@@ -259,7 +259,16 @@ export default function RedacaoPage() {
                   <Link href={`/redacao/editar/${l.id}`}>{l.title}</Link>
                 </h3>
                 <p className="mesa-datas">
-                  {aba === "revisar" && <>Criada em {dataCurta(l.created_at)}</>}
+                  {aba === "revisar" && (
+                    <>
+                      Criada em {dataCurta(l.created_at)}
+                      {l.scheduled_at && (
+                        <span className="mesa-sugestao">
+                          💡 sugerido para {dataCurta(l.scheduled_at)}
+                        </span>
+                      )}
+                    </>
+                  )}
                   {aba === "agendadas" && (
                     <span className="agendada-quando">🗓 Sai em {dataCurta(l.scheduled_at)}</span>
                   )}

@@ -97,7 +97,12 @@ export default function Editor({ articleId }: { articleId?: string }) {
               scheduled_at: data.scheduled_at,
             });
             setAnimais((data.animals as string[]) ?? []);
-            if (data.status === "scheduled" && data.scheduled_at) {
+            // Preenche também em rascunho: a rotina das 7h grava em
+            // scheduled_at o horário sugerido para a matéria sair, e o campo
+            // chega pronto para o editor só confirmar. Rascunho com horário
+            // não vai ao ar sozinho, porque publicar_agendadas() exige que o
+            // status já seja 'scheduled'.
+            if (data.scheduled_at) {
               setQuandoAgendar(isoParaBrasilia(data.scheduled_at));
             }
           }
@@ -207,7 +212,13 @@ export default function Editor({ articleId }: { articleId?: string }) {
       author_name: form.author_name.trim() || "Pedro Amaral",
       is_featured: form.is_featured,
       status,
-      scheduled_at: status === "scheduled" ? scheduledISO : null,
+      // Em rascunho o horário do campo é preservado, para a sugestão da rotina
+      // sobreviver a um "salvar". Esvaziar o campo e salvar é o que cancela,
+      // que é como o botão de cancelar agendamento funciona.
+      scheduled_at:
+        status === "scheduled" ? scheduledISO
+        : status === "published" ? null
+        : brasiliaParaISO(quandoAgendar),
       published_at:
         status === "published" ? form.published_at ?? new Date().toISOString() : form.published_at,
       updated_at: new Date().toISOString(),
@@ -305,6 +316,14 @@ export default function Editor({ articleId }: { articleId?: string }) {
         <p className="admin-msg" style={{ background: "#eef6ff", borderColor: "#bfdbfe" }}>
           🗓 Esta matéria está <b>agendada</b> para {isoParaBrasilia(form.scheduled_at).replace("T", " às ")}{" "}
           (horário de Brasília). Ela entra no ar sozinha nesse horário.
+        </p>
+      )}
+
+      {form.status === "draft" && quandoAgendar && (
+        <p className="admin-msg" style={{ background: "#fffbeb", borderColor: "#fde68a" }}>
+          💡 A redação sugeriu <b>{quandoAgendar.replace("T", " às ")}</b> para esta matéria sair,
+          espaçando as quatro do dia. Ela <b>não vai ao ar</b> enquanto você não clicar em
+          Agendar ou em Publicar.
         </p>
       )}
 
