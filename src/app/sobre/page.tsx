@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { mozart } from "@/lib/mozart";
 
 export const metadata: Metadata = {
   title: "Sobre o Maestro Pet",
@@ -29,11 +30,12 @@ export default function SobrePage() {
       <h2>Quem é o Mozart? 🐾</h2>
       <div style={{ float: "right", margin: "0 0 12px 18px" }}>
         <Image
-          src="/mozart/rosto.png"
-          alt="Mozart, o border collie mascote do Maestro Pet"
-          width={140}
-          height={140}
-          style={{ borderRadius: "50%", border: "3px solid #FED7AA" }}
+          src={mozart("maestro")}
+          alt="Mozart, o border collie mascote do Maestro Pet, vestido de maestro"
+          width={150}
+          height={150}
+          style={{ borderRadius: "50%", border: "3px solid #FED7AA", objectFit: "cover" }}
+          unoptimized
         />
       </div>
       <p>

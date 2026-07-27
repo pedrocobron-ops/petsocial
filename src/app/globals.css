@@ -48,12 +48,58 @@ img { max-width: 100%; display: block; }
 
 /* ---------- Animações base ---------- */
 
+/* Entrada em CSS puro (sempre funciona, sem depender de JS) */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-100%); }
+  to { opacity: 1; transform: none; }
+}
+
+.ticker { animation: slide-down 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.masthead-inner { animation: rise-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.masthead .tagline { animation: rise-in 0.7s 0.14s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.catnav li { animation: rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.catnav li:nth-child(2) { animation-delay: 0.04s; }
+.catnav li:nth-child(3) { animation-delay: 0.08s; }
+.catnav li:nth-child(4) { animation-delay: 0.12s; }
+.catnav li:nth-child(5) { animation-delay: 0.16s; }
+.catnav li:nth-child(6) { animation-delay: 0.2s; }
+.catnav li:nth-child(7) { animation-delay: 0.24s; }
+.catnav li:nth-child(8) { animation-delay: 0.28s; }
+.catnav li:nth-child(9) { animation-delay: 0.32s; }
+.catnav li:nth-child(10) { animation-delay: 0.36s; }
+.lead-main { animation: rise-in 0.8s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.mais-lidas { animation: rise-in 0.8s 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.cat-hero .emoji { animation: rise-in 0.6s both; }
+.cat-hero h1 { animation: rise-in 0.6s 0.1s both; }
+.cat-hero p { animation: rise-in 0.6s 0.2s both; }
+.article-head .kicker-chip { animation: rise-in 0.55s both; }
+.article-head h1 { animation: rise-in 0.65s 0.08s both; }
+.article-head .dek { animation: rise-in 0.65s 0.18s both; }
+.article-head .article-meta,
+.article-head .share-row { animation: rise-in 0.65s 0.28s both; }
+.article-cover { animation: rise-in 0.75s 0.2s both; }
+
+/* Revelação ao rolar (JS adiciona .visible; cai em modo visível sem JS) */
 .reveal {
   opacity: 0;
   transform: translateY(22px);
   transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1), transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .reveal.visible { opacity: 1; transform: none; }
+@media (scripting: none) {
+  .reveal, .reveal .grid > * { opacity: 1; transform: none; }
+}
+
+/* Cards em cascata dentro de seções reveladas */
+.reveal .grid > * { opacity: 0; transform: translateY(18px); transition: opacity 0.55s, transform 0.55s cubic-bezier(0.16, 1, 0.3, 1); }
+.reveal.visible .grid > *:nth-child(1) { transition-delay: 0.05s; }
+.reveal.visible .grid > *:nth-child(2) { transition-delay: 0.15s; }
+.reveal.visible .grid > *:nth-child(3) { transition-delay: 0.25s; }
+.reveal.visible .grid > * { opacity: 1; transform: none; }
 
 .progress-bar {
   position: fixed; top: 0; left: 0; height: 4px; z-index: 200;
@@ -329,6 +375,18 @@ img { max-width: 100%; display: block; }
 .mozart-strip .titulo { font-family: var(--display); font-weight: 600; font-size: 21px; }
 .mozart-strip p { font-size: 15.5px; margin-top: 4px; opacity: 0.95; max-width: 640px; }
 @media (max-width: 600px) { .mozart-strip { flex-direction: column; text-align: center; } }
+
+/* ---------- Breadcrumbs (trilha de navegação) ---------- */
+
+.breadcrumbs {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  font-size: 12.5px; font-weight: 600; color: var(--muted);
+  margin-bottom: 16px;
+}
+.breadcrumbs a { color: var(--muted); transition: color 0.15s; }
+.breadcrumbs a:hover { color: var(--brand-dark); }
+.breadcrumbs .sep { opacity: 0.5; }
+.breadcrumbs .atual { color: var(--cat-cor, var(--brand-dark)); }
 
 /* ---------- Página da matéria ---------- */
 

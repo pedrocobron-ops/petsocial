@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getByCategory, getCategories, getCategoryBySlug } from "@/lib/news";
+import { mozart } from "@/lib/mozart";
 import ArticleCard from "@/components/article-card";
 import AdSlot from "@/components/ad-slot";
 import Reveal from "@/components/reveal";
@@ -44,6 +46,9 @@ export default async function CategoryPage({ params }: Props) {
       <div className="container">
         {artigos.length === 0 ? (
           <div className="empty-state">
+            <div className="face">
+              <Image src={mozart("detetive")} alt="Mozart detetive" width={90} height={90} style={{ objectFit: "cover" }} unoptimized />
+            </div>
             <h2>Ainda não há matérias aqui</h2>
             <p>O Mozart já está farejando novidades para esta editoria. 🐾</p>
           </div>

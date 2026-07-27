@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getFeatured, getLatest, getMostRead, type NewsArticle } from "@/lib/news";
+import { mozart } from "@/lib/mozart";
 import { dataLonga } from "@/lib/format";
 import ArticleCard from "@/components/article-card";
 import AdSlot from "@/components/ad-slot";
@@ -50,7 +51,7 @@ export default async function Home() {
     <div className="container">
       {/* ---------- Destaque principal + Mais lidas ---------- */}
       <section className="lead-grid">
-        <Reveal>
+        <div>
           <article className="lead-main" style={{ ["--cat-cor" as string]: corPrincipal }}>
             <Link href={`/noticias/${principal.slug}`} className="cover">
               {principal.cover_url && (
@@ -77,9 +78,9 @@ export default async function Home() {
               </p>
             </div>
           </article>
-        </Reveal>
+        </div>
 
-        <Reveal delay={120}>
+        <div>
           <aside className="mais-lidas" aria-label="Mais lidas">
             <div className="titulo">🔥 Mais lidas</div>
             <ol>
@@ -97,7 +98,7 @@ export default async function Home() {
               ))}
             </ol>
           </aside>
-        </Reveal>
+        </div>
       </section>
 
       <AdSlot slot="home-topo" />
@@ -144,7 +145,7 @@ export default async function Home() {
       <Reveal>
         <aside className="mozart-strip">
           <div className="face">
-            <Image src="/mozart/rosto.png" alt="Mozart, o border collie mascote" width={84} height={84} />
+            <Image src={mozart("oi")} alt="Mozart, o border collie mascote, acenando" width={84} height={84} style={{ objectFit: "cover" }} unoptimized />
           </div>
           <div>
             <div className="titulo">Au! Eu sou o Mozart 🐾</div>
