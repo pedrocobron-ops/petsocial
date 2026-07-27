@@ -4,7 +4,9 @@ import { getCategories } from "@/lib/news";
 import { dataDeHoje } from "@/lib/format";
 
 export default async function SiteHeader() {
-  const categorias = await getCategories();
+  // A barra mostra só as primeiras editorias (por ordem definida no banco);
+  // a lista completa fica no rodapé. Evita menu lotado com 16 categorias.
+  const categorias = (await getCategories()).slice(0, 8);
 
   return (
     <header>
