@@ -235,6 +235,11 @@ export default function Editor({ articleId }: { articleId?: string }) {
               Ver no site ↗
             </a>
           )}
+          {form.id && form.status !== "published" && (
+            <a className="btn-ghost" href={`/redacao/previa/${form.id}`} target="_blank" rel="noreferrer">
+              👁 Prévia
+            </a>
+          )}
           <button className="btn-ghost" disabled={salvando} onClick={() => salvar()}>
             💾 Salvar
           </button>

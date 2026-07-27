@@ -76,6 +76,8 @@ function LoginForm() {
 export default function RedacaoPage() {
   const { carregando, session, isAdmin } = useAdmin();
   const [linhas, setLinhas] = useState<Linha[] | null>(null);
+  const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState<"todas" | "published" | "draft">("todas");
 
   async function carregarLista() {
     const { data } = await supabaseBrowser()
@@ -121,26 +123,53 @@ export default function RedacaoPage() {
     carregarLista();
   }
 
+  const noAr = (linhas ?? []).filter((l) => l.status === "published").length;
+  const rascunhos = (linhas ?? []).filter((l) => l.status !== "published").length;
+
+  const visiveis = (linhas ?? []).filter((l) => {
+    if (filtro !== "todas" && (filtro === "published") !== (l.status === "published")) return false;
+    if (busca && !l.title.toLowerCase().includes(busca.toLowerCase())) return false;
+    return true;
+  });
+
   return (
     <div className="admin-panel">
       <header className="admin-topo">
         <div className="admin-titulo">
-          <Image src="/mozart/rosto.png" alt="" width={40} height={40} style={{ borderRadius: "50%" }} />
           <div>
-            <h1>Redação</h1>
-            <span>{session.user.email}</span>
+            <h1>Mesa de matérias</h1>
+            <span>{noAr} no ar · {rascunhos} aguardando revisão</span>
           </div>
         </div>
         <div className="admin-acoes">
-          <Link href="/" className="btn-ghost" target="_blank">Ver o site ↗</Link>
-          <Link href="/redacao/metricas" className="btn-ghost">📊 Métricas</Link>
           <Link href="/redacao/nova" className="btn-primary">+ Nova matéria</Link>
-          <button className="btn-ghost" onClick={() => supabaseBrowser().auth.signOut()}>Sair</button>
         </div>
       </header>
 
+      <div className="admin-filtros">
+        <input
+          type="search"
+          placeholder="🔎 Buscar matéria pelo título…"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+        <div className="admin-filtros-status">
+          <button className={filtro === "todas" ? "on" : ""} onClick={() => setFiltro("todas")}>
+            Todas
+          </button>
+          <button className={filtro === "published" ? "on" : ""} onClick={() => setFiltro("published")}>
+            No ar ({noAr})
+          </button>
+          <button className={filtro === "draft" ? "on" : ""} onClick={() => setFiltro("draft")}>
+            Rascunhos ({rascunhos})
+          </button>
+        </div>
+      </div>
+
       {!linhas ? (
         <p className="admin-carregando">Carregando matérias…</p>
+      ) : visiveis.length === 0 ? (
+        <p className="admin-carregando">Nenhuma matéria encontrada com esses filtros.</p>
       ) : (
         <table className="admin-tabela">
           <thead>
@@ -152,7 +181,7 @@ export default function RedacaoPage() {
             </tr>
           </thead>
           <tbody>
-            {linhas.map((l) => (
+            {visiveis.map((l) => (
               <tr key={l.id}>
                 <td>
                   <Link href={`/redacao/editar/${l.id}`} className="admin-link-titulo">
@@ -176,8 +205,10 @@ export default function RedacaoPage() {
                   <button onClick={() => alternarPublicacao(l)}>
                     {l.status === "published" ? "Despublicar" : "Publicar"}
                   </button>
-                  {l.status === "published" && (
+                  {l.status === "published" ? (
                     <a href={`/noticias/${l.slug}`} target="_blank" rel="noreferrer">Ver ↗</a>
+                  ) : (
+                    <a href={`/redacao/previa/${l.id}`} target="_blank" rel="noreferrer">Prévia ↗</a>
                   )}
                 </td>
               </tr>

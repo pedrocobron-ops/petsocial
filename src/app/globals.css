@@ -725,3 +725,62 @@ footer.site-footer {
 }
 .editor-toolbar button:hover { border-color: var(--brand); color: var(--brand-dark); }
 .editor-dica { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 6px; line-height: 1.6; }
+
+/* ---------- Barra do sistema da Redação (independente do jornal) ---------- */
+
+.adminbar {
+  background: #14110e;
+  border-bottom: 3px solid var(--brand);
+  position: sticky; top: 0; z-index: 120;
+}
+.adminbar-inner {
+  max-width: 1180px; margin: 0 auto; padding: 0 20px;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  min-height: 56px;
+}
+.adminbar-brand {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--display); font-weight: 600; font-size: 17px; color: #fff;
+  padding: 9px 0;
+}
+.adminbar-brand img { border-radius: 50%; border: 2px solid var(--brand); }
+.adminbar-brand em { color: var(--brand); font-style: normal; }
+.adminbar-nav { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
+.adminbar-nav a {
+  font-size: 13px; font-weight: 600; color: #cfc6ba;
+  padding: 8px 11px; border-radius: 7px;
+  transition: background .15s, color .15s;
+}
+.adminbar-nav a:hover { color: #fff; background: rgba(255,255,255,.07); }
+.adminbar-nav a.ativo { color: #fff; background: rgba(249,115,22,.22); }
+.adminbar-user { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #a89e90; }
+.adminbar-user button {
+  font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  color: #fff; background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.18); border-radius: 7px; padding: 6px 13px;
+}
+.adminbar-user button:hover { background: var(--brand); border-color: var(--brand); }
+
+/* Filtros da mesa de matérias */
+.admin-filtros { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.admin-filtros input {
+  flex: 1; min-width: 220px; font: inherit; font-size: 14.5px;
+  padding: 10px 14px; border: 1px solid var(--hairline); border-radius: 8px; background: #fff;
+}
+.admin-filtros input:focus { outline: 2px solid var(--brand); border-color: transparent; }
+.admin-filtros-status { display: flex; gap: 6px; }
+.admin-filtros-status button {
+  font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  padding: 9px 14px; border-radius: 8px;
+  background: #fff; border: 1.5px solid var(--hairline); color: var(--ink-soft);
+}
+.admin-filtros-status button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* Banner da prévia */
+.previa-banner {
+  background: repeating-linear-gradient(45deg, #fef3c7, #fef3c7 12px, #fde68a 12px, #fde68a 24px);
+  border-bottom: 1px solid #f59e0b;
+  text-align: center; font-size: 13px; font-weight: 700; color: #78350f;
+  padding: 9px 16px;
+}
+.previa-banner a { text-decoration: underline; }
