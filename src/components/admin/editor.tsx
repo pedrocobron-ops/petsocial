@@ -281,6 +281,11 @@ export default function Editor({ articleId }: { articleId?: string }) {
               👁 Prévia
             </a>
           )}
+          {form.id && (
+            <Link className="btn-ghost" href={`/redacao/social/${form.id}`}>
+              📷 Instagram
+            </Link>
+          )}
           <button className="btn-ghost" disabled={salvando} onClick={() => salvar()}>
             💾 Salvar
           </button>

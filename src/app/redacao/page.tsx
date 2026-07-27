@@ -279,6 +279,10 @@ export default function RedacaoPage() {
                   {aba === "no-ar" ? "✏️ Atualizar" : "✏️ Editar"}
                 </Link>
 
+                <Link href={`/redacao/social/${l.id}`} className="btn-ghost">
+                  📷 Instagram
+                </Link>
+
                 {aba === "revisar" && (
                   <>
                     <a className="btn-ghost" href={`/redacao/previa/${l.id}`} target="_blank" rel="noreferrer">👁 Prévia</a>
