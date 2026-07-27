@@ -1,0 +1,50 @@
+{
+  "buildCommand": "npx expo export --platform web && node scripts/inject-og.mjs && node scripts/gen-sitemap.mjs && node scripts/prerender-articles.mjs",
+  "outputDirectory": "dist",
+  "framework": null,
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "petsocial-tawny.vercel.app" }],
+      "destination": "https://maestropet.com/",
+      "permanent": true
+    },
+    {
+      "source": "/:path+",
+      "has": [{ "type": "host", "value": "petsocial-tawny.vercel.app" }],
+      "destination": "https://maestropet.com/:path+",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/share/:kind/:id",
+      "destination": "https://aefrcwysifgniogumxwk.supabase.co/functions/v1/share-meta/share/:kind/:id"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/_expo/static/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://adservice.google.com https://*.google.com https://*.doubleclick.net; connect-src 'self' https: wss: blob: data:; frame-src 'self' https://pay.cakto.com.br https://*.doubleclick.net https://*.googlesyndication.com https://*.google.com; worker-src 'self' blob:; manifest-src 'self'" }
+      ]
+    }
+  ]
+}
