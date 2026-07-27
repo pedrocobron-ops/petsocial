@@ -18,8 +18,22 @@ interface Linha {
   category: { name: string; color: string } | null;
 }
 
+/** Converte nome de usuário em e-mail interno ("Pedro Amaral" -> pedro.amaral@redacao.maestropet.com). */
+function usuarioParaEmail(usuario: string): string {
+  const u = usuario.trim();
+  if (u.includes("@")) return u; // aceita e-mail direto também
+  const slug = u
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .replace(/\s+/g, ".");
+  return `${slug}@redacao.maestropet.com`;
+}
+
 function LoginForm() {
-  const [email, setEmail] = useState("");
+  const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -29,11 +43,11 @@ function LoginForm() {
     setErro("");
     setEnviando(true);
     const { error } = await supabaseBrowser().auth.signInWithPassword({
-      email: email.trim(),
+      email: usuarioParaEmail(usuario),
       password: senha,
     });
     setEnviando(false);
-    if (error) setErro("E-mail ou senha incorretos.");
+    if (error) setErro("Usuário ou senha incorretos.");
   }
 
   return (
@@ -43,8 +57,8 @@ function LoginForm() {
       <p className="admin-sub">Área restrita da equipe editorial.</p>
       <form onSubmit={entrar}>
         <input
-          type="email" placeholder="E-mail" value={email} required
-          onChange={(e) => setEmail(e.target.value)} autoComplete="email"
+          type="text" placeholder="Nome de usuário" value={usuario} required
+          onChange={(e) => setUsuario(e.target.value)} autoComplete="username"
         />
         <input
           type="password" placeholder="Senha" value={senha} required
@@ -119,6 +133,7 @@ export default function RedacaoPage() {
         </div>
         <div className="admin-acoes">
           <Link href="/" className="btn-ghost" target="_blank">Ver o site ↗</Link>
+          <Link href="/redacao/metricas" className="btn-ghost">📊 Métricas</Link>
           <Link href="/redacao/nova" className="btn-primary">+ Nova matéria</Link>
           <button className="btn-ghost" onClick={() => supabaseBrowser().auth.signOut()}>Sair</button>
         </div>

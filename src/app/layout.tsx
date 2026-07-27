@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import { AdSenseLoader } from "@/components/ad-slot";
+import PageTracker from "@/components/page-tracker";
 import "./globals.css";
 
 const SITE_URL =
@@ -79,6 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteLd) }}
         />
         <AdSenseLoader />
+        <PageTracker />
         <SiteHeader />
         <main>{children}</main>
         <SiteFooter />

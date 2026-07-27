@@ -663,3 +663,16 @@ footer.site-footer {
 .admin-chips button.on {
   background: var(--brand); border-color: var(--brand); color: #fff;
 }
+
+/* Painel de métricas */
+.metric-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px; margin-bottom: 30px;
+}
+.metric-card {
+  background: #fff; border: 1px solid var(--hairline); border-radius: 10px;
+  padding: 18px 16px; text-align: center;
+}
+.metric-card .valor { font-family: var(--headline); font-weight: 800; font-size: 30px; color: var(--brand-dark); }
+.metric-card .rotulo { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 4px; }
+.admin-secao { font-family: var(--display); font-weight: 600; font-size: 19px; margin: 26px 0 12px; }
