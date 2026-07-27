@@ -17,6 +17,9 @@ const organizacaoLd = {
     width: 1000,
     height: 120,
   },
+  // Perfis oficiais. É por aqui que o buscador liga o site à marca que já
+  // existe fora dele, em vez de tratar os dois como coisas sem relação.
+  sameAs: ["https://www.instagram.com/maestro_pet_/"],
   // Propriedades que o Google usa para aferir a seriedade de um veículo de
   // notícias. Apontam para páginas que já existem e descrevem como o jornal
   // apura, corrige e assina o que publica.
