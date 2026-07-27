@@ -1,18 +1,20 @@
 /**
  * Artes do mascote Mozart.
- * As versões otimizadas para web estão hospedadas no projeto legado da
- * Vercel (o app antigo, que continua no ar como acervo). O rosto oficial
- * também existe localmente em /mozart/rosto.png (usado em favicon/logo).
- *
- * Poses disponíveis: rosto, oi, corpo, comemorando, coracao, curioso,
- * detetive, dormindo, espiando, ideia, maestro, megafone, placa, triste,
- * balao, logo.
+ * As artes foram importadas do Drive para o Supabase Storage (bucket
+ * público `sponsored`, pasta mozart/) com nomes numerados. O mapa POSES
+ * traduz cada pose para o arquivo certo — preenchido conforme as artes
+ * são identificadas na galeria /redacao/mozart.
+ * Pose sem mapeamento cai no rosto oficial local (sempre disponível).
  */
-const BASE =
-  process.env.NEXT_PUBLIC_MOZART_BASE ??
-  "https://petsocial-tawny.vercel.app/mozart";
+const STORAGE_BASE =
+  "https://aefrcwysifgniogumxwk.supabase.co/storage/v1/object/public/sponsored/mozart";
+
+const POSES: Record<string, string> = {
+  // exemplo, após identificar: oi: "3.jpg", dormindo: "7.jpg", ...
+};
 
 export function mozart(pose: string): string {
-  if (pose === "rosto") return "/mozart/rosto.png"; // local, sempre disponível
-  return `${BASE}/${pose}.png`;
+  const arquivo = POSES[pose];
+  if (arquivo) return `${STORAGE_BASE}/${arquivo}`;
+  return "/mozart/rosto.png";
 }
