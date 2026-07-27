@@ -1,0 +1,300 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { supabaseBrowser } from "@/lib/supabase-browser";
+import { revalidarSite } from "@/components/admin/use-admin";
+import { slugify } from "@/lib/slug";
+
+interface Categoria { id: string; name: string; emoji: string }
+
+interface Form {
+  id?: string;
+  title: string;
+  slug: string;
+  dek: string;
+  body: string;
+  category_id: string;
+  cover_url: string;
+  cover_caption: string;
+  author_name: string;
+  is_featured: boolean;
+  status: string;
+  published_at: string | null;
+}
+
+const VAZIO: Form = {
+  title: "", slug: "", dek: "", body: "",
+  category_id: "", cover_url: "", cover_caption: "",
+  author_name: "Redação Maestro Pet",
+  is_featured: false, status: "draft", published_at: null,
+};
+
+export default function Editor({ articleId }: { articleId?: string }) {
+  const router = useRouter();
+  const [form, setForm] = useState<Form>(VAZIO);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [slugTravado, setSlugTravado] = useState(Boolean(articleId));
+  const [salvando, setSalvando] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [subindoCapa, setSubindoCapa] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    supabaseBrowser()
+      .from("news_categories")
+      .select("id, name, emoji")
+      .order("sort_order")
+      .then(({ data }) => setCategorias((data as Categoria[]) ?? []));
+
+    if (articleId) {
+      supabaseBrowser()
+        .from("news_articles")
+        .select("*")
+        .eq("id", articleId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setForm({
+              id: data.id,
+              title: data.title ?? "",
+              slug: data.slug ?? "",
+              dek: data.dek ?? "",
+              body: data.body ?? "",
+              category_id: data.category_id ?? "",
+              cover_url: data.cover_url ?? "",
+              cover_caption: data.cover_caption ?? "",
+              author_name: data.author_name ?? "Redação Maestro Pet",
+              is_featured: Boolean(data.is_featured),
+              status: data.status ?? "draft",
+              published_at: data.published_at,
+            });
+          }
+        });
+    }
+  }, [articleId]);
+
+  function set<K extends keyof Form>(campo: K, valor: Form[K]) {
+    setForm((f) => {
+      const novo = { ...f, [campo]: valor };
+      if (campo === "title" && !slugTravado) novo.slug = slugify(String(valor));
+      return novo;
+    });
+  }
+
+  async function subirCapa(arquivo: File) {
+    setSubindoCapa(true);
+    setMsg("");
+    const ext = arquivo.name.split(".").pop()?.toLowerCase() || "jpg";
+    const caminho = `news/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabaseBrowser()
+      .storage.from("sponsored")
+      .upload(caminho, arquivo, { cacheControl: "31536000", upsert: false });
+    setSubindoCapa(false);
+    if (error) {
+      setMsg("❌ Falha ao subir a imagem: " + error.message);
+      return;
+    }
+    const { data } = supabaseBrowser().storage.from("sponsored").getPublicUrl(caminho);
+    set("cover_url", data.publicUrl);
+  }
+
+  async function salvar(publicar?: boolean) {
+    if (!form.title.trim()) { setMsg("❌ A matéria precisa de um título."); return; }
+    if (!form.slug.trim()) { setMsg("❌ A matéria precisa de um endereço (slug)."); return; }
+    if (!form.body.trim()) { setMsg("❌ A matéria está sem texto."); return; }
+
+    setSalvando(true);
+    setMsg("");
+
+    const status = publicar === undefined ? form.status : publicar ? "published" : "draft";
+    const registro = {
+      title: form.title.trim(),
+      slug: form.slug.trim(),
+      dek: form.dek.trim() || null,
+      body: form.body.trim(),
+      category_id: form.category_id || null,
+      cover_url: form.cover_url.trim() || null,
+      cover_caption: form.cover_caption.trim() || null,
+      author_name: form.author_name.trim() || "Redação Maestro Pet",
+      is_featured: form.is_featured,
+      status,
+      published_at:
+        status === "published" ? form.published_at ?? new Date().toISOString() : form.published_at,
+      updated_at: new Date().toISOString(),
+    };
+
+    const sb = supabaseBrowser();
+    let erro: string | null = null;
+    let idFinal = form.id;
+
+    if (form.id) {
+      const { error } = await sb.from("news_articles").update(registro).eq("id", form.id);
+      erro = error?.message ?? null;
+    } else {
+      const { data, error } = await sb.from("news_articles").insert(registro).select("id").single();
+      erro = error?.message ?? null;
+      idFinal = data?.id;
+    }
+
+    setSalvando(false);
+
+    if (erro) {
+      setMsg(
+        erro.includes("duplicate")
+          ? "❌ Já existe uma matéria com esse endereço (slug). Mude o slug."
+          : "❌ Erro ao salvar: " + erro
+      );
+      return;
+    }
+
+    setForm((f) => ({ ...f, id: idFinal, status, published_at: registro.published_at }));
+    await revalidarSite();
+    setMsg(status === "published" ? "✅ Publicada! Já está no ar." : "✅ Rascunho salvo.");
+    if (!articleId && idFinal) router.replace(`/redacao/editar/${idFinal}`);
+  }
+
+  async function excluir() {
+    if (!form.id) return;
+    if (!confirm(`Excluir de vez a matéria "${form.title}"? Essa ação não tem volta.`)) return;
+    await supabaseBrowser().from("news_articles").delete().eq("id", form.id);
+    await revalidarSite();
+    router.push("/redacao");
+  }
+
+  return (
+    <div className="admin-editor">
+      <header className="admin-topo">
+        <Link href="/redacao" className="btn-ghost">← Voltar</Link>
+        <div className="admin-acoes">
+          {form.status === "published" && form.slug && (
+            <a className="btn-ghost" href={`/noticias/${form.slug}`} target="_blank" rel="noreferrer">
+              Ver no site ↗
+            </a>
+          )}
+          <button className="btn-ghost" disabled={salvando} onClick={() => salvar()}>
+            💾 Salvar
+          </button>
+          {form.status === "published" ? (
+            <button className="btn-ghost" disabled={salvando} onClick={() => salvar(false)}>
+              Despublicar
+            </button>
+          ) : (
+            <button className="btn-primary" disabled={salvando} onClick={() => salvar(true)}>
+              🚀 Publicar agora
+            </button>
+          )}
+        </div>
+      </header>
+
+      {msg && <p className="admin-msg">{msg}</p>}
+
+      <div className="admin-form">
+        <label>
+          Título
+          <input
+            value={form.title}
+            onChange={(e) => set("title", e.target.value)}
+            placeholder="Ex.: Cachorro pode comer melancia? Veja os cuidados"
+          />
+        </label>
+
+        <label>
+          Endereço (slug)
+          <div className="admin-slug">
+            <span>maestropet.com/noticias/</span>
+            <input
+              value={form.slug}
+              onChange={(e) => { setSlugTravado(true); set("slug", slugify(e.target.value)); }}
+            />
+          </div>
+        </label>
+
+        <div className="admin-linha2">
+          <label>
+            Categoria
+            <select value={form.category_id} onChange={(e) => set("category_id", e.target.value)}>
+              <option value="">— Sem categoria —</option>
+              {categorias.map((c) => (
+                <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-check">
+            <input
+              type="checkbox"
+              checked={form.is_featured}
+              onChange={(e) => set("is_featured", e.target.checked)}
+            />
+            ⭐ Manchete (destaque na capa)
+          </label>
+        </div>
+
+        <label>
+          Subtítulo (linha fina)
+          <input
+            value={form.dek}
+            onChange={(e) => set("dek", e.target.value)}
+            placeholder="Uma frase que complementa o título e convida à leitura"
+          />
+        </label>
+
+        <label>
+          Imagem de capa
+          <div className="admin-capa">
+            <input
+              value={form.cover_url}
+              onChange={(e) => set("cover_url", e.target.value)}
+              placeholder="Cole a URL de uma imagem ou use o botão ao lado"
+            />
+            <button
+              type="button" className="btn-ghost" disabled={subindoCapa}
+              onClick={() => fileRef.current?.click()}
+            >
+              {subindoCapa ? "Subindo…" : "📤 Subir imagem"}
+            </button>
+            <input
+              ref={fileRef} type="file" accept="image/*" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) subirCapa(f); }}
+            />
+          </div>
+          {form.cover_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={form.cover_url} alt="Prévia da capa" className="admin-capa-previa" />
+          )}
+        </label>
+
+        <label>
+          Legenda da capa (opcional)
+          <input
+            value={form.cover_caption}
+            onChange={(e) => set("cover_caption", e.target.value)}
+            placeholder="Ex.: Foto: Getty Images"
+          />
+        </label>
+
+        <label>
+          Texto da matéria
+          <textarea
+            rows={18}
+            value={form.body}
+            onChange={(e) => set("body", e.target.value)}
+            placeholder={"Escreva aqui. Separe os parágrafos com uma linha em branco.\n\nAssim como neste exemplo."}
+          />
+        </label>
+
+        <label>
+          Assinatura
+          <input value={form.author_name} onChange={(e) => set("author_name", e.target.value)} />
+        </label>
+
+        {form.id && (
+          <button className="btn-perigo" onClick={excluir}>
+            🗑 Excluir matéria
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
