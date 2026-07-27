@@ -996,3 +996,25 @@ footer.site-footer {
 .ig-endereco span {
   font-size: 12.5px; color: var(--ink-soft); word-break: break-all;
 }
+
+.ig-agenda { margin-top: 12px; }
+.ig-agenda label {
+  display: flex; flex-direction: column; gap: 7px;
+  font-size: 13px; font-weight: 700; color: var(--ink-soft);
+}
+.ig-agenda input {
+  font: inherit; font-size: 15px; font-weight: 400; max-width: 280px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff;
+}
+
+.ig-fila { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ig-fila li {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  padding: 10px 14px; border: 1px solid var(--line); border-radius: 9px;
+  font-size: 13.5px; background: #fff;
+}
+.ig-fila-quando { flex: 1; min-width: 150px; }
+.ig-fila-status { font-weight: 600; font-size: 12.5px; }
+.ig-fila-erro { flex-basis: 100%; font-size: 12px; color: #b91c1c; word-break: break-word; }
+.ig-fila-publicado { background: #f0fdf4; border-color: #bbf7d0; }
+.ig-fila-erro-item, .ig-fila li.ig-fila-erro { background: #fef2f2; border-color: #fecaca; }

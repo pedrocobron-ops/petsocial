@@ -32,6 +32,49 @@ interface Props {
   artigo: MateriaSocial & { id: string; ig_legenda: string | null };
 }
 
+interface ItemFila {
+  id: string;
+  formato: Formato;
+  agendado_para: string;
+  status: string;
+  erro: string | null;
+}
+
+const ROTULO_STATUS: Record<string, string> = {
+  agendado: "🕒 Agendado",
+  publicando: "📤 Publicando…",
+  publicado: "✅ Publicado",
+  erro: "❌ Falhou",
+  cancelado: "Cancelado",
+};
+
+/**
+ * O Brasil não tem mais horário de verão, então o fuso de Brasília é sempre
+ * -03:00. Isso permite converter sem depender do relógio de quem está usando:
+ * o editor pensa em horário de Brasília, o banco guarda em UTC.
+ */
+function brasiliaParaISO(local: string): string | null {
+  if (!local) return null;
+  return new Date(`${local}:00-03:00`).toISOString();
+}
+
+function paraCampoBrasilia(d: Date): string {
+  // "sv-SE" formata como "AAAA-MM-DD HH:MM", que é o formato do input trocando
+  // o espaço por T.
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(d).replace(" ", "T");
+}
+
+function quandoLegivel(iso: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).format(new Date(iso));
+}
+
 /** Carrega imagem já liberada para uso em canvas (sem "sujar" o contexto). */
 function carregarImagem(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -132,6 +175,26 @@ export default function InstagramKit({ artigo }: Props) {
   const [legenda, setLegenda] = useState(artigo.ig_legenda ?? legendaPadrao(artigo));
   const [msg, setMsg] = useState("");
   const [desenhando, setDesenhando] = useState(true);
+  const [fila, setFila] = useState<ItemFila[] | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [quando, setQuando] = useState(() => {
+    // Padrão: próxima hora cheia. Evita agendar para daqui a dois minutos por
+    // descuido e deixa espaço para revisar antes de sair.
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    d.setMinutes(0, 0, 0);
+    return paraCampoBrasilia(d);
+  });
+
+  const carregarFila = useCallback(async () => {
+    const { data } = await supabaseBrowser()
+      .from("instagram_fila")
+      .select("id, formato, agendado_para, status, erro")
+      .eq("article_id", artigo.id)
+      .order("agendado_para", { ascending: true });
+    setFila((data ?? []) as ItemFila[]);
+  }, [artigo.id]);
+
+  useEffect(() => { carregarFila(); }, [carregarFila]);
 
   const desenhar = useCallback(async () => {
     setDesenhando(true);
@@ -311,6 +374,76 @@ export default function InstagramKit({ artigo }: Props) {
     setMsg("Legenda restaurada para o texto gerado.");
   }
 
+  /**
+   * Agenda a publicação: sobe a arte para o storage e põe na fila.
+   *
+   * A imagem precisa ir para uma URL pública porque quem baixa o arquivo é a
+   * Meta, não o nosso servidor. Cada agendamento grava um arquivo novo, com
+   * carimbo de tempo no nome: se a capa ou o título mudarem e você reagendar,
+   * a publicação antiga não é sobrescrita nem serve imagem trocada.
+   */
+  async function agendar(formato: Formato, agora = false) {
+    const canvas = (formato === "post" ? postRef : storyRef).current;
+    if (!canvas) return;
+
+    const iso = agora ? new Date().toISOString() : brasiliaParaISO(quando);
+    if (!iso) {
+      setMsg("❌ Escolha a data e a hora.");
+      return;
+    }
+
+    setEnviando(true);
+    setMsg("");
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.92)
+    );
+    if (!blob) {
+      setEnviando(false);
+      setMsg("❌ Não consegui gerar a imagem.");
+      return;
+    }
+
+    const sb = supabaseBrowser();
+    const caminho = `instagram/${artigo.id}-${formato}-${Date.now()}.jpg`;
+    const { error: erroUpload } = await sb.storage
+      .from("sponsored")
+      .upload(caminho, blob, { contentType: "image/jpeg", cacheControl: "3600" });
+
+    if (erroUpload) {
+      setEnviando(false);
+      setMsg(`❌ Não consegui subir a imagem: ${erroUpload.message}`);
+      return;
+    }
+
+    const { data: publico } = sb.storage.from("sponsored").getPublicUrl(caminho);
+    const { error } = await sb.from("instagram_fila").insert({
+      article_id: artigo.id,
+      formato,
+      imagem_url: publico.publicUrl,
+      // Story não aceita legenda no Instagram; o texto vive na própria arte.
+      legenda: formato === "post" ? legenda : null,
+      agendado_para: iso,
+    });
+
+    setEnviando(false);
+    if (error) {
+      setMsg(`❌ ${error.message}`);
+      return;
+    }
+    setMsg(
+      agora
+        ? "✅ Na fila. Sai no próximo minuto."
+        : `✅ ${formato === "post" ? "Post" : "Story"} agendado para ${quando.replace("T", " às ")}.`
+    );
+    carregarFila();
+  }
+
+  async function cancelar(id: string) {
+    await supabaseBrowser().from("instagram_fila").delete().eq("id", id);
+    carregarFila();
+  }
+
   return (
     <div className="ig-kit">
       <div className="ig-artes">
@@ -362,6 +495,67 @@ export default function InstagramKit({ artigo }: Props) {
             📋 Copiar link
           </button>
         </div>
+
+        <h2 className="admin-secao">Publicar no Instagram</h2>
+
+        <div className="ig-agenda">
+          <label>
+            Data e hora (horário de Brasília)
+            <input
+              type="datetime-local"
+              value={quando}
+              onChange={(e) => setQuando(e.target.value)}
+            />
+          </label>
+
+          <div className="ig-acoes">
+            <button
+              className="btn-primary" disabled={enviando || desenhando}
+              onClick={() => agendar("post")}
+            >
+              🗓 Agendar post
+            </button>
+            <button
+              className="btn-primary" disabled={enviando || desenhando}
+              onClick={() => agendar("story")}
+            >
+              🗓 Agendar story
+            </button>
+            <button
+              className="btn-ghost" disabled={enviando || desenhando}
+              onClick={() => agendar("post", true)}
+            >
+              🚀 Postar agora
+            </button>
+          </div>
+
+          <p className="editor-dica">
+            Você publica 10 matérias por dia, mas postar 10 vezes por dia no
+            Instagram derruba o alcance. Escolha de uma a três, e prefira
+            horários em que o seu público está no celular: começo da manhã,
+            hora do almoço e começo da noite.
+          </p>
+        </div>
+
+        {fila && fila.length > 0 && (
+          <ul className="ig-fila">
+            {fila.map((f) => (
+              <li key={f.id} className={`ig-fila-${f.status}`}>
+                <span className="ig-fila-quando">
+                  <strong>{f.formato === "post" ? "Post" : "Story"}</strong>
+                  {" · "}{quandoLegivel(f.agendado_para)}
+                </span>
+                <span className="ig-fila-status">{ROTULO_STATUS[f.status] ?? f.status}</span>
+                {f.erro && <span className="ig-fila-erro">{f.erro}</span>}
+                {f.status !== "publicado" && (
+                  <button className="btn-ghost" onClick={() => cancelar(f.id)}>
+                    Remover
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
 
         {msg && <p className="admin-msg">{msg}</p>}
       </div>
