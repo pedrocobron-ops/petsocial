@@ -52,6 +52,7 @@ export default async function SiteFooter() {
             <ul>
               <li><Link href="/sobre">Sobre o Maestro Pet</Link></li>
               <li><Link href="/contato">Contato</Link></li>
+              <li><Link href="/principios-editoriais">Princípios Editoriais</Link></li>
               <li><Link href="/creditos-de-imagem">Créditos de Imagem</Link></li>
               <li><Link href="/politica-de-privacidade">Política de Privacidade</Link></li>
               <li><Link href="/termos-de-uso">Termos de Uso</Link></li>

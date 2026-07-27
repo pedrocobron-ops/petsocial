@@ -930,3 +930,15 @@ footer.site-footer {
 
 .link-autor { border-bottom: 1px solid var(--hairline); }
 .link-autor:hover { color: var(--brand-dark); border-bottom-color: var(--brand); }
+
+/* Nota editorial ao final da matéria (transparência de método) */
+.nota-editorial {
+  background: var(--brand-surface);
+  border-left: 4px solid var(--brand);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 10px 0 30px;
+  font-size: 14px; line-height: 1.65; color: var(--ink-soft);
+}
+.nota-editorial strong { color: var(--brand-dark); }
+.nota-editorial a { color: var(--brand-dark); text-decoration: underline; text-underline-offset: 3px; }

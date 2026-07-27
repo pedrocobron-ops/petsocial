@@ -216,6 +216,17 @@ export default async function ArticlePage({ params }: Props) {
 
       <ArticleBody body={artigo.body} />
 
+      <div className="article-body" style={{ marginTop: 0 }}>
+        <aside className="nota-editorial">
+          <strong>Nota da redação.</strong> Este conteúdo é informativo e foi
+          apurado a partir de fontes especializadas citadas ao longo do texto.
+          Ele não substitui a consulta com um médico-veterinário, único
+          profissional habilitado a examinar, diagnosticar e tratar o seu
+          animal. Saiba como apuramos em{" "}
+          <Link href="/principios-editoriais">princípios editoriais</Link>.
+        </aside>
+      </div>
+
       <div className="container">
         <AdSlot slot="materia-fim" />
         {relacionadas.length > 0 && (
