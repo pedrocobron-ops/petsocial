@@ -29,6 +29,12 @@ export const metadata: Metadata = {
   },
   twitter: { card: "summary_large_image" },
   robots: { index: true, follow: true },
+  // Código de verificação do Google Search Console.
+  // Basta definir GOOGLE_SITE_VERIFICATION na Vercel (Settings > Environment
+  // Variables) com o valor que o Search Console fornece e refazer o deploy.
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+    : undefined,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
