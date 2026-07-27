@@ -15,6 +15,14 @@ export default function Reveal({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+
+    // Navegador sem IntersectionObserver: mostra direto. Perder a animação é
+    // melhor do que esconder matéria.
+    if (typeof IntersectionObserver === "undefined") {
+      el.classList.add("visible");
+      return;
+    }
+
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
@@ -24,7 +32,13 @@ export default function Reveal({
           }
         });
       },
-      { threshold: 0.12 }
+      // Sem threshold percentual de propósito. Uma fração da altura só funciona
+      // em blocos curtos: numa grade com dezenas de matérias, a seção é bem
+      // mais alta que a janela e a razão exigida só é atingida depois de
+      // centenas de pixels de rolagem, deixando o topo da lista em branco.
+      // Com threshold 0, basta o bloco encostar na tela. A margem negativa
+      // segura a entrada por 60px para o fade não começar colado na borda.
+      { rootMargin: "0px 0px -60px 0px" }
     );
     io.observe(el);
     return () => io.disconnect();
