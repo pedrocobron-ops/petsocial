@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getByCategory, getCategories, getCategoryBySlug } from "@/lib/news";
 import ArticleCard from "@/components/article-card";
 import AdSlot from "@/components/ad-slot";
+import Reveal from "@/components/reveal";
 
 export const revalidate = 300;
 export const dynamicParams = true;
@@ -33,27 +34,29 @@ export default async function CategoryPage({ params }: Props) {
   const artigos = await getByCategory(categoria.id, 30);
 
   return (
-    <div className="container">
-      <header className="cat-hero">
+    <div>
+      <header className="cat-hero" style={{ ["--cor" as string]: categoria.color }}>
         <div className="emoji" aria-hidden>{categoria.emoji}</div>
-        <h1 style={{ color: categoria.color }}>{categoria.name}</h1>
+        <h1>{categoria.name}</h1>
         <p>Tudo sobre {categoria.name.toLowerCase()} no universo pet.</p>
       </header>
 
-      <hr className="rule" />
+      <div className="container">
+        {artigos.length === 0 ? (
+          <div className="empty-state">
+            <h2>Ainda não há matérias aqui</h2>
+            <p>O Mozart já está farejando novidades para esta editoria. 🐾</p>
+          </div>
+        ) : (
+          <Reveal>
+            <div className="grid">
+              {artigos.map((a) => <ArticleCard key={a.id} artigo={a} />)}
+            </div>
+          </Reveal>
+        )}
 
-      {artigos.length === 0 ? (
-        <div className="empty-state">
-          <h2>Ainda não há matérias aqui</h2>
-          <p>O Mozart já está farejando novidades para esta editoria. 🐾</p>
-        </div>
-      ) : (
-        <div className="grid">
-          {artigos.map((a) => <ArticleCard key={a.id} artigo={a} />)}
-        </div>
-      )}
-
-      <AdSlot slot="categoria-fim" />
+        <AdSlot slot="categoria-fim" />
+      </div>
     </div>
   );
 }

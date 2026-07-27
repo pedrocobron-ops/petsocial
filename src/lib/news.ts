@@ -82,6 +82,21 @@ export async function getFeatured(limit = 3): Promise<NewsArticle[]> {
   }
 }
 
+/** Mais lidas (por visualizações reais). */
+export async function getMostRead(limit = 5): Promise<NewsArticle[]> {
+  try {
+    const { data } = await supabase
+      .from("news_articles")
+      .select(CARD_FIELDS)
+      .eq("status", "published")
+      .order("view_count", { ascending: false })
+      .limit(limit);
+    return (data as unknown as NewsArticle[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function getArticle(slug: string): Promise<NewsArticle | null> {
   try {
     const { data } = await supabase

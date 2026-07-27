@@ -7,6 +7,8 @@ import ArticleCard from "@/components/article-card";
 import AdSlot from "@/components/ad-slot";
 import ShareRow from "@/components/share-row";
 import ViewTracker from "@/components/view-tracker";
+import ProgressBar from "@/components/progress-bar";
+import Reveal from "@/components/reveal";
 
 export const revalidate = 300;
 export const dynamicParams = true;
@@ -52,6 +54,7 @@ export default async function ArticlePage({ params }: Props) {
   const relacionadas = await getRelated(artigo, 3);
   const corpo = paragrafos(artigo.body);
   const url = `${SITE_URL}/noticias/${artigo.slug}`;
+  const cor = artigo.category?.color ?? "#f97316";
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -72,16 +75,17 @@ export default async function ArticlePage({ params }: Props) {
   };
 
   return (
-    <article>
+    <article style={{ ["--cat-cor" as string]: cor }}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <ProgressBar />
       <ViewTracker articleId={artigo.id} />
 
       <header className="article-head">
         {artigo.category && (
-          <span className="kicker" style={{ color: artigo.category.color }}>
+          <span className="kicker-chip">
             {artigo.category.emoji} {artigo.category.name}
           </span>
         )}
@@ -90,25 +94,27 @@ export default async function ArticlePage({ params }: Props) {
         <div className="article-meta">
           <span>Por <b>{artigo.author_name}</b></span>
           <span>{dataLonga(artigo.published_at)}</span>
-          <span>{tempoDeLeitura(artigo.body)} min de leitura</span>
+          <span>⏱ {tempoDeLeitura(artigo.body)} min de leitura</span>
         </div>
         <ShareRow url={url} title={artigo.title} />
       </header>
 
       {artigo.cover_url && (
-        <figure className="article-cover">
-          <div className="frame">
-            <Image
-              src={artigo.cover_url}
-              alt={artigo.cover_caption ?? artigo.title}
-              fill
-              priority
-              sizes="(max-width: 1020px) 100vw, 980px"
-              style={{ objectFit: "cover" }}
-            />
-          </div>
-          {artigo.cover_caption && <figcaption>{artigo.cover_caption}</figcaption>}
-        </figure>
+        <Reveal>
+          <figure className="article-cover">
+            <div className="frame">
+              <Image
+                src={artigo.cover_url}
+                alt={artigo.cover_caption ?? artigo.title}
+                fill
+                priority
+                sizes="(max-width: 1040px) 100vw, 1000px"
+                style={{ objectFit: "cover" }}
+              />
+            </div>
+            {artigo.cover_caption && <figcaption>{artigo.cover_caption}</figcaption>}
+          </figure>
+        </Reveal>
       )}
 
       <div className="article-body">
@@ -120,11 +126,15 @@ export default async function ArticlePage({ params }: Props) {
       <div className="container">
         <AdSlot slot="materia-fim" />
         {relacionadas.length > 0 && (
-          <section aria-label="Matérias relacionadas" style={{ marginTop: 30 }}>
-            <h2 className="section-title"><span className="dot">●</span> Leia também</h2>
-            <div className="grid">
-              {relacionadas.map((a) => <ArticleCard key={a.id} artigo={a} />)}
-            </div>
+          <section aria-label="Matérias relacionadas" style={{ marginTop: 24 }}>
+            <Reveal>
+              <div className="section-head" style={{ ["--cor" as string]: cor }}>
+                <h2><span className="emoji">🐾</span>Leia também</h2>
+              </div>
+              <div className="grid">
+                {relacionadas.map((a) => <ArticleCard key={a.id} artigo={a} />)}
+              </div>
+            </Reveal>
           </section>
         )}
       </div>

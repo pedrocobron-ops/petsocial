@@ -1,26 +1,21 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getFeatured, getLatest } from "@/lib/news";
+import { getFeatured, getLatest, getMostRead, type NewsArticle } from "@/lib/news";
 import { dataLonga } from "@/lib/format";
 import ArticleCard from "@/components/article-card";
 import AdSlot from "@/components/ad-slot";
+import Reveal from "@/components/reveal";
 
 export const revalidate = 300; // atualiza a cada 5 minutos
 
 export default async function Home() {
-  const [destaques, ultimas] = await Promise.all([getFeatured(4), getLatest(15)]);
+  const [destaques, ultimas, maisLidas] = await Promise.all([
+    getFeatured(1),
+    getLatest(40),
+    getMostRead(5),
+  ]);
 
   const principal = destaques[0] ?? ultimas[0];
-  const laterais = (
-    principal
-      ? [...destaques.slice(1), ...ultimas.filter((a) => a.id !== principal.id)]
-      : ultimas
-  )
-    .filter((a, i, arr) => arr.findIndex((b) => b.id === a.id) === i)
-    .slice(0, 3);
-
-  const usados = new Set([principal?.id, ...laterais.map((a) => a.id)]);
-  const grade = ultimas.filter((a) => !usados.has(a.id)).slice(0, 9);
 
   if (!principal) {
     return (
@@ -34,84 +29,132 @@ export default async function Home() {
     );
   }
 
+  const corPrincipal = principal.category?.color ?? "#f97316";
+  const restantes = ultimas.filter((a) => a.id !== principal.id);
+
+  // Bandas por editoria: agrupa as últimas por categoria (até 3 bandas com 3+ matérias)
+  const porCategoria = new Map<string, NewsArticle[]>();
+  for (const artigo of restantes) {
+    if (!artigo.category) continue;
+    const lista = porCategoria.get(artigo.category.id) ?? [];
+    lista.push(artigo);
+    porCategoria.set(artigo.category.id, lista);
+  }
+  const bandas = [...porCategoria.values()]
+    .filter((lista) => lista.length >= 3)
+    .slice(0, 3);
+  const usadosEmBandas = new Set(bandas.flat().map((a) => a.id));
+  const graderestante = restantes.filter((a) => !usadosEmBandas.has(a.id)).slice(0, 6);
+
   return (
     <div className="container">
-      {/* ---------- Destaque principal ---------- */}
+      {/* ---------- Destaque principal + Mais lidas ---------- */}
       <section className="lead-grid">
-        <article className="lead-main">
-          <Link href={`/noticias/${principal.slug}`} className="cover">
-            {principal.cover_url && (
-              <Image
-                src={principal.cover_url}
-                alt=""
-                fill
-                priority
-                sizes="(max-width: 900px) 100vw, 60vw"
-                style={{ objectFit: "cover" }}
-              />
-            )}
-          </Link>
-          {principal.category && (
-            <span className="kicker" style={{ color: principal.category.color }}>
-              {principal.category.name}
-            </span>
-          )}
-          <h2><Link href={`/noticias/${principal.slug}`}>{principal.title}</Link></h2>
-          {principal.dek && <p className="dek">{principal.dek}</p>}
-          <p className="byline">
-            Por <b>{principal.author_name}</b> · {dataLonga(principal.published_at)}
-          </p>
-        </article>
+        <Reveal>
+          <article className="lead-main" style={{ ["--cat-cor" as string]: corPrincipal }}>
+            <Link href={`/noticias/${principal.slug}`} className="cover">
+              {principal.cover_url && (
+                <Image
+                  src={principal.cover_url}
+                  alt=""
+                  fill
+                  priority
+                  sizes="(max-width: 920px) 100vw, 66vw"
+                  style={{ objectFit: "cover" }}
+                />
+              )}
+            </Link>
+            <div className="lead-body">
+              {principal.category && (
+                <span className="kicker" style={{ color: corPrincipal }}>
+                  {principal.category.emoji} {principal.category.name}
+                </span>
+              )}
+              <h2><Link href={`/noticias/${principal.slug}`}>{principal.title}</Link></h2>
+              {principal.dek && <p className="dek">{principal.dek}</p>}
+              <p className="byline">
+                Por <b>{principal.author_name}</b> · {dataLonga(principal.published_at)}
+              </p>
+            </div>
+          </article>
+        </Reveal>
 
-        <div className="lead-side">
-          {laterais.map((artigo) => (
-            <article className="side-item" key={artigo.id}>
-              <div>
-                {artigo.category && (
-                  <span className="kicker" style={{ color: artigo.category.color }}>
-                    {artigo.category.name}
-                  </span>
-                )}
-                <h3><Link href={`/noticias/${artigo.slug}`}>{artigo.title}</Link></h3>
-                <p className="byline">{dataLonga(artigo.published_at)}</p>
-              </div>
-              <Link href={`/noticias/${artigo.slug}`} className="thumb" aria-hidden tabIndex={-1}>
-                {artigo.cover_url && (
-                  <Image src={artigo.cover_url} alt="" fill sizes="108px" style={{ objectFit: "cover" }} />
-                )}
-              </Link>
-            </article>
-          ))}
-        </div>
+        <Reveal delay={120}>
+          <aside className="mais-lidas" aria-label="Mais lidas">
+            <div className="titulo">🔥 Mais lidas</div>
+            <ol>
+              {maisLidas.map((artigo) => (
+                <li key={artigo.id}>
+                  <div>
+                    {artigo.category && (
+                      <span className="cat" style={{ color: artigo.category.color }}>
+                        {artigo.category.name}
+                      </span>
+                    )}
+                    <h3><Link href={`/noticias/${artigo.slug}`}>{artigo.title}</Link></h3>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </aside>
+        </Reveal>
       </section>
 
       <AdSlot slot="home-topo" />
 
-      <hr className="rule-double" />
+      {/* ---------- Bandas por editoria ---------- */}
+      {bandas.map((lista, i) => {
+        const cat = lista[0].category!;
+        return (
+          <section key={cat.id} aria-label={cat.name}>
+            <Reveal delay={i * 60}>
+              <div className="section-head" style={{ ["--cor" as string]: cat.color }}>
+                <h2><span className="emoji">{cat.emoji}</span>{cat.name}</h2>
+                <Link href={`/categoria/${cat.slug}`} className="ver-tudo">
+                  Ver tudo →
+                </Link>
+              </div>
+              <div className="grid">
+                {lista.slice(0, 3).map((artigo) => (
+                  <ArticleCard key={artigo.id} artigo={artigo} />
+                ))}
+              </div>
+            </Reveal>
+          </section>
+        );
+      })}
 
-      {/* ---------- Últimas notícias ---------- */}
-      <section aria-label="Últimas notícias">
-        <h2 className="section-title"><span className="dot">●</span> Últimas notícias</h2>
-        <div className="grid">
-          {grade.map((artigo) => (
-            <ArticleCard key={artigo.id} artigo={artigo} />
-          ))}
-        </div>
-      </section>
+      {/* ---------- Últimas ---------- */}
+      {graderestante.length > 0 && (
+        <section aria-label="Últimas notícias">
+          <Reveal>
+            <div className="section-head" style={{ ["--cor" as string]: "#f97316" }}>
+              <h2><span className="emoji">📰</span>Últimas notícias</h2>
+            </div>
+            <div className="grid">
+              {graderestante.map((artigo) => (
+                <ArticleCard key={artigo.id} artigo={artigo} />
+              ))}
+            </div>
+          </Reveal>
+        </section>
+      )}
 
       {/* ---------- Faixa do Mozart ---------- */}
-      <aside className="mozart-strip">
-        <div className="face">
-          <Image src="/mozart/rosto.png" alt="Mozart, o border collie mascote" width={72} height={72} />
-        </div>
-        <div>
-          <div className="titulo">Au! Eu sou o Mozart 🐾</div>
-          <p>
-            Border collie, editor-chefe e farejador oficial de notícias.
-            Todo dia eu garimpo o melhor do universo pet para você e seu melhor amigo.
-          </p>
-        </div>
-      </aside>
+      <Reveal>
+        <aside className="mozart-strip">
+          <div className="face">
+            <Image src="/mozart/rosto.png" alt="Mozart, o border collie mascote" width={84} height={84} />
+          </div>
+          <div>
+            <div className="titulo">Au! Eu sou o Mozart 🐾</div>
+            <p>
+              Border collie, editor-chefe e farejador oficial de notícias. Todo dia
+              eu garimpo o melhor do universo pet para você e seu melhor amigo.
+            </p>
+          </div>
+        </aside>
+      </Reveal>
     </div>
   );
 }
