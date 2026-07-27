@@ -44,7 +44,10 @@ export default function Editor({ articleId }: { articleId?: string }) {
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState("");
   const [subindoCapa, setSubindoCapa] = useState(false);
+  const [subindoFoto, setSubindoFoto] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const fotoCorpoRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     supabaseBrowser()
@@ -113,6 +116,38 @@ export default function Editor({ articleId }: { articleId?: string }) {
     }
     const { data } = supabaseBrowser().storage.from("sponsored").getPublicUrl(caminho);
     set("cover_url", data.publicUrl);
+  }
+
+  /** Insere marcação de formatação em volta do texto selecionado no corpo. */
+  function formatar(antes: string, depois = "", exemplo = "texto") {
+    const ta = bodyRef.current;
+    if (!ta) return;
+    const ini = ta.selectionStart ?? form.body.length;
+    const fim = ta.selectionEnd ?? form.body.length;
+    const selecao = form.body.slice(ini, fim) || exemplo;
+    const novo = form.body.slice(0, ini) + antes + selecao + depois + form.body.slice(fim);
+    set("body", novo);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(ini + antes.length, ini + antes.length + selecao.length);
+    });
+  }
+
+  async function subirFotoCorpo(arquivo: File) {
+    setSubindoFoto(true);
+    setMsg("");
+    const ext = arquivo.name.split(".").pop()?.toLowerCase() || "jpg";
+    const caminho = `news-img/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabaseBrowser()
+      .storage.from("sponsored")
+      .upload(caminho, arquivo, { cacheControl: "31536000", upsert: false });
+    setSubindoFoto(false);
+    if (error) {
+      setMsg("❌ Falha ao subir a foto: " + error.message);
+      return;
+    }
+    const { data } = supabaseBrowser().storage.from("sponsored").getPublicUrl(caminho);
+    formatar(`\n\n![Escreva a legenda desta foto aqui](${data.publicUrl})\n\n`, "", "");
   }
 
   async function salvar(publicar?: boolean) {
@@ -337,12 +372,32 @@ export default function Editor({ articleId }: { articleId?: string }) {
 
         <label>
           Texto da matéria
+          <div className="editor-toolbar">
+            <button type="button" onClick={() => formatar("**", "**")} title="Negrito"><b>B</b></button>
+            <button type="button" onClick={() => formatar("*", "*")} title="Itálico"><i>I</i></button>
+            <button type="button" onClick={() => formatar("\n\n## ", "", "Intertítulo")}>Intertítulo</button>
+            <button type="button" onClick={() => formatar("\n\n> ", "", "Frase em destaque")}>❝ Destaque</button>
+            <button type="button" onClick={() => formatar("\n\n- ", "", "item da lista")}>• Lista</button>
+            <button type="button" disabled={subindoFoto} onClick={() => fotoCorpoRef.current?.click()}>
+              {subindoFoto ? "Subindo…" : "📷 Foto no texto"}
+            </button>
+            <input
+              ref={fotoCorpoRef} type="file" accept="image/*" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFotoCorpo(f); e.target.value = ""; }}
+            />
+          </div>
           <textarea
+            ref={bodyRef}
             rows={18}
             value={form.body}
             onChange={(e) => set("body", e.target.value)}
-            placeholder={"Escreva aqui. Separe os parágrafos com uma linha em branco.\n\nAssim como neste exemplo."}
+            placeholder={"Escreva aqui. Separe os parágrafos com uma linha em branco.\n\nSelecione um trecho e use os botões acima para formatar."}
           />
+          <span className="editor-dica">
+            Dica: selecione um trecho e clique em <b>B</b> ou <i>I</i>. Use <b>Intertítulo</b> para
+            dividir a matéria em seções, <b>❝ Destaque</b> para frases de efeito e <b>📷 Foto no texto</b>{" "}
+            para ilustrar (edite a legenda entre os colchetes).
+          </span>
         </label>
 
         <label>

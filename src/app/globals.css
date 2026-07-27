@@ -676,3 +676,52 @@ footer.site-footer {
 .metric-card .valor { font-family: var(--headline); font-weight: 800; font-size: 30px; color: var(--brand-dark); }
 .metric-card .rotulo { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 4px; }
 .admin-secao { font-family: var(--display); font-weight: 600; font-size: 19px; margin: 26px 0 12px; }
+
+/* ---------- Recursos editoriais no corpo da matéria ---------- */
+
+.article-body h2 {
+  font-family: var(--headline); font-weight: 800; font-size: 26px;
+  line-height: 1.2; margin: 36px 0 16px;
+  padding-left: 14px; border-left: 4px solid var(--cat-cor, var(--brand));
+}
+.article-body h3 {
+  font-family: var(--headline); font-weight: 700; font-size: 21px;
+  margin: 30px 0 12px;
+}
+.article-body strong { font-weight: 700; color: var(--ink); }
+.article-body a { color: var(--brand-dark); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Frase em destaque (olho da matéria) */
+.article-body blockquote {
+  margin: 38px 0; padding: 8px 0 8px 26px; position: relative;
+  border-left: 4px solid var(--cat-cor, var(--brand));
+}
+.article-body blockquote p {
+  font-family: var(--headline); font-weight: 700; font-style: italic;
+  font-size: 23px; line-height: 1.4; margin-bottom: 0;
+  color: var(--cat-cor, var(--brand-dark));
+}
+.article-body blockquote p + p { margin-top: 12px; }
+
+.article-body ul, .article-body ol { margin: 0 0 26px 24px; }
+.article-body li {
+  font-family: var(--body-serif); font-size: 18.5px; line-height: 1.7;
+  margin-bottom: 10px; color: #292420;
+}
+.article-body li::marker { color: var(--cat-cor, var(--brand)); font-weight: 700; }
+
+/* Fotos dentro do texto */
+.body-figure { margin: 32px 0; }
+.body-figure img { width: 100%; border-radius: 10px; }
+.body-figure figcaption { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+
+/* Barra de formatação do editor */
+.editor-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.editor-toolbar button {
+  font: inherit; font-size: 13px; font-weight: 700;
+  padding: 7px 12px; border-radius: 7px; cursor: pointer;
+  background: #fff; border: 1.5px solid var(--hairline); color: var(--ink-soft);
+  transition: all .15s;
+}
+.editor-toolbar button:hover { border-color: var(--brand); color: var(--brand-dark); }
+.editor-dica { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 6px; line-height: 1.6; }

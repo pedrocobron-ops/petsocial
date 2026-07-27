@@ -6,6 +6,7 @@ import { getAllPublishedSlugs, getArticle, getRelated } from "@/lib/news";
 import { dataHora, paragrafos, tempoDeLeitura } from "@/lib/format";
 import { animalPorSlug } from "@/lib/animais";
 import ArticleCard from "@/components/article-card";
+import ArticleBody from "@/components/article-body";
 import AdSlot from "@/components/ad-slot";
 import ShareRow from "@/components/share-row";
 import ViewTracker from "@/components/view-tracker";
@@ -29,7 +30,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const artigo = await getArticle(slug);
   if (!artigo) return { title: "Matéria não encontrada" };
 
-  const descricao = artigo.dek ?? paragrafos(artigo.body)[0]?.slice(0, 160) ?? "";
+  const descricao =
+    artigo.dek ??
+    paragrafos(artigo.body)[0]?.replace(/[#*>_\[\]!()`]/g, "").slice(0, 160) ??
+    "";
   return {
     title: artigo.title,
     description: descricao,
@@ -54,7 +58,6 @@ export default async function ArticlePage({ params }: Props) {
   if (!artigo) notFound();
 
   const relacionadas = await getRelated(artigo, 3);
-  const corpo = paragrafos(artigo.body);
   const url = `${SITE_URL}/noticias/${artigo.slug}`;
   const cor = artigo.category?.color ?? "#f97316";
 
@@ -192,11 +195,7 @@ export default async function ArticlePage({ params }: Props) {
         </Reveal>
       )}
 
-      <div className="article-body">
-        {corpo.slice(0, 2).map((p, i) => <p key={i}>{p}</p>)}
-        {corpo.length > 3 && <AdSlot slot="materia-meio" />}
-        {corpo.slice(2).map((p, i) => <p key={i + 2}>{p}</p>)}
-      </div>
+      <ArticleBody body={artigo.body} />
 
       <div className="container">
         <AdSlot slot="materia-fim" />
