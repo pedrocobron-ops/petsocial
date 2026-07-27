@@ -249,7 +249,7 @@ export default function Editor({ articleId }: { articleId?: string }) {
     }
 
     setForm((f) => ({ ...f, id: idFinal, status, published_at: registro.published_at, scheduled_at: registro.scheduled_at }));
-    await revalidarSite();
+    await revalidarSite(status === "published" ? registro.slug : undefined);
     setMsg(
       status === "published" ? "✅ Publicada! Já está no ar."
       : status === "scheduled" ? `🗓 Agendada para ${quandoAgendar.replace("T", " às ")} (horário de Brasília).`

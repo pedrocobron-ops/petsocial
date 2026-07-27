@@ -39,15 +39,25 @@ export function useAdmin() {
   return state;
 }
 
-/** Avisa o site que houve mudança — as páginas atualizam na hora. */
-export async function revalidarSite() {
+/**
+ * Avisa o site que houve mudança — as páginas atualizam na hora.
+ *
+ * Passe `slug` apenas quando a matéria estiver de fato no ar: além de limpar
+ * o cache, ele dispara o aviso do IndexNow, e não faz sentido mandar buscador
+ * visitar rascunho.
+ */
+export async function revalidarSite(slug?: string) {
   try {
     const { data } = await supabaseBrowser().auth.getSession();
     const token = data.session?.access_token;
     if (!token) return;
     await fetch("/api/revalidar", {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ slug }),
     });
   } catch {}
 }

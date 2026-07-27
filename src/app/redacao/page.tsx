@@ -131,7 +131,7 @@ export default function RedacaoPage() {
         scheduled_at: null,
       })
       .eq("id", l.id);
-    await revalidarSite();
+    await revalidarSite(l.slug);
     carregarLista();
   }
 
