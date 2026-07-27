@@ -106,7 +106,12 @@ export default async function ArticlePage({ params }: Props) {
       "@type": "NewsMediaOrganization",
       name: "Maestro Pet",
       url: SITE_URL,
-      logo: { "@type": "ImageObject", url: `${SITE_URL}/mozart/rosto.png` },
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/logos/logo-horizontal-1000x120.png`,
+        width: 1000,
+        height: 120,
+      },
     },
   };
 

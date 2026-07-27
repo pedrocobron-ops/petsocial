@@ -11,8 +11,18 @@ const organizacaoLd = {
   name: "Maestro Pet",
   alternateName: "Maestro Pet — Jornal do Universo Pet",
   url: SITE_URL,
-  logo: { "@type": "ImageObject", url: `${SITE_URL}/mozart/rosto.png` },
-  sameAs: [],
+  logo: {
+    "@type": "ImageObject",
+    url: `${SITE_URL}/logos/logo-horizontal-1000x120.png`,
+    width: 1000,
+    height: 120,
+  },
+  // Propriedades que o Google usa para aferir a seriedade de um veículo de
+  // notícias. Apontam para páginas que já existem e descrevem como o jornal
+  // apura, corrige e assina o que publica.
+  publishingPrinciples: `${SITE_URL}/principios-editoriais`,
+  ethicsPolicy: `${SITE_URL}/principios-editoriais`,
+  masthead: `${SITE_URL}/sobre`,
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "editorial",
