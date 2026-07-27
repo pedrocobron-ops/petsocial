@@ -784,3 +784,18 @@ footer.site-footer {
   padding: 9px 16px;
 }
 .previa-banner a { text-decoration: underline; }
+
+/* Agendamento de publicação */
+.admin-badge.agen { background: #dbeafe; color: #1d4ed8; }
+.admin-agen-quando { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
+.admin-agendar {
+  background: #f0f6ff; border: 1px solid #cfe0fb; border-radius: 10px;
+  padding: 16px 18px;
+}
+.admin-agendar-titulo { font-weight: 700; font-size: 14.5px; color: #1d4ed8; }
+.admin-agendar p { font-size: 13px; color: var(--muted); margin: 4px 0 12px; }
+.admin-agendar-linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.admin-agendar-linha input {
+  font: inherit; font-size: 14.5px; padding: 9px 12px;
+  border: 1px solid var(--hairline); border-radius: 8px; background: #fff;
+}

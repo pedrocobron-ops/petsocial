@@ -7,7 +7,7 @@ import ArticleCard from "@/components/article-card";
 import AdSlot from "@/components/ad-slot";
 import Reveal from "@/components/reveal";
 
-export const revalidate = 300; // atualiza a cada 5 minutos
+export const revalidate = 60; // atualiza a cada minuto (capta publicações agendadas)
 
 export default async function Home() {
   const [destaques, ultimas, maisLidas] = await Promise.all([

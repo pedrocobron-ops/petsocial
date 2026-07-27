@@ -23,13 +23,29 @@ interface Form {
   is_featured: boolean;
   status: string;
   published_at: string | null;
+  scheduled_at: string | null;
+}
+
+/** Converte "2026-07-28T08:00" (horário de Brasília no input) para ISO UTC. */
+function brasiliaParaISO(local: string): string | null {
+  if (!local) return null;
+  // input datetime-local não tem fuso; tratamos como America/Sao_Paulo (UTC-3)
+  return new Date(local + ":00-03:00").toISOString();
+}
+
+/** Converte ISO UTC de volta para o formato do input (horário de Brasília). */
+function isoParaBrasilia(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(new Date(iso).toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 const VAZIO: Form = {
   title: "", slug: "", dek: "", body: "",
   category_id: "", cover_url: "", cover_caption: "",
   author_name: "Redação Maestro Pet",
-  is_featured: false, status: "draft", published_at: null,
+  is_featured: false, status: "draft", published_at: null, scheduled_at: null,
 };
 
 const SEM_ANIMAIS: string[] = [];
@@ -43,6 +59,7 @@ export default function Editor({ articleId }: { articleId?: string }) {
   const [slugTravado, setSlugTravado] = useState(Boolean(articleId));
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState("");
+  const [quandoAgendar, setQuandoAgendar] = useState("");
   const [subindoCapa, setSubindoCapa] = useState(false);
   const [subindoFoto, setSubindoFoto] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -77,8 +94,12 @@ export default function Editor({ articleId }: { articleId?: string }) {
               is_featured: Boolean(data.is_featured),
               status: data.status ?? "draft",
               published_at: data.published_at,
+              scheduled_at: data.scheduled_at,
             });
             setAnimais((data.animals as string[]) ?? []);
+            if (data.status === "scheduled" && data.scheduled_at) {
+              setQuandoAgendar(isoParaBrasilia(data.scheduled_at));
+            }
           }
         });
       supabaseBrowser()
@@ -150,15 +171,30 @@ export default function Editor({ articleId }: { articleId?: string }) {
     formatar(`\n\n![Escreva a legenda desta foto aqui](${data.publicUrl})\n\n`, "", "");
   }
 
-  async function salvar(publicar?: boolean) {
+  // acao: undefined = salvar mantendo status | "publish" | "draft" | "schedule"
+  async function salvar(acao?: "publish" | "draft" | "schedule") {
     if (!form.title.trim()) { setMsg("❌ A matéria precisa de um título."); return; }
     if (!form.slug.trim()) { setMsg("❌ A matéria precisa de um endereço (slug)."); return; }
     if (!form.body.trim()) { setMsg("❌ A matéria está sem texto."); return; }
 
+    let scheduledISO: string | null = form.scheduled_at;
+    if (acao === "schedule") {
+      scheduledISO = brasiliaParaISO(quandoAgendar);
+      if (!scheduledISO) { setMsg("❌ Escolha a data e a hora do agendamento."); return; }
+      if (new Date(scheduledISO).getTime() <= Date.now()) {
+        setMsg("❌ O horário do agendamento precisa ser no futuro."); return;
+      }
+    }
+
     setSalvando(true);
     setMsg("");
 
-    const status = publicar === undefined ? form.status : publicar ? "published" : "draft";
+    const status =
+      acao === "publish" ? "published"
+      : acao === "draft" ? "draft"
+      : acao === "schedule" ? "scheduled"
+      : form.status;
+
     const registro = {
       animals: animais,
       title: form.title.trim(),
@@ -171,6 +207,7 @@ export default function Editor({ articleId }: { articleId?: string }) {
       author_name: form.author_name.trim() || "Redação Maestro Pet",
       is_featured: form.is_featured,
       status,
+      scheduled_at: status === "scheduled" ? scheduledISO : null,
       published_at:
         status === "published" ? form.published_at ?? new Date().toISOString() : form.published_at,
       updated_at: new Date().toISOString(),
@@ -211,9 +248,13 @@ export default function Editor({ articleId }: { articleId?: string }) {
       }
     }
 
-    setForm((f) => ({ ...f, id: idFinal, status, published_at: registro.published_at }));
+    setForm((f) => ({ ...f, id: idFinal, status, published_at: registro.published_at, scheduled_at: registro.scheduled_at }));
     await revalidarSite();
-    setMsg(status === "published" ? "✅ Publicada! Já está no ar." : "✅ Rascunho salvo.");
+    setMsg(
+      status === "published" ? "✅ Publicada! Já está no ar."
+      : status === "scheduled" ? `🗓 Agendada para ${quandoAgendar.replace("T", " às ")} (horário de Brasília).`
+      : "✅ Rascunho salvo."
+    );
     if (!articleId && idFinal) router.replace(`/redacao/editar/${idFinal}`);
   }
 
@@ -244,16 +285,23 @@ export default function Editor({ articleId }: { articleId?: string }) {
             💾 Salvar
           </button>
           {form.status === "published" ? (
-            <button className="btn-ghost" disabled={salvando} onClick={() => salvar(false)}>
+            <button className="btn-ghost" disabled={salvando} onClick={() => salvar("draft")}>
               Despublicar
             </button>
           ) : (
-            <button className="btn-primary" disabled={salvando} onClick={() => salvar(true)}>
+            <button className="btn-primary" disabled={salvando} onClick={() => salvar("publish")}>
               🚀 Publicar agora
             </button>
           )}
         </div>
       </header>
+
+      {form.status === "scheduled" && form.scheduled_at && (
+        <p className="admin-msg" style={{ background: "#eef6ff", borderColor: "#bfdbfe" }}>
+          🗓 Esta matéria está <b>agendada</b> para {isoParaBrasilia(form.scheduled_at).replace("T", " às ")}{" "}
+          (horário de Brasília). Ela entra no ar sozinha nesse horário.
+        </p>
+      )}
 
       {msg && <p className="admin-msg">{msg}</p>}
 
@@ -409,6 +457,34 @@ export default function Editor({ articleId }: { articleId?: string }) {
           Assinatura
           <input value={form.author_name} onChange={(e) => set("author_name", e.target.value)} />
         </label>
+
+        <div className="admin-agendar">
+          <div className="admin-agendar-titulo">🗓 Agendar publicação</div>
+          <p>Escolha uma data e hora futuras (horário de Brasília) para a matéria entrar no ar sozinha.</p>
+          <div className="admin-agendar-linha">
+            <input
+              type="datetime-local"
+              value={quandoAgendar}
+              onChange={(e) => setQuandoAgendar(e.target.value)}
+            />
+            <button
+              type="button" className="btn-primary"
+              disabled={salvando || !quandoAgendar}
+              onClick={() => salvar("schedule")}
+            >
+              Agendar
+            </button>
+            {form.status === "scheduled" && (
+              <button
+                type="button" className="btn-ghost"
+                disabled={salvando}
+                onClick={() => { setQuandoAgendar(""); salvar("draft"); }}
+              >
+                Cancelar agendamento
+              </button>
+            )}
+          </div>
+        </div>
 
         {form.id && (
           <button className="btn-perigo" onClick={excluir}>
