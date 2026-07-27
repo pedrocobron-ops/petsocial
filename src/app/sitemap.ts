@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getAllPublishedSlugs, getCategories } from "@/lib/news";
 import { ANIMAIS } from "@/lib/animais";
+import { AUTORES } from "@/lib/autores";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
@@ -33,6 +34,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(a.updated_at),
       changeFrequency: "weekly" as const,
       priority: 0.7,
+    })),
+    ...AUTORES.map((a) => ({
+      url: `${SITE_URL}/autor/${a.slug}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
     })),
     { url: `${SITE_URL}/sobre`, priority: 0.4 },
     { url: `${SITE_URL}/creditos-de-imagem`, priority: 0.2 },

@@ -44,7 +44,7 @@ function isoParaBrasilia(iso: string | null): string {
 const VAZIO: Form = {
   title: "", slug: "", dek: "", body: "",
   category_id: "", cover_url: "", cover_caption: "",
-  author_name: "Redação Maestro Pet",
+  author_name: "Pedro Amaral",
   is_featured: false, status: "draft", published_at: null, scheduled_at: null,
 };
 
@@ -90,7 +90,7 @@ export default function Editor({ articleId }: { articleId?: string }) {
               category_id: data.category_id ?? "",
               cover_url: data.cover_url ?? "",
               cover_caption: data.cover_caption ?? "",
-              author_name: data.author_name ?? "Redação Maestro Pet",
+              author_name: data.author_name ?? "Pedro Amaral",
               is_featured: Boolean(data.is_featured),
               status: data.status ?? "draft",
               published_at: data.published_at,
@@ -204,7 +204,7 @@ export default function Editor({ articleId }: { articleId?: string }) {
       category_id: form.category_id || null,
       cover_url: form.cover_url.trim() || null,
       cover_caption: form.cover_caption.trim() || null,
-      author_name: form.author_name.trim() || "Redação Maestro Pet",
+      author_name: form.author_name.trim() || "Pedro Amaral",
       is_featured: form.is_featured,
       status,
       scheduled_at: status === "scheduled" ? scheduledISO : null,

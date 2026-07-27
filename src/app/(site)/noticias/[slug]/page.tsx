@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getAllPublishedSlugs, getArticle, getRelated } from "@/lib/news";
 import { dataHora, paragrafos, tempoDeLeitura } from "@/lib/format";
 import { animalPorSlug } from "@/lib/animais";
+import { autorPorNome } from "@/lib/autores";
 import ArticleCard from "@/components/article-card";
 import ArticleBody from "@/components/article-body";
 import Credito from "@/components/credito";
@@ -68,6 +69,7 @@ export default async function ArticlePage({ params }: Props) {
     new Date(artigo.updated_at).getTime() - new Date(artigo.published_at).getTime() >
       60 * 60 * 1000;
 
+  const autor = autorPorNome(artigo.author_name);
   const animais = (artigo.animals ?? [])
     .map(animalPorSlug)
     .filter((a): a is NonNullable<typeof a> => Boolean(a));
@@ -92,7 +94,14 @@ export default async function ArticlePage({ params }: Props) {
     ].join(", ") || undefined,
     about: animais.map((a) => ({ "@type": "Thing", name: a.singular })),
     mainEntityOfPage: url,
-    author: { "@type": "Organization", name: artigo.author_name, url: `${SITE_URL}/sobre` },
+    author: autor
+      ? {
+          "@type": "Person",
+          name: autor.nome,
+          jobTitle: autor.cargo,
+          url: `${SITE_URL}/autor/${autor.slug}`,
+        }
+      : { "@type": "Organization", name: artigo.author_name, url: `${SITE_URL}/sobre` },
     publisher: {
       "@type": "NewsMediaOrganization",
       name: "Maestro Pet",
@@ -156,7 +165,14 @@ export default async function ArticlePage({ params }: Props) {
         <h1>{artigo.title}</h1>
         {artigo.dek && <p className="dek">{artigo.dek}</p>}
         <div className="article-meta">
-          <span>Por <b>{artigo.author_name}</b></span>
+          <span>
+            Por{" "}
+            {autor ? (
+              <Link href={`/autor/${autor.slug}`} className="link-autor"><b>{autor.nome}</b></Link>
+            ) : (
+              <b>{artigo.author_name}</b>
+            )}
+          </span>
           <span>Publicado em {dataHora(artigo.published_at)}</span>
           {foiAtualizada && <span className="selo-atualizada">Atualizado em {dataHora(artigo.updated_at)}</span>}
           <span>⏱ {tempoDeLeitura(artigo.body)} min de leitura</span>

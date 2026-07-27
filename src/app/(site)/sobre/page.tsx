@@ -45,6 +45,15 @@ export default function SobrePage() {
         selo de qualidade Maestro Pet.
       </p>
 
+      <h2>Quem assina</h2>
+      <p>
+        As matérias do Maestro Pet são assinadas por{" "}
+        <a href="/autor/pedro-amaral">Pedro Amaral</a>, editor-chefe do jornal,
+        que revisa pessoalmente cada texto antes da publicação. As fontes
+        consultadas são citadas ao longo das reportagens, e as imagens seguem
+        nossa <a href="/creditos-de-imagem">política de créditos</a>.
+      </p>
+
       <h2>Compromisso editorial</h2>
       <p>
         Nosso conteúdo tem caráter informativo e educativo. Ele{" "}
