@@ -20,6 +20,25 @@ export const AUTORES: Autor[] = [
   },
 ];
 
+const STORAGE_AUTORES =
+  "https://aefrcwysifgniogumxwk.supabase.co/storage/v1/object/public/sponsored/autores";
+
+/** URL da foto do autor, se ele já subiu uma pela Redação. */
+export function urlFotoAutor(slug: string): string {
+  return `${STORAGE_AUTORES}/${slug}.jpg`;
+}
+
+/** Verifica no servidor se a foto existe; devolve null quando ainda não há. */
+export async function fotoDoAutor(slug: string): Promise<string | null> {
+  const url = urlFotoAutor(slug);
+  try {
+    const r = await fetch(url, { method: "HEAD", next: { revalidate: 300 } });
+    return r.ok ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 export function autorPorNome(nome: string): Autor | undefined {
   const n = nome.trim().toLowerCase();
   return AUTORES.find((a) => a.nome.toLowerCase() === n);

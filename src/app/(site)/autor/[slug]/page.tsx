@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { AUTORES, autorPorSlug } from "@/lib/autores";
+import { AUTORES, autorPorSlug, fotoDoAutor } from "@/lib/autores";
 import { getLatest } from "@/lib/news";
 import ArticleCard from "@/components/article-card";
 import Reveal from "@/components/reveal";
@@ -34,7 +34,7 @@ export default async function AutorPage({ params }: Props) {
   const autor = autorPorSlug(slug);
   if (!autor) notFound();
 
-  const todas = await getLatest(60);
+  const [todas, foto] = await Promise.all([getLatest(60), fotoDoAutor(autor.slug)]);
   const doAutor = todas.filter((a) => a.author_name === autor.nome);
 
   const jsonLd = {
@@ -46,6 +46,7 @@ export default async function AutorPage({ params }: Props) {
       jobTitle: autor.cargo,
       description: autor.bio,
       url: `${SITE_URL}/autor/${autor.slug}`,
+      image: foto ?? undefined,
       email: autor.email,
       worksFor: { "@type": "NewsMediaOrganization", name: "Maestro Pet", url: SITE_URL },
     },
@@ -60,12 +61,12 @@ export default async function AutorPage({ params }: Props) {
 
       <header className="autor-hero">
         <div className="autor-foto">
-          <Image
-            src={autor.foto ?? mozart("rosto")}
-            alt={autor.nome}
-            width={110}
-            height={110}
-          />
+          {foto ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={foto} alt={`${autor.nome}, ${autor.cargo} do Maestro Pet`} />
+          ) : (
+            <Image src={mozart("rosto")} alt="" width={140} height={140} />
+          )}
         </div>
         <div className="autor-dados">
           <span className="autor-cargo">{autor.cargo}</span>

@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/redacao/nova", rotulo: "✍️ Nova matéria" },
   { href: "/redacao/metricas", rotulo: "📊 Métricas" },
   { href: "/redacao/mozart", rotulo: "🐶 Galeria Mozart" },
+  { href: "/redacao/perfil", rotulo: "👤 Meu perfil" },
 ];
 
 /** Barra do sistema da Redação — identidade própria, independente do jornal. */
