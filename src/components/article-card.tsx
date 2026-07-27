@@ -9,8 +9,8 @@ export default function ArticleCard({ artigo }: { artigo: NewsArticle }) {
 
   return (
     <article className="card" style={{ ["--cat-cor" as string]: cor }}>
-      <Link href={href} className="cover" aria-hidden tabIndex={-1}>
-        {artigo.cover_url && (
+      {artigo.cover_url && (
+        <Link href={href} className="cover" aria-hidden tabIndex={-1}>
           <Image
             src={artigo.cover_url}
             alt=""
@@ -18,8 +18,8 @@ export default function ArticleCard({ artigo }: { artigo: NewsArticle }) {
             sizes="(max-width: 600px) 100vw, (max-width: 920px) 50vw, 33vw"
             style={{ objectFit: "cover" }}
           />
-        )}
-      </Link>
+        </Link>
+      )}
       <div className="card-body">
         {artigo.category && (
           <span className="kicker" style={{ color: cor }}>

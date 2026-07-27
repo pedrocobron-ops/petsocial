@@ -257,6 +257,7 @@ img { max-width: 100%; display: block; }
 .lead-grid {
   display: grid; grid-template-columns: 8fr 4fr; gap: 34px;
   padding: 26px 0 8px;
+  align-items: start; /* cada coluna com sua altura natural, sem esticar */
 }
 @media (max-width: 920px) { .lead-grid { grid-template-columns: 1fr; } }
 
@@ -269,7 +270,9 @@ img { max-width: 100%; display: block; }
   transition: box-shadow 0.3s, transform 0.3s;
 }
 .lead-main:hover { box-shadow: var(--shadow-lift); transform: translateY(-3px); }
-.lead-main .cover { aspect-ratio: 16/9; position: relative; background: var(--brand-surface); overflow: hidden; }
+/* display:block é obrigatório: o container é um <a>, e em modo inline o
+   navegador ignora aspect-ratio, colapsando a área da foto. */
+.lead-main .cover { display: block; aspect-ratio: 16/9; position: relative; background: var(--brand-surface); overflow: hidden; }
 .lead-main .cover img { transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
 .lead-main:hover .cover img { transform: scale(1.04); }
 .lead-body { padding: 22px 26px 26px; }
@@ -338,7 +341,7 @@ img { max-width: 100%; display: block; }
   transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s;
 }
 .card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lift); }
-.card .cover { aspect-ratio: 3/2; position: relative; background: var(--brand-surface); overflow: hidden; }
+.card .cover { display: block; aspect-ratio: 3/2; position: relative; background: var(--brand-surface); overflow: hidden; }
 .card .cover img { transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
 .card:hover .cover img { transform: scale(1.055); }
 .card-body { padding: 15px 18px 18px; display: flex; flex-direction: column; flex: 1; }

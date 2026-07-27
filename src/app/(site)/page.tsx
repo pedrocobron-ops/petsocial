@@ -53,8 +53,8 @@ export default async function Home() {
       <section className="lead-grid">
         <div>
           <article className="lead-main" style={{ ["--cat-cor" as string]: corPrincipal }}>
-            <Link href={`/noticias/${principal.slug}`} className="cover">
-              {principal.cover_url && (
+            {principal.cover_url && (
+              <Link href={`/noticias/${principal.slug}`} className="cover">
                 <Image
                   src={principal.cover_url}
                   alt=""
@@ -63,8 +63,8 @@ export default async function Home() {
                   sizes="(max-width: 920px) 100vw, 66vw"
                   style={{ objectFit: "cover" }}
                 />
-              )}
-            </Link>
+              </Link>
+            )}
             <div className="lead-body">
               {principal.category && (
                 <span className="kicker" style={{ color: corPrincipal }}>
