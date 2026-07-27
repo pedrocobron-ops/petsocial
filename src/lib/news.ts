@@ -34,11 +34,13 @@ export interface NewsArticle {
   secundarias?: { category: NewsCategory | null }[];
 }
 
+// "!category_id" desfaz a ambiguidade: existem 2 caminhos entre matérias e
+// categorias (principal via category_id e secundárias via tabela de vínculo).
 const ARTICLE_FIELDS =
-  "id, slug, category_id, title, dek, cover_url, cover_caption, body, author_name, is_featured, view_count, animals, published_at, updated_at, category:news_categories(*), secundarias:news_article_categories(category:news_categories(*))";
+  "id, slug, category_id, title, dek, cover_url, cover_caption, body, author_name, is_featured, view_count, animals, published_at, updated_at, category:news_categories!category_id(*), secundarias:news_article_categories(category:news_categories(*))";
 
 const CARD_FIELDS =
-  "id, slug, category_id, title, dek, cover_url, cover_caption, author_name, is_featured, view_count, published_at, updated_at, category:news_categories(*)";
+  "id, slug, category_id, title, dek, cover_url, cover_caption, author_name, is_featured, view_count, published_at, updated_at, category:news_categories!category_id(*)";
 
 /* Toda busca é tolerante a falha: em erro de rede devolve vazio e a página
    renderiza um estado vazio em vez de quebrar. */

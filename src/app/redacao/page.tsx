@@ -80,7 +80,7 @@ export default function RedacaoPage() {
   async function carregarLista() {
     const { data } = await supabaseBrowser()
       .from("news_articles")
-      .select("id, slug, title, status, is_featured, view_count, published_at, updated_at, category:news_categories(name, color)")
+      .select("id, slug, title, status, is_featured, view_count, published_at, updated_at, category:news_categories!category_id(name, color)")
       .order("updated_at", { ascending: false })
       .limit(200);
     setLinhas((data as unknown as Linha[]) ?? []);
