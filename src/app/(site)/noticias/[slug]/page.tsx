@@ -7,6 +7,7 @@ import { dataHora, paragrafos, tempoDeLeitura } from "@/lib/format";
 import { animalPorSlug } from "@/lib/animais";
 import ArticleCard from "@/components/article-card";
 import ArticleBody from "@/components/article-body";
+import Credito from "@/components/credito";
 import AdSlot from "@/components/ad-slot";
 import ShareRow from "@/components/share-row";
 import ViewTracker from "@/components/view-tracker";
@@ -190,7 +191,9 @@ export default async function ArticlePage({ params }: Props) {
                 style={{ objectFit: "cover" }}
               />
             </div>
-            {artigo.cover_caption && <figcaption>{artigo.cover_caption}</figcaption>}
+            {artigo.cover_caption && (
+              <figcaption><Credito texto={artigo.cover_caption} /></figcaption>
+            )}
           </figure>
         </Reveal>
       )}

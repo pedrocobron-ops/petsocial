@@ -35,6 +35,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     })),
     { url: `${SITE_URL}/sobre`, priority: 0.4 },
+    { url: `${SITE_URL}/creditos-de-imagem`, priority: 0.2 },
     { url: `${SITE_URL}/contato`, priority: 0.3 },
     { url: `${SITE_URL}/politica-de-privacidade`, priority: 0.2 },
     { url: `${SITE_URL}/termos-de-uso`, priority: 0.2 },

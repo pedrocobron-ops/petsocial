@@ -1,5 +1,6 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import AdSlot from "./ad-slot";
+import Credito from "./credito";
 
 /**
  * Corpo da matéria com recursos editoriais de jornal:
@@ -19,7 +20,7 @@ const componentes: Components = {
     <figure className="body-figure">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={typeof src === "string" ? src : undefined} alt={alt ?? ""} loading="lazy" />
-      {alt ? <figcaption>{alt}</figcaption> : null}
+      {alt ? <figcaption><Credito texto={alt} /></figcaption> : null}
     </figure>
   ),
   a: ({ href, children }) => (
