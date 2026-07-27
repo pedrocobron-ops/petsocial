@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getAllPublishedSlugs, getCategories } from "@/lib/news";
+import { ANIMAIS } from "@/lib/animais";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
@@ -19,6 +20,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     ...categorias.map((c) => ({
       url: `${SITE_URL}/categoria/${c.slug}`,
+      changeFrequency: "daily" as const,
+      priority: 0.8,
+    })),
+    ...ANIMAIS.map((a) => ({
+      url: `${SITE_URL}/animal/${a.slug}`,
       changeFrequency: "daily" as const,
       priority: 0.8,
     })),

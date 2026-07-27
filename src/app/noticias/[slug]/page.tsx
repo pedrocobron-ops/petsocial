@@ -3,7 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAllPublishedSlugs, getArticle, getRelated } from "@/lib/news";
-import { dataLonga, paragrafos, tempoDeLeitura } from "@/lib/format";
+import { dataHora, paragrafos, tempoDeLeitura } from "@/lib/format";
+import { animalPorSlug } from "@/lib/animais";
 import ArticleCard from "@/components/article-card";
 import AdSlot from "@/components/ad-slot";
 import ShareRow from "@/components/share-row";
@@ -63,6 +64,13 @@ export default async function ArticlePage({ params }: Props) {
     new Date(artigo.updated_at).getTime() - new Date(artigo.published_at).getTime() >
       60 * 60 * 1000;
 
+  const animais = (artigo.animals ?? [])
+    .map(animalPorSlug)
+    .filter((a): a is NonNullable<typeof a> => Boolean(a));
+  const categoriasSecundarias = (artigo.secundarias ?? [])
+    .map((s) => s.category)
+    .filter((c): c is NonNullable<typeof c> => Boolean(c) && c!.id !== artigo.category_id);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
@@ -74,6 +82,11 @@ export default async function ArticlePage({ params }: Props) {
     inLanguage: "pt-BR",
     isAccessibleForFree: true,
     articleSection: artigo.category?.name,
+    keywords: [
+      ...animais.map((a) => a.singular),
+      ...categoriasSecundarias.map((c) => c.name),
+    ].join(", ") || undefined,
+    about: animais.map((a) => ({ "@type": "Thing", name: a.singular })),
     mainEntityOfPage: url,
     author: { "@type": "Organization", name: artigo.author_name, url: `${SITE_URL}/sobre` },
     publisher: {
@@ -140,10 +153,24 @@ export default async function ArticlePage({ params }: Props) {
         {artigo.dek && <p className="dek">{artigo.dek}</p>}
         <div className="article-meta">
           <span>Por <b>{artigo.author_name}</b></span>
-          <span>{dataLonga(artigo.published_at)}</span>
-          {foiAtualizada && <span>Atualizada em {dataLonga(artigo.updated_at)}</span>}
+          <span>Publicado em {dataHora(artigo.published_at)}</span>
+          {foiAtualizada && <span className="selo-atualizada">Atualizado em {dataHora(artigo.updated_at)}</span>}
           <span>⏱ {tempoDeLeitura(artigo.body)} min de leitura</span>
         </div>
+        {(animais.length > 0 || categoriasSecundarias.length > 0) && (
+          <div className="chips-row">
+            {animais.map((a) => (
+              <Link key={a.slug} href={`/animal/${a.slug}`} className="chip">
+                {a.emoji} {a.nome}
+              </Link>
+            ))}
+            {categoriasSecundarias.map((c) => (
+              <Link key={c.id} href={`/categoria/${c.slug}`} className="chip" style={{ color: c.color }}>
+                {c.emoji} {c.name}
+              </Link>
+            ))}
+          </div>
+        )}
         <ShareRow url={url} title={artigo.title} />
       </header>
 

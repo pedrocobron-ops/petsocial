@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 import { revalidarSite } from "@/components/admin/use-admin";
 import { slugify } from "@/lib/slug";
+import { ANIMAIS } from "@/lib/animais";
 
 interface Categoria { id: string; name: string; emoji: string }
 
@@ -31,9 +32,13 @@ const VAZIO: Form = {
   is_featured: false, status: "draft", published_at: null,
 };
 
+const SEM_ANIMAIS: string[] = [];
+
 export default function Editor({ articleId }: { articleId?: string }) {
   const router = useRouter();
   const [form, setForm] = useState<Form>(VAZIO);
+  const [animais, setAnimais] = useState<string[]>(SEM_ANIMAIS);
+  const [secundarias, setSecundarias] = useState<string[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [slugTravado, setSlugTravado] = useState(Boolean(articleId));
   const [salvando, setSalvando] = useState(false);
@@ -70,10 +75,20 @@ export default function Editor({ articleId }: { articleId?: string }) {
               status: data.status ?? "draft",
               published_at: data.published_at,
             });
+            setAnimais((data.animals as string[]) ?? []);
           }
         });
+      supabaseBrowser()
+        .from("news_article_categories")
+        .select("category_id")
+        .eq("article_id", articleId)
+        .then(({ data }) => setSecundarias((data ?? []).map((r) => r.category_id)));
     }
   }, [articleId]);
+
+  function alternarLista(lista: string[], setLista: (v: string[]) => void, valor: string) {
+    setLista(lista.includes(valor) ? lista.filter((v) => v !== valor) : [...lista, valor]);
+  }
 
   function set<K extends keyof Form>(campo: K, valor: Form[K]) {
     setForm((f) => {
@@ -110,6 +125,7 @@ export default function Editor({ articleId }: { articleId?: string }) {
 
     const status = publicar === undefined ? form.status : publicar ? "published" : "draft";
     const registro = {
+      animals: animais,
       title: form.title.trim(),
       slug: form.slug.trim(),
       dek: form.dek.trim() || null,
@@ -147,6 +163,17 @@ export default function Editor({ articleId }: { articleId?: string }) {
           : "❌ Erro ao salvar: " + erro
       );
       return;
+    }
+
+    // categorias secundárias: regrava o vínculo (sem incluir a principal)
+    if (idFinal) {
+      await sb.from("news_article_categories").delete().eq("article_id", idFinal);
+      const validas = secundarias.filter((c) => c && c !== form.category_id);
+      if (validas.length > 0) {
+        await sb.from("news_article_categories").insert(
+          validas.map((category_id) => ({ article_id: idFinal, category_id }))
+        );
+      }
     }
 
     setForm((f) => ({ ...f, id: idFinal, status, published_at: registro.published_at }));
@@ -230,6 +257,40 @@ export default function Editor({ articleId }: { articleId?: string }) {
             ⭐ Manchete (destaque na capa)
           </label>
         </div>
+
+        <label>
+          Para quais animais é esta matéria?
+          <div className="admin-chips">
+            {ANIMAIS.map((a) => (
+              <button
+                key={a.slug}
+                type="button"
+                className={animais.includes(a.slug) ? "on" : ""}
+                onClick={() => alternarLista(animais, setAnimais, a.slug)}
+              >
+                {a.emoji} {a.nome}
+              </button>
+            ))}
+          </div>
+        </label>
+
+        <label>
+          Categorias secundárias (opcional — a principal é a de cima)
+          <div className="admin-chips">
+            {categorias
+              .filter((c) => c.id !== form.category_id)
+              .map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={secundarias.includes(c.id) ? "on" : ""}
+                  onClick={() => alternarLista(secundarias, setSecundarias, c.id)}
+                >
+                  {c.emoji} {c.name}
+                </button>
+              ))}
+          </div>
+        </label>
 
         <label>
           Subtítulo (linha fina)

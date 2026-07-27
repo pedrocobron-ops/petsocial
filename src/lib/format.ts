@@ -19,6 +19,17 @@ export function dataDeHoje(): string {
   return `${dias[agora.getDay()]}, ${agora.getDate()} de ${MESES[agora.getMonth()]} de ${agora.getFullYear()}`;
 }
 
+/** "25 de junho de 2026, 14h32" (horário de Brasília) — padrão de portais. */
+export function dataHora(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(
+    new Date(iso).toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+  );
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}, ${hh}h${mm}`;
+}
+
 /** Tempo de leitura estimado (200 palavras/min), mínimo 1. */
 export function tempoDeLeitura(body: string): number {
   const palavras = body.trim().split(/\s+/).length;

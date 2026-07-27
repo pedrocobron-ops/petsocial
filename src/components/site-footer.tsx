@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getCategories } from "@/lib/news";
+import { ANIMAIS } from "@/lib/animais";
 
 export default async function SiteFooter() {
   const categorias = await getCategories();
@@ -30,6 +31,17 @@ export default async function SiteFooter() {
               {categorias.map((c) => (
                 <li key={c.id}>
                   <Link href={`/categoria/${c.slug}`}>{c.name}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="footer-col">
+            <h4>Por animal</h4>
+            <ul>
+              {ANIMAIS.map((a) => (
+                <li key={a.slug}>
+                  <Link href={`/animal/${a.slug}`}>{a.emoji} {a.nome}</Link>
                 </li>
               ))}
             </ul>

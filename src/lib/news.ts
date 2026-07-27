@@ -27,13 +27,15 @@ export interface NewsArticle {
   author_name: string;
   is_featured: boolean;
   view_count: number;
+  animals: string[];
   published_at: string | null;
   updated_at: string;
   category?: NewsCategory | null;
+  secundarias?: { category: NewsCategory | null }[];
 }
 
 const ARTICLE_FIELDS =
-  "id, slug, category_id, title, dek, cover_url, cover_caption, body, author_name, is_featured, view_count, published_at, updated_at, category:news_categories(*)";
+  "id, slug, category_id, title, dek, cover_url, cover_caption, body, author_name, is_featured, view_count, animals, published_at, updated_at, category:news_categories(*), secundarias:news_article_categories(category:news_categories(*))";
 
 const CARD_FIELDS =
   "id, slug, category_id, title, dek, cover_url, cover_caption, author_name, is_featured, view_count, published_at, updated_at, category:news_categories(*)";
@@ -126,6 +128,22 @@ export async function getByCategory(
       .limit(limit);
     if (excludeId) q = q.neq("id", excludeId);
     const { data } = await q;
+    return (data as unknown as NewsArticle[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Matérias direcionadas a um animal (hub /animal/[slug]). */
+export async function getByAnimal(animalSlug: string, limit = 30): Promise<NewsArticle[]> {
+  try {
+    const { data } = await supabase
+      .from("news_articles")
+      .select(CARD_FIELDS)
+      .eq("status", "published")
+      .contains("animals", [animalSlug])
+      .order("published_at", { ascending: false })
+      .limit(limit);
     return (data as unknown as NewsArticle[]) ?? [];
   } catch {
     return [];
