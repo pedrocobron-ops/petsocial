@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 import { revalidarSite } from "@/components/admin/use-admin";
+import BuscadorImagem from "@/components/admin/buscador-imagem";
 import { slugify } from "@/lib/slug";
 import { ANIMAIS } from "@/lib/animais";
 
@@ -50,6 +51,20 @@ const VAZIO: Form = {
 
 const SEM_ANIMAIS: string[] = [];
 
+/**
+ * Termos de busca que a rotina deixou nas notas ao editor, para o buscador
+ * de imagem já abrir com a sugestão pronta em vez de campo vazio.
+ */
+function termosSugeridos(body: string): string[] {
+  return [...body.matchAll(/sugest[ãa]o de termo [ée]\s*"([^"]+)"/gi)].map((m) => m[1]);
+}
+
+/** foto1, foto2, foto3: continua a numeração das fotos já inseridas no corpo. */
+function proximoSufixoFoto(body: string): string {
+  const usados = [...body.matchAll(/-foto(\d+)/g)].map((m) => Number(m[1]));
+  return `foto${(usados.length ? Math.max(...usados) : 0) + 1}`;
+}
+
 export default function Editor({ articleId }: { articleId?: string }) {
   const router = useRouter();
   const [form, setForm] = useState<Form>(VAZIO);
@@ -62,6 +77,7 @@ export default function Editor({ articleId }: { articleId?: string }) {
   const [quandoAgendar, setQuandoAgendar] = useState("");
   const [subindoCapa, setSubindoCapa] = useState(false);
   const [subindoFoto, setSubindoFoto] = useState(false);
+  const [busca, setBusca] = useState<null | { alvo: "capa" | "corpo"; termo: string }>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const fotoCorpoRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -422,6 +438,12 @@ export default function Editor({ articleId }: { articleId?: string }) {
               placeholder="Cole a URL de uma imagem ou use o botão ao lado"
             />
             <button
+              type="button" className="btn-ghost"
+              onClick={() => setBusca({ alvo: "capa", termo: "" })}
+            >
+              🔎 Buscar imagem
+            </button>
+            <button
               type="button" className="btn-ghost" disabled={subindoCapa}
               onClick={() => fileRef.current?.click()}
             >
@@ -432,6 +454,18 @@ export default function Editor({ articleId }: { articleId?: string }) {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) subirCapa(f); }}
             />
           </div>
+          {busca?.alvo === "capa" && (
+            <BuscadorImagem
+              termoInicial={busca.termo}
+              nomeBase={form.slug || "materia"}
+              sufixo="capa"
+              onFechar={() => setBusca(null)}
+              onEscolher={(url, credito) => {
+                set("cover_url", url);
+                if (!form.cover_caption.trim()) set("cover_caption", credito);
+              }}
+            />
+          )}
           {form.cover_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={form.cover_url} alt="Prévia da capa" className="admin-capa-previa" />
@@ -455,6 +489,12 @@ export default function Editor({ articleId }: { articleId?: string }) {
             <button type="button" onClick={() => formatar("\n\n## ", "", "Intertítulo")}>Intertítulo</button>
             <button type="button" onClick={() => formatar("\n\n> ", "", "Frase em destaque")}>❝ Destaque</button>
             <button type="button" onClick={() => formatar("\n\n- ", "", "item da lista")}>• Lista</button>
+            <button
+              type="button"
+              onClick={() => setBusca({ alvo: "corpo", termo: termosSugeridos(form.body)[0] ?? "" })}
+            >
+              🔎 Buscar foto
+            </button>
             <button type="button" disabled={subindoFoto} onClick={() => fotoCorpoRef.current?.click()}>
               {subindoFoto ? "Subindo…" : "📷 Foto no texto"}
             </button>
@@ -463,6 +503,17 @@ export default function Editor({ articleId }: { articleId?: string }) {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) subirFotoCorpo(f); e.target.value = ""; }}
             />
           </div>
+          {busca?.alvo === "corpo" && (
+            <BuscadorImagem
+              termoInicial={busca.termo}
+              nomeBase={form.slug || "materia"}
+              sufixo={proximoSufixoFoto(form.body)}
+              onFechar={() => setBusca(null)}
+              onEscolher={(url, credito) =>
+                formatar(`\n\n![Escreva a legenda desta foto aqui. ${credito}](${url})\n\n`, "", "")
+              }
+            />
+          )}
           <textarea
             ref={bodyRef}
             rows={18}

@@ -997,6 +997,36 @@ footer.site-footer {
   font-size: 12.5px; color: var(--ink-soft); word-break: break-all;
 }
 
+/* Buscador de imagem do Wikimedia, dentro do editor */
+.buscaimg {
+  margin-top: 10px; padding: 14px; border: 1px solid #dbeafe; border-radius: 12px;
+  background: #f8fbff; font-weight: 400;
+}
+.buscaimg-topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.buscaimg-dica { margin: 8px 0 12px; font-size: 13px; line-height: 1.5; color: #475569; }
+.buscaimg-campo { display: flex; gap: 8px; }
+.buscaimg-campo input { flex: 1; min-width: 0; }
+.buscaimg-msg { margin: 10px 0 0; font-size: 13.5px; color: #475569; }
+
+.buscaimg-grade {
+  list-style: none; margin: 14px 0 0; padding: 0;
+  display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+}
+.buscaimg-grade button {
+  display: flex; flex-direction: column; gap: 6px; width: 100%; height: 100%;
+  padding: 8px; text-align: left; cursor: pointer;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+}
+.buscaimg-grade button:hover:not(:disabled) { border-color: #2563eb; background: #f0f7ff; }
+.buscaimg-grade button:disabled { opacity: .55; cursor: default; }
+.buscaimg-grade img {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+  border-radius: 6px; background: #eef2f7;
+}
+.buscaimg-titulo { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: #0f172a; }
+.buscaimg-credito { font-size: 11px; line-height: 1.35; color: #64748b; }
+.buscaimg-salvando { font-size: 11.5px; font-weight: 700; color: #2563eb; }
+
 .mesa-sugestao {
   display: inline-block; margin-left: 8px; padding: 1px 8px;
   background: #fffbeb; border: 1px solid #fde68a; border-radius: 99px;
