@@ -77,12 +77,19 @@ export async function POST(req: Request) {
   // matéria cuja capa veio do aplicativo antigo, sem autor e sem licença:
   // imagem de origem desconhecida é passivo, e trocar por uma do Commons,
   // com crédito, resolve o texto e a exposição de uma vez.
-  const { data: pendentes, error } = await sb
-    .from("news_articles")
-    .select("id, slug, title, body, cover_url, cover_query")
-    .not("cover_query", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(lote);
+  //
+  // Rascunho vem primeiro. Matéria que ainda não saiu é a que trava a
+  // publicação; matéria antiga já está no ar e pode esperar a próxima volta.
+  const colunas = "id, slug, title, body, cover_url, cover_query";
+  const fila = (status?: string) => {
+    const q = sb.from("news_articles").select(colunas).not("cover_query", "is", null);
+    return (status ? q.eq("status", status) : q)
+      .order("created_at", { ascending: true })
+      .limit(lote);
+  };
+
+  let { data: pendentes, error } = await fila("draft");
+  if (!error && (pendentes?.length ?? 0) === 0) ({ data: pendentes, error } = await fila());
 
   if (error) return Response.json({ ok: false, erro: error.message }, { status: 500 });
 
