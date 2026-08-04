@@ -6,6 +6,7 @@ import { dataLonga } from "@/lib/format";
 import ArticleCard from "@/components/article-card";
 import AdSlot from "@/components/ad-slot";
 import Reveal from "@/components/reveal";
+import { capaDe } from "@/lib/capa";
 
 export const revalidate = 60; // atualiza a cada minuto (capta publicações agendadas)
 
@@ -53,18 +54,16 @@ export default async function Home() {
       <section className="lead-grid">
         <div>
           <article className="lead-main" style={{ ["--cat-cor" as string]: corPrincipal }}>
-            {principal.cover_url && (
-              <Link href={`/noticias/${principal.slug}`} className="cover">
-                <Image
-                  src={principal.cover_url}
-                  alt=""
-                  fill
-                  priority
-                  sizes="(max-width: 920px) 100vw, 66vw"
-                  style={{ objectFit: "cover" }}
-                />
-              </Link>
-            )}
+            <Link href={`/noticias/${principal.slug}`} className="cover">
+              <Image
+                src={capaDe(principal)}
+                alt=""
+                fill
+                priority
+                sizes="(max-width: 920px) 100vw, 66vw"
+                style={{ objectFit: "cover" }}
+              />
+            </Link>
             <div className="lead-body">
               {principal.category && (
                 <span className="kicker" style={{ color: corPrincipal }}>

@@ -238,12 +238,11 @@ export default function RedacaoPage() {
           {visiveis.map((l) => (
             <li key={l.id} className="mesa-item">
               <Link href={`/redacao/editar/${l.id}`} className="mesa-capa" aria-hidden tabIndex={-1}>
-                {l.cover_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.cover_url} alt="" loading="lazy" />
-                ) : (
-                  <span className="sem-capa">sem<br />capa</span>
-                )}
+                {/* Sem foto, mostra a capa gerada, que é o que o leitor veria
+                    hoje. A tarja avisa que ainda cabe uma fotografia ali. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={l.cover_url || `/api/capa/${l.slug}`} alt="" loading="lazy" />
+                {!l.cover_url && <span className="capa-gerada">sem foto</span>}
               </Link>
 
               <div className="mesa-info">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { capaDe, capaAbsolutaDe, ehCapaGerada } from "@/lib/capa";
 import { getAllPublishedSlugs, getArticle, getRelated } from "@/lib/news";
 import { dataHora, paragrafos, tempoDeLeitura } from "@/lib/format";
 import { animalPorSlug } from "@/lib/animais";
@@ -48,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       modifiedTime: artigo.updated_at,
       authors: [artigo.author_name],
       section: artigo.category?.name,
-      images: artigo.cover_url ? [{ url: artigo.cover_url }] : undefined,
+      images: [{ url: capaAbsolutaDe(artigo) }],
     },
     twitter: { card: "summary_large_image" },
   };
@@ -82,7 +83,7 @@ export default async function ArticlePage({ params }: Props) {
     "@type": "NewsArticle",
     headline: artigo.title,
     description: artigo.dek ?? undefined,
-    image: artigo.cover_url ? [artigo.cover_url] : undefined,
+    image: [capaAbsolutaDe(artigo)],
     datePublished: artigo.published_at ?? undefined,
     dateModified: artigo.updated_at,
     inLanguage: "pt-BR",
@@ -199,12 +200,15 @@ export default async function ArticlePage({ params }: Props) {
         <ShareRow url={url} title={artigo.title} />
       </header>
 
-      {artigo.cover_url && (
+      {/* A capa gerada já traz o título dentro dela, então repeti-la no topo
+          da matéria seria dizer a mesma coisa duas vezes. Ela existe para o
+          card e para o compartilhamento; aqui em cima, só entra foto real. */}
+      {!ehCapaGerada(artigo) && (
         <Reveal>
           <figure className="article-cover">
             <div className="frame">
               <Image
-                src={artigo.cover_url}
+                src={capaDe(artigo)}
                 alt={artigo.cover_caption ?? artigo.title}
                 fill
                 priority

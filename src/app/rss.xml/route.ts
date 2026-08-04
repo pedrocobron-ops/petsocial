@@ -1,4 +1,5 @@
 import { getLatest } from "@/lib/news";
+import { capaAbsolutaDe } from "@/lib/capa";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
@@ -25,7 +26,7 @@ export async function GET() {
       ${a.dek ? `<description>${esc(a.dek)}</description>` : ""}
       ${a.published_at ? `<pubDate>${new Date(a.published_at).toUTCString()}</pubDate>` : ""}
       ${a.category ? `<category>${esc(a.category.name)}</category>` : ""}
-      ${a.cover_url ? `<enclosure url="${esc(a.cover_url)}" type="image/jpeg"/>` : ""}
+      <enclosure url="${esc(capaAbsolutaDe(a))}" type="image/jpeg"/>
     </item>`;
     })
     .join("\n");
