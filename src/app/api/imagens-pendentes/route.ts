@@ -73,10 +73,13 @@ export async function POST(req: Request) {
   const corpo = await req.json().catch(() => ({}));
   const lote = Math.min(Math.max(Number(corpo?.lote) || LOTE_PADRAO, 1), 5);
 
+  // cover_query é a fila. Vale para matéria sem capa nenhuma e também para
+  // matéria cuja capa veio do aplicativo antigo, sem autor e sem licença:
+  // imagem de origem desconhecida é passivo, e trocar por uma do Commons,
+  // com crédito, resolve o texto e a exposição de uma vez.
   const { data: pendentes, error } = await sb
     .from("news_articles")
     .select("id, slug, title, body, cover_url, cover_query")
-    .is("cover_url", null)
     .not("cover_query", "is", null)
     .order("created_at", { ascending: true })
     .limit(lote);
@@ -103,7 +106,11 @@ export async function POST(req: Request) {
         .update({ cover_url: escolhida.url, cover_caption: escolhida.credito, cover_query: null })
         .eq("id", artigo.id);
     } else {
-      aviso = "Nenhuma candidata livre de direitos para o termo da capa.";
+      // Sai da fila mesmo sem achar foto, senão o lote seguinte pega a mesma
+      // matéria e o botão gira em falso até bater o limite de voltas. O nome
+      // dela vai no relatório para o editor tentar outro termo na mão.
+      aviso = "Nenhuma candidata livre de direitos para este termo.";
+      await sb.from("news_articles").update({ cover_query: null }).eq("id", artigo.id);
     }
 
     // Fotos do corpo: cada nota ao editor traz o termo que a redação escolheu.
@@ -136,7 +143,6 @@ export async function POST(req: Request) {
   const { count } = await sb
     .from("news_articles")
     .select("id", { count: "exact", head: true })
-    .is("cover_url", null)
     .not("cover_query", "is", null);
 
   return Response.json({ ok: true, processadas: relatorio, restantes: count ?? 0 });

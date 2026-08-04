@@ -14,6 +14,7 @@ interface Linha {
   is_featured: boolean;
   view_count: number;
   cover_url: string | null;
+  cover_query: string | null;
   published_at: string | null;
   scheduled_at: string | null;
   updated_at: string;
@@ -97,7 +98,7 @@ export default function RedacaoPage() {
   async function carregarLista() {
     const { data } = await supabaseBrowser()
       .from("news_articles")
-      .select("id, slug, title, status, is_featured, view_count, cover_url, published_at, scheduled_at, updated_at, created_at, category:news_categories!category_id(name, color)")
+      .select("id, slug, title, status, is_featured, view_count, cover_url, cover_query, published_at, scheduled_at, updated_at, created_at, category:news_categories!category_id(name, color)")
       .order("updated_at", { ascending: false })
       .limit(300);
     setLinhas((data as unknown as Linha[]) ?? []);
@@ -212,7 +213,8 @@ export default function RedacaoPage() {
     ? daAba.filter((l) => l.title.toLowerCase().includes(busca.toLowerCase()))
     : daAba;
 
-  const semFoto = todas.filter((l) => !l.cover_url).length;
+  // Fila de imagem: matéria sem foto, ou com foto de origem não documentada.
+  const semFoto = todas.filter((l) => l.cover_query).length;
 
   const ABAS: { id: Aba; rotulo: string; icone: string; n: number }[] = [
     { id: "revisar", rotulo: "Aguardando revisão", icone: "📥", n: rascunhos.length },
@@ -240,7 +242,7 @@ export default function RedacaoPage() {
               onClick={buscarFotosQueFaltam}
               title="Busca no Wikimedia Commons e salva no jornal, só imagem livre de direitos"
             >
-              {buscandoFotos ? "Buscando fotos…" : `🖼 Buscar as ${semFoto} fotos que faltam`}
+              {buscandoFotos ? "Buscando fotos…" : `🖼 Resolver imagem de ${semFoto} matérias`}
             </button>
           )}
           <Link href="/redacao/nova" className="btn-primary">+ Nova matéria</Link>
