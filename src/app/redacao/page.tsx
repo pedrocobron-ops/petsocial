@@ -91,6 +91,8 @@ export default function RedacaoPage() {
   const [linhas, setLinhas] = useState<Linha[] | null>(null);
   const [busca, setBusca] = useState("");
   const [aba, setAba] = useState<Aba>("revisar");
+  const [buscandoFotos, setBuscandoFotos] = useState(false);
+  const [progressoFotos, setProgressoFotos] = useState("");
 
   async function carregarLista() {
     const { data } = await supabaseBrowser()
@@ -154,6 +156,52 @@ export default function RedacaoPage() {
     carregarLista();
   }
 
+  /**
+   * Busca no Wikimedia Commons as fotos que faltam, em lotes pequenos, até
+   * zerar. O trabalho acontece no servidor do site, que tem saída para a
+   * internet; aqui é só o disparo e o acompanhamento. Só entra imagem de
+   * domínio público, CC0 ou CC BY, com crédito do autor na legenda.
+   */
+  async function buscarFotosQueFaltam() {
+    setBuscandoFotos(true);
+    setProgressoFotos("Procurando imagens livres de direitos no Wikimedia…");
+    const { data } = await supabaseBrowser().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) { setBuscandoFotos(false); setProgressoFotos("Sessão expirada. Entre de novo."); return; }
+
+    let capas = 0, fotos = 0, semResultado = 0;
+    try {
+      // Trava de segurança: se um lote não render nada, para em vez de girar.
+      for (let volta = 0; volta < 40; volta++) {
+        const r = await fetch("/api/imagens-pendentes", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ lote: 3 }),
+        });
+        const j = await r.json();
+        if (!j.ok) { setProgressoFotos("❌ " + (j.erro ?? "A busca falhou.")); break; }
+
+        for (const p of j.processadas ?? []) {
+          if (p.capa) capas++; else semResultado++;
+          fotos += p.fotos ?? 0;
+        }
+        setProgressoFotos(`Buscando… ${capas} capas e ${fotos} fotos de corpo até agora, ${j.restantes} matérias na fila.`);
+        if (!j.processadas?.length || j.restantes === 0) {
+          setProgressoFotos(
+            `✅ ${capas} capas e ${fotos} fotos inseridas.` +
+            (semResultado ? ` ${semResultado} sem candidata livre: use o 🔎 Buscar imagem dentro da matéria com outro termo.` : "")
+          );
+          break;
+        }
+      }
+    } catch (e) {
+      setProgressoFotos("❌ " + String(e));
+    }
+    setBuscandoFotos(false);
+    await carregarLista();
+    await revalidarSite();
+  }
+
   const todas = linhas ?? [];
   const rascunhos = todas.filter((l) => l.status === "draft");
   const agendadas = todas.filter((l) => l.status === "scheduled");
@@ -163,6 +211,8 @@ export default function RedacaoPage() {
   const visiveis = busca
     ? daAba.filter((l) => l.title.toLowerCase().includes(busca.toLowerCase()))
     : daAba;
+
+  const semFoto = todas.filter((l) => !l.cover_url).length;
 
   const ABAS: { id: Aba; rotulo: string; icone: string; n: number }[] = [
     { id: "revisar", rotulo: "Aguardando revisão", icone: "📥", n: rascunhos.length },
@@ -183,9 +233,21 @@ export default function RedacaoPage() {
           </div>
         </div>
         <div className="admin-acoes">
+          {semFoto > 0 && (
+            <button
+              className="btn-ghost"
+              disabled={buscandoFotos}
+              onClick={buscarFotosQueFaltam}
+              title="Busca no Wikimedia Commons e salva no jornal, só imagem livre de direitos"
+            >
+              {buscandoFotos ? "Buscando fotos…" : `🖼 Buscar as ${semFoto} fotos que faltam`}
+            </button>
+          )}
           <Link href="/redacao/nova" className="btn-primary">+ Nova matéria</Link>
         </div>
       </header>
+
+      {progressoFotos && <p className="admin-msg">{progressoFotos}</p>}
 
       {/* Abas por etapa do fluxo editorial */}
       <nav className="mesa-abas" aria-label="Etapas">
