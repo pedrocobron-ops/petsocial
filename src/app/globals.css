@@ -134,7 +134,7 @@ a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
 .paginas img:last-child { bottom: 0; right: 0; transform: rotate(4deg); }
 
 .metodo-art { width: 100%; max-width: 760px; border-radius: 22px; border: 6px solid #fff; box-shadow: var(--shadow); margin: 0 0 32px; }
-.dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }
+.dias { display: grid; grid-template-columns: repeat(var(--cols, 7), 1fr); gap: 12px; }
 .dia { background: var(--paper); border-radius: 14px; padding: 18px 14px; border: 1px solid var(--line); text-align: center; }
 .dia small { display: block; font-family: var(--display); letter-spacing: .14em; text-transform: uppercase; font-size: .7rem; color: var(--muted); }
 .dia b { display: block; font-family: var(--headline); font-size: 2.4rem; font-weight: 900; color: var(--brand); line-height: 1.05; }
@@ -212,3 +212,22 @@ a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
   .oferta-box { padding: 24px; }
   .topo nav a:nth-child(2) { display: none; }
 }
+
+/* ---------- Home: pilares e dicas ---------- */
+.pilares { background: var(--ink-2); color: #e7ddd2; padding: 30px 0; }
+.pilares-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+.pilar { display: flex; gap: 12px; align-items: flex-start; }
+.pilar-ic { font-size: 1.6rem; line-height: 1; background: rgba(249,115,22,.15); border-radius: 12px; padding: 10px; }
+.pilar b { color: #fff; display: block; margin-bottom: 2px; }
+.pilar p { font-size: .9rem; color: #cbbfb2; line-height: 1.45; }
+.dicas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.dica { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: grid; }
+.dica img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.dica > div { padding: 22px; }
+.dica h3 { margin-bottom: 8px; }
+.dica p { color: var(--ink-soft); font-size: .97rem; }
+@media (max-width: 900px) {
+  .pilares-grid { grid-template-columns: 1fr 1fr; }
+  .dicas { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) { .pilares-grid { grid-template-columns: 1fr; } }

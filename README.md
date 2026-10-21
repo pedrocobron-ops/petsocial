@@ -26,7 +26,9 @@ Tudo fica em `src/lib/produtos.ts`. Para colocar um guia à venda:
 
 1. Crie o produto na Cakto e copie o link de pagamento (`https://pay.cakto.com.br/...`).
 2. Cole o link no campo `checkout` do produto. Enquanto estiver vazio, o botão aparece como "Em breve".
-3. Para lançar um guia novo, marque `lancado: true` e crie a página `src/app/(site)/<slug>/page.tsx`.
+3. Para lançar um guia novo, escreva o conteúdo da página de vendas em `src/lib/vendas/<slug>.ts`
+   (mesmo formato de `xixi.ts`), registre em `src/lib/vendas/index.ts` e marque `lancado: true` no catálogo.
+   A rota `/<slug>` é gerada automaticamente.
 
 ## Variáveis de ambiente (Vercel)
 
