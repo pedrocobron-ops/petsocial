@@ -32,13 +32,13 @@ export const PRODUTOS: Produto[] = [
   {
     slug: "petiscos",
     nome: "Petiscos do Maestro",
-    chamada: "Receitas caseiras, baratas e seguras para agradar seu cachorro.",
+    chamada: "30 receitas caseiras, baratas e seguras para agradar seu cachorro.",
     dor: "Quer dar petisco saudável e não sabe o que pode",
     preco: 19.9,
     precoDe: 47,
-    capa: "/produtos/capa-petiscos.webp",
+    capa: "/produtos/petiscos-capa.webp",
     checkout: "",
-    lancado: false,
+    lancado: true,
   },
   {
     slug: "filhote",
