@@ -1,68 +1,44 @@
-# Maestro Pet — Jornal do Universo Pet 🐾📰
+# Maestro Pet — Loja de guias
 
-Portal de notícias sobre o universo pet (cães, gatos e companhia), construído
-para **performance no Google** e monetização com **Google AdSense**.
-
-- **Site:** [maestropet.com](https://maestropet.com)
-- **Mascote:** Mozart, o border collie editor-chefe 🐶
+Site do [maestropet.com](https://maestropet.com): loja de guias digitais (low-ticket) para tutores de cães e
+gatos, apresentados pelo Mozart, o border collie da marca. O pagamento, a entrega e a área de membros ficam
+na **Cakto**; este site tem a vitrine e as páginas de vendas.
 
 ## Stack
 
-- **Next.js 15** (App Router, renderização no servidor + ISR) — HTML pronto
-  para o Google indexar, atualizado a cada 5 minutos sem rebuild.
-- **Supabase** (Postgres) — o CMS: matérias ficam nas tabelas `news_articles`
-  e `news_categories` (leitura pública via RLS).
-- **TypeScript** · CSS puro (design system próprio, tipografia de jornal).
+- **Next.js 15** (App Router, páginas estáticas) · TypeScript · CSS próprio
+- Hospedagem na **Vercel**
 
-## SEO embutido
+## Páginas
 
-| Recurso | Onde |
+| Rota | O que é |
 |---|---|
-| Meta tags + Open Graph + Twitter Card | `layout.tsx` e `generateMetadata` por página |
-| Dados estruturados `NewsArticle` (JSON-LD) | página da matéria |
-| `sitemap.xml` automático | `src/app/sitemap.ts` |
-| `robots.txt` | `src/app/robots.ts` |
-| Feed RSS | `/rss.xml` |
-| `ads.txt` (AdSense) | `/ads.txt` — gerado da env `NEXT_PUBLIC_ADSENSE_CLIENT` |
-| URLs canônicas e limpas | `/noticias/[slug]`, `/categoria/[slug]` |
+| `/` | Vitrine com todos os guias |
+| `/xixi` | Página de vendas do guia **Xixi no Lugar Certo** |
+| `/sobre`, `/contato` | Institucional e suporte |
+| `/termos-de-uso`, `/politica-de-privacidade` | Exigidas pela Cakto e pelo Meta Ads |
 
-## Como rodar localmente
+As URLs antigas do jornal e da rede social redirecionam (301) para a página inicial — ver `next.config.ts`.
+
+## Produtos
+
+Tudo fica em `src/lib/produtos.ts`. Para colocar um guia à venda:
+
+1. Crie o produto na Cakto e copie o link de pagamento (`https://pay.cakto.com.br/...`).
+2. Cole o link no campo `checkout` do produto. Enquanto estiver vazio, o botão aparece como "Em breve".
+3. Para lançar um guia novo, marque `lancado: true` e crie a página `src/app/(site)/<slug>/page.tsx`.
+
+## Variáveis de ambiente (Vercel)
+
+| Variável | Para quê |
+|---|---|
+| `NEXT_PUBLIC_SITE_URL` | URL canônica (padrão: `https://maestropet.com`) |
+| `NEXT_PUBLIC_META_PIXEL_ID` | Liga o Pixel da Meta em todas as páginas |
+| `GOOGLE_SITE_VERIFICATION` | Verificação do Google Search Console |
+
+## Rodar localmente
 
 ```bash
 npm install
-npm run dev        # abre em http://localhost:3000
+npm run dev   # http://localhost:3000
 ```
-
-Não precisa configurar nada: a conexão com o Supabase usa a chave pública
-(anon), que é segura para exposição — o banco é protegido por Row Level
-Security e só serve matérias com `status = 'published'`.
-
-## Publicar (Vercel)
-
-1. Importe este repositório em [vercel.com/new](https://vercel.com/new).
-2. Framework: **Next.js** (detectado sozinho). Deploy.
-3. Aponte o domínio `maestropet.com` no painel da Vercel.
-
-### Ligar o AdSense (quando a conta for aprovada)
-
-Na Vercel → Settings → Environment Variables, adicione:
-
-```
-NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-SEU-ID-AQUI
-```
-
-Redeploy — os blocos de anúncio e o `/ads.txt` ligam automaticamente.
-
-## Onde está o app antigo (rede social)?
-
-O aplicativo social original do Maestro Pet está preservado na branch
-[`legado-app-rede-social`](../../tree/legado-app-rede-social). O banco de
-dados no Supabase é compartilhado — nada foi apagado.
-
-## Publicar uma nova matéria
-
-Inserir uma linha em `news_articles` no Supabase com `status='published'`
-(via painel do Supabase ou automação). O site atualiza sozinho em até 5
-minutos. Campos principais: `slug`, `title`, `dek` (subtítulo), `cover_url`,
-`body` (parágrafos separados por linha em branco), `category_id`,
-`published_at`, `is_featured`.

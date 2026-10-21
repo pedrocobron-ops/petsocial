@@ -1,71 +1,41 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getCategories } from "@/lib/news";
-import { ANIMAIS } from "@/lib/animais";
+import { PRODUTOS } from "@/lib/produtos";
 
-export default async function SiteFooter() {
-  const categorias = await getCategories();
-  const ano = new Date().getFullYear();
-
+export default function SiteFooter() {
   return (
-    <footer className="site-footer">
-      <div className="container">
-        <div className="footer-grid">
-          <div>
-            <div className="footer-brand">
-              <span className="face">
-                <Image src="/mozart/rosto.png" alt="" width={44} height={44} />
-              </span>
-              <span className="nome">Maestro Pet</span>
-            </div>
-            <p className="footer-desc">
-              Jornalismo dedicado ao universo pet: saúde, comportamento,
-              nutrição, adoção e curiosidades — com a curadoria carinhosa do
-              Mozart, nosso border collie editor-chefe.
-            </p>
+    <footer className="rodape">
+      <div className="container rodape-grid">
+        <div>
+          <div className="marca marca-clara">
+            <Image src="/mozart/rosto.png" alt="" width={40} height={40} />
+            <span>Maestro<em>Pet</em></span>
           </div>
-
-          <div className="footer-col">
-            <h4>Editorias</h4>
-            <ul>
-              {categorias.map((c) => (
-                <li key={c.id}>
-                  <Link href={`/categoria/${c.slug}`}>{c.name}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="footer-col">
-            <h4>Por animal</h4>
-            <ul>
-              {ANIMAIS.map((a) => (
-                <li key={a.slug}>
-                  <Link href={`/animal/${a.slug}`}>{a.emoji} {a.nome}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="footer-col">
-            <h4>Institucional</h4>
-            <ul>
-              <li><Link href="/sobre">Sobre o Maestro Pet</Link></li>
-              <li><Link href="/contato">Contato</Link></li>
-              <li><Link href="/principios-editoriais">Princípios Editoriais</Link></li>
-              <li><Link href="/creditos-de-imagem">Créditos de Imagem</Link></li>
-              <li><Link href="/politica-de-privacidade">Política de Privacidade</Link></li>
-              <li><Link href="/termos-de-uso">Termos de Uso</Link></li>
-            </ul>
-          </div>
+          <p>Guias práticos para tutores de cães e gatos, com o carinho e a paciência do Mozart, nosso border collie.</p>
         </div>
-
-        <div className="footer-bottom">
-          <span>© {ano} Maestro Pet — Todos os direitos reservados.</span>
-          <span>
-            Conteúdo informativo: não substitui a consulta com um médico-veterinário.
-          </span>
+        <div>
+          <h4>Guias</h4>
+          <ul>
+            {PRODUTOS.map((p) => (
+              <li key={p.slug}>{p.lancado ? <Link href={`/${p.slug}`}>{p.nome}</Link> : <span>{p.nome} <small>(em breve)</small></span>}</li>
+            ))}
+          </ul>
         </div>
+        <div>
+          <h4>Institucional</h4>
+          <ul>
+            <li><Link href="/sobre">Sobre</Link></li>
+            <li><Link href="/contato">Contato e suporte</Link></li>
+            <li><Link href="/termos-de-uso">Termos de uso</Link></li>
+            <li><Link href="/politica-de-privacidade">Política de privacidade</Link></li>
+          </ul>
+        </div>
+      </div>
+      <div className="container rodape-legal">
+        <p>
+          Os guias do Maestro Pet têm caráter educativo e não substituem a avaliação de um(a) médico(a)-veterinário(a).
+          Pagamentos processados pela Cakto. © {new Date().getFullYear()} Maestro Pet.
+        </p>
       </div>
     </footer>
   );
