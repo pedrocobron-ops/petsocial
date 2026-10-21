@@ -14,7 +14,8 @@ export default function Comprar({ produto, texto = "Quero o guia agora", grande 
       className={cls}
       href={produto.checkout}
       rel="nofollow"
-      onClick={() => rastrear("InitiateCheckout", { content_name: produto.nome, value: produto.preco, currency: "BRL" })}
+      // O InitiateCheckout sai do checkout da Cakto; aqui o clique conta como AddToCart, para não duplicar.
+      onClick={() => rastrear("AddToCart", { content_name: produto.nome, value: produto.preco, currency: "BRL" })}
     >
       {texto}
     </a>

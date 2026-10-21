@@ -12,9 +12,10 @@ declare global {
   interface Window { fbq?: Fbq }
 }
 
-/** Dispara um evento do Pixel, se ele já tiver carregado. */
-export function rastrear(evento: string, dados?: Record<string, unknown>) {
-  window.fbq?.("track", evento, dados);
+/** Dispara um evento do Pixel. Se o script ainda não carregou, tenta de novo por até 10 s. */
+export function rastrear(evento: string, dados?: Record<string, unknown>, tentativa = 0) {
+  if (window.fbq) window.fbq("track", evento, dados);
+  else if (tentativa < 20) setTimeout(() => rastrear(evento, dados, tentativa + 1), 500);
 }
 
 /** Meta Pixel: PageView na carga e a cada troca de página feita pelo Next. */
