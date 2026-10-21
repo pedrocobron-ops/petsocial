@@ -36,6 +36,7 @@ export const PRODUTOS: Produto[] = [
     dor: "Quer dar petisco saudável e não sabe o que pode",
     preco: 19.9,
     precoDe: 47,
+    capa: "/produtos/capa-petiscos.webp",
     checkout: "",
     lancado: false,
   },
