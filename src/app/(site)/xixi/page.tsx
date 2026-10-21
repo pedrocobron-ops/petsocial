@@ -85,7 +85,7 @@ export default function XixiPage() {
       {/* VIRADA */}
       <section className="secao secao-escura">
         <div className="container virada">
-          <Image src="/mozart/sorrindo.webp" alt="Mozart sorrindo" width={260} height={260} />
+          <Image className="virada-art" src="/produtos/mozart-tapete.webp" alt="Mozart sentado ao lado do tapete higiênico" width={330} height={409} />
           <div>
             <span className="eyebrow">Um segredo de cachorro, contado pelo Mozart</span>
             <h2>Ele não faz xixi no lugar errado para te provocar.</h2>
