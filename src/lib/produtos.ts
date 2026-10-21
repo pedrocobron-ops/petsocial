@@ -47,9 +47,9 @@ export const PRODUTOS: Produto[] = [
     dor: "O filhote chora à noite e morde tudo",
     preco: 27,
     precoDe: 67,
-    capa: "/produtos/capa-filhote.webp",
+    capa: "/produtos/filhote-capa.webp",
     checkout: "",
-    lancado: false,
+    lancado: true,
   },
   {
     slug: "sozinho",
