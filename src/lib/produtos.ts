@@ -26,7 +26,7 @@ export const PRODUTOS: Produto[] = [
     preco: 27,
     precoDe: 67,
     capa: "/produtos/xixi-capa.webp",
-    checkout: "",
+    checkout: "https://pay.cakto.com.br/rmu4ida",
     lancado: true,
   },
   {
