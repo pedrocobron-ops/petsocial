@@ -9,7 +9,8 @@ export type PaginaVendas = {
   metodo: { eyebrow: string; titulo: string; imagem?: string; alt?: string; passos: [string, string][] };
   bonus: { titulo: string; itens: { imagem?: string; icone?: string; titulo: string; texto: string }[] };
   paraQuem: { sim: string[]; nao: string[] };
-  oferta: { itens: string[] };
+  /** `complemento`: o order bump oferecido no checkout da Cakto, em uma frase. */
+  oferta: { itens: string[]; complemento?: string };
   garantia: string;
   faq: [string, string][];
   ctaFinal: string;

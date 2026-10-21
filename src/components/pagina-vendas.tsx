@@ -136,6 +136,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
               <strong>{reais(p.preco)}</strong>
               <small>pagamento único · Pix ou cartão</small>
             </div>
+            {c.oferta.complemento && <p className="complemento"><b>No checkout:</b> {c.oferta.complemento}</p>}
             <Comprar produto={p} texto="Quero o guia agora" grande />
             <p className="seguro">Pagamento seguro processado pela Cakto · acesso enviado por e-mail</p>
           </div>

@@ -285,6 +285,7 @@ h1 em { background: linear-gradient(transparent 64%, rgba(249, 115, 22, .22) 64%
 .mv .dores blockquote.rv { translate: -28px 0; }
 .mv .paginas img.rv:first-child { translate: -48px 12px; }
 .mv .paginas img.rv:last-child { translate: 48px 12px; }
+main { overflow-x: clip; }
 .mv .rv.in { opacity: 1; translate: none; }
 .mv .guia-off.rv.in { opacity: .85; }
 .dia.vis b { animation: pop .55s cubic-bezier(.2, .7, .2, 1) calc(var(--i, 0) * 85ms + .25s) both; }
@@ -335,3 +336,5 @@ a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
   h1 em { background-size: 100% 100%; }
   .mv .rv { opacity: 1; translate: none; }
 }
+.complemento { background: var(--brand-surface); border: 1px dashed var(--brand-border); border-radius: 12px; padding: 10px 14px; font-size: .92rem; color: var(--ink-soft); margin: -6px 0 18px; }
+.complemento b { color: var(--brand-dark); }
