@@ -88,6 +88,7 @@ export const xixi: PaginaVendas = {
     ],
   },
   oferta: {
+    complemento: "adicione a Rotina de 7 Dias para imprimir, um cartão por dia para a família toda seguir, por só R$\u00a09,90.",
     itens: [
       "Guia completo ilustrado (23 páginas)",
       "Diagnóstico rápido do seu caso",

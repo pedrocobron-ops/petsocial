@@ -85,6 +85,7 @@ export const filhote: PaginaVendas = {
     ],
   },
   oferta: {
+    complemento: "adicione o Kit Enxoval + Calendário de Saúde para imprimir, com lista de compras e carteirinha de vacinas, por só R$\u00a09,90.",
     itens: [
       "Guia completo ilustrado (29 páginas)",
       "Preparação da casa e enxoval",
