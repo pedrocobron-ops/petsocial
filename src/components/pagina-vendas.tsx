@@ -1,4 +1,5 @@
 import Image from "next/image";
+import BarraCompra from "@/components/barra-compra";
 import Comprar from "@/components/comprar";
 import type { Produto } from "@/lib/produtos";
 import { reais } from "@/lib/produtos";
@@ -9,9 +10,27 @@ function Rico({ texto }: { texto: string }) {
   return <>{texto.split(/(\*\*[^*]+\*\*)/g).map((t, i) => (t.startsWith("**") ? <b key={i}>{t.slice(2, -2)}</b> : t))}</>;
 }
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
+
 export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
+  const produtoLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: p.nome,
+    description: c.seo.descricao,
+    image: p.capa ? `${SITE_URL}${p.capa}` : undefined,
+    brand: { "@type": "Brand", name: "Maestro Pet" },
+    offers: {
+      "@type": "Offer",
+      price: p.preco.toFixed(2),
+      priceCurrency: "BRL",
+      availability: p.checkout ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
+      url: `${SITE_URL}/${p.slug}`,
+    },
+  };
   return (
-    <>
+    <div className="com-barra">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(produtoLd) }} />
       <section className="lp-hero">
         <div className="container lp-hero-grid">
           <div>
@@ -144,6 +163,8 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           <p className="aviso">{c.aviso}</p>
         </div>
       </section>
-    </>
+
+      <BarraCompra nome={p.nome} preco={reais(p.preco)} />
+    </div>
   );
 }

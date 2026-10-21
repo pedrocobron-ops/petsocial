@@ -1,13 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
+import { BookOpen, HeartHandshake, ShieldCheck, Zap } from "lucide-react";
 import { PRODUTOS, reais } from "@/lib/produtos";
 
 const PILARES = [
-  ["🐾", "Reforço positivo", "Nada de bronca ou castigo. Métodos que ensinam com confiança e carinho."],
-  ["📖", "Passo a passo ilustrado", "Guias curtos, visuais e diretos, para aplicar no mesmo dia."],
-  ["⚡", "Acesso imediato", "Pagou, recebeu no e-mail. Leia no celular, no computador ou imprima."],
-  ["🛡️", "Garantia de 7 dias", "Não gostou? Devolvemos 100% do valor, sem perguntas."],
-];
+  [HeartHandshake, "Reforço positivo", "Nada de bronca ou castigo. Métodos que ensinam com confiança e carinho."],
+  [BookOpen, "Passo a passo ilustrado", "Guias curtos, visuais e diretos, para aplicar no mesmo dia."],
+  [Zap, "Acesso imediato", "Pagou, recebeu no e-mail. Leia no celular, no computador ou imprima."],
+  [ShieldCheck, "Garantia de 7 dias", "Não gostou? Devolvemos 100% do valor, sem perguntas."],
+] as const;
 
 const DICAS = [
   {
@@ -66,8 +67,8 @@ export default function Home() {
 
       <section className="pilares">
         <div className="container pilares-grid">
-          {PILARES.map(([ic, t, d]) => (
-            <div key={t} className="pilar"><span className="pilar-ic">{ic}</span><div><b>{t}</b><p>{d}</p></div></div>
+          {PILARES.map(([Icone, t, d]) => (
+            <div key={t} className="pilar"><span className="pilar-ic"><Icone size={24} aria-hidden /></span><div><b>{t}</b><p>{d}</p></div></div>
           ))}
         </div>
       </section>

@@ -14,12 +14,11 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const c = PAGINAS[(await params).slug];
-  const p = PRODUTOS.find((x) => x.slug === c.slug);
   return {
     title: c.seo.titulo,
     description: c.seo.descricao,
     alternates: { canonical: `/${c.slug}` },
-    openGraph: p?.capa ? { images: [{ url: p.capa }] } : undefined,
+    openGraph: { title: c.seo.titulo, description: c.seo.descricao, images: [{ url: `/og/${c.slug}.png`, width: 1200, height: 630 }] },
   };
 }
 

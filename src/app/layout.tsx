@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     siteName: "Maestro Pet",
     title: "Maestro Pet — Guias práticos para tutores",
     description: "Guias práticos para resolver os problemas do dia a dia com seu pet.",
-    images: [{ url: "/mozart/acenando.webp", width: 1200, height: 1200 }],
+    images: [{ url: "/og/home.png", width: 1200, height: 630 }],
   },
   twitter: { card: "summary_large_image" },
   robots: { index: true, follow: true, "max-image-preview": "large" },

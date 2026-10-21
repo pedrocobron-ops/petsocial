@@ -10,9 +10,9 @@ export default function SiteHeader() {
           <span>Maestro<em>Pet</em></span>
         </Link>
         <nav aria-label="Principal">
-          <Link href="/#guias">Guias</Link>
           <Link href="/sobre">Sobre</Link>
           <Link href="/contato">Contato</Link>
+          <Link href="/#guias" className="btn btn-sm">Ver guias</Link>
         </nav>
       </div>
     </header>

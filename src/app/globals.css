@@ -63,7 +63,9 @@ h3 { font-size: 1.25rem; font-weight: 800; }
 .marca { display: flex; align-items: center; gap: 10px; font-family: var(--headline); font-weight: 900; font-size: 1.45rem; }
 .marca img { border-radius: 50%; border: 2px solid var(--brand); }
 .marca em { font-style: normal; color: var(--brand); }
-.topo nav { display: flex; gap: 22px; font-weight: 600; font-size: 0.95rem; }
+.topo nav { display: flex; gap: 22px; font-weight: 600; font-size: 0.95rem; align-items: center; }
+.btn-sm { padding: 9px 18px; font-size: .9rem; box-shadow: none; white-space: nowrap; }
+.topo nav .btn-sm:hover { color: #fff; }
 .topo nav a:hover { color: var(--brand-dark); }
 
 .rodape { background: var(--ink-2); color: #d6cec4; padding: 56px 0 28px; font-size: 0.95rem; }
@@ -194,9 +196,10 @@ a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
 /* ---------- Responsivo ---------- */
 @media (max-width: 900px) {
   .hero-home-grid, .lp-hero-grid, .como, .virada, .recebe, .oferta, .garantia, .para-quem { grid-template-columns: 1fr; }
-  .hero-art { max-width: 320px; margin: 0 auto; order: -1; }
+  .hero-art { max-width: 230px; margin: 0 auto; order: -1; }
   .mockup { order: -1; }
-  .lp-hero .livro { width: min(260px, 62vw); }
+  .lp-hero .livro { width: min(210px, 52vw); }
+  .hero-home, .lp-hero { padding-top: 28px; }
   .garantia img { max-width: 180px; }
   .virada-art { max-width: 280px; margin: 0 auto; }
   .dias { grid-template-columns: repeat(2, 1fr); }
@@ -208,16 +211,17 @@ a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
 }
 @media (max-width: 480px) {
   body { font-size: 16px; }
+  .topo nav a:not(.btn) { display: none; }
+  .marca { font-size: 1.25rem; }
   .guia { grid-template-columns: 92px 1fr; }
   .oferta-box { padding: 24px; }
-  .topo nav a:nth-child(2) { display: none; }
 }
 
 /* ---------- Home: pilares e dicas ---------- */
 .pilares { background: var(--ink-2); color: #e7ddd2; padding: 30px 0; }
 .pilares-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
 .pilar { display: flex; gap: 12px; align-items: flex-start; }
-.pilar-ic { font-size: 1.6rem; line-height: 1; background: rgba(249,115,22,.15); border-radius: 12px; padding: 10px; }
+.pilar-ic { display: flex; color: var(--brand); background: rgba(249,115,22,.15); border-radius: 12px; padding: 10px; }
 .pilar b { color: #fff; display: block; margin-bottom: 2px; }
 .pilar p { font-size: .9rem; color: #cbbfb2; line-height: 1.45; }
 .dicas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
@@ -231,3 +235,16 @@ a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
   .dicas { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) { .pilares-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Barra fixa de compra (celular) ---------- */
+.barra-compra { display: none; }
+@media (max-width: 900px) {
+  .barra-compra { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; gap: 12px; align-items: center; justify-content: space-between;
+    background: rgba(41, 36, 32, .97); color: #fff; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgba(0,0,0,.2);
+    transform: translateY(110%); transition: transform .25s ease; }
+  .barra-compra.on { transform: none; }
+  .barra-compra b { font-family: var(--headline); font-size: 1.25rem; color: var(--brand); }
+  .barra-compra small { display: block; font-size: .72rem; color: #cbbfb2; }
+  .barra-compra .btn { padding: 11px 20px; font-size: .95rem; }
+  .com-barra { padding-bottom: 76px; }
+}

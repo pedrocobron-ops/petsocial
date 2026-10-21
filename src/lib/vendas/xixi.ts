@@ -72,7 +72,7 @@ export const xixi: PaginaVendas = {
     itens: [
       { imagem: "/produtos/xixi-pag21.webp", titulo: "Tabela da semana", texto: "Para colar na geladeira e anotar acertos e horários. Em 2 ou 3 dias o padrão do seu cachorro aparece." },
       { imagem: "/mozart/medalha.webp", titulo: "Diploma de Xixi no Lugar Certo", texto: "Um certificado para preencher quando ele concluir o método. A família toda vai querer foto." },
-      { icone: "🧴", titulo: "Receita de limpador caseiro", texto: "Para tirar o cheiro que faz ele voltar sempre ao mesmo canto, com o que você já tem em casa." },
+      { imagem: "/produtos/limpeza.webp", titulo: "Receita de limpador caseiro", texto: "Para tirar o cheiro que faz ele voltar sempre ao mesmo canto, com o que você já tem em casa." },
     ],
   },
   paraQuem: {
