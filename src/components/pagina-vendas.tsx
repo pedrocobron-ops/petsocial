@@ -1,6 +1,7 @@
 import Image from "next/image";
 import BarraCompra from "@/components/barra-compra";
 import Comprar from "@/components/comprar";
+import { VerProduto } from "@/components/meta-pixel";
 import type { Produto } from "@/lib/produtos";
 import { reais } from "@/lib/produtos";
 import type { PaginaVendas as Conteudo } from "@/lib/vendas/tipos";
@@ -32,6 +33,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
     <div className="com-barra">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(produtoLd) }} />
       <div className="progresso" aria-hidden />
+      <VerProduto nome={p.nome} preco={p.preco} />
       <section className="lp-hero">
         <div className="container lp-hero-grid">
           <div>
