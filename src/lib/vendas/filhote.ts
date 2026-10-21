@@ -13,7 +13,7 @@ export const filhote: PaginaVendas = {
     destaque: "dormindo a noite toda",
     depois: " e aprendendo as regras da casa.",
     lead: "O passo a passo dos primeiros 30 dias: o que preparar antes de ele chegar, as primeiras 72 horas, o fim do choro à noite e das mordidas, e a socialização segura antes e depois das vacinas.",
-    selos: ["Acesso imediato", "27 páginas ilustradas", "Garantia de 7 dias"],
+    selos: ["Acesso imediato", "29 páginas ilustradas", "Garantia de 7 dias"],
   },
   dores: {
     titulo: "Se você já pensou alguma destas frases, este guia é para você",
@@ -67,9 +67,9 @@ export const filhote: PaginaVendas = {
   bonus: {
     titulo: "Material para imprimir e usar todo dia",
     itens: [
-      { imagem: "/produtos/filhote-pag22.webp", titulo: "Rotina diária do filhote", texto: "Um modelo hora a hora para colar na geladeira. Com todo mundo nos mesmos horários, ele entende rapidinho o que vem depois." },
-      { imagem: "/produtos/filhote-pag23.webp", titulo: "Plano dos primeiros 30 dias", texto: "As metas de cada semana em forma de checklist, para você ver o progresso e não se perder." },
-      { imagem: "/produtos/filhote-pag26.webp", titulo: "Certidão do Filhote", texto: "Nome, data de chegada, primeiro brinquedo e espaço para a primeira foto. Uma lembrança para guardar." },
+      { imagem: "/produtos/filhote-pag24.webp", titulo: "Rotina diária do filhote", texto: "Um modelo hora a hora para colar na geladeira. Com todo mundo nos mesmos horários, ele entende rapidinho o que vem depois." },
+      { imagem: "/produtos/filhote-pag25.webp", titulo: "Plano dos primeiros 30 dias", texto: "As metas de cada semana em forma de checklist, para você ver o progresso e não se perder." },
+      { imagem: "/produtos/filhote-pag28.webp", titulo: "Certidão do Filhote", texto: "Nome, data de chegada, primeiro brinquedo e espaço para a primeira foto. Uma lembrança para guardar." },
     ],
   },
   paraQuem: {
@@ -86,7 +86,7 @@ export const filhote: PaginaVendas = {
   },
   oferta: {
     itens: [
-      "Guia completo ilustrado (27 páginas)",
+      "Guia completo ilustrado (29 páginas)",
       "Preparação da casa e enxoval",
       "Primeiras 72 horas, dia a dia",
       "Rotina de sono e fim das mordidas",
