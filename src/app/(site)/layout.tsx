@@ -1,5 +1,6 @@
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
+import Animacoes from "@/components/animacoes";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
@@ -20,6 +21,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <SiteHeader />
       <main>{children}</main>
       <SiteFooter />
+      <Animacoes />
     </>
   );
 }

@@ -31,6 +31,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
   return (
     <div className="com-barra">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(produtoLd) }} />
+      <div className="progresso" aria-hidden />
       <section className="lp-hero">
         <div className="container lp-hero-grid">
           <div>

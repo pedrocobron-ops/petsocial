@@ -87,8 +87,7 @@ h3 { font-size: 1.25rem; font-weight: 800; }
 /* ---------- Home ---------- */
 .hero-home { background: radial-gradient(circle at 80% 20%, var(--brand-surface), transparent 60%), var(--bg); padding: 56px 0 72px; }
 .hero-home-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 40px; align-items: center; }
-.hero-art img { filter: drop-shadow(0 26px 30px rgba(26, 20, 16, 0.22)); animation: flutua 6s ease-in-out infinite; }
-@keyframes flutua { 50% { transform: translateY(-10px); } }
+.hero-art img { filter: drop-shadow(0 26px 30px rgba(26, 20, 16, 0.22)); transform-origin: 50% 90%; animation: flutua 6s ease-in-out infinite, aceno 7s ease-in-out 2s infinite; }
 
 .guias { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 22px; }
 .guia { display: grid; grid-template-columns: 120px 1fr; gap: 18px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; transition: transform .2s, box-shadow .2s; }
@@ -247,4 +246,92 @@ a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
   .barra-compra small { display: block; font-size: .72rem; color: #cbbfb2; }
   .barra-compra .btn { padding: 11px 20px; font-size: .95rem; }
   .com-barra { padding-bottom: 76px; }
+}
+
+/* ============================================================
+   MOVIMENTO
+   Entradas ao carregar e ao rolar, micro-interações e o Mozart
+   "vivo". Tudo usa translate/rotate/scale separados para não
+   brigar com os transform já existentes. Desligado com
+   "reduzir movimento".
+   ============================================================ */
+@keyframes flutua { 50% { translate: 0 -10px; } }
+@keyframes aceno { 0%, 78%, 100% { rotate: 0deg; } 82% { rotate: 3deg; } 86% { rotate: -3deg; } 90% { rotate: 2deg; } 94% { rotate: -1deg; } }
+@keyframes entra { from { opacity: 0; translate: 0 18px; } }
+@keyframes entra-art { from { opacity: 0; scale: .88; } }
+@keyframes marca { to { background-size: 100% 100%; } }
+@keyframes pulso { 0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, .55); } 70%, 100% { box-shadow: 0 0 0 16px rgba(249, 115, 22, 0); } }
+@keyframes pula { 30% { translate: 0 -6px; } 60% { translate: 0 1px; } }
+@keyframes pop { from { opacity: 0; scale: .4; } 70% { scale: 1.12; } }
+@keyframes medalha { from { opacity: 0; scale: .6; rotate: -14deg; } 60% { scale: 1.06; rotate: 4deg; } }
+@keyframes cresce { from { scale: 0 1; } to { scale: 1 1; } }
+
+/* Topo da página: entra em sequência ao carregar */
+.hero-home-grid > div:first-child > *, .lp-hero-grid > div:first-child > * { animation: entra .8s cubic-bezier(.2, .7, .2, 1) both; }
+.hero-home-grid > div:first-child > :nth-child(2), .lp-hero-grid > div:first-child > :nth-child(2) { animation-delay: .08s; }
+.hero-home-grid > div:first-child > :nth-child(3), .lp-hero-grid > div:first-child > :nth-child(3) { animation-delay: .16s; }
+.hero-home-grid > div:first-child > :nth-child(4), .lp-hero-grid > div:first-child > :nth-child(4) { animation-delay: .24s; }
+.hero-home-grid > div:first-child > :nth-child(5), .lp-hero-grid > div:first-child > :nth-child(5) { animation-delay: .32s; }
+.hero-art, .lp-hero .mockup { animation: entra-art 1s cubic-bezier(.2, .7, .2, 1) .15s both; }
+.lp-hero .livro { animation: flutua 6s ease-in-out 1.2s infinite; transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+.lp-hero .livro:hover, .oferta-mockup .livro:hover { transform: rotateY(-4deg) rotateX(2deg); }
+.oferta-mockup .livro { transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+
+/* Marca-texto desenhado sob a palavra em destaque do título */
+h1 em { background: linear-gradient(transparent 64%, rgba(249, 115, 22, .22) 64%) no-repeat 0 0 / 0% 100%; -webkit-box-decoration-break: clone; box-decoration-break: clone; animation: marca .9s cubic-bezier(.6, 0, .2, 1) .75s forwards; }
+
+/* Revelar ao rolar (classes postas pelo componente Animacoes) */
+.mv .rv { opacity: 0; translate: 0 28px; transition: opacity .7s cubic-bezier(.2, .7, .2, 1), translate .7s cubic-bezier(.2, .7, .2, 1); transition-delay: calc(var(--i, 0) * 85ms); }
+.mv .dores blockquote.rv { translate: -28px 0; }
+.mv .paginas img.rv:first-child { translate: -48px 12px; }
+.mv .paginas img.rv:last-child { translate: 48px 12px; }
+.mv .rv.in { opacity: 1; translate: none; }
+.mv .guia-off.rv.in { opacity: .85; }
+.dia.vis b { animation: pop .55s cubic-bezier(.2, .7, .2, 1) calc(var(--i, 0) * 85ms + .25s) both; }
+.garantia img.vis { animation: medalha 1s cubic-bezier(.2, .7, .2, 1) .1s both; }
+.pilar.vis .pilar-ic { animation: pula .6s ease calc(var(--i, 0) * 85ms + .4s) both; }
+
+/* Topo fixo ganha sombra quando a página rola */
+.topo { transition: box-shadow .25s, background .25s; }
+.topo.rolou { box-shadow: 0 10px 28px -18px rgba(26, 20, 16, .45); background: rgba(255, 253, 248, .97); }
+.marca img { transition: rotate .4s cubic-bezier(.2, .7, .2, 1); }
+.marca:hover img { rotate: -12deg; }
+
+/* Botões: brilho que atravessa no hover e pulso nas chamadas de compra */
+.btn:not(.btn-ghost):not(.btn-off) { position: relative; overflow: hidden; isolation: isolate; }
+.btn:not(.btn-ghost):not(.btn-off)::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .38) 50%, transparent 70%); translate: -120% 0; transition: translate .7s cubic-bezier(.2, .7, .2, 1); pointer-events: none; }
+.btn:not(.btn-ghost):not(.btn-off):hover::after { translate: 120% 0; }
+.btn:active { scale: .97; }
+.oferta-box a.btn, .cta-final .btn, .barra-compra a.btn { animation: pulso 2.4s ease-out 1s infinite; }
+
+/* Cards: capa inclina, imagem aproxima, ícones pulam */
+.guia-capa { transition: rotate .35s cubic-bezier(.2, .7, .2, 1), scale .35s cubic-bezier(.2, .7, .2, 1); }
+a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
+.dica img { transition: scale .7s cubic-bezier(.2, .7, .2, 1); }
+.dica:hover img { scale: 1.06; }
+.dica, .bonus-card, .pq, .dia, .passos li { transition: translate .25s, box-shadow .25s, border-color .25s; }
+.dica:hover, .bonus-card:hover, .dia:hover, .passos li:hover { translate: 0 -4px; box-shadow: var(--shadow); border-color: var(--brand-border); }
+.pilar:hover .pilar-ic { animation: pula .6s ease; }
+.dores blockquote { transition: border-left-width .25s, translate .25s; }
+.dores blockquote:hover { border-left-width: 9px; }
+.virada-art { transition: rotate .5s cubic-bezier(.2, .7, .2, 1); }
+.virada-art:hover { rotate: 1deg; }
+
+/* FAQ: resposta aparece suave e o sinal gira */
+.faq summary { list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-family: var(--headline); font-size: 1.5rem; line-height: 1; color: var(--brand); transition: rotate .3s; }
+.faq details[open] summary::after { rotate: 45deg; }
+.faq details[open] p { animation: entra .4s cubic-bezier(.2, .7, .2, 1) both; }
+
+/* Barra de leitura na página de vendas */
+.progresso { display: none; }
+@supports (animation-timeline: scroll()) {
+  .progresso { display: block; position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 40; background: linear-gradient(90deg, var(--brand), #fbbf24); transform-origin: 0 50%; animation: cresce linear both; animation-timeline: scroll(root); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  h1 em { background-size: 100% 100%; }
+  .mv .rv { opacity: 1; translate: none; }
 }
