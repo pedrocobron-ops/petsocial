@@ -91,15 +91,16 @@ h3 { font-size: 1.25rem; font-weight: 800; }
 .guias { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 22px; }
 .guia { display: grid; grid-template-columns: 120px 1fr; gap: 18px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; transition: transform .2s, box-shadow .2s; }
 a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
-.guia-capa { aspect-ratio: 210 / 297; border-radius: 8px; overflow: hidden; background: linear-gradient(160deg, var(--brand), var(--brand-dark)); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 16px -8px rgba(0,0,0,.4); }
+.guia-capa { position: relative; aspect-ratio: 210 / 297; border-radius: 8px; overflow: hidden; background: linear-gradient(160deg, var(--brand), var(--brand-dark)); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 16px -8px rgba(0,0,0,.4); }
 .guia-capa img { width: 100%; height: 100%; object-fit: cover; }
+.guia-capa img + .guia-breve { position: absolute; left: 6px; right: 6px; bottom: 6px; background: rgba(41,36,32,.85); border-radius: 6px; padding: 4px; text-align: center; }
 .guia-breve { font-family: var(--display); color: #fff; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; font-size: .75rem; }
 .guia-dor { display: block; font-size: 0.85rem; color: var(--brand-dark); font-weight: 600; margin-bottom: 6px; }
 .guia h3 { margin-bottom: 6px; }
 .guia p { font-size: 0.93rem; color: var(--ink-soft); margin-bottom: 10px; }
 .guia-preco { font-weight: 800; font-size: 1.1rem; }
 .guia-preco s { color: var(--muted); font-weight: 500; font-size: .9rem; margin-right: 4px; }
-.guia-off { opacity: .72; }
+.guia-off { opacity: .85; }
 
 .como { display: grid; grid-template-columns: 1fr 1.3fr; gap: 40px; align-items: start; }
 .passos { list-style: none; counter-reset: p; display: grid; gap: 16px; }
@@ -132,6 +133,7 @@ a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
 .paginas img:first-child { top: 0; left: 0; transform: rotate(-4deg); }
 .paginas img:last-child { bottom: 0; right: 0; transform: rotate(4deg); }
 
+.metodo-art { width: 100%; max-width: 760px; border-radius: 22px; border: 6px solid #fff; box-shadow: var(--shadow); margin: 0 0 32px; }
 .dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }
 .dia { background: var(--paper); border-radius: 14px; padding: 18px 14px; border: 1px solid var(--line); text-align: center; }
 .dia small { display: block; font-family: var(--display); letter-spacing: .14em; text-transform: uppercase; font-size: .7rem; color: var(--muted); }

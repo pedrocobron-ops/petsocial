@@ -39,7 +39,8 @@ export default function Home() {
               const card = (
                 <>
                   <div className="guia-capa">
-                    {p.capa ? <Image src={p.capa} alt={`Capa do guia ${p.nome}`} width={300} height={424} /> : <span className="guia-breve">Em breve</span>}
+                    {p.capa && <Image src={p.capa} alt={`Capa do guia ${p.nome}`} width={300} height={424} />}
+                    {!p.lancado && <span className="guia-breve">Em breve</span>}
                   </div>
                   <div className="guia-corpo">
                     <span className="guia-dor">“{p.dor}”</span>

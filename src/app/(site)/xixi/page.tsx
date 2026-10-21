@@ -126,6 +126,7 @@ export default function XixiPage() {
         <div className="container">
           <span className="eyebrow">O método</span>
           <h2>Um dia de cada vez</h2>
+          <Image className="metodo-art" src="/produtos/tutora.webp" alt="Tutora elogiando o Mozart no tapete higiênico" width={1100} height={618} />
           <div className="dias">
             {[
               ["Montar o cenário", "Casa preparada e rotina definida"],
