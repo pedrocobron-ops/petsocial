@@ -1,50 +1,38 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Termos de Uso",
-  description: "Termos de uso do Maestro Pet.",
+  title: "Termos de uso",
   alternates: { canonical: "/termos-de-uso" },
 };
 
 export default function TermosPage() {
   return (
-    <div className="prose">
-      <h1>Termos de Uso</h1>
-
-      <h2>1. Sobre o conteúdo</h2>
+    <div className="container prose">
+      <h1>Termos de uso</h1>
+      <p>Ao comprar ou usar os produtos do Maestro Pet, você concorda com estes termos.</p>
+      <h2>1. Produtos</h2>
       <p>
-        O conteúdo do <strong>Maestro Pet</strong> tem caráter exclusivamente
-        informativo e educativo. As matérias <strong>não substituem</strong> a
-        avaliação, o diagnóstico ou o tratamento realizados por um
-        médico-veterinário. Em caso de emergência ou sinais de doença, procure
-        imediatamente um profissional.
+        O Maestro Pet vende guias digitais (arquivos e conteúdos on-line) sobre cuidados e comportamento de animais de
+        estimação. O acesso é pessoal e intransferível; é proibido copiar, revender ou distribuir o material.
       </p>
-
-      <h2>2. Propriedade intelectual</h2>
+      <h2>2. Pagamento e entrega</h2>
       <p>
-        Textos, marca, logotipo e o personagem Mozart são de propriedade do
-        Maestro Pet. É permitido compartilhar links para as matérias; a
-        reprodução integral do conteúdo sem autorização prévia não é permitida.
+        Os pagamentos são processados pela plataforma Cakto. O acesso é liberado após a confirmação do pagamento e
+        enviado ao e-mail informado na compra.
       </p>
-
-      <h2>3. Links externos</h2>
+      <h2>3. Garantia e reembolso</h2>
       <p>
-        Podemos indicar links para sites de terceiros. Não nos
-        responsabilizamos pelo conteúdo, políticas ou práticas desses sites.
+        Em conformidade com o artigo 49 do Código de Defesa do Consumidor, você pode desistir da compra em até 7 dias
+        e receber de volta 100% do valor pago, sem precisar justificar.
       </p>
-
-      <h2>4. Publicidade</h2>
+      <h2>4. Caráter educativo</h2>
       <p>
-        O site pode exibir anúncios de terceiros (como Google AdSense) e
-        conteúdo patrocinado devidamente identificado. Anunciantes são
-        responsáveis pelas ofertas que veiculam.
+        Os guias têm caráter educativo e não substituem a avaliação de um(a) médico(a)-veterinário(a) ou de um
+        profissional de comportamento animal. Os resultados variam conforme o animal, sua saúde, idade e rotina.
+        Procure um veterinário sempre que houver mudança repentina de comportamento ou sinais de dor ou doença.
       </p>
-
       <h2>5. Contato</h2>
-      <p>
-        Dúvidas sobre estes termos? Escreva para{" "}
-        <a href="mailto:contato@maestropet.com">contato@maestropet.com</a>.
-      </p>
+      <p>Dúvidas sobre estes termos: <a href="mailto:contato@maestropet.com">contato@maestropet.com</a>.</p>
     </div>
   );
 }

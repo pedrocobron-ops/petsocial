@@ -1,70 +1,30 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade",
-  description: "Política de privacidade do Maestro Pet.",
+  title: "Política de privacidade",
   alternates: { canonical: "/politica-de-privacidade" },
 };
 
 export default function PrivacidadePage() {
   return (
-    <div className="prose">
-      <h1>Política de Privacidade</h1>
-      <p>
-        Esta Política de Privacidade descreve como o <strong>Maestro Pet</strong>{" "}
-        (&ldquo;nós&rdquo;) trata as informações de quem visita este site, em conformidade
-        com a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018).
-      </p>
-
-      <h2>1. Dados que coletamos</h2>
-      <p>
-        A leitura do jornal não exige cadastro. Coletamos apenas dados de
-        navegação de forma automática e agregada (páginas visitadas, tipo de
-        dispositivo e navegador), usados para medir audiência e melhorar o
-        conteúdo.
-      </p>
-
-      <h2>2. Cookies e publicidade</h2>
-      <p>
-        Este site pode exibir anúncios fornecidos pelo <strong>Google AdSense</strong>.
-        O Google e seus parceiros utilizam cookies para exibir anúncios com
-        base em visitas anteriores a este e a outros sites. O cookie DART
-        permite a veiculação de anúncios personalizados.
-      </p>
+    <div className="container prose">
+      <h1>Política de privacidade</h1>
+      <p>Esta política explica como o Maestro Pet trata os seus dados, de acordo com a Lei Geral de Proteção de Dados (LGPD).</p>
+      <h2>Dados que coletamos</h2>
       <ul>
-        <li>
-          Você pode desativar a publicidade personalizada nas{" "}
-          <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer">
-            Configurações de anúncios do Google
-          </a>.
-        </li>
-        <li>
-          Saiba mais sobre como o Google usa dados em{" "}
-          <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer">
-            policies.google.com/technologies/partner-sites
-          </a>.
-        </li>
+        <li><b>Na compra:</b> nome, e-mail, telefone e dados de pagamento são coletados e processados pela Cakto, nossa plataforma de pagamentos, para concluir a compra e entregar o acesso.</li>
+        <li><b>Na navegação:</b> podemos usar cookies e o Pixel da Meta para medir visitas e o desempenho de anúncios.</li>
       </ul>
-
-      <h2>3. Compartilhamento de dados</h2>
-      <p>
-        Não vendemos nem compartilhamos dados pessoais com terceiros, exceto os
-        dados de navegação processados automaticamente pelos serviços de
-        medição de audiência e publicidade citados acima.
-      </p>
-
-      <h2>4. Seus direitos (LGPD)</h2>
-      <p>
-        Você pode solicitar informações sobre tratamento de dados, correção ou
-        exclusão de dados pessoais escrevendo para{" "}
-        <a href="mailto:contato@maestropet.com">contato@maestropet.com</a>.
-      </p>
-
-      <h2>5. Alterações desta política</h2>
-      <p>
-        Esta política pode ser atualizada periodicamente. A versão mais recente
-        estará sempre disponível nesta página.
-      </p>
+      <h2>Para que usamos</h2>
+      <ul>
+        <li>Entregar o produto comprado e prestar suporte.</li>
+        <li>Enviar comunicações sobre a sua compra e, se você permitir, novidades do Maestro Pet.</li>
+        <li>Medir e melhorar nossos anúncios e o site.</li>
+      </ul>
+      <h2>Compartilhamento</h2>
+      <p>Não vendemos seus dados. Eles são compartilhados apenas com os serviços necessários para a operação (plataforma de pagamento, hospedagem e ferramentas de medição de anúncios).</p>
+      <h2>Seus direitos</h2>
+      <p>Você pode pedir acesso, correção ou exclusão dos seus dados a qualquer momento pelo e-mail <a href="mailto:contato@maestropet.com">contato@maestropet.com</a>.</p>
     </div>
   );
 }

@@ -1,18 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
-import { mozart } from "@/lib/mozart";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Página não encontrada" };
 
 export default function NotFound() {
   return (
-    <div className="container empty-state">
-      <div className="face">
-        <Image src={mozart("dormindo")} alt="Mozart dormindo" width={90} height={90} style={{ objectFit: "cover" }} unoptimized />
-      </div>
-      <h2>Au! Página não encontrada…</h2>
-      <p>
-        O Mozart cochilou e esta página fugiu.{" "}
-        <Link href="/" style={{ textDecoration: "underline" }}>Voltar à capa do jornal</Link>
-      </p>
+    <div className="container prose" style={{ textAlign: "center" }}>
+      <Image src="/mozart/sorrindo.webp" alt="Mozart" width={160} height={160} style={{ margin: "0 auto" }} />
+      <h1>Au! Página não encontrada…</h1>
+      <p>O Mozart procurou por toda parte e não achou esta página. <Link href="/">Voltar ao início</Link></p>
     </div>
   );
 }

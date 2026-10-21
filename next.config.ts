@@ -8,16 +8,24 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
 
   /**
-   * Redirecionamentos permanentes (301) das rotas do app antigo.
-   * O jornal herdou o domínio de um aplicativo de rede social cujas matérias
-   * viviam em /ler/[slug]. Essas URLs já estão indexadas no Google, então
-   * apontamos cada uma para o novo endereço em vez de devolver 404, o que
-   * preserva a autoridade acumulada e evita erro para quem vem da busca.
+   * Redirecionamentos permanentes (301) das versões antigas do domínio
+   * (rede social e jornal). As URLs antigas seguem indexadas no Google; em vez
+   * de 404, mandamos quem chega por elas para a página inicial da loja.
    */
   async redirects() {
     return [
-      // matérias do portal antigo
-      { source: "/ler/:slug", destination: "/noticias/:slug", permanent: true },
+            // jornal (versão anterior)
+      { source: "/noticias/:path*", destination: "/", permanent: true },
+      { source: "/categoria/:path*", destination: "/", permanent: true },
+      { source: "/animal/:path*", destination: "/", permanent: true },
+      { source: "/autor/:path*", destination: "/", permanent: true },
+      { source: "/redacao/:path*", destination: "/", permanent: true },
+      { source: "/redacao", destination: "/", permanent: true },
+      { source: "/principios-editoriais", destination: "/sobre", permanent: true },
+      { source: "/creditos-de-imagem", destination: "/sobre", permanent: true },
+      { source: "/rss.xml", destination: "/", permanent: true },
+      { source: "/news-sitemap.xml", destination: "/sitemap.xml", permanent: true },
+      { source: "/ler/:slug", destination: "/", permanent: true },
       { source: "/jornal", destination: "/", permanent: true },
       { source: "/jornal/:path*", destination: "/", permanent: true },
 
