@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
    */
   async redirects() {
     return [
+      // o celular costuma digitar a primeira letra em maiúscula
+      { source: "/Fogos", destination: "/fogos", permanent: true },
+      { source: "/FOGOS", destination: "/fogos", permanent: true },
+
             // jornal (versão anterior)
       { source: "/noticias/:path*", destination: "/", permanent: true },
       { source: "/categoria/:path*", destination: "/", permanent: true },

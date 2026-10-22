@@ -4,24 +4,23 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { rastrear } from "@/components/meta-pixel";
 
-/** Formulário do Google que recebe os cadastros (as respostas caem numa planilha da conta da Maestro Pet). */
-const FORM = "https://docs.google.com/forms/d/e/1FAIpQLScbh_y1nrAZbee81OOUGP_0tKXQ2l41ri0Tqu7Yb-6hs6cGAg/formResponse";
-const CAMPOS = { nome: "entry.1743077274", email: "entry.514587458", cao: "entry.126728612" };
-
-/** Ficha curta do e-book grátis: envia para o formulário e leva direto à página de download. */
+/** Ficha curta do e-book grátis: grava o cadastro (via /api/cadastro) e leva direto à página de download. */
 export default function CadastroFogos() {
   const router = useRouter();
   const [enviando, setEnviando] = useState(false);
 
-  function enviar(e: React.FormEvent<HTMLFormElement>) {
+  async function enviar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setEnviando(true);
     const f = new FormData(e.currentTarget);
-    const dados = new URLSearchParams();
-    for (const [campo, entrada] of Object.entries(CAMPOS)) dados.append(entrada, String(f.get(campo) ?? "").trim());
-    // sendBeacon continua o envio mesmo depois que a página muda; o fetch é a reserva.
-    const foi = typeof navigator.sendBeacon === "function" && navigator.sendBeacon(FORM, dados);
-    if (!foi) fetch(FORM, { method: "POST", mode: "no-cors", body: dados, keepalive: true }).catch(() => {});
+    const dados = { nome: f.get("nome"), email: f.get("email"), cao: f.get("cao") };
+    // Espera o cadastro ser gravado (até 8 s); se falhar, a pessoa recebe o e-book mesmo assim.
+    await fetch("/api/cadastro", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(dados),
+      signal: AbortSignal.timeout(8000),
+    }).catch(() => {});
     rastrear("Lead", { content_name: "Plano Anti-Fogos" });
     router.push("/fogos/baixar");
   }
