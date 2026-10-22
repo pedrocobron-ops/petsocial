@@ -168,7 +168,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
         </div>
       </section>
 
-      <BarraCompra nome={p.nome} preco={reais(p.preco)} />
+      <BarraCompra produto={p} />
     </div>
   );
 }

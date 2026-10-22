@@ -8,8 +8,25 @@ const CAMPOS = { nome: "entry.1743077274", email: "entry.514587458", cao: "entry
  * Recebe a ficha do e-book grátis e repassa para o Formulário do Google pelo servidor.
  * Enviar direto do navegador para o Google falhava em alguns celulares (bloqueio de envio entre sites).
  */
+/** Só aceita envios do próprio site (produção, prévias da Vercel e testes locais). */
+function origemPermitida(req: Request) {
+  const origem = req.headers.get("origin");
+  if (!origem) return false;
+  try {
+    const host = new URL(origem).hostname;
+    return host === "maestropet.com" || host === "www.maestropet.com" || host.endsWith(".vercel.app") || host === "localhost";
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: Request) {
+  if (!origemPermitida(req) || !req.headers.get("content-type")?.includes("application/json")) {
+    return NextResponse.json({ ok: false }, { status: 403 });
+  }
   const dados = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  // Campo-armadilha preenchido = robô: responde ok sem gravar.
+  if (String(dados?.site ?? "").trim()) return NextResponse.json({ ok: true });
   const campo = (k: string) => String(dados?.[k] ?? "").trim().slice(0, 200);
   const nome = campo("nome");
   const email = campo("email");

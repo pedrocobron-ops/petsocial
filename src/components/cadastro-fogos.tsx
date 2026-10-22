@@ -13,16 +13,23 @@ export default function CadastroFogos() {
     e.preventDefault();
     setEnviando(true);
     const f = new FormData(e.currentTarget);
-    const dados = { nome: f.get("nome"), email: f.get("email"), cao: f.get("cao") };
+    const dados = { nome: f.get("nome"), email: f.get("email"), cao: f.get("cao"), site: f.get("site") };
     // Espera o cadastro ser gravado (até 8 s); se falhar, a pessoa recebe o e-book mesmo assim.
-    await fetch("/api/cadastro", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(dados),
-      signal: AbortSignal.timeout(8000),
-    }).catch(() => {});
-    rastrear("Lead", { content_name: "Plano Anti-Fogos" });
-    router.push("/fogos/baixar");
+    try {
+      // AbortSignal.timeout não existe no Safari antigo (iOS 15 ou anterior).
+      const signal = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(8000) : undefined;
+      const r = await fetch("/api/cadastro", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(dados),
+        signal,
+      });
+      if (r.ok) rastrear("Lead", { content_name: "Plano Anti-Fogos" });
+    } catch {
+      // segue para o download
+    } finally {
+      router.push("/fogos/baixar");
+    }
   }
 
   return (
@@ -33,12 +40,14 @@ export default function CadastroFogos() {
       </label>
       <label>
         Seu e-mail
-        <input name="email" type="email" required autoComplete="email" inputMode="email" placeholder="voce@email.com" />
+        <input name="email" type="email" required autoComplete="email" inputMode="email" placeholder="voce@email.com" pattern="[^\s@]+@[^\s@]+\.[^\s@]+" title="Confira o e-mail: precisa ter @ e um domínio, como nome@gmail.com" />
       </label>
       <label>
         Como se chama o seu cão? <small>(opcional)</small>
         <input name="cao" placeholder="Ex.: Mozart" />
       </label>
+      {/* Campo-armadilha: pessoas não veem; robôs preenchem e o cadastro é descartado. */}
+      <input name="site" tabIndex={-1} autoComplete="off" aria-hidden="true" className="armadilha" />
       <button className="btn btn-lg" type="submit" disabled={enviando}>
         {enviando ? "Abrindo o seu e-book…" : "Quero meu e-book grátis"}
       </button>
