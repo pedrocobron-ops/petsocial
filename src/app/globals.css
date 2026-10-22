@@ -159,6 +159,7 @@ a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
 .oferta-sec { background: linear-gradient(180deg, var(--bg), var(--brand-surface)); }
 .oferta { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 48px; align-items: center; }
 .oferta-mockup { display: flex; justify-content: center; perspective: 1400px; }
+#oferta { scroll-margin-top: 80px; }
 .oferta-box { background: var(--paper); border: 3px solid var(--brand); border-radius: 26px; padding: 36px; box-shadow: var(--shadow); }
 .oferta-box h2 { margin-bottom: 18px; }
 .oferta-itens { list-style: none; display: grid; gap: 9px; margin-bottom: 24px; }
@@ -197,6 +198,7 @@ a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
   .hero-home-grid, .lp-hero-grid, .como, .virada, .recebe, .oferta, .garantia, .para-quem { grid-template-columns: 1fr; }
   .hero-art { max-width: 230px; margin: 0 auto; order: -1; }
   .mockup { order: -1; }
+  .oferta-mockup { display: none; }
   .lp-hero .livro { width: min(210px, 52vw); }
   .hero-home, .lp-hero { padding-top: 28px; }
   .garantia img { max-width: 180px; }
@@ -358,3 +360,4 @@ a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
   .baixar .lead { margin-left: auto; margin-right: auto; }
   .fogos-hero .livro { width: min(150px, 40vw); }
 }
+.armadilha { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }

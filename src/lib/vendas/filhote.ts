@@ -10,7 +10,7 @@ export const filhote: PaginaVendas = {
   hero: {
     eyebrow: "Guia prático · Primeiros 30 dias",
     antes: "Seu filhote ",
-    destaque: "dormindo a noite toda",
+    destaque: "com noites mais tranquilas",
     depois: " e aprendendo as regras da casa.",
     lead: "O passo a passo dos primeiros 30 dias: o que preparar antes de ele chegar, as primeiras 72 horas, o fim do choro à noite e das mordidas, e a socialização segura antes e depois das vacinas.",
     selos: ["Acesso imediato", "29 páginas ilustradas", "Garantia de 7 dias"],

@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Comprar from "@/components/comprar";
+import type { Produto } from "@/lib/produtos";
+import { reais } from "@/lib/produtos";
 
-/** Barra fixa de compra no celular: aparece depois que o visitante passa do topo da página. */
-export default function BarraCompra({ nome, preco }: { nome: string; preco: string }) {
+/** Barra fixa de compra no celular: aparece depois que o visitante passa do topo e leva direto ao checkout. */
+export default function BarraCompra({ produto }: { produto: Produto }) {
   const [visivel, setVisivel] = useState(false);
   useEffect(() => {
     const onScroll = () => setVisivel(window.scrollY > 700);
@@ -13,8 +16,8 @@ export default function BarraCompra({ nome, preco }: { nome: string; preco: stri
   }, []);
   return (
     <div className={`barra-compra${visivel ? " on" : ""}`} role="region" aria-label="Comprar" aria-hidden={!visivel}>
-      <div><small>{nome}</small><b>{preco}</b></div>
-      <a className="btn" href="#oferta" tabIndex={visivel ? 0 : -1}>Quero o guia</a>
+      <div><small>{produto.nome}</small><b>{reais(produto.preco)}</b></div>
+      <Comprar produto={produto} texto="Comprar agora" />
     </div>
   );
 }

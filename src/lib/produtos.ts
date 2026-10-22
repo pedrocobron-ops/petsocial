@@ -43,7 +43,7 @@ export const PRODUTOS: Produto[] = [
   {
     slug: "filhote",
     nome: "Filhote Sem Caos",
-    chamada: "O guia dos primeiros 30 dias para o filhote dormir, parar de morder e aprender a rotina.",
+    chamada: "O guia dos primeiros 30 dias: rotina de sono, mordidas, xixi e socialização, passo a passo.",
     dor: "O filhote chora à noite e morde tudo",
     preco: 19.9,
     precoDe: 47,

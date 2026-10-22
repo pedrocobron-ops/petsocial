@@ -5,7 +5,7 @@ export const xixi: PaginaVendas = {
   seo: {
     titulo: "Xixi no Lugar Certo — o método de 7 dias",
     descricao:
-      "Ensine seu cachorro a fazer xixi e cocô no lugar certo em 7 dias, com reforço positivo e sem bronca. Guia ilustrado com material para imprimir. Acesso imediato.",
+      "Um método de 7 dias para ensinar seu cachorro a fazer xixi e cocô no lugar certo, com reforço positivo e sem bronca. Guia ilustrado com material para imprimir. Acesso imediato.",
   },
   hero: {
     eyebrow: "Guia prático · Método de 7 dias",
@@ -103,7 +103,7 @@ export const xixi: PaginaVendas = {
   faq: [
     ["Funciona para cachorro adulto?", "Sim. Cães aprendem em qualquer idade. O guia tem uma parte só para cães adultos e recém-adotados."],
     ["Como recebo o guia?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail. O guia é um PDF ilustrado que você lê no celular, no computador ou imprime."],
-    ["Em quanto tempo vejo resultado?", "Muitos cães mostram melhora clara já na primeira semana. A consolidação do hábito costuma levar algumas semanas — depende da idade, do histórico e da constância da rotina."],
+    ["Em quanto tempo vejo resultado?", "A primeira semana é para montar a rotina e ensinar o lugar certo. Firmar o hábito costuma levar algumas semanas e varia com a idade, o histórico e a constância da rotina."],
     ["Precisa de algum equipamento caro?", "Não. Você vai precisar de tapetes higiênicos (ou a superfície que preferir), petiscos pequenos e, se possível, um limpador enzimático. Tem até receita de limpador caseiro."],
     ["Ele começou a errar de repente. O guia resolve?", "Se o cachorro sempre acertou e passou a errar de uma hora para outra, leve-o primeiro ao veterinário: infecção urinária e outros problemas de saúde causam esse comportamento. O guia ajuda depois que a causa médica for descartada."],
     ["E se eu não gostar?", "Você tem 7 dias de garantia. Se não gostar, pede o reembolso e recebe 100% do valor de volta, sem perguntas."],

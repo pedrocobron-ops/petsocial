@@ -2,7 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "**" }],
     formats: ["image/avif", "image/webp"],
   },
   poweredByHeader: false,
@@ -14,6 +13,9 @@ const nextConfig: NextConfig = {
    */
   async redirects() {
     return [
+      // link citado no PDF do Xixi ("Continue com o Mozart"); a página não existe, leva para a vitrine
+      { source: "/adestramento", destination: "/", permanent: false },
+
             // jornal (versão anterior)
       { source: "/noticias/:path*", destination: "/", permanent: true },
       { source: "/categoria/:path*", destination: "/", permanent: true },

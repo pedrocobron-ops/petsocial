@@ -17,7 +17,7 @@ export default function SobrePage() {
         gatos — xixi no lugar errado, filhote que chora à noite, ansiedade quando fica sozinho, alimentação e mais.
       </p>
       <p>
-        Nossos guias são curtos, ilustrados e direto ao ponto: em vez de teoria, você recebe um passo a passo para
+        Nossos guias são curtos, ilustrados e diretos ao ponto: em vez de teoria, você recebe um passo a passo para
         aplicar no mesmo dia. Todos os métodos usam <b>reforço positivo</b>, sem castigo, e indicam o veterinário
         sempre que um comportamento pode ter causa de saúde.
       </p>
