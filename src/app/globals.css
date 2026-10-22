@@ -338,3 +338,23 @@ a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
 }
 .complemento { background: var(--brand-surface); border: 1px dashed var(--brand-border); border-radius: 12px; padding: 10px 14px; font-size: .92rem; color: var(--ink-soft); margin: -6px 0 18px; }
 .complemento b { color: var(--brand-dark); }
+
+/* ---------- E-book grátis (Plano Anti-Fogos) ---------- */
+.cadastro { display: grid; gap: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); max-width: 520px; }
+.cadastro label { display: grid; gap: 6px; font-weight: 600; font-size: .95rem; }
+.cadastro label small { font-weight: 400; color: var(--muted); }
+.cadastro input { font: inherit; font-weight: 400; padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--bg); }
+.cadastro input:focus { outline: none; border-color: var(--brand); background: #fff; }
+.cadastro .btn { width: 100%; margin-top: 4px; }
+.cadastro .btn:disabled { opacity: .75; cursor: wait; }
+.cadastro-lgpd { font-size: .8rem; color: var(--muted); text-align: center; }
+.cadastro-lgpd a { text-decoration: underline; }
+.baixar { display: grid; grid-template-columns: 300px 1fr; gap: 56px; align-items: center; max-width: 960px; }
+.baixar-capa { width: 300px; }
+.baixar-dica { margin-top: 16px; font-size: .92rem; }
+@media (max-width: 900px) {
+  .baixar { grid-template-columns: 1fr; gap: 28px; text-align: center; }
+  .baixar-capa { width: min(200px, 52vw); margin: 0 auto; }
+  .baixar .lead { margin-left: auto; margin-right: auto; }
+  .fogos-hero .livro { width: min(150px, 40vw); }
+}

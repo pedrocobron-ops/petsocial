@@ -13,6 +13,7 @@ export default function PrivacidadePage() {
       <h2>Dados que coletamos</h2>
       <ul>
         <li><b>Na compra:</b> nome, e-mail, telefone e dados de pagamento são coletados e processados pela Cakto, nossa plataforma de pagamentos, para concluir a compra e entregar o acesso.</li>
+        <li><b>No cadastro de materiais gratuitos:</b> nome, e-mail e, se você quiser, o nome do seu cão, guardados em uma planilha privada do Google, usados só para enviar novidades da Maestro Pet. Você pode pedir a exclusão a qualquer momento.</li>
         <li><b>Na navegação:</b> podemos usar cookies e o Pixel da Meta para medir visitas e o desempenho de anúncios.</li>
       </ul>
       <h2>Para que usamos</h2>
