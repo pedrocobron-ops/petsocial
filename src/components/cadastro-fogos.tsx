@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { rastrear } from "@/components/meta-pixel";
 
-/** Ficha curta do e-book grátis: grava o cadastro (via /api/cadastro) e leva direto à página de download. */
+/** Ficha curta do guia grátis: grava o cadastro (via /api/cadastro) e leva direto à página de download. */
 export default function CadastroFogos() {
   const router = useRouter();
   const [enviando, setEnviando] = useState(false);
@@ -14,7 +14,7 @@ export default function CadastroFogos() {
     setEnviando(true);
     const f = new FormData(e.currentTarget);
     const dados = { nome: f.get("nome"), email: f.get("email"), cao: f.get("cao"), site: f.get("site") };
-    // Espera o cadastro ser gravado (até 8 s); se falhar, a pessoa recebe o e-book mesmo assim.
+    // Espera o cadastro ser gravado (até 8 s); se falhar, a pessoa recebe o guia mesmo assim.
     try {
       // AbortSignal.timeout não existe no Safari antigo (iOS 15 ou anterior).
       const signal = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(8000) : undefined;
@@ -49,7 +49,7 @@ export default function CadastroFogos() {
       {/* Campo-armadilha: pessoas não veem; robôs preenchem e o cadastro é descartado. */}
       <input name="site" tabIndex={-1} autoComplete="off" aria-hidden="true" className="armadilha" />
       <button className="btn btn-lg" type="submit" disabled={enviando}>
-        {enviando ? "Abrindo o seu e-book…" : "Quero meu e-book grátis"}
+        {enviando ? "Abrindo o seu guia…" : "Quero meu guia grátis"}
       </button>
       <p className="cadastro-lgpd">
         Seus dados ficam só com a Maestro Pet, sem spam. Você pode pedir para apagar quando quiser.{" "}
