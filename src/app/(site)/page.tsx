@@ -89,7 +89,7 @@ export default function Home() {
                     <span className="guia-dor">“{p.dor}”</span>
                     <h3>{p.nome}</h3>
                     <p>{p.chamada}</p>
-                    {p.lancado ? <span className="guia-preco"><s>{reais(p.precoDe)}</s> {reais(p.preco)}</span> : <span className="guia-preco muted">Lançamento em breve</span>}
+                    {p.lancado ? <span className="guia-preco">{p.precoDe && <s>{reais(p.precoDe)}</s>} {p.ofertas && <small>a partir de </small>}{reais(p.preco)}</span> : <span className="guia-preco muted">Lançamento em breve</span>}
                   </div>
                 </>
               );
