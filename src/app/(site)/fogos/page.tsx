@@ -3,11 +3,11 @@ import Image from "next/image";
 import CadastroFogos from "@/components/cadastro-fogos";
 
 export const metadata: Metadata = {
-  title: "Plano Anti-Fogos — e-book grátis para o seu cão",
+  title: "Plano Anti-Fogos — guia grátis para o seu cão",
   description:
     "Guia gratuito com o plano de 6 semanas para preparar o seu cão para o Réveillon e qualquer noite de fogos ou trovões: cantinho seguro, treino do som baixinho e checklist da virada.",
   alternates: { canonical: "/fogos" },
-  openGraph: { title: "Plano Anti-Fogos — e-book grátis", images: [{ url: "/produtos/fogos-capa.webp", width: 600, height: 849 }] },
+  openGraph: { title: "Plano Anti-Fogos — guia grátis", images: [{ url: "/produtos/fogos-capa.webp", width: 600, height: 849 }] },
 };
 
 const ITENS = [
@@ -25,7 +25,7 @@ export default function FogosPage() {
       <section className="lp-hero" id="topo-fogos">
         <div className="container lp-hero-grid fogos-hero">
           <div>
-            <span className="eyebrow">E-book grátis · Plano Anti-Fogos</span>
+            <span className="eyebrow">Guia grátis · Plano Anti-Fogos</span>
             <h1>Seu cão treme com os fogos? <em>Comece a preparar agora.</em></h1>
             <p className="lead">
               O plano de 6 semanas para chegar no Réveillon com o seu cão mais tranquilo: cantinho seguro, treino com o som
@@ -35,7 +35,7 @@ export default function FogosPage() {
           </div>
           <div className="mockup">
             <div className="livro">
-              <Image src="/produtos/fogos-capa.webp" alt="Capa do e-book Plano Anti-Fogos" width={420} height={594} priority />
+              <Image src="/produtos/fogos-capa.webp" alt="Capa do guia Plano Anti-Fogos" width={420} height={594} priority />
             </div>
           </div>
         </div>
@@ -43,7 +43,7 @@ export default function FogosPage() {
 
       <section className="secao">
         <div className="container">
-          <span className="eyebrow">O que tem no e-book</span>
+          <span className="eyebrow">O que tem no guia</span>
           <h2>12 páginas ilustradas, com o passo a passo do Mozart</h2>
           <div className="recebe">
             <ol>{ITENS.map(([t, d]) => <li key={t}><b>{t}</b><span>{d}</span></li>)}</ol>
@@ -62,7 +62,7 @@ export default function FogosPage() {
             <span className="eyebrow">Por que começar agora</span>
             <h2>O treino leva semanas. A festa tem data marcada.</h2>
             <p>Na noite dos fogos não dá para ensinar nada: o objetivo é só proteger e acalmar. O que faz diferença é o que você faz nas semanas antes, com sessões de 5 minutos por dia.</p>
-            <p>Para o Réveillon, o ideal é começar até a metade de novembro. Se faltar menos que isso, o e-book tem um plano rápido de 2 semanas.</p>
+            <p>Para o Réveillon, o ideal é começar até a metade de novembro. Se faltar menos que isso, o guia tem um plano rápido de 2 semanas.</p>
           </div>
         </div>
       </section>
@@ -70,7 +70,7 @@ export default function FogosPage() {
       <section className="secao cta-final">
         <div className="container">
           <h2>Baixe grátis e comece hoje.</h2>
-          <a className="btn btn-lg" href="#topo-fogos">Quero meu e-book grátis</a>
+          <a className="btn btn-lg" href="#topo-fogos">Quero meu guia grátis</a>
           <p className="aviso">
             Material educativo. Não substitui a avaliação de um(a) médico(a)-veterinário(a). Cães com medo intenso, que se
             machucam ou tentam fugir, devem ser avaliados por um profissional. Nunca dê remédio sem orientação veterinária.

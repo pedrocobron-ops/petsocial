@@ -341,7 +341,7 @@ a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
 .complemento { background: var(--brand-surface); border: 1px dashed var(--brand-border); border-radius: 12px; padding: 10px 14px; font-size: .92rem; color: var(--ink-soft); margin: -6px 0 18px; }
 .complemento b { color: var(--brand-dark); }
 
-/* ---------- E-book grátis (Plano Anti-Fogos) ---------- */
+/* ---------- Guia grátis (Plano Anti-Fogos) ---------- */
 .cadastro { display: grid; gap: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); max-width: 520px; }
 .cadastro label { display: grid; gap: 6px; font-weight: 600; font-size: .95rem; }
 .cadastro label small { font-weight: 400; color: var(--muted); }

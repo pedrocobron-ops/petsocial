@@ -5,7 +5,7 @@ const FORM = "https://docs.google.com/forms/d/e/1FAIpQLScbh_y1nrAZbee81OOUGP_0tK
 const CAMPOS = { nome: "entry.1743077274", email: "entry.514587458", cao: "entry.126728612" } as const;
 
 /**
- * Recebe a ficha do e-book grátis e repassa para o Formulário do Google pelo servidor.
+ * Recebe a ficha do guia grátis e repassa para o Formulário do Google pelo servidor.
  * Enviar direto do navegador para o Google falhava em alguns celulares (bloqueio de envio entre sites).
  */
 /** Só aceita envios do próprio site (produção, prévias da Vercel e testes locais). */

@@ -16,11 +16,11 @@ export default function BaixarFogosPage() {
       <section className="lp-hero">
         <div className="container baixar">
           <div className="livro baixar-capa">
-            <Image src="/produtos/fogos-capa.webp" alt="Capa do e-book Plano Anti-Fogos" width={300} height={424} priority />
+            <Image src="/produtos/fogos-capa.webp" alt="Capa do guia Plano Anti-Fogos" width={300} height={424} priority />
           </div>
           <div>
             <span className="eyebrow">Cadastro feito</span>
-            <h1>Seu e-book <em>está pronto!</em></h1>
+            <h1>Seu guia <em>está pronto!</em></h1>
             <p className="lead">Toque no botão para baixar o Plano Anti-Fogos. Dá para ler no celular, no computador ou imprimir as páginas de checklist.</p>
             <a className="btn btn-lg" href="/gratis/plano-anti-fogos.pdf" download="Plano-Anti-Fogos-Maestro-Pet.pdf">
               Baixar o Plano Anti-Fogos
