@@ -13,8 +13,12 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const c = PAGINAS[(await params).slug];
+  const slug = (await params).slug;
+  const c = PAGINAS[slug];
+  const p = PRODUTOS.find((x) => x.slug === slug);
   return {
+    // Guia ainda não lançado: a página existe para revisão, mas fica fora do Google até entrar na vitrine.
+    ...(p && !p.lancado ? { robots: { index: false, follow: false } } : {}),
     title: c.seo.titulo,
     description: c.seo.descricao,
     alternates: { canonical: `/${c.slug}` },

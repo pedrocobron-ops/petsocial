@@ -15,6 +15,10 @@ na **Cakto**; este site tem a vitrine e as páginas de vendas.
 |---|---|
 | `/` | Vitrine com todos os guias |
 | `/xixi` | Página de vendas do guia **Xixi no Lugar Certo** |
+| `/filhote` | Página de vendas do guia **Filhote Sem Caos** |
+| `/petiscos` | Página de vendas do livro de receitas **Petiscos do Maestro** |
+| `/tedio` | Página de vendas do guia **Cão Sem Tédio** (dois planos: Básico e Kit Completo). Ainda fora da vitrine e do Google (`lancado: false`) |
+| `/fogos` | Guia grátis **Plano Anti-Fogos**, com cadastro |
 | `/sobre`, `/contato` | Institucional e suporte |
 | `/termos-de-uso`, `/politica-de-privacidade` | Exigidas pela Cakto e pelo Meta Ads |
 
@@ -28,7 +32,11 @@ Tudo fica em `src/lib/produtos.ts`. Para colocar um guia à venda:
 2. Cole o link no campo `checkout` do produto. Enquanto estiver vazio, o botão aparece como "Em breve".
 3. Para lançar um guia novo, escreva o conteúdo da página de vendas em `src/lib/vendas/<slug>.ts`
    (mesmo formato de `xixi.ts`), registre em `src/lib/vendas/index.ts` e marque `lancado: true` no catálogo.
-   A rota `/<slug>` é gerada automaticamente.
+   A rota `/<slug>` é gerada automaticamente. Enquanto `lancado` for `false`, a página abre pelo link, mas fica
+   fora da vitrine, do sitemap e do Google (`noindex`).
+4. **Guia com dois planos** (ex.: Cão Sem Tédio): em vez de `checkout`, preencha `ofertas` no catálogo, cada uma com
+   `id`, `nome`, `preco`, `checkout` e, na principal, `destaque: true`. O texto de cada plano fica na página de vendas,
+   em `oferta.planos`, pelo mesmo `id`. Oferta sem link aparece como "Em breve".
 
 ## Variáveis de ambiente (Vercel)
 
