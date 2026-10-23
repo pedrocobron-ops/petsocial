@@ -164,6 +164,24 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
         </div>
       </section>
 
+      {c.todas && (
+        <section id="todas" className="secao">
+          <div className="container">
+            <span className="eyebrow">{c.todas.eyebrow}</span>
+            <h2>{c.todas.titulo}</h2>
+            <p className="lead">{c.todas.lead}</p>
+            <div className="todas">
+              {c.todas.grupos.map(([g, itens], i) => (
+                <div key={g} className="todas-grupo">
+                  <h3><small>Capítulo {i + 1}</small>{g}</h3>
+                  <ul>{itens.map((t) => <li key={t}><b>{t.slice(0, 2)}</b>{t.slice(3)}</li>)}</ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="secao">
         <div className="container">
           <span className="eyebrow">Incluído no guia</span>

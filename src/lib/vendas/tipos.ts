@@ -13,6 +13,8 @@ export type PaginaVendas = {
   ficha?: FichaExemplo;
   bonus: { titulo: string; itens: { imagem?: string; icone?: string; titulo: string; texto: string }[] };
   /** Opcional: o que vem a mais no plano em destaque (ex.: os guias práticos do Kit). */
+  /** Lista completa do conteúdo (ex.: as 100 atividades), agrupada. `id="todas"` na página. */
+  todas?: { eyebrow: string; titulo: string; lead: string; grupos: [string, string[]][] };
   kit?: { eyebrow: string; titulo: string; texto: string; itens: { imagem: string; titulo: string; texto: string }[]; nota?: string };
   paraQuem: { sim: string[]; nao: string[] };
   /**
