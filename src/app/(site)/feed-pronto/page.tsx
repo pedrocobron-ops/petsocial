@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { FEED_AREAS, POSTS_POR_PACOTE, imgFeed, nomeFeed } from "@/lib/feed-pronto";
+import { COMBO, FEED_AREAS, POSTS_POR_PACOTE, imgFeed, nomeFeed } from "@/lib/feed-pronto";
 
 export const metadata: Metadata = {
   title: "Feed Pronto: posts editáveis no Canva para negócios pet",
@@ -23,6 +23,18 @@ export default function Page() {
             Você troca a logo, as fotos e os preços e posta.
           </p>
           <ul className="selos"><li>Editável no Canva grátis</li><li>Legendas prontas</li><li>Acesso imediato</li></ul>
+        </div>
+      </section>
+
+      <section className="secao secao-creme">
+        <div className="container feed-combo">
+          <Image src="/feed-pronto/combo/capa.webp" alt={`Capa do ${COMBO.nome}`} width={260} height={325} />
+          <div>
+            <span className="eyebrow">Para quem atende mais de um público</span>
+            <h2>{COMBO.nome}</h2>
+            <p className="lead">{COMBO.chamada} 600 posts, 600 stories, 300 avisos, capas de destaques, bios, 300 roteiros de Reels e calendários.</p>
+            <Link className="btn" href="/feed-pronto/combo">Ver o combo</Link>
+          </div>
         </div>
       </section>
 

@@ -187,6 +187,7 @@ export default async function Page({ params }: Params) {
           <span className="eyebrow">Linha Feed Pronto</span>
           <h2>Tem outro negócio pet?</h2>
           <ul className="feed-outras">{outras.map((o) => <li key={o.slug}><Link href={`/feed-pronto/${o.slug}`}>{nomeFeed(o)}</Link></li>)}</ul>
+          <p className="feed-combo-link">Atende mais de um público? <Link href="/feed-pronto/combo">Leve as 10 áreas no Combo Pet Completo</Link>.</p>
         </div>
       </section>
     </div>

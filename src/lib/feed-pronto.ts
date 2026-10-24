@@ -148,3 +148,26 @@ export const nomeFeed = (a: AreaFeed) => `Feed Pronto ${a.nome}`;
 
 /** Caminho das imagens de uma área (capa.webp e exemplo-1.webp a exemplo-6.webp). */
 export const imgFeed = (a: AreaFeed, arquivo: string) => `/feed-pronto/${a.slug}/${arquivo}`;
+
+/**
+ * Combo Pet Completo: as 10 áreas com todos os complementos num produto só.
+ * `preco` e `precoSeparado` (a soma real das áreas e complementos avulsos) ficam vazios até o Pedro decidir os preços.
+ */
+export const COMBO = {
+  slug: "combo-pet-completo",
+  nome: "Combo Pet Completo",
+  chamada: "As 10 áreas do Feed Pronto, com todos os complementos, num pacote só.",
+  preco: undefined as number | undefined,
+  precoSeparado: undefined as number | undefined,
+  checkout: "",
+  lancado: false,
+  /** O que vem, com as quantidades reais (10 áreas). */
+  itens: [
+    ["600 posts de feed", "60 por área, editáveis no Canva, com legenda pronta, nas edições azul, rosa e verde."],
+    ["600 stories", "A versão vertical de cada post, feita para a tela do celular."],
+    ["300 avisos em 3 formatos", "Feriado, horário, regras, pagamento e mais: post, story e A4 para imprimir, com QR code."],
+    ["400 capas de destaques e 100 bios", "O Kit Perfil Profissional de cada área."],
+    ["300 roteiros de Reels", "Com manual de gravação para quem nunca gravou."],
+    ["10 calendários de postagem", "Os posts de cada área organizados em 3 por semana e as datas do ano."],
+  ] as [string, string][],
+};
