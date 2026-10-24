@@ -105,8 +105,16 @@ export default async function Page({ params }: Params) {
               <li><b>Legenda pronta para cada post</b><span>Com chamada para ação e hashtags. É só copiar e colar.</span></li>
               <li><b>Todos os temas que o seu perfil precisa</b><span>{a.temas.join(" · ")}.</span></li>
               <li><b>Guia de uso</b><span>Como trocar a logo, as fotos e os preços em poucos minutos.</span></li>
+              <li><b>Bônus: Calendário de Postagens</b><span>Os posts organizados em 3 por semana e as datas comemorativas do ano. É só seguir.</span></li>
             </ol>
           </div>
+          <h3 className="feed-extras-titulo">Se quiser, no checkout você também pode levar</h3>
+          <ul className="feed-extras">
+            <li><b>Stories Prontos</b><span>A versão vertical de cada post, feita para a tela do celular.</span></li>
+            <li><b>Avisos Prontos</b><span>30 avisos (feriado, horário, regras, pagamento) para postar e imprimir em A4.</span></li>
+            <li><b>Kit Perfil Profissional</b><span>Capas de destaques e bios prontas para o Instagram.</span></li>
+            <li><b>30 Roteiros de Reels</b><span>Manual de gravação e roteiros cena a cena.</span></li>
+          </ul>
         </div>
       </section>
 
@@ -157,6 +165,7 @@ export default async function Page({ params }: Params) {
               <li>{a.carrosseis} carrosséis completos</li>
               <li>Legenda pronta para cada post</li>
               <li>Guia de uso</li>
+              <li>Bônus: Calendário de Postagens</li>
             </ul>
             {a.preco ? <div className="preco"><strong>{reais(a.preco)}</strong><small>pagamento único · Pix ou cartão</small></div> : null}
             <Comprar produto={p} texto="Quero o meu Feed Pronto" grande />
