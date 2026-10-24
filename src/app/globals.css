@@ -471,3 +471,19 @@ a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
   .todas-grupo ul { grid-template-columns: 1fr 1fr; column-gap: 12px; gap: 6px 12px; }
   .todas-grupo li { font-size: .8rem; gap: 5px; }
 }
+
+/* ---- Linha Feed Pronto (posts para negócios pet) ---- */
+.feed-capa img { width: min(400px, 82vw); height: auto; border-radius: 14px; box-shadow: var(--shadow); }
+.feed-exemplos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.feed-exemplos img { width: 100%; height: auto; border-radius: 12px; box-shadow: var(--shadow); }
+.recebe.feed-recebe { grid-template-columns: 1fr; max-width: 760px; }
+.feed-outras { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; }
+.feed-outras a { display: inline-block; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); font-weight: 600; }
+.feed-areas { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; }
+.feed-area { display: flex; flex-direction: column; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; color: inherit; text-decoration: none; box-shadow: var(--shadow); }
+.feed-area img { width: 100%; height: auto; }
+.feed-area > div { padding: 14px 16px 18px; }
+.feed-area h3 { margin-bottom: 6px; }
+.feed-area p { font-size: .93rem; color: var(--ink-soft); }
+.feed-area .guia-breve { display: inline-block; margin-top: 10px; background: var(--brand-dark); padding: 4px 10px; border-radius: 999px; }
+@media (max-width: 760px) { .feed-exemplos { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
