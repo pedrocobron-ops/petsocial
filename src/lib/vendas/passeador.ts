@@ -42,7 +42,7 @@ export const passeador: PaginaVendas = {
     titulo: "Tudo o que o trabalho exige, do primeiro cão ao plano de carreira",
     itens: [
       ["O mercado e o perfil", "Quem contrata passeador, o que é realidade e o que é ilusão, um teste rápido de perfil e a rotina real de um dia de trabalho."],
-      ["Casos reais", "Passeadores e negócios do Brasil e de fora: como começaram, o que cobram, como cresceram e a lição de cada um. Com fonte, data e QR code para o perfil."],
+      ["Casos reais", "Passeadores e negócios do Brasil e de fora: como começaram, o que cobram e a lição de cada um. Com fonte, data e QR code para a reportagem ou o perfil."],
       ["Comportamento canino", "Linguagem corporal, a escada de sinais antes da mordida, cão reativo, cão medroso e como apresentar cães para o passeio em grupo."],
       ["Segurança e primeiros socorros", "Calor e asfalto, raças de focinho curto, cão solto se aproximando, briga, fuga e o que fazer (e não fazer) numa emergência até chegar ao veterinário."],
       ["Equipamento e investimento", "Lista de compras com faixa de preço e investimento inicial em 3 níveis: mínimo, recomendado e completo."],
@@ -114,7 +114,7 @@ export const passeador: PaginaVendas = {
     ["É melhor trabalhar por aplicativo ou por conta própria?", "Cada caminho tem prós e contras, e o manual compara os dois. Um exemplo: em junho de 2026, a Petlove Serviços listava hospedagem, creche e pet sitter, mas não o passeio avulso, e informava taxa de 25% para o prestador. Por isso o manual dá peso à sua carteira própria no bairro."],
     ["Ele complementa o Manual do Pet Sitter?", "Sim. Muitos passeadores também fazem visitas na casa do tutor, e vice-versa. Cada manual é completo sozinho; juntos, cobrem o passeio e o cuidado em casa, com contratos e fichas para cada serviço."],
     ["Quem escreveu o manual?", "A equipe Maestro Pet, com pesquisa em fontes oficiais (Planalto, gov.br, Receita Federal, Manual Veterinário MSD) e de mercado. Todas as fontes estão listadas no manual, com link e data, para você conferir."],
-    ["Por que os casos reais não têm foto?", "Porque as imagens pertencem a cada profissional. Em vez de usar foto sem autorização, cada caso traz um QR code que abre o perfil de verdade."],
+    ["Por que os casos reais não têm foto?", "Porque as imagens pertencem a cada profissional. Em vez de usar foto sem autorização, cada caso traz um QR code que abre a reportagem ou o perfil de verdade."],
     ["Como recebo?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail: o manual em PDF, a planilha (Google Planilhas e Excel) e os materiais para imprimir e editar."],
     ["E se não for para mim?", "Você tem 7 dias de garantia. Se achar que não valeu a pena, pede o reembolso e recebe 100% do valor de volta."],
   ],
