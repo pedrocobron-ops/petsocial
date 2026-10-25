@@ -5,15 +5,15 @@ export const influenciador: PaginaVendas = {
   seo: {
     titulo: "Pet Influenciador — o passo a passo para o perfil do seu pet chegar até as marcas",
     descricao:
-      "O guia completo para transformar o perfil do seu cão ou gato num perfil profissional: 30 roteiros, 60 legendas, calendário de 2027, mídia kit, e-mails para marcas e as regras do CONAR. Com casos reais brasileiros.",
+      "O guia completo para transformar o perfil do seu cão ou gato num perfil profissional: 30 roteiros, 60 legendas, calendário de 2027, mídia kit, e-mails para marcas e as regras do CONAR. Com casos reais e os nichos além do humor.",
   },
   hero: {
-    eyebrow: "Guia completo · 90 páginas",
+    eyebrow: "Guia completo · 97 páginas",
     antes: "O seu pet já é uma estrela em casa. ",
     destaque: "Agora vamos montar o palco",
     depois: ".",
     lead: "O passo a passo completo para o perfil do seu cão ou gato ficar profissional, crescer com consistência e chegar até as marcas: da bio ao mídia kit, com roteiros, legendas e e-mails prontos.",
-    selos: ["Acesso imediato", "90 páginas", "Garantia de 7 dias"],
+    selos: ["Acesso imediato", "97 páginas", "Garantia de 7 dias"],
   },
   dores: {
     titulo: "Se você já pensou alguma destas coisas",
@@ -32,13 +32,15 @@ export const influenciador: PaginaVendas = {
     eyebrow: "O que os perfis grandes têm em comum",
     titulo: "Nenhum começou grande. Todos começaram com um formato.",
     paragrafos: [
-      "O guia reúne **casos reais de pets influenciadores brasileiros**, com fontes, e mostra o que eles têm em comum: um personagem claro, um quadro fixo, constância e muito cuidado com o bem-estar do bicho.",
+      "O guia reúne **casos reais de pets influenciadores brasileiros**, com fontes, data e um QR code para o perfil de verdade, e mostra o que eles têm em comum: um personagem claro, um quadro fixo, constância e muito cuidado com o bem-estar do bicho.",
+      "E vai **além do humor**: mostra quem faz sucesso com moda, culinária pet, viagem, educação, gatos calmos e causa, quem patrocina cada nicho e um primeiro roteiro para cada um.",
       "Sem promessa mágica: a maioria dos perfis leva meses para crescer. O que o guia entrega é **o caminho completo e organizado**, com tudo pronto para você começar hoje e chegar até as marcas do jeito certo.",
     ],
   },
   recebe: {
-    titulo: "Tudo o que você precisa, em 4 fases",
+    titulo: "Tudo o que você precisa, em 4 fases e muito mais",
     itens: [
+      ["Além do humor", "Os nichos possíveis (moda, culinária, viagem, educação, gatos, causa), quem patrocina cada um e como escolher o do seu pet."],
       ["Fundação", "Nome e @, 10 modelos de bio, foto de perfil, destaques, conta profissional e o quadro fixo do seu perfil."],
       ["Foto e vídeo", "Como fazer ele ficar parado, luz, os 3 primeiros segundos, edição no CapCut e a voz do pet."],
       ["Conteúdo pronto", "30 roteiros, 50 ideias, 60 legendas e piadas, 30 ganchos, plano de 30 dias e datas comemorativas de 2027."],
@@ -86,8 +88,9 @@ export const influenciador: PaginaVendas = {
   },
   oferta: {
     itens: [
-      "Guia completo de 90 páginas",
-      "Casos reais de pets influenciadores do Brasil",
+      "Guia completo de 97 páginas",
+      "Casos reais de pets influenciadores do Brasil e de fora",
+      "Além do humor: moda, culinária, viagem, educação, gatos e causa",
       "30 roteiros, 50 ideias, 60 legendas e 30 ganchos",
       "Calendário de datas comemorativas de 2027",
       "Mídia kit para preencher e 5 e-mails para marcas",
@@ -100,6 +103,8 @@ export const influenciador: PaginaVendas = {
     ["O guia garante que meu pet vai ficar famoso ou ganhar dinheiro?", "Não. Ninguém pode garantir isso. O guia entrega o passo a passo completo e organizado, com o que funciona para os perfis pet, e mostra o caminho para chegar até as marcas. O resultado depende do seu pet, da sua constância e do tempo."],
     ["Preciso ter muitos seguidores para começar?", "Não. O guia começa do zero, e o capítulo de marcas mostra os caminhos que funcionam para perfis pequenos, como negócios locais e programas de afiliados."],
     ["Serve para gato?", "Sim. Os roteiros, as legendas e o passo a passo servem para cães e gatos."],
+    ["Meu pet não é engraçado. O guia serve para ele?", "Serve. O humor é o nicho mais forte no Brasil, mas o guia tem um capítulo só com os outros caminhos: moda, culinária pet, viagem, educação, gatos calmos, pets idosos e causa. E um teste para descobrir o jeito do seu pet."],
+    ["Por que os casos reais não têm foto dos pets?", "Porque a imagem desses pets pertence aos tutores. Em vez de usar foto sem autorização, cada caso traz um QR code que abre o perfil de verdade, para você ver o pet e o conteúdo dele."],
     ["Preciso de equipamento?", "Não. Tudo é pensado para o celular, com edição em aplicativo gratuito."],
     ["Como recebo?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail, com o guia em PDF."],
   ],
