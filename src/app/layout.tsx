@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import MetaPixel from "@/components/meta-pixel";
+import AvisoCookies from "@/components/aviso-cookies";
 import "./globals.css";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <MetaPixel />
         {children}
+        <AvisoCookies />
       </body>
     </html>
   );

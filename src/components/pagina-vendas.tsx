@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import BarraCompra from "@/components/barra-compra";
 import Comprar from "@/components/comprar";
+import Amostras from "@/components/amostras";
+import { DepoisDaCompra, QuemFaz, Selos } from "@/components/confianca";
 import { VerProduto } from "@/components/meta-pixel";
 import type { Produto } from "@/lib/produtos";
 import { comoProduto, daFamilia, linhaDe, reais, urlProduto } from "@/lib/produtos";
@@ -157,9 +159,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           <h2>{c.recebe.titulo}</h2>
           <div className="recebe">
             <ol>{c.recebe.itens.map(([t, d]) => <li key={t}><b>{t}</b><span>{d}</span></li>)}</ol>
-            <div className="paginas">
-              {c.recebe.paginas.map(([src, alt]) => <Image key={src} src={src} alt={alt} width={300} height={424} />)}
-            </div>
+            <div><Amostras paginas={c.recebe.paginas} /></div>
           </div>
         </div>
       </section>
@@ -265,7 +265,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
                 );
               })}
             </div>
-            <p className="seguro">Pagamento seguro processado pela Cakto · material digital, com acesso enviado para o seu e-mail</p>
+            <Selos />
           </div>
         </section>
       ) : (
@@ -287,11 +287,13 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
             </div>
             {c.oferta.complemento && <p className="complemento"><b>{negocios ? "Também disponível:" : "No checkout:"}</b> {c.oferta.complemento}</p>}
             <Comprar produto={p} texto={`Quero ${item} agora`} grande />
-            <p className="seguro">Pagamento seguro processado pela Cakto · acesso enviado por e-mail</p>
+            <Selos />
           </div>
         </div>
       </section>
       )}
+
+      {p.lancado && <DepoisDaCompra item={item} />}
 
       <section className="secao">
         <div className="container garantia">
@@ -299,6 +301,8 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           <div><h2>Garantia incondicional de 7 dias</h2><p>{c.garantia}</p></div>
         </div>
       </section>
+
+      <QuemFaz negocios={negocios} />
 
       <section className="secao secao-creme">
         <div className="container faq">

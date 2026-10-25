@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Amostras from "@/components/amostras";
 import CadastroFogos from "@/components/cadastro-fogos";
 
 export const metadata: Metadata = {
@@ -47,9 +48,8 @@ export default function FogosPage() {
           <h2>12 páginas ilustradas, com o passo a passo do Mozart</h2>
           <div className="recebe">
             <ol>{ITENS.map(([t, d]) => <li key={t}><b>{t}</b><span>{d}</span></li>)}</ol>
-            <div className="paginas">
-              <Image src="/produtos/fogos-pag7.webp" alt="Página com o plano de 6 semanas para imprimir" width={300} height={424} />
-              <Image src="/produtos/fogos-pag9.webp" alt="Página com o checklist do dia dos fogos" width={300} height={424} />
+            <div>
+              <Amostras paginas={[["/produtos/fogos-pag7.webp", "Página com o plano de 6 semanas para imprimir"], ["/produtos/fogos-pag9.webp", "Página com o checklist do dia dos fogos"]]} />
             </div>
           </div>
         </div>

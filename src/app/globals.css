@@ -130,9 +130,9 @@ a.guia:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
 .recebe li b { font-size: 1.05rem; }
 .recebe li span { color: var(--ink-soft); font-size: 0.97rem; }
 .paginas { position: relative; height: 520px; }
-.paginas img { position: absolute; width: 72%; border-radius: 6px; box-shadow: var(--shadow); border: 1px solid var(--line); }
-.paginas img:first-child { top: 0; left: 0; transform: rotate(-4deg); }
-.paginas img:last-child { bottom: 0; right: 0; transform: rotate(4deg); }
+.paginas .amostra { position: absolute; width: 72%; overflow: hidden; border-radius: 6px; box-shadow: var(--shadow); border: 1px solid var(--line); }
+.paginas .amostra:first-child { top: 0; left: 0; transform: rotate(-4deg); }
+.paginas .amostra:last-child { bottom: 0; right: 0; transform: rotate(4deg); }
 
 .metodo-art { width: 100%; max-width: 760px; border-radius: 22px; border: 6px solid #fff; box-shadow: var(--shadow); margin: 0 0 32px; }
 .dias { display: grid; grid-template-columns: repeat(var(--cols, 7), 1fr); gap: 12px; }
@@ -285,8 +285,8 @@ h1 em { background: linear-gradient(transparent 64%, rgba(249, 115, 22, .22) 64%
 /* Revelar ao rolar (classes postas pelo componente Animacoes) */
 .mv .rv { opacity: 0; translate: 0 28px; transition: opacity .7s cubic-bezier(.2, .7, .2, 1), translate .7s cubic-bezier(.2, .7, .2, 1); transition-delay: calc(var(--i, 0) * 85ms); }
 .mv .dores blockquote.rv { translate: -28px 0; }
-.mv .paginas img.rv:first-child { translate: -48px 12px; }
-.mv .paginas img.rv:last-child { translate: 48px 12px; }
+.mv .paginas .amostra.rv:first-child { translate: -48px 12px; }
+.mv .paginas .amostra.rv:last-child { translate: 48px 12px; }
 main { overflow-x: clip; }
 .mv .rv.in { opacity: 1; translate: none; }
 .mv .guia-off.rv.in { opacity: .85; }
@@ -570,3 +570,57 @@ a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
 /* a barra fixa de compra não cobre o rodapé no celular */
 @media (max-width: 900px) { main:has(.com-barra) + footer { padding-bottom: 110px; } }
 .bonus-icone { height: 120px; font-size: 3rem; }
+
+/* Páginas legais */
+.prose-data { font-size: .9rem; color: var(--ink-soft); opacity: .8; }
+.prose ol { padding-left: 22px; }
+.prose table { width: 100%; border-collapse: collapse; margin: 8px 0 18px; font-size: .92rem; display: block; overflow-x: auto; }
+.prose th, .prose td { border: 1px solid rgba(0,0,0,.1); padding: 8px 10px; text-align: left; vertical-align: top; color: var(--ink-soft); }
+.prose th { background: rgba(249,115,22,.08); color: var(--ink); }
+.sobre-fundador { display: flex; gap: 20px; align-items: center; margin: 24px 0; padding: 18px; border-radius: 16px; background: rgba(249,115,22,.07); }
+.sobre-fundador img { border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.sobre-fundador h2 { margin-top: 0; }
+@media (max-width: 560px) { .sobre-fundador { flex-direction: column; text-align: center; } }
+
+/* Aviso de cookies */
+.aviso-cookies { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 50; max-width: 720px; margin: 0 auto; display: flex; gap: 14px; align-items: center;
+  background: #2a2420; color: #f3ece4; padding: 12px 14px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); font-size: .88rem; }
+.aviso-cookies p { margin: 0; flex: 1; }
+.aviso-cookies a { color: #fdba74; text-decoration: underline; }
+.aviso-cookies .btn { padding: 8px 16px; font-size: .9rem; flex-shrink: 0; }
+
+/* Amostras com zoom */
+.amostra { position: relative; padding: 0; border: 0; background: none; cursor: zoom-in; display: block; }
+.amostra img { display: block; width: 100%; height: auto; }
+.paginas .amostra:hover { z-index: 2; }
+.amostra-lupa { position: absolute; right: 8px; bottom: 8px; background: rgba(42,36,32,.85); color: #fff; font-size: .75rem; font-weight: 600; padding: 4px 10px; border-radius: 99px; }
+.amostra-dica { font-size: .85rem; color: var(--ink-soft); margin-top: 8px; text-align: center; }
+.lightbox { padding: 0; border: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; margin: 0; overflow: hidden; }
+.lightbox::backdrop { background: rgba(20,16,14,.92); }
+.lightbox[open] { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.lightbox-img { max-width: min(860px, 96vw); max-height: calc(100vh - 70px); overflow: auto; cursor: zoom-in; border-radius: 8px; -webkit-overflow-scrolling: touch; }
+.lightbox-img img { display: block; width: 100%; height: auto; max-height: calc(100vh - 70px); object-fit: contain; background: #fff; }
+.lightbox-img.zoom { cursor: zoom-out; }
+.lightbox-img.zoom img { width: 200%; max-width: none; max-height: none; }
+.lightbox-legenda { color: #e9dfd5; font-size: .85rem; margin: 10px 16px 0; text-align: center; }
+.lightbox-fechar { position: fixed; top: 10px; right: 12px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.15); color: #fff; font-size: 1.8rem; line-height: 1; cursor: pointer; }
+.lightbox-nav { position: fixed; top: 50%; translate: 0 -50%; width: 44px; height: 64px; border: 0; border-radius: 10px; background: rgba(255,255,255,.12); color: #fff; font-size: 2rem; cursor: pointer; }
+.lightbox-nav.ant { left: 8px; } .lightbox-nav.prox { right: 8px; }
+
+/* Selos de compra, passo a passo pós-compra e "quem faz" */
+.selos { list-style: none; padding: 0; margin: 14px auto 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 8px; max-width: 900px; }
+.selos li { display: inline-flex; align-items: center; gap: 5px; font-size: .78rem; font-weight: 600; color: var(--ink-soft); background: rgba(0,0,0,.04); border: 1px solid var(--line); border-radius: 99px; padding: 4px 10px; }
+.selos svg { color: var(--brand-dark); }
+.depois-passos { list-style: none; counter-reset: dp; padding: 0; margin: 24px 0 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.depois-passos li { counter-increment: dp; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 18px 18px 16px; position: relative; }
+.depois-passos li::before { content: counter(dp); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 800; margin-bottom: 10px; }
+.depois-passos b { display: block; margin-bottom: 4px; }
+.depois-passos span { color: var(--ink-soft); font-size: .93rem; }
+.depois-ajuda { margin-top: 18px; color: var(--ink-soft); font-size: .93rem; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.depois-ajuda a, .quem-faz a { color: var(--brand-dark); text-decoration: underline; }
+.quem-faz-lista { padding-left: 20px; margin-top: 16px; max-width: 760px; }
+.quem-faz-lista li { color: var(--ink-soft); margin-bottom: 10px; }
+.quem-faz-lista b { color: var(--ink); }
+.quem-faz-links { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.quem-faz-links a { display: inline-flex; align-items: center; gap: 4px; }
+.quem-faz-id { font-size: .85rem; color: var(--muted); margin-top: 8px; }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { EMPRESA, identificacao, linkInstagram, linkWhatsapp } from "@/lib/empresa";
 
 export const metadata: Metadata = {
   title: "Quem somos",
@@ -9,6 +10,10 @@ export const metadata: Metadata = {
 };
 
 export default function SobrePage() {
+  const f = EMPRESA.fundador;
+  const id = identificacao();
+  const wa = linkWhatsapp();
+  const ig = linkInstagram();
   return (
     <div className="container prose">
       <Image src="/mozart/acenando.webp" alt="Mozart acenando" width={180} height={180} />
@@ -17,6 +22,16 @@ export default function SobrePage() {
         A Maestro Pet é uma empresa de conteúdo sobre o mundo pet. Fazemos materiais práticos para dois públicos:
         quem tem um cão ou um gato em casa e quem trabalha, ou quer trabalhar, no mercado pet.
       </p>
+      {f.nome && (
+        <div className="sobre-fundador">
+          {f.foto && <Image src={f.foto} alt={`${f.nome} com o Mozart`} width={160} height={160} />}
+          <div>
+            <h2>Quem está por trás</h2>
+            <p><b>{f.nome}</b>, {f.papel}.</p>
+            {f.texto && <p>{f.texto}</p>}
+          </div>
+        </div>
+      )}
       <h2>Para tutores</h2>
       <p>
         Guias que resolvem os problemas do dia a dia (xixi no lugar errado, filhote que chora à noite, ansiedade quando
@@ -38,7 +53,17 @@ export default function SobrePage() {
         <li>Todos os produtos têm garantia de 7 dias e pagamento seguro pela Cakto.</li>
       </ul>
       <h2>Fale com a gente</h2>
-      <p>Dúvidas, sugestões ou suporte: <a href="mailto:contato@maestropet.com">contato@maestropet.com</a>. Instagram: <a href="https://www.instagram.com/maestro_pet_/">@maestro_pet_</a>.</p>
+      <ul>
+        <li>E-mail: <a href={`mailto:${EMPRESA.email}`}>{EMPRESA.email}</a> (respondemos em até 2 dias úteis)</li>
+        {wa && <li>WhatsApp: <a href={wa}>fale com o suporte</a></li>}
+        {ig && <li>Instagram: <a href={ig}>@{EMPRESA.instagram}</a></li>}
+      </ul>
+      {id && (
+        <>
+          <h2>Dados da empresa</h2>
+          <p>{id}</p>
+        </>
+      )}
     </div>
   );
 }
