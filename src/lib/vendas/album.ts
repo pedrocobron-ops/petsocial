@@ -2,6 +2,7 @@ import type { PaginaVendas } from "./tipos";
 
 export const album: PaginaVendas = {
   slug: "album",
+  item: "o álbum",
   seo: {
     titulo: "Álbum do Primeiro Ano do Pet — para imprimir",
     descricao:

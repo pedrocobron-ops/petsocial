@@ -2,6 +2,7 @@ import type { PaginaVendas } from "./tipos";
 
 export const calendario: PaginaVendas = {
   slug: "calendario",
+  item: "o calendário",
   seo: {
     titulo: "Calendário 2027 do Pet — para imprimir, com a foto dele em cada mês",
     descricao:

@@ -2,6 +2,7 @@ import type { PaginaVendas } from "./tipos";
 
 export const papelaria: PaginaVendas = {
   slug: "papelaria",
+  item: "os 6 kits",
   seo: {
     titulo: "Kit Papelaria do Pet — 6 kits para imprimir num pacote só",
     descricao:

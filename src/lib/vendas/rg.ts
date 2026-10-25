@@ -2,6 +2,7 @@ import type { PaginaVendas } from "./tipos";
 
 export const rg: PaginaVendas = {
   slug: "rg",
+  item: "o kit",
   seo: {
     titulo: "RG e Certidão do Pet — para imprimir e plastificar",
     descricao:

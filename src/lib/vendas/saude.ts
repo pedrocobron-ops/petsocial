@@ -2,6 +2,7 @@ import type { PaginaVendas } from "./tipos";
 
 export const saude: PaginaVendas = {
   slug: "saude",
+  item: "o kit",
   seo: {
     titulo: "Kit Saúde do Pet — carteira de vacinação para imprimir + guia",
     descricao:
