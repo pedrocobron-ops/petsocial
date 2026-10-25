@@ -75,10 +75,11 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
   };
   const item = c.item ?? "o guia";
   /** "o guia" → "no guia", "a carteira" → "na carteira". */
-  const noItem = `n${item.slice(1)}`;
+  const noItem = `n${item}`;
   const negocios = linhaDe(p) === "negocios";
   const familia = daFamilia(p);
-  const ctaTopo = ofertas ? `Quero ${item}` : `Quero ${item} por ${reais(p.preco)}`;
+  // Antes do lançamento, os botões levam à oferta sem prometer a compra (o botão de lá mostra "Em breve").
+  const ctaTopo = !p.lancado ? `Ver o que vem ${noItem}` : ofertas ? `Quero ${item}` : `Quero ${item} por ${reais(p.preco)}`;
   const passos = c.metodo.passos.length;
   return (
     <div className="com-barra">
@@ -96,6 +97,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
               {c.hero.secundario && <a className="btn btn-ghost btn-lg" href={c.hero.secundario[1]}>{c.hero.secundario[0]}</a>}
             </div>
             {ofertas && <p className="hero-precos">{ofertas.map((o) => `${o.nome} ${reais(o.preco)}`).join(" · ")} · pagamento único</p>}
+            {!p.lancado && <p className="hero-breve">Lançamento em breve: a venda ainda não está aberta.</p>}
             <ul className="selos">{c.hero.selos.map((s) => <li key={s}>{s}</li>)}</ul>
           </div>
           {p.capa && (
@@ -305,7 +307,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
       <section className="secao cta-final">
         <div className="container">
           <h2>{c.ctaFinal}</h2>
-          <a className="btn btn-lg" href="#oferta">{ofertas ? "Escolher meu plano" : `Quero ${item} por ${reais(p.preco)}`}</a>
+          <a className="btn btn-lg" href="#oferta">{!p.lancado ? "Ver a oferta" : ofertas ? "Escolher meu plano" : `Quero ${item} por ${reais(p.preco)}`}</a>
           <p className="aviso">{c.aviso}</p>
         </div>
       </section>

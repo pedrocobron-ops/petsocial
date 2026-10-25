@@ -37,7 +37,7 @@ export default function Negocios() {
         <div className="container hero-home-grid">
           <div>
             <span className="eyebrow">Maestro Pet Negócios</span>
-            <h1>Construa a sua renda no mercado pet, <em>com método</em>.</h1>
+            <h1>Comece o seu negócio no mercado pet, <em>com método</em>.</h1>
             <p className="lead">
               Manuais completos para começar e crescer num negócio pet, com plano de carreira, as regras do seu ramo,
               planilhas e mensagens prontas. E posts editáveis no Canva para divulgar o que você já faz.

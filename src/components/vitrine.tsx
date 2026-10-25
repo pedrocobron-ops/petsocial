@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Produto } from "@/lib/produtos";
 import { reais, urlProduto } from "@/lib/produtos";
 
-/** Cartão de produto das vitrines. Produto ainda não lançado aparece como "Em breve", sem link. */
+/** Cartão de produto das vitrines. Produto ainda não lançado aparece como "Em breve", mas abre a página (que mostra o que vem e o botão "Em breve"). */
 export function CartaoProduto({ p }: { p: Produto }) {
   const card = (
     <>
@@ -23,11 +23,7 @@ export function CartaoProduto({ p }: { p: Produto }) {
       </div>
     </>
   );
-  return p.lancado ? (
-    <Link href={urlProduto(p)} className="guia">{card}</Link>
-  ) : (
-    <div className="guia guia-off">{card}</div>
-  );
+  return <Link href={urlProduto(p)} className={p.lancado ? "guia" : "guia guia-off"}>{card}</Link>;
 }
 
 /** Uma seção da vitrine: título, texto e os cartões. Lançados primeiro. */
