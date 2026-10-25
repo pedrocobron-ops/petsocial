@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { COMBO, FEED_AREAS, POSTS_POR_PACOTE, imgFeed, nomeFeed } from "@/lib/feed-pronto";
+import { reais } from "@/lib/produtos";
+import "../../../feed-pronto.css";
 
 export const metadata: Metadata = {
   title: "Feed Pronto: posts editáveis no Canva para negócios pet",
@@ -49,6 +51,7 @@ export default function Page() {
                 <div>
                   <h3>{nomeFeed(a)}</h3>
                   <p>{a.chamada}</p>
+                  <p className="fp-card-preco">{POSTS_POR_PACOTE} posts{a.preco ? ` · ${reais(a.preco)}` : ""}</p>
                   {!a.lancado && <span className="guia-breve">Em breve</span>}
                 </div>
               </Link>

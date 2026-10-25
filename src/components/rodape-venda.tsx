@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { identificacao } from "@/lib/empresa";
 import type { Linha } from "@/lib/produtos";
 
 /** Rodapé das páginas de venda: quem somos e as páginas institucionais, sem vitrine de outros produtos. */
@@ -23,6 +24,7 @@ export default function RodapeVenda({ linha }: { linha: Linha }) {
             ? "Os guias do Maestro Pet têm caráter educativo e não substituem a avaliação de um(a) médico(a)-veterinário(a)."
             : "Os materiais têm caráter educativo e não garantem renda ou resultado. Para impostos, contratos e regras do seu ramo, procure um contador ou o órgão responsável."}{" "}
           Pagamentos processados pela Cakto. Suporte: <a href="mailto:contato@maestropet.com">contato@maestropet.com</a>. © {new Date().getFullYear()} Maestro Pet.
+          {identificacao() && <><br />{identificacao()}</>}
         </p>
       </div>
     </footer>

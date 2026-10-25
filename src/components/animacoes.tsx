@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 const ALVOS = [
   ".secao .eyebrow", ".secao h2", ".virada p",
   ".pilar", ".guia", ".dica", ".passos li",
-  ".dores blockquote", ".virada-art", ".recebe li", ".paginas img", ".metodo-art", ".dia",
+  ".dores blockquote", ".virada-art", ".recebe li", ".paginas .amostra", ".metodo-art", ".dia",
   ".bonus-card", ".pq", ".oferta-mockup", ".oferta-box", ".garantia img", ".garantia > div",
   ".faq details", ".cta-final .btn", ".prose > *",
 ].join(",");
