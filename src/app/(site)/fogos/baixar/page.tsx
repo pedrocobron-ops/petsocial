@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { PRODUTOS, reais, temCheckout } from "@/lib/produtos";
+import { PRODUTOS, linhaDe, reais, temCheckout, urlProduto } from "@/lib/produtos";
 
 export const metadata: Metadata = {
   title: "Seu Plano Anti-Fogos está pronto",
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default function BaixarFogosPage() {
-  const guias = PRODUTOS.filter((p) => p.lancado && temCheckout(p));
+  const guias = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "tutor" && temCheckout(p));
   return (
     <>
       <section className="lp-hero">
@@ -36,13 +36,13 @@ export default function BaixarFogosPage() {
           <h2>Conheça os guias completos</h2>
           <div className="guias">
             {guias.map((p) => (
-              <Link key={p.slug} className="guia" href={`/${p.slug}`}>
+              <Link key={p.slug} className="guia" href={urlProduto(p)}>
                 <div className="guia-capa">{p.capa && <Image src={p.capa} alt="" width={120} height={170} />}</div>
                 <div>
                   <span className="guia-dor">{p.dor}</span>
                   <h3>{p.nome}</h3>
                   <p>{p.chamada}</p>
-                  <span className="guia-preco">{p.precoDe && <s>{reais(p.precoDe)}</s>} {p.ofertas && <small>a partir de </small>}{reais(p.preco)}</span>
+                  <span className="guia-preco">{p.ofertas && <small>a partir de </small>}{reais(p.preco)}</span>
                 </div>
               </Link>
             ))}

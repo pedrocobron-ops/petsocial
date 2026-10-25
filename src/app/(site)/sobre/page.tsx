@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Sobre",
-  description: "Quem somos: o Maestro Pet cria guias práticos para tutores de cães e gatos.",
+  title: "Quem somos",
+  description: "A Maestro Pet faz guias práticos para tutores de cães e gatos e manuais para quem trabalha no mercado pet.",
   alternates: { canonical: "/sobre" },
 };
 
@@ -11,24 +12,33 @@ export default function SobrePage() {
   return (
     <div className="container prose">
       <Image src="/mozart/acenando.webp" alt="Mozart acenando" width={180} height={180} />
-      <h1>Sobre o Maestro Pet</h1>
+      <h1>Quem somos</h1>
       <p>
-        O Maestro Pet cria guias práticos para ajudar tutores a resolver os problemas do dia a dia com seus cães e
-        gatos — xixi no lugar errado, filhote que chora à noite, ansiedade quando fica sozinho, alimentação e mais.
+        A Maestro Pet é uma empresa de conteúdo sobre o mundo pet. Fazemos materiais práticos para dois públicos:
+        quem tem um cão ou um gato em casa e quem trabalha, ou quer trabalhar, no mercado pet.
       </p>
+      <h2>Para tutores</h2>
       <p>
-        Nossos guias são curtos, ilustrados e diretos ao ponto: em vez de teoria, você recebe um passo a passo para
-        aplicar no mesmo dia. Todos os métodos usam <b>reforço positivo</b>, sem castigo, e indicam o veterinário
-        sempre que um comportamento pode ter causa de saúde.
+        Guias que resolvem os problemas do dia a dia (xixi no lugar errado, filhote que chora à noite, ansiedade quando
+        fica sozinho, gato que arranha o sofá), receitas seguras e kits para imprimir. Todos os métodos usam
+        <b> reforço positivo</b>, sem castigo, e indicam o veterinário sempre que um comportamento pode ter causa de saúde.
+        Quem apresenta os guias é o Mozart, o nosso border collie. <Link href="/tutor">Ver os guias e kits</Link>.
       </p>
-      <h2>Quem é o Mozart?</h2>
+      <h2>Para negócios pet</h2>
       <p>
-        O Mozart é o nosso mascote: um border collie curioso que apresenta cada guia e aparece com dicas ao longo do
-        caminho. Ele é a lembrança de que, do ponto de vista do cachorro, quase todo “mau comportamento” é só falta
-        de alguém explicar direito.
+        Manuais completos para começar e crescer no mercado pet, com plano de carreira, as regras de cada ramo,
+        planilhas, contratos e mensagens prontas, e posts editáveis no Canva para divulgar o negócio. Nenhum manual
+        promete renda: mostramos o caminho, as contas de exemplo e as ferramentas. <Link href="/negocios">Ver os manuais</Link>.
       </p>
+      <h2>Como trabalhamos</h2>
+      <ul>
+        <li>Pesquisamos em fontes oficiais, entidades do setor e imprensa especializada, e listamos as fontes nos materiais.</li>
+        <li>Não usamos depoimentos inventados, números sem fonte nem promessas de resultado.</li>
+        <li>Saúde é com o veterinário; impostos e contratos do seu caso, com um contador ou advogado.</li>
+        <li>Todos os produtos têm garantia de 7 dias e pagamento seguro pela Cakto.</li>
+      </ul>
       <h2>Fale com a gente</h2>
-      <p>Dúvidas, sugestões ou suporte: <a href="mailto:contato@maestropet.com">contato@maestropet.com</a>.</p>
+      <p>Dúvidas, sugestões ou suporte: <a href="mailto:contato@maestropet.com">contato@maestropet.com</a>. Instagram: <a href="https://www.instagram.com/maestro_pet_/">@maestro_pet_</a>.</p>
     </div>
   );
 }

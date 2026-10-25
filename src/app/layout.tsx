@@ -7,19 +7,19 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Maestro Pet — Guias práticos para tutores",
+    default: "Maestro Pet — conhecimento prático para quem ama pets e para quem vive deles",
     template: "%s | Maestro Pet",
   },
   description:
-    "Guias práticos e baratos para resolver os problemas do dia a dia com seu cachorro ou gato: xixi no lugar errado, filhote, petiscos, ansiedade e mais.",
+    "Guias e kits práticos para tutores de cães e gatos, e manuais completos para quem quer empreender no mercado pet.",
   applicationName: "Maestro Pet",
   icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
   openGraph: {
     type: "website",
     locale: "pt_BR",
     siteName: "Maestro Pet",
-    title: "Maestro Pet — Guias práticos para tutores",
-    description: "Guias práticos para resolver os problemas do dia a dia com seu pet.",
+    title: "Maestro Pet",
+    description: "Guias para tutores e manuais para quem trabalha no mercado pet.",
     images: [{ url: "/og/home.png", width: 1200, height: 630 }],
   },
   twitter: { card: "summary_large_image" },

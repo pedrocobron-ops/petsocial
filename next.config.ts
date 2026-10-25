@@ -13,8 +13,11 @@ const nextConfig: NextConfig = {
    */
   async redirects() {
     return [
+      // linha Feed Pronto mudou para a área de negócios
+      { source: "/feed-pronto", destination: "/negocios/feed-pronto", permanent: true },
+      { source: "/feed-pronto/:pagina([a-z-]+)", destination: "/negocios/feed-pronto/:pagina", permanent: true }, // só páginas: as imagens continuam em /feed-pronto/<área>/...
       // link citado no PDF do Xixi ("Continue com o Mozart"); a página não existe, leva para a vitrine
-      { source: "/adestramento", destination: "/", permanent: false },
+      { source: "/adestramento", destination: "/tutor", permanent: false },
 
             // jornal (versão anterior)
       { source: "/noticias/:path*", destination: "/", permanent: true },

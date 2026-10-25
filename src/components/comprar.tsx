@@ -14,10 +14,10 @@ function linkCheckout(base: string) {
   return destino.toString();
 }
 
-/** Botão de compra: leva ao checkout da Cakto, ou mostra "Em breve" se ainda não houver link. */
+/** Botão de compra: leva ao checkout da Cakto, ou mostra "Em breve" se ainda não houver link ou se o produto não foi lançado (entrega ainda não ligada). */
 export default function Comprar({ produto, texto = "Quero o guia agora", grande = false, className = "" }: { produto: Produto; texto?: string; grande?: boolean; className?: string }) {
   const cls = `btn${grande ? " btn-lg" : ""}${className ? ` ${className}` : ""}`;
-  if (!produto.checkout) {
+  if (!produto.checkout || !produto.lancado) {
     return <span className={`${cls} btn-off`} aria-disabled="true">Em breve</span>;
   }
   return (

@@ -1,9 +1,11 @@
 import Image from "next/image";
+import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import BarraCompra from "@/components/barra-compra";
 import Comprar from "@/components/comprar";
 import { VerProduto } from "@/components/meta-pixel";
 import type { Produto } from "@/lib/produtos";
-import { comoProduto, reais } from "@/lib/produtos";
+import { comoProduto, daFamilia, linhaDe, reais, urlProduto } from "@/lib/produtos";
 import type { PaginaVendas as Conteudo, FichaExemplo } from "@/lib/vendas/tipos";
 
 /** Converte **negrito** do conteúdo em <b>. */
@@ -60,7 +62,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
     price: preco.toFixed(2),
     priceCurrency: "BRL",
     availability: checkout ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
-    url: `${SITE_URL}/${p.slug}`,
+    url: `${SITE_URL}${urlProduto(p)}`,
   });
   const produtoLd = {
     "@context": "https://schema.org",
@@ -71,7 +73,12 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
     brand: { "@type": "Brand", name: "Maestro Pet" },
     offers: ofertas ? ofertas.map((o) => offer(o.preco, o.checkout, o.nome)) : offer(p.preco, p.checkout),
   };
-  const ctaTopo = ofertas ? "Quero o guia" : `Quero o guia por ${reais(p.preco)}`;
+  const item = c.item ?? "o guia";
+  /** "o guia" → "no guia", "a carteira" → "na carteira". */
+  const noItem = `n${item.slice(1)}`;
+  const negocios = linhaDe(p) === "negocios";
+  const familia = daFamilia(p);
+  const ctaTopo = ofertas ? `Quero ${item}` : `Quero ${item} por ${reais(p.preco)}`;
   const passos = c.metodo.passos.length;
   return (
     <div className="com-barra">
@@ -94,7 +101,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           {p.capa && (
             <div className="mockup">
               <div className="livro">
-                <Image src={p.capa} alt={`Capa do guia ${p.nome}`} width={420} height={594} priority />
+                <Image src={p.capa} alt={`Capa: ${p.nome}`} width={420} height={594} priority />
               </div>
             </div>
           )}
@@ -140,7 +147,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
 
       <section className="secao">
         <div className="container">
-          <span className="eyebrow">O que tem no guia</span>
+          <span className="eyebrow">O que tem {noItem}</span>
           <h2>{c.recebe.titulo}</h2>
           <div className="recebe">
             <ol>{c.recebe.itens.map(([t, d]) => <li key={t}><b>{t}</b><span>{d}</span></li>)}</ol>
@@ -184,7 +191,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
 
       <section className="secao">
         <div className="container">
-          <span className="eyebrow">Incluído no guia</span>
+          <span className="eyebrow">Incluído {noItem}</span>
           <h2>{c.bonus.titulo}</h2>
           <div className="bonus">
             {c.bonus.itens.map((b) => (
@@ -252,7 +259,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
                 );
               })}
             </div>
-            <p className="seguro">Pagamento seguro processado pela Cakto · guia digital em PDF, com acesso imediato no seu e-mail</p>
+            <p className="seguro">Pagamento seguro processado pela Cakto · material digital, com acesso enviado para o seu e-mail</p>
           </div>
         </section>
       ) : (
@@ -264,7 +271,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
             </div>
           )}
           <div className="oferta-box">
-            <span className="eyebrow">Oferta de lançamento</span>
+            <span className="eyebrow">O que você leva</span>
             <h2>{p.nome}</h2>
             <ul className="oferta-itens">{c.oferta.itens.map((i) => <li key={i}>{i}</li>)}</ul>
             <div className="preco">
@@ -272,8 +279,8 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
               <strong>{reais(p.preco)}</strong>
               <small>pagamento único · Pix ou cartão</small>
             </div>
-            {c.oferta.complemento && <p className="complemento"><b>No checkout:</b> {c.oferta.complemento}</p>}
-            <Comprar produto={p} texto="Quero o guia agora" grande />
+            {c.oferta.complemento && <p className="complemento"><b>{negocios ? "Também disponível:" : "No checkout:"}</b> {c.oferta.complemento}</p>}
+            <Comprar produto={p} texto={`Quero ${item} agora`} grande />
             <p className="seguro">Pagamento seguro processado pela Cakto · acesso enviado por e-mail</p>
           </div>
         </div>
@@ -282,7 +289,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
 
       <section className="secao">
         <div className="container garantia">
-          <Image src="/mozart/medalha.webp" alt="Selo de garantia" width={200} height={200} />
+          {negocios ? <span className="garantia-selo" aria-hidden><ShieldCheck size={96} /></span> : <Image src="/mozart/medalha.webp" alt="Selo de garantia" width={200} height={200} />}
           <div><h2>Garantia incondicional de 7 dias</h2><p>{c.garantia}</p></div>
         </div>
       </section>
@@ -298,10 +305,27 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
       <section className="secao cta-final">
         <div className="container">
           <h2>{c.ctaFinal}</h2>
-          <a className="btn btn-lg" href="#oferta">{ofertas ? "Escolher meu plano" : `Quero o guia por ${reais(p.preco)}`}</a>
+          <a className="btn btn-lg" href="#oferta">{ofertas ? "Escolher meu plano" : `Quero ${item} por ${reais(p.preco)}`}</a>
           <p className="aviso">{c.aviso}</p>
         </div>
       </section>
+
+      {familia.length > 0 && (
+        <section className="secao secao-creme">
+          <div className="container">
+            <span className="eyebrow">{negocios ? "Também da Maestro Pet Negócios" : "Também do Maestro Pet"}</span>
+            <h2>Combina com este</h2>
+            <div className="familia">
+              {familia.map((x) => (
+                <Link key={x.slug} href={urlProduto(x)} className="familia-card">
+                  {x.capa && <Image src={x.capa} alt="" width={120} height={170} />}
+                  <div><b>{x.nome}</b><span>{x.chamada}</span><em>{reais(x.preco)}</em></div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <BarraCompra produto={p} />
     </div>
