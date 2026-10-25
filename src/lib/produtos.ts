@@ -162,6 +162,16 @@ export const PRODUTOS: Produto[] = [
     checkout: "https://pay.cakto.com.br/32wc3di",
     lancado: false,
   },
+  {
+    slug: "influenciador",
+    nome: "Pet Influenciador",
+    chamada: "O passo a passo completo para o perfil do seu pet ficar profissional, crescer e chegar até as marcas.",
+    dor: "Todo mundo diz que ele deveria estar na internet.",
+    preco: 47,
+    capa: "/produtos/capa-influenciador.webp",
+    checkout: "https://pay.cakto.com.br/h9iyg3a",
+    lancado: false,
+  },
 ];
 
 export const produto = (slug: string) => PRODUTOS.find((p) => p.slug === slug)!;
