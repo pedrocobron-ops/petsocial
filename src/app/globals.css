@@ -566,3 +566,7 @@ a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
 .topo-negocios { background: rgba(253, 251, 247, .95); }
 .topo-confianca { white-space: nowrap; flex-shrink: 0; }
 @media (max-width: 520px) { .topo-venda .marca { font-size: 1.2rem; gap: 8px; } .topo-venda .marca img, .topo-venda .marca-selo { width: 34px; height: 34px; } }
+.hero-breve { margin-top: 12px; font-weight: 600; color: var(--brand-dark); font-size: .95rem; }
+/* a barra fixa de compra não cobre o rodapé no celular */
+@media (max-width: 900px) { main:has(.com-barra) + footer { padding-bottom: 110px; } }
+.bonus-icone { height: 120px; font-size: 3rem; }

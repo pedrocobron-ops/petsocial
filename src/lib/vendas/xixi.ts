@@ -108,7 +108,7 @@ export const xixi: PaginaVendas = {
     ["Ele começou a errar de repente. O guia resolve?", "Se o cachorro sempre acertou e passou a errar de uma hora para outra, leve-o primeiro ao veterinário: infecção urinária e outros problemas de saúde causam esse comportamento. O guia ajuda depois que a causa médica for descartada."],
     ["E se eu não gostar?", "Você tem 7 dias de garantia. Se não gostar, pede o reembolso e recebe 100% do valor de volta, sem perguntas."],
   ],
-  ctaFinal: "Daqui a 7 dias, sua casa pode estar sem poças.",
+  ctaFinal: "Comece hoje o método de 7 dias, sem bronca e sem castigo.",
   aviso:
     "Este guia tem caráter educativo e não substitui a avaliação de um(a) médico(a)-veterinário(a). Os resultados variam de acordo com a idade, o histórico e a rotina de cada cachorro.",
 };

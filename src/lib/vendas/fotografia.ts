@@ -10,7 +10,7 @@ export const fotografia: PaginaVendas = {
   },
   hero: {
     eyebrow: "Maestro Pet Negócios · Manual completo",
-    antes: "Construa a sua renda no mercado pet ",
+    antes: "Trabalhe no mercado pet ",
     destaque: "atrás da câmera",
     depois: ".",
     lead: "O manual para transformar a fotografia de cães e gatos em um negócio organizado: como conduzir a sessão com o bem-estar do animal em primeiro lugar, que equipamento comprar e quando, quanto cobrar, como conseguir clientes e como crescer, com ferramentas prontas e um plano de carreira em 4 níveis.",

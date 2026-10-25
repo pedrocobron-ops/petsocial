@@ -10,7 +10,7 @@ export const confeitaria: PaginaVendas = {
   },
   hero: {
     eyebrow: "Maestro Pet Negócios · Manual completo",
-    antes: "Construa a sua renda no mercado pet com ",
+    antes: "Monte o seu negócio no mercado pet com ",
     destaque: "uma confeitaria de verdade",
     depois: ".",
     lead: "As 30 receitas e o negócio inteiro em volta delas: kits de festa, ficha técnica, preço, as regras para vender dentro da lei, embalagem e etiquetas prontas, cardápio editável e um plano de carreira do primeiro bolo à confeitaria com equipe.",
@@ -102,7 +102,7 @@ export const confeitaria: PaginaVendas = {
       "Casos reais com fonte, data e QR code",
     ],
     complemento:
-      "também disponível o Feed Pronto Confeitaria Pet, com 60 posts editáveis no Canva e legendas prontas para divulgar as suas encomendas (opcional, vendido à parte).",
+      "o Feed Pronto Confeitaria Pet, com 60 posts editáveis no Canva e legendas prontas para divulgar as suas encomendas (opcional, vendido à parte).",
   },
   garantia:
     "Leia o manual, use as ferramentas e comece o plano. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta. Sem perguntas e sem burocracia.",

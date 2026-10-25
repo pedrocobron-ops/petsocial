@@ -10,7 +10,7 @@ export const petsitter: PaginaVendas = {
   },
   hero: {
     eyebrow: "Maestro Pet Negócios · Manual completo",
-    antes: "Construa a sua renda no mercado pet ",
+    antes: "Trabalhe no mercado pet ",
     destaque: "cuidando de quem fica em casa",
     depois: ".",
     lead: "O manual completo para trabalhar como pet sitter de cães e gatos com confiança e organização: a visita do começo ao fim, os sinais de alerta, o que você pode e não pode fazer, contrato, preço, alta temporada e um plano de carreira em 4 níveis.",
@@ -101,7 +101,7 @@ export const petsitter: PaginaVendas = {
       "Plano de carreira em 4 níveis e casos reais com QR code",
     ],
     complemento:
-      "também disponíveis o Manual do Passeador de Cães, que completa este com o passeio, e o Feed Pronto Pet Sitter, com 60 posts editáveis no Canva para divulgar o seu serviço (opcionais, vendidos à parte).",
+      "o Manual do Passeador de Cães, que completa este com o passeio, e o Feed Pronto Pet Sitter, com 60 posts editáveis no Canva para divulgar o seu serviço (opcionais, vendidos à parte).",
   },
   garantia:
     "Leia o manual, use as ferramentas e comece o plano. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta. Sem perguntas e sem burocracia.",

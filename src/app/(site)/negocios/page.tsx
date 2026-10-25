@@ -29,15 +29,14 @@ const FAQ = [
 
 export default function Negocios() {
   const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios");
-  const influenciador = PRODUTOS.filter((p) => p.grupo === "redes");
-  const [comece, redes] = GRUPOS.negocios;
+  const [comece] = GRUPOS.negocios;
   return (
     <div className="linha-negocios">
       <section className="hero-home hero-negocios">
         <div className="container hero-home-grid">
           <div>
             <span className="eyebrow">Maestro Pet Negócios</span>
-            <h1>Construa a sua renda no mercado pet, <em>com método</em>.</h1>
+            <h1>Comece o seu negócio no mercado pet, <em>com método</em>.</h1>
             <p className="lead">
               Manuais completos para começar e crescer num negócio pet, com plano de carreira, as regras do seu ramo,
               planilhas e mensagens prontas. E posts editáveis no Canva para divulgar o que você já faz.
@@ -76,7 +75,6 @@ export default function Negocios() {
         </div>
       </section>
 
-      <SecaoVitrine id={redes[0]} titulo={redes[1]} texto={redes[2]} produtos={influenciador} />
 
       <section className="secao">
         <div className="container">
