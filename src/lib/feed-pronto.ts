@@ -16,14 +16,19 @@ export type AreaFeed = {
   dores: string[];
   temas: string[];
   carrosseis: number;
-  /** Edições de cor do mesmo pacote (além da azul e amarela). */
-  cores?: string[];
   preco?: number;
   checkout: string;
   lancado: boolean;
 };
 
 export const POSTS_POR_PACOTE = 60;
+
+/** Edições de cor que vêm em todos os pacotes, além da azul e amarela (os mesmos 60 posts, recoloridos). */
+export const EDICOES_COR = ["Rosa", "Verde"] as const;
+
+/** Complementos oferecidos no checkout de cada área (Stories, Avisos, Kit Perfil e Roteiros de Reels). */
+export const COMPLEMENTOS_POR_AREA = 4;
+export const PRECO_COMPLEMENTO = 9.9;
 
 export const FEED_AREAS: AreaFeed[] = [
   {
@@ -34,7 +39,6 @@ export const FEED_AREAS: AreaFeed[] = [
     dores: ["Entre um banho e outro, não sobra tempo para criar post", "O Instagram da loja fica semanas parado", "Pago designer e ainda demora para ficar pronto"],
     temas: ["Serviços de banho e tosa", "Dicas e cuidados entre banhos", "Loja", "Promoções e pacotes", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 3,
-    cores: ["Rosa", "Verde"],
     preco: 27,
     checkout: "https://pay.cakto.com.br/36cv2sf",
     lancado: false,
@@ -156,19 +160,112 @@ export const deNegocio = (a: AreaFeed) => a.negocio.replace(/^o /, "do ").replac
 
 export const nomeFeed = (a: AreaFeed) => `Feed Pronto ${a.nome}`;
 
-/** Caminho das imagens de uma área (capa.webp e exemplo-1.webp a exemplo-6.webp). */
+/**
+ * Caminho das imagens de uma área em /public/feed-pronto/<slug>/: capa.webp, exemplo-1..12.webp (posts reais do pacote),
+ * carrossel-1..N.webp (as páginas de um carrossel) e rosa-1/2.webp, verde-1/2.webp (os mesmos posts nas outras cores).
+ * Todas tiradas dos arquivos .pptx entregues ao comprador (800 px, webp).
+ */
 export const imgFeed = (a: AreaFeed, arquivo: string) => `/feed-pronto/${a.slug}/${arquivo}`;
+
+/** Amostras de cada área mostradas na página de vendas (textos tirados das legendas que vêm no pacote). */
+export type AmostrasFeed = {
+  /** Título de cada exemplo-N.webp, na ordem (usado no texto alternativo). */
+  exemplos: string[];
+  /** Um dos carrosséis do pacote: carrossel-1.webp a carrossel-<paginas>.webp. */
+  carrossel: { titulo: string; paginas: number };
+  /** A legenda que vem pronta com o exemplo-<exemplo>.webp, como está no pacote. */
+  legenda: { exemplo: number; texto: string };
+  /** Exemplos que aparecem também nas edições rosa e verde (rosa-1/2.webp e verde-1/2.webp). */
+  cores: [number, number];
+};
+
+export const AMOSTRAS: Record<string, AmostrasFeed> = {
+  "pet-shop": {
+    exemplos: ["Tá na hora do banho!", "Feliz Dia dos Namorados!", "Time cachorro ou time gato?", "Ainda não conhece a gente?", "Tosa na tesoura é trabalho de paciência.", "De quanto em quanto tempo dar banho?", "Roupinhas pós-banho.", "Combo da semana: banho + hidratação.", "Feliz Ano Novo!", "Onde estamos.", "Dia de banho: ama ou foge?", "Gato também toma banho, e merece um ambiente calmo."],
+    carrossel: { titulo: "O que acontece no banho?", paginas: 5 },
+    legenda: { exemplo: 8, texto: "Combo da semana: banho + hidratação. ✨\nPelo macio, cheiroso e brilhante, com preço especial. Consulte as condições.\nAgende pelo WhatsApp: o link está na bio. 📲\n#promocaopet #banhoetosa #petshop #descontopet" },
+    cores: [1, 8],
+  },
+  "veterinaria": {
+    exemplos: ["Cuidado completo para o seu pet.", "Pulgas e carrapatos: prevenir é o caminho.", "Alimentos proibidos para pet.", "Plano filhote!", "Feliz Ano Novo!", "Muito prazer!", "Check-up de rotina.", "Vermifugação em dia.", "Remédio de gente não é para pet.", "Combo consulta + vacina V10.", "Feliz Dia do Gato!", "Horário de atendimento."],
+    carrossel: { titulo: "Vacinas do filhote: o básico.", paginas: 5 },
+    legenda: { exemplo: 4, texto: "Plano filhote! 🐶\n1ª consulta + vacina V10 + antirrábica, com preço especial.\nAgende pelo WhatsApp: o link está na bio. 📲\n#clinicaveterinaria #saudepet #promocaopet #veterinario" },
+    cores: [1, 4],
+  },
+  "adestramento": {
+    exemplos: ["É hora de aprender!", "O chamado “vem!”.", "Late demais?", "Pacote 4 aulas em casa.", "Feliz Ano Novo!", "Muito prazer!", "Passeio sem puxão.", "Como ensinar o “senta”.", "Medo de barulho?", "Primeira aula com 20% off.", "Feliz Dia das Mães de pet!", "Horário das aulas."],
+    carrossel: { titulo: "Como funciona uma aula em casa?", paginas: 4 },
+    legenda: { exemplo: 4, texto: "Pacote 4 aulas em casa. 📅\nUma aula por semana, com tarefas entre elas.\nGaranta o seu pelo WhatsApp (link na bio).\n#adestramento #adestramentoemcasa #filhote #cachorro" },
+    cores: [1, 4],
+  },
+  "dog-walker": {
+    exemplos: ["Tá na hora do passeio!", "Quanto tempo de passeio?", "Segurança no passeio.", "Pacote 8 passeios no mês.", "Feliz Ano Novo!", "Muito prazer!", "Passeio com brincadeira.", "Passeio no calor.", "Guia sempre na mão.", "Pacote 20 passeios no mês.", "Feliz Dia das Mães de pet!", "Horário dos passeios."],
+    carrossel: { titulo: "Como funciona o passeio?", paginas: 5 },
+    legenda: { exemplo: 4, texto: "Pacote 8 passeios no mês. 📅\nIndividuais de 30 min, duas vezes por semana.\nGaranta o seu pelo WhatsApp (link na bio).\n#dogwalker #passeadordecaes #passeiocomcachorro #cachorro" },
+    cores: [1, 4],
+  },
+  "hotel-e-creche": {
+    exemplos: ["Vai viajar? Ele fica com a gente!", "Na creche, é dia de brincar!", "Conta tudo pra gente!", "Pacote feriadão: 3 diárias no hotel.", "Vai curtir o Carnaval?", "Muito prazer!", "Sono tranquilo para cada hóspede.", "Novos amigos todo dia.", "Primeiro dia na creche.", "Diária teste com 50% off!", "Feliz Dia dos Namorados!", "Nossos horários."],
+    carrossel: { titulo: "Como é um dia no hotel?", paginas: 5 },
+    legenda: { exemplo: 4, texto: "Pacote feriadão: 3 diárias no hotel. 📅\nPequeno porte, de R$ 299,70 por R$ 269,90. Consulte datas e vagas.\nReserve pelo WhatsApp: o link está na bio. 📲\n#hotelpet #crecheparacaes #promocaopet #feriado #ferias" },
+    cores: [1, 4],
+  },
+  "pet-sitter": {
+    exemplos: ["Vai viajar? Ele fica em casa!", "Gato gosta de rotina.", "Feriadão chegando?", "Pacote feriado: 4 visitas de 1 hora.", "Vai curtir o Carnaval?", "Muito prazer!", "Gato prefere ficar no território dele.", "Vai viajar? Deixe tudo pronto antes de sair.", "Férias à vista?", "A visita de apresentação é grátis.", "Feliz Dia dos Namorados!", "Horários de visita."],
+    carrossel: { titulo: "Como é uma visita de pet sitter?", paginas: 5 },
+    legenda: { exemplo: 4, texto: "Pacote feriado: 4 visitas de 1 hora. 📅\nUma visita por dia no feriado prolongado, com preço especial. Consulte as datas.\nReserve pelo WhatsApp: o link está na bio. 📲\n#petsitter #promocaopet #cuidadordepets #feriado #ferias" },
+    cores: [1, 4],
+  },
+  "comida-natural": {
+    exemplos: ["Comida natural de verdade para o seu pet.", "Na hora de servir: fria da geladeira ou levemente morna.", "Primeiro pedido? Comece pelo kit degustação.", "Feliz Natal!", "Muito prazer!", "Frango ou carne?", "Gato também tem cardápio aqui.", "Troca de ração para comida natural? Sem pressa.", "O décimo kit é por nossa conta.", "Seu pet faz aniversário este mês?", "Pedidos e entregas.", "Qual o nome do seu pet?"],
+    carrossel: { titulo: "Alimentos proibidos para pets.", paginas: 4 },
+    legenda: { exemplo: 3, texto: "Primeiro pedido? Comece pelo kit degustação. 🎁\n7 marmitas de 200 g para ele provar, de R$ 69,90 por R$ 59,90.\nPeça pelo WhatsApp: o link está na bio. 📲\n#comidanatural #alimentacaonatural #promocaopet #marmitapet" },
+    cores: [1, 3],
+  },
+  "confeitaria-pet": {
+    exemplos: ["Tem doce para o seu cão!", "Como guardar os doces.", "Kit cãoversário!", "Feliz Natal!", "Muito prazer!", "Bolo ou cupcake?", "Cupcakes pet, fofinhos e coloridos.", "O que vai no bolo do cão?", "Ainda não provou?", "Aniversariante do mês!", "Horário de encomendas.", "Marque quem sempre divide o lanche com o pet."],
+    carrossel: { titulo: "Bolo pet: perguntas frequentes.", paginas: 5 },
+    legenda: { exemplo: 3, texto: "Kit cãoversário! 🎉\nBolo P + 6 cupcakes + pote de biscoitos, com preço de kit.\nEncomende pelo WhatsApp: o link está na bio. 📲\n#confeitariapet #promocaopet #kitfestapet #bolopet #caoversario" },
+    cores: [1, 3],
+  },
+  "moda-pet": {
+    exemplos: ["Novidades na vitrine!", "Tabela de medidas.", "Kit passeio: peitoral + guia combinando.", "É Carnaval!", "Muito prazer!", "Laço ou bandana?", "Peitoral confortável para o passeio.", "Ficou entre dois tamanhos?", "Cartão fidelidade!", "Feliz Dia das Mães de pet!", "Bastidores do ateliê.", "Qual o tamanho do seu pet?"],
+    carrossel: { titulo: "Coleção de inverno chegou!", paginas: 4 },
+    legenda: { exemplo: 3, texto: "Kit passeio: peitoral + guia combinando. 🐾\nNo mesmo tecido, com preço especial.\nPeça pelo WhatsApp: o link está na bio. 📲\n#modapet #promocaopet #acessoriospet #lojapet" },
+    cores: [1, 3],
+  },
+  "agropet": {
+    exemplos: ["Ração, areia e muito mais.", "Pediu, a gente entrega!", "Caixa de areia limpa.", "Combo gato: ração 10 kg + 2 areias de 4 kg.", "Feliz Dia dos Namorados!", "Muito prazer!", "Ração para gatos.", "Saco de 15 kg? Deixa com a gente.", "Como guardar a ração.", "Primeiro pedido com entrega grátis.", "Feliz Dia das Mães de pet!", "Atendimento de bairro."],
+    carrossel: { titulo: "Como trocar a ração sem susto.", paginas: 5 },
+    legenda: { exemplo: 4, texto: "Combo gato: ração 10 kg + 2 areias de 4 kg. 🐱\nDe R$ 209,70 por R$ 189,90. O mês do seu gato resolvido numa compra só.\nPeça pelo WhatsApp: o link está na bio. 📲\n#promocaopet #agropet #racao #descontopet #casaderacao" },
+    cores: [1, 4],
+  },
+};
+
+const AREAS_AVULSAS = FEED_AREAS.length;
+const COMPLEMENTOS = AREAS_AVULSAS * COMPLEMENTOS_POR_AREA;
+const PRECO_AREA = FEED_AREAS[0].preco ?? 0;
+
+/** A conta do valor separado do combo, para mostrar na página: áreas + complementos comprados um a um. */
+export const CONTA_SEPARADO = {
+  areas: AREAS_AVULSAS,
+  precoArea: PRECO_AREA,
+  totalAreas: AREAS_AVULSAS * PRECO_AREA,
+  complementos: COMPLEMENTOS,
+  precoComplemento: PRECO_COMPLEMENTO,
+  totalComplementos: Math.round(COMPLEMENTOS * PRECO_COMPLEMENTO * 100) / 100,
+};
 
 /**
  * Combo Pet Completo: as 10 áreas com todos os complementos num produto só.
- * `precoSeparado` é a soma real das 10 áreas e dos 40 complementos avulsos (10 × R$ 27 + 40 × R$ 9,90).
+ * `precoSeparado` é a soma real das 10 áreas e dos 40 complementos avulsos (10 × R$ 27 + 40 × R$ 9,90 = R$ 666).
  */
 export const COMBO = {
   slug: "combo-pet-completo",
   nome: "Combo Pet Completo",
   chamada: "As 10 áreas do Feed Pronto, com todos os complementos, num pacote só.",
   preco: 67 as number | undefined,
-  precoSeparado: 666 as number | undefined,
+  precoSeparado: (CONTA_SEPARADO.totalAreas + CONTA_SEPARADO.totalComplementos) as number | undefined,
   checkout: "https://pay.cakto.com.br/ez6jart",
   lancado: false,
   /** O que vem, com as quantidades reais (10 áreas). */

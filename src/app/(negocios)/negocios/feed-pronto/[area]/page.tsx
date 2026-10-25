@@ -2,10 +2,14 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import Comprar from "@/components/comprar";
-import { FEED_AREAS, POSTS_POR_PACOTE, areaFeed, deNegocio, imgFeed, nomeFeed, type AreaFeed } from "@/lib/feed-pronto";
+import {
+  AMOSTRAS, EDICOES_COR, FEED_AREAS, POSTS_POR_PACOTE, PRECO_COMPLEMENTO, areaFeed, deNegocio, imgFeed, nomeFeed, type AreaFeed,
+} from "@/lib/feed-pronto";
 import type { Produto } from "@/lib/produtos";
 import { reais } from "@/lib/produtos";
+import "../../../../feed-pronto.css";
 
 type Params = { params: Promise<{ area: string }> };
 
@@ -41,17 +45,51 @@ const PASSOS: [string, string][] = [
   ["Copie a legenda e poste", "Cada post tem a legenda pronta. Baixe a imagem e publique."],
 ];
 
+/**
+ * Imagem que amplia ao tocar, sem JavaScript: o botão abre um popover nativo (fecha com Esc, com o botão
+ * ou tocando fora). A imagem grande só carrega quando o popover abre.
+ */
+function Ampliavel({ id, src, alt, rotulo, largura = 360 }: { id: string; src: string; alt: string; rotulo?: string; largura?: number }) {
+  return (
+    <>
+      <button type="button" className="fp-amostra" popoverTarget={id} aria-label={`Ampliar: ${alt}`}>
+        <Image src={src} alt={alt} width={largura} height={Math.round(largura * 1.25)} sizes={`(max-width: 760px) 50vw, ${largura}px`} />
+        <span className="fp-lupa" aria-hidden>Ampliar</span>
+      </button>
+      <div id={id} popover="auto" className="fp-zoom" role="dialog" aria-label={alt}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt} loading="lazy" width={800} height={1000} />
+        {rotulo ? <p className="fp-zoom-legenda">{rotulo}</p> : null}
+        <button type="button" className="fp-zoom-fechar" popoverTarget={id} popoverTargetAction="hide" aria-label="Fechar">×</button>
+      </div>
+    </>
+  );
+}
+
 export default async function Page({ params }: Params) {
   const a = areaFeed((await params).area);
   if (!a) notFound();
   const p = comoProduto(a);
   const outras = FEED_AREAS.filter((x) => x.slug !== a.slug);
-  const faq: [string, string][] = [
+  const am = AMOSTRAS[a.slug];
+  const img = (arquivo: string) => imgFeed(a, arquivo);
+  const tituloEx = (n: number) => am.exemplos[n - 1];
+  const faq: [string, ReactNode][] = [
     ["Preciso pagar o Canva?", "Não. O pacote funciona na conta grátis do Canva, no computador ou no celular."],
     ["Dá para editar tudo?", "Sim. Textos, cores, fotos, ícones e enfeites são elementos soltos, que você muda como quiser."],
     ["As fotos e os preços dos posts são exemplos?", "Sim. Use as fotos do pacote ou troque pelas suas. Os preços, horários e endereços são exemplos para você ajustar."],
     ["Como recebo?", "Assim que o pagamento é confirmado, o link de acesso chega no e-mail informado na compra."],
-    ["Posso usar em mais de um negócio?", "Pode usar nos perfis dos negócios que você administra. Não é permitido revender nem repassar o pacote."],
+    ["Outros negócios vão ter os mesmos posts?", (
+      <>
+        <span className="fp-faq-p">Sim. O pacote é o mesmo para todo mundo que compra o {nomeFeed(a)}. O que muda é o que você troca no Canva: logo, cores, fotos, nome e preços. Algumas dicas para o post ficar com a cara {deNegocio(a)}:</span>
+        <ol className="fp-faq-dicas">
+          <li><b>Use as suas fotos.</b> Troque as fotos de exemplo por fotos dos seus clientes e do seu espaço (com a autorização do tutor). É o que mais diferencia o post.</li>
+          <li><b>Use a cor da sua marca.</b> Escolha a edição de cor mais próxima (azul, rosa ou verde) ou troque as cores no Canva, e coloque a sua logo no círculo do topo.</li>
+          <li><b>Escreva do seu jeito.</b> Mude o título e a primeira linha da legenda com o nome do bairro, os seus serviços e o jeito como você fala com os clientes.</li>
+        </ol>
+      </>
+    )],
+    ["Posso usar em mais de um perfil?", "Pode, desde que sejam perfis dos negócios que você administra (por exemplo, a loja e a filial). Não é permitido revender, repassar ou compartilhar o pacote com outros negócios."],
     ["E se eu não gostar?", "Você tem 7 dias de garantia. Peça o reembolso e recebe 100% do valor de volta."],
   ];
   return (
@@ -84,12 +122,38 @@ export default async function Page({ params }: Params) {
 
       <section className="secao secao-creme" id="exemplos">
         <div className="container">
-          <span className="eyebrow">Alguns dos {POSTS_POR_PACOTE} posts</span>
-          <h2>Bonitos, com texto pronto e a cara {deNegocio(a)}</h2>
-          <div className="feed-exemplos">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <Image key={n} src={imgFeed(a, `exemplo-${n}.webp`)} alt={`Exemplo de post ${n} do ${nomeFeed(a)}`} width={360} height={450} />
+          <span className="eyebrow">{am.exemplos.length} dos {POSTS_POR_PACOTE} posts</span>
+          <h2>Veja {am.exemplos.length} posts do pacote, como você recebe</h2>
+          <p className="fp-intro">Toque num post para ampliar. O nome, o @, as fotos e os preços são exemplos: no Canva, você troca pelos seus.</p>
+          <div className="fp-grade">
+            {am.exemplos.map((t, i) => (
+              <Ampliavel key={t + i} id={`fp-ex-${i + 1}`} src={img(`exemplo-${i + 1}.webp`)} alt={`Post “${t}” do ${nomeFeed(a)}`} rotulo={`Post ${i + 1} de ${am.exemplos.length} · ${t}`} />
             ))}
+          </div>
+
+          <div className="fp-bloco">
+            <h3>Um dos {a.carrosseis} carrosséis, página por página</h3>
+            <p className="fp-intro">“{am.carrossel.titulo}”: {am.carrossel.paginas} páginas para postar juntas, na ordem. Arraste para o lado para ver todas.</p>
+            <div className="fp-carrossel" tabIndex={0} aria-label={`Carrossel “${am.carrossel.titulo}”, ${am.carrossel.paginas} páginas`}>
+              {Array.from({ length: am.carrossel.paginas }, (_, i) => (
+                <div key={i} className="fp-carrossel-item">
+                  <Ampliavel id={`fp-car-${i + 1}`} src={img(`carrossel-${i + 1}.webp`)} alt={`Carrossel “${am.carrossel.titulo}”, página ${i + 1} de ${am.carrossel.paginas}`} rotulo={`Página ${i + 1} de ${am.carrossel.paginas}`} largura={260} />
+                  <small>{i + 1}/{am.carrossel.paginas}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="fp-bloco fp-legenda">
+            <div className="fp-legenda-post">
+              <Ampliavel id="fp-leg" src={img(`exemplo-${am.legenda.exemplo}.webp`)} alt={`Post “${tituloEx(am.legenda.exemplo)}”`} rotulo={tituloEx(am.legenda.exemplo)} largura={280} />
+            </div>
+            <div>
+              <h3>Assim vem a legenda, é só copiar</h3>
+              <p className="fp-intro">Cada post vem com a legenda pronta, com chamada para ação e hashtags. Esta é a legenda deste post, exatamente como está no pacote:</p>
+              <blockquote className="fp-legenda-texto">{am.legenda.texto}</blockquote>
+              <p className="fp-nota">Dica: antes de postar, acrescente uma frase sua e confira preços e condições.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -108,7 +172,7 @@ export default async function Page({ params }: Params) {
               <li><b>Bônus: Calendário de Postagens</b><span>Os posts organizados em 3 por semana e as datas comemorativas do ano. É só seguir.</span></li>
             </ol>
           </div>
-          <h3 className="feed-extras-titulo">Se quiser, no checkout você também pode levar</h3>
+          <h3 className="feed-extras-titulo">Se quiser, no checkout você também pode levar (opcional, {reais(PRECO_COMPLEMENTO)} cada)</h3>
           <ul className="feed-extras">
             <li><b>Stories Prontos</b><span>A versão vertical de cada post, feita para a tela do celular.</span></li>
             <li><b>Avisos Prontos</b><span>30 avisos (feriado, horário, regras, pagamento) para postar e imprimir em A4.</span></li>
@@ -130,15 +194,24 @@ export default async function Page({ params }: Params) {
         </div>
       </section>
 
-      {a.cores && (
-        <section className="secao">
-          <div className="container">
-            <span className="eyebrow">Edições de cor</span>
-            <h2>Escolha a cor que combina com a sua marca</h2>
-            <p className="lead">Além da edição azul e amarela, o {nomeFeed(a)} tem as edições {a.cores.join(" e ").toLowerCase()}, com os mesmos posts.</p>
+      <section className="secao">
+        <div className="container">
+          <span className="eyebrow">Edições de cor</span>
+          <h2>Escolha a cor que combina com a sua marca</h2>
+          <p className="fp-intro">O pacote vem em 3 edições com os mesmos {POSTS_POR_PACOTE} posts: azul e amarela, {EDICOES_COR.join(" e ").toLowerCase()}. Veja o mesmo post nas 3. Se a sua marca tem outra cor, dá para trocar no Canva.</p>
+          <div className="fp-cores">
+            {[["Azul e amarela", "exemplo"], ...EDICOES_COR.map((c) => [c, c.toLowerCase()])].map(([cor, pref]) => (
+              <div key={cor} className="fp-cor">
+                <h3>{cor}</h3>
+                {am.cores.map((n, k) => {
+                  const src = pref === "exemplo" ? img(`exemplo-${n}.webp`) : img(`${pref}-${k + 1}.webp`);
+                  return <Ampliavel key={n} id={`fp-cor-${pref}-${k + 1}`} src={src} alt={`Post “${tituloEx(n)}”, edição ${cor.toLowerCase()}`} rotulo={`Edição ${cor.toLowerCase()} · ${tituloEx(n)}`} largura={240} />;
+                })}
+              </div>
+            ))}
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       <section className="secao secao-creme">
         <div className="container para-quem">
@@ -178,7 +251,7 @@ export default async function Page({ params }: Params) {
         <div className="container faq">
           <span className="eyebrow">Dúvidas</span>
           <h2>Perguntas frequentes</h2>
-          {faq.map(([q, r]) => <details key={q}><summary>{q}</summary><p>{r}</p></details>)}
+          {faq.map(([q, r]) => <details key={q}><summary>{q}</summary>{typeof r === "string" ? <p>{r}</p> : <div className="fp-faq-r">{r}</div>}</details>)}
         </div>
       </section>
 
