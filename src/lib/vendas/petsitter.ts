@@ -42,7 +42,7 @@ export const petsitter: PaginaVendas = {
     titulo: "Tudo o que o trabalho exige, da primeira visita ao plano de carreira",
     itens: [
       ["O mercado de verdade", "Quem contrata pet sitter e por quê, a força dos gatos (que lidam melhor com rotina e território conhecidos), a sazonalidade e o que é ilusão. Com fonte e data."],
-      ["Casos reais", "Pet sitters e cat sitters do Brasil e de fora: de quem começou por aplicativo e migrou para a carteira própria a uma pequena equipe especializada em gatos. Com fonte e QR code."],
+      ["Casos reais", "Pet sitters e cat sitters do Brasil, e negócios de fora (plataforma e franquia): de quem começou por aplicativo e migrou para a carteira própria a uma pequena equipe especializada em gatos. Com fonte e QR code."],
       ["Cães e gatos na prática", "Rotina, caixa de areia, ambiente e estresse, como dar remédio prescrito, plantas perigosas e os sinais de alerta que não podem esperar."],
       ["O que você pode e não pode fazer", "Remédio só com prescrição por escrito, nunca remédio humano, o que é exclusivo do médico-veterinário e o que diz a lei de maus-tratos."],
       ["Chaves, casa e segurança", "Entrega e guarda de chaves, câmeras, condomínio, hospedagem na sua própria casa (e quando o condomínio pode proibir) e o registro de cada visita."],
