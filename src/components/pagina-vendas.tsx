@@ -71,7 +71,8 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
     brand: { "@type": "Brand", name: "Maestro Pet" },
     offers: ofertas ? ofertas.map((o) => offer(o.preco, o.checkout, o.nome)) : offer(p.preco, p.checkout),
   };
-  const ctaTopo = ofertas ? "Quero o guia" : `Quero o guia por ${reais(p.preco)}`;
+  const item = c.item ?? "o guia";
+  const ctaTopo = ofertas ? `Quero ${item}` : `Quero ${item} por ${reais(p.preco)}`;
   const passos = c.metodo.passos.length;
   return (
     <div className="com-barra">
@@ -273,7 +274,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
               <small>pagamento único · Pix ou cartão</small>
             </div>
             {c.oferta.complemento && <p className="complemento"><b>No checkout:</b> {c.oferta.complemento}</p>}
-            <Comprar produto={p} texto="Quero o guia agora" grande />
+            <Comprar produto={p} texto={`Quero ${item} agora`} grande />
             <p className="seguro">Pagamento seguro processado pela Cakto · acesso enviado por e-mail</p>
           </div>
         </div>
@@ -298,7 +299,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
       <section className="secao cta-final">
         <div className="container">
           <h2>{c.ctaFinal}</h2>
-          <a className="btn btn-lg" href="#oferta">{ofertas ? "Escolher meu plano" : `Quero o guia por ${reais(p.preco)}`}</a>
+          <a className="btn btn-lg" href="#oferta">{ofertas ? "Escolher meu plano" : `Quero ${item} por ${reais(p.preco)}`}</a>
           <p className="aviso">{c.aviso}</p>
         </div>
       </section>

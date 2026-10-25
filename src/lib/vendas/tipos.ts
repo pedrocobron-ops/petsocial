@@ -1,6 +1,8 @@
 /** Conteúdo de uma página de vendas. Cada guia tem um arquivo com este formato. */
 export type PaginaVendas = {
   slug: string;
+  /** O que o botão de compra chama de produto (padrão: "o guia"), ex.: "o kit", "o álbum". */
+  item?: string;
   seo: { titulo: string; descricao: string };
   /** `secundario`: um segundo botão no topo, [texto, link], por exemplo para uma âncora da página. */
   hero: { eyebrow: string; antes: string; destaque: string; depois: string; lead: string; selos: string[]; secundario?: [string, string] };
