@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: `Pacotes com ${POSTS_POR_PACOTE} posts prontos para o Instagram de pet shops, clínicas, adestradores, dog walkers e outros negócios pet.`,
   // Fora do Google até o lançamento da linha.
   ...(FEED_AREAS.some((a) => a.lancado) ? {} : { robots: { index: false, follow: false } }),
-  alternates: { canonical: "/feed-pronto" },
+  alternates: { canonical: "/negocios/feed-pronto" },
 };
 
 export default function Page() {
@@ -33,7 +33,7 @@ export default function Page() {
             <span className="eyebrow">Para quem atende mais de um público</span>
             <h2>{COMBO.nome}</h2>
             <p className="lead">{COMBO.chamada} 600 posts, 600 stories, 300 avisos, capas de destaques, bios, 300 roteiros de Reels e calendários.</p>
-            <Link className="btn" href="/feed-pronto/combo">Ver o combo</Link>
+            <Link className="btn" href="/negocios/feed-pronto/combo">Ver o combo</Link>
           </div>
         </div>
       </section>
@@ -44,7 +44,7 @@ export default function Page() {
           <h2>Um pacote para cada tipo de negócio</h2>
           <div className="feed-areas">
             {FEED_AREAS.map((a) => (
-              <Link key={a.slug} href={`/feed-pronto/${a.slug}`} className="feed-area">
+              <Link key={a.slug} href={`/negocios/feed-pronto/${a.slug}`} className="feed-area">
                 <Image src={imgFeed(a, "capa.webp")} alt={`Capa do ${nomeFeed(a)}`} width={300} height={375} />
                 <div>
                   <h3>{nomeFeed(a)}</h3>

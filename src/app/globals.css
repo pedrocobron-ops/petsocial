@@ -498,3 +498,71 @@ a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
 .feed-area p { font-size: .93rem; color: var(--ink-soft); }
 .feed-area .guia-breve { display: inline-block; margin-top: 10px; background: var(--brand-dark); padding: 4px 10px; border-radius: 999px; }
 @media (max-width: 760px) { .feed-exemplos { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
+
+/* ============================================================
+   ESTRUTURA EM DUAS PORTAS: empresa (/), tutores (/tutor) e negócios (/negocios)
+   ============================================================ */
+.so-desktop { }
+@media (max-width: 700px) { .so-desktop { display: none; } .topo nav { gap: 14px; font-size: .88rem; } }
+
+/* página inicial da empresa */
+.hero-empresa { text-align: center; padding: 64px 0 24px; }
+.hero-empresa .lead { margin: 18px auto 0; }
+.hero-empresa h1 { max-width: 860px; margin: 0 auto; }
+.portas-sec { padding-top: 24px; }
+.portas { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.porta { display: grid; grid-template-columns: 150px 1fr; gap: 22px; align-items: center; border-radius: var(--radius); padding: 26px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); transition: transform .2s; }
+.porta:hover { transform: translateY(-3px); }
+.porta img { width: 150px; height: 180px; object-fit: cover; border-radius: 14px; }
+.porta-tutor img { object-fit: contain; background: var(--brand-surface); }
+.porta h2 { font-size: 1.7rem; margin: 4px 0 8px; }
+.porta p { color: var(--ink-soft); font-size: .97rem; }
+.porta-cta { display: inline-flex; gap: 6px; align-items: center; margin-top: 14px; font-weight: 700; color: var(--brand-dark); }
+.porta-negocios { background: var(--ink-2); border-color: var(--ink-2); }
+.porta-negocios h2 { color: #fff; } .porta-negocios p { color: #d6cec4; } .porta-negocios .eyebrow { color: #fdba74; } .porta-negocios .porta-cta { color: #fdba74; }
+.prose-home { max-width: 760px; } .prose-home p { color: var(--ink-soft); margin-top: 12px; } .prose-home a { color: var(--brand-dark); font-weight: 600; }
+@media (max-width: 900px) { .portas { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .porta { grid-template-columns: 1fr; } .porta img { width: 100%; height: 200px; } }
+
+/* vitrines */
+.vitrine-secao h2 { margin-bottom: 4px; }
+.vitrine-secao .lead { margin: 6px 0 24px; }
+.mercado-num { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.mercado-num b { display: block; font-family: var(--headline); font-size: 2.2rem; color: #fdba74; line-height: 1.1; }
+.mercado-num span { color: #d6cec4; font-size: .95rem; }
+@media (max-width: 800px) { .mercado-num { grid-template-columns: 1fr; } }
+.hero-foto img { border-radius: 22px; object-fit: cover; box-shadow: var(--shadow); max-height: 520px; width: auto; }
+.como-grid { margin-top: 24px; }
+.rodape-grid-4 { grid-template-columns: 1.3fr 1fr 1fr 1fr; }
+.rodape h4 a { color: inherit; }
+@media (max-width: 900px) { .rodape-grid-4 { grid-template-columns: 1fr 1fr; } }
+
+/* páginas de venda: topo sem menu e rodapé enxuto */
+.topo-confianca { display: flex; gap: 6px; align-items: center; font-size: .88rem; font-weight: 600; color: var(--ink-soft); }
+.topo-confianca svg { color: var(--green); }
+@media (max-width: 520px) { .topo-confianca { font-size: .76rem; } }
+.marca-selo { width: 40px; height: 40px; border-radius: 10px; background: var(--ink-2); color: #fdba74; display: grid; place-items: center; font-family: var(--headline); font-weight: 900; font-size: 1.3rem; }
+.marca-linha { display: block; font-family: var(--display); font-weight: 600; font-size: .62rem; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); margin-top: -4px; }
+.rodape-venda { padding: 36px 0 28px; }
+.rodape-venda-marca { color: #e7ddd2; }
+.rodape-venda-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 14px 0; font-weight: 600; }
+.rodape-venda-links a:hover { color: #fff; }
+.rodape-legal-txt { font-size: .82rem; color: #a8a29e; }
+.rodape-legal-txt a { text-decoration: underline; }
+.garantia-selo { display: grid; place-items: center; width: 180px; height: 180px; border-radius: 50%; background: var(--brand-surface); color: var(--green); }
+
+/* produtos da mesma família, no fim da página de venda */
+.familia { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin-top: 20px; }
+.familia-card { display: grid; grid-template-columns: 90px 1fr; gap: 14px; align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.familia-card img { width: 90px; height: auto; border-radius: 4px; box-shadow: 0 6px 14px -6px rgba(0,0,0,.4); }
+.familia-card b { display: block; font-family: var(--headline); font-size: 1.05rem; }
+.familia-card span { display: block; color: var(--ink-soft); font-size: .88rem; margin: 4px 0; }
+.familia-card em { font-style: normal; font-weight: 700; color: var(--brand-dark); }
+
+/* linha negócios: mais sóbria, menos laranja */
+.linha-negocios { --brand-surface: #f5f1ea; }
+.linha-negocios .eyebrow { color: #9a3412; }
+.linha-negocios .hero-home, .linha-negocios .lp-hero { background: linear-gradient(180deg, #f5f1ea, var(--bg)); }
+.topo-negocios { background: rgba(253, 251, 247, .95); }
+.topo-confianca { white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 520px) { .topo-venda .marca { font-size: 1.2rem; gap: 8px; } .topo-venda .marca img, .topo-venda .marca-selo { width: 34px; height: 34px; } }

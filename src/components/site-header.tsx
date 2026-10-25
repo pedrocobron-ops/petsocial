@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+/** Topo das páginas institucionais e das vitrines (as páginas de venda usam o TopoVenda, sem menu). */
 export default function SiteHeader() {
   return (
     <header className="topo">
@@ -10,9 +11,10 @@ export default function SiteHeader() {
           <span>Maestro<em>Pet</em></span>
         </Link>
         <nav aria-label="Principal">
-          <Link href="/sobre">Sobre</Link>
-          <Link href="/contato">Contato</Link>
-          <Link href="/#guias" className="btn btn-sm">Ver guias</Link>
+          <Link href="/tutor">Para tutores</Link>
+          <Link href="/negocios">Para negócios pet</Link>
+          <Link href="/sobre" className="so-desktop">Quem somos</Link>
+          <Link href="/contato" className="so-desktop">Contato</Link>
         </nav>
       </div>
     </header>

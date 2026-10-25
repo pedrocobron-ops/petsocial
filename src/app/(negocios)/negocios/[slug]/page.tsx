@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import PaginaVendas from "@/components/pagina-vendas";
-import { PRODUTOS } from "@/lib/produtos";
+import { PRODUTOS, linhaDe } from "@/lib/produtos";
 import { PAGINAS } from "@/lib/vendas";
 
 type Params = { params: Promise<{ slug: string }> };
@@ -9,7 +9,7 @@ type Params = { params: Promise<{ slug: string }> };
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return Object.keys(PAGINAS).map((slug) => ({ slug }));
+  return PRODUTOS.filter((p) => linhaDe(p) === "negocios" && PAGINAS[p.slug]).map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     ...(p && !p.lancado ? { robots: { index: false, follow: false } } : {}),
     title: c.seo.titulo,
     description: c.seo.descricao,
-    alternates: { canonical: `/${c.slug}` },
+    alternates: { canonical: `/negocios/${c.slug}` },
     openGraph: { title: c.seo.titulo, description: c.seo.descricao, images: [{ url: `/og/${c.slug}.png`, width: 1200, height: 630 }] },
   };
 }
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function Page({ params }: Params) {
   const { slug } = await params;
   const c = PAGINAS[slug];
-  const p = PRODUTOS.find((x) => x.slug === slug);
+  const p = PRODUTOS.find((x) => x.slug === slug && linhaDe(x) === "negocios");
   if (!c || !p) notFound();
   return <PaginaVendas c={c} p={p} />;
 }

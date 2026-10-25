@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: "600 posts, 600 stories, 300 avisos, capas de destaques, bios, 300 roteiros de Reels e calendários para negócios pet. Editável no Canva grátis.",
   // Fora do Google até o lançamento.
   ...(!COMBO.lancado ? { robots: { index: false, follow: false } } : {}),
-  alternates: { canonical: "/feed-pronto/combo" },
+  alternates: { canonical: "/negocios/feed-pronto/combo" },
 };
 
 const produto: Produto = {
@@ -60,7 +60,7 @@ export default function Page() {
           <h2>Cada área com textos próprios</h2>
           <div className="feed-areas">
             {FEED_AREAS.map((a) => (
-              <Link key={a.slug} href={`/feed-pronto/${a.slug}`} className="feed-area">
+              <Link key={a.slug} href={`/negocios/feed-pronto/${a.slug}`} className="feed-area">
                 <Image src={imgFeed(a, "capa.webp")} alt={`Capa do ${nomeFeed(a)}`} width={300} height={375} />
                 <div><h3>{nomeFeed(a)}</h3><p>{a.chamada}</p></div>
               </Link>
