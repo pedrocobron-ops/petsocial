@@ -8,12 +8,12 @@ export const influenciador: PaginaVendas = {
       "O guia completo para transformar o perfil do seu cão ou gato num perfil profissional: 30 roteiros, 60 legendas, calendário de 2027, mídia kit, e-mails para marcas e as regras do CONAR. Com casos reais e os nichos além do humor.",
   },
   hero: {
-    eyebrow: "Guia completo · 97 páginas",
+    eyebrow: "Guia completo · 110 páginas",
     antes: "O seu pet já é uma estrela em casa. ",
     destaque: "Agora vamos montar o palco",
     depois: ".",
     lead: "O passo a passo completo para o perfil do seu cão ou gato ficar profissional, crescer com consistência e chegar até as marcas: da bio ao mídia kit, com roteiros, legendas e e-mails prontos.",
-    selos: ["Acesso imediato", "97 páginas", "Garantia de 7 dias"],
+    selos: ["Acesso imediato", "110 páginas", "Garantia de 7 dias"],
   },
   dores: {
     titulo: "Se você já pensou alguma destas coisas",
@@ -46,11 +46,12 @@ export const influenciador: PaginaVendas = {
       ["Conteúdo pronto", "30 roteiros, 50 ideias, 60 legendas e piadas, 30 ganchos, plano de 30 dias e datas comemorativas de 2027."],
       ["Crescimento", "As métricas que importam, collabs, comunidade e o que fazer quando o perfil não cresce."],
       ["Marcas", "Afiliados, plataformas, negócios locais, mídia kit para preencher, 5 e-mails prontos, preço e contrato."],
+      ["Mão na massa", "Toque por toque: como tirar os números do Instagram e do TikTok, a conta do engajamento, onde se cadastrar, mensagens para copiar e colar e o plano de 30 dias."],
       ["Regras e bem-estar", "CONAR, publi de ração e remédio, MEI, e o que nunca fazer com o seu pet por um vídeo."],
     ],
     paginas: [
       ["/produtos/influenciador-pag72.webp", "Os modelos de e-mail para marcas"],
-      ["/produtos/influenciador-pag70.webp", "O mídia kit para preencher"],
+      ["/produtos/influenciador-pag70.webp", "Um mídia kit pronto, de exemplo"],
     ],
   },
   metodo: {
@@ -88,11 +89,13 @@ export const influenciador: PaginaVendas = {
   },
   oferta: {
     itens: [
-      "Guia completo de 97 páginas",
+      "Guia completo de 110 páginas",
       "Casos reais de pets influenciadores do Brasil e de fora",
       "Além do humor: moda, culinária, viagem, educação, gatos e causa",
       "30 roteiros, 50 ideias, 60 legendas e 30 ganchos",
       "Calendário de datas comemorativas de 2027",
+      "Mão na massa: números, mídia kit pronto, cadastros e mensagens para copiar e colar",
+      "Os 5 jeitos de o TikTok pagar e os pets que já ganham lá",
       "Mídia kit para preencher e 5 e-mails para marcas",
       "Regras do CONAR, preço, contrato e bem-estar",
     ],
