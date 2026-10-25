@@ -112,6 +112,16 @@ export const PRODUTOS: Produto[] = [
     checkout: "",
     lancado: false,
   },
+  {
+    slug: "saude",
+    nome: "Kit Saúde do Pet",
+    chamada: "A carteira de vacinação e saúde para imprimir, com espaço para o veterinário, e o guia de vacinas, vermífugo e antipulgas.",
+    dor: "A carteirinha do seu pet está rasgada ou perdida?",
+    preco: 7.9,
+    capa: "/produtos/capa-saude.webp",
+    checkout: "",
+    lancado: false,
+  },
 ];
 
 export const produto = (slug: string) => PRODUTOS.find((p) => p.slug === slug)!;
