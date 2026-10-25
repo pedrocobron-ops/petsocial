@@ -142,6 +142,26 @@ export const PRODUTOS: Produto[] = [
     checkout: "https://pay.cakto.com.br/3ab6fqm",
     lancado: false,
   },
+  {
+    slug: "calendario",
+    nome: "Calendário 2027 do Pet",
+    chamada: "O calendário de parede para imprimir, com a foto dele em cada mês e as datas de vacina, vermífugo e antipulgas.",
+    dor: "Quem deu o vermífugo? E quando foi?",
+    preco: 9.9,
+    capa: "/produtos/capa-calendario.webp",
+    checkout: "https://pay.cakto.com.br/y8veb39",
+    lancado: false,
+  },
+  {
+    slug: "papelaria",
+    nome: "Kit Papelaria do Pet",
+    chamada: "Os 6 kits para imprimir num pacote só: saúde, RG, álbum, calendário, ficha de cuidados e viagem.",
+    dor: "Tudo do seu pet organizado e impresso.",
+    preco: 24.9,
+    capa: "/produtos/papelaria-kits.webp",
+    checkout: "https://pay.cakto.com.br/32wc3di",
+    lancado: false,
+  },
 ];
 
 export const produto = (slug: string) => PRODUTOS.find((p) => p.slug === slug)!;
