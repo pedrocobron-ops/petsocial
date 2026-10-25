@@ -35,7 +35,8 @@ export const FEED_AREAS: AreaFeed[] = [
     temas: ["Serviços de banho e tosa", "Dicas e cuidados entre banhos", "Loja", "Promoções e pacotes", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 3,
     cores: ["Rosa", "Verde"],
-    checkout: "",
+    preco: 27,
+    checkout: "https://pay.cakto.com.br/36cv2sf",
     lancado: false,
   },
   {
@@ -46,7 +47,8 @@ export const FEED_AREAS: AreaFeed[] = [
     dores: ["Atendo o dia todo e o Instagram fica para depois", "Quero orientar os tutores, mas não sei o que postar", "Os posts da clínica não têm a cara de uma clínica"],
     temas: ["Consultas e serviços", "Vacinas e prevenção", "Dicas de saúde", "Planos e promoções", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 3,
-    checkout: "",
+    preco: 27,
+    checkout: "https://pay.cakto.com.br/zbyhhkj",
     lancado: false,
   },
   {
@@ -57,7 +59,8 @@ export const FEED_AREAS: AreaFeed[] = [
     dores: ["Sei adestrar, mas não sei divulgar", "Passo o dia em aula e não sobra tempo para postar", "Não sei como mostrar o meu trabalho"],
     temas: ["Aulas e serviços", "Comandos e dicas de treino", "Comportamento", "Pacotes e promoções", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 3,
-    checkout: "",
+    preco: 27,
+    checkout: "https://pay.cakto.com.br/36jhahs",
     lancado: false,
   },
   {
@@ -68,7 +71,8 @@ export const FEED_AREAS: AreaFeed[] = [
     dores: ["Passo o dia na rua e não consigo postar", "Quero mais clientes no bairro", "Meu perfil não mostra o cuidado que eu tenho"],
     temas: ["Passeios e serviços", "Dicas de passeio", "Segurança no passeio", "Pacotes e promoções", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 3,
-    checkout: "",
+    preco: 27,
+    checkout: "https://pay.cakto.com.br/3boabzp",
     lancado: false,
   },
   {
@@ -79,7 +83,8 @@ export const FEED_AREAS: AreaFeed[] = [
     dores: ["O tutor tem medo de deixar o pet com quem não conhece", "Nos feriados lota, no resto do ano sobra vaga", "Não tenho tempo de pensar no que postar"],
     temas: ["Hotel e hospedagem", "Creche e day care", "Dicas e adaptação", "Pacotes e promoções", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 3,
-    checkout: "",
+    preco: 27,
+    checkout: "https://pay.cakto.com.br/fpa5w26",
     lancado: false,
   },
   {
@@ -90,7 +95,8 @@ export const FEED_AREAS: AreaFeed[] = [
     dores: ["É difícil mostrar confiança só pelo Instagram", "Os clientes só aparecem nas férias", "Não sei o que postar no dia a dia"],
     temas: ["Serviços de pet sitter", "Dicas para o tutor", "Viagens e feriados", "Pacotes e promoções", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 3,
-    checkout: "",
+    preco: 27,
+    checkout: "https://pay.cakto.com.br/bh4jjtj",
     lancado: false,
   },
   {
@@ -101,7 +107,8 @@ export const FEED_AREAS: AreaFeed[] = [
     dores: ["Faço a comida, mas não consigo divulgar", "Os tutores têm muitas dúvidas antes de comprar", "Não sei montar posts bonitos dos produtos"],
     temas: ["Cardápio e serviços", "Dicas de alimentação", "Promoções e kits", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 3,
-    checkout: "",
+    preco: 27,
+    checkout: "https://pay.cakto.com.br/33efuq5",
     lancado: false,
   },
   {
@@ -112,7 +119,8 @@ export const FEED_AREAS: AreaFeed[] = [
     dores: ["As encomendas dependem de eu postar sempre", "Não tenho tempo de fazer arte para cada produto", "Quero vender mais nos aniversários e datas"],
     temas: ["Produtos e encomendas", "Dicas e ingredientes", "Promoções e kits", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 3,
-    checkout: "",
+    preco: 27,
+    checkout: "https://pay.cakto.com.br/womojdv",
     lancado: false,
   },
   {
@@ -123,7 +131,8 @@ export const FEED_AREAS: AreaFeed[] = [
     dores: ["Cada coleção nova precisa de muitos posts", "Os clientes perguntam sempre o tamanho", "O feed não mostra o capricho das peças"],
     temas: ["Coleção e produtos", "Medidas e dicas de uso", "Promoções e kits", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 2,
-    checkout: "",
+    preco: 27,
+    checkout: "https://pay.cakto.com.br/87n2n8g",
     lancado: false,
   },
   {
@@ -134,7 +143,8 @@ export const FEED_AREAS: AreaFeed[] = [
     dores: ["A loja não para e o Instagram fica parado", "Os clientes não sabem tudo o que eu vendo", "As promoções não chegam em ninguém"],
     temas: ["Rações e produtos", "Entrega e atendimento", "Dicas úteis", "Promoções e clube", "Datas comemorativas", "Confiança e bastidores", "Engajamento"],
     carrosseis: 3,
-    checkout: "",
+    preco: 27,
+    checkout: "https://pay.cakto.com.br/wetsm9f",
     lancado: false,
   },
 ];
@@ -151,15 +161,15 @@ export const imgFeed = (a: AreaFeed, arquivo: string) => `/feed-pronto/${a.slug}
 
 /**
  * Combo Pet Completo: as 10 áreas com todos os complementos num produto só.
- * `preco` e `precoSeparado` (a soma real das áreas e complementos avulsos) ficam vazios até o Pedro decidir os preços.
+ * `precoSeparado` é a soma real das 10 áreas e dos 40 complementos avulsos (10 × R$ 27 + 40 × R$ 9,90).
  */
 export const COMBO = {
   slug: "combo-pet-completo",
   nome: "Combo Pet Completo",
   chamada: "As 10 áreas do Feed Pronto, com todos os complementos, num pacote só.",
-  preco: undefined as number | undefined,
-  precoSeparado: undefined as number | undefined,
-  checkout: "",
+  preco: 67 as number | undefined,
+  precoSeparado: 666 as number | undefined,
+  checkout: "https://pay.cakto.com.br/ez6jart",
   lancado: false,
   /** O que vem, com as quantidades reais (10 áreas). */
   itens: [
