@@ -616,7 +616,8 @@ a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
 .depois-passos li::before { content: counter(dp); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 800; margin-bottom: 10px; }
 .depois-passos b { display: block; margin-bottom: 4px; }
 .depois-passos span { color: var(--ink-soft); font-size: .93rem; }
-.depois-ajuda { margin-top: 18px; color: var(--ink-soft); font-size: .93rem; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.depois-ajuda { margin-top: 18px; color: var(--ink-soft); font-size: .93rem; }
+.depois-ajuda svg { vertical-align: -3px; margin-right: 4px; }
 .depois-ajuda a, .quem-faz a { color: var(--brand-dark); text-decoration: underline; }
 .quem-faz-lista { padding-left: 20px; margin-top: 16px; max-width: 760px; }
 .quem-faz-lista li { color: var(--ink-soft); margin-bottom: 10px; }
