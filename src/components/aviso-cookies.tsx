@@ -19,7 +19,7 @@ export default function AvisoCookies() {
   return (
     <div className="aviso-cookies" role="region" aria-label="Aviso de cookies">
       <p>
-        Usamos cookies para o site funcionar e para medir visitas e anúncios. Você pode bloqueá-los no navegador quando quiser.{" "}
+        Usamos cookies para medir visitas e anúncios.{" "}
         <Link href="/politica-de-privacidade">Saiba mais</Link>
       </p>
       <button type="button" className="btn btn-primary" onClick={fechar}>Entendi</button>

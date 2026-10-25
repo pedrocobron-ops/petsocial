@@ -99,12 +99,12 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
             <h1>{c.hero.antes}<em>{c.hero.destaque}</em>{c.hero.depois}</h1>
             <p className="lead">{c.hero.lead}</p>
             <div className="hero-ctas">
-              <a className="btn btn-lg" href="#oferta">{ctaTopo}</a>
+              <a className="btn btn-lg" href={p.lancado ? "#oferta" : "#conteudo"}>{ctaTopo}</a>
               {c.hero.secundario && <a className="btn btn-ghost btn-lg" href={c.hero.secundario[1]}>{c.hero.secundario[0]}</a>}
             </div>
             {ofertas && <p className="hero-precos">{ofertas.map((o) => `${o.nome} ${reais(o.preco)}`).join(" · ")} · pagamento único</p>}
             {!p.lancado && <p className="hero-breve">Lançamento em breve: a venda ainda não está aberta.</p>}
-            <ul className="selos">{c.hero.selos.map((s) => <li key={s}>{s}</li>)}</ul>
+            <ul className="selos">{c.hero.selos.filter((s) => p.lancado || !/acesso imediato/i.test(s)).map((s) => <li key={s}>{s}</li>)}</ul>
           </div>
           {p.capa && (
             <div className="mockup">
@@ -153,7 +153,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
         </section>
       )}
 
-      <section className="secao">
+      <section className="secao" id="conteudo">
         <div className="container">
           <span className="eyebrow">O que tem {noItem}</span>
           <h2>{c.recebe.titulo}</h2>

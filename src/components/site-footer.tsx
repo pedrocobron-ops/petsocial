@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { identificacao } from "@/lib/empresa";
+import { identificacao, linkWhatsapp } from "@/lib/empresa";
 import { PRODUTOS, linhaDe, urlProduto } from "@/lib/produtos";
 
 export default function SiteFooter() {
@@ -40,7 +40,7 @@ export default function SiteFooter() {
       <div className="container rodape-legal">
         <p>
           Os materiais do Maestro Pet têm caráter educativo: não substituem a avaliação de um(a) médico(a)-veterinário(a) e não garantem renda ou resultado.
-          Pagamentos processados pela Cakto. Suporte: contato@maestropet.com. © {new Date().getFullYear()} Maestro Pet.
+          Pagamentos processados pela Cakto. Suporte: contato@maestropet.com{linkWhatsapp() && <> · <a href={linkWhatsapp()}>WhatsApp (13) 99137-6169</a></>}. © {new Date().getFullYear()} Maestro Pet.
           {identificacao() && <><br />{identificacao()}</>}
         </p>
       </div>
