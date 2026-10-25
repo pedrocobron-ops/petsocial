@@ -625,3 +625,7 @@ a.guia:hover .guia-capa { rotate: -3deg; scale: 1.05; }
 .quem-faz-links { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .quem-faz-links a { display: inline-flex; align-items: center; gap: 4px; }
 .quem-faz-id { font-size: .85rem; color: var(--muted); margin-top: 8px; }
+@media (max-width: 640px) {
+  .aviso-cookies { left: 8px; right: 8px; bottom: 8px; padding: 8px 10px; gap: 10px; font-size: .76rem; line-height: 1.35; border-radius: 12px; }
+  .aviso-cookies .btn { padding: 6px 12px; font-size: .8rem; }
+}

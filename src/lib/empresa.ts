@@ -9,7 +9,7 @@ export const EMPRESA = {
   endereco: "",
   email: "contato@maestropet.com",
   /** Só números, com DDI e DDD: ex. "5511999999999". */
-  whatsapp: "",
+  whatsapp: "5513991376169",
   instagram: "maestro_pet_",
   /** Quem está por trás da marca (aparece em "Quem somos"). Foto em /public, ex. "/equipe/fundador.webp". */
   fundador: { nome: "", papel: "fundador do Maestro Pet e tutor do Mozart", foto: "", texto: "" },
