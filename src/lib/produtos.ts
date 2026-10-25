@@ -122,6 +122,26 @@ export const PRODUTOS: Produto[] = [
     checkout: "https://pay.cakto.com.br/w6b4u9s",
     lancado: false,
   },
+  {
+    slug: "rg",
+    nome: "RG e Certidão do Pet",
+    chamada: "O RG do seu cão ou gato para imprimir e plastificar, a certidão de nascimento e a certidão de adoção.",
+    dor: "Ele é da família. Merece documentos à altura.",
+    preco: 7.9,
+    capa: "/produtos/capa-rg.webp",
+    checkout: "https://pay.cakto.com.br/32m8vuq",
+    lancado: false,
+  },
+  {
+    slug: "album",
+    nome: "Álbum do Primeiro Ano",
+    chamada: "O álbum para imprimir do primeiro ano com o seu filhote ou pet adotado, mês a mês.",
+    dor: "Ele cresceu tão rápido que já nem lembro de como era pequeno.",
+    preco: 14.9,
+    capa: "/produtos/capa-album.webp",
+    checkout: "https://pay.cakto.com.br/3ab6fqm",
+    lancado: false,
+  },
 ];
 
 export const produto = (slug: string) => PRODUTOS.find((p) => p.slug === slug)!;
