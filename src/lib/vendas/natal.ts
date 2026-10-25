@@ -81,7 +81,7 @@ export const natal: PaginaVendas = {
     ],
     nao: [
       "Você quer cartões já impressos: este é um kit para imprimir",
-      "Você procura um treino completo para o medo de fogos: o kit traz um plano rápido, e o treino está no guia Plano Anti-Fogos",
+      "Você procura um treino completo para o medo de fogos: o kit traz um plano rápido para a noite da virada",
     ],
   },
   oferta: {
