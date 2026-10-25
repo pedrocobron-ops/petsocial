@@ -42,7 +42,7 @@ export const confeitaria: PaginaVendas = {
     titulo: "O negócio inteiro, do mercado ao plano de carreira",
     itens: [
       ["O mercado de verdade", "Quem compra bolo e kit de festa pet, quando compra e quanto se cobra hoje, com preços reais pesquisados e a fonte de cada número."],
-      ["Casos reais", "Confeitarias pet do Brasil e de fora: como começaram, o que vendem, como cresceram e a lição de cada uma. Com fonte, data e QR code para o perfil."],
+      ["A vitrine do mercado", "Negócios reais de confeitaria pet: o que vendem, quanto cobram e o que observar em cada um. Com fonte, data e QR code para a loja."],
       ["Segurança dos ingredientes", "O que nunca entra na receita (chocolate, xilitol, uva, cebola, alho, macadâmia, glitter de decoração) e a tabela do que muda entre cão e gato."],
       ["As 30 receitas", "Bolos, docinhos, biscoitos e petiscos para festa, só com ingredientes de uso humano e equipamento de cozinha comum, cada um com a sua ficha técnica."],
       ["Kits e cardápio", "Como montar kits de festa e de lembrancinha que vendem, e um cardápio editável para mandar no WhatsApp."],
@@ -99,7 +99,7 @@ export const confeitaria: PaginaVendas = {
       "Embalagem e etiquetas para imprimir",
       "Plano de 30 dias e mensagens prontas para os primeiros clientes",
       "Plano de carreira em 4 níveis, com metas e checklists",
-      "Casos reais com fonte, data e QR code",
+      "A vitrine do mercado: negócios reais com fonte, data e QR code",
     ],
     complemento:
       "o Feed Pronto Confeitaria Pet, com 60 posts editáveis no Canva e legendas prontas para divulgar as suas encomendas (opcional, vendido à parte).",
@@ -116,7 +116,7 @@ export const confeitaria: PaginaVendas = {
     ["Serve para gato?", "Serve, com diferenças. Gatos não sentem o sabor doce, então o “bolo de gato” é salgado, e eles são ainda mais sensíveis a cebola e alho. O manual mostra o que muda."],
     ["Quem escreveu o manual?", "A equipe Maestro Pet, com pesquisa em fontes oficiais (Planalto, Ministério da Agricultura, Receita Federal, Anvisa) e de mercado. Todas as fontes estão listadas no manual, com link e data, para você conferir."],
     ["E se a lei mudar?", "Normas mudam, e o Ministério da Agricultura está revisando as regras de registro e rotulagem de produtos para animais. O manual traz a data da revisão e o link de cada norma, para você sempre conferir a versão em vigor."],
-    ["Por que os casos reais não têm foto?", "Porque as imagens pertencem a cada negócio. Em vez de usar foto sem autorização, cada caso traz um QR code que abre o perfil de verdade."],
+    ["Por que os negócios da vitrine não têm foto?", "Porque as imagens pertencem a cada negócio. Em vez de usar foto sem autorização, cada negócio traz um QR code que abre a loja ou a notícia de verdade."],
     ["Como recebo?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail: o manual em PDF, a planilha (Google Planilhas e Excel) e os materiais para imprimir e editar."],
     ["E se não for para mim?", "Você tem 7 dias de garantia. Se achar que não valeu a pena, pede o reembolso e recebe 100% do valor de volta."],
   ],
