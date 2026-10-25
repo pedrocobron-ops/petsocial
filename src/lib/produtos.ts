@@ -89,7 +89,7 @@ export const PRODUTOS: Produto[] = [
     dor: "Fecho a porta e escuto o choro lá do corredor",
     preco: 27.9,
     capa: "/produtos/capa-sozinho.webp",
-    checkout: "",
+    checkout: "https://pay.cakto.com.br/39x2q2d",
     lancado: false,
   },
   {
@@ -99,7 +99,7 @@ export const PRODUTOS: Produto[] = [
     dor: "O braço do sofá novo já está todo desfiado",
     preco: 27.9,
     capa: "/produtos/capa-gato.webp",
-    checkout: "",
+    checkout: "https://pay.cakto.com.br/vi3hpwx",
     lancado: false,
   },
   {
@@ -109,7 +109,7 @@ export const PRODUTOS: Produto[] = [
     dor: "Ele vomitou espuma amarela. Isso é normal?",
     preco: 19.9,
     capa: "/produtos/capa-normal.webp",
-    checkout: "",
+    checkout: "https://pay.cakto.com.br/jfooex7",
     lancado: false,
   },
   {
@@ -119,7 +119,7 @@ export const PRODUTOS: Produto[] = [
     dor: "A carteirinha do seu pet está rasgada ou perdida?",
     preco: 7.9,
     capa: "/produtos/capa-saude.webp",
-    checkout: "",
+    checkout: "https://pay.cakto.com.br/w6b4u9s",
     lancado: false,
   },
 ];
