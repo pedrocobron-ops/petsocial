@@ -15,6 +15,10 @@ function Rico({ texto }: { texto: string }) {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
+/** Perguntas que valem para todos os produtos e entram no fim do FAQ de cada página. */
+const REEMBOLSO: [string, string] = ["Como peço o reembolso? Vale para Pix?", "Vale para Pix e para cartão. Em até 7 dias depois da compra, escreva para contato@maestropet.com com o e-mail usado na compra, ou peça direto pelo link de acesso que a Cakto envia. No Pix, o valor volta para a conta de origem; no cartão, o estorno aparece na fatura conforme o prazo do banco."];
+const PAGAMENTO: [string, string] = ["O pagamento é seguro?", "Sim. O pagamento é feito no checkout da Cakto, uma plataforma brasileira de pagamentos, com Pix ou cartão. A Maestro Pet não vê nem guarda os dados do seu cartão. O valor final, com qualquer taxa da plataforma, aparece no checkout antes de você confirmar."];
+
 /** Uma página do guia (a ficha de uma atividade), desenhada em HTML com o texto real do guia. */
 function Ficha({ f }: { f: FichaExemplo }) {
   return (
@@ -300,7 +304,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
         <div className="container faq">
           <span className="eyebrow">Dúvidas</span>
           <h2>Perguntas frequentes</h2>
-          {c.faq.map(([q, a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}
+          {[...c.faq, ...(c.faq.some(([q]) => /reembolso/i.test(q)) ? [] : [REEMBOLSO]), PAGAMENTO].map(([q, a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}
         </div>
       </section>
 

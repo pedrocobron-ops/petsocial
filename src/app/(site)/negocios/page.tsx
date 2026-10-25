@@ -29,8 +29,7 @@ const FAQ = [
 
 export default function Negocios() {
   const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios");
-  const influenciador = PRODUTOS.filter((p) => p.grupo === "redes");
-  const [comece, redes] = GRUPOS.negocios;
+  const [comece] = GRUPOS.negocios;
   return (
     <div className="linha-negocios">
       <section className="hero-home hero-negocios">
@@ -76,7 +75,6 @@ export default function Negocios() {
         </div>
       </section>
 
-      <SecaoVitrine id={redes[0]} titulo={redes[1]} texto={redes[2]} produtos={influenciador} />
 
       <section className="secao">
         <div className="container">
