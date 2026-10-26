@@ -70,10 +70,10 @@ export const petsitter: PaginaVendas = {
   bonus: {
     titulo: "As ferramentas que vêm com o manual",
     itens: [
-      { icone: "📄", titulo: "Contrato-modelo para adaptar", texto: "Tarefas, duração, frequência, confirmação da visita, chaves, emergência veterinária e cancelamento. Para revisar com um advogado." },
-      { icone: "📋", titulo: "Ficha do pet e da casa", texto: "O que o tutor deixa para você: rotina, comida, remédios, temperamento, esconderijos, caixa de transporte e contatos." },
-      { icone: "✅", titulo: "Relatório da visita e checklist", texto: "O que foi feito, quanto comeu, caixa de areia, remédio e observações, para enviar ao tutor com foto ou vídeo." },
-      { icone: "📊", titulo: "Planilha de preço e agenda", texto: "Em Google Planilhas e Excel: preço por serviço, alta temporada, agenda e recebimentos." },
+      { icone: "FileText", titulo: "Contrato-modelo para adaptar", texto: "Tarefas, duração, frequência, confirmação da visita, chaves, emergência veterinária e cancelamento. Para revisar com um advogado." },
+      { icone: "ClipboardList", titulo: "Ficha do pet e da casa", texto: "O que o tutor deixa para você: rotina, comida, remédios, temperamento, esconderijos, caixa de transporte e contatos." },
+      { icone: "ListChecks", titulo: "Relatório da visita e checklist", texto: "O que foi feito, quanto comeu, caixa de areia, remédio e observações, para enviar ao tutor com foto ou vídeo." },
+      { icone: "Calculator", titulo: "Planilha de preço e agenda", texto: "Em Google Planilhas e Excel: preço por serviço, alta temporada, agenda e recebimentos." },
     ],
   },
   paraQuem: {

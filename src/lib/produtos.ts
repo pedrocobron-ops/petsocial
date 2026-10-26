@@ -37,8 +37,15 @@ export type Produto = {
   dor: string;
   /** Com `ofertas`, é o menor preço ("a partir de"). */
   preco: number;
-  /** Preço anterior, riscado. Só use se o produto já foi vendido por esse valor. */
-  precoDe?: number;
+  /**
+   * Preço anterior, riscado (brief 20, 10.1). Só existe com a data desde quando o produto foi vendido
+   * por esse valor e o caminho do print guardado em docs/precos/. Sem isso, nada é riscado.
+   */
+  riscado?: { precoDe: number; precoDeDesde: string; print: string };
+  /** Imagem de compartilhamento própria (/og/<slug>.png). */
+  og?: string;
+  /** "Versão 1.1 · outubro de 2026": só com dado real. */
+  versao?: string;
   capa?: string;
   /** Com `ofertas`, fica vazio: cada oferta tem o seu link. */
   checkout: string;

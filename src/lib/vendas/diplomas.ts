@@ -68,8 +68,8 @@ export const diplomas: PaginaVendas = {
     titulo: "Também no kit",
     itens: [
       { imagem: "/produtos/diplomas-pag15.webp", titulo: "Cartões de conquista", texto: "Primeiro xixi no lugar, dormiu a noite toda, usou a caixa de areia e mais." },
-      { icone: "🎓", titulo: "Capelo e plaquinhas", texto: "Para a foto de formatura, segurados por você, perto dele." },
-      { icone: "📸", titulo: "A sessão de fotos", texto: "Seis passos para uma foto linda, e três ideias de pose." },
+      { icone: "GraduationCap", titulo: "Capelo e plaquinhas", texto: "Para a foto de formatura, segurados por você, perto dele." },
+      { icone: "Camera", titulo: "A sessão de fotos", texto: "Seis passos para uma foto linda, e três ideias de pose." },
     ],
   },
   paraQuem: {

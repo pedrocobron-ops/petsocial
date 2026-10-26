@@ -10,10 +10,11 @@ export const fotografia: PaginaVendas = {
   },
   hero: {
     eyebrow: "Maestro Pet Negócios · Manual completo",
+    fatos: ["Manual completo", "Equipamento em 3 níveis", "Plano em 4 níveis"],
     antes: "Trabalhe no mercado pet ",
-    destaque: "atrás da câmera",
-    depois: ".",
-    lead: "O manual para transformar a fotografia de cães e gatos em um negócio organizado: como conduzir a sessão com o bem-estar do animal em primeiro lugar, que equipamento comprar e quando, quanto cobrar, como conseguir clientes e como crescer, com ferramentas prontas e um plano de carreira em 4 níveis.",
+    destaque: "atrás da câmera.",
+    depois: "",
+    lead: "Sessão com bem-estar, equipamento, contrato, preço e os primeiros clientes.",
     selos: ["Acesso imediato", "Plano de carreira em 4 níveis", "Garantia de 7 dias"],
   },
   dores: {
@@ -39,7 +40,7 @@ export const fotografia: PaginaVendas = {
     ],
   },
   recebe: {
-    titulo: "O negócio inteiro, da primeira sessão ao plano de carreira",
+    titulo: "O negócio inteiro, *da primeira sessão ao plano de carreira.*",
     itens: [
       ["O mercado de verdade", "Quem contrata ensaio pet e para quê (aniversário, Natal e outras datas, família, adoção, homenagem, marcas), as tabelas reais de fotógrafos brasileiros, o que é realidade e o que é ilusão. Com fonte e data."],
       ["Casos reais", "Fotógrafos e estúdios de pets do Brasil e de fora, de quem começou como hobby a quem fotografa para marcas pet e ganhou prêmio internacional: como começaram, o que vendem e a lição de cada um. Com fonte, data e QR code."],
@@ -56,9 +57,10 @@ export const fotografia: PaginaVendas = {
       ["/produtos/negocios/ferramenta-fotografia.webp", "O briefing do ensaio, para imprimir"],
     ],
   },
+  numeros: [["4", "níveis no plano de carreira"], ["3", "níveis de investimento em equipamento"], ["4", "ferramentas para usar"]],
   metodo: {
     eyebrow: "O plano de carreira",
-    titulo: "Da primeira sessão paga ao estúdio, em 4 níveis",
+    titulo: "Da primeira sessão paga ao estúdio, *em 4 níveis.*",
     rotulo: "Nível",
     passos: [
       ["Começando", "Portfólio, primeiras sessões pagas e um fluxo de trabalho que funciona"],
@@ -68,12 +70,12 @@ export const fotografia: PaginaVendas = {
     ],
   },
   bonus: {
-    titulo: "As ferramentas que vêm com o manual",
+    titulo: "As ferramentas que vêm *com o manual.*",
     itens: [
-      { icone: "📄", titulo: "Contrato com uso de imagem", texto: "Modelo para adaptar: o que está incluído, prazos, remarcação, bem-estar do animal e autorização de uso das fotos. Para revisar com um advogado." },
-      { icone: "📋", titulo: "Briefing e ficha do pet", texto: "Temperamento, medos, petisco preferido, saúde e o estilo de foto que o tutor quer." },
-      { icone: "✅", titulo: "Checklist da sessão", texto: "Equipamento, cenário, segurança do espaço e o roteiro de fotos, para não esquecer nada." },
-      { icone: "📊", titulo: "Planilha de preço e agenda", texto: "Em Google Planilhas e Excel: custo da sessão e da edição, pacotes, agenda e recebimentos." },
+      { icone: "FileText", titulo: "Contrato com uso de imagem", texto: "Modelo para adaptar: o que está incluído, prazos, remarcação, bem-estar do animal e autorização de uso das fotos. Para revisar com um advogado." },
+      { icone: "ClipboardList", titulo: "Briefing e ficha do pet", texto: "Temperamento, medos, petisco preferido, saúde e o estilo de foto que o tutor quer." },
+      { icone: "ListChecks", titulo: "Checklist da sessão", texto: "Equipamento, cenário, segurança do espaço e o roteiro de fotos, para não esquecer nada." },
+      { icone: "Calculator", titulo: "Planilha de preço e agenda", texto: "Em Google Planilhas e Excel: custo da sessão e da edição, pacotes, agenda e recebimentos." },
     ],
   },
   paraQuem: {
@@ -116,7 +118,7 @@ export const fotografia: PaginaVendas = {
     ["Como recebo?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail: o manual em PDF, a planilha (Google Planilhas e Excel) e os materiais para imprimir e editar."],
     ["E se não for para mim?", "Você tem 7 dias de garantia. Se achar que não valeu a pena, pede o reembolso e recebe 100% do valor de volta."],
   ],
-  ctaFinal: "O seu olhar já existe. Agora é dar a ele um negócio.",
+  ctaFinal: "O seu olhar já existe. *Agora é dar a ele um negócio.*",
   aviso:
     "Este manual tem caráter educativo e não garante clientes ou renda. As contas apresentadas são exemplos. Preços e dados de mercado têm fonte e data e podem ter mudado. Contratos e autorizações são modelos para adaptar com um advogado. O bem-estar do animal vem sempre antes da foto.",
 };

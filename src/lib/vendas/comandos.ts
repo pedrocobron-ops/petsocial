@@ -68,8 +68,8 @@ export const comandos: PaginaVendas = {
     titulo: "Também no kit",
     itens: [
       { imagem: "/produtos/comandos-pag14.webp", titulo: "Cola de bolso", texto: "Os 20 comandos em versão mini, para a argola pequena de chaveiro." },
-      { icone: "📋", titulo: "Ficha de progresso", texto: "Para a geladeira: cada quadradinho marcado é uma conquista." },
-      { icone: "🏠", titulo: "Palavras da casa", texto: "O cartão para a família anotar as mesmas palavras para todos." },
+      { icone: "ClipboardList", titulo: "Ficha de progresso", texto: "Para a geladeira: cada quadradinho marcado é uma conquista." },
+      { icone: "House", titulo: "Palavras da casa", texto: "O cartão para a família anotar as mesmas palavras para todos." },
     ],
   },
   paraQuem: {

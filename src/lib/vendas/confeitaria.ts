@@ -10,10 +10,12 @@ export const confeitaria: PaginaVendas = {
   },
   hero: {
     eyebrow: "Maestro Pet Negócios · Manual completo",
-    antes: "Monte o seu negócio no mercado pet com ",
-    destaque: "uma confeitaria de verdade",
-    depois: ".",
-    lead: "As 30 receitas e o negócio inteiro em volta delas: kits de festa, ficha técnica, preço, as regras para vender dentro da lei, embalagem e etiquetas prontas, cardápio editável e um plano de carreira do primeiro bolo à confeitaria com equipe.",
+    fatos: ["Manual completo", "30 receitas", "Plano em 4 níveis"],
+    antes: "Confeitaria pet ",
+    destaque: "como negócio,",
+    depois: " com preço e lei.",
+    lead: "30 receitas com ficha técnica, as regras do MAPA para vender e um plano de carreira em 4 níveis.",
+    foto: ["/fotos/negocios-confeitaria-hero-4x5.webp", "Mãos entregando uma caixa com bolo de cenoura para cães a um cachorro que espera na porta"],
     selos: ["Acesso imediato", "Plano de carreira em 4 níveis", "Garantia de 7 dias"],
   },
   dores: {
@@ -39,7 +41,7 @@ export const confeitaria: PaginaVendas = {
     ],
   },
   recebe: {
-    titulo: "O negócio inteiro, do mercado ao plano de carreira",
+    titulo: "O negócio inteiro, *do mercado ao plano de carreira.*",
     itens: [
       ["O mercado de verdade", "Quem compra bolo e kit de festa pet, quando compra e quanto se cobra hoje, com preços reais pesquisados e a fonte de cada número."],
       ["A vitrine do mercado", "Negócios reais de confeitaria pet: o que vendem, quanto cobram e o que observar em cada um. Com fonte, data e QR code para a loja."],
@@ -56,9 +58,10 @@ export const confeitaria: PaginaVendas = {
       ["/produtos/negocios/ferramenta-confeitaria.webp", "A ficha técnica e preço, para imprimir"],
     ],
   },
+  numeros: [["30", "receitas com ficha técnica"], ["4", "níveis no plano de carreira"], ["4", "ferramentas para usar"]],
   metodo: {
     eyebrow: "O plano de carreira",
-    titulo: "Do primeiro bolo à confeitaria com equipe, em 4 níveis",
+    titulo: "Do primeiro bolo à confeitaria com equipe, *em 4 níveis.*",
     rotulo: "Nível",
     passos: [
       ["Começando", "Primeiras encomendas, receitas-base e ficha técnica no lugar"],
@@ -68,12 +71,12 @@ export const confeitaria: PaginaVendas = {
     ],
   },
   bonus: {
-    titulo: "As ferramentas que vêm com o manual",
+    titulo: "As ferramentas que vêm *com o manual.*",
     itens: [
-      { icone: "📊", titulo: "Planilha de precificação", texto: "Em Google Planilhas e Excel: custo da receita, embalagem, hora de trabalho, margem e preço final de bolos e kits." },
-      { icone: "🏷️", titulo: "Etiquetas e embalagem para imprimir", texto: "Etiquetas com os campos do rótulo, cartões e tags para os kits de festa." },
-      { icone: "📋", titulo: "Cardápio editável", texto: "Para preencher com os seus produtos e preços e enviar aos clientes." },
-      { icone: "📝", titulo: "Ficha do pedido e checklist de produção", texto: "Data, retirada ou entrega, espécie e porte, e a pergunta que não pode faltar: o pet tem alergia ou restrição?" },
+      { icone: "Calculator", titulo: "Planilha de precificação", texto: "Em Google Planilhas e Excel: custo da receita, embalagem, hora de trabalho, margem e preço final de bolos e kits." },
+      { icone: "Tag", titulo: "Etiquetas e embalagem para imprimir", texto: "Etiquetas com os campos do rótulo, cartões e tags para os kits de festa." },
+      { icone: "ClipboardList", titulo: "Cardápio editável", texto: "Para preencher com os seus produtos e preços e enviar aos clientes." },
+      { icone: "NotebookPen", titulo: "Ficha do pedido e checklist de produção", texto: "Data, retirada ou entrega, espécie e porte, e a pergunta que não pode faltar: o pet tem alergia ou restrição?" },
     ],
   },
   paraQuem: {
@@ -120,7 +123,7 @@ export const confeitaria: PaginaVendas = {
     ["Como recebo?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail: o manual em PDF, a planilha (Google Planilhas e Excel) e os materiais para imprimir e editar."],
     ["E se não for para mim?", "Você tem 7 dias de garantia. Se achar que não valeu a pena, pede o reembolso e recebe 100% do valor de volta."],
   ],
-  ctaFinal: "Faça da sua cozinha um negócio organizado.",
+  ctaFinal: "Faça da sua cozinha *um negócio organizado.*",
   aviso:
     "Este manual tem caráter educativo e não garante vendas, clientes ou renda. As contas apresentadas são exemplos. Preços e números de mercado têm fonte e data e podem ter mudado. As regras citadas valem na data da revisão do manual: confirme o seu caso com o Ministério da Agricultura, a prefeitura e um contador. Bolos e petiscos não substituem a alimentação completa nem a orientação do médico-veterinário.",
 };

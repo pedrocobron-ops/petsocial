@@ -68,8 +68,8 @@ export const natal: PaginaVendas = {
     titulo: "Também no kit",
     itens: [
       { imagem: "/produtos/natal-pag11.webp", titulo: "Plaquinhas para a foto", texto: "Para a foto embaixo da árvore e para o presente dele na manhã de Natal." },
-      { icone: "🍪", titulo: "Biscoito natalino", texto: "Estrelinhas de batata-doce e maçã, sem açúcar e sem sal, para a meia dele." },
-      { icone: "🎆", titulo: "Plano para os fogos", texto: "Antes, durante e depois da virada, com espaço para os telefones de emergência." },
+      { icone: "Cookie", titulo: "Biscoito natalino", texto: "Estrelinhas de batata-doce e maçã, sem açúcar e sem sal, para a meia dele." },
+      { icone: "Sparkles", titulo: "Plano para os fogos", texto: "Antes, durante e depois da virada, com espaço para os telefones de emergência." },
     ],
   },
   paraQuem: {

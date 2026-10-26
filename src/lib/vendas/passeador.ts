@@ -70,10 +70,10 @@ export const passeador: PaginaVendas = {
   bonus: {
     titulo: "As ferramentas que vêm com o manual",
     itens: [
-      { icone: "📊", titulo: "Planilha de preço e clientes", texto: "Em Google Planilhas e Excel: valor da hora, pacotes, agenda da semana e controle de pagamentos." },
-      { icone: "📄", titulo: "Contrato e termo de responsabilidade", texto: "Modelos para adaptar, com saúde e vacinas, emergência veterinária, comportamento e cancelamento. Para revisar com um advogado." },
-      { icone: "🐕", titulo: "Ficha do cão", texto: "A entrevista com o tutor: saúde, medos, manias, gatilhos e contatos de emergência." },
-      { icone: "✅", titulo: "Relatório do passeio e checklist da mochila", texto: "Para enviar ao tutor depois de cada passeio e não esquecer nada antes de sair." },
+      { icone: "Calculator", titulo: "Planilha de preço e clientes", texto: "Em Google Planilhas e Excel: valor da hora, pacotes, agenda da semana e controle de pagamentos." },
+      { icone: "FileText", titulo: "Contrato e termo de responsabilidade", texto: "Modelos para adaptar, com saúde e vacinas, emergência veterinária, comportamento e cancelamento. Para revisar com um advogado." },
+      { icone: "Dog", titulo: "Ficha do cão", texto: "A entrevista com o tutor: saúde, medos, manias, gatilhos e contatos de emergência." },
+      { icone: "ListChecks", titulo: "Relatório do passeio e checklist da mochila", texto: "Para enviar ao tutor depois de cada passeio e não esquecer nada antes de sair." },
     ],
   },
   paraQuem: {

@@ -68,8 +68,8 @@ export const saude: PaginaVendas = {
     titulo: "Também no guia",
     itens: [
       { imagem: "/produtos/saude-pag10.webp", titulo: "O semáforo pós-vacina", texto: "O que é normal nas primeiras 48 horas e o que é urgência." },
-      { icone: "✈️", titulo: "Viagem", texto: "O que ônibus, avião, hotel e creche costumam pedir, e o atestado de saúde." },
-      { icone: "📅", titulo: "O ano de saúde do pet", texto: "Um calendário para a geladeira e as perguntas para levar ao veterinário." },
+      { icone: "Plane", titulo: "Viagem", texto: "O que ônibus, avião, hotel e creche costumam pedir, e o atestado de saúde." },
+      { icone: "Calendar", titulo: "O ano de saúde do pet", texto: "Um calendário para a geladeira e as perguntas para levar ao veterinário." },
     ],
   },
   paraQuem: {

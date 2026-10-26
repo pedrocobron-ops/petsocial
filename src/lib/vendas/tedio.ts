@@ -19,7 +19,8 @@ export const tedio: PaginaVendas = {
     antes: "",
     destaque: "100 atividades",
     depois: " para gastar a energia do seu cão dentro de casa.",
-    lead: "18h40, você abre a porta e o chinelo está roído de novo? Não é birra: é energia sobrando e cabeça sem trabalho. Aqui são 100 jeitos de dar trabalho para essa energia, quase todos com o que você já tem em casa. Hoje à noite você já faz a primeira, com a ração do jantar.",
+    fatos: ["Guia ilustrado", "100 atividades", "Uma por página"],
+    lead: "Quase todas com o que você já tem em casa, como a ração do jantar.",
     selos: ["100 atividades, uma por página", "Menos de R$ 0,30 por atividade", "Acesso imediato no seu e-mail", "Garantia de 7 dias"],
     secundario: ["Ver as 100 atividades", "#todas"],
   },
@@ -33,12 +34,13 @@ export const tedio: PaginaVendas = {
       "Dia de chuva, sem passeio, e às 15h ele já está girando pela casa.",
       "Comprei brinquedo caro, e ele continua preferindo o pé da cadeira.",
     ],
+    foto: ["/fotos/tutor-tedio-duvida-4x5.webp", "Filhote de labrador preto deitado no piso ao lado de um chinelo roído"],
   },
   virada: {
     imagem: "/produtos/tedio-quebra-cabeca.webp",
     alt: "Mozart tirando petiscos de uma caixa com rolos de papel enquanto a tutora observa sentada no chão",
     eyebrow: "Um segredo de border collie, contado pelo Mozart",
-    titulo: "Ele não está fazendo birra. É energia sobrando e cabeça sem trabalho.",
+    titulo: "Ele não está fazendo birra. *É energia sobrando e cabeça sem trabalho.*",
     paragrafos: [
       "Eu sou o Mozart. Já desfiei almofada, já “pastoreei” as visitas, já lati para a sombra da janela. Cão foi feito para farejar, procurar comida, mastigar e resolver problemas. **Quando a rotina não oferece nada disso, a gente inventa.** Todo tutor passa por isso.",
       "E a saída não é só correr mais. **Um cão também cansa pensando**: procurando a ração escondida, desenrolando uma toalha, aprendendo um truque. Num estudo pequeno de 2019 (Duranton e Horowitz, 20 cães), os que fizeram duas semanas de buscas por faro passaram a reagir às situações de um jeito mais “otimista”. O grupo que só treinou andar junto não mudou.",
@@ -93,7 +95,7 @@ export const tedio: PaginaVendas = {
     nota: "Acima está o texto da ficha 1. No guia, cada ficha também tem a ilustração do Mozart fazendo a atividade.",
   },
   recebe: {
-    titulo: "Organizado para você achar a atividade certa rápido",
+    titulo: "Organizado para você achar *a atividade certa rápido.*",
     itens: [
       ["Antes de brincar", "Os sinais de tédio, cansar o corpo × cansar a cabeça, quanto exercício e descanso em cada fase e as 6 regras de segurança."],
       ["100 atividades em 10 capítulos", "Faro, quebra-cabeças caseiros, mastigar e lamber, truques, dias de chuva, passeios, calma, família, filhotes e idosos."],
@@ -106,11 +108,14 @@ export const tedio: PaginaVendas = {
     paginas: [
       ["/produtos/tedio-pag10.webp", "Abertura do capítulo 1, Faro e caça ao tesouro, com a lista das 12 atividades"],
       ["/produtos/tedio-pag5.webp", "Página “Cansar o corpo × cansar a cabeça”"],
+      ["/produtos/tedio-pag120.webp", "Encontre pela cena: a cena da sua casa e as atividades indicadas"],
+      ["/produtos/tedio-pag122.webp", "O que fazer hoje: as atividades separadas pelo tempo que você tem"],
     ],
   },
+  numeros: [["100", "atividades, uma por página"], ["10", "capítulos, do filhote ao idoso"], ["8", "cenas do dia a dia para achar a atividade"]],
   metodo: {
     eyebrow: "Os 10 capítulos",
-    titulo: "Uma atividade para cada cão, cada casa e cada dia",
+    titulo: "Uma atividade para cada cão, *cada casa e cada dia.*",
     imagem: "/produtos/tedio-truques.webp",
     alt: "Mozart dando a pata para a tutora, que segura um petisco",
     rotulo: "Capítulo",
@@ -145,7 +150,7 @@ export const tedio: PaginaVendas = {
     ],
   },
   bonus: {
-    titulo: "Para usar todo dia, sem precisar ler tudo",
+    titulo: "Para usar todo dia, *sem precisar ler tudo.*",
     itens: [
       { imagem: "/produtos/tedio-pag120.webp", titulo: "Encontre pela cena", texto: "“Chego em casa e tem coisa roída”, “Late para todo barulho”, “Chega visita e ele pula”: ache a cena da sua casa e escolha uma das atividades indicadas." },
       { imagem: "/produtos/tedio-pag122.webp", titulo: "O que fazer hoje?", texto: "Tem 5 minutos antes de sair ou meia hora no domingo? As atividades estão separadas pelo tempo que você tem, com a página de cada uma." },

@@ -25,6 +25,7 @@ export const sozinho: PaginaVendas = {
       "Ele me segue até o banheiro e fica esperando na porta.",
       "Saio para trabalhar com o coração apertado, pensando nele o dia todo.",
     ],
+    foto: ["/fotos/tutor-sozinho-duvida-4x5.webp", "Cachorro sentado no encosto do sofá, olhando a cidade pela janela"],
   },
   virada: {
     imagem: "/produtos/sozinho-soneca.webp",
@@ -72,8 +73,8 @@ export const sozinho: PaginaVendas = {
     titulo: "Material para imprimir e aplicar",
     itens: [
       { imagem: "/produtos/sozinho-pag29.webp", titulo: "10 fichas de atividades", texto: "O que deixar com ele na hora de sair, com tempo que ocupa, bagunça e cuidados." },
-      { icone: "📋", titulo: "Diário dos 14 dias", texto: "Uma linha por dia para ver o progresso e saber quando subir o tempo." },
-      { icone: "✉️", titulo: "Bilhete para os vizinhos", texto: "Um modelo pronto para avisar o prédio que você está treinando. O clima muda na hora." },
+      { icone: "ClipboardList", titulo: "Diário dos 14 dias", texto: "Uma linha por dia para ver o progresso e saber quando subir o tempo." },
+      { icone: "Mail", titulo: "Bilhete para os vizinhos", texto: "Um modelo pronto para avisar o prédio que você está treinando. O clima muda na hora." },
     ],
   },
   paraQuem: {

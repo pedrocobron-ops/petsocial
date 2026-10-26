@@ -68,8 +68,8 @@ export const placas: PaginaVendas = {
     titulo: "Também no kit",
     itens: [
       { imagem: "/produtos/placas-pag10.webp", titulo: "Placa de emergência", texto: "Para bombeiros e vizinhos saberem quantos pets há na casa e onde eles se escondem." },
-      { icone: "🚗", titulo: "Adesivos", texto: "“Tem pet aqui dentro” para a janela e “Pet a bordo” para o carro." },
-      { icone: "🔧", titulo: "Como fixar", texto: "No portão de grade, no muro, na porta e no vidro, e como proteger da chuva." },
+      { icone: "Car", titulo: "Adesivos", texto: "“Tem pet aqui dentro” para a janela e “Pet a bordo” para o carro." },
+      { icone: "Wrench", titulo: "Como fixar", texto: "No portão de grade, no muro, na porta e no vidro, e como proteger da chuva." },
     ],
   },
   paraQuem: {

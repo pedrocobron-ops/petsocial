@@ -68,8 +68,8 @@ export const aniversario: PaginaVendas = {
     titulo: "Também no kit",
     itens: [
       { imagem: "/produtos/aniversario-pag15.webp", titulo: "Plaquinhas para foto", texto: "12 frases para o cantinho de fotos, para cães e para gatos." },
-      { icone: "🐱", titulo: "Aniversário felino", texto: "Bolo de patê e bolinhas de frango: receitas só para gatos, sem farinha e sem leite." },
-      { icone: "🚫", titulo: "Nunca na festa", texto: "A página para deixar à vista: o que não pode na mesa e na decoração, e o que fazer se ele comer." },
+      { icone: "Cat", titulo: "Aniversário felino", texto: "Bolo de patê e bolinhas de frango: receitas só para gatos, sem farinha e sem leite." },
+      { icone: "Ban", titulo: "Nunca na festa", texto: "A página para deixar à vista: o que não pode na mesa e na decoração, e o que fazer se ele comer." },
     ],
   },
   paraQuem: {

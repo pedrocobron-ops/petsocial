@@ -71,8 +71,8 @@ export const influenciador: PaginaVendas = {
     titulo: "Para imprimir e usar",
     itens: [
       { imagem: "/produtos/influenciador-pag54.webp", titulo: "Datas comemorativas de 2027", texto: "O ano inteiro com uma ideia de post para cada data." },
-      { icone: "🗓️", titulo: "Plano de 90 dias", texto: "O que fazer em cada semana, do primeiro post ao primeiro contato com marcas." },
-      { icone: "📋", titulo: "Controle de marcas", texto: "Uma tabela para anotar quem você contatou, quando e a resposta." },
+      { icone: "Calendar", titulo: "Plano de 90 dias", texto: "O que fazer em cada semana, do primeiro post ao primeiro contato com marcas." },
+      { icone: "ClipboardList", titulo: "Controle de marcas", texto: "Uma tabela para anotar quem você contatou, quando e a resposta." },
     ],
   },
   paraQuem: {

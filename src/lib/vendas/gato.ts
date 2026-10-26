@@ -71,8 +71,8 @@ export const gato: PaginaVendas = {
     titulo: "Para consultar e imprimir",
     itens: [
       { imagem: "/produtos/gato-pag20.webp", titulo: "A rotina de caça", texto: "Caçar, pegar, comer e descansar: a sequência que acalma as madrugadas." },
-      { icone: "📋", titulo: "Diário do gato", texto: "Para anotar caixa, vômitos e brincadeiras e levar à consulta." },
-      { icone: "🐾", titulo: "Resumo da linguagem", texto: "Uma página para salvar no celular: tudo bem, atenção e se afaste." },
+      { icone: "ClipboardList", titulo: "Diário do gato", texto: "Para anotar caixa, vômitos e brincadeiras e levar à consulta." },
+      { icone: "PawPrint", titulo: "Resumo da linguagem", texto: "Uma página para salvar no celular: tudo bem, atenção e se afaste." },
     ],
   },
   paraQuem: {

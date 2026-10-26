@@ -69,8 +69,8 @@ export const planner: PaginaVendas = {
     titulo: "Também no planner",
     itens: [
       { imagem: "/produtos/planner-pag39.webp", titulo: "Orçamento anual", texto: "Ração, petiscos, veterinário, banho e tosa, acessórios e outros, mês a mês." },
-      { icone: "📸", titulo: "Retrospectiva do ano", texto: "A foto do ano e o que vocês aprenderam juntos, para guardar." },
-      { icone: "🧳", titulo: "Checklist de viagem", texto: "Para conferir antes de sair, de carro, para a casa de parentes ou para o hotel." },
+      { icone: "Camera", titulo: "Retrospectiva do ano", texto: "A foto do ano e o que vocês aprenderam juntos, para guardar." },
+      { icone: "Luggage", titulo: "Checklist de viagem", texto: "Para conferir antes de sair, de carro, para a casa de parentes ou para o hotel." },
     ],
   },
   paraQuem: {

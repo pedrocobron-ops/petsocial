@@ -68,8 +68,8 @@ export const baralho: PaginaVendas = {
     titulo: "Também no baralho",
     itens: [
       { imagem: "/produtos/baralho-pag15.webp", titulo: "O pote do tédio", texto: "Rótulos para o pote “Tire uma!” e para o pote “Já brincamos!”." },
-      { icone: "🃏", titulo: "Verso das cartas", texto: "Para imprimir frente e verso, em casa ou na gráfica." },
-      { icone: "✍️", titulo: "Cartas em branco", texto: "Para criar as brincadeiras que só o seu cão tem." },
+      { icone: "Layers", titulo: "Verso das cartas", texto: "Para imprimir frente e verso, em casa ou na gráfica." },
+      { icone: "PenLine", titulo: "Cartas em branco", texto: "Para criar as brincadeiras que só o seu cão tem." },
     ],
   },
   paraQuem: {

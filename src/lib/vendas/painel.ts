@@ -68,8 +68,8 @@ export const painel: PaginaVendas = {
     titulo: "Também no painel",
     itens: [
       { imagem: "/produtos/painel-pag13.webp", titulo: "Plaquinhas “já foi?”", texto: "Com bolinhas para colar em ímãs: muda o ímã de lado ao fazer a tarefa." },
-      { icone: "🚫", titulo: "O que ele não pode comer", texto: "Para cão e para gato, para a visita ver antes de oferecer qualquer coisa." },
-      { icone: "🐾", titulo: "Painel para vários pets", texto: "Uma faixa por bicho, para a casa com mais de um." },
+      { icone: "Ban", titulo: "O que ele não pode comer", texto: "Para cão e para gato, para a visita ver antes de oferecer qualquer coisa." },
+      { icone: "PawPrint", titulo: "Painel para vários pets", texto: "Uma faixa por bicho, para a casa com mais de um." },
     ],
   },
   paraQuem: {
