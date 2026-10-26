@@ -25,6 +25,7 @@ export const normal: PaginaVendas = {
       "Fez um barulho estranho, como se estivesse engasgado.",
       "Fico pesquisando na internet e cada site diz uma coisa.",
     ],
+    foto: ["/fotos/tutor-normal-duvida-4x5.webp", "Golden retriever cheirando uma barra de chocolate na mesa de centro enquanto a tutora corre para tirar"],
   },
   virada: {
     imagem: "/produtos/normal-confuso.webp",
@@ -67,8 +68,8 @@ export const normal: PaginaVendas = {
     titulo: "Para ter à mão",
     itens: [
       { imagem: "/produtos/normal-pag4.webp", titulo: "Sinais de emergência", texto: "Uma página para guardar, com o espaço para o telefone da clínica 24 horas." },
-      { icone: "📋", titulo: "Diário de sintomas", texto: "Para anotar desde quando, quantas vezes e o que você fez, e levar à consulta." },
-      { icone: "📞", titulo: "O que contar ao veterinário", texto: "Em cada página, o que dizer quando ligar para a clínica." },
+      { icone: "ClipboardList", titulo: "Diário de sintomas", texto: "Para anotar desde quando, quantas vezes e o que você fez, e levar à consulta." },
+      { icone: "Phone", titulo: "O que contar ao veterinário", texto: "Em cada página, o que dizer quando ligar para a clínica." },
     ],
   },
   paraQuem: {

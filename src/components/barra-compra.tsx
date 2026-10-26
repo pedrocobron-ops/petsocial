@@ -5,23 +5,50 @@ import Comprar from "@/components/comprar";
 import type { Produto } from "@/lib/produtos";
 import { reais } from "@/lib/produtos";
 
-/** Barra fixa de compra no celular: aparece depois que o visitante passa do topo e leva direto ao checkout (ou à escolha do plano, se houver mais de um). */
-export default function BarraCompra({ produto }: { produto: Produto }) {
+/** Alvos que, na tela, escondem a barra: nunca dois botões de compra na mesma tela. */
+const ALVOS = ["#cta-dobra", "#oferta", "#cta-final"];
+
+/**
+ * Barra fixa de compra no celular (brief 20, 6.19). Aparece quando o botão da dobra sai da tela
+ * e some enquanto a oferta ou o CTA final estão na tela.
+ */
+export default function BarraCompra({ produto, item = "o guia" }: { produto: Produto; item?: string }) {
   const [visivel, setVisivel] = useState(false);
   useEffect(() => {
-    const onScroll = () => setVisivel(window.scrollY > 700);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const naTela = new Set<Element>();
+    const alvos = ALVOS.map((s) => document.querySelector(s)).filter((x): x is Element => Boolean(x));
+    const atualiza = () => setVisivel(naTela.size === 0 && window.scrollY > 200);
+    const io = new IntersectionObserver((es) => {
+      for (const e of es) (e.isIntersecting ? naTela.add(e.target) : naTela.delete(e.target));
+      atualiza();
+    });
+    alvos.forEach((a) => io.observe(a));
+    window.addEventListener("scroll", atualiza, { passive: true });
+    return () => { io.disconnect(); window.removeEventListener("scroll", atualiza); };
   }, []);
+  const breve = !produto.lancado;
+  /** Rola até o formulário de aviso e já põe o cursor no e-mail: um toque a menos. */
+  const irParaAviso = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const alvo = document.querySelector<HTMLElement>("#avise");
+    const campo = alvo?.querySelector<HTMLInputElement>("input[type=email]");
+    if (!alvo || !campo) return;
+    e.preventDefault();
+    const reduz = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    alvo.scrollIntoView({ block: "center", behavior: reduz ? "auto" : "smooth" });
+    campo.focus({ preventScroll: true });
+  };
   return (
-    <div className={`barra-compra${visivel ? " on" : ""}`} role="region" aria-label="Comprar" aria-hidden={!visivel}>
-      <div><small>{produto.nome}{produto.ofertas && " · a partir de"}</small><b>{reais(produto.preco)}</b></div>
-      {produto.ofertas ? (
-        // Com mais de um plano, a barra leva à escolha do plano em vez de ir direto a um checkout.
-        <a className="btn" href="#oferta" tabIndex={visivel ? 0 : -1}>Ver os planos</a>
+    <div className={`barra${visivel ? " on" : ""}`} role="region" aria-label="Comprar" aria-hidden={!visivel} inert={!visivel || undefined}>
+      <div>
+        <small>{breve ? "Em breve" : "Pagamento único"} · {produto.nome}</small>
+        {!breve && <strong>{produto.ofertas && "a partir de "}{reais(produto.preco)}</strong>}
+      </div>
+      {breve ? (
+        <a className="btn btn-secundario btn-claro btn-pq" href="#avise" tabIndex={visivel ? 0 : -1} onClick={irParaAviso}>Avise-me</a>
+      ) : produto.ofertas ? (
+        <a className="btn btn-pq" href="#oferta" tabIndex={visivel ? 0 : -1}>Ver os planos</a>
       ) : (
-        <Comprar produto={produto} texto="Comprar agora" />
+        <Comprar produto={produto} texto={`Quero ${item}`} origem="barra" className="btn-pq" />
       )}
     </div>
   );

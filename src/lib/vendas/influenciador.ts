@@ -29,7 +29,7 @@ export const influenciador: PaginaVendas = {
   virada: {
     imagem: "/produtos/influenciador-pag13.webp",
     alt: "Página de um dos casos reais do guia",
-    eyebrow: "O que os perfis grandes têm em comum",
+    eyebrow: "O que os perfis grandes fazem",
     titulo: "Nenhum começou grande. Todos começaram com um formato.",
     paragrafos: [
       "O guia reúne **casos reais de pets influenciadores brasileiros**, com fontes, data e um QR code para o perfil de verdade, e mostra o que eles têm em comum: um personagem claro, um quadro fixo, constância e muito cuidado com o bem-estar do bicho.",
@@ -71,8 +71,8 @@ export const influenciador: PaginaVendas = {
     titulo: "Para imprimir e usar",
     itens: [
       { imagem: "/produtos/influenciador-pag54.webp", titulo: "Datas comemorativas de 2027", texto: "O ano inteiro com uma ideia de post para cada data." },
-      { icone: "🗓️", titulo: "Plano de 90 dias", texto: "O que fazer em cada semana, do primeiro post ao primeiro contato com marcas." },
-      { icone: "📋", titulo: "Controle de marcas", texto: "Uma tabela para anotar quem você contatou, quando e a resposta." },
+      { icone: "Calendar", titulo: "Plano de 90 dias", texto: "O que fazer em cada semana, do primeiro post ao primeiro contato com marcas." },
+      { icone: "ClipboardList", titulo: "Controle de marcas", texto: "Uma tabela para anotar quem você contatou, quando e a resposta." },
     ],
   },
   paraQuem: {

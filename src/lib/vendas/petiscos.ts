@@ -5,14 +5,15 @@ export const petiscos: PaginaVendas = {
   seo: {
     titulo: "Petiscos do Maestro — 30 receitas caseiras para cães",
     descricao:
-      "30 receitas caseiras e seguras para o seu cão: biscoitos, desidratados, gelados, petiscos de treino e bolo de festa. Sem sal, sem açúcar e sem tempero, com porção por porte e tabela de conservação. Acesso imediato.",
+      "30 receitas caseiras e seguras para o seu cão: biscoitos, desidratados, gelados, petiscos de treino e bolo de festa. Sem sal, sem açúcar e sem tempero, com porção por porte e tabela de conservação. Acesso no e-mail logo após o pagamento.",
   },
   hero: {
     eyebrow: "Livro de receitas · 30 petiscos caseiros",
     antes: "Petiscos ",
-    destaque: "feitos em casa",
-    depois: ", com ingredientes que você conhece.",
-    lead: "30 receitas simples e seguras para o seu cão: biscoitos, chips, gelados para o verão, petiscos de treino e até bolo de aniversário. Sem sal, sem açúcar e sem tempero, com o passo a passo ilustrado.",
+    destaque: "feitos em casa,",
+    depois: " com o que você tem na cozinha.",
+    fatos: ["Livro de receitas", "30 receitas", "Ilustrado"],
+    lead: "30 receitas simples e seguras, sem sal, sem açúcar e sem tempero.",
     selos: ["Acesso imediato", "30 receitas ilustradas", "Garantia de 7 dias"],
   },
   dores: {
@@ -25,22 +26,23 @@ export const petiscos: PaginaVendas = {
       "Não sei quanto petisco posso dar por dia.",
       "Queria fazer um bolo no aniversário dele.",
     ],
+    foto: ["/fotos/tutor-petiscos-duvida-4x5.webp", "Tutora oferecendo um cubo de melancia a um shih tzu na varanda"],
   },
   virada: {
     imagem: "/produtos/petiscos-cozinhando.webp",
     alt: "Tutora cortando biscoitos em formato de osso enquanto o Mozart observa de chapéu de chef",
-    eyebrow: "Um segredo da cozinha, contado pelo Mozart",
-    titulo: "O melhor petisco tem três ingredientes, e você já tem todos em casa.",
+    eyebrow: "Contado pelo Mozart",
+    titulo: "O melhor petisco tem três ingredientes, *e você já tem todos em casa.*",
     paragrafos: [
       "Abóbora, aveia e um ovo. Foi assim o primeiro biscoito que a minha tutora fez, e eu fiquei sentadinho ao lado do forno os 30 minutos inteiros. **Petisco caseiro não precisa de nada difícil**: só de ingredientes certos e de saber o que nunca pode entrar na receita.",
       "Neste livro estão as receitas que a gente mais faz, com ingredientes de supermercado, e as regras que deixam tudo **seguro**: o que pode, o que nunca pode e quanto dar por dia.",
     ],
   },
   recebe: {
-    titulo: "30 receitas e tudo o que você precisa saber antes de ligar o forno",
+    titulo: "30 receitas e tudo o que você precisa saber *antes de ligar o forno.*",
     itens: [
       ["As 5 regras de ouro", "O que vale para toda receita: sem sal, sem açúcar, sem tempero e na quantidade certa."],
-      ["O que pode e o que nunca pode", "A lista de alimentos liberados e dos tóxicos para cães, como chocolate, uva e xilitol."],
+      ["O que pode e o que nunca pode", "A lista de alimentos liberados e dos tóxicos para cães, como chocolate, uva e xilitol.", 5],
       ["10 biscoitos assados", "Abóbora, banana, cenoura, pasta de amendoim, frango, maçã e mais."],
       ["6 desidratados", "Chips de batata-doce, maçã, banana e cenoura, tirinhas de frango e de carne."],
       ["6 gelados para o verão", "Melancia, picolé, caldo de frango, sorvete, patinhas de mirtilo e manga."],
@@ -48,13 +50,18 @@ export const petiscos: PaginaVendas = {
       ["3 receitas de festa", "Bolo, cupcake e cobertura para o aniversário dele."],
     ],
     paginas: [
-      ["/produtos/petiscos-pag9.webp", "Página da receita de biscoito de abóbora e aveia"],
-      ["/produtos/petiscos-pag5.webp", "Página com a lista do que o cão pode e nunca pode comer"],
+      ["/produtos/petiscos-pag9.webp", "Uma receita inteira: biscoito de abóbora e aveia, com rendimento e validade."],
+      ["/produtos/petiscos-pag5.webp", "O que o cão pode e o que nunca pode comer, antes de ligar o forno."],
+      ["/produtos/petiscos-pag7.webp", "Quanto dar por dia, para cada porte, do mini ao gigante."],
+      ["/produtos/petiscos-pag34.webp", "Petisco de treino: bolinhas de frango pequenas, que somem na boca."],
+      ["/produtos/petiscos-pag43.webp", "Quanto tempo dura cada petisco: pote, geladeira e freezer."],
+      ["/produtos/petiscos-pag44.webp", "Etiquetas para os potes, para imprimir e colar."],
     ],
   },
+  numeros: [["30", "receitas ilustradas"], ["4", "passos da despensa ao pote"], ["3", "tabelas e etiquetas para usar"]],
   metodo: {
     eyebrow: "Como funciona",
-    titulo: "Da despensa ao pote em 4 passos",
+    titulo: "Da despensa ao pote *em 4 passos.*",
     imagem: "/produtos/petiscos-desidratados.webp",
     alt: "Mozart de chapéu de chef ao lado de uma assadeira de chips de maçã e de batata-doce",
     passos: [
@@ -65,7 +72,7 @@ export const petiscos: PaginaVendas = {
     ],
   },
   bonus: {
-    titulo: "Tabelas e etiquetas para usar todo dia",
+    titulo: "Tabelas e etiquetas *para usar todo dia.*",
     itens: [
       { imagem: "/produtos/petiscos-pag7.webp", titulo: "Quanto dar por dia", texto: "A porção de biscoitos e de petiscos de treino para cada porte, do mini ao gigante, para não exagerar." },
       { imagem: "/produtos/petiscos-pag43.webp", titulo: "Tabela de conservação", texto: "Quanto tempo cada tipo de petisco dura no pote, na geladeira e no freezer, e como saber se estragou." },

@@ -52,8 +52,8 @@ export const petsitter: PaginaVendas = {
       ["A visita na prática", "A visita de reconhecimento, a visita padrão, o relatório para o tutor e o que fazer quando algo dá errado."],
     ],
     paginas: [
-      ["/produtos/negocios/sumario-petsitter.webp", "O sumário do manual"],
-      ["/produtos/negocios/ferramenta-petsitter.webp", "O relatório da visita, para imprimir"],
+      ["/produtos/negocios/petsitter-pag4.webp", "O sumário do manual."],
+      ["/produtos/negocios/petsitter-pag98.webp", "O relatório da visita, para imprimir."],
     ],
   },
   metodo: {
@@ -70,10 +70,10 @@ export const petsitter: PaginaVendas = {
   bonus: {
     titulo: "As ferramentas que vêm com o manual",
     itens: [
-      { icone: "📄", titulo: "Contrato-modelo para adaptar", texto: "Tarefas, duração, frequência, confirmação da visita, chaves, emergência veterinária e cancelamento. Para revisar com um advogado." },
-      { icone: "📋", titulo: "Ficha do pet e da casa", texto: "O que o tutor deixa para você: rotina, comida, remédios, temperamento, esconderijos, caixa de transporte e contatos." },
-      { icone: "✅", titulo: "Relatório da visita e checklist", texto: "O que foi feito, quanto comeu, caixa de areia, remédio e observações, para enviar ao tutor com foto ou vídeo." },
-      { icone: "📊", titulo: "Planilha de preço e agenda", texto: "Em Google Planilhas e Excel: preço por serviço, alta temporada, agenda e recebimentos." },
+      { icone: "FileText", titulo: "Contrato-modelo para adaptar", texto: "Tarefas, duração, frequência, confirmação da visita, chaves, emergência veterinária e cancelamento. Para revisar com um advogado." },
+      { icone: "ClipboardList", titulo: "Ficha do pet e da casa", texto: "O que o tutor deixa para você: rotina, comida, remédios, temperamento, esconderijos, caixa de transporte e contatos." },
+      { icone: "ListChecks", titulo: "Relatório da visita e checklist", texto: "O que foi feito, quanto comeu, caixa de areia, remédio e observações, para enviar ao tutor com foto ou vídeo." },
+      { icone: "Calculator", titulo: "Planilha de preço e agenda", texto: "Em Google Planilhas e Excel: preço por serviço, alta temporada, agenda e recebimentos." },
     ],
   },
   paraQuem: {
@@ -106,14 +106,14 @@ export const petsitter: PaginaVendas = {
   garantia:
     "Leia o manual, use as ferramentas e comece o plano. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta. Sem perguntas e sem burocracia.",
   faq: [
-    ["Funciona para iniciante?", "Sim. O manual parte do zero, e muitos dos casos pesquisados começaram exatamente assim: cuidando dos pets de amigos e da família. O nível 1 do plano de carreira parte daí. Se você já atende, vá direto para preço, contrato e plano de carreira."],
-    ["Preciso de CNPJ?", "Para começar, não necessariamente; para crescer, vale a pena. Existe ocupação própria no MEI, “Cuidador(a) de animais (pet sitter) independente”, CNAE 9609-2/08. O manual mostra o passo a passo, o que muda com a nova lei do MEI sancionada em outubro de 2026 e quando a nota fiscal é obrigatória. A profissão não é regulamentada, e o manual explica o que isso quer dizer na prática."],
-    ["O manual garante renda?", "Não. Nenhum manual pode garantir clientes ou renda: isso depende da sua cidade, do seu tempo, do seu preço e da sua constância. O manual entrega o caminho organizado, as ferramentas e contas de exemplo, sempre marcadas como exemplo."],
-    ["Posso dar remédio para o pet do cliente?", "Só o que o veterinário prescreveu, por escrito, com dose e horário, e com a autorização do tutor. Nunca escolher, trocar ou ajustar a dose, e nunca dar remédio humano: o paracetamol, por exemplo, é especialmente tóxico para gatos. Diagnosticar e prescrever é exclusivo do médico-veterinário."],
-    ["Quanto cobra um pet sitter?", "Varia muito por cidade e serviço. Como referência, o Serasa publicou em dezembro de 2025 faixas de R$ 40 a R$ 150 por visita de 45 a 60 minutos. O manual reúne as faixas de várias fontes, com data, e a planilha para calcular o seu preço."],
-    ["Serve só para gatos?", "Não, serve para cães e gatos. O manual dá atenção especial aos gatos porque eles costumam lidar melhor com a rotina e o território conhecidos, o que faz deles um público forte do pet sitter."],
-    ["Ele complementa o Manual do Passeador de Cães?", "Sim. Muitos pet sitters também passeiam com cães, e vice-versa. Cada manual é completo sozinho; juntos, cobrem o cuidado em casa e o passeio, com contratos e fichas para cada serviço."],
-    ["Quem escreveu o manual?", "A equipe Maestro Pet, com pesquisa em fontes oficiais (Planalto, gov.br, Conselho Federal de Medicina Veterinária, Manual Veterinário MSD) e de mercado. Todas as fontes estão listadas no manual, com link e data, para você conferir."],
+    ["Funciona para iniciante?", "Sim. Muitos dos casos pesquisados começaram cuidando dos pets de amigos, e o nível 1 do plano parte daí. Se você já atende, vá direto para preço, contrato e carreira."],
+    ["Preciso de CNPJ?", "Para começar, não necessariamente. Há ocupação no MEI, “Cuidador(a) de animais (pet sitter) independente”, CNAE 9609-2/08. O manual explica a lei do MEI de outubro de 2026."],
+    ["O manual garante renda?", "Não. Nenhum manual pode garantir clientes ou renda. O manual entrega o caminho, as ferramentas e contas de exemplo, sempre marcadas como exemplo."],
+    ["Posso dar remédio para o pet do cliente?", "Só o que o veterinário prescreveu, por escrito, com dose e horário, e com autorização do tutor. Nunca remédio humano: o paracetamol é muito tóxico para gatos."],
+    ["Quanto cobra um pet sitter?", "Varia por cidade e serviço. O Serasa publicou em dezembro de 2025 de R$ 40 a R$ 150 por visita de 45 a 60 min. O manual reúne outras fontes, com data, e a planilha."],
+    ["Serve só para gatos?", "Não, serve para cães e gatos. Os gatos têm atenção especial porque lidam melhor com a rotina em casa, o que faz deles um público forte do pet sitter."],
+    ["Ele complementa o Manual do Passeador de Cães?", "Sim. Cada manual é completo sozinho; juntos, cobrem o cuidado em casa e o passeio, com contratos e fichas para cada serviço."],
+    ["Quem escreveu o manual?", "A equipe Maestro Pet, com fontes oficiais (Planalto, gov.br, Conselho Federal de Medicina Veterinária, Manual Veterinário MSD) e de mercado, listadas com link e data."],
     ["Por que os casos reais não têm foto?", "Porque as imagens pertencem a cada profissional. Em vez de usar foto sem autorização, cada caso traz um QR code que abre o perfil de verdade."],
     ["Como recebo?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail: o manual em PDF, a planilha (Google Planilhas e Excel) e os materiais para imprimir e editar."],
     ["E se não for para mim?", "Você tem 7 dias de garantia. Se achar que não valeu a pena, pede o reembolso e recebe 100% do valor de volta."],

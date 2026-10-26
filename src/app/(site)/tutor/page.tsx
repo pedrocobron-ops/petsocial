@@ -1,91 +1,119 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { BookOpen, HeartHandshake, ShieldCheck, Zap } from "lucide-react";
+import { Seta } from "@/components/icones";
+import { FaixaProva } from "@/components/pagamento";
+import { CartaoProduto } from "@/components/vitrine";
+import { EmPreparo, FaqVitrine, Leque, Marquee } from "@/components/vitrine-blocos";
+import { fixa } from "@/lib/faq";
 import { GRUPOS, PRODUTOS, linhaDe } from "@/lib/produtos";
-import { SecaoVitrine } from "@/components/vitrine";
 
 export const metadata: Metadata = {
-  title: "Para tutores: guias e kits para cães e gatos",
-  description: "Guias práticos para os problemas do dia a dia com cães e gatos, kits para imprimir e receitas seguras. Com reforço positivo e garantia de 7 dias.",
+  title: "Para tutores: guias para cães e gatos",
+  description: "Guias práticos para os problemas do dia a dia com cães e gatos, com reforço positivo, passo a passo ilustrado e 7 dias para desistir.",
   alternates: { canonical: "/tutor" },
 };
 
-const PILARES = [
-  [HeartHandshake, "Reforço positivo", "Nada de bronca ou castigo. Métodos que ensinam com confiança e carinho."],
-  [BookOpen, "Passo a passo ilustrado", "Guias diretos, visuais e práticos, para aplicar no mesmo dia."],
-  [Zap, "Acesso imediato", "Pagou, recebeu no e-mail. Leia no celular, no computador ou imprima."],
-  [ShieldCheck, "Garantia de 7 dias", "Não gostou? Devolvemos 100% do valor, sem perguntas."],
+/** Dica do Mozart (brief 20, 7.2, bloco 5): três coisas que já mudam hoje, com a ilustração do guia em moldura. */
+const DICAS = [
+  ["Recompense em até 3 segundos", "O cachorro liga a recompensa ao que fazia naquele exato momento. Elogio e petisco vêm logo depois do acerto: um minuto depois, ele já não sabe pelo que ganhou."],
+  ["Fareja em círculos? Hora do banheiro", "Farejar o chão andando em círculo, parar de brincar de repente e ir para um canto são os sinais clássicos. Leve-o ao lugar certo na hora."],
+  ["Morde tudo? Ofereça o que pode", "Morder faz parte da fase de dentes. Em vez de só tirar o chinelo da boca, troque por um brinquedo de mastigar e elogie quando ele morder o objeto certo."],
 ] as const;
 
-const DICAS = [
-  { img: "/produtos/dica-petisco.webp", titulo: "Recompense em até 3 segundos", texto: "O cachorro liga a recompensa ao que estava fazendo naquele exato momento. Elogio e petisco precisam vir logo depois do acerto — um minuto depois, ele já não sabe pelo que ganhou." },
-  { img: "/produtos/dica-farejando.webp", titulo: "Fareja em círculos? Hora do banheiro", texto: "Farejar o chão andando em círculo, parar de brincar de repente e ir para um canto são os sinais clássicos de que ele precisa fazer xixi. Leve-o ao lugar certo na hora." },
-  { img: "/produtos/dica-filhote.webp", titulo: "Filhote morde tudo? Ofereça o que pode", texto: "Morder faz parte da fase de dentes. Em vez de só tirar o chinelo da boca, troque por um brinquedo de mastigar e elogie quando ele morder o objeto certo." },
-];
-
-const FAQ = [
-  ["Como recebo o guia?", "Assim que o pagamento é confirmado, você recebe o acesso no e-mail informado na compra. Os guias são PDFs para ler no celular, no computador ou imprimir."],
-  ["Quais formas de pagamento?", "Pix e cartão de crédito, em ambiente seguro processado pela Cakto."],
-  ["E se eu não gostar?", "Todos os guias têm garantia de 7 dias. Peça o reembolso e você recebe 100% do valor de volta."],
-  ["Os guias substituem o veterinário?", "Não. Eles ensinam rotina, comportamento e cuidados do dia a dia. Sempre que um problema pode ter causa de saúde, o guia indica procurar um(a) veterinário(a)."],
+const FAQ: [string, string][] = [
+  ["Como recebo o guia?", "O acesso chega no e-mail da compra logo após o pagamento. É um PDF ilustrado para ler no celular, no computador ou imprimir."],
+  fixa("Pix ou cartão"),
+  fixa("Como peço o reembolso"),
+  fixa("Preciso imprimir"),
 ];
 
 export default function Tutor() {
   const tutor = PRODUTOS.filter((p) => linhaDe(p) === "tutor");
+  const lancados = tutor.filter((p) => p.lancado);
+  const emPreparo = tutor.filter((p) => !p.lancado);
+  // Subtítulos por grupo só quando há guias suficientes para eles não ficarem com um card só.
+  const grupos = GRUPOS.tutor.map(([id, titulo]) => [titulo, lancados.filter((p) => p.grupo === id)] as const).filter(([, l]) => l.length > 0);
+  const comSubtitulos = lancados.length > 4 && grupos.length > 1;
   return (
     <>
-      <section className="hero-home">
-        <div className="container hero-home-grid">
-          <div>
-            <span className="eyebrow">Maestro Pet · Para tutores</span>
-            <h1>Seu pet feliz, <em>sua casa em paz</em>.</h1>
-            <p className="lead">
-              Guias que resolvem os problemas do dia a dia com cães e gatos, kits para imprimir e receitas seguras.
-              Com o passo a passo do Mozart, nosso border collie, e sempre com reforço positivo.
-            </p>
-            <div className="hero-ctas"><a className="btn btn-lg" href="#comportamento">Ver os guias</a></div>
-            <ul className="selos"><li>Acesso imediato</li><li>Garantia de 7 dias</li><li>Pix ou cartão</li></ul>
+      {/* 1 · Hero (7.2): rótulo, h1 com itálico, lead de 2 linhas, um botão, linha de risco curta; leque das capas lançadas */}
+      <section className="hero hero-vitrine">
+        <div className="container hero-grade hero-grade-leque">
+          <div className="hero-texto">
+            <span className="rotulo">Para tutores · {lancados.length} {lancados.length === 1 ? "guia" : "guias"} à venda</span>
+            <h1>Seu pet feliz, <em>sua casa em paz.</em></h1>
+            <p className="lead">Guias para o dia a dia com o seu pet, um problema de cada vez.</p>
+            <div className="botoes"><a className="btn btn-largo" id="cta-home" href="#guias">Ver os guias<Seta /></a></div>
+            <p className="risco risco-linha"><span>Pagamento único</span><span>Pix ou cartão</span><span>7 dias para desistir</span></p>
           </div>
-          <div className="hero-art">
-            <Image src="/mozart/acenando.webp" alt="Mozart, o border collie do Maestro Pet, acenando" width={560} height={560} priority />
-          </div>
+          <Leque produtos={lancados} className="leque-hero" prioridade />
         </div>
       </section>
 
-      <section className="pilares">
-        <div className="container pilares-grid">
-          {PILARES.map(([Icone, t, d]) => (
-            <div key={t} className="pilar"><span className="pilar-ic"><Icone size={24} aria-hidden /></span><div><b>{t}</b><p>{d}</p></div></div>
-          ))}
-        </div>
+      {/* 2 · Faixa de prova */}
+      <section className="secao secao-prova">
+        <div className="container"><FaixaProva className="rv" /></div>
       </section>
 
-      {GRUPOS.tutor.map(([id, titulo, texto]) => (
-        <SecaoVitrine key={id} id={id} titulo={titulo} texto={texto} produtos={tutor.filter((p) => p.grupo === id)} />
-      ))}
-
-      <section className="secao secao-creme">
+      {/* 3 · Guias à venda: só os lançados */}
+      <section className="secao vitrine-sec" id="guias" aria-labelledby="guias-titulo">
         <div className="container">
-          <span className="eyebrow">Dicas do Mozart</span>
-          <h2>Comece hoje: três dicas que já fazem diferença</h2>
-          <div className="dicas">
-            {DICAS.map((d) => (
-              <article key={d.titulo} className="dica">
-                <Image src={d.img} alt="" width={400} height={400} />
-                <div><h3>{d.titulo}</h3><p>{d.texto}</p></div>
-              </article>
-            ))}
+          {comSubtitulos ? (
+            <>
+              <div className="cab rv">
+                <span className="rotulo">Guias ilustrados</span>
+                <h2 id="guias-titulo">Um problema por guia, <em>um passo por página.</em></h2>
+              </div>
+              {grupos.map(([titulo, lista]) => (
+                <div key={titulo} className="vitrine-grupo">
+                  <h3 className="vitrine-subtitulo">{titulo}</h3>
+                  <div className={`cards${lista.length % 2 ? " cards-impar" : ""}`}>{lista.map((p) => <CartaoProduto key={p.slug} p={p} />)}</div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <div className={`cards cards-com-cab${lancados.length % 2 ? " cards-impar" : ""}`}>
+              <div className="cab cab-card rv">
+                <span className="rotulo">Guias ilustrados</span>
+                <h2 id="guias-titulo">Um problema por guia, <em>um passo por página.</em></h2>
+                <p>Cada guia resolve uma coisa, com reforço positivo e passo a passo ilustrado.</p>
+              </div>
+              {lancados.map((p) => <CartaoProduto key={p.slug} p={p} />)}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 4 · Em preparo (6.11) */}
+      <EmPreparo produtos={emPreparo} linha="tutores" />
+
+      {/* 5 · Dica do Mozart */}
+      <section className="secao dica-sec" aria-labelledby="dica-titulo">
+        <div className="container dica-grid">
+          <figure className="moldura-dica rv">
+            <span className="moldura-dica-img"><Image src="/produtos/dica-petisco.webp" alt="Mozart recebendo um petisco da tutora logo depois do acerto" width={645} height={800} sizes="(max-width: 899px) 90vw, 480px" /></span>
+            <figcaption>Ilustração do guia</figcaption>
+          </figure>
+          <div>
+            <div className="cab rv">
+              <span className="rotulo rotulo-mozart"><Image src="/mozart/sorrindo-112.webp" alt="" width={48} height={48} />Dica do Mozart</span>
+              <h2 id="dica-titulo">Três coisas que já mudam <em>hoje.</em></h2>
+            </div>
+            <ol className="pilares-n pilares-lista">
+              {DICAS.map(([t, d], i) => (
+                <li key={t} className="rv"><span aria-hidden>{String(i + 1).padStart(2, "0")}</span><b>{t}</b><p>{d}</p></li>
+              ))}
+            </ol>
           </div>
         </div>
       </section>
 
-      <section className="secao">
-        <div className="container faq">
-          <span className="eyebrow">Dúvidas</span>
-          <h2>Perguntas frequentes</h2>
-          {FAQ.map(([q, a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}
-        </div>
-      </section>
+      {/* 6 · Marquee: só com 6 ou mais capas à venda. Com 3, o loop repete a mesma capa no quadro ou abre buracos,
+          e a grade logo acima já mostra as mesmas capas. */}
+      {lancados.length >= 6 && <Marquee capas={lancados} />}
+
+      {/* 7 · FAQ */}
+      <FaqVitrine faq={FAQ} />
     </>
   );
 }

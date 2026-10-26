@@ -68,8 +68,8 @@ export const colorir: PaginaVendas = {
     titulo: "Também no livro",
     itens: [
       { imagem: "/produtos/colorir-pag24.webp", titulo: "Ligue os pontos", texto: "Para descobrir o presente do Mozart, com uma curiosidade sobre ossos." },
-      { icone: "🧭", titulo: "Labirinto do Mozart", texto: "Para ajudar o Mozart a chegar até o brinquedo dele." },
-      { icone: "🏅", titulo: "Certificado de pintor", texto: "Para quem pintou o livro inteirinho com capricho." },
+      { icone: "Compass", titulo: "Labirinto do Mozart", texto: "Para ajudar o Mozart a chegar até o brinquedo dele." },
+      { icone: "Medal", titulo: "Certificado de pintor", texto: "Para quem pintou o livro inteirinho com capricho." },
     ],
   },
   paraQuem: {

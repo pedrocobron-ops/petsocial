@@ -68,8 +68,8 @@ export const calendario: PaginaVendas = {
     titulo: "Também no calendário",
     itens: [
       { imagem: "/produtos/calendario-pag2.webp", titulo: "Selos para recortar", texto: "12 selos para marcar vacina, vermífugo, banho, aniversário e mais." },
-      { icone: "🎆", titulo: "Lembretes de fogos", texto: "Nos meses de festa, a dica para preparar o seu pet com antecedência." },
-      { icone: "🎁", titulo: "Ótimo presente", texto: "Imprima com as fotos do pet de quem você ama." },
+      { icone: "Sparkles", titulo: "Lembretes de fogos", texto: "Nos meses de festa, a dica para preparar o seu pet com antecedência." },
+      { icone: "Gift", titulo: "Ótimo presente", texto: "Imprima com as fotos do pet de quem você ama." },
     ],
   },
   paraQuem: {

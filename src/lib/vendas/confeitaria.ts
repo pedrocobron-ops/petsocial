@@ -10,10 +10,12 @@ export const confeitaria: PaginaVendas = {
   },
   hero: {
     eyebrow: "Maestro Pet Negócios · Manual completo",
-    antes: "Monte o seu negócio no mercado pet com ",
-    destaque: "uma confeitaria de verdade",
-    depois: ".",
-    lead: "As 30 receitas e o negócio inteiro em volta delas: kits de festa, ficha técnica, preço, as regras para vender dentro da lei, embalagem e etiquetas prontas, cardápio editável e um plano de carreira do primeiro bolo à confeitaria com equipe.",
+    fatos: ["Manual", "30 receitas", "Plano em 4 níveis"],
+    antes: "Confeitaria pet ",
+    destaque: "como negócio,",
+    depois: " com preço e lei.",
+    lead: "30 receitas com ficha técnica, as regras do MAPA para vender e um plano de carreira em 4 níveis.",
+    foto: ["/fotos/negocios-confeitaria-hero-4x5.webp", "Mãos entregando uma caixa com bolo de cenoura para cães a um cachorro que espera na porta"],
     selos: ["Acesso imediato", "Plano de carreira em 4 níveis", "Garantia de 7 dias"],
   },
   dores: {
@@ -39,7 +41,7 @@ export const confeitaria: PaginaVendas = {
     ],
   },
   recebe: {
-    titulo: "O negócio inteiro, do mercado ao plano de carreira",
+    titulo: "O negócio inteiro, *do mercado ao plano de carreira.*",
     itens: [
       ["O mercado de verdade", "Quem compra bolo e kit de festa pet, quando compra e quanto se cobra hoje, com preços reais pesquisados e a fonte de cada número."],
       ["A vitrine do mercado", "Negócios reais de confeitaria pet: o que vendem, quanto cobram e o que observar em cada um. Com fonte, data e QR code para a loja."],
@@ -52,13 +54,23 @@ export const confeitaria: PaginaVendas = {
       ["Primeiros clientes", "Plano de 30 dias, canais (bairro, Instagram, pet shops, feiras e parcerias) e mensagens prontas para copiar e colar."],
     ],
     paginas: [
-      ["/produtos/negocios/sumario-confeitaria.webp", "O sumário do manual"],
-      ["/produtos/negocios/ferramenta-confeitaria.webp", "A ficha técnica e preço, para imprimir"],
+      ["/produtos/negocios/confeitaria-pag79.webp", "A ficha técnica em 7 passos: custo por unidade, valor da hora e margem."],
+      ["/produtos/negocios/confeitaria-pag4.webp", "O sumário: do mercado ao plano de carreira."],
+      ["/produtos/negocios/confeitaria-pag69.webp", "A dispensa de registro no MAPA, com as condições, explicada com a norma."],
+      ["/produtos/negocios/confeitaria-pag72.webp", "O rótulo, campo a campo, com o que é obrigatório e o que é proibido alegar."],
+      ["/produtos/negocios/confeitaria-pag81.webp", "Da ficha técnica à tabela de preços, com pacotes e adicionais."],
+      ["/produtos/negocios/confeitaria-pag105.webp", "A ficha técnica para imprimir e preencher a cada receita."],
     ],
   },
+  fontes: [
+    ["Decreto 12.031/2024", "Dispensa a confeitaria caseira de registro no Ministério da Agricultura, mas só com condições, e continua exigindo rótulo completo.", "Planalto, Decreto 12.031/2024", "https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2024/decreto/D12031.htm"],
+    ["CNAE 1066-0/00", "A fabricação de alimento para animais não está na lista de ocupações permitidas ao MEI. A conversa com o contador vem antes do CNPJ.", "gov.br, ocupações permitidas ao MEI", "https://www.gov.br/empresas-e-negocios/pt-br/empreendedor/quero-ser-mei/atividades-permitidas"],
+    ["IN MAPA 30/2009", "Traz as regras de rotulagem de produtos para animais, que valem também para quem está na dispensa de registro.", "Ministério da Agricultura, legislação de alimentação animal", "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/legislacao-alimentacao-animal"],
+  ],
+  numeros: [["30", "receitas com ficha técnica"], ["4", "níveis no plano de carreira"], ["4", "ferramentas para usar"]],
   metodo: {
     eyebrow: "O plano de carreira",
-    titulo: "Do primeiro bolo à confeitaria com equipe, em 4 níveis",
+    titulo: "Do primeiro bolo à confeitaria com equipe, *em 4 níveis.*",
     rotulo: "Nível",
     passos: [
       ["Começando", "Primeiras encomendas, receitas-base e ficha técnica no lugar"],
@@ -68,12 +80,12 @@ export const confeitaria: PaginaVendas = {
     ],
   },
   bonus: {
-    titulo: "As ferramentas que vêm com o manual",
+    titulo: "As ferramentas que vêm *com o manual.*",
     itens: [
-      { icone: "📊", titulo: "Planilha de precificação", texto: "Em Google Planilhas e Excel: custo da receita, embalagem, hora de trabalho, margem e preço final de bolos e kits." },
-      { icone: "🏷️", titulo: "Etiquetas e embalagem para imprimir", texto: "Etiquetas com os campos do rótulo, cartões e tags para os kits de festa." },
-      { icone: "📋", titulo: "Cardápio editável", texto: "Para preencher com os seus produtos e preços e enviar aos clientes." },
-      { icone: "📝", titulo: "Ficha do pedido e checklist de produção", texto: "Data, retirada ou entrega, espécie e porte, e a pergunta que não pode faltar: o pet tem alergia ou restrição?" },
+      { icone: "Calculator", titulo: "Planilha de precificação", texto: "Em Google Planilhas e Excel: custo da receita, embalagem, hora de trabalho, margem e preço final de bolos e kits." },
+      { icone: "Tag", titulo: "Etiquetas e embalagem para imprimir", texto: "Etiquetas com os campos do rótulo, cartões e tags para os kits de festa." },
+      { icone: "ClipboardList", titulo: "Cardápio editável", texto: "Para preencher com os seus produtos e preços e enviar aos clientes." },
+      { icone: "NotebookPen", titulo: "Ficha do pedido e checklist de produção", texto: "Data, retirada ou entrega, espécie e porte, e a pergunta que não pode faltar: o pet tem alergia ou restrição?" },
     ],
   },
   paraQuem: {
@@ -107,20 +119,20 @@ export const confeitaria: PaginaVendas = {
   garantia:
     "Leia o manual, use as ferramentas e comece o plano. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta. Sem perguntas e sem burocracia.",
   faq: [
-    ["Funciona para quem nunca vendeu nada?", "Sim. O manual começa do zero: o teste de perfil, as receitas-base, o primeiro cálculo de preço e os primeiros clientes. O nível 1 do plano de carreira foi feito para quem ainda está testando. Se você já vende, vá direto para preço, regras e plano de carreira."],
-    ["Preciso ser confeiteira profissional?", "Não. As receitas usam técnica caseira e equipamento de cozinha comum, como forno, batedeira e geladeira. Equipamento doméstico, aliás, é uma das condições para a confeitaria caseira ficar dispensada de registro."],
-    ["Preciso de CNPJ para vender?", "O manual não manda você vender na informalidade nem decide o seu enquadramento. Ele mostra o que a norma pede (o rótulo exige a identificação de quem fabrica), explica por que o CNAE de fabricação de alimento para animais (1066-0/00) não está na lista do MEI, e lista o que perguntar ao contador e à prefeitura antes de abrir o CNPJ."],
-    ["Preciso de registro no Ministério da Agricultura?", "Depende do que você faz. Pelo Decreto 12.031/2024, a confeitaria caseira fica dispensada de registro quando cumpre todas as condições, como usar só ingredientes de uso humano, não fazer alegação terapêutica e vender só no Brasil. Mastigáveis, como orelha desidratada e osso de couro, tiram você da dispensa. O manual traz o checklist completo e o link de cada norma."],
-    ["O manual garante que eu vou ter renda?", "Não. Nenhum manual pode garantir clientes, vendas ou renda: isso depende da sua cidade, do seu tempo, do seu preço e da sua constância. O manual entrega o caminho organizado, as ferramentas e contas de exemplo, sempre marcadas como exemplo, para você fazer as suas."],
-    ["As receitas são seguras para os pets dos clientes?", "As receitas usam só ingredientes de uso humano e deixam de fora os que fazem mal a cães e gatos, como chocolate, xilitol, uva, cebola, alho e macadâmia. Bolo e petisco não substituem a alimentação do dia a dia, e pets com doença, alergia ou dieta especial precisam do aval do veterinário: o manual ensina a fazer essa pergunta em todo pedido."],
+    ["Funciona para quem nunca vendeu nada?", "Sim. O manual começa do zero: teste de perfil, receitas-base, primeiro preço e primeiros clientes. Se você já vende, vá direto para preço, regras e plano de carreira."],
+    ["Preciso ser confeiteira profissional?", "Não. As receitas usam técnica caseira e equipamento comum de cozinha, que aliás é uma das condições para a confeitaria caseira ficar dispensada de registro."],
+    ["Preciso de CNPJ para vender?", "O manual não decide o seu enquadramento. Mostra o que a norma pede, por que o CNAE 1066-0/00 não está no MEI e o que perguntar ao contador e à prefeitura."],
+    ["Preciso de registro no Ministério da Agricultura?", "Depende. Pelo Decreto 12.031/2024, a confeitaria caseira fica dispensada quando cumpre todas as condições; mastigáveis tiram você da dispensa. O manual traz o checklist."],
+    ["O manual garante que eu vou ter renda?", "Não. Nenhum manual pode garantir clientes, vendas ou renda. O manual entrega o caminho, as ferramentas e contas de exemplo, sempre marcadas como exemplo."],
+    ["As receitas são seguras para os pets dos clientes?", "Usam só ingredientes de uso humano e deixam de fora os que fazem mal, como chocolate, xilitol, uva, cebola e alho. Pet com doença ou dieta especial: aval do veterinário."],
     ["Serve para gato?", "Serve, com diferenças. Gatos não sentem o sabor doce, então o “bolo de gato” é salgado, e eles são ainda mais sensíveis a cebola e alho. O manual mostra o que muda."],
-    ["Quem escreveu o manual?", "A equipe Maestro Pet, com pesquisa em fontes oficiais (Planalto, Ministério da Agricultura, Receita Federal, Anvisa) e de mercado. Todas as fontes estão listadas no manual, com link e data, para você conferir."],
-    ["E se a lei mudar?", "Normas mudam, e o Ministério da Agricultura está revisando as regras de registro e rotulagem de produtos para animais. O manual traz a data da revisão e o link de cada norma, para você sempre conferir a versão em vigor."],
+    ["Quem escreveu o manual?", "A equipe Maestro Pet, com pesquisa em fontes oficiais (Planalto, Ministério da Agricultura, Receita Federal, Anvisa) e de mercado, listadas no manual com link e data."],
+    ["E se a lei mudar?", "Normas mudam, e o Ministério da Agricultura está revisando as regras para produtos para animais. O manual traz a data da revisão e o link de cada norma."],
     ["Por que os negócios da vitrine não têm foto?", "Porque as imagens pertencem a cada negócio. Em vez de usar foto sem autorização, cada negócio traz um QR code que abre a loja ou a notícia de verdade."],
     ["Como recebo?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail: o manual em PDF, a planilha (Google Planilhas e Excel) e os materiais para imprimir e editar."],
     ["E se não for para mim?", "Você tem 7 dias de garantia. Se achar que não valeu a pena, pede o reembolso e recebe 100% do valor de volta."],
   ],
-  ctaFinal: "Faça da sua cozinha um negócio organizado.",
+  ctaFinal: "Faça da sua cozinha *um negócio organizado.*",
   aviso:
     "Este manual tem caráter educativo e não garante vendas, clientes ou renda. As contas apresentadas são exemplos. Preços e números de mercado têm fonte e data e podem ter mudado. As regras citadas valem na data da revisão do manual: confirme o seu caso com o Ministério da Agricultura, a prefeitura e um contador. Bolos e petiscos não substituem a alimentação completa nem a orientação do médico-veterinário.",
 };

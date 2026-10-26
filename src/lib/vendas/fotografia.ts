@@ -10,10 +10,11 @@ export const fotografia: PaginaVendas = {
   },
   hero: {
     eyebrow: "Maestro Pet Negócios · Manual completo",
+    fatos: ["Manual", "Contrato-modelo", "Plano em 4 níveis"],
     antes: "Trabalhe no mercado pet ",
-    destaque: "atrás da câmera",
-    depois: ".",
-    lead: "O manual para transformar a fotografia de cães e gatos em um negócio organizado: como conduzir a sessão com o bem-estar do animal em primeiro lugar, que equipamento comprar e quando, quanto cobrar, como conseguir clientes e como crescer, com ferramentas prontas e um plano de carreira em 4 níveis.",
+    destaque: "atrás da câmera.",
+    depois: "",
+    lead: "Sessão com bem-estar, equipamento, contrato, preço e os primeiros clientes.",
     selos: ["Acesso imediato", "Plano de carreira em 4 níveis", "Garantia de 7 dias"],
   },
   dores: {
@@ -39,7 +40,7 @@ export const fotografia: PaginaVendas = {
     ],
   },
   recebe: {
-    titulo: "O negócio inteiro, da primeira sessão ao plano de carreira",
+    titulo: "O negócio inteiro, *da primeira sessão ao plano de carreira.*",
     itens: [
       ["O mercado de verdade", "Quem contrata ensaio pet e para quê (aniversário, Natal e outras datas, família, adoção, homenagem, marcas), as tabelas reais de fotógrafos brasileiros, o que é realidade e o que é ilusão. Com fonte e data."],
       ["Casos reais", "Fotógrafos e estúdios de pets do Brasil e de fora, de quem começou como hobby a quem fotografa para marcas pet e ganhou prêmio internacional: como começaram, o que vendem e a lição de cada um. Com fonte, data e QR code."],
@@ -52,13 +53,23 @@ export const fotografia: PaginaVendas = {
       ["A sessão na prática", "Do agendamento à entrega: briefing, checklist da sessão, seleção, edição (com aplicativos gratuitos e pagos), galeria e o que fazer quando algo dá errado."],
     ],
     paginas: [
-      ["/produtos/negocios/sumario-fotografia.webp", "O sumário do manual"],
-      ["/produtos/negocios/ferramenta-fotografia.webp", "O briefing do ensaio, para imprimir"],
+      ["/produtos/negocios/fotografia-pag26.webp", "A regra de ouro: o animal vem antes da foto, com o pacto de bem-estar."],
+      ["/produtos/negocios/fotografia-pag4.webp", "O sumário: do mercado ao plano de carreira."],
+      ["/produtos/negocios/fotografia-pag54.webp", "De quem é a foto? Direito autoral e direito de imagem, com a lei."],
+      ["/produtos/negocios/fotografia-pag57.webp", "MEI de fotógrafo, passo a passo, com o CNAE e o DAS de 2026."],
+      ["/produtos/negocios/fotografia-pag60.webp", "O que fotógrafos pet brasileiros cobram, a partir de tabelas publicadas."],
+      ["/produtos/negocios/fotografia-pag89.webp", "O briefing do ensaio, para imprimir e preencher com o cliente."],
     ],
   },
+  fontes: [
+    ["Lei 9.610/1998", "A fotografia é obra protegida, e o autor é o fotógrafo, mesmo quando o cliente paga a sessão.", "Planalto, Lei 9.610/1998", "https://www.planalto.gov.br/ccivil_03/leis/l9610.htm"],
+    ["Código Civil, art. 20", "O tutor que aparece na foto tem direito sobre a própria imagem. O uso em portfólio e redes se combina por escrito.", "Planalto, Código Civil", "https://www.planalto.gov.br/ccivil_03/leis/2002/l10406compilada.htm"],
+    ["CNAE 7420-0/01", "“Fotógrafo(a)” está na lista de ocupações permitidas ao MEI. Vídeo e venda de impressos se confirmam com o contador.", "gov.br, ocupações permitidas ao MEI", "https://www.gov.br/empresas-e-negocios/pt-br/empreendedor/quero-ser-mei/atividades-permitidas"],
+  ],
+  numeros: [["4", "níveis no plano de carreira"], ["3", "níveis de investimento em equipamento"], ["4", "ferramentas para usar"]],
   metodo: {
     eyebrow: "O plano de carreira",
-    titulo: "Da primeira sessão paga ao estúdio, em 4 níveis",
+    titulo: "Da primeira sessão paga ao estúdio, *em 4 níveis.*",
     rotulo: "Nível",
     passos: [
       ["Começando", "Portfólio, primeiras sessões pagas e um fluxo de trabalho que funciona"],
@@ -68,12 +79,12 @@ export const fotografia: PaginaVendas = {
     ],
   },
   bonus: {
-    titulo: "As ferramentas que vêm com o manual",
+    titulo: "As ferramentas que vêm *com o manual.*",
     itens: [
-      { icone: "📄", titulo: "Contrato com uso de imagem", texto: "Modelo para adaptar: o que está incluído, prazos, remarcação, bem-estar do animal e autorização de uso das fotos. Para revisar com um advogado." },
-      { icone: "📋", titulo: "Briefing e ficha do pet", texto: "Temperamento, medos, petisco preferido, saúde e o estilo de foto que o tutor quer." },
-      { icone: "✅", titulo: "Checklist da sessão", texto: "Equipamento, cenário, segurança do espaço e o roteiro de fotos, para não esquecer nada." },
-      { icone: "📊", titulo: "Planilha de preço e agenda", texto: "Em Google Planilhas e Excel: custo da sessão e da edição, pacotes, agenda e recebimentos." },
+      { icone: "FileText", titulo: "Contrato com uso de imagem", texto: "Modelo para adaptar: o que está incluído, prazos, remarcação, bem-estar do animal e autorização de uso das fotos. Para revisar com um advogado." },
+      { icone: "ClipboardList", titulo: "Briefing e ficha do pet", texto: "Temperamento, medos, petisco preferido, saúde e o estilo de foto que o tutor quer." },
+      { icone: "ListChecks", titulo: "Checklist da sessão", texto: "Equipamento, cenário, segurança do espaço e o roteiro de fotos, para não esquecer nada." },
+      { icone: "Calculator", titulo: "Planilha de preço e agenda", texto: "Em Google Planilhas e Excel: custo da sessão e da edição, pacotes, agenda e recebimentos." },
     ],
   },
   paraQuem: {
@@ -104,19 +115,19 @@ export const fotografia: PaginaVendas = {
   garantia:
     "Leia o manual, use as ferramentas e comece o plano. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta. Sem perguntas e sem burocracia.",
   faq: [
-    ["Funciona para iniciante?", "Sim. O manual começa do portfólio e das primeiras sessões, e o nível 1 do plano de carreira foi feito para quem ainda está testando. Se você já é fotógrafo de outra área, vá direto para manejo do animal, preço e plano de carreira."],
+    ["Funciona para iniciante?", "Sim. Começa do portfólio e das primeiras sessões, e o nível 1 do plano é para quem está testando. Se você já fotografa, vá direto para manejo, preço e carreira."],
     ["Preciso de equipamento profissional para começar?", "O manual mostra o que é o mínimo para começar, o que é recomendado e o que é completo, com faixa de preço, para você investir aos poucos, conforme a agenda cresce."],
-    ["Preciso de CNPJ?", "Não para aprender e montar o portfólio. Para emitir nota fiscal, fechar com marcas e pet shops e crescer, a formalização entra no nível 2 do plano. Existe ocupação no MEI: “Fotógrafo(a)”, CNAE 7420-0/01 (não há uma específica para pets). O manual mostra o passo a passo, o valor do DAS em 2026 e o que confirmar com um contador, como vídeo e venda de impressos."],
-    ["Quanto cobra um ensaio pet?", "Varia muito por cidade, número de fotos e produtos impressos. Como referência, a Cronoshare publicou em janeiro de 2026 a faixa de R$ 300 a R$ 600 para fotografia de animais de estimação. O manual traz tabelas publicadas por fotógrafos pet brasileiros, com data, e a planilha para você calcular o seu preço."],
-    ["O manual garante renda?", "Não. Nenhum manual pode garantir clientes ou renda: isso depende da sua cidade, do seu tempo, do seu preço e da sua constância. O manual entrega o caminho organizado, as ferramentas e contas de exemplo, sempre marcadas como exemplo."],
-    ["Serve para gatos?", "Sim. O manual trata cães e gatos, com os cuidados de manejo que valem para os dois. Pets tímidos costumam ficar melhor no ambiente que já conhecem, e por isso o ensaio em casa tem espaço no manual."],
-    ["Posso postar as fotos dos clientes?", "Combine por escrito antes da sessão. Você é o autor das fotos, mas o tutor que aparece nelas tem direito sobre a própria imagem, e a lei não trata de forma clara o uso de fotos só do pet. Por isso o contrato-modelo do manual traz uma autorização específica para portfólio, site e redes."],
-    ["Quem escreveu o manual?", "A equipe Maestro Pet, com pesquisa em fontes oficiais (Planalto, gov.br, Receita Federal, Manual Veterinário MSD) e de mercado. Todas as fontes estão listadas no manual, com link e data, para você conferir."],
+    ["Preciso de CNPJ?", "Não para aprender e montar o portfólio. Para emitir nota e fechar com marcas, a formalização entra no nível 2. Existe MEI de “Fotógrafo(a)”, CNAE 7420-0/01."],
+    ["Quanto cobra um ensaio pet?", "Varia por cidade e pacote. A Cronoshare publicou em janeiro de 2026 a faixa de R$ 300 a R$ 600. O manual traz tabelas de fotógrafos pet, com data, e a planilha."],
+    ["O manual garante renda?", "Não. Nenhum manual pode garantir clientes ou renda. O manual entrega o caminho, as ferramentas e contas de exemplo, sempre marcadas como exemplo."],
+    ["Serve para gatos?", "Sim. O manual trata cães e gatos, com o manejo de cada um. Pets tímidos costumam render mais em casa, e por isso o ensaio em casa tem espaço no manual."],
+    ["Posso postar as fotos dos clientes?", "Combine por escrito antes. Você é o autor, mas o tutor tem direito sobre a própria imagem. O contrato-modelo traz uma autorização para portfólio, site e redes."],
+    ["Quem escreveu o manual?", "A equipe Maestro Pet, com pesquisa em fontes oficiais (Planalto, gov.br, Receita Federal, Manual Veterinário MSD) e de mercado, listadas no manual com link e data."],
     ["Por que os casos reais não têm foto?", "Porque as imagens pertencem a cada fotógrafo e aos seus clientes. Em vez de usar foto sem autorização, cada caso traz um QR code que abre o perfil de verdade."],
     ["Como recebo?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail: o manual em PDF, a planilha (Google Planilhas e Excel) e os materiais para imprimir e editar."],
     ["E se não for para mim?", "Você tem 7 dias de garantia. Se achar que não valeu a pena, pede o reembolso e recebe 100% do valor de volta."],
   ],
-  ctaFinal: "O seu olhar já existe. Agora é dar a ele um negócio.",
+  ctaFinal: "O seu olhar já existe. *Agora é dar a ele um negócio.*",
   aviso:
     "Este manual tem caráter educativo e não garante clientes ou renda. As contas apresentadas são exemplos. Preços e dados de mercado têm fonte e data e podem ter mudado. Contratos e autorizações são modelos para adaptar com um advogado. O bem-estar do animal vem sempre antes da foto.",
 };

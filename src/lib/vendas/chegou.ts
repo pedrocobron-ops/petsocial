@@ -68,8 +68,8 @@ export const chegou: PaginaVendas = {
     titulo: "Também no kit",
     itens: [
       { imagem: "/produtos/chegou-pag04.webp", titulo: "As fotos do primeiro dia", texto: "E a mesma foto daqui a um ano, com a plaquinha, para comparar." },
-      { icone: "🐱", titulo: "Chegou o gatinho", texto: "Plaquinhas, anúncio e o que muda na casa e na primeira semana de um gato." },
-      { icone: "📞", titulo: "Contatos importantes", texto: "Veterinário, clínica 24 horas, de onde ele veio, microchip e SinPatinhas." },
+      { icone: "Cat", titulo: "Chegou o gatinho", texto: "Plaquinhas, anúncio e o que muda na casa e na primeira semana de um gato." },
+      { icone: "Phone", titulo: "Contatos importantes", texto: "Veterinário, clínica 24 horas, de onde ele veio, microchip e SinPatinhas." },
     ],
   },
   paraQuem: {

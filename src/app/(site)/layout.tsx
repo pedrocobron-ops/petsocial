@@ -1,6 +1,5 @@
 import SiteHeader from "@/components/site-header";
-import SiteFooter from "@/components/site-footer";
-import Animacoes from "@/components/animacoes";
+import Rodape from "@/components/rodape";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
@@ -20,8 +19,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizacaoLd) }} />
       <SiteHeader />
       <main>{children}</main>
-      <SiteFooter />
-      <Animacoes />
+      <Rodape />
     </>
   );
 }

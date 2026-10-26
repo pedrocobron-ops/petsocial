@@ -69,8 +69,8 @@ export const album: PaginaVendas = {
     titulo: "Também no álbum",
     itens: [
       { imagem: "/produtos/album-pag7.webp", titulo: "As primeiras vezes", texto: "Doze momentos com data, lugar e como foi." },
-      { icone: "💌", titulo: "Uma carta para ele", texto: "A página para escrever o que esse primeiro ano significou." },
-      { icone: "🎂", titulo: "O primeiro aniversário", texto: "Foto da festa, quem veio, o bolo e o presente." },
+      { icone: "Mail", titulo: "Uma carta para ele", texto: "A página para escrever o que esse primeiro ano significou." },
+      { icone: "Cake", titulo: "O primeiro aniversário", texto: "Foto da festa, quem veio, o bolo e o presente." },
     ],
   },
   paraQuem: {

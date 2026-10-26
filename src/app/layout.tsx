@@ -1,7 +1,24 @@
 import type { Metadata } from "next";
 import MetaPixel from "@/components/meta-pixel";
 import AvisoCookies from "@/components/aviso-cookies";
+import Revela from "@/components/revela";
+import localFont from "next/font/local";
 import "./globals.css";
+
+/* Brief 20, 4.1: três arquivos (90 KB). Fraunces com opsz 144 e SOFT 50 fixos, peso variável; itálico 400; Instrument Sans 400–700.
+   O itálico também é pré-carregado (23 KB): aparece no h1 de toda dobra, e a troca tardia mexia o layout (CLS). */
+const fraunces = localFont({
+  src: "./fontes/fraunces-roman.woff2", weight: "100 900", style: "normal",
+  variable: "--font-fraunces", display: "swap", preload: true, adjustFontFallback: "Times New Roman",
+});
+const frauncesItalico = localFont({
+  src: "./fontes/fraunces-italico.woff2", weight: "400", style: "italic",
+  variable: "--font-fraunces-italico", display: "swap", preload: true, adjustFontFallback: "Times New Roman",
+});
+const instrument = localFont({
+  src: "./fontes/instrument-sans.woff2", weight: "400 700", style: "normal",
+  variable: "--font-instrument", display: "swap", preload: true, adjustFontFallback: "Arial",
+});
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
@@ -14,7 +31,10 @@ export const metadata: Metadata = {
   description:
     "Guias e kits práticos para tutores de cães e gatos, e manuais completos para quem quer empreender no mercado pet.",
   applicationName: "Maestro Pet",
-  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  icons: {
+    icon: [{ url: "/marca/icon.svg", type: "image/svg+xml" }, { url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: "/apple-touch-icon.png",
+  },
   openGraph: {
     type: "website",
     locale: "pt_BR",
@@ -33,19 +53,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800;9..144,900&family=Inter:wght@400;500;600;700;800&family=Fredoka:wght@500;600&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="pt-BR" className={`${fraunces.variable} ${frauncesItalico.variable} ${instrument.variable}`}>
       <body>
         <MetaPixel />
         {children}
         <AvisoCookies />
+        <Revela />
       </body>
     </html>
   );

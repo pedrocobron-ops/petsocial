@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function Page() {
   return (
-    <>
+    <div className="negocios">
       <section className="lp-hero">
         <div className="container">
           <span className="eyebrow">Feed Pronto · Maestro Pet</span>
@@ -59,6 +59,6 @@ export default function Page() {
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }

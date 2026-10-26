@@ -67,9 +67,9 @@ export const rg: PaginaVendas = {
   bonus: {
     titulo: "Também no kit",
     itens: [
-      { icone: "🏛️", titulo: "O RG oficial, passo a passo", texto: "Como cadastrar o seu pet no SinPatinhas, de graça, com a conta gov.br." },
-      { icone: "🐾", titulo: "Carimbo da patinha seguro", texto: "Qual tinta usar e como limpar a pata em seguida." },
-      { icone: "📸", titulo: "A foto perfeita", texto: "Dicas para a foto do RG ficar linda." },
+      { icone: "Landmark", titulo: "O RG oficial, passo a passo", texto: "Como cadastrar o seu pet no SinPatinhas, de graça, com a conta gov.br." },
+      { icone: "PawPrint", titulo: "Carimbo da patinha seguro", texto: "Qual tinta usar e como limpar a pata em seguida." },
+      { icone: "Camera", titulo: "A foto perfeita", texto: "Dicas para a foto do RG ficar linda." },
     ],
   },
   paraQuem: {

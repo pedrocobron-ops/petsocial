@@ -1,69 +1,111 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Search, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { Seta } from "@/components/icones";
+import { FaixaProva } from "@/components/pagamento";
+import { Leque, Marquee } from "@/components/vitrine-blocos";
+import type { Produto } from "@/lib/produtos";
+import { PRODUTOS, linhaDe, produto, reais, urlProduto } from "@/lib/produtos";
 
+export const metadata: Metadata = { alternates: { canonical: "/" } };
+
+/** Uma linha por guia lançado no índice "Nesta edição" (brief 20, 7.1, bloco 1b). */
+const LINHA: Record<string, string> = {
+  xixi: "Método de 7 dias",
+  filhote: "Os primeiros 30 dias",
+  petiscos: "30 receitas seguras",
+};
+
+/** Os 4 pilares de "Como fazemos" (6.21, sem retrato: sem moldura vazia). */
 const PILARES = [
-  [Search, "Pesquisa de verdade", "Métodos e números com fonte. Nada de achismo nem promessa milagrosa."],
-  [Sparkles, "Prático do começo ao fim", "Passo a passo, checklists e materiais para usar no mesmo dia."],
-  [Zap, "Acesso imediato", "Pagou, recebeu no e-mail. Pix ou cartão, em ambiente seguro."],
-  [ShieldCheck, "Garantia de 7 dias", "Não fez sentido para você? Devolvemos 100% do valor."],
+  ["Pesquisa com fonte e data", "Leis, preços e dados vêm de órgãos oficiais e entidades do setor, citados no próprio material."],
+  ["Reforço positivo, veterinário primeiro", "Nada de castigo. Quando pode ser saúde, o guia manda procurar o veterinário."],
+  ["Sem depoimento inventado", "Preferimos mostrar as páginas de verdade a inventar elogios."],
+  ["7 dias para desistir", "Se não valer a pena, o dinheiro volta pelo mesmo meio do pagamento."],
 ] as const;
 
 export default function Home() {
+  const lancados = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "tutor");
+  // "Nesta edição": no desktop fica ao lado do hero; no celular vem logo abaixo dele, como índice de 3 linhas.
+  const edicao = ["xixi", "filhote", "petiscos"].map(produto).filter((p) => p?.lancado);
+  const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios" && p.grupo === "comece");
+  const leque = ["filhote", "xixi", "petiscos"].map(produto).filter((p) => p?.capa);
+  const capas = [...lancados, ...manuais].filter((p) => p.capa);
+  const confeitaria = produto("confeitaria");
   return (
     <>
-      <section className="hero-home hero-empresa">
-        <div className="container">
-          <span className="eyebrow">Maestro Pet</span>
-          <h1>Conhecimento prático para quem ama pets <em>e para quem vive deles</em>.</h1>
-          <p className="lead">
-            Guias e kits para tutores de cães e gatos, e manuais completos para quem quer empreender no mercado pet.
-            Escolha o seu caminho.
-          </p>
+      <section className="hero">
+        <div className="container hero-grade">
+          <div className="hero-texto">
+            <span className="rotulo">Guias e manuais para o mundo pet</span>
+            <h1>Cuidar bem é uma <em>arte</em> que se aprende.</h1>
+            <p className="lead">Guias passo a passo para quem tem cão ou gato, e manuais para quem trabalha com eles.</p>
+            <div className="botoes">
+              <Link className="btn" id="cta-home" href="/tutor">Tenho um pet<Seta /></Link>
+              <Link className="btn btn-secundario" href="/negocios">Trabalho com pets</Link>
+            </div>
+            <p className="risco risco-linha"><span>Pagamento único</span><span>Pix ou cartão</span><span>7 dias para desistir</span></p>
+          </div>
+          {edicao.length > 0 && (
+            <aside className="edicao" aria-labelledby="edicao-titulo">
+              <span className="rotulo" id="edicao-titulo">Nesta edição</span>
+              <ul>
+                {edicao.map((p) => (
+                  <li key={p.slug}>
+                    <Link href={urlProduto(p)}>
+                      {p.capa && <Image src={p.capa} alt="" width={56} height={79} />}
+                      <span className="edicao-nome"><b>{p.nome}</b><small>{LINHA[p.slug] ?? p.chamada}</small></span>
+                      <span className="edicao-preco">{reais(p.preco)}</span>
+                      <Seta />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          )}
         </div>
       </section>
 
-      <section className="secao portas-sec">
+      <section className="secao-portas" aria-label="Escolha o seu caminho">
         <div className="container portas">
-          <Link href="/tutor" className="porta porta-tutor">
-            <Image src="/mozart/acenando.webp" alt="Mozart, o border collie do Maestro Pet" width={260} height={260} />
-            <div>
-              <span className="eyebrow">Tenho um pet</span>
-              <h2>Para tutores</h2>
-              <p>Xixi no lugar certo, filhote, gato, saúde, receitas seguras e kits para imprimir. Com o passo a passo do Mozart.</p>
-              <span className="porta-cta">Ver guias e kits <ArrowRight size={18} aria-hidden /></span>
+          <article className="porta rv">
+            <span className="porta-num">01 · Para tutores</span>
+            <Leque produtos={leque as Produto[]} />
+            <h2>Um problema por guia, <em>um passo por página.</em></h2>
+            <p>Xixi no lugar certo, filhote, petiscos seguros e kits para imprimir. A partir de {reais(Math.min(...lancados.map((p) => p.preco)))}.</p>
+            <Link className="btn-link" href="/tutor">Ver os guias</Link>
+          </article>
+          <article className="porta rv">
+            <span className="porta-num">02 · Para negócios pet</span>
+            <div className="foto-porta">
+              <Image src="/fotos/negocios-confeitaria-porta-16x10.webp" alt="Fachada de uma confeitaria pet com vitrine de bolos para cães" width={1600} height={1000} sizes="(max-width: 899px) 100vw, 580px" />
+              {confeitaria?.capa && <Image className="foto-porta-capa" src={confeitaria.capa} alt="" width={300} height={424} sizes="140px" />}
             </div>
-          </Link>
-          <Link href="/negocios" className="porta porta-negocios">
-            <Image src="/negocios-porta.webp" alt="" width={260} height={325} />
-            <div>
-              <span className="eyebrow">Trabalho ou quero trabalhar com pets</span>
-              <h2>Para negócios pet</h2>
-              <p>Manuais para começar e crescer (confeitaria pet, passeador, pet sitter, fotografia) e posts prontos no Canva para divulgar.</p>
-              <span className="porta-cta">Ver manuais e materiais <ArrowRight size={18} aria-hidden /></span>
-            </div>
-          </Link>
+            <h2>Viver de pets é um <em>ofício.</em></h2>
+            <p>Manuais de confeitaria pet, passeador, pet sitter e fotografia: a lei, o preço e as ferramentas.</p>
+            <Link className="btn-link" href="/negocios">Ver os manuais</Link>
+          </article>
         </div>
       </section>
 
-      <section className="pilares">
-        <div className="container pilares-grid">
-          {PILARES.map(([Icone, t, d]) => (
-            <div key={t} className="pilar"><span className="pilar-ic"><Icone size={24} aria-hidden /></span><div><b>{t}</b><p>{d}</p></div></div>
-          ))}
-        </div>
+      <Marquee capas={capas} rotulo="Guias e manuais" />
+
+      <section className="secao secao-prova">
+        <div className="container"><FaixaProva className="rv" /></div>
       </section>
 
-      <section className="secao secao-creme">
-        <div className="container prose-home">
-          <span className="eyebrow">Quem somos</span>
-          <h2>Uma empresa de conteúdo sobre o mundo pet</h2>
-          <p>
-            O Maestro Pet nasceu ensinando tutores a resolver o dia a dia com seus cães e gatos, sempre com reforço positivo
-            e com o veterinário por perto quando é caso de saúde. Hoje também fazemos manuais para quem trabalha no mercado pet,
-            com a mesma regra: pesquisa séria, passo a passo prático e nenhuma promessa que a gente não possa cumprir.
-          </p>
-          <p><Link href="/sobre">Conheça a Maestro Pet</Link> · <Link href="/contato">Fale com a gente</Link></p>
+      <section className="secao bloco-suave" aria-labelledby="como-fazemos">
+        <div className="container">
+          <div className="cab">
+            <span className="rotulo">Como fazemos</span>
+            <h2 id="como-fazemos">Só o que dá <em>para provar.</em></h2>
+          </div>
+          <ol className="pilares-n">
+            {PILARES.map(([t, d], i) => (
+              <li key={t} className="rv"><span>{String(i + 1).padStart(2, "0")}</span><b>{t}</b><p>{d}</p></li>
+            ))}
+          </ol>
+          <p className="pilares-link"><Link className="btn-link" href="/sobre">Quem faz o Maestro Pet</Link></p>
         </div>
       </section>
     </>

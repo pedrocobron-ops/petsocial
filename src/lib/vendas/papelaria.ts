@@ -68,9 +68,9 @@ export const papelaria: PaginaVendas = {
   bonus: {
     titulo: "Por que vale o pacote",
     itens: [
-      { icone: "💰", titulo: "Mais da metade de desconto", texto: "R$ 54,40 separados, R$ 24,90 no pacote." },
-      { icone: "🖨️", titulo: "Imprima quantas vezes quiser", texto: "Para todos os pets da casa, sem pagar de novo." },
-      { icone: "🎁", titulo: "Presente pronto", texto: "Para quem acabou de adotar ou de ganhar um filhote." },
+      { icone: "Wallet", titulo: "Mais da metade de desconto", texto: "R$ 54,40 separados, R$ 24,90 no pacote." },
+      { icone: "Printer", titulo: "Imprima quantas vezes quiser", texto: "Para todos os pets da casa, sem pagar de novo." },
+      { icone: "Gift", titulo: "Presente pronto", texto: "Para quem acabou de adotar ou de ganhar um filhote." },
     ],
   },
   paraQuem: {
