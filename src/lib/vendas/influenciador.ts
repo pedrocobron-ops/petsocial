@@ -29,7 +29,7 @@ export const influenciador: PaginaVendas = {
   virada: {
     imagem: "/produtos/influenciador-pag13.webp",
     alt: "Página de um dos casos reais do guia",
-    eyebrow: "O que os perfis grandes têm em comum",
+    eyebrow: "O que os perfis grandes fazem",
     titulo: "Nenhum começou grande. Todos começaram com um formato.",
     paragrafos: [
       "O guia reúne **casos reais de pets influenciadores brasileiros**, com fontes, data e um QR code para o perfil de verdade, e mostra o que eles têm em comum: um personagem claro, um quadro fixo, constância e muito cuidado com o bem-estar do bicho.",

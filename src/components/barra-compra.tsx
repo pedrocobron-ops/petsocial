@@ -27,6 +27,16 @@ export default function BarraCompra({ produto, item = "o guia" }: { produto: Pro
     return () => { io.disconnect(); window.removeEventListener("scroll", atualiza); };
   }, []);
   const breve = !produto.lancado;
+  /** Rola até o formulário de aviso e já põe o cursor no e-mail: um toque a menos. */
+  const irParaAviso = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const alvo = document.querySelector<HTMLElement>("#avise");
+    const campo = alvo?.querySelector<HTMLInputElement>("input[type=email]");
+    if (!alvo || !campo) return;
+    e.preventDefault();
+    const reduz = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    alvo.scrollIntoView({ block: "center", behavior: reduz ? "auto" : "smooth" });
+    campo.focus({ preventScroll: true });
+  };
   return (
     <div className={`barra${visivel ? " on" : ""}`} role="region" aria-label="Comprar" aria-hidden={!visivel} inert={!visivel || undefined}>
       <div>
@@ -34,7 +44,7 @@ export default function BarraCompra({ produto, item = "o guia" }: { produto: Pro
         {!breve && <strong>{produto.ofertas && "a partir de "}{reais(produto.preco)}</strong>}
       </div>
       {breve ? (
-        <a className="btn btn-secundario btn-claro btn-pq" href="#avise" tabIndex={visivel ? 0 : -1}>Avise-me</a>
+        <a className="btn btn-secundario btn-claro btn-pq" href="#avise" tabIndex={visivel ? 0 : -1} onClick={irParaAviso}>Avise-me</a>
       ) : produto.ofertas ? (
         <a className="btn btn-pq" href="#oferta" tabIndex={visivel ? 0 : -1}>Ver os planos</a>
       ) : (

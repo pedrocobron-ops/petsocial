@@ -8,10 +8,10 @@ export function Seta({ tamanho = 18 }: { tamanho?: number }) {
   );
 }
 
-/** Pix (marca do Banco Central): o losango de quatro pétalas em #32BCAD e o nome. */
+/** Pix (marca do Banco Central): o losango de quatro pétalas em #32BCAD e o nome. Caixa recortada no desenho, para o símbolo ter ≈ 14 px como as outras bandeiras. */
 export function LogoPix() {
   return (
-    <svg viewBox="0 0 64 24" width="40" height="15" aria-hidden>
+    <svg viewBox="0 1.5 53 21" width="42" height="17" aria-hidden>
       <g fill="#32BCAD" transform="translate(11 12)">
         <path d="M-1.6-9.4a2.3 2.3 0 0 1 3.2 0l3.1 3.1-1.3 1.3a3.4 3.4 0 0 0-2.4 1L0-3a1.1 1.1 0 0 1-1.6 0l-1-1a3.4 3.4 0 0 0-2.4-1H-5l-1.7-1.7z" transform="translate(0.8 0)" />
         <path d="M-1.6 9.4a2.3 2.3 0 0 0 3.2 0l3.1-3.1-1.3-1.3a3.4 3.4 0 0 1-2.4-1L0 3a1.1 1.1 0 0 0-1.6 0l-1 1a3.4 3.4 0 0 1-2.4 1H-5l-1.7 1.7z" transform="translate(0.8 0)" />

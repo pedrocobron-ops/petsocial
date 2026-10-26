@@ -10,6 +10,9 @@ import { PRODUTOS, linhaDe, urlProduto } from "@/lib/produtos";
  * Rodapé único (brief 20, 6.3), para vitrines, institucionais e páginas de venda.
  * Na linha Negócios o fundo vira verde-garrafa e sai o Mozart (pelo wrapper `.negocios` ou por `main:has(.negocios)`).
  */
+/** "Confeitaria Pet: o manual do negócio" → "Confeitaria Pet"; "Manual do Passeador de Cães" → "Passeador de Cães". */
+const nomeCurto = (nome: string) => nome.replace(/: o manual do negócio$/, "").replace(/^Manual do /, "");
+
 export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocios" }) {
   const guias = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "tutor");
   const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios" && p.grupo === "comece");
@@ -21,7 +24,7 @@ export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocio
     <footer className={`rodape${linha === "negocios" ? " negocios" : ""}`}>
       <div className="container rodape-grade">
         <div className="rodape-marca">
-          <Logo clara />
+          <Logo clara preguicosa />
           <p className="rodape-tag so-tutor">Guias feitos com calma, para tutores com pressa.</p>
           <p className="rodape-tag so-negocios">Manuais para quem vive do mercado pet.</p>
           <Image className="rodape-mozart so-tutor" src="/mozart/acenando-144.webp" alt="" width={72} height={72} />
@@ -36,7 +39,7 @@ export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocio
         <nav aria-label="Manuais">
           <h2 className="rotulo">Manuais</h2>
           <ul>
-            {manuais.map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{p.nome.replace(/: o manual do negócio$/, "")}</Link></li>)}
+            {manuais.map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{nomeCurto(p.nome)}</Link></li>)}
             {feedLancado && <li><Link href="/negocios/feed-pronto">Feed Pronto</Link></li>}
           </ul>
         </nav>
@@ -63,8 +66,8 @@ export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocio
         {id && <p>{id}</p>}
         <p className="rodape-cakto">Pagamentos processados pela Cakto <LogosPagamento /></p>
         <p className="rodape-links"><Link href="/termos-de-uso">Termos de uso</Link><Link href="/politica-de-privacidade">Política de privacidade</Link></p>
-        <p className="so-tutor">Os guias do Maestro Pet têm caráter educativo e não substituem a avaliação de um(a) médico(a)-veterinário(a).</p>
-        <p className="so-negocios">Os manuais têm caráter educativo e não garantem renda ou resultado. Para impostos, contratos e regras do seu ramo, procure um contador ou o órgão responsável.</p>
+        <p className="so-tutor rodape-aviso">Os guias do Maestro Pet têm caráter educativo e não substituem a avaliação de um(a) médico(a)-veterinário(a).</p>
+        <p className="so-negocios rodape-aviso">Os manuais têm caráter educativo e não garantem renda ou resultado. Para impostos, contratos e regras do seu ramo, procure um contador ou o órgão responsável.</p>
         <p>© {new Date().getFullYear()} Maestro Pet</p>
       </div>
     </footer>

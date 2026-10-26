@@ -83,11 +83,12 @@ export function QuemFaz({ negocios }: { negocios: boolean }) {
               <li key={t} className="rv"><span aria-hidden>{String(i + 1).padStart(2, "0")}</span><b>{t}</b><p>{d}</p></li>
             ))}
           </ol>
-          <p className="quem-links">
-            <Link href="/sobre">Conheça a Maestro Pet</Link>
-            {ig && <> · <a href={ig} rel="noopener noreferrer"><Instagram size={16} strokeWidth={1.75} aria-hidden /> @{EMPRESA.instagram}</a></>}
-            {" · "}<Link href="/contato">Fale com a gente</Link>
-          </p>
+          {/* O separador é ::before do item seguinte: nunca fica sozinho no fim da linha. */}
+          <ul className="quem-links">
+            <li><Link href="/sobre">Conheça a Maestro Pet</Link></li>
+            {ig && <li><a href={ig} rel="noopener noreferrer"><Instagram size={16} strokeWidth={1.75} aria-hidden /> @{EMPRESA.instagram}</a></li>}
+            <li><Link href="/contato">Fale com a gente</Link></li>
+          </ul>
           {id && <p className="quem-id">{id}</p>}
         </div>
       </div>

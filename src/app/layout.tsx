@@ -5,14 +5,15 @@ import Revela from "@/components/revela";
 import localFont from "next/font/local";
 import "./globals.css";
 
-/* Brief 20, 4.1: três arquivos (90 KB). Fraunces com opsz 144 e SOFT 50 fixos, peso variável; itálico 400; Instrument Sans 400–700. */
+/* Brief 20, 4.1: três arquivos (90 KB). Fraunces com opsz 144 e SOFT 50 fixos, peso variável; itálico 400; Instrument Sans 400–700.
+   O itálico também é pré-carregado (23 KB): aparece no h1 de toda dobra, e a troca tardia mexia o layout (CLS). */
 const fraunces = localFont({
   src: "./fontes/fraunces-roman.woff2", weight: "100 900", style: "normal",
   variable: "--font-fraunces", display: "swap", preload: true, adjustFontFallback: "Times New Roman",
 });
 const frauncesItalico = localFont({
   src: "./fontes/fraunces-italico.woff2", weight: "400", style: "italic",
-  variable: "--font-fraunces-italico", display: "swap", preload: false, adjustFontFallback: "Times New Roman",
+  variable: "--font-fraunces-italico", display: "swap", preload: true, adjustFontFallback: "Times New Roman",
 });
 const instrument = localFont({
   src: "./fontes/instrument-sans.woff2", weight: "400 700", style: "normal",

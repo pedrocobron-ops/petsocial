@@ -18,7 +18,11 @@ export function rastrear(evento: string, dados?: Record<string, unknown>, tentat
   else if (tentativa < 20) setTimeout(() => rastrear(evento, dados, tentativa + 1), 500);
 }
 
-/** Meta Pixel: PageView na carga e a cada troca de página feita pelo Next. */
+/**
+ * Meta Pixel: PageView na carga e a cada troca de página feita pelo Next.
+ * A fila do fbq é criada logo; o fbevents.js (≈ 200 KB) só baixa em `lazyOnload`, sem disputar banda com a capa (LCP),
+ * e processa a fila quando chega. Nenhum evento se perde.
+ */
 export default function MetaPixel() {
   const pathname = usePathname();
   const primeira = useRef(true);
@@ -28,9 +32,14 @@ export default function MetaPixel() {
   }, [pathname]);
   if (!PIXEL_ID) return null;
   return (
-    <Script id="meta-pixel" strategy="afterInteractive">
-      {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq.disablePushState=true;fbq('init',${JSON.stringify(PIXEL_ID)});fbq('track','PageView');`}
-    </Script>
+    <>
+      {/* A fila do fbq nasce já (poucos bytes): init, PageView e qualquer evento entram nela na hora. */}
+      <Script id="meta-pixel" strategy="afterInteractive">
+        {`!function(f){if(f.fbq)return;var n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[]}(window);fbq.disablePushState=true;fbq('init',${JSON.stringify(PIXEL_ID)});fbq('track','PageView');`}
+      </Script>
+      {/* O fbevents.js (≈ 200 KB) só baixa depois da carga e processa a fila; não disputa banda com a capa (LCP). */}
+      <Script id="meta-pixel-js" src="https://connect.facebook.net/en_US/fbevents.js" strategy="lazyOnload" />
+    </>
   );
 }
 

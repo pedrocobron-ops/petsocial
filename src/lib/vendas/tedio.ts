@@ -12,13 +12,13 @@ export const tedio: PaginaVendas = {
   seo: {
     titulo: "Cão Sem Tédio — 100 atividades para gastar a energia do seu cão",
     descricao:
-      "100 atividades para gastar a energia do seu cão em casa: faro, quebra-cabeças caseiros, truques, dias de chuva e calma. Uma por página, com passo a passo, quase tudo com o que você já tem. Guia digital em PDF, com acesso imediato no seu e-mail.",
+      "100 atividades para gastar a energia do seu cão em casa: faro, quebra-cabeças caseiros, truques, dias de chuva e calma. Uma por página, com passo a passo, quase tudo com o que você já tem. Guia digital em PDF, com acesso no seu e-mail logo após o pagamento.",
   },
   hero: {
     eyebrow: "Guia Cão Sem Tédio · uma atividade por página",
     antes: "",
     destaque: "100 atividades",
-    depois: " para gastar a energia do seu cão dentro de casa.",
+    depois: " para gastar a energia do seu cão em casa.",
     fatos: ["Guia ilustrado", "100 atividades", "Uma por página"],
     lead: "Quase todas com o que você já tem em casa, como a ração do jantar.",
     selos: ["100 atividades, uma por página", "Menos de R$ 0,30 por atividade", "Acesso imediato no seu e-mail", "Garantia de 7 dias"],
@@ -39,7 +39,7 @@ export const tedio: PaginaVendas = {
   virada: {
     imagem: "/produtos/tedio-quebra-cabeca.webp",
     alt: "Mozart tirando petiscos de uma caixa com rolos de papel enquanto a tutora observa sentada no chão",
-    eyebrow: "Um segredo de border collie, contado pelo Mozart",
+    eyebrow: "Contado pelo Mozart",
     titulo: "Ele não está fazendo birra. *É energia sobrando e cabeça sem trabalho.*",
     paragrafos: [
       "Eu sou o Mozart. Já desfiei almofada, já “pastoreei” as visitas, já lati para a sombra da janela. Cão foi feito para farejar, procurar comida, mastigar e resolver problemas. **Quando a rotina não oferece nada disso, a gente inventa.** Todo tutor passa por isso.",
@@ -106,10 +106,12 @@ export const tedio: PaginaVendas = {
       ["Quando pedir ajuda", "Os sinais de que o caso pede veterinário ou profissional de comportamento, e o que levar anotado."],
     ],
     paginas: [
-      ["/produtos/tedio-pag10.webp", "Abertura do capítulo 1, Faro e caça ao tesouro, com a lista das 12 atividades"],
-      ["/produtos/tedio-pag5.webp", "Página “Cansar o corpo × cansar a cabeça”"],
-      ["/produtos/tedio-pag120.webp", "Encontre pela cena: a cena da sua casa e as atividades indicadas"],
-      ["/produtos/tedio-pag122.webp", "O que fazer hoje: as atividades separadas pelo tempo que você tem"],
+      ["/produtos/tedio-pag10.webp", "Abertura do capítulo 1, Faro e caça ao tesouro, com a lista das 12 atividades."],
+      ["/produtos/tedio-pag5.webp", "Cansar o corpo × cansar a cabeça: por que farejar também cansa."],
+      ["/produtos/tedio-pag7.webp", "As 6 regras de segurança, antes da primeira brincadeira."],
+      ["/produtos/tedio-pag9.webp", "Três jeitos de escolher a atividade: pela cena, pelo tempo ou pelo capítulo."],
+      ["/produtos/tedio-pag120.webp", "Encontre pela cena: a cena da sua casa e as atividades indicadas."],
+      ["/produtos/tedio-pag122.webp", "O que fazer hoje: as atividades separadas pelo tempo que você tem."],
     ],
   },
   numeros: [["100", "atividades, uma por página"], ["10", "capítulos, do filhote ao idoso"], ["8", "cenas do dia a dia para achar a atividade"]],
@@ -217,13 +219,13 @@ export const tedio: PaginaVendas = {
   garantia:
     "Abra o guia e faça as primeiras atividades com o seu cão. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta, no Básico ou no Kit. Sem perguntas e sem burocracia.",
   faq: [
-    ["Como recebo o guia?", "É um guia digital em PDF, com acesso imediato no seu e-mail logo depois da confirmação do pagamento. Dá para ler no celular, no computador ou imprimir só as fichas que você for usar."],
-    ["Qual a diferença entre o Básico e o Kit Completo?", "O Básico traz o guia Cão Sem Tédio, com as 100 atividades. O Kit Completo traz o mesmo guia e mais 4 guias práticos: Cão que Rói Tudo, Calendário de 30 Dias, Atividades Relâmpago e Brinquedos Seguros. O Calendário e as Atividades Relâmpago organizam atividades do guia em planos prontos."],
-    ["Preciso comprar brinquedos ou material?", "Não. Quase todas as atividades usam o que você já tem: a ração do dia, toalha velha, caixa de papelão, rolo de papel, garrafa PET. Quando uma atividade pede algo diferente, como um mordedor recheável, a ficha avisa."],
+    ["Como recebo o guia?", "É um guia em PDF: o acesso chega no seu e-mail logo após o pagamento. Dá para ler no celular, no computador ou imprimir só as fichas que você usar."],
+    ["Qual a diferença entre o Básico e o Kit Completo?", "O Básico é o guia das 100 atividades. O Kit traz o mesmo guia e mais 4 guias práticos: Cão que Rói Tudo, Calendário de 30 Dias, Atividades Relâmpago e Brinquedos Seguros."],
+    ["Preciso comprar brinquedos ou material?", "Não. Quase todas usam o que você já tem: a ração do dia, toalha velha, caixa de papelão, rolo de papel. Quando uma pede algo diferente, a ficha avisa."],
     ["Moro em apartamento. Serve?", "Serve. Um capítulo inteiro é para gastar energia dentro de casa e em dias de chuva, e a maioria das atividades cabe na sala."],
     ["Tenho pouco tempo. Dá para usar?", "Dá. Muitas atividades levam de 2 a 5 minutos, e a página “O que fazer hoje” separa todas pelo tempo que você tem."],
-    ["Serve para filhote e para cão idoso?", "Sim. Há um capítulo para filhotes e outro para cães idosos ou com limitação, e cada ficha mostra o porte e a idade indicados. Se o seu cão tem dor, alguma doença ou é idoso, converse com o veterinário antes de mudar a rotina de exercícios."],
-    ["Ele destrói tudo quando fica sozinho. O guia resolve?", "Destruir, uivar ou fazer as necessidades só quando fica sozinho pode ser ansiedade de separação, que pede o veterinário e um profissional de comportamento. As atividades ajudam na rotina, mas não substituem esse acompanhamento. O guia tem uma página sobre quando pedir ajuda."],
+    ["Serve para filhote e para cão idoso?", "Sim. Há um capítulo para filhotes e outro para idosos ou com limitação. Se ele tem dor, alguma doença ou é idoso, fale antes com o veterinário."],
+    ["Ele destrói tudo quando fica sozinho. O guia resolve?", "Destruir só quando fica sozinho pode ser ansiedade de separação, que pede veterinário e profissional de comportamento. As atividades ajudam, mas não substituem isso."],
     ["E se eu não gostar?", "Você tem 7 dias de garantia, no Básico e no Kit. Se não gostar, pede o reembolso e recebe 100% do valor de volta, sem perguntas."],
   ],
   ctaFinal: "Hoje à noite, a ração do jantar já pode virar a atividade 1.",

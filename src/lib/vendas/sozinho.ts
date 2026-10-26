@@ -30,7 +30,7 @@ export const sozinho: PaginaVendas = {
   virada: {
     imagem: "/produtos/sozinho-soneca.webp",
     alt: "Mozart dormindo tranquilo na caminha",
-    eyebrow: "Um segredo de cachorro, contado pelo Mozart",
+    eyebrow: "Contado pelo Mozart",
     titulo: "Ele não chora para te irritar. Ele só ainda não aprendeu que você sempre volta.",
     paragrafos: [
       "Nem todo cão que chora sozinho tem o mesmo problema. Alguns estão **entediados**, outros **nunca aprenderam** a ficar sós, outros sentem **ansiedade de verdade** e outros latem para **cada barulho do prédio**. Cada caso pede um caminho diferente.",

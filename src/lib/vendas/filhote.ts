@@ -5,7 +5,7 @@ export const filhote: PaginaVendas = {
   seo: {
     titulo: "Filhote Sem Caos — o guia dos primeiros 30 dias",
     descricao:
-      "O guia dos primeiros 30 dias com o seu filhote: noites tranquilas, fim das mordidas, xixi no lugar certo e socialização segura. Ilustrado, com rotina e plano para imprimir. Acesso imediato.",
+      "O guia dos primeiros 30 dias com o seu filhote: noites tranquilas, fim das mordidas, xixi no lugar certo e socialização segura. Ilustrado, com rotina e plano para imprimir. Acesso no e-mail logo após o pagamento.",
   },
   hero: {
     eyebrow: "Guia prático · Primeiros 30 dias",
@@ -31,7 +31,7 @@ export const filhote: PaginaVendas = {
   virada: {
     imagem: "/produtos/filhote-chorando.webp",
     alt: "Mozart filhote chorando na caminha à noite",
-    eyebrow: "Um segredo de filhote, contado pelo Mozart",
+    eyebrow: "Contado pelo Mozart",
     titulo: "Ele não está fazendo manha. *Ele é um bebê num mundo novo.*",
     paragrafos: [
       "Até ontem ele dormia num montinho quente com a mãe e os irmãos. Hoje está num lugar com cheiros e barulhos que não entende. Chorar, morder e errar o lugar é **o jeito de filhote** de lidar com tanta novidade.",
@@ -50,10 +50,12 @@ export const filhote: PaginaVendas = {
       ["Calendário de saúde", "Consultas, vacinas, vermífugo e os sinais de alerta."],
     ],
     paginas: [
-      ["/produtos/filhote-pag13.webp", "Página da rotina de sono em 7 passos"],
-      ["/produtos/filhote-pag15.webp", "Página do método da troca para as mordidas"],
-      ["/produtos/filhote-pag24.webp", "A rotina diária do filhote, hora a hora, para colar na geladeira"],
-      ["/produtos/filhote-pag25.webp", "O plano dos primeiros 30 dias, com as metas de cada semana"],
+      ["/produtos/filhote-pag13.webp", "Os 7 passos da rotina de sono, para as noites ficarem mais tranquilas."],
+      ["/produtos/filhote-pag4.webp", "Diagnóstico rápido: o que está tirando o seu sono e onde está a resposta."],
+      ["/produtos/filhote-pag15.webp", "O método da troca: ensine o que ele pode morder."],
+      ["/produtos/filhote-pag18.webp", "Os horários-chave: leve antes da vontade apertar."],
+      ["/produtos/filhote-pag24.webp", "A rotina diária do filhote, hora a hora, para colar na geladeira."],
+      ["/produtos/filhote-pag25.webp", "O plano dos primeiros 30 dias, com as metas de cada semana."],
     ],
   },
   numeros: [["29", "páginas ilustradas"], ["4", "semanas, uma de cada vez"], ["3", "materiais para imprimir"]],

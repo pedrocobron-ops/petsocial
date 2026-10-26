@@ -24,7 +24,7 @@ export default function SiteHeader() {
   return (
     <header className="topo topo-fixo">
       <div className="container topo-in">
-        <Link href={negocios ? "/negocios" : "/"} className="logo" aria-label="Maestro Pet, página inicial">
+        <Link href={negocios ? "/negocios" : "/"} className="logo" aria-label={negocios ? "Maestro Pet Negócios, página inicial" : "Maestro Pet, página inicial"}>
           <Logo negocios={negocios} prioridade />
         </Link>
         <nav className="nav" aria-label="Principal">
@@ -37,12 +37,12 @@ export default function SiteHeader() {
       <dialog ref={menu} className="menu" aria-label="Menu" onClick={(e) => { if (e.target === menu.current) fechar(); }}>
         <div className="menu-in">
           <div className="menu-cab">
-            <Link href="/" className="logo" onClick={fechar} aria-label="Maestro Pet, página inicial"><Logo /></Link>
+            <Link href={negocios ? "/negocios" : "/"} className="logo" onClick={fechar} aria-label={negocios ? "Maestro Pet Negócios, página inicial" : "Maestro Pet, página inicial"}><Logo negocios={negocios} /></Link>
             <button type="button" className="hamb" aria-label="Fechar menu" onClick={fechar}><X size={20} strokeWidth={1.75} aria-hidden /></button>
           </div>
           <nav aria-label="Menu do celular">
             <ul className="menu-links">
-              {NAV_TUTOR.map(([href, t]) => <li key={href}><Link href={href} onClick={fechar}>{t}</Link></li>)}
+              {nav.map(([href, t]) => <li key={href}><Link href={href} onClick={fechar}>{t}</Link></li>)}
             </ul>
           </nav>
           <ul className="menu-contato">

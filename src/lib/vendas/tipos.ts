@@ -28,6 +28,11 @@ export type PaginaVendas = {
   recebe: { titulo: string; itens: [string, string, number?][]; paginas: [string, string][] };
   /** Até 3 números lidos do PDF, para "O que vem no guia": ["23", "páginas ilustradas"]. Só números reais. */
   numeros?: [string, string][];
+  /**
+   * Linha Negócios: "Três fatos com fonte" no lugar de "Ainda em dúvida?" (brief 20, 7.5 #7).
+   * [termo, frase, nome da fonte, link]. Só enunciados conferidos com o texto do manual e com a fonte pública.
+   */
+  fontes?: [string, string, string, string][];
   /** Comparação honesta da tabela 10.3 do brief, só depois de validada (ex.: "Custa menos que um saco de petisco."). */
   comparacao?: string;
   /** `rotulo`: a palavra acima de cada número (padrão: "Passo"). */

@@ -1,10 +1,13 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import Image from "next/image";
 import {
-  Ban, Cake, Calculator, Calendar, Camera, Car, Cat, Check, ClipboardList, Compass, Cookie, Dog, FileText, Gift, GraduationCap,
+  ArrowDown, ArrowUp, Heart, Square, Star, Ban, Cake, Calculator, Calendar, Camera, Car, Cat, Check, ClipboardList, Compass, Cookie, Dog, FileText, Gift, GraduationCap,
   House, Info, Landmark, Layers, ListChecks, Luggage, Mail, Medal, Minus, NotebookPen, PawPrint, PenLine, Phone, Plane, Printer,
   Sparkles, Tag, Wallet, Wrench,
 } from "lucide-react";
 import AviseMe from "@/components/avise-me";
+import ListaCompleta from "@/components/lista-completa";
 import BarraCompra from "@/components/barra-compra";
 import Comprar from "@/components/comprar";
 import Amostras from "@/components/amostras";
@@ -41,17 +44,40 @@ const preco = (v: number) => (Number.isInteger(v) ? `R$\u00a0${v}` : reais(v));
 /** Só o número, para o preço grande da folha: "19,90" / "67". */
 const valor = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2).replace(".", ","));
 
-/** Perguntas que valem para todos os produtos e entram no FAQ de cada página. */
-const REEMBOLSO: [string, string] = ["Como peço o reembolso e em quanto tempo volta?", "Em até 7 dias depois da compra, peça em reembolso.cakto.com.br com o e-mail da compra, ou escreva para contato@maestropet.com. A Cakto processa o pedido em até 24 horas. No Pix, o valor costuma voltar em minutos ou horas; no cartão, o estorno aparece na fatura atual ou na próxima, conforme o banco."];
-const DEPOIMENTOS: [string, string] = ["Por que não tem depoimentos?", "Porque não inventamos. Preferimos mostrar as páginas de verdade, que você vê nesta página antes de decidir."];
-const PAGAMENTO: [string, string] = ["O pagamento é seguro?", "Sim. Você paga no checkout da Cakto, com Pix ou cartão. Nós não vemos os dados do seu cartão, e o valor final aparece antes de você confirmar."];
+/**
+ * Perguntas que valem para todos os produtos (brief 20, 6.18), cada uma com até 3 linhas no celular (≈ 180 caracteres).
+ * `fora`: perguntas do arquivo do produto que esta resposta substitui (a do arquivo sai, para não repetir).
+ * `pula`: se o arquivo já tem uma pergunta assim, a fixa não entra (a do produto é mais específica).
+ */
+type Fixa = { q: [string, string]; peso: number; fora?: RegExp; pula?: RegExp };
+const FIXAS: Fixa[] = [
+  { peso: 1, q: ["Pix ou cartão? Parcela?", "Pix ou cartão de crédito, no checkout da Cakto. Se escolher parcelar, o checkout mostra as parcelas e os juros antes de você confirmar."], pula: /pix|parcel|formas? de pagamento/i },
+  { peso: 2, q: ["Como peço o reembolso e em quanto tempo volta?", "Em até 7 dias, em reembolso.cakto.com.br ou pelo nosso e-mail. A Cakto processa em até 24 h; no Pix costuma voltar em minutos, no cartão segue o prazo do banco."], fora: /reembolso|não gostar|não for para mim|devolu/i },
+  { peso: 3, q: ["Precisa de cadastro ou aplicativo?", "Não precisa de aplicativo. O acesso chega no e-mail da compra, e o PDF abre no celular ou no computador."], pula: /aplicativo|cadastro/i },
+  { peso: 6, q: ["Preciso imprimir?", "Não. Dá para usar tudo no celular ou no computador. As páginas para imprimir são opcionais e saem em A4, numa impressora comum."], pula: /imprimir|impress/i },
+  { peso: 7, q: ["Recebo nota fiscal?", "O comprovante da compra chega no e-mail da Cakto. Para pedir nota fiscal, escreva para contato@maestropet.com com o e-mail usado na compra."], pula: /nota fiscal/i },
+  { peso: 8, q: ["Por que não tem depoimentos?", "Porque não inventamos. Preferimos mostrar as páginas de verdade, que você vê nesta página antes de decidir."], pula: /depoimento/i },
+  { peso: 9, q: ["O pagamento é seguro?", "Sim. Você paga no checkout da Cakto, com Pix ou cartão. Nós não vemos os dados do seu cartão, e o valor final aparece antes de você confirmar."], pula: /seguro\?/i },
+];
 
-/** Ordem por objeção (brief 20, 6.18): como recebo, pagamento, reembolso, o resto, depoimentos e segurança no fim. */
-function ordenaFaq(faq: [string, string][]) {
+/**
+ * Ordem por objeção (6.18): como recebo · Pix ou cartão · reembolso · cadastro · o caso do produto · imprimir · nota · depoimentos · segurança.
+ * Uma pergunta do arquivo que a fixa substitui sai (ex. "E se eu não gostar?" e o reembolso fixo não aparecem juntos).
+ */
+function montaFaq(faq: [string, string][]) {
+  const doArquivo = faq.filter(([q]) => !FIXAS.some((f) => f.fora?.test(q)));
+  const fixas = FIXAS.filter((f) => !f.pula || !faq.some(([q]) => f.pula!.test(q)));
   const peso = ([q]: [string, string]) =>
-    /como recebo|recebo o|acesso/i.test(q) ? 0 : /pix|cart[ãa]o|parcel/i.test(q) ? 1 : /reembolso|não gostar|não for para mim/i.test(q) ? 2
-      : /depoimento/i.test(q) ? 8 : /seguro\?/i.test(q) ? 9 : 5;
-  return faq.map((x, i) => [x, i] as const).sort((a, b) => peso(a[0]) - peso(b[0]) || a[1] - b[1]).map(([x]) => x);
+    /como recebo|recebo o|acesso/i.test(q) ? 0 : /pix|cart[ãa]o|parcel/i.test(q) ? 1 : /cadastro|aplicativo/i.test(q) ? 3
+      : /imprimir/i.test(q) ? 6 : /nota fiscal/i.test(q) ? 7 : /depoimento/i.test(q) ? 8 : /seguro\?/i.test(q) ? 9 : 5;
+  const todas = [...doArquivo.map((x) => [x, peso(x)] as const), ...fixas.map((f) => [f.q, f.peso] as const)];
+  return todas.map(([x, w], i) => [x, w, i] as const).sort((a, b) => a[1] - b[1] || a[2] - b[2]).map(([x]) => x);
+}
+
+/** A página em 1500 px para a tela cheia, quando existe (`xixi-pag14.webp` → `xixi-pag14-1500.webp`). */
+function comGrande([src, legenda]: [string, string]): [string, string, string?] {
+  const grande = src.replace(/\.webp$/, "-1500.webp");
+  return existsSync(path.join(process.cwd(), "public", grande)) ? [src, legenda, grande] : [src, legenda];
 }
 
 /** "**Ilusão:** … **Real:** …" → [ilusão, real]; os parágrafos da virada da linha Negócios. */
@@ -72,7 +98,7 @@ function Ficha({ f }: { f: FichaExemplo }) {
       </div>
       <dl className="fx-rapida">
         <div><dt>Tempo médio</dt><dd>{f.tempo}</dd></div>
-        <div><dt>Dificuldade</dt><dd><span className="fx-estrelas" aria-label={`${f.nivel} de 3 estrelas`}>{"★".repeat(f.nivel)}<i>{"★".repeat(3 - f.nivel)}</i></span> {f.nivelNome}</dd></div>
+        <div><dt>Dificuldade</dt><dd><span className="fx-estrelas" role="img" aria-label={`${f.nivel} de 3 estrelas`}>{Array.from({ length: 3 }, (_, i) => <Star key={i} size={16} strokeWidth={1.75} className={i < f.nivel ? "on" : ""} aria-hidden />)}</span> {f.nivelNome}</dd></div>
         <div><dt>Porte</dt><dd>{f.porte}</dd></div>
         <div><dt>Idade</dt><dd>{f.idade}</dd></div>
       </dl>
@@ -84,18 +110,24 @@ function Ficha({ f }: { f: FichaExemplo }) {
           ))}
         </ul>
       </div>
+      <details className="fx-mais">
+        <summary>Ver a ficha inteira</summary>
       <p className="fx-porque"><b>Por que funciona:</b> {f.porque}</p>
       <div className="fx-meio">
         <div><h4>Materiais</h4><ul>{f.materiais.map((m) => <li key={m}>{m}</li>)}</ul></div>
         <div><h4>Passo a passo</h4><ol>{f.passos.map((m) => <li key={m}>{m}</li>)}</ol></div>
       </div>
-      <div className="fx-var"><p><b>↓ Mais fácil</b>{f.facil}</p><p><b>↑ Mais difícil</b>{f.dificil}</p></div>
+      <div className="fx-var"><p><b><ArrowDown size={16} strokeWidth={2} aria-hidden />Mais fácil</b>{f.facil}</p><p><b><ArrowUp size={16} strokeWidth={2} aria-hidden />Mais difícil</b>{f.dificil}</p></div>
       <p className="fx-cuid"><b>Cuidado:</b> {f.cuidado}</p>
       <div className="fx-dica"><Image src="/mozart/sorrindo-112.webp" alt="" width={48} height={48} /><p><b>Dica do Mozart</b>{f.dica}</p></div>
       <footer className="fx-rodape">
         <p><b>Combina com</b> {f.combina.join(" · ")}</p>
-        <p className="fx-diario"><span>Já fizemos <i>□□□□□</i></span><span>Ele gostou <i>♡♡♡♡♡</i></span></p>
+        <p className="fx-diario">
+          <span>Já fizemos <i aria-hidden>{Array.from({ length: 5 }, (_, i) => <Square key={i} size={16} strokeWidth={1.75} />)}</i></span>
+          <span>Ele gostou <i aria-hidden>{Array.from({ length: 5 }, (_, i) => <Heart key={i} size={16} strokeWidth={1.75} />)}</i></span>
+        </p>
       </footer>
+      </details>
     </article>
   );
 }
@@ -135,7 +167,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
     ...(nome ? { name: nome } : {}),
     price: v.toFixed(2),
     priceCurrency: "BRL",
-    availability: checkout ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
+    availability: checkout && p.lancado ? "https://schema.org/InStock" : "https://schema.org/PreOrder",
     url: `${SITE_URL}${urlProduto(p)}`,
   });
   const produtoLd = {
@@ -145,7 +177,8 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
     description: c.seo.descricao,
     image: p.capa ? `${SITE_URL}${p.capa}` : undefined,
     brand: { "@type": "Brand", name: "Maestro Pet" },
-    offers: ofertas ? ofertas.map((o) => offer(o.preco, o.checkout, o.nome)) : offer(p.preco, p.checkout),
+    // Produto ainda não lançado não publica preço nem disponibilidade: não há checkout.
+    ...(p.lancado ? { offers: ofertas ? ofertas.map((o) => offer(o.preco, o.checkout, o.nome)) : offer(p.preco, p.checkout) } : {}),
   };
   const item = c.item ?? "o guia";
   const feminino = item.startsWith("a ");
@@ -157,9 +190,9 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
   const lancado = p.lancado;
   const familia = daFamilia(p, 2);
   const fatos = c.hero.fatos ?? c.hero.eyebrow.split(" · ");
-  const paginas = c.recebe.paginas;
+  const paginas = c.recebe.paginas.map(comGrande);
   const textoCompra = `Quero ${item} por ${preco(p.preco)}`;
-  const faq = ordenaFaq([...c.faq, ...(c.faq.some(([q]) => /reembolso/i.test(q)) ? [] : [REEMBOLSO]), DEPOIMENTOS, PAGAMENTO]);
+  const faq = montaFaq(c.faq);
   const faqLd = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -188,14 +221,14 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
             {lancado && ofertas && <p className="dobra-planos">{ofertas.map((o) => `${o.nome} ${preco(o.preco)}`).join(" · ")} · pagamento único</p>}
             {lancado && <LinhaPagamento />}
             {!lancado ? (
-              <a className="btn btn-secundario btn-largo" id="cta-dobra" href="#dentro">Ver o que vem n{item}<Seta /></a>
+              <a className="btn btn-secundario btn-largo" href="#dentro">Ver o que vem n{item}<Seta /></a>
             ) : ofertas ? (
               <a className="btn btn-largo" id="cta-dobra" href="#oferta">Ver os {ofertas.length} planos<Seta /></a>
             ) : (
               <Comprar produto={p} texto={textoCompra} origem="dobra" id="cta-dobra" className="btn-largo" />
             )}
             {lancado ? <Risco /> : (
-              <div className="dobra-breve">
+              <div className="dobra-breve" id="cta-dobra">
                 <p>Lançamento em breve. Deixe o e-mail e avisamos no dia.</p>
                 <AviseMe produto={p.nome} origem="dobra" />
               </div>
@@ -209,7 +242,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
             </figure>
           ) : p.capa && <Palco capa={p.capa} alt={`Capa: ${p.nome}`} assinatura={!negocios} />}
         </div>
-        <div className="container"><FaixaProva negocios={negocios} /></div>
+        <div className="container"><FaixaProva negocios={negocios} breve={!lancado} /></div>
       </section>
 
       {/* 3 · Por dentro */}
@@ -218,7 +251,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           <div className="container">
             <div className="cab cab-lado rv">
               <div><span className="rotulo">Por dentro</span><h2>Páginas de verdade, <em>do PDF que você recebe.</em></h2></div>
-              <p>Toque numa página para ver em tela cheia. É a prova que não exige confiar em ninguém.</p>
+              <p>Abra uma página para ver em tela cheia. É a prova que não exige confiar em ninguém.</p>
             </div>
             <Amostras paginas={paginas} trilho />
           </div>
@@ -267,8 +300,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
             ))}
           </ol>
           {c.todas && (
-            <details className="todas-det" id="todas">
-              <summary>Ver {c.todas.titulo.replace(/,.*$/, "").replace(/^As /, "as ")}</summary>
+            <ListaCompleta resumo={`Ver ${c.todas.titulo.replace(/,.*$/, "").replace(/^As /, "as ")}`}>
               <p className="todas-lead">{c.todas.lead}</p>
               <div className="todas">
                 {c.todas.grupos.map(([g, itens], i) => (
@@ -278,32 +310,10 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
                   </div>
                 ))}
               </div>
-            </details>
+            </ListaCompleta>
           )}
         </div>
       </section>
-
-      {/* 4b · O que vem a mais no Kit */}
-      {c.kit && (
-        <section className="secao bloco-suave kit-sec">
-          <div className="container">
-            <div className="cab rv">
-              <span className="rotulo">{c.kit.eyebrow}</span>
-              <h2><Titulo t={c.kit.titulo} /></h2>
-              <p>{c.kit.texto}</p>
-            </div>
-            <ul className="kit-lista">
-              {c.kit.itens.map((k) => (
-                <li key={k.titulo} className="rv">
-                  <Image src={k.imagem} alt={`Capa do guia prático ${k.titulo}`} width={192} height={272} sizes="96px" />
-                  <div><h3>{k.titulo}</h3><p>{k.texto}</p></div>
-                </li>
-              ))}
-            </ul>
-            {c.kit.nota && <p className="kit-nota2">{c.kit.nota}</p>}
-          </div>
-        </section>
-      )}
 
       {/* 5 · Oferta */}
       {ofertas ? (
@@ -359,8 +369,8 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
               </div>
             )}
             <div className="oferta-lado">
-              <span className="rotulo rv">O que você leva</span>
-              <div className="folha rv">
+              <span className="rotulo">O que você leva</span>
+              <div className="folha">
                 <div className="folha-cab">
                   {p.capa && <Image className="folha-capa" src={p.capa} alt="" width={128} height={181} sizes="64px" />}
                   <div><h3>{p.nome}</h3><small>{fatos.join(" · ")}</small></div>
@@ -388,6 +398,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
       )}
 
       {/* 6 · Garantia */}
+      {lancado && (
       <section className="secao" id="garantia">
         <div className="container garantia-grid">
           <SeloGarantia negocios={negocios} />
@@ -405,9 +416,50 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           </div>
         </div>
       </section>
+      )}
+
+      {/* 6b · O que vem a mais no Kit (depois da garantia, para a oferta chegar antes) */}
+      {c.kit && (
+        <section className="secao bloco-suave kit-sec">
+          <div className="container">
+            <div className="cab rv">
+              <span className="rotulo">{c.kit.eyebrow}</span>
+              <h2><Titulo t={c.kit.titulo} /></h2>
+              <p>{c.kit.texto}</p>
+            </div>
+            <ul className="kit-lista">
+              {c.kit.itens.map((k) => (
+                <li key={k.titulo} className="rv">
+                  <Image src={k.imagem} alt={`Capa do guia prático ${k.titulo}`} width={192} height={272} sizes="96px" />
+                  <div><h3>{k.titulo}</h3><p>{k.texto}</p></div>
+                </li>
+              ))}
+            </ul>
+            {c.kit.nota && <p className="kit-nota2">{c.kit.nota}</p>}
+          </div>
+        </section>
+      )}
 
       {/* 7 · Ainda em dúvida? */}
-      {frase1 && (
+      {negocios ? c.fontes && c.fontes.length > 0 && (
+        <section className="secao fontes-sec">
+          <div className="container">
+            <div className="cab rv">
+              <span className="rotulo">Com fonte</span>
+              <h2>Três regras do ofício, <em>com a norma na mão.</em></h2>
+            </div>
+            <ul className="fontes-lista">
+              {c.fontes.map(([termo, frase, nome, url]) => (
+                <li key={termo} className="rv">
+                  <b>{termo}</b>
+                  <p>{frase}</p>
+                  <a href={url} target="_blank" rel="noopener noreferrer">Fonte: {nome}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : frase1 && (
         <section className={`secao duvida-sec${c.dores.foto ? " duvida-com-foto" : ""}`}>
           <div className="container duvida-grid">
             {c.dores.foto && (
@@ -464,17 +516,19 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
       {/* 9 · O método / plano de carreira */}
       <section className="secao metodo-sec">
         <div className="container">
-          <div className="cab rv">
-            <span className="rotulo">{c.metodo.eyebrow}</span>
-            <h2><Titulo t={c.metodo.titulo} /></h2>
+          <div className={`metodo-topo${imagemMetodo ? " metodo-com-fig" : ""}`}>
+            <div className="cab rv">
+              <span className="rotulo">{c.metodo.eyebrow}</span>
+              <h2><Titulo t={c.metodo.titulo} /></h2>
+            </div>
+            {imagemMetodo && (
+              <figure className={`moldura moldura-metodo rv${negocios && !c.metodo.imagem ? " moldura-pagina" : ""}`}>
+                <Image src={imagemMetodo} alt={altMetodo} width={1100} height={negocios && !c.metodo.imagem ? 1362 : 618} sizes="(max-width: 899px) 90vw, 680px" />
+                <figcaption>{negocios ? "Página do manual" : "Ilustração do guia"}</figcaption>
+              </figure>
+            )}
           </div>
-          {imagemMetodo && (
-            <figure className={`moldura moldura-metodo rv${negocios && !c.metodo.imagem ? " moldura-pagina" : ""}`}>
-              <Image src={imagemMetodo} alt={altMetodo} width={1100} height={negocios && !c.metodo.imagem ? 1362 : 618} sizes="(max-width: 899px) 90vw, 760px" />
-              <figcaption>{negocios ? "Página do manual" : "Ilustração do guia"}</figcaption>
-            </figure>
-          )}
-          <Trilho total={passos.length} as="ol" className={`linha-tempo${passos.length > 7 ? " linha-tempo-longa" : ""}`} indicadorClasse={passos.length > 7 ? "" : "so-celular"}>
+          <Trilho total={passos.length} as="ol" className={`linha-tempo${passos.length > 7 ? " linha-tempo-longa" : ""}`} indicadorClasse="so-celular">
             {passos.map(([t, d], i) => (
               <li key={t} className="marco">
                 <span className="marco-rotulo">{c.metodo.rotulo ?? "Passo"} {i + 1}</span>
@@ -565,8 +619,12 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
       {/* 16 · Combina com este */}
       {familia.length > 0 && (
         <section className="secao combina-sec">
-          <div className="container">
-            <div className="cab rv"><span className="rotulo">Combina com este</span></div>
+          <div className="container combina-grid">
+            <div className="cab rv">
+              <span className="rotulo">Combina com este</span>
+              <h2>Para o mesmo {negocios ? "ofício" : "cão"}, <em>o mesmo método.</em></h2>
+              <p>{negocios ? "Outros manuais da linha, com as mesmas regras: fonte e data em tudo." : "Outros guias à venda, com o mesmo cuidado: reforço positivo e passo a passo ilustrado."}</p>
+            </div>
             <div className="cards cards-2">{familia.map((x) => <CartaoProduto key={x.slug} p={x} />)}</div>
           </div>
         </section>
