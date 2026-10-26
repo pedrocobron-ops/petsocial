@@ -4,6 +4,9 @@ import { ShieldCheck } from "lucide-react";
 import BarraCompra from "@/components/barra-compra";
 import Comprar from "@/components/comprar";
 import Amostras from "@/components/amostras";
+import { Seta } from "@/components/icones";
+import { Palco } from "@/components/palco";
+import { FaixaProva, LinhaPagamento, Risco } from "@/components/pagamento";
 import { DepoisDaCompra, QuemFaz, Selos } from "@/components/confianca";
 import { VerProduto } from "@/components/meta-pixel";
 import type { Produto } from "@/lib/produtos";
@@ -90,30 +93,22 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
   return (
     <div className="com-barra">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(produtoLd) }} />
-      <div className="progresso" aria-hidden />
       <VerProduto nome={p.nome} preco={p.preco} />
       <section className="lp-hero">
         <div className="container lp-hero-grid">
-          <div>
+          <div className="dobra-texto">
             <span className="eyebrow">{c.hero.eyebrow}</span>
             <h1>{c.hero.antes}<em>{c.hero.destaque}</em>{c.hero.depois}</h1>
             <p className="lead">{c.hero.lead}</p>
-            <div className="hero-ctas">
-              <a className="btn btn-lg" href={p.lancado ? "#oferta" : "#conteudo"}>{ctaTopo}</a>
-              {c.hero.secundario && <a className="btn btn-ghost btn-lg" href={c.hero.secundario[1]}>{c.hero.secundario[0]}</a>}
-            </div>
             {ofertas && <p className="hero-precos">{ofertas.map((o) => `${o.nome} ${reais(o.preco)}`).join(" · ")} · pagamento único</p>}
-            {!p.lancado && <p className="hero-breve">Lançamento em breve: a venda ainda não está aberta.</p>}
-            <ul className="selos">{c.hero.selos.filter((s) => p.lancado || !/acesso imediato/i.test(s)).map((s) => <li key={s}>{s}</li>)}</ul>
+            {p.lancado && <LinhaPagamento />}
+            <a className={`btn btn-largo${p.lancado ? "" : " btn-secundario"}`} id="cta-dobra" href={p.lancado ? "#oferta" : "#conteudo"}>{ctaTopo}<Seta /></a>
+            {p.lancado ? <Risco /> : <p className="hero-breve">Lançamento em breve: a venda ainda não está aberta.</p>}
+            {c.hero.secundario && <a className="btn-link" href={c.hero.secundario[1]}>{c.hero.secundario[0]}</a>}
           </div>
-          {p.capa && (
-            <div className="mockup">
-              <div className="livro">
-                <Image src={p.capa} alt={`Capa: ${p.nome}`} width={420} height={594} priority />
-              </div>
-            </div>
-          )}
+          {p.capa && <Palco capa={p.capa} alt={`Capa: ${p.nome}`} assinatura={!negocios} />}
         </div>
+        <div className="container"><FaixaProva negocios={negocios} /></div>
       </section>
 
       <section className="secao">
@@ -312,7 +307,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
         </div>
       </section>
 
-      <section className="secao cta-final">
+      <section className="secao cta-final" id="cta-final">
         <div className="container">
           <h2>{c.ctaFinal}</h2>
           <a className="btn btn-lg" href="#oferta">{!p.lancado ? "Ver a oferta" : ofertas ? "Escolher meu plano" : `Quero ${item} por ${reais(p.preco)}`}</a>
@@ -337,7 +332,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
         </section>
       )}
 
-      <BarraCompra produto={p} />
+      <BarraCompra produto={p} item={item} />
     </div>
   );
 }

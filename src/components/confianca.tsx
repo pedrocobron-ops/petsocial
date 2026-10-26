@@ -1,17 +1,16 @@
 import Link from "next/link";
-import { CreditCard, Instagram, Lock, Mail, QrCode, ShieldCheck, Zap } from "lucide-react";
+import { Instagram, Lock, Mail } from "lucide-react";
+import { LogosPagamento } from "@/components/pagamento";
 import { EMPRESA, identificacao, linkInstagram, linkWhatsapp } from "@/lib/empresa";
 
-/** Selos logo abaixo do botão de compra. */
+/** Caixa "Checkout seguro da Cakto" (brief 20, 6.14 item 8), logo abaixo do botão de compra da oferta. */
 export function Selos() {
   return (
-    <ul className="selos" aria-label="Garantias da compra">
-      <li><Lock size={15} aria-hidden /> Checkout seguro Cakto</li>
-      <li><QrCode size={15} aria-hidden /> Pix</li>
-      <li><CreditCard size={15} aria-hidden /> Cartão</li>
-      <li><ShieldCheck size={15} aria-hidden /> 7 dias de garantia</li>
-      <li><Zap size={15} aria-hidden /> Acesso por e-mail</li>
-    </ul>
+    <div className="cakto">
+      <b><Lock size={16} strokeWidth={1.75} aria-hidden /> Checkout seguro da Cakto</b>
+      <LogosPagamento />
+      <p>A Cakto é uma plataforma brasileira de pagamento. Nós não vemos os dados do seu cartão. O valor final aparece no checkout antes de você confirmar.</p>
+    </div>
   );
 }
 
