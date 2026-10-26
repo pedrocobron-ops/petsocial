@@ -34,7 +34,7 @@ export default function BarraCompra({ produto, item = "o guia" }: { produto: Pro
         {!breve && <strong>{produto.ofertas && "a partir de "}{reais(produto.preco)}</strong>}
       </div>
       {breve ? (
-        <a className="btn btn-secundario btn-claro btn-pq" href="#oferta" tabIndex={visivel ? 0 : -1}>Avise-me</a>
+        <a className="btn btn-secundario btn-claro btn-pq" href="#avise" tabIndex={visivel ? 0 : -1}>Avise-me</a>
       ) : produto.ofertas ? (
         <a className="btn btn-pq" href="#oferta" tabIndex={visivel ? 0 : -1}>Ver os planos</a>
       ) : (
