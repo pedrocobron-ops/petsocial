@@ -11,7 +11,7 @@ export const filhote: PaginaVendas = {
     eyebrow: "Guia prático · Primeiros 30 dias",
     antes: "Seu filhote ",
     destaque: "com noites mais tranquilas",
-    depois: " e aprendendo as regras da casa.",
+    depois: " e as regras da casa.",
     fatos: ["Guia ilustrado", "29 páginas", "Primeiros 30 dias"],
     lead: "Os primeiros 30 dias, passo a passo: sono, mordidas, xixi e socialização.",
     selos: ["Acesso imediato", "29 páginas ilustradas", "Garantia de 7 dias"],

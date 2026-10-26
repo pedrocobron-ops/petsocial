@@ -694,8 +694,8 @@ main:has(.negocios) + .rodape { --grafite-2: var(--negocios); }
 
 /* 7 · ainda em dúvida? */
 .duvida-grid { display: grid; gap: 32px; }
-.duvida-foto { margin: 0 calc(-1 * var(--gutter)); aspect-ratio: 4 / 5; overflow: clip; background: var(--papel-2); }
-.duvida-foto img { width: 100%; height: 112%; object-fit: cover; }
+.duvida-foto { position: relative; margin: 0 calc(-1 * var(--gutter)); aspect-ratio: 4 / 5; overflow: clip; background: var(--papel-2); }
+.duvida-foto img { position: absolute; top: 0; left: 0; width: 100%; height: 112%; object-fit: cover; }
 .duvida-frase { margin: 16px 0 24px; font-size: 2rem; line-height: 1.12; text-wrap: pretty; }
 .duvida-outras li { padding: 16px 0; border-top: 1px solid var(--linho); line-height: 1.45; }
 .duvida-outras li:last-child { border-bottom: 1px solid var(--linho); }
