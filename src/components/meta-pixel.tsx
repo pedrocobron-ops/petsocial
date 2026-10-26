@@ -18,6 +18,12 @@ export function rastrear(evento: string, dados?: Record<string, unknown>, tentat
   else if (tentativa < 20) setTimeout(() => rastrear(evento, dados, tentativa + 1), 500);
 }
 
+/** Evento próprio do Pixel (trackCustom), que não entra na otimização de Lead dos anúncios. */
+export function rastrearProprio(evento: string, dados?: Record<string, unknown>, tentativa = 0) {
+  if (window.fbq) window.fbq("trackCustom", evento, dados);
+  else if (tentativa < 20) setTimeout(() => rastrearProprio(evento, dados, tentativa + 1), 500);
+}
+
 /**
  * Meta Pixel: PageView na carga e a cada troca de página feita pelo Next.
  * A fila do fbq é criada logo; o fbevents.js (≈ 200 KB) só baixa em `lazyOnload`, sem disputar banda com a capa (LCP),

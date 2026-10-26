@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { rastrear } from "@/components/meta-pixel";
+import { rastrearProprio } from "@/components/meta-pixel";
 
 /**
  * "Avise-me" de produto ainda não lançado (brief 20, 7.6 e 6.11): só o e-mail, campo de 56 px,
@@ -19,13 +19,15 @@ export default function AviseMe({ produto, origem, escuro = false }: { produto: 
       const r = await fetch("/api/cadastro", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        // O formulário de cadastro guarda nome, e-mail e cão: aqui o "nome" registra de qual lançamento é o aviso.
-        body: JSON.stringify({ nome: `Avise-me · ${produto}`, email: f.get("email"), cao: "", site: f.get("site") }),
+        // O formulário é o mesmo do guia grátis (nome, e-mail e cão). O campo "cao" leva a marca "avise-me:" para a
+        // automação da planilha separar os avisos dos cadastros do Plano Anti-Fogos (e não mandar o guia errado).
+        body: JSON.stringify({ nome: `Avise-me · ${produto}`, email: f.get("email"), cao: `avise-me:${origem}`, site: f.get("site") }),
         signal,
       });
       if (!r.ok) throw new Error(String(r.status));
       setEstado("ok");
-      rastrear("Lead", { content_name: `Avise-me · ${produto}`, content_category: origem });
+      // Evento próprio: o aviso não se mistura ao Lead do guia grátis na otimização dos anúncios.
+      rastrearProprio("AviseMe", { content_name: produto, content_category: "avise-me", origem });
     } catch {
       setEstado("erro");
     }
