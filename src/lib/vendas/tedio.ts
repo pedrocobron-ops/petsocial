@@ -101,8 +101,8 @@ export const tedio: PaginaVendas = {
       ["100 atividades em 10 capítulos", "Faro, quebra-cabeças caseiros, mastigar e lamber, truques, dias de chuva, passeios, calma, família, filhotes e idosos."],
       ["Uma página para cada atividade", "Do material ao cuidado de segurança, tudo na mesma página. Dá para imprimir só a que você vai usar."],
       ["Encontre pela cena", "Oito cenas do dia a dia, como “Fica elétrico às 22h”, cada uma com as atividades que mais ajudam."],
-      ["O que fazer hoje", "As atividades separadas pelo tempo que você tem: até 5 minutos, uns 10 a 15, ou 20 ou mais."],
-      ["Como ensinar o “senta”", "E as duas palavras do guia: “sim!” para marcar o acerto e “pode ir!” para liberar."],
+      ["O que fazer hoje", "As atividades separadas pelo tempo que você tem: até 5 minutos, uns 10, ou 20 ou mais."],
+      ["Como ensinar o “senta”", "E as quatro palavras do guia: “sim!” para marcar o acerto, “pode ir!” para liberar, “procura!” para começar a busca e “larga!” para trocar o brinquedo por um petisco."],
       ["Quando pedir ajuda", "Os sinais de que o caso pede veterinário ou profissional de comportamento, e o que levar anotado."],
     ],
     paginas: [
@@ -156,7 +156,7 @@ export const tedio: PaginaVendas = {
     itens: [
       { imagem: "/produtos/tedio-pag120.webp", titulo: "Encontre pela cena", texto: "“Chego em casa e tem coisa roída”, “Late para todo barulho”, “Chega visita e ele pula”: ache a cena da sua casa e escolha uma das atividades indicadas." },
       { imagem: "/produtos/tedio-pag122.webp", titulo: "O que fazer hoje?", texto: "Tem 5 minutos antes de sair ou meia hora no domingo? As atividades estão separadas pelo tempo que você tem, com a página de cada uma." },
-      { imagem: "/produtos/tedio-pag7.webp", titulo: "As 6 regras de segurança", texto: "Você por perto, a ração do dia, nada tóxico, o tamanho certo do brinquedo, chão e calor. E cada ficha traz o cuidado específico dela." },
+      { imagem: "/produtos/tedio-pag7.webp", titulo: "As 6 regras de segurança", texto: "Você por perto, a ração do dia, nada tóxico, o tamanho certo do brinquedo, chão e calor, e nada de laser nem bronca. E cada ficha traz o cuidado específico dela." },
     ],
   },
   kit: {
@@ -169,7 +169,7 @@ export const tedio: PaginaVendas = {
       { imagem: CAPAS_KIT[2], titulo: "Atividades Relâmpago", texto: "10 atividades curtas, a maioria de 5 minutos, e combinações prontas de 5, 10 e 15 minutos para a manhã, o almoço ou a noite." },
       { imagem: CAPAS_KIT[3], titulo: "Brinquedos Seguros", texto: "O tamanho certo de brinquedo para cada porte, o que não dar e o que oferecer no lugar, o checklist semanal e o que fazer se ele engolir um pedaço." },
     ],
-    nota: "O Calendário e as Atividades Relâmpago usam atividades do guia, organizadas em planos prontos. Não são atividades novas: são o atalho para você não precisar escolher.",
+    nota: "O Calendário e as Atividades Relâmpago organizam atividades do guia em planos prontos, para você não precisar escolher. O Relâmpago traz ainda uma atividade que não está no guia: a sessão relâmpago de truques.",
   },
   paraQuem: {
     sim: [
