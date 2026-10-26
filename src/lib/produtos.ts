@@ -42,6 +42,8 @@ export type Produto = {
    * por esse valor e o caminho do print guardado em docs/precos/. Sem isso, nada é riscado.
    */
   riscado?: { precoDe: number; precoDeDesde: string; print: string };
+  /** Uma linha curta para o card da vitrine (6.10), no lugar da chamada cortada com reticências. */
+  resumo?: string;
   /** Imagem de compartilhamento própria (/og/<slug>.png). */
   og?: string;
   /** "Versão 1.1 · outubro de 2026": só com dado real. */
@@ -71,6 +73,7 @@ export const PRODUTOS: Produto[] = [
     slug: "xixi", para: "cao",
     grupo: "comportamento",
     nome: "Xixi no Lugar Certo",
+    resumo: "Método de 7 dias, sem bronca.",
     chamada: "O método de 7 dias para ensinar seu cachorro a fazer as necessidades no lugar certo.",
     dor: "Ele faz xixi no tapete, no sofá, em qualquer lugar",
     preco: 19.9,
@@ -82,6 +85,7 @@ export const PRODUTOS: Produto[] = [
     slug: "petiscos", para: "cao",
     grupo: "cuidados",
     nome: "Petiscos do Maestro",
+    resumo: "30 receitas seguras e baratas.",
     chamada: "30 receitas caseiras, baratas e seguras para agradar seu cachorro.",
     dor: "Quer dar petisco saudável e não sabe o que pode",
     preco: 14.9,
@@ -93,6 +97,7 @@ export const PRODUTOS: Produto[] = [
     slug: "filhote", para: "cao",
     grupo: "comportamento",
     nome: "Filhote Sem Caos",
+    resumo: "Os primeiros 30 dias, passo a passo.",
     chamada: "O guia dos primeiros 30 dias: rotina de sono, mordidas, xixi e socialização, passo a passo.",
     dor: "O filhote chora à noite e morde tudo",
     preco: 19.9,
@@ -224,10 +229,10 @@ export const PRODUTOS: Produto[] = [
   { slug: "chegou", para: "cao", grupo: "imprimir", nome: "Chegou o Filhote!", chamada: "O kit de boas-vindas para imprimir: plaquinhas para as primeiras fotos, anúncio para a família, o cantinho e a primeira semana.", dor: "O filhote chegou, e o primeiro dia merece ser lembrado.", preco: 7.9, capa: "/produtos/capa-chegou.webp", checkout: "https://pay.cakto.com.br/3k9qcsq", lancado: false },
   { slug: "colorir", grupo: "imprimir", nome: "Livro de Colorir do Mozart", chamada: "19 desenhos do Mozart para as crianças pintarem, com frases que ensinam a cuidar bem dos bichos.", dor: "Uma atividade para as crianças longe da tela.", preco: 7.9, capa: "/produtos/capa-colorir.webp", checkout: "https://pay.cakto.com.br/3998pcs", lancado: false },
   { slug: "planner", grupo: "imprimir", nome: "Planner do Tutor 2027", chamada: "O ano inteiro do seu pet num planner só: saúde, gastos, treino, metas e a foto de cada mês de 2027.", dor: "Vacina, vermífugo, gastos e fotos espalhados por todo lado.", preco: 14.9, capa: "/produtos/capa-planner.webp", checkout: "https://pay.cakto.com.br/399gtq4", lancado: false },
-  { slug: "confeitaria", linha: "negocios", grupo: "comece", nome: "Confeitaria Pet: o manual do negócio", chamada: "30 receitas para festa e o negócio completo: kits, ficha técnica e preço, regras para vender, etiquetas e plano de carreira em 4 níveis.", dor: "Faço bolo de cachorro, mas não sei cobrar nem o que a lei exige", preco: 67, capa: "/produtos/negocios/capa-confeitaria.webp", checkout: "", lancado: false },
-  { slug: "passeador", linha: "negocios", grupo: "comece", nome: "Manual do Passeador de Cães", chamada: "Comportamento, segurança, preço, MEI, contrato e primeiros clientes, com ferramentas prontas e plano de carreira em 4 níveis.", dor: "Quero trabalhar com cães, mas não sei por onde começar", preco: 67, capa: "/produtos/negocios/capa-passeador.webp", checkout: "", lancado: false },
-  { slug: "petsitter", linha: "negocios", grupo: "comece", nome: "Manual do Pet Sitter", chamada: "Visitas a cães e gatos na casa do tutor: rotina, sinais de alerta, chaves, contrato, preço e plano de carreira em 4 níveis.", dor: "Cuido dos pets dos amigos, mas nunca cobrei direito", preco: 67, capa: "/produtos/negocios/capa-petsitter.webp", checkout: "", lancado: false },
-  { slug: "fotografia", linha: "negocios", grupo: "comece", nome: "Fotografia Pet: o manual do negócio", chamada: "Sessão com bem-estar, equipamento em 3 níveis, contrato e uso de imagem, preço, clientes e plano de carreira em 4 níveis.", dor: "Fotografo pets bem, mas não sei transformar em negócio", preco: 67, capa: "/produtos/negocios/capa-fotografia.webp", checkout: "", lancado: false },
+  { slug: "confeitaria", linha: "negocios", grupo: "comece", nome: "Confeitaria Pet: o manual do negócio", resumo: "30 receitas, ficha técnica e as regras.", chamada: "30 receitas para festa e o negócio completo: kits, ficha técnica e preço, regras para vender, etiquetas e plano de carreira em 4 níveis.", dor: "Faço bolo de cachorro, mas não sei cobrar nem o que a lei exige", preco: 67, capa: "/produtos/negocios/capa-confeitaria.webp", checkout: "", lancado: false },
+  { slug: "passeador", linha: "negocios", grupo: "comece", nome: "Manual do Passeador de Cães", resumo: "Segurança, preço, contrato e clientes.", chamada: "Comportamento, segurança, preço, MEI, contrato e primeiros clientes, com ferramentas prontas e plano de carreira em 4 níveis.", dor: "Quero trabalhar com cães, mas não sei por onde começar", preco: 67, capa: "/produtos/negocios/capa-passeador.webp", checkout: "", lancado: false },
+  { slug: "petsitter", linha: "negocios", grupo: "comece", nome: "Manual do Pet Sitter", resumo: "Visitas, chaves, contrato e preço.", chamada: "Visitas a cães e gatos na casa do tutor: rotina, sinais de alerta, chaves, contrato, preço e plano de carreira em 4 níveis.", dor: "Cuido dos pets dos amigos, mas nunca cobrei direito", preco: 67, capa: "/produtos/negocios/capa-petsitter.webp", checkout: "", lancado: false },
+  { slug: "fotografia", linha: "negocios", grupo: "comece", nome: "Fotografia Pet: o manual do negócio", resumo: "Bem-estar, contrato, preço e clientes.", chamada: "Sessão com bem-estar, equipamento em 3 níveis, contrato e uso de imagem, preço, clientes e plano de carreira em 4 níveis.", dor: "Fotografo pets bem, mas não sei transformar em negócio", preco: 67, capa: "/produtos/negocios/capa-fotografia.webp", checkout: "", lancado: false },
 ];
 
 export const produto = (slug: string) => PRODUTOS.find((p) => p.slug === slug)!;

@@ -21,11 +21,12 @@ import { VerProduto } from "@/components/meta-pixel";
 import type { Produto } from "@/lib/produtos";
 import { comoProduto, daFamilia, linhaDe, reais, urlProduto } from "@/lib/produtos";
 import type { PaginaVendas as Conteudo, FichaExemplo, IconeLucide } from "@/lib/vendas/tipos";
+import { FIXAS } from "@/lib/faq";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
 /** Converte **negrito** do conteúdo em <b>. */
-function Rico({ texto }: { texto: string }) {
+export function Rico({ texto }: { texto: string }) {
   return <>{texto.split(/(\*\*[^*]+\*\*)/g).map((t, i) => (t.startsWith("**") ? <b key={i}>{t.slice(2, -2)}</b> : t))}</>;
 }
 
@@ -43,22 +44,6 @@ const ICONES: Record<IconeLucide, typeof Check> = {
 const preco = (v: number) => (Number.isInteger(v) ? `R$\u00a0${v}` : reais(v));
 /** Só o número, para o preço grande da folha: "19,90" / "67". */
 const valor = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2).replace(".", ","));
-
-/**
- * Perguntas que valem para todos os produtos (brief 20, 6.18), cada uma com até 3 linhas no celular (≈ 180 caracteres).
- * `fora`: perguntas do arquivo do produto que esta resposta substitui (a do arquivo sai, para não repetir).
- * `pula`: se o arquivo já tem uma pergunta assim, a fixa não entra (a do produto é mais específica).
- */
-type Fixa = { q: [string, string]; peso: number; fora?: RegExp; pula?: RegExp };
-const FIXAS: Fixa[] = [
-  { peso: 1, q: ["Pix ou cartão? Parcela?", "Pix ou cartão de crédito, no checkout da Cakto. Se escolher parcelar, o checkout mostra as parcelas e os juros antes de você confirmar."], pula: /pix|parcel|formas? de pagamento/i },
-  { peso: 2, q: ["Como peço o reembolso e em quanto tempo volta?", "Em até 7 dias, em reembolso.cakto.com.br ou pelo nosso e-mail. A Cakto processa em até 24 h; no Pix costuma voltar em minutos, no cartão segue o prazo do banco."], fora: /reembolso|não gostar|não for para mim|devolu/i },
-  { peso: 3, q: ["Precisa de cadastro ou aplicativo?", "Não precisa de aplicativo. O acesso chega no e-mail da compra, e o PDF abre no celular ou no computador."], pula: /aplicativo|cadastro/i },
-  { peso: 6, q: ["Preciso imprimir?", "Não. Dá para usar tudo no celular ou no computador. As páginas para imprimir são opcionais e saem em A4, numa impressora comum."], pula: /imprimir|impress/i },
-  { peso: 7, q: ["Recebo nota fiscal?", "O comprovante da compra chega no e-mail da Cakto. Para pedir nota fiscal, escreva para contato@maestropet.com com o e-mail usado na compra."], pula: /nota fiscal/i },
-  { peso: 8, q: ["Por que não tem depoimentos?", "Porque não inventamos. Preferimos mostrar as páginas de verdade, que você vê nesta página antes de decidir."], pula: /depoimento/i },
-  { peso: 9, q: ["O pagamento é seguro?", "Sim. Você paga no checkout da Cakto, com Pix ou cartão. Nós não vemos os dados do seu cartão, e o valor final aparece antes de você confirmar."], pula: /seguro\?/i },
-];
 
 /**
  * Ordem por objeção (6.18): como recebo · Pix ou cartão · reembolso · cadastro · o caso do produto · imprimir · nota · depoimentos · segurança.
@@ -81,7 +66,7 @@ function comGrande([src, legenda]: [string, string]): [string, string, string?] 
 }
 
 /** "**Ilusão:** … **Real:** …" → [ilusão, real]; os parágrafos da virada da linha Negócios. */
-function pares(paragrafos: string[]) {
+export function pares(paragrafos: string[]) {
   const r = paragrafos.map((t) => t.match(/^\*\*Ilusão:\*\*\s*(.+?)\s*\*\*Real:\*\*\s*(.+)$/s));
   const maiuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
   return r.every(Boolean) ? r.map((m) => [maiuscula(m![1]), maiuscula(m![2])] as [string, string]) : null;

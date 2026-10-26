@@ -8,7 +8,7 @@ import Logo from "@/components/logo";
 import { EMPRESA, linkInstagram, linkWhatsapp } from "@/lib/empresa";
 
 const NAV_TUTOR: [string, string][] = [["/tutor", "Para tutores"], ["/negocios", "Para negócios pet"], ["/sobre", "Quem faz"], ["/contato", "Ajuda"]];
-const NAV_NEGOCIOS: [string, string][] = [["/negocios#comece", "Manuais"], ["/negocios#como-fazemos", "Como fazemos"], ["/tutor", "Para tutores"], ["/contato", "Ajuda"]];
+const NAV_NEGOCIOS: [string, string][] = [["/negocios#manuais", "Manuais"], ["/negocios#como-fazemos", "Como fazemos"], ["/tutor", "Para tutores"], ["/contato", "Ajuda"]];
 
 /**
  * Topo das vitrines e institucionais (brief 20, 6.1): sticky de 60/72 px, logo à esquerda,

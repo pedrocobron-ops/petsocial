@@ -5,14 +5,12 @@ import { LogosPagamento } from "@/components/pagamento";
 import { EMPRESA, identificacao, linkInstagram, linkWhatsapp } from "@/lib/empresa";
 import { FEED_AREAS } from "@/lib/feed-pronto";
 import { PRODUTOS, linhaDe, urlProduto } from "@/lib/produtos";
+import { nomeCurto } from "@/components/vitrine";
 
 /**
  * Rodapé único (brief 20, 6.3), para vitrines, institucionais e páginas de venda.
  * Na linha Negócios o fundo vira verde-garrafa e sai o Mozart (pelo wrapper `.negocios` ou por `main:has(.negocios)`).
  */
-/** "Confeitaria Pet: o manual do negócio" → "Confeitaria Pet"; "Manual do Passeador de Cães" → "Passeador de Cães". */
-const nomeCurto = (nome: string) => nome.replace(/: o manual do negócio$/, "").replace(/^Manual do /, "");
-
 export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocios" }) {
   const guias = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "tutor");
   const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios" && p.grupo === "comece");

@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { Seta } from "@/components/icones";
 import { FaixaProva } from "@/components/pagamento";
-import { CartaoProduto } from "@/components/vitrine";
+import { Leque, Marquee } from "@/components/vitrine-blocos";
+import type { Produto } from "@/lib/produtos";
 import { PRODUTOS, linhaDe, produto, reais, urlProduto } from "@/lib/produtos";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 /** Uma linha por guia lançado no índice "Nesta edição" (brief 20, 7.1, bloco 1b). */
 const LINHA: Record<string, string> = {
@@ -22,6 +26,7 @@ const PILARES = [
 
 export default function Home() {
   const lancados = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "tutor");
+  // "Nesta edição": no desktop fica ao lado do hero; no celular vem logo abaixo dele, como índice de 3 linhas.
   const edicao = ["xixi", "filhote", "petiscos"].map(produto).filter((p) => p?.lancado);
   const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios" && p.grupo === "comece");
   const leque = ["filhote", "xixi", "petiscos"].map(produto).filter((p) => p?.capa);
@@ -39,7 +44,7 @@ export default function Home() {
               <Link className="btn" id="cta-home" href="/tutor">Tenho um pet<Seta /></Link>
               <Link className="btn btn-secundario" href="/negocios">Trabalho com pets</Link>
             </div>
-            <p className="risco">Pagamento único · Pix ou cartão · 7 dias para desistir</p>
+            <p className="risco risco-linha"><span>Pagamento único</span><span>Pix ou cartão</span><span>7 dias para desistir</span></p>
           </div>
           {edicao.length > 0 && (
             <aside className="edicao" aria-labelledby="edicao-titulo">
@@ -65,9 +70,7 @@ export default function Home() {
         <div className="container portas">
           <article className="porta rv">
             <span className="porta-num">01 · Para tutores</span>
-            <div className="leque" aria-hidden>
-              {leque.map((p) => <Image key={p.slug} src={p.capa!} alt="" width={300} height={424} sizes="(max-width: 899px) 30vw, 180px" />)}
-            </div>
+            <Leque produtos={leque as Produto[]} />
             <h2>Um problema por guia, <em>um passo por página.</em></h2>
             <p>Xixi no lugar certo, filhote, petiscos seguros e kits para imprimir. A partir de {reais(Math.min(...lancados.map((p) => p.preco)))}.</p>
             <Link className="btn-link" href="/tutor">Ver os guias</Link>
@@ -85,26 +88,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="marquee" aria-label="Guias e manuais">
-        <div className="marquee-trilho">
-          <ul aria-label="Guias à venda">
-            {capas.map((p) => <li key={p.slug}><Link href={urlProduto(p)} tabIndex={-1}><Image src={p.capa!} alt={p.nome} width={140} height={198} sizes="140px" /></Link></li>)}
-          </ul>
-          <ul aria-hidden>
-            {capas.map((p) => <li key={p.slug}><Image src={p.capa!} alt="" width={140} height={198} sizes="140px" /></li>)}
-          </ul>
-        </div>
-      </section>
-
-      <section className="secao so-celular" aria-labelledby="venda-hoje">
-        <div className="container">
-          <div className="cab">
-            <span className="rotulo">Nesta edição</span>
-            <h2 id="venda-hoje">Os guias que resolvem <em>a semana.</em></h2>
-          </div>
-          <div className="cards">{lancados.map((p) => <CartaoProduto key={p.slug} p={p} />)}</div>
-        </div>
-      </section>
+      <Marquee capas={capas} rotulo="Guias e manuais" />
 
       <section className="secao secao-prova">
         <div className="container"><FaixaProva className="rv" /></div>

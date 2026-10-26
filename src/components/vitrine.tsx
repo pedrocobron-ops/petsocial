@@ -7,15 +7,19 @@ import { linhaDe, reais, urlProduto } from "@/lib/produtos";
  * Cartão de produto (brief 20, 6.10): a capa como objeto num bloco de papel, depois nome, uma linha e preço.
  * Linha Negócios: bloco verde e capa reta. Não lançado: "Em breve" no lugar do preço (nunca apagado).
  */
+/** Nome curto no card da linha Negócios ("Confeitaria Pet: o manual do negócio" → "Confeitaria Pet"): os títulos da grade ficam numa linha. */
+export const nomeCurto = (nome: string) => nome.replace(/: o manual do negócio$/, "").replace(/^Manual do /, "");
+
 export function CartaoProduto({ p }: { p: Produto }) {
   const negocios = linhaDe(p) === "negocios";
+  const nome = negocios ? nomeCurto(p.nome) : p.nome;
   return (
     <Link href={urlProduto(p)} className={`card${negocios ? " card-negocios" : ""}${p.lancado ? "" : " card-breve"}`}>
       <div className="card-palco">
         {p.capa && <Image src={p.capa} alt={`Capa: ${p.nome}`} width={300} height={424} sizes="(max-width: 899px) 30vw, 180px" />}
       </div>
-      <h3>{p.nome}</h3>
-      <p>{p.chamada}</p>
+      <h3>{nome}</h3>
+      <p>{p.resumo ?? p.chamada}</p>
       {p.lancado ? (
         <span className="card-preco"><b>{p.ofertas && <small>a partir de </small>}{reais(p.preco)}</b> <small>pagamento único</small></span>
       ) : (
