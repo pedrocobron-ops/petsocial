@@ -23,14 +23,14 @@ export default function ContatoPage() {
       </ul>
       {id && <p><b>Empresa:</b> {id}</p>}
 
-      <h2>Não recebi meu acesso</h2>
+      <h2 id="acesso">Não recebi meu acesso</h2>
       <p>
         O acesso é enviado para o e-mail informado na compra, normalmente em poucos minutos depois da confirmação do pagamento.
         Confira a caixa de spam e a aba Promoções e procure por &quot;Cakto&quot; ou &quot;Maestro Pet&quot;. Se não encontrar,
         escreva para nós com o e-mail usado na compra e reenviamos.
       </p>
 
-      <h2>Quero o reembolso</h2>
+      <h2 id="reembolso">Quero o reembolso</h2>
       <p>Todos os produtos têm garantia de 7 dias corridos a partir da compra, no Pix ou no cartão, sem precisar justificar.</p>
       <ol>
         <li>Use a opção de reembolso no e-mail de confirmação da Cakto; <b>ou</b></li>

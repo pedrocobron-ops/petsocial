@@ -31,7 +31,7 @@ export default function Negocios() {
   const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios");
   const [comece] = GRUPOS.negocios;
   return (
-    <div className="linha-negocios">
+    <div className="linha-negocios negocios">
       <section className="hero-home hero-negocios">
         <div className="container hero-home-grid">
           <div>
@@ -76,7 +76,7 @@ export default function Negocios() {
       </section>
 
 
-      <section className="secao">
+      <section className="secao" id="como-fazemos">
         <div className="container">
           <span className="eyebrow">Como fazemos</span>
           <h2>Um manual de negócio sério, do jeito que você gostaria de comprar</h2>

@@ -1,25 +1,20 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
+import Logo from "@/components/logo";
 import type { Linha } from "@/lib/produtos";
 
 /**
- * Topo das páginas de venda: só a marca e os selos de confiança, sem menu.
- * Quem chega pelo anúncio fica na página do produto, sem caminhos para outras linhas.
+ * Topo das páginas de venda (brief 20, 6.1): não é fixo, sem menu e sem links de fuga.
+ * Logo à esquerda e "Garantia de 7 dias" à direita.
  */
 export default function TopoVenda({ linha }: { linha: Linha }) {
   return (
-    <header className={`topo topo-venda${linha === "negocios" ? " topo-negocios" : ""}`}>
-      <div className="container topo-inner">
-        <Link href="/" className="marca" aria-label="Maestro Pet — sobre a empresa">
-          {linha === "tutor" ? (
-            <Image src="/mozart/rosto.png" alt="" width={40} height={40} priority />
-          ) : (
-            <span className="marca-selo" aria-hidden>M</span>
-          )}
-          <span>Maestro<em>Pet</em>{linha === "negocios" && <small className="marca-linha">Negócios</small>}</span>
+    <header className="topo topo-venda">
+      <div className="container topo-in">
+        <Link href="/" className="logo" aria-label="Maestro Pet, sobre a empresa">
+          <Logo negocios={linha === "negocios"} prioridade />
         </Link>
-        <p className="topo-confianca"><ShieldCheck size={18} aria-hidden /> <span className="so-desktop">Compra segura · </span>Garantia de 7 dias</p>
+        <p className="topo-garantia"><ShieldCheck size={18} strokeWidth={1.75} aria-hidden /><span><span className="topo-garantia-longo">Garantia de </span>7 dias</span></p>
       </div>
     </header>
   );

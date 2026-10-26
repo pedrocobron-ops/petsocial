@@ -1,15 +1,13 @@
 import TopoVenda from "@/components/topo-venda";
-import RodapeVenda from "@/components/rodape-venda";
-import Animacoes from "@/components/animacoes";
+import Rodape from "@/components/rodape";
 
-/** Páginas de venda da linha "negocios": topo sem menu e rodapé enxuto. */
+/** Páginas de venda da linha "negocios": wrapper `.negocios` (verde-garrafa nos blocos escuros), topo sem menu e o rodapé único. */
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <div className="negocios">
       <TopoVenda linha="negocios" />
       <main className="linha-negocios">{children}</main>
-      <RodapeVenda linha="negocios" />
-      <Animacoes />
-    </>
+      <Rodape linha="negocios" />
+    </div>
   );
 }
