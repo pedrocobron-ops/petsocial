@@ -1,29 +1,28 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Produto } from "@/lib/produtos";
-import { reais, urlProduto } from "@/lib/produtos";
+import { linhaDe, reais, urlProduto } from "@/lib/produtos";
 
-/** Cartão de produto das vitrines. Produto ainda não lançado aparece como "Em breve", mas abre a página (que mostra o que vem e o botão "Em breve"). */
+/**
+ * Cartão de produto (brief 20, 6.10): a capa como objeto num bloco de papel, depois nome, uma linha e preço.
+ * Linha Negócios: bloco verde e capa reta. Não lançado: "Em breve" no lugar do preço (nunca apagado).
+ */
 export function CartaoProduto({ p }: { p: Produto }) {
-  const card = (
-    <>
-      <div className="guia-capa">
-        {p.capa && <Image src={p.capa} alt={`Capa: ${p.nome}`} width={300} height={424} />}
-        {!p.lancado && <span className="guia-breve">Em breve</span>}
+  const negocios = linhaDe(p) === "negocios";
+  return (
+    <Link href={urlProduto(p)} className={`card${negocios ? " card-negocios" : ""}${p.lancado ? "" : " card-breve"}`}>
+      <div className="card-palco">
+        {p.capa && <Image src={p.capa} alt={`Capa: ${p.nome}`} width={300} height={424} sizes="(max-width: 899px) 30vw, 180px" />}
       </div>
-      <div className="guia-corpo">
-        <span className="guia-dor">“{p.dor}”</span>
-        <h3>{p.nome}</h3>
-        <p>{p.chamada}</p>
-        {p.lancado ? (
-          <span className="guia-preco">{p.ofertas && <small>a partir de </small>}{reais(p.preco)}</span>
-        ) : (
-          <span className="guia-preco muted">Lançamento em breve</span>
-        )}
-      </div>
-    </>
+      <h3>{p.nome}</h3>
+      <p>{p.chamada}</p>
+      {p.lancado ? (
+        <span className="card-preco"><b>{p.ofertas && <small>a partir de </small>}{reais(p.preco)}</b> <small>pagamento único</small></span>
+      ) : (
+        <span className="card-preco"><small>Em breve · avise-me</small></span>
+      )}
+    </Link>
   );
-  return <Link href={urlProduto(p)} className={p.lancado ? "guia" : "guia guia-off"}>{card}</Link>;
 }
 
 /** Uma seção da vitrine: título, texto e os cartões. Lançados primeiro. */
@@ -35,7 +34,7 @@ export function SecaoVitrine({ id, titulo, texto, produtos }: { id: string; titu
       <div className="container">
         <h2>{titulo}</h2>
         <p className="lead">{texto}</p>
-        <div className="guias">{ordem.map((p) => <CartaoProduto key={p.slug} p={p} />)}</div>
+        <div className="cards">{ordem.map((p) => <CartaoProduto key={p.slug} p={p} />)}</div>
       </div>
     </section>
   );
