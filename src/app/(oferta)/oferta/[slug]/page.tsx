@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CircleCheck, Check } from "lucide-react";
 import { OFERTAS, oferta } from "@/lib/ofertas";
 import { produto } from "@/lib/produtos";
+import BotaoUpsell from "@/components/botao-upsell";
 
 export const metadata: Metadata = { title: "Sua compra foi aprovada", robots: { index: false, follow: false } };
 export const generateStaticParams = () => OFERTAS.map((o) => ({ slug: o.slug }));
@@ -30,13 +30,8 @@ export default async function OfertaPage({ params }: { params: Promise<{ slug: s
             <b>{brl(o.preco)}</b>
             <span>{kit ? "a mais, e você recebe o Kit Completo com os 5 guias" : `nesta página. No site, ${brl(o.precoNormal)}.`}</span>
           </p>
-          {o.botaoCakto ? (
-            <div className="pc-botao" dangerouslySetInnerHTML={{ __html: o.botaoCakto }} />
-          ) : (
-            <a className="btn pc-sim" href={o.checkout}>Sim, quero por {brl(o.preco)}</a>
-          )}
+          <BotaoUpsell oferta={o.oferta} aceitar={`Sim, quero por ${brl(o.preco)}`} recusar="Não, obrigado. Quero só o que já comprei." />
           <p className="pc-nota">Pagamento único. Também tem 7 dias de garantia.</p>
-          <Link className="pc-nao" href="/obrigado">Não, obrigado. Quero só o que já comprei.</Link>
         </div>
       </div>
     </div>
