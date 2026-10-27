@@ -1461,3 +1461,21 @@ html:has(dialog[open]) .barra { visibility: hidden; }
 .baixar-capa { width: min(220px, 52vw); border-radius: var(--raio-capa); box-shadow: var(--sombra-objeto); rotate: -4deg; }
 .baixar-dica { margin-top: 16px; font-size: var(--t-pequeno); color: var(--cinza); }
 @media (min-width: 900px) { .baixar { grid-template-columns: 300px 1fr; gap: 56px; } .baixar-capa { width: 300px; } }
+
+/* Pós-compra (/oferta e /obrigado) */
+.pc-pg { padding-block: 32px 64px; }
+.pc { max-width: 920px; }
+.pc h1 { font-size: clamp(28px, 4.4vw, 44px); line-height: 1.08; margin: 10px 0 24px; text-wrap: balance; }
+.pc-ok svg { flex: none; }
+.pc-ok { display: flex; gap: 8px; align-items: center; background: #e8f5ee; color: #166534; padding: 12px 16px; border-radius: 12px; font-weight: 600; margin: 0 0 24px; }
+.pc-corpo { display: grid; grid-template-columns: minmax(0, 300px) 1fr; gap: 32px; align-items: start; }
+.pc-capa { width: 100%; height: auto; border-radius: 6px; box-shadow: 0 12px 32px rgba(0, 0, 0, .18); }
+.pc-pontos { list-style: none; padding: 0; margin: 20px 0; display: grid; gap: 10px; }
+.pc-pontos li { display: flex; gap: 10px; align-items: flex-start; }
+.pc-pontos svg { flex: none; margin-top: 3px; color: #ea580c; }
+.pc-preco { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 16px; }
+.pc-preco b { font-size: 36px; line-height: 1; }
+.pc-sim { width: 100%; justify-content: center; }
+.pc-nota { font-size: 14px; color: var(--grafite); margin: 10px 0 18px; }
+.pc-nao { font-size: 15px; color: var(--grafite); text-decoration: underline; }
+@media (max-width: 680px) { .pc-corpo { grid-template-columns: 1fr; } .pc-capa { max-width: 220px; } }
