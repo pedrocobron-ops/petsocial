@@ -54,6 +54,9 @@ export const confeitaria: PaginaVendas = {
       ["Primeiros clientes", "Plano de 30 dias, canais (bairro, Instagram, pet shops, feiras e parcerias) e mensagens prontas para copiar e colar."],
     ],
     paginas: [
+      ["/produtos/negocios/confeitaria-receitas.webp", "Algumas das 30 receitas, todas com foto do resultado."],
+      ["/produtos/negocios/confeitaria-pag35.webp", "Uma receita completa: ingredientes, modo de fazer, conservação, alérgenos e a ficha de custo e preço."],
+      ["/produtos/negocios/confeitaria-pag59.webp", "Um dos 6 modelos de kit, com o que vai na caixa, como montar e a conta do preço."],
       ["/produtos/negocios/confeitaria-pag79.webp", "A ficha técnica em 7 passos: custo por unidade, valor da hora e margem."],
       ["/produtos/negocios/confeitaria-pag4.webp", "O sumário: do mercado ao plano de carreira."],
       ["/produtos/negocios/confeitaria-pag69.webp", "A dispensa de registro no MAPA, com as condições, explicada com a norma."],
