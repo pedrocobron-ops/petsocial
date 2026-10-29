@@ -6,7 +6,7 @@ export const moldesNatal: PaginaVendas = {
   seo: {
     titulo: "Look de Natal e Réveillon Pet: 30 moldes prontos para costurar e vender no fim de ano",
     descricao:
-      "30 moldes de roupas e acessórios de Natal e Ano-Novo para cães, do PP ao XGG, para imprimir em A4, com passo a passo, medidas de corte e foto de cada peça. E o capítulo Vender no Natal e no Réveillon: calendário de encomendas, combos para presente, preço e mensagens prontas.",
+      "30 moldes de roupas e acessórios de Natal e Ano-Novo para cães, do PP ao XGG, para imprimir em A4, com passo a passo, medidas de corte e foto ilustrativa de cada peça. E o capítulo Vender no Natal e no Réveillon: calendário de encomendas, combos para presente, preço e mensagens prontas.",
   },
   hero: {
     eyebrow: "Maestro Pet Negócios · Moldes de Natal e Réveillon",
@@ -46,7 +46,7 @@ export const moldesNatal: PaginaVendas = {
     itens: [
       ["30 moldes do PP ao XGG", "12 roupas de Natal (Papai Noel, Mamãe Noel, elfo, rena, pijama xadrez, suéter, casaco forrado e mais), 8 acessórios de Natal (gorro, tiara de chifres, bandanas, gravata, cachecol e golas) e 10 peças de Réveillon (vestido branco com tule dourado, camisa de festa, colete, capa, cartola, tiara de estrelas e mais)."],
       ["Do fácil ao avançado", "Dentro de cada área, os moldes vêm em ordem de dificuldade, com selo de cor e uma trilha de 5 moldes para aprender costurando."],
-      ["Página de cada molde", "Foto da peça pronta, desenho das peças, tabela do que cortar e comprar em cada tamanho, consumo de tecido e passo a passo numerado."],
+      ["Página de cada molde", "Foto ilustrativa da peça, desenho das peças (quando há peças para imprimir), tabela do que cortar e comprar em cada tamanho, consumo de tecido e passo a passo numerado."],
       ["Moldes para imprimir", "25 arquivos PDF em A4, tamanho real, com quadrado de teste de 5 cm e mapa de montagem das folhas. Os outros 5 moldes são só retângulos, com as medidas no livro."],
       ["Antes de costurar", "Como medir o cão, tabela de tamanhos, tecidos, materiais, técnicas básicas, ajustes rápidos e onde comprar."],
       ["Vender no Natal e no Réveillon", "Calendário de 9 semanas, data limite de encomendas, 9 combos para presente, primeiro estoque, embalagem, proposta para pet shop, preço, mensagens e legendas de Natal e de Ano-Novo."],
@@ -60,7 +60,7 @@ export const moldesNatal: PaginaVendas = {
       ["/produtos/negocios/natal-pag81.webp", "O calendário de fim de ano, do mostruário à virada."],
       ["/produtos/negocios/natal-pag82.webp", "Combos para presente e como dar preço a eles."],
       ["/produtos/negocios/natal-pag83.webp", "Vender no Réveillon: combos e mensagens da virada."],
-      ["/produtos/negocios/natal-pag4.webp", "O sumário: dos moldes às vendas de fim de ano."],
+      ["/produtos/negocios/natal-pag5.webp", "O sumário: as áreas de Natal e Réveillon e o capítulo de vendas."],
     ],
   },
   numeros: [["30", "moldes de Natal e Réveillon"], ["7", "tamanhos, do PP ao XGG"], ["92", "páginas no livro"]],
@@ -114,10 +114,10 @@ export const moldesNatal: PaginaVendas = {
   faq: [
     ["Preciso saber costurar?", "Precisa saber o básico da máquina de costura: ponto reto e zigue-zague. O livro começa pelos moldes mais fáceis, como a bandana, que fica pronta em menos de meia hora."],
     ["Que máquina eu preciso?", "Uma máquina doméstica com ponto reto e zigue-zague faz todos os moldes. A overloque ajuda, mas não é obrigatória."],
-    ["Os moldes servem para cachorro grande?", "Sim. Cada molde vem em 7 tamanhos, do PP ao XGG, para cães de 22 a 100 cm de tórax. O livro ensina a medir e a escolher o tamanho."],
-    ["Os moldes foram testados?", "Os moldes foram desenhados a partir das medidas de cada tamanho e conferidos medida a medida: as costuras que se encontram têm o mesmo comprimento, e gola e tórax batem com o cão. Como cada cão tem um corpo, o livro pede uma prova em tecido barato antes do tecido bom."],
+    ["Os moldes servem para cachorro grande?", "Sim. Cada molde vem em 7 tamanhos, do PP ao XGG, para cães de até 100 cm de tórax. O livro ensina a medir e a escolher o tamanho."],
+    ["Os moldes foram conferidos?", "Foram desenhados a partir das medidas de cada tamanho e conferidos medida a medida: as costuras que se encontram têm o mesmo comprimento, e gola e tórax batem com o cão. Não foram provados em um cão de cada tamanho: por isso o livro pede uma prova em tecido barato antes do tecido bom."],
     ["Gorro, cartola e tiaras são seguros?", "São para fotos e momentos curtos, sempre com alguém olhando, e presos com elástico macio. O livro orienta a costurar pompons e enfeites com pontos firmes e a não usar cola, guizo ou peça pequena que o cão possa engolir."],
-    ["Já tenho os Moldes de Roupa Pet. Este é diferente?", "Sim. São 30 moldes novos, só de Natal e Réveillon, e um capítulo de vendas próprio para o fim de ano. Nenhum molde se repete."],
+    ["Já tenho os Moldes de Roupa Pet. Este é diferente?", "Sim. São 30 moldes só de Natal e Réveillon e um capítulo de vendas próprio para o fim de ano. Alguns acessórios simples (saia de tule, gravata borboleta, cachecol e gola de babado) usam as mesmas medidas-base do kit do ano todo, em versão de festa."],
     ["As fotos são das peças costuradas com os moldes?", "As fotos são ilustrativas: mostram como cada peça fica, para inspirar. O seu resultado depende do tecido, das cores e do acabamento."],
     ["Posso vender as roupas que eu costurar?", "Pode, quantas quiser. O que não pode é revender, copiar ou compartilhar os moldes e o livro."],
     ["O livro garante que eu vou vender?", "Não. Nenhum material pode garantir vendas ou renda. O livro entrega os moldes, o calendário e as ferramentas; o resultado depende do seu acabamento, das fotos, do preço e da divulgação."],
