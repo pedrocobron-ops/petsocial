@@ -67,6 +67,15 @@ export const fotografia: PaginaVendas = {
     ["CNAE 7420-0/01", "“Fotógrafo(a)” está na lista de ocupações permitidas ao MEI. Vídeo e venda de impressos se confirmam com o contador.", "gov.br, ocupações permitidas ao MEI", "https://www.gov.br/empresas-e-negocios/pt-br/empreendedor/quero-ser-mei/atividades-permitidas"],
   ],
   numeros: [["4", "níveis no plano de carreira"], ["3", "níveis de investimento em equipamento"], ["4", "ferramentas para usar"]],
+  conta: {
+    periodo: "mes",
+    quantidade: { rotulo: "Ensaios por mês", valor: 2 },
+    unidade: "ensaios",
+    preco: { rotulo: "Preço do ensaio", valor: 450 },
+    custoUnidade: { rotulo: "Custo de cada ensaio (deslocamento, petiscos e fotos impressas)", valor: 49 },
+    custoMes: { rotulo: "Custos fixos do mês (MEI, Lightroom, desgaste do equipamento, celular)", valor: 421 },
+    origem: "Valores iniciais do manual: ensaio a R$ 450, com 2 ensaios no mês (p. 9), custo de R$ 49 por ensaio e R$ 421 de custos fixos (p. 62).",
+  },
   metodo: {
     eyebrow: "O plano de carreira",
     titulo: "Da primeira sessão paga ao estúdio, *em 4 níveis.*",

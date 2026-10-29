@@ -63,6 +63,14 @@ export const moldes: PaginaVendas = {
     ],
   },
   numeros: [["60", "moldes de roupa pet"], ["7", "tamanhos, do PP ao XGG"], ["156", "páginas no livro"]],
+  conta: {
+    periodo: "semana",
+    quantidade: { rotulo: "Peças vendidas por semana", valor: 3 },
+    unidade: "peças",
+    preco: { rotulo: "Preço de cada peça", valor: 40 },
+    custoUnidade: { rotulo: "Custo de material por peça (tecido, ribana, linha, etiqueta e embalagem)", valor: 15 },
+    origem: "O livro traz a ficha de preço para você preencher (p. 147), sem valores prontos. Estes números são só um exemplo baixo: troque pelos seus.",
+  },
   metodo: {
     eyebrow: "O plano de 7 dias",
     titulo: "Do molde impresso à *primeira oferta no ar.*",

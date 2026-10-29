@@ -56,6 +56,14 @@ export const passeador: PaginaVendas = {
       ["/produtos/negocios/passeador-pag83.webp", "A ficha do cão, para imprimir."],
     ],
   },
+  conta: {
+    periodo: "semana",
+    quantidade: { rotulo: "Passeios por semana", valor: 10 },
+    unidade: "passeios",
+    preco: { rotulo: "Preço do passeio de 30 min", valor: 25 },
+    custoMes: { rotulo: "Custos do mês (MEI, celular, transporte e reposição)", valor: 466 },
+    origem: "Valores iniciais do manual: passeio de 30 min a R$ 25 e custos do mês de R$ 466 (p. 55). A quantidade é só um exemplo: 2 passeios por dia útil.",
+  },
   metodo: {
     eyebrow: "O plano de carreira",
     titulo: "Do primeiro cão à equipe de passeadores, em 4 níveis",

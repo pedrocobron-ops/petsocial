@@ -71,6 +71,14 @@ export const confeitaria: PaginaVendas = {
     ["IN MAPA 30/2009", "Traz as regras de rotulagem de produtos para animais, que valem também para quem está na dispensa de registro.", "Ministério da Agricultura, legislação de alimentação animal", "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/legislacao-alimentacao-animal"],
   ],
   numeros: [["30", "receitas com ficha técnica"], ["4", "níveis no plano de carreira"], ["4", "ferramentas para usar"]],
+  conta: {
+    periodo: "semana",
+    quantidade: { rotulo: "Kits de aniversário vendidos por semana", valor: 3 },
+    unidade: "kits",
+    preco: { rotulo: "Preço de cada kit", valor: 90.9, passo: 0.1 },
+    custoUnidade: { rotulo: "Custo de cada kit (ingredientes, embalagem e montagem)", valor: 67.8, passo: 0.1 },
+    origem: "Valores iniciais: o Kit Aniversário do manual (p. 59), com custo de R$ 67,80 e preço sugerido de R$ 90,90. A sua hora de montagem já entra no custo. A quantidade é só um exemplo.",
+  },
   metodo: {
     eyebrow: "O plano de carreira",
     titulo: "Do primeiro bolo à confeitaria com equipe, *em 4 níveis.*",

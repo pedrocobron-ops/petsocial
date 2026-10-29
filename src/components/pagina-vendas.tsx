@@ -22,6 +22,8 @@ import type { Produto } from "@/lib/produtos";
 import { comoProduto, daFamilia, linhaDe, reais, urlProduto } from "@/lib/produtos";
 import type { PaginaVendas as Conteudo, FichaExemplo, IconeLucide } from "@/lib/vendas/tipos";
 import { FIXAS } from "@/lib/faq";
+import Conta from "@/components/conta";
+import { FaixaMercado } from "@/components/mercado";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
@@ -230,6 +232,9 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
         <div className="container"><FaixaProva negocios={negocios} breve={!lancado} /></div>
       </section>
 
+      {/* 2 · O mercado pet no Brasil (linha Negócios, só nas páginas com "A conta") */}
+      {negocios && c.conta && <FaixaMercado />}
+
       {/* 3 · Por dentro */}
       {paginas.length > 0 && (
         <section className="secao dentro-sec" id="dentro">
@@ -299,6 +304,20 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           )}
         </div>
       </section>
+
+      {/* 4b · A conta: simulador com os valores de exemplo do manual */}
+      {negocios && c.conta && (
+        <section className="secao bloco-suave conta-sec" id="conta" aria-labelledby="conta-titulo">
+          <div className="container">
+            <div className="cab rv">
+              <span className="rotulo">A conta</span>
+              <h2 id="conta-titulo">Quanto pode sobrar <em>no fim do mês?</em></h2>
+              <p>Troque os números pelos da sua realidade. A conta começa com um exemplo, e a sobra muda na hora.</p>
+            </div>
+            <Conta conta={c.conta} />
+          </div>
+        </section>
+      )}
 
       {/* 5 · Oferta */}
       {ofertas ? (

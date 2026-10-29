@@ -6,6 +6,7 @@ import { FaixaProva } from "@/components/pagamento";
 import { Rico, pares } from "@/components/pagina-vendas";
 import { CartaoProduto } from "@/components/vitrine";
 import { FaqVitrine } from "@/components/vitrine-blocos";
+import { FaixaMercado } from "@/components/mercado";
 import { fixa } from "@/lib/faq";
 import { FEED_AREAS } from "@/lib/feed-pronto";
 import { PRODUTOS, linhaDe } from "@/lib/produtos";
@@ -16,12 +17,6 @@ export const metadata: Metadata = {
   description: "Manuais para começar e crescer num negócio pet: a lei do seu ramo, quanto cobrar e as ferramentas, com fonte e data. Sem promessa de renda.",
   alternates: { canonical: "/negocios" },
 };
-
-/** Dois fatos com fonte (6.23). "Muita gente" saiu: não é número. Enunciado e link conferidos na fonte. */
-const FATOS = [
-  ["R$ 77,96 bi", "faturamento do setor pet no Brasil em 2025", "Abempet, 2026", "https://www.gov.br/agricultura/pt-br/assuntos/camaras-setoriais-tematicas/documentos/camaras-setoriais/animais-e-estimacao/2026/45a-ro-23-04-2026/release-projecao-2025-setor-pet.pdf"],
-  ["+22%", "na abertura de pequenos negócios pet entre 2023 e 2025, a maioria MEI", "Sebrae, via Itatiaia, 2026", "https://www.itatiaia.com.br/pets-e-animais/mercado-pet-abertura-de-pequenos-negocios-cresce-22-impulsionada-pela-ascensao-felina/"],
-] as const;
 
 /** Como fazemos (padrão numerado 01–04 da home). */
 const PILARES = [
@@ -68,20 +63,13 @@ export default function Negocios() {
         </figure>
       </section>
 
-      {/* 2 · Dois fatos com fonte (bloco verde) */}
-      <section className="secao secao-escura fatos-fonte" aria-label="O mercado pet em números">
-        <div className="container">
-          <ul className="fatos-fonte-lista">
-            {FATOS.map(([n, frase, fonte, url]) => (
-              <li key={n} className="rv">
-                <b className="num">{n}</b>
-                <p>{frase}</p>
-                <a href={url} target="_blank" rel="noopener noreferrer">Fonte: {fonte}</a>
-              </li>
-            ))}
-          </ul>
+      {/* 2 · O mercado pet no Brasil: 4 números com fonte e o convite */}
+      <FaixaMercado hub>
+        <div className="mercado-convite rv">
+          <p><b>Quem atende bem tem espaço.</b> O mercado cresce, e o cliente procura quem cuida direito do pet dele. Comece com as regras certas e um preço que fecha a conta.</p>
+          <a className="btn btn-claro" href="#manuais">Escolher o meu ofício<Seta /></a>
         </div>
-      </section>
+      </FaixaMercado>
 
       {/* 3 · Os manuais */}
       <section className="secao vitrine-sec" id="manuais" aria-labelledby="manuais-titulo">

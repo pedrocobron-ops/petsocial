@@ -56,6 +56,14 @@ export const petsitter: PaginaVendas = {
       ["/produtos/negocios/petsitter-pag98.webp", "O relatório da visita, para imprimir."],
     ],
   },
+  conta: {
+    periodo: "semana",
+    quantidade: { rotulo: "Visitas por semana", valor: 6 },
+    unidade: "visitas",
+    preco: { rotulo: "Preço da visita de 1 hora", valor: 60 },
+    custoMes: { rotulo: "Custos do mês (MEI, celular, transporte e reposição)", valor: 466 },
+    origem: "Valores iniciais do manual: o “mês calmo”, com 24 visitas de 1 hora a R$ 60 (p. 10), e custos do mês de R$ 466 (p. 61).",
+  },
   metodo: {
     eyebrow: "O plano de carreira",
     titulo: "Das primeiras visitas à sua própria equipe, em 4 níveis",

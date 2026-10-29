@@ -579,6 +579,41 @@ main:has(.venda) + .rodape .rodape-aviso { display: none !important; }
   .fatos-fonte-lista { grid-template-columns: 1fr 1fr; gap: 0 64px; }
   .fatos-fonte-lista li, .fatos-fonte-lista li:last-child { padding: 32px 0; border-bottom: 1px solid var(--linho-claro); }
 }
+/* O mercado pet no Brasil (hub e páginas da linha Negócios) */
+.mercado-sec .cab p { color: var(--no-escuro-2); }
+.mercado-convite { display: grid; gap: 20px; justify-items: start; margin-top: 40px; }
+.mercado-convite p { max-width: 52ch; font-size: var(--t-lead); line-height: 1.45; }
+@media (min-width: 900px) {
+  .mercado-convite { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 48px; margin-top: 48px; }
+  .fatos-fonte-lista.fatos-fonte-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 48px; }
+}
+
+/* A conta: simulador (linha Negócios) */
+.conta { display: grid; gap: 24px; }
+.conta-form { display: grid; gap: 20px; padding: 24px 20px; border-radius: var(--raio); }
+.conta-campo { display: grid; gap: 8px; }
+.conta-campo label { font-size: var(--t-pequeno); line-height: 1.35; color: var(--grafite); }
+.conta-input { display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 0 16px; border-radius: var(--raio); background: var(--papel); box-shadow: inset 0 0 0 1px var(--linho-forte); }
+.conta-input:focus-within { outline: 2px solid var(--grafite); outline-offset: 1px; }
+.conta-input span { color: var(--cinza); }
+.conta-input input { flex: 1; min-width: 0; height: 54px; border: 0; background: transparent; font-size: 1.25rem; font-variant-numeric: tabular-nums; outline: none; }
+.conta-origem { font-size: var(--t-pequeno); line-height: 1.45; color: var(--cinza); }
+.conta-resultado { display: grid; gap: 16px; align-content: start; }
+.conta-resultado dl { display: grid; margin: 0; border-top: 1px solid var(--linho); }
+.conta-resultado dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--linho); }
+.conta-resultado dt { font-size: var(--t-pequeno); color: var(--cinza); }
+.conta-resultado dd { display: grid; justify-items: end; margin: 0; font: var(--w-forte) 1.375rem/1.2 var(--display); font-variant-numeric: tabular-nums; text-align: right; }
+.conta-resultado dd small { font: 400 var(--t-pequeno)/1.35 var(--sans); color: var(--cinza); }
+.conta-sobra { flex-wrap: wrap; }
+.conta-sobra dt { color: var(--grafite); font-weight: 500; }
+.conta-sobra dd { font: var(--w-titulo) var(--t-num)/1 var(--display); letter-spacing: -.02em; }
+.conta-alerta { font-size: var(--t-pequeno); color: var(--grafite); }
+.conta-aviso { padding: 16px; border-radius: var(--raio); background: var(--papel); box-shadow: inset 0 0 0 1px var(--linho); font-size: var(--t-pequeno); line-height: 1.45; color: var(--grafite); }
+@media (min-width: 900px) {
+  .conta { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: start; }
+  .conta-form { padding: 32px; }
+}
+
 /* ilusão × real sobre o papel */
 .ilusao.ilusao-claro li { border-top-color: var(--linho); }
 .ilusao.ilusao-claro li:last-child { border-bottom-color: var(--linho); }

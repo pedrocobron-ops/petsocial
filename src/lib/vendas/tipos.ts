@@ -33,6 +33,11 @@ export type PaginaVendas = {
    * [termo, frase, nome da fonte, link]. Só enunciados conferidos com o texto do manual e com a fonte pública.
    */
   fontes?: [string, string, string, string][];
+  /**
+   * Linha Negócios: a faixa "O mercado pet no Brasil" e a seção "A conta" (simulador).
+   * Valores iniciais tirados do manual (ou baixos e marcados como exemplo); `origem` diz de onde vieram.
+   */
+  conta?: ContaExemplo;
   /** Comparação honesta da tabela 10.3 do brief, só depois de validada (ex.: "Custa menos que um saco de petisco."). */
   comparacao?: string;
   /** `rotulo`: a palavra acima de cada número (padrão: "Passo"). */
@@ -87,4 +92,24 @@ export type FichaExemplo = {
   /** O que vem em cada página: [título, explicação]. */
   legenda: [string, string][];
   nota?: string;
+};
+
+/** Um campo do simulador: o rótulo e o valor inicial. `passo` padrão: 1. */
+export type CampoConta = { rotulo: string; valor: number; passo?: number };
+
+/**
+ * O simulador "A conta". Mês = 4 semanas quando `periodo` é "semana" (conservador).
+ * Sobra = quantidade no mês × (preço − custo por unidade) − custos do mês.
+ */
+export type ContaExemplo = {
+  periodo: "semana" | "mes";
+  /** Ex.: { rotulo: "Kits vendidos por semana", valor: 3 }. */
+  quantidade: CampoConta;
+  /** Nome no plural do que se vende, para o resumo: "kits", "passeios". */
+  unidade: string;
+  preco: CampoConta;
+  custoUnidade?: CampoConta;
+  custoMes?: CampoConta;
+  /** Uma frase que diz de onde vieram os valores iniciais (página do manual ou "exemplo"). */
+  origem: string;
 };
