@@ -65,11 +65,17 @@ export const moldes: PaginaVendas = {
   numeros: [["60", "moldes de roupa pet"], ["7", "tamanhos, do PP ao XGG"], ["156", "páginas no livro"]],
   conta: {
     periodo: "semana",
-    quantidade: { rotulo: "Peças vendidas por semana", valor: 3 },
-    unidade: "peças",
-    preco: { rotulo: "Preço de cada peça", valor: 40 },
-    custoUnidade: { rotulo: "Custo de material por peça (tecido, ribana, linha, etiqueta e embalagem)", valor: 15 },
-    origem: "O livro traz a ficha de preço para você preencher (p. 147), sem valores prontos. Estes números são só um exemplo baixo: troque pelos seus.",
+    lead: "Escolha um degrau e veja a conta. O preço é o de roupa pet feita à mão em lojas online, e você pode trocar pelos seus números.",
+    rotulos: { quantidade: "Peças vendidas por semana", preco: "Preço de cada peça", custoUnidade: "Custo de material por peça (tecido, ribana, linha, etiqueta e embalagem)" },
+    unidade: ["peça", "peças"],
+    degraus: [
+      { nome: "Renda extra", quantidade: 5, preco: 45, custoUnidade: 15, origem: "5 peças por semana. Quantidade e custo de material são exemplo." },
+      { nome: "Meio período", quantidade: 12, preco: 45, custoUnidade: 15, origem: "12 peças por semana. Quantidade e custo de material são exemplo." },
+      { nome: "Negócio", quantidade: 25, preco: 45, custoUnidade: 15, origem: "25 peças por semana, cortando em série (p. 147). Quantidade e custo de material são exemplo." },
+    ],
+    nota: "O livro traz a ficha de preço para você preencher (p. 147). O preço de R$ 45 é conservador, dentro da faixa de R$ 25 a R$ 80 de roupa pet feita à mão em lojas online, pesquisada em out/2026:",
+    fonte: ["anúncios no Elo7", "https://www.elo7.com.br/lista/roupa-para-cachorro-comprar/"],
+    paga: "O livro de moldes se paga",
   },
   metodo: {
     eyebrow: "O plano de 7 dias",

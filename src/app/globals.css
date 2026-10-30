@@ -600,13 +600,25 @@ main:has(.venda) + .rodape .rodape-aviso { display: none !important; }
 .conta-origem { font-size: var(--t-pequeno); line-height: 1.45; color: var(--cinza); }
 .conta-resultado { display: grid; gap: 16px; align-content: start; }
 .conta-resultado dl { display: grid; margin: 0; border-top: 1px solid var(--linho); }
-.conta-resultado dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--linho); }
+.conta-resultado dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--linho); }
 .conta-resultado dt { font-size: var(--t-pequeno); color: var(--cinza); }
-.conta-resultado dd { display: grid; justify-items: end; margin: 0; font: var(--w-forte) 1.375rem/1.2 var(--display); font-variant-numeric: tabular-nums; text-align: right; }
+.conta-resultado dd { display: grid; justify-items: end; margin: 0; font: var(--w-forte) 1.25rem/1.2 var(--display); font-variant-numeric: tabular-nums; text-align: right; }
 .conta-resultado dd small { font: 400 var(--t-pequeno)/1.35 var(--sans); color: var(--cinza); }
-.conta-sobra { flex-wrap: wrap; }
-.conta-sobra dt { color: var(--grafite); font-weight: 500; }
-.conta-sobra dd { font: var(--w-titulo) var(--t-num)/1 var(--display); letter-spacing: -.02em; }
+.conta-lado { display: grid; gap: 16px; align-content: start; }
+.conta-degraus { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 6px; border-radius: var(--pill); background: var(--papel); box-shadow: inset 0 0 0 1px var(--linho-forte); }
+.conta-degraus button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 52px; padding: 4px 6px; border: 0; border-radius: var(--pill); background: transparent; font-size: .9375rem; font-weight: 500; line-height: 1.15; color: var(--grafite); cursor: pointer; transition: background var(--d-rapida) var(--e-saida), color var(--d-rapida) var(--e-saida); }
+.conta-degraus button small { font-size: .6875rem; font-weight: 400; letter-spacing: .08em; color: var(--cinza); }
+.conta-degraus button[aria-pressed="true"] { background: var(--negocios); color: var(--no-escuro); }
+.conta-degraus button[aria-pressed="true"] small { color: var(--no-escuro-2); }
+.conta-degraus button:focus-visible { outline: 2px solid var(--grafite); outline-offset: 2px; }
+.conta-sobra { display: grid; gap: 6px; padding: 24px 20px; border-radius: var(--raio); background: var(--negocios); color: var(--no-escuro); }
+.conta-sobra > span:first-child { font-size: var(--t-pequeno); color: var(--no-escuro-2); }
+.conta-sobra .num { color: var(--no-escuro); overflow-wrap: anywhere; }
+.conta-ano { font-size: var(--t-lead); color: var(--no-escuro-2); }
+.conta-ano b { color: var(--no-escuro); font-weight: 500; }
+.conta-paga { display: grid; gap: 4px; padding: 16px 20px; border-radius: var(--raio); background: var(--negocios-tint); box-shadow: inset 4px 0 0 var(--laranja); font-size: var(--t-lead); line-height: 1.35; color: var(--grafite); }
+.conta-paga small { font-size: var(--t-pequeno); color: var(--cinza); }
+.conta-origem a { color: var(--grafite); text-decoration: underline; text-underline-offset: 3px; }
 .conta-alerta { font-size: var(--t-pequeno); color: var(--grafite); }
 .conta-aviso { padding: 16px; border-radius: var(--raio); background: var(--papel); box-shadow: inset 0 0 0 1px var(--linho); font-size: var(--t-pequeno); line-height: 1.45; color: var(--grafite); }
 @media (min-width: 900px) {

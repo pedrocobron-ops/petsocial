@@ -58,11 +58,15 @@ export const passeador: PaginaVendas = {
   },
   conta: {
     periodo: "semana",
-    quantidade: { rotulo: "Passeios por semana", valor: 10 },
-    unidade: "passeios",
-    preco: { rotulo: "Preço do passeio de 30 min", valor: 25 },
-    custoMes: { rotulo: "Custos do mês (MEI, celular, transporte e reposição)", valor: 466 },
-    origem: "Valores iniciais do manual: passeio de 30 min a R$ 25 e custos do mês de R$ 466 (p. 55). A quantidade é só um exemplo: 2 passeios por dia útil.",
+    lead: "Escolha um degrau e veja a conta. Os números vêm do plano de carreira do manual, e você pode trocar pelos seus.",
+    rotulos: { quantidade: "Passeios por semana", preco: "Preço de cada passeio", custoMes: "Custos do mês (MEI, celular, transporte e reposição)" },
+    unidade: ["passeio", "passeios"],
+    degraus: [
+      { nome: "Começando", quantidade: 10, preco: 25, custoMes: 466, origem: "De 3 a 5 clientes regulares (nível 1, p. 75): 10 passeios de 30 min por semana, a R$ 25 (p. 55)." },
+      { nome: "Profissional", quantidade: 20, preco: 25, custoMes: 466, origem: "Os horários bons quase todos ocupados (nível 2, p. 76): 4 passeios por dia útil, a R$ 25 (p. 55). A quantidade é exemplo." },
+      { nome: "Negócio", quantidade: 30, preco: 21.4, custoMes: 466, origem: "6 clientes no pacote de 5 passeios por semana a R$ 470 por mês (nível 3, p. 77, e p. 56): R$ 21,40 por passeio." },
+    ],
+    nota: "Custos do mês: R$ 466 (p. 55).",
   },
   metodo: {
     eyebrow: "O plano de carreira",

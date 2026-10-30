@@ -57,12 +57,16 @@ export const petsitter: PaginaVendas = {
     ],
   },
   conta: {
-    periodo: "semana",
-    quantidade: { rotulo: "Visitas por semana", valor: 6 },
-    unidade: "visitas",
-    preco: { rotulo: "Preço da visita de 1 hora", valor: 60 },
-    custoMes: { rotulo: "Custos do mês (MEI, celular, transporte e reposição)", valor: 466 },
-    origem: "Valores iniciais do manual: o “mês calmo”, com 24 visitas de 1 hora a R$ 60 (p. 10), e custos do mês de R$ 466 (p. 61).",
+    periodo: "mes",
+    lead: "Escolha um degrau e veja a conta. Os números vêm do plano de carreira do manual, e você pode trocar pelos seus.",
+    rotulos: { quantidade: "Visitas no mês", preco: "Preço médio da visita", custoMes: "Custos do mês (MEI, celular, transporte e reposição)" },
+    unidade: ["visita", "visitas"],
+    degraus: [
+      { nome: "Começando", quantidade: 24, preco: 60, custoMes: 466, origem: "O “mês calmo” do manual: 24 visitas de 1 hora a R$ 60 (p. 10)." },
+      { nome: "Profissional", quantidade: 40, preco: 67, custoMes: 466, origem: "O “mês com feriado”: 24 visitas a R$ 60 e 16 a R$ 78, com o acréscimo de feriado (p. 10). Dá R$ 67 em média." },
+      { nome: "Negócio", quantidade: 88, preco: 36, custoMes: 466, origem: "4 clientes no pacote “remédio do almoço”, R$ 792 por mês cada (nível 3, p. 84, e p. 64): 22 visitas de 30 min, R$ 36 cada." },
+    ],
+    nota: "Custos do mês: R$ 466 (p. 61).",
   },
   metodo: {
     eyebrow: "O plano de carreira",

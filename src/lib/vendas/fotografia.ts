@@ -69,12 +69,15 @@ export const fotografia: PaginaVendas = {
   numeros: [["4", "níveis no plano de carreira"], ["3", "níveis de investimento em equipamento"], ["4", "ferramentas para usar"]],
   conta: {
     periodo: "mes",
-    quantidade: { rotulo: "Ensaios por mês", valor: 2 },
-    unidade: "ensaios",
-    preco: { rotulo: "Preço do ensaio", valor: 450 },
-    custoUnidade: { rotulo: "Custo de cada ensaio (deslocamento, petiscos e fotos impressas)", valor: 49 },
-    custoMes: { rotulo: "Custos fixos do mês (MEI, Lightroom, desgaste do equipamento, celular)", valor: 421 },
-    origem: "Valores iniciais do manual: ensaio a R$ 450, com 2 ensaios no mês (p. 9), custo de R$ 49 por ensaio e R$ 421 de custos fixos (p. 62).",
+    lead: "Escolha um degrau e veja a conta. Os números vêm do plano de carreira do manual, e você pode trocar pelos seus.",
+    rotulos: { quantidade: "Ensaios no mês", preco: "Preço do ensaio", custoUnidade: "Custo de cada ensaio (deslocamento, petiscos e fotos impressas)", custoMes: "Custos fixos do mês (MEI, Lightroom, desgaste do equipamento, celular)" },
+    unidade: ["ensaio", "ensaios"],
+    degraus: [
+      { nome: "Começando", quantidade: 2, preco: 450, custoUnidade: 49, custoMes: 421, origem: "As primeiras sessões pagas (nível 1, p. 81): 2 ensaios no mês, a R$ 450 (p. 9)." },
+      { nome: "Profissional", quantidade: 4, preco: 450, custoUnidade: 49, custoMes: 421, origem: "Ensaios todo mês (nível 2, p. 82): 4 ensaios, a R$ 450 (p. 9)." },
+      { nome: "Negócio", quantidade: 8, preco: 450, custoUnidade: 49, custoMes: 421, origem: "Datas fortes lotadas e parceiros (nível 3, p. 83): 8 ensaios, a R$ 450 (p. 9)." },
+    ],
+    nota: "Custos: R$ 49 por ensaio e R$ 421 fixos no mês (p. 62).",
   },
   metodo: {
     eyebrow: "O plano de carreira",

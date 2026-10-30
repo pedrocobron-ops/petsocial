@@ -73,11 +73,15 @@ export const confeitaria: PaginaVendas = {
   numeros: [["30", "receitas com ficha técnica"], ["4", "níveis no plano de carreira"], ["4", "ferramentas para usar"]],
   conta: {
     periodo: "semana",
-    quantidade: { rotulo: "Kits de aniversário vendidos por semana", valor: 3 },
-    unidade: "kits",
-    preco: { rotulo: "Preço de cada kit", valor: 90.9, passo: 0.1 },
-    custoUnidade: { rotulo: "Custo de cada kit (ingredientes, embalagem e montagem)", valor: 67.8, passo: 0.1 },
-    origem: "Valores iniciais: o Kit Aniversário do manual (p. 59), com custo de R$ 67,80 e preço sugerido de R$ 90,90. A sua hora de montagem já entra no custo. A quantidade é só um exemplo.",
+    lead: "Escolha um degrau e veja a conta. Os números vêm do plano de carreira do manual, e você pode trocar pelos seus.",
+    rotulos: { quantidade: "Kits de aniversário vendidos por semana", preco: "Preço de cada kit", custoUnidade: "Custo de cada kit, sem contar a sua hora" },
+    unidade: ["kit", "kits"],
+    degraus: [
+      { nome: "Começando", quantidade: 1, preco: 90.9, custoUnidade: 26.3, origem: "1 kit por semana, perto das “2 a 4 encomendas por mês” do nível 1 (p. 92)." },
+      { nome: "Profissional", quantidade: 4, preco: 90.9, custoUnidade: 26.3, origem: "“Encomendas toda semana, com 1 ou 2 dias fixos de produção” (nível 2, p. 93). O manual não dá número: 4 kits por semana é exemplo." },
+      { nome: "Negócio", quantidade: 8, preco: 90.9, custoUnidade: 26.3, origem: "Kits nas datas fortes, clientes que voltam e ajuda nos picos (nível 3, p. 94). O manual não dá número: 8 kits por semana é exemplo." },
+    ],
+    nota: "Preço do Kit Aniversário: R$ 90,90 (p. 59). O custo de R$ 26,30 é ingrediente, embalagem e custos da casa, tirado das fichas das pp. 27, 37, 45, 49 e 59; a sobra paga a sua hora (cerca de 1 h 40 por kit no manual). Custos fixos como responsável técnico e contador não entram aqui.",
   },
   metodo: {
     eyebrow: "O plano de carreira",

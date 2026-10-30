@@ -94,22 +94,34 @@ export type FichaExemplo = {
   nota?: string;
 };
 
-/** Um campo do simulador: o rótulo e o valor inicial. `passo` padrão: 1. */
-export type CampoConta = { rotulo: string; valor: number; passo?: number };
+/** Um degrau do simulador: um cenário com os valores dos campos e de onde eles vieram. */
+export type DegrauConta = {
+  nome: string;
+  quantidade: number;
+  preco: number;
+  custoUnidade?: number;
+  custoMes?: number;
+  /** De onde vieram os números deste degrau (página do manual ou "exemplo"). */
+  origem: string;
+};
 
 /**
- * O simulador "A conta". Mês = 4 semanas quando `periodo` é "semana" (conservador).
+ * O simulador "A conta", em 3 degraus (começa no do meio). Mês = 4 semanas quando `periodo` é "semana" (conservador).
  * Sobra = quantidade no mês × (preço − custo por unidade) − custos do mês.
+ * "Se paga com N": preço do produto ÷ (sobra do mês ÷ unidades no mês), arredondado para cima.
  */
 export type ContaExemplo = {
   periodo: "semana" | "mes";
-  /** Ex.: { rotulo: "Kits vendidos por semana", valor: 3 }. */
-  quantidade: CampoConta;
-  /** Nome no plural do que se vende, para o resumo: "kits", "passeios". */
-  unidade: string;
-  preco: CampoConta;
-  custoUnidade?: CampoConta;
-  custoMes?: CampoConta;
-  /** Uma frase que diz de onde vieram os valores iniciais (página do manual ou "exemplo"). */
-  origem: string;
+  /** Abertura da seção, abaixo do título. */
+  lead: string;
+  rotulos: { quantidade: string; preco: string; custoUnidade?: string; custoMes?: string };
+  /** [singular, plural] do que se vende: ["passeio", "passeios"]. */
+  unidade: [string, string];
+  degraus: [DegrauConta, DegrauConta, DegrauConta];
+  /** Uma nota fixa sobre a conta (ex.: o que entra no custo). */
+  nota?: string;
+  /** Fonte externa de algum valor: [texto do link, url]. */
+  fonte?: [string, string];
+  /** Sujeito da frase do "se paga" (padrão: "O manual se paga"). */
+  paga?: string;
 };

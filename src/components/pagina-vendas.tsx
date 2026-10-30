@@ -311,10 +311,10 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           <div className="container">
             <div className="cab rv">
               <span className="rotulo">A conta</span>
-              <h2 id="conta-titulo">Quanto pode sobrar <em>no fim do mês?</em></h2>
-              <p>Troque os números pelos da sua realidade. A conta começa com um exemplo, e a sobra muda na hora.</p>
+              <h2 id="conta-titulo">Quanto o seu negócio pet <em>pode render?</em></h2>
+              <p>{c.conta.lead}</p>
             </div>
-            <Conta conta={c.conta} />
+            <Conta conta={c.conta} precoProduto={p.preco} />
           </div>
         </section>
       )}
