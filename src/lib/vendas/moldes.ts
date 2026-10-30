@@ -122,7 +122,7 @@ export const moldes: PaginaVendas = {
       "Bônus: Planilha de Preço e Kit da Marca para imprimir",
     ],
     complemento:
-      "o manual Fotografia Pet ou o guia Pet Influenciador, para fotografar e divulgar as suas peças (opcional, com preço especial no checkout).",
+      "os livros Look de Natal, Look de Réveillon, Look de Verão e Look de Carnaval Pet (R$ 7,90 cada) e o manual Fotografia Pet, para fotografar e divulgar as suas peças.",
   },
   garantia:
     "Baixe os moldes, imprima, costure uma peça e leia o plano de venda. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta. Sem perguntas e sem burocracia.",
