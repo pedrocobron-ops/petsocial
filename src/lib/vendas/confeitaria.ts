@@ -71,6 +71,22 @@ export const confeitaria: PaginaVendas = {
     ["IN MAPA 30/2009", "Traz as regras de rotulagem de produtos para animais, que valem também para quem está na dispensa de registro.", "Ministério da Agricultura, legislação de alimentação animal", "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/legislacao-alimentacao-animal"],
   ],
   numeros: [["30", "receitas com ficha técnica"], ["4", "níveis no plano de carreira"], ["4", "ferramentas para usar"]],
+  conta: {
+    periodo: "semana",
+    lead: "Escolha um degrau e veja a conta. Os números vêm do plano de carreira do manual, e você pode trocar pelos seus.",
+    rotulos: { quantidade: "Kits de aniversário vendidos por semana", preco: "Preço de cada kit", custoUnidade: "Custo de cada kit, sem contar a sua hora", custoMes: "Ajudante e outros custos do mês" },
+    unidade: ["kit", "kits"],
+    degraus: [
+      { nome: "Começando", quantidade: 1, preco: 90.9, custoUnidade: 26.3, custoMes: 0, origem: "1 kit por semana, perto das “2 a 4 encomendas por mês” do nível 1 (p. 92)." },
+      { nome: "Profissional", quantidade: 4, preco: 90.9, custoUnidade: 26.3, custoMes: 0, origem: "“Encomendas toda semana, com 1 ou 2 dias fixos de produção” (nível 2, p. 93). O manual não dá número: 4 kits por semana é exemplo." },
+      { nome: "Agenda cheia", quantidade: 12, preco: 90.9, custoUnidade: 26.3, custoMes: 0, origem: "Tempo integral: 12 kits por semana, cerca de 20 horas só de produção e montagem (1 h 40 por kit). Kits nas datas fortes e clientes que voltam (nível 3, p. 94). A quantidade é exemplo." },
+      { nome: "Com equipe", quantidade: 25, preco: 90.9, custoUnidade: 26.3, custoMes: 2000, origem: "Nível 4, “Empresa”: equipe e produção além de você (p. 95). 25 kits por semana com uma ajudante. A ajudante a R$ 2.000 por mês, com encargos, é exemplo, como a quantidade. Se o faturamento passar do teto do MEI (R$ 81 mil por ano em 2026), os impostos mudam: veja com o contador." },
+    ],
+    nota: "Preço do Kit Aniversário: R$ 90,90 (p. 59). O custo de R$ 26,30 é ingrediente, embalagem e custos da casa, tirado das fichas das pp. 27, 37, 45, 49 e 59; a sobra paga a sua hora. Responsável técnico, contador e imposto não entram aqui.",
+    casos: [
+      ["Em Brasília, a Cani Bravo, que vende comida natural sob encomenda e bolos de aniversário para cães, faturou R$ 81 mil no último ano fiscal.", "Seu Dinheiro, set/2026", "https://www.seudinheiro.com/2026/seu-negocio/ela-comecou-a-cozinhar-para-o-proprio-cachorro-e-criou-negocio-de-bolos-de-aniversario-e-racao-personalizada-para-caes-cbcb/"],
+    ],
+  },
   metodo: {
     eyebrow: "O plano de carreira",
     titulo: "Do primeiro bolo à confeitaria com equipe, *em 4 níveis.*",

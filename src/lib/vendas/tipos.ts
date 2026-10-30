@@ -33,6 +33,11 @@ export type PaginaVendas = {
    * [termo, frase, nome da fonte, link]. Só enunciados conferidos com o texto do manual e com a fonte pública.
    */
   fontes?: [string, string, string, string][];
+  /**
+   * Linha Negócios: a faixa "O mercado pet no Brasil" e a seção "A conta" (simulador).
+   * Valores iniciais tirados do manual (ou baixos e marcados como exemplo); `origem` diz de onde vieram.
+   */
+  conta?: ContaExemplo;
   /** Comparação honesta da tabela 10.3 do brief, só depois de validada (ex.: "Custa menos que um saco de petisco."). */
   comparacao?: string;
   /** `rotulo`: a palavra acima de cada número (padrão: "Passo"). */
@@ -87,4 +92,38 @@ export type FichaExemplo = {
   /** O que vem em cada página: [título, explicação]. */
   legenda: [string, string][];
   nota?: string;
+};
+
+/** Um degrau do simulador: um cenário com os valores dos campos e de onde eles vieram. */
+export type DegrauConta = {
+  nome: string;
+  quantidade: number;
+  preco: number;
+  custoUnidade?: number;
+  custoMes?: number;
+  /** De onde vieram os números deste degrau (página do manual ou "exemplo"). */
+  origem: string;
+};
+
+/**
+ * O simulador "A conta", em 4 degraus (abre no 3º, "Agenda cheia"). Mês = 4 semanas quando `periodo` é "semana" (conservador).
+ * Sobra = quantidade no mês × (preço − custo por unidade) − custos do mês.
+ * "Se paga com N": preço do produto ÷ (sobra do mês ÷ unidades no mês), arredondado para cima.
+ */
+export type ContaExemplo = {
+  periodo: "semana" | "mes";
+  /** Abertura da seção, abaixo do título. */
+  lead: string;
+  rotulos: { quantidade: string; preco: string; custoUnidade?: string; custoMes?: string };
+  /** [singular, plural] do que se vende: ["passeio", "passeios"]. */
+  unidade: [string, string];
+  degraus: [DegrauConta, DegrauConta, DegrauConta, DegrauConta];
+  /** Uma nota fixa sobre a conta (ex.: o que entra no custo). */
+  nota?: string;
+  /** Fonte externa de algum valor: [texto do link, url]. */
+  fonte?: [string, string];
+  /** Sujeito da frase do "se paga" (padrão: "O manual se paga"). */
+  paga?: string;
+  /** "Na vida real": casos com fonte, abaixo da conta. [frase, nome da fonte, link]. Só o que a reportagem diz. */
+  casos?: [string, string, string][];
 };

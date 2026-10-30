@@ -56,6 +56,22 @@ export const petsitter: PaginaVendas = {
       ["/produtos/negocios/petsitter-pag98.webp", "O relatório da visita, para imprimir."],
     ],
   },
+  conta: {
+    periodo: "mes",
+    lead: "Escolha um degrau e veja a conta. Os números vêm do plano de carreira do manual, e você pode trocar pelos seus.",
+    rotulos: { quantidade: "Visitas no mês", preco: "Preço médio da visita", custoMes: "Custos do mês (MEI, celular, transporte, reposição e equipe)" },
+    unidade: ["visita", "visitas"],
+    degraus: [
+      { nome: "Começando", quantidade: 24, preco: 60, custoMes: 466, origem: "O “mês calmo” do manual: 24 visitas de 1 hora a R$ 60 (p. 10)." },
+      { nome: "Profissional", quantidade: 40, preco: 67, custoMes: 466, origem: "O “mês com feriado”: 24 visitas a R$ 60 e 16 a R$ 78, com o acréscimo de feriado (p. 10). Dá R$ 67 em média." },
+      { nome: "Agenda cheia", quantidade: 110, preco: 50.4, custoMes: 466, origem: "Tempo integral, perto de 40 horas por semana: 66 visitas de 1 hora a R$ 60 (p. 10) e 44 visitas de 30 min do pacote “remédio do almoço”, a R$ 36 (p. 64). Dá R$ 50,40 em média. A quantidade é exemplo." },
+      { nome: "Com equipe", quantidade: 220, preco: 50.4, custoMes: 2716, origem: "Nível 4, “Empresa”: equipe com o seu método (p. 85). Você e um sitter contratado, com a mesma agenda. Custos: R$ 466 (p. 61), mais R$ 2.000 do sitter com encargos e R$ 250 de transporte dele. O manual pede salário, INSS de 3% e FGTS de 8% (p. 84); os valores são exemplo. Se o faturamento passar do teto do MEI (R$ 81 mil por ano em 2026), os impostos mudam: veja com o contador." },
+    ],
+    nota: "Custos do mês de um pet sitter: R$ 466 (p. 61).",
+    casos: [
+      ["Em São Paulo, a pet sitter Adriane Silveira cuidava de 25 cães em oito bairros e faturava, em média, R$ 8 mil por mês (2013).", "G1, via Olhar Direto, jan/2013", "https://olhardireto.com.br/noticias/baba-de-cachorro-fatura-r-8-mil-por-mes-em-sao-paulo"],
+    ],
+  },
   metodo: {
     eyebrow: "O plano de carreira",
     titulo: "Das primeiras visitas à sua própria equipe, em 4 níveis",

@@ -67,6 +67,22 @@ export const fotografia: PaginaVendas = {
     ["CNAE 7420-0/01", "“Fotógrafo(a)” está na lista de ocupações permitidas ao MEI. Vídeo e venda de impressos se confirmam com o contador.", "gov.br, ocupações permitidas ao MEI", "https://www.gov.br/empresas-e-negocios/pt-br/empreendedor/quero-ser-mei/atividades-permitidas"],
   ],
   numeros: [["4", "níveis no plano de carreira"], ["3", "níveis de investimento em equipamento"], ["4", "ferramentas para usar"]],
+  conta: {
+    periodo: "mes",
+    lead: "Escolha um degrau e veja a conta. Os números vêm do plano de carreira do manual, e você pode trocar pelos seus.",
+    rotulos: { quantidade: "Ensaios no mês", preco: "Preço do ensaio", custoUnidade: "Custo de cada ensaio (deslocamento, petiscos e fotos impressas)", custoMes: "Custos fixos do mês (MEI, Lightroom, equipamento, celular e equipe)" },
+    unidade: ["ensaio", "ensaios"],
+    degraus: [
+      { nome: "Começando", quantidade: 2, preco: 450, custoUnidade: 49, custoMes: 421, origem: "As primeiras sessões pagas (nível 1, p. 81): 2 ensaios no mês, a R$ 450 (p. 9)." },
+      { nome: "Profissional", quantidade: 4, preco: 450, custoUnidade: 49, custoMes: 421, origem: "Ensaios todo mês (nível 2, p. 82): 4 ensaios, a R$ 450 (p. 9)." },
+      { nome: "Agenda cheia", quantidade: 12, preco: 450, custoUnidade: 49, custoMes: 421, origem: "Tempo integral: 3 ensaios por semana, a R$ 450 (p. 9). Cada ensaio ocupa umas 6 horas com a edição (p. 9): cerca de 72 horas no mês. A quantidade é exemplo." },
+      { nome: "Com equipe", quantidade: 20, preco: 450, custoUnidade: 49, custoMes: 2421, origem: "Nível 4, “Empresa”: estúdio próprio ou equipe (p. 84), com o assistente do nível 3 (p. 83). 20 ensaios no mês. Custos fixos: R$ 421 (p. 62), mais R$ 2.000 do assistente com encargos. A quantidade e o assistente são exemplo. Se o faturamento passar do teto do MEI (R$ 81 mil por ano em 2026), os impostos mudam: veja com o contador." },
+    ],
+    nota: "Custos: R$ 49 por ensaio e R$ 421 fixos no mês (p. 62).",
+    casos: [
+      ["Em Belém, fotógrafos ouvidos pelo jornal cobravam de R$ 400 a R$ 500 por ensaio pet, preço parecido com o de ensaio de pessoas (2023).", "O Liberal, abr/2023", "https://www.oliberal.com/empreendamais/ensaio-fotografico-de-pet-e-nicho-de-mercado-promissor-e-apaixonante-1.668782"],
+    ],
+  },
   metodo: {
     eyebrow: "O plano de carreira",
     titulo: "Da primeira sessão paga ao estúdio, *em 4 níveis.*",
