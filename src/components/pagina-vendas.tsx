@@ -20,7 +20,7 @@ import { CartaoProduto } from "@/components/vitrine";
 import { VerProduto } from "@/components/meta-pixel";
 import type { Produto } from "@/lib/produtos";
 import { comoProduto, daFamilia, linhaDe, reais, urlProduto } from "@/lib/produtos";
-import type { PaginaVendas as Conteudo, FichaExemplo, IconeLucide } from "@/lib/vendas/tipos";
+import type { PaginaVendas as Conteudo, FichaExemplo, IconeLucide, ContaExemplo } from "@/lib/vendas/tipos";
 import { FIXAS } from "@/lib/faq";
 import Conta from "@/components/conta";
 import { FaixaMercado } from "@/components/mercado";
@@ -313,6 +313,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
               <span className="rotulo">A conta</span>
               <h2 id="conta-titulo">Quanto o seu negócio pet <em>pode render?</em></h2>
               <p>{c.conta.lead}</p>
+              <p className="conta-teto">{c.conta.degraus[3].nome}, a conta chega a <b>{tetoConta(c.conta)} por mês</b>. Escolha o seu degrau abaixo.</p>
             </div>
             <Conta conta={c.conta} precoProduto={p.preco} />
           </div>
@@ -643,4 +644,12 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
       <BarraCompra produto={p} item={item} />
     </div>
   );
+}
+
+/** Sobra do último degrau ("Com equipe"), mesma conta do simulador, para a frase de destaque. */
+function tetoConta(conta: ContaExemplo) {
+  const d = conta.degraus[3];
+  const noMes = d.quantidade * (conta.periodo === "semana" ? 4 : 1);
+  const sobra = noMes * d.preco - noMes * (conta.rotulos.custoUnidade ? d.custoUnidade ?? 0 : 0) - (conta.rotulos.custoMes ? d.custoMes ?? 0 : 0);
+  return "R$ " + Math.round(sobra).toLocaleString("pt-BR");
 }
