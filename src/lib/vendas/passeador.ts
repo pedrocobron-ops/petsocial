@@ -59,14 +59,18 @@ export const passeador: PaginaVendas = {
   conta: {
     periodo: "semana",
     lead: "Escolha um degrau e veja a conta. Os números vêm do plano de carreira do manual, e você pode trocar pelos seus.",
-    rotulos: { quantidade: "Passeios por semana", preco: "Preço de cada passeio", custoMes: "Custos do mês (MEI, celular, transporte e reposição)" },
+    rotulos: { quantidade: "Passeios por semana", preco: "Preço de cada passeio", custoMes: "Custos do mês (MEI, celular, transporte, reposição e equipe)" },
     unidade: ["passeio", "passeios"],
     degraus: [
       { nome: "Começando", quantidade: 10, preco: 25, custoMes: 466, origem: "De 3 a 5 clientes regulares (nível 1, p. 75): 10 passeios de 30 min por semana, a R$ 25 (p. 55)." },
       { nome: "Profissional", quantidade: 20, preco: 25, custoMes: 466, origem: "Os horários bons quase todos ocupados (nível 2, p. 76): 4 passeios por dia útil, a R$ 25 (p. 55). A quantidade é exemplo." },
-      { nome: "Negócio", quantidade: 30, preco: 21.4, custoMes: 466, origem: "6 clientes no pacote de 5 passeios por semana a R$ 470 por mês (nível 3, p. 77, e p. 56): R$ 21,40 por passeio." },
+      { nome: "Agenda cheia", quantidade: 40, preco: 25, custoMes: 466, origem: "Tempo integral: 8 passeios separados por dia útil, a R$ 25 (p. 55). Cada um ocupa uns 45 minutos (p. 9): cerca de 6 horas por dia. A quantidade é exemplo." },
+      { nome: "Com equipe", quantidade: 80, preco: 25, custoMes: 2716, origem: "Nível 4, “Empresa”: uma equipe com o seu método (p. 78). Você e um passeador contratado, 80 passeios por semana. Custos: R$ 466 (p. 55), mais R$ 2.000 do passeador com encargos e R$ 250 de transporte dele. O manual pede salário, INSS de 3% e FGTS de 8% (p. 77); os valores são exemplo. Se o faturamento passar do teto do MEI (R$ 81 mil por ano em 2026), os impostos mudam: veja com o contador." },
     ],
-    nota: "Custos do mês: R$ 466 (p. 55).",
+    nota: "Custos do mês de um passeador: R$ 466 (p. 55).",
+    casos: [
+      ["No Reino Unido, uma passeadora chegou a juntar até 30 cães no mesmo dia e diz que ganha mais do que no emprego antigo. A reportagem não dá valores.", "Tribuna de Jundiaí, set/2026", "https://tribunadejundiai.com.br/mais/mundo-pet/ela-largou-um-emprego-de-destaque-para-passear-com-ate-30-caes-por-dia-e-diz-que-agora-ganha-mais/"],
+    ],
   },
   metodo: {
     eyebrow: "O plano de carreira",

@@ -31,12 +31,12 @@ const doDegrau = (d: DegrauConta): Valores => ({
 });
 
 /**
- * "A conta": 3 degraus (começa no do meio) que preenchem os campos; a pessoa pode trocar os números.
+ * "A conta": 4 degraus (abre no 3º, "Agenda cheia") que preenchem os campos; a pessoa pode trocar os números.
  * Mostra a sobra do mês em destaque, o ano e em quantas vendas o produto se paga. O aviso fica sempre junto.
  */
 export default function Conta({ conta, precoProduto }: { conta: ContaExemplo; precoProduto: number }) {
-  const [ativo, setAtivo] = useState(1);
-  const [v, setV] = useState<Valores>(() => doDegrau(conta.degraus[1]));
+  const [ativo, setAtivo] = useState(2);
+  const [v, setV] = useState<Valores>(() => doDegrau(conta.degraus[2]));
   const muda = (k: keyof Valores) => (x: string) => setV((o) => ({ ...o, [k]: x }));
   const escolhe = (i: number) => { setAtivo(i); setV(doDegrau(conta.degraus[i])); };
 
@@ -92,6 +92,16 @@ export default function Conta({ conta, precoProduto }: { conta: ContaExemplo; pr
           </div>
         </dl>
         <p className="conta-aviso"><b>Exemplo, não promessa.</b> O resultado depende do seu trabalho, preço e região. Imposto e meses fracos podem mudar a conta.</p>
+        {conta.casos && conta.casos.length > 0 && (
+          <div className="conta-casos">
+            <h3>Na vida real</h3>
+            <ul>
+              {conta.casos.map(([frase, fonte, url]) => (
+                <li key={url}>{frase} <a href={url} target="_blank" rel="noopener noreferrer">Fonte: {fonte}</a></li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

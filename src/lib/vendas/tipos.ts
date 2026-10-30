@@ -106,7 +106,7 @@ export type DegrauConta = {
 };
 
 /**
- * O simulador "A conta", em 3 degraus (começa no do meio). Mês = 4 semanas quando `periodo` é "semana" (conservador).
+ * O simulador "A conta", em 4 degraus (abre no 3º, "Agenda cheia"). Mês = 4 semanas quando `periodo` é "semana" (conservador).
  * Sobra = quantidade no mês × (preço − custo por unidade) − custos do mês.
  * "Se paga com N": preço do produto ÷ (sobra do mês ÷ unidades no mês), arredondado para cima.
  */
@@ -117,11 +117,13 @@ export type ContaExemplo = {
   rotulos: { quantidade: string; preco: string; custoUnidade?: string; custoMes?: string };
   /** [singular, plural] do que se vende: ["passeio", "passeios"]. */
   unidade: [string, string];
-  degraus: [DegrauConta, DegrauConta, DegrauConta];
+  degraus: [DegrauConta, DegrauConta, DegrauConta, DegrauConta];
   /** Uma nota fixa sobre a conta (ex.: o que entra no custo). */
   nota?: string;
   /** Fonte externa de algum valor: [texto do link, url]. */
   fonte?: [string, string];
   /** Sujeito da frase do "se paga" (padrão: "O manual se paga"). */
   paga?: string;
+  /** "Na vida real": casos com fonte, abaixo da conta. [frase, nome da fonte, link]. Só o que a reportagem diz. */
+  casos?: [string, string, string][];
 };
