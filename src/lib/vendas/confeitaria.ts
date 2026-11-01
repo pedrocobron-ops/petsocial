@@ -70,6 +70,7 @@ export const confeitaria: PaginaVendas = {
     ["CNAE 1066-0/00", "A fabricação de alimento para animais não está na lista de ocupações permitidas ao MEI. A conversa com o contador vem antes do CNPJ.", "gov.br, ocupações permitidas ao MEI", "https://www.gov.br/empresas-e-negocios/pt-br/empreendedor/quero-ser-mei/atividades-permitidas"],
     ["IN MAPA 30/2009", "Traz as regras de rotulagem de produtos para animais, que valem também para quem está na dispensa de registro.", "Ministério da Agricultura, legislação de alimentação animal", "https://www.gov.br/agricultura/pt-br/assuntos/insumos-agropecuarios/insumos-pecuarios/alimentacao-animal/legislacao-alimentacao-animal"],
   ],
+  video: { titulo: "Veja em *25 segundos* o que vem no manual.", texto: "O mesmo vídeo do anúncio: o mercado de festa pet, como é o manual por dentro e o que você precisa para começar.", arquivo: "/videos/venda-confeitaria.mp4", capa: "/videos/venda-confeitaria.jpg" },
   numeros: [["30", "receitas com ficha técnica"], ["4", "níveis no plano de carreira"], ["4", "ferramentas para usar"]],
   conta: {
     periodo: "semana",

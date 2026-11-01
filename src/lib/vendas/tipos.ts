@@ -28,6 +28,8 @@ export type PaginaVendas = {
   recebe: { titulo: string; itens: [string, string, number?][]; paginas: [string, string][] };
   /** Até 3 números lidos do PDF, para "O que vem no guia": ["23", "páginas ilustradas"]. Só números reais. */
   numeros?: [string, string][];
+  /** Linha Negócios: o vídeo de venda (o mesmo do anúncio), no meio da página. `arquivo` e `capa` ficam em /public/videos. */
+  video?: { titulo: string; texto: string; arquivo: string; capa: string };
   /**
    * Linha Negócios: "Três fatos com fonte" no lugar de "Ainda em dúvida?" (brief 20, 7.5 #7).
    * [termo, frase, nome da fonte, link]. Só enunciados conferidos com o texto do manual e com a fonte pública.

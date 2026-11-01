@@ -72,6 +72,7 @@ export const petsitter: PaginaVendas = {
       ["Em São Paulo, a pet sitter Adriane Silveira cuidava de 25 cães em oito bairros e faturava, em média, R$ 8 mil por mês (2013).", "G1, via Olhar Direto, jan/2013", "https://olhardireto.com.br/noticias/baba-de-cachorro-fatura-r-8-mil-por-mes-em-sao-paulo"],
     ],
   },
+  video: { titulo: "Veja em *25 segundos* o que vem no manual.", texto: "O mesmo vídeo do anúncio: o mercado de pet sitter, como é o manual por dentro e o que você precisa para começar.", arquivo: "/videos/venda-petsitter.mp4", capa: "/videos/venda-petsitter.jpg" },
   metodo: {
     eyebrow: "O plano de carreira",
     titulo: "Das primeiras visitas à sua própria equipe, em 4 níveis",

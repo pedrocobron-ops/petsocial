@@ -269,6 +269,21 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
         </section>
       )}
 
+      {/* 3c · O vídeo de venda (o mesmo do anúncio), para quem chega sem ter visto */}
+      {c.video && (
+        <section className="secao video-sec" id="video">
+          <div className="container video-grid">
+            <div className="cab rv">
+              <span className="rotulo">Em vídeo</span>
+              <h2><Titulo t={c.video.titulo} /></h2>
+              <p>{c.video.texto}</p>
+              {lancado && !ofertas && <Comprar produto={p} texto={textoCompra} origem="video" className="btn-largo" />}
+            </div>
+            <video className="video-venda" src={c.video.arquivo} poster={c.video.capa} controls playsInline preload="none" width={720} height={1280} />
+          </div>
+        </section>
+      )}
+
       {/* 4 · O que vem */}
       <section className="secao vem-sec" id="conteudo">
         <div className="container">
