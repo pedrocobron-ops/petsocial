@@ -54,6 +54,7 @@ export const influenciador: PaginaVendas = {
       ["/produtos/influenciador-pag70.webp", "Um mídia kit pronto, de exemplo"],
     ],
   },
+  video: { titulo: "Veja em *25 segundos* o que vem no guia.", texto: "O mesmo vídeo do anúncio: o que as marcas procuram, como é o guia por dentro e o que você precisa para começar.", arquivo: "/videos/venda-influenciador.mp4", capa: "/videos/venda-influenciador.jpg" },
   metodo: {
     eyebrow: "O caminho",
     titulo: "Do primeiro post à primeira proposta",

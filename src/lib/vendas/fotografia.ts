@@ -66,6 +66,7 @@ export const fotografia: PaginaVendas = {
     ["Código Civil, art. 20", "O tutor que aparece na foto tem direito sobre a própria imagem. O uso em portfólio e redes se combina por escrito.", "Planalto, Código Civil", "https://www.planalto.gov.br/ccivil_03/leis/2002/l10406compilada.htm"],
     ["CNAE 7420-0/01", "“Fotógrafo(a)” está na lista de ocupações permitidas ao MEI. Vídeo e venda de impressos se confirmam com o contador.", "gov.br, ocupações permitidas ao MEI", "https://www.gov.br/empresas-e-negocios/pt-br/empreendedor/quero-ser-mei/atividades-permitidas"],
   ],
+  video: { titulo: "Veja em *25 segundos* o que vem no manual.", texto: "O mesmo vídeo do anúncio: o mercado de fotografia pet, como é o manual por dentro e o que você precisa para começar.", arquivo: "/videos/venda-fotografia.mp4", capa: "/videos/venda-fotografia.jpg" },
   numeros: [["4", "níveis no plano de carreira"], ["3", "níveis de investimento em equipamento"], ["4", "ferramentas para usar"]],
   conta: {
     periodo: "mes",

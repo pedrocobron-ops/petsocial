@@ -62,6 +62,7 @@ export const moldes: PaginaVendas = {
       ["/produtos/negocios/moda-pag4.webp", "O sumário: dos moldes à primeira venda."],
     ],
   },
+  video: { titulo: "Veja em *25 segundos* o que vem nos moldes.", texto: "O mesmo vídeo do anúncio: o mercado de roupa pet, como é o livro por dentro e o que você precisa para começar.", arquivo: "/videos/venda-moldes.mp4", capa: "/videos/venda-moldes.jpg" },
   numeros: [["60", "moldes de roupa pet"], ["7", "tamanhos, do PP ao XGG"], ["156", "páginas no livro"]],
   conta: {
     periodo: "semana",
