@@ -20,6 +20,15 @@ export const EMPRESA = {
 export const linkWhatsapp = (texto = "Olá! Tenho uma dúvida sobre o Maestro Pet.") =>
   EMPRESA.whatsapp ? `https://wa.me/${EMPRESA.whatsapp}?text=${encodeURIComponent(texto)}` : "";
 
+/** As outras redes da marca, na ordem em que aparecem. `url` vazio = não aparece. */
+export const REDES: { nome: string; url: string }[] = [
+  { nome: "TikTok", url: "https://www.tiktok.com/@maestropet" },
+  { nome: "YouTube", url: "https://www.youtube.com/@maestropet" },
+  { nome: "Pinterest", url: "https://br.pinterest.com/maestropet/" },
+  { nome: "Facebook", url: "" },
+];
+export const redes = () => REDES.filter((r) => r.url);
+
 export const linkInstagram = () => (EMPRESA.instagram ? `https://www.instagram.com/${EMPRESA.instagram.replace(/^@/, "")}/` : "");
 
 /** "Razão social · CNPJ … · Endereço", só com o que estiver preenchido. */

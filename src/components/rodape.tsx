@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Logo from "@/components/logo";
 import { LogosPagamento } from "@/components/pagamento";
-import { EMPRESA, identificacao, linkInstagram, linkWhatsapp } from "@/lib/empresa";
+import { EMPRESA, identificacao, linkInstagram, linkWhatsapp, redes } from "@/lib/empresa";
 import { FEED_AREAS } from "@/lib/feed-pronto";
 import { PRODUTOS, linhaDe, urlProduto } from "@/lib/produtos";
 import { nomeCurto } from "@/components/vitrine";
@@ -56,6 +56,7 @@ export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocio
             <li><Link href="/sobre">Quem faz</Link></li>
             <li><a href={`mailto:${EMPRESA.email}`}>Contato</a></li>
             {ig && <li><a href={ig} rel="noopener noreferrer">Instagram</a></li>}
+            {redes().map((r) => <li key={r.nome}><a href={r.url} rel="noopener noreferrer">{r.nome}</a></li>)}
             {wa && <li><a href={wa}>WhatsApp</a></li>}
           </ul>
         </nav>
