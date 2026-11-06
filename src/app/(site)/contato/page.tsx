@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Instagram, Mail, MessageCircle } from "lucide-react";
+import { Instagram, Mail, MessageCircle, Share2 } from "lucide-react";
 import AbreAncora from "@/components/abre-ancora";
-import { EMPRESA, identificacao, linkInstagram, linkWhatsapp } from "@/lib/empresa";
+import { EMPRESA, identificacao, linkInstagram, linkWhatsapp, redes } from "@/lib/empresa";
 
 export const metadata: Metadata = {
   title: "Contato e ajuda",
@@ -52,6 +52,13 @@ export default function ContatoPage() {
                 <Instagram size={20} strokeWidth={1.75} aria-hidden />
                 <div><b>Instagram</b><span>Dicas do Mozart e novidades.</span></div>
                 <a className="canal-link" href={ig} rel="noopener noreferrer">@{EMPRESA.instagram}</a>
+              </li>
+            )}
+            {redes().length > 0 && (
+              <li className="rv">
+                <Share2 size={20} strokeWidth={1.75} aria-hidden />
+                <div><b>Outras redes</b><span>Vídeos, receitas e ideias para salvar.</span></div>
+                <span className="canal-redes">{redes().map((r) => <a key={r.nome} className="canal-link" href={r.url} rel="noopener noreferrer">{r.nome}</a>)}</span>
               </li>
             )}
           </ul>

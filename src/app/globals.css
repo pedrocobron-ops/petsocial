@@ -1543,3 +1543,6 @@ html:has(dialog[open]) .barra { visibility: hidden; }
 .video-grid { display: grid; gap: 32px; align-items: center; }
 .video-venda { width: 100%; max-width: 360px; aspect-ratio: 9 / 16; height: auto; justify-self: center; border-radius: var(--raio); background: #111; box-shadow: var(--luz); }
 @media (min-width: 900px) { .video-grid { grid-template-columns: minmax(0, 1fr) 360px; gap: 64px; } .video-grid > .cab { margin-bottom: 0; } }
+
+/* /contato: as outras redes lado a lado */
+.canal-redes { display: flex; flex-wrap: wrap; gap: 6px 16px; }

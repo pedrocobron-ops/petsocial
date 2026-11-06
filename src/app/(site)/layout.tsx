@@ -1,5 +1,6 @@
 import SiteHeader from "@/components/site-header";
 import Rodape from "@/components/rodape";
+import { linkInstagram, redes } from "@/lib/empresa";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
@@ -9,7 +10,7 @@ const organizacaoLd = {
   name: "Maestro Pet",
   url: SITE_URL,
   logo: `${SITE_URL}/logos/logo-quadrado-1024.png`,
-  sameAs: ["https://www.instagram.com/maestro_pet_/"],
+  sameAs: [linkInstagram(), ...redes().map((r) => r.url)].filter(Boolean),
   contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: "contato@maestropet.com" },
 };
 
