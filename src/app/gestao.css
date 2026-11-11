@@ -697,3 +697,4 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
   .g-porta-lado h2 { font-size: 2.375rem; max-width: 16ch; }
 }
 @media (max-width: 959px) { .g-porta-papo, .g-porta-lado > .fundo { display: none; } }
+@media (max-width: 520px) { .g-ag-faixa { padding: 6px 2px; gap: 0; } .g-ag-faixa .g-ico { width: 30px; height: 36px; } .g-ag-faixa .g-dia { padding: 8px 2px; border-radius: 13px; } .g-ag-faixa .g-dia b { font-size: 1.25rem; } }
