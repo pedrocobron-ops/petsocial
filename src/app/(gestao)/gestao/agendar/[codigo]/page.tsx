@@ -21,7 +21,7 @@ type Info = {
 type Passo = "servico" | "quando" | "dados" | "enviado";
 type Especie = "cao" | "gato" | "outro";
 type PetDoPedido = { id: number; nome: string; especie: Especie; porte: Porte | null };
-type Enviado = { servico: string; dia: string; pets: { nome: string; hora: string }[] };
+type Enviado = { id: string | null; servico: string; dia: string; pets: { nome: string; hora: string }[] };
 
 /** Quantos pets cabem num pedido só (o banco aceita até 4). */
 const MAX_PETS = 4;
@@ -203,9 +203,9 @@ export default function AgendarPeloLink() {
     });
     setEnviando(false);
     if (error) return setErro("Não consegui enviar agora. Confira a internet e tente de novo.");
-    const r = data as unknown as { ok: boolean; erro?: string } | null;
+    const r = data as unknown as { ok: boolean; erro?: string; id?: string } | null;
     if (r?.ok) {
-      setEnviado({ servico: servico.nome, dia, pets: lista.map((x, i) => ({ nome: x.nome, hora: somaMin(horaEscolhida, servico.duracao_min * i) })) });
+      setEnviado({ id: r.id ?? null, servico: servico.nome, dia, pets: lista.map((x, i) => ({ nome: x.nome, hora: somaMin(horaEscolhida, servico.duracao_min * i) })) });
       setPasso("enviado");
       window.scrollTo({ top: 0 });
       return;
@@ -534,6 +534,7 @@ export default function AgendarPeloLink() {
           </dl>
           <p className="g-lk-nota">{enviado.pets.length > 1 ? "Os horários ainda não estão marcados. Espere a confirmação do pet shop." : "O horário ainda não está marcado. Espere a confirmação do pet shop."}</p>
           <div className="g-lk-ok-acoes">
+            {enviado.id && <a className="g-btn verde" href={`/gestao/agendar/${codigo}/pedido/${enviado.id}`}>Acompanhar o pedido</a>}
             <button type="button" className="g-btn sec" onClick={pedirOutro}>Pedir outro horário</button>
             {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com o pet shop</a>}
           </div>

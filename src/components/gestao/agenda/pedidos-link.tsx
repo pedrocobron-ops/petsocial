@@ -124,12 +124,15 @@ export default function PedidosLink() {
     const p = lista[0].pedido;
     const oi = `Oi, ${primeiroNome(p.tutor_nome)}! Aqui é do ${petshop.nome}.`;
     const nomes = listaDe(lista.map((r) => r.pedido.pet_nome));
+    // endereços para o tutor: a página do pedido (confirmação) e o link para escolher outro horário (recusa)
+    const base = `${window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
+    const acompanhar = `\n\nVeja a confirmação aqui: ${base}/pedido/${p.id}`;
     if (lista[0].resposta === "recusado") {
-      return `${oi} Recebemos o seu pedido para ${nomes}, mas ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}, não vamos conseguir atender. Podemos ver outro horário? Me diga os dias e períodos que ficam bons para você.`;
+      return `${oi} Recebemos o seu pedido para ${nomes}, mas ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}, não vamos conseguir atender. Você pode escolher outro horário livre aqui: ${base}\n\nSe preferir, me diga os dias e períodos que ficam bons para você.`;
     }
     if (lista.length === 1) {
       const oQue = lista[0].servico ? `${lista[0].servico} de ${p.pet_nome}` : `horário de ${p.pet_nome}`;
-      return `${oi} Está confirmado: ${oQue} ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}. Esperamos vocês!`;
+      return `${oi} Está confirmado: ${oQue} ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}. Esperamos vocês!${acompanhar}`;
     }
     // cada pet com o seu serviço, o seu dia e a sua hora (o dia só se repete quando muda)
     const linhas = lista.map((r, i) => {
@@ -137,7 +140,7 @@ export default function PedidosLink() {
       const mesmoDia = i > 0 && dia === quandoNaFrase(lista[i - 1].pedido.inicio);
       return `${r.servico ? `${r.servico} de ${r.pedido.pet_nome}` : r.pedido.pet_nome} ${mesmoDia ? "" : `${dia}, `}às ${hora(r.pedido.inicio)}`;
     });
-    return `${oi} Está confirmado: ${listaDe(linhas)}. Esperamos vocês!`;
+    return `${oi} Está confirmado: ${listaDe(linhas)}. Esperamos vocês!${acompanhar}`;
   }
 
   if (!pendentes.length && !respondidos.length) return null;

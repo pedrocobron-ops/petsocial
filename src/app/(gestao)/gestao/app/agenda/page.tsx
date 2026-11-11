@@ -11,6 +11,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
+import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
 import FormBloqueio from "@/components/gestao/agenda/form-bloqueio";
@@ -143,6 +144,7 @@ function Agenda() {
             <button aria-pressed={visao === "dia"} onClick={() => setVisao("dia")}>Dia</button>
             <button aria-pressed={visao === "semana"} onClick={() => setVisao("semana")}>Semana</button>
           </div>
+          <LinkRapido />
           <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear<span className="g-agd-curto">&nbsp;horário</span></button>
           <button className="g-btn pri" onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>
         </div>

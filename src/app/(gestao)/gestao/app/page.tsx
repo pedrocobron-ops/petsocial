@@ -10,6 +10,7 @@ import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
+import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import { buscarSaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
 import MetaMes from "@/components/gestao/meta-mes";
@@ -119,6 +120,7 @@ export default function Hoje() {
           <h1>{saudacao()}, <em className="it">{eu.nome.split(" ")[0]}</em></h1>
         </div>
         <div className="g-acoes">
+          <LinkRapido rotulo="Mandar link de agendamento" />
           <Link className="g-btn pri" href="/gestao/app/agenda?novo=1"><Plus />Marcar horário</Link>
         </div>
       </header>

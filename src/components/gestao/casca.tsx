@@ -10,7 +10,7 @@ import {
 import { useGestao } from "./contexto";
 import { planoPorId } from "@/lib/gestao/planos";
 import { dataLonga } from "@/lib/gestao/util";
-import { AvatarPessoa, EVENTO_ASSISTENTE, Folha } from "./ui";
+import { AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
 import BuscaGeral from "./busca-geral";
 import type { Tom } from "./painel";
 import Assistente from "./assistente";
@@ -41,7 +41,8 @@ const GRUPOS: { titulo: string; itens: Item[] }[] = [
 /** Navegação, avisos de assinatura e o botão da assistente em volta de todas as telas do aplicativo. */
 export default function Casca({ children }: { children: React.ReactNode }) {
   const caminho = usePathname();
-  const { petshop, eu, souDono, vejoFinanceiro, liberado, diasDeTeste, sair } = useGestao();
+  const { sb, petshop, eu, souDono, vejoFinanceiro, liberado, diasDeTeste, sair } = useGestao();
+  const [pedidos, setPedidos] = useState(0);
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
   const [mais, setMais] = useState(false);
   const [ajuda, setAjuda] = useState(false);
@@ -52,6 +53,23 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener(EVENTO_ASSISTENTE, abrir);
   }, []);
   useEffect(() => { setMais(false); }, [caminho]);
+
+  // pedidos pelo link esperando resposta: bolinha com o número no menu, atualizada a cada minuto
+  useEffect(() => {
+    if (!petshop.link_ativo) { setPedidos(0); return; }
+    let vale = true;
+    const contar = async () => {
+      if (document.visibilityState !== "visible") return;
+      const { count } = await sb.from("pedidos_agendamento").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("status", "pendente");
+      if (vale) setPedidos(count ?? 0);
+    };
+    void contar();
+    const t = setInterval(() => void contar(), 60000);
+    const ouvir = () => void contar();
+    window.addEventListener(EVENTO_MUDOU, ouvir);
+    document.addEventListener("visibilitychange", ouvir);
+    return () => { vale = false; clearInterval(t); window.removeEventListener(EVENTO_MUDOU, ouvir); document.removeEventListener("visibilitychange", ouvir); };
+  }, [sb, petshop.id, petshop.link_ativo]);
 
   const pode = (i: Item) => (i.so === "financeiro" ? vejoFinanceiro : i.so === "dono" ? souDono : true);
   const atual = (href: string) => (href === "/gestao/app" ? caminho === href : caminho.startsWith(href));
@@ -65,7 +83,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         <div key={g.titulo}>
           <div className="g-nav-t">{g.titulo}</div>
           {g.itens.map((i) => (
-            <Link key={i.href} href={i.href} aria-current={atual(i.href) ? "page" : undefined}><i.icone />{i.rotulo}</Link>
+            <Link key={i.href} href={i.href} aria-current={atual(i.href) ? "page" : undefined}><i.icone />{i.rotulo}{i.href.endsWith("/agenda") && pedidos > 0 && <span className="g-nav-n" aria-label={`${pedidos} pedidos pelo link esperando resposta`}>{pedidos}</span>}</Link>
           ))}
         </div>
       ))}
@@ -132,7 +150,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
 
       <nav className="g-abas" aria-label="Menu">
         <Link href="/gestao/app" aria-current={atual("/gestao/app") ? "page" : undefined}><Sun />Hoje</Link>
-        <Link href="/gestao/app/agenda" aria-current={atual("/gestao/app/agenda") ? "page" : undefined}><CalendarDays />Agenda</Link>
+        <Link href="/gestao/app/agenda" aria-current={atual("/gestao/app/agenda") ? "page" : undefined} style={{ position: "relative" }}><CalendarDays />Agenda{pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
         <button className="g-aba-mic" onClick={() => setAssistente({ aberta: true, pedido: "" })} aria-label="Falar com o Mozart, o assistente">
           <span className="b"><Mic /></span>
         </button>

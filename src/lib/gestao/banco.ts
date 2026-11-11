@@ -595,6 +595,9 @@ isOneToOne: false
 "link_info":
 { Args: { "p_codigo": string }; Returns: Json
                            },
+"link_pedido":
+{ Args: { "p_id": string }; Returns: Json
+                           },
 "link_pedir":
 { Args: { "p_codigo": string,"p_dia": string,"p_especie"?: string,"p_hora": string,"p_obs"?: string,"p_outros"?: Json,"p_pet": string,"p_porte"?: string,"p_servico": string,"p_telefone": string,"p_tutor": string }; Returns: Json
                            },

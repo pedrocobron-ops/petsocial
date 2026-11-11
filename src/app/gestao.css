@@ -600,7 +600,7 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 
 /* entrada suave das seções */
 @keyframes g-entra { from { opacity: 0; transform: translateY(10px); } }
-.g-main > .g-topo, .g-main > .g-pilha > *, .g-main > section, .g-main > .g-grade, .g-main > .g-card { animation: g-entra .42s cubic-bezier(.2, .7, .2, 1) both; }
+.g-main > .g-topo, .g-main > .g-pilha > *, .g-main > section, .g-main > .g-grade, .g-main > .g-card { animation: g-entra .42s cubic-bezier(.2, .7, .2, 1) backwards; }
 .g-main > .g-pilha > *:nth-child(2) { animation-delay: .05s; } .g-main > .g-pilha > *:nth-child(3) { animation-delay: .1s; }
 .g-main > .g-pilha > *:nth-child(4) { animation-delay: .15s; } .g-main > .g-pilha > *:nth-child(n+5) { animation-delay: .2s; }
 
@@ -720,3 +720,8 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 /* a classe "cab" também existe no site de vendas (com margem embaixo); dentro do aplicativo ela não vale */
 .g-app .cab, .g-ass .cab, .g-porta .cab, .g-folha .cab { margin-bottom: 0; }
 .g-raiz .g-ass-entrada textarea:focus-visible { outline: 0; border-radius: 23px; }
+
+/* bolinha com o número de pedidos pelo link esperando resposta */
+.g-nav-n { margin-left: auto; min-width: 22px; height: 22px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: 999px; background: var(--g-laranja); color: #1f1b17; font: 700 .75rem/1 var(--sans); font-variant-numeric: tabular-nums; }
+.g-nav a[aria-current="page"] .g-nav-n + *, .g-nav a[aria-current="page"]:has(.g-nav-n)::after { display: none; }
+.g-nav-n.aba { position: absolute; top: 4px; left: calc(50% + 6px); margin: 0; min-width: 18px; height: 18px; font-size: .6875rem; box-shadow: 0 0 0 2px #fffbf5; }
