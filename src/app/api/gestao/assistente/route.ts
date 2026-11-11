@@ -92,6 +92,13 @@ export async function POST(req: Request) {
   }
 
   // tira espaço, quebra de linha ou caractere invisível colado junto com a chave
+  // guarda a conversa para a equipe Maestro Pet entender o que as pessoas pedem (não trava a resposta se falhar)
+  const pedidoDaVez = pendentes.length ? "" : (corpo.texto ?? "").trim().slice(0, 2000);
+  const guardarConversa = async (resposta: string) => {
+    if (!pedidoDaVez) return;
+    try { await sb.rpc("registrar_conversa", { p_petshop: c.petshop.id, p_canal: "mozart", p_pergunta: pedidoDaVez, p_resposta: resposta }); } catch { /* segue */ }
+  };
+
   const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, "") });
   const comFallback = /^claude-(opus-5-5|fable-5-2)/.test(MODELO);
   let texto = "";
@@ -138,7 +145,10 @@ export async function POST(req: Request) {
         }
       }
       // há algo para a pessoa confirmar: para aqui e espera os botões
-      if (propostas.length) return NextResponse.json({ mensagens, texto, propostas, parciais, links, mudou });
+      if (propostas.length) {
+        await guardarConversa([texto, ...propostas.map((p) => `[cartão] ${p.resumo.titulo}`)].filter(Boolean).join("\n"));
+        return NextResponse.json({ mensagens, texto, propostas, parciais, links, mudou });
+      }
       mensagens.push({ role: "user", content: parciais });
     }
   } catch (err) {
@@ -150,5 +160,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: "falha", mensagem: "Algo deu errado do nosso lado. Tente de novo em instantes.", tipo: err instanceof Error ? err.name : typeof err }, { status: 500 });
   }
 
+  await guardarConversa(texto || "Pronto.");
   return NextResponse.json({ mensagens, texto: texto || "Pronto.", propostas: [], parciais: [], links, mudou });
 }

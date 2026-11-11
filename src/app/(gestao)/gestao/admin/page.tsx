@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Download, LogOut, Mail, MessageCircle, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Download, LogOut, Mail, MessageCircle, RefreshCw, Search } from "lucide-react";
+import AbaUso, { type Uso, tempo, vistoHa } from "@/components/gestao/admin/uso";
+import AbaConversas from "@/components/gestao/admin/conversas";
 import { AvisosProvider, Campo, Esqueleto, Folha, Vazio, mensagemDeErro, ok, useAvisos } from "@/components/gestao/ui";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { brl, dataCompleta, dataCurta, fmtTelefone, haQuanto, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDiaCurto, semAcento, somaDias } from "@/lib/gestao/util";
@@ -88,11 +90,17 @@ function Admin() {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [abertaId, setAbertaId] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
+  const [aba, setAba] = useState<"geral" | "uso" | "conversas">("geral");
+  const [uso, setUso] = useState<Uso[]>([]);
+  const [vez, setVez] = useState(0);
 
   const carregar = useCallback(async () => {
     setAtualizando(true);
     try {
-      setLojas((ok(await banco().rpc("admin_painel")) as unknown as Loja[]) ?? []);
+      const [l, u] = await Promise.all([banco().rpc("admin_painel"), banco().rpc("admin_uso")]);
+      setLojas((ok(l) as unknown as Loja[]) ?? []);
+      setUso((u.data as unknown as Uso[]) ?? []);
+      setVez((v) => v + 1);
       setErro(null);
     } catch (e) {
       setErro(mensagemDeErro(e));
@@ -198,17 +206,24 @@ function Admin() {
     <main className="g-main" style={{ paddingBottom: 96 }}>
       <header className="g-topo">
         <div>
-          <h1>Painel Maestro Pet Gestão</h1>
-          <p className="g-muted">Os pet shops que usam o sistema, do teste à assinatura.</p>
+          <h1>Administrador · Maestro Pet Gestão</h1>
+          <p className="g-muted">Todos os pet shops: assinatura, uso do sistema e conversas.</p>
         </div>
         <div className="g-acoes">
+          <Link className="g-btn sec" href="/gestao/app"><ArrowLeft /> Meu pet shop</Link>
           <button className="g-btn sec" onClick={() => void carregar()} disabled={atualizando}><RefreshCw /> {atualizando ? "Atualizando…" : "Atualizar"}</button>
           <button className="g-btn fantasma" onClick={() => void sair()}><LogOut /> Sair</button>
         </div>
       </header>
 
       {erro && <p className="g-aviso vermelho" role="alert">{erro}</p>}
-      {!lojas ? (!erro && <Esqueleto linhas={6} />) : (
+      <div className="g-seg" role="group" aria-label="Partes do painel" style={{ marginBottom: 18 }}>
+        {([["geral", "Clientes"], ["uso", "Uso"], ["conversas", "Conversas"]] as const).map(([id, r]) => (
+          <button key={id} aria-pressed={aba === id} onClick={() => setAba(id)}>{r}</button>
+        ))}
+      </div>
+      {!lojas ? (!erro && <Esqueleto linhas={6} />) : aba === "uso" ? <AbaUso lojas={lojas} uso={uso} aoAbrir={setAbertaId} />
+        : aba === "conversas" ? <AbaConversas key={vez} /> : (
         <div className="g-pilha g">
           <section className="g-grade c4" aria-label="Números">
             <Numero rotulo="Pet shops cadastrados" valor={n.total} />
@@ -305,7 +320,7 @@ function Admin() {
         </div>
       )}
 
-      {aberta && <Detalhe key={aberta.id} loja={aberta} agora={agora} aoFechar={() => setAbertaId(null)} aoMudar={carregar} />}
+      {aberta && <Detalhe key={aberta.id} loja={aberta} uso={uso.find((u) => u.id === aberta.id)} agora={agora} aoFechar={() => setAbertaId(null)} aoMudar={carregar} />}
     </main>
   );
 }
@@ -321,7 +336,7 @@ function Numero({ rotulo, valor }: { rotulo: string; valor: number }) {
 
 /* ---------- folha de um pet shop ---------- */
 
-function Detalhe({ loja, agora, aoFechar, aoMudar }: { loja: Loja; agora: number; aoFechar: () => void; aoMudar: () => Promise<void> }) {
+function Detalhe({ loja, uso, agora, aoFechar, aoMudar }: { loja: Loja; uso?: Uso; agora: number; aoFechar: () => void; aoMudar: () => Promise<void> }) {
   const { avisar, avisarErro, confirmar } = useAvisos();
   const [nota, setNota] = useState(loja.nota ?? "");
   const [indo, setIndo] = useState(false);
@@ -373,6 +388,8 @@ function Detalhe({ loja, agora, aoFechar, aoMudar }: { loja: Loja; agora: number
     ["Agendamentos", `${loja.agendamentos} (${loja.agendamentos_7d} nos últimos 7 dias)`],
     ["Pedidos ao assistente", loja.pedidos_assistente],
     ["Último agendamento", loja.ultimo_agendamento ? `${haQuanto(loja.ultimo_agendamento)} (${dataCompleta(new Date(loja.ultimo_agendamento))})` : "nunca"],
+    ["Última vez no sistema", vistoHa(uso?.visto_em ?? null)],
+    ["Tempo de uso", `${tempo(uso?.min_7d ?? 0)} em 7 dias · ${tempo(uso?.min_30d ?? 0)} em 30 dias`],
   ];
 
   return (
@@ -430,6 +447,11 @@ function Detalhe({ loja, agora, aoFechar, aoMudar }: { loja: Loja; agora: number
         </Campo>
         <div>
           <button className="g-btn sec" disabled={indo || nota.trim() === (loja.nota ?? "").trim()} onClick={() => void gravar({ p_nota: nota.trim() }, "Anotação salva.")}>Salvar anotação</button>
+        </div>
+
+        <div className="g-pilha p">
+          <h3>Conversas com o Mozart e a Ajuda</h3>
+          <AbaConversas petshopId={loja.id} enxuto />
         </div>
       </div>
     </Folha>

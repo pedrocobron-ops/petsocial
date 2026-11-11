@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, BedDouble, CalendarDays, CalendarClock, CreditCard, Landmark, LifeBuoy, LogOut, Menu, Mic, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
+  BarChart3, BedDouble, CalendarDays, CalendarClock, CreditCard, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
 import { useGestao } from "./contexto";
 import { planoPorId } from "@/lib/gestao/planos";
@@ -50,6 +50,20 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
   const [mais, setMais] = useState(false);
   const [ajuda, setAjuda] = useState(false);
+  const [admin, setAdmin] = useState(false);
+
+  // só a equipe Maestro Pet vê o item "Administrador" no menu
+  useEffect(() => { let vale = true; void sb.rpc("sou_admin").then((r) => { if (vale) setAdmin(r.data === true); }); return () => { vale = false; }; }, [sb]);
+
+  // marca de uso: a cada minuto com a tela aberta, diz em que parte do sistema a pessoa está
+  useEffect(() => {
+    const area = caminho.replace(/^\/gestao\/app\/?/, "").split("/")[0] || "hoje";
+    const marcar = () => { if (document.visibilityState === "visible") void sb.rpc("marcar_uso", { p_petshop: petshop.id, p_area: area }).then(() => {}, () => {}); };
+    marcar();
+    const t = setInterval(marcar, 60000);
+    document.addEventListener("visibilitychange", marcar);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", marcar); };
+  }, [sb, petshop.id, caminho]);
 
   useEffect(() => {
     const abrir = (e: Event) => { setAjuda(false); setAssistente({ aberta: true, pedido: String((e as CustomEvent).detail ?? "") }); };
@@ -97,6 +111,12 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           ))}
         </div>
       ))}
+      {admin && (
+        <div>
+          <div className="g-nav-t">Maestro Pet</div>
+          <Link href="/gestao/admin"><ShieldCheck />Administrador</Link>
+        </div>
+      )}
     </nav>
   );
 
@@ -193,6 +213,12 @@ export default function Casca({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             ))}
+            {admin && (
+              <div>
+                <div className="g-rotulo" style={{ marginBottom: 4 }}>Maestro Pet</div>
+                <div className="g-lista"><Link href="/gestao/admin" className="g-linha"><span className="g-ico" aria-hidden><ShieldCheck /></span><span className="t"><b>Administrador</b></span></Link></div>
+              </div>
+            )}
             <button className="g-btn verde" onClick={() => { setMais(false); setAjuda(true); }}><LifeBuoy />Ajuda</button>
             <button className="g-btn sec" onClick={() => void sair()}><LogOut />Sair</button>
           </div>
