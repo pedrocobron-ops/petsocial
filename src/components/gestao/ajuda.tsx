@@ -8,7 +8,7 @@ import { hora } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";
 import { abrirAssistente } from "./ui";
 
-type Item = { de: "eu" | "ajuda"; texto: string; quando: string; avaliar?: boolean; avaliado?: "sim" | "nao" };
+type Item = { de: "eu" | "ajuda"; texto: string; quando: string; avaliar?: boolean; avaliado?: "sim" | "nao"; registro?: string | null };
 type Resposta = { texto?: string; equipe?: boolean; semResposta?: boolean; novo?: boolean; assunto?: string; erro?: string; mensagem?: string };
 
 /**
@@ -69,7 +69,11 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
       const mudou = j.novo === true || (j.assunto != null && memoria.assunto != null && j.assunto !== memoria.assunto);
       if (mudou) zerar();
       if (j.assunto != null) memoria.assunto = j.assunto;
-      guardar([...comPergunta, { de: "ajuda", texto: j.texto, quando: hora(new Date()), avaliar: !j.semResposta && !j.equipe }]);
+      // guarda a dúvida para a equipe Maestro Pet melhorar o sistema
+      const reg = await sb.rpc("registrar_conversa", { p_petshop: petshop.id, p_canal: "ajuda", p_pergunta: limpo, p_resposta: j.texto, p_pediu_equipe: j.equipe === true });
+      const registro = typeof reg.data === "string" ? reg.data : null;
+      if (j.semResposta && registro) void sb.rpc("avaliar_conversa", { p_id: registro, p_resolveu: false }).then(() => {}, () => {});
+      guardar([...comPergunta, { de: "ajuda", texto: j.texto, quando: hora(new Date()), avaliar: !j.semResposta && !j.equipe, registro }]);
       if (j.semResposta) falhou();
       if (j.equipe) chamarEquipe();
     } catch {
@@ -78,6 +82,8 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
   }, [pensando, sb, petshop.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function avaliar(indice: number, resolveu: boolean) {
+    const registro = memoria.itens[indice]?.registro;
+    if (registro) void sb.rpc("avaliar_conversa", { p_id: registro, p_resolveu: resolveu, p_pediu_equipe: !resolveu && memoria.falhas + 1 >= TENTATIVAS ? true : undefined }).then(() => {}, () => {});
     const novos = memoria.itens.map((i, n) => (n === indice ? { ...i, avaliar: false, avaliado: resolveu ? ("sim" as const) : ("nao" as const) } : i));
     if (resolveu) { zerar(); guardar([...novos, { de: "ajuda", texto: "Que bom! Se aparecer outra dúvida, é só escrever.", quando: hora(new Date()) }]); }
     else {

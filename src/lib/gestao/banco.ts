@@ -195,6 +195,26 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"conversas": {
+                  Row: {
+                    "canal": string,"criado_em": string,"id": string,"pediu_equipe": boolean,"pergunta": string,"petshop_id": string,"resolveu": boolean | null,"resposta": string | null,"user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "canal": string,"criado_em"?: string,"id"?: string,"pediu_equipe"?: boolean,"pergunta": string,"petshop_id": string,"resolveu"?: boolean | null,"resposta"?: string | null,"user_id"?: string | null
+                  }
+                  Update: {
+                    "canal"?: string,"criado_em"?: string,"id"?: string,"pediu_equipe"?: boolean,"pergunta"?: string,"petshop_id"?: string,"resolveu"?: boolean | null,"resposta"?: string | null,"user_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "conversas_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"estadias": {
                   Row: {
                     "criado_em": string,"entrada": string,"id": string,"obs": string | null,"pet_id": string,"petshop_id": string,"saida": string | null,"saida_prevista": string | null,"status": string,"tipo": string,"valor_diaria": number | null
@@ -437,6 +457,26 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"presenca": {
+                  Row: {
+                    "area": string | null,"contado_em": string,"petshop_id": string,"user_id": string,"visto_em": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "area"?: string | null,"contado_em"?: string,"petshop_id": string,"user_id": string,"visto_em"?: string
+                  }
+                  Update: {
+                    "area"?: string | null,"contado_em"?: string,"petshop_id"?: string,"user_id"?: string,"visto_em"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "presenca_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"produtos": {
                   Row: {
                     "ativo": boolean,"categoria": string | null,"criado_em": string,"custo": number | null,"estoque": number,"estoque_minimo": number,"id": string,"nome": string,"petshop_id": string,"preco_venda": number | null,"unidade": string
@@ -497,6 +537,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"uso_diario": {
+                  Row: {
+                    "area": string,"dia": string,"minutos": number,"petshop_id": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "area": string,"dia": string,"minutos"?: number,"petshop_id": string,"user_id": string
+                  }
+                  Update: {
+                    "area"?: string,"dia"?: string,"minutos"?: number,"petshop_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "uso_diario_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -508,6 +568,9 @@ isOneToOne: false
                            },
 "admin_atualizar":
 { Args: { "p_nota"?: string,"p_petshop": string,"p_plano"?: string,"p_status"?: Database["public"]['Enums']["status_assinatura"],"p_teste_ate"?: string }; Returns: undefined
+                           },
+"admin_conversas":
+{ Args: { "p_canal"?: string,"p_limite"?: number,"p_petshop"?: string }; Returns: Json
                            },
 "admin_eventos_cakto":
 { Args: Record<PropertyKey, never>; Returns: {
@@ -526,6 +589,12 @@ isOneToOne: false
       } },
 "admin_painel":
 { Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"admin_uso":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"avaliar_conversa":
+{ Args: { "p_id": string,"p_pediu_equipe"?: boolean,"p_resolveu"?: boolean }; Returns: undefined
                            },
 "cakto_evento":
 { Args: { "p_assinatura": string,"p_email": string,"p_evento": string,"p_oferta"?: string,"p_payload": Json,"p_segredo": string }; Returns: string
@@ -606,11 +675,17 @@ isOneToOne: false
 "link_vaga":
 { Args: { "p_fim": string,"p_inicio": string,"p_petshop": string }; Returns: boolean
                            },
+"marcar_uso":
+{ Args: { "p_area": string,"p_petshop": string }; Returns: undefined
+                           },
 "meus_petshops":
 { Args: Record<PropertyKey, never>; Returns: string[]
                            },
 "pedido_aceitar":
 { Args: { "p_id": string,"p_profissional"?: string }; Returns: string
+                           },
+"registrar_conversa":
+{ Args: { "p_canal": string,"p_pediu_equipe"?: boolean,"p_pergunta": string,"p_petshop": string,"p_resposta": string }; Returns: string
                            },
 "sou_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean

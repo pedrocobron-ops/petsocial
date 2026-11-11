@@ -58,7 +58,8 @@ export default function PrivacidadeDoGestao() {
         <li><b>Pet shop:</b> nome, telefone, cidade e estado, horário de funcionamento, serviços, preços e ajustes.</li>
         <li><b>Equipe:</b> nome, e-mail de convite, função, escala, percentual de comissão e se a pessoa vê o financeiro.</li>
         <li><b>Assinatura:</b> plano, situação, datas e o e-mail usado na compra. A Cakto nos avisa de cada pagamento, cancelamento ou falha de cobrança, e guardamos esses avisos. Não recebemos o número do cartão.</li>
-        <li><b>Uso do assistente:</b> o texto dos pedidos feitos ao Mozart e à Ajuda, a ação proposta, quem pediu e quando.</li>
+        <li><b>Uso do assistente:</b> o texto dos pedidos feitos ao Mozart e à Ajuda, a resposta dada, a ação proposta, se a dúvida foi resolvida, quem pediu e quando. A nossa equipe lê essas conversas para melhorar o sistema e o atendimento.</li>
+        <li><b>Uso do sistema:</b> quando cada pessoa esteve com o sistema aberto, por quanto tempo e em quais telas.</li>
         <li><b>Atendimento:</b> o que você escrever para nós por e-mail ou WhatsApp.</li>
         <li><b>Registros técnicos:</b> endereço IP, data, hora e tipo de navegador, gerados pelos servidores a cada acesso.</li>
       </ul>
