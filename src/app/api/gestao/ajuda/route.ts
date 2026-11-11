@@ -49,7 +49,7 @@ export async function POST(req: Request) {
   if ((count ?? 0) >= LIMITE_DIA) return NextResponse.json(local());
 
   try {
-    const cliente = new Anthropic();
+    const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, "") });
     const r = await cliente.messages.create({
       model: MODELO, max_tokens: 500,
       system: [{ type: "text", text: INSTRUCOES_AJUDA, cache_control: { type: "ephemeral" } }],

@@ -91,7 +91,8 @@ export async function POST(req: Request) {
     mensagens.push({ role: "user", content: [{ type: "text", text: texto }, { type: "text", text: `(Agora: ${dia}, ${c.agora.replace("T", " ")}, horário local do pet shop.)` }] });
   }
 
-  const cliente = new Anthropic();
+  // tira espaço, quebra de linha ou caractere invisível colado junto com a chave
+  const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, "") });
   const comFallback = /^claude-(opus-5-5|fable-5-2)/.test(MODELO);
   let texto = "";
 
@@ -144,7 +145,9 @@ export async function POST(req: Request) {
     if (err instanceof Anthropic.RateLimitError) return erro(429, "ocupado", "O Mozart está com muitos pedidos agora. Tente de novo em um minuto.");
     if (err instanceof Anthropic.AuthenticationError) return erro(503, "sem_chave", "A chave da inteligência artificial não está válida. Avise o suporte da Maestro Pet.");
     if (err instanceof Anthropic.APIError) return erro(502, "ia_fora", "O Mozart não respondeu agora. Tente de novo em instantes.");
-    return erro(500, "falha", "Algo deu errado do nosso lado. Tente de novo em instantes.");
+    // o motivo vai para o registro do servidor; a pessoa vê só a frase
+    console.error("[assistente] falha", err);
+    return NextResponse.json({ erro: "falha", mensagem: "Algo deu errado do nosso lado. Tente de novo em instantes.", tipo: err instanceof Error ? err.name : typeof err }, { status: 500 });
   }
 
   return NextResponse.json({ mensagens, texto: texto || "Pronto.", propostas: [], parciais: [], links, mudou });
