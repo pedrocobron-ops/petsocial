@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
-import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres } from "../agenda";
+import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres, vagasDe } from "../agenda";
 import { brl, fmtTelefone, linkWhatsApp, precoDoServico, semAcento } from "../util";
 
 /**
@@ -398,12 +398,11 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       const emMin = (x: { inicio: string; fim: string }) => ({ inicio: (new Date(x.inicio).getTime() - ini.getTime()) / 60000, fim: (new Date(x.fim).getTime() - ini.getTime()) / 60000 });
       // bloqueio do pet shop inteiro vale sempre; o de uma pessoa, quando o horário é com ela (ou só ela atende)
       const bloqueios = await bloqueiosEntre(c, ini, new Date(ini.getTime() + 864e5));
-      const ocupados = [
-        ...ags.filter((a) => !["cancelado", "faltou"].includes(a.status) && (prof ? a.profissional_id === prof.id : quemAtende.length <= 1)),
-        ...bloqueios.filter((b) => !b.profissional_id || b.profissional_id === prof?.id || quemAtende.length <= 1),
-      ].map(emMin);
+      // sem profissional escolhido, vale o número de vagas do pet shop; com profissional, a agenda dele
+      const ocupados = ags.filter((a) => !["cancelado", "faltou"].includes(a.status) && (prof ? a.profissional_id === prof.id : true)).map(emMin);
+      const bloqueados = bloqueios.filter((b) => !b.profissional_id || b.profissional_id === prof?.id || quemAtende.length <= 1).map(emMin);
       const aPartirDe = dia === hoje ? Number(c.agora.slice(11, 13)) * 60 + Number(c.agora.slice(14, 16)) : undefined;
-      const livres = horariosLivres({ abre: func.abre, fecha: func.fecha, duracaoMin: servico?.duracao_min ?? 60, ocupados, aPartirDe });
+      const livres = horariosLivres({ abre: func.abre, fecha: func.fecha, duracaoMin: servico?.duracao_min ?? 60, ocupados, bloqueados, vagas: prof ? 1 : vagasDe(petshop, c.equipe), aPartirDe });
       return { resultado: { dia, funcionamento: `${func.abre} às ${func.fecha}`, duracao_min: servico?.duracao_min ?? 60, livres, marcados: ags.filter((a) => !["cancelado", "faltou"].includes(a.status)).length,
         bloqueios: bloqueios.map((b) => bloqueioParaModelo(c, b)),
         ...(bloqueios.length ? { aviso: "Os horários livres já descontam os bloqueios. Não ofereça horário dentro de um bloqueio." } : {}) } };

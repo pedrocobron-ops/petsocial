@@ -9,16 +9,27 @@ export const deMin = (min: number) => `${String(Math.floor(min / 60)).padStart(2
  * Horários de início possíveis num dia: dentro do funcionamento, sem bater com o que já está marcado.
  * `aPartirDe` (minutos) corta os horários que já passaram quando o dia é hoje.
  */
-export function horariosLivres(p: { abre: string; fecha: string; duracaoMin: number; ocupados: Intervalo[]; passo?: number; aPartirDe?: number }): string[] {
+export function horariosLivres(p: { abre: string; fecha: string; duracaoMin: number; ocupados: Intervalo[]; passo?: number; aPartirDe?: number; vagas?: number; bloqueados?: Intervalo[] }): string[] {
   const passo = p.passo ?? 30;
   const abre = paraMin(p.abre), fecha = paraMin(p.fecha);
   const livres: string[] = [];
   for (let t = abre; t + p.duracaoMin <= fecha; t += passo) {
     if (p.aPartirDe != null && t < p.aPartirDe) continue;
-    if (p.ocupados.some((o) => t < o.fim && t + p.duracaoMin > o.inicio)) continue;
+    const bate = (o: Intervalo) => t < o.fim && t + p.duracaoMin > o.inicio;
+    if (p.bloqueados?.some(bate)) continue;
+    // com mais de uma vaga, o horário só some quando todas estão tomadas
+    if (p.ocupados.filter(bate).length >= Math.max(1, p.vagas ?? 1)) continue;
     livres.push(deMin(t));
   }
   return livres;
+}
+
+/**
+ * Quantos pets o pet shop atende ao mesmo tempo: o número definido no guia de configuração
+ * ou, se não foi definido, uma vaga por pessoa que atende na agenda.
+ */
+export function vagasDe(petshop: { vagas?: number | null }, equipe: { ativo: boolean; atende: boolean }[]) {
+  return petshop.vagas ?? Math.max(1, equipe.filter((p) => p.ativo && p.atende).length);
 }
 
 /** Texto do lembrete que vai para o WhatsApp do tutor. */

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarOff, Check, Clock, Lock, Repeat, Truck } from "lucide-react";
 import type { AgendamentoCompleto, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres } from "@/lib/gestao/agenda";
+import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, vagasDe } from "@/lib/gestao/agenda";
 import { brlCurto, dataAmigavel, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, nomeDiaCurto, precoDoServico, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
@@ -90,8 +90,8 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     const bloqueados = (bloqueios ?? []).filter((b) => !b.profissional_id || b.profissional_id === profId).map(emMin);
     const agora = new Date();
     const aPartirDe = dia === isoDia(agora) ? agora.getHours() * 60 + agora.getMinutes() : undefined;
-    return horariosLivres({ abre: funcionamento.abre, fecha: funcionamento.fecha, duracaoMin: duracao, ocupados: [...(quemAtende.length > 1 && !profId ? [] : ocupados), ...bloqueados], aPartirDe });
-  }, [funcionamento, dia, doDia, bloqueios, profId, duracao, agendamento, quemAtende.length]);
+    return horariosLivres({ abre: funcionamento.abre, fecha: funcionamento.fecha, duracaoMin: duracao, ocupados, bloqueados, vagas: profId ? 1 : vagasDe(petshop, equipe), aPartirDe });
+  }, [funcionamento, dia, doDia, bloqueios, profId, duracao, agendamento, petshop, equipe]);
 
   const bloqueioEm = (d: string) => {
     const ini = juntaDiaHora(d, hhmm).getTime();

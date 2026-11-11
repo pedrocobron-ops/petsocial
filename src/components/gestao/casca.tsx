@@ -15,6 +15,7 @@ import BuscaGeral from "./busca-geral";
 import type { Tom } from "./painel";
 import Assistente from "./assistente";
 import Ajuda from "./ajuda";
+import GuiaInicial from "./guia-inicial";
 
 type Item = { href: string; rotulo: string; icone: React.ComponentType; tom: Tom; so?: "financeiro" | "dono" };
 const GRUPOS: { titulo: string; itens: Item[] }[] = [
@@ -182,6 +183,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         </Folha>
       )}
 
+      <GuiaInicial />
       {ajuda && <Ajuda aoFechar={() => setAjuda(false)} />}
       {assistente.aberta && <Assistente pedidoInicial={assistente.pedido} aoFechar={() => setAssistente({ aberta: false, pedido: "" })} />}
     </div>

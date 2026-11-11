@@ -1,5 +1,6 @@
 "use client";
 
+import { abrirGuia } from "@/components/gestao/guia-inicial";
 import { useState } from "react";
 import { CalendarDays, Check, Clock, Copy, ExternalLink, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
 import { Kpi, Tile } from "@/components/gestao/painel";
@@ -44,6 +45,7 @@ export default function MeuPetshop() {
     <>
       <header className="g-topo">
         <div><h1>Meu pet shop</h1><p className="g-muted">Dados, horário e os serviços que você oferece.</p></div>
+        <div className="g-acoes"><button className="g-btn sec" onClick={() => abrirGuia()}>Refazer o guia de configuração</button></div>
       </header>
       {semPreco && (
         <div className="g-aviso"><Tag /><span className="g-cresce">Coloque os preços dos serviços para o Mozart e a agenda já sugerirem o valor certo.</span></div>
