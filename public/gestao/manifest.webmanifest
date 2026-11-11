@@ -1,0 +1,25 @@
+{
+  "name": "Maestro Pet Gestão",
+  "short_name": "Maestro Gestão",
+  "description": "O sistema do pet shop com uma assistente que organiza tudo para você.",
+  "start_url": "/gestao/app",
+  "scope": "/gestao/",
+  "display": "standalone",
+  "background_color": "#f6f1e8",
+  "theme_color": "#1e3a2f",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/gestao/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/gestao/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

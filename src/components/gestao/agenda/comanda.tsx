@@ -1,0 +1,133 @@
+"use client";
+
+import { useState } from "react";
+import { Plus, Truck } from "lucide-react";
+import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
+import { lancarPago } from "@/lib/gestao/dinheiro";
+import { brl, hora } from "@/lib/gestao/util";
+import { useGestao } from "../contexto";
+import { AvatarPet, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "../ui";
+import {
+  baixarEstoque, BuscaProduto, comProduto, encurtar, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
+  produtosDaConta, resumoDosItens, useProdutosDaLoja, valorDaLinha, type ItemConta,
+} from "../loja/conta";
+import type { Forma } from "../loja/pecas";
+
+/**
+ * Fechar a conta de um atendimento: serviço, produtos do estoque e extras numa conta só.
+ * Lança a entrada, dá baixa nos produtos e deixa o atendimento como concluído.
+ */
+export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
+  agendamento: AgendamentoCompleto; aoFechar: () => void; aoPronto: () => void;
+}) {
+  const { sb, petshop, user } = useGestao();
+  const { avisar, avisarErro } = useAvisos();
+  const somenteLeitura = useSomenteLeitura();
+  const { produtos, carregando, erro } = useProdutosDaLoja();
+  const pet = a.pets, tutor = pet?.clientes;
+  const servico = a.servicos?.nome ?? "Atendimento";
+  const [itens, setItens] = useState<ItemConta[]>([
+    { chave: novaChave(), tipo: "servico", nome: servico, qtd: 1, valor: a.preco == null ? null : Number(a.preco) },
+  ]);
+  const [desconto, setDesconto] = useState<number | null>(null);
+  const [forma, setForma] = useState<Forma>("pix");
+  const [salvando, setSalvando] = useState(false);
+
+  const contas = fecharContas(itens, desconto);
+  const vendidos = produtosDaConta(itens);
+  const temLevaTraz = itens.some((i) => i.tipo === "extra" && i.nome === LEVA_E_TRAZ);
+  const nadaAFazer = contas.total <= 0 && a.status === "concluido" && !vendidos.length;
+  const mudar = (chave: string, m: Partial<ItemConta>) => setItens((l) => l.map((i) => (i.chave === chave ? { ...i, ...m } : i)));
+  const extra = (nome: string) => setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome, qtd: 1, valor: null }]);
+
+  /** Mesma categoria do recebimento simples; creche e hotel vão para a deles; conta só de produto vira venda. */
+  function categoria() {
+    const doServico = itens.filter((i) => i.tipo !== "produto").reduce((t, i) => t + valorDaLinha(i), 0);
+    if (doServico <= 0 && vendidos.length) return "Venda de produtos";
+    return a.servicos?.categoria === "creche" || a.servicos?.categoria === "hotel" ? "Creche e hotel" : "Banho e tosa";
+  }
+
+  async function confirmar() {
+    if (salvando || nadaAFazer || somenteLeitura()) return;
+    setSalvando(true);
+    let recebeu = false;
+    try {
+      // outra pessoa pode ter recebido enquanto esta conta estava aberta
+      const ja = ok(await sb.from("lancamentos").select("id").eq("petshop_id", petshop.id).eq("agendamento_id", a.id).eq("tipo", "entrada").limit(1));
+      if (ja.length) {
+        avisarErro("Este atendimento já tem recebimento lançado.");
+        avisarMudanca();
+        aoPronto();
+        return;
+      }
+      const gravar = itensParaGravar(itens);
+      const mais = resumoDosItens(gravar);
+      if (contas.total > 0) {
+        await lancarPago(sb, petshop.id, {
+          tipo: "entrada", valor: contas.total, forma, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null,
+          descricao: encurtar(`${servico} · ${pet?.nome ?? ""}`.trim().replace(/ ·$/, "") + (mais ? ` + ${mais}` : "")), itens: gravar,
+        });
+        recebeu = true;
+      }
+      let estoqueOk = true;
+      try { await baixarEstoque(sb, petshop.id, user.id, itens); } catch (e) {
+        estoqueOk = false;
+        avisarErro(`${recebeu ? "O valor foi recebido, mas o" : "O"} estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
+      }
+      if (a.status !== "concluido") ok(await sb.from("agendamentos").update({ status: "concluido" }).eq("id", a.id).select("id").single());
+      if (estoqueOk) avisar(recebeu ? `Recebido ${brl(contas.total)}.` : "Atendimento concluído sem cobrança.");
+      avisarMudanca();
+      aoPronto();
+    } catch (e) {
+      if (recebeu) {
+        avisarErro(`O valor foi recebido, mas o atendimento não ficou como concluído. Conclua pela agenda. (${mensagemDeErro(e)})`);
+        avisarMudanca();
+        aoPronto();
+      } else { avisarErro(e); setSalvando(false); }
+    }
+  }
+
+  return (
+    <Folha larga titulo="Fechar a conta" aoFechar={aoFechar}
+      rodape={<>
+        <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
+        <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || nadaAFazer}>
+          {salvando ? "Anotando…" : contas.total > 0 ? `Receber ${brl(contas.total)}` : "Concluir sem cobrar"}
+        </button>
+      </>}>
+      <div className="g-form">
+        <div className="g-vd-quem">
+          {pet && <AvatarPet pet={pet} tamanho="g" />}
+          <div>
+            <b>{pet?.nome ?? "Pet"}</b>
+            <span>{[tutor?.nome, `${hora(a.inicio)} às ${hora(a.fim)}`].filter(Boolean).join(" · ")}</span>
+          </div>
+        </div>
+
+        <div className="g-card liso g-vd-itens">
+          {itens.map((i) => (
+            <LinhaDaConta key={i.chave} item={i} produto={produtos.find((p) => p.id === i.produtoId)} apoio={a.profissionais ? `com ${a.profissionais.nome}` : undefined}
+              aoMudar={(m) => mudar(i.chave, m)} aoTirar={i.tipo === "servico" ? undefined : () => setItens((l) => l.filter((x) => x.chave !== i.chave))} />
+          ))}
+        </div>
+
+        <div className="g-campo">
+          <span>Levou mais alguma coisa?</span>
+          <BuscaProduto produtos={produtos} carregando={carregando} erro={erro} itens={itens} aoEscolher={(p) => setItens((l) => comProduto(l, p))} />
+          <div className="g-chips g-vd-chips">
+            {a.leva_traz && !temLevaTraz && <button type="button" className="g-chip" onClick={() => extra(LEVA_E_TRAZ)}><Truck />{LEVA_E_TRAZ}</button>}
+            <button type="button" className="g-chip" onClick={() => extra("")}><Plus />Outro extra</button>
+          </div>
+        </div>
+
+        <FechamentoDaConta subtotal={contas.subtotal} desconto={contas.desconto} total={contas.total} descontoDigitado={desconto} aoDesconto={setDesconto}
+          forma={forma} aoForma={setForma} />
+        <p className="g-pp g-muted">
+          {contas.total > 0 ? "O valor entra no caixa de hoje" : "Nada entra no caixa"}
+          {vendidos.length ? ", os produtos saem do estoque" : ""}
+          {a.status !== "concluido" ? " e o atendimento fica como concluído." : "."}
+        </p>
+      </div>
+    </Folha>
+  );
+}

@@ -1,0 +1,100 @@
+/* Equipe: acessos do plano, cartões de pessoa, quem pode o quê e escala em grade. Prefixo g-eq-.
+   As peças do formulário ficam em src/components/gestao/equipe/equipe-form.css. */
+.g-eq-resumo { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) { .g-eq-resumo { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
+@media (min-width: 1100px) { .g-grade.kpis.g-eq-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* acessos do plano */
+.g-eq-plano { display: grid; gap: 14px; align-content: start; min-width: 0; padding: 20px; border-radius: 22px; background: linear-gradient(160deg, #f4f8f1 0%, var(--t-menta) 100%); border: 1px solid rgba(36, 84, 59, .14); box-shadow: var(--g-sombra); }
+.g-eq-plano.cheio { background: linear-gradient(160deg, #fff6ea 0%, var(--t-pessego) 100%); border-color: rgba(180, 80, 11, .14); }
+.g-eq-plano-t { display: grid; gap: 4px; }
+.g-eq-plano-t .g-rotulo { color: var(--i-menta); }
+.g-eq-plano.cheio .g-eq-plano-t .g-rotulo { color: #8a4a17; }
+.g-eq-plano .g-eq-plano-t h2 { font: 480 clamp(1.25rem, 1.1rem + .7vw, 1.625rem)/1.15 var(--display); letter-spacing: -.01em; text-wrap: balance; }
+.g-eq-plano .g-eq-plano-t h2 em { font-style: normal; white-space: nowrap; color: var(--i-menta); }
+.g-eq-plano.cheio .g-eq-plano .g-eq-plano-t h2 em { color: #9a4508; }
+.g-eq-plano-n { font-size: .9375rem; line-height: 1.45; color: #33423a; }
+.g-eq-plano.cheio .g-eq-plano-n { color: #5a3a1c; }
+.g-eq-plano-c { display: block; margin-top: 4px; font-size: .8125rem; opacity: .8; }
+.g-eq-plano-l { display: inline-flex; align-items: center; gap: 6px; font-size: .9375rem; font-weight: 600; color: var(--g-verde); text-decoration: underline; text-underline-offset: 3px; }
+
+/* só o dono na equipe */
+.g-eq-convida { display: grid; gap: 18px; min-width: 0; padding: 22px 20px; border-radius: 22px; background: var(--g-carta); border: 1px solid var(--g-linha); box-shadow: var(--g-sombra);
+  background-image: radial-gradient(420px 220px at 100% 0%, rgba(249, 115, 22, .09), transparent 65%), radial-gradient(360px 220px at 0% 100%, rgba(30, 58, 47, .06), transparent 65%); }
+@media (min-width: 860px) { .g-eq-convida { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; padding: 26px; } }
+.g-eq-convida-t { display: grid; gap: 8px; justify-items: start; }
+.g-eq-convida .g-eq-convida-t h2 { font: 460 clamp(1.5rem, 1.3rem + 1vw, 1.875rem)/1.1 var(--display); letter-spacing: -.02em; }
+.g-eq-convida-t > p:not(.g-rotulo) { color: var(--g-cinza); max-width: 46ch; line-height: 1.5; }
+.g-eq-convida-t .g-btn { margin-top: 6px; }
+.g-eq-convida-l { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.g-eq-convida-l > li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: rgba(255, 253, 249, .8); border: 1px solid var(--g-linha); }
+.g-eq-convida-i { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.g-eq-convida-i > b { font-weight: 600; }
+.g-eq-convida-i > small { font-size: .875rem; color: var(--g-cinza); line-height: 1.35; }
+
+/* cartões de pessoa */
+.g-eq-grade { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .g-eq-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; } }
+.g-card.g-eq-pessoa { --cor: var(--g-verde); position: relative; overflow: hidden; display: grid; gap: 12px; align-content: start; min-width: 0; padding: 0 16px 16px; transition: transform .18s cubic-bezier(.2, .7, .2, 1), box-shadow .18s, border-color .18s; }
+.g-eq-pessoa::before { content: ""; display: block; height: 46px; margin: 0 -16px -34px; background: linear-gradient(120deg, color-mix(in srgb, var(--cor) 34%, #fffbf5), color-mix(in srgb, var(--cor) 12%, #fffbf5)); }
+.g-eq-pessoa:hover { transform: translateY(-2px); border-color: var(--g-linha-forte); box-shadow: 0 2px 4px rgba(31, 27, 23, .05), 0 22px 36px -22px rgba(31, 27, 23, .4); }
+/* o cartão inteiro abre a pessoa; só o botão de ação fica por cima */
+.g-eq-abrir { position: absolute; inset: 0; z-index: 0; padding: 0; border: 0; border-radius: inherit; background: none; cursor: pointer; }
+.g-eq-pessoa > :not(.g-eq-abrir) { position: relative; z-index: 1; pointer-events: none; min-width: 0; }
+.g-eq-pessoa .g-eq-acao { pointer-events: auto; }
+.g-eq-topo { display: flex; align-items: flex-end; gap: 12px; }
+.g-eq-topo .g-avatar { box-shadow: 0 0 0 3px var(--g-carta), 0 8px 18px -8px rgba(31, 27, 23, .5); }
+.g-eq-topo-t { flex: 1; min-width: 0; display: grid; gap: 3px; padding-top: 18px; }
+.g-eq-nome { display: block; font: 480 1.25rem/1.15 var(--display); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-eq-funcao { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: .9375rem; font-weight: 600; color: color-mix(in srgb, var(--cor) 62%, #1f1b17); }
+.g-eq-seta { flex: none; align-self: center; margin-top: 18px; opacity: .4; }
+.g-eq-acesso { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: var(--g-carta-2); color: var(--g-cinza); }
+.g-eq-acesso.login { background: var(--t-menta); color: var(--i-menta); }
+.g-eq-acesso.convite { background: var(--t-manteiga); color: var(--i-manteiga); }
+.g-eq-acesso-i { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 10px; background: rgba(255, 253, 249, .7); }
+.g-eq-acesso-i svg { width: 16px; height: 16px; }
+.g-eq-acesso-t { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.g-eq-acesso-t > b { font-size: .875rem; font-weight: 600; line-height: 1.25; }
+.g-eq-acesso-t > small { font-size: .75rem; opacity: .85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-eq-acesso .g-eq-acao { flex: none; background: rgba(255, 253, 249, .85); color: var(--g-tinta); }
+.g-eq-acesso .g-eq-acao svg { width: 15px; height: 15px; }
+.g-eq-abre { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.g-eq-abre-r { margin-right: 2px; font-size: .6875rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--g-cinza); }
+.g-eq-pilula { padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 600; line-height: 1.5; color: #33423a; background: transparent; box-shadow: inset 0 0 0 1px var(--g-linha-forte); white-space: nowrap; }
+.g-eq-pilula.tudo { background: var(--g-verde); color: #f6f1e8; box-shadow: none; }
+.g-eq-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.g-eq-tags .g-tag svg { width: 13px; height: 13px; flex: none; }
+.g-eq-trabalha { display: grid; gap: 6px; }
+.g-eq-trabalha-r { font-size: .6875rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--g-cinza); }
+
+/* quem pode o quê */
+.g-card.g-eq-pode { padding: 0; }
+.g-eq-pode-s { display: flex; align-items: center; gap: 12px; padding: 16px 18px; cursor: pointer; list-style: none; }
+.g-eq-pode-s::-webkit-details-marker { display: none; }
+.g-eq-pode-st { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.g-eq-pode-st > b { font: 480 1.25rem/1.15 var(--display); letter-spacing: -.01em; }
+.g-eq-pode-st > small { font-size: .875rem; color: var(--g-cinza); line-height: 1.35; }
+.g-eq-pode-seta { flex: none; opacity: .5; transition: rotate .18s; }
+.g-eq-pode[open] .g-eq-pode-seta { rotate: 90deg; }
+.g-eq-compara { display: grid; gap: 10px; padding: 0 18px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+.g-eq-pode-n { padding: 12px 18px 18px; }
+
+/* escala em grade: pessoas nas linhas, dias nas colunas */
+.g-eq-escala { display: grid; grid-template-columns: minmax(0, 3.75rem) repeat(7, minmax(0, 1fr)); gap: 5px; align-items: stretch; }
+.g-eq-esc-dia { display: grid; place-items: center; padding: 4px 0 6px; font-size: .6875rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--g-cinza); border-radius: 8px; }
+.g-eq-esc-dia abbr { text-decoration: none; }
+.g-eq-esc-dia.hoje { color: var(--g-laranja-2); background: rgba(249, 115, 22, .1); }
+.g-eq-esc-dia.fechado { opacity: .55; }
+.g-eq-esc-nome { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: .875rem; font-weight: 600; overflow: hidden; white-space: nowrap; }
+.g-eq-esc-nome > i { width: 10px; height: 10px; border-radius: 4px; flex: none; }
+.g-eq-esc-cel { --cor: var(--g-verde); position: relative; display: grid; align-content: center; justify-items: center; gap: 1px; min-height: 44px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--g-linha); }
+.g-eq-esc-cel.on { background: color-mix(in srgb, var(--cor) 20%, #fffbf5); box-shadow: inset 0 -3px 0 var(--cor); }
+.g-eq-esc-cel.on.hoje { box-shadow: inset 0 -3px 0 var(--cor), 0 0 0 2px rgba(249, 115, 22, .55); }
+.g-eq-esc-cel.fechado { box-shadow: none; background: repeating-linear-gradient(135deg, rgba(31, 27, 23, .06) 0 4px, transparent 4px 8px); }
+.g-eq-esc-cel > b { font-size: .6875rem; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (min-width: 520px) { .g-eq-escala { gap: 6px; grid-template-columns: minmax(0, 4.75rem) repeat(7, minmax(0, 1fr)); } .g-eq-esc-cel > b { font-size: .75rem; } }
+.g-eq-leg { display: flex; gap: 6px 14px; flex-wrap: wrap; margin-top: 12px; font-size: .8125rem; color: var(--g-cinza); }
+.g-eq-leg > span { display: inline-flex; align-items: center; gap: 6px; }
+.g-eq-leg i { width: 14px; height: 14px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--g-linha-forte); }
+.g-eq-leg i.on { background: var(--t-menta); box-shadow: inset 0 -3px 0 #2f6b4c; }
+.g-eq-leg i.fechado { box-shadow: none; background: repeating-linear-gradient(135deg, rgba(31, 27, 23, .14) 0 3px, transparent 3px 6px); }

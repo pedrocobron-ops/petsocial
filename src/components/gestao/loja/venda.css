@@ -1,0 +1,63 @@
+/* Comanda do atendimento e venda no balcão (prefixo g-vd-) */
+
+/* cabeçalho da comanda: de quem é a conta */
+.g-vd-quem { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.g-vd-quem > div { min-width: 0; flex: 1; }
+.g-vd-quem b { display: block; font: 480 1.375rem/1.15 var(--display); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-vd-quem span { display: block; font-size: .875rem; color: var(--g-cinza); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* linhas da conta */
+.g-vd-itens { padding: 4px 16px; }
+.g-vd-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 12px; padding: 14px 0; border-bottom: 1px solid var(--g-linha); }
+.g-vd-item:last-child { border-bottom: 0; }
+.g-vd-item .t { min-width: 0; }
+.g-vd-item .t b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-vd-item .t span { display: block; font-size: .875rem; color: var(--g-cinza); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-vd-item .g-vd-nome { min-width: 0; min-height: 42px; padding-block: 8px; }
+.g-vd-soma { font: 480 1.125rem/1.2 var(--display); white-space: nowrap; }
+.g-vd-ctrl { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; min-width: 0; }
+@media (min-width: 520px) { .g-vd-ctrl { grid-column: 2 / -1; } }
+.g-vd-ctrl .g-ico { width: 38px; height: 38px; color: var(--g-cinza); margin-right: -6px; }
+.g-vd-ctrl .g-ico svg { width: 18px; height: 18px; }
+.g-vd-ctrl .g-ico:hover { color: var(--g-vermelho); }
+.g-vd-preco { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: .8125rem; color: var(--g-cinza); white-space: nowrap; }
+.g-vd-preco .g-input { width: 92px; min-height: 40px; padding: 6px 10px; text-align: right; }
+.g-vd-qtd { display: inline-flex; align-items: center; flex: none; margin-right: auto; border-radius: 999px; background: var(--g-carta-2); box-shadow: inset 0 0 0 1px var(--g-linha); }
+.g-vd-qtd button { display: grid; place-items: center; width: 38px; height: 40px; border: 0; border-radius: 999px; background: none; color: var(--g-tinta); }
+.g-vd-qtd button:hover:not(:disabled) { background: rgba(31, 27, 23, .07); }
+.g-vd-qtd button:disabled { opacity: .35; }
+.g-vd-qtd button svg { width: 16px; height: 16px; }
+.g-vd-qtd input { width: 40px; height: 40px; border: 0; background: none; text-align: center; font-weight: 600; font-size: 1rem; color: var(--g-tinta); padding: 0; }
+.g-vd-qtd input:focus { outline: 0; box-shadow: inset 0 -2px 0 var(--g-verde); }
+.g-vd-falta { grid-column: 1 / -1; padding: 8px 12px; border-radius: 10px; background: var(--g-amarelo-tint); color: #5b4708; font-size: .8125rem; line-height: 1.35; }
+.g-vd-nada { padding: 18px 4px; text-align: center; color: var(--g-cinza); font-size: .9375rem; }
+
+/* resultado da busca de produto */
+.g-vd-achados { border-radius: 16px; background: var(--g-carta); border: 1px solid var(--g-linha); padding: 2px 8px; }
+.g-vd-achados .g-linha { padding: 10px 4px; }
+.g-vd-mais { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 50%; background: var(--g-verde); color: #f6f1e8; }
+.g-vd-mais svg { width: 16px; height: 16px; }
+.g-vd-chips .g-chip svg { width: 16px; height: 16px; }
+
+/* tutor da venda */
+.g-vd-tutor { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: var(--g-carta); border: 1px solid var(--g-linha); min-width: 0; }
+.g-vd-tutor .t { flex: 1; min-width: 0; }
+.g-vd-tutor .t b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-vd-tutor .t span { display: block; font-size: .875rem; color: var(--g-cinza); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* total */
+.g-vd-total { position: relative; overflow: hidden; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 18px 20px; border-radius: 20px; background: linear-gradient(160deg, #f4f8f1 0%, var(--t-menta, #d9ead9) 100%); border: 1px solid rgba(36, 84, 59, .14); }
+.g-vd-total::after { content: ""; position: absolute; right: -40px; top: -52px; width: 140px; height: 140px; border-radius: 50%; background: rgba(255, 255, 255, .45); pointer-events: none; }
+.g-vd-total > * { position: relative; z-index: 1; min-width: 0; }
+.g-vd-total .g-rotulo { color: var(--i-menta, #24543b); }
+.g-vd-total .g-num { margin-top: 6px; font-size: clamp(2.25rem, 1.7rem + 2.6vw, 3rem); color: var(--g-escuro-b); white-space: nowrap; }
+.g-vd-contas { display: grid; gap: 2px; text-align: right; font-size: .875rem; color: var(--i-menta, #24543b); }
+
+/* botão que ocupa a linha inteira numa grade de dois (atalho no Caixa) */
+.g-vd-inteiro { grid-column: 1 / -1; }
+
+@media (max-width: 380px) {
+  .g-vd-itens { padding-inline: 12px; }
+  .g-vd-preco > span { display: none; }
+  .g-vd-preco .g-input { width: 84px; }
+}

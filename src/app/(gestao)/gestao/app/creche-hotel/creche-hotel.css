@@ -1,0 +1,59 @@
+/* Creche e hotel · segunda demão (prefixo g-ch-), tom céu */
+
+/* indicadores que também trocam de aba */
+.g-ch-kpi-acao { display: grid; min-width: 0; cursor: pointer; border-radius: 20px; outline: 0; -webkit-tap-highlight-color: transparent; }
+.g-ch-kpi-acao > .g-kpi { height: 100%; grid-template-columns: minmax(0, 1fr); transition: transform .18s cubic-bezier(.2, .7, .2, 1), box-shadow .18s, border-color .18s; }
+.g-ch-kpi-acao:hover > .g-kpi { transform: translateY(-2px); border-color: var(--g-linha-forte); }
+.g-ch-kpi-acao:focus-visible > .g-kpi { box-shadow: 0 0 0 3px rgba(30, 58, 47, .25); }
+.g-ch-kpi-acao[aria-pressed="true"] > .g-kpi { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg), var(--g-sombra); }
+.g-ch-kpi-acao .g-kpi-apoio { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+
+/* etiqueta do tipo: creche é dia, hotel é noite */
+.g-ch-tipo { display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 4px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
+.g-ch-tipo em { font-style: normal; }
+.g-ch-tipo svg { width: 14px; height: 14px; flex: none; }
+.g-ch-tipo.creche { background: var(--t-manteiga); color: var(--i-manteiga); }
+.g-ch-tipo.hotel { background: #1f5268; color: #eaf4f8; }
+@media (max-width: 719px) { .g-ch-tipo.curta { padding: 6px; } .g-ch-tipo.curta em { display: none; } }
+
+.g-ch-grade { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .g-ch-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; } }
+
+/* cartão da estadia */
+.g-ch-cartao {
+  position: relative; overflow: hidden; display: grid; gap: 14px; align-content: start; min-width: 0; padding: 16px; border-radius: 20px;
+  background: linear-gradient(180deg, #eef6fa 0, var(--g-carta) 104px); border: 1px solid rgba(31, 82, 104, .16); box-shadow: var(--g-sombra);
+}
+.g-ch-cartao::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: #2f6f8a; }
+.g-ch-cartao.creche::before { background: #d9a520; }
+.g-ch-cartao.reserva { background: var(--g-carta); }
+.g-ch-topo { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.g-ch-topo .g-avatar { box-shadow: 0 0 0 3px #fffbf5, 0 8px 16px -10px rgba(31, 27, 23, .5); }
+.g-ch-topo .t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.g-ch-cartao .g-ch-topo h2 { font: 480 1.375rem/1.15 var(--display); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-ch-topo .t span { font-size: .875rem; color: var(--g-cinza); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-ch-topo .g-ch-tipo { align-self: flex-start; }
+
+/* período como barra */
+.g-ch-periodo { display: grid; gap: 7px; padding: 12px; border-radius: 14px; background: rgba(255, 251, 245, .75); border: 1px solid var(--g-linha); }
+.g-ch-barra { height: 10px; border-radius: 999px; background: var(--t-ceu); overflow: hidden; }
+.g-ch-barra i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #5a9bb5, #2f6f8a); transition: width .5s cubic-bezier(.2, .7, .2, 1); }
+.g-ch-periodo.atrasada .g-ch-barra { background: var(--t-rosa); }
+.g-ch-periodo.atrasada .g-ch-barra i { background: linear-gradient(90deg, #d9737f, #b3402e); }
+.g-ch-periodo.aberta .g-ch-barra i { background: repeating-linear-gradient(135deg, rgba(47, 111, 138, .5) 0 8px, rgba(47, 111, 138, .18) 8px 16px); }
+.g-ch-periodo .pontas { display: flex; justify-content: space-between; gap: 12px; }
+.g-ch-periodo .pontas span { display: grid; gap: 1px; min-width: 0; }
+.g-ch-periodo .pontas span:last-child { text-align: right; }
+.g-ch-periodo small, .g-ch-rota small { font-size: .6875rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--g-cinza); }
+.g-ch-periodo .pontas b, .g-ch-rota b { font-size: .9375rem; font-weight: 600; }
+
+/* reserva: de quando até quando */
+.g-ch-rota { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 12px; border-radius: 14px; background: var(--g-carta-2); }
+.g-ch-rota > span:not(.g-tag) { display: grid; gap: 1px; min-width: 0; }
+.g-ch-rota > svg { width: 18px; height: 18px; flex: none; color: var(--g-cinza); }
+.g-ch-rota .g-tag { margin-left: auto; }
+
+.g-ch-obs { display: flex; gap: 8px; align-items: flex-start; font-size: .9375rem; color: var(--g-cinza); }
+.g-ch-obs svg { width: 16px; height: 16px; flex: none; margin-top: 3px; }
+.g-ch-obs span { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.g-ch-acoes { padding-top: 12px; border-top: 1px dashed var(--g-linha); }

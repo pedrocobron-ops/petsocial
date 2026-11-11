@@ -1,0 +1,4 @@
+.g-lr-endereco { padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); font-size: .9375rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.g-lr-acoes { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.g-lr-acoes .g-btn { white-space: normal; text-align: center; }
+@media (max-width: 520px) { .g-topo .g-lr-rot { display: none; } }

@@ -1,0 +1,24 @@
+/* Meta do mês na tela inicial (prefixo g-meta-). */
+
+.g-meta { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px 16px; color: inherit; text-decoration: none; background: linear-gradient(160deg, #fffdf9 0%, #f1f6ee 100%); border-color: rgba(36, 84, 59, .14); transition: border-color .15s, transform .15s; }
+.g-meta:hover { border-color: rgba(36, 84, 59, .34); }
+.g-meta:active { transform: scale(.995); }
+.g-meta .g-anel b { font-size: .9375rem; }
+.g-meta-txt { display: grid; gap: 4px; min-width: 0; }
+.g-meta-cab { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.g-meta-num { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px; min-width: 0; }
+.g-meta-num b { font: 460 1.5rem/1.15 var(--display); letter-spacing: -.015em; white-space: nowrap; }
+.g-meta-num span { font-size: .9375rem; color: var(--g-cinza); white-space: nowrap; }
+.g-meta-ir { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: flex-end; gap: 2px; padding-top: 10px; border-top: 1px solid var(--g-linha); font-size: .875rem; font-weight: 600; color: var(--i-menta, #24543b); }
+.g-meta-ir svg { width: 16px; height: 16px; flex: none; }
+@media (min-width: 640px) {
+  .g-meta { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .g-meta-num b { font-size: 1.75rem; }
+  .g-meta-ir { grid-column: auto; padding-top: 0; border-top: 0; }
+}
+
+/* sem meta: uma linha discreta para o dono */
+.g-meta-convite { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px 14px; border-radius: 14px; border: 1px dashed var(--g-linha-forte); color: var(--g-cinza); font-size: .875rem; font-weight: 600; text-decoration: none; }
+.g-meta-convite:hover { color: var(--g-tinta); border-color: var(--g-cinza); }
+.g-meta-convite svg { width: 16px; height: 16px; flex: none; }
+.g-meta-convite span { flex: 1; min-width: 0; }

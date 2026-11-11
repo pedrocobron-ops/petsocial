@@ -52,3 +52,44 @@ Tudo fica em `src/lib/produtos.ts`. Para colocar um guia à venda:
 npm install
 npm run dev   # http://localhost:3000
 ```
+
+## Maestro Pet Gestão (`/gestao`)
+
+Sistema por assinatura para pet shops, dentro deste site. Fica fora do Google (`noindex`) e sem link no site até o lançamento.
+
+| Rota | O que é |
+|---|---|
+| `/gestao` | Página de apresentação do produto |
+| `/gestao/criar-conta`, `/gestao/entrar`, `/gestao/recuperar` | Cadastro (7 dias grátis, sem cartão), login e senha |
+| `/gestao/app/*` | O aplicativo do pet shop: Hoje, Agenda, Clientes e pets, Creche e hotel, Pacotes, Caixa, Financeiro, Relatórios, Estoque, Equipe, Meu pet shop, Assinatura |
+| `/gestao/admin` | Painel interno da Maestro Pet (só para quem está na tabela `admins`) |
+| `/gestao/agendar/<código>` | Link público de agendamento: o tutor pede um horário e a equipe aceita ou recusa (liga em Meu pet shop) |
+| `/api/gestao/assistente` | O Mozart (assistente): entende o pedido, consulta e propõe ações; só grava depois do "Confirmar" |
+| `/api/gestao/cakto` | Aviso de pagamento da Cakto (webhook): libera ou bloqueia a assinatura |
+
+Como as telas são feitas: `src/components/gestao/LEIAME.md`. Banco (tabelas e regras de acesso): `supabase/migrations/`.
+
+### Variáveis de ambiente (Vercel)
+
+| Variável | Para quê |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Endereço do projeto no Supabase |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Chave pública do Supabase (a proteção é a regra do banco, RLS) |
+| `ANTHROPIC_API_KEY` | Chave da IA do Mozart e da Ajuda. Segredo: só na Vercel, nos ambientes Production e Preview. Depois de criar ou trocar, é preciso uma publicação nova para valer |
+| `GESTAO_MODELO` | Modelo do Mozart (padrão `claude-opus-5-5`) |
+| `GESTAO_AJUDA_MODELO` | Opcional. Modelo da Ajuda (dúvidas de uso; padrão `claude-haiku-5-5`). Sem a chave da IA, a Ajuda responde pelo guia em `src/lib/gestao/ajuda.ts` |
+| `GESTAO_ASSISTENTE_LIMITE_DIA` | Pedidos ao Mozart por pet shop por dia (padrão 150) |
+| `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO`, `_EQUIPE`, `_PETSHOP` | Link do checkout de cada plano na Cakto. Os planos e preços ficam em `src/lib/gestao/planos.ts` |
+| `GESTAO_CAKTO_PRODUTO` | Id do produto na Cakto: eventos de outros produtos são ignorados |
+
+### Para colocar no ar
+
+1. Criar o projeto no Supabase (plano com backup) e aplicar `supabase/migrations/`. Manter a confirmação de e-mail ligada e configurar o envio de e-mail (SMTP).
+2. Preencher as variáveis acima na Vercel.
+3. Na Cakto: criar o produto de assinatura mensal com uma oferta por plano (Solo, Equipe e Pet shop) e ligar cada oferta ao plano: `insert into config_interna values ('cakto_oferta_<id da oferta>', 'solo');` (ou `equipe`, `petshop`). Criar também um webhook para `https://maestropet.com/api/gestao/cakto` com os eventos de compra e de assinatura. Guardar o segredo do webhook no banco, só como hash:
+   `insert into config_interna values ('cakto_segredo_sha256', encode(extensions.digest('<segredo>', 'sha256'), 'hex'));`
+4. Dar acesso ao painel interno: `insert into admins (user_id) select id from auth.users where email = '<e-mail>';`
+
+### Rodar localmente
+
+`npx supabase start` (precisa de Docker) sobe o banco com as migrations; copie o endereço e a chave pública para `.env.local` e rode `npm run dev`.

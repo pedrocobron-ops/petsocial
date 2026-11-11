@@ -1,0 +1,7 @@
+/* Dicas do Mozart na tela inicial */
+.g-dicas-lista { display: grid; gap: 8px; }
+.g-dica { position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 14px 40px 14px 14px; border-radius: 16px; background: linear-gradient(135deg, #fffdf9, #f3f6ee); border: 1px solid rgba(36, 84, 59, .14); box-shadow: var(--g-sombra); }
+.g-dica .corpo { display: grid; gap: 10px; justify-items: start; min-width: 0; }
+.g-dica p { font-size: .9375rem; line-height: 1.4; text-wrap: pretty; }
+.g-dica .fechar { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; color: var(--g-cinza); }
+.g-dica .fechar svg { width: 15px; height: 15px; }
