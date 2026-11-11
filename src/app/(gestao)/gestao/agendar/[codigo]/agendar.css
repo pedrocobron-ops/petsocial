@@ -12,7 +12,7 @@
 /* cabeçalho com o nome do pet shop */
 .g-lk-cab {
   position: relative; overflow: hidden; display: grid; gap: 14px; padding: 22px 20px; border-radius: 24px; color: #f6f1e8;
-  background: radial-gradient(420px 260px at 110% -10%, rgba(249, 115, 22, .34), transparent 62%), radial-gradient(360px 260px at -10% 120%, rgba(255, 255, 255, .1), transparent 60%), linear-gradient(135deg, #24473a 0%, #17302a 100%);
+  background: radial-gradient(420px 260px at 110% -10%, color-mix(in srgb, var(--g-laranja) 34%, transparent), transparent 62%), radial-gradient(360px 260px at -10% 120%, rgba(255, 255, 255, .1), transparent 60%), linear-gradient(135deg, var(--g-escuro-a) 0%, var(--g-escuro-b) 100%);
   box-shadow: 0 2px 4px rgba(31, 27, 23, .1), 0 30px 50px -30px rgba(23, 48, 42, .8);
 }
 .g-lk-cab-fundo { position: absolute; right: -40px; bottom: -64px; color: rgba(246, 241, 232, .07); pointer-events: none; }
@@ -95,7 +95,7 @@
 .g-lk-hora { min-width: 0; min-height: 46px; border-radius: 999px; border: 1px solid var(--g-linha-forte); background: #fffdf9; color: var(--g-tinta); font: inherit; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; transition: background .15s, border-color .15s, transform .1s; }
 .g-lk-hora:hover { border-color: var(--g-verde); }
 .g-lk-hora:active { transform: scale(.96); }
-.g-lk-hora[aria-pressed="true"] { background: var(--g-laranja); border-color: var(--g-laranja); color: #1f1b17; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 8px 16px -10px rgba(249, 115, 22, .9); }
+.g-lk-hora[aria-pressed="true"] { background: var(--g-laranja); border-color: var(--g-laranja); color: #1f1b17; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 8px 16px -10px color-mix(in srgb, var(--g-laranja) 90%, transparent); }
 .g-lk-hora-esq { min-height: 46px; border-radius: 999px; }
 .g-lk-termino { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--t-menta); color: #24543b; font-size: .9375rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
 .g-lk-termino svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }

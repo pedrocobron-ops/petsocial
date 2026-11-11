@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { banco, configurado, type Banco } from "@/lib/gestao/supabase";
 import type { Petshop, Profissional, Servico } from "@/lib/gestao/tipos";
+import { podeArea, type Area } from "@/lib/gestao/acessos";
 
 export type Gestao = {
   sb: Banco;
@@ -17,6 +18,8 @@ export type Gestao = {
   servicos: Servico[];
   souDono: boolean;
   vejoFinanceiro: boolean;
+  /** A pessoa abre esta área do aplicativo? (o dono libera área por área em Equipe) */
+  posso: (area: Area) => boolean;
   /** false = teste vencido ou assinatura cancelada: a conta fica só para consulta. */
   liberado: boolean;
   /** Dias que faltam de teste (null quando não está em teste). */
@@ -97,6 +100,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       sb, user, petshop, eu, equipe, servicos,
       souDono: eu.papel === "dono",
       vejoFinanceiro: eu.papel === "dono" || eu.papel === "gerente" || eu.ve_financeiro,
+      posso: (area: Area) => podeArea(eu, area),
       liberado,
       diasDeTeste: emTeste ? Math.max(0, Math.ceil(resta / 864e5)) : null,
       recarregarBase: async () => {

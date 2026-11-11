@@ -1,7 +1,7 @@
 /* Guia de configuração da primeira vez */
 .g-guia { position: fixed; inset: 0; z-index: 85; display: grid; place-items: end center; background: rgba(23, 48, 42, .55); backdrop-filter: blur(6px); animation: g-some .2s ease-out; }
 .g-guia-caixa { width: 100%; max-width: 680px; max-height: 96dvh; display: flex; flex-direction: column; background: var(--g-fundo); border-radius: 26px 26px 0 0; box-shadow: var(--g-sombra-alta); animation: g-sobe .3s cubic-bezier(.2, .7, .2, 1); overflow: hidden;
-  background-image: radial-gradient(520px 260px at 100% 0%, rgba(249, 115, 22, .09), transparent 65%), radial-gradient(420px 260px at 0% 0%, rgba(30, 58, 47, .07), transparent 65%); }
+  background-image: radial-gradient(520px 260px at 100% 0%, color-mix(in srgb, var(--g-laranja) 9%, transparent), transparent 65%), radial-gradient(420px 260px at 0% 0%, rgba(30, 58, 47, .07), transparent 65%); }
 @media (min-width: 720px) { .g-guia { place-items: center; padding: 24px; } .g-guia-caixa { border-radius: 28px; max-height: min(92dvh, 820px); } }
 .g-guia-topo { display: flex; align-items: center; gap: 14px; padding: 16px 18px 8px; }
 .g-guia-trilho { flex: 1; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }

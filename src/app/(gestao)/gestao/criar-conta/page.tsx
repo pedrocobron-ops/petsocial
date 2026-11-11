@@ -1,15 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Porta from "@/components/gestao/porta";
 import { banco, configurado } from "@/lib/gestao/supabase";
 
+/** `?email=` vem no convite da equipe: o campo já chega preenchido com o e-mail que liga a pessoa ao pet shop. */
 export default function CriarConta() {
+  return <Suspense fallback={<Formulario emailInicial="" />}><ComConvite /></Suspense>;
+}
+
+function ComConvite() {
+  const email = (useSearchParams().get("email") ?? "").trim().toLowerCase().slice(0, 254);
+  return <Formulario key={email} emailInicial={email} />;
+}
+
+function Formulario({ emailInicial }: { emailInicial: string }) {
   const router = useRouter();
+  const convidado = emailInicial !== "";
   const [nome, setNome] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(emailInicial);
   const [senha, setSenha] = useState("");
   const [aceito, setAceito] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -39,20 +50,22 @@ export default function CriarConta() {
 
   if (confirmar) {
     return (
-      <Porta titulo="Confira o seu e-mail" texto={`Enviamos um link de confirmação para ${email.trim()}. Abra o link para começar os seus 7 dias grátis.`}>
+      <Porta titulo="Confira o seu e-mail" texto={`Enviamos um link de confirmação para ${email.trim()}. Abra o link para ${convidado ? "entrar na equipe" : "começar os seus 7 dias grátis"}.`}>
         <p className="g-muted g-p">Não chegou? Olhe a caixa de spam ou <button className="g-link" onClick={() => setConfirmar(false)}>tente de novo</button>.</p>
       </Porta>
     );
   }
 
   return (
-    <Porta titulo="Comece os seus 7 dias grátis" texto="Sem cartão. Você só decide se assina depois de testar.">
+    <Porta titulo={convidado ? "Crie a sua conta para entrar na equipe" : "Comece os seus 7 dias grátis"}
+      texto={convidado ? "Você foi convidado por um pet shop. É só escolher uma senha." : "Sem cartão. Você só decide se assina depois de testar."}>
       <form className="g-form" onSubmit={enviar}>
         <label className="g-campo"><span>Seu nome</span>
           <input className="g-input" autoComplete="name" required maxLength={80} value={nome} onChange={(e) => setNome(e.target.value)} />
         </label>
         <label className="g-campo"><span>E-mail</span>
           <input className="g-input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          {convidado && <small>{email.trim().toLowerCase() === emailInicial ? "Use este e-mail: é ele que liga a sua conta ao pet shop." : `O convite foi feito para ${emailInicial}. Com outro e-mail, você não entra na equipe.`}</small>}
         </label>
         <label className="g-campo"><span>Crie uma senha</span>
           <input className="g-input" type="password" autoComplete="new-password" required minLength={8} value={senha} onChange={(e) => setSenha(e.target.value)} />

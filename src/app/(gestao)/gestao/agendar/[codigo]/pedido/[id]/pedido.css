@@ -23,3 +23,6 @@
 .g-lkp-nota, .g-lkp-pe { font-size: .875rem; color: var(--g-cinza); text-align: center; }
 .g-lkp-pe { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; }
 .g-lkp-pe a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+.g-lkp-loja { display: flex; align-items: center; gap: 8px; }
+.g-lkp-selo.confirmado, .g-lkp-selo.misto { background: var(--g-verde); }

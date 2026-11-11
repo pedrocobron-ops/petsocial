@@ -1,6 +1,7 @@
 "use client";
 
 import { abrirGuia } from "@/components/gestao/guia-inicial";
+import Identidade from "@/components/gestao/ajustes/identidade";
 import { useState } from "react";
 import { CalendarDays, Check, Clock, Copy, ExternalLink, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
 import { Kpi, Tile } from "@/components/gestao/painel";
@@ -63,6 +64,7 @@ export default function MeuPetshop() {
             <HorarioDaLoja />
           </div>
           <div className="g-pilha g">
+            <Identidade />
             <LinkAgendamento />
             <Servicos />
           </div>

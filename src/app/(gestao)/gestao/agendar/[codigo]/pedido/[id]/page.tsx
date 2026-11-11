@@ -6,11 +6,13 @@ import { CalendarCheck, CalendarX, Clock, Hourglass, MessageCircle, RefreshCw } 
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { Marca } from "@/components/gestao/marca";
 import { dataLonga, deIsoDia, linkWhatsApp } from "@/lib/gestao/util";
+import LogoLoja from "@/components/gestao/logo-loja";
+import { aplicarTema } from "@/lib/gestao/identidade";
 import "./pedido.css";
 
 type Situacao = "pendente" | "aceito" | "recusado" | "cancelado" | "concluido";
 type Item = { pet: string; servico: string | null; dia: string; hora: string; status: Situacao };
-type Pedido = { petshop: string; telefone: string | null; codigo: string; tutor: string; itens: Item[] };
+type Pedido = { logo?: string | null; tema?: string | null; petshop: string; telefone: string | null; codigo: string; tutor: string; itens: Item[] };
 
 const TEXTO: Record<Situacao, { rotulo: string; tom: string }> = {
   pendente: { rotulo: "Aguardando o pet shop", tom: "amarelo" },
@@ -32,7 +34,9 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
     const { data, error } = await banco().rpc("link_pedido", { p_id: id });
     setAtualizando(false);
     if (error) { setPedido((p) => p ?? null); return; }
-    setPedido((data as unknown as Pedido | null) ?? null);
+    const lido = (data as unknown as Pedido | null) ?? null;
+    aplicarTema(lido?.tema);
+    setPedido(lido);
   }, [id]);
 
   useEffect(() => { void buscar(); }, [buscar]);
@@ -65,7 +69,7 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
           <>
             <section className={`g-card g-lkp-cartao ${geral}`}>
               <span className={`g-lkp-selo ${geral}`}>{geral === "aguardando" ? <Hourglass /> : geral === "recusado" ? <CalendarX /> : <CalendarCheck />}</span>
-              <p className="g-rotulo">{pedido.petshop}</p>
+              <p className="g-lkp-loja"><LogoLoja nome={pedido.petshop} logo={pedido.logo} tamanho={28} /><span className="g-rotulo">{pedido.petshop}</span></p>
               <h1>{geral === "aguardando" ? `${pedido.tutor}, seu pedido chegou.` : geral === "confirmado" ? "Está confirmado!" : geral === "recusado" ? "Não deu neste horário." : "O pet shop respondeu."}</h1>
               <p className="g-muted">
                 {geral === "aguardando" ? "O pet shop ainda vai confirmar. Esta página atualiza sozinha; pode deixar aberta ou voltar depois."

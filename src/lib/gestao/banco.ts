@@ -425,14 +425,14 @@ isOneToOne: false
                   ]
                 },"petshops": {
                   Row: {
-                    "assinatura_desde": string | null,"cakto_assinatura": string | null,"cakto_email": string | null,"cidade": string | null,"criado_em": string,"criado_por": string | null,"fuso": string,"guia_feito_em": string | null,"horario": NonNullable<Json>,"id": string,"link_ativo": boolean,"link_aviso": string | null,"link_codigo": string,"meta_mes": number | null,"nome": string,"plano": string,"status": Database["public"]['Enums']["status_assinatura"],"telefone": string | null,"teste_ate": string,"uf": string | null,"vagas": number | null,"whatsapp": boolean
+                    "assinatura_desde": string | null,"cakto_assinatura": string | null,"cakto_email": string | null,"cidade": string | null,"criado_em": string,"criado_por": string | null,"fuso": string,"guia_feito_em": string | null,"horario": NonNullable<Json>,"id": string,"link_ativo": boolean,"link_aviso": string | null,"link_codigo": string,"logo": string | null,"meta_mes": number | null,"nome": string,"plano": string,"status": Database["public"]['Enums']["status_assinatura"],"telefone": string | null,"tema": string,"teste_ate": string,"uf": string | null,"vagas": number | null,"whatsapp": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"guia_feito_em"?: string | null,"horario"?: NonNullable<Json>,"id"?: string,"link_ativo"?: boolean,"link_aviso"?: string | null,"link_codigo"?: string,"meta_mes"?: number | null,"nome": string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"teste_ate"?: string,"uf"?: string | null,"vagas"?: number | null,"whatsapp"?: boolean
+                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"guia_feito_em"?: string | null,"horario"?: NonNullable<Json>,"id"?: string,"link_ativo"?: boolean,"link_aviso"?: string | null,"link_codigo"?: string,"logo"?: string | null,"meta_mes"?: number | null,"nome": string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"tema"?: string,"teste_ate"?: string,"uf"?: string | null,"vagas"?: number | null,"whatsapp"?: boolean
                   }
                   Update: {
-                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"guia_feito_em"?: string | null,"horario"?: NonNullable<Json>,"id"?: string,"link_ativo"?: boolean,"link_aviso"?: string | null,"link_codigo"?: string,"meta_mes"?: number | null,"nome"?: string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"teste_ate"?: string,"uf"?: string | null,"vagas"?: number | null,"whatsapp"?: boolean
+                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"guia_feito_em"?: string | null,"horario"?: NonNullable<Json>,"id"?: string,"link_ativo"?: boolean,"link_aviso"?: string | null,"link_codigo"?: string,"logo"?: string | null,"meta_mes"?: number | null,"nome"?: string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"tema"?: string,"teste_ate"?: string,"uf"?: string | null,"vagas"?: number | null,"whatsapp"?: boolean
                   }
                   Relationships: [
                     
@@ -459,14 +459,14 @@ isOneToOne: false
                   ]
                 },"profissionais": {
                   Row: {
-                    "atende": boolean,"ativo": boolean,"comissao_pct": number,"cor": string,"criado_em": string,"email_convite": string | null,"escala": Json | null,"funcao": string | null,"id": string,"nome": string,"papel": Database["public"]['Enums']["papel_equipe"],"petshop_id": string,"user_id": string | null,"ve_financeiro": boolean
+                    "acessos": (string)[] | null,"atende": boolean,"ativo": boolean,"comissao_pct": number,"cor": string,"criado_em": string,"email_convite": string | null,"escala": Json | null,"funcao": string | null,"id": string,"nome": string,"papel": Database["public"]['Enums']["papel_equipe"],"petshop_id": string,"user_id": string | null,"ve_financeiro": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "atende"?: boolean,"ativo"?: boolean,"comissao_pct"?: number,"cor"?: string,"criado_em"?: string,"email_convite"?: string | null,"escala"?: Json | null,"funcao"?: string | null,"id"?: string,"nome": string,"papel"?: Database["public"]['Enums']["papel_equipe"],"petshop_id": string,"user_id"?: string | null,"ve_financeiro"?: boolean
+                    "acessos"?: (string)[] | null,"atende"?: boolean,"ativo"?: boolean,"comissao_pct"?: number,"cor"?: string,"criado_em"?: string,"email_convite"?: string | null,"escala"?: Json | null,"funcao"?: string | null,"id"?: string,"nome": string,"papel"?: Database["public"]['Enums']["papel_equipe"],"petshop_id": string,"user_id"?: string | null,"ve_financeiro"?: boolean
                   }
                   Update: {
-                    "atende"?: boolean,"ativo"?: boolean,"comissao_pct"?: number,"cor"?: string,"criado_em"?: string,"email_convite"?: string | null,"escala"?: Json | null,"funcao"?: string | null,"id"?: string,"nome"?: string,"papel"?: Database["public"]['Enums']["papel_equipe"],"petshop_id"?: string,"user_id"?: string | null,"ve_financeiro"?: boolean
+                    "acessos"?: (string)[] | null,"atende"?: boolean,"ativo"?: boolean,"comissao_pct"?: number,"cor"?: string,"criado_em"?: string,"email_convite"?: string | null,"escala"?: Json | null,"funcao"?: string | null,"id"?: string,"nome"?: string,"papel"?: Database["public"]['Enums']["papel_equipe"],"petshop_id"?: string,"user_id"?: string | null,"ve_financeiro"?: boolean
                   }
                   Relationships: [
                     {
@@ -566,7 +566,8 @@ isOneToOne: false
                            },
 "entrar":
 { Args: Record<PropertyKey, never>; Returns: {
-              "atende": boolean,
+              "acessos": (string)[] | null,
+"atende": boolean,
 "ativo": boolean,
 "comissao_pct": number,
 "cor": string,
@@ -616,6 +617,9 @@ isOneToOne: false
                            },
 "sou_dono":
 { Args: { "p": string }; Returns: boolean
+                           },
+"tirar_acesso":
+{ Args: { "p_id": string }; Returns: undefined
                            },
 "vejo_financeiro":
 { Args: { "p": string }; Returns: boolean

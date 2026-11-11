@@ -22,7 +22,7 @@ const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa sema
 
 /** Tela inicial: o dia de relance, o que precisa de atenção e o atalho para pedir ao Mozart. */
 export default function Hoje() {
-  const { sb, petshop, eu, servicos, vejoFinanceiro, souDono } = useGestao();
+  const { sb, petshop, eu, servicos, vejoFinanceiro, souDono, posso } = useGestao();
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
   const hoje = inicioDoDia(new Date());
@@ -120,8 +120,8 @@ export default function Hoje() {
           <h1>{saudacao()}, <em className="it">{eu.nome.split(" ")[0]}</em></h1>
         </div>
         <div className="g-acoes">
-          <LinkRapido rotulo="Mandar link de agendamento" />
-          <Link className="g-btn pri" href="/gestao/app/agenda?novo=1"><Plus />Marcar horário</Link>
+          {posso("agenda") && <LinkRapido rotulo="Mandar link de agendamento" />}
+          {posso("agenda") && <Link className="g-btn pri" href="/gestao/app/agenda?novo=1"><Plus />Marcar horário</Link>}
         </div>
       </header>
 
@@ -177,7 +177,7 @@ export default function Hoje() {
           )}
         </div>
 
-        <PedidosLink />
+        {posso("agenda") && <PedidosLink />}
 
         {comecando && (
           <section>
@@ -198,7 +198,7 @@ export default function Hoje() {
           <Kpi href="/gestao/app/agenda" icone={Scissors} tom="pessego" rotulo="Atendimentos hoje" valor={dados ? ativos.length : "–"}
             apoio={dados ? (ativos.length ? `${feitos} ${feitos === 1 ? "concluído" : "concluídos"}` : "agenda livre") : " "}
             lado={dados && ativos.length > 0 ? <Anel parte={feitos / ativos.length} cor="var(--g-laranja)">{Math.round((feitos / ativos.length) * 100)}%</Anel> : undefined} />
-          <Kpi href="/gestao/app/creche-hotel" icone={BedDouble} tom="ceu" rotulo="Creche e hotel" valor={dados ? dados.emCasa : "–"} apoio={dados?.emCasa === 1 ? "pet na casa agora" : "pets na casa agora"} />
+          {posso("creche_hotel") && <Kpi href="/gestao/app/creche-hotel" icone={BedDouble} tom="ceu" rotulo="Creche e hotel" valor={dados ? dados.emCasa : "–"} apoio={dados?.emCasa === 1 ? "pet na casa agora" : "pets na casa agora"} />}
           {vejoFinanceiro ? (
             <Kpi href="/gestao/app/caixa" icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"} apoio={dados && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : "ver o caixa"}
               lado={dados ? <Tendencia valores={dados.entradas7} /> : undefined} />
@@ -240,7 +240,7 @@ export default function Hoje() {
           </section>
 
           <div className="g-pilha g">
-            <DicasMozart />
+            {posso("clientes") && posso("agenda") && <DicasMozart />}
             {atencao.length > 0 && (
               <section>
                 <div className="g-card-t"><h2>Pede a sua atenção</h2><span className="g-tag amarelo">{atencao.length}</span></div>

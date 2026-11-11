@@ -1,44 +1,51 @@
 "use client";
 
-import { planoPorId } from "@/lib/gestao/planos";
 import { Fragment, useState } from "react";
 import Link from "next/link";
-import { CalendarCheck, CalendarDays, ChevronRight, Copy, KeyRound, Lock, Mail, Scissors, UserPlus, Users, Wallet } from "lucide-react";
-import { Anel, Kpi, Tile } from "@/components/gestao/painel";
+import { ArrowRight, CalendarCheck, CalendarDays, ChevronRight, Hourglass, KeyRound, Lock, Mail, Percent, Scissors, Send, Smartphone, UserPlus, Users } from "lucide-react";
+import { Kpi, Tile } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
-import { AvatarPessoa, Campo, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
-import { CORES, EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
-import type { Horario, Papel, Profissional } from "@/lib/gestao/tipos";
+import { AvatarPessoa, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
+import { NOME_DIAS, ORDEM_DIAS, lerHorario } from "@/components/gestao/ajustes/grade-horario";
+import AdicionarPessoa from "@/components/gestao/equipe/adicionar";
+import EditarPessoa, { FolhaConvite } from "@/components/gestao/equipe/editar";
+import { Areas, Vagas } from "@/components/gestao/equipe/pecas";
+import { acessoDe, erroDeLimite, fraseDoLimite, funcaoDe, nAcessos, pilulasDe, primeiroNome, titularDe, usoDoPlano, type Uso } from "@/components/gestao/equipe/modelo";
+import { PERFIS } from "@/lib/gestao/acessos";
+import type { Profissional } from "@/lib/gestao/tipos";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./equipe.css";
 
-const PAPEL: Record<Papel, string> = { dono: "Dono", gerente: "Gerente", funcionario: "Funcionário" };
 const pct = (n: number) => `${String(Number(n)).replace(".", ",")}%`;
 
 /** Quem aparece na escala e o horário da pessoa em cada dia (a escala própria ou, sem ela, o horário do pet shop). */
 const naEscala = (p: Profissional) => p.atende || !!p.escala;
 const horaCurta = (h: string) => { const [a, m] = h.split(":"); return m === "00" ? `${Number(a)}h` : `${Number(a)}:${m}`; };
 
+type Aberto = { tipo: "novo" } | { tipo: "editar"; id: string; foco?: "acesso" } | { tipo: "convite"; id: string } | null;
+
 export default function Equipe() {
   const { souDono, equipe, eu, sb, petshop, recarregarBase } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
-  const [editando, setEditando] = useState<Profissional | "novo" | null>(null);
+  const [aberto, setAberto] = useState<Aberto>(null);
   if (!souDono) return <Vazio titulo="Só o dono do pet shop mexe aqui." />;
 
   const ativos = equipe.filter((p) => p.ativo);
   const inativos = equipe.filter((p) => !p.ativo);
-  const plano = planoPorId(petshop.plano);
-  const comAcesso = ativos.filter((p) => p.user_id || p.email_convite?.trim()).length;
-  const abrir = (p: Profissional | "novo") => { if (!somenteLeitura()) setEditando(p); };
+  const uso = usoDoPlano(petshop, equipe);
+  const abrir = (a: Aberto) => { if (!somenteLeitura()) setAberto(a); };
+  // a pessoa aberta vem sempre da equipe carregada, para a folha acompanhar o que acabou de ser gravado
+  const pessoaAberta = aberto && aberto.tipo !== "novo" ? equipe.find((p) => p.id === aberto.id) ?? null : null;
 
   const loja = lerHorario(petshop.horario);
   const diaDe = (p: Profissional, d: string) => (p.escala ? lerHorario(p.escala)[d] : loja[d]);
   const hoje = String(new Date().getDay());
   const atendem = ativos.filter((p) => p.atende).length;
   const trabalhamHoje = ativos.filter((p) => naEscala(p) && diaDe(p, hoje)).length;
-  const convites = ativos.filter((p) => !p.user_id && p.email_convite?.trim()).length;
-  const cheio = comAcesso >= plano.acessos;
+  const convites = ativos.filter((p) => acessoDe(p) === "convite").length;
+  const soEu = ativos.length <= 1;
+  const titular = titularDe(equipe);
 
   async function reativar(p: Profissional) {
     if (somenteLeitura()) return;
@@ -47,27 +54,23 @@ export default function Equipe() {
       await recarregarBase();
       avisarMudanca();
       avisar(`${p.nome} voltou para a equipe.`);
-    } catch (x) { avisarErro(x); }
+    } catch (x) {
+      // quem tinha login volta ocupando um acesso; se o plano está cheio, o banco recusa
+      if (erroDeLimite(x)) avisarErro(new Error(`${primeiroNome(p.nome)} tinha login e ${fraseDoLimite(uso).replace(/^O plano/, "o plano")} A mudança de plano fica na tela Assinatura.`));
+      else avisarErro(x);
+    }
   }
 
   return (
     <>
       <header className="g-topo">
-        <div><h1>Equipe</h1><p className="g-muted">Quem trabalha com você, o que cada um vê e em que dias.</p></div>
-        <div className="g-acoes"><button className="g-btn pri" onClick={() => abrir("novo")}><UserPlus />Adicionar pessoa</button></div>
+        <div><h1>Equipe</h1><p className="g-muted">Quem trabalha com você, quem entra no sistema e o que cada um abre.</p></div>
+        <div className="g-acoes"><button className="g-btn pri" onClick={() => abrir({ tipo: "novo" })}><UserPlus />Adicionar pessoa</button></div>
       </header>
 
       <div className="g-pilha g">
         <div className="g-eq-resumo">
-          <Link href="/gestao/app/assinatura" className={`g-eq-plano${cheio ? " cheio" : ""}`}>
-            <Anel parte={plano.acessos ? comAcesso / plano.acessos : 0} tamanho={84} cor={cheio ? "var(--g-laranja)" : "var(--g-verde)"}>{comAcesso}/{plano.acessos}</Anel>
-            <span className="t">
-              <span className="g-rotulo">Acessos no plano {plano.nome}</span>
-              <b>{comAcesso} de {plano.acessos} {plano.acessos === 1 ? "acesso usado" : "acessos usados"}</b>
-              <span className="g-p">Conta quem tem login ou convite.</span>
-            </span>
-            <ChevronRight size={18} aria-hidden />
-          </Link>
+          <BlocoDoPlano uso={uso} aoAdicionar={() => abrir({ tipo: "novo" })} />
           <div className="g-grade kpis g-eq-kpis">
             <Kpi icone={Users} tom="ceu" rotulo="Na equipe" valor={ativos.length} apoio={ativos.length === 1 ? "pessoa ativa" : "pessoas ativas"} />
             <Kpi icone={Scissors} tom="pessego" rotulo="Atendem" valor={atendem} apoio="aparecem na agenda" />
@@ -76,47 +79,77 @@ export default function Equipe() {
           </div>
         </div>
 
+        {soEu && (
+          <section className="g-eq-convida">
+            <div className="g-eq-convida-t">
+              <p className="g-rotulo">Sua equipe</p>
+              <h2>Por enquanto é só você.</h2>
+              <p>Adicione quem dá banho e tosa para aparecer na agenda: não precisa de login. Login é para quem usa o sistema, como recepção, financeiro, gerente ou sócio.</p>
+              <div><button className="g-btn verde" onClick={() => abrir({ tipo: "novo" })}><UserPlus />Adicionar a primeira pessoa</button></div>
+            </div>
+            <ul className="g-eq-convida-l">
+              <li><Tile icone={CalendarDays} tom="pessego" /><p className="g-eq-convida-i"><b>Agenda por pessoa</b><small>Cada um com a sua cor e o seu filtro na agenda.</small></p></li>
+              <li><Tile icone={Percent} tom="menta" /><p className="g-eq-convida-i"><b>Comissão calculada</b><small>A conta de cada um sai pronta em Relatórios.</small></p></li>
+              <li><Tile icone={Smartphone} tom="ceu" /><p className="g-eq-convida-i"><b>Login só para quem precisa</b><small>Você escolhe, área por área, o que a pessoa abre.</small></p></li>
+            </ul>
+          </section>
+        )}
+
         <div className="g-duas">
           <section>
             <div className="g-card-t"><h2>Pessoas</h2><span className="g-muted g-p">{ativos.length} {ativos.length === 1 ? "ativa" : "ativas"}</span></div>
             <div className="g-eq-grade">
               {ativos.map((p) => {
-                const veDinheiro = p.papel !== "funcionario" || p.ve_financeiro;
+                const acesso = acessoDe(p);
+                const dono = p.papel === "dono";
+                const dias = ORDEM_DIAS.filter((d) => diaDe(p, d));
                 return (
-                  <button key={p.id} type="button" className="g-card g-eq-pessoa" style={{ "--cor": p.cor } as React.CSSProperties} onClick={() => abrir(p)}>
-                    <span className="g-eq-topo">
+                  <article key={p.id} className="g-card g-eq-pessoa" style={{ "--cor": p.cor } as React.CSSProperties}>
+                    <button type="button" className="g-eq-abrir" onClick={() => abrir({ tipo: "editar", id: p.id })} aria-label={`Abrir ${p.nome}`} />
+                    <div className="g-eq-topo">
                       <AvatarPessoa nome={p.nome} cor={p.cor} tamanho="g" />
-                      <span className="t">
-                        <b>{p.nome}{p.id === eu.id ? " (você)" : ""}</b>
-                        <span className="g-eq-tags">
-                          <span className={`g-tag ${p.papel === "dono" ? "laranja" : p.papel === "gerente" ? "azul" : ""}`}>{PAPEL[p.papel]}</span>
-                          {Number(p.comissao_pct) > 0 && <span className="g-tag">comissão de {pct(p.comissao_pct)}</span>}
-                        </span>
-                      </span>
-                    </span>
+                      <div className="g-eq-topo-t">
+                        <b className="g-eq-nome">{p.nome}{p.id === eu.id ? " (você)" : ""}</b>
+                        <span className="g-eq-funcao">{funcaoDe(p)}{dono && <span className={`g-tag ${p.id === titular ? "laranja" : "azul"}`}>{p.id === titular ? "Titular" : "Sócio"}</span>}</span>
+                      </div>
+                      <ChevronRight className="g-eq-seta" size={18} aria-hidden />
+                    </div>
 
-                    <span className={`g-eq-acesso${p.user_id ? " ok" : p.email_convite ? " convite" : ""}`}>
-                      {p.user_id ? <KeyRound aria-hidden /> : p.email_convite ? <Mail aria-hidden /> : <Lock aria-hidden />}
-                      <span>{p.user_id ? "Entra com login" : p.email_convite ? <>Convite enviado <i>{p.email_convite}</i></> : "Sem login"}</span>
-                    </span>
+                    <div className={`g-eq-acesso ${acesso}`}>
+                      <i className="g-eq-acesso-i" aria-hidden>{acesso === "login" ? <KeyRound /> : acesso === "convite" ? <Hourglass /> : p.atende ? <CalendarDays /> : <Lock />}</i>
+                      <p className="g-eq-acesso-t">
+                        <b>{acesso === "login" ? "Com login" : acesso === "convite" ? "Convite enviado, esperando criar a conta" : p.atende ? "Sem login, só na agenda" : "Sem login"}</b>
+                        {acesso === "convite" && <small>{p.email_convite}</small>}
+                      </p>
+                      {acesso === "convite" && <button type="button" className="g-btn p sec g-eq-acao" onClick={() => abrir({ tipo: "convite", id: p.id })}><Send />Reenviar</button>}
+                      {acesso === "sem" && <button type="button" className="g-btn p sec g-eq-acao" onClick={() => abrir({ tipo: "editar", id: p.id, foco: "acesso" })}><KeyRound />Dar login</button>}
+                    </div>
 
-                    <span className="g-eq-tags">
-                      {p.atende && <span className="g-tag verde"><Scissors aria-hidden />atende na agenda</span>}
-                      {veDinheiro && <span className="g-tag azul"><Wallet aria-hidden />vê o financeiro</span>}
-                    </span>
-
-                    {naEscala(p) && (
-                      <span className="g-eq-dias" role="img" aria-label={`Trabalha: ${ORDEM_DIAS.filter((d) => diaDe(p, d)).map((d) => NOME_DIAS[d]).join(", ") || "nenhum dia"}`}>
-                        {ORDEM_DIAS.map((d) => <i key={d} className={`${diaDe(p, d) ? "on" : ""}${d === hoje ? " hoje" : ""}`}>{NOME_DIAS[d][0]}</i>)}
-                      </span>
+                    {acesso !== "sem" && (
+                      <div className="g-eq-abre">
+                        <span className="g-eq-abre-r">Abre</span>
+                        {pilulasDe(p).map((a) => <span key={a} className={`g-eq-pilula${a === "Tudo" ? " tudo" : ""}`}>{a}</span>)}
+                        {dono && <span className="g-eq-pilula tudo">Equipe e assinatura</span>}
+                      </div>
                     )}
-                  </button>
+
+                    {(p.atende || Number(p.comissao_pct) > 0) && (
+                      <div className="g-eq-tags">
+                        {p.atende && <span className="g-tag verde"><Scissors aria-hidden />atende na agenda</span>}
+                        {Number(p.comissao_pct) > 0 && <span className="g-tag">comissão de {pct(p.comissao_pct)}</span>}
+                      </div>
+                    )}
+
+                    <div className="g-eq-trabalha">
+                      <span className="g-eq-trabalha-r">{p.escala ? "Dias próprios" : "Horário do pet shop"}</span>
+                      <div className="g-eq-dias" role="img" aria-label={`Trabalha: ${dias.map((d) => NOME_DIAS[d]).join(", ") || "nenhum dia"}`}>
+                        {ORDEM_DIAS.map((d) => <i key={d} className={`${diaDe(p, d) ? "on" : ""}${d === hoje ? " hoje" : ""}`}>{NOME_DIAS[d][0]}</i>)}
+                      </div>
+                    </div>
+                  </article>
                 );
               })}
             </div>
-            {ativos.length === 1 && (
-              <p className="g-muted g-p" style={{ marginTop: 12 }}>Por enquanto é só você. Adicione quem dá banho, tosa ou atende no balcão.</p>
-            )}
             {inativos.length > 0 && (
               <details className="gj-recolhe" style={{ marginTop: 12 }}>
                 <summary>{inativos.length === 1 ? "1 pessoa desativada" : `${inativos.length} pessoas desativadas`}</summary>
@@ -124,7 +157,7 @@ export default function Equipe() {
                   {inativos.map((p) => (
                     <div key={p.id} className="g-linha">
                       <AvatarPessoa nome={p.nome} cor="#a39a90" tamanho="p" />
-                      <span className="t"><b className="g-muted">{p.nome}</b><span>{PAPEL[p.papel]}</span></span>
+                      <span className="t"><b className="g-muted">{p.nome}</b><span>{funcaoDe(p)}</span></span>
                       <button className="g-btn p sec" onClick={() => reativar(p)}>Reativar</button>
                     </div>
                   ))}
@@ -134,9 +167,54 @@ export default function Equipe() {
           </section>
           <EscalaDaSemana />
         </div>
+
+        <details className="g-card g-eq-pode">
+          <summary className="g-eq-pode-s">
+            <Tile icone={KeyRound} tom="lilas" />
+            <span className="g-eq-pode-st"><b>Quem pode o quê</b><small>O que cada perfil pronto abre. Você pode ligar e desligar área por área em cada pessoa.</small></span>
+            <ChevronRight className="g-eq-pode-seta" size={18} aria-hidden />
+          </summary>
+          <div className="g-eq-compara">
+            {PERFIS.map((c) => (
+              <div key={c.id} className="g-eq-quadro">
+                <p className="g-eq-quadro-t">{c.titulo}</p>
+                <Areas areas={c.areas} socio={c.socio} curto />
+              </div>
+            ))}
+          </div>
+          <p className="g-muted g-pp g-eq-pode-n">Vale para quem entra com o próprio login. Quem só aparece na agenda não abre nada. Caixa, Financeiro e Relatórios são as áreas que mostram valores.</p>
+        </details>
       </div>
-      {editando && <FolhaPessoa pessoa={editando === "novo" ? null : editando} aoFechar={() => setEditando(null)} />}
+
+      {aberto?.tipo === "novo" && <AdicionarPessoa aoFechar={() => setAberto(null)} />}
+      {aberto?.tipo === "editar" && pessoaAberta && <EditarPessoa key={pessoaAberta.id} pessoa={pessoaAberta} foco={aberto.foco} aoFechar={() => setAberto(null)} />}
+      {aberto?.tipo === "convite" && pessoaAberta && <FolhaConvite pessoa={pessoaAberta} aoFechar={() => setAberto(null)} />}
     </>
+  );
+}
+
+/* ---------- acessos do plano ---------- */
+
+function BlocoDoPlano({ uso, aoAdicionar }: { uso: Uso; aoAdicionar: () => void }) {
+  const { plano, proximo, livres, cheio, emTeste } = uso;
+  const linha = emTeste
+    ? "Durante o teste valem os 6 acessos do plano Pet shop. Na hora de assinar, você escolhe pelo número de pessoas com login."
+    : cheio
+      ? proximo ? `Todos em uso. Para dar login a mais gente, o plano ${proximo.nome} tem ${nAcessos(proximo.acessos)}.` : "Todos em uso. Este é o maior plano."
+      : livres === 1 && proximo
+        ? `Sobra 1 acesso. Se mais gente precisar de login, o plano ${proximo.nome} tem ${nAcessos(proximo.acessos)}.`
+        : `${livres === 1 ? "Sobra 1 acesso" : `Sobram ${livres} acessos`}.`;
+  const mostraPlanos = !emTeste && !!proximo && livres <= 1;
+  return (
+    <section className={`g-eq-plano${cheio && !emTeste ? " cheio" : ""}`}>
+      <div className="g-eq-plano-t">
+        <p className="g-rotulo">{emTeste ? "Pessoas com login · período de teste" : "Pessoas com login"}</p>
+        <h2>Acessos do plano {plano.nome}: <em>{uso.usados} de {uso.limite} em uso</em></h2>
+      </div>
+      <Vagas uso={uso} aoAdicionar={aoAdicionar} />
+      <p className="g-eq-plano-n">{linha} <span className="g-eq-plano-c">Conta quem entra no sistema: você, recepção, financeiro, gerente, sócio. Quem só aparece na agenda, como banhista e tosador, não ocupa acesso.</span></p>
+      <div><Link className="g-eq-plano-l" href="/gestao/app/assinatura">{mostraPlanos ? "Ver os planos" : "Ver a assinatura"}<ArrowRight size={16} aria-hidden /></Link></div>
+    </section>
   );
 }
 
@@ -153,188 +231,32 @@ function EscalaDaSemana() {
       <div className="g-eq-escala">
         <span />
         {ORDEM_DIAS.map((d) => (
-          <span key={d} className={`cab${d === hoje ? " hoje" : ""}${loja[d] ? "" : " fechado"}`} title={loja[d] ? NOME_DIAS[d] : `${NOME_DIAS[d]}: fechado`}>
+          <span key={d} className={`g-eq-esc-dia${d === hoje ? " hoje" : ""}${loja[d] ? "" : " fechado"}`} title={loja[d] ? NOME_DIAS[d] : `${NOME_DIAS[d]}: fechado`}>
             <abbr title={NOME_DIAS[d]}>{NOME_DIAS[d].slice(0, 3)}</abbr>
           </span>
         ))}
         {quem.map((p) => (
           <Fragment key={p.id}>
-            <span className="nome"><i style={{ background: p.cor }} aria-hidden />{p.nome.split(" ")[0]}</span>
+            <span className="g-eq-esc-nome"><i style={{ background: p.cor }} aria-hidden />{p.nome.split(" ")[0]}</span>
             {ORDEM_DIAS.map((d) => {
               const h = p.escala ? lerHorario(p.escala)[d] : loja[d];
               return h ? (
-                <span key={d} className={`cel on${d === hoje ? " hoje" : ""}`} style={{ "--cor": p.cor } as React.CSSProperties} title={`${p.nome}, ${NOME_DIAS[d]}: ${h.abre}–${h.fecha}`}>
+                <span key={d} className={`g-eq-esc-cel on${d === hoje ? " hoje" : ""}`} style={{ "--cor": p.cor } as React.CSSProperties} title={`${p.nome}, ${NOME_DIAS[d]}: ${h.abre}–${h.fecha}`}>
                   <b>{horaCurta(h.abre)}</b><b>{horaCurta(h.fecha)}</b>
                   <span className="g-eq-so-leitor">{NOME_DIAS[d]}, das {h.abre} às {h.fecha}</span>
                 </span>
-              ) : <span key={d} className={`cel${loja[d] ? "" : " fechado"}`}><span className="g-eq-so-leitor">{NOME_DIAS[d]}: {loja[d] ? "folga" : "fechado"}</span></span>;
+              ) : <span key={d} className={`g-eq-esc-cel${loja[d] ? "" : " fechado"}`}><span className="g-eq-so-leitor">{NOME_DIAS[d]}: {loja[d] ? "folga" : "fechado"}</span></span>;
             })}
           </Fragment>
         ))}
       </div>
-      {!quem.length && <p className="g-muted g-p" style={{ marginTop: 10 }}>Ninguém escalado</p>}
+      {!quem.length && <p className="g-muted g-p" style={{ marginTop: 10 }}>Ninguém escalado. A escala mostra quem atende os pets ou tem dias próprios.</p>}
       <div className="g-eq-leg">
         <span><i className="on" aria-hidden />trabalha</span>
         <span><i aria-hidden />folga</span>
         {ORDEM_DIAS.some((d) => !loja[d]) && <span><i className="fechado" aria-hidden />pet shop fechado</span>}
       </div>
-      <p className="g-muted g-pp" style={{ marginTop: 10 }}>Para mudar os dias de alguém, toque no nome da pessoa.</p>
+      <p className="g-muted g-pp" style={{ marginTop: 10 }}>Para mudar os dias de alguém, toque no cartão da pessoa.</p>
     </section>
-  );
-}
-
-/* ---------- adicionar ou editar ---------- */
-
-function FolhaPessoa({ pessoa, aoFechar }: { pessoa: Profissional | null; aoFechar: () => void }) {
-  const { sb, petshop, equipe, recarregarBase } = useGestao();
-  const { avisar, avisarErro, confirmar } = useAvisos();
-  const ehDono = pessoa?.papel === "dono";
-  const loja = lerHorario(petshop.horario);
-  const [nome, setNome] = useState(pessoa?.nome ?? "");
-  const [papel, setPapel] = useState<Papel>(pessoa?.papel ?? "funcionario");
-  const [atende, setAtende] = useState(pessoa?.atende ?? true);
-  const [veFinanceiro, setVeFinanceiro] = useState(pessoa?.ve_financeiro ?? false);
-  const [comissao, setComissao] = useState(pessoa && Number(pessoa.comissao_pct) > 0 ? String(Number(pessoa.comissao_pct)).replace(".", ",") : "");
-  const [cor, setCor] = useState(pessoa?.cor ?? CORES[equipe.length % CORES.length]);
-  const [email, setEmail] = useState(pessoa?.email_convite ?? "");
-  const [segueLoja, setSegueLoja] = useState(!pessoa?.escala);
-  const [escala, setEscala] = useState<Horario>(() => (pessoa?.escala ? lerHorario(pessoa.escala) : loja));
-  const [erro, setErro] = useState<string | null>(null);
-  const [salvando, setSalvando] = useState(false);
-  const semprVe = papel !== "funcionario";
-
-  async function copiarConvite() {
-    const link = `${location.origin}/gestao/criar-conta`;
-    const e = email.trim().toLowerCase();
-    const texto = `Oi${nome.trim() ? `, ${nome.trim().split(" ")[0]}` : ""}! Você agora faz parte da equipe do ${petshop.nome} no Maestro Pet. Crie a sua conta em ${link}${e ? ` usando o e-mail ${e}` : ""} e você já entra direto na equipe.`;
-    try {
-      await navigator.clipboard.writeText(texto);
-      avisar("Convite copiado. Agora é só colar no WhatsApp.");
-    } catch { avisarErro(new Error("Não consegui copiar. Copie o endereço: " + link)); }
-  }
-
-  async function salvar() {
-    const n = nome.trim();
-    const e = email.trim().toLowerCase();
-    const c = comissao.trim() ? Number(comissao.replace(",", ".")) : 0;
-    if (!n) return setErro("Escreva o nome da pessoa.");
-    if (!Number.isFinite(c) || c < 0 || c > 100) return setErro("A comissão fica entre 0 e 100%.");
-    if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return setErro("Confira o e-mail.");
-    if (e && equipe.some((p) => p.id !== pessoa?.id && p.email_convite?.toLowerCase() === e)) return setErro("Esse e-mail já está em outra pessoa da equipe.");
-    const problema = segueLoja ? null : erroDoHorario(escala);
-    if (problema) return setErro(problema);
-    setErro(null);
-    setSalvando(true);
-    const campos = {
-      nome: n.slice(0, 80),
-      // o dono continua dono; ninguém vira dono por aqui
-      papel: ehDono ? ("dono" as const) : papel === "gerente" ? ("gerente" as const) : ("funcionario" as const),
-      atende,
-      ve_financeiro: ehDono || papel === "gerente" ? true : veFinanceiro,
-      comissao_pct: Math.round(c * 100) / 100,
-      cor,
-      escala: segueLoja ? null : escala,
-      // quem já tem login não troca de e-mail por aqui
-      ...(pessoa?.user_id ? {} : { email_convite: e || null }),
-    };
-    try {
-      if (pessoa) ok(await sb.from("profissionais").update(campos).eq("id", pessoa.id).eq("petshop_id", petshop.id).select("id"));
-      else ok(await sb.from("profissionais").insert({ ...campos, petshop_id: petshop.id }).select("id"));
-      await recarregarBase();
-      avisarMudanca();
-      avisar(pessoa ? "Salvo." : `${n.split(" ")[0]} entrou na equipe.`);
-      aoFechar();
-    } catch (x) { avisarErro(x); setSalvando(false); }
-  }
-
-  async function desativar() {
-    if (!pessoa || ehDono) return;
-    const sim = await confirmar({
-      titulo: `Desativar ${pessoa.nome}?`,
-      texto: "A pessoa perde o acesso e some da agenda. O histórico dela continua guardado e você pode reativar quando quiser.",
-      confirmar: "Desativar", perigo: true,
-    });
-    if (!sim) return;
-    setSalvando(true);
-    try {
-      ok(await sb.from("profissionais").update({ ativo: false }).eq("id", pessoa.id).eq("petshop_id", petshop.id).neq("papel", "dono").select("id"));
-      await recarregarBase();
-      avisarMudanca();
-      avisar(`${pessoa.nome} não tem mais acesso.`);
-      aoFechar();
-    } catch (x) { avisarErro(x); setSalvando(false); }
-  }
-
-  return (
-    <Folha titulo={pessoa ? pessoa.nome : "Adicionar pessoa"} aoFechar={aoFechar}
-      rodape={<>
-        <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
-      </>}>
-      <div className="g-form">
-        <Campo rotulo="Nome"><input className="g-input" value={nome} maxLength={80} autoFocus={!pessoa} onChange={(e) => setNome(e.target.value)} /></Campo>
-
-        <div className="g-campo">
-          <span>Papel</span>
-          {ehDono ? <p className="g-muted g-p">Dono. Vê e mexe em tudo.</p> : (
-            <>
-              <div className="g-chips">
-                <button type="button" className="g-chip" aria-pressed={papel === "funcionario"} onClick={() => setPapel("funcionario")}>Funcionário</button>
-                <button type="button" className="g-chip" aria-pressed={papel === "gerente"} onClick={() => setPapel("gerente")}>Gerente</button>
-              </div>
-              <small>{papel === "gerente" ? "Gerente vê o caixa e o financeiro, mas não mexe na equipe nem na assinatura." : "Funcionário cuida da agenda, dos clientes e dos pets."}</small>
-            </>
-          )}
-        </div>
-
-        <label className="g-check">
-          <input type="checkbox" checked={atende} onChange={(e) => setAtende(e.target.checked)} />
-          <span>Atende na agenda <span className="g-muted">(aparece para escolher em cada horário)</span></span>
-        </label>
-        <label className="g-check">
-          <input type="checkbox" checked={semprVe || veFinanceiro} disabled={semprVe} onChange={(e) => setVeFinanceiro(e.target.checked)} />
-          <span>Vê o caixa e o financeiro{semprVe && <span className="g-muted"> ({ehDono ? "dono" : "gerente"} sempre vê)</span>}</span>
-        </label>
-
-        <Campo rotulo="Comissão (%)" dica="De 0 a 100. Deixe em branco se a pessoa não ganha comissão.">
-          <input className="g-input g-tab" inputMode="decimal" placeholder="0" style={{ maxWidth: "8rem" }} value={comissao}
-            onChange={(e) => setComissao(e.target.value.replace(/[^\d,.]/g, "").slice(0, 6))} />
-        </Campo>
-
-        <div className="g-campo"><span>Cor na agenda</span><EscolherCor valor={cor} aoMudar={setCor} /></div>
-
-        <hr className="g-sep" />
-        {pessoa?.user_id ? (
-          <p className="g-muted g-p">{ehDono ? "Esta é a conta que criou o pet shop." : "Esta pessoa já entra com o próprio login."}</p>
-        ) : (
-          <div className="g-pilha p">
-            <Campo rotulo="E-mail para login (opcional)"
-              dica="Peça para a pessoa criar a conta em maestropet.com/gestao/criar-conta com este e-mail. Ela entra direto na equipe.">
-              <input className="g-input" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" placeholder="nome@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </Campo>
-            <div><button type="button" className="g-btn p sec" onClick={copiarConvite}><Copy />Copiar convite</button></div>
-          </div>
-        )}
-
-        <hr className="g-sep" />
-        <div className="g-pilha p">
-          <h3>Escala</h3>
-          <label className="g-check">
-            <input type="checkbox" checked={segueLoja} onChange={(e) => setSegueLoja(e.target.checked)} />
-            Segue o horário do pet shop
-          </label>
-          {!segueLoja && <GradeHorario valor={escala} aoMudar={(h) => { setEscala(h); setErro(null); }} aberto="Trabalha" fechado="Folga" base={loja} />}
-        </div>
-
-        {erro && <p className="g-erro" role="alert">{erro}</p>}
-
-        {pessoa && !ehDono && (
-          <>
-            <hr className="g-sep" />
-            <div><button type="button" className="g-btn p perigo" onClick={desativar} disabled={salvando}>Desativar pessoa</button></div>
-          </>
-        )}
-      </div>
-    </Folha>
   );
 }

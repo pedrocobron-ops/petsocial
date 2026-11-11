@@ -12,10 +12,13 @@ import { planoPorId } from "@/lib/gestao/planos";
 import { dataLonga } from "@/lib/gestao/util";
 import { AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
 import BuscaGeral from "./busca-geral";
+import { areaDaRota } from "@/lib/gestao/acessos";
 import type { Tom } from "./painel";
 import Assistente from "./assistente";
 import Ajuda from "./ajuda";
 import GuiaInicial from "./guia-inicial";
+import LogoLoja from "./logo-loja";
+import { aplicarTema } from "@/lib/gestao/identidade";
 
 type Item = { href: string; rotulo: string; icone: React.ComponentType; tom: Tom; so?: "financeiro" | "dono" };
 const GRUPOS: { titulo: string; itens: Item[] }[] = [
@@ -42,7 +45,7 @@ const GRUPOS: { titulo: string; itens: Item[] }[] = [
 /** Navegação, avisos de assinatura e o botão da assistente em volta de todas as telas do aplicativo. */
 export default function Casca({ children }: { children: React.ReactNode }) {
   const caminho = usePathname();
-  const { sb, petshop, eu, souDono, vejoFinanceiro, liberado, diasDeTeste, sair } = useGestao();
+  const { sb, petshop, eu, souDono, posso, liberado, diasDeTeste, sair } = useGestao();
   const [pedidos, setPedidos] = useState(0);
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
   const [mais, setMais] = useState(false);
@@ -54,6 +57,8 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener(EVENTO_ASSISTENTE, abrir);
   }, []);
   useEffect(() => { setMais(false); }, [caminho]);
+  // as cores do pet shop valem no aplicativo inteiro; ao sair do aplicativo, volta o padrão
+  useEffect(() => { aplicarTema(petshop.tema); return () => aplicarTema(null); }, [petshop.tema]);
 
   // pedidos pelo link esperando resposta: bolinha com o número no menu, atualizada a cada minuto
   useEffect(() => {
@@ -72,7 +77,11 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     return () => { vale = false; clearInterval(t); window.removeEventListener(EVENTO_MUDOU, ouvir); document.removeEventListener("visibilitychange", ouvir); };
   }, [sb, petshop.id, petshop.link_ativo]);
 
-  const pode = (i: Item) => (i.so === "financeiro" ? vejoFinanceiro : i.so === "dono" ? souDono : true);
+  const podeRota = (href: string) => { const area = areaDaRota(href); return area ? posso(area) : true; };
+  const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href));
+  // tela aberta pelo endereço sem ter acesso: mostra o aviso no lugar da tela
+  const soDeDono = ["/gestao/app/equipe", "/gestao/app/meu-petshop", "/gestao/app/assinatura"].some((r) => caminho.startsWith(r));
+  const semAcesso = (soDeDono && !souDono) || !podeRota(caminho);
   const atual = (href: string) => (href === "/gestao/app" ? caminho === href : caminho.startsWith(href));
   const grupos = GRUPOS.map((g) => ({ ...g, itens: g.itens.filter(pode) })).filter((g) => g.itens.length);
 
@@ -95,7 +104,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     <div className="g-app">
       <aside className="g-lado">
         <div className="g-marca">
-          <Selo tamanho={38} />
+          <LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={38} padrao="selo" />
           <div><b>{petshop.nome}</b><span>Maestro Pet Gestão</span></div>
         </div>
         {nav}
@@ -121,9 +130,9 @@ export default function Casca({ children }: { children: React.ReactNode }) {
 
       <main className="g-main">
         <div className="g-barra">
-          <div className="g-barra-marca"><Selo tamanho={34} tom="verde" /><span>{petshop.nome}</span></div>
+          <div className="g-barra-marca"><LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={34} padrao="selo" tomSelo="verde" /><span>{petshop.nome}</span></div>
           {aqui && <div className="g-barra-onde"><span className={`g-tile p ${aqui.item.tom}`} aria-hidden><aqui.item.icone /></span><span>{aqui.grupo} / <b>{aqui.item.rotulo}</b></span></div>}
-          <BuscaGeral />
+          {posso("clientes") ? <BuscaGeral /> : <span style={{ flex: 1 }} />}
           <div className="g-barra-data"><CalendarClock />{dataLonga(new Date())}</div>
         </div>
         {!liberado && (
@@ -146,16 +155,23 @@ export default function Casca({ children }: { children: React.ReactNode }) {
             <Link className="g-btn p verde" href="/gestao/app/assinatura">Assinar</Link>
           </div>
         )}
-        {children}
+        {semAcesso ? (
+          <div className="g-card"><div className="g-vazio">
+            <Selo tamanho={72} tom="suave" />
+            <b>Esta área não está liberada para você</b>
+            <p>Quem libera é o dono do pet shop, em Equipe. Se precisar dela para trabalhar, peça para ele ligar o seu acesso.</p>
+            <Link className="g-btn verde" href="/gestao/app">Voltar para o início</Link>
+          </div></div>
+        ) : children}
       </main>
 
       <nav className="g-abas" aria-label="Menu">
         <Link href="/gestao/app" aria-current={atual("/gestao/app") ? "page" : undefined}><Sun />Hoje</Link>
-        <Link href="/gestao/app/agenda" aria-current={atual("/gestao/app/agenda") ? "page" : undefined} style={{ position: "relative" }}><CalendarDays />Agenda{pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
+        <Link href={posso("agenda") ? "/gestao/app/agenda" : "/gestao/app"} aria-current={atual("/gestao/app/agenda") ? "page" : undefined} style={{ position: "relative", opacity: posso("agenda") ? 1 : .35 }}><CalendarDays />Agenda{pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
         <button className="g-aba-mic" onClick={() => setAssistente({ aberta: true, pedido: "" })} aria-label="Falar com o Mozart, o assistente">
           <span className="b"><Mic /></span>
         </button>
-        <Link href="/gestao/app/clientes" aria-current={atual("/gestao/app/clientes") ? "page" : undefined}><PawPrint />Clientes</Link>
+        <Link href={posso("clientes") ? "/gestao/app/clientes" : "/gestao/app"} aria-current={atual("/gestao/app/clientes") ? "page" : undefined} style={{ opacity: posso("clientes") ? 1 : .35 }}><PawPrint />Clientes</Link>
         <button onClick={() => setMais(true)}><Menu />Mais</button>
       </nav>
 

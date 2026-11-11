@@ -1,0 +1,27 @@
+/* Cartão "Identidade do pet shop" em Meu pet shop */
+.g-idt-t { display: flex; align-items: flex-start; gap: 12px; }
+.g-idt-t > div { min-width: 0; }
+.g-idt-logo { display: flex; align-items: center; gap: 16px; padding: 14px; border-radius: 16px; background: var(--g-carta-2); }
+.g-idt-logo .g-logo { box-shadow: 0 0 0 3px #fffbf5, 0 6px 14px -8px rgba(31, 27, 23, .5); }
+.g-idt-logo-txt { display: grid; gap: 4px; min-width: 0; }
+.g-idt-logo-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.g-idt-temas { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 560px) { .g-idt-temas { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.g-idt-tema { display: grid; gap: 6px; justify-items: center; padding: 8px 4px; border-radius: 14px; border: 2px solid transparent; background: none; color: inherit; font-size: .8125rem; font-weight: 600; transition: border-color .15s, background .15s; }
+.g-idt-tema:hover { background: rgba(31, 27, 23, .04); }
+.g-idt-tema.on { border-color: var(--g-verde); background: var(--g-carta-2); }
+.g-idt-tema .amostra { position: relative; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 6px 12px -8px rgba(31, 27, 23, .7); }
+.g-idt-tema .amostra i { position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid var(--g-carta); }
+.g-idt-tema .amostra svg { width: 20px; height: 20px; }
+.g-idt-previa { display: grid; gap: 10px; padding: 12px; border-radius: 18px; border: 1px dashed var(--g-linha-forte); }
+.g-idt-previa .cabeca { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; color: #f6f1e8;
+  background: radial-gradient(260px 160px at 110% -10%, color-mix(in srgb, var(--g-laranja) 34%, transparent), transparent 62%), linear-gradient(135deg, var(--g-escuro-a), var(--g-escuro-b)); }
+.g-idt-previa .cabeca b { display: block; font: 500 1.125rem/1.15 var(--display); }
+.g-idt-previa .cabeca div span { font-size: .8125rem; opacity: .8; }
+.g-idt-previa .passos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.g-idt-previa .passos > span { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; background: var(--g-carta-2); font-size: .75rem; font-weight: 600; color: var(--g-cinza); white-space: nowrap; overflow: hidden; }
+.g-idt-previa .passos > span i { display: grid; place-items: center; width: 20px; height: 20px; flex: none; border-radius: 50%; background: #fffbf5; font-style: normal; font-size: .6875rem; }
+.g-idt-previa .passos > span.on { background: var(--g-verde); color: #f6f1e8; }
+.g-idt-previa .passos > span.on i { background: var(--g-laranja); color: #1f1b17; }
+.g-idt-previa .legenda { display: flex; align-items: center; gap: 6px; font-size: .8125rem; color: var(--g-cinza); }
+.g-idt-previa .legenda svg { width: 14px; height: 14px; }

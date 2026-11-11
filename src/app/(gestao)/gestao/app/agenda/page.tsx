@@ -1,8 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BellRing, ChevronLeft, ChevronRight, Lock, Plus, Truck } from "lucide-react";
+import { BellRing, ChevronLeft, ChevronRight, Lock, Plus, Truck, Printer } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { deMin, paraMin } from "@/lib/gestao/agenda";
@@ -144,6 +145,7 @@ function Agenda() {
             <button aria-pressed={visao === "dia"} onClick={() => setVisao("dia")}>Dia</button>
             <button aria-pressed={visao === "semana"} onClick={() => setVisao("semana")}>Semana</button>
           </div>
+          <Link className="g-btn sec" href={`/gestao/app/agenda/imprimir?dia=${dia}&visao=${visao}${prof ? `&prof=${prof}` : ""}`} title="Imprimir ou salvar a agenda em PDF"><Printer /><span className="g-agd-curto">Imprimir</span></Link>
           <LinkRapido />
           <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear<span className="g-agd-curto">&nbsp;horário</span></button>
           <button className="g-btn pri" onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>

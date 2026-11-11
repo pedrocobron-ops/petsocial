@@ -6,7 +6,7 @@
 /* bloco de destaque: caixa aberto (verde-garrafa) ou fechado (menta clara) */
 .g-cx-heroi {
   position: relative; overflow: hidden; display: grid; gap: 16px; align-content: space-between; padding: 22px; border-radius: 22px; color: #f6f1e8;
-  background: radial-gradient(520px 300px at 110% -10%, rgba(120, 190, 150, .34), transparent 62%), radial-gradient(420px 300px at -10% 120%, rgba(255, 255, 255, .1), transparent 60%), linear-gradient(135deg, #24473a 0%, #17302a 100%);
+  background: radial-gradient(520px 300px at 110% -10%, rgba(120, 190, 150, .34), transparent 62%), radial-gradient(420px 300px at -10% 120%, rgba(255, 255, 255, .1), transparent 60%), linear-gradient(135deg, var(--g-escuro-a) 0%, var(--g-escuro-b) 100%);
   box-shadow: 0 2px 4px rgba(31, 27, 23, .1), 0 30px 50px -28px rgba(23, 48, 42, .8);
 }
 .g-cx-heroi > .fundo { position: absolute; right: -28px; top: -34px; width: 220px; height: 220px; color: rgba(246, 241, 232, .07); rotate: -14deg; pointer-events: none; }

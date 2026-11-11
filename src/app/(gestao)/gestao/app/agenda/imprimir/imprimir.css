@@ -1,0 +1,44 @@
+/* Agenda para imprimir ou salvar em PDF */
+.g-imp { display: grid; gap: 18px; }
+.g-imp-controles { display: grid; gap: 12px; }
+.g-imp-linha { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.g-imp-linha .g-input, .g-imp-linha .g-select { width: auto; min-width: 150px; }
+.g-imp-folha { background: #fff; color: #1f1b17; border: 1px solid var(--g-linha); border-radius: 16px; padding: 28px 26px; box-shadow: var(--g-sombra); display: grid; gap: 18px; overflow-x: auto; }
+.g-imp-cab { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 2px solid #1f1b17; }
+.g-imp-cab h1 { font-size: 1.75rem; }
+.g-imp-cab p { font-size: .9375rem; }
+.g-imp-quando { font-size: .75rem !important; color: #6a625a; }
+.g-imp-dia { display: grid; gap: 8px; break-inside: avoid-page; }
+.g-imp-dia h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font: 600 1.0625rem/1.2 var(--sans); text-transform: capitalize; padding: 6px 10px; background: #f1eadd; border-radius: 8px; }
+.g-imp-dia h2 small { font-weight: 500; font-size: .8125rem; color: #6a625a; text-transform: none; }
+.g-imp-bloq { display: flex; align-items: center; gap: 6px; font-size: .875rem; color: #6a625a; }
+.g-imp-bloq svg { width: 14px; height: 14px; }
+.g-imp-vazio { font-size: .9375rem; color: #6a625a; padding: 4px 2px; }
+.g-imp-folha table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: .875rem; }
+.g-imp-folha th { text-align: left; font-size: .6875rem; letter-spacing: .06em; text-transform: uppercase; color: #6a625a; padding: 6px 8px; border-bottom: 1px solid #1f1b17; }
+.g-imp-folha td { padding: 9px 8px; border-bottom: 1px solid #ddd5c8; vertical-align: top; }
+.g-imp-folha tr { break-inside: avoid; }
+.g-imp-folha td small { display: block; font-size: .75rem; color: #6a625a; }
+.g-imp-folha td.hora { font: 600 1rem/1.2 var(--sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-imp-folha td b { font-size: 1rem; }
+.g-imp-folha td.atencao span { display: flex; align-items: flex-start; gap: 4px; font-size: .8125rem; }
+.g-imp-folha td.atencao svg { width: 13px; height: 13px; flex: none; margin-top: 2px; }
+.g-imp-folha .feito { width: 44px; text-align: center; }
+.g-imp-folha td.feito i { display: inline-block; width: 18px; height: 18px; border: 1.5px solid #1f1b17; border-radius: 4px; }
+.g-imp-pe { font-size: .75rem; color: #6a625a; text-align: right; }
+
+@media print {
+  @page { margin: 12mm; }
+  body { background: #fff !important; }
+  .g-raiz { background: #fff !important; }
+  .g-barra, .g-imp-controles, .g-aviso, .g-ass, .g-guia, .g-toasts { display: none !important; }
+  .g-main { max-width: none !important; padding: 0 !important; }
+  .g-imp-folha { border: 0; border-radius: 0; box-shadow: none; padding: 0; overflow: visible; }
+  .g-imp-folha table { min-width: 0; }
+  .g-imp-dia h2 { background: none; border-bottom: 1px solid #1f1b17; border-radius: 0; padding: 4px 0; }
+}
+
+.g-imp-marca { display: flex; align-items: center; gap: 12px; }
+.g-imp-marca .g-logo { border: 1px solid #ddd5c8; }
+.g-imp-cab { border-bottom-color: var(--g-verde); }
+.g-imp-cab h1 { color: var(--g-verde); }

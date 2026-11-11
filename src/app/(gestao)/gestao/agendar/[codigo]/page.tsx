@@ -7,7 +7,9 @@ import { ArrowLeft, ArrowRight, CalendarDays, Cat, Check, Clock, Dog, MapPin, Me
 import { Marca, Selo } from "@/components/gestao/marca";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
-import { brlCurto, deIsoDia, fmtTelefone, horarioDoDia, iniciais, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, nomeMes, soDigitos, somaDias } from "@/lib/gestao/util";
+import { brlCurto, deIsoDia, fmtTelefone, horarioDoDia, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, nomeMes, soDigitos, somaDias } from "@/lib/gestao/util";
+import LogoLoja from "@/components/gestao/logo-loja";
+import { aplicarTema } from "@/lib/gestao/identidade";
 import "./agendar.css";
 
 type ServicoDoLink = {
@@ -15,6 +17,7 @@ type ServicoDoLink = {
   preco_p: number | null; preco_m: number | null; preco_g: number | null; preco_gg: number | null;
 };
 type Info = {
+  logo?: string | null; tema?: string | null;
   nome: string; telefone: string | null; cidade: string | null; uf: string | null; horario: unknown; aviso: string | null; hoje: string;
   servicos: ServicoDoLink[];
 };
@@ -106,6 +109,7 @@ export default function AgendarPeloLink() {
     if (error) { setSemRede(true); return; }
     const lido = data as unknown as Info | null;
     setInfo(lido && typeof lido === "object" && lido.nome ? { ...lido, servicos: Array.isArray(lido.servicos) ? lido.servicos : [] } : null);
+    aplicarTema(lido && typeof lido === "object" ? lido.tema : null); // as cores do pet shop, não as da Maestro Pet
   }, [codigo]);
   useEffect(() => { void carregar(); }, [carregar]);
   useEffect(() => { if (info?.nome) document.title = `Agendar no ${info.nome}`; }, [info?.nome]);
@@ -284,7 +288,7 @@ export default function AgendarPeloLink() {
       <header className="g-lk-cab">
         <Marca tamanho={220} className="g-lk-cab-fundo" />
         <div className="g-lk-cab-quem">
-          <span className="g-lk-sigla" aria-hidden>{iniciais(info.nome)}</span>
+          <LogoLoja nome={info.nome} logo={info.logo} tamanho={54} />
           <div>
             <h1>{info.nome}</h1>
             {onde && <p className="g-lk-onde"><MapPin aria-hidden />{onde}</p>}
