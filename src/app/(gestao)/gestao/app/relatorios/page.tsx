@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Printer } from "lucide-react";
+import { CalendarDays, CircleCheck, Clock, HandCoins, PawPrint, Printer, Receipt, Scissors, TrendingUp, UserPlus, Users, UserX } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPessoa, AvatarPet, Esqueleto, useDados, Vazio } from "@/components/gestao/ui";
-import { Chips, ErroDeCarga, paginar, SemAcesso } from "@/components/gestao/financeiro/comum";
+import { brlMini, Chips, ErroDeCarga, PALETA, paginar, SemAcesso } from "@/components/gestao/financeiro/comum";
+import { Anel, Barras, Kpi, Rosca, Tile } from "@/components/gestao/painel";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
+import "./relatorios.css";
 
 export default function PaginaRelatorios() {
   const { vejoFinanceiro } = useGestao();
@@ -31,11 +33,12 @@ function intervalo(p: Periodo, hoje: Date): { de: Date; ate: Date } {
 type Ag = {
   id: string; inicio: string; status: string; preco: number | null; pet_id: string; servico_id: string | null; profissional_id: string | null;
   pets: { id: string; nome: string; foto: string | null; especie: string | null; clientes: { id: string; nome: string } | null } | null;
-  servicos: { id: string; nome: string } | null;
+  servicos: { id: string; nome: string; cor: string | null } | null;
 };
 type Entrada = { data: string; valor: number };
 
 const DIAS_DA_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
+const DIAS_CURTOS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
 const real = (n: number) => Math.round(n * 100) / 100;
 const vezes = (n: number) => (n === 1 ? "1 vez" : `${n} vezes`);
 const atendimentos = (n: number) => (n === 1 ? "1 atendimento" : `${n} atendimentos`);
@@ -53,7 +56,7 @@ function Relatorios() {
     const [ags, entradas, novos] = await Promise.all([
       paginar<Ag>(async (a, b) => {
         const r = await sb.from("agendamentos")
-          .select("id, inicio, status, preco, pet_id, servico_id, profissional_id, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome)")
+          .select("id, inicio, status, preco, pet_id, servico_id, profissional_id, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome, cor)")
           .eq("petshop_id", petshop.id).gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b);
         return { data: r.data as unknown as Ag[] | null, error: r.error };
       }),
@@ -97,7 +100,14 @@ function Relatorios() {
       }
       return [...mapa.values()].sort((a, b) => b.n - a.n || b.valor - a.valor);
     };
-    const servicos = contar(concluidos, (a) => a.servico_id ?? "sem", (a) => a.servicos?.nome ?? "Sem serviço escolhido").slice(0, 8);
+    const usadas = new Set<string>();
+    const servicos = contar(concluidos, (a) => a.servico_id ?? "sem", (a) => ({ nome: a.servicos?.nome ?? "Sem serviço escolhido", cor: a.servicos?.cor ?? null })).slice(0, 8)
+      .map((s) => {
+        // cada fatia com uma cor só dela: a do serviço, ou a próxima livre da paleta
+        const cor = s.extra.cor && !usadas.has(s.extra.cor) ? s.extra.cor : PALETA.find((c) => !usadas.has(c)) ?? "#a39a90";
+        usadas.add(cor);
+        return { n: s.n, valor: s.valor, extra: s.extra.nome, cor };
+      });
     const pets = contar(concluidos, (a) => a.pet_id, (a) => a.pets).slice(0, 5);
     const tutores = contar(concluidos, (a) => a.pets?.clientes?.id, (a) => a.pets?.clientes?.nome ?? "").slice(0, 5);
 
@@ -118,7 +128,13 @@ function Relatorios() {
     }
     const horas = [...porHora].map(([h, n]) => ({ h, n })).sort((a, b) => b.n - a.n || a.h - b.h).slice(0, 3);
 
+    const comEntrada = barras.filter((b) => b.valor > 0);
+    const melhor = comEntrada.reduce<{ dia: Date; valor: number } | null>((m, b) => (!m || b.valor > m.valor ? b : m), null);
+    const diaCheio = porDia.reduce((m, d, i) => (d.n > porDia[m].n ? i : m), 0);
+
     return {
+      comEntrada: comEntrada.length, melhor, diaCheio,
+      totalComissao: real(comissoes.reduce((s, c) => s + c.comissao, 0)),
       concluidos: concluidos.length, faltas, taxaFalta: concluidos.length + faltas ? (faltas / (concluidos.length + faltas)) * 100 : null,
       faturamento, ticket: concluidos.length ? real(baseTicket / concluidos.length) : null,
       barras, porSemana, servicos, pets, tutores, comissoes, porDia, horas, marcados: marcados.length,
@@ -150,81 +166,128 @@ function Relatorios() {
           <Vazio titulo="Nada por aqui neste período." texto="Quando houver atendimentos e pagamentos, os números aparecem aqui." />
         ) : (
           <>
-            <div className="g-grade c4">
-              <Numero rotulo="Atendimentos concluídos" valor={String(r.concluidos)} />
-              <Numero rotulo="Faltas" valor={String(r.faltas)}
-                nota={r.taxaFalta == null ? undefined : `${r.taxaFalta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de falta`} />
-              <Numero rotulo="Faturamento" valor={brl(r.faturamento)} nota="entradas já recebidas" />
-              <Numero rotulo="Ticket médio" valor={r.ticket == null ? "—" : brl(r.ticket)} nota="por atendimento concluído" />
-              <Numero rotulo="Clientes novos" valor={String(dados.clientesNovos)} />
+            <div className="g-grade kpis">
+              <Kpi icone={CircleCheck} tom="pessego" rotulo="Atendimentos concluídos" valor={r.concluidos}
+                apoio={r.taxaFalta == null ? "nenhum no período" : `${(100 - r.taxaFalta).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% compareceram`}
+                lado={r.taxaFalta == null ? undefined : <Anel parte={1 - r.taxaFalta / 100} cor="var(--g-laranja)">{Math.round(100 - r.taxaFalta)}%</Anel>} />
+              <Kpi icone={UserX} tom="rosa" rotulo="Faltas" valor={r.faltas}
+                apoio={r.taxaFalta == null ? "nenhuma falta" : `${r.taxaFalta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de falta`} />
+              <Kpi icone={Receipt} tom="ceu" rotulo="Ticket médio" valor={<span className="gf-kpi-v">{r.ticket == null ? "—" : brl(r.ticket)}</span>} apoio="por atendimento concluído" />
+              <Kpi icone={UserPlus} tom="lilas" rotulo="Clientes novos" valor={dados.clientesNovos} apoio={dados.clientesNovos === 1 ? "cadastrado no período" : "cadastrados no período"} />
             </div>
 
-            <section className="g-card">
-              <div className="g-card-t">
-                <h3>Faturamento por {r.porSemana ? "semana" : "dia"}</h3>
-                <b className="g-tab">{brl(r.faturamento)}</b>
-              </div>
-              {r.faturamento > 0 ? <Barras barras={r.barras} porSemana={r.porSemana} /> : <p className="g-muted g-p">Nenhuma entrada recebida neste período.</p>}
-            </section>
+            <div className="g-duas">
+              <section className="g-card g-rel-fat">
+                <div className="g-card-t">
+                  <h3><Tile icone={TrendingUp} tom="menta" tamanho="p" />Faturamento por {r.porSemana ? "semana" : "dia"}</h3>
+                  <span className="g-muted g-pp">entradas já recebidas</span>
+                </div>
+                <p className="g-rotulo">Faturamento</p>
+                <p className="g-rel-total">{brl(r.faturamento)}</p>
+                {r.faturamento > 0 ? (
+                  <>
+                    {r.barras.length <= 7
+                      ? <Barras itens={r.barras.map((b) => ({ rotulo: nomeDiaCurto(b.dia), valor: b.valor }))} formato={brlMini} altura={176}
+                          destaque={r.barras.findIndex((b) => isoDia(b.dia) === hojeIso)} />
+                      : <Area pontos={r.barras} porSemana={r.porSemana} />}
+                    <div className="g-rel-fatos">
+                      {r.melhor && (
+                        <div><small>{r.porSemana ? "Melhor semana" : "Melhor dia"}</small><b>{brl(r.melhor.valor)}</b><small>{r.porSemana ? `semana de ${dataCurta(r.melhor.dia)}` : dataCurta(r.melhor.dia)}</small></div>
+                      )}
+                      <div><small>{r.porSemana ? "Semanas com entrada" : "Dias com entrada"}</small><b>{r.comEntrada} de {r.barras.length}</b><small>no período</small></div>
+                    </div>
+                  </>
+                ) : <p className="g-muted g-p" style={{ marginTop: 10 }}>Nenhuma entrada recebida neste período.</p>}
+              </section>
 
-            <div className="g-grade c2">
               <section className="g-card">
-                <div className="g-card-t"><h3>Serviços mais feitos</h3></div>
+                <div className="g-card-t"><h3><Tile icone={CalendarDays} tom="pessego" tamanho="p" />Dias mais cheios</h3><span className="g-muted g-pp">por dia da semana</span></div>
+                {r.marcados ? (
+                  <>
+                    <div title={r.porDia.map((d) => `${d.nome}: ${d.n}`).join(" · ")}>
+                      <Barras itens={r.porDia.map((d, i) => ({ rotulo: DIAS_CURTOS[i], valor: d.n }))} destaque={r.diaCheio} altura={148} />
+                    </div>
+                    <p className="g-rotulo" style={{ margin: "18px 0 8px" }}>Horários mais cheios</p>
+                    <div className="g-rel-horas">
+                      {r.horas.map((h) => (
+                        <div key={h.h}><Tile icone={Clock} tom="pessego" tamanho="p" /><span><b>{h.h}h</b><small>{h.n === 1 ? "1 horário" : `${h.n} horários`}</small></span></div>
+                      ))}
+                    </div>
+                    <p className="g-muted g-pp" style={{ marginTop: 12 }}>Conta tudo o que foi marcado, menos os cancelados.</p>
+                  </>
+                ) : <p className="g-muted g-p">Nenhum horário marcado neste período.</p>}
+              </section>
+            </div>
+
+            <div className="g-duas">
+              <section className="g-card">
+                <div className="g-card-t"><h3><Tile icone={Scissors} tom="pessego" tamanho="p" />Serviços mais feitos</h3><span className="g-muted g-pp">concluídos</span></div>
                 {r.servicos.length ? (
-                  <div className="g-lista">
-                    {r.servicos.map((s, i) => (
-                      <div key={i} className="g-linha">
-                        <span className="gf-posicao">{i + 1}</span>
-                        <span className="t"><b>{s.extra}</b><span>{vezes(s.n)}</span></span>
-                        <span className="d">{brl(s.valor)}</span>
-                      </div>
-                    ))}
+                  <div className="g-rel-rosca">
+                    <Rosca fatias={r.servicos.map((s) => ({ valor: s.n, cor: s.cor }))} tamanho={148}>{r.concluidos}<small>{r.concluidos === 1 ? "feito" : "feitos"}</small></Rosca>
+                    <div className="g-legenda">
+                      {r.servicos.map((s, i) => (
+                        <div key={i}>
+                          <i style={{ background: s.cor }} />
+                          <span className="nome">{s.extra}<small>{vezes(s.n)} · {Math.round((s.n / r.concluidos) * 100)}%</small></span>
+                          <b>{brl(s.valor)}</b>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : <p className="g-muted g-p">Nenhum atendimento concluído neste período.</p>}
               </section>
 
               <section className="g-card">
-                <div className="g-card-t"><h3>Dias mais cheios</h3></div>
-                {r.marcados ? (
-                  <>
-                    {r.porDia.map((d) => {
-                      const maior = Math.max(...r.porDia.map((x) => x.n));
-                      return (
-                        <div key={d.nome} className="gf-cat">
-                          <div className="g-fila entre g-p"><span>{d.nome}</span><span className="g-tab">{d.n}</span></div>
-                          <div className="g-prog"><i style={{ width: `${maior ? (d.n / maior) * 100 : 0}%` }} /></div>
-                        </div>
-                      );
-                    })}
-                    <p className="g-muted g-p" style={{ marginTop: 10 }}>
-                      Horários mais cheios: {r.horas.map((h) => `${h.h}h (${h.n})`).join(", ")}.
-                    </p>
-                    <p className="g-muted g-pp" style={{ marginTop: 4 }}>Conta tudo o que foi marcado, menos os cancelados.</p>
-                  </>
-                ) : <p className="g-muted g-p">Nenhum horário marcado neste período.</p>}
-              </section>
-
-              <section className="g-card">
-                <div className="g-card-t"><h3>Pets que mais vieram</h3></div>
+                <div className="g-card-t"><h3><Tile icone={PawPrint} tom="lilas" tamanho="p" />Pets que mais vieram</h3></div>
                 {r.pets.length ? (
                   <div className="g-lista">
                     {r.pets.map((p, i) => (
                       <div key={i} className="g-linha">
+                        <span className={`g-rel-pos${i === 0 ? " um" : ""}`}>{i + 1}</span>
                         <AvatarPet pet={p.extra ?? { nome: "Pet" }} />
                         <span className="t"><b>{p.extra?.nome ?? "Pet"}</b><span>{p.extra?.clientes?.nome ?? "Sem tutor"}</span></span>
-                        <span className="d">{vezes(p.n)}</span>
+                        <span className="g-tag">{vezes(p.n)}</span>
                       </div>
                     ))}
                   </div>
                 ) : <p className="g-muted g-p">Nenhum atendimento concluído neste período.</p>}
               </section>
+            </div>
+
+            <div className="g-duas">
+              <section className="g-card">
+                <div className="g-card-t">
+                  <h3><Tile icone={HandCoins} tom="menta" tamanho="p" />Comissão por profissional</h3>
+                  {r.comissoes.length > 0 && <b className="g-tab">{brl(r.totalComissao)}</b>}
+                </div>
+                {r.comissoes.length ? (
+                  <div className="g-lista">
+                    {r.comissoes.map((c) => (
+                      <div key={c.p.id} className="g-linha g-rel-com">
+                        <AvatarPessoa nome={c.p.nome} cor={c.p.cor} />
+                        <span className="t">
+                          <b>{c.p.nome}</b>
+                          <span>{atendimentos(c.n)} · base {brl(c.base)} · {Number(c.p.comissao_pct).toLocaleString("pt-BR")}%</span>
+                          {r.totalComissao > 0 && <span className="g-prog"><i style={{ width: `${(c.comissao / r.comissoes[0].comissao) * 100}%`, background: c.p.cor ?? undefined }} /></span>}
+                        </span>
+                        <span className="d"><b>{brl(c.comissao)}</b></span>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="g-muted g-p">Ninguém da equipe tem comissão definida. A porcentagem de cada pessoa fica no cadastro da equipe.</p>}
+                <p className="g-muted g-pp" style={{ marginTop: 10 }}>
+                  A base é o preço dos atendimentos concluídos de cada profissional no período, mesmo que o pagamento ainda não tenha entrado.
+                </p>
+              </section>
 
               <section className="g-card">
-                <div className="g-card-t"><h3>Tutores que mais vieram</h3></div>
+                <div className="g-card-t"><h3><Tile icone={Users} tom="ceu" tamanho="p" />Tutores que mais vieram</h3></div>
                 {r.tutores.length ? (
                   <div className="g-lista">
                     {r.tutores.map((t, i) => (
                       <div key={i} className="g-linha">
+                        <span className={`g-rel-pos${i === 0 ? " um" : ""}`}>{i + 1}</span>
                         <AvatarPessoa nome={t.extra || "?"} />
                         <span className="t"><b>{t.extra}</b><span>{vezes(t.n)}</span></span>
                         <span className="d">{brl(t.valor)}</span>
@@ -234,27 +297,6 @@ function Relatorios() {
                 ) : <p className="g-muted g-p">Nenhum atendimento concluído neste período.</p>}
               </section>
             </div>
-
-            <section className="g-card">
-              <div className="g-card-t"><h3>Comissão por profissional</h3></div>
-              {r.comissoes.length ? (
-                <div className="g-lista">
-                  {r.comissoes.map((c) => (
-                    <div key={c.p.id} className="g-linha">
-                      <AvatarPessoa nome={c.p.nome} cor={c.p.cor} />
-                      <span className="t">
-                        <b>{c.p.nome}</b>
-                        <span>{atendimentos(c.n)} · base {brl(c.base)} · {Number(c.p.comissao_pct).toLocaleString("pt-BR")}%</span>
-                      </span>
-                      <span className="d"><b>{brl(c.comissao)}</b></span>
-                    </div>
-                  ))}
-                </div>
-              ) : <p className="g-muted g-p">Ninguém da equipe tem comissão definida. A porcentagem de cada pessoa fica no cadastro da equipe.</p>}
-              <p className="g-muted g-pp" style={{ marginTop: 10 }}>
-                A base é o preço dos atendimentos concluídos de cada profissional no período, mesmo que o pagamento ainda não tenha entrado.
-              </p>
-            </section>
           </>
         )}
       </div>
@@ -262,34 +304,36 @@ function Relatorios() {
   );
 }
 
-function Numero({ rotulo, valor, nota }: { rotulo: string; valor: string; nota?: string }) {
+/** Linha com área para muitos pontos (dias do mês ou semanas dos 90 dias). */
+function Area({ pontos, porSemana }: { pontos: { dia: Date; valor: number }[]; porSemana: boolean }) {
+  const L = 100, A = 40;
+  const maior = Math.max(...pontos.map((p) => p.valor), 1);
+  const passo = L / Math.max(1, pontos.length - 1);
+  const xy = pontos.map((p, i) => [i * passo, A - 1 - (p.valor / maior) * (A - 5)] as const);
+  const linha = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`).join(" ");
+  const pico = pontos.findIndex((p) => p.valor === maior);
+  const nome = (p: { dia: Date }) => (porSemana ? `Semana de ${dataCurta(p.dia)}` : dataCurta(p.dia));
+  const meio = pontos[Math.floor((pontos.length - 1) / 2)];
   return (
-    <div className="g-card">
-      <p className="g-rotulo">{rotulo}</p>
-      <p className="gf-num" style={{ marginTop: 8 }}>{valor}</p>
-      {nota && <p className="g-muted g-pp" style={{ marginTop: 4 }}>{nota}</p>}
-    </div>
-  );
-}
-
-function Barras({ barras, porSemana }: { barras: { dia: Date; valor: number }[]; porSemana: boolean }) {
-  const maior = Math.max(...barras.map((b) => b.valor), 0);
-  const poucas = barras.length <= 14;
-  const rotulo = (b: { dia: Date }, i: number) => {
-    if (porSemana) return i % 3 === 0 ? dataCurta(b.dia) : "";
-    if (barras.length <= 7) return nomeDiaCurto(b.dia);
-    const d = b.dia.getDate();
-    return d === 1 || d % 5 === 0 ? String(d) : "";
-  };
-  return (
-    <div className={`g-barras gf-barras${poucas ? " poucas" : ""}`} role="img"
-      aria-label={`Faturamento por ${porSemana ? "semana" : "dia"}. Maior valor: ${brl(maior)}.`}>
-      {barras.map((b, i) => (
-        <div key={i} title={`${porSemana ? `Semana de ${dataCurta(b.dia)}` : dataCurta(b.dia)}: ${brl(b.valor)}`}>
-          <span className="gf-col"><i className={b.valor ? undefined : "fraco"} style={{ height: `${maior ? (b.valor / maior) * 100 : 0}%` }} /></span>
-          <small>{rotulo(b, i)}</small>
-        </div>
-      ))}
+    <div className="g-rel-area" role="img" aria-label={`Faturamento por ${porSemana ? "semana" : "dia"}. Maior valor: ${brl(maior)}.`}>
+      <div className="palco">
+        <svg viewBox={`0 0 ${L} ${A}`} preserveAspectRatio="none" aria-hidden>
+          <defs>
+            <linearGradient id="g-rel-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#2f6b4c" stopOpacity=".34" />
+              <stop offset="1" stopColor="#2f6b4c" stopOpacity=".02" />
+            </linearGradient>
+          </defs>
+          {[0.25, 0.5, 0.75].map((f) => <line key={f} x1="0" x2={L} y1={A * f} y2={A * f} className="grade" vectorEffect="non-scaling-stroke" />)}
+          <path d={`${linha} L${L} ${A} L0 ${A} Z`} fill="url(#g-rel-grad)" />
+          <path d={linha} className="traco" vectorEffect="non-scaling-stroke" />
+        </svg>
+        {pico >= 0 && pontos[pico].valor > 0 && (
+          <span className={`pico${xy[pico][0] > 55 ? " esq" : ""}`} style={{ left: `${xy[pico][0]}%`, top: `${(xy[pico][1] / A) * 100}%` }}><b>{brl(maior)}</b></span>
+        )}
+        <div className="alvos">{pontos.map((p, i) => <span key={i} title={`${nome(p)}: ${brl(p.valor)}`} />)}</div>
+      </div>
+      <div className="eixo"><span>{dataCurta(pontos[0].dia)}</span><span>{dataCurta(meio.dia)}</span><span>{dataCurta(pontos[pontos.length - 1].dia)}</span></div>
     </div>
   );
 }

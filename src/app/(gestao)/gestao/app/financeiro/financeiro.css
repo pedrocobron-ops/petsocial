@@ -1,0 +1,63 @@
+/* Financeiro: segunda demão (prefixo g-fin-). O que é comum a Caixa e Relatórios fica em components/gestao/financeiro. */
+
+/* mês: ‹ novembro de 2026 › dentro de uma pílula */
+.g-fin-mes { justify-self: start; padding: 4px; border-radius: 999px; background: var(--g-carta); border: 1px solid var(--g-linha); box-shadow: var(--g-sombra); }
+.g-fin-mes b { padding-inline: 6px; }
+
+.g-fin-so-cel { font-style: normal; }
+@media (max-width: 559px) { .g-fin-so-largo { display: none !important; } }
+@media (min-width: 560px) { .g-fin-so-cel { display: none; } span.g-fin-so-largo:not(.g-tag) { display: contents; } }
+
+/* legenda do gráfico de semanas */
+.g-fin-leg { display: flex; gap: 12px; font-size: .8125rem; color: var(--g-cinza); flex: none; }
+.g-fin-leg span { display: inline-flex; align-items: center; gap: 6px; }
+.g-fin-leg i, .g-fin-fluxo i { --e: #2f6b4c; --s: #cf6f7a; }
+.g-fin-leg i { width: 10px; height: 10px; border-radius: 4px; }
+.g-fin-leg i.e { background: var(--e); } .g-fin-leg i.s { background: var(--s); }
+
+/* entrou x saiu por semana */
+.g-fin-fluxo { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; height: 196px; padding-top: 4px; background: repeating-linear-gradient(180deg, transparent 0 calc(25% - 1px), var(--g-linha) calc(25% - 1px) 25%); background-size: 100% calc(100% - 26px); background-repeat: no-repeat; border-radius: 4px; }
+.g-fin-fluxo > div { display: grid; grid-template-rows: minmax(0, 1fr) 18px; gap: 8px; min-width: 0; }
+.g-fin-fluxo .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 18px 2px 0; justify-content: center; }
+.g-fin-fluxo .cols span { position: relative; min-width: 0; }
+.g-fin-fluxo .cols i { position: absolute; bottom: 0; left: 50%; translate: -50% 0; width: 100%; max-width: 34px; border-radius: 8px 8px 3px 3px; transition: height .5s cubic-bezier(.2, .7, .2, 1); }
+.g-fin-fluxo .e i { background: linear-gradient(180deg, #47856a, var(--e)); }
+.g-fin-fluxo .s i { background: linear-gradient(180deg, #e39aa2, var(--s)); }
+.g-fin-fluxo .cols b { display: none; position: absolute; left: 50%; translate: -50% 0; margin-bottom: 4px; font-size: .6875rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-fin-fluxo .s b { color: var(--i-rosa); } .g-fin-fluxo .e b { color: var(--i-menta); }
+.g-fin-fluxo small { text-align: center; font-size: .6875rem; line-height: 18px; font-weight: 600; letter-spacing: .03em; color: var(--g-cinza); white-space: nowrap; }
+.g-fin-fluxo .agora small { color: var(--g-laranja-2); }
+@media (min-width: 640px) { .g-fin-fluxo { gap: 18px; height: 220px; } .g-fin-fluxo .cols b { display: block; } .g-fin-fluxo .cols { gap: 8px; padding-inline: 8px; } }
+
+.g-fin-nota { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--g-linha); }
+
+/* dois cartões lado a lado dentro da coluna larga */
+.g-fin-par { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 720px) { .g-fin-par { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.g-fin-rosca { display: grid; gap: 16px; justify-items: center; }
+.g-fin-rosca .g-legenda { width: 100%; }
+.g-fin-rosca .g-legenda > div > span { min-width: 0; }
+.g-fin-rosca .g-anel b { display: grid; justify-items: center; gap: 2px; font: 480 1.5rem/1 var(--display); }
+.g-fin-rosca .g-anel small { font: 600 .625rem/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--g-cinza); }
+
+.g-fin-acum { display: grid; align-content: start; }
+.g-fin-acum .g-tend { width: 100%; height: auto; margin-top: 14px; }
+.g-fin-eixo { display: flex; justify-content: space-between; margin-top: 6px; font-size: .6875rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--g-cinza); }
+
+/* contas: bloco do total com os prazos */
+.g-fin-total { display: grid; gap: 16px; padding: 18px; border-radius: 22px; background: linear-gradient(160deg, #fffaf0 0%, var(--t-manteiga) 100%); border: 1px solid rgba(110, 85, 16, .14); box-shadow: var(--g-sombra); }
+.g-fin-total.receber { background: linear-gradient(160deg, #f4f8f1 0%, var(--t-menta) 100%); border-color: rgba(36, 84, 59, .14); }
+.g-fin-prazos { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+.g-fin-prazos > div { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; border-radius: 14px; background: rgba(255, 251, 245, .78); border: 1px solid rgba(31, 27, 23, .06); }
+.g-fin-prazos > div.rosa { border-color: rgba(139, 52, 64, .28); }
+.g-fin-prazos span { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0 10px; flex: 1; min-width: 0; }
+.g-fin-prazos small { font-size: .8125rem; color: var(--g-cinza); }
+.g-fin-prazos small:first-child { grid-column: 1; font-weight: 600; color: var(--g-tinta); }
+.g-fin-prazos b { grid-column: 2; grid-row: 1 / span 2; align-self: center; font: 480 1.125rem/1.1 var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (min-width: 720px) {
+  .g-fin-prazos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .g-fin-prazos span { grid-template-columns: minmax(0, 1fr); }
+  .g-fin-prazos b { grid-column: 1; grid-row: auto; margin: 2px 0; }
+}
+.g-fin-cab { flex-wrap: wrap; }

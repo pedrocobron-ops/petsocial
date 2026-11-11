@@ -18,6 +18,12 @@ export const hojeIso = () => isoDia(new Date());
 export const rotuloForma = (f: string | null | undefined) => FORMAS.find((x) => x.id === f)?.rotulo ?? "Sem forma";
 const centavos = (n: number) => Math.round(n * 100) / 100;
 export const soma = (lista: { valor: number }[]) => centavos(lista.reduce((s, l) => s + Number(l.valor), 0));
+/** Valor curto para rótulo de gráfico: "850", "1,2 mil". */
+export const brlMini = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil` : String(Math.round(n)));
+/** Cor de cada forma de pagamento nos gráficos. */
+export const COR_FORMA: Record<string, string> = { pix: "#2f6b4c", dinheiro: "#c99a2e", debito: "#2f6f8a", credito: "#5b4590", outro: "#a39a90" };
+/** Cores para fatias e barras quando o item não tem cor própria. */
+export const PALETA = ["#2f6b4c", "#ea670c", "#2f6f8a", "#5b4590", "#c99a2e", "#b3402e", "#6a625a", "#a39a90"];
 
 type Movimento = Pick<Lancamento, "tipo" | "valor" | "forma">;
 

@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Lock, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, History, Lock, Minus, Plus, Scale, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { avisarMudanca, Campo, CampoValor, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import {
-  ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDoCaixa, rotuloForma, SemAcesso, type Tipo,
+  brlMini, COR_FORMA, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDoCaixa, rotuloForma, SemAcesso, soma, type Tipo,
 } from "@/components/gestao/financeiro/comum";
+import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
 import type { Caixa, Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCurta, dataLonga, hora, isoDia } from "@/lib/gestao/util";
+import "./caixa.css";
 
 export default function PaginaCaixa() {
   const { vejoFinanceiro } = useGestao();
@@ -82,57 +84,126 @@ function CaixaDoDia() {
   const abertoEmOutroDia = aberto && isoDia(new Date(aberto.aberto_em)) !== hoje;
   const ultimo = fechados[0];
   const caixaDoResumo = folha?.tipo === "resumo" ? fechados.find((c) => c.id === folha.caixaId) : null;
+  const entradasDoCaixa = lancamentos.filter((l) => l.tipo === "entrada").length;
+  const saidasDoCaixa = lancamentos.length - entradasDoCaixa;
+  const saldo = resumo ? Math.round((resumo.entrou - resumo.saiu) * 100) / 100 : 0;
+  const resumoUltimo = ultimo ? resumoDoCaixa(ultimo.valor_inicial, doCaixa(ultimo.id)) : null;
+  // do mais antigo para o mais novo, para ler da esquerda para a direita
+  const ultimosCaixas = fechados.slice(0, 7).reverse().map((c) => ({ rotulo: dataCurta(c.fechado_em!), valor: resumoDoCaixa(c.valor_inicial, doCaixa(c.id)).entrou }));
 
   return (
     <>
       {topo}
       {erro && <ErroDeCarga erro={erro} tentar={recarregar} />}
-      <div className="g-grade c2">
-        <div className="g-pilha">
+      <div className="g-pilha g">
+        {abertoEmOutroDia && aberto && (
+          <div className="g-aviso" style={{ marginBottom: 0 }}>
+            <span>Este caixa está aberto desde {dataAmigavel(aberto.aberto_em)}. Feche e abra outro para o dia de hoje ficar separado.</span>
+          </div>
+        )}
+
+        <div className={`g-cx-topo${aberto || ultimo ? "" : " so"}`}>
           {aberto && resumo ? (
-            <>
-              {abertoEmOutroDia && (
-                <div className="g-aviso" style={{ marginBottom: 0 }}>
-                  <span>Este caixa está aberto desde {dataAmigavel(aberto.aberto_em)}. Feche e abra outro para o dia de hoje ficar separado.</span>
-                </div>
-              )}
-              <section className="g-card verde" aria-label="Caixa aberto">
-                <p className="g-rotulo">Dinheiro na gaveta agora</p>
-                <p className="g-num" style={{ marginTop: 8 }}>{brl(resumo.esperado)}</p>
-                <p className="g-muted g-pp" style={{ marginTop: 8 }}>
+            <section className="g-cx-heroi" aria-label="Caixa aberto">
+              <Banknote className="fundo" aria-hidden />
+              <div className="g-fila entre" style={{ flexWrap: "nowrap" }}>
+                <span className="g-rotulo"><i className="g-cx-pulso" aria-hidden />Caixa aberto</span>
+                <span className="g-cx-desde">desde {abertoEmOutroDia ? dataCurta(aberto.aberto_em) : hora(aberto.aberto_em)}</span>
+              </div>
+              <div>
+                <p className="g-cx-leg">Dinheiro na gaveta agora</p>
+                <p className="g-cx-gaveta">{brl(resumo.esperado)}</p>
+                <p className="g-cx-leg" style={{ marginTop: 8 }}>
                   Aberto às {hora(aberto.aberto_em)} com {brl(aberto.valor_inicial)} de troco.
                 </p>
-                <div className="gf-formas">
-                  {resumo.porForma.filter((f) => f.id !== "outro" || f.entrou > 0).map((f) => (
-                    <div key={f.id}>
-                      <span className="g-muted g-pp">{f.rotulo}</span>
-                      <b>{brl(f.entrou)}</b>
-                    </div>
-                  ))}
-                </div>
-                <p className="g-muted g-pp" style={{ marginTop: 12 }}>
-                  Entrou {brl(resumo.entrou)} neste caixa{resumo.saiu > 0 ? ` e saiu ${brl(resumo.saiu)}` : ""}.
-                </p>
-              </section>
+              </div>
+              <div className="gf-formas">
+                {resumo.porForma.filter((f) => f.id !== "outro" || f.entrou > 0).map((f) => (
+                  <div key={f.id}>
+                    <span className="g-cx-leg">{f.rotulo}</span>
+                    <b>{brl(f.entrou)}</b>
+                  </div>
+                ))}
+              </div>
+              <p className="g-cx-leg">
+                Entrou {brl(resumo.entrou)} neste caixa{resumo.saiu > 0 ? ` e saiu ${brl(resumo.saiu)}` : ""}.
+              </p>
               <div className="gf-dupla">
                 <button className="g-btn pri" onClick={() => abrir({ tipo: "novo", de: "entrada" })}><ArrowDownLeft />Entrada</button>
-                <button className="g-btn sec" onClick={() => abrir({ tipo: "novo", de: "saida" })}><ArrowUpRight />Saída</button>
+                <button className="g-btn g-cx-claro" onClick={() => abrir({ tipo: "novo", de: "saida" })}><ArrowUpRight />Saída</button>
               </div>
-            </>
+            </section>
           ) : (
-            <section className="g-card menta">
-              <div className="g-pilha p">
-                <h2>O caixa está fechado</h2>
-                <p className="g-muted">Abra o caixa para começar o dia. Você conta o troco da gaveta e o resto a gente soma.</p>
-                <div><button className="g-btn pri" onClick={() => abrir({ tipo: "abrir" })}><Wallet />Abrir o caixa</button></div>
+            <section className="g-cx-heroi fechado" aria-label="Caixa fechado">
+              <span className="g-rotulo">Caixa fechado</span>
+              <div className="quem">
+                <Tile icone={Lock} tom="menta" tamanho="g" />
+                <div style={{ minWidth: 0 }}>
+                  <h2>O caixa está fechado</h2>
+                  <p>Abra o caixa para começar o dia. Você conta o troco da gaveta e o resto a gente soma.</p>
+                </div>
               </div>
+              <div><button className="g-btn pri" onClick={() => abrir({ tipo: "abrir" })}><Wallet />Abrir o caixa</button></div>
             </section>
           )}
 
+          {aberto && resumo ? (
+            <section className="g-card">
+              <div className="g-card-t"><h3><Tile icone={CreditCard} tom="ceu" tamanho="p" />Como entrou</h3><span className="g-muted g-pp">neste caixa</span></div>
+              {resumo.entrou > 0 ? (
+                <div className="g-cx-rosca">
+                  <Rosca fatias={resumo.porForma.map((f) => ({ valor: f.entrou, cor: COR_FORMA[f.id] }))} tamanho={124}>
+                    {entradasDoCaixa}<small>{entradasDoCaixa === 1 ? "entrada" : "entradas"}</small>
+                  </Rosca>
+                  <div className="g-legenda">
+                    {resumo.porForma.filter((f) => f.entrou > 0).map((f) => (
+                      <div key={f.id}><i style={{ background: COR_FORMA[f.id] }} /><span>{f.rotulo} <span className="g-muted g-pp">{Math.round((f.entrou / resumo.entrou) * 100)}%</span></span><b>{brl(f.entrou)}</b></div>
+                    ))}
+                  </div>
+                </div>
+              ) : <p className="g-muted g-p">Nada entrou neste caixa ainda. Quando alguém pagar, a divisão por forma de pagamento aparece aqui.</p>}
+            </section>
+          ) : ultimo ? (
+            <section className="g-card">
+              <div className="g-card-t">
+                <h3><Tile icone={History} tom="manteiga" tamanho="p" />Último fechamento</h3>
+                <span className="g-muted g-pp">{dataAmigavel(ultimo.fechado_em!)}, {hora(ultimo.fechado_em!)}</span>
+              </div>
+              <ResumoCaixa caixa={ultimo} lancamentos={doCaixa(ultimo.id)} />
+            </section>
+          ) : null}
+        </div>
+
+        <div className="g-grade kpis">
+          {aberto && resumo ? (
+            <>
+              <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Entrou no caixa" valor={<span className="gf-kpi-v">{brl(resumo.entrou)}</span>}
+                apoio={entradasDoCaixa ? (entradasDoCaixa === 1 ? "1 entrada" : `${entradasDoCaixa} entradas`) : "nada ainda"} />
+              <Kpi icone={ArrowUpRight} tom="rosa" rotulo="Saiu do caixa" valor={<span className="gf-kpi-v">{brl(resumo.saiu)}</span>}
+                apoio={saidasDoCaixa ? (saidasDoCaixa === 1 ? "1 saída" : `${saidasDoCaixa} saídas`) : "nada ainda"} />
+              <Kpi icone={Scale} tom="ceu" rotulo="Saldo do caixa" valor={<span className={`gf-kpi-v${saldo < 0 ? " g-vermelho-t" : ""}`}>{brl(saldo)}</span>} apoio="entradas menos saídas" />
+              <Kpi icone={Coins} tom="manteiga" rotulo="Troco inicial" valor={<span className="gf-kpi-v">{brl(aberto.valor_inicial)}</span>} apoio="contado na abertura" />
+            </>
+          ) : (
+            <>
+              <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Entrou hoje" valor={<span className="gf-kpi-v">{brl(soma(soltos.filter((l) => l.tipo === "entrada")))}</span>} apoio="sem caixa aberto" />
+              <Kpi icone={ArrowUpRight} tom="rosa" rotulo="Saiu hoje" valor={<span className="gf-kpi-v">{brl(soma(soltos.filter((l) => l.tipo === "saida")))}</span>} apoio="sem caixa aberto" />
+              {ultimo && resumoUltimo && (
+                <>
+                  <Kpi icone={Wallet} tom="ceu" rotulo="Último caixa" valor={<span className="gf-kpi-v">{brl(resumoUltimo.entrou)}</span>} apoio={`entrou · ${dataCurta(ultimo.fechado_em!)}`} />
+                  <Kpi icone={Coins} tom="manteiga" rotulo="Gaveta contada" valor={<span className="gf-kpi-v">{ultimo.valor_contado == null ? "—" : brl(ultimo.valor_contado)}</span>}
+                    apoio={diferenca(ultimo.valor_contado, resumoUltimo.esperado)?.curto ?? "no último fechamento"} />
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="g-duas">
           <section className="g-card">
             <div className="g-card-t">
               <h3>{aberto ? "Lançamentos deste caixa" : "Lançado hoje, sem caixa aberto"}</h3>
-              {lancamentos.length > 0 && <span className="g-muted g-pp g-tab">{lancamentos.length}</span>}
+              {lancamentos.length > 0 && <span className="g-tag g-tab">{lancamentos.length}</span>}
             </div>
             {lancamentos.length ? (
               <div className="g-lista">
@@ -142,40 +213,40 @@ function CaixaDoDia() {
               <Vazio titulo="Nada lançado hoje ainda." texto={aberto ? "Quando alguém pagar, toque em Entrada." : "O que entrar e sair hoje aparece aqui."} />
             )}
           </section>
-        </div>
 
-        <div className="g-pilha">
-          {!aberto && ultimo && (
-            <section className="g-card">
-              <div className="g-card-t">
-                <h3>Último fechamento</h3>
-                <span className="g-muted g-pp">{dataAmigavel(ultimo.fechado_em!)}, {hora(ultimo.fechado_em!)}</span>
-              </div>
-              <ResumoCaixa caixa={ultimo} lancamentos={doCaixa(ultimo.id)} />
-            </section>
-          )}
-          <section className="g-card">
-            <div className="g-card-t"><h3>Caixas fechados</h3></div>
-            {fechados.length ? (
-              <div className="g-lista">
-                {fechados.map((c) => {
-                  const r = resumoDoCaixa(c.valor_inicial, doCaixa(c.id));
-                  const dif = diferenca(c.valor_contado, r.esperado);
-                  return (
-                    <button key={c.id} className="g-linha" onClick={() => setFolha({ tipo: "resumo", caixaId: c.id })}>
-                      <span className="t">
-                        <b>{dataLonga(c.fechado_em!)}</b>
-                        <span>Entrou {brl(r.entrou)}</span>
-                      </span>
-                      {dif && <span className={`g-tag ${dif.etiqueta}`}>{dif.curto}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="g-muted g-p">Os caixas que você fechar ficam guardados aqui.</p>
+          <div className="g-pilha">
+            {ultimosCaixas.length >= 2 && (
+              <section className="g-card">
+                <div className="g-card-t"><h3><Tile icone={ChartColumn} tom="menta" tamanho="p" />Entradas por caixa</h3><span className="g-muted g-pp">{ultimosCaixas.length} últimos fechados</span></div>
+                <Barras itens={ultimosCaixas} formato={brlMini} altura={148} />
+              </section>
             )}
-          </section>
+            <section className="g-card">
+              <div className="g-card-t"><h3><Tile icone={Lock} tom="manteiga" tamanho="p" />Caixas fechados</h3></div>
+              {fechados.length ? (
+                <div className="g-lista">
+                  {fechados.map((c) => {
+                    const r = resumoDoCaixa(c.valor_inicial, doCaixa(c.id));
+                    const dif = diferenca(c.valor_contado, r.esperado);
+                    const selo: { icone: typeof Check; tom: Tom } = !dif ? { icone: Lock, tom: "manteiga" }
+                      : dif.tom === "certo" ? { icone: Check, tom: "menta" } : dif.tom === "sobra" ? { icone: Plus, tom: "ceu" } : { icone: Minus, tom: "rosa" };
+                    return (
+                      <button key={c.id} className="g-linha" onClick={() => setFolha({ tipo: "resumo", caixaId: c.id })}>
+                        <Tile icone={selo.icone} tom={selo.tom} />
+                        <span className="t">
+                          <b>{dataLonga(c.fechado_em!)}</b>
+                          <span>Entrou {brl(r.entrou)}</span>
+                        </span>
+                        {dif && <span className={`g-tag ${dif.etiqueta}`}>{dif.curto}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="g-muted g-p">Os caixas que você fechar ficam guardados aqui.</p>
+              )}
+            </section>
+          </div>
         </div>
       </div>
 
@@ -207,11 +278,12 @@ function LinhaLancamento({ l, aoTocar }: { l: Lancamento; aoTocar: () => void })
   const entrada = l.tipo === "entrada";
   return (
     <button className="g-linha" onClick={aoTocar}>
+      <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
       <span className="t">
         <b>{l.descricao || l.categoria}</b>
-        <span>{hora(l.criado_em)}{l.descricao ? ` · ${l.categoria}` : ""}</span>
+        <span>{hora(l.criado_em)}{l.descricao ? ` · ${l.categoria}` : ""}<i className="g-cx-so-cel"> · {rotuloForma(l.forma)}</i></span>
       </span>
-      <span className="g-tag">{rotuloForma(l.forma)}</span>
+      <span className="g-tag g-cx-so-largo">{rotuloForma(l.forma)}</span>
       <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
     </button>
   );

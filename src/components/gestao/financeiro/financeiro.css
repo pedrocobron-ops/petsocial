@@ -78,3 +78,7 @@
   .gf-nao-imprime { display: none !important; }
   .gf-so-papel { display: block; }
 }
+
+/* dinheiro dentro do cartão de indicador: "R$ 12.345,67" precisa caber em meia tela */
+.g-kpi .gf-kpi-v { font-size: 1.25rem; letter-spacing: -.015em; }
+@media (min-width: 560px) { .g-kpi .gf-kpi-v { font-size: 1.625rem; } }

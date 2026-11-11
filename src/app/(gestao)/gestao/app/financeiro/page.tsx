@@ -1,14 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Download, Plus, Search } from "lucide-react";
+import {
+  ArrowDownLeft, ArrowUpRight, CalendarClock, CalendarDays, ChartColumn, Check, ChevronLeft, ChevronRight, CreditCard, Download, HandCoins, Plus, Receipt, Scale,
+  Search, TrendingUp, TriangleAlert,
+} from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { Esqueleto, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import {
-  Chips, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, paginar, rotuloForma, SemAcesso, soma, type Tipo,
+  brlMini, Chips, COR_FORMA, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, rotuloForma, SemAcesso, soma, type Tipo,
 } from "@/components/gestao/financeiro/comum";
+import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
+import { FORMAS } from "@/lib/gestao/tipos";
 import type { Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, dataCompleta, dataCurta, isoDia, nomeMes, semAcento } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
+import "./financeiro.css";
 
 export default function PaginaFinanceiro() {
   const { vejoFinanceiro } = useGestao();
@@ -84,6 +90,40 @@ function Financeiro() {
   }, [dados]);
   const resultado = Math.round((contas.entrou - contas.saiu) * 100) / 100;
 
+  // desenhos do resumo: semanas do mês, entradas acumuladas e formas de pagamento
+  const graficos = useMemo(() => {
+    const doMes = dados?.doMes ?? [];
+    const ultimoDia = deIsoDia(fim).getDate();
+    const semanas = Array.from({ length: Math.ceil(ultimoDia / 7) }, (_, i) => ({
+      rotulo: `${i * 7 + 1} a ${Math.min(ultimoDia, i * 7 + 7)}`, entrou: 0, saiu: 0,
+    }));
+    const porDia = Array.from({ length: ultimoDia }, () => 0);
+    const formas = new Map<string, number>();
+    let nEntradas = 0, nSaidas = 0;
+    for (const l of doMes) {
+      const dia = deIsoDia(l.data).getDate(), v = Number(l.valor), sem = semanas[Math.floor((dia - 1) / 7)];
+      if (l.tipo === "entrada") {
+        nEntradas++;
+        if (sem) sem.entrou += v;
+        porDia[dia - 1] += v;
+        formas.set(l.forma ?? "outro", (formas.get(l.forma ?? "outro") ?? 0) + v);
+      } else {
+        nSaidas++;
+        if (sem) sem.saiu += v;
+      }
+    }
+    const ate = mesAtual ? deIsoDia(hoje).getDate() : ultimoDia;
+    let corrido = 0;
+    const acumulado = porDia.slice(0, ate).map((v) => (corrido += v));
+    return {
+      semanas, acumulado, ate, nEntradas, nSaidas,
+      semanaAtual: mesAtual ? Math.floor((deIsoDia(hoje).getDate() - 1) / 7) : -1,
+      formas: FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: Math.round((formas.get(f.id) ?? 0) * 100) / 100, cor: COR_FORMA[f.id] })).filter((f) => f.valor > 0),
+    };
+  }, [dados, fim, mesAtual, hoje]);
+  const atrasadasPagar = contas.aPagar.filter((c) => c.vencimento && c.vencimento < hoje);
+  const n = (q: number, um: string, varios: string) => (q === 1 ? `1 ${um}` : `${q} ${varios}`);
+
   const abrir = (f: FolhaAberta) => { if (somenteLeitura()) return; setFolha(f); };
 
   function exportar() {
@@ -132,7 +172,7 @@ function Financeiro() {
       </header>
 
       <div className="g-pilha">
-        <div className="gf-mes">
+        <div className="gf-mes g-fin-mes">
           <button className="g-ico" aria-label="Mês anterior" onClick={() => setMes(mesAnterior)}><ChevronLeft /></button>
           <b aria-live="polite">{tituloMes}</b>
           <button className="g-ico" aria-label="Próximo mês" disabled={mesAtual}
@@ -142,10 +182,16 @@ function Financeiro() {
         {erro && <ErroDeCarga erro={erro} tentar={recarregar} />}
         {!dados ? (carregando ? <Esqueleto linhas={4} /> : null) : (
           <>
-            <section className="g-card gf-tres" aria-label={`Números de ${tituloMes}`}>
-              <div><span className="g-rotulo">Entrou</span><span className="gf-num g-verde-t">{brl(contas.entrou)}</span></div>
-              <div><span className="g-rotulo">Saiu</span><span className="gf-num g-vermelho-t">{brl(contas.saiu)}</span></div>
-              <div><span className="g-rotulo">Resultado do mês</span><span className={`gf-num${resultado < 0 ? " g-vermelho-t" : ""}`}>{brl(resultado)}</span></div>
+            <section className="g-grade kpis" aria-label={`Números de ${tituloMes}`}>
+              <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Entrou" valor={<span className="gf-kpi-v">{brl(contas.entrou)}</span>}
+                apoio={graficos.nEntradas ? n(graficos.nEntradas, "entrada", "entradas") : "nada ainda"} />
+              <Kpi icone={ArrowUpRight} tom="rosa" rotulo="Saiu" valor={<span className="gf-kpi-v">{brl(contas.saiu)}</span>}
+                apoio={graficos.nSaidas ? n(graficos.nSaidas, "saída", "saídas") : "nada ainda"} />
+              <Kpi icone={Scale} tom={resultado < 0 ? "rosa" : "ceu"} rotulo="Resultado do mês"
+                valor={<span className={`gf-kpi-v${resultado < 0 ? " g-vermelho-t" : ""}`}>{brl(resultado)}</span>}
+                apoio={resultado < 0 ? "saiu mais do que entrou" : resultado > 0 ? (mesAtual ? "sobrando até agora" : "sobrou no mês") : "empatado"} />
+              <Kpi icone={Receipt} tom="manteiga" rotulo="Contas a pagar" valor={<span className="gf-kpi-v">{brl(soma(contas.aPagar))}</span>}
+                apoio={!contas.aPagar.length ? "nenhuma em aberto" : atrasadasPagar.length ? `${n(atrasadasPagar.length, "atrasada", "atrasadas")} de ${contas.aPagar.length}` : n(contas.aPagar.length, "conta em aberto", "contas em aberto")} />
             </section>
 
             <div className="gf-rola">
@@ -162,11 +208,43 @@ function Financeiro() {
 
             {aba === "resumo" && (
               dados.doMes.length ? (
-                <div className="g-pilha">
-                  <Comparacao contas={contas} mesAtual={mesAtual} nomeAnterior={nomeMes(mesAnterior)} />
-                  <div className="g-grade c2">
-                    <Categorias titulo="De onde veio" total={contas.entrou} linhas={contas.entradasPorCategoria} vazio="Nenhuma entrada neste mês." />
-                    <Categorias titulo="Para onde foi" total={contas.saiu} linhas={contas.saidasPorCategoria} vazio="Nenhuma saída neste mês." laranja />
+                <div className="g-duas">
+                  <div className="g-pilha">
+                    <section className="g-card">
+                      <div className="g-card-t g-fin-cab">
+                        <h3><Tile icone={ChartColumn} tom="menta" tamanho="p" />Entradas e saídas por semana</h3>
+                        <div className="g-fin-leg"><span><i className="e" />Entrou</span><span><i className="s" />Saiu</span></div>
+                      </div>
+                      <Fluxo semanas={graficos.semanas} atual={graficos.semanaAtual} />
+                      <div className="g-fin-nota"><Comparacao contas={contas} mesAtual={mesAtual} nomeAnterior={nomeMes(mesAnterior)} /></div>
+                    </section>
+                    <div className="g-fin-par">
+                      <section className="g-card">
+                        <div className="g-card-t"><h3><Tile icone={CreditCard} tom="ceu" tamanho="p" />Como entrou</h3><span className="g-muted g-pp">forma de pagamento</span></div>
+                        {graficos.formas.length ? (
+                          <div className="g-fin-rosca">
+                            <Rosca fatias={graficos.formas} tamanho={116}>{graficos.formas.length}<small>{graficos.formas.length === 1 ? "forma" : "formas"}</small></Rosca>
+                            <div className="g-legenda">
+                              {graficos.formas.map((f) => (
+                                <div key={f.id}><i style={{ background: f.cor }} /><span>{f.rotulo} <span className="g-muted g-pp">{Math.round((f.valor / contas.entrou) * 100)}%</span></span><b>{brl(f.valor)}</b></div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : <p className="g-muted g-p">Nenhuma entrada neste mês.</p>}
+                      </section>
+                      <section className="g-card g-fin-acum">
+                        <div className="g-card-t"><h3><Tile icone={TrendingUp} tom="menta" tamanho="p" />Entradas acumuladas</h3><span className="g-muted g-pp">{mesAtual ? `até o dia ${graficos.ate}` : "mês inteiro"}</span></div>
+                        <p className="g-num m">{brl(contas.entrou)}</p>
+                        {graficos.acumulado.length >= 2 && contas.entrou > 0
+                          ? <Tendencia valores={graficos.acumulado} largura={300} altura={84} />
+                          : <p className="g-muted g-p" style={{ marginTop: 8 }}>{contas.entrou > 0 ? "A linha aparece a partir do segundo dia do mês." : "Nenhuma entrada neste mês."}</p>}
+                        {graficos.acumulado.length >= 2 && contas.entrou > 0 && <div className="g-fin-eixo"><span>dia 1</span><span>dia {graficos.ate}</span></div>}
+                      </section>
+                    </div>
+                  </div>
+                  <div className="g-pilha">
+                    <Categorias titulo="De onde veio" icone={ArrowDownLeft} tom="menta" total={contas.entrou} linhas={contas.entradasPorCategoria} vazio="Nenhuma entrada neste mês." />
+                    <Categorias titulo="Para onde foi" icone={ArrowUpRight} tom="rosa" total={contas.saiu} linhas={contas.saidasPorCategoria} vazio="Nenhuma saída neste mês." quente />
                   </div>
                 </div>
               ) : (
@@ -190,17 +268,25 @@ function Financeiro() {
                   </div>
                   <Chips opcoes={FILTROS} valor={filtro} aoMudar={setFiltro} rotulo="Mostrar" />
                 </div>
+                {filtrados.length > 0 && (
+                  <p className="g-muted g-pp g-tab" style={{ margin: "12px 4px 0" }}>
+                    {n(filtrados.length, "lançamento", "lançamentos")}
+                    {filtro !== "saida" && ` · entrou ${brl(soma(filtrados.filter((l) => l.tipo === "entrada")))}`}
+                    {filtro !== "entrada" && ` · saiu ${brl(soma(filtrados.filter((l) => l.tipo === "saida")))}`}
+                  </p>
+                )}
                 {filtrados.length ? (
-                  <div className="g-lista" style={{ marginTop: 8 }}>
+                  <div className="g-lista" style={{ marginTop: 4 }}>
                     {filtrados.map((l) => {
                       const entrada = l.tipo === "entrada";
                       return (
                         <button key={l.id} className="g-linha" onClick={() => abrir({ tipo: "editar", lancamento: l })}>
+                          <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
                           <span className="t">
                             <b>{l.descricao || l.categoria}</b>
-                            <span>{dataCurta(l.data)}{l.descricao ? ` · ${l.categoria}` : ""}</span>
+                            <span>{dataCurta(l.data)}{l.descricao ? ` · ${l.categoria}` : ""}<i className="g-fin-so-cel"> · {rotuloForma(l.forma)}</i></span>
                           </span>
-                          <span className="g-tag">{rotuloForma(l.forma)}</span>
+                          <span className="g-tag g-fin-so-largo">{rotuloForma(l.forma)}</span>
                           <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
                         </button>
                       );
@@ -244,22 +330,40 @@ function Comparacao({ contas, mesAtual, nomeAnterior }: {
   );
 }
 
-function Categorias({ titulo, total, linhas, vazio, laranja }: {
-  titulo: string; total: number; linhas: { nome: string; valor: number }[]; vazio: string; laranja?: boolean;
+/** Barras lado a lado (entrou e saiu) para cada semana do mês. */
+function Fluxo({ semanas, atual }: { semanas: { rotulo: string; entrou: number; saiu: number }[]; atual: number }) {
+  const maior = Math.max(...semanas.flatMap((s) => [s.entrou, s.saiu]), 1);
+  const altura = (v: number) => (v ? Math.max(3, (v / maior) * 100) : 0);
+  return (
+    <div className="g-fin-fluxo" role="img"
+      aria-label={semanas.map((s) => `Dias ${s.rotulo}: entrou ${brl(s.entrou)}, saiu ${brl(s.saiu)}`).join(". ")}>
+      {semanas.map((s, i) => (
+        <div key={s.rotulo} className={i === atual ? "agora" : undefined} title={`Dias ${s.rotulo}: entrou ${brl(s.entrou)}, saiu ${brl(s.saiu)}`}>
+          <div className="cols">
+            <span className="e"><b style={{ bottom: `${altura(s.entrou)}%` }}>{s.entrou ? brlMini(s.entrou) : ""}</b><i style={{ height: `${altura(s.entrou)}%` }} /></span>
+            <span className="s"><b style={{ bottom: `${altura(s.saiu)}%` }}>{s.saiu ? brlMini(s.saiu) : ""}</b><i style={{ height: `${altura(s.saiu)}%` }} /></span>
+          </div>
+          <small>{s.rotulo}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const QUENTES = ["#b3402e", "#ea670c", "#c99a2e", "#8b3440", "#5b4590", "#2f6f8a", "#6a625a", "#a39a90"];
+
+function Categorias({ titulo, total, linhas, vazio, quente, icone, tom }: {
+  titulo: string; total: number; linhas: { nome: string; valor: number }[]; vazio: string; quente?: boolean;
+  icone: React.ComponentType<{ size?: number }>; tom: "menta" | "rosa";
 }) {
-  const maior = linhas[0]?.valor ?? 0;
+  const cores = quente ? QUENTES : PALETA;
   return (
     <section className="g-card">
-      <div className="g-card-t"><h3>{titulo}</h3><b className="g-tab">{brl(total)}</b></div>
-      {linhas.length ? linhas.map((c) => (
-        <div key={c.nome} className="gf-cat">
-          <div className="g-fila entre g-p">
-            <span>{c.nome}</span>
-            <span className="g-tab">{brl(c.valor)} <span className="g-muted g-pp">{Math.round((c.valor / total) * 100)}%</span></span>
-          </div>
-          <div className={`g-prog${laranja ? " laranja" : ""}`}><i style={{ width: `${Math.max(2, (c.valor / maior) * 100)}%` }} /></div>
-        </div>
-      )) : <p className="g-muted g-p">{vazio}</p>}
+      <div className="g-card-t"><h3><Tile icone={icone} tom={tom} tamanho="p" />{titulo}</h3><b className="g-tab">{brl(total)}</b></div>
+      {linhas.length ? (
+        <Ranking itens={linhas.map((c, i) => ({ rotulo: c.nome, valor: c.valor, cor: cores[i % cores.length] }))}
+          formato={(v) => `${brl(v)} · ${Math.round((v / total) * 100)}%`} />
+      ) : <p className="g-muted g-p">{vazio}</p>}
     </section>
   );
 }
@@ -277,15 +381,37 @@ function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
     );
   }
   const atrasadas = lista.filter((c) => c.vencimento && c.vencimento < hoje);
+  const deHoje = lista.filter((c) => c.vencimento === hoje);
+  const em7 = isoDia(somaDias(deIsoDia(hoje), 7));
+  const proximas = lista.filter((c) => c.vencimento && c.vencimento > hoje && c.vencimento <= em7);
+  const quantas = (q: number) => (q === 1 ? "1 conta" : `${q} contas`);
   return (
-    <section className="g-card">
-      <div className="g-card-t">
-        <div>
-          <p className="g-rotulo">{receber ? "Total a receber" : "Total a pagar"}</p>
-          <p className="g-num m" style={{ marginTop: 6 }}>{brl(soma(lista))}</p>
+    <div className="g-pilha">
+      <section className={`g-fin-total${receber ? " receber" : ""}`}>
+        <div className="g-fila" style={{ flexWrap: "nowrap", gap: 14 }}>
+          <Tile icone={receber ? HandCoins : Receipt} tom={receber ? "menta" : "manteiga"} tamanho="g" />
+          <div style={{ minWidth: 0 }}>
+            <p className="g-rotulo">{receber ? "Total a receber" : "Total a pagar"}</p>
+            <p className="g-num m" style={{ marginTop: 6 }}>{brl(soma(lista))}</p>
+          </div>
+          {atrasadas.length > 0 && <span className="g-tag vermelho g-fin-so-largo" style={{ marginLeft: "auto" }}>{brl(soma(atrasadas))} em atraso</span>}
         </div>
-        {atrasadas.length > 0 && <span className="g-tag vermelho">{brl(soma(atrasadas))} em atraso</span>}
-      </div>
+        <div className="g-fin-prazos">
+          <div className={atrasadas.length ? "rosa" : undefined}>
+            <Tile icone={TriangleAlert} tom="rosa" tamanho="p" />
+            <span><small>Em atraso</small><b>{brl(soma(atrasadas))}</b><small>{atrasadas.length ? quantas(atrasadas.length) : "nenhuma"}</small></span>
+          </div>
+          <div>
+            <Tile icone={CalendarClock} tom="manteiga" tamanho="p" />
+            <span><small>Vence hoje</small><b>{brl(soma(deHoje))}</b><small>{deHoje.length ? quantas(deHoje.length) : "nenhuma"}</small></span>
+          </div>
+          <div>
+            <Tile icone={CalendarDays} tom="ceu" tamanho="p" />
+            <span><small>Próximos 7 dias</small><b>{brl(soma(proximas))}</b><small>{proximas.length ? quantas(proximas.length) : "nenhuma"}</small></span>
+          </div>
+        </div>
+      </section>
+      <section className="g-card">
       <div className="g-lista">
         {lista.map((c) => {
           const v = c.vencimento;
@@ -296,6 +422,7 @@ function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
           return (
             <div key={c.id} className="g-linha gf-conta">
               <button className="gf-toque" onClick={() => aoEditar(c)} aria-label={`Editar ${c.descricao || c.categoria}`}>
+                <span className="g-fin-so-largo"><Tile icone={v && v < hoje ? TriangleAlert : receber ? HandCoins : Receipt} tom={v && v < hoje ? "rosa" : receber ? "menta" : "manteiga"} /></span>
                 <span className="t">
                   <b>{c.descricao || c.categoria}</b>
                   <span>{c.categoria}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${dataAmigavel(v)}` : ""}</span>
@@ -312,6 +439,7 @@ function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
           );
         })}
       </div>
-    </section>
+      </section>
+    </div>
   );
 }

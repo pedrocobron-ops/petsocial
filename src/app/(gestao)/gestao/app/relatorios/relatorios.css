@@ -1,0 +1,53 @@
+/* Relatórios: segunda demão (prefixo g-rel-). */
+
+/* faturamento: número grande + gráfico */
+.g-rel-total { margin: 6px 0 16px; font: 460 clamp(2rem, 1.5rem + 2.2vw, 2.75rem)/1 var(--display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; color: #24543b; }
+
+.g-rel-area { display: grid; gap: 8px; }
+.g-rel-area .palco { position: relative; height: 180px; }
+.g-rel-area svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.g-rel-area .grade { stroke: var(--g-linha); stroke-width: 1; stroke-dasharray: 3 5; }
+.g-rel-area .traco { fill: none; stroke: #2f6b4c; stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+.g-rel-area .pico { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--g-laranja); border: 2px solid var(--g-carta); box-shadow: 0 0 0 4px rgba(249, 115, 22, .2); pointer-events: none; }
+.g-rel-area .pico b { position: absolute; left: 14px; top: 50%; translate: 0 -50%; padding: 3px 8px; border-radius: 999px; background: var(--g-tinta); color: #f6f1e8; font-size: .6875rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-rel-area .pico.esq b { left: auto; right: 14px; }
+.g-rel-area .alvos { position: absolute; inset: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.g-rel-area .alvos span:hover { background: linear-gradient(90deg, transparent calc(50% - 1px), rgba(31, 27, 23, .18) calc(50% - 1px), rgba(31, 27, 23, .18) calc(50% + 1px), transparent calc(50% + 1px)); }
+.g-rel-area .eixo { display: flex; justify-content: space-between; font-size: .6875rem; font-weight: 600; letter-spacing: .05em; color: var(--g-cinza); font-variant-numeric: tabular-nums; }
+@media (min-width: 960px) { .g-rel-area .palco { height: 220px; } }
+
+.g-rel-fatos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.g-rel-fatos > div { display: grid; gap: 2px; min-width: 0; padding: 10px 12px; border-radius: 14px; background: var(--t-menta); color: var(--i-menta); }
+.g-rel-fatos > div + div { background: var(--g-carta-2); color: var(--g-tinta); }
+.g-rel-fatos small { font-size: .75rem; opacity: .85; }
+.g-rel-fatos b { font: 480 1.125rem/1.2 var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* horários mais cheios */
+.g-rel-horas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.g-rel-horas > div { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 10px; border-radius: 14px; background: linear-gradient(160deg, #fff6ea, var(--t-pessego)); }
+.g-rel-horas span { display: grid; min-width: 0; line-height: 1.2; }
+.g-rel-horas b { font: 480 1.125rem/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.g-rel-horas small { font-size: .6875rem; color: #6b4a2f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) { .g-rel-horas .g-tile { display: none; } }
+
+/* serviços: rosca + legenda */
+.g-rel-rosca { display: grid; gap: 18px; justify-items: center; }
+.g-rel-rosca .g-legenda { width: 100%; gap: 10px; }
+.g-rel-rosca .g-legenda > div { align-items: flex-start; }
+.g-rel-rosca .g-legenda i { margin-top: 6px; }
+.g-rel-rosca .nome { display: grid; min-width: 0; line-height: 1.3; overflow-wrap: anywhere; }
+.g-rel-rosca .nome small { font-size: .8125rem; color: var(--g-cinza); }
+.g-rel-rosca .g-legenda b { flex: none; padding-left: 8px; }
+.g-rel-rosca .g-anel b { display: grid; justify-items: center; gap: 2px; font: 480 1.75rem/1 var(--display); }
+.g-rel-rosca .g-anel small { font: 600 .625rem/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--g-cinza); }
+@media (min-width: 640px) { .g-rel-rosca { grid-template-columns: auto minmax(0, 1fr); align-items: center; justify-items: stretch; gap: 28px; } }
+
+/* posição no ranking */
+.g-rel-pos { display: grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: 50%; background: var(--g-carta-2); font-size: .75rem; font-weight: 600; color: var(--g-cinza); font-variant-numeric: tabular-nums; }
+.g-rel-pos.um { background: var(--t-manteiga); color: var(--i-manteiga); }
+.g-rel-com .g-prog { height: 6px; margin-top: 7px; max-width: 320px; }
+
+@media print {
+  .g-rel-area .pico b { background: none; color: var(--g-tinta); }
+  .g-duas { grid-template-columns: minmax(0, 1fr) !important; }
+}
