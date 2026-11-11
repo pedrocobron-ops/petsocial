@@ -9,13 +9,17 @@ import { useGestao } from "./contexto";
 import { abrirAssistente } from "./ui";
 
 type Item = { de: "eu" | "ajuda"; texto: string; quando: string; avaliar?: boolean; avaliado?: "sim" | "nao" };
-type Resposta = { texto?: string; equipe?: boolean; semResposta?: boolean; erro?: string; mensagem?: string };
+type Resposta = { texto?: string; equipe?: boolean; semResposta?: boolean; novo?: boolean; assunto?: string; erro?: string; mensagem?: string };
 
-/** Quantas tentativas sem resolver até oferecer o WhatsApp da equipe. */
+/**
+ * Quantas tentativas seguidas sem resolver, NO MESMO ASSUNTO, até oferecer o WhatsApp da equipe.
+ * Conta: tocar em "Ainda não" e a Ajuda dizer que não sabe. Zera: tocar em "Sim", mudar de assunto ou começar de novo.
+ * Abandonar a conversa não conta nada. Erro de conexão também não.
+ */
 const TENTATIVAS = 2;
 const RAPIDAS = ["marcar", "conta", "link", "equipe", "caixa"];
 
-const memoria: { petshop: string | null; itens: Item[]; falhas: number; equipe: boolean } = { petshop: null, itens: [], falhas: 0, equipe: false };
+const memoria: { petshop: string | null; itens: Item[]; falhas: number; equipe: boolean; assunto: string | null } = { petshop: null, itens: [], falhas: 0, equipe: false, assunto: null };
 
 /**
  * Ajuda: primeiro uma conversa que tira dúvidas de uso com base no guia. O WhatsApp da equipe só aparece
@@ -23,7 +27,7 @@ const memoria: { petshop: string | null; itens: Item[]; falhas: number; equipe: 
  */
 export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
   const { sb, petshop, eu } = useGestao();
-  if (memoria.petshop !== petshop.id) { memoria.petshop = petshop.id; memoria.itens = []; memoria.falhas = 0; memoria.equipe = false; }
+  if (memoria.petshop !== petshop.id) { memoria.petshop = petshop.id; memoria.itens = []; memoria.falhas = 0; memoria.equipe = false; memoria.assunto = null; }
   const [itens, setItens] = useState<Item[]>(memoria.itens);
   const [falhas, setFalhas] = useState(memoria.falhas);
   const [equipe, setEquipe] = useState(memoria.equipe);
@@ -34,6 +38,7 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
   const guardar = (novos: Item[]) => { memoria.itens = novos; setItens(novos); };
   const falhou = () => { memoria.falhas += 1; setFalhas(memoria.falhas); };
   const chamarEquipe = () => { memoria.equipe = true; setEquipe(true); };
+  const zerar = () => { memoria.falhas = 0; memoria.equipe = false; setFalhas(0); setEquipe(false); };
 
   useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [itens, pensando, equipe, falhas]);
   useEffect(() => {
@@ -59,7 +64,11 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
         body: JSON.stringify({ petshopId: petshop.id, falas: comPergunta.map((i) => ({ de: i.de, texto: i.texto })) }),
       });
       const j = (await r.json().catch(() => null)) as Resposta | null;
-      if (!r.ok || !j?.texto) { guardar([...comPergunta, { de: "ajuda", texto: j?.mensagem ?? "Não consegui responder agora. Tente de novo em instantes.", quando: hora(new Date()) }]); falhou(); return; }
+      if (!r.ok || !j?.texto) { guardar([...comPergunta, { de: "ajuda", texto: j?.mensagem ?? "Não consegui responder agora. Tente de novo em instantes.", quando: hora(new Date()) }]); return; }
+      // mudou de assunto: as tentativas do assunto anterior não contam para este
+      const mudou = j.novo === true || (j.assunto != null && memoria.assunto != null && j.assunto !== memoria.assunto);
+      if (mudou) zerar();
+      if (j.assunto != null) memoria.assunto = j.assunto;
       guardar([...comPergunta, { de: "ajuda", texto: j.texto, quando: hora(new Date()), avaliar: !j.semResposta && !j.equipe }]);
       if (j.semResposta) falhou();
       if (j.equipe) chamarEquipe();
@@ -70,7 +79,7 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
 
   function avaliar(indice: number, resolveu: boolean) {
     const novos = memoria.itens.map((i, n) => (n === indice ? { ...i, avaliar: false, avaliado: resolveu ? ("sim" as const) : ("nao" as const) } : i));
-    if (resolveu) guardar([...novos, { de: "ajuda", texto: "Que bom! Se aparecer outra dúvida, é só escrever.", quando: hora(new Date()) }]);
+    if (resolveu) { zerar(); guardar([...novos, { de: "ajuda", texto: "Que bom! Se aparecer outra dúvida, é só escrever.", quando: hora(new Date()) }]); }
     else {
       falhou();
       guardar([...novos, { de: "ajuda", texto: memoria.falhas >= TENTATIVAS ? "Entendi, não resolveu. Vou te passar para a nossa equipe." : "Poxa. Me conta com mais detalhe o que você está tentando fazer e o que aparece na tela, que eu tento de novo.", quando: hora(new Date()) }]);
@@ -78,7 +87,7 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
   }
 
   function recomecar() {
-    memoria.itens = []; memoria.falhas = 0; memoria.equipe = false;
+    memoria.itens = []; memoria.falhas = 0; memoria.equipe = false; memoria.assunto = null;
     setItens([]); setFalhas(0); setEquipe(false);
   }
 

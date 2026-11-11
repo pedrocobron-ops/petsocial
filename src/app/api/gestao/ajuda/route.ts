@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
-import { INSTRUCOES_AJUDA, MARCA_EQUIPE, procurarTopico } from "@/lib/gestao/ajuda";
+import { INSTRUCOES_AJUDA, MARCA_EQUIPE, MARCA_NOVO, procurarTopico } from "@/lib/gestao/ajuda";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -15,7 +15,8 @@ const erro = (status: number, codigo: string, mensagem: string) => NextResponse.
 
 /**
  * Primeira linha do suporte: responde dúvidas de uso com base no guia.
- * Devolve { texto, equipe }: `equipe` = true quando o caso deve ir para uma pessoa (o botão do WhatsApp aparece).
+ * Devolve { texto, equipe, novo | assunto }: `equipe` = true quando o caso deve ir direto para uma pessoa;
+ * `novo` (IA) ou `assunto` (busca no guia) dizem se a pessoa mudou de assunto, para a contagem de tentativas recomeçar.
  * Sem a chave da IA, responde pela busca de palavras no mesmo guia.
  */
 export async function POST(req: Request) {
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
 
   const local = () => {
     const t = procurarTopico(ultima.texto);
-    return t ? { texto: t.resposta, equipe: false, topico: t.titulo } : { texto: "Essa eu não sei responder com certeza. Pode me explicar de outro jeito, ou dizer em qual tela você está?", equipe: false, semResposta: true };
+    return t ? { texto: t.resposta, equipe: false, assunto: t.id } : { texto: "Essa eu não sei responder com certeza. Pode me explicar de outro jeito, ou dizer em qual tela você está?", equipe: false, semResposta: true };
   };
 
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json(local());
@@ -56,11 +57,12 @@ export async function POST(req: Request) {
     });
     const bruto = r.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
     const equipe = bruto.includes(MARCA_EQUIPE);
-    const texto = bruto.replace(MARCA_EQUIPE, "").trim();
+    const novo = bruto.includes(MARCA_NOVO);
+    const texto = bruto.replace(MARCA_EQUIPE, "").replace(MARCA_NOVO, "").trim();
     // registro para o limite diário; se a conta estiver só para consulta, o registro é recusado e a resposta segue
     await sb.from("assistente_eventos").insert({ petshop_id: corpo.petshopId, user_id: u.user.id, acao: "ajuda", pedido: ultima.texto.slice(0, 300) });
     if (!texto) return NextResponse.json(local());
-    return NextResponse.json({ texto, equipe });
+    return NextResponse.json({ texto, equipe, novo });
   } catch {
     return NextResponse.json(local());
   }
