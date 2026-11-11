@@ -24,6 +24,7 @@ export async function POST(req: Request) {
 
   const cliente = (dados.customer ?? {}) as { email?: string };
   const assinatura = (dados.subscription ?? null) as { id?: string | number } | null;
+  const oferta = (dados.offer ?? null) as { id?: string } | null;
   const email = typeof cliente.email === "string" ? cliente.email : typeof dados.customerEmail === "string" ? dados.customerEmail : null;
 
   const sb = createClient<Database>(SUPABASE_URL, SUPABASE_CHAVE, { auth: { persistSession: false } });
@@ -31,7 +32,8 @@ export async function POST(req: Request) {
     p_segredo: corpo.secret, p_evento: corpo.event, p_email: email as string,
     p_assinatura: (assinatura?.id != null ? String(assinatura.id) : null) as string,
     // guarda só o necessário para conferir depois (sem documento nem telefone do comprador)
-    p_payload: { pedido: dados.id ?? null, status: dados.status ?? null, produto: produto.short_id ?? produto.id ?? null, valor: dados.amount ?? null, metodo: dados.paymentMethod ?? null } as never,
+    p_oferta: (typeof oferta?.id === "string" ? oferta.id : null) as string,
+    p_payload: { oferta: oferta?.id ?? null, pedido: dados.id ?? null, status: dados.status ?? null, produto: produto.short_id ?? produto.id ?? null, valor: dados.amount ?? null, metodo: dados.paymentMethod ?? null } as never,
   });
   if (error) return NextResponse.json({ ok: false }, { status: 500 });
   if (data === "recusado") return NextResponse.json({ ok: false }, { status: 401 });

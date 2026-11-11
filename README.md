@@ -77,15 +77,14 @@ Como as telas são feitas: `src/components/gestao/LEIAME.md`. Banco (tabelas e r
 | `ANTHROPIC_API_KEY` | Chave da IA do Mozart. Segredo: só na Vercel |
 | `GESTAO_MODELO` | Modelo do Mozart (padrão `claude-opus-5-5`) |
 | `GESTAO_ASSISTENTE_LIMITE_DIA` | Pedidos ao Mozart por pet shop por dia (padrão 150) |
-| `NEXT_PUBLIC_GESTAO_PRECO` | Preço mostrado nas telas, ex.: `R$ 69` |
-| `NEXT_PUBLIC_GESTAO_CHECKOUT` | Link do checkout da assinatura na Cakto |
+| `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO`, `_EQUIPE`, `_PETSHOP` | Link do checkout de cada plano na Cakto. Os planos e preços ficam em `src/lib/gestao/planos.ts` |
 | `GESTAO_CAKTO_PRODUTO` | Id do produto na Cakto: eventos de outros produtos são ignorados |
 
 ### Para colocar no ar
 
 1. Criar o projeto no Supabase (plano com backup) e aplicar `supabase/migrations/`. Manter a confirmação de e-mail ligada e configurar o envio de e-mail (SMTP).
 2. Preencher as variáveis acima na Vercel.
-3. Na Cakto: criar o produto de assinatura mensal e um webhook para `https://maestropet.com/api/gestao/cakto` com os eventos de compra e de assinatura. Guardar o segredo do webhook no banco, só como hash:
+3. Na Cakto: criar o produto de assinatura mensal com uma oferta por plano (Solo, Equipe e Pet shop) e ligar cada oferta ao plano: `insert into config_interna values ('cakto_oferta_<id da oferta>', 'solo');` (ou `equipe`, `petshop`). Criar também um webhook para `https://maestropet.com/api/gestao/cakto` com os eventos de compra e de assinatura. Guardar o segredo do webhook no banco, só como hash:
    `insert into config_interna values ('cakto_segredo_sha256', encode(extensions.digest('<segredo>', 'sha256'), 'hex'));`
 4. Dar acesso ao painel interno: `insert into admins (user_id) select id from auth.users where email = '<e-mail>';`
 

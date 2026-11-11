@@ -1,5 +1,6 @@
 "use client";
 
+import { planoPorId } from "@/lib/gestao/planos";
 import { useState } from "react";
 import { Copy, UserPlus } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
@@ -12,7 +13,7 @@ const PAPEL: Record<Papel, string> = { dono: "Dono", gerente: "Gerente", funcion
 const pct = (n: number) => `${String(Number(n)).replace(".", ",")}%`;
 
 export default function Equipe() {
-  const { souDono, equipe, eu, sb, recarregarBase } = useGestao();
+  const { souDono, equipe, eu, sb, petshop, recarregarBase } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = useState<Profissional | "novo" | null>(null);
@@ -20,6 +21,8 @@ export default function Equipe() {
 
   const ativos = equipe.filter((p) => p.ativo);
   const inativos = equipe.filter((p) => !p.ativo);
+  const plano = planoPorId(petshop.plano);
+  const comAcesso = ativos.filter((p) => p.user_id || p.email_convite?.trim()).length;
   const abrir = (p: Profissional | "novo") => { if (!somenteLeitura()) setEditando(p); };
 
   async function reativar(p: Profissional) {
@@ -35,7 +38,7 @@ export default function Equipe() {
   return (
     <>
       <header className="g-topo">
-        <div><h1>Equipe</h1><p className="g-muted">Quem trabalha com você, o que cada um vê e em que dias.</p></div>
+        <div><h1>Equipe</h1><p className="g-muted">Quem trabalha com você, o que cada um vê e em que dias. {comAcesso} de {plano.acessos} {plano.acessos === 1 ? "acesso usado" : "acessos usados"} no plano {plano.nome}.</p></div>
         <div className="g-acoes"><button className="g-btn pri" onClick={() => abrir("novo")}><UserPlus />Adicionar pessoa</button></div>
       </header>
       <div className="g-grade c2" style={{ alignItems: "start" }}>

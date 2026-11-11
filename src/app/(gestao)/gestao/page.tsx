@@ -4,6 +4,7 @@ import { ArrowRight, Check, Monitor, Smartphone } from "lucide-react";
 import Instalar from "@/components/gestao/instalar";
 import Vitrine from "@/components/gestao/vitrine";
 import { Marca } from "@/components/gestao/marca";
+import { PLANOS, textoAcessos } from "@/lib/gestao/planos";
 import { brlCurto } from "@/lib/gestao/util";
 import "./produto.css";
 
@@ -13,8 +14,6 @@ export const metadata: Metadata = {
 };
 
 const CRIAR = "/gestao/criar-conta";
-const PRECO = Number(String(process.env.NEXT_PUBLIC_GESTAO_PRECO ?? "").replace(",", "."));
-const TEM_PRECO = Number.isFinite(PRECO) && PRECO > 0;
 
 /** O que a pessoa diz e o que o assistente faz com isso. */
 const PEDIDOS: [string, string][] = [
@@ -47,7 +46,8 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["Emite nota fiscal?", "Ainda não. Hoje o sistema não emite nota fiscal."],
   ["Serve para clínica veterinária?", "O sistema é feito para pet shop, banho e tosa, creche e hotel. Ele não tem prontuário, receituário nem internação. Uma clínica que também faz banho e tosa pode usá-lo para essa parte."],
   ["Tem fidelidade?", "Não. A cobrança é mensal e você cancela quando quiser."],
-  ["Posso colocar a minha equipe?", "Sim. Cada pessoa entra com o próprio acesso, e você escolhe quem atende na agenda e quem vê o financeiro."],
+  ["Posso colocar a minha equipe?", "Sim. Cada pessoa entra com o próprio acesso, e você escolhe quem atende na agenda e quem vê o financeiro. O número de acessos depende do plano: 1, 3 ou 6."],
+  ["Posso trocar de plano depois?", "Pode. Você cancela o plano atual e assina o novo. Os dados do pet shop continuam os mesmos."],
 ];
 
 function Tela({ arquivo, alt, celular, prioridade }: { arquivo: string; alt: string; celular?: boolean; prioridade?: boolean }) {
@@ -134,23 +134,27 @@ export default function Pagina() {
         </div>
       </section>
 
-      <section className="gp-plano gp-c" id="plano">
-        <div className="gp-plano-texto">
-          <h2>Um plano. <em>Sem letra miúda.</em></h2>
-          <p>Você testa por 7 dias sem informar cartão. Se gostar, assina e continua de onde parou. Se não assinar, nada é cobrado e os seus dados ficam guardados para consulta.</p>
-        </div>
-        <div className="gp-preco">
-          <span className="gp-preco-nome">Plano Gestão</span>
-          {TEM_PRECO
-            ? <p className="gp-valor">{brlCurto(PRECO)}<small> por mês</small></p>
-            : <p className="gp-valor def">Preço de lançamento em definição</p>}
-          <ul>
-            <li><Check />Todas as funções desta página</li>
-            <li><Check />O assistente por áudio e texto</li>
-            <li><Check />Equipe com acesso por função</li>
-            <li><Check />Cobrança mensal, cancela quando quiser</li>
+      <section className="gp-planos" id="plano">
+        <div className="gp-c">
+          <h2>Planos <em>e preços</em></h2>
+          <p className="gp-lead">Todos os planos têm todas as funções e o assistente. Você escolhe pelo número de pessoas que entram no sistema.</p>
+          <ul className="gp-planos-grade">
+            {PLANOS.map((p) => (
+              <li key={p.id} className={p.id === "equipe" ? "destaque" : undefined}>
+                <h3>{p.nome}</h3>
+                <p className="gp-para">{p.para}</p>
+                <p className="gp-valor">{brlCurto(p.preco)}<small> por mês</small></p>
+                <p className="gp-acessos">{textoAcessos(p.acessos)}<span> ao sistema</span></p>
+                <ul>
+                  <li><Check />Todas as funções</li>
+                  <li><Check />Assistente por áudio e texto</li>
+                  <li><Check />Celular e computador</li>
+                </ul>
+                <Link href={CRIAR} className={`gp-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`}>Teste grátis</Link>
+              </li>
+            ))}
           </ul>
-          <Link href={CRIAR} className="gp-btn pri cheio">Teste grátis por 7 dias <ArrowRight /></Link>
+          <p className="gp-planos-nota">7 dias grátis, sem cartão. Cobrança mensal, sem fidelidade: você cancela quando quiser. Durante o teste, até 6 pessoas podem entrar.</p>
         </div>
       </section>
 

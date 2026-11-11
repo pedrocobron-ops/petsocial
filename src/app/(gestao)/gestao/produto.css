@@ -114,19 +114,24 @@
 .gp-grade b { font: 600 1.125rem/1.25 var(--sans); }
 .gp-grade span { color: var(--cinza); font-size: 1rem; line-height: 1.45; }
 
-/* ---------- plano ---------- */
-.gp-plano, .gp-faq { scroll-margin-top: 1rem; }
-.gp-plano { display: grid; gap: 2.5rem; padding-block: clamp(4.5rem, 3rem + 7vw, 8rem); align-items: center; }
-.gp-plano-texto p { color: var(--cinza); margin-top: 1.25rem; max-width: 44ch; font-size: 1.125rem; }
-.gp-preco { background: #fffbf5; border-radius: 22px; padding: clamp(1.5rem, 1rem + 2vw, 2.5rem); box-shadow: 0 1px 2px rgba(31, 27, 23, .06), 0 30px 60px -32px rgba(31, 27, 23, .4); }
-.gp-preco-nome { font-weight: 600; color: var(--v); }
-.gp-valor { font: 440 clamp(3rem, 2.4rem + 2.5vw, 4.25rem)/1 var(--display); letter-spacing: -.03em; margin-top: .5rem !important; font-variant-numeric: tabular-nums; }
-.gp-valor small { font: 500 1.0625rem/1 var(--sans); letter-spacing: 0; color: var(--cinza); }
-.gp-valor.def { font-size: clamp(1.625rem, 1.3rem + 1.2vw, 2.125rem); line-height: 1.15; letter-spacing: -.015em; }
-.gp-preco ul { list-style: none; padding: 0; margin: 1.5rem 0; display: grid; gap: .7rem; }
-.gp-preco li { display: flex; gap: .7rem; align-items: flex-start; }
-.gp-preco li svg { width: 20px; height: 20px; flex: none; margin-top: .18rem; color: var(--v); }
-@media (min-width: 900px) { .gp-plano { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 5rem; } }
+/* ---------- planos ---------- */
+.gp-planos { padding-block: clamp(4rem, 3rem + 6vw, 7rem); scroll-margin-top: 1rem; }
+.gp-planos h2, .gp-planos .gp-lead { text-align: center; margin-inline: auto; }
+.gp-planos h2 { color: var(--v); }
+.gp-planos-grade { list-style: none; padding: 0; margin: 2.5rem auto 0; display: grid; gap: 16px; max-width: 1040px; }
+.gp-planos-grade > li { background: #fffdf9; border-radius: 20px; padding: 1.75rem 1.5rem; display: grid; gap: .4rem; align-content: start; border: 1.5px solid rgba(31, 27, 23, .1); }
+.gp-planos-grade > li.destaque { border-color: var(--v); box-shadow: 0 30px 60px -34px rgba(30, 58, 47, .55); }
+.gp-planos-grade h3 { font: 500 1.75rem/1.1 var(--display); letter-spacing: -.015em; color: var(--v); margin: 0; }
+.gp-para { color: var(--cinza); font-size: .9688rem; min-height: 2.9em; }
+.gp-valor { font: 460 3.25rem/1 var(--display); letter-spacing: -.03em; margin-top: .6rem !important; font-variant-numeric: tabular-nums; }
+.gp-valor small { font: 500 1rem/1 var(--sans); letter-spacing: 0; color: var(--cinza); }
+.gp-acessos { font-weight: 700; font-size: 1.125rem; color: var(--v); margin-top: .5rem !important; padding: .7rem .9rem; border-radius: 12px; background: var(--g-menta, #dfeadf); }
+.gp-acessos span { font-weight: 500; }
+.gp-planos-grade ul { list-style: none; padding: 0; margin: 1rem 0 1.25rem; display: grid; gap: .55rem; }
+.gp-planos-grade ul li { display: flex; gap: .6rem; align-items: flex-start; }
+.gp-planos-grade ul svg { width: 19px; height: 19px; flex: none; margin-top: .2rem; color: var(--v); }
+.gp-planos-nota { text-align: center; color: var(--cinza); margin: 1.75rem auto 0 !important; max-width: 60ch; }
+@media (min-width: 820px) { .gp-planos-grade { grid-template-columns: repeat(3, 1fr); align-items: stretch; } }
 
 /* ---------- perguntas ---------- */
 .gp-faq { display: grid; gap: 2rem; padding-bottom: clamp(4.5rem, 3rem + 7vw, 8rem); }

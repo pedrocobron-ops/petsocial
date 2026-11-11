@@ -4,11 +4,10 @@ import Link from "next/link";
 import { Check, ExternalLink } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { Vazio } from "@/components/gestao/ui";
-import { dataCompleta, dataCurta } from "@/lib/gestao/util";
+import { PLANOS, planoPorId, textoAcessos } from "@/lib/gestao/planos";
+import { brlCurto, dataCompleta, dataCurta } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
 
-const PRECO = (process.env.NEXT_PUBLIC_GESTAO_PRECO ?? "").trim();
-const CHECKOUT = (process.env.NEXT_PUBLIC_GESTAO_CHECKOUT ?? "").trim();
 const PORTAL = "https://assinatura.cakto.com.br/";
 const DIAS_DE_TESTE = 7;
 const INCLUI = [
@@ -22,7 +21,7 @@ const INCLUI = [
   "O Mozart, por áudio e por texto",
 ];
 
-function linkDoCheckout(email: string | undefined) {
+function linkDoCheckout(CHECKOUT: string, email: string | undefined) {
   if (!email) return CHECKOUT;
   try {
     const u = new URL(CHECKOUT);
@@ -39,45 +38,52 @@ export default function Assinatura() {
   const status = petshop.status;
   const podeAssinar = status === "teste" || status === "cancelada";
   const temAssinatura = status === "ativa" || status === "atrasada";
+  const atual = planoPorId(petshop.plano);
 
   return (
-    <div className="gj-estreito">
+    <div>
       <header className="g-topo">
         <div><h1>Assinatura</h1><p className="g-muted">O plano do {petshop.nome}.</p></div>
       </header>
       <div className="g-pilha">
         {estado()}
 
-        <section className="g-card g-pilha">
-          <div className="g-fila entre">
-            <div><p className="g-rotulo">Plano</p><h2>Plano Gestão</h2></div>
-            {PRECO && <p><span className="g-num m">{PRECO}</span>{/mês|\//i.test(PRECO) ? "" : <span className="g-muted g-p"> por mês</span>}</p>}
-          </div>
-          <ul className="gj-inclui">
-            {INCLUI.map((i) => <li key={i}><Check aria-hidden />{i}</li>)}
-          </ul>
-          {podeAssinar && (
-            <div className="g-pilha p">
-              {CHECKOUT ? (
-                <a className="g-btn pri cheio" href={linkDoCheckout(user.email)} target="_blank" rel="noopener noreferrer">Assinar agora<ExternalLink aria-hidden /></a>
-              ) : (
-                <>
-                  <button className="g-btn pri cheio" disabled>Assinatura disponível em breve</button>
-                  <p className="g-muted g-p">{liberado ? "Enquanto isso, o seu acesso continua pelo teste." : "Enquanto isso, os seus dados continuam guardados."}</p>
-                </>
-              )}
-              <p className="g-muted g-pp">Cobrança mensal pela Cakto. Sem fidelidade: você cancela quando quiser.</p>
-              <p className="g-muted g-pp">Use no checkout o mesmo e-mail da sua conta{user.email ? ` (${user.email})` : ""} para o acesso ser liberado sozinho.</p>
+        {temAssinatura && (
+          <section className="g-card g-pilha">
+            <div className="g-fila entre">
+              <div><p className="g-rotulo">Seu plano</p><h2>{atual.nome}</h2><p className="g-muted g-p">{textoAcessos(atual.acessos)} com login</p></div>
+              <p><span className="g-num m">{brlCurto(atual.preco)}</span><span className="g-muted g-p"> por mês</span></p>
             </div>
-          )}
-          {temAssinatura && (
-            <div className="g-pilha p">
-              <div><a className={`g-btn ${status === "atrasada" ? "verde" : "sec"}`} href={PORTAL} target="_blank" rel="noopener noreferrer">Trocar cartão ou cancelar<ExternalLink aria-hidden /></a></div>
-              <p className="g-muted g-pp">Abre a página da Cakto, que cuida da cobrança. Lá você entra com o e-mail usado na compra{petshop.cakto_email ? ` (${petshop.cakto_email})` : ""}.</p>
-              <p className="g-muted g-pp">Cobrança mensal pela Cakto. Sem fidelidade: você cancela quando quiser.</p>
+            <div><a className={`g-btn ${status === "atrasada" ? "verde" : "sec"}`} href={PORTAL} target="_blank" rel="noopener noreferrer">Trocar cartão ou cancelar<ExternalLink aria-hidden /></a></div>
+            <p className="g-muted g-pp">Abre a página da Cakto, que cuida da cobrança. Lá você entra com o e-mail usado na compra{petshop.cakto_email ? ` (${petshop.cakto_email})` : ""}. Para mudar de plano, cancele por lá e assine o plano novo aqui: os seus dados continuam.</p>
+          </section>
+        )}
+
+        {podeAssinar && (
+          <section className="g-pilha">
+            <div>
+              <h2>Escolha o plano</h2>
+              <p className="g-muted g-p">Todos têm as mesmas funções e o Mozart. Muda quantas pessoas entram com login.</p>
             </div>
-          )}
-        </section>
+            <div className="g-grade c3">
+              {PLANOS.map((p) => (
+                <div key={p.id} className={`g-card g-pilha p${p.id === "equipe" ? " menta" : ""}`}>
+                  <div><p className="g-rotulo">{p.para}</p><h2>{p.nome}</h2></div>
+                  <p><span className="g-num m">{brlCurto(p.preco)}</span><span className="g-muted g-p"> por mês</span></p>
+                  <p className="g-p"><b>{textoAcessos(p.acessos)}</b> com login</p>
+                  {p.checkout
+                    ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(p.checkout, user.email)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
+                    : <button className="g-btn cheio" disabled>Disponível em breve</button>}
+                </div>
+              ))}
+            </div>
+            <ul className="gj-inclui">
+              {INCLUI.map((i) => <li key={i}><Check aria-hidden />{i}</li>)}
+            </ul>
+            {!PLANOS.some((p) => p.checkout) && <p className="g-muted g-p">{liberado ? "A assinatura ainda não abriu. Enquanto isso, o seu acesso continua pelo teste." : "A assinatura ainda não abriu. Os seus dados continuam guardados."}</p>}
+            <p className="g-muted g-pp">Cobrança mensal pela Cakto. Sem fidelidade: você cancela quando quiser. Use no checkout o mesmo e-mail da sua conta{user.email ? ` (${user.email})` : ""} para o acesso ser liberado sozinho.</p>
+          </section>
+        )}
 
         <section className="g-card areia g-pilha p">
           <h2>Seus dados</h2>
@@ -116,7 +122,7 @@ export default function Assinatura() {
           <div className="g-prog" role="img" aria-label={`${Math.min(dias, DIAS_DE_TESTE)} de ${DIAS_DE_TESTE} dias restantes`}>
             <i style={{ width: `${Math.min(100, Math.round((dias / DIAS_DE_TESTE) * 100))}%` }} />
           </div>
-          <p className="g-muted g-p">Vai até {dataCurta(fim)}. Durante o teste, tudo funciona sem limite.</p>
+          <p className="g-muted g-p">Vai até {dataCurta(fim)}. Durante o teste, tudo funciona e até 6 pessoas podem entrar.</p>
         </section>
       );
     }

@@ -347,14 +347,14 @@ isOneToOne: false
                   ]
                 },"petshops": {
                   Row: {
-                    "assinatura_desde": string | null,"cakto_assinatura": string | null,"cakto_email": string | null,"cidade": string | null,"criado_em": string,"criado_por": string | null,"fuso": string,"horario": NonNullable<Json>,"id": string,"nome": string,"plano": string,"status": Database["public"]['Enums']["status_assinatura"],"telefone": string | null,"teste_ate": string,"uf": string | null
+                    "assinatura_desde": string | null,"cakto_assinatura": string | null,"cakto_email": string | null,"cidade": string | null,"criado_em": string,"criado_por": string | null,"fuso": string,"horario": NonNullable<Json>,"id": string,"nome": string,"plano": string,"status": Database["public"]['Enums']["status_assinatura"],"telefone": string | null,"teste_ate": string,"uf": string | null,"whatsapp": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"horario"?: NonNullable<Json>,"id"?: string,"nome": string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"teste_ate"?: string,"uf"?: string | null
+                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"horario"?: NonNullable<Json>,"id"?: string,"nome": string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"teste_ate"?: string,"uf"?: string | null,"whatsapp"?: boolean
                   }
                   Update: {
-                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"horario"?: NonNullable<Json>,"id"?: string,"nome"?: string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"teste_ate"?: string,"uf"?: string | null
+                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"horario"?: NonNullable<Json>,"id"?: string,"nome"?: string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"teste_ate"?: string,"uf"?: string | null,"whatsapp"?: boolean
                   }
                   Relationships: [
                     
@@ -450,7 +450,7 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
 "cakto_evento":
-{ Args: { "p_assinatura": string,"p_email": string,"p_evento": string,"p_payload": Json,"p_segredo": string }; Returns: string
+{ Args: { "p_assinatura": string,"p_email": string,"p_evento": string,"p_oferta"?: string,"p_payload": Json,"p_segredo": string }; Returns: string
                            },
 "conflitos_agenda":
 { Args: { "p_fim": string,"p_ignorar"?: string,"p_inicio": string,"p_petshop": string,"p_profissional": string }; Returns: {
@@ -504,6 +504,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"limite_de_acessos":
+{ Args: { "p_plano": string }; Returns: number
+                           },
 "meus_petshops":
 { Args: Record<PropertyKey, never>; Returns: string[]
                            },

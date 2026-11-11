@@ -20,9 +20,8 @@ type Loja = {
 type EventoCakto = { id: number; evento: string | null; email: string | null; petshop_id: string | null; recebido_em: string };
 
 const DIA = 864e5;
-const PRECO = Number(String(process.env.NEXT_PUBLIC_GESTAO_PRECO ?? "").replace(",", "."));
-const TEM_PRECO = Number.isFinite(PRECO) && PRECO > 0;
-const PLANOS: Record<string, string> = { gestao: "Gestão", gestao_whatsapp: "Gestão + WhatsApp (interno)" };
+import { PLANOS as CATALOGO, planoPorId } from "@/lib/gestao/planos";
+const PLANOS: Record<string, string> = Object.fromEntries(CATALOGO.map((p) => [p.id, `${p.nome} (${p.acessos})`]));
 const nomePlano = (p: string) => PLANOS[p] ?? p;
 
 /* ---------- leitura de cada pet shop ---------- */
@@ -127,6 +126,7 @@ function Admin() {
   // "agora" acompanha cada carga, para os prazos de teste não ficarem velhos na tela
   const agora = useMemo(() => Date.now(), [lojas]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const receita = useMemo(() => (lojas ?? []).filter((l) => l.status === "ativa").reduce((t, l) => t + planoPorId(l.plano).preco, 0), [lojas]);
   const n = useMemo(() => {
     const l = lojas ?? [];
     const ativas = l.filter((x) => x.status === "ativa").length;
@@ -220,9 +220,8 @@ function Admin() {
             <Numero rotulo="Cadastros em 7 dias" valor={n.novos7} />
             <div className="g-card verde">
               <p className="g-rotulo">Receita mensal (estimativa)</p>
-              {TEM_PRECO
-                ? <><p className="g-num m" style={{ marginTop: 10 }}>{brl(n.ativas * PRECO)}</p><p className="g-pp g-muted" style={{ marginTop: 6 }}>{n.ativas} × {brl(PRECO)}, sem descontar taxas</p></>
-                : <p className="g-p" style={{ marginTop: 10 }}>Aparece quando o preço do plano for definido.</p>}
+              <p className="g-num m" style={{ marginTop: 10 }}>{brl(receita)}</p>
+              <p className="g-pp g-muted" style={{ marginTop: 6 }}>{n.ativas} {n.ativas === 1 ? "assinante" : "assinantes"}, pelo preço de cada plano, sem descontar taxas</p>
             </div>
           </section>
 
