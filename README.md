@@ -75,7 +75,7 @@ Como as telas são feitas: `src/components/gestao/LEIAME.md`. Banco (tabelas e r
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Endereço do projeto no Supabase |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Chave pública do Supabase (a proteção é a regra do banco, RLS) |
-| `ANTHROPIC_API_KEY` | Chave da IA do Mozart. Segredo: só na Vercel |
+| `ANTHROPIC_API_KEY` | Chave da IA do Mozart e da Ajuda. Segredo: só na Vercel, nos ambientes Production e Preview. Depois de criar ou trocar, é preciso uma publicação nova para valer |
 | `GESTAO_MODELO` | Modelo do Mozart (padrão `claude-opus-5-5`) |
 | `GESTAO_AJUDA_MODELO` | Opcional. Modelo da Ajuda (dúvidas de uso; padrão `claude-haiku-5-5`). Sem a chave da IA, a Ajuda responde pelo guia em `src/lib/gestao/ajuda.ts` |
 | `GESTAO_ASSISTENTE_LIMITE_DIA` | Pedidos ao Mozart por pet shop por dia (padrão 150) |
