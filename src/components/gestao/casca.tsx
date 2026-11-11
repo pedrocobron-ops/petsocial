@@ -5,32 +5,36 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, BedDouble, CalendarDays, CreditCard, Landmark, LifeBuoy, LogOut, Menu, Mic, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
+  BarChart3, BedDouble, CalendarDays, CalendarClock, CreditCard, Landmark, LifeBuoy, LogOut, Menu, Mic, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
 import { linkSuporte } from "@/lib/gestao/contato";
 import { useGestao } from "./contexto";
-import { EVENTO_ASSISTENTE, Folha } from "./ui";
+import { planoPorId } from "@/lib/gestao/planos";
+import { dataLonga } from "@/lib/gestao/util";
+import { AvatarPessoa, EVENTO_ASSISTENTE, Folha } from "./ui";
+import BuscaGeral from "./busca-geral";
+import type { Tom } from "./painel";
 import Assistente from "./assistente";
 
-type Item = { href: string; rotulo: string; icone: React.ComponentType; so?: "financeiro" | "dono" };
+type Item = { href: string; rotulo: string; icone: React.ComponentType; tom: Tom; so?: "financeiro" | "dono" };
 const GRUPOS: { titulo: string; itens: Item[] }[] = [
   { titulo: "Dia a dia", itens: [
-    { href: "/gestao/app", rotulo: "Hoje", icone: Sun },
-    { href: "/gestao/app/agenda", rotulo: "Agenda", icone: CalendarDays },
-    { href: "/gestao/app/clientes", rotulo: "Clientes e pets", icone: PawPrint },
-    { href: "/gestao/app/creche-hotel", rotulo: "Creche e hotel", icone: BedDouble },
-    { href: "/gestao/app/pacotes", rotulo: "Pacotes", icone: Ticket },
+    { href: "/gestao/app", rotulo: "Hoje", icone: Sun, tom: "pessego" },
+    { href: "/gestao/app/agenda", rotulo: "Agenda", icone: CalendarDays, tom: "pessego" },
+    { href: "/gestao/app/clientes", rotulo: "Clientes e pets", icone: PawPrint, tom: "menta" },
+    { href: "/gestao/app/creche-hotel", rotulo: "Creche e hotel", icone: BedDouble, tom: "ceu" },
+    { href: "/gestao/app/pacotes", rotulo: "Pacotes", icone: Ticket, tom: "lilas" },
   ] },
   { titulo: "Dinheiro", itens: [
-    { href: "/gestao/app/caixa", rotulo: "Caixa", icone: Wallet, so: "financeiro" },
-    { href: "/gestao/app/financeiro", rotulo: "Financeiro", icone: Landmark, so: "financeiro" },
-    { href: "/gestao/app/relatorios", rotulo: "Relatórios", icone: BarChart3, so: "financeiro" },
-    { href: "/gestao/app/estoque", rotulo: "Estoque", icone: Package },
+    { href: "/gestao/app/caixa", rotulo: "Caixa", icone: Wallet, tom: "manteiga", so: "financeiro" },
+    { href: "/gestao/app/financeiro", rotulo: "Financeiro", icone: Landmark, tom: "menta", so: "financeiro" },
+    { href: "/gestao/app/relatorios", rotulo: "Relatórios", icone: BarChart3, tom: "ceu", so: "financeiro" },
+    { href: "/gestao/app/estoque", rotulo: "Estoque", icone: Package, tom: "rosa" },
   ] },
   { titulo: "Ajustes", itens: [
-    { href: "/gestao/app/equipe", rotulo: "Equipe", icone: Users, so: "dono" },
-    { href: "/gestao/app/meu-petshop", rotulo: "Meu pet shop", icone: Store, so: "dono" },
-    { href: "/gestao/app/assinatura", rotulo: "Assinatura", icone: CreditCard, so: "dono" },
+    { href: "/gestao/app/equipe", rotulo: "Equipe", icone: Users, tom: "lilas", so: "dono" },
+    { href: "/gestao/app/meu-petshop", rotulo: "Meu pet shop", icone: Store, tom: "pessego", so: "dono" },
+    { href: "/gestao/app/assinatura", rotulo: "Assinatura", icone: CreditCard, tom: "manteiga", so: "dono" },
   ] },
 ];
 
@@ -51,6 +55,8 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   const pode = (i: Item) => (i.so === "financeiro" ? vejoFinanceiro : i.so === "dono" ? souDono : true);
   const atual = (href: string) => (href === "/gestao/app" ? caminho === href : caminho.startsWith(href));
   const grupos = GRUPOS.map((g) => ({ ...g, itens: g.itens.filter(pode) })).filter((g) => g.itens.length);
+
+  const aqui = GRUPOS.flatMap((g) => g.itens.map((item) => ({ grupo: g.titulo, item }))).find((x) => atual(x.item.href));
 
   const nav = (
     <nav className="g-nav" aria-label="Menu">
@@ -73,13 +79,33 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           <div><b>{petshop.nome}</b><span>Maestro Pet Gestão</span></div>
         </div>
         {nav}
-        <div className="g-lado-pe g-nav">
-          <a href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer"><LifeBuoy />Ajuda no WhatsApp</a>
-          <button onClick={() => void sair()}><LogOut />Sair ({eu.nome.split(" ")[0]})</button>
+        <div className="g-lado-pe">
+          {souDono && diasDeTeste !== null && (
+            <div className="g-lado-plano">
+              <b>Teste grátis</b>
+              <span>{diasDeTeste <= 0 ? "Terminou." : diasDeTeste === 1 ? "Termina hoje." : `Faltam ${diasDeTeste} dias.`}</span>
+              <div className="g-prog"><i style={{ width: `${Math.max(4, Math.min(100, ((7 - diasDeTeste) / 7) * 100))}%` }} /></div>
+              <Link href="/gestao/app/assinatura">Ver os planos</Link>
+            </div>
+          )}
+          <div className="g-nav" style={{ marginTop: 10 }}>
+            <a href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer"><LifeBuoy />Ajuda no WhatsApp</a>
+          </div>
+          <div className="g-lado-eu">
+            <AvatarPessoa nome={eu.nome} cor={eu.cor} tamanho="p" />
+            <div className="t"><b>{eu.nome}</b><span>{souDono ? "Dono" : "Equipe"}{petshop.status === "ativa" ? ` · plano ${planoPorId(petshop.plano)?.nome ?? ""}` : ""}</span></div>
+            <button className="g-ico" onClick={() => void sair()} aria-label="Sair" title="Sair"><LogOut /></button>
+          </div>
         </div>
       </aside>
 
       <main className="g-main">
+        <div className="g-barra">
+          <div className="g-barra-marca"><Selo tamanho={34} tom="verde" /><span>{petshop.nome}</span></div>
+          {aqui && <div className="g-barra-onde"><span className={`g-tile p ${aqui.item.tom}`} aria-hidden><aqui.item.icone /></span><span>{aqui.grupo} / <b>{aqui.item.rotulo}</b></span></div>}
+          <BuscaGeral />
+          <div className="g-barra-data"><CalendarClock />{dataLonga(new Date())}</div>
+        </div>
         {!liberado && (
           <div className="g-aviso vermelho" role="alert">
             <TriangleAlert />
@@ -113,9 +139,9 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         <button onClick={() => setMais(true)}><Menu />Mais</button>
       </nav>
 
-      <button className="g-fab" onClick={() => setAssistente({ aberta: true, pedido: "" })}>
-          <Selo tamanho={38} />
-        Pedir ao Mozart
+      <button className={`g-fab${assistente.aberta ? " aberta" : ""}`} onClick={() => setAssistente((a) => ({ aberta: !a.aberta, pedido: "" }))} aria-expanded={assistente.aberta}>
+        <span className="foto"><Selo tamanho={40} /><i aria-hidden /></span>
+        <span className="txt"><b>Mozart</b><span>{assistente.aberta ? "fechar a conversa" : "fala comigo"}</span></span>
       </button>
 
       {mais && (

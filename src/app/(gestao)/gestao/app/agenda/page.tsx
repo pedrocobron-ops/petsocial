@@ -8,6 +8,7 @@ import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { deMin, paraMin } from "@/lib/gestao/agenda";
 import { dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
+import { Rosca } from "@/components/gestao/painel";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
@@ -78,6 +79,17 @@ function Agenda() {
     return out;
   }, [doDia, funcionamento, data.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const resumo = useMemo(() => {
+    const ativos = doDia.filter((a) => !["cancelado", "faltou"].includes(a.status));
+    const porServico = new Map<string, { rotulo: string; valor: number; cor: string }>();
+    for (const a of ativos) {
+      const nome = a.servicos?.nome ?? "Outros";
+      const x = porServico.get(nome) ?? { rotulo: nome, valor: 0, cor: a.servicos?.cor ?? "#f97316" };
+      x.valor++; porServico.set(nome, x);
+    }
+    return { total: ativos.length, feitos: ativos.filter((a) => a.status === "concluido").length, fora: doDia.length - ativos.length, levaTraz: ativos.filter((a) => a.leva_traz).length, servicos: [...porServico.values()].sort((a, b) => b.valor - a.valor) };
+  }, [doDia]);
+
   // semana: faixa de horas mostrada
   const faixa = useMemo(() => {
     let ini = 8 * 60, fim = 18 * 60;
@@ -108,7 +120,7 @@ function Agenda() {
       </header>
 
       <div className="g-pilha">
-        <div className="g-fila">
+        <div className="g-fila g-card g-ag-faixa">
           <button className="g-ico" aria-label="Semana anterior" onClick={() => setDia(isoDia(somaDias(data, -7)))}><ChevronLeft /></button>
           <div className="g-dias g-cresce">
             {semana.map((d) => (
@@ -151,7 +163,7 @@ function Agenda() {
               }
               const agora = new Date();
               return (
-                <div key={d.getTime()} className={`g-semana-col${horarioDoDia(petshop.horario, d) ? "" : " fechado"}`}
+                <div key={d.getTime()} className={`g-semana-col${horarioDoDia(petshop.horario, d) ? "" : " fechado"}${mesmoDia(d, new Date()) ? " hoje" : ""}`}
                   style={{ height: ((faixa.fim - faixa.ini) / 60) * H_HORA }}
                   onClick={(e) => {
                     if (e.target !== e.currentTarget) return;
@@ -168,8 +180,9 @@ function Agenda() {
                     return (
                       <button key={a.id} className={`g-bloco${["cancelado", "faltou"].includes(a.status) ? " apagado" : ""}`} onClick={() => setAberto(a.id)}
                         style={{ top: topo, height: alt, left: `calc(${(ri / raias.length) * 100}% + 3px)`, right: `calc(${((raias.length - ri - 1) / raias.length) * 100}% + 3px)`, "--cor": a.servicos?.cor ?? "#f97316" } as React.CSSProperties}>
-                        <b>{hora(a.inicio)} {a.pets?.nome}</b>
-                        {alt > 40 && <span>{a.servicos?.nome}</span>}
+                        <b>{a.pets?.nome}</b>
+                        <span>{hora(a.inicio)}{alt > 40 ? ` · ${a.servicos?.nome ?? ""}` : ""}</span>
+                        {alt > 62 && a.pets && raias.length === 1 && <span className="av"><AvatarPet pet={a.pets} tamanho="p" /></span>}
                       </button>
                     );
                   }))}
@@ -188,26 +201,46 @@ function Agenda() {
             </Vazio>
           </div>
         ) : (
-          <div className="g-pilha p">
-            {linhas.map((l, i) => l.tipo === "livre" ? (
-              <div className="g-hora-grupo" key={`l${i}`}>
-                <time style={{ paddingTop: 12 }}>{deMin(l.de)}</time>
-                <button className="g-livre" onClick={() => abrirNovo({ dia, hora: deMin(l.de), profissional: prof })}><Plus size={16} />Livre até {deMin(l.ate)}</button>
+          <div className="g-duas">
+            <div className="g-tempo">
+              {linhas.map((l, i) => l.tipo === "livre" ? (
+                <div className="g-hora-grupo livre" key={`l${i}`}>
+                  <time>{deMin(l.de)}</time>
+                  <span className="ponto" aria-hidden />
+                  <button className="g-livre" onClick={() => abrirNovo({ dia, hora: deMin(l.de), profissional: prof })}><Plus size={16} />Livre até {deMin(l.ate)}</button>
+                </div>
+              ) : (
+                <div className={`g-hora-grupo${l.a.status === "concluido" ? " feito" : ""}`} key={l.a.id} style={{ "--cor": l.a.servicos?.cor ?? "#f97316" } as React.CSSProperties}>
+                  <time>{hora(l.a.inicio)}</time>
+                  <span className="ponto" aria-hidden />
+                  <button className={`g-ag${["cancelado", "faltou"].includes(l.a.status) ? " apagado" : ""}`} onClick={() => setAberto(l.a.id)}>
+                    {l.a.pets && <AvatarPet pet={l.a.pets} />}
+                    <span className="t">
+                      <b>{l.a.pets?.nome}</b>
+                      <span className="serv"><i />{[l.a.servicos?.nome, l.a.pets?.clientes?.nome, quemAtende.length > 1 ? l.a.profissionais?.nome.split(" ")[0] : null].filter(Boolean).join(" · ")}</span>
+                    </span>
+                    {l.a.leva_traz && <Truck size={18} aria-label="Leva e traz" />}
+                    {l.a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[l.a.status].tom}`}>{STATUS_AGENDAMENTO[l.a.status].rotulo}</span>}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <aside className="g-card g-so-pc" style={{ position: "sticky", top: 24 }}>
+              <div className="g-card-t"><h3>Resumo do dia</h3><span className="g-muted g-pp">{resumo.total} {resumo.total === 1 ? "horário" : "horários"}</span></div>
+              <div className="g-fila" style={{ gap: 18, flexWrap: "nowrap", alignItems: "center" }}>
+                <Rosca fatias={resumo.servicos.map((x) => ({ valor: x.valor, cor: x.cor }))}><span style={{ font: "460 1.5rem/1 var(--display)" }}>{resumo.feitos}/{resumo.total}</span></Rosca>
+                <div className="g-legenda g-cresce">
+                  {resumo.servicos.map((x) => <div key={x.rotulo}><i style={{ background: x.cor }} /><span>{x.rotulo}</span><b>{x.valor}</b></div>)}
+                </div>
               </div>
-            ) : (
-              <div className="g-hora-grupo" key={l.a.id}>
-                <time>{hora(l.a.inicio)}</time>
-                <button className={`g-ag${["cancelado", "faltou"].includes(l.a.status) ? " apagado" : ""}`} style={{ "--cor": l.a.servicos?.cor ?? "#f97316" } as React.CSSProperties} onClick={() => setAberto(l.a.id)}>
-                  {l.a.pets && <AvatarPet pet={l.a.pets} />}
-                  <span className="t">
-                    <b>{l.a.pets?.nome}</b>
-                    <span>{[l.a.servicos?.nome, l.a.pets?.clientes?.nome, quemAtende.length > 1 ? l.a.profissionais?.nome.split(" ")[0] : null].filter(Boolean).join(" · ")}</span>
-                  </span>
-                  {l.a.leva_traz && <Truck size={18} aria-label="Leva e traz" />}
-                  {l.a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[l.a.status].tom}`}>{STATUS_AGENDAMENTO[l.a.status].rotulo}</span>}
-                </button>
+              <hr className="g-sep" style={{ margin: "16px 0 12px" }} />
+              <div className="g-legenda">
+                <div><span className="g-muted">Concluídos</span><b>{resumo.feitos}</b></div>
+                <div><span className="g-muted">Ainda por atender</span><b>{resumo.total - resumo.feitos}</b></div>
+                {resumo.levaTraz > 0 && <div><span className="g-muted">Com leva e traz</span><b>{resumo.levaTraz}</b></div>}
+                {resumo.fora > 0 && <div><span className="g-muted">Cancelados ou faltas</span><b>{resumo.fora}</b></div>}
               </div>
-            ))}
+            </aside>
           </div>
         )}
       </div>

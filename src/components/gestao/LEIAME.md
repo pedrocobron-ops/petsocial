@@ -33,6 +33,22 @@ chips (`g-chip` com `aria-pressed`), seletor (`g-seg`). Nada de `<table>` com gr
 - Carregando: `<Esqueleto />`. Confirmação antes de apagar: `await confirmar({ titulo, texto, perigo: true })`.
 - Ícones: `lucide-react`. Sem emoji. Primeiro o celular (390 px), depois o computador.
 
+### Painel (segunda demão do visual)
+
+A plataforma não pode parecer "pobrinha": cada tela abre com um resumo visual antes das listas. Peças prontas em
+`src/components/gestao/painel.tsx` (SVG simples, sem biblioteca):
+
+- `<Kpi rotulo valor apoio icone tom href lado />`: cartão de indicador com ícone colorido. Agrupe em
+  `<div className="g-grade kpis">` (2 colunas no celular, 4 no computador). Em `lado` cabe `<Anel>` ou `<Tendencia>`.
+- `<Tile icone tom tamanho? />`: quadradinho colorido com ícone, para linhas de lista e títulos de cartão.
+- `<Anel parte={0..1}>texto</Anel>`, `<Tendencia valores={[…]} />`, `<Barras itens destaque />` (colunas),
+  `<Ranking itens />` (barras deitadas com cor), `<Rosca fatias>texto</Rosca>` + `g-legenda`.
+- Tons: `pessego | menta | ceu | lilas | manteiga | rosa`. Um tom por assunto, não enfeite aleatório: dinheiro que
+  entra é `menta`, que sai é `rosa`, agenda `pessego`, hospedagem `ceu`, pacotes `lilas`, avisos `manteiga`.
+- Duas colunas no computador: `<div className="g-duas">` (1,5 : 1) ou `g-duas meio` (1 : 1).
+- Título de cartão com apoio à direita: `<div className="g-card-t"><h3>…</h3><span className="g-muted g-pp">…</span></div>`.
+- Só mostre gráfico com dado de verdade do banco. Sem número inventado, sem "+12% vs mês passado" se não foi calculado.
+
 ## Texto
 
 Português do Brasil, frases curtas, tom de gente ("Nenhum banho marcado para hoje."), sem jargão de sistema

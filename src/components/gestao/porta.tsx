@@ -1,4 +1,4 @@
-import { Selo } from "./marca";
+import { Marca, Selo } from "./marca";
 import Link from "next/link";
 import { Check } from "lucide-react";
 
@@ -7,6 +7,15 @@ export default function Porta({ titulo, texto, children }: { titulo: string; tex
   return (
     <div className="g-porta">
       <aside className="g-porta-lado">
+        <Marca tamanho={520} className="fundo" />
+        <div className="g-porta-papo" aria-hidden>
+          <div className="cab"><span className="foto"><Selo tamanho={38} /><i /></span><div><b>Mozart</b><span>online</span></div></div>
+          <div className="corpo">
+            <p className="eu">Marca banho da Mel sexta às dez</p>
+            <p className="ele">Deixa comigo. Sexta às 10h está livre.</p>
+            <div className="cartao"><b>Banho da Mel</b><span>sexta, 10h · com a Carla</span><i>Pode fazer</i></div>
+          </div>
+        </div>
         <div className="g-pilha g">
           <h2>O pet shop organizado. E uma <em className="it">assistente</em> para fazer por você.</h2>
           <ul>

@@ -1,12 +1,13 @@
 "use client";
 
-import { Selo } from "@/components/gestao/marca";
+import { Marca, Selo } from "@/components/gestao/marca";
+import { Anel, Barras, Kpi, Ranking, Tendencia, Tile, type Tom } from "@/components/gestao/painel";
 import { useState } from "react";
 import Link from "next/link";
-import { BedDouble, CalendarDays, Check, ChevronRight, Mic, Package, Plus, Receipt, Ticket } from "lucide-react";
+import { BedDouble, CalendarDays, Check, ChevronRight, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, Wallet } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { brl, dataLonga, hora, inicioDoDia, isoDia, saudacao, somaDias } from "@/lib/gestao/util";
+import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
@@ -24,7 +25,8 @@ export default function Hoje() {
 
   const { dados, carregando, recarregar } = useDados(async () => {
     const amanha = somaDias(hoje, 1), depois = somaDias(hoje, 2);
-    const [ags, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes] = await Promise.all([
+    const seg = inicioDaSemana(hoje), ha30 = somaDias(hoje, -30), ha6 = somaDias(hoje, -6);
+    const [ags, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes, daSemana, doMes, ultimos7] = await Promise.all([
       sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id).gte("inicio", hoje.toISOString()).lt("inicio", amanha.toISOString()).order("inicio"),
       sb.from("agendamentos").select("id, lembrete_em, status").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).lt("inicio", depois.toISOString()),
       sb.from("estadias").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("status", "em_casa"),
@@ -34,7 +36,17 @@ export default function Hoje() {
       vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo").eq("petshop_id", petshop.id).eq("pago", true).eq("data", hojeIso) : Promise.resolve({ data: [] }),
       vejoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento").eq("petshop_id", petshop.id).eq("pago", false).eq("tipo", "saida").lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
       sb.from("pacotes_clientes").select("id").eq("petshop_id", petshop.id).eq("ativo", true).gte("vence_em", hojeIso).lte("vence_em", isoDia(somaDias(hoje, 7))),
+      sb.from("agendamentos").select("inicio, status").eq("petshop_id", petshop.id).gte("inicio", seg.toISOString()).lt("inicio", somaDias(seg, 7).toISOString()),
+      sb.from("agendamentos").select("status, servicos(nome, cor)").eq("petshop_id", petshop.id).gte("inicio", ha30.toISOString()).lt("inicio", amanha.toISOString()).limit(2000),
+      vejoFinanceiro ? sb.from("lancamentos").select("valor, data").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").gte("data", isoDia(ha6)).lte("data", hojeIso) : Promise.resolve({ data: [] }),
     ]);
+    const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
+    const porServico = new Map<string, { rotulo: string; valor: number; cor: string | null }>();
+    for (const a of (doMes.data ?? []) as unknown as { status: string; servicos: { nome: string; cor: string | null } | null }[]) {
+      if (!valeAg(a.status) || !a.servicos) continue;
+      const x = porServico.get(a.servicos.nome) ?? { rotulo: a.servicos.nome, valor: 0, cor: a.servicos.cor };
+      x.valor++; porServico.set(a.servicos.nome, x);
+    }
     const lista = (ags.data ?? []) as unknown as AgendamentoCompleto[];
     const amanhaAtivos = (agsAmanha.data ?? []).filter((a) => !["cancelado", "faltou"].includes(a.status));
     return {
@@ -49,6 +61,15 @@ export default function Hoje() {
       saiu: (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0),
       contas: contas.data ?? [],
       pacotesVencendo: (pacotes.data ?? []).length,
+      semana: Array.from({ length: 7 }, (_, i) => {
+        const d = somaDias(seg, i), iso = isoDia(d);
+        return { rotulo: nomeDiaCurto(d), valor: (daSemana.data ?? []).filter((a) => valeAg(a.status) && isoDia(new Date(a.inicio)) === iso).length };
+      }),
+      servicosMes: [...porServico.values()].sort((a, b) => b.valor - a.valor).slice(0, 5),
+      entradas7: Array.from({ length: 7 }, (_, i) => {
+        const iso = isoDia(somaDias(ha6, i));
+        return ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data === iso).reduce((t, l) => t + Number(l.valor), 0);
+      }),
     };
   }, [petshop.id, hojeIso, vejoFinanceiro]);
 
@@ -69,11 +90,19 @@ export default function Hoje() {
     : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? ", todos concluídos" : ""}.`;
 
   const atencao = dados ? [
-    dados.amanhaSemLembrete > 0 && { icone: CalendarDays, texto: `Amanhã ${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}.`, href: `/gestao/app/agenda?dia=${isoDia(somaDias(hoje, 1))}` },
-    dados.acabando.length > 0 && { icone: Package, texto: `${dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}: ${dados.acabando.slice(0, 3).map((p) => p.nome).join(", ")}.`, href: "/gestao/app/estoque" },
-    dados.contas.length > 0 && { icone: Receipt, texto: `${dados.contas.length === 1 ? "1 conta vence" : `${dados.contas.length} contas vencem`} até hoje: ${brl(dados.contas.reduce((s, c) => s + Number(c.valor), 0))}.`, href: "/gestao/app/financeiro" },
-    dados.pacotesVencendo > 0 && { icone: Ticket, texto: `${dados.pacotesVencendo === 1 ? "1 pacote vence" : `${dados.pacotesVencendo} pacotes vencem`} nos próximos 7 dias.`, href: "/gestao/app/pacotes" },
-  ].filter(Boolean) as { icone: React.ComponentType<{ size?: number }>; texto: string; href: string }[] : [];
+    dados.amanhaSemLembrete > 0 && { icone: CalendarDays, tom: "pessego" as Tom, texto: `Amanhã ${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}.`, href: `/gestao/app/agenda?dia=${isoDia(somaDias(hoje, 1))}` },
+    dados.acabando.length > 0 && { icone: Package, tom: "rosa" as Tom, texto: `${dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}: ${dados.acabando.slice(0, 3).map((p) => p.nome).join(", ")}.`, href: "/gestao/app/estoque" },
+    dados.contas.length > 0 && { icone: Receipt, tom: "manteiga" as Tom, texto: `${dados.contas.length === 1 ? "1 conta vence" : `${dados.contas.length} contas vencem`} até hoje: ${brl(dados.contas.reduce((s, c) => s + Number(c.valor), 0))}.`, href: "/gestao/app/financeiro" },
+    dados.pacotesVencendo > 0 && { icone: Ticket, tom: "lilas" as Tom, texto: `${dados.pacotesVencendo === 1 ? "1 pacote vence" : `${dados.pacotesVencendo} pacotes vencem`} nos próximos 7 dias.`, href: "/gestao/app/pacotes" },
+  ].filter(Boolean) as { icone: React.ComponentType<{ size?: number }>; tom: Tom; texto: string; href: string }[] : [];
+
+  const agora = new Date();
+  const emAndamento = ativos.find((a) => a.status !== "concluido" && new Date(a.inicio) <= agora && new Date(a.fim) > agora);
+  const destaque = emAndamento ?? proximo;
+  const faltam = destaque ? Math.round((new Date(destaque.inicio).getTime() - agora.getTime()) / 60000) : 0;
+  const quando = !destaque ? "" : faltam <= 0 ? "acontecendo agora" : faltam < 60 ? `em ${faltam} min` : `em ${Math.floor(faltam / 60)} h${faltam % 60 ? ` ${faltam % 60} min` : ""}`;
+  const semana = dados?.semana ?? [];
+  const totalSemana = semana.reduce((s, d) => s + d.valor, 0);
 
   return (
     <>
@@ -83,36 +112,70 @@ export default function Hoje() {
           <h1>{saudacao()}, <em className="it">{eu.nome.split(" ")[0]}</em></h1>
         </div>
         <div className="g-acoes">
-          <Link className="g-btn sec" href="/gestao/app/agenda?novo=1"><Plus />Marcar horário</Link>
+          <Link className="g-btn pri" href="/gestao/app/agenda?novo=1"><Plus />Marcar horário</Link>
         </div>
       </header>
 
       <div className="g-pilha g">
-        <section className="g-card verde">
-          <div className="g-fila" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}>
-            <Selo tamanho={52} />
-            <div className="g-cresce">
-              <p className="g-rotulo">Mozart, seu assistente</p>
-              <p style={{ fontFamily: "var(--display)", fontSize: "1.3125rem", lineHeight: 1.25, marginTop: 4 }}>{carregando && !dados ? "Olhando a agenda…" : frase}</p>
+        <div className="g-heroi">
+          <section className="g-mozart">
+            <Marca tamanho={300} className="fundo" />
+            <div className="g-fila" style={{ alignItems: "flex-start", flexWrap: "nowrap", gap: 14 }}>
+              <Selo tamanho={52} />
+              <div className="g-cresce">
+                <p className="g-rotulo"><span className="g-ondas" aria-hidden><i /><i /><i /><i /></span>Mozart, seu assistente</p>
+                <p className="fala">{carregando && !dados ? "Olhando a agenda…" : frase}</p>
+              </div>
             </div>
-          </div>
-          <div className="g-fila" style={{ marginTop: 16 }}>
-            <button className="g-btn pri" onClick={() => abrirAssistente()}><Mic />Falar com o Mozart</button>
-          </div>
-          <div className="g-sugestoes" style={{ padding: "12px 0 0" }}>
-            {PEDIDOS.filter((p) => vejoFinanceiro || !p.startsWith("Quanto")).map((p) => <button key={p} onClick={() => abrirAssistente(p)} style={{ background: "rgba(246,241,232,.1)", color: "#f6f1e8", borderColor: "rgba(246,241,232,.25)" }}>{p}</button>)}
-          </div>
-        </section>
+            <div className="g-pilha p">
+              <div className="g-fila"><button className="g-btn pri" onClick={() => abrirAssistente()}><Mic />Falar com o Mozart</button></div>
+              <div className="g-sugestoes">
+                {PEDIDOS.filter((p) => vejoFinanceiro || !p.startsWith("Quanto")).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
+              </div>
+            </div>
+          </section>
+
+          {destaque?.pets ? (
+            <button className="g-proximo" style={{ textAlign: "left", color: "inherit", "--cor": destaque.servicos?.cor ?? "#f97316" } as React.CSSProperties} onClick={() => setAberto(destaque.id)}>
+              <div className="g-fila entre" style={{ flexWrap: "nowrap" }}>
+                <span className="g-rotulo" style={{ color: "#8a4a17" }}>{emAndamento ? "Na mesa agora" : "Próximo atendimento"}</span>
+                <span className="g-tag laranja">{quando}</span>
+              </div>
+              <div className="quem">
+                <AvatarPet pet={destaque.pets} tamanho="g" />
+                <div style={{ minWidth: 0 }}>
+                  <b>{destaque.pets.nome}</b>
+                  <span>{[destaque.pets.raca, destaque.pets.clientes?.nome].filter(Boolean).join(" · ")}</span>
+                </div>
+              </div>
+              <div className="quando">
+                <b>{hora(destaque.inicio)}</b>
+                <span className="g-ag" style={{ width: "auto", padding: "6px 12px", boxShadow: "none", borderLeftWidth: 1, borderRadius: 999 }}><span className="serv"><i />{destaque.servicos?.nome ?? "Atendimento"}</span></span>
+                {destaque.profissionais && <span className="g-p" style={{ color: "#6b4a2f" }}>com {destaque.profissionais.nome.split(" ")[0]}</span>}
+              </div>
+            </button>
+          ) : (
+            <div className="g-proximo vazio">
+              <span className="g-rotulo" style={{ color: "#24543b" }}>{dados && ativos.length ? "Dia concluído" : "Agenda livre"}</span>
+              <div className="quem">
+                <Tile icone={dados && ativos.length ? Check : Sparkles} tom="menta" tamanho="g" />
+                <div style={{ minWidth: 0 }}>
+                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{dados && ativos.length ? "Tudo atendido por hoje" : "Nenhum horário por vir"}</b>
+                </div>
+              </div>
+              <Link className="g-btn verde" href="/gestao/app/agenda?novo=1" style={{ justifySelf: "start" }}><Plus />Marcar horário</Link>
+            </div>
+          )}
+        </div>
 
         {comecando && (
-          <section className="g-card menta">
-            <h2 style={{ marginBottom: 4 }}>Primeiros passos</h2>
-            <p className="g-muted g-p" style={{ marginBottom: 8 }}>Três coisas rápidas e o {petshop.nome} está pronto para rodar.</p>
-            <div className="g-lista">
-              {passos.map((p) => (
-                <Link key={p.texto} href={p.href} className="g-linha">
-                  <span className="g-avatar p" style={{ background: p.feito ? "#2f6b4c" : "transparent", boxShadow: p.feito ? "none" : "inset 0 0 0 2px rgba(31,27,23,.25)" }}>{p.feito && <Check />}</span>
-                  <span className="t"><b style={{ textDecoration: p.feito ? "line-through" : "none", opacity: p.feito ? .6 : 1 }}>{p.texto}</b></span>
+          <section>
+            <div className="g-card-t"><h2>Primeiros passos</h2><span className="g-muted g-p">{passos.filter((p) => p.feito).length} de {passos.length}</span></div>
+            <div className="g-passos">
+              {passos.map((p, i) => (
+                <Link key={p.texto} href={p.href} className={`g-passo${p.feito ? " feito" : ""}`}>
+                  <span className="n">{p.feito ? <Check /> : i + 1}</span>
+                  <span className="g-cresce">{p.texto}</span>
                   {!p.feito && <ChevronRight size={18} />}
                 </Link>
               ))}
@@ -120,65 +183,80 @@ export default function Hoje() {
           </section>
         )}
 
-        <div className="g-grade c3">
-          <Link href="/gestao/app/agenda" className="g-card">
-            <p className="g-rotulo">Atendimentos hoje</p>
-            <p className="g-num" style={{ marginTop: 8 }}>{dados ? ativos.length : "–"}</p>
-            <p className="g-muted g-p" style={{ marginTop: 4 }}>{dados ? (ativos.length ? `${feitos} ${feitos === 1 ? "concluído" : "concluídos"}` : "agenda livre") : " "}</p>
-          </Link>
-          <Link href="/gestao/app/creche-hotel" className="g-card">
-            <p className="g-rotulo">Creche e hotel</p>
-            <p className="g-num" style={{ marginTop: 8 }}>{dados ? dados.emCasa : "–"}</p>
-            <p className="g-muted g-p g-fila" style={{ marginTop: 4, gap: 6 }}><BedDouble size={16} />{dados?.emCasa === 1 ? "pet na casa agora" : "pets na casa agora"}</p>
-          </Link>
-          {vejoFinanceiro && (
-            <Link href="/gestao/app/caixa" className="g-card">
-              <p className="g-rotulo">Entrou hoje</p>
-              <p className="g-num" style={{ marginTop: 8 }}>{dados ? brl(dados.entrou) : "–"}</p>
-              <p className="g-muted g-p" style={{ marginTop: 4 }}>{dados && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : "ver o caixa"}</p>
-            </Link>
+        <div className="g-grade kpis">
+          <Kpi href="/gestao/app/agenda" icone={Scissors} tom="pessego" rotulo="Atendimentos hoje" valor={dados ? ativos.length : "–"}
+            apoio={dados ? (ativos.length ? `${feitos} ${feitos === 1 ? "concluído" : "concluídos"}` : "agenda livre") : " "}
+            lado={dados && ativos.length > 0 ? <Anel parte={feitos / ativos.length} cor="var(--g-laranja)">{Math.round((feitos / ativos.length) * 100)}%</Anel> : undefined} />
+          <Kpi href="/gestao/app/creche-hotel" icone={BedDouble} tom="ceu" rotulo="Creche e hotel" valor={dados ? dados.emCasa : "–"} apoio={dados?.emCasa === 1 ? "pet na casa agora" : "pets na casa agora"} />
+          {vejoFinanceiro ? (
+            <Kpi href="/gestao/app/caixa" icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"} apoio={dados && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : "últimos 7 dias ao lado"}
+              lado={dados ? <Tendencia valores={dados.entradas7} /> : undefined} />
+          ) : (
+            <Kpi href="/gestao/app/clientes" icone={PawPrint} tom="menta" rotulo="Pets cadastrados" valor={dados ? dados.pets : "–"} apoio="ver todos" />
           )}
+          <Kpi href="/gestao/app/agenda" icone={CalendarDays} tom="lilas" rotulo="Nesta semana" valor={dados ? totalSemana : "–"} apoio={totalSemana === 1 ? "horário marcado" : "horários marcados"} />
         </div>
 
-        {atencao.length > 0 && (
-          <section className="g-card">
-            <h2 style={{ marginBottom: 6 }}>Pede a sua atenção</h2>
-            <div className="g-lista">
-              {atencao.map((x) => (
-                <Link key={x.texto} href={x.href} className="g-linha">
-                  <span className="g-ico" aria-hidden style={{ background: "var(--g-amarelo-tint)" }}><x.icone size={18} /></span>
-                  <span className="t" style={{ whiteSpace: "normal" }}>{x.texto}</span>
-                  <ChevronRight size={18} />
-                </Link>
-              ))}
+        <div className="g-duas">
+          <section>
+            <div className="g-card-t">
+              <h2>Agenda de hoje</h2>
+              <Link className="g-btn fantasma p" href="/gestao/app/agenda">Ver a semana<ChevronRight /></Link>
             </div>
+            {carregando && !dados ? <Esqueleto /> : !dados?.ags.length ? (
+              <div className="g-card"><Vazio mozart="acenando" titulo="Nenhum banho marcado para hoje" texto="Que tal chamar quem está com o banho atrasado? O Mozart monta a lista para você.">
+                <button className="g-btn verde" onClick={() => abrirAssistente("Quem não vem há mais de um mês?")}>Ver quem está sumido</button>
+              </Vazio></div>
+            ) : (
+              <div className="g-tempo">
+                {dados.ags.map((a) => {
+                  const fora = ["cancelado", "faltou"].includes(a.status);
+                  return (
+                    <div className={`g-hora-grupo${a.status === "concluido" ? " feito" : ""}${a.id === destaque?.id ? " agora" : ""}`} key={a.id} style={{ "--cor": a.servicos?.cor ?? "#f97316" } as React.CSSProperties}>
+                      <time>{hora(a.inicio)}</time>
+                      <span className="ponto" aria-hidden />
+                      <button className={`g-ag${fora ? " apagado" : ""}`} onClick={() => setAberto(a.id)}>
+                        {a.pets && <AvatarPet pet={a.pets} />}
+                        <span className="t"><b>{a.pets?.nome}</b><span className="serv"><i />{[a.servicos?.nome, a.pets?.clientes?.nome].filter(Boolean).join(" · ")}</span></span>
+                        {a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}
+                        <ChevronRight size={18} className="g-muted g-so-pc" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
-        )}
 
-        <section>
-          <div className="g-card-t">
-            <h2>Agenda de hoje</h2>
-            <Link className="g-btn fantasma p" href="/gestao/app/agenda">Ver a semana<ChevronRight /></Link>
-          </div>
-          {carregando && !dados ? <Esqueleto /> : !dados?.ags.length ? (
-            <div className="g-card"><Vazio mozart="acenando" titulo="Nenhum banho marcado para hoje" texto="Que tal chamar quem está com o banho atrasado? O Mozart monta a lista para você.">
-              <button className="g-btn verde" onClick={() => abrirAssistente("Quem não vem há mais de um mês?")}>Ver quem está sumido</button>
-            </Vazio></div>
-          ) : (
-            <div className="g-pilha p">
-              {dados.ags.map((a) => (
-                <div className="g-hora-grupo" key={a.id}>
-                  <time>{hora(a.inicio)}</time>
-                  <button className={`g-ag${["cancelado", "faltou"].includes(a.status) ? " apagado" : ""}`} style={{ "--cor": a.servicos?.cor ?? "#f97316" } as React.CSSProperties} onClick={() => setAberto(a.id)}>
-                    {a.pets && <AvatarPet pet={a.pets} />}
-                    <span className="t"><b>{a.pets?.nome}</b><span>{[a.servicos?.nome, a.pets?.clientes?.nome].filter(Boolean).join(" · ")}</span></span>
-                    {a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}
-                  </button>
+          <div className="g-pilha g">
+            {atencao.length > 0 && (
+              <section>
+                <div className="g-card-t"><h2>Pede a sua atenção</h2><span className="g-tag amarelo">{atencao.length}</span></div>
+                <div className="g-atencao">
+                  {atencao.map((x) => (
+                    <Link key={x.texto} href={x.href}>
+                      <Tile icone={x.icone} tom={x.tom} />
+                      <span>{x.texto}</span>
+                      <ChevronRight size={18} />
+                    </Link>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              </section>
+            )}
+
+            <section className="g-card">
+              <div className="g-card-t"><h3>Movimento da semana</h3><span className="g-muted g-pp">horários por dia</span></div>
+              {dados ? <Barras itens={semana} destaque={(hoje.getDay() + 6) % 7} /> : <Esqueleto linhas={2} />}
+            </section>
+
+            {dados && dados.servicosMes.length > 0 && (
+              <section className="g-card">
+                <div className="g-card-t"><h3>Serviços mais pedidos</h3><span className="g-muted g-pp">últimos 30 dias</span></div>
+                <Ranking itens={dados.servicosMes} />
+              </section>
+            )}
+          </div>
+        </div>
       </div>
 
       {selecionado && !editando && <DetalheAgendamento agendamento={selecionado} aoFechar={() => setAberto(null)} aoMudar={() => void recarregar()} aoEditar={() => setEditando(selecionado)} />}
