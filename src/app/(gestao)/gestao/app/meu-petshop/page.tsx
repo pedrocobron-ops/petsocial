@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Tag } from "lucide-react";
+import { CalendarDays, Clock, Plus, Scissors, Store, Tag } from "lucide-react";
+import { Kpi, Tile } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
 import { Campo, CampoValor, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
-import { EscolherCor, GradeHorario, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
+import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import { PORTES, type Horario, type Porte, type Servico } from "@/lib/gestao/tipos";
 import { brlCurto, fmtTelefone, soDigitos } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
+import "./meu-petshop.css";
 
 const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
 const CATEGORIAS = [
@@ -26,12 +28,18 @@ function duracao(min: number) {
   const h = Math.floor(min / 60), m = min % 60;
   return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
 }
+const horaCurta = (h: string) => { const [a, m] = h.split(":"); return m === "00" ? `${Number(a)}h` : `${Number(a)}:${m}`; };
 const precos = (s: Servico) => PORTES.map((p) => ({ porte: p.id, valor: s[CAMPO_PRECO[p.id]] })).filter((x) => x.valor != null);
 
 export default function MeuPetshop() {
-  const { souDono, servicos } = useGestao();
+  const { souDono, servicos, petshop } = useGestao();
   if (!souDono) return <Vazio titulo="Só o dono do pet shop mexe aqui." />;
-  const semPreco = servicos.some((s) => s.ativo && !precos(s).length);
+  const ativos = servicos.filter((s) => s.ativo);
+  const faltaPreco = ativos.filter((s) => !precos(s).length).length;
+  const semPreco = faltaPreco > 0;
+  const salvo = lerHorario(petshop.horario);
+  const abertos = ORDEM_DIAS.filter((d) => salvo[d]).length;
+  const deHoje = salvo[String(new Date().getDay())];
   return (
     <>
       <header className="g-topo">
@@ -40,12 +48,20 @@ export default function MeuPetshop() {
       {semPreco && (
         <div className="g-aviso"><Tag /><span className="g-cresce">Coloque os preços dos serviços para o Mozart e a agenda já sugerirem o valor certo.</span></div>
       )}
-      <div className="g-grade c2" style={{ alignItems: "start" }}>
-        <div className="g-pilha">
-          <Dados />
-          <HorarioDaLoja />
+      <div className="g-pilha g">
+        <div className="g-grade kpis">
+          <Kpi icone={Scissors} tom="pessego" rotulo="Serviços" valor={ativos.length} apoio={ativos.length === 1 ? "ativo na agenda" : "ativos na agenda"} />
+          <Kpi icone={Tag} tom={semPreco ? "manteiga" : "menta"} rotulo="Sem preço" valor={faltaPreco} apoio={semPreco ? "faltam os valores" : "todos com valor"} />
+          <Kpi icone={CalendarDays} tom="ceu" rotulo="Dias abertos" valor={abertos} apoio="por semana" />
+          <Kpi icone={Clock} tom="lilas" rotulo="Hoje" valor={deHoje ? `${horaCurta(deHoje.abre)}–${horaCurta(deHoje.fecha)}` : "Fechado"} apoio={deHoje ? "horário de hoje" : "sem atendimento"} />
         </div>
-        <Servicos />
+        <div className="g-duas meio">
+          <div className="g-pilha g">
+            <Dados />
+            <HorarioDaLoja />
+          </div>
+          <Servicos />
+        </div>
       </div>
     </>
   );
@@ -83,7 +99,7 @@ function Dados() {
 
   return (
     <form className="g-card g-form" onSubmit={salvar}>
-      <h2>Dados</h2>
+      <div className="g-mp-t"><Tile icone={Store} tom="menta" /><div><h2>Dados</h2><p className="g-muted g-p">Nome, contato e cidade.</p></div></div>
       <Campo rotulo="Nome do pet shop"><input className="g-input" value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} /></Campo>
       <Campo rotulo="WhatsApp" dica="O número que os clientes usam para falar com vocês.">
         <input className="g-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 91234-5678" value={telefone}
@@ -131,7 +147,18 @@ function HorarioDaLoja() {
 
   return (
     <section className="g-card g-pilha">
-      <div><h2>Horário de funcionamento</h2><p className="g-muted g-p">A agenda mostra só as horas em que vocês estão abertos.</p></div>
+      <div className="g-mp-t"><Tile icone={Clock} tom="ceu" /><div><h2>Horário de funcionamento</h2><p className="g-muted g-p">A agenda mostra só as horas em que vocês estão abertos.</p></div></div>
+      <div className="g-mp-semana" role="img" aria-label={`Abre em: ${ORDEM_DIAS.filter((d) => horario[d]).map((d) => NOME_DIAS[d]).join(", ") || "nenhum dia"}`}>
+        {ORDEM_DIAS.map((d) => {
+          const v = horario[d];
+          return (
+            <span key={d} className={`${v ? "on" : ""}${d === String(new Date().getDay()) ? " hoje" : ""}`}>
+              <b>{NOME_DIAS[d].slice(0, 3)}</b>
+              <small>{v && v.abre && v.fecha ? <>{horaCurta(v.abre)}<br />{horaCurta(v.fecha)}</> : "—"}</small>
+            </span>
+          );
+        })}
+      </div>
       <GradeHorario valor={horario} aoMudar={(h) => { setHorario(h); setErro(null); }} />
       {erro && <p className="g-erro" role="alert">{erro}</p>}
       <div><button className="g-btn verde" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar horário"}</button></div>
@@ -162,38 +189,40 @@ function Servicos() {
 
   return (
     <section className="g-card">
-      <div className="g-card-t">
-        <h2>Serviços e preços</h2>
+      <div className="g-mp-t">
+        <Tile icone={Scissors} tom="pessego" />
+        <div className="g-cresce"><h2>Serviços e preços</h2><p className="g-muted g-p">{ativos.length ? `${ativos.length} ${ativos.length === 1 ? "serviço" : "serviços"}, com preço por porte.` : "O que vocês fazem e quanto custa."}</p></div>
         <button className="g-btn p pri" onClick={() => abrir("novo")}><Plus />Serviço novo</button>
       </div>
       {!ativos.length ? (
         <Vazio titulo="Nenhum serviço na lista" texto="Coloque o primeiro: banho, tosa, creche, o que vocês fazem." />
       ) : (
-        <div className="g-lista">
+        <div className="g-mp-servicos">
           {ativos.map((s) => {
             const p = precos(s);
             return (
-              <button key={s.id} type="button" className="g-linha" onClick={() => abrir(s)}>
-                <i className="gj-bola" style={{ background: s.cor }} aria-hidden />
+              <button key={s.id} type="button" className="g-mp-serv" style={{ "--cor": s.cor } as React.CSSProperties} onClick={() => abrir(s)}>
+                <i className="g-mp-cor" aria-hidden><Scissors /></i>
                 <span className="t">
-                  <b>{s.nome}</b>
-                  <span className="gj-quebra g-tab">
-                    {duracao(s.duracao_min)}{p.length ? ` · ${p.map((x) => `${x.porte} ${brlCurto(x.valor)}`).join(" · ")}` : ""}
-                  </span>
+                  <span className="g-mp-nome"><b>{s.nome}</b><span className="g-mp-tempo"><Clock aria-hidden />{duracao(s.duracao_min)}</span></span>
+                  {p.length ? (
+                    <span className="g-mp-precos">
+                      {p.map((x) => <span key={x.porte} className="g-mp-preco"><i>{x.porte}</i>{brlCurto(x.valor)}</span>)}
+                    </span>
+                  ) : <span className="g-tag amarelo" style={{ justifySelf: "start" }}>sem preço</span>}
                 </span>
-                {!p.length && <span className="g-tag amarelo">sem preço</span>}
               </button>
             );
           })}
         </div>
       )}
       {inativos.length > 0 && (
-        <details className="gj-recolhe" style={{ marginTop: 12 }}>
+        <details className="gj-recolhe" style={{ marginTop: 14 }}>
           <summary>{inativos.length === 1 ? "1 serviço desativado" : `${inativos.length} serviços desativados`}</summary>
           <div className="g-lista">
             {inativos.map((s) => (
               <div key={s.id} className="g-linha">
-                <i className="gj-bola" style={{ background: s.cor, opacity: .45 }} aria-hidden />
+                <i className="g-mp-cor p" style={{ "--cor": s.cor, opacity: .45 } as React.CSSProperties} aria-hidden />
                 <span className="t"><b className="g-muted">{s.nome}</b><span>{duracao(s.duracao_min)}</span></span>
                 <button className="g-btn p sec" onClick={() => reativar(s)}>Reativar</button>
               </div>

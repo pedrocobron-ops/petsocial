@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Minus, Plus, Search, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowUpFromLine, Minus, Package, PackageX, Plus, Search, Sparkles, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { abrirAssistente, avisarMudanca, Campo, CampoValor, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
+import { Kpi, Tile } from "@/components/gestao/painel";
 import { Chips, ChipsForma, ErroTela, fmtQtd, lerQtd, type Forma } from "@/components/gestao/loja/pecas";
 import { lancarPago } from "@/lib/gestao/dinheiro";
 import type { MovimentoEstoque, Produto } from "@/lib/gestao/tipos";
-import { brl, dataCurta, semAcento } from "@/lib/gestao/util";
+import { brl, brlCurto, dataCurta, semAcento } from "@/lib/gestao/util";
 import "./estoque.css";
 
 const UNIDADES = ["un", "kg", "g", "L", "ml", "pacote", "saco"];
@@ -28,10 +29,19 @@ const zerado = (p: Produto) => Number(p.estoque) <= 0;
 const acabando = (p: Produto) => !zerado(p) && Number(p.estoque_minimo) > 0 && Number(p.estoque) <= Number(p.estoque_minimo);
 const centavos = (n: number) => Math.round(n * 100) / 100;
 
+/** Nível do estoque em relação ao mínimo: vermelho abaixo, amarelo perto, verde com folga. */
+function nivel(p: Produto): { tom: "ok" | "perto" | "baixo"; parte: number | null } {
+  const tem = Number(p.estoque), min = Number(p.estoque_minimo);
+  if (tem <= 0) return { tom: "baixo", parte: 0 };
+  if (!(min > 0)) return { tom: "ok", parte: null };
+  // a barra cheia vale o dobro do mínimo; a marca do mínimo fica no meio
+  return { tom: tem < min ? "baixo" : tem <= min * 1.5 ? "perto" : "ok", parte: Math.min(1, tem / (min * 2)) };
+}
+
 type Aberta = { tipo: "novo" } | { tipo: "entrada" | "saida" | "ficha"; produto: Produto };
 
 export default function Estoque() {
-  const { sb, petshop } = useGestao();
+  const { sb, petshop, vejoFinanceiro } = useGestao();
   const somenteLeitura = useSomenteLeitura();
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -40,6 +50,12 @@ export default function Estoque() {
   const { dados, carregando, erro, recarregar } = useDados(async () =>
     ok(await sb.from("produtos").select("*").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as Produto[],
   [petshop.id]);
+
+  // saídas dos últimos 30 dias: só para o resumo do topo (se a busca falhar, o cartão fica de fora)
+  const { dados: saidas, recarregar: recarregarSaidas } = useDados(async () => {
+    const desde = new Date(Date.now() - 30 * 864e5).toISOString();
+    return ok(await sb.from("movimentos_estoque").select("motivo").eq("petshop_id", petshop.id).eq("tipo", "saida").gte("criado_em", desde).limit(2000)) as { motivo: string | null }[];
+  }, [petshop.id]);
 
   const produtos = useMemo(() => dados ?? [], [dados]);
   const baixos = produtos.filter(acabando);
@@ -51,7 +67,13 @@ export default function Estoque() {
 
   const abrir = (a: Aberta) => { if (a.tipo !== "ficha" && somenteLeitura()) return; setAberta(a); };
   const fechar = () => setAberta(null);
-  const gravou = () => { fechar(); void recarregar(); avisarMudanca(); };
+  const gravou = () => { fechar(); void recarregar(); void recarregarSaidas(); avisarMudanca(); };
+
+  const categorias = new Set(produtos.map((p) => p.categoria?.trim()).filter(Boolean)).size;
+  const comCusto = produtos.filter((p) => p.custo != null && Number(p.estoque) > 0);
+  const valorParado = comCusto.reduce((t, p) => t + Number(p.estoque) * Number(p.custo), 0);
+  const semCusto = produtos.filter((p) => p.custo == null && Number(p.estoque) > 0).length;
+  const vendas = (saidas ?? []).filter((m) => m.motivo === "Venda").length;
 
   return (
     <>
@@ -66,6 +88,23 @@ export default function Estoque() {
       </header>
 
       {erro && <ErroTela erro={erro} aoTentar={() => void recarregar()} />}
+
+      {produtos.length > 0 && (
+        <div className="g-grade kpis g-est-kpis">
+          <Kpi icone={Package} tom="rosa" rotulo="Produtos" valor={produtos.length}
+            apoio={categorias ? `${categorias} ${categorias === 1 ? "categoria" : "categorias"}` : "na prateleira"} />
+          <Kpi icone={AlertTriangle} tom="manteiga" rotulo="Acabando" valor={baixos.length}
+            apoio={baixos.length ? "no mínimo ou abaixo" : "nada perto do mínimo"} />
+          {vejoFinanceiro ? (
+            <Kpi icone={Wallet} tom="menta" rotulo="Valor em estoque" valor={brlCurto(Math.round(valorParado))}
+              apoio={semCusto ? `a preço de custo · ${semCusto} sem custo` : "a preço de custo"} />
+          ) : (
+            <Kpi icone={PackageX} tom="lilas" rotulo="Zerados" valor={semSaldo.length} apoio={semSaldo.length ? "sem nada na prateleira" : "nenhum em falta"} />
+          )}
+          <Kpi icone={ArrowUpFromLine} tom="ceu" rotulo="Saídas em 30 dias" valor={saidas ? saidas.length : "–"}
+            apoio={!saidas ? " " : vendas ? `${vendas} ${vendas === 1 ? "venda" : "vendas"}` : saidas.length ? "nenhuma venda" : "nada saiu ainda"} />
+        </div>
+      )}
 
       {baixos.length > 0 && (
         <div className="g-aviso">
@@ -102,24 +141,41 @@ export default function Estoque() {
               {alvo ? "Nenhum produto com esse nome." : filtro === "acabando" ? "Nada acabando por aqui." : "Nenhum produto zerado."}
             </p>
           ) : (
-            <div className="g-grade c2">
-              {lista.map((p) => (
-                <div key={p.id} className="g-card ge-prod">
-                  <button type="button" className="ge-prod-t" onClick={() => abrir({ tipo: "ficha", produto: p })} aria-label={`Abrir ${p.nome}`}>
-                    <b>{p.nome}</b>
-                    <span>{[p.categoria, p.preco_venda != null ? `vende a ${brl(p.preco_venda)}` : null].filter(Boolean).join(" · ") || "Sem categoria"}</span>
-                  </button>
-                  <div className="ge-saldo">
-                    <span className={`g-num m${zerado(p) ? " ge-zero" : acabando(p) ? " ge-baixo" : ""}`}>{fmtQtd(p.estoque)}</span>
-                    <small>{p.unidade}</small>
+            <div className="g-est-grade">
+              {lista.map((p) => {
+                const n = nivel(p), min = Number(p.estoque_minimo);
+                return (
+                  <div key={p.id} className={`g-card g-est-prod ${n.tom}`}>
+                    <button type="button" className="g-est-cab" onClick={() => abrir({ tipo: "ficha", produto: p })} aria-label={`Abrir ${p.nome}`}>
+                      <Tile icone={zerado(p) ? PackageX : Package} tom="rosa" />
+                      <span className="t">
+                        <b>{p.nome}</b>
+                        <span>{[p.categoria, p.preco_venda != null ? `vende a ${brl(p.preco_venda)}` : null].filter(Boolean).join(" · ") || "Sem categoria"}</span>
+                      </span>
+                      <span className="g-est-saldo">
+                        <span className="g-num m">{fmtQtd(p.estoque)}</span>
+                        <small>{p.unidade}</small>
+                      </span>
+                    </button>
+                    <div className="g-est-nivel">
+                      {n.parte != null ? (
+                        <div className="g-est-barra" role="img" aria-label={min > 0 ? `${fmtQtd(p.estoque)} ${p.unidade}, mínimo ${fmtQtd(min)}` : `${fmtQtd(p.estoque)} ${p.unidade}`}>
+                          {n.parte > 0 && <i style={{ width: `${Math.round(n.parte * 100)}%` }} />}
+                          {min > 0 && <u aria-hidden />}
+                        </div>
+                      ) : <div className="g-est-barra sem" aria-hidden />}
+                      <div className="g-est-leg">
+                        {zerado(p) ? <span className="g-tag vermelho">zerado</span> : acabando(p) ? <span className="g-tag laranja">acabando</span> : n.tom === "perto" ? <span className="g-tag amarelo">perto do mínimo</span> : null}
+                        <span className="g-muted g-pp g-tab">{min > 0 ? `mínimo ${fmtQtd(min)} ${p.unidade}` : "sem mínimo definido"}</span>
+                      </div>
+                    </div>
+                    <div className="g-est-pe">
+                      <button className="g-btn sec p" onClick={() => abrir({ tipo: "entrada", produto: p })}><Plus /> Entrada</button>
+                      <button className="g-btn sec p" onClick={() => abrir({ tipo: "saida", produto: p })} disabled={zerado(p)}><Minus /> Saída</button>
+                    </div>
                   </div>
-                  <div className="ge-prod-pe">
-                    {zerado(p) ? <span className="g-tag vermelho">zerado</span> : acabando(p) ? <span className="g-tag laranja">acabando</span> : null}
-                    <button className="g-btn sec p" onClick={() => abrir({ tipo: "entrada", produto: p })}><Plus /> Entrada</button>
-                    <button className="g-btn sec p" onClick={() => abrir({ tipo: "saida", produto: p })} disabled={zerado(p)}><Minus /> Saída</button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -419,7 +475,7 @@ function Ficha({ produto, aoFechar, aoMudar, aoGravar }: { produto: Produto; aoF
         <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
       </>}>
       <div className="g-pilha g">
-        <div className="g-card areia">
+        <div className={`g-card g-est-ficha ${nivel(produto).tom}`}>
           <div className="g-fila entre">
             <div>
               <span className="g-rotulo">Saldo</span>

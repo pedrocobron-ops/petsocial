@@ -1,16 +1,23 @@
 "use client";
 
 import { planoPorId } from "@/lib/gestao/planos";
-import { useState } from "react";
-import { Copy, UserPlus } from "lucide-react";
+import { Fragment, useState } from "react";
+import Link from "next/link";
+import { CalendarCheck, CalendarDays, ChevronRight, Copy, KeyRound, Lock, Mail, Scissors, UserPlus, Users, Wallet } from "lucide-react";
+import { Anel, Kpi, Tile } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPessoa, Campo, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
 import { CORES, EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import type { Horario, Papel, Profissional } from "@/lib/gestao/tipos";
 import "@/components/gestao/ajustes/ajustes.css";
+import "./equipe.css";
 
 const PAPEL: Record<Papel, string> = { dono: "Dono", gerente: "Gerente", funcionario: "Funcionário" };
 const pct = (n: number) => `${String(Number(n)).replace(".", ",")}%`;
+
+/** Quem aparece na escala e o horário da pessoa em cada dia (a escala própria ou, sem ela, o horário do pet shop). */
+const naEscala = (p: Profissional) => p.atende || !!p.escala;
+const horaCurta = (h: string) => { const [a, m] = h.split(":"); return m === "00" ? `${Number(a)}h` : `${Number(a)}:${m}`; };
 
 export default function Equipe() {
   const { souDono, equipe, eu, sb, petshop, recarregarBase } = useGestao();
@@ -25,6 +32,14 @@ export default function Equipe() {
   const comAcesso = ativos.filter((p) => p.user_id || p.email_convite?.trim()).length;
   const abrir = (p: Profissional | "novo") => { if (!somenteLeitura()) setEditando(p); };
 
+  const loja = lerHorario(petshop.horario);
+  const diaDe = (p: Profissional, d: string) => (p.escala ? lerHorario(p.escala)[d] : loja[d]);
+  const hoje = String(new Date().getDay());
+  const atendem = ativos.filter((p) => p.atende).length;
+  const trabalhamHoje = ativos.filter((p) => naEscala(p) && diaDe(p, hoje)).length;
+  const convites = ativos.filter((p) => !p.user_id && p.email_convite?.trim()).length;
+  const cheio = comAcesso >= plano.acessos;
+
   async function reativar(p: Profissional) {
     if (somenteLeitura()) return;
     try {
@@ -38,46 +53,87 @@ export default function Equipe() {
   return (
     <>
       <header className="g-topo">
-        <div><h1>Equipe</h1><p className="g-muted">Quem trabalha com você, o que cada um vê e em que dias. {comAcesso} de {plano.acessos} {plano.acessos === 1 ? "acesso usado" : "acessos usados"} no plano {plano.nome}.</p></div>
+        <div><h1>Equipe</h1><p className="g-muted">Quem trabalha com você, o que cada um vê e em que dias.</p></div>
         <div className="g-acoes"><button className="g-btn pri" onClick={() => abrir("novo")}><UserPlus />Adicionar pessoa</button></div>
       </header>
-      <div className="g-grade c2" style={{ alignItems: "start" }}>
-        <section className="g-card">
-          <div className="g-lista">
-            {ativos.map((p) => (
-              <button key={p.id} type="button" className="g-linha" onClick={() => abrir(p)}>
-                <AvatarPessoa nome={p.nome} cor={p.cor} />
-                <span className="t">
-                  <b>{p.nome}{p.id === eu.id ? " (você)" : ""}</b>
-                  <span>{PAPEL[p.papel]}{Number(p.comissao_pct) > 0 ? ` · comissão de ${pct(p.comissao_pct)}` : ""}</span>
-                  <small className="gj-tags">
-                    {p.atende && <small className="g-tag verde">atende na agenda</small>}
-                    {(p.papel !== "funcionario" || p.ve_financeiro) && <small className="g-tag azul">vê o financeiro</small>}
-                    {p.user_id ? <small className="g-tag">com login</small> : p.email_convite ? <small className="g-tag amarelo">convite enviado</small> : null}
-                  </small>
-                </span>
-              </button>
-            ))}
+
+      <div className="g-pilha g">
+        <div className="g-eq-resumo">
+          <Link href="/gestao/app/assinatura" className={`g-eq-plano${cheio ? " cheio" : ""}`}>
+            <Anel parte={plano.acessos ? comAcesso / plano.acessos : 0} tamanho={84} cor={cheio ? "var(--g-laranja)" : "var(--g-verde)"}>{comAcesso}/{plano.acessos}</Anel>
+            <span className="t">
+              <span className="g-rotulo">Acessos no plano {plano.nome}</span>
+              <b>{comAcesso} de {plano.acessos} {plano.acessos === 1 ? "acesso usado" : "acessos usados"}</b>
+              <span className="g-p">Conta quem tem login ou convite.</span>
+            </span>
+            <ChevronRight size={18} aria-hidden />
+          </Link>
+          <div className="g-grade kpis g-eq-kpis">
+            <Kpi icone={Users} tom="ceu" rotulo="Na equipe" valor={ativos.length} apoio={ativos.length === 1 ? "pessoa ativa" : "pessoas ativas"} />
+            <Kpi icone={Scissors} tom="pessego" rotulo="Atendem" valor={atendem} apoio="aparecem na agenda" />
+            <Kpi icone={CalendarCheck} tom="menta" rotulo="Trabalham hoje" valor={trabalhamHoje} apoio={loja[hoje] ? `${NOME_DIAS[hoje]}, pela escala` : "pet shop fechado hoje"} />
+            <Kpi icone={Mail} tom="manteiga" rotulo="Convites" valor={convites} apoio={convites ? "esperando criar a conta" : "nenhum pendente"} />
           </div>
-          {ativos.length === 1 && (
-            <p className="g-muted g-p" style={{ marginTop: 10 }}>Por enquanto é só você. Adicione quem dá banho, tosa ou atende no balcão.</p>
-          )}
-          {inativos.length > 0 && (
-            <details className="gj-recolhe" style={{ marginTop: 12 }}>
-              <summary>{inativos.length === 1 ? "1 pessoa desativada" : `${inativos.length} pessoas desativadas`}</summary>
-              <div className="g-lista">
-                {inativos.map((p) => (
-                  <div key={p.id} className="g-linha">
-                    <AvatarPessoa nome={p.nome} cor="#a39a90" tamanho="p" />
-                    <span className="t"><b className="g-muted">{p.nome}</b><span>{PAPEL[p.papel]}</span></span>
-                    <button className="g-btn p sec" onClick={() => reativar(p)}>Reativar</button>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
-        </section>
-        <EscalaDaSemana />
+        </div>
+
+        <div className="g-duas">
+          <section>
+            <div className="g-card-t"><h2>Pessoas</h2><span className="g-muted g-p">{ativos.length} {ativos.length === 1 ? "ativa" : "ativas"}</span></div>
+            <div className="g-eq-grade">
+              {ativos.map((p) => {
+                const veDinheiro = p.papel !== "funcionario" || p.ve_financeiro;
+                return (
+                  <button key={p.id} type="button" className="g-card g-eq-pessoa" style={{ "--cor": p.cor } as React.CSSProperties} onClick={() => abrir(p)}>
+                    <span className="g-eq-topo">
+                      <AvatarPessoa nome={p.nome} cor={p.cor} tamanho="g" />
+                      <span className="t">
+                        <b>{p.nome}{p.id === eu.id ? " (você)" : ""}</b>
+                        <span className="g-eq-tags">
+                          <span className={`g-tag ${p.papel === "dono" ? "laranja" : p.papel === "gerente" ? "azul" : ""}`}>{PAPEL[p.papel]}</span>
+                          {Number(p.comissao_pct) > 0 && <span className="g-tag">comissão de {pct(p.comissao_pct)}</span>}
+                        </span>
+                      </span>
+                    </span>
+
+                    <span className={`g-eq-acesso${p.user_id ? " ok" : p.email_convite ? " convite" : ""}`}>
+                      {p.user_id ? <KeyRound aria-hidden /> : p.email_convite ? <Mail aria-hidden /> : <Lock aria-hidden />}
+                      <span>{p.user_id ? "Entra com login" : p.email_convite ? <>Convite enviado <i>{p.email_convite}</i></> : "Sem login"}</span>
+                    </span>
+
+                    <span className="g-eq-tags">
+                      {p.atende && <span className="g-tag verde"><Scissors aria-hidden />atende na agenda</span>}
+                      {veDinheiro && <span className="g-tag azul"><Wallet aria-hidden />vê o financeiro</span>}
+                    </span>
+
+                    {naEscala(p) && (
+                      <span className="g-eq-dias" role="img" aria-label={`Trabalha: ${ORDEM_DIAS.filter((d) => diaDe(p, d)).map((d) => NOME_DIAS[d]).join(", ") || "nenhum dia"}`}>
+                        {ORDEM_DIAS.map((d) => <i key={d} className={`${diaDe(p, d) ? "on" : ""}${d === hoje ? " hoje" : ""}`}>{NOME_DIAS[d][0]}</i>)}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {ativos.length === 1 && (
+              <p className="g-muted g-p" style={{ marginTop: 12 }}>Por enquanto é só você. Adicione quem dá banho, tosa ou atende no balcão.</p>
+            )}
+            {inativos.length > 0 && (
+              <details className="gj-recolhe" style={{ marginTop: 12 }}>
+                <summary>{inativos.length === 1 ? "1 pessoa desativada" : `${inativos.length} pessoas desativadas`}</summary>
+                <div className="g-card g-lista" style={{ paddingBlock: 6 }}>
+                  {inativos.map((p) => (
+                    <div key={p.id} className="g-linha">
+                      <AvatarPessoa nome={p.nome} cor="#a39a90" tamanho="p" />
+                      <span className="t"><b className="g-muted">{p.nome}</b><span>{PAPEL[p.papel]}</span></span>
+                      <button className="g-btn p sec" onClick={() => reativar(p)}>Reativar</button>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </section>
+          <EscalaDaSemana />
+        </div>
       </div>
       {editando && <FolhaPessoa pessoa={editando === "novo" ? null : editando} aoFechar={() => setEditando(null)} />}
     </>
@@ -89,28 +145,38 @@ export default function Equipe() {
 function EscalaDaSemana() {
   const { petshop, equipe } = useGestao();
   const loja = lerHorario(petshop.horario);
-  const quem = equipe.filter((p) => p.ativo && (p.atende || p.escala));
+  const quem = equipe.filter((p) => p.ativo && naEscala(p));
+  const hoje = String(new Date().getDay());
   return (
     <section className="g-card">
-      <div className="g-card-t"><h2>Escala da semana</h2></div>
-      <div className="gj-escala">
-        {ORDEM_DIAS.map((d) => {
-          const doDia = quem
-            .map((p) => ({ p, h: p.escala ? lerHorario(p.escala)[d] : loja[d] }))
-            .filter((x): x is { p: Profissional; h: NonNullable<Horario[string]> } => !!x.h);
-          return (
-            <div key={d}>
-              <b>{NOME_DIAS[d]}</b>
-              <div className="g-chips">
-                {!loja[d] && <span className="g-tag">Fechado</span>}
-                {doDia.map(({ p, h }) => (
-                  <span key={p.id} className="gj-quem"><i style={{ background: p.cor }} aria-hidden />{p.nome.split(" ")[0]} <span>{h.abre}–{h.fecha}</span></span>
-                ))}
-                {loja[d] && !doDia.length && <span className="g-muted g-p">Ninguém escalado</span>}
-              </div>
-            </div>
-          );
-        })}
+      <div className="g-card-t"><h3><Tile icone={CalendarDays} tom="ceu" tamanho="p" />Escala da semana</h3><span className="g-muted g-pp">entrada e saída</span></div>
+      <div className="g-eq-escala">
+        <span />
+        {ORDEM_DIAS.map((d) => (
+          <span key={d} className={`cab${d === hoje ? " hoje" : ""}${loja[d] ? "" : " fechado"}`} title={loja[d] ? NOME_DIAS[d] : `${NOME_DIAS[d]}: fechado`}>
+            <abbr title={NOME_DIAS[d]}>{NOME_DIAS[d].slice(0, 3)}</abbr>
+          </span>
+        ))}
+        {quem.map((p) => (
+          <Fragment key={p.id}>
+            <span className="nome"><i style={{ background: p.cor }} aria-hidden />{p.nome.split(" ")[0]}</span>
+            {ORDEM_DIAS.map((d) => {
+              const h = p.escala ? lerHorario(p.escala)[d] : loja[d];
+              return h ? (
+                <span key={d} className={`cel on${d === hoje ? " hoje" : ""}`} style={{ "--cor": p.cor } as React.CSSProperties} title={`${p.nome}, ${NOME_DIAS[d]}: ${h.abre}–${h.fecha}`}>
+                  <b>{horaCurta(h.abre)}</b><b>{horaCurta(h.fecha)}</b>
+                  <span className="g-eq-so-leitor">{NOME_DIAS[d]}, das {h.abre} às {h.fecha}</span>
+                </span>
+              ) : <span key={d} className={`cel${loja[d] ? "" : " fechado"}`}><span className="g-eq-so-leitor">{NOME_DIAS[d]}: {loja[d] ? "folga" : "fechado"}</span></span>;
+            })}
+          </Fragment>
+        ))}
+      </div>
+      {!quem.length && <p className="g-muted g-p" style={{ marginTop: 10 }}>Ninguém escalado</p>}
+      <div className="g-eq-leg">
+        <span><i className="on" aria-hidden />trabalha</span>
+        <span><i aria-hidden />folga</span>
+        {ORDEM_DIAS.some((d) => !loja[d]) && <span><i className="fechado" aria-hidden />pet shop fechado</span>}
       </div>
       <p className="g-muted g-pp" style={{ marginTop: 10 }}>Para mudar os dias de alguém, toque no nome da pessoa.</p>
     </section>
