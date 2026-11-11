@@ -181,3 +181,26 @@
 /* selo acima do título da seção do assistente */
 .gp-ia { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 1rem !important; padding: 7px 14px; border-radius: 999px; background: #fde7d4; color: #9a4508; font-size: .875rem; font-weight: 600; letter-spacing: .01em; }
 .gp-ia svg { width: 16px; height: 16px; }
+
+/* ---------- link de agendamento ---------- */
+.gp-link-sec { background: var(--creme2); padding-block: clamp(4.5rem, 3rem + 7vw, 8.5rem); scroll-margin-top: 1rem; }
+.gp-link-grade { display: grid; gap: 3rem; }
+.gp-link-grade .gp-fone { max-width: 300px; margin-inline: auto; }
+.gp-link-sec h2 { color: var(--v); }
+.gp-ia.claro { background: #dcebe2; color: #24543b; }
+.gp-passos { list-style: none; counter-reset: passo; padding: 0; margin: 2rem 0 .5rem; display: grid; gap: 1.1rem; }
+.gp-passos li { counter-increment: passo; display: grid; grid-template-columns: 40px 1fr; column-gap: 14px; align-items: start; }
+.gp-passos li::before { content: counter(passo); grid-row: span 2; width: 40px; height: 40px; border-radius: 50%; background: var(--v); color: var(--creme); display: grid; place-items: center; font: 500 1.125rem/1 var(--display); }
+.gp-passos b { font-size: 1.0625rem; color: var(--v); }
+.gp-passos span { color: var(--cinza); max-width: 46ch; }
+.gp-link-sec .gp-nota { margin-top: 1rem !important; }
+@media (min-width: 900px) { .gp-link-grade { grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr); gap: 5rem; align-items: center; } }
+
+/* ---------- período dos planos ---------- */
+.gp-periodo { display: flex; gap: 4px; padding: 5px; border-radius: 999px; background: var(--creme2); width: fit-content; margin: 2rem auto 0; }
+.gp-periodo button { border: 0; background: none; padding: 10px 20px; border-radius: 999px; font: 600 .9688rem/1 var(--sans); color: var(--cinza); cursor: pointer; }
+.gp-periodo button[aria-pressed="true"] { background: var(--v); color: var(--creme); }
+.gp-periodo + .gp-planos-grade { margin-top: 1.5rem; }
+.gp-valor small { white-space: nowrap; }
+.gp-conta { color: var(--cinza); font-size: .9375rem; min-height: 2.9em; }
+.gp-conta b { color: var(--v); }

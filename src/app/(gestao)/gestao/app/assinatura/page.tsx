@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, BadgeCheck, Check, Clock, Database, ExternalLink, Gift, Lock, Sparkles, Store, User, Users } from "lucide-react";
 import { Tile, type Tom } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
 import { Vazio } from "@/components/gestao/ui";
 import { linkSuporte } from "@/lib/gestao/contato";
-import { PLANOS, planoPorId, textoAcessos, type PlanoId } from "@/lib/gestao/planos";
+import { PERIODOS, PLANOS, ofertaDe, planoPorId, temCheckout, textoAcessos, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
 import { brlCurto, dataCompleta, dataCurta } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./assinatura.css";
@@ -54,6 +55,7 @@ export default function Assinatura() {
   const podeAssinar = status === "teste" || status === "cancelada";
   const temAssinatura = status === "ativa" || status === "atrasada";
   const atual = planoPorId(petshop.plano);
+  const [periodo, setPeriodo] = useState<PeriodoId>("mensal");
 
   return (
     <div>
@@ -90,18 +92,22 @@ export default function Assinatura() {
           <section className="g-pilha">
             <div>
               <h2>Escolha o plano</h2>
-              <p className="g-muted g-p">Todos têm as mesmas funções e o Mozart. Muda quantas pessoas entram com login.</p>
+              <p className="g-muted g-p">Todos têm as mesmas funções e o Mozart. Muda quantas pessoas entram com login. Pagando por 3 ou 6 meses, sai mais barato.</p>
+            </div>
+            <div className="g-seg" role="group" aria-label="De quanto em quanto tempo pagar" style={{ justifySelf: "start" }}>
+              {PERIODOS.map((pe) => <button key={pe.id} aria-pressed={periodo === pe.id} onClick={() => setPeriodo(pe.id)}>{pe.nome}</button>)}
             </div>
             <div className="g-as-planos">
               {PLANOS.map((p) => {
-                const v = VISUAL[p.id];
+                const v = VISUAL[p.id], o = ofertaDe(p.id, periodo);
                 return (
                   <div key={p.id} className={`g-card g-as-plano tom-${v.tom}${p.id === "equipe" ? " realce" : ""}`}>
                     <div className="g-as-plano-t"><Tile icone={v.icone} tom={v.tom} tamanho="g" /><div><h2>{p.nome}</h2><p className="g-muted g-pp">{p.para}</p></div></div>
-                    <p className="g-as-preco"><span className="g-num">{brlCurto(p.preco)}</span><span className="g-muted g-p"> por mês</span></p>
+                    <p className="g-as-preco"><span className="g-num">{brlCurto(o.preco)}</span><span className="g-muted g-p"> {o.periodo.cada}</span></p>
+                    <p className="g-muted g-pp" style={{ minHeight: "2.6em" }}>{o.periodo.meses > 1 ? `Equivale a ${brlCurto(Math.round(o.porMes))} por mês: ${brlCurto(o.economia)} a menos do que no mensal.` : "Cobrado todo mês."}</p>
                     <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoAcessos(p.acessos)}</b> com login</p></div>
-                    {p.checkout
-                      ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(p.checkout, user.email)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
+                    {o.checkout
+                      ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(o.checkout, user.email)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
                       : <button className="g-btn cheio" disabled>Disponível em breve</button>}
                   </div>
                 );
@@ -113,8 +119,8 @@ export default function Assinatura() {
                 {INCLUI.map((i) => <li key={i}><Check aria-hidden />{i}</li>)}
               </ul>
             </div>
-            {!PLANOS.some((p) => p.checkout) && <p className="g-muted g-p">{liberado ? "A assinatura ainda não abriu. Enquanto isso, o seu acesso continua pelo teste." : "A assinatura ainda não abriu. Os seus dados continuam guardados."}</p>}
-            <p className="g-muted g-pp">Cobrança mensal pela Cakto. Sem fidelidade: você cancela quando quiser. Use no checkout o mesmo e-mail da sua conta{user.email ? ` (${user.email})` : ""} para o acesso ser liberado sozinho.</p>
+            {!temCheckout() && <p className="g-muted g-p">{liberado ? "A assinatura ainda não abriu. Enquanto isso, o seu acesso continua pelo teste." : "A assinatura ainda não abriu. Os seus dados continuam guardados."}</p>}
+            <p className="g-muted g-pp">Cobrança pela Cakto, que se renova sozinha ao fim de cada período até você cancelar. Você cancela quando quiser e usa até o fim do período já pago. Use no checkout o mesmo e-mail da sua conta{user.email ? ` (${user.email})` : ""} para o acesso ser liberado sozinho.</p>
           </section>
         )}
 
@@ -184,7 +190,7 @@ export default function Assinatura() {
       return (
         <section className="g-as-estado neutro">
           <div className="g-as-estado-t"><Tile icone={Lock} tom="manteiga" tamanho="g" /><div><p className="g-rotulo">Assinatura</p><h2>Assinatura cancelada. Seus dados continuam guardados.</h2></div></div>
-          <p className="g-p">A conta fica só para consulta. Se quiser voltar, é só assinar de novo.</p>
+          <p className="g-p">{liberado && petshop.pago_ate ? `Você continua usando normalmente até ${dataCompleta(new Date(petshop.pago_ate))}, fim do período já pago. Depois disso a conta fica só para consulta.` : "A conta fica só para consulta. Se quiser voltar, é só assinar de novo."}</p>
         </section>
       );
     }

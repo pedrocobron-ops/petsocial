@@ -79,14 +79,14 @@ Como as telas são feitas: `src/components/gestao/LEIAME.md`. Banco (tabelas e r
 | `GESTAO_MODELO` | Modelo do Mozart (padrão `claude-haiku-5-5`) |
 | `GESTAO_AJUDA_MODELO` | Opcional. Modelo da Ajuda (dúvidas de uso; padrão `claude-haiku-5-5`). Sem a chave da IA, a Ajuda responde pelo guia em `src/lib/gestao/ajuda.ts` |
 | `GESTAO_ASSISTENTE_LIMITE_DIA` | Pedidos ao Mozart por pet shop por dia (padrão 150) |
-| `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO`, `_EQUIPE`, `_PETSHOP` | Link do checkout de cada plano na Cakto. Os planos e preços ficam em `src/lib/gestao/planos.ts` |
+| `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO`, `_EQUIPE`, `_PETSHOP` | Link do checkout mensal de cada plano na Cakto. Com `_3` ou `_6` no fim (ex.: `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO_6`), o link do plano de 3 ou 6 meses. Os planos e preços ficam em `src/lib/gestao/planos.ts` |
 | `GESTAO_CAKTO_PRODUTO` | Id do produto na Cakto: eventos de outros produtos são ignorados |
 
 ### Para colocar no ar
 
 1. Criar o projeto no Supabase (plano com backup) e aplicar `supabase/migrations/`. Manter a confirmação de e-mail ligada e configurar o envio de e-mail (SMTP).
 2. Preencher as variáveis acima na Vercel.
-3. Na Cakto: criar o produto de assinatura mensal com uma oferta por plano (Solo, Equipe e Pet shop) e ligar cada oferta ao plano: `insert into config_interna values ('cakto_oferta_<id da oferta>', 'solo');` (ou `equipe`, `petshop`). Criar também um webhook para `https://maestropet.com/api/gestao/cakto` com os eventos de compra e de assinatura. Guardar o segredo do webhook no banco, só como hash:
+3. Na Cakto: criar o produto de assinatura mensal com uma oferta por plano (Solo, Equipe e Pet shop) e ligar cada oferta ao plano: `insert into config_interna values ('cakto_oferta_<id da oferta>', 'solo');` (ou `equipe`, `petshop`). Para as ofertas de 3 e 6 meses, acrescente o período: `'solo:3'`, `'equipe:6'`. Criar também um webhook para `https://maestropet.com/api/gestao/cakto` com os eventos de compra e de assinatura. Guardar o segredo do webhook no banco, só como hash:
    `insert into config_interna values ('cakto_segredo_sha256', encode(extensions.digest('<segredo>', 'sha256'), 'hex'));`
 4. Dar acesso ao painel interno: `insert into admins (user_id) select id from auth.users where email = '<e-mail>';`
 
