@@ -21,7 +21,7 @@ const INCLUI = [
   "Pacotes",
   "Creche e hotel",
   "Equipe",
-  "O Mozart, por áudio e por texto",
+  "Mozart, o assistente de inteligência artificial, por áudio e texto",
 ];
 
 const VISUAL: Record<PlanoId, { icone: React.ComponentType<{ size?: number }>; tom: Tom }> = {

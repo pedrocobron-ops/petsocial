@@ -705,3 +705,18 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-marca .g-selo, .g-ass-topo .g-selo, .g-porta-papo .g-selo, .g-barra-marca .g-selo { margin: 0; }
 .g-raiz .g-selo, .g-raiz .g-tile { display: inline-grid !important; opacity: 1 !important; }
 .g-ass-topo .foto, .g-fab .foto, .g-porta-papo .foto { display: grid; opacity: 1; max-width: none; overflow: visible; font-size: inherit; }
+
+/* Ajuda: mesma janelinha de conversa, com avaliação e passagem para a equipe */
+.g-ajuda .g-ass-topo { background: linear-gradient(135deg, #24566b, #173a48); }
+.g-ajuda-avaliar { justify-self: start; display: flex; align-items: center; gap: 6px; margin: 4px 0 2px; font-size: .8125rem; color: var(--g-cinza); animation: g-bolha .25s both; }
+.g-ajuda-avaliar button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 999px; border: 1px solid rgba(31, 27, 23, .16); background: rgba(255, 253, 249, .92); font-size: .8125rem; font-weight: 600; color: var(--g-tinta); }
+.g-ajuda-avaliar button:hover { background: #fff; }
+.g-ajuda-avaliar svg { width: 14px; height: 14px; }
+.g-ajuda-equipe { border-left-color: #1f8f52; }
+.g-ajuda-equipe .g-btn { justify-self: start; }
+.g-ajuda-mozart { padding: 6px 14px 0; background: #efe7d9; font-size: .8125rem; color: var(--g-cinza); text-align: center; }
+.g-ajuda-mozart button { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--g-verde); text-decoration: underline; text-underline-offset: 2px; }
+
+/* a classe "cab" também existe no site de vendas (com margem embaixo); dentro do aplicativo ela não vale */
+.g-app .cab, .g-ass .cab, .g-porta .cab, .g-folha .cab { margin-bottom: 0; }
+.g-raiz .g-ass-entrada textarea:focus-visible { outline: 0; border-radius: 23px; }

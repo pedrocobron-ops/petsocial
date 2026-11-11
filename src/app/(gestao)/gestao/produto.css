@@ -177,3 +177,7 @@
 @media (min-width: 760px) { .gp-pe-grade { grid-template-columns: 1fr auto; align-items: end; } }
 
 @media (prefers-reduced-motion: reduce) { .gp *, .gp *::before, .gp *::after { animation: none !important; transition: none !important; } }
+
+/* selo acima do título da seção do assistente */
+.gp-ia { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 1rem !important; padding: 7px 14px; border-radius: 999px; background: #fde7d4; color: #9a4508; font-size: .875rem; font-weight: 600; letter-spacing: .01em; }
+.gp-ia svg { width: 16px; height: 16px; }

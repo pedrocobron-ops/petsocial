@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, MessageCircle, Monitor, Smartphone } from "lucide-react";
+import { ArrowRight, Check, MessageCircle, Monitor, Smartphone, Sparkles } from "lucide-react";
 import Instalar from "@/components/gestao/instalar";
 import Vitrine from "@/components/gestao/vitrine";
 import { Marca } from "@/components/gestao/marca";
@@ -10,8 +10,8 @@ import { brlCurto } from "@/lib/gestao/util";
 import "./produto.css";
 
 export const metadata: Metadata = {
-  title: { absolute: "Maestro Pet Gestão — sistema para pet shop com assistente" },
-  description: "Agenda de banho e tosa, clientes, caixa e estoque num lugar só, com um assistente que marca e lança quando você pede por áudio ou texto. 7 dias grátis, sem cartão.",
+  title: { absolute: "Maestro Pet Gestão — sistema para pet shop com assistente de inteligência artificial" },
+  description: "Agenda de banho e tosa, clientes, caixa e estoque num lugar só, com um assistente de inteligência artificial que marca e lança quando você pede por áudio ou texto. 7 dias grátis, sem cartão.",
 };
 
 const CRIAR = "/gestao/criar-conta";
@@ -25,7 +25,9 @@ const PEDIDOS: [string, string][] = [
 ];
 
 const INCLUI: [string, string][] = [
+  ["Assistente de inteligência artificial", "Diga o que precisa, por áudio ou texto. Ele prepara e você confirma."],
   ["Agenda de banho e tosa", "Por dia e por semana, por profissional, com os horários livres à vista."],
+  ["Link de agendamento", "O cliente pede o horário pelo link e você aceita com um toque."],
   ["Clientes e pets", "Foto, porte, cuidados e o histórico de cada atendimento."],
   ["Lembrete no WhatsApp", "O sistema monta a mensagem e abre o seu WhatsApp. Você só envia."],
   ["Pacotes e mensalistas", "Quantos banhos o cliente comprou, quantos usou e quando vence."],
@@ -35,8 +37,8 @@ const INCLUI: [string, string][] = [
   ["Estoque", "Entradas, saídas e aviso quando um produto está acabando."],
   ["Equipe", "Acesso por função, escala da semana e comissão."],
   ["Relatórios", "Atendimentos, faltas, serviços mais feitos e faturamento."],
+  ["Comanda e venda no balcão", "Serviço, produto e extra numa conta só, com baixa no estoque."],
   ["Leva e traz", "Marque quem precisa ser buscado, com o endereço no próprio horário."],
-  ["Assistente por áudio", "Diga o que precisa. Ele prepara e você confirma."],
 ];
 
 const PERGUNTAS: [string, React.ReactNode][] = [
@@ -82,9 +84,9 @@ export default function Pagina() {
         <div className="gp-c gp-capa-grade">
           <div className="gp-capa-texto">
             <h1>Sistema para <em>pet shop</em> e banho e tosa</h1>
-            <p>Agenda, clientes, caixa e estoque em um lugar só. E um assistente que marca e lança para você: é só falar.</p>
+            <p>Agenda, clientes, caixa e estoque em um lugar só. E um assistente de inteligência artificial que marca e lança para você: é só falar.</p>
             <ul className="gp-selos">
-              <li><Check />Agende falando com o assistente</li>
+              <li><Check />Assistente de inteligência artificial incluído</li>
               <li><Check />Tudo o que o pet shop usa, em um plano só</li>
             </ul>
             <div className="gp-acao">
@@ -103,8 +105,9 @@ export default function Pagina() {
       <section className="gp-pedir">
         <div className="gp-c gp-pedir-grade">
           <div>
+            <p className="gp-ia"><Sparkles />Assistente de inteligência artificial</p>
             <h2>Peça como você fala <em>no balcão.</em></h2>
-            <p className="gp-lead">Toque no microfone e diga o que aconteceu. O assistente entende, encontra o pet certo e prepara tudo.</p>
+            <p className="gp-lead">Toque no microfone e diga o que aconteceu. O assistente de inteligência artificial entende, encontra o pet certo e prepara tudo.</p>
             <ul className="gp-falas">
               {PEDIDOS.map(([fala, faz]) => (
                 <li key={fala}><q>{fala.slice(1, -1)}</q><span>{faz}</span></li>
@@ -138,7 +141,7 @@ export default function Pagina() {
       <section className="gp-planos" id="plano">
         <div className="gp-c">
           <h2>Planos <em>e preços</em></h2>
-          <p className="gp-lead">Todos os planos têm todas as funções e o assistente. Você escolhe pelo número de pessoas que entram no sistema.</p>
+          <p className="gp-lead">Todos os planos têm todas as funções e o assistente de inteligência artificial. Você escolhe pelo número de pessoas que entram no sistema.</p>
           <ul className="gp-planos-grade">
             {PLANOS.map((p) => (
               <li key={p.id} className={p.id === "equipe" ? "destaque" : undefined}>
@@ -148,7 +151,7 @@ export default function Pagina() {
                 <p className="gp-acessos">{textoAcessos(p.acessos)}<span> ao sistema</span></p>
                 <ul>
                   <li><Check />Todas as funções</li>
-                  <li><Check />Assistente por áudio e texto</li>
+                  <li><Check />Assistente de inteligência artificial, por áudio e texto</li>
                   <li><Check />Celular e computador</li>
                   <li><Check />Suporte por WhatsApp</li>
                 </ul>

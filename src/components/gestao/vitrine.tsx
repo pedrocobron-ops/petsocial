@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 
 const ABAS: { id: string; rotulo: string; frase: string; alt: string }[] = [
   { id: "agenda", rotulo: "Agenda", frase: "A semana inteira de relance, por profissional, com os horários livres à vista.", alt: "Agenda da semana com os atendimentos coloridos por serviço" },
-  { id: "assistente", rotulo: "Assistente", frase: "Fale ou escreva o que precisa. Ele prepara e você confirma com um toque.", alt: "Painel do assistente aberto ao lado da tela inicial" },
+  { id: "assistente", rotulo: "Assistente de IA", frase: "Um assistente de inteligência artificial: fale ou escreva o que precisa. Ele prepara e você confirma com um toque.", alt: "Painel do assistente aberto ao lado da tela inicial" },
   { id: "clientes", rotulo: "Clientes e pets", frase: "Cada pet com foto, tutor, cuidados e a data da última visita.", alt: "Lista de pets com foto, tutor e última visita" },
   { id: "caixa", rotulo: "Caixa", frase: "Abra o caixa, lance entradas e saídas e feche o dia conferindo a gaveta.", alt: "Caixa do dia com entradas e saídas" },
   { id: "financeiro", rotulo: "Financeiro", frase: "O que entrou, o que saiu, as contas que vencem e o resultado do mês.", alt: "Financeiro do mês com entradas, saídas e resultado" },

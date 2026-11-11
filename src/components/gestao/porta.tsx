@@ -17,7 +17,7 @@ export default function Porta({ titulo, texto, children }: { titulo: string; tex
           </div>
         </div>
         <div className="g-pilha g">
-          <h2>O pet shop organizado. E uma <em className="it">assistente</em> para fazer por você.</h2>
+          <h2>O pet shop organizado. E um <em className="it">assistente de inteligência artificial</em> para fazer por você.</h2>
           <ul>
             <li><Check /> Agenda de banho e tosa, clientes, caixa e estoque em um lugar só</li>
             <li><Check /> Mande um áudio: “marca banho da Mel sexta às dez” e está marcado</li>

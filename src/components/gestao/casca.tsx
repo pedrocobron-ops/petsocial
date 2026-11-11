@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3, BedDouble, CalendarDays, CalendarClock, CreditCard, Landmark, LifeBuoy, LogOut, Menu, Mic, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
-import { linkSuporte } from "@/lib/gestao/contato";
 import { useGestao } from "./contexto";
 import { planoPorId } from "@/lib/gestao/planos";
 import { dataLonga } from "@/lib/gestao/util";
@@ -15,6 +14,7 @@ import { AvatarPessoa, EVENTO_ASSISTENTE, Folha } from "./ui";
 import BuscaGeral from "./busca-geral";
 import type { Tom } from "./painel";
 import Assistente from "./assistente";
+import Ajuda from "./ajuda";
 
 type Item = { href: string; rotulo: string; icone: React.ComponentType; tom: Tom; so?: "financeiro" | "dono" };
 const GRUPOS: { titulo: string; itens: Item[] }[] = [
@@ -44,9 +44,10 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   const { petshop, eu, souDono, vejoFinanceiro, liberado, diasDeTeste, sair } = useGestao();
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
   const [mais, setMais] = useState(false);
+  const [ajuda, setAjuda] = useState(false);
 
   useEffect(() => {
-    const abrir = (e: Event) => setAssistente({ aberta: true, pedido: String((e as CustomEvent).detail ?? "") });
+    const abrir = (e: Event) => { setAjuda(false); setAssistente({ aberta: true, pedido: String((e as CustomEvent).detail ?? "") }); };
     window.addEventListener(EVENTO_ASSISTENTE, abrir);
     return () => window.removeEventListener(EVENTO_ASSISTENTE, abrir);
   }, []);
@@ -89,7 +90,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
             </div>
           )}
           <div className="g-nav" style={{ marginTop: 10 }}>
-            <a href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer"><LifeBuoy />Ajuda no WhatsApp</a>
+            <button onClick={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }}><LifeBuoy />Ajuda</button>
           </div>
           <div className="g-lado-eu">
             <AvatarPessoa nome={eu.nome} cor={eu.cor} tamanho="p" />
@@ -139,7 +140,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         <button onClick={() => setMais(true)}><Menu />Mais</button>
       </nav>
 
-      <button className={`g-fab${assistente.aberta ? " aberta" : ""}`} onClick={() => setAssistente((a) => ({ aberta: !a.aberta, pedido: "" }))} aria-expanded={assistente.aberta}>
+      <button className={`g-fab${assistente.aberta ? " aberta" : ""}`} onClick={() => { setAjuda(false); setAssistente((a) => ({ aberta: !a.aberta, pedido: "" })); }} aria-expanded={assistente.aberta}>
         <span className="foto"><Selo tamanho={40} /><i aria-hidden /></span>
         <span className="txt"><b>Mozart</b><span>{assistente.aberta ? "fechar a conversa" : "fala comigo"}</span></span>
       </button>
@@ -157,12 +158,13 @@ export default function Casca({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             ))}
-            <a className="g-btn zap" href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer"><LifeBuoy />Ajuda no WhatsApp</a>
+            <button className="g-btn verde" onClick={() => { setMais(false); setAjuda(true); }}><LifeBuoy />Ajuda</button>
             <button className="g-btn sec" onClick={() => void sair()}><LogOut />Sair</button>
           </div>
         </Folha>
       )}
 
+      {ajuda && <Ajuda aoFechar={() => setAjuda(false)} />}
       {assistente.aberta && <Assistente pedidoInicial={assistente.pedido} aoFechar={() => setAssistente({ aberta: false, pedido: "" })} />}
     </div>
   );

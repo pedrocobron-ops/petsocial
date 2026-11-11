@@ -125,7 +125,7 @@ export default function Hoje() {
             <div className="g-fila" style={{ alignItems: "flex-start", flexWrap: "nowrap", gap: 14 }}>
               <Selo tamanho={52} />
               <div className="g-cresce">
-                <p className="g-rotulo"><span className="g-ondas" aria-hidden><i /><i /><i /><i /></span>Mozart, seu assistente</p>
+                <p className="g-rotulo"><span className="g-ondas" aria-hidden><i /><i /><i /><i /></span>Mozart, seu assistente de inteligência artificial</p>
                 <p className="fala">{carregando && !dados ? "Olhando a agenda…" : frase}</p>
               </div>
             </div>
