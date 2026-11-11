@@ -12,6 +12,7 @@ import { Anel, Tile, type Tom } from "../painel";
 import { AvatarPet, avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { linkTutor, nomePorte, primeiroNome } from "./comum";
 import { EtiquetaEspecie, tomDaVisita } from "./lista";
+import { CartaoSaude, EtiquetaSaude, resumoSaude, type CuidadoSaude } from "./saude";
 
 type PetDaFicha = Pet & { clientes: Cliente | null };
 type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id">;
@@ -34,13 +35,14 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
   const [ocupado, setOcupado] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
-    const [pet, atendimentos, pacotes, estadias, concluidos] = await Promise.all([
+    const [pet, atendimentos, pacotes, estadias, concluidos, saude] = await Promise.all([
       sb.from("pets").select("*, clientes(*)").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
       sb.from("agendamentos").select("id, inicio, status, preco, servico_id").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
       sb.from("pacotes_clientes").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).eq("ativo", true).order("comprado_em", { ascending: false }),
       sb.from("estadias").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("entrada", { ascending: false }).limit(8),
       // visitas concluídas: a conta exata, a mais recente e os valores para somar
       sb.from("agendamentos").select("inicio, preco", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).eq("status", "concluido").order("inicio", { ascending: false }).limit(1000),
+      sb.from("pets_saude").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("vence_em").order("criado_em").limit(500),
     ]);
     for (const r of [pet, atendimentos, pacotes, estadias, concluidos]) if (r.error) throw new Error(r.error.message);
     const feitos = (concluidos.data ?? []) as { inicio: string; preco: number | null }[];
@@ -53,6 +55,9 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       ultimaVisita: feitos[0]?.inicio ?? null,
       gasto: feitos.reduce((t, a) => t + Number(a.preco ?? 0), 0),
       gastoParcial: (concluidos.count ?? 0) > feitos.length,
+      // se a saúde falhar, o resto da ficha abre do mesmo jeito
+      saude: saude.error ? null : (saude.data ?? []) as CuidadoSaude[],
+      erroSaude: saude.error?.message ?? null,
     };
   }, [petshop.id, id]);
 
@@ -66,7 +71,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
     return <>{botaoVoltar}<Vazio titulo="Não achei esse pet" texto="Pode ser que a ficha tenha sido apagada."><button className="g-btn verde" onClick={voltar}>Ver a lista</button></Vazio></>;
   }
 
-  const { pet, atendimentos, pacotes, estadias, visitas, ultimaVisita, gasto, gastoParcial } = dados;
+  const { pet, atendimentos, pacotes, estadias, visitas, ultimaVisita, gasto, gastoParcial, saude, erroSaude } = dados;
   const tutor = pet.clientes;
   const zap = tutor ? linkWhatsApp(tutor.telefone, `Oi, ${primeiroNome(tutor.nome)}! Aqui é do ${petshop.nome}. `) : null;
   const etiquetas = [pet.raca, pet.porte ? `Porte ${nomePorte(pet.porte).toLowerCase()}` : null, pet.sexo === "M" ? "Macho" : pet.sexo === "F" ? "Fêmea" : null, idade(pet.nascimento)]
@@ -110,6 +115,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
               <div className="g-cli-etqs">
                 <EtiquetaEspecie especie={pet.especie} />
                 {etiquetas.map((e) => <span key={e} className="g-cli-etq">{e}</span>)}
+                <EtiquetaSaude resumo={saude ? resumoSaude(saude) : null} />
                 {!pet.ativo && <span className="g-cli-etq rosa">Desativado</span>}
               </div>
             </div>
@@ -166,6 +172,8 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
 
       <div className="gc-colunas">
         <div>
+          <CartaoSaude pet={pet} tutor={tutor} itens={saude} erro={erroSaude} aoMudar={() => void recarregar()} />
+
           <section className="g-card">
             <div className="g-card-t"><h3><Tile icone={History} tom="pessego" tamanho="p" />Histórico de atendimentos</h3>{atendimentos.length > 0 && <span className="g-muted g-pp" style={{ whiteSpace: "nowrap" }}>{atendimentos.length === 60 ? "60 mais recentes" : atendimentos.length === 1 ? "1 horário" : `${atendimentos.length} horários`}</span>}</div>
             {!atendimentos.length ? <p className="g-muted g-p">{pet.nome} ainda não tem atendimento marcado.</p> : (

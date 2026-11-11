@@ -22,6 +22,18 @@
 .g-pl-hora svg { width: 14px; height: 14px; flex: none; }
 .g-pl-obs { padding: 8px 12px; border-radius: 12px; background: var(--t-manteiga); color: #5b4708; font-size: .9375rem; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
 
+/* vários pets do mesmo tutor num cartão só */
+.g-pl-varios { display: flex; flex: none; }
+.g-pl-varios > * + * { margin-left: -14px; box-shadow: 0 0 0 2px var(--g-carta); }
+.g-pl-pets { display: grid; margin: 0; padding: 0 12px; list-style: none; border-radius: 14px; background: var(--g-carta-2); }
+.g-pl-pets li { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-width: 0; padding: 8px 0; }
+.g-pl-pets li + li { border-top: 1px solid var(--g-linha); }
+.g-pl-pet-h { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+.g-pl-pet-n { flex: 1 1 8ch; min-width: 0; overflow-wrap: anywhere; }
+.g-pl-pet-n b { font-weight: 600; }
+.g-pl-pet-n small { margin-left: 6px; font-size: .8125rem; color: var(--g-cinza); }
+.g-pl-pet-b { display: flex; gap: 4px; flex: none; margin-left: auto; }
+
 .g-pl-acoes { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .g-pl-com { flex: 1 1 100%; min-width: 0; min-height: 40px; padding-block: 6px; font-size: .9375rem; }
 @media (min-width: 560px) { .g-pl-com { flex: 1 1 200px; } }

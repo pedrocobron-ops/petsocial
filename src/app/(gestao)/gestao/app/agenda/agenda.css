@@ -58,3 +58,38 @@
 .g-agd-data.fora b { text-decoration: line-through; }
 .g-agd-escolha { display: grid; gap: 8px; justify-items: start; }
 .g-agd-escolha .g-seg { flex-wrap: wrap; border-radius: 20px; max-width: 100%; }
+
+/* atendimento: fotos de antes e depois */
+.g-agd-quadros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.g-agd-quadro { position: relative; aspect-ratio: 4 / 5; min-width: 0; overflow: hidden; border-radius: var(--g-raio); background: var(--g-carta-2); }
+.g-agd-quadro.cheio { box-shadow: var(--g-sombra); }
+.g-agd-quadro-toque {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: grid; place-content: center; justify-items: center; gap: 4px; padding: 12px;
+  border: 1.5px dashed var(--g-linha-forte); border-radius: inherit; background: transparent; color: var(--g-cinza); text-align: center; cursor: pointer;
+  transition: border-color .16s, background-color .16s;
+}
+.g-agd-quadro-toque:hover { border-color: var(--g-laranja); background: var(--g-carta); }
+.g-agd-quadro-toque:disabled { cursor: default; }
+.g-agd-quadro-toque b { font: 480 1.125rem/1.2 var(--display); color: var(--g-tinta); }
+.g-agd-quadro-toque small { font-size: .8125rem; }
+.g-agd-quadro-ico { display: inline-grid; place-items: center; width: 44px; height: 44px; margin-bottom: 4px; border-radius: 14px; background: var(--g-laranja-tint); color: #9a4508; }
+.g-agd-quadro-ico svg { width: 21px; height: 21px; }
+.g-agd-quadro.cheio .g-agd-quadro-toque { display: block; padding: 0; border: 0; }
+.g-agd-quadro img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.g-agd-quadro-rot {
+  position: absolute; left: 8px; top: 8px; padding: 3px 10px; border-radius: 999px; background: rgba(31, 27, 23, .62); color: #fff;
+  font-size: .75rem; font-weight: 600; pointer-events: none;
+}
+.g-agd-quadro-x {
+  position: absolute; right: 8px; bottom: 8px; display: inline-grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 12px;
+  background: rgba(255, 251, 245, .94); color: var(--g-vermelho); box-shadow: 0 1px 3px rgba(31, 27, 23, .25); cursor: pointer;
+}
+.g-agd-quadro-x svg { width: 18px; height: 18px; }
+.g-agd-quadro-env {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: inherit; background: rgba(255, 251, 245, .86);
+  color: var(--g-tinta); font-size: .875rem; font-weight: 600;
+}
+
+/* linha do tempo: tutor já avisado de que o pet está pronto */
+.g-agd-avisado { display: inline-grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: 50%; background: var(--g-menta); color: #24543b; }
+.g-agd-avisado svg { width: 13px; height: 13px; }

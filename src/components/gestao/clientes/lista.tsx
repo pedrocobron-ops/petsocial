@@ -11,13 +11,16 @@ import { Anel, Kpi } from "../painel";
 import { abrirAssistente, AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { baixarCsv, buscarTudo, ESPECIES, linkPet, linkTutor, nomePorte, type PetDaLista } from "./comum";
 import FormTutor from "./form-tutor";
+import { EtiquetaSaude } from "./saude";
+import { buscarAlertasSaude } from "./saude-avisos";
 
-type Filtro = "todos" | "sumidos30" | "sumidos60" | "alerta";
+type Filtro = "todos" | "sumidos30" | "sumidos60" | "alerta" | "saude";
 const FILTROS: { id: Filtro; rotulo: string }[] = [
   { id: "todos", rotulo: "Todos" },
   { id: "sumidos30", rotulo: "Sumidos há 30 dias" },
   { id: "sumidos60", rotulo: "Sumidos há 60 dias" },
   { id: "alerta", rotulo: "Com alerta" },
+  { id: "saude", rotulo: "Saúde vencendo" },
 ];
 const PASSO = 100;
 
@@ -87,6 +90,9 @@ export default function Lista({ aoAbrir, irPara }: {
     return mapa;
   }, [petshop.id, totalPets]);
 
+  // Saúde: pets com cuidado vencido ou vencendo em 30 dias (consulta leve, só de leitura)
+  const { dados: saude, erro: erroSaude } = useDados(() => buscarAlertasSaude(sb, petshop.id), [petshop.id]);
+
   const pets = useMemo(() => dados?.pets ?? [], [dados]);
   const clientes = useMemo(() => dados?.clientes ?? [], [dados]);
   const petsPorTutor = useMemo(() => {
@@ -106,12 +112,13 @@ export default function Lista({ aoAbrir, irPara }: {
     return pets.filter((p) => {
       if (alvo && !bate(p.nome, p.clientes?.nome) && !bateFone(p.clientes?.telefone)) return false;
       if (filtro === "alerta") return !!p.alertas?.trim();
+      if (filtro === "saude") return !!saude?.[p.id];
       if (filtro === "sumidos30") return sumido(p.id, 30);
       if (filtro === "sumidos60") return sumido(p.id, 60);
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pets, ultimos, alvo, alvoFone, filtro]);
+  }, [pets, ultimos, saude, alvo, alvoFone, filtro]);
 
   const tutoresFiltrados = useMemo(() => clientes.filter((c) =>
     !alvo || bate(c.nome, ...(petsPorTutor.get(c.id) ?? []).map((p) => p.nome)) || bateFone(c.telefone)),
@@ -149,7 +156,7 @@ export default function Lista({ aoAbrir, irPara }: {
     } catch (e) { avisarErro(e); }
   }
 
-  const esperandoUltimos = (filtro === "sumidos30" || filtro === "sumidos60") && !ultimos && !erroUltimos;
+  const esperandoUltimos = ((filtro === "sumidos30" || filtro === "sumidos60") && !ultimos && !erroUltimos) || (filtro === "saude" && !saude && !erroSaude);
   const contagem = !dados ? " " : aba === "pets"
     ? (pets.length === 1 ? "1 pet" : `${pets.length} pets`) + (petsFiltrados.length !== pets.length ? ` · ${petsFiltrados.length} na lista` : "")
     : (clientes.length === 1 ? "1 tutor" : `${clientes.length} tutores`) + (tutoresFiltrados.length !== clientes.length ? ` · ${tutoresFiltrados.length} na lista` : "");
@@ -220,8 +227,9 @@ export default function Lista({ aoAbrir, irPara }: {
           </Vazio>
         ) : esperandoUltimos ? <Esqueleto linhas={4} />
         : !petsFiltrados.length ? (
-          <Vazio titulo={alvo ? "Não achei ninguém com esse nome" : filtro === "alerta" ? "Nenhum pet com alerta" : "Ninguém sumido"}
-            texto={alvo ? "Confira como está escrito ou cadastre um pet novo." : filtro === "alerta" ? "Alergias, medos e cuidados aparecem aqui quando estiverem na ficha." : "Todo mundo passou por aqui nesse período."}>
+          <Vazio titulo={alvo ? "Não achei ninguém com esse nome" : filtro === "alerta" ? "Nenhum pet com alerta" : filtro === "saude" ? (erroSaude ? "Não consegui ver a saúde dos pets" : "Nenhum cuidado vencendo") : "Ninguém sumido"}
+            texto={alvo ? "Confira como está escrito ou cadastre um pet novo." : filtro === "alerta" ? "Alergias, medos e cuidados aparecem aqui quando estiverem na ficha."
+              : filtro === "saude" ? (erroSaude ?? "Vacinas, vermífugo e antipulgas anotados na ficha aparecem aqui quando vencem ou faltam até 30 dias.") : "Todo mundo passou por aqui nesse período."}>
             {(alvo || filtro !== "todos") && <button className="g-btn sec" onClick={() => { setQ(""); setFiltro("todos"); }}>Ver todos</button>}
           </Vazio>
         ) : (
@@ -245,6 +253,7 @@ export default function Lista({ aoAbrir, irPara }: {
                         <EtiquetaEspecie especie={p.especie} />
                         {p.porte && <span className="g-cli-etq">{nomePorte(p.porte)}</span>}
                         {p.alertas?.trim() && <span className="g-cli-etq rosa"><AlertTriangle aria-hidden />Alerta</span>}
+                        <EtiquetaSaude resumo={saude?.[p.id]} />
                       </span>
                       {ultimos && <span className={`g-cli-visita ${tomDaVisita(ultima, resumo.agora)}`}><i aria-hidden />{ultima ? haQuanto(ultima) : "ainda não veio"}</span>}
                     </span>

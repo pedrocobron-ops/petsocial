@@ -27,6 +27,11 @@ export function textoLembrete(p: { tutor?: string | null; pet: string; servico?:
   return `${oi} Aqui é do ${p.petshop}. Passando para lembrar ${p.servico ? `do ${p.servico.toLowerCase()}` : "do horário"} de ${p.pet} ${p.quando} às ${p.hora}. Posso confirmar?`;
 }
 
+/** Texto do aviso de que o pet está pronto para ir para casa (WhatsApp do tutor). */
+export function textoPronto(p: { tutor?: string | null; pet: string; petshop: string }) {
+  return `${p.tutor ? `Oi, ${p.tutor.split(" ")[0]}!` : "Oi!"} ${p.pet} está pronto e esperando por você aqui no ${p.petshop}.`;
+}
+
 /* ---------- série (horário que se repete) e bloqueio ---------- */
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;

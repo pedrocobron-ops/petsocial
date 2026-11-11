@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarClock, Check, MessageCircle, Play, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
+import { BellRing, CalendarClock, Check, MessageCircle, Play, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
 import type { AgendamentoCompleto, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, FORMAS, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { textoLembrete } from "@/lib/gestao/agenda";
-import { brl, dataAmigavel, dataLonga, fmtTelefone, hora, isoDia, linkWhatsApp } from "@/lib/gestao/util";
+import { textoLembrete, textoPronto } from "@/lib/gestao/agenda";
+import { brl, dataAmigavel, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import Comanda from "./comanda";
+import AntesDepois from "./antes-depois";
 
 /** Tudo sobre um horário: quem é o pet, o que fazer agora (confirmar, iniciar, concluir e fechar a conta) e o lembrete no WhatsApp. */
 export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, aoEditar }: {
@@ -22,11 +23,17 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const [cancelando, setCancelando] = useState(false);
   const [checklist, setChecklist] = useState<Record<string, boolean>>((a.checklist as Record<string, boolean>) ?? {});
   const [ocupado, setOcupado] = useState(false);
+  const [avisadoEm, setAvisadoEm] = useState(a.pronto_avisado_em);
 
   const pet = a.pets;
   const tutor = pet?.clientes;
   const st = STATUS_AGENDAMENTO[a.status];
   const encerrado = ["concluido", "faltou", "cancelado"].includes(a.status);
+  const deHoje = mesmoDia(new Date(a.inicio), new Date());
+  // fotos: de hoje para trás, em horário que aconteceu (ou em qualquer um que já tenha foto)
+  const comFotos = Boolean(a.foto_antes || a.foto_depois)
+    || (!["cancelado", "faltou"].includes(a.status) && new Date(a.inicio) < somaDias(inicioDoDia(new Date()), 1));
+  const podeAvisarPronto = deHoje && (a.status === "em_atendimento" || a.status === "concluido");
 
   // já foi pago? tem pacote que cobre este serviço?
   const { dados: extra, recarregar } = useDados(async () => {
@@ -41,7 +48,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const recebido = (extra?.pago ?? []).reduce((t, l) => t + Number(l.valor), 0);
   const formasDoRecebido = [...new Set((extra?.pago ?? []).map((l) => FORMAS.find((f) => f.id === l.forma)?.rotulo).filter(Boolean))].join(" e ");
 
-  async function mudar(campos: Partial<{ status: StatusAgendamento; checklist: Record<string, boolean>; lembrete_em: string; pacote_cliente_id: string }>, aviso?: string) {
+  async function mudar(campos: Partial<{ status: StatusAgendamento; checklist: Record<string, boolean>; lembrete_em: string; pronto_avisado_em: string; pacote_cliente_id: string }>, aviso?: string) {
     if (somenteLeitura()) return false;
     setOcupado(true);
     try {
@@ -88,6 +95,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     if (!(await confirmar({ titulo: "Apagar este horário?", texto: "Ele some da agenda. Se o cliente só desmarcou, prefira Cancelar, que fica no histórico.", confirmar: "Apagar", perigo: true }))) return;
     try {
       ok(await sb.from("agendamentos").delete().eq("id", a.id).select("id"));
+      const fotos = [a.foto_antes, a.foto_depois].filter((c): c is string => Boolean(c));
+      if (fotos.length) void sb.storage.from("pets").remove(fotos);
       avisar("Horário apagado.");
       avisarMudanca(); aoMudar(); aoFechar();
     } catch (e) { avisarErro(e); }
@@ -96,6 +105,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const zap = linkWhatsApp(tutor?.telefone, textoLembrete({
     tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: a.servicos?.nome, quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
   }));
+
+  const zapPronto = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: pet?.nome ?? "Seu pet", petshop: petshop.nome }));
 
   if (comanda) {
     return <Comanda agendamento={a} aoFechar={() => setComanda(false)} aoPronto={() => { aoMudar(); aoFechar(); }} />;
@@ -158,6 +169,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           </div>
         )}
 
+        {comFotos && <AntesDepois agendamento={a} aoMudar={aoMudar} />}
+
         {!encerrado && (
           <div className="g-pilha p">
             {a.status === "marcado" && <button className="g-btn verde cheio" disabled={ocupado} onClick={() => void mudar({ status: "confirmado" }, "Horário confirmado.")}><Check />Cliente confirmou</button>}
@@ -171,9 +184,16 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           <button className="g-btn pri cheio" onClick={() => { if (!somenteLeitura()) setComanda(true); }}><Receipt />Fechar a conta{a.preco ? ` · ${brl(a.preco)}` : ""}</button>
         )}
 
+        {podeAvisarPronto && (zapPronto ? (
+          <a className="g-btn zap cheio" href={zapPronto} target="_blank" rel="noopener noreferrer"
+            onClick={() => { const agora = new Date().toISOString(); void mudar({ pronto_avisado_em: agora }).then((deu) => deu && setAvisadoEm(agora)); }}>
+            {avisadoEm ? <><BellRing />Avisado às {hora(avisadoEm)}</> : <><MessageCircle />Avisar que está pronto</>}
+          </a>
+        ) : <p className="g-pp g-muted">Sem telefone do tutor para avisar que {pet?.nome ?? "o pet"} está pronto.</p>)}
+
         <div className="g-fila">
           {zap ? (
-            <a className="g-btn zap g-cresce" href={zap} target="_blank" rel="noopener noreferrer" onClick={() => { void mudar({ lembrete_em: new Date().toISOString() }).then(recarregar); }}>
+            <a className={`g-btn ${podeAvisarPronto && zapPronto ? "sec" : "zap"} g-cresce`} href={zap} target="_blank" rel="noopener noreferrer" onClick={() => { void mudar({ lembrete_em: new Date().toISOString() }).then(recarregar); }}>
               <MessageCircle />{a.lembrete_em ? "Lembrar de novo" : "Lembrete no WhatsApp"}
             </a>
           ) : <p className="g-pp g-muted g-cresce">Sem telefone do tutor para mandar o lembrete.</p>}

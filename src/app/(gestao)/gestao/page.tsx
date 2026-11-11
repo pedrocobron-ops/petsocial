@@ -45,7 +45,7 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["Precisa instalar alguma coisa?", "Não. O sistema abre no navegador. Se quiser, você coloca na tela inicial do celular e ele fica como um aplicativo."],
   ["Funciona no celular?", "Sim. Ele foi feito primeiro para o celular. No computador funciona igual, com a tela maior."],
   ["O assistente faz as coisas sozinho?", "Não. Ele entende o pedido, mostra o que vai fazer e espera o seu “confirmar”. Nada entra na agenda, no caixa ou no estoque sem você ver."],
-  ["E os dados dos meus clientes?", <>Os dados são do seu pet shop. Você pode exportar e apagar quando quiser, como pede a LGPD. Os detalhes estão na <Link href="/politica-de-privacidade">política de privacidade</Link>.</>],
+  ["E os dados dos meus clientes?", <>Os dados são do seu pet shop. Você pode exportar e apagar quando quiser, como pede a LGPD. Os detalhes estão na <Link href="/gestao/privacidade">política de privacidade</Link>.</>],
   ["Emite nota fiscal?", "Ainda não. Hoje o sistema não emite nota fiscal."],
   ["Serve para clínica veterinária?", "O sistema é feito para pet shop, banho e tosa, creche e hotel. Ele não tem prontuário, receituário nem internação. Uma clínica que também faz banho e tosa pode usá-lo para essa parte."],
   ["Tem fidelidade?", "Não. A cobrança é mensal e você cancela quando quiser."],
@@ -196,8 +196,8 @@ export default function Pagina() {
           </div>
           <nav aria-label="Rodapé">
             <Link href="/gestao/entrar">Entrar</Link>
-            <Link href="/termos-de-uso">Termos de uso</Link>
-            <Link href="/politica-de-privacidade">Política de privacidade</Link>
+            <Link href="/gestao/termos">Termos de uso</Link>
+            <Link href="/gestao/privacidade">Política de privacidade</Link>
             <a href={linkSuporte()} target="_blank" rel="noopener noreferrer">WhatsApp</a>
             <Link href="/contato">Contato</Link>
             <Link href="/">Maestro Pet</Link>

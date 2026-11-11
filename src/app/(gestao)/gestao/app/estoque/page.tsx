@@ -371,6 +371,8 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
           await lancarPago(sb, petshop.id, {
             tipo: "entrada", valor, forma, categoria: "Venda de produtos",
             descricao: `Venda: ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}`,
+            // com os itens, apagar esta venda depois devolve o produto ao estoque
+            itens: [{ tipo: "produto", nome: produto.nome, qtd: n, valor: Math.round((valor / n) * 100) / 100, produto_id: produto.id }],
           });
           avisar(`Venda de ${brl(valor)} anotada.`);
         } catch (e) {

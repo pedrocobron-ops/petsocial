@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, CalendarDays, Cat, Check, Clock, Dog, MapPin, MessageCircle, PawPrint, Scissors } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Cat, Check, Clock, Dog, MapPin, MessageCircle, PawPrint, Plus, Scissors, X } from "lucide-react";
 import { Marca, Selo } from "@/components/gestao/marca";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
@@ -19,6 +20,13 @@ type Info = {
 };
 type Passo = "servico" | "quando" | "dados" | "enviado";
 type Especie = "cao" | "gato" | "outro";
+type PetDoPedido = { id: number; nome: string; especie: Especie; porte: Porte | null };
+type Enviado = { servico: string; dia: string; pets: { nome: string; hora: string }[] };
+
+/** Quantos pets cabem num pedido só (o banco aceita até 4). */
+const MAX_PETS = 4;
+let proximoPet = 0;
+const novoPet = (): PetDoPedido => ({ id: ++proximoPet, nome: "", especie: "cao", porte: null });
 
 const DIAS_NA_FAIXA = 14;
 const ESPECIES: { id: Especie; rotulo: string; icone: React.ComponentType<{ size?: number }> }[] = [
@@ -44,6 +52,15 @@ function precoDoCartao(s: ServicoDoLink) {
   const menor = Math.min(...valores);
   return valores.every((v) => v === menor) ? brlCurto(menor) : `a partir de ${brlCurto(menor)}`;
 }
+/** "10:00" + 90 min = "11:30". */
+function somaMin(h: string, min: number) {
+  const total = Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5)) + min;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+/** "Nina", "Nina e Bob", "Nina, Bob e Mel". */
+function listaDeNomes(nomes: string[]) {
+  return nomes.length <= 1 ? nomes.join("") : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+}
 /** "hoje", "amanhã" ou "sexta, 14 de novembro", contando a partir do dia do pet shop. */
 function diaPorExtenso(dia: string, hoje: string) {
   const d = deIsoDia(dia);
@@ -68,16 +85,18 @@ export default function AgendarPeloLink() {
   const [erroHorarios, setErroHorarios] = useState(false);
   const [avisoQuando, setAvisoQuando] = useState<string | null>(null);
 
-  const [pet, setPet] = useState("");
-  const [especie, setEspecie] = useState<Especie>("cao");
-  const [porte, setPorte] = useState<Porte | null>(null);
+  // um item por pet: a quantidade escolhida no passo de dia e hora é o tamanho desta lista
+  const [pets, setPets] = useState<PetDoPedido[]>(() => [novoPet()]);
+  const [conferindo, setConferindo] = useState(false);
+  const [naoCabe, setNaoCabe] = useState<number | null>(null);
   const [tutor, setTutor] = useState("");
   const [telefone, setTelefone] = useState("");
   const [obs, setObs] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [limite, setLimite] = useState(false);
   const [enviando, setEnviando] = useState(false);
-  const [enviado, setEnviado] = useState<{ pet: string; servico: string; dia: string; hora: string } | null>(null);
+  const [enviado, setEnviado] = useState<Enviado | null>(null);
+  const qtd = pets.length;
 
   const carregar = useCallback(async () => {
     setSemRede(false);
@@ -104,11 +123,11 @@ export default function AgendarPeloLink() {
 
   // horários livres do dia escolhido
   const vez = useRef(0);
-  const buscarHorarios = useCallback(async (s: string, d: string) => {
+  const buscarHorarios = useCallback(async (s: string, d: string, n: number) => {
     const minha = ++vez.current;
     setHorarios(null);
     setErroHorarios(false);
-    const { data, error } = await banco().rpc("link_horarios", { p_codigo: codigo, p_servico: s, p_dia: d });
+    const { data, error } = await banco().rpc("link_horarios", { p_codigo: codigo, p_servico: s, p_dia: d, p_pets: n });
     if (minha !== vez.current) return;
     if (error) { setErroHorarios(true); setHorarios([]); return; }
     const lista = ((data ?? []) as string[]).map((h) => String(h).slice(0, 5));
@@ -116,10 +135,41 @@ export default function AgendarPeloLink() {
     setHoraEscolhida((h) => (h && lista.includes(h) ? h : null));
   }, [codigo]);
   useEffect(() => {
-    if (passo === "quando" && servicoId && dia) void buscarHorarios(servicoId, dia);
-  }, [passo, servicoId, dia, buscarHorarios]);
+    if (passo === "quando" && servicoId && dia) void buscarHorarios(servicoId, dia, qtd);
+  }, [passo, servicoId, dia, qtd, buscarHorarios]);
 
-  const ir = (p: Passo) => { setPasso(p); setErro(null); window.scrollTo({ top: 0 }); };
+  const ir = (p: Passo) => { setPasso(p); setErro(null); setNaoCabe(null); window.scrollTo({ top: 0 }); };
+
+  /** Muda quantos pets vêm: completa a lista com pets em branco ou tira os últimos. */
+  function mudarQtd(n: number) {
+    const alvo = Math.min(MAX_PETS, Math.max(1, n));
+    setAvisoQuando(null);
+    setPets((l) => (alvo > l.length ? [...l, ...Array.from({ length: alvo - l.length }, novoPet)] : l.slice(0, alvo)));
+  }
+  const mudarPet = (id: number, novo: Partial<PetDoPedido>) => setPets((l) => l.map((x) => (x.id === id ? { ...x, ...novo } : x)));
+  function removerPet(id: number) {
+    setNaoCabe(null);
+    setPets((l) => (l.length > 1 ? l.filter((x) => x.id !== id) : l));
+  }
+  /** No passo de dados: só entra mais um pet se o horário escolhido ainda couber todos, um depois do outro. */
+  async function adicionarPet() {
+    if (!servico || !dia || !horaEscolhida || conferindo || pets.length >= MAX_PETS) return;
+    const n = pets.length + 1;
+    setErro(null);
+    setNaoCabe(null);
+    setConferindo(true);
+    const { data, error } = await banco().rpc("link_horarios", { p_codigo: codigo, p_servico: servico.id, p_dia: dia, p_pets: n });
+    setConferindo(false);
+    if (error) return setErro("Não consegui conferir o horário agora. Confira a internet e tente de novo.");
+    if (((data ?? []) as string[]).some((h) => String(h).slice(0, 5) === horaEscolhida)) setPets((l) => (l.length < MAX_PETS ? [...l, novoPet()] : l));
+    else setNaoCabe(n);
+  }
+  /** O horário escolhido não comporta mais um pet: leva para a escolha de horário já com a quantidade nova. */
+  function verHorariosPara(n: number) {
+    mudarQtd(n);
+    setHoraEscolhida(null);
+    ir("quando");
+  }
 
   function escolherServico(id: string) {
     setServicoId(id);
@@ -137,29 +187,32 @@ export default function AgendarPeloLink() {
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     if (!info || !servico || !dia || !horaEscolhida || enviando) return;
-    const nomePet = pet.trim(), nomeTutor = tutor.trim(), fone = soDigitos(telefone);
+    const lista = pets.map((x) => ({ ...x, nome: x.nome.trim() }));
+    const nomeTutor = tutor.trim(), fone = soDigitos(telefone);
     setLimite(false);
-    if (!nomePet) return setErro("Escreva o nome do pet.");
+    setNaoCabe(null);
+    if (lista.some((x) => !x.nome)) return setErro(lista.length > 1 ? "Escreva o nome de cada pet." : "Escreva o nome do pet.");
     if (nomeTutor.length < 2) return setErro("Escreva o seu nome.");
     if (fone.length !== 10 && fone.length !== 11) return setErro("Confira o WhatsApp: DDD e número.");
     setErro(null);
     setEnviando(true);
     const { data, error } = await banco().rpc("link_pedir", {
-      p_codigo: codigo, p_servico: servico.id, p_dia: dia, p_hora: horaEscolhida, p_tutor: nomeTutor, p_telefone: fone, p_pet: nomePet,
-      p_especie: especie, p_porte: porte ?? undefined, p_obs: obs.trim() || undefined,
+      p_codigo: codigo, p_servico: servico.id, p_dia: dia, p_hora: horaEscolhida, p_tutor: nomeTutor, p_telefone: fone, p_pet: lista[0].nome,
+      p_especie: lista[0].especie, p_porte: lista[0].porte ?? undefined, p_obs: obs.trim() || undefined,
+      p_outros: lista.length > 1 ? lista.slice(1).map((x) => ({ nome: x.nome, especie: x.especie, porte: x.porte })) : undefined,
     });
     setEnviando(false);
     if (error) return setErro("Não consegui enviar agora. Confira a internet e tente de novo.");
     const r = data as unknown as { ok: boolean; erro?: string } | null;
     if (r?.ok) {
-      setEnviado({ pet: nomePet, servico: servico.nome, dia, hora: horaEscolhida });
+      setEnviado({ servico: servico.nome, dia, pets: lista.map((x, i) => ({ nome: x.nome, hora: somaMin(horaEscolhida, servico.duracao_min * i) })) });
       setPasso("enviado");
       window.scrollTo({ top: 0 });
       return;
     }
     if (r?.erro === "ocupado") {
       setHoraEscolhida(null);
-      setAvisoQuando("Esse horário acabou de ser ocupado. Escolha outro, por favor.");
+      setAvisoQuando(lista.length > 1 ? `Esse horário não comporta mais os ${lista.length} pets seguidos. Escolha outro, por favor.` : "Esse horário acabou de ser ocupado. Escolha outro, por favor.");
       ir("quando");
     } else if (r?.erro === "limite") {
       setLimite(true);
@@ -167,7 +220,7 @@ export default function AgendarPeloLink() {
     } else if (r?.erro === "fechado") {
       setInfo(null);
     } else if (r?.erro === "dados") {
-      setErro("Confira o nome do pet, o seu nome e o WhatsApp com DDD.");
+      setErro("Confira o nome de cada pet, o seu nome e o WhatsApp com DDD.");
     } else {
       setErro("Algo deu errado. Tente de novo em instantes.");
     }
@@ -176,8 +229,7 @@ export default function AgendarPeloLink() {
   function pedirOutro() {
     setEnviado(null);
     setHoraEscolhida(null);
-    setPet("");
-    setPorte(null);
+    setPets([novoPet()]);
     setObs("");
     setServicoId(null);
     ir("servico");
@@ -225,6 +277,7 @@ export default function AgendarPeloLink() {
   const manha = (horarios ?? []).filter((h) => h < "12:00");
   const tarde = (horarios ?? []).filter((h) => h >= "12:00");
   const indice = PASSOS.findIndex((p) => p.id === passo);
+  const fimEstimado = servico && horaEscolhida ? somaMin(horaEscolhida, servico.duracao_min * qtd) : null;
 
   return (
     <Moldura>
@@ -296,6 +349,16 @@ export default function AgendarPeloLink() {
           </button>
 
           <div className="g-lk-bloco">
+            <div className="g-lk-bloco-t"><h2 id="g-lk-qtd-t">Quantos pets vêm?</h2><span className="g-muted g-pp">até {MAX_PETS}</span></div>
+            <div className="g-lk-opcoes quatro" role="group" aria-labelledby="g-lk-qtd-t">
+              {Array.from({ length: MAX_PETS }, (_, i) => i + 1).map((n) => (
+                <button key={n} type="button" className="g-lk-opcao g-lk-qtd" aria-pressed={qtd === n} aria-label={n === 1 ? "1 pet" : `${n} pets`} onClick={() => mudarQtd(n)}>{n}</button>
+              ))}
+            </div>
+            {qtd > 1 && <p className="g-muted g-p">Os pets são atendidos um depois do outro. Só aparecem os horários em que cabem os {qtd} seguidos.</p>}
+          </div>
+
+          <div className="g-lk-bloco">
             <div className="g-lk-bloco-t"><h2>Que dia fica bom?</h2><span className="g-muted g-pp">{meses}</span></div>
             <div className="g-lk-dias">
               {dias.map((d) => (
@@ -319,13 +382,13 @@ export default function AgendarPeloLink() {
                 <div className="g-lk-vazio">
                   <b>Não consegui ver os horários</b>
                   <p>Confira a internet e tente de novo.</p>
-                  <button type="button" className="g-btn sec" onClick={() => void buscarHorarios(servico.id, dia)}>Tentar de novo</button>
+                  <button type="button" className="g-btn sec" onClick={() => void buscarHorarios(servico.id, dia, qtd)}>Tentar de novo</button>
                 </div>
               ) : !horarios.length ? (
                 <div className="g-lk-vazio">
                   <CalendarDays aria-hidden />
-                  <b>Esse dia já está cheio</b>
-                  <p>Tente outro dia aqui em cima.</p>
+                  <b>{qtd > 1 ? `Não há horário para ${qtd} pets seguidos nesse dia` : "Esse dia já está cheio"}</b>
+                  <p>{qtd > 1 ? "Tente outro dia ou diminua a quantidade de pets aqui em cima." : "Tente outro dia aqui em cima."}</p>
                 </div>
               ) : (
                 <>
@@ -339,6 +402,12 @@ export default function AgendarPeloLink() {
                       </div>
                     </div>
                   ))}
+                  {horaEscolhida && fimEstimado && (
+                    <p className="g-lk-termino" aria-live="polite">
+                      <Clock aria-hidden />
+                      <span>{qtd > 1 ? `${qtd} pets, um depois do outro: começa às ${horaEscolhida} e termina por volta das ${fimEstimado}.` : `Começa às ${horaEscolhida} e termina por volta das ${fimEstimado}.`}</span>
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -356,33 +425,56 @@ export default function AgendarPeloLink() {
         <form className="g-lk-secao" onSubmit={enviar} noValidate>
           <button type="button" className="g-lk-escolhido" style={{ "--cor": servico.cor ?? "#f97316" } as React.CSSProperties} onClick={() => ir("quando")}>
             <i aria-hidden />
-            <span><b>{servico.nome}</b> · {diaPorExtenso(dia, info.hoje)}, às {horaEscolhida}</span>
+            <span><b>{servico.nome}</b> · {diaPorExtenso(dia, info.hoje)}, {qtd > 1 ? `das ${horaEscolhida} às ${fimEstimado}` : `às ${horaEscolhida}`}</span>
             <u>Trocar</u>
           </button>
 
           <div className="g-lk-bloco g-form">
-            <h2>Quem vem?</h2>
-            <label className="g-campo"><span>Nome do pet</span>
-              <input className="g-input" value={pet} maxLength={80} autoComplete="off" onChange={(e) => setPet(e.target.value)} />
-            </label>
-            <div className="g-campo">
-              <span>É um</span>
-              <div className="g-lk-opcoes tres">
-                {ESPECIES.map((x) => (
-                  <button key={x.id} type="button" className="g-lk-opcao" aria-pressed={especie === x.id} onClick={() => setEspecie(x.id)}><x.icone />{x.rotulo}</button>
-                ))}
+            <div className="g-lk-bloco-t"><h2>Quem vem?</h2>{qtd > 1 && <span className="g-muted g-pp">{qtd} pets</span>}</div>
+            {qtd > 1 && <p className="g-muted g-p">O mesmo serviço vale para todos os pets deste pedido: {servico.nome}. Eles são atendidos um depois do outro, na ordem abaixo.</p>}
+            {pets.map((x, i) => (
+              <div key={x.id} className="g-lk-pet" role="group" aria-label={qtd > 1 ? `Pet ${i + 1}` : "Pet"}>
+                {qtd > 1 && (
+                  <div className="g-lk-pet-t">
+                    <b>Pet {i + 1}</b>
+                    <span>das {somaMin(horaEscolhida, servico.duracao_min * i)} às {somaMin(horaEscolhida, servico.duracao_min * (i + 1))}</span>
+                    <button type="button" className="g-lk-pet-tira" onClick={() => removerPet(x.id)} aria-label={`Remover o pet ${i + 1}${x.nome.trim() ? `, ${x.nome.trim()}` : ""}`}><X aria-hidden />Remover</button>
+                  </div>
+                )}
+                <label className="g-campo"><span>Nome do pet</span>
+                  <input className="g-input" value={x.nome} maxLength={80} autoComplete="off" onChange={(e) => mudarPet(x.id, { nome: e.target.value })} />
+                </label>
+                <div className="g-campo">
+                  <span>É um</span>
+                  <div className="g-lk-opcoes tres">
+                    {ESPECIES.map((e) => (
+                      <button key={e.id} type="button" className="g-lk-opcao" aria-pressed={x.especie === e.id} onClick={() => mudarPet(x.id, { especie: e.id })}><e.icone />{e.rotulo}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="g-campo">
+                  <span>Porte <small>(se souber)</small></span>
+                  <div className="g-lk-opcoes quatro">
+                    {PORTES.map((p) => (
+                      <button key={p.id} type="button" className="g-lk-opcao porte" aria-pressed={x.porte === p.id} onClick={() => mudarPet(x.id, { porte: x.porte === p.id ? null : p.id })}>
+                        <b>{p.id}</b><small>{p.rotulo}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="g-campo">
-              <span>Porte <small>(se souber)</small></span>
-              <div className="g-lk-opcoes quatro">
-                {PORTES.map((p) => (
-                  <button key={p.id} type="button" className="g-lk-opcao porte" aria-pressed={porte === p.id} onClick={() => setPorte(porte === p.id ? null : p.id)}>
-                    <b>{p.id}</b><small>{p.rotulo}</small>
-                  </button>
-                ))}
+            ))}
+            {naoCabe && (
+              <div className="g-lk-alerta" role="alert">
+                <span>Às {horaEscolhida} não cabem {naoCabe} pets seguidos.</span>
+                <button type="button" className="g-btn sec p" onClick={() => verHorariosPara(naoCabe)}>Ver horários para {naoCabe} pets</button>
               </div>
-            </div>
+            )}
+            {qtd < MAX_PETS ? (
+              <button type="button" className="g-btn sec g-lk-pet-mais" disabled={conferindo} onClick={() => void adicionarPet()}><Plus />{conferindo ? "Conferindo o horário…" : "Adicionar outro pet"}</button>
+            ) : (
+              <p className="g-muted g-pp">Cabem até {MAX_PETS} pets por pedido.</p>
+            )}
           </div>
 
           <div className="g-lk-bloco g-form">
@@ -419,15 +511,28 @@ export default function AgendarPeloLink() {
       {passo === "enviado" && enviado && (
         <section className="g-lk-secao g-lk-ok" aria-live="polite">
           <span className="g-lk-ok-selo" aria-hidden><Check /></span>
-          <h2>Pedido enviado.</h2>
+          <h2>{enviado.pets.length > 1 ? `Pedido enviado para ${listaDeNomes(enviado.pets.map((x) => x.nome))}.` : "Pedido enviado."}</h2>
           <p>O {info.nome} confirma com você pelo WhatsApp.</p>
           <dl className="g-lk-resumo">
-            <div><dt>Pet</dt><dd>{enviado.pet}</dd></div>
-            <div><dt>Serviço</dt><dd>{enviado.servico}</dd></div>
+            <div><dt>Serviço</dt><dd>{enviado.servico}{enviado.pets.length > 1 && <small> para cada pet</small>}</dd></div>
             <div><dt>Dia</dt><dd>{diaPorExtenso(enviado.dia, info.hoje)}</dd></div>
-            <div><dt>Hora</dt><dd>{enviado.hora}</dd></div>
+            {enviado.pets.length === 1 ? (
+              <>
+                <div><dt>Pet</dt><dd>{enviado.pets[0].nome}</dd></div>
+                <div><dt>Hora</dt><dd>{enviado.pets[0].hora}</dd></div>
+              </>
+            ) : (
+              <div>
+                <dt>Pets</dt>
+                <dd>
+                  <ul className="g-lk-resumo-pets">
+                    {enviado.pets.map((x, i) => <li key={i}><span>{x.nome}</span><b>{x.hora}</b></li>)}
+                  </ul>
+                </dd>
+              </div>
+            )}
           </dl>
-          <p className="g-lk-nota">O horário ainda não está marcado. Espere a confirmação do pet shop.</p>
+          <p className="g-lk-nota">{enviado.pets.length > 1 ? "Os horários ainda não estão marcados. Espere a confirmação do pet shop." : "O horário ainda não está marcado. Espere a confirmação do pet shop."}</p>
           <div className="g-lk-ok-acoes">
             <button type="button" className="g-btn sec" onClick={pedirOutro}>Pedir outro horário</button>
             {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com o pet shop</a>}
@@ -442,7 +547,10 @@ function Moldura({ children }: { children: React.ReactNode }) {
   return (
     <div className="g-lk">
       <main className="g-lk-miolo">{children}</main>
-      <footer className="g-lk-rodape"><Marca tamanho={16} />Feito com Maestro Pet Gestão</footer>
+      <footer className="g-lk-rodape">
+        <span><Marca tamanho={16} />Feito com Maestro Pet Gestão</span>
+        <Link href="/gestao/privacidade" target="_blank">Privacidade</Link>
+      </footer>
     </div>
   );
 }

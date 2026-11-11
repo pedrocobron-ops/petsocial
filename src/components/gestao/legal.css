@@ -1,0 +1,44 @@
+/* Termos de uso e Política de privacidade do Gestão. Página de leitura, primeiro o celular. Prefixo g-leg-. */
+.g-leg { display: grid; grid-template-rows: auto 1fr auto; gap: 16px; min-height: 100dvh; width: 100%; max-width: 780px; min-width: 0; margin-inline: auto; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); overflow-x: clip; }
+@media (min-width: 720px) { .g-leg { padding-top: 28px; gap: 22px; } }
+
+.g-leg-topo { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; min-width: 0; }
+.g-leg-marca { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: var(--g-tinta); text-decoration: none; font: 500 1.125rem/1.1 var(--display); }
+.g-leg-nav { display: inline-flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--g-carta-2); }
+.g-leg-nav a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; color: var(--g-cinza); font-size: .875rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.g-leg-nav a[aria-current="page"] { background: var(--g-carta); color: var(--g-tinta); box-shadow: 0 1px 3px rgba(31, 27, 23, .14); }
+
+.g-leg-folha { min-width: 0; padding: 22px 18px 26px; border-radius: 24px; background: var(--g-carta); border: 1px solid var(--g-linha); box-shadow: var(--g-sombra); }
+@media (min-width: 720px) { .g-leg-folha { padding: 40px 48px 44px; } }
+
+.g-leg-abre { display: grid; gap: 10px; padding-bottom: 20px; margin-bottom: 22px; border-bottom: 1px solid var(--g-linha); }
+.g-leg-data { font-size: .875rem; color: var(--g-cinza); }
+.g-leg-resumo { font-size: 1.0625rem; line-height: 1.55; max-width: 62ch; }
+
+/* o texto: uma coluna estreita, bom espaço entre linhas, nada que passe da largura da tela */
+.g-leg-texto { max-width: 66ch; font-size: 1rem; line-height: 1.65; overflow-wrap: break-word; }
+.g-raiz .g-leg-texto > * + * { margin-top: 14px; }
+.g-raiz .g-leg-texto > h2 { margin-top: 34px; scroll-margin-top: 16px; }
+.g-raiz .g-leg-texto > h3 { margin-top: 22px; }
+.g-leg-texto ul, .g-leg-texto ol { display: grid; gap: 8px; margin-bottom: 0; padding-left: 1.25rem; }
+.g-leg-texto li { padding-left: 2px; }
+.g-leg-texto li::marker { color: var(--g-cinza); }
+.g-leg-texto a { color: var(--g-verde); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.g-leg-texto b { font-weight: 600; }
+
+/* quadro de destaque e lista de "quem faz o quê" (sem tabela, para não rolar para o lado) */
+.g-leg-quadro { padding: 14px 16px; border-radius: 16px; background: var(--t-menta); color: #1f4633; }
+.g-leg-quadro.aviso { background: var(--t-manteiga); color: #5b4708; }
+.g-leg-pares { display: grid; gap: 10px; margin-bottom: 0; }
+.g-leg-pares > div { display: grid; gap: 2px; min-width: 0; padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); }
+.g-leg-pares dt { font-weight: 600; }
+.g-leg-pares dd { margin: 0; color: var(--g-tinta); }
+@media (min-width: 620px) { .g-leg-pares > div { grid-template-columns: 11rem minmax(0, 1fr); gap: 14px; } }
+
+/* dado que falta preencher: precisa chamar a atenção de quem revisa */
+.g-leg-falta { padding: 1px 6px; border-radius: 6px; background: #ffe08a; color: #4a3500; font-weight: 600; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+
+.g-leg-pe { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font-size: .875rem; }
+.g-leg-pe a { color: var(--g-cinza); text-decoration: underline; text-underline-offset: 3px; }
+
+@media print { .g-leg-topo nav, .g-leg-pe { display: none; } .g-leg-folha { border: 0; box-shadow: none; padding: 0; } }

@@ -82,3 +82,18 @@
 /* dinheiro dentro do cartão de indicador: "R$ 12.345,67" precisa caber em meia tela */
 .g-kpi .gf-kpi-v { font-size: 1.25rem; letter-spacing: -.015em; }
 @media (min-width: 560px) { .g-kpi .gf-kpi-v { font-size: 1.625rem; } }
+
+/* itens de uma venda dentro da folha do lançamento (só leitura) */
+.gf-itens { display: grid; gap: 4px; padding: 12px 14px; border-radius: var(--g-raio); background: var(--g-carta-2); min-width: 0; }
+.gf-itens-t { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 4px; }
+.gf-itens ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.gf-itens li { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 9px 0; }
+.gf-itens li + li { border-top: 1px solid var(--g-linha); }
+.gf-itens .n { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.gf-itens .n b { font-weight: 600; font-size: .9375rem; overflow-wrap: anywhere; }
+.gf-itens .n small { font-size: .8125rem; color: var(--g-cinza); }
+.gf-itens .v { flex: none; font-weight: 600; font-size: .9375rem; white-space: nowrap; }
+.gf-itens-pe { display: grid; gap: 4px; padding-top: 10px; border-top: 1px dashed var(--g-linha-forte); font-size: .875rem; color: var(--g-cinza); }
+.gf-itens-pe > div { display: flex; justify-content: space-between; gap: 12px; }
+.gf-itens-pe > div > span:last-child { flex: none; }
+.gf-itens-pe .forte { color: var(--g-tinta); font-weight: 600; font-size: .9375rem; }

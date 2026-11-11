@@ -4,13 +4,15 @@ import { Marca, Selo } from "@/components/gestao/marca";
 import { Anel, Barras, Kpi, Ranking, Tendencia, Tile, type Tom } from "@/components/gestao/painel";
 import { useState } from "react";
 import Link from "next/link";
-import { BedDouble, CalendarDays, Check, ChevronRight, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, Wallet } from "lucide-react";
+import { BedDouble, CalendarDays, Check, HeartPulse, ChevronRight, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, Wallet } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
+import { buscarSaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
+import MetaMes from "@/components/gestao/meta-mes";
 import DicasMozart from "@/components/gestao/dicas-mozart";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
@@ -42,6 +44,7 @@ export default function Hoje() {
       sb.from("agendamentos").select("status, servicos(nome, cor)").eq("petshop_id", petshop.id).gte("inicio", ha30.toISOString()).lt("inicio", amanha.toISOString()).limit(2000),
       vejoFinanceiro ? sb.from("lancamentos").select("valor, data").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").gte("data", isoDia(ha6)).lte("data", hojeIso) : Promise.resolve({ data: [] }),
     ]);
+    const saude = await buscarSaudeVencendo(sb, petshop.id).catch(() => null);
     const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
     const porServico = new Map<string, { rotulo: string; valor: number; cor: string | null }>();
     for (const a of (doMes.data ?? []) as unknown as { status: string; servicos: { nome: string; cor: string | null } | null }[]) {
@@ -63,6 +66,7 @@ export default function Hoje() {
       saiu: (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0),
       contas: contas.data ?? [],
       pacotesVencendo: (pacotes.data ?? []).length,
+      saude,
       semana: Array.from({ length: 7 }, (_, i) => {
         const d = somaDias(seg, i), iso = isoDia(d);
         return { rotulo: nomeDiaCurto(d), valor: (daSemana.data ?? []).filter((a) => valeAg(a.status) && isoDia(new Date(a.inicio)) === iso).length };
@@ -95,6 +99,7 @@ export default function Hoje() {
     dados.amanhaSemLembrete > 0 && { icone: CalendarDays, tom: "pessego" as Tom, texto: `Amanhã ${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}.`, href: `/gestao/app/agenda?dia=${isoDia(somaDias(hoje, 1))}` },
     dados.acabando.length > 0 && { icone: Package, tom: "rosa" as Tom, texto: `${dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}: ${dados.acabando.slice(0, 3).map((p) => p.nome).join(", ")}.`, href: "/gestao/app/estoque" },
     dados.contas.length > 0 && { icone: Receipt, tom: "manteiga" as Tom, texto: `${dados.contas.length === 1 ? "1 conta vence" : `${dados.contas.length} contas vencem`} até hoje: ${brl(dados.contas.reduce((s, c) => s + Number(c.valor), 0))}.`, href: "/gestao/app/financeiro" },
+    dados.saude && dados.saude.vencidos + dados.saude.vencendo > 0 && { icone: HeartPulse, tom: "ceu" as Tom, texto: `${dados.saude.nomes.slice(0, 3).join(", ")}${dados.saude.nomes.length > 3 ? ` e mais ${dados.saude.nomes.length - 3}` : ""}: ${dados.saude.vencidos > 0 ? "vacina ou cuidado vencido" : "vacina ou cuidado vencendo nos próximos dias"}.`, href: "/gestao/app/clientes" },
     dados.pacotesVencendo > 0 && { icone: Ticket, tom: "lilas" as Tom, texto: `${dados.pacotesVencendo === 1 ? "1 pacote vence" : `${dados.pacotesVencendo} pacotes vencem`} nos próximos 7 dias.`, href: "/gestao/app/pacotes" },
   ].filter(Boolean) as { icone: React.ComponentType<{ size?: number }>; tom: Tom; texto: string; href: string }[] : [];
 
@@ -248,6 +253,8 @@ export default function Hoje() {
                 </div>
               </section>
             )}
+
+            <MetaMes />
 
             <section className="g-card">
               <div className="g-card-t"><h3>Movimento da semana</h3><span className="g-muted g-pp">horários por dia</span></div>

@@ -126,8 +126,8 @@ export default function Assinatura() {
             <Link className="g-link" href="/gestao/app/financeiro">Financeiro → Exportar</Link>.
           </p>
           <p className="g-p g-muted">
-            <Link className="g-link" href="/politica-de-privacidade" target="_blank">Política de privacidade</Link>{" · "}
-            <Link className="g-link" href="/termos-de-uso" target="_blank">Termos de uso</Link>{" · "}
+            <Link className="g-link" href="/gestao/privacidade" target="_blank">Política de privacidade</Link>{" · "}
+            <Link className="g-link" href="/gestao/termos" target="_blank">Termos de uso</Link>{" · "}
             <a className="g-link" href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer">Fale com a gente no WhatsApp</a>
           </p>
         </section>

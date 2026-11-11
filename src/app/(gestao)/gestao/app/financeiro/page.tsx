@@ -3,14 +3,15 @@
 import { useMemo, useState } from "react";
 import {
   ArrowDownLeft, ArrowUpRight, CalendarClock, CalendarDays, ChartColumn, Check, ChevronLeft, ChevronRight, CreditCard, Download, HandCoins, Plus, Receipt, Scale,
-  Search, TrendingUp, TriangleAlert,
+  Search, Target, TrendingUp, TriangleAlert,
 } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
-import { Esqueleto, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
+import { avisarMudanca, Campo, CampoValor, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import {
-  brlMini, Chips, COR_FORMA, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, rotuloForma, SemAcesso, soma, type Tipo,
+  brlMini, Chips, COR_FORMA, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, rotuloForma, SemAcesso, soma, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
+import { contasDaMeta } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
 import type { Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
@@ -35,7 +36,8 @@ type FolhaAberta =
   | { tipo: "novo" }
   | { tipo: "editar"; lancamento: Lancamento }
   | { tipo: "conta"; de: Tipo; conta?: Lancamento }
-  | { tipo: "baixa"; conta: Lancamento };
+  | { tipo: "baixa"; conta: Lancamento }
+  | { tipo: "meta" };
 
 type Movimento = Pick<Lancamento, "tipo" | "valor">;
 
@@ -206,6 +208,8 @@ function Financeiro() {
               </div>
             </div>
 
+            {aba === "resumo" && mesAtual && <CartaoMeta entrou={contas.entrou} aoEditar={() => abrir({ tipo: "meta" })} />}
+
             {aba === "resumo" && (
               dados.doMes.length ? (
                 <div className="g-duas">
@@ -284,7 +288,7 @@ function Financeiro() {
                           <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
                           <span className="t">
                             <b>{l.descricao || l.categoria}</b>
-                            <span>{dataCurta(l.data)}{l.descricao ? ` · ${l.categoria}` : ""}<i className="g-fin-so-cel"> · {rotuloForma(l.forma)}</i></span>
+                            <span>{dataCurta(l.data)}{l.descricao ? ` · ${l.categoria}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {rotuloForma(l.forma)}</i></span>
                           </span>
                           <span className="g-tag g-fin-so-largo">{rotuloForma(l.forma)}</span>
                           <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
@@ -309,7 +313,114 @@ function Financeiro() {
       )}
       {folha?.tipo === "conta" && <FolhaLancamento modo="conta" tipo={folha.de} inicial={folha.conta} aoFechar={() => setFolha(null)} aoSalvo={recarregar} />}
       {folha?.tipo === "baixa" && <FolhaBaixa conta={folha.conta} aoFechar={() => setFolha(null)} aoSalvo={recarregar} />}
+      {folha?.tipo === "meta" && <FolhaMeta aoFechar={() => setFolha(null)} />}
     </>
+  );
+}
+
+/** Meta do mês: quanto já entrou contra a meta, quanto falta e quanto precisa entrar por dia aberto. Só o dono altera. */
+function CartaoMeta({ entrou, aoEditar }: { entrou: number; aoEditar: () => void }) {
+  const { petshop, souDono } = useGestao();
+  const meta = Number(petshop.meta_mes ?? 0);
+  if (!(meta > 0)) {
+    if (!souDono) return null;
+    return (
+      <section className="g-card g-fin-meta vazia">
+        <Tile icone={Target} tom="menta" tamanho="g" />
+        <div className="g-fin-meta-txt">
+          <h3>Meta do mês</h3>
+          <p className="g-muted g-p">Diga quanto você quer que entre no mês. O progresso aparece aqui e na tela inicial.</p>
+        </div>
+        <button className="g-btn sec" onClick={aoEditar}><Target />Definir meta</button>
+      </section>
+    );
+  }
+  const hoje = new Date();
+  const c = contasDaMeta(meta, entrou, petshop.horario, hoje);
+  const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+  const diasNoMes = ultimoDia - hoje.getDate() + 1;
+  const nomeDosDias = c.peloHorario ? (c.dias === 1 ? "dia aberto" : "dias abertos") : c.dias === 1 ? "dia" : "dias";
+  return (
+    <section className="g-card g-fin-meta" aria-label="Meta do mês">
+      <div className="g-card-t">
+        <h3><Tile icone={Target} tom="menta" tamanho="p" />Meta do mês</h3>
+        {souDono
+          ? <button className="g-btn fantasma p" onClick={aoEditar}>Alterar</button>
+          : <span className="g-muted g-pp">{nomeMes(hoje)}</span>}
+      </div>
+      <div className="g-fin-meta-topo">
+        <p className="g-fin-meta-num"><b className="g-num">{brl(entrou)}</b> <span className="g-muted">de {brl(meta)}</span></p>
+        <span className={`g-tag g-tab${c.falta > 0 ? "" : " verde"}`}>{c.pct}%</span>
+      </div>
+      <div className="g-fin-meta-barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, c.pct)}
+        aria-label={`${c.pct}% da meta do mês`}>
+        <i style={{ width: `${Math.min(100, c.parte * 100)}%` }} />
+      </div>
+      <div className="g-fin-meta-fatos">
+        {c.falta > 0 ? (
+          <>
+            <div><small>Falta</small><b className="g-tab">{brl(c.falta)}</b></div>
+            <div>
+              <small>Até o fim do mês</small>
+              <b className="g-tab">{c.dias} {nomeDosDias}</b>
+              {c.peloHorario && c.dias !== diasNoMes && <small>{diasNoMes === 1 ? "de 1 dia no calendário" : `de ${diasNoMes} dias no calendário`}</small>}
+            </div>
+            {c.porDia != null
+              ? <div><small>Por {c.peloHorario ? "dia aberto" : "dia"}</small><b className="g-tab">{brl(c.porDia)}</b><small>para fechar a meta</small></div>
+              : <div><small>Por dia aberto</small><b>—</b><small>não há mais dia aberto neste mês</small></div>}
+          </>
+        ) : (
+          <>
+            <div><small>Meta</small><b>Alcançada</b></div>
+            <div><small>Acima da meta</small><b className="g-tab">{brl(c.passou)}</b></div>
+            <div><small>Até o fim do mês</small><b className="g-tab">{c.dias} {nomeDosDias}</b></div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FolhaMeta({ aoFechar }: { aoFechar: () => void }) {
+  const { sb, petshop, recarregarBase } = useGestao();
+  const { avisar, avisarErro } = useAvisos();
+  const atual = petshop.meta_mes == null ? null : Number(petshop.meta_mes);
+  const [valor, setValor] = useState<number | null>(atual && atual > 0 ? atual : null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  async function gravar(meta: number | null) {
+    if (salvando) return;
+    if (meta != null && !(meta > 0)) { setErro("Escreva o valor da meta."); return; }
+    if (meta != null && meta >= 1e8) { setErro("Esse valor é grande demais."); return; }
+    setSalvando(true);
+    try {
+      const r = await sb.from("petshops").update({ meta_mes: meta }).eq("id", petshop.id).select("id");
+      if (r.error) throw new Error(r.error.message);
+      if (!r.data?.length) throw new Error("Só o dono do pet shop pode mudar a meta.");
+      await recarregarBase();
+      avisar(meta == null ? "Meta retirada." : `Meta do mês: ${brl(meta)}.`);
+      avisarMudanca();
+      aoFechar();
+    } catch (e) {
+      avisarErro(e);
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Folha titulo="Meta do mês" aoFechar={aoFechar}
+      rodape={<>
+        {atual != null && atual > 0 && <button type="button" className="g-btn sec" onClick={() => void gravar(null)} disabled={salvando}>Tirar a meta</button>}
+        <button type="button" className="g-btn pri" onClick={() => void gravar(valor)} disabled={salvando}>{salvando ? "Guardando…" : "Guardar"}</button>
+      </>}>
+      <form className="g-form" onSubmit={(e) => { e.preventDefault(); void gravar(valor); }}>
+        <Campo rotulo="Quanto você quer que entre por mês" erro={erro} dica="Vale para todos os meses, até você mudar. Conta tudo o que entrou e já foi pago.">
+          <CampoValor valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus />
+        </Campo>
+        <button type="submit" hidden />
+      </form>
+    </Folha>
   );
 }
 

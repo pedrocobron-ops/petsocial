@@ -60,7 +60,7 @@ export default function CriarConta() {
         </label>
         <label className="g-check">
           <input type="checkbox" checked={aceito} onChange={(e) => setAceito(e.target.checked)} required />
-          <span>Li e aceito os <Link className="g-link" href="/termos-de-uso" target="_blank">Termos de Uso</Link> e a <Link className="g-link" href="/politica-de-privacidade" target="_blank">Política de Privacidade</Link>.</span>
+          <span>Li e aceito os <Link className="g-link" href="/gestao/termos" target="_blank">Termos de Uso</Link> e a <Link className="g-link" href="/gestao/privacidade" target="_blank">Política de Privacidade</Link>.</span>
         </label>
         {erro && <p className="g-erro" role="alert">{erro}</p>}
         <button className="g-btn pri cheio" disabled={indo}>{indo ? "Criando…" : "Criar minha conta"}</button>

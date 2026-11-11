@@ -5,7 +5,9 @@
 @keyframes g-lk-entra { from { opacity: 0; transform: translateY(8px); } }
 @media (min-width: 720px) { .g-lk-miolo { padding-top: 36px; gap: 18px; } }
 
-.g-lk-rodape { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 18px 16px calc(22px + env(safe-area-inset-bottom)); font-size: .8125rem; color: var(--g-cinza); }
+.g-lk-rodape { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 14px; padding: 18px 16px calc(22px + env(safe-area-inset-bottom)); font-size: .8125rem; color: var(--g-cinza); }
+.g-lk-rodape span { display: inline-flex; align-items: center; gap: 7px; }
+.g-lk-rodape a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 
 /* cabeçalho com o nome do pet shop */
 .g-lk-cab {
@@ -95,6 +97,21 @@
 .g-lk-hora:active { transform: scale(.96); }
 .g-lk-hora[aria-pressed="true"] { background: var(--g-laranja); border-color: var(--g-laranja); color: #1f1b17; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 8px 16px -10px rgba(249, 115, 22, .9); }
 .g-lk-hora-esq { min-height: 46px; border-radius: 999px; }
+.g-lk-termino { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--t-menta); color: #24543b; font-size: .9375rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.g-lk-termino svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+.g-lk-termino span { min-width: 0; }
+
+/* quantos pets vêm e um bloco por pet */
+.g-lk-opcao.g-lk-qtd { font: 500 1.25rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.g-lk-pet { display: grid; gap: 12px; min-width: 0; }
+.g-lk-pet + .g-lk-pet { padding-top: 14px; border-top: 1px dashed var(--g-linha-forte); }
+.g-lk-pet-t { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 10px; min-width: 0; }
+.g-lk-pet-t b { font: 500 1.125rem/1.2 var(--display); }
+.g-lk-pet-t span { flex: 1; min-width: 0; font-size: .875rem; color: var(--g-cinza); font-variant-numeric: tabular-nums; }
+.g-lk-pet-tira { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 10px; margin-right: -10px; border: 0; border-radius: 10px; background: none; color: #7a281b; font: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; }
+.g-lk-pet-tira:hover { background: var(--g-vermelho-tint); }
+.g-lk-pet-tira svg { width: 15px; height: 15px; }
+.g-lk-pet-mais { width: 100%; }
 
 /* escolhas do formulário */
 .g-lk-opcoes { display: grid; gap: 8px; }
@@ -135,6 +152,11 @@
 .g-lk-resumo dt { color: var(--g-cinza); font-size: .9375rem; }
 .g-lk-resumo dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .g-lk-resumo dd::first-letter { text-transform: uppercase; }
+.g-lk-resumo dd small { font-weight: 400; color: var(--g-cinza); }
+.g-lk-resumo-pets { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.g-lk-resumo-pets li { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
+.g-lk-resumo-pets span { min-width: 0; overflow-wrap: anywhere; }
+.g-lk-resumo-pets b { flex: none; font-variant-numeric: tabular-nums; }
 .g-lk-ok-acoes { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 
 /* carregando e telas de fim */

@@ -5,7 +5,7 @@ import { ArrowDownLeft, ArrowUpRight, Banknote, ChartColumn, Check, Coins, Credi
 import { useGestao } from "@/components/gestao/contexto";
 import { avisarMudanca, Campo, CampoValor, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import {
-  brlMini, COR_FORMA, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDoCaixa, rotuloForma, SemAcesso, soma, type Tipo,
+  brlMini, COR_FORMA, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDeItens, resumoDoCaixa, rotuloForma, SemAcesso, soma, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import VendaBalcao from "@/components/gestao/loja/venda";
 import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
@@ -285,7 +285,7 @@ function LinhaLancamento({ l, aoTocar }: { l: Lancamento; aoTocar: () => void })
       <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
       <span className="t">
         <b>{l.descricao || l.categoria}</b>
-        <span>{hora(l.criado_em)}{l.descricao ? ` · ${l.categoria}` : ""}<i className="g-cx-so-cel"> · {rotuloForma(l.forma)}</i></span>
+        <span>{hora(l.criado_em)}{l.descricao ? ` · ${l.categoria}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-cx-so-cel"> · {rotuloForma(l.forma)}</i></span>
       </span>
       <span className="g-tag g-cx-so-largo">{rotuloForma(l.forma)}</span>
       <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>

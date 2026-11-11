@@ -2,14 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Lock, Plus, Truck } from "lucide-react";
+import { BellRing, ChevronLeft, ChevronRight, Lock, Plus, Truck } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { deMin, paraMin } from "@/lib/gestao/agenda";
-import { dataCurta, dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
+import { dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
-import { AvatarPet, Esqueleto, Vazio, abrirAssistente, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
+import { AvatarPet, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
@@ -26,7 +26,6 @@ function Agenda() {
   const router = useRouter();
   const params = useSearchParams();
   const somenteLeitura = useSomenteLeitura();
-  const { avisar, avisarErro, confirmar } = useAvisos();
   const [dia, setDia] = useState(() => params.get("dia") ?? isoDia(new Date()));
   const [visao, setVisao] = useState<"dia" | "semana">("dia");
   const [prof, setProf] = useState<string | null>(null);
@@ -34,6 +33,7 @@ function Agenda() {
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
   const [bloqueando, setBloqueando] = useState(false);
+  const [bloqueioAberto, setBloqueioAberto] = useState<Bloqueio | null>(null);
 
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
   const data = deIsoDia(dia);
@@ -78,17 +78,7 @@ function Agenda() {
   };
   const bloqueiosDoDia = trechosDe(data);
   const textoDoTrecho = (t: Trecho) => (t.inteiro ? "Dia inteiro" : `${deMin(t.de)} às ${deMin(t.ate)}`);
-  async function removerBloqueio(t: Trecho, d: Date) {
-    if (somenteLeitura()) return;
-    const sim = await confirmar({ titulo: "Remover este bloqueio?", texto: `${t.b.motivo ?? "Bloqueio"} · ${nomeDiaCurto(d)} ${dataCurta(d)}, ${textoDoTrecho(t).toLowerCase()} · ${nomeDe(t.b.profissional_id)}. O horário volta a ficar livre.`, confirmar: "Remover bloqueio", perigo: true });
-    if (!sim) return;
-    try {
-      ok(await sb.from("bloqueios").delete().eq("id", t.b.id).eq("petshop_id", petshop.id).select("id").single());
-      avisar("Bloqueio removido.");
-      void recarregarBloqueios();
-      avisarMudanca();
-    } catch (e) { avisarErro(e); }
-  }
+  const abrirBloqueio = (b: Bloqueio) => { if (!somenteLeitura()) setBloqueioAberto(b); };
 
   // janelas livres do dia (entre um atendimento e outro, dentro do funcionamento)
   const funcionamento = horarioDoDia(petshop.horario, data);
@@ -218,7 +208,7 @@ function Agenda() {
                     if (ate <= de) return null;
                     const rotulo = `${t.b.motivo ?? "Bloqueado"}${t.b.profissional_id ? ` · ${nomeDe(t.b.profissional_id)}` : ""}`;
                     return (
-                      <button key={t.b.id} className="g-agd-faixa" title={`${rotulo}, ${textoDoTrecho(t).toLowerCase()}. Toque para remover.`} onClick={() => void removerBloqueio(t, d)}
+                      <button key={t.b.id} className="g-agd-faixa" title={`${rotulo}, ${textoDoTrecho(t).toLowerCase()}. Toque para alterar ou remover.`} onClick={() => abrirBloqueio(t.b)}
                         style={{ top: ((de - faixa.ini) / 60) * H_HORA, height: ((ate - de) / 60) * H_HORA }}>
                         <Lock aria-hidden /><span>{rotulo}</span>
                       </button>
@@ -264,7 +254,7 @@ function Agenda() {
                 <div className="g-hora-grupo g-agd-linha" key={`b${l.t.b.id}`}>
                   {l.t.inteiro ? <time className="txt">Dia</time> : <time>{deMin(l.t.de)}</time>}
                   <span className="ponto" aria-hidden />
-                  <button className="g-agd-bloq" onClick={() => void removerBloqueio(l.t, data)} aria-label={`Bloqueio: ${l.t.b.motivo ?? "sem motivo"}, ${textoDoTrecho(l.t)}. Toque para remover.`}>
+                  <button className="g-agd-bloq" onClick={() => abrirBloqueio(l.t.b)} aria-label={`Bloqueio: ${l.t.b.motivo ?? "sem motivo"}, ${textoDoTrecho(l.t)}. Toque para alterar ou remover.`}>
                     <span className="g-agd-cadeado"><Lock aria-hidden /></span>
                     <span className="t">
                       <b>{l.t.b.motivo ?? "Bloqueado"}</b>
@@ -284,6 +274,7 @@ function Agenda() {
                       <span className="serv"><i />{[l.a.servicos?.nome, l.a.pets?.clientes?.nome, quemAtende.length > 1 ? l.a.profissionais?.nome.split(" ")[0] : null].filter(Boolean).join(" · ")}</span>
                     </span>
                     {l.a.leva_traz && <Truck size={18} aria-label="Leva e traz" />}
+                    {l.a.pronto_avisado_em && <span className="g-agd-avisado" role="img" aria-label={`Tutor avisado às ${hora(l.a.pronto_avisado_em)}`} title={`Tutor avisado às ${hora(l.a.pronto_avisado_em)}`}><BellRing aria-hidden /></span>}
                     {l.a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[l.a.status].tom}`}>{STATUS_AGENDAMENTO[l.a.status].rotulo}</span>}
                   </button>
                 </div>
@@ -314,6 +305,7 @@ function Agenda() {
         aoFechar={() => setNovo(null)} aoSalvar={() => { setNovo(null); void recarregar(); }} />}
       {selecionado && !editando && <DetalheAgendamento agendamento={selecionado} aoFechar={() => setAberto(null)} aoMudar={() => void recarregar()} aoEditar={() => setEditando(selecionado)} />}
       {bloqueando && <FormBloqueio diaInicial={dia} profissionalInicial={prof} aoFechar={() => setBloqueando(false)} aoSalvar={() => { setBloqueando(false); void recarregarBloqueios(); }} />}
+      {bloqueioAberto && <FormBloqueio key={bloqueioAberto.id} bloqueio={bloqueioAberto} aoFechar={() => setBloqueioAberto(null)} aoSalvar={() => { setBloqueioAberto(null); void recarregarBloqueios(); }} />}
       {editando && <FormAgendamento agendamento={editando} aoFechar={() => setEditando(null)} aoSalvar={() => { setEditando(null); setAberto(null); void recarregar(); }} />}
     </>
   );

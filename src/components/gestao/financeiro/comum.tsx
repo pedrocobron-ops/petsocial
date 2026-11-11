@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
-import { caixaAberto, lancarPago } from "@/lib/gestao/dinheiro";
+import { Package, Scissors, Sparkles, Trash2 } from "lucide-react";
+import { caixaAberto, contaDosItens, desfazerVenda, itensDoLancamento, lancarPago, produtosDaVenda } from "@/lib/gestao/dinheiro";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, isoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
+import { Tile } from "../painel";
 import { avisarMudanca, Campo, CampoValor, Folha, useAvisos, Vazio } from "../ui";
 import "./financeiro.css";
 
@@ -105,6 +106,52 @@ export function LinhaResumo({ nome, valor, forte, tom }: { nome: string; valor: 
   );
 }
 
+/* ---------- itens de uma venda ---------- */
+
+const fmtQtd = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
+const ICONE_ITEM = { servico: Scissors, produto: Package, extra: Sparkles } as const;
+const TOM_ITEM = { servico: "pessego", produto: "rosa", extra: "ceu" } as const;
+
+/** "3 itens" para o subtítulo das linhas de lista; vazio quando o lançamento não tem itens. */
+export function resumoDeItens(l: { itens?: unknown }) {
+  const n = itensDoLancamento(l).length;
+  return n ? (n === 1 ? "1 item" : `${n} itens`) : "";
+}
+
+/** O que foi vendido neste lançamento: quantidade × nome, preço de cada um e total da linha. Só leitura. */
+export function ItensDoLancamento({ lancamento }: { lancamento: Pick<Lancamento, "itens" | "valor"> }) {
+  const itens = itensDoLancamento(lancamento);
+  if (!itens.length) return null;
+  const { soma: somaItens, desconto } = contaDosItens(itens, Number(lancamento.valor));
+  return (
+    <section className="gf-itens" aria-label="Itens desta venda">
+      <div className="gf-itens-t">
+        <span className="g-rotulo">Itens desta venda</span>
+        <span className="g-muted g-pp">{itens.length === 1 ? "1 item" : `${itens.length} itens`}</span>
+      </div>
+      <ul>
+        {itens.map((i, n) => (
+          <li key={n}>
+            <Tile icone={ICONE_ITEM[i.tipo]} tom={TOM_ITEM[i.tipo]} tamanho="p" />
+            <span className="n">
+              <b><span className="g-tab">{fmtQtd(i.qtd)} ×</span> {i.nome}</b>
+              <small className="g-tab">{brl(i.valor)} cada</small>
+            </span>
+            <b className="g-tab v">{brl(Math.round(i.qtd * i.valor * 100) / 100)}</b>
+          </li>
+        ))}
+      </ul>
+      {desconto > 0 && (
+        <div className="gf-itens-pe">
+          <div><span>Soma dos itens</span><span className="g-tab">{brl(somaItens)}</span></div>
+          <div><span>Desconto</span><span className="g-tab">− {brl(desconto)}</span></div>
+          <div className="forte"><span>Valor do lançamento</span><span className="g-tab">{brl(lancamento.valor)}</span></div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /* ---------- folha de lançamento ---------- */
 
 const categoriasDe = (tipo: Tipo) => (tipo === "entrada" ? CATEGORIAS_ENTRADA : CATEGORIAS_SAIDA);
@@ -134,6 +181,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
 
   const conta = modo === "conta";
   const entrada = tipo === "entrada";
+  const voltam = produtosDaVenda(inicial).length;
   const lista = categoriasDe(tipo);
   const categorias = (lista.includes(categoria) ? lista : [categoria, ...lista]).map((c) => ({ id: c, rotulo: c }));
   const titulo = conta
@@ -199,20 +247,24 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     if (!inicial || salvando) return;
     const sim = await confirmar({
       titulo: conta ? "Excluir esta conta?" : "Excluir este lançamento?",
-      texto: `${inicial.descricao || inicial.categoria} · ${brl(inicial.valor)}. Não dá para desfazer.`,
+      texto: `${inicial.descricao || inicial.categoria} · ${brl(inicial.valor)}. ${voltam === 1 ? "Esta venda tinha 1 produto. Ele volta para o estoque. " : voltam > 1 ? `Esta venda tinha ${voltam} produtos. Eles voltam para o estoque. ` : ""}Não dá para desfazer.`,
       confirmar: "Excluir", perigo: true,
     });
     if (!sim) return;
     setSalvando(true);
     try {
-      const r = await sb.from("lancamentos").delete().eq("id", inicial.id).eq("petshop_id", petshop.id);
-      if (r.error) throw new Error(r.error.message);
-      avisar(conta ? "Conta excluída." : "Lançamento excluído.");
+      const r = await desfazerVenda(sb, petshop.id, inicial);
+      const nome = conta ? "Conta excluída." : "Lançamento excluído.";
+      if (r.erroEstoque) avisarErro(`${nome} Mas os produtos não voltaram para o estoque. Acerte o saldo na tela de Estoque. (${r.erroEstoque})`);
+      else if (!r.produtos) avisar(nome);
+      else if (!r.devolvidos) avisar(`${nome} ${r.produtos === 1 ? "O produto não existe mais" : "Os produtos não existem mais"} no estoque, então nada voltou.`);
+      else avisar(`${nome} ${r.devolvidos === 1 ? "1 produto voltou" : `${r.devolvidos} produtos voltaram`} para o estoque.${r.devolvidos < r.produtos ? ` ${r.produtos - r.devolvidos === 1 ? "1 não existe mais" : `${r.produtos - r.devolvidos} não existem mais`} e ficou de fora.` : ""}`);
       await aoSalvo();
       avisarMudanca();
       aoFechar();
     } catch (e) {
       avisarErro(e);
+      await aoSalvo();
       setSalvando(false);
     }
   }
@@ -224,6 +276,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Guardando…" : inicial ? "Guardar" : conta ? "Anotar conta" : "Lançar"}</button>
       </>}>
       <form className="g-form" onSubmit={(e) => { e.preventDefault(); void salvar(); }}>
+        {inicial && <ItensDoLancamento lancamento={inicial} />}
         {escolheTipo && !inicial && (
           <div className="g-seg gf-seg-cheio" role="group" aria-label="Tipo">
             <button type="button" aria-pressed={entrada} onClick={() => trocarTipo("entrada")}>Entrada</button>

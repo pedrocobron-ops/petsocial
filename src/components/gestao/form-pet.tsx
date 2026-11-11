@@ -5,19 +5,9 @@ import { Camera } from "lucide-react";
 import type { Cliente, Pet, PetComTutor } from "@/lib/gestao/tipos";
 import { PORTES } from "@/lib/gestao/tipos";
 import { semAcento } from "@/lib/gestao/util";
+import { reduzirFoto } from "@/lib/gestao/foto";
 import { useGestao } from "./contexto";
 import { AvatarPet, Campo, Folha, ok, useAvisos, useDados } from "./ui";
-
-/** Reduz a foto para no máximo 640 px e devolve um JPEG leve (celulares mandam fotos de vários MB). */
-async function reduzirFoto(arquivo: File): Promise<Blob> {
-  const img = await createImageBitmap(arquivo);
-  const escala = Math.min(1, 640 / Math.max(img.width, img.height));
-  const tela = document.createElement("canvas");
-  tela.width = Math.round(img.width * escala);
-  tela.height = Math.round(img.height * escala);
-  tela.getContext("2d")!.drawImage(img, 0, 0, tela.width, tela.height);
-  return new Promise((res, rej) => tela.toBlob((b) => (b ? res(b) : rej(new Error("Não consegui ler a foto."))), "image/jpeg", 0.82));
-}
 
 /**
  * Cadastro ou edição de um pet. Em cadastro novo, escolhe um tutor existente ou cria o tutor junto.
