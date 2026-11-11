@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, LogIn, LogOut, MessageCircle, Plus } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarCheck, DoorOpen, Home, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Plus, Sun } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import FormPet from "@/components/gestao/form-pet";
+import { Kpi } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { Chips, ChipsForma, ErroTela, type Forma } from "@/components/gestao/loja/pecas";
 import { lancarPago } from "@/lib/gestao/dinheiro";
 import type { Cliente, Estadia, Pet } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCurta, hora, inicioDoDia, isoDia, juntaDiaHora, linkWhatsApp } from "@/lib/gestao/util";
+import "./creche-hotel.css";
 
 type PetDaEstadia = Pick<Pet, "id" | "nome" | "foto" | "especie" | "sexo" | "alertas"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
 type EstadiaCompleta = Estadia & { pets: PetDaEstadia | null };
@@ -43,6 +45,22 @@ function mensagem(e: EstadiaCompleta, petshop: string, reserva: boolean) {
   }
   const bem = pet.sexo === "M" ? `O ${pet.nome} está ótimo` : pet.sexo === "F" ? `A ${pet.nome} está ótima` : `${pet.nome} está muito bem`;
   return `${oi} ${bem} aqui ${lugar} do ${petshop}.`;
+}
+
+/** Etiqueta colorida do tipo: creche é dia (manteiga), hotel é noite (céu). */
+function EtiquetaTipo({ tipo, curta }: { tipo: string; curta?: boolean }) {
+  const Icone = tipo === "hotel" ? Moon : Sun;
+  return <span className={`g-ch-tipo ${tipo === "hotel" ? "hotel" : "creche"}${curta ? " curta" : ""}`} title={nomeTipo(tipo)}><Icone aria-hidden /><em>{nomeTipo(tipo)}</em></span>;
+}
+
+/** Indicador que também é botão: toca e a tela abre naquela aba. */
+function KpiAcao({ ativo, aoTocar, children }: { ativo: boolean; aoTocar: () => void; children: React.ReactNode }) {
+  return (
+    <div className="g-ch-kpi-acao" role="button" tabIndex={0} aria-pressed={ativo} onClick={aoTocar}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); aoTocar(); } }}>
+      {children}
+    </div>
+  );
 }
 
 function BotaoZap({ e, reserva }: { e: EstadiaCompleta; reserva?: boolean }) {
@@ -108,7 +126,16 @@ export default function CrecheHotel() {
     } catch (x) { avisarErro(x); }
   }
 
-  const hoje0 = inicioDoDia(new Date()).getTime();
+  const agora = new Date();
+  const hoje0 = inicioDoDia(agora).getTime();
+  const hojeIso = isoDia(agora);
+
+  // números do topo: saem das estadias abertas que a tela já carregou
+  const chegamHoje = reservas.filter((e) => isoDia(new Date(e.entrada)) === hojeIso);
+  const saemHoje = naCasa.filter((e) => e.saida_prevista && isoDia(new Date(e.saida_prevista)) === hojeIso);
+  const atrasadas = naCasa.filter((e) => e.saida_prevista && new Date(e.saida_prevista) < agora).length;
+  const noHotel = naCasa.filter((e) => e.tipo === "hotel").length;
+  const proximaReserva = reservas.find((e) => new Date(e.entrada).getTime() >= hoje0);
 
   return (
     <>
@@ -132,6 +159,25 @@ export default function CrecheHotel() {
         </Vazio>
       ) : (
         <div className="g-pilha">
+          <div className="g-grade kpis">
+            <KpiAcao ativo={aba === "casa"} aoTocar={() => setAba("casa")}>
+              <Kpi icone={Home} tom="ceu" rotulo="Na casa agora" valor={naCasa.length}
+                apoio={naCasa.length ? [naCasa.length - noHotel && `${naCasa.length - noHotel} na creche`, noHotel && `${noHotel} no hotel`].filter(Boolean).join(" · ") : "a casa está vazia"} />
+            </KpiAcao>
+            <KpiAcao ativo={false} aoTocar={() => setAba("reservas")}>
+              <Kpi icone={LogIn} tom="menta" rotulo="Chegam hoje" valor={chegamHoje.length}
+                apoio={chegamHoje.length ? chegamHoje.slice(0, 2).map((e) => e.pets?.nome).filter(Boolean).join(", ") + (chegamHoje.length > 2 ? ` e mais ${chegamHoje.length - 2}` : "") : "nenhuma reserva para hoje"} />
+            </KpiAcao>
+            <KpiAcao ativo={false} aoTocar={() => setAba("casa")}>
+              <Kpi icone={DoorOpen} tom={atrasadas ? "rosa" : "pessego"} rotulo="Saem hoje" valor={saemHoje.length}
+                apoio={atrasadas ? `${atrasadas} com saída atrasada` : saemHoje.length ? "pela saída prevista" : "ninguém com saída hoje"} />
+            </KpiAcao>
+            <KpiAcao ativo={aba === "reservas"} aoTocar={() => setAba("reservas")}>
+              <Kpi icone={CalendarCheck} tom="lilas" rotulo="Reservas" valor={reservas.length}
+                apoio={proximaReserva ? `próxima: ${quando(proximaReserva.entrada)}` : reservas.length ? "com a data já passada" : "nenhuma marcada"} />
+            </KpiAcao>
+          </div>
+
           <div className="g-fila entre">
             <div className="g-seg ge-abas">
               <button aria-pressed={aba === "casa"} onClick={() => setAba("casa")}>Na casa agora{naCasa.length ? ` (${naCasa.length})` : ""}</button>
@@ -145,27 +191,42 @@ export default function CrecheHotel() {
             const lista = naCasa.filter(doTipo);
             if (!lista.length) return <p className="g-muted g-centro" style={{ padding: "32px 8px" }}>{naCasa.length ? "Ninguém desse tipo na casa agora." : "A casa está vazia agora."}</p>;
             return (
-              <div className="g-grade c2">
+              <div className="g-ch-grade">
                 {lista.map((e) => {
                   const pet = e.pets;
-                  const atrasada = e.saida_prevista && new Date(e.saida_prevista).getTime() < Date.now();
+                  const entrou = new Date(e.entrada).getTime();
+                  const sai = e.saida_prevista ? new Date(e.saida_prevista).getTime() : null;
+                  const atrasada = sai != null && sai < agora.getTime();
+                  const parte = sai == null ? null : sai <= entrou ? 1 : Math.max(0, Math.min(1, (agora.getTime() - entrou) / (sai - entrou)));
+                  const diarias = contarDiarias(e, agora);
                   return (
-                    <div key={e.id} className="g-card g-pilha p">
-                      <div className="g-fila" style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
+                    <div key={e.id} className={`g-ch-cartao ${e.tipo === "hotel" ? "hotel" : "creche"}`}>
+                      <div className="g-ch-topo">
                         <AvatarPet pet={pet ?? { nome: "?" }} tamanho="g" />
-                        <div className="g-cresce">
-                          <div className="g-fila entre" style={{ gap: 6 }}>
-                            <h2 style={{ overflowWrap: "anywhere" }}>{pet?.nome ?? "Pet removido"}</h2>
-                            <span className={`g-tag ${e.tipo === "hotel" ? "azul" : "verde"}`}>{nomeTipo(e.tipo)}</span>
-                          </div>
-                          <p className="g-muted g-p">{pet?.clientes?.nome ?? "Sem tutor"}</p>
-                          <p className="g-p">desde {quando(e.entrada)}</p>
-                          <p className={`g-p ${atrasada ? "g-vermelho-t" : "g-muted"}`}>{e.saida_prevista ? `saída prevista: ${quando(e.saida_prevista)}` : "sem saída prevista"}</p>
+                        <div className="t">
+                          <h2>{pet?.nome ?? "Pet removido"}</h2>
+                          <span>{pet?.clientes?.nome ?? "Sem tutor"}</span>
+                        </div>
+                        <EtiquetaTipo tipo={e.tipo} />
+                      </div>
+
+                      <div className={`g-ch-periodo${atrasada ? " atrasada" : ""}${parte == null ? " aberta" : ""}`}>
+                        <div className="g-fila entre g-pp">
+                          <span className="g-muted">{diarias === 1 ? "1ª diária" : `${diarias}ª diária`}</span>
+                          {atrasada ? <span className="g-tag vermelho">saída atrasada</span> : parte != null && <span className="g-muted g-tab">{Math.round(parte * 100)}% do período</span>}
+                        </div>
+                        <div className="g-ch-barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={parte == null ? undefined : Math.round(parte * 100)} aria-label="Quanto do período já passou">
+                          <i style={{ width: `${parte == null ? 100 : Math.max(4, parte * 100)}%` }} />
+                        </div>
+                        <div className="pontas">
+                          <span><small>desde</small><b>{quando(e.entrada)}</b></span>
+                          <span className={atrasada ? "g-vermelho-t" : undefined}><small>{e.saida_prevista ? "saída prevista" : "saída"}</small><b>{e.saida_prevista ? quando(e.saida_prevista) : "sem saída prevista"}</b></span>
                         </div>
                       </div>
+
                       {pet?.alertas && <div className="g-aviso vermelho" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce"><b>Atenção:</b> {pet.alertas}</span></div>}
-                      {e.obs && <p className="g-p" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{e.obs}</p>}
-                      <div className="g-fila">
+                      {e.obs && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{e.obs}</span></p>}
+                      <div className="g-fila g-ch-acoes">
                         <BotaoZap e={e} />
                         <button className="g-btn verde p" style={{ marginLeft: "auto" }} onClick={() => { if (!somenteLeitura()) setSaindo(e); }}><LogOut /> Check-out</button>
                       </div>
@@ -180,27 +241,32 @@ export default function CrecheHotel() {
             const lista = reservas.filter(doTipo);
             if (!lista.length) return <p className="g-muted g-centro" style={{ padding: "32px 8px" }}>Nenhuma reserva marcada.</p>;
             return (
-              <div className="g-grade c2">
+              <div className="g-ch-grade">
                 {lista.map((e) => {
                   const pet = e.pets;
-                  const passou = inicioDoDia(new Date(e.entrada)).getTime() < hoje0;
+                  const dias = Math.round((inicioDoDia(new Date(e.entrada)).getTime() - hoje0) / 864e5);
+                  const passou = dias < 0;
                   return (
-                    <div key={e.id} className="g-card g-pilha p">
-                      <div className="g-fila" style={{ flexWrap: "nowrap" }}>
-                        <AvatarPet pet={pet ?? { nome: "?" }} />
-                        <div className="g-cresce">
-                          <b style={{ display: "block", fontSize: "1.0625rem" }}>{pet?.nome ?? "Pet removido"}</b>
-                          <span className="g-muted g-p">{[pet?.clientes?.nome, nomeTipo(e.tipo)].filter(Boolean).join(" · ")}</span>
+                    <div key={e.id} className={`g-ch-cartao reserva ${e.tipo === "hotel" ? "hotel" : "creche"}`}>
+                      <div className="g-ch-topo">
+                        <AvatarPet pet={pet ?? { nome: "?" }} tamanho="g" />
+                        <div className="t">
+                          <h2>{pet?.nome ?? "Pet removido"}</h2>
+                          <span>{pet?.clientes?.nome ?? "Sem tutor"}</span>
                         </div>
-                        {passou && <span className="g-tag amarelo">não veio</span>}
+                        <EtiquetaTipo tipo={e.tipo} />
                       </div>
-                      <p className="g-p">
-                        <b>{quando(e.entrada)}</b>
-                        {e.saida_prevista ? ` até ${quando(e.saida_prevista)}` : ""}
-                      </p>
+
+                      <div className="g-ch-rota">
+                        <span><small>chega</small><b>{quando(e.entrada)}</b></span>
+                        {e.saida_prevista && <><ArrowRight aria-hidden /><span><small>sai</small><b>{quando(e.saida_prevista)}</b></span></>}
+                        {passou ? <span className="g-tag amarelo">não veio</span>
+                          : <span className={`g-tag ${dias === 0 ? "verde" : "azul"}`}>{dias === 0 ? "chega hoje" : dias === 1 ? "chega amanhã" : `em ${dias} dias`}</span>}
+                      </div>
+
                       {pet?.alertas && <p className="g-p g-vermelho-t"><b>Atenção:</b> {pet.alertas}</p>}
-                      {e.obs && <p className="g-p g-muted" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{e.obs}</p>}
-                      <div className="g-fila">
+                      {e.obs && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{e.obs}</span></p>}
+                      <div className="g-fila g-ch-acoes">
                         <button className="g-btn verde p" disabled={ocupado === e.id} onClick={() => checkIn(e)}><LogIn /> Check-in</button>
                         <button className="g-btn fantasma p" onClick={() => cancelar(e)}>Cancelar</button>
                         <span style={{ marginLeft: "auto" }}><BotaoZap e={e} reserva /></span>
@@ -226,8 +292,9 @@ export default function CrecheHotel() {
                         <AvatarPet pet={e.pets ?? { nome: "?" }} />
                         <span className="t">
                           <b>{e.pets?.nome ?? "Pet removido"}</b>
-                          <span>{[nomeTipo(e.tipo), periodo, e.pets?.clientes?.nome].filter(Boolean).join(" · ")}</span>
+                          <span>{[periodo, e.pets?.clientes?.nome].filter(Boolean).join(" · ")}</span>
                         </span>
+                        <EtiquetaTipo tipo={e.tipo} curta />
                         {e.status === "cancelada"
                           ? <span className="g-tag vermelho">cancelada</span>
                           : <span className="g-tag">{(() => { const n = contarDiarias(e, new Date(e.saida ?? e.entrada)); return `${n} ${n === 1 ? "diária" : "diárias"}`; })()}</span>}

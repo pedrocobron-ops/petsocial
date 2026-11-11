@@ -189,7 +189,7 @@ export default function Hoje() {
             lado={dados && ativos.length > 0 ? <Anel parte={feitos / ativos.length} cor="var(--g-laranja)">{Math.round((feitos / ativos.length) * 100)}%</Anel> : undefined} />
           <Kpi href="/gestao/app/creche-hotel" icone={BedDouble} tom="ceu" rotulo="Creche e hotel" valor={dados ? dados.emCasa : "–"} apoio={dados?.emCasa === 1 ? "pet na casa agora" : "pets na casa agora"} />
           {vejoFinanceiro ? (
-            <Kpi href="/gestao/app/caixa" icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"} apoio={dados && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : "últimos 7 dias ao lado"}
+            <Kpi href="/gestao/app/caixa" icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"} apoio={dados && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : "ver o caixa"}
               lado={dados ? <Tendencia valores={dados.entradas7} /> : undefined} />
           ) : (
             <Kpi href="/gestao/app/clientes" icone={PawPrint} tom="menta" rotulo="Pets cadastrados" valor={dados ? dados.pets : "–"} apoio="ver todos" />
@@ -246,7 +246,7 @@ export default function Hoje() {
 
             <section className="g-card">
               <div className="g-card-t"><h3>Movimento da semana</h3><span className="g-muted g-pp">horários por dia</span></div>
-              {dados ? <Barras itens={semana} destaque={(hoje.getDay() + 6) % 7} /> : <Esqueleto linhas={2} />}
+              {!dados ? <Esqueleto linhas={2} /> : totalSemana ? <Barras itens={semana} destaque={(hoje.getDay() + 6) % 7} /> : <p className="g-muted g-p">Nenhum horário marcado nesta semana ainda.</p>}
             </section>
 
             {dados && dados.servicosMes.length > 0 && (

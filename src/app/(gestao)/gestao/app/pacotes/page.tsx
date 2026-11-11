@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Plus, RotateCcw, Undo2 } from "lucide-react";
+import { CalendarClock, Check, Layers, Plus, RotateCcw, Sparkles, Ticket, Undo2 } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import FormPet from "@/components/gestao/form-pet";
+import { Anel, Kpi, Tile } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { Chips, ChipsForma, ErroTela, type Forma } from "@/components/gestao/loja/pecas";
 import { lancarPago } from "@/lib/gestao/dinheiro";
 import type { Cliente, Pacote, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { brl, dataCurta, deIsoDia, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
+import "./pacotes.css";
 
 type PetDoPacote = Pick<Pet, "id" | "nome" | "foto" | "especie"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
 type PacoteDoPet = PacoteCliente & { pets: PetDoPacote | null };
@@ -33,6 +35,16 @@ function etiquetaValidade(vence: string | null) {
   if (d === 1) return { texto: "vence amanhã", tom: "laranja" };
   if (d <= 7) return { texto: `vence em ${d} dias`, tom: "laranja" };
   return { texto: `até ${dataCurta(vence!)}`, tom: "" };
+}
+
+/** Indicador que também é botão: toca e a tela mostra aquele recorte. */
+function KpiAcao({ ativo, aoTocar, children }: { ativo: boolean; aoTocar: () => void; children: React.ReactNode }) {
+  return (
+    <div className="g-pac-kpi-acao" role="button" tabIndex={0} aria-pressed={ativo} onClick={aoTocar}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); aoTocar(); } }}>
+      {children}
+    </div>
+  );
 }
 
 type Venda = { pet?: PetDoPacote; base?: Pick<PacoteCliente, "pacote_id" | "nome" | "servico_id" | "total" | "preco"> & { validade: number | null } };
@@ -61,6 +73,13 @@ export default function Pacotes() {
   const ativos = vendidos.filter((p) => p.ativo);
   const vencendo = ativos.filter((p) => { const d = diasParaVencer(p.vence_em); return d != null && d >= 0 && d <= 7; });
   const lista = filtro === "ativos" ? ativos : filtro === "vencendo" ? vencendo : vendidos.filter((p) => !p.ativo).slice(0, 100);
+
+  // números do topo: saem dos pacotes ativos que a tela já carregou
+  const aUsar = ativos.reduce((t, p) => t + Math.max(0, p.total - p.usados), 0);
+  const totalAtivos = ativos.reduce((t, p) => t + p.total, 0);
+  const petsComPacote = new Set(ativos.map((p) => p.pet_id)).size;
+  const modelosAVenda = modelos.filter((m) => m.ativo).length;
+  const verClientes = (f: Filtro) => { setAba("clientes"); setFiltro(f); };
 
   const mudou = () => { void recarregar(); avisarMudanca(); };
 
@@ -122,6 +141,24 @@ export default function Pacotes() {
       </header>
 
       <div className="g-pilha">
+        {dados && (vendidos.length > 0 || modelos.length > 0) && (
+          <div className="g-grade kpis">
+            <KpiAcao ativo={aba === "clientes" && filtro === "ativos"} aoTocar={() => verClientes("ativos")}>
+              <Kpi icone={Ticket} tom="lilas" rotulo="Pacotes ativos" valor={ativos.length}
+                apoio={!ativos.length ? "nenhum em uso" : petsComPacote === 1 ? "de 1 pet" : `de ${petsComPacote} pets`} />
+            </KpiAcao>
+            <KpiAcao ativo={aba === "clientes" && filtro === "vencendo"} aoTocar={() => verClientes("vencendo")}>
+              <Kpi icone={CalendarClock} tom="manteiga" rotulo="Vencendo em 7 dias" valor={vencendo.length} apoio={vencendo.length ? "vale avisar o tutor" : "nenhum por agora"} />
+            </KpiAcao>
+            <Kpi icone={Sparkles} tom="menta" rotulo="Ainda a usar" valor={aUsar}
+              apoio={!totalAtivos ? "nada em aberto" : `de ${totalAtivos} nos pacotes ativos`}
+              lado={totalAtivos > 0 ? <Anel parte={(totalAtivos - aUsar) / totalAtivos} tamanho={52} cor="#7c62c0">{Math.round(((totalAtivos - aUsar) / totalAtivos) * 100)}%</Anel> : undefined} />
+            <KpiAcao ativo={aba === "modelos"} aoTocar={() => setAba("modelos")}>
+              <Kpi icone={Layers} tom="pessego" rotulo="Modelos à venda" valor={modelosAVenda} apoio={modelos.length > modelosAVenda ? `${modelos.length - modelosAVenda} ${modelos.length - modelosAVenda === 1 ? "desativado" : "desativados"}` : "prontos para vender"} />
+            </KpiAcao>
+          </div>
+        )}
+
         <div className="g-seg ge-abas" style={{ justifySelf: "start" }}>
           <button aria-pressed={aba === "clientes"} onClick={() => setAba("clientes")}>Clientes com pacote</button>
           <button aria-pressed={aba === "modelos"} onClick={() => setAba("modelos")}>Modelos de pacote</button>
@@ -148,29 +185,41 @@ export default function Pacotes() {
                   {filtro === "ativos" ? "Nenhum pacote em uso agora." : filtro === "vencendo" ? "Nenhum pacote vence nos próximos 7 dias." : "Nenhum pacote encerrado."}
                 </p>
               ) : (
-                <div className="g-grade c2">
+                <div className="g-pac-grade">
                   {lista.map((p) => {
                     const val = etiquetaValidade(p.vence_em);
                     const pet = p.pets;
+                    const resta = Math.max(0, p.total - p.usados);
+                    const ultimo = p.ativo && resta === 1;
                     return (
-                      <div key={p.id} className="g-card g-pilha p">
-                        <div className="g-fila" style={{ flexWrap: "nowrap" }}>
-                          <AvatarPet pet={pet ?? { nome: "?" }} />
-                          <div className="g-cresce">
-                            <b style={{ display: "block", fontSize: "1.0625rem" }}>{pet?.nome ?? "Pet removido"}</b>
-                            <span className="g-muted g-p">{[pet?.clientes?.nome, p.nome].filter(Boolean).join(" · ")}</span>
+                      <div key={p.id} className={`g-pac-cartao${p.ativo ? "" : " fim"}`}>
+                        <div className="g-pac-topo">
+                          <AvatarPet pet={pet ?? { nome: "?" }} tamanho="g" />
+                          <div className="t">
+                            <b>{pet?.nome ?? "Pet removido"}</b>
+                            <span>{pet?.clientes?.nome ?? (pet ? "Sem tutor" : " ")}</span>
                           </div>
+                          <Anel parte={p.total ? p.usados / p.total : 0} tamanho={60} cor={!p.ativo ? "#a89cc4" : ultimo ? "var(--g-laranja)" : "#7c62c0"}>{p.usados}/{p.total}</Anel>
+                        </div>
+                        <div className="g-pac-nome">
+                          <span className="n"><Ticket aria-hidden />{p.nome}</span>
                           {!p.ativo ? <span className="g-tag">{p.usados >= p.total ? "concluído" : "encerrado"}</span>
                             : val && <span className={`g-tag ${val.tom}`}>{val.texto}</span>}
                         </div>
-                        <div>
-                          <div className="g-fila entre g-p" style={{ marginBottom: 6 }}>
-                            <span><b>{p.usados} de {p.total}</b> usados</span>
+                        <div className="g-pac-uso">
+                          {p.total <= 12 ? (
+                            <div className={`g-pac-pips${ultimo ? " ultimo" : ""}`} role="img" aria-label={`${p.usados} de ${p.total} usados`}>
+                              {Array.from({ length: p.total }, (_, i) => <i key={i} className={i < p.usados ? "usado" : undefined}>{i < p.usados && <Check />}</i>)}
+                            </div>
+                          ) : (
+                            <div className={`g-prog g-pac-barra${ultimo ? " laranja" : ""}`}><i style={{ width: `${Math.min(100, (p.usados / p.total) * 100)}%` }} /></div>
+                          )}
+                          <div className="g-fila entre g-p">
+                            <span><b>{p.usados} de {p.total}</b> usados{p.ativo && resta > 0 ? <span className={ultimo ? "g-pac-falta" : "g-muted"}> · {resta === 1 ? "falta 1" : `faltam ${resta}`}</span> : null}</span>
                             {vejoFinanceiro && Number(p.preco) > 0 && <span className="g-muted g-tab">{brl(p.preco)}</span>}
                           </div>
-                          <div className={`g-prog${p.ativo && p.total - p.usados === 1 ? " laranja" : ""}`}><i style={{ width: `${Math.min(100, (p.usados / p.total) * 100)}%` }} /></div>
                         </div>
-                        <div className="g-fila">
+                        <div className="g-fila g-pac-acoes">
                           {p.ativo && <button className="g-btn verde p" disabled={ocupado === p.id} onClick={() => mudarUso(p, 1)}><Check /> Usar 1</button>}
                           {p.usados > 0 && <button className="g-btn fantasma p" disabled={ocupado === p.id} onClick={() => mudarUso(p, -1)}><Undo2 /> Desfazer uso</button>}
                           {pet && <button className="g-btn sec p" style={{ marginLeft: "auto" }} onClick={() => renovar(p)}><RotateCcw /> Renovar</button>}
@@ -189,21 +238,28 @@ export default function Pacotes() {
           </Vazio>
         ) : (
           <>
-            <div className="g-card">
-              <div className="g-lista">
-                {modelos.map((m) => (
-                  <div key={m.id} className="g-linha" style={m.ativo ? undefined : { opacity: .6 }}>
-                    <button type="button" className="t" style={{ border: 0, background: "none", padding: 0, textAlign: "left", color: "inherit" }}
-                      onClick={() => { if (!somenteLeitura()) setModelo(m); }}>
+            <div className="g-pac-grade">
+              {modelos.map((m) => (
+                <div key={m.id} className={`g-pac-modelo${m.ativo ? "" : " fim"}`}>
+                  <button type="button" className="corpo" onClick={() => { if (!somenteLeitura()) setModelo(m); }}>
+                    <Tile icone={Ticket} tom="lilas" tamanho="g" />
+                    <span className="t">
                       <b>{m.nome}</b>
-                      <span>{`${m.quantidade}x · vale ${m.validade_dias} dias · ${brl(m.preco)}`}</span>
-                    </button>
+                      <span className="g-pac-etqs">
+                        <span className="g-pac-etq">{m.quantidade}x</span>
+                        <span className="g-pac-etq">vale {m.validade_dias} dias</span>
+                        {!m.ativo && <span className="g-tag">desativado</span>}
+                      </span>
+                    </span>
+                    <b className="preco g-tab">{brl(m.preco)}</b>
+                  </button>
+                  <div className="pe">
                     {m.ativo
                       ? <button className="g-btn fantasma p" onClick={() => ativarModelo(m, false)}>Desativar</button>
                       : <button className="g-btn sec p" onClick={() => ativarModelo(m, true)}>Reativar</button>}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
             <button className="g-btn sec" style={{ justifySelf: "start" }} onClick={() => { if (!somenteLeitura()) setModelo("novo"); }}><Plus /> Modelo novo</button>
           </>

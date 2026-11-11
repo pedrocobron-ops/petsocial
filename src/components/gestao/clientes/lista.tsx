@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Download, Plus, Search, Sparkles, UserPlus } from "lucide-react";
+import { AlertTriangle, Cat, ChevronRight, Dog, Download, PawPrint, Phone, Plus, Search, Sparkles, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
+import { Anel, Kpi } from "../painel";
 import { abrirAssistente, AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
-import { baixarCsv, buscarTudo, linkPet, linkTutor, nomePorte, type PetDaLista } from "./comum";
+import { baixarCsv, buscarTudo, ESPECIES, linkPet, linkTutor, nomePorte, type PetDaLista } from "./comum";
 import FormTutor from "./form-tutor";
 
 type Filtro = "todos" | "sumidos30" | "sumidos60" | "alerta";
@@ -19,6 +20,29 @@ const FILTROS: { id: Filtro; rotulo: string }[] = [
   { id: "alerta", rotulo: "Com alerta" },
 ];
 const PASSO = 100;
+
+/** Cor da última visita: verde até 30 dias, amarelo até 60, vermelho depois. Sem visita fica cinza. */
+export function tomDaVisita(quando: string | null | undefined, agora: number) {
+  if (!quando) return "";
+  const dias = Math.floor((agora - new Date(quando).getTime()) / 864e5);
+  return dias <= 30 ? "verde" : dias <= 60 ? "amarelo" : "vermelho";
+}
+
+/** Etiqueta da espécie, com o bichinho desenhado. */
+export function EtiquetaEspecie({ especie }: { especie: string }) {
+  const Icone = especie === "gato" ? Cat : especie === "cao" ? Dog : PawPrint;
+  return <span className={`g-cli-etq ${especie === "gato" ? "lilas" : especie === "cao" ? "pessego" : "ceu"}`}><Icone />{ESPECIES[especie] ?? "Outro"}</span>;
+}
+
+/** Indicador que também é botão: toca e a lista mostra aquele recorte. */
+function KpiAcao({ ativo, aoTocar, children }: { ativo: boolean; aoTocar: () => void; children: React.ReactNode }) {
+  return (
+    <div className="g-cli-kpi-acao" role="button" tabIndex={0} aria-pressed={ativo} onClick={aoTocar}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); aoTocar(); } }}>
+      {children}
+    </div>
+  );
+}
 const PEDIDO_EXEMPLO = "cadastra a Mel, shih-tzu pequena, da Dona Célia, telefone ";
 
 export default function Lista({ aoAbrir, irPara }: {
@@ -94,6 +118,28 @@ export default function Lista({ aoAbrir, irPara }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [clientes, petsPorTutor, alvo, alvoFone]);
 
+  // números do topo: tudo sai do que a lista já carregou
+  const resumo = useMemo(() => {
+    const agora = Date.now();
+    let caes = 0, gatos = 0, comAlerta = 0, sumidos = 0, semVisita = 0;
+    for (const p of pets) {
+      if (p.especie === "cao") caes++; else if (p.especie === "gato") gatos++;
+      if (p.alertas?.trim()) comAlerta++;
+      const u = ultimos?.[p.id];
+      if (!u) semVisita++;
+      if (!u || agora - new Date(u).getTime() > 30 * 864e5) sumidos++;
+    }
+    let comVarios = 0;
+    for (const dele of petsPorTutor.values()) if (dele.length > 1) comVarios++;
+    return { caes, gatos, outros: pets.length - caes - gatos, comAlerta, sumidos, semVisita, comVarios, agora };
+  }, [pets, ultimos, petsPorTutor]);
+  const especies = [
+    resumo.caes && (resumo.caes === 1 ? "1 cachorro" : `${resumo.caes} cachorros`),
+    resumo.gatos && (resumo.gatos === 1 ? "1 gato" : `${resumo.gatos} gatos`),
+    resumo.outros && (resumo.outros === 1 ? "1 outro" : `${resumo.outros} outros`),
+  ].filter(Boolean).join(" · ");
+  const verPets = (f: Filtro) => { setAba("pets"); setFiltro(f); setMostrar(PASSO); };
+
   function abrirPetNovo() { if (!somenteLeitura()) setPetNovo(true); }
   function exportar() {
     if (!clientes.length) { avisar("Ainda não há ninguém para exportar."); return; }
@@ -120,6 +166,26 @@ export default function Lista({ aoAbrir, irPara }: {
           <button className="g-btn pri" onClick={abrirPetNovo}><Plus />Pet novo</button>
         </div>
       </header>
+
+      {dados && (pets.length > 0 || clientes.length > 0) && (
+        <div className="g-grade kpis g-cli-kpis">
+          <KpiAcao ativo={aba === "pets" && filtro === "todos"} aoTocar={() => verPets("todos")}>
+            <Kpi icone={PawPrint} tom="pessego" rotulo="Pets" valor={pets.length} apoio={especies || "nenhum na lista"} />
+          </KpiAcao>
+          <KpiAcao ativo={aba === "tutores"} aoTocar={() => { setAba("tutores"); setMostrar(PASSO); }}>
+            <Kpi icone={Users} tom="menta" rotulo="Tutores" valor={clientes.length}
+              apoio={resumo.comVarios ? `${resumo.comVarios} com mais de um pet` : "um pet para cada"} />
+          </KpiAcao>
+          <KpiAcao ativo={aba === "pets" && filtro === "sumidos30"} aoTocar={() => verPets("sumidos30")}>
+            <Kpi icone={UserSearch} tom="manteiga" rotulo="Sumidos há 30 dias" valor={ultimos ? resumo.sumidos : "–"}
+              apoio={!ultimos ? (erroUltimos ? "não consegui calcular" : "calculando…") : resumo.semVisita ? `${resumo.semVisita} ainda sem visita` : "sem visita no período"}
+              lado={ultimos && pets.length > 0 ? <Anel parte={resumo.sumidos / pets.length} tamanho={52} cor="#c2941a">{Math.round((resumo.sumidos / pets.length) * 100)}%</Anel> : undefined} />
+          </KpiAcao>
+          <KpiAcao ativo={aba === "pets" && filtro === "alerta"} aoTocar={() => verPets("alerta")}>
+            <Kpi icone={AlertTriangle} tom="rosa" rotulo="Com alerta" valor={resumo.comAlerta} apoio="alergias, medos e cuidados" />
+          </KpiAcao>
+        </div>
+      )}
 
       <div className="gc-filtros">
         <div className="g-fila entre">
@@ -161,17 +227,30 @@ export default function Lista({ aoAbrir, irPara }: {
         ) : (
           <>
             {erroUltimos && <p className="g-erro" style={{ marginBottom: 10 }}>Não consegui ver quando cada pet veio pela última vez.</p>}
-            <div className="g-lista gc-lista">
-              {petsFiltrados.slice(0, mostrar).map((p) => (
-                <Link key={p.id} href={linkPet(p.id)} scroll={false} className="g-linha" onClick={aoAbrir}>
-                  <AvatarPet pet={p} />
-                  <span className="t">
-                    <b>{p.nome}{p.alertas?.trim() && <AlertTriangle className="gc-alerta" aria-label="Tem alerta" />}</b>
-                    <span>{[p.clientes?.nome, p.raca, p.porte ? nomePorte(p.porte) : null].filter(Boolean).join(" · ")}</span>
-                  </span>
-                  {ultimos && <span className="d g-pp g-muted">{ultimos[p.id] ? haQuanto(ultimos[p.id]) : "ainda não veio"}</span>}
-                </Link>
-              ))}
+            <div className="g-cli-grade">
+              {petsFiltrados.slice(0, mostrar).map((p) => {
+                const ultima = ultimos?.[p.id];
+                return (
+                  <Link key={p.id} href={linkPet(p.id)} scroll={false} className="g-cli-pet" onClick={aoAbrir}>
+                    <span className="cab">
+                      <AvatarPet pet={p} tamanho="g" />
+                      <span className="t">
+                        <b>{p.nome}</b>
+                        <span>{[p.clientes?.nome ?? "Sem tutor", p.raca].filter(Boolean).join(" · ")}</span>
+                      </span>
+                      <ChevronRight className="seta" aria-hidden />
+                    </span>
+                    <span className="pe">
+                      <span className="g-cli-etqs">
+                        <EtiquetaEspecie especie={p.especie} />
+                        {p.porte && <span className="g-cli-etq">{nomePorte(p.porte)}</span>}
+                        {p.alertas?.trim() && <span className="g-cli-etq rosa"><AlertTriangle aria-hidden />Alerta</span>}
+                      </span>
+                      {ultimos && <span className={`g-cli-visita ${tomDaVisita(ultima, resumo.agora)}`}><i aria-hidden />{ultima ? haQuanto(ultima) : "ainda não veio"}</span>}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
             {petsFiltrados.length > mostrar && <div className="gc-fim"><button className="g-btn sec" onClick={() => setMostrar(mostrar + PASSO)}>Mostrar mais</button></div>}
           </>
@@ -187,15 +266,27 @@ export default function Lista({ aoAbrir, irPara }: {
         </Vazio>
       ) : (
         <>
-          <div className="g-lista gc-lista">
+          <div className="g-cli-grade">
             {tutoresFiltrados.slice(0, mostrar).map((c) => {
               const dele = petsPorTutor.get(c.id) ?? [];
               return (
-                <Link key={c.id} href={linkTutor(c.id)} scroll={false} className="g-linha" onClick={aoAbrir}>
-                  <AvatarPessoa nome={c.nome} />
-                  <span className="t">
-                    <b>{c.nome}</b>
-                    <span>{[dele.map((p) => p.nome).join(", ") || "Sem pet na lista", fmtTelefone(c.telefone)].filter(Boolean).join(" · ")}</span>
+                <Link key={c.id} href={linkTutor(c.id)} scroll={false} className="g-cli-pet tutor" onClick={aoAbrir}>
+                  <span className="cab">
+                    <AvatarPessoa nome={c.nome} tamanho="g" />
+                    <span className="t">
+                      <b>{c.nome}</b>
+                      <span>{fmtTelefone(c.telefone) ? <><Phone aria-hidden />{fmtTelefone(c.telefone)}</> : "Sem telefone"}</span>
+                    </span>
+                    <ChevronRight className="seta" aria-hidden />
+                  </span>
+                  <span className="pe">
+                    {dele.length ? (
+                      <span className="g-cli-turma">
+                        <span className="fotos">{dele.slice(0, 4).map((p) => <AvatarPet key={p.id} pet={p} tamanho="p" />)}</span>
+                        <span className="nomes">{dele.map((p) => p.nome).join(", ")}</span>
+                      </span>
+                    ) : <span className="g-pp g-muted">Sem pet na lista</span>}
+                    <span className="g-cli-etq">{dele.length === 1 ? "1 pet" : `${dele.length} pets`}</span>
                   </span>
                 </Link>
               );

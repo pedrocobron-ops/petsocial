@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, MessageCircle, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, MessageCircle, NotebookPen, PawPrint, Pencil, Phone, Plus, Receipt, Users, Wallet } from "lucide-react";
 import type { Cliente, Lancamento, Pet } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, fmtTelefone, linkWhatsApp } from "@/lib/gestao/util";
+import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
+import { Tile } from "../painel";
 import { AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { linkPet, nomePorte, primeiroNome } from "./comum";
 import FormTutor from "./form-tutor";
+import { EtiquetaEspecie } from "./lista";
 
 type Entrada = Pick<Lancamento, "id" | "valor" | "data" | "categoria" | "descricao" | "pago">;
 
@@ -51,6 +53,8 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
   const zap = linkWhatsApp(cliente.telefone, `Oi, ${primeiroNome(cliente.nome)}! Aqui é do ${petshop.nome}. `);
   const pagas = entradas.filter((l) => l.pago);
   const total = pagas.reduce((s, l) => s + Number(l.valor), 0);
+  const aReceber = entradas.filter((l) => !l.pago).reduce((s, l) => s + Number(l.valor), 0);
+  const ativos = pets.filter((p) => p.ativo).length;
 
   async function excluir() {
     if (somenteLeitura()) return;
@@ -78,37 +82,75 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
     <div className="gc-ficha">
       <div>
         {botaoVoltar}
-        <div className="gc-cab">
-          <AvatarPessoa nome={cliente.nome} tamanho="g" />
-          <div>
-            <h1>{cliente.nome}</h1>
-            <p className="g-muted g-p">{[fmtTelefone(cliente.telefone) || "Sem telefone", pets.length === 1 ? "1 pet" : `${pets.length} pets`].join(" · ")}</p>
+        <section className="g-cli-heroi menta">
+          <Users className="fundo" aria-hidden />
+          <div className="quem">
+            <AvatarPessoa nome={cliente.nome} tamanho="g" />
+            <div>
+              <h1>{cliente.nome}</h1>
+              <p className="tutor"><Phone aria-hidden />{fmtTelefone(cliente.telefone) || "Sem telefone"}</p>
+              <div className="g-cli-etqs">
+                <span className="g-cli-etq pessego"><PawPrint aria-hidden />{pets.length === 1 ? "1 pet" : `${pets.length} pets`}</span>
+                <span className="g-cli-etq">Cliente desde {dataCompleta(cliente.criado_em)}</span>
+              </div>
+            </div>
           </div>
-        </div>
+          <div className="gc-botoes">
+            {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />WhatsApp</a>}
+            <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditando(true); }}><Pencil />Editar</button>
+          </div>
+        </section>
       </div>
 
-      <div className="gc-botoes">
-        {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />WhatsApp</a>}
-        <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditando(true); }}><Pencil />Editar</button>
+      <div className={`g-cli-nums${vejoFinanceiro ? "" : " dois"}`}>
+        <div className="g-cli-num">
+          <Tile icone={PawPrint} tom="pessego" />
+          <div><span className="g-rotulo">Pets</span><b className="g-tab">{pets.length}</b><small>{ativos === pets.length ? (pets.length === 1 ? "na lista" : "todos na lista") : `${ativos} na lista, ${pets.length - ativos} ${pets.length - ativos === 1 ? "desativado" : "desativados"}`}</small></div>
+        </div>
+        <div className="g-cli-num">
+          <Tile icone={CalendarHeart} tom="ceu" />
+          <div><span className="g-rotulo">Cliente</span><b>{haQuanto(cliente.criado_em)}</b><small>desde {dataCompleta(cliente.criado_em)}</small></div>
+        </div>
+        {vejoFinanceiro && (
+          <>
+            <div className="g-cli-num">
+              <Tile icone={Wallet} tom="menta" />
+              <div><span className="g-rotulo">Já gastou aqui</span><b className="g-tab">{brl(total)}</b><small>{!pagas.length ? "nenhuma entrada" : pagas.length === 1 ? "em 1 entrada recebida" : `em ${pagas.length} entradas recebidas`}</small></div>
+            </div>
+            <div className="g-cli-num">
+              <Tile icone={HandCoins} tom="manteiga" />
+              <div><span className="g-rotulo">A receber</span><b className="g-tab">{brl(aReceber)}</b><small>{pagas.length ? `última entrada em ${dataCompleta(pagas[0].data)}` : "nada recebido ainda"}</small></div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="gc-colunas">
         <div>
           <section className="g-card">
             <div className="g-card-t">
-              <h3>Pets</h3>
+              <h3><Tile icone={PawPrint} tom="pessego" tamanho="p" />Pets</h3>
               <button className="g-btn pri p" onClick={() => { if (!somenteLeitura()) setPetNovo(true); }}><Plus />Adicionar pet</button>
             </div>
             {!pets.length ? <p className="g-muted g-p">Nenhum pet na ficha ainda.</p> : (
-              <div className="g-lista">
+              <div className="g-cli-grade dentro">
                 {pets.map((p) => (
-                  <Link key={p.id} href={linkPet(p.id)} scroll={false} className="g-linha" style={{ textDecoration: "none" }}>
-                    <AvatarPet pet={p} />
-                    <span className="t">
-                      <b>{p.nome}</b>
-                      <span>{[p.raca, p.porte ? nomePorte(p.porte) : null].filter(Boolean).join(" · ") || " "}</span>
+                  <Link key={p.id} href={linkPet(p.id)} scroll={false} className={`g-cli-pet${p.ativo ? "" : " apagado"}`}>
+                    <span className="cab">
+                      <AvatarPet pet={p} tamanho="g" />
+                      <span className="t">
+                        <b>{p.nome}</b>
+                        <span>{p.raca || " "}</span>
+                      </span>
+                      <ChevronRight className="seta" aria-hidden />
                     </span>
-                    {!p.ativo && <span className="d"><span className="g-tag">Desativado</span></span>}
+                    <span className="pe">
+                      <span className="g-cli-etqs">
+                        <EtiquetaEspecie especie={p.especie} />
+                        {p.porte && <span className="g-cli-etq">{nomePorte(p.porte)}</span>}
+                        {!p.ativo && <span className="g-cli-etq">Desativado</span>}
+                      </span>
+                    </span>
                   </Link>
                 ))}
               </div>
@@ -117,7 +159,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
 
           {vejoFinanceiro && (
             <section className="g-card">
-              <div className="g-card-t"><h3>Quanto já gastou aqui</h3></div>
+              <div className="g-card-t"><h3><Tile icone={Wallet} tom="menta" tamanho="p" />Quanto já gastou aqui</h3></div>
               <p className="g-num m">{brl(total)}</p>
               <p className="g-pp g-muted" style={{ marginTop: 4 }}>
                 {!pagas.length ? "Nenhuma entrada ligada a este cliente." : pagas.length === 1 ? "Em 1 entrada recebida." : `Em ${pagas.length} entradas recebidas.`}
@@ -126,12 +168,13 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
                 <div className="g-lista" style={{ marginTop: 8 }}>
                   {entradas.slice(0, 8).map((l) => (
                     <div key={l.id} className="g-linha">
+                      <Tile icone={Receipt} tom={l.pago ? "menta" : "manteiga"} tamanho="p" />
                       <span className="t">
                         <b>{l.descricao?.trim() || l.categoria}</b>
                         <span>{dataCompleta(l.data)}{l.descricao?.trim() ? ` · ${l.categoria}` : ""}</span>
                       </span>
                       <span className="d gc-linha-tags">
-                        <span>{brl(l.valor)}</span>
+                        <b>{brl(l.valor)}</b>
                         {!l.pago && <span className="g-tag amarelo">A receber</span>}
                       </span>
                     </div>
@@ -144,14 +187,14 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
 
         <div>
           <section className="g-card">
-            <div className="g-card-t"><h3>Contato</h3></div>
-            <dl className="gc-dados">
-              <div><dt>Telefone</dt><dd>{fmtTelefone(cliente.telefone) || <span className="g-muted">Não informado</span>}</dd></div>
-              <div><dt>E-mail</dt><dd>{cliente.email ? <a className="g-link" href={`mailto:${cliente.email}`}>{cliente.email}</a> : <span className="g-muted">Não informado</span>}</dd></div>
-              <div><dt>Endereço</dt><dd>{cliente.endereco || <span className="g-muted">Não informado</span>}</dd></div>
-              {cliente.obs?.trim() && <div><dt>Observações</dt><dd className="gc-texto">{cliente.obs}</dd></div>}
-              <div><dt>Cliente desde</dt><dd>{dataCompleta(cliente.criado_em)}</dd></div>
-            </dl>
+            <div className="g-card-t"><h3><Tile icone={Phone} tom="ceu" tamanho="p" />Contato</h3></div>
+            <div className="g-cli-contato">
+              <div><Tile icone={Phone} tom="ceu" tamanho="p" /><div><span>Telefone</span><p>{fmtTelefone(cliente.telefone) || <span className="g-muted">Não informado</span>}</p></div></div>
+              <div><Tile icone={Mail} tom="lilas" tamanho="p" /><div><span>E-mail</span><p>{cliente.email ? <a className="g-link" href={`mailto:${cliente.email}`}>{cliente.email}</a> : <span className="g-muted">Não informado</span>}</p></div></div>
+              <div><Tile icone={MapPin} tom="pessego" tamanho="p" /><div><span>Endereço</span><p>{cliente.endereco || <span className="g-muted">Não informado</span>}</p></div></div>
+              {cliente.obs?.trim() && <div><Tile icone={NotebookPen} tom="manteiga" tamanho="p" /><div><span>Observações</span><p className="gc-texto">{cliente.obs}</p></div></div>}
+              <div><Tile icone={CalendarHeart} tom="menta" tamanho="p" /><div><span>Cliente desde</span><p>{dataCompleta(cliente.criado_em)}</p></div></div>
+            </div>
           </section>
 
           <div className="g-pilha p">
