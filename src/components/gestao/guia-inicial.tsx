@@ -107,7 +107,7 @@ export default function GuiaInicial() {
         if (!euAtendo && !outros.length && !pendente.length) { setErro("Diga quem atende os pets: você, alguém da equipe ou os dois."); return; }
         if (euAtendo !== eu.atende) ok(await sb.from("profissionais").update({ atende: euAtendo }).eq("id", eu.id).eq("petshop_id", petshop.id).select("id"));
         if (pendente.length) {
-          ok(await sb.from("profissionais").insert(pendente.map((n, i) => ({ petshop_id: petshop.id, nome: n, papel: "funcionario" as const, atende: true, cor: CORES[(outros.length + i) % CORES.length] }))).select("id"));
+          ok(await sb.from("profissionais").insert(pendente.map((n, i) => ({ petshop_id: petshop.id, nome: n, papel: "funcionario" as const, funcao: "Banhista e tosador(a)", atende: true, cor: CORES[(outros.length + i) % CORES.length] }))).select("id"));
           setNovos([]); setNome("");
         }
         ok(await sb.from("petshops").update({ vagas: vagasAgora }).eq("id", petshop.id).select("id"));
