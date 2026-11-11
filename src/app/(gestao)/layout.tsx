@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   description: "O sistema do pet shop com uma assistente que organiza a agenda, os clientes e o caixa para você.",
   robots: { index: false, follow: false },
   manifest: "/gestao/manifest.webmanifest",
+  icons: { icon: [{ url: "/gestao/marca.svg", type: "image/svg+xml" }, { url: "/gestao/icon-192.png", sizes: "192x192", type: "image/png" }], apple: "/gestao/apple-touch-icon.png" },
   appleWebApp: { capable: true, title: "Maestro Gestão", statusBarStyle: "default" },
 };
 export const viewport: Viewport = { themeColor: "#1e3a2f", width: "device-width", initialScale: 1, viewportFit: "cover" };

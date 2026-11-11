@@ -1,5 +1,6 @@
 "use client";
 
+import { Selo } from "@/components/gestao/marca";
 import { useState } from "react";
 import Link from "next/link";
 import { BedDouble, CalendarDays, Check, ChevronRight, Mic, Package, Plus, Receipt, Ticket } from "lucide-react";
@@ -89,8 +90,7 @@ export default function Hoje() {
       <div className="g-pilha g">
         <section className="g-card verde">
           <div className="g-fila" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/mozart/rosto.png" alt="" width={52} height={52} style={{ borderRadius: "50%", background: "#f6f1e8", flex: "none" }} />
+            <Selo tamanho={52} />
             <div className="g-cresce">
               <p className="g-rotulo">Mozart, seu assistente</p>
               <p style={{ fontFamily: "var(--display)", fontSize: "1.3125rem", lineHeight: 1.25, marginTop: 4 }}>{carregando && !dados ? "Olhando a agenda…" : frase}</p>

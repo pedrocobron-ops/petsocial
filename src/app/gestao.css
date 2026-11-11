@@ -389,3 +389,9 @@ button.g-linha:hover, a.g-linha:hover { background: rgba(31, 27, 23, .03); borde
 
 /* dentro do aplicativo e das telas de entrada não há cookie de medição (o Pixel fica desligado ali) */
 body:has(.g-raiz):not(:has(.gp)) .cookies { display: none; }
+
+/* ---------- marca ---------- */
+.g-selo { display: inline-grid; place-items: center; flex: none; background: #f6f1e8; color: var(--g-verde); }
+.g-selo.verde { background: var(--g-verde); color: #f6f1e8; }
+.g-selo.suave { background: var(--g-verde-tint); color: var(--g-verde); }
+.g-vazio .g-selo { margin-bottom: 6px; }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Selo } from "./marca";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -67,8 +68,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     <div className="g-app">
       <aside className="g-lado">
         <div className="g-marca">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/mozart/rosto.png" alt="" />
+          <Selo tamanho={38} />
           <div><b>{petshop.nome}</b><span>Maestro Pet Gestão</span></div>
         </div>
         {nav}
@@ -112,8 +112,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
       </nav>
 
       <button className="g-fab" onClick={() => setAssistente({ aberta: true, pedido: "" })}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/mozart/rosto.png" alt="" />
+          <Selo tamanho={38} />
         Pedir ao Mozart
       </button>
 

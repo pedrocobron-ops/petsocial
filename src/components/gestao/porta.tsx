@@ -1,3 +1,4 @@
+import { Selo } from "./marca";
 import Link from "next/link";
 import { Check } from "lucide-react";
 
@@ -14,13 +15,10 @@ export default function Porta({ titulo, texto, children }: { titulo: string; tex
             <li><Check /> 7 dias grátis, sem cartão</li>
           </ul>
         </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="mz" src="/mozart/acenando.webp" alt="Mozart, o border collie da Maestro Pet, acenando" />
       </aside>
       <main className="g-porta-form">
         <Link href="/gestao" className="logo">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/mozart/rosto.png" alt="" />
+          <Selo tamanho={40} tom="verde" />
           Maestro Pet Gestão
         </Link>
         <div className="g-pilha p">

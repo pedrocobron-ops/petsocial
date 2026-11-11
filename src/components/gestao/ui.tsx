@@ -1,5 +1,6 @@
 "use client";
 
+import { Selo } from "./marca";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Cat, Dog, PawPrint, Search, X } from "lucide-react";
 import { fotoPet } from "@/lib/gestao/supabase";
@@ -186,8 +187,7 @@ export function AvatarPessoa({ nome, cor, tamanho }: { nome: string; cor?: strin
 export function Vazio({ titulo, texto, children, mozart = "sorrindo" }: { titulo: string; texto?: string; children?: React.ReactNode; mozart?: "sorrindo" | "acenando" }) {
   return (
     <div className="g-vazio">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={`/mozart/${mozart}-144.webp`} alt="" />
+      <Selo tamanho={72} tom="suave" />
       <b>{titulo}</b>
       {texto && <p>{texto}</p>}
       {children}

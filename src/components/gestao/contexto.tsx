@@ -1,5 +1,6 @@
 "use client";
 
+import { Selo } from "./marca";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
@@ -110,8 +111,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   if (erro) {
     return (
       <div className="g g-raiz"><div className="g-vazio" style={{ minHeight: "100dvh", alignContent: "center" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/mozart/sorrindo-144.webp" alt="" />
+        <Selo tamanho={72} tom="suave" />
         <b>Opa, algo não carregou</b>
         <p>{erro}</p>
         <button className="g-btn verde" onClick={() => location.reload()}>Tentar de novo</button>
@@ -121,8 +121,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   if (!valor) {
     return (
       <div className="g g-raiz"><div className="g-vazio" style={{ minHeight: "100dvh", alignContent: "center" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/mozart/acenando-144.webp" alt="" />
+        <Selo tamanho={72} tom="suave" />
         <p>Abrindo o seu pet shop…</p>
       </div></div>
     );

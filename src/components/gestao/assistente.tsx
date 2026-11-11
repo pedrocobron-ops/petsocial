@@ -1,5 +1,6 @@
 "use client";
 
+import { Selo } from "./marca";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Check, MessageCircle, Mic, RotateCcw, Square, X } from "lucide-react";
 import { isoDia } from "@/lib/gestao/util";
@@ -154,8 +155,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     <div className="g-ass" onMouseDown={(e) => { if (e.target === e.currentTarget) aoFechar(); }}>
       <section className="g-ass-painel" role="dialog" aria-modal="true" aria-label="Mozart, o assistente">
         <header className="g-ass-topo">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/mozart/rosto.png" alt="" />
+          <Selo tamanho={44} />
           <div><b>Mozart</b><span>assistente do {petshop.nome}</span></div>
           {itens.length > 0 && <button className="g-ico" onClick={novaConversa} aria-label="Começar conversa nova" title="Conversa nova"><RotateCcw /></button>}
           <button className="g-ico" style={itens.length ? { marginLeft: 0 } : undefined} onClick={aoFechar} aria-label="Fechar"><X /></button>
@@ -164,8 +164,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
         <div className="g-ass-conversa" aria-live="polite">
           {!itens.length && (
             <div className="g-vazio" style={{ paddingTop: 12 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/mozart/acenando-144.webp" alt="" />
+              <Selo tamanho={72} tom="suave" />
               <b>Oi, {eu.nome.split(" ")[0]}. O que você precisa?</b>
               <p>{temVoz ? "Toque no microfone e fale, ou escreva." : "Escreva o que precisa, ou use o microfone do teclado para ditar."} Eu mostro o que vou fazer antes de gravar.</p>
             </div>
