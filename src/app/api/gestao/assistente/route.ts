@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /** Modelo do assistente (variável na Vercel). */
-const MODELO = process.env.GESTAO_MODELO ?? "claude-opus-5-5";
+const MODELO = process.env.GESTAO_MODELO ?? "claude-haiku-5-5";
 /** Pedidos por pet shop por dia: segura o custo de uma conta que dispare. */
 const LIMITE_DIA = Number(process.env.GESTAO_ASSISTENTE_LIMITE_DIA ?? 150);
 const MAX_VOLTAS = 8;
