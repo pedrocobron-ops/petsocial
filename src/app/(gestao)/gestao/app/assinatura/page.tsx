@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Check, ExternalLink } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { Vazio } from "@/components/gestao/ui";
+import { linkSuporte } from "@/lib/gestao/contato";
 import { PLANOS, planoPorId, textoAcessos } from "@/lib/gestao/planos";
 import { brlCurto, dataCompleta, dataCurta } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
@@ -95,7 +96,7 @@ export default function Assinatura() {
           <p className="g-p g-muted">
             <Link className="g-link" href="/politica-de-privacidade" target="_blank">Política de privacidade</Link>{" · "}
             <Link className="g-link" href="/termos-de-uso" target="_blank">Termos de uso</Link>{" · "}
-            <Link className="g-link" href="/contato" target="_blank">Fale com a gente</Link>
+            <a className="g-link" href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer">Fale com a gente no WhatsApp</a>
           </p>
         </section>
       </div>

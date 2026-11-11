@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, Monitor, Smartphone } from "lucide-react";
+import { ArrowRight, Check, MessageCircle, Monitor, Smartphone } from "lucide-react";
 import Instalar from "@/components/gestao/instalar";
 import Vitrine from "@/components/gestao/vitrine";
 import { Marca } from "@/components/gestao/marca";
+import { linkSuporte } from "@/lib/gestao/contato";
 import { PLANOS, textoAcessos } from "@/lib/gestao/planos";
 import { brlCurto } from "@/lib/gestao/util";
 import "./produto.css";
@@ -149,6 +150,7 @@ export default function Pagina() {
                   <li><Check />Todas as funções</li>
                   <li><Check />Assistente por áudio e texto</li>
                   <li><Check />Celular e computador</li>
+                  <li><Check />Suporte por WhatsApp</li>
                 </ul>
                 <Link href={CRIAR} className={`gp-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`}>Teste grátis</Link>
               </li>
@@ -162,6 +164,7 @@ export default function Pagina() {
         <h2>Perguntas <em>frequentes</em></h2>
         <div>
           {PERGUNTAS.map(([p, r]) => <details key={p}><summary>{p}</summary><p>{r}</p></details>)}
+          <a className="gp-btn zap" href={linkSuporte()} target="_blank" rel="noopener noreferrer"><MessageCircle />Tirar dúvida no WhatsApp</a>
         </div>
       </section>
 
@@ -179,6 +182,8 @@ export default function Pagina() {
         </div>
       </section>
 
+      <a className="gp-zap-flutua" href={linkSuporte()} target="_blank" rel="noopener noreferrer" aria-label="Falar com a gente no WhatsApp"><MessageCircle /></a>
+
       <footer className="gp-pe">
         <div className="gp-c gp-pe-grade">
           <div>
@@ -190,6 +195,7 @@ export default function Pagina() {
             <Link href="/gestao/entrar">Entrar</Link>
             <Link href="/termos-de-uso">Termos de uso</Link>
             <Link href="/politica-de-privacidade">Política de privacidade</Link>
+            <a href={linkSuporte()} target="_blank" rel="noopener noreferrer">WhatsApp</a>
             <Link href="/contato">Contato</Link>
             <Link href="/">Maestro Pet</Link>
           </nav>

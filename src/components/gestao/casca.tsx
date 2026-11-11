@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, BedDouble, CalendarDays, CreditCard, Landmark, LogOut, Menu, Mic, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
+  BarChart3, BedDouble, CalendarDays, CreditCard, Landmark, LifeBuoy, LogOut, Menu, Mic, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
+import { linkSuporte } from "@/lib/gestao/contato";
 import { useGestao } from "./contexto";
 import { EVENTO_ASSISTENTE, Folha } from "./ui";
 import Assistente from "./assistente";
@@ -73,6 +74,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         </div>
         {nav}
         <div className="g-lado-pe g-nav">
+          <a href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer"><LifeBuoy />Ajuda no WhatsApp</a>
           <button onClick={() => void sair()}><LogOut />Sair ({eu.nome.split(" ")[0]})</button>
         </div>
       </aside>
@@ -129,6 +131,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             ))}
+            <a className="g-btn zap" href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer"><LifeBuoy />Ajuda no WhatsApp</a>
             <button className="g-btn sec" onClick={() => void sair()}><LogOut />Sair</button>
           </div>
         </Folha>

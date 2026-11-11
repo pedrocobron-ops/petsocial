@@ -160,6 +160,13 @@
 .gp-instalado { font-weight: 600; color: var(--v); }
 @media (min-width: 900px) { .gp-baixe-grade { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 4.5rem; } }
 
+/* ---------- WhatsApp ---------- */
+.gp-btn.zap { background: #1f8f52; color: #fff; border-radius: 14px; margin-top: 1.75rem; }
+.gp-btn.zap:hover { background: #18784a; }
+.gp-zap-flutua { position: fixed; right: 18px; bottom: 18px; z-index: 20; display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%; background: #1f8f52; color: #fff; box-shadow: 0 10px 26px -10px rgba(31, 143, 82, .9); transition: transform .15s; }
+.gp-zap-flutua:hover { transform: scale(1.06); }
+.gp-zap-flutua svg { width: 28px; height: 28px; }
+
 /* ---------- fecho ---------- */
 .gp-pe { background: var(--v2); color: var(--creme); padding-block: clamp(3.5rem, 2.5rem + 5vw, 6rem); }
 .gp-pe-grade { display: grid; gap: 3rem; }
