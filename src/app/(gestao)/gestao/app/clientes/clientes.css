@@ -1,0 +1,47 @@
+/* Clientes e pets · só o que falta no gestao.css (prefixo gc-) */
+
+/* lista: um cartão com linhas no celular; duas colunas de cartões no computador */
+.gc-lista { background: var(--g-carta); border: 1px solid var(--g-linha); border-radius: var(--g-raio); padding: 4px 14px; box-shadow: var(--g-sombra); }
+.gc-lista .g-linha { text-decoration: none; }
+.gc-lista .g-linha .d { max-width: 38%; }
+.gc-alerta { display: inline-block; width: 15px; height: 15px; margin-left: 6px; vertical-align: -2px; color: #b4630c; }
+@media (min-width: 960px) {
+  .gc-lista { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: none; border: 0; padding: 0; box-shadow: none; }
+  .gc-lista > .g-linha, .gc-lista > .g-linha:last-child {
+    background: var(--g-carta); border: 1px solid var(--g-linha); border-radius: 16px; padding: 12px 16px; min-width: 0;
+  }
+  .gc-lista > a.g-linha:hover { background: #fffdf9; border-color: var(--g-linha-forte); border-radius: 16px; }
+}
+
+.gc-filtros { display: grid; gap: 12px; margin-bottom: 16px; }
+.gc-filtros .g-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -16px; padding-inline: 16px; }
+.gc-filtros .g-chips::-webkit-scrollbar { display: none; }
+.gc-filtros .g-chip { flex: none; }
+@media (min-width: 720px) {
+  .gc-filtros .g-chips { flex-wrap: wrap; overflow: visible; margin-inline: 0; padding-inline: 0; }
+}
+
+/* ficha */
+.gc-ficha { display: grid; gap: 16px; }
+.gc-ficha .g-aviso { margin-bottom: 0; align-items: flex-start; }
+.gc-ficha .g-aviso > svg { margin-top: 2px; }
+.gc-cab { display: flex; align-items: center; gap: 16px; }
+.gc-cab > div { min-width: 0; }
+.gc-cab h1 { overflow-wrap: anywhere; }
+.gc-cab p { margin-top: 4px; }
+.gc-botoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.gc-botoes .g-btn { flex: 1 1 auto; text-decoration: none; }
+@media (min-width: 720px) { .gc-botoes .g-btn { flex: none; } }
+.gc-colunas { display: grid; gap: 16px; align-items: start; }
+@media (min-width: 960px) { .gc-colunas { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
+.gc-colunas > div { display: grid; gap: 16px; min-width: 0; }
+.gc-texto { white-space: pre-wrap; overflow-wrap: anywhere; }
+.gc-dados { display: grid; gap: 12px; margin: 0; }
+.gc-dados > div { display: grid; gap: 2px; min-width: 0; }
+.gc-dados dt { font-size: .8125rem; color: var(--g-cinza); }
+.gc-dados dd { margin: 0; overflow-wrap: anywhere; }
+.gc-pacote { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--g-linha); }
+.gc-pacote:first-child { padding-top: 0; }
+.gc-pacote:last-child { border-bottom: 0; padding-bottom: 0; }
+.gc-fim { display: flex; justify-content: center; padding-top: 8px; }
+.gc-linha-tags { display: grid; justify-items: end; gap: 4px; }

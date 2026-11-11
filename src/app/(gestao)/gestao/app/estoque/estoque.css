@@ -1,0 +1,16 @@
+/* Estoque: linha do produto com saldo em destaque e botões rápidos */
+.ge-prod { display: grid; grid-template-columns: 1fr auto; gap: 10px 14px; align-items: center; padding: 14px 16px; }
+.ge-prod .ge-prod-t { min-width: 0; border: 0; background: none; padding: 0; text-align: left; color: inherit; cursor: pointer; }
+.ge-prod .ge-prod-t b { display: block; font-weight: 600; font-size: 1.0625rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ge-prod .ge-prod-t span { display: block; font-size: .875rem; color: var(--g-cinza); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ge-prod .ge-saldo { text-align: right; }
+.ge-prod .ge-saldo small { font-size: .8125rem; color: var(--g-cinza); margin-left: 4px; }
+.ge-prod .ge-prod-pe { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ge-prod .ge-prod-pe .g-btn:first-of-type { margin-left: auto; }
+.ge-baixo { color: #9a4508; }
+.ge-zero { color: var(--g-vermelho); }
+.ge-mov { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--g-linha); font-size: .9375rem; }
+.ge-mov:last-child { border-bottom: 0; }
+.ge-mov time { flex: none; width: 46px; color: var(--g-cinza); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.ge-mov span { flex: 1; min-width: 0; }
+.ge-mov b { flex: none; font-variant-numeric: tabular-nums; }

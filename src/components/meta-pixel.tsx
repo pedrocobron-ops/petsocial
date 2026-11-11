@@ -34,9 +34,11 @@ export default function MetaPixel() {
   const primeira = useRef(true);
   useEffect(() => {
     if (primeira.current) { primeira.current = false; return; }
+    if (pathname.startsWith("/gestao/")) return;
     rastrear("PageView");
   }, [pathname]);
-  if (!PIXEL_ID) return null;
+  // dentro do aplicativo de gestão não há rastreamento de anúncio: são dados de trabalho do pet shop
+  if (!PIXEL_ID || pathname.startsWith("/gestao/")) return null;
   return (
     <>
       {/* A fila do fbq nasce já (poucos bytes): init, PageView e qualquer evento entram nela na hora. */}

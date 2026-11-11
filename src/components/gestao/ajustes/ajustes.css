@@ -1,0 +1,36 @@
+/* Ajustes (meu pet shop, equipe, assinatura): só o que o gestao.css não cobre. Prefixo gj-. */
+.gj-dias { display: grid; }
+.gj-dia { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px 0; border-bottom: 1px solid var(--g-linha); min-height: 58px; }
+.gj-dia:last-child { border-bottom: 0; }
+.gj-dia > b { width: 4.75rem; font-weight: 600; text-transform: capitalize; }
+.gj-horas { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.gj-horas .g-input { width: 7.25rem; min-width: 0; padding-inline: 10px; font-variant-numeric: tabular-nums; }
+.gj-horas .g-input.ruim { border-color: var(--g-vermelho); }
+.gj-dia > .g-muted { margin-left: auto; }
+
+.gj-cores { display: flex; gap: 10px; flex-wrap: wrap; }
+.gj-cor { width: 38px; height: 38px; border-radius: 50%; border: 3px solid var(--g-carta); box-shadow: 0 0 0 1px var(--g-linha-forte); padding: 0; }
+.gj-cor[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--g-tinta); }
+
+.gj-bola { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+.g-linha .t span.gj-quebra { white-space: normal; }
+.gj-tags { font-size: inherit; display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+
+.gj-min { display: flex; align-items: center; gap: 8px; }
+.gj-min .g-input { width: 6.5rem; }
+
+.gj-recolhe > summary { cursor: pointer; font-weight: 600; font-size: .9375rem; color: var(--g-cinza); padding: 6px 0; }
+
+.gj-escala { display: grid; }
+.gj-escala > div { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--g-linha); }
+.gj-escala > div:last-child { border-bottom: 0; }
+.gj-escala > div > b { width: 4.75rem; flex: none; font-weight: 600; text-transform: capitalize; padding-top: 4px; }
+.gj-escala .g-chips { flex: 1; min-width: 0; gap: 6px; }
+.gj-quem { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--g-carta-2); font-size: .8125rem; font-weight: 600; }
+.gj-quem i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.gj-quem span { font-weight: 400; color: var(--g-cinza); font-variant-numeric: tabular-nums; }
+
+.gj-inclui { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gj-inclui li { display: flex; gap: 10px; align-items: flex-start; font-size: .9375rem; }
+.gj-inclui svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: #2f6b4c; }
+.gj-estreito { max-width: 760px; }

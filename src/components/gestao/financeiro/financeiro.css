@@ -1,0 +1,80 @@
+/* Caixa, Financeiro e Relatórios: só o que faltava no gestao.css (prefixo gf-). */
+
+/* linha "nome … valor" dos resumos */
+.gf-par { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: .9375rem; }
+.gf-par > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.gf-par > span:last-child { flex: none; }
+.gf-par.forte { font-weight: 600; font-size: 1rem; }
+.gf-pares { display: grid; }
+.gf-pares > .gf-par + .gf-par { border-top: 1px solid var(--g-linha); }
+
+/* seletor que ocupa a largura toda ou rola de lado no celular */
+.gf-seg-cheio { display: flex; }
+.gf-seg-cheio button { flex: 1; }
+.gf-rola { overflow-x: auto; scrollbar-width: none; margin-inline: -16px; padding-inline: 16px; }
+.gf-rola::-webkit-scrollbar { display: none; }
+.gf-rola .g-seg button { padding: 0 13px; white-space: nowrap; }
+.gf-rola .g-chips { flex-wrap: nowrap; }
+.gf-rola .g-chip { flex: none; }
+@media (min-width: 960px) { .gf-rola { margin-inline: 0; padding-inline: 0; } }
+
+/* caixa aberto: formas de pagamento dentro do cartão verde */
+.gf-formas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(246, 241, 232, .18); }
+.gf-formas > div { display: grid; gap: 2px; min-width: 0; }
+.gf-formas b { font-weight: 600; font-variant-numeric: tabular-nums; }
+@media (min-width: 560px) { .gf-formas { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* dois botões grandes lado a lado */
+.gf-dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gf-dupla .g-btn { min-height: 56px; font-size: 1rem; padding-inline: 12px; }
+
+/* diferença na gaveta */
+.gf-dif { padding: 12px 14px; border-radius: var(--g-raio-p); background: var(--g-carta-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+.gf-dif.certo { background: var(--g-menta); color: #24543b; }
+.gf-dif.sobra { background: var(--g-azul-tint); color: #1f5268; }
+.gf-dif.falta { background: var(--g-vermelho-tint); color: #8b2f20; }
+
+/* mês: ‹ novembro de 2026 › */
+.gf-mes { display: flex; align-items: center; gap: 2px; }
+.gf-mes b { font: 480 1.125rem/1.2 var(--display); min-width: 11.5ch; text-align: center; }
+.gf-mes .g-ico:disabled { opacity: .3; cursor: default; }
+
+/* três números do mês */
+.gf-tres { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 14px; }
+.gf-tres > div { display: grid; gap: 6px; min-width: 0; }
+.gf-tres > div:last-child { grid-column: 1 / -1; padding-top: 14px; border-top: 1px solid var(--g-linha); }
+@media (min-width: 640px) {
+  .gf-tres { grid-template-columns: repeat(3, 1fr); }
+  .gf-tres > div:last-child { grid-column: auto; padding-top: 0; border-top: 0; padding-left: 18px; border-left: 1px solid var(--g-linha); }
+}
+.gf-num { font: 460 1.25rem/1.1 var(--display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (min-width: 420px) { .gf-num { font-size: 1.4375rem; } }
+@media (min-width: 720px) { .gf-num { font-size: 1.625rem; } }
+
+/* categoria com barra */
+.gf-cat { display: grid; gap: 6px; padding: 9px 0; }
+
+/* conta a pagar ou a receber: a linha abre, o botão dá baixa */
+.gf-conta { padding-block: 6px; gap: 8px; }
+.gf-toque { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 6px 0; border: 0; background: none; color: inherit; text-align: left; }
+.gf-toque:hover b { text-decoration: underline; text-underline-offset: 3px; }
+.gf-conta .d { display: grid; justify-items: end; gap: 3px; }
+.gf-so-largo { display: none; }
+.gf-conta .g-btn { padding-inline: 10px; }
+@media (min-width: 560px) { .gf-so-largo { display: inline; } .gf-conta .g-btn { padding-inline: 14px; } }
+
+/* barras: a altura em % vale sempre, e cabem 31 dias no celular */
+.gf-barras { gap: 3px; height: 160px; }
+.gf-barras.poucas { gap: 8px; }
+.gf-barras > div { grid-template-rows: minmax(0, 1fr) 1rem; align-content: stretch; gap: 6px; min-width: 0; }
+.gf-barras .gf-col { position: relative; justify-self: stretch; }
+.gf-barras .gf-col i { position: absolute; bottom: 0; left: 50%; translate: -50% 0; }
+.gf-barras small { font-size: .6875rem; line-height: 1rem; white-space: nowrap; }
+
+.gf-posicao { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 50%; background: var(--g-carta-2); font-size: .8125rem; font-weight: 600; color: var(--g-cinza); font-variant-numeric: tabular-nums; }
+
+.gf-so-papel { display: none; }
+@media print {
+  .gf-nao-imprime { display: none !important; }
+  .gf-so-papel { display: block; }
+}
