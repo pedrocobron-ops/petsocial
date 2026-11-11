@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Legal, { Email, Preencher, QuemResponde, Zap } from "@/components/gestao/legal";
 import { EMPRESA } from "@/lib/empresa";
-import { PLANOS, textoAcessos } from "@/lib/gestao/planos";
+import { PERIODOS, PLANOS, ofertaDe, textoAcessos } from "@/lib/gestao/planos";
 import { brlCurto } from "@/lib/gestao/util";
 
 export const metadata: Metadata = {
@@ -17,7 +17,7 @@ export default function TermosDoGestao() {
       resumo="Estas são as regras para usar o Maestro Pet Gestão, o sistema de gestão para pet shop, banho e tosa, creche e hotel. Ao criar a conta, você declara que leu e concorda com elas.">
 
       <div className="g-leg-quadro">
-        <b>Em poucas linhas:</b> você testa 7 dias sem cartão. Se gostar, assina um plano mensal e cancela quando quiser. Os dados que você
+        <b>Em poucas linhas:</b> você testa 7 dias sem cartão. Se gostar, assina um plano (mensal, de 3 ou de 6 meses) e cancela quando quiser. Os dados que você
         lança são do seu pet shop. O assistente ajuda, mas quem confere e confirma é você.
       </div>
 
@@ -61,14 +61,14 @@ export default function TermosDoGestao() {
       <p>Todos os planos têm as mesmas funções. O que muda é quantas pessoas podem entrar com login:</p>
       <ul>
         {PLANOS.map((p) => (
-          <li key={p.id}><b>{p.nome}:</b> {textoAcessos(p.acessos)}, {brlCurto(p.preco)} por mês.</li>
+          <li key={p.id}><b>{p.nome}:</b> {textoAcessos(p.acessos)}. {PERIODOS.map((pe) => `${brlCurto(ofertaDe(p.id, pe.id).preco)} ${pe.cada}`).join(", ")}.</li>
         ))}
       </ul>
       <p>
         Estes são os preços na data desta versão. O preço que vale para você é o mostrado na tela Assinatura e no checkout no momento em que você assina.
       </p>
       <ul>
-        <li>A cobrança é <b>mensal e recorrente</b>, feita pela Cakto, a plataforma de pagamentos. O valor é cobrado a cada mês até você cancelar.</li>
+        <li>A cobrança é <b>recorrente</b>, feita pela Cakto, a plataforma de pagamentos. Conforme o período escolhido, o valor é cobrado todo mês, a cada 3 meses ou a cada 6 meses, e a assinatura se renova sozinha pelo mesmo período até você cancelar.</li>
         <li>Os dados de pagamento são digitados no ambiente da Cakto. Nós não recebemos nem guardamos o número do seu cartão.</li>
         <li>Use no checkout o mesmo e-mail da sua conta. É por ele que o sistema reconhece o pagamento e libera o acesso.</li>
         <li>Se uma cobrança não passar, o acesso continua por um tempo enquanto o pagamento é tentado de novo. Se não for regularizado, a assinatura é encerrada e a conta fica só para consulta.</li>
@@ -78,13 +78,13 @@ export default function TermosDoGestao() {
       <h2>6. Sem fidelidade: cancelamento</h2>
       <p>
         Não há fidelidade nem multa. Você cancela quando quiser, pela página da Cakto (o botão fica na tela Assinatura) ou pedindo ajuda pelo nosso contato.
-        O cancelamento encerra as cobranças seguintes.
+        O cancelamento encerra as cobranças seguintes, e você continua usando o sistema até o fim do período que já pagou.
       </p>
       <p>
-        Quando a Cakto nos avisa do cancelamento, a conta fica só para consulta. Os dados continuam guardados e você pode assinar de novo quando quiser.
+        Terminado o período pago, a conta fica só para consulta. Os dados continuam guardados e você pode assinar de novo quando quiser.
         Para mudar de plano, você cancela o atual e assina o novo: os dados do pet shop continuam os mesmos.
       </p>
-      <p>Devolução de valores já pagos: <Preencher>regra de reembolso da mensalidade (por exemplo, se há devolução dentro de 7 dias da primeira cobrança e como pedir)</Preencher>.</p>
+      <p>Devolução de valores já pagos: <Preencher>regra de reembolso do valor pago, inclusive nos planos de 3 e 6 meses (por exemplo, se há devolução dentro de 7 dias da primeira cobrança e como pedir)</Preencher>.</p>
 
       <h2>7. Os dados são do seu pet shop</h2>
       <p>

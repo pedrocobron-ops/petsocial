@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, MessageCircle, Monitor, Smartphone, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarCheck, Check, MessageCircle, Monitor, Palette, Smartphone, Sparkles } from "lucide-react";
 import Instalar from "@/components/gestao/instalar";
 import Vitrine from "@/components/gestao/vitrine";
 import { Marca } from "@/components/gestao/marca";
 import { linkSuporte } from "@/lib/gestao/contato";
-import { PLANOS, textoAcessos } from "@/lib/gestao/planos";
-import { brlCurto } from "@/lib/gestao/util";
+import PlanosVenda from "@/components/gestao/planos-venda";
 import "./produto.css";
 
 export const metadata: Metadata = {
   title: { absolute: "Maestro Pet Gestão — sistema para pet shop com assistente de inteligência artificial" },
-  description: "Agenda de banho e tosa, clientes, caixa e estoque num lugar só, com um assistente de inteligência artificial que marca e lança quando você pede por áudio ou texto. 7 dias grátis, sem cartão.",
+  description: "Agenda de banho e tosa, link para o cliente agendar, clientes, caixa e estoque num lugar só, com um assistente de inteligência artificial que marca e lança quando você pede por áudio ou texto. 7 dias grátis, sem cartão.",
 };
 
 const CRIAR = "/gestao/criar-conta";
@@ -27,17 +26,23 @@ const PEDIDOS: [string, string][] = [
 const INCLUI: [string, string][] = [
   ["Assistente de inteligência artificial", "Diga o que precisa, por áudio ou texto. Ele prepara e você confirma."],
   ["Agenda de banho e tosa", "Por dia e por semana, por profissional, com os horários livres à vista."],
-  ["Link de agendamento", "O cliente pede o horário pelo link e você aceita com um toque."],
+  ["Link de agendamento", "O cliente escolhe o horário pelo link e você aceita ou recusa com um toque."],
+  ["Sua marca no sistema", "Sua logo e as cores do pet shop no link do cliente, nas telas e na agenda impressa."],
   ["Clientes e pets", "Foto, porte, cuidados e o histórico de cada atendimento."],
-  ["Lembrete no WhatsApp", "O sistema monta a mensagem e abre o seu WhatsApp. Você só envia."],
+  ["Saúde do pet", "Vacinas, vermífugo e antipulgas com a data de vencer e aviso quando está chegando."],
+  ["Fotos de antes e depois", "Guarde o resultado do banho e mande para o tutor."],
+  ["Aviso de pet pronto", "Terminou o banho? O sistema monta a mensagem e abre o seu WhatsApp."],
+  ["Lembrete no WhatsApp", "O sistema monta a mensagem do horário e abre o seu WhatsApp. Você só envia."],
+  ["Horários que se repetem", "Marque o banho de toda semana de uma vez e bloqueie almoço e folgas."],
   ["Pacotes e mensalistas", "Quantos banhos o cliente comprou, quantos usou e quando vence."],
   ["Creche e hotel", "Entrada, saída e diárias de quem fica com você."],
-  ["Caixa do dia", "Abertura, entradas, saídas e fechamento conferido com a gaveta."],
-  ["Financeiro", "Contas a pagar e a receber e o resultado do mês."],
-  ["Estoque", "Entradas, saídas e aviso quando um produto está acabando."],
-  ["Equipe", "Acesso por função, escala da semana e comissão."],
-  ["Relatórios", "Atendimentos, faltas, serviços mais feitos e faturamento."],
   ["Comanda e venda no balcão", "Serviço, produto e extra numa conta só, com baixa no estoque."],
+  ["Caixa do dia", "Abertura, entradas, saídas e fechamento conferido com a gaveta."],
+  ["Financeiro e meta do mês", "Contas a pagar e a receber, o resultado do mês e quanto falta para a meta."],
+  ["Estoque", "Entradas, saídas e aviso quando um produto está acabando."],
+  ["Equipe com acesso por área", "Você escolhe o que cada pessoa vê: agenda, clientes, caixa, financeiro, estoque."],
+  ["Agenda em PDF", "Baixe ou imprima a agenda do dia para deixar na bancada."],
+  ["Relatórios", "Atendimentos, faltas, serviços mais feitos, faturamento e comissão."],
   ["Leva e traz", "Marque quem precisa ser buscado, com o endereço no próprio horário."],
 ];
 
@@ -48,8 +53,10 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["E os dados dos meus clientes?", <>Os dados são do seu pet shop. Você pode exportar e apagar quando quiser, como pede a LGPD. Os detalhes estão na <Link href="/gestao/privacidade">política de privacidade</Link>.</>],
   ["Emite nota fiscal?", "Ainda não. Hoje o sistema não emite nota fiscal."],
   ["Serve para clínica veterinária?", "O sistema é feito para pet shop, banho e tosa, creche e hotel. Ele não tem prontuário, receituário nem internação. Uma clínica que também faz banho e tosa pode usá-lo para essa parte."],
-  ["Tem fidelidade?", "Não. A cobrança é mensal e você cancela quando quiser."],
-  ["Posso colocar a minha equipe?", "Sim. Cada pessoa entra com o próprio acesso, e você escolhe quem atende na agenda e quem vê o financeiro. O número de acessos depende do plano: 1, 3 ou 6."],
+  ["Tem fidelidade?", "Não. No plano mensal a cobrança é todo mês. Nos planos de 3 e 6 meses você paga o período de uma vez, por um valor menor. Em qualquer um, você cancela quando quiser e usa até o fim do período já pago."],
+  ["Como o meu cliente agenda pelo link?", "Você manda o link pelo WhatsApp ou deixa no Instagram. O cliente escolhe o serviço, o dia e um dos horários livres, e você recebe o pedido para aceitar ou recusar. Ele não vê a sua agenda nem os dados de outros clientes, só os horários que estão livres."],
+  ["O que o cliente vê tem a minha marca?", "Sim. Você coloca a sua logo e escolhe as cores do pet shop. Elas aparecem no link de agendamento, nas telas do sistema e na agenda impressa."],
+  ["Posso colocar a minha equipe?", "Sim. Cada pessoa entra com o próprio acesso, e você escolhe o que ela vê: agenda, clientes, caixa, financeiro, estoque. Dá para ter mais de um dono. O número de acessos depende do plano: 1, 3 ou 6."],
   ["Posso trocar de plano depois?", "Pode. Você cancela o plano atual e assina o novo. Os dados do pet shop continuam os mesmos."],
 ];
 
@@ -74,7 +81,8 @@ export default function Pagina() {
           </Link>
           <nav aria-label="Página">
             <a href="#funcoes" className="gp-link so-pc">Funções</a>
-            <a href="#plano" className="gp-link so-pc">Plano</a>
+            <a href="#link" className="gp-link so-pc">Link do cliente</a>
+            <a href="#plano" className="gp-link so-pc">Planos</a>
             <a href="#perguntas" className="gp-link so-pc">Perguntas</a>
             <Link href="/gestao/entrar" className="gp-btn contorno">Entrar</Link>
             <Link href={CRIAR} className="gp-btn verde">Teste grátis</Link>
@@ -84,10 +92,11 @@ export default function Pagina() {
         <div className="gp-c gp-capa-grade">
           <div className="gp-capa-texto">
             <h1>Sistema para <em>pet shop</em> e banho e tosa</h1>
-            <p>Agenda, clientes, caixa e estoque em um lugar só. E um assistente de inteligência artificial que marca e lança para você: é só falar.</p>
+            <p>Agenda, clientes, caixa e estoque em um lugar só. O cliente agenda sozinho pelo seu link, e um assistente de inteligência artificial marca e lança para você: é só falar.</p>
             <ul className="gp-selos">
               <li><Check />Assistente de inteligência artificial incluído</li>
-              <li><Check />Tudo o que o pet shop usa, em um plano só</li>
+              <li><Check />Link para o cliente agendar, com a sua marca</li>
+              <li><Check />Todas as funções em qualquer plano</li>
             </ul>
             <div className="gp-acao">
               <Link href={CRIAR} className="gp-btn pri grande">Teste grátis por 7 dias <ArrowRight /></Link>
@@ -119,6 +128,24 @@ export default function Pagina() {
         </div>
       </section>
 
+      <section className="gp-link-sec" id="link">
+        <div className="gp-c gp-link-grade">
+          <Tela arquivo="cel-link" alt="Página de agendamento que o cliente abre pelo link, com a logo e as cores do pet shop" celular />
+          <div>
+            <p className="gp-ia claro"><CalendarCheck />Link de agendamento</p>
+            <h2>O cliente agenda sozinho. <em>Você só aceita.</em></h2>
+            <p className="gp-lead">Mande o seu link pelo WhatsApp ou deixe no Instagram. Chega de responder “tem horário sábado?” o dia inteiro.</p>
+            <ol className="gp-passos">
+              <li><b>O cliente abre o link</b><span>Escolhe o serviço, o dia e um dos horários livres. Pode pedir para mais de um pet de uma vez.</span></li>
+              <li><b>O pedido chega para você</b><span>Aparece na tela inicial e na agenda. Um toque para aceitar, outro para recusar.</span></li>
+              <li><b>Ele acompanha a resposta</b><span>O cliente vê na hora se o horário foi confirmado, pelo mesmo link.</span></li>
+            </ol>
+            <p className="gp-nota"><Check />Ele só vê os horários livres. A sua agenda e os outros clientes não aparecem.</p>
+            <p className="gp-nota"><Palette />A página leva a sua logo e as cores do seu pet shop.</p>
+          </div>
+        </div>
+      </section>
+
       <section className="gp-mostra" id="funcoes">
         <div className="gp-c">
           <h2>Conheça o sistema <em>por dentro</em></h2>
@@ -141,25 +168,9 @@ export default function Pagina() {
       <section className="gp-planos" id="plano">
         <div className="gp-c">
           <h2>Planos <em>e preços</em></h2>
-          <p className="gp-lead">Todos os planos têm todas as funções e o assistente de inteligência artificial. Você escolhe pelo número de pessoas que entram no sistema.</p>
-          <ul className="gp-planos-grade">
-            {PLANOS.map((p) => (
-              <li key={p.id} className={p.id === "equipe" ? "destaque" : undefined}>
-                <h3>{p.nome}</h3>
-                <p className="gp-para">{p.para}</p>
-                <p className="gp-valor">{brlCurto(p.preco)}<small> por mês</small></p>
-                <p className="gp-acessos">{textoAcessos(p.acessos)}<span> ao sistema</span></p>
-                <ul>
-                  <li><Check />Todas as funções</li>
-                  <li><Check />Assistente de inteligência artificial, por áudio e texto</li>
-                  <li><Check />Celular e computador</li>
-                  <li><Check />Suporte por WhatsApp</li>
-                </ul>
-                <Link href={CRIAR} className={`gp-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`}>Teste grátis</Link>
-              </li>
-            ))}
-          </ul>
-          <p className="gp-planos-nota">7 dias grátis, sem cartão. Cobrança mensal, sem fidelidade: você cancela quando quiser. Durante o teste, até 6 pessoas podem entrar.</p>
+          <p className="gp-lead">Todos os planos têm todas as funções e o assistente de inteligência artificial. Você escolhe pelo número de pessoas que entram no sistema e de quanto em quanto tempo quer pagar.</p>
+          <PlanosVenda criar={CRIAR} />
+          <p className="gp-planos-nota">7 dias grátis, sem cartão. Sem fidelidade: você cancela quando quiser e usa até o fim do período já pago. Durante o teste, até 6 pessoas podem entrar.</p>
         </div>
       </section>
 

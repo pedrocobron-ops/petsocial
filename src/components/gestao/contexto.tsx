@@ -95,7 +95,9 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     if (!user || !eu || !petshop) return null;
     const emTeste = petshop.status === "teste";
     const resta = new Date(petshop.teste_ate).getTime() - Date.now();
-    const liberado = ["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && resta > 0);
+    // quem cancelou continua usando até o fim do período que já pagou
+    const pagoAinda = petshop.status === "cancelada" && petshop.pago_ate != null && new Date(petshop.pago_ate).getTime() > Date.now();
+    const liberado = ["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && resta > 0) || pagoAinda;
     return {
       sb, user, petshop, eu, equipe, servicos,
       souDono: eu.papel === "dono",
