@@ -9,6 +9,7 @@ export type Servico = T["servicos"]["Row"];
 export type Pacote = T["pacotes"]["Row"];
 export type PacoteCliente = T["pacotes_clientes"]["Row"];
 export type Agendamento = T["agendamentos"]["Row"];
+export type Bloqueio = T["bloqueios"]["Row"];
 export type Estadia = T["estadias"]["Row"];
 export type Caixa = T["caixas"]["Row"];
 export type Lancamento = T["lancamentos"]["Row"];

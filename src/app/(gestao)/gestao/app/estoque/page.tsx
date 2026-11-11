@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowUpFromLine, Minus, Package, PackageX, Plus, Search, Sparkles, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowUpFromLine, Minus, Package, PackageX, Plus, Search, ShoppingBag, Sparkles, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { abrirAssistente, avisarMudanca, Campo, CampoValor, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { Kpi, Tile } from "@/components/gestao/painel";
 import { Chips, ChipsForma, ErroTela, fmtQtd, lerQtd, type Forma } from "@/components/gestao/loja/pecas";
+import VendaBalcao from "@/components/gestao/loja/venda";
 import { lancarPago } from "@/lib/gestao/dinheiro";
 import type { MovimentoEstoque, Produto } from "@/lib/gestao/tipos";
 import { brl, brlCurto, dataCurta, semAcento } from "@/lib/gestao/util";
@@ -38,7 +39,7 @@ function nivel(p: Produto): { tom: "ok" | "perto" | "baixo"; parte: number | nul
   return { tom: tem < min ? "baixo" : tem <= min * 1.5 ? "perto" : "ok", parte: Math.min(1, tem / (min * 2)) };
 }
 
-type Aberta = { tipo: "novo" } | { tipo: "entrada" | "saida" | "ficha"; produto: Produto };
+type Aberta = { tipo: "novo" | "venda" } | { tipo: "entrada" | "saida" | "ficha"; produto: Produto };
 
 export default function Estoque() {
   const { sb, petshop, vejoFinanceiro } = useGestao();
@@ -83,6 +84,7 @@ export default function Estoque() {
           <p className="g-muted">{produtos.length ? `${produtos.length} ${produtos.length === 1 ? "produto" : "produtos"} na prateleira` : "Ração, shampoo, petiscos e o que mais você vende ou usa."}</p>
         </div>
         <div className="g-acoes">
+          {produtos.length > 0 && <button className="g-btn sec" onClick={() => abrir({ tipo: "venda" })}><ShoppingBag /> Vender</button>}
           <button className="g-btn pri" onClick={() => abrir({ tipo: "novo" })}><Plus /> Produto novo</button>
         </div>
       </header>
@@ -181,6 +183,7 @@ export default function Estoque() {
         </div>
       )}
 
+      {aberta?.tipo === "venda" && <VendaBalcao aoFechar={fechar} aoPronto={gravou} />}
       {aberta?.tipo === "novo" && <ProdutoNovo aoFechar={fechar} aoGravar={gravou} />}
       {aberta?.tipo === "entrada" && <Entrada produto={aberta.produto} aoFechar={fechar} aoGravar={gravou} />}
       {aberta?.tipo === "saida" && <Saida produto={aberta.produto} aoFechar={fechar} aoGravar={gravou} />}

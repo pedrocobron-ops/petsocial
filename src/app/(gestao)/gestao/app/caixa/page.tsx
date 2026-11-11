@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, History, Lock, Minus, Plus, Scale, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, History, Lock, Minus, Plus, Scale, ShoppingBag, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { avisarMudanca, Campo, CampoValor, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import {
   brlMini, COR_FORMA, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDoCaixa, rotuloForma, SemAcesso, soma, type Tipo,
 } from "@/components/gestao/financeiro/comum";
+import VendaBalcao from "@/components/gestao/loja/venda";
 import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
 import type { Caixa, Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCurta, dataLonga, hora, isoDia } from "@/lib/gestao/util";
@@ -22,6 +23,7 @@ type FolhaAberta =
   | { tipo: "novo"; de: Tipo }
   | { tipo: "editar"; lancamento: Lancamento }
   | { tipo: "fechar" }
+  | { tipo: "venda" }
   | { tipo: "resumo"; caixaId: string };
 
 function diferenca(contado: number | null, esperado: number) {
@@ -131,6 +133,7 @@ function CaixaDoDia() {
               <div className="gf-dupla">
                 <button className="g-btn pri" onClick={() => abrir({ tipo: "novo", de: "entrada" })}><ArrowDownLeft />Entrada</button>
                 <button className="g-btn g-cx-claro" onClick={() => abrir({ tipo: "novo", de: "saida" })}><ArrowUpRight />Saída</button>
+                <button className="g-btn g-cx-claro g-vd-inteiro" onClick={() => abrir({ tipo: "venda" })}><ShoppingBag />Venda no balcão</button>
               </div>
             </section>
           ) : (
@@ -255,6 +258,7 @@ function CaixaDoDia() {
       {folha?.tipo === "editar" && (
         <FolhaLancamento modo="pago" tipo={folha.lancamento.tipo as Tipo} inicial={folha.lancamento} aoFechar={() => setFolha(null)} aoSalvo={recarregar} />
       )}
+      {folha?.tipo === "venda" && <VendaBalcao aoFechar={() => setFolha(null)} aoPronto={() => void recarregar()} />}
       {folha?.tipo === "fechar" && aberto && (
         <FolhaFechar caixa={aberto} lancamentos={lancamentos} aoFechar={() => setFolha(null)}
           aoSalvo={async () => { await recarregar(); setFolha({ tipo: "resumo", caixaId: aberto.id }); }} />

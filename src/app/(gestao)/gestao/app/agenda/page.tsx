@@ -2,31 +2,38 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Plus, Truck } from "lucide-react";
-import type { AgendamentoCompleto, PetComTutor } from "@/lib/gestao/tipos";
+import { ChevronLeft, ChevronRight, Lock, Plus, Truck } from "lucide-react";
+import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { deMin, paraMin } from "@/lib/gestao/agenda";
-import { dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
+import { dataCurta, dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
-import { AvatarPet, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
+import { AvatarPet, Esqueleto, Vazio, abrirAssistente, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
+import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
+import FormBloqueio from "@/components/gestao/agenda/form-bloqueio";
+import "./agenda.css";
 
 type Novo = { dia: string; hora?: string; pet?: PetComTutor | null; profissional?: string | null };
 const H_HORA = 64; // altura de uma hora na visão de semana, em px
+/** Bloqueio recortado dentro de um dia, em minutos desde 00:00. */
+type Trecho = { b: Bloqueio; de: number; ate: number; inteiro: boolean };
 
 function Agenda() {
   const { sb, petshop, equipe } = useGestao();
   const router = useRouter();
   const params = useSearchParams();
   const somenteLeitura = useSomenteLeitura();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const [dia, setDia] = useState(() => params.get("dia") ?? isoDia(new Date()));
   const [visao, setVisao] = useState<"dia" | "semana">("dia");
   const [prof, setProf] = useState<string | null>(null);
   const [novo, setNovo] = useState<Novo | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
+  const [bloqueando, setBloqueando] = useState(false);
 
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
   const data = deIsoDia(dia);
@@ -36,6 +43,11 @@ function Agenda() {
   const { dados, carregando, erro, recarregar } = useDados(async () =>
     ok(await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id)
       .gte("inicio", segunda.toISOString()).lt("inicio", somaDias(segunda, 7).toISOString()).order("inicio")) as unknown as AgendamentoCompleto[],
+  [petshop.id, segunda.getTime()]);
+
+  const { dados: bloqueios, recarregar: recarregarBloqueios } = useDados(async () =>
+    ok(await sb.from("bloqueios").select("*").eq("petshop_id", petshop.id)
+      .lt("inicio", somaDias(segunda, 7).toISOString()).gt("fim", segunda.toISOString()).order("inicio")),
   [petshop.id, segunda.getTime()]);
 
   // link "Agendar" vindo da ficha do pet: /gestao/app/agenda?novo=1&pet=<id>
@@ -56,10 +68,32 @@ function Agenda() {
   const selecionado = aberto ? (dados ?? []).find((a) => a.id === aberto) ?? null : null;
   const abrirNovo = (n: Novo) => { if (!somenteLeitura()) setNovo(n); };
 
+  // bloqueios: com filtro de profissional, só os dele e os do pet shop inteiro
+  const nomeDe = (id: string | null) => (id ? equipe.find((p) => p.id === id)?.nome.split(" ")[0] ?? "Profissional" : "Pet shop inteiro");
+  const bloqueiosVisiveis = (bloqueios ?? []).filter((b) => !prof || !b.profissional_id || b.profissional_id === prof);
+  const trechosDe = (d: Date): Trecho[] => {
+    const base = d.getTime(), fimDoDia = Math.round((somaDias(d, 1).getTime() - base) / 60000);
+    return bloqueiosVisiveis.map((b) => ({ b, de: Math.max(0, Math.round((new Date(b.inicio).getTime() - base) / 60000)), ate: Math.min(fimDoDia, Math.round((new Date(b.fim).getTime() - base) / 60000)) }))
+      .filter((t) => t.ate > t.de).map((t) => ({ ...t, inteiro: t.de === 0 && t.ate >= fimDoDia }));
+  };
+  const bloqueiosDoDia = trechosDe(data);
+  const textoDoTrecho = (t: Trecho) => (t.inteiro ? "Dia inteiro" : `${deMin(t.de)} às ${deMin(t.ate)}`);
+  async function removerBloqueio(t: Trecho, d: Date) {
+    if (somenteLeitura()) return;
+    const sim = await confirmar({ titulo: "Remover este bloqueio?", texto: `${t.b.motivo ?? "Bloqueio"} · ${nomeDiaCurto(d)} ${dataCurta(d)}, ${textoDoTrecho(t).toLowerCase()} · ${nomeDe(t.b.profissional_id)}. O horário volta a ficar livre.`, confirmar: "Remover bloqueio", perigo: true });
+    if (!sim) return;
+    try {
+      ok(await sb.from("bloqueios").delete().eq("id", t.b.id).eq("petshop_id", petshop.id).select("id").single());
+      avisar("Bloqueio removido.");
+      void recarregarBloqueios();
+      avisarMudanca();
+    } catch (e) { avisarErro(e); }
+  }
+
   // janelas livres do dia (entre um atendimento e outro, dentro do funcionamento)
   const funcionamento = horarioDoDia(petshop.horario, data);
   const linhas = useMemo(() => {
-    type Linha = { tipo: "ag"; a: AgendamentoCompleto } | { tipo: "livre"; de: number; ate: number };
+    type Linha = { tipo: "ag"; a: AgendamentoCompleto } | { tipo: "livre"; de: number; ate: number } | { tipo: "bloq"; t: Trecho };
     const out: Linha[] = [];
     const ativos = doDia.filter((a) => !["cancelado", "faltou"].includes(a.status));
     const base = data.getTime();
@@ -68,16 +102,20 @@ function Agenda() {
     const agora = new Date();
     if (cursor != null && mesmoDia(agora, data)) cursor = Math.max(cursor, Math.ceil((agora.getHours() * 60 + agora.getMinutes()) / 30) * 30);
     const fecha = funcionamento ? paraMin(funcionamento.fecha) : null;
-    for (const a of doDia) {
-      const ini = min(a.inicio);
-      const conta = ativos.includes(a);
-      if (conta && cursor != null && fecha != null && ini - cursor >= 30 && cursor < fecha) out.push({ tipo: "livre", de: cursor, ate: Math.min(ini, fecha) });
-      out.push({ tipo: "ag", a });
-      if (conta && cursor != null) cursor = Math.max(cursor, min(a.fim));
+    // atendimentos e bloqueios na ordem do relógio; o tempo bloqueado não é oferecido como livre.
+    // Bloqueio de uma pessoa só tira o tempo livre quando a agenda é dela (filtro) ou só ela atende.
+    const itens = [
+      ...doDia.map((a) => ({ linha: { tipo: "ag", a } as Linha, de: min(a.inicio), ate: min(a.fim), conta: ativos.includes(a) })),
+      ...bloqueiosDoDia.map((t) => ({ linha: { tipo: "bloq", t } as Linha, de: t.de, ate: t.ate, conta: !t.b.profissional_id || t.b.profissional_id === prof || quemAtende.length <= 1 })),
+    ].sort((x, y) => x.de - y.de || Number(y.linha.tipo === "bloq") - Number(x.linha.tipo === "bloq"));
+    for (const it of itens) {
+      if (it.conta && cursor != null && fecha != null && it.de - cursor >= 30 && cursor < fecha) out.push({ tipo: "livre", de: cursor, ate: Math.min(it.de, fecha) });
+      out.push(it.linha);
+      if (it.conta && cursor != null) cursor = Math.max(cursor, it.ate);
     }
     if (cursor != null && fecha != null && fecha - cursor >= 30) out.push({ tipo: "livre", de: cursor, ate: fecha });
     return out;
-  }, [doDia, funcionamento, data.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [doDia, bloqueiosDoDia, funcionamento, data.getTime(), prof, quemAtende.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resumo = useMemo(() => {
     const ativos = doDia.filter((a) => !["cancelado", "faltou"].includes(a.status));
@@ -115,11 +153,13 @@ function Agenda() {
             <button aria-pressed={visao === "dia"} onClick={() => setVisao("dia")}>Dia</button>
             <button aria-pressed={visao === "semana"} onClick={() => setVisao("semana")}>Semana</button>
           </div>
+          <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear<span className="g-agd-curto">&nbsp;horário</span></button>
           <button className="g-btn pri" onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>
         </div>
       </header>
 
       <div className="g-pilha">
+        <PedidosLink />
         <div className="g-fila g-card g-ag-faixa">
           <button className="g-ico" aria-label="Semana anterior" onClick={() => setDia(isoDia(somaDias(data, -7)))}><ChevronLeft /></button>
           <div className="g-dias g-cresce">
@@ -173,6 +213,17 @@ function Agenda() {
                   {mesmoDia(d, agora) && agora.getHours() * 60 >= faixa.ini && agora.getHours() * 60 < faixa.fim && (
                     <div className="g-agora" style={{ top: ((agora.getHours() * 60 + agora.getMinutes() - faixa.ini) / 60) * H_HORA }} />
                   )}
+                  {trechosDe(d).map((t) => {
+                    const de = Math.max(t.de, faixa.ini), ate = Math.min(t.ate, faixa.fim);
+                    if (ate <= de) return null;
+                    const rotulo = `${t.b.motivo ?? "Bloqueado"}${t.b.profissional_id ? ` · ${nomeDe(t.b.profissional_id)}` : ""}`;
+                    return (
+                      <button key={t.b.id} className="g-agd-faixa" title={`${rotulo}, ${textoDoTrecho(t).toLowerCase()}. Toque para remover.`} onClick={() => void removerBloqueio(t, d)}
+                        style={{ top: ((de - faixa.ini) / 60) * H_HORA, height: ((ate - de) / 60) * H_HORA }}>
+                        <Lock aria-hidden /><span>{rotulo}</span>
+                      </button>
+                    );
+                  })}
                   {raias.map((r, ri) => r.map((a) => {
                     const i = new Date(a.inicio), f = new Date(a.fim);
                     const topo = ((i.getHours() * 60 + i.getMinutes() - faixa.ini) / 60) * H_HORA;
@@ -190,7 +241,7 @@ function Agenda() {
               );
             })}
           </div>
-        ) : !doDia.length ? (
+        ) : !doDia.length && !bloqueiosDoDia.length ? (
           <div className="g-card">
             <Vazio titulo={funcionamento ? "Dia livre por enquanto" : "O pet shop não abre neste dia"}
               texto={funcionamento ? `Nenhum horário marcado. Aberto das ${funcionamento.abre} às ${funcionamento.fecha}.` : "Se for atender mesmo assim, é só marcar."}>
@@ -208,6 +259,19 @@ function Agenda() {
                   <time>{deMin(l.de)}</time>
                   <span className="ponto" aria-hidden />
                   <button className="g-livre" onClick={() => abrirNovo({ dia, hora: deMin(l.de), profissional: prof })}><Plus size={16} />Livre até {deMin(l.ate)}</button>
+                </div>
+              ) : l.tipo === "bloq" ? (
+                <div className="g-hora-grupo g-agd-linha" key={`b${l.t.b.id}`}>
+                  {l.t.inteiro ? <time className="txt">Dia</time> : <time>{deMin(l.t.de)}</time>}
+                  <span className="ponto" aria-hidden />
+                  <button className="g-agd-bloq" onClick={() => void removerBloqueio(l.t, data)} aria-label={`Bloqueio: ${l.t.b.motivo ?? "sem motivo"}, ${textoDoTrecho(l.t)}. Toque para remover.`}>
+                    <span className="g-agd-cadeado"><Lock aria-hidden /></span>
+                    <span className="t">
+                      <b>{l.t.b.motivo ?? "Bloqueado"}</b>
+                      <span>{l.t.inteiro ? "Dia inteiro" : `Até ${deMin(l.t.ate)}`} · {nomeDe(l.t.b.profissional_id)}</span>
+                    </span>
+                    <span className="g-tag">Bloqueado</span>
+                  </button>
                 </div>
               ) : (
                 <div className={`g-hora-grupo${l.a.status === "concluido" ? " feito" : ""}`} key={l.a.id} style={{ "--cor": l.a.servicos?.cor ?? "#f97316" } as React.CSSProperties}>
@@ -239,6 +303,7 @@ function Agenda() {
                 <div><span className="g-muted">Ainda por atender</span><b>{resumo.total - resumo.feitos}</b></div>
                 {resumo.levaTraz > 0 && <div><span className="g-muted">Com leva e traz</span><b>{resumo.levaTraz}</b></div>}
                 {resumo.fora > 0 && <div><span className="g-muted">Cancelados ou faltas</span><b>{resumo.fora}</b></div>}
+                {bloqueiosDoDia.length > 0 && <div><span className="g-muted">Bloqueios</span><b>{bloqueiosDoDia.length}</b></div>}
               </div>
             </aside>
           </div>
@@ -248,6 +313,7 @@ function Agenda() {
       {novo && <FormAgendamento diaInicial={novo.dia} horaInicial={novo.hora} petInicial={novo.pet} profissionalInicial={novo.profissional}
         aoFechar={() => setNovo(null)} aoSalvar={() => { setNovo(null); void recarregar(); }} />}
       {selecionado && !editando && <DetalheAgendamento agendamento={selecionado} aoFechar={() => setAberto(null)} aoMudar={() => void recarregar()} aoEditar={() => setEditando(selecionado)} />}
+      {bloqueando && <FormBloqueio diaInicial={dia} profissionalInicial={prof} aoFechar={() => setBloqueando(false)} aoSalvar={() => { setBloqueando(false); void recarregarBloqueios(); }} />}
       {editando && <FormAgendamento agendamento={editando} aoFechar={() => setEditando(null)} aoSalvar={() => { setEditando(null); setAberto(null); void recarregar(); }} />}
     </>
   );

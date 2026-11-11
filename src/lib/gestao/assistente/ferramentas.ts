@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
-import { horariosLivres } from "../agenda";
+import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres } from "../agenda";
 import { brl, fmtTelefone, linkWhatsApp, precoDoServico, semAcento } from "../util";
 
 /**
@@ -61,13 +61,14 @@ const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
 const S = { type: "string" }, N = { type: "number" }, B = { type: "boolean" };
 const DIA = { type: "string", description: "Dia no formato AAAA-MM-DD" };
 const DIA_HORA = { type: "string", description: "Dia e hora locais no formato AAAA-MM-DDTHH:mm" };
+const HORA = { type: "string", description: "Hora local no formato HH:mm" };
 
 export const FERRAMENTAS: Def[] = [
   { grava: false, name: "buscar_pets", description: "Procura pets e tutores pelo nome do pet, nome do tutor ou telefone. Use sempre antes de marcar horário ou lançar algo para um pet, para pegar o id certo. Devolve também o último atendimento e os pacotes ativos.",
     input_schema: obj({ termo: { ...S, description: "Nome do pet, do tutor ou parte do telefone" } }, ["termo"]) },
-  { grava: false, name: "ver_agenda", description: "Lista os horários marcados entre dois dias (inclusive), com pet, tutor, serviço, profissional, status e valor.",
+  { grava: false, name: "ver_agenda", description: "Lista os horários marcados entre dois dias (inclusive), com pet, tutor, serviço, profissional, status e valor, e os bloqueios de horário do período (almoço, folga, feriado).",
     input_schema: obj({ de: DIA, ate: DIA }, ["de", "ate"]) },
-  { grava: false, name: "horarios_livres", description: "Mostra os horários livres de um dia, dentro do funcionamento do pet shop, para um serviço. Use antes de sugerir horário ou quando o horário pedido estiver ocupado.",
+  { grava: false, name: "horarios_livres", description: "Mostra os horários livres de um dia, dentro do funcionamento do pet shop, para um serviço. Já desconta o tempo bloqueado e lista os bloqueios do dia. Use antes de sugerir horário ou quando o horário pedido estiver ocupado ou bloqueado.",
     input_schema: obj({ dia: DIA, servico_id: S, profissional_id: S }, ["dia"]) },
   { grava: false, name: "clientes_sumidos", description: "Lista pets cujo último atendimento concluído foi há mais de N dias (ou que nunca vieram), com tutor e telefone.",
     input_schema: obj({ dias: { ...N, description: "Quantidade de dias sem vir, ex.: 30 ou 60" } }, ["dias"]) },
@@ -82,8 +83,12 @@ export const FERRAMENTAS: Def[] = [
 
   { grava: true, name: "cadastrar_pet", description: "Cadastra um pet novo. Se o tutor já é cliente, passe cliente_id; senão, passe tutor_nome (e telefone, se a pessoa disse) e o tutor é criado junto.",
     input_schema: obj({ nome: S, cliente_id: S, tutor_nome: S, tutor_telefone: S, especie: { type: "string", enum: ["cao", "gato", "outro"] }, raca: S, porte: { type: "string", enum: ["P", "M", "G", "GG"] }, alertas: { ...S, description: "Cuidados: alergia, medo, comportamento" } }, ["nome"]) },
-  { grava: true, name: "marcar_horario", description: "Marca um horário na agenda para um pet já cadastrado. O valor é sugerido pelo serviço e porte se você não passar.",
-    input_schema: obj({ pet_id: S, servico_id: S, inicio: DIA_HORA, profissional_id: S, preco: N, obs: S, leva_traz: B }, ["pet_id", "servico_id", "inicio"]) },
+  { grava: true, name: "marcar_horario", description: "Marca um horário na agenda para um pet já cadastrado. O valor é sugerido pelo serviço e porte se você não passar. Para horário que se repete (toda semana, de 15 em 15 dias, uma vez por mês), passe repetir_a_cada_semanas e repetir_vezes: cria todos de uma vez, no mesmo dia da semana e hora. Dá erro se cair em bloqueio do pet shop inteiro ou do profissional escolhido.",
+    input_schema: obj({ pet_id: S, servico_id: S, inicio: DIA_HORA, profissional_id: S, preco: N, obs: S, leva_traz: B,
+      repetir_a_cada_semanas: { type: "number", enum: [1, 2, 4], description: "Intervalo da repetição, em semanas: 1, 2 ou 4" },
+      repetir_vezes: { ...N, description: "Quantos horários no total, contando o primeiro: de 2 a 12" } }, ["pet_id", "servico_id", "inicio"]) },
+  { grava: true, name: "bloquear_horario", description: "Bloqueia um período da agenda (almoço, folga, feriado, manutenção) para ninguém marcar nele. Sem profissional_id vale para o pet shop inteiro. Sem de e ate, bloqueia o dia inteiro. Com repetir_semanas, repete o mesmo bloqueio em todos os dias úteis (os dias em que o pet shop abre) pelas próximas N semanas.",
+    input_schema: obj({ dia: DIA, de: HORA, ate: HORA, profissional_id: S, motivo: { ...S, description: "Ex.: Almoço, Folga, Feriado, Manutenção" }, repetir_semanas: { ...N, description: "Opcional, de 1 a 8" } }, ["dia"]) },
   { grava: true, name: "alterar_horario", description: "Altera um horário existente: remarca (inicio), troca serviço ou profissional, muda o valor ou o status (confirmado, concluido, faltou, cancelado, marcado).",
     input_schema: obj({ agendamento_id: S, inicio: DIA_HORA, servico_id: S, profissional_id: S, preco: N, status: { type: "string", enum: ["marcado", "confirmado", "em_atendimento", "concluido", "faltou", "cancelado"] } }, ["agendamento_id"]) },
   { grava: true, financeiro: true, name: "lancar_dinheiro", description: "Registra dinheiro que já entrou ou saiu hoje (entra no caixa aberto). Para receber um atendimento, passe agendamento_id: ele fica como concluído.",
@@ -111,6 +116,54 @@ async function petPorId(c: Contexto, id: unknown) {
 }
 const servicoPorId = (c: Contexto, id: unknown) => c.servicos.find((s) => s.id === id) ?? null;
 const profPorId = (c: Contexto, id: unknown) => c.equipe.find((p) => p.id === id) ?? null;
+
+/* ---------- bloqueios e séries ---------- */
+
+type Bloq = { id: string; inicio: string; fim: string; motivo: string | null; profissional_id: string | null };
+const RE_HORA = /^\d{2}:\d{2}$/;
+const DIAS_CURTOS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+/** "sex 13/11" */
+const diaCurtoLocal = (dia: string) => `${DIAS_CURTOS[diaSemanaLocal(dia)]} ${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+
+/** Bloqueios que cruzam o intervalo (instantes em UTC). */
+async function bloqueiosEntre(c: Contexto, ini: Date, fim: Date): Promise<Bloq[]> {
+  return ok(await c.sb.from("bloqueios").select("id, inicio, fim, motivo, profissional_id").eq("petshop_id", c.petshop.id)
+    .lt("inicio", fim.toISOString()).gt("fim", ini.toISOString()).order("inicio").limit(1000));
+}
+const quemDoBloqueio = (c: Contexto, b: Pick<Bloq, "profissional_id">) => (b.profissional_id ? profPorId(c, b.profissional_id)?.nome ?? "profissional" : "pet shop inteiro");
+const bloqueioParaModelo = (c: Contexto, b: Bloq) => ({ inicio: utcParaLocal(b.inicio, c.fusoMin), fim: utcParaLocal(b.fim, c.fusoMin), motivo: b.motivo ?? "sem motivo", para: quemDoBloqueio(c, b) });
+/** "Almoço, pet shop inteiro, das 12:00 às 13:00" */
+const bloqueioEmTexto = (c: Contexto, b: Bloq) => `${b.motivo ?? "bloqueio"}, ${quemDoBloqueio(c, b)}, das ${utcParaLocal(b.inicio, c.fusoMin).slice(11)} às ${utcParaLocal(b.fim, c.fusoMin).slice(11)}`;
+
+/** Inícios locais ("AAAA-MM-DDTHH:mm") de um pedido de marcar_horario: um só, ou a série inteira. */
+function iniciosDoPedido(e: Entrada): { inicios: string[]; aCada: number | null } {
+  exigir(RE_DIA_HORA.test(String(e.inicio)), "inicio no formato AAAA-MM-DDTHH:mm.");
+  const inicio = String(e.inicio).slice(0, 16);
+  const aCada = numero(e.repetir_a_cada_semanas), vezes = numero(e.repetir_vezes);
+  if (aCada == null && vezes == null) return { inicios: [inicio], aCada: null };
+  exigir(aCada == null || [1, 2, 4].includes(aCada), "repetir_a_cada_semanas deve ser 1, 2 ou 4.");
+  exigir(vezes == null || (Number.isInteger(vezes) && vezes >= 2 && vezes <= 12), "repetir_vezes deve ser de 2 a 12.");
+  return { inicios: datasDaSerie(inicio.slice(0, 10), aCada ?? 1, vezes ?? 4).map((d) => `${d}T${inicio.slice(11)}`), aCada: aCada ?? 1 };
+}
+
+/** Confere e monta os registros de um pedido de bloquear_horario (um por dia). */
+function planoDoBloqueio(c: Contexto, e: Entrada) {
+  const dia = String(e.dia);
+  exigir(RE_DIA.test(dia), "dia no formato AAAA-MM-DD.");
+  const de = texto(e.de, 5), ate = texto(e.ate, 5);
+  exigir((!de && !ate) || (RE_HORA.test(de) && RE_HORA.test(ate)), "de e ate no formato HH:mm. Para o dia inteiro, não passe nenhum dos dois.");
+  exigir(!de || ate > de, "O fim do bloqueio precisa ser depois do início.");
+  const prof = e.profissional_id ? profPorId(c, e.profissional_id) : null;
+  exigir(!e.profissional_id || prof, "profissional_id inválido.");
+  const semanas = numero(e.repetir_semanas);
+  exigir(semanas == null || (Number.isInteger(semanas) && semanas >= 1 && semanas <= 8), "repetir_semanas deve ser de 1 a 8.");
+  const dias = semanas ? diasUteis(dia, semanas, c.petshop.horario) : [dia];
+  const linhas = dias.map((d) => ({
+    inicio: localParaUtc(`${d}T${de || "00:00"}`, c.fusoMin).toISOString(),
+    fim: localParaUtc(de ? `${d}T${ate}` : `${somaDiasLocal(d, 1)}T00:00`, c.fusoMin).toISOString(),
+  }));
+  return { dias, de, ate, prof, semanas, motivo: texto(e.motivo, 80) || null, linhas };
+}
 
 async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resultado: unknown; links?: LinkZap[] }> {
   const { sb, petshop } = c;
@@ -144,11 +197,12 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       exigir(RE_DIA.test(String(e.de)) && RE_DIA.test(String(e.ate)), "Datas no formato AAAA-MM-DD.");
       const ini = localParaUtc(`${e.de}T00:00`, c.fusoMin), fim = localParaUtc(`${somaDiasLocal(String(e.ate), 1)}T00:00`, c.fusoMin);
       const ags = ok(await sb.from("agendamentos").select("id, inicio, fim, status, preco, obs, lembrete_em, pets(nome, clientes(nome)), servicos(nome), profissionais(nome)").eq("petshop_id", petshop.id).gte("inicio", ini.toISOString()).lt("inicio", fim.toISOString()).order("inicio").limit(200));
+      const bloqueios = await bloqueiosEntre(c, ini, fim);
       return { resultado: { horarios: ags.map((a) => ({
         agendamento_id: a.id, inicio: utcParaLocal(a.inicio, c.fusoMin), fim: utcParaLocal(a.fim, c.fusoMin).slice(11), status: a.status,
         pet: a.pets?.nome, tutor: a.pets?.clientes?.nome, servico: a.servicos?.nome, com: a.profissionais?.nome,
         ...(c.vejoFinanceiro ? { valor: a.preco } : {}), obs: a.obs, lembrete_enviado: Boolean(a.lembrete_em),
-      })), total: ags.length } };
+      })), total: ags.length, bloqueios: bloqueios.map((b) => bloqueioParaModelo(c, b)) } };
     }
     case "horarios_livres": {
       const dia = String(e.dia);
@@ -160,11 +214,18 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       const ini = localParaUtc(`${dia}T00:00`, c.fusoMin);
       const ags = ok(await sb.from("agendamentos").select("inicio, fim, profissional_id, status").eq("petshop_id", petshop.id).gte("inicio", ini.toISOString()).lt("inicio", new Date(ini.getTime() + 864e5).toISOString()));
       const quemAtende = c.equipe.filter((p) => p.ativo && p.atende);
-      const ocupados = ags.filter((a) => !["cancelado", "faltou"].includes(a.status) && (prof ? a.profissional_id === prof.id : quemAtende.length <= 1))
-        .map((a) => ({ inicio: (new Date(a.inicio).getTime() - ini.getTime()) / 60000, fim: (new Date(a.fim).getTime() - ini.getTime()) / 60000 }));
+      const emMin = (x: { inicio: string; fim: string }) => ({ inicio: (new Date(x.inicio).getTime() - ini.getTime()) / 60000, fim: (new Date(x.fim).getTime() - ini.getTime()) / 60000 });
+      // bloqueio do pet shop inteiro vale sempre; o de uma pessoa, quando o horário é com ela (ou só ela atende)
+      const bloqueios = await bloqueiosEntre(c, ini, new Date(ini.getTime() + 864e5));
+      const ocupados = [
+        ...ags.filter((a) => !["cancelado", "faltou"].includes(a.status) && (prof ? a.profissional_id === prof.id : quemAtende.length <= 1)),
+        ...bloqueios.filter((b) => !b.profissional_id || b.profissional_id === prof?.id || quemAtende.length <= 1),
+      ].map(emMin);
       const aPartirDe = dia === hoje ? Number(c.agora.slice(11, 13)) * 60 + Number(c.agora.slice(14, 16)) : undefined;
       const livres = horariosLivres({ abre: func.abre, fecha: func.fecha, duracaoMin: servico?.duracao_min ?? 60, ocupados, aPartirDe });
-      return { resultado: { dia, funcionamento: `${func.abre} às ${func.fecha}`, duracao_min: servico?.duracao_min ?? 60, livres, marcados: ags.filter((a) => !["cancelado", "faltou"].includes(a.status)).length } };
+      return { resultado: { dia, funcionamento: `${func.abre} às ${func.fecha}`, duracao_min: servico?.duracao_min ?? 60, livres, marcados: ags.filter((a) => !["cancelado", "faltou"].includes(a.status)).length,
+        bloqueios: bloqueios.map((b) => bloqueioParaModelo(c, b)),
+        ...(bloqueios.length ? { aviso: "Os horários livres já descontam os bloqueios. Não ofereça horário dentro de um bloqueio." } : {}) } };
     }
     case "clientes_sumidos": {
       const dias = Math.max(1, Math.min(720, numero(e.dias) ?? 30));
@@ -262,25 +323,56 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       const pet = await petPorId(c, e.pet_id);
       const servico = servicoPorId(c, e.servico_id);
       exigir(servico, "servico_id inválido: use um dos serviços do pet shop.");
-      exigir(RE_DIA_HORA.test(String(e.inicio)), "inicio no formato AAAA-MM-DDTHH:mm.");
-      const inicio = String(e.inicio).slice(0, 16);
+      const { inicios, aCada } = iniciosDoPedido(e);
+      const inicio = inicios[0];
       const prof = e.profissional_id ? profPorId(c, e.profissional_id) : null;
       exigir(!e.profissional_id || prof, "profissional_id inválido.");
+      const intervalos = inicios.map((i) => { const ini = localParaUtc(i, c.fusoMin); return { local: i, ini, fim: new Date(ini.getTime() + servico.duracao_min * 60000) }; });
+      // bloqueio do pet shop inteiro ou do profissional escolhido: não marca
+      const bloqueios = await bloqueiosEntre(c, intervalos[0].ini, intervalos[intervalos.length - 1].fim);
+      const barrados = intervalos.map((x) => ({ x, b: bloqueios.find((b) => bloqueioPega(b, prof?.id, x.ini.getTime(), x.fim.getTime())) })).filter((r) => r.b);
+      if (barrados.length) {
+        exigir(inicios.length > 1, `Esse horário está bloqueado (${bloqueioEmTexto(c, barrados[0].b!)}). Nada foi marcado. Avise a pessoa e use horarios_livres para sugerir outro horário.`);
+        throw new ErroDeUso(`A série cai em horário bloqueado nestas datas: ${barrados.map((r) => `${quandoLocal(r.x.local.slice(0, 10))} (${bloqueioEmTexto(c, r.b!)})`).join("; ")}. Nada foi marcado. Avise a pessoa e combine outro horário ou outra repetição.`);
+      }
       const preco = numero(e.preco) ?? precoDoServico(servico, pet.porte);
-      const linhas: [string, string][] = [["Pet", `${pet.nome}${pet.clientes?.nome ? ` (${pet.clientes.nome})` : ""}`], ["Serviço", servico.nome], ["Quando", quandoLocal(inicio)]];
+      const linhas: [string, string][] = [["Pet", `${pet.nome}${pet.clientes?.nome ? ` (${pet.clientes.nome})` : ""}`], ["Serviço", servico.nome]];
+      if (inicios.length > 1) {
+        linhas.push(["Começa", quandoLocal(inicio)], ["Repete", `${aCada === 1 ? "toda semana" : `a cada ${aCada} semanas`}, ${inicios.length} horários`], ["Datas", inicios.map((i) => diaCurtoLocal(i.slice(0, 10))).join(", ")]);
+      } else linhas.push(["Quando", quandoLocal(inicio)]);
       if (prof) linhas.push(["Com", prof.nome]);
-      linhas.push(["Valor", preco != null ? brl(preco) : "a definir"]);
+      linhas.push(["Valor", preco != null ? `${brl(preco)}${inicios.length > 1 ? " cada" : ""}` : "a definir"]);
       if (e.leva_traz) linhas.push(["Leva e traz", "sim"]);
       if (texto(e.obs)) linhas.push(["Obs.", texto(e.obs, 300)]);
       const func = (c.petshop.horario as Horario | null)?.[String(diaSemanaLocal(inicio.slice(0, 10)))];
       if (!func) linhas.push(["Atenção", "o pet shop não abre nesse dia"]);
       else if (inicio.slice(11) < func.abre || inicio.slice(11) >= func.fecha) linhas.push(["Atenção", `fora do horário (${func.abre} às ${func.fecha})`]);
       if (prof) {
-        const ini = localParaUtc(inicio, c.fusoMin), fim = new Date(ini.getTime() + servico.duracao_min * 60000);
-        const { data: bate } = await c.sb.rpc("conflitos_agenda", { p_petshop: c.petshop.id, p_profissional: prof.id, p_inicio: ini.toISOString(), p_fim: fim.toISOString() });
-        if (bate?.length) linhas.push(["Atenção", `${prof.nome.split(" ")[0]} já tem atendimento nesse horário`]);
+        const batem: string[] = [];
+        for (const x of intervalos) {
+          const { data: bate } = await c.sb.rpc("conflitos_agenda", { p_petshop: c.petshop.id, p_profissional: prof.id, p_inicio: x.ini.toISOString(), p_fim: x.fim.toISOString() });
+          if (bate?.length) batem.push(diaCurtoLocal(x.local.slice(0, 10)));
+        }
+        if (batem.length) linhas.push(["Atenção", `${prof.nome.split(" ")[0]} já tem atendimento ${inicios.length > 1 ? `em ${batem.join(", ")}` : "nesse horário"}`]);
       }
-      return { titulo: "Marcar horário", linhas };
+      return { titulo: inicios.length > 1 ? `Marcar ${inicios.length} horários` : "Marcar horário", linhas };
+    }
+    case "bloquear_horario": {
+      const p = planoDoBloqueio(c, e);
+      const linhas: [string, string][] = [
+        ["Quando", p.dias.length > 1 ? `${quandoLocal(p.dias[0])} até ${quandoLocal(p.dias[p.dias.length - 1])}` : quandoLocal(p.dias[0])],
+        ["Horário", p.de ? `${p.de} às ${p.ate}` : "dia inteiro"],
+        ["Para", p.prof ? p.prof.nome : "pet shop inteiro"],
+      ];
+      if (p.motivo) linhas.push(["Motivo", p.motivo]);
+      if (p.dias.length > 1) linhas.push(["Repete", `nos dias úteis, ${p.dias.length} dias (${[...new Set(p.dias.slice(0, 14).map((d) => DIAS_CURTOS[diaSemanaLocal(d)]))].join(", ")})`]);
+      // quem já está marcado nesse período continua marcado: só avisa
+      const ags = ok(await c.sb.from("agendamentos").select("inicio, fim, profissional_id, status").eq("petshop_id", c.petshop.id)
+        .gte("inicio", new Date(Date.parse(p.linhas[0].inicio) - 864e5).toISOString()).lt("inicio", p.linhas[p.linhas.length - 1].fim).limit(2000));
+      const marcados = ags.filter((a) => !["cancelado", "faltou"].includes(a.status) && (!p.prof || a.profissional_id === p.prof.id)
+        && p.linhas.some((l) => new Date(a.inicio).getTime() < Date.parse(l.fim) && new Date(a.fim).getTime() > Date.parse(l.inicio))).length;
+      if (marcados) linhas.push(["Atenção", `${marcados === 1 ? "já há 1 horário marcado" : `já há ${marcados} horários marcados`} nesse período (${marcados === 1 ? "continua marcado" : "continuam marcados"})`]);
+      return { titulo: "Bloquear horário", linhas };
     }
     case "alterar_horario": {
       const id = uuid(e.agendamento_id);
@@ -364,11 +456,22 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
     case "marcar_horario": {
       const pet = await petPorId(c, e.pet_id);
       const servico = servicoPorId(c, e.servico_id)!;
-      const ini = localParaUtc(String(e.inicio), c.fusoMin);
-      const a = ok(await sb.from("agendamentos").insert({ petshop_id: petshop.id, pet_id: pet.id, servico_id: servico.id, profissional_id: uuid(e.profissional_id),
-        inicio: ini.toISOString(), fim: new Date(ini.getTime() + servico.duracao_min * 60000).toISOString(), preco: numero(e.preco) ?? precoDoServico(servico, pet.porte),
-        obs: texto(e.obs, 400) || null, leva_traz: Boolean(e.leva_traz), origem: "assistente", criado_por: c.userId }).select("id").single());
-      return { feito: true, agendamento_id: a.id };
+      const { inicios } = iniciosDoPedido(e);
+      const serie = inicios.length > 1 ? crypto.randomUUID() : null;
+      const criados = ok(await sb.from("agendamentos").insert(inicios.map((i) => {
+        const ini = localParaUtc(i, c.fusoMin);
+        return { petshop_id: petshop.id, pet_id: pet.id, servico_id: servico.id, profissional_id: uuid(e.profissional_id), serie_id: serie,
+          inicio: ini.toISOString(), fim: new Date(ini.getTime() + servico.duracao_min * 60000).toISOString(), preco: numero(e.preco) ?? precoDoServico(servico, pet.porte),
+          obs: texto(e.obs, 400) || null, leva_traz: Boolean(e.leva_traz), origem: "assistente", criado_por: c.userId };
+      })).select("id, inicio"));
+      const emOrdem = [...criados].sort((x, y) => x.inicio.localeCompare(y.inicio));
+      if (inicios.length === 1) return { feito: true, agendamento_id: emOrdem[0]?.id };
+      return { feito: true, horarios_marcados: emOrdem.length, serie_id: serie, agendamento_id: emOrdem[0]?.id, datas: emOrdem.map((a) => utcParaLocal(a.inicio, c.fusoMin)) };
+    }
+    case "bloquear_horario": {
+      const p = planoDoBloqueio(c, e);
+      const criados = ok(await sb.from("bloqueios").insert(p.linhas.map((l) => ({ petshop_id: petshop.id, profissional_id: p.prof?.id ?? null, inicio: l.inicio, fim: l.fim, motivo: p.motivo, criado_por: c.userId }))).select("id"));
+      return { feito: true, bloqueios_criados: criados.length };
     }
     case "alterar_horario": {
       const id = String(e.agendamento_id);

@@ -7,6 +7,9 @@ export async function caixaAberto(sb: Banco, petshopId: string) {
   return data;
 }
 
+/** Uma linha de uma venda ou comanda, como fica guardada em `lancamentos.itens`. `valor` é o preço de uma unidade. */
+export type ItemLancamento = { tipo: "servico" | "produto" | "extra"; nome: string; qtd: number; valor: number; produto_id?: string };
+
 /**
  * Registra dinheiro que já entrou ou saiu hoje. Se houver caixa aberto, o lançamento entra nele.
  * Use para: receber um atendimento, vender um pacote, fechar uma estadia, pagar uma despesa na hora.
@@ -14,7 +17,7 @@ export async function caixaAberto(sb: Banco, petshopId: string) {
 export async function lancarPago(sb: Banco, petshopId: string, l: {
   tipo: "entrada" | "saida"; valor: number; forma: "dinheiro" | "pix" | "debito" | "credito" | "outro";
   categoria: string; descricao?: string | null; agendamentoId?: string | null; clienteId?: string | null;
-  origem?: "tela" | "assistente" | "sistema"; data?: string;
+  origem?: "tela" | "assistente" | "sistema"; data?: string; itens?: ItemLancamento[] | null;
 }) {
   const caixa = await caixaAberto(sb, petshopId);
   const { data: u } = await sb.auth.getUser();
@@ -22,6 +25,7 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
     petshop_id: petshopId, tipo: l.tipo, valor: l.valor, forma: l.forma, categoria: l.categoria, descricao: l.descricao ?? null,
     data: l.data ?? isoDia(new Date()), pago: true, caixa_id: caixa?.id ?? null,
     agendamento_id: l.agendamentoId ?? null, cliente_id: l.clienteId ?? null, origem: l.origem ?? "tela", criado_por: u.user?.id ?? null,
+    ...(l.itens?.length ? { itens: l.itens } : {}),
   }).select().single();
   if (error) throw new Error(error.message);
   return data;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, Clock, Plus, Scissors, Store, Tag } from "lucide-react";
+import { CalendarDays, Check, Clock, Copy, ExternalLink, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
 import { Kpi, Tile } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
 import { Campo, CampoValor, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
@@ -60,7 +60,10 @@ export default function MeuPetshop() {
             <Dados />
             <HorarioDaLoja />
           </div>
-          <Servicos />
+          <div className="g-pilha g">
+            <LinkAgendamento />
+            <Servicos />
+          </div>
         </div>
       </div>
     </>
@@ -118,6 +121,89 @@ function Dados() {
       {erro && <p className="g-erro" role="alert">{erro}</p>}
       <div><button className="g-btn verde" disabled={salvando}>{salvando ? "Salvando…" : "Salvar dados"}</button></div>
     </form>
+  );
+}
+
+/* ---------- link de agendamento ---------- */
+
+function LinkAgendamento() {
+  const { sb, petshop, servicos, recarregarBase } = useGestao();
+  const { avisar, avisarErro } = useAvisos();
+  const somenteLeitura = useSomenteLeitura();
+  const [aviso, setAviso] = useState(petshop.link_aviso ?? "");
+  const [ligando, setLigando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+  const ativo = petshop.link_ativo;
+  const endereco = `${typeof window === "undefined" ? "" : window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
+  const semServico = !servicos.some((s) => s.ativo && !["creche", "hotel"].includes(s.categoria));
+  const semDia = !ORDEM_DIAS.some((d) => lerHorario(petshop.horario)[d]);
+  const mudouAviso = aviso.trim() !== (petshop.link_aviso ?? "");
+  const zap = `https://wa.me/?text=${encodeURIComponent(`Agora dá para pedir horário no ${petshop.nome} pelo celular. Escolha o serviço, o dia e a hora, e a gente confirma por aqui: ${endereco}`)}`;
+
+  async function ligar(valor: boolean) {
+    if (somenteLeitura() || ligando) return;
+    setLigando(true);
+    try {
+      ok(await sb.from("petshops").update({ link_ativo: valor }).eq("id", petshop.id).select("id"));
+      await recarregarBase();
+      avisar(valor ? "Link ligado. Já pode mandar para os clientes." : "Link desligado.");
+    } catch (x) { avisarErro(x); } finally { setLigando(false); }
+  }
+
+  async function salvarAviso(e: React.FormEvent) {
+    e.preventDefault();
+    if (somenteLeitura()) return;
+    setSalvando(true);
+    try {
+      ok(await sb.from("petshops").update({ link_aviso: aviso.trim().slice(0, 240) || null }).eq("id", petshop.id).select("id"));
+      await recarregarBase();
+      setAviso(aviso.trim());
+      avisar("Recado salvo.");
+    } catch (x) { avisarErro(x); } finally { setSalvando(false); }
+  }
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(endereco);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch { avisar("Não consegui copiar. Segure o dedo no endereço para copiar."); }
+  }
+
+  return (
+    <section className={`g-card g-pilha g-mp-link${ativo ? " on" : ""}`}>
+      <div className="g-mp-t">
+        <Tile icone={Link2} tom="pessego" />
+        <div><h2>Link de agendamento</h2><p className="g-muted g-p">O cliente pede o horário pelo celular. Você aceita ou recusa.</p></div>
+        <button type="button" role="switch" aria-checked={ativo} aria-label="Link de agendamento ligado" className="g-mp-chave" disabled={ligando} onClick={() => void ligar(!ativo)}><i /></button>
+      </div>
+
+      {ativo ? (
+        <>
+          <div className="g-mp-endereco">
+            <span className="g-rotulo">Endereço do seu link</span>
+            <a href={endereco} target="_blank" rel="noopener noreferrer">{endereco}<ExternalLink aria-hidden /></a>
+          </div>
+          <div className="g-mp-link-acoes">
+            <button type="button" className="g-btn verde" onClick={() => void copiar()}>{copiado ? <Check /> : <Copy />}{copiado ? "Copiado" : "Copiar link"}</button>
+            <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar no WhatsApp</a>
+          </div>
+          {(semServico || semDia) && (
+            <p className="g-mp-link-falta">{semServico ? "Nenhum serviço da agenda está ativo, então o link abre sem opções. Creche e hotel não entram no link." : "Nenhum dia está aberto no horário de funcionamento, então o link não mostra horários."}</p>
+          )}
+        </>
+      ) : (
+        <p className="g-mp-link-off">O link está desligado. Ligue a chave para receber pedidos de horário. Nada é marcado sem você aceitar.</p>
+      )}
+
+      <form className="g-form" onSubmit={salvarAviso}>
+        <Campo rotulo="Recado na página" dica={`Aparece no topo do link. ${240 - aviso.length} letras sobrando.`}>
+          <textarea className="g-textarea" value={aviso} maxLength={240} placeholder="Ex.: Traga a carteirinha de vacina. Tosa só com horário confirmado." onChange={(e) => setAviso(e.target.value)} />
+        </Campo>
+        <div><button className="g-btn sec" disabled={salvando || !mudouAviso}>{salvando ? "Salvando…" : "Salvar recado"}</button></div>
+      </form>
+    </section>
   );
 }
 

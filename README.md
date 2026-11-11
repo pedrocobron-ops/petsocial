@@ -63,6 +63,7 @@ Sistema por assinatura para pet shops, dentro deste site. Fica fora do Google (`
 | `/gestao/criar-conta`, `/gestao/entrar`, `/gestao/recuperar` | Cadastro (7 dias grátis, sem cartão), login e senha |
 | `/gestao/app/*` | O aplicativo do pet shop: Hoje, Agenda, Clientes e pets, Creche e hotel, Pacotes, Caixa, Financeiro, Relatórios, Estoque, Equipe, Meu pet shop, Assinatura |
 | `/gestao/admin` | Painel interno da Maestro Pet (só para quem está na tabela `admins`) |
+| `/gestao/agendar/<código>` | Link público de agendamento: o tutor pede um horário e a equipe aceita ou recusa (liga em Meu pet shop) |
 | `/api/gestao/assistente` | O Mozart (assistente): entende o pedido, consulta e propõe ações; só grava depois do "Confirmar" |
 | `/api/gestao/cakto` | Aviso de pagamento da Cakto (webhook): libera ou bloqueia a assinatura |
 
