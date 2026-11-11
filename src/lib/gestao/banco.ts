@@ -39,14 +39,14 @@ export type Database = {
                   ]
                 },"agendamentos": {
                   Row: {
-                    "checklist": NonNullable<Json>,"criado_em": string,"criado_por": string | null,"endereco_leva_traz": string | null,"fim": string,"id": string,"inicio": string,"lembrete_em": string | null,"leva_traz": boolean,"obs": string | null,"origem": string,"pacote_cliente_id": string | null,"pet_id": string,"petshop_id": string,"preco": number | null,"profissional_id": string | null,"servico_id": string | null,"status": Database["public"]['Enums']["status_agendamento"]
+                    "checklist": NonNullable<Json>,"criado_em": string,"criado_por": string | null,"endereco_leva_traz": string | null,"fim": string,"id": string,"inicio": string,"lembrete_em": string | null,"leva_traz": boolean,"obs": string | null,"origem": string,"pacote_cliente_id": string | null,"pet_id": string,"petshop_id": string,"preco": number | null,"profissional_id": string | null,"serie_id": string | null,"servico_id": string | null,"status": Database["public"]['Enums']["status_agendamento"]
                   }
                   ComputedFields: never
                   Insert: {
-                    "checklist"?: NonNullable<Json>,"criado_em"?: string,"criado_por"?: string | null,"endereco_leva_traz"?: string | null,"fim": string,"id"?: string,"inicio": string,"lembrete_em"?: string | null,"leva_traz"?: boolean,"obs"?: string | null,"origem"?: string,"pacote_cliente_id"?: string | null,"pet_id": string,"petshop_id": string,"preco"?: number | null,"profissional_id"?: string | null,"servico_id"?: string | null,"status"?: Database["public"]['Enums']["status_agendamento"]
+                    "checklist"?: NonNullable<Json>,"criado_em"?: string,"criado_por"?: string | null,"endereco_leva_traz"?: string | null,"fim": string,"id"?: string,"inicio": string,"lembrete_em"?: string | null,"leva_traz"?: boolean,"obs"?: string | null,"origem"?: string,"pacote_cliente_id"?: string | null,"pet_id": string,"petshop_id": string,"preco"?: number | null,"profissional_id"?: string | null,"serie_id"?: string | null,"servico_id"?: string | null,"status"?: Database["public"]['Enums']["status_agendamento"]
                   }
                   Update: {
-                    "checklist"?: NonNullable<Json>,"criado_em"?: string,"criado_por"?: string | null,"endereco_leva_traz"?: string | null,"fim"?: string,"id"?: string,"inicio"?: string,"lembrete_em"?: string | null,"leva_traz"?: boolean,"obs"?: string | null,"origem"?: string,"pacote_cliente_id"?: string | null,"pet_id"?: string,"petshop_id"?: string,"preco"?: number | null,"profissional_id"?: string | null,"servico_id"?: string | null,"status"?: Database["public"]['Enums']["status_agendamento"]
+                    "checklist"?: NonNullable<Json>,"criado_em"?: string,"criado_por"?: string | null,"endereco_leva_traz"?: string | null,"fim"?: string,"id"?: string,"inicio"?: string,"lembrete_em"?: string | null,"leva_traz"?: boolean,"obs"?: string | null,"origem"?: string,"pacote_cliente_id"?: string | null,"pet_id"?: string,"petshop_id"?: string,"preco"?: number | null,"profissional_id"?: string | null,"serie_id"?: string | null,"servico_id"?: string | null,"status"?: Database["public"]['Enums']["status_agendamento"]
                   }
                   Relationships: [
                     {
@@ -93,6 +93,32 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "petshops"
       referencedColumns: ["id"]
+    }
+                  ]
+                },"bloqueios": {
+                  Row: {
+                    "criado_em": string,"criado_por": string | null,"fim": string,"id": string,"inicio": string,"motivo": string | null,"petshop_id": string,"profissional_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "criado_em"?: string,"criado_por"?: string | null,"fim": string,"id"?: string,"inicio": string,"motivo"?: string | null,"petshop_id": string,"profissional_id"?: string | null
+                  }
+                  Update: {
+                    "criado_em"?: string,"criado_por"?: string | null,"fim"?: string,"id"?: string,"inicio"?: string,"motivo"?: string | null,"petshop_id"?: string,"profissional_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "bloqueios_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "bloqueios_profissional_id_petshop_id_fkey"
+      columns: ["profissional_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "profissionais"
+      referencedColumns: ["id","petshop_id"]
     }
                   ]
                 },"caixas": {
@@ -191,14 +217,14 @@ isOneToOne: false
                   ]
                 },"lancamentos": {
                   Row: {
-                    "agendamento_id": string | null,"caixa_id": string | null,"categoria": string,"cliente_id": string | null,"criado_em": string,"criado_por": string | null,"data": string,"descricao": string | null,"forma": string | null,"id": string,"origem": string,"pago": boolean,"petshop_id": string,"tipo": string,"valor": number,"vencimento": string | null
+                    "agendamento_id": string | null,"caixa_id": string | null,"categoria": string,"cliente_id": string | null,"criado_em": string,"criado_por": string | null,"data": string,"descricao": string | null,"forma": string | null,"id": string,"itens": Json | null,"origem": string,"pago": boolean,"petshop_id": string,"tipo": string,"valor": number,"vencimento": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendamento_id"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"cliente_id"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"forma"?: string | null,"id"?: string,"origem"?: string,"pago"?: boolean,"petshop_id": string,"tipo": string,"valor": number,"vencimento"?: string | null
+                    "agendamento_id"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"cliente_id"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"origem"?: string,"pago"?: boolean,"petshop_id": string,"tipo": string,"valor": number,"vencimento"?: string | null
                   }
                   Update: {
-                    "agendamento_id"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"cliente_id"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"forma"?: string | null,"id"?: string,"origem"?: string,"pago"?: boolean,"petshop_id"?: string,"tipo"?: string,"valor"?: number,"vencimento"?: string | null
+                    "agendamento_id"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"cliente_id"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"origem"?: string,"pago"?: boolean,"petshop_id"?: string,"tipo"?: string,"valor"?: number,"vencimento"?: string | null
                   }
                   Relationships: [
                     {
@@ -325,6 +351,38 @@ isOneToOne: false
       referencedColumns: ["id","petshop_id"]
     }
                   ]
+                },"pedidos_agendamento": {
+                  Row: {
+                    "agendamento_id": string | null,"criado_em": string,"especie": string,"fim": string,"id": string,"inicio": string,"obs": string | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"servico_id": string | null,"status": string,"telefone": string,"tutor_nome": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agendamento_id"?: string | null,"criado_em"?: string,"especie"?: string,"fim": string,"id"?: string,"inicio": string,"obs"?: string | null,"pet_nome": string,"petshop_id": string,"porte"?: string | null,"servico_id"?: string | null,"status"?: string,"telefone": string,"tutor_nome": string
+                  }
+                  Update: {
+                    "agendamento_id"?: string | null,"criado_em"?: string,"especie"?: string,"fim"?: string,"id"?: string,"inicio"?: string,"obs"?: string | null,"pet_nome"?: string,"petshop_id"?: string,"porte"?: string | null,"servico_id"?: string | null,"status"?: string,"telefone"?: string,"tutor_nome"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "pedidos_agendamento_agendamento_id_petshop_id_fkey"
+      columns: ["agendamento_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "agendamentos"
+      referencedColumns: ["id","petshop_id"]
+    },{
+      foreignKeyName: "pedidos_agendamento_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pedidos_agendamento_servico_id_petshop_id_fkey"
+      columns: ["servico_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "servicos"
+      referencedColumns: ["id","petshop_id"]
+    }
+                  ]
                 },"pets": {
                   Row: {
                     "alertas": string | null,"ativo": boolean,"cliente_id": string,"criado_em": string,"especie": string,"foto": string | null,"id": string,"nascimento": string | null,"nome": string,"obs": string | null,"petshop_id": string,"porte": string | null,"raca": string | null,"sexo": string | null
@@ -347,14 +405,14 @@ isOneToOne: false
                   ]
                 },"petshops": {
                   Row: {
-                    "assinatura_desde": string | null,"cakto_assinatura": string | null,"cakto_email": string | null,"cidade": string | null,"criado_em": string,"criado_por": string | null,"fuso": string,"horario": NonNullable<Json>,"id": string,"nome": string,"plano": string,"status": Database["public"]['Enums']["status_assinatura"],"telefone": string | null,"teste_ate": string,"uf": string | null,"whatsapp": boolean
+                    "assinatura_desde": string | null,"cakto_assinatura": string | null,"cakto_email": string | null,"cidade": string | null,"criado_em": string,"criado_por": string | null,"fuso": string,"horario": NonNullable<Json>,"id": string,"link_ativo": boolean,"link_aviso": string | null,"link_codigo": string,"nome": string,"plano": string,"status": Database["public"]['Enums']["status_assinatura"],"telefone": string | null,"teste_ate": string,"uf": string | null,"whatsapp": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"horario"?: NonNullable<Json>,"id"?: string,"nome": string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"teste_ate"?: string,"uf"?: string | null,"whatsapp"?: boolean
+                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"horario"?: NonNullable<Json>,"id"?: string,"link_ativo"?: boolean,"link_aviso"?: string | null,"link_codigo"?: string,"nome": string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"teste_ate"?: string,"uf"?: string | null,"whatsapp"?: boolean
                   }
                   Update: {
-                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"horario"?: NonNullable<Json>,"id"?: string,"nome"?: string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"teste_ate"?: string,"uf"?: string | null,"whatsapp"?: boolean
+                    "assinatura_desde"?: string | null,"cakto_assinatura"?: string | null,"cakto_email"?: string | null,"cidade"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"fuso"?: string,"horario"?: NonNullable<Json>,"id"?: string,"link_ativo"?: boolean,"link_aviso"?: string | null,"link_codigo"?: string,"nome"?: string,"plano"?: string,"status"?: Database["public"]['Enums']["status_assinatura"],"telefone"?: string | null,"teste_ate"?: string,"uf"?: string | null,"whatsapp"?: boolean
                   }
                   Relationships: [
                     
@@ -470,6 +528,7 @@ isOneToOne: false
 "petshop_id": string,
 "preco": number | null,
 "profissional_id": string | null,
+"serie_id": string | null,
 "servico_id": string | null,
 "status": Database["public"]['Enums']["status_agendamento"]
             }[]
@@ -507,8 +566,23 @@ isOneToOne: false
 "limite_de_acessos":
 { Args: { "p_plano": string }; Returns: number
                            },
+"link_horarios":
+{ Args: { "p_codigo": string,"p_dia": string,"p_servico": string }; Returns: string[]
+                           },
+"link_info":
+{ Args: { "p_codigo": string }; Returns: Json
+                           },
+"link_pedir":
+{ Args: { "p_codigo": string,"p_dia": string,"p_especie"?: string,"p_hora": string,"p_obs"?: string,"p_pet": string,"p_porte"?: string,"p_servico": string,"p_telefone": string,"p_tutor": string }; Returns: Json
+                           },
+"link_vaga":
+{ Args: { "p_fim": string,"p_inicio": string,"p_petshop": string }; Returns: boolean
+                           },
 "meus_petshops":
 { Args: Record<PropertyKey, never>; Returns: string[]
+                           },
+"pedido_aceitar":
+{ Args: { "p_id": string,"p_profissional"?: string }; Returns: string
                            },
 "sou_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean

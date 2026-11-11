@@ -10,6 +10,7 @@ import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
+import DicasMozart from "@/components/gestao/dicas-mozart";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 
@@ -229,6 +230,7 @@ export default function Hoje() {
           </section>
 
           <div className="g-pilha g">
+            <DicasMozart />
             {atencao.length > 0 && (
               <section>
                 <div className="g-card-t"><h2>Pede a sua atenção</h2><span className="g-tag amarelo">{atencao.length}</span></div>
