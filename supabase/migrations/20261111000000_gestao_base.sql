@@ -574,7 +574,15 @@ begin
 end $$;
 
 -- quem pode chamar o quê
-revoke execute on all functions in schema public from public, anon;
+-- só as funções deste sistema: o banco pode ter outros sistemas no mesmo esquema
+revoke execute on function
+  public.meus_petshops(), public.sou_dono(uuid), public.vejo_financeiro(uuid), public.acesso_liberado(uuid), public.sou_admin(),
+  public.criar_petshop(text, text, text, text, text), public.entrar(),
+  public.conflitos_agenda(uuid, uuid, timestamptz, timestamptz, uuid),
+  public.cakto_evento(text, text, text, text, jsonb),
+  public.admin_painel(), public.admin_atualizar(uuid, public.status_assinatura, timestamptz, text, text), public.admin_eventos_cakto(),
+  public.aplicar_movimento_estoque()
+  from public, anon, authenticated;
 grant execute on function public.meus_petshops(), public.sou_dono(uuid), public.vejo_financeiro(uuid), public.acesso_liberado(uuid), public.sou_admin() to authenticated;
 grant execute on function public.criar_petshop(text, text, text, text, text), public.entrar() to authenticated;
 grant execute on function public.conflitos_agenda(uuid, uuid, timestamptz, timestamptz, uuid) to authenticated;

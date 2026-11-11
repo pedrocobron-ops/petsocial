@@ -2,8 +2,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./banco";
 
 /** Endereço e chave pública do Supabase (variáveis na Vercel). A chave pública só funciona junto com as regras do banco (RLS). */
-export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-export const SUPABASE_CHAVE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
+// Padrão: o projeto do Supabase em uso hoje. Os dois valores são públicos por natureza (vão para o navegador de qualquer forma);
+// as variáveis da Vercel trocam o projeto sem mexer no código, quando o Gestão ganhar um banco só dele.
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://pifuiczrytmizqxzygbi.supabase.co";
+export const SUPABASE_CHAVE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "sb_publishable_0WFj3aYhEER7N0yrDQ6Q1Q_Lk1I4XwY";
 export const configurado = Boolean(SUPABASE_URL && SUPABASE_CHAVE);
 
 export type Banco = SupabaseClient<Database>;
