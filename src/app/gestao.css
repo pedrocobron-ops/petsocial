@@ -698,3 +698,10 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 }
 @media (max-width: 959px) { .g-porta-papo, .g-porta-lado > .fundo { display: none; } }
 @media (max-width: 520px) { .g-ag-faixa { padding: 6px 2px; gap: 0; } .g-ag-faixa .g-ico { width: 30px; height: 36px; } .g-ag-faixa .g-dia { padding: 8px 2px; border-radius: 13px; } .g-ag-faixa .g-dia b { font-size: 1.25rem; } }
+
+/* o selo da marca e os quadradinhos de ícone não herdam estilo de texto dos blocos em volta (ficavam apagados e fora do centro) */
+.g-raiz .g-selo, .g-raiz .g-tile { display: inline-grid; place-items: center; opacity: 1; max-width: none; overflow: visible; font-size: inherit; }
+.g-raiz .g-selo svg, .g-raiz .g-tile svg { display: block; }
+.g-marca .g-selo, .g-ass-topo .g-selo, .g-porta-papo .g-selo, .g-barra-marca .g-selo { margin: 0; }
+.g-raiz .g-selo, .g-raiz .g-tile { display: inline-grid !important; opacity: 1 !important; }
+.g-ass-topo .foto, .g-fab .foto, .g-porta-papo .foto { display: grid; opacity: 1; max-width: none; overflow: visible; font-size: inherit; }
