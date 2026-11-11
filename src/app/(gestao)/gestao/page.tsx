@@ -45,6 +45,7 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["O assistente faz as coisas sozinho?", "Não. Ele entende o pedido, mostra o que vai fazer e espera o seu “confirmar”. Nada entra na agenda, no caixa ou no estoque sem você ver."],
   ["E os dados dos meus clientes?", <>Os dados são do seu pet shop. Você pode exportar e apagar quando quiser, como pede a LGPD. Os detalhes estão na <Link href="/politica-de-privacidade">política de privacidade</Link>.</>],
   ["Emite nota fiscal?", "Ainda não. Hoje o sistema não emite nota fiscal."],
+  ["Serve para clínica veterinária?", "O sistema é feito para pet shop, banho e tosa, creche e hotel. Ele não tem prontuário, receituário nem internação. Uma clínica que também faz banho e tosa pode usá-lo para essa parte."],
   ["Tem fidelidade?", "Não. A cobrança é mensal e você cancela quando quiser."],
   ["Posso colocar a minha equipe?", "Sim. Cada pessoa entra com o próprio acesso, e você escolhe quem atende na agenda e quem vê o financeiro."],
 ];
