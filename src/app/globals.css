@@ -1723,3 +1723,6 @@ html:has(dialog[open]) .barra { visibility: hidden; }
 @media (min-width: 900px) { .h2-hero-palco { padding: 0 0 0 14%; } .h2-flutua { width: 31%; top: 12%; } }
 .h2-flutua { width: 25%; }
 @media (min-width: 900px) { .h2-flutua { width: 25%; } }
+.h2-flutua { display: block; }
+.h2-flutua img { display: block; }
+.h2-flutua span { position: absolute; left: 0; top: calc(100% + 8px); }
