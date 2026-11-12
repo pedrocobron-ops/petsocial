@@ -965,3 +965,60 @@ body:has(.g-fundo) .g-toasts { bottom: auto; top: calc(14px + env(safe-area-inse
 .g-esc-texto h3 { font: 500 1.1875rem/1.2 var(--display); margin-top: 6px; }
 .g-esc-texto ul { margin: 0; padding-left: 1.15rem; display: grid; gap: 8px; }
 .g-esc-pratica { display: grid; gap: 10px; padding: 14px 16px; border-radius: var(--g-raio-p); background: var(--g-verde-tint); }
+
+/* terceira leva: retenção (fim de teste, primeiros passos e resumo da semana na tela Hoje) */
+.g-ret-cab { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.g-ret-cab > div { min-width: 0; }
+.g-ret-cab h2 { font: 500 clamp(1.25rem, 1.1rem + .6vw, 1.5rem)/1.2 var(--display); letter-spacing: -.01em; text-wrap: balance; }
+.g-ret-linha { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 14px; border-radius: 14px; background: var(--g-carta); border: 1px solid var(--g-linha); color: inherit; font: inherit; font-size: .9375rem; line-height: 1.35; text-align: left; }
+a.g-ret-linha:hover, button.g-ret-linha:hover { border-color: var(--g-linha-forte); }
+.g-ret-linha.parada { background: var(--g-amarelo-tint); border-color: transparent; color: #5b4708; }
+.g-ret-linha > svg { width: 18px; height: 18px; flex: none; color: var(--g-cinza); }
+.g-ret-linha.parada > svg { color: inherit; }
+.g-ret-linha > span { flex: 1; min-width: 0; }
+
+.g-ret-teste { display: grid; gap: 14px; background: linear-gradient(160deg, #fff6ea 0%, var(--t-pessego) 100%); border-color: rgba(180, 80, 11, .14); }
+.g-ret-teste.vencido { background: var(--g-amarelo-tint); border-color: transparent; }
+.g-ret-feito { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.g-ret-feito li { padding: 7px 12px; border-radius: 999px; background: rgba(255, 251, 245, .82); border: 1px solid rgba(31, 27, 23, .08); font-size: .9375rem; font-weight: 600; }
+.g-ret-explica { max-width: 68ch; }
+
+.g-pps { display: grid; gap: 14px; }
+.g-pps.na-folha { padding-bottom: 4px; }
+.g-pps-conta { margin-left: auto; flex: none; color: var(--g-cinza); font-size: .9375rem; white-space: nowrap; }
+.g-pps-conta b { font: 460 1.625rem/1 var(--display); color: var(--g-tinta); }
+.g-pps-lista { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.g-pps-passo { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 12px; border-radius: 14px; background: #fffdf9; border: 1px solid var(--g-linha); color: inherit; font: inherit; text-align: left; transition: transform .16s, border-color .16s; }
+.g-pps-passo:hover { transform: translateY(-1px); border-color: var(--g-linha-forte); }
+.g-pps-passo .n { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; flex: none; font: 500 1rem/1 var(--display); background: var(--g-carta-2); }
+.g-pps-passo .n:empty { background: transparent; border: 1.5px dashed var(--g-linha-forte); }
+.g-pps-passo .n svg { width: 16px; height: 16px; }
+.g-pps-passo .t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.g-pps-passo .t b { font-weight: 600; line-height: 1.3; }
+.g-pps-passo .t small { font-size: .8125rem; line-height: 1.35; color: var(--g-cinza); }
+.g-pps-passo > svg { flex: none; color: var(--g-cinza); }
+.g-pps-passo.agora { border-color: var(--g-verde); box-shadow: inset 0 0 0 1px var(--g-verde); }
+.g-pps-passo.agora .n { background: var(--g-verde); color: #fff; }
+.g-pps-passo.feito { min-height: 48px; background: transparent; }
+.g-pps-passo.feito .n { background: #2f6b4c; color: #fff; }
+.g-pps-passo.feito .t b { font-weight: 500; color: var(--g-cinza); text-decoration: line-through; }
+.g-pps-sei { min-height: 44px; margin-left: -12px; color: var(--g-cinza); }
+.g-pps-festa { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.g-pps-festa .g-cresce { flex: 1 1 220px; min-width: 0; }
+.g-pps-festa h2 { font: 500 1.25rem/1.2 var(--display); }
+
+.g-rs { display: grid; gap: 14px; }
+.g-rs-grade { margin: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
+.g-rs-grade > div { display: grid; gap: 4px; align-content: start; padding: 12px 14px; border-radius: 14px; background: #fffdf9; border: 1px solid var(--g-linha); min-width: 0; }
+.g-rs-grade dd { margin: 0; overflow-wrap: anywhere; }
+.g-rs-grade .g-num.m { font-size: 1.5rem; }
+.g-rs-dica { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; padding: 14px; border-radius: 14px; background: var(--g-verde-tint); }
+.g-rs-dica .g-btn { grid-column: 1 / -1; justify-self: start; max-width: 100%; white-space: normal; text-align: left; padding-block: 8px; }
+@media (max-width: 480px) {
+  /* no celular a lista fica curta: só o próximo passo mostra a explicação */
+  .g-pps-passo { min-height: 48px; padding-block: 8px; }
+  .g-pps-passo:not(.agora) .t small { display: none; }
+  .g-pps .g-ret-cab .g-muted { display: none; }
+  .g-rs-grade { grid-template-columns: 1fr 1fr; }
+  .g-rs-dica .g-btn { justify-self: stretch; }
+}

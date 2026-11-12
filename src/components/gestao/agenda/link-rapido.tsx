@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Copy, Link2, MessageCircle, Settings2 } from "lucide-react";
 import type { PetComTutor } from "@/lib/gestao/tipos";
 import { linkWhatsApp } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { EscolherPet, Folha, ok, useAvisos, useSomenteLeitura } from "../ui";
+import { EVENTO_LINK } from "../lembrado";
 import "./link-rapido.css";
 
 /**
@@ -21,6 +22,12 @@ export default function LinkRapido({ rotulo = "Link do cliente" }: { rotulo?: st
   const [copiado, setCopiado] = useState(false);
   const [escolhendo, setEscolhendo] = useState(false);
   const [ligando, setLigando] = useState(false);
+  // os primeiros passos e o resumo da semana pedem para abrir esta janela
+  useEffect(() => {
+    const abrir = () => setAberto(true);
+    window.addEventListener(EVENTO_LINK, abrir);
+    return () => window.removeEventListener(EVENTO_LINK, abrir);
+  }, []);
   const endereco = `${typeof window === "undefined" ? "" : window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
   const convite = (nome?: string | null) => `${nome ? `Oi, ${nome.split(" ")[0]}! ` : ""}Agora dá para pedir horário no ${petshop.nome} pelo celular. É só escolher o serviço, o dia e a hora que estiver livre, e a gente confirma por aqui: ${endereco}`;
 
