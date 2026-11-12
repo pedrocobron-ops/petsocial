@@ -28,12 +28,11 @@ export default function SobrePage() {
   const f = EMPRESA.fundador;
   const wa = linkWhatsapp();
   const ig = linkInstagram();
-  const aVenda = PRODUTOS.filter((p) => p.lancado).length;
-  const tutores = PRODUTOS.filter((p) => linhaDe(p) === "tutor").length;
-  const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios").length;
+  const guiasAVenda = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "tutor").length;
+  const manuaisAVenda = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "negocios").length;
   const fatos: [string, string][] = [
-    [String(aVenda), aVenda === 1 ? "guia à venda hoje" : "guias à venda hoje"],
-    [String(tutores + manuais), `guias, kits e manuais, à venda ou em preparo (${manuais} para negócios pet)`],
+    [String(guiasAVenda), "guias e kits para tutores, à venda hoje"],
+    [String(manuaisAVenda), manuaisAVenda === 1 ? "manual para quem trabalha com pets" : "manuais para quem trabalha com pets"],
     ["7 dias", "para desistir de qualquer compra"],
   ];
   const identificacao: [string, string][] = [

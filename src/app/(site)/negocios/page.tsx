@@ -77,7 +77,7 @@ export default function Negocios() {
           <div className="cab cab-lado rv">
             <div>
               <span className="rotulo">Manuais{aVenda === 0 ? " · lançamento em breve" : ""}</span>
-              <h2 id="manuais-titulo">Quatro ofícios, <em>um método.</em></h2>
+              <h2 id="manuais-titulo">{["Um manual", "Dois manuais", "Três manuais", "Quatro manuais", "Cinco manuais", "Seis manuais", "Sete manuais", "Oito manuais"][manuais.length - 1] ?? `${manuais.length} manuais`}, <em>o mesmo método.</em></h2>
             </div>
             <p>Lei, preço, ferramentas e plano de carreira em 4 níveis, com fonte e data em tudo.</p>
           </div>
