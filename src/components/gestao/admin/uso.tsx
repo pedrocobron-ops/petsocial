@@ -15,7 +15,7 @@ export type LojaBasica = { id: string; nome: string; dono_nome: string | null };
 export const AREAS: { id: string; nome: string }[] = [
   { id: "hoje", nome: "Hoje" }, { id: "agenda", nome: "Agenda" }, { id: "clientes", nome: "Clientes e pets" }, { id: "creche-hotel", nome: "Creche e hotel" },
   { id: "pacotes", nome: "Pacotes" }, { id: "caixa", nome: "Caixa" }, { id: "financeiro", nome: "Financeiro" }, { id: "relatorios", nome: "Relatórios" },
-  { id: "estoque", nome: "Estoque" }, { id: "equipe", nome: "Equipe" }, { id: "meu-petshop", nome: "Meu pet shop" }, { id: "assinatura", nome: "Assinatura" },
+  { id: "estoque", nome: "Estoque" }, { id: "equipe", nome: "Equipe" }, { id: "meu-petshop", nome: "Meu pet shop" }, { id: "assinatura", nome: "Assinatura" }, { id: "escola", nome: "Escola de Gestão" },
 ];
 const nomeArea = (id: string | null) => AREAS.find((a) => a.id === id)?.nome ?? id ?? "";
 

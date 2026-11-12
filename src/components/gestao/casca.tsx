@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, BedDouble, CalendarDays, CalendarClock, CreditCard, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
+  BarChart3, BedDouble, CalendarDays, CalendarClock, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
 import { useGestao } from "./contexto";
 import { planoPorId } from "@/lib/gestao/planos";
@@ -39,6 +39,9 @@ const GRUPOS: { titulo: string; itens: Item[] }[] = [
     { href: "/gestao/app/equipe", rotulo: "Equipe", icone: Users, tom: "lilas", so: "dono" },
     { href: "/gestao/app/meu-petshop", rotulo: "Meu pet shop", icone: Store, tom: "pessego", so: "dono" },
     { href: "/gestao/app/assinatura", rotulo: "Assinatura", icone: CreditCard, tom: "manteiga", so: "dono" },
+  ] },
+  { titulo: "Aprender", itens: [
+    { href: "/gestao/app/escola", rotulo: "Escola de Gestão", icone: GraduationCap, tom: "manteiga", so: "dono" },
   ] },
 ];
 
@@ -98,7 +101,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   const podeRota = (href: string) => { const area = areaDaRota(href); return area ? posso(area) : true; };
   const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href));
   // tela aberta pelo endereço sem ter acesso: mostra o aviso no lugar da tela
-  const soDeDono = ["/gestao/app/equipe", "/gestao/app/meu-petshop", "/gestao/app/assinatura"].some((r) => caminho.startsWith(r));
+  const soDeDono = ["/gestao/app/equipe", "/gestao/app/meu-petshop", "/gestao/app/assinatura", "/gestao/app/escola"].some((r) => caminho.startsWith(r));
   const semAcesso = (soDeDono && !souDono) || !podeRota(caminho);
   const atual = (href: string) => (href === "/gestao/app" ? caminho === href : caminho.startsWith(href));
   const grupos = GRUPOS.map((g) => ({ ...g, itens: g.itens.filter(pode) })).filter((g) => g.itens.length);
