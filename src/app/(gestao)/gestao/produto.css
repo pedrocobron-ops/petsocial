@@ -204,3 +204,43 @@
 .gp-valor small { white-space: nowrap; }
 .gp-conta { color: var(--cinza); font-size: .9375rem; min-height: 2.9em; }
 .gp-conta b { color: var(--v); }
+
+/* ---------- chat de venda (Mozart) ---------- */
+.gp-chat-botao { position: fixed; right: 18px; bottom: 18px; z-index: 20; display: inline-flex; align-items: center; gap: .6rem; height: 56px; padding: 0 1.25rem 0 1.1rem; border: 0; border-radius: 999px; background: var(--v); color: var(--creme); font: 600 .9688rem/1 var(--sans); cursor: pointer; box-shadow: 0 14px 30px -12px rgba(23, 48, 42, .9); transition: transform .15s; }
+.gp-chat-botao:hover { transform: translateY(-2px); }
+.gp-chat-botao svg { width: 24px; height: 24px; }
+.gp-chat { position: fixed; z-index: 30; inset: 0; display: grid; grid-template-rows: auto 1fr auto auto; background: var(--creme); }
+.gp-chat > header { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .75rem; padding: .85rem 1rem; background: var(--v); color: var(--creme); }
+.gp-chat-rosto { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--creme); color: var(--v); }
+.gp-chat > header b { display: block; font: 500 1.125rem/1.1 var(--display); }
+.gp-chat > header small { display: block; margin-top: 3px; font-size: .8125rem; color: var(--no-v); }
+.gp-chat > header button { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(246, 241, 232, .12); color: inherit; cursor: pointer; }
+.gp-chat > header svg { width: 20px; height: 20px; }
+.gp-chat-falas { overflow-y: auto; overscroll-behavior: contain; padding: 1rem; display: grid; gap: .6rem; align-content: start; }
+.gp-chat-fala { display: grid; gap: .5rem; max-width: 86%; justify-self: start; }
+.gp-chat-fala.eu { justify-self: end; }
+.gp-chat-fala p { margin: 0; padding: .7rem .9rem; border-radius: 16px 16px 16px 4px; background: #fff; box-shadow: inset 0 0 0 1px rgba(31, 27, 23, .1); font-size: .9688rem; line-height: 1.45; white-space: pre-wrap; }
+.gp-chat-fala.eu p { border-radius: 16px 16px 4px 16px; background: var(--v); color: var(--creme); box-shadow: none; }
+.gp-chat-zap { display: inline-flex; align-items: center; gap: .5rem; justify-self: start; padding: .55rem .85rem; border-radius: 999px; background: #1f8f52; color: #fff; font: 600 .875rem/1 var(--sans); }
+.gp-chat-zap svg { width: 16px; height: 16px; }
+.gp-chat-pontos { display: inline-flex; gap: 5px; }
+.gp-chat-pontos i { width: 7px; height: 7px; border-radius: 50%; background: var(--cinza); animation: gp-pisca 1s infinite; }
+.gp-chat-pontos i:nth-child(2) { animation-delay: .15s; }
+.gp-chat-pontos i:nth-child(3) { animation-delay: .3s; }
+@keyframes gp-pisca { 50% { opacity: .25; } }
+.gp-chat-rapidas { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .25rem; }
+.gp-chat-rapidas button { padding: .55rem .85rem; border: 0; border-radius: 999px; background: var(--creme2); color: var(--tinta); font: 500 .875rem/1.2 var(--sans); text-align: left; cursor: pointer; }
+.gp-chat-rapidas button:hover { background: #e0d6c4; }
+.gp-chat-teste { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .7rem 1rem; background: var(--laranja); color: var(--tinta); font: 600 .9375rem/1.2 var(--sans); }
+.gp-chat-teste:hover { background: var(--laranja2); }
+.gp-chat-teste svg { width: 18px; height: 18px; }
+.gp-chat > form { display: grid; grid-template-columns: 1fr auto; gap: .5rem; padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid rgba(31, 27, 23, .1); }
+.gp-chat > form input { min-width: 0; height: 46px; padding: 0 1rem; border: 1px solid rgba(31, 27, 23, .2); border-radius: 999px; background: var(--creme); font: 400 1rem/1 var(--sans); color: var(--tinta); }
+.gp-chat > form button { display: grid; place-items: center; width: 46px; height: 46px; border: 0; border-radius: 50%; background: var(--v); color: var(--creme); cursor: pointer; }
+.gp-chat > form button:disabled { opacity: .4; cursor: default; }
+.gp-chat > form svg { width: 20px; height: 20px; }
+@media (min-width: 720px) {
+  .gp-chat { inset: auto 18px 18px auto; width: 390px; height: min(620px, calc(100vh - 36px)); border-radius: 20px; overflow: clip; box-shadow: 0 30px 70px -24px rgba(23, 48, 42, .65), 0 0 0 1px rgba(31, 27, 23, .1); }
+}
+.gp-chat-rosto { position: relative; border-radius: 50%; font: 500 1.25rem/1 var(--display); }
+.gp-chat-rosto i { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: #3fbf7f; box-shadow: 0 0 0 2px var(--v); }
