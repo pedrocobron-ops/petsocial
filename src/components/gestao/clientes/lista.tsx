@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Cat, ChevronRight, Dog, Download, PawPrint, Phone, Plus, Search, Sparkles, UserPlus, UserSearch, Users } from "lucide-react";
+import Importar from "@/components/gestao/importar";
+import { AlertTriangle, Cat, ChevronRight, Dog, Download, PawPrint, Phone, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -63,6 +64,7 @@ export default function Lista({ aoAbrir, irPara }: {
   const [mostrar, setMostrar] = useState(PASSO);
   const [petNovo, setPetNovo] = useState(false);
   const [tutorNovo, setTutorNovo] = useState(false);
+  const [importando, setImportando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [pets, clientes] = await Promise.all([
@@ -185,6 +187,7 @@ export default function Lista({ aoAbrir, irPara }: {
         </div>
         <div className="g-acoes">
           <button className="g-btn sec" onClick={exportar} disabled={!dados}><Download />Exportar</button>
+          <button className="g-btn sec" onClick={() => setImportando(true)}><Upload />Trazer de planilha</button>
           <button className="g-btn pri" onClick={abrirPetNovo}><Plus />Pet novo</button>
         </div>
       </header>
@@ -320,6 +323,7 @@ export default function Lista({ aoAbrir, irPara }: {
         </>
       )}
 
+      {importando && <Importar tipo="clientes" aoFechar={() => setImportando(false)} aoTerminar={() => void recarregar()} />}
       {petNovo && (
         <FormPet nomeInicial={aba === "pets" && petsFiltrados.length === 0 ? q.trim() : undefined} aoFechar={() => setPetNovo(false)}
           aoSalvar={(p) => { setPetNovo(false); avisarMudanca(); aoAbrir(); irPara(linkPet(p.id)); }} />
