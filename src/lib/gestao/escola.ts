@@ -115,7 +115,7 @@ export const AULAS: Aula[] = [
       ] },
       { p: "Vale também olhar em que dia e horário as faltas se concentram. Às vezes o problema é um horário ruim para o bairro, e não o cliente." },
     ],
-    naPratica: { texto: "Na Agenda, o botão \"Lembretes de amanhã\" abre o WhatsApp de cada tutor com a mensagem pronta. As faltas de cada pet aparecem na ficha e em Relatórios.", rotulo: "Abrir a Agenda", href: "/gestao/app/agenda" },
+    naPratica: { texto: "Na tela inicial, em Pede a sua atenção, os lembretes de amanhã abrem o WhatsApp de cada tutor com a mensagem pronta. As faltas de cada pet aparecem na ficha e em Relatórios.", rotulo: "Abrir a tela inicial", href: "/gestao/app" },
   },
   {
     id: "pacote-mensal", titulo: "Pacote de banhos: quando vale e como montar", tema: "Clientes", minutos: 4,

@@ -6,7 +6,7 @@ import { Check, MessageCircle, PhoneOff } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoLembrete } from "@/lib/gestao/agenda";
-import { dataAmigavel, dataLonga, deIsoDia, fmtTelefone, hora, linkWhatsApp, soDigitos, somaDias } from "@/lib/gestao/util";
+import { dataAmigavel, dataLonga, deIsoDia, fmtTelefone, hora, linkWhatsApp, soDigitos, somaDias, chamar } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPessoa, Esqueleto, Folha, Vazio, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 
@@ -41,7 +41,7 @@ export function mensagemDoLembrete(ags: Ag[], petshop: string) {
   }
   const partes = ags.map((a) => `${a.servicos?.nome ? a.servicos.nome.toLowerCase() : "horário"} de ${a.pets?.nome ?? "seu pet"} às ${hora(a.inicio)}`);
   const lista = `${partes.slice(0, -1).join(", ")} e ${partes[partes.length - 1]}`;
-  return `${tutor ? `Oi, ${tutor.split(" ")[0]}!` : "Oi!"} Aqui é do ${petshop}. Passando para lembrar dos horários de ${dataAmigavel(ags[0].inicio)}: ${lista}. Posso confirmar?`;
+  return `${tutor ? `Oi, ${chamar(tutor)}!` : "Oi!"} Aqui é do ${petshop}. Passando para lembrar dos horários de ${dataAmigavel(ags[0].inicio)}: ${lista}. Posso confirmar?`;
 }
 
 /** Marca o lembrete como enviado nos horários (o mesmo campo que o detalhe do horário grava). */

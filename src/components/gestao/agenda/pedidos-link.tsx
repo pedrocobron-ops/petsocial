@@ -5,7 +5,7 @@ import { Check, Clock, Link2, MessageCircle, X } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPet, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import type { Database } from "@/lib/gestao/banco";
-import { dataCurta, fmtTelefone, hora, inicioDoDia, linkWhatsApp, nomeDia } from "@/lib/gestao/util";
+import { dataCurta, fmtTelefone, hora, inicioDoDia, linkWhatsApp, nomeDia, chamar } from "@/lib/gestao/util";
 import "./pedidos-link.css";
 
 type Pedido = Database["public"]["Tables"]["pedidos_agendamento"]["Row"];
@@ -35,7 +35,7 @@ function periodoDe(p: Pedido) {
   const a = new Date(p.inicio), b = new Date(p.fim);
   return inicioDoDia(a).getTime() === inicioDoDia(b).getTime() ? `${nomeDia(a)}, ${dataCurta(a)}` : `de ${dataCurta(a)} a ${dataCurta(b)}`;
 }
-const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0];
+const primeiroNome = (nome: string) => chamar(nome);
 /** "Nina", "Nina e Bob", "Nina, Bob e Mel". */
 const listaDe = (itens: string[]) => (itens.length <= 1 ? itens.join("") : `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`);
 /** Pedidos feitos juntos (vários pets do mesmo tutor) têm o mesmo `grupo_id`; pedido sozinho é o próprio grupo. */

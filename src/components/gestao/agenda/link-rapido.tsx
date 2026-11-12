@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Copy, Link2, MessageCircle, Settings2 } from "lucide-react";
 import type { PetComTutor } from "@/lib/gestao/tipos";
-import { linkWhatsApp } from "@/lib/gestao/util";
+import { linkWhatsApp, chamar } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { EscolherPet, Folha, ok, useAvisos, useSomenteLeitura } from "../ui";
 import { EVENTO_LINK } from "../lembrado";
@@ -29,7 +29,7 @@ export default function LinkRapido({ rotulo = "Link do cliente" }: { rotulo?: st
     return () => window.removeEventListener(EVENTO_LINK, abrir);
   }, []);
   const endereco = `${typeof window === "undefined" ? "" : window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
-  const convite = (nome?: string | null) => `${nome ? `Oi, ${nome.split(" ")[0]}! ` : ""}Agora dá para pedir horário no ${petshop.nome} pelo celular. É só escolher o serviço, o dia e a hora que estiver livre, e a gente confirma por aqui: ${endereco}`;
+  const convite = (nome?: string | null) => `${nome ? `Oi, ${chamar(nome)}! ` : ""}Agora dá para pedir horário no ${petshop.nome} pelo celular. É só escolher o serviço, o dia e a hora que estiver livre, e a gente confirma por aqui: ${endereco}`;
 
   async function copiar() {
     try { await navigator.clipboard.writeText(endereco); setCopiado(true); setTimeout(() => setCopiado(false), 2000); }

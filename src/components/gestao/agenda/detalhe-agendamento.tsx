@@ -288,7 +288,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         ) : <p className="g-pp g-muted">Sem telefone do tutor para avisar que {pet?.nome ?? "o pet"} está pronto.</p>)}
 
         <div className="g-fila">
-          {zap ? (
+          {a.status === "cancelado" || a.status === "faltou" || a.status === "concluido" ? null : zap ? (
             <a className={`g-btn ${podeAvisarPronto && zapPronto ? "sec" : "zap"} g-cresce`} href={zap} target="_blank" rel="noopener noreferrer" onClick={() => { void mudar({ lembrete_em: new Date().toISOString() }).then(recarregar); }}>
               <MessageCircle />{a.lembrete_em ? "Lembrar de novo" : "Lembrete no WhatsApp"}
             </a>

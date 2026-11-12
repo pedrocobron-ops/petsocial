@@ -1,3 +1,4 @@
+import { chamar } from "./util";
 /** Contas da agenda que não dependem do navegador (a tela e o assistente usam as mesmas). */
 
 export type Intervalo = { inicio: number; fim: number }; // minutos desde 00:00 do dia
@@ -34,13 +35,13 @@ export function vagasDe(petshop: { vagas?: number | null }, equipe: { ativo: boo
 
 /** Texto do lembrete que vai para o WhatsApp do tutor. */
 export function textoLembrete(p: { tutor?: string | null; pet: string; servico?: string | null; quando: string; hora: string; petshop: string }) {
-  const oi = p.tutor ? `Oi, ${p.tutor.split(" ")[0]}!` : "Oi!";
+  const oi = p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!";
   return `${oi} Aqui é do ${p.petshop}. Passando para lembrar ${p.servico ? `do ${p.servico.toLowerCase()}` : "do horário"} de ${p.pet} ${p.quando} às ${p.hora}. Posso confirmar?`;
 }
 
 /** Texto do aviso de que o pet está pronto para ir para casa (WhatsApp do tutor). */
 export function textoPronto(p: { tutor?: string | null; pet: string; petshop: string }) {
-  return `${p.tutor ? `Oi, ${p.tutor.split(" ")[0]}!` : "Oi!"} ${p.pet} está pronto e esperando por você aqui no ${p.petshop}.`;
+  return `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} ${p.pet} está pronto e esperando por você aqui no ${p.petshop}.`;
 }
 
 /* ---------- série (horário que se repete) e bloqueio ---------- */
