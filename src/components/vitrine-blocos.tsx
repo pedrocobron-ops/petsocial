@@ -50,7 +50,7 @@ export function EmPreparo({ produtos, linha }: { produtos: Produto[]; linha: "tu
         </ul>
         <div className="preparo-texto rv">
           <span className="rotulo">Em preparo</span>
-          <h2 id="preparo-titulo">Mais {n} {linha === "tutores" ? "guias e kits estão sendo" : "materiais estão sendo"} <em>terminados.</em></h2>
+          <h2 id="preparo-titulo">{n === 1 ? (linha === "tutores" ? "Mais 1 guia está sendo" : "Mais 1 material está sendo") : `Mais ${n} ${linha === "tutores" ? "guias e kits estão sendo" : "materiais estão sendo"}`} <em>{n === 1 ? "terminado." : "terminados."}</em></h2>
           <p>Deixe o e-mail e avisamos no dia do lançamento. Sem spam.</p>
           <div id="avise"><AviseMe produto={`Em preparo · ${linha}`} origem="em-preparo" /></div>
         </div>

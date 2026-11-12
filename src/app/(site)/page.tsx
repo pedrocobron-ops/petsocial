@@ -5,7 +5,7 @@ import { CalendarCheck, Check, Mic, Store } from "lucide-react";
 import { Seta } from "@/components/icones";
 import { FaixaProva } from "@/components/pagamento";
 import PalcoHome, { type Cena } from "@/components/palco-home";
-import { Leque, Marquee } from "@/components/vitrine-blocos";
+import { Marquee } from "@/components/vitrine-blocos";
 import type { Produto } from "@/lib/produtos";
 import { PRODUTOS, linhaDe, produto, reais, urlProduto } from "@/lib/produtos";
 import { PLANOS } from "@/lib/gestao/planos";
@@ -14,9 +14,10 @@ export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 /** Uma linha por guia em destaque. */
 const LINHA: Record<string, string> = {
-  xixi: "Método de 7 dias",
-  filhote: "Os primeiros 30 dias",
-  petiscos: "30 receitas seguras",
+  xixi: "Xixi fora do lugar",
+  sozinho: "Chora quando fica sozinho",
+  gato: "Gato em casa ou apartamento",
+  normal: "Dúvida se é normal ou é veterinário",
 };
 
 /** O que o sistema faz, em 4 linhas curtas. */
@@ -37,9 +38,8 @@ const PILARES = [
 
 export default function Home() {
   const lancados = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "tutor");
-  const destaque = ["xixi", "filhote", "petiscos"].map(produto).filter((p): p is Produto => !!p?.lancado);
+  const destaque = ["xixi", "sozinho", "gato", "normal"].map(produto).filter((p): p is Produto => !!p?.lancado);
   const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios" && p.grupo === "comece");
-  const leque = ["filhote", "xixi", "petiscos"].map(produto).filter((p) => p?.capa);
   const capas = [...lancados, ...manuais].filter((p) => p.capa);
   const confeitaria = produto("confeitaria");
   const cena = (slug: string, foto: string, alt: string, rotulo: string): Cena | null => {
@@ -55,6 +55,28 @@ export default function Home() {
   ].filter((c): c is Cena => !!c);
   const menorGuia = Math.min(...lancados.map((p) => p.preco));
   const menorPlano = Math.min(...PLANOS.map((p) => p.preco));
+  const portas = (
+    <nav className="h2-portas" aria-label="Escolha o seu caminho">
+      <Link className="h2-porta" href="/tutor">
+        <span className="h2-porta-tag">Para tutores</span>
+        <b>Tenho um pet</b>
+        <small>Guias passo a passo, a partir de {reais(menorGuia)}</small>
+        <Seta />
+      </Link>
+      <Link className="h2-porta" href="/negocios">
+        <span className="h2-porta-tag">Para negócios pet</span>
+        <b>Trabalho com pets</b>
+        <small>Confeitaria, passeio, pet sitter, fotografia e roupa pet</small>
+        <Seta />
+      </Link>
+      <Link className="h2-porta h2-porta-gestao" href="/gestao">
+        <span className="h2-porta-tag"><span className="h2-novo">Novo</span>Sistema</span>
+        <b>Tenho pet shop</b>
+        <small>Agenda, clientes e caixa. 7 dias grátis</small>
+        <Seta />
+      </Link>
+    </nav>
+  );
   return (
     <>
       <section className="h2-hero">
@@ -62,62 +84,10 @@ export default function Home() {
           <div className="h2-hero-texto">
             <span className="h2-selo-claro"><i />Guias, manuais e sistema para pet shop</span>
             <h1>Tudo para quem <em>cuida</em> de pets.</h1>
-            <p className="lead">Guias para quem tem cão ou gato, manuais para quem trabalha com pets e um sistema para o seu pet shop.</p>
-            <nav className="h2-portas" aria-label="Escolha o seu caminho">
-              <Link className="h2-porta" href="/tutor" id="cta-home">
-                <span className="h2-porta-tag">Para tutores</span>
-                <b>Tenho um pet</b>
-                <small>Guias passo a passo, a partir de {reais(menorGuia)}</small>
-                <Seta />
-              </Link>
-              <Link className="h2-porta" href="/negocios">
-                <span className="h2-porta-tag">Para negócios pet</span>
-                <b>Trabalho com pets</b>
-                <small>Manuais de confeitaria, moda pet, passeio e fotografia</small>
-                <Seta />
-              </Link>
-              <Link className="h2-porta h2-porta-gestao" href="/gestao">
-                <span className="h2-porta-tag"><span className="h2-novo">Novo</span>Sistema</span>
-                <b>Tenho pet shop</b>
-                <small>Agenda, clientes e caixa. 7 dias grátis</small>
-                <Seta />
-              </Link>
-            </nav>
+            <p className="lead">Guias passo a passo para o dia a dia com cão ou gato, a partir de {reais(menorGuia)}. Manuais para quem trabalha com pets e um sistema para o seu pet shop.</p>
           </div>
-          <div className="h2-hero-palco">
-            <PalcoHome cenas={cenas} />
-            <Link className="h2-flutua" href="/gestao" aria-label="Conhecer o Maestro Pet Gestão">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/gestao/telas/cel-hoje.webp" alt="" width={780} height={1328} loading="eager" decoding="async" />
-              <span><small>Novo</small>Sistema para pet shop</span>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="h2-gestao" aria-labelledby="gestao-titulo">
-        <div className="container h2-gestao-grade">
-          <div className="h2-gestao-texto">
-            <span className="h2-selo"><Store size={16} aria-hidden />Maestro Pet Gestão</span>
-            <h2 id="gestao-titulo">O sistema do seu <em>pet shop</em>, no celular.</h2>
-            <p>Para banho e tosa, pet shop, creche e hotel. Feito para o dia a dia de quem atende no balcão.</p>
-            <ul className="h2-lista">
-              {GESTAO.map((t) => <li key={t}><Check size={18} aria-hidden />{t}</li>)}
-            </ul>
-            <div className="h2-gestao-ctas">
-              <Link className="btn" href="/gestao/criar-conta">Testar grátis por 7 dias<Seta /></Link>
-              <Link className="btn h2-btn-claro" href="/gestao">Conhecer o sistema</Link>
-            </div>
-            <p className="h2-gestao-nota">Sem cartão para testar. Planos a partir de R$ {menorPlano} por mês, sem fidelidade.</p>
-          </div>
-          <div className="h2-gestao-telas" aria-hidden>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="h2-tela-pc" src="/gestao/telas/pc-hoje.webp" alt="" width={1760} height={1093} loading="eager" decoding="async" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="h2-tela-cel" src="/gestao/telas/cel-agenda.webp" alt="" width={780} height={1328} loading="eager" decoding="async" />
-            <span className="h2-bolha h2-bolha-1"><Mic size={16} />“Marca banho da Mel sexta às dez”</span>
-            <span className="h2-bolha h2-bolha-2"><CalendarCheck size={16} />Agendado pelo link</span>
-          </div>
+          <div className="h2-hero-palco"><PalcoHome cenas={cenas} /></div>
+          {portas}
         </div>
       </section>
 
@@ -127,7 +97,7 @@ export default function Home() {
             <div className="h2-cab">
               <div>
                 <span className="rotulo">Para tutores</span>
-                <h2 id="guias-titulo">Os guias mais <em>procurados.</em></h2>
+                <h2 id="guias-titulo">Qual é o <em>problema</em> de hoje?</h2>
               </div>
               <Link className="btn-link" href="/tutor">Ver todos os guias</Link>
             </div>
@@ -149,10 +119,38 @@ export default function Home() {
         </section>
       )}
 
+      <section className="h2-gestao" aria-labelledby="gestao-titulo">
+        <div className="container h2-gestao-grade">
+          <div className="h2-gestao-texto">
+            <span className="h2-selo"><Store size={16} aria-hidden />Maestro Pet Gestão</span>
+            <h2 id="gestao-titulo">O sistema do seu <em>pet shop</em>, no celular.</h2>
+            <p>Para banho e tosa, pet shop, creche e hotel. Feito para o dia a dia de quem atende no balcão.</p>
+            <ul className="h2-lista">
+              {GESTAO.map((t) => <li key={t}><Check size={18} aria-hidden />{t}</li>)}
+            </ul>
+            <div className="h2-gestao-ctas">
+              <Link className="btn" href="/gestao/criar-conta">Testar grátis por 7 dias<Seta /></Link>
+              <Link className="btn h2-btn-claro" href="/gestao">Conhecer o sistema</Link>
+            </div>
+            <p className="h2-gestao-nota">Sem cartão para testar. Planos a partir de R$ {menorPlano} por mês, sem fidelidade.</p>
+          </div>
+          <div className="h2-gestao-telas" aria-hidden>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="h2-tela-pc" src="/gestao/telas/pc-hoje.webp" alt="" width={1760} height={1093} loading="lazy" decoding="async" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="h2-tela-cel" src="/gestao/telas/cel-agenda.webp" alt="" width={780} height={1328} loading="lazy" decoding="async" />
+            <span className="h2-bolha h2-bolha-1"><Mic size={16} />“Marca banho da Mel sexta às dez”</span>
+            <span className="h2-bolha h2-bolha-2"><CalendarCheck size={16} />Agendado pelo link</span>
+          </div>
+        </div>
+      </section>
+
       <section className="secao h2-duo" aria-label="Guias e manuais">
         <div className="container h2-duo-grade">
           <Link className="h2-bloco" href="/tutor">
-            <Leque produtos={leque as Produto[]} />
+            <span className="foto-porta">
+              <Image src="/fotos/tutor-petiscos-duvida-4x5.webp" alt="" width={960} height={1200} sizes="(max-width: 899px) 100vw, 580px" />
+            </span>
             <span className="rotulo">Para tutores</span>
             <h3>Um problema por guia, <em>um passo por página.</em></h3>
             <p>Xixi no lugar certo, filhote, petiscos seguros e kits para imprimir.</p>
@@ -165,7 +163,7 @@ export default function Home() {
             </span>
             <span className="rotulo">Para negócios pet</span>
             <h3>Viver de pets é um <em>ofício.</em></h3>
-            <p>Confeitaria pet, passeador, pet sitter e fotografia: a lei, o preço e as ferramentas.</p>
+            <p>Confeitaria, passeio, pet sitter, fotografia e roupa pet: a lei, o preço e as ferramentas.</p>
             <span className="btn-link">Ver os manuais</span>
           </Link>
         </div>
@@ -191,6 +189,13 @@ export default function Home() {
               <li key={t}><span>{String(i + 1).padStart(2, "0")}</span><b>{t}</b><p>{d}</p></li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      <section className="h2-fim" aria-labelledby="fim-titulo">
+        <div className="container">
+          <h2 id="fim-titulo">Por onde você quer <em>começar?</em></h2>
+          {portas}
         </div>
       </section>
     </>

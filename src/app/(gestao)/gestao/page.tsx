@@ -10,8 +10,12 @@ import PlanosVenda from "@/components/gestao/planos-venda";
 import "./produto.css";
 
 export const metadata: Metadata = {
-  title: { absolute: "Maestro Pet Gestão — sistema para pet shop com assistente de inteligência artificial" },
-  description: "Agenda de banho e tosa, link para o cliente agendar, clientes, caixa e estoque num lugar só, com um assistente de inteligência artificial que marca e lança quando você pede por áudio ou texto. 7 dias grátis, sem cartão.",
+  title: { absolute: "Maestro Pet Gestão: sistema para pet shop e banho e tosa" },
+  description: "Agenda de banho e tosa, link para o cliente agendar, clientes, caixa e estoque num lugar só, com assistente de inteligência artificial. 7 dias grátis, sem cartão.",
+  // A página de venda aparece no Google; o aplicativo e as telas de entrada continuam fora (layout do grupo).
+  robots: { index: true, follow: true },
+  alternates: { canonical: "/gestao" },
+  openGraph: { title: "Maestro Pet Gestão: sistema para pet shop e banho e tosa", description: "Agenda, clientes, caixa e estoque num lugar só, com assistente de inteligência artificial. 7 dias grátis, sem cartão.", url: "/gestao" },
 };
 
 const CRIAR = "/gestao/criar-conta";

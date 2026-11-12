@@ -5,7 +5,7 @@ import { FaixaProva } from "@/components/pagamento";
 import { CartaoProduto } from "@/components/vitrine";
 import { EmPreparo, FaqVitrine, Leque, Marquee } from "@/components/vitrine-blocos";
 import { fixa } from "@/lib/faq";
-import { GRUPOS, PRODUTOS, linhaDe } from "@/lib/produtos";
+import { GRUPOS, PRODUTOS, linhaDe, produto, urlProduto } from "@/lib/produtos";
 
 export const metadata: Metadata = {
   title: "Para tutores: guias para cães e gatos",
@@ -19,6 +19,16 @@ const DICAS = [
   ["Fareja em círculos? Hora do banheiro", "Farejar o chão andando em círculo, parar de brincar de repente e ir para um canto são os sinais clássicos. Leve-o ao lugar certo na hora."],
   ["Morde tudo? Ofereça o que pode", "Morder faz parte da fase de dentes. Em vez de só tirar o chinelo da boca, troque por um brinquedo de mastigar e elogie quando ele morder o objeto certo."],
 ] as const;
+
+/** Atalhos do topo: o problema do tutor leva direto ao guia. */
+const ATALHOS: [string, string][] = [
+  ["Xixi fora do lugar", "xixi"],
+  ["Filhote novo em casa", "filhote"],
+  ["Chora quando fica sozinho", "sozinho"],
+  ["Cão entediado", "tedio"],
+  ["Tenho gato", "gato"],
+  ["Isso é normal?", "normal"],
+];
 
 const FAQ: [string, string][] = [
   ["Como recebo o guia?", "O acesso chega no e-mail da compra logo após o pagamento. É um PDF ilustrado para ler no celular, no computador ou imprimir."],
@@ -43,7 +53,13 @@ export default function Tutor() {
             <span className="rotulo">Para tutores · {lancados.length} {lancados.length === 1 ? "guia" : "guias"} à venda</span>
             <h1>Seu pet feliz, <em>sua casa em paz.</em></h1>
             <p className="lead">Guias para o dia a dia com o seu pet, um problema de cada vez.</p>
-            <div className="botoes"><a className="btn btn-largo" id="cta-home" href="#guias">Ver os guias<Seta /></a></div>
+            <div>
+              <span className="atalhos-rotulo">O que está acontecendo aí?</span>
+              <nav className="atalhos" aria-label="Atalhos por problema">
+                {ATALHOS.map(([t, slug]) => { const p = produto(slug); return p?.lancado ? <a key={slug} href={urlProduto(p)}>{t}</a> : null; })}
+              </nav>
+            </div>
+            <div className="botoes"><a className="btn btn-largo" id="cta-home" href="#guias">Ver todos os guias<Seta /></a></div>
             <p className="risco risco-linha"><span>Pagamento único</span><span>Pix ou cartão</span><span>7 dias para desistir</span></p>
           </div>
           <Leque produtos={lancados} className="leque-hero" prioridade />

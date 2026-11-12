@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import Logo from "@/components/logo";
 import { LogosPagamento } from "@/components/pagamento";
@@ -23,9 +22,8 @@ export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocio
       <div className="container rodape-grade">
         <div className="rodape-marca">
           <Logo clara preguicosa />
-          <p className="rodape-tag so-tutor">Guias feitos com calma, para tutores com pressa.</p>
+          <p className="rodape-tag so-tutor">Feito com calma, para quem cuida de pets com pressa.</p>
           <p className="rodape-tag so-negocios">Manuais para quem vive do mercado pet.</p>
-          <Image className="rodape-mozart so-tutor" src="/mozart/acenando-144.webp" alt="" width={72} height={72} />
         </div>
         <nav aria-label="Guias">
           <h2 className="rotulo">Guias</h2>

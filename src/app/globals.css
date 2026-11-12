@@ -1735,3 +1735,59 @@ html:has(dialog[open]) .barra { visibility: hidden; }
 .pc-seta { top: 14px; }
 .pc-seta-e { left: auto; right: 62px; }
 .pc-seta-d { right: 14px; }
+
+/* ============================================================
+   AJUSTES DOS ESPECIALISTAS (design, vendas, celular)
+   ============================================================ */
+/* um escuro só: verde-garrafa nos blocos escuros, rodapé um tom mais fundo */
+:root { --grafite-2: #1e3a2f; }
+.rodape { background: #16291f; }
+main:has(.negocios) + .rodape, .rodape.negocios { background: #16291f; }
+.rodape-marca { padding-right: 0; }
+/* ícones da faixa de garantias em verde: o laranja fica só no botão principal */
+.prova svg { color: var(--negocios); }
+
+/* começo da página inicial: texto, foto e portas (no celular a foto vem antes das portas) */
+.h2-hero-grade { display: grid; gap: 24px; grid-template-areas: "texto" "palco" "portas"; }
+.h2-hero-texto { grid-area: texto; }
+.h2-hero-palco { grid-area: palco; padding: 0; }
+.h2-hero .h2-portas { grid-area: portas; margin-top: 0; }
+.h2-hero .lead { max-width: 44ch; }
+.pc { rotate: none; border-radius: 24px; aspect-ratio: 4 / 3; }
+.pc-fotos img { object-position: 50% 30%; }
+@media (min-width: 900px) {
+  .h2-hero-grade { grid-template-columns: 1.05fr .95fr; grid-template-areas: "texto palco" "portas palco"; gap: 28px 56px; align-items: start; }
+  .h2-hero-palco { align-self: stretch; padding: 0; }
+  .pc { aspect-ratio: auto; height: 100%; min-height: 560px; }
+  .h2-hero .h2-portas { margin-top: 8px; max-width: none; }
+}
+/* controles do carrossel: pausa e setas no canto, barrinhas com área de toque maior e fora da legenda */
+.pc-controles { position: absolute; z-index: 2; top: 14px; right: 14px; display: flex; gap: 8px; }
+.pc-seta { position: static; }
+.pc-legenda { bottom: 46px; }
+.pc-pontos { bottom: 8px; }
+.pc-pontos button { height: 28px; padding: 12px 0; }
+.pc-legenda small { font-size: .75rem; }
+
+/* guias em destaque: quatro cartões */
+@media (min-width: 900px) { .h2-cards { grid-template-columns: repeat(4, 1fr); gap: 20px; } .h2-card-palco { padding: 28px 22%; } }
+.h2-card-txt small { order: -1; font: 600 var(--t-rotulo)/1.3 var(--sans); letter-spacing: .06em; text-transform: uppercase; }
+.h2-guias { padding-top: 0; }
+.h2-guias h2 em { color: var(--negocios); }
+.h2-bloco > .foto-porta > img:first-child { object-position: 50% 30%; }
+
+/* fecho da página inicial */
+.h2-fim { background: var(--negocios); color: var(--no-escuro); padding: 72px 0; }
+.h2-fim h2 { margin: 0 0 32px; max-width: 16ch; }
+.h2-fim .h2-portas { margin-top: 0; }
+.h2-fim .h2-porta:not(.h2-porta-gestao) { color: var(--grafite); }
+.h2-fim .h2-porta-gestao { background: var(--laranja); color: var(--grafite); box-shadow: none; }
+.h2-fim .h2-porta-gestao small, .h2-fim .h2-porta-gestao .h2-porta-tag { color: rgba(31, 27, 23, .78); }
+.h2-fim .h2-novo { background: var(--grafite); color: var(--no-escuro); }
+@media (min-width: 900px) { .h2-fim { padding: 112px 0; } .h2-fim h2 { margin-bottom: 48px; } }
+
+/* /tutor: atalhos por problema no topo */
+.atalhos { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 20px; }
+.atalhos a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: var(--pill); background: var(--folha); box-shadow: inset 0 0 0 1px var(--linho-forte); font: 500 var(--t-pequeno)/1.2 var(--sans); transition: background-color var(--d-rapida) var(--e-saida), color var(--d-rapida) var(--e-saida); }
+.atalhos a:hover { background: var(--negocios); color: var(--no-escuro); box-shadow: none; }
+.atalhos-rotulo { display: block; margin-bottom: 10px; font: 600 var(--t-pequeno)/1.2 var(--sans); }
