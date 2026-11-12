@@ -8,8 +8,8 @@ import type { Produto } from "@/lib/gestao/tipos";
 import { brl, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
-import { CampoValor, ok, useDados } from "../ui";
-import { ChipsForma, fmtQtd, lerQtd, type Forma } from "./pecas";
+import { ok, useDados } from "../ui";
+import { CampoDinheiro, ChipsForma, erroDeValor, fmtQtd, lerQtd, type Forma } from "./pecas";
 import "./venda.css";
 
 /**
@@ -34,6 +34,33 @@ export function fecharContas(itens: ItemConta[], desconto: number | null) {
   const subtotal = centavos(itens.reduce((t, i) => t + valorDaLinha(i), 0));
   const tirado = Math.min(Math.max(desconto ?? 0, 0), subtotal);
   return { subtotal, desconto: tirado, total: centavos(subtotal - tirado) };
+}
+
+/** Maior quantidade aceita numa linha da conta. */
+export const QTD_MAXIMA = 9999;
+
+/** O que impede de fechar a conta (valor negativo, valor ou quantidade grande demais), em português; null quando está tudo certo. */
+export function erroDaConta(itens: ItemConta[], desconto: number | null, total: number): string | null {
+  for (const i of itens) {
+    const nome = i.nome.trim() || (i.tipo === "extra" ? "extra" : "item");
+    const e = erroDeValor(i.valor, `O valor de ${nome}`);
+    if (e) return e;
+    if (i.qtd < 0) return `A quantidade de ${nome} não pode ser negativa.`;
+    if (i.qtd > QTD_MAXIMA) return `A quantidade de ${nome} passa do máximo de ${fmtQtd(QTD_MAXIMA)}. Confira os números.`;
+  }
+  return erroDeValor(desconto, "O desconto") ?? erroDeValor(total, "O total da conta");
+}
+
+/** Produtos da conta que passam do saldo do estoque, com o texto da confirmação. */
+export function faltaNoEstoque(itens: ItemConta[], produtos: Produto[]) {
+  const linhas: string[] = [];
+  for (const i of produtosDaConta(itens)) {
+    const p = produtos.find((x) => x.id === i.produtoId);
+    if (!p) continue;
+    const saldo = Number(p.estoque);
+    if (i.qtd > saldo) linhas.push(`${i.nome}: ${saldo > 0 ? `só há ${fmtQtd(saldo)} ${p.unidade} em estoque` : "sem saldo em estoque"} e a conta tem ${fmtQtd(i.qtd)}.`);
+  }
+  return linhas;
 }
 
 /** Produtos da conta com quantidade maior que zero. */
@@ -129,7 +156,7 @@ function CampoQtd({ valor, aoMudar, nome }: { valor: number; aoMudar: (n: number
   useEffect(() => {
     if (valor !== ultimo.current) { ultimo.current = valor; setTexto(fmtQtd(valor)); }
   }, [valor]);
-  const por = (n: number) => { const v = Math.max(0, Math.round(n * 1000) / 1000); ultimo.current = v; setTexto(fmtQtd(v)); aoMudar(v); };
+  const por = (n: number) => { const v = Math.min(QTD_MAXIMA, Math.max(0, Math.round(n * 1000) / 1000)); ultimo.current = v; setTexto(fmtQtd(v)); aoMudar(v); };
   return (
     <span className="g-vd-qtd">
       <button type="button" onClick={() => por(valor - 1)} disabled={valor <= 0} aria-label={`Menos um: ${nome}`}><Minus /></button>
@@ -166,14 +193,17 @@ export function LinhaDaConta({ item, produto, aoMudar, aoTirar, apoio }: {
         {ehProduto && <CampoQtd valor={item.qtd} aoMudar={(qtd) => aoMudar({ qtd })} nome={item.nome} />}
         <label className="g-vd-preco">
           <span>{ehProduto ? "cada" : "Valor"}</span>
-          <CampoValor valor={item.valor} aoMudar={(valor) => aoMudar({ valor })} />
+          <CampoDinheiro valor={item.valor} aoMudar={(valor) => aoMudar({ valor })} />
         </label>
         {aoTirar && <button type="button" className="g-ico" onClick={aoTirar} aria-label={`Tirar ${nome} da conta`}><Trash2 /></button>}
       </div>
       {falta && (
         <p className="g-vd-falta">
-          {saldo! > 0 ? `No estoque só tem ${fmtQtd(saldo)} ${item.unidade ?? "un"}.` : "Este produto está sem saldo no estoque."} Dá para vender assim mesmo.
+          {saldo! > 0 ? `No estoque só tem ${fmtQtd(saldo)} ${item.unidade ?? "un"}.` : "Este produto está sem saldo no estoque."} Dá para vender assim mesmo: o sistema pede uma confirmação.
         </p>
+      )}
+      {(erroDeValor(item.valor) || item.qtd > QTD_MAXIMA) && (
+        <p className="g-vd-falta erro" role="alert">{erroDeValor(item.valor) ?? `A quantidade passa do máximo de ${fmtQtd(QTD_MAXIMA)}.`}</p>
       )}
     </div>
   );
@@ -181,9 +211,9 @@ export function LinhaDaConta({ item, produto, aoMudar, aoTirar, apoio }: {
 
 /* ---------- desconto, pagamento e total ---------- */
 
-export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, forma, aoForma, comPagamento = true }: {
+export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, forma, aoForma, comPagamento = true, erroForma }: {
   subtotal: number; desconto: number; total: number; descontoDigitado: number | null; aoDesconto: (v: number | null) => void;
-  forma: Forma; aoForma: (f: Forma) => void; comPagamento?: boolean;
+  forma: Forma | null; aoForma: (f: Forma) => void; comPagamento?: boolean; erroForma?: string | null;
 }) {
   const passou = (descontoDigitado ?? 0) > subtotal && subtotal > 0;
   return (
@@ -192,10 +222,10 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
         <>
           <label className="g-campo g-vd-desconto">
             <span>Desconto em reais (se tiver)</span>
-            <CampoValor valor={descontoDigitado} aoMudar={aoDesconto} />
+            <CampoDinheiro valor={descontoDigitado} aoMudar={aoDesconto} />
             {passou && <small>O desconto não passa do valor da conta.</small>}
           </label>
-          <ChipsForma valor={forma} aoMudar={aoForma} />
+          <ChipsForma valor={forma} aoMudar={aoForma} erro={erroForma} />
         </>
       )}
       <div className="g-vd-total" role="status">

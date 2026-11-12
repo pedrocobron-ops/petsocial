@@ -6,12 +6,13 @@ import {
   Search, Target, TrendingUp, TriangleAlert,
 } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
-import { avisarMudanca, Campo, CampoValor, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
+import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
+import { CampoDinheiro } from "@/components/gestao/loja/pecas";
 import {
-  brlMini, Chips, COR_FORMA, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, rotuloForma, SemAcesso, soma, type Tipo,
+  brlMini, categoriaAtual, Chips, COR_FORMA, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, rotuloForma, SemAcesso, soma, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
-import { contasDaMeta } from "@/lib/gestao/dinheiro";
+import { contasDaMeta, partesDoLancamento, percentuaisQueFecham } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
 import type { Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
@@ -41,9 +42,20 @@ type FolhaAberta =
 
 type Movimento = Pick<Lancamento, "tipo" | "valor">;
 
+/**
+ * Soma por categoria. Uma conta com serviço, produto e extra é repartida: o serviço fica na categoria do lançamento,
+ * o produto em "Venda de produtos" e o extra em "Extras", com o desconto rateado na proporção de cada parte.
+ */
 function porCategoria(lista: Lancamento[]) {
   const mapa = new Map<string, number>();
-  for (const l of lista) mapa.set(l.categoria, (mapa.get(l.categoria) ?? 0) + Number(l.valor));
+  const por = (nome: string, valor: number) => { if (valor) mapa.set(nome, (mapa.get(nome) ?? 0) + valor); };
+  for (const l of lista) {
+    const partes = l.tipo === "entrada" ? partesDoLancamento(l) : null;
+    if (!partes) { por(categoriaAtual(l.categoria), Number(l.valor)); continue; }
+    por(categoriaAtual(l.categoria), partes.servico);
+    por("Venda de produtos", partes.produto);
+    por("Extras", partes.extra);
+  }
   return [...mapa].map(([nome, valor]) => ({ nome, valor: Math.round(valor * 100) / 100 })).sort((a, b) => b.valor - a.valor);
 }
 
@@ -229,8 +241,8 @@ function Financeiro() {
                           <div className="g-fin-rosca">
                             <Rosca fatias={graficos.formas} tamanho={116}>{graficos.formas.length}<small>{graficos.formas.length === 1 ? "forma" : "formas"}</small></Rosca>
                             <div className="g-legenda">
-                              {graficos.formas.map((f) => (
-                                <div key={f.id}><i style={{ background: f.cor }} /><span>{f.rotulo} <span className="g-muted g-pp">{Math.round((f.valor / contas.entrou) * 100)}%</span></span><b>{brl(f.valor)}</b></div>
+                              {graficos.formas.map((f, i, todas) => (
+                                <div key={f.id}><i style={{ background: f.cor }} /><span>{f.rotulo} <span className="g-muted g-pp">{percentuaisQueFecham(todas.map((x) => x.valor))[i]}%</span></span><b>{brl(f.valor)}</b></div>
                               ))}
                             </div>
                           </div>
@@ -287,8 +299,8 @@ function Financeiro() {
                         <button key={l.id} className="g-linha" onClick={() => abrir({ tipo: "editar", lancamento: l })}>
                           <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
                           <span className="t">
-                            <b>{l.descricao || l.categoria}</b>
-                            <span>{dataCurta(l.data)}{l.descricao ? ` · ${l.categoria}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {rotuloForma(l.forma)}</i></span>
+                            <b>{l.descricao || categoriaAtual(l.categoria)}</b>
+                            <span>{dataCurta(l.data)}{l.descricao ? ` · ${categoriaAtual(l.categoria)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {rotuloForma(l.forma)}</i></span>
                           </span>
                           <span className="g-tag g-fin-so-largo">{rotuloForma(l.forma)}</span>
                           <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
@@ -416,7 +428,7 @@ function FolhaMeta({ aoFechar }: { aoFechar: () => void }) {
       </>}>
       <form className="g-form" onSubmit={(e) => { e.preventDefault(); void gravar(valor); }}>
         <Campo rotulo="Quanto você quer que entre por mês" erro={erro} dica="Vale para todos os meses, até você mudar. Conta tudo o que entrou e já foi pago.">
-          <CampoValor valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus />
+          <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus maximo={99999999} />
         </Campo>
         <button type="submit" hidden />
       </form>
@@ -468,12 +480,14 @@ function Categorias({ titulo, total, linhas, vazio, quente, icone, tom }: {
   icone: React.ComponentType<{ size?: number }>; tom: "menta" | "rosa";
 }) {
   const cores = quente ? QUENTES : PALETA;
+  const pct = percentuaisQueFecham(linhas.map((c) => c.valor));
+  const pctDe = new Map(linhas.map((c, i) => [c.valor, pct[i]]));
   return (
     <section className="g-card">
       <div className="g-card-t"><h3><Tile icone={icone} tom={tom} tamanho="p" />{titulo}</h3><b className="g-tab">{brl(total)}</b></div>
       {linhas.length ? (
         <Ranking itens={linhas.map((c, i) => ({ rotulo: c.nome, valor: c.valor, cor: cores[i % cores.length] }))}
-          formato={(v) => `${brl(v)} · ${Math.round((v / total) * 100)}%`} />
+          formato={(v) => `${brl(v)} · ${pctDe.get(v) ?? Math.round((v / total) * 100)}%`} />
       ) : <p className="g-muted g-p">{vazio}</p>}
     </section>
   );
@@ -496,6 +510,8 @@ function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
   const em7 = isoDia(somaDias(deIsoDia(hoje), 7));
   const proximas = lista.filter((c) => c.vencimento && c.vencimento > hoje && c.vencimento <= em7);
   const quantas = (q: number) => (q === 1 ? "1 conta" : `${q} contas`);
+  // vencimento de outro ano aparece com o ano, para não confundir 10/01 deste ano com 10/01 do ano que vem
+  const outroAno = (v: string) => v.slice(0, 4) !== hoje.slice(0, 4);
   return (
     <div className="g-pilha">
       <section className={`g-fin-total${receber ? " receber" : ""}`}>
@@ -529,14 +545,14 @@ function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
           const etiqueta = !v ? { texto: "sem data", tom: "" }
             : v < hoje ? { texto: "atrasada", tom: " vermelho" }
             : v === hoje ? { texto: "vence hoje", tom: " amarelo" }
-            : { texto: dataCurta(v), tom: "" };
+            : { texto: outroAno(v) ? dataCompleta(v) : dataCurta(v), tom: "" };
           return (
             <div key={c.id} className="g-linha gf-conta">
               <button className="gf-toque" onClick={() => aoEditar(c)} aria-label={`Editar ${c.descricao || c.categoria}`}>
                 <span className="g-fin-so-largo"><Tile icone={v && v < hoje ? TriangleAlert : receber ? HandCoins : Receipt} tom={v && v < hoje ? "rosa" : receber ? "menta" : "manteiga"} /></span>
                 <span className="t">
                   <b>{c.descricao || c.categoria}</b>
-                  <span>{c.categoria}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${dataAmigavel(v)}` : ""}</span>
+                  <span>{categoriaAtual(c.categoria)}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
                 </span>
                 <span className="d">
                   <b>{brl(c.valor)}</b>

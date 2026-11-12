@@ -74,7 +74,7 @@ function Folha() {
         <p className="g-muted g-pp">Para salvar em PDF, toque em Imprimir e escolha "Salvar como PDF" no lugar da impressora. A folha não mostra valores.</p>
       </div>
 
-      <article className="g-imp-folha">
+      <article className={`g-imp-folha${visao === "semana" ? " semana" : ""}`}>
         <header className="g-imp-cab">
           <div className="g-imp-marca"><LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={46} /><div><h1>{petshop.nome}</h1><p>Agenda · {periodo}{quem ? ` · ${quem}` : ""}</p></div></div>
           <p className="g-imp-quando">Impresso em {dataCurta(new Date())}, {hora(new Date())}</p>
@@ -82,10 +82,10 @@ function Folha() {
         {carregando && !dados ? <Esqueleto linhas={5} /> : mostrados.map((d) => {
           const lista = doDia(d), bloqs = bloqueiosDoDia(d);
           return (
-            <section key={d.getTime()} className="g-imp-dia">
-              {visao === "semana" && <h2>{dataLonga(d)}<small>{lista.length === 1 ? "1 horário" : `${lista.length} horários`}</small></h2>}
+            <section key={d.getTime()} className={`g-imp-dia${lista.length ? "" : " vazio"}`}>
+              {visao === "semana" && <h2>{dataLonga(d).replace(/^./, (c) => c.toUpperCase())}<small>{!lista.length ? "sem horários" : lista.length === 1 ? "1 horário" : `${lista.length} horários`}</small></h2>}
               {bloqs.map((b) => <p key={b.id} className="g-imp-bloq"><Lock />{hora(b.inicio)} às {hora(b.fim)} · {b.motivo || "Bloqueado"}{b.profissional_id ? ` · ${equipe.find((p) => p.id === b.profissional_id)?.nome.split(" ")[0] ?? ""}` : ""}</p>)}
-              {!lista.length ? <p className="g-imp-vazio">Sem horários marcados.</p> : (
+              {!lista.length ? (visao === "semana" ? null : <p className="g-imp-vazio">Sem horários marcados.</p>) : (
                 <table>
                   <thead><tr><th>Hora</th><th>Pet</th><th>Serviço</th>{!prof && atendem.length > 1 && <th>Com</th>}<th>Tutor</th><th>Atenção</th><th className="feito">Feito</th></tr></thead>
                   <tbody>

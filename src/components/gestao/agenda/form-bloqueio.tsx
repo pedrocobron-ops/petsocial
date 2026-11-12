@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Check, Lock, Repeat, Store, Trash2 } from "lucide-react";
 import type { Bloqueio } from "@/lib/gestao/tipos";
 import { MOTIVOS_BLOQUEIO, bloqueioPega, diasUteis } from "@/lib/gestao/agenda";
-import { dataCurta, deIsoDia, hora, inicioDoDia, isoDia, juntaDiaHora, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
+import { dataCurta, deIsoDia, hora, horarioDoDia, inicioDoDia, isoDia, juntaDiaHora, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Campo, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
@@ -50,7 +50,23 @@ export default function FormBloqueio({ bloqueio, diaInicial, profissionalInicial
   const perguntar = Boolean(serieId) && aFrente !== 0;
 
   const diaOk = RE_DIA.test(dia);
-  const dias = useMemo(() => (repete && diaOk ? diasUteis(dia, semanas, petshop.horario) : [dia]), [repete, diaOk, dia, semanas, petshop.horario]);
+  // repetição: só os dias em que o pet shop abre e, em cada um, só o trecho que cai dentro do expediente daquele dia.
+  // O primeiro dia entra sempre do jeito que foi escrito (foi a pessoa que escolheu).
+  const temHorario = useMemo(() => Array.from({ length: 7 }, (_, i) => horarioDoDia(petshop.horario, new Date(2024, 0, 7 + i))).some(Boolean), [petshop.horario]);
+  const plano = useMemo(() => {
+    const todos = repete && diaOk ? diasUteis(dia, semanas, petshop.horario) : [dia];
+    const usados: { dia: string; de: string; ate: string }[] = [];
+    let fora = 0;
+    todos.forEach((d, i) => {
+      const h = i > 0 && !inteiro ? horarioDoDia(petshop.horario, deIsoDia(d)) : null;
+      if (!h) { usados.push({ dia: d, de, ate }); return; }
+      const de2 = de > h.abre ? de : h.abre, ate2 = ate < h.fecha ? ate : h.fecha;
+      if (ate2 <= de2) { fora++; return; }
+      usados.push({ dia: d, de: de2, ate: ate2 });
+    });
+    return { usados, fora, cortados: usados.filter((u) => u.de !== de || u.ate !== ate).length };
+  }, [repete, diaOk, dia, semanas, petshop.horario, inteiro, de, ate]);
+  const dias = useMemo(() => plano.usados.map((u) => u.dia), [plano]);
   const diasDaSemana = useMemo(() => {
     const nomes: string[] = [];
     for (const d of dias.slice(0, 14)) { const n = nomeDiaCurto(deIsoDia(d)); if (!nomes.includes(n)) nomes.push(n); }
@@ -67,9 +83,10 @@ export default function FormBloqueio({ bloqueio, diaInicial, profissionalInicial
     setSalvando(true);
     try {
       const serie = dias.length > 1 ? crypto.randomUUID() : null;
-      const linhas = dias.map((d) => {
-        const inicio = inteiro ? deIsoDia(d) : juntaDiaHora(d, de);
-        const fim = inteiro ? somaDias(deIsoDia(d), 1) : juntaDiaHora(d, ate);
+      const linhas = plano.usados.map((u) => {
+        const d = u.dia;
+        const inicio = inteiro ? deIsoDia(d) : juntaDiaHora(d, u.de);
+        const fim = inteiro ? somaDias(deIsoDia(d), 1) : juntaDiaHora(d, u.ate);
         return { petshop_id: petshop.id, profissional_id: profId, inicio: inicio.toISOString(), fim: fim.toISOString(), motivo: motivo.trim() || null, criado_por: user.id, serie_id: serie };
       });
       ok(await sb.from("bloqueios").insert(linhas).select("id"));
@@ -178,12 +195,15 @@ export default function FormBloqueio({ bloqueio, diaInicial, profissionalInicial
           </div>
         )}
 
-        <div className="g-campo"><span>Para quem</span>
-          <div className="g-chips">
-            <button type="button" className="g-chip" aria-pressed={profId === null} onClick={() => setProfId(null)}><Store size={15} />Pet shop inteiro</button>
-            {quemAtende.map((p) => <button key={p.id} type="button" className="g-chip" aria-pressed={profId === p.id} onClick={() => setProfId(p.id)}><i style={{ background: p.cor }} />{p.nome.split(" ")[0]}</button>)}
+        {/* com uma pessoa só atendendo, bloquear para ela ou para o pet shop inteiro dá no mesmo: não pergunta */}
+        {(quemAtende.length > 1 || Boolean(bloqueio?.profissional_id)) && (
+          <div className="g-campo"><span>Para quem</span>
+            <div className="g-chips">
+              <button type="button" className="g-chip" aria-pressed={profId === null} onClick={() => setProfId(null)}><Store size={15} />Pet shop inteiro</button>
+              {quemAtende.map((p) => <button key={p.id} type="button" className="g-chip" aria-pressed={profId === p.id} onClick={() => setProfId(p.id)}><i style={{ background: p.cor }} />{p.nome.split(" ")[0]}</button>)}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="g-campo"><span>Motivo</span>
           <div className="g-chips">
@@ -193,7 +213,7 @@ export default function FormBloqueio({ bloqueio, diaInicial, profissionalInicial
         </div>
 
         {!bloqueio && <div className="g-agd-rep">
-          <label className="g-check"><input type="checkbox" checked={repete} onChange={(e) => setRepete(e.target.checked)} /> Repetir nos próximos dias úteis</label>
+          <label className="g-check"><input type="checkbox" checked={repete} onChange={(e) => setRepete(e.target.checked)} /> {temHorario ? "Repetir nos dias em que o pet shop abre" : "Repetir de segunda a sexta"}</label>
           {repete && (
             <>
               <Campo rotulo="Por quantas semanas">
@@ -204,6 +224,9 @@ export default function FormBloqueio({ bloqueio, diaInicial, profissionalInicial
               {diaOk && (
                 <p className="g-pp g-muted">
                   {dias.length} {dias.length === 1 ? "dia" : "dias"} ({diasDaSemana}), de {dataCurta(dias[0])} até {dataCurta(dias[dias.length - 1])}. Um bloqueio por dia.
+                  {!temHorario && " O horário de funcionamento ainda não foi preenchido em Meu pet shop."}
+                  {plano.cortados > 0 && ` Em ${plano.cortados === 1 ? "1 dia" : `${plano.cortados} dias`} o bloqueio fica menor, para caber no horário em que o pet shop abre.`}
+                  {plano.fora > 0 && ` ${plano.fora === 1 ? "1 dia ficou de fora" : `${plano.fora} dias ficaram de fora`}: nesse horário o pet shop já está fechado.`}
                 </p>
               )}
             </>

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Package, Scissors, Sparkles, Trash2 } from "lucide-react";
+import { Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
 import { caixaAberto, contaDosItens, desfazerVenda, itensDoLancamento, lancarPago, produtosDaVenda } from "@/lib/gestao/dinheiro";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, isoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
-import { avisarMudanca, Campo, CampoValor, Folha, useAvisos, Vazio } from "../ui";
+import { CampoDinheiro, formaLembrada, lembrarForma } from "../loja/pecas";
+import { avisarMudanca, Campo, Folha, useAvisos, useDados, Vazio } from "../ui";
 import "./financeiro.css";
 
 /* ---------- contas ---------- */
@@ -155,6 +156,8 @@ export function ItensDoLancamento({ lancamento }: { lancamento: Pick<Lancamento,
 /* ---------- folha de lançamento ---------- */
 
 const categoriasDe = (tipo: Tipo) => (tipo === "entrada" ? CATEGORIAS_ENTRADA : CATEGORIAS_SAIDA);
+/** Nome de hoje para uma categoria gravada com o nome antigo. */
+export const categoriaAtual = (c: string) => (c === "Produtos e insumos" ? "Produtos e material" : c);
 
 /**
  * Cria ou edita um lançamento.
@@ -169,8 +172,16 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   const hoje = hojeIso();
   const [tipo, setTipo] = useState<Tipo>(inicial ? (inicial.tipo as Tipo) : tipoInicial);
   const [valor, setValor] = useState<number | null>(inicial ? Number(inicial.valor) : null);
-  const [forma, setForma] = useState<FormaId>((inicial?.forma as FormaId | null) ?? "pix");
-  const [categoria, setCategoria] = useState(inicial?.categoria ?? categoriasDe(tipoInicial)[0]);
+  // forma: a do lançamento; num novo, a última usada neste aparelho; sem nenhuma, a pessoa escolhe
+  const [forma, setForma] = useState<FormaId | null>(() => (inicial ? (inicial.forma as FormaId | null) ?? "pix" : formaLembrada()));
+  const [categoria, setCategoria] = useState(inicial ? categoriaAtual(inicial.categoria) : categoriasDe(tipoInicial)[0]);
+  // lançamento de um caixa que já foi fechado: valor, forma e dia não mudam mais, e ele não pode ser excluído (o banco também recusa)
+  const { dados: caixaFechadoEm } = useDados(async () => {
+    if (!inicial?.caixa_id) return null;
+    const r = await sb.from("caixas").select("fechado_em").eq("id", inicial.caixa_id).maybeSingle();
+    return r.data?.fechado_em ?? null;
+  }, [inicial?.caixa_id]);
+  const travado = Boolean(caixaFechadoEm);
   const [descricao, setDescricao] = useState(inicial?.descricao ?? "");
   const [data, setData] = useState(inicial?.data ?? hoje);
   const [vencimento, setVencimento] = useState(inicial?.vencimento ?? hoje);
@@ -201,6 +212,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     if (conta && !texto) { setErro("Escreva do que é esta conta."); return; }
     if (conta && !vencimento) { setErro("Escolha o dia do vencimento."); return; }
     if (!conta && escolheData && (!data || data > hoje)) { setErro("Escolha um dia até hoje."); return; }
+    if (!conta && !forma) { setErro(entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
     const vezes = conta && !inicial && repetir ? Math.min(36, Math.max(2, Math.round(meses) || 2)) : 1;
     setErro(null);
     setSalvando(true);
@@ -208,6 +220,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
       if (inicial) {
         const mudancas = conta
           ? { valor, categoria, descricao: texto, vencimento, data: vencimento }
+          : travado ? { categoria, descricao: texto }
           : { valor, forma, categoria, descricao: texto, ...(escolheData ? { data } : {}) };
         const r = await sb.from("lancamentos").update(mudancas).eq("id", inicial.id).eq("petshop_id", petshop.id);
         if (r.error) throw new Error(r.error.message);
@@ -223,7 +236,11 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         const r = await sb.from("lancamentos").insert(linhas);
         if (r.error) throw new Error(r.error.message);
         avisar(vezes > 1 ? `${vezes} contas anotadas, uma por mês.` : "Conta anotada.");
+      } else if (!forma) {
+        setSalvando(false);
+        return;
       } else if (!escolheData || data === hoje) {
+        lembrarForma(forma);
         await lancarPago(sb, petshop.id, { tipo, valor, forma, categoria, descricao: texto });
         avisar(entrada ? `Entrada de ${brl(valor)} anotada.` : `Saída de ${brl(valor)} anotada.`);
       } else {
@@ -272,10 +289,16 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   return (
     <Folha titulo={titulo} aoFechar={aoFechar}
       rodape={<>
-        {inicial && <button type="button" className="g-btn perigo" onClick={excluir} disabled={salvando}><Trash2 />Excluir</button>}
+        {inicial && !travado && <button type="button" className="g-btn perigo" onClick={excluir} disabled={salvando}><Trash2 />Excluir</button>}
         <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Guardando…" : inicial ? "Guardar" : conta ? "Anotar conta" : "Lançar"}</button>
       </>}>
       <form className="g-form" onSubmit={(e) => { e.preventDefault(); void salvar(); }}>
+        {travado && (
+          <p className="g-cx-fora" role="status">
+            <Lock aria-hidden />
+            <span>Este lançamento é de um caixa já fechado ({dataCompleta(caixaFechadoEm!)}). O valor, a forma de pagamento e o dia não mudam mais, e ele não pode ser excluído. Se precisar corrigir, lance um ajuste: uma entrada ou uma saída com a diferença.</span>
+          </p>
+        )}
         {inicial && <ItensDoLancamento lancamento={inicial} />}
         {escolheTipo && !inicial && (
           <div className="g-seg gf-seg-cheio" role="group" aria-label="Tipo">
@@ -291,7 +314,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         )}
         <div className={conta || escolheData ? "dupla" : undefined}>
           <Campo rotulo="Valor" erro={erro}>
-            <CampoValor valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus={!conta && !inicial} />
+            <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus={!conta && !inicial} desligado={travado} maximo={99999999} />
           </Campo>
           {conta && (
             <Campo rotulo="Vencimento">
@@ -300,11 +323,13 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
           )}
           {!conta && escolheData && (
             <Campo rotulo="Dia">
-              <input type="date" className="g-input" value={data} max={hoje} onChange={(e) => setData(e.target.value)} />
+              <input type="date" className="g-input" value={data} max={hoje} disabled={travado} onChange={(e) => setData(e.target.value)} />
             </Campo>
           )}
         </div>
-        {!conta && <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}><Chips opcoes={FORMAS} valor={forma} aoMudar={setForma} rotulo="Forma de pagamento" /></Grupo>}
+        {!conta && (travado
+          ? <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}><p className="g-p">{rotuloForma(forma)}</p></Grupo>
+          : <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}><Chips opcoes={FORMAS} valor={forma} aoMudar={(f) => { setForma(f); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>)}
         <Grupo rotulo="Categoria"><Chips opcoes={categorias} valor={categoria} aoMudar={setCategoria} rotulo="Categoria" /></Grupo>
         {!conta && (
           <Campo rotulo="Descrição (se quiser)">
@@ -339,16 +364,18 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
   const { avisar, avisarErro } = useAvisos();
   const hoje = hojeIso();
   const entrada = conta.tipo === "entrada";
-  const [forma, setForma] = useState<FormaId>("pix");
+  const [forma, setForma] = useState<FormaId | null>(() => formaLembrada());
   const [data, setData] = useState(hoje);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   async function salvar() {
     if (salvando) return;
+    if (!forma) { setErro(entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
     if (!data || data > hoje) { setErro("Escolha um dia até hoje."); return; }
     setSalvando(true);
     try {
+      lembrarForma(forma);
       // só entra no caixa aberto quando o dinheiro andou hoje
       const caixa = data === hoje ? await caixaAberto(sb, petshop.id) : null;
       const r = await sb.from("lancamentos").update({ pago: true, data, forma, caixa_id: caixa?.id ?? null })
@@ -377,7 +404,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
           <LinhaResumo nome={conta.descricao || conta.categoria} valor={brl(conta.valor)} forte />
           <p className="g-muted g-pp">{conta.categoria}{conta.vencimento ? ` · vencimento em ${dataCompleta(conta.vencimento)}` : ""}</p>
         </div>
-        <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}><Chips opcoes={FORMAS} valor={forma} aoMudar={setForma} rotulo="Forma de pagamento" /></Grupo>
+        <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}><Chips opcoes={FORMAS} valor={forma} aoMudar={(f) => { setForma(f); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>
         <Campo rotulo={entrada ? "Dia em que recebeu" : "Dia em que pagou"} erro={erro}>
           <input type="date" className="g-input" value={data} max={hoje} onChange={(e) => { setData(e.target.value); setErro(null); }} />
         </Campo>

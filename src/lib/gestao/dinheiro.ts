@@ -123,3 +123,43 @@ export function contasDaMeta(meta: number, entrou: number, horario: unknown, hoj
     porDia: falta > 0 && dias > 0 ? centavos(falta / dias) : null,
   };
 }
+
+/* ---------- valor realmente cobrado, por tipo de item ---------- */
+
+/** Maior valor aceito num campo de dinheiro das telas de venda e agenda. */
+export const VALOR_MAXIMO = 99999.99;
+
+/**
+ * Divide o valor recebido de um lançamento entre serviço, produto e extra, conforme os itens.
+ * O desconto é rateado na proporção de cada linha e a soma das partes é sempre o valor do lançamento.
+ * Sem itens, devolve null (o lançamento inteiro é da categoria dele).
+ */
+export function partesDoLancamento(l: { valor: number; itens?: unknown }): { servico: number; produto: number; extra: number } | null {
+  const itens = itensDoLancamento(l);
+  if (!itens.length) return null;
+  const bruto = { servico: 0, produto: 0, extra: 0 };
+  for (const i of itens) bruto[i.tipo] += Math.max(0, i.qtd * i.valor);
+  const soma = bruto.servico + bruto.produto + bruto.extra;
+  const total = Number(l.valor);
+  if (!(soma > 0)) return null;
+  const partes = { servico: centavos((bruto.servico / soma) * total), produto: centavos((bruto.produto / soma) * total), extra: centavos((bruto.extra / soma) * total) };
+  // o centavo que sobra do arredondamento vai para a maior parte
+  const sobra = centavos(total - partes.servico - partes.produto - partes.extra);
+  if (sobra) {
+    const maior = (["servico", "produto", "extra"] as const).reduce<"servico" | "produto" | "extra">((m, k) => (partes[k] > partes[m] ? k : m), "servico");
+    partes[maior] = centavos(partes[maior] + sobra);
+  }
+  return partes;
+}
+
+/** Percentuais inteiros que somam exatamente 100 (o resto do arredondamento vai para quem ficou mais longe do inteiro). */
+export function percentuaisQueFecham(valores: number[]): number[] {
+  const total = valores.reduce((s, v) => s + Math.max(0, v), 0);
+  if (!(total > 0)) return valores.map(() => 0);
+  const exatos = valores.map((v) => (Math.max(0, v) / total) * 100);
+  const pct = exatos.map(Math.floor);
+  let falta = 100 - pct.reduce((s, v) => s + v, 0);
+  const ordem = exatos.map((v, i) => ({ i, resto: v - Math.floor(v) })).sort((a, b) => b.resto - a.resto);
+  for (const o of ordem) { if (falta <= 0) break; pct[o.i]++; falta--; }
+  return pct;
+}
