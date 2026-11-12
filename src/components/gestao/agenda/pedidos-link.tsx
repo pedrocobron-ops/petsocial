@@ -28,6 +28,13 @@ function quandoNaFrase(inicio: string) {
   const fimDeSemana = d.getDay() === 0 || d.getDay() === 6;
   return `${fimDeSemana ? "no" : "na"} ${nomeDia(d)}, ${dataCurta(d)}`;
 }
+/** Pedido de creche ou de hotel: vira reserva em Creche e hotel, não horário na agenda. */
+const ehEstadia = (p: Pedido) => p.tipo === "creche" || p.tipo === "hotel";
+/** "sexta, 14/11" ou "de 14/11 a 17/11". */
+function periodoDe(p: Pedido) {
+  const a = new Date(p.inicio), b = new Date(p.fim);
+  return inicioDoDia(a).getTime() === inicioDoDia(b).getTime() ? `${nomeDia(a)}, ${dataCurta(a)}` : `de ${dataCurta(a)} a ${dataCurta(b)}`;
+}
 const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0];
 /** "Nina", "Nina e Bob", "Nina, Bob e Mel". */
 const listaDe = (itens: string[]) => (itens.length <= 1 ? itens.join("") : `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`);
@@ -67,6 +74,7 @@ export default function PedidosLink() {
 
   const atendem = equipe.filter((p) => p.ativo && p.atende);
   const nomeServico = (id: string | null) => servicos.find((s) => s.id === id)?.nome ?? null;
+  const rotulo = (p: Pedido) => (p.tipo === "creche" ? "Creche" : p.tipo === "hotel" ? "Hotel" : nomeServico(p.servico_id));
   const corServico = (id: string | null) => servicos.find((s) => s.id === id)?.cor ?? "#f97316";
   const pendentes = (dados ?? []).filter((p) => !respondidos.some((r) => r.pedido.id === p.id));
   const gruposPendentes = agrupar(pendentes, chaveDe).map((g) => ({ ...g, lista: [...g.lista].sort(porHora) }));
@@ -83,13 +91,13 @@ export default function PedidosLink() {
     let falha: unknown = null;
     for (const p of lista) {
       try {
-        ok(await sb.rpc("pedido_aceitar", { p_id: p.id, p_profissional: profissional }));
+        ok(await sb.rpc("pedido_aceitar", { p_id: p.id, p_profissional: ehEstadia(p) ? undefined : profissional }));
         feitos.push(p);
       } catch (e) { falha ??= e; }
     }
     if (feitos.length) {
-      setRespondidos((r) => [...r, ...feitos.map((p) => ({ pedido: p, servico: nomeServico(p.servico_id), resposta: "aceito" as const }))]);
-      avisar(feitos.length === 1 ? `Horário de ${feitos[0].pet_nome} marcado.` : `Horários de ${listaDe(feitos.map((p) => p.pet_nome))} marcados.`);
+      setRespondidos((r) => [...r, ...feitos.map((p) => ({ pedido: p, servico: rotulo(p), resposta: "aceito" as const }))]);
+      avisar(feitos.length === 1 ? (ehEstadia(feitos[0]) ? `Reserva de ${feitos[0].pet_nome} feita. Ela está em Creche e hotel.` : `Horário de ${feitos[0].pet_nome} marcado.`) : `Horários de ${listaDe(feitos.map((p) => p.pet_nome))} marcados.`);
       avisarMudanca();
     }
     if (falha) { avisarErro(falha); void recarregar(); }
@@ -101,7 +109,7 @@ export default function PedidosLink() {
     const nomes = listaDe(lista.map((p) => p.pet_nome));
     const sim = await confirmar({
       titulo: lista.length > 1 ? `Recusar os pedidos de ${nomes}?` : `Recusar o pedido de ${nomes}?`,
-      texto: `${lista.length > 1 ? "Os horários voltam" : "O horário volta"} a ficar livre no link. Depois é só avisar o tutor pelo WhatsApp.`,
+      texto: `${lista.length > 1 ? "Os horários voltam a ficar livres" : "O horário volta a ficar livre"} no link. Depois é só avisar o tutor pelo WhatsApp.`,
       confirmar: lista.length > 1 ? "Recusar todos" : "Recusar", perigo: true,
     });
     if (!sim) return;
@@ -110,7 +118,7 @@ export default function PedidosLink() {
       const linhas = ok(await sb.from("pedidos_agendamento").update({ status: "recusado" }).in("id", lista.map((p) => p.id)).eq("petshop_id", petshop.id).eq("status", "pendente").select("id"));
       const feitos = lista.filter((p) => linhas.some((l) => l.id === p.id));
       if (!feitos.length) throw new Error(lista.length > 1 ? "Esses pedidos já foram respondidos." : "Esse pedido já foi respondido.");
-      setRespondidos((r) => [...r, ...feitos.map((p) => ({ pedido: p, servico: nomeServico(p.servico_id), resposta: "recusado" as const }))]);
+      setRespondidos((r) => [...r, ...feitos.map((p) => ({ pedido: p, servico: rotulo(p), resposta: "recusado" as const }))]);
       avisar(feitos.length > 1 ? "Pedidos recusados." : "Pedido recusado.");
       void recarregar();
     } catch (e) {
@@ -127,6 +135,12 @@ export default function PedidosLink() {
     // endereços para o tutor: a página do pedido (confirmação) e o link para escolher outro horário (recusa)
     const base = `${window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
     const acompanhar = `\n\nVeja a confirmação aqui: ${base}/pedido/${p.id}`;
+    if (ehEstadia(p)) {
+      const oQue = `${p.tipo === "hotel" ? "o hotel" : "a creche"} de ${p.pet_nome}, ${periodoDe(p)}`;
+      return lista[0].resposta === "recusado"
+        ? `${oi} Recebemos o seu pedido para ${oQue}, mas não vamos ter vaga nessas datas. Você pode escolher outros dias aqui: ${base}`
+        : `${oi} Está confirmado: ${oQue}. Esperamos vocês!${acompanhar}`;
+    }
     if (lista[0].resposta === "recusado") {
       return `${oi} Recebemos o seu pedido para ${nomes}, mas ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}, não vamos conseguir atender. Você pode escolher outro horário livre aqui: ${base}\n\nSe preferir, me diga os dias e períodos que ficam bons para você.`;
     }
@@ -172,6 +186,7 @@ export default function PedidosLink() {
                   <span>
                     {!aceito ? (varios ? "Pedidos recusados." : "Pedido recusado.")
                       : varios ? `Marcados para ${quandoNaTela(p.inicio)}: ${listaDe(g.lista.map((r) => `${r.pedido.pet_nome} às ${hora(r.pedido.inicio)}`))}.`
+                      : ehEstadia(p) ? `Reserva de ${p.tipo === "hotel" ? "hotel" : "creche"} feita: ${periodoDe(p)}.`
                       : `Marcado para ${quandoNaTela(p.inicio)}, às ${hora(p.inicio)}.`} Avise {primeiroNome(p.tutor_nome)}.
                   </span>
                 </div>
@@ -191,12 +206,12 @@ export default function PedidosLink() {
         {gruposPendentes.map((g) => {
           const p = g.lista[0];
           const varios = g.lista.length > 1;
-          const servico = nomeServico(p.servico_id);
+          const servico = rotulo(p);
           const fim = g.lista[g.lista.length - 1].fim;
           const passou = new Date(p.inicio).getTime() < Date.now();
           const detalhesDe = (x: Pedido) => [ESPECIE[x.especie] ?? null, x.porte ? `porte ${x.porte}` : null].filter(Boolean).join(", ");
           const nomes = listaDe(g.lista.map((x) => x.pet_nome));
-          const seletor = atendem.length > 1 && (
+          const seletor = atendem.length > 1 && !ehEstadia(p) && (
             <select className="g-select g-pl-com" aria-label={`Quem atende ${nomes}`} value={quem[g.id] ?? ""} onChange={(e) => setQuem((q) => ({ ...q, [g.id]: e.target.value }))}>
               <option value="">Quem atende? Decidir depois</option>
               {atendem.map((x) => <option key={x.id} value={x.id}>Com {x.nome}</option>)}
@@ -206,7 +221,7 @@ export default function PedidosLink() {
           if (!varios) {
             const detalhes = detalhesDe(p);
             return (
-              <article key={g.id} className="g-pl-item" style={{ "--cor": corServico(p.servico_id) } as React.CSSProperties}>
+              <article key={g.id} className="g-pl-item" style={{ "--cor": p.tipo === "creche" ? "#3b9bd9" : p.tipo === "hotel" ? "#7c6bd6" : corServico(p.servico_id) } as React.CSSProperties}>
                 <div className="g-pl-quem">
                   <AvatarPet pet={{ nome: p.pet_nome, especie: p.especie }} />
                   <div className="g-pl-nome">
@@ -216,8 +231,8 @@ export default function PedidosLink() {
                 </div>
                 <div className="g-pl-quando">
                   <span className="g-pl-serv"><i aria-hidden />{servico ?? "Serviço"}</span>
-                  <span className="g-pl-hora"><Clock aria-hidden />{quandoNaTela(p.inicio)}, {hora(p.inicio)}</span>
-                  {passou && <span className="g-tag vermelho">horário já passou</span>}
+                  <span className="g-pl-hora"><Clock aria-hidden />{ehEstadia(p) ? periodoDe(p) : `${quandoNaTela(p.inicio)}, ${hora(p.inicio)}`}</span>
+                  {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
                 </div>
                 {p.obs && <p className="g-pl-obs">{p.obs}</p>}
                 <div className="g-pl-acoes">
