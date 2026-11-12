@@ -60,7 +60,8 @@ function lerTabela(texto: string): string[][] {
 function numero(v: string | undefined) {
   const s = (v ?? "").replace(/[^\d,.-]/g, "");
   if (!s) return null;
-  const n = Number(s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : s);
+  // no Brasil "1.200" é mil e duzentos: ponto seguido de três algarismos é separador de milhar
+  const n = Number(s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : /^\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g, "") : s);
   return Number.isFinite(n) && n >= 0 && n < 1e7 ? Math.round(n * 1000) / 1000 : null;
 }
 const digitos = (v: string | undefined) => (v ?? "").replace(/\D/g, "");
@@ -141,14 +142,20 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     if (petsJa.error) throw new Error(petsJa.error.message);
     const temPet = new Set((petsJa.data ?? []).map((p) => `${p.cliente_id}:${semAcento(p.nome)}`));
 
-    let tutores = 0, pets = 0, pulados = 0, semFone = 0;
+    let tutores = 0, pets = 0, pulados = 0, semFone = 0, homonimos = 0;
+    const foneDoCliente = new Map<string, string>();
+    for (const c of existentes.data ?? []) if (fimDoFone(c.telefone).length === 8) foneDoCliente.set(c.id, fimDoFone(c.telefone));
     for (const l of linhas) {
       const nome = l.tutor.trim().slice(0, 120);
       const fone = digitos(l.telefone);
       const foneOk = fone.length >= 10 && fone.length <= 13;
       if (l.telefone?.trim() && !foneOk) semFone++;
       const chaveFone = foneOk ? fone.slice(-8) : "";
-      let clienteId = (chaveFone && porFone.get(chaveFone)) || porNome.get(semAcento(nome)) || null;
+      // mesmo telefone é a mesma pessoa. Mesmo nome com outro telefone é outra pessoa (duas "Maria Silva").
+      const peloNome = porNome.get(semAcento(nome)) ?? null;
+      const outroFone = Boolean(peloNome && chaveFone && foneDoCliente.get(peloNome) && foneDoCliente.get(peloNome) !== chaveFone);
+      if (outroFone) homonimos++;
+      let clienteId = (chaveFone && porFone.get(chaveFone)) || (outroFone ? null : peloNome) || null;
       if (!clienteId) {
         const novo = await sb.from("clientes").insert({
           petshop_id: petshop.id, nome, telefone: foneOk ? fone : null,
@@ -157,7 +164,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
         if (novo.error) throw new Error(novo.error.message);
         clienteId = novo.data.id;
         tutores++;
-        if (chaveFone) porFone.set(chaveFone, clienteId);
+        if (chaveFone) { porFone.set(chaveFone, clienteId); foneDoCliente.set(clienteId, chaveFone); }
         porNome.set(semAcento(nome), clienteId);
       }
       const pet = (l.pet ?? "").trim().slice(0, 80);
@@ -174,6 +181,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     return [
       `${tutores} ${tutores === 1 ? "tutor novo" : "tutores novos"} e ${pets} ${pets === 1 ? "pet novo" : "pets novos"} no cadastro.`,
       ...(pulados ? [`${pulados} ${pulados === 1 ? "pet já estava" : "pets já estavam"} no cadastro e ${pulados === 1 ? "foi pulado" : "foram pulados"}.`] : []),
+      ...(homonimos ? [`${homonimos} ${homonimos === 1 ? "tutor tinha o mesmo nome de outro, com telefone diferente, e entrou como pessoa separada" : "tutores tinham o mesmo nome de outros, com telefone diferente, e entraram como pessoas separadas"}.`] : []),
       ...(semFone ? [`${semFone} ${semFone === 1 ? "telefone estava incompleto e ficou" : "telefones estavam incompletos e ficaram"} em branco. Confira depois.`] : []),
     ];
   }
@@ -183,11 +191,13 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     if (existentes.error) throw new Error(existentes.error.message);
     const tem = new Set((existentes.data ?? []).map((p) => semAcento(p.nome)));
     const { data: u } = await sb.auth.getUser();
-    let novos = 0, pulados = 0;
+    let novos = 0, pulados = 0, ignorados = 0;
+    const ruim = (v: string | undefined) => Boolean((v ?? "").trim()) && numero(v) == null;
     for (const l of linhas) {
       const nome = l.nome.trim().slice(0, 120);
       if (tem.has(semAcento(nome))) { pulados++; continue; }
       const preco = numero(l.preco), custo = numero(l.custo), qtd = numero(l.estoque), minimo = numero(l.minimo);
+      if (ruim(l.preco) || ruim(l.custo) || ruim(l.estoque) || ruim(l.minimo)) ignorados++;
       const r = await sb.from("produtos").insert({
         petshop_id: petshop.id, nome, categoria: l.categoria?.trim() || null, unidade: l.unidade?.trim().slice(0, 12) || "un",
         preco_venda: preco != null ? Math.round(preco * 100) / 100 : null, custo: custo != null ? Math.round(custo * 100) / 100 : null,
@@ -205,6 +215,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     }
     return [
       `${novos} ${novos === 1 ? "produto novo" : "produtos novos"} no estoque.`,
+      ...(ignorados ? [`${ignorados} ${ignorados === 1 ? "produto tinha" : "produtos tinham"} preço, custo ou quantidade que não era número (ou era negativo) e ficou em branco. Confira no Estoque.`] : []),
       ...(pulados ? [`${pulados} já ${pulados === 1 ? "existia" : "existiam"} com o mesmo nome e ${pulados === 1 ? "foi pulado" : "foram pulados"}.`] : []),
     ];
   }

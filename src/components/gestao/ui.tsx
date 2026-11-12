@@ -61,6 +61,8 @@ export function mensagemDeErro(e: unknown): string {
   if (/duplicate key/i.test(m)) return "Isso já está cadastrado.";
   if (/JSON object requested|0 rows|PGRST116/i.test(m)) return "Não deu para gravar: sua conta está só para consulta ou você não tem permissão para isso.";
   if (/caixas_um_aberto/i.test(m)) return "Já existe um caixa aberto.";
+  if (/numeric field overflow|out of range/i.test(m)) return "Esse valor é grande demais. Confira os números.";
+  if (/violates check constraint/i.test(m)) return "Confira os valores: algum número está negativo ou fora do permitido.";
   return m || "Algo deu errado. Tente de novo.";
 }
 

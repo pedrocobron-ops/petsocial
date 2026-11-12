@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Lock, MessageCircle, Printer, Truck } from "lucide-react";
@@ -22,6 +22,12 @@ function Folha() {
   const [dia, setDia] = useState(() => params.get("dia") ?? isoDia(new Date()));
   const [visao, setVisao] = useState<"dia" | "semana">(params.get("visao") === "semana" ? "semana" : "dia");
   const [prof, setProf] = useState<string>(params.get("prof") ?? "");
+  // o nome do arquivo do PDF vem do título da página
+  useEffect(() => {
+    const antes = document.title;
+    document.title = `Agenda ${visao === "semana" ? "da semana de" : "de"} ${dia.split("-").reverse().join("-")} · ${petshop.nome}`;
+    return () => { document.title = antes; };
+  }, [dia, visao, petshop.nome]);
   const data = deIsoDia(dia);
   const dias = useMemo(() => (visao === "dia" ? [data] : Array.from({ length: 7 }, (_, i) => somaDias(inicioDaSemana(data), i))), [visao, dia]); // eslint-disable-line react-hooks/exhaustive-deps
   const de = dias[0], ate = somaDias(dias[dias.length - 1], 1);

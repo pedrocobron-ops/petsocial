@@ -272,7 +272,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
       if (inicial) {
         const mudancas = conta
           ? { valor, categoria, descricao: texto, vencimento, data: vencimento }
-          : travado ? { categoria, descricao: texto }
+          : travado ? { descricao: texto }
           : manterDividido ? { categoria, descricao: texto, ...(escolheData ? { data } : {}) }
           : { valor, forma, pagamentos, categoria, descricao: texto, ...(escolheData ? { data } : {}) };
         const r = await sb.from("lancamentos").update(mudancas).eq("id", inicial.id).eq("petshop_id", petshop.id);
@@ -350,7 +350,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         {travado && (
           <p className="g-cx-fora" role="status">
             <Lock aria-hidden />
-            <span>Este lançamento é de um caixa já fechado ({dataCompleta(caixaFechadoEm!)}). O valor, a forma de pagamento e o dia não mudam mais, e ele não pode ser excluído. Se precisar corrigir, lance um ajuste: uma entrada ou uma saída com a diferença.</span>
+            <span>Este lançamento é de um caixa já fechado ({dataCompleta(caixaFechadoEm!)}). O valor, a forma de pagamento, a categoria e o dia não mudam mais, e ele não pode ser excluído. Só a descrição pode ser corrigida. Se precisar corrigir, lance um ajuste: uma entrada ou uma saída com a diferença.</span>
           </p>
         )}
         {inicial && <ItensDoLancamento lancamento={inicial} />}

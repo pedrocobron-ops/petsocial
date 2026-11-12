@@ -103,7 +103,7 @@ export default function Estoque() {
           <Kpi icone={AlertTriangle} tom="manteiga" rotulo="Acabando" valor={baixos.length}
             apoio={baixos.length ? "no mínimo ou abaixo" : "nada perto do mínimo"} />
           {vejoFinanceiro ? (
-            <Kpi icone={Wallet} tom="menta" rotulo="Valor em estoque" valor={brlCurto(Math.round(valorParado))}
+            <Kpi icone={Wallet} tom="menta" rotulo="Valor em estoque" valor={brl(valorParado)}
               apoio={semCusto ? `a preço de custo · ${semCusto} sem custo` : "a preço de custo"} />
           ) : (
             <Kpi icone={PackageX} tom="lilas" rotulo="Zerados" valor={semSaldo.length} apoio={semSaldo.length ? "sem nada na prateleira" : "nenhum em falta"} />

@@ -24,7 +24,7 @@ export default function PlanosVenda({ criar }: { criar: string }) {
               <h3>{p.nome}</h3>
               <p className="gp-para">{p.para}</p>
               <p className="gp-valor">{brlCurto(o.preco)}<small> {o.periodo.cada}</small></p>
-              <p className="gp-conta">{o.periodo.meses > 1 ? <>Equivale a <b>{brlCurto(Math.round(o.porMes))} por mês</b>. Você paga {brlCurto(o.economia)} a menos do que no mensal.</> : "Cobrado todo mês."}</p>
+              <p className="gp-conta">{o.periodo.meses > 1 ? <>Equivale a <b>{brlCurto(Math.round(o.porMes * 100) / 100)} por mês</b>. Você paga {brlCurto(o.economia)} a menos do que no mensal.</> : "Cobrado todo mês."}</p>
               <p className="gp-acessos">{textoAcessos(p.acessos)}<span> ao sistema</span></p>
               <ul>
                 <li><Check />Todas as funções</li>

@@ -307,7 +307,9 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         </div>
         {/* a lixeira fica sozinha, longe de Desmarcar, para não apagar por engano */}
         <div className="g-agd-apagar">
-          <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirApagar()}><Trash2 />Apagar da agenda</button>
+          {a.status === "concluido" && !vejoFinanceiro
+            ? <p className="g-pp g-muted">Atendimento concluído: só quem cuida do financeiro pode apagar ou mudar.</p>
+            : <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirApagar()}><Trash2 />Apagar da agenda</button>}
         </div>
       </div>
     </Folha>

@@ -54,3 +54,5 @@
 
 .g-rel-horas small { white-space: normal; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .g-rel-horas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.g-rel-com span { white-space: normal; overflow-wrap: anywhere; }
