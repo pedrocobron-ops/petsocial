@@ -7,12 +7,14 @@ alter table public.estadias
 
 -- Uma estadia ocupa vaga no dia `d`?
 -- Creche: da entrada até a saída prevista, inclusive. Hotel: conta a noite, então o dia da saída fica livre.
--- Quem está na casa sem saída prevista ocupa até sair. Reserva sem saída prevista vale um dia (creche) ou uma noite (hotel).
+-- Na casa sem saída prevista: o hotel segue ocupado até sair; a creche esvazia no fim do dia (ocupa só até hoje).
+-- Hóspede do hotel que passou da saída e ainda está na casa ocupa só hoje.
+-- Reserva sem saída prevista vale um dia (creche) ou uma noite (hotel).
 create function public.estadia_ocupa(p_tipo text, p_status text, p_entrada date, p_saida date, p_dia date, p_hoje date) returns boolean
 language sql immutable set search_path = '' as $$
   select p_entrada <= p_dia and case
-    when p_status = 'em_casa' and p_saida is null then true
-    when p_tipo = 'hotel' then p_dia < coalesce(p_saida, p_entrada + 1)
+    when p_status = 'em_casa' and p_saida is null then (p_tipo = 'hotel' or p_dia <= p_hoje)
+    when p_tipo = 'hotel' then p_dia < coalesce(p_saida, p_entrada + 1) or (p_status = 'em_casa' and p_saida < p_hoje and p_dia = p_hoje)
     else p_dia <= case when p_status = 'em_casa' then greatest(coalesce(p_saida, p_entrada), p_hoje) else coalesce(p_saida, p_entrada) end
   end
 $$;

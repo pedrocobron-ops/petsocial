@@ -48,8 +48,10 @@ type Periodo = Pick<Estadia, "tipo" | "entrada" | "saida_prevista" | "status">;
  */
 function estadiaOcupa(tipo: string, status: string, entrada: string, saida: string | null, dia: string, hoje: string): boolean {
   if (entrada > dia) return false;
-  if (status === "em_casa" && saida == null) return true;
-  if (tipo === "hotel") return dia < (saida ?? isoDia(somaDias(deIsoDia(entrada), 1)));
+  // na casa e sem saída marcada: o hotel segue ocupado até sair; a creche esvazia no fim do dia
+  if (status === "em_casa" && saida == null) return tipo === "hotel" || dia <= hoje;
+  // hotel conta a noite; quem passou da saída e ainda está na casa ocupa só hoje
+  if (tipo === "hotel") return dia < (saida ?? isoDia(somaDias(deIsoDia(entrada), 1))) || (status === "em_casa" && saida != null && saida < hoje && dia === hoje);
   const fim = saida ?? entrada;
   return dia <= (status === "em_casa" && hoje > fim ? hoje : fim);
 }
