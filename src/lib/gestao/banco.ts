@@ -215,6 +215,34 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"escola_compras": {
+                  Row: {
+                    "criado_em": string,"email": string,"id": string,"origem": string,"pedido": string | null,"slug": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "criado_em"?: string,"email": string,"id"?: string,"origem"?: string,"pedido"?: string | null,"slug": string
+                  }
+                  Update: {
+                    "criado_em"?: string,"email"?: string,"id"?: string,"origem"?: string,"pedido"?: string | null,"slug"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"escola_materiais": {
+                  Row: {
+                    "arquivo": string,"atualizado_em": string,"slug": string,"tamanho": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "arquivo": string,"atualizado_em"?: string,"slug": string,"tamanho"?: number | null
+                  }
+                  Update: {
+                    "arquivo"?: string,"atualizado_em"?: string,"slug"?: string,"tamanho"?: number | null
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"estadias": {
                   Row: {
                     "criado_em": string,"entrada": string,"id": string,"obs": string | null,"pet_id": string,"petshop_id": string,"saida": string | null,"saida_prevista": string | null,"status": string,"tipo": string,"valor_diaria": number | null
@@ -572,6 +600,12 @@ isOneToOne: false
 "admin_conversas":
 { Args: { "p_canal"?: string,"p_limite"?: number,"p_petshop"?: string }; Returns: Json
                            },
+"admin_escola":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"admin_escola_liberar":
+{ Args: { "p_email": string,"p_slug": string,"p_tirar"?: boolean }; Returns: undefined
+                           },
 "admin_eventos_cakto":
 { Args: Record<PropertyKey, never>; Returns: {
               "email": string | null,
@@ -657,6 +691,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"escola_evento":
+{ Args: { "p_email": string,"p_evento": string,"p_pedido"?: string,"p_segredo": string,"p_slug": string }; Returns: string
+                           },
 "limite_de_acessos":
 { Args: { "p_plano": string }; Returns: number
                            },
@@ -683,6 +720,9 @@ isOneToOne: false
                            },
 "marcar_uso":
 { Args: { "p_area": string,"p_petshop": string }; Returns: undefined
+                           },
+"meu_email":
+{ Args: Record<PropertyKey, never>; Returns: string
                            },
 "meus_petshops":
 { Args: Record<PropertyKey, never>; Returns: string[]

@@ -927,3 +927,41 @@ body:has(.g-fundo) .g-toasts { bottom: auto; top: calc(14px + env(safe-area-inse
 .g-atencao button:hover { transform: translateX(3px); border-color: var(--g-linha-forte); }
 .g-atencao button > span:nth-child(2) { flex: 1; min-width: 0; }
 .g-atencao button > svg { flex: none; color: var(--g-cinza); }
+
+/* ---------- escola de gestão ---------- */
+.g-leitor { position: fixed; inset: 0; z-index: 90; background: #2b2826; display: grid; grid-template-rows: auto 1fr; }
+.g-leitor-topo { display: flex; align-items: center; gap: 10px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); background: #1f1b17; color: #f6f1e8; }
+.g-leitor-topo .g-ico { color: #f6f1e8; width: 44px; height: 44px; flex: none; }
+.g-leitor-topo .g-ico:disabled { opacity: .35; }
+.g-leitor-t { min-width: 0; flex: 1; display: grid; }
+.g-leitor-t b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-leitor-t span { font-size: .8125rem; opacity: .7; font-variant-numeric: tabular-nums; }
+.g-leitor-acoes { display: flex; }
+.g-leitor-rolo { overflow: auto; padding: 16px 10px 60px; overscroll-behavior: contain; }
+.g-leitor-pag { margin: 0 auto 14px; position: relative; background: #fff; box-shadow: 0 6px 24px rgba(0, 0, 0, .35); border-radius: 4px; overflow: hidden; }
+.g-leitor-pag canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.g-leitor-aviso { color: #f6f1e8; max-width: 44ch; text-align: center; margin: 18vh auto 0; padding-inline: 20px; }
+
+.g-esc-capa { display: grid; gap: 14px; padding: clamp(20px, 3vw, 32px); border-radius: var(--g-raio); color: #fffbf5; background: linear-gradient(135deg, var(--g-escuro-a), var(--g-escuro-b)); }
+.g-esc-capa h2 { font: 500 clamp(1.5rem, 1.2rem + 1.4vw, 2.125rem)/1.12 var(--display); letter-spacing: -.015em; color: inherit; max-width: 22ch; }
+.g-esc-capa p { max-width: 58ch; opacity: .88; }
+.g-esc-aulas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.g-esc-aula { text-align: left; color: inherit; cursor: pointer; display: grid; gap: 8px; align-content: start; width: 100%; }
+.g-esc-aula b { font: 500 1.1875rem/1.2 var(--display); letter-spacing: -.01em; }
+.g-esc-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: .8125rem; color: var(--g-cinza); }
+.g-esc-estante { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.g-esc-item { display: grid; grid-template-columns: 92px 1fr; gap: 14px; align-items: start; text-align: left; color: inherit; cursor: pointer; width: 100%; }
+.g-esc-item img { width: 92px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; box-shadow: 0 8px 18px -10px rgba(31, 27, 23, .5); background: var(--g-carta-2); }
+.g-esc-item b { font: 500 1.125rem/1.2 var(--display); letter-spacing: -.01em; display: block; }
+.g-esc-item .g-p { margin-top: 4px; }
+.g-esc-preco { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-weight: 600; }
+.g-esc-det { display: grid; gap: 16px; }
+.g-esc-det-topo { display: grid; grid-template-columns: 120px 1fr; gap: 16px; align-items: start; }
+.g-esc-det-topo img { width: 120px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 12px; box-shadow: 0 10px 22px -12px rgba(31, 27, 23, .55); }
+.g-esc-lista { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.g-esc-lista li { display: flex; gap: 10px; align-items: flex-start; }
+.g-esc-lista svg { width: 18px; height: 18px; flex: none; margin-top: 3px; color: var(--g-verde); }
+.g-esc-texto { display: grid; gap: 12px; font-size: 1rem; line-height: 1.6; max-width: 62ch; }
+.g-esc-texto h3 { font: 500 1.1875rem/1.2 var(--display); margin-top: 6px; }
+.g-esc-texto ul { margin: 0; padding-left: 1.15rem; display: grid; gap: 8px; }
+.g-esc-pratica { display: grid; gap: 10px; padding: 14px 16px; border-radius: var(--g-raio-p); background: var(--g-verde-tint); }

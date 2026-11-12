@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronRight, Download, LogOut, Mail, MessageCircle, RefreshCw, Search } from "lucide-react";
 import AbaUso, { type Uso, tempo, vistoHa } from "@/components/gestao/admin/uso";
 import AbaConversas from "@/components/gestao/admin/conversas";
+import AbaEscola from "@/components/gestao/admin/escola";
 import { AvisosProvider, Campo, Esqueleto, Folha, Vazio, mensagemDeErro, ok, useAvisos } from "@/components/gestao/ui";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { brl, dataCompleta, dataCurta, fmtTelefone, haQuanto, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDiaCurto, semAcento, somaDias } from "@/lib/gestao/util";
@@ -90,7 +91,7 @@ function Admin() {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [abertaId, setAbertaId] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
-  const [aba, setAba] = useState<"geral" | "uso" | "conversas">("geral");
+  const [aba, setAba] = useState<"geral" | "uso" | "conversas" | "escola">("geral");
   const [uso, setUso] = useState<Uso[]>([]);
   const [vez, setVez] = useState(0);
 
@@ -218,12 +219,12 @@ function Admin() {
 
       {erro && <p className="g-aviso vermelho" role="alert">{erro}</p>}
       <div className="g-seg" role="group" aria-label="Partes do painel" style={{ marginBottom: 18 }}>
-        {([["geral", "Clientes"], ["uso", "Uso"], ["conversas", "Conversas"]] as const).map(([id, r]) => (
+        {([["geral", "Clientes"], ["uso", "Uso"], ["conversas", "Conversas"], ["escola", "Escola"]] as const).map(([id, r]) => (
           <button key={id} aria-pressed={aba === id} onClick={() => setAba(id)}>{r}</button>
         ))}
       </div>
       {!lojas ? (!erro && <Esqueleto linhas={6} />) : aba === "uso" ? <AbaUso lojas={lojas} uso={uso} aoAbrir={setAbertaId} />
-        : aba === "conversas" ? <AbaConversas key={vez} /> : (
+        : aba === "conversas" ? <AbaConversas key={vez} /> : aba === "escola" ? <AbaEscola /> : (
         <div className="g-pilha g">
           <section className="g-grade c4" aria-label="Números">
             <Numero rotulo="Pet shops cadastrados" valor={n.total} />
