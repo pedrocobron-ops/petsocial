@@ -35,7 +35,7 @@ const INCLUI: [string, string][] = [
   ["Lembrete no WhatsApp", "O sistema monta a mensagem do horário e abre o seu WhatsApp. Você só envia."],
   ["Horários que se repetem", "Marque o banho de toda semana de uma vez e bloqueie almoço e folgas."],
   ["Pacotes e mensalistas", "Quantos banhos o cliente comprou, quantos usou e quando vence."],
-  ["Creche e hotel", "Entrada, saída e diárias de quem fica com você."],
+  ["Creche e hotel", "Entrada, saída e diárias, com número de vagas, aviso de casa cheia e de vacina vencida."],
   ["Comanda e venda no balcão", "Serviço, produto e extra numa conta só, com baixa no estoque."],
   ["Caixa do dia", "Abertura, entradas, saídas e fechamento conferido com a gaveta."],
   ["Financeiro e meta do mês", "Contas a pagar e a receber, o resultado do mês e quanto falta para a meta."],
@@ -52,6 +52,8 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["O assistente faz as coisas sozinho?", "Não. Ele entende o pedido, mostra o que vai fazer e espera o seu “confirmar”. Nada entra na agenda, no caixa ou no estoque sem você ver."],
   ["E os dados dos meus clientes?", <>Os dados são do seu pet shop. Você pode exportar e apagar quando quiser, como pede a LGPD. Os detalhes estão na <Link href="/gestao/privacidade">política de privacidade</Link>.</>],
   ["Emite nota fiscal?", "Ainda não. Hoje o sistema não emite nota fiscal."],
+  ["Serve para creche e hotel de cães?", "Sim. Tem reserva, entrada e saída, diária fixa, número de vagas com aviso de casa cheia, aviso de vacina vencida na entrada, pacotes de diárias e pedido de vaga pelo link do cliente."],
+  ["Estou em outro sistema. Consigo trazer meus clientes?", "Sim. Você traz clientes, pets e produtos de uma planilha, colando as células ou enviando o arquivo. O que já está no sistema não é apagado."],
   ["Serve para clínica veterinária?", "O sistema é feito para pet shop, banho e tosa, creche e hotel. Ele não tem prontuário, receituário nem internação. Uma clínica que também faz banho e tosa pode usá-lo para essa parte."],
   ["Tem fidelidade?", "Não. No plano mensal a cobrança é todo mês. Nos planos de 3 e 6 meses você paga o período de uma vez, por um valor menor. Em qualquer um, você cancela quando quiser e usa até o fim do período já pago."],
   ["Como o meu cliente agenda pelo link?", "Você manda o link pelo WhatsApp ou deixa no Instagram. O cliente escolhe o serviço, o dia e um dos horários livres, e você recebe o pedido para aceitar ou recusar. Ele não vê a sua agenda nem os dados de outros clientes, só os horários que estão livres."],
@@ -91,8 +93,8 @@ export default function Pagina() {
 
         <div className="gp-c gp-capa-grade">
           <div className="gp-capa-texto">
-            <h1>Sistema para <em>pet shop</em> e banho e tosa</h1>
-            <p>Agenda, clientes, caixa e estoque em um lugar só. O cliente agenda sozinho pelo seu link, e um assistente de inteligência artificial marca e lança para você: é só falar.</p>
+            <h1>Sistema para <em>pet shop</em>, banho e tosa, creche e hotel</h1>
+            <p>Agenda, creche e hotel, clientes, caixa e estoque em um lugar só. O cliente agenda sozinho pelo seu link, e um assistente de inteligência artificial marca e lança para você: é só falar.</p>
             <ul className="gp-selos">
               <li><Check />Assistente de inteligência artificial incluído</li>
               <li><Check />Link para o cliente agendar, com a sua marca</li>
@@ -136,7 +138,7 @@ export default function Pagina() {
             <h2>O cliente agenda sozinho. <em>Você só aceita.</em></h2>
             <p className="gp-lead">Mande o seu link pelo WhatsApp ou deixe no Instagram. Chega de responder “tem horário sábado?” o dia inteiro.</p>
             <ol className="gp-passos">
-              <li><b>O cliente abre o link</b><span>Escolhe o serviço, o dia e um dos horários livres. Pode pedir para mais de um pet de uma vez.</span></li>
+              <li><b>O cliente abre o link</b><span>Escolhe o serviço, o dia e um dos horários livres. Também dá para pedir creche e hotel, se você quiser.</span></li>
               <li><b>O pedido chega para você</b><span>Aparece na tela inicial e na agenda. Um toque para aceitar, outro para recusar.</span></li>
               <li><b>Ele acompanha a resposta</b><span>O cliente vê na hora se o horário foi confirmado, pelo mesmo link.</span></li>
             </ol>

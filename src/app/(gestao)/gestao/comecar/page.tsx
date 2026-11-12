@@ -84,10 +84,10 @@ export default function Comecar() {
   }
 
   return (
-    <Porta titulo="Como se chama o seu pet shop?" texto="Aqui você cria um pet shop novo, do zero, com 7 dias grátis. Foi convidado para a equipe de um pet shop que já existe? Então não crie outro: peça ao dono para conferir o e-mail do convite.">
+    <Porta titulo="Como se chama o seu negócio?" texto="Aqui você cria um pet shop novo, do zero, com 7 dias grátis. Foi convidado para a equipe de um pet shop que já existe? Então não crie outro: peça ao dono para conferir o e-mail do convite.">
       <form className="g-form" onSubmit={enviar}>
-        <label className="g-campo"><span>Nome do pet shop</span>
-          <input className="g-input" required minLength={2} maxLength={80} placeholder="Ex.: Banho & Cia" value={nome} onChange={(e) => setNome(e.target.value)} autoFocus />
+        <label className="g-campo"><span>Nome do pet shop, banho e tosa, creche ou hotel</span>
+          <input className="g-input" required minLength={2} maxLength={80} placeholder="Ex.: Banho & Cia ou Creche Patinhas" value={nome} onChange={(e) => setNome(e.target.value)} autoFocus />
         </label>
         <label className="g-campo"><span>Como você quer ser chamado</span>
           <input className="g-input" required maxLength={80} value={seuNome} onChange={(e) => setSeuNome(e.target.value)} />

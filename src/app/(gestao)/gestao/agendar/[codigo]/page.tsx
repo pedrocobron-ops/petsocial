@@ -515,7 +515,7 @@ export default function AgendarPeloLink() {
             <label className="g-campo"><span>Seu WhatsApp</span>
               <input className="g-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 91234-5678" value={telefone} maxLength={20}
                 onChange={(e) => setTelefone(e.target.value)} onBlur={() => setTelefone(fmtTelefone(telefone))} />
-              <small>É por ele que o pet shop confirma o horário.</small>
+              <small>É por ele que a confirmação chega.</small>
             </label>
             <label className="g-campo"><span>Quer avisar alguma coisa? <small>(opcional)</small></span>
               <textarea className="g-textarea" value={obs} maxLength={300} placeholder="Tem medo de secador, toma remédio, primeira vez…" onChange={(e) => setObs(e.target.value)} />
