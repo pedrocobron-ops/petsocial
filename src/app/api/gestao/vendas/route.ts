@@ -41,11 +41,17 @@ export async function POST(req: Request) {
 
   try {
     const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, "") });
-    const r = await cliente.messages.create({
-      model: MODELO, max_tokens: 400,
-      system: [{ type: "text", text: INSTRUCOES_VENDAS, cache_control: { type: "ephemeral" } }],
+    const pedido = {
+      model: MODELO,
+      system: [{ type: "text" as const, text: INSTRUCOES_VENDAS, cache_control: { type: "ephemeral" as const } }],
       messages: falas.map((f) => ({ role: f.de === "eu" ? ("user" as const) : ("assistant" as const), content: f.texto })),
-    });
+    };
+    // Conversa de venda não precisa de raciocínio longo: sem "pensar" a resposta sai mais rápida e mais barata.
+    // (Com o pensamento ligado ele conta no limite de tokens e a resposta saía cortada ou vazia.)
+    // Se o modelo configurado não aceitar desligar, tenta de novo com folga no limite.
+    const r = await cliente.messages.create({ ...pedido, max_tokens: 500, thinking: { type: "disabled" } })
+      .catch(() => cliente.messages.create({ ...pedido, max_tokens: 3000 }));
+    if (r.stop_reason === "max_tokens" || r.stop_reason === "refusal") return semIa();
     const bruto = r.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
     const texto = bruto.replace(MARCA_PESSOA, "").trim();
     if (!texto) return semIa();
