@@ -1726,3 +1726,12 @@ html:has(dialog[open]) .barra { visibility: hidden; }
 .h2-flutua { display: block; }
 .h2-flutua img { display: block; }
 .h2-flutua span { position: absolute; left: 0; top: calc(100% + 8px); }
+.pc-seta { position: absolute; z-index: 2; top: 44%; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 50%; color: #fff; background: rgba(18, 28, 23, .38); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25); cursor: pointer; transition: background-color var(--d-rapida) var(--e-saida); }
+.pc-seta:hover { background: rgba(18, 28, 23, .6); }
+.pc-seta-e { left: 12px; }
+.pc-seta-d { right: 12px; }
+/* a foto ativa aparece mesmo se o aparelho estiver com "reduzir movimento" */
+@media (prefers-reduced-motion: reduce) { .pc-fotos img { scale: 1; } .pc-pontos .on i { width: 100%; } }
+.pc-seta { top: 14px; }
+.pc-seta-e { left: auto; right: 62px; }
+.pc-seta-d { right: 14px; }
