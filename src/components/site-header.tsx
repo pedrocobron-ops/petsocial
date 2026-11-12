@@ -7,8 +7,8 @@ import { Instagram, Mail, MessageCircle, X } from "lucide-react";
 import Logo from "@/components/logo";
 import { EMPRESA, linkInstagram, linkWhatsapp } from "@/lib/empresa";
 
-const NAV_TUTOR: [string, string][] = [["/tutor", "Para tutores"], ["/negocios", "Para negócios pet"], ["/sobre", "Quem faz"], ["/contato", "Ajuda"]];
-const NAV_NEGOCIOS: [string, string][] = [["/negocios#manuais", "Manuais"], ["/negocios#como-fazemos", "Como fazemos"], ["/tutor", "Para tutores"], ["/contato", "Ajuda"]];
+const NAV_TUTOR: [string, string][] = [["/tutor", "Para tutores"], ["/negocios", "Para negócios pet"], ["/sobre", "Quem faz"], ["/contato", "Ajuda"], ["/gestao", "Sistema para pet shop"]];
+const NAV_NEGOCIOS: [string, string][] = [["/negocios#manuais", "Manuais"], ["/negocios#como-fazemos", "Como fazemos"], ["/tutor", "Para tutores"], ["/contato", "Ajuda"], ["/gestao", "Sistema para pet shop"]];
 
 /**
  * Topo das vitrines e institucionais (brief 20, 6.1): sticky de 60/72 px, logo à esquerda,
@@ -28,7 +28,7 @@ export default function SiteHeader() {
           <Logo negocios={negocios} prioridade />
         </Link>
         <nav className="nav" aria-label="Principal">
-          {nav.map(([href, t]) => <Link key={href} href={href}>{t}</Link>)}
+          {nav.map(([href, t]) => <Link key={href} href={href} className={href === "/gestao" ? "nav-gestao" : undefined}>{t}</Link>)}
         </nav>
         <button type="button" className="hamb" aria-label="Abrir menu" aria-haspopup="dialog" onClick={() => menu.current?.showModal()}>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden><path d="M4 8h16M4 16h16" /></svg>

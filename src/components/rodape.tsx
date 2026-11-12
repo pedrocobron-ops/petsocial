@@ -30,15 +30,17 @@ export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocio
         <nav aria-label="Guias">
           <h2 className="rotulo">Guias</h2>
           <ul>
-            {guias.map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{p.nome}</Link></li>)}
+            {guias.slice(0, 6).map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{p.nome}</Link></li>)}
             <li><Link href="/tutor">Todos os guias e kits</Link></li>
           </ul>
         </nav>
         <nav aria-label="Manuais">
           <h2 className="rotulo">Manuais</h2>
           <ul>
-            {manuais.map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{nomeCurto(p.nome)}</Link></li>)}
+            {manuais.slice(0, 6).map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{nomeCurto(p.nome).split(":")[0]}</Link></li>)}
             {feedLancado && <li><Link href="/negocios/feed-pronto">Feed Pronto</Link></li>}
+            <li><Link href="/negocios">Todos os manuais</Link></li>
+            <li><Link href="/gestao">Sistema para pet shop</Link></li>
           </ul>
         </nav>
         <nav aria-label="Ajuda">
