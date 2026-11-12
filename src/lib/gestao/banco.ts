@@ -237,14 +237,14 @@ isOneToOne: false
                   ]
                 },"lancamentos": {
                   Row: {
-                    "agendamento_id": string | null,"caixa_id": string | null,"categoria": string,"cliente_id": string | null,"criado_em": string,"criado_por": string | null,"data": string,"descricao": string | null,"forma": string | null,"id": string,"itens": Json | null,"origem": string,"pago": boolean,"petshop_id": string,"tipo": string,"valor": number,"vencimento": string | null
+                    "agendamento_id": string | null,"caixa_id": string | null,"categoria": string,"cliente_id": string | null,"criado_em": string,"criado_por": string | null,"data": string,"descricao": string | null,"forma": string | null,"id": string,"itens": Json | null,"movimento": string | null,"origem": string,"pagamentos": Json | null,"pago": boolean,"petshop_id": string,"tipo": string,"valor": number,"vencimento": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendamento_id"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"cliente_id"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"origem"?: string,"pago"?: boolean,"petshop_id": string,"tipo": string,"valor": number,"vencimento"?: string | null
+                    "agendamento_id"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"cliente_id"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"movimento"?: string | null,"origem"?: string,"pagamentos"?: Json | null,"pago"?: boolean,"petshop_id": string,"tipo": string,"valor": number,"vencimento"?: string | null
                   }
                   Update: {
-                    "agendamento_id"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"cliente_id"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"origem"?: string,"pago"?: boolean,"petshop_id"?: string,"tipo"?: string,"valor"?: number,"vencimento"?: string | null
+                    "agendamento_id"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"cliente_id"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"movimento"?: string | null,"origem"?: string,"pagamentos"?: Json | null,"pago"?: boolean,"petshop_id"?: string,"tipo"?: string,"valor"?: number,"vencimento"?: string | null
                   }
                   Relationships: [
                     {
