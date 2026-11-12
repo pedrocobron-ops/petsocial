@@ -302,7 +302,7 @@ export const AULAS: Aula[] = [
       { p: "Com a retirada definida, o que sobra depois dela e das despesas é o resultado do negócio. É com esse número que você decide contratar, reformar ou guardar para um mês fraco." },
       { p: "Se você ainda não sabe quanto dá para retirar, comece com um valor baixo que o caixa aguente todo mês. Um valor pequeno e constante ensina mais sobre o negócio do que retiradas grandes e irregulares." },
     ],
-    naPratica: { texto: "No Financeiro, lance a sua retirada como uma saída na categoria "Retirada do dono". O resultado do mês passa a mostrar o que o negócio rendeu depois dela.", rotulo: "Abrir o Financeiro", href: "/gestao/app/financeiro" },
+    naPratica: { texto: "No Financeiro, lance a sua retirada como uma saída na categoria Retirada do dono. O resultado do mês passa a mostrar o que o negócio rendeu depois dela.", rotulo: "Abrir o Financeiro", href: "/gestao/app/financeiro" },
   },
   {
     id: "antes-e-depois", titulo: "A foto de antes e depois como divulgação", tema: "Divulgação", minutos: 3,
