@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CalendarCheck, Check, Mic, Store } from "lucide-react";
 import { Seta } from "@/components/icones";
 import { FaixaProva } from "@/components/pagamento";
+import PalcoHome, { type Cena } from "@/components/palco-home";
 import { Leque, Marquee } from "@/components/vitrine-blocos";
 import type { Produto } from "@/lib/produtos";
 import { PRODUTOS, linhaDe, produto, reais, urlProduto } from "@/lib/produtos";
@@ -41,41 +42,56 @@ export default function Home() {
   const leque = ["filhote", "xixi", "petiscos"].map(produto).filter((p) => p?.capa);
   const capas = [...lancados, ...manuais].filter((p) => p.capa);
   const confeitaria = produto("confeitaria");
+  const cena = (slug: string, foto: string, alt: string, rotulo: string): Cena | null => {
+    const p = produto(slug);
+    return p ? { foto: `/fotos/${foto}.webp`, alt, rotulo, nome: p.nome.split(":")[0], href: urlProduto(p) } : null;
+  };
+  const cenas = [
+    cena("filhote", "tutor-filhote-duvida-4x5", "Tutora cochilando no sofá com um filhote no colo", "Para tutores"),
+    cena("confeitaria", "negocios-confeitaria-hero-4x5", "Cão olhando uma caixa com bolo para pets", "Para negócios pet"),
+    cena("petiscos", "tutor-petiscos-duvida-4x5", "Cão recebendo um pedaço de melancia", "Para tutores"),
+    cena("moldes", "negocios-moda-hero-4x5", "Arara com roupas para cães em um ateliê", "Para negócios pet"),
+    cena("sozinho", "tutor-sozinho-duvida-4x5", "Cão no encosto do sofá olhando pela janela", "Para tutores"),
+  ].filter((c): c is Cena => !!c);
   const menorGuia = Math.min(...lancados.map((p) => p.preco));
   const menorPlano = Math.min(...PLANOS.map((p) => p.preco));
   return (
     <>
       <section className="h2-hero">
-        <div className="container">
-          <div className="h2-hero-topo">
-            <div>
-              <span className="rotulo">Maestro Pet</span>
-              <h1>Tudo para quem <em>cuida</em> de pets.</h1>
-              <p className="lead">Guias para quem tem cão ou gato, manuais para quem trabalha com pets e um sistema para o seu pet shop.</p>
-            </div>
-            <Image className="h2-mozart" src="/mozart/acenando.webp" alt="" width={300} height={300} priority />
+        <div className="container h2-hero-grade">
+          <div className="h2-hero-texto">
+            <span className="h2-selo-claro"><i />Guias, manuais e sistema para pet shop</span>
+            <h1>Tudo para quem <em>cuida</em> de pets.</h1>
+            <p className="lead">Guias para quem tem cão ou gato, manuais para quem trabalha com pets e um sistema para o seu pet shop.</p>
+            <nav className="h2-portas" aria-label="Escolha o seu caminho">
+              <Link className="h2-porta" href="/tutor" id="cta-home">
+                <span className="h2-porta-tag">Para tutores</span>
+                <b>Tenho um pet</b>
+                <small>Guias passo a passo, a partir de {reais(menorGuia)}</small>
+                <Seta />
+              </Link>
+              <Link className="h2-porta" href="/negocios">
+                <span className="h2-porta-tag">Para negócios pet</span>
+                <b>Trabalho com pets</b>
+                <small>Manuais de confeitaria, moda pet, passeio e fotografia</small>
+                <Seta />
+              </Link>
+              <Link className="h2-porta h2-porta-gestao" href="/gestao">
+                <span className="h2-porta-tag"><span className="h2-novo">Novo</span>Sistema</span>
+                <b>Tenho pet shop</b>
+                <small>Agenda, clientes e caixa. 7 dias grátis</small>
+                <Seta />
+              </Link>
+            </nav>
           </div>
-
-          <nav className="h2-portas" aria-label="Escolha o seu caminho">
-            <Link className="h2-porta" href="/tutor" id="cta-home">
-              <span className="h2-porta-tag">Para tutores</span>
-              <b>Tenho um pet</b>
-              <small>Guias passo a passo, a partir de {reais(menorGuia)}</small>
-              <Seta />
+          <div className="h2-hero-palco">
+            <PalcoHome cenas={cenas} />
+            <Link className="h2-flutua" href="/gestao" aria-label="Conhecer o Maestro Pet Gestão">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/gestao/telas/cel-hoje.webp" alt="" width={780} height={1328} loading="eager" decoding="async" />
+              <span><small>Novo</small>Sistema para pet shop</span>
             </Link>
-            <Link className="h2-porta" href="/negocios">
-              <span className="h2-porta-tag">Para negócios pet</span>
-              <b>Trabalho com pets</b>
-              <small>Manuais de confeitaria, passeio, pet sitter e fotografia</small>
-              <Seta />
-            </Link>
-            <Link className="h2-porta h2-porta-gestao" href="/gestao">
-              <span className="h2-porta-tag"><span className="h2-novo">Novo</span>Sistema</span>
-              <b>Tenho pet shop</b>
-              <small>Agenda, clientes e caixa. 7 dias grátis</small>
-              <Seta />
-            </Link>
-          </nav>
+          </div>
         </div>
       </section>
 
