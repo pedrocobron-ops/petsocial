@@ -739,3 +739,37 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-raiz[data-tema="turquesa"] { --tema: #0e4a4a; --destaque: #f7c948; }
 .g-logo { display: inline-grid; place-items: center; flex: none; overflow: hidden; background: #fffbf5; color: var(--g-verde); font: 500 1rem/1 var(--display); }
 .g-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* correções: clientes e creche */
+/* "Sair sem salvar?": pergunta por cima da folha quando a pessoa digitou algo e fecha por fora, Esc ou X */
+.g-folha { position: relative; }
+.g-folha-sair { position: absolute; inset: 0; z-index: 5; display: grid; align-items: end; padding: 16px; border-radius: inherit; background: rgba(246, 241, 232, .86); backdrop-filter: blur(3px); animation: g-some .15s ease-out; }
+.g-folha-sair > div { display: grid; gap: 8px; padding: 18px; border-radius: 20px; background: var(--g-carta); border: 1px solid var(--g-linha-forte); box-shadow: var(--g-sombra-alta); }
+.g-folha-sair b { font: 500 1.25rem/1.2 var(--display); }
+.g-folha-sair p { color: var(--g-cinza); font-size: .9375rem; }
+.g-folha-sair .bts { display: grid; gap: 8px; margin-top: 6px; }
+@media (min-width: 720px) { .g-folha-sair { align-items: center; } .g-folha-sair .bts { grid-template-columns: 1fr 1fr; } }
+
+/* alvos de toque: a caixinha continua do mesmo tamanho, a área que responde ao dedo tem pelo menos 44px */
+.g-check { min-height: 44px; cursor: pointer; }
+.g-check input { flex: none; }
+.g-check.grande { align-items: flex-start; gap: 12px; }
+.g-check.grande input { width: 26px; height: 26px; margin-top: 1px; }
+.g-voltar { min-height: 44px; }
+
+/* senha com o botão de mostrar */
+.g-senha { position: relative; display: block; }
+.g-senha .g-input { padding-right: 52px; }
+.g-senha .g-ico { position: absolute; right: 3px; top: 50%; translate: 0 -50%; width: 44px; height: 44px; color: var(--g-cinza); }
+
+/* menu lateral: o nome da loja pode ocupar duas linhas */
+.g-marca b { white-space: normal; overflow: hidden; text-overflow: clip; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; line-height: 1.15; }
+.g-lado-eu .t span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* respiro no fim das telas para o botão do Mozart não cobrir o último conteúdo */
+@media (min-width: 960px) { .g-main { padding-bottom: 150px; } }
+@media print { .g-main { padding-bottom: 0; } }
+
+/* ficha do pet: telefone do tutor à vista */
+.g-cli-heroi .tutor.gc-fone { font-variant-numeric: tabular-nums; opacity: .9; }
+/* fim das correções: clientes e creche */

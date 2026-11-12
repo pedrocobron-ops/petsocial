@@ -9,7 +9,7 @@ import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Fo
 import { Chips, ChipsForma, ErroTela, type Forma } from "@/components/gestao/loja/pecas";
 import { lancarPago } from "@/lib/gestao/dinheiro";
 import type { Cliente, Pacote, PacoteCliente, Pet } from "@/lib/gestao/tipos";
-import { brl, dataCurta, deIsoDia, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
 import "./pacotes.css";
 
 type PetDoPacote = Pick<Pet, "id" | "nome" | "foto" | "especie"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
@@ -87,6 +87,10 @@ export default function Pacotes() {
     if (somenteLeitura()) return;
     const usados = p.usados + passo;
     if (usados < 0 || usados > p.total) return;
+    const dias = diasParaVencer(p.vence_em);
+    if (passo > 0 && dias != null && dias < 0 && !(await confirmar({
+      titulo: "Pacote vencido", texto: `Este pacote venceu em ${dataCompleta(p.vence_em!)}. Usar mesmo assim?`, confirmar: "Usar mesmo assim",
+    }))) return;
     setOcupado(p.id);
     try {
       // só grava se ninguém mexeu no meio do caminho
@@ -328,8 +332,8 @@ function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: Pacote | null; aoF
 /* ---------- vender pacote ---------- */
 
 function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; modelos: Pacote[]; aoFechar: () => void; aoGravar: () => void }) {
-  const { sb, petshop, servicos, vejoFinanceiro } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { sb, petshop, servicos, vejoFinanceiro, user } = useGestao();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const [pet, setPet] = useState<PetDoPacote | null>(inicio.pet ?? null);
   const [criando, setCriando] = useState<string | null>(null);
   const [escolhido, setEscolhido] = useState(Boolean(inicio.base));
@@ -342,6 +346,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
   const [compra, setCompra] = useState(isoDia(new Date()));
   const [recebido, setRecebido] = useState<"sim" | "nao">("sim");
   const [forma, setForma] = useState<Forma>("pix");
+  const [pagaEm, setPagaEm] = useState(isoDia(new Date()));
   const [salvando, setSalvando] = useState(false);
 
   function escolherModelo(m: Pacote | null) {
@@ -357,6 +362,10 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
   const dias = validade.trim() ? Number(validade) : null;
   const venceEm = dias && Number.isInteger(dias) && dias > 0 && compra ? isoDia(somaDias(deIsoDia(compra), dias)) : null;
   const lanca = vejoFinanceiro && recebido === "sim" && Boolean(preco);
+  // "ainda não pagou": vira conta a receber no Financeiro
+  const fiado = vejoFinanceiro && recebido === "nao" && Boolean(preco);
+  const hoje = isoDia(new Date());
+  const nasceVencido = Boolean(venceEm && venceEm < hoje);
 
   async function salvar() {
     if (!pet) return;
@@ -365,6 +374,14 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
     if (!Number.isInteger(t) || t < 1) { avisarErro("A quantidade precisa ser 1 ou mais."); return; }
     if (dias != null && (!Number.isInteger(dias) || dias < 1)) { avisarErro("A validade precisa ser de 1 dia ou mais, ou fique em branco."); return; }
     if (!compra) { avisarErro("Escolha a data da compra."); return; }
+    if (compra > hoje) { avisarErro("A data da compra não pode ser depois de hoje."); return; }
+    if (preco != null && preco < 0) { avisarErro("O preço não pode ser negativo."); return; }
+    if (fiado && !pagaEm) { avisarErro("Escolha o dia combinado para o pagamento."); return; }
+    if (nasceVencido && !(await confirmar({
+      titulo: "Este pacote já nasce vencido",
+      texto: `Com a compra em ${dataCompleta(compra)} e validade de ${dias} dias, ele venceu em ${dataCompleta(venceEm!)}. Confira a data da compra ou aumente a validade. Salvar assim mesmo?`,
+      confirmar: "Salvar vencido", perigo: true,
+    }))) return;
     setSalvando(true);
     try {
       ok(await sb.from("pacotes_clientes").insert({
@@ -381,6 +398,14 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
         } catch (e) {
           avisarErro(`O pacote foi criado, mas o pagamento não foi lançado. Lance pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
         }
+      } else if (fiado && preco) {
+        // mesma conta a receber que o Financeiro cria: entrada ainda não paga, com vencimento e ligada ao cliente
+        const r = await sb.from("lancamentos").insert({
+          petshop_id: petshop.id, tipo: "entrada", valor: preco, categoria: "Pacotes", pago: false, forma: null, vencimento: pagaEm, data: pagaEm,
+          descricao: `Pacote ${nome.trim()} · ${pet.nome} (a receber)`, cliente_id: pet.clientes?.id ?? null, origem: "tela", criado_por: user.id,
+        });
+        if (r.error) avisarErro(`O pacote foi criado, mas a conta a receber não foi anotada. Anote pelo Financeiro. (${r.error.message})`);
+        else avisar(`Pacote vendido para ${pet.nome}. ${brl(preco)} em A receber, para ${dataCurta(pagaEm)}.`);
       } else avisar(`Pacote vendido para ${pet.nome}.`);
       aoGravar();
     } catch (e) { avisarErro(e); } finally { setSalvando(false); }
@@ -443,7 +468,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
         </Campo>
         <div className="dupla">
           <Campo rotulo="Quantidade"><input className="g-input g-tab" inputMode="numeric" value={total} onChange={(e) => setTotal(e.target.value)} /></Campo>
-          <Campo rotulo="Validade (dias)" dica={venceEm ? `Vence em ${dataCurta(venceEm)}` : "Sem data para vencer"}>
+          <Campo rotulo="Validade (dias)" erro={nasceVencido ? `Já nasce vencido: venceu em ${dataCurta(venceEm!)}` : null} dica={venceEm ? `Vence em ${dataCurta(venceEm)}` : "Sem data para vencer"}>
             <input className="g-input g-tab" inputMode="numeric" value={validade} onChange={(e) => setValidade(e.target.value)} />
           </Campo>
         </div>
@@ -455,9 +480,13 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
           <>
             <div className="g-campo">
               <span>O cliente já pagou?</span>
-              <Chips opcoes={[{ id: "sim", rotulo: "Já pagou" }, { id: "nao", rotulo: "Ainda não" }] as const} valor={recebido} aoMudar={setRecebido} />
+              <Chips opcoes={[{ id: "sim", rotulo: "Já pagou" }, { id: "nao", rotulo: "Ainda não pagou" }] as const} valor={recebido} aoMudar={setRecebido} />
             </div>
-            {lanca ? <ChipsForma valor={forma} aoMudar={setForma} /> : <p className="g-muted g-p">Nada entra no financeiro agora. Quando receber, lance pelo Financeiro.</p>}
+            {lanca ? <ChipsForma valor={forma} aoMudar={setForma} /> : (
+              <Campo rotulo="Quando vai pagar" dica={`Vira uma conta a receber de ${brl(preco)} no Financeiro, em A receber. Quando o cliente pagar, é lá que você dá baixa.`}>
+                <input type="date" className="g-input" value={pagaEm} onChange={(e) => setPagaEm(e.target.value)} />
+              </Campo>
+            )}
           </>
         )}
       </div>

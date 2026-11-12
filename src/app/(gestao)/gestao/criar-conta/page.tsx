@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Porta from "@/components/gestao/porta";
 import { banco, configurado } from "@/lib/gestao/supabase";
+import CampoSenha from "../entrar/campo-senha";
 
 /** `?email=` vem no convite da equipe: o campo já chega preenchido com o e-mail que liga a pessoa ao pet shop. */
 export default function CriarConta() {
@@ -35,7 +36,7 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
     setIndo(true);
     const { data, error } = await banco().auth.signUp({
       email: email.trim(), password: senha,
-      options: { data: { nome: nome.trim() }, emailRedirectTo: `${location.origin}/gestao/comecar` },
+      options: { data: { nome: nome.trim(), ...(convidado ? { convidado: true } : {}) }, emailRedirectTo: `${location.origin}/gestao/comecar` },
     });
     setIndo(false);
     if (error) {
@@ -68,10 +69,10 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
           {convidado && <small>{email.trim().toLowerCase() === emailInicial ? "Use este e-mail: é ele que liga a sua conta ao pet shop." : `O convite foi feito para ${emailInicial}. Com outro e-mail, você não entra na equipe.`}</small>}
         </label>
         <label className="g-campo"><span>Crie uma senha</span>
-          <input className="g-input" type="password" autoComplete="new-password" required minLength={8} value={senha} onChange={(e) => setSenha(e.target.value)} />
+          <CampoSenha valor={senha} aoMudar={setSenha} nova />
           <small>Pelo menos 8 caracteres.</small>
         </label>
-        <label className="g-check">
+        <label className="g-check grande">
           <input type="checkbox" checked={aceito} onChange={(e) => setAceito(e.target.checked)} required />
           <span>Li e aceito os <Link className="g-link" href="/gestao/termos" target="_blank">Termos de Uso</Link> e a <Link className="g-link" href="/gestao/privacidade" target="_blank">Política de Privacidade</Link>.</span>
         </label>

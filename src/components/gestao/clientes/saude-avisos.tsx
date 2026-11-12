@@ -37,12 +37,24 @@ export async function buscarAlertasSaude(sb: Banco, petshopId: string, dias = DI
   return mapa;
 }
 
+const listar = (nomes: string[]) => `${nomes.slice(0, 3).join(", ")}${nomes.length > 3 ? ` e mais ${nomes.length - 3}` : ""}`;
+/**
+ * Frase pronta para o aviso, sem misturar o que já venceu com o que ainda vai vencer:
+ * "Vencido (2): Rex, Mel. Vence nos próximos 15 dias (1): Thor."
+ */
+export function fraseSaude(vencidos: string[], vencendo: string[], dias: number) {
+  return [
+    vencidos.length ? `Vacina ou cuidado vencido (${vencidos.length}): ${listar(vencidos)}.` : "",
+    vencendo.length ? `Vence nos próximos ${dias} dias (${vencendo.length}): ${listar(vencendo)}.` : "",
+  ].filter(Boolean).join(" ");
+}
+
 /**
  * Para a tela Hoje: quantos pets (distintos, ativos) têm cuidado vencido e quantos têm cuidado
  * vencendo nos próximos 15 dias. O pet com as duas coisas conta só em `vencidos`.
  * `nomes` vem com os vencidos primeiro.
  */
-export async function buscarSaudeVencendo(sb: Banco, petshopId: string): Promise<{ vencidos: number; vencendo: number; nomes: string[] }> {
+export async function buscarSaudeVencendo(sb: Banco, petshopId: string): Promise<{ vencidos: number; vencendo: number; nomes: string[]; nomesVencidos: string[]; nomesVencendo: string[]; frase: string }> {
   const DIAS = 15;
   const hoje = new Date();
   const alerta = cuidadosEmAlerta(await buscarCuidados(sb, petshopId, DIAS), hoje, DIAS);
@@ -51,7 +63,7 @@ export async function buscarSaudeVencendo(sb: Banco, petshopId: string): Promise
     if (estadoSaude(c.vence_em, hoje, DIAS) === "vencido") estadoDoPet.set(c.pet_id, "vencido");
     else if (!estadoDoPet.has(c.pet_id)) estadoDoPet.set(c.pet_id, "vencendo");
   }
-  if (!estadoDoPet.size) return { vencidos: 0, vencendo: 0, nomes: [] };
+  if (!estadoDoPet.size) return { vencidos: 0, vencendo: 0, nomes: [], nomesVencidos: [], nomesVencendo: [], frase: "" };
 
   // só os pets ativos entram na conta
   const ids = [...estadoDoPet.keys()];
@@ -65,9 +77,13 @@ export async function buscarSaudeVencendo(sb: Banco, petshopId: string): Promise
   const vencidos = ativos.filter((id) => estadoDoPet.get(id) === "vencido");
   const vencendo = ativos.filter((id) => estadoDoPet.get(id) === "vencendo");
   const porNome = (a: string, b: string) => nomeDe.get(a)!.localeCompare(nomeDe.get(b)!, "pt-BR");
+  const nomesVencidos = vencidos.sort(porNome).map((id) => nomeDe.get(id)!);
+  const nomesVencendo = vencendo.sort(porNome).map((id) => nomeDe.get(id)!);
   return {
     vencidos: vencidos.length,
     vencendo: vencendo.length,
-    nomes: [...vencidos.sort(porNome), ...vencendo.sort(porNome)].map((id) => nomeDe.get(id)!),
+    nomes: [...nomesVencidos, ...nomesVencendo],
+    nomesVencidos, nomesVencendo,
+    frase: fraseSaude(nomesVencidos, nomesVencendo, DIAS),
   };
 }

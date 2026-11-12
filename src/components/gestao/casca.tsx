@@ -45,7 +45,7 @@ const GRUPOS: { titulo: string; itens: Item[] }[] = [
 /** Navegação, avisos de assinatura e o botão da assistente em volta de todas as telas do aplicativo. */
 export default function Casca({ children }: { children: React.ReactNode }) {
   const caminho = usePathname();
-  const { sb, petshop, eu, souDono, posso, liberado, diasDeTeste, sair } = useGestao();
+  const { sb, user, petshop, eu, souDono, posso, liberado, diasDeTeste, sair } = useGestao();
   const [pedidos, setPedidos] = useState(0);
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
   const [mais, setMais] = useState(false);
@@ -71,6 +71,10 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener(EVENTO_ASSISTENTE, abrir);
   }, []);
   useEffect(() => { setMais(false); }, [caminho]);
+  // lembra em qual pet shop esta conta entrou neste aparelho: se o acesso for retirado, a tela de entrada consegue explicar
+  useEffect(() => {
+    try { localStorage.setItem("maestro-gestao-ultimo-acesso", JSON.stringify({ user: user.id, nome: petshop.nome, dono: souDono })); } catch { /* sem armazenamento: segue */ }
+  }, [user.id, petshop.nome, souDono]);
   // as cores do pet shop valem no aplicativo inteiro; ao sair do aplicativo, volta o padrão
   useEffect(() => { aplicarTema(petshop.tema); return () => aplicarTema(null); }, [petshop.tema]);
 
@@ -125,7 +129,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
       <aside className="g-lado">
         <div className="g-marca">
           <LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={38} padrao="selo" />
-          <div><b>{petshop.nome}</b><span>Maestro Pet Gestão</span></div>
+          <div><b title={petshop.nome}>{petshop.nome}</b><span>Maestro Pet Gestão</span></div>
         </div>
         {nav}
         <div className="g-lado-pe">
@@ -142,7 +146,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           </div>
           <div className="g-lado-eu">
             <AvatarPessoa nome={eu.nome} cor={eu.cor} tamanho="p" />
-            <div className="t"><b>{eu.nome}</b><span>{souDono ? "Dono" : "Equipe"}{petshop.status === "ativa" ? ` · plano ${planoPorId(petshop.plano)?.nome ?? ""}` : ""}</span></div>
+            <div className="t"><b>{eu.nome}</b><span>{souDono ? "Dono" : eu.funcao?.trim() || (eu.papel === "gerente" ? "Gerente" : "Equipe")}{petshop.status === "ativa" ? ` · plano ${planoPorId(petshop.plano)?.nome ?? ""}` : ""}</span></div>
             <button className="g-ico" onClick={() => void sair()} aria-label="Sair" title="Sair"><LogOut /></button>
           </div>
         </div>

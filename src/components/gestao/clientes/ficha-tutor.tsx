@@ -16,7 +16,7 @@ import { EtiquetaEspecie } from "./lista";
 type Entrada = Pick<Lancamento, "id" | "valor" | "data" | "categoria" | "descricao" | "pago">;
 
 export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; voltar: () => void; aoExcluir: () => void }) {
-  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { sb, petshop, vejoFinanceiro, souDono } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = useState(false);
@@ -57,12 +57,13 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
   const ativos = pets.filter((p) => p.ativo).length;
 
   async function excluir() {
-    if (somenteLeitura()) return;
+    if (!souDono || somenteLeitura()) return;
     const nomes = pets.map((p) => p.nome).join(", ");
     const sim = await confirmar({
-      titulo: `Excluir ${cliente.nome}?`,
-      texto: `Apaga de vez os dados de contato${pets.length ? `, ${pets.length === 1 ? "o pet" : "os pets"} (${nomes})` : ""}, fotos, agendamentos, pacotes e estadias. `
-        + "O que já entrou no financeiro continua lá, sem ligação com o cliente. Não dá para desfazer.",
+      titulo: `Excluir ${cliente.nome} de vez?`,
+      texto: `Isso apaga ${pets.length ? `${pets.length === 1 ? "o pet" : "os pets"} (${nomes}), ` : ""}os horários marcados e já atendidos, os pacotes, as estadias de creche e hotel e todo o histórico. `
+        + "Os relatórios e a comissão de meses passados mudam, porque esses atendimentos deixam de existir. O dinheiro já lançado continua no financeiro, sem o nome do cliente. "
+        + `Não dá para desfazer. ${pets.some((p) => p.ativo) ? "Se a ideia é só tirar da lista, volte e use Desativar pet na ficha de cada pet: o histórico fica guardado." : "Os pets já estão desativados e fora da lista; se não precisa apagar, é só voltar."}`,
       confirmar: "Excluir de vez", perigo: true,
     });
     if (!sim) return;
@@ -197,10 +198,14 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
             </div>
           </section>
 
-          <div className="g-pilha p">
-            <div><button className="g-btn perigo p" onClick={() => void excluir()}>Excluir cliente</button></div>
-            <p className="g-pp g-muted">Se o cliente pedir para sair do seu cadastro, é por aqui. Apaga os pets e o histórico dele.</p>
-          </div>
+          {souDono ? (
+            <div className="g-pilha p">
+              <div><button className="g-btn perigo" onClick={() => void excluir()}>Excluir cliente de vez</button></div>
+              <p className="g-pp g-muted">Se o cliente pedir para sair do seu cadastro, é por aqui. Apaga os pets, os horários, os pacotes e o histórico dele. Para só tirar da lista, desative o pet na ficha do pet.</p>
+            </div>
+          ) : (
+            <p className="g-pp g-muted">Só o dono pode excluir de vez. Para tirar um pet da lista sem apagar o histórico, abra a ficha do pet e toque em Desativar pet.</p>
+          )}
         </div>
       </div>
 

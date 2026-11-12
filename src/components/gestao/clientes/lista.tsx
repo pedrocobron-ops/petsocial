@@ -14,11 +14,12 @@ import FormTutor from "./form-tutor";
 import { EtiquetaSaude } from "./saude";
 import { buscarAlertasSaude } from "./saude-avisos";
 
-type Filtro = "todos" | "sumidos30" | "sumidos60" | "alerta" | "saude";
+type Filtro = "todos" | "sumidos30" | "sumidos60" | "semvisita" | "alerta" | "saude";
 const FILTROS: { id: Filtro; rotulo: string }[] = [
   { id: "todos", rotulo: "Todos" },
   { id: "sumidos30", rotulo: "Sumidos há 30 dias" },
   { id: "sumidos60", rotulo: "Sumidos há 60 dias" },
+  { id: "semvisita", rotulo: "Ainda sem visita" },
   { id: "alerta", rotulo: "Com alerta" },
   { id: "saude", rotulo: "Saúde vencendo" },
 ];
@@ -87,6 +88,18 @@ export default function Lista({ aoAbrir, irPara }: {
         for (const l of linhas) if (!mapa[l.pet_id]) { mapa[l.pet_id] = l.inicio; faltam.delete(l.pet_id); }
         return faltam.size === 0;
       });
+    // creche e hotel também é visita: estadia encerrada conta pelo dia da saída; quem está na casa agora veio hoje
+    const agora = new Date().toISOString();
+    await buscarTudo<{ pet_id: string; entrada: string; saida: string | null; status: string }>(
+      (de, ate) => sb.from("estadias").select("pet_id, entrada, saida, status").eq("petshop_id", petshop.id).in("status", ["encerrada", "em_casa"])
+        .order("entrada", { ascending: false }).order("id").range(de, ate),
+      (linhas) => {
+        for (const l of linhas) {
+          const quando = l.status === "em_casa" ? agora : l.saida ?? l.entrada;
+          if (!mapa[l.pet_id] || new Date(quando) > new Date(mapa[l.pet_id])) mapa[l.pet_id] = quando;
+        }
+        return false;
+      });
     return mapa;
   }, [petshop.id, totalPets]);
 
@@ -108,13 +121,15 @@ export default function Lista({ aoAbrir, irPara }: {
 
   const petsFiltrados = useMemo(() => {
     const agora = Date.now();
-    const sumido = (id: string, dias: number) => { const u = ultimos?.[id]; return !u || agora - new Date(u).getTime() > dias * 864e5; };
+    // sumido é quem já veio e parou de vir; quem nunca veio fica em "Ainda sem visita"
+    const sumido = (id: string, dias: number) => { const u = ultimos?.[id]; return !!u && agora - new Date(u).getTime() > dias * 864e5; };
     return pets.filter((p) => {
       if (alvo && !bate(p.nome, p.clientes?.nome) && !bateFone(p.clientes?.telefone)) return false;
       if (filtro === "alerta") return !!p.alertas?.trim();
       if (filtro === "saude") return !!saude?.[p.id];
       if (filtro === "sumidos30") return sumido(p.id, 30);
       if (filtro === "sumidos60") return sumido(p.id, 60);
+      if (filtro === "semvisita") return !!ultimos && !ultimos[p.id];
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,7 +149,7 @@ export default function Lista({ aoAbrir, irPara }: {
       if (p.alertas?.trim()) comAlerta++;
       const u = ultimos?.[p.id];
       if (!u) semVisita++;
-      if (!u || agora - new Date(u).getTime() > 30 * 864e5) sumidos++;
+      else if (agora - new Date(u).getTime() > 30 * 864e5) sumidos++;
     }
     let comVarios = 0;
     for (const dele of petsPorTutor.values()) if (dele.length > 1) comVarios++;
@@ -156,7 +171,7 @@ export default function Lista({ aoAbrir, irPara }: {
     } catch (e) { avisarErro(e); }
   }
 
-  const esperandoUltimos = ((filtro === "sumidos30" || filtro === "sumidos60") && !ultimos && !erroUltimos) || (filtro === "saude" && !saude && !erroSaude);
+  const esperandoUltimos = ((filtro === "sumidos30" || filtro === "sumidos60" || filtro === "semvisita") && !ultimos && !erroUltimos) || (filtro === "saude" && !saude && !erroSaude);
   const contagem = !dados ? " " : aba === "pets"
     ? (pets.length === 1 ? "1 pet" : `${pets.length} pets`) + (petsFiltrados.length !== pets.length ? ` · ${petsFiltrados.length} na lista` : "")
     : (clientes.length === 1 ? "1 tutor" : `${clientes.length} tutores`) + (tutoresFiltrados.length !== clientes.length ? ` · ${tutoresFiltrados.length} na lista` : "");
@@ -185,7 +200,7 @@ export default function Lista({ aoAbrir, irPara }: {
           </KpiAcao>
           <KpiAcao ativo={aba === "pets" && filtro === "sumidos30"} aoTocar={() => verPets("sumidos30")}>
             <Kpi icone={UserSearch} tom="manteiga" rotulo="Sumidos há 30 dias" valor={ultimos ? resumo.sumidos : "–"}
-              apoio={!ultimos ? (erroUltimos ? "não consegui calcular" : "calculando…") : resumo.semVisita ? `${resumo.semVisita} ainda sem visita` : "sem visita no período"}
+              apoio={!ultimos ? (erroUltimos ? "não consegui calcular" : "calculando…") : resumo.semVisita ? `já vieram e pararam · ${resumo.semVisita} ainda sem visita` : "já vieram e pararam de vir"}
               lado={ultimos && pets.length > 0 ? <Anel parte={resumo.sumidos / pets.length} tamanho={52} cor="#c2941a">{Math.round((resumo.sumidos / pets.length) * 100)}%</Anel> : undefined} />
           </KpiAcao>
           <KpiAcao ativo={aba === "pets" && filtro === "alerta"} aoTocar={() => verPets("alerta")}>
@@ -227,9 +242,9 @@ export default function Lista({ aoAbrir, irPara }: {
           </Vazio>
         ) : esperandoUltimos ? <Esqueleto linhas={4} />
         : !petsFiltrados.length ? (
-          <Vazio titulo={alvo ? "Não achei ninguém com esse nome" : filtro === "alerta" ? "Nenhum pet com alerta" : filtro === "saude" ? (erroSaude ? "Não consegui ver a saúde dos pets" : "Nenhum cuidado vencendo") : "Ninguém sumido"}
+          <Vazio titulo={alvo ? "Não achei ninguém com esse nome" : filtro === "alerta" ? "Nenhum pet com alerta" : filtro === "saude" ? (erroSaude ? "Não consegui ver a saúde dos pets" : "Nenhum cuidado vencendo") : filtro === "semvisita" ? "Todo mundo já veio pelo menos uma vez" : "Ninguém sumido"}
             texto={alvo ? "Confira como está escrito ou cadastre um pet novo." : filtro === "alerta" ? "Alergias, medos e cuidados aparecem aqui quando estiverem na ficha."
-              : filtro === "saude" ? (erroSaude ?? "Vacinas, vermífugo e antipulgas anotados na ficha aparecem aqui quando vencem ou faltam até 30 dias.") : "Todo mundo passou por aqui nesse período."}>
+              : filtro === "saude" ? (erroSaude ?? "Vacinas, vermífugo e antipulgas anotados na ficha aparecem aqui quando vencem ou faltam até 30 dias.") : filtro === "semvisita" ? "Aqui aparecem os pets cadastrados que ainda não tiveram atendimento nem estadia." : "Quem já veio continua vindo. Pet que nunca veio aparece em Ainda sem visita."}>
             {(alvo || filtro !== "todos") && <button className="g-btn sec" onClick={() => { setQ(""); setFiltro("todos"); }}>Ver todos</button>}
           </Vazio>
         ) : (

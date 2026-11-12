@@ -112,3 +112,21 @@ export function corDoNome(nome: string) {
 
 /** Compara textos sem acento e sem maiúsculas (busca). */
 export const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+/* ---------- telefone (cadastro de tutor) e valores com centavos ---------- */
+
+export const ERRO_TELEFONE = "Confira o WhatsApp: DDD e número.";
+/** Vazio vale; preenchido precisa ter DDD + número (10 ou 11 dígitos). */
+export const telefoneValido = (s: string | null | undefined) => { const d = soDigitos(s); return d.length === 0 || d.length === 10 || d.length === 11; };
+/** Formata enquanto a pessoa digita: "(35) 99999-1234". Letras e sobras são descartadas. */
+export function mascaraTelefone(s: string | null | undefined) {
+  let d = soDigitos(s);
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2); // colou com o código do país
+  d = d.slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : "";
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+/** "135,50" (sempre com duas casas, sem o R$). */
+export const valor2 = (n: number | null | undefined) => Number(n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

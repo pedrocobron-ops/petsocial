@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Camera } from "lucide-react";
 import type { Cliente, Pet, PetComTutor } from "@/lib/gestao/tipos";
 import { PORTES } from "@/lib/gestao/tipos";
-import { semAcento } from "@/lib/gestao/util";
+import { ERRO_TELEFONE, isoDia, mascaraTelefone, semAcento, soDigitos, telefoneValido } from "@/lib/gestao/util";
 import { reduzirFoto } from "@/lib/gestao/foto";
 import { useGestao } from "./contexto";
 import { AvatarPet, Campo, Folha, ok, useAvisos, useDados } from "./ui";
@@ -33,6 +33,9 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
   const [tutorFone, setTutorFone] = useState("");
   const [tutorId, setTutorId] = useState<string | null>(clienteFixo?.id ?? pet?.cliente_id ?? null);
   const [salvando, setSalvando] = useState(false);
+  const [erroFone, setErroFone] = useState<string | null>(null);
+  const [erroNasc, setErroNasc] = useState<string | null>(null);
+  const hoje = isoDia(new Date());
   const arquivo = useRef<HTMLInputElement>(null);
 
   const precisaTutor = !pet && !clienteFixo;
@@ -47,7 +50,11 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
     if (!f) return;
     setEnviandoFoto(true);
     try {
-      const blob = await reduzirFoto(f);
+      let blob: Blob;
+      try {
+        if (f.type && !f.type.startsWith("image/")) throw new Error("não é imagem");
+        blob = await reduzirFoto(f);
+      } catch { throw new Error("Esse arquivo não é uma foto. Escolha uma imagem JPG ou PNG."); }
       const caminho = `${petshop.id}/${crypto.randomUUID()}.jpg`;
       const { error } = await sb.storage.from("pets").upload(caminho, blob, { contentType: "image/jpeg" });
       if (error) throw error;
@@ -59,13 +66,15 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
-    if (!nome.trim()) return;
+    if (!nome.trim() || salvando) return;
+    if (!tutorId && precisaTutor && !telefoneValido(tutorFone)) { setErroFone(ERRO_TELEFONE); return; }
+    if (nascimento && nascimento > hoje) { setErroNasc("O nascimento não pode ser depois de hoje."); return; }
     setSalvando(true);
     try {
       let clienteId = tutorId;
       if (!clienteId) {
         if (!tutorNome.trim()) throw new Error("Diga o nome do tutor.");
-        const novo = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome: tutorNome.trim(), telefone: tutorFone.trim() || null }).select("id").single());
+        const novo = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome: tutorNome.trim(), telefone: soDigitos(tutorFone) || null }).select("id").single());
         clienteId = novo.id;
       }
       const campos = {
@@ -75,7 +84,7 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
       const salvo = pet
         ? ok(await sb.from("pets").update(campos).eq("id", pet.id).select("*, clientes(id, nome, telefone)").single())
         : ok(await sb.from("pets").insert({ ...campos, petshop_id: petshop.id, cliente_id: clienteId }).select("*, clientes(id, nome, telefone)").single());
-      avisar(pet ? "Ficha atualizada." : `${campos.nome} foi cadastrado.`);
+      avisar(pet ? "Ficha atualizada." : `${campos.nome} entrou no cadastro.`);
       aoSalvar(salvo as PetComTutor);
     } catch (err) { avisarErro(err); }
     setSalvando(false);
@@ -90,7 +99,9 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
           <button type="button" className="g-btn sec p" onClick={() => arquivo.current?.click()} disabled={enviandoFoto}><Camera />{enviandoFoto ? "Enviando…" : foto ? "Trocar foto" : "Colocar foto"}</button>
           <input ref={arquivo} type="file" accept="image/*" hidden onChange={escolherFoto} />
         </div>
-        <Campo rotulo="Nome do pet"><input className="g-input" required maxLength={80} value={nome} onChange={(e) => setNome(e.target.value)} autoFocus={!nome} /></Campo>
+        <Campo rotulo="Nome do pet" dica={nome.length >= 60 ? `${nome.length} de 80 letras${nome.length >= 80 ? ": chegou ao limite." : "."}` : undefined}>
+          <input className="g-input" required maxLength={80} value={nome} onChange={(e) => setNome(e.target.value)} autoFocus={!nome} />
+        </Campo>
 
         {precisaTutor && (
           <div className="g-card areia g-form">
@@ -101,12 +112,16 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
             {sugestoes.length > 0 && (
               <div className="g-chips">
                 {sugestoes.map((c) => (
-                  <button key={c.id} type="button" className="g-chip" onClick={() => { setTutorId(c.id); setTutorNome(c.nome); setTutorFone(c.telefone ?? ""); }}>{c.nome}</button>
+                  <button key={c.id} type="button" className="g-chip" onClick={() => { setTutorId(c.id); setTutorNome(c.nome); setTutorFone(c.telefone ?? ""); setErroFone(null); }}>{c.nome}</button>
                 ))}
               </div>
             )}
             {tutorId ? <p className="g-pp g-muted">Cliente já cadastrado. O pet entra na ficha dele.</p> : (
-              <Campo rotulo="WhatsApp do tutor"><input className="g-input" type="tel" inputMode="tel" placeholder="(11) 99999-9999" value={tutorFone} onChange={(e) => setTutorFone(e.target.value)} /></Campo>
+              <Campo rotulo="WhatsApp do tutor" erro={erroFone} dica="DDD e número. Pode ficar em branco.">
+                <input className="g-input" type="tel" inputMode="tel" autoComplete="off" placeholder="(11) 99999-9999" maxLength={16} value={tutorFone} aria-invalid={!!erroFone}
+                  onChange={(e) => { setTutorFone(mascaraTelefone(e.target.value)); setErroFone(null); }}
+                  onBlur={() => setErroFone(telefoneValido(tutorFone) ? null : ERRO_TELEFONE)} />
+              </Campo>
             )}
           </div>
         )}
@@ -130,7 +145,10 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
             <select className="g-select" value={sexo} onChange={(e) => setSexo(e.target.value)}><option value="">—</option><option value="M">Macho</option><option value="F">Fêmea</option></select>
           </Campo>
         </div>
-        <Campo rotulo="Nascimento"><input className="g-input" type="date" value={nascimento} onChange={(e) => setNascimento(e.target.value)} /></Campo>
+        <Campo rotulo="Nascimento" erro={erroNasc}>
+          <input className="g-input" type="date" max={hoje} value={nascimento} aria-invalid={!!erroNasc}
+            onChange={(e) => { setNascimento(e.target.value); setErroNasc(e.target.value && e.target.value > hoje ? "O nascimento não pode ser depois de hoje." : null); }} />
+        </Campo>
         <Campo rotulo="Cuidados e alertas" dica="Aparece em destaque na agenda. Ex.: alergia a shampoo, medo de secador, morde.">
           <textarea className="g-textarea" value={alertas} maxLength={400} onChange={(e) => setAlertas(e.target.value)} />
         </Campo>

@@ -60,8 +60,12 @@ export default function AntesDepois({ agendamento: a, aoMudar }: { agendamento: 
     if (!f || somenteLeitura()) return;
     setOcupado(lado);
     try {
-      let blob = await reduzirFoto(f, 1080, 0.8);
-      if (blob.size > LIMITE) blob = await reduzirFoto(f);
+      let blob: Blob;
+      try {
+        if (f.type && !f.type.startsWith("image/")) throw new Error("não é imagem");
+        blob = await reduzirFoto(f, 1080, 0.8);
+        if (blob.size > LIMITE) blob = await reduzirFoto(f);
+      } catch { throw new Error("Esse arquivo não é uma foto. Escolha uma imagem JPG ou PNG."); }
       const caminho = `${petshop.id}/${crypto.randomUUID()}.jpg`;
       const { error } = await sb.storage.from("pets").upload(caminho, blob, { contentType: "image/jpeg" });
       if (error) throw error;
