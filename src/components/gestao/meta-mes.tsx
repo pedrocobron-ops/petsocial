@@ -27,7 +27,7 @@ export default function MetaMes() {
   const { dados: entrou, erro } = useDados(async () => {
     if (!temMeta) return null;
     const linhas = await paginar<{ valor: number }>((de, ate) => sb.from("lancamentos").select("valor").eq("petshop_id", petshop.id)
-      .eq("tipo", "entrada").eq("pago", true).gte("data", inicio).lte("data", fim).order("id").range(de, ate));
+      .eq("tipo", "entrada").eq("pago", true).is("movimento", null).gte("data", inicio).lte("data", fim).order("id").range(de, ate));
     return Math.round(linhas.reduce((t, l) => t + Number(l.valor), 0) * 100) / 100;
   }, [petshop.id, temMeta, inicio]);
 

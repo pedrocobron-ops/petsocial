@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, History, Lock, Minus, Plus, Scale, ShoppingBag, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, History, Lock, Minus, Plus, Scale, ShoppingBag, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
-import { percentuaisQueFecham } from "@/lib/gestao/dinheiro";
+import { CATEGORIA_GAVETA, desfazerVenda, lancarPago, nomeDoMovimento, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import {
-  brlMini, categoriaAtual, COR_FORMA, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDeItens, resumoDoCaixa, rotuloForma, SemAcesso, soma, type Tipo,
+  brlMini, categoriaAtual, COR_FORMA, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDeItens, resumoDoCaixa, SemAcesso, semMovimentos, soma, somaPorForma, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import VendaBalcao from "@/components/gestao/loja/venda";
 import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
@@ -26,7 +26,10 @@ type FolhaAberta =
   | { tipo: "editar"; lancamento: Lancamento }
   | { tipo: "fechar" }
   | { tipo: "venda" }
+  | { tipo: "gaveta"; de: Gaveta; lancamento?: Lancamento }
   | { tipo: "resumo"; caixaId: string };
+
+type Gaveta = "sangria" | "suprimento";
 
 function diferenca(contado: number | null, esperado: number) {
   if (contado == null) return null;
@@ -87,16 +90,20 @@ function CaixaDoDia() {
   const { aberto, fechados, soltos, doDia } = dados;
   const lancamentos = aberto ? doCaixa(aberto.id) : soltos;
   // o dia inteiro (bate com a tela Hoje) e o que ficou fora do caixa
-  const entrouNoDia = soma(doDia.filter((l) => l.tipo === "entrada")), saiuNoDia = soma(doDia.filter((l) => l.tipo === "saida"));
-  const entrouFora = soma(soltos.filter((l) => l.tipo === "entrada")), saiuFora = soma(soltos.filter((l) => l.tipo === "saida"));
-  const dinheiroFora = Math.round((soma(soltos.filter((l) => l.tipo === "entrada" && l.forma === "dinheiro")) - soma(soltos.filter((l) => l.tipo === "saida" && l.forma === "dinheiro"))) * 100) / 100;
-  const emOutrosCaixas = Math.round((entrouNoDia - entrouFora - (aberto ? soma(doCaixa(aberto.id).filter((l) => l.tipo === "entrada" && l.data === hoje)) : 0)) * 100) / 100;
+  // sangria e suprimento só mexem na gaveta: não são entrada nem saída do dia
+  const vendasDoDia = semMovimentos(doDia), vendasSoltas = semMovimentos(soltos);
+  const entrouNoDia = soma(vendasDoDia.filter((l) => l.tipo === "entrada")), saiuNoDia = soma(vendasDoDia.filter((l) => l.tipo === "saida"));
+  const entrouFora = soma(vendasSoltas.filter((l) => l.tipo === "entrada")), saiuFora = soma(vendasSoltas.filter((l) => l.tipo === "saida"));
+  // dinheiro em espécie fora do caixa: no pagamento dividido, só a parte em dinheiro
+  const dinheiroFora = Math.round(((somaPorForma(vendasSoltas.filter((l) => l.tipo === "entrada")).get("dinheiro") ?? 0) - (somaPorForma(vendasSoltas.filter((l) => l.tipo === "saida")).get("dinheiro") ?? 0)) * 100) / 100;
+  const emOutrosCaixas = Math.round((entrouNoDia - entrouFora - (aberto ? soma(semMovimentos(doCaixa(aberto.id)).filter((l) => l.tipo === "entrada" && l.data === hoje)) : 0)) * 100) / 100;
   const resumo = aberto ? resumoDoCaixa(aberto.valor_inicial, lancamentos) : null;
   const abertoEmOutroDia = aberto && isoDia(new Date(aberto.aberto_em)) !== hoje;
   const ultimo = fechados[0];
   const caixaDoResumo = folha?.tipo === "resumo" ? fechados.find((c) => c.id === folha.caixaId) : null;
-  const entradasDoCaixa = lancamentos.filter((l) => l.tipo === "entrada").length;
-  const saidasDoCaixa = lancamentos.length - entradasDoCaixa;
+  const entradasDoCaixa = resumo?.nEntradas ?? 0;
+  const saidasDoCaixa = resumo?.nSaidas ?? 0;
+  const editar = (l: Lancamento) => abrir(l.movimento === "sangria" || l.movimento === "suprimento" ? { tipo: "gaveta", de: l.movimento, lancamento: l } : { tipo: "editar", lancamento: l });
   const saldo = resumo ? Math.round((resumo.entrou - resumo.saiu) * 100) / 100 : 0;
   const resumoUltimo = ultimo ? resumoDoCaixa(ultimo.valor_inicial, doCaixa(ultimo.id)) : null;
   // do mais antigo para o mais novo, para ler da esquerda para a direita
@@ -138,11 +145,17 @@ function CaixaDoDia() {
               </div>
               <p className="g-cx-leg">
                 Entrou {brl(resumo.entrou)} neste caixa{resumo.saiu > 0 ? ` e saiu ${brl(resumo.saiu)}` : ""}.
+                {resumo.suprimentos > 0 && ` Colocado na gaveta: ${brl(resumo.suprimentos)}.`}
+                {resumo.sangrias > 0 && ` Tirado da gaveta: ${brl(resumo.sangrias)}.`}
               </p>
               <div className="gf-dupla">
                 <button className="g-btn pri" onClick={() => abrir({ tipo: "novo", de: "entrada" })}><ArrowDownLeft />Entrada</button>
                 <button className="g-btn g-cx-claro" onClick={() => abrir({ tipo: "novo", de: "saida" })}><ArrowUpRight />Saída</button>
                 <button className="g-btn g-cx-claro g-vd-inteiro" onClick={() => abrir({ tipo: "venda" })}><ShoppingBag />Venda no balcão</button>
+              </div>
+              <div className="g-cx-gaveta-bts" role="group" aria-label="Dinheiro da gaveta">
+                <button className="g-btn g-cx-claro" onClick={() => abrir({ tipo: "gaveta", de: "sangria" })}><ArrowUpFromLine />Tirar dinheiro da gaveta</button>
+                <button className="g-btn g-cx-claro" onClick={() => abrir({ tipo: "gaveta", de: "suprimento" })}><ArrowDownToLine />Colocar dinheiro na gaveta</button>
               </div>
             </section>
           ) : (
@@ -227,7 +240,7 @@ function CaixaDoDia() {
               )}
               {lancamentos.length ? (
                 <div className="g-lista">
-                  {lancamentos.map((l) => <LinhaLancamento key={l.id} l={l} aoTocar={() => abrir({ tipo: "editar", lancamento: l })} />)}
+                  {lancamentos.map((l) => <LinhaLancamento key={l.id} l={l} aoTocar={() => editar(l)} />)}
                 </div>
               ) : (
                 <Vazio titulo="Nada lançado hoje ainda." texto={aberto ? "Quando alguém pagar, toque em Entrada." : "O que entrar e sair hoje aparece aqui."} />
@@ -245,7 +258,7 @@ function CaixaDoDia() {
                   {dinheiroFora !== 0 && ` Em dinheiro: ${brl(dinheiroFora)}.`}
                 </p>
                 <div className="g-lista">
-                  {soltos.map((l) => <LinhaLancamento key={l.id} l={l} aoTocar={() => abrir({ tipo: "editar", lancamento: l })} />)}
+                  {soltos.map((l) => <LinhaLancamento key={l.id} l={l} aoTocar={() => editar(l)} />)}
                 </div>
               </section>
             )}
@@ -292,6 +305,9 @@ function CaixaDoDia() {
       {folha?.tipo === "editar" && (
         <FolhaLancamento modo="pago" tipo={folha.lancamento.tipo as Tipo} inicial={folha.lancamento} aoFechar={() => setFolha(null)} aoSalvo={recarregar} />
       )}
+      {folha?.tipo === "gaveta" && aberto && resumo && (
+        <FolhaGaveta tipo={folha.de} inicial={folha.lancamento} naGaveta={resumo.esperado} aoFechar={() => setFolha(null)} aoSalvo={recarregar} />
+      )}
       {folha?.tipo === "venda" && <VendaBalcao aoFechar={() => setFolha(null)} aoPronto={() => void recarregar()} />}
       {folha?.tipo === "fechar" && aberto && (
         <FolhaFechar caixa={aberto} lancamentos={lancamentos} dinheiroFora={dinheiroFora} aoFechar={() => setFolha(null)}
@@ -324,21 +340,124 @@ function CaixaDoDia() {
   );
 }
 
-/** Uma linha de lançamento. Sem `aoTocar` (caixa já fechado), é só leitura. */
+/** Uma linha de lançamento. Sem `aoTocar` (caixa já fechado), é só leitura. Sangria e suprimento têm rótulo e cor próprios. */
 function LinhaLancamento({ l, aoTocar }: { l: Lancamento; aoTocar?: () => void }) {
   const entrada = l.tipo === "entrada";
+  const gaveta = Boolean(l.movimento);
+  const forma = textoDoPagamento(l);
+  const apoio = gaveta
+    ? `${hora(l.criado_em)} · ${l.descricao || "não é venda nem despesa"}`
+    : `${hora(l.criado_em)}${l.descricao ? ` · ${categoriaAtual(l.categoria)}` : ""}${resumoDeItens(l) ? ` · ${resumoDeItens(l)}` : ""}`;
   const dentro = (
     <>
-      <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
+      <Tile icone={gaveta ? (entrada ? ArrowDownToLine : ArrowUpFromLine) : entrada ? ArrowDownLeft : ArrowUpRight} tom={gaveta ? "manteiga" : entrada ? "menta" : "rosa"} />
       <span className="t">
-        <b>{l.descricao || categoriaAtual(l.categoria)}</b>
-        <span>{hora(l.criado_em)}{l.descricao ? ` · ${categoriaAtual(l.categoria)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-cx-so-cel"> · {rotuloForma(l.forma)}</i></span>
+        <b>{gaveta ? nomeDoMovimento(l.movimento) : l.descricao || categoriaAtual(l.categoria)}</b>
+        <span>{apoio}{!gaveta && <i className="g-cx-so-cel"> · {forma}</i>}</span>
       </span>
-      <span className="g-tag g-cx-so-largo">{rotuloForma(l.forma)}</span>
-      <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
+      {gaveta ? <span className="g-tag amarelo g-cx-so-largo">Gaveta</span> : <span className="g-tag g-cx-so-largo">{forma}</span>}
+      <span className={`d ${gaveta ? "" : entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
     </>
   );
   return aoTocar ? <button className="g-linha" onClick={aoTocar}>{dentro}</button> : <div className="g-linha">{dentro}</div>;
+}
+
+/** Tirar dinheiro da gaveta (sangria) ou colocar (suprimento). Só mexe na conferência da gaveta: não é venda nem despesa. */
+function FolhaGaveta({ tipo, inicial, naGaveta, aoFechar, aoSalvo }: {
+  tipo: Gaveta; inicial?: Lancamento; naGaveta: number; aoFechar: () => void; aoSalvo: () => Promise<void>;
+}) {
+  const { sb, petshop } = useGestao();
+  const { avisar, avisarErro, confirmar } = useAvisos();
+  const tirar = tipo === "sangria";
+  const [valor, setValor] = useState<number | null>(inicial ? Number(inicial.valor) : null);
+  const [motivo, setMotivo] = useState(inicial?.descricao ?? "");
+  const [erro, setErro] = useState<string | null>(null);
+  const [erroMotivo, setErroMotivo] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  // o que tem na gaveta sem este movimento (na edição, desfaz o valor antigo) e o que fica depois dele
+  const base = Math.round((inicial ? naGaveta + (tirar ? Number(inicial.valor) : -Number(inicial.valor)) : naGaveta) * 100) / 100;
+  const depois = Math.round((base + (tirar ? -(valor ?? 0) : valor ?? 0)) * 100) / 100;
+
+  async function salvar() {
+    if (salvando) return;
+    if (!valor || valor <= 0) { setErro("Escreva o valor."); return; }
+    if (valor >= 1e8) { setErro("Esse valor é grande demais. Confira os números."); return; }
+    const texto = motivo.trim();
+    if (tirar && !texto) { setErroMotivo("Escreva para onde foi o dinheiro."); return; }
+    if (tirar && depois < 0 && !(await confirmar({
+      titulo: "Passa do que tem na gaveta", texto: `Pelas contas, a gaveta tem ${brl(base)} e você está tirando ${brl(valor)}. Anotar mesmo assim?`, confirmar: "Anotar mesmo assim",
+    }))) return;
+    setSalvando(true);
+    try {
+      if (inicial) {
+        const r = await sb.from("lancamentos").update({ valor, descricao: texto || null }).eq("id", inicial.id).eq("petshop_id", petshop.id).select("id");
+        if (r.error) throw new Error(r.error.message);
+        if (!r.data?.length) throw new Error("Não deu para salvar. Este movimento pode ter sido apagado.");
+        avisar("Alteração salva.");
+      } else {
+        await lancarPago(sb, petshop.id, {
+          tipo: tirar ? "saida" : "entrada", valor, forma: "dinheiro", categoria: CATEGORIA_GAVETA, descricao: texto || (tirar ? null : "Troco"),
+          movimento: tipo, exigeCaixa: true,
+        });
+        avisar(tirar ? `Anotado: ${brl(valor)} saiu da gaveta.` : `Anotado: ${brl(valor)} entrou na gaveta.`);
+      }
+      await aoSalvo();
+      avisarMudanca();
+      aoFechar();
+    } catch (e) {
+      avisarErro(e);
+      await aoSalvo();
+      setSalvando(false);
+    }
+  }
+
+  async function excluir() {
+    if (!inicial || salvando) return;
+    if (!(await confirmar({ titulo: "Excluir este movimento da gaveta?", texto: `${nomeDoMovimento(inicial.movimento)} · ${brl(inicial.valor)}. A conta da gaveta volta a ser como era antes. Não dá para desfazer.`, confirmar: "Excluir", perigo: true }))) return;
+    setSalvando(true);
+    try {
+      await desfazerVenda(sb, petshop.id, inicial);
+      avisar("Movimento excluído.");
+      await aoSalvo();
+      avisarMudanca();
+      aoFechar();
+    } catch (e) {
+      avisarErro(e);
+      await aoSalvo();
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Folha titulo={tirar ? "Tirar dinheiro da gaveta" : "Colocar dinheiro na gaveta"} aoFechar={aoFechar}
+      rodape={<>
+        {inicial ? <button type="button" className="g-btn perigo" onClick={() => void excluir()} disabled={salvando}>Excluir</button>
+          : <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>}
+        <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando}>{salvando ? "Anotando…" : inicial ? "Salvar" : tirar ? "Anotar retirada" : "Anotar"}</button>
+      </>}>
+      <form className="g-form" onSubmit={(e) => { e.preventDefault(); void salvar(); }}>
+        <p className="g-muted g-p">
+          {tirar
+            ? "Use quando você tira dinheiro da gaveta sem ser uma despesa do pet shop: levou ao banco, guardou no cofre, o dono retirou. O nome disso é sangria."
+            : "Use quando você coloca dinheiro na gaveta sem ser uma venda: mais troco, por exemplo. O nome disso é suprimento."}
+          {" "}Não conta como {tirar ? "despesa" : "venda"}: só entra na conferência da gaveta.
+        </p>
+        <Campo rotulo="Valor em dinheiro" erro={erro}>
+          <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus={!inicial} maximo={99999999} />
+        </Campo>
+        <Campo rotulo={tirar ? "Para onde foi" : "De onde veio (se quiser)"} erro={erroMotivo}>
+          <input className="g-input" value={motivo} maxLength={120} onChange={(e) => { setMotivo(e.target.value); setErroMotivo(null); }}
+            placeholder={tirar ? "Ex.: levei ao banco" : "Ex.: troco para o fim de semana"} />
+        </Campo>
+        <div className="g-card areia">
+          <LinhaResumo nome={inicial ? "Na gaveta, sem contar este movimento" : "Na gaveta agora, pelas contas"} valor={brl(base)} />
+          <LinhaResumo nome={tirar ? "Depois de tirar" : "Depois de colocar"} valor={brl(depois)} forte tom={depois < 0 ? "vermelho" : undefined} />
+        </div>
+        {tirar && <p className="g-muted g-pp">Se o dinheiro saiu para pagar uma conta do pet shop (um fornecedor, o motoboy), use o botão Saída: aí conta como despesa.</p>}
+        <button type="submit" hidden />
+      </form>
+    </Folha>
+  );
 }
 
 /** Contas de um caixa: troco, o que entrou e saiu por forma, o esperado e (se fechado) o contado. */
@@ -355,6 +474,8 @@ function ResumoCaixa({ caixa, lancamentos }: { caixa: Caixa; lancamentos: Lancam
         {entradas.map((f) => <LinhaResumo key={f.id} nome={`· ${f.rotulo}`} valor={brl(f.entrou)} />)}
         <LinhaResumo nome="Saídas" valor={brl(r.saiu)} forte tom="vermelho" />
         {saidas.map((f) => <LinhaResumo key={f.id} nome={`· ${f.rotulo}`} valor={brl(f.saiu)} />)}
+        {r.suprimentos > 0 && <LinhaResumo nome="Colocado na gaveta (suprimento)" valor={`+ ${brl(r.suprimentos)}`} />}
+        {r.sangrias > 0 && <LinhaResumo nome="Tirado da gaveta (sangria)" valor={`− ${brl(r.sangrias)}`} />}
         <LinhaResumo nome="Dinheiro esperado na gaveta" valor={brl(r.esperado)} forte />
         {caixa.valor_contado != null && <LinhaResumo nome="Dinheiro contado" valor={brl(caixa.valor_contado)} forte />}
       </div>
@@ -459,7 +580,7 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo }: {
         {dif && <p className={`gf-dif ${dif.tom}`} role="status">{dif.texto}</p>}
         <Campo rotulo="Observação (se quiser)">
           <textarea className="g-textarea" value={obs} maxLength={500} onChange={(e) => setObs(e.target.value)}
-            placeholder="Ex.: faltou troco, sangria para o banco" />
+            placeholder="Ex.: faltou troco" />
         </Campo>
       </div>
     </Folha>

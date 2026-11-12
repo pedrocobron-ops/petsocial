@@ -9,13 +9,14 @@ import { useGestao } from "@/components/gestao/contexto";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
 import {
-  brlMini, categoriaAtual, Chips, COR_FORMA, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, rotuloForma, SemAcesso, soma, type Tipo,
+  baixarPlanilha, brlMini, categoriaAtual, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, SemAcesso, soma, somaPorForma,
+  type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
-import { contasDaMeta, partesDoLancamento, percentuaisQueFecham } from "@/lib/gestao/dinheiro";
+import { contasDaMeta, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
 import type { Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
 import "./financeiro.css";
 
 export default function PaginaFinanceiro() {
@@ -60,8 +61,8 @@ function porCategoria(lista: Lancamento[]) {
 }
 
 function Financeiro() {
-  const { sb, petshop } = useGestao();
-  const { avisar } = useAvisos();
+  const { sb, petshop, equipe } = useGestao();
+  const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const agora = new Date();
   const [mes, setMes] = useState(() => new Date(agora.getFullYear(), agora.getMonth(), 1));
@@ -77,10 +78,11 @@ function Financeiro() {
   const hoje = hojeIso();
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
+    // sangria e suprimento (movimento de gaveta) não são receita nem despesa: ficam fora de tudo aqui
     const [doMes, anterior, contas] = await Promise.all([
-      paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true)
+      paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null)
         .gte("data", inicio).lte("data", fim).order("data", { ascending: false }).order("criado_em", { ascending: false }).order("id").range(de, ate)),
-      paginar<Movimento>((de, ate) => sb.from("lancamentos").select("tipo, valor").eq("petshop_id", petshop.id).eq("pago", true)
+      paginar<Movimento>((de, ate) => sb.from("lancamentos").select("tipo, valor").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null)
         .gte("data", isoDia(mesAnterior)).lt("data", inicio).order("id").range(de, ate)),
       paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", false)
         .order("vencimento", { ascending: true, nullsFirst: false }).order("id").range(de, ate)),
@@ -112,7 +114,8 @@ function Financeiro() {
       rotulo: `${i * 7 + 1} a ${Math.min(ultimoDia, i * 7 + 7)}`, entrou: 0, saiu: 0,
     }));
     const porDia = Array.from({ length: ultimoDia }, () => 0);
-    const formas = new Map<string, number>();
+    // pagamento dividido entra repartido: cada parte na forma dela
+    const formas = somaPorForma(doMes.filter((l) => l.tipo === "entrada"));
     let nEntradas = 0, nSaidas = 0;
     for (const l of doMes) {
       const dia = deIsoDia(l.data).getDate(), v = Number(l.valor), sem = semanas[Math.floor((dia - 1) / 7)];
@@ -120,7 +123,6 @@ function Financeiro() {
         nEntradas++;
         if (sem) sem.entrou += v;
         porDia[dia - 1] += v;
-        formas.set(l.forma ?? "outro", (formas.get(l.forma ?? "outro") ?? 0) + v);
       } else {
         nSaidas++;
         if (sem) sem.saiu += v;
@@ -140,32 +142,47 @@ function Financeiro() {
 
   const abrir = (f: FolhaAberta) => { if (somenteLeitura()) return; setFolha(f); };
 
-  function exportar() {
+  const [exportando, setExportando] = useState(false);
+  /** Planilha com todos os lançamentos do mês: cliente, itens, partes do pagamento, hora e quem lançou. */
+  async function exportar() {
     const linhas = dados?.doMes ?? [];
     if (!linhas.length) { avisar("Não há lançamentos neste mês para exportar."); return; }
-    const campo = (s: string) => `"${s.replace(/"/g, '""')}"`;
-    const numero = (n: number) => Number(n).toFixed(2).replace(".", ",");
-    const csv = [
-      ["Data", "Tipo", "Categoria", "Descrição", "Forma", "Valor"].join(";"),
-      ...[...linhas].reverse().map((l) => [
-        dataCompleta(l.data), l.tipo === "entrada" ? "Entrada" : "Saída", campo(l.categoria), campo(l.descricao ?? ""),
-        l.forma ? rotuloForma(l.forma) : "", numero(l.tipo === "entrada" ? l.valor : -l.valor),
-      ].join(";")),
-    ].join("\r\n");
-    const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `financeiro-${inicio.slice(0, 7)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    if (exportando) return;
+    setExportando(true);
+    try {
+      // nome dos clientes dos lançamentos, buscado só na hora de exportar
+      const ids = [...new Set(linhas.map((l) => l.cliente_id).filter((x): x is string => Boolean(x)))];
+      const nomes = new Map<string, string>();
+      for (let i = 0; i < ids.length; i += 150) {
+        const r = await sb.from("clientes").select("id, nome").eq("petshop_id", petshop.id).in("id", ids.slice(i, i + 150));
+        if (r.error) throw new Error(r.error.message);
+        for (const c of r.data ?? []) nomes.set(c.id, c.nome);
+      }
+      const quem = new Map(equipe.filter((p) => p.user_id).map((p) => [p.user_id!, p.nome]));
+      const qtd = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
+      const tabela: Cel[][] = [
+        ["Data", "Hora do lançamento", "Tipo", "Categoria", "Descrição", "Cliente", "Itens", "Forma", "Partes do pagamento", "Valor", "Quem lançou"],
+        ...[...linhas].reverse().map((l): Cel[] => {
+          const partes = partesPorForma(l);
+          return [
+            dataCompleta(l.data), hora(l.criado_em), l.tipo === "entrada" ? "Entrada" : "Saída", categoriaAtual(l.categoria), l.descricao ?? "",
+            l.cliente_id ? nomes.get(l.cliente_id) ?? "" : "",
+            itensDoLancamento(l).map((i) => `${qtd(i.qtd)} x ${i.nome} (${brl(i.valor)} cada)`).join(" | "),
+            textoDoPagamento({ ...l, pagamentos: null }),
+            partes.length > 1 ? textoDoPagamento(l) : "",
+            dinheiroCsv(l.tipo === "entrada" ? Number(l.valor) : -Number(l.valor)),
+            l.origem === "assistente" ? `${(l.criado_por && quem.get(l.criado_por)) || "Alguém"}, pelo Mozart` : (l.criado_por && quem.get(l.criado_por)) || "",
+          ];
+        }),
+      ];
+      baixarPlanilha(tabela, `financeiro-${inicio.slice(0, 7)}.csv`);
+    } catch (e) { avisarErro(e); } finally { setExportando(false); }
   }
 
   const alvo = semAcento(busca);
   const filtrados = (dados?.doMes ?? []).filter((l) =>
     (filtro === "tudo" || l.tipo === filtro) &&
-    (!alvo || semAcento(`${l.descricao ?? ""} ${l.categoria} ${rotuloForma(l.forma)}`).includes(alvo)));
+    (!alvo || semAcento(`${l.descricao ?? ""} ${l.categoria} ${textoDoPagamento(l)}`).includes(alvo)));
 
   const tituloMes = `${nomeMes(mes)} de ${mes.getFullYear()}`;
   const acao = aba === "pagar" ? { rotulo: "Nova conta", abre: (): FolhaAberta => ({ tipo: "conta", de: "saida" }) }
@@ -180,7 +197,7 @@ function Financeiro() {
           <p className="g-muted">O que entrou, o que saiu e o que ainda vence.</p>
         </div>
         <div className="g-acoes">
-          <button className="g-btn sec" onClick={exportar} disabled={!dados} title={`Baixar os lançamentos de ${tituloMes} em planilha`}><Download />Exportar</button>
+          <button className="g-btn sec" onClick={() => void exportar()} disabled={!dados || exportando} title={`Baixar os lançamentos de ${tituloMes} em planilha`}><Download />Exportar</button>
           <button className="g-btn pri" onClick={() => abrir(acao.abre())}><Plus />{acao.rotulo}</button>
         </div>
       </header>
@@ -300,9 +317,9 @@ function Financeiro() {
                           <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
                           <span className="t">
                             <b>{l.descricao || categoriaAtual(l.categoria)}</b>
-                            <span>{dataCurta(l.data)}{l.descricao ? ` · ${categoriaAtual(l.categoria)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {rotuloForma(l.forma)}</i></span>
+                            <span>{dataCurta(l.data)}{l.descricao ? ` · ${categoriaAtual(l.categoria)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {textoDoPagamento(l)}</i></span>
                           </span>
-                          <span className="g-tag g-fin-so-largo">{rotuloForma(l.forma)}</span>
+                          <span className="g-tag g-fin-so-largo">{textoDoPagamento(l)}</span>
                           <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
                         </button>
                       );

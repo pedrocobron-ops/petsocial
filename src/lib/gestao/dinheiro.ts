@@ -1,5 +1,13 @@
 import type { Banco } from "./supabase";
-import { horarioDoDia, isoDia } from "./util";
+import { FORMAS } from "./tipos";
+import { brl, horarioDoDia, isoDia } from "./util";
+
+/** Forma de pagamento aceita num lançamento. */
+export type FormaPagamento = (typeof FORMAS)[number]["id"];
+/** Uma parte de um pagamento dividido (ex.: R$ 30 no Pix). */
+export type PartePagamento = { forma: FormaPagamento; valor: number };
+/** Nome da categoria dos movimentos de gaveta (sangria e suprimento). */
+export const CATEGORIA_GAVETA = "Movimento de gaveta";
 
 /** Caixa aberto do pet shop (ou null). Só quem vê o financeiro consegue ler. */
 export async function caixaAberto(sb: Banco, petshopId: string) {
@@ -18,14 +26,24 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
   tipo: "entrada" | "saida"; valor: number; forma: "dinheiro" | "pix" | "debito" | "credito" | "outro";
   categoria: string; descricao?: string | null; agendamentoId?: string | null; clienteId?: string | null;
   origem?: "tela" | "assistente" | "sistema"; data?: string; itens?: ItemLancamento[] | null;
+  /** Pagamento dividido: as partes (a soma é o valor). Sem isso, o valor inteiro é da `forma`. */
+  pagamentos?: PartePagamento[] | null;
+  /** Dinheiro que só entrou ou saiu da gaveta: não é receita nem despesa. */
+  movimento?: "sangria" | "suprimento" | null;
+  /** Exige caixa aberto (movimentos de gaveta). */
+  exigeCaixa?: boolean;
 }) {
   const caixa = await caixaAberto(sb, petshopId);
+  if (l.exigeCaixa && !caixa) throw new Error("O caixa não está aberto. Abra o caixa e tente de novo.");
   const { data: u } = await sb.auth.getUser();
+  const dividido = l.pagamentos && l.pagamentos.length > 1 ? l.pagamentos : null;
   const { data, error } = await sb.from("lancamentos").insert({
     petshop_id: petshopId, tipo: l.tipo, valor: l.valor, forma: l.forma, categoria: l.categoria, descricao: l.descricao ?? null,
     data: l.data ?? isoDia(new Date()), pago: true, caixa_id: caixa?.id ?? null,
     agendamento_id: l.agendamentoId ?? null, cliente_id: l.clienteId ?? null, origem: l.origem ?? "tela", criado_por: u.user?.id ?? null,
     ...(l.itens?.length ? { itens: l.itens } : {}),
+    ...(dividido ? { pagamentos: dividido } : {}),
+    ...(l.movimento ? { movimento: l.movimento } : {}),
   }).select().single();
   // outra pessoa recebeu este atendimento no mesmo instante: o banco aceita só um recebimento por atendimento
   if (error?.code === "23505") throw new Error("Este atendimento já tem recebimento lançado. Atualize a tela para ver.");
@@ -33,7 +51,78 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
   return data;
 }
 
+/**
+ * Anota uma conta que o cliente vai pagar depois (fiado): uma entrada ainda não paga, com vencimento.
+ * Não entra no caixa nem nas somas do que entrou; aparece em Financeiro, A receber, até alguém dar baixa.
+ */
+export async function lancarAReceber(sb: Banco, petshopId: string, l: {
+  valor: number; vencimento: string; categoria: string; descricao?: string | null; agendamentoId?: string | null; clienteId?: string | null;
+  itens?: ItemLancamento[] | null;
+}) {
+  const { data: u } = await sb.auth.getUser();
+  const { data, error } = await sb.from("lancamentos").insert({
+    petshop_id: petshopId, tipo: "entrada", valor: l.valor, forma: null, categoria: l.categoria, descricao: l.descricao ?? null,
+    data: l.vencimento, vencimento: l.vencimento, pago: false,
+    agendamento_id: l.agendamentoId ?? null, cliente_id: l.clienteId ?? null, origem: "tela", criado_por: u.user?.id ?? null,
+    ...(l.itens?.length ? { itens: l.itens } : {}),
+  }).select().single();
+  if (error?.code === "23505") throw new Error("Este atendimento já tem recebimento lançado. Atualize a tela para ver.");
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 const centavos = (n: number) => Math.round(n * 100) / 100;
+
+/* ---------- pagamento dividido e movimentos de gaveta ---------- */
+
+const ehForma = (s: unknown): s is FormaPagamento => FORMAS.some((f) => f.id === s);
+const nomeDaForma = (f: string) => FORMAS.find((x) => x.id === f)?.rotulo ?? "Outro";
+
+/**
+ * As partes de um lançamento por forma de pagamento. Pagamento dividido devolve uma parte por forma (somadas se repetirem);
+ * pagamento inteiro devolve uma parte só, com a `forma` do lançamento (sem forma, "outro").
+ * A soma das partes é sempre o valor do lançamento: se `pagamentos` não fechar com o valor, vale a `forma`.
+ * Use em toda soma por forma de pagamento (gaveta do caixa, financeiro, relatórios).
+ */
+export function partesPorForma(l: { valor: number; forma?: string | null; pagamentos?: unknown }): PartePagamento[] {
+  const total = centavos(Number(l.valor));
+  const inteiro: PartePagamento[] = [{ forma: ehForma(l.forma) ? l.forma : "outro", valor: total }];
+  if (!Array.isArray(l.pagamentos)) return inteiro;
+  const porForma = new Map<FormaPagamento, number>();
+  for (const x of l.pagamentos as unknown[]) {
+    if (!x || typeof x !== "object") continue;
+    const p = x as Record<string, unknown>;
+    const valor = Number(p.valor);
+    if (!Number.isFinite(valor) || valor <= 0) continue;
+    const forma = ehForma(p.forma) ? p.forma : "outro";
+    porForma.set(forma, centavos((porForma.get(forma) ?? 0) + valor));
+  }
+  const partes = [...porForma].map(([forma, valor]) => ({ forma, valor }));
+  if (!partes.length || centavos(partes.reduce((s, p) => s + p.valor, 0)) !== total) return inteiro;
+  return partes;
+}
+
+/** O lançamento foi pago com mais de uma forma? */
+export const ehDividido = (l: { valor: number; forma?: string | null; pagamentos?: unknown }) => partesPorForma(l).length > 1;
+
+/** "Pix" para pagamento inteiro; "Pix R$ 30,00 + Dinheiro R$ 20,00" para o dividido. Sem forma (conta ainda não paga), "Sem forma". */
+export function textoDoPagamento(l: { valor: number; forma?: string | null; pagamentos?: unknown }) {
+  const partes = partesPorForma(l);
+  if (partes.length > 1) return partes.map((p) => `${nomeDaForma(p.forma)} ${brl(p.valor)}`).join(" + ");
+  return l.forma ? nomeDaForma(partes[0].forma) : "Sem forma";
+}
+
+/** Forma que fica no campo `forma` de um pagamento dividido: a de maior valor (empate: a primeira). */
+export function formaPrincipal(partes: PartePagamento[]): FormaPagamento {
+  return partes.reduce((m, p) => (p.valor > m.valor ? p : m), partes[0]).forma;
+}
+
+/** Sangria ou suprimento: dinheiro que só entrou ou saiu da gaveta. Não conta como receita nem despesa. */
+export const ehMovimentoDeGaveta = (l: { movimento?: string | null }) => Boolean(l.movimento);
+
+/** Nome simples de um movimento de gaveta, para as listas. */
+export const nomeDoMovimento = (m: string | null | undefined) =>
+  m === "sangria" ? "Tirou da gaveta (sangria)" : m === "suprimento" ? "Colocou na gaveta (suprimento)" : "";
 
 /** Lê `lancamentos.itens` (jsonb) com cuidado: o que não tem cara de item fica de fora. */
 export function itensDoLancamento(l: { itens?: unknown } | null | undefined): ItemLancamento[] {

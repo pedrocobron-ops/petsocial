@@ -3,11 +3,11 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BellRing, ChevronLeft, ChevronRight, Lock, Plus, Truck, Printer, Users } from "lucide-react";
+import { BellRing, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, Truck, Printer, Users } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { deMin, paraMin, vagasDe } from "@/lib/gestao/agenda";
-import { dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
+import { dataAmigavel, dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
@@ -15,6 +15,7 @@ import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
+import LembretesDoDia, { BotaoLembrete, lembretesQueFaltam } from "@/components/gestao/agenda/lembretes";
 import FormBloqueio from "@/components/gestao/agenda/form-bloqueio";
 import "./agenda.css";
 
@@ -35,6 +36,7 @@ function Agenda() {
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
   const [bloqueando, setBloqueando] = useState(false);
+  const [lembretes, setLembretes] = useState(false);
   const [bloqueioAberto, setBloqueioAberto] = useState<Bloqueio | null>(null);
 
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
@@ -67,6 +69,9 @@ function Agenda() {
   const todos = (dados ?? []).filter((a) => !prof || a.profissional_id === prof);
   const doDia = todos.filter((a) => mesmoDia(new Date(a.inicio), data));
   const temNoDia = (d: Date) => (dados ?? []).some((a) => mesmoDia(new Date(a.inicio), d) && !["cancelado"].includes(a.status));
+  // lembretes do dia escolhido: conta todos os profissionais (um por tutor), só de hoje em diante
+  const faltamLembretes = lembretesQueFaltam((dados ?? []).filter((a) => mesmoDia(new Date(a.inicio), data)));
+  const quandoDia = dataAmigavel(data);
   const selecionado = aberto ? (dados ?? []).find((a) => a.id === aberto) ?? null : null;
   const abrirNovo = (n: Novo) => { if (!somenteLeitura()) setNovo(n); };
 
@@ -183,6 +188,13 @@ function Agenda() {
           <span className="g-muted g-p">{nomeMes(data).replace(/^./, (c) => c.toUpperCase())} de {data.getFullYear()}</span>
           {!mesmoDia(data, new Date()) && <button className="g-btn fantasma p" onClick={() => setDia(isoDia(new Date()))}>Voltar para hoje</button>}
         </div>
+        {faltamLembretes > 0 && (
+          <button className="g-lb-chamada" onClick={() => setLembretes(true)}>
+            <MessageCircle aria-hidden />
+            <span><b>Mandar os lembretes {quandoDia === "hoje" || quandoDia === "amanhã" ? `de ${quandoDia}` : "deste dia"}</b> {faltamLembretes === 1 ? "Falta 1 tutor" : `Faltam ${faltamLembretes} tutores`}, um toque para cada.</span>
+            <ChevronRight aria-hidden />
+          </button>
+        )}
 
         {quemAtende.length > 1 && (
           <div className="g-chips">
@@ -312,6 +324,7 @@ function Agenda() {
                 <div className={`g-hora-grupo${l.a.status === "concluido" ? " feito" : ""}`} key={l.a.id} style={{ "--cor": l.a.servicos?.cor ?? "#f97316" } as React.CSSProperties}>
                   <time>{hora(l.a.inicio)}</time>
                   <span className="ponto" aria-hidden />
+                  <div className="g-lb-par">
                   <button className={`g-ag${["cancelado", "faltou"].includes(l.a.status) ? " apagado" : ""}`} onClick={() => setAberto(l.a.id)}>
                     {l.a.pets && <AvatarPet pet={l.a.pets} />}
                     <span className="t">
@@ -324,6 +337,8 @@ function Agenda() {
                     {l.a.pronto_avisado_em && <span className="g-agd-avisado" role="img" aria-label={`Tutor avisado às ${hora(l.a.pronto_avisado_em)}`} title={`Tutor avisado às ${hora(l.a.pronto_avisado_em)}`}><BellRing aria-hidden /></span>}
                     {l.a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[l.a.status].tom}`}>{STATUS_AGENDAMENTO[l.a.status].rotulo}</span>}
                   </button>
+                  <BotaoLembrete agendamento={l.a} doDia={dados ?? []} aoMandar={() => void recarregar()} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -351,6 +366,7 @@ function Agenda() {
       {novo && <FormAgendamento diaInicial={novo.dia} horaInicial={novo.hora} petInicial={novo.pet} profissionalInicial={novo.profissional}
         aoFechar={() => setNovo(null)} aoSalvar={() => { setNovo(null); void recarregar(); }} />}
       {selecionado && !editando && <DetalheAgendamento agendamento={selecionado} aoFechar={() => setAberto(null)} aoMudar={() => void recarregar()} aoEditar={() => setEditando(selecionado)} />}
+      {lembretes && <LembretesDoDia dia={dia} aoFechar={() => setLembretes(false)} aoMudar={() => void recarregar()} />}
       {bloqueando && <FormBloqueio diaInicial={dia} profissionalInicial={prof} aoFechar={() => setBloqueando(false)} aoSalvar={() => { setBloqueando(false); void recarregarBloqueios(); }} />}
       {bloqueioAberto && <FormBloqueio key={bloqueioAberto.id} bloqueio={bloqueioAberto} aoFechar={() => setBloqueioAberto(null)} aoSalvar={() => { setBloqueioAberto(null); void recarregarBloqueios(); }} />}
       {editando && <FormAgendamento agendamento={editando} aoFechar={() => setEditando(null)} aoSalvar={() => { setEditando(null); setAberto(null); void recarregar(); }} />}

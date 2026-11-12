@@ -28,7 +28,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
       sb.from("clientes").select("*").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
       sb.from("pets").select("*").eq("petshop_id", petshop.id).eq("cliente_id", id).order("ativo", { ascending: false }).order("nome"),
       vejoFinanceiro
-        ? sb.from("lancamentos").select("id, valor, data, categoria, descricao, pago").eq("petshop_id", petshop.id).eq("cliente_id", id).eq("tipo", "entrada")
+        ? sb.from("lancamentos").select("id, valor, data, categoria, descricao, pago").eq("petshop_id", petshop.id).eq("cliente_id", id).eq("tipo", "entrada").is("movimento", null)
           .order("data", { ascending: false }).order("criado_em", { ascending: false }).limit(1000)
         : null,
     ]);

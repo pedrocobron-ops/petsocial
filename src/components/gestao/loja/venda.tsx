@@ -11,7 +11,7 @@ import {
   baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LinhaDaConta, produtosDaConta,
   resumoDosItens, useProdutosDaLoja, type ItemConta,
 } from "./conta";
-import { AvisoCaixaFechado, lembrarForma, useCaixaAberto, useFormaLembrada } from "./pecas";
+import { AvisoCaixaFechado, fecharPagamento, lembrarForma, useCaixaAberto, usePagamento } from "./pecas";
 
 type Tutor = Pick<Cliente, "id" | "nome" | "telefone">;
 
@@ -24,7 +24,7 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
   const [itens, setItens] = useState<ItemConta[]>([]);
   const [tutor, setTutor] = useState<Tutor | null>(null);
   const [desconto, setDesconto] = useState<number | null>(null);
-  const [forma, setForma] = useFormaLembrada();
+  const [pagamento, setPagamento] = usePagamento();
   const [erroForma, setErroForma] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const caixa = useCaixaAberto();
@@ -39,16 +39,17 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
     const problema = erroDaConta(itens, vejoFinanceiro ? desconto : null, contas.total);
     if (problema) { avisarErro(problema); return; }
     if (vejoFinanceiro && contas.total <= 0) { avisarErro("A venda está sem valor. Confira os preços e o desconto."); return; }
-    if (vejoFinanceiro && !forma) { setErroForma("Escolha como o cliente pagou."); avisarErro("Escolha a forma de pagamento."); return; }
+    const pg = vejoFinanceiro ? fecharPagamento(pagamento, contas.total) : null;
+    if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return; }
     const falta = faltaNoEstoque(itens, produtos);
     if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return;
     setSalvando(true);
     try {
       const gravar = itensParaGravar(vendidos);
-      if (vejoFinanceiro && forma) {
-        lembrarForma(forma);
+      if (pg && !("erro" in pg)) {
+        lembrarForma(pg.forma);
         await lancarPago(sb, petshop.id, {
-          tipo: "entrada", valor: contas.total, forma, categoria: "Venda de produtos", clienteId: tutor?.id ?? null,
+          tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: pg.pagamentos, categoria: "Venda de produtos", clienteId: tutor?.id ?? null,
           descricao: encurtar(`Venda: ${resumoDosItens(gravar)}`), itens: gravar,
         });
       }
@@ -86,7 +87,7 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
         <EscolherTutor valor={tutor} aoMudar={setTutor} />
 
         <FechamentoDaConta subtotal={contas.subtotal} desconto={contas.desconto} total={contas.total} descontoDigitado={desconto} aoDesconto={setDesconto}
-          forma={forma} aoForma={(f) => { setForma(f); setErroForma(null); }} comPagamento={vejoFinanceiro} erroForma={erroForma} />
+          pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErroForma(null); }} comPagamento={vejoFinanceiro} erroForma={erroForma} />
         {vejoFinanceiro && <AvisoCaixaFechado aberto={caixa} />}
         {!vejoFinanceiro && <p className="g-muted g-pp">A venda sai do estoque. O dinheiro fica para quem cuida do financeiro lançar.</p>}
       </div>

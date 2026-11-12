@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
-import { caixaAberto, contaDosItens, desfazerVenda, itensDoLancamento, lancarPago, produtosDaVenda } from "@/lib/gestao/dinheiro";
+import { caixaAberto, contaDosItens, desfazerVenda, ehDividido, itensDoLancamento, lancarPago, partesPorForma, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, isoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
-import { CampoDinheiro, formaLembrada, lembrarForma } from "../loja/pecas";
+import { CampoDinheiro, EscolhaPagamento, fecharPagamento, formaLembrada, lembrarForma, pagamentoInicial, type EstadoPagamento } from "../loja/pecas";
 import { avisarMudanca, Campo, Folha, useAvisos, useDados, Vazio } from "../ui";
 import "./financeiro.css";
 
@@ -27,19 +27,65 @@ export const COR_FORMA: Record<string, string> = { pix: "#2f6b4c", dinheiro: "#c
 /** Cores para fatias e barras quando o item não tem cor própria. */
 export const PALETA = ["#2f6b4c", "#ea670c", "#2f6f8a", "#5b4590", "#c99a2e", "#b3402e", "#6a625a", "#a39a90"];
 
-type Movimento = Pick<Lancamento, "tipo" | "valor" | "forma">;
+type Movimento = Pick<Lancamento, "tipo" | "valor" | "forma"> & { pagamentos?: unknown; movimento?: string | null };
 
-/** Quanto entrou e saiu por forma de pagamento, e quanto deve ter de dinheiro na gaveta. */
+/** Tira sangrias e suprimentos: dinheiro que só entrou ou saiu da gaveta não é receita nem despesa. */
+export const semMovimentos = <T extends { movimento?: string | null }>(lista: T[]) => lista.filter((l) => !l.movimento);
+
+/** Soma por forma de pagamento, repartindo o pagamento dividido entre as formas dele. */
+export function somaPorForma(lista: { valor: number; forma?: string | null; pagamentos?: unknown }[]) {
+  const mapa = new Map<string, number>();
+  for (const l of lista) for (const p of partesPorForma(l)) mapa.set(p.forma, centavos((mapa.get(p.forma) ?? 0) + p.valor));
+  return mapa;
+}
+
+/**
+ * Quanto entrou e saiu por forma de pagamento, e quanto deve ter de dinheiro na gaveta:
+ * troco inicial + dinheiro recebido + colocado na gaveta (suprimento) − saídas em dinheiro − tirado da gaveta (sangria).
+ * `entrou` e `saiu` não contam sangria nem suprimento.
+ */
 export function resumoDoCaixa(valorInicial: number, lancamentos: Movimento[]) {
-  const entradas = lancamentos.filter((l) => l.tipo === "entrada");
-  const saidas = lancamentos.filter((l) => l.tipo === "saida");
-  const daForma = (lista: Movimento[], id: string) => soma(lista.filter((l) => (l.forma ?? "outro") === id));
-  const porForma = FORMAS.map((f) => ({ id: f.id, rotulo: f.rotulo, entrou: daForma(entradas, f.id), saiu: daForma(saidas, f.id) }));
+  const vendas = semMovimentos(lancamentos);
+  const entradas = vendas.filter((l) => l.tipo === "entrada");
+  const saidas = vendas.filter((l) => l.tipo === "saida");
+  const entrouPor = somaPorForma(entradas), saiuPor = somaPorForma(saidas);
+  const porForma = FORMAS.map((f) => ({ id: f.id, rotulo: f.rotulo, entrou: entrouPor.get(f.id) ?? 0, saiu: saiuPor.get(f.id) ?? 0 }));
   const dinheiro = porForma.find((f) => f.id === "dinheiro")!;
+  const suprimentos = soma(lancamentos.filter((l) => l.movimento === "suprimento"));
+  const sangrias = soma(lancamentos.filter((l) => l.movimento === "sangria"));
   return {
-    entrou: soma(entradas), saiu: soma(saidas), porForma,
-    esperado: centavos(Number(valorInicial) + dinheiro.entrou - dinheiro.saiu),
+    entrou: soma(entradas), saiu: soma(saidas), porForma, suprimentos, sangrias,
+    nEntradas: entradas.length, nSaidas: saidas.length,
+    esperado: centavos(Number(valorInicial) + dinheiro.entrou + suprimentos - dinheiro.saiu - sangrias),
   };
+}
+
+/* ---------- planilha (CSV) ---------- */
+
+/** Célula de planilha: texto (protegido) ou `{ bruto }` para número já formatado. */
+export type Cel = string | { bruto: string };
+/** Dinheiro para planilha: "1234,56" (sem R$, para o Excel somar). */
+export const dinheiroCsv = (n: number): Cel => ({ bruto: Number(n).toFixed(2).replace(".", ",") });
+/** Número inteiro ou quantidade para planilha. */
+export const numeroCsv = (n: number): Cel => ({ bruto: String(n).replace(".", ",") });
+/** Texto entre aspas; o que começa com = + - @ ganha um apóstrofo, para a planilha não ler como fórmula. */
+function celulaCsv(c: Cel) {
+  if (typeof c !== "string") return c.bruto;
+  let t = c.replace(/\r?\n/g, " ").trim();
+  if (/^[=+\-@]/.test(t)) t = `'${t}`;
+  return `"${t.replace(/"/g, '""')}"`;
+}
+/** Baixa uma planilha CSV (separador ponto e vírgula, com BOM: abre direto no Excel e no Google Planilhas). */
+export function baixarPlanilha(linhas: Cel[][], nomeDoArquivo: string) {
+  const texto = "\ufeff" + linhas.map((l) => l.map(celulaCsv).join(";")).join("\r\n") + "\r\n";
+  const url = URL.createObjectURL(new Blob([texto], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nomeDoArquivo;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /** Busca todas as linhas de uma consulta, de mil em mil. */
@@ -173,7 +219,9 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   const [tipo, setTipo] = useState<Tipo>(inicial ? (inicial.tipo as Tipo) : tipoInicial);
   const [valor, setValor] = useState<number | null>(inicial ? Number(inicial.valor) : null);
   // forma: a do lançamento; num novo, a última usada neste aparelho; sem nenhuma, a pessoa escolhe
-  const [forma, setForma] = useState<FormaId | null>(() => (inicial ? (inicial.forma as FormaId | null) ?? "pix" : formaLembrada()));
+  const [pagamento, setPagamento] = useState<EstadoPagamento>(() => pagamentoInicial(inicial ? (inicial.forma as FormaId | null) ?? "pix" : formaLembrada()));
+  // lançamento já dividido: as partes aparecem só para leitura até a pessoa trocar para uma forma só
+  const [manterDividido, setManterDividido] = useState(() => Boolean(inicial && inicial.pago && ehDividido(inicial)));
   const [categoria, setCategoria] = useState(inicial ? categoriaAtual(inicial.categoria) : categoriasDe(tipoInicial)[0]);
   // lançamento de um caixa que já foi fechado: valor, forma e dia não mudam mais, e ele não pode ser excluído (o banco também recusa)
   const { dados: caixaFechadoEm } = useDados(async () => {
@@ -201,6 +249,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
 
   function trocarTipo(t: Tipo) {
     setTipo(t);
+    if (t === "saida" && pagamento.dividido) setPagamento(pagamentoInicial(pagamento.partes[0]?.forma ?? pagamento.forma));
     if (!categoriasDe(t).includes(categoria)) setCategoria(categoriasDe(t)[0]);
   }
 
@@ -212,7 +261,10 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     if (conta && !texto) { setErro("Escreva do que é esta conta."); return; }
     if (conta && !vencimento) { setErro("Escolha o dia do vencimento."); return; }
     if (!conta && escolheData && (!data || data > hoje)) { setErro("Escolha um dia até hoje."); return; }
-    if (!conta && !forma) { setErro(entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
+    const pg = conta || travado || manterDividido ? null : fecharPagamento(pagamento, valor);
+    if (pg && "erro" in pg) { setErro(pagamento.dividido ? pg.erro : entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
+    const forma = pg && !("erro" in pg) ? pg.forma : null;
+    const pagamentos = pg && !("erro" in pg) ? pg.pagamentos : null;
     const vezes = conta && !inicial && repetir ? Math.min(36, Math.max(2, Math.round(meses) || 2)) : 1;
     setErro(null);
     setSalvando(true);
@@ -221,7 +273,8 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         const mudancas = conta
           ? { valor, categoria, descricao: texto, vencimento, data: vencimento }
           : travado ? { categoria, descricao: texto }
-          : { valor, forma, categoria, descricao: texto, ...(escolheData ? { data } : {}) };
+          : manterDividido ? { categoria, descricao: texto, ...(escolheData ? { data } : {}) }
+          : { valor, forma, pagamentos, categoria, descricao: texto, ...(escolheData ? { data } : {}) };
         const r = await sb.from("lancamentos").update(mudancas).eq("id", inicial.id).eq("petshop_id", petshop.id);
         if (r.error) throw new Error(r.error.message);
         avisar("Alteração salva.");
@@ -241,12 +294,13 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         return;
       } else if (!escolheData || data === hoje) {
         lembrarForma(forma);
-        await lancarPago(sb, petshop.id, { tipo, valor, forma, categoria, descricao: texto });
+        await lancarPago(sb, petshop.id, { tipo, valor, forma, pagamentos, categoria, descricao: texto });
         avisar(entrada ? `Entrada de ${brl(valor)} anotada.` : `Saída de ${brl(valor)} anotada.`);
       } else {
         // dia que já passou: não entra no caixa de hoje
         const r = await sb.from("lancamentos").insert({
           petshop_id: petshop.id, tipo, valor, forma, categoria, descricao: texto, data, pago: true, origem: "tela", criado_por: user.id,
+          ...(pagamentos ? { pagamentos } : {}),
         });
         if (r.error) throw new Error(r.error.message);
         avisar(`${entrada ? "Entrada" : "Saída"} de ${brl(valor)} anotada em ${dataCompleta(data)}.`);
@@ -314,7 +368,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         )}
         <div className={conta || escolheData ? "dupla" : undefined}>
           <Campo rotulo="Valor" erro={erro}>
-            <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus={!conta && !inicial} desligado={travado} maximo={99999999} />
+            <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus={!conta && !inicial} desligado={travado || manterDividido} maximo={99999999} />
           </Campo>
           {conta && (
             <Campo rotulo="Vencimento">
@@ -327,9 +381,19 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
             </Campo>
           )}
         </div>
-        {!conta && (travado
-          ? <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}><p className="g-p">{rotuloForma(forma)}</p></Grupo>
-          : <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}><Chips opcoes={FORMAS} valor={forma} aoMudar={(f) => { setForma(f); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>)}
+        {!conta && (travado || manterDividido ? (
+          <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}>
+            <p className="g-p g-tab">{inicial ? textoDoPagamento(inicial) : ""}</p>
+            {manterDividido && !travado && (
+              <>
+                <small>Pagamento dividido. Para mudar o valor ou a forma, troque para uma forma só.</small>
+                <div><button type="button" className="g-btn sec p" onClick={() => setManterDividido(false)}>Trocar a forma de pagamento</button></div>
+              </>
+            )}
+          </Grupo>
+        ) : entrada
+          ? <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={valor ?? 0} rotulo="Como recebeu" />
+          : <Grupo rotulo="Como pagou"><Chips opcoes={FORMAS} valor={pagamento.forma} aoMudar={(f) => { setPagamento(pagamentoInicial(f)); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>)}
         <Grupo rotulo="Categoria"><Chips opcoes={categorias} valor={categoria} aoMudar={setCategoria} rotulo="Categoria" /></Grupo>
         {!conta && (
           <Campo rotulo="Descrição (se quiser)">
@@ -364,21 +428,22 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
   const { avisar, avisarErro } = useAvisos();
   const hoje = hojeIso();
   const entrada = conta.tipo === "entrada";
-  const [forma, setForma] = useState<FormaId | null>(() => formaLembrada());
+  const [pagamento, setPagamento] = useState<EstadoPagamento>(() => pagamentoInicial(formaLembrada()));
   const [data, setData] = useState(hoje);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   async function salvar() {
     if (salvando) return;
-    if (!forma) { setErro(entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
+    const pg = fecharPagamento(pagamento, Number(conta.valor));
+    if ("erro" in pg) { setErro(pagamento.dividido ? pg.erro : entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
     if (!data || data > hoje) { setErro("Escolha um dia até hoje."); return; }
     setSalvando(true);
     try {
-      lembrarForma(forma);
+      lembrarForma(pg.forma);
       // só entra no caixa aberto quando o dinheiro andou hoje
       const caixa = data === hoje ? await caixaAberto(sb, petshop.id) : null;
-      const r = await sb.from("lancamentos").update({ pago: true, data, forma, caixa_id: caixa?.id ?? null })
+      const r = await sb.from("lancamentos").update({ pago: true, data, forma: pg.forma, pagamentos: pg.pagamentos, caixa_id: caixa?.id ?? null })
         .eq("id", conta.id).eq("petshop_id", petshop.id).eq("pago", false).select("id");
       if (r.error) throw new Error(r.error.message);
       if (!r.data?.length) throw new Error("Esta conta já tinha sido baixada.");
@@ -404,7 +469,10 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
           <LinhaResumo nome={conta.descricao || conta.categoria} valor={brl(conta.valor)} forte />
           <p className="g-muted g-pp">{conta.categoria}{conta.vencimento ? ` · vencimento em ${dataCompleta(conta.vencimento)}` : ""}</p>
         </div>
-        <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}><Chips opcoes={FORMAS} valor={forma} aoMudar={(f) => { setForma(f); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>
+        {entrada
+          ? <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={Number(conta.valor)} rotulo="Como recebeu" />
+          : <Grupo rotulo="Como pagou"><Chips opcoes={FORMAS} valor={pagamento.forma} aoMudar={(f) => { setPagamento(pagamentoInicial(f)); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>}
+        {conta.itens != null && <ItensDoLancamento lancamento={conta} />}
         <Campo rotulo={entrada ? "Dia em que recebeu" : "Dia em que pagou"} erro={erro}>
           <input type="date" className="g-input" value={data} max={hoje} onChange={(e) => { setData(e.target.value); setErro(null); }} />
         </Campo>

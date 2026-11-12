@@ -9,7 +9,7 @@ import { brl, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { ok, useDados } from "../ui";
-import { CampoDinheiro, ChipsForma, erroDeValor, fmtQtd, lerQtd, type Forma } from "./pecas";
+import { CampoDinheiro, erroDeValor, EscolhaPagamento, fmtQtd, lerQtd, type EstadoPagamento } from "./pecas";
 import "./venda.css";
 
 /**
@@ -211,9 +211,14 @@ export function LinhaDaConta({ item, produto, aoMudar, aoTirar, apoio }: {
 
 /* ---------- desconto, pagamento e total ---------- */
 
-export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, forma, aoForma, comPagamento = true, erroForma }: {
+/** "Cliente paga depois": a conta fica em A receber, com o dia combinado. */
+export type PagaDepois = { ativo: boolean; quando: string };
+
+export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, pagamento, aoPagamento, comPagamento = true, erroForma, depois, aoDepois }: {
   subtotal: number; desconto: number; total: number; descontoDigitado: number | null; aoDesconto: (v: number | null) => void;
-  forma: Forma | null; aoForma: (f: Forma) => void; comPagamento?: boolean; erroForma?: string | null;
+  pagamento: EstadoPagamento; aoPagamento: (e: EstadoPagamento) => void; comPagamento?: boolean; erroForma?: string | null;
+  /** Só na conta do atendimento: deixa escolher "Cliente paga depois". */
+  depois?: PagaDepois; aoDepois?: (d: PagaDepois) => void;
 }) {
   const passou = (descontoDigitado ?? 0) > subtotal && subtotal > 0;
   return (
@@ -225,7 +230,20 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
             <CampoDinheiro valor={descontoDigitado} aoMudar={aoDesconto} />
             {passou && <small>O desconto não passa do valor da conta.</small>}
           </label>
-          <ChipsForma valor={forma} aoMudar={aoForma} erro={erroForma} />
+          {depois && aoDepois && total > 0 && (
+            <div className="g-seg g-pg-quando" role="group" aria-label="Quando o cliente paga">
+              <button type="button" aria-pressed={!depois.ativo} onClick={() => aoDepois({ ...depois, ativo: false })}>Paga agora</button>
+              <button type="button" aria-pressed={depois.ativo} onClick={() => aoDepois({ ...depois, ativo: true })}>Cliente paga depois</button>
+            </div>
+          )}
+          {depois?.ativo && aoDepois && total > 0 ? (
+            <label className="g-campo">
+              <span>Quando vai pagar</span>
+              <input type="date" className="g-input" value={depois.quando} onChange={(e) => aoDepois({ ...depois, quando: e.target.value })} />
+              <small>A conta fica anotada em Financeiro, A receber, e na ficha do tutor. Quando o cliente pagar, é só dar baixa.</small>
+              {erroForma && <small className="erro" role="alert">{erroForma}</small>}
+            </label>
+          ) : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erroForma} />}
         </>
       )}
       <div className="g-vd-total" role="status">

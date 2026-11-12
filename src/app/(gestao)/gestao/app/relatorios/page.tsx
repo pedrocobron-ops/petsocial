@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, CircleCheck, Clock, HandCoins, PawPrint, Printer, Receipt, Scissors, TrendingUp, UserPlus, Users, UserX } from "lucide-react";
+import { CalendarDays, CircleCheck, Clock, CreditCard, Download, HandCoins, PawPrint, Printer, Receipt, Scissors, TrendingUp, UserPlus, Users, UserX } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
-import { AvatarPessoa, AvatarPet, Esqueleto, useDados, Vazio } from "@/components/gestao/ui";
-import { brlMini, Chips, ErroDeCarga, PALETA, paginar, SemAcesso } from "@/components/gestao/financeiro/comum";
+import { AvatarPessoa, AvatarPet, Esqueleto, useAvisos, useDados, Vazio } from "@/components/gestao/ui";
+import { baixarPlanilha, brlMini, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, numeroCsv, PALETA, paginar, SemAcesso, somaPorForma, type Cel } from "@/components/gestao/financeiro/comum";
 import { Anel, Barras, Kpi, Rosca, Tile } from "@/components/gestao/painel";
-import { partesDoLancamento } from "@/lib/gestao/dinheiro";
+import { partesDoLancamento, percentuaisQueFecham } from "@/lib/gestao/dinheiro";
+import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
 import "./relatorios.css";
 
@@ -20,11 +21,14 @@ const PERIODOS = [
   { id: "mes", rotulo: "Este mês" },
   { id: "mes_passado", rotulo: "Mês passado" },
   { id: "90", rotulo: "Últimos 90 dias" },
+  { id: "livre", rotulo: "Personalizado" },
 ] as const;
+/** Maior período aceito nas datas livres. */
+const MAX_DIAS = 366;
 type Periodo = (typeof PERIODOS)[number]["id"];
 
 /** Primeiro e último dia do período (os dois entram na conta). */
-function intervalo(p: Periodo, hoje: Date): { de: Date; ate: Date } {
+function intervalo(p: Exclude<Periodo, "livre">, hoje: Date): { de: Date; ate: Date } {
   if (p === "semana") { const de = inicioDaSemana(hoje); return { de, ate: somaDias(de, 6) }; }
   if (p === "mes") return { de: new Date(hoje.getFullYear(), hoje.getMonth(), 1), ate: new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0) };
   if (p === "mes_passado") return { de: new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1), ate: new Date(hoje.getFullYear(), hoje.getMonth(), 0) };
@@ -36,18 +40,19 @@ type Ag = {
   pets: { id: string; nome: string; foto: string | null; especie: string | null; clientes: { id: string; nome: string } | null } | null;
   servicos: { id: string; nome: string; cor: string | null } | null;
 };
-type Entrada = { id: string; data: string; valor: number; cliente_id: string | null; agendamento_id: string | null; itens: unknown };
-/** Recebimento de um atendimento (um por atendimento). */
-type Recebimento = { agendamento_id: string | null; valor: number; itens: unknown };
+type Entrada = { id: string; data: string; valor: number; cliente_id: string | null; agendamento_id: string | null; itens: unknown; forma: string | null; pagamentos: unknown };
+/** Conta de um atendimento (uma por atendimento): já recebida, ou anotada para o cliente pagar depois (`pago: false`). */
+type Recebimento = { agendamento_id: string | null; valor: number; itens: unknown; pago?: boolean };
 
 /**
  * Quanto foi realmente cobrado pelo serviço de um atendimento concluído:
  * - com recebimento lançado: a parte de serviço da conta, com o desconto rateado (sem itens, o valor recebido);
+ * - conta que o cliente paga depois (fiado): a mesma conta, pelo valor cobrado, mesmo sem o dinheiro ter entrado;
  * - pago com pacote: nada (o dinheiro entrou na venda do pacote);
  * - sem recebimento ainda: o preço combinado na agenda.
  */
-function cobradoDe(a: Ag, recebimento: Recebimento | undefined): { valor: number; como: "recebido" | "pacote" | "agenda" } {
-  if (recebimento) return { valor: partesDoLancamento(recebimento)?.servico ?? Number(recebimento.valor), como: "recebido" };
+function cobradoDe(a: Ag, recebimento: Recebimento | undefined): { valor: number; como: "recebido" | "fiado" | "pacote" | "agenda" } {
+  if (recebimento) return { valor: partesDoLancamento(recebimento)?.servico ?? Number(recebimento.valor), como: recebimento.pago === false ? "fiado" : "recebido" };
   if (a.pacote_cliente_id) return { valor: 0, como: "pacote" };
   return { valor: Number(a.preco ?? 0), como: "agenda" };
 }
@@ -60,10 +65,23 @@ const atendimentos = (n: number) => (n === 1 ? "1 atendimento" : `${n} atendimen
 
 function Relatorios() {
   const { sb, petshop, equipe } = useGestao();
+  const { avisar } = useAvisos();
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const hojeIso = isoDia(new Date());
-  const { de, ate } = useMemo(() => intervalo(periodo, deIsoDia(hojeIso)), [periodo, hojeIso]);
+  // datas livres: começam no mês até hoje; só valem quando estão certas (ordem e no máximo 366 dias)
+  const [livreDe, setLivreDe] = useState(() => `${hojeIso.slice(0, 8)}01`);
+  const [livreAte, setLivreAte] = useState(hojeIso);
+  const [livreValido, setLivreValido] = useState(() => ({ de: `${hojeIso.slice(0, 8)}01`, ate: hojeIso }));
+  const erroLivre = erroDasDatas(livreDe, livreAte);
+  function mudarLivre(deNovo: string, ateNovo: string) {
+    setLivreDe(deNovo); setLivreAte(ateNovo);
+    if (!erroDasDatas(deNovo, ateNovo)) setLivreValido({ de: deNovo, ate: ateNovo });
+  }
+  const { de, ate } = useMemo(
+    () => (periodo === "livre" ? { de: deIsoDia(livreValido.de), ate: deIsoDia(livreValido.ate) } : intervalo(periodo, deIsoDia(hojeIso))),
+    [periodo, hojeIso, livreValido]);
   const deIso = isoDia(de), ateIso = isoDia(ate);
+  const nomeDoPeriodo = periodo === "livre" ? `De ${dataCompleta(de)} a ${dataCompleta(ate)}` : PERIODOS.find((p) => p.id === periodo)?.rotulo ?? "";
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const comeco = de.toISOString();
@@ -75,17 +93,17 @@ function Relatorios() {
           .eq("petshop_id", petshop.id).gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b);
         return { data: r.data as unknown as Ag[] | null, error: r.error };
       }),
-      paginar<Entrada>((a, b) => sb.from("lancamentos").select("id, data, valor, cliente_id, agendamento_id, itens").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
-        .gte("data", deIso).lte("data", ateIso).order("data").order("id").range(a, b)),
+      paginar<Entrada>((a, b) => sb.from("lancamentos").select("id, data, valor, cliente_id, agendamento_id, itens, forma, pagamentos").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
+        .is("movimento", null).gte("data", deIso).lte("data", ateIso).order("data").order("id").range(a, b)),
       sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).gte("criado_em", comeco).lt("criado_em", final),
     ]);
     if (novos.error) throw new Error(novos.error.message);
-    // recebimento de cada atendimento concluído do período (pode ter sido pago em outro dia, fora do período)
+    // conta de cada atendimento concluído do período: paga em outro dia (fora do período) ou ainda a receber (cliente paga depois)
     const recebimentos = new Map<string, Recebimento>();
     for (const l of entradas) if (l.agendamento_id) recebimentos.set(l.agendamento_id, l);
     const semRecebimento = ags.filter((a) => a.status === "concluido" && !recebimentos.has(a.id)).map((a) => a.id);
     for (let i = 0; i < semRecebimento.length; i += 150) {
-      const r = await sb.from("lancamentos").select("agendamento_id, valor, itens").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
+      const r = await sb.from("lancamentos").select("agendamento_id, valor, itens, pago").eq("petshop_id", petshop.id).eq("tipo", "entrada")
         .in("agendamento_id", semRecebimento.slice(i, i + 150));
       if (r.error) throw new Error(r.error.message);
       for (const l of r.data ?? []) if (l.agendamento_id) recebimentos.set(l.agendamento_id, l);
@@ -103,6 +121,12 @@ function Relatorios() {
     const pagoComPacote = (a: Ag) => cobrado.get(a.id)?.como === "pacote";
     const comPacote = concluidos.filter(pagoComPacote).length;
     const aReceber = concluidos.filter((a) => cobrado.get(a.id)?.como === "agenda" && Number(a.preco ?? 0) > 0).length;
+    // contas que o cliente ficou de pagar depois: o serviço conta como feito, o dinheiro ainda não entrou
+    const fiados = concluidos.filter((a) => cobrado.get(a.id)?.como === "fiado");
+    const valorFiado = real(fiados.reduce((s, a) => s + Number(dados.recebimentos.get(a.id)?.valor ?? 0), 0));
+    // por forma de pagamento: o pagamento dividido entra repartido
+    const porFormaMapa = somaPorForma(dados.entradas);
+    const porForma = FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: porFormaMapa.get(f.id) ?? 0, cor: COR_FORMA[f.id] })).filter((f) => f.valor > 0);
     const pagantes = concluidos.length - comPacote;
     const baseTicket = real(concluidos.reduce((s, a) => s + valorDe(a), 0));
     // quanto cada tutor gastou no período: todas as entradas recebidas ligadas a ele (a mesma conta de "Já gastou aqui" na ficha)
@@ -110,9 +134,9 @@ function Relatorios() {
     for (const l of dados.entradas) if (l.cliente_id) gastoDoTutor.set(l.cliente_id, real((gastoDoTutor.get(l.cliente_id) ?? 0) + Number(l.valor)));
     const faturamento = real(dados.entradas.reduce((s, l) => s + Number(l.valor), 0));
 
-    // faturamento por dia, ou por semana nos 90 dias
-    const porSemana = periodo === "90";
+    // faturamento por dia, ou por semana quando o período é comprido
     const dias = Math.round((ate.getTime() - de.getTime()) / 864e5) + 1;
+    const porSemana = dias > 45;
     const barras = Array.from({ length: porSemana ? Math.ceil(dias / 7) : dias }, (_, i) => {
       const dia = somaDias(de, porSemana ? i * 7 : i);
       return { dia, valor: 0 };
@@ -137,7 +161,8 @@ function Relatorios() {
       return [...mapa.values()].sort((a, b) => b.n - a.n || b.valor - a.valor);
     };
     const usadas = new Set<string>();
-    const servicos = contar(concluidos, (a) => a.servico_id ?? "sem", (a) => ({ nome: a.servicos?.nome ?? "Sem serviço escolhido", cor: a.servicos?.cor ?? null })).slice(0, 8)
+    const servicosTodos = contar(concluidos, (a) => a.servico_id ?? "sem", (a) => ({ nome: a.servicos?.nome ?? "Sem serviço escolhido", cor: a.servicos?.cor ?? null }));
+    const servicos = servicosTodos.slice(0, 8)
       .map((s) => {
         // cada fatia com uma cor só dela: a do serviço, ou a próxima livre da paleta
         const cor = s.extra.cor && !usadas.has(s.extra.cor) ? s.extra.cor : PALETA.find((c) => !usadas.has(c)) ?? "#a39a90";
@@ -145,8 +170,9 @@ function Relatorios() {
         return { n: s.n, valor: s.valor, pacote: s.pacote, extra: s.extra.nome, cor };
       });
     const pets = contar(concluidos, (a) => a.pet_id, (a) => a.pets).slice(0, 5);
-    const tutores = contar(concluidos, (a) => a.pets?.clientes?.id, (a) => a.pets?.clientes?.nome ?? "").slice(0, 5)
+    const tutoresTodos = contar(concluidos, (a) => a.pets?.clientes?.id, (a) => a.pets?.clientes?.nome ?? "")
       .map((t) => ({ ...t, valor: gastoDoTutor.get(t.chave) ?? 0 }));
+    const tutores = tutoresTodos.slice(0, 5);
 
     // comissão: sobre o que foi cobrado pelo serviço; atendimento pago com pacote conta pelo preço do serviço na agenda
     const comissoes = equipe.filter((p) => Number(p.comissao_pct) > 0).map((p) => {
@@ -174,10 +200,49 @@ function Relatorios() {
       comEntrada: comEntrada.length, melhor, diaCheio,
       totalComissao: real(comissoes.reduce((s, c) => s + c.comissao, 0)),
       concluidos: concluidos.length, faltas, taxaFalta: concluidos.length + faltas ? (faltas / (concluidos.length + faltas)) * 100 : null,
-      faturamento, ticket: pagantes ? real(baseTicket / pagantes) : null, comPacote, aReceber,
-      barras, porSemana, servicos, pets, tutores, comissoes, porDia, horas, marcados: marcados.length,
+      faturamento, ticket: pagantes ? real(baseTicket / pagantes) : null, comPacote, aReceber, fiados: fiados.length, valorFiado, porForma,
+      barras, porSemana, servicos, servicosTodos, pets, tutores, tutoresTodos, comissoes, porDia, horas, marcados: marcados.length,
     };
-  }, [dados, periodo, de, ate, equipe]);
+  }, [dados, de, ate, equipe]);
+
+  /** Planilha do período: resumo, serviços, comissão, formas de pagamento e tutores. */
+  function exportar() {
+    if (!r || !dados) return;
+    const t: Cel[][] = [
+      ["Relatório", petshop.nome],
+      ["Período", `${dataCompleta(de)} a ${dataCompleta(ate)}`],
+      [],
+      ["Resumo do período"],
+      ["Faturamento (entradas já recebidas)", dinheiroCsv(r.faturamento)],
+      ["A receber de atendimentos do período (cliente paga depois)", dinheiroCsv(r.valorFiado)],
+      ["Contas a receber de atendimentos do período", numeroCsv(r.fiados)],
+      ["Atendimentos concluídos", numeroCsv(r.concluidos)],
+      ["Faltas", numeroCsv(r.faltas)],
+      ["Atendimentos pagos com pacote", numeroCsv(r.comPacote)],
+      ["Valor médio por atendimento", r.ticket == null ? "" : dinheiroCsv(r.ticket)],
+      ["Clientes novos", numeroCsv(dados.clientesNovos)],
+      ["Comissão total", dinheiroCsv(r.totalComissao)],
+      [],
+      ["Serviços mais feitos"],
+      ["Serviço", "Vezes", "Com pacote", "Valor cobrado"],
+      ...r.servicosTodos.map((x): Cel[] => [x.extra.nome, numeroCsv(x.n), numeroCsv(x.pacote), dinheiroCsv(x.valor)]),
+      [],
+      ["Comissão por profissional"],
+      ["Profissional", "Atendimentos", "Com pacote", "Base", "Percentual", "Comissão"],
+      ...r.comissoes.map((c): Cel[] => [c.p.nome, numeroCsv(c.n), numeroCsv(c.pacote), dinheiroCsv(c.base), numeroCsv(Number(c.p.comissao_pct)), dinheiroCsv(c.comissao)]),
+      [],
+      ["Por forma de pagamento (entradas recebidas)"],
+      ["Forma", "Valor"],
+      ...r.porForma.map((f): Cel[] => [f.rotulo, dinheiroCsv(f.valor)]),
+      ["Total", dinheiroCsv(r.faturamento)],
+      [],
+      ["Tutores que mais vieram"],
+      ["Tutor", "Vezes", "Com pacote", "Pagou no período"],
+      ...r.tutoresTodos.map((x): Cel[] => [x.extra, numeroCsv(x.n), numeroCsv(x.pacote), dinheiroCsv(x.valor)]),
+    ];
+    baixarPlanilha(t, `relatorio-${deIso}-a-${ateIso}.csv`);
+    avisar("Planilha baixada.");
+  }
 
   const semNada = r && !r.marcados && !r.faturamento && !dados?.clientesNovos && !r.faltas;
 
@@ -189,6 +254,7 @@ function Relatorios() {
           <p className="g-muted">De {dataCompleta(de)} a {dataCompleta(ate)}</p>
         </div>
         <div className="g-acoes">
+          <button className="g-btn sec" onClick={exportar} disabled={!r || !dados || carregando} title="Baixar os números deste período em planilha"><Download />Exportar</button>
           <button className="g-btn sec" onClick={() => window.print()}><Printer />Imprimir</button>
         </div>
       </header>
@@ -197,7 +263,18 @@ function Relatorios() {
         <div className="gf-rola gf-nao-imprime">
           <Chips opcoes={PERIODOS} valor={periodo} aoMudar={setPeriodo} rotulo="Período" />
         </div>
-        <p className="gf-so-papel g-p">{petshop.nome} · {PERIODOS.find((p) => p.id === periodo)?.rotulo}</p>
+        {periodo === "livre" && (
+          <div className="g-rel-livre gf-nao-imprime">
+            <label className="g-campo"><span>De</span>
+              <input type="date" className="g-input" value={livreDe} max={livreAte || undefined} aria-invalid={erroLivre ? true : undefined} onChange={(e) => mudarLivre(e.target.value, livreAte)} />
+            </label>
+            <label className="g-campo"><span>Até</span>
+              <input type="date" className="g-input" value={livreAte} min={livreDe || undefined} aria-invalid={erroLivre ? true : undefined} onChange={(e) => mudarLivre(livreDe, e.target.value)} />
+            </label>
+            {erroLivre && <p className="g-rel-livre-erro" role="alert">{erroLivre} Mostrando de {dataCompleta(de)} a {dataCompleta(ate)}.</p>}
+          </div>
+        )}
+        <p className="gf-so-papel g-p">{petshop.nome} · {nomeDoPeriodo}</p>
 
         {erro && <ErroDeCarga erro={erro} tentar={recarregar} />}
         {carregando || !r || !dados ? (erro ? null : <Esqueleto linhas={5} />) : semNada ? (
@@ -237,6 +314,22 @@ function Relatorios() {
                     </div>
                   </>
                 ) : <p className="g-muted g-p" style={{ marginTop: 10 }}>Nenhuma entrada recebida neste período.</p>}
+                {r.fiados > 0 && (
+                  <p className="g-rel-areceber">
+                    <HandCoins aria-hidden />
+                    <span><b>{brl(r.valorFiado)} a receber</b> de {r.fiados === 1 ? "1 atendimento" : `${r.fiados} atendimentos`} deste período que o cliente ficou de pagar depois. Não está no faturamento: entra quando você der baixa em Financeiro, A receber.</span>
+                  </p>
+                )}
+                {r.porForma.length > 0 && (
+                  <div className="g-rel-formas">
+                    <p className="g-rotulo"><CreditCard size={14} aria-hidden /> Por forma de pagamento</p>
+                    <div className="g-legenda">
+                      {r.porForma.map((f, i, todas) => (
+                        <div key={f.id}><i style={{ background: f.cor }} /><span>{f.rotulo} <span className="g-muted g-pp">{percentuaisQueFecham(todas.map((x) => x.valor))[i]}%</span></span><b>{brl(f.valor)}</b></div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </section>
 
               <section className="g-card">
@@ -276,7 +369,8 @@ function Relatorios() {
                     <p className="g-muted g-pp g-rel-nota">
                       O valor é o que foi cobrado pelo serviço, já com o desconto. Produto e extra da mesma conta não entram aqui.
                       {r.comPacote > 0 && ` ${r.comPacote === 1 ? "1 atendimento foi pago com pacote e não soma" : `${r.comPacote} atendimentos foram pagos com pacote e não somam`} de novo: o dinheiro entrou na venda do pacote.`}
-                      {r.aReceber > 0 && ` ${r.aReceber === 1 ? "1 ainda não foi recebido e conta" : `${r.aReceber} ainda não foram recebidos e contam`} pelo preço da agenda.`}
+                      {r.fiados > 0 && ` ${r.fiados === 1 ? "1 ficou para o cliente pagar depois e conta" : `${r.fiados} ficaram para o cliente pagar depois e contam`} pelo valor cobrado, mesmo sem o dinheiro ter entrado.`}
+                      {r.aReceber > 0 && ` ${r.aReceber === 1 ? "1 ainda está sem conta fechada e conta" : `${r.aReceber} ainda estão sem conta fechada e contam`} pelo preço da agenda.`}
                     </p>
                   </div>
                 ) : <p className="g-muted g-p">Nenhum atendimento concluído neste período.</p>}
@@ -322,7 +416,8 @@ function Relatorios() {
                 ) : <p className="g-muted g-p">Ninguém da equipe tem comissão definida. A porcentagem de cada pessoa fica no cadastro da equipe.</p>}
                 <p className="g-muted g-pp" style={{ marginTop: 10 }}>
                   A base é o valor cobrado pelo serviço nos atendimentos concluídos de cada profissional, já com o desconto (produto e extra ficam de fora).
-                  Atendimento pago com pacote conta pelo preço do serviço na agenda; o que ainda não foi recebido, também.
+                  Atendimento pago com pacote conta pelo preço do serviço na agenda; o que ainda está sem conta fechada, também.
+                  Conta que o cliente ficou de pagar depois entra pelo valor cobrado, mesmo antes de o dinheiro entrar.
                 </p>
               </section>
 
@@ -350,6 +445,15 @@ function Relatorios() {
       </div>
     </>
   );
+}
+
+/** O que está errado nas datas livres (em português); null quando pode buscar. */
+function erroDasDatas(de: string, ate: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(de) || !/^\d{4}-\d{2}-\d{2}$/.test(ate)) return "Escolha a data inicial e a final.";
+  if (de > ate) return "A data inicial não pode ser depois da final.";
+  const dias = Math.round((deIsoDia(ate).getTime() - deIsoDia(de).getTime()) / 864e5) + 1;
+  if (dias > MAX_DIAS) return `O período pode ter no máximo ${MAX_DIAS} dias (um ano).`;
+  return null;
 }
 
 /** Linha com área para muitos pontos (dias do mês ou semanas dos 90 dias). */
