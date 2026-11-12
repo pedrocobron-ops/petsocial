@@ -27,6 +27,8 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
     agendamento_id: l.agendamentoId ?? null, cliente_id: l.clienteId ?? null, origem: l.origem ?? "tela", criado_por: u.user?.id ?? null,
     ...(l.itens?.length ? { itens: l.itens } : {}),
   }).select().single();
+  // outra pessoa recebeu este atendimento no mesmo instante: o banco aceita só um recebimento por atendimento
+  if (error?.code === "23505") throw new Error("Este atendimento já tem recebimento lançado. Atualize a tela para ver.");
   if (error) throw new Error(error.message);
   return data;
 }
