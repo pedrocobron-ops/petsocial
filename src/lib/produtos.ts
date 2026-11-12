@@ -212,7 +212,7 @@ export const PRODUTOS: Produto[] = [
     slug: "influenciador",
     grupo: "redes",
     nome: "Pet Influenciador",
-    chamada: "O passo a passo completo para o perfil do seu pet ficar profissional, crescer e chegar até as marcas.",
+    chamada: "O passo a passo para montar o perfil do seu pet, postar com constância e se apresentar às marcas do jeito certo.",
     dor: "Todo mundo diz que ele deveria estar na internet.",
     preco: 47,
     capa: "/produtos/capa-influenciador.webp",

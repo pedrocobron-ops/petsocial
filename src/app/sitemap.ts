@@ -7,7 +7,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 export default function sitemap(): MetadataRoute.Sitemap {
   const feed = FEED_AREAS.filter((a) => a.lancado).map((a) => `/negocios/feed-pronto/${a.slug}`);
   const paginas = [
-    "", "/tutor", "/negocios",
+    "", "/tutor", "/negocios", "/gestao",
     ...PRODUTOS.filter((p) => p.lancado).map(urlProduto),
     ...(feed.length ? ["/negocios/feed-pronto", ...feed] : []),
     "/fogos", "/sobre", "/contato", "/termos-de-uso", "/politica-de-privacidade",

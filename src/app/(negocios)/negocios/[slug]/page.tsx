@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import PaginaVendas from "@/components/pagina-vendas";
@@ -22,7 +24,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     title: c.seo.titulo,
     description: c.seo.descricao,
     alternates: { canonical: `/negocios/${c.slug}` },
-    openGraph: { title: c.seo.titulo, description: c.seo.descricao, images: [{ url: `/og/${c.slug}.png`, width: 1200, height: 630 }] },
+    openGraph: { title: c.seo.titulo, description: c.seo.descricao, images: [{ url: existsSync(join(process.cwd(), "public", "og", `${c.slug}.png`)) ? `/og/${c.slug}.png` : "/og/home.png", width: 1200, height: 630 }] },
   };
 }
 

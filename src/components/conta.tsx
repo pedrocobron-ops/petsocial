@@ -78,7 +78,7 @@ export default function Conta({ conta, precoProduto }: { conta: ContaExemplo; pr
           <span className="conta-ano">por ano: <b>{reais(sobra * 12)}</b></span>
         </div>
         {paga > 0 && (
-          <p className="conta-paga"><span>{conta.paga ?? "O manual se paga"} com <b>{paga} {paga === 1 ? um : varios}</b>.</span><small>{reais(precoProduto)} ÷ a sobra de cada {um} nesta conta.</small></p>
+          <p className="conta-paga"><span>Nesta conta de exemplo, a sobra de <b>{paga} {paga === 1 ? um : varios}</b> cobre os {reais(precoProduto)} {conta.paga?.includes("livro") ? "do livro de moldes" : "do manual"}.</span><small>{reais(precoProduto)} ÷ a sobra de cada {um} nesta conta.</small></p>
         )}
         {sobra < 0 && <p className="conta-alerta">Com esses números, a conta não fecha. Reveja o preço ou os custos: o manual ensina a calcular.</p>}
         <dl>

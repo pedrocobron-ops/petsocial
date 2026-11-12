@@ -23,7 +23,7 @@ export function AssinaturaMozart() {
         <Image src="/mozart/sorrindo-112.webp" alt="" width={56} height={56} />
         <Image className="assinatura-aceno" src="/mozart/acenando-112.webp" alt="" width={56} height={56} />
       </span>
-      <span>Com o passo a passo do Mozart</span>
+      <span>Com o passo a passo do Mozart, o border collie da casa</span>
     </span>
   );
 }

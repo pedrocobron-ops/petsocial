@@ -6,7 +6,7 @@ export const papelaria: PaginaVendas = {
   seo: {
     titulo: "Kit Papelaria do Pet — 6 kits para imprimir num pacote só",
     descricao:
-      "Carteira de vacinação + guia, RG e certidão, álbum do primeiro ano, calendário 2027, ficha de cuidados e checklists de viagem: os 6 kits para imprimir da Maestro Pet por R$ 24,90.",
+      "Carteira de vacinação + guia, RG e certidão, álbum do primeiro ano, calendário 2027, ficha de cuidados e checklists de viagem: os 6 kits para imprimir do Maestro Pet por R$ 24,90.",
   },
   hero: {
     eyebrow: "6 kits para imprimir · cães e gatos",
@@ -33,7 +33,7 @@ export const papelaria: PaginaVendas = {
     eyebrow: "Seis kits, um preço",
     titulo: "Tudo o que dá para imprimir, num pacote só.",
     paragrafos: [
-      "São os **6 kits para imprimir** da Maestro Pet: saúde, documentos, memórias, rotina do ano, cuidados e viagem. Separados, custam **R$ 54,40**. No pacote, saem por **R$ 24,90**.",
+      "São os **6 kits para imprimir** do Maestro Pet: saúde, documentos, memórias, rotina do ano, cuidados e viagem. Separados, custam **R$ 54,40**. No pacote, saem por **R$ 24,90**.",
       "Imprima em casa ou na gráfica, **quantas vezes quiser**, para todos os pets da casa.",
     ],
   },

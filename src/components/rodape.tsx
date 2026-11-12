@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import Logo from "@/components/logo";
 import { LogosPagamento } from "@/components/pagamento";
@@ -23,22 +22,23 @@ export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocio
       <div className="container rodape-grade">
         <div className="rodape-marca">
           <Logo clara preguicosa />
-          <p className="rodape-tag so-tutor">Guias feitos com calma, para tutores com pressa.</p>
+          <p className="rodape-tag so-tutor">Feito com calma, para quem cuida de pets com pressa.</p>
           <p className="rodape-tag so-negocios">Manuais para quem vive do mercado pet.</p>
-          <Image className="rodape-mozart so-tutor" src="/mozart/acenando-144.webp" alt="" width={72} height={72} />
         </div>
         <nav aria-label="Guias">
           <h2 className="rotulo">Guias</h2>
           <ul>
-            {guias.map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{p.nome}</Link></li>)}
+            {guias.slice(0, 6).map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{p.nome}</Link></li>)}
             <li><Link href="/tutor">Todos os guias e kits</Link></li>
           </ul>
         </nav>
         <nav aria-label="Manuais">
           <h2 className="rotulo">Manuais</h2>
           <ul>
-            {manuais.map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{nomeCurto(p.nome)}</Link></li>)}
+            {manuais.slice(0, 6).map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{nomeCurto(p.nome).split(":")[0]}</Link></li>)}
             {feedLancado && <li><Link href="/negocios/feed-pronto">Feed Pronto</Link></li>}
+            <li><Link href="/negocios">Todos os manuais</Link></li>
+            <li><Link href="/gestao">Sistema para pet shop</Link></li>
           </ul>
         </nav>
         <nav aria-label="Ajuda">
