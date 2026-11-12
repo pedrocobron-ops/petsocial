@@ -112,7 +112,101 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
 
 /* ---------- folha (janela) ---------- */
 
-const pilhaDeFolhas: object[] = [];
+/** Uma folha aberta. `voltar` é o botão Voltar do aparelho: fecha (ou pergunta "Sair sem salvar?") e diz se a folha continuou aberta. */
+type FolhaAberta = { voltar: () => boolean };
+const pilhaDeFolhas: FolhaAberta[] = [];
+
+/* ---------- botão Voltar do celular fecha a folha de cima ----------
+ *
+ * Ao abrir a primeira folha, a tela ganha UMA entrada a mais no histórico (a "guarda"), com o mesmo endereço.
+ * O Voltar do aparelho consome a guarda em vez de sair da tela, e a folha de cima fecha.
+ * - Fechar a folha por código (X, salvar) NÃO mexe no histórico: a guarda fica e é reaproveitada pela próxima folha,
+ *   então abrir e fechar várias vezes não acumula nada. Sem folha aberta, o Voltar passa pela guarda e segue direto
+ *   para a tela anterior (um toque só).
+ * - Navegar com a folha aberta (salvar e ir para outra tela, tocar num link) também não mexe no histórico:
+ *   nunca chamamos history.back() fora de um Voltar que a própria pessoa deu, então nenhuma navegação é desfeita.
+ * As duas entradas levam uma marca com o mesmo número, para o Voltar e o Avançar entre outras telas não serem confundidos.
+ */
+const MARCA_GUARDA = "__folhaGuarda", MARCA_BASE = "__folhaBase";
+type Guarda = { id: string; href: string; len: number; chave: string | null };
+/** A guarda em que estamos agora (ou null, se a entrada atual do histórico não é uma guarda). */
+let guarda: Guarda | null = null;
+
+const marcaDe = (estado: unknown, marca: string): string | null => {
+  const v = estado && typeof estado === "object" ? (estado as Record<string, unknown>)[marca] : null;
+  return typeof v === "string" && v ? v : null;
+};
+/** Identidade da entrada atual do histórico, nos navegadores que informam (não muda quando a tela troca o próprio endereço). */
+function chaveDoHistorico(): string | null {
+  try {
+    const k = (window as unknown as { navigation?: { currentEntry?: { key?: unknown } | null } }).navigation?.currentEntry?.key;
+    return typeof k === "string" ? k : null;
+  } catch { return null; }
+}
+const retratoDaGuarda = (id: string): Guarda => ({ id, href: window.location.href, len: window.history.length, chave: chaveDoHistorico() });
+
+/** Cria a guarda em cima da entrada atual. */
+function porGuarda() {
+  try {
+    const estado = window.history.state as Record<string, unknown> | null;
+    const id = marcaDe(estado, MARCA_BASE) ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    if (!marcaDe(estado, MARCA_BASE)) window.history.replaceState({ ...(estado ?? {}), [MARCA_BASE]: id }, "");
+    // sem endereço: o Next só copia o estado dele para a entrada nova e não navega
+    window.history.pushState({ [MARCA_GUARDA]: id }, "");
+    guarda = retratoDaGuarda(id);
+  } catch { guarda = null; }
+}
+
+/** Confere se ainda estamos na guarda (a tela pode ter navegado ou trocado o próprio endereço) e refaz a marca se ela se perdeu. */
+function conferirGuarda() {
+  if (!guarda) return;
+  try {
+    const estado = window.history.state as Record<string, unknown> | null;
+    const chave = chaveDoHistorico();
+    const marcada = marcaDe(estado, MARCA_GUARDA) === guarda.id;
+    const naMesma = chave && guarda.chave ? chave === guarda.chave : marcada || (!marcaDe(estado, MARCA_GUARDA) && window.history.length === guarda.len);
+    if (!naMesma) { guarda = null; return; }
+    guarda.href = window.location.href;
+    guarda.len = window.history.length;
+    if (!marcada) window.history.replaceState({ ...(estado ?? {}), [MARCA_GUARDA]: guarda.id }, "");
+  } catch { guarda = null; }
+}
+
+function aoVoltarNoHistorico(ev: PopStateEvent) {
+  const vinha = guarda;
+  const estado = window.history.state as Record<string, unknown> | null;
+  const chegou = marcaDe(estado, MARCA_GUARDA);
+  // chegou numa guarda (voltou de outra tela para esta): a tela aparece normalmente
+  if (chegou) { guarda = retratoDaGuarda(chegou); return; }
+  guarda = null;
+  // só é nosso o passo da guarda para a entrada de baixo, da mesma tela
+  if (!vinha || marcaDe(estado, MARCA_BASE) !== vinha.id) return;
+  // o endereço e a tela são os mesmos: o roteador não precisa saber deste passo
+  ev.stopImmediatePropagation();
+  const topo = pilhaDeFolhas[pilhaDeFolhas.length - 1];
+  // nenhuma folha aberta: a guarda era sobra de uma folha já fechada; o Voltar segue para a tela anterior
+  if (!topo) { window.history.back(); return; }
+  // a tela trocou o próprio endereço com a folha aberta (ex.: tirou o "?novo=1"): a entrada de baixo acompanha
+  if (window.location.href !== vinha.href) { try { window.history.replaceState({ [MARCA_BASE]: vinha.id }, "", vinha.href); } catch { /* segue com o endereço antigo */ } }
+  const ficou = topo.voltar();
+  // ainda tem folha aberta (perguntou "Sair sem salvar?" ou havia outra por baixo): repõe a guarda para o próximo Voltar
+  const repor = () => {
+    if (pilhaDeFolhas.length && !guarda && marcaDe(window.history.state, MARCA_BASE) === vinha.id) porGuarda();
+  };
+  if (ficou) repor(); else { window.setTimeout(repor, 0); window.setTimeout(repor, 350); }
+}
+
+if (typeof window !== "undefined") {
+  const w = window as unknown as { __folhaVoltar?: (ev: PopStateEvent) => void };
+  // (em desenvolvimento o módulo recarrega: troca o ouvinte antigo pelo novo)
+  if (w.__folhaVoltar) window.removeEventListener("popstate", w.__folhaVoltar, true);
+  w.__folhaVoltar = aoVoltarNoHistorico;
+  // na captura: roda antes do roteador
+  window.addEventListener("popstate", aoVoltarNoHistorico, true);
+  // página recarregada em cima de uma guarda: lembra dela
+  const id = marcaDe(window.history.state, MARCA_GUARDA);
+  if (id) guarda = retratoDaGuarda(id);
+}
 
 export function Folha({ titulo, aoFechar, children, rodape, larga }: {
   titulo: React.ReactNode; aoFechar: () => void; children: React.ReactNode; rodape?: React.ReactNode; larga?: boolean;
@@ -127,9 +221,22 @@ export function Folha({ titulo, aoFechar, children, rodape, larga }: {
   perguntandoAgora.current = perguntando;
   const tentar = useRef(() => {});
   tentar.current = () => { if (mexeu.current) setPerguntando(true); else fechar.current(); };
+  // a tela pode trocar o próprio endereço com a folha aberta: a guarda do botão Voltar acompanha
+  useEffect(() => { conferirGuarda(); });
   useEffect(() => {
-    const eu = {};
+    // botão Voltar do aparelho: igual ao Esc
+    const eu: FolhaAberta = {
+      voltar: () => {
+        if (perguntandoAgora.current) { setPerguntando(false); return true; }
+        if (mexeu.current) { setPerguntando(true); return true; }
+        fechar.current();
+        return false;
+      },
+    };
     pilhaDeFolhas.push(eu);
+    conferirGuarda();
+    if (!guarda) porGuarda();
+    const relogio = window.setInterval(conferirGuarda, 700);
     // Esc fecha só a folha que está por cima
     const tecla = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || pilhaDeFolhas[pilhaDeFolhas.length - 1] !== eu) return;
@@ -153,6 +260,8 @@ export function Folha({ titulo, aoFechar, children, rodape, larga }: {
     document.documentElement.style.overflow = "hidden";
     return () => {
       pilhaDeFolhas.splice(pilhaDeFolhas.indexOf(eu), 1); document.removeEventListener("keydown", tecla);
+      window.clearInterval(relogio);
+      conferirGuarda();
       no?.removeEventListener("input", digitou); no?.removeEventListener("change", digitou); window.removeEventListener(EVENTO_AVISOU, gravou);
       document.documentElement.style.overflow = antes;
     };

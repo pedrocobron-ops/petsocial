@@ -6,9 +6,9 @@ import { useGestao } from "@/components/gestao/contexto";
 import FormPet from "@/components/gestao/form-pet";
 import { Kpi } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
-import { Chips, ChipsForma, ErroTela, type Forma } from "@/components/gestao/loja/pecas";
+import { AvisoCaixaFechado, CampoDinheiro, Chips, ChipsForma, erroDeValor, ErroTela, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, useFormaLembrada, usePagamento, type PagaDepois } from "@/components/gestao/loja/pecas";
 import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
-import { lancarPago } from "@/lib/gestao/dinheiro";
+import { lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Cliente, Estadia, PacoteCliente, Pet, Petshop, Servico } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, inicioDoDia, isoDia, juntaDiaHora, linkWhatsApp, somaDias } from "@/lib/gestao/util";
@@ -614,7 +614,11 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
   const contadas = contarDiarias(estadia, agora);
   const [diarias, setDiarias] = useState(String(contadas));
   const [valorEditado, setValorEditado] = useState<number | null | undefined>(undefined);
-  const [forma, setForma] = useState<Forma>("pix");
+  // mesmo recebimento da comanda: uma forma, dividido em até três, ou "Cliente paga depois"
+  const [pagamento, setPagamento] = usePagamento();
+  const [depois, setDepois] = useState<PagaDepois>(pagaDepoisInicial);
+  const [erroForma, setErroForma] = useState<string | null>(null);
+  const caixa = useCaixaAberto();
   const [comPacote, setComPacote] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -633,7 +637,10 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
 
   async function salvar() {
     if (!nValido) { avisarErro("Confira o número de diárias."); return; }
-    if (valor != null && valor < 0) { avisarErro("O valor não pode ser negativo."); return; }
+    const valorRuim = pacote ? null : erroDeValor(valor);
+    if (valorRuim) { avisarErro(valorRuim); return; }
+    const rec = cobra && valor ? fecharRecebimento(pagamento, depois, valor) : null;
+    if (rec && "erro" in rec) { setErroForma(rec.noCampo); avisarErro(rec.erro); return; }
     if (pacote) {
       if (pacote.total - pacote.usados < n) { avisarErro(`O pacote só tem ${pacote.total - pacote.usados} para usar e são ${n} diárias. Diminua as diárias ou cobre a diferença à parte.`); return; }
       if (venceu(pacote) && !(await confirmar({ titulo: "Pacote vencido", texto: `Este pacote venceu em ${dataCompleta(pacote.vence_em!)}. Usar mesmo assim?`, confirmar: "Usar mesmo assim" }))) return;
@@ -651,15 +658,21 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
           .eq("id", pacote.id).eq("petshop_id", petshop.id).eq("usados", pacote.usados).select("id");
         if (b.error || !b.data?.length) avisarErro("O check-out foi feito, mas não consegui dar baixa no pacote. Dê baixa pela tela Pacotes.");
         else avisar(`${nome} foi para casa. ${n === 1 ? "1 uso" : `${n} usos`} do pacote, ${pacote.total - usados === 0 ? "que terminou" : `restam ${pacote.total - usados}`}.`);
-      } else if (cobra && valor) {
+      } else if (rec && !("erro" in rec) && valor) {
+        const descricao = `${nomeTipo(estadia.tipo)}: ${n} ${n === 1 ? "diária" : "diárias"} · ${nome}`;
         try {
-          await lancarPago(sb, petshop.id, {
-            tipo: "entrada", valor, forma, categoria: "Creche e hotel",
-            descricao: `${nomeTipo(estadia.tipo)}: ${n} ${n === 1 ? "diária" : "diárias"} · ${nome}`, clienteId: pet?.clientes?.id ?? null,
-          });
-          avisar(`${nome} foi para casa. ${brl(valor)} no financeiro.`);
+          if (rec.fiado) {
+            await lancarAReceber(sb, petshop.id, { valor, vencimento: rec.quando, categoria: "Creche e hotel", descricao, clienteId: pet?.clientes?.id ?? null });
+            avisar(`${nome} foi para casa. ${brl(valor)} em A receber, para ${dataCurta(rec.quando)}.`);
+          } else {
+            lembrarForma(rec.forma);
+            await lancarPago(sb, petshop.id, {
+              tipo: "entrada", valor, forma: rec.forma, pagamentos: rec.pagamentos, categoria: "Creche e hotel", descricao, clienteId: pet?.clientes?.id ?? null,
+            });
+            avisar(`${nome} foi para casa. ${brl(valor)} no financeiro.`);
+          }
         } catch (e) {
-          avisarErro(`O check-out foi feito, mas o pagamento não foi lançado. Lance pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
+          avisarErro(`O check-out foi feito, mas ${rec.fiado ? "a conta a receber não foi anotada. Anote" : "o pagamento não foi lançado. Lance"} pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
         }
       } else avisar(`${nome} foi para casa.`);
       aoGravar();
@@ -670,7 +683,7 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
     <Folha titulo={`Check-out${pet ? ` de ${pet.nome}` : ""}`} aoFechar={aoFechar}
       rodape={<>
         <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : pacote ? "Usar o pacote e encerrar" : cobra ? `Receber ${brl(valor)}` : "Fazer check-out"}</button>
+        <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : pacote ? "Usar o pacote e encerrar" : cobra && depois.ativo ? `Anotar ${brl(valor)} a receber` : cobra ? `Receber ${brl(valor)}` : "Fazer check-out"}</button>
       </>}>
       <div className="g-form">
         <div className="g-card areia">
@@ -702,10 +715,16 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
         )}
         {pacote ? null : vejoFinanceiro ? (
           <>
-            <Campo rotulo="Valor a receber" dica={estadia.valor_diaria == null ? "A diária não foi combinada no check-in. Deixe em branco se não for cobrar agora." : "Deixe em branco se não for cobrar agora."}>
-              <CampoValor valor={valor} aoMudar={setValorEditado} />
+            <Campo rotulo="Valor a receber" erro={erroDeValor(valor)} dica={estadia.valor_diaria == null ? "A diária não foi combinada no check-in. Deixe em branco se não for cobrar." : "Deixe em branco se não for cobrar."}>
+              <CampoDinheiro valor={valor} aoMudar={(v) => { setValorEditado(v); setErroForma(null); }} />
             </Campo>
-            {Boolean(valor) && <ChipsForma valor={forma} aoMudar={setForma} />}
+            {cobra && valor ? (
+              <>
+                <QuandoPaga total={valor} pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErroForma(null); }}
+                  depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} erro={erroForma} />
+                {!depois.ativo && <AvisoCaixaFechado aberto={caixa} />}
+              </>
+            ) : null}
           </>
         ) : (
           <p className="g-muted g-p">O check-out encerra a estadia. O pagamento fica para quem cuida do financeiro lançar.</p>
@@ -723,7 +742,10 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
   const [agora] = useState(() => new Date());
   const [sai, setSai] = useState<Record<string, boolean>>(() => Object.fromEntries(estadias.map((e) => [e.id, true])));
   const [cobrar, setCobrar] = useState<Record<string, boolean>>({});
-  const [forma, setForma] = useState<Forma>("pix");
+  // no lote é uma forma só para todos (quem divide o pagamento sai pelo check-out do próprio pet)
+  const [forma, setForma] = useFormaLembrada();
+  const [erroForma, setErroForma] = useState<string | null>(null);
+  const caixa = useCaixaAberto();
   const [salvando, setSalvando] = useState(false);
 
   const { dados: pacotes } = useDados(async () =>
@@ -742,6 +764,10 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
 
   async function salvar() {
     if (!escolhidas.length || salvando) return;
+    const valorRuim = escolhidas.map((l) => (l.cobra ? erroDeValor(l.valor, `O valor de ${l.e.pets?.nome ?? "um pet"}`) : null)).find(Boolean);
+    if (valorRuim) { avisarErro(valorRuim); return; }
+    if (total > 0 && !forma) { setErroForma("Escolha como os clientes pagaram."); avisarErro("Escolha a forma de pagamento."); return; }
+    if (total > 0 && forma) lembrarForma(forma);
     setSalvando(true);
     let feitos = 0, recebido = 0;
     const falhas: string[] = [];
@@ -752,7 +778,7 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
           .eq("id", l.e.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
         if (!r.length) continue; // já tinha saído por outra tela
         feitos++;
-        if (l.cobra) {
+        if (l.cobra && forma) {
           try {
             await lancarPago(sb, petshop.id, {
               tipo: "entrada", valor: l.valor, forma, categoria: "Creche e hotel",
@@ -797,7 +823,13 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
             </div>
           ))}
         </div>
-        {vejoFinanceiro && total > 0 && <ChipsForma valor={forma} aoMudar={setForma} />}
+        {vejoFinanceiro && total > 0 && (
+          <>
+            <ChipsForma valor={forma} aoMudar={(f) => { setForma(f); setErroForma(null); }} erro={erroForma} />
+            <p className="g-pp g-muted">A mesma forma vale para todos. Se alguém dividir o pagamento ou for pagar depois, desmarque esse pet aqui e faça o check-out pelo cartão dele.</p>
+            <AvisoCaixaFechado aberto={caixa} />
+          </>
+        )}
       </div>
     </Folha>
   );

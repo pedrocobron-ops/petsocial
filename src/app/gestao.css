@@ -1022,3 +1022,7 @@ a.g-ret-linha:hover, button.g-ret-linha:hover { border-color: var(--g-linha-fort
   .g-rs-grade { grid-template-columns: 1fr 1fr; }
   .g-rs-dica .g-btn { justify-self: stretch; }
 }
+
+/* terceira leva: pagamento e voltar */
+/* os botões de dividir o pagamento com a altura de toque das outras ações da folha */
+.g-folha .g-btn.p.g-pg-dividir, .g-folha .g-pg-acoes .g-btn.p { min-height: 44px; }
