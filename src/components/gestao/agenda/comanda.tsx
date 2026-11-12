@@ -8,10 +8,10 @@ import { brl, hora } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "../ui";
 import {
-  baixarEstoque, BuscaProduto, comProduto, encurtar, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
+  baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
   produtosDaConta, resumoDosItens, useProdutosDaLoja, valorDaLinha, type ItemConta,
 } from "../loja/conta";
-import type { Forma } from "../loja/pecas";
+import { AvisoCaixaFechado, lembrarForma, useCaixaAberto, useFormaLembrada } from "../loja/pecas";
 
 /**
  * Fechar a conta de um atendimento: serviço, produtos do estoque e extras numa conta só.
@@ -21,7 +21,7 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
   agendamento: AgendamentoCompleto; aoFechar: () => void; aoPronto: () => void;
 }) {
   const { sb, petshop, user } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const { produtos, carregando, erro } = useProdutosDaLoja();
   const pet = a.pets, tutor = pet?.clientes;
@@ -30,8 +30,10 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
     { chave: novaChave(), tipo: "servico", nome: servico, qtd: 1, valor: a.preco == null ? null : Number(a.preco) },
   ]);
   const [desconto, setDesconto] = useState<number | null>(null);
-  const [forma, setForma] = useState<Forma>("pix");
+  const [forma, setForma] = useFormaLembrada();
+  const [erroForma, setErroForma] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const caixa = useCaixaAberto();
 
   const contas = fecharContas(itens, desconto);
   const vendidos = produtosDaConta(itens);
@@ -49,6 +51,11 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
 
   async function confirmar() {
     if (salvando || nadaAFazer || somenteLeitura()) return;
+    const problema = erroDaConta(itens, desconto, contas.total);
+    if (problema) { avisarErro(problema); return; }
+    if (contas.total > 0 && !forma) { setErroForma("Escolha como o cliente pagou."); avisarErro("Escolha a forma de pagamento."); return; }
+    const falta = faltaNoEstoque(itens, produtos);
+    if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return;
     setSalvando(true);
     let recebeu = false;
     try {
@@ -62,7 +69,8 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
       }
       const gravar = itensParaGravar(itens);
       const mais = resumoDosItens(gravar);
-      if (contas.total > 0) {
+      if (contas.total > 0 && forma) {
+        lembrarForma(forma);
         await lancarPago(sb, petshop.id, {
           tipo: "entrada", valor: contas.total, forma, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null,
           descricao: encurtar(`${servico} · ${pet?.nome ?? ""}`.trim().replace(/ ·$/, "") + (mais ? ` + ${mais}` : "")), itens: gravar,
@@ -121,9 +129,10 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
         </div>
 
         <FechamentoDaConta subtotal={contas.subtotal} desconto={contas.desconto} total={contas.total} descontoDigitado={desconto} aoDesconto={setDesconto}
-          forma={forma} aoForma={setForma} />
+          forma={forma} aoForma={(f) => { setForma(f); setErroForma(null); }} erroForma={erroForma} />
+        {contas.total > 0 && <AvisoCaixaFechado aberto={caixa} />}
         <p className="g-pp g-muted">
-          {contas.total > 0 ? "O valor entra no caixa de hoje" : "Nada entra no caixa"}
+          {contas.total > 0 ? (caixa === false ? "O valor entra no financeiro de hoje, fora do caixa" : "O valor entra no caixa de hoje") : "Nada entra no caixa"}
           {vendidos.length ? ", os produtos saem do estoque" : ""}
           {a.status !== "concluido" ? " e o atendimento fica como concluído." : "."}
         </p>

@@ -3,10 +3,10 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BellRing, ChevronLeft, ChevronRight, Lock, Plus, Truck, Printer } from "lucide-react";
+import { BellRing, ChevronLeft, ChevronRight, Lock, Plus, Truck, Printer, Users } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { deMin, paraMin } from "@/lib/gestao/agenda";
+import { deMin, paraMin, vagasDe } from "@/lib/gestao/agenda";
 import { dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
@@ -86,7 +86,7 @@ function Agenda() {
   const funcionamento = horarioDoDia(petshop.horario, data);
   const linhas = useMemo(() => {
     type Linha = { tipo: "ag"; a: AgendamentoCompleto } | { tipo: "livre"; de: number; ate: number } | { tipo: "bloq"; t: Trecho };
-    const out: Linha[] = [];
+    const out: { de: number; linha: Linha }[] = [];
     const ativos = doDia.filter((a) => !["cancelado", "faltou"].includes(a.status));
     const base = data.getTime();
     const min = (iso: string) => Math.round((new Date(iso).getTime() - base) / 60000);
@@ -101,13 +101,27 @@ function Agenda() {
       ...bloqueiosDoDia.map((t) => ({ linha: { tipo: "bloq", t } as Linha, de: t.de, ate: t.ate, conta: !t.b.profissional_id || t.b.profissional_id === prof || quemAtende.length <= 1 })),
     ].sort((x, y) => x.de - y.de || Number(y.linha.tipo === "bloq") - Number(x.linha.tipo === "bloq"));
     for (const it of itens) {
-      if (it.conta && cursor != null && fecha != null && it.de - cursor >= 30 && cursor < fecha) out.push({ tipo: "livre", de: cursor, ate: Math.min(it.de, fecha) });
-      out.push(it.linha);
+      if (it.conta && cursor != null && fecha != null && it.de - cursor >= 30 && cursor < fecha) out.push({ de: cursor, linha: { tipo: "livre", de: cursor, ate: Math.min(it.de, fecha) } });
+      out.push({ de: it.de, linha: it.linha });
       if (it.conta && cursor != null) cursor = Math.max(cursor, it.ate);
     }
-    if (cursor != null && fecha != null && fecha - cursor >= 30) out.push({ tipo: "livre", de: cursor, ate: fecha });
-    return out;
+    if (cursor != null && fecha != null && fecha - cursor >= 30) out.push({ de: cursor, linha: { tipo: "livre", de: cursor, ate: fecha } });
+    // sempre na ordem do relógio: o tempo livre não fica depois de um horário cancelado ou marcado fora do expediente
+    return out.map((x, i) => ({ ...x, i })).sort((x, y) => x.de - y.de || x.i - y.i).map((x) => x.linha);
   }, [doDia, bloqueiosDoDia, funcionamento, data.getTime(), prof, quemAtende.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // horários que passam das vagas: mais pets ao mesmo tempo do que o pet shop atende (conta todos os profissionais e os "a definir")
+  const vagas = vagasDe(petshop, equipe);
+  const lotados = useMemo(() => {
+    const ativos = (dados ?? []).filter((a) => !["cancelado", "faltou"].includes(a.status))
+      .map((a) => ({ id: a.id, de: new Date(a.inicio).getTime(), ate: new Date(a.fim).getTime() }));
+    const mapa = new Map<string, number>();
+    for (const a of ativos) {
+      const juntos = ativos.filter((b) => b.de <= a.de && b.ate > a.de);
+      if (juntos.length > vagas) for (const b of juntos) mapa.set(b.id, Math.max(mapa.get(b.id) ?? 0, juntos.length));
+    }
+    return mapa;
+  }, [dados, vagas]);
 
   const resumo = useMemo(() => {
     const ativos = doDia.filter((a) => !["cancelado", "faltou"].includes(a.status));
@@ -140,14 +154,14 @@ function Agenda() {
           <h1>Agenda</h1>
           <p className="g-muted">{mesmoDia(data, new Date()) ? "Hoje, " : ""}{dataLonga(data)}</p>
         </div>
-        <div className="g-acoes">
+        <div className="g-acoes g-agd-acoes">
           <div className="g-seg g-so-pc" role="group" aria-label="Visão">
             <button aria-pressed={visao === "dia"} onClick={() => setVisao("dia")}>Dia</button>
             <button aria-pressed={visao === "semana"} onClick={() => setVisao("semana")}>Semana</button>
           </div>
-          <Link className="g-btn sec" href={`/gestao/app/agenda/imprimir?dia=${dia}&visao=${visao}${prof ? `&prof=${prof}` : ""}`} title="Imprimir ou salvar a agenda em PDF"><Printer /><span className="g-agd-curto">Imprimir</span></Link>
+          <Link className="g-btn sec" href={`/gestao/app/agenda/imprimir?dia=${dia}&visao=${visao}${prof ? `&prof=${prof}` : ""}`} title="Imprimir ou salvar a agenda em PDF"><Printer />Imprimir</Link>
           <LinkRapido />
-          <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear<span className="g-agd-curto">&nbsp;horário</span></button>
+          <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear horário</button>
           <button className="g-btn pri" onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>
         </div>
       </header>
@@ -189,12 +203,21 @@ function Agenda() {
             </div>
             {diasDaSemana.map((d) => {
               const lista = todos.filter((a) => mesmoDia(new Date(a.inicio), d));
-              // atendimentos que se sobrepõem dividem a largura da coluna
-              const raias: AgendamentoCompleto[][] = [];
+              // atendimentos que se cruzam formam um grupo e dividem a largura da coluna em até duas raias;
+              // com mais do que isso, a primeira raia aparece e o resto vira um botão "+N" que abre o dia
+              const grupos: { itens: AgendamentoCompleto[]; de: number; ate: number; raias: AgendamentoCompleto[][] }[] = [];
               for (const a of lista) {
-                const r = raias.find((x) => new Date(x[x.length - 1].fim) <= new Date(a.inicio));
-                if (r) r.push(a); else raias.push([a]);
+                const i = new Date(a.inicio).getTime(), f = new Date(a.fim).getTime();
+                const g = grupos[grupos.length - 1];
+                if (g && i < g.ate) { g.itens.push(a); g.ate = Math.max(g.ate, f); } else grupos.push({ itens: [a], de: i, ate: f, raias: [] });
               }
+              for (const g of grupos) {
+                for (const a of g.itens) {
+                  const r = g.raias.find((x) => new Date(x[x.length - 1].fim) <= new Date(a.inicio));
+                  if (r) r.push(a); else g.raias.push([a]);
+                }
+              }
+              const topoDe = (ms: number) => { const x = new Date(ms); return ((x.getHours() * 60 + x.getMinutes() - faixa.ini) / 60) * H_HORA; };
               const agora = new Date();
               return (
                 <div key={d.getTime()} className={`g-semana-col${horarioDoDia(petshop.horario, d) ? "" : " fechado"}${mesmoDia(d, new Date()) ? " hoje" : ""}`}
@@ -218,19 +241,37 @@ function Agenda() {
                       </button>
                     );
                   })}
-                  {raias.map((r, ri) => r.map((a) => {
-                    const i = new Date(a.inicio), f = new Date(a.fim);
-                    const topo = ((i.getHours() * 60 + i.getMinutes() - faixa.ini) / 60) * H_HORA;
-                    const alt = Math.max(26, ((f.getTime() - i.getTime()) / 36e5) * H_HORA - 2);
-                    return (
-                      <button key={a.id} className={`g-bloco${["cancelado", "faltou"].includes(a.status) ? " apagado" : ""}`} onClick={() => setAberto(a.id)}
-                        style={{ top: topo, height: alt, left: `calc(${(ri / raias.length) * 100}% + 3px)`, right: `calc(${((raias.length - ri - 1) / raias.length) * 100}% + 3px)`, "--cor": a.servicos?.cor ?? "#f97316" } as React.CSSProperties}>
-                        <b>{a.pets?.nome}</b>
-                        <span>{hora(a.inicio)}{alt > 40 ? ` · ${a.servicos?.nome ?? ""}` : ""}</span>
-                        {alt > 62 && a.pets && raias.length === 1 && <span className="av"><AvatarPet pet={a.pets} tamanho="p" /></span>}
-                      </button>
-                    );
-                  }))}
+                  {grupos.map((g) => {
+                    const cheio = g.raias.length > 2;
+                    const colunas = cheio ? 2 : g.raias.length;
+                    const escondidos = cheio ? g.itens.length - g.raias[0].length : 0;
+                    const algumLotado = g.itens.some((a) => lotados.has(a.id));
+                    return [
+                      ...(cheio ? [g.raias[0]] : g.raias).flatMap((r, ri) => r.map((a) => {
+                        const i = new Date(a.inicio), f = new Date(a.fim);
+                        const alt = Math.max(26, ((f.getTime() - i.getTime()) / 36e5) * H_HORA - 2);
+                        const tutor = a.pets?.clientes?.nome;
+                        return (
+                          <button key={a.id} className={`g-bloco${["cancelado", "faltou"].includes(a.status) ? " apagado" : ""}${lotados.has(a.id) ? " lotado" : ""}`} onClick={() => setAberto(a.id)}
+                            title={`${hora(a.inicio)} · ${a.pets?.nome ?? "Pet"}${tutor ? ` (${tutor})` : ""} · ${a.servicos?.nome ?? "Atendimento"}${lotados.has(a.id) ? ` · passa das vagas: ${lotados.get(a.id)} ao mesmo tempo` : ""}`}
+                            style={{ top: topoDe(i.getTime()), height: alt, left: `calc(${(ri / colunas) * 100}% + 3px)`, right: `calc(${((colunas - ri - 1) / colunas) * 100}% + 3px)`, "--cor": a.servicos?.cor ?? "#f97316" } as React.CSSProperties}>
+                            <b>{a.pets?.nome}</b>
+                            <span>{hora(a.inicio)}{alt > 40 ? ` · ${a.servicos?.nome ?? ""}` : ""}</span>
+                            {alt > 56 && tutor && <span>{tutor}</span>}
+                            {alt > 62 && a.pets && colunas === 1 && <span className="av"><AvatarPet pet={a.pets} tamanho="p" /></span>}
+                          </button>
+                        );
+                      })),
+                      cheio && (
+                        <button key={`mais-${g.de}`} className={`g-bloco g-agd-mais${algumLotado ? " lotado" : ""}`} onClick={() => { setDia(isoDia(d)); setVisao("dia"); }}
+                          title={`Mais ${escondidos} no mesmo horário: ${g.itens.filter((a) => !g.raias[0].includes(a)).map((a) => `${hora(a.inicio)} ${a.pets?.nome ?? "Pet"}`).join(", ")}. Toque para ver o dia.`}
+                          style={{ top: topoDe(g.de), height: Math.max(26, ((g.ate - g.de) / 36e5) * H_HORA - 2), left: "calc(50% + 3px)", right: "3px" } as React.CSSProperties}>
+                          <b>+{escondidos}</b>
+                          <span>{algumLotado ? "acima das vagas" : "ver o dia"}</span>
+                        </button>
+                      ),
+                    ];
+                  })}
                 </div>
               );
             })}
@@ -275,7 +316,9 @@ function Agenda() {
                     {l.a.pets && <AvatarPet pet={l.a.pets} />}
                     <span className="t">
                       <b>{l.a.pets?.nome}</b>
-                      <span className="serv"><i />{[l.a.servicos?.nome, l.a.pets?.clientes?.nome, quemAtende.length > 1 ? l.a.profissionais?.nome.split(" ")[0] : null].filter(Boolean).join(" · ")}</span>
+                      <span className="serv"><i />{[l.a.servicos?.nome, quemAtende.length > 1 ? l.a.profissionais?.nome.split(" ")[0] : null].filter(Boolean).join(" · ") || "Atendimento"}</span>
+                      {l.a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {l.a.pets.clientes.nome}</span>}
+                      {lotados.has(l.a.id) && !["cancelado", "faltou"].includes(l.a.status) && <span className="g-agd-lotado"><Users size={13} aria-hidden />Passa das vagas: {lotados.get(l.a.id)} ao mesmo tempo</span>}
                     </span>
                     {l.a.leva_traz && <Truck size={18} aria-label="Leva e traz" />}
                     {l.a.pronto_avisado_em && <span className="g-agd-avisado" role="img" aria-label={`Tutor avisado às ${hora(l.a.pronto_avisado_em)}`} title={`Tutor avisado às ${hora(l.a.pronto_avisado_em)}`}><BellRing aria-hidden /></span>}

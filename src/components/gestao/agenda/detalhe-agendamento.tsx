@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BellRing, CalendarClock, Check, MessageCircle, Play, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
+import { BellRing, CalendarClock, CalendarX, Check, MessageCircle, Play, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
 import type { AgendamentoCompleto, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, FORMAS, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoLembrete, textoPronto } from "@/lib/gestao/agenda";
+import { desfazerVenda, produtosDaVenda } from "@/lib/gestao/dinheiro";
 import { brl, dataAmigavel, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
@@ -21,6 +22,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const somenteLeitura = useSomenteLeitura();
   const [comanda, setComanda] = useState(false);
   const [cancelando, setCancelando] = useState(false);
+  const [apagando, setApagando] = useState(false);
   const [checklist, setChecklist] = useState<Record<string, boolean>>((a.checklist as Record<string, boolean>) ?? {});
   const [ocupado, setOcupado] = useState(false);
   const [avisadoEm, setAvisadoEm] = useState(a.pronto_avisado_em);
@@ -38,7 +40,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   // já foi pago? tem pacote que cobre este serviço?
   const { dados: extra, recarregar } = useDados(async () => {
     const [pago, pacotes] = await Promise.all([
-      vejoFinanceiro ? sb.from("lancamentos").select("id, valor, forma").eq("agendamento_id", a.id).eq("tipo", "entrada") : Promise.resolve({ data: [], error: null }),
+      vejoFinanceiro ? sb.from("lancamentos").select("id, valor, forma, itens").eq("agendamento_id", a.id).eq("tipo", "entrada") : Promise.resolve({ data: [], error: null }),
       sb.from("pacotes_clientes").select("*").eq("petshop_id", petshop.id).eq("pet_id", a.pet_id).eq("ativo", true),
     ]);
     const validos = ((pacotes.data ?? []) as PacoteCliente[]).filter((p) => p.usados < p.total && (!p.vence_em || p.vence_em >= isoDia(new Date())) && (!p.servico_id || p.servico_id === a.servico_id));
@@ -90,16 +92,55 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     setOcupado(false);
   }
 
-  async function apagar() {
+  const avisoPacote = a.pacote_cliente_id ? " Este atendimento foi pago com um pacote: apagar o horário não devolve o uso ao pacote (acerte em Pacotes, se for o caso)." : "";
+
+  /** Toque na lixeira: sem recebimento, uma confirmação simples; com recebimento, abre a escolha (apagar junto ou manter). */
+  async function pedirApagar() {
     if (somenteLeitura()) return;
-    if (!(await confirmar({ titulo: "Apagar este horário?", texto: "Ele some da agenda. Se o cliente só desmarcou, prefira Cancelar, que fica no histórico.", confirmar: "Apagar", perigo: true }))) return;
+    if (recebido > 0) { setApagando(true); return; }
+    if (!(await confirmar({ titulo: "Apagar este horário?", texto: `Ele some da agenda. Se o cliente só desmarcou, prefira Desmarcar horário, que fica no histórico.${avisoPacote}`, confirmar: "Apagar", perigo: true }))) return;
+    void apagar(false);
+  }
+
+  /** Apaga o horário. Com `comRecebimento`, apaga antes o pagamento lançado (e devolve ao estoque os produtos vendidos na conta). */
+  async function apagar(comRecebimento: boolean) {
+    if (somenteLeitura()) return;
+    setOcupado(true);
     try {
+      let extraAviso = "";
+      if (comRecebimento) {
+        let voltaram = 0, erroEstoque: string | null = null;
+        for (const l of extra?.pago ?? []) {
+          // se o lançamento é de um caixa já fechado, o banco recusa e o horário também fica como está
+          const r = await desfazerVenda(sb, petshop.id, l);
+          voltaram += r.devolvidos;
+          erroEstoque = erroEstoque ?? r.erroEstoque;
+        }
+        extraAviso = ` O recebimento de ${brl(recebido)} também foi apagado${voltaram ? ` e ${voltaram === 1 ? "1 produto voltou" : `${voltaram} produtos voltaram`} para o estoque` : ""}.`;
+        if (erroEstoque) avisarErro(`O recebimento foi apagado, mas os produtos não voltaram para o estoque. Acerte o saldo na tela de Estoque. (${erroEstoque})`);
+      }
       ok(await sb.from("agendamentos").delete().eq("id", a.id).select("id"));
       const fotos = [a.foto_antes, a.foto_depois].filter((c): c is string => Boolean(c));
       if (fotos.length) void sb.storage.from("pets").remove(fotos);
-      avisar("Horário apagado.");
+      avisar(`Horário apagado.${extraAviso}${!comRecebimento && recebido > 0 ? ` O recebimento de ${brl(recebido)} continua no financeiro.` : ""}`);
       avisarMudanca(); aoMudar(); aoFechar();
-    } catch (e) { avisarErro(e); }
+    } catch (e) { avisarErro(e); avisarMudanca(); void recarregar(); } finally { setOcupado(false); }
+  }
+
+  /** Desmarcar (cancelar o atendimento): pede confirmação; se o horário se repete, pergunta se é só este ou este e os próximos. */
+  async function pedirDesmarcar() {
+    if (somenteLeitura()) return;
+    if (a.serie_id) { setCancelando(true); return; }
+    if (!(await confirmar({ titulo: "Desmarcar este horário?", texto: `${pet?.nome ?? "O pet"}, ${dataAmigavel(a.inicio)} às ${hora(a.inicio)}. O horário fica como cancelado no histórico e a vaga volta a ficar livre.`, confirmar: "Desmarcar horário", perigo: true }))) return;
+    void mudar({ status: "cancelado" }, "Horário desmarcado.");
+  }
+
+  /** Falta: se o horário ainda não chegou, confirma antes (toque errado é comum). */
+  async function pedirFalta() {
+    if (somenteLeitura()) return;
+    if (new Date(a.inicio).getTime() > Date.now()
+      && !(await confirmar({ titulo: "Marcar como falta?", texto: `O horário de ${pet?.nome ?? "este pet"} é ${dataAmigavel(a.inicio)} às ${hora(a.inicio)} e ainda não chegou. Se o cliente avisou que não vem, prefira Desmarcar horário.`, confirmar: "Marcar falta" }))) return;
+    void mudar({ status: "faltou" }, "Marcado como falta.");
   }
 
   const zap = linkWhatsApp(tutor?.telefone, textoLembrete({
@@ -112,17 +153,41 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     return <Comanda agendamento={a} aoFechar={() => setComanda(false)} aoPronto={() => { aoMudar(); aoFechar(); }} />;
   }
 
+  if (apagando) {
+    const comProdutos = (extra?.pago ?? []).reduce((n, l) => n + produtosDaVenda(l).length, 0);
+    return (
+      <Folha titulo="Apagar um horário que já foi pago" aoFechar={() => setApagando(false)}
+        rodape={<button className="g-btn sec" disabled={ocupado} onClick={() => setApagando(false)}>Voltar</button>}>
+        <div className="g-pilha">
+          <p className="g-aviso" style={{ margin: 0 }}>
+            <span>Este horário tem um pagamento de <b>{brl(recebido)}</b> lançado{formasDoRecebido ? ` (${formasDoRecebido})` : ""}. O que fazer com ele?</span>
+          </p>
+          <p className="g-muted g-p">
+            {pet?.nome ?? "O pet"}, {dataAmigavel(a.inicio)} às {hora(a.inicio)}. O horário some da agenda e não dá para desfazer.
+            {comProdutos > 0 ? ` Se apagar o recebimento, ${comProdutos === 1 ? "o produto vendido nesta conta volta" : "os produtos vendidos nesta conta voltam"} para o estoque.` : ""}
+            {avisoPacote}
+          </p>
+          <div className="g-pilha p">
+            <button className="g-btn perigo cheio" disabled={ocupado} onClick={() => void apagar(true)}>Apagar o horário e o recebimento de {brl(recebido)}</button>
+            <button className="g-btn sec cheio" disabled={ocupado} onClick={() => void apagar(false)}>Apagar só o horário e manter o recebimento</button>
+          </div>
+          <p className="g-muted g-pp">Mantendo o recebimento, o dinheiro continua no caixa e no financeiro, sem ligação com a agenda.</p>
+        </div>
+      </Folha>
+    );
+  }
+
   if (cancelando) {
     return (
-      <Folha titulo="Cancelar um horário que se repete" aoFechar={() => setCancelando(false)}
+      <Folha titulo="Desmarcar um horário que se repete" aoFechar={() => setCancelando(false)}
         rodape={<button className="g-btn sec" onClick={() => setCancelando(false)}>Voltar</button>}>
         <div className="g-pilha">
           <p className="g-muted">
             {pet?.nome ?? "Este pet"} tem este horário marcado para se repetir. Os que já foram atendidos continuam no histórico.
           </p>
           <div className="g-pilha p">
-            <button className="g-btn sec cheio" disabled={ocupado} onClick={() => void mudar({ status: "cancelado" }, "Horário cancelado.").then((deu) => deu && setCancelando(false))}>Só este</button>
-            <button className="g-btn perigo cheio" disabled={ocupado} onClick={() => void cancelarDaquiEmDiante()}>Este e os próximos</button>
+            <button className="g-btn sec cheio" disabled={ocupado} onClick={() => void mudar({ status: "cancelado" }, "Horário desmarcado.").then((deu) => deu && setCancelando(false))}>Desmarcar só este</button>
+            <button className="g-btn perigo cheio" disabled={ocupado} onClick={() => void cancelarDaquiEmDiante()}>Desmarcar este e os próximos</button>
           </div>
         </div>
       </Folha>
@@ -204,10 +269,13 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         <hr className="g-sep" />
         <div className="g-fila">
           {!encerrado && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) aoEditar(); }}><CalendarClock />Remarcar ou alterar</button>}
-          {!encerrado && <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void mudar({ status: "faltou" }, "Marcado como falta.")}><UserX />Faltou</button>}
-          {!encerrado && <button className="g-btn fantasma p" disabled={ocupado} onClick={() => { if (a.serie_id) { if (!somenteLeitura()) setCancelando(true); } else void mudar({ status: "cancelado" }, "Horário cancelado."); }}>Cancelar</button>}
+          {!encerrado && <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirFalta()}><UserX />Faltou</button>}
+          {!encerrado && <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirDesmarcar()}><CalendarX />Desmarcar horário</button>}
           {encerrado && <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void mudar({ status: "marcado" }, "Voltou para marcado.")}>Voltar para marcado</button>}
-          <button className="g-btn fantasma p" onClick={() => void apagar()} aria-label="Apagar horário"><Trash2 /></button>
+        </div>
+        {/* a lixeira fica sozinha, longe de Desmarcar, para não apagar por engano */}
+        <div className="g-agd-apagar">
+          <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirApagar()}><Trash2 />Apagar da agenda</button>
         </div>
       </div>
     </Folha>

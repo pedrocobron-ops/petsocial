@@ -9,7 +9,7 @@
 .g-imp-cab p { font-size: .9375rem; }
 .g-imp-quando { font-size: .75rem !important; color: #6a625a; }
 .g-imp-dia { display: grid; gap: 8px; break-inside: avoid-page; }
-.g-imp-dia h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font: 600 1.0625rem/1.2 var(--sans); text-transform: capitalize; padding: 6px 10px; background: #f1eadd; border-radius: 8px; }
+.g-imp-dia h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font: 600 1.0625rem/1.2 var(--sans); padding: 6px 10px; background: #f1eadd; border-radius: 8px; }
 .g-imp-dia h2 small { font-weight: 500; font-size: .8125rem; color: #6a625a; text-transform: none; }
 .g-imp-bloq { display: flex; align-items: center; gap: 6px; font-size: .875rem; color: #6a625a; }
 .g-imp-bloq svg { width: 14px; height: 14px; }

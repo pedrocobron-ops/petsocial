@@ -8,24 +8,26 @@ import { brl, fmtTelefone, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPessoa, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import {
-  baixarEstoque, BuscaProduto, comProduto, encurtar, fecharContas, FechamentoDaConta, itensParaGravar, LinhaDaConta, produtosDaConta,
+  baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LinhaDaConta, produtosDaConta,
   resumoDosItens, useProdutosDaLoja, type ItemConta,
 } from "./conta";
-import type { Forma } from "./pecas";
+import { AvisoCaixaFechado, lembrarForma, useCaixaAberto, useFormaLembrada } from "./pecas";
 
 type Tutor = Pick<Cliente, "id" | "nome" | "telefone">;
 
 /** Venda de produtos sem agendamento: escolhe os produtos, recebe e dá baixa no estoque. */
 export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => void; aoPronto?: () => void }) {
   const { sb, petshop, user, vejoFinanceiro } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const { produtos, carregando, erro } = useProdutosDaLoja();
   const [itens, setItens] = useState<ItemConta[]>([]);
   const [tutor, setTutor] = useState<Tutor | null>(null);
   const [desconto, setDesconto] = useState<number | null>(null);
-  const [forma, setForma] = useState<Forma>("pix");
+  const [forma, setForma] = useFormaLembrada();
+  const [erroForma, setErroForma] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const caixa = useCaixaAberto();
 
   const contas = fecharContas(itens, vejoFinanceiro ? desconto : null);
   const vendidos = produtosDaConta(itens);
@@ -34,11 +36,17 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
   async function confirmar() {
     if (salvando || somenteLeitura()) return;
     if (!vendidos.length) { avisarErro("Escolha pelo menos um produto."); return; }
+    const problema = erroDaConta(itens, vejoFinanceiro ? desconto : null, contas.total);
+    if (problema) { avisarErro(problema); return; }
     if (vejoFinanceiro && contas.total <= 0) { avisarErro("A venda está sem valor. Confira os preços e o desconto."); return; }
+    if (vejoFinanceiro && !forma) { setErroForma("Escolha como o cliente pagou."); avisarErro("Escolha a forma de pagamento."); return; }
+    const falta = faltaNoEstoque(itens, produtos);
+    if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return;
     setSalvando(true);
     try {
       const gravar = itensParaGravar(vendidos);
-      if (vejoFinanceiro) {
+      if (vejoFinanceiro && forma) {
+        lembrarForma(forma);
         await lancarPago(sb, petshop.id, {
           tipo: "entrada", valor: contas.total, forma, categoria: "Venda de produtos", clienteId: tutor?.id ?? null,
           descricao: encurtar(`Venda: ${resumoDosItens(gravar)}`), itens: gravar,
@@ -78,7 +86,8 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
         <EscolherTutor valor={tutor} aoMudar={setTutor} />
 
         <FechamentoDaConta subtotal={contas.subtotal} desconto={contas.desconto} total={contas.total} descontoDigitado={desconto} aoDesconto={setDesconto}
-          forma={forma} aoForma={setForma} comPagamento={vejoFinanceiro} />
+          forma={forma} aoForma={(f) => { setForma(f); setErroForma(null); }} comPagamento={vejoFinanceiro} erroForma={erroForma} />
+        {vejoFinanceiro && <AvisoCaixaFechado aberto={caixa} />}
         {!vejoFinanceiro && <p className="g-muted g-pp">A venda sai do estoque. O dinheiro fica para quem cuida do financeiro lançar.</p>}
       </div>
     </Folha>

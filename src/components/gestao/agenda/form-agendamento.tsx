@@ -1,18 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarOff, Check, Clock, Lock, Repeat, Truck } from "lucide-react";
+import { CalendarOff, Check, Clock, Lock, Repeat, TriangleAlert, Truck, Users } from "lucide-react";
 import type { AgendamentoCompleto, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, vagasDe } from "@/lib/gestao/agenda";
-import { brlCurto, dataAmigavel, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, nomeDiaCurto, precoDoServico, somaDias } from "@/lib/gestao/util";
+import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, paraMin, vagasDe } from "@/lib/gestao/agenda";
+import { dataAmigavel, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, nomeDiaCurto, precoDoServico, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
-import { AvatarPet, Campo, CampoValor, EscolherPet, Folha, avisarMudanca, ok, useAvisos, useDados } from "../ui";
+import { CampoDinheiro, erroDeValor } from "../loja/pecas";
+import { AvatarPet, Campo, EscolherPet, Folha, avisarMudanca, ok, useAvisos, useDados } from "../ui";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
-type Problema = { tipo: "fechado" | "bloqueio" | "conflito"; texto: string };
+type Problema = { tipo: "fechado" | "bloqueio" | "conflito" | "vagas" | "fora"; texto: string };
+/** Horários livres separados por parte do dia. */
+const PARTES = [
+  { rotulo: "Manhã", de: 0, ate: 12 * 60 },
+  { rotulo: "Tarde", de: 12 * 60, ate: 18 * 60 },
+  { rotulo: "Noite", de: 18 * 60, ate: 24 * 60 },
+];
+/** O ano da data faz sentido? (do ano passado até daqui a dois anos) */
+function anoFazSentido(dia: string) {
+  const ano = Number(dia.slice(0, 4)), atual = new Date().getFullYear();
+  return RE_DIA.test(dia) && !Number.isNaN(deIsoDia(dia).getTime()) && ano >= atual - 1 && ano <= atual + 2;
+}
 
 /**
  * Marca um horário novo ou altera um existente. Avisa (sem impedir) quando bate com outro atendimento ou com um bloqueio.
@@ -99,20 +111,49 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   };
   const bloqueioAqui = diaOk && hhmm ? bloqueioEm(dia) : null;
 
-  /** Confere cada data: dia fechado, bloqueio e conflito com outro horário do mesmo profissional (a mesma conferência do salvar). */
+  // vagas: quantos pets o pet shop atende ao mesmo tempo, somando todos os profissionais e os "a definir"
+  const vagas = vagasDe(petshop, equipe);
+  type Marcado = { id: string; inicio: string; fim: string; status: string };
+  /** O máximo de outros pets ao mesmo tempo dentro do horário escolhido, no dia `d`. */
+  const juntosEm = (lista: Marcado[], d: string) => {
+    const ini = juntaDiaHora(d, hhmm).getTime(), fim = ini + duracao * 60000;
+    const outros = lista.filter((a) => a.id !== agendamento?.id && !["cancelado", "faltou"].includes(a.status))
+      .map((a) => ({ de: new Date(a.inicio).getTime(), ate: new Date(a.fim).getTime() })).filter((a) => a.de < fim && a.ate > ini);
+    return Math.max(0, ...[ini, ...outros.map((a) => a.de)].filter((t) => t >= ini && t < fim).map((t) => outros.filter((a) => a.de <= t && a.ate > t).length));
+  };
+  /** O horário escolhido cabe no expediente do dia `d`? (dia fechado é outro aviso) */
+  const foraDoExpediente = (d: string) => {
+    const f = horarioDoDia(petshop.horario, deIsoDia(d));
+    if (!f || !hhmm) return null;
+    const ini = paraMin(hhmm);
+    return ini < paraMin(f.abre) || ini + duracao > paraMin(f.fecha) ? f : null;
+  };
+  const juntosAqui = diaOk && hhmm && doDia ? juntosEm(doDia, dia) : 0;
+  const lotadoAqui = juntosAqui >= vagas;
+  const foraAqui = diaOk ? foraDoExpediente(dia) : null;
+  const anoOk = anoFazSentido(dia);
+  // data ou hora que já passou (em edição, só avisa se a pessoa mexeu no dia ou na hora)
+  const mexeuNoQuando = !agendamento || dia !== isoDia(new Date(agendamento.inicio)) || hhmm !== hora(agendamento.inicio);
+  const jaPassou = diaOk && anoOk && mexeuNoQuando && (dia < isoDia(new Date()) ? "dia" : dia === isoDia(new Date()) && hhmm && juntaDiaHora(dia, hhmm).getTime() < Date.now() - 5 * 60000 ? "hora" : null);
+
+  /** Confere cada data: dia fechado, fora do expediente, bloqueio, conflito com o mesmo profissional e vagas (a mesma conferência do salvar). */
   async function conferir(lista: string[]): Promise<Record<string, Problema[]>> {
     const bate = await Promise.all(lista.map(async (d) => {
       if (!profId) return 0;
       const ini = juntaDiaHora(d, hhmm);
       return ok(await sb.rpc("conflitos_agenda", { p_petshop: petshop.id, p_profissional: profId, p_inicio: ini.toISOString(), p_fim: new Date(ini.getTime() + duracao * 60000).toISOString(), p_ignorar: agendamento?.id })).length;
     }));
+    const marcados = ok(await sb.from("agendamentos").select("id, inicio, fim, status").eq("petshop_id", petshop.id)
+      .gte("inicio", somaDias(deIsoDia(lista[0]), -1).toISOString()).lt("inicio", somaDias(deIsoDia(lista[lista.length - 1]), 1).toISOString()).limit(5000));
     const out: Record<string, Problema[]> = {};
     lista.forEach((d, i) => {
       const p: Problema[] = [];
       if (!horarioDoDia(petshop.horario, deIsoDia(d))) p.push({ tipo: "fechado", texto: "fechado" });
+      else if (foraDoExpediente(d)) p.push({ tipo: "fora", texto: "fora do expediente" });
       const b = bloqueioEm(d);
       if (b) p.push({ tipo: "bloqueio", texto: b.motivo ? `bloqueado: ${b.motivo}` : "bloqueado" });
       if (bate[i]) p.push({ tipo: "conflito", texto: "já tem horário" });
+      else if (juntosEm(marcados, d) >= vagas) p.push({ tipo: "vagas", texto: "sem vaga" });
       out[d] = p;
     });
     return out;
@@ -133,6 +174,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     e.preventDefault();
     if (!pet) { avisar("Escolha o pet."); return; }
     if (!hhmm) { avisar("Escolha o horário."); return; }
+    if (!anoOk) { avisarErro("Confira o ano da data: ele parece errado."); return; }
+    const erroPreco = erroDeValor(preco);
+    if (erroPreco) { avisarErro(erroPreco); return; }
     const inicio = juntaDiaHora(dia, hhmm);
     const fim = new Date(inicio.getTime() + duracao * 60000);
     setSalvando(true);
@@ -164,11 +208,23 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
         const segue = await confirmar({ titulo: "Esse horário está bloqueado", texto: `${bloqueio.motivo ?? "Bloqueio"} (${nomeDe(bloqueio.profissional_id)}), das ${hora(bloqueio.inicio)} às ${hora(bloqueio.fim)}. Quer marcar mesmo assim?`, confirmar: "Marcar mesmo assim" });
         if (!segue) { setSalvando(false); return; }
       }
+      let jaPerguntou = false;
       if (profId) {
         const bate = ok(await sb.rpc("conflitos_agenda", { p_petshop: petshop.id, p_profissional: profId, p_inicio: inicio.toISOString(), p_fim: fim.toISOString(), p_ignorar: agendamento?.id }));
         if (bate.length) {
           const quem = quemAtende.find((p) => p.id === profId)?.nome ?? "Esse profissional";
           const segue = await confirmar({ titulo: "Esse horário já tem atendimento", texto: `${quem} já tem ${bate.length === 1 ? "um atendimento" : `${bate.length} atendimentos`} nesse horário. Quer marcar mesmo assim?`, confirmar: "Marcar mesmo assim" });
+          if (!segue) { setSalvando(false); return; }
+          jaPerguntou = true;
+        }
+      }
+      if (!jaPerguntou) {
+        // confere as vagas com o que está marcado agora (outra pessoa pode ter marcado nesse meio-tempo)
+        const marcados = ok(await sb.from("agendamentos").select("id, inicio, fim, status").eq("petshop_id", petshop.id)
+          .gte("inicio", somaDias(deIsoDia(dia), -1).toISOString()).lt("inicio", somaDias(deIsoDia(dia), 1).toISOString()));
+        const juntos = juntosEm(marcados, dia);
+        if (juntos >= vagas) {
+          const segue = await confirmar({ titulo: "Esse horário passa das vagas", texto: `Já ${juntos === 1 ? "tem 1 pet marcado" : `tem ${juntos} pets marcados`} nesse horário e o pet shop atende ${vagas === 1 ? "1 pet" : `${vagas} pets`} ao mesmo tempo. Quer marcar mesmo assim?`, confirmar: "Marcar mesmo assim" });
           if (!segue) { setSalvando(false); return; }
         }
       }
@@ -219,17 +275,43 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
           )}
 
           <div className="dupla">
-            <Campo rotulo="Dia"><input className="g-input" type="date" required value={dia} onChange={(e) => setDia(e.target.value)} /></Campo>
+            <Campo rotulo="Dia" erro={diaOk && !anoOk ? "Confira o ano." : null}>
+              <input className="g-input" type="date" required value={dia} onChange={(e) => setDia(e.target.value)} />
+            </Campo>
             <Campo rotulo="Horário"><input className="g-input" type="time" required step={300} value={hhmm} onChange={(e) => setHhmm(e.target.value)} /></Campo>
           </div>
-          {!funcionamento ? <p className="g-pp g-muted">O pet shop não abre {dataAmigavel(dia)}. Você pode marcar mesmo assim.</p>
+          {!diaOk || !anoOk ? null : !funcionamento ? <p className="g-pp g-muted">O pet shop não abre {dataAmigavel(dia)}. Você pode marcar mesmo assim.</p>
             : livres.length > 0 ? (
-              <div className="g-campo"><span className="g-muted" style={{ fontWeight: 500 }}>Horários livres {dataAmigavel(dia)}</span>
-                <div className="g-chips">
-                  {livres.slice(0, 14).map((h) => <button key={h} type="button" className="g-chip" aria-pressed={hhmm === h} onClick={() => setHhmm(h)}>{h}</button>)}
-                </div>
+              <div className="g-campo g-agd-livres"><span className="g-muted" style={{ fontWeight: 500 }}>Horários livres {dataAmigavel(dia)}</span>
+                {PARTES.map((parte) => {
+                  const daParte = livres.filter((h) => paraMin(h) >= parte.de && paraMin(h) < parte.ate);
+                  if (!daParte.length) return null;
+                  return (
+                    <div key={parte.rotulo} className="g-agd-parte" role="group" aria-label={`Horários livres: ${parte.rotulo.toLowerCase()}`}>
+                      <small>{parte.rotulo}</small>
+                      <div className="g-chips">
+                        {daParte.map((h) => <button key={h} type="button" className="g-chip" aria-pressed={hhmm === h} onClick={() => setHhmm(h)}>{h}</button>)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ) : <p className="g-pp g-muted">Sem horário livre {dataAmigavel(dia)} para este serviço. Você pode encaixar escolhendo o horário acima.</p>}
+          {jaPassou && (
+            <p className="g-agd-alerta" role="status"><TriangleAlert />
+              <span><b>{jaPassou === "dia" ? `Esse dia já passou (${dataCurta(dia)}/${dia.slice(0, 4)}).` : "Esse horário de hoje já passou."}</b> Se é isso mesmo, pode marcar: fica anotado no histórico.</span>
+            </p>
+          )}
+          {foraAqui && !repetindo && (
+            <p className="g-agd-alerta" role="status"><Clock />
+              <span><b>Fora do horário de funcionamento.</b> {dataAmigavel(dia).replace(/^./, (c) => c.toUpperCase())} o pet shop abre das {foraAqui.abre} às {foraAqui.fecha}. Você pode marcar mesmo assim.</span>
+            </p>
+          )}
+          {lotadoAqui && !repetindo && (
+            <p className="g-agd-alerta" role="status"><Users />
+              <span><b>Esse horário passa das vagas.</b> Já {juntosAqui === 1 ? "tem 1 pet marcado" : `tem ${juntosAqui} pets marcados`} nesse horário e o pet shop atende {vagas === 1 ? "1 pet" : `${vagas} pets`} ao mesmo tempo. Dá para marcar mesmo assim: o sistema pede uma confirmação.</span>
+            </p>
+          )}
           {bloqueioAqui && !repetindo && (
             <p className="g-agd-alerta" role="status"><Lock />
               <span><b>Horário bloqueado: {bloqueioAqui.motivo ?? "sem motivo"}</b> ({nomeDe(bloqueioAqui.profissional_id)}), das {hora(bloqueioAqui.inicio)} às {hora(bloqueioAqui.fim)}. Dá para marcar mesmo assim: o sistema pede uma confirmação.</span>
@@ -258,7 +340,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
                   <ul className="g-agd-datas">
                     {datas.map((d) => {
                       const p = previa?.[d] ?? [];
-                      const Icone = !p.length ? Check : p[0].tipo === "fechado" ? CalendarOff : p[0].tipo === "bloqueio" ? Lock : Clock;
+                      const Icone = !p.length ? Check : p[0].tipo === "fechado" ? CalendarOff : p[0].tipo === "bloqueio" ? Lock : p[0].tipo === "vagas" ? Users : Clock;
                       return (
                         <li key={d} className={`g-agd-data${p.length ? " aviso" : ""}${p.length && comProblema === "pular" ? " fora" : ""}`}>
                           {previa && <Icone size={14} aria-hidden />}
@@ -293,7 +375,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
               </select>
             </Campo>
             <Campo rotulo="Valor" dica={servico && !pet.porte && !precoMexido ? "Pet sem porte: confira o valor." : undefined}>
-              <CampoValor valor={preco} aoMudar={(v) => { setPreco(v); setPrecoMexido(true); }} placeholder={preco == null ? "definir" : brlCurto(preco)} />
+              <CampoDinheiro valor={preco} aoMudar={(v) => { setPreco(v); setPrecoMexido(true); }} placeholder="definir" />
             </Campo>
           </div>
 
