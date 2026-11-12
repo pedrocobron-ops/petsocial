@@ -116,7 +116,7 @@ export const FERRAMENTAS: Def[] = [
   { grava: true, financeiro: true, name: "fechar_caixa", description: "Fecha o caixa aberto. Passe o dinheiro contado na gaveta (só dinheiro; Pix e cartão não entram). O cartão mostra o esperado, o contado e a diferença.",
     input_schema: obj({ valor_contado: N, obs: S }, ["valor_contado"]) },
   { grava: true, financeiro: true, name: "lancar_dinheiro", description: "Registra dinheiro que já entrou ou saiu hoje (entra no caixa aberto). Para receber um atendimento, passe agendamento_id: ele fica como concluído.",
-    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e insumos, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S }, ["tipo", "valor", "forma", "categoria"]) },
+    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e material, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S }, ["tipo", "valor", "forma", "categoria"]) },
   { grava: true, financeiro: true, name: "criar_conta", description: "Cria uma conta a pagar (saida) ou a receber (entrada) com vencimento futuro.",
     input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, vencimento: DIA, descricao: S, categoria: S }, ["tipo", "valor", "vencimento", "descricao"]) },
   { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar. Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento.",
@@ -943,7 +943,7 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
         custo_unitario: e.tipo === "entrada" ? custo : null, motivo: texto(e.motivo, 80) || null, origem: "assistente", criado_por: c.userId }).select("id").single());
       let despesa = false;
       if (e.lancar_despesa && custo != null && e.tipo === "entrada" && c.vejoFinanceiro) {
-        ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "saida", valor: Math.round(custo * qtd * 100) / 100, forma: String(e.forma), categoria: "Produtos e insumos",
+        ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "saida", valor: Math.round(custo * qtd * 100) / 100, forma: String(e.forma), categoria: "Produtos e material",
           descricao: `Compra: ${qtd} ${unidade} de ${nomeProd}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), origem: "assistente", criado_por: c.userId }).select("id").single());
         despesa = true;
       }

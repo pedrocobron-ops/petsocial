@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowUpFromLine, Minus, Package, PackageX, Plus, Search, ShoppingBag, Sparkles, Wallet } from "lucide-react";
+import Importar from "@/components/gestao/importar";
+import { AlertTriangle, ArrowUpFromLine, Minus, Package, PackageX, Plus, Search, ShoppingBag, Sparkles, Wallet, Upload } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { abrirAssistente, avisarMudanca, Campo, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { Kpi, Tile } from "@/components/gestao/painel";
@@ -47,6 +48,7 @@ export default function Estoque() {
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [aberta, setAberta] = useState<Aberta | null>(null);
+  const [importando, setImportando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () =>
     ok(await sb.from("produtos").select("*").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as Produto[],
@@ -85,9 +87,11 @@ export default function Estoque() {
         </div>
         <div className="g-acoes">
           {produtos.length > 0 && <button className="g-btn sec" onClick={() => abrir({ tipo: "venda" })}><ShoppingBag /> Vender</button>}
+          <button className="g-btn sec" onClick={() => setImportando(true)}><Upload /> Trazer de planilha</button>
           <button className="g-btn pri" onClick={() => abrir({ tipo: "novo" })}><Plus /> Produto novo</button>
         </div>
       </header>
+      {importando && <Importar tipo="produtos" aoFechar={() => setImportando(false)} aoTerminar={() => void recarregar()} />}
 
       {erro && <ErroTela erro={erro} aoTentar={() => void recarregar()} />}
 

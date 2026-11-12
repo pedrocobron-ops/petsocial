@@ -424,7 +424,7 @@ function FolhaMeta({ aoFechar }: { aoFechar: () => void }) {
     <Folha titulo="Meta do mês" aoFechar={aoFechar}
       rodape={<>
         {atual != null && atual > 0 && <button type="button" className="g-btn sec" onClick={() => void gravar(null)} disabled={salvando}>Tirar a meta</button>}
-        <button type="button" className="g-btn pri" onClick={() => void gravar(valor)} disabled={salvando}>{salvando ? "Guardando…" : "Guardar"}</button>
+        <button type="button" className="g-btn pri" onClick={() => void gravar(valor)} disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
       </>}>
       <form className="g-form" onSubmit={(e) => { e.preventDefault(); void gravar(valor); }}>
         <Campo rotulo="Quanto você quer que entre por mês" erro={erro} dica="Vale para todos os meses, até você mudar. Conta tudo o que entrou e já foi pago.">

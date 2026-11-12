@@ -224,7 +224,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
           : { valor, forma, categoria, descricao: texto, ...(escolheData ? { data } : {}) };
         const r = await sb.from("lancamentos").update(mudancas).eq("id", inicial.id).eq("petshop_id", petshop.id);
         if (r.error) throw new Error(r.error.message);
-        avisar("Alteração guardada.");
+        avisar("Alteração salva.");
       } else if (conta) {
         const linhas = Array.from({ length: vezes }, (_, i) => {
           const dia = somaMeses(vencimento, i);
@@ -290,7 +290,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     <Folha titulo={titulo} aoFechar={aoFechar}
       rodape={<>
         {inicial && !travado && <button type="button" className="g-btn perigo" onClick={excluir} disabled={salvando}><Trash2 />Excluir</button>}
-        <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Guardando…" : inicial ? "Guardar" : conta ? "Anotar conta" : "Lançar"}</button>
+        <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : inicial ? "Salvar" : conta ? "Anotar conta" : "Lançar"}</button>
       </>}>
       <form className="g-form" onSubmit={(e) => { e.preventDefault(); void salvar(); }}>
         {travado && (
@@ -397,7 +397,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     <Folha titulo={entrada ? "Recebi esta conta" : "Paguei esta conta"} aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Guardando…" : "Dar baixa"}</button>
+        <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Dar baixa"}</button>
       </>}>
       <div className="g-form">
         <div className="g-card areia">
