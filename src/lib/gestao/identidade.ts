@@ -42,13 +42,15 @@ export function corSegura(hex: string) {
 
 /** Reduz a logo para até 512 px mantendo o fundo transparente (WebP). */
 export async function reduzirLogo(arquivo: File, maximo = 512): Promise<Blob> {
-  const img = await createImageBitmap(arquivo);
+  // arquivo que não é imagem de verdade (ou está corrompido): o navegador recusa com uma frase em inglês
+  const img = await createImageBitmap(arquivo).catch(() => null);
+  if (!img || !img.width || !img.height) throw new Error("Não consegui ler essa imagem. Escolha um arquivo PNG ou JPG.");
   const escala = Math.min(1, maximo / Math.max(img.width, img.height));
   const tela = document.createElement("canvas");
   tela.width = Math.max(1, Math.round(img.width * escala));
   tela.height = Math.max(1, Math.round(img.height * escala));
   tela.getContext("2d")!.drawImage(img, 0, 0, tela.width, tela.height);
   const blob = await new Promise<Blob | null>((ok) => tela.toBlob(ok, "image/webp", 0.9));
-  if (!blob) throw new Error("Não consegui ler essa imagem. Tente outra.");
+  if (!blob) throw new Error("Não consegui ler essa imagem. Escolha um arquivo PNG ou JPG.");
   return blob;
 }

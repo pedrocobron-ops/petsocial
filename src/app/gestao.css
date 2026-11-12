@@ -1026,3 +1026,12 @@ a.g-ret-linha:hover, button.g-ret-linha:hover { border-color: var(--g-linha-fort
 /* terceira leva: pagamento e voltar */
 /* os botões de dividir o pagamento com a altura de toque das outras ações da folha */
 .g-folha .g-btn.p.g-pg-dividir, .g-folha .g-pg-acoes .g-btn.p { min-height: 44px; }
+
+/* rodada 2: creche e link */
+/* Escola: ícone e título na mesma linha (o ícone não encolhe nem cai para a linha de cima) */
+.g-esc-tit { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.g-esc-tit > svg { flex: none; width: 20px; height: 20px; }
+/* Creche e hotel: total previsto no formulário e o que foi cobrado no histórico */
+.g-ch-previsto { margin: 0; }
+.g-ch-cobrado { white-space: nowrap; }
+.g-ch-cobrado small { font-weight: 400; opacity: .75; }

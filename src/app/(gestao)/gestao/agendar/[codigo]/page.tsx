@@ -74,6 +74,18 @@ function diaPorExtenso(dia: string, hoje: string) {
   return dif === 0 ? `hoje, ${d.getDate()} de ${nomeMes(d)}` : dif === 1 ? `amanhã, ${texto}` : texto;
 }
 
+/**
+ * Já passou da hora de fechar hoje? Usa o relógio do aparelho e só responde sim quando o dia do aparelho
+ * é o mesmo dia do pet shop (quem está em outro fuso cai na frase geral "não há mais horário hoje").
+ */
+function passouDoFechamento(horario: unknown, hoje: string) {
+  const agora = new Date();
+  if (isoDia(agora) !== hoje) return false;
+  const h = horarioDoDia(horario, agora);
+  if (!h) return false;
+  return `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}` >= String(h.fecha).slice(0, 5);
+}
+
 export default function AgendarPeloLink() {
   const { codigo: bruto } = useParams<{ codigo: string }>();
   const codigo = decodeURIComponent(String(bruto ?? "")).trim();
@@ -284,6 +296,8 @@ export default function AgendarPeloLink() {
   const manha = (horarios ?? []).filter((h) => h < "12:00");
   const tarde = (horarios ?? []).filter((h) => h >= "12:00");
   const indice = PASSOS.findIndex((p) => p.id === passo);
+  // pedido para hoje depois da hora de fechar: o dia não está cheio, já fechou
+  const hojeFechou = dia === info.hoje && passouDoFechamento(info.horario, info.hoje);
   const fimEstimado = servico && horaEscolhida ? somaMin(horaEscolhida, servico.duracao_min * qtd) : null;
 
   return (
@@ -297,7 +311,7 @@ export default function AgendarPeloLink() {
             {onde && <p className="g-lk-onde"><MapPin aria-hidden />{onde}</p>}
           </div>
         </div>
-        {passo !== "enviado" && <p className="g-lk-cab-frase">Peça um horário por aqui. A confirmação chega pelo seu WhatsApp.</p>}
+        {passo !== "enviado" && <p className="g-lk-cab-frase">{estadia ? "Peça uma vaga por aqui" : info.creche || info.hotel ? "Peça um horário ou uma vaga por aqui" : "Peça um horário por aqui"}. A confirmação chega pelo seu WhatsApp.</p>}
       </header>
 
       {info.aviso && passo !== "enviado" && (
@@ -305,7 +319,8 @@ export default function AgendarPeloLink() {
       )}
 
       {estadia && (
-        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} zapLoja={zapLoja}
+        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome}
+          zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"} do ${info.nome}.`)}
           diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)} />
       )}
 
@@ -417,8 +432,8 @@ export default function AgendarPeloLink() {
               ) : !horarios.length ? (
                 <div className="g-lk-vazio">
                   <CalendarDays aria-hidden />
-                  <b>{qtd > 1 ? `Não há horário para ${qtd} pets seguidos nesse dia` : "Esse dia já está cheio"}</b>
-                  <p>{qtd > 1 ? "Tente outro dia ou diminua a quantidade de pets aqui em cima." : "Tente outro dia aqui em cima."}</p>
+                  <b>{hojeFechou ? "Hoje já fechou" : dia === info.hoje ? (qtd > 1 ? `Não há mais horário hoje para ${qtd} pets seguidos` : "Não há mais horário hoje") : qtd > 1 ? `Não há horário para ${qtd} pets seguidos nesse dia` : "Esse dia já está cheio"}</b>
+                  <p>{hojeFechou ? "O atendimento de hoje já terminou. Escolha outro dia aqui em cima." : qtd > 1 ? "Tente outro dia ou diminua a quantidade de pets aqui em cima." : "Tente outro dia aqui em cima."}</p>
                 </div>
               ) : (
                 <>

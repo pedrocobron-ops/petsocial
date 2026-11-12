@@ -52,7 +52,7 @@ export default function Escola() {
 
         {meus.length > 0 && (
           <section className="g-pilha">
-            <div className="g-card-t" style={{ marginBottom: 0 }}><h2><Library style={{ width: 20, height: 20, verticalAlign: "-3px", marginRight: 8 }} />Meus materiais</h2></div>
+            <div className="g-card-t" style={{ marginBottom: 0 }}><h2 className="g-esc-tit"><Library aria-hidden />Meus materiais</h2></div>
             <div className="g-esc-estante">
               {meus.map((m) => (
                 <div key={m.slug} className="g-card g-esc-item" style={{ cursor: "default" }}>
@@ -96,7 +96,7 @@ export default function Escola() {
         {estante.length > 0 && (
           <section className="g-pilha">
             <div>
-              <h2><Store style={{ width: 20, height: 20, verticalAlign: "-3px", marginRight: 8 }} />Um serviço novo para o seu pet shop</h2>
+              <h2 className="g-esc-tit"><Store aria-hidden /><span>Um serviço novo para o seu pet shop</span></h2>
               <p className="g-muted g-p">Materiais completos da Maestro Pet, cada um sobre um serviço que dá para somar ao que você já faz. Toque para ver o que ensina e para quem serve.</p>
             </div>
             <div className="g-esc-estante">

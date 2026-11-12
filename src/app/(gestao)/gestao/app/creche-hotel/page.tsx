@@ -39,26 +39,56 @@ function contarDiarias(e: Pick<Estadia, "tipo" | "entrada">, fim: Date) {
 type Periodo = Pick<Estadia, "tipo" | "entrada" | "saida_prevista" | "status">;
 
 /**
- * Dias (AAAA-MM-DD) que a estadia ocupa uma vaga. Creche: da entrada à saída prevista, os dois dias contam.
- * Hotel: as noites (o dia da saída não conta). Sem saída prevista, vale o dia da entrada; quem ainda está na casa ocupa até hoje.
+ * A regra de ocupação de vaga. É a mesma da função `estadia_ocupa` do banco
+ * (supabase/migrations/20261129000000_gestao_creche_link.sql), que o link público e o aceite de pedido usam.
+ * Se mudar lá, mude aqui. As datas são dias "AAAA-MM-DD" no horário do pet shop.
+ * - Quem está na casa sem saída prevista ocupa até sair.
+ * - Hotel conta a noite: o dia da saída não ocupa vaga; reserva sem saída prevista vale uma noite.
+ * - Creche: da entrada à saída prevista, os dois dias contam; quem está na casa e passou da saída prevista ocupa até hoje.
  */
+function estadiaOcupa(tipo: string, status: string, entrada: string, saida: string | null, dia: string, hoje: string): boolean {
+  if (entrada > dia) return false;
+  if (status === "em_casa" && saida == null) return true;
+  if (tipo === "hotel") return dia < (saida ?? isoDia(somaDias(deIsoDia(entrada), 1)));
+  const fim = saida ?? entrada;
+  return dia <= (status === "em_casa" && hoje > fim ? hoje : fim);
+}
+const ocupaNoDia = (e: Periodo, dia: string, hoje: string) =>
+  estadiaOcupa(e.tipo, e.status, isoDia(new Date(e.entrada)), e.saida_prevista ? isoDia(new Date(e.saida_prevista)) : null, dia, hoje);
+
+/** Quantos dias à frente a tela confere quando a estadia não tem saída prevista. */
+const DIAS_A_CONFERIR = 30;
+/** Dias (AAAA-MM-DD) em que a estadia ocupa uma vaga, pela regra acima. Na casa e sem saída prevista, confere os próximos 30 dias. */
 function diasOcupados(e: Periodo, hoje: Date): string[] {
+  const hojeIso = isoDia(hoje);
+  const hoje0 = inicioDoDia(hoje);
   const ini = inicioDoDia(new Date(e.entrada));
-  let fim = e.saida_prevista ? inicioDoDia(new Date(e.saida_prevista)) : ini;
-  if (e.tipo === "hotel" && fim > ini) fim = somaDias(fim, -1);
-  if (e.status === "em_casa" && inicioDoDia(hoje) > fim) fim = inicioDoDia(hoje);
+  let fim = e.saida_prevista ? inicioDoDia(new Date(e.saida_prevista)) : somaDias(hoje0 > ini ? hoje0 : ini, DIAS_A_CONFERIR);
+  if (e.status === "em_casa" && hoje0 > fim) fim = hoje0;
   const dias: string[] = [];
-  for (let d = ini; d <= fim && dias.length < 120; d = somaDias(d, 1)) dias.push(isoDia(d));
+  for (let d = ini; d <= fim && dias.length < 400; d = somaDias(d, 1)) if (ocupaNoDia(e, isoDia(d), hojeIso)) dias.push(isoDia(d));
   return dias;
 }
 
-/** Outra reserva ou estadia aberta do mesmo pet que bate com o período novo. Quem já está na casa não entra de novo. */
+/** Primeiro e último dia do período no calendário (os dois contam). Quem está na casa sem saída prevista não tem fim. */
+function pontas(e: Periodo, hoje: string): [string, string] {
+  const ini = isoDia(new Date(e.entrada));
+  let fim = e.saida_prevista ? isoDia(new Date(e.saida_prevista)) : e.status === "em_casa" ? "9999-12-31" : ini;
+  if (e.status === "em_casa" && hoje > fim) fim = hoje;
+  return [ini, fim < ini ? ini : fim];
+}
+/**
+ * Outra reserva ou estadia aberta do mesmo pet que cruza o período novo. É a mesma conta do aceite de pedido no banco:
+ * as datas se cruzam no calendário, com o dia da saída contando. Quem já está na casa não entra de novo.
+ */
 function conflitoDoPet(petId: string, novo: Periodo, abertas: EstadiaCompleta[], ignorar: string | null, hoje: Date): EstadiaCompleta | null {
-  const dias = new Set(diasOcupados(novo, hoje));
+  const hojeIso = isoDia(hoje);
+  const [de, ate] = pontas(novo, hojeIso);
   for (const e of abertas) {
     if (e.pet_id !== petId || e.id === ignorar) continue;
     if (novo.status === "em_casa" && e.status === "em_casa") return e;
-    if (diasOcupados(e, hoje).some((d) => dias.has(d))) return e;
+    const [a, b] = pontas(e, hojeIso);
+    if (a <= ate && b >= de) return e;
   }
   return null;
 }
@@ -69,14 +99,10 @@ function fraseConflito(nome: string, e: EstadiaCompleta) {
 }
 const ehRepetido = (x: unknown) => /estadias_um_na_casa|duplicate key|23505/i.test(x instanceof Error ? x.message : String((x as { message?: unknown })?.message ?? x));
 
-/** Quantas vagas do tipo estão tomadas em cada dia (sem contar a estadia `ignorar`). */
-function ocupacao(tipo: string, abertas: EstadiaCompleta[], ignorar: string | null, hoje: Date) {
-  const porDia = new Map<string, number>();
-  for (const e of abertas) {
-    if (e.tipo !== tipo || e.id === ignorar) continue;
-    for (const d of diasOcupados(e, hoje)) porDia.set(d, (porDia.get(d) ?? 0) + 1);
-  }
-  return porDia;
+/** Quantas vagas do tipo estão tomadas no dia (sem contar a estadia `ignorar`). */
+function ocupadasNoDia(tipo: string, abertas: EstadiaCompleta[], ignorar: string | null, dia: string, hoje: Date) {
+  const hojeIso = isoDia(hoje);
+  return abertas.filter((e) => e.tipo === tipo && e.id !== ignorar && ocupaNoDia(e, dia, hojeIso)).length;
 }
 const vagasDoTipo = (p: Petshop, tipo: string) => (tipo === "hotel" ? p.vagas_hotel : p.vagas_creche) ?? null;
 const diariaFixa = (p: Petshop, tipo: string) => { const v = tipo === "hotel" ? p.diaria_hotel : p.diaria_creche; return v == null ? null : Number(v); };
@@ -106,6 +132,24 @@ function LinhaValor({ e }: { e: EstadiaCompleta }) {
         : <span>Total previsto <b className="g-tab">{brl(p.total)}</b> <span className="g-muted">({p.n} {p.n === 1 ? "diária" : "diárias"})</span></span>}
     </p>
   );
+}
+
+/** Marca na observação da estadia que a saída foi com pacote (o banco guarda só as diárias e o valor cobrados). */
+const NOTA_PACOTE = "Saiu usando o pacote.";
+const comNota = (obs: string | null, nota: string) => (obs?.includes(nota) ? obs : [obs?.trim().slice(0, 590 - nota.length), nota].filter(Boolean).join(" "));
+
+/** No Histórico: o que foi cobrado na saída. Estadia antiga, sem esse registro, mostra a conta pelas datas como estimativa. */
+function Cobrado({ e }: { e: EstadiaCompleta }) {
+  const plural = (n: number) => `${n} ${n === 1 ? "diária" : "diárias"}`;
+  if (e.diarias_cobradas == null) {
+    const n = contarDiarias(e, new Date(e.saida ?? e.entrada));
+    return <span className="g-tag g-ch-cobrado" title="Estadia antiga: o sistema ainda não guardava o que foi cobrado. Esta é a conta pelas datas.">{plural(n)} <small>(estimativa)</small></span>;
+  }
+  const n = e.diarias_cobradas;
+  if (e.obs?.includes(NOTA_PACOTE)) return <span className="g-tag azul g-ch-cobrado">{n === 1 ? "1 uso do pacote" : `${n} usos do pacote`}</span>;
+  if (e.valor_cobrado == null) return <span className="g-tag g-ch-cobrado">{plural(n)} · sem valor lançado</span>;
+  if (Number(e.valor_cobrado) === 0) return <span className="g-tag g-ch-cobrado">{plural(n)} · cortesia</span>;
+  return <span className="g-tag verde g-tab g-ch-cobrado">{plural(n)} · {brl(e.valor_cobrado)}</span>;
 }
 
 function mensagem(e: EstadiaCompleta, petshop: string, reserva: boolean) {
@@ -217,8 +261,8 @@ export default function CrecheHotel() {
   const saemHoje = naCasa.filter((e) => e.saida_prevista && isoDia(new Date(e.saida_prevista)) === hojeIso);
   const atrasadas = naCasa.filter((e) => e.saida_prevista && new Date(e.saida_prevista) < agora);
   const crecheNaCasa = naCasa.filter((e) => e.tipo === "creche");
-  // vagas de hoje, por tipo: conta quem está na casa e quem tem reserva para hoje
-  const vagasHoje = TIPOS.map((t) => ({ ...t, total: vagasDoTipo(petshop, t.id), ocupadas: ocupacao(t.id, dados?.abertas ?? [], null, agora).get(hojeIso) ?? 0 }))
+  // vagas de hoje, por tipo, pela regra de estadiaOcupa (no hotel, quem sai hoje já não ocupa a noite de hoje)
+  const vagasHoje = TIPOS.map((t) => ({ ...t, total: vagasDoTipo(petshop, t.id), ocupadas: ocupadasNoDia(t.id, dados?.abertas ?? [], null, hojeIso, agora) }))
     .filter((v) => v.total != null);
   const noHotel = naCasa.filter((e) => e.tipo === "hotel").length;
   const proximaReserva = reservas.find((e) => new Date(e.entrada).getTime() >= hoje0);
@@ -407,7 +451,7 @@ export default function CrecheHotel() {
                         <EtiquetaTipo tipo={e.tipo} curta />
                         {e.status === "cancelada"
                           ? <span className="g-tag vermelho">cancelada</span>
-                          : <span className="g-tag">{(() => { const n = contarDiarias(e, new Date(e.saida ?? e.entrada)); return `${n} ${n === 1 ? "diária" : "diárias"}`; })()}</span>}
+                          : <Cobrado e={e} />}
                       </div>
                     );
                   })}
@@ -448,6 +492,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, aoFechar, ao
   const [saidaHora, setSaidaHora] = useState(editar?.saida_prevista ? horaDe(editar.saida_prevista) : "18:00");
   // a diária sugerida é sempre o preço fixo de Meu pet shop, nunca a última digitada
   const [diaria, setDiaria] = useState<number | null>(editar ? (editar.valor_diaria == null ? null : Number(editar.valor_diaria)) : diariaFixa(petshop, tipoInicial));
+  // na edição, a diária combinada fica como está até a pessoa trocar o tipo: aí vale o preço fixo do tipo novo
   const [mexeuNaDiaria, setMexeuNaDiaria] = useState(Boolean(editar));
   const [obs, setObs] = useState(editar?.obs ?? "");
   const [erro, setErro] = useState<string | null>(null);
@@ -460,8 +505,10 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, aoFechar, ao
   const { dados: vencidas } = useDados(async () => (pet ? vacinasVencidas(sb, petshop.id, pet.id).catch(() => []) : []), [petshop.id, pet?.id]);
 
   function trocarTipo(t: Tipo) {
+    if (t === tipo) return;
     setTipo(t);
-    if (!mexeuNaDiaria) setDiaria(diariaFixa(petshop, t));
+    // trocou o tipo: a diária passa a ser o preço fixo do tipo novo, a não ser que a pessoa digite outro valor depois da troca
+    if (!mexeuNaDiaria || editar) { setDiaria(diariaFixa(petshop, t)); setMexeuNaDiaria(false); }
   }
 
   async function salvar() {
@@ -494,11 +541,11 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, aoFechar, ao
     // casa cheia em algum dia do período
     const vagas = vagasDoTipo(petshop, tipo);
     if (vagas != null) {
-      const tomadas = ocupacao(tipo, abertas, editar?.id ?? null, agora);
-      const cheios = diasOcupados(novo, agora).filter((d) => (tomadas.get(d) ?? 0) >= vagas);
+      const tomadas = new Map(diasOcupados(novo, agora).map((d) => [d, ocupadasNoDia(tipo, abertas, editar?.id ?? null, d, agora)]));
+      const cheios = [...tomadas.keys()].filter((d) => (tomadas.get(d) ?? 0) >= vagas);
       if (cheios.length && !(await confirmar({
         titulo: `Casa cheia em ${dataCurta(cheios[0])} (${Math.max(vagas, tomadas.get(cheios[0]) ?? 0)} de ${vagas})`,
-        texto: `${cheios.length === 1 ? `Em ${dataCurta(cheios[0])}` : `Em ${cheios.length} dias (${cheios.slice(0, 6).map((d) => dataCurta(d)).join(", ")}${cheios.length > 6 ? "…" : ""})`} ${tipo === "hotel" ? "o hotel" : "a creche"} já está com todas as ${vagas} vagas tomadas. ${editar ? "Salvar" : emCasa ? "Fazer o check-in" : "Marcar a reserva"} passando do limite?`,
+        texto: `${cheios.length === 1 ? `Em ${dataCurta(cheios[0])}` : !saida && cheios.length > 6 ? `De ${dataCurta(cheios[0])} em diante, sem data para acabar,` : `Em ${cheios.length} dias (${cheios.slice(0, 6).map((d) => dataCurta(d)).join(", ")}${cheios.length > 6 ? "…" : ""})`} ${tipo === "hotel" ? "o hotel" : "a creche"} já está com todas as ${vagas} vagas tomadas. ${editar ? "Salvar" : emCasa ? "Fazer o check-in" : "Marcar a reserva"} passando do limite?`,
         confirmar: "Passar do limite", perigo: true,
       }))) return;
     }
@@ -534,6 +581,13 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, aoFechar, ao
       </Folha>
     );
   }
+
+  // total previsto com o que está no formulário agora (muda na hora quando troca o tipo, as datas ou a diária)
+  const entradaForm = escolheEntrada ? (dia && hhmm ? juntaDiaHora(dia, hhmm) : null) : new Date();
+  const saidaForm = saidaDia ? juntaDiaHora(saidaDia, saidaHora || "18:00") : null;
+  const prev = entradaForm && !Number.isNaN(entradaForm.getTime()) && diaria != null && (!saidaForm || saidaForm > entradaForm)
+    ? previsto({ tipo, entrada: entradaForm.toISOString(), saida_prevista: saidaForm?.toISOString() ?? null, valor_diaria: diaria }) : null;
+  const trocouTipo = Boolean(editar) && tipo !== editar!.tipo;
 
   const jaNaCasa = !editar ? abertas.find((e) => e.pet_id === pet.id && e.status === "em_casa") : undefined;
 
@@ -583,6 +637,19 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, aoFechar, ao
             : `O preço fixo ${tipo === "hotel" ? "do hotel" : "da creche"} é ${brl(fixa)}.`}>
           <CampoValor valor={diaria} aoMudar={(n) => { setMexeuNaDiaria(true); setDiaria(n); }} placeholder={fixa == null ? "Sem preço fixo" : "0,00"} />
         </Campo>
+        {trocouTipo && (
+          <p className="g-pp g-muted" role="status">
+            Mudou de {nomeTipo(editar!.tipo).toLowerCase()} para {nomeTipo(tipo).toLowerCase()}: a diária {diaria == null ? "ficou em branco, porque esse tipo não tem preço fixo" : diaria === fixa ? `passou para ${brl(diaria)}, o preço fixo` : `está em ${brl(diaria)}`}
+            {editar!.valor_diaria != null ? ` (antes era ${brl(editar!.valor_diaria)})` : ""}.
+          </p>
+        )}
+        {prev && (
+          <p className="g-ch-valor g-ch-previsto" aria-live="polite">
+            {prev.total === 0 ? <span className="g-tag">cortesia</span>
+              : prev.aberto ? <span className="g-muted">Sem saída prevista: o total sai no check-out.</span>
+              : <span>Total previsto <b className="g-tab">{brl(prev.total)}</b> <span className="g-muted">({prev.n} {prev.n === 1 ? "diária" : "diárias"} de {brl(diaria)})</span></span>}
+          </p>
+        )}
         <Campo rotulo="Observações">
           <textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder="Ração, remédio, horário de passeio, o que trouxe na mochila…" />
         </Campo>
@@ -647,7 +714,9 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
     }
     setSalvando(true);
     try {
-      const r = ok(await sb.from("estadias").update({ status: "encerrada", saida: new Date().toISOString() })
+      // guarda o que foi cobrado. Com pacote não entra dinheiro (0, com a nota). Valor em branco fica em branco; cortesia fica 0.
+      const cobrado = pacote ? 0 : vejoFinanceiro ? valor ?? null : calculado === 0 ? 0 : null;
+      const r = ok(await sb.from("estadias").update({ status: "encerrada", saida: new Date().toISOString(), diarias_cobradas: n, valor_cobrado: cobrado, ...(pacote ? { obs: comNota(estadia.obs, NOTA_PACOTE) } : {}) })
         .eq("id", estadia.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
       if (!r.length) { avisar("Esse check-out já tinha sido feito. Atualizei a lista."); aoGravar(); return; }
       const nome = pet?.nome ?? "O pet";
@@ -757,7 +826,8 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
     const valor = e.valor_diaria != null ? Math.round(n * Number(e.valor_diaria) * 100) / 100 : 0;
     // quem tem pacote fica sem cobrança aqui: a baixa do pacote é pelo check-out do próprio pet
     const cobra = vejoFinanceiro && valor > 0 && (cobrar[e.id] ?? !temPacote(e.pet_id));
-    return { e, n, valor, cobra };
+    const cortesia = e.valor_diaria != null && Number(e.valor_diaria) === 0;
+    return { e, n, valor, cobra, cortesia };
   });
   const escolhidas = linhas.filter((l) => sai[l.e.id]);
   const total = escolhidas.reduce((t, l) => t + (l.cobra ? l.valor : 0), 0);
@@ -774,7 +844,8 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
     for (const l of escolhidas) {
       const nome = l.e.pets?.nome ?? "Pet";
       try {
-        const r = ok(await sb.from("estadias").update({ status: "encerrada", saida: new Date().toISOString() })
+        // guarda o que foi cobrado: quem saiu sem cobrar fica com o valor em branco (cortesia fica com 0)
+        const r = ok(await sb.from("estadias").update({ status: "encerrada", saida: new Date().toISOString(), diarias_cobradas: l.n, valor_cobrado: l.cobra && forma ? l.valor : l.cortesia ? 0 : null })
           .eq("id", l.e.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
         if (!r.length) continue; // já tinha saído por outra tela
         feitos++;
@@ -811,7 +882,7 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
               <label className="quem">
                 <input type="checkbox" checked={Boolean(sai[l.e.id])} onChange={(ev) => setSai((x) => ({ ...x, [l.e.id]: ev.target.checked }))} />
                 <AvatarPet pet={l.e.pets ?? { nome: "?" }} tamanho="p" />
-                <span className="t"><b>{l.e.pets?.nome ?? "Pet removido"}</b><small>{l.e.pets?.clientes?.nome ?? "Sem tutor"} · {l.n} {l.n === 1 ? "diária" : "diárias"}{l.valor > 0 ? ` · ${brl(l.valor)}` : " · sem diária combinada"}</small></span>
+                <span className="t"><b>{l.e.pets?.nome ?? "Pet removido"}</b><small>{l.e.pets?.clientes?.nome ?? "Sem tutor"} · {l.n} {l.n === 1 ? "diária" : "diárias"}{l.valor > 0 ? ` · ${brl(l.valor)}` : l.cortesia ? " · cortesia" : " · sem diária combinada"}</small></span>
               </label>
               {vejoFinanceiro && l.valor > 0 && sai[l.e.id] && (
                 <label className="cobra">

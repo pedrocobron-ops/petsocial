@@ -191,7 +191,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           <div className="g-card"><div className="g-vazio">
             <Selo tamanho={72} tom="suave" />
             <b>Esta área não está liberada para você</b>
-            <p>Quem libera é o dono do pet shop, em Equipe. Se precisar dela para trabalhar, peça para ele ligar o seu acesso.</p>
+            <p>{soDeDono && !souDono ? "Esta tela é só do dono e dos sócios. Se precisar de alguma coisa daqui, fale com o dono do pet shop." : "Quem libera é o dono do pet shop, em Equipe. Se precisar dela para trabalhar, peça para ele ligar o seu acesso."}</p>
             <Link className="g-btn verde" href="/gestao/app">Voltar para o início</Link>
           </div></div>
         ) : children}
