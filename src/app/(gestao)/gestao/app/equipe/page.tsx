@@ -65,11 +65,11 @@ export default function Equipe() {
     <>
       <header className="g-topo">
         <div><h1>Equipe</h1><p className="g-muted">Quem trabalha com você, quem entra no sistema e o que cada um abre.</p></div>
-        <div className="g-acoes"><button className="g-btn pri" onClick={() => abrir({ tipo: "novo" })}><UserPlus />Adicionar pessoa</button></div>
+        {!soEu && <div className="g-acoes"><button className="g-btn pri" onClick={() => abrir({ tipo: "novo" })}><UserPlus />Adicionar pessoa</button></div>}
       </header>
 
       <div className="g-pilha g">
-        <div className="g-eq-resumo">
+        {!soEu && <div className="g-eq-resumo">
           <BlocoDoPlano uso={uso} aoAdicionar={() => abrir({ tipo: "novo" })} />
           <div className="g-grade kpis g-eq-kpis">
             <Kpi icone={Users} tom="ceu" rotulo="Na equipe" valor={ativos.length} apoio={ativos.length === 1 ? "pessoa ativa" : "pessoas ativas"} />
@@ -77,15 +77,16 @@ export default function Equipe() {
             <Kpi icone={CalendarCheck} tom="menta" rotulo="Trabalham hoje" valor={trabalhamHoje} apoio={loja[hoje] ? `${NOME_DIAS[hoje]}, pela escala` : "pet shop fechado hoje"} />
             <Kpi icone={Mail} tom="manteiga" rotulo="Convites" valor={convites} apoio={convites ? "esperando criar a conta" : "nenhum pendente"} />
           </div>
-        </div>
+        </div>}
 
         {soEu && (
           <section className="g-eq-convida">
             <div className="g-eq-convida-t">
               <p className="g-rotulo">Sua equipe</p>
-              <h2>Por enquanto é só você.</h2>
-              <p>Adicione quem dá banho e tosa para aparecer na agenda: não precisa de login. Login é para quem usa o sistema, como recepção, financeiro, gerente ou sócio.</p>
-              <div><button className="g-btn verde" onClick={() => abrir({ tipo: "novo" })}><UserPlus />Adicionar a primeira pessoa</button></div>
+              <h2>Trabalha sozinha ou sozinho? Então está tudo pronto.</h2>
+              <p>A agenda, o caixa e o resto já estão no seu nome. Você não precisa mexer nesta tela.</p>
+              <p>Se um dia tiver ajuda, é aqui que você coloca a pessoa: quem dá banho e tosa aparece na agenda sem precisar de senha, e quem usa o sistema (recepção, financeiro, sócio) ganha um acesso próprio.</p>
+              <div><button className="g-btn verde" onClick={() => abrir({ tipo: "novo" })}><UserPlus />Tenho ajuda: adicionar pessoa</button></div>
             </div>
             <ul className="g-eq-convida-l">
               <li><Tile icone={CalendarDays} tom="pessego" /><p className="g-eq-convida-i"><b>Agenda por pessoa</b><small>Cada um com a sua cor e o seu filtro na agenda.</small></p></li>
@@ -165,10 +166,10 @@ export default function Equipe() {
               </details>
             )}
           </section>
-          <EscalaDaSemana />
+          {!soEu && <EscalaDaSemana />}
         </div>
 
-        <details className="g-card g-eq-pode">
+        {!soEu && <details className="g-card g-eq-pode">
           <summary className="g-eq-pode-s">
             <Tile icone={KeyRound} tom="lilas" />
             <span className="g-eq-pode-st"><b>Quem pode o quê</b><small>O que cada perfil pronto abre. Você pode ligar e desligar área por área em cada pessoa.</small></span>
@@ -183,7 +184,7 @@ export default function Equipe() {
             ))}
           </div>
           <p className="g-muted g-pp g-eq-pode-n">Vale para quem entra com o próprio login. Quem só aparece na agenda não abre nada. Caixa, Financeiro e Relatórios são as áreas que mostram valores.</p>
-        </details>
+        </details>}
       </div>
 
       {aberto?.tipo === "novo" && <AdicionarPessoa aoFechar={() => setAberto(null)} />}

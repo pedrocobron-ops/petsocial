@@ -3,25 +3,25 @@
 import { useState } from "react";
 import { Plus, Truck } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
-import { lancarPago } from "@/lib/gestao/dinheiro";
-import { brl, hora } from "@/lib/gestao/util";
+import { lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { brl, dataCompleta, hora, isoDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "../ui";
 import {
-  baixarEstoque, BuscaProduto, comProduto, encurtar, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
-  produtosDaConta, resumoDosItens, useProdutosDaLoja, valorDaLinha, type ItemConta,
+  baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
+  produtosDaConta, resumoDosItens, useProdutosDaLoja, valorDaLinha, type ItemConta, type PagaDepois,
 } from "../loja/conta";
-import type { Forma } from "../loja/pecas";
+import { AvisoCaixaFechado, fecharPagamento, lembrarForma, useCaixaAberto, usePagamento } from "../loja/pecas";
 
 /**
  * Fechar a conta de um atendimento: serviço, produtos do estoque e extras numa conta só.
- * Lança a entrada, dá baixa nos produtos e deixa o atendimento como concluído.
+ * Lança a entrada (ou anota para receber depois), dá baixa nos produtos e deixa o atendimento como concluído.
  */
 export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
   agendamento: AgendamentoCompleto; aoFechar: () => void; aoPronto: () => void;
 }) {
   const { sb, petshop, user } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const { produtos, carregando, erro } = useProdutosDaLoja();
   const pet = a.pets, tutor = pet?.clientes;
@@ -30,8 +30,12 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
     { chave: novaChave(), tipo: "servico", nome: servico, qtd: 1, valor: a.preco == null ? null : Number(a.preco) },
   ]);
   const [desconto, setDesconto] = useState<number | null>(null);
-  const [forma, setForma] = useState<Forma>("pix");
+  const [pagamento, setPagamento] = usePagamento();
+  // "Cliente paga depois" (fiado): a conta fica em A receber, com o dia combinado (padrão: daqui a 7 dias)
+  const [depois, setDepois] = useState<PagaDepois>(() => ({ ativo: false, quando: isoDia(somaDias(new Date(), 7)) }));
+  const [erroForma, setErroForma] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const caixa = useCaixaAberto();
 
   const contas = fecharContas(itens, desconto);
   const vendidos = produtosDaConta(itens);
@@ -49,6 +53,14 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
 
   async function confirmar() {
     if (salvando || nadaAFazer || somenteLeitura()) return;
+    const problema = erroDaConta(itens, desconto, contas.total);
+    if (problema) { avisarErro(problema); return; }
+    const fiado = depois.ativo && contas.total > 0;
+    if (fiado && (!depois.quando || depois.quando < isoDia(new Date()))) { setErroForma("Escolha um dia de hoje em diante."); avisarErro("Escolha quando o cliente vai pagar."); return; }
+    const pg = contas.total > 0 && !fiado ? fecharPagamento(pagamento, contas.total) : null;
+    if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return; }
+    const falta = faltaNoEstoque(itens, produtos);
+    if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return;
     setSalvando(true);
     let recebeu = false;
     try {
@@ -62,25 +74,32 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
       }
       const gravar = itensParaGravar(itens);
       const mais = resumoDosItens(gravar);
-      if (contas.total > 0) {
+      const descricao = encurtar(`${servico} · ${pet?.nome ?? ""}`.trim().replace(/ ·$/, "") + (mais ? ` + ${mais}` : ""));
+      if (fiado) {
+        await lancarAReceber(sb, petshop.id, {
+          valor: contas.total, vencimento: depois.quando, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null, descricao, itens: gravar,
+        });
+        recebeu = true;
+      } else if (pg && !("erro" in pg)) {
+        lembrarForma(pg.forma);
         await lancarPago(sb, petshop.id, {
-          tipo: "entrada", valor: contas.total, forma, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null,
-          descricao: encurtar(`${servico} · ${pet?.nome ?? ""}`.trim().replace(/ ·$/, "") + (mais ? ` + ${mais}` : "")), itens: gravar,
+          tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: pg.pagamentos, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null,
+          descricao, itens: gravar,
         });
         recebeu = true;
       }
       let estoqueOk = true;
       try { await baixarEstoque(sb, petshop.id, user.id, itens); } catch (e) {
         estoqueOk = false;
-        avisarErro(`${recebeu ? "O valor foi recebido, mas o" : "O"} estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
+        avisarErro(`${recebeu ? (fiado ? "A conta foi anotada, mas o" : "O valor foi recebido, mas o") : "O"} estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
       }
       if (a.status !== "concluido") ok(await sb.from("agendamentos").update({ status: "concluido" }).eq("id", a.id).select("id").single());
-      if (estoqueOk) avisar(recebeu ? `Recebido ${brl(contas.total)}.` : "Atendimento concluído sem cobrança.");
+      if (estoqueOk) avisar(fiado ? `Anotado: ${brl(contas.total)} a receber até ${dataCompleta(depois.quando)}.` : recebeu ? `Recebido ${brl(contas.total)}.` : "Atendimento concluído sem cobrança.");
       avisarMudanca();
       aoPronto();
     } catch (e) {
       if (recebeu) {
-        avisarErro(`O valor foi recebido, mas o atendimento não ficou como concluído. Conclua pela agenda. (${mensagemDeErro(e)})`);
+        avisarErro(`${depois.ativo ? "A conta foi anotada" : "O valor foi recebido"}, mas o atendimento não ficou como concluído. Conclua pela agenda. (${mensagemDeErro(e)})`);
         avisarMudanca();
         aoPronto();
       } else { avisarErro(e); setSalvando(false); }
@@ -92,7 +111,7 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
         <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || nadaAFazer}>
-          {salvando ? "Anotando…" : contas.total > 0 ? `Receber ${brl(contas.total)}` : "Concluir sem cobrar"}
+          {salvando ? "Anotando…" : contas.total <= 0 ? "Concluir sem cobrar" : depois.ativo ? `Anotar ${brl(contas.total)} a receber` : `Receber ${brl(contas.total)}`}
         </button>
       </>}>
       <div className="g-form">
@@ -121,9 +140,11 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
         </div>
 
         <FechamentoDaConta subtotal={contas.subtotal} desconto={contas.desconto} total={contas.total} descontoDigitado={desconto} aoDesconto={setDesconto}
-          forma={forma} aoForma={setForma} />
+          pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErroForma(null); }} erroForma={erroForma}
+          depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} />
+        {contas.total > 0 && !depois.ativo && <AvisoCaixaFechado aberto={caixa} />}
         <p className="g-pp g-muted">
-          {contas.total > 0 ? "O valor entra no caixa de hoje" : "Nada entra no caixa"}
+          {contas.total > 0 && depois.ativo ? "Nada entra no caixa agora: a conta fica em A receber" : contas.total > 0 ? (caixa === false ? "O valor entra no financeiro de hoje, fora do caixa" : "O valor entra no caixa de hoje") : "Nada entra no caixa"}
           {vendidos.length ? ", os produtos saem do estoque" : ""}
           {a.status !== "concluido" ? " e o atendimento fica como concluído." : "."}
         </p>

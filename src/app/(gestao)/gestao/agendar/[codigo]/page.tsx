@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import EstadiaPeloLink from "./estadia";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, CalendarDays, Cat, Check, Clock, Dog, MapPin, MessageCircle, PawPrint, Plus, Scissors, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, Cat, Check, Clock, Dog, MapPin, MessageCircle, PawPrint, Plus, Scissors, Sun, X } from "lucide-react";
 import { Marca, Selo } from "@/components/gestao/marca";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
@@ -20,6 +21,7 @@ type Info = {
   logo?: string | null; tema?: string | null;
   nome: string; telefone: string | null; cidade: string | null; uf: string | null; horario: unknown; aviso: string | null; hoje: string;
   servicos: ServicoDoLink[];
+  creche?: { diaria: number | null } | null; hotel?: { diaria: number | null } | null;
 };
 type Passo = "servico" | "quando" | "dados" | "enviado";
 type Especie = "cao" | "gato" | "outro";
@@ -80,6 +82,7 @@ export default function AgendarPeloLink() {
   const [info, setInfo] = useState<Info | null | undefined>(undefined);
   const [semRede, setSemRede] = useState(false);
   const [passo, setPasso] = useState<Passo>("servico");
+  const [estadia, setEstadia] = useState<"creche" | "hotel" | null>(null);
 
   const [servicoId, setServicoId] = useState<string | null>(null);
   const [dia, setDia] = useState<string | null>(null);
@@ -294,14 +297,19 @@ export default function AgendarPeloLink() {
             {onde && <p className="g-lk-onde"><MapPin aria-hidden />{onde}</p>}
           </div>
         </div>
-        {passo !== "enviado" && <p className="g-lk-cab-frase">Peça um horário por aqui. O pet shop confirma com você pelo WhatsApp.</p>}
+        {passo !== "enviado" && <p className="g-lk-cab-frase">Peça um horário por aqui. A confirmação chega pelo seu WhatsApp.</p>}
       </header>
 
       {info.aviso && passo !== "enviado" && (
         <p className="g-lk-recado"><MessageCircle aria-hidden /><span>{info.aviso}</span></p>
       )}
 
-      {passo !== "enviado" && (
+      {estadia && (
+        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} zapLoja={zapLoja}
+          diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)} />
+      )}
+
+      {!estadia && passo !== "enviado" && (
         <ol className="g-lk-passos" aria-label="Passos do pedido">
           {PASSOS.map((p, i) => (
             <li key={p.id} className={i < indice ? "feito" : i === indice ? "atual" : undefined} aria-current={i === indice ? "step" : undefined}>
@@ -312,10 +320,28 @@ export default function AgendarPeloLink() {
       )}
 
       {/* ---------- 1. serviço ---------- */}
-      {passo === "servico" && (
+      {!estadia && passo === "servico" && (
         <section className="g-lk-secao">
           <h2>O que o seu pet vai fazer?</h2>
-          {!info.servicos.length ? (
+          {(info.creche || info.hotel) && (
+            <div className="g-lk-servicos" style={{ marginBottom: 12 }}>
+              {info.creche && (
+                <button type="button" className="g-lk-serv" style={{ "--cor": "#3b9bd9" } as React.CSSProperties} onClick={() => setEstadia("creche")}>
+                  <i className="g-lk-serv-cor" aria-hidden><Sun /></i>
+                  <span className="g-lk-serv-t"><b>Creche</b><span>Passar o dia{info.creche.diaria != null && <em>{brlCurto(Number(info.creche.diaria))} a diária</em>}</span></span>
+                  <ArrowRight className="g-lk-serv-seta" aria-hidden />
+                </button>
+              )}
+              {info.hotel && (
+                <button type="button" className="g-lk-serv" style={{ "--cor": "#7c6bd6" } as React.CSSProperties} onClick={() => setEstadia("hotel")}>
+                  <i className="g-lk-serv-cor" aria-hidden><BedDouble /></i>
+                  <span className="g-lk-serv-t"><b>Hotel</b><span>Dormir com a gente{info.hotel.diaria != null && <em>{brlCurto(Number(info.hotel.diaria))} a diária</em>}</span></span>
+                  <ArrowRight className="g-lk-serv-seta" aria-hidden />
+                </button>
+              )}
+            </div>
+          )}
+          {!info.servicos.length ? (info.creche || info.hotel) ? null : (
             <div className="g-lk-vazio">
               <Scissors aria-hidden />
               <b>Nenhum serviço por aqui ainda</b>
@@ -344,7 +370,7 @@ export default function AgendarPeloLink() {
       )}
 
       {/* ---------- 2. dia e hora ---------- */}
-      {passo === "quando" && servico && (
+      {!estadia && passo === "quando" && servico && (
         <section className="g-lk-secao">
           <button type="button" className="g-lk-escolhido" style={{ "--cor": servico.cor ?? "#f97316" } as React.CSSProperties} onClick={() => ir("servico")}>
             <i aria-hidden />
@@ -425,7 +451,7 @@ export default function AgendarPeloLink() {
       )}
 
       {/* ---------- 3. dados ---------- */}
-      {passo === "dados" && servico && dia && horaEscolhida && (
+      {!estadia && passo === "dados" && servico && dia && horaEscolhida && (
         <form className="g-lk-secao" onSubmit={enviar} noValidate>
           <button type="button" className="g-lk-escolhido" style={{ "--cor": servico.cor ?? "#f97316" } as React.CSSProperties} onClick={() => ir("quando")}>
             <i aria-hidden />
@@ -489,7 +515,7 @@ export default function AgendarPeloLink() {
             <label className="g-campo"><span>Seu WhatsApp</span>
               <input className="g-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 91234-5678" value={telefone} maxLength={20}
                 onChange={(e) => setTelefone(e.target.value)} onBlur={() => setTelefone(fmtTelefone(telefone))} />
-              <small>É por ele que o pet shop confirma o horário.</small>
+              <small>É por ele que a confirmação chega.</small>
             </label>
             <label className="g-campo"><span>Quer avisar alguma coisa? <small>(opcional)</small></span>
               <textarea className="g-textarea" value={obs} maxLength={300} placeholder="Tem medo de secador, toma remédio, primeira vez…" onChange={(e) => setObs(e.target.value)} />
@@ -512,7 +538,7 @@ export default function AgendarPeloLink() {
       )}
 
       {/* ---------- 4. enviado ---------- */}
-      {passo === "enviado" && enviado && (
+      {!estadia && passo === "enviado" && enviado && (
         <section className="g-lk-secao g-lk-ok" aria-live="polite">
           <span className="g-lk-ok-selo" aria-hidden><Check /></span>
           <h2>{enviado.pets.length > 1 ? `Pedido enviado para ${listaDeNomes(enviado.pets.map((x) => x.nome))}.` : "Pedido enviado."}</h2>

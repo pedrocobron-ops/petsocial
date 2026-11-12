@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import type { Cliente } from "@/lib/gestao/tipos";
+import { ERRO_TELEFONE, fmtTelefone, mascaraTelefone, soDigitos, telefoneValido } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Campo, Folha, ok, useAvisos } from "../ui";
 
 /** Cadastro ou edição de um tutor (cliente). */
 export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: Cliente; aoFechar: () => void; aoSalvar: (c: Cliente) => void }) {
   const { sb, petshop } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const [nome, setNome] = useState(cliente?.nome ?? "");
-  const [telefone, setTelefone] = useState(cliente?.telefone ?? "");
+  const [telefone, setTelefone] = useState(() => { const m = mascaraTelefone(cliente?.telefone); return telefoneValido(m) ? m : cliente?.telefone ?? ""; });
+  const [erroFone, setErroFone] = useState<string | null>(null);
   const [email, setEmail] = useState(cliente?.email ?? "");
   const [endereco, setEndereco] = useState(cliente?.endereco ?? "");
   const [obs, setObs] = useState(cliente?.obs ?? "");
@@ -19,9 +21,21 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!nome.trim() || salvando) return;
+    if (!telefoneValido(telefone)) { setErroFone(ERRO_TELEFONE); return; }
     setSalvando(true);
     try {
-      const campos = { nome: nome.trim(), telefone: telefone.trim() || null, email: email.trim() || null, endereco: endereco.trim() || null, obs: obs.trim() || null };
+      if (cliente) {
+        // outra pessoa mexeu neste cadastro depois que o formulário abriu? (a tabela não tem data de alteração: compara os campos)
+        const agora = ok(await sb.from("clientes").select("nome, telefone, email, endereco, obs").eq("id", cliente.id).eq("petshop_id", petshop.id).maybeSingle()) as Pick<Cliente, "nome" | "telefone" | "email" | "endereco" | "obs"> | null;
+        const igual = (a: string | null | undefined, b: string | null | undefined) => (a ?? "") === (b ?? "");
+        const mudou = agora && !(igual(agora.nome, cliente.nome) && igual(agora.telefone, cliente.telefone) && igual(agora.email, cliente.email) && igual(agora.endereco, cliente.endereco) && igual(agora.obs, cliente.obs));
+        if (mudou && !(await confirmar({
+          titulo: "Este cadastro mudou enquanto você editava",
+          texto: `Outra pessoa alterou os dados de ${agora.nome} há pouco${!igual(agora.telefone, cliente.telefone) ? ` (telefone agora: ${fmtTelefone(agora.telefone) || "em branco"})` : ""}. Se salvar, vale o que está neste formulário.`,
+          confirmar: "Salvar mesmo assim",
+        }))) { setSalvando(false); return; }
+      }
+      const campos = { nome: nome.trim(), telefone: soDigitos(telefone) || null, email: email.trim() || null, endereco: endereco.trim() || null, obs: obs.trim() || null };
       const salvo = cliente
         ? ok(await sb.from("clientes").update(campos).eq("id", cliente.id).eq("petshop_id", petshop.id).select().single())
         : ok(await sb.from("clientes").insert({ ...campos, petshop_id: petshop.id }).select().single());
@@ -36,7 +50,11 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
       rodape={<><button type="button" className="g-btn sec" onClick={aoFechar}>Cancelar</button><button className="g-btn pri" form="form-tutor" disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button></>}>
       <form id="form-tutor" className="g-form" onSubmit={salvar}>
         <Campo rotulo="Nome"><input className="g-input" required maxLength={120} value={nome} onChange={(e) => setNome(e.target.value)} autoFocus={!nome} /></Campo>
-        <Campo rotulo="WhatsApp"><input className="g-input" type="tel" inputMode="tel" autoComplete="off" placeholder="(11) 99999-9999" maxLength={30} value={telefone} onChange={(e) => setTelefone(e.target.value)} /></Campo>
+        <Campo rotulo="WhatsApp" erro={erroFone} dica="DDD e número. Pode ficar em branco.">
+          <input className="g-input" type="tel" inputMode="tel" autoComplete="off" placeholder="(11) 99999-9999" maxLength={16} value={telefone} aria-invalid={!!erroFone}
+            onChange={(e) => { setTelefone(mascaraTelefone(e.target.value)); setErroFone(null); }}
+            onBlur={() => setErroFone(telefoneValido(telefone) ? null : ERRO_TELEFONE)} />
+        </Campo>
         <Campo rotulo="E-mail"><input className="g-input" type="email" inputMode="email" autoComplete="off" maxLength={160} value={email} onChange={(e) => setEmail(e.target.value)} /></Campo>
         <Campo rotulo="Endereço" dica="Ajuda no leva e traz."><input className="g-input" autoComplete="off" maxLength={200} value={endereco} onChange={(e) => setEndereco(e.target.value)} /></Campo>
         <Campo rotulo="Observações"><textarea className="g-textarea" maxLength={600} value={obs} onChange={(e) => setObs(e.target.value)} /></Campo>

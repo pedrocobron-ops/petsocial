@@ -4,10 +4,10 @@ import { Marca, Selo } from "@/components/gestao/marca";
 import { Anel, Barras, Kpi, Ranking, Tendencia, Tile, type Tom } from "@/components/gestao/painel";
 import { useState } from "react";
 import Link from "next/link";
-import { BedDouble, CalendarDays, Check, HeartPulse, ChevronRight, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, Wallet } from "lucide-react";
+import { BedDouble, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, Wallet } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, somaDias } from "@/lib/gestao/util";
+import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
@@ -16,6 +16,7 @@ import { buscarSaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
 import MetaMes from "@/components/gestao/meta-mes";
 import DicasMozart from "@/components/gestao/dicas-mozart";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
+import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 
 const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa semana?", "Quem não vem há mais de um mês?"];
@@ -25,6 +26,7 @@ export default function Hoje() {
   const { sb, petshop, eu, servicos, vejoFinanceiro, souDono, posso } = useGestao();
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
+  const [lembretes, setLembretes] = useState(false);
   const hoje = inicioDoDia(new Date());
   const hojeIso = isoDia(hoje);
 
@@ -33,17 +35,17 @@ export default function Hoje() {
     const seg = inicioDaSemana(hoje), ha30 = somaDias(hoje, -30), ha6 = somaDias(hoje, -6);
     const [ags, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes, daSemana, doMes, ultimos7] = await Promise.all([
       sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id).gte("inicio", hoje.toISOString()).lt("inicio", amanha.toISOString()).order("inicio"),
-      sb.from("agendamentos").select("id, lembrete_em, status").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).lt("inicio", depois.toISOString()),
-      sb.from("estadias").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("status", "em_casa"),
+      sb.from("agendamentos").select("id, lembrete_em, status, pets(clientes(id, telefone))").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).lt("inicio", depois.toISOString()),
+      sb.from("estadias").select("id, status, entrada, saida_prevista").eq("petshop_id", petshop.id).in("status", ["em_casa", "reservada"]).limit(1000),
       sb.from("produtos").select("id, nome, estoque, estoque_minimo").eq("petshop_id", petshop.id).eq("ativo", true).gt("estoque_minimo", 0),
       sb.from("pets").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
       sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
-      vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo").eq("petshop_id", petshop.id).eq("pago", true).eq("data", hojeIso) : Promise.resolve({ data: [] }),
-      vejoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento").eq("petshop_id", petshop.id).eq("pago", false).eq("tipo", "saida").lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
+      vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).eq("data", hojeIso) : Promise.resolve({ data: [] }),
+      vejoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento, tipo").eq("petshop_id", petshop.id).eq("pago", false).lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
       sb.from("pacotes_clientes").select("id").eq("petshop_id", petshop.id).eq("ativo", true).gte("vence_em", hojeIso).lte("vence_em", isoDia(somaDias(hoje, 7))),
       sb.from("agendamentos").select("inicio, status").eq("petshop_id", petshop.id).gte("inicio", seg.toISOString()).lt("inicio", somaDias(seg, 7).toISOString()),
       sb.from("agendamentos").select("status, servicos(nome, cor)").eq("petshop_id", petshop.id).gte("inicio", ha30.toISOString()).lt("inicio", amanha.toISOString()).limit(2000),
-      vejoFinanceiro ? sb.from("lancamentos").select("valor, data").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").gte("data", isoDia(ha6)).lte("data", hojeIso) : Promise.resolve({ data: [] }),
+      vejoFinanceiro ? sb.from("lancamentos").select("valor, data").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").is("movimento", null).gte("data", isoDia(ha6)).lte("data", hojeIso) : Promise.resolve({ data: [] }),
     ]);
     const saude = await buscarSaudeVencendo(sb, petshop.id).catch(() => null);
     const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
@@ -54,18 +56,29 @@ export default function Hoje() {
       x.valor++; porServico.set(a.servicos.nome, x);
     }
     const lista = (ags.data ?? []) as unknown as AgendamentoCompleto[];
-    const amanhaAtivos = (agsAmanha.data ?? []).filter((a) => !["cancelado", "faltou"].includes(a.status));
+    const amanhaAtivos = ((agsAmanha.data ?? []) as unknown as { id: string; lembrete_em: string | null; status: string; pets: { clientes: { id: string; telefone: string | null } | null } | null }[])
+      .filter((a) => !["cancelado", "faltou"].includes(a.status));
+    // um lembrete por tutor: quem tem dois pets amanhã recebe uma mensagem só
+    const tutores = (lista: typeof amanhaAtivos) => new Set(lista.map((a) => a.pets?.clientes?.id ?? a.id)).size;
+    // lembrete só dá para mandar a quem tem telefone: os outros não entram na conta do que falta
+    const semTelefone = (a: (typeof amanhaAtivos)[number]) => soDigitos(a.pets?.clientes?.telefone).length < 8;
+    const estadias = emCasa.data ?? [];
+    const noDia = (iso: string | null) => Boolean(iso) && isoDia(new Date(iso!)) === hojeIso;
     return {
       ags: lista,
       amanha: amanhaAtivos.length,
-      amanhaSemLembrete: amanhaAtivos.filter((a) => !a.lembrete_em).length,
-      emCasa: emCasa.count ?? 0,
+      amanhaSemLembrete: tutores(amanhaAtivos.filter((a) => !a.lembrete_em && !semTelefone(a))),
+      amanhaSemTelefone: tutores(amanhaAtivos.filter((a) => !a.lembrete_em && semTelefone(a))),
+      emCasa: estadias.filter((e) => e.status === "em_casa").length,
+      chegamHoje: estadias.filter((e) => e.status === "reservada" && noDia(e.entrada)).length,
+      saemHoje: estadias.filter((e) => e.status === "em_casa" && noDia(e.saida_prevista)).length,
       acabando: (produtos.data ?? []).filter((p) => Number(p.estoque) <= Number(p.estoque_minimo)),
       pets: pets.count ?? 0,
       totalAgs: totalAgs.count ?? 0,
       entrou: (entradas.data ?? []).filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0),
       saiu: (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0),
-      contas: contas.data ?? [],
+      contas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "saida"),
+      aReceberVencidas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "entrada"),
       pacotesVencendo: (pacotes.data ?? []).length,
       saude,
       semana: Array.from({ length: 7 }, (_, i) => {
@@ -93,16 +106,24 @@ export default function Hoje() {
   ].filter((p) => p.so) : [];
   const comecando = passos.some((p) => !p.feito);
 
-  const frase = !dados ? "" : !ativos.length ? "Nenhum horário marcado para hoje."
+  // creche e hotel: a casa pode estar cheia mesmo com a agenda de banho vazia
+  const n = (q: number, um: string, varios: string) => (q === 1 ? `1 ${um}` : `${q} ${varios}`);
+  const temCasa = Boolean(dados && posso("creche_hotel") && dados.emCasa + dados.chegamHoje + dados.saemHoje > 0);
+  const linhaCasa = dados && temCasa
+    ? `Creche e hotel: ${dados.emCasa} na casa, ${n(dados.chegamHoje, "chega", "chegam")} hoje, ${n(dados.saemHoje, "sai", "saem")} hoje`
+    : "";
+
+  const frase = !dados ? "" : !ativos.length ? `Nenhum horário marcado para hoje.${linhaCasa ? ` ${linhaCasa}.` : ""}`
     : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? ", todos concluídos" : ""}.`;
 
   const atencao = dados ? [
-    dados.amanhaSemLembrete > 0 && { icone: CalendarDays, tom: "pessego" as Tom, texto: `Amanhã ${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}.`, href: `/gestao/app/agenda?dia=${isoDia(somaDias(hoje, 1))}` },
+    dados.amanhaSemLembrete > 0 && { icone: MessageCircle, tom: "pessego" as Tom, texto: `Amanhã ${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}: toque para mandar pelo WhatsApp.${dados.amanhaSemTelefone > 0 ? ` ${dados.amanhaSemTelefone} sem telefone (não ${dados.amanhaSemTelefone === 1 ? "entra" : "entram"} na conta).` : ""}`, aoTocar: () => setLembretes(true) },
     dados.acabando.length > 0 && { icone: Package, tom: "rosa" as Tom, texto: `${dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}: ${dados.acabando.slice(0, 3).map((p) => p.nome).join(", ")}.`, href: "/gestao/app/estoque" },
     dados.contas.length > 0 && { icone: Receipt, tom: "manteiga" as Tom, texto: `${dados.contas.length === 1 ? "1 conta vence" : `${dados.contas.length} contas vencem`} até hoje: ${brl(dados.contas.reduce((s, c) => s + Number(c.valor), 0))}.`, href: "/gestao/app/financeiro" },
-    dados.saude && dados.saude.vencidos + dados.saude.vencendo > 0 && { icone: HeartPulse, tom: "ceu" as Tom, texto: `${dados.saude.nomes.slice(0, 3).join(", ")}${dados.saude.nomes.length > 3 ? ` e mais ${dados.saude.nomes.length - 3}` : ""}: ${dados.saude.vencidos > 0 ? "vacina ou cuidado vencido" : "vacina ou cuidado vencendo nos próximos dias"}.`, href: "/gestao/app/clientes" },
+    dados.aReceberVencidas.length > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${dados.aReceberVencidas.length === 1 ? "1 cliente ficou de pagar" : `${dados.aReceberVencidas.length} contas de clientes venceram`} até hoje: ${brl(dados.aReceberVencidas.reduce((s, c) => s + Number(c.valor), 0))} a receber.`, href: "/gestao/app/financeiro" },
+    dados.saude && dados.saude.vencidos + dados.saude.vencendo > 0 && { icone: HeartPulse, tom: "ceu" as Tom, texto: dados.saude.frase, href: "/gestao/app/clientes" },
     dados.pacotesVencendo > 0 && { icone: Ticket, tom: "lilas" as Tom, texto: `${dados.pacotesVencendo === 1 ? "1 pacote vence" : `${dados.pacotesVencendo} pacotes vencem`} nos próximos 7 dias.`, href: "/gestao/app/pacotes" },
-  ].filter(Boolean) as { icone: React.ComponentType<{ size?: number }>; tom: Tom; texto: string; href: string }[] : [];
+  ].filter(Boolean) as { icone: React.ComponentType<{ size?: number }>; tom: Tom; texto: string; href?: string; aoTocar?: () => void }[] : [];
 
   const agora = new Date();
   const emAndamento = ativos.find((a) => a.status !== "concluido" && new Date(a.inicio) <= agora && new Date(a.fim) > agora);
@@ -165,17 +186,20 @@ export default function Hoje() {
             </button>
           ) : (
             <div className="g-proximo vazio">
-              <span className="g-rotulo" style={{ color: "#24543b" }}>{dados && ativos.length ? "Dia concluído" : "Agenda livre"}</span>
+              <span className="g-rotulo" style={{ color: "#24543b" }}>{dados && ativos.length ? "Dia concluído" : temCasa ? "Banho e tosa sem horários" : "Agenda livre"}</span>
               <div className="quem">
                 <Tile icone={dados && ativos.length ? Check : Sparkles} tom="menta" tamanho="g" />
                 <div style={{ minWidth: 0 }}>
                   <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{dados && ativos.length ? "Tudo atendido por hoje" : "Nenhum horário por vir"}</b>
                 </div>
               </div>
+              {temCasa && <Link className="g-hoje-casa" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
               <Link className="g-btn verde" href="/gestao/app/agenda?novo=1" style={{ justifySelf: "start" }}><Plus />Marcar horário</Link>
             </div>
           )}
         </div>
+
+        {temCasa && destaque?.pets && <Link className="g-hoje-casa solta" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
 
         {posso("agenda") && <PedidosLink />}
 
@@ -226,12 +250,19 @@ export default function Hoje() {
                     <div className={`g-hora-grupo${a.status === "concluido" ? " feito" : ""}${a.id === destaque?.id ? " agora" : ""}`} key={a.id} style={{ "--cor": a.servicos?.cor ?? "#f97316" } as React.CSSProperties}>
                       <time>{hora(a.inicio)}</time>
                       <span className="ponto" aria-hidden />
-                      <button className={`g-ag${fora ? " apagado" : ""}`} onClick={() => setAberto(a.id)}>
-                        {a.pets && <AvatarPet pet={a.pets} />}
-                        <span className="t"><b>{a.pets?.nome}</b><span className="serv"><i />{[a.servicos?.nome, a.pets?.clientes?.nome].filter(Boolean).join(" · ")}</span></span>
-                        {a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}
-                        <ChevronRight size={18} className="g-muted g-so-pc" />
-                      </button>
+                      <div className="g-lb-par">
+                        <button className={`g-ag${fora ? " apagado" : ""}`} onClick={() => setAberto(a.id)}>
+                          {a.pets && <AvatarPet pet={a.pets} />}
+                          <span className="t">
+                            <b>{a.pets?.nome}</b>
+                            <span className="serv"><i />{a.servicos?.nome ?? "Atendimento"}</span>
+                            {a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {a.pets.clientes.nome}</span>}
+                          </span>
+                          {a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}
+                          <ChevronRight size={18} className="g-muted g-so-pc" />
+                        </button>
+                        {posso("agenda") && <BotaoLembrete agendamento={a} doDia={dados.ags} aoMandar={() => void recarregar()} />}
+                      </div>
                     </div>
                   );
                 })}
@@ -245,12 +276,18 @@ export default function Hoje() {
               <section>
                 <div className="g-card-t"><h2>Pede a sua atenção</h2><span className="g-tag amarelo">{atencao.length}</span></div>
                 <div className="g-atencao">
-                  {atencao.map((x) => (
+                  {atencao.map((x) => x.href ? (
                     <Link key={x.texto} href={x.href}>
                       <Tile icone={x.icone} tom={x.tom} />
                       <span>{x.texto}</span>
                       <ChevronRight size={18} />
                     </Link>
+                  ) : (
+                    <button key={x.texto} type="button" onClick={x.aoTocar}>
+                      <Tile icone={x.icone} tom={x.tom} />
+                      <span>{x.texto}</span>
+                      <ChevronRight size={18} />
+                    </button>
                   ))}
                 </div>
               </section>
@@ -274,6 +311,7 @@ export default function Hoje() {
       </div>
 
       {selecionado && !editando && <DetalheAgendamento agendamento={selecionado} aoFechar={() => setAberto(null)} aoMudar={() => void recarregar()} aoEditar={() => setEditando(selecionado)} />}
+      {lembretes && <LembretesDoDia dia={isoDia(somaDias(hoje, 1))} aoFechar={() => setLembretes(false)} aoMudar={() => void recarregar()} />}
       {editando && <FormAgendamento agendamento={editando} aoFechar={() => setEditando(null)} aoSalvar={() => { setEditando(null); setAberto(null); void recarregar(); }} />}
     </>
   );

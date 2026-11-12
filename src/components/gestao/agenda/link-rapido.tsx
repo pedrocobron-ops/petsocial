@@ -37,6 +37,14 @@ export default function LinkRapido({ rotulo = "Link do cliente" }: { rotulo?: st
       avisar("Link ligado. Já pode mandar para os clientes.");
     } catch (e) { avisarErro(e); } finally { setLigando(false); }
   }
+  async function alternar(campo: "link_creche" | "link_hotel", valor: boolean) {
+    if (somenteLeitura()) return;
+    try {
+      ok(await sb.from("petshops").update(campo === "link_creche" ? { link_creche: valor } : { link_hotel: valor }).eq("id", petshop.id).select("id"));
+      await recarregarBase();
+      avisar(valor ? `O link agora recebe pedido de ${campo === "link_creche" ? "creche" : "hotel"}.` : `O link não recebe mais pedido de ${campo === "link_creche" ? "creche" : "hotel"}.`);
+    } catch (e) { avisarErro(e); }
+  }
   function mandarPara(pet: PetComTutor) {
     const url = linkWhatsApp(pet.clientes?.telefone, convite(pet.clientes?.nome));
     if (!url) { avisar(`${pet.clientes?.nome ?? "Esse tutor"} está sem telefone no cadastro.`); return; }
@@ -71,6 +79,14 @@ export default function LinkRapido({ rotulo = "Link do cliente" }: { rotulo?: st
                 <a className="g-btn sec" href={`https://wa.me/?text=${encodeURIComponent(convite())}`} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar para outro contato</a>
                 <a className="g-btn fantasma" href={endereco} target="_blank" rel="noopener noreferrer">Ver como o cliente vê</a>
               </div>
+              {souDono && (
+                <div className="g-card liso g-pilha p">
+                  <b className="g-p">O que o cliente pode pedir pelo link</b>
+                  <p className="g-muted g-pp">Os serviços de banho e tosa aparecem sempre. Creche e hotel, só se você ligar aqui. O preço da diária e as vagas ficam em Meu pet shop.</p>
+                  <label className="g-check"><input type="checkbox" checked={petshop.link_creche} onChange={(e) => void alternar("link_creche", e.target.checked)} />Creche (passar o dia)</label>
+                  <label className="g-check"><input type="checkbox" checked={petshop.link_hotel} onChange={(e) => void alternar("link_hotel", e.target.checked)} />Hotel (dormir)</label>
+                </div>
+              )}
               {souDono && <Link className="g-btn fantasma p" href="/gestao/app/meu-petshop" style={{ justifySelf: "start" }}><Settings2 />Recado e ajustes do link</Link>}
             </div>
           )}

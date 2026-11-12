@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { Cat, Dog, PawPrint, Search, X } from "lucide-react";
 import { fotoPet } from "@/lib/gestao/supabase";
 import type { PetComTutor } from "@/lib/gestao/tipos";
-import { brl, corDoNome, iniciais, lerValor, semAcento } from "@/lib/gestao/util";
+import { corDoNome, iniciais, lerValor, semAcento, valor2 } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";
 
 /* ---------- carregar dados ---------- */
@@ -66,6 +66,7 @@ export function mensagemDeErro(e: unknown): string {
 
 /* ---------- avisos rápidos e confirmação ---------- */
 
+const EVENTO_AVISOU = "gestao:avisou";
 type Toast = { id: number; texto: string; erro?: boolean };
 type Pergunta = { titulo: string; texto?: string; confirmar?: string; perigo?: boolean; resolver: (v: boolean) => void };
 const AvisosCtx = createContext<{ avisar: (t: string) => void; avisarErro: (e: unknown) => void; confirmar: (p: Omit<Pergunta, "resolver">) => Promise<boolean> } | null>(null);
@@ -83,6 +84,8 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t.slice(-2), { id, texto, erro }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), erro ? 5000 : 2600);
+    // aviso de que deu certo = algo foi gravado: a folha aberta deixa de contar como "mexida"
+    if (!erro) window.dispatchEvent(new Event(EVENTO_AVISOU));
   }, []);
   const avisar = useCallback((t: string) => por(t), [por]);
   const avisarErro = useCallback((e: unknown) => por(mensagemDeErro(e), true), [por]);
@@ -116,25 +119,65 @@ export function Folha({ titulo, aoFechar, children, rodape, larga }: {
 }) {
   const fechar = useRef(aoFechar);
   fechar.current = aoFechar;
+  const caixa = useRef<HTMLDivElement>(null);
+  // a pessoa digitou algo nesta folha? (só vale para fechar por fora, Esc ou X; o próprio formulário fecha direto ao salvar)
+  const mexeu = useRef(false);
+  const [perguntando, setPerguntando] = useState(false);
+  const perguntandoAgora = useRef(false);
+  perguntandoAgora.current = perguntando;
+  const tentar = useRef(() => {});
+  tentar.current = () => { if (mexeu.current) setPerguntando(true); else fechar.current(); };
   useEffect(() => {
     const eu = {};
     pilhaDeFolhas.push(eu);
     // Esc fecha só a folha que está por cima
-    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape" && pilhaDeFolhas[pilhaDeFolhas.length - 1] === eu) { e.stopImmediatePropagation(); fechar.current(); } };
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || pilhaDeFolhas[pilhaDeFolhas.length - 1] !== eu) return;
+      e.stopImmediatePropagation();
+      if (perguntandoAgora.current) setPerguntando(false); else tentar.current();
+    };
     document.addEventListener("keydown", tecla);
+    // digitar ou marcar algo dentro desta folha (e não de outra aberta por cima) conta como formulário mexido; busca não conta
+    const no = caixa.current;
+    const digitou = (e: Event) => {
+      const alvo = e.target as HTMLElement | null;
+      if (!alvo || alvo.closest(".g-folha") !== no) return;
+      if (alvo.closest(".g-busca, [data-sem-aviso]") || (alvo as HTMLInputElement).type === "search" || (alvo as HTMLInputElement).type === "file") return;
+      mexeu.current = true;
+    };
+    no?.addEventListener("input", digitou);
+    no?.addEventListener("change", digitou);
+    const gravou = () => { mexeu.current = false; };
+    window.addEventListener(EVENTO_AVISOU, gravou);
     const antes = document.documentElement.style.overflow;
     document.documentElement.style.overflow = "hidden";
-    return () => { pilhaDeFolhas.splice(pilhaDeFolhas.indexOf(eu), 1); document.removeEventListener("keydown", tecla); document.documentElement.style.overflow = antes; };
+    return () => {
+      pilhaDeFolhas.splice(pilhaDeFolhas.indexOf(eu), 1); document.removeEventListener("keydown", tecla);
+      no?.removeEventListener("input", digitou); no?.removeEventListener("change", digitou); window.removeEventListener(EVENTO_AVISOU, gravou);
+      document.documentElement.style.overflow = antes;
+    };
   }, []);
   return (
-    <div className="g-fundo" onMouseDown={(e) => { if (e.target === e.currentTarget) aoFechar(); }}>
-      <div className={`g-folha${larga ? " larga" : ""}`} role="dialog" aria-modal="true">
+    <div className="g-fundo" onMouseDown={(e) => { if (e.target === e.currentTarget) tentar.current(); }}>
+      <div ref={caixa} className={`g-folha${larga ? " larga" : ""}`} role="dialog" aria-modal="true">
         <div className="g-folha-topo">
           <h2>{titulo}</h2>
-          <button className="g-ico" onClick={aoFechar} aria-label="Fechar"><X /></button>
+          <button className="g-ico" onClick={() => tentar.current()} aria-label="Fechar"><X /></button>
         </div>
         <div className="g-folha-corpo">{children}</div>
         {rodape && <div className="g-folha-pe">{rodape}</div>}
+        {perguntando && (
+          <div className="g-folha-sair" role="alertdialog" aria-modal="true" aria-label="Sair sem salvar?" onMouseDown={(e) => e.stopPropagation()}>
+            <div>
+              <b>Sair sem salvar?</b>
+              <p>O que você preencheu aqui não foi salvo.</p>
+              <div className="bts">
+                <button type="button" className="g-btn pri" autoFocus onClick={() => setPerguntando(false)}>Continuar preenchendo</button>
+                <button type="button" className="g-btn perigo" onClick={() => { setPerguntando(false); fechar.current(); }}>Sair sem salvar</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -156,15 +199,15 @@ export function Campo({ rotulo, dica, erro, children }: { rotulo: string; dica?:
 export function CampoValor({ valor, aoMudar, placeholder = "0,00", autoFocus, id }: {
   valor: number | null; aoMudar: (v: number | null) => void; placeholder?: string; autoFocus?: boolean; id?: string;
 }) {
-  const [texto, setTexto] = useState(valor == null ? "" : String(valor).replace(".", ","));
+  const [texto, setTexto] = useState(valor == null ? "" : valor2(valor));
   const ultimo = useRef(valor);
   useEffect(() => {
-    if (valor !== ultimo.current) { ultimo.current = valor; setTexto(valor == null ? "" : String(valor).replace(".", ",")); }
+    if (valor !== ultimo.current) { ultimo.current = valor; setTexto(valor == null ? "" : valor2(valor)); }
   }, [valor]);
   return (
     <input id={id} className="g-input g-tab" inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={texto}
       onChange={(e) => { setTexto(e.target.value); const n = lerValor(e.target.value); ultimo.current = n; aoMudar(n); }}
-      onBlur={() => { if (ultimo.current != null) setTexto(brl(ultimo.current).replace("R$", "").trim()); }} />
+      onBlur={() => { if (ultimo.current != null) setTexto(valor2(ultimo.current)); }} />
   );
 }
 

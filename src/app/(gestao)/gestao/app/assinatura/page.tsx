@@ -67,7 +67,7 @@ export default function Assinatura() {
 
         {temAssinatura && (
           <section className="g-pilha">
-            <div className="g-card-t" style={{ marginBottom: 0 }}><h2>Seu plano</h2><span className="g-muted g-p">{textoAcessos(atual.acessos)} com login</span></div>
+            <div className="g-card-t" style={{ marginBottom: 0 }}><h2>Seu plano</h2><span className="g-muted g-p">{textoAcessos(atual.acessos)} ao sistema</span></div>
             <div className="g-as-planos">
               {PLANOS.map((p) => {
                 const meu = p.id === atual.id, v = VISUAL[p.id];
@@ -76,7 +76,7 @@ export default function Assinatura() {
                     {meu && <span className="g-as-marca"><BadgeCheck aria-hidden />Seu plano</span>}
                     <div className="g-as-plano-t"><Tile icone={v.icone} tom={v.tom} tamanho="g" /><div><h2>{p.nome}</h2><p className="g-muted g-pp">{p.para}</p></div></div>
                     <p className="g-as-preco"><span className="g-num">{brlCurto(p.preco)}</span><span className="g-muted g-p"> por mês</span></p>
-                    <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoAcessos(p.acessos)}</b> com login</p></div>
+                    <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoAcessos(p.acessos)}</b> ao sistema</p></div>
                   </div>
                 );
               })}
@@ -92,7 +92,7 @@ export default function Assinatura() {
           <section className="g-pilha">
             <div>
               <h2>Escolha o plano</h2>
-              <p className="g-muted g-p">Todos têm as mesmas funções e o Mozart. Muda quantas pessoas entram com login. Pagando por 3 ou 6 meses, sai mais barato.</p>
+              <p className="g-muted g-p">Todos têm as mesmas funções e o Mozart. Muda quantas pessoas têm acesso ao sistema. Pagando por 3 ou 6 meses, sai mais barato.</p>
             </div>
             <div className="g-seg" role="group" aria-label="De quanto em quanto tempo pagar" style={{ justifySelf: "start" }}>
               {PERIODOS.map((pe) => <button key={pe.id} aria-pressed={periodo === pe.id} onClick={() => setPeriodo(pe.id)}>{pe.nome}</button>)}
@@ -105,7 +105,7 @@ export default function Assinatura() {
                     <div className="g-as-plano-t"><Tile icone={v.icone} tom={v.tom} tamanho="g" /><div><h2>{p.nome}</h2><p className="g-muted g-pp">{p.para}</p></div></div>
                     <p className="g-as-preco"><span className="g-num">{brlCurto(o.preco)}</span><span className="g-muted g-p"> {o.periodo.cada}</span></p>
                     <p className="g-muted g-pp" style={{ minHeight: "2.6em" }}>{o.periodo.meses > 1 ? `Equivale a ${brlCurto(Math.round(o.porMes))} por mês: ${brlCurto(o.economia)} a menos do que no mensal.` : "Cobrado todo mês."}</p>
-                    <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoAcessos(p.acessos)}</b> com login</p></div>
+                    <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoAcessos(p.acessos)}</b> ao sistema</p></div>
                     {o.checkout
                       ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(o.checkout, user.email)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
                       : <button className="g-btn cheio" disabled>Disponível em breve</button>}
@@ -120,7 +120,7 @@ export default function Assinatura() {
               </ul>
             </div>
             {!temCheckout() && <p className="g-muted g-p">{liberado ? "A assinatura ainda não abriu. Enquanto isso, o seu acesso continua pelo teste." : "A assinatura ainda não abriu. Os seus dados continuam guardados."}</p>}
-            <p className="g-muted g-pp">Cobrança pela Cakto, que se renova sozinha ao fim de cada período até você cancelar. Você cancela quando quiser e usa até o fim do período já pago. Use no checkout o mesmo e-mail da sua conta{user.email ? ` (${user.email})` : ""} para o acesso ser liberado sozinho.</p>
+            <p className="g-muted g-pp">Cobrança pela Cakto, que se renova sozinha ao fim de cada período até você cancelar. Você cancela quando quiser e usa até o fim do período já pago. Use na página de pagamento o mesmo e-mail da sua conta{user.email ? ` (${user.email})` : ""} para o acesso ser liberado sozinho.</p>
           </section>
         )}
 

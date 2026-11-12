@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Porta from "@/components/gestao/porta";
 import { banco, configurado } from "@/lib/gestao/supabase";
+import CampoSenha from "./campo-senha";
 
 export default function Entrar() {
   const router = useRouter();
@@ -35,7 +36,7 @@ export default function Entrar() {
           <input className="g-input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label className="g-campo"><span>Senha</span>
-          <input className="g-input" type="password" autoComplete="current-password" required value={senha} onChange={(e) => setSenha(e.target.value)} />
+          <CampoSenha valor={senha} aoMudar={setSenha} />
         </label>
         {erro && <p className="g-erro" role="alert">{erro}</p>}
         <button className="g-btn pri cheio" disabled={indo}>{indo ? "Entrando…" : "Entrar"}</button>

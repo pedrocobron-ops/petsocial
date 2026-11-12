@@ -57,6 +57,8 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["O assistente faz as coisas sozinho?", "Não. Ele entende o pedido, mostra o que vai fazer e espera o seu “confirmar”. Nada entra na agenda, no caixa ou no estoque sem você ver."],
   ["E os dados dos meus clientes?", <>Os dados são do seu pet shop. Você pode exportar e apagar quando quiser, como pede a LGPD. Os detalhes estão na <Link href="/gestao/privacidade">política de privacidade</Link>.</>],
   ["Emite nota fiscal?", "Ainda não. Hoje o sistema não emite nota fiscal."],
+  ["Serve para creche e hotel de cães?", "Sim. Tem reserva, entrada e saída, diária fixa, número de vagas com aviso de casa cheia, aviso de vacina vencida na entrada, pacotes de diárias e pedido de vaga pelo link do cliente."],
+  ["Estou em outro sistema. Consigo trazer meus clientes?", "Sim. Você traz clientes, pets e produtos de uma planilha, colando as células ou enviando o arquivo. O que já está no sistema não é apagado."],
   ["Serve para clínica veterinária?", "O sistema é feito para pet shop, banho e tosa, creche e hotel. Ele não tem prontuário, receituário nem internação. Uma clínica que também faz banho e tosa pode usá-lo para essa parte."],
   ["Tem fidelidade?", "Não. No plano mensal a cobrança é todo mês. Nos planos de 3 e 6 meses você paga o período de uma vez, por um valor menor. Em qualquer um, você cancela quando quiser e usa até o fim do período já pago."],
   ["Como o meu cliente agenda pelo link?", "Você manda o link pelo WhatsApp ou deixa no Instagram. O cliente escolhe o serviço, o dia e um dos horários livres, e você recebe o pedido para aceitar ou recusar. Ele não vê a sua agenda nem os dados de outros clientes, só os horários que estão livres."],

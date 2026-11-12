@@ -11,7 +11,7 @@ import { aplicarTema } from "@/lib/gestao/identidade";
 import "./pedido.css";
 
 type Situacao = "pendente" | "aceito" | "recusado" | "cancelado" | "concluido";
-type Item = { pet: string; servico: string | null; dia: string; hora: string; status: Situacao };
+type Item = { pet: string; servico: string | null; dia: string; hora: string; status: Situacao; tipo?: string | null; ate?: string | null };
 type Pedido = { logo?: string | null; tema?: string | null; petshop: string; telefone: string | null; codigo: string; tutor: string; itens: Item[] };
 
 const TEXTO: Record<Situacao, { rotulo: string; tom: string }> = {
@@ -82,10 +82,10 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
                   <li key={n}>
                     <div>
                       <b>{i.pet}</b>
-                      <span>{[i.servico, dataLonga(deIsoDia(i.dia))].filter(Boolean).join(" · ")}</span>
+                      <span>{[i.servico, dataLonga(deIsoDia(i.dia)), i.ate && i.ate !== i.dia ? `até ${dataLonga(deIsoDia(i.ate))}` : null].filter(Boolean).join(" · ")}</span>
                     </div>
                     <div className="lado">
-                      <span className="hora"><Clock aria-hidden />{i.hora}</span>
+                      {(!i.tipo || i.tipo === "servico") && <span className="hora"><Clock aria-hidden />{i.hora}</span>}
                       <span className={`g-tag ${TEXTO[i.status].tom}`}>{TEXTO[i.status].rotulo}</span>
                     </div>
                   </li>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock, Link2, Mic, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Users, X } from "lucide-react";
 import type { Horario, Servico } from "@/lib/gestao/tipos";
@@ -9,7 +9,8 @@ import { GradeHorario, erroDoHorario, lerHorario } from "./ajustes/grade-horario
 import { useGestao } from "./contexto";
 import { Selo } from "./marca";
 import { Tile } from "./painel";
-import { CampoValor, abrirAssistente, avisarMudanca, ok, useAvisos } from "./ui";
+import { lerValor, valor2 } from "@/lib/gestao/util";
+import { abrirAssistente, avisarMudanca, ok, useAvisos } from "./ui";
 import "./guia-inicial.css";
 
 /** Evento para abrir o guia de novo (botão em Meu pet shop). */
@@ -33,6 +34,35 @@ const CORES = ["#4d8f6b", "#3b82a0", "#7c6fb0", "#b0563f", "#8a7a3a", "#a05a82",
 const DURACOES = [15, 30, 45, 60, 90, 120, 150, 180];
 const textoDuracao = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}`);
 type Preco = Pick<Servico, "id" | "nome" | "cor" | "ativo" | "duracao_min" | "preco_p" | "preco_m" | "preco_g" | "preco_gg">;
+const NOME_PORTE: Record<string, string> = { P: "pequeno", M: "médio", G: "grande", GG: "gigante" };
+
+/** O que está errado no preço digitado (null = certo ou em branco). */
+function erroDoPreco(texto: string): string | null {
+  const t = texto.trim();
+  if (!t) return null;
+  if (!/^(R\$)?\s*-?[\d.,\s]+$/.test(t)) return "use só números";
+  const n = lerValor(t);
+  if (n == null) return "use só números";
+  if (n < 0) return "não pode ser negativo";
+  if (n > 99999) return "valor alto demais";
+  return null;
+}
+
+/** Preço de um porte: guarda o texto, avisa o que está errado embaixo do campo e só passa adiante valor que vale. */
+function CampoPreco({ porte, servico, valor, aoMudar }: { porte: string; servico: string; valor: number | null; aoMudar: (v: number | null, erro: string | null) => void }) {
+  const [texto, setTexto] = useState(valor == null ? "" : valor2(valor));
+  const erro = erroDoPreco(texto);
+  return (
+    <label>
+      <span>{porte}</span>
+      <input className={`g-input g-tab${erro ? " ruim" : ""}`} inputMode="decimal" placeholder="R$" value={texto} aria-invalid={!!erro}
+        aria-label={`${servico}, porte ${NOME_PORTE[porte] ?? porte}`}
+        onChange={(e) => { setTexto(e.target.value); const ruim = erroDoPreco(e.target.value); aoMudar(ruim ? null : lerValor(e.target.value), ruim); }}
+        onBlur={() => { if (!erro && texto.trim()) { const n = lerValor(texto); if (n != null) setTexto(valor2(n)); } }} />
+      {erro && <small className="erro" role="alert">{erro}</small>}
+    </label>
+  );
+}
 
 /**
  * Guia da primeira vez: horário, quem atende e quantas vagas, serviços com preço e o link do cliente.
@@ -55,6 +85,14 @@ export default function GuiaInicial() {
   const [vagas, setVagas] = useState<number | null>(petshop.vagas ?? null);
   const [precos, setPrecos] = useState<Preco[]>(() => servicos.filter((s) => !["creche", "hotel"].includes(s.categoria)).map((s) => ({ ...s })));
   const [linkLigado, setLinkLigado] = useState(petshop.link_ativo);
+  const [errosPreco, setErrosPreco] = useState<Record<string, string>>({});
+  const corpo = useRef<HTMLDivElement>(null);
+  // o erro aparece junto do botão; se o campo errado ficou fora da tela, rola até ele
+  useEffect(() => {
+    if (!erro) return;
+    const ruim = corpo.current?.querySelector<HTMLElement>(".ruim, [aria-invalid='true']");
+    ruim?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [erro]);
 
   useEffect(() => {
     const abrir = () => { setPasso(-1); setForcado(true); };
@@ -115,6 +153,9 @@ export default function GuiaInicial() {
       }
       if (id === "servicos") {
         if (!precos.some((s) => s.ativo)) { setErro("Deixe pelo menos um serviço ligado."); return; }
+        const comErro = precos.find((s) => s.ativo && Object.keys(errosPreco).some((k) => k.startsWith(`${s.id}:`)));
+        if (comErro) { setErro(`Confira o preço de ${comErro.nome}: use só números, sem valor negativo.`); return; }
+        if (precos.some((s) => s.ativo && [s.preco_p, s.preco_m, s.preco_g, s.preco_gg].some((v) => v != null && v < 0))) { setErro("O preço não pode ser negativo."); return; }
         for (const s of precos) {
           const antes = servicos.find((x) => x.id === s.id);
           if (!antes) continue;
@@ -146,7 +187,7 @@ export default function GuiaInicial() {
           <button className="g-ico" onClick={() => void fechar()} aria-label="Fechar o guia" title={petshop.guia_feito_em ? "Fechar" : "Fazer depois"}><X /></button>
         </header>
 
-        <div className="g-guia-corpo">
+        <div className="g-guia-corpo" ref={corpo}>
           {passo === -1 && (
             <div className="g-guia-ola">
               <p className="g-rotulo">Guia rápido · 3 minutos</p>
@@ -170,7 +211,7 @@ export default function GuiaInicial() {
 
           {passo === 1 && (
             <div className="g-pilha">
-              <div><p className="g-rotulo">Passo 2 de 4</p><h2 className="g-guia-h">Quem atende os pets?</h2><p className="g-muted g-p">Quem dá banho e faz tosa. Só o nome basta; login e permissões ficam para depois, em Equipe.</p></div>
+              <div><p className="g-rotulo">Passo 2 de 4</p><h2 className="g-guia-h">Quem atende os pets?</h2><p className="g-muted g-p">Quem aparece na agenda para receber os horários: banho, tosa e o que mais vocês fizerem. Só o nome basta; login e permissões ficam para depois, em Equipe.</p></div>
               <div className="g-guia-gente">
                 <label className={`g-guia-pessoa${euAtendo ? " on" : ""}`}>
                   <input type="checkbox" checked={euAtendo} onChange={(e) => setEuAtendo(e.target.checked)} />
@@ -205,7 +246,8 @@ export default function GuiaInicial() {
 
           {passo === 2 && (
             <div className="g-pilha">
-              <div><p className="g-rotulo">Passo 3 de 4</p><h2 className="g-guia-h">O que vocês fazem e quanto custa?</h2><p className="g-muted g-p">O preço por porte aparece sozinho ao marcar um horário. Pode deixar em branco e preencher depois; outros serviços você cria em Meu pet shop.</p></div>
+              <div><p className="g-rotulo">Passo 3 de 4</p><h2 className="g-guia-h">O que vocês fazem e quanto custa?</h2><p className="g-muted g-p">O preço por porte aparece sozinho ao marcar um horário. Pode deixar em branco e preencher depois; outros serviços você cria em Meu pet shop. Creche e hotel têm o preço da diária e as vagas em Meu pet shop.</p></div>
+              <p className="g-guia-legenda"><b>P</b> = pequeno · <b>M</b> = médio · <b>G</b> = grande · <b>GG</b> = gigante</p>
               <div className="g-guia-servicos">
                 {precos.map((s) => (
                   <section key={s.id} className={`g-guia-servico${s.ativo ? "" : " off"}`} style={{ "--cor": s.cor } as React.CSSProperties}>
@@ -220,7 +262,12 @@ export default function GuiaInicial() {
                     {s.ativo && (
                       <div className="precos">
                         {(["preco_p", "preco_m", "preco_g", "preco_gg"] as const).map((c) => (
-                          <label key={c}><span>{c.replace("preco_", "").toUpperCase()}</span><CampoValor valor={s[c]} aoMudar={(v) => mudarPreco(s.id, { [c]: v })} placeholder="R$" /></label>
+                          <CampoPreco key={c} porte={c.replace("preco_", "").toUpperCase()} servico={s.nome} valor={s[c]}
+                            aoMudar={(v, ruim) => {
+                              mudarPreco(s.id, { [c]: v });
+                              setErro(null);
+                              setErrosPreco((m) => { const n = { ...m }; if (ruim) n[`${s.id}:${c}`] = ruim; else delete n[`${s.id}:${c}`]; return n; });
+                            }} />
                         ))}
                       </div>
                     )}
@@ -249,7 +296,7 @@ export default function GuiaInicial() {
               <ul className="g-guia-resumo">
                 <li><Clock /><span>Aberto em {Object.values(lerHorario(petshop.horario)).filter(Boolean).length} dias da semana</span></li>
                 <li><Users /><span>{vagasDe(petshop, equipe) === 1 ? "1 pet por horário" : `Até ${vagasDe(petshop, equipe)} pets no mesmo horário`}</span></li>
-                <li><Scissors /><span>{servicos.filter((s) => s.ativo && !["creche", "hotel"].includes(s.categoria)).length} serviços na agenda</span></li>
+                <li><Scissors /><span>{(() => { const n = servicos.filter((s) => s.ativo && !["creche", "hotel"].includes(s.categoria)).length; return n === 1 ? "1 serviço na agenda" : `${n} serviços na agenda`; })()}</span></li>
                 <li><Link2 /><span>Link do cliente {petshop.link_ativo ? "ligado" : "desligado"}</span></li>
               </ul>
               <p className="g-muted">Agora é usar. Por onde quer começar?</p>
@@ -261,9 +308,9 @@ export default function GuiaInicial() {
             </div>
           )}
 
-          {erro && <p className="g-erro" role="alert">{erro}</p>}
         </div>
 
+        {erro && <p className="g-erro g-guia-erro" role="alert">{erro}</p>}
         <footer className="g-guia-pe">
           {passo === -1 ? (
             <>

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Check, ImagePlus, Link2, Palette, Trash2 } from "lucide-react";
-import { TEMAS, aplicarTema, reduzirLogo, type Tema } from "@/lib/gestao/identidade";
+import { TEMAS, aplicarTema, corPropria, corSegura, reduzirLogo } from "@/lib/gestao/identidade";
 import { useGestao } from "../contexto";
 import LogoLoja from "../logo-loja";
 import { Tile } from "../painel";
@@ -20,9 +20,16 @@ export default function Identidade() {
   const entrada = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
   const [trocando, setTrocando] = useState<string | null>(null);
-  const tema = (petshop.tema ?? "floresta") as Tema;
+  const tema = petshop.tema ?? "floresta";
+  const propria = corPropria(tema);
+  const [cor1, setCor1] = useState(propria?.tema ?? "#1e3a2f");
+  const [cor2, setCor2] = useState(propria?.destaque ?? "#f97316");
+  const [aberta, setAberta] = useState(Boolean(propria));
+  // a cor principal vira fundo do menu e dos botões com letra clara: se for clara demais, escurece até dar leitura
+  const segura = corSegura(cor1);
+  const novaPropria = `${segura}/${cor2.toLowerCase()}`;
 
-  async function escolherTema(id: Tema) {
+  async function escolherTema(id: string) {
     if (id === tema || trocando || somenteLeitura()) return;
     setTrocando(id);
     aplicarTema(id); // mostra na hora
@@ -92,6 +99,30 @@ export default function Identidade() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="g-pilha p">
+        <button type="button" className="g-btn fantasma p" style={{ justifySelf: "start" }} aria-expanded={aberta} onClick={() => setAberta((a) => !a)}>
+          <Palette />{propria ? "Você está usando cores próprias" : "Usar as cores da minha marca"}
+        </button>
+        {aberta && (
+          <div className="g-card liso g-pilha p">
+            <div className="g-fila" style={{ gap: 18, flexWrap: "wrap" }}>
+              <label className="g-campo" style={{ width: "auto" }}><span>Cor principal</span>
+                <input type="color" value={cor1} onChange={(e) => setCor1(e.target.value)} style={{ width: 72, height: 44, padding: 2, border: "1px solid var(--g-linha)", borderRadius: 10, background: "none", cursor: "pointer" }} />
+              </label>
+              <label className="g-campo" style={{ width: "auto" }}><span>Cor de destaque</span>
+                <input type="color" value={cor2} onChange={(e) => setCor2(e.target.value)} style={{ width: 72, height: 44, padding: 2, border: "1px solid var(--g-linha)", borderRadius: 10, background: "none", cursor: "pointer" }} />
+              </label>
+              <span className="g-idt-tema on" style={{ pointerEvents: "none" }} aria-hidden>
+                <span className="amostra" style={{ background: segura }}><i style={{ background: cor2 }} /></span>
+                <span className="nome">Como fica</span>
+              </span>
+            </div>
+            <p className="g-muted g-pp">A cor principal vai no menu e nos títulos; a de destaque, nos botões mais importantes.{segura.toLowerCase() !== cor1.toLowerCase() ? " Escureci um pouco a cor principal para as letras claras ficarem legíveis por cima dela." : ""}</p>
+            <div><button type="button" className="g-btn verde p" disabled={!!trocando || novaPropria === tema} onClick={() => void escolherTema(novaPropria)}>{novaPropria === tema ? "Cores em uso" : "Usar estas cores"}</button></div>
+          </div>
+        )}
       </div>
 
       <div className="g-idt-previa" aria-hidden>

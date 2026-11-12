@@ -2,6 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
 import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres, vagasDe } from "../agenda";
+import { partesPorForma } from "../dinheiro";
 import { brl, fmtTelefone, linkWhatsApp, precoDoServico, semAcento } from "../util";
 
 /**
@@ -116,7 +117,7 @@ export const FERRAMENTAS: Def[] = [
   { grava: true, financeiro: true, name: "fechar_caixa", description: "Fecha o caixa aberto. Passe o dinheiro contado na gaveta (só dinheiro; Pix e cartão não entram). O cartão mostra o esperado, o contado e a diferença.",
     input_schema: obj({ valor_contado: N, obs: S }, ["valor_contado"]) },
   { grava: true, financeiro: true, name: "lancar_dinheiro", description: "Registra dinheiro que já entrou ou saiu hoje (entra no caixa aberto). Para receber um atendimento, passe agendamento_id: ele fica como concluído.",
-    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e insumos, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S }, ["tipo", "valor", "forma", "categoria"]) },
+    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e material, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S }, ["tipo", "valor", "forma", "categoria"]) },
   { grava: true, financeiro: true, name: "criar_conta", description: "Cria uma conta a pagar (saida) ou a receber (entrada) com vencimento futuro.",
     input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, vencimento: DIA, descricao: S, categoria: S }, ["tipo", "valor", "vencimento", "descricao"]) },
   { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar. Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento.",
@@ -309,23 +310,31 @@ async function pacoteParaUsar(c: Contexto, e: Entrada) {
 
 /* ---------- caixa ---------- */
 
-type Movimento = { tipo: string; valor: number; forma: string | null };
+type Movimento = { tipo: string; valor: number; forma: string | null; pagamentos: unknown; movimento: string | null };
 /** Lançamentos pagos de um caixa; sem caixa, os de hoje que ficaram soltos. De mil em mil, para a soma não sair cortada. */
 async function movimentosDoCaixa(c: Contexto, caixaId: string | null) {
   const tudo: Movimento[] = [];
   for (let de = 0; de < 20000; de += 1000) {
-    const q = c.sb.from("lancamentos").select("tipo, valor, forma").eq("petshop_id", c.petshop.id).eq("pago", true);
+    const q = c.sb.from("lancamentos").select("tipo, valor, forma, pagamentos, movimento").eq("petshop_id", c.petshop.id).eq("pago", true);
     const r = ok(await (caixaId ? q.eq("caixa_id", caixaId) : q.is("caixa_id", null).eq("data", c.agora.slice(0, 10))).order("criado_em").order("id").range(de, de + 999));
     tudo.push(...r);
     if (r.length < 1000) break;
   }
   return tudo;
 }
-/** As contas de um caixa, iguais às da tela: na gaveta só conta o dinheiro. */
-function resumoDoCaixa(valorInicial: number, ls: Movimento[]) {
-  const soma = (tipo: string, forma?: string) => centavos(ls.filter((l) => l.tipo === tipo && (!forma || (l.forma ?? "outro") === forma)).reduce((t, l) => t + Number(l.valor), 0));
+/**
+ * As contas de um caixa, iguais às da tela: na gaveta só conta o dinheiro (no pagamento dividido, só a parte em dinheiro).
+ * Sangria e suprimento (movimento de gaveta) mexem na gaveta, mas não são entrada nem saída.
+ */
+function resumoDoCaixa(valorInicial: number, todos: Movimento[]) {
+  const ls = todos.filter((l) => !l.movimento);
+  const soma = (tipo: string, forma?: string) => centavos(ls.filter((l) => l.tipo === tipo)
+    .reduce((t, l) => t + (forma ? partesPorForma(l).filter((p) => p.forma === forma).reduce((s, p) => s + p.valor, 0) : Number(l.valor)), 0));
+  const gaveta = (m: string) => centavos(todos.filter((l) => l.movimento === m).reduce((t, l) => t + Number(l.valor), 0));
   const porForma = Object.keys(FORMA).map((id) => ({ id, rotulo: FORMA[id], entrou: soma("entrada", id), saiu: soma("saida", id) }));
-  return { entrou: soma("entrada"), saiu: soma("saida"), porForma, esperado: centavos(Number(valorInicial) + soma("entrada", "dinheiro") - soma("saida", "dinheiro")), lancamentos: ls.length };
+  const suprimentos = gaveta("suprimento"), sangrias = gaveta("sangria");
+  return { entrou: soma("entrada"), saiu: soma("saida"), porForma, suprimentos, sangrias,
+    esperado: centavos(Number(valorInicial) + soma("entrada", "dinheiro") + suprimentos - soma("saida", "dinheiro") - sangrias), lancamentos: ls.length };
 }
 function diferencaDoCaixa(contado: number, esperado: number) {
   const d = centavos(contado - esperado);
@@ -437,12 +446,18 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       exigir(c.vejoFinanceiro, "Esta pessoa não tem acesso ao financeiro.");
       exigir(RE_DIA.test(String(e.de)) && RE_DIA.test(String(e.ate)), "Datas no formato AAAA-MM-DD.");
       const [ls, caixa] = await Promise.all([
-        sb.from("lancamentos").select("tipo, valor, forma, categoria").eq("petshop_id", petshop.id).eq("pago", true).gte("data", String(e.de)).lte("data", String(e.ate)).limit(5000),
+        sb.from("lancamentos").select("tipo, valor, forma, categoria, pagamentos").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).gte("data", String(e.de)).lte("data", String(e.ate)).limit(5000),
         sb.from("caixas").select("aberto_em, valor_inicial").eq("petshop_id", petshop.id).is("fechado_em", null).maybeSingle(),
       ]);
+      // por forma, o pagamento dividido entra repartido (parte no Pix, parte em dinheiro)
       const soma = (tipo: string, chave: "categoria" | "forma") => {
         const m: Record<string, number> = {};
-        for (const l of ls.data ?? []) if (l.tipo === tipo) m[l[chave] ?? "outro"] = Math.round(((m[l[chave] ?? "outro"] ?? 0) + Number(l.valor)) * 100) / 100;
+        const por = (k: string, v: number) => { m[k] = Math.round(((m[k] ?? 0) + v) * 100) / 100; };
+        for (const l of ls.data ?? []) {
+          if (l.tipo !== tipo) continue;
+          if (chave === "forma") for (const p of partesPorForma(l)) por(p.forma, p.valor);
+          else por(l.categoria ?? "outro", Number(l.valor));
+        }
         return m;
       };
       const total = (tipo: string) => Math.round((ls.data ?? []).filter((l) => l.tipo === tipo).reduce((s, l) => s + Number(l.valor), 0) * 100) / 100;
@@ -495,7 +510,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
         return { resultado: { caixa: "aberto", desde, ...(desde.slice(0, 10) !== hoje ? { aviso: "Este caixa foi aberto em outro dia. Vale fechar e abrir outro para o dia de hoje ficar separado." } : {}),
           troco_inicial: aberto.valor_inicial, entrou: r.entrou, saiu: r.saiu, lancamentos: r.lancamentos,
           por_forma: Object.fromEntries(r.porForma.filter((f) => f.entrou || f.saiu).map((f) => [f.rotulo, { entrou: f.entrou, saiu: f.saiu }])),
-          dinheiro_esperado_na_gaveta: r.esperado, observacao: "Os totais são deste caixa, desde a abertura. Na gaveta só conta o dinheiro." } };
+          ...(r.suprimentos ? { colocado_na_gaveta_suprimento: r.suprimentos } : {}), ...(r.sangrias ? { tirado_da_gaveta_sangria: r.sangrias } : {}),
+          dinheiro_esperado_na_gaveta: r.esperado, observacao: "Os totais são deste caixa, desde a abertura. Na gaveta só conta o dinheiro. Sangria e suprimento mexem na gaveta, mas não são entrada nem saída." } };
       }
       const r = resumoDoCaixa(0, await movimentosDoCaixa(c, null));
       const { data: ultimo } = await sb.from("caixas").select("*").eq("petshop_id", petshop.id).not("fechado_em", "is", null).order("fechado_em", { ascending: false }).limit(1).maybeSingle();
@@ -943,7 +959,7 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
         custo_unitario: e.tipo === "entrada" ? custo : null, motivo: texto(e.motivo, 80) || null, origem: "assistente", criado_por: c.userId }).select("id").single());
       let despesa = false;
       if (e.lancar_despesa && custo != null && e.tipo === "entrada" && c.vejoFinanceiro) {
-        ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "saida", valor: Math.round(custo * qtd * 100) / 100, forma: String(e.forma), categoria: "Produtos e insumos",
+        ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "saida", valor: Math.round(custo * qtd * 100) / 100, forma: String(e.forma), categoria: "Produtos e material",
           descricao: `Compra: ${qtd} ${unidade} de ${nomeProd}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), origem: "assistente", criado_por: c.userId }).select("id").single());
         despesa = true;
       }

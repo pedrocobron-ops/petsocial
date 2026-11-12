@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowUpFromLine, Minus, Package, PackageX, Plus, Search, ShoppingBag, Sparkles, Wallet } from "lucide-react";
+import Importar from "@/components/gestao/importar";
+import { AlertTriangle, ArrowUpFromLine, Minus, Package, PackageX, Plus, Search, ShoppingBag, Sparkles, Wallet, Upload } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
-import { abrirAssistente, avisarMudanca, Campo, CampoValor, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
+import { abrirAssistente, avisarMudanca, Campo, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { Kpi, Tile } from "@/components/gestao/painel";
-import { Chips, ChipsForma, ErroTela, fmtQtd, lerQtd, type Forma } from "@/components/gestao/loja/pecas";
+import { CampoDinheiro, Chips, ChipsForma, ErroTela, fmtQtd, lerQtd, type Forma } from "@/components/gestao/loja/pecas";
 import VendaBalcao from "@/components/gestao/loja/venda";
 import { lancarPago } from "@/lib/gestao/dinheiro";
 import type { MovimentoEstoque, Produto } from "@/lib/gestao/tipos";
@@ -47,6 +48,7 @@ export default function Estoque() {
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [aberta, setAberta] = useState<Aberta | null>(null);
+  const [importando, setImportando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () =>
     ok(await sb.from("produtos").select("*").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as Produto[],
@@ -85,9 +87,11 @@ export default function Estoque() {
         </div>
         <div className="g-acoes">
           {produtos.length > 0 && <button className="g-btn sec" onClick={() => abrir({ tipo: "venda" })}><ShoppingBag /> Vender</button>}
+          <button className="g-btn sec" onClick={() => setImportando(true)}><Upload /> Trazer de planilha</button>
           <button className="g-btn pri" onClick={() => abrir({ tipo: "novo" })}><Plus /> Produto novo</button>
         </div>
       </header>
+      {importando && <Importar tipo="produtos" aoFechar={() => setImportando(false)} aoTerminar={() => void recarregar()} />}
 
       {erro && <ErroTela erro={erro} aoTentar={() => void recarregar()} />}
 
@@ -217,8 +221,8 @@ function CamposDoProduto({ v, mudar, categorias }: { v: CamposProduto; mudar: (p
       </div>
       {categorias && <datalist id="ge-categorias">{categorias.map((c) => <option key={c} value={c} />)}</datalist>}
       <div className="dupla">
-        <Campo rotulo="Preço de venda"><CampoValor valor={v.preco} aoMudar={(n) => mudar({ preco: n })} /></Campo>
-        <Campo rotulo="Custo"><CampoValor valor={v.custo} aoMudar={(n) => mudar({ custo: n })} /></Campo>
+        <Campo rotulo="Preço de venda"><CampoDinheiro valor={v.preco} aoMudar={(n) => mudar({ preco: n })} /></Campo>
+        <Campo rotulo="Custo"><CampoDinheiro valor={v.custo} aoMudar={(n) => mudar({ custo: n })} /></Campo>
       </div>
       <Campo rotulo="Estoque mínimo" dica="Abaixo disso, o produto aparece como acabando. Deixe 0 para não avisar.">
         <input className="g-input g-tab" inputMode="decimal" value={v.minimo} onChange={(e) => mudar({ minimo: e.target.value })} placeholder="0" />
@@ -299,7 +303,7 @@ function Entrada({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: 
       if (lanca) {
         try {
           await lancarPago(sb, petshop.id, {
-            tipo: "saida", valor: total, forma, categoria: "Produtos e insumos",
+            tipo: "saida", valor: total, forma, categoria: "Produtos e material",
             descricao: `Compra: ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}`,
           });
           avisar(`Entrada anotada e ${brl(total)} lançados como despesa.`);
@@ -323,7 +327,7 @@ function Entrada({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: 
           <Campo rotulo={`Quantidade (${produto.unidade})`}>
             <input className="g-input g-tab" inputMode="decimal" value={qtd} onChange={(e) => setQtd(e.target.value)} placeholder="0" autoFocus />
           </Campo>
-          <Campo rotulo={`Custo por ${produto.unidade}`} dica="Opcional"><CampoValor valor={custo} aoMudar={setCusto} /></Campo>
+          <Campo rotulo={`Custo por ${produto.unidade}`} dica="Opcional"><CampoDinheiro valor={custo} aoMudar={setCusto} /></Campo>
         </div>
         {vejoFinanceiro && (
           <>
@@ -400,7 +404,7 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
         {venda && (vejoFinanceiro ? (
           <>
             <Campo rotulo="Valor da venda" dica={produto.preco_venda != null ? `${brl(produto.preco_venda)} por ${produto.unidade}` : "Este produto ainda não tem preço de venda."}>
-              <CampoValor valor={valor} aoMudar={setValorEditado} />
+              <CampoDinheiro valor={valor} aoMudar={setValorEditado} />
             </Campo>
             <ChipsForma valor={forma} aoMudar={setForma} />
           </>

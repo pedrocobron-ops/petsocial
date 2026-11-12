@@ -34,3 +34,14 @@
 .gj-inclui li { display: flex; gap: 10px; align-items: flex-start; font-size: .9375rem; }
 .gj-inclui svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: #2f6b4c; }
 .gj-estreito { max-width: 760px; }
+
+/* correções do teste de uso: contador de vagas e área de toque de 44px */
+.gj-conta-linha { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.gj-conta-linha > p { flex: 1; min-width: min(100%, 220px); }
+.gj-conta { display: inline-flex; align-items: center; gap: 10px; padding: 6px; border-radius: 999px; background: var(--g-carta-2); }
+.gj-conta .g-num { min-width: 1.8ch; text-align: center; font-size: 2rem; }
+.gj-conta .g-ico { width: 44px; height: 44px; background: var(--g-verde); color: #f6f1e8; }
+.gj-conta .g-ico:disabled { opacity: .3; }
+.gj-dia .g-check { min-height: 44px; padding: 0 8px 0 2px; }
+.gj-cor { position: relative; }
+.gj-cor::after { content: ""; position: absolute; inset: -5px; }

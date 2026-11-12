@@ -53,7 +53,7 @@ export const FORMAS = [
 ] as const;
 
 export const CATEGORIAS_ENTRADA = ["Banho e tosa", "Creche e hotel", "Pacotes", "Venda de produtos", "Outros"];
-export const CATEGORIAS_SAIDA = ["Produtos e insumos", "Salários e comissões", "Aluguel", "Água, luz e internet", "Impostos e taxas", "Manutenção", "Marketing", "Outros"];
+export const CATEGORIAS_SAIDA = ["Produtos e material", "Salários e comissões", "Aluguel", "Água, luz e internet", "Impostos e taxas", "Manutenção", "Marketing", "Outros"];
 
 export const PORTES: { id: Porte; rotulo: string }[] = [
   { id: "P", rotulo: "Pequeno" },

@@ -42,6 +42,9 @@ section.g-card.g-pilha > .g-mp-t { margin-bottom: 0; }
 .g-mp-endereco a svg { width: 15px; height: 15px; flex: none; margin-top: 3px; }
 .g-mp-link-acoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .g-mp-link-acoes .g-btn { min-width: 0; padding-inline: 10px; }
-@media (max-width: 380px) { .g-mp-link-acoes { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) { .g-mp-link-acoes { grid-template-columns: minmax(0, 1fr); } }
 .g-mp-link-falta { padding: 10px 14px; border-radius: 12px; background: var(--g-amarelo-tint); color: #5b4708; font-size: .9375rem; }
 .g-mp-link-off { padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); color: var(--g-cinza); font-size: .9375rem; }
+
+/* área de toque da chave do link: 44px sem mudar o desenho */
+.g-mp-chave::after { content: ""; position: absolute; inset: -7px -2px; }
