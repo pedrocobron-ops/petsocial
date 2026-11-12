@@ -1,5 +1,6 @@
 "use client";
 
+import { COLS_MOVIMENTO, COLS_PRODUTO, comCustos, comCustosDeMovimento } from "@/lib/gestao/reservado";
 import { useMemo, useState } from "react";
 import Importar from "@/components/gestao/importar";
 import { AlertTriangle, ArrowUpFromLine, Minus, Package, PackageX, Plus, Search, ShoppingBag, Sparkles, Wallet, Upload } from "lucide-react";
@@ -51,7 +52,7 @@ export default function Estoque() {
   const [importando, setImportando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () =>
-    ok(await sb.from("produtos").select("*").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as Produto[],
+    (await comCustos(sb, petshop.id, ok(await sb.from("produtos").select(COLS_PRODUTO).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as unknown as { id: string }[])) as unknown as Produto[],
   [petshop.id]);
 
   // saídas dos últimos 30 dias: só para o resumo do topo (se a busca falhar, o cartão fica de fora)
@@ -448,8 +449,8 @@ function Ficha({ produto, aoFechar, aoMudar, aoGravar }: { produto: Produto; aoF
   const [salvando, setSalvando] = useState(false);
 
   const { dados: movs, carregando, erro, recarregar } = useDados(async () =>
-    ok(await sb.from("movimentos_estoque").select("*").eq("petshop_id", petshop.id).eq("produto_id", produto.id)
-      .order("criado_em", { ascending: false }).limit(20)) as MovimentoEstoque[],
+    (await comCustosDeMovimento(sb, produto.id, ok(await sb.from("movimentos_estoque").select(COLS_MOVIMENTO).eq("petshop_id", petshop.id).eq("produto_id", produto.id)
+      .order("criado_em", { ascending: false }).limit(20)) as unknown as { id: string }[])) as unknown as MovimentoEstoque[],
   [petshop.id, produto.id]);
 
   async function salvar() {

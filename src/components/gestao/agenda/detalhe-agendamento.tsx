@@ -1,5 +1,6 @@
 "use client";
 
+import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { useState } from "react";
 import Link from "next/link";
 import { BellRing, CalendarClock, CalendarX, Check, MessageCircle, Play, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
@@ -43,7 +44,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const { dados: extra, recarregar } = useDados(async () => {
     const [pago, pacotes] = await Promise.all([
       vejoFinanceiro ? sb.from("lancamentos").select("*").eq("agendamento_id", a.id).eq("tipo", "entrada") : Promise.resolve({ data: [] as Lancamento[], error: null }),
-      sb.from("pacotes_clientes").select("*").eq("petshop_id", petshop.id).eq("pet_id", a.pet_id).eq("ativo", true),
+      sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", a.pet_id).eq("ativo", true),
     ]);
     const validos = ((pacotes.data ?? []) as PacoteCliente[]).filter((p) => p.usados < p.total && (!p.vence_em || p.vence_em >= isoDia(new Date())) && (!p.servico_id || p.servico_id === a.servico_id));
     return { pago: (pago.data ?? []) as Lancamento[], pacote: validos[0] ?? null };

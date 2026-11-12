@@ -1,5 +1,6 @@
 "use client";
 
+import { COLS_PRODUTO } from "@/lib/gestao/reservado";
 import { useEffect, useRef, useState } from "react";
 import { Minus, Package, Plus, Scissors, Search, Sparkles, Trash2, Truck } from "lucide-react";
 import type { ItemLancamento } from "@/lib/gestao/dinheiro";
@@ -104,7 +105,7 @@ export async function baixarEstoque(sb: Banco, petshopId: string, userId: string
 export function useProdutosDaLoja() {
   const { sb, petshop } = useGestao();
   const { dados, carregando, erro } = useDados(async () =>
-    ok(await sb.from("produtos").select("*").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as Produto[],
+    (ok(await sb.from("produtos").select(COLS_PRODUTO).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as unknown as Omit<Produto, "custo">[]).map((p) => ({ ...p, custo: null })) as Produto[],
   [petshop.id]);
   return { produtos: dados ?? [], carregando: carregando && !dados, erro };
 }

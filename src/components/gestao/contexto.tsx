@@ -1,5 +1,6 @@
 "use client";
 
+import { lerEquipe } from "@/lib/gestao/reservado";
 import { temCheckout } from "@/lib/gestao/planos";
 import { Selo } from "./marca";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -53,7 +54,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   const carregarBase = useCallback(async (petshopId: string) => {
     const [p, e, s] = await Promise.all([
       sb.from("petshops").select("*").eq("id", petshopId).single(),
-      sb.from("profissionais").select("*").eq("petshop_id", petshopId).order("criado_em"),
+      lerEquipe(sb, petshopId),
       sb.from("servicos").select("*").eq("petshop_id", petshopId).order("ordem").order("nome"),
     ]);
     if (p.error) throw p.error;

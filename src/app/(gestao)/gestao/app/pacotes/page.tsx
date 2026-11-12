@@ -1,5 +1,6 @@
 "use client";
 
+import { COLS_PACOTE, COLS_PACOTE_CLIENTE, comPrecosDePacote } from "@/lib/gestao/reservado";
 import { useMemo, useState } from "react";
 import { CalendarClock, Check, Layers, Plus, RotateCcw, Sparkles, Ticket, Undo2 } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
@@ -61,11 +62,16 @@ export default function Pacotes() {
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [modelos, vendidos] = await Promise.all([
-      sb.from("pacotes").select("*").eq("petshop_id", petshop.id).order("ativo", { ascending: false }).order("nome"),
-      sb.from("pacotes_clientes").select("*, pets(id, nome, foto, especie, clientes(id, nome, telefone))").eq("petshop_id", petshop.id)
+      sb.from("pacotes").select(COLS_PACOTE).eq("petshop_id", petshop.id).order("ativo", { ascending: false }).order("nome"),
+      sb.from("pacotes_clientes").select(`${COLS_PACOTE_CLIENTE}, pets(id, nome, foto, especie, clientes(id, nome, telefone))`).eq("petshop_id", petshop.id)
         .order("criado_em", { ascending: false }).limit(1000),
     ]);
-    return { modelos: ok(modelos) as Pacote[], vendidos: ok(vendidos) as unknown as PacoteDoPet[] };
+    // o preço só vem para quem cuida de pacotes ou vê o financeiro
+    const [m, v] = await Promise.all([
+      comPrecosDePacote(sb, petshop.id, ok(modelos) as unknown as { id: string }[]),
+      comPrecosDePacote(sb, petshop.id, ok(vendidos) as unknown as { id: string }[]),
+    ]);
+    return { modelos: m as unknown as Pacote[], vendidos: v as unknown as PacoteDoPet[] };
   }, [petshop.id]);
 
   const modelos = useMemo(() => dados?.modelos ?? [], [dados]);
