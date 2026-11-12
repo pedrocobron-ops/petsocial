@@ -63,3 +63,15 @@
 .g-guia-proximos { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .g-guia .g-tile { flex: none; width: 38px; }
+
+/* correções do teste de uso: erro de preço ao lado do campo, erro junto do botão, legenda dos portes, toque de 44px */
+.g-guia-servico .precos { align-items: start; }
+.g-guia-servico .precos .g-input.ruim { border-color: var(--g-vermelho); box-shadow: 0 0 0 3px rgba(179, 64, 46, .14); }
+.g-guia-servico .precos small.erro { font-size: .6875rem; line-height: 1.2; color: var(--g-vermelho); text-align: center; font-weight: 600; }
+.g-guia-legenda { font-size: .8125rem; color: var(--g-cinza); padding: 8px 12px; border-radius: 12px; background: var(--g-carta-2); }
+.g-guia-legenda b { color: var(--g-tinta); }
+.g-guia-erro { padding: 10px 20px; background: var(--g-vermelho-tint); color: #7a281b; font-weight: 600; border-top: 1px solid rgba(179, 64, 46, .2); }
+@media (min-width: 720px) { .g-guia-erro { padding: 10px 28px; } }
+.g-guia-chave::after { content: ""; position: absolute; inset: -9px -4px; }
+.g-guia-pessoa { min-height: 56px; }
+.g-guia-conta .g-ico { width: 44px; height: 44px; }

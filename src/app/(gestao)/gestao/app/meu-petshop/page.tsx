@@ -2,6 +2,7 @@
 
 import { abrirGuia } from "@/components/gestao/guia-inicial";
 import Identidade from "@/components/gestao/ajustes/identidade";
+import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
 import { useState } from "react";
 import { CalendarDays, Check, Clock, Copy, ExternalLink, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
 import { Kpi, Tile } from "@/components/gestao/painel";
@@ -62,6 +63,8 @@ export default function MeuPetshop() {
           <div className="g-pilha g">
             <Dados />
             <HorarioDaLoja />
+            <VagasBanho />
+            <AjustesCrecheHotel />
           </div>
           <div className="g-pilha g">
             <Identidade />
@@ -345,7 +348,8 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
     const min = Number(minutos);
     if (!n) return setErro("Dê um nome ao serviço.");
     if (!Number.isInteger(min) || min < 5 || min > 1440) return setErro("A duração fica entre 5 minutos e 24 horas.");
-    if (PORTES.some((p) => (valores[p.id] ?? 0) < 0 || (valores[p.id] ?? 0) > 99999)) return setErro("Confira os preços.");
+    if (PORTES.some((p) => (valores[p.id] ?? 0) < 0)) return setErro("O preço não pode ser negativo.");
+    if (PORTES.some((p) => (valores[p.id] ?? 0) > 99999)) return setErro("Confira os preços.");
     setErro(null);
     setSalvando(true);
     const campos = {
@@ -406,7 +410,7 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
               Usar o mesmo preço para todos
             </button>
           </div>
-          <small>Pode deixar em branco o porte que vocês não atendem.</small>
+          <small>P = pequeno, M = médio, G = grande, GG = gigante. Pode deixar em branco o porte que vocês não atendem.</small>
         </div>
         <div className="g-campo"><span>Cor na agenda</span><EscolherCor valor={cor} aoMudar={setCor} /></div>
         {servico && (

@@ -11,6 +11,9 @@ const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","P
 export default function Comecar() {
   const router = useRouter();
   const [pronto, setPronto] = useState(false);
+  // por que a pessoa caiu aqui sem pet shop: perdeu o acesso, o convite não foi achado ou é conta nova mesmo
+  const [motivo, setMotivo] = useState<{ tipo: "retirado" | "sem-convite"; loja?: string; email?: string } | null>(null);
+  const [conferindo, setConferindo] = useState(false);
   const [nome, setNome] = useState("");
   const [seuNome, setSeuNome] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -27,7 +30,14 @@ export default function Comecar() {
       // quem foi convidado para uma equipe, ou já tem pet shop, vai direto para o aplicativo
       const { data: vinculos } = await sb.rpc("entrar");
       if (vinculos?.length) { router.replace("/gestao/app"); return; }
-      setSeuNome(String(data.session.user.user_metadata?.nome ?? ""));
+      const u = data.session.user;
+      setSeuNome(String(u.user_metadata?.nome ?? ""));
+      // esta conta já entrou num pet shop neste aparelho e agora não tem nenhum: o acesso foi retirado
+      let antes: { user?: string; nome?: string } | null = null;
+      try { antes = JSON.parse(localStorage.getItem("maestro-gestao-ultimo-acesso") ?? "null"); } catch { antes = null; }
+      if (antes?.user === u.id) setMotivo({ tipo: "retirado", loja: antes.nome });
+      // criou a conta pelo link de um convite, mas nenhum convite bate com este e-mail
+      else if (u.user_metadata?.convidado) setMotivo({ tipo: "sem-convite", email: u.email });
       setPronto(true);
     })();
   }, [router]);
@@ -42,10 +52,39 @@ export default function Comecar() {
     router.replace("/gestao/app?boas-vindas=1");
   }
 
+  async function conferirDeNovo() {
+    setConferindo(true);
+    const { data: vinculos } = await banco().rpc("entrar");
+    setConferindo(false);
+    if (vinculos?.length) router.replace("/gestao/app");
+    else setErro("Ainda não achei nenhum pet shop ligado a esta conta.");
+  }
+  async function sair() {
+    await banco().auth.signOut();
+    router.replace("/gestao/entrar");
+  }
+
   if (!pronto) return <Porta titulo="Só um instante…"><span /></Porta>;
 
+  if (motivo) {
+    const retirado = motivo.tipo === "retirado";
+    return (
+      <Porta titulo={retirado ? "Seu acesso a este pet shop foi retirado" : "Não achei o seu convite"}
+        texto={retirado
+          ? `Esta conta não está mais ligada ${motivo.loja ? `ao ${motivo.loja}` : "ao pet shop"}. Fale com o dono para ele liberar de novo, em Equipe.`
+          : `Nenhum pet shop convidou o e-mail ${motivo.email ?? "desta conta"}. Peça ao dono para conferir se o convite foi feito para este mesmo e-mail e se você já confirmou o e-mail pelo link que enviamos.`}>
+        <div className="g-pilha p">
+          {erro && <p className="g-erro" role="alert">{erro}</p>}
+          <button type="button" className="g-btn pri cheio" onClick={() => void conferirDeNovo()} disabled={conferindo}>{conferindo ? "Conferindo…" : "O dono já liberou: tentar de novo"}</button>
+          <button type="button" className="g-btn sec cheio" onClick={() => void sair()}>Sair desta conta</button>
+          <p className="g-muted g-p">Quer abrir um pet shop seu, separado desse? <button type="button" className="g-link" onClick={() => { setErro(null); setMotivo(null); }}>Criar um pet shop novo</button></p>
+        </div>
+      </Porta>
+    );
+  }
+
   return (
-    <Porta titulo="Como se chama o seu pet shop?" texto="Leva um minuto. Depois você ajusta horários, serviços e preços.">
+    <Porta titulo="Como se chama o seu pet shop?" texto="Aqui você cria um pet shop novo, do zero, com 7 dias grátis. Foi convidado para a equipe de um pet shop que já existe? Então não crie outro: peça ao dono para conferir o e-mail do convite.">
       <form className="g-form" onSubmit={enviar}>
         <label className="g-campo"><span>Nome do pet shop</span>
           <input className="g-input" required minLength={2} maxLength={80} placeholder="Ex.: Banho & Cia" value={nome} onChange={(e) => setNome(e.target.value)} autoFocus />
@@ -68,7 +107,7 @@ export default function Comecar() {
           </label>
         </div>
         {erro && <p className="g-erro" role="alert">{erro}</p>}
-        <button className="g-btn pri cheio" disabled={indo}>{indo ? "Criando…" : "Abrir meu pet shop"}</button>
+        <button className="g-btn pri cheio" disabled={indo}>{indo ? "Criando…" : "Criar meu pet shop novo"}</button>
       </form>
     </Porta>
   );

@@ -2,15 +2,16 @@
 
 import { Fragment, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserRound, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
 import type { Agendamento, Cliente, Estadia, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, haQuanto, hora, idade, inicioDoDia, linkWhatsApp, nomeDiaCurto } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, fmtTelefone, haQuanto, hora, idade, inicioDoDia, linkWhatsApp, nomeDiaCurto, telefoneValido } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { Anel, Tile, type Tom } from "../painel";
 import { AvatarPet, avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { linkTutor, nomePorte, primeiroNome } from "./comum";
+import FormTutor from "./form-tutor";
 import { EtiquetaEspecie, tomDaVisita } from "./lista";
 import { CartaoSaude, EtiquetaSaude, resumoSaude, type CuidadoSaude } from "./saude";
 
@@ -32,10 +33,11 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = useState(false);
+  const [editandoTutor, setEditandoTutor] = useState(false);
   const [ocupado, setOcupado] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
-    const [pet, atendimentos, pacotes, estadias, concluidos, saude] = await Promise.all([
+    const [pet, atendimentos, pacotes, estadias, concluidos, saude, hospedagens] = await Promise.all([
       sb.from("pets").select("*, clientes(*)").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
       sb.from("agendamentos").select("id, inicio, status, preco, servico_id").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
       sb.from("pacotes_clientes").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).eq("ativo", true).order("comprado_em", { ascending: false }),
@@ -43,23 +45,41 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       // visitas concluídas: a conta exata, a mais recente e os valores para somar
       sb.from("agendamentos").select("inicio, preco", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).eq("status", "concluido").order("inicio", { ascending: false }).limit(1000),
       sb.from("pets_saude").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("vence_em").order("criado_em").limit(500),
+      // creche e hotel também é visita: estadias encerradas e a que está acontecendo agora
+      sb.from("estadias").select("entrada, saida, status", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).in("status", ["encerrada", "em_casa"]).order("entrada", { ascending: false }).limit(1000),
     ]);
-    for (const r of [pet, atendimentos, pacotes, estadias, concluidos]) if (r.error) throw new Error(r.error.message);
+    for (const r of [pet, atendimentos, pacotes, estadias, concluidos, hospedagens]) if (r.error) throw new Error(r.error.message);
     const feitos = (concluidos.data ?? []) as { inicio: string; preco: number | null }[];
+    const ficou = (hospedagens.data ?? []) as { entrada: string; saida: string | null; status: string }[];
+    const nEstadias = hospedagens.count ?? ficou.length;
+    // quem está na casa agora veio hoje; estadia encerrada conta pelo dia em que saiu
+    const ultimaEstadia = ficou.map((e) => (e.status === "em_casa" ? new Date().toISOString() : e.saida ?? e.entrada)).sort().pop() ?? null;
+    const ultimoAtendimento = feitos[0]?.inicio ?? null;
+    // o check-out lança a estadia no financeiro ligada ao tutor, com o nome do pet na descrição
+    const petLido = pet.data as unknown as PetDaFicha | null;
+    let gastoEstadias = 0;
+    if (vejoFinanceiro && petLido?.cliente_id && nEstadias > 0) {
+      const l = await sb.from("lancamentos").select("valor, descricao").eq("petshop_id", petshop.id).eq("cliente_id", petLido.cliente_id)
+        .eq("tipo", "entrada").eq("pago", true).eq("categoria", "Creche e hotel").limit(1000);
+      const fim = `· ${petLido.nome}`.toLowerCase();
+      gastoEstadias = (l.data ?? []).filter((x) => (x.descricao ?? "").trim().toLowerCase().endsWith(fim)).reduce((t, x) => t + Number(x.valor), 0);
+    }
     return {
       pet: pet.data as unknown as PetDaFicha | null,
       atendimentos: (atendimentos.data ?? []) as Atendimento[],
       pacotes: (pacotes.data ?? []) as PacoteCliente[],
       estadias: (estadias.data ?? []) as Estadia[],
-      visitas: concluidos.count ?? feitos.length,
-      ultimaVisita: feitos[0]?.inicio ?? null,
-      gasto: feitos.reduce((t, a) => t + Number(a.preco ?? 0), 0),
+      visitas: (concluidos.count ?? feitos.length) + nEstadias,
+      nEstadias,
+      ultimaVisita: ultimaEstadia && (!ultimoAtendimento || new Date(ultimaEstadia) > new Date(ultimoAtendimento)) ? ultimaEstadia : ultimoAtendimento,
+      gasto: feitos.reduce((t, a) => t + Number(a.preco ?? 0), 0) + gastoEstadias,
+      gastoEstadias,
       gastoParcial: (concluidos.count ?? 0) > feitos.length,
       // se a saúde falhar, o resto da ficha abre do mesmo jeito
       saude: saude.error ? null : (saude.data ?? []) as CuidadoSaude[],
       erroSaude: saude.error?.message ?? null,
     };
-  }, [petshop.id, id]);
+  }, [petshop.id, id, vejoFinanceiro]);
 
   const botaoVoltar = <button className="g-voltar" onClick={voltar}><ArrowLeft />Voltar</button>;
 
@@ -71,7 +91,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
     return <>{botaoVoltar}<Vazio titulo="Não achei esse pet" texto="Pode ser que a ficha tenha sido apagada."><button className="g-btn verde" onClick={voltar}>Ver a lista</button></Vazio></>;
   }
 
-  const { pet, atendimentos, pacotes, estadias, visitas, ultimaVisita, gasto, gastoParcial, saude, erroSaude } = dados;
+  const { pet, atendimentos, pacotes, estadias, visitas, nEstadias, ultimaVisita, gasto, gastoEstadias, gastoParcial, saude, erroSaude } = dados;
   const tutor = pet.clientes;
   const zap = tutor ? linkWhatsApp(tutor.telefone, `Oi, ${primeiroNome(tutor.nome)}! Aqui é do ${petshop.nome}. `) : null;
   const etiquetas = [pet.raca, pet.porte ? `Porte ${nomePorte(pet.porte).toLowerCase()}` : null, pet.sexo === "M" ? "Macho" : pet.sexo === "F" ? "Fêmea" : null, idade(pet.nascimento)]
@@ -112,6 +132,11 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
             <div>
               <h1>{pet.nome}</h1>
               {tutor && <p className="tutor"><UserRound aria-hidden />Tutor: <Link className="g-link" href={linkTutor(tutor.id)} scroll={false}>{tutor.nome}</Link></p>}
+              {tutor && (
+                <p className="tutor gc-fone">
+                  {tutor.telefone ? (telefoneValido(tutor.telefone) ? fmtTelefone(tutor.telefone) : <span className="g-vermelho-t">Telefone incompleto: {tutor.telefone}</span>) : <span>Sem telefone</span>}
+                </p>
+              )}
               <div className="g-cli-etqs">
                 <EtiquetaEspecie especie={pet.especie} />
                 {etiquetas.map((e) => <span key={e} className="g-cli-etq">{e}</span>)}
@@ -123,7 +148,8 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
           <div className="gc-botoes">
             {pet.ativo && <Link className="g-btn pri" href={`/gestao/app/agenda?novo=1&pet=${pet.id}`}><CalendarPlus />Agendar</Link>}
             {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />WhatsApp</a>}
-            <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditando(true); }}><Pencil />Editar</button>
+            <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditando(true); }}><Pencil />Editar pet</button>
+            {tutor && <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditandoTutor(true); }}><UserPen />Editar tutor</button>}
           </div>
         </section>
       </div>
@@ -147,7 +173,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       <div className="g-cli-nums">
         <div className="g-cli-num">
           <Tile icone={Scissors} tom="pessego" />
-          <div><span className="g-rotulo">Visitas</span><b className="g-tab">{visitas}</b><small>{visitas === 1 ? "atendimento concluído" : "atendimentos concluídos"}</small></div>
+          <div><span className="g-rotulo">Visitas</span><b className="g-tab">{visitas}</b><small>{nEstadias > 0 ? `${visitas - nEstadias} na agenda + ${nEstadias} na creche ou hotel` : visitas === 1 ? "atendimento concluído" : "atendimentos concluídos"}</small></div>
         </div>
         <div className="g-cli-num">
           <Tile icone={History} tom={tomVisita} />
@@ -160,7 +186,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
         {vejoFinanceiro ? (
           <div className="g-cli-num">
             <Tile icone={Wallet} tom="menta" />
-            <div><span className="g-rotulo">Gasto em atendimentos</span><b className="g-tab">{brl(gasto)}</b><small>{gastoParcial ? "nos 1.000 mais recentes" : "soma dos concluídos"}</small></div>
+            <div><span className="g-rotulo">{gastoEstadias > 0 ? "Gasto aqui" : "Gasto em atendimentos"}</span><b className="g-tab">{brl(gasto)}</b><small>{gastoParcial ? "nos 1.000 mais recentes" : gastoEstadias > 0 ? `${brl(gastoEstadias)} de creche e hotel` : "soma dos concluídos"}</small></div>
           </div>
         ) : (
           <div className="g-cli-num">
@@ -267,6 +293,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       </div>
 
       {editando && <FormPet pet={pet} aoFechar={() => setEditando(false)} aoSalvar={() => { setEditando(false); avisarMudanca(); }} />}
+      {editandoTutor && tutor && <FormTutor cliente={tutor} aoFechar={() => setEditandoTutor(false)} aoSalvar={() => { setEditandoTutor(false); avisarMudanca(); }} />}
     </div>
   );
 }

@@ -57,3 +57,24 @@
 .g-ch-obs svg { width: 16px; height: 16px; flex: none; margin-top: 3px; }
 .g-ch-obs span { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .g-ch-acoes { padding-top: 12px; border-top: 1px dashed var(--g-linha); }
+
+/* correções do teste de uso: saída atrasada e vagas à parte dos indicadores, valor no cartão, check-out em lote */
+.g-ch-faixa { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.g-ch-atraso { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border-radius: 14px; border: 1px solid rgba(179, 64, 46, .3); background: var(--g-vermelho-tint); color: #7a281b; font-size: .9375rem; text-align: left; }
+.g-ch-atraso svg, .g-ch-vagas svg { width: 18px; height: 18px; flex: none; }
+.g-ch-vagas { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border-radius: 14px; background: var(--g-carta); border: 1px solid var(--g-linha); font-size: .9375rem; }
+.g-ch-vagas.cheia { background: var(--g-amarelo-tint); border-color: rgba(194, 148, 26, .4); color: #5b4708; }
+.g-ch-lote { margin-left: auto; min-height: 44px; }
+@media (max-width: 719px) { .g-ch-lote { margin-left: 0; width: 100%; } .g-ch-atraso, .g-ch-vagas { flex: 1 1 100%; } }
+.g-ch-valor { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 14px; font-size: .9375rem; }
+.g-ch-acoes { flex-wrap: wrap; row-gap: 8px; }
+.g-ch-acoes .g-btn.p { min-height: 44px; }
+.g-ch-lote-lista { display: grid; gap: 8px; }
+.g-ch-lote-linha { display: grid; gap: 4px; padding: 10px 12px; border-radius: 16px; border: 1px solid var(--g-linha); background: var(--g-carta); }
+.g-ch-lote-linha.on { border-color: rgba(36, 84, 59, .35); background: #f4f8f1; }
+.g-ch-lote-linha label { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.g-ch-lote-linha input { width: 22px; height: 22px; flex: none; accent-color: var(--g-verde); }
+.g-ch-lote-linha .t { display: grid; min-width: 0; }
+.g-ch-lote-linha .t small { color: var(--g-cinza); font-size: .8125rem; }
+.g-ch-lote-linha .cobra { padding-left: 32px; font-size: .9375rem; }
+.g-ch-lote-linha > small { padding-left: 32px; font-size: .8125rem; }
