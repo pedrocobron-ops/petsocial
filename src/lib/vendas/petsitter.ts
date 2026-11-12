@@ -118,7 +118,7 @@ export const petsitter: PaginaVendas = {
       "Plano de carreira em 4 níveis e casos reais com QR code",
     ],
     complemento:
-      "o Manual do Passeador de Cães, que completa este com o passeio, e o Feed Pronto Pet Sitter, com 60 posts editáveis no Canva para divulgar o seu serviço (opcionais, vendidos à parte).",
+      "o Manual do Passeador de Cães, que completa este com o passeio, e o Feed Pronto Pet Sitter, com 60 posts editáveis no Canva para divulgar o seu serviço. São vendidos à parte e você decide se quer.",
   },
   garantia:
     "Leia o manual, use as ferramentas e comece o plano. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta. Sem perguntas e sem burocracia.",

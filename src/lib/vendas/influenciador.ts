@@ -12,7 +12,7 @@ export const influenciador: PaginaVendas = {
     antes: "O seu pet já é uma estrela em casa. ",
     destaque: "Agora vamos montar o palco",
     depois: ".",
-    lead: "O passo a passo completo para o perfil do seu cão ou gato ficar profissional, crescer com consistência e chegar até as marcas: da bio ao mídia kit, com roteiros, legendas e e-mails prontos.",
+    lead: "O passo a passo completo para o perfil do seu cão ou gato ficar bem montado, ter constância nas postagens e se apresentar às marcas do jeito certo: da bio ao mídia kit, com roteiros, legendas e e-mails prontos.",
     selos: ["Acesso imediato", "110 páginas", "Garantia de 7 dias"],
   },
   dores: {

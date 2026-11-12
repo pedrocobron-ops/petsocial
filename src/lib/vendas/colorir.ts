@@ -33,7 +33,7 @@ export const colorir: PaginaVendas = {
     eyebrow: "Pintar e aprender",
     titulo: "Cada desenho é uma conversa sobre cuidar bem dos bichos.",
     paragrafos: [
-      "O Mozart, o border collie da Maestro Pet, aparece em **19 cenas do dia a dia**: comendo, passeando, tomando vacina, dormindo, brincando com o brinquedo certo. Cada uma tem **uma frase curta** para ler junto com a criança.",
+      "O Mozart, o border collie do Maestro Pet, aparece em **19 cenas do dia a dia**: comendo, passeando, tomando vacina, dormindo, brincando com o brinquedo certo. Cada uma tem **uma frase curta** para ler junto com a criança.",
       "E o livro é seu para sempre: **imprima os desenhos quantas vezes quiser**, para os irmãos, os primos e os amigos que vêm brincar em casa.",
     ],
   },

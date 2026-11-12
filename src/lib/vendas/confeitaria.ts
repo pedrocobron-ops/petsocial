@@ -85,7 +85,7 @@ export const confeitaria: PaginaVendas = {
     ],
     nota: "Preço do Kit Aniversário: R$ 90,90 (p. 59). O custo de R$ 26,30 é ingrediente, embalagem e custos da casa, tirado das fichas das pp. 27, 37, 45, 49 e 59; a sobra paga a sua hora. Responsável técnico, contador e imposto não entram aqui.",
     casos: [
-      ["Em Brasília, a Cani Bravo, que vende comida natural sob encomenda e bolos de aniversário para cães, faturou R$ 81 mil no último ano fiscal.", "Seu Dinheiro, set/2026", "https://www.seudinheiro.com/2026/seu-negocio/ela-comecou-a-cozinhar-para-o-proprio-cachorro-e-criou-negocio-de-bolos-de-aniversario-e-racao-personalizada-para-caes-cbcb/"],
+      ["Em Brasília, a Cani Bravo, que vende comida natural sob encomenda e bolos de aniversário para cães, faturou R$ 81 mil no último ano fiscal (faturamento, não lucro).", "Seu Dinheiro, set/2026", "https://www.seudinheiro.com/2026/seu-negocio/ela-comecou-a-cozinhar-para-o-proprio-cachorro-e-criou-negocio-de-bolos-de-aniversario-e-racao-personalizada-para-caes-cbcb/"],
     ],
   },
   metodo: {
@@ -134,7 +134,7 @@ export const confeitaria: PaginaVendas = {
       "A vitrine do mercado: negócios reais com fonte, data e QR code",
     ],
     complemento:
-      "o Feed Pronto Confeitaria Pet, com 60 posts editáveis no Canva e legendas prontas para divulgar as suas encomendas (opcional, vendido à parte).",
+      "o Feed Pronto Confeitaria Pet, com 60 posts editáveis no Canva e legendas para divulgar as suas encomendas. É vendido à parte e você decide se quer.",
   },
   garantia:
     "Leia o manual, use as ferramentas e comece o plano. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta. Sem perguntas e sem burocracia.",

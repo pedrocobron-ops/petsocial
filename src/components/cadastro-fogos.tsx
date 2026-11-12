@@ -52,7 +52,7 @@ export default function CadastroFogos() {
         {enviando ? "Abrindo o seu guia…" : "Quero meu guia grátis"}
       </button>
       <p className="cadastro-lgpd">
-        Seus dados ficam só com a Maestro Pet, sem spam. Você pode pedir para apagar quando quiser.{" "}
+        Seus dados ficam só com o Maestro Pet, sem spam. Você pode pedir para apagar quando quiser.{" "}
         <a href="/politica-de-privacidade">Política de privacidade</a>
       </p>
     </form>
