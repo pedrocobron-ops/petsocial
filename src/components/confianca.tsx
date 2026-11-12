@@ -58,7 +58,7 @@ export function QuemFaz({ negocios }: { negocios: boolean }) {
       ]
     : [
         ["Pesquisa com fonte e data", "O que está no guia vem de fontes citadas, não de achismo."],
-        ["Reforço positivo, veterinário primeiro", "Nada de castigo. Quando pode ser saúde, o guia manda ao veterinário."],
+        ["Veterinário primeiro", "Quando pode ser saúde, o guia manda procurar o veterinário. Sem castigo e sem improviso."],
         ["Sem depoimento inventado", "Preferimos mostrar as páginas de verdade a inventar elogios."],
         ["7 dias para desistir", "Se não valer a pena, o dinheiro volta pelo mesmo meio."],
       ];
@@ -85,7 +85,7 @@ export function QuemFaz({ negocios }: { negocios: boolean }) {
           </ol>
           {/* O separador é ::before do item seguinte: nunca fica sozinho no fim da linha. */}
           <ul className="quem-links">
-            <li><Link href="/sobre">Conheça a Maestro Pet</Link></li>
+            <li><Link href="/sobre">Conheça o Maestro Pet</Link></li>
             {ig && <li><a href={ig} rel="noopener noreferrer"><Instagram size={16} strokeWidth={1.75} aria-hidden /> @{EMPRESA.instagram}</a></li>}
             <li><Link href="/contato">Fale com a gente</Link></li>
           </ul>

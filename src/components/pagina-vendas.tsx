@@ -241,7 +241,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           <div className="container">
             <div className="cab cab-lado rv">
               <div><span className="rotulo">Por dentro</span><h2>Páginas de verdade, <em>do PDF que você recebe.</em></h2></div>
-              <p>Abra uma página para ver em tela cheia. É a prova que não exige confiar em ninguém.</p>
+              <p>Abra uma página para ver em tela cheia. Assim você vê o que vai receber antes de pagar.</p>
             </div>
             <Amostras paginas={paginas} trilho />
           </div>
@@ -326,9 +326,9 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           <div className="container">
             <div className="cab rv">
               <span className="rotulo">A conta</span>
-              <h2 id="conta-titulo">Quanto o seu negócio pet <em>pode render?</em></h2>
+              <h2 id="conta-titulo">Faça a conta do seu negócio <em>antes de começar.</em></h2>
               <p>{c.conta.lead}</p>
-              <p className="conta-teto">{c.conta.degraus[3].nome}, a conta chega a <b>{tetoConta(c.conta)} por mês</b>. Escolha o seu degrau abaixo.</p>
+              <p className="conta-teto">No exemplo do manual, {c.conta.degraus[3].nome.toLowerCase()}, a sobra é de <b>{tetoConta(c.conta)} por mês</b>.</p>
             </div>
             <Conta conta={c.conta} precoProduto={p.preco} />
           </div>
@@ -402,7 +402,7 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
                     {c.comparacao && <p className="comparacao">{c.comparacao}</p>}
                     <Comprar produto={p} texto={textoCompra} origem="oferta" className="btn-largo" />
                     <Risco resto="7 dias para pedir o dinheiro de volta" />
-                    {c.oferta.complemento && <p className="complemento"><b>{negocios ? "Também disponível:" : "No checkout:"}</b> {c.oferta.complemento} É opcional.</p>}
+                    {c.oferta.complemento && <p className="complemento"><b>{negocios ? "Também disponível:" : "No checkout:"}</b> {c.oferta.complemento}{negocios ? "" : " É opcional."}</p>}
                     <Selos />
                   </>
                 ) : (
@@ -642,8 +642,8 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
           <div className="container combina-grid">
             <div className="cab rv">
               <span className="rotulo">Combina com este</span>
-              <h2>Para o mesmo {negocios ? "ofício" : "cão"}, <em>o mesmo método.</em></h2>
-              <p>{negocios ? "Outros manuais da linha, com as mesmas regras: fonte e data em tudo." : "Outros guias à venda, com o mesmo cuidado: reforço positivo e passo a passo ilustrado."}</p>
+              <h2>{negocios ? "Para o mesmo ofício, " : "Para o dia a dia "}<em>{negocios ? "o mesmo método." : "do seu pet."}</em></h2>
+              <p>{negocios ? "Outros manuais da linha, com as mesmas regras: fonte e data em tudo." : "Outros guias do Maestro Pet, com o mesmo cuidado: passo a passo ilustrado e fonte citada."}</p>
             </div>
             <div className="cards cards-2">{familia.map((x) => <CartaoProduto key={x.slug} p={x} />)}</div>
           </div>

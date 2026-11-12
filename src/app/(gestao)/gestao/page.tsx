@@ -62,7 +62,8 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["Como o meu cliente agenda pelo link?", "Você manda o link pelo WhatsApp ou deixa no Instagram. O cliente escolhe o serviço, o dia e um dos horários livres, e você recebe o pedido para aceitar ou recusar. Ele não vê a sua agenda nem os dados de outros clientes, só os horários que estão livres."],
   ["O que o cliente vê tem a minha marca?", "Sim. Você coloca a sua logo e escolhe as cores do pet shop. Elas aparecem no link de agendamento, nas telas do sistema e na agenda impressa."],
   ["Posso colocar a minha equipe?", "Sim. Cada pessoa entra com o próprio acesso, e você escolhe o que ela vê: agenda, clientes, caixa, financeiro, estoque. Dá para ter mais de um dono. O número de acessos depende do plano: 1, 3 ou 6."],
-  ["Posso trocar de plano depois?", "Pode. Você cancela o plano atual e assina o novo. Os dados do pet shop continuam os mesmos."],
+  ["Posso trocar de plano depois?", "Pode. Hoje a troca é feita cancelando o plano atual e assinando o novo; os dados do pet shop continuam os mesmos."],
+  ["O que acontece quando os 7 dias acabam?", "A conta fica só para consulta e os dados continuam guardados. Para voltar a usar, é só escolher um plano. Nada é cobrado sozinho, porque o teste não pede cartão."],
 ];
 
 function Tela({ arquivo, alt, celular, prioridade }: { arquivo: string; alt: string; celular?: boolean; prioridade?: boolean }) {
@@ -96,8 +97,8 @@ export default function Pagina() {
 
         <div className="gp-c gp-capa-grade">
           <div className="gp-capa-texto">
-            <h1>Sistema para <em>pet shop</em> e banho e tosa</h1>
-            <p>Agenda, clientes, caixa e estoque em um lugar só. O cliente agenda sozinho pelo seu link, e um assistente de inteligência artificial marca e lança para você: é só falar.</p>
+            <h1>Agenda, clientes e caixa do seu <em>pet shop</em>, no celular.</h1>
+            <p>O cliente marca o banho sozinho pelo seu link. Você fala o que aconteceu e o assistente de inteligência artificial deixa pronto para você confirmar. Feito para pet shop, banho e tosa, creche e hotel.</p>
             <ul className="gp-selos">
               <li><Check />Assistente de inteligência artificial incluído</li>
               <li><Check />Link para o cliente agendar, com a sua marca</li>
@@ -207,7 +208,7 @@ export default function Pagina() {
         <div className="gp-c gp-pe-grade">
           <div>
             <Marca tamanho={56} />
-            <p className="gp-pe-frase">O seu pet shop organizado <em>a partir de hoje.</em></p>
+            <p className="gp-pe-frase">Comece a organizar o seu pet shop <em>hoje.</em></p>
             <Link href={CRIAR} className="gp-btn pri">Teste grátis por 7 dias <ArrowRight /></Link>
           </div>
           <nav aria-label="Rodapé">

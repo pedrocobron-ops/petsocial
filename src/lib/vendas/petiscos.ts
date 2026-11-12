@@ -8,16 +8,16 @@ export const petiscos: PaginaVendas = {
       "30 receitas caseiras e seguras para o seu cão: biscoitos, desidratados, gelados, petiscos de treino e bolo de festa. Sem sal, sem açúcar e sem tempero, com porção por porte e tabela de conservação. Acesso no e-mail logo após o pagamento.",
   },
   hero: {
-    eyebrow: "Livro de receitas · 30 petiscos caseiros",
+    eyebrow: "Guia de receitas · 30 petiscos caseiros",
     antes: "Petiscos ",
     destaque: "feitos em casa,",
     depois: " com o que você tem na cozinha.",
-    fatos: ["Livro de receitas", "30 receitas", "Ilustrado"],
+    fatos: ["Guia de receitas", "30 receitas", "Ilustrado"],
     lead: "30 receitas simples e seguras, sem sal, sem açúcar e sem tempero.",
     selos: ["Acesso imediato", "30 receitas ilustradas", "Garantia de 7 dias"],
   },
   dores: {
-    titulo: "Se você já pensou alguma destas frases, este livro é para você",
+    titulo: "Se você já pensou alguma destas frases, este guia é para você",
     frases: [
       "Não entendo metade dos ingredientes do pacote de petisco.",
       "Petisco bom é caro e acaba em dois dias.",
@@ -34,8 +34,8 @@ export const petiscos: PaginaVendas = {
     eyebrow: "Contado pelo Mozart",
     titulo: "O melhor petisco tem três ingredientes, *e você já tem todos em casa.*",
     paragrafos: [
-      "Abóbora, aveia e um ovo. Foi assim o primeiro biscoito que a minha tutora fez, e eu fiquei sentadinho ao lado do forno os 30 minutos inteiros. **Petisco caseiro não precisa de nada difícil**: só de ingredientes certos e de saber o que nunca pode entrar na receita.",
-      "Neste livro estão as receitas que a gente mais faz, com ingredientes de supermercado, e as regras que deixam tudo **seguro**: o que pode, o que nunca pode e quanto dar por dia.",
+      "Abóbora, aveia e um ovo. Foi assim o primeiro biscoito que o meu tutor fez, e eu fiquei sentadinho ao lado do forno os 30 minutos inteiros. **Petisco caseiro não precisa de nada difícil**: só de ingredientes certos e de saber o que nunca pode entrar na receita.",
+      "Neste guia estão as receitas que a gente mais faz, com ingredientes de supermercado, e as regras que deixam tudo **seguro**: o que pode, o que nunca pode e quanto dar por dia.",
     ],
   },
   recebe: {
@@ -106,7 +106,7 @@ export const petiscos: PaginaVendas = {
     "Faça as receitas e veja a reação do seu cão. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta. Sem perguntas e sem burocracia.",
   faq: [
     ["Preciso de algum equipamento especial?", "Não. Forno, assadeira e liquidificador já resolvem. Cortadores e forminhas de silicone deixam os petiscos mais bonitos, mas são opcionais."],
-    ["Como recebo o livro?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail. O livro é um PDF ilustrado que você lê no celular, no computador ou imprime."],
+    ["Como recebo o guia?", "Logo depois da confirmação do pagamento você recebe o acesso no seu e-mail. O guia é um PDF ilustrado que você lê no celular, no computador ou imprime."],
     ["Os ingredientes são caros ou difíceis de achar?", "Não. São ingredientes de supermercado: aveia, ovo, abóbora, cenoura, banana, frango. A maioria das receitas tem de 1 a 4 ingredientes."],
     ["Dá para fazer sem forno?", "Sim. Os gelados não usam forno, e os biscoitos e chips também podem ser feitos na air fryer."],
     ["Serve para filhotes?", "Depois que o filhote já come alimento sólido, sim, em pedaços pequenos e na quantidade indicada para cães mini. Confirme com o veterinário."],
@@ -115,5 +115,5 @@ export const petiscos: PaginaVendas = {
   ],
   ctaFinal: "O próximo petisco favorito dele pode sair da sua cozinha hoje.",
   aviso:
-    "Este livro tem caráter educativo e não substitui a avaliação de um(a) médico(a)-veterinário(a). Petiscos são complemento da alimentação. Cães com doenças, alergias ou dieta especial devem ter a alimentação orientada por um profissional.",
+    "Este guia tem caráter educativo e não substitui a avaliação de um(a) médico(a)-veterinário(a). Petiscos são complemento da alimentação. Cães com doenças, alergias ou dieta especial devem ter a alimentação orientada por um profissional.",
 };

@@ -106,7 +106,7 @@ export const moldesNatal: PaginaVendas = {
       "Mensagens e legendas de Natal prontas e proposta para pet shop",
     ],
     complemento:
-      "os 60 moldes do ano todo (Moldes de Roupa Pet) com preço especial, ou o manual Fotografia Pet (opcional, no checkout).",
+      "os 60 moldes do ano todo (Moldes de Roupa Pet) com preço especial, ou o manual Fotografia Pet. Você decide no checkout.",
   },
   garantia:
     "Baixe os moldes, imprima, costure uma peça e leia o capítulo de vendas. Se em até 7 dias você achar que não valeu a pena, é só pedir o reembolso e você recebe 100% do valor de volta. Sem perguntas e sem burocracia.",

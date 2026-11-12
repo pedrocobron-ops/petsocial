@@ -13,7 +13,7 @@ export const xixi: PaginaVendas = {
     antes: "Seu cachorro fazendo xixi ",
     destaque: "no lugar certo,",
     depois: " sem bronca.",
-    lead: "Sete dias de rotina com reforço positivo, para filhotes e adultos.",
+    lead: "Sete dias para montar a rotina com reforço positivo. O hábito firma nas semanas seguintes. Para filhotes e adultos.",
     selos: ["Acesso imediato", "23 páginas ilustradas", "Garantia de 7 dias"],
   },
   dores: {

@@ -37,7 +37,7 @@ export function Risco({ fato = "Acesso no e-mail logo após o pagamento", resto 
  * Títulos curtos, para caberem numa linha a 390 px. `breve`: produto ainda não lançado, sem falar de pagamento como se já desse para pagar.
  */
 export function FaixaProva({ negocios = false, breve = false, className = "" }: { negocios?: boolean; breve?: boolean; className?: string }) {
-  const quarto: [typeof Mail, string, string] = negocios ? [FileText, "Fonte e data", "nenhum número sem origem"] : [FileText, "Páginas reais", "nenhum depoimento inventado"];
+  const quarto: [typeof Mail, string, string] = negocios ? [FileText, "Fonte e data", "nenhum número sem origem"] : [FileText, "Veja antes de comprar", "páginas reais do guia"];
   const itens: [typeof Mail, string, string][] = breve
     ? [
         [BellRing, "Aviso por e-mail", "no dia do lançamento, sem spam"],
