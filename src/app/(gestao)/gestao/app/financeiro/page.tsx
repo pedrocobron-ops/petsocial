@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownLeft, ArrowUpRight, CalendarClock, CalendarDays, ChartColumn, Check, ChevronLeft, ChevronRight, CreditCard, Download, HandCoins, Plus, Receipt, Scale,
   Search, Target, TrendingUp, TriangleAlert,
@@ -67,6 +67,8 @@ function Financeiro() {
   const agora = new Date();
   const [mes, setMes] = useState(() => new Date(agora.getFullYear(), agora.getMonth(), 1));
   const [aba, setAba] = useState<Aba>("resumo");
+  // atalho vindo da tela Hoje: /gestao/app/financeiro?aba=receber
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("aba") === "receber") setAba("receber"); }, []);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("tudo");
   const [folha, setFolha] = useState<FolhaAberta | null>(null);
