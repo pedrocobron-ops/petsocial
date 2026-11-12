@@ -965,3 +965,7 @@ body:has(.g-fundo) .g-toasts { bottom: auto; top: calc(14px + env(safe-area-inse
 .g-esc-texto h3 { font: 500 1.1875rem/1.2 var(--display); margin-top: 6px; }
 .g-esc-texto ul { margin: 0; padding-left: 1.15rem; display: grid; gap: 8px; }
 .g-esc-pratica { display: grid; gap: 10px; padding: 14px 16px; border-radius: var(--g-raio-p); background: var(--g-verde-tint); }
+
+/* terceira leva: pagamento e voltar */
+/* os botões de dividir o pagamento com a altura de toque das outras ações da folha */
+.g-folha .g-btn.p.g-pg-dividir, .g-folha .g-pg-acoes .g-btn.p { min-height: 44px; }
