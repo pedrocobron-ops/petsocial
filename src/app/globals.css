@@ -1658,3 +1658,18 @@ html:has(dialog[open]) .barra { visibility: hidden; }
 .btn.h2-btn-claro { background: transparent; color: var(--no-escuro); box-shadow: inset 0 0 0 1.5px var(--no-escuro); }
 .btn.h2-btn-claro:hover { background: var(--no-escuro); color: var(--grafite); }
 .h2-duo { padding-bottom: 0; }
+
+/* logo nova: marca em traço + nome, verde-garrafa como no site do sistema; clara no escuro */
+.logo-marca { gap: 10px; color: var(--negocios); }
+.logo-desenho { flex: none; width: 30px; height: 30px; }
+.logo-nome { font: var(--w-forte) 1.3125rem/1 var(--display); letter-spacing: -.015em; white-space: nowrap; }
+.logo-nome em { font-family: var(--display-italico); font-style: italic; font-weight: var(--w-italico); }
+.logo-marca.logo-clara { color: var(--no-escuro); }
+@media (min-width: 900px) { .logo-desenho { width: 34px; height: 34px; } .logo-nome { font-size: 1.5rem; } }
+
+/* menos laranja na página inicial: ele fica só no botão principal */
+.h2-gestao h2 em { color: inherit; }
+.h2-lista svg { background: rgba(246, 241, 232, .14); color: var(--no-escuro); }
+.h2-novo { background: var(--no-escuro); color: var(--negocios); }
+.h2-pilares span { color: var(--negocios); }
+.h2-bolha svg { color: var(--negocios); }
