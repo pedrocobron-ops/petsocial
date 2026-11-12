@@ -97,8 +97,8 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
         {abre
           ? (teste.vencido ? "A conta está só para consulta: você continua vendo o que lançou, mas não consegue marcar, lançar nem alterar. Os dados continuam guardados e, para voltar a usar, é só assinar." : SE_NAO_ASSINAR)
           : (teste.vencido
-            ? "A assinatura ainda não abriu; abre em breve. Por enquanto a conta fica só para consulta, e os seus dados continuam guardados."
-            : "A assinatura ainda não abriu; abre em breve. Enquanto isso, o seu acesso continua pelo teste, e os seus dados ficam guardados.")}
+            ? "A assinatura ainda não abriu. Até ela abrir, você continua usando o sistema normalmente, sem pagar nada, e os seus dados ficam guardados."
+            : "A assinatura ainda não abriu. Até ela abrir, você continua usando o sistema normalmente, sem pagar nada. Avisamos por aqui quando os planos estiverem disponíveis.")}
       </p>
 
       <div className="g-fila">
