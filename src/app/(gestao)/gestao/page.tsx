@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarCheck, Check, MessageCircle, Monitor, Palette, Smartphone, Sparkles } from "lucide-react";
 import Instalar from "@/components/gestao/instalar";
 import Vitrine from "@/components/gestao/vitrine";
+import ChatVendas from "@/components/gestao/chat-vendas";
 import { Marca } from "@/components/gestao/marca";
 import { linkSuporte } from "@/lib/gestao/contato";
 import PlanosVenda from "@/components/gestao/planos-venda";
@@ -196,7 +197,7 @@ export default function Pagina() {
         </div>
       </section>
 
-      <a className="gp-zap-flutua" href={linkSuporte()} target="_blank" rel="noopener noreferrer" aria-label="Falar com a gente no WhatsApp"><MessageCircle /></a>
+      <ChatVendas />
 
       <footer className="gp-pe">
         <div className="gp-c gp-pe-grade">
