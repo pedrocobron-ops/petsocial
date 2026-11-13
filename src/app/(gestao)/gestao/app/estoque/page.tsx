@@ -262,7 +262,7 @@ function ProdutoNovo({ aoFechar, aoGravar }: { aoFechar: () => void; aoGravar: (
       const novo = ok(await sb.from("produtos").insert({
         petshop_id: petshop.id, nome, categoria: v.categoria.trim() || null, unidade: v.unidade,
         preco_venda: v.preco, custo: v.custo, estoque_minimo: minimo,
-      }).select().single());
+      }).select("id").single());
       if (qtd > 0) {
         ok(await sb.from("movimentos_estoque").insert({
           petshop_id: petshop.id, produto_id: novo.id, tipo: "entrada", quantidade: qtd, custo_unitario: v.custo,
