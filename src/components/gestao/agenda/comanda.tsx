@@ -27,7 +27,7 @@ import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: {
   agendamento: AgendamentoCompleto; pacote?: PacoteCliente | null; aoFechar: () => void; aoPronto: () => void;
 }) {
-  const { sb, petshop, user, vejoFinanceiro, servicos } = useGestao();
+  const { sb, petshop, user, vejoFinanceiro, cuidoDoFinanceiro, servicos } = useGestao();
   // quem não vende produtos não vê a busca do estoque: fica só o "Outro extra"
   const vendeProdutos = usaModulo(petshop, "loja");
   const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
@@ -38,6 +38,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   // o serviço principal foi (ou vai ser agora) pelo pacote: não entra na conta
   const peloPacote = Boolean(pacote) || Boolean(a.pacote_cliente_id);
   const outrosDoHorario = servicosAMais(a);
+  // horário que já usou o pacote: o banco só deixa quem cuida do financeiro juntar ou tirar serviços (a mesma trava de atendimento pago)
+  const mexeNosServicos = !a.pacote_cliente_id || cuidoDoFinanceiro;
   const [itens, setItens] = useState<ItemConta[]>(() => [
     ...(peloPacote ? [] : [{ chave: novaChave(), tipo: "servico" as const, nome: servico, qtd: 1, valor: a.preco == null ? null : Number(a.preco) }]),
     ...outrosDoHorario.map((o) => ({ chave: novaChave(), tipo: "servico" as const, nome: o.servicos?.nome ?? "Serviço", qtd: 1, valor: o.preco == null ? null : Number(o.preco), servicoId: o.servico_id })),
@@ -215,7 +217,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
           )}
           {itens.map((i) => (
             <LinhaDaConta key={i.chave} item={i} produto={produtos.find((p) => p.id === i.produtoId)} apoio={a.profissionais ? `com ${a.profissionais.nome}` : undefined}
-              aoMudar={(m) => mudar(i.chave, m)} aoTirar={i.tipo === "servico" && !i.servicoId ? undefined : () => setItens((l) => l.filter((x) => x.chave !== i.chave))} />
+              aoMudar={(m) => mudar(i.chave, m)} aoTirar={i.tipo === "servico" && (!i.servicoId || !mexeNosServicos) ? undefined : () => setItens((l) => l.filter((x) => x.chave !== i.chave))} />
           ))}
         </div>
 
@@ -224,7 +226,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
           {vendeProdutos && <BuscaProduto produtos={produtos} carregando={carregando} erro={erro} itens={itens} aoEscolher={(p) => setItens((l) => comProduto(l, p))} />}
           <div className="g-chips g-vd-chips">
             {a.leva_traz && !temLevaTraz && <button type="button" className="g-chip" onClick={() => extra(LEVA_E_TRAZ)}><Truck />{LEVA_E_TRAZ}</button>}
-            {servicosParaJuntar.length > 0 && <button type="button" className="g-chip" aria-expanded={escolhendoServico} onClick={() => setEscolhendoServico((v) => !v)}><Scissors />Outro serviço</button>}
+            {mexeNosServicos && servicosParaJuntar.length > 0 && <button type="button" className="g-chip" aria-expanded={escolhendoServico} onClick={() => setEscolhendoServico((v) => !v)}><Scissors />Outro serviço</button>}
             <button type="button" className="g-chip" onClick={() => extra("")}><Plus />Outro extra</button>
           </div>
           {escolhendoServico && servicosParaJuntar.length > 0 && (
