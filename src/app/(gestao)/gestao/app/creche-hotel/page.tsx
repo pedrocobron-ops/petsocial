@@ -13,7 +13,8 @@ import Cobrancas from "@/components/gestao/creche/cobrancas";
 import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
 import Mensalistas from "@/components/gestao/creche/mensalistas";
 import { estadiaOcupa, lerPlanos, lerPresencas, mensalistasNoDia, planoAtivo, type Falta, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
-import { lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { saudacaoZap } from "@/lib/gestao/agenda";
+import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
 import { usaModulo } from "@/lib/gestao/modulos";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Cliente, Estadia, PacoteCliente, Pet, Petshop, Servico } from "@/lib/gestao/tipos";
@@ -173,14 +174,15 @@ function Cobrado({ e }: { e: EstadiaCompleta }) {
 function mensagem(e: EstadiaCompleta, petshop: string, reserva: boolean) {
   const pet = e.pets;
   if (!pet) return "";
-  const oi = `Oi${primeiroNome(pet.clientes?.nome) ? `, ${primeiroNome(pet.clientes?.nome)}` : ""}!`;
+  // "Oi, Ana! Aqui é Hotel Pet Serra Azul.": o nome do negócio vem na saudação, sem "do/da" (não sai "no hotel do Hotel…")
+  const oi = saudacaoZap(pet.clientes?.nome, petshop);
   const lugar = e.tipo === "hotel" ? "no hotel" : "na creche";
   if (reserva) {
     const art = pet.sexo === "M" ? "do " : pet.sexo === "F" ? "da " : "de ";
-    return `${oi} Confirmando a reserva ${art}${pet.nome} ${lugar} do ${petshop}: ${dataAmigavel(new Date(e.entrada))}, às ${hora(e.entrada)}. Até lá!`;
+    return `${oi} Confirmando a reserva ${art}${pet.nome} ${lugar}: ${dataAmigavel(new Date(e.entrada))}, às ${hora(e.entrada)}. Até lá!`;
   }
   const bem = pet.sexo === "M" ? `O ${pet.nome} está ótimo` : pet.sexo === "F" ? `A ${pet.nome} está ótima` : `${pet.nome} está muito bem`;
-  return `${oi} ${bem} aqui ${lugar} do ${petshop}.`;
+  return `${oi} ${bem} aqui ${lugar}.`;
 }
 
 /** Etiqueta colorida do tipo: creche é dia (manteiga), hotel é noite (céu). */
@@ -207,7 +209,7 @@ function BotaoZap({ e, reserva }: { e: EstadiaCompleta; reserva?: boolean }) {
 }
 
 export default function CrecheHotel() {
-  const { sb, petshop, vejoFinanceiro, souDono } = useGestao();
+  const { sb, petshop, vejoFinanceiro, cuidoDoFinanceiro, souDono } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const usaCreche = usaModulo(petshop, "creche");
@@ -235,11 +237,11 @@ export default function CrecheHotel() {
   // mensalistas: os planos e o que já aconteceu hoje (para a chamada e para a conta de vagas)
   const { dados: mens } = useDados<Mens | null>(async () => {
     if (!usaCreche) return null;
-    const planos = await lerPlanos(sb, petshop.id, vejoFinanceiro);
+    const planos = await lerPlanos(sb, petshop.id, cuidoDoFinanceiro);
     const dia = isoDia(new Date());
     const mov = planos.length ? await lerPresencas(sb, petshop.id, dia, dia) : { presencas: [], faltas: [] };
     return { planos, ...mov };
-  }, [petshop.id, usaCreche, vejoFinanceiro]);
+  }, [petshop.id, usaCreche, cuidoDoFinanceiro]);
   const temMensalista = Boolean(mens?.planos.some((p) => planoAtivo(p, isoDia(new Date()))));
   // a tela abre na chamada quando há mensalistas; o endereço pode pedir outra parte (?ver=cobrancas)
   const [abriu, setAbriu] = useState(false);
@@ -247,9 +249,9 @@ export default function CrecheHotel() {
     if (abriu || !usaCreche || !mens) return;
     setAbriu(true);
     const pedido = new URLSearchParams(window.location.search).get("ver");
-    if (pedido === "chamada" || pedido === "mensalistas" || pedido === "casa" || (pedido === "cobrancas" && vejoFinanceiro)) setVer(pedido);
+    if (pedido === "chamada" || pedido === "mensalistas" || pedido === "casa" || (pedido === "cobrancas" && cuidoDoFinanceiro)) setVer(pedido);
     else if (temMensalista) setVer("chamada");
-  }, [abriu, usaCreche, mens, temMensalista, vejoFinanceiro]);
+  }, [abriu, usaCreche, mens, temMensalista, cuidoDoFinanceiro]);
   const planoDe = (e: EstadiaCompleta) => (e.plano_id ? mens?.planos.find((p) => p.id === e.plano_id) : undefined);
 
   const doTipo = (e: EstadiaCompleta) => tipo === "todos" || e.tipo === tipo;
@@ -351,7 +353,7 @@ export default function CrecheHotel() {
           <button aria-pressed={ver === "chamada"} onClick={() => setVer("chamada")}>Chamada</button>
           <button aria-pressed={ver === "casa"} onClick={() => setVer("casa")}>Casa agora</button>
           <button aria-pressed={ver === "mensalistas"} onClick={() => setVer("mensalistas")}>Mensalistas</button>
-          {vejoFinanceiro && <button aria-pressed={ver === "cobrancas"} onClick={() => setVer("cobrancas")}>Cobranças</button>}
+          {cuidoDoFinanceiro && <button aria-pressed={ver === "cobrancas"} onClick={() => setVer("cobrancas")}>Cobranças</button>}
         </div>
       )}
 
@@ -361,7 +363,7 @@ export default function CrecheHotel() {
         : ver === "chamada" && mens ? <Chamada planos={mens.planos} vagasHoje={vagasCrecheHoje ? { ocupadas: vagasCrecheHoje.ocupadas, total: vagasCrecheHoje.total! } : null}
             aoNovoMensalista={() => { if (!somenteLeitura()) { setVer("mensalistas"); setNovoPlano(true); } }} />
         : ver === "mensalistas" && mens ? <Mensalistas planos={mens.planos} novo={novoPlano} aoAbrirNovo={() => { if (!somenteLeitura()) setNovoPlano(true); }} aoFecharNovo={() => setNovoPlano(false)} aoMudar={mudou} />
-        : ver === "cobrancas" && mens && vejoFinanceiro ? <Cobrancas planos={mens.planos} gerar={gerando} aoFecharGerar={() => setGerando(false)} aoMes={setMesCobranca} />
+        : ver === "cobrancas" && mens && cuidoDoFinanceiro ? <Cobrancas planos={mens.planos} gerar={gerando} aoFecharGerar={() => setGerando(false)} aoMes={setMesCobranca} />
         : carregando && !dados ? <Esqueleto linhas={4} /> : !dados ? null : tudoVazio ? (
         <Vazio titulo="Nenhum hóspede ainda" texto="Quando um pet vier passar o dia ou dormir aqui, faça o check-in e acompanhe por esta tela." mozart="acenando">
           <button className="g-btn sec" onClick={abrirNova}>Fazer o primeiro check-in</button>
@@ -815,6 +817,11 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
       if (pacote.total - pacote.usados < n) { avisarErro(`O pacote só tem ${pacote.total - pacote.usados} para usar e são ${n} diárias. Diminua as diárias ou cobre a diferença à parte.`); return; }
       if (venceu(pacote) && !(await confirmar({ titulo: "Pacote vencido", texto: `Este pacote venceu em ${dataCompleta(pacote.vence_em!)}. Usar mesmo assim?`, confirmar: "Usar mesmo assim" }))) return;
     }
+    if (rec && !("erro" in rec)) {
+      if (!(await conferirValorAlto(valor, confirmar))) return;
+      // o caixa fechou enquanto esta folha estava aberta: pergunta antes de receber fora dele
+      if (!rec.fiado && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
+    }
     setSalvando(true);
     try {
       // guarda o que foi cobrado. Com pacote não entra dinheiro (0, com a nota). Valor em branco fica em branco; cortesia fica 0.
@@ -910,7 +917,7 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
 
 function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCompleta[]; aoFechar: () => void; aoGravar: () => void }) {
   const { sb, petshop, servicos, vejoFinanceiro } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const [agora] = useState(() => new Date());
   const [sai, setSai] = useState<Record<string, boolean>>(() => Object.fromEntries(estadias.map((e) => [e.id, true])));
   const [cobrar, setCobrar] = useState<Record<string, boolean>>({});
@@ -947,6 +954,10 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
     if (valorRuim) { avisarErro(valorRuim); return; }
     if (total > 0 && !forma) { setErroForma("Escolha como os clientes pagaram."); avisarErro("Escolha a forma de pagamento."); return; }
     if (total > 0 && forma) lembrarForma(forma);
+    if (total > 0 && forma) {
+      if (!(await conferirValorAlto(total, confirmar))) return;
+      if (!(await conferirCaixa(sb, petshop.id, confirmar))) return;
+    }
     setSalvando(true);
     let feitos = 0, recebido = 0, comPacote = 0;
     const falhas: string[] = [];
@@ -1040,7 +1051,7 @@ function estadiaSemCobranca(e: Pick<Estadia, "status" | "mensalista" | "diarias_
 
 function AcertarEstadia({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; aoFechar: () => void; aoGravar: () => void }) {
   const { sb, petshop } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const pendente = estadiaSemCobranca(estadia);
   const fimInicial = estadia.saida ?? estadia.entrada;
   const [dia, setDia] = useState(isoDia(new Date(estadia.entrada)));
@@ -1076,6 +1087,10 @@ function AcertarEstadia({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompl
     if (cobrando && !valor) return setErro("Preencha o valor a receber, ou escolha Cortesia.");
     const rec = cobrando && valor ? fecharRecebimento(pagamento, depois, valor) : null;
     if (rec && "erro" in rec) return setErro(rec.erro);
+    if (rec && !("erro" in rec)) {
+      if (!(await conferirValorAlto(valor, confirmar))) return;
+      if (!rec.fiado && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
+    }
     setErro(null); setSalvando(true);
     try {
       const r = ok(await sb.from("estadias").update({

@@ -9,10 +9,55 @@ export type PartePagamento = { forma: FormaPagamento; valor: number };
 /** Nome da categoria dos movimentos de gaveta (sangria e suprimento). */
 export const CATEGORIA_GAVETA = "Movimento de gaveta";
 
-/** Caixa aberto do pet shop (ou null). Só quem vê o financeiro consegue ler. */
-export async function caixaAberto(sb: Banco, petshopId: string) {
+/**
+ * O que cada tela viu por último: havia caixa aberto? Serve para avisar quando o caixa fecha em outro aparelho
+ * enquanto alguém está com uma venda aberta (o valor ficaria fora do caixa sem ninguém perceber).
+ */
+const caixaVisto = new Map<string, string | null>();
+
+async function lerCaixaAberto(sb: Banco, petshopId: string) {
   const { data } = await sb.from("caixas").select("*").eq("petshop_id", petshopId).is("fechado_em", null).maybeSingle();
   return data;
+}
+
+/** Caixa aberto do pet shop (ou null). Só quem recebe consegue ler. Guarda o que viu, para `conferirCaixa`. */
+export async function caixaAberto(sb: Banco, petshopId: string) {
+  const data = await lerCaixaAberto(sb, petshopId);
+  caixaVisto.set(petshopId, data?.id ?? null);
+  return data;
+}
+
+/** A tela de Caixa avisa o que mostrou (caixa aberto ou fechado). */
+export const lembrarCaixa = (petshopId: string, caixaId: string | null) => { caixaVisto.set(petshopId, caixaId); };
+
+type Perguntar = (p: { titulo: string; texto?: string; confirmar?: string; perigo?: boolean }) => Promise<boolean>;
+
+/**
+ * Antes de gravar dinheiro de hoje: se a tela foi aberta com o caixa aberto e ele fechou nesse meio tempo, pergunta.
+ * Devolve false quando a pessoa preferiu voltar (para abrir um caixa novo antes).
+ * Chame antes de `lancarPago` em toda tela que recebe, e antes de gravar qualquer outra coisa da mesma operação.
+ */
+export async function conferirCaixa(sb: Banco, petshopId: string, perguntar: Perguntar) {
+  const antes = caixaVisto.get(petshopId);
+  const agora = await lerCaixaAberto(sb, petshopId);
+  if (antes && !agora) {
+    const sim = await perguntar({
+      titulo: "O caixa foi fechado há pouco",
+      texto: "Este valor fica fora do caixa: conta no dia, mas não entra na conferência da gaveta. Para ele entrar, volte, abra um caixa novo na tela Caixa e lance de novo.",
+      confirmar: "Lançar fora do caixa",
+    });
+    if (!sim) return false;
+  }
+  caixaVisto.set(petshopId, agora?.id ?? null);
+  return true;
+}
+
+/** A partir deste valor, as telas pedem para conferir antes de gravar (um zero a mais é fácil de digitar). */
+export const VALOR_PARA_CONFERIR = 10000;
+/** "Confere? R$ 12.000,00": devolve false quando a pessoa quer corrigir. Abaixo de R$ 10.000,00 não pergunta. */
+export async function conferirValorAlto(valor: number | null | undefined, perguntar: Perguntar) {
+  if (valor == null || valor < VALOR_PARA_CONFERIR) return true;
+  return perguntar({ titulo: `Confere? ${brl(valor)}`, texto: "É um valor alto. Se digitou um número a mais, volte e corrija.", confirmar: "Está certo" });
 }
 
 /** Uma linha de uma venda ou comanda, como fica guardada em `lancamentos.itens`. `valor` é o preço de uma unidade. */
@@ -33,13 +78,14 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
   /** Exige caixa aberto (movimentos de gaveta). */
   exigeCaixa?: boolean;
 }) {
+  const hoje = isoDia(new Date());
   const caixa = await caixaAberto(sb, petshopId);
   if (l.exigeCaixa && !caixa) throw new Error("O caixa não está aberto. Abra o caixa e tente de novo.");
   const { data: u } = await sb.auth.getUser();
   const dividido = l.pagamentos && l.pagamentos.length > 1 ? l.pagamentos : null;
   const { data, error } = await sb.from("lancamentos").insert({
     petshop_id: petshopId, tipo: l.tipo, valor: l.valor, forma: l.forma, categoria: l.categoria, descricao: l.descricao ?? null,
-    data: l.data ?? isoDia(new Date()), pago: true, caixa_id: caixa?.id ?? null,
+    data: l.data ?? hoje, pago: true, caixa_id: caixa?.id ?? null,
     agendamento_id: l.agendamentoId ?? null, cliente_id: l.clienteId ?? null, origem: l.origem ?? "tela", criado_por: u.user?.id ?? null,
     ...(l.itens?.length ? { itens: l.itens } : {}),
     ...(dividido ? { pagamentos: dividido } : {}),
@@ -47,6 +93,8 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
   }).select().single();
   // outra pessoa recebeu este atendimento no mesmo instante: o banco aceita só um recebimento por atendimento
   if (error?.code === "23505") throw new Error("Este atendimento já tem recebimento lançado. Atualize a tela para ver.");
+  // quem só opera o caixa lança o dinheiro de hoje; outro dia é com quem cuida do financeiro
+  if (error && /row-level security/i.test(error.message) && l.data && l.data !== hoje) throw new Error("Só quem cuida do financeiro lança um valor em outro dia. Lance com a data de hoje ou peça para o dono.");
   if (error) throw new Error(error.message);
   return data;
 }

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarOff, Check, Clock, Lock, Repeat, TriangleAlert, Truck, Users } from "lucide-react";
+import { CalendarOff, Check, Clock, Lock, Repeat, TriangleAlert, Truck, Users, Utensils } from "lucide-react";
 import type { AgendamentoCompleto, PetComTutor, StatusAgendamento } from "@/lib/gestao/tipos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
-import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
+import { PORTES, SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, paraMin, vagasDe } from "@/lib/gestao/agenda";
-import { dataAmigavel, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, nomeDiaCurto, precoDoServico, somaDias } from "@/lib/gestao/util";
+import { almocoDoDia, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, nomeDiaCurto, precoDoServico, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { CampoDinheiro, erroDeValor } from "../loja/pecas";
@@ -14,7 +14,10 @@ import { AvatarPet, Campo, EscolherPet, Folha, avisarMudanca, ok, useAvisos, use
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
-type Problema = { tipo: "fechado" | "bloqueio" | "conflito" | "vagas" | "fora"; texto: string };
+type Problema = { tipo: "fechado" | "bloqueio" | "conflito" | "vagas" | "fora" | "almoco"; texto: string };
+/** Até quantas vezes um horário pode se repetir de uma vez (toda semana, dá meio ano). */
+const MAX_VEZES = 26;
+const OPCOES_VEZES = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 26];
 /** Horários livres separados por parte do dia. */
 const PARTES = [
   { rotulo: "Manhã", de: 0, ate: 12 * 60 },
@@ -53,6 +56,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const [endereco, setEndereco] = useState(agendamento?.endereco_leva_traz ?? "");
   const [obs, setObs] = useState(agendamento?.obs ?? "");
   const [salvando, setSalvando] = useState(false);
+  // o que está escrito no campo Valor (para avisar quando não é número) e o porte escolhido aqui mesmo
+  const [textoValor, setTextoValor] = useState("");
+  const [salvandoPorte, setSalvandoPorte] = useState(false);
   // repetição (só ao criar)
   const [repetir, setRepetir] = useState<number>(0);
   const [vezes, setVezes] = useState(4);
@@ -82,7 +88,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   // datas da série (uma só quando não repete) e os bloqueios do período
   const diaOk = RE_DIA.test(dia);
   const repetindo = !agendamento && repetir > 0;
-  const datas = useMemo(() => (repetindo ? datasDaSerie(dia, repetir, vezes) : [dia]), [repetindo, dia, repetir, vezes]);
+  const datas = useMemo(() => (repetindo ? datasDaSerie(dia, repetir, vezes, MAX_VEZES) : [dia]), [repetindo, dia, repetir, vezes]);
   const ultimoDia = datas[datas.length - 1];
   const { dados: bloqueios } = useDados(async () => {
     if (!diaOk) return [];
@@ -101,6 +107,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
       .map(emMin);
     // tempo bloqueado (do pet shop inteiro ou de quem vai atender) não é oferecido
     const bloqueados = (bloqueios ?? []).filter((b) => !b.profissional_id || b.profissional_id === profId).map(emMin);
+    // o almoço do pet shop (Meu pet shop > Horário) fica fechado todos os dias
+    const almoco = almocoDoDia(petshop.horario, deIsoDia(dia));
+    if (almoco) bloqueados.push({ inicio: almoco.inicio, fim: almoco.fim });
     const agora = new Date();
     const aPartirDe = dia === isoDia(agora) ? agora.getHours() * 60 + agora.getMinutes() : undefined;
     return horariosLivres({ abre: funcionamento.abre, fecha: funcionamento.fecha, duracaoMin: duracao, ocupados, bloqueados, vagas: profId ? 1 : vagasDe(petshop, equipe), aPartirDe });
@@ -111,6 +120,14 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     return (bloqueios ?? []).find((b) => bloqueioPega(b, profId, ini, ini + duracao * 60000)) ?? null;
   };
   const bloqueioAqui = diaOk && hhmm ? bloqueioEm(dia) : null;
+  /** O horário escolhido cruza o almoço do pet shop no dia `d`? */
+  const almocoEm = (d: string) => {
+    const al = hhmm ? almocoDoDia(petshop.horario, deIsoDia(d)) : null;
+    if (!al) return null;
+    const ini = paraMin(hhmm);
+    return ini < al.fim && ini + duracao > al.inicio ? al : null;
+  };
+  const almocoAqui = diaOk && hhmm ? almocoEm(dia) : null;
 
   // vagas: quantos pets o pet shop atende ao mesmo tempo, somando todos os profissionais e os "a definir"
   const vagas = vagasDe(petshop, equipe);
@@ -151,6 +168,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
       const p: Problema[] = [];
       if (!horarioDoDia(petshop.horario, deIsoDia(d))) p.push({ tipo: "fechado", texto: "fechado" });
       else if (foraDoExpediente(d)) p.push({ tipo: "fora", texto: "fora do expediente" });
+      if (almocoEm(d)) p.push({ tipo: "almoco", texto: "hora do almoço" });
       const b = bloqueioEm(d);
       if (b) p.push({ tipo: "bloqueio", texto: b.motivo ? `bloqueado: ${b.motivo}` : "bloqueado" });
       if (bate[i]) p.push({ tipo: "conflito", texto: "já tem horário" });
@@ -171,11 +189,29 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const comAviso = previa ? datas.filter((d) => previa[d]?.length) : [];
   const vaoMarcar = datas.length - (comProblema === "pular" ? comAviso.length : 0);
 
+  // texto que não é número no campo Valor: mostra o erro em vez de salvar em branco
+  const valorRuim = precoMexido && textoValor.trim() !== "" && lerValor(textoValor) == null;
+  const semPorte = Boolean(pet && !pet.porte);
+  const ultimaData = datas[datas.length - 1];
+
+  /** Escolhe o porte do pet aqui mesmo, na hora de marcar: grava na ficha e o valor sugerido se ajusta. */
+  async function definirPorte(porte: string) {
+    if (!pet || salvandoPorte) return;
+    setSalvandoPorte(true);
+    try {
+      ok(await sb.from("pets").update({ porte }).eq("id", pet.id).eq("petshop_id", petshop.id).select("id").single());
+      setPet({ ...pet, porte });
+      avisar(`Porte de ${pet.nome} guardado na ficha.`);
+    } catch (err) { avisarErro(err); }
+    setSalvandoPorte(false);
+  }
+
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!pet) { avisar("Escolha o pet."); return; }
     if (!hhmm) { avisar("Escolha o horário."); return; }
     if (!anoOk) { avisarErro("Confira o ano da data: ele parece errado."); return; }
+    if (valorRuim) { avisarErro("Confira o valor: escreva só números, como 45,00."); return; }
     const erroPreco = erroDeValor(preco);
     if (erroPreco) { avisarErro(erroPreco); return; }
     const inicio = juntaDiaHora(dia, hhmm);
@@ -203,6 +239,11 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
         aoSalvar();
         setSalvando(false);
         return;
+      }
+      const noAlmoco = almocoEm(dia);
+      if (noAlmoco) {
+        const segue = await confirmar({ titulo: "Esse horário cai no almoço", texto: `O pet shop fecha para o almoço das ${noAlmoco.de} às ${noAlmoco.ate}. Quer marcar mesmo assim?`, confirmar: "Marcar mesmo assim" });
+        if (!segue) { setSalvando(false); return; }
       }
       const bloqueio = bloqueioEm(dia);
       if (bloqueio) {
@@ -261,7 +302,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
             <div className="g-chips">
               {ativos.map((s) => (
                 <button key={s.id} type="button" className="g-chip" aria-pressed={servicoId === s.id}
-                  onClick={() => { setServicoId(s.id); setDuracao(s.duracao_min); setPrecoMexido(false); }}><i style={{ background: s.cor }} />{s.nome}</button>
+                  onClick={() => { setServicoId(s.id); setDuracao(s.duracao_min); setPrecoMexido(false); setTextoValor(""); }}><i style={{ background: s.cor }} />{s.nome}</button>
               ))}
             </div>
           </div>
@@ -313,6 +354,11 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
               <span><b>Esse horário passa das vagas.</b> Já {juntosAqui === 1 ? "tem 1 pet marcado" : `tem ${juntosAqui} pets marcados`} nesse horário e o pet shop atende {vagas === 1 ? "1 pet" : `${vagas} pets`} ao mesmo tempo. Dá para marcar mesmo assim: o sistema pede uma confirmação.</span>
             </p>
           )}
+          {almocoAqui && !repetindo && (
+            <p className="g-agd-alerta" role="status"><Utensils />
+              <span><b>Esse horário cai no almoço.</b> O pet shop fecha das {almocoAqui.de} às {almocoAqui.ate}. Dá para marcar mesmo assim: o sistema pede uma confirmação.</span>
+            </p>
+          )}
           {bloqueioAqui && !repetindo && (
             <p className="g-agd-alerta" role="status"><Lock />
               <span><b>Horário bloqueado: {bloqueioAqui.motivo ?? "sem motivo"}</b> ({nomeDe(bloqueioAqui.profissional_id)}), das {hora(bloqueioAqui.inicio)} às {hora(bloqueioAqui.fim)}. Dá para marcar mesmo assim: o sistema pede uma confirmação.</span>
@@ -330,7 +376,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
                 {repetindo && (
                   <Campo rotulo="Por quantas vezes">
                     <select className="g-select" value={vezes} onChange={(e) => setVezes(Number(e.target.value))}>
-                      {Array.from({ length: 11 }, (_, i) => i + 2).map((n) => <option key={n} value={n}>{n} vezes</option>)}
+                      {OPCOES_VEZES.map((n) => <option key={n} value={n}>{n} vezes</option>)}
                     </select>
                   </Campo>
                 )}
@@ -338,6 +384,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
               {repetindo && diaOk && (
                 <>
                   <div className="g-agd-rep-t"><Repeat size={15} /><span>{hhmm ? `Sempre às ${hhmm}` : "Escolha o horário para conferir as datas"}</span></div>
+                  <p className="g-pp g-muted" style={{ margin: 0 }}>A repetição vai até <b>{dataCompleta(ultimaData)}</b>. Não existe repetição sem fim: perto dessa data, é só marcar de novo.</p>
                   <ul className="g-agd-datas">
                     {datas.map((d) => {
                       const p = previa?.[d] ?? [];
@@ -375,10 +422,23 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
                   .map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}`}</option>)}
               </select>
             </Campo>
-            <Campo rotulo="Valor" dica={servico && !pet.porte && !precoMexido ? "Pet sem porte: confira o valor." : undefined}>
-              <CampoDinheiro valor={preco} aoMudar={(v) => { setPreco(v); setPrecoMexido(true); }} placeholder="definir" />
+            <Campo rotulo="Valor" erro={valorRuim ? "Isso não é um valor. Escreva só números, como 45,00." : null}
+              dica={semPorte && servico && !precoMexido ? "Pet sem porte: confira o valor." : undefined}>
+              <span className={`g-agd-valor${valorRuim ? " ruim" : semPorte && servico && !precoMexido ? " atencao" : ""}`} onInput={(e) => setTextoValor((e.target as HTMLInputElement).value)}>
+                <CampoDinheiro valor={preco} aoMudar={(v) => { setPreco(v); setPrecoMexido(true); }} placeholder="definir" />
+              </span>
             </Campo>
           </div>
+          {semPorte && servico && (
+            <div className="g-agd-alerta g-agd-porte" role="status"><TriangleAlert />
+              <div>
+                <span><b>{pet.nome} está sem porte na ficha.</b> {precoMexido ? "O valor é o que você escreveu." : preco != null ? "O valor acima é o primeiro preço do serviço." : "O valor ficou em branco."} Qual é o porte?</span>
+                <div className="g-chips" role="group" aria-label={`Porte de ${pet.nome}`}>
+                  {PORTES.map((x) => <button key={x.id} type="button" className="g-chip" disabled={salvandoPorte} onClick={() => void definirPorte(x.id)}>{x.rotulo}</button>)}
+                </div>
+              </div>
+            </div>
+          )}
 
           <label className="g-check"><input type="checkbox" checked={levaTraz} onChange={(e) => setLevaTraz(e.target.checked)} /><Truck size={18} /> Leva e traz</label>
           {levaTraz && <Campo rotulo="Endereço para buscar"><input className="g-input" value={endereco} onChange={(e) => setEndereco(e.target.value)} /></Campo>}

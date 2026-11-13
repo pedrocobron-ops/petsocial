@@ -10,7 +10,7 @@ import { abrirAssistente, avisarMudanca, Campo, Esqueleto, Folha, ok, useAvisos,
 import { Kpi, Tile } from "@/components/gestao/painel";
 import { AvisoCaixaFechado, CampoDinheiro, Chips, ChipsForma, erroDeValor, ErroTela, EscolhaPagamento, fecharPagamento, fmtQtd, lembrarForma, lerQtd, useCaixaAberto, usePagamento, type Forma } from "@/components/gestao/loja/pecas";
 import VendaBalcao from "@/components/gestao/loja/venda";
-import { lancarPago } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, lancarPago } from "@/lib/gestao/dinheiro";
 import type { MovimentoEstoque, Produto } from "@/lib/gestao/tipos";
 import { brl, brlCurto, dataCurta, semAcento } from "@/lib/gestao/util";
 import "./estoque.css";
@@ -301,7 +301,7 @@ function ProdutoNovo({ aoFechar, aoGravar }: { aoFechar: () => void; aoGravar: (
 
 function Entrada({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: () => void; aoGravar: () => void }) {
   const { sb, petshop, user, vejoFinanceiro } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const [qtd, setQtd] = useState("");
   const [custo, setCusto] = useState<number | null>(produto.custo);
   const [despesa, setDespesa] = useState(true);
@@ -320,6 +320,8 @@ function Entrada({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: 
     const custoRuim = erroDeValor(custo, "O custo") ?? (lanca ? erroDeValor(total, "O total da compra") : null);
     if (custoRuim) { avisarErro(custoRuim); return; }
     if (lanca && !forma) { setErroForma("Escolha como você pagou a compra."); avisarErro("Escolha a forma de pagamento."); return; }
+    if (lanca && !(await conferirValorAlto(total, confirmar))) return;
+    if (lanca && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
       ok(await sb.from("movimentos_estoque").insert({
@@ -374,7 +376,7 @@ function Entrada({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: 
 
 function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: () => void; aoGravar: () => void }) {
   const { sb, petshop, user, vejoFinanceiro } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const [qtd, setQtd] = useState("1");
   const [motivo, setMotivo] = useState<Motivo>("Venda");
   const [valorEditado, setValorEditado] = useState<number | null | undefined>(undefined);
@@ -399,6 +401,8 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
     if (valorRuim) { avisarErro(valorRuim); return; }
     const pg = venda && vejoFinanceiro && valor ? fecharPagamento(pagamento, valor) : null;
     if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return; }
+    if (pg && !(await conferirValorAlto(valor, confirmar))) return;
+    if (pg && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
       ok(await sb.from("movimentos_estoque").insert({

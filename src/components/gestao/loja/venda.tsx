@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Search, UserPlus, X } from "lucide-react";
-import { lancarPago } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, lancarPago } from "@/lib/gestao/dinheiro";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { brl, fmtTelefone, semAcento } from "@/lib/gestao/util";
@@ -12,7 +12,7 @@ import {
   baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LinhaDaConta, produtosDaConta,
   resumoDosItens, useProdutosDaLoja, type ItemConta,
 } from "./conta";
-import { AvisoCaixaFechado, fecharPagamento, lembrarForma, useCaixaAberto, usePagamento } from "./pecas";
+import { AvisoCaixaFechado, fecharPagamento, useCaixaAberto, usePagamento } from "./pecas";
 
 type Tutor = Pick<Cliente, "id" | "nome" | "telefone">;
 
@@ -44,11 +44,13 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
     if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return; }
     const falta = faltaNoEstoque(itens, produtos);
     if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return;
+    if (vejoFinanceiro && !(await conferirValorAlto(contas.total, perguntar))) return;
+    // o caixa fechou enquanto esta venda estava aberta: pergunta antes de receber fora dele
+    if (pg && !("erro" in pg) && !(await conferirCaixa(sb, petshop.id, perguntar))) return;
     setSalvando(true);
     try {
       const gravar = itensParaGravar(vendidos);
       if (pg && !("erro" in pg)) {
-        lembrarForma(pg.forma);
         await lancarPago(sb, petshop.id, {
           tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: pg.pagamentos, categoria: "Venda de produtos", clienteId: tutor?.id ?? null,
           descricao: encurtar(`Venda: ${resumoDosItens(gravar)}`), itens: gravar,

@@ -13,8 +13,8 @@ import { brl, dataCompleta, dataCurta, deIsoDia, inicioDaSemana, inicioDoDia, is
 import "./relatorios.css";
 
 export default function PaginaRelatorios() {
-  const { vejoFinanceiro } = useGestao();
-  return vejoFinanceiro ? <Relatorios /> : <SemAcesso />;
+  const { cuidoDoFinanceiro } = useGestao();
+  return cuidoDoFinanceiro ? <Relatorios /> : <SemAcesso />;
 }
 
 const PERIODOS = [

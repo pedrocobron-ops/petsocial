@@ -45,3 +45,8 @@
 .gj-dia .g-check { min-height: 44px; padding: 0 8px 0 2px; }
 .gj-cor { position: relative; }
 .gj-cor::after { content: ""; position: absolute; inset: -5px; }
+
+/* almoço, logo abaixo da grade de dias */
+.gj-almoco { display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); }
+.gj-almoco .gj-horas { justify-self: start; margin-left: 0; }
+.gj-almoco small { font-size: .8125rem; line-height: 1.4; }

@@ -27,7 +27,7 @@ export function mensalistasPorDia(planos: PlanoCompleto[], hoje: string, semPlan
 export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, aoSalvo }: {
   plano?: PlanoCompleto; pet?: PetDoPlano | null; planos: PlanoCompleto[]; aoFechar: () => void; aoSalvo: () => void;
 }) {
-  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { sb, petshop, cuidoDoFinanceiro: vejoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const hoje = isoDia(new Date());
   const [pet, setPet] = useState<PetDoPlano | null>(plano?.pets ?? petInicial ?? null);

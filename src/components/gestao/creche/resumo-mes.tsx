@@ -58,7 +58,7 @@ export function ResumoDosMeses({ plano, presencas, faltas }: { plano: PlanoCompl
 
 /** Cartão da ficha do pet: o plano de mensalista (ou o atalho para criar) e o resumo deste mês e do mês passado. */
 export function CartaoMensalista({ pet }: { pet: PetDoPlano }) {
-  const { sb, petshop, vejoFinanceiro, posso } = useGestao();
+  const { sb, petshop, cuidoDoFinanceiro: vejoFinanceiro, posso } = useGestao();
   const somenteLeitura = useSomenteLeitura();
   const [form, setForm] = useState<"novo" | "editar" | null>(null);
   const hoje = isoDia(new Date());

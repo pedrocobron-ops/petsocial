@@ -41,15 +41,15 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
   numeros: { pets: number; horarios: number; concluidos: number } | null;
   aoDispensar: () => void;
 }) {
-  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { sb, petshop, cuidoDoFinanceiro } = useGestao();
   const teste = fimDoTeste(petshop);
   const cartao = modo === "cartao";
   // dinheiro lançado: só entradas recebidas, sem contar movimentos internos do caixa
   const { dados: dinheiro } = useDados(async () => {
-    if (!cartao || !vejoFinanceiro) return 0;
+    if (!cartao || !cuidoDoFinanceiro) return 0;
     const { data } = await sb.from("lancamentos").select("valor").eq("petshop_id", petshop.id).eq("tipo", "entrada").eq("pago", true).is("movimento", null).limit(5000);
     return (data ?? []).reduce((s, l) => s + Number(l.valor), 0);
-  }, [petshop.id, cartao, vejoFinanceiro]);
+  }, [petshop.id, cartao, cuidoDoFinanceiro]);
   if (!teste) return null;
 
   if (modo === "equipe") {

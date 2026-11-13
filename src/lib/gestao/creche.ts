@@ -2,7 +2,8 @@ import type { Database } from "./banco";
 import type { Banco } from "./supabase";
 import type { Cliente, Estadia, Pet } from "./tipos";
 import { contando, lerTudo } from "./paginas";
-import { brl, chamar, dataCompleta, dataCurta, deIsoDia, horarioDoDia, isoDia, nomeMes, somaDias } from "./util";
+import { saudacaoZap } from "./agenda";
+import { brl, dataCompleta, dataCurta, deIsoDia, horarioDoDia, isoDia, nomeMes, somaDias } from "./util";
 
 /**
  * Creche com mensalistas: plano por pet (dias fixos da semana), chamada do dia, dias extras e cobrança do mês.
@@ -263,10 +264,10 @@ export function mensagemDeCobranca(p: { tutor: string | null | undefined; petsho
   const vencimentos = [...new Set(cs.map((c) => c.vencimento))].sort();
   const total = centavos(cs.reduce((s, c) => s + Number(c.total), 0));
   const atrasada = vencimentos[0] < p.hoje;
-  const oi = p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!";
+  const oi = saudacaoZap(p.tutor, p.petshop);
   const abre = atrasada
-    ? `${oi} Aqui é do ${p.petshop}. Passando para lembrar da mensalidade da creche de ${juntar(meses)}:`
-    : `${oi} Aqui é do ${p.petshop}. Segue a mensalidade da creche de ${juntar(meses)}:`;
+    ? `${oi} Passando para lembrar da mensalidade da creche de ${juntar(meses)}:`
+    : `${oi} Segue a mensalidade da creche de ${juntar(meses)}:`;
   const vence = vencimentos.length === 1
     ? `Vencimento: ${dataCompleta(vencimentos[0])}`
     : `Vencimentos: ${cs.map((c) => `${c.pets?.nome ?? "Pet"} em ${dataCompleta(c.vencimento)}`).join(", ")}`;
@@ -283,7 +284,7 @@ export function erroDaChamada(e: unknown): { vacina: string | null; texto: strin
 /** Mensagem para o tutor do mensalista que não veio: "O Zeca não veio à creche hoje. Está tudo bem?" */
 export function mensagemDeFalta(tutor: string | null | undefined, pet: string, sexo: string | null | undefined, petshop: string) {
   const quem = sexo === "M" ? `O ${pet}` : sexo === "F" ? `A ${pet}` : pet;
-  return `${tutor ? `Oi, ${chamar(tutor)}!` : "Oi!"} Aqui é do ${petshop}. ${quem} não veio à creche hoje. Está tudo bem?`;
+  return `${saudacaoZap(tutor, petshop)} ${quem} não veio à creche hoje. Está tudo bem?`;
 }
 
 /**

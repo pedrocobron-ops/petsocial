@@ -267,7 +267,7 @@ function HorarioDaLoja() {
           );
         })}
       </div>
-      <GradeHorario valor={horario} aoMudar={(h) => { setHorario(h); setErro(null); }} />
+      <GradeHorario valor={horario} aoMudar={(h) => { setHorario(h); setErro(null); }} modelos />
       {erro && <p className="g-erro" role="alert">{erro}</p>}
       <div><button className="g-btn verde" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar horário"}</button></div>
     </section>

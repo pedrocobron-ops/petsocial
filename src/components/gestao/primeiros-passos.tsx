@@ -47,7 +47,7 @@ export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: ()
   const todos: (Passo & { so: boolean })[] = dados ? [
     { id: "precos", so: souDono && banho && banhoInteiro && ativos.length > 0, feito: temPreco, texto: "Colocar os preços dos serviços", dica: "Em Meu pet shop, na parte Serviços e preços.", href: "/gestao/app/meu-petshop" },
     { id: "diaria", so: souDono && soCasa, feito: temDiaria, texto: "Colocar o preço da diária", dica: `Em Meu pet shop, na parte ${nomeDaCasa(petshop)}.`, href: "/gestao/app/meu-petshop" },
-    { id: "pet", so: posso("clientes"), feito: dados.pets > 0, texto: "Cadastrar o primeiro pet", dica: "Em Clientes e pets, no botão de novo pet.", href: "/gestao/app/clientes" },
+    { id: "pet", so: posso("clientes"), feito: dados.pets > 0, texto: "Cadastrar o primeiro pet", dica: "Já abre a ficha para preencher.", href: "/gestao/app/clientes?novo=1" },
     { id: "checkin", so: comCasa && posso("creche_hotel"), feito: dados.estadias > 0, texto: "Fazer o primeiro check-in", dica: `Em ${nomeDaCasa(petshop)}, no botão Nova reserva / Check-in.`, href: "/gestao/app/creche-hotel" },
     { id: "produto", so: comLoja && posso("estoque"), feito: dados.produtos > 0, texto: "Cadastrar o primeiro produto", dica: "Em Estoque, no botão de produto novo.", href: "/gestao/app/estoque" },
     { id: "horario", so: agenda, feito: dados.horarios > 0, texto: "Marcar o primeiro horário", dica: "Já abre a janela para marcar.", href: "/gestao/app/agenda?novo=1" },

@@ -3,11 +3,11 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BellRing, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, Truck, Printer, Users } from "lucide-react";
+import { BellRing, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, Truck, Printer, Users, Utensils } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { deMin, paraMin, vagasDe } from "@/lib/gestao/agenda";
-import { dataAmigavel, dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
+import { almocoDoDia, dataAmigavel, dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
@@ -89,8 +89,10 @@ function Agenda() {
 
   // janelas livres do dia (entre um atendimento e outro, dentro do funcionamento)
   const funcionamento = horarioDoDia(petshop.horario, data);
+  // almoço do pet shop (Meu pet shop > Horário): intervalo fechado todo dia, sem bloqueio manual
+  const almoco = almocoDoDia(petshop.horario, data);
   const linhas = useMemo(() => {
-    type Linha = { tipo: "ag"; a: AgendamentoCompleto } | { tipo: "livre"; de: number; ate: number } | { tipo: "bloq"; t: Trecho };
+    type Linha = { tipo: "ag"; a: AgendamentoCompleto } | { tipo: "livre"; de: number; ate: number } | { tipo: "bloq"; t: Trecho } | { tipo: "almoco"; de: number; ate: number };
     const out: { de: number; linha: Linha }[] = [];
     const ativos = doDia.filter((a) => !["cancelado", "faltou"].includes(a.status));
     const base = data.getTime();
@@ -104,6 +106,7 @@ function Agenda() {
     const itens = [
       ...doDia.map((a) => ({ linha: { tipo: "ag", a } as Linha, de: min(a.inicio), ate: min(a.fim), conta: ativos.includes(a) })),
       ...bloqueiosDoDia.map((t) => ({ linha: { tipo: "bloq", t } as Linha, de: t.de, ate: t.ate, conta: !t.b.profissional_id || t.b.profissional_id === prof || quemAtende.length <= 1 })),
+      ...(almoco ? [{ linha: { tipo: "almoco", de: almoco.inicio, ate: almoco.fim } as Linha, de: almoco.inicio, ate: almoco.fim, conta: true }] : []),
     ].sort((x, y) => x.de - y.de || Number(y.linha.tipo === "bloq") - Number(x.linha.tipo === "bloq"));
     for (const it of itens) {
       if (it.conta && cursor != null && fecha != null && it.de - cursor >= 30 && cursor < fecha) out.push({ de: cursor, linha: { tipo: "livre", de: cursor, ate: Math.min(it.de, fecha) } });
@@ -113,7 +116,7 @@ function Agenda() {
     if (cursor != null && fecha != null && fecha - cursor >= 30) out.push({ de: cursor, linha: { tipo: "livre", de: cursor, ate: fecha } });
     // sempre na ordem do relógio: o tempo livre não fica depois de um horário cancelado ou marcado fora do expediente
     return out.map((x, i) => ({ ...x, i })).sort((x, y) => x.de - y.de || x.i - y.i).map((x) => x.linha);
-  }, [doDia, bloqueiosDoDia, funcionamento, data.getTime(), prof, quemAtende.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [doDia, bloqueiosDoDia, funcionamento, almoco?.inicio, almoco?.fim, data.getTime(), prof, quemAtende.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // horários que passam das vagas: mais pets ao mesmo tempo do que o pet shop atende (conta todos os profissionais e os "a definir")
   const vagas = vagasDe(petshop, equipe);
@@ -242,6 +245,11 @@ function Agenda() {
                   {mesmoDia(d, agora) && agora.getHours() * 60 >= faixa.ini && agora.getHours() * 60 < faixa.fim && (
                     <div className="g-agora" style={{ top: ((agora.getHours() * 60 + agora.getMinutes() - faixa.ini) / 60) * H_HORA }} />
                   )}
+                  {(() => {
+                    const al = almocoDoDia(petshop.horario, d);
+                    return al && <div className="g-agd-faixa almoco" title={`Almoço, das ${al.de} às ${al.ate}. Muda em Meu pet shop, no horário de funcionamento.`}
+                      style={{ top: ((al.inicio - faixa.ini) / 60) * H_HORA, height: ((al.fim - al.inicio) / 60) * H_HORA }}><Utensils aria-hidden /><span>Almoço</span></div>;
+                  })()}
                   {trechosDe(d).map((t) => {
                     const de = Math.max(t.de, faixa.ini), ate = Math.min(t.ate, faixa.fim);
                     if (ate <= de) return null;
@@ -288,7 +296,7 @@ function Agenda() {
               );
             })}
           </div>
-        ) : !doDia.length && !bloqueiosDoDia.length ? (
+        ) : !doDia.length && !bloqueiosDoDia.length && !almoco ? (
           <div className="g-card">
             <Vazio titulo={funcionamento ? "Dia livre por enquanto" : "O pet shop não abre neste dia"}
               texto={funcionamento ? `Nenhum horário marcado. Aberto das ${funcionamento.abre} às ${funcionamento.fecha}.` : "Se for atender mesmo assim, é só marcar."}>
@@ -306,6 +314,19 @@ function Agenda() {
                   <time>{deMin(l.de)}</time>
                   <span className="ponto" aria-hidden />
                   <button className="g-livre" onClick={() => abrirNovo({ dia, hora: deMin(l.de), profissional: prof })}><Plus size={16} />Livre até {deMin(l.ate)}</button>
+                </div>
+              ) : l.tipo === "almoco" ? (
+                <div className="g-hora-grupo g-agd-linha" key="almoco">
+                  <time>{deMin(l.de)}</time>
+                  <span className="ponto" aria-hidden />
+                  <div className="g-agd-bloq almoco" role="note">
+                    <span className="g-agd-cadeado"><Utensils aria-hidden /></span>
+                    <span className="t">
+                      <b>Almoço</b>
+                      <span>Até {deMin(l.ate)}</span>
+                    </span>
+                    <span className="g-tag">Fechado</span>
+                  </div>
                 </div>
               ) : l.tipo === "bloq" ? (
                 <div className="g-hora-grupo g-agd-linha" key={`b${l.t.b.id}`}>

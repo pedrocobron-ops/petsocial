@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
-import { caixaAberto, contaDosItens, desfazerVenda, ehDividido, itensDoLancamento, lancarPago, partesPorForma, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
-import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, deIsoDia, isoDia } from "@/lib/gestao/util";
+import { History, Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
+import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, desfazerVenda, ehDividido, itensDoLancamento, lancarPago, nomeDoMovimento, partesPorForma, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Lancamento } from "@/lib/gestao/tipos";
+import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
-import { CampoDinheiro, EscolhaPagamento, fecharPagamento, formaLembrada, lembrarForma, pagamentoInicial, type EstadoPagamento } from "../loja/pecas";
+import { AvisoCaixaFechado, CampoDinheiro, EscolhaPagamento, fecharPagamento, pagamentoInicial, useCaixaAberto, type EstadoPagamento } from "../loja/pecas";
 import { avisarMudanca, Campo, Folha, useAvisos, useDados, Vazio } from "../ui";
 import "./financeiro.css";
 
@@ -204,6 +204,82 @@ export function ItensDoLancamento({ lancamento }: { lancamento: Pick<Lancamento,
   );
 }
 
+/* ---------- alterações e exclusões de valor já recebido ---------- */
+
+type Campos = Record<string, unknown>;
+const campos = (j: unknown): Campos => (j && typeof j === "object" && !Array.isArray(j) ? (j as Campos) : {});
+const quandoFoi = (iso: string) => `${dataCompleta(iso)} às ${hora(iso)}`;
+
+/** "R$ 75,80 → R$ 45,80; Pix → Dinheiro": o que mudou numa alteração, em palavras. */
+export function textoDaAlteracao(a: Pick<AlteracaoLancamento, "antes" | "depois">) {
+  const de = campos(a.antes), para = campos(a.depois);
+  const partes: string[] = [];
+  if ("valor" in de) partes.push(`${brl(Number(de.valor))} → ${brl(Number(para.valor))}`);
+  if ("forma" in de) partes.push(`${rotuloForma(de.forma as string | null)} → ${rotuloForma(para.forma as string | null)}`);
+  else if ("pagamentos" in de) partes.push("divisão do pagamento");
+  if ("data" in de) partes.push(`dia ${dataCompleta(String(de.data))} → ${dataCompleta(String(para.data))}`);
+  if ("tipo" in de) partes.push(para.tipo === "entrada" ? "saída → entrada" : "entrada → saída");
+  if ("categoria" in de) partes.push(`categoria ${String(de.categoria)} → ${String(para.categoria)}`);
+  if ("descricao" in de) partes.push(`descrição ${de.descricao ? `"${String(de.descricao)}"` : "em branco"} → ${para.descricao ? `"${String(para.descricao)}"` : "em branco"}`);
+  if ("itens" in de) partes.push("itens da venda");
+  if ("pago" in de) partes.push("voltou a ser conta em aberto");
+  if ("caixa_id" in de && !("pago" in de)) partes.push("caixa");
+  return partes.join("; ") || "detalhes";
+}
+
+/** Dentro do lançamento: quem alterou, quando, e de quanto para quanto. Só busca quando o lançamento foi alterado. */
+function HistoricoDeAlteracoes({ lancamento }: { lancamento: Pick<Lancamento, "id" | "alterado_em"> }) {
+  const { sb, petshop } = useGestao();
+  const { dados } = useDados(async () => {
+    if (!lancamento.alterado_em) return [];
+    const r = await sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", petshop.id).eq("lancamento_id", lancamento.id).eq("acao", "alterou")
+      .order("quando", { ascending: false }).limit(20);
+    return r.data ?? [];
+  }, [lancamento.id, lancamento.alterado_em]);
+  if (!lancamento.alterado_em) return null;
+  return (
+    <section className="gf-alteracoes" aria-label="Alterações deste lançamento">
+      <span className="g-rotulo"><History size={14} aria-hidden />Alterações</span>
+      {dados?.length
+        ? <ul>{dados.map((a) => <li key={a.id}>Alterado por <b>{a.quem_nome ?? "alguém da equipe"}</b> em {quandoFoi(a.quando)}: <span className="g-tab">{textoDaAlteracao(a)}</span></li>)}</ul>
+        : <p className="g-muted g-pp">Alterado em {quandoFoi(lancamento.alterado_em)}.</p>}
+    </section>
+  );
+}
+
+/** Etiqueta discreta das listas para o lançamento recebido que foi alterado depois. */
+export function TagAlterado({ lancamento }: { lancamento: Pick<Lancamento, "alterado_em"> }) {
+  return lancamento.alterado_em ? <span className="g-tag amarelo gf-alterado" title={`Alterado em ${quandoFoi(lancamento.alterado_em)}`}>alterado</span> : null;
+}
+
+/** Lançamentos recebidos que foram apagados (só chega para o dono e para quem cuida do financeiro). */
+export function Apagados({ linhas, titulo = "Apagados" }: { linhas: AlteracaoLancamento[]; titulo?: string }) {
+  if (!linhas.length) return null;
+  return (
+    <section className="g-card gf-apagados">
+      <div className="g-card-t"><h3><Tile icone={Trash2} tom="manteiga" tamanho="p" />{titulo}</h3><span className="g-tag g-tab">{linhas.length}</span></div>
+      <p className="g-muted g-pp" style={{ marginBottom: 6 }}>Valores já recebidos que alguém excluiu. Não entram mais em nenhuma soma; ficam aqui para você conferir.</p>
+      <div className="g-lista">
+        {linhas.map((a) => {
+          const l = campos(a.antes);
+          const entrada = l.tipo === "entrada";
+          const nome = l.movimento ? nomeDoMovimento(String(l.movimento)) : String(l.descricao || categoriaAtual(String(l.categoria ?? "Outros")));
+          return (
+            <div key={a.id} className="g-linha">
+              <Tile icone={Trash2} tom="manteiga" />
+              <span className="t">
+                <b>{nome}</b>
+                <span>Apagado por {a.quem_nome ?? "alguém da equipe"} em {quandoFoi(a.quando)} · era {textoDoPagamento({ valor: Number(l.valor), forma: l.forma as string | null, pagamentos: l.pagamentos })}{l.data ? `, de ${dataCompleta(String(l.data))}` : ""}</span>
+              </span>
+              <span className="d g-muted"><b><s>{entrada ? "+" : "−"} {brl(Number(l.valor))}</s></b></span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 /* ---------- folha de lançamento ---------- */
 
 const categoriasDe = (tipo: Tipo) => (tipo === "entrada" ? CATEGORIAS_ENTRADA : CATEGORIAS_SAIDA);
@@ -218,13 +294,13 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   modo: "pago" | "conta"; tipo: Tipo; inicial?: Lancamento | null; escolheData?: boolean; escolheTipo?: boolean;
   aoFechar: () => void; aoSalvo: () => void | Promise<void>;
 }) {
-  const { sb, petshop, user } = useGestao();
+  const { sb, petshop, user, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const hoje = hojeIso();
   const [tipo, setTipo] = useState<Tipo>(inicial ? (inicial.tipo as Tipo) : tipoInicial);
   const [valor, setValor] = useState<number | null>(inicial ? Number(inicial.valor) : null);
-  // forma: a do lançamento; num novo, a última usada neste aparelho; sem nenhuma, a pessoa escolhe
-  const [pagamento, setPagamento] = useState<EstadoPagamento>(() => pagamentoInicial(inicial ? (inicial.forma as FormaId | null) ?? "pix" : formaLembrada()));
+  // forma: a do lançamento; num novo, nenhuma vem marcada: a pessoa escolhe
+  const [pagamento, setPagamento] = useState<EstadoPagamento>(() => pagamentoInicial(inicial ? (inicial.forma as FormaId | null) ?? "pix" : null));
   // lançamento já dividido: as partes aparecem só para leitura até a pessoa trocar para uma forma só
   const [manterDividido, setManterDividido] = useState(() => Boolean(inicial && inicial.pago && ehDividido(inicial)));
   const [categoria, setCategoria] = useState(inicial ? categoriaAtual(inicial.categoria) : categoriasDe(tipoInicial)[0]);
@@ -235,6 +311,10 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     return r.data?.fechado_em ?? null;
   }, [inicial?.caixa_id]);
   const travado = Boolean(caixaFechadoEm);
+  // valor já recebido: o dono e quem cuida do financeiro alteram; quem só opera o caixa corrige o que ela mesma lançou no caixa aberto
+  const soVer = Boolean(inicial?.pago && !cuidoDoFinanceiro && !(inicial.criado_por === user.id && inicial.caixa_id && !travado));
+  const recebido = Boolean(inicial?.pago);
+  const caixa = useCaixaAberto();
   const [descricao, setDescricao] = useState(inicial?.descricao ?? "");
   const [data, setData] = useState(inicial?.data ?? hoje);
   const [vencimento, setVencimento] = useState(inicial?.vencimento ?? hoje);
@@ -259,7 +339,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   }
 
   async function salvar() {
-    if (salvando) return;
+    if (salvando || soVer) return;
     if (!valor || valor <= 0) { setErro("Escreva o valor."); return; }
     if (valor >= 1e8) { setErro("Esse valor é grande demais."); return; }
     const texto = descricao.trim() || null;
@@ -272,6 +352,10 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     const pagamentos = pg && !("erro" in pg) ? pg.pagamentos : null;
     const vezes = conta && !inicial && repetir ? Math.min(36, Math.max(2, Math.round(meses) || 2)) : 1;
     setErro(null);
+    // um zero a mais é fácil de digitar: valor alto pede uma conferência (na edição, só se o valor mudou)
+    if ((!inicial || Number(inicial.valor) !== valor) && !(await conferirValorAlto(valor, confirmar))) return;
+    // dinheiro de hoje: se o caixa fechou enquanto esta folha estava aberta, pergunta antes de lançar fora dele
+    if (!inicial && !conta && (!escolheData || data === hoje) && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
       if (inicial) {
@@ -280,8 +364,9 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
           : travado ? { descricao: texto }
           : manterDividido ? { categoria, descricao: texto, ...(escolheData ? { data } : {}) }
           : { valor, forma, pagamentos, categoria, descricao: texto, ...(escolheData ? { data } : {}) };
-        const r = await sb.from("lancamentos").update(mudancas).eq("id", inicial.id).eq("petshop_id", petshop.id);
+        const r = await sb.from("lancamentos").update(mudancas).eq("id", inicial.id).eq("petshop_id", petshop.id).select("id");
         if (r.error) throw new Error(r.error.message);
+        if (!r.data?.length) throw new Error("Não deu para salvar. Este lançamento pode ter sido apagado, ou só o dono e quem cuida do financeiro podem alterar.");
         avisar("Alteração salva.");
       } else if (conta) {
         const linhas = Array.from({ length: vezes }, (_, i) => {
@@ -298,7 +383,6 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         setSalvando(false);
         return;
       } else if (!escolheData || data === hoje) {
-        lembrarForma(forma);
         await lancarPago(sb, petshop.id, { tipo, valor, forma, pagamentos, categoria, descricao: texto });
         avisar(entrada ? `Entrada de ${brl(valor)} anotada.` : `Saída de ${brl(valor)} anotada.`);
       } else {
@@ -347,11 +431,17 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
 
   return (
     <Folha titulo={titulo} aoFechar={aoFechar}
-      rodape={<>
+      rodape={soVer ? <button type="button" className="g-btn sec" onClick={aoFechar}>Fechar</button> : <>
         {inicial && !travado && <button type="button" className="g-btn perigo" onClick={excluir} disabled={salvando}><Trash2 />Excluir</button>}
         <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : inicial ? "Salvar" : conta ? "Anotar conta" : "Lançar"}</button>
       </>}>
       <form className="g-form" onSubmit={(e) => { e.preventDefault(); void salvar(); }}>
+        {soVer && !travado && (
+          <p className="g-cx-fora" role="status">
+            <Lock aria-hidden />
+            <span>Valor já recebido: só o dono ou quem cuida do financeiro pode alterar ou excluir. Quem opera o caixa corrige só o que lançou, enquanto o caixa está aberto.</span>
+          </p>
+        )}
         {travado && (
           <p className="g-cx-fora" role="status">
             <Lock aria-hidden />
@@ -359,6 +449,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
           </p>
         )}
         {inicial && <ItensDoLancamento lancamento={inicial} />}
+        {inicial && <HistoricoDeAlteracoes lancamento={inicial} />}
         {escolheTipo && !inicial && (
           <div className="g-seg gf-seg-cheio" role="group" aria-label="Tipo">
             <button type="button" aria-pressed={entrada} onClick={() => trocarTipo("entrada")}>Entrada</button>
@@ -373,7 +464,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         )}
         <div className={conta || escolheData ? "dupla" : undefined}>
           <Campo rotulo="Valor" erro={erro}>
-            <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus={!conta && !inicial} desligado={travado || manterDividido} maximo={99999999} />
+            <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus={!conta && !inicial} desligado={travado || manterDividido || soVer} maximo={99999999} />
           </Campo>
           {conta && (
             <Campo rotulo="Vencimento">
@@ -382,14 +473,14 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
           )}
           {!conta && escolheData && (
             <Campo rotulo="Dia">
-              <input type="date" className="g-input" value={data} max={hoje} disabled={travado} onChange={(e) => setData(e.target.value)} />
+              <input type="date" className="g-input" value={data} max={hoje} disabled={travado || soVer} onChange={(e) => setData(e.target.value)} />
             </Campo>
           )}
         </div>
-        {!conta && (travado || manterDividido ? (
+        {!conta && (travado || manterDividido || soVer ? (
           <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}>
             <p className="g-p g-tab">{inicial ? textoDoPagamento(inicial) : ""}</p>
-            {manterDividido && !travado && (
+            {manterDividido && !travado && !soVer && (
               <>
                 <small>Pagamento dividido. Para mudar o valor ou a forma, troque para uma forma só.</small>
                 <div><button type="button" className="g-btn sec p" onClick={() => setManterDividido(false)}>Trocar a forma de pagamento</button></div>
@@ -399,13 +490,19 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         ) : entrada
           ? <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={valor ?? 0} rotulo="Como recebeu" />
           : <Grupo rotulo="Como pagou"><Chips opcoes={FORMAS} valor={pagamento.forma} aoMudar={(f) => { setPagamento(pagamentoInicial(f)); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>)}
-        <Grupo rotulo="Categoria"><Chips opcoes={categorias} valor={categoria} aoMudar={setCategoria} rotulo="Categoria" /></Grupo>
-        {!conta && (
+        {soVer
+          ? <Grupo rotulo="Categoria"><p className="g-p">{categoria}{descricao ? ` · ${descricao}` : ""}</p></Grupo>
+          : <Grupo rotulo="Categoria"><Chips opcoes={categorias} valor={categoria} aoMudar={setCategoria} rotulo="Categoria" /></Grupo>}
+        {!conta && !soVer && (
           <Campo rotulo="Descrição (se quiser)">
             <input className="g-input" value={descricao} maxLength={120} onChange={(e) => setDescricao(e.target.value)}
               placeholder={entrada ? "Ex.: banho da Mel" : "Ex.: shampoo, troco do motoboy"} />
           </Campo>
         )}
+        {recebido && !soVer && !travado && (
+          <p className="g-muted g-pp">Este valor já foi recebido. Se você alterar ou excluir, fica anotado quem mudou, quando e o valor de antes.</p>
+        )}
+        {!inicial && !conta && (!escolheData || data === hoje) && <AvisoCaixaFechado aberto={caixa} />}
         {conta && !inicial && (
           <>
             <label className="g-check">
@@ -429,11 +526,13 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
 /* ---------- dar baixa em uma conta ---------- */
 
 export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; aoFechar: () => void; aoSalvo: () => void | Promise<void> }) {
-  const { sb, petshop } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { sb, petshop, cuidoDoFinanceiro } = useGestao();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const hoje = hojeIso();
   const entrada = conta.tipo === "entrada";
-  const [pagamento, setPagamento] = useState<EstadoPagamento>(() => pagamentoInicial(formaLembrada()));
+  // nenhuma forma vem marcada: a pessoa escolhe como o dinheiro entrou
+  const [pagamento, setPagamento] = useState<EstadoPagamento>(() => pagamentoInicial());
+  const caixaAgora = useCaixaAberto();
   const [data, setData] = useState(hoje);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -443,9 +542,9 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     const pg = fecharPagamento(pagamento, Number(conta.valor));
     if ("erro" in pg) { setErro(pagamento.dividido ? pg.erro : entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
     if (!data || data > hoje) { setErro("Escolha um dia até hoje."); return; }
+    if (data === hoje && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
-      lembrarForma(pg.forma);
       // só entra no caixa aberto quando o dinheiro andou hoje
       const caixa = data === hoje ? await caixaAberto(sb, petshop.id) : null;
       const r = await sb.from("lancamentos").update({ pago: true, data, forma: pg.forma, pagamentos: pg.pagamentos, caixa_id: caixa?.id ?? null })
@@ -478,9 +577,12 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
           ? <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={Number(conta.valor)} rotulo="Como recebeu" />
           : <Grupo rotulo="Como pagou"><Chips opcoes={FORMAS} valor={pagamento.forma} aoMudar={(f) => { setPagamento(pagamentoInicial(f)); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>}
         {conta.itens != null && <ItensDoLancamento lancamento={conta} />}
-        <Campo rotulo={entrada ? "Dia em que recebeu" : "Dia em que pagou"} erro={erro}>
-          <input type="date" className="g-input" value={data} max={hoje} onChange={(e) => { setData(e.target.value); setErro(null); }} />
-        </Campo>
+        {cuidoDoFinanceiro ? (
+          <Campo rotulo={entrada ? "Dia em que recebeu" : "Dia em que pagou"} erro={erro}>
+            <input type="date" className="g-input" value={data} max={hoje} onChange={(e) => { setData(e.target.value); setErro(null); }} />
+          </Campo>
+        ) : <p className="g-muted g-pp">{erro ? <span className="erro" role="alert">{erro} </span> : null}Entra com a data de hoje.</p>}
+        {data === hoje && <AvisoCaixaFechado aberto={caixaAgora} />}
       </div>
     </Folha>
   );

@@ -3,12 +3,12 @@
 import { useRef, useState } from "react";
 import { Camera } from "lucide-react";
 import type { Cliente, Pet, PetComTutor } from "@/lib/gestao/tipos";
-import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { PORTES } from "@/lib/gestao/tipos";
-import { ERRO_TELEFONE, isoDia, mascaraTelefone, semAcento, soDigitos, telefoneValido } from "@/lib/gestao/util";
+import { ERRO_TELEFONE, isoDia, mascaraTelefone, semAcento, telefoneLimpo, telefoneValido } from "@/lib/gestao/util";
 import { reduzirFoto } from "@/lib/gestao/foto";
 import { useGestao } from "./contexto";
-import { AvatarPet, Campo, Folha, ok, useAvisos, useDados } from "./ui";
+import { AvatarPet, Campo, Folha, ok, useAvisos } from "./ui";
+import { FolhaMesmaPessoa, acharTutorIgual, useTutores, type TutorCurto } from "./clientes/juntar";
 
 /**
  * Cadastro ou edição de um pet. Em cadastro novo, escolhe um tutor existente ou cria o tutor junto.
@@ -24,6 +24,11 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
   const [especie, setEspecie] = useState(pet?.especie ?? "cao");
   const [raca, setRaca] = useState(pet?.raca ?? "");
   const [porte, setPorte] = useState(pet?.porte ?? "");
+  // "Não sei ainda": deixa o porte em branco de propósito (cachorro sem porte não salva sem essa escolha)
+  const [naoSeiPorte, setNaoSeiPorte] = useState(false);
+  const [erroPorte, setErroPorte] = useState<string | null>(null);
+  // tutor digitado que já existe: pergunta antes de criar outro
+  const [igual, setIgual] = useState<{ tutor: TutorCurto; por: "telefone" | "nome" } | null>(null);
   const [sexo, setSexo] = useState(pet?.sexo ?? "");
   const [nascimento, setNascimento] = useState(pet?.nascimento ?? "");
   const [alertas, setAlertas] = useState(pet?.alertas ?? "");
@@ -40,9 +45,7 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
   const arquivo = useRef<HTMLInputElement>(null);
 
   const precisaTutor = !pet && !clienteFixo;
-  const { dados: clientes } = useDados(async () =>
-    precisaTutor ? lerTudo<{ id: string; nome: string; telefone: string | null }>((de, ate, contar) => sb.from("clientes").select("id, nome, telefone", contando(contar)).eq("petshop_id", petshop.id).order("nome").order("id").range(de, ate)) : [],
-  [petshop.id, precisaTutor]);
+  const { dados: clientes } = useTutores(precisaTutor);
   const alvo = semAcento(tutorNome);
   const sugestoes = precisaTutor && !tutorId && alvo.length >= 2 ? (clientes ?? []).filter((c) => semAcento(c.nome).includes(alvo)).slice(0, 4) : [];
 
@@ -65,17 +68,32 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
     e.target.value = "";
   }
 
-  async function salvar(e: React.FormEvent) {
+  function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!nome.trim() || salvando) return;
     if (!tutorId && precisaTutor && !telefoneValido(tutorFone)) { setErroFone(ERRO_TELEFONE); return; }
     if (nascimento && nascimento > hoje) { setErroNasc("O nascimento não pode ser depois de hoje."); return; }
+    if (especie === "cao" && !porte && !naoSeiPorte) {
+      setErroPorte("Escolha o porte. Se ainda não sabe, toque em Não sei ainda.");
+      document.getElementById("form-pet-porte")?.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
+    // nome ou telefone igual ao de um tutor que já existe: pergunta antes de criar outro
+    if (precisaTutor && !tutorId) {
+      const achado = acharTutorIgual(clientes ?? [], tutorNome, tutorFone);
+      if (achado) { setIgual(achado); return; }
+    }
+    void gravar(tutorId);
+  }
+
+  /** Grava o pet. `tutorCerto` é o tutor já existente a usar; sem ele, cria o tutor digitado. */
+  async function gravar(tutorCerto: string | null) {
     setSalvando(true);
     try {
-      let clienteId = tutorId;
+      let clienteId = tutorCerto;
       if (!clienteId) {
         if (!tutorNome.trim()) throw new Error("Diga o nome do tutor.");
-        const novo = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome: tutorNome.trim(), telefone: soDigitos(tutorFone) || null }).select("id").single());
+        const novo = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome: tutorNome.trim(), telefone: telefoneLimpo(tutorFone) || null }).select("id").single());
         clienteId = novo.id;
       }
       const campos = {
@@ -89,6 +107,14 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
       aoSalvar(salvo as PetComTutor);
     } catch (err) { avisarErro(err); }
     setSalvando(false);
+  }
+
+  if (igual) {
+    return (
+      <FolhaMesmaPessoa igual={igual} digitado={tutorNome} ocupado={salvando} aoFechar={() => setIgual(null)}
+        aoUsar={() => { const t = igual.tutor; setTutorId(t.id); setTutorNome(t.nome); setTutorFone(t.telefone ?? ""); setIgual(null); void gravar(t.id); }}
+        aoCriar={() => { setIgual(null); void gravar(null); }} />
+    );
   }
 
   return (
@@ -119,7 +145,7 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
             )}
             {tutorId ? <p className="g-pp g-muted">Cliente já cadastrado. O pet entra na ficha dele.</p> : (
               <Campo rotulo="WhatsApp do tutor" erro={erroFone} dica="DDD e número. Pode ficar em branco.">
-                <input className="g-input" type="tel" inputMode="tel" autoComplete="off" placeholder="(11) 99999-9999" maxLength={16} value={tutorFone} aria-invalid={!!erroFone}
+                <input className="g-input" type="tel" inputMode="tel" autoComplete="off" placeholder="(11) 99999-9999" maxLength={24} value={tutorFone} aria-invalid={!!erroFone}
                   onChange={(e) => { setTutorFone(mascaraTelefone(e.target.value)); setErroFone(null); }}
                   onBlur={() => setErroFone(telefoneValido(tutorFone) ? null : ERRO_TELEFONE)} />
               </Campo>
@@ -134,11 +160,13 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
             ))}
           </div>
         </div>
-        <div className="g-campo"><span>Porte</span>
-          <div className="g-chips">
-            {PORTES.map((p) => <button key={p.id} type="button" className="g-chip" aria-pressed={porte === p.id} onClick={() => setPorte(porte === p.id ? "" : p.id)}>{p.rotulo}</button>)}
+        <div className="g-campo" id="form-pet-porte"><span>Porte{especie === "cao" ? " (qual o tamanho?)" : ""}</span>
+          <div className="g-chips" role="group" aria-label="Porte">
+            {PORTES.map((p) => <button key={p.id} type="button" className="g-chip" aria-pressed={porte === p.id} onClick={() => { setPorte(porte === p.id ? "" : p.id); setNaoSeiPorte(false); setErroPorte(null); }}>{p.rotulo}</button>)}
+            <button type="button" className="g-chip" aria-pressed={!porte && naoSeiPorte} onClick={() => { setPorte(""); setNaoSeiPorte(true); setErroPorte(null); }}>Não sei ainda</button>
           </div>
-          <small>O porte define o preço do banho.</small>
+          {erroPorte ? <small className="erro" role="alert">{erroPorte}</small>
+            : <small>{!porte && naoSeiPorte ? "Fica em branco por enquanto. Na hora de marcar um horário, o sistema pergunta de novo." : "O porte define o preço do banho."}</small>}
         </div>
         <div className="dupla">
           <Campo rotulo="Raça"><input className="g-input" value={raca} maxLength={60} onChange={(e) => setRaca(e.target.value)} /></Campo>

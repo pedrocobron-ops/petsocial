@@ -9,19 +9,20 @@ import { useGestao } from "@/components/gestao/contexto";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
 import {
-  baixarPlanilha, brlMini, categoriaAtual, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, SemAcesso, soma, somaPorForma,
-  type Cel, type Tipo,
+  Apagados, baixarPlanilha, brlMini, categoriaAtual, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, SemAcesso, soma, somaPorForma,
+  TagAlterado, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
 import { contasDaMeta, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
-import type { Lancamento } from "@/lib/gestao/tipos";
+import type { AlteracaoLancamento, Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
 import "./financeiro.css";
 
 export default function PaginaFinanceiro() {
-  const { vejoFinanceiro } = useGestao();
-  return vejoFinanceiro ? <Financeiro /> : <SemAcesso />;
+  // quem só opera o caixa não entra aqui: despesas, contas e o histórico são de quem cuida do financeiro
+  const { cuidoDoFinanceiro } = useGestao();
+  return cuidoDoFinanceiro ? <Financeiro /> : <SemAcesso />;
 }
 
 type Aba = "resumo" | "pagar" | "receber" | "lancamentos";
@@ -89,7 +90,18 @@ function Financeiro() {
       paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", false)
         .order("vencimento", { ascending: true, nullsFirst: false }).order("id").range(de, ate)),
     ]);
-    return { doMes, anterior, contas };
+    // quem deve: o nome do tutor de cada conta a receber
+    const devedores = [...new Set(contas.filter((c) => c.tipo === "entrada" && c.cliente_id).map((c) => c.cliente_id!))];
+    const tutores = new Map<string, string>();
+    for (let i = 0; i < devedores.length; i += 150) {
+      const r = await sb.from("clientes").select("id, nome").eq("petshop_id", petshop.id).in("id", devedores.slice(i, i + 150));
+      for (const c of r.data ?? []) tutores.set(c.id, c.nome);
+    }
+    // valores recebidos neste mês que alguém apagou depois
+    const ap = await sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", petshop.id).eq("acao", "apagou")
+      .gte("antes->>data", inicio).lte("antes->>data", fim).order("quando", { ascending: false }).limit(200);
+    const apagados: AlteracaoLancamento[] = ap.data ?? [];
+    return { doMes, anterior, contas, tutores, apagados };
   }, [petshop.id, inicio]);
 
   const contas = useMemo(() => {
@@ -288,7 +300,7 @@ function Financeiro() {
             )}
 
             {(aba === "pagar" || aba === "receber") && (
-              <Contas lista={aba === "pagar" ? contas.aPagar : contas.aReceber} receber={aba === "receber"} hoje={hoje}
+              <Contas lista={aba === "pagar" ? contas.aPagar : contas.aReceber} receber={aba === "receber"} hoje={hoje} tutores={dados.tutores}
                 aoEditar={(c) => abrir({ tipo: "conta", de: c.tipo as Tipo, conta: c })}
                 aoBaixar={(c) => abrir({ tipo: "baixa", conta: c })}
                 aoCriar={() => abrir({ tipo: "conta", de: aba === "pagar" ? "saida" : "entrada" })} />
@@ -318,7 +330,7 @@ function Financeiro() {
                         <button key={l.id} className="g-linha" onClick={() => abrir({ tipo: "editar", lancamento: l })}>
                           <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
                           <span className="t">
-                            <b>{l.descricao || categoriaAtual(l.categoria)}</b>
+                            <b>{l.descricao || categoriaAtual(l.categoria)} <TagAlterado lancamento={l} /></b>
                             <span>{dataCurta(l.data)}{l.descricao ? ` · ${categoriaAtual(l.categoria)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {textoDoPagamento(l)}</i></span>
                           </span>
                           <span className="g-tag g-fin-so-largo">{textoDoPagamento(l)}</span>
@@ -334,6 +346,7 @@ function Financeiro() {
                 )}
               </section>
             )}
+            {aba === "lancamentos" && <Apagados linhas={dados.apagados} titulo={`Apagados de ${nomeMes(mes)}`} />}
           </>
         )}
       </div>
@@ -512,8 +525,8 @@ function Categorias({ titulo, total, linhas, vazio, quente, icone, tom }: {
   );
 }
 
-function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
-  lista: Lancamento[]; receber: boolean; hoje: string;
+function Contas({ lista, receber, hoje, tutores, aoEditar, aoBaixar, aoCriar }: {
+  lista: Lancamento[]; receber: boolean; hoje: string; tutores: Map<string, string>;
   aoEditar: (c: Lancamento) => void; aoBaixar: (c: Lancamento) => void; aoCriar: () => void;
 }) {
   if (!lista.length) {
@@ -561,6 +574,7 @@ function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
       <div className="g-lista">
         {lista.map((c) => {
           const v = c.vencimento;
+          const tutor = receber && c.cliente_id ? tutores.get(c.cliente_id) : null;
           const etiqueta = !v ? { texto: "sem data", tom: "" }
             : v < hoje ? { texto: "atrasada", tom: " vermelho" }
             : v === hoje ? { texto: "vence hoje", tom: " amarelo" }
@@ -571,15 +585,15 @@ function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
                 <span className="g-fin-so-largo"><Tile icone={v && v < hoje ? TriangleAlert : receber ? HandCoins : Receipt} tom={v && v < hoje ? "rosa" : receber ? "menta" : "manteiga"} /></span>
                 <span className="t">
                   <b>{c.descricao || c.categoria}</b>
-                  <span>{categoriaAtual(c.categoria)}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
+                  <span>{tutor ? `${tutor} · ` : ""}{categoriaAtual(c.categoria)}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
                 </span>
                 <span className="d">
                   <b>{brl(c.valor)}</b>
                   <span className={`g-tag${etiqueta.tom}`}>{etiqueta.texto}</span>
                 </span>
               </button>
-              <button className="g-btn p verde" onClick={() => aoBaixar(c)} aria-label={`Dar baixa em ${c.descricao || c.categoria}`}>
-                <Check /><span className="gf-so-largo">Dar baixa</span>
+              <button className="g-btn p verde" onClick={() => aoBaixar(c)} aria-label={`${receber ? "Recebi" : "Paguei"}: dar baixa em ${c.descricao || c.categoria}`}>
+                <Check />{receber ? "Recebi" : "Paguei"}
               </button>
             </div>
           );

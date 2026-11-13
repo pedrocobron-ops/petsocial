@@ -42,15 +42,17 @@ const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sáb
 export function contextoDoPetshop(c: Contexto) {
   const h = c.petshop.horario as Horario | null;
   const horario = [1, 2, 3, 4, 5, 6, 0].map((d) => `${DIAS[d]}: ${h?.[String(d)] ? `${h[String(d)]!.abre} às ${h[String(d)]!.fecha}` : "fechado"}`).join("; ");
+  const al = [1, 2, 3, 4, 5, 6, 0].map((d) => h?.[String(d)]?.almoco).find((x) => x?.de && x.ate);
+  const almoco = al ? `${al.de} às ${al.ate}` : null;
   const preco = (v: number | null) => (v == null ? "-" : String(v));
   const servicos = c.servicos.filter((s) => s.ativo).map((s) => `- ${s.nome} | id ${s.id} | ${s.duracao_min} min | preço por porte P ${preco(s.preco_p)}, M ${preco(s.preco_m)}, G ${preco(s.preco_g)}, GG ${preco(s.preco_gg)}`).join("\n");
   const equipe = c.equipe.filter((p) => p.ativo).map((p) => `- ${p.nome} | id ${p.id} | ${p.papel}${p.atende ? " | atende na agenda" : ""}`).join("\n");
   return `Pet shop: ${c.petshop.nome}${c.petshop.cidade ? ` (${c.petshop.cidade}${c.petshop.uf ? `/${c.petshop.uf}` : ""})` : ""}
-Funcionamento: ${horario}
+Funcionamento: ${horario}${almoco ? `\nAlmoço: fechado das ${almoco}, nos dias que continuam abertos depois (não ofereça horário nesse intervalo)` : ""}
 Serviços:
 ${servicos || "(nenhum serviço ativo)"}
 Equipe:
 ${equipe}
-Quem está falando com você: ${c.eu.nome} (${c.eu.papel}). ${c.vejoFinanceiro ? "Tem acesso ao financeiro." : "Não tem acesso ao financeiro."}
+Quem está falando com você: ${c.eu.nome} (${c.eu.papel}). ${c.cuidoDoFinanceiro ? "Tem acesso ao financeiro." : c.vejoFinanceiro ? "Recebe e opera o caixa, mas não vê o financeiro (despesas, contas a pagar, resumo do mês)." : "Não tem acesso ao financeiro."}
 ${c.equipe.filter((p) => p.ativo && p.atende).length <= 1 ? "Só uma pessoa atende: não precisa perguntar quem vai atender." : "Mais de uma pessoa atende: se a pessoa não disser quem, marque sem profissional definido."}`;
 }

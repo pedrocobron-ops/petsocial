@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { textoLembrete } from "@/lib/gestao/agenda";
+import { saudacaoZap, textoLembrete } from "@/lib/gestao/agenda";
 import { dataAmigavel, dataLonga, deIsoDia, fmtTelefone, hora, linkWhatsApp, soDigitos, somaDias, chamar } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPessoa, Esqueleto, Folha, Vazio, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
@@ -41,7 +41,7 @@ export function mensagemDoLembrete(ags: Ag[], petshop: string) {
   }
   const partes = ags.map((a) => `${a.servicos?.nome ? a.servicos.nome.toLowerCase() : "horário"} de ${a.pets?.nome ?? "seu pet"} às ${hora(a.inicio)}`);
   const lista = `${partes.slice(0, -1).join(", ")} e ${partes[partes.length - 1]}`;
-  return `${tutor ? `Oi, ${chamar(tutor)}!` : "Oi!"} Aqui é do ${petshop}. Passando para lembrar dos horários de ${dataAmigavel(ags[0].inicio)}: ${lista}. Posso confirmar?`;
+  return `${saudacaoZap(tutor, petshop)} Passando para lembrar dos horários de ${dataAmigavel(ags[0].inicio)}: ${lista}. Posso confirmar?`;
 }
 
 /** Marca o lembrete como enviado nos horários (o mesmo campo que o detalhe do horário grava). */
@@ -101,7 +101,9 @@ export default function LembretesDoDia({ dia, aoFechar, aoMudar }: { dia: string
     const ags = ok(await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id)
       .gte("inicio", data.toISOString()).lt("inicio", somaDias(data, 1).toISOString()).order("inicio")) as unknown as Ag[];
     const grupos = new Map<string, Grupo>();
-    for (const a of ags.filter(esperaLembrete)) {
+    // horário que já começou não entra: lembrar de algo que está acontecendo (ou já passou) só confunde o tutor
+    const agora = new Date();
+    for (const a of ags.filter((x) => esperaLembrete(x) && new Date(x.inicio) > agora)) {
       const c = a.pets?.clientes;
       const chave = c?.id ?? `pet-${a.pet_id}`;
       const g = grupos.get(chave) ?? { chave, nome: c?.nome ?? a.pets?.nome ?? "Sem tutor", telefone: temTelefone(a) ? c!.telefone : null, ficha: c?.id ? `/gestao/app/clientes?cliente=${c.id}` : a.pets?.id ? `/gestao/app/clientes?pet=${a.pets.id}` : null, ags: [], enviadoEm: null };

@@ -23,7 +23,7 @@ const umDia = (dow: number) => isoDia(somaDias(new Date(2024, 0, 7), dow));
 export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, aoMudar }: {
   planos: PlanoCompleto[]; novo: boolean; aoAbrirNovo: () => void; aoFecharNovo: () => void; aoMudar: () => void;
 }) {
-  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { sb, petshop, cuidoDoFinanceiro: vejoFinanceiro } = useGestao();
   const somenteLeitura = useSomenteLeitura();
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<"ativos" | "encerrados">("ativos");

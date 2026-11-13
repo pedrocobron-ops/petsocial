@@ -1,16 +1,21 @@
 "use client";
 
+import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useEffect, useState } from "react";
 import { Check, Clock, Link2, MessageCircle, X } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
-import { AvatarPet, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
+import { AvatarPessoa, AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import type { Database } from "@/lib/gestao/banco";
 import { abreNoDia } from "@/lib/gestao/creche";
-import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar } from "@/lib/gestao/util";
+import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar, semAcento } from "@/lib/gestao/util";
 import "./pedidos-link.css";
 
 type Pedido = Database["public"]["Tables"]["pedidos_agendamento"]["Row"];
-type Respondido = { pedido: Pedido; servico: string | null; resposta: "aceito" | "recusado" };
+/** `tutor` é o nome de quem ficou com o pedido (o tutor que já existia, quando a pessoa escolheu usar a ficha dele). */
+type Respondido = { pedido: Pedido; servico: string | null; resposta: "aceito" | "recusado"; tutor?: string };
+type TutorDoTelefone = { id: string; nome: string; telefone: string | null };
+/** O telefone do pedido já é de outro nome: espera a pessoa dizer se é a mesma. */
+type Duvida = { lista: Pedido[]; grupo: string; existente: TutorDoTelefone };
 
 const ESPECIE: Record<string, string> = { cao: "cão", gato: "gato", outro: "outro" };
 
@@ -67,6 +72,7 @@ export default function PedidosLink() {
   const [quem, setQuem] = useState<Record<string, string>>({});
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [respondidos, setRespondidos] = useState<Respondido[]>([]);
+  const [duvida, setDuvida] = useState<Duvida | null>(null);
 
   const { dados, recarregar } = useDados(async () =>
     ok(await sb.from("pedidos_agendamento").select("*").eq("petshop_id", petshop.id).eq("status", "pendente").order("inicio").limit(100)) as Pedido[],
@@ -90,17 +96,30 @@ export default function PedidosLink() {
   const gruposRespondidos = agrupar(respondidos, (r) => `${chaveDe(r.pedido)}:${r.resposta}`)
     .map((g) => ({ ...g, lista: [...g.lista].sort((a, b) => porHora(a.pedido, b.pedido)) }));
 
-  /** Marca os pedidos na agenda, um por um. Se algum falhar, os outros seguem e o erro aparece no fim. */
-  async function aceitar(lista: Pedido[], grupo: string) {
+  /**
+   * Marca os pedidos na agenda, um por um. Se algum falhar, os outros seguem e o erro aparece no fim.
+   * Antes, confere se o telefone do pedido já é de um tutor com outro nome: aí pergunta se é a mesma pessoa
+   * (`decisao`: "existente" usa a ficha que já existe; "novo" cria ou usa um tutor com o nome do pedido).
+   */
+  async function aceitar(lista: Pedido[], grupo: string, decisao?: { como: "existente" | "novo"; tutor?: string }) {
     if (somenteLeitura() || ocupado) return;
     const profissional = atendem.length > 1 ? quem[grupo] || undefined : atendem[0]?.id;
     setOcupado(lista.length > 1 ? grupo : lista[0].id);
+    if (!decisao) {
+      // sem resposta do banco, segue como sempre foi (o pedido entra no tutor que tem o telefone)
+      const r = await sb.rpc("pedido_tutores_do_telefone", { p_id: lista[0].id });
+      const donos = (r.error ? [] : r.data ?? []) as TutorDoTelefone[];
+      const igual = donos.findIndex((c) => semAcento(c.nome) === semAcento(lista[0].tutor_nome));
+      if (donos.length && igual < 0) { setDuvida({ lista, grupo, existente: donos[0] }); setOcupado(null); return; }
+      // já existe um tutor com esse telefone e esse nome: é ele (mesmo que não seja o mais antigo com o número)
+      decisao = { como: igual > 0 ? "novo" : "existente" };
+    }
     const feitos: Pedido[] = [];
     let falha: unknown = null;
     for (const p of lista) {
-      const args = { p_id: p.id, p_profissional: ehEstadia(p) ? undefined : profissional };
+      const args = { p_id: p.id, p_profissional: ehEstadia(p) ? undefined : profissional, p_tutor_novo: decisao.como === "novo" };
       try {
-        ok(await sb.rpc("pedido_aceitar", args));
+        ok(await sb.rpc("pedido_aceitar_como", args));
         feitos.push(p);
       } catch (e) {
         // creche ou hotel sem vaga em algum dia: o banco recusa e explica; a pessoa decide se aceita assim mesmo
@@ -113,13 +132,14 @@ export default function PedidosLink() {
         });
         if (!forcar) continue; // desistiu: o pedido segue pendente
         try {
-          ok(await sb.rpc("pedido_aceitar", { ...args, p_forcar: true }));
+          ok(await sb.rpc("pedido_aceitar_como", { ...args, p_forcar: true }));
           feitos.push(p);
         } catch (e2) { falha ??= e2; }
       }
     }
     if (feitos.length) {
-      setRespondidos((r) => [...r, ...feitos.map((p) => ({ pedido: p, servico: rotulo(p), resposta: "aceito" as const }))]);
+      const tutor = decisao.tutor;
+      setRespondidos((r) => [...r, ...feitos.map((p) => ({ pedido: p, servico: rotulo(p), resposta: "aceito" as const, tutor }))]);
       avisar(feitos.length === 1 ? (ehEstadia(feitos[0]) ? `Reserva de ${feitos[0].pet_nome} feita. Ela está em Creche e hotel.` : `Horário de ${feitos[0].pet_nome} marcado.`) : `Horários de ${listaDe(feitos.map((p) => p.pet_nome))} marcados.`);
       avisarMudanca();
     }
@@ -153,7 +173,7 @@ export default function PedidosLink() {
   /** Mensagem pronta para o tutor: cita todos os pets da mesma resposta e o horário de cada um. */
   function mensagem(lista: Respondido[]) {
     const p = lista[0].pedido;
-    const oi = `Oi, ${primeiroNome(p.tutor_nome)}! Aqui é do ${petshop.nome}.`;
+    const oi = saudacaoZap(lista[0].tutor ?? p.tutor_nome, petshop.nome);
     const nomes = listaDe(lista.map((r) => r.pedido.pet_nome));
     // endereços para o tutor: a página do pedido (confirmação) e o link para escolher outro horário (recusa)
     const base = `${window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
@@ -211,7 +231,7 @@ export default function PedidosLink() {
                     {!aceito ? (varios ? "Pedidos recusados." : "Pedido recusado.")
                       : varios ? `Marcados para ${quandoNaTela(p.inicio)}: ${listaDe(g.lista.map((r) => `${r.pedido.pet_nome} às ${hora(r.pedido.inicio)}`))}.`
                       : ehEstadia(p) ? `Reserva de ${p.tipo === "hotel" ? "hotel" : "creche"} feita: ${periodoDe(p)}.`
-                      : `Marcado para ${quandoNaTela(p.inicio)}, às ${hora(p.inicio)}.`} Avise {primeiroNome(p.tutor_nome)}.
+                      : `Marcado para ${quandoNaTela(p.inicio)}, às ${hora(p.inicio)}.`} Avise {primeiroNome(g.lista[0].tutor ?? p.tutor_nome)}.
                   </span>
                 </div>
               </div>
@@ -311,6 +331,27 @@ export default function PedidosLink() {
           );
         })}
       </div>
+
+      {duvida && (
+        <Folha titulo={`Este telefone já é de ${duvida.existente.nome}`} aoFechar={() => setDuvida(null)}
+          rodape={<>
+            <button type="button" className="g-btn sec" onClick={() => { const d = duvida; setDuvida(null); void aceitar(d.lista, d.grupo, { como: "novo" }); }}>Criar outro tutor</button>
+            <button type="button" className="g-btn pri" autoFocus onClick={() => { const d = duvida; setDuvida(null); void aceitar(d.lista, d.grupo, { como: "existente", tutor: d.existente.nome }); }}>Usar {duvida.existente.nome}</button>
+          </>}>
+          <div className="g-pilha">
+            <div className="g-card areia g-pilha p">
+              <div className="g-fila"><AvatarPessoa nome={duvida.lista[0].tutor_nome} /><div className="g-cresce"><b>{duvida.lista[0].tutor_nome}</b><div className="g-pp g-muted">quem pediu pelo link · {fmtTelefone(duvida.lista[0].telefone)}</div></div></div>
+              <div className="g-fila"><AvatarPessoa nome={duvida.existente.nome} /><div className="g-cresce"><b>{duvida.existente.nome}</b><div className="g-pp g-muted">já é cliente · {fmtTelefone(duvida.existente.telefone)}</div></div></div>
+            </div>
+            <p><b>É a mesma pessoa?</b></p>
+            <p className="g-muted g-p">
+              Se for, toque em Usar {duvida.existente.nome}: {listaDe(duvida.lista.map((x) => x.pet_nome))} {duvida.lista.length > 1 ? "entram" : "entra"} na ficha que já existe.
+              Se for outra pessoa que usa o mesmo número, toque em Criar outro tutor: {duvida.lista[0].tutor_nome} ganha uma ficha própria.
+              Fechando esta janela, o pedido continua esperando.
+            </p>
+          </div>
+        </Folha>
+      )}
     </section>
   );
 }
