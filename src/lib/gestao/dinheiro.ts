@@ -300,3 +300,20 @@ export function percentuaisQueFecham(valores: number[]): number[] {
   for (const o of ordem) { if (falta <= 0) break; pct[o.i]++; falta--; }
   return pct;
 }
+
+/* ---------- receber uma conta que estava em A receber ---------- */
+
+/**
+ * Dá baixa numa conta a receber (a mesma baixa da folha "Recebi esta conta" do Financeiro): marca como paga hoje,
+ * com a forma de pagamento, e põe no caixa aberto. Não cria lançamento novo: o dinheiro é o da própria conta.
+ * Lança erro quando a conta já tinha sido baixada. Usada pela conta do hotel (sinal e pendências recebidas junto).
+ */
+export async function receberConta(sb: Banco, petshopId: string, contaId: string, pg: { forma: FormaPagamento; pagamentos?: PartePagamento[] | null }) {
+  const caixa = await caixaAberto(sb, petshopId);
+  const dividido = pg.pagamentos && pg.pagamentos.length > 1 ? pg.pagamentos : null;
+  const r = await sb.from("lancamentos").update({ pago: true, data: isoDia(new Date()), forma: pg.forma, pagamentos: dividido, caixa_id: caixa?.id ?? null })
+    .eq("id", contaId).eq("petshop_id", petshopId).eq("pago", false).select().maybeSingle();
+  if (r.error) throw new Error(r.error.message);
+  if (!r.data) throw new Error("Esta conta já tinha sido baixada.");
+  return r.data;
+}
