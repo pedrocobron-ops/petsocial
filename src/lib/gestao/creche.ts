@@ -191,6 +191,8 @@ const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Mensalidade sugerida para o mês: cheia, ou proporcional aos dias do plano quando ele começa no meio do mês ou tem pausa no mês.
+ * Dia que o negócio não abre fica fora da conta dos dois lados (não é dia do plano): tanto o dia da semana fechado quanto a
+ * data marcada como fechada (feriado, folga). Por isso feriado no mês não muda a mensalidade.
  * (Mesma conta de `creche_sugestao_mensal` no banco.)
  */
 export function sugestaoDoMes(plano: Vigencia, mes: Date, valor: number, horario: unknown) {
@@ -198,7 +200,7 @@ export function sugestaoDoMes(plano: Vigencia, mes: Date, valor: number, horario
   let todos = 0, restam = 0;
   for (let d = primeiroDoMes(mes); isoDia(d) <= ate; d = somaDias(d, 1)) {
     const dia = isoDia(d);
-    if (!plano.dias.includes(d.getDay()) || !abreNoDia(horario, dia)) continue;
+    if (!plano.dias.includes(d.getDay()) || !abreNoDia(horario, dia) || diaFechado(dia)) continue;
     todos++;
     if (dia >= plano.inicio && !emPausa(plano, dia)) restam++;
   }
@@ -228,6 +230,22 @@ export function extrasDaCobranca(c: Pick<Cobranca, "extras">): ExtraCobrado[] {
   });
 }
 
+/** As taxas de busca fora do horário que entraram na cobrança (quem recebe mandou para a mensalidade). */
+export function taxasDaCobranca(c: Pick<Cobranca, "taxas">): ExtraCobrado[] {
+  if (!Array.isArray(c.taxas)) return [];
+  return (c.taxas as unknown[]).flatMap((x) => {
+    const e = x as { dia?: unknown; valor?: unknown };
+    return typeof e?.dia === "string" ? [{ dia: e.dia, valor: Number(e.valor ?? 0) || 0 }] : [];
+  });
+}
+/** `valor_extras` soma os dias extras e as taxas de busca fora do horário: aqui, cada parte. */
+export function partesDosExtras(c: Pick<Cobranca, "taxas" | "valor_extras">) {
+  const taxas = centavos(taxasDaCobranca(c).reduce((s, x) => s + x.valor, 0));
+  return { dias: centavos(Math.max(0, Number(c.valor_extras) - taxas)), taxas };
+}
+/** "1 taxa de busca fora do horário" */
+export const textoDasTaxas = (n: number) => (n === 1 ? "1 taxa de busca fora do horário" : `${n} taxas de busca fora do horário`);
+
 export type CobrancaCompleta = Cobranca & {
   pets: (Pick<Pet, "id" | "nome" | "foto" | "especie"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null }) | null;
   lancamentos: { id: string; valor: number; pago: boolean; data: string; vencimento: string | null; forma: string | null; pagamentos: unknown } | null;
@@ -255,9 +273,10 @@ export const textoDasDatas = (dias: string[]) => juntar(dias.map((d) => dataCurt
 
 /** Linha de um pet na mensagem: "Thor: mensalidade R$ 600,00 + 2 dias extras (03/10 e 17/10) R$ 120,00 = R$ 720,00". */
 function linhaDaMensagem(c: CobrancaCompleta) {
-  const extras = extrasDaCobranca(c);
+  const extras = extrasDaCobranca(c), taxas = taxasDaCobranca(c), valores = partesDosExtras(c);
   const partes = [`mensalidade ${brl(c.valor_mensal)}`];
-  if (extras.length) partes.push(`${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((e) => e.dia))})${Number(c.valor_extras) > 0 ? ` ${brl(c.valor_extras)}` : ""}`);
+  if (extras.length) partes.push(`${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((e) => e.dia))})${valores.dias > 0 ? ` ${brl(valores.dias)}` : ""}`);
+  if (taxas.length) partes.push(`${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((e) => e.dia))}) ${brl(valores.taxas)}`);
   let texto = partes.join(" + ");
   if (Number(c.desconto) > 0) texto += ` - desconto ${brl(c.desconto)}`;
   if (partes.length > 1 || Number(c.desconto) > 0) texto += ` = ${brl(c.total)}`;

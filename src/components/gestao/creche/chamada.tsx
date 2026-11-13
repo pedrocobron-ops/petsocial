@@ -11,8 +11,10 @@ import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
+import { FolhaTaxaDeAtraso, lerAtraso, type AtrasoPendente } from "./atraso";
 import { DiasDoPlano } from "./resumo-mes";
 import "./creche.css";
+import "@/components/gestao/hotel/hotel.css";
 
 type Acao = "chegou" | "extra" | "reposicao" | "saiu" | "faltou" | "desfazer";
 type Saude = { vacinas: string[]; outros: string[] };
@@ -44,13 +46,15 @@ async function saudeVencida(sb: ReturnType<typeof useGestao>["sb"], petshopId: s
  * Chamada do dia: os mensalistas esperados pelo plano, com um toque para Chegou, Saiu ou Faltou, e Desfazer em cada um.
  * Quem vem fora do dia entra como dia extra (vai para a cobrança do mês) ou como reposição de falta (não cobra).
  * Nada de dinheiro aqui: a chegada de um mensalista não cobra diária.
+ * Saída depois do horário, com a taxa de busca fora do horário ligada: o banco anota (sem valor). Quem recebe vê a pergunta
+ * "Cobrar / Não cobrar" na hora; quem não mexe com dinheiro só é avisado de que a saída ficou para quem recebe decidir.
  */
 export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: {
   planos: PlanoCompleto[]; vagasHoje: { ocupadas: number; total: number } | null; aoNovoMensalista: () => void;
   /** faixa opcional acima da lista (abriu vaga para quem está na lista de espera) */
   aviso?: React.ReactNode;
 }) {
-  const { sb, petshop, souDono } = useGestao();
+  const { sb, petshop, souDono, vejoFinanceiro } = useGestao();
   const { calendario } = useCalendario(); // dia marcado como fechado: ninguém é esperado e ninguém leva falta
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
@@ -61,6 +65,9 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
   // com "Quem pode buscar" ligado, o Saiu pergunta antes quem levou o pet
   const comPortaria = portariaLigada(petshop);
   const [buscando, setBuscando] = useState<LinhaChamada | null>(null);
+  // saída fora do horário: a pergunta da taxa, só para quem recebe
+  const [taxa, setTaxa] = useState<AtrasoPendente | null>(null);
+  const valorDaTaxa = vejoFinanceiro && calendario?.atraso.ativo ? calendario.atraso.creche.valor : null;
   const ehHoje = dia === hoje;
   const minimo = primeiroDia(agora);
 
@@ -87,12 +94,17 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
     const nome = plano.pets?.nome ?? "O pet";
     setOcupado(plano.id);
     try {
-      const r = ok(await sb.rpc("creche_chamada", { p_plano: plano.id, p_dia: dia, p_acao: acao, p_avisou: opcoes.avisou ?? false, p_forcar: opcoes.forcar ?? false })) as { repetido?: boolean };
+      const r = ok(await sb.rpc("creche_chamada", { p_plano: plano.id, p_dia: dia, p_acao: acao, p_avisou: opcoes.avisou ?? false, p_forcar: opcoes.forcar ?? false })) as { repetido?: boolean; atraso?: boolean; estadia?: string };
       if (r.repetido) avisar("Outra pessoa já tinha marcado. Atualizei a chamada.");
       else if (acao === "chegou") avisar(ehHoje ? `${nome} chegou.` : `${nome}: presença marcada em ${dataAmigavel(dia)}.`);
       else if (acao === "extra") avisar(`${nome}: dia extra anotado. Entra na cobrança do mês.`);
       else if (acao === "reposicao") avisar(`${nome}: reposição anotada, sem cobrança.`);
-      else if (acao === "saiu") avisar(`${nome} foi para casa.`);
+      else if (acao === "saiu" && r.atraso) {
+        // saiu depois do horário: quem recebe decide a taxa agora; os outros só ficam sabendo que ficou anotado (sem valor)
+        const a = valorDaTaxa && r.estadia ? await lerAtraso(sb, r.estadia) : null;
+        if (a) { avisar(`${nome} foi para casa.`); setTaxa(a); }
+        else avisar(`${nome} foi para casa. A saída foi depois do horário: ficou anotada em Check-outs para cobrar, para quem cuida do caixa decidir a taxa.`);
+      } else if (acao === "saiu") avisar(`${nome} foi para casa.`);
       else if (acao === "faltou") avisar(opcoes.avisou ? `${nome}: falta com aviso.` : `${nome}: falta marcada.`);
       else avisar("Desfeito.");
       await recarregar();
@@ -126,10 +138,11 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
       faltam.length ? `marca falta para ${faltam.length === 1 ? "1 que não veio" : `${faltam.length} que não vieram`} (${faltam.slice(0, 4).map((l) => l.plano.pets?.nome).join(", ")}${faltam.length > 4 ? "…" : ""})` : "",
     ].filter(Boolean).join(" e ");
     if (!(await confirmar({ titulo: ehHoje ? "Encerrar a chamada de hoje?" : "Encerrar a chamada deste dia?", texto: `Isto ${partes}. Nada é cobrado. Dá para desfazer um por um depois.`, confirmar: "Encerrar a chamada" }))) return;
-    let saidas = 0, faltas = 0;
-    for (const l of naCasa) { const r = await sb.rpc("creche_chamada", { p_plano: l.plano.id, p_dia: dia, p_acao: "saiu" }); if (!r.error) saidas++; }
+    let saidas = 0, faltas = 0, atrasos = 0;
+    for (const l of naCasa) { const r = await sb.rpc("creche_chamada", { p_plano: l.plano.id, p_dia: dia, p_acao: "saiu" }); if (!r.error) { saidas++; if ((r.data as { atraso?: boolean } | null)?.atraso) atrasos++; } }
     for (const l of faltam) { const r = await sb.rpc("creche_chamada", { p_plano: l.plano.id, p_dia: dia, p_acao: "faltou" }); if (!r.error) faltas++; }
-    avisar([saidas ? `${saidas === 1 ? "1 saída" : `${saidas} saídas`}` : "", faltas ? `${faltas === 1 ? "1 falta" : `${faltas} faltas`}` : ""].filter(Boolean).join(" e ") + " na chamada.");
+    avisar([saidas ? `${saidas === 1 ? "1 saída" : `${saidas} saídas`}` : "", faltas ? `${faltas === 1 ? "1 falta" : `${faltas} faltas`}` : ""].filter(Boolean).join(" e ") + " na chamada."
+      + (atrasos ? ` ${atrasos === 1 ? "1 saída foi" : `${atrasos} saídas foram`} depois do horário: ${atrasos === 1 ? "ficou" : "ficaram"} em Check-outs para cobrar, para ${vejoFinanceiro ? "você decidir" : "quem cuida do caixa decidir"} a taxa.` : ""));
     await recarregar(); avisarMudanca();
   }
 
@@ -175,7 +188,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
 
           {!linhas.length ? (
             <p className="g-muted g-centro" style={{ padding: "28px 8px" }}>
-              {diaFechado(dia) ? `${fraseDoDiaFechado(dia)}. Ninguém é esperado e ninguém leva falta (a lista fica em Meu pet shop, em Feriados e dias fechados).` : !abre ? "Pelo horário de Meu pet shop, a creche não abre neste dia." : "Nenhum mensalista tem plano para este dia da semana."}
+              {diaFechado(dia) ? `${fraseDoDiaFechado(dia)}. Ninguém é esperado e ninguém leva falta (a lista fica em Meu pet shop, em Feriados e dias fechados). Se algum mensalista veio mesmo assim, toque em Veio fora do dia.` : !abre ? "Pelo horário de Meu pet shop, a creche não abre neste dia." : "Nenhum mensalista tem plano para este dia da semana."}
             </p>
           ) : (
             <div className="g-cm-chamada">
@@ -254,6 +267,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
 
       {buscando?.presenca && <QuemBuscou key={buscando.presenca.id} estadia={{ id: buscando.presenca.id, pets: buscando.plano.pets }} aoFechar={() => setBuscando(null)}
         aoSeguir={async () => { const l = buscando; setBuscando(null); await marcar(l.plano, "saiu"); }} />}
+      {taxa && valorDaTaxa && <FolhaTaxaDeAtraso key={taxa.estadia_id} atraso={taxa} valor={valorDaTaxa} aoFechar={() => { setTaxa(null); avisarMudanca(); }} aoDecidir={() => { setTaxa(null); avisarMudanca(); }} />}
       {fora && dados && <ForaDoDia planos={planos} dia={dia} jaVieram={new Set(linhas.map((l) => l.plano.id))} saude={dados.saude}
         cheia={ehHoje && vagas != null && ocupadas != null && ocupadas >= vagas ? { ocupadas: ocupadas!, vagas } : null}
         aoFechar={() => setFora(false)} aoMarcar={async (p, reposicao) => { if (await marcar(p, reposicao ? "reposicao" : "extra")) setFora(false); }} />}
@@ -272,6 +286,10 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
   const [escolhido, setEscolhido] = useState<PlanoCompleto | null>(null);
   const [reposicao, setReposicao] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  // dia marcado como fechado: ninguém tem esse dia no plano. Quem vier só vira dia extra se a pessoa escolher (nada vem marcado).
+  const fechado = fraseDoDiaFechado(dia);
+  const [conta, setConta] = useState<"extra" | "sem" | null>(null);
+  const semCobrar = fechado ? conta === "sem" : reposicao;
   const alvo = semAcento(q);
   // só os mensalistas que não são esperados neste dia e ainda não foram marcados
   const lista = planos.filter((p) => p.pets?.ativo && planoVale(p, dia) && !jaVieram.has(p.id) && !esperadoNoDia(p, dia, petshop.horario))
@@ -280,26 +298,28 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
   const s = escolhido ? saude.get(escolhido.pet_id) : undefined;
 
   async function salvar() {
-    if (!escolhido || salvando) return;
+    if (!escolhido || salvando || (fechado && !conta)) return;
     if (cheia && !(await confirmar({
       titulo: `Casa cheia (${cheia.ocupadas} de ${cheia.vagas})`,
       texto: `A creche já está com todas as vagas de hoje tomadas, contando os mensalistas que ainda vão chegar. Receber ${escolhido.pets?.nome ?? "o pet"} passando do limite?`,
       confirmar: "Passar do limite", perigo: true,
     }))) return;
     setSalvando(true);
-    await aoMarcar(escolhido, reposicao);
+    await aoMarcar(escolhido, semCobrar);
     setSalvando(false);
   }
 
   return (
     <Folha titulo="Veio fora do dia" aoFechar={aoFechar}
       rodape={escolhido ? <>
-        <button className="g-btn sec" onClick={() => setEscolhido(null)}>Voltar</button>
-        <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : reposicao ? "Marcar reposição" : "Marcar dia extra"}</button>
+        <button className="g-btn sec" onClick={() => { setEscolhido(null); setConta(null); }}>Voltar</button>
+        <button className="g-btn pri" onClick={salvar} disabled={salvando || Boolean(fechado && !conta)}>{salvando ? "Salvando…" : fechado ? (conta === "extra" ? "Marcar dia extra" : conta === "sem" ? "Marcar sem cobrança" : "Escolha como conta") : reposicao ? "Marcar reposição" : "Marcar dia extra"}</button>
       </> : <button className="g-btn sec" onClick={aoFechar}>Fechar</button>}>
       {!escolhido ? (
         <div className="g-pilha p">
-          <p className="g-muted g-p">Mensalistas que não têm {dataAmigavel(dia) === "hoje" ? "hoje" : `${dataAmigavel(dia)}`} no plano. Toque em quem veio.</p>
+          {fechado
+            ? <p className="g-muted g-p"><b>{fechado}.</b> Neste dia ninguém é esperado e o dia não é do plano de ninguém. Se algum mensalista veio mesmo assim, toque nele e diga como o dia conta.</p>
+            : <p className="g-muted g-p">Mensalistas que não têm {dataAmigavel(dia) === "hoje" ? "hoje" : `${dataAmigavel(dia)}`} no plano. Toque em quem veio.</p>}
           <div className="g-busca"><Search /><input className="g-input" type="search" placeholder="Nome do pet ou do tutor" value={q} onChange={(e) => setQ(e.target.value)} /></div>
           <div className="g-lista">
             {lista.map((p) => (
@@ -321,14 +341,31 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
           </div>
           {s?.vacinas.length ? <div className="g-aviso vermelho" role="alert" style={{ marginBottom: 0 }}><Syringe /><span className="g-cresce"><b>Vacina vencida:</b> {s.vacinas.join(", ")}.{petshop.creche_bloqueia_vacina ? " O bloqueio está ligado: só o dono libera a entrada." : " Confira a carteirinha."}</span></div> : null}
           {escolhido.pets?.alertas && <div className="g-aviso vermelho" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce"><b>Atenção:</b> {escolhido.pets.alertas}</span></div>}
-          <label className="g-check">
-            <input type="checkbox" checked={reposicao} onChange={(e) => setReposicao(e.target.checked)} />
-            <span>É reposição de falta (não cobrar)</span>
-          </label>
-          <p className="g-muted g-p">
-            {reposicao ? "O dia fica anotado como reposição e não entra na cobrança."
-              : "O dia fica anotado como dia extra e entra na cobrança do mês que vem. Nada é cobrado na porta."}
-          </p>
+          {fechado ? (
+            <div className={`g-ht-atraso${conta ? " ok" : ""}`} role="group" aria-label="Como conta este dia">
+              <p><b>{fechado}.</b> Este dia não está no plano. Como ele conta para {escolhido.pets?.nome ?? "o pet"}?</p>
+              <div className="g-seg g-ht-seg" role="group">
+                <button type="button" aria-pressed={conta === "extra"} onClick={() => setConta("extra")}>Cobrar como dia extra</button>
+                <button type="button" aria-pressed={conta === "sem"} onClick={() => setConta("sem")}>Não cobrar</button>
+              </div>
+              <p className="g-pp">
+                {conta === "extra" ? "O dia fica anotado como dia extra e entra na cobrança do mês que vem. Nada é cobrado na porta."
+                  : conta === "sem" ? "O dia fica anotado como reposição, sem cobrança."
+                  : "Nada vem marcado: o dia só vira dia extra se você escolher."}
+              </p>
+            </div>
+          ) : (
+            <>
+              <label className="g-check">
+                <input type="checkbox" checked={reposicao} onChange={(e) => setReposicao(e.target.checked)} />
+                <span>É reposição de falta (não cobrar)</span>
+              </label>
+              <p className="g-muted g-p">
+                {reposicao ? "O dia fica anotado como reposição e não entra na cobrança."
+                  : "O dia fica anotado como dia extra e entra na cobrança do mês que vem. Nada é cobrado na porta."}
+              </p>
+            </>
+          )}
         </div>
       )}
     </Folha>

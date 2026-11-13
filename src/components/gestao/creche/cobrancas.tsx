@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Ban, CalendarClock, Check, ChevronLeft, ChevronRight, CircleCheck, HandCoins, MessageCircle, Pencil, RotateCcw, TriangleAlert, Undo2 } from "lucide-react";
 import {
-  cobraNoMes, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, SELECT_COBRANCA, sugestaoDoMes, textoDasDatas, vencimentoDoMes,
+  cobraNoMes, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, partesDosExtras, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, vencimentoDoMes,
   type CobrancaCompleta, type EstadoCobranca, type PlanoCompleto,
 } from "@/lib/gestao/creche";
 import { textoDoPagamento } from "@/lib/gestao/dinheiro";
@@ -181,7 +181,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
                         </div>
                         <div className="g-cm-itens">
                           {g.cobrancas.map((c) => {
-                            const e = estadoDaCobranca(c, hoje), extras = extrasDaCobranca(c);
+                            const e = estadoDaCobranca(c, hoje), extras = extrasDaCobranca(c), taxas = taxasDaCobranca(c), partes = partesDosExtras(c);
                             return (
                               <div key={c.id} className="g-cm-item">
                                 <AvatarPet pet={c.pets ?? { nome: "?" }} tamanho="p" />
@@ -189,7 +189,8 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
                                   <b>{c.pets?.nome ?? "Pet removido"} <span className="g-tab">{brl(c.total)}</span></b>
                                   <span>
                                     {c.mes !== mesIso ? `${nomeMes(deIsoDia(c.mes))} · ` : ""}Mensalidade {brl(c.valor_mensal)}{Number(c.valor_mensal) < Number(c.valor_cheio) ? " (proporcional)" : ""}
-                                    {extras.length ? ` + ${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})${Number(c.valor_extras) > 0 ? ` ${brl(c.valor_extras)}` : " sem valor"}` : ""}
+                                    {extras.length ? ` + ${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})${partes.dias > 0 ? ` ${brl(partes.dias)}` : " sem valor"}` : ""}
+                                    {taxas.length ? ` + ${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((x) => x.dia))}) ${brl(partes.taxas)}` : ""}
                                     {Number(c.desconto) > 0 ? ` − desconto ${brl(c.desconto)}` : ""}
                                   </span>
                                   <span className="selos">
@@ -284,7 +285,7 @@ function MensagemDeCobranca({ grupo, texto: inicial, aoFechar, aoMandar }: { gru
 
 /* ---------- gerar as cobranças do mês ---------- */
 
-type LinhaGerar = { plano: PlanoCompleto; valor: number | null; sugestao: ReturnType<typeof sugestaoDoMes> | null; extras: string[]; unit: number; vencimento: string };
+type LinhaGerar = { plano: PlanoCompleto; valor: number | null; sugestao: ReturnType<typeof sugestaoDoMes> | null; extras: string[]; unit: number; taxas: { dia: string; valor: number }[]; vencimento: string };
 
 function GerarCobrancas({ mes, planos, aoFechar, aoGerar }: { mes: Date; planos: PlanoCompleto[]; aoFechar: () => void; aoGerar: () => Promise<void> }) {
   const { sb, petshop } = useGestao();
@@ -302,18 +303,26 @@ function GerarCobrancas({ mes, planos, aoFechar, aoGerar }: { mes: Date; planos:
     for (const e of r) mapa.set(e.pet_id, [...(mapa.get(e.pet_id) ?? []), e.dia!]);
     return mapa;
   }, [petshop.id, mesIso, planos.length]);
+  // taxas de busca fora do horário de meses anteriores que foram mandadas para a mensalidade e ainda não entraram em nenhuma cobrança
+  const { dados: taxas } = useDados(async () => {
+    const mapa = new Map<string, { dia: string; valor: number }[]>();
+    if (!planos.length) return mapa;
+    const r = await sb.from("creche_atrasos").select("pet_id, dia, valor").eq("petshop_id", petshop.id).eq("estado", "mensalidade").is("cobranca_id", null).lt("dia", mesIso).order("dia").limit(1000);
+    for (const a of r.data ?? []) mapa.set(a.pet_id, [...(mapa.get(a.pet_id) ?? []), { dia: a.dia, valor: Number(a.valor ?? 0) }]);
+    return mapa;
+  }, [petshop.id, mesIso, planos.length]);
 
   const diaria = petshop.diaria_creche == null ? 0 : Number(petshop.diaria_creche);
   const linhas: LinhaGerar[] = planos.map((plano) => {
     const sugestao = plano.valor_mensal == null ? null : sugestaoDoMes(plano, mes, plano.valor_mensal, petshop.horario);
     return {
       plano, sugestao, valor: plano.id in valores ? valores[plano.id] : sugestao?.valor ?? null,
-      extras: extras?.get(plano.pet_id) ?? [], unit: plano.valor_extra ?? diaria, vencimento: vencimentoDoMes(plano, mes),
+      extras: extras?.get(plano.pet_id) ?? [], unit: plano.valor_extra ?? diaria, taxas: taxas?.get(plano.pet_id) ?? [], vencimento: vencimentoDoMes(plano, mes),
     };
   }).sort((a, b) => (a.plano.pets?.nome ?? "").localeCompare(b.plano.pets?.nome ?? "", "pt-BR"));
   const prontas = linhas.filter((l) => l.plano.temValor && l.valor != null);
   const semValor = linhas.filter((l) => !l.plano.temValor);
-  const totalDe = (l: LinhaGerar) => centavos((l.valor ?? 0) + l.extras.length * l.unit);
+  const totalDe = (l: LinhaGerar) => centavos((l.valor ?? 0) + l.extras.length * l.unit + l.taxas.reduce((s, x) => s + x.valor, 0));
   const total = centavos(prontas.reduce((s, l) => s + totalDe(l), 0));
 
   async function gerar() {
@@ -335,7 +344,7 @@ function GerarCobrancas({ mes, planos, aoFechar, aoGerar }: { mes: Date; planos:
     <Folha larga titulo={`Gerar cobranças de ${nomeMes(mes)}`} aoFechar={aoFechar}
       rodape={<>
         <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button className="g-btn pri" onClick={gerar} disabled={salvando || !prontas.length || carregando}>
+        <button className="g-btn pri" onClick={gerar} disabled={salvando || !prontas.length || carregando || !taxas}>
           {salvando ? "Gerando…" : prontas.length ? `Gerar ${prontas.length === 1 ? "1 cobrança" : `${prontas.length} cobranças`} · ${brl(total)}` : "Nada para gerar"}
         </button>
       </>}>
@@ -343,7 +352,7 @@ function GerarCobrancas({ mes, planos, aoFechar, aoGerar }: { mes: Date; planos:
         <Vazio titulo={`As cobranças de ${nomeMes(mes)} já foram geradas`} texto="Todo mensalista com plano neste mês já tem cobrança. Se entrar um mensalista novo, volte aqui: só a dele é criada." />
       ) : carregando && !extras ? <Esqueleto linhas={3} /> : (
         <div className="g-pilha">
-          <p className="g-muted g-p">Uma cobrança por mensalista: a mensalidade, mais os dias extras de meses anteriores que ainda não foram cobrados. Quem já tem cobrança em {nomeMes(mes)} não entra de novo. As de mensalidade cheia do mês corrente já são criadas quando você abre esta tela; aqui ficam as que pedem conferência.</p>
+          <p className="g-muted g-p">Uma cobrança por mensalista: a mensalidade, mais os dias extras e as taxas de busca fora do horário de meses anteriores que ainda não foram cobrados. Quem já tem cobrança em {nomeMes(mes)} não entra de novo. As de mensalidade cheia do mês corrente já são criadas quando você abre esta tela; aqui ficam as que pedem conferência.</p>
           <div className="g-cm-gerar">
             {prontas.map((l) => (
               <div key={l.plano.id} className="g-cm-gerar-linha">
@@ -355,6 +364,7 @@ function GerarCobrancas({ mes, planos, aoFechar, aoGerar }: { mes: Date; planos:
                     <span className="g-cm-prorata">{l.plano.inicio > mesIso ? `Começou em ${dataCurta(l.plano.inicio)}` : "Plano com pausa no mês"}: {l.sugestao.restam} de {l.sugestao.todos} dias do plano no mês. Sugestão: {brl(l.sugestao.valor)} (a mensalidade cheia é {brl(l.plano.valor_mensal)}). Mude o valor se combinou outro.</span>
                   )}
                   {l.extras.length > 0 && <span>{l.extras.length === 1 ? "1 dia extra" : `${l.extras.length} dias extras`} ({textoDasDatas(l.extras)}){l.unit > 0 ? `: ${brl(l.extras.length * l.unit)}` : ": sem preço de dia extra definido"}</span>}
+                  {l.taxas.length > 0 && <span>{textoDasTaxas(l.taxas.length)} ({textoDasDatas(l.taxas.map((x) => x.dia))}): {brl(centavos(l.taxas.reduce((s, x) => s + x.valor, 0)))}</span>}
                 </div>
                 <div className="valor">
                   {l.sugestao?.proporcional
@@ -387,7 +397,7 @@ function EditarCobranca({ cobranca: c, aoFechar, aoSalvo }: { cobranca: Cobranca
   const [obs, setObs] = useState(c.obs ?? "");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const extras = extrasDaCobranca(c);
+  const extras = extrasDaCobranca(c), taxas = taxasDaCobranca(c), partes = partesDosExtras(c);
   const total = centavos((valor ?? 0) + Number(c.valor_extras) - (desconto ?? 0));
 
   async function salvar() {
@@ -406,7 +416,7 @@ function EditarCobranca({ cobranca: c, aoFechar, aoSalvo }: { cobranca: Cobranca
     if (salvando) return;
     if (!(await confirmar({
       titulo: `Cancelar a cobrança de ${c.pets?.nome ?? "pet"}?`,
-      texto: `A conta de ${brl(c.total)} sai de A receber.${extras.length ? " Os dias extras voltam a ficar sem cobrança e entram na próxima." : ""} Gerar as cobranças de novo não recria esta: para trazer de volta, use Gerar de novo em Canceladas.`,
+      texto: `A conta de ${brl(c.total)} sai de A receber.${extras.length || taxas.length ? ` ${[extras.length ? "Os dias extras" : "", taxas.length ? (extras.length ? "as taxas de busca fora do horário" : "As taxas de busca fora do horário") : ""].filter(Boolean).join(" e ")} voltam a ficar sem cobrança e entram na próxima.` : ""} Gerar as cobranças de novo não recria esta: para trazer de volta, use Gerar de novo em Canceladas.`,
       confirmar: "Cancelar cobrança", perigo: true,
     }))) return;
     setSalvando(true);
@@ -426,7 +436,10 @@ function EditarCobranca({ cobranca: c, aoFechar, aoSalvo }: { cobranca: Cobranca
           <Campo rotulo="Desconto" dica="Opcional"><CampoValor valor={desconto} aoMudar={(v) => { setDesconto(v); setErro(null); }} /></Campo>
         </div>
         {extras.length > 0 && (
-          <p className="g-p"><b>{extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`}:</b> {textoDasDatas(extras.map((x) => x.dia))} · {Number(c.valor_extras) > 0 ? brl(c.valor_extras) : "sem valor"}</p>
+          <p className="g-p"><b>{extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`}:</b> {textoDasDatas(extras.map((x) => x.dia))} · {partes.dias > 0 ? brl(partes.dias) : "sem valor"}</p>
+        )}
+        {taxas.length > 0 && (
+          <p className="g-p"><b>{textoDasTaxas(taxas.length)}:</b> {textoDasDatas(taxas.map((x) => x.dia))} · {brl(partes.taxas)}</p>
         )}
         <Campo rotulo="Vencimento"><input type="date" className="g-input" value={vencimento} onChange={(e) => { setVencimento(e.target.value); setErro(null); }} /></Campo>
         <Campo rotulo="Observação" dica="Só para vocês. Não vai na mensagem.">
