@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, BedDouble, CalendarDays, CalendarClock, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
+  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
 import { useGestao } from "./contexto";
 import { planoPorId, temCheckout } from "@/lib/gestao/planos";
@@ -18,6 +18,7 @@ import { rotaForaDoMenu } from "@/lib/gestao/modulos";
 import type { Tom } from "./painel";
 import Assistente from "./assistente";
 import Ajuda from "./ajuda";
+import AjudaDaTela from "./manual/ajuda-da-tela";
 import GuiaInicial from "./guia-inicial";
 import LogoLoja from "./logo-loja";
 import { aplicarTema } from "@/lib/gestao/identidade";
@@ -43,6 +44,7 @@ const GRUPOS: { titulo: string; itens: Item[] }[] = [
     { href: "/gestao/app/assinatura", rotulo: "Assinatura", icone: CreditCard, tom: "manteiga", so: "dono" },
   ] },
   { titulo: "Aprender", itens: [
+    { href: "/gestao/app/manual", rotulo: "Manual", icone: BookOpen, tom: "ceu" },
     { href: "/gestao/app/escola", rotulo: "Escola de Gestão", icone: GraduationCap, tom: "manteiga", so: "dono" },
   ] },
 ];
@@ -167,6 +169,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           <div className="g-barra-marca"><LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={34} padrao="selo" tomSelo="verde" /><span>{petshop.nome}</span></div>
           {aqui && <div className="g-barra-onde"><span className={`g-tile p ${aqui.item.tom}`} aria-hidden><aqui.item.icone /></span><span>{aqui.grupo} / <b>{aqui.item.rotulo}</b></span></div>}
           {posso("clientes") ? <BuscaGeral /> : <span style={{ flex: 1 }} />}
+          <AjudaDaTela aoPerguntar={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }} />
           <div className="g-barra-data"><CalendarClock />{dataLonga(new Date())}</div>
         </div>
         {!liberado && !cartaoNoHoje && (
