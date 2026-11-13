@@ -1,5 +1,8 @@
 "use client";
 
+import { CalendarCheck2, UserX } from "lucide-react";
+import { CATEGORIA_MENSALIDADE, resumoDaCrecheHoje } from "@/lib/gestao/creche";
+
 import { Marca, Selo } from "@/components/gestao/marca";
 import { Anel, Barras, Kpi, Ranking, Tendencia, Tile, type Tom } from "@/components/gestao/painel";
 import { useState } from "react";
@@ -58,7 +61,7 @@ export default function Hoje() {
       sb.from("pets").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
       sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
       vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).eq("data", hojeIso) : Promise.resolve({ data: [] }),
-      vejoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento, tipo").eq("petshop_id", petshop.id).eq("pago", false).lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
+      vejoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento, tipo, categoria").eq("petshop_id", petshop.id).eq("pago", false).lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
       vejoPacotes ? sb.from("pacotes_clientes").select("id").eq("petshop_id", petshop.id).eq("ativo", true).gte("vence_em", hojeIso).lte("vence_em", isoDia(somaDias(hoje, 7))) : Promise.resolve({ data: [] }),
       sb.from("agendamentos").select("inicio, status").eq("petshop_id", petshop.id).gte("inicio", seg.toISOString()).lt("inicio", somaDias(seg, 7).toISOString()),
       lerTudo((de, ate, contar) => sb.from("agendamentos").select("status, servicos(nome, cor)", contando(contar)).eq("petshop_id", petshop.id).gte("inicio", ha30.toISOString()).lt("inicio", amanha.toISOString()).order("inicio").order("id").range(de, ate)).then((data) => ({ data })),
@@ -70,6 +73,7 @@ export default function Hoje() {
       sb.from("produtos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
     ]);
     const saude = await buscarSaudeVencendo(sb, petshop.id).catch(() => null);
+    const creche = casa && usaModulo(petshop, "creche") ? await resumoDaCrecheHoje(sb, petshop, vejoFinanceiro, liberado).catch(() => null) : null;
     const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
     const porServico = new Map<string, { rotulo: string; valor: number; cor: string | null }>();
     for (const a of (doMes.data ?? []) as unknown as { status: string; servicos: { nome: string; cor: string | null } | null }[]) {
@@ -104,9 +108,11 @@ export default function Hoje() {
       entrou: (entradas.data ?? []).filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0),
       saiu: (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0),
       contas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "saida"),
-      aReceberVencidas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "entrada"),
+      // as mensalidades da creche têm a linha delas (com o atalho para Cobranças)
+      aReceberVencidas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string; categoria?: string }[]).filter((c) => c.tipo === "entrada" && c.categoria !== CATEGORIA_MENSALIDADE),
       pacotesVencendo: (pacotes.data ?? []).length,
       saude,
+      creche,
       semana: Array.from({ length: 7 }, (_, i) => {
         const d = somaDias(seg, i), iso = isoDia(d);
         return { rotulo: nomeDiaCurto(d), valor: (daSemana.data ?? []).filter((a) => valeAg(a.status) && isoDia(new Date(a.inicio)) === iso).length };
@@ -117,7 +123,7 @@ export default function Hoje() {
         return ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data === iso).reduce((t, l) => t + Number(l.valor), 0);
       }),
     };
-  }, [petshop.id, hojeIso, vejoFinanceiro, vejoEstoque, vejoPacotes]);
+  }, [petshop.id, hojeIso, vejoFinanceiro, vejoEstoque, vejoPacotes, casa]);
 
   // quem chamar de volta e aniversariantes: consulta à parte, para não segurar o resto da tela
   const vejoClientes = posso("clientes");
@@ -167,7 +173,12 @@ export default function Hoje() {
     : !ativos.length ? `Nenhum horário marcado para hoje.${linhaCasa ? ` ${linhaCasa}.` : ""}`
     : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? ", todos concluídos" : ""}.`;
 
+  const cr = dados?.creche ?? null;
   const atencao = dados ? [
+    cr && cr.esperados > 0 && { icone: CalendarCheck2, tom: "manteiga" as Tom, texto: `Chamada de hoje: ${cr.esperados === 1 ? "1 cão esperado" : `${cr.esperados} cães esperados`}${cr.aindaNao > 0 ? `, ${cr.aindaNao === 1 ? "1 ainda não chegou" : `${cr.aindaNao} ainda não chegaram`}` : ", chamada feita"}.`, href: "/gestao/app/creche-hotel?ver=chamada" },
+    cr && cr.faltaram.length > 0 && { icone: UserX, tom: "rosa" as Tom, texto: `${cr.faltaram.length <= 2 ? cr.faltaram.join(" e ") : `${cr.faltaram.slice(0, 2).join(", ")} e mais ${cr.faltaram.length - 2}`} ${cr.faltaram.length === 1 ? "não veio" : "não vieram"} à creche hoje. Toque para ver a chamada e mandar uma mensagem ao tutor.`, href: "/gestao/app/creche-hotel?ver=chamada" },
+    cr && cr.vencemHoje > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `Hoje ${cr.vencemHoje === 1 ? "vence 1 mensalidade" : `vencem ${cr.vencemHoje} mensalidades`} da creche. Toque para cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
+    cr && cr.atrasadas > 0 && { icone: HandCoins, tom: "rosa" as Tom, texto: `${cr.atrasadas === 1 ? "1 mensalidade atrasada" : `${cr.atrasadas} mensalidades atrasadas`} na creche. Toque para ver e cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
     posso("agenda") && dados.amanhaSemLembrete > 0 && { icone: MessageCircle, tom: "pessego" as Tom, texto: `Amanhã ${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}: toque para mandar pelo WhatsApp.${dados.amanhaSemTelefone > 0 ? ` ${dados.amanhaSemTelefone} sem telefone (não ${dados.amanhaSemTelefone === 1 ? "entra" : "entram"} na conta).` : ""}`, aoTocar: () => setLembretes(true) },
     sumidosAChamar.length > 0 && { icone: UserSearch, tom: "menta" as Tom, texto: `${petsSumidos.texto} ${petsSumidos.q === 1 ? "não vem" : "não vêm"} há mais de 30 dias e não ${petsSumidos.q === 1 ? "tem" : "têm"} horário marcado. Toque para chamar de volta pelo WhatsApp.`, aoTocar: () => setChamando("volta") },
     niverAChamar.length > 0 && { icone: Cake, tom: "manteiga" as Tom, texto: `${petsNiver.texto} ${petsNiver.q === 1 ? "faz" : "fazem"} aniversário ${niverHoje ? "hoje" : "nos próximos dias"}. Toque para mandar os parabéns pelo WhatsApp.`, aoTocar: () => setChamando("niver") },

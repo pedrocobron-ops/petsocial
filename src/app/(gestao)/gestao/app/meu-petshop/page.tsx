@@ -1,5 +1,7 @@
 "use client";
 
+import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
+
 import { abrirGuia } from "@/components/gestao/guia-inicial";
 import Identidade from "@/components/gestao/ajustes/identidade";
 import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
@@ -189,7 +191,7 @@ function LinkAgendamento() {
     <section className={`g-card g-pilha g-mp-link${ativo ? " on" : ""}`}>
       <div className="g-mp-t">
         <Tile icone={Link2} tom="pessego" />
-        <div><h2>Link de agendamento</h2><p className="g-muted g-p">O cliente pede o horário pelo celular. Você aceita ou recusa.</p></div>
+        <div><h2>Link de agendamento</h2><p className="g-muted g-p">{usaCasa(petshop) ? "O cliente pede horário ou vaga pelo celular. Você aceita ou recusa." : "O cliente pede o horário pelo celular. Você aceita ou recusa."}</p></div>
         <button type="button" role="switch" aria-checked={ativo} aria-label="Link de agendamento ligado" className="g-mp-chave" disabled={ligando} onClick={() => void ligar(!ativo)}><i /></button>
       </div>
 
@@ -204,8 +206,14 @@ function LinkAgendamento() {
             <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar no WhatsApp</a>
           </div>
           {(semServico || semDia) && (
-            <p className="g-mp-link-falta">{semServico ? "Nenhum serviço da agenda está ativo, então o link abre sem opções. Creche e hotel não entram no link." : "Nenhum dia está aberto no horário de funcionamento, então o link não mostra horários."}</p>
+            <p className="g-mp-link-falta">{semServico
+              ? (usaCasa(petshop) && (petshop.link_creche || petshop.link_hotel)
+                ? `Nenhum serviço da agenda está ativo: pelo link, o cliente pede só vaga ${[petshop.link_creche && "na creche", petshop.link_hotel && "no hotel"].filter(Boolean).join(" ou ")}.`
+                : usaCasa(petshop) ? "Nenhum serviço da agenda está ativo e os pedidos de creche e hotel estão desligados, então o link abre sem opções. Marque abaixo o que o cliente pode pedir."
+                : "Nenhum serviço da agenda está ativo, então o link abre sem opções.")
+              : "Nenhum dia está aberto no horário de funcionamento, então o link não mostra horários."}</p>
           )}
+          <LinkCrecheHotel />
         </>
       ) : (
         <p className="g-mp-link-off">O link está desligado. Ligue a chave para receber pedidos de horário. Nada é marcado sem você aceitar.</p>

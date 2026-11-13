@@ -15,6 +15,7 @@ import { linkTutor, nomePorte, primeiroNome } from "./comum";
 import FormTutor from "./form-tutor";
 import { EtiquetaEspecie, tomDaVisita } from "./lista";
 import { CartaoSaude, EtiquetaSaude, resumoSaude, type CuidadoSaude } from "./saude";
+import { CartaoMensalista } from "../creche/resumo-mes";
 
 type PetDaFicha = Pet & { clientes: Cliente | null };
 type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id">;
@@ -200,6 +201,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       <div className="gc-colunas">
         <div>
           <CartaoSaude pet={pet} tutor={tutor} itens={saude} erro={erroSaude} aoMudar={() => void recarregar()} />
+          <CartaoMensalista pet={pet} />
 
           <section className="g-card">
             <div className="g-card-t"><h3><Tile icone={History} tom="pessego" tamanho="p" />Histórico de atendimentos</h3>{atendimentos.length > 0 && <span className="g-muted g-pp" style={{ whiteSpace: "nowrap" }}>{atendimentos.length === 60 ? "60 mais recentes" : atendimentos.length === 1 ? "1 horário" : `${atendimentos.length} horários`}</span>}</div>

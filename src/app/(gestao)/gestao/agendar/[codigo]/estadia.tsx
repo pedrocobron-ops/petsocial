@@ -85,7 +85,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
       const r = data as { ok?: boolean; erro?: string; id?: string; dia?: string } | null;
       if (error || !r) { setErro("Não deu para enviar agora. Confira a internet e tente de novo."); return; }
       if (!r.ok) {
-        setErro(r.erro === "lotado" ? `Não há vaga em ${r.dia ? dia(r.dia) : "um dos dias"}. Escolha outras datas.`
+        setErro(r.erro === "lotado" ? `Não dá para receber em ${r.dia ? dia(r.dia) : "um dos dias"}: a casa está cheia ou não abre nesse dia. Escolha outras datas.`
           : r.erro === "limite" ? "Você já tem pedidos esperando resposta. Fale direto com a gente para combinar."
           : r.erro === "fechado" ? "Este link não está recebendo pedidos agora."
           : r.erro === "datas" ? "Confira as datas: a entrada não pode ser no passado, a saída vem depois da entrada e o período vai até 60 dias."

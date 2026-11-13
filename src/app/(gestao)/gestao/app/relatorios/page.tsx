@@ -121,7 +121,7 @@ async function carregarAnterior(sb: Banco, petshopId: string, de: Date, ate: Dat
 }
 
 /** Estadia de creche ou hotel encerrada (a saída é a data que vale para o período). */
-type EstadiaRel = { id: string; tipo: string; entrada: string; saida: string | null; diarias_cobradas: number | null; valor_cobrado: number | null; obs: string | null };
+type EstadiaRel = { id: string; tipo: string; entrada: string; saida: string | null; diarias_cobradas: number | null; valor_cobrado: number | null; obs: string | null; mensalista?: string | null };
 /** A mesma nota que o check-out de Creche e hotel grava na observação quando a saída é com pacote. */
 const NOTA_PACOTE = "Saiu usando o pacote.";
 /** A mesma conta de Creche e hotel: hotel cobra por noite; creche, por dia em que o pet esteve aqui. Sempre pelo menos 1. */
@@ -133,7 +133,7 @@ const TIPOS_ESTADIA = [{ id: "creche", nome: "Creche", icone: Sun }, { id: "hote
 
 /** Resumo das estadias encerradas de um tipo, como o Histórico de Creche e hotel mostra cada uma. */
 function resumoEstadias(lista: EstadiaRel[]) {
-  const x = { n: lista.length, diarias: 0, valor: 0, comValor: 0, pacote: 0, cortesia: 0, semValor: 0, estimadas: 0 };
+  const x = { n: lista.length, diarias: 0, valor: 0, comValor: 0, pacote: 0, cortesia: 0, semValor: 0, estimadas: 0, mensalistas: 0 };
   for (const e of lista) {
     if (e.diarias_cobradas == null) {
       // estadia antiga, sem o que foi cobrado: diárias pelas datas, sem valor
@@ -142,7 +142,9 @@ function resumoEstadias(lista: EstadiaRel[]) {
       continue;
     }
     x.diarias += e.diarias_cobradas;
-    if (e.obs?.includes(NOTA_PACOTE)) x.pacote++;
+    // dia de mensalista: coberto pela mensalidade (ou cobrado como dia extra na cobrança do mês)
+    if (e.mensalista) x.mensalistas++;
+    else if (e.obs?.includes(NOTA_PACOTE)) x.pacote++;
     else if (e.valor_cobrado == null) x.semValor++;
     else if (Number(e.valor_cobrado) === 0) x.cortesia++;
     else { x.comValor++; x.valor = real(x.valor + Number(e.valor_cobrado)); }
@@ -192,7 +194,7 @@ function Relatorios() {
         .is("movimento", null).gte("data", deIso).lte("data", ateIso).order("data").order("id").range(a, b)),
       sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).gte("criado_em", comeco).lt("criado_em", final),
       // creche e hotel: estadias encerradas, pela data da saída
-      paginar<EstadiaRel>((a, b) => sb.from("estadias").select("id, tipo, entrada, saida, diarias_cobradas, valor_cobrado, obs").eq("petshop_id", petshop.id).eq("status", "encerrada")
+      paginar<EstadiaRel>((a, b) => sb.from("estadias").select("id, tipo, entrada, saida, diarias_cobradas, valor_cobrado, obs, mensalista").eq("petshop_id", petshop.id).eq("status", "encerrada")
         .gte("saida", comeco).lt("saida", final).order("saida").order("id").range(a, b)),
       carregarAnterior(sb, petshop.id, antes.de, antes.ate),
     ]);
@@ -481,9 +483,10 @@ function Relatorios() {
                             <div><small>{x.diarias === 1 ? "Diária" : "Diárias"}</small><b>{x.diarias}</b></div>
                             <div><small>Cobrado</small><b>{x.comValor ? brl(x.valor) : "—"}</b></div>
                           </div>
-                          {(x.pacote > 0 || x.cortesia > 0 || x.semValor > 0 || x.estimadas > 0) && (
+                          {(x.pacote > 0 || x.cortesia > 0 || x.semValor > 0 || x.estimadas > 0 || x.mensalistas > 0) && (
                             <p className="g-muted g-pp">
                               {[
+                                x.mensalistas > 0 && `${x.mensalistas} de mensalista`,
                                 x.pacote > 0 && `${x.pacote} com pacote`,
                                 x.cortesia > 0 && `${x.cortesia} de cortesia`,
                                 x.semValor > 0 && `${x.semValor} sem valor lançado`,

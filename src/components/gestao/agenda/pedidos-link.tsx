@@ -5,7 +5,8 @@ import { Check, Clock, Link2, MessageCircle, X } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPet, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import type { Database } from "@/lib/gestao/banco";
-import { dataCurta, fmtTelefone, hora, inicioDoDia, linkWhatsApp, nomeDia, chamar } from "@/lib/gestao/util";
+import { abreNoDia } from "@/lib/gestao/creche";
+import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar } from "@/lib/gestao/util";
 import "./pedidos-link.css";
 
 type Pedido = Database["public"]["Tables"]["pedidos_agendamento"]["Row"];
@@ -30,6 +31,12 @@ function quandoNaFrase(inicio: string) {
 }
 /** Pedido de creche ou de hotel: vira reserva em Creche e hotel, não horário na agenda. */
 const ehEstadia = (p: Pedido) => p.tipo === "creche" || p.tipo === "hotel";
+/** Dias do pedido de creche em que o pet shop não abre (pelo horário de Meu pet shop). O aceite continua possível: é só um aviso. */
+function fechadosDe(p: Pedido, horario: unknown): string[] {
+  const dias: string[] = [];
+  for (let d = inicioDoDia(new Date(p.inicio)), i = 0; d <= new Date(p.fim) && i < 62; d = somaDias(d, 1), i++) if (!abreNoDia(horario, isoDia(d))) dias.push(isoDia(d));
+  return dias;
+}
 /** "sexta, 14/11" ou "de 14/11 a 17/11". */
 function periodoDe(p: Pedido) {
   const a = new Date(p.inicio), b = new Date(p.fim);
@@ -250,6 +257,7 @@ export default function PedidosLink() {
                   <span className="g-pl-serv"><i aria-hidden />{servico ?? "Serviço"}</span>
                   <span className="g-pl-hora"><Clock aria-hidden />{ehEstadia(p) ? periodoDe(p) : `${quandoNaTela(p.inicio)}, ${hora(p.inicio)}`}</span>
                   {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
+                  {p.tipo === "creche" && fechadosDe(p, petshop.horario).length > 0 && <span className="g-tag amarelo">pelo seu horário, a creche não abre em {fechadosDe(p, petshop.horario).map((d) => dataCurta(d)).join(", ")}</span>}
                 </div>
                 {p.obs && <p className="g-pl-obs">{p.obs}</p>}
                 <div className="g-pl-acoes">

@@ -1,17 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarCheck, DoorOpen, Home, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Sun, Sunset, Syringe } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ArrowRight, CalendarCheck, DoorOpen, Home, HandCoins, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Sun, Sunset, Syringe } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import FormPet from "@/components/gestao/form-pet";
 import { Kpi } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { AvisoCaixaFechado, CampoDinheiro, Chips, ChipsForma, erroDeValor, ErroTela, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, useFormaLembrada, usePagamento, type PagaDepois } from "@/components/gestao/loja/pecas";
 import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
+import Chamada from "@/components/gestao/creche/chamada";
+import Cobrancas from "@/components/gestao/creche/cobrancas";
+import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
+import Mensalistas from "@/components/gestao/creche/mensalistas";
+import { estadiaOcupa, lerPlanos, lerPresencas, mensalistasNoDia, planoAtivo, type Falta, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
 import { lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { usaModulo } from "@/lib/gestao/modulos";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Cliente, Estadia, PacoteCliente, Pet, Petshop, Servico } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, inicioDoDia, isoDia, juntaDiaHora, linkWhatsApp, somaDias } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, inicioDoDia, isoDia, juntaDiaHora, linkWhatsApp, nomeMes, somaDias } from "@/lib/gestao/util";
 import "./creche-hotel.css";
 
 type PetDaEstadia = Pick<Pet, "id" | "nome" | "foto" | "especie" | "sexo" | "alertas"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
@@ -22,6 +28,10 @@ type Tipo = "creche" | "hotel";
 const TIPOS = [{ id: "creche", rotulo: "Creche" }, { id: "hotel", rotulo: "Hotel" }] as const;
 const FILTRO_TIPO = [{ id: "todos", rotulo: "Todos" }, ...TIPOS] as const;
 type Aba = "casa" | "reservas" | "historico";
+/** As partes da tela para quem tem creche: a chamada dos mensalistas, a casa (como sempre foi), os planos e as cobranças. */
+type Ver = "chamada" | "casa" | "mensalistas" | "cobrancas";
+/** O que a conta de vagas precisa saber dos mensalistas: os planos, as presenças e as faltas de hoje. */
+type Mens = { planos: PlanoCompleto[]; presencas: Presenca[]; faltas: Falta[] };
 
 /** "8h" ou "8h30" */
 const horaCurta = (d: string | Date) => { const x = new Date(d); return x.getMinutes() ? `${x.getHours()}h${String(x.getMinutes()).padStart(2, "0")}` : `${x.getHours()}h`; };
@@ -38,23 +48,7 @@ function contarDiarias(e: Pick<Estadia, "tipo" | "entrada">, fim: Date) {
 
 type Periodo = Pick<Estadia, "tipo" | "entrada" | "saida_prevista" | "status">;
 
-/**
- * A regra de ocupação de vaga. É a mesma da função `estadia_ocupa` do banco
- * (supabase/migrations/20261129000000_gestao_creche_link.sql), que o link público e o aceite de pedido usam.
- * Se mudar lá, mude aqui. As datas são dias "AAAA-MM-DD" no horário do pet shop.
- * - Quem está na casa sem saída prevista ocupa até sair.
- * - Hotel conta a noite: o dia da saída não ocupa vaga; reserva sem saída prevista vale uma noite.
- * - Creche: da entrada à saída prevista, os dois dias contam; quem está na casa e passou da saída prevista ocupa até hoje.
- */
-function estadiaOcupa(tipo: string, status: string, entrada: string, saida: string | null, dia: string, hoje: string): boolean {
-  if (entrada > dia) return false;
-  // na casa e sem saída marcada: o hotel segue ocupado até sair; a creche esvazia no fim do dia
-  if (status === "em_casa" && saida == null) return tipo === "hotel" || dia <= hoje;
-  // hotel conta a noite; quem passou da saída e ainda está na casa ocupa só hoje
-  if (tipo === "hotel") return dia < (saida ?? isoDia(somaDias(deIsoDia(entrada), 1))) || (status === "em_casa" && saida != null && saida < hoje && dia === hoje);
-  const fim = saida ?? entrada;
-  return dia <= (status === "em_casa" && hoje > fim ? hoje : fim);
-}
+// A regra de ocupação de vaga (`estadiaOcupa`) mora em src/lib/gestao/creche.ts, junto da conta dos mensalistas.
 const ocupaNoDia = (e: Periodo, dia: string, hoje: string) =>
   estadiaOcupa(e.tipo, e.status, isoDia(new Date(e.entrada)), e.saida_prevista ? isoDia(new Date(e.saida_prevista)) : null, dia, hoje);
 
@@ -90,6 +84,10 @@ function conflitoDoPet(petId: string, novo: Periodo, abertas: EstadiaCompleta[],
     if (e.pet_id !== petId || e.id === ignorar) continue;
     if (novo.status === "em_casa" && e.status === "em_casa") return e;
     const [a, b] = pontas(e, hojeIso);
+    // passa o dia na creche e dorme no hotel: a reserva do hotel pode começar no dia em que a creche termina, depois da saída
+    const fimDaCreche = e.tipo === "creche" && e.status === "em_casa" && !e.saida_prevista ? hojeIso : b;
+    if (novo.tipo === "hotel" && novo.status === "reservada" && e.tipo === "creche" && de === fimDaCreche
+      && new Date(novo.entrada) >= new Date(e.saida_prevista ?? e.entrada) && (e.status !== "em_casa" || new Date(novo.entrada) > hoje)) continue;
     if (a <= ate && b >= de) return e;
   }
   return null;
@@ -102,9 +100,12 @@ function fraseConflito(nome: string, e: EstadiaCompleta) {
 const ehRepetido = (x: unknown) => /estadias_um_na_casa|duplicate key|23505/i.test(x instanceof Error ? x.message : String((x as { message?: unknown })?.message ?? x));
 
 /** Quantas vagas do tipo estão tomadas no dia (sem contar a estadia `ignorar`). */
-function ocupadasNoDia(tipo: string, abertas: EstadiaCompleta[], ignorar: string | null, dia: string, hoje: Date) {
+function ocupadasNoDia(tipo: string, abertas: EstadiaCompleta[], ignorar: string | null, dia: string, hoje: Date, mens: Mens | null, horario: unknown) {
   const hojeIso = isoDia(hoje);
-  return abertas.filter((e) => e.tipo === tipo && e.id !== ignorar && ocupaNoDia(e, dia, hojeIso)).length;
+  const outras = abertas.filter((e) => e.id !== ignorar);
+  // na creche, o mensalista que ainda vai chegar nesse dia também ocupa vaga
+  const doPlano = tipo === "creche" && mens ? mensalistasNoDia(mens.planos, dia, hojeIso, [...outras, ...mens.presencas], mens.faltas, horario) : 0;
+  return outras.filter((e) => e.tipo === tipo && ocupaNoDia(e, dia, hojeIso)).length + doPlano;
 }
 const vagasDoTipo = (p: Petshop, tipo: string) => (tipo === "hotel" ? p.vagas_hotel : p.vagas_creche) ?? null;
 const diariaFixa = (p: Petshop, tipo: string) => { const v = tipo === "hotel" ? p.diaria_hotel : p.diaria_creche; return v == null ? null : Number(v); };
@@ -123,7 +124,18 @@ function previsto(e: Pick<Estadia, "tipo" | "entrada" | "saida_prevista" | "valo
   const n = e.saida_prevista ? contarDiarias(e, new Date(e.saida_prevista)) : 1;
   return { n, total: Math.round(n * Number(e.valor_diaria) * 100) / 100, aberto: !e.saida_prevista };
 }
-function LinhaValor({ e }: { e: EstadiaCompleta }) {
+function LinhaValor({ e, plano }: { e: EstadiaCompleta; plano?: PlanoCompleto }) {
+  const { vejoFinanceiro } = useGestao();
+  // mensalista: o dia é do plano (ou vai para a cobrança do mês); não tem diária na porta
+  if (e.mensalista) {
+    return (
+      <p className="g-cm-marca">
+        <span className="g-tag amarelo">Mensalista{plano ? ` · ${plano.dias.length}x por semana` : ""}</span>
+        <span>{e.mensalista === "plano" ? "dia do plano" : e.mensalista === "extra" ? "dia extra: entra na cobrança do mês" : "reposição de falta"}</span>
+      </p>
+    );
+  }
+  if (!vejoFinanceiro) return null;
   const p = previsto(e);
   if (!p) return <p className="g-ch-valor g-muted">Diária não combinada</p>;
   return (
@@ -142,7 +154,11 @@ const comNota = (obs: string | null, nota: string) => (obs?.includes(nota) ? obs
 
 /** No Histórico: o que foi cobrado na saída. Estadia antiga, sem esse registro, mostra a conta pelas datas como estimativa. */
 function Cobrado({ e }: { e: EstadiaCompleta }) {
+  const { vejoFinanceiro } = useGestao();
   const plural = (n: number) => `${n} ${n === 1 ? "diária" : "diárias"}`;
+  if (e.mensalista) return <span className="g-tag amarelo g-ch-cobrado">{e.mensalista === "plano" ? "dia do plano" : e.mensalista === "extra" ? "dia extra" : "reposição"}</span>;
+  // quem não vê o financeiro vê as diárias, sem valor
+  if (!vejoFinanceiro && !e.obs?.includes(NOTA_PACOTE)) return <span className="g-tag g-ch-cobrado">{plural(e.diarias_cobradas ?? contarDiarias(e, new Date(e.saida ?? e.entrada)))}</span>;
   if (e.diarias_cobradas == null) {
     const n = contarDiarias(e, new Date(e.saida ?? e.entrada));
     return <span className="g-tag g-ch-cobrado" title="Estadia antiga: o sistema ainda não guardava o que foi cobrado. Esta é a conta pelas datas.">{plural(n)} <small>(estimativa)</small></span>;
@@ -191,9 +207,15 @@ function BotaoZap({ e, reserva }: { e: EstadiaCompleta; reserva?: boolean }) {
 }
 
 export default function CrecheHotel() {
-  const { sb, petshop } = useGestao();
+  const { sb, petshop, vejoFinanceiro, souDono } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
+  const usaCreche = usaModulo(petshop, "creche");
+  const [ver, setVer] = useState<Ver>("casa");
+  const [novoPlano, setNovoPlano] = useState(false);
+  const [gerando, setGerando] = useState(false);
+  const [mesCobranca, setMesCobranca] = useState(() => new Date());
+  const [acertando, setAcertando] = useState<EstadiaCompleta | null>(null);
   const [aba, setAba] = useState<Aba>("casa");
   const [tipo, setTipo] = useState<"todos" | Tipo>("todos");
   const [nova, setNova] = useState(false);
@@ -209,6 +231,26 @@ export default function CrecheHotel() {
     ]);
     return { abertas: ok(abertas) as unknown as EstadiaCompleta[], passadas: ok(passadas) as unknown as EstadiaCompleta[] };
   }, [petshop.id]);
+
+  // mensalistas: os planos e o que já aconteceu hoje (para a chamada e para a conta de vagas)
+  const { dados: mens } = useDados<Mens | null>(async () => {
+    if (!usaCreche) return null;
+    const planos = await lerPlanos(sb, petshop.id, vejoFinanceiro);
+    const dia = isoDia(new Date());
+    const mov = planos.length ? await lerPresencas(sb, petshop.id, dia, dia) : { presencas: [], faltas: [] };
+    return { planos, ...mov };
+  }, [petshop.id, usaCreche, vejoFinanceiro]);
+  const temMensalista = Boolean(mens?.planos.some((p) => planoAtivo(p, isoDia(new Date()))));
+  // a tela abre na chamada quando há mensalistas; o endereço pode pedir outra parte (?ver=cobrancas)
+  const [abriu, setAbriu] = useState(false);
+  useEffect(() => {
+    if (abriu || !usaCreche || !mens) return;
+    setAbriu(true);
+    const pedido = new URLSearchParams(window.location.search).get("ver");
+    if (pedido === "chamada" || pedido === "mensalistas" || pedido === "casa" || (pedido === "cobrancas" && vejoFinanceiro)) setVer(pedido);
+    else if (temMensalista) setVer("chamada");
+  }, [abriu, usaCreche, mens, temMensalista, vejoFinanceiro]);
+  const planoDe = (e: EstadiaCompleta) => (e.plano_id ? mens?.planos.find((p) => p.id === e.plano_id) : undefined);
 
   const doTipo = (e: EstadiaCompleta) => tipo === "todos" || e.tipo === tipo;
   const naCasa = useMemo(() => (dados?.abertas ?? []).filter((e) => e.status === "em_casa"), [dados]);
@@ -228,6 +270,10 @@ export default function CrecheHotel() {
     setOcupado(e.id);
     try {
       const vencidas = await vacinasVencidas(sb, petshop.id, e.pet_id).catch(() => []);
+      if (vencidas.length && e.tipo === "creche" && petshop.creche_bloqueia_vacina && !souDono) {
+        avisarErro(`Check-in bloqueado: ${nome} está com vacina vencida (${vencidas.join(", ")}). Só o dono pode liberar a entrada.`);
+        return;
+      }
       if (vencidas.length && !(await confirmar({
         titulo: `${nome} está com vacina vencida`,
         texto: `${vencidas.join(", ")}. Confira a carteirinha antes de receber o pet.`,
@@ -254,6 +300,18 @@ export default function CrecheHotel() {
     } catch (x) { avisarErro(x); }
   }
 
+  /** Saída de um mensalista: um toque, sem folha de pagamento (o dia é do plano ou vai para a cobrança do mês). */
+  async function saidaDoMensalista(e: EstadiaCompleta) {
+    if (somenteLeitura()) return;
+    setOcupado(e.id);
+    try {
+      if (e.plano_id && e.dia) ok(await sb.rpc("creche_chamada", { p_plano: e.plano_id, p_dia: e.dia, p_acao: "saiu" }));
+      else ok(await sb.from("estadias").update({ status: "encerrada", saida: new Date().toISOString(), diarias_cobradas: 1 }).eq("id", e.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
+      avisar(`${e.pets?.nome ?? "O pet"} foi para casa.`);
+      mudou();
+    } catch (x) { avisarErro(x); } finally { setOcupado(null); }
+  }
+
   const agora = new Date();
   const hoje0 = inicioDoDia(agora).getTime();
   const hojeIso = isoDia(agora);
@@ -264,10 +322,13 @@ export default function CrecheHotel() {
   const atrasadas = naCasa.filter((e) => e.saida_prevista && new Date(e.saida_prevista) < agora);
   const crecheNaCasa = naCasa.filter((e) => e.tipo === "creche");
   // vagas de hoje, por tipo, pela regra de estadiaOcupa (no hotel, quem sai hoje já não ocupa a noite de hoje)
-  const vagasHoje = TIPOS.map((t) => ({ ...t, total: vagasDoTipo(petshop, t.id), ocupadas: ocupadasNoDia(t.id, dados?.abertas ?? [], null, hojeIso, agora) }))
+  const vagasHoje = TIPOS.map((t) => ({ ...t, total: vagasDoTipo(petshop, t.id), ocupadas: ocupadasNoDia(t.id, dados?.abertas ?? [], null, hojeIso, agora, mens ?? null, petshop.horario) }))
     .filter((v) => v.total != null);
   const noHotel = naCasa.filter((e) => e.tipo === "hotel").length;
   const proximaReserva = reservas.find((e) => new Date(e.entrada).getTime() >= hoje0);
+  // check-out que fechou sem cobrança, sem pacote e sem plano: o dono precisa ver e acertar
+  const semCobranca = vejoFinanceiro ? historico.filter(estadiaSemCobranca) : [];
+  const vagasCrecheHoje = vagasHoje.find((v) => v.id === "creche");
 
   return (
     <>
@@ -279,13 +340,29 @@ export default function CrecheHotel() {
           </p>
         </div>
         <div className="g-acoes">
-          <button className="g-btn pri" onClick={abrirNova}><Plus /> Nova reserva / Check-in</button>
+          {ver === "mensalistas" ? <button className="g-btn pri" onClick={() => { if (!somenteLeitura()) setNovoPlano(true); }}><Plus /> Novo mensalista</button>
+            : ver === "cobrancas" ? <button className="g-btn pri" onClick={() => { if (!somenteLeitura()) setGerando(true); }}><HandCoins /> Gerar cobranças de {nomeMes(mesCobranca)}</button>
+            : <button className="g-btn pri" onClick={abrirNova}><Plus /> Nova reserva / Check-in</button>}
         </div>
       </header>
 
+      {usaCreche && (
+        <div className="g-seg g-cm-ver" role="group" aria-label="Partes da tela" style={{ marginBottom: 16 }}>
+          <button aria-pressed={ver === "chamada"} onClick={() => setVer("chamada")}>Chamada</button>
+          <button aria-pressed={ver === "casa"} onClick={() => setVer("casa")}>Casa agora</button>
+          <button aria-pressed={ver === "mensalistas"} onClick={() => setVer("mensalistas")}>Mensalistas</button>
+          {vejoFinanceiro && <button aria-pressed={ver === "cobrancas"} onClick={() => setVer("cobrancas")}>Cobranças</button>}
+        </div>
+      )}
+
       {erro && <ErroTela erro={erro} aoTentar={() => void recarregar()} />}
 
-      {carregando && !dados ? <Esqueleto linhas={4} /> : !dados ? null : tudoVazio ? (
+      {usaCreche && !mens ? <Esqueleto linhas={4} />
+        : ver === "chamada" && mens ? <Chamada planos={mens.planos} vagasHoje={vagasCrecheHoje ? { ocupadas: vagasCrecheHoje.ocupadas, total: vagasCrecheHoje.total! } : null}
+            aoNovoMensalista={() => { if (!somenteLeitura()) { setVer("mensalistas"); setNovoPlano(true); } }} />
+        : ver === "mensalistas" && mens ? <Mensalistas planos={mens.planos} novo={novoPlano} aoAbrirNovo={() => { if (!somenteLeitura()) setNovoPlano(true); }} aoFecharNovo={() => setNovoPlano(false)} aoMudar={mudou} />
+        : ver === "cobrancas" && mens && vejoFinanceiro ? <Cobrancas planos={mens.planos} gerar={gerando} aoFecharGerar={() => setGerando(false)} aoMes={setMesCobranca} />
+        : carregando && !dados ? <Esqueleto linhas={4} /> : !dados ? null : tudoVazio ? (
         <Vazio titulo="Nenhum hóspede ainda" texto="Quando um pet vier passar o dia ou dormir aqui, faça o check-in e acompanhe por esta tela." mozart="acenando">
           <button className="g-btn sec" onClick={abrirNova}>Fazer o primeiro check-in</button>
         </Vazio>
@@ -310,8 +387,14 @@ export default function CrecheHotel() {
             </KpiAcao>
           </div>
 
-          {(atrasadas.length > 0 || vagasHoje.length > 0 || crecheNaCasa.length > 0) && (
+          {(atrasadas.length > 0 || vagasHoje.length > 0 || crecheNaCasa.length > 0 || semCobranca.length > 0) && (
             <div className="g-ch-faixa">
+              {semCobranca.length > 0 && (
+                <button type="button" className="g-ch-atraso" onClick={() => setAba("historico")}>
+                  <AlertTriangle aria-hidden />
+                  <span><b>{semCobranca.length === 1 ? "1 check-out sem cobrança" : `${semCobranca.length} check-outs sem cobrança`}:</b> {semCobranca.slice(0, 3).map((e) => e.pets?.nome).filter(Boolean).join(", ")}{semCobranca.length > 3 ? ` e mais ${semCobranca.length - 3}` : ""}. Toque para acertar.</span>
+                </button>
+              )}
               {atrasadas.length > 0 && (
                 <button type="button" className="g-ch-atraso" onClick={() => setAba("casa")}>
                   <AlertTriangle aria-hidden />
@@ -376,13 +459,15 @@ export default function CrecheHotel() {
                         </div>
                       </div>
 
-                      <LinhaValor e={e} />
+                      <LinhaValor e={e} plano={planoDe(e)} />
                       {pet?.alertas && <div className="g-aviso vermelho" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce"><b>Atenção:</b> {pet.alertas}</span></div>}
                       {e.obs && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{e.obs}</span></p>}
                       <div className="g-fila g-ch-acoes">
                         <BotaoZap e={e} />
-                        <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setEditando(e); }}><Pencil /> Editar</button>
-                        <button className="g-btn verde p" style={{ marginLeft: "auto" }} onClick={() => { if (!somenteLeitura()) setSaindo(e); }}><LogOut /> Check-out</button>
+                        {!e.mensalista && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setEditando(e); }}><Pencil /> Editar</button>}
+                        {e.mensalista
+                          ? <button className="g-btn verde p" style={{ marginLeft: "auto" }} disabled={ocupado === e.id} onClick={() => void saidaDoMensalista(e)}><LogOut /> Saiu</button>
+                          : <button className="g-btn verde p" style={{ marginLeft: "auto" }} onClick={() => { if (!somenteLeitura()) setSaindo(e); }}><LogOut /> Check-out</button>}
                       </div>
                     </div>
                   );
@@ -454,6 +539,10 @@ export default function CrecheHotel() {
                         {e.status === "cancelada"
                           ? <span className="g-tag vermelho">cancelada</span>
                           : <Cobrado e={e} />}
+                        {vejoFinanceiro && e.status === "encerrada" && !e.mensalista && (
+                          <button className={`g-btn p ${estadiaSemCobranca(e) ? "sec" : "fantasma"}`} onClick={() => { if (!somenteLeitura()) setAcertando(e); }}
+                            aria-label={`${estadiaSemCobranca(e) ? "Acertar" : "Corrigir"} a estadia de ${e.pets?.nome ?? "pet"}`}>{estadiaSemCobranca(e) ? <><HandCoins />Acertar</> : <Pencil />}</button>
+                        )}
                       </div>
                     );
                   })}
@@ -464,9 +553,11 @@ export default function CrecheHotel() {
         </div>
       )}
 
-      {nova && <NovaEstadia jaAquiInicial={aba !== "reservas"} tipoInicial={tipo === "todos" ? "creche" : tipo} abertas={dados?.abertas ?? []}
-        aoFechar={() => setNova(false)} aoGravar={(emCasa) => { setNova(false); setAba(emCasa ? "casa" : "reservas"); mudou(); }} />}
-      {editando && <NovaEstadia key={editando.id} editar={editando} jaAquiInicial={editando.status === "em_casa"} tipoInicial={editando.tipo === "hotel" ? "hotel" : "creche"} abertas={dados?.abertas ?? []}
+      {ver === "casa" && dados && !tudoVazio && souDono && <div style={{ marginTop: 20 }}><LinkCrecheHotel titulo="Pedidos pelo link do cliente" /></div>}
+      {acertando && <AcertarEstadia key={acertando.id} estadia={acertando} aoFechar={() => setAcertando(null)} aoGravar={() => { setAcertando(null); mudou(); }} />}
+      {nova && <NovaEstadia mens={mens ?? null} jaAquiInicial={aba !== "reservas"} tipoInicial={tipo === "todos" ? "creche" : tipo} abertas={dados?.abertas ?? []}
+        aoFechar={() => setNova(false)} aoGravar={(emCasa) => { setNova(false); setVer("casa"); setAba(emCasa ? "casa" : "reservas"); mudou(); }} />}
+      {editando && <NovaEstadia mens={mens ?? null} key={editando.id} editar={editando} jaAquiInicial={editando.status === "em_casa"} tipoInicial={editando.tipo === "hotel" ? "hotel" : "creche"} abertas={dados?.abertas ?? []}
         aoFechar={() => setEditando(null)} aoGravar={() => { setEditando(null); mudou(); }} />}
       {lote && <EncerrarCreche estadias={crecheNaCasa} aoFechar={() => setLote(false)} aoGravar={() => { setLote(false); mudou(); }} />}
       {saindo && <CheckOut estadia={saindo} aoFechar={() => setSaindo(null)} aoGravar={() => { setSaindo(null); mudou(); }} />}
@@ -478,11 +569,11 @@ export default function CrecheHotel() {
 
 const horaDe = (d: string | Date) => { const x = new Date(d); return `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
 
-function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, aoFechar, aoGravar }: {
-  jaAquiInicial: boolean; tipoInicial: Tipo; abertas: EstadiaCompleta[]; editar?: EstadiaCompleta;
+function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, mens, aoFechar, aoGravar }: {
+  jaAquiInicial: boolean; tipoInicial: Tipo; abertas: EstadiaCompleta[]; editar?: EstadiaCompleta; mens: Mens | null;
   aoFechar: () => void; aoGravar: (emCasa: boolean) => void;
 }) {
-  const { sb, petshop } = useGestao();
+  const { sb, petshop, vejoFinanceiro, souDono } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const [pet, setPet] = useState<PetDaEstadia | null>(editar?.pets ?? null);
   const [criando, setCriando] = useState<string | null>(null);
@@ -526,6 +617,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, aoFechar, ao
     if (diaria != null && diaria < 0) return falha("A diária não pode ser negativa.");
     if (diaria != null && diaria > 99999) return falha("Confira o valor da diária.");
 
+    if (!editar && emCasa && tipo === "creche" && petshop.creche_bloqueia_vacina && vencidas?.length && !souDono) {
+      return falha(`Check-in bloqueado: ${pet.nome} está com vacina vencida. Só o dono pode liberar a entrada.`);
+    }
     const status = emCasa ? "em_casa" : "reservada";
     const novo: Periodo = { tipo, entrada: entrada.toISOString(), saida_prevista: saida?.toISOString() ?? null, status };
     // o mesmo pet não fica duas vezes na casa nem com duas reservas no mesmo período (sem opção de forçar)
@@ -543,7 +637,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, aoFechar, ao
     // casa cheia em algum dia do período
     const vagas = vagasDoTipo(petshop, tipo);
     if (vagas != null) {
-      const tomadas = new Map(diasOcupados(novo, agora).map((d) => [d, ocupadasNoDia(tipo, abertas, editar?.id ?? null, d, agora)]));
+      const tomadas = new Map(diasOcupados(novo, agora).map((d) => [d, ocupadasNoDia(tipo, abertas, editar?.id ?? null, d, agora, mens, petshop.horario)]));
       const cheios = [...tomadas.keys()].filter((d) => (tomadas.get(d) ?? 0) >= vagas);
       if (cheios.length && !(await confirmar({
         titulo: `Casa cheia em ${dataCurta(cheios[0])} (${Math.max(vagas, tomadas.get(cheios[0]) ?? 0)} de ${vagas})`,
@@ -551,7 +645,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, aoFechar, ao
         confirmar: "Passar do limite", perigo: true,
       }))) return;
     }
-    if (diaria === 0 && !(await confirmar({ titulo: "Cortesia, sem cobrar?", texto: `A diária está em R$ 0,00. ${pet.nome} fica sem cobrança nesta estadia.`, confirmar: "Sim, é cortesia" }))) return;
+    if (vejoFinanceiro && diaria === 0 && !(await confirmar({ titulo: "Cortesia, sem cobrar?", texto: `A diária está em R$ 0,00. ${pet.nome} fica sem cobrança nesta estadia.`, confirmar: "Sim, é cortesia" }))) return;
 
     setSalvando(true);
     try {
@@ -633,19 +727,19 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, abertas, editar, aoFechar, ao
           <Campo rotulo="Saída prevista" dica="Opcional"><input type="date" className="g-input" value={saidaDia} min={escolheEntrada ? dia : isoDia(new Date())} onChange={(e) => setSaidaDia(e.target.value)} /></Campo>
           <Campo rotulo="Hora"><input type="time" className="g-input" value={saidaHora} onChange={(e) => setSaidaHora(e.target.value)} disabled={!saidaDia} /></Campo>
         </div>
-        <Campo rotulo={`Valor da diária (${tipo === "hotel" ? "por noite" : "por dia"})`}
+        {vejoFinanceiro && <Campo rotulo={`Valor da diária (${tipo === "hotel" ? "por noite" : "por dia"})`}
           dica={fixa == null ? "Defina o preço da diária em Meu pet shop para ele já vir preenchido."
             : diaria === fixa ? `Preço fixo ${tipo === "hotel" ? "do hotel" : "da creche"}, definido em Meu pet shop.`
             : `O preço fixo ${tipo === "hotel" ? "do hotel" : "da creche"} é ${brl(fixa)}.`}>
           <CampoValor valor={diaria} aoMudar={(n) => { setMexeuNaDiaria(true); setDiaria(n); }} placeholder={fixa == null ? "Sem preço fixo" : "0,00"} />
-        </Campo>
-        {trocouTipo && (
+        </Campo>}
+        {vejoFinanceiro && trocouTipo && (
           <p className="g-pp g-muted" role="status">
             Mudou de {nomeTipo(editar!.tipo).toLowerCase()} para {nomeTipo(tipo).toLowerCase()}: a diária {diaria == null ? "ficou em branco, porque esse tipo não tem preço fixo" : diaria === fixa ? `passou para ${brl(diaria)}, o preço fixo` : `está em ${brl(diaria)}`}
             {editar!.valor_diaria != null ? ` (antes era ${brl(editar!.valor_diaria)})` : ""}.
           </p>
         )}
-        {prev && (
+        {vejoFinanceiro && prev && (
           <p className="g-ch-valor g-ch-previsto" aria-live="polite">
             {prev.total === 0 ? <span className="g-tag">cortesia</span>
               : prev.aberto ? <span className="g-muted">Sem saída prevista: o total sai no check-out.</span>
@@ -701,6 +795,13 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
   const { dados: pacotes } = useDados(async () =>
     (await pacotesParaEstadia(sb, petshop.id, [estadia.pet_id]).catch(() => [])).filter((p) => pacoteServe(p, estadia.tipo, servicos)),
   [petshop.id, estadia.pet_id]);
+  // quem tem pacote com saldo sai usando o pacote, a não ser que a pessoa escolha cobrar a diária
+  const [escolheu, setEscolheu] = useState(false);
+  useEffect(() => {
+    if (escolheu || comPacote || !pacotes?.length) return;
+    const serve = pacotes.find((p) => p.total - p.usados >= contadas && !venceu(p));
+    if (serve) setComPacote(serve.id);
+  }, [pacotes, escolheu, comPacote, contadas]);
   const pacote = (pacotes ?? []).find((p) => p.id === comPacote) ?? null;
   const cobra = !pacote && vejoFinanceiro && Boolean(valor);
 
@@ -766,7 +867,7 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
             </div>
           </div>
         </div>
-        <Campo rotulo="Diárias" dica={nValido ? `${n} ${palavra}${estadia.valor_diaria != null ? ` × ${brl(estadia.valor_diaria)}` : ""}` : undefined}
+        <Campo rotulo="Diárias" dica={nValido ? `${n} ${palavra}${vejoFinanceiro && estadia.valor_diaria != null ? ` × ${brl(estadia.valor_diaria)}` : ""}` : undefined}
           erro={nValido ? null : "Use um número inteiro, a partir de 1."}>
           <input className="g-input g-tab" inputMode="numeric" value={diarias} onChange={(e) => { setDiarias(e.target.value); setValorEditado(undefined); }} />
         </Campo>
@@ -774,9 +875,9 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
           <div className="g-campo">
             <span>Como fica a conta</span>
             <div className="g-chips">
-              <button type="button" className="g-chip" aria-pressed={!pacote} onClick={() => setComPacote(null)}>Cobrar a diária</button>
+              <button type="button" className="g-chip" aria-pressed={!pacote} onClick={() => { setEscolheu(true); setComPacote(null); }}>{vejoFinanceiro ? "Cobrar a diária" : "Não usar o pacote"}</button>
               {pacotes!.map((p) => (
-                <button key={p.id} type="button" className="g-chip" aria-pressed={comPacote === p.id} onClick={() => setComPacote(p.id)}>
+                <button key={p.id} type="button" className="g-chip" aria-pressed={comPacote === p.id} onClick={() => { setEscolheu(true); setComPacote(p.id); }}>
                   Usar {nValido ? n : 1} do pacote (restam {p.total - p.usados}){venceu(p) ? " · vencido" : ""}
                 </button>
               ))}
@@ -798,7 +899,7 @@ function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; a
             ) : null}
           </>
         ) : (
-          <p className="g-muted g-p">O check-out encerra a estadia. O pagamento fica para quem cuida do financeiro lançar.</p>
+          <p className="g-muted g-p">O check-out encerra a estadia. A cobrança fica como pendência para quem cuida do financeiro acertar.</p>
         )}
       </div>
     </Folha>
@@ -813,6 +914,7 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
   const [agora] = useState(() => new Date());
   const [sai, setSai] = useState<Record<string, boolean>>(() => Object.fromEntries(estadias.map((e) => [e.id, true])));
   const [cobrar, setCobrar] = useState<Record<string, boolean>>({});
+  const [semPacote, setSemPacote] = useState<Record<string, boolean>>({});
   // no lote é uma forma só para todos (quem divide o pagamento sai pelo check-out do próprio pet)
   const [forma, setForma] = useFormaLembrada();
   const [erroForma, setErroForma] = useState<string | null>(null);
@@ -822,14 +924,19 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
   const { dados: pacotes } = useDados(async () =>
     (await pacotesParaEstadia(sb, petshop.id, [...new Set(estadias.map((e) => e.pet_id))]).catch(() => [])).filter((p) => pacoteServe(p, "creche", servicos)),
   [petshop.id]);
-  const temPacote = (petId: string) => (pacotes ?? []).some((p) => p.pet_id === petId);
+  /** Pacote do pet que cobre as diárias (com saldo e dentro da validade). */
+  const pacoteDe = (petId: string, n: number) => (pacotes ?? []).find((p) => p.pet_id === petId && p.total - p.usados >= n && !venceu(p)) ?? null;
   const linhas = estadias.map((e) => {
-    const n = contarDiarias(e, agora);
-    const valor = e.valor_diaria != null ? Math.round(n * Number(e.valor_diaria) * 100) / 100 : 0;
-    // quem tem pacote fica sem cobrança aqui: a baixa do pacote é pelo check-out do próprio pet
-    const cobra = vejoFinanceiro && valor > 0 && (cobrar[e.id] ?? !temPacote(e.pet_id));
-    const cortesia = e.valor_diaria != null && Number(e.valor_diaria) === 0;
-    return { e, n, valor, cobra, cortesia };
+    // mensalista: o dia é do plano (ou vai para a cobrança do mês); nada é cobrado na saída
+    const mensal = Boolean(e.mensalista);
+    const n = mensal ? 1 : contarDiarias(e, agora);
+    const valor = !mensal && e.valor_diaria != null ? Math.round(n * Number(e.valor_diaria) * 100) / 100 : 0;
+    const pacote = mensal ? null : pacoteDe(e.pet_id, n);
+    // quem tem pacote com saldo sai usando o pacote, a não ser que a pessoa desmarque
+    const usaPacote = Boolean(pacote) && !semPacote[e.id];
+    const cobra = !mensal && !usaPacote && vejoFinanceiro && valor > 0 && (cobrar[e.id] ?? true);
+    const cortesia = !mensal && e.valor_diaria != null && Number(e.valor_diaria) === 0;
+    return { e, n, valor, cobra, cortesia, mensal, pacote, usaPacote };
   });
   const escolhidas = linhas.filter((l) => sai[l.e.id]);
   const total = escolhidas.reduce((t, l) => t + (l.cobra ? l.valor : 0), 0);
@@ -841,17 +948,26 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
     if (total > 0 && !forma) { setErroForma("Escolha como os clientes pagaram."); avisarErro("Escolha a forma de pagamento."); return; }
     if (total > 0 && forma) lembrarForma(forma);
     setSalvando(true);
-    let feitos = 0, recebido = 0;
+    let feitos = 0, recebido = 0, comPacote = 0;
     const falhas: string[] = [];
     for (const l of escolhidas) {
       const nome = l.e.pets?.nome ?? "Pet";
       try {
-        // guarda o que foi cobrado: quem saiu sem cobrar fica com o valor em branco (cortesia fica com 0)
-        const r = ok(await sb.from("estadias").update({ status: "encerrada", saida: new Date().toISOString(), diarias_cobradas: l.n, valor_cobrado: l.cobra && forma ? l.valor : l.cortesia ? 0 : null })
-          .eq("id", l.e.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
+        // guarda o que foi cobrado: com pacote fica 0 e a nota; quem saiu sem cobrar fica com o valor em branco (cortesia fica com 0)
+        const r = ok(await sb.from("estadias").update({
+          status: "encerrada", saida: new Date().toISOString(), diarias_cobradas: l.n,
+          valor_cobrado: l.mensal ? null : l.usaPacote ? 0 : l.cobra && forma ? l.valor : l.cortesia ? 0 : null,
+          ...(l.usaPacote ? { obs: comNota(l.e.obs, NOTA_PACOTE) } : {}),
+        }).eq("id", l.e.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
         if (!r.length) continue; // já tinha saído por outra tela
         feitos++;
-        if (l.cobra && forma) {
+        if (l.usaPacote && l.pacote) {
+          // mesma baixa do check-out do pet: só grava se ninguém mexeu no pacote no meio do caminho
+          const usados = l.pacote.usados + l.n;
+          const b = await sb.from("pacotes_clientes").update({ usados, ativo: usados < l.pacote.total })
+            .eq("id", l.pacote.id).eq("petshop_id", petshop.id).eq("usados", l.pacote.usados).select("id");
+          if (b.error || !b.data?.length) falhas.push(`${nome} (saiu, mas o pacote não teve baixa)`); else comPacote++;
+        } else if (l.cobra && forma) {
           try {
             await lancarPago(sb, petshop.id, {
               tipo: "entrada", valor: l.valor, forma, categoria: "Creche e hotel",
@@ -863,8 +979,8 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
       } catch { falhas.push(nome); }
     }
     setSalvando(false);
-    if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join(", ")}. Confira e, se precisar, lance pelo Financeiro.`);
-    if (feitos) avisar(`${feitos === 1 ? "1 pet foi" : `${feitos} pets foram`} para casa.${recebido ? ` ${brl(recebido)} no financeiro.` : ""}`);
+    if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join(", ")}. Confira${vejoFinanceiro ? " e, se precisar, lance pelo Financeiro" : ""}.`);
+    if (feitos) avisar(`${feitos === 1 ? "1 pet foi" : `${feitos} pets foram`} para casa.${comPacote ? ` ${comPacote === 1 ? "1 usou" : `${comPacote} usaram`} o pacote.` : ""}${recebido ? ` ${brl(recebido)} no financeiro.` : ""}`);
     aoGravar();
   }
 
@@ -877,22 +993,29 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
         </button>
       </>}>
       <div className="g-form">
-        <p className="g-muted g-p">Marque quem está indo embora agora. {vejoFinanceiro ? "Cada um é cobrado com a forma escolhida, ou fica sem cobrar." : "O pagamento fica para quem cuida do financeiro lançar."}</p>
+        <p className="g-muted g-p">Marque quem está indo embora agora. Mensalista sai sem cobrança e quem tem pacote usa o pacote. {vejoFinanceiro ? "Os outros são cobrados com a forma escolhida, ou ficam sem cobrar." : "A cobrança dos outros fica para quem cuida do financeiro."}</p>
         <div className="g-ch-lote-lista">
           {linhas.map((l) => (
             <div key={l.e.id} className={`g-ch-lote-linha${sai[l.e.id] ? " on" : ""}`}>
               <label className="quem">
                 <input type="checkbox" checked={Boolean(sai[l.e.id])} onChange={(ev) => setSai((x) => ({ ...x, [l.e.id]: ev.target.checked }))} />
                 <AvatarPet pet={l.e.pets ?? { nome: "?" }} tamanho="p" />
-                <span className="t"><b>{l.e.pets?.nome ?? "Pet removido"}</b><small>{l.e.pets?.clientes?.nome ?? "Sem tutor"} · {l.n} {l.n === 1 ? "diária" : "diárias"}{l.valor > 0 ? ` · ${brl(l.valor)}` : l.cortesia ? " · cortesia" : " · sem diária combinada"}</small></span>
+                <span className="t"><b>{l.e.pets?.nome ?? "Pet removido"}</b><small>{l.e.pets?.clientes?.nome ?? "Sem tutor"} · {l.mensal
+                  ? (l.e.mensalista === "extra" ? "mensalista, dia extra (vai na cobrança do mês)" : l.e.mensalista === "reposicao" ? "mensalista, reposição" : "mensalista, dia do plano")
+                  : `${l.n} ${l.n === 1 ? "diária" : "diárias"}${!vejoFinanceiro ? "" : l.valor > 0 ? ` · ${brl(l.valor)}` : l.cortesia ? " · cortesia" : " · sem diária combinada"}`}</small></span>
               </label>
-              {vejoFinanceiro && l.valor > 0 && sai[l.e.id] && (
+              {l.pacote && sai[l.e.id] && (
+                <label className="cobra">
+                  <input type="checkbox" checked={l.usaPacote} onChange={(ev) => setSemPacote((x) => ({ ...x, [l.e.id]: !ev.target.checked }))} />
+                  <span>Usar {l.n} do pacote (restam {l.pacote.total - l.pacote.usados})</span>
+                </label>
+              )}
+              {vejoFinanceiro && !l.mensal && !l.usaPacote && l.valor > 0 && sai[l.e.id] && (
                 <label className="cobra">
                   <input type="checkbox" checked={l.cobra} onChange={(ev) => setCobrar((x) => ({ ...x, [l.e.id]: ev.target.checked }))} />
                   <span>Cobrar {brl(l.valor)}</span>
                 </label>
               )}
-              {temPacote(l.e.pet_id) && sai[l.e.id] && <small className="g-muted">Tem pacote com saldo. Para usar o pacote, faça o check-out pelo cartão do pet.</small>}
             </div>
           ))}
         </div>
@@ -903,6 +1026,123 @@ function EncerrarCreche({ estadias, aoFechar, aoGravar }: { estadias: EstadiaCom
             <AvisoCaixaFechado aberto={caixa} />
           </>
         )}
+      </div>
+    </Folha>
+  );
+}
+
+/* ---------- estadia encerrada: corrigir as datas e acertar a cobrança que ficou para trás ---------- */
+
+/** Check-out que fechou sem nada cobrado: não é de mensalista, não usou pacote e não é cortesia. */
+function estadiaSemCobranca(e: Pick<Estadia, "status" | "mensalista" | "diarias_cobradas" | "valor_cobrado" | "obs">) {
+  return e.status === "encerrada" && !e.mensalista && e.diarias_cobradas != null && e.valor_cobrado == null && !e.obs?.includes(NOTA_PACOTE);
+}
+
+function AcertarEstadia({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; aoFechar: () => void; aoGravar: () => void }) {
+  const { sb, petshop } = useGestao();
+  const { avisar, avisarErro } = useAvisos();
+  const pendente = estadiaSemCobranca(estadia);
+  const fimInicial = estadia.saida ?? estadia.entrada;
+  const [dia, setDia] = useState(isoDia(new Date(estadia.entrada)));
+  const [hhmm, setHhmm] = useState(horaDe(estadia.entrada));
+  const [saidaDia, setSaidaDia] = useState(isoDia(new Date(fimInicial)));
+  const [saidaHora, setSaidaHora] = useState(horaDe(fimInicial));
+  const [diarias, setDiarias] = useState<string | null>(null);
+  const [modo, setModo] = useState<"depois" | "cobrar" | "cortesia">(pendente ? "cobrar" : "depois");
+  const [valorEditado, setValorEditado] = useState<number | null | undefined>(undefined);
+  const [pagamento, setPagamento] = usePagamento();
+  const [depois, setDepois] = useState<PagaDepois>(pagaDepoisInicial);
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const caixa = useCaixaAberto();
+
+  const entrada = dia && hhmm ? juntaDiaHora(dia, hhmm) : null;
+  const saida = saidaDia && saidaHora ? juntaDiaHora(saidaDia, saidaHora) : null;
+  const datasBoas = Boolean(entrada && saida && !Number.isNaN(entrada.getTime()) && !Number.isNaN(saida.getTime()) && saida > entrada && saida.getTime() <= Date.now() + 60000);
+  const mexeuNasDatas = entrada?.toISOString() !== new Date(estadia.entrada).toISOString() || saida?.toISOString() !== new Date(fimInicial).toISOString();
+  // as diárias acompanham as datas enquanto a pessoa não digita outro número
+  const contadas = datasBoas ? contarDiarias({ tipo: estadia.tipo, entrada: entrada!.toISOString() }, saida!) : estadia.diarias_cobradas ?? 1;
+  const n = Number(diarias ?? (mexeuNasDatas ? contadas : estadia.diarias_cobradas ?? contadas));
+  const nValido = Number.isInteger(n) && n >= 1;
+  const calculado = nValido && estadia.valor_diaria != null ? Math.round(n * Number(estadia.valor_diaria) * 100) / 100 : null;
+  const valor = valorEditado === undefined ? calculado : valorEditado;
+  const nome = estadia.pets?.nome ?? "O pet";
+
+  async function salvar() {
+    if (salvando) return;
+    if (!datasBoas) return setErro("Confira as datas: a saída vem depois da entrada e não pode ser no futuro.");
+    if (!nValido) return setErro("Confira o número de diárias.");
+    const cobrando = pendente && modo === "cobrar";
+    if (cobrando && !valor) return setErro("Preencha o valor a receber, ou escolha Cortesia.");
+    const rec = cobrando && valor ? fecharRecebimento(pagamento, depois, valor) : null;
+    if (rec && "erro" in rec) return setErro(rec.erro);
+    setErro(null); setSalvando(true);
+    try {
+      const r = ok(await sb.from("estadias").update({
+        entrada: entrada!.toISOString(), saida: saida!.toISOString(), diarias_cobradas: n,
+        ...(cobrando ? { valor_cobrado: valor } : pendente && modo === "cortesia" ? { valor_cobrado: 0 } : {}),
+      }).eq("id", estadia.id).eq("petshop_id", petshop.id).eq("status", "encerrada").select("id"));
+      if (!r.length) { avisar("Essa estadia já tinha sido alterada. Atualizei a lista."); aoGravar(); return; }
+      if (rec && !("erro" in rec) && valor) {
+        const descricao = `${nomeTipo(estadia.tipo)}: ${n} ${n === 1 ? "diária" : "diárias"} · ${nome}`;
+        try {
+          if (rec.fiado) {
+            await lancarAReceber(sb, petshop.id, { valor, vencimento: rec.quando, categoria: "Creche e hotel", descricao, clienteId: estadia.pets?.clientes?.id ?? null });
+            avisar(`Acertado: ${brl(valor)} em A receber, para ${dataCurta(rec.quando)}.`);
+          } else {
+            lembrarForma(rec.forma);
+            await lancarPago(sb, petshop.id, { tipo: "entrada", valor, forma: rec.forma, pagamentos: rec.pagamentos, categoria: "Creche e hotel", descricao, clienteId: estadia.pets?.clientes?.id ?? null });
+            avisar(`Acertado: ${brl(valor)} no financeiro.`);
+          }
+        } catch (e) {
+          avisarErro(`A estadia foi corrigida, mas o valor não foi lançado. Lance pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
+        }
+      } else avisar(pendente && modo === "cortesia" ? `${nome}: estadia marcada como cortesia.` : "Estadia corrigida.");
+      aoGravar();
+    } catch (e) { avisarErro(e); setSalvando(false); }
+  }
+
+  return (
+    <Folha titulo={pendente ? `Acertar a estadia de ${nome}` : `Corrigir a estadia de ${nome}`} aoFechar={aoFechar}
+      rodape={<>
+        <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
+        <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : pendente && modo === "cobrar" && valor ? (depois.ativo ? `Anotar ${brl(valor)} a receber` : `Receber ${brl(valor)}`) : "Salvar"}</button>
+      </>}>
+      <div className="g-form">
+        <p className="g-muted g-p">{nomeTipo(estadia.tipo)} · {estadia.pets?.clientes?.nome ?? "Sem tutor"}. Acerte o dia e a hora em que o pet entrou e saiu de verdade.</p>
+        <div className="dupla">
+          <Campo rotulo="Entrou em"><input type="date" className="g-input" value={dia} max={isoDia(new Date())} onChange={(e) => { setDia(e.target.value); setErro(null); }} /></Campo>
+          <Campo rotulo="Hora"><input type="time" className="g-input" value={hhmm} onChange={(e) => { setHhmm(e.target.value); setErro(null); }} /></Campo>
+        </div>
+        <div className="dupla">
+          <Campo rotulo="Saiu em"><input type="date" className="g-input" value={saidaDia} min={dia} max={isoDia(new Date())} onChange={(e) => { setSaidaDia(e.target.value); setErro(null); }} /></Campo>
+          <Campo rotulo="Hora"><input type="time" className="g-input" value={saidaHora} onChange={(e) => { setSaidaHora(e.target.value); setErro(null); }} /></Campo>
+        </div>
+        <Campo rotulo="Diárias" dica={datasBoas ? `Pelas datas: ${contadas}.` : undefined} erro={nValido ? null : "Use um número inteiro, a partir de 1."}>
+          <input className="g-input g-tab" inputMode="numeric" value={String(diarias ?? (Number.isFinite(n) ? n : ""))} onChange={(e) => { setDiarias(e.target.value); setValorEditado(undefined); }} />
+        </Campo>
+        {pendente && (
+          <>
+            <div className="g-campo">
+              <span>Este check-out ficou sem cobrança</span>
+              <Chips opcoes={[{ id: "cobrar", rotulo: "Cobrar" }, { id: "cortesia", rotulo: "Cortesia (não cobrar)" }, { id: "depois", rotulo: "Deixar pendente" }] as const} valor={modo} aoMudar={setModo} />
+            </div>
+            {modo === "cobrar" && (
+              <>
+                <Campo rotulo="Valor a receber" erro={erroDeValor(valor)} dica={estadia.valor_diaria == null ? "A diária não foi combinada no check-in." : `${n} × ${brl(estadia.valor_diaria)}`}>
+                  <CampoDinheiro valor={valor} aoMudar={(v) => { setValorEditado(v); setErro(null); }} />
+                </Campo>
+                {valor ? (
+                  <>
+                    <QuandoPaga total={valor} pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErro(null); }} depois={depois} aoDepois={(d) => { setDepois(d); setErro(null); }} />
+                    {!depois.ativo && <AvisoCaixaFechado aberto={caixa} />}
+                  </>
+                ) : null}
+              </>
+            )}
+          </>
+        )}
+        {erro && <p className="g-erro" role="alert">{erro}</p>}
       </div>
     </Folha>
   );
