@@ -1,0 +1,312 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { Check, MessageCircle, PhoneOff } from "lucide-react";
+import type { Banco } from "@/lib/gestao/supabase";
+import { chamar, dataAmigavel, deIsoDia, fmtTelefone, haQuanto, inicioDoDia, linkWhatsApp, soDigitos } from "@/lib/gestao/util";
+import { useGestao } from "../contexto";
+import { guardarLembrado, lerLembrado } from "../lembrado";
+import { AvatarPet, Esqueleto, Folha, Vazio, useDados } from "../ui";
+import { buscarTudo, linkTutor } from "./comum";
+import "./chamar-de-volta.css";
+
+/**
+ * "Chamar de volta": quem já veio e parou de vir (sem horário marcado) e os aniversariantes da semana,
+ * um tutor por linha, com a mensagem pronta para abrir no WhatsApp. Só lê o banco: o texto das mensagens
+ * e quem já foi chamado ficam guardados no aparelho.
+ */
+
+export type AbaChamar = "volta" | "niver";
+
+type PetChamar = {
+  id: string; nome: string; foto: string | null; especie: string; nascimento: string | null; cliente_id: string;
+  clientes: { id: string; nome: string; telefone: string | null } | null;
+};
+/** Um pet ativo com a última visita (atendimento concluído ou estadia) e se já tem algo marcado daqui para a frente. */
+export type ParaChamar = { pet: PetChamar; ultima: string | null; servico: string | null; marcado: boolean };
+
+type Resposta<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
+
+/** Pets ativos com a última visita de cada um e se há horário ou estadia por vir. Só leitura, página a página. */
+export async function buscarParaChamar(sb: Banco, petshopId: string): Promise<ParaChamar[]> {
+  const pets = await buscarTudo<PetChamar>((de, ate) => sb.from("pets").select("id, nome, foto, especie, nascimento, cliente_id, clientes(id, nome, telefone)")
+    .eq("petshop_id", petshopId).eq("ativo", true).order("nome").order("id").range(de, ate) as unknown as Resposta<PetChamar>);
+  if (!pets.length) return [];
+  const agora = new Date();
+  const ultima = new Map<string, { quando: string; servico: string | null }>();
+  const faltam = new Set(pets.map((p) => p.id));
+  // do mais novo para o mais antigo: para quando todos os pets já apareceram
+  await buscarTudo<{ pet_id: string; inicio: string; servicos: { nome: string } | null }>(
+    (de, ate) => sb.from("agendamentos").select("pet_id, inicio, servicos(nome)").eq("petshop_id", petshopId).eq("status", "concluido")
+      .order("inicio", { ascending: false }).order("id").range(de, ate) as unknown as Resposta<{ pet_id: string; inicio: string; servicos: { nome: string } | null }>,
+    (linhas) => {
+      for (const l of linhas) if (!ultima.has(l.pet_id)) { ultima.set(l.pet_id, { quando: l.inicio, servico: l.servicos?.nome ?? null }); faltam.delete(l.pet_id); }
+      return faltam.size === 0;
+    });
+  const marcado = new Set<string>();
+  // creche e hotel também é visita; reserva ou pet na casa conta como "já tem algo marcado"
+  await buscarTudo<{ pet_id: string; entrada: string; saida: string | null; status: string; tipo: string }>(
+    (de, ate) => sb.from("estadias").select("pet_id, entrada, saida, status, tipo").eq("petshop_id", petshopId).in("status", ["encerrada", "em_casa", "reservada"])
+      .order("entrada", { ascending: false }).order("id").range(de, ate),
+    (linhas) => {
+      for (const l of linhas) {
+        if (l.status !== "encerrada") { marcado.add(l.pet_id); continue; }
+        const quando = l.saida ?? l.entrada, u = ultima.get(l.pet_id);
+        if (!u || new Date(quando) > new Date(u.quando)) ultima.set(l.pet_id, { quando, servico: l.tipo === "hotel" ? "Hotel" : "Creche" });
+      }
+      return false;
+    });
+  await buscarTudo<{ pet_id: string }>(
+    (de, ate) => sb.from("agendamentos").select("pet_id").eq("petshop_id", petshopId).gte("inicio", inicioDoDia(agora).toISOString())
+      .in("status", ["marcado", "confirmado", "em_atendimento"]).order("inicio").order("id").range(de, ate),
+    (linhas) => { for (const l of linhas) marcado.add(l.pet_id); return false; });
+  return pets.map((pet) => ({ pet, ultima: ultima.get(pet.id)?.quando ?? null, servico: ultima.get(pet.id)?.servico ?? null, marcado: marcado.has(pet.id) }));
+}
+
+type PetDoGrupo = { pet: PetChamar; detalhe: string; ordem: number };
+/** Um tutor e os pets dele que entram na lista (uma mensagem só por tutor). */
+export type GrupoChamar = { chave: string; nome: string; telefone: string | null; pets: PetDoGrupo[]; ordem: number };
+
+function agrupar(itens: PetDoGrupo[]): GrupoChamar[] {
+  const grupos = new Map<string, GrupoChamar>();
+  for (const i of itens) {
+    const c = i.pet.clientes;
+    const g = grupos.get(i.pet.cliente_id) ?? { chave: i.pet.cliente_id, nome: c?.nome ?? "Sem tutor", telefone: soDigitos(c?.telefone).length >= 8 ? c!.telefone : null, pets: [], ordem: i.ordem };
+    g.pets.push(i);
+    g.ordem = Math.min(g.ordem, i.ordem);
+    grupos.set(g.chave, g);
+  }
+  return [...grupos.values()].sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome));
+}
+
+const diasEntre = (de: Date, ate: Date) => Math.round((inicioDoDia(ate).getTime() - inicioDoDia(de).getTime()) / 864e5);
+
+/** Quem já veio, não vem há mais de `dias` dias e não tem nada marcado. Quem saiu há menos tempo vem primeiro. */
+export function quemSumiu(lista: ParaChamar[], dias: number, hoje = new Date()): GrupoChamar[] {
+  const itens: PetDoGrupo[] = [];
+  for (const x of lista) {
+    if (!x.ultima || x.marcado) continue;
+    const faz = diasEntre(new Date(x.ultima), hoje);
+    if (faz <= dias) continue;
+    itens.push({ pet: x.pet, ordem: faz, detalhe: `${faz < 90 ? `há ${faz} dias` : haQuanto(x.ultima)}${x.servico ? ` · ${x.servico}` : ""}` });
+  }
+  return agrupar(itens);
+}
+
+/** Pets que fazem aniversário de hoje até daqui a 7 dias. Sem data de nascimento na ficha, o pet não entra. */
+export function aniversariantes(lista: ParaChamar[], hoje = new Date()): GrupoChamar[] {
+  const h = inicioDoDia(hoje);
+  const itens: PetDoGrupo[] = [];
+  for (const x of lista) {
+    if (!x.pet.nascimento) continue;
+    const n = deIsoDia(x.pet.nascimento);
+    if (Number.isNaN(n.getTime())) continue;
+    let d = new Date(h.getFullYear(), n.getMonth(), n.getDate());
+    if (d < h) d = new Date(h.getFullYear() + 1, n.getMonth(), n.getDate());
+    const em = diasEntre(h, d);
+    if (em > 7) continue;
+    const anos = d.getFullYear() - n.getFullYear();
+    itens.push({ pet: x.pet, ordem: em, detalhe: `aniversário ${dataAmigavel(d)}${anos >= 1 && anos <= 30 ? ` · faz ${anos === 1 ? "1 ano" : `${anos} anos`}` : ""}` });
+  }
+  return agrupar(itens);
+}
+
+/** "Thor", "Thor e Mel", "Thor, Mel e Luna". */
+export const juntarNomes = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(0, -1).join(", ")} e ${n[n.length - 1]}`);
+
+/* ---------- textos das mensagens (guardados no aparelho, por pet shop) ---------- */
+
+export const MODELOS_PADRAO: Record<AbaChamar, string> = {
+  volta: "Faz um tempinho desde a última visita de [pet]. Quer que eu veja um horário?",
+  niver: "A gente lembrou do aniversário de [pet] e passou para dar os parabéns! Muita saúde e muito carinho.",
+};
+const chaveModelos = (petshopId: string) => `maestro-gestao-chamar-modelos:${petshopId}`;
+const chaveChamados = (petshopId: string) => `maestro-gestao-chamados:${petshopId}`;
+
+function lerJson<T extends object>(chave: string): Partial<T> {
+  try { const v: unknown = JSON.parse(lerLembrado(chave) ?? "{}"); return v && typeof v === "object" && !Array.isArray(v) ? (v as Partial<T>) : {}; } catch { return {}; }
+}
+function lerModelos(petshopId: string): Record<AbaChamar, string> {
+  const g = lerJson<Record<AbaChamar, string>>(chaveModelos(petshopId));
+  return { volta: typeof g.volta === "string" ? g.volta : MODELOS_PADRAO.volta, niver: typeof g.niver === "string" ? g.niver : MODELOS_PADRAO.niver };
+}
+
+/** A mensagem inteira: a saudação entra sozinha e `[pet]` vira o nome do pet (ou dos pets) do tutor. Texto em branco usa o padrão. */
+export function montarMensagem(aba: AbaChamar, modelo: string, p: { tutor: string | null; pets: string[]; petshop: string }) {
+  const corpo = (modelo.trim() || MODELOS_PADRAO[aba]).replace(/\[pet\]/gi, juntarNomes(p.pets) || "seu pet");
+  return `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} Aqui é do ${p.petshop}. ${corpo}`;
+}
+
+/* ---------- quem já foi chamado (fica marcado por alguns dias, neste aparelho) ---------- */
+
+/** Por quantos dias a linha continua marcada como chamada. */
+const DIAS_CHAMADO: Record<AbaChamar, number> = { volta: 7, niver: 20 };
+type Chamados = Record<string, string>;
+
+export function lerChamados(petshopId: string): Chamados {
+  const g = lerJson<Chamados>(chaveChamados(petshopId));
+  const vale: Chamados = {};
+  for (const [k, v] of Object.entries(g)) if (typeof v === "string" && !Number.isNaN(Date.parse(v))) vale[k] = v;
+  return vale;
+}
+/** Quando este tutor foi chamado (se ainda está dentro do prazo), ou null. */
+export function chamadoEm(chamados: Chamados, aba: AbaChamar, chave: string, agora = Date.now()): string | null {
+  const em = chamados[`${aba}:${chave}`];
+  return em && agora - Date.parse(em) < DIAS_CHAMADO[aba] * 864e5 ? em : null;
+}
+
+const DIAS = [30, 45, 60, 90];
+const PASSO = 40;
+
+export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: { aoFechar: () => void; aba?: AbaChamar }) {
+  const { sb, petshop } = useGestao();
+  const [aba, setAba] = useState<AbaChamar>(abaInicial);
+  const [dias, setDias] = useState(30);
+  const [modelos, setModelos] = useState(() => lerModelos(petshop.id));
+  const [editando, setEditando] = useState(false);
+  const [chamados, setChamados] = useState(() => lerChamados(petshop.id));
+  const [mostrar, setMostrar] = useState(PASSO);
+
+  const { dados, carregando, erro, recarregar } = useDados(() => buscarParaChamar(sb, petshop.id), [petshop.id]);
+
+  const sumidos = dados ? quemSumiu(dados, dias) : [];
+  const niver = dados ? aniversariantes(dados) : [];
+  const grupos = aba === "volta" ? sumidos : niver;
+  const comTelefone = grupos.filter((g) => g.telefone);
+  const semTelefone = grupos.filter((g) => !g.telefone);
+  const feito = (g: GrupoChamar) => chamadoEm(chamados, aba, g.chave);
+  const faltam = comTelefone.filter((g) => !feito(g));
+  const proximo = faltam[0]?.chave ?? null;
+  const modelo = modelos[aba];
+  const mensagem = (g: GrupoChamar) => montarMensagem(aba, modelo, { tutor: g.nome, pets: g.pets.map((p) => p.pet.nome), petshop: petshop.nome });
+  const exemplo = faltam[0] ?? comTelefone[0] ?? null;
+
+  function mudarModelo(texto: string) {
+    const novo = { ...modelos, [aba]: texto };
+    setModelos(novo);
+    guardarLembrado(chaveModelos(petshop.id), JSON.stringify(novo));
+  }
+
+  function chamou(g: GrupoChamar) {
+    const agora = Date.now();
+    // relê o que está guardado (outra aba pode ter marcado alguém) e descarta o que já é antigo
+    const novo: Chamados = {};
+    for (const [k, v] of Object.entries(lerChamados(petshop.id))) if (agora - Date.parse(v) < 40 * 864e5) novo[k] = v;
+    novo[`${aba}:${g.chave}`] = new Date(agora).toISOString();
+    guardarLembrado(chaveChamados(petshop.id), JSON.stringify(novo));
+    setChamados(novo);
+  }
+
+  const trocarAba = (a: AbaChamar) => { setAba(a); setEditando(false); setMostrar(PASSO); };
+  const fotos = (g: GrupoChamar) => (
+    <span className="g-cv-fotos">{g.pets.slice(0, 3).map((p) => <AvatarPet key={p.pet.id} pet={p.pet} tamanho={g.pets.length > 1 ? "p" : undefined} />)}</span>
+  );
+  const detalhe = (g: GrupoChamar) => (g.pets.length === 1 ? g.pets[0].detalhe : g.pets.map((p) => `${p.pet.nome}: ${p.detalhe}`).join(" · "));
+  const nomesDe = (g: GrupoChamar) => juntarNomes(g.pets.map((p) => p.pet.nome));
+
+  return (
+    <Folha larga titulo="Chamar de volta" aoFechar={aoFechar} rodape={<button type="button" className="g-btn sec" onClick={aoFechar}>Fechar</button>}>
+      <div className="g-pilha">
+        <div className="g-seg g-cv-abas" role="group" aria-label="Quem chamar">
+          <button type="button" aria-pressed={aba === "volta"} onClick={() => trocarAba("volta")}>Faz tempo que não vêm{dados ? ` (${sumidos.length})` : ""}</button>
+          <button type="button" aria-pressed={aba === "niver"} onClick={() => trocarAba("niver")}>Aniversário{dados ? ` (${niver.length})` : ""}</button>
+        </div>
+
+        {aba === "volta" && (
+          <div className="g-campo">
+            <span>Sem vir há mais de</span>
+            <div className="g-chips" role="group" aria-label="Dias sem vir">
+              {DIAS.map((d) => <button key={d} type="button" className="g-chip" aria-pressed={dias === d} onClick={() => { setDias(d); setMostrar(PASSO); }}>{d} dias</button>)}
+            </div>
+          </div>
+        )}
+
+        {erro && !dados ? (
+          <Vazio titulo="Não consegui montar a lista" texto={erro}><button className="g-btn verde" onClick={() => void recarregar()}>Tentar de novo</button></Vazio>
+        ) : carregando && !dados ? <Esqueleto linhas={4} /> : !grupos.length ? (
+          aba === "volta"
+            ? <Vazio titulo="Ninguém sumido por aqui" texto={`Quem já veio voltou nos últimos ${dias} dias ou já tem horário marcado.`} />
+            : <Vazio titulo="Nenhum aniversário nos próximos 7 dias" texto="Aparecem aqui os pets com a data de nascimento anotada na ficha." />
+        ) : (
+          <>
+            <div className="g-cv-msg">
+              <div className="g-cv-msg-t">
+                <span className="g-rotulo">Mensagem</span>
+                <button type="button" className="g-btn fantasma p" aria-expanded={editando} onClick={() => setEditando(!editando)}>{editando ? "Pronto" : "Mudar o texto"}</button>
+              </div>
+              {editando && (
+                <label className="g-campo">
+                  <span>O que vai escrito depois do “Oi”</span>
+                  <textarea className="g-textarea" data-sem-aviso rows={3} maxLength={500} value={modelo} onChange={(e) => mudarModelo(e.target.value)} />
+                  <small>Onde estiver [pet] entra o nome do pet. O começo, com o nome do tutor e do pet shop, entra sozinho. O texto fica guardado neste aparelho.</small>
+                  {modelo !== MODELOS_PADRAO[aba] && <button type="button" className="g-btn fantasma p g-cv-padrao" onClick={() => mudarModelo(MODELOS_PADRAO[aba])}>Voltar ao texto padrão</button>}
+                </label>
+              )}
+              {exemplo && <p className="g-cv-previa"><span className="g-pp g-muted">Para {chamar(exemplo.nome) || "o tutor"}, vai assim:</span>{mensagem(exemplo)}</p>}
+            </div>
+
+            <p className="g-lb-topo" role="status">
+              {!comTelefone.length ? "Nenhum tutor desta lista tem telefone na ficha."
+                : faltam.length ? <><b>{faltam.length === 1 ? "1 tutor para chamar" : `${faltam.length} tutores para chamar`}</b>. Toque em Chamar: o WhatsApp abre com a mensagem pronta e você só aperta enviar.</>
+                : <span className="g-cv-ok"><Check aria-hidden /><b>Todo mundo desta lista já foi chamado.</b></span>}
+            </p>
+
+            {comTelefone.length > 0 && (
+              <div className="g-lb-lista">
+                {comTelefone.slice(0, mostrar).map((g) => {
+                  const zap = linkWhatsApp(g.telefone, mensagem(g))!;
+                  const em = feito(g), vez = g.chave === proximo;
+                  return (
+                    <div key={g.chave} className={`g-lb-linha${vez ? " vez" : ""}${em ? " feito" : ""}`}>
+                      {fotos(g)}
+                      <span className="t">
+                        <b>{nomesDe(g)}</b>
+                        <span>{detalhe(g)}</span>
+                        <span className="g-tab">Tutor: {g.nome} · {fmtTelefone(g.telefone)}</span>
+                      </span>
+                      {em ? (
+                        <span className="g-lb-feito">
+                          <span className="g-tag verde"><Check size={12} aria-hidden />Chamado {dataAmigavel(em)}</span>
+                          <a href={zap} target="_blank" rel="noopener noreferrer" onClick={() => chamou(g)}>Chamar de novo</a>
+                        </span>
+                      ) : (
+                        <a className={`g-btn ${vez ? "zap" : "sec"}`} href={zap} target="_blank" rel="noopener noreferrer" onClick={() => chamou(g)}
+                          aria-label={`Chamar ${g.nome} no WhatsApp`}>
+                          <MessageCircle />Chamar
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {comTelefone.length > mostrar && <button type="button" className="g-btn sec" onClick={() => setMostrar(mostrar + PASSO)}>Mostrar mais</button>}
+
+            {semTelefone.length > 0 && (
+              <section className="g-cv-sem">
+                <p className="g-rotulo" style={{ marginBottom: 6 }}>Sem telefone</p>
+                <div className="g-lb-lista">
+                  {semTelefone.slice(0, PASSO).map((g) => (
+                    <div key={g.chave} className="g-lb-linha sem">
+                      <span className="g-lb-sem" aria-hidden><PhoneOff /></span>
+                      <span className="t">
+                        <b>{nomesDe(g)}</b>
+                        <span>{detalhe(g)}</span>
+                        <span>Tutor: {g.nome} · sem telefone</span>
+                      </span>
+                      <Link className="g-btn sec" href={linkTutor(g.chave)} onClick={aoFechar}>Ver ficha</Link>
+                    </div>
+                  ))}
+                </div>
+                <p className="g-muted g-pp" style={{ marginTop: 6 }}>
+                  {semTelefone.length > PASSO ? `E mais ${semTelefone.length - PASSO} sem telefone. ` : ""}Coloque o telefone na ficha do tutor para chamar pelo WhatsApp.
+                </p>
+              </section>
+            )}
+          </>
+        )}
+      </div>
+    </Folha>
+  );
+}

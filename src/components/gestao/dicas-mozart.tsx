@@ -19,7 +19,10 @@ const CHAVE = "maestro-gestao-dicas";
  * O que o Mozart reparou olhando os dados do pet shop: quem sumiu, quem faltou, pacote acabando,
  * aniversário e dia fraco na agenda. Tudo calculado no navegador com dados reais; cada dica leva a uma ação.
  */
-export default function DicasMozart() {
+export default function DicasMozart({ semDicas = [] }: {
+  /** Dicas que a tela já mostra de outro jeito (ex.: a linha que abre direto a lista de quem chamar). */
+  semDicas?: string[];
+}) {
   const { sb, petshop } = useGestao();
   const hoje = inicioDoDia(new Date());
   const hojeIso = isoDia(hoje);
@@ -108,7 +111,7 @@ export default function DicasMozart() {
     return dicas;
   }, [petshop.id, hojeIso]);
 
-  const visiveis = (dados ?? []).filter((d) => !escondidas.includes(d.id)).slice(0, 3);
+  const visiveis = (dados ?? []).filter((d) => !escondidas.includes(d.id) && !semDicas.includes(d.id)).slice(0, 3);
   if (!visiveis.length) return null;
 
   return (

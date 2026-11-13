@@ -7,8 +7,9 @@ import { BellRing, CalendarClock, CalendarX, Check, MessageCircle, Play, Receipt
 import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoLembrete, textoPronto } from "@/lib/gestao/agenda";
+import { textoComprovante } from "@/lib/gestao/comprovante";
 import { desfazerVenda, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
-import { brl, dataAmigavel, dataCompleta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, somaDias } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { FolhaBaixa } from "../financeiro/comum";
@@ -159,6 +160,11 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
 
   const zapPronto = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: pet?.nome ?? "Seu pet", petshop: petshop.nome }));
 
+  // comprovante: só para quem vê o financeiro, com o atendimento concluído, a conta toda recebida e telefone na ficha
+  const zapComprovante = vejoFinanceiro && a.status === "concluido" && recebidos.length > 0 && !devidos.length && soDigitos(tutor?.telefone).length >= 8
+    ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico: a.servicos?.nome, quando: a.inicio, recebidos }))
+    : null;
+
   if (comanda) {
     return <Comanda agendamento={a} aoFechar={() => setComanda(false)} aoPronto={() => { aoMudar(); aoFechar(); }} />;
   }
@@ -281,6 +287,10 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           <button className="g-btn verde cheio" disabled={ocupado} onClick={() => { if (!somenteLeitura()) setBaixando(devidos[0]); }}>
             <Receipt />O cliente pagou: receber {brl(devidos[0].valor)}
           </button>
+        )}
+
+        {zapComprovante && (
+          <a className="g-btn sec cheio" href={zapComprovante} target="_blank" rel="noopener noreferrer"><Receipt />Mandar comprovante</a>
         )}
 
         {podeAvisarPronto && (zapPronto ? (

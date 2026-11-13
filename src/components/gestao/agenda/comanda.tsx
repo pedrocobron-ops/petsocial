@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Truck } from "lucide-react";
+import { Check, MessageCircle, Plus, Truck } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
+import { textoComprovante } from "@/lib/gestao/comprovante";
 import { lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
-import { brl, dataCompleta, hora, isoDia, somaDias } from "@/lib/gestao/util";
+import { brl, dataCompleta, hora, isoDia, linkWhatsApp, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
+import { Tile } from "../painel";
 import { AvatarPet, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "../ui";
 import {
   baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
@@ -20,7 +22,7 @@ import { AvisoCaixaFechado, fecharPagamento, lembrarForma, useCaixaAberto, usePa
 export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
   agendamento: AgendamentoCompleto; aoFechar: () => void; aoPronto: () => void;
 }) {
-  const { sb, petshop, user } = useGestao();
+  const { sb, petshop, user, vejoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const { produtos, carregando, erro } = useProdutosDaLoja();
@@ -35,6 +37,8 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
   const [depois, setDepois] = useState<PagaDepois>(() => ({ ativo: false, quando: isoDia(somaDias(new Date(), 7)) }));
   const [erroForma, setErroForma] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // conta recebida: antes de fechar, oferece o comprovante no WhatsApp do tutor
+  const [recebida, setRecebida] = useState<{ valor: number; zap: string } | null>(null);
   const caixa = useCaixaAberto();
 
   const contas = fecharContas(itens, desconto);
@@ -63,6 +67,7 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
     if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return;
     setSalvando(true);
     let recebeu = false;
+    let zapComprovante: string | null = null;
     try {
       // outra pessoa pode ter recebido enquanto esta conta estava aberta
       const ja = ok(await sb.from("lancamentos").select("id").eq("petshop_id", petshop.id).eq("agendamento_id", a.id).eq("tipo", "entrada").limit(1));
@@ -82,11 +87,14 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
         recebeu = true;
       } else if (pg && !("erro" in pg)) {
         lembrarForma(pg.forma);
-        await lancarPago(sb, petshop.id, {
+        const lancado = await lancarPago(sb, petshop.id, {
           tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: pg.pagamentos, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null,
           descricao, itens: gravar,
         });
         recebeu = true;
+        if (vejoFinanceiro && lancado && soDigitos(tutor?.telefone).length >= 8) {
+          zapComprovante = linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] }));
+        }
       }
       let estoqueOk = true;
       try { await baixarEstoque(sb, petshop.id, user.id, itens); } catch (e) {
@@ -96,7 +104,8 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
       if (a.status !== "concluido") ok(await sb.from("agendamentos").update({ status: "concluido" }).eq("id", a.id).select("id").single());
       if (estoqueOk) avisar(fiado ? `Anotado: ${brl(contas.total)} a receber até ${dataCompleta(depois.quando)}.` : recebeu ? `Recebido ${brl(contas.total)}.` : "Atendimento concluído sem cobrança.");
       avisarMudanca();
-      aoPronto();
+      if (zapComprovante) setRecebida({ valor: contas.total, zap: zapComprovante });
+      else aoPronto();
     } catch (e) {
       if (recebeu) {
         avisarErro(`${depois.ativo ? "A conta foi anotada" : "O valor foi recebido"}, mas o atendimento não ficou como concluído. Conclua pela agenda. (${mensagemDeErro(e)})`);
@@ -109,6 +118,20 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
         aoPronto();
       } else { avisarErro(e); setSalvando(false); }
     }
+  }
+
+  if (recebida) {
+    return (
+      <Folha titulo="Conta fechada" aoFechar={aoPronto} rodape={<button type="button" className="g-btn sec" onClick={aoPronto}>Pronto</button>}>
+        <div className="g-vd-recibo">
+          <Tile icone={Check} tom="menta" tamanho="g" />
+          <p className="g-num">{brl(recebida.valor)}</p>
+          <p><b>Recebido.</b> O atendimento{pet?.nome ? ` de ${pet.nome}` : ""} ficou como concluído.</p>
+          <a className="g-btn zap cheio" href={recebida.zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar comprovante</a>
+          <p className="g-pp g-muted">O WhatsApp de {tutor?.nome ?? "quem trouxe o pet"} abre com o comprovante pronto e você só aperta enviar. Não é nota fiscal.</p>
+        </div>
+      </Folha>
+    );
   }
 
   return (

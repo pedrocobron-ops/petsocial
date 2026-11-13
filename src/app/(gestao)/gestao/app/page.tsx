@@ -8,7 +8,7 @@ import PrimeirosPassos, { usePrimeirosPassos } from "@/components/gestao/primeir
 import ResumoSemana, { temSemanaPassada } from "@/components/gestao/resumo-semana";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import Link from "next/link";
-import { BedDouble, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, Wallet } from "lucide-react";
+import { BedDouble, Cake, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, UserSearch, Wallet } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
@@ -19,6 +19,7 @@ import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import { buscarSaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
 import MetaMes from "@/components/gestao/meta-mes";
 import DicasMozart from "@/components/gestao/dicas-mozart";
+import ChamarDeVolta, { aniversariantes, buscarParaChamar, chamadoEm, lerChamados, quemSumiu, type AbaChamar, type GrupoChamar } from "@/components/gestao/clientes/chamar-de-volta";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
@@ -31,6 +32,7 @@ export default function Hoje() {
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
   const [lembretes, setLembretes] = useState(false);
+  const [chamando, setChamando] = useState<AbaChamar | null>(null);
   const hoje = inicioDoDia(new Date());
   const hojeIso = isoDia(hoje);
 
@@ -102,6 +104,22 @@ export default function Hoje() {
     };
   }, [petshop.id, hojeIso, vejoFinanceiro]);
 
+  // quem chamar de volta e aniversariantes: consulta à parte, para não segurar o resto da tela
+  const vejoClientes = posso("clientes");
+  const { dados: paraChamar } = useDados(async () => (vejoClientes ? buscarParaChamar(sb, petshop.id) : null), [petshop.id, hojeIso, vejoClientes]);
+  const chamados = paraChamar ? lerChamados(petshop.id) : {};
+  const comFone = (grupos: GrupoChamar[]) => grupos.filter((g) => g.telefone);
+  const sumidos = paraChamar ? comFone(quemSumiu(paraChamar, 30, hoje)) : [];
+  const niver = paraChamar ? comFone(aniversariantes(paraChamar, hoje)) : [];
+  const sumidosAChamar = sumidos.filter((g) => !chamadoEm(chamados, "volta", g.chave));
+  const niverAChamar = niver.filter((g) => !chamadoEm(chamados, "niver", g.chave));
+  const nomesDosPets = (grupos: GrupoChamar[]) => {
+    const nomes = grupos.flatMap((g) => g.pets.map((p) => p.pet.nome));
+    return { q: nomes.length, texto: nomes.length <= 2 ? nomes.join(" e ") : `${nomes.slice(0, 2).join(", ")} e mais ${nomes.length - 2}` };
+  };
+  const petsSumidos = nomesDosPets(sumidosAChamar), petsNiver = nomesDosPets(niverAChamar);
+  const niverHoje = niverAChamar.length > 0 && niverAChamar.every((g) => g.pets.every((p) => p.ordem === 0));
+
   const ativos = (dados?.ags ?? []).filter((a) => !["cancelado", "faltou"].includes(a.status));
   const feitos = ativos.filter((a) => a.status === "concluido").length;
   const proximo = ativos.find((a) => a.status !== "concluido" && new Date(a.fim) > new Date());
@@ -132,6 +150,8 @@ export default function Hoje() {
 
   const atencao = dados ? [
     dados.amanhaSemLembrete > 0 && { icone: MessageCircle, tom: "pessego" as Tom, texto: `Amanhã ${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}: toque para mandar pelo WhatsApp.${dados.amanhaSemTelefone > 0 ? ` ${dados.amanhaSemTelefone} sem telefone (não ${dados.amanhaSemTelefone === 1 ? "entra" : "entram"} na conta).` : ""}`, aoTocar: () => setLembretes(true) },
+    sumidosAChamar.length > 0 && { icone: UserSearch, tom: "menta" as Tom, texto: `${petsSumidos.texto} ${petsSumidos.q === 1 ? "não vem" : "não vêm"} há mais de 30 dias e não ${petsSumidos.q === 1 ? "tem" : "têm"} horário marcado. Toque para chamar de volta pelo WhatsApp.`, aoTocar: () => setChamando("volta") },
+    niverAChamar.length > 0 && { icone: Cake, tom: "manteiga" as Tom, texto: `${petsNiver.texto} ${petsNiver.q === 1 ? "faz" : "fazem"} aniversário ${niverHoje ? "hoje" : "nos próximos dias"}. Toque para mandar os parabéns pelo WhatsApp.`, aoTocar: () => setChamando("niver") },
     dados.acabando.length > 0 && { icone: Package, tom: "rosa" as Tom, texto: `${dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}: ${dados.acabando.slice(0, 3).map((p) => p.nome).join(", ")}.`, href: "/gestao/app/estoque" },
     dados.contas.length > 0 && { icone: Receipt, tom: "manteiga" as Tom, texto: `${dados.contas.length === 1 ? "1 conta vence" : `${dados.contas.length} contas vencem`} até hoje: ${brl(dados.contas.reduce((s, c) => s + Number(c.valor), 0))}.`, href: "/gestao/app/financeiro" },
     dados.aReceberVencidas.length > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${dados.aReceberVencidas.length === 1 ? "1 cliente ficou de pagar" : `${dados.aReceberVencidas.length} contas de clientes venceram`} até hoje: ${brl(dados.aReceberVencidas.reduce((s, c) => s + Number(c.valor), 0))} a receber.`, href: "/gestao/app/financeiro" },
@@ -279,7 +299,7 @@ export default function Hoje() {
           </section>
 
           <div className="g-pilha g">
-            {posso("clientes") && posso("agenda") && <DicasMozart />}
+            {posso("clientes") && posso("agenda") && <DicasMozart semDicas={[...(sumidos.length ? ["sumidos"] : []), ...(niver.length ? ["niver"] : [])]} />}
             {atencao.length > 0 && (
               <section>
                 <div className="g-card-t"><h2>Pede a sua atenção</h2><span className="g-tag amarelo">{atencao.length}</span></div>
@@ -319,6 +339,7 @@ export default function Hoje() {
       </div>
 
       {selecionado && !editando && <DetalheAgendamento agendamento={selecionado} aoFechar={() => setAberto(null)} aoMudar={() => void recarregar()} aoEditar={() => setEditando(selecionado)} />}
+      {chamando && <ChamarDeVolta aba={chamando} aoFechar={() => setChamando(null)} />}
       {lembretes && <LembretesDoDia dia={isoDia(somaDias(hoje, 1))} aoFechar={() => setLembretes(false)} aoMudar={() => void recarregar()} />}
       {editando && <FormAgendamento agendamento={editando} aoFechar={() => setEditando(null)} aoSalvar={() => { setEditando(null); setAberto(null); void recarregar(); }} />}
     </>
