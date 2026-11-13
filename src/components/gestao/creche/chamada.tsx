@@ -181,7 +181,8 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
             <span className="faltou"><b className="g-num">{conta("faltou")}</b>{conta("faltou") === 1 ? "faltou" : "faltaram"}</span>
           </div>
           {ehHoje && aviso}
-          {emPausaHoje.length > 0 && <p className="g-muted g-p">Em pausa neste dia (não é falta): {emPausaHoje.map((p) => p.pets?.nome).join(", ")}.</p>}
+          {diaFechado(dia) && linhas.length > 0 && <p className="g-muted g-p" role="status"><b>{fraseDoDiaFechado(dia)}.</b> Ninguém é esperado e ninguém leva falta. Aqui embaixo fica só quem veio mesmo assim.</p>}
+          {emPausaHoje.length > 0 && !diaFechado(dia) && <p className="g-muted g-p">Em pausa neste dia (não é falta): {emPausaHoje.map((p) => p.pets?.nome).join(", ")}.</p>}
           {ehHoje && vagas != null && ocupadas != null && (
             <p className={`g-cm-vagas${ocupadas >= vagas ? " cheia" : ""}`}>Creche hoje: <b className="g-tab">{ocupadas} de {vagas} vagas</b>, contando quem ainda vai chegar{ocupadas >= vagas ? " · casa cheia" : ""}</p>
           )}

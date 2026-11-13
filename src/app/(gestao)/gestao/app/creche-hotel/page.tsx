@@ -496,7 +496,7 @@ export default function CrecheHotel() {
                     <AvatarPet pet={a.pets ?? { nome: "?" }} />
                     <span className="t">
                       <b>{a.pets?.nome ?? "Pet removido"}</b>
-                      <span>{[a.pets?.clientes?.nome, "mensalista", fraseDoAtraso(a)].filter(Boolean).join(" · ")}</span>
+                      <span>{[fraseDoAtraso(a), a.pets?.clientes?.nome, "mensalista"].filter(Boolean).join(" · ")}</span>
                     </span>
                     {valorDaTaxa
                       ? <button type="button" className="g-btn verde p" onClick={() => { if (!somenteLeitura()) setTaxa(a); }} aria-label={`Decidir a taxa de busca fora do horário de ${a.pets?.nome ?? "pet"}`}><HandCoins />Taxa de {brl(valorDaTaxa)}</button>
