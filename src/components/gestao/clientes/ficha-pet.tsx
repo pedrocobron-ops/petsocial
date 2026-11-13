@@ -18,6 +18,10 @@ import { FolhaTrocarTutor } from "./juntar";
 import { EtiquetaEspecie, tomDaVisita } from "./lista";
 import { CartaoSaude, EtiquetaSaude, resumoSaude, type CuidadoSaude } from "./saude";
 import { CartaoMensalista } from "../creche/resumo-mes";
+import { OcorrenciasDoPet } from "../casa/ocorrencias";
+import { QuemPodeBuscar } from "../casa/portaria";
+import { portariaLigada } from "@/lib/gestao/casa-opcoes";
+import { usaCasa } from "@/lib/gestao/modulos";
 
 type PetDaFicha = Pet & { clientes: Cliente | null };
 type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id">;
@@ -293,6 +297,9 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
               </div>
             )}
           </section>
+
+          {usaCasa(petshop) && portariaLigada(petshop) && <QuemPodeBuscar pet={{ ...pet, clientes: tutor }} />}
+          <OcorrenciasDoPet petId={pet.id} />
 
           {pet.ativo && (
             <div><button className="g-btn perigo p" onClick={() => void mudarAtivo(false)} disabled={ocupado}>Desativar pet</button></div>

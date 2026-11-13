@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { AlertTriangle, CalendarPlus, Check, DoorOpen, LogIn, MessageCircle, Search, Sunset, Syringe, Undo2, UserX } from "lucide-react";
+import { lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { cuidadosVigentes, estadoSaude, tipoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
+import { portariaLigada, type Retirada } from "@/lib/gestao/casa-opcoes";
 import { abreNoDia, emPausa, erroDaChamada, esperadoNoDia, lerPresencas, mensagemDeFalta, montarChamada, planoVale, type LinhaChamada, type PlanoCompleto } from "@/lib/gestao/creche";
 import { dataAmigavel, dataLonga, deIsoDia, isoDia, linkWhatsApp, semAcento, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -41,8 +43,10 @@ async function saudeVencida(sb: ReturnType<typeof useGestao>["sb"], petshopId: s
  * Quem vem fora do dia entra como dia extra (vai para a cobrança do mês) ou como reposição de falta (não cobra).
  * Nada de dinheiro aqui: a chegada de um mensalista não cobra diária.
  */
-export default function Chamada({ planos, vagasHoje, aoNovoMensalista }: {
+export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: {
   planos: PlanoCompleto[]; vagasHoje: { ocupadas: number; total: number } | null; aoNovoMensalista: () => void;
+  /** faixa opcional acima da lista (abriu vaga para quem está na lista de espera) */
+  aviso?: React.ReactNode;
 }) {
   const { sb, petshop, souDono } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
@@ -51,6 +55,9 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista }: {
   const [dia, setDia] = useState(hoje);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [fora, setFora] = useState(false);
+  // com "Quem pode buscar" ligado, o Saiu pergunta antes quem levou o pet
+  const comPortaria = portariaLigada(petshop);
+  const [buscando, setBuscando] = useState<LinhaChamada | null>(null);
   const ehHoje = dia === hoje;
   const minimo = primeiroDia(agora);
 
@@ -59,8 +66,9 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista }: {
       lerPresencas(sb, petshop.id, dia, dia),
       saudeVencida(sb, petshop.id, [...new Set(planos.filter((p) => planoVale(p, dia)).map((p) => p.pet_id))]).catch(() => new Map<string, Saude>()),
     ]);
-    return { ...mov, saude };
-  }, [petshop.id, dia, planos.length]);
+    const retiradas = comPortaria ? await lerRetiradas(sb, petshop.id, mov.presencas.filter((e) => e.status === "encerrada").map((e) => e.id)).catch(() => new Map<string, Retirada>()) : new Map<string, Retirada>();
+    return { ...mov, saude, retiradas };
+  }, [petshop.id, dia, planos.length, comPortaria]);
 
   const linhas = useMemo(() => (dados ? montarChamada(planos, dia, dados.presencas, dados.faltas, petshop.horario) : []), [dados, planos, dia, petshop.horario]);
   const conta = (e: LinhaChamada["estado"]) => linhas.filter((l) => l.estado === e).length;
@@ -155,6 +163,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista }: {
             {ehHoje && <span className="saiu"><b className="g-num">{conta("saiu")}</b>já saíram</span>}
             <span className="faltou"><b className="g-num">{conta("faltou")}</b>{conta("faltou") === 1 ? "faltou" : "faltaram"}</span>
           </div>
+          {ehHoje && aviso}
           {emPausaHoje.length > 0 && <p className="g-muted g-p">Em pausa neste dia (não é falta): {emPausaHoje.map((p) => p.pets?.nome).join(", ")}.</p>}
           {ehHoje && vagas != null && ocupadas != null && (
             <p className={`g-cm-vagas${ocupadas >= vagas ? " cheia" : ""}`}>Creche hoje: <b className="g-tab">{ocupadas} de {vagas} vagas</b>, contando quem ainda vai chegar{ocupadas >= vagas ? " · casa cheia" : ""}</p>
@@ -198,7 +207,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista }: {
                           <span className="g-tag verde"><Check size={12} aria-hidden />na casa desde {isoDia(new Date(l.presenca!.entrada)) === hoje ? horaCurta(l.presenca!.entrada) : dataAmigavel(l.presenca!.entrada)}</span>
                           {l.presenca?.mensalista ? (
                             <>
-                              <button className="g-btn sec" disabled={trava} onClick={() => fazer("saiu")}><DoorOpen />Saiu</button>
+                              <button className="g-btn sec" disabled={trava} onClick={() => { if (comPortaria && ehHoje && l.presenca) { if (!somenteLeitura()) setBuscando(l); } else fazer("saiu"); }}><DoorOpen />Saiu</button>
                               <button className="g-btn fantasma p" disabled={trava} onClick={() => fazer("desfazer")} aria-label={`Desfazer a chegada de ${pet.nome}`}><Undo2 />Desfazer</button>
                             </>
                           ) : <span className="g-muted g-pp">saída pelo cartão, em Casa agora</span>}
@@ -206,7 +215,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista }: {
                       )}
                       {l.estado === "saiu" && (
                         <>
-                          <span className="g-tag">{ehHoje && l.presenca?.saida ? `saiu às ${horaCurta(l.presenca.saida)}` : "veio"}</span>
+                          <span className="g-tag">{ehHoje && l.presenca?.saida ? `saiu às ${horaCurta(l.presenca.saida)}` : "veio"}{l.presenca && dados.retiradas.get(l.presenca.id) ? ` ${textoDaRetirada(dados.retiradas.get(l.presenca.id)!)}` : ""}</span>
                           {l.presenca?.mensalista && <button className="g-btn fantasma p" disabled={trava} onClick={() => fazer("desfazer")} aria-label={`Desfazer a ${ehHoje ? "saída" : "presença"} de ${pet.nome}`}><Undo2 />Desfazer</button>}
                         </>
                       )}
@@ -239,6 +248,8 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista }: {
         </>
       )}
 
+      {buscando?.presenca && <QuemBuscou key={buscando.presenca.id} estadia={{ id: buscando.presenca.id, pets: buscando.plano.pets }} aoFechar={() => setBuscando(null)}
+        aoSeguir={async () => { const l = buscando; setBuscando(null); await marcar(l.plano, "saiu"); }} />}
       {fora && dados && <ForaDoDia planos={planos} dia={dia} jaVieram={new Set(linhas.map((l) => l.plano.id))} saude={dados.saude}
         cheia={ehHoje && vagas != null && ocupadas != null && ocupadas >= vagas ? { ocupadas: ocupadas!, vagas } : null}
         aoFechar={() => setFora(false)} aoMarcar={async (p, reposicao) => { if (await marcar(p, reposicao ? "reposicao" : "extra")) setFora(false); }} />}

@@ -2,6 +2,7 @@
 
 import { CalendarCheck2, UserX } from "lucide-react";
 import { CATEGORIA_MENSALIDADE, resumoDaCrecheHoje } from "@/lib/gestao/creche";
+import { OcorrenciasDeHoje } from "@/components/gestao/casa/ocorrencias";
 
 import { Marca, Selo } from "@/components/gestao/marca";
 import { Anel, Barras, Kpi, Ranking, Tendencia, Tile, type Tom } from "@/components/gestao/painel";
@@ -328,6 +329,7 @@ export default function Hoje() {
         )}
 
         {posso("agenda") && <PedidosLink />}
+        {casa && <OcorrenciasDeHoje />}
 
         {!(contaNova && cartaoPassos) && <PrimeirosPassos pp={pp} modo={cartaoPassos ? "cartao" : "linha"} />}
         {temResumo && <ResumoSemana modo={cartaoResumo ? "cartao" : "linha"} />}

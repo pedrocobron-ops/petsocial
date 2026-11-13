@@ -2,13 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, DoorOpen, Home, HandCoins, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, Sun, Sunset, Syringe } from "lucide-react";
+import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, DoorOpen, Home, HandCoins, Hourglass, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, ShieldAlert, ShieldCheck, Sun, Sunset, Syringe } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import FormPet from "@/components/gestao/form-pet";
 import { Kpi } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { AvisoCaixaFechado, CampoDinheiro, Chips, ChipsForma, erroDeValor, ErroTela, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, useFormaLembrada, usePagamento, type PagaDepois } from "@/components/gestao/loja/pecas";
 import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
+import Diario from "@/components/gestao/casa/diario";
+import { AvisoDeVaga, FolhaEspera, ListaDeEspera, useListaDeEspera } from "@/components/gestao/casa/espera";
+import { FolhaOcorrencia, OcorrenciasDoCartao } from "@/components/gestao/casa/ocorrencias";
+import { FolhaQuemPodeBuscar, lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import Chamada from "@/components/gestao/creche/chamada";
 import Cobrancas from "@/components/gestao/creche/cobrancas";
 import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
@@ -19,6 +23,7 @@ import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/me
 import Ocupacao from "@/components/gestao/hotel/ocupacao";
 import { CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
+import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
 import { lerPlanos, lerPresencas, planoAtivo, type PlanoCompleto } from "@/lib/gestao/creche";
 import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
 import {
@@ -37,7 +42,7 @@ const TIPOS = [{ id: "creche", rotulo: "Creche" }, { id: "hotel", rotulo: "Hotel
 const FILTRO_TIPO = [{ id: "todos", rotulo: "Todos" }, ...TIPOS] as const;
 type Aba = "casa" | "reservas" | "historico";
 /** As partes da tela: a chamada dos mensalistas, a casa (como sempre foi), a ocupação por dia, os planos e as cobranças. */
-type Ver = "chamada" | "casa" | "ocupacao" | "mensalistas" | "cobrancas";
+type Ver = "chamada" | "casa" | "ocupacao" | "diario" | "mensalistas" | "cobrancas";
 
 /** "ontem, 8h" */
 const quando = (d: string | Date) => `${dataAmigavel(new Date(d))}, ${horaCurta(d)}`;
@@ -193,7 +198,7 @@ export default function CrecheHotel() {
   const [acertando, setAcertando] = useState<EstadiaCompleta | null>(null);
   const [aba, setAba] = useState<Aba>("casa");
   const [tipo, setTipo] = useState<"todos" | Tipo>("todos");
-  const [nova, setNova] = useState<{ dia?: string; tipo?: Tipo } | null>(null);
+  const [nova, setNova] = useState<{ dia?: string; tipo?: Tipo; pet?: PetDaEstadia | null; espera?: string } | null>(null);
   const [editando, setEditando] = useState<EstadiaCompleta | null>(null);
   const [lote, setLote] = useState(false);
   const [saindo, setSaindo] = useState<EstadiaCompleta | null>(null);
@@ -207,6 +212,12 @@ export default function CrecheHotel() {
   const [de, setDe] = useState(() => isoDia(new Date()));
   const [ate, setAte] = useState(() => isoDia(somaDias(new Date(), 30)));
   const comCuidados = cuidadosLigados(petshop);
+  // cuidado com o tutor (tudo opcional): diário, quem pode buscar, lista de espera e ocorrências
+  const comDiario = diarioDe(petshop).ativo, comPortaria = portariaLigada(petshop), comEspera = esperaDe(petshop).ativo, comOcorrencias = ocorrenciasLigadas(petshop);
+  const [buscando, setBuscando] = useState<EstadiaCompleta | null>(null);
+  const [ocorrenciaDe, setOcorrenciaDe] = useState<EstadiaCompleta | null>(null);
+  const [autorizadosDe, setAutorizadosDe] = useState<EstadiaCompleta | null>(null);
+  const [esperaNova, setEsperaNova] = useState<{ pet?: PetDaEstadia | null; tipo?: Tipo; entrada?: string; saida?: string } | null>(null);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [abertas, passadas] = await Promise.all([
@@ -222,8 +233,14 @@ export default function CrecheHotel() {
     }
     let feitos: CuidadoFeito[] = [];
     if (comCuidados) feitos = (await sb.from("estadias_cuidados").select("*").eq("petshop_id", petshop.id).eq("dia", isoDia(new Date())).limit(1000)).data ?? [];
-    return { abertas: lista, passadas: ok(passadas) as unknown as EstadiaCompleta[], valores, feitos };
-  }, [petshop.id, vejoFinanceiro, comCuidados]);
+    const encerradas = ok(passadas) as unknown as EstadiaCompleta[];
+    // ocorrências das estadias abertas e quem levou cada pet das encerradas (só com as opções ligadas)
+    let ocorrencias: Ocorrencia[] = [];
+    const naCasaIds = lista.filter((e) => e.status === "em_casa").map((e) => e.id);
+    if (comOcorrencias && naCasaIds.length) ocorrencias = (await sb.from("estadias_ocorrencias").select("*").eq("petshop_id", petshop.id).in("estadia_id", naCasaIds).order("quando").limit(1000)).data ?? [];
+    const retiradas = comPortaria ? await lerRetiradas(sb, petshop.id, encerradas.filter((e) => e.status === "encerrada").map((e) => e.id)).catch(() => new Map<string, Retirada>()) : new Map<string, Retirada>();
+    return { abertas: lista, passadas: encerradas, valores, feitos, ocorrencias, retiradas };
+  }, [petshop.id, vejoFinanceiro, comCuidados, comOcorrencias, comPortaria]);
 
   // mensalistas: os planos e o que já aconteceu hoje (para a chamada e para a conta de vagas)
   const { dados: mens } = useDados<Mens | null>(async () => {
@@ -239,13 +256,14 @@ export default function CrecheHotel() {
   useEffect(() => {
     if (abriu) return;
     const pedido = new URLSearchParams(window.location.search).get("ver");
-    if (pedido === "ocupacao") { setVer("ocupacao"); if (!usaCreche) setAbriu(true); }
+    const direto = pedido === "ocupacao" || (pedido === "diario" && comDiario) ? pedido : null;
+    if (direto) { setVer(direto); if (!usaCreche) setAbriu(true); }
     if (!usaCreche || !mens) return;
     setAbriu(true);
-    if (pedido === "ocupacao") return;
+    if (direto) return;
     if (pedido === "chamada" || pedido === "mensalistas" || pedido === "casa" || (pedido === "cobrancas" && cuidoDoFinanceiro)) setVer(pedido);
     else if (temMensalista) setVer("chamada");
-  }, [abriu, usaCreche, mens, temMensalista, cuidoDoFinanceiro]);
+  }, [abriu, usaCreche, mens, temMensalista, cuidoDoFinanceiro, comDiario]);
   const planoDe = (e: EstadiaCompleta) => (e.plano_id ? mens?.planos.find((p) => p.id === e.plano_id) : undefined);
 
   const doTipo = (e: EstadiaCompleta) => tipo === "todos" || e.tipo === tipo;
@@ -258,6 +276,8 @@ export default function CrecheHotel() {
 
   const mudou = () => { void recarregar(); avisarMudanca(); };
   const abrirNova = () => { if (!somenteLeitura()) setNova({}); };
+  const espera = useListaDeEspera(abertas, mens ?? null);
+  const verEspera = () => { setVer("ocupacao"); setTimeout(() => document.getElementById("lista-de-espera")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); };
 
   async function checkIn(e: EstadiaCompleta) {
     if (somenteLeitura()) return;
@@ -317,6 +337,14 @@ export default function CrecheHotel() {
     } catch (x) { avisarErro(x); } finally { setOcupado(null); }
   }
 
+  /** A saída de um hóspede: com "Quem pode buscar" ligado, primeiro a equipe marca quem levou. */
+  const sair = (e: EstadiaCompleta) => {
+    if (somenteLeitura()) return;
+    if (comPortaria) setBuscando(e);
+    else if (e.mensalista) void saidaDoMensalista(e);
+    else setSaindo(e);
+  };
+
   const agora = new Date();
   const hoje0 = inicioDoDia(agora).getTime();
   const hojeIso = isoDia(agora);
@@ -362,6 +390,7 @@ export default function CrecheHotel() {
         {usaCreche && <button aria-pressed={ver === "chamada"} onClick={() => setVer("chamada")}>Chamada</button>}
         <button aria-pressed={ver === "casa"} onClick={() => setVer("casa")}>Casa agora</button>
         <button aria-pressed={ver === "ocupacao"} onClick={() => setVer("ocupacao")}>Ocupação</button>
+        {comDiario && <button aria-pressed={ver === "diario"} onClick={() => setVer("diario")}>Diário</button>}
         {usaCreche && <button aria-pressed={ver === "mensalistas"} onClick={() => setVer("mensalistas")}>Mensalistas</button>}
         {usaCreche && cuidoDoFinanceiro && <button aria-pressed={ver === "cobrancas"} onClick={() => setVer("cobrancas")}>Cobranças</button>}
       </div>
@@ -369,12 +398,19 @@ export default function CrecheHotel() {
       {erro && <ErroTela erro={erro} aoTentar={() => void recarregar()} />}
 
       {usaCreche && !mens ? <Esqueleto linhas={4} />
-        : ver === "chamada" && mens ? <Chamada planos={mens.planos} vagasHoje={vagasCrecheHoje ? { ocupadas: vagasCrecheHoje.ocupadas, total: vagasCrecheHoje.total! } : null}
+        : ver === "diario" && comDiario ? <Diario />
+        : ver === "chamada" && mens ? <Chamada aviso={<AvisoDeVaga espera={espera} aoVer={verEspera} />} planos={mens.planos} vagasHoje={vagasCrecheHoje ? { ocupadas: vagasCrecheHoje.ocupadas, total: vagasCrecheHoje.total! } : null}
             aoNovoMensalista={() => { if (!somenteLeitura()) { setVer("mensalistas"); setNovoPlano(true); } }} />
         : ver === "mensalistas" && mens ? <Mensalistas planos={mens.planos} novo={novoPlano} aoAbrirNovo={() => { if (!somenteLeitura()) setNovoPlano(true); }} aoFecharNovo={() => setNovoPlano(false)} aoMudar={mudou} />
         : ver === "cobrancas" && mens && cuidoDoFinanceiro ? <Cobrancas planos={mens.planos} gerar={gerando} aoFecharGerar={() => setGerando(false)} aoMes={setMesCobranca} />
         : carregando && !dados ? <Esqueleto linhas={4} /> : !dados ? null
-        : ver === "ocupacao" ? <Ocupacao abertas={abertas} mens={mens ?? null} aoNovaReserva={(dia, t) => { if (!somenteLeitura()) setNova({ dia, tipo: t }); }} />
+        : ver === "ocupacao" ? (
+          <div className="g-pilha">
+            <Ocupacao abertas={abertas} mens={mens ?? null} aoNovaReserva={(dia, t) => { if (!somenteLeitura()) setNova({ dia, tipo: t }); }} />
+            <ListaDeEspera espera={espera} aoNova={() => setEsperaNova({})}
+              aoReservar={(x) => setNova({ dia: x.entrada, tipo: x.tipo === "hotel" ? "hotel" : "creche", pet: x.pets, espera: x.id })} />
+          </div>
+        )
         : tudoVazio ? (
         <Vazio titulo="Nenhum hóspede ainda" texto="Quando um pet vier passar o dia ou dormir aqui, faça o check-in e acompanhe por esta tela." mozart="acenando">
           <button className="g-btn sec" onClick={abrirNova}>Fazer o primeiro check-in</button>
@@ -400,6 +436,7 @@ export default function CrecheHotel() {
             </KpiAcao>
           </div>
 
+          <AvisoDeVaga espera={espera} aoVer={verEspera} />
           <div className="g-ch-faixa">
             {semCobranca.length > 0 && (
               <button type="button" className="g-ch-atraso" onClick={() => setAba("historico")}>
@@ -477,12 +514,15 @@ export default function CrecheHotel() {
                       {quarto(e)}
                       {e.obs && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{e.obs}</span></p>}
                       {comCuidados && <CuidadosDoDia estadia={e} feitos={dados.feitos} aoMudar={() => void recarregar()} />}
+                      {comOcorrencias && <OcorrenciasDoCartao lista={dados.ocorrencias.filter((o) => o.estadia_id === e.id)} />}
                       <div className="g-fila g-ch-acoes">
                         {botaoMensagens(e)}
                         {!e.mensalista && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setEditando(e); }}><Pencil /> Editar</button>}
+                        {comOcorrencias && pet && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setOcorrenciaDe(e); }}><ShieldAlert /> Ocorrência</button>}
+                        {comPortaria && pet && <button className="g-btn fantasma p" onClick={() => setAutorizadosDe(e)}><ShieldCheck /> Quem busca</button>}
                         {e.mensalista
-                          ? <button className="g-btn verde p" style={{ marginLeft: "auto" }} disabled={ocupado === e.id} onClick={() => void saidaDoMensalista(e)}><LogOut /> Saiu</button>
-                          : <button className="g-btn verde p" style={{ marginLeft: "auto" }} onClick={() => { if (!somenteLeitura()) setSaindo(e); }}><LogOut /> Check-out</button>}
+                          ? <button className="g-btn verde p" style={{ marginLeft: "auto" }} disabled={ocupado === e.id} onClick={() => sair(e)}><LogOut /> Saiu</button>
+                          : <button className="g-btn verde p" style={{ marginLeft: "auto" }} onClick={() => sair(e)}><LogOut /> Check-out</button>}
                       </div>
                     </div>
                   );
@@ -569,7 +609,7 @@ export default function CrecheHotel() {
                         <AvatarPet pet={e.pets ?? { nome: "?" }} />
                         <span className="t">
                           <b>{e.pets?.nome ?? "Pet removido"}</b>
-                          <span>{[periodoDaLinha, e.pets?.clientes?.nome].filter(Boolean).join(" · ")}</span>
+                          <span>{[periodoDaLinha, e.pets?.clientes?.nome, dados.retiradas.get(e.id) ? `saiu ${textoDaRetirada(dados.retiradas.get(e.id)!)}` : null].filter(Boolean).join(" · ")}</span>
                         </span>
                         <EtiquetaTipo tipo={e.tipo} curta />
                         {e.status === "cancelada"
@@ -592,8 +632,13 @@ export default function CrecheHotel() {
       {ver === "casa" && dados && !tudoVazio && souDono && <div style={{ marginTop: 20 }}><LinkCrecheHotel titulo="Pedidos pelo link do cliente" /></div>}
       {(ver === "casa" || ver === "ocupacao") && dados && souDono && <p style={{ marginTop: 16 }}><Link className="g-btn fantasma p" href="/gestao/app/meu-petshop#opcoes-hotel"><Settings2 />Opções do hotel e da creche</Link></p>}
       {acertando && <AcertarEstadia key={acertando.id} estadia={acertando} aoFechar={() => setAcertando(null)} aoGravar={() => { setAcertando(null); mudou(); }} />}
-      {nova && <NovaEstadia mens={mens ?? null} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} abertas={abertas}
-        aoFechar={() => setNova(null)} aoGravar={(emCasa) => { setNova(null); setVer((v) => (v === "ocupacao" ? v : "casa")); setAba(emCasa ? "casa" : "reservas"); mudou(); }} />}
+      {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} abertas={abertas}
+        aoFechar={() => setNova(null)} aoGravar={(emCasa) => {
+          // a reserva veio da lista de espera: o pedido sai da fila
+          const daEspera = nova.espera;
+          if (daEspera) void sb.from("lista_espera").update({ status: "atendido" }).eq("id", daEspera).eq("petshop_id", petshop.id).select("id").then(() => espera.recarregar());
+          setNova(null); setVer((v) => (v === "ocupacao" ? v : "casa")); setAba(emCasa ? "casa" : "reservas"); mudou();
+        }} />}
       {editando && <NovaEstadia mens={mens ?? null} key={editando.id} editar={editando} valores={valoresDe(editando)} jaAquiInicial={editando.status === "em_casa"} tipoInicial={editando.tipo === "hotel" ? "hotel" : "creche"} abertas={abertas}
         aoFechar={() => setEditando(null)} aoGravar={() => { setEditando(null); mudou(); }} />}
       {lote && <EncerrarCreche estadias={crecheNaCasa} aoFechar={() => setLote(false)} aoGravar={() => { setLote(false); mudou(); }} />}
@@ -605,6 +650,11 @@ export default function CrecheHotel() {
       {cancelando && valoresDe(cancelando) && <CancelarComSinal estadia={cancelando} valores={valoresDe(cancelando)!} aoFechar={() => setCancelando(null)} aoGravar={() => { setCancelando(null); mudou(); }} />}
       {detalhe && <DetalheDaEstadia estadia={detalhe} aoFechar={() => setDetalhe(null)}
         aoCorrigir={vejoFinanceiro && detalhe.status === "encerrada" && !detalhe.mensalista ? () => { const e = detalhe; setDetalhe(null); if (!somenteLeitura()) setAcertando(e); } : undefined} />}
+      {buscando && <QuemBuscou key={buscando.id} estadia={buscando} aoFechar={() => setBuscando(null)}
+        aoSeguir={async () => { const e = buscando; setBuscando(null); if (e.mensalista) await saidaDoMensalista(e); else setSaindo(e); }} />}
+      {ocorrenciaDe && <FolhaOcorrencia estadia={ocorrenciaDe} aoFechar={() => setOcorrenciaDe(null)} aoGravar={() => { setOcorrenciaDe(null); void recarregar(); }} />}
+      {autorizadosDe?.pets && <FolhaQuemPodeBuscar pet={autorizadosDe.pets} aoFechar={() => setAutorizadosDe(null)} />}
+      {esperaNova && <FolhaEspera inicial={esperaNova} aoFechar={() => setEsperaNova(null)} aoGravar={() => { setEsperaNova(null); void espera.recarregar(); verEspera(); }} />}
       {avisando && <AvisarChegadas reservas={reservas} aoFechar={() => setAvisando(false)} aoMudar={() => void recarregar()} />}
     </>
   );
@@ -614,8 +664,12 @@ export default function CrecheHotel() {
 
 const horaDe = (d: string | Date) => { const x = new Date(d); return `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
 
-function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, valores, mens, aoFechar, aoGravar }: {
+function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, valores, mens, petInicial, aoEspera, aoFechar, aoGravar }: {
   jaAquiInicial: boolean; tipoInicial: Tipo; diaInicial?: string; abertas: EstadiaCompleta[]; editar?: EstadiaCompleta; valores?: ValoresDaEstadia | null; mens: Mens | null;
+  /** pet já escolhido (reserva que vem da lista de espera) */
+  petInicial?: PetDaEstadia;
+  /** com a lista de espera ligada: em dia cheio, a pessoa pode pôr o pet na lista em vez de passar do limite */
+  aoEspera?: (x: { pet: PetDaEstadia; tipo: Tipo; entrada: string; saida?: string }) => void;
   aoFechar: () => void; aoGravar: (emCasa: boolean) => void;
 }) {
   const { sb, petshop, vejoFinanceiro, souDono } = useGestao();
@@ -628,7 +682,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, 
   const principal = principalDe(petshop);
   const jaAqui0 = diaInicial ? false
     : principal === "hotel" ? false : principal === "creche" ? true : tiposDaCasa.length === 1 && tiposDaCasa[0].id === "hotel" ? false : jaAquiInicial;
-  const [pet, setPet] = useState<PetDaEstadia | null>(editar?.pets ?? null);
+  const [pet, setPet] = useState<PetDaEstadia | null>(editar?.pets ?? petInicial ?? null);
   const [criando, setCriando] = useState<string | null>(null);
   const [tipo, setTipo] = useState<Tipo>(tipo0);
   const [jaAqui, setJaAqui] = useState(jaAqui0);
@@ -637,7 +691,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, 
   const [saidaDia, setSaidaDia] = useState(editar?.saida_prevista ? isoDia(new Date(editar.saida_prevista)) : "");
   const [saidaHora, setSaidaHora] = useState(editar?.saida_prevista ? horaDe(editar.saida_prevista) : "18:00");
   // a diária sugerida é sempre o preço de Meu pet shop (ou o do porte, se a opção estiver ligada), nunca a última digitada
-  const [diaria, setDiaria] = useState<number | null>(editar ? (editar.valor_diaria == null ? null : Number(editar.valor_diaria)) : diariaSugerida(petshop, tipo0, null));
+  const [diaria, setDiaria] = useState<number | null>(editar ? (editar.valor_diaria == null ? null : Number(editar.valor_diaria)) : diariaSugerida(petshop, tipo0, petInicial?.porte ?? null));
   // na edição, a diária combinada fica como está até a pessoa trocar o tipo: aí vale o preço fixo do tipo novo
   const [mexeuNaDiaria, setMexeuNaDiaria] = useState(Boolean(editar));
   const [obs, setObs] = useState(editar?.obs ?? "");
@@ -853,6 +907,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, 
             <span>{diasDoPeriodo.length === 1 ? `Em ${dataCurta(maisCheio.d)}` : "Nessas datas"}: <b className="g-tab">{maisCheio.n} de {vagas} vagas</b>
               {diasDoPeriodo.length > 1 ? ` ${tipo === "hotel" ? "na noite mais cheia" : "no dia mais cheio"} (${dataCurta(maisCheio.d)})` : " tomadas"}{maisCheio.n >= vagas ? ". Sem vaga: dá para marcar, passando do limite." : "."}</span>
           </p>
+        )}
+        {aoEspera && !editar && !jaAqui && maisCheio && vagas != null && maisCheio.n >= vagas && dia >= hojeIso && (
+          <div><button type="button" className="g-btn sec p" style={{ minHeight: 44 }} onClick={() => aoEspera({ pet, tipo, entrada: dia, saida: saidaDia || undefined })}><Hourglass />Colocar {pet.nome} na lista de espera</button></div>
         )}
         {opQuartos.ativo && tipo === "hotel" && opQuartos.lista.length > 0 && (
           <Campo rotulo="Acomodação" dica="Opcional. Mostra quantos hóspedes cada uma já tem nessas datas.">
