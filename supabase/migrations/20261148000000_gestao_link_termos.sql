@@ -159,6 +159,8 @@ begin
     'horas', (o ->> 'horas')::int,
     'aberto', v_pend or v_ativo,
     'limite', v_limite,
+    -- o mesmo limite no relógio de quem recebe o pedido, como os horários que a página mostra
+    'limite_dia', to_char(v_limite at time zone s.fuso, 'YYYY-MM-DD'), 'limite_hora', to_char(v_limite at time zone s.fuso, 'HH24:MI'),
     -- pedido sem resposta cancela a qualquer hora; o que já foi aceito respeita o prazo
     'no_prazo', not v_ativo or now() <= v_limite,
     'itens', coalesce(v_itens, '[]'::jsonb),

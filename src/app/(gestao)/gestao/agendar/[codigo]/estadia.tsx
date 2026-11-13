@@ -165,7 +165,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
         <div className="g-lk-ok-acoes">
           {pedidoId && <a className="g-btn verde" href={`/gestao/agendar/${codigo}/pedido/${pedidoId}`}>Acompanhar o pedido</a>}
           <button type="button" className="g-btn sec" onClick={aoVoltar}>Fazer outro pedido</button>
-          {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com a gente</a>}
+          {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {loja}</a>}
         </div>
       </section>
     );

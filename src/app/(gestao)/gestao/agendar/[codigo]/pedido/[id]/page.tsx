@@ -16,7 +16,7 @@ type Item = { pet: string; servico: string | null; dia: string; hora: string; st
 type Pedido = { logo?: string | null; tema?: string | null; petshop: string; telefone: string | null; codigo: string; tutor: string; itens: Item[] };
 /** O que o tutor pode fazer com o pedido (vem de `link_pedido_cliente`; só existe quando quem recebe o pedido ligou a opção). */
 type Acoes = {
-  ligado: boolean; horas: number; aberto: boolean; limite: string | null; no_prazo: boolean;
+  ligado: boolean; horas: number; aberto: boolean; limite: string | null; limite_dia?: string | null; limite_hora?: string | null; no_prazo: boolean;
   itens: { chave: string; cancelado_cliente: boolean }[];
   pediu: "cancelar" | "mudar" | null; pediu_em: string | null; recado: string | null;
 };
@@ -189,7 +189,7 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
               <section className="g-card g-lkp-mexer">
                 <h2>Precisa mudar ou cancelar?</h2>
                 <p className="g-muted g-p">
-                  {acoes!.limite ? `Dá para fazer por aqui ${prazo}: até ${diaEHora(acoes!.limite)}.` : "Dá para fazer por aqui enquanto o pedido espera a confirmação."}
+                  {acoes!.limite ? `Dá para fazer por aqui ${prazo}: até ${acoes!.limite_dia && acoes!.limite_hora ? `${dataLonga(deIsoDia(acoes!.limite_dia))}, às ${acoes!.limite_hora}` : diaEHora(acoes!.limite)}.` : "Dá para fazer por aqui enquanto o pedido espera a confirmação."}
                 </p>
                 <div className="g-lkp-acoes">
                   <button type="button" className="g-btn sec" onClick={() => abrir("mudar")}><CalendarClock />Pedir outra data</button>
