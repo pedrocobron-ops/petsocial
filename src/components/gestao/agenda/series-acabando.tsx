@@ -7,6 +7,7 @@ import { avisarMudanca, useAvisos, useDados, useSomenteLeitura } from "@/compone
 import type { Banco } from "@/lib/gestao/supabase";
 import { dataCompleta, hora, nomeDia } from "@/lib/gestao/util";
 import { Tile } from "../painel";
+import "./series-acabando.css";
 
 /**
  * Repetição "até eu cancelar". No banco a série continua tendo fim (um número fechado de horários, como sempre);
@@ -70,13 +71,13 @@ export default function SeriesAcabando({ aoMudar }: { aoMudar: () => void }) {
         {dados.map((s) => {
           const passou = new Date(s.ultimo).getTime() < Date.now();
           return (
-            <div key={s.serie_id} className="g-linha" style={{ flexWrap: "wrap" }}>
+            <div key={s.serie_id} className="g-linha g-sa-linha">
               <span className="t">
                 <b>{s.pet_nome}{s.servico_nome ? ` · ${s.servico_nome}` : ""}</b>
                 <span>{CADA[s.cada_semanas] ?? "repete"}, {nomeDia(new Date(s.ultimo))} às {hora(s.ultimo)}{s.tutor_nome ? ` · ${s.tutor_nome}` : ""}</span>
                 <span>{passou ? `O último horário foi em ${dataCompleta(s.ultimo)}.` : `${s.restantes === 1 ? "Falta 1 horário" : `Faltam ${s.restantes} horários`}: o último é em ${dataCompleta(s.ultimo)}.`}</span>
               </span>
-              <span className="d g-fila">
+              <span className="d">
                 <button type="button" className="g-btn verde p" disabled={ocupado !== null} onClick={() => void continuar(s)}>{ocupado === s.serie_id ? "Um instante…" : `Marcar mais ${VEZES_POR_VEZ}`}</button>
                 <button type="button" className="g-btn fantasma p" disabled={ocupado !== null} onClick={() => void deixar(s)}>Deixar terminar</button>
               </span>

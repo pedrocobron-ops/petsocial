@@ -1084,8 +1084,8 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "O Resultado do mês é tudo o que entrou menos tudo o que saiu. Ele não separa o lucro por produto nem por serviço.",
-      { so: ["loja"], texto: "Quem ligou Margem e custo médio, nas opções da loja, vê no Resumo o cartão Produtos vendidos no mês: a venda de produtos, o custo dos produtos vendidos, a sobra e o Resultado depois do custo dos produtos. Sem venda de produto no mês, o cartão não aparece." },
-      { so: ["loja"], texto: "Se você já lança a compra de mercadoria como saída, o custo já está contado no que saiu: fique com o Resultado do mês. O Resultado depois do custo dos produtos serve para quem não lança essas compras." },
+      { so: ["loja"], texto: "Quem ligou Margem e custo médio, nas opções da loja, vê no Resumo o cartão Produtos vendidos no mês: a venda de produtos, o custo dos produtos vendidos, a sobra e o resultado Depois do custo dos produtos. Sem venda de produto no mês, o cartão não aparece." },
+      { so: ["loja"], texto: "Se você já lança a compra de mercadoria como saída, o custo já está contado no que saiu: fique com o Resultado do mês. O número Depois do custo dos produtos serve para quem não lança essas compras." },
       { so: ["loja"], texto: "Venda de produto sem custo registrado não entra no custo nem na sobra, e o cartão diz quantas foram. O detalhe por produto está em Relatórios." },
     ],
     palavras: ["resultado", "resumo", "lucro", "quanto entrou", "quanto saiu", "exportar financeiro", "planilha do financeiro", "mes passado", "custo dos produtos vendidos", "custo da mercadoria", "cmv", "resultado depois do custo", "lucro de verdade"] },

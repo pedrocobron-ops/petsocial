@@ -53,7 +53,7 @@ function Cartao({ inicio, fim, doMes, resultado, mesAtual }: { inicio: string; f
       {temCusto && (
         <div className="g-fin-nota g-pilha p">
           {linha(mesAtual ? "Resultado do mês até agora" : "Resultado do mês", brl(resultado), resultado < 0 ? "g-vermelho-t" : "")}
-          {linha("Resultado depois do custo dos produtos", brl(depois), depois < 0 ? "g-vermelho-t" : "")}
+          {linha("Depois do custo dos produtos", brl(depois), depois < 0 ? "g-vermelho-t" : "")}
         </div>
       )}
       <p className="g-muted g-pp" style={{ marginTop: 10 }}>
