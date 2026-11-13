@@ -22,7 +22,10 @@ export type Contexto = {
   eu: Profissional;
   equipe: Profissional[];
   servicos: Servico[];
+  /** Recebe e opera o caixa (Caixa, Financeiro ou Relatórios). */
   vejoFinanceiro: boolean;
+  /** Dono, ou quem tem Financeiro ou Relatórios: vê despesas, contas e o histórico. */
+  cuidoDoFinanceiro: boolean;
   /** Minutos a leste de UTC no aparelho de quem pediu (Brasília = -180). */
   fusoMin: number;
   /** Agora, no horário local: "AAAA-MM-DDTHH:mm". */
@@ -454,7 +457,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       return { resultado: { total: lista.length, produtos: lista.slice(0, 40) } };
     }
     case "resumo_financeiro": {
-      exigir(c.vejoFinanceiro, "Esta pessoa não tem acesso ao financeiro.");
+      exigir(c.cuidoDoFinanceiro, "Esta pessoa opera o caixa, mas não tem a área Financeiro: não vê o resumo do período nem as contas. O dono pode liberar em Equipe.");
       exigir(RE_DIA.test(String(e.de)) && RE_DIA.test(String(e.ate)), "Datas no formato AAAA-MM-DD.");
       const [ls, caixa] = await Promise.all([
         lerTudo<{ tipo: string; valor: number; forma: string | null; categoria: string; pagamentos: unknown }>((de, ate, contar) => sb.from("lancamentos").select("tipo, valor, forma, categoria, pagamentos", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).gte("data", String(e.de)).lte("data", String(e.ate)).order("data").order("id").range(de, ate)).then((data) => ({ data })),
@@ -477,7 +480,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
         lancamentos: (ls.data ?? []).length, caixa_aberto: caixa.data ? { desde: utcParaLocal(caixa.data.aberto_em, c.fusoMin), troco_inicial: caixa.data.valor_inicial } : null } };
     }
     case "contas_em_aberto": {
-      exigir(c.vejoFinanceiro, "Esta pessoa não tem acesso ao financeiro.");
+      exigir(c.cuidoDoFinanceiro, "Esta pessoa opera o caixa, mas não tem a área Financeiro: não vê o resumo do período nem as contas. O dono pode liberar em Equipe.");
       const ls = ok(await sb.from("lancamentos").select("id, tipo, valor, descricao, categoria, vencimento").eq("petshop_id", petshop.id).eq("pago", false).order("vencimento").limit(200));
       return { resultado: { hoje, a_pagar: ls.filter((l) => l.tipo === "saida").map((l) => ({ descricao: l.descricao ?? l.categoria, valor: l.valor, vencimento: l.vencimento, atrasada: (l.vencimento ?? hoje) < hoje })),
         a_receber: ls.filter((l) => l.tipo === "entrada").map((l) => ({ descricao: l.descricao ?? l.categoria, valor: l.valor, vencimento: l.vencimento })) } };
@@ -530,8 +533,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       const { data: ultimo } = await sb.from("caixas").select("*").eq("petshop_id", petshop.id).not("fechado_em", "is", null).order("fechado_em", { ascending: false }).limit(1).maybeSingle();
       const ru = ultimo ? resumoDoCaixa(ultimo.valor_inicial, await movimentosDoCaixa(c, ultimo.id)) : null;
       return { resultado: { caixa: "fechado", lancado_hoje_sem_caixa: { entrou: r.entrou, saiu: r.saiu, por_forma: Object.fromEntries(r.porForma.filter((f) => f.entrou || f.saiu).map((f) => [f.rotulo, { entrou: f.entrou, saiu: f.saiu }])) },
-        ultimo_fechamento: ultimo && ru ? { aberto_em: utcParaLocal(ultimo.aberto_em, c.fusoMin), fechado_em: utcParaLocal(ultimo.fechado_em!, c.fusoMin), entrou: ru.entrou, saiu: ru.saiu, esperado_na_gaveta: ru.esperado, contado: ultimo.valor_contado,
-          ...(ultimo.valor_contado != null ? { diferenca: diferencaDoCaixa(ultimo.valor_contado, ru.esperado).texto } : {}), ...(ultimo.obs ? { obs: ultimo.obs } : {}) } : null } };
+        ultimo_fechamento: ultimo && ru ? { aberto_em: utcParaLocal(ultimo.aberto_em, c.fusoMin), fechado_em: utcParaLocal(ultimo.fechado_em!, c.fusoMin), ...(c.cuidoDoFinanceiro ? { entrou: ru.entrou, saiu: ru.saiu } : {}), esperado_na_gaveta: ultimo.valor_esperado ?? ru.esperado, contado: ultimo.valor_contado,
+          ...(ultimo.valor_contado != null ? { diferenca: diferencaDoCaixa(ultimo.valor_contado, Number(ultimo.valor_esperado ?? ru.esperado)).texto } : {}), ...(ultimo.obs ? { obs: ultimo.obs } : {}) } : null } };
     }
     case "ver_saude": {
       const aviso = "Você só informa o que está anotado e as datas. Não dê orientação veterinária.";
@@ -935,10 +938,11 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
       const aberto = await caixaAbertoAgora(c);
       exigir(aberto, "Não há caixa aberto para fechar.");
       const contado = numero(e.valor_contado)!;
-      const esperado = resumoDoCaixa(aberto.valor_inicial, await movimentosDoCaixa(c, aberto.id)).esperado;
+      // o banco anota o dinheiro esperado na hora de fechar: a conta vale mesmo se alguém recebeu enquanto isso
       const r = ok(await sb.from("caixas").update({ fechado_em: new Date().toISOString(), fechado_por: c.userId, valor_contado: contado, obs: texto(e.obs, 500) || null })
-        .eq("id", aberto.id).eq("petshop_id", petshop.id).is("fechado_em", null).select("id"));
+        .eq("id", aberto.id).eq("petshop_id", petshop.id).is("fechado_em", null).select("id, valor_esperado"));
       exigir(r.length, "Este caixa já tinha sido fechado.");
+      const esperado = Number(r[0].valor_esperado ?? resumoDoCaixa(aberto.valor_inicial, await movimentosDoCaixa(c, aberto.id)).esperado);
       return { feito: true, esperado_na_gaveta: esperado, contado, diferenca: diferencaDoCaixa(contado, esperado).texto };
     }
     case "alterar_horario": {

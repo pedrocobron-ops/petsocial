@@ -9,7 +9,7 @@ import FormPet from "@/components/gestao/form-pet";
 import { Anel, Kpi, Tile } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, EscolherPet, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { AvisoCaixaFechado, CampoDinheiro, erroDeValor, ErroTela, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, usePagamento, type PagaDepois } from "@/components/gestao/loja/pecas";
-import { lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
 import type { Cliente, Pacote, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
 import "./pacotes.css";
@@ -393,6 +393,9 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
       texto: `Com a compra em ${dataCompleta(compra)} e validade de ${dias} dias, ele venceu em ${dataCompleta(venceEm!)}. Confira a data da compra ou aumente a validade. Salvar assim mesmo?`,
       confirmar: "Salvar vencido", perigo: true,
     }))) return;
+    if (cobra && !(await conferirValorAlto(preco, confirmar))) return;
+    // recebendo hoje: se o caixa fechou enquanto esta venda estava aberta, pergunta antes de receber fora dele
+    if (rec && !("erro" in rec) && preco && !rec.fiado && compra === hoje && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
       ok(await sb.from("pacotes_clientes").insert({

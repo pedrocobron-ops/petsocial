@@ -53,6 +53,6 @@ Serviços:
 ${servicos || "(nenhum serviço ativo)"}
 Equipe:
 ${equipe}
-Quem está falando com você: ${c.eu.nome} (${c.eu.papel}). ${c.vejoFinanceiro ? "Tem acesso ao financeiro." : "Não tem acesso ao financeiro."}
+Quem está falando com você: ${c.eu.nome} (${c.eu.papel}). ${c.cuidoDoFinanceiro ? "Tem acesso ao financeiro." : c.vejoFinanceiro ? "Recebe e opera o caixa, mas não vê o financeiro (despesas, contas a pagar, resumo do mês)." : "Não tem acesso ao financeiro."}
 ${c.equipe.filter((p) => p.ativo && p.atende).length <= 1 ? "Só uma pessoa atende: não precisa perguntar quem vai atender." : "Mais de uma pessoa atende: se a pessoa não disser quem, marque sem profissional definido."}`;
 }

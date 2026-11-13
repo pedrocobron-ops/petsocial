@@ -1,3 +1,4 @@
+import { podeArea } from "@/lib/gestao/acessos";
 import { lerEquipe, lerPetshop } from "@/lib/gestao/reservado";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
@@ -48,7 +49,8 @@ export async function POST(req: Request) {
   const liberado = ["ativa", "atrasada", "cortesia"].includes(p.data.status) || (p.data.status === "teste" && new Date(p.data.teste_ate) > new Date());
   const c: Contexto = {
     sb, userId: u.user.id, petshop: p.data, eu, equipe: e.data ?? [], servicos: s.data ?? [],
-    vejoFinanceiro: eu.papel === "dono" || eu.papel === "gerente" || eu.ve_financeiro,
+    vejoFinanceiro: podeArea(eu, "caixa") || podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
+    cuidoDoFinanceiro: podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
     fusoMin: corpo.fusoMin, agora: corpo.agora!.slice(0, 16),
   };
 

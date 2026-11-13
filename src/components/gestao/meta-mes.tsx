@@ -14,10 +14,11 @@ const FINANCEIRO = "/gestao/app/financeiro";
 
 /**
  * Meta do mês na tela inicial: anel de progresso, quanto já entrou, quanto falta e o caminho para o Financeiro.
- * Só aparece para quem vê o financeiro. Sem meta definida, o dono vê uma linha discreta para definir.
+ * Só aparece para o dono e para quem tem a área Financeiro ou Relatórios. Sem meta definida, o dono vê uma linha discreta para definir.
  */
 export default function MetaMes() {
-  const { sb, petshop, vejoFinanceiro, souDono } = useGestao();
+  // a meta é assunto do financeiro: quem só opera o caixa não vê
+  const { sb, petshop, cuidoDoFinanceiro: vejoFinanceiro, souDono } = useGestao();
   const meta = Number(petshop.meta_mes ?? 0);
   const temMeta = vejoFinanceiro && meta > 0;
   const hoje = new Date();

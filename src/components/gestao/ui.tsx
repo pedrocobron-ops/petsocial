@@ -7,7 +7,7 @@ import { fotoPet } from "@/lib/gestao/supabase";
 import type { PetComTutor } from "@/lib/gestao/tipos";
 import { corDoNome, iniciais, lerValor, semAcento, valor2 } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
-import { useGestao } from "./contexto";
+import { contaSoConsulta, useGestao } from "./contexto";
 
 /* ---------- carregar dados ---------- */
 
@@ -54,13 +54,18 @@ export function ok<T>(r: { data: T; error: { message: string } | null }): NonNul
   return r.data as NonNullable<T>;
 }
 
+/** Recusa do banco que o aplicativo não sabe explicar: só fala em "só para consulta" quando a conta está mesmo assim. */
+const semPermissao = () => (contaSoConsulta()
+  ? "Sua conta está só para consulta. Para voltar a gravar, veja a tela Assinatura."
+  : "Não consegui salvar agora. Tente de novo ou fale com o suporte.");
+
 /** Texto de erro que uma pessoa entende. */
 export function mensagemDeErro(e: unknown): string {
   const m = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e);
-  if (/row-level security|permission denied/i.test(m)) return "Sua conta está só para consulta ou você não tem permissão para isso.";
+  if (/row-level security|permission denied/i.test(m)) return semPermissao();
   if (/Failed to fetch|NetworkError|network/i.test(m)) return "Sem conexão. Confira a internet e tente de novo.";
   if (/duplicate key/i.test(m)) return "Isso já está cadastrado.";
-  if (/JSON object requested|0 rows|PGRST116/i.test(m)) return "Não deu para gravar: sua conta está só para consulta ou você não tem permissão para isso.";
+  if (/JSON object requested|0 rows|PGRST116/i.test(m)) return semPermissao();
   if (/caixas_um_aberto/i.test(m)) return "Já existe um caixa aberto.";
   if (/numeric field overflow|out of range/i.test(m)) return "Esse valor é grande demais. Confira os números.";
   if (/violates check constraint/i.test(m)) return "Confira os valores: algum número está negativo ou fora do permitido.";

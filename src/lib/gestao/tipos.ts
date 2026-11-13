@@ -13,6 +13,8 @@ export type Bloqueio = T["bloqueios"]["Row"];
 export type Estadia = T["estadias"]["Row"];
 export type Caixa = T["caixas"]["Row"];
 export type Lancamento = T["lancamentos"]["Row"];
+/** Alteração ou exclusão de um valor já recebido, anotada pelo banco. */
+export type AlteracaoLancamento = T["lancamentos_alteracoes"]["Row"];
 export type Produto = T["produtos"]["Row"];
 export type MovimentoEstoque = T["movimentos_estoque"]["Row"];
 export type StatusAgendamento = Database["public"]["Enums"]["status_agendamento"];

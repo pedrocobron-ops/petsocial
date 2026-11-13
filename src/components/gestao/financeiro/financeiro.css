@@ -97,3 +97,11 @@
 .gf-itens-pe > div { display: flex; justify-content: space-between; gap: 12px; }
 .gf-itens-pe > div > span:last-child { flex: none; }
 .gf-itens-pe .forte { color: var(--g-tinta); font-weight: 600; font-size: .9375rem; }
+
+/* alterações de um valor já recebido e lançamentos apagados */
+.gf-alteracoes { display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--g-raio); background: #fdf6e3; border: 1px solid rgba(201, 154, 46, .32); min-width: 0; }
+.gf-alteracoes .g-rotulo { display: inline-flex; align-items: center; gap: 6px; }
+.gf-alteracoes ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: .875rem; line-height: 1.4; }
+.gf-alterado { flex: none; font-size: .6875rem; padding: 1px 7px; }
+.gf-apagados { border-style: dashed; box-shadow: none; }
+.gf-apagados .d s { text-decoration-thickness: 1px; }
