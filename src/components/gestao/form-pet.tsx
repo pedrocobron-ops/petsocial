@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Camera } from "lucide-react";
 import type { Cliente, Pet, PetComTutor } from "@/lib/gestao/tipos";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { PORTES } from "@/lib/gestao/tipos";
 import { ERRO_TELEFONE, isoDia, mascaraTelefone, semAcento, soDigitos, telefoneValido } from "@/lib/gestao/util";
 import { reduzirFoto } from "@/lib/gestao/foto";
@@ -40,7 +41,7 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
 
   const precisaTutor = !pet && !clienteFixo;
   const { dados: clientes } = useDados(async () =>
-    precisaTutor ? ok(await sb.from("clientes").select("id, nome, telefone").eq("petshop_id", petshop.id).order("nome").limit(2000)) : [],
+    precisaTutor ? lerTudo<{ id: string; nome: string; telefone: string | null }>((de, ate, contar) => sb.from("clientes").select("id, nome, telefone", contando(contar)).eq("petshop_id", petshop.id).order("nome").order("id").range(de, ate)) : [],
   [petshop.id, precisaTutor]);
   const alvo = semAcento(tutorNome);
   const sugestoes = precisaTutor && !tutorId && alvo.length >= 2 ? (clientes ?? []).filter((c) => semAcento(c.nome).includes(alvo)).slice(0, 4) : [];

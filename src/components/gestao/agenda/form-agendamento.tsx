@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CalendarOff, Check, Clock, Lock, Repeat, TriangleAlert, Truck, Users } from "lucide-react";
-import type { AgendamentoCompleto, PetComTutor } from "@/lib/gestao/tipos";
+import type { AgendamentoCompleto, PetComTutor, StatusAgendamento } from "@/lib/gestao/tipos";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, paraMin, vagasDe } from "@/lib/gestao/agenda";
 import { dataAmigavel, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, nomeDiaCurto, precoDoServico, somaDias } from "@/lib/gestao/util";
@@ -143,8 +144,8 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
       const ini = juntaDiaHora(d, hhmm);
       return ok(await sb.rpc("conflitos_agenda", { p_petshop: petshop.id, p_profissional: profId, p_inicio: ini.toISOString(), p_fim: new Date(ini.getTime() + duracao * 60000).toISOString(), p_ignorar: agendamento?.id })).length;
     }));
-    const marcados = ok(await sb.from("agendamentos").select("id, inicio, fim, status").eq("petshop_id", petshop.id)
-      .gte("inicio", somaDias(deIsoDia(lista[0]), -1).toISOString()).lt("inicio", somaDias(deIsoDia(lista[lista.length - 1]), 1).toISOString()).limit(5000));
+    const marcados = await lerTudo<{ id: string; inicio: string; fim: string; status: StatusAgendamento }>((de, ate, contar) => sb.from("agendamentos").select("id, inicio, fim, status", contando(contar)).eq("petshop_id", petshop.id)
+      .gte("inicio", somaDias(deIsoDia(lista[0]), -1).toISOString()).lt("inicio", somaDias(deIsoDia(lista[lista.length - 1]), 1).toISOString()).order("inicio").order("id").range(de, ate));
     const out: Record<string, Problema[]> = {};
     lista.forEach((d, i) => {
       const p: Problema[] = [];

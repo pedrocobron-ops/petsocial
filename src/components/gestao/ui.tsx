@@ -6,6 +6,7 @@ import { Cat, Dog, PawPrint, Search, X } from "lucide-react";
 import { fotoPet } from "@/lib/gestao/supabase";
 import type { PetComTutor } from "@/lib/gestao/tipos";
 import { corDoNome, iniciais, lerValor, semAcento, valor2 } from "@/lib/gestao/util";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useGestao } from "./contexto";
 
 /* ---------- carregar dados ---------- */
@@ -381,7 +382,7 @@ export function EscolherPet({ aoEscolher, aoCriar, autoFocus }: {
   const { sb, petshop } = useGestao();
   const [q, setQ] = useState("");
   const { dados } = useDados(async () =>
-    ok(await sb.from("pets").select("*, clientes(id, nome, telefone)").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(1000)) as PetComTutor[],
+    lerTudo<PetComTutor>((de, ate, contar) => sb.from("pets").select("*, clientes(id, nome, telefone)", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)),
   [petshop.id]);
   const alvo = semAcento(q);
   const lista = (dados ?? []).filter((p) => !alvo || semAcento(p.nome).includes(alvo) || semAcento(p.clientes?.nome ?? "").includes(alvo)).slice(0, 30);

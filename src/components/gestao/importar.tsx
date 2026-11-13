@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Download, FileSpreadsheet, Upload } from "lucide-react";
 import { semAcento } from "@/lib/gestao/util";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useGestao } from "./contexto";
 import { Folha, avisarMudanca, mensagemDeErro, useAvisos, useSomenteLeitura } from "./ui";
 
@@ -134,12 +135,12 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
   }
 
   async function importarClientes(linhas: Record<string, string>[]) {
-    const existentes = await sb.from("clientes").select("id, nome, telefone").eq("petshop_id", petshop.id).limit(10000);
-    if (existentes.error) throw new Error(existentes.error.message);
+    const existentes = { data: await lerTudo<{ id: string; nome: string; telefone: string | null }>((de, ate, contar) =>
+      sb.from("clientes").select("id, nome, telefone", contando(contar)).eq("petshop_id", petshop.id).order("id").range(de, ate)) };
     const porFone = new Map<string, string>(), porNome = new Map<string, string>();
     for (const c of existentes.data ?? []) { if (fimDoFone(c.telefone).length === 8) porFone.set(fimDoFone(c.telefone), c.id); porNome.set(semAcento(c.nome), c.id); }
-    const petsJa = await sb.from("pets").select("cliente_id, nome").eq("petshop_id", petshop.id).limit(20000);
-    if (petsJa.error) throw new Error(petsJa.error.message);
+    const petsJa = { data: await lerTudo<{ cliente_id: string; nome: string }>((de, ate, contar) =>
+      sb.from("pets").select("cliente_id, nome", contando(contar)).eq("petshop_id", petshop.id).order("id").range(de, ate)) };
     const temPet = new Set((petsJa.data ?? []).map((p) => `${p.cliente_id}:${semAcento(p.nome)}`));
 
     let tutores = 0, pets = 0, pulados = 0, semFone = 0, homonimos = 0;
@@ -187,8 +188,8 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
   }
 
   async function importarProdutos(linhas: Record<string, string>[]) {
-    const existentes = await sb.from("produtos").select("nome").eq("petshop_id", petshop.id).limit(10000);
-    if (existentes.error) throw new Error(existentes.error.message);
+    const existentes = { data: await lerTudo<{ nome: string }>((de, ate, contar) =>
+      sb.from("produtos").select("nome", contando(contar)).eq("petshop_id", petshop.id).order("id").range(de, ate)) };
     const tem = new Set((existentes.data ?? []).map((p) => semAcento(p.nome)));
     const { data: u } = await sb.auth.getUser();
     let novos = 0, pulados = 0, ignorados = 0;

@@ -101,15 +101,34 @@ export function CartaoFidelidade({ clienteId, nome }: { clienteId: string; nome:
 
 /** Janela do horário: uma linha discreta com a contagem, ou um destaque quando há prêmio para entregar. */
 export function FidelidadeNoHorario({ clienteId }: { clienteId: string }) {
-  const { posso } = useGestao();
-  const { dados: f, programa } = useFidelidade(clienteId);
+  const { sb, petshop, posso } = useGestao();
+  const { avisar, avisarErro, confirmar } = useAvisos();
+  const somenteLeitura = useSomenteLeitura();
+  const { dados: f, programa, recarregar } = useFidelidade(clienteId);
+  const [ocupado, setOcupado] = useState(false);
   if (!programa || !f) return null;
+  const { cada, premio } = programa;
+
+  // quem atende sem abrir Clientes (só agenda ou só caixa) entrega o prêmio daqui mesmo
+  async function entregar() {
+    if (ocupado || somenteLeitura()) return;
+    if (!(await confirmar({ titulo: "Entregar o prêmio?", texto: `Prêmio: ${premio}. A contagem recomeça para o próximo.`, confirmar: "Entregar prêmio" }))) return;
+    setOcupado(true);
+    try {
+      ok(await sb.from("fidelidade_resgates").insert({ petshop_id: petshop.id, cliente_id: clienteId, premio, atendimentos: cada }).select("id"));
+      avisar("Prêmio entregue.");
+      await recarregar();
+      avisarMudanca();
+    } catch (e) { avisarErro(e); } finally { setOcupado(false); }
+  }
+
   if (f.premios > 0) {
     return (
       <p className="g-aviso verde g-fid-ganhou" style={{ margin: 0 }}>
         <Gift aria-hidden />
-        <span className="g-cresce">Tem prêmio para entregar: <b>{programa.premio}</b></span>
-        {posso("clientes") && <Link className="g-link" href={`/gestao/app/clientes?cliente=${clienteId}`}>Abrir a ficha</Link>}
+        <span className="g-cresce">Tem prêmio para entregar: <b>{premio}</b></span>
+        {posso("clientes") ? <Link className="g-link" href={`/gestao/app/clientes?cliente=${clienteId}`}>Abrir a ficha</Link>
+          : AREAS_FIDELIDADE.some((a) => posso(a)) && <button type="button" className="g-btn verde p" disabled={ocupado} onClick={() => void entregar()}>Entregar prêmio</button>}
       </p>
     );
   }

@@ -5,13 +5,15 @@ import Link from "next/link";
 import { CalendarRange, Check, ChevronRight, Copy, Lightbulb } from "lucide-react";
 import type { Banco } from "@/lib/gestao/supabase";
 import { brl, dataCurta, inicioDaSemana, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
+import { buscarVisitas, diasSemVir, sumiu } from "@/lib/gestao/visitas";
 import { buscarTudo } from "./clientes/comum";
 import { useGestao } from "./contexto";
 import { Tile } from "./painel";
 import { Esqueleto, Folha, useAvisos, useDados } from "./ui";
 import { abrirLinkDeAgendamento } from "./lembrado";
 
-/** Sumido é quem já veio e está há mais de 30 dias sem vir: a mesma regra da lista de Clientes. */
+/** Sumido é quem já veio, está há mais de 30 dias sem vir e não tem nada marcado: a mesma regra da lista de Clientes e do Chamar de volta. */
 const DIAS_SUMIDO = 30;
 
 type Semana = { entrou: number; concluidos: number; faltas: number; petsNovos: number };
@@ -29,15 +31,14 @@ export async function buscarResumo(sb: Banco, petshop: { id: string; criado_em: 
   const seg = inicioDaSemana(inicioDoDia(hoje));
   const de = somaDias(seg, -7), antesDe = somaDias(seg, -14);
   const [lancs, ags, pets, abertas, ativos] = await Promise.all([
-    sb.from("lancamentos").select("valor, data").eq("petshop_id", petshop.id).eq("tipo", "entrada").eq("pago", true).is("movimento", null)
-      .gte("data", isoDia(antesDe)).lt("data", isoDia(seg)).limit(10000),
-    sb.from("agendamentos").select("status, inicio").eq("petshop_id", petshop.id).in("status", ["concluido", "faltou"])
-      .gte("inicio", antesDe.toISOString()).lt("inicio", seg.toISOString()).limit(10000),
-    sb.from("pets").select("criado_em").eq("petshop_id", petshop.id).gte("criado_em", antesDe.toISOString()).lt("criado_em", seg.toISOString()).limit(10000),
-    sb.from("lancamentos").select("valor").eq("petshop_id", petshop.id).eq("tipo", "entrada").eq("pago", false).is("movimento", null).limit(10000),
+    lerTudo<{ valor: number; data: string }>((a, b, contar) => sb.from("lancamentos").select("valor, data", contando(contar)).eq("petshop_id", petshop.id).eq("tipo", "entrada").eq("pago", true).is("movimento", null)
+      .gte("data", isoDia(antesDe)).lt("data", isoDia(seg)).order("data").order("id").range(a, b)).then((data) => ({ data })),
+    lerTudo<{ status: string; inicio: string }>((a, b, contar) => sb.from("agendamentos").select("status, inicio", contando(contar)).eq("petshop_id", petshop.id).in("status", ["concluido", "faltou"])
+      .gte("inicio", antesDe.toISOString()).lt("inicio", seg.toISOString()).order("inicio").order("id").range(a, b)).then((data) => ({ data })),
+    lerTudo<{ criado_em: string }>((a, b, contar) => sb.from("pets").select("criado_em", contando(contar)).eq("petshop_id", petshop.id).gte("criado_em", antesDe.toISOString()).lt("criado_em", seg.toISOString()).order("criado_em").order("id").range(a, b)).then((data) => ({ data })),
+    lerTudo<{ valor: number }>((a, b, contar) => sb.from("lancamentos").select("valor", contando(contar)).eq("petshop_id", petshop.id).eq("tipo", "entrada").eq("pago", false).is("movimento", null).order("id").range(a, b)).then((data) => ({ data })),
     buscarTudo<{ id: string; nome: string }>((a, b) => sb.from("pets").select("id, nome").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(a, b)),
   ]);
-  for (const r of [lancs, ags, pets, abertas]) if (r.error) throw new Error(r.error.message);
 
   const conta = (ini: Date): Semana => {
     const fim = somaDias(ini, 7), a = isoDia(ini), b = isoDia(fim);
@@ -51,32 +52,10 @@ export async function buscarResumo(sb: Banco, petshop: { id: string; criado_em: 
     };
   };
 
-  // última visita de cada pet ativo: atendimento concluído ou estadia de creche e hotel (como em Clientes)
-  const ultima: Record<string, string> = {};
-  if (ativos.length) {
-    const faltam = new Set(ativos.map((p) => p.id));
-    await buscarTudo<{ pet_id: string; inicio: string }>(
-      (a, b) => sb.from("agendamentos").select("pet_id, inicio").eq("petshop_id", petshop.id).eq("status", "concluido")
-        .order("inicio", { ascending: false }).order("id").range(a, b),
-      (linhas) => {
-        for (const l of linhas) if (!ultima[l.pet_id]) { ultima[l.pet_id] = l.inicio; faltam.delete(l.pet_id); }
-        return faltam.size === 0;
-      });
-    const agora = new Date().toISOString();
-    await buscarTudo<{ pet_id: string; entrada: string; saida: string | null; status: string }>(
-      (a, b) => sb.from("estadias").select("pet_id, entrada, saida, status").eq("petshop_id", petshop.id).in("status", ["encerrada", "em_casa"])
-        .order("entrada", { ascending: false }).order("id").range(a, b),
-      (linhas) => {
-        for (const l of linhas) {
-          const quando = l.status === "em_casa" ? agora : l.saida ?? l.entrada;
-          if (!ultima[l.pet_id] || new Date(quando) > new Date(ultima[l.pet_id])) ultima[l.pet_id] = quando;
-        }
-        return false;
-      });
-  }
-  const limite = Date.now() - DIAS_SUMIDO * 864e5;
-  const sumidos = ativos.filter((p) => ultima[p.id] && new Date(ultima[p.id]).getTime() < limite)
-    .sort((x, y) => new Date(ultima[y.id]).getTime() - new Date(ultima[x.id]).getTime()).map((p) => p.nome);
+  // sumidos: a mesma conta de Clientes e do Chamar de volta; quem saiu há menos tempo vem primeiro
+  const visitas = ativos.length ? await buscarVisitas(sb, petshop.id, hoje) : new Map();
+  const sumidos = ativos.filter((p) => sumiu(visitas.get(p.id), DIAS_SUMIDO, hoje))
+    .sort((x, y) => diasSemVir(visitas.get(x.id)!.ultima!, hoje) - diasSemVir(visitas.get(y.id)!.ultima!, hoje)).map((p) => p.nome);
 
   return {
     de, ate: somaDias(seg, -1),
@@ -110,7 +89,7 @@ export function textoDoResumo(r: Resumo, nome: string) {
     `Pets novos: ${r.semana.petsNovos}${c(comparar(r.semana.petsNovos, r.antes?.petsNovos))}`,
   );
   if (!semMovimento(r) || r.aReceber > 0) linhas.push(`A receber em aberto: ${brl(r.aReceber)}`);
-  if (!semMovimento(r) || r.sumidos.length) linhas.push(`Pets há mais de ${DIAS_SUMIDO} dias sem vir: ${r.sumidos.length}`);
+  if (!semMovimento(r) || r.sumidos.length) linhas.push(`Pets há mais de ${DIAS_SUMIDO} dias sem vir e sem nada marcado: ${r.sumidos.length}`);
   return linhas.join("\n");
 }
 
@@ -147,7 +126,7 @@ function Conteudo({ aoIr }: { aoIr?: () => void }) {
     !vazia && { rotulo: "Faltas", valor: String(s.faltas), apoio: comparar(s.faltas, a?.faltas) },
     !vazia && { rotulo: "Pets novos", valor: String(s.petsNovos), apoio: comparar(s.petsNovos, a?.petsNovos) },
     (!vazia || r.aReceber > 0) && { rotulo: "A receber", valor: brl(r.aReceber), apoio: r.aReceber > 0 ? "em aberto hoje" : "ninguém devendo" },
-    (!vazia || r.sumidos.length > 0) && { rotulo: "Sumidos", valor: String(r.sumidos.length), apoio: `há mais de ${DIAS_SUMIDO} dias sem vir` },
+    (!vazia || r.sumidos.length > 0) && { rotulo: "Sumidos", valor: String(r.sumidos.length), apoio: `há mais de ${DIAS_SUMIDO} dias sem vir e sem nada marcado` },
   ].filter(Boolean) as { rotulo: string; valor: string; apoio: string | null }[];
 
   async function copiar() {

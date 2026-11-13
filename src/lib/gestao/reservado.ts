@@ -91,6 +91,29 @@ export async function comCustosDeMovimento<M extends { id: string }>(sb: Banco, 
   return movimentos.map((m) => ({ ...m, custo_unitario: num(extra.get(m.id)?.custo_unitario) }));
 }
 
+/**
+ * Custo unitário de todos os movimentos do pet shop, por id do movimento (cópia de segurança).
+ * Uma função só no banco; se ela ainda não existe (banco antes da atualização), pede produto por produto, seis de cada vez.
+ */
+export async function custosDeTodosOsMovimentos(sb: Banco, petshopId: string, movimentos: { id: string; produto_id: string }[]): Promise<Map<string, number | null>> {
+  const custos = new Map<string, number | null>();
+  if (!movimentos.length) return custos;
+  let semFuncao = false;
+  const linhas = await reservado(sb, "custos_dos_movimentos_do_petshop", { p: petshopId }, async () => { semFuncao = true; return { data: [], error: null }; });
+  if (!semFuncao) {
+    for (const l of linhas) custos.set(String(l.id), num(l.custo_unitario));
+    return custos;
+  }
+  const porProduto = new Map<string, { id: string }[]>();
+  for (const m of movimentos) porProduto.set(m.produto_id, [...(porProduto.get(m.produto_id) ?? []), m]);
+  const grupos = [...porProduto];
+  for (let i = 0; i < grupos.length; i += 6) {
+    const lidos = await Promise.all(grupos.slice(i, i + 6).map(([produtoId, lista]) => comCustosDeMovimento(sb, produtoId, lista)));
+    for (const m of lidos.flat()) custos.set(m.id, m.custo_unitario);
+  }
+  return custos;
+}
+
 /** Junta o preço aos pacotes (modelos e vendidos). Sem a área de pacotes, o preço vem 0. */
 export async function comPrecosDePacote<P extends { id: string }>(sb: Banco, petshopId: string, pacotes: P[]): Promise<(P & { preco: number })[]> {
   const extra = pacotes.length ? porId(await reservado(sb, "precos_dos_pacotes", { p: petshopId }, async () => {

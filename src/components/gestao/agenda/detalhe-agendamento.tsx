@@ -21,7 +21,7 @@ import AntesDepois from "./antes-depois";
 export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, aoEditar }: {
   agendamento: AgendamentoCompleto; aoFechar: () => void; aoMudar: () => void; aoEditar: () => void;
 }) {
-  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { sb, petshop, vejoFinanceiro, posso } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [comanda, setComanda] = useState(false);
@@ -306,7 +306,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
               <MessageCircle />{a.lembrete_em ? "Lembrar de novo" : "Lembrete no WhatsApp"}
             </a>
           ) : <p className="g-pp g-muted g-cresce">Sem telefone do tutor para mandar o lembrete.</p>}
-          {pet && <Link className="g-btn sec" href={`/gestao/app/clientes?pet=${pet.id}`}>Ver ficha</Link>}
+          {pet && posso("clientes") && <Link className="g-btn sec" href={`/gestao/app/clientes?pet=${pet.id}`}>Ver ficha</Link>}
         </div>
         {a.lembrete_em && <p className="g-pp g-muted">Lembrete aberto {dataAmigavel(a.lembrete_em)} às {hora(a.lembrete_em)}.</p>}
 

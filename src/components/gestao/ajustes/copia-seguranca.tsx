@@ -11,7 +11,7 @@ import {
 } from "@/components/gestao/financeiro/comum";
 import { itensDoLancamento, nomeDoMovimento, partesPorForma, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import {
-  COLS_MOVIMENTO, COLS_PACOTE, COLS_PACOTE_CLIENTE, COLS_PRODUTO, comCustos, comCustosDeMovimento, comPrecosDePacote, lerEquipe,
+  COLS_MOVIMENTO, COLS_PACOTE, COLS_PACOTE_CLIENTE, COLS_PRODUTO, comCustos, custosDeTodosOsMovimentos, comPrecosDePacote, lerEquipe,
 } from "@/lib/gestao/reservado";
 import { FORMAS, STATUS_AGENDAMENTO, type Caixa, type Cliente, type Estadia, type Lancamento, type Pet, type Servico, type StatusAgendamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, hora, isoDia, semAcento } from "@/lib/gestao/util";
@@ -210,15 +210,7 @@ export default function CopiaSeguranca() {
 
       etapa("movimentos de estoque");
       const movimentosSemCusto = await todas<MovimentoLido>((a, b) => sb.from("movimentos_estoque").select(COLS_MOVIMENTO).eq("petshop_id", id).order("criado_em").order("id").range(a, b));
-      // o custo de cada movimento sai por produto; busca de poucos em poucos para não pesar
-      const porProduto = new Map<string, MovimentoLido[]>();
-      for (const m of movimentosSemCusto) porProduto.set(m.produto_id, [...(porProduto.get(m.produto_id) ?? []), m]);
-      const custoDoMovimento = new Map<string, number | null>();
-      const grupos = [...porProduto];
-      for (let i = 0; i < grupos.length; i += 6) {
-        const lidos = await Promise.all(grupos.slice(i, i + 6).map(([produtoId, lista]) => comCustosDeMovimento(sb, produtoId, lista)));
-        for (const m of lidos.flat()) custoDoMovimento.set(m.id, m.custo_unitario);
-      }
+      const custoDoMovimento = await custosDeTodosOsMovimentos(sb, id, movimentosSemCusto);
       tabelas.set("movimentos-de-estoque.csv", [
         ["Quando", "Produto", "Tipo", "Quantidade", "Unidade", "Custo por unidade", "Motivo", "Quem fez"],
         ...movimentosSemCusto.map((m): Cel[] => [
