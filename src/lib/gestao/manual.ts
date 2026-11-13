@@ -67,12 +67,13 @@ const BASE: TopicoBase[] = [
   /* ---------- Primeiros passos ---------- */
   { id: "guia", titulo: "Como é o primeiro acesso", secao: "primeiros", quem: "dono", rota: HOJE,
     passos: [
-      "Entre com o e-mail e a senha da conta que você criou.",
-      "Na primeira vez, o sistema pergunta o que o seu negócio faz e monta o menu só com o que você usa.",
-      "Responda uma pergunta de cada vez. Dá para deixar para depois.",
-      "Quando terminar, você cai na tela Hoje, pronta para usar.",
+      "Ao criar o pet shop, marque o que o seu negócio faz: banho e tosa, creche, hotel, venda de produtos, pacotes. O menu fica só com o que você usa.",
+      "Em seguida abre um guia curto, com um assunto por passo: horário, equipe e vagas, serviços e preços, diária e vagas da creche e do hotel, link do cliente. Só aparecem os passos do que você marcou.",
+      "Em cada passo, toque em Continuar para gravar ou em Faço depois para pular.",
+      "Nos preços, escolha Um preço só para usar o mesmo valor em todos os portes, ou Por porte para separar.",
+      "No fim, escolha Cadastrar o primeiro pet ou Trazer meus clientes de uma planilha.",
     ],
-    dicas: ["Tudo o que você respondeu pode ser mudado depois em Meu pet shop.", "Na tela Hoje, o cartão Primeiros passos mostra o que falta fazer. Um toque leva direto ao lugar."],
+    dicas: ["Tudo o que você respondeu pode ser mudado depois em Meu pet shop. O cartão O que você usa mostra ou esconde menus, sem apagar nada.", "Para passar pelo guia de novo, abra Meu pet shop e toque em Refazer o guia de configuração.", "Na tela Hoje, o cartão Primeiros passos mostra o que falta fazer. Um toque leva direto ao lugar."],
     palavras: ["guia", "configurar", "configuracao", "primeiro acesso", "primeira vez", "comecar", "primeiros passos", "por onde comeco"] },
   { id: "tela-hoje", titulo: "Como ler a tela Hoje", secao: "primeiros", quem: "todos", rota: HOJE,
     passos: [
