@@ -20,7 +20,7 @@ import { CartaoSaude, EtiquetaSaude, resumoSaude, type CuidadoSaude } from "./sa
 import { CartaoMensalista } from "../creche/resumo-mes";
 
 type PetDaFicha = Pet & { clientes: Cliente | null };
-type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id">;
+type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id"> & { agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number }[] | null };
 
 const mesDoAno = (d: string) => new Date(d).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 const TOM_VISITA: Record<string, Tom> = { verde: "menta", amarelo: "manteiga", vermelho: "rosa" };
@@ -45,17 +45,17 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [pet, atendimentos, pacotes, estadias, concluidos, saude, hospedagens] = await Promise.all([
       sb.from("pets").select("*, clientes(*)").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
-      sb.from("agendamentos").select("id, inicio, status, preco, servico_id").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
+      sb.from("agendamentos").select("id, inicio, status, preco, servico_id, agendamento_servicos(servico_id, preco, ordem)").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
       sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", id).eq("ativo", true).order("comprado_em", { ascending: false }),
       sb.from("estadias").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("entrada", { ascending: false }).limit(8),
       // visitas concluídas: a conta exata, a mais recente e os valores para somar
-      sb.from("agendamentos").select("inicio, preco", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).eq("status", "concluido").order("inicio", { ascending: false }).limit(1000),
+      sb.from("agendamentos").select("inicio, preco, agendamento_servicos(preco)", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).eq("status", "concluido").order("inicio", { ascending: false }).limit(1000),
       sb.from("pets_saude").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("vence_em").order("criado_em").limit(500),
       // creche e hotel também é visita: estadias encerradas e a que está acontecendo agora
       sb.from("estadias").select("entrada, saida, status", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).in("status", ["encerrada", "em_casa"]).order("entrada", { ascending: false }).limit(1000),
     ]);
     for (const r of [pet, atendimentos, pacotes, estadias, concluidos, hospedagens]) if (r.error) throw new Error(r.error.message);
-    const feitos = (concluidos.data ?? []) as { inicio: string; preco: number | null }[];
+    const feitos = (concluidos.data ?? []) as { inicio: string; preco: number | null; agendamento_servicos?: { preco: number | null }[] | null }[];
     const ficou = (hospedagens.data ?? []) as { entrada: string; saida: string | null; status: string }[];
     const nEstadias = hospedagens.count ?? ficou.length;
     // quem está na casa agora veio hoje; estadia encerrada conta pelo dia em que saiu
@@ -78,7 +78,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       visitas: (concluidos.count ?? feitos.length) + nEstadias,
       nEstadias,
       ultimaVisita: ultimaEstadia && (!ultimoAtendimento || new Date(ultimaEstadia) > new Date(ultimoAtendimento)) ? ultimaEstadia : ultimoAtendimento,
-      gasto: feitos.reduce((t, a) => t + Number(a.preco ?? 0), 0) + gastoEstadias,
+      gasto: feitos.reduce((t, a) => t + Number(a.preco ?? 0) + (a.agendamento_servicos ?? []).reduce((x, o) => x + Number(o.preco ?? 0), 0), 0) + gastoEstadias,
       gastoEstadias,
       gastoParcial: (concluidos.count ?? 0) > feitos.length,
       // se a saúde falhar, o resto da ficha abre do mesmo jeito
@@ -105,6 +105,10 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
   const agora = new Date();
   const hoje = inicioDoDia(agora);
   const servicoDe = (sid: string | null) => servicos.find((s) => s.id === sid);
+  // horário com mais de um serviço: os nomes juntos e o valor somado
+  const outrosDe = (a: Atendimento) => [...(a.agendamento_servicos ?? [])].sort((x, y) => x.ordem - y.ordem);
+  const nomesDe = (a: Atendimento) => [servicoDe(a.servico_id)?.nome, ...outrosDe(a).map((o) => servicoDe(o.servico_id)?.nome)].filter(Boolean).join(" + ") || "Atendimento";
+  const valorDe = (a: Atendimento) => (a.preco == null && !outrosDe(a).some((o) => o.preco != null) ? null : Number(a.preco ?? 0) + outrosDe(a).reduce((t, o) => t + Number(o.preco ?? 0), 0));
   // o histórico vem do mais novo para o mais antigo: o próximo horário é o último que ainda está por vir
   const porVir = atendimentos.filter((a) => new Date(a.inicio) > agora && !["cancelado", "faltou", "concluido"].includes(a.status));
   const proximo = porVir[porVir.length - 1] ?? null;
@@ -188,7 +192,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
         </div>
         <div className="g-cli-num">
           <Tile icone={CalendarClock} tom="ceu" />
-          <div><span className="g-rotulo">Próximo horário</span><b>{proximo ? dataAmigavel(proximo.inicio) : "nada marcado"}</b>{proximo && <small>às {hora(proximo.inicio)} · {servicoDe(proximo.servico_id)?.nome ?? "Atendimento"}</small>}</div>
+          <div><span className="g-rotulo">Próximo horário</span><b>{proximo ? dataAmigavel(proximo.inicio) : "nada marcado"}</b>{proximo && <small>às {hora(proximo.inicio)} · {nomesDe(proximo)}</small>}</div>
         </div>
         {vejoFinanceiro ? (
           <div className="g-cli-num">
@@ -224,12 +228,12 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
                         <span className="ponto" aria-hidden />
                         <div className="c">
                           <div className="l">
-                            <b>{servicoDe(a.servico_id)?.nome ?? "Atendimento"}</b>
+                            <b>{nomesDe(a)}</b>
                             <span className={`g-tag ${st.tom}`}>{st.rotulo}</span>
                           </div>
                           <span className="q">
                             {nomeDiaCurto(new Date(a.inicio))}, {dataCurta(a.inicio)} às {hora(a.inicio)}
-                            {vejoFinanceiro && a.preco != null && <> · <b className="g-tab">{brl(a.preco)}</b></>}
+                            {vejoFinanceiro && valorDe(a) != null && <> · <b className="g-tab">{brl(valorDe(a)!)}</b></>}
                           </span>
                         </div>
                       </li>

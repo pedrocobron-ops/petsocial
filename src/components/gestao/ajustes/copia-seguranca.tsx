@@ -29,6 +29,7 @@ type SaudeLida = { tipo: string; nome: string; aplicado_em: string | null; vence
 type AgendamentoLido = {
   inicio: string; fim: string; status: StatusAgendamento; preco: number | null; obs: string | null; origem: string; criado_por: string | null; leva_traz: boolean;
   endereco_leva_traz: string | null; pacote_cliente_id: string | null; pets: DoPet; servicos: { nome: string } | null; profissionais: { nome: string } | null;
+  agendamento_servicos?: { preco: number | null; ordem: number; servicos: { nome: string } | null }[] | null;
 };
 type ProdutoLido = { id: string; nome: string; categoria: string | null; unidade: string; preco_venda: number | null; estoque: number; estoque_minimo: number; ativo: boolean; criado_em: string; codigo_barras: string | null; fornecedor_id: string | null };
 type MovimentoLido = { id: string; produto_id: string; tipo: string; quantidade: number; motivo: string | null; origem: string; criado_por: string | null; criado_em: string; fornecedor_id: string | null };
@@ -74,7 +75,7 @@ const ASSUNTOS = [
   { arquivo: "clientes.csv", nome: "clientes", explica: "Os tutores: nome, telefone, e-mail, endereço e observações." },
   { arquivo: "pets.csv", nome: "pets", explica: "Os pets, cada um com o nome do tutor, espécie, raça, porte, alertas e observações." },
   { arquivo: "cuidados-de-saude.csv", nome: "cuidados de saúde", explica: "Vacinas, vermífugos, antipulgas e outros cuidados anotados na ficha de cada pet." },
-  { arquivo: "agendamentos.csv", nome: "agendamentos", explica: "Todos os horários da agenda, com pet, tutor, serviço, profissional, situação e preço." },
+  { arquivo: "agendamentos.csv", nome: "agendamentos", explica: "Todos os horários da agenda, com pet, tutor, serviço (e os outros serviços do mesmo horário), profissional, situação e preço." },
   { arquivo: "lancamentos.csv", nome: "lançamentos", explica: "O financeiro: tudo o que entrou e saiu, as contas a pagar e a receber. Saídas aparecem com valor negativo. Conta recebida em partes: cada parte é uma linha, e a linha da conta traz o valor cheio na última coluna." },
   { arquivo: "caixas.csv", nome: "caixas", explica: "Cada caixa aberto e fechado, com o troco, o que entrou e saiu, o dinheiro esperado e o contado." },
   { arquivo: "produtos.csv", nome: "produtos", explica: "Os produtos do estoque, com preço, custo, último custo, código de barras, último fornecedor, quantidade atual e mínima." },
@@ -174,15 +175,18 @@ export default function CopiaSeguranca() {
 
       etapa("agendamentos");
       const agendamentos = await todas<AgendamentoLido>((a, b) => sb.from("agendamentos")
-        .select("inicio, fim, status, preco, obs, origem, criado_por, leva_traz, endereco_leva_traz, pacote_cliente_id, pets(nome, clientes(nome, telefone)), servicos(nome), profissionais(nome)")
+        .select("inicio, fim, status, preco, obs, origem, criado_por, leva_traz, endereco_leva_traz, pacote_cliente_id, pets(nome, clientes(nome, telefone)), servicos(nome), profissionais(nome), agendamento_servicos(preco, ordem, servicos(nome))")
         .eq("petshop_id", id).order("inicio").order("id").range(a, b));
       tabelas.set("agendamentos.csv", [
-        ["Dia", "Começa", "Termina", "Pet", "Tutor", "Telefone do tutor", "Serviço", "Profissional", "Situação", "Preço", "Usou pacote", "Leva e traz", "Endereço do leva e traz", "Observações", "Marcado por"],
+        ["Dia", "Começa", "Termina", "Pet", "Tutor", "Telefone do tutor", "Serviço", "Profissional", "Situação", "Preço", "Usou pacote", "Leva e traz", "Endereço do leva e traz", "Observações", "Marcado por", "Outros serviços no mesmo horário", "Preço dos outros serviços"],
         ...agendamentos.map((g): Cel[] => [
           dataCompleta(g.inicio), hora(g.inicio), hora(g.fim), g.pets?.nome ?? "", tutorDe(g.pets), fmtTelefone(g.pets?.clientes?.telefone), g.servicos?.nome ?? "", g.profissionais?.nome ?? "",
           STATUS_AGENDAMENTO[g.status]?.rotulo ?? g.status, dinheiro(g.preco), simNao(Boolean(g.pacote_cliente_id)), simNao(g.leva_traz), g.endereco_leva_traz ?? "", g.obs ?? "",
           // quem marcou: o nome de quem estava logado; pelo link, foi o próprio cliente
           g.origem === "link" ? rotulo(ORIGEM, g.origem) : autor(g.criado_por, g.origem),
+          // horário com mais de um serviço: os outros, na ordem, e a soma dos preços deles
+          [...(g.agendamento_servicos ?? [])].sort((x, y) => x.ordem - y.ordem).map((o) => o.servicos?.nome ?? "Serviço").join(" + "),
+          g.agendamento_servicos?.length ? dinheiro(Math.round(g.agendamento_servicos.reduce((t, o) => t + Number(o.preco ?? 0), 0) * 100) / 100) : "",
         ]),
       ]);
 

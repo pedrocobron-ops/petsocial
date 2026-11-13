@@ -12,14 +12,18 @@ export type ServicoAMais = {
   id: string; servico_id: string; preco: number | null; ordem: number;
   servicos: { id: string; nome: string; cor: string | null; categoria?: string | null } | null;
 };
-type ComServicos = { servicos?: { nome: string } | null; agendamento_servicos?: ServicoAMais[] | null };
+/** O mínimo para pôr os outros serviços em ordem (algumas leituras não trazem o id do serviço). */
+type NaOrdem = { ordem: number; servico_id?: string };
+type ComServicos = { servicos?: { nome: string } | null; agendamento_servicos?: (NaOrdem & { servicos: { nome: string } | null })[] | null };
+const emOrdem = <T extends NaOrdem>(lista: T[] | null | undefined): T[] =>
+  [...(lista ?? [])].sort((x, y) => x.ordem - y.ordem || ((x.servico_id ?? "") < (y.servico_id ?? "") ? -1 : 1));
 
 /** O pedaço do `select` que traz os outros serviços do horário. */
 export const SELECT_SERVICOS_A_MAIS = "agendamento_servicos(id, servico_id, preco, ordem, servicos(id, nome, cor, categoria))";
 
 /** Os outros serviços do horário, na ordem em que foram juntados (a mesma ordem que o banco usa nas contas). */
-export function servicosAMais(a: { agendamento_servicos?: ServicoAMais[] | null } | null | undefined): ServicoAMais[] {
-  return [...(a?.agendamento_servicos ?? [])].sort((x, y) => x.ordem - y.ordem || (x.servico_id < y.servico_id ? -1 : 1));
+export function servicosAMais<T extends NaOrdem = ServicoAMais>(a: { agendamento_servicos?: T[] | null } | null | undefined): T[] {
+  return emOrdem(a?.agendamento_servicos);
 }
 
 /** "Banho + Hidratação + Corte de unha" (o principal na frente). Sem serviço nenhum, devolve null. */
@@ -38,7 +42,7 @@ export function servicosPorExtenso(a: ComServicos | null | undefined): string | 
 const emCentavos = (n: number | null | undefined) => Math.round(Number(n ?? 0) * 100);
 
 /** O valor combinado do horário inteiro: o serviço principal mais os outros. Sem valor nenhum, null. */
-export function valorDoHorario(a: { preco: number | null; agendamento_servicos?: ServicoAMais[] | null }): number | null {
+export function valorDoHorario(a: { preco: number | null; agendamento_servicos?: (NaOrdem & { preco: number | null })[] | null }): number | null {
   const outros = servicosAMais(a);
   if (a.preco == null && !outros.some((s) => s.preco != null)) return null;
   return (emCentavos(a.preco) + outros.reduce((t, s) => t + emCentavos(s.preco), 0)) / 100;
@@ -63,7 +67,7 @@ export type ParteDoServico = { servicoId: string | null; valor: number; principa
  * A soma das partes é sempre a parte de serviço da conta.
  */
 export function partesPorServico(a: HorarioDaConta, conta: ContaDoHorario): ParteDoServico[] {
-  const outros = [...(a.agendamento_servicos ?? [])].sort((x, y) => x.ordem - y.ordem || (x.servico_id < y.servico_id ? -1 : 1));
+  const outros = emOrdem(a.agendamento_servicos);
   const partes = partesDoLancamento(conta);
   const total = emCentavos(partes ? partes.servico : conta.valor);
   const ids: (string | null)[] = [a.servico_id, ...outros.map((s) => s.servico_id)];
@@ -100,7 +104,7 @@ export function partesPorServico(a: HorarioDaConta, conta: ContaDoHorario): Part
  * - sem conta ainda: o preço combinado na agenda.
  */
 export function cobradoPorServico(a: HorarioDaConta, conta: ContaDoHorario | undefined): ParteDoServico[] {
-  const outros = [...(a.agendamento_servicos ?? [])].sort((x, y) => x.ordem - y.ordem || (x.servico_id < y.servico_id ? -1 : 1));
+  const outros = emOrdem(a.agendamento_servicos);
   if (!outros.length) {
     const valor = conta ? partesDoLancamento(conta)?.servico ?? Number(conta.valor) : a.pacote_cliente_id ? 0 : Number(a.preco ?? 0);
     return [{ servicoId: a.servico_id, valor, principal: true }];

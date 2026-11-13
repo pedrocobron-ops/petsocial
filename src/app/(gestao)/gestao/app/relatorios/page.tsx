@@ -9,7 +9,8 @@ import { AvatarPessoa, AvatarPet, Esqueleto, useAvisos, useDados, Vazio } from "
 import { baixarPlanilha, brlMini, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, numeroCsv, PALETA, paginar, SemAcesso, somaPorForma, type Cel } from "@/components/gestao/financeiro/comum";
 import { Anel, Barras, Kpi, Rosca, Tile } from "@/components/gestao/painel";
 import RelatorioProdutos from "@/components/gestao/loja/relatorio-produtos";
-import { partesDoLancamento, percentuaisQueFecham } from "@/lib/gestao/dinheiro";
+import { percentuaisQueFecham } from "@/lib/gestao/dinheiro";
+import { cobradoPorServico, type ParteDoServico } from "@/lib/gestao/servicos-do-horario";
 import type { Banco } from "@/lib/gestao/supabase";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
@@ -53,7 +54,10 @@ type Ag = {
   id: string; inicio: string; status: string; preco: number | null; pet_id: string; servico_id: string | null; profissional_id: string | null; pacote_cliente_id: string | null;
   pets: { id: string; nome: string; foto: string | null; especie: string | null; clientes: { id: string; nome: string } | null } | null;
   servicos: { id: string; nome: string; cor: string | null } | null;
+  /** Os outros serviços do mesmo horário (cada um com o seu preço). */
+  agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number; servicos: { id: string; nome: string; cor: string | null } | null }[] | null;
 };
+type DaConta = Pick<Ag, "servico_id" | "preco" | "pacote_cliente_id"> & { agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number }[] | null };
 type Entrada = { id: string; data: string; valor: number; cliente_id: string | null; agendamento_id: string | null; itens: unknown; forma: string | null; pagamentos: unknown; valor_original?: number | null };
 /** Conta de um atendimento (uma por atendimento): já recebida, ou anotada para o cliente pagar depois (`pago: false`). */
 type Recebimento = { agendamento_id: string | null; valor: number; itens: unknown; pago?: boolean; valor_original?: number | null };
@@ -66,11 +70,17 @@ const cheio = (l: Recebimento) => ({ valor: Number(l.valor_original ?? l.valor),
  * - conta que o cliente paga depois (fiado): a mesma conta, pelo valor cobrado, mesmo sem o dinheiro ter entrado;
  * - pago com pacote: nada (o dinheiro entrou na venda do pacote);
  * - sem recebimento ainda: o preço combinado na agenda.
+ * Horário com mais de um serviço: `partes` traz o valor de cada serviço (a soma é `valor`); com pacote, só o serviço
+ * principal sai do pacote e os outros entram pelo que foi cobrado. `pacote`: o serviço principal foi pelo pacote.
  */
-function cobradoDe(a: Pick<Ag, "preco" | "pacote_cliente_id">, recebimento: Recebimento | undefined): { valor: number; como: "recebido" | "fiado" | "pacote" | "agenda" } {
-  if (recebimento) return { valor: partesDoLancamento(cheio(recebimento))?.servico ?? cheio(recebimento).valor, como: recebimento.pago === false ? "fiado" : "recebido" };
-  if (a.pacote_cliente_id) return { valor: 0, como: "pacote" };
-  return { valor: Number(a.preco ?? 0), como: "agenda" };
+function cobradoDe(a: DaConta, recebimento: Recebimento | undefined): { valor: number; como: "recebido" | "fiado" | "pacote" | "agenda"; pacote: boolean; partes: ParteDoServico[] } {
+  const partes = cobradoPorServico(a, recebimento ? cheio(recebimento) : undefined);
+  const valor = real(partes.reduce((s, p) => s + p.valor, 0));
+  const pacote = Boolean(a.pacote_cliente_id) && (!recebimento || Boolean(a.agendamento_servicos?.length));
+  if (recebimento) return { valor, como: recebimento.pago === false ? "fiado" : "recebido", pacote, partes };
+  // pago com pacote e mais nada a cobrar; com outros serviços ainda sem conta, eles contam pelo preço da agenda
+  if (a.pacote_cliente_id && valor === 0) return { valor: 0, como: "pacote", pacote, partes };
+  return { valor, como: "agenda", pacote, partes };
 }
 
 /**
@@ -95,7 +105,7 @@ async function contasDosAtendimentos(sb: Banco, petshopId: string, concluidos: s
 }
 
 /** Valor médio cobrado por atendimento concluído; quem pagou com pacote fica de fora da conta. */
-function valorMedio(concluidos: Pick<Ag, "id" | "preco" | "pacote_cliente_id">[], recebimentos: Map<string, Recebimento>): number | null {
+function valorMedio(concluidos: (DaConta & Pick<Ag, "id">)[], recebimentos: Map<string, Recebimento>): number | null {
   let soma = 0, pagantes = 0;
   for (const a of concluidos) {
     const c = cobradoDe(a, recebimentos.get(a.id));
@@ -109,7 +119,7 @@ function valorMedio(concluidos: Pick<Ag, "id" | "preco" | "pacote_cliente_id">[]
 async function carregarAnterior(sb: Banco, petshopId: string, de: Date, ate: Date) {
   const comeco = de.toISOString(), final = somaDias(ate, 1).toISOString();
   const [ags, entradas, novos] = await Promise.all([
-    paginar<Pick<Ag, "id" | "preco" | "pacote_cliente_id">>((a, b) => sb.from("agendamentos").select("id, preco, pacote_cliente_id")
+    paginar<DaConta & Pick<Ag, "id">>((a, b) => sb.from("agendamentos").select("id, preco, pacote_cliente_id, servico_id, agendamento_servicos(servico_id, preco, ordem)")
       .eq("petshop_id", petshopId).eq("status", "concluido").gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b)),
     paginar<Recebimento>((a, b) => sb.from("lancamentos").select("agendamento_id, valor, itens, valor_original").eq("petshop_id", petshopId).eq("pago", true).eq("tipo", "entrada")
       .is("movimento", null).gte("data", isoDia(de)).lte("data", isoDia(ate)).order("data").order("id").range(a, b)),
@@ -193,7 +203,7 @@ function Relatorios() {
     const [ags, entradas, novos, estadias, anterior] = await Promise.all([
       paginar<Ag>(async (a, b) => {
         const r = await sb.from("agendamentos")
-          .select("id, inicio, status, preco, pet_id, servico_id, profissional_id, pacote_cliente_id, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome, cor)")
+          .select("id, inicio, status, preco, pet_id, servico_id, profissional_id, pacote_cliente_id, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome, cor), agendamento_servicos(servico_id, preco, ordem, servicos(id, nome, cor))")
           .eq("petshop_id", petshop.id).gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b);
         return { data: r.data as unknown as Ag[] | null, error: r.error };
       }),
@@ -218,9 +228,9 @@ function Relatorios() {
     // valor realmente cobrado de cada atendimento concluído (não o preço combinado na agenda)
     const cobrado = new Map(concluidos.map((a) => [a.id, cobradoDe(a, dados.recebimentos.get(a.id))]));
     const valorDe = (a: Ag) => cobrado.get(a.id)?.valor ?? 0;
-    const pagoComPacote = (a: Ag) => cobrado.get(a.id)?.como === "pacote";
+    const pagoComPacote = (a: Ag) => Boolean(cobrado.get(a.id)?.pacote);
     const comPacote = concluidos.filter(pagoComPacote).length;
-    const aReceber = concluidos.filter((a) => cobrado.get(a.id)?.como === "agenda" && Number(a.preco ?? 0) > 0).length;
+    const aReceber = concluidos.filter((a) => cobrado.get(a.id)?.como === "agenda" && (cobrado.get(a.id)?.valor ?? 0) > 0).length;
     // contas que o cliente ficou de pagar depois: o serviço conta como feito, o dinheiro ainda não entrou
     const fiados = concluidos.filter((a) => cobrado.get(a.id)?.como === "fiado");
     const valorFiado = real(fiados.reduce((s, a) => s + Number(dados.recebimentos.get(a.id)?.valor ?? 0), 0));
@@ -260,7 +270,22 @@ function Relatorios() {
       return [...mapa.values()].sort((a, b) => b.n - a.n || b.valor - a.valor);
     };
     const usadas = new Set<string>();
-    const servicosTodos = contar(concluidos, (a) => a.servico_id ?? "sem", (a) => ({ nome: a.servicos?.nome ?? "Sem serviço escolhido", cor: a.servicos?.cor ?? null }));
+    // serviços: cada serviço do horário conta uma vez, com o valor cobrado por ele (a soma fecha com o valor dos atendimentos)
+    const porServico = new Map<string, { chave: string; n: number; valor: number; pacote: number; extra: { nome: string; cor: string | null } }>();
+    for (const a of concluidos) {
+      const c = cobrado.get(a.id);
+      const outros = a.agendamento_servicos ?? [];
+      const todos = [{ id: a.servico_id, de: a.servicos, principal: true }, ...outros.map((o) => ({ id: o.servico_id as string | null, de: o.servicos, principal: false }))];
+      for (const sv of todos) {
+        const k = sv.id ?? "sem";
+        const x = porServico.get(k) ?? { chave: k, n: 0, valor: 0, pacote: 0, extra: { nome: sv.de?.nome ?? "Sem serviço escolhido", cor: sv.de?.cor ?? null } };
+        x.n++;
+        x.valor = real(x.valor + (c?.partes ?? []).filter((p) => p.principal === sv.principal && (sv.principal || p.servicoId === sv.id)).reduce((s, p) => s + p.valor, 0));
+        if (sv.principal && c?.pacote) x.pacote++;
+        porServico.set(k, x);
+      }
+    }
+    const servicosTodos = [...porServico.values()].sort((a, b) => b.n - a.n || b.valor - a.valor);
     const servicos = servicosTodos.slice(0, 8)
       .map((s) => {
         // cada fatia com uma cor só dela: a do serviço, ou a próxima livre da paleta
@@ -276,7 +301,7 @@ function Relatorios() {
     // comissão: sobre o que foi cobrado pelo serviço; atendimento pago com pacote conta pelo preço do serviço na agenda
     const comissoes = equipe.filter((p) => Number(p.comissao_pct) > 0).map((p) => {
       const dele = concluidos.filter((a) => a.profissional_id === p.id);
-      const base = real(dele.reduce((s, a) => s + (pagoComPacote(a) ? Number(a.preco ?? 0) : valorDe(a)), 0));
+      const base = real(dele.reduce((s, a) => s + (pagoComPacote(a) ? Number(a.preco ?? 0) : 0) + valorDe(a), 0));
       return { p, n: dele.length, pacote: dele.filter(pagoComPacote).length, base, comissao: real((base * Number(p.comissao_pct)) / 100) };
     }).filter((c) => c.p.ativo || c.n > 0).sort((a, b) => b.comissao - a.comissao);
 

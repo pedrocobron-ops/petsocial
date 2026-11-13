@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BellRing, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, Truck, Printer, Users, Utensils } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
+import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
+
 import { deMin, paraMin, vagasDe } from "@/lib/gestao/agenda";
 import { almocoDoDia, dataAmigavel, dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
@@ -273,10 +275,10 @@ function Agenda() {
                         const tutor = a.pets?.clientes?.nome;
                         return (
                           <button key={a.id} className={`g-bloco${["cancelado", "faltou"].includes(a.status) ? " apagado" : ""}${lotados.has(a.id) ? " lotado" : ""}`} onClick={() => setAberto(a.id)}
-                            title={`${hora(a.inicio)} · ${a.pets?.nome ?? "Pet"}${tutor ? ` (${tutor})` : ""} · ${a.servicos?.nome ?? "Atendimento"}${lotados.has(a.id) ? ` · passa das vagas: ${lotados.get(a.id)} ao mesmo tempo` : ""}`}
+                            title={`${hora(a.inicio)} · ${a.pets?.nome ?? "Pet"}${tutor ? ` (${tutor})` : ""} · ${nomeDosServicos(a) ?? "Atendimento"}${lotados.has(a.id) ? ` · passa das vagas: ${lotados.get(a.id)} ao mesmo tempo` : ""}`}
                             style={{ top: topoDe(i.getTime()), height: alt, left: `calc(${(ri / colunas) * 100}% + 3px)`, right: `calc(${((colunas - ri - 1) / colunas) * 100}% + 3px)`, "--cor": a.servicos?.cor ?? "#f97316" } as React.CSSProperties}>
                             <b>{a.pets?.nome}</b>
-                            <span>{hora(a.inicio)}{alt > 40 ? ` · ${a.servicos?.nome ?? ""}` : ""}</span>
+                            <span>{hora(a.inicio)}{alt > 40 ? ` · ${nomeDosServicos(a) ?? ""}` : ""}</span>
                             {alt > 56 && tutor && <span>{tutor}</span>}
                             {alt > 62 && a.pets && colunas === 1 && <span className="av"><AvatarPet pet={a.pets} tamanho="p" /></span>}
                           </button>
@@ -350,7 +352,7 @@ function Agenda() {
                     {l.a.pets && <AvatarPet pet={l.a.pets} />}
                     <span className="t">
                       <b>{l.a.pets?.nome}</b>
-                      <span className="serv"><i />{[l.a.servicos?.nome, quemAtende.length > 1 ? l.a.profissionais?.nome.split(" ")[0] : null].filter(Boolean).join(" · ") || "Atendimento"}</span>
+                      <span className="serv"><i />{[nomeDosServicos(l.a), quemAtende.length > 1 ? l.a.profissionais?.nome.split(" ")[0] : null].filter(Boolean).join(" · ") || "Atendimento"}</span>
                       {l.a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {l.a.pets.clientes.nome}</span>}
                       {lotados.has(l.a.id) && !["cancelado", "faltou"].includes(l.a.status) && <span className="g-agd-lotado"><Users size={13} aria-hidden />Passa das vagas: {lotados.get(l.a.id)} ao mesmo tempo</span>}
                     </span>
