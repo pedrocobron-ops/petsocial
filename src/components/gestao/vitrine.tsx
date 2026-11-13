@@ -6,13 +6,15 @@ const ABAS: { id: string; rotulo: string; frase: string; alt: string }[] = [
   { id: "agenda", rotulo: "Agenda", frase: "A semana inteira de relance, por profissional, com os horários livres à vista.", alt: "Agenda da semana com os atendimentos coloridos por serviço" },
   { id: "assistente", rotulo: "Assistente de IA", frase: "Um assistente de inteligência artificial: fale ou escreva o que precisa. Ele prepara e você confirma com um toque.", alt: "Painel do assistente aberto ao lado da tela inicial" },
   { id: "clientes", rotulo: "Clientes e pets", frase: "Cada pet com foto, tutor, cuidados e a data da última visita.", alt: "Lista de pets com foto, tutor e última visita" },
+  { id: "chamar-de-volta", rotulo: "Chamar de volta", frase: "Quem não vem há 30, 45, 60 ou 90 dias e os aniversariantes da semana, com a mensagem pronta. Você toca e envia pelo seu WhatsApp.", alt: "Chamar de volta: lista de tutores com a mensagem pronta para abrir no WhatsApp" },
   { id: "caixa", rotulo: "Caixa", frase: "Abra o caixa, lance entradas e saídas e feche o dia conferindo a gaveta.", alt: "Caixa do dia com entradas e saídas" },
   { id: "financeiro", rotulo: "Financeiro", frase: "O que entrou, o que saiu, as contas que vencem e o resultado do mês.", alt: "Financeiro do mês com entradas, saídas e resultado" },
   { id: "estoque", rotulo: "Estoque", frase: "Entradas e saídas de produto, com aviso quando algum está acabando.", alt: "Estoque com saldo de cada produto" },
   { id: "pacotes", rotulo: "Pacotes", frase: "Venda pacotes de banho e acompanhe o que cada cliente já usou.", alt: "Pacotes e mensalistas" },
   { id: "creche-hotel", rotulo: "Creche e hotel", frase: "Quem está na casa agora, as reservas e o check-out com as diárias.", alt: "Creche e hotel" },
-  { id: "relatorios", rotulo: "Relatórios", frase: "Atendimentos, faltas, serviços mais feitos, faturamento e comissão.", alt: "Relatórios do período" },
+  { id: "relatorios", rotulo: "Relatórios", frase: "Atendimentos, faltas, serviços mais feitos, faturamento e comissão, com os números do período anterior ao lado.", alt: "Relatórios do período, com a comparação com o período anterior" },
   { id: "equipe", rotulo: "Equipe", frase: "Acesso por função, quem atende na agenda e a escala da semana.", alt: "Equipe e escala da semana" },
+  { id: "manual", rotulo: "Manual", frase: "O passo a passo de cada tarefa, com busca e para imprimir. E o botão “Como usar esta tela” no alto de todas as telas.", alt: "Manual dentro do sistema, com busca e os primeiros passos" },
 ];
 
 /** Vitrine das funções: uma aba por parte do sistema, cada uma com a tela real e uma frase. */
