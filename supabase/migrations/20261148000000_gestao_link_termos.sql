@@ -1,9 +1,9 @@
 -- Link do cliente: aceite de regras e de vacinas em dia, e o tutor cancelando ou pedindo outra data pela página do pedido.
 -- Tudo opcional e desligado: as chaves ficam em petshops.opcoes ("link.termos", "link.termos_texto", "link.termos_vacinas",
 -- "link.cancelar", "link.cancelar_horas"). Sem as chaves, nada muda.
--- Só acrescenta: colunas novas em pedidos_agendamento e funções novas. Nenhuma função que já existia foi trocada
--- (link_pedir, link_pedir_estadia, link_horarios, link_estadia_cheios, link_pedido e pedido_aceitar seguem como estavam),
--- então o código de antes continua funcionando neste banco.
+-- Só acrescenta: colunas novas em pedidos_agendamento e funções novas. link_pedir, link_pedir_estadia, link_horarios,
+-- link_estadia_cheios, link_pedido e pedido_aceitar seguem como estavam, então o código de antes continua funcionando neste banco.
+-- A única função trocada é link_vaga (mesma assinatura), no fim do arquivo, para consertar uma conta de vagas.
 
 -- ---------- o que o pedido guarda ----------
 -- Aceite: quando foi, o texto exato que o tutor leu e se declarou as vacinas em dia.
@@ -25,12 +25,13 @@ grant update (cliente_pedido_visto_em) on public.pedidos_agendamento to authenti
 -- ---------- as opções do link, lidas com cuidado (o campo é livre) ----------
 create function public.link_opcoes_de(p_opcoes jsonb) returns jsonb
 language sql immutable set search_path = '' as $$
+  -- chave ausente ou com outro tipo vale desligado (nunca nulo: quem lê decide com sim ou não)
   select jsonb_build_object(
-    'termos', (p_opcoes -> 'link.termos') = 'true'::jsonb
-      and (t.texto <> '' or (p_opcoes -> 'link.termos_vacinas') = 'true'::jsonb),
+    'termos', coalesce((p_opcoes -> 'link.termos') = 'true'::jsonb, false)
+      and (t.texto <> '' or coalesce((p_opcoes -> 'link.termos_vacinas') = 'true'::jsonb, false)),
     'texto', t.texto,
-    'vacinas', (p_opcoes -> 'link.termos_vacinas') = 'true'::jsonb,
-    'cancelar', (p_opcoes -> 'link.cancelar') = 'true'::jsonb,
+    'vacinas', coalesce((p_opcoes -> 'link.termos_vacinas') = 'true'::jsonb, false),
+    'cancelar', coalesce((p_opcoes -> 'link.cancelar') = 'true'::jsonb, false),
     'horas', case when jsonb_typeof(p_opcoes -> 'link.cancelar_horas') = 'number'
       then least(720, greatest(0, round((p_opcoes ->> 'link.cancelar_horas')::numeric)))::int else 24 end
   )
@@ -255,5 +256,29 @@ revoke execute on function public.link_opcoes(text), public.link_nome(text), pub
   public.link_pedido_cliente(uuid), public.link_pedido_cancelar(uuid, text), public.link_pedido_pedir_mudanca(uuid, text) from public;
 grant execute on function public.link_opcoes(text), public.link_nome(text), public.link_pedir_com_termos(text, jsonb, text, boolean),
   public.link_pedido_cliente(uuid), public.link_pedido_cancelar(uuid, text), public.link_pedido_pedir_mudanca(uuid, text) to anon, authenticated;
+
+-- ---------- conserto: pedido de creche ou de hotel esperando resposta não ocupa horário de banho ----------
+-- link_vaga contava todo pedido pendente que cruzava o horário, inclusive os de creche e hotel (que duram dias):
+-- um pedido de hotel sem resposta escondia os horários de banho do período inteiro. Mesma assinatura; só a conta mudou.
+create or replace function public.link_vaga(p_petshop uuid, p_inicio timestamptz, p_fim timestamptz) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  v_cap int;
+  v_ocupados int;
+begin
+  if exists (select 1 from public.bloqueios where petshop_id = p_petshop and profissional_id is null and inicio < p_fim and fim > p_inicio) then
+    return false;
+  end if;
+  select coalesce(
+    (select vagas from public.petshops where id = p_petshop),
+    (select greatest(1, count(*))::int from public.profissionais where petshop_id = p_petshop and ativo and atende)
+  ) into v_cap;
+  select
+    (select count(*) from public.agendamentos where petshop_id = p_petshop and status not in ('cancelado', 'faltou') and inicio < p_fim and fim > p_inicio)
+    + (select count(*) from public.pedidos_agendamento where petshop_id = p_petshop and status = 'pendente' and tipo = 'servico' and inicio < p_fim and fim > p_inicio)
+    + (select count(distinct profissional_id) from public.bloqueios where petshop_id = p_petshop and profissional_id is not null and inicio < p_fim and fim > p_inicio)
+  into v_ocupados;
+  return v_ocupados < v_cap;
+end $$;
 
 notify pgrst, 'reload schema';
