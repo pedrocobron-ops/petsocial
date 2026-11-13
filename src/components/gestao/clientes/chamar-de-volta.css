@@ -1,0 +1,14 @@
+/* Chamar de volta: quem sumiu e aniversariantes, com a mensagem pronta do WhatsApp */
+.g-cv-abas { display: flex; width: 100%; }
+.g-cv-abas button { flex: 1 1 0; min-height: 40px; padding: 4px 10px; line-height: 1.2; }
+.g-cv-msg { display: grid; gap: 8px; padding: 12px 14px; border-radius: 16px; background: var(--g-carta-2); }
+.g-cv-msg-t { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.g-cv-msg .g-textarea { background: var(--g-carta); }
+.g-cv-padrao { justify-self: start; padding-left: 0; }
+.g-cv-previa { display: grid; gap: 2px; padding: 10px 12px; border-radius: 4px 14px 14px 14px; background: #e7f5e4; color: #1c3b26; font-size: .9375rem; line-height: 1.4; overflow-wrap: anywhere; }
+.g-cv-fotos { display: flex; flex: none; align-items: center; }
+.g-cv-fotos .g-avatar + .g-avatar { margin-left: -12px; box-shadow: 0 0 0 2px var(--g-carta); }
+.g-cv-sem .g-lb-linha { background: transparent; }
+.g-cv-sem .g-lb-linha .t { opacity: .75; }
+.g-cv-ok { display: flex; align-items: center; gap: 2px; }
+.g-cv-ok svg { flex: none; }
