@@ -37,7 +37,7 @@ const SUGESTOES_DINHEIRO = ["Quanto entrou essa semana?", "Recebi 60 no Pix do b
 
 /** Painel do Mozart: a pessoa fala ou escreve, ele mostra o que vai fazer e só grava depois do Confirmar. */
 export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?: string; aoFechar: () => void }) {
-  const { sb, petshop, eu, vejoFinanceiro } = useGestao();
+  const { sb, petshop, eu, cuidoDoFinanceiro: vejoFinanceiro } = useGestao();
   if (memoria.petshop !== petshop.id) { memoria.petshop = petshop.id; memoria.itens = []; memoria.mensagens = []; memoria.parciais = []; }
   const [itens, setItens] = useState<Item[]>(memoria.itens);
   const [texto, setTexto] = useState("");

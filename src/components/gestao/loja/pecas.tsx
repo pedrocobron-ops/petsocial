@@ -27,29 +27,17 @@ export function ChipsForma({ valor, aoMudar, erro }: { valor: Forma | null; aoMu
   );
 }
 
-/* ---------- forma de pagamento lembrada neste aparelho ---------- */
+/* ---------- forma de pagamento: sempre escolhida na hora ---------- */
 
-const CHAVE_FORMA = "maestro-gestao-forma";
-const ehForma = (s: unknown): s is Forma => FORMAS.some((f) => f.id === s);
-
-/** Última forma de pagamento usada neste aparelho (ou null). */
-export function formaLembrada(): Forma | null {
-  try {
-    const s = window.localStorage.getItem(CHAVE_FORMA);
-    return ehForma(s) ? s : null;
-  } catch { return null; }
-}
-/** Guarda a forma usada num recebimento, para vir marcada na próxima vez. */
-export function lembrarForma(f: Forma) {
-  try { window.localStorage.setItem(CHAVE_FORMA, f); } catch { /* aparelho sem armazenamento: segue sem lembrar */ }
-}
-/** Forma de pagamento que começa na última usada neste aparelho; sem nenhuma, começa vazia. */
+/**
+ * Toda tela que recebe dinheiro começa sem forma de pagamento marcada: a pessoa escolhe a cada recebimento.
+ * (Antes a última forma usada vinha marcada, e um Pix virava "Dinheiro" sem ninguém perceber.)
+ */
 export function useFormaLembrada() {
-  const [forma, setForma] = useState<Forma | null>(null);
-  const mexeu = useRef(false);
-  useEffect(() => { if (!mexeu.current) setForma(formaLembrada()); }, []);
-  return [forma, (f: Forma) => { mexeu.current = true; setForma(f); }] as const;
+  return useState<Forma | null>(null);
 }
+/** Não guarda mais nada: as telas começam sem forma marcada. Fica para as telas que ainda chamam. */
+export function lembrarForma(forma: Forma) { void forma; }
 
 /* ---------- pagamento dividido ---------- */
 
@@ -64,12 +52,9 @@ export type EstadoPagamento = { forma: Forma | null; dividido: boolean; partes: 
 
 export const pagamentoInicial = (forma: Forma | null = null): EstadoPagamento => ({ forma, dividido: false, partes: [], ultimaManual: false });
 
-/** Pagamento que começa na última forma usada neste aparelho. */
+/** Pagamento de uma tela que recebe: começa sem forma marcada. */
 export function usePagamento() {
-  const [estado, setEstado] = useState<EstadoPagamento>(() => pagamentoInicial());
-  const mexeu = useRef(false);
-  useEffect(() => { if (!mexeu.current) setEstado(pagamentoInicial(formaLembrada())); }, []);
-  return [estado, (e: EstadoPagamento) => { mexeu.current = true; setEstado(e); }] as const;
+  return useState<EstadoPagamento>(() => pagamentoInicial());
 }
 
 /** As partes com a última completada sozinha (enquanto a pessoa não mexeu nela), e quanto falta ou passou do total. */

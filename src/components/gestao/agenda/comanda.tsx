@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, MessageCircle, Plus, Truck } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { textoComprovante } from "@/lib/gestao/comprovante";
-import { lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
 import { brl, dataCompleta, hora, isoDia, linkWhatsApp, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -13,7 +13,7 @@ import {
   baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
   produtosDaConta, resumoDosItens, useProdutosDaLoja, valorDaLinha, type ItemConta, type PagaDepois,
 } from "../loja/conta";
-import { AvisoCaixaFechado, fecharPagamento, lembrarForma, useCaixaAberto, usePagamento } from "../loja/pecas";
+import { AvisoCaixaFechado, fecharPagamento, useCaixaAberto, usePagamento } from "../loja/pecas";
 
 /**
  * Fechar a conta de um atendimento: serviço, produtos do estoque e extras numa conta só.
@@ -65,12 +65,15 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
     if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return; }
     const falta = faltaNoEstoque(itens, produtos);
     if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return;
+    if (!(await conferirValorAlto(contas.total, perguntar))) return;
+    // o caixa fechou enquanto esta conta estava aberta: pergunta antes de receber fora dele
+    if (pg && !("erro" in pg) && !(await conferirCaixa(sb, petshop.id, perguntar))) return;
     setSalvando(true);
     let recebeu = false;
     let zapComprovante: string | null = null;
     try {
       // outra pessoa pode ter recebido enquanto esta conta estava aberta
-      const ja = ok(await sb.from("lancamentos").select("id").eq("petshop_id", petshop.id).eq("agendamento_id", a.id).eq("tipo", "entrada").limit(1));
+      const ja = ok(await sb.rpc("recebimentos_do_agendamento", { p_agendamento: a.id }));
       if (ja.length) {
         avisarErro("Este atendimento já tem recebimento lançado.");
         avisarMudanca();
@@ -86,7 +89,6 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
         });
         recebeu = true;
       } else if (pg && !("erro" in pg)) {
-        lembrarForma(pg.forma);
         const lancado = await lancarPago(sb, petshop.id, {
           tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: pg.pagamentos, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null,
           descricao, itens: gravar,

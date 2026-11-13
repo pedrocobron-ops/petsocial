@@ -32,7 +32,9 @@ const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa sema
 
 /** Tela inicial: o dia de relance, o que precisa de atenção e o atalho para pedir ao Mozart. */
 export default function Hoje() {
-  const { sb, petshop, eu, vejoFinanceiro, souDono, posso, liberado } = useGestao();
+  // vejoFinanceiro: recebe (Caixa, Financeiro ou Relatórios) e vê o que entrou hoje.
+  // cuidoDoFinanceiro: vê também o que saiu, as contas, a meta e o caminho para o Financeiro.
+  const { sb, petshop, eu, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso, liberado } = useGestao();
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
   const [lembretes, setLembretes] = useState(false);
@@ -63,11 +65,11 @@ export default function Hoje() {
       sb.from("pets").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
       sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
       vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo, categoria").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).eq("data", hojeIso) : Promise.resolve({ data: [] }),
-      vejoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento, tipo").eq("petshop_id", petshop.id).eq("pago", false).lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
+      cuidoDoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento, tipo").eq("petshop_id", petshop.id).eq("pago", false).lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
       vejoPacotes ? sb.from("pacotes_clientes").select("id").eq("petshop_id", petshop.id).eq("ativo", true).gte("vence_em", hojeIso).lte("vence_em", isoDia(somaDias(hoje, 7))) : Promise.resolve({ data: [] }),
       sb.from("agendamentos").select("inicio, status").eq("petshop_id", petshop.id).gte("inicio", seg.toISOString()).lt("inicio", somaDias(seg, 7).toISOString()),
       lerTudo((de, ate, contar) => sb.from("agendamentos").select("status, servicos(nome, cor)", contando(contar)).eq("petshop_id", petshop.id).gte("inicio", ha30.toISOString()).lt("inicio", amanha.toISOString()).order("inicio").order("id").range(de, ate)).then((data) => ({ data })),
-      vejoFinanceiro ? lerTudo((de, ate, contar) => sb.from("lancamentos").select("valor, data", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").is("movimento", null).gte("data", isoDia(ha6)).lte("data", hojeIso).order("data").order("id").range(de, ate)).then((data) => ({ data })) : Promise.resolve({ data: [] }),
+      cuidoDoFinanceiro ? lerTudo((de, ate, contar) => sb.from("lancamentos").select("valor, data", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").is("movimento", null).gte("data", isoDia(ha6)).lte("data", hojeIso).order("data").order("id").range(de, ate)).then((data) => ({ data })) : Promise.resolve({ data: [] }),
       // primeiros passos e aviso de fim de teste: duas contagens, sem trazer linha nenhuma
       sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("status", "concluido"),
       sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).not("lembrete_em", "is", null),
@@ -107,7 +109,7 @@ export default function Hoje() {
       estadiasTotal: estadiasTotal.count ?? 0,
       produtosTotal: produtosTotal.count ?? 0,
       entrou: (entradas.data ?? []).filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0),
-      saiu: (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0),
+      saiu: cuidoDoFinanceiro ? (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0) : 0,
       vendasHoje: ((entradas.data ?? []) as { valor: number; tipo: string; categoria?: string | null }[]).filter((l) => l.tipo === "entrada" && l.categoria === "Venda de produtos"),
       contas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "saida"),
       aReceberVencidas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "entrada"),
@@ -123,7 +125,7 @@ export default function Hoje() {
         return ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data === iso).reduce((t, l) => t + Number(l.valor), 0);
       }),
     };
-  }, [petshop.id, hojeIso, vejoFinanceiro, vejoEstoque, vejoPacotes]);
+  }, [petshop.id, hojeIso, vejoFinanceiro, cuidoDoFinanceiro, vejoEstoque, vejoPacotes]);
 
   // quem chamar de volta e aniversariantes: consulta à parte, para não segurar o resto da tela
   const vejoClientes = posso("clientes");
@@ -156,7 +158,7 @@ export default function Hoje() {
     () => setLembretes(true),
   );
   const cartaoPassos = !cartaoTeste && pp.estado !== "some";
-  const temResumo = vejoFinanceiro && temSemanaPassada(petshop.criado_em, hoje);
+  const temResumo = cuidoDoFinanceiro && temSemanaPassada(petshop.criado_em, hoje);
   const cartaoResumo = temResumo && hoje.getDay() === 1 && !cartaoTeste && !cartaoPassos;
 
   // creche e hotel: a casa pode estar cheia mesmo com a agenda de banho vazia
@@ -238,7 +240,7 @@ export default function Hoje() {
             <div className="g-pilha p">
               <div className="g-fila"><button className="g-btn pri" onClick={() => abrirAssistente()}><Mic />Falar com o Mozart</button></div>
               <div className="g-sugestoes">
-                {pedidosDaFrente(frente, PEDIDOS).filter((p) => vejoFinanceiro || !p.startsWith("Quanto")).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
+                {pedidosDaFrente(frente, PEDIDOS).filter((p) => cuidoDoFinanceiro || !p.startsWith("Quanto")).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
               </div>
             </div>
           </section>
@@ -324,8 +326,9 @@ export default function Hoje() {
             lado={dados && ativos.length > 0 ? <Anel parte={feitos / ativos.length} cor="var(--g-laranja)">{Math.round((feitos / ativos.length) * 100)}%</Anel> : undefined} />}
           {frente !== "casa" && kpiCasa}
           {vejoFinanceiro ? (
-            <Kpi href="/gestao/app/caixa" icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"} apoio={dados && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : "ver o caixa"}
-              lado={dados ? <Tendencia valores={dados.entradas7} /> : undefined} />
+            <Kpi href={posso("caixa") ? "/gestao/app/caixa" : "/gestao/app/financeiro"} icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"}
+              apoio={dados && cuidoDoFinanceiro && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : posso("caixa") ? "ver o caixa" : "ver o financeiro"}
+              lado={dados && cuidoDoFinanceiro ? <Tendencia valores={dados.entradas7} /> : undefined} />
           ) : (
             <Kpi href="/gestao/app/clientes" icone={PawPrint} tom="menta" rotulo="Pets cadastrados" valor={dados ? dados.pets : "–"} apoio="ver todos" />
           )}

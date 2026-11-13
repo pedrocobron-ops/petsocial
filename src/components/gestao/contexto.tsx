@@ -19,7 +19,10 @@ export type Gestao = {
   equipe: Profissional[];
   servicos: Servico[];
   souDono: boolean;
+  /** Mexe com dinheiro: tem Caixa, Financeiro ou Relatórios. Recebe, vende e vê o que entrou hoje. */
   vejoFinanceiro: boolean;
+  /** Dono, ou quem tem Financeiro ou Relatórios: vê todo o dinheiro (despesas, contas, histórico, meta) e corrige valor já recebido. */
+  cuidoDoFinanceiro: boolean;
   /** A pessoa abre esta área do aplicativo? (o dono libera área por área em Equipe) */
   posso: (area: Area) => boolean;
   /** false = teste vencido ou assinatura cancelada: a conta fica só para consulta. */
@@ -40,6 +43,10 @@ export function useGestao(): Gestao {
 }
 
 const CHAVE_LOJA = "maestro-gestao-petshop";
+
+let soConsulta = false;
+/** A conta está só para consulta (teste vencido ou assinatura cancelada)? Para as mensagens de erro, fora dos componentes. */
+export const contaSoConsulta = () => soConsulta;
 
 export function GestaoProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -101,10 +108,13 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     const pagoAinda = petshop.status === "cancelada" && petshop.pago_ate != null && new Date(petshop.pago_ate).getTime() > Date.now();
     // enquanto a assinatura não abriu (sem link de pagamento), o teste não bloqueia ninguém: a pessoa não teria como pagar
     const liberado = ["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && (resta > 0 || !temCheckout())) || pagoAinda;
+    // as mensagens de erro só falam em "conta só para consulta" quando a conta está mesmo assim
+    soConsulta = !liberado;
     return {
       sb, user, petshop, eu, equipe, servicos,
       souDono: eu.papel === "dono",
-      vejoFinanceiro: eu.papel === "dono" || eu.papel === "gerente" || eu.ve_financeiro,
+      vejoFinanceiro: podeArea(eu, "caixa") || podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
+      cuidoDoFinanceiro: podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
       posso: (area: Area) => podeArea(eu, area),
       liberado,
       diasDeTeste: emTeste ? Math.max(0, Math.ceil(resta / 864e5)) : null,

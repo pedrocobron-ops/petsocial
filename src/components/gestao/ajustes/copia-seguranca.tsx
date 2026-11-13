@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Archive, Download } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
+import { AREAS, areasDe } from "@/lib/gestao/acessos";
 import { Tile } from "@/components/gestao/painel";
 import { mensagemDeErro, useAvisos } from "@/components/gestao/ui";
 import { ESPECIES, nomePorte } from "@/components/gestao/clientes/comum";
@@ -25,7 +26,7 @@ type DoPet = { nome: string; clientes: Tutor } | null;
 type PetLido = Pet & { clientes: Tutor };
 type SaudeLida = { tipo: string; nome: string; aplicado_em: string | null; vence_em: string | null; obs: string | null; criado_em: string; pets: DoPet };
 type AgendamentoLido = {
-  inicio: string; fim: string; status: StatusAgendamento; preco: number | null; obs: string | null; origem: string; leva_traz: boolean;
+  inicio: string; fim: string; status: StatusAgendamento; preco: number | null; obs: string | null; origem: string; criado_por: string | null; leva_traz: boolean;
   endereco_leva_traz: string | null; pacote_cliente_id: string | null; pets: DoPet; servicos: { nome: string } | null; profissionais: { nome: string } | null;
 };
 type ProdutoLido = { id: string; nome: string; categoria: string | null; unidade: string; preco_venda: number | null; estoque: number; estoque_minimo: number; ativo: boolean; criado_em: string };
@@ -146,25 +147,27 @@ export default function CopiaSeguranca() {
         ...saude.map((s): Cel[] => [s.pets?.nome ?? "", tutorDe(s.pets), rotulo(TIPO_SAUDE, s.tipo), s.nome, quando(s.aplicado_em), quando(s.vence_em), s.obs ?? ""]),
       ]);
 
-      etapa("agendamentos");
-      const agendamentos = await todas<AgendamentoLido>((a, b) => sb.from("agendamentos")
-        .select("inicio, fim, status, preco, obs, origem, leva_traz, endereco_leva_traz, pacote_cliente_id, pets(nome, clientes(nome, telefone)), servicos(nome), profissionais(nome)")
-        .eq("petshop_id", id).order("inicio").order("id").range(a, b));
-      tabelas.set("agendamentos.csv", [
-        ["Dia", "Começa", "Termina", "Pet", "Tutor", "Telefone do tutor", "Serviço", "Profissional", "Situação", "Preço", "Usou pacote", "Leva e traz", "Endereço do leva e traz", "Observações", "Marcado por"],
-        ...agendamentos.map((g): Cel[] => [
-          dataCompleta(g.inicio), hora(g.inicio), hora(g.fim), g.pets?.nome ?? "", tutorDe(g.pets), fmtTelefone(g.pets?.clientes?.telefone), g.servicos?.nome ?? "", g.profissionais?.nome ?? "",
-          STATUS_AGENDAMENTO[g.status]?.rotulo ?? g.status, dinheiro(g.preco), simNao(Boolean(g.pacote_cliente_id)), simNao(g.leva_traz), g.endereco_leva_traz ?? "", g.obs ?? "", rotulo(ORIGEM, g.origem),
-        ]),
-      ]);
-
-      // a equipe vem antes para dar nome a quem lançou; o arquivo dela sai na ordem dos assuntos
+      // a equipe vem antes para dar nome a quem marcou e a quem lançou; o arquivo dela sai na ordem dos assuntos
       const equipeLida = await lerEquipe(sb, id);
       if (equipeLida.error) throw new Error(equipeLida.error.message);
       const equipe = equipeLida.data ?? [];
       const quem = new Map(equipe.filter((p) => p.user_id).map((p) => [p.user_id!, p.nome]));
       const autor = (userId: string | null, origem: string) =>
         origem === "assistente" ? `${(userId && quem.get(userId)) || "Alguém"}, pelo Mozart` : (userId && quem.get(userId)) || "";
+
+      etapa("agendamentos");
+      const agendamentos = await todas<AgendamentoLido>((a, b) => sb.from("agendamentos")
+        .select("inicio, fim, status, preco, obs, origem, criado_por, leva_traz, endereco_leva_traz, pacote_cliente_id, pets(nome, clientes(nome, telefone)), servicos(nome), profissionais(nome)")
+        .eq("petshop_id", id).order("inicio").order("id").range(a, b));
+      tabelas.set("agendamentos.csv", [
+        ["Dia", "Começa", "Termina", "Pet", "Tutor", "Telefone do tutor", "Serviço", "Profissional", "Situação", "Preço", "Usou pacote", "Leva e traz", "Endereço do leva e traz", "Observações", "Marcado por"],
+        ...agendamentos.map((g): Cel[] => [
+          dataCompleta(g.inicio), hora(g.inicio), hora(g.fim), g.pets?.nome ?? "", tutorDe(g.pets), fmtTelefone(g.pets?.clientes?.telefone), g.servicos?.nome ?? "", g.profissionais?.nome ?? "",
+          STATUS_AGENDAMENTO[g.status]?.rotulo ?? g.status, dinheiro(g.preco), simNao(Boolean(g.pacote_cliente_id)), simNao(g.leva_traz), g.endereco_leva_traz ?? "", g.obs ?? "",
+          // quem marcou: o nome de quem estava logado; pelo link, foi o próprio cliente
+          g.origem === "link" ? rotulo(ORIGEM, g.origem) : autor(g.criado_por, g.origem),
+        ]),
+      ]);
 
       etapa("lançamentos");
       const lancamentos = await todas<Lancamento>((a, b) => sb.from("lancamentos").select("*").eq("petshop_id", id).order("data").order("criado_em").order("id").range(a, b));
@@ -192,10 +195,12 @@ export default function CopiaSeguranca() {
           "Colocado na gaveta (suprimento)", "Tirado da gaveta (sangria)", "Dinheiro esperado na gaveta", "Dinheiro contado", "Diferença", "Observação"],
         ...caixas.map((c): Cel[] => {
           const r = resumoDoCaixa(c.valor_inicial, doCaixa.get(c.id) ?? []);
+          // caixa fechado: vale o dinheiro esperado que o banco anotou na hora de fechar
+          const esperado = c.fechado_em && c.valor_esperado != null ? Number(c.valor_esperado) : r.esperado;
           return [
             quando(c.aberto_em), c.fechado_em ? quando(c.fechado_em) : "Ainda aberto", dinheiro(c.valor_inicial), dinheiro(r.entrou), ...r.porForma.map((f) => dinheiro(f.entrou)),
-            dinheiro(r.saiu), dinheiro(r.porForma.find((f) => f.id === "dinheiro")?.saiu ?? 0), dinheiro(r.suprimentos), dinheiro(r.sangrias), dinheiro(r.esperado),
-            dinheiro(c.valor_contado), c.valor_contado == null ? "" : dinheiro(Math.round((Number(c.valor_contado) - r.esperado) * 100) / 100), c.obs ?? "",
+            dinheiro(r.saiu), dinheiro(r.porForma.find((f) => f.id === "dinheiro")?.saiu ?? 0), dinheiro(r.suprimentos), dinheiro(r.sangrias), dinheiro(esperado),
+            dinheiro(c.valor_contado), c.valor_contado == null ? "" : dinheiro(Math.round((Number(c.valor_contado) - esperado) * 100) / 100), c.obs ?? "",
           ];
         }),
       ]);
@@ -249,11 +254,16 @@ export default function CopiaSeguranca() {
 
       etapa("equipe");
       tabelas.set("equipe.csv", [
-        ["Nome", "Função", "Papel", "Atende na agenda", "Vê o financeiro", "Comissão (%)", "Tem acesso ao sistema", "E-mail do convite", "Ativo", "Na equipe desde"],
-        ...equipe.map((p): Cel[] => [
-          p.nome, p.funcao ?? "", rotulo(PAPEL, p.papel), simNao(p.atende), simNao(p.papel === "dono" || p.ve_financeiro), numero(p.comissao_pct), simNao(Boolean(p.user_id)),
-          p.email_convite ?? "", simNao(p.ativo), quando(p.criado_em),
-        ]),
+        ["Nome", "Função", "Papel", "Atende na agenda", "Áreas que abre", "Recebe no caixa", "Vê o financeiro", "Comissão (%)", "Tem acesso ao sistema", "E-mail do convite", "Ativo", "Na equipe desde"],
+        ...equipe.map((p): Cel[] => {
+          // o acesso que vale de verdade: "Vê o financeiro" é só para quem abre Financeiro ou Relatórios (quem só recebe no caixa fica como Não)
+          const areas = areasDe(p);
+          return [
+            p.nome, p.funcao ?? "", rotulo(PAPEL, p.papel), simNao(p.atende), AREAS.filter((a) => areas.includes(a.id)).map((a) => a.rotulo).join(", "),
+            simNao(areas.includes("caixa")), simNao(areas.includes("financeiro") || areas.includes("relatorios")), numero(p.comissao_pct), simNao(Boolean(p.user_id)),
+            p.email_convite ?? "", simNao(p.ativo), quando(p.criado_em),
+          ];
+        }),
       ]);
 
       etapa("serviços");
