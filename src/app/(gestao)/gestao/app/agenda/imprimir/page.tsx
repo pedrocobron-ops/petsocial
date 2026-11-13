@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Lock, MessageCircle, Printer, Truck } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
+import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
+
 import { dataCurta, dataLonga, deIsoDia, fmtTelefone, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Esqueleto, ok, useDados } from "@/components/gestao/ui";
@@ -53,7 +55,7 @@ function Folha() {
       const lista = doDia(d);
       const cab = visao === "semana" ? [``, `*${dataLonga(d)}*`] : [``];
       if (!lista.length) return [...cab, "Sem horários marcados."];
-      return [...cab, ...lista.map((a) => `${hora(a.inicio)} ${a.pets?.nome ?? ""} · ${a.servicos?.nome ?? "atendimento"}${a.pets?.porte ? ` · porte ${a.pets.porte}` : ""}${!prof && a.profissionais ? ` · com ${a.profissionais.nome.split(" ")[0]}` : ""}${a.leva_traz ? " · leva e traz" : ""}${a.pets?.alertas ? ` · atenção: ${a.pets.alertas}` : ""}`)];
+      return [...cab, ...lista.map((a) => `${hora(a.inicio)} ${a.pets?.nome ?? ""} · ${nomeDosServicos(a) ?? "atendimento"}${a.pets?.porte ? ` · porte ${a.pets.porte}` : ""}${!prof && a.profissionais ? ` · com ${a.profissionais.nome.split(" ")[0]}` : ""}${a.leva_traz ? " · leva e traz" : ""}${a.pets?.alertas ? ` · atenção: ${a.pets.alertas}` : ""}`)];
     })].join("\n");
 
   return (
@@ -99,7 +101,7 @@ function Folha() {
                       <tr key={a.id}>
                         <td className="hora">{hora(a.inicio)}<small>até {hora(a.fim)}</small></td>
                         <td><b>{a.pets?.nome}</b><small>{[a.pets?.raca, a.pets?.porte ? `porte ${a.pets.porte}` : null].filter(Boolean).join(" · ")}</small></td>
-                        <td>{a.servicos?.nome ?? "Atendimento"}{a.status !== "marcado" && <small>{STATUS_AGENDAMENTO[a.status].rotulo}</small>}</td>
+                        <td>{nomeDosServicos(a) ?? "Atendimento"}{a.status !== "marcado" && <small>{STATUS_AGENDAMENTO[a.status].rotulo}</small>}</td>
                         {!prof && atendem.length > 1 && <td>{a.profissionais?.nome.split(" ")[0] ?? "—"}</td>}
                         <td>{a.pets?.clientes?.nome ?? "—"}<small>{fmtTelefone(a.pets?.clientes?.telefone)}</small></td>
                         <td className="atencao">{a.leva_traz && <span><Truck />Leva e traz{a.endereco_leva_traz ? `: ${a.endereco_leva_traz}` : ""}</span>}{a.pets?.alertas && <span>{a.pets.alertas}</span>}{a.obs && <span>{a.obs}</span>}</td>

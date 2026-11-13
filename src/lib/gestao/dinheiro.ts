@@ -61,7 +61,8 @@ export async function conferirValorAlto(valor: number | null | undefined, pergun
 }
 
 /** Uma linha de uma venda ou comanda, como fica guardada em `lancamentos.itens`. `valor` é o preço de uma unidade. */
-export type ItemLancamento = { tipo: "servico" | "produto" | "extra"; nome: string; qtd: number; valor: number; produto_id?: string };
+/** `servico_id`: qual serviço da lista é esta linha (horário com mais de um serviço; sem ele, é o serviço principal do horário). */
+export type ItemLancamento = { tipo: "servico" | "produto" | "extra"; nome: string; qtd: number; valor: number; produto_id?: string; servico_id?: string };
 
 /**
  * Registra dinheiro que já entrou ou saiu hoje. Se houver caixa aberto, o lançamento entra nele.
@@ -186,6 +187,7 @@ export function itensDoLancamento(l: { itens?: unknown } | null | undefined): It
     itens.push({
       tipo, nome: typeof i.nome === "string" && i.nome.trim() ? i.nome.trim() : "Item", qtd, valor,
       ...(typeof i.produto_id === "string" && i.produto_id ? { produto_id: i.produto_id } : {}),
+      ...(tipo === "servico" && typeof i.servico_id === "string" && i.servico_id ? { servico_id: i.servico_id } : {}),
     });
   }
   return itens;

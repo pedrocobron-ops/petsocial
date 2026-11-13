@@ -16,6 +16,8 @@ import { ShoppingBag, BedDouble, FileSpreadsheet, Cake, CalendarDays, Check, Han
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
+import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
+
 import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
@@ -284,7 +286,7 @@ export default function Hoje() {
               </div>
               <div className="quando">
                 <b>{hora(destaque.inicio)}</b>
-                <span className="g-ag" style={{ width: "auto", padding: "6px 12px", boxShadow: "none", borderLeftWidth: 1, borderRadius: 999 }}><span className="serv"><i />{destaque.servicos?.nome ?? "Atendimento"}</span></span>
+                <span className="g-ag" style={{ width: "auto", padding: "6px 12px", boxShadow: "none", borderLeftWidth: 1, borderRadius: 999 }}><span className="serv"><i />{nomeDosServicos(destaque) ?? "Atendimento"}</span></span>
                 {destaque.profissionais && <span className="g-p" style={{ color: "#6b4a2f" }}>com {destaque.profissionais.nome.split(" ")[0]}</span>}
               </div>
             </button>
@@ -396,7 +398,7 @@ export default function Hoje() {
                           {a.pets && <AvatarPet pet={a.pets} />}
                           <span className="t">
                             <b>{a.pets?.nome}</b>
-                            <span className="serv"><i />{a.servicos?.nome ?? "Atendimento"}</span>
+                            <span className="serv"><i />{nomeDosServicos(a) ?? "Atendimento"}</span>
                             {a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {a.pets.clientes.nome}</span>}
                           </span>
                           {a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}

@@ -37,6 +37,38 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"agendamento_servicos": {
+                  Row: {
+                    "agendamento_id": string,"criado_em": string,"id": string,"ordem": number,"petshop_id": string,"preco": number | null,"servico_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agendamento_id": string,"criado_em"?: string,"id"?: string,"ordem"?: number,"petshop_id": string,"preco"?: number | null,"servico_id": string
+                  }
+                  Update: {
+                    "agendamento_id"?: string,"criado_em"?: string,"id"?: string,"ordem"?: number,"petshop_id"?: string,"preco"?: number | null,"servico_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "agendamento_servicos_agendamento_id_petshop_id_fkey"
+      columns: ["agendamento_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "agendamentos"
+      referencedColumns: ["id","petshop_id"]
+    },{
+      foreignKeyName: "agendamento_servicos_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "agendamento_servicos_servico_id_petshop_id_fkey"
+      columns: ["servico_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "servicos"
+      referencedColumns: ["id","petshop_id"]
+    }
+                  ]
                 },"agendamentos": {
                   Row: {
                     "checklist": NonNullable<Json>,"criado_em": string,"criado_por": string | null,"endereco_leva_traz": string | null,"fim": string,"foto_antes": string | null,"foto_depois": string | null,"id": string,"inicio": string,"lembrete_em": string | null,"leva_traz": boolean,"obs": string | null,"origem": string,"pacote_cliente_id": string | null,"pet_id": string,"petshop_id": string,"preco": number | null,"profissional_id": string | null,"pronto_avisado_em": string | null,"serie_id": string | null,"servico_id": string | null,"status": Database["public"]['Enums']["status_agendamento"]
@@ -779,6 +811,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"modelos_mensagem": {
+                  Row: {
+                    "atualizado_em": string,"chave": string,"petshop_id": string,"texto": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "atualizado_em"?: string,"chave": string,"petshop_id": string,"texto": string
+                  }
+                  Update: {
+                    "atualizado_em"?: string,"chave"?: string,"petshop_id"?: string,"texto"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "modelos_mensagem_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"movimentos_estoque": {
                   Row: {
                     "criado_em": string,"criado_por": string | null,"custo_unitario": number | null,"fornecedor_id": string | null,"id": string,"lancamento_id": string | null,"motivo": string | null,"origem": string,"petshop_id": string,"produto_id": string,"quantidade": number,"tipo": string
@@ -1067,6 +1119,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"series_agenda": {
+                  Row: {
+                    "cada_semanas": number,"criado_em": string,"encerrada_em": string | null,"petshop_id": string,"serie_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cada_semanas": number,"criado_em"?: string,"encerrada_em"?: string | null,"petshop_id": string,"serie_id": string
+                  }
+                  Update: {
+                    "cada_semanas"?: number,"criado_em"?: string,"encerrada_em"?: string | null,"petshop_id"?: string,"serie_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "series_agenda_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"servicos": {
                   Row: {
                     "ativo": boolean,"categoria": string,"cor": string,"criado_em": string,"duracao_min": number,"id": string,"nome": string,"ordem": number,"petshop_id": string,"preco_g": number | null,"preco_gg": number | null,"preco_m": number | null,"preco_p": number | null
@@ -1148,6 +1220,9 @@ isOneToOne: false
                            },
 "admin_uso":
 { Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"agendamento_servicos_definir":
+{ Args: { "p_agendamento": string,"p_servicos": Json }; Returns: number
                            },
 "avaliar_conversa":
 { Args: { "p_id": string,"p_pediu_equipe"?: boolean,"p_resolveu"?: boolean }; Returns: undefined
@@ -1284,6 +1359,9 @@ isOneToOne: false
 "dia_fechado":
 { Args: { "p_dia": string,"p_petshop": string }; Returns: boolean
                            },
+"diaria_sugerida":
+{ Args: { "p_petshop": string,"p_porte": string,"p_tipo": string }; Returns: number
+                           },
 "entrar":
 { Args: Record<PropertyKey, never>; Returns: {
               "acessos": (string)[] | null,
@@ -1318,6 +1396,11 @@ isOneToOne: false
                            },
 "estadia_ocupa":
 { Args: { "p_dia": string,"p_entrada": string,"p_hoje": string,"p_saida": string,"p_status": string,"p_tipo": string }; Returns: boolean
+                           },
+"estadias_reservado":
+{ Args: { "p": string,"p_ids"?: (string)[] }; Returns: {
+              "id": string,"valor_cobrado": number,"valor_diaria": number
+            }[]
                            },
 "fechar_caixa":
 { Args: { "p_caixa": string,"p_contado": number,"p_esperado"?: number,"p_obs"?: string }; Returns: Json
@@ -1407,6 +1490,9 @@ isOneToOne: false
 "minha_comissao":
 { Args: { "p_petshop": string }; Returns: Json
                            },
+"opcoes_sem_valores":
+{ Args: { "o": Json }; Returns: Json
+                           },
 "pagamentos_conferidos":
 { Args: { "p_pagamentos": Json,"p_total": number }; Returns: Json
                            },
@@ -1423,21 +1509,35 @@ isOneToOne: false
               "extra": number,"produto": number,"servico": number
             }[]
                            },
+"partes_por_servico":
+{ Args: { "p_agendamento": string,"p_com_itens": boolean,"p_itens": Json,"p_total": number }; Returns: {
+              "servico_id": string,"valor": number
+            }[]
+                           },
 "pedido_aceitar":
 { Args: { "p_forcar"?: boolean,"p_id": string,"p_profissional"?: string }; Returns: string
                            },
 "pedido_aceitar_como":
 { Args: { "p_forcar"?: boolean,"p_id": string,"p_profissional"?: string,"p_tutor_novo"?: boolean }; Returns: string
                            },
+"pedido_acertar_diaria":
+{ Args: { "p_id": string }; Returns: undefined
+                           },
 "pedido_tutores_do_telefone":
 { Args: { "p_id": string }; Returns: {
               "id": string,"nome": string,"telefone": string
             }[]
                            },
+"petshop_opcoes":
+{ Args: { "p": string }; Returns: Json
+                           },
 "petshop_reservado":
 { Args: { "p": string }; Returns: {
               "id": string,"meta_mes": number
             }[]
+                           },
+"petshop_salvar_opcoes":
+{ Args: { "p": string,"p_mudancas": Json }; Returns: undefined
                            },
 "petshops_do_financeiro":
 { Args: Record<PropertyKey, never>; Returns: string[]
@@ -1492,6 +1592,14 @@ isOneToOne: false
       } },
 "registrar_conversa":
 { Args: { "p_canal": string,"p_pediu_equipe"?: boolean,"p_pergunta": string,"p_petshop": string,"p_resposta": string }; Returns: string
+                           },
+"serie_continuar":
+{ Args: { "p_depois_de": string,"p_serie": string,"p_vezes"?: number }; Returns: number
+                           },
+"series_acabando":
+{ Args: { "p": string }; Returns: {
+              "cada_semanas": number,"pet_id": string,"pet_nome": string,"restantes": number,"serie_id": string,"servico_nome": string,"tutor_nome": string,"ultimo": string
+            }[]
                            },
 "sou_admin":
 { Args: Record<PropertyKey, never>; Returns: boolean

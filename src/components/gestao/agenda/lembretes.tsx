@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
+import { servicosPorExtenso } from "@/lib/gestao/servicos-do-horario";
 import { saudacaoZap, textoLembrete } from "@/lib/gestao/agenda";
 import { dataAmigavel, dataLonga, deIsoDia, fmtTelefone, hora, linkWhatsApp, soDigitos, somaDias, chamar } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -37,9 +38,9 @@ export function mensagemDoLembrete(ags: Ag[], petshop: string) {
   const tutor = ags[0]?.pets?.clientes?.nome;
   if (ags.length === 1) {
     const a = ags[0];
-    return textoLembrete({ tutor, pet: a.pets?.nome ?? "seu pet", servico: a.servicos?.nome, quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop });
+    return textoLembrete({ tutor, pet: a.pets?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop });
   }
-  const partes = ags.map((a) => `${a.servicos?.nome ? a.servicos.nome.toLowerCase() : "horário"} de ${a.pets?.nome ?? "seu pet"} às ${hora(a.inicio)}`);
+  const partes = ags.map((a) => `${servicosPorExtenso(a)?.toLowerCase() ?? "horário"} de ${a.pets?.nome ?? "seu pet"} às ${hora(a.inicio)}`);
   const lista = `${partes.slice(0, -1).join(", ")} e ${partes[partes.length - 1]}`;
   return `${saudacaoZap(tutor, petshop)} Passando para lembrar dos horários de ${dataAmigavel(ags[0].inicio)}: ${lista}. Posso confirmar?`;
 }
@@ -129,7 +130,7 @@ export default function LembretesDoDia({ dia, aoFechar, aoMudar }: { dia: string
     aoMudar?.();
   }
 
-  const resumo = (g: Grupo) => g.ags.map((a) => `${a.pets?.nome ?? "Pet"}, ${a.servicos?.nome?.toLowerCase() ?? "horário"} às ${hora(a.inicio)}`).join(" · ");
+  const resumo = (g: Grupo) => g.ags.map((a) => `${a.pets?.nome ?? "Pet"}, ${servicosPorExtenso(a)?.toLowerCase() ?? "horário"} às ${hora(a.inicio)}`).join(" · ");
 
   return (
     <Folha titulo={`Lembretes ${doDia}`} aoFechar={aoFechar} rodape={<button type="button" className="g-btn sec" onClick={aoFechar}>Fechar</button>}>
