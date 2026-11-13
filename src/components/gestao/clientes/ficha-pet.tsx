@@ -1,7 +1,7 @@
 "use client";
 
 import { saudacaoZap } from "@/lib/gestao/agenda";
-import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
+import { COLS_ESTADIA, COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { Fragment, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, ArrowLeftRight, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
@@ -47,7 +47,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       sb.from("pets").select("*, clientes(*)").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
       sb.from("agendamentos").select("id, inicio, status, preco, servico_id").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
       sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", id).eq("ativo", true).order("comprado_em", { ascending: false }),
-      sb.from("estadias").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("entrada", { ascending: false }).limit(8),
+      sb.from("estadias").select(COLS_ESTADIA).eq("petshop_id", petshop.id).eq("pet_id", id).order("entrada", { ascending: false }).limit(8),
       // visitas concluídas: a conta exata, a mais recente e os valores para somar
       sb.from("agendamentos").select("inicio, preco", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).eq("status", "concluido").order("inicio", { ascending: false }).limit(1000),
       sb.from("pets_saude").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("vence_em").order("criado_em").limit(500),
@@ -74,7 +74,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       pet: pet.data as unknown as PetDaFicha | null,
       atendimentos: (atendimentos.data ?? []) as Atendimento[],
       pacotes: (pacotes.data ?? []) as PacoteCliente[],
-      estadias: (estadias.data ?? []) as Estadia[],
+      estadias: (estadias.data ?? []) as unknown as Estadia[],
       visitas: (concluidos.count ?? feitos.length) + nEstadias,
       nEstadias,
       ultimaVisita: ultimaEstadia && (!ultimoAtendimento || new Date(ultimaEstadia) > new Date(ultimoAtendimento)) ? ultimaEstadia : ultimoAtendimento,

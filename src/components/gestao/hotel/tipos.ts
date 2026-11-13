@@ -1,9 +1,11 @@
+import { COLS_ESTADIA } from "@/lib/gestao/reservado";
 import type { Cliente, Estadia, Pet } from "@/lib/gestao/tipos";
 
 /** A estadia como as telas de creche e hotel leem: com o pet e o tutor. */
 export type PetDaEstadia = Pick<Pet, "id" | "nome" | "foto" | "especie" | "sexo" | "alertas"> & { porte?: string | null; clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
 export type EstadiaCompleta = Estadia & { pets: PetDaEstadia | null };
-export const SELECT_ESTADIA = "*, pets(id, nome, foto, especie, sexo, alertas, porte, clientes(id, nome, telefone))";
+/** Sem a diária e o valor cobrado: quem recebe junta os dois com `comValoresDeEstadia` (reservado.ts). */
+export const SELECT_ESTADIA = `${COLS_ESTADIA}, pets(id, nome, foto, especie, sexo, alertas, porte, clientes(id, nome, telefone))`;
 export type Tipo = "creche" | "hotel";
 export const nomeTipo = (t: string) => (t === "hotel" ? "Hotel" : "Creche");
 /** "8h" ou "8h30" */

@@ -7,8 +7,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPessoa, AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import type { Database } from "@/lib/gestao/banco";
 import { abreNoDia } from "@/lib/gestao/creche";
-import { diariaFixa, diariaSugerida } from "@/lib/gestao/hotel";
-import { sinalDe } from "@/lib/gestao/hotel-opcoes";
+import { porteDe, sinalDe } from "@/lib/gestao/hotel-opcoes";
 import { brl } from "@/lib/gestao/util";
 import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar, semAcento } from "@/lib/gestao/util";
 import "./pedidos-link.css";
@@ -172,9 +171,9 @@ export default function PedidosLink() {
   /** Reserva de hotel aceita pelo link com a opção de diária por porte ligada: a diária da reserva passa a ser a do porte do pedido. */
   function acertarDiaria(p: Pedido, estadiaId: unknown) {
     if (p.tipo !== "hotel" || typeof estadiaId !== "string") return;
-    const doPorte = diariaSugerida(petshop, "hotel", p.porte);
-    if (doPorte == null || doPorte === diariaFixa(petshop, "hotel")) return;
-    void sb.from("estadias").update({ valor_diaria: doPorte }).eq("id", estadiaId).eq("petshop_id", petshop.id).eq("status", "reservada").then(() => {}, () => {});
+    // a conta é do banco: quem aceita o pedido pode não ver a lista de preços
+    if (!porteDe(petshop).ativo || !p.porte) return;
+    void sb.rpc("pedido_acertar_diaria", { p_id: p.id }).then(() => {}, () => {});
   }
 
   async function recusar(lista: Pedido[], grupo: string) {

@@ -21,8 +21,11 @@ export const COLS_PACOTE = "id, petshop_id, nome, servico_id, quantidade, valida
 export const COLS_PACOTE_CLIENTE = "id, petshop_id, pet_id, pacote_id, nome, servico_id, total, usados, comprado_em, vence_em, ativo, criado_em";
 export const COLS_PROFISSIONAL = "id, petshop_id, user_id, nome, papel, ve_financeiro, cor, escala, atende, ativo, criado_em, funcao, acessos";
 
-/** Tudo do pet shop menos a meta do mês e os dados da assinatura na Cakto. */
-export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, diaria_creche, diaria_hotel, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos, principal, creche_bloqueia_vacina, opcoes";
+/** A estadia sem a diária e o valor cobrado (reservados: `comValoresDeEstadia`). O banco não entrega `select("*")` em estadias. */
+export const COLS_ESTADIA = "id, petshop_id, pet_id, tipo, entrada, saida_prevista, saida, status, obs, criado_em, diarias_cobradas, plano_id, mensalista, dia, cobranca_id, acomodacao, cuidados, avisos, sinal_estado";
+
+/** Tudo do pet shop menos a meta do mês, as opções (`petshop_opcoes`) e os dados da assinatura na Cakto. */
+export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, diaria_creche, diaria_hotel, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos, principal, creche_bloqueia_vacina";
 
 type Linhas = Record<string, unknown>[];
 /**
@@ -58,8 +61,39 @@ const num = (v: unknown) => (v == null ? null : Number(v));
 export async function lerPetshop(sb: Banco, petshopId: string): Promise<{ data: PetshopLinha | null; error: { message: string } | null }> {
   const base = await sb.from("petshops").select(COLS_PETSHOP).eq("id", petshopId).maybeSingle();
   if (base.error || !base.data) return { data: null, error: base.error };
-  const extra = await reservado(sb, "petshop_reservado", { p: petshopId }, () => sb.from("petshops").select("id, meta_mes").eq("id", petshopId));
-  return { data: { ...(base.data as unknown as PetshopLinha), meta_mes: num(extra[0]?.meta_mes), cakto_email: null, cakto_assinatura: null }, error: null };
+  const [extra, opcoes] = await Promise.all([
+    reservado(sb, "petshop_reservado", { p: petshopId }, () => sb.from("petshops").select("id, meta_mes").eq("id", petshopId)),
+    lerOpcoes(sb, petshopId),
+  ]);
+  return { data: { ...(base.data as unknown as PetshopLinha), opcoes: opcoes as PetshopLinha["opcoes"], meta_mes: num(extra[0]?.meta_mes), cakto_email: null, cakto_assinatura: null }, error: null };
+}
+
+/**
+ * As opções do negócio (`petshops.opcoes`). Vêm por uma função do banco: quem não recebe (sem Caixa, Financeiro nem Relatórios)
+ * recebe as listas de preço em branco (só a chave ligada/desligada). Banco antes da atualização: lê a coluna direto.
+ */
+export async function lerOpcoes(sb: Banco, petshopId: string): Promise<Record<string, unknown>> {
+  const objeto = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+  const r = await (sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string } | null }> }).rpc("petshop_opcoes", { p: petshopId });
+  if (!r.error) return objeto(r.data);
+  if (r.error.code !== "PGRST202" && r.error.code !== "42883") return {};
+  const d = await sb.from("petshops").select("opcoes").eq("id", petshopId).maybeSingle();
+  return objeto(d.data?.opcoes);
+}
+
+/**
+ * Junta a diária e o valor cobrado às estadias. Só quem recebe (Caixa, Financeiro, Relatórios ou o dono) recebe os valores;
+ * para os outros (e com `vejo` falso, sem nem perguntar ao banco) os dois campos vêm vazios.
+ */
+export async function comValoresDeEstadia<E extends { id: string }>(sb: Banco, petshopId: string, estadias: E[], vejo = true): Promise<(E & { valor_diaria: number | null; valor_cobrado: number | null })[]> {
+  const extra = new Map<string, Record<string, unknown>>();
+  if (vejo) {
+    const ids = estadias.map((e) => e.id);
+    const partes = await Promise.all(Array.from({ length: Math.ceil(ids.length / 400) }, (_, i) => ids.slice(i * 400, i * 400 + 400)).map((parte) =>
+      reservado(sb, "estadias_reservado", { p: petshopId, p_ids: parte }, () => sb.from("estadias").select("id, valor_diaria, valor_cobrado").eq("petshop_id", petshopId).in("id", parte))));
+    for (const l of partes.flat()) extra.set(String(l.id), l);
+  }
+  return estadias.map((e) => ({ ...e, valor_diaria: num(extra.get(e.id)?.valor_diaria), valor_cobrado: num(extra.get(e.id)?.valor_cobrado) }));
 }
 
 /** A equipe do pet shop, com comissão e e-mail de convite para quem pode ver (dono, relatórios, a própria pessoa). */

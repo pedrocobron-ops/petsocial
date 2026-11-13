@@ -18,6 +18,7 @@ import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/component
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
 import Ocupacao from "@/components/gestao/hotel/ocupacao";
 import { CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
+import { comValoresDeEstadia } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { lerPlanos, lerPresencas, planoAtivo, type PlanoCompleto } from "@/lib/gestao/creche";
 import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
@@ -213,7 +214,11 @@ export default function CrecheHotel() {
       sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500),
       sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["encerrada", "cancelada"]).order("entrada", { ascending: false }).limit(100),
     ]);
-    const lista = ok(abertas) as unknown as EstadiaCompleta[];
+    // a diária e o valor cobrado vêm à parte, só para quem recebe (para os outros ficam em branco)
+    const [lista, antigas] = await Promise.all([
+      comValoresDeEstadia(sb, petshop.id, ok(abertas) as unknown as EstadiaCompleta[], vejoFinanceiro),
+      comValoresDeEstadia(sb, petshop.id, ok(passadas) as unknown as EstadiaCompleta[], vejoFinanceiro),
+    ]);
     // sinal e taxas das reservas e estadias abertas: só quem recebe lê (o banco não entrega para os outros)
     const valores = new Map<string, ValoresDaEstadia>();
     if (vejoFinanceiro && lista.length) {
@@ -222,7 +227,7 @@ export default function CrecheHotel() {
     }
     let feitos: CuidadoFeito[] = [];
     if (comCuidados) feitos = (await sb.from("estadias_cuidados").select("*").eq("petshop_id", petshop.id).eq("dia", isoDia(new Date())).limit(1000)).data ?? [];
-    return { abertas: lista, passadas: ok(passadas) as unknown as EstadiaCompleta[], valores, feitos };
+    return { abertas: lista, passadas: antigas, valores, feitos };
   }, [petshop.id, vejoFinanceiro, comCuidados]);
 
   // mensalistas: os planos e o que já aconteceu hoje (para a chamada e para a conta de vagas)
@@ -756,7 +761,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, 
     setSalvando(true);
     try {
       const campos = {
-        tipo, entrada: entrada.toISOString(), saida_prevista: saida?.toISOString() ?? null, valor_diaria: diaria, obs: obs.trim() || null,
+        tipo, entrada: entrada.toISOString(), saida_prevista: saida?.toISOString() ?? null, obs: obs.trim() || null,
+        // quem não recebe não vê nem manda a diária: o banco coloca a sugerida (a do porte, ou a de Meu pet shop)
+        ...(vejoFinanceiro ? { valor_diaria: diaria } : {}),
         ...(opQuartos.ativo || editar?.acomodacao ? { acomodacao: tipo === "hotel" && quarto ? quarto.id : null } : {}),
         ...(comCuidados || editar?.cuidados ? { cuidados: cuidadosParaGravar(cuidados) as never } : {}),
       };

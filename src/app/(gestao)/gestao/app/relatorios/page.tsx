@@ -14,6 +14,7 @@ import type { Banco } from "@/lib/gestao/supabase";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
 import "./relatorios.css";
+import { comValoresDeEstadia } from "@/lib/gestao/reservado";
 
 export default function PaginaRelatorios() {
   const { cuidoDoFinanceiro } = useGestao();
@@ -201,8 +202,8 @@ function Relatorios() {
         .is("movimento", null).gte("data", deIso).lte("data", ateIso).order("data").order("id").range(a, b)),
       sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).gte("criado_em", comeco).lt("criado_em", final),
       // creche e hotel: estadias encerradas, pela data da saída
-      paginar<EstadiaRel>((a, b) => sb.from("estadias").select("id, tipo, entrada, saida, diarias_cobradas, valor_cobrado, obs, mensalista").eq("petshop_id", petshop.id).eq("status", "encerrada")
-        .gte("saida", comeco).lt("saida", final).order("saida").order("id").range(a, b)),
+      paginar<Omit<EstadiaRel, "valor_cobrado">>((a, b) => sb.from("estadias").select("id, tipo, entrada, saida, diarias_cobradas, obs, mensalista").eq("petshop_id", petshop.id).eq("status", "encerrada")
+        .gte("saida", comeco).lt("saida", final).order("saida").order("id").range(a, b)).then((l) => comValoresDeEstadia(sb, petshop.id, l)),
       carregarAnterior(sb, petshop.id, antes.de, antes.ate),
     ]);
     if (novos.error) throw new Error(novos.error.message);
