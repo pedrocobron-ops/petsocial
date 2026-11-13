@@ -51,6 +51,14 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
   const [enviando, setEnviando] = useState(false);
   const [pedidoId, setPedidoId] = useState<string | null>(null);
   const [aceite, setAceite] = useState(SEM_ACEITE);
+  // lista de espera (só quando o pet shop ligou): em dia cheio, o tutor pode pedir para ser chamado se abrir vaga
+  const [esperaAtiva, setEsperaAtiva] = useState(false);
+  const [naEspera, setNaEspera] = useState(false);
+  useEffect(() => {
+    let vale = true;
+    void banco().rpc("link_espera_ativa", { p_codigo: codigo }).then(({ data }) => { if (vale) setEsperaAtiva(data === true); });
+    return () => { vale = false; };
+  }, [codigo]);
 
   const dias = hotel ? entre(entrada, saida) : entre(entrada, saida) + 1;
   // diz qual é o problema das datas (as mesmas regras do banco); null = datas boas
@@ -109,6 +117,31 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
     setRepetido(false);
     setEnviando(true);
     try {
+      if (naEspera) {
+        // um pedido de espera por pet; não reserva nada
+        for (const x of pets) {
+          const { data, error } = await banco().rpc("link_espera_pedir", {
+            p_codigo: codigo, p_tipo: tipo, p_entrada: entrada, p_saida: saida, p_tutor: tutor.trim(), p_telefone: fone, p_pet: x.nome.trim(),
+            p_especie: x.especie, p_porte: x.porte ?? undefined, p_obs: obs.trim() || undefined,
+          });
+          const r = data as { ok?: boolean; erro?: string } | null;
+          if (error || !r) { setErro("Não deu para enviar agora. Confira a internet e tente de novo."); return; }
+          if (!r.ok) {
+            setErro(r.erro === "tem_vaga" ? "Abriu vaga nessas datas. Volte e faça o pedido normal."
+              : r.erro === "repetido" ? `${x.nome.trim()} já está na lista de espera para essas datas.`
+              : r.erro === "nao_abre" ? "Um dos dias escolhidos não tem atendimento. Escolha outras datas."
+              : r.erro === "limite" ? "Você já tem pedidos esperando. Fale direto com a gente para combinar."
+              : r.erro === "fechado" ? "A lista de espera não está aberta agora. Fale direto com a gente."
+              : r.erro === "datas" ? "Confira as datas e tente de novo."
+              : r.erro === "dados" ? "Confira o nome do pet, o seu nome e o WhatsApp com DDD."
+              : "Algo deu errado. Tente de novo em instantes.");
+            if (r.erro === "tem_vaga" || r.erro === "nao_abre" || r.erro === "datas") { setNaEspera(false); setPasso("quando"); }
+            return;
+          }
+        }
+        setPasso("enviado");
+        return;
+      }
       const { data, error } = await pedirPeloLink("link_pedir_estadia", {
         p_codigo: codigo, p_tipo: tipo, p_entrada: entrada, p_saida: saida, p_tutor: tutor.trim(), p_telefone: fone, p_pet: pets[0].nome.trim(),
         p_especie: pets[0].especie, p_porte: pets[0].porte ?? undefined, p_obs: obs.trim() || undefined,
@@ -147,6 +180,27 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
 
   const nome = hotel ? "Hotel" : "Creche";
   const periodo = hotel ? `de ${dia(entrada)} até ${dia(saida)}` : entrada === saida ? dia(entrada) : `de ${dia(entrada)} até ${dia(saida)}`;
+
+  if (passo === "enviado" && naEspera) {
+    return (
+      <section className="g-lk-secao g-lk-ok" aria-live="polite">
+        <span className="g-lk-ok-selo" aria-hidden><Check /></span>
+        <h2>Você está na lista de espera.</h2>
+        <p>Se abrir vaga, {loja} chama você pelo WhatsApp.</p>
+        <dl className="g-lk-resumo">
+          <div><dt>Lista de espera</dt><dd>{nome}</dd></div>
+          <div><dt>{nomes.length > 1 ? "Pets" : "Pet"}</dt><dd>{listaE(nomes)}</dd></div>
+          <div><dt>{hotel ? "Entrada" : "Dia"}</dt><dd>{dia(entrada)}</dd></div>
+          {(hotel || saida !== entrada) && <div><dt>{hotel ? "Saída" : "Até"}</dt><dd>{dia(saida)}</dd></div>}
+        </dl>
+        <p className="g-lk-nota">Isto não é uma reserva: a vaga só vale se {loja} chamar e confirmar com você.</p>
+        <div className="g-lk-ok-acoes">
+          <button type="button" className="g-btn sec" onClick={aoVoltar}>Fazer outro pedido</button>
+          {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com a gente</a>}
+        </div>
+      </section>
+    );
+  }
 
   if (passo === "enviado") {
     return (
@@ -201,12 +255,18 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
           {erroDatas && <p className="g-lk-alerta" role="alert"><span>{erroDatas}</span></p>}
           {erro && !erroDatas && <p className="g-lk-alerta" role="alert"><span>{erro}</span></p>}
           {temCheio && (
-            <p className="g-lk-alerta" role="alert"><span>Sem vaga em {cheios!.slice(0, 4).map(dia).join("; ")}{cheios!.length > 4 ? " e outros dias" : ""}. Escolha outras datas.</span></p>
+            <p className="g-lk-alerta" role="alert"><span>Sem vaga em {cheios!.slice(0, 4).map(dia).join("; ")}{cheios!.length > 4 ? " e outros dias" : ""}. Escolha outras datas{esperaAtiva ? " ou entre na lista de espera" : ""}.</span></p>
+          )}
+          {temCheio && esperaAtiva && (
+            <div style={{ display: "grid", gap: 6, justifyItems: "start" }}>
+              <button type="button" className="g-btn sec" onClick={() => { setErro(null); setNaEspera(true); setPasso("dados"); }}>Entrar na lista de espera</button>
+              <small className="g-muted">Se abrir vaga nessas datas, {loja} chama você. Entrar na lista não reserva a vaga.</small>
+            </div>
           )}
         </div>
         <div className="g-lk-pe">
           <button type="button" className="g-btn sec" onClick={aoVoltar}><ArrowLeft />Voltar</button>
-          <button type="button" className="g-btn pri" disabled={!datasOk || cheios === null || temCheio} onClick={() => setPasso("dados")}>{cheios === null && datasOk ? "Conferindo as vagas…" : "Continuar"}</button>
+          <button type="button" className="g-btn pri" disabled={!datasOk || cheios === null || temCheio} onClick={() => { setNaEspera(false); setPasso("dados"); }}>{cheios === null && datasOk ? "Conferindo as vagas…" : "Continuar"}</button>
         </div>
       </section>
     );
@@ -216,7 +276,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
     <form className="g-lk-secao" onSubmit={enviar} noValidate>
       <button type="button" className="g-lk-escolhido" style={{ "--cor": hotel ? "#7c6bd6" : "#3b9bd9" } as React.CSSProperties} onClick={() => setPasso("quando")}>
         <i aria-hidden />
-        <span><b>{nome}</b> · {periodo} · chega às {horaEntrada}, busca às {horaSaida}</span>
+        <span><b>{naEspera ? `Lista de espera · ${nome}` : nome}</b> · {periodo}{naEspera ? "" : ` · chega às ${horaEntrada}, busca às ${horaSaida}`}</span>
         <u>Trocar</u>
       </button>
       <div className="g-lk-bloco g-form">
@@ -271,9 +331,9 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
       )}
       <div className="g-lk-pe">
         <button type="button" className="g-btn sec" onClick={() => { setErro(null); setRepetido(false); setPasso("quando"); }}><ArrowLeft />Voltar</button>
-        <button className="g-btn pri" disabled={enviando}>{enviando ? "Enviando…" : "Enviar pedido"}</button>
+        <button className="g-btn pri" disabled={enviando}>{enviando ? "Enviando…" : naEspera ? "Entrar na lista de espera" : "Enviar pedido"}</button>
       </div>
-      <p className="g-lk-nota">Isto é um pedido. A vaga só vale depois que {loja} confirmar.</p>
+      <p className="g-lk-nota">{naEspera ? `A lista de espera não reserva a vaga. Se abrir lugar, ${loja} chama você pelo WhatsApp.` : `Isto é um pedido. A vaga só vale depois que ${loja} confirmar.`}</p>
     </form>
   );
 }

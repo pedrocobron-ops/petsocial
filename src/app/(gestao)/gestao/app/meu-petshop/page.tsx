@@ -8,6 +8,7 @@ import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
 import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
 import OpcoesDeCobranca from "@/components/gestao/ajustes/opcoes-cobranca";
+import OpcoesCasa from "@/components/gestao/ajustes/opcoes-casa";
 import OpcoesHotel from "@/components/gestao/ajustes/opcoes-hotel";
 import OpcoesDoLink from "@/components/gestao/ajustes/opcoes-link";
 import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
@@ -79,6 +80,7 @@ export default function MeuPetshop() {
             {usaCasa(petshop) && <AjustesCrecheHotel />}
             {usaModulo(petshop, "loja") && <OpcoesDaLoja />}
             {usaCasa(petshop) && <OpcoesHotel />}
+            {usaCasa(petshop) && <OpcoesCasa />}
           </div>
           <div className="g-pilha g">
             <Identidade />
