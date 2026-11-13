@@ -1,6 +1,7 @@
 "use client";
 
 import { COLS_PACOTE, COLS_PACOTE_CLIENTE, comPrecosDePacote } from "@/lib/gestao/reservado";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useMemo, useState } from "react";
 import { CalendarClock, Check, Layers, Plus, RotateCcw, Sparkles, Ticket, Undo2 } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
@@ -63,8 +64,8 @@ export default function Pacotes() {
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [modelos, vendidos] = await Promise.all([
       sb.from("pacotes").select(COLS_PACOTE).eq("petshop_id", petshop.id).order("ativo", { ascending: false }).order("nome"),
-      sb.from("pacotes_clientes").select(`${COLS_PACOTE_CLIENTE}, pets(id, nome, foto, especie, clientes(id, nome, telefone))`).eq("petshop_id", petshop.id)
-        .order("criado_em", { ascending: false }).limit(1000),
+      lerTudo((de, ate, contar) => sb.from("pacotes_clientes").select(`${COLS_PACOTE_CLIENTE}, pets(id, nome, foto, especie, clientes(id, nome, telefone))`, contando(contar)).eq("petshop_id", petshop.id)
+        .order("criado_em", { ascending: false }).order("id").range(de, ate)).then((data) => ({ data, error: null })),
     ]);
     // o preço só vem para quem cuida de pacotes ou vê o financeiro
     const [m, v] = await Promise.all([

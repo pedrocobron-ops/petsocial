@@ -6,6 +6,7 @@ import Importar from "@/components/gestao/importar";
 import { AlertTriangle, Cat, ChevronRight, Dog, Download, MessageCircle, PawPrint, Phone, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
+import { buscarVisitas, sumiu } from "@/lib/gestao/visitas";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { Anel, Kpi } from "../painel";
@@ -79,34 +80,12 @@ export default function Lista({ aoAbrir, irPara }: {
     return { pets, clientes };
   }, [petshop.id]);
 
-  // Último atendimento concluído de cada pet: uma consulta do mais novo para o mais antigo, reduzida aqui.
-  // Para de buscar quando todos os pets da lista já apareceram.
+  // Última visita de cada pet e se já tem algo marcado: a mesma conta da folha "Chamar de volta" (src/lib/gestao/visitas.ts).
+  // Refaz quando a lista de pets muda.
   const totalPets = dados?.pets.length ?? null;
   const { dados: ultimos, erro: erroUltimos } = useDados(async () => {
-    if (!dados) return null; // a lista ainda não chegou
-    const mapa: Record<string, string> = {};
-    if (!dados.pets.length) return mapa;
-    const faltam = new Set(dados.pets.map((p) => p.id));
-    await buscarTudo<{ pet_id: string; inicio: string }>(
-      (de, ate) => sb.from("agendamentos").select("pet_id, inicio").eq("petshop_id", petshop.id).eq("status", "concluido")
-        .order("inicio", { ascending: false }).order("id").range(de, ate),
-      (linhas) => {
-        for (const l of linhas) if (!mapa[l.pet_id]) { mapa[l.pet_id] = l.inicio; faltam.delete(l.pet_id); }
-        return faltam.size === 0;
-      });
-    // creche e hotel também é visita: estadia encerrada conta pelo dia da saída; quem está na casa agora veio hoje
-    const agora = new Date().toISOString();
-    await buscarTudo<{ pet_id: string; entrada: string; saida: string | null; status: string }>(
-      (de, ate) => sb.from("estadias").select("pet_id, entrada, saida, status").eq("petshop_id", petshop.id).in("status", ["encerrada", "em_casa"])
-        .order("entrada", { ascending: false }).order("id").range(de, ate),
-      (linhas) => {
-        for (const l of linhas) {
-          const quando = l.status === "em_casa" ? agora : l.saida ?? l.entrada;
-          if (!mapa[l.pet_id] || new Date(quando) > new Date(mapa[l.pet_id])) mapa[l.pet_id] = quando;
-        }
-        return false;
-      });
-    return mapa;
+    if (totalPets === null) return null; // a lista ainda não chegou
+    return buscarVisitas(sb, petshop.id);
   }, [petshop.id, totalPets]);
 
   // Saúde: pets com cuidado vencido ou vencendo em 30 dias (consulta leve, só de leitura)
@@ -128,14 +107,14 @@ export default function Lista({ aoAbrir, irPara }: {
   const petsFiltrados = useMemo(() => {
     const agora = Date.now();
     // sumido é quem já veio e parou de vir; quem nunca veio fica em "Ainda sem visita"
-    const sumido = (id: string, dias: number) => { const u = ultimos?.[id]; return !!u && agora - new Date(u).getTime() > dias * 864e5; };
+    const sumido = (id: string, dias: number) => sumiu(ultimos?.get(id), dias, new Date(agora));
     return pets.filter((p) => {
       if (alvo && !bate(p.nome, p.clientes?.nome) && !bateFone(p.clientes?.telefone)) return false;
       if (filtro === "alerta") return !!p.alertas?.trim();
       if (filtro === "saude") return !!saude?.[p.id];
       if (filtro === "sumidos30") return sumido(p.id, 30);
       if (filtro === "sumidos60") return sumido(p.id, 60);
-      if (filtro === "semvisita") return !!ultimos && !ultimos[p.id];
+      if (filtro === "semvisita") return !!ultimos && !ultimos.get(p.id)?.ultima;
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,9 +132,9 @@ export default function Lista({ aoAbrir, irPara }: {
     for (const p of pets) {
       if (p.especie === "cao") caes++; else if (p.especie === "gato") gatos++;
       if (p.alertas?.trim()) comAlerta++;
-      const u = ultimos?.[p.id];
-      if (!u) semVisita++;
-      else if (agora - new Date(u).getTime() > 30 * 864e5) sumidos++;
+      const v = ultimos?.get(p.id);
+      if (!v?.ultima) semVisita++;
+      else if (sumiu(v, 30, new Date(agora))) sumidos++;
     }
     let comVarios = 0;
     for (const dele of petsPorTutor.values()) if (dele.length > 1) comVarios++;
@@ -208,7 +187,7 @@ export default function Lista({ aoAbrir, irPara }: {
           </KpiAcao>
           <KpiAcao ativo={aba === "pets" && filtro === "sumidos30"} aoTocar={() => verPets("sumidos30")}>
             <Kpi icone={UserSearch} tom="manteiga" rotulo="Sumidos há 30 dias" valor={ultimos ? resumo.sumidos : "–"}
-              apoio={!ultimos ? (erroUltimos ? "não consegui calcular" : "calculando…") : resumo.semVisita ? `já vieram e pararam · ${resumo.semVisita} ainda sem visita` : "já vieram e pararam de vir"}
+              apoio={!ultimos ? (erroUltimos ? "não consegui calcular" : "calculando…") : resumo.sumidos === 1 ? "já veio e não tem nada marcado" : "já vieram e não têm nada marcado"}
               lado={ultimos && pets.length > 0 ? <Anel parte={resumo.sumidos / pets.length} tamanho={52} cor="#c2941a">{Math.round((resumo.sumidos / pets.length) * 100)}%</Anel> : undefined} />
           </KpiAcao>
           <KpiAcao ativo={aba === "pets" && filtro === "alerta"} aoTocar={() => verPets("alerta")}>
@@ -232,7 +211,7 @@ export default function Lista({ aoAbrir, irPara }: {
         </div>
         {aba === "pets" && (
           <div className="g-chips" role="group" aria-label="Filtro">
-            {FILTROS.map((f) => <button key={f.id} className="g-chip" aria-pressed={filtro === f.id} onClick={() => { setFiltro(f.id); setMostrar(PASSO); }}>{f.rotulo}</button>)}
+            {FILTROS.map((f) => <button key={f.id} className="g-chip" aria-pressed={filtro === f.id} onClick={() => { setFiltro(f.id); setMostrar(PASSO); }}>{f.rotulo}{f.id === "semvisita" && ultimos && resumo.semVisita ? ` (${resumo.semVisita})` : ""}</button>)}
           </div>
         )}
       </div>
@@ -260,7 +239,7 @@ export default function Lista({ aoAbrir, irPara }: {
             {erroUltimos && <p className="g-erro" style={{ marginBottom: 10 }}>Não consegui ver quando cada pet veio pela última vez.</p>}
             <div className="g-cli-grade">
               {petsFiltrados.slice(0, mostrar).map((p) => {
-                const ultima = ultimos?.[p.id];
+                const ultima = ultimos?.get(p.id)?.ultima;
                 return (
                   <Link key={p.id} href={linkPet(p.id)} scroll={false} className="g-cli-pet" onClick={aoAbrir}>
                     <span className="cab">
