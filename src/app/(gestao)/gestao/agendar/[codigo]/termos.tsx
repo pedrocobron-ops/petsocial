@@ -37,7 +37,7 @@ export function faltaAceitar(termos: TermosDoLink | null, aceite: Aceite, loja: 
  * Envia o pedido. Sem regras para aceitar, chama a função de sempre. Com regras, o banco confere se o tutor aceitou
  * exatamente o texto que está valendo e guarda o aceite junto com o pedido.
  */
-export function pedirPeloLink(funcao: "link_pedir" | "link_pedir_estadia", args: Record<string, unknown>, termos: TermosDoLink | null, aceite: Aceite) {
+export function pedirPeloLink(funcao: "link_pedir" | "link_pedir_estadia" | "link_espera_pedir", args: Record<string, unknown>, termos: TermosDoLink | null, aceite: Aceite) {
   const sb = banco();
   if (!termos) return sb.rpc(funcao, args as never);
   return sb.rpc("link_pedir_com_termos", { p_funcao: funcao, p_args: args as never, p_termos: termos.texto, p_vacinas: aceite.vacinas });

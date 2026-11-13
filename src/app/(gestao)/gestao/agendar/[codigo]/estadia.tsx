@@ -122,12 +122,19 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
       if (naEspera) {
         // um pedido de espera por pet; não reserva nada
         for (const x of pets) {
-          const { data, error } = await banco().rpc("link_espera_pedir", {
+          // com as regras do link ligadas, a espera também só entra com o aceite (o banco confere e guarda a data)
+          const { data, error } = await pedirPeloLink("link_espera_pedir", {
             p_codigo: codigo, p_tipo: tipo, p_entrada: entrada, p_saida: saida, p_tutor: tutor.trim(), p_telefone: fone, p_pet: x.nome.trim(),
             p_especie: x.especie, p_porte: x.porte ?? undefined, p_obs: obs.trim() || undefined,
-          });
+          }, termos, aceite);
           const r = data as { ok?: boolean; erro?: string } | null;
           if (error || !r) { setErro("Não deu para enviar agora. Confira a internet e tente de novo."); return; }
+          if (!r.ok && r.erro === "termos") {
+            await recarregarTermos?.();
+            setAceite(SEM_ACEITE);
+            setErro(`As regras de ${loja} mudaram agora há pouco. Leia de novo e marque para enviar.`);
+            return;
+          }
           if (!r.ok) {
             setErro(r.erro === "tem_vaga" ? "Abriu vaga nessas datas. Volte e faça o pedido normal."
               : r.erro === "repetido" ? `${x.nome.trim()} já está na lista de espera para essas datas.`

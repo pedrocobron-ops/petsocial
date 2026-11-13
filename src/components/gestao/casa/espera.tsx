@@ -85,7 +85,7 @@ export function ListaDeEspera({ espera, aoReservar, aoNova }: { espera: ListaEsp
         <div className="t">
           <b>{nomeDoPet(e)}</b>
           <span>{[tutorDe(e) ?? "Sem tutor", foneDe(e) ? fmtTelefone(foneDe(e)) : null].filter(Boolean).join(" · ")}</span>
-          <span>{e.tipo === "hotel" ? "Hotel" : "Creche"} · {periodoDaEspera(e)}{e.origem === "link" ? " · pediu pelo link" : ""}{e.obs ? ` · ${e.obs}` : ""}</span>
+          <span>{e.tipo === "hotel" ? "Hotel" : "Creche"} · {periodoDaEspera(e)}{e.origem === "link" ? ` · pediu pelo link${e.termos_aceitos_em ? " e aceitou as regras" : ""}` : ""}{e.obs ? ` · ${e.obs}` : ""}</span>
           <div className="selos">
             {temVaga ? <span className="g-tag verde"><Check size={12} aria-hidden />abriu vaga</span> : <span className="g-tag"><Hourglass size={12} aria-hidden />cheio em {dataCurta(deIsoDia(cheioEm!))}</span>}
             {e.status === "chamado" && e.chamado_em && <span className="g-tag azul">avisado {dataCurta(new Date(e.chamado_em))}</span>}

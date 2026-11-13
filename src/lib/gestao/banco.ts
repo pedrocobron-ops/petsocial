@@ -837,14 +837,14 @@ isOneToOne: false
                   ]
                 },"lista_espera": {
                   Row: {
-                    "chamado_em": string | null,"criado_em": string,"criado_nome": string | null,"criado_por": string | null,"entrada": string,"especie": string | null,"id": string,"obs": string | null,"origem": string,"pet_id": string | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"saida": string,"status": string,"telefone": string | null,"tipo": string,"tutor_nome": string | null
+                    "chamado_em": string | null,"criado_em": string,"criado_nome": string | null,"criado_por": string | null,"entrada": string,"especie": string | null,"id": string,"obs": string | null,"origem": string,"pet_id": string | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"saida": string,"status": string,"telefone": string | null,"termos_aceitos_em": string | null,"tipo": string,"tutor_nome": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "chamado_em"?: string | null,"criado_em"?: string,"criado_nome"?: string | null,"criado_por"?: string | null,"entrada": string,"especie"?: string | null,"id"?: string,"obs"?: string | null,"origem"?: string,"pet_id"?: string | null,"pet_nome": string,"petshop_id": string,"porte"?: string | null,"saida": string,"status"?: string,"telefone"?: string | null,"tipo": string,"tutor_nome"?: string | null
+                    "chamado_em"?: string | null,"criado_em"?: string,"criado_nome"?: string | null,"criado_por"?: string | null,"entrada": string,"especie"?: string | null,"id"?: string,"obs"?: string | null,"origem"?: string,"pet_id"?: string | null,"pet_nome": string,"petshop_id": string,"porte"?: string | null,"saida": string,"status"?: string,"telefone"?: string | null,"termos_aceitos_em"?: string | null,"tipo": string,"tutor_nome"?: string | null
                   }
                   Update: {
-                    "chamado_em"?: string | null,"criado_em"?: string,"criado_nome"?: string | null,"criado_por"?: string | null,"entrada"?: string,"especie"?: string | null,"id"?: string,"obs"?: string | null,"origem"?: string,"pet_id"?: string | null,"pet_nome"?: string,"petshop_id"?: string,"porte"?: string | null,"saida"?: string,"status"?: string,"telefone"?: string | null,"tipo"?: string,"tutor_nome"?: string | null
+                    "chamado_em"?: string | null,"criado_em"?: string,"criado_nome"?: string | null,"criado_por"?: string | null,"entrada"?: string,"especie"?: string | null,"id"?: string,"obs"?: string | null,"origem"?: string,"pet_id"?: string | null,"pet_nome"?: string,"petshop_id"?: string,"porte"?: string | null,"saida"?: string,"status"?: string,"telefone"?: string | null,"termos_aceitos_em"?: string | null,"tipo"?: string,"tutor_nome"?: string | null
                   }
                   Relationships: [
                     {

@@ -5,7 +5,7 @@ import { Repeat } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { avisarMudanca, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import type { Banco } from "@/lib/gestao/supabase";
-import { dataCompleta, hora, nomeDia } from "@/lib/gestao/util";
+import { dataCompleta, dataCurta, hora, isoDia, nomeDia } from "@/lib/gestao/util";
 import { Tile } from "../painel";
 import "./series-acabando.css";
 
@@ -19,17 +19,38 @@ export const VEZES_POR_VEZ = 12;
 type Serie = { serie_id: string; cada_semanas: number; ultimo: string; restantes: number; pet_id: string; pet_nome: string; tutor_nome: string | null; servico_nome: string | null };
 const CADA: Record<number, string> = { 1: "toda semana", 2: "a cada 2 semanas", 4: "a cada 4 semanas" };
 
-/** Marca os próximos horários de uma série. Devolve quantos marcou (0 quando outra pessoa já tinha continuado). */
-export async function continuarSerie(sb: Banco, serieId: string, ultimo: string): Promise<number> {
+export type Continuou = { marcados: number; fechados: string[] };
+/**
+ * Marca os próximos horários de uma série. Devolve quantos marcou (0 quando outra pessoa já tinha continuado) e,
+ * dos que marcou, os dias (AAAA-MM-DD) que caem em dia fechado do negócio, para a tela avisar.
+ */
+export async function continuarSerie(sb: Banco, serieId: string, ultimo: string): Promise<Continuou> {
   const r = await sb.rpc("serie_continuar", { p_serie: serieId, p_depois_de: ultimo, p_vezes: VEZES_POR_VEZ });
   if (r.error) throw new Error(r.error.message);
-  return Number(r.data ?? 0);
+  const marcados = Number(r.data ?? 0);
+  if (!marcados) return { marcados, fechados: [] };
+  // os horários novos que caíram em dia marcado como fechado (falha aqui não desfaz nada: só fica sem o aviso)
+  const novos = await sb.from("agendamentos").select("petshop_id, inicio").eq("serie_id", serieId).gt("inicio", ultimo).in("status", ["marcado", "confirmado"]).order("inicio").limit(60);
+  const dias = [...new Set((novos.data ?? []).map((a) => isoDia(new Date(a.inicio))))];
+  const loja = novos.data?.[0]?.petshop_id;
+  if (!dias.length || !loja) return { marcados, fechados: [] };
+  const f = await sb.from("dias_especiais").select("dia").eq("petshop_id", loja).eq("fechado", true).in("dia", dias).order("dia");
+  return { marcados, fechados: (f.data ?? []).map((d) => d.dia) };
 }
 /** A série deixa de pedir para continuar (os horários que já estão marcados ficam como estão). */
 export async function encerrarSerie(sb: Banco, petshopId: string, serieId: string) {
   return sb.from("series_agenda").update({ encerrada_em: new Date().toISOString() }).eq("serie_id", serieId).eq("petshop_id", petshopId).is("encerrada_em", null).select("serie_id");
 }
-export const textoContinuou = (n: number) => (n === 0 ? "Essa repetição já tinha sido continuada." : n === 1 ? "Mais 1 horário marcado." : `Mais ${n} horários marcados. Confira na agenda os dias de feriado ou de folga.`);
+export function textoContinuou({ marcados: n, fechados }: Continuou) {
+  if (n === 0) return "Essa repetição já tinha sido continuada.";
+  const base = n === 1 ? "Mais 1 horário marcado." : `Mais ${n} horários marcados.`;
+  if (fechados.length) {
+    const datas = fechados.map((d) => dataCurta(d));
+    const lista = datas.length === 1 ? datas[0] : `${datas.slice(0, -1).join(", ")} e ${datas[datas.length - 1]}`;
+    return `${base} Atenção: ${fechados.length === 1 ? `o de ${lista} caiu em dia fechado` : `os de ${lista} caíram em dia fechado`}. Abra ${fechados.length === 1 ? "esse horário" : "esses horários"} na agenda para mudar o dia ou desmarcar.`;
+  }
+  return n === 1 ? base : `${base} Confira na agenda os dias de feriado ou de folga.`;
+}
 
 export default function SeriesAcabando({ aoMudar }: { aoMudar: () => void }) {
   const { sb, petshop, posso } = useGestao();

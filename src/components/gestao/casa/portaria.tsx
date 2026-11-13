@@ -192,6 +192,9 @@ export function QuemBuscou({ estadia, aoFechar, aoSeguir }: {
           : { quem: "outro", nome: nome.trim(), relacao: relacao.trim() || null, contato_id: null };
         ok(await sb.from("estadias_retiradas").upsert({ estadia_id: estadia.id, petshop_id: petshop.id, ...linha }, { onConflict: "estadia_id" }).select("estadia_id"));
       } catch (e) { avisarErro(e); setSalvando(false); return; }
+    } else {
+      // saída desfeita e refeita sem marcar: a anotação antiga de quem buscou não vale mais (se não der para apagar, a saída segue)
+      await sb.from("estadias_retiradas").delete().eq("estadia_id", estadia.id).eq("petshop_id", petshop.id).select("estadia_id");
     }
     setSalvando(true);
     try { await aoSeguir(); } finally { setSalvando(false); }
