@@ -109,7 +109,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
       <section className="g-lk-secao g-lk-ok" aria-live="polite">
         <span className="g-lk-ok-selo" aria-hidden><Check /></span>
         <h2>Pedido enviado.</h2>
-        <p>O {loja} confirma com você pelo WhatsApp.</p>
+        <p>{loja} confirma com você pelo WhatsApp.</p>
         <dl className="g-lk-resumo">
           <div><dt>Pedido</dt><dd>{nome}</dd></div>
           <div><dt>Pet</dt><dd>{pet.trim()}</dd></div>

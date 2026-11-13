@@ -152,7 +152,7 @@ export function linkDoConvite(origem: string, email: string) {
 export function textoDoConvite({ nome, petshop, email, origem }: { nome: string; petshop: string; email: string; origem: string }) {
   const e = email.trim().toLowerCase();
   return [
-    `Oi${primeiroNome(nome) ? `, ${primeiroNome(nome)}` : ""}! Você agora faz parte da equipe do ${petshop} no Maestro Pet Gestão.`,
+    `Oi${primeiroNome(nome) ? `, ${primeiroNome(nome)}` : ""}! Aqui é ${petshop.trim()}. Você agora faz parte da nossa equipe no Maestro Pet Gestão.`,
     "",
     "Para entrar:",
     `1. Abra este link: ${linkDoConvite(origem, e)}`,

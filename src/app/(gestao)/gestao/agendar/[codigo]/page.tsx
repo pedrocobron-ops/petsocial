@@ -127,7 +127,7 @@ export default function AgendarPeloLink() {
     aplicarTema(lido && typeof lido === "object" ? lido.tema : null); // as cores do pet shop, não as da Maestro Pet
   }, [codigo]);
   useEffect(() => { void carregar(); }, [carregar]);
-  useEffect(() => { if (info?.nome) document.title = `Agendar no ${info.nome}`; }, [info?.nome]);
+  useEffect(() => { if (info?.nome) document.title = `Agendar: ${info.nome}`; }, [info?.nome]);
 
   const servico = info?.servicos.find((s) => s.id === servicoId) ?? null;
   const dias = useMemo(() => {
@@ -291,7 +291,7 @@ export default function AgendarPeloLink() {
     );
   }
 
-  const zapLoja = linkWhatsApp(info.telefone, `Oi! Quero marcar um horário no ${info.nome}.`);
+  const zapLoja = linkWhatsApp(info.telefone, `Oi! Quero marcar um horário.`);
   const onde = [info.cidade, info.uf].filter(Boolean).join(" · ");
   const manha = (horarios ?? []).filter((h) => h < "12:00");
   const tarde = (horarios ?? []).filter((h) => h >= "12:00");
@@ -311,7 +311,7 @@ export default function AgendarPeloLink() {
             {onde && <p className="g-lk-onde"><MapPin aria-hidden />{onde}</p>}
           </div>
         </div>
-        {passo !== "enviado" && <p className="g-lk-cab-frase">{estadia ? "Peça uma vaga por aqui" : info.creche || info.hotel ? "Peça um horário ou uma vaga por aqui" : "Peça um horário por aqui"}. A confirmação chega pelo seu WhatsApp.</p>}
+        {passo !== "enviado" && <p className="g-lk-cab-frase">{estadia || (!info.servicos.length && (info.creche || info.hotel)) ? "Peça uma vaga por aqui" : info.creche || info.hotel ? "Peça um horário ou uma vaga por aqui" : "Peça um horário por aqui"}. A confirmação chega pelo seu WhatsApp.</p>}
       </header>
 
       {info.aviso && passo !== "enviado" && (
@@ -320,7 +320,7 @@ export default function AgendarPeloLink() {
 
       {estadia && (
         <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome}
-          zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"} do ${info.nome}.`)}
+          zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)}
           diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)} />
       )}
 
@@ -360,7 +360,7 @@ export default function AgendarPeloLink() {
             <div className="g-lk-vazio">
               <Scissors aria-hidden />
               <b>Nenhum serviço por aqui ainda</b>
-              <p>Fale direto com o pet shop para marcar o horário.</p>
+              <p>Fale direto com {info.nome} para marcar o horário.</p>
               {zapLoja && <a className="g-btn zap" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Chamar no WhatsApp</a>}
             </div>
           ) : (
@@ -414,7 +414,7 @@ export default function AgendarPeloLink() {
                 </button>
               ))}
             </div>
-            {!dias.some((d) => d.aberto) && <p className="g-muted g-p">O pet shop não abre nos próximos dias. Fale direto com ele.</p>}
+            {!dias.some((d) => d.aberto) && <p className="g-muted g-p">{info.nome} não abre nos próximos dias. Fale direto pelo WhatsApp.</p>}
           </div>
 
           {dia && (
@@ -523,7 +523,7 @@ export default function AgendarPeloLink() {
           </div>
 
           <div className="g-lk-bloco g-form">
-            <h2>Com quem o pet shop fala?</h2>
+            <h2>Com quem a gente fala?</h2>
             <label className="g-campo"><span>Seu nome</span>
               <input className="g-input" value={tutor} maxLength={120} autoComplete="name" onChange={(e) => setTutor(e.target.value)} />
             </label>
@@ -557,7 +557,7 @@ export default function AgendarPeloLink() {
         <section className="g-lk-secao g-lk-ok" aria-live="polite">
           <span className="g-lk-ok-selo" aria-hidden><Check /></span>
           <h2>{enviado.pets.length > 1 ? `Pedido enviado para ${listaDeNomes(enviado.pets.map((x) => x.nome))}.` : "Pedido enviado."}</h2>
-          <p>O {info.nome} confirma com você pelo WhatsApp.</p>
+          <p>{info.nome} confirma com você pelo WhatsApp.</p>
           <dl className="g-lk-resumo">
             <div><dt>Serviço</dt><dd>{enviado.servico}{enviado.pets.length > 1 && <small> para cada pet</small>}</dd></div>
             <div><dt>Dia</dt><dd>{diaPorExtenso(enviado.dia, info.hoje)}</dd></div>
@@ -577,11 +577,11 @@ export default function AgendarPeloLink() {
               </div>
             )}
           </dl>
-          <p className="g-lk-nota">{enviado.pets.length > 1 ? "Os horários ainda não estão marcados. Espere a confirmação do pet shop." : "O horário ainda não está marcado. Espere a confirmação do pet shop."}</p>
+          <p className="g-lk-nota">{enviado.pets.length > 1 ? "Os horários ainda não estão marcados. Espere a confirmação pelo WhatsApp." : "O horário ainda não está marcado. Espere a confirmação pelo WhatsApp."}</p>
           <div className="g-lk-ok-acoes">
             {enviado.id && <a className="g-btn verde" href={`/gestao/agendar/${codigo}/pedido/${enviado.id}`}>Acompanhar o pedido</a>}
             <button type="button" className="g-btn sec" onClick={pedirOutro}>Pedir outro horário</button>
-            {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com o pet shop</a>}
+            {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {info.nome}</a>}
           </div>
         </section>
       )}

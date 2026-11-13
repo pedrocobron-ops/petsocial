@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Check, ConciergeBell, Copy, Handshake, MessageCircle, PenLine, Plus, Scissors, Wallet, X } from "lucide-react";
+import { ArrowRight, BadgeCheck, Check, ConciergeBell, Copy, Handshake, House, MessageCircle, PenLine, Plus, Scissors, Wallet, X } from "lucide-react";
 import { Tile, type Tom } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPessoa, useAvisos } from "@/components/gestao/ui";
 import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS } from "@/components/gestao/ajustes/grade-horario";
 import type { Horario } from "@/lib/gestao/tipos";
-import { AREAS, PERFIS, type Area } from "@/lib/gestao/acessos";
+import { areasPara, perfisPara, type Area } from "@/lib/gestao/acessos";
 import { ROTULOS_ATENDE, SO_DONOS, TODAS_AREAS, comPerfil, fraseDoLimite, nAcessos, primeiroNome, textoDoConvite, type Escolha, type PerfilId, type Uso } from "./modelo";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./equipe-form.css";
@@ -63,17 +63,20 @@ const VISUAL: Record<PerfilId, { icone: Icone; tom: Tom }> = {
   financeiro: { icone: Wallet, tom: "menta" },
   gerente: { icone: BadgeCheck, tom: "lilas" },
   socio: { icone: Handshake, tom: "rosa" },
+  monitor: { icone: House, tom: "ceu" },
   outra: { icone: PenLine, tom: "manteiga" },
 };
 /** Na pergunta "o que faz", quem atende os pets vem primeiro e é apresentado pelo trabalho, não pelo que acessa. */
-const CARTOES: { id: PerfilId; titulo: string; texto: string }[] = [
+const cartoesPara = (petshop: { modulos?: string[] | null }): { id: PerfilId; titulo: string; texto: string }[] => [
   { id: "atendimento", titulo: "Banhista ou tosador(a)", texto: "Atende os pets e aparece na agenda. Quase sempre sem login." },
-  ...PERFIS.filter((p) => p.id !== "atendimento").map((p) => ({ id: p.id as PerfilId, titulo: p.titulo, texto: p.apoio })),
+  ...perfisPara(petshop).filter((p) => p.id !== "atendimento").map((p) => ({ id: p.id as PerfilId, titulo: p.titulo, texto: p.apoio })),
   { id: "outra", titulo: "Outra função", texto: "Você dá o nome e escolhe o que a pessoa abre." },
 ];
 
 /** "O que essa pessoa faz?": cartões dos perfis prontos. Escolher um só preenche a função e as áreas. */
 export function EscolherPerfil({ valor, aoMudar }: { valor: Escolha; aoMudar: (e: Escolha) => void }) {
+  const { petshop } = useGestao();
+  const CARTOES = cartoesPara(petshop);
   return (
     <div className="g-eq-opcoes" role="group" aria-label="O que essa pessoa faz?">
       {CARTOES.map((c) => (
@@ -100,11 +103,12 @@ export function EscolherPerfil({ valor, aoMudar }: { valor: Escolha; aoMudar: (e
 
 /** Os perfis prontos em versão curta: um toque preenche as chaves das áreas. */
 export function ModelosProntos({ valor, aoMudar }: { valor: Escolha; aoMudar: (e: Escolha) => void }) {
+  const { petshop } = useGestao();
   return (
     <div className="g-pilha p">
       <p className="g-eq-mini">Perfis prontos (só preenchem as chaves abaixo)</p>
       <div className="g-chips">
-        {PERFIS.map((p) => <button key={p.id} type="button" className="g-chip" aria-pressed={valor.perfil === p.id} onClick={() => aoMudar(comPerfil(valor, p.id, true))}>{p.titulo}</button>)}
+        {perfisPara(petshop).map((p) => <button key={p.id} type="button" className="g-chip" aria-pressed={valor.perfil === p.id} onClick={() => aoMudar(comPerfil(valor, p.id, true))}>{p.titulo}</button>)}
       </div>
     </div>
   );
@@ -124,9 +128,11 @@ function LinhaPode({ pode, rotulo, apoio }: { pode: boolean; rotulo: string; apo
  * Com `aoMudar`, cada área vira uma chave. Sem ele (ou para sócio), é só leitura.
  */
 export function Areas({ areas, aoMudar, socio, curto }: { areas: Area[]; aoMudar?: (a: Area[]) => void; socio?: boolean; curto?: boolean }) {
+  const { petshop } = useGestao();
   const ligadas = socio ? TODAS_AREAS : areas;
   const editavel = !!aoMudar && !socio;
-  const grupo = (dinheiro: boolean) => AREAS.filter((a) => a.dinheiro === dinheiro).map((a) => editavel ? (
+  // área de módulo que o pet shop não usa (creche e hotel, pacotes, estoque) não vira chave: a tela nem está no menu
+  const grupo = (dinheiro: boolean) => areasPara(petshop).filter((a) => a.dinheiro === dinheiro).map((a) => editavel ? (
     <li key={a.id}>
       <Chave titulo={a.rotulo} texto={a.apoio} ligada={ligadas.includes(a.id)}
         aoMudar={(v) => aoMudar!(v ? [...areas, a.id] : areas.filter((x) => x !== a.id))} />

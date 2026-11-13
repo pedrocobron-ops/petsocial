@@ -12,7 +12,12 @@ import { AvisoCaixaFechado, CampoDinheiro, erroDeValor, ErroTela, fecharRecebime
 import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
 import type { Cliente, Pacote, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
+import { usaModulo } from "@/lib/gestao/modulos";
 import "./pacotes.css";
+
+/** Exemplo de nome de pacote, no assunto do pet shop: quem não faz banho e tosa não lê "4 banhos no mês". */
+const exemploDePacote = (petshop: { modulos?: string[] | null }) =>
+  usaModulo(petshop, "banho_tosa") ? "4 banhos no mês" : usaModulo(petshop, "creche") ? "10 diárias de creche" : usaModulo(petshop, "hotel") ? "5 diárias de hotel" : "4 banhos no mês";
 
 type PetDoPacote = Pick<Pet, "id" | "nome" | "foto" | "especie"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
 type PacoteDoPet = PacoteCliente & { pets: PetDoPacote | null };
@@ -144,7 +149,7 @@ export default function Pacotes() {
       <header className="g-topo">
         <div>
           <h1>Pacotes</h1>
-          <p className="g-muted">{ativos.length ? `${ativos.length} ${ativos.length === 1 ? "pacote em uso" : "pacotes em uso"}` : "Banhos do mês e mensalistas, com a conta de quantos já foram."}</p>
+          <p className="g-muted">{ativos.length ? `${ativos.length} ${ativos.length === 1 ? "pacote em uso" : "pacotes em uso"}` : "Pacotes e planos, com a conta de quantos usos já foram."}</p>
         </div>
         <div className="g-acoes">
           <button className="g-btn pri" onClick={() => { if (!somenteLeitura()) setVenda({}); }}><Plus /> Vender pacote</button>
@@ -179,7 +184,7 @@ export default function Pacotes() {
 
         {carregando && !dados ? <Esqueleto linhas={4} /> : !dados ? null : aba === "clientes" ? (
           !vendidos.length ? (
-            <Vazio titulo="Nenhum pacote vendido ainda" texto="Quando um cliente fechar um pacote de banhos, venda por aqui e vá marcando cada uso.">
+            <Vazio titulo="Nenhum pacote vendido ainda" texto="Quando um cliente fechar um pacote ou plano, venda por aqui e vá marcando cada uso.">
               <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setVenda({}); }}>Vender o primeiro pacote</button>
             </Vazio>
           ) : (
@@ -244,7 +249,7 @@ export default function Pacotes() {
             </>
           )
         ) : !modelos.length ? (
-          <Vazio titulo="Nenhum modelo de pacote" texto="Monte os pacotes que você costuma vender, como 4 banhos no mês. Na hora da venda é só escolher.">
+          <Vazio titulo="Nenhum modelo de pacote" texto={`Monte os pacotes que você costuma vender, como ${exemploDePacote(petshop)}. Na hora da venda é só escolher.`}>
             <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setModelo("novo"); }}>Criar um modelo</button>
           </Vazio>
         ) : (
@@ -321,7 +326,7 @@ function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: Pacote | null; aoF
         <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
       </>}>
       <div className="g-form">
-        <Campo rotulo="Nome"><input className="g-input" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: 4 banhos no mês" autoFocus={!modelo} /></Campo>
+        <Campo rotulo="Nome"><input className="g-input" value={nome} onChange={(e) => setNome(e.target.value)} placeholder={`Ex.: ${exemploDePacote(petshop)}`} autoFocus={!modelo} /></Campo>
         <Campo rotulo="Serviço">
           <select className="g-select" value={servico} onChange={(e) => setServico(e.target.value)}>
             <option value="">Qualquer serviço</option>
@@ -478,7 +483,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
       </>}>
       <div className="g-form">
         {cabecalho}
-        <Campo rotulo="Pacote"><input className="g-input" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: 4 banhos no mês" /></Campo>
+        <Campo rotulo="Pacote"><input className="g-input" value={nome} onChange={(e) => setNome(e.target.value)} placeholder={`Ex.: ${exemploDePacote(petshop)}`} /></Campo>
         <Campo rotulo="Serviço">
           <select className="g-select" value={servico} onChange={(e) => setServico(e.target.value)}>
             <option value="">Qualquer serviço</option>
