@@ -68,6 +68,19 @@ export function textoPronto(p: { tutor?: string | null; pet: string; petshop: st
   return `${saudacaoZap(p.tutor, p.petshop)} ${oQue} de ${p.pet} terminou. Já pode vir buscar.`;
 }
 
+/** Aviso de que o horário mudou: "O banho de Nina foi remarcado para amanhã às 14:00." A pessoa manda pelo WhatsApp. */
+export function textoRemarcado(p: { tutor?: string | null; pet: string; servico?: string | null; quando: string; hora: string; petshop: string }) {
+  const s = (p.servico ?? "").trim().toLowerCase();
+  const oQue = /^banho/.test(s) ? `O ${s}` : /^(tosa|hidratação|escovação)/.test(s) ? `A ${s}` : "O horário";
+  const foi = oQue.startsWith("A ") ? "foi remarcada" : "foi remarcado";
+  return `${saudacaoZap(p.tutor, p.petshop)} ${oQue} de ${p.pet} ${foi} para ${p.quando} às ${p.hora}. Se esse horário não der, é só avisar que a gente acha outro.`;
+}
+
+/** Aviso de que o horário foi cancelado, com o convite para marcar outro dia. */
+export function textoCancelado(p: { tutor?: string | null; pet: string; quando: string; hora: string; petshop: string }) {
+  return `${saudacaoZap(p.tutor, p.petshop)} O horário de ${p.pet} de ${p.quando} às ${p.hora} foi cancelado. Quando quiser marcar outro dia, é só chamar.`;
+}
+
 /* ---------- série (horário que se repete) e bloqueio ---------- */
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Package, ShoppingBag } from "lucide-react";
+import { ChevronRight, Package, ShoppingBag, Wallet } from "lucide-react";
 import { Tile } from "./painel";
 import { brl } from "@/lib/gestao/util";
 import "./boas-vindas.css";
@@ -67,5 +67,20 @@ export function FrenteDaLoja({ carregando, produtos, acabando, vendas, novo }: {
         {!novo && <Link className="g-btn fantasma p" href="/gestao/app/estoque">Ver o estoque<ChevronRight /></Link>}
       </div>
     </div>
+  );
+}
+
+/** "Recebido esta semana": um número só, de segunda até hoje, para o dono e quem cuida do financeiro. Leva ao Financeiro. */
+export function RecebidoNaSemana({ valor, hoje }: { valor: number; hoje: number }) {
+  return (
+    <Link className="g-hoje-semana" href="/gestao/app/financeiro">
+      <Tile icone={Wallet} tom="menta" />
+      <span className="t">
+        <span className="g-rotulo">Recebido esta semana</span>
+        <small>de segunda até hoje{hoje > 0 ? ` · hoje ${brl(hoje)}` : ""}</small>
+      </span>
+      <b className="g-num m">{brl(valor)}</b>
+      <ChevronRight aria-hidden />
+    </Link>
   );
 }

@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Lock, Plus, Split, Trash2 } from "lucide-react";
-import { caixaAberto, formaPrincipal, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { caixaAberto, formaPrincipal, ultimoContado, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, isoDia, lerValor, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
-import { AVISO_SEM_MENOS, useAvisos, useDados } from "../ui";
+import { AVISO_SEM_MENOS, avisarMudanca, useAvisos, useDados } from "../ui";
 import "./loja.css";
+import "../financeiro/recebimentos.css";
 
 export type Forma = (typeof FORMAS)[number]["id"];
 
@@ -99,6 +99,7 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
           ))}
         </div>
         {erro && <small className="erro" role="alert">{erro}</small>}
+        {e.forma === "dinheiro" && total > 0 && <Troco devido={total} />}
         {total > 0.01 && (
           <div>
             <button type="button" className="g-btn fantasma p g-pg-dividir"
@@ -117,6 +118,9 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
     ultimaManual: e.ultimaManual || (i === ultima && "valor" in m),
   });
   const usadas = (i: number) => new Set(e.partes.filter((_, n) => n !== i).map((p) => p.forma));
+  // "Fecha certinho" só depois de a pessoa escolher as formas e os valores: antes disso a frase não quer dizer nada
+  const preenchido = c.partes.every((p) => p.forma && Number(p.valor) > 0);
+  const emDinheiro = c.partes.find((p) => p.forma === "dinheiro" && Number(p.valor) > 0);
   return (
     <div className="g-campo g-pg">
       <span>Pagamento dividido</span>
@@ -135,14 +139,17 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
           </div>
         ))}
       </div>
-      <p className={`g-pg-conta${c.falta > 0 || c.passou > 0 ? " erro" : " certo"}`} role="status">
-        {c.passou > 0 ? `Passou ${brl(c.passou)} do total de ${brl(total)}.`
-          : c.falta > 0 ? `Falta ${brl(c.falta)} para fechar ${brl(total)}.`
-          : `Fecha certinho com o total de ${brl(total)}.`}
-        {(c.falta > 0 || (c.passou > 0 && e.ultimaManual)) && (
-          <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, ultimaManual: false })}>Completar a última parte</button>
-        )}
-      </p>
+      {(c.falta > 0 || c.passou > 0 || preenchido) && (
+        <p className={`g-pg-conta${c.falta > 0 || c.passou > 0 ? " erro" : " certo"}`} role="status">
+          {c.passou > 0 ? `Passou ${brl(c.passou)} do total de ${brl(total)}.`
+            : c.falta > 0 ? `Falta ${brl(c.falta)} para fechar ${brl(total)}.`
+            : `Fecha certinho com o total de ${brl(total)}.`}
+          {(c.falta > 0 || (c.passou > 0 && e.ultimaManual)) && (
+            <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, ultimaManual: false })}>Completar a última parte</button>
+          )}
+        </p>
+      )}
+      {emDinheiro && <Troco devido={Number(emDinheiro.valor)} parte />}
       {!e.ultimaManual && c.passou === 0 && <small>A última parte se completa sozinha com o que falta.</small>}
       {erro && <small className="erro" role="alert">{erro}</small>}
       <div className="g-pg-acoes">
@@ -151,6 +158,28 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
         )}
         <button type="button" className="g-btn fantasma p" onClick={() => aoMudar({ ...e, dividido: false, partes: [], ultimaManual: false, forma: e.partes[0]?.forma ?? e.forma })}>Pagar com uma forma só</button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Calculadora de troco: aparece quando o pagamento (ou uma parte dele) é em dinheiro.
+ * É só uma ajuda para quem está no balcão: o que fica anotado é sempre o valor da conta, nunca o que foi digitado aqui.
+ */
+export function Troco({ devido, parte }: { devido: number; parte?: boolean }) {
+  const [recebeu, setRecebeu] = useState<number | null>(null);
+  const troco = recebeu == null ? null : centavos(recebeu - devido);
+  return (
+    <div className="g-pg-troco">
+      <label>
+        <span>Recebeu quanto?</span>
+        <CampoDinheiro valor={recebeu} aoMudar={setRecebeu} rotulo="Recebeu quanto em dinheiro" maximo={99999999} />
+      </label>
+      <p role="status" className={troco != null && troco < 0 ? "falta" : undefined}>
+        {troco == null ? <span className="g-muted">{parte ? "Se quiser, escreva quanto ele entregou em dinheiro para ver o troco." : "Se quiser, escreva quanto o cliente entregou para ver o troco."}</span>
+          : troco > 0 ? <>Troco: <b className="g-tab">{brl(troco)}</b></>
+          : troco === 0 ? "Sem troco." : <>Faltam <b className="g-tab">{brl(-troco)}</b> para {brl(devido)}.</>}
+      </p>
     </div>
   );
 }
@@ -256,17 +285,58 @@ export function useCaixaAberto() {
   return dados ?? null;
 }
 
-/** Aviso curto ao receber com o caixa fechado, com atalho para abrir (só para quem tem acesso ao caixa). */
+/**
+ * Aviso ao receber com o caixa fechado. Quem tem a área Caixa abre o caixa ali mesmo, sem sair do que estava fazendo:
+ * o troco inicial já vem com o último valor contado.
+ */
 export function AvisoCaixaFechado({ aberto }: { aberto: boolean | null }) {
-  const { posso } = useGestao();
+  const { sb, petshop, user, posso, liberado } = useGestao();
+  const { avisar, avisarErro } = useAvisos();
+  const [abrindo, setAbrindo] = useState(false);
+  const [abriu, setAbriu] = useState(false);
+  const [troco, setTroco] = useState<number | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  // abriu o caixa daqui: a confirmação fica na tela até a pessoa terminar o recebimento
+  if (abriu) {
+    return <p className="g-cx-fora ok" role="status"><Lock aria-hidden /><span>Caixa aberto. Este valor entra na contagem da gaveta.</span></p>;
+  }
   if (aberto !== false) return null;
+  async function comecar() {
+    setAbrindo(true);
+    const ultimo = await ultimoContado(sb, petshop.id);
+    if (ultimo != null) setTroco((t) => t ?? ultimo);
+  }
+  async function abrir() {
+    if (salvando) return;
+    if (troco != null && (troco < 0 || troco >= 1e8)) { avisarErro("Confira o troco inicial."); return; }
+    setSalvando(true);
+    try {
+      const r = await sb.from("caixas").insert({ petshop_id: petshop.id, valor_inicial: troco ?? 0, aberto_por: user.id });
+      // já havia um caixa aberto (alguém abriu em outro aparelho): vale o que está aberto
+      if (r.error && r.error.code !== "23505") throw new Error(r.error.message);
+      await caixaAberto(sb, petshop.id);
+      setAbriu(true);
+      avisar("Caixa aberto.");
+      avisarMudanca();
+    } catch (e) { avisarErro(e); } finally { setSalvando(false); }
+  }
   return (
-    <p className="g-cx-fora" role="status">
+    <div className="g-cx-fora" role="status">
       <Lock aria-hidden />
-      <span>O caixa está fechado: este valor não entra na conferência da gaveta.{" "}
-        {posso("caixa") && <Link href="/gestao/app/caixa">Abrir o caixa</Link>}
-      </span>
-    </p>
+      <div>
+        <span>O caixa de hoje não está aberto. O valor fica anotado, mas não entra na contagem da gaveta.</span>
+        {posso("caixa") && liberado && !abrindo && <div><button type="button" className="g-btn sec p" onClick={() => void comecar()}>Abrir o caixa agora</button></div>}
+        {abrindo && (
+          <div className="g-cx-abrir">
+            <label>
+              <span>Troco inicial em dinheiro</span>
+              <CampoDinheiro valor={troco} aoMudar={setTroco} rotulo="Troco inicial em dinheiro" maximo={99999999} />
+            </label>
+            <button type="button" className="g-btn sec p" onClick={() => void abrir()} disabled={salvando}>{salvando ? "Abrindo…" : "Abrir o caixa"}</button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -7,6 +7,7 @@ import Identidade from "@/components/gestao/ajustes/identidade";
 import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
 import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
+import OpcoesDeCobranca from "@/components/gestao/ajustes/opcoes-cobranca";
 import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
 import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { textoDoLink } from "@/lib/gestao/agenda";
@@ -78,6 +79,7 @@ export default function MeuPetshop() {
             <Identidade />
             <LinkAgendamento />
             <AjusteFidelidade />
+            <OpcoesDeCobranca />
             <Servicos />
           </div>
         </div>

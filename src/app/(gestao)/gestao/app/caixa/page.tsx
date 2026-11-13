@@ -4,12 +4,14 @@ import { useState } from "react";
 import { ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, Download, History, Lock, Minus, Plus, Scale, ShoppingBag, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
-import { caixaAberto, CATEGORIA_GAVETA, conferirValorAlto, desfazerVenda, lancarPago, lembrarCaixa, nomeDoMovimento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { caixaAberto, CATEGORIA_GAVETA, conferirValorAlto, desfazerVenda, lancarPago, lembrarCaixa, nomeDoMovimento, partesPorForma, percentuaisQueFecham, textoDoPagamento, ultimoContado } from "@/lib/gestao/dinheiro";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
+import "@/components/gestao/financeiro/recebimentos.css";
 import {
-  Apagados, baixarPlanilha, brlMini, categoriaAtual, COR_FORMA, dinheiroCsv, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDeItens, resumoDoCaixa, rotuloForma, SemAcesso, semMovimentos, soma,
+  Apagados, baixarPlanilha, brlMini, categoriaAtual, COR_FORMA, dinheiroCsv, ehDeServico, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDeItens, resumoDoCaixa, rotuloForma, SemAcesso, semMovimentos, soma,
   somaPorForma, TagAlterado, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
+import { ContasDeClientes } from "@/components/gestao/financeiro/contas-clientes";
 import VendaBalcao from "@/components/gestao/loja/venda";
 import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
 import type { AlteracaoLancamento, Caixa, Lancamento } from "@/lib/gestao/tipos";
@@ -210,26 +212,38 @@ function CaixaDoDia() {
                 <span className="g-rotulo"><i className="g-cx-pulso" aria-hidden />Caixa aberto</span>
                 <span className="g-cx-desde">desde {abertoEmOutroDia ? dataCurta(aberto.aberto_em) : hora(aberto.aberto_em)}</span>
               </div>
-              <div>
-                <p className="g-cx-leg">Dinheiro na gaveta agora</p>
-                <p className="g-cx-gaveta">{brl(resumo.esperado)}</p>
-                <p className="g-cx-leg" style={{ marginTop: 8 }}>
-                  Aberto às {hora(aberto.aberto_em)} com {brl(aberto.valor_inicial)} de troco.
-                </p>
-              </div>
-              <div className="gf-formas">
-                {resumo.porForma.filter((f) => f.id !== "outro" || f.entrou > 0).map((f) => (
-                  <div key={f.id}>
-                    <span className="g-cx-leg">{f.rotulo}</span>
-                    <b>{brl(f.entrou)}</b>
-                  </div>
-                ))}
+              <div className="g-cx-dois">
+                <div>
+                  <p className="g-cx-leg">Dinheiro na gaveta</p>
+                  <p className="g-cx-gaveta">{brl(resumo.esperado)}</p>
+                </div>
+                <div>
+                  <p className="g-cx-leg">Recebido hoje</p>
+                  <p className="g-cx-gaveta">{brl(entrouNoDia)}</p>
+                </div>
               </div>
               <p className="g-cx-leg">
-                Entrou {brl(resumo.entrou)} neste caixa{fin ? (resumo.saiu > 0 ? ` e saiu ${brl(resumo.saiu)}` : "") : saiuEmDinheiro > 0 ? ` e ${brl(saiuEmDinheiro)} saíram em dinheiro` : ""}.
-                {resumo.suprimentos > 0 && ` Colocado na gaveta: ${brl(resumo.suprimentos)}.`}
-                {resumo.sangrias > 0 && ` Tirado da gaveta: ${brl(resumo.sangrias)}.`}
+                Na gaveta: o troco de {brl(aberto.valor_inicial)} mais o que entrou e saiu em dinheiro. Recebido hoje: tudo o que entrou hoje, em dinheiro, Pix ou cartão.
               </p>
+              <details className="g-cx-detalhes">
+                <summary>Ver detalhes</summary>
+                <div>
+                  <p className="g-cx-leg">Aberto às {hora(aberto.aberto_em)} com {brl(aberto.valor_inicial)} de troco.</p>
+                  <div className="gf-formas">
+                    {resumo.porForma.filter((f) => f.id !== "outro" || f.entrou > 0).map((f) => (
+                      <div key={f.id}>
+                        <span className="g-cx-leg">{f.rotulo}</span>
+                        <b>{brl(f.entrou)}</b>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="g-cx-leg">
+                    Entrou {brl(resumo.entrou)} neste caixa{fin ? (resumo.saiu > 0 ? ` e saiu ${brl(resumo.saiu)}` : "") : saiuEmDinheiro > 0 ? ` e ${brl(saiuEmDinheiro)} saíram em dinheiro` : ""}.
+                    {resumo.suprimentos > 0 && ` Colocado na gaveta: ${brl(resumo.suprimentos)}.`}
+                    {resumo.sangrias > 0 && ` Tirado da gaveta: ${brl(resumo.sangrias)}.`}
+                  </p>
+                </div>
+              </details>
               <div className="gf-dupla">
                 <button className="g-btn pri" onClick={() => void abrir({ tipo: "novo", de: "entrada" })}><ArrowDownLeft />Entrada</button>
                 <button className="g-btn g-cx-claro" onClick={() => void abrir({ tipo: "novo", de: "saida" })}><ArrowUpRight />Saída</button>
@@ -254,23 +268,7 @@ function CaixaDoDia() {
             </section>
           )}
 
-          {aberto && resumo ? (
-            <section className="g-card">
-              <div className="g-card-t"><h3><Tile icone={CreditCard} tom="ceu" tamanho="p" />Como entrou</h3><span className="g-muted g-pp">neste caixa</span></div>
-              {resumo.entrou > 0 ? (
-                <div className="g-cx-rosca">
-                  <Rosca fatias={resumo.porForma.map((f) => ({ valor: f.entrou, cor: COR_FORMA[f.id] }))} tamanho={124}>
-                    {entradasDoCaixa}<small>{entradasDoCaixa === 1 ? "entrada" : "entradas"}</small>
-                  </Rosca>
-                  <div className="g-legenda">
-                    {resumo.porForma.filter((f) => f.entrou > 0).map((f, i, usadas) => (
-                      <div key={f.id}><i style={{ background: COR_FORMA[f.id] }} /><span>{f.rotulo} <span className="g-muted g-pp">{percentuaisQueFecham(usadas.map((x) => x.entrou))[i]}%</span></span><b>{brl(f.entrou)}</b></div>
-                    ))}
-                  </div>
-                </div>
-              ) : <p className="g-muted g-p">Nada entrou neste caixa ainda. Quando alguém pagar, a divisão por forma de pagamento aparece aqui.</p>}
-            </section>
-          ) : ultimo ? (
+          {aberto && resumo ? null : ultimo ? (
             <section className="g-card">
               <div className="g-card-t">
                 <h3><Tile icone={History} tom="manteiga" tamanho="p" />Último fechamento</h3>
@@ -279,11 +277,16 @@ function CaixaDoDia() {
               <ResumoCaixa caixa={ultimo} lancamentos={doCaixa(ultimo.id)} soGaveta={!fin} />
             </section>
           ) : null}
+          {/* sempre no mesmo lugar da tela: abrir o caixa no meio de um recebimento não fecha a folha que está aberta */}
+          <ContasDeClientes aoMudar={recarregar} largo={!aberto && Boolean(ultimo)} />
         </div>
 
-        <div className="g-grade kpis">
-          {aberto && resumo ? (
-            <>
+        {aberto && resumo ? (
+          <details className="g-cx-mais">
+            <summary>Ver detalhes do caixa</summary>
+            <div>
+              <div className="g-grade kpis">
+                <>
               <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Entrou neste caixa" valor={<span className="gf-kpi-v">{brl(resumo.entrou)}</span>}
                 apoio={entradasDoCaixa ? (entradasDoCaixa === 1 ? "1 entrada" : `${entradasDoCaixa} entradas`) : "nada ainda"} />
               {fin ? (
@@ -301,8 +304,28 @@ function CaixaDoDia() {
               <Kpi icone={Coins} tom="manteiga" rotulo="Entrou hoje, no dia" valor={<span className="gf-kpi-v">{brl(entrouNoDia)}</span>}
                 apoio={entrouFora > 0 ? `${brl(entrouFora)} fora do caixa` : emOutrosCaixas > 0 ? `${brl(emOutrosCaixas)} em caixa já fechado` : abertoEmOutroDia ? "só o que é de hoje" : "tudo neste caixa"} />
             </>
-          ) : (
-            <>
+              </div>
+              <section className="g-card">
+              <div className="g-card-t"><h3><Tile icone={CreditCard} tom="ceu" tamanho="p" />Como entrou</h3><span className="g-muted g-pp">neste caixa</span></div>
+              {resumo.entrou > 0 ? (
+                <div className="g-cx-rosca">
+                  <Rosca fatias={resumo.porForma.map((f) => ({ valor: f.entrou, cor: COR_FORMA[f.id] }))} tamanho={124}>
+                    {entradasDoCaixa}<small>{entradasDoCaixa === 1 ? "entrada" : "entradas"}</small>
+                  </Rosca>
+                  <div className="g-legenda">
+                    {resumo.porForma.filter((f) => f.entrou > 0).map((f, i, usadas) => (
+                      <div key={f.id}><i style={{ background: COR_FORMA[f.id] }} /><span>{f.rotulo} <span className="g-muted g-pp">{percentuaisQueFecham(usadas.map((x) => x.entrou))[i]}%</span></span><b>{brl(f.entrou)}</b></div>
+                    ))}
+                  </div>
+                </div>
+              ) : <p className="g-muted g-p">Nada entrou neste caixa ainda. Quando alguém pagar, a divisão por forma de pagamento aparece aqui.</p>}
+            </section>
+            </div>
+          </details>
+        ) : (
+          <>
+            <div className="g-grade kpis">
+              <>
               <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Entrou hoje, no dia" valor={<span className="gf-kpi-v">{brl(entrouNoDia)}</span>}
                 apoio={emOutrosCaixas > 0 ? `${brl(entrouFora)} fora do caixa` : entrouNoDia > 0 ? "tudo fora do caixa" : "sem caixa aberto"} />
               {fin && <Kpi icone={ArrowUpRight} tom="rosa" rotulo="Saiu hoje, no dia" valor={<span className="gf-kpi-v">{brl(saiuNoDia)}</span>} apoio={saiuNoDia > 0 && saiuFora < saiuNoDia ? `${brl(saiuFora)} fora do caixa` : "sem caixa aberto"} />}
@@ -314,8 +337,9 @@ function CaixaDoDia() {
                 </>
               )}
             </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
 
         <div className="g-duas">
           <div className="g-pilha g-cx-col">
@@ -444,7 +468,7 @@ function LinhaLancamento({ l, aoTocar }: { l: Lancamento; aoTocar?: () => void }
   const forma = textoDoPagamento(l);
   const apoio = gaveta
     ? `${hora(l.criado_em)} · ${l.descricao || "não é venda nem despesa"}`
-    : `${hora(l.criado_em)}${l.descricao ? ` · ${categoriaAtual(l.categoria)}` : ""}${resumoDeItens(l) ? ` · ${resumoDeItens(l)}` : ""}`;
+    : `${hora(l.criado_em)}${l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria)}` : ""}${resumoDeItens(l) ? ` · ${resumoDeItens(l)}` : ""}`;
   const dentro = (
     <>
       <Tile icone={gaveta ? (entrada ? ArrowDownToLine : ArrowUpFromLine) : entrada ? ArrowDownLeft : ArrowUpRight} tom={gaveta ? "manteiga" : entrada ? "menta" : "rosa"} />
@@ -598,9 +622,15 @@ function FolhaAbrir({ aoFechar, aoSalvo }: { aoFechar: () => void; aoSalvo: () =
   const [valor, setValor] = useState<number | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // o troco já vem com o que foi contado no último fechamento; a pessoa confere e muda se precisar
+  const [mexeu, setMexeu] = useState(false);
+  const { dados: ultimo } = useDados(async () => ultimoContado(sb, petshop.id), [petshop.id]);
+  const sugerido = !mexeu && ultimo != null && ultimo > 0 ? ultimo : null;
+  const troco = mexeu ? valor : sugerido ?? valor;
 
   async function salvar() {
     if (salvando) return;
+    const valor = troco;
     // nada de trocar em silêncio: troco negativo ou absurdo volta para a pessoa conferir
     if (valor != null && valor < 0) { setErro("O troco não pode ser negativo. Se a gaveta está vazia, deixe em branco."); return; }
     if (valor != null && valor >= 1e8) { setErro("Esse valor é grande demais. Confira os números."); return; }
@@ -627,8 +657,9 @@ function FolhaAbrir({ aoFechar, aoSalvo }: { aoFechar: () => void; aoSalvo: () =
         <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Abrindo…" : "Abrir o caixa"}</button>
       </>}>
       <form className="g-form" onSubmit={(e) => { e.preventDefault(); void salvar(); }}>
-        <Campo rotulo="Troco inicial em dinheiro" erro={erro} dica="Quanto tem de dinheiro na gaveta agora. Se não tem nada, deixe em branco.">
-          <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus maximo={99999999} />
+        <Campo rotulo="Troco inicial em dinheiro" erro={erro}
+          dica={sugerido != null ? `Já veio com ${brl(sugerido)}, o que foi contado no último fechamento. Confira a gaveta e mude se for diferente.` : "Quanto tem de dinheiro na gaveta agora. Se não tem nada, deixe em branco."}>
+          <CampoDinheiro valor={troco} aoMudar={(v) => { setMexeu(true); setValor(v); setErro(null); }} autoFocus maximo={99999999} />
         </Campo>
         <button type="submit" hidden />
       </form>

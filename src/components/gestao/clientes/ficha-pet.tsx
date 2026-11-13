@@ -33,7 +33,8 @@ const STATUS_ESTADIA: Record<string, { rotulo: string; tom: string }> = {
 };
 
 export default function FichaPet({ id, voltar }: { id: string; voltar: () => void }) {
-  const { sb, petshop, servicos, vejoFinanceiro } = useGestao();
+  // o gasto do pet é histórico de dinheiro: só para o dono e quem cuida do financeiro (quem só opera o caixa não lê esse histórico)
+  const { sb, petshop, servicos, cuidoDoFinanceiro: vejoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = useState(false);

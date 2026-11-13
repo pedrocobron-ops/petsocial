@@ -1,0 +1,93 @@
+/* Recebimentos: troco, conta recebida em partes, multa, contas de clientes, opções de cobrança e comissão. */
+
+/* calculadora de troco */
+.g-pg-troco { display: grid; grid-template-columns: minmax(0, 150px) minmax(0, 1fr); gap: 10px 12px; align-items: end; padding: 10px 12px; border-radius: var(--g-raio-p); background: var(--g-carta-2); border: 1px dashed var(--g-linha-forte); }
+.g-pg-troco label { display: grid; gap: 4px; font-size: .8125rem; color: var(--g-cinza); }
+.g-pg-troco p { margin: 0; min-height: 44px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: .9375rem; font-weight: 600; }
+.g-pg-troco p b { font-family: var(--display); font-size: 1.125rem; }
+.g-pg-troco p .g-muted { font-weight: 400; font-size: .8125rem; }
+.g-pg-troco p.falta { color: #7a281b; }
+
+/* abrir o caixa sem sair do recebimento */
+.g-cx-fora > div { display: grid; gap: 8px; min-width: 0; flex: 1; }
+.g-cx-fora.ok { background: var(--g-menta); border-color: transparent; color: #24543b; }
+.g-cx-abrir { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: flex-end; }
+.g-cx-abrir label { display: grid; gap: 4px; font-size: .8125rem; color: var(--g-cinza); flex: 1 1 140px; max-width: 200px; }
+
+/* receber uma parte e multa */
+.gf-parcial, .gf-multa { display: grid; gap: 10px; padding: 12px 14px; border-radius: var(--g-raio-p); background: var(--g-amarelo-tint); font-size: .875rem; line-height: 1.45; }
+.gf-parcial p, .gf-multa p { margin: 0; }
+.gf-multa small { color: var(--g-cinza); }
+.gf-multa-linha { display: flex; gap: 10px; align-items: flex-end; }
+.gf-multa-linha label { display: grid; gap: 4px; font-size: .8125rem; color: var(--g-cinza); flex: 1; max-width: 200px; }
+
+/* contas de clientes */
+.gr-card { display: grid; gap: 10px; align-content: start; }
+.gr-card.largo { grid-column: 1 / -1; }
+.gr-devedor { display: grid; gap: 8px; padding: 12px; border-radius: var(--g-raio-p); border: 1px solid var(--g-linha); background: var(--g-carta); }
+.gr-ficha .gr-devedor { border: 0; padding: 0; background: none; }
+.gr-devedor-t { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gr-devedor-t .t { display: grid; min-width: 0; flex: 1 1 160px; }
+.gr-devedor-t .t b { font-size: 1rem; }
+.gr-ficha .gr-devedor-t .t b { font-family: var(--display); font-size: 1.5rem; line-height: 1.15; }
+.gr-devedor-t .t span { font-size: .8125rem; color: var(--g-cinza); }
+.gr-devedor-t .g-tag { display: inline-flex; align-items: center; gap: 4px; }
+.gr-contas { display: grid; }
+.gr-conta { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--g-linha); }
+.gr-conta .t { display: grid; min-width: 0; }
+.gr-conta .t b { font-size: .9375rem; font-weight: 600; overflow-wrap: anywhere; }
+.gr-conta .t span { font-size: .8125rem; color: var(--g-cinza); }
+.gr-conta .v { font-size: .9375rem; white-space: nowrap; }
+.gr-devedor-pe { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.gr-msg { min-height: 220px; font-size: .9375rem; line-height: 1.45; }
+@media (max-width: 420px) {
+  .gr-conta { grid-template-columns: minmax(0, 1fr) auto; }
+  .gr-conta .t { grid-column: 1 / -1; }
+  .gr-conta .v { justify-self: start; }
+}
+
+/* caixa aberto: dois números no alto */
+.g-cx-topo > .g-cx-heroi { align-self: start; }
+.g-cx-dois { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.g-cx-dois > div { min-width: 0; }
+.g-cx-dois .g-cx-gaveta { font-size: clamp(1.375rem, 6.4vw, 2.5rem); white-space: nowrap; }
+.g-cx-detalhes { border-top: 1px solid rgba(255, 255, 255, .18); padding-top: 8px; }
+.g-cx-detalhes > summary { cursor: pointer; font-size: .875rem; font-weight: 600; min-height: 44px; display: flex; align-items: center; gap: 6px; list-style: none; }
+.g-cx-detalhes > summary::-webkit-details-marker { display: none; }
+.g-cx-detalhes > summary::after { content: "▾"; font-size: .75rem; opacity: .8; }
+.g-cx-detalhes[open] > summary::after { content: "▴"; }
+.g-cx-detalhes > div { display: grid; gap: 10px; padding-top: 4px; }
+.g-cx-mais > summary { cursor: pointer; font-weight: 600; font-size: .9375rem; min-height: 44px; display: flex; align-items: center; gap: 8px; list-style: none; color: var(--g-verde); }
+.g-cx-mais > summary::-webkit-details-marker { display: none; }
+.g-cx-mais > summary::after { content: "▾"; font-size: .75rem; }
+.g-cx-mais[open] > summary::after { content: "▴"; }
+.g-cx-mais > div { display: grid; gap: 16px; padding-top: 8px; }
+
+/* opções de cobrança */
+.gr-op { display: grid; gap: 14px; }
+.gr-op-bloco { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--g-linha); }
+.gr-op-bloco:first-of-type { border-top: 0; padding-top: 0; }
+.gr-op-chave { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.gr-op-chave > div { min-width: 0; }
+.gr-op-chave b { display: block; }
+.gr-op-chave span { font-size: .8125rem; color: var(--g-cinza); line-height: 1.4; }
+.gr-op-tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.gr-op-pct { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 8px 10px; align-items: center; }
+.gr-op-pct span { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .gr-op-tres { grid-template-columns: 1fr; } }
+
+/* minha comissão e comissão paga */
+.gr-minha { display: grid; gap: 10px; }
+.gr-minha-meses { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gr-minha-meses > div { padding: 12px; border-radius: var(--g-raio-p); background: var(--g-carta-2); display: grid; gap: 2px; min-width: 0; }
+.gr-minha-meses small { color: var(--g-cinza); font-size: .8125rem; }
+.gr-minha-meses small, .gr-minha-meses .g-tag { overflow-wrap: anywhere; white-space: normal; }
+@media (max-width: 420px) { .gr-minha-meses { grid-template-columns: 1fr; } }
+.gr-minha-meses b { font-family: var(--display); font-size: 1.375rem; overflow-wrap: anywhere; }
+.gr-com-linha { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--g-linha); }
+.gr-com-linha:first-child { border-top: 0; }
+.gr-com-topo { display: flex; gap: 10px; align-items: center; }
+.gr-com-topo .t { display: grid; min-width: 0; flex: 1; }
+.gr-com-topo .t span { font-size: .8125rem; color: var(--g-cinza); }
+.gr-com-pe { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-left: 50px; font-size: .8125rem; }
+@media (max-width: 420px) { .gr-com-pe { padding-left: 0; } }

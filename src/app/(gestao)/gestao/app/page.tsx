@@ -18,7 +18,8 @@ import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
-import { ChegamESaem, FrenteDaLoja, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
+import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
+import MinhaComissao from "@/components/gestao/minha-comissao";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
@@ -126,6 +127,8 @@ export default function Hoje() {
         return { rotulo: nomeDiaCurto(d), valor: (daSemana.data ?? []).filter((a) => valeAg(a.status) && isoDia(new Date(a.inicio)) === iso).length };
       }),
       servicosMes: [...porServico.values()].sort((a, b) => b.valor - a.valor).slice(0, 5),
+      // de segunda até hoje (a segunda desta semana está sempre dentro dos últimos 7 dias)
+      recebidoSemana: ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data >= isoDia(seg)).reduce((t, l) => t + Number(l.valor), 0),
       entradas7: Array.from({ length: 7 }, (_, i) => {
         const iso = isoDia(somaDias(ha6, i));
         return ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data === iso).reduce((t, l) => t + Number(l.valor), 0);
@@ -345,6 +348,9 @@ export default function Hoje() {
           )}
           {!semAgenda && <Kpi href="/gestao/app/agenda" icone={CalendarDays} tom="lilas" rotulo="Nesta semana" valor={dados ? totalSemana : "–"} apoio={totalSemana === 1 ? "horário marcado" : "horários marcados"} />}
         </div>}
+
+        {!contaNova && cuidoDoFinanceiro && dados && <RecebidoNaSemana valor={dados.recebidoSemana} hoje={dados.entrou} />}
+        <MinhaComissao />
 
         <div className={semAgenda ? "g-pilha g" : "g-duas"}>
           {!semAgenda && <section>
