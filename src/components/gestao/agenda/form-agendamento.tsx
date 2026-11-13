@@ -7,6 +7,8 @@ import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { PORTES, SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, paraMin, vagasDe } from "@/lib/gestao/agenda";
 import { almocoDoDia, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, nomeDiaCurto, precoDoServico, somaDias } from "@/lib/gestao/util";
+import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { CampoDinheiro, erroDeValor } from "../loja/pecas";
@@ -39,6 +41,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   aoFechar: () => void; aoSalvar: () => void;
 }) {
   const { sb, petshop, equipe, servicos, user } = useGestao();
+  useCalendario(); // feriados e dias fechados: a tela avisa quando o dia escolhido é um deles
   const { avisar, avisarErro, confirmar } = useAvisos();
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
   const ativos = servicos.filter((s) => s.ativo || s.id === agendamento?.servico_id);
@@ -166,7 +169,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     const out: Record<string, Problema[]> = {};
     lista.forEach((d, i) => {
       const p: Problema[] = [];
-      if (!horarioDoDia(petshop.horario, deIsoDia(d))) p.push({ tipo: "fechado", texto: "fechado" });
+      if (!horarioDoDia(petshop.horario, deIsoDia(d)) || diaFechado(d)) p.push({ tipo: "fechado", texto: diaFechado(d) ? "dia fechado" : "fechado" });
       else if (foraDoExpediente(d)) p.push({ tipo: "fora", texto: "fora do expediente" });
       if (almocoEm(d)) p.push({ tipo: "almoco", texto: "hora do almoço" });
       const b = bloqueioEm(d);
@@ -322,6 +325,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
             </Campo>
             <Campo rotulo="Horário"><input className="g-input" type="time" required step={300} value={hhmm} onChange={(e) => setHhmm(e.target.value)} /></Campo>
           </div>
+          {diaOk && anoOk && diaFechado(dia) && (
+            <div className="g-aviso" role="status" style={{ marginBottom: 0 }}><CalendarOff /><span className="g-cresce"><b>{fraseDoDiaFechado(dia)}.</b> Vocês marcaram {dataAmigavel(dia)} como dia fechado em Meu pet shop. Dá para marcar mesmo assim.</span></div>
+          )}
           {!diaOk || !anoOk ? null : !funcionamento ? <p className="g-pp g-muted">O pet shop não abre {dataAmigavel(dia)}. Você pode marcar mesmo assim.</p>
             : livres.length > 0 ? (
               <div className="g-campo g-agd-livres"><span className="g-muted" style={{ fontWeight: 500 }}>Horários livres {dataAmigavel(dia)}</span>

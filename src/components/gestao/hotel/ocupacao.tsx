@@ -9,6 +9,8 @@ import { acomodacoesDe } from "@/lib/gestao/hotel-opcoes";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { dataLonga, deIsoDia, isoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
+import { diaFechado, feriadoDoDia, fraseDoDiaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
+import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { AvatarPet, Esqueleto, Folha, useDados } from "../ui";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type Tipo } from "./tipos";
@@ -25,6 +27,7 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
   abertas: EstadiaCompleta[]; mens: Mens | null; aoNovaReserva: (dia: string, tipo: Tipo) => void;
 }) {
   const { sb, petshop } = useGestao();
+  useCalendario(); // feriados e dias fechados
   const [hoje] = useState(() => new Date());
   const hojeIso = isoDia(hoje);
   const [mes, setMes] = useState(() => new Date(hoje.getFullYear(), hoje.getMonth(), 1));
@@ -53,6 +56,7 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
       <button type="button" className={`g-ht-dia${dia === hojeIso ? " hoje" : ""}${dia < hojeIso ? " passado" : ""}`} onClick={() => setAberto(dia)}
         aria-label={`${dataLonga(d)}: ${tipos.map((t) => { const v = vagasDoTipo(petshop, t); return `${nomeTipo(t)} ${conta(t, dia)}${v != null ? ` de ${v}` : ""}`; }).join(", ")}`}>
         <span className="n"><span>{d.getDate()}</span>{comSemana && <small>{nomeDiaCurto(d)}</small>}</span>
+        {(diaFechado(dia) || feriadoDoDia(dia)) && <span className="fer" title={fraseDoDiaFechado(dia) ?? feriadoDoDia(dia) ?? undefined}>{diaFechado(dia) ? (nomeDoDiaFechado(dia) || "fechado") : feriadoDoDia(dia)}</span>}
         {tipos.map((t) => {
           const n = conta(t, dia), v = vagasDoTipo(petshop, t);
           return <span key={t} className={`g-ht-oc ${nivelDeOcupacao(n, v)}`}>{t === "hotel" ? <Moon aria-hidden /> : <Sun aria-hidden />}{n}{v != null ? `/${v}` : ""}</span>;
