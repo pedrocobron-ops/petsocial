@@ -194,7 +194,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
   async function salvar() {
     if (salvando) return;
     if (!nValido) { avisarErro("Confira o número de diárias."); return; }
-    if (atraso && comAtraso === null) { setErroAtraso(true); avisarErro("Diga se a taxa de busca fora do horário entra na conta ou não."); return; }
+    if (atraso && comAtraso === null) { setErroAtraso(true); document.getElementById("g-ht-atraso")?.scrollIntoView({ block: "center", behavior: "smooth" }); avisarErro("Diga se a taxa de busca fora do horário entra na conta ou não."); return; }
     const valorRuim = erroDeValor(valor) ?? (vejoFinanceiro ? erroDaConta(itens, null, soma) : null);
     if (valorRuim) { avisarErro(valorRuim); return; }
     const rec = recebido > 0 ? (cobra ? fecharRecebimento(pagamento, depois, fiado ? valor! : recebido) : fecharRecebimento(pagamento, { ...depois, ativo: false }, recebido)) : null;
@@ -331,7 +331,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
           <>
             {dasDiarias.noites && <NoitePorNoite noites={dasDiarias.noites} total={dasDiarias.total} />}
             {atraso && (
-              <div className={`g-ht-atraso${comAtraso === null ? "" : " ok"}`} role="group" aria-label="Taxa de busca fora do horário">
+              <div id="g-ht-atraso" className={`g-ht-atraso${comAtraso === null ? "" : " ok"}`} role="group" aria-label="Taxa de busca fora do horário">
                 <p><Clock aria-hidden style={{ width: 16, height: 16, verticalAlign: "-3px", marginRight: 6 }} /><b>Saída às {atraso.saiu.replace(":", "h")}, depois das {atraso.hora.replace(":", "h")}.</b> A taxa de busca fora do horário é de {brl(atraso.valor)}. Ela entra na conta?</p>
                 <div className="g-seg g-ht-seg" role="group">
                   <button type="button" aria-pressed={comAtraso === true} onClick={() => { setComAtraso(true); setErroAtraso(false); setValorEditado(undefined); }}>Cobrar {brl(atraso.valor)}</button>
