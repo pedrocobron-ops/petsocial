@@ -75,10 +75,15 @@ function celulaCsv(c: Cel) {
   if (/^[=+\-@]/.test(t)) t = `'${t}`;
   return `"${t.replace(/"/g, '""')}"`;
 }
-/** Baixa uma planilha CSV (separador ponto e vírgula, com BOM: abre direto no Excel e no Google Planilhas). */
+/** O texto de uma planilha CSV (separador ponto e vírgula, com BOM: abre direto no Excel e no Google Planilhas). */
+export const textoCsv = (linhas: Cel[][]) => "\ufeff" + linhas.map((l) => l.map(celulaCsv).join(";")).join("\r\n") + "\r\n";
+/** Baixa uma planilha CSV. */
 export function baixarPlanilha(linhas: Cel[][], nomeDoArquivo: string) {
-  const texto = "\ufeff" + linhas.map((l) => l.map(celulaCsv).join(";")).join("\r\n") + "\r\n";
-  const url = URL.createObjectURL(new Blob([texto], { type: "text/csv;charset=utf-8" }));
+  baixarArquivo(new Blob([textoCsv(linhas)], { type: "text/csv;charset=utf-8" }), nomeDoArquivo);
+}
+/** Entrega um arquivo pronto para o navegador baixar. */
+export function baixarArquivo(arquivo: Blob, nomeDoArquivo: string) {
+  const url = URL.createObjectURL(arquivo);
   const a = document.createElement("a");
   a.href = url;
   a.download = nomeDoArquivo;

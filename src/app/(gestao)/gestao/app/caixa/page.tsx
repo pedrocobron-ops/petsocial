@@ -1,18 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, History, Lock, Minus, Plus, Scale, ShoppingBag, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, Download, History, Lock, Minus, Plus, Scale, ShoppingBag, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
-import { CATEGORIA_GAVETA, desfazerVenda, lancarPago, nomeDoMovimento, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { CATEGORIA_GAVETA, desfazerVenda, lancarPago, nomeDoMovimento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import {
-  brlMini, categoriaAtual, COR_FORMA, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDeItens, resumoDoCaixa, SemAcesso, semMovimentos, soma, somaPorForma, type Tipo,
+  baixarPlanilha, brlMini, categoriaAtual, COR_FORMA, dinheiroCsv, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDeItens, resumoDoCaixa, rotuloForma, SemAcesso, semMovimentos, soma,
+  somaPorForma, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import VendaBalcao from "@/components/gestao/loja/venda";
 import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
 import type { Caixa, Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, dataCurta, dataLonga, hora, isoDia } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, hora, isoDia } from "@/lib/gestao/util";
 import "./caixa.css";
 
 export default function PaginaCaixa() {
@@ -37,6 +38,49 @@ function diferenca(contado: number | null, esperado: number) {
   if (d === 0) return { tom: "certo", etiqueta: "verde", texto: "Bateu certinho.", curto: "bateu" } as const;
   if (d > 0) return { tom: "sobra", etiqueta: "azul", texto: `Sobra de ${brl(d)}.`, curto: `sobra ${brl(d)}` } as const;
   return { tom: "falta", etiqueta: "vermelho", texto: `Falta de ${brl(-d)}.`, curto: `falta ${brl(-d)}` } as const;
+}
+
+/**
+ * Planilha de um caixa: os movimentos (pagamento dividido vira uma linha por forma) e, embaixo, as mesmas contas
+ * que a tela mostra (`resumoDoCaixa` e `diferenca`).
+ */
+function exportarCaixa(caixa: Caixa, lancamentos: Lancamento[]) {
+  const r = resumoDoCaixa(caixa.valor_inicial, lancamentos);
+  const dif = diferenca(caixa.valor_contado, r.esperado);
+  const emOrdem = [...lancamentos].sort((a, b) => a.criado_em.localeCompare(b.criado_em) || a.id.localeCompare(b.id));
+  const movimentos = emOrdem.flatMap((l): Cel[][] => {
+    const gaveta = Boolean(l.movimento), entrada = l.tipo === "entrada";
+    const tipo = l.movimento === "sangria" ? "Sangria" : l.movimento === "suprimento" ? "Suprimento" : entrada ? "Entrada" : "Saída";
+    const descricao = gaveta ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [l.descricao, resumoDeItens(l)].filter(Boolean).join(" · ");
+    return partesPorForma(l).map((p): Cel[] => [
+      dataCompleta(l.criado_em), hora(l.criado_em), descricao, categoriaAtual(l.categoria), tipo, rotuloForma(p.forma), dinheiroCsv(entrada ? p.valor : -p.valor),
+    ]);
+  });
+  const linha = (nome: string, valor: number): Cel[] => [nome, dinheiroCsv(valor)];
+  const tabela: Cel[][] = [
+    ["Data", "Hora", "Descrição", "Categoria", "Tipo", "Forma de pagamento", "Valor"],
+    ...movimentos,
+    [],
+    ["Resumo do caixa", "Valor"],
+    ["Aberto em", `${dataCompleta(caixa.aberto_em)} ${hora(caixa.aberto_em)}`],
+    ["Fechado em", caixa.fechado_em ? `${dataCompleta(caixa.fechado_em)} ${hora(caixa.fechado_em)}` : "Ainda aberto"],
+    linha("Troco inicial", Number(caixa.valor_inicial)),
+    linha("Entradas", r.entrou),
+    ...r.porForma.filter((f) => f.entrou > 0).map((f) => linha(`Entradas em ${f.rotulo.toLowerCase()}`, f.entrou)),
+    linha("Saídas", r.saiu),
+    ...r.porForma.filter((f) => f.saiu > 0).map((f) => linha(`Saídas em ${f.rotulo.toLowerCase()}`, f.saiu)),
+    linha("Colocado na gaveta (suprimento)", r.suprimentos),
+    linha("Tirado da gaveta (sangria)", r.sangrias),
+    linha("Dinheiro esperado na gaveta", r.esperado),
+    ...(caixa.valor_contado == null ? [] : [
+      linha("Dinheiro contado", Number(caixa.valor_contado)),
+      linha("Diferença (contado menos esperado)", Math.round((Number(caixa.valor_contado) - r.esperado) * 100) / 100),
+      ["Resultado", dif?.texto ?? ""] as Cel[],
+    ]),
+    ...(caixa.obs ? [["Observação", caixa.obs] as Cel[]] : []),
+  ];
+  const abertura = new Date(caixa.aberto_em);
+  baixarPlanilha(tabela, `caixa-${isoDia(abertura)}-${hora(abertura).replace(":", "h")}.csv`);
 }
 
 function CaixaDoDia() {
@@ -77,6 +121,7 @@ function CaixaDoDia() {
       </div>
       {dados?.aberto && (
         <div className="g-acoes">
+          <button className="g-btn fantasma" onClick={() => exportarCaixa(dados.aberto!, doCaixa(dados.aberto!.id))}><Download />Exportar</button>
           <button className="g-btn sec" onClick={() => abrir({ tipo: "fechar" })}><Lock />Fechar o caixa</button>
         </div>
       )}
@@ -315,7 +360,10 @@ function CaixaDoDia() {
       )}
       {caixaDoResumo && (
         <Folha titulo={`Caixa de ${dataCurta(caixaDoResumo.aberto_em)}`} aoFechar={() => setFolha(null)}
-          rodape={<button className="g-btn sec" onClick={() => setFolha(null)}>Fechar</button>}>
+          rodape={<>
+            <button className="g-btn sec" onClick={() => exportarCaixa(caixaDoResumo, doCaixa(caixaDoResumo.id))}><Download />Exportar</button>
+            <button className="g-btn sec" onClick={() => setFolha(null)}>Fechar</button>
+          </>}>
           <div className="g-pilha">
             <p className="g-muted g-p">
               Aberto {dataAmigavel(caixaDoResumo.aberto_em)} às {hora(caixaDoResumo.aberto_em)}, fechado {dataAmigavel(caixaDoResumo.fechado_em!)} às {hora(caixaDoResumo.fechado_em!)}.

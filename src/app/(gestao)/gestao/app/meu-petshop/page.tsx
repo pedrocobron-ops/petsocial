@@ -2,6 +2,7 @@
 
 import { abrirGuia } from "@/components/gestao/guia-inicial";
 import Identidade from "@/components/gestao/ajustes/identidade";
+import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
 import { useState } from "react";
 import { CalendarDays, Check, Clock, Copy, ExternalLink, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
@@ -72,6 +73,7 @@ export default function MeuPetshop() {
             <Servicos />
           </div>
         </div>
+        <CopiaSeguranca />
       </div>
     </>
   );
