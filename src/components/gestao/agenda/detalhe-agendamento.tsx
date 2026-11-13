@@ -12,6 +12,7 @@ import { brl, dataAmigavel, dataCompleta, dataLonga, fmtTelefone, hora, inicioDo
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { FolhaBaixa } from "../financeiro/comum";
+import { FidelidadeNoHorario } from "../fidelidade";
 import Comanda from "./comanda";
 import AntesDepois from "./antes-depois";
 
@@ -246,6 +247,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           ))}
           {a.pacote_cliente_id && <div className="g-fila entre"><span className="g-muted">Pagamento</span><b>Pelo pacote</b></div>}
           {a.leva_traz && <div className="g-fila"><Truck size={18} /><span>Leva e traz{a.endereco_leva_traz ? `: ${a.endereco_leva_traz}` : ""}</span></div>}
+          {tutor && <FidelidadeNoHorario clienteId={tutor.id} />}
           {a.obs && <p className="g-p">{a.obs}</p>}
         </div>
 
