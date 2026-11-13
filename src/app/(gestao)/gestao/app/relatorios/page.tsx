@@ -1,5 +1,6 @@
 "use client";
 
+import HotelNoRelatorio from "@/components/gestao/hotel/relatorio";
 import { useMemo, useState } from "react";
 import BlocoComissao, { type LinhaComissao } from "@/components/gestao/relatorios/comissao";
 import { ArrowDownRight, ArrowUpRight, CalendarDays, CircleCheck, Clock, CreditCard, Download, HandCoins, Home, Moon, PawPrint, Printer, Receipt, Scissors, Sun, TrendingUp, UserPlus, Users, UserX } from "lucide-react";
@@ -513,6 +514,7 @@ function Relatorios() {
                 </p>
               </section>
             )}
+            <HotelNoRelatorio de={de} ate={ate} antes={antes} />
 
             <RelatorioProdutos de={deIso} ate={ateIso} />
 

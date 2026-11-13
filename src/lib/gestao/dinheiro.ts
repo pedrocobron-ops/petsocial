@@ -358,3 +358,18 @@ export function separarMulta(forma: FormaPagamento, pagamentos: PartePagamento[]
   const fecha = (l: PartePagamento[]) => ({ forma: l.length ? formaPrincipal(l) : forma, pagamentos: l.length > 1 ? l : null });
   return { conta: fecha(c), multa: fecha(m) };
 }
+
+/* ---------- quitar de uma vez uma conta que estava em A receber ---------- */
+
+/**
+ * Quita inteira uma conta a receber, pelo mesmo caminho protegido de `receberConta` (o banco confere quem pode,
+ * põe no caixa aberto e mantém o histórico). Lança erro quando a conta já tinha sido baixada.
+ * Usada pela conta do hotel (sinal e pendências recebidas junto).
+ */
+export async function quitarConta(sb: Banco, petshopId: string, contaId: string, pg: { forma: FormaPagamento; pagamentos?: PartePagamento[] | null }) {
+  const c = await sb.from("lancamentos").select("id, valor, pago").eq("id", contaId).eq("petshop_id", petshopId).maybeSingle();
+  if (c.error) throw new Error(c.error.message);
+  if (!c.data || c.data.pago) throw new Error("Esta conta já tinha sido baixada.");
+  await receberConta(sb, contaId, { valor: Number(c.data.valor), forma: pg.forma, pagamentos: pg.pagamentos ?? null });
+  return c.data;
+}

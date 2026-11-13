@@ -61,10 +61,10 @@ type ComMenu = Parameters<typeof rotaForaDoMenu>[0];
  * O que o pet shop não marcou não some: vai para "Outras áreas", um grupo fechado no fim do menu.
  * Sem área principal (pet shops de antes), a ordem é a de sempre.
  */
-function montarMenu(petshop: ComMenu) {
+function montarMenu(petshop: ComMenu, semAgenda: boolean) {
   const principal = principalDe(petshop);
-  // quem escolheu a área principal e não faz banho e tosa não precisa da Agenda na frente
-  const fora = (i: Item) => rotaForaDoMenu(petshop, i.href) || (principal != null && i.href === AGENDA && !usaModulo(petshop, "banho_tosa"));
+  // quem não faz banho e tosa não precisa da Agenda na frente: com área principal escolhida, ou sem nenhum horário marcado até hoje
+  const fora = (i: Item) => rotaForaDoMenu(petshop, i.href) || (i.href === AGENDA && !usaModulo(petshop, "banho_tosa") && (principal != null || semAgenda));
   const rotulo = (i: Item): Item => (i.href === CASA && !fora(i) ? { ...i, rotulo: nomeDaCasa(petshop) } : i);
   const todos = GRUPOS.flatMap((g) => g.itens);
   const sobem = principal ? TELAS_DA_PRINCIPAL[principal].map((h) => todos.find((i) => i.href === h)!).filter((i) => !fora(i)) : [];
@@ -76,7 +76,10 @@ function montarMenu(petshop: ComMenu) {
     return { ...g, itens: [itens[0], ...sobem, ...areas, ...itens.slice(1).filter((i) => !areas.includes(i))].map(rotulo) };
   });
   // na barra de baixo do celular, a tela da área principal fica ao lado de Hoje
-  const aba = sobem[0] ? { ...sobem[0], rotulo: principal ? TELA_DA_AREA[principal].menu : sobem[0].rotulo } : todos.find((i) => i.href === AGENDA)!;
+  // sem Agenda no menu, o lugar dela na barra fica com a primeira tela de trabalho que o pet shop usa (creche e hotel, estoque…)
+  const agenda = todos.find((i) => i.href === AGENDA)!;
+  const semAgendaNoMenu = fora(agenda) ? [CASA, ESTOQUE, CAIXA].map((h) => todos.find((i) => i.href === h)!).find((i) => !fora(i)) : undefined;
+  const aba = sobem[0] ? { ...sobem[0], rotulo: principal ? TELA_DA_AREA[principal].menu : sobem[0].rotulo } : semAgendaNoMenu ? rotulo(semAgendaNoMenu) : agenda;
   return { grupos, outras: todos.filter(fora), aba };
 }
 
@@ -91,6 +94,18 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   const [admin, setAdmin] = useState(false);
   const [outrasAbertas, setOutrasAbertas] = useState(() => lerLembrado(CHAVE_OUTRAS) === "1");
   const abrirOutras = () => setOutrasAbertas((a) => { guardarLembrado(CHAVE_OUTRAS, a ? "0" : "1"); return !a; });
+
+  // pet shop que não faz banho e tosa e nunca marcou horário: a Agenda vai para "Outras áreas" (continua abrindo por lá)
+  const semBanho = !usaModulo(petshop, "banho_tosa");
+  const [semAgenda, setSemAgenda] = useState(false);
+  useEffect(() => {
+    if (!semBanho) { setSemAgenda(false); return; }
+    let vale = true;
+    const olhar = () => void sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).then((r) => { if (vale && !r.error) setSemAgenda((r.count ?? 0) === 0); });
+    olhar();
+    window.addEventListener(EVENTO_MUDOU, olhar);
+    return () => { vale = false; window.removeEventListener(EVENTO_MUDOU, olhar); };
+  }, [sb, petshop.id, semBanho]);
 
   // só a equipe Maestro Pet vê o item "Administrador" no menu
   useEffect(() => { let vale = true; void sb.rpc("sou_admin").then((r) => { if (vale) setAdmin(r.data === true); }); return () => { vale = false; }; }, [sb]);
@@ -138,7 +153,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   const podeRota = (href: string) => { const area = areaDaRota(href); return area ? posso(area) : true; };
   // as permissões de cada pessoa valem por cima da ordem do menu
   const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href));
-  const menu = montarMenu(petshop);
+  const menu = montarMenu(petshop, semAgenda);
   // tela aberta pelo endereço sem ter acesso: mostra o aviso no lugar da tela
   const soDeDono = ["/gestao/app/equipe", "/gestao/app/meu-petshop", "/gestao/app/assinatura", "/gestao/app/escola"].some((r) => caminho.startsWith(r));
   const semAcesso = (soDeDono && !souDono) || !podeRota(caminho);

@@ -274,8 +274,10 @@ async function planoDoCheckin(c: Contexto, e: Entrada) {
 
 async function planoDoCheckout(c: Contexto, e: Entrada) {
   const pet = await petPorId(c, e.pet_id);
-  const { data: estadia } = await c.sb.from("estadias").select("id, tipo, entrada, valor_diaria").eq("petshop_id", c.petshop.id).eq("pet_id", pet.id).eq("status", "em_casa").order("entrada", { ascending: false }).limit(1).maybeSingle();
+  const { data: estadia } = await c.sb.from("estadias").select("id, tipo, entrada, valor_diaria, sinal_estado").eq("petshop_id", c.petshop.id).eq("pet_id", pet.id).eq("status", "em_casa").order("entrada", { ascending: false }).limit(1).maybeSingle();
   exigir(estadia, `${pet.nome} não está na casa agora. Use ver_hospedes para ver quem está.`);
+  // estadia com sinal: a conta desconta o sinal, e isso só a tela faz
+  exigir(!estadia.sinal_estado, `A estadia de ${pet.nome} tem sinal na reserva. Faça o check-out pela tela Creche e hotel, que desconta o sinal da conta.`);
   const n = numero(e.diarias) ?? contarDiarias(c, estadia);
   exigir(Number.isInteger(n) && n >= 1, "diarias deve ser um número inteiro, a partir de 1.");
   // dinheiro só para quem vê o financeiro: sem acesso, o check-out só encerra a estadia (igual à tela)
