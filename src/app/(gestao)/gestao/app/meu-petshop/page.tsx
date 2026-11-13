@@ -9,6 +9,7 @@ import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capa
 import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
 import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
 import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { textoDoLink } from "@/lib/gestao/agenda";
 import { useState } from "react";
 import { CalendarDays, Check, Clock, Copy, ExternalLink, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
 import { Kpi, Tile } from "@/components/gestao/painel";
@@ -155,7 +156,7 @@ function LinkAgendamento() {
   const semServico = !servicos.some((s) => s.ativo && !["creche", "hotel"].includes(s.categoria));
   const semDia = !ORDEM_DIAS.some((d) => lerHorario(petshop.horario)[d]);
   const mudouAviso = aviso.trim() !== (petshop.link_aviso ?? "");
-  const zap = `https://wa.me/?text=${encodeURIComponent(`Agora dá para pedir horário no ${petshop.nome} pelo celular. Escolha o serviço, o dia e a hora, e a gente confirma por aqui: ${endereco}`)}`;
+  const zap = `https://wa.me/?text=${encodeURIComponent(textoDoLink(petshop, endereco))}`;
 
   async function ligar(valor: boolean) {
     if (somenteLeitura() || ligando) return;
@@ -395,7 +396,7 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
         <Campo rotulo="Nome"><input className="g-input" value={nome} maxLength={80} placeholder="Banho, Tosa higiênica…" autoFocus={!servico} onChange={(e) => setNome(e.target.value)} /></Campo>
         <Campo rotulo="Tipo">
           <select className="g-select" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-            {CATEGORIAS.map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
+            {CATEGORIAS.filter((c) => (c.id !== "creche" && c.id !== "hotel") || c.id === categoria || usaModulo(petshop, c.id)).map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
           </select>
         </Campo>
         <div className="g-campo">

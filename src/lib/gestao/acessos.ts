@@ -1,4 +1,5 @@
 import type { Profissional } from "./tipos";
+import { rotaForaDoMenu, usaCasa } from "./modulos";
 
 /**
  * Áreas do aplicativo que o dono libera para cada pessoa com login.
@@ -29,7 +30,14 @@ export const PERFIS = [
   { id: "gerente", funcao: "Gerente", titulo: "Gerente", apoio: "Abre todas as áreas. Só não mexe na equipe, nos ajustes do pet shop e na assinatura.", areas: TODAS, socio: false },
   { id: "socio", funcao: "Sócio", titulo: "Sócio (outro dono)", apoio: "Acesso a tudo, igual a você: equipe, ajustes e assinatura.", areas: TODAS, socio: true },
   { id: "atendimento", funcao: "Banhista e tosador(a)", titulo: "Banhista ou tosador(a)", apoio: "Vê a agenda e as fichas dos pets. Não vê dinheiro.", areas: ["agenda", "clientes"] as Area[], socio: false },
+  { id: "monitor", funcao: "Monitor(a) de creche", titulo: "Monitor(a) de creche", apoio: "Faz a chamada, o check-in e o check-out e vê as fichas dos pets. Não vê dinheiro.", areas: ["clientes", "creche_hotel"] as Area[], socio: false },
 ] as const;
+
+type ComModulos = { modulos?: string[] | null };
+/** Os perfis prontos que fazem sentido para o pet shop: monitor(a) de creche só aparece para quem tem creche ou hotel. */
+export const perfisPara = (petshop: ComModulos) => PERFIS.filter((p) => p.id !== "monitor" || usaCasa(petshop));
+/** As áreas que viram chave na tela da equipe: as de módulos que o pet shop não usa ficam de fora (como no menu). */
+export const areasPara = (petshop: ComModulos) => AREAS.filter((a) => !rotaForaDoMenu(petshop, a.rota));
 
 /** As áreas que a pessoa abre, valendo o que foi marcado ou, se nada foi marcado, o padrão do papel. */
 export function areasDe(p: Pick<Profissional, "papel" | "ve_financeiro" | "acessos">): Area[] {

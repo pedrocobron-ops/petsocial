@@ -7,6 +7,7 @@ import { textoComprovante } from "@/lib/gestao/comprovante";
 import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
 import { brl, dataCompleta, hora, isoDia, linkWhatsApp, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
+import { usaModulo } from "@/lib/gestao/modulos";
 import { Tile } from "../painel";
 import { AvatarPet, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "../ui";
 import {
@@ -23,6 +24,8 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
   agendamento: AgendamentoCompleto; aoFechar: () => void; aoPronto: () => void;
 }) {
   const { sb, petshop, user, vejoFinanceiro } = useGestao();
+  // quem não vende produtos não vê a busca do estoque: fica só o "Outro extra"
+  const vendeProdutos = usaModulo(petshop, "loja");
   const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const { produtos, carregando, erro } = useProdutosDaLoja();
@@ -161,8 +164,8 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
         </div>
 
         <div className="g-campo">
-          <span>Levou mais alguma coisa?</span>
-          <BuscaProduto produtos={produtos} carregando={carregando} erro={erro} itens={itens} aoEscolher={(p) => setItens((l) => comProduto(l, p))} />
+          <span>{vendeProdutos ? "Levou mais alguma coisa?" : "Tem mais alguma coisa na conta?"}</span>
+          {vendeProdutos && <BuscaProduto produtos={produtos} carregando={carregando} erro={erro} itens={itens} aoEscolher={(p) => setItens((l) => comProduto(l, p))} />}
           <div className="g-chips g-vd-chips">
             {a.leva_traz && !temLevaTraz && <button type="button" className="g-chip" onClick={() => extra(LEVA_E_TRAZ)}><Truck />{LEVA_E_TRAZ}</button>}
             <button type="button" className="g-chip" onClick={() => extra("")}><Plus />Outro extra</button>

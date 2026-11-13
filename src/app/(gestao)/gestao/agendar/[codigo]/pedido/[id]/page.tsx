@@ -15,7 +15,7 @@ type Item = { pet: string; servico: string | null; dia: string; hora: string; st
 type Pedido = { logo?: string | null; tema?: string | null; petshop: string; telefone: string | null; codigo: string; tutor: string; itens: Item[] };
 
 const TEXTO: Record<Situacao, { rotulo: string; tom: string }> = {
-  pendente: { rotulo: "Aguardando o pet shop", tom: "amarelo" },
+  pendente: { rotulo: "Aguardando a confirmação", tom: "amarelo" },
   aceito: { rotulo: "Confirmado", tom: "verde" },
   recusado: { rotulo: "Não deu neste horário", tom: "vermelho" },
   cancelado: { rotulo: "Cancelado", tom: "vermelho" },
@@ -60,7 +60,7 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
   const soEstadia = itens.length > 0 && itens.every(ehEstadia);
   const umaEstadia = itens.find(ehEstadia);
   const oPedido = soEstadia ? `um pedido de vaga ${umaEstadia?.tipo === "hotel" ? "no hotel" : "na creche"}` : "um pedido de horário";
-  const zap = pedido ? linkWhatsApp(pedido.telefone, `Oi! Fiz ${oPedido} pelo link do ${pedido.petshop} e queria falar sobre ele.`) : null;
+  const zap = pedido ? linkWhatsApp(pedido.telefone, `Oi! Fiz ${oPedido} pelo link e queria falar sobre ele.`) : null;
 
   return (
     <main className="g-lkp">
@@ -77,11 +77,11 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
             <section className={`g-card g-lkp-cartao ${geral}`}>
               <span className={`g-lkp-selo ${geral}`}>{geral === "aguardando" ? <Hourglass /> : geral === "recusado" ? <CalendarX /> : <CalendarCheck />}</span>
               <p className="g-lkp-loja"><LogoLoja nome={pedido.petshop} logo={pedido.logo} tamanho={28} /><span className="g-rotulo">{pedido.petshop}</span></p>
-              <h1>{geral === "aguardando" ? `${pedido.tutor}, seu pedido chegou.` : geral === "confirmado" ? "Está confirmado!" : geral === "recusado" ? (soEstadia ? "Não temos vaga nessas datas." : "Não deu neste horário.") : "O pet shop respondeu."}</h1>
+              <h1>{geral === "aguardando" ? `${pedido.tutor}, seu pedido chegou.` : geral === "confirmado" ? "Está confirmado!" : geral === "recusado" ? (soEstadia ? "Não temos vaga nessas datas." : "Não deu neste horário.") : `${pedido.petshop} respondeu.`}</h1>
               <p className="g-muted">
-                {geral === "aguardando" ? "O pet shop ainda vai confirmar. Esta página atualiza sozinha; pode deixar aberta ou voltar depois."
-                  : geral === "confirmado" ? (soEstadia ? "O pet shop confirmou a vaga. É só trazer no dia combinado." : "O pet shop confirmou. É só aparecer no dia e na hora.")
-                  : geral === "recusado" ? (soEstadia ? "O pet shop não tem vaga nesse período. Escolha outras datas." : "O pet shop não consegue atender nesse horário. Escolha outro dia ou hora.")
+                {geral === "aguardando" ? `${pedido.petshop} ainda vai confirmar. Esta página atualiza sozinha; pode deixar aberta ou voltar depois.`
+                  : geral === "confirmado" ? (soEstadia ? `${pedido.petshop} confirmou a vaga. É só trazer no dia combinado.` : `${pedido.petshop} confirmou. É só aparecer no dia e na hora.`)
+                  : geral === "recusado" ? (soEstadia ? `${pedido.petshop} não tem vaga nesse período. Escolha outras datas.` : `${pedido.petshop} não consegue atender nesse horário. Escolha outro dia ou hora.`)
                   : "Veja abaixo a situação de cada pet."}
               </p>
               <ul className="g-lkp-itens">
@@ -101,10 +101,10 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
               <div className="g-lkp-acoes">
                 {algumRecusado && <Link className="g-btn pri" href={`/gestao/agendar/${pedido.codigo}`}>{soEstadia ? "Escolher outras datas" : "Escolher outro horário"}</Link>}
                 {aguardando && <button className="g-btn sec" onClick={() => void buscar()} disabled={atualizando}><RefreshCw />{atualizando ? "Atualizando…" : "Atualizar"}</button>}
-                {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com o pet shop</a>}
+                {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {pedido.petshop}</a>}
               </div>
             </section>
-            {!algumRecusado && <p className="g-lkp-nota">Precisa mudar ou cancelar? Fale com o pet shop pelo WhatsApp.</p>}
+            {!algumRecusado && <p className="g-lkp-nota">Precisa mudar ou cancelar? Fale com {pedido.petshop} pelo WhatsApp.</p>}
           </>
         )}
         <p className="g-lkp-pe"><Marca tamanho={16} /> Feito com Maestro Pet Gestão · <Link href="/gestao/privacidade">Privacidade</Link></p>

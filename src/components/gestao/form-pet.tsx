@@ -7,6 +7,7 @@ import { PORTES } from "@/lib/gestao/tipos";
 import { ERRO_TELEFONE, isoDia, mascaraTelefone, semAcento, telefoneLimpo, telefoneValido } from "@/lib/gestao/util";
 import { reduzirFoto } from "@/lib/gestao/foto";
 import { useGestao } from "./contexto";
+import { usaModulo } from "@/lib/gestao/modulos";
 import { AvatarPet, Campo, Folha, ok, useAvisos } from "./ui";
 import { FolhaMesmaPessoa, acharTutorIgual, useTutores, type TutorCurto } from "./clientes/juntar";
 
@@ -19,6 +20,8 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
   aoFechar: () => void; aoSalvar: (pet: PetComTutor) => void;
 }) {
   const { sb, petshop } = useGestao();
+  // sem banho e tosa, a tela não fala de preço do banho nem de secador
+  const comBanho = usaModulo(petshop, "banho_tosa");
   const { avisar, avisarErro } = useAvisos();
   const [nome, setNome] = useState(pet?.nome ?? nomeInicial ?? "");
   const [especie, setEspecie] = useState(pet?.especie ?? "cao");
@@ -166,7 +169,8 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
             <button type="button" className="g-chip" aria-pressed={!porte && naoSeiPorte} onClick={() => { setPorte(""); setNaoSeiPorte(true); setErroPorte(null); }}>Não sei ainda</button>
           </div>
           {erroPorte ? <small className="erro" role="alert">{erroPorte}</small>
-            : <small>{!porte && naoSeiPorte ? "Fica em branco por enquanto. Na hora de marcar um horário, o sistema pergunta de novo." : "O porte define o preço do banho."}</small>}
+            : !porte && naoSeiPorte ? <small>{comBanho ? "Fica em branco por enquanto. Na hora de marcar um horário, o sistema pergunta de novo." : "Fica em branco por enquanto. Dá para preencher depois, na ficha do pet."}</small>
+            : comBanho ? <small>O porte define o preço do banho.</small> : null}
         </div>
         <div className="dupla">
           <Campo rotulo="Raça"><input className="g-input" value={raca} maxLength={60} onChange={(e) => setRaca(e.target.value)} /></Campo>
@@ -178,7 +182,7 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
           <input className="g-input" type="date" max={hoje} value={nascimento} aria-invalid={!!erroNasc}
             onChange={(e) => { setNascimento(e.target.value); setErroNasc(e.target.value && e.target.value > hoje ? "O nascimento não pode ser depois de hoje." : null); }} />
         </Campo>
-        <Campo rotulo="Cuidados e alertas" dica="Aparece em destaque na agenda. Ex.: alergia a shampoo, medo de secador, morde.">
+        <Campo rotulo="Cuidados e alertas" dica={comBanho ? "Aparece em destaque na agenda. Ex.: alergia a shampoo, medo de secador, morde." : "Aparece em destaque junto do nome do pet. Ex.: alergia, briga com outros cães, foge no portão."}>
           <textarea className="g-textarea" value={alertas} maxLength={400} onChange={(e) => setAlertas(e.target.value)} />
         </Campo>
         <Campo rotulo="Observações"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} /></Campo>

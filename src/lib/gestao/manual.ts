@@ -1,3 +1,5 @@
+import { nomeDaCasa, principalDe, usaCasa, usaModulo } from "./modulos";
+
 /**
  * Manual do Maestro Pet Gestão, em dados. É a única fonte:
  * - da tela Manual (/gestao/app/manual),
@@ -6,6 +8,10 @@
  * Mudou uma tela ou o nome de um botão? Atualize o tópico aqui.
  *
  * Regras de escrita: cada passo é uma ação só, com o nome do botão igual ao da tela. Quem lê não é bom de computador.
+ * - Botão se chama pelo nome, nunca pela cor: cada pet shop escolhe as próprias cores.
+ * - Passo que só existe com mais de uma pessoa na equipe ou mais de uma área leva "se aparecer".
+ * - O que o sistema NÃO faz também tem tópico (seção "limites"), para a busca e a Ajuda responderem com franqueza.
+ * - `usa` diz de que parte do negócio o tópico depende: quem não usa creche não vê os tópicos da creche.
  */
 
 export const SECOES = [
@@ -14,20 +20,31 @@ export const SECOES = [
   { id: "clientes", titulo: "Clientes e pets", apoio: "Fichas, tutores, saúde e planilhas." },
   { id: "creche", titulo: "Creche e hotel", apoio: "Reservas, check-in, check-out e vagas." },
   { id: "dinheiro", titulo: "Dinheiro", apoio: "Receber, caixa, contas e relatórios." },
-  { id: "estoque", titulo: "Estoque e pacotes", apoio: "Produtos, venda no balcão e pacotes de banho." },
+  { id: "estoque", titulo: "Estoque e pacotes", apoio: "Produtos, venda no balcão, pacotes e planos." },
   { id: "equipe", titulo: "Equipe", apoio: "Quem trabalha com você e o que cada um abre." },
   { id: "divulgacao", titulo: "Divulgação e relacionamento", apoio: "Link do cliente, lembretes e clientes de volta." },
   { id: "ajustes", titulo: "Ajustes e conta", apoio: "Preços, horário, cópia de segurança e assinatura." },
+  { id: "limites", titulo: "O que o sistema não faz", apoio: "Para você não procurar o que não existe." },
 ] as const;
 
 export type SecaoId = (typeof SECOES)[number]["id"];
-/** Quem consegue fazer: qualquer pessoa da equipe, quem tem área de dinheiro liberada, ou só o dono e os sócios. */
-export type Quem = "todos" | "financeiro" | "dono";
-export const QUEM: Record<Quem, { rotulo: string; tom: "verde" | "azul" | "laranja" }> = {
+/**
+ * Quem consegue fazer: qualquer pessoa da equipe; quem recebe (área Caixa, Financeiro ou Relatórios);
+ * quem vê todo o dinheiro (Financeiro ou Relatórios); ou só o dono e os sócios.
+ */
+export type Quem = "todos" | "caixa" | "financeiro" | "dono";
+export const QUEM: Record<Quem, { rotulo: string; tom: "verde" | "azul" | "laranja" | "amarelo" }> = {
   todos: { rotulo: "Todos", tom: "verde" },
+  caixa: { rotulo: "Quem cuida do caixa", tom: "amarelo" },
   financeiro: { rotulo: "Quem vê o financeiro", tom: "azul" },
   dono: { rotulo: "Só o dono", tom: "laranja" },
 };
+
+/** Parte do negócio de que um tópico (ou um passo) depende. "casa" = creche ou hotel. */
+export type Uso = "banho" | "creche" | "hotel" | "casa" | "loja" | "pacotes";
+type ComModulos = { modulos?: string[] | null; principal?: string | null };
+/** Um passo comum, ou um passo que só vale para quem usa certa parte do negócio. */
+type Passo = string | { so: Uso[]; texto: string };
 
 type TopicoBase = {
   id: string;
@@ -39,14 +56,20 @@ type TopicoBase = {
   rota: string | null;
   /** Outras telas em que o tópico também aparece no botão "Como usar esta tela". */
   tambem?: string[];
+  /** Só aparece para o pet shop que usa alguma destas partes. Sem isso, aparece para todos. */
+  usa?: Uso[];
   /** Uma ação por passo, na ordem. */
-  passos: string[];
-  dicas?: string[];
-  atencao?: string[];
+  passos: Passo[];
+  dicas?: Passo[];
+  atencao?: Passo[];
   /** Palavras da busca, sem acento. */
   palavras: string[];
 };
-export type Topico = TopicoBase & { /** Texto corrido que a Ajuda responde: os passos numerados e os avisos. */ resposta: string };
+export type Topico = Omit<TopicoBase, "passos" | "dicas" | "atencao"> & {
+  passos: string[]; dicas?: string[]; atencao?: string[];
+  /** Texto corrido que a Ajuda responde: os passos numerados e os avisos. */
+  resposta: string;
+};
 
 const HOJE = "/gestao/app";
 const AGENDA = "/gestao/app/agenda";
@@ -73,21 +96,25 @@ const BASE: TopicoBase[] = [
       "Na quarta, toque em Escolher a imagem para colocar a sua logo e em Continuar.",
       "Cor e logo podem ficar para depois: toque em Faço depois em cada uma, ou em Com pressa? Pular a cor e a logo.",
       "Em seguida abre um guia curto, com um assunto por passo: horário, equipe e vagas, serviços e preços, diária e vagas da creche e do hotel, link do cliente. Só aparecem os passos do que você marcou.",
+      "No horário, toque em uma semana pronta, como Segunda a sexta ou Terça a sábado, e acerte as horas. Se vocês fecham para almoçar, marque Fecha para o almoço?.",
       "Em cada passo, toque em Continuar para gravar ou em Faço depois para pular.",
       "Nos preços, escolha Um preço só para usar o mesmo valor em todos os portes, ou Por porte para separar.",
-      "No fim, escolha Cadastrar o primeiro pet ou Trazer meus clientes de uma planilha.",
+      "No fim, escolha Cadastrar o primeiro pet (já abre a ficha para preencher) ou Trazer meus clientes de uma planilha.",
     ],
     dicas: ["A área principal aparece primeiro no menu e na tela inicial. O que você não marcou fica em Outras áreas, no fim do menu.", "Tudo o que você respondeu pode ser mudado depois em Meu pet shop: o cartão O que você usa troca as áreas e a área principal, e o cartão Identidade do pet shop troca a logo e as cores.", "Para passar pelo guia de novo, abra Meu pet shop e toque em Refazer o guia de configuração.", "Na tela Hoje, o cartão Primeiros passos mostra o que falta fazer. Um toque leva direto ao lugar."],
     palavras: ["guia", "configurar", "configuracao", "primeiro acesso", "primeira vez", "comecar", "primeiros passos", "por onde comeco", "boas-vindas", "boas vindas", "atividade principal"] },
   { id: "tela-hoje", titulo: "Como ler a tela Hoje", secao: "primeiros", quem: "todos", rota: HOJE,
     passos: [
       "Abra Hoje: é a primeira tela do sistema.",
-      "No alto fica o resumo do dia, com o próximo atendimento.",
-      "Em Agenda de hoje, toque em um horário para abrir, concluir ou remarcar.",
-      "Em Pede a sua atenção, toque em cada linha para resolver: lembretes de amanhã, clientes sumidos, aniversários, produto acabando e contas vencendo.",
-      "Para marcar, toque em Marcar horário, o botão laranja.",
+      "No alto, ao lado do seu nome, fica o botão do que o pet shop mais faz: Marcar horário, Fazer check-in, Nova reserva ou Vender. Ele muda conforme a área principal.",
+      "Logo abaixo, o Mozart resume o dia em uma frase.",
+      { so: ["banho"], texto: "O cartão ao lado mostra o Próximo atendimento. Toque nele para abrir o horário." },
+      { so: ["casa"], texto: "Quem tem creche ou hotel vê quantos pets estão na casa agora, quem chega e quem sai hoje." },
+      { so: ["loja"], texto: "Quem tem a loja como área principal vê os produtos acabando." },
+      { so: ["banho"], texto: "Em Agenda de hoje, toque em um horário para abrir, concluir ou remarcar." },
+      "Em Pede a sua atenção, toque em cada linha para resolver: lembretes de amanhã, clientes sumidos, aniversários, produto acabando, contas vencendo e, na creche, a chamada e as mensalidades.",
     ],
-    dicas: ["Se o pet shop escolheu uma área principal, ela vem na frente: creche e hotel mostram os pets na casa agora, quem chega e quem sai hoje, com o botão Fazer check-in ou Nova reserva; a loja mostra os produtos acabando, com o botão Vender.", "Valores em dinheiro só aparecem para quem vê o financeiro.", "Pedidos que chegaram pelo link de agendamento aparecem em destaque, com Aceitar e Recusar."],
+    dicas: ["Só aparece o que o pet shop usa e o que o dono liberou para você.", "Valores em dinheiro só aparecem para quem cuida do caixa ou do financeiro.", "Pedidos que chegaram pelo link de agendamento aparecem em destaque, com Aceitar e Recusar."],
     palavras: ["hoje", "tela inicial", "inicio", "resumo do dia", "pede a sua atencao", "painel"] },
   { id: "menu", titulo: "Como achar as telas no menu", secao: "primeiros", quem: "todos", rota: HOJE,
     passos: [
@@ -109,7 +136,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "Ele também cadastra pet, bloqueia horário, faz check-in e check-out, vende e usa pacote, anota vacina, abre e fecha o caixa e prepara mensagens de WhatsApp.",
-      "Perguntas sobre dinheiro só funcionam para quem vê o financeiro.",
+      "Perguntas sobre dinheiro só funcionam para quem vê o financeiro (dono, ou quem tem Financeiro ou Relatórios).",
       "Se o microfone não funcionar, libere a permissão no navegador ou use o microfone do teclado.",
     ],
     palavras: ["mozart", "assistente", "voz", "audio", "microfone", "falar", "ditado", "ia", "inteligencia artificial", "o que posso pedir"] },
@@ -151,67 +178,82 @@ const BASE: TopicoBase[] = [
     palavras: ["so para consulta", "nao consigo marcar", "nao deixa salvar", "bloqueado", "teste terminou", "teste acabou", "inativa", "travou"] },
 
   /* ---------- Agenda ---------- */
-  { id: "marcar", titulo: "Como marcar um horário", secao: "agenda", quem: "todos", rota: AGENDA, tambem: [HOJE],
+  { id: "marcar", titulo: "Como marcar um horário", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA, tambem: [HOJE],
     passos: [
-      "Toque em Marcar horário, o botão laranja na tela Hoje ou na Agenda.",
+      "Toque em Marcar horário, na tela Hoje ou na Agenda.",
       "Escolha o pet. Se ele ainda não tem ficha, toque em Cadastrar pet novo.",
-      "Escolha o serviço e quem atende.",
-      "Escolha o dia e toque em um dos horários livres.",
-      "Confira o valor. Se quiser, marque Leva e traz e escreva uma observação.",
+      "Escolha o Serviço. Se aparecer Quem atende, escolha a pessoa (com uma pessoa só na equipe, o campo não aparece).",
+      "Escolha o Dia e toque em um dos horários livres.",
+      "Confira o Valor. Se quiser, marque Leva e traz e escreva uma Observação.",
       "Toque em Marcar.",
     ],
-    dicas: ["Se o horário estiver ocupado, bloqueado ou fora do funcionamento, o sistema avisa e pergunta se é para marcar mesmo assim.", "Pelo Mozart: \"marca banho da Mel sexta às 10h\"."],
+    dicas: [
+      "Se o horário estiver ocupado, bloqueado, no almoço ou fora do funcionamento, o sistema avisa e pergunta se é para marcar mesmo assim.",
+      "Em dia que o pet shop não abre, a tela só avisa que está fora do horário de funcionamento. Se for atender mesmo assim, é só marcar.",
+      "Pet sem porte na ficha: o sistema usa o primeiro preço do serviço e avisa para conferir o valor.",
+      "Pelo Mozart: \"marca banho da Mel sexta às 10h\".",
+    ],
     palavras: ["marcar", "agendar", "agendamento", "marcar horario", "marcar um horario", "banho", "tosa", "novo horario", "encaixe"] },
-  { id: "repetir", titulo: "Como marcar um horário que se repete", secao: "agenda", quem: "todos", rota: AGENDA,
+  { id: "repetir", titulo: "Como marcar um horário que se repete", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA,
     passos: [
       "Comece a marcar o horário normalmente: pet, serviço, dia e hora.",
       "No campo Repetir, escolha de quanto em quanto tempo o pet volta.",
-      "Em Por quantas vezes, escolha o número de horários.",
-      "Confira a lista de datas. Nas Datas com aviso, decida entre pular ou marcar mesmo assim.",
+      "Em Por quantas vezes, escolha o número de horários: de 2 até 26.",
+      "Confira até que dia a repetição vai: a data aparece logo abaixo.",
+      "Nas Datas com aviso, decida entre pular ou marcar mesmo assim.",
       "Toque em Marcar.",
     ],
-    dicas: ["Todos os horários da série ficam com o mesmo serviço, valor e observação.", "Para desmarcar depois, o sistema pergunta se é só aquele dia ou aquele e os próximos."],
-    palavras: ["repetir", "repete", "se repete", "horario que se repete", "toda semana", "quinzenal", "recorrente", "fixo", "serie", "cliente fixo"] },
-  { id: "ver-agenda", titulo: "Como ver a agenda do dia, da semana e de cada pessoa", secao: "agenda", quem: "todos", rota: AGENDA,
+    dicas: ["Todos os horários da série ficam com o mesmo serviço, valor e observação.", "Não existe repetição sem fim. Perto da última data, marque de novo.", "Para desmarcar depois, o sistema pergunta se é só aquele dia ou aquele e os próximos."],
+    palavras: ["repetir", "repete", "se repete", "horario que se repete", "toda semana", "quinzenal", "recorrente", "fixo", "serie", "cliente fixo", "banho toda semana"] },
+  { id: "ver-agenda", titulo: "Como ver a agenda do dia, da semana e de cada pessoa", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA,
     passos: [
       "Abra Agenda.",
       "Toque em um dia da semana, no alto, para ver os horários daquele dia.",
       "Use as setas para ir para a semana anterior ou a próxima. Voltar para hoje traz o dia de hoje de volta.",
-      "Se mais de uma pessoa atende, toque no nome dela para ver só os horários dela. Todos mostra a agenda inteira.",
-      "No computador, escolha entre Dia e Semana no alto da tela.",
+      "Se aparecerem os nomes da equipe no alto, toque em um nome para ver só os horários daquela pessoa. Todos mostra a agenda inteira.",
+      "No computador, escolha entre Dia e Semana no alto da tela. No celular, a agenda mostra um dia por vez.",
     ],
-    dicas: ["O Resumo do dia mostra quantos foram concluídos, quantos faltam atender e os cancelados ou faltas."],
+    dicas: ["No computador, o Resumo do dia fica ao lado da agenda: quantos foram concluídos, quantos faltam atender e os cancelados ou faltas."],
     palavras: ["ver agenda", "ver a agenda", "agenda da semana", "agenda do dia", "agenda de alguem", "agenda de cada", "outro dia", "proxima semana"] },
-  { id: "atender", titulo: "Como acompanhar o atendimento do pet", secao: "agenda", quem: "todos", rota: AGENDA, tambem: [HOJE],
+  { id: "atender", titulo: "Como acompanhar o atendimento do pet", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA, tambem: [HOJE],
     passos: [
       "Toque no horário do pet, na Agenda ou na tela Hoje.",
       "Quando o tutor confirmar que vem, toque em Cliente confirmou.",
       "Quando o pet chegar, toque em Chegou: iniciar atendimento.",
       "Em Como o pet chegou, marque o que você reparou no pet.",
-      "Quando terminar, toque em Fechar a conta para receber. Quem não vê o financeiro toca em Concluir atendimento.",
+      "Quando terminar, toque em Fechar a conta para receber. Quem não cuida do caixa toca em Concluir atendimento.",
+      "Se o pet tem pacote para o serviço, o primeiro botão é Concluir usando o pacote (sem cobrar).",
     ],
     dicas: ["Ver ficha abre a ficha do pet, com alertas e histórico."],
     palavras: ["atendimento", "chegou", "iniciar", "confirmou", "confirmar", "concluir", "em atendimento", "como o pet chegou", "checklist"] },
-  { id: "remarcar", titulo: "Como remarcar, desmarcar ou marcar falta", secao: "agenda", quem: "todos", rota: AGENDA, tambem: [HOJE],
+  { id: "remarcar", titulo: "Como remarcar, desmarcar ou marcar falta", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA, tambem: [HOJE],
     passos: [
       "Toque no horário, na Agenda ou na tela Hoje.",
       "Para mudar dia, hora, serviço ou valor, toque em Remarcar ou alterar, mude o que precisa e toque em Salvar.",
       "Se o cliente avisou que não vem, toque em Desmarcar horário.",
       "Se o cliente não apareceu, toque em Faltou.",
     ],
-    dicas: ["O horário desmarcado ou com falta continua aparecendo no dia e no histórico do pet.", "Se o horário faz parte de uma série, o sistema pergunta: Desmarcar só este ou Desmarcar este e os próximos."],
-    atencao: ["Atendimento já concluído só pode ser mudado ou apagado por quem cuida do financeiro."],
+    dicas: [
+      "Tocou em Faltou sem querer? O aviso que aparece embaixo tem o botão Desfazer. Depois que ele some, abra o horário e toque em Voltar para marcado.",
+      "O horário desmarcado ou com falta continua aparecendo no dia e no histórico do pet.",
+      "Se o horário faz parte de uma série, o sistema pergunta: Desmarcar só este ou Desmarcar este e os próximos.",
+    ],
+    atencao: ["Atendimento já concluído tem regra própria. Sem dinheiro lançado, quem cuida do caixa pode reabrir, alterar ou apagar. Com pagamento, conta a receber ou pacote usado, só o dono ou quem vê o financeiro. Com o pagamento em um caixa já fechado, só o dono."],
     palavras: ["remarcar", "remarco", "cancelar", "cancelo", "cancelou", "desmarco", "desmarcou", "cancelar horario", "cancelar um horario", "cancelar o horario", "desmarcar", "falta", "faltou", "mudar horario", "trocar horario", "editar horario", "alterar horario", "nao veio"] },
-  { id: "desfazer", titulo: "Como desfazer um horário desmarcado ou uma falta", secao: "agenda", quem: "todos", rota: AGENDA,
+  { id: "desfazer", titulo: "Como desfazer um horário desmarcado, uma falta ou um atendimento concluído", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA,
     passos: [
       "Na Agenda, vá até o dia do horário.",
-      "Toque no horário que ficou como desmarcado ou com falta. Ele continua aparecendo no dia.",
+      "Toque no horário que ficou como desmarcado, com falta ou concluído. Ele continua aparecendo no dia.",
       "Toque em Voltar para marcado.",
+      "Se o atendimento já tinha pagamento, o sistema explica o que acontece com o dinheiro e pede para confirmar.",
     ],
-    dicas: ["O horário volta ao normal, com o mesmo pet, serviço e hora."],
-    atencao: ["Horário apagado pelo botão Apagar da agenda não volta: precisa ser marcado de novo."],
-    palavras: ["desfazer", "apertei errado", "cliquei errado", "toquei errado", "sem querer", "cancelei errado", "cancelei sem querer", "como volta", "voltar para marcado", "voltar o horario", "recuperar horario", "descancelar", "reabrir", "desfazer cancelamento", "desfazer falta"] },
-  { id: "apagar-horario", titulo: "Como apagar um horário da agenda", secao: "agenda", quem: "todos", rota: AGENDA,
+    dicas: ["O horário volta ao normal, com o mesmo pet, serviço e hora.", "Ao reabrir um atendimento pago, o pagamento continua registrado no caixa e no financeiro."],
+    atencao: [
+      "Reabrir atendimento com pagamento é só para o dono ou quem vê o financeiro. Se o pagamento está em um caixa já fechado, só o dono. Para os outros, o botão não aparece e a tela diz por quê.",
+      "Horário apagado pelo botão Apagar da agenda não volta: precisa ser marcado de novo.",
+    ],
+    palavras: ["desfazer", "apertei errado", "cliquei errado", "toquei errado", "sem querer", "cancelei errado", "cancelei sem querer", "como volta", "voltar para marcado", "voltar o horario", "recuperar horario", "descancelar", "reabrir", "desfazer cancelamento", "desfazer falta", "conclui errado"] },
+  { id: "apagar-horario", titulo: "Como apagar um horário da agenda", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA,
     passos: [
       "Toque no horário.",
       "Toque em Apagar da agenda, no fim da janela.",
@@ -220,26 +262,30 @@ const BASE: TopicoBase[] = [
     dicas: ["Se o cliente só desmarcou, prefira Desmarcar horário: assim fica no histórico."],
     atencao: ["Se o horário já foi pago ou tem conta a receber, o sistema pergunta o que fazer com o dinheiro antes de apagar. Leia com calma."],
     palavras: ["apagar horario", "apagar um horario", "apagar o horario", "apagar da agenda", "excluir horario", "lixeira", "remover horario", "marquei errado", "horario duplicado"] },
-  { id: "bloquear", titulo: "Como bloquear um horário (almoço, folga, feriado)", secao: "agenda", quem: "todos", rota: AGENDA,
+  { id: "bloquear", titulo: "Como bloquear um horário (folga, feriado, compromisso)", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA,
     passos: [
       "Na Agenda, toque em Bloquear horário.",
-      "Escolha o dia e as horas, ou marque Dia inteiro.",
-      "Em Para quem, escolha Pet shop inteiro ou uma pessoa.",
-      "Escolha o motivo ou escreva o seu.",
-      "Se o bloqueio se repete, marque a opção de repetir e escolha por quantas semanas.",
+      "Escolha o Dia e as horas, ou marque Dia inteiro.",
+      "Se aparecer Para quem, escolha Pet shop inteiro ou uma pessoa (com uma pessoa só na equipe, o campo não aparece).",
+      "Escolha o Motivo ou escreva o seu.",
+      "Se o bloqueio se repete, marque a opção de repetir e escolha Por quantas semanas: de 1 a 8.",
       "Toque em Bloquear.",
     ],
-    dicas: ["Para mudar ou tirar um bloqueio, toque nele na agenda. Se ele se repete, o sistema pergunta: Só este ou Este e os próximos."],
+    dicas: [
+      "Fecha para o almoço todo dia? Não bloqueie a agenda: o dono abre Meu pet shop e, no cartão Horário de funcionamento, marca Fecha para o almoço?. Vale toda semana, sem prazo para acabar.",
+      "Para mudar ou tirar um bloqueio, toque nele na agenda. Se ele se repete, o sistema pergunta: Só este ou Este e os próximos.",
+    ],
+    atencao: ["O bloqueio que se repete vale por até 8 semanas. Depois disso, é preciso bloquear de novo."],
     palavras: ["bloquear", "bloqueio", "almoco", "folga", "feriado", "fechar agenda", "nao atender", "ferias", "manutencao"] },
-  { id: "pronto", titulo: "Como avisar o tutor que o pet está pronto", secao: "agenda", quem: "todos", rota: AGENDA, tambem: [HOJE],
+  { id: "pronto", titulo: "Como avisar o tutor que o atendimento terminou", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA, tambem: [HOJE],
     passos: [
       "Toque no horário do pet, depois que o atendimento de hoje começou ou terminou.",
-      "Toque em Avisar que está pronto.",
+      "Toque em Avisar que terminou.",
       "O WhatsApp abre com a mensagem escrita. Toque em enviar.",
     ],
-    dicas: ["A agenda mostra a hora em que o tutor foi avisado.", "O botão só aparece se o tutor tem telefone na ficha."],
-    palavras: ["pronto", "esta pronto", "buscar", "avisar tutor", "terminou", "pode buscar"] },
-  { id: "fotos", titulo: "Como mandar fotos de antes e depois", secao: "agenda", quem: "todos", rota: AGENDA, tambem: [HOJE],
+    dicas: ["Depois de avisar, o botão passa a mostrar a hora: Avisado às, com o horário.", "O botão só aparece se o tutor tem telefone na ficha."],
+    palavras: ["pronto", "esta pronto", "buscar", "avisar tutor", "terminou", "pode buscar", "avisar que terminou", "pet pronto"] },
+  { id: "fotos", titulo: "Como mandar fotos de antes e depois", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA, tambem: [HOJE],
     passos: [
       "Toque no horário do pet.",
       "No bloco Antes e depois, toque no quadro Antes e tire ou escolha a foto.",
@@ -248,7 +294,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["No celular abre o compartilhamento com as fotos. No computador abre o WhatsApp do tutor com a mensagem.", "Para trocar uma foto, toque nela."],
     palavras: ["foto", "fotos", "antes e depois", "antes", "depois", "enviar foto", "mandar foto"] },
-  { id: "imprimir", titulo: "Como imprimir a agenda ou salvar em PDF", secao: "agenda", quem: "todos", rota: AGENDA,
+  { id: "imprimir", titulo: "Como imprimir a agenda ou salvar em PDF", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA,
     passos: [
       "Na Agenda, toque em Imprimir.",
       "Escolha Dia ou Semana.",
@@ -263,14 +309,19 @@ const BASE: TopicoBase[] = [
     passos: [
       "Abra Clientes e pets e toque em Pet novo.",
       "Escreva o nome do pet.",
-      "Escreva o nome do tutor. Se ele já for cliente, escolha na lista que aparece.",
-      "Escreva o WhatsApp do tutor, com DDD.",
-      "Escolha o porte: é ele que define o preço do banho.",
+      "Em Tutor (dono do pet), escreva o nome. Se ele já for cliente, escolha na lista que aparece.",
+      "Se quiser, escreva o WhatsApp do tutor, com DDD. Pode ficar em branco.",
+      "Para cão, escolha o Porte. Se ainda não sabe, toque em Não sei ainda.",
       "Se quiser, coloque foto, raça, nascimento e os Cuidados e alertas.",
       "Toque em Salvar.",
     ],
-    dicas: ["Também dá para cadastrar na hora de marcar um horário, em Cadastrar pet novo.", "Com a data de nascimento anotada, o sistema lembra do aniversário do pet."],
-    palavras: ["cadastrar", "cadastro", "pet novo", "cliente novo", "tutor", "adicionar pet", "foto", "novo cliente", "porte"] },
+    dicas: [
+      "Se o nome ou o telefone já for de um tutor, o sistema pergunta É a mesma pessoa?. Toque em Usar, com o nome dele, para ficar uma ficha só, ou em Criar outro se for outra pessoa.",
+      { so: ["banho"], texto: "O porte define o preço do banho. Com Não sei ainda, o sistema pergunta de novo na hora de marcar um horário." },
+      { so: ["banho"], texto: "Também dá para cadastrar na hora de marcar um horário, em Cadastrar pet novo." },
+      "Com a data de nascimento anotada, o sistema lembra do aniversário do pet.",
+    ],
+    palavras: ["cadastrar", "cadastro", "pet novo", "cliente novo", "tutor", "adicionar pet", "foto", "novo cliente", "porte", "cadastrar cliente", "cadastrar pet"] },
   { id: "ficha", titulo: "Como ver a ficha e o histórico do pet", secao: "clientes", quem: "todos", rota: CLIENTES,
     passos: [
       "Abra Clientes e pets.",
@@ -279,7 +330,7 @@ const BASE: TopicoBase[] = [
       "A ficha mostra os alertas, a última visita, o próximo horário, os pacotes, a saúde e o histórico de atendimentos.",
       "Para mudar os dados do pet, toque em Editar pet.",
     ],
-    dicas: ["Agendar já abre a janela de marcar horário com o pet escolhido.", "WhatsApp abre a conversa com o tutor."],
+    dicas: [{ so: ["banho"], texto: "Agendar já abre a janela de marcar horário com o pet escolhido." }, "WhatsApp abre a conversa com o tutor.", "Trocar tutor passa o pet para a ficha de outra pessoa."],
     palavras: ["ficha", "historico", "ultima visita", "alerta", "alergia", "observacao", "editar pet", "dados do pet", "prontuario"] },
   { id: "telefone-tutor", titulo: "Como corrigir o telefone ou os dados do tutor", secao: "clientes", quem: "todos", rota: CLIENTES,
     passos: [
@@ -293,13 +344,41 @@ const BASE: TopicoBase[] = [
   { id: "ficha-tutor", titulo: "Como ver a ficha do tutor e o que ele deve", secao: "clientes", quem: "todos", rota: CLIENTES,
     passos: [
       "Abra Clientes e pets.",
-      "Em O que mostrar, toque em Tutores.",
+      "Logo acima da busca, toque em Tutores (ao lado de Pets).",
       "Toque no tutor.",
       "A ficha mostra os pets dele e o contato. Com a fidelidade ligada, mostra também quanto falta para o prêmio.",
       "Para colocar mais um pet na mesma ficha, toque em Adicionar pet.",
     ],
-    dicas: ["Quem vê o financeiro também vê quanto o tutor já gastou e o que ficou A receber.", "Tutor novo cadastra um tutor sem pet."],
-    palavras: ["ficha do tutor", "tutores", "cliente deve", "quanto gastou", "pets do tutor", "tutor novo", "segundo pet", "mais um pet"] },
+    dicas: [
+      "Quem cuida do caixa também vê quanto o tutor já gastou e o que ficou A receber.",
+      "A ficha só mostra o valor a receber. Para receber, abra Financeiro, toque na aba A receber e em Recebi na conta dele. Se a conta veio de um horário, também dá para abrir o horário na Agenda e tocar em O cliente pagou.",
+      "Tutor novo cadastra um tutor sem pet.",
+    ],
+    palavras: ["ficha do tutor", "tutores", "cliente deve", "quanto gastou", "pets do tutor", "tutor novo", "segundo pet", "mais um pet", "quanto o cliente deve"] },
+  { id: "juntar", titulo: "Como juntar um cliente cadastrado duas vezes", secao: "clientes", quem: "todos", rota: CLIENTES,
+    passos: [
+      "Abra Clientes e pets e toque em Tutores (ao lado de Pets).",
+      "Toque na ficha que vai ficar: a do cadastro mais completo.",
+      "Desça até o fim da ficha e toque em Juntar com outro tutor.",
+      "Procure a ficha repetida pelo nome ou pelo telefone e toque nela.",
+      "Confira o que vem para esta ficha e toque em Juntar as duas fichas.",
+    ],
+    dicas: [
+      "Os pets e o histórico da ficha repetida passam para a ficha que ficou. A repetida deixa de existir.",
+      "Para não repetir de novo: ao cadastrar, escolha o tutor na lista que aparece. Se o sistema perguntar É a mesma pessoa?, toque em Usar, com o nome dele.",
+      "Pet repetido não se junta: abra a ficha do pet que sobrou e toque em Desativar pet.",
+    ],
+    atencao: ["Juntar não dá para desfazer. Confira os nomes antes de confirmar."],
+    palavras: ["juntar", "juntar tutores", "juntar com outro tutor", "duplicado", "duplicada", "cliente duplicado", "cliente repetido", "repetido", "cadastro repetido", "duas vezes", "mesmo cliente", "em dobro", "unir", "mesclar", "dois cadastros"] },
+  { id: "trocar-tutor", titulo: "Como passar um pet para outro tutor", secao: "clientes", quem: "todos", rota: CLIENTES,
+    passos: [
+      "Abra a ficha do pet, em Clientes e pets.",
+      "Toque em Trocar tutor.",
+      "Procure o novo tutor pelo nome ou pelo telefone e toque nele.",
+      "Confira e toque em Passar para, com o nome do novo tutor.",
+    ],
+    dicas: ["O que já foi pago ou ficou a receber continua na ficha de quem pagou.", "Se as duas fichas são da mesma pessoa, prefira Juntar com outro tutor, na ficha do tutor."],
+    palavras: ["trocar tutor", "mudar tutor", "mudar o dono do pet", "pet mudou de dono", "tutor errado", "pet no tutor errado", "passar o pet"] },
   { id: "saude", titulo: "Como anotar vacinas e a saúde do pet", secao: "clientes", quem: "todos", rota: CLIENTES,
     passos: [
       "Abra a ficha do pet, em Clientes e pets.",
@@ -324,19 +403,26 @@ const BASE: TopicoBase[] = [
       "Toque no pet para abrir a ficha.",
       "Para voltar à lista inteira, toque em Todos.",
     ],
-    dicas: ["Sumido é quem já veio (banho, tosa, creche ou hotel) e parou de vir.", "Para mandar mensagem a quem sumiu, use o botão Chamar de volta."],
+    dicas: ["Sumido é quem já veio (atendimento, creche ou hotel) e parou de vir.", "Para mandar mensagem a quem sumiu, use o botão Chamar de volta."],
     palavras: ["filtro", "sumido", "sumidos", "sem visita", "com alerta", "nunca veio", "inativo", "lista de clientes"] },
   { id: "importar", titulo: "Como trazer clientes de uma planilha", secao: "clientes", quem: "todos", rota: CLIENTES,
     passos: [
       "Abra Clientes e pets e toque em Trazer de planilha.",
-      "Toque em Baixar planilha modelo para ver como os títulos das colunas devem ficar.",
-      "Toque em Escolher arquivo CSV, ou copie as células no Excel ou no Google Planilhas e cole no campo.",
-      "Confira as primeiras linhas que o sistema mostra.",
-      "Toque em Trazer.",
+      "Toque em Baixar planilha modelo para ver como os títulos das colunas costumam ficar.",
+      "Toque em Escolher arquivo CSV, ou copie as células no Excel ou no Google Planilhas (com a linha de títulos) e cole no campo.",
+      "Em Confira o que é cada coluna, veja o palpite do sistema. Se ele errou, escolha na lista embaixo de cada título: Tutor, Telefone, Pet e as outras. Não usar deixa a coluna de fora.",
+      "Se aparecer o aviso de que nenhuma coluna está marcada como Telefone ou como Pet, escolha a coluna certa. Só toque em Trazer mesmo assim se a planilha não tem essa informação.",
+      "Toque em Trazer, o botão que mostra quantas linhas vão entrar.",
     ],
-    dicas: ["A planilha precisa ter uma linha de títulos, como Tutor, Telefone e Pet. Só a coluna Tutor é obrigatória.", "Nada do que já está no sistema é apagado: tutor ou pet que já existe é pulado.", "Se parar no meio, pode trazer a mesma planilha de novo: os repetidos são pulados."],
+    dicas: [
+      "Só a coluna Tutor é obrigatória. Um tutor com dois pets ocupa duas linhas, repetindo o nome e o telefone.",
+      "Nada do que já está no sistema é apagado. Tutor ou pet que já existe só ganha o que estava em branco: telefone, raça, porte, observações.",
+      "A coluna Observações vai para as observações do pet, não para os alertas.",
+      "O resumo fica guardado neste aparelho: abra Trazer de planilha de novo e veja Última importação.",
+      "Trouxe a planilha errada? Em Última importação, toque em Desfazer esta importação: saem os tutores e os pets que ela criou.",
+    ],
     atencao: ["Arquivo fechado do Excel não é lido direto: copie e cole as células, ou salve como CSV.", "Não feche a janela enquanto estiver trazendo."],
-    palavras: ["importar", "planilha", "excel", "csv", "trazer clientes", "trazer de planilha", "migrar", "outro sistema", "lista de clientes antiga", "google planilhas"] },
+    palavras: ["importar", "planilha", "excel", "csv", "trazer clientes", "trazer de planilha", "migrar", "outro sistema", "lista de clientes antiga", "google planilhas", "desfazer importacao", "colunas"] },
   { id: "exportar-clientes", titulo: "Como baixar a lista de clientes", secao: "clientes", quem: "todos", rota: CLIENTES,
     passos: [
       "Abra Clientes e pets.",
@@ -356,30 +442,39 @@ const BASE: TopicoBase[] = [
     palavras: ["desativar", "desativar pet", "excluir cliente", "apagar cliente", "remover pet", "pet morreu", "faleceu", "reativar", "tirar da lista"] },
 
   /* ---------- Creche e hotel ---------- */
-  { id: "creche", titulo: "Como funciona a tela Creche e hotel", secao: "creche", quem: "todos", rota: CRECHE,
+  { id: "creche", titulo: "Como funciona a tela Creche e hotel", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
     passos: [
-      "Abra Creche e hotel.",
-      "Quem tem creche vê quatro partes no alto: Chamada (os mensalistas do dia), Casa agora, Mensalistas e Cobranças (só para quem vê o financeiro).",
-      "Em Casa agora, os quadros mostram quem está Na casa agora, quem chega hoje, quem sai hoje e as Reservas.",
+      "Abra Creche e hotel, no menu. Para quem usa só uma das duas, o menu mostra Creche ou Hotel.",
+      { so: ["creche"], texto: "Quem tem creche vê as partes da tela no alto: Chamada (os mensalistas do dia), Casa agora, Mensalistas e Cobranças. Cobranças só aparece para quem vê o financeiro." },
+      "Em Casa agora ficam três abas: Na casa agora, Reservas e Histórico.",
       "Em Na casa agora, cada pet tem os botões Editar e Check-out.",
       "Em Reservas, cada pet tem Check-in, Editar e Cancelar.",
       "Em Histórico ficam as estadias encerradas.",
     ],
-    dicas: ["Creche é para passar o dia. Hotel é para dormir.", "O botão WhatsApp no cartão do pet abre a conversa com o tutor, com uma mensagem pronta."],
-    palavras: ["creche", "hotel", "hospedagem", "hospedes", "daycare", "day care", "escolinha", "na casa agora"] },
-  { id: "creche-reserva", titulo: "Como marcar uma reserva de creche ou hotel", secao: "creche", quem: "todos", rota: CRECHE,
+    dicas: [
+      "A faixa no alto mostra as vagas de hoje e avisa quando a casa está cheia, quando tem saída atrasada e quando ficou check-out sem cobrança.",
+      "Creche é para passar o dia. Hotel é para dormir.",
+      "O botão WhatsApp no cartão do pet abre a conversa com o tutor, com uma mensagem pronta.",
+    ],
+    palavras: ["creche", "hotel", "hospedagem", "hospedes", "daycare", "day care", "escolinha", "na casa agora", "casa agora"] },
+  { id: "creche-reserva", titulo: "Como marcar uma reserva de creche ou hotel", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
     passos: [
       "Em Creche e hotel, toque em Nova reserva / Check-in.",
       "Escolha o pet.",
       "Em Tipo, escolha Creche ou Hotel.",
-      "Desmarque a opção Já está aqui (check-in agora): ela vem marcada.",
+      "Se a opção Já está aqui (check-in agora) estiver marcada, desmarque.",
       "Escolha o dia e a hora da Entrada e, se souber, a Saída prevista.",
-      "Confira o Valor da diária.",
+      "Se aparecer o Valor da diária, confira. Ele só aparece para quem cuida do caixa.",
       "Toque em Marcar reserva.",
     ],
-    dicas: ["A diária já vem com o preço definido em Meu pet shop.", "O sistema avisa se o pet tem vacina vencida e se a casa está cheia no período."],
+    dicas: [
+      "A diária já vem com o preço definido em Meu pet shop.",
+      "O sistema avisa se o pet tem vacina vencida.",
+      "Se a casa estiver cheia em algum dia do período, aparece o aviso Casa cheia. A reserva só passa do limite se você tocar em Passar do limite.",
+      "Não existe sinal nem adiantamento na reserva: o valor é cobrado no check-out.",
+    ],
     palavras: ["reserva", "reservar", "marcar uma reserva", "reserva de creche", "reserva de hotel", "marcar hotel", "marcar creche", "hospedar", "diaria", "nova reserva"] },
-  { id: "creche-checkin", titulo: "Como fazer o check-in", secao: "creche", quem: "todos", rota: CRECHE,
+  { id: "creche-checkin", titulo: "Como fazer o check-in", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
     passos: [
       "Se o pet tem reserva, abra Reservas e toque em Check-in no cartão dele.",
       "Se não tem reserva, toque em Nova reserva / Check-in e escolha o pet.",
@@ -387,31 +482,41 @@ const BASE: TopicoBase[] = [
       "Em Observações, anote ração, remédio e o que veio na mochila.",
       "Toque em Fazer check-in.",
     ],
-    dicas: ["O pet passa a aparecer em Na casa agora.", "Diária em R$ 0,00 vira cortesia: o sistema pede confirmação."],
+    dicas: [
+      "O pet passa a aparecer em Na casa agora.",
+      "Diária em R$ 0,00 vira cortesia: o sistema pede confirmação.",
+      { so: ["creche"], texto: "Mensalista da creche não entra por aqui: a chegada dele é um toque em Chegou, na Chamada." },
+    ],
     palavras: ["check-in", "checkin", "check in", "fazer check-in", "fazer o check-in", "check-in do hotel", "check-in da creche", "chegou na creche", "chegou no hotel", "pet chegou"] },
-  { id: "creche-checkout", titulo: "Como fazer o check-out e receber a estadia", secao: "creche", quem: "todos", rota: CRECHE,
+  { id: "creche-checkout", titulo: "Como fazer o check-out e receber a estadia", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
     passos: [
       "Em Creche e hotel, abra Na casa agora.",
       "Toque em Check-out no cartão do pet.",
       "Confira o número de Diárias.",
-      "Se o pet tem pacote com saldo, aparece Como fica a conta: escolha Cobrar a diária ou usar o pacote.",
+      "Se o pet tem pacote com saldo, aparece Como fica a conta: escolha Cobrar a diária ou Usar 1 do pacote.",
       "Confira o Valor a receber.",
       "Escolha Paga agora e a forma de pagamento, ou Cliente paga depois.",
-      "Toque em Receber, o botão laranja.",
+      "Toque em Receber, o botão que mostra o valor.",
     ],
-    dicas: ["Usando o pacote, o botão laranja vira Usar o pacote e encerrar, e nenhum dinheiro é lançado.", "Quem não vê o financeiro toca em Fazer check-out: a estadia encerra e o pagamento fica para quem cuida do financeiro."],
-    palavras: ["check-out", "checkout", "check out", "fazer check-out", "fazer o check-out", "check-out do hotel", "check-out da creche", "foi embora", "encerrar estadia", "receber hotel", "receber creche", "diarias"] },
-  { id: "creche-encerrar", titulo: "Como encerrar o dia da creche de uma vez", secao: "creche", quem: "todos", rota: CRECHE,
+    dicas: [
+      "Usando o pacote, o botão vira Usar o pacote e encerrar, e nenhum dinheiro é lançado.",
+      "Quem não cuida do caixa toca em Fazer check-out: a estadia encerra e a cobrança fica como pendência.",
+      "Check-out que ficou sem cobrança aparece na faixa do alto, para quem cuida do caixa. Toque no aviso, ache o pet em Histórico e toque em Acertar: dá para Cobrar, marcar Cortesia (não cobrar) ou Deixar pendente.",
+      "O check-out só cobra as diárias. Banho ou produto do mesmo hóspede são cobrados à parte, na Agenda ou na venda no balcão.",
+    ],
+    palavras: ["check-out", "checkout", "check out", "fazer check-out", "fazer o check-out", "check-out do hotel", "check-out da creche", "foi embora", "encerrar estadia", "receber hotel", "receber creche", "diarias", "check-out sem cobranca", "acertar estadia"] },
+  { id: "creche-encerrar", titulo: "Como encerrar o dia da creche de uma vez", secao: "creche", usa: ["creche"], quem: "todos", rota: CRECHE,
     passos: [
-      "No fim do dia, em Creche e hotel, toque em Encerrar o dia da creche.",
+      "No fim do dia, em Creche e hotel, abra Casa agora e toque em Encerrar o dia da creche, na faixa do alto.",
       "Marque os pets que estão indo embora.",
-      "Escolha a forma de pagamento, que vale para todos.",
-      "Toque no botão laranja Encerrar, que mostra quantos pets saem e quanto você recebe.",
+      "Mensalista sai sem cobrança. Quem tem pacote já vem com a opção de usar o pacote marcada.",
+      "Para os outros, quem cuida do caixa escolhe a forma de pagamento, que vale para todos.",
+      "Toque em Encerrar, o botão que mostra quantos pets saem e quanto você recebe.",
     ],
-    dicas: ["O botão só aparece quando tem pet da creche na casa."],
-    atencao: ["Se alguém vai dividir o pagamento, pagar depois ou usar pacote, desmarque esse pet e faça o check-out pelo cartão dele."],
+    dicas: ["O botão só aparece quando tem pet da creche na casa.", "Para os mensalistas, o mais simples é a Chamada: toque em Saiu em cada um, ou em Encerrar a chamada."],
+    atencao: ["Se alguém vai dividir o pagamento ou pagar depois, desmarque esse pet e faça o check-out pelo cartão dele."],
     palavras: ["encerrar o dia", "fim do dia", "todos de uma vez", "check-out de todos", "fechar a creche"] },
-  { id: "creche-editar", titulo: "Como mudar ou cancelar uma reserva ou estadia", secao: "creche", quem: "todos", rota: CRECHE,
+  { id: "creche-editar", titulo: "Como mudar ou cancelar uma reserva ou estadia", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
     passos: [
       "Em Creche e hotel, ache o pet em Reservas ou em Na casa agora.",
       "Toque em Editar para mudar as datas, a diária ou as observações.",
@@ -419,7 +524,30 @@ const BASE: TopicoBase[] = [
       "Para cancelar uma reserva, toque em Cancelar no cartão dela e confirme em Cancelar reserva.",
     ],
     palavras: ["editar reserva", "cancelar reserva", "mudar data", "mudar diaria", "estender", "mais um dia", "editar estadia"] },
-  { id: "creche-preco", titulo: "Como definir a diária e as vagas da creche e do hotel", secao: "creche", quem: "dono", rota: PETSHOP, tambem: [CRECHE],
+  { id: "creche-passado", titulo: "Como corrigir a entrada e a saída de uma estadia que já passou", secao: "creche", usa: ["casa"], quem: "caixa", rota: CRECHE,
+    passos: [
+      "Em Creche e hotel, abra Casa agora e toque na aba Histórico.",
+      "Ache a estadia e toque no lápis, ao lado dela. Se ela ficou sem cobrança, o botão se chama Acertar.",
+      "Acerte Entrou em e Saiu em, com o dia e a hora em que o pet entrou e saiu de verdade.",
+      "Confira o número de Diárias e toque em Salvar.",
+    ],
+    dicas: [
+      "Esqueceu de anotar um dia? Faça o check-in e o check-out agora e depois corrija as datas por aqui.",
+      { so: ["creche"], texto: "Para mensalista, o caminho é outro: na Chamada, toque em Ontem ou em Outro dia deste mês e marque quem veio." },
+    ],
+    atencao: ["A correção é para quem cuida do caixa. Estadia de mensalista não tem o lápis."],
+    palavras: ["dia passado", "dia que passou", "data errada", "corrigir estadia", "corrigir saida", "corrigir entrada", "hora da saida", "esqueci o check-out", "esqueci de anotar", "retroativo", "lancar dia anterior"] },
+  { id: "hospede-cuidados", titulo: "Como anotar remédio, ração e cuidados do hóspede", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
+    passos: [
+      "No check-in ou na reserva, escreva em Observações: ração, remédio com dose e horário, passeio e o que veio na mochila.",
+      "Já fez o check-in? Em Na casa agora, toque em Editar no cartão do pet.",
+      "Complete as Observações e toque em Salvar.",
+      "A anotação fica à vista no cartão do pet, em Na casa agora.",
+    ],
+    dicas: ["O que vale sempre (alergia, briga com outros cães, foge no portão) fica melhor na ficha do pet, em Cuidados e alertas: aparece em vermelho no cartão, no check-in e na chamada."],
+    atencao: ["O sistema só guarda a anotação. Ele não tem lista de tarefas do dia nem avisa a hora do remédio."],
+    palavras: ["medicacao", "medicamento", "remedio", "racao do hospede", "alimentacao", "cuidados do hospede", "mochila", "o que trouxe", "dose"] },
+  { id: "creche-preco", titulo: "Como definir a diária e as vagas da creche e do hotel", secao: "creche", usa: ["casa"], quem: "dono", rota: PETSHOP, tambem: [CRECHE],
     passos: [
       "Abra Meu pet shop.",
       "Vá até o cartão Creche e hotel.",
@@ -427,26 +555,36 @@ const BASE: TopicoBase[] = [
       "Escreva as Vagas da creche e as Vagas do hotel. Em branco fica sem limite.",
       "Toque em Salvar creche e hotel.",
     ],
-    dicas: ["A tela Creche e hotel mostra quantas vagas estão tomadas hoje.", "Quando a casa enche em algum dia do período, o sistema avisa e só passa do limite se você confirmar."],
-    palavras: ["preco da diaria", "valor da diaria", "diaria da creche", "diaria do hotel", "preco da creche", "preco do hotel", "vagas da creche", "vagas do hotel", "casa cheia", "lotacao", "lotou", "quantas vagas"] },
-  { id: "creche-link", titulo: "Como receber pedidos de creche e hotel pelo link", secao: "creche", quem: "todos", rota: AGENDA, tambem: [CRECHE],
+    dicas: [
+      "A tela Creche e hotel mostra quantas vagas estão tomadas hoje. Quando lota, a faixa do alto diz casa cheia.",
+      "Quando a casa enche em algum dia do período, o sistema avisa na reserva, no check-in e no pedido pelo link, e só passa do limite se você confirmar.",
+      "A lotação aparece para hoje e na hora de reservar. Ainda não existe um calendário com a ocupação dos próximos dias.",
+      { so: ["creche"], texto: "No mesmo cartão fica a chave Bloquear check-in na creche com vacina vencida." },
+    ],
+    palavras: ["preco da diaria", "valor da diaria", "diaria da creche", "diaria do hotel", "preco da creche", "preco do hotel", "vagas da creche", "vagas do hotel", "casa cheia", "lotado", "lotada", "lotacao", "lotou", "cheio", "cheia", "quantas vagas", "ocupacao"] },
+  { id: "creche-link", titulo: "Como receber pedidos de creche e hotel pelo link", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE, tambem: [AGENDA, PETSHOP],
     passos: [
-      "Na tela Hoje, toque em Mandar link de agendamento. Na Agenda, o botão se chama Link do cliente.",
-      "Em O que o cliente pode pedir pelo link, ligue Creche (passar o dia) e Hotel (dormir).",
-      "Mande o link para o cliente.",
+      "O dono abre Meu pet shop e, no cartão Link de agendamento, liga a chave do link.",
+      "Logo abaixo, em Pelo link, o cliente também pode pedir, o dono marca Vaga na creche e Vaga no hotel. As mesmas opções ficam no fim da tela Creche e hotel, em Casa agora.",
+      "Mande o link para o cliente: em Meu pet shop, toque em Copiar link ou em Mandar no WhatsApp.",
       "Quando o pedido chegar, ele aparece em Pedidos pelo link, na tela Hoje e na Agenda.",
       "Toque em Aceitar ou em Recusar.",
+      "Depois, toque em Confirmar no WhatsApp para avisar o tutor.",
     ],
-    dicas: ["Ao aceitar, a reserva é criada e aparece em Creche e hotel.", "Se a casa estiver cheia naquele dia, o sistema avisa antes de aceitar."],
-    palavras: ["pedido de creche", "pedido de hotel", "pedidos de creche", "creche e hotel pelo link", "reserva pelo link", "cliente reservar", "reserva online", "hospedagem pelo link"] },
-
-  { id: "mensalista", titulo: "Como cadastrar um mensalista da creche", secao: "creche", quem: "todos", rota: CRECHE, tambem: [CLIENTES],
+    dicas: [
+      "Ao aceitar, a reserva é criada e aparece em Creche e hotel, em Reservas.",
+      "Se a casa estiver cheia naquele dia, o sistema avisa antes de aceitar.",
+      "Se o telefone do pedido já for de um tutor, o sistema pergunta É a mesma pessoa? antes de criar a ficha.",
+      { so: ["banho"], texto: "Quem tem banho e tosa também acha o link na tela Hoje, em Mandar link de agendamento, e na Agenda, em Link do cliente." },
+    ],
+    palavras: ["pedido de creche", "pedido de hotel", "pedidos de creche", "creche e hotel pelo link", "reserva pelo link", "cliente reservar", "reserva online", "hospedagem pelo link", "pedir vaga", "vaga pelo link"] },
+  { id: "mensalista", titulo: "Como cadastrar um mensalista da creche", secao: "creche", usa: ["creche"], quem: "todos", rota: CRECHE, tambem: [CLIENTES],
     passos: [
       "Abra Creche e hotel e toque em Mensalistas, no alto.",
       "Toque em Novo mensalista e escolha o pet.",
       "Toque nos dias da semana em que ele vem. A tela mostra quantos mensalistas já vêm em cada dia, contra as vagas da creche.",
       "Escolha o dia em que o plano começa e o dia do vencimento.",
-      "Quem vê o financeiro preenche a Mensalidade e, se quiser, o Preço do dia extra. Em branco, o dia extra vale a diária da creche.",
+      "Quem vê o financeiro preenche a Mensalidade e, se quiser, o Preço do dia extra. Em branco, o dia extra entra na cobrança sem valor.",
       "Toque em Cadastrar mensalista.",
     ],
     dicas: [
@@ -456,8 +594,8 @@ const BASE: TopicoBase[] = [
       "Dia em que o pet shop não abre, pelo horário de Meu pet shop, não conta como dia do plano nem como falta.",
     ],
     atencao: ["Cada pet tem um plano só. Quem não vê o financeiro cadastra os dias, mas não vê nem preenche os valores."],
-    palavras: ["mensalista", "mensalistas", "mensalidade", "plano mensal", "dias fixos", "escolinha", "day care", "daycare", "creche canina", "matricula", "matricular", "pausar plano", "pausa"] },
-  { id: "chamada", titulo: "Como fazer a chamada do dia na creche", secao: "creche", quem: "todos", rota: CRECHE, tambem: [HOJE],
+    palavras: ["dia fixo", "plano da creche", "mensalista", "mensalistas", "mensalidade", "plano mensal", "dias fixos", "escolinha", "day care", "daycare", "creche canina", "matricula", "matricular", "pausar plano", "pausa"] },
+  { id: "chamada", titulo: "Como fazer a chamada do dia na creche", secao: "creche", usa: ["creche"], quem: "todos", rota: CRECHE, tambem: [HOJE],
     passos: [
       "Abra Creche e hotel. Com mensalistas cadastrados, a tela já abre em Chamada, com quem deve vir hoje.",
       "Quando o pet chegar, toque em Chegou. Nada é cobrado: o dia já está no plano.",
@@ -472,8 +610,8 @@ const BASE: TopicoBase[] = [
       "Pet sem plano entra pelo botão Nova reserva / Check-in, como sempre.",
       "As vagas de hoje contam os mensalistas que ainda vão chegar.",
     ],
-    palavras: ["chamada", "chamada do dia", "chegou", "saiu", "faltou", "falta", "presenca", "quem vem hoje", "lista de presenca", "escolinha", "day care", "mensalista"] },
-  { id: "dia-extra", titulo: "Como lançar um dia extra ou uma reposição", secao: "creche", quem: "todos", rota: CRECHE,
+    palavras: ["falta na creche", "nao veio na creche", "roll call", "chamada", "chamada do dia", "chegou", "saiu", "faltou", "falta", "presenca", "quem vem hoje", "lista de presenca", "escolinha", "day care", "mensalista"] },
+  { id: "dia-extra", titulo: "Como lançar um dia extra ou uma reposição", secao: "creche", usa: ["creche"], quem: "todos", rota: CRECHE,
     passos: [
       "Em Creche e hotel, na Chamada, toque em Veio fora do dia.",
       "Toque no mensalista que veio num dia que não é do plano dele.",
@@ -485,7 +623,7 @@ const BASE: TopicoBase[] = [
       "A saída é igual à dos outros: toque em Saiu.",
     ],
     palavras: ["dia extra", "extra", "veio fora do dia", "reposicao", "repor falta", "dia avulso do mensalista", "mensalista", "escolinha", "day care"] },
-  { id: "cobrancas-creche", titulo: "Como gerar e mandar as cobranças do mês", secao: "creche", quem: "financeiro", rota: CRECHE, tambem: [HOJE],
+  { id: "cobrancas-creche", titulo: "Como gerar e mandar as cobranças do mês", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE, tambem: [HOJE],
     passos: [
       "Abra Creche e hotel e toque em Cobranças, no alto.",
       "As mensalidades cheias do mês já aparecem sozinhas quando você abre a tela. Para as que pedem conferência (plano que começou no meio do mês ou teve pausa), toque em Gerar cobranças.",
@@ -501,7 +639,7 @@ const BASE: TopicoBase[] = [
     ],
     atencao: ["O sistema não manda mensagem nem cobra sozinho. A mensagem não fala de multa nem de juros: se quiser, escreva antes de enviar."],
     palavras: ["cobranca", "cobrancas", "mensalidade", "mensalidades", "gerar cobrancas", "cobrar mensalidade", "vencimento", "atrasada", "inadimplente", "pro-rata", "proporcional", "escolinha", "day care", "mensalista", "dia extra"] },
-  { id: "baixa-mensalidade", titulo: "Como dar baixa numa mensalidade", secao: "creche", quem: "financeiro", rota: CRECHE, tambem: [FINANCEIRO],
+  { id: "baixa-mensalidade", titulo: "Como dar baixa numa mensalidade", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE, tambem: [FINANCEIRO],
     passos: [
       "Em Creche e hotel, toque em Cobranças.",
       "Na cobrança do pet, toque em Receber.",
@@ -514,7 +652,7 @@ const BASE: TopicoBase[] = [
       "Deu baixa errado? Em Pagas, toque em Desfazer.",
     ],
     palavras: ["dar baixa mensalidade", "receber mensalidade", "mensalidade paga", "pagou a mensalidade", "mensalidade", "escolinha", "day care", "mensalista"] },
-  { id: "faltas-extras", titulo: "Como ver as faltas e os extras do mês", secao: "creche", quem: "todos", rota: CRECHE, tambem: [CLIENTES],
+  { id: "faltas-extras", titulo: "Como ver as faltas e os extras do mês", secao: "creche", usa: ["creche"], quem: "todos", rota: CRECHE, tambem: [CLIENTES],
     passos: [
       "Abra Creche e hotel e toque em Mensalistas.",
       "Cada mensalista mostra o resumo do mês: presenças, faltas e dias extras.",
@@ -525,68 +663,80 @@ const BASE: TopicoBase[] = [
       "Sem chamada são os dias do plano que passaram sem ninguém marcar presença nem falta. Abra a chamada daquele dia para acertar.",
       "No alto de Mensalistas, o quadro por dia da semana mostra quantos mensalistas vêm em cada dia, contra as vagas.",
     ],
-    palavras: ["faltas", "falta", "extras", "dias extras", "resumo do mes", "presencas", "frequencia", "ocupacao por dia", "mensalista", "escolinha", "day care", "chamada"] },
+    palavras: ["falta na creche", "faltas", "falta", "extras", "dias extras", "resumo do mes", "presencas", "frequencia", "ocupacao por dia", "mensalista", "escolinha", "day care", "chamada"] },
   /* ---------- Dinheiro ---------- */
-  { id: "conta", titulo: "Como receber e fechar a conta do atendimento", secao: "dinheiro", quem: "financeiro", rota: AGENDA, tambem: [HOJE, CAIXA],
+  { id: "conta", titulo: "Como receber e fechar a conta do atendimento", secao: "dinheiro", usa: ["banho"], quem: "caixa", rota: AGENDA, tambem: [HOJE, CAIXA],
     passos: [
       "Toque no horário do pet, na Agenda ou na tela Hoje.",
-      "Toque em Fechar a conta.",
+      "Toque em Fechar a conta. Se o pet tem pacote para o serviço, o primeiro botão é Concluir usando o pacote (sem cobrar), e o de cobrar se chama Cobrar à parte, sem usar o pacote.",
       "Confira o serviço e o valor.",
-      "Em Levou mais alguma coisa?, busque produtos do estoque ou toque em Outro extra.",
+      { so: ["loja"], texto: "Em Levou mais alguma coisa?, busque produtos do estoque pelo nome." },
+      "Para somar outra coisa na conta, toque em Outro extra, escreva o que é e o valor.",
       "Se tiver desconto, escreva em Desconto em reais.",
-      "Escolha a Forma de pagamento: Pix, Dinheiro, Débito, Crédito ou Outro.",
-      "Toque em Receber, o botão laranja.",
+      "Escolha a Forma de pagamento: Pix, Dinheiro, Débito, Crédito ou Outro. Nenhuma vem escolhida.",
+      "Toque em Receber, o botão que mostra o valor.",
     ],
-    dicas: ["O valor entra no caixa aberto e os produtos saem do estoque. Com o caixa fechado, o valor entra só no financeiro do dia.", "Depois de receber, aparece o botão Mandar comprovante."],
-    atencao: ["Só quem vê o financeiro recebe. Os outros tocam em Concluir atendimento, e o pagamento fica para depois."],
+    dicas: [
+      "O valor entra no caixa aberto. Com o caixa fechado, o valor entra só no financeiro do dia, fora da contagem da gaveta.",
+      { so: ["loja"], texto: "Os produtos da conta saem do estoque sozinhos." },
+      "Depois de receber, aparece o botão Mandar comprovante.",
+      "A conta não calcula o troco do cliente: essa conta é por fora.",
+    ],
+    atencao: ["Só quem tem a área Caixa ou Financeiro recebe. Os outros tocam em Concluir atendimento, e o pagamento fica para depois."],
     palavras: ["receber", "pagamento", "pagar", "fechar conta", "fechar a conta", "comanda", "cobrar", "pix", "desconto", "concluir", "forma de pagamento"] },
-  { id: "dividir", titulo: "Como dividir o pagamento em duas formas", secao: "dinheiro", quem: "financeiro", rota: AGENDA, tambem: [CAIXA, FINANCEIRO],
+  { id: "dividir", titulo: "Como dividir o pagamento em duas formas", secao: "dinheiro", quem: "caixa", rota: CAIXA, tambem: [AGENDA, FINANCEIRO],
     passos: [
       "Na hora de receber, abaixo da forma de pagamento, toque em Dividir o pagamento.",
       "Na primeira parte, escolha a forma e escreva o valor.",
       "Na segunda parte, escolha a outra forma. O valor se completa sozinho com o que falta.",
       "Se forem três formas, toque em Mais uma forma.",
-      "Confira o aviso Fecha certinho com o total e toque em Receber.",
+      "Confira o aviso Fecha certinho com o total e toque em Receber. Se aparecer Falta ou Passou, acerte os valores.",
     ],
     dicas: ["Exemplo: parte no Pix e parte em dinheiro.", "Para voltar atrás, toque em Pagar com uma forma só."],
     palavras: ["dividir", "dividir pagamento", "pagamento dividido", "duas formas", "metade", "parte no pix", "parte em dinheiro", "parte no cartao", "split"] },
-  { id: "paga-depois", titulo: "Como anotar quando o cliente paga depois", secao: "dinheiro", quem: "financeiro", rota: AGENDA, tambem: [FINANCEIRO, PACOTES, CRECHE],
+  { id: "paga-depois", titulo: "Como anotar quando o cliente paga depois", secao: "dinheiro", quem: "caixa", rota: FINANCEIRO, tambem: [AGENDA, PACOTES, CRECHE],
     passos: [
       "Na hora de receber (conta do atendimento, pacote ou check-out), toque em Cliente paga depois.",
-      "Em Quando vai pagar, escolha o dia combinado.",
-      "Toque no botão laranja, que agora diz Anotar e o valor a receber.",
+      "Em Quando vai pagar, escolha o dia combinado, de hoje em diante.",
+      "Toque no botão de baixo, que agora diz Anotar e o valor a receber.",
     ],
-    dicas: ["Nada entra no caixa agora. A conta fica em Financeiro, na aba A receber, e na ficha do tutor.", "A tela Hoje avisa quando o dia combinado chega."],
+    dicas: ["Nada entra no caixa agora. A conta fica em Financeiro, na aba A receber, e na ficha do tutor.", "A tela Hoje avisa quando o dia combinado chega.", "A venda no balcão não tem Cliente paga depois: para fiado de produto, anote uma conta em Financeiro, A receber, em Nova conta."],
     palavras: ["paga depois", "pagar depois", "vai pagar", "paga semana que vem", "paga amanha", "fica devendo", "fiado", "pendurar", "deve", "devendo", "anotar a receber", "nao pagou", "ainda nao pagou", "cliente paga depois"] },
-  { id: "dar-baixa", titulo: "Como dar baixa quando o cliente paga o que devia", secao: "dinheiro", quem: "financeiro", rota: FINANCEIRO,
+  { id: "dar-baixa", titulo: "Como dar baixa quando o cliente paga o que devia", secao: "dinheiro", quem: "caixa", rota: FINANCEIRO, tambem: [AGENDA],
     passos: [
       "Abra Financeiro e toque na aba A receber.",
       "Ache a conta do cliente.",
+      "Toque em Recebi, ao lado da conta.",
+      "Em Como recebeu, escolha a forma. Nenhuma vem escolhida.",
+      "Se aparecer Dia em que recebeu, confira a data. Esse campo é só de quem vê o financeiro: para os outros, entra com a data de hoje.",
       "Toque em Dar baixa.",
-      "Escolha como recebeu e o dia em que recebeu.",
-      "Toque em Dar baixa de novo para confirmar.",
     ],
-    dicas: ["O valor entra no financeiro no dia que você escolheu.", "Na aba A pagar funciona igual, para as contas que o pet shop pagou."],
-    palavras: ["cliente pagou", "pagou o que devia", "recebi o fiado", "quitar", "quitou", "a receber", "pagou a conta"] },
-  { id: "comprovante", titulo: "Como mandar o comprovante pelo WhatsApp", secao: "dinheiro", quem: "financeiro", rota: AGENDA,
+    dicas: [
+      "Recebendo hoje com o caixa aberto, o valor entra no caixa. Em dinheiro, conta na gaveta.",
+      "Se a conta veio de um horário, também dá para abrir o horário na Agenda e tocar em O cliente pagou.",
+      "Na aba A pagar funciona igual, com o botão Paguei.",
+    ],
+    atencao: ["A tela Financeiro só abre para quem tem a área Financeiro. Quem tem só o Caixa recebe pelo horário, na Agenda."],
+    palavras: ["cliente pagou", "pagou o que devia", "recebi o fiado", "quitar", "quitou", "a receber", "pagou a conta", "dar baixa", "recebi", "paguei"] },
+  { id: "comprovante", titulo: "Como mandar o comprovante pelo WhatsApp", secao: "dinheiro", usa: ["banho"], quem: "caixa", rota: AGENDA,
     passos: [
       "Receba a conta do atendimento.",
       "Na janela Conta fechada, toque em Mandar comprovante.",
       "O WhatsApp abre com o comprovante escrito. Toque em enviar.",
     ],
     dicas: ["Para mandar mais tarde, abra o horário concluído na Agenda e toque em Mandar comprovante.", "O botão aparece quando o tutor tem telefone na ficha."],
-    atencao: ["O comprovante não é nota fiscal."],
-    palavras: ["comprovante", "recibo", "nota", "mandar comprovante", "comprovante de pagamento"] },
-  { id: "caixa", titulo: "Como abrir o caixa", secao: "dinheiro", quem: "financeiro", rota: CAIXA,
+    atencao: ["O comprovante não é nota fiscal. O sistema não emite nota fiscal."],
+    palavras: ["comprovante", "recibo", "mandar comprovante", "comprovante de pagamento"] },
+  { id: "caixa", titulo: "Como abrir o caixa", secao: "dinheiro", quem: "caixa", rota: CAIXA,
     passos: [
       "Abra Caixa.",
       "Toque em Abrir o caixa.",
       "Em Troco inicial em dinheiro, escreva quanto tem na gaveta agora. Se não tem nada, deixe em branco.",
       "Toque em Abrir o caixa de novo para confirmar.",
     ],
-    dicas: ["Com o caixa aberto, o que você recebe durante o dia entra nele sozinho.", "Pelo Mozart: \"abre o caixa com 100 de troco\"."],
-    palavras: ["caixa", "abrir caixa", "abrir o caixa", "troco", "gaveta", "troco inicial", "comecar o dia"] },
-  { id: "caixa-movimento", titulo: "Como anotar uma entrada ou uma saída no caixa", secao: "dinheiro", quem: "financeiro", rota: CAIXA,
+    dicas: ["Com o caixa aberto, o que você recebe durante o dia entra nele sozinho.", "O troco daqui é o dinheiro que começa o dia na gaveta. O sistema não calcula o troco de cada cliente.", "Pelo Mozart: \"abre o caixa com 100 de troco\"."],
+    palavras: ["troco da gaveta", "caixa", "abrir caixa", "abrir o caixa", "troco", "gaveta", "troco inicial", "comecar o dia"] },
+  { id: "caixa-movimento", titulo: "Como anotar uma entrada ou uma saída no caixa", secao: "dinheiro", quem: "caixa", rota: CAIXA,
     passos: [
       "Com o caixa aberto, toque em Entrada (dinheiro que entrou) ou em Saída (despesa paga).",
       "Escreva o valor.",
@@ -594,9 +744,17 @@ const BASE: TopicoBase[] = [
       "Escolha a categoria e, se quiser, escreva uma descrição.",
       "Toque em Lançar.",
     ],
-    dicas: ["Use Saída para despesa do pet shop, como fornecedor ou motoboy.", "Venda no balcão, na mesma tela, vende produtos do estoque."],
-    palavras: ["lancar no caixa", "entrada no caixa", "saida no caixa", "saida do caixa", "paguei", "avulso", "motoboy"] },
-  { id: "caixa-gaveta", titulo: "Como tirar ou colocar dinheiro na gaveta (sangria e suprimento)", secao: "dinheiro", quem: "financeiro", rota: CAIXA,
+    dicas: [
+      "Use Saída para despesa do pet shop, como fornecedor ou motoboy.",
+      { so: ["loja"], texto: "Venda no balcão, na mesma tela, vende produtos do estoque." },
+      "Para corrigir um lançamento, toque nele na lista do caixa.",
+    ],
+    atencao: [
+      "Valor já recebido não some sem deixar marca. Se alguém altera, fica anotado quem mudou, quando e o valor de antes. Se alguém exclui, o lançamento vai para a lista Apagados deste caixa.",
+      "Quem tem só a área Caixa corrige apenas o que ela mesma lançou, e só enquanto o caixa está aberto. O resto é com o dono ou com quem vê o financeiro.",
+    ],
+    palavras: ["lancar no caixa", "entrada no caixa", "saida no caixa", "saida do caixa", "paguei", "avulso", "motoboy", "corrigir entrada", "apagados", "alterado"] },
+  { id: "caixa-gaveta", titulo: "Como tirar ou colocar dinheiro na gaveta (sangria e suprimento)", secao: "dinheiro", quem: "caixa", rota: CAIXA,
     passos: [
       "Com o caixa aberto, toque em Tirar dinheiro da gaveta ou em Colocar dinheiro na gaveta.",
       "Escreva o Valor em dinheiro.",
@@ -610,15 +768,19 @@ const BASE: TopicoBase[] = [
     ],
     atencao: ["Se o dinheiro saiu para pagar uma conta do pet shop, use o botão Saída: aí conta como despesa."],
     palavras: ["sangria", "suprimento", "tirar dinheiro", "colocar dinheiro", "retirada", "gaveta", "cofre", "levar ao banco", "mais troco", "reforco"] },
-  { id: "caixa-fechar", titulo: "Como fechar o caixa", secao: "dinheiro", quem: "financeiro", rota: CAIXA,
+  { id: "caixa-fechar", titulo: "Como fechar o caixa", secao: "dinheiro", quem: "caixa", rota: CAIXA,
     passos: [
       "No fim do dia, abra Caixa e toque em Fechar o caixa.",
       "Conte o dinheiro da gaveta.",
       "Escreva o valor em Quanto tem na gaveta. Pix e cartão não entram nesta conta.",
       "Toque em Fechar o caixa e confirme.",
     ],
-    dicas: ["O sistema mostra se bateu certinho, se sobrou ou se faltou.", "Se quiser, escreva uma observação, como \"faltou troco\"."],
-    atencao: ["Depois de fechado, os lançamentos daquele caixa não mudam mais de valor nem podem ser excluídos."],
+    dicas: [
+      "O sistema mostra se bateu certinho, se sobrou ou se faltou.",
+      "Se alguém receber enquanto você conta, o sistema avisa quanto entrou, mostra o novo valor esperado e pede para você conferir e tocar em Fechar o caixa de novo.",
+      "Se quiser, escreva uma observação, como \"faltou troco\".",
+    ],
+    atencao: ["Depois de fechado, os lançamentos daquele caixa não mudam mais de valor nem podem ser excluídos. Para corrigir, lance um ajuste no caixa de hoje."],
     palavras: ["fechar caixa", "fechar o caixa", "conferir", "bateu", "sobrou", "faltou dinheiro", "quebra de caixa", "fim do dia", "fechamento"] },
   { id: "caixa-exportar", titulo: "Como ver os caixas antigos e exportar", secao: "dinheiro", quem: "financeiro", rota: CAIXA,
     passos: [
@@ -628,6 +790,7 @@ const BASE: TopicoBase[] = [
       "Na janela do caixa, toque em Exportar para baixar a planilha.",
     ],
     dicas: ["A planilha traz o resumo do caixa e cada lançamento, com a forma de pagamento."],
+    atencao: ["Exportar e os lançamentos dos caixas fechados são do dono e de quem vê o financeiro. Quem tem só a área Caixa abre o caixa antigo e vê a conferência da gaveta."],
     palavras: ["exportar caixa", "exportar o caixa", "caixas fechados", "caixas antigos", "caixa antigo", "caixa de ontem", "planilha do caixa", "historico do caixa"] },
   { id: "financeiro", titulo: "Como anotar contas a pagar e a receber", secao: "dinheiro", quem: "financeiro", rota: FINANCEIRO,
     passos: [
@@ -638,7 +801,7 @@ const BASE: TopicoBase[] = [
       "Se a conta vem todo mês, marque Repetir todo mês e diga por quantos meses.",
       "Toque em Anotar conta.",
     ],
-    dicas: ["A tela mostra o que está em atraso, o que vence hoje e nos próximos 7 dias.", "Quando pagar ou receber, toque em Dar baixa.", "A tela Hoje avisa das contas que vencem até hoje."],
+    dicas: ["A tela mostra o que está em atraso, o que vence hoje e nos próximos 7 dias.", "Quando pagar ou receber, toque em Paguei ou em Recebi, ao lado da conta.", "A tela Hoje avisa das contas que vencem até hoje."],
     palavras: ["financeiro", "conta a pagar", "contas", "boleto", "vencimento", "a receber", "a pagar", "aluguel", "luz", "fornecedor", "conta fixa"] },
   { id: "lancamento", titulo: "Como lançar uma entrada ou saída no Financeiro", secao: "dinheiro", quem: "financeiro", rota: FINANCEIRO,
     passos: [
@@ -649,8 +812,22 @@ const BASE: TopicoBase[] = [
       "Escolha como recebeu ou como pagou, e a categoria.",
       "Toque em Lançar.",
     ],
-    dicas: ["Para corrigir ou excluir, abra a aba Lançamentos e toque no lançamento.", "Lançamento de um caixa já fechado não muda mais de valor."],
+    dicas: ["Para corrigir ou excluir, abra a aba Lançamentos e toque no lançamento.", "Lançamento de um caixa já fechado não muda mais de valor.", "Escreva o valor sem sinal de menos: quem diz se é Entrada ou Saída é o botão de cima."],
     palavras: ["lancamento", "lancar", "novo lancamento", "despesa", "gasto", "corrigir lancamento", "excluir lancamento", "lancei errado"] },
+  { id: "quanto-entrou", titulo: "Como ver quanto entrou: hoje, na semana e no mês", secao: "dinheiro", quem: "caixa", rota: RELATORIOS, tambem: [HOJE, FINANCEIRO],
+    passos: [
+      "Hoje: abra a tela Hoje e veja o quadro Entrou hoje.",
+      "Na semana: abra Relatórios, toque em Esta semana e veja o Faturamento.",
+      "No mês: abra Financeiro. A aba Resumo mostra quanto entrou, quanto saiu e o Resultado do mês.",
+      "Outro período: em Relatórios, toque em Personalizado e escolha o dia inicial e o final.",
+    ],
+    dicas: [
+      "Pelo Mozart é mais rápido: pergunte \"quanto entrou essa semana?\".",
+      "Faturamento conta só o que já foi recebido. O que ficou para o cliente pagar depois está em Financeiro, A receber.",
+      "O que entrou não é o lucro: o Resultado do mês, em Financeiro, desconta o que saiu.",
+    ],
+    atencao: ["Entrou hoje aparece para quem cuida do caixa. Relatórios e Financeiro, só para quem tem essas áreas."],
+    palavras: ["ganhei", "ganhou", "faturei", "faturou", "quanto ganhei", "quanto eu ganhei", "quanto faturei", "quanto entrou", "quanto fiz", "quanto vendi", "entrou hoje", "ganho da semana", "quanto deu"] },
   { id: "resultado", titulo: "Como ver o resultado do mês e exportar", secao: "dinheiro", quem: "financeiro", rota: FINANCEIRO,
     passos: [
       "Abra Financeiro. A aba Resumo já vem aberta.",
@@ -659,6 +836,7 @@ const BASE: TopicoBase[] = [
       "Desça para ver como entrou (forma de pagamento), de onde veio e para onde foi.",
       "Para baixar a planilha do mês, toque em Exportar.",
     ],
+    dicas: ["O Resultado do mês é tudo o que entrou menos tudo o que saiu. Ele não separa o lucro por produto nem por serviço."],
     palavras: ["resultado", "resumo", "lucro", "quanto entrou", "quanto saiu", "exportar financeiro", "planilha do financeiro", "mes passado"] },
   { id: "meta", titulo: "Como definir a meta do mês", secao: "dinheiro", quem: "dono", rota: FINANCEIRO, tambem: [HOJE],
     passos: [
@@ -672,12 +850,17 @@ const BASE: TopicoBase[] = [
   { id: "relatorios", titulo: "Como ver os relatórios", secao: "dinheiro", quem: "financeiro", rota: RELATORIOS,
     passos: [
       "Abra Relatórios.",
-      "Em Período, escolha Esta semana, Este mês, Mês passado ou Últimos 90 dias.",
+      "No alto, toque em um dos períodos: Esta semana, Este mês, Mês passado ou Últimos 90 dias.",
       "Para outras datas, toque em Personalizado e escolha o dia inicial e o final.",
       "Veja os atendimentos concluídos, as faltas, o valor médio por atendimento, os clientes novos e o faturamento.",
       "Desça para ver as formas de pagamento, os dias e horários mais cheios, os serviços mais feitos e os pets e tutores que mais vieram.",
     ],
-    dicas: ["Faturamento conta só o que já foi recebido.", "Embaixo de cada número aparece a comparação com o período anterior, do mesmo tamanho."],
+    dicas: [
+      "Faturamento conta só o que já foi recebido.",
+      "Embaixo de cada número aparece a comparação com o período anterior, do mesmo tamanho.",
+      "Atendimentos, faltas e dias mais cheios contam os horários da Agenda. Creche e hotel têm um cartão próprio, com as estadias encerradas.",
+      "Não existe relatório de vendas nem de margem por produto.",
+    ],
     palavras: ["relatorio", "relatorios", "faturamento", "ticket", "ticket medio", "desempenho", "numeros", "comparar", "periodo anterior", "mes passado"] },
   { id: "relatorio-exportar", titulo: "Como exportar ou imprimir um relatório", secao: "dinheiro", quem: "financeiro", rota: RELATORIOS,
     passos: [
@@ -687,7 +870,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["A planilha traz o resumo, o período anterior, creche e hotel, serviços, comissão, formas de pagamento e tutores."],
     palavras: ["exportar relatorio", "imprimir relatorio", "planilha do relatorio", "pdf do relatorio", "mandar para o contador", "contador"] },
-  { id: "relatorio-creche", titulo: "Como ver os números da creche e do hotel", secao: "dinheiro", quem: "financeiro", rota: RELATORIOS,
+  { id: "relatorio-creche", titulo: "Como ver os números da creche e do hotel", secao: "dinheiro", usa: ["casa"], quem: "financeiro", rota: RELATORIOS,
     passos: [
       "Abra Relatórios e escolha o período.",
       "Desça até o cartão Creche e hotel.",
@@ -695,18 +878,23 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["Entram as estadias encerradas no período.", "O valor recebido das estadias já está somado no faturamento."],
     palavras: ["relatorio da creche", "relatorio do hotel", "numeros da creche e do hotel", "numeros do hotel", "numeros da creche", "diarias no mes", "estadias", "faturamento do hotel"] },
-  { id: "comissao", titulo: "Como calcular a comissão da equipe", secao: "dinheiro", quem: "dono", rota: RELATORIOS, tambem: [EQUIPE],
+  { id: "comissao", titulo: "Como calcular a comissão da equipe", secao: "dinheiro", usa: ["banho"], quem: "dono", rota: RELATORIOS, tambem: [EQUIPE],
     passos: [
       "Abra Equipe e toque no cartão da pessoa.",
       "Em Comissão, escreva a porcentagem de cada atendimento e toque em Salvar.",
       "Abra Relatórios e escolha o período.",
       "Desça até Comissão por profissional: a conta de cada um já vem pronta.",
     ],
-    dicas: ["A comissão é uma parte do valor de cada atendimento que a pessoa concluiu.", "Sem porcentagem definida, a pessoa não aparece com comissão."],
+    dicas: [
+      "A base da conta é o valor cobrado pelo serviço nos atendimentos que a pessoa concluiu, já com o desconto. Produto e extra ficam de fora.",
+      "Atendimento concluído com pacote aparece na contagem, com a marca com pacote.",
+      "Sem porcentagem definida, a pessoa não aparece com comissão.",
+      "A porcentagem é uma só por pessoa: não muda por serviço, e não há comissão sobre produto.",
+    ],
     palavras: ["comissao", "porcentagem", "pagar a equipe", "comissao do banhista", "comissao do tosador", "percentual"] },
 
   /* ---------- Estoque e pacotes ---------- */
-  { id: "estoque", titulo: "Como cadastrar um produto no estoque", secao: "estoque", quem: "todos", rota: ESTOQUE,
+  { id: "estoque", titulo: "Como cadastrar um produto no estoque", secao: "estoque", usa: ["loja"], quem: "todos", rota: ESTOQUE,
     passos: [
       "Abra Estoque e toque em Produto novo.",
       "Escreva o nome e, se quiser, a categoria.",
@@ -716,9 +904,9 @@ const BASE: TopicoBase[] = [
       "Em Quanto tem hoje, escreva o que já está na prateleira.",
       "Toque em Salvar produto.",
     ],
-    dicas: ["Quando o saldo chega ao mínimo, o produto aparece como acabando e a tela Hoje avisa.", "Para muitos produtos de uma vez, use Trazer de planilha."],
+    dicas: ["Quando o saldo chega ao mínimo, o produto aparece como acabando e a tela Hoje avisa.", "Para muitos produtos de uma vez, use Trazer de planilha.", "O produto não tem código de barras: na venda, a busca é pelo nome.", "O Custo fica guardado no produto. Ainda não existe relatório de margem por produto."],
     palavras: ["estoque", "produto novo", "cadastrar produto", "minimo", "acabando", "inventario", "racao", "shampoo", "trazer produtos", "planilha de produtos"] },
-  { id: "estoque-entrada", titulo: "Como dar entrada e saída de produto", secao: "estoque", quem: "todos", rota: ESTOQUE,
+  { id: "estoque-entrada", titulo: "Como dar entrada e saída de produto", secao: "estoque", usa: ["loja"], quem: "todos", rota: ESTOQUE,
     passos: [
       "Abra Estoque e ache o produto.",
       "Quando chegar mercadoria, toque em Entrada, escreva a quantidade e toque em Anotar entrada.",
@@ -726,9 +914,9 @@ const BASE: TopicoBase[] = [
       "Em Motivo, escolha Venda, Uso no banho ou Perda ou vencido.",
       "Toque em Anotar saída ou em Anotar venda.",
     ],
-    dicas: ["Na entrada, quem vê o financeiro pode escrever o custo e marcar Lançar a compra como despesa.", "Pelo Mozart: \"entrou 10 sacos de ração a 140 cada\"."],
+    dicas: ["Na entrada, dá para escrever o custo. Quem cuida do caixa também pode marcar Lançar a compra como despesa.", "Pelo Mozart: \"entrou 10 sacos de ração a 140 cada\"."],
     palavras: ["entrada de estoque", "saida de estoque", "entrada de produto", "saida de produto", "entrada e saida de produto", "chegou mercadoria", "compra", "uso interno", "perda", "vencido", "dar entrada", "dar saida"] },
-  { id: "estoque-saldo", titulo: "Como corrigir o saldo de um produto", secao: "estoque", quem: "todos", rota: ESTOQUE,
+  { id: "estoque-saldo", titulo: "Como corrigir o saldo de um produto", secao: "estoque", usa: ["loja"], quem: "todos", rota: ESTOQUE,
     passos: [
       "Abra Estoque e toque no nome do produto.",
       "Toque em Corrigir saldo.",
@@ -737,61 +925,70 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["Na mesma janela você muda o nome, o preço e o estoque mínimo, e vê os Últimos movimentos.", "Tirar este produto da lista esconde o produto e guarda o histórico."],
     palavras: ["corrigir saldo", "saldo errado", "contagem", "inventario", "editar produto", "mudar preco do produto", "tirar produto"] },
-  { id: "venda", titulo: "Como vender um produto no balcão", secao: "estoque", quem: "todos", rota: ESTOQUE, tambem: [CAIXA],
+  { id: "venda", titulo: "Como vender um produto no balcão", secao: "estoque", usa: ["loja"], quem: "todos", rota: ESTOQUE, tambem: [CAIXA],
     passos: [
       "Na tela Estoque, toque em Vender. Na tela Caixa, o botão se chama Venda no balcão.",
       "Busque o produto pelo nome e toque nele.",
       "Ajuste a quantidade com os botões de mais e de menos.",
       "Se quiser, toque em Dizer quem comprou e escolha o tutor.",
       "Escolha a Forma de pagamento.",
-      "Toque em Receber, o botão laranja.",
+      "Toque em Receber, o botão que mostra o valor.",
     ],
-    dicas: ["O dinheiro entra no caixa e o estoque baixa sozinho.", "Quem não vê o financeiro toca em Dar baixa no estoque: o dinheiro fica para quem cuida do financeiro lançar."],
+    dicas: ["O dinheiro entra no caixa e o estoque baixa sozinho.", "Quem não cuida do caixa toca em Dar baixa no estoque: o dinheiro fica para quem cuida do financeiro lançar.", "A venda no balcão é sempre paga na hora: não tem Cliente paga depois."],
     palavras: ["vender", "venda", "balcao", "produto", "racao", "shampoo", "venda no balcao", "vender produto", "petisco"] },
-  { id: "pacotes-modelo", titulo: "Como criar um modelo de pacote", secao: "estoque", quem: "todos", rota: PACOTES,
+  { id: "pacotes-modelo", titulo: "Como criar um modelo de pacote", secao: "estoque", usa: ["pacotes"], quem: "todos", rota: PACOTES,
     passos: [
       "Abra Pacotes e toque em Modelos de pacote.",
-      "Toque em Modelo novo.",
-      "Dê um nome, como \"4 banhos no mês\".",
+      "Toque em Modelo novo. Se ainda não existe nenhum modelo, o botão se chama Criar um modelo.",
+      "Dê um nome, como \"4 banhos no mês\" ou \"10 diárias de creche\".",
       "Escolha o serviço, a quantidade, a validade em dias e o preço.",
       "Toque em Salvar.",
     ],
     dicas: ["O modelo é o pacote que você costuma vender. Na hora da venda é só escolher.", "Desativar tira o modelo da venda. Quem já comprou continua com o pacote."],
-    palavras: ["modelo de pacote", "criar pacote", "pacote novo", "plano de banho", "mensalidade", "4 banhos"] },
-  { id: "pacotes", titulo: "Como vender um pacote", secao: "estoque", quem: "todos", rota: PACOTES,
+    palavras: ["modelo de pacote", "criar pacote", "pacote novo", "plano de banho", "mensalidade", "4 banhos", "pacote de diarias"] },
+  { id: "pacotes", titulo: "Como vender um pacote", secao: "estoque", usa: ["pacotes"], quem: "todos", rota: PACOTES,
     passos: [
       "Abra Pacotes e toque em Vender pacote.",
       "Escolha o pet.",
       "Escolha o pacote. Sem modelo pronto, toque em Montar um avulso.",
       "Confira a quantidade, a validade, o preço e a data da compra.",
       "Escolha Paga agora e a forma de pagamento, ou Cliente paga depois.",
-      "Toque em Receber, o botão laranja.",
+      "Toque em Receber, o botão que mostra o valor.",
     ],
     dicas: ["Pago na hora, o valor entra no caixa. Se o cliente paga depois, a conta fica em Financeiro, A receber."],
     palavras: ["pacote", "pacotes", "vender pacote", "vender um pacote", "mensalidade", "plano de banho", "pacote de banho", "mensalista"] },
-  { id: "pacotes-usar", titulo: "Como usar, renovar ou encerrar um pacote", secao: "estoque", quem: "todos", rota: PACOTES,
+  { id: "pacotes-usar", titulo: "Como usar, renovar ou encerrar um pacote", secao: "estoque", usa: ["pacotes"], quem: "todos", rota: PACOTES,
     passos: [
       "Abra Pacotes e ache o pacote do pet em Clientes com pacote.",
-      "A cada banho, toque em Usar 1.",
+      "A cada uso, toque em Usar 1.",
       "Tocou sem querer? Toque em Desfazer uso.",
       "Quando acabar, toque em Renovar para vender outro igual.",
       "Pacote que venceu ganha o botão Encerrar: toque nele para tirar o pacote da lista de ativos.",
     ],
-    dicas: ["Os filtros Ativos, Vencendo em 7 dias e Encerrados ajudam a achar.", "Pacote vencido ainda pode ser usado: o sistema pede confirmação."],
-    palavras: ["usar pacote", "dar baixa no pacote", "baixa no pacote", "renovar pacote", "usar 1", "renovar", "encerrar pacote", "pacote vencido", "pacote acabou", "saldo do pacote"] },
+    dicas: [
+      { so: ["banho"], texto: "Na Agenda, o pet com pacote para o serviço ganha o botão Concluir usando o pacote (sem cobrar): ele conclui o atendimento e já dá baixa em um uso." },
+      { so: ["casa"], texto: "No check-out da creche e do hotel, em Como fica a conta, escolha Usar 1 do pacote: a diária sai do pacote e nenhum dinheiro é lançado." },
+      "Os filtros Ativos, Vencendo em 7 dias e Encerrados ajudam a achar.",
+      "Pacote vencido ainda pode ser usado: o sistema pede confirmação.",
+    ],
+    palavras: ["usar pacote", "dar baixa no pacote", "baixa no pacote", "renovar pacote", "usar 1", "renovar", "encerrar pacote", "pacote vencido", "pacote acabou", "saldo do pacote", "concluir usando o pacote"] },
 
   /* ---------- Equipe ---------- */
   { id: "equipe", titulo: "Como adicionar uma pessoa na equipe", secao: "equipe", quem: "dono", rota: EQUIPE,
     passos: [
-      "Abra Equipe e toque em Adicionar pessoa.",
+      "Abra Equipe e toque em Adicionar pessoa. Se você ainda trabalha sozinho, o botão se chama Tenho ajuda: adicionar pessoa.",
       "Escreva o nome, escolha o que a pessoa faz e toque em Continuar.",
       "Diga se ela vai entrar no sistema. Para banhista e tosador, o comum é Não, só aparece na agenda.",
       "Toque em Continuar.",
       "Se quiser, escolha a cor, a comissão e os dias de trabalho. Esse passo pode ser pulado.",
-      "Toque no botão laranja Adicionar, que vem com o nome da pessoa.",
+      "Toque em Adicionar, o botão que vem com o nome da pessoa.",
     ],
-    dicas: ["Banhista e tosador quase nunca precisam de login: você marca os horários e eles aparecem na agenda.", "Quem não tem login não ocupa acesso do plano."],
-    palavras: ["equipe", "funcionario", "funcionaria", "adicionar pessoa", "banhista", "tosador", "contratar", "nova pessoa", "ajudante"] },
+    dicas: [
+      "Banhista e tosador quase nunca precisam de login: você marca os horários e eles aparecem na agenda.",
+      { so: ["casa"], texto: "Para quem cuida dos pets da creche ou do hotel, escolha Monitor(a) de creche: abre Creche e hotel e Clientes e pets, sem ver dinheiro." },
+      "Quem não tem login não ocupa acesso do plano.",
+    ],
+    palavras: ["equipe", "funcionario", "funcionaria", "adicionar pessoa", "banhista", "tosador", "contratar", "nova pessoa", "ajudante", "monitor", "monitora"] },
   { id: "equipe-login", titulo: "Como dar login e mandar o convite", secao: "equipe", quem: "dono", rota: EQUIPE,
     passos: [
       "Abra Equipe.",
@@ -801,18 +998,24 @@ const BASE: TopicoBase[] = [
       "Ligue as áreas que ela pode abrir.",
       "No fim, toque em Mandar pelo WhatsApp ou em Copiar convite.",
     ],
-    dicas: ["A pessoa cria a conta com esse mesmo e-mail e escolhe a própria senha.", "Convite não chegou? Toque em Reenviar no cartão da pessoa."],
+    dicas: ["A pessoa cria a conta com esse mesmo e-mail e escolhe a própria senha.", "O convite não é enviado sozinho: é você quem manda o link. Enquanto a pessoa não cria a conta, o cartão dela mostra Convite criado: falta a pessoa criar a conta.", "Para mandar de novo, toque em Reenviar no cartão da pessoa."],
     atencao: ["O e-mail precisa ser exatamente o mesmo: é assim que o sistema sabe que a pessoa é da sua equipe.", "Cada pessoa com login ocupa um acesso do plano."],
     palavras: ["login", "convite", "convidar", "acesso", "dar acesso", "senha da funcionaria", "reenviar convite", "email da pessoa", "recepcao", "socio", "gerente"] },
   { id: "permissoes", titulo: "Como escolher o que cada pessoa pode abrir", secao: "equipe", quem: "dono", rota: EQUIPE,
     passos: [
       "Abra Equipe e toque no cartão da pessoa.",
       "Desça até a parte que diz o que a pessoa abre.",
-      "Ligue ou desligue cada área: Agenda, Clientes e pets, Creche e hotel, Pacotes, Estoque, Caixa, Financeiro e Relatórios.",
-      "Se preferir, troque a Função, lá em cima: ela preenche as chaves com o que é comum para aquela função.",
+      "Ligue ou desligue cada área: Agenda, Clientes e pets, Creche e hotel, Pacotes, Estoque, Caixa, Financeiro e Relatórios. Só aparecem as áreas do que o pet shop usa.",
+      "Se preferir, toque em um dos perfis prontos: ele preenche as chaves com o que é comum para aquela função.",
       "Toque em Salvar.",
     ],
-    dicas: ["As chaves só aparecem para quem tem login.", "Caixa, Financeiro e Relatórios são as áreas que mostram valores. Com elas desligadas, a pessoa não vê quanto entrou nem quanto saiu.", "O cartão Quem pode o quê, na tela Equipe, mostra o que cada perfil abre."],
+    dicas: [
+      "As chaves só aparecem para quem tem login.",
+      "Caixa é para receber, vender e conferir a gaveta: a pessoa vê o que entrou hoje, mas não as contas, as despesas nem o histórico.",
+      "Financeiro e Relatórios mostram todo o dinheiro. Só quem tem uma delas (ou o dono) altera um valor já recebido que outra pessoa lançou.",
+      "Com Caixa, Financeiro e Relatórios desligados, a pessoa não vê valor nenhum.",
+      "O cartão Quem pode o quê, na tela Equipe, mostra o que cada perfil abre.",
+    ],
     atencao: ["Equipe, Meu pet shop e Assinatura ficam só com os donos. Sócio abre tudo, igual a você."],
     palavras: ["permissao", "permissoes", "o que pode ver", "liberar area", "bloquear area", "esconder valores", "nao ver dinheiro", "perfil", "acessos", "area nao liberada"] },
   { id: "escala", titulo: "Como definir os dias de trabalho e a cor de cada pessoa", secao: "equipe", quem: "dono", rota: EQUIPE,
@@ -835,26 +1038,33 @@ const BASE: TopicoBase[] = [
     palavras: ["tirar acesso", "desativar pessoa", "demitir", "saiu da equipe", "remover funcionario", "bloquear funcionario", "mandou embora"] },
 
   /* ---------- Divulgação e relacionamento ---------- */
-  { id: "link", titulo: "Como mandar o link para o cliente agendar sozinho", secao: "divulgacao", quem: "todos", rota: AGENDA, tambem: [HOJE, PETSHOP],
+  { id: "link", titulo: "Como mandar o link para o cliente agendar sozinho", secao: "divulgacao", quem: "todos", rota: PETSHOP, tambem: [HOJE, AGENDA],
     passos: [
-      "Na tela Hoje, toque em Mandar link de agendamento. Na Agenda, o botão se chama Link do cliente.",
-      "Se o link estiver desligado, o dono toca em Ligar o link.",
+      { so: ["banho"], texto: "Na tela Hoje, toque em Mandar link de agendamento. Na Agenda, o botão se chama Link do cliente." },
+      "O dono também acha o link em Meu pet shop, no cartão Link de agendamento.",
+      "Se o link estiver desligado, o dono liga: na janela do link, em Ligar o link; em Meu pet shop, na chave do cartão.",
       "Toque em Copiar link para colar onde quiser.",
-      "Ou toque em Mandar para um cliente e escolha o pet: o WhatsApp do tutor abre com o convite.",
+      { so: ["banho"], texto: "Ou, na janela do link, toque em Mandar para um cliente e escolha o pet: o WhatsApp do tutor abre com o convite." },
+      "Em Meu pet shop, Mandar no WhatsApp abre o WhatsApp para você escolher para quem mandar.",
     ],
-    dicas: ["O cliente vê só os horários livres. Nada é marcado sem você aceitar.", "Ver como o cliente vê abre a página do link.", "O recado que aparece no topo da página fica em Meu pet shop, no cartão Link de agendamento."],
+    dicas: [
+      "O cliente vê só os horários livres. Nada é marcado sem você aceitar.",
+      "Ver como o cliente vê abre a página do link.",
+      "O recado que aparece no topo da página fica em Meu pet shop, no cartão Link de agendamento, em Recado na página.",
+      "Pelo link o cliente só pede: não paga nada, nem sinal.",
+    ],
     palavras: ["link", "agendamento online", "cliente agendar", "tutor agendar", "link de agendamento", "link do cliente", "agendar sozinho", "bio do instagram"] },
   { id: "pedidos-link", titulo: "Como aceitar ou recusar um pedido que veio pelo link", secao: "divulgacao", quem: "todos", rota: AGENDA, tambem: [HOJE],
     passos: [
       "Quando chega um pedido, aparece o bloco Pedidos pelo link, na tela Hoje e na Agenda.",
       "Confira o pet, o serviço, o dia e a hora.",
-      "Se quiser, escolha quem atende.",
+      "Se aparecer Quem atende?, escolha a pessoa ou deixe para decidir depois.",
       "Toque em Aceitar ou em Recusar.",
       "Toque em Confirmar no WhatsApp para avisar o tutor. Se recusou, o botão é Sugerir outro horário.",
     ],
-    dicas: ["Ao aceitar, o horário entra na agenda.", "O número ao lado de Agenda, no menu, mostra quantos pedidos esperam resposta."],
+    dicas: ["Ao aceitar, o horário entra na agenda.", "O tutor não é avisado sozinho: toque em Confirmar no WhatsApp logo depois de responder.", "Se o telefone do pedido já for de outro tutor, o sistema pergunta É a mesma pessoa?.", "O número ao lado de Agenda, no menu, mostra quantos pedidos esperam resposta."],
     palavras: ["pedido", "pedidos", "aceitar", "recusar", "pedido pelo link", "cliente pediu horario", "confirmar pedido"] },
-  { id: "lembrete", titulo: "Como mandar lembretes pelo WhatsApp", secao: "divulgacao", quem: "todos", rota: AGENDA, tambem: [HOJE],
+  { id: "lembrete", titulo: "Como mandar lembretes pelo WhatsApp", secao: "divulgacao", usa: ["banho"], quem: "todos", rota: AGENDA, tambem: [HOJE],
     passos: [
       "Na Agenda, toque na faixa Mandar os lembretes, que aparece no dia que tem lembrete faltando. Na tela Hoje, toque no aviso de lembretes de amanhã, em Pede a sua atenção.",
       "Abre a lista dos tutores que ainda não receberam.",
@@ -862,7 +1072,12 @@ const BASE: TopicoBase[] = [
       "Envie a mensagem e volte para o sistema.",
       "Repita com o próximo da lista.",
     ],
-    dicas: ["Para lembrar de um horário só, abra o horário e toque em Lembrete no WhatsApp.", "Tutor com mais de um horário recebe tudo em uma mensagem só."],
+    dicas: [
+      "Para lembrar de um horário só, abra o horário e toque em Lembrete no WhatsApp.",
+      "Tutor com mais de um horário recebe tudo em uma mensagem só.",
+      "Horário que já começou fica de fora da lista.",
+      { so: ["casa"], texto: "A lista traz só os horários da Agenda. Quem chega amanhã na creche ou no hotel é avisado um por um, pelo botão WhatsApp do cartão, em Reservas." },
+    ],
     atencao: ["O sistema não envia mensagem sozinho: quem aperta enviar é você.", "Tutor sem telefone na ficha não entra na lista."],
     palavras: ["lembrete", "lembretes", "confirmar", "confirmacao", "whatsapp do cliente", "mensagem", "avisar cliente", "lembrar o cliente", "zap"] },
   { id: "sumidos", titulo: "Como chamar de volta quem não vem há um tempo", secao: "divulgacao", quem: "todos", rota: CLIENTES, tambem: [HOJE],
@@ -873,7 +1088,7 @@ const BASE: TopicoBase[] = [
       "Toque em Chamar ao lado do tutor: o WhatsApp abre com a mensagem pronta.",
       "Envie a mensagem e volte para chamar o próximo.",
     ],
-    dicas: ["Para escrever do seu jeito, toque em Mudar o texto. Onde estiver [pet] entra o nome do pet.", "Quem já foi chamado fica marcado, com a opção Chamar de novo.", "Só entra na lista quem não tem horário marcado."],
+    dicas: ["Para escrever do seu jeito, toque em Mudar o texto. Onde estiver [pet] entra o nome do pet. O texto fica guardado neste aparelho.", "Quem já foi chamado fica marcado, com a opção Chamar de novo.", "Só entra na lista quem não tem horário marcado."],
     palavras: ["sumido", "sumidos", "nao vem", "nao voltou", "nao voltaram", "chamar de volta", "recuperar cliente", "cliente parou de vir"] },
   { id: "aniversarios", titulo: "Como dar parabéns no aniversário do pet", secao: "divulgacao", quem: "todos", rota: CLIENTES, tambem: [HOJE],
     passos: [
@@ -885,7 +1100,7 @@ const BASE: TopicoBase[] = [
     dicas: ["Aparecem os pets que fazem aniversário nos próximos 7 dias.", "A tela Hoje avisa quando tem aniversário chegando."],
     atencao: ["Só aparece o pet que tem a data de nascimento anotada na ficha."],
     palavras: ["aniversario", "aniversarios", "parabens", "nascimento", "aniversariante"] },
-  { id: "fidelidade", titulo: "Como usar o programa de fidelidade", secao: "divulgacao", quem: "dono", rota: PETSHOP, tambem: [CLIENTES],
+  { id: "fidelidade", titulo: "Como usar o programa de fidelidade", secao: "divulgacao", usa: ["banho"], quem: "dono", rota: PETSHOP, tambem: [CLIENTES],
     passos: [
       "Abra Meu pet shop e vá até o cartão Fidelidade.",
       "Escolha a cada quantos atendimentos o tutor ganha.",
@@ -895,7 +1110,8 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "A contagem é por tutor, soma os atendimentos concluídos de todos os pets dele e começa no dia em que você liga.",
-      "O andamento aparece na ficha do tutor e na janela do horário, na Agenda.",
+      "Só contam os atendimentos da Agenda. Estadias de creche e de hotel não entram na contagem.",
+      "Quando o tutor completa, o aviso Tem prêmio para entregar aparece na janela do horário dele, na Agenda, e na ficha do tutor. O sistema não manda mensagem.",
       "Entregou por engano? Toque em Desfazer na última entrega.",
     ],
     atencao: ["O sistema só conta e avisa. O prêmio é você quem entrega, e o valor da conta não muda sozinho."],
@@ -913,11 +1129,11 @@ const BASE: TopicoBase[] = [
     passos: [
       "Abra a tela Hoje.",
       "Na segunda-feira, o cartão Sua semana aparece em destaque.",
-      "Nos outros dias, toque em Ver o resumo da semana passada.",
+      "Nos outros dias, toque em Ver o resumo da semana passada, no meio da tela.",
       "Veja quanto entrou, os atendimentos concluídos, as faltas, os pets novos, o que há a receber e os sumidos.",
       "Toque em Copiar resumo para colar no WhatsApp ou guardar.",
     ],
-    dicas: ["Cada número vem comparado com a semana anterior.", "O resumo sugere um próximo passo, com um botão que leva direto ao lugar."],
+    dicas: ["O resumo só aparece depois que o pet shop completa a primeira semana no sistema, e para quem vê o financeiro.", "Cada número vem comparado com a semana anterior.", "O resumo sugere um próximo passo, com um botão que leva direto ao lugar."],
     palavras: ["resumo da semana", "sua semana", "semana passada", "como foi a semana", "resumo semanal"] },
 
   /* ---------- Ajustes e conta ---------- */
@@ -925,13 +1141,19 @@ const BASE: TopicoBase[] = [
     passos: [
       "Abra Meu pet shop.",
       "No cartão Dados, mude o nome, o WhatsApp e a cidade e toque em Salvar dados.",
-      "No cartão Horário de funcionamento, marque cada dia como Aberto ou Fechado.",
-      "Escreva a hora de abrir e a de fechar de cada dia.",
+      "No cartão Horário de funcionamento, toque em uma semana pronta: Segunda a sexta, Segunda a sábado, Terça a sábado ou Todos os dias.",
+      "Acerte cada dia: marque Aberto e escreva a hora de abrir e a de fechar. Dia desmarcado fica Fechado.",
+      "Se os dias abertos têm o mesmo horário, toque em Usar o mesmo horário em todos os dias abertos: ele copia o horário do primeiro dia aberto.",
+      "Se vocês fecham para almoçar, marque Fecha para o almoço? e escreva de que horas a que horas.",
       "Toque em Salvar horário.",
     ],
-    dicas: ["A agenda, o link do cliente e o Mozart só oferecem horário dentro do funcionamento.", "Copiar segunda para os dias de semana preenche de terça a sexta de uma vez."],
-    palavras: ["horario de funcionamento", "abre", "fecha", "meu pet shop", "nome do pet shop", "dados do pet shop", "endereco", "whatsapp do pet shop", "sabado", "domingo"] },
-  { id: "preco-servico", titulo: "Como mudar o preço de um serviço", secao: "ajustes", quem: "dono", rota: PETSHOP,
+    dicas: [
+      "A agenda, o link do cliente e o Mozart só oferecem horário dentro do funcionamento e fora do almoço.",
+      "O almoço vale toda semana, sem prazo para acabar. Não precisa bloquear a agenda.",
+      "Usar o mesmo horário não abre dia fechado: dia fechado continua fechado.",
+    ],
+    palavras: ["horario de funcionamento", "abre", "fecha", "meu pet shop", "nome do pet shop", "dados do pet shop", "endereco", "whatsapp do pet shop", "sabado", "domingo", "almoco", "hora do almoco", "terca a sabado"] },
+  { id: "preco-servico", titulo: "Como mudar o preço de um serviço", secao: "ajustes", usa: ["banho"], quem: "dono", rota: PETSHOP,
     passos: [
       "Abra Meu pet shop e vá até o cartão Serviços e preços.",
       "Toque no serviço, por exemplo Banho.",
@@ -941,7 +1163,7 @@ const BASE: TopicoBase[] = [
     dicas: ["O preço novo vale para os próximos horários que você marcar."],
     atencao: ["Os horários que já estão marcados ficam com o valor antigo. Para mudar um deles, abra o horário e toque em Remarcar ou alterar."],
     palavras: ["mudar o preco", "mudo o preco", "mudar preco", "alterar o preco", "alterar preco", "trocar o preco", "aumentar o preco", "preco do banho", "preco da tosa", "preco do servico", "valor do banho", "valor da tosa", "reajuste", "reajustar", "tabela de precos", "precos"] },
-  { id: "servico-novo", titulo: "Como criar ou desativar um serviço", secao: "ajustes", quem: "dono", rota: PETSHOP,
+  { id: "servico-novo", titulo: "Como criar ou desativar um serviço", secao: "ajustes", usa: ["banho"], quem: "dono", rota: PETSHOP,
     passos: [
       "Abra Meu pet shop e vá até o cartão Serviços e preços.",
       "Toque em Serviço novo.",
@@ -951,7 +1173,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["Para tirar um serviço da agenda sem apagar o histórico, abra o serviço e desmarque Ativo.", "A duração define quanto tempo o horário ocupa na agenda."],
     palavras: ["servico novo", "criar servico", "novo servico", "hidratacao", "tosa higienica", "duracao", "desativar servico", "servicos"] },
-  { id: "vagas-banho", titulo: "Como definir quantos pets são atendidos ao mesmo tempo", secao: "ajustes", quem: "dono", rota: PETSHOP,
+  { id: "vagas-banho", titulo: "Como definir quantos pets são atendidos ao mesmo tempo", secao: "ajustes", usa: ["banho"], quem: "dono", rota: PETSHOP,
     passos: [
       "Abra Meu pet shop.",
       "Vá até o cartão Banho e tosa: pets ao mesmo tempo.",
@@ -986,7 +1208,7 @@ const BASE: TopicoBase[] = [
       "Guarde o arquivo baixado em um lugar seguro.",
     ],
     dicas: ["O arquivo traz planilhas de clientes, pets, agenda, financeiro, caixas, estoque, pacotes, creche e hotel, equipe e serviços.", "As planilhas abrem no Excel e no Google Planilhas."],
-    atencao: ["É uma cópia para guardar e consultar: ainda não dá para trazer esses dados de volta para o sistema automaticamente. As fotos não entram."],
+    atencao: ["É uma cópia para guardar e consultar: não dá para restaurar, isto é, trazer esses arquivos de volta para o sistema. As fotos não entram."],
     palavras: ["copia de seguranca", "backup", "copia", "baixar dados", "guardar dados", "seguranca", "baixar tudo"] },
   { id: "dados", titulo: "Como baixar ou apagar os meus dados", secao: "ajustes", quem: "dono", rota: PETSHOP,
     passos: [
@@ -1022,22 +1244,146 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["Os materiais não fazem parte da assinatura. Ninguém precisa comprar nada para usar o sistema.", "Comprou com um e-mail diferente do da conta? Fale com a nossa equipe para liberar."],
     palavras: ["escola", "aula", "aulas", "curso", "material", "comprei", "ler o material", "meus materiais", "aprender"] },
+  /* ---------- O que o sistema não faz ---------- */
+  { id: "nota-fiscal", titulo: "Dá para emitir nota fiscal?", secao: "limites", quem: "todos", rota: null,
+    passos: [
+      "Não. O Maestro Pet Gestão não emite nota fiscal: nem NF-e, nem NFC-e, nem NFS-e.",
+      "Para o cliente, mande o comprovante: depois de receber, toque em Mandar comprovante. Ele não vale como nota fiscal.",
+      "Para o contador, abra Relatórios ou Financeiro e toque em Exportar: a planilha traz o que entrou no período.",
+      "A nota fiscal continua sendo emitida onde você já emite hoje: na prefeitura, com o contador ou em um programa emissor.",
+    ],
+    palavras: ["nota fiscal", "nf", "nfe", "nf-e", "nfce", "nfc-e", "nfse", "nfs-e", "emitir nota", "cupom fiscal", "danfe", "fiscal"] },
+  { id: "sinal", titulo: "Dá para cobrar sinal ou adiantamento na reserva?", secao: "limites", quem: "todos", rota: null,
+    passos: [
+      "Não. A reserva de creche e de hotel não tem sinal nem adiantamento: o valor é cobrado no check-out. O link do cliente também não cobra nada.",
+      "Se você recebeu um adiantamento por fora, anote para não se perder: abra Caixa, toque em Entrada, escreva o valor e, na descrição, o nome do pet e \"sinal da reserva\".",
+      "Na reserva, toque em Editar e escreva em Observações quanto já foi pago.",
+      "No check-out, em Valor a receber, escreva só o que falta.",
+    ],
+    atencao: ["O sistema não desconta o sinal sozinho. Quem lembra de cobrar só a diferença é você."],
+    palavras: ["sinal", "adiantamento", "adiantado", "antecipado", "pagamento antecipado", "cobrar um sinal", "sinal na reserva", "sinal da reserva", "entrada na reserva", "caucao", "garantir a reserva"] },
+  { id: "margem", titulo: "Dá para ver a margem de lucro por produto?", secao: "limites", quem: "todos", rota: null,
+    passos: [
+      "Não. Não existe relatório de margem nem de vendas por produto.",
+      "O custo fica guardado no produto: abra Estoque, toque no nome do produto e veja o Custo ao lado do Preço de venda.",
+      "Para fazer a conta por fora, o dono baixa a cópia de segurança em Meu pet shop: a planilha de produtos traz o preço e o custo de cada um.",
+      "O que o sistema mostra é o Resultado do mês, em Financeiro: tudo o que entrou menos tudo o que saiu.",
+    ],
+    atencao: ["Na entrada de mercadoria, o custo que você escreve passa a ser o custo do produto. O sistema guarda o último custo, não a média."],
+    palavras: ["margem", "margem de lucro", "lucro por produto", "lucro do produto", "markup", "custo do produto", "relatorio de produtos", "vendas por produto", "produto mais vendido", "cmv"] },
+  { id: "codigo-barras", titulo: "Dá para usar leitor de código de barras?", secao: "limites", quem: "todos", rota: null,
+    passos: [
+      "Não. O produto não tem campo de código de barras, e a venda não lê o leitor.",
+      "Para vender, busque o produto pelo nome: em Estoque, toque em Vender e escreva o começo do nome.",
+      "Para achar rápido, comece o nome pelo que você fala no balcão, como \"Ração Golden 15 kg\".",
+    ],
+    palavras: ["codigo de barras", "barras", "leitor", "leitor de codigo", "scanner", "bipar", "sku", "ean", "codigo do produto"] },
+  { id: "restaurar", titulo: "Dá para restaurar a cópia de segurança?", secao: "limites", quem: "todos", rota: null,
+    passos: [
+      "Não. A cópia de segurança serve para guardar e consultar: o sistema não traz esses arquivos de volta.",
+      "Os dados continuam guardados no sistema. A cópia é uma garantia a mais, que fica com você.",
+      "Por planilha só entram clientes e pets (Trazer de planilha, em Clientes e pets) e produtos (Trazer de planilha, em Estoque). Agenda, financeiro e o resto não voltam por arquivo.",
+      "Apagou alguma coisa por engano? Fale com a nossa equipe pela Ajuda.",
+    ],
+    palavras: ["restaurar", "restaurar a copia", "restaurar a copia de seguranca", "restaurar copia", "restaurar backup", "restauracao", "recuperar backup", "recuperar copia", "voltar backup", "subir backup", "importar backup", "trazer a copia de volta"] },
+  { id: "envio-automatico", titulo: "O sistema manda mensagens sozinho?", secao: "limites", quem: "todos", rota: null,
+    passos: [
+      "Não. O sistema não envia WhatsApp, SMS nem e-mail para o cliente sozinho.",
+      "Ele deixa a mensagem pronta: lembrete, aviso de que terminou, confirmação de pedido, cobrança, parabéns.",
+      "Você toca no botão, o WhatsApp abre com o texto escrito e você aperta enviar.",
+      "A mensagem sai do seu WhatsApp, com o seu número.",
+    ],
+    dicas: ["Para mandar os lembretes do dia em sequência, veja Como mandar lembretes pelo WhatsApp."],
+    palavras: ["envio automatico", "automatico", "automatica", "sozinho", "manda sozinho", "envia sozinho", "disparo", "disparar", "robo", "mensagem automatica", "lembrete automatico", "whatsapp automatico", "em massa"] },
+  { id: "canil", titulo: "Dá para escolher o canil ou o quarto de cada hóspede?", secao: "limites", quem: "todos", rota: null,
+    passos: [
+      "Não. A estadia não tem campo de canil, baia nem quarto.",
+      "As vagas são contadas pelo total da creche e do hotel, em Meu pet shop, no cartão Creche e hotel.",
+      "Se precisar lembrar onde o pet está, escreva em Observações, no check-in ou em Editar: a anotação fica à vista no cartão dele.",
+    ],
+    palavras: ["canil", "baia", "box", "quarto", "suite", "acomodacao", "gaiola", "onde o pet fica"] },
 ];
 
+const usaParte = (petshop: ComModulos, u: Uso) => (u === "banho" ? usaModulo(petshop, "banho_tosa") : u === "casa" ? usaCasa(petshop) : usaModulo(petshop, u));
+/** Vale para este pet shop? Sem pet shop (a Ajuda com IA, a impressão geral), vale tudo. */
+const vale = (petshop: ComModulos | null, so?: Uso[]) => !petshop || !so || so.some((u) => usaParte(petshop, u));
+
 const numerar = (passos: string[]) => passos.map((p, i) => `${i + 1}. ${p}`).join("\n");
-const respostaDe = (t: TopicoBase) => {
+/** Na seção do que o sistema não faz, a resposta é uma conversa ("Não. …"), não um passo a passo numerado. */
+const respostaDe = (t: { secao: SecaoId; passos: string[]; dicas?: string[]; atencao?: string[] }) => {
   const avisos = [...(t.atencao ?? []).map((a) => `Atenção: ${a}`), ...(t.dicas ?? [])];
-  return avisos.length ? `${numerar(t.passos)}\n\n${avisos.join("\n")}` : numerar(t.passos);
+  const corpo = t.secao === "limites" ? t.passos.join("\n") : numerar(t.passos);
+  return avisos.length ? `${corpo}\n\n${avisos.join("\n")}` : corpo;
 };
 
-export const TOPICOS: Topico[] = BASE.map((t) => ({ ...t, resposta: respostaDe(t) }));
+/** Quem tem só creche (ou só hotel) lê o título do tópico com o nome da casa dele. */
+function tituloPara(titulo: string, petshop: ComModulos | null): string {
+  if (!petshop) return titulo;
+  const creche = usaModulo(petshop, "creche"), hotel = usaModulo(petshop, "hotel");
+  if (creche === hotel) return titulo;
+  return titulo
+    .replace("a tela Creche e hotel", creche ? "a tela Creche" : "a tela Hotel")
+    .replace("de creche ou hotel", creche ? "de creche" : "de hotel")
+    .replace("da creche e do hotel", creche ? "da creche" : "do hotel")
+    .replace("de creche e hotel", creche ? "de creche" : "de hotel");
+}
 
-/** Os tópicos que um dono novo precisa, na ordem. */
-export const COMECANDO = ["guia", "preco-servico", "pet", "marcar", "conta", "caixa", "link", "equipe"];
+/** O tópico em texto puro. Com pet shop, saem os passos e as dicas das partes que ele não usa. */
+function pronto(t: TopicoBase, petshop: ComModulos | null): Topico {
+  const linhas = (l?: Passo[]) => (l ?? []).filter((x) => typeof x === "string" || vale(petshop, x.so)).map((x) => (typeof x === "string" ? x : x.texto));
+  const passos = linhas(t.passos), dicas = linhas(t.dicas), atencao = linhas(t.atencao);
+  const limpo = { ...t, titulo: tituloPara(t.titulo, petshop), passos, dicas: dicas.length ? dicas : undefined, atencao: atencao.length ? atencao : undefined };
+  return { ...limpo, resposta: respostaDe(limpo) };
+}
+
+/** Todos os tópicos, com todos os passos (o guia da Ajuda com IA e o padrão de quem não informa o pet shop). */
+export const TOPICOS: Topico[] = BASE.map((t) => pronto(t, null));
+
+const PARTES: Uso[] = ["banho", "creche", "hotel", "loja", "pacotes"];
+const porPetshop = new Map<string, Topico[]>();
+/** Os tópicos que valem para um pet shop: só os das partes que ele usa, e cada um só com os passos dele. */
+export function topicosPara(petshop: ComModulos): Topico[] {
+  const chave = PARTES.filter((u) => usaParte(petshop, u)).join(",");
+  let lista = porPetshop.get(chave);
+  if (!lista) { lista = BASE.filter((t) => vale(petshop, t.usa)).map((t) => pronto(t, petshop)); porPetshop.set(chave, lista); }
+  return lista;
+}
+
+/** As seções que têm tópico para este pet shop, com o nome do jeito dele ("Creche", "Hotel", "Estoque"…). */
+export function secoesPara(petshop: ComModulos): { id: SecaoId; titulo: string; apoio: string }[] {
+  const lista = topicosPara(petshop);
+  const loja = usaModulo(petshop, "loja"), pacotes = usaModulo(petshop, "pacotes");
+  return SECOES.filter((s) => lista.some((t) => t.secao === s.id)).map((s) =>
+    s.id === "creche" ? { ...s, titulo: nomeDaCasa(petshop) }
+    : s.id === "estoque" && !(loja && pacotes) ? { ...s, titulo: loja ? "Estoque" : "Pacotes", apoio: loja ? "Produtos e venda no balcão." : "Vender pacote e dar baixa a cada uso." }
+    : s);
+}
+
+/** Os tópicos que um dono novo precisa, na ordem, conforme a área principal do pet shop. */
+const COMECO = {
+  banho_tosa: ["guia", "preco-servico", "pet", "marcar", "conta", "caixa", "link", "equipe"],
+  creche: ["guia", "creche-preco", "pet", "mensalista", "chamada", "cobrancas-creche", "creche-link", "equipe"],
+  hotel: ["guia", "creche-preco", "pet", "creche-reserva", "creche-checkin", "creche-checkout", "creche-link", "equipe"],
+  loja: ["guia", "estoque", "estoque-entrada", "venda", "caixa", "caixa-fechar", "equipe"],
+} as const;
+/** As dúvidas mais comuns de cada área, para os atalhos da Ajuda. */
+const RAPIDAS = {
+  banho_tosa: ["marcar", "conta", "link", "equipe", "caixa"],
+  creche: ["mensalista", "chamada", "cobrancas-creche", "creche-link", "equipe"],
+  hotel: ["creche-reserva", "creche-checkin", "creche-checkout", "creche-link", "equipe"],
+  loja: ["estoque", "venda", "caixa", "caixa-fechar", "equipe"],
+} as const;
+/** A área que puxa a ordem: a principal do pet shop; sem ela, a primeira que ele usa. */
+function areaDaFrente(petshop: ComModulos): keyof typeof COMECO {
+  return principalDe(petshop) ?? (usaModulo(petshop, "banho_tosa") ? "banho_tosa" : usaModulo(petshop, "creche") ? "creche" : usaModulo(petshop, "hotel") ? "hotel" : usaModulo(petshop, "loja") ? "loja" : "banho_tosa");
+}
+const escolhidos = (ids: readonly string[], lista: Topico[]) => ids.map((id) => lista.find((t) => t.id === id)).filter((t): t is Topico => t != null);
+export const comecandoPara = (petshop: ComModulos) => escolhidos(COMECO[areaDaFrente(petshop)], topicosPara(petshop));
+export const rapidasPara = (petshop: ComModulos) => escolhidos(RAPIDAS[areaDaFrente(petshop)], topicosPara(petshop));
 
 export const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-export const topicoPorId = (id: string | null | undefined) => TOPICOS.find((t) => t.id === id) ?? null;
+export const topicoPorId = (id: string | null | undefined, lista: Topico[] = TOPICOS) => lista.find((t) => t.id === id) ?? null;
 
 /** Nome de cada tela, como está no menu. */
 export const NOME_TELA: Record<string, string> = {
@@ -1045,41 +1391,53 @@ export const NOME_TELA: Record<string, string> = {
   [CAIXA]: "Caixa", [FINANCEIRO]: "Financeiro", [RELATORIOS]: "Relatórios", [ESTOQUE]: "Estoque", [EQUIPE]: "Equipe",
   [PETSHOP]: "Meu pet shop", [ASSINATURA]: "Assinatura", [ESCOLA]: "Escola de Gestão", [ROTA_MANUAL]: "Manual",
 };
+/** O nome da tela para este pet shop: quem só tem creche lê "Creche", como no menu. */
+export const nomeDaTela = (rota: string, petshop?: ComModulos | null) => (rota === CRECHE && petshop ? nomeDaCasa(petshop) : NOME_TELA[rota]);
 
 /** A tela do aplicativo a que um endereço pertence (a agenda impressa é da Agenda; /gestao/app casa só com ela mesma). */
 export function telaDoCaminho(caminho: string): string | null {
   return Object.keys(NOME_TELA).filter((r) => (r === HOJE ? caminho === r : caminho === r || caminho.startsWith(`${r}/`))).sort((a, b) => b.length - a.length)[0] ?? null;
 }
 
-/** Tópicos de uma tela do aplicativo: os que moram nela e os que também se fazem por ela. */
-export function topicosDaRota(caminho: string): Topico[] {
+/** Tópicos de uma tela do aplicativo: os que moram nela e os que também se fazem por ela. Com o pet shop, só os dele. */
+export function topicosDaRota(caminho: string, petshop?: ComModulos | null): Topico[] {
   const tela = telaDoCaminho(caminho);
   if (!tela) return [];
-  return [...TOPICOS.filter((t) => t.rota === tela), ...TOPICOS.filter((t) => t.rota !== tela && t.tambem?.includes(tela))];
+  const lista = petshop ? topicosPara(petshop) : TOPICOS;
+  return [...lista.filter((t) => t.rota === tela), ...lista.filter((t) => t.rota !== tela && t.tambem?.includes(tela))];
 }
 
 const VAZIAS = new Set(["como", "faco", "fazer", "faz", "que", "para", "pra", "um", "uma", "uns", "de", "do", "da", "dos", "das", "no", "na", "nos", "nas", "eu", "meu", "minha", "os", "as", "em", "por", "com", "se", "quero", "posso", "onde", "qual", "quando", "ao", "aos"]);
 /** Começo da palavra, para "importo" achar "importar" e "vacinas" achar "vacina". */
 const raiz = (w: string) => (w.length >= 7 ? w.slice(0, w.length - 2) : w.length >= 5 ? w.slice(0, w.length - 1) : w);
+const limpa = (s: string) => semAcento(s).replace(/[^a-z0-9 -]/g, " ").replace(/\s+/g, " ").trim();
 
 /**
- * Busca do manual: sem acento, em título, palavras, passos e avisos. Primeiro procura os tópicos que têm todas
- * as palavras escritas; se nenhum tem todas, mostra os que têm alguma, do mais parecido para o menos.
+ * Busca do manual: sem acento, em título, palavras, passos e avisos.
+ * Vem primeiro o tópico que tem a busca inteira como palavra-chave ("troco" acha o caixa, não "trocar a senha");
+ * depois os que têm todas as palavras escritas; se nenhum tem todas, os que têm alguma, do mais parecido para o menos.
+ * Palavra inteira vale mais que pedaço de palavra.
  */
-export function buscarNoManual(texto: string): Topico[] {
-  const todos = semAcento(texto).replace(/[^a-z0-9 -]/g, " ").split(/\s+/).filter((w) => w.length > 1);
+export function buscarNoManual(texto: string, lista: Topico[] = TOPICOS): Topico[] {
+  const frase = limpa(texto);
+  const todos = frase.split(" ").filter((w) => w.length > 1);
   const uteis = todos.filter((w) => !VAZIAS.has(w));
-  const termos = (uteis.length ? uteis : todos).map(raiz);
-  if (!termos.length) return TOPICOS;
-  const notas = TOPICOS.map((t) => {
-    const titulo = semAcento(t.titulo), palavras = semAcento(t.palavras.join(" | ")), corpo = semAcento(t.resposta);
+  const inteiras = uteis.length ? uteis : todos;
+  if (!inteiras.length) return lista;
+  const termos = inteiras.map(raiz);
+  const fraseUtil = inteiras.join(" ");
+  const notas = lista.map((t) => {
+    const titulo = ` ${limpa(t.titulo)} `, chaves = t.palavras.map(limpa), palavras = chaves.join(" | "), corpo = semAcento(t.resposta);
+    // 2 = a busca é uma palavra-chave do tópico; 1 = a busca está inteira dentro de uma palavra-chave
+    const exata = chaves.includes(fraseUtil) || chaves.includes(frase) ? 2 : chaves.some((c) => ` ${c} `.includes(` ${fraseUtil} `)) ? 1 : 0;
     let n = 0, achou = 0;
-    for (const w of termos) {
-      const p = titulo.includes(w) ? 5 : palavras.includes(w) ? 3 : corpo.includes(w) ? 1 : 0;
+    inteiras.forEach((w, i) => {
+      const r = termos[i];
+      const p = titulo.includes(` ${w} `) ? 6 : chaves.includes(w) ? 5 : titulo.includes(r) ? 4 : palavras.includes(r) ? 3 : corpo.includes(r) ? 1 : 0;
       if (p) { n += p; achou += 1; }
-    }
-    return { t, n, achou };
+    });
+    return { t, n, achou, exata };
   });
-  const completos = notas.filter((x) => x.achou === termos.length);
-  return (completos.length ? completos : notas.filter((x) => x.achou > 0)).sort((a, b) => b.achou - a.achou || b.n - a.n).map((x) => x.t);
+  const completos = notas.filter((x) => x.exata > 0 || x.achou === termos.length);
+  return (completos.length ? completos : notas.filter((x) => x.achou > 0)).sort((a, b) => b.exata - a.exata || b.achou - a.achou || b.n - a.n).map((x) => x.t);
 }

@@ -27,18 +27,11 @@ export const abrirGuia = () => window.dispatchEvent(new Event(EVENTO_GUIA));
 type IdPasso = "cor" | "logo" | "horario" | "equipe" | "servicos" | "casa" | "link";
 type PassoDoGuia = { id: IdPasso };
 
-const DIA = { abre: "08:00", fecha: "18:00" };
-const MODELOS: { rotulo: string; horario: Horario }[] = [
-  { rotulo: "Segunda a sexta", horario: { "1": DIA, "2": DIA, "3": DIA, "4": DIA, "5": DIA, "6": null, "0": null } },
-  { rotulo: "Segunda a sábado", horario: { "1": DIA, "2": DIA, "3": DIA, "4": DIA, "5": DIA, "6": { abre: "08:00", fecha: "13:00" }, "0": null } },
-  { rotulo: "Todos os dias", horario: { "1": DIA, "2": DIA, "3": DIA, "4": DIA, "5": DIA, "6": DIA, "0": DIA } },
-];
 const CORES = ["#4d8f6b", "#3b82a0", "#7c6fb0", "#b0563f", "#8a7a3a", "#a05a82", "#c9773f"];
 const DURACOES = [15, 30, 45, 60, 90, 120, 150, 180];
 const textoDuracao = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}`);
 type Preco = Pick<Servico, "id" | "nome" | "cor" | "ativo" | "categoria" | "duracao_min" | "preco_p" | "preco_m" | "preco_g" | "preco_gg">;
 const CAMPOS_PRECO = ["preco_p", "preco_m", "preco_g", "preco_gg"] as const;
-const mesmoHorario = (a: Horario, b: Horario) => ["0", "1", "2", "3", "4", "5", "6"].every((d) => (a[d]?.abre ?? "") === (b[d]?.abre ?? "") && (a[d]?.fecha ?? "") === (b[d]?.fecha ?? ""));
 const lerVagas = (s: string) => { const t = s.trim(); if (!t) return null; const n = Number(t); return Number.isInteger(n) ? n : NaN; };
 /** Banho e tosa costumam mudar de preço com o porte; os serviços rápidos (unha, hidratação) quase sempre têm um preço só. */
 function comecaPorPorte(s: Preco): boolean {
@@ -401,16 +394,13 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
           {atual === "horario" && (
             <div className="g-pilha">
               {cabeca("Quando vocês abrem?", banho ? "A agenda só oferece horário dentro desses dias e horas. Já deixei o mais comum marcado: confira e siga." : "Já deixei o mais comum marcado: confira e siga.")}
-              <div className="g-chips">
-                {MODELOS.map((m) => <button key={m.rotulo} type="button" className="g-chip" aria-pressed={mesmoHorario(lerHorario(m.horario), horario)} onClick={() => { setHorario(lerHorario(m.horario)); setErro(null); }}>{m.rotulo}</button>)}
-              </div>
-              <GradeHorario valor={horario} aoMudar={setHorario} />
+              <GradeHorario valor={horario} aoMudar={(h) => { setHorario(h); setErro(null); }} modelos />
             </div>
           )}
 
           {atual === "equipe" && (
             <div className="g-pilha">
-              {cabeca("Quem atende os pets?", "Quem aparece na agenda para receber os horários. Só o nome basta; login e permissões ficam para depois, em Equipe.")}
+              {cabeca("Quem atende os pets?", "Quem aparece na agenda para receber os horários. Só o nome basta. Se você trabalha sozinho, é só continuar.")}
               <div className="g-guia-gente">
                 <label className={`g-guia-pessoa${euAtendo ? " on" : ""}`}>
                   <input type="checkbox" checked={euAtendo} onChange={(e) => setEuAtendo(e.target.checked)} />
@@ -525,9 +515,9 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
 
           {atual === "link" && (
             <div className="g-pilha">
-              {cabeca("Quer que o cliente peça horário pelo celular?", "Você manda um link. O cliente vê só os horários livres, conforme o que você acabou de configurar, e envia o pedido. Nada é marcado sem você aceitar.")}
+              {cabeca(banho ? "Quer que o cliente peça horário pelo celular?" : "Quer que o cliente peça vaga pelo celular?", banho ? "Você manda um link. O cliente vê só os horários livres, conforme o que você acabou de configurar, e envia o pedido. Nada é marcado sem você aceitar." : "Você manda um link. O cliente escolhe o dia e envia o pedido. Nada é marcado sem você aceitar.")}
               <button type="button" className={`g-guia-opcao${linkLigado ? " on" : ""}`} onClick={() => setLinkLigado(true)}>
-                <Tile icone={Link2} tom="pessego" /><span><b>Sim, ligar o link</b><small>Fica em "Mandar link de agendamento", na tela inicial.</small></span>{linkLigado && <Check />}
+                <Tile icone={Link2} tom="pessego" /><span><b>Sim, ligar o link</b><small>{banho ? 'Fica em "Mandar link de agendamento", na tela inicial.' : "Fica em Meu pet shop, em Link de agendamento."}</small></span>{linkLigado && <Check />}
               </button>
               <button type="button" className={`g-guia-opcao${!linkLigado ? " on" : ""}`} onClick={() => setLinkLigado(false)}>
                 <Tile icone={CalendarDays} tom="menta" /><span><b>Agora não</b><small>Só a equipe marca. Dá para ligar depois.</small></span>{!linkLigado && <Check />}
@@ -549,7 +539,7 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
               </ul>
               <p className="g-muted">O que ficou para depois está em Meu pet shop. Agora, por onde quer começar?</p>
               <div className="g-guia-proximos">
-                <Link className="g-btn pri" href="/gestao/app/clientes" onClick={aoFechar}><PawPrint />Cadastrar o primeiro pet</Link>
+                <Link className="g-btn pri" href="/gestao/app/clientes?novo=1" onClick={aoFechar}><PawPrint />Cadastrar o primeiro pet</Link>
                 <button type="button" className="g-btn sec" onClick={aoImportar}><FileSpreadsheet />Trazer meus clientes de uma planilha</button>
                 <Link className="g-btn fantasma" href="/gestao/app/manual" onClick={aoFechar}><BookOpen />Ver o manual</Link>
               </div>

@@ -11,7 +11,7 @@ import AdicionarPessoa from "@/components/gestao/equipe/adicionar";
 import EditarPessoa, { FolhaConvite } from "@/components/gestao/equipe/editar";
 import { Areas, Vagas } from "@/components/gestao/equipe/pecas";
 import { acessoDe, erroDeLimite, fraseDoLimite, funcaoDe, nAcessos, pilulasDe, primeiroNome, titularDe, usoDoPlano, type Uso } from "@/components/gestao/equipe/modelo";
-import { PERFIS } from "@/lib/gestao/acessos";
+import { perfisPara } from "@/lib/gestao/acessos";
 import type { Profissional } from "@/lib/gestao/tipos";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./equipe.css";
@@ -119,7 +119,7 @@ export default function Equipe() {
                     <div className={`g-eq-acesso ${acesso}`}>
                       <i className="g-eq-acesso-i" aria-hidden>{acesso === "login" ? <KeyRound /> : acesso === "convite" ? <Hourglass /> : p.atende ? <CalendarDays /> : <Lock />}</i>
                       <p className="g-eq-acesso-t">
-                        <b>{acesso === "login" ? "Com login" : acesso === "convite" ? "Convite enviado, esperando criar a conta" : p.atende ? "Sem login, só na agenda" : "Sem login"}</b>
+                        <b>{acesso === "login" ? "Com login" : acesso === "convite" ? "Convite criado: falta a pessoa criar a conta" : p.atende ? "Sem login, só na agenda" : "Sem login"}</b>
                         {acesso === "convite" && <small>{p.email_convite}</small>}
                       </p>
                       {acesso === "convite" && <button type="button" className="g-btn p sec g-eq-acao" onClick={() => abrir({ tipo: "convite", id: p.id })}><Send />Reenviar</button>}
@@ -176,7 +176,7 @@ export default function Equipe() {
             <ChevronRight className="g-eq-pode-seta" size={18} aria-hidden />
           </summary>
           <div className="g-eq-compara">
-            {PERFIS.map((c) => (
+            {perfisPara(petshop).map((c) => (
               <div key={c.id} className="g-eq-quadro">
                 <p className="g-eq-quadro-t">{c.titulo}</p>
                 <Areas areas={c.areas} socio={c.socio} curto />

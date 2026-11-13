@@ -1,4 +1,5 @@
 import { chamar } from "./util";
+import { usaCasa, usaModulo } from "./modulos";
 /** Contas da agenda que não dependem do navegador (a tela e o assistente usam as mesmas). */
 
 export type Intervalo = { inicio: number; fim: number }; // minutos desde 00:00 do dia
@@ -40,6 +41,17 @@ export function vagasDe(petshop: { vagas?: number | null }, equipe: { ativo: boo
 export const aquiE = (petshop: string) => `Aqui é ${petshop.trim()}.`;
 /** Saudação inteira: "Oi, Dona Zefa! Aqui é Banho da Neide." */
 export const saudacaoZap = (tutor: string | null | undefined, petshop: string) => `${tutor ? `Oi, ${chamar(tutor)}!` : "Oi!"} ${aquiE(petshop)}`;
+
+/**
+ * Convite que acompanha o link de agendamento. Quem só tem creche ou hotel convida para pedir vaga, não horário.
+ */
+export function textoDoLink(petshop: { nome: string; modulos?: string[] | null }, endereco: string, tutor?: string | null) {
+  const soVaga = !usaModulo(petshop, "banho_tosa") && usaCasa(petshop);
+  const corpo = soVaga
+    ? "Agora dá para pedir vaga pelo celular. É só escolher o dia, e a gente confirma por aqui:"
+    : "Agora dá para pedir horário pelo celular. É só escolher o serviço, o dia e a hora que estiver livre, e a gente confirma por aqui:";
+  return `${saudacaoZap(tutor, petshop.nome)} ${corpo} ${endereco}`;
+}
 
 /** Texto do lembrete que vai para o WhatsApp do tutor. */
 export function textoLembrete(p: { tutor?: string | null; pet: string; servico?: string | null; quando: string; hora: string; petshop: string }) {
