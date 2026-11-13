@@ -751,6 +751,11 @@ isOneToOne: false
 "pedido_aceitar":
 { Args: { "p_forcar"?: boolean,"p_id": string,"p_profissional"?: string }; Returns: string
                            },
+"petshop_reservado":
+{ Args: { "p": string }; Returns: {
+              "id": string,"meta_mes": number
+            }[]
+                           },
 "precos_dos_pacotes":
 { Args: { "p": string }; Returns: {
               "id": string,"preco": number,"vendido": boolean

@@ -306,18 +306,26 @@ export function Campo({ rotulo, dica, erro, children }: { rotulo: string; dica?:
   );
 }
 
-/** Campo de dinheiro: aceita "60", "60,50" ou "1.200,00" e devolve número (ou null). */
+/** Aviso de quando alguém digita o sinal de menos num campo de valor (o sinal é tirado). */
+export const AVISO_SEM_MENOS = "Valor não leva sinal de menos: tirei o sinal. Dinheiro que sai é lançado como saída.";
+
+/** Campo de dinheiro: aceita "60", "60,50" ou "1.200,00" e devolve número (ou null). Não aceita sinal de menos. */
 export function CampoValor({ valor, aoMudar, placeholder = "0,00", autoFocus, id }: {
   valor: number | null; aoMudar: (v: number | null) => void; placeholder?: string; autoFocus?: boolean; id?: string;
 }) {
   const [texto, setTexto] = useState(valor == null ? "" : valor2(valor));
   const ultimo = useRef(valor);
+  const { avisar } = useAvisos();
   useEffect(() => {
     if (valor !== ultimo.current) { ultimo.current = valor; setTexto(valor == null ? "" : valor2(valor)); }
   }, [valor]);
   return (
     <input id={id} className="g-input g-tab" inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={texto}
-      onChange={(e) => { setTexto(e.target.value); const n = lerValor(e.target.value); ultimo.current = n; aoMudar(n); }}
+      onChange={(e) => {
+        const limpo = e.target.value.replace(/-/g, "");
+        if (limpo !== e.target.value) avisar(AVISO_SEM_MENOS);
+        setTexto(limpo); const n = lerValor(limpo); ultimo.current = n; aoMudar(n);
+      }}
       onBlur={() => { if (ultimo.current != null) setTexto(valor2(ultimo.current)); }} />
   );
 }

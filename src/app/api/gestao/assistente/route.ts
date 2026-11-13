@@ -1,4 +1,4 @@
-import { lerEquipe } from "@/lib/gestao/reservado";
+import { lerEquipe, lerPetshop } from "@/lib/gestao/reservado";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   const { data: u } = await sb.auth.getUser(token);
   if (!u.user) return erro(401, "sem_login", "Entre de novo para falar com o Mozart.");
   const [p, e, s] = await Promise.all([
-    sb.from("petshops").select("*").eq("id", corpo.petshopId).maybeSingle(),
+    lerPetshop(sb, corpo.petshopId),
     lerEquipe(sb, corpo.petshopId),
     sb.from("servicos").select("*").eq("petshop_id", corpo.petshopId).order("ordem"),
   ]);
