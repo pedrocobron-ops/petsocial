@@ -1,5 +1,6 @@
 "use client";
 
+import HotelNoRelatorio from "@/components/gestao/hotel/relatorio";
 import { useMemo, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, CalendarDays, CircleCheck, Clock, CreditCard, Download, HandCoins, Home, Moon, PawPrint, Printer, Receipt, Scissors, Sun, TrendingUp, UserPlus, Users, UserX } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
@@ -505,6 +506,7 @@ function Relatorios() {
                 </p>
               </section>
             )}
+            <HotelNoRelatorio de={de} ate={ate} antes={antes} />
 
             <div className="g-duas">
               <section className="g-card">
