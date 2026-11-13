@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarOff, Check, Clock, Lock, Repeat, TriangleAlert, Truck, Users, Utensils } from "lucide-react";
+import { CalendarOff, Check, Clock, Lock, Plus, Repeat, TriangleAlert, Truck, Users, Utensils, X } from "lucide-react";
 import type { AgendamentoCompleto, PetComTutor, StatusAgendamento } from "@/lib/gestao/tipos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
-import { PORTES, SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
+import { PORTES } from "@/lib/gestao/tipos";
 import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, paraMin, vagasDe } from "@/lib/gestao/agenda";
-import { almocoDoDia, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, nomeDiaCurto, precoDoServico, somaDias } from "@/lib/gestao/util";
+import { definirServicosAMais, juntarServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-horario";
+import { almocoDoDia, brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, nomeDiaCurto, precoDoServico, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { CampoDinheiro, erroDeValor } from "../loja/pecas";
@@ -18,6 +19,11 @@ type Problema = { tipo: "fechado" | "bloqueio" | "conflito" | "vagas" | "fora" |
 /** Até quantas vezes um horário pode se repetir de uma vez (toda semana, dá meio ano). */
 const MAX_VEZES = 26;
 const OPCOES_VEZES = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 26];
+/** Um serviço a mais no mesmo horário, enquanto o formulário está aberto. `mexido`: a pessoa escreveu o valor. */
+type OutroServico = { servicoId: string; preco: number | null; mexido: boolean };
+/** Até quantos serviços a mais cabem num horário. */
+const MAX_OUTROS = 10;
+const tempo = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}`);
 /** Horários livres separados por parte do dia. */
 const PARTES = [
   { rotulo: "Manhã", de: 0, ate: 12 * 60 },
@@ -41,7 +47,8 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const { sb, petshop, equipe, servicos, user } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
-  const ativos = servicos.filter((s) => s.ativo || s.id === agendamento?.servico_id);
+  const outrosDoHorario = useMemo(() => servicosAMais(agendamento), [agendamento]);
+  const ativos = servicos.filter((s) => s.ativo || s.id === agendamento?.servico_id || outrosDoHorario.some((o) => o.servico_id === s.id));
 
   const [pet, setPet] = useState<PetComTutor | null>(petInicial ?? null);
   const [petNovo, setPetNovo] = useState<string | null>(null);
@@ -55,6 +62,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const [levaTraz, setLevaTraz] = useState(agendamento?.leva_traz ?? false);
   const [endereco, setEndereco] = useState(agendamento?.endereco_leva_traz ?? "");
   const [obs, setObs] = useState(agendamento?.obs ?? "");
+  // outros serviços no mesmo horário (Banho + Hidratação): cada um com o seu valor; a duração soma
+  const [outros, setOutros] = useState<OutroServico[]>(() => outrosDoHorario.map((o) => ({ servicoId: o.servico_id, preco: o.preco == null ? null : Number(o.preco), mexido: true })));
+  const [juntando, setJuntando] = useState(outrosDoHorario.length > 0);
   const [salvando, setSalvando] = useState(false);
   // o que está escrito no campo Valor (para avisar quando não é número) e o porte escolhido aqui mesmo
   const [textoValor, setTextoValor] = useState("");
@@ -77,6 +87,32 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   useEffect(() => {
     if (!precoMexido) setPreco(precoDoServico(servico, pet?.porte));
   }, [servico, pet, precoMexido]);
+  // o mesmo para os outros serviços: o valor acompanha o porte até a pessoa escrever outro
+  const porte = pet?.porte ?? null;
+  useEffect(() => {
+    setOutros((l) => (l.some((o) => !o.mexido) ? l.map((o) => (o.mexido ? o : { ...o, preco: precoDoServico(servicos.find((s) => s.id === o.servicoId), porte) })) : l));
+  }, [porte, servicos]);
+  const duracaoDe = (id: string) => servicos.find((s) => s.id === id)?.duracao_min ?? 0;
+  /** Junta ou tira um serviço a mais: a duração do horário acompanha. */
+  function alternarOutro(id: string) {
+    const tem = outros.some((o) => o.servicoId === id);
+    if (!tem && outros.length >= MAX_OUTROS) { avisar(`Um horário aceita até ${MAX_OUTROS} serviços a mais.`); return; }
+    setOutros((l) => (tem ? l.filter((o) => o.servicoId !== id) : [...l, { servicoId: id, preco: precoDoServico(servicos.find((s) => s.id === id), porte), mexido: false }]));
+    setDuracao((d) => {
+      const nova = tem ? d - duracaoDe(id) : d + duracaoDe(id);
+      return nova >= 5 ? Math.min(nova, 1440) : servico?.duracao_min ?? 60;
+    });
+  }
+  /** Troca o serviço principal: se ele estava entre os outros, sai de lá; a duração é a soma de todos. */
+  function escolherPrincipal(id: string, duracaoMin: number) {
+    const ficam = outros.filter((o) => o.servicoId !== id);
+    setServicoId(id);
+    setOutros(ficam);
+    setDuracao(Math.min(1440, duracaoMin + ficam.reduce((t, o) => t + duracaoDe(o.servicoId), 0)));
+    setPrecoMexido(false);
+    setTextoValor("");
+  }
+  const totalDoHorario = Math.round(((preco ?? 0) + outros.reduce((t, o) => t + (o.preco ?? 0), 0)) * 100) / 100;
 
   // o que já está marcado no dia, para sugerir horários livres
   const { dados: doDia } = useDados(async () => {
@@ -214,6 +250,11 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     if (valorRuim) { avisarErro("Confira o valor: escreva só números, como 45,00."); return; }
     const erroPreco = erroDeValor(preco);
     if (erroPreco) { avisarErro(erroPreco); return; }
+    for (const o of outros) {
+      const erroOutro = erroDeValor(o.preco, `O valor de ${servicos.find((x) => x.id === o.servicoId)?.nome ?? "um serviço"}`);
+      if (erroOutro) { avisarErro(erroOutro); return; }
+    }
+    const aMais = outros.filter((o) => o.servicoId !== servicoId).map((o) => ({ servico_id: o.servicoId, preco: o.preco }));
     const inicio = juntaDiaHora(dia, hhmm);
     const fim = new Date(inicio.getTime() + duracao * 60000);
     setSalvando(true);
@@ -230,10 +271,11 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
         const usar = comProblema === "pular" ? datas.filter((d) => !problemas[d]?.length) : datas;
         if (!usar.length) { avisar("Não sobrou nenhuma data para marcar."); setSalvando(false); return; }
         const serie = usar.length > 1 ? crypto.randomUUID() : null;
-        ok(await sb.from("agendamentos").insert(usar.map((d) => {
+        const marcados = ok(await sb.from("agendamentos").insert(usar.map((d) => {
           const ini = juntaDiaHora(d, hhmm);
           return { ...campos, inicio: ini.toISOString(), fim: new Date(ini.getTime() + duracao * 60000).toISOString(), serie_id: serie, petshop_id: petshop.id, criado_por: user.id };
         })).select("id"));
+        if (aMais.length) await juntarAosMarcados(marcados.map((m) => m.id), aMais);
         avisar(usar.length === 1 ? "1 horário marcado" : `${usar.length} horários marcados`);
         avisarMudanca();
         aoSalvar();
@@ -271,13 +313,32 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
         }
       }
       const quando = { inicio: inicio.toISOString(), fim: fim.toISOString() };
-      if (agendamento) ok(await sb.from("agendamentos").update({ ...campos, ...quando }).eq("id", agendamento.id).select(SELECT_AGENDAMENTO).single());
-      else ok(await sb.from("agendamentos").insert({ ...campos, ...quando, petshop_id: petshop.id, criado_por: user.id }).select("id").single());
+      if (agendamento) {
+        ok(await sb.from("agendamentos").update({ ...campos, ...quando }).eq("id", agendamento.id).select("id").single());
+        // só mexe nos outros serviços quando o horário tem (ou tinha) algum
+        if (aMais.length || outrosDoHorario.length) {
+          try { await definirServicosAMais(sb, agendamento.id, aMais); } catch (err) {
+            avisarErro(`O horário foi alterado, mas os outros serviços não. Abra o horário e confira. (${err instanceof Error ? err.message : "erro"})`);
+            avisarMudanca(); aoSalvar(); setSalvando(false);
+            return;
+          }
+        }
+      } else {
+        const novo = ok(await sb.from("agendamentos").insert({ ...campos, ...quando, petshop_id: petshop.id, criado_por: user.id }).select("id").single());
+        if (aMais.length) await juntarAosMarcados([novo.id], aMais);
+      }
       avisar(agendamento ? "Horário alterado." : `${pet.nome} marcado para ${dataAmigavel(inicio)} às ${hhmm}.`);
       avisarMudanca();
       aoSalvar();
     } catch (err) { avisarErro(err); }
     setSalvando(false);
+  }
+
+  /** Junta os outros serviços aos horários recém-marcados. Se falhar, o horário já existe: avisa para a pessoa conferir. */
+  async function juntarAosMarcados(ids: string[], aMais: { servico_id: string; preco: number | null }[]) {
+    try { await juntarServicosAMais(sb, petshop.id, ids, aMais); } catch (err) {
+      avisarErro(`O horário foi marcado só com o primeiro serviço. Abra o horário e junte os outros de novo. (${err instanceof Error ? err.message : "erro"})`);
+    }
   }
 
   if (petNovo !== null) {
@@ -302,10 +363,38 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
             <div className="g-chips">
               {ativos.map((s) => (
                 <button key={s.id} type="button" className="g-chip" aria-pressed={servicoId === s.id}
-                  onClick={() => { setServicoId(s.id); setDuracao(s.duracao_min); setPrecoMexido(false); setTextoValor(""); }}><i style={{ background: s.cor }} />{s.nome}</button>
+                  onClick={() => escolherPrincipal(s.id, s.duracao_min)}><i style={{ background: s.cor }} />{s.nome}</button>
               ))}
             </div>
+            {servico && ativos.length > 1 && !juntando && (
+              <button type="button" className="g-agd-juntar" onClick={() => setJuntando(true)}><Plus size={15} aria-hidden />Juntar outro serviço no mesmo horário</button>
+            )}
           </div>
+          {servico && juntando && (
+            <div className="g-campo g-agd-outros"><span>Outros serviços no mesmo horário</span>
+              <div className="g-chips" role="group" aria-label="Outros serviços no mesmo horário">
+                {ativos.filter((s) => s.id !== servicoId).map((s) => (
+                  <button key={s.id} type="button" className="g-chip" aria-pressed={outros.some((o) => o.servicoId === s.id)} onClick={() => alternarOutro(s.id)}><i style={{ background: s.cor }} />{s.nome}</button>
+                ))}
+              </div>
+              {outros.length === 0 ? <p className="g-pp g-muted" style={{ margin: 0 }}>Toque nos serviços que o pet vai fazer junto com {servico.nome}. Cada um entra com o seu valor e o tempo soma.</p> : (
+                <ul className="g-agd-outros-l">
+                  {outros.map((o) => {
+                    const s = servicos.find((x) => x.id === o.servicoId);
+                    return (
+                      <li key={o.servicoId}>
+                        <div className="t"><b>{s?.nome ?? "Serviço"}</b><small>mais {tempo(s?.duracao_min ?? 0)}</small></div>
+                        <label className="g-agd-valor" aria-label={`Valor de ${s?.nome ?? "serviço"}`}>
+                          <CampoDinheiro valor={o.preco} aoMudar={(v) => setOutros((l) => l.map((x) => (x.servicoId === o.servicoId ? { ...x, preco: v, mexido: true } : x)))} placeholder="definir" />
+                        </label>
+                        <button type="button" className="g-ico" aria-label={`Tirar ${s?.nome ?? "serviço"} deste horário`} onClick={() => alternarOutro(o.servicoId)}><X /></button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
 
           {quemAtende.length > 1 && (
             <div className="g-campo"><span>Quem atende</span>
@@ -419,16 +508,22 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
             <Campo rotulo="Duração">
               <select className="g-select" value={duracao} onChange={(e) => setDuracao(Number(e.target.value))}>
                 {[15, 30, 45, 60, 90, 120, 150, 180, 240].concat([15, 30, 45, 60, 90, 120, 150, 180, 240].includes(duracao) ? [] : [duracao]).sort((a, b) => a - b)
-                  .map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}`}</option>)}
+                  .map((m) => <option key={m} value={m}>{tempo(m)}</option>)}
               </select>
             </Campo>
-            <Campo rotulo="Valor" erro={valorRuim ? "Isso não é um valor. Escreva só números, como 45,00." : null}
+            <Campo rotulo={outros.length && servico ? `Valor de ${servico.nome}` : "Valor"} erro={valorRuim ? "Isso não é um valor. Escreva só números, como 45,00." : null}
               dica={semPorte && servico && !precoMexido ? "Pet sem porte: confira o valor." : undefined}>
               <span className={`g-agd-valor${valorRuim ? " ruim" : semPorte && servico && !precoMexido ? " atencao" : ""}`} onInput={(e) => setTextoValor((e.target as HTMLInputElement).value)}>
                 <CampoDinheiro valor={preco} aoMudar={(v) => { setPreco(v); setPrecoMexido(true); }} placeholder="definir" />
               </span>
             </Campo>
           </div>
+          {outros.length > 0 && (
+            <p className="g-agd-total" role="status">
+              <span>Total do horário, com {outros.length === 1 ? "o outro serviço" : `os outros ${outros.length} serviços`}</span>
+              <b className="g-tab">{brl(totalDoHorario)}</b>
+            </p>
+          )}
           {semPorte && servico && (
             <div className="g-agd-alerta g-agd-porte" role="status"><TriangleAlert />
               <div>

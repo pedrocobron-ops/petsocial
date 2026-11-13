@@ -105,3 +105,18 @@ div.g-agd-faixa.almoco { cursor: default; }
 .g-agd-valor.ruim .g-input { border-color: var(--g-vermelho); box-shadow: 0 0 0 3px rgba(179, 64, 46, .14); }
 .g-agd-porte > div { display: grid; gap: 8px; min-width: 0; }
 .g-agd-porte .g-chip { background: var(--g-carta); }
+
+/* mais de um serviço no mesmo horário */
+.g-agd-juntar { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 2px; border: 0; background: none; color: #9a4508; font: inherit; font-size: .9375rem; font-weight: 600; cursor: pointer; min-height: 36px; text-align: left; }
+.g-agd-juntar:hover { text-decoration: underline; }
+.g-agd-outros-l { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+.g-agd-outros-l li { display: grid; grid-template-columns: minmax(0, 1fr) 118px 40px; gap: 8px; align-items: center; padding: 8px 10px; border-radius: var(--g-raio-p); background: var(--g-carta-2); }
+.g-agd-outros-l .t { display: grid; min-width: 0; }
+.g-agd-outros-l .t b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-agd-outros-l .t small { color: var(--g-cinza); }
+.g-agd-total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0; padding: 10px 14px; border-radius: var(--g-raio-p); background: var(--g-carta-2); font-size: .9375rem; }
+.g-agd-total b { font-size: 1.0625rem; white-space: nowrap; }
+.g-agd-servicos { display: grid; gap: 2px; margin: 0; padding: 0 0 0 12px; list-style: none; border-left: 2px solid var(--g-linha); }
+.g-agd-servicos li { display: flex; justify-content: space-between; gap: 12px; font-size: .9375rem; color: var(--g-cinza); }
+.g-agd-servicos li b { color: var(--g-tinta); font-weight: 600; }
+.g-vd-servicos { display: grid; gap: 8px; margin-top: 10px; padding: 12px; border-radius: var(--g-raio-p); background: var(--g-carta-2); }

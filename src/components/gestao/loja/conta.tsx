@@ -26,6 +26,8 @@ import "./venda.css";
 /** Uma linha da conta enquanto ela está sendo montada. `valor` é o preço de uma unidade. */
 export type ItemConta = {
   chave: string; tipo: ItemLancamento["tipo"]; nome: string; qtd: number; valor: number | null; produtoId?: string; unidade?: string;
+  /** Linha de serviço: qual serviço da lista do pet shop (horário com mais de um serviço). */
+  servicoId?: string;
 };
 
 export const LEVA_E_TRAZ = "Leva e traz";
@@ -85,6 +87,7 @@ export function itensParaGravar(itens: ItemConta[]): ItemLancamento[] {
     .map((i) => ({
       tipo: i.tipo, nome: i.nome.trim() || (i.tipo === "extra" ? "Extra" : "Item"), qtd: i.qtd, valor: i.valor ?? 0,
       ...(i.produtoId ? { produto_id: i.produtoId } : {}),
+      ...(i.tipo === "servico" && i.servicoId ? { servico_id: i.servicoId } : {}),
     }));
 }
 

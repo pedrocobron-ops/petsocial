@@ -9,6 +9,7 @@ import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoCancelado, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
 import { textoComprovante } from "@/lib/gestao/comprovante";
 import { desfazerVenda, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { nomeDosServicos, servicosAMais, servicosPorExtenso, valorDoHorario } from "@/lib/gestao/servicos-do-horario";
 import { brl, dataAmigavel, dataCompleta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
@@ -24,7 +25,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const { sb, petshop, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
-  const [comanda, setComanda] = useState(false);
+  // conta aberta: "sim", ou com o pacote que vai cobrir o serviço principal
+  const [comanda, setComanda] = useState<false | "sim" | PacoteCliente>(false);
   const [cancelando, setCancelando] = useState(false);
   const [apagando, setApagando] = useState(false);
   const [baixando, setBaixando] = useState<Lancamento | null>(null);
@@ -62,7 +64,15 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     const fechados = caixas.length ? await sb.from("caixas").select("id").in("id", caixas).not("fechado_em", "is", null) : { data: [] };
     return { pago: lancados, pacote: validos[0] ?? null, fimDaSerie, emCaixaFechado: (fechados.data ?? []).length > 0 };
   }, [a.id]);
-  const pago = (extra?.pago.length ?? 0) > 0 || Boolean(a.pacote_cliente_id);
+  // mais de um serviço no mesmo horário: o pacote cobre só o principal; os outros entram na conta
+  const outros = servicosAMais(a);
+  const valorOutros = Math.round(outros.reduce((t, o) => t + Number(o.preco ?? 0), 0) * 100) / 100;
+  const total = valorDoHorario(a);
+  const pago = (extra?.pago.length ?? 0) > 0 || (Boolean(a.pacote_cliente_id) && !outros.length);
+  // pacote que ainda pode cobrir o serviço principal (se este horário já usou um, não oferece de novo)
+  const pacote = a.pacote_cliente_id ? null : extra?.pacote ?? null;
+  // o que falta cobrar na conta: tudo, ou só os outros serviços quando o principal foi pelo pacote
+  const aCobrar = a.pacote_cliente_id ? valorOutros : total;
   // conta fechada: já recebida, ou anotada para o cliente pagar depois (a receber)
   const recebidos = (extra?.pago ?? []).filter((l) => l.pago), devidos = (extra?.pago ?? []).filter((l) => !l.pago);
   const recebido = recebidos.reduce((t, l) => t + Number(l.valor), 0);
@@ -207,24 +217,24 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   }
 
   const zap = linkWhatsApp(tutor?.telefone, textoLembrete({
-    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: a.servicos?.nome, quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
   }));
 
   // remarcou ou cancelou: a mensagem para o tutor já vem pronta (quem manda é a pessoa, pelo WhatsApp)
   const zapRemarcado = linkWhatsApp(tutor?.telefone, textoRemarcado({
-    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: a.servicos?.nome, quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
   }));
   const zapCancelado = linkWhatsApp(tutor?.telefone, textoCancelado({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome }));
 
-  const zapPronto = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", petshop: petshop.nome, servico: a.servicos?.nome }));
+  const zapPronto = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", petshop: petshop.nome, servico: servicosPorExtenso(a) }));
 
   // comprovante: só para quem vê o financeiro, com o atendimento concluído, a conta toda recebida e telefone na ficha
   const zapComprovante = vejoFinanceiro && a.status === "concluido" && recebidos.length > 0 && !devidos.length && soDigitos(tutor?.telefone).length >= 8
-    ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico: a.servicos?.nome, quando: a.inicio, recebidos }))
+    ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico: nomeDosServicos(a), quando: a.inicio, recebidos }))
     : null;
 
   if (comanda) {
-    return <Comanda agendamento={a} aoFechar={() => setComanda(false)} aoPronto={() => { aoMudar(); aoFechar(); }} />;
+    return <Comanda agendamento={a} pacote={comanda === "sim" ? null : comanda} aoFechar={() => setComanda(false)} aoPronto={() => { aoMudar(); aoFechar(); }} />;
   }
 
   if (baixando) {
@@ -298,10 +308,16 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         {pet?.alertas && <p className="g-aviso" style={{ margin: 0 }}>{pet.alertas}</p>}
 
         <div className="g-card liso g-pilha p">
-          <div className="g-fila entre"><span className="g-muted">Serviço</span><b>{a.servicos?.nome ?? "A definir"}</b></div>
+          <div className="g-fila entre"><span className="g-muted">{outros.length ? "Serviços" : "Serviço"}</span><b style={{ textAlign: "right" }}>{nomeDosServicos(a) ?? "A definir"}</b></div>
           <div className="g-fila entre"><span className="g-muted">Horário</span><b className="g-tab">{hora(a.inicio)} às {hora(a.fim)}</b></div>
           {a.profissionais && <div className="g-fila entre"><span className="g-muted">Com</span><b>{a.profissionais.nome}</b></div>}
-          <div className="g-fila entre"><span className="g-muted">Valor</span><b className="g-tab">{a.preco != null ? brl(a.preco) : "A definir"}{pago && !lancado ? " · pago" : ""}</b></div>
+          <div className="g-fila entre"><span className="g-muted">{outros.length ? "Valor total" : "Valor"}</span><b className="g-tab">{total != null ? brl(total) : "A definir"}{pago && !lancado ? " · pago" : ""}</b></div>
+          {outros.length > 0 && (
+            <ul className="g-agd-servicos" aria-label="Valor de cada serviço">
+              <li><span>{a.servicos?.nome ?? "Serviço"}</span><b className="g-tab">{a.pacote_cliente_id ? "pelo pacote" : a.preco != null ? brl(a.preco) : "a definir"}</b></li>
+              {outros.map((o) => <li key={o.id}><span>{o.servicos?.nome ?? "Serviço"}</span><b className="g-tab">{o.preco != null ? brl(o.preco) : "a definir"}</b></li>)}
+            </ul>
+          )}
           {recebido > 0 && <div className="g-fila entre"><span className="g-muted">Recebido</span><b className="g-tab g-verde-t">{brl(recebido)}{formasDoRecebido ? ` · ${formasDoRecebido}` : ""}</b></div>}
           {devidos.map((l) => (
             <div className="g-fila entre" key={l.id}>
@@ -309,7 +325,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
               <b className="g-tab g-agd-areceber">{brl(l.valor)}{l.vencimento ? ` · ${l.vencimento < isoDia(new Date()) ? "venceu" : "paga"} ${dataAmigavel(l.vencimento) === "hoje" || dataAmigavel(l.vencimento) === "amanhã" || dataAmigavel(l.vencimento) === "ontem" ? dataAmigavel(l.vencimento) : `em ${dataCompleta(l.vencimento)}`}` : ""}</b>
             </div>
           ))}
-          {a.pacote_cliente_id && <div className="g-fila entre"><span className="g-muted">Pagamento</span><b>Pelo pacote</b></div>}
+          {a.pacote_cliente_id && <div className="g-fila entre"><span className="g-muted">Pagamento</span><b>{outros.length ? `${a.servicos?.nome ?? "Serviço"} pelo pacote` : "Pelo pacote"}</b></div>}
           {a.leva_traz && <div className="g-fila"><Truck size={18} /><span>Leva e traz{a.endereco_leva_traz ? `: ${a.endereco_leva_traz}` : ""}</span></div>}
           {tutor && <FidelidadeNoHorario clienteId={tutor.id} />}
           {a.obs && <p className="g-p">{a.obs}</p>}
@@ -339,24 +355,26 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
             {a.status === "marcado" && <button className="g-btn verde cheio" disabled={ocupado} onClick={() => void mudar({ status: "confirmado" }, "Horário confirmado.")}><Check />Cliente confirmou</button>}
             {(a.status === "marcado" || a.status === "confirmado") && <button className="g-btn sec cheio" disabled={ocupado} onClick={() => void mudar({ status: "em_atendimento" }, `${pet?.nome ?? "Pet"} em atendimento.`)}><Play />Chegou: iniciar atendimento</button>}
             {/* pet com pacote que cobre este serviço: usar o pacote vem primeiro, para ninguém cobrar duas vezes */}
-            {extra?.pacote && !pago && (
+            {pacote && !pago && (
               <>
                 <p className="g-aviso" style={{ margin: 0 }} role="status">
-                  <span><b>{pet?.nome ?? "Este pet"} tem pacote para este serviço</b> ({extra.pacote.nome}: {extra.pacote.total - extra.pacote.usados === 1 ? "sobra 1 uso" : `sobram ${extra.pacote.total - extra.pacote.usados} usos`} de {extra.pacote.total}). Use o pacote para não cobrar de novo.</span>
+                  <span><b>{pet?.nome ?? "Este pet"} tem pacote para {outros.length ? a.servicos?.nome ?? "o primeiro serviço" : "este serviço"}</b> ({pacote.nome}: {pacote.total - pacote.usados === 1 ? "sobra 1 uso" : `sobram ${pacote.total - pacote.usados} usos`} de {pacote.total}). Use o pacote para não cobrar de novo.{outros.length ? ` ${outros.length === 1 ? "O outro serviço entra" : "Os outros serviços entram"} na conta normalmente.` : ""}</span>
                 </p>
-                <button className="g-btn pri cheio" disabled={ocupado} onClick={() => void usarPacote(extra.pacote!)}><Check />Concluir usando o pacote (sem cobrar)</button>
+                {outros.length > 0 && vejoFinanceiro
+                  ? <button className="g-btn pri cheio" disabled={ocupado || !sabe} onClick={() => { if (!somenteLeitura()) setComanda(pacote); }}><Check />Usar o pacote e cobrar o resto{valorOutros ? ` · ${brl(valorOutros)}` : ""}</button>
+                  : <button className="g-btn pri cheio" disabled={ocupado} onClick={() => void usarPacote(pacote)}><Check />{outros.length ? "Concluir usando o pacote (o resto fica para o caixa cobrar)" : "Concluir usando o pacote (sem cobrar)"}</button>}
               </>
             )}
             {vejoFinanceiro && !pago && (
-              <button className={`g-btn ${extra?.pacote ? "sec" : "pri"} cheio`} disabled={ocupado || !sabe} onClick={() => { if (!somenteLeitura()) setComanda(true); }}>
-                <Receipt />{extra?.pacote ? "Cobrar à parte, sem usar o pacote" : "Fechar a conta"}{a.preco ? ` · ${brl(a.preco)}` : ""}
+              <button className={`g-btn ${pacote ? "sec" : "pri"} cheio`} disabled={ocupado || !sabe} onClick={() => { if (!somenteLeitura()) setComanda("sim"); }}>
+                <Receipt />{pacote ? "Cobrar à parte, sem usar o pacote" : "Fechar a conta"}{aCobrar ? ` · ${brl(aCobrar)}` : ""}
               </button>
             )}
-            {(!vejoFinanceiro || pago) && <button className={`g-btn ${extra?.pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void mudar({ status: "concluido" }, "Atendimento concluído.").then((deu) => deu && aoFechar())}><Check />{extra?.pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}
+            {(!vejoFinanceiro || pago) && <button className={`g-btn ${pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void mudar({ status: "concluido" }, "Atendimento concluído.").then((deu) => deu && aoFechar())}><Check />{pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}
           </div>
         )}
         {a.status === "concluido" && vejoFinanceiro && !pago && (
-          <button className="g-btn pri cheio" onClick={() => { if (!somenteLeitura()) setComanda(true); }}><Receipt />Fechar a conta{a.preco ? ` · ${brl(a.preco)}` : ""}</button>
+          <button className="g-btn pri cheio" disabled={!sabe} onClick={() => { if (!somenteLeitura()) setComanda("sim"); }}><Receipt />Fechar a conta{aCobrar ? ` · ${brl(aCobrar)}` : ""}</button>
         )}
 
         {devidos.length > 0 && (

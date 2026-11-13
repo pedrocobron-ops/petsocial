@@ -31,9 +31,14 @@ export type AgendamentoCompleto = Agendamento & {
   }) | null;
   servicos: Pick<Servico, "id" | "nome" | "cor" | "categoria"> | null;
   profissionais: Pick<Profissional, "id" | "nome" | "cor"> | null;
+  /** Os outros serviços do mesmo horário (vazio quando o horário tem um serviço só). */
+  agendamento_servicos?: {
+    id: string; servico_id: string; preco: number | null; ordem: number;
+    servicos: Pick<Servico, "id" | "nome" | "cor" | "categoria"> | null;
+  }[] | null;
 };
 export const SELECT_AGENDAMENTO =
-  "*, pets(id, nome, foto, porte, especie, raca, alertas, clientes(id, nome, telefone)), servicos(id, nome, cor, categoria), profissionais(id, nome, cor)";
+  "*, pets(id, nome, foto, porte, especie, raca, alertas, clientes(id, nome, telefone)), servicos(id, nome, cor, categoria), profissionais(id, nome, cor), agendamento_servicos(id, servico_id, preco, ordem, servicos(id, nome, cor, categoria))";
 
 /**
  * Horário de funcionamento: uma chave por dia da semana ("0" domingo … "6" sábado), `null` = fechado.
