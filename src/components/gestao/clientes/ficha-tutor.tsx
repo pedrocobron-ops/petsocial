@@ -6,6 +6,7 @@ import { ArrowLeft, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, Messag
 import type { Cliente, Lancamento, Pet } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
+import { CartaoFidelidade } from "../fidelidade";
 import FormPet from "../form-pet";
 import { Tile } from "../painel";
 import { AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
@@ -197,6 +198,8 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
               <div><Tile icone={CalendarHeart} tom="menta" tamanho="p" /><div><span>Cliente desde</span><p>{dataCompleta(cliente.criado_em)}</p></div></div>
             </div>
           </section>
+
+          <CartaoFidelidade clienteId={cliente.id} nome={cliente.nome} />
 
           {souDono ? (
             <div className="g-pilha p">
