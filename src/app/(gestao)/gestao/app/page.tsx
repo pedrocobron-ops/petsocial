@@ -35,6 +35,7 @@ import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import Importar from "@/components/gestao/importar";
+import { idsParaCobrar } from "@/lib/gestao/reservado";
 
 const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa semana?", "Quem não vem há mais de um mês?"];
 
@@ -145,9 +146,7 @@ export default function Hoje() {
   // check-outs de creche e hotel que saíram sem cobrança (feitos por quem não mexe com dinheiro): quem recebe vê aqui
   const { dados: semCobrar } = useDados(async () => {
     if (!vejoFinanceiro || !posso("creche_hotel")) return 0;
-    const r = await sb.from("estadias").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("status", "encerrada")
-      .is("valor_cobrado", null).not("diarias_cobradas", "is", null).is("mensalista", null);
-    return r.count ?? 0;
+    return (await idsParaCobrar(sb, petshop.id)).length;
   }, [petshop.id, hojeIso, vejoFinanceiro]);
   const paraCobrar = semCobrar ?? 0;
   // mensalistas que saíram depois do horário e esperam a decisão da taxa (só quem recebe lê)

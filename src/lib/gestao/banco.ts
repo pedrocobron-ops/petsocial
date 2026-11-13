@@ -1453,8 +1453,16 @@ isOneToOne: false
 "escola_evento":
 { Args: { "p_email": string,"p_evento": string,"p_pedido"?: string,"p_segredo": string,"p_slug": string }; Returns: string
                            },
+"estadia_acertar":
+{ Args: { "p_diarias": number,"p_id": string,"p_obs"?: string,"p_valor": number }; Returns: boolean
+                           },
 "estadia_ocupa":
 { Args: { "p_dia": string,"p_entrada": string,"p_hoje": string,"p_saida": string,"p_status": string,"p_tipo": string }; Returns: boolean
+                           },
+"estadias_para_cobrar":
+{ Args: { "p": string }; Returns: {
+              "id": string,"saida": string
+            }[]
                            },
 "estadias_reservado":
 { Args: { "p": string,"p_ids"?: (string)[] }; Returns: {

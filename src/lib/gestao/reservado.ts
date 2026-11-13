@@ -96,6 +96,18 @@ export async function comValoresDeEstadia<E extends { id: string }>(sb: Banco, p
   return estadias.map((e) => ({ ...e, valor_diaria: num(extra.get(e.id)?.valor_diaria), valor_cobrado: num(extra.get(e.id)?.valor_cobrado) }));
 }
 
+/**
+ * Ids das estadias encerradas que saíram sem valor lançado (a lista Check-outs para cobrar), da saída mais nova para a mais antiga.
+ * Vem por função do banco, só para quem recebe: a coluna do valor cobrado não pode ser filtrada pela API. No máximo 150 por vez.
+ */
+export async function idsParaCobrar(sb: Banco, petshopId: string): Promise<string[]> {
+  const r = await (sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }).rpc("estadias_para_cobrar", { p: petshopId });
+  if (r.error) return [];
+  const linhas = ((r.data as { id: string; saida: string | null }[] | null) ?? []).slice();
+  linhas.sort((a, b) => (b.saida ?? "").localeCompare(a.saida ?? ""));
+  return linhas.slice(0, 150).map((l) => l.id);
+}
+
 /** A equipe do pet shop, com comissão e e-mail de convite para quem pode ver (dono, relatórios, a própria pessoa). */
 export async function lerEquipe(sb: Banco, petshopId: string): Promise<{ data: ProfissionalLinha[] | null; error: { message: string } | null }> {
   const base = await sb.from("profissionais").select(COLS_PROFISSIONAL).eq("petshop_id", petshopId).order("criado_em");

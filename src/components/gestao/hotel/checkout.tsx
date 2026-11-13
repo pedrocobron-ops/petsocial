@@ -220,8 +220,8 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
       const cobrado = !vejoFinanceiro ? (pacote ? 0 : calculado === 0 ? 0 : null) : pacote && !temMais && !sinal ? 0 : valor == null && !sinal ? null : centavos((valor ?? 0) + sinal);
       const comObs = pacote ? { obs: comNota(estadia.obs, NOTA_PACOTE) } : {};
       const r = pendente
-        ? ok(await sb.from("estadias").update({ diarias_cobradas: n, valor_cobrado: cobrado ?? 0, ...comObs })
-          .eq("id", estadia.id).eq("petshop_id", petshop.id).eq("status", "encerrada").is("valor_cobrado", null).select("id"))
+        // o banco só grava se a estadia ainda está sem valor (a coluna do valor não é filtrada pela API)
+        ? (ok(await sb.rpc("estadia_acertar", { p_id: estadia.id, p_diarias: n, p_valor: cobrado ?? 0, ...(pacote ? { p_obs: comNota(estadia.obs, NOTA_PACOTE) } : {}) })) ? [{ id: estadia.id }] : [])
         : ok(await sb.from("estadias").update({ status: "encerrada", saida, diarias_cobradas: n, valor_cobrado: cobrado, ...comObs })
           .eq("id", estadia.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
       if (!r.length) { avisar(pendente ? "Essa estadia já tinha sido acertada. Atualizei a lista." : "Esse check-out já tinha sido feito. Atualizei a lista."); aoGravar(); return; }

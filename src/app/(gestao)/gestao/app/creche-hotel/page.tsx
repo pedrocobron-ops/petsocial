@@ -25,7 +25,7 @@ import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/component
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
 import Ocupacao from "@/components/gestao/hotel/ocupacao";
 import { CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
-import { comValoresDeEstadia } from "@/lib/gestao/reservado";
+import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
 import { lerPlanos, lerPresencas, planoAtivo, type PlanoCompleto } from "@/lib/gestao/creche";
@@ -235,7 +235,10 @@ export default function CrecheHotel() {
       sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500),
       sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["encerrada", "cancelada"]).order("entrada", { ascending: false }).limit(100),
       // check-outs que fecharam sem cobrança (feitos por quem não mexe com dinheiro): todos, não só os últimos do histórico
-      vejoFinanceiro ? sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).eq("status", "encerrada").is("valor_cobrado", null).not("diarias_cobradas", "is", null).is("mensalista", null).order("saida", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
+      (async (): Promise<{ data: unknown[] | null }> => {
+        const ids = vejoFinanceiro ? await idsParaCobrar(sb, petshop.id) : [];
+        return ids.length ? await sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("id", ids).order("saida", { ascending: false }) : { data: [] };
+      })(),
     ]);
     // a diária e o valor cobrado vêm à parte, só para quem recebe (para os outros ficam em branco)
     const [lista, antigas, pend] = await Promise.all([
