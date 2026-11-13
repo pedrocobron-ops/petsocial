@@ -1,4 +1,5 @@
-import { COLS_PACOTE, comCustos, comPrecosDePacote, type PacoteLinha } from "../reservado";
+import { COLS_PACOTE, comCustos, comPrecosDePacote, comValoresDeEstadia, type PacoteLinha } from "../reservado";
+import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -110,7 +111,7 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ agendamento_id: S, inicio: DIA_HORA, servico_id: S, profissional_id: S, preco: N, status: { type: "string", enum: ["marcado", "confirmado", "em_atendimento", "concluido", "faltou", "cancelado"] } }, ["agendamento_id"]) },
   { grava: true, name: "remover_bloqueio", description: "Remove um bloqueio da agenda. Passe bloqueio_id (de ver_agenda) ou o dia; se houver mais de um bloqueio no dia, passe também hora, motivo ou profissional_id. Se o bloqueio faz parte de uma série e a pessoa quer tirar também os dias seguintes, passe e_os_proximos: true.",
     input_schema: obj({ bloqueio_id: S, dia: DIA, hora: { ...HORA, description: "Uma hora que cai dentro do bloqueio, HH:mm" }, motivo: S, profissional_id: S, e_os_proximos: { ...B, description: "Remove este e os próximos da mesma série" } }) },
-  { grava: true, name: "fazer_checkin", description: "Creche e hotel: registra que o pet chegou agora. Se o pet tem reserva do mesmo tipo para hoje (ou atrasada, ou para amanhã), a reserva vira check-in; senão, cria a estadia. Sem valor_diaria, usa a da reserva ou a última cobrada nesse tipo.",
+  { grava: true, name: "fazer_checkin", description: "Creche e hotel: registra que o pet chegou agora. Se o pet tem reserva do mesmo tipo para hoje (ou atrasada, ou para amanhã), a reserva vira check-in; senão, cria a estadia. Sem valor_diaria, usa a da reserva ou a diária de Meu pet shop.",
     input_schema: obj({ pet_id: S, tipo: { type: "string", enum: ["creche", "hotel"] }, saida_prevista: { ...S, description: "Opcional. AAAA-MM-DDTHH:mm (só o dia vale 18:00)" }, valor_diaria: N, obs: { ...S, description: "Ração, remédio, o que trouxe" } }, ["pet_id", "tipo"]) },
   { grava: true, name: "fazer_checkout", description: "Creche e hotel: encerra a estadia do pet que está na casa. Quem tem acesso ao financeiro recebe junto: o valor é diárias vezes o valor da diária, se você não passar, e precisa da forma de pagamento. Passe valor 0 para não cobrar agora.",
     input_schema: obj({ pet_id: S, diarias: { ...N, description: "Opcional. Padrão: contadas da entrada até hoje (hotel por noite, creche por dia)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] } }, ["pet_id"]) },
@@ -259,7 +260,8 @@ async function planoDoCheckin(c: Contexto, e: Entrada) {
   const pet = await petPorId(c, e.pet_id);
   const tipo = String(e.tipo);
   exigir(TIPO_ESTADIA[tipo], "tipo deve ser creche ou hotel. Pergunte se o pet vem passar o dia (creche) ou dormir (hotel).");
-  const abertas = ok(await c.sb.from("estadias").select("id, tipo, entrada, saida_prevista, valor_diaria, status").eq("petshop_id", c.petshop.id).eq("pet_id", pet.id).in("status", ["reservada", "em_casa"]).order("entrada"));
+  // a diária vem à parte, só para quem recebe
+  const abertas = await comValoresDeEstadia(c.sb, c.petshop.id, ok(await c.sb.from("estadias").select("id, tipo, entrada, saida_prevista, status").eq("petshop_id", c.petshop.id).eq("pet_id", pet.id).in("status", ["reservada", "em_casa"]).order("entrada")), c.vejoFinanceiro);
   const emCasa = abertas.find((x) => x.status === "em_casa");
   exigir(!emCasa, `${pet.nome} já está na casa (${TIPO_ESTADIA[emCasa?.tipo ?? ""] ?? "estadia"} desde ${quandoLocal(utcParaLocal(emCasa?.entrada ?? new Date().toISOString(), c.fusoMin))}). Nada foi feito.`);
   // reserva do mesmo tipo para hoje, atrasada ou para amanhã: vira check-in, como o botão da tela
@@ -274,22 +276,24 @@ async function planoDoCheckin(c: Contexto, e: Entrada) {
     saida = RE_DIA.test(v) ? `${v}T18:00` : v.slice(0, 16);
     exigir(saida > c.agora, "A saída prevista precisa ser depois de agora.");
   }
-  let diaria = numero(e.valor_diaria);
+  // quem não recebe não escolhe nem vê a diária: o banco coloca a sugerida (a do porte, ou a de Meu pet shop)
+  let diaria = c.vejoFinanceiro ? numero(e.valor_diaria) : null;
   exigir(diaria == null || diaria >= 0, "valor_diaria inválido.");
+  const informada = diaria != null;
   let origemDiaria = "";
-  if (diaria == null && reserva) { diaria = reserva.valor_diaria; origemDiaria = " (da reserva)"; }
-  else if (diaria == null) {
-    const { data: ultima } = await c.sb.from("estadias").select("valor_diaria").eq("petshop_id", c.petshop.id).eq("tipo", tipo).not("valor_diaria", "is", null).order("entrada", { ascending: false }).limit(1).maybeSingle();
-    diaria = ultima?.valor_diaria ?? null;
-    if (diaria != null) origemDiaria = " (a última cobrada)";
+  if (c.vejoFinanceiro && diaria == null && reserva) { diaria = reserva.valor_diaria; origemDiaria = " (da reserva)"; }
+  else if (c.vejoFinanceiro && diaria == null) {
+    diaria = diariaSugerida(c.petshop, tipo, pet.porte);
+    if (diaria != null) origemDiaria = " (a de Meu pet shop)";
   }
-  return { pet, tipo, reserva, outra, saida, diaria, origemDiaria, obs: texto(e.obs, 400) || null };
+  return { pet, tipo, reserva, outra, saida, diaria, informada, origemDiaria, obs: texto(e.obs, 400) || null };
 }
 
 async function planoDoCheckout(c: Contexto, e: Entrada) {
   const pet = await petPorId(c, e.pet_id);
-  const { data: estadia } = await c.sb.from("estadias").select("id, tipo, entrada, valor_diaria, sinal_estado").eq("petshop_id", c.petshop.id).eq("pet_id", pet.id).eq("status", "em_casa").order("entrada", { ascending: false }).limit(1).maybeSingle();
-  exigir(estadia, `${pet.nome} não está na casa agora. Use ver_hospedes para ver quem está.`);
+  const { data: semValor } = await c.sb.from("estadias").select("id, tipo, entrada, sinal_estado").eq("petshop_id", c.petshop.id).eq("pet_id", pet.id).eq("status", "em_casa").order("entrada", { ascending: false }).limit(1).maybeSingle();
+  exigir(semValor, `${pet.nome} não está na casa agora. Use ver_hospedes para ver quem está.`);
+  const [estadia] = await comValoresDeEstadia(c.sb, c.petshop.id, [semValor], c.vejoFinanceiro);
   // estadia com sinal: a conta desconta o sinal, e isso só a tela faz
   exigir(!estadia.sinal_estado, `A estadia de ${pet.nome} tem sinal na reserva. Faça o check-out pela tela Creche e hotel, que desconta o sinal da conta.`);
   const n = numero(e.diarias) ?? contarDiarias(c, estadia);
@@ -503,10 +507,10 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     }
     case "ver_hospedes": {
       const dias = Math.max(0, Math.min(60, numero(e.dias) ?? 7));
-      const abertas = ok(await sb.from("estadias").select("id, tipo, entrada, saida_prevista, valor_diaria, status, obs, pets(id, nome, alertas, clientes(nome))").eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500));
+      const abertas = await comValoresDeEstadia(sb, petshop.id, ok(await sb.from("estadias").select("id, tipo, entrada, saida_prevista, status, obs, pets(id, nome, alertas, clientes(nome))").eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500)), c.vejoFinanceiro);
       const ate = somaDiasLocal(hoje, dias);
       const comum = (x: (typeof abertas)[number]) => ({ estadia_id: x.id, pet_id: x.pets?.id, pet: x.pets?.nome ?? "pet removido", tutor: x.pets?.clientes?.nome, tipo: x.tipo,
-        ...(x.pets?.alertas ? { cuidados: x.pets.alertas } : {}), ...(x.obs ? { obs: x.obs } : {}), valor_diaria: x.valor_diaria });
+        ...(x.pets?.alertas ? { cuidados: x.pets.alertas } : {}), ...(x.obs ? { obs: x.obs } : {}), ...(c.vejoFinanceiro ? { valor_diaria: x.valor_diaria } : {}) });
       const naCasa = abertas.filter((x) => x.status === "em_casa").map((x) => {
         const sai = x.saida_prevista ? utcParaLocal(x.saida_prevista, c.fusoMin) : null;
         return { ...comum(x), desde: utcParaLocal(x.entrada, c.fusoMin), saida_prevista: sai, ...(sai && sai < c.agora ? { saida_atrasada: true } : {}), diarias_ate_agora: contarDiarias(c, x) };
@@ -737,7 +741,7 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       if (p.reserva) linhas.push(["Reserva", `usa a reserva de ${quandoLocal(utcParaLocal(p.reserva.entrada, c.fusoMin))}`]);
       const sai = p.saida ?? (p.reserva?.saida_prevista ? utcParaLocal(p.reserva.saida_prevista, c.fusoMin) : null);
       linhas.push(["Saída prevista", sai ? quandoLocal(sai) : "sem saída prevista"]);
-      linhas.push(["Diária", p.diaria != null ? `${brl(p.diaria)} por ${p.tipo === "hotel" ? "noite" : "dia"}${p.origemDiaria}` : "a combinar"]);
+      if (c.vejoFinanceiro) linhas.push(["Diária", p.diaria != null ? `${brl(p.diaria)} por ${p.tipo === "hotel" ? "noite" : "dia"}${p.origemDiaria}` : "a combinar"]);
       if (p.obs) linhas.push(["Obs.", p.obs]);
       if (p.pet.alertas) linhas.push(["Cuidados", texto(p.pet.alertas, 300)]);
       if (p.outra) linhas.push(["Atenção", `a reserva de ${TIPO_ESTADIA[p.outra.tipo]?.toLowerCase() ?? "estadia"} de ${quandoLocal(utcParaLocal(p.outra.entrada, c.fusoMin))} continua marcada`]);
@@ -912,13 +916,13 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
       const saida = p.saida ? localParaUtc(p.saida, c.fusoMin).toISOString() : null;
       if (p.reserva) {
         const r = ok(await sb.from("estadias").update({ status: "em_casa", entrada: new Date().toISOString(), ...(saida ? { saida_prevista: saida } : {}),
-          ...(numero(e.valor_diaria) != null ? { valor_diaria: numero(e.valor_diaria) } : {}), ...(p.obs ? { obs: p.obs } : {}) })
+          ...(p.informada ? { valor_diaria: p.diaria } : {}), ...(p.obs ? { obs: p.obs } : {}) })
           .eq("id", p.reserva.id).eq("petshop_id", petshop.id).eq("status", "reservada").select("id"));
         exigir(r.length, "Essa reserva já tinha sido alterada. Use ver_hospedes para conferir.");
         return { feito: true, estadia_id: p.reserva.id, usou_reserva: true };
       }
       const nova = ok(await sb.from("estadias").insert({ petshop_id: petshop.id, pet_id: p.pet.id, tipo: p.tipo, entrada: new Date().toISOString(), saida_prevista: saida,
-        valor_diaria: p.diaria, status: "em_casa", obs: p.obs }).select("id").single());
+        ...(c.vejoFinanceiro ? { valor_diaria: p.diaria } : {}), status: "em_casa", obs: p.obs }).select("id").single());
       return { feito: true, estadia_id: nova.id, usou_reserva: false };
     }
     case "fazer_checkout": {

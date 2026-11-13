@@ -18,6 +18,7 @@ import { FolhaBaixa } from "../financeiro/comum";
 import { FidelidadeNoHorario } from "../fidelidade";
 import Comanda from "./comanda";
 import AntesDepois from "./antes-depois";
+import { continuarSerie, encerrarSerie, textoContinuou, VEZES_POR_VEZ } from "./series-acabando";
 
 /** Tudo sobre um horário: quem é o pet, o que fazer agora (confirmar, iniciar, concluir e fechar a conta) e o lembrete no WhatsApp. */
 export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, aoEditar }: {
@@ -54,7 +55,11 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     ]);
     // horário que se repete: até quando vai a série (o último que ainda está de pé)
     let fimDaSerie: string | null = null;
+    // repetição marcada como "até eu cancelar" (ainda valendo)?
+    let semFim = false;
     if (a.serie_id) {
+      const sf = await sb.from("series_agenda").select("serie_id").eq("serie_id", a.serie_id).eq("petshop_id", petshop.id).is("encerrada_em", null).maybeSingle();
+      semFim = Boolean(sf.data);
       const u = await sb.from("agendamentos").select("inicio").eq("petshop_id", petshop.id).eq("serie_id", a.serie_id).not("status", "in", "(cancelado,faltou)").order("inicio", { ascending: false }).limit(1);
       fimDaSerie = u.data?.[0]?.inicio ?? null;
     }
@@ -63,7 +68,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     // o pagamento já está num caixa fechado? (aí só o dono reabre ou apaga)
     const caixas = [...new Set(lancados.filter((l) => l.pago && l.caixa_id).map((l) => l.caixa_id!))];
     const fechados = caixas.length ? await sb.from("caixas").select("id").in("id", caixas).not("fechado_em", "is", null) : { data: [] };
-    return { pago: lancados, pacote: validos[0] ?? null, fimDaSerie, emCaixaFechado: (fechados.data ?? []).length > 0 };
+    return { pago: lancados, pacote: validos[0] ?? null, fimDaSerie, semFim, emCaixaFechado: (fechados.data ?? []).length > 0 };
   }, [a.id]);
   // mais de um serviço no mesmo horário: o pacote cobre só o principal; os outros entram na conta
   const outros = servicosAMais(a);
@@ -114,11 +119,27 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
       ok(await sb.from("agendamentos").update({ status: "cancelado" }).eq("id", a.id).select("id").single());
       const outros = ok(await sb.from("agendamentos").update({ status: "cancelado" }).eq("petshop_id", petshop.id).eq("serie_id", a.serie_id)
         .gte("inicio", a.inicio).in("status", ["marcado", "confirmado"]).neq("id", a.id).select("id"));
+      // era "até eu cancelar": cancelou, então a Agenda para de avisar para continuar
+      await encerrarSerie(sb, petshop.id, a.serie_id);
       avisar(outros.length ? `Cancelado este e mais ${outros.length === 1 ? "1 horário" : `${outros.length} horários`} da repetição.` : "Horário cancelado. Não havia outros à frente.");
       avisarMudanca();
       aoMudar();
       setCancelando(false);
     } catch (e) { avisarErro(e); avisarMudanca(); aoMudar(); } finally { setOcupado(false); }
+  }
+
+  /** Repetição "até eu cancelar": marca os próximos horários da série, a partir do último que existe. */
+  async function continuarRepeticao(visto: string) {
+    if (somenteLeitura() || !a.serie_id) return;
+    setOcupado(true);
+    try {
+      // o último horário da série, de pé ou não: é dele que a repetição segue
+      const u = await sb.from("agendamentos").select("inicio").eq("petshop_id", petshop.id).eq("serie_id", a.serie_id).order("inicio", { ascending: false }).limit(1);
+      avisar(textoContinuou(await continuarSerie(sb, a.serie_id, u.data?.[0]?.inicio ?? visto)));
+      avisarMudanca();
+      aoMudar();
+      void recarregar();
+    } catch (e) { avisarErro(e); } finally { setOcupado(false); }
   }
 
   async function usarPacote(p: PacoteCliente) {
@@ -335,7 +356,9 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         {a.serie_id && extra?.fimDaSerie && !encerrado && (
           <p className="g-pp g-muted" style={{ margin: 0 }}>
             <Repeat size={13} aria-hidden style={{ verticalAlign: "-2px", marginRight: 4 }} />
-            {mesmoDia(new Date(extra.fimDaSerie), new Date(a.inicio)) ? "Este é o último horário da repetição. Para continuar, marque de novo com Repetir." : `A repetição vai até ${dataCompleta(extra.fimDaSerie)}.`}
+            {extra.semFim
+              ? <>Repete até você cancelar. Os horários estão marcados até {dataCompleta(extra.fimDaSerie)}. <button type="button" className="g-link" disabled={ocupado} onClick={() => void continuarRepeticao(extra.fimDaSerie!)}>Marcar mais {VEZES_POR_VEZ}</button></>
+              : mesmoDia(new Date(extra.fimDaSerie), new Date(a.inicio)) ? "Este é o último horário da repetição. Para continuar, marque de novo com Repetir." : `A repetição vai até ${dataCompleta(extra.fimDaSerie)}.`}
           </p>
         )}
 

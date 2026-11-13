@@ -13,6 +13,7 @@ import {
   Apagados, baixarPlanilha, brlMini, categoriaAtual, Chips, COR_FORMA, dinheiroCsv, ehDeServico, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, SemAcesso, soma, somaPorForma,
   TagAlterado, textoJaRecebido, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
+import CustoDasVendas from "@/components/gestao/financeiro/custo-vendas";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
 import { contasDaMeta, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
@@ -293,6 +294,7 @@ function Financeiro() {
                   <div className="g-pilha">
                     <Categorias titulo="De onde veio" icone={ArrowDownLeft} tom="menta" total={contas.entrou} linhas={contas.entradasPorCategoria} vazio="Nenhuma entrada neste mês." />
                     <Categorias titulo="Para onde foi" icone={ArrowUpRight} tom="rosa" total={contas.saiu} linhas={contas.saidasPorCategoria} vazio="Nenhuma saída neste mês." quente />
+                    <CustoDasVendas inicio={inicio} fim={fim} doMes={dados.doMes} resultado={resultado} mesAtual={mesAtual} />
                   </div>
                 </div>
               ) : (

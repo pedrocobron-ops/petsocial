@@ -8,7 +8,7 @@ import { AvatarPessoa, AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados,
 import type { Database } from "@/lib/gestao/banco";
 import { abreNoDia } from "@/lib/gestao/creche";
 import { diariaFixa, diariaSugerida } from "@/lib/gestao/hotel";
-import { sinalDe } from "@/lib/gestao/hotel-opcoes";
+import { porteDe, sinalDe } from "@/lib/gestao/hotel-opcoes";
 import { opcoesDoLink, prazoPorExtenso, usouOpcoesDoLink } from "@/lib/gestao/link-opcoes";
 import { brl } from "@/lib/gestao/util";
 import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar, semAcento } from "@/lib/gestao/util";
@@ -158,6 +158,18 @@ export default function PedidosLink() {
     .map((g) => ({ ...g, lista: [...g.lista].sort((a, b) => porHora(a.pedido, b.pedido)) }));
 
   /**
+   * A pergunta "É a mesma pessoa?" já foi respondida para este pedido? Vale quando outro pedido do mesmo grupo (vários pets
+   * pedidos juntos), ou do mesmo telefone e nome feito até um dia antes ou depois, já foi aceito. Lê do banco: vale em qualquer
+   * aparelho e depois de recarregar a tela.
+   */
+  async function jaRespondeu(p: Pedido) {
+    const base = () => sb.from("pedidos_agendamento").select("id, tutor_nome, criado_em").eq("petshop_id", petshop.id).eq("status", "aceito").neq("id", p.id);
+    const r = p.grupo_id ? await base().eq("grupo_id", p.grupo_id).limit(1)
+      : await base().eq("telefone", p.telefone).gte("criado_em", somaDias(new Date(p.criado_em), -1).toISOString()).lte("criado_em", somaDias(new Date(p.criado_em), 1).toISOString()).limit(20);
+    return (r.data ?? []).some((x) => semAcento(x.tutor_nome) === semAcento(p.tutor_nome));
+  }
+
+  /**
    * Marca os pedidos na agenda, um por um. Se algum falhar, os outros seguem e o erro aparece no fim.
    * Antes, confere se o telefone do pedido já é de um tutor com outro nome: aí pergunta se é a mesma pessoa
    * (`decisao`: "existente" usa a ficha que já existe; "novo" cria ou usa um tutor com o nome do pedido).
@@ -171,9 +183,14 @@ export default function PedidosLink() {
       const r = await sb.rpc("pedido_tutores_do_telefone", { p_id: lista[0].id });
       const donos = (r.error ? [] : r.data ?? []) as TutorDoTelefone[];
       const igual = donos.findIndex((c) => semAcento(c.nome) === semAcento(lista[0].tutor_nome));
-      if (donos.length && igual < 0) { setDuvida({ lista, grupo, existente: donos[0] }); setOcupado(null); return; }
+      if (donos.length && igual < 0) {
+        // a pergunta é uma só por pedido: se outro pet do mesmo pedido (ou do mesmo tutor, na mesma hora) já foi aceito
+        // e ninguém ganhou ficha com o nome de quem pediu, a resposta foi "é a mesma pessoa"
+        if (await jaRespondeu(lista[0])) decisao = { como: "existente", tutor: donos[0].nome };
+        else { setDuvida({ lista, grupo, existente: donos[0] }); setOcupado(null); return; }
+      }
       // já existe um tutor com esse telefone e esse nome: é ele (mesmo que não seja o mais antigo com o número)
-      decisao = { como: igual > 0 ? "novo" : "existente" };
+      decisao ??= { como: igual > 0 ? "novo" : "existente" };
     }
     const feitos: Pedido[] = [];
     let falha: unknown = null;
@@ -213,9 +230,9 @@ export default function PedidosLink() {
   /** Reserva de hotel aceita pelo link com a opção de diária por porte ligada: a diária da reserva passa a ser a do porte do pedido. */
   function acertarDiaria(p: Pedido, estadiaId: unknown) {
     if (p.tipo !== "hotel" || typeof estadiaId !== "string") return;
-    const doPorte = diariaSugerida(petshop, "hotel", p.porte);
-    if (doPorte == null || doPorte === diariaFixa(petshop, "hotel")) return;
-    void sb.from("estadias").update({ valor_diaria: doPorte }).eq("id", estadiaId).eq("petshop_id", petshop.id).eq("status", "reservada").then(() => {}, () => {});
+    // a conta é do banco: quem aceita o pedido pode não ver a lista de preços
+    if (!porteDe(petshop).ativo || !p.porte) return;
+    void sb.rpc("pedido_acertar_diaria", { p_id: p.id }).then(() => {}, () => {});
   }
 
   async function recusar(lista: Pedido[], grupo: string) {

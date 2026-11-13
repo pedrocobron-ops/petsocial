@@ -12,7 +12,7 @@ import {
 } from "@/components/gestao/financeiro/comum";
 import { itensDoLancamento, nomeDoMovimento, partesPorForma, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import {
-  COLS_MOVIMENTO, COLS_PACOTE, COLS_PACOTE_CLIENTE, COLS_PRODUTO, comCustos, custosDeTodosOsMovimentos, comPrecosDePacote, lerEquipe,
+  COLS_MOVIMENTO, COLS_PACOTE, COLS_PACOTE_CLIENTE, COLS_PRODUTO, comCustos, custosDeTodosOsMovimentos, comPrecosDePacote, lerEquipe, COLS_ESTADIA, comValoresDeEstadia,
 } from "@/lib/gestao/reservado";
 import { FORMAS, STATUS_AGENDAMENTO, type Caixa, type Cliente, type Estadia, type Lancamento, type Pet, type Servico, type StatusAgendamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, hora, isoDia, semAcento } from "@/lib/gestao/util";
@@ -275,7 +275,7 @@ export default function CopiaSeguranca() {
       ]);
 
       etapa("creche e hotel");
-      const estadias = await todas<EstadiaLida>((a, b) => sb.from("estadias").select("*, pets(nome, clientes(nome, telefone))").eq("petshop_id", id).order("entrada").order("id").range(a, b));
+      const estadias = await comValoresDeEstadia(sb, id, await todas<EstadiaLida>((a, b) => sb.from("estadias").select(`${COLS_ESTADIA}, pets(nome, clientes(nome, telefone))`).eq("petshop_id", id).order("entrada").order("id").range(a, b) as never));
       // o sinal da reserva fica à parte da estadia (só quem recebe lê): a cópia é do dono, que lê tudo
       const sinais = await todas<SinalLido>((a, b) => sb.from("estadias_valores").select("estadia_id, sinal, sinal_estado, sinal_recebido").eq("petshop_id", id).order("estadia_id").range(a, b));
       const sinalDe = new Map(sinais.map((v) => [v.estadia_id, v]));

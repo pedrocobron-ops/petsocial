@@ -12,6 +12,8 @@ import { nomeDaCasa, principalDe, usaCasa, usaModulo } from "./modulos";
  * - Passo que só existe com mais de uma pessoa na equipe ou mais de uma área leva "se aparecer".
  * - O que o sistema NÃO faz também tem tópico (seção "limites"), para a busca e a Ajuda responderem com franqueza.
  * - `usa` diz de que parte do negócio o tópico depende: quem não usa creche não vê os tópicos da creche.
+ *   Vale também para um passo ou uma dica: frase que só serve para o hotel leva `{ so: ["hotel"], texto }`;
+ *   a versão de quem não tem hotel leva `{ sem: ["hotel"], texto }`. Título com "do hotel" é trocado em `tituloPara`.
  */
 
 export const SECOES = [
@@ -43,8 +45,11 @@ export const QUEM: Record<Quem, { rotulo: string; tom: "verde" | "azul" | "laran
 /** Parte do negócio de que um tópico (ou um passo) depende. "casa" = creche ou hotel. */
 export type Uso = "banho" | "creche" | "hotel" | "casa" | "loja" | "pacotes";
 type ComModulos = { modulos?: string[] | null; principal?: string | null };
-/** Um passo comum, ou um passo que só vale para quem usa certa parte do negócio. */
-type Passo = string | { so: Uso[]; texto: string };
+/**
+ * Um passo comum, ou um passo que só vale para quem usa certa parte do negócio (`so`: usa alguma delas)
+ * ou para quem não usa (`sem`: não usa nenhuma delas; serve para a versão curta de uma frase que cita outra área).
+ */
+type Passo = string | { so?: Uso[]; sem?: Uso[]; texto: string };
 
 type TopicoBase = {
   id: string;
@@ -219,13 +224,17 @@ const BASE: TopicoBase[] = [
     passos: [
       "Comece a marcar o horário normalmente: pet, serviço, dia e hora.",
       "No campo Repetir, escolha de quanto em quanto tempo o pet volta.",
-      "Em Por quantas vezes, escolha o número de horários: de 2 até 26.",
+      "Em Por quantas vezes, escolha o número de horários, de 2 até 26, ou Até eu cancelar.",
       "Confira até que dia a repetição vai: a data aparece logo abaixo.",
       "Nas Datas com aviso, decida entre pular ou marcar mesmo assim.",
       "Toque em Marcar.",
     ],
-    dicas: ["Todos os horários da série ficam com o mesmo serviço, valor e observação.", "Não existe repetição sem fim. Perto da última data, marque de novo.", "Para desmarcar depois, o sistema pergunta se é só aquele dia ou aquele e os próximos."],
-    palavras: ["repetir", "repete", "se repete", "horario que se repete", "toda semana", "quinzenal", "recorrente", "fixo", "serie", "cliente fixo", "banho toda semana"] },
+    dicas: ["Todos os horários da série ficam com o mesmo serviço, valor e observação.", "Com Até eu cancelar, o sistema marca os 12 primeiros horários. Quando faltam poucos, a Agenda mostra o cartão Repetições que estão acabando: toque em Marcar mais 12 e a repetição segue no mesmo dia e na mesma hora.",
+      "Nada é marcado sozinho: sem o seu toque, a repetição termina no último horário. Se o cliente parou de vir, toque em Deixar terminar.",
+      "Com um número de vezes, a repetição acaba na última data. Para continuar, marque de novo.",
+      "Para desmarcar depois, o sistema pergunta se é só aquele dia ou aquele e os próximos. Desmarcar este e os próximos também encerra o Até eu cancelar.",
+      "Ao abrir um horário que repete até cancelar, dá para tocar em Marcar mais 12 ali mesmo."],
+    palavras: ["repetir", "repete", "se repete", "horario que se repete", "toda semana", "quinzenal", "recorrente", "fixo", "serie", "cliente fixo", "banho toda semana", "ate eu cancelar", "sem fim", "para sempre", "repeticao acabando", "continuar repeticao", "marcar mais 12", "deixar terminar"] },
   { id: "ver-agenda", titulo: "Como ver a agenda do dia, da semana e de cada pessoa", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA,
     passos: [
       "Abra Agenda.",
@@ -533,7 +542,7 @@ const BASE: TopicoBase[] = [
       "Quem não cuida do caixa toca em Fazer check-out: a estadia encerra e a cobrança fica na lista Check-outs para cobrar, para quem cuida do caixa.",
       "Se a taxa de busca fora do horário está ligada e o pet saiu depois da hora, a folha pergunta se a taxa entra na conta: toque em Cobrar ou em Não cobrar a taxa. Sem escolher, a conta não fecha.",
       "Reserva com sinal: o sinal aparece numa linha própria e sai da conta sozinho.",
-      "Com temporada, preço de feriado ou desconto do segundo pet ligados, toque em ver noite por noite para conferir a diária de cada noite.",
+      { so: ["hotel"], texto: "Com temporada, preço de feriado ou desconto do segundo pet ligados, toque em ver noite por noite para conferir a diária de cada noite." },
       "Depois, em Histórico, toque na estadia para ver a conta como foi cobrada e mandar o comprovante de novo.",
       "O comprovante não é nota fiscal, e o texto diz isso.",
     ],
@@ -619,7 +628,7 @@ const BASE: TopicoBase[] = [
     dicas: [
       "Os números contam estadias, reservas e, na creche, os mensalistas esperados. É a mesma conta do aviso de casa cheia.",
       "Para aparecer cheio, o dono preenche as vagas em Meu pet shop, no cartão Creche e hotel.",
-      "Quem usa Acomodações vê, no dia, quantos hóspedes cada uma tem.",
+      { so: ["hotel"], texto: "Quem usa Acomodações vê, no dia, quantos hóspedes cada uma tem." },
     ],
     palavras: ["ocupacao", "lotado", "lotada", "lotacao", "calendario", "calendario do hotel", "vagas por dia", "feriado", "proximos dias", "tem vaga", "mapa de ocupacao", "quem chega", "quem sai"] },
   { id: "folha-do-dia", titulo: "Como imprimir a folha do dia da creche e do hotel", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
@@ -653,7 +662,8 @@ const BASE: TopicoBase[] = [
   { id: "hotel-opcoes", titulo: "Como ligar as opções do hotel e da creche", secao: "creche", usa: ["casa"], quem: "dono", rota: PETSHOP, tambem: [CRECHE],
     passos: [
       "Abra Meu pet shop e vá até o cartão Opções do hotel e da creche. Em Creche e hotel, o botão Opções do hotel e da creche leva até lá.",
-      "Ligue a chave do que você usa: Sinal na reserva, Diária do hotel por porte, Temporadas, Desconto para o segundo pet, Preço de feriado, Taxa de busca fora do horário, Taxas opcionais, Ficha de cuidados ou Acomodações.",
+      { so: ["hotel"], texto: "Ligue a chave do que você usa: Sinal na reserva, Diária do hotel por porte, Temporadas, Desconto para o segundo pet, Preço de feriado, Taxa de busca fora do horário, Taxas opcionais, Ficha de cuidados ou Acomodações." },
+      { sem: ["hotel"], texto: "Ligue a chave do que você usa: Sinal na reserva, Taxa de busca fora do horário, Taxas opcionais ou Ficha de cuidados." },
       "Preencha os campos que aparecem embaixo da chave.",
       "Toque em Salvar opções.",
     ],
@@ -856,7 +866,8 @@ const BASE: TopicoBase[] = [
       "A tela Creche e hotel mostra quantas vagas estão tomadas hoje. Quando lota, a faixa do alto diz casa cheia.",
       "Quando a casa enche em algum dia do período, o sistema avisa na reserva, no check-in e no pedido pelo link, e só passa do limite se você confirmar.",
       "Para ver a lotação dos próximos dias, abra Creche e hotel e toque em Ocupação.",
-      "Preço por porte, temporada, desconto do segundo pet e taxas ficam no cartão Opções do hotel e da creche.",
+      { so: ["hotel"], texto: "Preço por porte, temporada, desconto do segundo pet e taxas ficam no cartão Opções do hotel e da creche." },
+      { sem: ["hotel"], texto: "As taxas (táxi dog, banho de saída) ficam no cartão Opções do hotel e da creche." },
       { so: ["creche"], texto: "No mesmo cartão fica a chave Bloquear check-in na creche com vacina vencida." },
     ],
     palavras: ["preco da diaria", "valor da diaria", "diaria da creche", "diaria do hotel", "preco da creche", "preco do hotel", "vagas da creche", "vagas do hotel", "casa cheia", "lotado", "lotada", "lotacao", "lotou", "cheio", "cheia", "quantas vagas", "ocupacao"] },
@@ -875,7 +886,7 @@ const BASE: TopicoBase[] = [
       "No link, o cliente escolhe a hora de chegada e a hora de buscar, e pode pedir vaga para até 4 pets no mesmo pedido.",
       "O pedido respondido continua na lista até alguém avisar o tutor, mesmo depois de fechar e abrir a tela.",
       "Com o Sinal na reserva ligado, o link e a mensagem de confirmação já avisam o valor do sinal.",
-      "Se o telefone do pedido já for de um tutor, o sistema pergunta É a mesma pessoa? antes de criar a ficha.",
+      "Se o telefone do pedido já for de um tutor, o sistema pergunta É a mesma pessoa? antes de criar a ficha. A pergunta vem uma vez por pedido, mesmo aceitando os pets um por um.",
       { so: ["banho"], texto: "Quem tem banho e tosa também acha o link na tela Hoje, em Mandar link de agendamento, e na Agenda, em Link do cliente." },
     ],
     palavras: ["pedido de creche", "pedido de hotel", "pedidos de creche", "creche e hotel pelo link", "reserva pelo link", "cliente reservar", "reserva online", "hospedagem pelo link", "pedir vaga", "vaga pelo link"] },
@@ -1064,7 +1075,7 @@ const BASE: TopicoBase[] = [
       "Depois de cobrar, a conta mostra cobrado em, com o dia e a hora, e o botão vira Cobrar de novo no WhatsApp.",
       "O dono muda o modelo da mensagem e coloca a chave Pix em Meu pet shop, Opções de cobrança.",
       "A mensagem só fala em multa e juros se o dono ligou essa opção e marcou Mostrar a multa e os juros na mensagem de cobrança.",
-      "As mensalidades da creche têm a cobrança própria, em Creche, Cobranças.",
+      { so: ["creche"], texto: "As mensalidades da creche têm a cobrança própria, em Creche, Cobranças." },
     ],
     atencao: ["Sem WhatsApp na ficha do tutor, o botão não aparece. Coloque o telefone na ficha."],
     palavras: ["cobrar", "cobranca", "cobrar no whatsapp", "cobrar cliente", "cobrar fiado", "lembrar de pagar", "mensagem de cobranca", "cobrado em", "cobrar de novo"] },
@@ -1233,8 +1244,13 @@ const BASE: TopicoBase[] = [
       "Desça para ver como entrou (forma de pagamento), de onde veio e para onde foi.",
       "Para baixar a planilha do mês, toque em Exportar.",
     ],
-    dicas: ["O Resultado do mês é tudo o que entrou menos tudo o que saiu. Ele não separa o lucro por produto nem por serviço."],
-    palavras: ["resultado", "resumo", "lucro", "quanto entrou", "quanto saiu", "exportar financeiro", "planilha do financeiro", "mes passado"] },
+    dicas: [
+      "O Resultado do mês é tudo o que entrou menos tudo o que saiu. Ele não separa o lucro por produto nem por serviço.",
+      { so: ["loja"], texto: "Quem ligou Margem e custo médio, nas opções da loja, vê no Resumo o cartão Produtos vendidos no mês: a venda de produtos, o custo dos produtos vendidos, a sobra e o resultado Depois do custo dos produtos. Sem venda de produto no mês, o cartão não aparece." },
+      { so: ["loja"], texto: "Se você já lança a compra de mercadoria como saída, o custo já está contado no que saiu: fique com o Resultado do mês. O número Depois do custo dos produtos serve para quem não lança essas compras." },
+      { so: ["loja"], texto: "Venda de produto sem custo registrado não entra no custo nem na sobra, e o cartão diz quantas foram. O detalhe por produto está em Relatórios." },
+    ],
+    palavras: ["resultado", "resumo", "lucro", "quanto entrou", "quanto saiu", "exportar financeiro", "planilha do financeiro", "mes passado", "custo dos produtos vendidos", "custo da mercadoria", "cmv", "resultado depois do custo", "lucro de verdade"] },
   { id: "meta", titulo: "Como definir a meta do mês", secao: "dinheiro", quem: "dono", rota: FINANCEIRO, tambem: [HOJE],
     passos: [
       "Abra Financeiro, na aba Resumo.",
@@ -1275,6 +1291,7 @@ const BASE: TopicoBase[] = [
       { so: ["hotel"], texto: "Logo abaixo, no cartão Hotel: ocupação e contas, veja a taxa de ocupação do período, as noites já reservadas de hoje em diante, de onde veio o valor das contas (diárias, taxas, extras e produtos) e os sinais recebidos e devolvidos." },
     ],
     dicas: ["Entram as estadias encerradas no período.", "O valor recebido das estadias já está somado no faturamento.",
+      { so: ["hotel"], texto: "Sinal recebido em partes conta cada parte no dia em que ela entrou, e não tudo no dia em que o sinal ficou quitado." },
       { so: ["hotel"], texto: "A taxa de ocupação é noites vendidas dividido por noites disponíveis (as vagas do hotel vezes os dias do período), com a comparação com o período anterior." }],
     palavras: ["relatorio da creche", "relatorio do hotel", "numeros da creche e do hotel", "numeros do hotel", "numeros da creche", "diarias no mes", "estadias", "faturamento do hotel", "taxa de ocupacao", "noites vendidas", "reservas futuras", "sinais recebidos"] },
   { id: "comissao", titulo: "Como calcular a comissão da equipe", secao: "dinheiro", usa: ["banho"], quem: "dono", rota: RELATORIOS, tambem: [EQUIPE],
@@ -1542,6 +1559,7 @@ const BASE: TopicoBase[] = [
       "Caixa é para receber, vender e conferir a gaveta: a pessoa vê o que entrou hoje, mas não as contas, as despesas nem o histórico.",
       "Financeiro e Relatórios mostram todo o dinheiro. Só quem tem uma delas (ou o dono) altera um valor já recebido que outra pessoa lançou.",
       "Com Caixa, Financeiro e Relatórios desligados, a pessoa não vê valor nenhum.",
+      { so: ["casa"], texto: "Isso vale para a creche e o hotel: sem essas áreas, a pessoa faz reserva, check-in, check-out e chamada sem ver a diária, o valor cobrado nem as listas de preço (porte, temporada, taxas). A diária entra sozinha pela regra de Meu pet shop, e quem cuida do caixa acerta o valor depois." },
       "O cartão Quem pode o quê, na tela Equipe, mostra o que cada perfil abre.",
     ],
     atencao: ["Equipe, Meu pet shop e Assinatura ficam só com os donos. Sócio abre tudo, igual a você."],
@@ -1590,7 +1608,7 @@ const BASE: TopicoBase[] = [
       "Toque em Aceitar ou em Recusar.",
       "Toque em Confirmar no WhatsApp para avisar o tutor. Se recusou, o botão é Sugerir outro horário.",
     ],
-    dicas: ["Ao aceitar, o horário entra na agenda.", "O tutor não é avisado sozinho: toque em Confirmar no WhatsApp logo depois de responder.", "Se o telefone do pedido já for de outro tutor, o sistema pergunta É a mesma pessoa?.", "O número ao lado de Agenda, no menu, mostra quantos pedidos esperam resposta."],
+    dicas: ["Ao aceitar, o horário entra na agenda.", "O tutor não é avisado sozinho: toque em Confirmar no WhatsApp logo depois de responder.", "Se o telefone do pedido já for de outro tutor, o sistema pergunta É a mesma pessoa?. A pergunta vem uma vez por pedido: aceitando os pets um por um, os outros seguem a mesma resposta.", "O número ao lado de Agenda, no menu, mostra quantos pedidos esperam resposta."],
     palavras: ["pedido", "pedidos", "aceitar", "recusar", "pedido pelo link", "cliente pediu horario", "confirmar pedido"] },
   { id: "link-regras", titulo: "Como pedir que o cliente aceite as suas regras no link", secao: "divulgacao", quem: "dono", rota: PETSHOP,
     passos: [
@@ -1649,8 +1667,8 @@ const BASE: TopicoBase[] = [
       "Toque em Chamar ao lado do tutor: o WhatsApp abre com a mensagem pronta.",
       "Envie a mensagem e volte para chamar o próximo.",
     ],
-    dicas: ["Para escrever do seu jeito, toque em Mudar o texto. Onde estiver [pet] entra o nome do pet. O texto fica guardado neste aparelho.", "Quem já foi chamado fica marcado, com a opção Chamar de novo.", "Só entra na lista quem não tem horário marcado."],
-    palavras: ["sumido", "sumidos", "nao vem", "nao voltou", "nao voltaram", "chamar de volta", "recuperar cliente", "cliente parou de vir"] },
+    dicas: ["Para escrever do seu jeito, toque em Mudar o texto. Onde estiver [pet] entra o nome do pet. O texto vale para o pet shop inteiro: aparece igual em qualquer aparelho, para toda a equipe.", "Quem já foi chamado fica marcado neste aparelho, com a opção Chamar de novo.", "Só entra na lista quem não tem horário marcado."],
+    palavras: ["sumido", "sumidos", "nao vem", "nao voltou", "nao voltaram", "chamar de volta", "recuperar cliente", "cliente parou de vir", "texto da mensagem", "mudar o texto", "mesmo texto em outro aparelho"] },
   { id: "aniversarios", titulo: "Como dar parabéns no aniversário do pet", secao: "divulgacao", quem: "todos", rota: CLIENTES, tambem: [HOJE],
     passos: [
       "Abra Clientes e pets e toque em Chamar de volta.",
@@ -1658,7 +1676,7 @@ const BASE: TopicoBase[] = [
       "Toque em Chamar ao lado do tutor: o WhatsApp abre com os parabéns prontos.",
       "Envie a mensagem.",
     ],
-    dicas: ["Aparecem os pets que fazem aniversário nos próximos 7 dias.", "A tela Hoje avisa quando tem aniversário chegando."],
+    dicas: ["Aparecem os pets que fazem aniversário nos próximos 7 dias.", "A tela Hoje avisa quando tem aniversário chegando.", "Para escrever os parabéns do seu jeito, toque em Mudar o texto. O texto vale para o pet shop inteiro, em qualquer aparelho."],
     atencao: ["Só aparece o pet que tem a data de nascimento anotada na ficha."],
     palavras: ["aniversario", "aniversarios", "parabens", "nascimento", "aniversariante"] },
   { id: "fidelidade", titulo: "Como usar o programa de fidelidade", secao: "divulgacao", usa: ["banho"], quem: "dono", rota: PETSHOP, tambem: [CLIENTES],
@@ -1671,7 +1689,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "A contagem é por tutor, soma os atendimentos concluídos de todos os pets dele e começa no dia em que você liga.",
-      "Só contam os atendimentos da Agenda. Estadias de creche e de hotel não entram na contagem.",
+      { so: ["casa"], texto: "Só contam os atendimentos da Agenda. Estadias de creche e de hotel não entram na contagem." },
       "Quando o tutor completa, o aviso Tem prêmio para entregar aparece na janela do horário dele, na Agenda, e na ficha do tutor. O sistema não manda mensagem.",
       "Entregou por engano? Toque em Desfazer na última entrega.",
     ],
@@ -1814,7 +1832,7 @@ const BASE: TopicoBase[] = [
       "A nota fiscal continua sendo emitida onde você já emite hoje: na prefeitura, com o contador ou em um programa emissor.",
     ],
     palavras: ["nota fiscal", "nf", "nfe", "nf-e", "nfce", "nfc-e", "nfse", "nfs-e", "emitir nota", "cupom fiscal", "danfe", "fiscal"] },
-  { id: "sinal", titulo: "Dá para cobrar sinal ou adiantamento na reserva?", secao: "limites", quem: "todos", rota: null,
+  { id: "sinal", titulo: "Dá para cobrar sinal ou adiantamento na reserva?", secao: "limites", usa: ["casa"], quem: "todos", rota: null,
     passos: [
       "Dá, mas é uma opção que começa desligada. O dono liga em Meu pet shop, no cartão Opções do hotel e da creche, na chave Sinal na reserva, e toca em Salvar opções.",
       "Ligada, a reserva nova mostra Sinal da reserva: Recebi agora, Vai pagar depois ou Sem sinal.",
@@ -1840,7 +1858,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["Para mandar os lembretes do dia em sequência, veja Como mandar lembretes pelo WhatsApp."],
     palavras: ["envio automatico", "automatico", "automatica", "sozinho", "manda sozinho", "envia sozinho", "disparo", "disparar", "robo", "mensagem automatica", "lembrete automatico", "whatsapp automatico", "em massa"] },
-  { id: "canil", titulo: "Dá para escolher o canil ou o quarto de cada hóspede?", secao: "limites", quem: "todos", rota: null,
+  { id: "canil", titulo: "Dá para escolher o canil ou o quarto de cada hóspede?", secao: "limites", usa: ["hotel"], quem: "todos", rota: null,
     passos: [
       "Dá, mas é uma opção que começa desligada. O dono liga em Meu pet shop, no cartão Opções do hotel e da creche, na chave Acomodações, cria a lista (nome e quantos pets cabem) e toca em Salvar opções.",
       "Ligada, a reserva, o check-in e o Editar mostram o campo Acomodação.",
@@ -1853,6 +1871,8 @@ const BASE: TopicoBase[] = [
 const usaParte = (petshop: ComModulos, u: Uso) => (u === "banho" ? usaModulo(petshop, "banho_tosa") : u === "casa" ? usaCasa(petshop) : usaModulo(petshop, u));
 /** Vale para este pet shop? Sem pet shop (a Ajuda com IA, a impressão geral), vale tudo. */
 const vale = (petshop: ComModulos | null, so?: Uso[]) => !petshop || !so || so.some((u) => usaParte(petshop, u));
+/** O passo vale? Sem pet shop ficam as versões completas (`so`) e saem as versões curtas (`sem`). */
+const valePasso = (petshop: ComModulos | null, x: { so?: Uso[]; sem?: Uso[] }) => (petshop ? vale(petshop, x.so) && !x.sem?.some((u) => usaParte(petshop, u)) : !x.sem);
 
 const numerar = (passos: string[]) => passos.map((p, i) => `${i + 1}. ${p}`).join("\n");
 /** Na seção do que o sistema não faz, a resposta é uma conversa ("Não. …"), não um passo a passo numerado. */
@@ -1871,12 +1891,16 @@ function tituloPara(titulo: string, petshop: ComModulos | null): string {
     .replace("a tela Creche e hotel", creche ? "a tela Creche" : "a tela Hotel")
     .replace("de creche ou hotel", creche ? "de creche" : "de hotel")
     .replace("da creche e do hotel", creche ? "da creche" : "do hotel")
-    .replace("de creche e hotel", creche ? "de creche" : "de hotel");
+    .replace("de creche e hotel", creche ? "de creche" : "de hotel")
+    .replace("as opções do hotel e da creche", creche ? "as opções da creche" : "as opções do hotel")
+    .replace("na conta do hotel", creche ? "na conta da creche" : "na conta do hotel")
+    .replace("as mensagens do hotel", creche ? "as mensagens da creche" : "as mensagens do hotel")
+    .replace("cuidados do hóspede", creche ? "cuidados do pet na creche" : "cuidados do hóspede");
 }
 
 /** O tópico em texto puro. Com pet shop, saem os passos e as dicas das partes que ele não usa. */
 function pronto(t: TopicoBase, petshop: ComModulos | null): Topico {
-  const linhas = (l?: Passo[]) => (l ?? []).filter((x) => typeof x === "string" || vale(petshop, x.so)).map((x) => (typeof x === "string" ? x : x.texto));
+  const linhas = (l?: Passo[]) => (l ?? []).filter((x) => typeof x === "string" || valePasso(petshop, x)).map((x) => (typeof x === "string" ? x : x.texto));
   const passos = linhas(t.passos), dicas = linhas(t.dicas), atencao = linhas(t.atencao);
   const limpo = { ...t, titulo: tituloPara(t.titulo, petshop), passos, dicas: dicas.length ? dicas : undefined, atencao: atencao.length ? atencao : undefined };
   return { ...limpo, resposta: respostaDe(limpo) };

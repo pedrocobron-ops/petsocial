@@ -12,7 +12,7 @@ import { useDados } from "../ui";
 
 /**
  * Hotel nos relatórios: taxa de ocupação do período (noites vendidas ÷ noites disponíveis), de onde veio o valor das contas
- * (diárias, taxas, extras e produtos), sinais recebidos e devolvidos, e as noites já reservadas daqui para a frente.
+ * (diárias, taxas, extras e produtos), sinais recebidos (cada parte no dia em que entrou) e devolvidos, e as noites já reservadas daqui para a frente.
  * Os valores vêm da conta guardada no check-out (`estadias_valores.conta`): nada é recalculado.
  */
 type E = Pick<Estadia, "id" | "tipo" | "status" | "entrada" | "saida" | "saida_prevista" | "diarias_cobradas">;
@@ -47,13 +47,30 @@ export default function HotelNoRelatorio({ de, ate, antes }: { de: Date; ate: Da
       // contas fechadas (hotel e creche) dos dois períodos, pela data da saída guardada na conta
       lerTudo<Pick<ValoresDaEstadia, "estadia_id" | "conta">>((a, b, contar) => sb.from("estadias_valores").select("estadia_id, conta", contando(contar)).eq("petshop_id", petshop.id)
         .not("conta", "is", null).gte("conta->>quando", desde).lt("conta->>quando", somaDias(ate, 1).toISOString()).order("estadia_id").range(a, b)),
-      lerTudo<Pick<ValoresDaEstadia, "estadia_id" | "sinal" | "sinal_estado" | "sinal_pago_em" | "sinal_devolvido_em" | "sinal_devolucao_id">>((a, b, contar) =>
-        sb.from("estadias_valores").select("estadia_id, sinal, sinal_estado, sinal_pago_em, sinal_devolvido_em, sinal_devolucao_id", contando(contar)).eq("petshop_id", petshop.id)
+      lerTudo<Pick<ValoresDaEstadia, "estadia_id" | "sinal" | "sinal_estado" | "sinal_pago_em" | "sinal_devolvido_em" | "sinal_devolucao_id" | "sinal_lancamento_id">>((a, b, contar) =>
+        sb.from("estadias_valores").select("estadia_id, sinal, sinal_estado, sinal_pago_em, sinal_devolvido_em, sinal_devolucao_id, sinal_lancamento_id", contando(contar)).eq("petshop_id", petshop.id)
           .not("sinal", "is", null).order("estadia_id").range(a, b)),
     ]);
     const devolucoes = sinais.filter((s) => s.sinal_devolucao_id && s.sinal_devolvido_em && s.sinal_devolvido_em >= deIso && s.sinal_devolvido_em <= ateIso).map((s) => s.sinal_devolucao_id!);
     const dev = devolucoes.length ? (await sb.from("lancamentos").select("id, valor").eq("petshop_id", petshop.id).in("id", devolucoes)).data ?? [] : [];
-    return { estadias: [...abertas, ...encerradas], contas, sinais, devolvido: real(dev.reduce((t, l) => t + Number(l.valor), 0)), devolucoes: dev.length };
+    // Sinal recebido no período: cada parte conta no dia em que entrou. A conta do sinal é um lançamento; o que foi recebido
+    // dela em partes são lançamentos ligados a ela (`conta_id`), e a própria conta, quando quitada, guarda a última parte.
+    const contasDoSinal = new Map(sinais.filter((x) => x.sinal_lancamento_id).map((x) => [x.sinal_lancamento_id!, x.estadia_id]));
+    const idsDoSinal = [...contasDoSinal.keys()];
+    const entrou = new Map<string, number>();
+    for (let i = 0; i < idsDoSinal.length; i += 80) {
+      const parte = idsDoSinal.slice(i, i + 80);
+      const [quitadas, partes] = await Promise.all([
+        sb.from("lancamentos").select("id, valor").eq("petshop_id", petshop.id).eq("pago", true).gte("data", deIso).lte("data", ateIso).in("id", parte),
+        sb.from("lancamentos").select("conta_id, valor").eq("petshop_id", petshop.id).eq("pago", true).gte("data", deIso).lte("data", ateIso).in("conta_id", parte).limit(1000),
+      ]);
+      for (const l of quitadas.data ?? []) { const e = contasDoSinal.get(l.id)!; entrou.set(e, real((entrou.get(e) ?? 0) + Number(l.valor))); }
+      for (const l of partes.data ?? []) { const e = contasDoSinal.get(l.conta_id!)!; entrou.set(e, real((entrou.get(e) ?? 0) + Number(l.valor))); }
+    }
+    // sinal que ficou sem a conta (ela foi apagada depois de recebida): vale o dia em que foi dado como pago
+    for (const x of sinais) if (!x.sinal_lancamento_id && x.sinal_pago_em && x.sinal_pago_em >= deIso && x.sinal_pago_em <= ateIso) entrou.set(x.estadia_id, real(Number(x.sinal)));
+    const sinalRecebido = real([...entrou.values()].reduce((t, n) => t + n, 0));
+    return { estadias: [...abertas, ...encerradas], contas, sinalRecebido, sinaisRecebidos: [...entrou.values()].filter((n) => n > 0).length, devolvido: real(dev.reduce((t, l) => t + Number(l.valor), 0)), devolucoes: dev.length };
   }, [petshop.id, temHotel, deIso, ateIso, antesDe, antesAte]);
 
   if (!temHotel || !dados) return null;
@@ -81,9 +98,8 @@ export default function HotelNoRelatorio({ de, ate, antes }: { de: Date; ate: Da
     return x;
   };
   const contas = somar(deIso, ateIso), contasAntes = somar(antesDe, antesAte);
-  const recebidos = dados.sinais.filter((s) => s.sinal_pago_em && s.sinal_pago_em >= deIso && s.sinal_pago_em <= ateIso);
-  const sinalRecebido = real(recebidos.reduce((t, s) => t + Number(s.sinal), 0));
-  const temAlgo = vendidas > 0 || futuras.length > 0 || contas.n > 0 || recebidos.length > 0 || dados.devolucoes > 0;
+  const { sinalRecebido, sinaisRecebidos } = dados;
+  const temAlgo = vendidas > 0 || futuras.length > 0 || contas.n > 0 || sinaisRecebidos > 0 || dados.devolucoes > 0;
   if (!temAlgo) return null;
 
   return (
@@ -119,11 +135,11 @@ export default function HotelNoRelatorio({ de, ate, antes }: { de: Date; ate: Da
               <p className="g-muted g-pp">{contas.n === 1 ? "1 conta fechada" : `${contas.n} contas fechadas`} de creche e hotel no período, somando {brl(contas.total)} (com o sinal dentro). Período anterior: {contasAntes.n ? brl(contasAntes.total) : "sem conta fechada"}.</p>
             </>
           ) : <p className="g-muted g-p">Nenhuma conta de estadia fechada com o detalhe neste período.{contasAntes.n ? ` Período anterior: ${brl(contasAntes.total)}.` : ""}</p>}
-          <p className="g-p">Sinais recebidos: <b className="g-tab">{brl(sinalRecebido)}</b>{recebidos.length ? ` (${recebidos.length})` : ""} · devolvidos: <b className="g-tab">{brl(dados.devolvido)}</b>{dados.devolucoes ? ` (${dados.devolucoes})` : ""}</p>
+          <p className="g-p">Sinais recebidos: <b className="g-tab">{brl(sinalRecebido)}</b>{sinaisRecebidos ? ` (${sinaisRecebidos})` : ""} · devolvidos: <b className="g-tab">{brl(dados.devolvido)}</b>{dados.devolucoes ? ` (${dados.devolucoes})` : ""}</p>
         </div>
       </div>
       <p className="g-muted g-pp g-rel-nota">
-        Estes valores são o detalhe das contas e não somam de novo: o que foi recebido já está no faturamento lá em cima, no dia em que entrou (o sinal, no dia em que foi pago).
+        Estes valores são o detalhe das contas e não somam de novo: o que foi recebido já está no faturamento lá em cima, no dia em que entrou (o sinal recebido em partes conta cada parte no dia dela).
         A noite conta pelo dia em que começa.
       </p>
     </section>

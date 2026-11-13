@@ -14,6 +14,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
+import SeriesAcabando from "@/components/gestao/agenda/series-acabando";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
@@ -178,6 +179,7 @@ function Agenda() {
 
       <div className="g-pilha">
         <PedidosLink />
+        <SeriesAcabando aoMudar={() => void recarregar()} />
         <div className="g-fila g-card g-ag-faixa">
           <button className="g-ico" aria-label="Semana anterior" onClick={() => setDia(isoDia(somaDias(data, -7)))}><ChevronLeft /></button>
           <div className="g-dias g-cresce">

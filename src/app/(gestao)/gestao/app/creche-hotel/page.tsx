@@ -24,6 +24,7 @@ import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/component
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
 import Ocupacao from "@/components/gestao/hotel/ocupacao";
 import { CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
+import { comValoresDeEstadia } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
 import { lerPlanos, lerPresencas, planoAtivo, type PlanoCompleto } from "@/lib/gestao/creche";
@@ -232,8 +233,13 @@ export default function CrecheHotel() {
       // check-outs que fecharam sem cobrança (feitos por quem não mexe com dinheiro): todos, não só os últimos do histórico
       vejoFinanceiro ? sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).eq("status", "encerrada").is("valor_cobrado", null).not("diarias_cobradas", "is", null).is("mensalista", null).order("saida", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
     ]);
-    const lista = ok(abertas) as unknown as EstadiaCompleta[];
-    const semCobranca = ((pendentes.data ?? []) as unknown as EstadiaCompleta[]).filter(estadiaSemCobranca);
+    // a diária e o valor cobrado vêm à parte, só para quem recebe (para os outros ficam em branco)
+    const [lista, antigas, pend] = await Promise.all([
+      comValoresDeEstadia(sb, petshop.id, ok(abertas) as unknown as EstadiaCompleta[], vejoFinanceiro),
+      comValoresDeEstadia(sb, petshop.id, ok(passadas) as unknown as EstadiaCompleta[], vejoFinanceiro),
+      comValoresDeEstadia(sb, petshop.id, (pendentes.data ?? []) as unknown as EstadiaCompleta[], vejoFinanceiro),
+    ]);
+    const semCobranca = pend.filter(estadiaSemCobranca);
     // sinal e taxas das reservas e estadias abertas: só quem recebe lê (o banco não entrega para os outros)
     const valores = new Map<string, ValoresDaEstadia>();
     if (vejoFinanceiro && lista.length + semCobranca.length) {
@@ -242,7 +248,7 @@ export default function CrecheHotel() {
     }
     let feitos: CuidadoFeito[] = [];
     if (comCuidados) feitos = (await sb.from("estadias_cuidados").select("*").eq("petshop_id", petshop.id).eq("dia", isoDia(new Date())).limit(1000)).data ?? [];
-    const encerradas = ok(passadas) as unknown as EstadiaCompleta[];
+    const encerradas = antigas;
     // ocorrências das estadias abertas e quem levou cada pet das encerradas (só com as opções ligadas)
     let ocorrencias: Ocorrencia[] = [];
     const naCasaIds = lista.filter((e) => e.status === "em_casa").map((e) => e.id);
@@ -855,7 +861,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, 
     setSalvando(true);
     try {
       const campos = {
-        tipo, entrada: entrada.toISOString(), saida_prevista: saida?.toISOString() ?? null, valor_diaria: diaria, obs: obs.trim() || null,
+        tipo, entrada: entrada.toISOString(), saida_prevista: saida?.toISOString() ?? null, obs: obs.trim() || null,
+        // quem não recebe não vê nem manda a diária: o banco coloca a sugerida (a do porte, ou a de Meu pet shop)
+        ...(vejoFinanceiro ? { valor_diaria: diaria } : {}),
         ...(opQuartos.ativo || editar?.acomodacao ? { acomodacao: tipo === "hotel" && quarto ? quarto.id : null } : {}),
         ...(comCuidados || editar?.cuidados ? { cuidados: cuidadosParaGravar(cuidados) as never } : {}),
       };
