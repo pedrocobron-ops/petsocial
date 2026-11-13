@@ -147,9 +147,10 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   // o que o pet shop não marcou: fica a um toque, num grupo fechado no fim do menu
   const outras = menu.outras.filter(pode);
   const outrasVisiveis = outrasAbertas || outras.some((i) => atual(i.href));
-  // quem não abre a tela da área principal fica com a Agenda na barra de baixo, se a Agenda é dele
-  const agenda = GRUPOS[0].itens.find((i) => i.href === AGENDA)!;
-  const aba = !podeRota(menu.aba.href) && podeRota(AGENDA) && !menu.outras.includes(agenda) ? agenda : menu.aba, podeAba = podeRota(aba.href);
+  // quem não abre a tela da área principal fica, na barra de baixo, com a primeira tela que é dele
+  // (a monitora da creche vê Creche e hotel, e não uma Agenda apagada). Hoje e Clientes já têm o lugar deles na barra.
+  const minhaPrimeira = grupos.flatMap((g) => g.itens).find((i) => areaDaRota(i.href) != null && i.href !== "/gestao/app/clientes");
+  const aba = podeRota(menu.aba.href) ? menu.aba : minhaPrimeira ?? menu.aba, podeAba = podeRota(aba.href);
 
   // na tela Hoje, o dono vê o cartão de fim de teste (com os números da conta): a faixa de cima não repete o recado
   const teste = fimDoTeste(petshop);
