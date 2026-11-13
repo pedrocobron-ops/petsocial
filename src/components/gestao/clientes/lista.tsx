@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Importar from "@/components/gestao/importar";
+import Importar, { UltimaImportacao } from "@/components/gestao/importar";
 import { AlertTriangle, Cat, ChevronRight, Dog, Download, MessageCircle, PawPrint, Phone, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
@@ -69,6 +69,16 @@ export default function Lista({ aoAbrir, irPara }: {
   const [petNovo, setPetNovo] = useState(false);
   const [tutorNovo, setTutorNovo] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [versaoImportacao, setVersaoImportacao] = useState(0);
+  // atalho "Cadastrar o primeiro pet" (guia, tela Hoje, primeiros passos): /gestao/app/clientes?novo=1 já abre o formulário
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("novo") !== "1") return;
+    p.delete("novo");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${p.size ? `?${p}` : ""}`);
+    if (!somenteLeitura()) setPetNovo(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [chamando, setChamando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
@@ -175,6 +185,8 @@ export default function Lista({ aoAbrir, irPara }: {
           <button className="g-btn pri" onClick={abrirPetNovo}><Plus />Pet novo</button>
         </div>
       </header>
+
+      <UltimaImportacao tipo="clientes" versao={versaoImportacao} aoAbrir={() => setImportando(true)} />
 
       {dados && (pets.length > 0 || clientes.length > 0) && (
         <div className="g-grade kpis g-cli-kpis">
@@ -308,7 +320,7 @@ export default function Lista({ aoAbrir, irPara }: {
       )}
 
       {chamando && <ChamarDeVolta aoFechar={() => setChamando(false)} />}
-      {importando && <Importar tipo="clientes" aoFechar={() => setImportando(false)} aoTerminar={() => void recarregar()} />}
+      {importando && <Importar tipo="clientes" aoFechar={() => { setImportando(false); setVersaoImportacao((v) => v + 1); }} aoTerminar={() => void recarregar()} />}
       {petNovo && (
         <FormPet nomeInicial={aba === "pets" && petsFiltrados.length === 0 ? q.trim() : undefined} aoFechar={() => setPetNovo(false)}
           aoSalvar={(p) => { setPetNovo(false); avisarMudanca(); aoAbrir(); irPara(linkPet(p.id)); }} />

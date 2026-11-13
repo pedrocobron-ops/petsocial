@@ -1,9 +1,10 @@
 "use client";
 
+import { saudacaoZap } from "@/lib/gestao/agenda";
 import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { Fragment, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowLeftRight, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
 import type { Agendamento, Cliente, Estadia, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, fmtTelefone, haQuanto, hora, idade, inicioDoDia, linkWhatsApp, nomeDiaCurto, telefoneValido } from "@/lib/gestao/util";
@@ -11,8 +12,9 @@ import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { Anel, Tile, type Tom } from "../painel";
 import { AvatarPet, avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
-import { linkTutor, nomePorte, primeiroNome } from "./comum";
+import { linkTutor, nomePorte } from "./comum";
 import FormTutor from "./form-tutor";
+import { FolhaTrocarTutor } from "./juntar";
 import { EtiquetaEspecie, tomDaVisita } from "./lista";
 import { CartaoSaude, EtiquetaSaude, resumoSaude, type CuidadoSaude } from "./saude";
 
@@ -35,6 +37,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = useState(false);
   const [editandoTutor, setEditandoTutor] = useState(false);
+  const [trocandoTutor, setTrocandoTutor] = useState(false);
   const [ocupado, setOcupado] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
@@ -94,7 +97,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
 
   const { pet, atendimentos, pacotes, estadias, visitas, nEstadias, ultimaVisita, gasto, gastoEstadias, gastoParcial, saude, erroSaude } = dados;
   const tutor = pet.clientes;
-  const zap = tutor ? linkWhatsApp(tutor.telefone, `Oi, ${primeiroNome(tutor.nome)}! Aqui é do ${petshop.nome}. `) : null;
+  const zap = tutor ? linkWhatsApp(tutor.telefone, `${saudacaoZap(tutor.nome, petshop.nome)} `) : null;
   const etiquetas = [pet.raca, pet.porte ? `Porte ${nomePorte(pet.porte).toLowerCase()}` : null, pet.sexo === "M" ? "Macho" : pet.sexo === "F" ? "Fêmea" : null, idade(pet.nascimento)]
     .filter((x): x is string => !!x);
   const agora = new Date();
@@ -135,7 +138,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
               {tutor && <p className="tutor"><UserRound aria-hidden />Tutor: <Link className="g-link" href={linkTutor(tutor.id)} scroll={false}>{tutor.nome}</Link></p>}
               {tutor && (
                 <p className="tutor gc-fone">
-                  {tutor.telefone ? (telefoneValido(tutor.telefone) ? fmtTelefone(tutor.telefone) : <span className="g-vermelho-t">Telefone incompleto: {tutor.telefone}</span>) : <span>Sem telefone</span>}
+                  {tutor.telefone ? (telefoneValido(tutor.telefone) ? fmtTelefone(tutor.telefone) : <span className="g-vermelho-t">Telefone incompleto: {tutor.telefone}. Toque em Editar tutor para corrigir.</span>) : <span>Sem telefone</span>}
                 </p>
               )}
               <div className="g-cli-etqs">
@@ -151,6 +154,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
             {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />WhatsApp</a>}
             <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditando(true); }}><Pencil />Editar pet</button>
             {tutor && <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditandoTutor(true); }}><UserPen />Editar tutor</button>}
+            <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setTrocandoTutor(true); }}><ArrowLeftRight />Trocar tutor</button>
           </div>
         </section>
       </div>
@@ -294,6 +298,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       </div>
 
       {editando && <FormPet pet={pet} aoFechar={() => setEditando(false)} aoSalvar={() => { setEditando(false); avisarMudanca(); }} />}
+      {trocandoTutor && <FolhaTrocarTutor pet={pet} tutorAtual={tutor} aoFechar={() => setTrocandoTutor(false)} aoTrocar={() => setTrocandoTutor(false)} />}
       {editandoTutor && tutor && <FormTutor cliente={tutor} aoFechar={() => setEditandoTutor(false)} aoSalvar={() => { setEditandoTutor(false); avisarMudanca(); }} />}
     </div>
   );

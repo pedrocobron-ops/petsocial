@@ -249,7 +249,7 @@ export function DetalhesAgenda({ nome, cor, aoCor, comissao, aoComissao, segueLo
             <b>Tem dias próprios</b><small>Você marca os dias e as horas dessa pessoa.</small>
           </button>
         </div>
-        {!segueLoja && <GradeHorario valor={escala} aoMudar={aoEscala} aberto="Trabalha" fechado="Folga" base={loja} />}
+        {!segueLoja && <GradeHorario valor={escala} aoMudar={aoEscala} aberto="Trabalha" fechado="Folga" base={loja} semAlmoco />}
       </section>
     </div>
   );

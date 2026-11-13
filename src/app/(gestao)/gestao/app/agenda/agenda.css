@@ -93,3 +93,15 @@
 /* linha do tempo: tutor já avisado de que o pet está pronto */
 .g-agd-avisado { display: inline-grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: 50%; background: var(--g-menta); color: #24543b; }
 .g-agd-avisado svg { width: 13px; height: 13px; }
+
+/* almoço do pet shop: parece um bloqueio, mas não abre nada (muda em Meu pet shop) */
+div.g-agd-bloq.almoco { cursor: default; }
+div.g-agd-bloq.almoco:hover { transform: none; border-color: var(--g-linha); }
+div.g-agd-faixa.almoco { cursor: default; }
+
+/* valor do horário: destaque quando o pet não tem porte ou quando o que foi escrito não é número */
+.g-agd-valor { display: block; }
+.g-agd-valor.atencao .g-input { border-color: #c79a1b; box-shadow: 0 0 0 3px rgba(199, 154, 27, .2); background: var(--g-amarelo-tint); }
+.g-agd-valor.ruim .g-input { border-color: var(--g-vermelho); box-shadow: 0 0 0 3px rgba(179, 64, 46, .14); }
+.g-agd-porte > div { display: grid; gap: 8px; min-width: 0; }
+.g-agd-porte .g-chip { background: var(--g-carta); }

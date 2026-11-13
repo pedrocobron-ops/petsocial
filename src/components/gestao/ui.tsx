@@ -70,9 +70,11 @@ export function mensagemDeErro(e: unknown): string {
 /* ---------- avisos rápidos e confirmação ---------- */
 
 const EVENTO_AVISOU = "gestao:avisou";
-type Toast = { id: number; texto: string; erro?: boolean };
+/** Botão dentro do aviso rápido (ex.: "Desfazer"). O aviso com botão fica mais tempo na tela. */
+export type AcaoDoAviso = { rotulo: string; fazer: () => void };
+type Toast = { id: number; texto: string; erro?: boolean; acao?: AcaoDoAviso };
 type Pergunta = { titulo: string; texto?: string; confirmar?: string; perigo?: boolean; resolver: (v: boolean) => void };
-const AvisosCtx = createContext<{ avisar: (t: string) => void; avisarErro: (e: unknown) => void; confirmar: (p: Omit<Pergunta, "resolver">) => Promise<boolean> } | null>(null);
+const AvisosCtx = createContext<{ avisar: (t: string, acao?: AcaoDoAviso) => void; avisarErro: (e: unknown) => void; confirmar: (p: Omit<Pergunta, "resolver">) => Promise<boolean> } | null>(null);
 
 export function useAvisos() {
   const v = useContext(AvisosCtx);
@@ -83,14 +85,14 @@ export function useAvisos() {
 export function AvisosProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [pergunta, setPergunta] = useState<Pergunta | null>(null);
-  const por = useCallback((texto: string, erro?: boolean) => {
+  const por = useCallback((texto: string, erro?: boolean, acao?: AcaoDoAviso) => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t.slice(-2), { id, texto, erro }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), erro ? 5000 : 2600);
+    setToasts((t) => [...t.slice(-2), { id, texto, erro, acao }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), acao ? 8000 : erro ? 5000 : 2600);
     // aviso de que deu certo = algo foi gravado: a folha aberta deixa de contar como "mexida"
     if (!erro) window.dispatchEvent(new Event(EVENTO_AVISOU));
   }, []);
-  const avisar = useCallback((t: string) => por(t), [por]);
+  const avisar = useCallback((t: string, acao?: AcaoDoAviso) => por(t, false, acao), [por]);
   const avisarErro = useCallback((e: unknown) => por(mensagemDeErro(e), true), [por]);
   const confirmar = useCallback((p: Omit<Pergunta, "resolver">) => new Promise<boolean>((resolver) => setPergunta({ ...p, resolver })), []);
   const responder = (v: boolean) => { pergunta?.resolver(v); setPergunta(null); };
@@ -98,7 +100,12 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
     <AvisosCtx.Provider value={{ avisar, avisarErro, confirmar }}>
       {children}
       <div className="g-toasts" role="status" aria-live="polite">
-        {toasts.map((t) => <div key={t.id} className={`g-toast${t.erro ? " erro" : ""}`}>{t.texto}</div>)}
+        {toasts.map((t) => (
+          <div key={t.id} className={`g-toast${t.erro ? " erro" : ""}${t.acao ? " com-acao" : ""}`}>
+            <span>{t.texto}</span>
+            {t.acao && <button type="button" onClick={() => { setToasts((l) => l.filter((x) => x.id !== t.id)); t.acao!.fazer(); }}>{t.acao.rotulo}</button>}
+          </div>
+        ))}
       </div>
       {pergunta && (
         <Folha titulo={pergunta.titulo} aoFechar={() => responder(false)}

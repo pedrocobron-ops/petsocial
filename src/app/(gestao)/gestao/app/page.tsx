@@ -209,7 +209,7 @@ export default function Hoje() {
         <div className="g-acoes">
           {posso("agenda") && banho && !contaNova && <LinkRapido rotulo="Mandar link de agendamento" />}
           {contaNova && frente === "loja" ? <Link className="g-btn pri" href="/gestao/app/estoque"><Plus />Cadastrar o primeiro produto</Link>
-            : contaNova && posso("clientes") ? <Link className="g-btn pri" href="/gestao/app/clientes"><Plus />Cadastrar o primeiro pet</Link>
+            : contaNova && posso("clientes") ? <Link className="g-btn pri" href="/gestao/app/clientes?novo=1"><Plus />Cadastrar o primeiro pet</Link>
             : frente === "loja" ? <Link className="g-btn pri" href={ROTA_VENDER}><ShoppingBag />Vender</Link>
             : soCasa ? <Link className="g-btn pri" href="/gestao/app/creche-hotel"><Plus />{principal === "hotel" ? "Nova reserva" : "Fazer check-in"}</Link>
             : posso("agenda") && <Link className="g-btn pri" href="/gestao/app/agenda?novo=1"><Plus />Marcar horário</Link>}
@@ -344,7 +344,7 @@ export default function Hoje() {
                   <Vazio mozart="acenando" titulo="Nenhum horário marcado para hoje" texto={casa ? `Serviços com hora marcada aparecem aqui. As estadias ficam em ${rotuloCasa}.` : "Serviços com hora marcada aparecem aqui."} />
                 ) : contaNova && posso("clientes") ? (
                   <Vazio mozart="acenando" titulo="A agenda começa pelo primeiro pet" texto="Cadastre um pet com o tutor. Depois é só marcar: o horário aparece aqui.">
-                    <Link className="g-btn verde" href="/gestao/app/clientes">Cadastrar o primeiro pet</Link>
+                    <Link className="g-btn verde" href="/gestao/app/clientes?novo=1">Cadastrar o primeiro pet</Link>
                   </Vazio>
                 ) : (
                   <Vazio mozart="acenando" titulo="Nenhum banho marcado para hoje" texto="Que tal chamar quem está com o banho atrasado? O Mozart monta a lista para você.">

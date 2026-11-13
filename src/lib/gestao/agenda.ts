@@ -33,15 +33,27 @@ export function vagasDe(petshop: { vagas?: number | null }, equipe: { ativo: boo
   return petshop.vagas ?? Math.max(1, equipe.filter((p) => p.ativo && p.atende).length);
 }
 
+/**
+ * Como o negócio se apresenta numa mensagem: "Aqui é Banho da Neide." Sem "do/da", que só acerta por sorte
+ * ("Aqui é do Escolinha", "Aqui é do Hotel Pet"). Todas as mensagens de WhatsApp começam por aqui.
+ */
+export const aquiE = (petshop: string) => `Aqui é ${petshop.trim()}.`;
+/** Saudação inteira: "Oi, Dona Zefa! Aqui é Banho da Neide." */
+export const saudacaoZap = (tutor: string | null | undefined, petshop: string) => `${tutor ? `Oi, ${chamar(tutor)}!` : "Oi!"} ${aquiE(petshop)}`;
+
 /** Texto do lembrete que vai para o WhatsApp do tutor. */
 export function textoLembrete(p: { tutor?: string | null; pet: string; servico?: string | null; quando: string; hora: string; petshop: string }) {
-  const oi = p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!";
-  return `${oi} Aqui é do ${p.petshop}. Passando para lembrar ${p.servico ? `do ${p.servico.toLowerCase()}` : "do horário"} de ${p.pet} ${p.quando} às ${p.hora}. Posso confirmar?`;
+  return `${saudacaoZap(p.tutor, p.petshop)} Passando para lembrar ${p.servico ? `do ${p.servico.toLowerCase()}` : "do horário"} de ${p.pet} ${p.quando} às ${p.hora}. Posso confirmar?`;
 }
 
-/** Texto do aviso de que o pet está pronto para ir para casa (WhatsApp do tutor). */
-export function textoPronto(p: { tutor?: string | null; pet: string; petshop: string }) {
-  return `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} ${p.pet} está pronto e esperando por você aqui no ${p.petshop}.`;
+/**
+ * Texto do aviso de que o atendimento terminou e o pet pode ir para casa (WhatsApp do tutor).
+ * Sem "pronto/pronta", que erra com metade dos pets: "O banho de Mel terminou. Já pode vir buscar."
+ */
+export function textoPronto(p: { tutor?: string | null; pet: string; petshop: string; servico?: string | null }) {
+  const s = (p.servico ?? "").trim().toLowerCase();
+  const oQue = /^banho/.test(s) ? `O ${s}` : /^(tosa|hidratação|escovação)/.test(s) ? `A ${s}` : "O atendimento";
+  return `${saudacaoZap(p.tutor, p.petshop)} ${oQue} de ${p.pet} terminou. Já pode vir buscar.`;
 }
 
 /* ---------- série (horário que se repete) e bloqueio ---------- */
@@ -59,9 +71,9 @@ export const REPETICOES = [
 export const MOTIVOS_BLOQUEIO = ["Almoço", "Folga", "Feriado", "Manutenção"];
 
 /** Dias (AAAA-MM-DD) de uma série: o primeiro e os seguintes, de N em N semanas. */
-export function datasDaSerie(dia: string, aCadaSemanas: number, vezes: number): string[] {
+export function datasDaSerie(dia: string, aCadaSemanas: number, vezes: number, maximo = 12): string[] {
   if (!RE_DIA.test(dia) || !aCadaSemanas || vezes < 2) return [dia];
-  return Array.from({ length: Math.min(12, Math.floor(vezes)) }, (_, i) => somaDiasIso(dia, i * 7 * aCadaSemanas));
+  return Array.from({ length: Math.min(maximo, Math.floor(vezes)) }, (_, i) => somaDiasIso(dia, i * 7 * aCadaSemanas));
 }
 
 /**

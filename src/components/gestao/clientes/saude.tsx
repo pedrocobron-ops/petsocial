@@ -1,5 +1,6 @@
 "use client";
 
+import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useMemo, useState } from "react";
 import { Bug, HeartPulse, MessageCircle, Pill, Plus, RotateCw, ShieldPlus, Syringe, Trash2 } from "lucide-react";
 import type { Database } from "@/lib/gestao/banco";
@@ -126,7 +127,7 @@ export function mensagemSaude(tutorNome: string, petNome: string, petshopNome: s
     return `- ${nome}: ${quando}`;
   });
   return [
-    `Oi, ${primeiroNome(tutorNome)}! Aqui é do ${petshopNome}. Tudo bem?`,
+    `${saudacaoZap(tutorNome, petshopNome)} Tudo bem?`,
     "",
     `Passando para lembrar ${alerta.length === 1 ? "de um cuidado" : "dos cuidados"} de ${petNome} que ${alerta.length === 1 ? "está" : "estão"} na nossa ficha:`,
     ...linhas,

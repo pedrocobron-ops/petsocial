@@ -6,7 +6,7 @@ import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
 import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres, vagasDe } from "../agenda";
 import { partesPorForma } from "../dinheiro";
-import { brl, fmtTelefone, linkWhatsApp, precoDoServico, semAcento } from "../util";
+import { almocoNoDiaDaSemana, brl, fmtTelefone, lerTelefone, linkWhatsApp, precoDoServico, semAcento, soDigitos } from "../util";
 
 /**
  * O que o Mozart sabe fazer no sistema.
@@ -415,11 +415,14 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       // sem profissional escolhido, vale o número de vagas do pet shop; com profissional, a agenda dele
       const ocupados = ags.filter((a) => !["cancelado", "faltou"].includes(a.status) && (prof ? a.profissional_id === prof.id : true)).map(emMin);
       const bloqueados = bloqueios.filter((b) => !b.profissional_id || b.profissional_id === prof?.id || quemAtende.length <= 1).map(emMin);
+      // almoço do pet shop: fechado todos os dias, sem bloqueio na agenda
+      const almoco = almocoNoDiaDaSemana(petshop.horario, diaSemanaLocal(dia));
+      if (almoco) bloqueados.push({ inicio: almoco.inicio, fim: almoco.fim });
       const aPartirDe = dia === hoje ? Number(c.agora.slice(11, 13)) * 60 + Number(c.agora.slice(14, 16)) : undefined;
       const livres = horariosLivres({ abre: func.abre, fecha: func.fecha, duracaoMin: servico?.duracao_min ?? 60, ocupados, bloqueados, vagas: prof ? 1 : vagasDe(petshop, c.equipe), aPartirDe });
-      return { resultado: { dia, funcionamento: `${func.abre} às ${func.fecha}`, duracao_min: servico?.duracao_min ?? 60, livres, marcados: ags.filter((a) => !["cancelado", "faltou"].includes(a.status)).length,
+      return { resultado: { dia, funcionamento: `${func.abre} às ${func.fecha}`, ...(almoco ? { almoco: `fechado das ${almoco.de} às ${almoco.ate}` } : {}), duracao_min: servico?.duracao_min ?? 60, livres, marcados: ags.filter((a) => !["cancelado", "faltou"].includes(a.status)).length,
         bloqueios: bloqueios.map((b) => bloqueioParaModelo(c, b)),
-        ...(bloqueios.length ? { aviso: "Os horários livres já descontam os bloqueios. Não ofereça horário dentro de um bloqueio." } : {}) } };
+        ...(bloqueios.length || almoco ? { aviso: "Os horários livres já descontam os bloqueios e o almoço. Não ofereça horário dentro de um bloqueio nem na hora do almoço." } : {}) } };
     }
     case "clientes_sumidos": {
       const dias = Math.max(1, Math.min(720, numero(e.dias) ?? 30));
@@ -623,6 +626,16 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       const func = (c.petshop.horario as Horario | null)?.[String(diaSemanaLocal(inicio.slice(0, 10)))];
       if (!func) linhas.push(["Atenção", "o pet shop não abre nesse dia"]);
       else if (inicio.slice(11) < func.abre || inicio.slice(11) >= func.fecha) linhas.push(["Atenção", `fora do horário (${func.abre} às ${func.fecha})`]);
+      {
+        // almoço do pet shop: avisa (a pessoa pode confirmar mesmo assim, como na tela)
+        const noAlmoco = inicios.filter((i) => {
+          const al = almocoNoDiaDaSemana(c.petshop.horario, diaSemanaLocal(i.slice(0, 10)));
+          const ini = Number(i.slice(11, 13)) * 60 + Number(i.slice(14, 16));
+          return !!al && ini < al.fim && ini + servico.duracao_min > al.inicio;
+        });
+        const al = almocoNoDiaDaSemana(c.petshop.horario, diaSemanaLocal((noAlmoco[0] ?? inicio).slice(0, 10)));
+        if (noAlmoco.length && al) linhas.push(["Atenção", `cai no almoço do pet shop (${al.de} às ${al.ate})${inicios.length > 1 ? ` em ${noAlmoco.length === inicios.length ? "todas as datas" : noAlmoco.map((i) => diaCurtoLocal(i.slice(0, 10))).join(", ")}` : ""}`]);
+      }
       if (prof) {
         const batem: string[] = [];
         for (const x of intervalos) {
@@ -830,7 +843,7 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
   switch (nome) {
     case "cadastrar_pet": {
       let clienteId = uuid(e.cliente_id);
-      if (!clienteId) clienteId = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome: texto(e.tutor_nome, 120), telefone: texto(e.tutor_telefone, 30) || null }).select("id").single()).id;
+      if (!clienteId) clienteId = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome: texto(e.tutor_nome, 120), telefone: lerTelefone(texto(e.tutor_telefone, 40)).fone ?? (soDigitos(texto(e.tutor_telefone, 40)) || null) }).select("id").single()).id;
       const pet = ok(await sb.from("pets").insert({ petshop_id: petshop.id, cliente_id: clienteId, nome: texto(e.nome, 80), especie: ["cao", "gato", "outro"].includes(String(e.especie)) ? String(e.especie) : "cao",
         raca: texto(e.raca, 60) || null, porte: ["P", "M", "G", "GG"].includes(String(e.porte)) ? String(e.porte) : null, alertas: texto(e.alertas, 400) || null }).select("id, nome").single());
       return { feito: true, pet_id: pet.id, cliente_id: clienteId };

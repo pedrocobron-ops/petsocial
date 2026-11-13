@@ -210,6 +210,9 @@ export default function FormBloqueio({ bloqueio, diaInicial, profissionalInicial
             {MOTIVOS_BLOQUEIO.map((m) => <button key={m} type="button" className="g-chip" aria-pressed={motivo === m} onClick={() => setMotivo(m)}>{m}</button>)}
           </div>
           <input className="g-input" value={motivo} maxLength={80} onChange={(e) => setMotivo(e.target.value)} placeholder="Ou escreva o motivo" aria-label="Motivo" />
+          {!bloqueio && !profId && /^almo[cç]o$/i.test(motivo.trim()) && (
+            <small>O pet shop fecha para o almoço todo dia? Em Meu pet shop, no horário de funcionamento, dá para marcar o almoço uma vez só, sem prazo para acabar. O bloqueio daqui serve para um dia ou para algumas semanas.</small>
+          )}
         </div>
 
         {!bloqueio && <div className="g-agd-rep">

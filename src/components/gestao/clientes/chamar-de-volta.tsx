@@ -1,5 +1,6 @@
 "use client";
 
+import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useState } from "react";
 import Link from "next/link";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
@@ -112,7 +113,7 @@ function lerModelos(petshopId: string): Record<AbaChamar, string> {
 /** A mensagem inteira: a saudação entra sozinha e `[pet]` vira o nome do pet (ou dos pets) do tutor. Texto em branco usa o padrão. */
 export function montarMensagem(aba: AbaChamar, modelo: string, p: { tutor: string | null; pets: string[]; petshop: string }) {
   const corpo = (modelo.trim() || MODELOS_PADRAO[aba]).replace(/\[pet\]/gi, juntarNomes(p.pets) || "seu pet");
-  return `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} Aqui é do ${p.petshop}. ${corpo}`;
+  return `${saudacaoZap(p.tutor, p.petshop)} ${corpo}`;
 }
 
 /* ---------- quem já foi chamado (fica marcado por alguns dias, neste aparelho) ---------- */
