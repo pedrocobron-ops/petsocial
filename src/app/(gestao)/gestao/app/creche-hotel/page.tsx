@@ -15,6 +15,7 @@ import Diario from "@/components/gestao/casa/diario";
 import { AvisoDeVaga, FolhaEspera, ListaDeEspera, useListaDeEspera } from "@/components/gestao/casa/espera";
 import { FolhaOcorrencia, OcorrenciasDoCartao } from "@/components/gestao/casa/ocorrencias";
 import { FolhaQuemPodeBuscar, lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
+import { decidirAtraso, FolhaTaxaDeAtraso, fraseDoAtraso, lerAtraso, lerAtrasosPendentes, type AtrasoPendente } from "@/components/gestao/creche/atraso";
 import Chamada from "@/components/gestao/creche/chamada";
 import Cobrancas from "@/components/gestao/creche/cobrancas";
 import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
@@ -201,8 +202,11 @@ export default function CrecheHotel() {
   const [mesCobranca, setMesCobranca] = useState(() => new Date());
   const [acertando, setAcertando] = useState<EstadiaCompleta | null>(null);
   const [cobrando, setCobrando] = useState<EstadiaCompleta | null>(null);
+  // mensalista que saiu depois do horário: a pergunta da taxa, só para quem recebe
+  const [taxa, setTaxa] = useState<AtrasoPendente | null>(null);
   // feriados e dias fechados (e, para quem recebe, o preço de feriado e a taxa de busca fora do horário)
   const { calendario } = useCalendario();
+  const valorDaTaxa = vejoFinanceiro && calendario?.atraso.ativo ? calendario.atraso.creche.valor : null;
   const [aba, setAba] = useState<Aba>("casa");
   const [tipo, setTipo] = useState<"todos" | Tipo>("todos");
   const [nova, setNova] = useState<{ dia?: string; tipo?: Tipo; pet?: PetDaEstadia | null; espera?: string } | null>(null);
@@ -254,8 +258,10 @@ export default function CrecheHotel() {
     const naCasaIds = lista.filter((e) => e.status === "em_casa").map((e) => e.id);
     if (comOcorrencias && naCasaIds.length) ocorrencias = (await sb.from("estadias_ocorrencias").select("*").eq("petshop_id", petshop.id).in("estadia_id", naCasaIds).order("quando").limit(1000)).data ?? [];
     const retiradas = comPortaria ? await lerRetiradas(sb, petshop.id, encerradas.filter((e) => e.status === "encerrada").map((e) => e.id)).catch(() => new Map<string, Retirada>()) : new Map<string, Retirada>();
-    return { abertas: lista, passadas: encerradas, valores, feitos, ocorrencias, retiradas, semCobranca };
-  }, [petshop.id, vejoFinanceiro, comCuidados, comOcorrencias, comPortaria]);
+    // saídas de mensalista fora do horário que esperam a decisão da taxa (só quem recebe lê)
+    const atrasos = vejoFinanceiro && usaCreche ? await lerAtrasosPendentes(sb, petshop.id) : [];
+    return { abertas: lista, passadas: encerradas, valores, feitos, ocorrencias, retiradas, semCobranca, atrasos };
+  }, [petshop.id, vejoFinanceiro, comCuidados, comOcorrencias, comPortaria, usaCreche]);
 
   // mensalistas: os planos e o que já aconteceu hoje (para a chamada e para a conta de vagas)
   const { dados: mens } = useDados<Mens | null>(async () => {
@@ -288,7 +294,7 @@ export default function CrecheHotel() {
   const naCasa = useMemo(() => abertas.filter((e) => e.status === "em_casa"), [abertas]);
   const reservas = useMemo(() => abertas.filter((e) => e.status === "reservada"), [abertas]);
   const historico = dados?.passadas ?? [];
-  const tudoVazio = Boolean(dados) && !naCasa.length && !reservas.length && !historico.length && !dados?.semCobranca.length;
+  const tudoVazio = Boolean(dados) && !naCasa.length && !reservas.length && !historico.length && !dados?.semCobranca.length && !dados?.atrasos.length;
   const valoresDe = (e: EstadiaCompleta) => dados?.valores.get(e.id) ?? null;
 
   const mudou = () => { void recarregar(); avisarMudanca(); };
@@ -347,11 +353,27 @@ export default function CrecheHotel() {
     if (somenteLeitura()) return;
     setOcupado(e.id);
     try {
-      if (e.plano_id && e.dia) ok(await sb.rpc("creche_chamada", { p_plano: e.plano_id, p_dia: e.dia, p_acao: "saiu" }));
-      else ok(await sb.from("estadias").update({ status: "encerrada", saida: new Date().toISOString(), diarias_cobradas: 1 }).eq("id", e.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
-      avisar(`${e.pets?.nome ?? "O pet"} foi para casa.`);
+      // saiu depois do horário (com a taxa ligada em Meu pet shop): o banco anota, sem valor e sem cobrar
+      let atrasada = false;
+      if (e.plano_id && e.dia) atrasada = Boolean((ok(await sb.rpc("creche_chamada", { p_plano: e.plano_id, p_dia: e.dia, p_acao: "saiu" })) as { atraso?: boolean } | null)?.atraso);
+      else {
+        ok(await sb.from("estadias").update({ status: "encerrada", saida: new Date().toISOString(), diarias_cobradas: 1 }).eq("id", e.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
+        atrasada = (await sb.rpc("creche_atraso_anotar", { p_estadia: e.id })).data === true;
+      }
+      const nome = e.pets?.nome ?? "O pet";
+      // quem recebe decide a taxa agora; os outros só ficam sabendo que a saída ficou anotada
+      const a = atrasada && valorDaTaxa ? await lerAtraso(sb, e.id) : null;
+      if (a) setTaxa(a);
+      avisar(atrasada && !a ? `${nome} foi para casa. A saída foi depois do horário: ficou anotada em Check-outs para cobrar, para quem cuida do caixa decidir a taxa.` : `${nome} foi para casa.`);
       mudou();
     } catch (x) { avisarErro(x); } finally { setOcupado(null); }
+  }
+
+  /** Taxa de busca fora do horário desligada depois que a saída foi anotada: não há valor para cobrar, só dá para tirar da lista. */
+  async function semTaxa(a: AtrasoPendente) {
+    if (somenteLeitura()) return;
+    if (!(await confirmar({ titulo: "Tirar da lista sem cobrar?", texto: `${a.pets?.nome ?? "O pet"} ${fraseDoAtraso(a)}. A taxa de busca fora do horário está desligada (ou sem valor) em Meu pet shop, então não há valor para cobrar. Para cobrar, ligue a taxa de novo e volte aqui.`, confirmar: "Não cobrar" }))) return;
+    try { await decidirAtraso(sb, a.estadia_id, "dispensada"); avisar("Sem taxa desta vez."); mudou(); } catch (x) { avisarErro(x); }
   }
 
   /** A saída de um hóspede: com "Quem pode buscar" ligado, primeiro a equipe marca quem levou. */
@@ -380,6 +402,7 @@ export default function CrecheHotel() {
   const proximaReserva = reservas.find((e) => new Date(e.entrada).getTime() >= hoje0);
   // check-out que fechou sem cobrança, sem pacote e sem plano: o dono precisa ver e acertar
   const semCobranca = vejoFinanceiro ? dados?.semCobranca ?? [] : [];
+  const atrasosPendentes = vejoFinanceiro ? dados?.atrasos ?? [] : [];
   /** Quanto dá a conta de um check-out que ficou para cobrar (diárias pelas regras, taxas combinadas, menos o sinal). Sem diária combinada, null. */
   const contaPendente = (e: EstadiaCompleta) => {
     if (e.valor_diaria == null) return null;
@@ -465,11 +488,27 @@ export default function CrecheHotel() {
           </div>
 
           <AvisoDeVaga espera={espera} aoVer={verEspera} />
-          {semCobranca.length > 0 && (
+          {semCobranca.length + atrasosPendentes.length > 0 && (
             <section className="g-card g-ht-cobrar" id="para-cobrar" aria-label="Check-outs para cobrar">
-              <div className="g-card-t"><h3><HandCoins aria-hidden style={{ width: 18, height: 18 }} />Check-outs para cobrar</h3><span className="g-muted g-pp">{semCobranca.length === 1 ? "1 estadia saiu sem cobrança" : `${semCobranca.length} estadias saíram sem cobrança`}</span></div>
-              <p className="g-muted g-p">O check-out foi feito por quem não mexe com dinheiro. Toque em Receber: a conta abre pronta, com as diárias, as taxas e o sinal.</p>
+              <div className="g-card-t"><h3><HandCoins aria-hidden style={{ width: 18, height: 18 }} />Check-outs para cobrar</h3><span className="g-muted g-pp">{[
+                semCobranca.length ? (semCobranca.length === 1 ? "1 estadia saiu sem cobrança" : `${semCobranca.length} estadias saíram sem cobrança`) : "",
+                atrasosPendentes.length ? (atrasosPendentes.length === 1 ? "1 mensalista saiu fora do horário" : `${atrasosPendentes.length} mensalistas saíram fora do horário`) : "",
+              ].filter(Boolean).join(" · ")}</span></div>
+              {semCobranca.length > 0 && <p className="g-muted g-p">O check-out foi feito por quem não mexe com dinheiro. Toque em Receber: a conta abre pronta, com as diárias, as taxas e o sinal.</p>}
+              {atrasosPendentes.length > 0 && <p className="g-muted g-p">Mensalista que saiu depois do horário: a taxa de busca fora do horário não foi cobrada. Você decide se cobra (na próxima mensalidade ou agora) ou se não cobra.</p>}
               <div className="g-lista">
+                {atrasosPendentes.map((a) => (
+                  <div key={a.estadia_id} className="g-linha">
+                    <AvatarPet pet={a.pets ?? { nome: "?" }} />
+                    <span className="t">
+                      <b>{a.pets?.nome ?? "Pet removido"}</b>
+                      <span>{[fraseDoAtraso(a), a.pets?.clientes?.nome, "mensalista"].filter(Boolean).join(" · ")}</span>
+                    </span>
+                    {valorDaTaxa
+                      ? <button type="button" className="g-btn verde p" onClick={() => { if (!somenteLeitura()) setTaxa(a); }} aria-label={`Decidir a taxa de busca fora do horário de ${a.pets?.nome ?? "pet"}`}><HandCoins />Taxa de {brl(valorDaTaxa)}</button>
+                      : <button type="button" className="g-btn sec p" onClick={() => void semTaxa(a)} aria-label={`Não cobrar a taxa de ${a.pets?.nome ?? "pet"}`}>Não cobrar</button>}
+                  </div>
+                ))}
                 {semCobranca.map((e) => {
                   const n = e.diarias_cobradas ?? 1, total = contaPendente(e);
                   const atraso = atrasoSugerido(e.tipo, e.saida ?? e.entrada, calendario?.atraso);
@@ -693,6 +732,7 @@ export default function CrecheHotel() {
       {lote && <EncerrarCreche estadias={crecheNaCasa} valores={dados?.valores ?? new Map()} aoFechar={() => setLote(false)} aoGravar={() => { setLote(false); mudou(); }}
         aoCheckOut={(e) => { setLote(false); setSaindo(e); }} />}
       {saindo && <CheckOut key={saindo.id} estadia={saindo} aoFechar={() => setSaindo(null)} aoGravar={() => { setSaindo(null); mudou(); }} />}
+      {taxa && valorDaTaxa && <FolhaTaxaDeAtraso key={taxa.estadia_id} atraso={taxa} valor={valorDaTaxa} aoFechar={() => { setTaxa(null); mudou(); }} aoDecidir={() => { setTaxa(null); mudou(); }} />}
       {cobrando && <CheckOut key={cobrando.id} pendente estadia={cobrando} aoFechar={() => setCobrando(null)} aoGravar={() => { setCobrando(null); mudou(); }} />}
       {mensagens && <MensagensDaEstadia estadia={mensagens} aoFechar={() => setMensagens(null)} aoMudar={() => void recarregar()}
         sinal={(() => { const v = valoresDe(mensagens); return v?.sinal != null && (v.sinal_estado === "a_receber" || v.sinal_estado === "pago") ? { valor: v.sinal_estado === "a_receber" ? faltaDoSinal(v) || Number(v.sinal) : Number(v.sinal), pago: v.sinal_estado === "pago" } : null; })()}
@@ -1044,6 +1084,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, 
  * - Taxa de busca fora do horário: quando a regra está ligada e a hora passou, a linha mostra a taxa já marcada, o total
  *   diz quanto é de taxa e, antes de gravar, a pessoa confirma (ou desmarca). Ela nunca entra sem aparecer.
  * - Quem não mexe com dinheiro encerra sem valor nenhum: as saídas ficam em Check-outs para cobrar, para quem recebe.
+ * - Mensalista que sai fora do horário: o banco anota a saída (`creche_atraso_anotar`). Quem recebe decide na linha (taxa marcada =
+ *   recebida agora; desmarcada = não cobrar); para quem não mexe com dinheiro, fica em Check-outs para cobrar.
  */
 function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
   estadias: EstadiaCompleta[]; valores: Map<string, ValoresDaEstadia>; aoFechar: () => void; aoGravar: () => void; aoCheckOut: (e: EstadiaCompleta) => void;
@@ -1109,7 +1151,7 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
       if (!(await conferirCaixa(sb, petshop.id, confirmar))) return;
     }
     setSalvando(true);
-    let feitos = 0, recebido = 0, comPacote = 0;
+    let feitos = 0, recebido = 0, comPacote = 0, anotadas = 0;
     const falhas: string[] = [];
     for (const l of escolhidas) {
       const nome = l.e.pets?.nome ?? "Pet";
@@ -1123,6 +1165,10 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
         }).eq("id", l.e.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
         if (!r.length) continue; // já tinha saído por outra tela
         feitos++;
+        // mensalista: o banco confere a hora e anota a saída fora do horário (sem valor); a decisão vem logo abaixo ou fica para quem recebe
+        const anotada = l.mensal && (await sb.rpc("creche_atraso_anotar", { p_estadia: l.e.id })).data === true;
+        if (l.mensal && l.podeTaxa && l.taxa === 0) await decidirAtraso(sb, l.e.id, "dispensada").catch(() => undefined);
+        else if (anotada && !(l.podeTaxa && l.taxa > 0 && forma)) anotadas++;
         if (l.usaPacote && l.pacote) {
           // mesma baixa do check-out do pet: só grava se ninguém mexeu no pacote no meio do caminho
           const usados = l.pacote.usados + l.n;
@@ -1140,6 +1186,8 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
               descricao: l.cobra ? `${diarias} · ${nome}${l.taxa > 0 ? ` + ${NOME_TAXA_ATRASO}` : ""}` : `Creche: ${NOME_TAXA_ATRASO.toLowerCase()} · ${nome}`, clienteId: l.e.pets?.clientes?.id ?? null,
             });
             recebido += l.recebe;
+            // mensalista com a taxa recebida aqui: a anotação da saída fica ligada ao recebimento (não entra de novo na mensalidade)
+            if (l.taxa > 0 && l.mensal) await decidirAtraso(sb, l.e.id, "recebida", l.taxa, lanc.id).catch(() => undefined);
             if (l.taxa > 0 && !l.mensal) {
               // conta com taxa: o histórico mostra como o total foi montado
               const dasDiarias = l.cobra ? l.valor : 0;
@@ -1157,7 +1205,7 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
     }
     setSalvando(false);
     if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join(", ")}. Confira${vejoFinanceiro ? " e, se precisar, lance pelo Financeiro" : ""}.`);
-    if (feitos) avisar(`${feitos === 1 ? "1 pet foi" : `${feitos} pets foram`} para casa.${comPacote ? ` ${comPacote === 1 ? "1 usou" : `${comPacote} usaram`} o pacote.` : ""}${recebido ? ` ${brl(recebido)} no financeiro.` : ""}`);
+    if (feitos) avisar(`${feitos === 1 ? "1 pet foi" : `${feitos} pets foram`} para casa.${comPacote ? ` ${comPacote === 1 ? "1 usou" : `${comPacote} usaram`} o pacote.` : ""}${recebido ? ` ${brl(recebido)} no financeiro.` : ""}${anotadas ? ` ${anotadas === 1 ? "1 mensalista saiu" : `${anotadas} mensalistas saíram`} depois do horário: a taxa fica em Check-outs para cobrar, para ${vejoFinanceiro ? "você decidir" : "quem cuida do caixa decidir"}.` : ""}`);
     aoGravar();
   }
 

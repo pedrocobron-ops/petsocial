@@ -2,6 +2,7 @@
 
 import { CalendarCheck2, UserX } from "lucide-react";
 import { CATEGORIA_MENSALIDADE, resumoDaCrecheHoje } from "@/lib/gestao/creche";
+import { contarAtrasosPendentes } from "@/components/gestao/creche/atraso";
 import { OcorrenciasDeHoje } from "@/components/gestao/casa/ocorrencias";
 
 import { Marca, Selo } from "@/components/gestao/marca";
@@ -149,6 +150,8 @@ export default function Hoje() {
     return r.count ?? 0;
   }, [petshop.id, hojeIso, vejoFinanceiro]);
   const paraCobrar = semCobrar ?? 0;
+  // mensalistas que saíram depois do horário e esperam a decisão da taxa (só quem recebe lê)
+  const { dados: taxasPendentes } = useDados(async () => (vejoFinanceiro && posso("creche_hotel") ? contarAtrasosPendentes(sb, petshop.id) : 0), [petshop.id, hojeIso, vejoFinanceiro]);
   const { dados: paraChamar } = useDados(async () => (vejoClientes ? buscarParaChamar(sb, petshop.id) : null), [petshop.id, hojeIso, vejoClientes]);
   const chamados = paraChamar ? lerChamados(petshop.id) : {};
   const comFone = (grupos: GrupoChamar[]) => grupos.filter((g) => g.telefone);
@@ -204,6 +207,7 @@ export default function Hoje() {
   const cr = dados?.creche ?? null;
   const atencao = dados ? [
     paraCobrar > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${paraCobrar === 1 ? "1 check-out saiu" : `${paraCobrar} check-outs saíram`} sem cobrança na creche e hotel. Toque para receber.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
+    (taxasPendentes ?? 0) > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${taxasPendentes === 1 ? "1 mensalista saiu" : `${taxasPendentes} mensalistas saíram`} da creche depois do horário. Toque para decidir a taxa.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
     cr && cr.esperados > 0 && { icone: CalendarCheck2, tom: "manteiga" as Tom, texto: `Chamada de hoje: ${cr.esperados === 1 ? "1 cão esperado" : `${cr.esperados} cães esperados`}${cr.aindaNao > 0 ? `, ${cr.aindaNao === 1 ? "1 ainda não chegou" : `${cr.aindaNao} ainda não chegaram`}` : ", chamada feita"}.`, href: "/gestao/app/creche-hotel?ver=chamada" },
     cr && cr.faltaram.length > 0 && { icone: UserX, tom: "rosa" as Tom, texto: `${cr.faltaram.length <= 2 ? cr.faltaram.join(" e ") : `${cr.faltaram.slice(0, 2).join(", ")} e mais ${cr.faltaram.length - 2}`} ${cr.faltaram.length === 1 ? "não veio" : "não vieram"} à creche hoje. Toque para ver a chamada e mandar uma mensagem ao tutor.`, href: "/gestao/app/creche-hotel?ver=chamada" },
     cr && cr.vencemHoje > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `Hoje ${cr.vencemHoje === 1 ? "vence 1 mensalidade" : `vencem ${cr.vencemHoje} mensalidades`} da creche. Toque para cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
