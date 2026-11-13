@@ -17,7 +17,7 @@ import CheckOut, { comNota, DetalheDaEstadia, NOTA_PACOTE, pacoteServe, pacotesP
 import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/components/gestao/hotel/cuidados";
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
 import Ocupacao from "@/components/gestao/hotel/ocupacao";
-import { CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
+import { CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { lerPlanos, lerPresencas, planoAtivo, type PlanoCompleto } from "@/lib/gestao/creche";
 import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
@@ -599,7 +599,7 @@ export default function CrecheHotel() {
       {lote && <EncerrarCreche estadias={crecheNaCasa} aoFechar={() => setLote(false)} aoGravar={() => { setLote(false); mudou(); }} />}
       {saindo && <CheckOut estadia={saindo} aoFechar={() => setSaindo(null)} aoGravar={() => { setSaindo(null); mudou(); }} />}
       {mensagens && <MensagensDaEstadia estadia={mensagens} aoFechar={() => setMensagens(null)} aoMudar={() => void recarregar()}
-        sinal={(() => { const v = valoresDe(mensagens); return v?.sinal != null && (v.sinal_estado === "a_receber" || v.sinal_estado === "pago") ? { valor: Number(v.sinal), pago: v.sinal_estado === "pago" } : null; })()}
+        sinal={(() => { const v = valoresDe(mensagens); return v?.sinal != null && (v.sinal_estado === "a_receber" || v.sinal_estado === "pago") ? { valor: v.sinal_estado === "a_receber" ? faltaDoSinal(v) || Number(v.sinal) : Number(v.sinal), pago: v.sinal_estado === "pago" } : null; })()}
         fatos={comCuidados ? fatosDoDia(lerCuidados(mensagens), dados?.feitos.filter((f) => f.estadia_id === mensagens.id) ?? [], hojeIso) : undefined} />}
       {sinalDe && <FolhaSinal estadia={sinalDe} valores={valoresDe(sinalDe)} sugerido={sugeridoPara(sinalDe)} aoFechar={() => setSinalDe(null)} aoGravar={() => { setSinalDe(null); mudou(); }} />}
       {cancelando && valoresDe(cancelando) && <CancelarComSinal estadia={cancelando} valores={valoresDe(cancelando)!} aoFechar={() => setCancelando(null)} aoGravar={() => { setCancelando(null); mudou(); }} />}

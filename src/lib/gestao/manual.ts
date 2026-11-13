@@ -536,7 +536,10 @@ const BASE: TopicoBase[] = [
       "Para cancelar uma reserva, toque em Cancelar no cartão dela e confirme em Cancelar reserva.",
       "Se a reserva tem sinal, quem cuida do caixa escolhe antes: Ficar com o sinal ou Devolver o sinal (se ainda não foi pago: Deixar em A receber ou Tirar a conta a receber).",
     ],
-    dicas: ["Devolver o sinal lança uma saída de hoje com o valor devolvido. O recebimento do sinal não é apagado."],
+    dicas: [
+      "Devolver o sinal lança uma saída de hoje com o valor devolvido. O recebimento do sinal não é apagado.",
+      "Se o tutor pagou só uma parte do sinal, a escolha é sobre o que entrou: Ficar com o que foi recebido, Devolver o que foi recebido ou Continuar cobrando o que falta. Nas duas primeiras, a conta do que faltava sai de A receber.",
+    ],
     atencao: ["Reserva com sinal só é cancelada por quem cuida do caixa."],
     palavras: ["editar reserva", "cancelar reserva", "mudar data", "mudar diaria", "estender", "mais um dia", "editar estadia"] },
   { id: "creche-passado", titulo: "Como corrigir a entrada e a saída de uma estadia que já passou", secao: "creche", usa: ["casa"], quem: "caixa", rota: CRECHE,
@@ -640,6 +643,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "O cartão da reserva mostra Sinal pago ou Sinal a receber.",
+      "Se o tutor pagar só uma parte do sinal (pelo Recebi, em Financeiro ou em Caixa), o cartão mostra quanto falta e o botão Receber o sinal recebe só o resto. No check-out, o sinal inteiro é descontado e o que falta dele vem marcado para receber junto.",
       "A mensagem Pedir o sinal leva o valor, o texto que o dono escreveu e a chave Pix, se ela estiver preenchida nas opções.",
       "Reserva que já existe e ainda não tem sinal: toque em Sinal no cartão dela.",
       "No link do cliente, o pedido e a confirmação avisam que o sinal vai ser pedido.",
@@ -1569,7 +1573,7 @@ const BASE: TopicoBase[] = [
       "Espere o sistema juntar os dados. Não feche a tela.",
       "Guarde o arquivo baixado em um lugar seguro.",
     ],
-    dicas: ["O arquivo traz planilhas de clientes, pets, agenda, financeiro, caixas, estoque, pacotes, creche e hotel, equipe e serviços.", "As planilhas abrem no Excel e no Google Planilhas."],
+    dicas: ["O arquivo traz planilhas de clientes, pets, agenda, financeiro, caixas, estoque, pacotes, creche e hotel (com os mensalistas e as mensalidades), equipe, comissões pagas e serviços.", "As planilhas abrem no Excel e no Google Planilhas."],
     atencao: ["É uma cópia para guardar e consultar: não dá para restaurar, isto é, trazer esses arquivos de volta para o sistema. As fotos não entram."],
     palavras: ["copia de seguranca", "backup", "copia", "baixar dados", "guardar dados", "seguranca", "baixar tudo"] },
   { id: "dados", titulo: "Como baixar ou apagar os meus dados", secao: "ajustes", quem: "dono", rota: PETSHOP,

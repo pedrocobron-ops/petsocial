@@ -343,7 +343,8 @@ export async function receberConta(sb: Banco, contaId: string, r: {
  */
 export function separarMulta(forma: FormaPagamento, pagamentos: PartePagamento[] | null, multa: number):
   { conta: { forma: FormaPagamento; pagamentos: PartePagamento[] | null }; multa: { forma: FormaPagamento; pagamentos: PartePagamento[] | null } } {
-  if (!pagamentos || pagamentos.length < 2 || !(multa > 0)) return { conta: { forma, pagamentos: null }, multa: { forma, pagamentos: null } };
+  // sem multa (ou com uma forma só) nada é separado: o pagamento dividido da conta segue inteiro, com as suas partes
+  if (!pagamentos || pagamentos.length < 2 || !(multa > 0)) return { conta: { forma, pagamentos: pagamentos && pagamentos.length > 1 ? pagamentos : null }, multa: { forma, pagamentos: null } };
   const daConta = pagamentos.map((p) => ({ ...p }));
   const daMulta: PartePagamento[] = [];
   let falta = centavos(multa);
@@ -362,14 +363,20 @@ export function separarMulta(forma: FormaPagamento, pagamentos: PartePagamento[]
 /* ---------- quitar de uma vez uma conta que estava em A receber ---------- */
 
 /**
- * Quita inteira uma conta a receber, pelo mesmo caminho protegido de `receberConta` (o banco confere quem pode,
+ * Quita uma conta a receber (o que falta dela), pelo mesmo caminho protegido de `receberConta` (o banco confere quem pode,
  * põe no caixa aberto e mantém o histórico). Lança erro quando a conta já tinha sido baixada.
+ * `esperado`: quanto a tela mostrou que faltava. Se outra pessoa recebeu uma parte nesse meio tempo, para em vez de
+ * receber um valor diferente do que foi combinado no balcão.
  * Usada pela conta do hotel (sinal e pendências recebidas junto).
  */
-export async function quitarConta(sb: Banco, petshopId: string, contaId: string, pg: { forma: FormaPagamento; pagamentos?: PartePagamento[] | null }) {
+export async function quitarConta(sb: Banco, petshopId: string, contaId: string, pg: { forma: FormaPagamento; pagamentos?: PartePagamento[] | null }, esperado?: number) {
   const c = await sb.from("lancamentos").select("id, valor, pago").eq("id", contaId).eq("petshop_id", petshopId).maybeSingle();
   if (c.error) throw new Error(c.error.message);
   if (!c.data || c.data.pago) throw new Error("Esta conta já tinha sido baixada.");
-  await receberConta(sb, contaId, { valor: Number(c.data.valor), forma: pg.forma, pagamentos: pg.pagamentos ?? null });
+  const falta = Number(c.data.valor);
+  if (esperado != null && centavos(esperado) !== centavos(falta)) {
+    throw new Error(`Esta conta mudou enquanto a tela estava aberta: agora faltam ${falta.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}. Atualize e receba de novo.`);
+  }
+  await receberConta(sb, contaId, { valor: falta, forma: pg.forma, pagamentos: pg.pagamentos ?? null });
   return c.data;
 }

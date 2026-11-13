@@ -123,6 +123,8 @@ export default function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: Est
   const soma = centavos((dasDiarias.total ?? 0) + somaTaxas + somaItens);
   const sinalVale = valores?.sinal != null && (valores.sinal_estado === "pago" || valores.sinal_estado === "a_receber");
   const sinal = sinalVale ? Number(valores!.sinal) : 0;
+  // sinal a receber que já teve uma parte paga: o desconto é o sinal cheio; o que falta dele segue na conta à parte (ou é recebido junto)
+  const sinalRecebido = sinalVale && valores!.sinal_estado === "a_receber" ? Number(valores!.sinal_recebido ?? 0) : 0;
   const calculado = dasDiarias.total == null && !temMais ? null : Math.max(0, centavos(soma - sinal));
   const valor = valorEditado === undefined ? calculado : valorEditado;
   const sobraDoSinal = sinal > 0 && valorEditado === undefined && soma < sinal ? centavos(sinal - soma) : 0;
@@ -224,7 +226,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: Est
             }
             const falhas: string[] = [];
             for (const [i, p] of recebeJunto.entries()) {
-              try { await quitarConta(sb, petshop.id, p.id, { forma: formaPrincipal(dasOutras[i]), pagamentos: dasOutras[i] }); }
+              try { await quitarConta(sb, petshop.id, p.id, { forma: formaPrincipal(dasOutras[i]), pagamentos: dasOutras[i] }, p.valor); }
               catch (e) { falhas.push(`${p.descricao || p.categoria} (${mensagemDeErro(e)})`); }
             }
             if (falhas.length) { dinheiroOk = false; avisarErro(`O check-out foi feito, mas não consegui dar baixa em: ${falhas.join("; ")}. Dê baixa pelo Financeiro, em A receber.`); }
@@ -342,7 +344,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: Est
                 {taxas.map((t) => <div key={t.id} className="l"><span>{t.nome}{t.por === "noite" ? ` (${t.qtd} × ${brl(t.valor)})` : ""}</span><span>{brl(t.total)}</span></div>)}
                 {itens.filter((i) => valorDaLinha(i) > 0 || i.nome.trim()).map((i) => <div key={i.chave} className="l"><span>{i.tipo === "produto" ? `${i.qtd.toLocaleString("pt-BR")} × ${i.nome}` : i.nome.trim() || "Extra"}</span><span>{brl(valorDaLinha(i))}</span></div>)}
                 <div className="l forte"><span>Total da estadia</span><span>{brl(soma)}</span></div>
-                {sinal > 0 && <div className="l"><span>{valores?.sinal_estado === "pago" ? `Sinal já pago${valores.sinal_pago_em ? ` em ${dataCurta(valores.sinal_pago_em)}` : ""}` : "Sinal combinado (ainda a receber)"}</span><span>- {brl(sinal)}</span></div>}
+                {sinal > 0 && <div className="l"><span>{valores?.sinal_estado === "pago" ? `Sinal já pago${valores.sinal_pago_em ? ` em ${dataCurta(valores.sinal_pago_em)}` : ""}` : sinalRecebido > 0 ? `Sinal combinado (${brl(sinalRecebido)} já recebidos, ${brl(centavos(sinal - sinalRecebido))} ainda a receber)` : "Sinal combinado (ainda a receber)"}</span><span>- {brl(sinal)}</span></div>}
                 {sinal > 0 && <div className="l forte"><span>Falta receber</span><span>{brl(Math.max(0, centavos(soma - sinal)))}</span></div>}
                 {sobraDoSinal > 0 && <div className="l fraca"><span>O sinal passa da conta em {brl(sobraDoSinal)}. Combine com o tutor o que fazer com a diferença.</span><span /></div>}
               </div>
@@ -357,7 +359,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar }: { estadia: Est
                   {pendencias.map((p) => (
                     <label key={p.id} className={marcada(p) && !fiado ? "on" : ""}>
                       <input type="checkbox" checked={marcada(p) && !fiado} disabled={Boolean(fiado)} onChange={(ev) => { setJunto((j) => ({ ...j, [p.id]: ev.target.checked })); setErroForma(null); }} />
-                      <span className="t"><b>{p.ehSinal ? "Sinal desta reserva" : p.descricao || p.categoria}</b><small>{p.ehSinal ? "ficou para pagar depois" : `de ${dataCurta(p.data)}`} · receber junto?</small></span>
+                      <span className="t"><b>{p.ehSinal ? "Sinal desta reserva" : p.descricao || p.categoria}</b><small>{p.ehSinal ? (sinalRecebido > 0 ? "o que falta do sinal" : "ficou para pagar depois") : `de ${dataCurta(p.data)}`} · receber junto?</small></span>
                       <b className="v">{brl(p.valor)}</b>
                     </label>
                   ))}

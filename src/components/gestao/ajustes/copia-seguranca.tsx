@@ -17,6 +17,7 @@ import {
 import { FORMAS, STATUS_AGENDAMENTO, type Caixa, type Cliente, type Estadia, type Lancamento, type Pet, type Servico, type StatusAgendamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, hora, isoDia, semAcento } from "@/lib/gestao/util";
 import { montarZip, type ArquivoZip } from "@/lib/gestao/zip";
+import { acomodacoesDe } from "@/lib/gestao/hotel-opcoes";
 import "./copia-seguranca.css";
 
 /* ---------- o que vem do banco ---------- */
@@ -37,6 +38,14 @@ type PacoteVendidoLido = {
   id: string; nome: string; total: number; usados: number; comprado_em: string; vence_em: string | null; ativo: boolean; pets: DoPet; servicos: { nome: string } | null;
 };
 type EstadiaLida = Estadia & { pets: DoPet };
+type SinalLido = { estadia_id: string; sinal: number | null; sinal_estado: string | null; sinal_recebido: number | null };
+type PlanoLido = { id: string; dias: number[]; vence_dia: number; inicio: string; fim: string | null; pausa_de: string | null; pausa_ate: string | null; obs: string | null; pets: DoPet };
+type PlanoValorLido = { plano_id: string; valor_mensal: number; valor_extra: number | null };
+type CobrancaLida = {
+  mes: string; valor_mensal: number; valor_extras: number; desconto: number; total: number; vencimento: string; status: string; lancamento_id: string | null; obs: string | null;
+  extras: unknown; pets: DoPet;
+};
+type ComissaoPagaLida = { profissional_id: string; de: string; ate: string; valor: number; pago_em: string };
 
 /* ---------- células ---------- */
 
@@ -55,6 +64,9 @@ const TIPO_SERVICO: Record<string, string> = { banho: "Banho", tosa: "Tosa", ban
 const PAPEL: Record<string, string> = { dono: "Dono ou sócio", gerente: "Gerente", funcionario: "Funcionário" };
 const ORIGEM: Record<string, string> = { tela: "", assistente: "Pelo Mozart", link: "Link de agendamento" };
 const SEXO: Record<string, string> = { M: "Macho", F: "Fêmea" };
+const MENSALISTA: Record<string, string> = { plano: "Dia do plano", extra: "Dia extra", reposicao: "Reposição de falta" };
+const SINAL: Record<string, string> = { a_receber: "A receber", pago: "Pago", devolvido: "Devolvido", mantido: "Não devolvido" };
+const DIAS_DA_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const rotulo = (mapa: Record<string, string>, v: string | null | undefined) => (v == null ? "" : mapa[v] ?? v);
 
 /** Os assuntos da cópia, na ordem em que são juntados. O texto também vai no LEIA-ME. */
@@ -63,15 +75,18 @@ const ASSUNTOS = [
   { arquivo: "pets.csv", nome: "pets", explica: "Os pets, cada um com o nome do tutor, espécie, raça, porte, alertas e observações." },
   { arquivo: "cuidados-de-saude.csv", nome: "cuidados de saúde", explica: "Vacinas, vermífugos, antipulgas e outros cuidados anotados na ficha de cada pet." },
   { arquivo: "agendamentos.csv", nome: "agendamentos", explica: "Todos os horários da agenda, com pet, tutor, serviço, profissional, situação e preço." },
-  { arquivo: "lancamentos.csv", nome: "lançamentos", explica: "O financeiro: tudo o que entrou e saiu, as contas a pagar e a receber. Saídas aparecem com valor negativo." },
+  { arquivo: "lancamentos.csv", nome: "lançamentos", explica: "O financeiro: tudo o que entrou e saiu, as contas a pagar e a receber. Saídas aparecem com valor negativo. Conta recebida em partes: cada parte é uma linha, e a linha da conta traz o valor cheio na última coluna." },
   { arquivo: "caixas.csv", nome: "caixas", explica: "Cada caixa aberto e fechado, com o troco, o que entrou e saiu, o dinheiro esperado e o contado." },
   { arquivo: "produtos.csv", nome: "produtos", explica: "Os produtos do estoque, com preço, custo, último custo, código de barras, último fornecedor, quantidade atual e mínima." },
   { arquivo: "movimentos-de-estoque.csv", nome: "movimentos de estoque", explica: "Cada entrada, saída e correção de saldo dos produtos. Nas saídas, o custo é o do produto naquele momento." },
   { arquivo: "fornecedores.csv", nome: "fornecedores", explica: "Os fornecedores cadastrados, com WhatsApp e observações." },
   { arquivo: "pacotes.csv", nome: "pacotes", explica: "Os pacotes que o pet shop oferece." },
   { arquivo: "pacotes-vendidos.csv", nome: "pacotes vendidos", explica: "Os pacotes comprados por cada pet, com quanto já foi usado e a validade." },
-  { arquivo: "estadias.csv", nome: "creche e hotel", explica: "As estadias de creche e hotel, com entrada, saída e valores." },
+  { arquivo: "estadias.csv", nome: "creche e hotel", explica: "As estadias de creche e hotel, com entrada, saída e valores. Mostra também o dia de mensalista, a acomodação e o sinal da reserva." },
+  { arquivo: "mensalistas.csv", nome: "mensalistas da creche", explica: "Os planos mensais da creche: pet, dias da semana, valor do mês, valor do dia extra, início e fim." },
+  { arquivo: "mensalidades.csv", nome: "mensalidades da creche", explica: "As cobranças de cada mês: mensalidade, dias extras, desconto, total, vencimento, se foi paga e quanto falta." },
   { arquivo: "equipe.csv", nome: "equipe", explica: "As pessoas da equipe, com função, comissão e se têm acesso ao sistema." },
+  { arquivo: "comissoes-pagas.csv", nome: "comissões pagas", explica: "Cada comissão marcada como paga: a pessoa, o período, o valor e o dia." },
   { arquivo: "servicos.csv", nome: "serviços", explica: "Os serviços e os preços por porte." },
 ] as const;
 type NomeArquivo = (typeof ASSUNTOS)[number]["arquivo"];
@@ -178,7 +193,7 @@ export default function CopiaSeguranca() {
       const caixaPorId = new Map(caixas.map((c) => [c.id, c]));
       const qtd = (x: number) => x.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
       tabelas.set("lancamentos.csv", [
-        ["Data", "Hora do lançamento", "Tipo", "Categoria", "Descrição", "Cliente", "Itens", "Forma", "Partes do pagamento", "Valor", "Pago", "Vencimento", "Movimento de gaveta", "Caixa aberto em", "Quem lançou"],
+        ["Data", "Hora do lançamento", "Tipo", "Categoria", "Descrição", "Cliente", "Itens", "Forma", "Partes do pagamento", "Valor", "Pago", "Vencimento", "Movimento de gaveta", "Caixa aberto em", "Quem lançou", "Valor cheio da conta (recebida em partes)"],
         ...lancamentos.map((l): Cel[] => [
           dataCompleta(l.data), hora(l.criado_em), l.tipo === "entrada" ? "Entrada" : "Saída", categoriaAtual(l.categoria), l.descricao ?? "",
           l.cliente_id ? nomeCliente.get(l.cliente_id) ?? "" : "",
@@ -188,6 +203,7 @@ export default function CopiaSeguranca() {
           dinheiroCsv(l.tipo === "entrada" ? Number(l.valor) : -Number(l.valor)),
           simNao(l.pago), quando(l.vencimento), nomeDoMovimento(l.movimento),
           l.caixa_id ? quando(caixaPorId.get(l.caixa_id)?.aberto_em) : "", autor(l.criado_por, l.origem),
+          l.valor_original != null ? dinheiroCsv(Number(l.valor_original)) : "",
         ]),
       ]);
       const doCaixa = new Map<string, Lancamento[]>();
@@ -256,12 +272,49 @@ export default function CopiaSeguranca() {
 
       etapa("creche e hotel");
       const estadias = await todas<EstadiaLida>((a, b) => sb.from("estadias").select("*, pets(nome, clientes(nome, telefone))").eq("petshop_id", id).order("entrada").order("id").range(a, b));
+      // o sinal da reserva fica à parte da estadia (só quem recebe lê): a cópia é do dono, que lê tudo
+      const sinais = await todas<SinalLido>((a, b) => sb.from("estadias_valores").select("estadia_id, sinal, sinal_estado, sinal_recebido").eq("petshop_id", id).order("estadia_id").range(a, b));
+      const sinalDe = new Map(sinais.map((v) => [v.estadia_id, v]));
+      const acomodacoes = new Map(acomodacoesDe(petshop).lista.map((a) => [a.id, a.nome]));
       tabelas.set("estadias.csv", [
-        ["Tipo", "Pet", "Tutor", "Telefone do tutor", "Entrada", "Saída prevista", "Saída", "Situação", "Valor da diária", "Diárias cobradas", "Valor cobrado", "Observações"],
-        ...estadias.map((e): Cel[] => [
-          rotulo(TIPO_ESTADIA, e.tipo), e.pets?.nome ?? "", tutorDe(e.pets), fmtTelefone(e.pets?.clientes?.telefone), quando(e.entrada), quando(e.saida_prevista), quando(e.saida),
-          rotulo(STATUS_ESTADIA, e.status), dinheiro(e.valor_diaria), numero(e.diarias_cobradas), dinheiro(e.valor_cobrado), e.obs ?? "",
+        ["Tipo", "Pet", "Tutor", "Telefone do tutor", "Entrada", "Saída prevista", "Saída", "Situação", "Valor da diária", "Diárias cobradas", "Valor cobrado", "Observações",
+          "Mensalista", "Acomodação", "Sinal da reserva", "Situação do sinal", "Sinal já recebido"],
+        ...estadias.map((e): Cel[] => {
+          const v = sinalDe.get(e.id);
+          return [
+            rotulo(TIPO_ESTADIA, e.tipo), e.pets?.nome ?? "", tutorDe(e.pets), fmtTelefone(e.pets?.clientes?.telefone), quando(e.entrada), quando(e.saida_prevista), quando(e.saida),
+            rotulo(STATUS_ESTADIA, e.status), dinheiro(e.valor_diaria), numero(e.diarias_cobradas), dinheiro(e.valor_cobrado), e.obs ?? "",
+            rotulo(MENSALISTA, e.mensalista), e.acomodacao ? acomodacoes.get(e.acomodacao) ?? e.acomodacao : "",
+            v?.sinal_estado ? dinheiro(v.sinal) : "", rotulo(SINAL, v?.sinal_estado ?? e.sinal_estado), v?.sinal_estado ? dinheiro(v.sinal_recebido) : "",
+          ];
+        }),
+      ]);
+
+      etapa("mensalistas da creche");
+      const planos = await todas<PlanoLido>((a, b) => sb.from("creche_planos").select("id, dias, vence_dia, inicio, fim, pausa_de, pausa_ate, obs, pets(nome, clientes(nome, telefone))").eq("petshop_id", id).order("inicio").order("id").range(a, b));
+      const valores = await todas<PlanoValorLido>((a, b) => sb.from("creche_planos_valores").select("plano_id, valor_mensal, valor_extra").eq("petshop_id", id).order("plano_id").range(a, b));
+      const valorDoPlano = new Map(valores.map((v) => [v.plano_id, v]));
+      tabelas.set("mensalistas.csv", [
+        ["Pet", "Tutor", "Telefone do tutor", "Dias da semana", "Valor do mês", "Valor do dia extra", "Vence todo dia", "Começou em", "Terminou em", "Pausa de", "Pausa até", "Observações"],
+        ...planos.map((pl): Cel[] => [
+          pl.pets?.nome ?? "", tutorDe(pl.pets), fmtTelefone(pl.pets?.clientes?.telefone), [...pl.dias].sort((x, y) => x - y).map((n) => DIAS_DA_SEMANA[n] ?? String(n)).join(", "),
+          dinheiro(valorDoPlano.get(pl.id)?.valor_mensal), dinheiro(valorDoPlano.get(pl.id)?.valor_extra), numero(pl.vence_dia), quando(pl.inicio), quando(pl.fim), quando(pl.pausa_de), quando(pl.pausa_ate), pl.obs ?? "",
         ]),
+      ]);
+
+      etapa("mensalidades da creche");
+      const cobrancas = await todas<CobrancaLida>((a, b) => sb.from("creche_cobrancas").select("mes, valor_mensal, valor_extras, desconto, total, vencimento, status, lancamento_id, obs, extras, pets(nome, clientes(nome, telefone))").eq("petshop_id", id).order("mes").order("id").range(a, b));
+      const contaPorId = new Map(lancamentos.map((l) => [l.id, l]));
+      tabelas.set("mensalidades.csv", [
+        ["Mês", "Pet", "Tutor", "Mensalidade", "Dias extras", "Valor dos dias extras", "Desconto", "Total", "Vencimento", "Situação", "Falta receber", "Observações"],
+        ...cobrancas.map((c): Cel[] => {
+          const conta = c.lancamento_id ? contaPorId.get(c.lancamento_id) : undefined;
+          const paga = Boolean(conta?.pago);
+          return [
+            dataCompleta(c.mes).slice(3), c.pets?.nome ?? "", tutorDe(c.pets), dinheiro(c.valor_mensal), numero(Array.isArray(c.extras) ? c.extras.length : 0), dinheiro(c.valor_extras), dinheiro(c.desconto), dinheiro(c.total),
+            quando(c.vencimento), c.status === "cancelada" ? "Cancelada" : paga ? "Paga" : "Em aberto", c.status === "cancelada" || paga ? "" : dinheiro(conta ? Number(conta.valor) : Number(c.total)), c.obs ?? "",
+          ];
+        }),
       ]);
 
       etapa("equipe");
@@ -276,6 +329,14 @@ export default function CopiaSeguranca() {
             p.email_convite ?? "", simNao(p.ativo), quando(p.criado_em),
           ];
         }),
+      ]);
+
+      etapa("comissões pagas");
+      const pagas = await todas<ComissaoPagaLida>((a, b) => sb.from("comissoes_pagas").select("profissional_id, de, ate, valor, pago_em").eq("petshop_id", id).order("de").order("id").range(a, b));
+      const nomeDaPessoa = new Map(equipe.map((x) => [x.id, x.nome]));
+      tabelas.set("comissoes-pagas.csv", [
+        ["Pessoa", "Período de", "Período até", "Valor pago", "Marcada como paga em"],
+        ...pagas.map((g): Cel[] => [nomeDaPessoa.get(g.profissional_id) ?? "", quando(g.de), quando(g.ate), dinheiro(g.valor), quando(g.pago_em)]),
       ]);
 
       etapa("serviços");
@@ -310,7 +371,7 @@ export default function CopiaSeguranca() {
     <section className="g-card gj-copia" aria-busy={Boolean(passo)}>
       <div className="g-card-t"><h3><Tile icone={Archive} tom="ceu" tamanho="p" />Cópia de segurança</h3></div>
       <p className="g-muted g-p">
-        Baixe um arquivo com os dados do seu pet shop para guardar com você: clientes, pets, agenda, financeiro, caixas, estoque, pacotes, creche e hotel, equipe e serviços.
+        Baixe um arquivo com os dados do seu pet shop para guardar com você: clientes, pets, agenda, financeiro, caixas, estoque, pacotes, creche e hotel (com os mensalistas e as mensalidades), equipe, comissões pagas e serviços.
         Vem tudo em planilhas, que abrem no Excel e no Google Planilhas.
       </p>
       <p className="g-muted g-pp">

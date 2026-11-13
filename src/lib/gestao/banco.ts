@@ -489,14 +489,14 @@ isOneToOne: false
                   ]
                 },"estadias_valores": {
                   Row: {
-                    "atualizado_em": string,"conta": Json | null,"estadia_id": string,"petshop_id": string,"sinal": number | null,"sinal_devolucao_id": string | null,"sinal_devolvido_em": string | null,"sinal_estado": string | null,"sinal_lancamento_id": string | null,"sinal_pagamento": Json | null,"sinal_pago_em": string | null,"taxas": Json | null
+                    "atualizado_em": string,"conta": Json | null,"estadia_id": string,"petshop_id": string,"sinal": number | null,"sinal_devolucao_id": string | null,"sinal_devolvido_em": string | null,"sinal_estado": string | null,"sinal_lancamento_id": string | null,"sinal_pagamento": Json | null,"sinal_pago_em": string | null,"sinal_recebido": number,"taxas": Json | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "atualizado_em"?: string,"conta"?: Json | null,"estadia_id": string,"petshop_id": string,"sinal"?: number | null,"sinal_devolucao_id"?: string | null,"sinal_devolvido_em"?: string | null,"sinal_estado"?: string | null,"sinal_lancamento_id"?: string | null,"sinal_pagamento"?: Json | null,"sinal_pago_em"?: string | null,"taxas"?: Json | null
+                    "atualizado_em"?: string,"conta"?: Json | null,"estadia_id": string,"petshop_id": string,"sinal"?: number | null,"sinal_devolucao_id"?: string | null,"sinal_devolvido_em"?: string | null,"sinal_estado"?: string | null,"sinal_lancamento_id"?: string | null,"sinal_pagamento"?: Json | null,"sinal_pago_em"?: string | null,"sinal_recebido"?: number,"taxas"?: Json | null
                   }
                   Update: {
-                    "atualizado_em"?: string,"conta"?: Json | null,"estadia_id"?: string,"petshop_id"?: string,"sinal"?: number | null,"sinal_devolucao_id"?: string | null,"sinal_devolvido_em"?: string | null,"sinal_estado"?: string | null,"sinal_lancamento_id"?: string | null,"sinal_pagamento"?: Json | null,"sinal_pago_em"?: string | null,"taxas"?: Json | null
+                    "atualizado_em"?: string,"conta"?: Json | null,"estadia_id"?: string,"petshop_id"?: string,"sinal"?: number | null,"sinal_devolucao_id"?: string | null,"sinal_devolvido_em"?: string | null,"sinal_estado"?: string | null,"sinal_lancamento_id"?: string | null,"sinal_pagamento"?: Json | null,"sinal_pago_em"?: string | null,"sinal_recebido"?: number,"taxas"?: Json | null
                   }
                   Relationships: [
                     {

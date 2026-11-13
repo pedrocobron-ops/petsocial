@@ -47,8 +47,11 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
 
   const { dados, carregando, erro } = useDados(async () => {
     const [vendas, fiado, saidas, produtos] = await Promise.all([
-      paginar<VendaLida>((a, b) => sb.from("lancamentos").select("id, valor, itens").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
-        .is("movimento", null).not("itens", "is", null).gte("data", de).lte("data", ate).order("data").order("id").range(a, b)),
+      // conta recebida em partes: depois de quitada, `valor` guarda só a última parte e `valor_original` o valor cheio.
+      // A venda entra uma vez, no dia em que a conta foi quitada, pelo valor cheio (senão a receita do produto sairia menor).
+      paginar<VendaLida & { valor_original: number | null }>((a, b) => sb.from("lancamentos").select("id, valor, valor_original, itens").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
+        .is("movimento", null).not("itens", "is", null).gte("data", de).lte("data", ate).order("data").order("id").range(a, b))
+        .then((l) => l.map((v): VendaLida => ({ id: v.id, itens: v.itens, valor: Number(v.valor_original ?? v.valor) }))),
       paginar<VendaLida>((a, b) => sb.from("lancamentos").select("id, valor, itens").eq("petshop_id", petshop.id).eq("pago", false).eq("tipo", "entrada")
         .not("itens", "is", null).gte("data", de).lte("data", ate).order("data").order("id").range(a, b)),
       paginar<SaidaLida & { id: string }>((a, b) => sb.rpc("custos_das_vendas", { p: petshop.id, p_de: de, p_ate: ate }).order("id").range(a, b)),

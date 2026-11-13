@@ -109,6 +109,13 @@ export function CamposSinal({ estado: s, aoMudar, sugerido, erro, semTutor }: {
   );
 }
 
+/** Quanto do sinal já entrou de verdade (o sinal pago inteiro, ou as partes já recebidas da conta dele). */
+export const sinalRecebidoDe = (v: Pick<ValoresDaEstadia, "sinal" | "sinal_estado" | "sinal_recebido">) =>
+  v.sinal_estado === "pago" ? Number(v.sinal ?? 0) : Math.min(Number(v.sinal ?? 0), Number(v.sinal_recebido ?? 0));
+/** Quanto do sinal ainda falta receber (só o sinal "a receber" tem falta). */
+export const faltaDoSinal = (v: Pick<ValoresDaEstadia, "sinal" | "sinal_estado" | "sinal_recebido">) =>
+  v.sinal_estado === "a_receber" ? Math.max(0, Math.round((Number(v.sinal ?? 0) - sinalRecebidoDe(v)) * 100) / 100) : 0;
+
 /** Etiqueta do sinal no cartão: com valor para quem recebe, só a situação para os outros. */
 export function EtiquetaSinal({ e, valores }: { e: Pick<EstadiaCompleta, "sinal_estado">; valores?: ValoresDaEstadia | null }) {
   const { vejoFinanceiro } = useGestao();
@@ -116,7 +123,8 @@ export function EtiquetaSinal({ e, valores }: { e: Pick<EstadiaCompleta, "sinal_
   if (!estado) return null;
   const valor = vejoFinanceiro && valores?.sinal != null ? ` ${brl(valores.sinal)}` : "";
   if (estado === "pago") return <span className="g-tag verde g-tab">Sinal{valor} pago</span>;
-  if (estado === "a_receber") return <span className="g-tag amarelo g-tab">Sinal{valor} a receber</span>;
+  const falta = vejoFinanceiro && valores ? faltaDoSinal(valores) : 0;
+  if (estado === "a_receber") return <span className="g-tag amarelo g-tab">{falta > 0 && falta < Number(valores?.sinal) ? `Sinal${valor} · falta ${brl(falta)}` : `Sinal${valor} a receber`}</span>;
   if (estado === "devolvido") return <span className="g-tag g-tab">Sinal{valor} devolvido</span>;
   return <span className="g-tag g-tab">Sinal{valor} mantido</span>;
 }
@@ -134,18 +142,20 @@ export function FolhaSinal({ estadia: e, valores, sugerido, aoFechar, aoGravar }
   const [salvando, setSalvando] = useState(false);
   const caixa = useCaixaAberto();
   const nome = e.pets?.nome ?? "o pet";
+  // o sinal pode já ter tido uma parte recebida (pelo Financeiro ou pelo Caixa): aqui entra só o que falta
+  const falta = pendente ? faltaDoSinal(pendente) : 0, jaEntrou = pendente ? sinalRecebidoDe(pendente) : 0;
 
   async function salvar() {
     if (salvando) return;
     setErro(null);
     try {
       if (pendente) {
-        const pg = fecharPagamento(pagamento, Number(pendente.sinal));
+        const pg = fecharPagamento(pagamento, falta);
         if ("erro" in pg) return setErro(pagamento.dividido ? pg.erro : "Escolha como o tutor pagou o sinal.");
         if (!(await conferirCaixa(sb, petshop.id, confirmar))) return;
         setSalvando(true);
-        await quitarConta(sb, petshop.id, pendente.sinal_lancamento_id!, pg);
-        avisar(`Sinal de ${nome} recebido: ${brl(pendente.sinal)}.`);
+        await quitarConta(sb, petshop.id, pendente.sinal_lancamento_id!, pg, falta);
+        avisar(jaEntrou > 0 ? `Sinal de ${nome} completo: ${brl(falta)} recebidos agora, ${brl(pendente.sinal)} no total.` : `Sinal de ${nome} recebido: ${brl(pendente.sinal)}.`);
       } else {
         const pronto = prepararSinal(estado);
         if ("erro" in pronto) return setErro(pronto.erro);
@@ -164,14 +174,14 @@ export function FolhaSinal({ estadia: e, valores, sugerido, aoFechar, aoGravar }
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
         <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando}>
-          {salvando ? "Salvando…" : pendente ? `Receber ${brl(pendente.sinal)}` : estado.modo === "agora" && estado.valor ? `Receber ${brl(estado.valor)}` : estado.modo === "depois" && estado.valor ? `Anotar ${brl(estado.valor)} a receber` : "Salvar"}
+          {salvando ? "Salvando…" : pendente ? `Receber ${brl(falta)}` : estado.modo === "agora" && estado.valor ? `Receber ${brl(estado.valor)}` : estado.modo === "depois" && estado.valor ? `Anotar ${brl(estado.valor)} a receber` : "Salvar"}
         </button>
       </>}>
       <div className="g-form">
         {pendente ? (
           <>
-            <div className="g-card areia"><b className="g-tab">Sinal de {brl(pendente.sinal)}</b><p className="g-muted g-p">Estava em A receber. Ao receber, entra no caixa de hoje e a reserva fica com o sinal pago.</p></div>
-            <EscolhaPagamento valor={pagamento} aoMudar={(p) => { setPagamento(p); setErro(null); }} total={Number(pendente.sinal)} rotulo="Como o tutor pagou o sinal" erro={erro} />
+            <div className="g-card areia"><b className="g-tab">Sinal de {brl(pendente.sinal)}{jaEntrou > 0 ? ` · falta ${brl(falta)}` : ""}</b><p className="g-muted g-p">{jaEntrou > 0 ? `O tutor já pagou ${brl(jaEntrou)} deste sinal. Ao receber o que falta, entra no caixa de hoje e a reserva fica com o sinal pago.` : "Estava em A receber. Ao receber, entra no caixa de hoje e a reserva fica com o sinal pago."}</p></div>
+            <EscolhaPagamento valor={pagamento} aoMudar={(p) => { setPagamento(p); setErro(null); }} total={falta} rotulo="Como o tutor pagou o sinal" erro={erro} />
             <AvisoCaixaFechado aberto={caixa} />
           </>
         ) : <CamposSinal estado={estado} aoMudar={(s) => { setEstado(s); setErro(null); }} sugerido={sugerido} erro={erro} semTutor={!e.pets?.clientes?.id} />}
@@ -180,13 +190,20 @@ export function FolhaSinal({ estadia: e, valores, sugerido, aoFechar, aoGravar }
   );
 }
 
-/** Cancelar uma reserva que tem sinal: quem recebe decide se o sinal fica ou é devolvido. Nada some sem decisão. */
+/**
+ * Cancelar uma reserva que tem sinal: quem recebe decide se o sinal fica ou é devolvido. Nada some sem decisão.
+ * O sinal pode estar pago, a receber, ou a receber com uma parte já paga (recebida pelo Financeiro ou pelo Caixa):
+ * nesse caso a decisão é sobre o que já entrou, e a conta do que falta sai de A receber (ou continua, se a pessoa quiser cobrar).
+ */
 export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { estadia: EstadiaCompleta; valores: ValoresDaEstadia; aoFechar: () => void; aoGravar: () => void }) {
   const { sb, petshop } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const pago = valores.sinal_estado === "pago";
-  const [escolha, setEscolha] = useState<"ficar" | "devolver" | null>(null);
-  const [valor, setValor] = useState<number | null>(Number(valores.sinal));
+  const recebido = sinalRecebidoDe(valores), falta = faltaDoSinal(valores);
+  const parcial = !pago && recebido > 0;
+  const entrou = pago || parcial;
+  const [escolha, setEscolha] = useState<"ficar" | "devolver" | "cobrar" | null>(null);
+  const [valor, setValor] = useState<number | null>(recebido > 0 ? recebido : Number(valores.sinal));
   const [forma, setForma] = useState<Forma | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -196,34 +213,46 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
 
   async function salvar() {
     if (salvando) return;
-    if (!escolha) return setErro(pago ? "Escolha se o sinal fica ou é devolvido." : "Escolha o que fazer com a conta do sinal.");
+    if (!escolha) return setErro(entrou ? "Escolha se o sinal fica ou é devolvido." : "Escolha o que fazer com a conta do sinal.");
     setErro(null);
     try {
-      if (pago && escolha === "devolver") {
-        if (!valor || valor <= 0 || valor > Number(valores.sinal)) return setErro(`O valor devolvido vai até ${brl(valores.sinal)}.`);
+      const devolve = entrou && escolha === "devolver";
+      if (devolve) {
+        if (!valor || valor <= 0 || valor > recebido) return setErro(`O valor devolvido vai até ${brl(recebido)}.`);
         if (!forma) return setErro("Escolha como o sinal foi devolvido.");
         if (!(await conferirCaixa(sb, petshop.id, confirmar))) return;
-        setSalvando(true);
-        // a devolução é uma saída de hoje; o recebimento do sinal fica como está, no dia em que entrou
-        const l = await lancarPago(sb, petshop.id, { tipo: "saida", valor, forma, categoria: CATEGORIA_DEVOLUCAO, descricao: `Devolução do sinal: ${nomeTipo(e.tipo).toLowerCase()} de ${nome}, ${dataCurta(e.entrada)}`, clienteId: e.pets?.clientes?.id ?? null });
-        ok(await sb.from("estadias_valores").update({ sinal_estado: "devolvido", sinal_devolucao_id: l.id, sinal_devolvido_em: isoDia(new Date()) }).eq("estadia_id", e.id).select("estadia_id"));
-      } else if (!pago && escolha === "devolver") {
-        setSalvando(true);
-        // sinal que ainda não foi pago: tira a conta a receber (não é dinheiro recebido)
+      }
+      setSalvando(true);
+      if ((parcial && escolha !== "cobrar") || (!entrou && escolha === "devolver")) {
+        // tira a conta do que ainda não foi pago (não é dinheiro recebido). Se já tinha entrado uma parte,
+        // o banco passa a reserva para "sinal pago" com o que entrou, e as partes seguem no financeiro como recebidas.
         const r = ok(await sb.from("lancamentos").delete().eq("id", valores.sinal_lancamento_id!).eq("petshop_id", petshop.id).eq("pago", false).select("id"));
-        if (!r.length) { setSalvando(false); return setErro("Não consegui tirar essa conta: ela pode já ter sido paga, ou foi anotada por outra pessoa. Escolha deixar em A receber, ou peça para quem cuida do financeiro."); }
-      } else {
-        setSalvando(true);
+        if (!r.length) { setSalvando(false); return setErro(`Não consegui tirar essa conta: ela pode já ter sido paga, ou foi anotada por outra pessoa. Escolha ${parcial ? "continuar cobrando o que falta" : "deixar em A receber"}, ou peça para quem cuida do financeiro.`); }
+      }
+      if (devolve) {
+        // a devolução é uma saída de hoje; o recebimento do sinal fica como está, no dia em que entrou
+        const l = await lancarPago(sb, petshop.id, { tipo: "saida", valor: valor!, forma: forma!, categoria: CATEGORIA_DEVOLUCAO, descricao: `Devolução do sinal: ${nomeTipo(e.tipo).toLowerCase()} de ${nome}, ${dataCurta(e.entrada)}`, clienteId: e.pets?.clientes?.id ?? null });
+        ok(await sb.from("estadias_valores").update({ sinal_estado: "devolvido", sinal_devolucao_id: l.id, sinal_devolvido_em: isoDia(new Date()) }).eq("estadia_id", e.id).select("estadia_id"));
+      } else if (entrou || escolha === "ficar") {
         ok(await sb.from("estadias_valores").update({ sinal_estado: "mantido" }).eq("estadia_id", e.id).select("estadia_id"));
       }
       const c = ok(await sb.from("estadias").update({ status: "cancelada" }).eq("id", e.id).eq("petshop_id", petshop.id).eq("status", "reservada").select("id"));
       avisar(!c.length ? "Essa reserva já tinha sido alterada. Atualizei a lista."
-        : pago && escolha === "devolver" ? `Reserva cancelada. ${brl(valor)} devolvidos, lançados como saída de hoje.`
+        : devolve ? `Reserva cancelada. ${brl(valor)} devolvidos, lançados como saída de hoje.${parcial ? " A conta do que faltava saiu de A receber." : ""}`
         : pago ? `Reserva cancelada. O sinal de ${brl(valores.sinal)} continua como recebido.`
+        : parcial && escolha === "cobrar" ? `Reserva cancelada. Os ${brl(recebido)} recebidos ficam, e os ${brl(falta)} que faltam continuam em A receber.`
+        : parcial ? `Reserva cancelada. Os ${brl(recebido)} recebidos ficam, e a conta do que faltava saiu de A receber.`
         : escolha === "devolver" ? "Reserva cancelada. A conta do sinal saiu de A receber." : "Reserva cancelada. A conta do sinal continua em A receber.");
       aoGravar();
     } catch (x) { avisarErro(x); setSalvando(false); }
   }
+
+  const opcao = (id: "ficar" | "devolver" | "cobrar", titulo: string, apoio: string) => (
+    <label className={escolha === id ? "on" : ""}>
+      <input type="radio" name="sinal" checked={escolha === id} onChange={() => { setEscolha(id); setErro(null); }} />
+      <span className="t"><b>{titulo}</b><small>{apoio}</small></span>
+    </label>
+  );
 
   return (
     <Folha titulo={`Cancelar a reserva de ${nome}`} aoFechar={aoFechar}
@@ -233,25 +262,28 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
       </>}>
       <div className="g-form">
         <div className="g-card areia">
-          <b className="g-tab">{pago ? `Esta reserva tem sinal pago: ${brl(valores.sinal)}` : `Esta reserva tem sinal a receber: ${brl(valores.sinal)}`}</b>
+          <b className="g-tab">{pago ? `Esta reserva tem sinal pago: ${brl(valores.sinal)}` : parcial ? `Esta reserva tem sinal de ${brl(valores.sinal)}: ${brl(recebido)} já recebidos, ${brl(falta)} a receber` : `Esta reserva tem sinal a receber: ${brl(valores.sinal)}`}</b>
           <p className="g-muted g-p">{nomeTipo(e.tipo)}, {dataCompleta(e.entrada)}{valores.sinal_pago_em ? ` · sinal recebido em ${dataCompleta(valores.sinal_pago_em)}` : ""}.{regra ? ` O que você combinou: ${regra}` : ""}</p>
         </div>
         <div className="g-campo">
-          <span>{pago ? "O que fazer com o sinal?" : "O que fazer com a conta do sinal?"}</span>
+          <span>{entrou ? "O que fazer com o sinal?" : "O que fazer com a conta do sinal?"}</span>
           <div className="g-ht-marcar">
-            <label className={escolha === "ficar" ? "on" : ""}>
-              <input type="radio" name="sinal" checked={escolha === "ficar"} onChange={() => { setEscolha("ficar"); setErro(null); }} />
-              <span className="t"><b>{pago ? "Ficar com o sinal" : "Deixar em A receber"}</b><small>{pago ? "O valor continua como recebido. Nada muda no financeiro." : "O tutor continua devendo o sinal. A conta segue em Financeiro, A receber."}</small></span>
-            </label>
-            <label className={escolha === "devolver" ? "on" : ""}>
-              <input type="radio" name="sinal" checked={escolha === "devolver"} onChange={() => { setEscolha("devolver"); setErro(null); }} />
-              <span className="t"><b>{pago ? "Devolver o sinal" : "Tirar a conta a receber"}</b><small>{pago ? "Lança uma saída de hoje com o valor devolvido. O recebimento do sinal não é apagado." : "O sinal não foi pago: a conta sai de A receber."}</small></span>
-            </label>
+            {pago ? (<>
+              {opcao("ficar", "Ficar com o sinal", "O valor continua como recebido. Nada muda no financeiro.")}
+              {opcao("devolver", "Devolver o sinal", "Lança uma saída de hoje com o valor devolvido. O recebimento do sinal não é apagado.")}
+            </>) : parcial ? (<>
+              {opcao("ficar", `Ficar com os ${brl(recebido)} recebidos`, `O que entrou continua como recebido. A conta dos ${brl(falta)} que faltavam sai de A receber.`)}
+              {opcao("devolver", "Devolver o que foi recebido", `Lança uma saída de hoje com o valor devolvido. A conta dos ${brl(falta)} que faltavam sai de A receber.`)}
+              {opcao("cobrar", "Continuar cobrando o que falta", `O que entrou continua como recebido e o tutor segue devendo ${brl(falta)}, em Financeiro, A receber.`)}
+            </>) : (<>
+              {opcao("ficar", "Deixar em A receber", "O tutor continua devendo o sinal. A conta segue em Financeiro, A receber.")}
+              {opcao("devolver", "Tirar a conta a receber", "O sinal não foi pago: a conta sai de A receber.")}
+            </>)}
           </div>
         </div>
-        {pago && escolha === "devolver" && (
+        {entrou && escolha === "devolver" && (
           <>
-            <Campo rotulo="Valor devolvido" dica={`Até ${brl(valores.sinal)}.`}><CampoDinheiro valor={valor} aoMudar={setValor} rotulo="Valor devolvido" maximo={Number(valores.sinal)} /></Campo>
+            <Campo rotulo="Valor devolvido" dica={`Até ${brl(recebido)}.`}><CampoDinheiro valor={valor} aoMudar={setValor} rotulo="Valor devolvido" maximo={recebido} /></Campo>
             <ChipsForma valor={forma} aoMudar={(f) => { setForma(f); setErro(null); }} />
             <AvisoCaixaFechado aberto={caixa} />
           </>
