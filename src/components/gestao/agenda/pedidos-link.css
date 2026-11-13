@@ -44,3 +44,18 @@
 .g-pl-feito { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 50%; background: #2f6b4c; color: #fff; }
 .g-pl-item.recusado .g-pl-feito { background: var(--g-carta-2); color: var(--g-cinza); }
 .g-pl-feito svg { width: 18px; height: 18px; }
+
+/* o cliente cancelou ou deixou um recado pela página do pedido */
+.g-pl-item.respondido.cliente { border-left-color: var(--i-manteiga, #b98a12); background: #fdf8e8; }
+.g-pl-item.respondido.recusado.cliente { border-left-color: var(--g-vermelho); background: #fdf1ee; }
+.g-pl-item.cliente .g-pl-feito { background: var(--t-manteiga); color: var(--i-manteiga, #7a5a05); }
+.g-pl-item.recusado.cliente .g-pl-feito { background: var(--g-vermelho-tint); color: var(--g-vermelho); }
+.g-pl-item.cliente .g-pl-nome b .g-tag { display: inline-flex; vertical-align: 2px; margin-left: 2px; font-weight: 600; }
+.g-pl-item.cliente .g-pl-nome > span { white-space: normal; overflow: visible; }
+
+/* linha "pedido pelo link: aceitou as regras em…" no horário e na reserva */
+.g-pl-aceite { display: grid; gap: 4px; font-size: .875rem; color: var(--g-cinza); line-height: 1.4; margin: 0; }
+.g-pl-aceite p { margin: 0; display: flex; gap: 6px; align-items: flex-start; }
+.g-pl-aceite svg { width: 15px; height: 15px; flex: none; margin-top: 2px; }
+.g-pl-aceite details summary { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; min-height: 28px; }
+.g-pl-aceite details div { margin-top: 4px; padding: 10px 12px; border-radius: 12px; background: var(--g-carta-2); white-space: pre-line; overflow-wrap: anywhere; color: var(--g-tinta); }

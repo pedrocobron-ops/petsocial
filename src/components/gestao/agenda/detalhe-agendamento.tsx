@@ -1,5 +1,6 @@
 "use client";
 
+import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { useState } from "react";
 import Link from "next/link";
@@ -313,6 +314,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           {a.leva_traz && <div className="g-fila"><Truck size={18} /><span>Leva e traz{a.endereco_leva_traz ? `: ${a.endereco_leva_traz}` : ""}</span></div>}
           {tutor && <FidelidadeNoHorario clienteId={tutor.id} />}
           {a.obs && <p className="g-p">{a.obs}</p>}
+          <AceiteDoLink agendamentoId={a.id} />
         </div>
         {a.serie_id && extra?.fimDaSerie && !encerrado && (
           <p className="g-pp g-muted" style={{ margin: 0 }}>

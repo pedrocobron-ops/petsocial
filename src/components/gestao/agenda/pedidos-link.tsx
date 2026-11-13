@@ -2,20 +2,23 @@
 
 import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useEffect, useState } from "react";
-import { Check, Clock, Link2, MessageCircle, X } from "lucide-react";
+import { CalendarClock, Check, Clock, Link2, MessageCircle, UserX, X } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPessoa, AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import type { Database } from "@/lib/gestao/banco";
 import { abreNoDia } from "@/lib/gestao/creche";
 import { diariaFixa, diariaSugerida } from "@/lib/gestao/hotel";
 import { sinalDe } from "@/lib/gestao/hotel-opcoes";
+import { opcoesDoLink, prazoPorExtenso, usouOpcoesDoLink } from "@/lib/gestao/link-opcoes";
 import { brl } from "@/lib/gestao/util";
 import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar, semAcento } from "@/lib/gestao/util";
 import "./pedidos-link.css";
 
 type Pedido = Database["public"]["Tables"]["pedidos_agendamento"]["Row"];
 /** `tutor` é o nome de quem ficou com o pedido (o tutor que já existia, quando a pessoa escolheu usar a ficha dele). */
-type Respondido = { pedido: Pedido; servico: string | null; resposta: "aceito" | "recusado"; tutor?: string };
+type Respondido = { pedido: Pedido; servico: string | null; resposta: "aceito" | "recusado" | "cancelou"; tutor?: string };
+/** "13/11 às 10:02" */
+const diaHora = (iso: string) => `${dataCurta(new Date(iso))} às ${hora(iso)}`;
 type TutorDoTelefone = { id: string; nome: string; telefone: string | null };
 /** O telefone do pedido já é de outro nome: espera a pessoa dizer se é a mesma. */
 type Duvida = { lista: Pedido[]; grupo: string; existente: TutorDoTelefone };
@@ -78,15 +81,19 @@ export default function PedidosLink() {
   // nome de quem ficou com o pedido, quando a pessoa escolheu usar a ficha de um tutor que já existia (vale até recarregar)
   const [tutores, setTutores] = useState<Record<string, string>>({});
   const [duvida, setDuvida] = useState<Duvida | null>(null);
+  const comOpcoes = usouOpcoesDoLink(petshop);
+  const doLink = opcoesDoLink(petshop);
 
   const { dados: tudo, recarregar } = useDados(async () => {
-    const [pendentes, semAviso] = await Promise.all([
+    const [pendentes, semAviso, recados] = await Promise.all([
       sb.from("pedidos_agendamento").select("*").eq("petshop_id", petshop.id).eq("status", "pendente").order("inicio").limit(100),
-      // respondidos em que o tutor ainda não foi avisado
+      // respondidos em que o tutor ainda não foi avisado (e os que o próprio tutor cancelou, até alguém ver)
       sb.from("pedidos_agendamento").select("*").eq("petshop_id", petshop.id).in("status", ["aceito", "recusado"]).is("avisado_em", null).order("inicio").limit(60),
+      // o tutor pediu outra data, ou pediu para cancelar algo que tem dinheiro no meio: só para quem ligou isso no link
+      comOpcoes ? sb.from("pedidos_agendamento").select("*").eq("petshop_id", petshop.id).not("cliente_pediu", "is", null).is("cliente_pedido_visto_em", null).order("inicio").limit(40) : null,
     ]);
-    return { pendentes: ok(pendentes) as Pedido[], semAviso: (semAviso.data ?? []) as Pedido[] };
-  }, [petshop.id]);
+    return { pendentes: ok(pendentes) as Pedido[], semAviso: (semAviso.data ?? []) as Pedido[], recados: (recados?.data ?? []) as Pedido[] };
+  }, [petshop.id, comOpcoes]);
   const dados = tudo?.pendentes;
 
   // o pedido chega de fora: olha de novo a cada minuto e quando a pessoa volta para a aba
@@ -101,7 +108,41 @@ export default function PedidosLink() {
   const nomeServico = (id: string | null) => servicos.find((s) => s.id === id)?.nome ?? null;
   const rotulo = (p: Pedido) => (p.tipo === "creche" ? "Creche" : p.tipo === "hotel" ? "Hotel" : nomeServico(p.servico_id));
   const corServico = (id: string | null) => servicos.find((s) => s.id === id)?.cor ?? "#f97316";
-  const respondidos: Respondido[] = (tudo?.semAviso ?? []).map((p) => ({ pedido: p, servico: rotulo(p), resposta: p.status === "aceito" ? "aceito" : "recusado", tutor: tutores[p.id] }));
+  const respondidos: Respondido[] = (tudo?.semAviso ?? []).map((p) => ({ pedido: p, servico: rotulo(p), resposta: p.cliente_cancelou_em ? "cancelou" : p.status === "aceito" ? "aceito" : "recusado", tutor: tutores[p.id] }));
+  // recados do tutor (outra data ou cancelamento que depende de você), um cartão por tutor
+  const gruposRecados = agrupar(tudo?.recados ?? [], (p) => `${chaveDe(p)}:${p.cliente_pediu}`).map((g) => ({ ...g, lista: [...g.lista].sort(porHora) }));
+
+  /** A pessoa respondeu (ou resolveu) o recado do tutor: ele sai da lista, em todos os aparelhos. */
+  async function recadoVisto(lista: Pedido[]) {
+    try {
+      ok(await sb.from("pedidos_agendamento").update({ cliente_pedido_visto_em: new Date().toISOString() }).in("id", lista.map((p) => p.id)).eq("petshop_id", petshop.id).select("id"));
+      void recarregar();
+    } catch (e) { avisarErro(e); }
+  }
+  /** "o banho de Nina na sexta, 14/11, às 10:00" ou "o hotel de Nina e Bob, de 20/11 a 23/11". */
+  function oQueFoi(lista: Pedido[]) {
+    const p = lista[0];
+    const nomes = listaDe(lista.map((x) => x.pet_nome));
+    if (ehEstadia(p)) return `${p.tipo === "hotel" ? "o hotel" : "a creche"} de ${nomes}, ${periodoDe(p)}`;
+    const s = rotulo(p);
+    return `o horário de ${nomes}${s ? ` (${s})` : ""} ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}`;
+  }
+  const enderecoDoLink = () => `${window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
+  /** Resposta pronta para o tutor que cancelou pelo link. */
+  const mensagemDoCancelado = (lista: Pedido[]) =>
+    `${saudacaoZap(lista[0].tutor_nome, petshop.nome)} Vi que você cancelou ${oQueFoi(lista)}. Está cancelado por aqui também. Quando quiser marcar de novo, é só escolher por aqui: ${enderecoDoLink()}`;
+  /** Resposta pronta para o recado do tutor (outra data, ou cancelamento que depende de você). */
+  const mensagemDoRecado = (lista: Pedido[]) => {
+    const p = lista[0];
+    const escreveu = p.cliente_recado ? ` Você escreveu: "${p.cliente_recado}".` : "";
+    return p.cliente_pediu === "mudar"
+      ? `${saudacaoZap(p.tutor_nome, petshop.nome)} Recebi o seu pedido para mudar ${oQueFoi(lista)}.${escreveu} Vou conferir a agenda e já te respondo.`
+      : `${saudacaoZap(p.tutor_nome, petshop.nome)} Recebi o seu pedido para cancelar ${oQueFoi(lista)}.${escreveu} Vou conferir o que já foi pago e já te respondo.`;
+  };
+  /** Com as regras ligadas no link, o cartão do pedido diz se o tutor aceitou (e quando). */
+  const aceiteDe = (p: Pedido) => p.termos_aceitos_em
+    ? <span className="g-tag verde" title={p.termos_texto ?? undefined}>aceitou {p.termos_texto ? "as regras" : "a declaração de vacinas"}{p.termos_texto && p.termos_vacinas ? " e declarou vacinas em dia" : ""} em {diaHora(p.termos_aceitos_em)}</span>
+    : doLink.pedeAceite ? <span className="g-tag amarelo">sem aceite das regras</span> : null;
   const pendentes = dados ?? [];
 
   /** O tutor foi avisado (ou a pessoa disse que já avisou): o pedido sai da lista, em todos os aparelhos. */
@@ -213,7 +254,8 @@ export default function PedidosLink() {
     const nomes = listaDe(lista.map((r) => r.pedido.pet_nome));
     // endereços para o tutor: a página do pedido (confirmação) e o link para escolher outro horário (recusa)
     const base = `${window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
-    const acompanhar = `\n\nVeja a confirmação aqui: ${base}/pedido/${p.id}`;
+    // com o cancelamento pelo link ligado, a confirmação já diz que é por esse endereço que o tutor cancela ou pede outra data
+    const acompanhar = `\n\nVeja a confirmação aqui: ${base}/pedido/${p.id}${doLink.cancelar ? `\nPor esse endereço você também cancela ou pede outra data, ${prazoPorExtenso(doLink.cancelarHoras)}.` : ""}`;
     if (ehEstadia(p)) {
       const oQue = `${p.tipo === "hotel" ? "o hotel" : "a creche"} de ${nomes}, ${periodoDe(p)}`;
       return lista[0].resposta === "recusado"
@@ -236,7 +278,8 @@ export default function PedidosLink() {
     return `${oi} Está confirmado: ${listaDe(linhas)}. Esperamos vocês!${acompanhar}`;
   }
 
-  if (!pendentes.length && !respondidos.length) return null;
+  if (!pendentes.length && !respondidos.length && !gruposRecados.length) return null;
+  const novidadeDoCliente = gruposRecados.length > 0 || respondidos.some((r) => r.resposta === "cancelou");
   // conta gente, não pedido: o mesmo tutor (telefone) com vários pedidos é um só
   const esperam = new Set(pendentes.map((p) => p.telefone.replace(/\D/g, "").slice(-8) || p.id)).size;
 
@@ -246,13 +289,66 @@ export default function PedidosLink() {
         <span className="g-pl-ico" aria-hidden><Link2 /></span>
         <div>
           <h2>Pedidos pelo link</h2>
-          <p className="g-p">{esperam === 0 ? "Tudo respondido. Falta só avisar o tutor." : esperam === 1 ? "1 tutor espera a sua resposta." : `${esperam} tutores esperam a sua resposta.`}</p>
+          <p className="g-p">{esperam === 0 ? (novidadeDoCliente ? "Tem novidade de cliente nos pedidos." : "Tudo respondido. Falta só avisar o tutor.") : esperam === 1 ? "1 tutor espera a sua resposta." : `${esperam} tutores esperam a sua resposta.`}</p>
         </div>
         {pendentes.length > 0 && <span className="g-tag laranja">{pendentes.length}</span>}
       </div>
 
       <div className="g-pl-lista">
-        {gruposRespondidos.map((g) => {
+        {gruposRecados.map((g) => {
+          const p = g.lista[0];
+          const mudar = p.cliente_pediu === "mudar";
+          const zap = linkWhatsApp(p.telefone, mensagemDoRecado(g.lista));
+          return (
+            <article key={`r:${g.id}`} className="g-pl-item respondido cliente">
+              <div className="g-pl-quem">
+                <span className="g-pl-feito" aria-hidden><CalendarClock /></span>
+                <div className="g-pl-nome">
+                  <b>{listaDe(g.lista.map((x) => x.pet_nome))} <span className={`g-tag ${mudar ? "azul" : "amarelo"}`}>{mudar ? "pediu outra data" : "pediu para cancelar"}</span></b>
+                  <span>
+                    {primeiroNome(p.tutor_nome)} {mudar ? "pediu pelo link para mudar" : "pediu pelo link para cancelar"} {oQueFoi(g.lista)}{p.status === "pendente" ? " (ainda esperando a sua resposta)" : ""}.
+                    {p.cliente_recado ? ` Recado: “${p.cliente_recado}”.` : ""}
+                    {mudar
+                      ? ` Nada foi desmarcado. Para mudar, ${p.status === "pendente" ? "recuse este pedido e combine a nova data" : ehEstadia(p) ? "abra a reserva em Creche e hotel" : "abra o horário na Agenda"}.`
+                      : ` Há ${ehEstadia(p) ? "sinal nesta reserva" : "pagamento neste horário"}, então nada foi cancelado: ${ehEstadia(p) ? "cancele a reserva em Creche e hotel" : "desmarque o horário na Agenda"} e decida o que fazer com o valor.`}
+                  </span>
+                </div>
+              </div>
+              <div className="g-pl-acoes">
+                {zap && <a className="g-btn zap p" href={zap} target="_blank" rel="noopener noreferrer" onClick={() => void recadoVisto(g.lista)}><MessageCircle />Responder no WhatsApp</a>}
+                <button type="button" className="g-btn fantasma p" onClick={() => void recadoVisto(g.lista)}>{mudar ? "Já respondi" : "Já resolvi"}</button>
+              </div>
+            </article>
+          );
+        })}
+
+        {gruposRespondidos.filter((g) => g.lista[0].resposta === "cancelou").map((g) => {
+          const lista = g.lista.map((r) => r.pedido);
+          const p = lista[0];
+          const tinhaAceito = lista.some((x) => x.agendamento_id || x.estadia_id);
+          const zap = linkWhatsApp(p.telefone, mensagemDoCancelado(lista));
+          return (
+            <article key={g.id} className="g-pl-item respondido recusado cliente">
+              <div className="g-pl-quem">
+                <span className="g-pl-feito" aria-hidden><UserX /></span>
+                <div className="g-pl-nome">
+                  <b>{listaDe(lista.map((x) => x.pet_nome))} <span className="g-tag vermelho">cancelado pelo cliente</span></b>
+                  <span>
+                    {primeiroNome(p.tutor_nome)} cancelou pelo link {oQueFoi(lista)}{p.cliente_cancelou_em ? `, em ${diaHora(p.cliente_cancelou_em)}` : ""}.
+                    {tinhaAceito ? (ehEstadia(p) ? " A reserva saiu de Creche e hotel e a vaga voltou." : " O horário foi desmarcado na Agenda e voltou a ficar livre.") : " O pedido ainda esperava a sua resposta."}
+                    {p.cliente_recado ? ` Motivo: “${p.cliente_recado}”.` : ""}
+                  </span>
+                </div>
+              </div>
+              <div className="g-pl-acoes">
+                {zap && <a className="g-btn zap p" href={zap} target="_blank" rel="noopener noreferrer" onClick={() => void avisado(g.lista)}><MessageCircle />Responder no WhatsApp</a>}
+                <button type="button" className="g-btn fantasma p" onClick={() => void avisado(g.lista)}>Já vi</button>
+              </div>
+            </article>
+          );
+        })}
+
+        {gruposRespondidos.filter((g) => g.lista[0].resposta !== "cancelou").map((g) => {
           const p = g.lista[0].pedido;
           const aceito = g.lista[0].resposta === "aceito";
           const zap = linkWhatsApp(p.telefone, mensagem(g.lista));
@@ -315,6 +411,7 @@ export default function PedidosLink() {
                   <span className="g-pl-hora"><Clock aria-hidden />{ehEstadia(p) ? periodoDe(p) : `${quandoNaTela(p.inicio)}, ${hora(p.inicio)}`}</span>
                   {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
                   {p.tipo === "creche" && fechadosDe(p, petshop.horario).length > 0 && <span className="g-tag amarelo">pelo seu horário, a creche não abre em {fechadosDe(p, petshop.horario).map((d) => dataCurta(d)).join(", ")}</span>}
+                  {aceiteDe(p)}
                 </div>
                 {p.obs && <p className="g-pl-obs">{p.obs}</p>}
                 <div className="g-pl-acoes">
@@ -342,6 +439,7 @@ export default function PedidosLink() {
                 <span className="g-pl-hora"><Clock aria-hidden />{ehEstadia(p) ? `${periodoDe(p)}, chega às ${hora(p.inicio)} e sai às ${hora(p.fim)}` : `${quandoNaTela(p.inicio)}, das ${hora(p.inicio)} às ${hora(fim)}`}</span>
                 <span className="g-tag azul">{ehEstadia(p) ? `${g.lista.length} pets do mesmo tutor` : `${g.lista.length} pets, um depois do outro`}</span>
                 {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
+                {aceiteDe(p)}
               </div>
               <ul className="g-pl-pets">
                 {g.lista.map((x) => {

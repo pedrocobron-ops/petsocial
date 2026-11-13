@@ -1,5 +1,6 @@
 "use client";
 
+import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { useEffect, useState } from "react";
 import { Check, MessageCircle, Plus } from "lucide-react";
 import { conferirCaixa, conferirValorAlto, formaPrincipal, lancarAReceber, lancarPago, quitarConta, type ItemLancamento, type PartePagamento } from "@/lib/gestao/dinheiro";
@@ -443,6 +444,7 @@ export function DetalheDaEstadia({ estadia: e, aoFechar, aoCorrigir }: { estadia
           </div>
         </div>
         {e.obs && <p className="g-muted g-p">{e.obs}</p>}
+        <AceiteDoLink estadiaId={e.id} />
         {e.status !== "cancelada" && <p className="g-p"><b>{n} {e.tipo === "hotel" ? (n === 1 ? "noite" : "noites") : n === 1 ? "diária" : "diárias"}</b>{e.mensalista ? " · mensalista" : e.obs?.includes(NOTA_PACOTE) ? " · saiu usando o pacote" : ""}</p>}
         {!vejoFinanceiro ? null : carregando && !dados ? <p className="g-muted g-p">Buscando a conta…</p> : conta ? (
           <div className="g-ht-conta">

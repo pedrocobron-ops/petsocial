@@ -1,5 +1,6 @@
 "use client";
 
+import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, DoorOpen, Home, HandCoins, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, Sun, Sunset, Syringe } from "lucide-react";
@@ -476,6 +477,7 @@ export default function CrecheHotel() {
                       {pet?.alertas && <div className="g-aviso vermelho" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce"><b>Atenção:</b> {pet.alertas}</span></div>}
                       {quarto(e)}
                       {e.obs && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{e.obs}</span></p>}
+                      <AceiteDoLink estadiaId={e.id} />
                       {comCuidados && <CuidadosDoDia estadia={e} feitos={dados.feitos} aoMudar={() => void recarregar()} />}
                       <div className="g-fila g-ch-acoes">
                         {botaoMensagens(e)}
@@ -536,6 +538,7 @@ export default function CrecheHotel() {
                       {pet?.alertas && <p className="g-p g-vermelho-t"><b>Atenção:</b> {pet.alertas}</p>}
                       {quarto(e)}
                       {e.obs && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{e.obs}</span></p>}
+                      <AceiteDoLink estadiaId={e.id} />
                       {comCuidados && lerCuidados(e).length > 0 && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{lerCuidados(e).map((c) => [c.oque, c.quanto].filter(Boolean).join(", ")).join(" · ")}</span></p>}
                       <div className="g-fila g-ch-acoes">
                         <button className="g-btn verde p" disabled={ocupado === e.id} onClick={() => checkIn(e)}><LogIn /> Check-in</button>

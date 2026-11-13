@@ -11,6 +11,8 @@ import { PORTES, type Porte } from "@/lib/gestao/tipos";
 import { brlCurto, deIsoDia, fmtTelefone, horarioDoDia, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, nomeMes, soDigitos, somaDias } from "@/lib/gestao/util";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { aplicarTema } from "@/lib/gestao/identidade";
+import { lembrarPedido } from "@/lib/gestao/link-opcoes";
+import { AceiteDosTermos, PedidosDesteAparelho, SEM_ACEITE, faltaAceitar, pedirPeloLink, useTermosDoLink } from "./termos";
 import "./agendar.css";
 
 type ServicoDoLink = {
@@ -115,6 +117,12 @@ export default function AgendarPeloLink() {
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState<Enviado | null>(null);
   const qtd = pets.length;
+  // regras que o tutor aceita antes de enviar (só quando quem recebe o pedido ligou isso)
+  const { termos, recarregarTermos } = useTermosDoLink(codigo);
+  const [aceite, setAceite] = useState(SEM_ACEITE);
+  // nome de quem é o link, para a página dizer com quem falar quando o link está desligado
+  const [nomeDoLink, setNomeDoLink] = useState<string | null>(null);
+  const [lembrados, setLembrados] = useState(0);
 
   const carregar = useCallback(async () => {
     setSemRede(false);
@@ -128,6 +136,12 @@ export default function AgendarPeloLink() {
   }, [codigo]);
   useEffect(() => { void carregar(); }, [carregar]);
   useEffect(() => { if (info?.nome) document.title = `Agendar: ${info.nome}`; }, [info?.nome]);
+  useEffect(() => {
+    if (info !== null || !configurado || !codigo) return;
+    let vale = true;
+    void banco().rpc("link_nome", { p_codigo: codigo }).then(({ data }) => { if (vale && typeof data === "string" && data.trim()) setNomeDoLink(data.trim()); });
+    return () => { vale = false; };
+  }, [info, codigo]);
 
   const servico = info?.servicos.find((s) => s.id === servicoId) ?? null;
   const dias = useMemo(() => {
@@ -213,18 +227,23 @@ export default function AgendarPeloLink() {
     if (lista.some((x) => !x.nome)) return setErro(lista.length > 1 ? "Escreva o nome de cada pet." : "Escreva o nome do pet.");
     if (nomeTutor.length < 2) return setErro("Escreva o seu nome.");
     if (fone.length !== 10 && fone.length !== 11) return setErro("Confira o WhatsApp: DDD e número.");
+    const falta = faltaAceitar(termos, aceite, info.nome);
+    if (falta) return setErro(falta);
     setErro(null);
     setEnviando(true);
-    const { data, error } = await banco().rpc("link_pedir", {
+    const { data, error } = await pedirPeloLink("link_pedir", {
       p_codigo: codigo, p_servico: servico.id, p_dia: dia, p_hora: horaEscolhida, p_tutor: nomeTutor, p_telefone: fone, p_pet: lista[0].nome,
       p_especie: lista[0].especie, p_porte: lista[0].porte ?? undefined, p_obs: obs.trim() || undefined,
       p_outros: lista.length > 1 ? lista.slice(1).map((x) => ({ nome: x.nome, especie: x.especie, porte: x.porte })) : undefined,
-    });
+    }, termos, aceite);
     setEnviando(false);
     if (error) return setErro("Não consegui enviar agora. Confira a internet e tente de novo.");
     const r = data as unknown as { ok: boolean; erro?: string; id?: string } | null;
     if (r?.ok) {
       setEnviado({ id: r.id ?? null, servico: servico.nome, dia, pets: lista.map((x, i) => ({ nome: x.nome, hora: somaMin(horaEscolhida, servico.duracao_min * i) })) });
+      // o endereço de acompanhar fica guardado neste aparelho: recarregar a página não perde o pedido
+      if (r.id) { lembrarPedido(codigo, r.id, `${servico.nome} de ${listaDeNomes(lista.map((x) => x.nome))}`); setLembrados((n) => n + 1); }
+      setAceite(SEM_ACEITE);
       setPasso("enviado");
       window.scrollTo({ top: 0 });
       return;
@@ -235,7 +254,12 @@ export default function AgendarPeloLink() {
       ir("quando");
     } else if (r?.erro === "limite") {
       setLimite(true);
-      setErro(`Não deu para enviar mais um pedido por aqui agora. Fale direto com o ${info.nome}.`);
+      setErro(`Não deu para enviar mais um pedido por aqui agora. Fale direto com ${info.nome}.`);
+    } else if (r?.erro === "termos") {
+      // as regras mudaram entre abrir a página e enviar: mostra o texto novo e pede o aceite de novo
+      await recarregarTermos();
+      setAceite(SEM_ACEITE);
+      setErro(`As regras de ${info.nome} mudaram agora há pouco. Leia de novo e marque para enviar.`);
     } else if (r?.erro === "fechado") {
       setInfo(null);
     } else if (r?.erro === "dados") {
@@ -285,7 +309,8 @@ export default function AgendarPeloLink() {
         <div className="g-lk-fim">
           <Selo tamanho={72} tom="suave" />
           <h1>Este link não está disponível</h1>
-          <p className="g-muted">O pet shop pode ter desligado o agendamento por aqui. Fale direto com ele para marcar o horário.</p>
+          <p className="g-muted">{nomeDoLink ? `${nomeDoLink} não está recebendo pedidos por aqui agora. Fale direto com ${nomeDoLink} para combinar.` : "Quem mandou este link pode ter desligado os pedidos por aqui. Fale direto com quem mandou para combinar."}</p>
+          <PedidosDesteAparelho codigo={codigo} />
         </div>
       </Moldura>
     );
@@ -318,8 +343,11 @@ export default function AgendarPeloLink() {
         <p className="g-lk-recado"><MessageCircle aria-hidden /><span>{info.aviso}</span></p>
       )}
 
+      {!estadia && passo === "servico" && <PedidosDesteAparelho codigo={codigo} versao={lembrados} />}
+
       {estadia && (
-        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome}
+        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} termos={termos} recarregarTermos={recarregarTermos}
+          aoPedir={() => setLembrados((n) => n + 1)}
           zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)}
           diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)} />
       )}
@@ -537,6 +565,8 @@ export default function AgendarPeloLink() {
             </label>
           </div>
 
+          <AceiteDosTermos termos={termos} loja={info.nome} pets={qtd} aceite={aceite} aoMudar={(a) => { setAceite(a); setErro(null); }} />
+
           {erro && (
             <div className="g-lk-alerta" role="alert">
               <span>{erro}</span>
@@ -548,7 +578,7 @@ export default function AgendarPeloLink() {
             <button type="button" className="g-btn sec" onClick={() => ir("quando")}><ArrowLeft />Voltar</button>
             <button className="g-btn pri" disabled={enviando}>{enviando ? "Enviando…" : "Enviar pedido"}</button>
           </div>
-          <p className="g-lk-nota">Isto é um pedido. O horário só vale depois que o {info.nome} confirmar.</p>
+          <p className="g-lk-nota">Isto é um pedido. O horário só vale depois que {info.nome} confirmar.</p>
         </form>
       )}
 

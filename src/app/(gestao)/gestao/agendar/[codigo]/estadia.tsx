@@ -5,6 +5,8 @@ import { ArrowLeft, Cat, Check, Dog, MessageCircle, PawPrint, Plus, Trash2 } fro
 import { banco } from "@/lib/gestao/supabase";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
 import { brl, brlCurto, dataCurta, fmtTelefone } from "@/lib/gestao/util";
+import { lembrarPedido } from "@/lib/gestao/link-opcoes";
+import { AceiteDosTermos, SEM_ACEITE, faltaAceitar, pedirPeloLink, type TermosDoLink } from "./termos";
 
 type Tipo = "creche" | "hotel";
 type Especie = "cao" | "gato" | "outro";
@@ -26,8 +28,10 @@ const listaE = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(0, -1).
  * Pedido de creche (um ou mais dias) ou de hotel (entrada e saída) pelo link do cliente.
  * O cliente só fica sabendo se um dia está cheio; não vê quem está na casa nem quantas vagas existem.
  */
-export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapLoja, aoVoltar }: {
+export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapLoja, aoVoltar, termos = null, recarregarTermos, aoPedir }: {
   codigo: string; tipo: Tipo; hoje: string; loja: string; diaria: number | null; zapLoja: string | null; aoVoltar: () => void;
+  /** Regras que o tutor aceita antes de enviar (null = não pede aceite). */
+  termos?: TermosDoLink | null; recarregarTermos?: () => Promise<unknown>; aoPedir?: () => void;
 }) {
   const hotel = tipo === "hotel";
   const [passo, setPasso] = useState<"quando" | "dados" | "enviado">("quando");
@@ -46,6 +50,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [pedidoId, setPedidoId] = useState<string | null>(null);
+  const [aceite, setAceite] = useState(SEM_ACEITE);
 
   const dias = hotel ? entre(entrada, saida) : entre(entrada, saida) + 1;
   // diz qual é o problema das datas (as mesmas regras do banco); null = datas boas
@@ -98,19 +103,28 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
     if (new Set(pets.map((x) => x.nome.trim().toLowerCase())).size < pets.length) { setErro("Dois pets estão com o mesmo nome. Mude um deles."); return; }
     if (tutor.trim().length < 2) { setErro("Diga o seu nome."); return; }
     if (fone.length < 10 || fone.length > 13) { setErro("Confira o WhatsApp: DDD e número."); return; }
+    const falta = faltaAceitar(termos, aceite, loja);
+    if (falta) { setErro(falta); return; }
     setErro(null);
     setRepetido(false);
     setEnviando(true);
     try {
-      const { data, error } = await banco().rpc("link_pedir_estadia", {
+      const { data, error } = await pedirPeloLink("link_pedir_estadia", {
         p_codigo: codigo, p_tipo: tipo, p_entrada: entrada, p_saida: saida, p_tutor: tutor.trim(), p_telefone: fone, p_pet: pets[0].nome.trim(),
         p_especie: pets[0].especie, p_porte: pets[0].porte ?? undefined, p_obs: obs.trim() || undefined,
         p_hora_entrada: horaEntrada, p_hora_saida: horaSaida,
         ...(pets.length > 1 ? { p_mais_pets: pets.slice(1).map((x) => ({ nome: x.nome.trim(), especie: x.especie, porte: x.porte })) } : {}),
-      });
+      }, termos, aceite);
       const r = data as { ok?: boolean; erro?: string; id?: string; dia?: string } | null;
       if (error || !r) { setErro("Não deu para enviar agora. Confira a internet e tente de novo."); return; }
       if (!r.ok) {
+        if (r.erro === "termos") {
+          // as regras mudaram entre abrir a página e enviar: mostra o texto novo e pede o aceite de novo
+          await recarregarTermos?.();
+          setAceite(SEM_ACEITE);
+          setErro(`As regras de ${loja} mudaram agora há pouco. Leia de novo e marque para enviar.`);
+          return;
+        }
         setErro(r.erro === "lotado" && pets.length > 1 ? `Não há vaga para os ${pets.length} pets em ${r.dia ? dia(r.dia) : "um dos dias"}. Escolha outras datas ou peça para menos pets.`
           : r.erro === "lotado" ? `Não dá para receber em ${r.dia ? dia(r.dia) : "um dos dias"}: a casa está cheia ou não abre nesse dia. Escolha outras datas.`
           : r.erro === "limite" ? "Você já tem pedidos esperando resposta. Fale direto com a gente para combinar."
@@ -125,6 +139,8 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
         return;
       }
       setPedidoId(r.id ?? null);
+      // o endereço de acompanhar fica guardado neste aparelho: recarregar a página não perde o pedido
+      if (r.id) { lembrarPedido(codigo, r.id, `${hotel ? "Hotel" : "Creche"} de ${listaE(nomes)}`); aoPedir?.(); }
       setPasso("enviado");
     } finally { setEnviando(false); }
   }
@@ -246,6 +262,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
           <textarea className="g-textarea" value={obs} maxLength={300} placeholder="Vacinas em dia, toma remédio, primeira vez, o que ele come…" onChange={(e) => setObs(e.target.value)} />
         </label>
       </div>
+      <AceiteDosTermos termos={termos} loja={loja} pets={pets.length} aceite={aceite} aoMudar={(a) => { setAceite(a); setErro(null); }} />
       {erro && (
         <div className="g-lk-alerta" role="alert">
           <span>{erro}</span>
@@ -256,7 +273,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
         <button type="button" className="g-btn sec" onClick={() => { setErro(null); setRepetido(false); setPasso("quando"); }}><ArrowLeft />Voltar</button>
         <button className="g-btn pri" disabled={enviando}>{enviando ? "Enviando…" : "Enviar pedido"}</button>
       </div>
-      <p className="g-lk-nota">Isto é um pedido. A vaga só vale depois que o {loja} confirmar.</p>
+      <p className="g-lk-nota">Isto é um pedido. A vaga só vale depois que {loja} confirmar.</p>
     </form>
   );
 }
