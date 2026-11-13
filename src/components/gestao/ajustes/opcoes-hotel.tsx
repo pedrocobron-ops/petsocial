@@ -99,7 +99,7 @@ export default function OpcoesHotel() {
         <Opcao titulo="Sinal na reserva" frase="A reserva pode ter um sinal: recebido na hora ou a receber. No check-out ele é descontado da conta." ligada={sinal.ativo} aoMudar={(v) => m(setSinal)({ ...sinal, ativo: v })}>
           <div className="g-campo">
             <span>Valor sugerido</span>
-            <div className="g-seg" role="group" aria-label="Como sugerir o sinal">
+            <div className="g-seg g-ht-seg" role="group" aria-label="Como sugerir o sinal">
               <button type="button" aria-pressed={sinal.modo === "pct"} onClick={() => m(setSinal)({ ...sinal, modo: "pct", valor: null })}>Porcentagem do total</button>
               <button type="button" aria-pressed={sinal.modo === "valor"} onClick={() => m(setSinal)({ ...sinal, modo: "valor", valor: null })}>Valor fixo</button>
             </div>

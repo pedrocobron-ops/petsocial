@@ -358,7 +358,7 @@ export default function CrecheHotel() {
         </div>
       </header>
 
-      <div className="g-seg g-cm-ver" role="group" aria-label="Partes da tela" style={{ marginBottom: 16 }}>
+      <div className="g-seg g-ht-ver" role="group" aria-label="Partes da tela" style={{ marginBottom: 16 }}>
         {usaCreche && <button aria-pressed={ver === "chamada"} onClick={() => setVer("chamada")}>Chamada</button>}
         <button aria-pressed={ver === "casa"} onClick={() => setVer("casa")}>Casa agora</button>
         <button aria-pressed={ver === "ocupacao"} onClick={() => setVer("ocupacao")}>Ocupação</button>
@@ -592,7 +592,7 @@ export default function CrecheHotel() {
       {ver === "casa" && dados && !tudoVazio && souDono && <div style={{ marginTop: 20 }}><LinkCrecheHotel titulo="Pedidos pelo link do cliente" /></div>}
       {(ver === "casa" || ver === "ocupacao") && dados && souDono && <p style={{ marginTop: 16 }}><Link className="g-btn fantasma p" href="/gestao/app/meu-petshop#opcoes-hotel"><Settings2 />Opções do hotel e da creche</Link></p>}
       {acertando && <AcertarEstadia key={acertando.id} estadia={acertando} aoFechar={() => setAcertando(null)} aoGravar={() => { setAcertando(null); mudou(); }} />}
-      {nova && <NovaEstadia mens={mens ?? null} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo === "todos" ? "creche" : tipo)} diaInicial={nova.dia} abertas={abertas}
+      {nova && <NovaEstadia mens={mens ?? null} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} abertas={abertas}
         aoFechar={() => setNova(null)} aoGravar={(emCasa) => { setNova(null); setVer((v) => (v === "ocupacao" ? v : "casa")); setAba(emCasa ? "casa" : "reservas"); mudou(); }} />}
       {editando && <NovaEstadia mens={mens ?? null} key={editando.id} editar={editando} valores={valoresDe(editando)} jaAquiInicial={editando.status === "em_casa"} tipoInicial={editando.tipo === "hotel" ? "hotel" : "creche"} abertas={abertas}
         aoFechar={() => setEditando(null)} aoGravar={() => { setEditando(null); mudou(); }} />}
@@ -832,7 +832,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, 
           </div>
         )}
         {!editar && (
-          <div className="g-seg" role="group" aria-label="Quando o pet vem">
+          <div className="g-seg g-ht-seg" role="group" aria-label="Quando o pet vem">
             <button type="button" aria-pressed={!jaAqui} onClick={() => setJaAqui(false)}>Reservar para outro dia</button>
             <button type="button" aria-pressed={jaAqui} onClick={() => setJaAqui(true)}>Chegou agora</button>
           </div>

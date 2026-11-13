@@ -81,7 +81,7 @@ export function CamposSinal({ estado: s, aoMudar, sugerido, erro, semTutor }: {
   return (
     <div className="g-campo">
       <span>Sinal da reserva</span>
-      <div className="g-seg" role="group" aria-label="Sinal da reserva">
+      <div className="g-seg g-ht-seg" role="group" aria-label="Sinal da reserva">
         <button type="button" aria-pressed={s.modo === "sem"} onClick={() => aoMudar({ ...s, modo: "sem" })}>Sem sinal</button>
         <button type="button" aria-pressed={s.modo === "depois"} onClick={() => aoMudar({ ...s, modo: "depois", valor: s.valor ?? sugerido })}>Vai pagar depois</button>
         <button type="button" aria-pressed={s.modo === "agora"} onClick={() => aoMudar({ ...s, modo: "agora", valor: s.valor ?? sugerido })}>Recebi agora</button>
