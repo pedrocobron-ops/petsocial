@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, UserPlus, X } from "lucide-react";
 import { conferirCaixa, conferirValorAlto, lancarPago } from "@/lib/gestao/dinheiro";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
@@ -32,6 +32,14 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
 
   const contas = fecharContas(itens, vejoFinanceiro ? desconto : null);
   const vendidos = produtosDaConta(itens);
+  // venda começada: recarregar ou fechar a aba pede confirmação antes de perder o que já está na conta
+  const temItens = itens.length > 0;
+  useEffect(() => {
+    if (!temItens) return;
+    const segurar = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", segurar);
+    return () => window.removeEventListener("beforeunload", segurar);
+  }, [temItens]);
   const mudar = (chave: string, m: Partial<ItemConta>) => setItens((l) => l.map((i) => (i.chave === chave ? { ...i, ...m } : i)));
 
   async function confirmar() {
@@ -50,14 +58,15 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
     setSalvando(true);
     try {
       const gravar = itensParaGravar(vendidos);
+      let lancamentoId: string | null = null;
       if (pg && !("erro" in pg)) {
-        await lancarPago(sb, petshop.id, {
+        lancamentoId = (await lancarPago(sb, petshop.id, {
           tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: pg.pagamentos, categoria: "Venda de produtos", clienteId: tutor?.id ?? null,
           descricao: encurtar(`Venda: ${resumoDosItens(gravar)}`), itens: gravar,
-        });
+        }))?.id ?? null;
       }
       try {
-        await baixarEstoque(sb, petshop.id, user.id, vendidos);
+        await baixarEstoque(sb, petshop.id, user.id, vendidos, lancamentoId);
         avisar(vejoFinanceiro ? `Venda de ${brl(contas.total)} anotada.` : "Venda anotada no estoque.");
       } catch (e) {
         if (!vejoFinanceiro) throw e;

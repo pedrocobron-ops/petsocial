@@ -29,8 +29,9 @@ type AgendamentoLido = {
   inicio: string; fim: string; status: StatusAgendamento; preco: number | null; obs: string | null; origem: string; criado_por: string | null; leva_traz: boolean;
   endereco_leva_traz: string | null; pacote_cliente_id: string | null; pets: DoPet; servicos: { nome: string } | null; profissionais: { nome: string } | null;
 };
-type ProdutoLido = { id: string; nome: string; categoria: string | null; unidade: string; preco_venda: number | null; estoque: number; estoque_minimo: number; ativo: boolean; criado_em: string };
-type MovimentoLido = { id: string; produto_id: string; tipo: string; quantidade: number; motivo: string | null; origem: string; criado_por: string | null; criado_em: string };
+type ProdutoLido = { id: string; nome: string; categoria: string | null; unidade: string; preco_venda: number | null; estoque: number; estoque_minimo: number; ativo: boolean; criado_em: string; codigo_barras: string | null; fornecedor_id: string | null };
+type MovimentoLido = { id: string; produto_id: string; tipo: string; quantidade: number; motivo: string | null; origem: string; criado_por: string | null; criado_em: string; fornecedor_id: string | null };
+type FornecedorLido = { id: string; nome: string; telefone: string | null; observacoes: string | null; ativo: boolean; criado_em: string };
 type PacoteLido = { id: string; nome: string; quantidade: number; validade_dias: number; ativo: boolean; criado_em: string; servicos: { nome: string } | null };
 type PacoteVendidoLido = {
   id: string; nome: string; total: number; usados: number; comprado_em: string; vence_em: string | null; ativo: boolean; pets: DoPet; servicos: { nome: string } | null;
@@ -64,8 +65,9 @@ const ASSUNTOS = [
   { arquivo: "agendamentos.csv", nome: "agendamentos", explica: "Todos os horários da agenda, com pet, tutor, serviço, profissional, situação e preço." },
   { arquivo: "lancamentos.csv", nome: "lançamentos", explica: "O financeiro: tudo o que entrou e saiu, as contas a pagar e a receber. Saídas aparecem com valor negativo." },
   { arquivo: "caixas.csv", nome: "caixas", explica: "Cada caixa aberto e fechado, com o troco, o que entrou e saiu, o dinheiro esperado e o contado." },
-  { arquivo: "produtos.csv", nome: "produtos", explica: "Os produtos do estoque, com preço, custo, quantidade atual e mínima." },
-  { arquivo: "movimentos-de-estoque.csv", nome: "movimentos de estoque", explica: "Cada entrada, saída e correção de saldo dos produtos." },
+  { arquivo: "produtos.csv", nome: "produtos", explica: "Os produtos do estoque, com preço, custo, último custo, código de barras, último fornecedor, quantidade atual e mínima." },
+  { arquivo: "movimentos-de-estoque.csv", nome: "movimentos de estoque", explica: "Cada entrada, saída e correção de saldo dos produtos. Nas saídas, o custo é o do produto naquele momento." },
+  { arquivo: "fornecedores.csv", nome: "fornecedores", explica: "Os fornecedores cadastrados, com WhatsApp e observações." },
   { arquivo: "pacotes.csv", nome: "pacotes", explica: "Os pacotes que o pet shop oferece." },
   { arquivo: "pacotes-vendidos.csv", nome: "pacotes vendidos", explica: "Os pacotes comprados por cada pet, com quanto já foi usado e a validade." },
   { arquivo: "estadias.csv", nome: "creche e hotel", explica: "As estadias de creche e hotel, com entrada, saída e valores." },
@@ -208,20 +210,30 @@ export default function CopiaSeguranca() {
       etapa("produtos");
       const produtos = await comCustos(sb, id, await todas<ProdutoLido>((a, b) => sb.from("produtos").select(COLS_PRODUTO).eq("petshop_id", id).order("nome").order("id").range(a, b)));
       const nomeProduto = new Map(produtos.map((p) => [p.id, p]));
+      const fornecedores = await todas<FornecedorLido>((a, b) => sb.from("fornecedores").select("id, nome, telefone, observacoes, ativo, criado_em").eq("petshop_id", id).order("nome").order("id").range(a, b));
+      const nomeFornecedor = new Map(fornecedores.map((f) => [f.id, f.nome]));
+      // colunas novas sempre no fim, para quem já usa a planilha antiga
       tabelas.set("produtos.csv", [
-        ["Produto", "Categoria", "Unidade", "Preço de venda", "Custo", "Em estoque", "Estoque mínimo", "Ativo", "Criado em"],
-        ...produtos.map((p): Cel[] => [p.nome, p.categoria ?? "", p.unidade, dinheiro(p.preco_venda), dinheiro(p.custo), numero(p.estoque), numero(p.estoque_minimo), simNao(p.ativo), quando(p.criado_em)]),
+        ["Produto", "Categoria", "Unidade", "Preço de venda", "Custo", "Em estoque", "Estoque mínimo", "Ativo", "Criado em", "Código de barras", "Último custo", "Último fornecedor"],
+        ...produtos.map((p): Cel[] => [p.nome, p.categoria ?? "", p.unidade, dinheiro(p.preco_venda), dinheiro(p.custo), numero(p.estoque), numero(p.estoque_minimo), simNao(p.ativo), quando(p.criado_em),
+          p.codigo_barras ?? "", dinheiro(p.ultimo_custo), (p.fornecedor_id && nomeFornecedor.get(p.fornecedor_id)) || ""]),
       ]);
 
       etapa("movimentos de estoque");
       const movimentosSemCusto = await todas<MovimentoLido>((a, b) => sb.from("movimentos_estoque").select(COLS_MOVIMENTO).eq("petshop_id", id).order("criado_em").order("id").range(a, b));
       const custoDoMovimento = await custosDeTodosOsMovimentos(sb, id, movimentosSemCusto);
       tabelas.set("movimentos-de-estoque.csv", [
-        ["Quando", "Produto", "Tipo", "Quantidade", "Unidade", "Custo por unidade", "Motivo", "Quem fez"],
+        ["Quando", "Produto", "Tipo", "Quantidade", "Unidade", "Custo por unidade", "Motivo", "Quem fez", "Fornecedor"],
         ...movimentosSemCusto.map((m): Cel[] => [
           quando(m.criado_em), nomeProduto.get(m.produto_id)?.nome ?? "", rotulo(TIPO_MOVIMENTO, m.tipo), numero(m.quantidade), nomeProduto.get(m.produto_id)?.unidade ?? "",
-          dinheiro(custoDoMovimento.get(m.id)), m.motivo ?? "", autor(m.criado_por, m.origem),
+          dinheiro(custoDoMovimento.get(m.id)), m.motivo ?? "", autor(m.criado_por, m.origem), (m.fornecedor_id && nomeFornecedor.get(m.fornecedor_id)) || "",
         ]),
+      ]);
+
+      etapa("fornecedores");
+      tabelas.set("fornecedores.csv", [
+        ["Fornecedor", "WhatsApp", "Observações", "Na lista", "Criado em"],
+        ...fornecedores.map((f): Cel[] => [f.nome, fmtTelefone(f.telefone), f.observacoes ?? "", simNao(f.ativo), quando(f.criado_em)]),
       ]);
 
       etapa("pacotes");

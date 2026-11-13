@@ -8,9 +8,11 @@ import type { ItemLancamento } from "@/lib/gestao/dinheiro";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Produto } from "@/lib/gestao/tipos";
 import { brl, semAcento } from "@/lib/gestao/util";
+import { limparCodigo, opcoesDaLoja } from "@/lib/gestao/loja-opcoes";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { ok, useDados } from "../ui";
+import { LerComCamera } from "./leitor";
 import { CampoDinheiro, erroDeValor, EscolhaPagamento, fmtQtd, lerQtd, QuandoPaga, type EstadoPagamento, type PagaDepois } from "./pecas";
 
 export type { PagaDepois } from "./pecas";
@@ -94,10 +96,15 @@ export function resumoDosItens(itens: ItemLancamento[]) {
 /** Corta uma descrição comprida sem quebrar a linha do extrato. */
 export const encurtar = (s: string, max = 200) => (s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s);
 
-/** Saída de estoque de cada produto vendido, do mesmo jeito que a tela de Estoque anota uma venda. */
-export async function baixarEstoque(sb: Banco, petshopId: string, userId: string, itens: ItemConta[]) {
+/**
+ * Saída de estoque de cada produto vendido, do mesmo jeito que a tela de Estoque anota uma venda.
+ * `lancamentoId` liga a saída à venda no financeiro: é por essa ligação que o relatório de produtos acha o custo de cada venda
+ * (o banco guarda o custo do produto na hora da saída).
+ */
+export async function baixarEstoque(sb: Banco, petshopId: string, userId: string, itens: ItemConta[], lancamentoId?: string | null) {
   const linhas = produtosDaConta(itens).map((i) => ({
     petshop_id: petshopId, produto_id: i.produtoId!, tipo: "saida", quantidade: i.qtd, motivo: "Venda", criado_por: userId,
+    ...(lancamentoId ? { lancamento_id: lancamentoId } : {}),
   }));
   if (linhas.length) ok(await sb.from("movimentos_estoque").insert(linhas).select("id"));
 }
@@ -106,35 +113,72 @@ export async function baixarEstoque(sb: Banco, petshopId: string, userId: string
 export function useProdutosDaLoja() {
   const { sb, petshop } = useGestao();
   const { dados, carregando, erro } = useDados(async () =>
-    (await lerTudo<Omit<Produto, "custo">>((de, ate, contar) => sb.from("produtos").select(COLS_PRODUTO, contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate))).map((p) => ({ ...p, custo: null })) as Produto[],
+    (await lerTudo<Omit<Produto, "custo">>((de, ate, contar) => sb.from("produtos").select(COLS_PRODUTO, contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate))).map((p) => ({ ...p, custo: null, ultimo_custo: null })) as Produto[],
   [petshop.id]);
   return { produtos: dados ?? [], carregando: carregando && !dados, erro };
 }
 
 /* ---------- busca de produto ---------- */
 
+/** O produto com exatamente este código de barras (null quando não há, ou quando o código veio vazio). */
+export function produtoDoCodigo<P extends { codigo_barras?: string | null }>(produtos: P[], digitado: string): P | null {
+  const codigo = limparCodigo(digitado);
+  return codigo ? produtos.find((p) => p.codigo_barras === codigo) ?? null : null;
+}
+
+/**
+ * Busca de produto. Com o código de barras ligado nas opções da loja, o campo também aceita o leitor:
+ * o leitor digita os números e aperta Enter, e o produto daquele código entra na conta na hora (de novo = mais um).
+ */
 export function BuscaProduto({ produtos, carregando, erro, itens, aoEscolher, autoFocus }: {
   produtos: Produto[]; carregando: boolean; erro?: string | null; itens: ItemConta[]; aoEscolher: (p: Produto) => void; autoFocus?: boolean;
 }) {
+  const { petshop } = useGestao();
+  const comCodigo = opcoesDaLoja(petshop).codigoBarras;
   const [q, setQ] = useState("");
+  const [aviso, setAviso] = useState<{ texto: string; ruim?: boolean } | null>(null);
   const alvo = semAcento(q);
-  const achados = alvo ? produtos.filter((p) => semAcento(p.nome).includes(alvo) || semAcento(p.categoria ?? "").includes(alvo)).slice(0, 6) : [];
+  const codigo = comCodigo ? limparCodigo(q) : null;
+  const achados = alvo ? produtos.filter((p) => semAcento(p.nome).includes(alvo) || semAcento(p.categoria ?? "").includes(alvo)
+    || (codigo != null && (p.codigo_barras ?? "").includes(codigo))).slice(0, 6) : [];
+
+  function porNaConta(p: Produto) {
+    const tinha = itens.find((i) => i.produtoId === p.id)?.qtd ?? 0;
+    aoEscolher(p);
+    setQ("");
+    setAviso({ texto: `${p.nome} entrou na conta${tinha > 0 ? ` (${fmtQtd(tinha + 1)} agora)` : ""}.` });
+  }
+  /** Código lido (leitor, câmera ou Enter no campo): código exato entra na conta; sem código, vale o único produto achado. */
+  function lerCodigo(texto: string) {
+    const exato = produtoDoCodigo(produtos, texto);
+    const unico = !exato && texto === q && achados.length === 1 ? achados[0] : null;
+    if (exato ?? unico) return porNaConta((exato ?? unico)!);
+    if (carregando) return setAviso({ texto: "Ainda estou buscando os produtos. Tente de novo em um instante.", ruim: true });
+    const limpo = limparCodigo(texto);
+    if (limpo && /^\d{6,}$/.test(limpo)) { setQ(""); setAviso({ texto: `Nenhum produto com o código ${limpo}. Confira o código na ficha do produto, em Estoque.`, ruim: true }); }
+  }
+
   return (
     <div className="g-pilha p">
       <div className="g-busca">
         <Search />
-        <input className="g-input" placeholder="Buscar produto pelo nome" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar produto" autoFocus={autoFocus} />
+        <input className="g-input" placeholder={comCodigo ? "Passe o leitor ou digite o nome" : "Buscar produto pelo nome"} value={q} aria-label="Buscar produto" autoFocus={autoFocus}
+          enterKeyHint={comCodigo ? "done" : undefined}
+          onChange={(e) => { setQ(e.target.value); setAviso(null); }}
+          onKeyDown={comCodigo ? (e) => { if (e.key === "Enter" && q.trim()) { e.preventDefault(); lerCodigo(q); } } : undefined} />
       </div>
+      {comCodigo && <LerComCamera aoLer={lerCodigo} continuo />}
+      {aviso && !alvo && <p className={`g-pp ${aviso.ruim ? "g-vermelho-t" : "g-verde-t"}`} role="status">{aviso.texto}</p>}
       {erro ? <p className="g-pp g-vermelho-t">{erro}</p>
         : alvo && carregando ? <p className="g-pp g-muted">Buscando os produtos…</p>
-        : alvo && !achados.length ? <p className="g-pp g-muted">{produtos.length ? "Nenhum produto com esse nome." : "Ainda não tem produto no estoque."}</p>
+        : alvo && !achados.length ? <p className="g-pp g-muted">{produtos.length ? (comCodigo ? "Nenhum produto com esse nome ou código." : "Nenhum produto com esse nome.") : "Ainda não tem produto no estoque."}</p>
         : achados.length > 0 && (
           <div className="g-lista g-vd-achados">
             {achados.map((p) => {
               const naConta = itens.find((i) => i.produtoId === p.id);
               const saldo = Number(p.estoque);
               return (
-                <button key={p.id} type="button" className="g-linha" onClick={() => aoEscolher(p)}>
+                <button key={p.id} type="button" className="g-linha" onClick={() => (comCodigo ? porNaConta(p) : aoEscolher(p))}>
                   <Tile icone={Package} tom="rosa" tamanho="p" />
                   <span className="t">
                     <b>{p.nome}</b>

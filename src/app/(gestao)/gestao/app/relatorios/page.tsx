@@ -6,6 +6,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPessoa, AvatarPet, Esqueleto, useAvisos, useDados, Vazio } from "@/components/gestao/ui";
 import { baixarPlanilha, brlMini, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, numeroCsv, PALETA, paginar, SemAcesso, somaPorForma, type Cel } from "@/components/gestao/financeiro/comum";
 import { Anel, Barras, Kpi, Rosca, Tile } from "@/components/gestao/painel";
+import RelatorioProdutos from "@/components/gestao/loja/relatorio-produtos";
 import { partesDoLancamento, percentuaisQueFecham } from "@/lib/gestao/dinheiro";
 import type { Banco } from "@/lib/gestao/supabase";
 import { FORMAS } from "@/lib/gestao/tipos";
@@ -505,6 +506,8 @@ function Relatorios() {
                 </p>
               </section>
             )}
+
+            <RelatorioProdutos de={deIso} ate={ateIso} />
 
             <div className="g-duas">
               <section className="g-card">

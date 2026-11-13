@@ -86,10 +86,11 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
       const gravar = itensParaGravar(itens);
       const mais = resumoDosItens(gravar);
       const descricao = encurtar(`${servico} · ${pet?.nome ?? ""}`.trim().replace(/ ·$/, "") + (mais ? ` + ${mais}` : ""));
+      let lancamentoId: string | null = null;
       if (fiado) {
-        await lancarAReceber(sb, petshop.id, {
+        lancamentoId = (await lancarAReceber(sb, petshop.id, {
           valor: contas.total, vencimento: depois.quando, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null, descricao, itens: gravar,
-        });
+        }))?.id ?? null;
         recebeu = true;
       } else if (pg && !("erro" in pg)) {
         const lancado = await lancarPago(sb, petshop.id, {
@@ -97,12 +98,13 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
           descricao, itens: gravar,
         });
         recebeu = true;
+        lancamentoId = lancado?.id ?? null;
         if (vejoFinanceiro && lancado && soDigitos(tutor?.telefone).length >= 8) {
           zapComprovante = linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] }));
         }
       }
       let estoqueOk = true;
-      try { await baixarEstoque(sb, petshop.id, user.id, itens); } catch (e) {
+      try { await baixarEstoque(sb, petshop.id, user.id, itens, lancamentoId); } catch (e) {
         estoqueOk = false;
         avisarErro(`${recebeu ? (fiado ? "A conta foi anotada, mas o" : "O valor foi recebido, mas o") : "O"} estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
       }

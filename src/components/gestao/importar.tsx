@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, FileSpreadsheet, History, TriangleAlert, Undo2, Upload } from "lucide-react";
 import { dataCurta, fimDoTelefone, hora, lerTelefone, semAcento } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
+import { limparCodigo, opcoesDaLoja } from "@/lib/gestao/loja-opcoes";
 import { useGestao } from "./contexto";
 import { guardarLembrado, lerLembrado } from "./lembrado";
 import { Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "./ui";
@@ -30,6 +31,8 @@ const COLUNAS: Record<Tipo, Coluna[]> = {
   ],
   produtos: [
     { id: "nome", rotulo: "Produto", nomes: ["produto", "nome", "nome do produto", "descricao", "item"], obrigatoria: true, exemplo: "Ração Golden 15kg" },
+    // só entra quando o pet shop ligou o código de barras nas opções da loja
+    { id: "codigo", rotulo: "Código de barras", nomes: ["codigo de barras", "codigo barras", "cod barras", "cod de barras", "barras", "ean", "gtin"], parece: /barras|\bean\b|gtin/, exemplo: "7891234567895" },
     { id: "categoria", rotulo: "Categoria", nomes: ["categoria", "grupo", "tipo"], exemplo: "Ração" },
     { id: "unidade", rotulo: "Unidade", nomes: ["unidade", "un", "medida"], exemplo: "saco" },
     { id: "preco", rotulo: "Preço de venda", nomes: ["preco", "preco de venda", "venda", "valor", "valor de venda"], exemplo: "189,90" },
@@ -41,9 +44,11 @@ const COLUNAS: Record<Tipo, Coluna[]> = {
 /** Ordem em que as colunas aparecem para a pessoa (na lista do seletor e na planilha modelo). */
 const ORDEM: Record<Tipo, string[]> = {
   clientes: ["tutor", "telefone", "pet", "especie", "raca", "porte", "obs", "email", "endereco"],
-  produtos: ["nome", "categoria", "unidade", "preco", "custo", "estoque", "minimo"],
+  produtos: ["nome", "codigo", "categoria", "unidade", "preco", "custo", "estoque", "minimo"],
 };
-const emOrdem = (tipo: Tipo) => ORDEM[tipo].map((id) => COLUNAS[tipo].find((c) => c.id === id)!);
+/** As colunas aceitas; a de código de barras só para quem ligou a opção. */
+const colunasDe = (tipo: Tipo, comCodigo: boolean) => COLUNAS[tipo].filter((c) => c.id !== "codigo" || comCodigo);
+const emOrdem = (tipo: Tipo, comCodigo: boolean) => ORDEM[tipo].filter((id) => id !== "codigo" || comCodigo).map((id) => COLUNAS[tipo].find((c) => c.id === id)!);
 const MAXIMO = 2000;
 
 /** Lê texto de planilha: CSV com ; ou , e também o que vem colado do Excel ou do Google Planilhas (separado por tabulação). */
@@ -109,8 +114,8 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 /** "Ana, Bia e mais 3". */
 const alguns = (nomes: string[], max = 6) => (nomes.length <= max ? nomes.join(", ") : `${nomes.slice(0, max).join(", ")} e mais ${nomes.length - max}`);
 
-function baixarModelo(tipo: Tipo) {
-  const cols = emOrdem(tipo);
+function baixarModelo(tipo: Tipo, comCodigo: boolean) {
+  const cols = emOrdem(tipo, comCodigo);
   const csv = "﻿" + [cols.map((c) => c.rotulo), cols.map((c) => c.exemplo)].map((l) => l.map((x) => `"${x.replace(/"/g, '""')}"`).join(";")).join("\r\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
@@ -159,7 +164,8 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
   /** Escolhas da pessoa: coluna da planilha → campo ("" = não usar). Só o que ela mudou; o resto vem do palpite. */
   const [escolhas, setEscolhas] = useState<Record<number, string>>({});
   const [mesmoAssim, setMesmoAssim] = useState(false);
-  const cols = COLUNAS[tipo];
+  const comCodigo = opcoesDaLoja(petshop).codigoBarras;
+  const cols = useMemo(() => colunasDe(tipo, comCodigo), [tipo, comCodigo]);
   const principal = cols.find((c) => c.obrigatoria)!;
 
   useEffect(() => { setUltima(lerUltimaImportacao(petshop.id, tipo)); }, [petshop.id, tipo]);
@@ -318,9 +324,12 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
   }
 
   async function importarProdutos(linhas: Record<string, string>[]) {
-    const existentes = { data: await lerTudo<{ nome: string }>((de, ate, contar) =>
-      sb.from("produtos").select("nome", contando(contar)).eq("petshop_id", petshop.id).order("id").range(de, ate)) };
+    const existentes = { data: await lerTudo<{ nome: string; codigo_barras: string | null; ativo: boolean }>((de, ate, contar) =>
+      sb.from("produtos").select("nome, codigo_barras, ativo", contando(contar)).eq("petshop_id", petshop.id).order("id").range(de, ate)) };
     const tem = new Set((existentes.data ?? []).map((p) => semAcento(p.nome)));
+    // código de barras é um por produto: o que vier repetido entra sem código
+    const codigos = new Set((existentes.data ?? []).filter((p) => p.ativo && p.codigo_barras).map((p) => p.codigo_barras!));
+    let repetidos = 0;
     const { data: u } = await sb.auth.getUser();
     let novos = 0, pulados = 0, ignorados = 0;
     const ruim = (v: string | undefined) => Boolean((v ?? "").trim()) && numero(v) == null;
@@ -329,13 +338,16 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
       if (tem.has(semAcento(nome))) { pulados++; continue; }
       const preco = numero(l.preco), custo = numero(l.custo), qtd = numero(l.estoque), minimo = numero(l.minimo);
       if (ruim(l.preco) || ruim(l.custo) || ruim(l.estoque) || ruim(l.minimo)) ignorados++;
+      let codigo = comCodigo ? limparCodigo(l.codigo) : null;
+      if (codigo && codigos.has(codigo)) { codigo = null; repetidos++; }
       const r = await sb.from("produtos").insert({
         petshop_id: petshop.id, nome, categoria: l.categoria?.trim() || null, unidade: l.unidade?.trim().slice(0, 12) || "un",
         preco_venda: preco != null ? Math.round(preco * 100) / 100 : null, custo: custo != null ? Math.round(custo * 100) / 100 : null,
-        estoque_minimo: minimo ?? 0,
+        estoque_minimo: minimo ?? 0, ...(codigo ? { codigo_barras: codigo } : {}),
       }).select("id").single();
       if (r.error) throw new Error(r.error.message);
       tem.add(semAcento(nome));
+      if (codigo) codigos.add(codigo);
       novos++;
       if (qtd && qtd > 0) {
         const m = await sb.from("movimentos_estoque").insert({
@@ -348,6 +360,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
       `${novos} ${novos === 1 ? "produto novo" : "produtos novos"} no estoque.`,
       ...(ignorados ? [`${ignorados} ${ignorados === 1 ? "produto tinha" : "produtos tinham"} preço, custo ou quantidade que não era número (ou era negativo) e ficou em branco. Confira no Estoque.`] : []),
       ...(pulados ? [`${pulados} já ${pulados === 1 ? "existia" : "existiam"} com o mesmo nome e ${pulados === 1 ? "foi pulado" : "foram pulados"}.`] : []),
+      ...(repetidos ? [`${repetidos} ${repetidos === 1 ? "produto veio" : "produtos vieram"} com um código de barras que já estava em outro produto e ${repetidos === 1 ? "entrou" : "entraram"} sem código. Confira no Estoque.`] : []),
     ];
   }
 
@@ -429,10 +442,10 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
           <div className="g-card liso g-pilha p">
             <b className="g-p">1. A planilha precisa de uma linha de títulos</b>
             <p className="g-muted g-pp">
-              Colunas aceitas: {emOrdem(tipo).map((c) => c.rotulo).join(", ")}. Só <b>{principal.rotulo}</b> é obrigatória.
+              Colunas aceitas: {emOrdem(tipo, comCodigo).map((c) => c.rotulo).join(", ")}. Só <b>{principal.rotulo}</b> é obrigatória.
               {tipo === "clientes" && " Um tutor com dois pets ocupa duas linhas, repetindo o nome e o telefone. Se os títulos da sua planilha forem outros (Responsável, Zap, Bichinho), você escolhe o que é cada coluna antes de trazer."}
             </p>
-            <div><button className="g-btn sec p" onClick={() => baixarModelo(tipo)}><Download />Baixar planilha modelo</button></div>
+            <div><button className="g-btn sec p" onClick={() => baixarModelo(tipo, comCodigo)}><Download />Baixar planilha modelo</button></div>
           </div>
           <div className="g-card liso g-pilha p">
             <b className="g-p">2. Escolha o arquivo ou cole as células</b>
@@ -459,7 +472,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
                         <td key={i}>
                           <select className={`g-select g-imp-sel${lido.mapa[i] ? " usa" : ""}`} value={lido.mapa[i]} aria-label={`A coluna “${t || i + 1}” é`} onChange={(e) => escolher(i, e.target.value)}>
                             <option value="">Não usar</option>
-                            {emOrdem(tipo).map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
+                            {emOrdem(tipo, comCodigo).map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
                           </select>
                         </td>
                       ))}
