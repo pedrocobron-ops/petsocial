@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Cake, CalendarPlus, MessageCircle, Ticket, UserX, X } from "lucide-react";
 import { deIsoDia, horarioDoDia, inicioDoDia, isoDia, nomeDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";
+import { usaModulo } from "@/lib/gestao/modulos";
 import { Selo } from "./marca";
 import { Tile, type Tom } from "./painel";
 import { abrirAssistente, useDados } from "./ui";
@@ -78,7 +79,7 @@ export default function DicasMozart({ semDicas = [] }: {
 
     // pacote no último uso
     const acabando = ((pacotes.data ?? []) as unknown as { total: number; usados: number; pets: { nome: string } | null }[]).filter((p) => p.total - p.usados === 1 && p.pets);
-    if (acabando.length) dicas.push({
+    if (acabando.length && usaModulo(petshop, "pacotes")) dicas.push({
       id: "pacotes", icone: Ticket, tom: "lilas",
       texto: `O pacote de ${lista(acabando.map((p) => p.pets!.nome))} acaba no próximo uso. Boa hora para oferecer a renovação.`,
       acao: "Ver os pacotes", href: "/gestao/app/pacotes",

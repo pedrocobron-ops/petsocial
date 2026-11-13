@@ -75,3 +75,26 @@
 .g-guia-chave::after { content: ""; position: absolute; inset: -9px -4px; }
 .g-guia-pessoa { min-height: 56px; }
 .g-guia-conta .g-ico { width: 44px; height: 44px; }
+
+/* guia em minutos: aviso de quantos passos, "Faço depois" em cada passo, preço único ou por porte, creche e hotel */
+.g-guia-intro { padding: 12px 14px; border-radius: 16px; background: var(--g-verde-tint); border: 1px solid rgba(36, 84, 59, .16); font-size: .9375rem; line-height: 1.4; }
+.g-guia-intro b { font-weight: 600; }
+.g-guia-pe { align-items: center; }
+.g-guia-pe .g-guia-depois { margin-left: auto; }
+.g-guia-pe .g-guia-volta { padding-inline: 10px; min-width: 44px; }
+.g-guia-modo { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.g-guia-modo .g-seg button { min-height: 34px; padding: 0 12px; font-size: .8125rem; }
+.g-guia-modo .g-btn { color: var(--g-cinza); }
+.g-guia-servico .precos.um { grid-template-columns: minmax(0, 150px) minmax(0, 1fr); align-items: end; }
+.g-guia-servico .precos.um label span { text-align: left; }
+.g-guia-servico .precos.um .g-input { text-align: left; padding-inline: 12px; }
+.g-guia-servico .precos.um > small { font-size: .8125rem; color: var(--g-cinza); padding-bottom: 12px; }
+.g-guia-fora { display: grid; gap: 4px; padding: 12px 14px; border-radius: 16px; border: 1px dashed var(--g-linha-forte); }
+.g-guia-fora > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; }
+.g-guia-fora > div span { color: var(--g-cinza); text-decoration: line-through; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-guia-bloco { display: grid; gap: 10px; padding: 14px; border-radius: 18px; background: var(--g-carta); border: 1px solid var(--g-linha); border-left: 5px solid #3b82a0; }
+.g-guia-bloco h3 { font: 480 1.125rem/1.2 var(--display); margin: 0; }
+.g-guia-dupla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.g-guia-proximos .g-btn { flex: 1 1 100%; justify-content: center; }
+@media (min-width: 720px) { .g-guia-proximos .g-btn { flex: 0 1 auto; } }
+.g-guia-servico .cabeca .g-ico { flex: none; width: 40px; height: 40px; color: var(--g-cinza); }

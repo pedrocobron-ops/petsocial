@@ -2,27 +2,25 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarDays, Check, Clock, Link2, Mic, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarDays, Check, Clock, FileSpreadsheet, Link2, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Undo2, Users, X } from "lucide-react";
 import type { Horario, Servico } from "@/lib/gestao/tipos";
 import { vagasDe } from "@/lib/gestao/agenda";
+import { nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { GradeHorario, erroDoHorario, lerHorario } from "./ajustes/grade-horario";
 import { useGestao } from "./contexto";
 import { Selo } from "./marca";
 import { Tile } from "./painel";
-import { lerValor, valor2 } from "@/lib/gestao/util";
-import { abrirAssistente, avisarMudanca, ok, useAvisos } from "./ui";
+import { brl, lerValor, valor2 } from "@/lib/gestao/util";
+import { Campo, CampoValor, avisarMudanca, ok, useAvisos } from "./ui";
+import Importar from "./importar";
 import "./guia-inicial.css";
 
 /** Evento para abrir o guia de novo (botão em Meu pet shop). */
 export const EVENTO_GUIA = "gestao:guia";
 export const abrirGuia = () => window.dispatchEvent(new Event(EVENTO_GUIA));
 
-const PASSOS = [
-  { id: "horario", titulo: "Horário", icone: Clock },
-  { id: "equipe", titulo: "Equipe e vagas", icone: Users },
-  { id: "servicos", titulo: "Serviços e preços", icone: Scissors },
-  { id: "link", titulo: "Link do cliente", icone: Link2 },
-] as const;
+type IdPasso = "horario" | "equipe" | "servicos" | "casa" | "link";
+type PassoDoGuia = { id: IdPasso };
 
 const DIA = { abre: "08:00", fecha: "18:00" };
 const MODELOS: { rotulo: string; horario: Horario }[] = [
@@ -33,7 +31,16 @@ const MODELOS: { rotulo: string; horario: Horario }[] = [
 const CORES = ["#4d8f6b", "#3b82a0", "#7c6fb0", "#b0563f", "#8a7a3a", "#a05a82", "#c9773f"];
 const DURACOES = [15, 30, 45, 60, 90, 120, 150, 180];
 const textoDuracao = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}`);
-type Preco = Pick<Servico, "id" | "nome" | "cor" | "ativo" | "duracao_min" | "preco_p" | "preco_m" | "preco_g" | "preco_gg">;
+type Preco = Pick<Servico, "id" | "nome" | "cor" | "ativo" | "categoria" | "duracao_min" | "preco_p" | "preco_m" | "preco_g" | "preco_gg">;
+const CAMPOS_PRECO = ["preco_p", "preco_m", "preco_g", "preco_gg"] as const;
+const mesmoHorario = (a: Horario, b: Horario) => ["0", "1", "2", "3", "4", "5", "6"].every((d) => (a[d]?.abre ?? "") === (b[d]?.abre ?? "") && (a[d]?.fecha ?? "") === (b[d]?.fecha ?? ""));
+const lerVagas = (s: string) => { const t = s.trim(); if (!t) return null; const n = Number(t); return Number.isInteger(n) ? n : NaN; };
+/** Banho e tosa costumam mudar de preço com o porte; os serviços rápidos (unha, hidratação) quase sempre têm um preço só. */
+function comecaPorPorte(s: Preco): boolean {
+  const v = CAMPOS_PRECO.map((c) => s[c]);
+  if (v.every((x) => x == null)) return s.categoria !== "outro";
+  return !v.every((x) => x === v[0]);
+}
 const NOME_PORTE: Record<string, string> = { P: "pequeno", M: "médio", G: "grande", GG: "gigante" };
 
 /** O que está errado no preço digitado (null = certo ou em branco). */
@@ -54,9 +61,9 @@ function CampoPreco({ porte, servico, valor, aoMudar }: { porte: string; servico
   const erro = erroDoPreco(texto);
   return (
     <label>
-      <span>{porte}</span>
+      <span>{porte === "todos" ? "Preço" : porte}</span>
       <input className={`g-input g-tab${erro ? " ruim" : ""}`} inputMode="decimal" placeholder="R$" value={texto} aria-invalid={!!erro}
-        aria-label={`${servico}, porte ${NOME_PORTE[porte] ?? porte}`}
+        aria-label={porte === "todos" ? `${servico}, preço para todos os portes` : `${servico}, porte ${NOME_PORTE[porte] ?? porte}`}
         onChange={(e) => { setTexto(e.target.value); const ruim = erroDoPreco(e.target.value); aoMudar(ruim ? null : lerValor(e.target.value), ruim); }}
         onBlur={() => { if (!erro && texto.trim()) { const n = lerValor(texto); if (n != null) setTexto(valor2(n)); } }} />
       {erro && <small className="erro" role="alert">{erro}</small>}
@@ -65,16 +72,61 @@ function CampoPreco({ porte, servico, valor, aoMudar }: { porte: string; servico
 }
 
 /**
- * Guia da primeira vez: horário, quem atende e quantas vagas, serviços com preço e o link do cliente.
- * Cada passo grava ao continuar. O que é definido aqui regula a agenda, o link de agendamento e o Mozart.
+ * Guia da primeira vez. Os passos seguem o que o negócio faz (`petshops.modulos`): horário para todos; quem atende,
+ * serviços com preço e link do cliente para quem faz banho e tosa; diária e vagas para creche e hotel.
+ * Cada passo grava ao continuar e pode ficar para depois. O que é definido aqui regula a agenda, o link e o Mozart.
  * Aparece sozinho para o dono enquanto `petshops.guia_feito_em` está vazio; depois, só pelo botão em Meu pet shop.
  */
 export default function GuiaInicial() {
-  const { sb, petshop, eu, equipe, servicos, souDono, liberado, recarregarBase } = useGestao();
+  const { sb, petshop, souDono, liberado, recarregarBase } = useGestao();
   const { avisarErro } = useAvisos();
   // aberto desde a primeira entrada (guia ainda não feito) ou pelo botão em Meu pet shop; fica aberto até a pessoa fechar
-  const [forcado, setForcado] = useState(() => !petshop.guia_feito_em);
-  const [passo, setPasso] = useState(-1); // -1 = boas-vindas; PASSOS.length = pronto
+  const [aberto, setAberto] = useState(() => !petshop.guia_feito_em);
+  const [vez, setVez] = useState(0); // cada abertura começa do primeiro passo, com os dados de agora
+  const [importando, setImportando] = useState(false);
+
+  useEffect(() => {
+    const abrir = () => { setVez((v) => v + 1); setAberto(true); };
+    window.addEventListener(EVENTO_GUIA, abrir);
+    return () => window.removeEventListener(EVENTO_GUIA, abrir);
+  }, []);
+
+  const visivel = souDono && liberado && aberto;
+  useEffect(() => {
+    if (!visivel) return;
+    const antes = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    return () => { document.documentElement.style.overflow = antes; };
+  }, [visivel]);
+
+  async function fechar() {
+    setAberto(false);
+    if (petshop.guia_feito_em) return;
+    try { ok(await sb.from("petshops").update({ guia_feito_em: new Date().toISOString() }).eq("id", petshop.id).select("id")); await recarregarBase(); }
+    catch (e) { avisarErro(e); }
+  }
+
+  return (
+    <>
+      {visivel && <Guia key={vez} aoFechar={() => void fechar()} aoImportar={() => { void fechar(); setImportando(true); }} />}
+      {importando && <Importar tipo="clientes" aoFechar={() => setImportando(false)} aoTerminar={avisarMudanca} />}
+    </>
+  );
+}
+
+function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () => void }) {
+  const { sb, petshop, eu, equipe, servicos, recarregarBase } = useGestao();
+  const { avisarErro } = useAvisos();
+  const banho = usaModulo(petshop, "banho_tosa"), creche = usaModulo(petshop, "creche"), hotel = usaModulo(petshop, "hotel");
+  const casa = nomeDaCasa(petshop);
+  // os passos ficam fixos enquanto o guia está aberto
+  const [passos] = useState<PassoDoGuia[]>(() => [
+    { id: "horario" as const },
+    ...(banho ? [{ id: "equipe" as const }, { id: "servicos" as const }] : []),
+    ...(creche || hotel ? [{ id: "casa" as const }] : []),
+    ...(banho ? [{ id: "link" as const }] : []),
+  ]);
+  const [passo, setPasso] = useState(0); // passos.length = pronto
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -84,8 +136,15 @@ export default function GuiaInicial() {
   const [nome, setNome] = useState("");
   const [vagas, setVagas] = useState<number | null>(petshop.vagas ?? null);
   const [precos, setPrecos] = useState<Preco[]>(() => servicos.filter((s) => !["creche", "hotel"].includes(s.categoria)).map((s) => ({ ...s })));
-  const [linkLigado, setLinkLigado] = useState(petshop.link_ativo);
+  // serviços que o pet shop não oferece: saem da lista ao continuar
+  const [fora, setFora] = useState<string[]>(() => servicos.filter((s) => !s.ativo).map((s) => s.id));
+  const [porPorte, setPorPorte] = useState<Record<string, boolean>>(() => Object.fromEntries(servicos.map((s) => [s.id, comecaPorPorte(s)])));
   const [errosPreco, setErrosPreco] = useState<Record<string, string>>({});
+  const [diariaCreche, setDiariaCreche] = useState<number | null>(petshop.diaria_creche == null ? null : Number(petshop.diaria_creche));
+  const [diariaHotel, setDiariaHotel] = useState<number | null>(petshop.diaria_hotel == null ? null : Number(petshop.diaria_hotel));
+  const [vagasCreche, setVagasCreche] = useState(petshop.vagas_creche == null ? "" : String(petshop.vagas_creche));
+  const [vagasHotel, setVagasHotel] = useState(petshop.vagas_hotel == null ? "" : String(petshop.vagas_hotel));
+  const [linkLigado, setLinkLigado] = useState(petshop.link_ativo);
   const corpo = useRef<HTMLDivElement>(null);
   // o erro aparece junto do botão; se o campo errado ficou fora da tela, rola até ele
   useEffect(() => {
@@ -93,134 +152,166 @@ export default function GuiaInicial() {
     const ruim = corpo.current?.querySelector<HTMLElement>(".ruim, [aria-invalid='true']");
     ruim?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [erro]);
-
-  useEffect(() => {
-    const abrir = () => { setPasso(-1); setForcado(true); };
-    window.addEventListener(EVENTO_GUIA, abrir);
-    return () => window.removeEventListener(EVENTO_GUIA, abrir);
-  }, []);
-
-  const visivel = souDono && liberado && forcado;
-  useEffect(() => {
-    if (!visivel) return;
-    const antes = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    return () => { document.documentElement.style.overflow = antes; };
-  }, [visivel]);
-  if (!visivel) return null;
+  // cada passo abre do começo
+  useEffect(() => { corpo.current?.scrollTo(0, 0); }, [passo]);
 
   const outros = equipe.filter((p) => p.ativo && p.atende && p.id !== eu.id);
   const atendem = (euAtendo ? 1 : 0) + outros.length + novos.length;
   const vagasAgora = vagas ?? Math.max(1, atendem);
   const primeiro = eu.nome.split(" ")[0];
+  const total = passos.length;
+  const atual = passos[passo]?.id;
+  const fim = passo >= total;
+  const n = passo + 1;
 
-  async function concluir() {
-    try { ok(await sb.from("petshops").update({ guia_feito_em: new Date().toISOString() }).eq("id", petshop.id).select("id")); await recarregarBase(); }
-    catch (e) { avisarErro(e); }
-  }
-  async function fechar() {
-    setForcado(false);
-    if (!petshop.guia_feito_em) await concluir();
-  }
   function juntarNome() {
-    const n = nome.trim();
-    if (n.length < 2) return;
-    setNovos((l) => [...l, n.slice(0, 60)]);
+    const t = nome.trim();
+    if (t.length < 2) return;
+    setNovos((l) => [...l, t.slice(0, 60)]);
     setNome("");
+  }
+
+  /** Vai para o passo seguinte; depois do último, o guia fica marcado como feito. */
+  async function avancar() {
+    if (passo === total - 1 && !petshop.guia_feito_em) {
+      ok(await sb.from("petshops").update({ guia_feito_em: new Date().toISOString() }).eq("id", petshop.id).select("id"));
+    }
+    await recarregarBase();
+    avisarMudanca();
+    setPasso((p) => p + 1);
+  }
+
+  /** "Faço depois": segue sem gravar o que está neste passo. */
+  async function pular() {
+    setErro(null);
+    setSalvando(true);
+    try { await avancar(); } catch (e) { avisarErro(e); } finally { setSalvando(false); }
   }
 
   async function continuar() {
     setErro(null);
     setSalvando(true);
     try {
-      const id = PASSOS[passo]?.id;
-      if (id === "horario") {
+      if (atual === "horario") {
         const ruim = erroDoHorario(horario);
         if (ruim) { setErro(ruim); return; }
         if (!Object.values(horario).some(Boolean)) { setErro("Marque pelo menos um dia em que o pet shop abre."); return; }
         ok(await sb.from("petshops").update({ horario }).eq("id", petshop.id).select("id"));
       }
-      if (id === "equipe") {
+      if (atual === "equipe") {
         const pendente = nome.trim().length >= 2 ? [...novos, nome.trim().slice(0, 60)] : novos;
         if (!euAtendo && !outros.length && !pendente.length) { setErro("Diga quem atende os pets: você, alguém da equipe ou os dois."); return; }
         if (euAtendo !== eu.atende) ok(await sb.from("profissionais").update({ atende: euAtendo }).eq("id", eu.id).eq("petshop_id", petshop.id).select("id"));
         if (pendente.length) {
-          ok(await sb.from("profissionais").insert(pendente.map((n, i) => ({ petshop_id: petshop.id, nome: n, papel: "funcionario" as const, funcao: "Banhista e tosador(a)", atende: true, cor: CORES[(outros.length + i) % CORES.length] }))).select("id"));
+          ok(await sb.from("profissionais").insert(pendente.map((t, i) => ({ petshop_id: petshop.id, nome: t, papel: "funcionario" as const, funcao: "Banhista e tosador(a)", atende: true, cor: CORES[(outros.length + i) % CORES.length] }))).select("id"));
           setNovos([]); setNome("");
         }
         ok(await sb.from("petshops").update({ vagas: vagasAgora }).eq("id", petshop.id).select("id"));
         setVagas(vagasAgora);
       }
-      if (id === "servicos") {
-        if (!precos.some((s) => s.ativo)) { setErro("Deixe pelo menos um serviço ligado."); return; }
-        const comErro = precos.find((s) => s.ativo && Object.keys(errosPreco).some((k) => k.startsWith(`${s.id}:`)));
+      if (atual === "servicos") {
+        const ficam = precos.filter((s) => !fora.includes(s.id));
+        if (precos.length && !ficam.length) { setErro("Deixe pelo menos um serviço na lista, ou toque em Faço depois."); return; }
+        const comErro = ficam.find((s) => Object.keys(errosPreco).some((k) => k.startsWith(`${s.id}:`)));
         if (comErro) { setErro(`Confira o preço de ${comErro.nome}: use só números, sem valor negativo.`); return; }
-        if (precos.some((s) => s.ativo && [s.preco_p, s.preco_m, s.preco_g, s.preco_gg].some((v) => v != null && v < 0))) { setErro("O preço não pode ser negativo."); return; }
+        if (ficam.some((s) => CAMPOS_PRECO.some((c) => s[c] != null && s[c]! < 0))) { setErro("O preço não pode ser negativo."); return; }
+        const apagados: string[] = [];
         for (const s of precos) {
           const antes = servicos.find((x) => x.id === s.id);
           if (!antes) continue;
-          const mudou = antes.ativo !== s.ativo || antes.duracao_min !== s.duracao_min || antes.preco_p !== s.preco_p || antes.preco_m !== s.preco_m || antes.preco_g !== s.preco_g || antes.preco_gg !== s.preco_gg;
-          if (mudou) ok(await sb.from("servicos").update({ ativo: s.ativo, duracao_min: s.duracao_min, preco_p: s.preco_p, preco_m: s.preco_m, preco_g: s.preco_g, preco_gg: s.preco_gg }).eq("id", s.id).eq("petshop_id", petshop.id).select("id"));
+          if (fora.includes(s.id)) {
+            if (!antes.ativo) continue;
+            // nunca usado: sai da lista de vez. Já usado em algum horário ou pacote: o banco não deixa apagar, então fica só desligado.
+            const r = await sb.from("servicos").delete().eq("id", s.id).eq("petshop_id", petshop.id).select("id");
+            if (r.error || !r.data?.length) ok(await sb.from("servicos").update({ ativo: false }).eq("id", s.id).eq("petshop_id", petshop.id).select("id"));
+            else apagados.push(s.id);
+            continue;
+          }
+          const mudou = !antes.ativo || antes.duracao_min !== s.duracao_min || CAMPOS_PRECO.some((c) => antes[c] !== s[c]);
+          if (mudou) ok(await sb.from("servicos").update({ ativo: true, duracao_min: s.duracao_min, preco_p: s.preco_p, preco_m: s.preco_m, preco_g: s.preco_g, preco_gg: s.preco_gg }).eq("id", s.id).eq("petshop_id", petshop.id).select("id"));
         }
+        if (apagados.length) { setPrecos((l) => l.filter((s) => !apagados.includes(s.id))); setFora((l) => l.filter((id) => !apagados.includes(id))); }
       }
-      if (id === "link") {
-        if (linkLigado !== petshop.link_ativo) ok(await sb.from("petshops").update({ link_ativo: linkLigado }).eq("id", petshop.id).select("id"));
-        ok(await sb.from("petshops").update({ guia_feito_em: new Date().toISOString() }).eq("id", petshop.id).select("id"));
+      if (atual === "casa") {
+        const vc = lerVagas(vagasCreche), vh = lerVagas(vagasHotel);
+        if ([creche ? diariaCreche : null, hotel ? diariaHotel : null].some((v) => v != null && (v < 0 || v > 99999))) { setErro("Confira o preço da diária: use um valor entre 0 e R$ 99.999."); return; }
+        if ([creche ? vc : null, hotel ? vh : null].some((v) => v != null && (Number.isNaN(v) || v < 1 || v > 500))) { setErro("As vagas ficam entre 1 e 500. Deixe em branco se não quiser limite."); return; }
+        ok(await sb.from("petshops").update({
+          ...(creche ? { diaria_creche: diariaCreche, vagas_creche: vc } : {}),
+          ...(hotel ? { diaria_hotel: diariaHotel, vagas_hotel: vh } : {}),
+        }).eq("id", petshop.id).select("id"));
       }
-      await recarregarBase();
-      avisarMudanca();
-      setPasso((p) => p + 1);
+      if (atual === "link" && linkLigado !== petshop.link_ativo) {
+        ok(await sb.from("petshops").update({ link_ativo: linkLigado }).eq("id", petshop.id).select("id"));
+      }
+      await avancar();
     } catch (e) { avisarErro(e); } finally { setSalvando(false); }
   }
 
   const mudarPreco = (id: string, campos: Partial<Preco>) => setPrecos((l) => l.map((s) => (s.id === id ? { ...s, ...campos } : s)));
-  const fim = passo >= PASSOS.length;
+  const semErros = (id: string) => setErrosPreco((m) => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith(`${id}:`))));
+  const anotarErro = (chave: string, ruim: string | null) => setErrosPreco((m) => { const x = { ...m }; if (ruim) x[chave] = ruim; else delete x[chave]; return x; });
+  function trocarModo(s: Preco, comPorte: boolean) {
+    setPorPorte((m) => ({ ...m, [s.id]: comPorte }));
+    semErros(s.id);
+    setErro(null);
+    // um preço só: o primeiro valor preenchido passa a valer para todos os portes
+    if (!comPorte) { const v = CAMPOS_PRECO.map((c) => s[c]).find((x) => x != null) ?? null; mudarPreco(s.id, { preco_p: v, preco_m: v, preco_g: v, preco_gg: v }); }
+  }
+  const cabeca = (titulo: string, texto: string) => (
+    <div>
+      <p className="g-rotulo">Passo {n} de {total}</p>
+      <h2 className="g-guia-h">{titulo}</h2>
+      <p className="g-muted g-p">{texto}</p>
+    </div>
+  );
+  const naLista = precos.filter((s) => !fora.includes(s.id)), tirados = precos.filter((s) => fora.includes(s.id));
+  const salvoH = lerHorario(petshop.horario);
+  const servicosAtivos = servicos.filter((s) => s.ativo && !["creche", "hotel"].includes(s.categoria)).length;
+  const resumoCasa = (rotulo: string, diaria: number | null, v: number | null) =>
+    `${rotulo}: ${diaria != null ? `diária de ${brl(Number(diaria))}` : "diária para definir depois"}${v ? `, ${v === 1 ? "1 vaga" : `${v} vagas`}` : ""}`;
 
   return (
     <div className="g-guia" role="dialog" aria-modal="true" aria-label="Guia de configuração">
       <div className="g-guia-caixa">
         <header className="g-guia-topo">
           <Selo tamanho={36} tom="verde" />
-          <div className="g-guia-trilho" aria-hidden>
-            {PASSOS.map((p, i) => <span key={p.id} className={i < passo ? "feito" : i === passo ? "agora" : ""}><i /></span>)}
+          <div className="g-guia-trilho" role="img" aria-label={fim ? "Guia concluído" : `Passo ${n} de ${total}`}>
+            {passos.map((p, i) => <span key={p.id} className={i < passo ? "feito" : i === passo ? "agora" : ""}><i /></span>)}
           </div>
-          <button className="g-ico" onClick={() => void fechar()} aria-label="Fechar o guia" title={petshop.guia_feito_em ? "Fechar" : "Fazer depois"}><X /></button>
+          <button className="g-ico" onClick={aoFechar} aria-label="Fechar o guia" title={petshop.guia_feito_em ? "Fechar" : "Fechar e fazer depois"}><X /></button>
         </header>
 
         <div className="g-guia-corpo" ref={corpo}>
-          {passo === -1 && (
-            <div className="g-guia-ola">
-              <p className="g-rotulo">Guia rápido · 3 minutos</p>
-              <h1>{primeiro}, vamos deixar o <em className="it">{petshop.nome}</em> pronto.</h1>
-              <p className="g-muted">São quatro perguntas. O que você responder aqui regula a agenda, o link do cliente e o Mozart, o seu assistente de inteligência artificial. Dá para mudar tudo depois.</p>
-              <ol className="g-guia-lista">
-                {PASSOS.map((p, i) => <li key={p.id}><Tile icone={p.icone} tom={(["pessego", "lilas", "menta", "ceu"] as const)[i]} /><span><b>{p.titulo}</b><small>{["Os dias e horas em que vocês abrem.", "Quem atende e quantos pets ao mesmo tempo.", "O que vocês fazem, quanto dura e quanto custa.", "Para o cliente pedir horário pelo celular."][i]}</small></span></li>)}
-              </ol>
-            </div>
+          {passo === 0 && (
+            <p className="g-guia-intro">
+              <b>{primeiro}, {total === 1 ? "é um passo só" : `são ${total} passos curtos`} para deixar o {petshop.nome} pronto.</b>{" "}
+              O que não souber agora, toque em Faço depois: dá para mudar tudo em Meu pet shop.
+            </p>
           )}
 
-          {passo === 0 && (
+          {atual === "horario" && (
             <div className="g-pilha">
-              <div><p className="g-rotulo">Passo 1 de 4</p><h2 className="g-guia-h">Quando o pet shop abre?</h2><p className="g-muted g-p">A agenda só oferece horário dentro desses dias e horas.</p></div>
+              {cabeca("Quando vocês abrem?", banho ? "A agenda só oferece horário dentro desses dias e horas. Já deixei o mais comum marcado: confira e siga." : "Já deixei o mais comum marcado: confira e siga.")}
               <div className="g-chips">
-                {MODELOS.map((m) => <button key={m.rotulo} type="button" className="g-chip" onClick={() => setHorario(lerHorario(m.horario))}>{m.rotulo}</button>)}
+                {MODELOS.map((m) => <button key={m.rotulo} type="button" className="g-chip" aria-pressed={mesmoHorario(lerHorario(m.horario), horario)} onClick={() => { setHorario(lerHorario(m.horario)); setErro(null); }}>{m.rotulo}</button>)}
               </div>
               <GradeHorario valor={horario} aoMudar={setHorario} />
             </div>
           )}
 
-          {passo === 1 && (
+          {atual === "equipe" && (
             <div className="g-pilha">
-              <div><p className="g-rotulo">Passo 2 de 4</p><h2 className="g-guia-h">Quem atende os pets?</h2><p className="g-muted g-p">Quem aparece na agenda para receber os horários: banho, tosa e o que mais vocês fizerem. Só o nome basta; login e permissões ficam para depois, em Equipe.</p></div>
+              {cabeca("Quem atende os pets?", "Quem aparece na agenda para receber os horários. Só o nome basta; login e permissões ficam para depois, em Equipe.")}
               <div className="g-guia-gente">
                 <label className={`g-guia-pessoa${euAtendo ? " on" : ""}`}>
                   <input type="checkbox" checked={euAtendo} onChange={(e) => setEuAtendo(e.target.checked)} />
                   <span><b>{eu.nome}</b><small>Você {euAtendo ? "atende" : "não atende"} na agenda</small></span>
                 </label>
                 {outros.map((p) => <div key={p.id} className="g-guia-pessoa on fixa"><Check /><span><b>{p.nome}</b><small>Já está na equipe</small></span></div>)}
-                {novos.map((n, i) => (
-                  <div key={`${n}${i}`} className="g-guia-pessoa on fixa"><Check /><span><b>{n}</b><small>Entra na equipe ao continuar</small></span>
-                    <button type="button" className="g-ico" aria-label={`Tirar ${n}`} onClick={() => setNovos((l) => l.filter((_, k) => k !== i))}><Trash2 /></button>
+                {novos.map((t, i) => (
+                  <div key={`${t}${i}`} className="g-guia-pessoa on fixa"><Check /><span><b>{t}</b><small>Entra na equipe ao continuar</small></span>
+                    <button type="button" className="g-ico" aria-label={`Tirar ${t}`} onClick={() => setNovos((l) => l.filter((_, k) => k !== i))}><Trash2 /></button>
                   </div>
                 ))}
               </div>
@@ -244,42 +335,89 @@ export default function GuiaInicial() {
             </div>
           )}
 
-          {passo === 2 && (
+          {atual === "servicos" && (
             <div className="g-pilha">
-              <div><p className="g-rotulo">Passo 3 de 4</p><h2 className="g-guia-h">O que vocês fazem e quanto custa?</h2><p className="g-muted g-p">O preço por porte aparece sozinho ao marcar um horário. Pode deixar em branco e preencher depois; outros serviços você cria em Meu pet shop. Creche e hotel têm o preço da diária e as vagas em Meu pet shop.</p></div>
-              <p className="g-guia-legenda"><b>P</b> = pequeno · <b>M</b> = médio · <b>G</b> = grande · <b>GG</b> = gigante</p>
+              {cabeca("O que vocês fazem e quanto custa?", "Já deixei os serviços mais comuns. Tire pela lixeira o que vocês não oferecem e coloque o preço dos outros: um só, ou um para cada porte. Em branco também vale; você preenche depois.")}
+              {!precos.length && <p className="g-guia-legenda">Nenhum serviço na lista ainda. Você cria os seus em Meu pet shop, em Serviços e preços.</p>}
               <div className="g-guia-servicos">
-                {precos.map((s) => (
-                  <section key={s.id} className={`g-guia-servico${s.ativo ? "" : " off"}`} style={{ "--cor": s.cor } as React.CSSProperties}>
-                    <div className="cabeca">
-                      <i aria-hidden />
-                      <b>{s.nome}</b>
-                      <select className="g-select" aria-label={`Duração de ${s.nome}`} value={s.duracao_min} disabled={!s.ativo} onChange={(e) => mudarPreco(s.id, { duracao_min: Number(e.target.value) })}>
-                        {[...new Set([...DURACOES, s.duracao_min])].sort((a, b) => a - b).map((m) => <option key={m} value={m}>{textoDuracao(m)}</option>)}
-                      </select>
-                      <button type="button" role="switch" aria-checked={s.ativo} aria-label={`${s.nome} ligado`} className="g-guia-chave" onClick={() => mudarPreco(s.id, { ativo: !s.ativo })}><i /></button>
-                    </div>
-                    {s.ativo && (
-                      <div className="precos">
-                        {(["preco_p", "preco_m", "preco_g", "preco_gg"] as const).map((c) => (
-                          <CampoPreco key={c} porte={c.replace("preco_", "").toUpperCase()} servico={s.nome} valor={s[c]}
-                            aoMudar={(v, ruim) => {
-                              mudarPreco(s.id, { [c]: v });
-                              setErro(null);
-                              setErrosPreco((m) => { const n = { ...m }; if (ruim) n[`${s.id}:${c}`] = ruim; else delete n[`${s.id}:${c}`]; return n; });
-                            }} />
-                        ))}
+                {naLista.map((s) => {
+                  const comPorte = porPorte[s.id] ?? true;
+                  return (
+                    <section key={s.id} className="g-guia-servico" style={{ "--cor": s.cor } as React.CSSProperties}>
+                      <div className="cabeca">
+                        <b>{s.nome}</b>
+                        <select className="g-select" aria-label={`Duração de ${s.nome}`} value={s.duracao_min} onChange={(e) => mudarPreco(s.id, { duracao_min: Number(e.target.value) })}>
+                          {[...new Set([...DURACOES, s.duracao_min])].sort((a, b) => a - b).map((m) => <option key={m} value={m}>{textoDuracao(m)}</option>)}
+                        </select>
+                        <button type="button" className="g-ico" title="Não ofereço: tirar da lista" aria-label={`Não ofereço ${s.nome}: tirar da lista`} onClick={() => { setFora((l) => [...l, s.id]); semErros(s.id); setErro(null); }}><Trash2 /></button>
                       </div>
-                    )}
-                  </section>
-                ))}
+                      <div className="g-guia-modo">
+                        <div className="g-seg" role="group" aria-label={`Como é o preço de ${s.nome}`}>
+                          <button type="button" aria-pressed={!comPorte} onClick={() => trocarModo(s, false)}>Um preço só</button>
+                          <button type="button" aria-pressed={comPorte} onClick={() => trocarModo(s, true)}>Por porte</button>
+                        </div>
+                      </div>
+                      {comPorte ? (
+                        <div className="precos">
+                          {CAMPOS_PRECO.map((c) => (
+                            <CampoPreco key={c} porte={c.replace("preco_", "").toUpperCase()} servico={s.nome} valor={s[c]}
+                              aoMudar={(v, ruim) => { mudarPreco(s.id, { [c]: v }); setErro(null); anotarErro(`${s.id}:${c}`, ruim); }} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="precos um">
+                          <CampoPreco key="todos" porte="todos" servico={s.nome} valor={s.preco_p}
+                            aoMudar={(v, ruim) => { mudarPreco(s.id, { preco_p: v, preco_m: v, preco_g: v, preco_gg: v }); setErro(null); anotarErro(`${s.id}:todos`, ruim); }} />
+                          <small>Vale para todos os portes.</small>
+                        </div>
+                      )}
+                    </section>
+                  );
+                })}
               </div>
+              {naLista.some((s) => porPorte[s.id] ?? true) && <p className="g-guia-legenda"><b>P</b> = pequeno · <b>M</b> = médio · <b>G</b> = grande · <b>GG</b> = gigante</p>}
+              {tirados.length > 0 && (
+                <div className="g-guia-fora">
+                  <p className="g-rotulo">Fora da lista</p>
+                  {tirados.map((s) => (
+                    <div key={s.id}><span>{s.nome}</span><button type="button" className="g-btn fantasma p" onClick={() => { setFora((l) => l.filter((id) => id !== s.id)); setErro(null); }}><Undo2 />Voltar a oferecer</button></div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {passo === 3 && (
+          {atual === "casa" && (
             <div className="g-pilha">
-              <div><p className="g-rotulo">Passo 4 de 4</p><h2 className="g-guia-h">Quer que o cliente peça horário pelo celular?</h2><p className="g-muted g-p">Você manda um link. O cliente vê só os horários livres, conforme o que você acabou de configurar, e envia o pedido. Nada é marcado sem você aceitar.</p></div>
+              {cabeca(`${casa}: quanto custa e quantos pets cabem?`, "A diária já vem preenchida no check-in e na reserva. As vagas avisam quando a casa enche. Em branco, você digita o valor a cada estadia e a casa fica sem limite.")}
+              {creche && (
+                <div className="g-guia-bloco">
+                  <h3>Creche</h3>
+                  <div className="g-guia-dupla">
+                    <Campo rotulo="Diária" dica="Por dia."><CampoValor valor={diariaCreche} aoMudar={(v) => { setDiariaCreche(v); setErro(null); }} placeholder="R$" /></Campo>
+                    <Campo rotulo="Vagas" dica="Pets por dia.">
+                      <input className="g-input g-tab" inputMode="numeric" placeholder="Sem limite" value={vagasCreche} onChange={(e) => { setVagasCreche(e.target.value.replace(/\D/g, "").slice(0, 3)); setErro(null); }} />
+                    </Campo>
+                  </div>
+                </div>
+              )}
+              {hotel && (
+                <div className="g-guia-bloco">
+                  <h3>Hotel</h3>
+                  <div className="g-guia-dupla">
+                    <Campo rotulo="Diária" dica="Por noite."><CampoValor valor={diariaHotel} aoMudar={(v) => { setDiariaHotel(v); setErro(null); }} placeholder="R$" /></Campo>
+                    <Campo rotulo="Vagas" dica="Pets por noite.">
+                      <input className="g-input g-tab" inputMode="numeric" placeholder="Sem limite" value={vagasHotel} onChange={(e) => { setVagasHotel(e.target.value.replace(/\D/g, "").slice(0, 3)); setErro(null); }} />
+                    </Campo>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {atual === "link" && (
+            <div className="g-pilha">
+              {cabeca("Quer que o cliente peça horário pelo celular?", "Você manda um link. O cliente vê só os horários livres, conforme o que você acabou de configurar, e envia o pedido. Nada é marcado sem você aceitar.")}
               <button type="button" className={`g-guia-opcao${linkLigado ? " on" : ""}`} onClick={() => setLinkLigado(true)}>
                 <Tile icone={Link2} tom="pessego" /><span><b>Sim, ligar o link</b><small>Fica em "Mandar link de agendamento", na tela inicial.</small></span>{linkLigado && <Check />}
               </button>
@@ -292,37 +430,34 @@ export default function GuiaInicial() {
           {fim && (
             <div className="g-guia-ola">
               <span className="g-guia-ok"><Check /></span>
-              <h1>Tudo pronto, <em className="it">{primeiro}</em>.</h1>
+              <h1>Pronto para usar, <em className="it">{primeiro}</em>.</h1>
               <ul className="g-guia-resumo">
-                <li><Clock /><span>Aberto em {Object.values(lerHorario(petshop.horario)).filter(Boolean).length} dias da semana</span></li>
-                <li><Users /><span>{vagasDe(petshop, equipe) === 1 ? "1 pet por horário" : `Até ${vagasDe(petshop, equipe)} pets no mesmo horário`}</span></li>
-                <li><Scissors /><span>{(() => { const n = servicos.filter((s) => s.ativo && !["creche", "hotel"].includes(s.categoria)).length; return n === 1 ? "1 serviço na agenda" : `${n} serviços na agenda`; })()}</span></li>
-                <li><Link2 /><span>Link do cliente {petshop.link_ativo ? "ligado" : "desligado"}</span></li>
+                <li><Clock /><span>Aberto em {Object.values(salvoH).filter(Boolean).length} dias da semana</span></li>
+                {banho && <li><Users /><span>{vagasDe(petshop, equipe) === 1 ? "1 pet por horário" : `Até ${vagasDe(petshop, equipe)} pets no mesmo horário`}</span></li>}
+                {banho && <li><Scissors /><span>{servicosAtivos === 1 ? "1 serviço na agenda" : `${servicosAtivos} serviços na agenda`}</span></li>}
+                {creche && <li><BedDouble /><span>{resumoCasa("Creche", petshop.diaria_creche, petshop.vagas_creche)}</span></li>}
+                {hotel && <li><BedDouble /><span>{resumoCasa("Hotel", petshop.diaria_hotel, petshop.vagas_hotel)}</span></li>}
+                {banho && <li><Link2 /><span>Link do cliente {petshop.link_ativo ? "ligado" : "desligado"}</span></li>}
               </ul>
-              <p className="g-muted">Agora é usar. Por onde quer começar?</p>
+              <p className="g-muted">O que ficou para depois está em Meu pet shop. Agora, por onde quer começar?</p>
               <div className="g-guia-proximos">
-                <Link className="g-btn pri" href="/gestao/app/clientes" onClick={() => setForcado(false)}><PawPrint />Cadastrar o primeiro pet</Link>
-                <Link className="g-btn sec" href="/gestao/app/agenda?novo=1" onClick={() => setForcado(false)}><CalendarDays />Marcar um horário</Link>
-                <button className="g-btn sec" onClick={() => { setForcado(false); abrirAssistente(); }}><Mic />Falar com o Mozart</button>
+                <Link className="g-btn pri" href="/gestao/app/clientes" onClick={aoFechar}><PawPrint />Cadastrar o primeiro pet</Link>
+                <button type="button" className="g-btn sec" onClick={aoImportar}><FileSpreadsheet />Trazer meus clientes de uma planilha</button>
+                <Link className="g-btn fantasma" href="/gestao/app/manual" onClick={aoFechar}><BookOpen />Ver o manual</Link>
               </div>
             </div>
           )}
-
         </div>
 
         {erro && <p className="g-erro g-guia-erro" role="alert">{erro}</p>}
         <footer className="g-guia-pe">
-          {passo === -1 ? (
-            <>
-              <button className="g-btn fantasma" onClick={() => void fechar()}>Fazer depois</button>
-              <button className="g-btn pri" onClick={() => setPasso(0)}>Começar<ArrowRight /></button>
-            </>
-          ) : fim ? (
-            <button className="g-btn verde" onClick={() => setForcado(false)}><Sparkles />Ir para a tela inicial</button>
+          {fim ? (
+            <button className="g-btn verde" onClick={aoFechar}><Sparkles />Ir para a tela inicial</button>
           ) : (
             <>
-              <button className="g-btn fantasma" onClick={() => { setErro(null); setPasso((p) => p - 1); }} disabled={salvando}><ArrowLeft />Voltar</button>
-              <button className="g-btn pri" onClick={() => void continuar()} disabled={salvando}>{salvando ? "Salvando…" : passo === PASSOS.length - 1 ? "Concluir" : "Continuar"}<ArrowRight /></button>
+              {passo > 0 && <button className="g-btn fantasma g-guia-volta" onClick={() => { setErro(null); setPasso((p) => p - 1); }} disabled={salvando} aria-label="Voltar ao passo anterior"><ArrowLeft /></button>}
+              <button className="g-btn fantasma g-guia-depois" onClick={() => void pular()} disabled={salvando}>Faço depois</button>
+              <button className="g-btn pri" onClick={() => void continuar()} disabled={salvando}>{salvando ? "Salvando…" : passo === total - 1 ? "Concluir" : "Continuar"}<ArrowRight /></button>
             </>
           )}
         </footer>

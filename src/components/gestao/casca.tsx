@@ -14,6 +14,7 @@ import { dataLonga } from "@/lib/gestao/util";
 import { AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
 import BuscaGeral from "./busca-geral";
 import { areaDaRota } from "@/lib/gestao/acessos";
+import { rotaForaDoMenu } from "@/lib/gestao/modulos";
 import type { Tom } from "./painel";
 import Assistente from "./assistente";
 import Ajuda from "./ajuda";
@@ -100,7 +101,8 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   }, [sb, petshop.id, petshop.link_ativo]);
 
   const podeRota = (href: string) => { const area = areaDaRota(href); return area ? posso(area) : true; };
-  const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href));
+  // o que o pet shop não usa sai do menu (a tela continua abrindo pelo endereço)
+  const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href)) && !rotaForaDoMenu(petshop, i.href);
   // tela aberta pelo endereço sem ter acesso: mostra o aviso no lugar da tela
   const soDeDono = ["/gestao/app/equipe", "/gestao/app/meu-petshop", "/gestao/app/assinatura", "/gestao/app/escola"].some((r) => caminho.startsWith(r));
   const semAcesso = (soDeDono && !souDono) || !podeRota(caminho);
