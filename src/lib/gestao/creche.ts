@@ -3,6 +3,7 @@ import type { Banco } from "./supabase";
 import type { Cliente, Estadia, Pet } from "./tipos";
 import { contando, lerTudo } from "./paginas";
 import { saudacaoZap } from "./agenda";
+import { calendarioGuardado, diaFechado, lerCalendario } from "./feriados";
 import { brl, dataCompleta, dataCurta, deIsoDia, horarioDoDia, isoDia, nomeMes, somaDias } from "./util";
 
 /**
@@ -95,9 +96,12 @@ export const emPausa = (p: Vigencia, dia: string) => Boolean(p.pausa_de && p.pau
 export const planoVale = (p: Vigencia, dia: string) => p.inicio <= dia && (!p.fim || p.fim >= dia);
 /** O plano ainda não acabou (vale hoje ou começa depois). */
 export const planoAtivo = (p: Vigencia, hoje: string) => !p.fim || p.fim >= hoje;
-/** O pet é esperado nesse dia: o plano vale, não está em pausa, é um dia da semana dele e o pet shop abre. */
+/**
+ * O pet é esperado nesse dia: o plano vale, não está em pausa, é um dia da semana dele e o pet shop abre.
+ * Dia que o dono marcou como fechado (feriado, folga) não espera ninguém: não entra na chamada, não vira falta e não ocupa vaga.
+ */
 export const esperadoNoDia = (p: Vigencia, dia: string, horario: unknown) =>
-  planoVale(p, dia) && !emPausa(p, dia) && p.dias.includes(deIsoDia(dia).getDay()) && abreNoDia(horario, dia);
+  planoVale(p, dia) && !emPausa(p, dia) && p.dias.includes(deIsoDia(dia).getDay()) && abreNoDia(horario, dia) && !diaFechado(dia);
 
 const diaDaPresenca = (e: Presenca) => e.dia ?? isoDia(new Date(e.entrada));
 
@@ -164,7 +168,8 @@ export function resumoDoMes(plano: Vigencia & { pet_id: string }, mes: Date, pre
   const de = isoDia(primeiroDoMes(mes)), ate = isoDia(ultimoDoMes(mes));
   const doPet = presencas.filter((e) => e.pet_id === plano.pet_id && diaDaPresenca(e) >= de && diaDaPresenca(e) <= ate);
   const veio = new Set(doPet.map(diaDaPresenca));
-  const faltou = faltas.filter((f) => f.pet_id === plano.pet_id && f.dia >= de && f.dia <= ate).sort((a, b) => a.dia.localeCompare(b.dia));
+  // falta anotada num dia que depois foi marcado como fechado não conta
+  const faltou = faltas.filter((f) => f.pet_id === plano.pet_id && f.dia >= de && f.dia <= ate && !diaFechado(f.dia)).sort((a, b) => a.dia.localeCompare(b.dia));
   const r: ResumoDoMes = {
     esperados: 0, vieram: doPet.filter((e) => e.mensalista !== "extra" && e.mensalista !== "reposicao").length,
     extras: doPet.filter((e) => e.mensalista === "extra").map(diaDaPresenca).sort(),
@@ -304,6 +309,8 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
   const hoje = isoDia(new Date());
   const planos = await lerPlanos(sb, petshop.id, false);
   if (!planos.length) return null;
+  // dia marcado como fechado: a chamada não espera ninguém
+  if (!calendarioGuardado(petshop.id, vejoFinanceiro)) await lerCalendario(sb, petshop.id, vejoFinanceiro);
   const mov = await lerPresencas(sb, petshop.id, hoje, hoje);
   const linhas = montarChamada(planos, hoje, mov.presencas, mov.faltas, petshop.horario).filter((l) => l.conta === "plano" || l.conta === "avulsa");
   let vencemHoje = 0, atrasadas = 0;

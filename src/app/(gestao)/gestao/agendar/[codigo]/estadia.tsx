@@ -28,10 +28,12 @@ const listaE = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(0, -1).
  * Pedido de creche (um ou mais dias) ou de hotel (entrada e saída) pelo link do cliente.
  * O cliente só fica sabendo se um dia está cheio; não vê quem está na casa nem quantas vagas existem.
  */
-export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapLoja, aoVoltar, termos = null, recarregarTermos, aoPedir }: {
+export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapLoja, aoVoltar, termos = null, recarregarTermos, aoPedir, fechados }: {
   codigo: string; tipo: Tipo; hoje: string; loja: string; diaria: number | null; zapLoja: string | null; aoVoltar: () => void;
   /** Regras que o tutor aceita antes de enviar (null = não pede aceite). */
   termos?: TermosDoLink | null; recarregarTermos?: () => Promise<unknown>; aoPedir?: () => void;
+  /** dias que o negócio marcou como fechados (a creche não recebe neles) */
+  fechados?: Set<string>;
 }) {
   const hotel = tipo === "hotel";
   const [passo, setPasso] = useState<"quando" | "dados" | "enviado">("quando");
@@ -255,9 +257,9 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
           {erroDatas && <p className="g-lk-alerta" role="alert"><span>{erroDatas}</span></p>}
           {erro && !erroDatas && <p className="g-lk-alerta" role="alert"><span>{erro}</span></p>}
           {temCheio && (
-            <p className="g-lk-alerta" role="alert"><span>Sem vaga em {cheios!.slice(0, 4).map(dia).join("; ")}{cheios!.length > 4 ? " e outros dias" : ""}. Escolha outras datas{esperaAtiva ? " ou entre na lista de espera" : ""}.</span></p>
+            <p className="g-lk-alerta" role="alert"><span>{cheios!.every((d) => fechados?.has(d)) ? "Não abrimos em" : "Sem vaga em"} {cheios!.slice(0, 4).map(dia).join("; ")}{cheios!.length > 4 ? " e outros dias" : ""}. Escolha outras datas{esperaAtiva ? " ou entre na lista de espera" : ""}.</span></p>
           )}
-          {temCheio && esperaAtiva && (
+          {temCheio && esperaAtiva && !cheios!.every((d) => fechados?.has(d)) && (
             <div style={{ display: "grid", gap: 6, justifyItems: "start" }}>
               <button type="button" className="g-btn sec" onClick={() => { setErro(null); setNaEspera(true); setPasso("dados"); }}>Entrar na lista de espera</button>
               <small className="g-muted">Se abrir vaga nessas datas, {loja} chama você. Entrar na lista não reserva a vaga.</small>

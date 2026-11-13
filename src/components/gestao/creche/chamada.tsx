@@ -7,6 +7,8 @@ import { cuidadosVigentes, estadoSaude, tipoSaude, type CuidadoResumido } from "
 import { portariaLigada, type Retirada } from "@/lib/gestao/casa-opcoes";
 import { abreNoDia, emPausa, erroDaChamada, esperadoNoDia, lerPresencas, mensagemDeFalta, montarChamada, planoVale, type LinhaChamada, type PlanoCompleto } from "@/lib/gestao/creche";
 import { dataAmigavel, dataLonga, deIsoDia, isoDia, linkWhatsApp, semAcento, somaDias } from "@/lib/gestao/util";
+import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { DiasDoPlano } from "./resumo-mes";
@@ -49,6 +51,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
   aviso?: React.ReactNode;
 }) {
   const { sb, petshop, souDono } = useGestao();
+  const { calendario } = useCalendario(); // dia marcado como fechado: ninguém é esperado e ninguém leva falta
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const agora = new Date(), hoje = isoDia(agora);
@@ -70,7 +73,8 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
     return { ...mov, saude, retiradas };
   }, [petshop.id, dia, planos.length, comPortaria]);
 
-  const linhas = useMemo(() => (dados ? montarChamada(planos, dia, dados.presencas, dados.faltas, petshop.horario) : []), [dados, planos, dia, petshop.horario]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const linhas = useMemo(() => (dados ? montarChamada(planos, dia, dados.presencas, dados.faltas, petshop.horario) : []), [dados, planos, dia, petshop.horario, calendario]);
   const conta = (e: LinhaChamada["estado"]) => linhas.filter((l) => l.estado === e).length;
   const naCasa = linhas.filter((l) => l.estado === "na_casa" && l.presenca?.mensalista);
   const abre = abreNoDia(petshop.horario, dia);
@@ -171,7 +175,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
 
           {!linhas.length ? (
             <p className="g-muted g-centro" style={{ padding: "28px 8px" }}>
-              {!abre ? "Pelo horário de Meu pet shop, a creche não abre neste dia." : "Nenhum mensalista tem plano para este dia da semana."}
+              {diaFechado(dia) ? `${fraseDoDiaFechado(dia)}. Ninguém é esperado e ninguém leva falta (a lista fica em Meu pet shop, em Feriados e dias fechados).` : !abre ? "Pelo horário de Meu pet shop, a creche não abre neste dia." : "Nenhum mensalista tem plano para este dia da semana."}
             </p>
           ) : (
             <div className="g-cm-chamada">

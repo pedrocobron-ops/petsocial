@@ -4,6 +4,7 @@ import { FORMAS } from "./tipos";
 import { saudacaoZap } from "./agenda";
 import { estadiaOcupa, mensalistasNoDia, type Falta, type PlanoCompleto, type Presenca } from "./creche";
 import type { PartePagamento } from "./dinheiro";
+import { feriadoDoDia, regraDeFeriado, type RegraFeriado } from "./feriados";
 import { acomodacoesDe, modelosDe, pixDe, porteDe, segundoPetDe, sinalDe, temporadasDe, type Taxa, type Temporada, type TipoDeMensagem } from "./hotel-opcoes";
 import { brl, dataAmigavel, dataCompleta, dataCurta, hora, inicioDoDia, isoDia, somaDias } from "./util";
 
@@ -97,16 +98,19 @@ export function diasDasNoites(entrada: string | Date, n: number): string[] {
 
 /**
  * Preço noite a noite. Para cada noite: começa na diária combinada na reserva (`base`);
- * se a noite cai numa temporada, vale a diária da temporada, ou a base com o acréscimo dela (em % ou em reais);
+ * se a noite é de feriado (data marcada pelo dono, com o preço de feriado ligado), vale o preço de feriado;
+ * senão, se cai numa temporada, vale a diária da temporada, ou a base com o acréscimo dela (em % ou em reais);
  * se é noite em que outro pet do mesmo tutor também está hospedado (e chegou antes), tira o desconto do segundo pet.
- * Cada noite é arredondada em centavos; o total é a soma das noites.
+ * Cada noite é arredondada em centavos; o total é a soma das noites. Em `temporada` vai o nome que aparece na conta.
  */
-export function precoDasNoites(p: { dias: string[]; base: number; temporadas: Temporada[]; segundoPct: number | null; diasDeSegundo: Set<string> }): Noite[] {
+export function precoDasNoites(p: { dias: string[]; base: number; temporadas: Temporada[]; segundoPct: number | null; diasDeSegundo: Set<string>; feriado?: { regra: RegraFeriado; nomeDe: (dia: string) => string | null } | null }): Noite[] {
+  const comRegra = (r: { modo: "valor" | "pct" | "mais"; valor: number }) => (r.modo === "valor" ? r.valor : r.modo === "mais" ? p.base + r.valor : p.base * (1 + r.valor / 100));
   return p.dias.map((dia) => {
-    const t = p.temporadas.find((x) => x.de <= dia && dia <= x.ate) ?? null;
-    const cheia = centavos(!t ? p.base : t.modo === "valor" ? t.valor : t.modo === "mais" ? p.base + t.valor : p.base * (1 + t.valor / 100));
+    const f = p.feriado && p.feriado.regra.valor != null ? p.feriado.nomeDe(dia) : null;
+    const t = f != null ? null : p.temporadas.find((x) => x.de <= dia && dia <= x.ate) ?? null;
+    const cheia = centavos(f != null ? comRegra({ modo: p.feriado!.regra.modo, valor: p.feriado!.regra.valor! }) : t ? comRegra(t) : p.base);
     const desconto = p.segundoPct && p.diasDeSegundo.has(dia) ? centavos((cheia * p.segundoPct) / 100) : 0;
-    return { dia, base: p.base, temporada: t?.nome ?? null, cheia, desconto, valor: centavos(cheia - desconto) };
+    return { dia, base: p.base, temporada: f ?? t?.nome ?? null, cheia, desconto, valor: centavos(cheia - desconto) };
   });
 }
 
@@ -133,13 +137,15 @@ export function diasDeSegundoPet(esta: { id: string | null; pet_id: string; entr
   return new Set(dias.filter((d) => antes.some((o) => cobre(o, d))));
 }
 
-/** As regras de preço ligadas mudam a conta deste tipo de estadia? (Só o hotel tem temporada e desconto do segundo pet.) */
+/** As regras de preço ligadas mudam a conta deste tipo de estadia? (Só o hotel tem temporada, feriado e desconto do segundo pet.) */
 export function precoPorNoite(petshop: Petshop, tipo: string) {
   if (tipo !== "hotel") return null;
   const temporadas = temporadasDe(petshop), segundo = segundoPetDe(petshop);
   const lista = temporadas.ativo ? temporadas.lista : [];
   const pct = segundo.ativo && segundo.pct ? segundo.pct : null;
-  return lista.length || pct ? { temporadas: lista, segundoPct: pct } : null;
+  // o preço de feriado vem de src/lib/gestao/feriados.ts (só chega para quem recebe)
+  const feriado = regraDeFeriado();
+  return lista.length || pct || feriado ? { temporadas: lista, segundoPct: pct, feriado } : null;
 }
 
 /** Diárias de uma estadia: noite a noite quando há regra ligada (hotel); senão, quantidade × diária, como sempre. */
@@ -149,9 +155,15 @@ export function contaDasDiarias(petshop: Petshop, e: { id: string | null; pet_id
   const regra = precoPorNoite(petshop, e.tipo);
   if (!regra) return { total: centavos(n * diaria), noites: null };
   const dias = diasDasNoites(e.entrada, n);
-  const noites = precoDasNoites({ dias, base: diaria, temporadas: regra.temporadas, segundoPct: regra.segundoPct, diasDeSegundo: regra.segundoPct ? diasDeSegundoPet(e, dias, outras, hoje) : new Set() });
+  const noites = precoDasNoites({
+    dias, base: diaria, temporadas: regra.temporadas, segundoPct: regra.segundoPct, diasDeSegundo: regra.segundoPct ? diasDeSegundoPet(e, dias, outras, hoje) : new Set(),
+    feriado: regra.feriado ? { regra: regra.feriado, nomeDe: feriadoDoDia } : null,
+  });
   return { total: centavos(noites.reduce((t, x) => t + x.valor, 0)), noites };
 }
+
+/** A conta noite a noite mudou alguma noite em relação à diária combinada? (Para a tela dizer "com temporada, feriado ou desconto".) */
+export const temNoiteDiferente = (noites: Noite[] | null) => Boolean(noites?.some((x) => x.temporada != null || x.desconto > 0));
 
 /** Taxa marcada numa estadia, com a quantidade (1, ou o número de noites) e o total. */
 export type TaxaDaConta = { id: string; nome: string; por: "fixa" | "noite"; valor: number; qtd: number; total: number };
@@ -377,4 +389,13 @@ export function corpoDaMensagem(tipo: TipoDeMensagem, p: DadosDaMensagem) {
 export function nomeDaAcomodacao(petshop: Petshop, codigo: string | null | undefined) {
   if (!codigo) return null;
   return acomodacoesDe(petshop).lista.find((a) => a.id === codigo)?.nome ?? null;
+}
+
+/* ---------- check-outs para cobrar ---------- */
+
+/** Marca na observação da estadia que a saída foi com pacote (o banco guarda só as diárias e o valor cobrados). */
+export const NOTA_PACOTE = "Saiu usando o pacote.";
+/** Check-out que fechou sem nada cobrado: não é de mensalista, não usou pacote e não é cortesia. Quem recebe precisa acertar. */
+export function estadiaSemCobranca(e: Pick<Estadia, "status" | "mensalista" | "diarias_cobradas" | "valor_cobrado" | "obs">) {
+  return e.status === "encerrada" && !e.mensalista && e.diarias_cobradas != null && e.valor_cobrado == null && !e.obs?.includes(NOTA_PACOTE);
 }

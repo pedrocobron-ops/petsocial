@@ -124,6 +124,8 @@ export default function AgendarPeloLink() {
   const [nomeDoLink, setNomeDoLink] = useState<string | null>(null);
   const [lembrados, setLembrados] = useState(0);
 
+  // dias que o negócio marcou como fechados (feriado, folga): o link não oferece horário neles
+  const [fechados, setFechados] = useState<Set<string>>(() => new Set());
   const carregar = useCallback(async () => {
     setSemRede(false);
     setInfo(undefined);
@@ -133,6 +135,9 @@ export default function AgendarPeloLink() {
     const lido = data as unknown as Info | null;
     setInfo(lido && typeof lido === "object" && lido.nome ? { ...lido, servicos: Array.isArray(lido.servicos) ? lido.servicos : [] } : null);
     aplicarTema(lido && typeof lido === "object" ? lido.tema : null); // as cores do pet shop, não as da Maestro Pet
+    // se a função ainda não existe no banco, segue sem dias fechados (como sempre foi)
+    const f = await banco().rpc("link_fechados", { p_codigo: codigo });
+    setFechados(new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []));
   }, [codigo]);
   useEffect(() => { void carregar(); }, [carregar]);
   useEffect(() => { if (info?.nome) document.title = `Agendar: ${info.nome}`; }, [info?.nome]);
@@ -149,9 +154,9 @@ export default function AgendarPeloLink() {
     const base = deIsoDia(info.hoje);
     return Array.from({ length: DIAS_NA_FAIXA }, (_, i) => {
       const d = somaDias(base, i);
-      return { iso: isoDia(d), data: d, aberto: !!horarioDoDia(info.horario, d), hoje: i === 0 };
+      return { iso: isoDia(d), data: d, aberto: !!horarioDoDia(info.horario, d) && !fechados.has(isoDia(d)), hoje: i === 0 };
     });
-  }, [info]);
+  }, [info, fechados]);
   const meses = useMemo(() => [...new Set(dias.map((d) => nomeMes(d.data)))].join(" e "), [dias]);
 
   // horários livres do dia escolhido
@@ -346,7 +351,7 @@ export default function AgendarPeloLink() {
       {!estadia && passo === "servico" && <PedidosDesteAparelho codigo={codigo} versao={lembrados} />}
 
       {estadia && (
-        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} termos={termos} recarregarTermos={recarregarTermos}
+        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} fechados={fechados} termos={termos} recarregarTermos={recarregarTermos}
           aoPedir={() => setLembrados((n) => n + 1)}
           zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)}
           diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)} />

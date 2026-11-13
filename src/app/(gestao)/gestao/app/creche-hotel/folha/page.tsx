@@ -9,6 +9,7 @@ import { lerCuidados, nomeDaAcomodacao, quemOcupa, textoDoCuidado } from "@/lib/
 import { cuidadosLigados } from "@/lib/gestao/hotel-opcoes";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { dataCurta, dataLonga, deIsoDia, fmtTelefone, hora, isoDia, somaDias } from "@/lib/gestao/util";
+import { useCalendario } from "@/components/gestao/calendario";
 import { useGestao } from "@/components/gestao/contexto";
 import { Esqueleto, ok, useDados } from "@/components/gestao/ui";
 import LogoLoja from "@/components/gestao/logo-loja";
@@ -22,6 +23,7 @@ import "../../agenda/imprimir/imprimir.css";
 function FolhaDoDia() {
   const params = useSearchParams();
   const { sb, petshop } = useGestao();
+  const { pronto: calendarioPronto } = useCalendario(); // dia fechado: nenhum mensalista esperado
   const [dia, setDia] = useState(() => params.get("dia") ?? isoDia(new Date()));
   const [hoje] = useState(() => new Date());
   const hojeIso = isoDia(hoje);
@@ -49,7 +51,7 @@ function FolhaDoDia() {
         .map((p) => ({ id: p.id, petId: p.pet_id, nome: p.pets!.nome, tutor: p.pets!.clientes?.nome ?? "", telefone: p.pets!.clientes?.telefone ?? null, alertas: p.pets!.alertas }));
     }
     return { abertas: ok(abertas) as unknown as EstadiaCompleta[], encerradas: ok(encerradas) as unknown as EstadiaCompleta[], esperados };
-  }, [petshop.id, dia, usaCreche]);
+  }, [petshop.id, dia, usaCreche, calendarioPronto]);
 
   const abertas = dados?.abertas ?? [], encerradas = dados?.encerradas ?? [];
   const noDia = (d: string | null) => Boolean(d) && isoDia(new Date(d!)) === dia;
