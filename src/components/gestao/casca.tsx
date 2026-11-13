@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
+  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
 import { useGestao } from "./contexto";
 import { planoPorId, temCheckout } from "@/lib/gestao/planos";
@@ -14,7 +14,8 @@ import { dataLonga } from "@/lib/gestao/util";
 import { AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
 import BuscaGeral from "./busca-geral";
 import { areaDaRota } from "@/lib/gestao/acessos";
-import { rotaForaDoMenu } from "@/lib/gestao/modulos";
+import { TELA_DA_AREA, nomeDaCasa, principalDe, rotaForaDoMenu, usaModulo, type Principal } from "@/lib/gestao/modulos";
+import { guardarLembrado, lerLembrado } from "./lembrado";
 import type { Tom } from "./painel";
 import Assistente from "./assistente";
 import Ajuda from "./ajuda";
@@ -49,6 +50,36 @@ const GRUPOS: { titulo: string; itens: Item[] }[] = [
   ] },
 ];
 
+const AGENDA = "/gestao/app/agenda", CASA = "/gestao/app/creche-hotel", ESTOQUE = "/gestao/app/estoque", CAIXA = "/gestao/app/caixa";
+/** As telas de cada área principal, na ordem em que sobem para logo depois de Hoje. */
+const TELAS_DA_PRINCIPAL: Record<Principal, string[]> = { banho_tosa: [AGENDA], creche: [CASA], hotel: [CASA], loja: [ESTOQUE, CAIXA] };
+const CHAVE_OUTRAS = "maestro-gestao-outras-areas";
+type ComMenu = Parameters<typeof rotaForaDoMenu>[0];
+
+/**
+ * O menu do pet shop. A área principal vem primeiro no dia a dia, logo depois de Hoje; as outras áreas marcadas seguem.
+ * O que o pet shop não marcou não some: vai para "Outras áreas", um grupo fechado no fim do menu.
+ * Sem área principal (pet shops de antes), a ordem é a de sempre.
+ */
+function montarMenu(petshop: ComMenu) {
+  const principal = principalDe(petshop);
+  // quem escolheu a área principal e não faz banho e tosa não precisa da Agenda na frente
+  const fora = (i: Item) => rotaForaDoMenu(petshop, i.href) || (principal != null && i.href === AGENDA && !usaModulo(petshop, "banho_tosa"));
+  const rotulo = (i: Item): Item => (i.href === CASA && !fora(i) ? { ...i, rotulo: nomeDaCasa(petshop) } : i);
+  const todos = GRUPOS.flatMap((g) => g.itens);
+  const sobem = principal ? TELAS_DA_PRINCIPAL[principal].map((h) => todos.find((i) => i.href === h)!).filter((i) => !fora(i)) : [];
+  const grupos = GRUPOS.map((g) => {
+    const itens = g.itens.filter((i) => !fora(i) && !sobem.includes(i));
+    if (g.titulo !== "Dia a dia" || !principal) return { ...g, itens: itens.map(rotulo) };
+    // Hoje, a área principal, as outras áreas marcadas e, depois, o resto
+    const areas = itens.filter((i) => i.href === AGENDA || i.href === CASA);
+    return { ...g, itens: [itens[0], ...sobem, ...areas, ...itens.slice(1).filter((i) => !areas.includes(i))].map(rotulo) };
+  });
+  // na barra de baixo do celular, a tela da área principal fica ao lado de Hoje
+  const aba = sobem[0] ? { ...sobem[0], rotulo: principal ? TELA_DA_AREA[principal].menu : sobem[0].rotulo } : todos.find((i) => i.href === AGENDA)!;
+  return { grupos, outras: todos.filter(fora), aba };
+}
+
 /** Navegação, avisos de assinatura e o botão da assistente em volta de todas as telas do aplicativo. */
 export default function Casca({ children }: { children: React.ReactNode }) {
   const caminho = usePathname();
@@ -58,6 +89,8 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   const [mais, setMais] = useState(false);
   const [ajuda, setAjuda] = useState(false);
   const [admin, setAdmin] = useState(false);
+  const [outrasAbertas, setOutrasAbertas] = useState(() => lerLembrado(CHAVE_OUTRAS) === "1");
+  const abrirOutras = () => setOutrasAbertas((a) => { guardarLembrado(CHAVE_OUTRAS, a ? "0" : "1"); return !a; });
 
   // só a equipe Maestro Pet vê o item "Administrador" no menu
   useEffect(() => { let vale = true; void sb.rpc("sou_admin").then((r) => { if (vale) setAdmin(r.data === true); }); return () => { vale = false; }; }, [sb]);
@@ -103,19 +136,26 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   }, [sb, petshop.id, petshop.link_ativo]);
 
   const podeRota = (href: string) => { const area = areaDaRota(href); return area ? posso(area) : true; };
-  // o que o pet shop não usa sai do menu (a tela continua abrindo pelo endereço)
-  const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href)) && !rotaForaDoMenu(petshop, i.href);
+  // as permissões de cada pessoa valem por cima da ordem do menu
+  const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href));
+  const menu = montarMenu(petshop);
   // tela aberta pelo endereço sem ter acesso: mostra o aviso no lugar da tela
   const soDeDono = ["/gestao/app/equipe", "/gestao/app/meu-petshop", "/gestao/app/assinatura", "/gestao/app/escola"].some((r) => caminho.startsWith(r));
   const semAcesso = (soDeDono && !souDono) || !podeRota(caminho);
   const atual = (href: string) => (href === "/gestao/app" ? caminho === href : caminho.startsWith(href));
-  const grupos = GRUPOS.map((g) => ({ ...g, itens: g.itens.filter(pode) })).filter((g) => g.itens.length);
+  const grupos = menu.grupos.map((g) => ({ ...g, itens: g.itens.filter(pode) })).filter((g) => g.itens.length);
+  // o que o pet shop não marcou: fica a um toque, num grupo fechado no fim do menu
+  const outras = menu.outras.filter(pode);
+  const outrasVisiveis = outrasAbertas || outras.some((i) => atual(i.href));
+  // quem não abre a tela da área principal fica com a Agenda na barra de baixo, se a Agenda é dele
+  const agenda = GRUPOS[0].itens.find((i) => i.href === AGENDA)!;
+  const aba = !podeRota(menu.aba.href) && podeRota(AGENDA) && !menu.outras.includes(agenda) ? agenda : menu.aba, podeAba = podeRota(aba.href);
 
   // na tela Hoje, o dono vê o cartão de fim de teste (com os números da conta): a faixa de cima não repete o recado
   const teste = fimDoTeste(petshop);
   const cartaoNoHoje = souDono && caminho === "/gestao/app" && teste != null && teste.dias <= DIAS_DE_AVISO;
 
-  const aqui = GRUPOS.flatMap((g) => g.itens.map((item) => ({ grupo: g.titulo, item }))).find((x) => atual(x.item.href));
+  const aqui = [...menu.grupos, { titulo: "Outras áreas", itens: menu.outras }].flatMap((g) => g.itens.map((item) => ({ grupo: g.titulo, item }))).find((x) => atual(x.item.href));
 
   const nav = (
     <nav className="g-nav" aria-label="Menu">
@@ -127,6 +167,14 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           ))}
         </div>
       ))}
+      {outras.length > 0 && (
+        <div>
+          <button type="button" className="g-nav-outras" aria-expanded={outrasVisiveis} onClick={abrirOutras}>Outras áreas<ChevronDown /></button>
+          {outrasVisiveis && outras.map((i) => (
+            <Link key={i.href} href={i.href} aria-current={atual(i.href) ? "page" : undefined}><i.icone />{i.rotulo}</Link>
+          ))}
+        </div>
+      )}
       {admin && (
         <div>
           <div className="g-nav-t">Maestro Pet</div>
@@ -204,7 +252,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
 
       <nav className="g-abas" aria-label="Menu">
         <Link href="/gestao/app" aria-current={atual("/gestao/app") ? "page" : undefined}><Sun />Hoje</Link>
-        <Link href={posso("agenda") ? "/gestao/app/agenda" : "/gestao/app"} aria-current={atual("/gestao/app/agenda") ? "page" : undefined} style={{ position: "relative", opacity: posso("agenda") ? 1 : .35 }}><CalendarDays />Agenda{pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
+        <Link href={podeAba ? aba.href : "/gestao/app"} aria-current={atual(aba.href) ? "page" : undefined} style={{ position: "relative", opacity: podeAba ? 1 : .35 }}><aba.icone />{aba.rotulo}{aba.href === AGENDA && pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
         <button className="g-aba-mic" onClick={() => setAssistente({ aberta: true, pedido: "" })} aria-label="Falar com o Mozart, o assistente">
           <span className="b"><Mic /></span>
         </button>
@@ -230,6 +278,18 @@ export default function Casca({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             ))}
+            {outras.length > 0 && (
+              <div>
+                <button type="button" className="g-mais-outras" aria-expanded={outrasVisiveis} onClick={abrirOutras}><span className="g-rotulo">Outras áreas</span><ChevronDown /></button>
+                {outrasVisiveis && (
+                  <div className="g-lista">
+                    {outras.map((i) => (
+                      <Link key={i.href} href={i.href} className="g-linha"><span className="g-ico" aria-hidden><i.icone /></span><span className="t"><b>{i.rotulo}</b></span></Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {admin && (
               <div>
                 <div className="g-rotulo" style={{ marginBottom: 4 }}>Maestro Pet</div>

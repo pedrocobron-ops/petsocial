@@ -8,13 +8,14 @@ import PrimeirosPassos, { usePrimeirosPassos } from "@/components/gestao/primeir
 import ResumoSemana, { temSemanaPassada } from "@/components/gestao/resumo-semana";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import Link from "next/link";
-import { BedDouble, FileSpreadsheet, Cake, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, UserSearch, Wallet } from "lucide-react";
+import { ShoppingBag, BedDouble, FileSpreadsheet, Cake, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, UserSearch, Wallet } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
-import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { ChegamESaem, FrenteDaLoja, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
@@ -42,7 +43,11 @@ export default function Hoje() {
   // o que o negócio faz decide o que a tela mostra: quem não tem creche, loja ou pacotes não vê cartão nem aviso disso
   const banho = usaModulo(petshop, "banho_tosa"), casa = usaCasa(petshop) && posso("creche_hotel");
   const loja = usaModulo(petshop, "loja"), comPacotes = usaModulo(petshop, "pacotes");
-  const soCasa = casa && !banho;
+  // área principal (`petshops.principal`): decide o que vai na frente da tela, dentro do que a pessoa pode abrir.
+  // Sem ela, vale a ordem de sempre.
+  const principal = principalDe(petshop), frenteDoNegocio = frenteDe(petshop);
+  const frente = frenteDoNegocio === "casa" ? (casa ? "casa" : null) : frenteDoNegocio === "loja" ? (posso("estoque") ? "loja" : null) : frenteDoNegocio === "banho" && posso("agenda") ? "banho" : null;
+  const soCasa = frente ? frente === "casa" : casa && !banho;
   const rotuloCasa = nomeDaCasa(petshop);
 
   const vejoEstoque = posso("estoque"), vejoPacotes = posso("pacotes");
@@ -57,7 +62,7 @@ export default function Hoje() {
       vejoEstoque ? lerTudo<{ id: string; nome: string; estoque: number; estoque_minimo: number }>((de, ate, contar) => sb.from("produtos").select("id, nome, estoque, estoque_minimo", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).gt("estoque_minimo", 0).order("nome").order("id").range(de, ate)).then((data) => ({ data })) : Promise.resolve({ data: [] }),
       sb.from("pets").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
       sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
-      vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).eq("data", hojeIso) : Promise.resolve({ data: [] }),
+      vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo, categoria").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).eq("data", hojeIso) : Promise.resolve({ data: [] }),
       vejoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento, tipo").eq("petshop_id", petshop.id).eq("pago", false).lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
       vejoPacotes ? sb.from("pacotes_clientes").select("id").eq("petshop_id", petshop.id).eq("ativo", true).gte("vence_em", hojeIso).lte("vence_em", isoDia(somaDias(hoje, 7))) : Promise.resolve({ data: [] }),
       sb.from("agendamentos").select("inicio, status").eq("petshop_id", petshop.id).gte("inicio", seg.toISOString()).lt("inicio", somaDias(seg, 7).toISOString()),
@@ -103,6 +108,7 @@ export default function Hoje() {
       produtosTotal: produtosTotal.count ?? 0,
       entrou: (entradas.data ?? []).filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0),
       saiu: (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0),
+      vendasHoje: ((entradas.data ?? []) as { valor: number; tipo: string; categoria?: string | null }[]).filter((l) => l.tipo === "entrada" && l.categoria === "Venda de produtos"),
       contas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "saida"),
       aReceberVencidas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "entrada"),
       pacotesVencendo: (pacotes.data ?? []).length,
@@ -161,8 +167,14 @@ export default function Hoje() {
     : "";
 
   // conta que acabou de nascer: nada de zeros soltos, só o próximo passo
-  const contaNova = Boolean(dados && dados.pets === 0 && dados.totalAgs === 0 && dados.estadiasTotal === 0);
-  const frase = !dados ? "" : contaNova ? (posso("clientes") ? "Tudo pronto para começar. O primeiro passo é cadastrar um pet, ou trazer os seus clientes de uma planilha." : "Tudo pronto para começar.")
+  const contaNova = Boolean(dados && dados.pets === 0 && dados.totalAgs === 0 && dados.estadiasTotal === 0 && (frente !== "loja" || dados.produtosTotal === 0));
+  const vendas = dados && vejoFinanceiro ? { quantas: dados.vendasHoje.length, total: dados.vendasHoje.reduce((s, l) => s + Number(l.valor), 0) } : null;
+  // sem banho e tosa e sem horário hoje: a agenda não ocupa lugar na tela de quem escolheu outra área principal
+  const semAgenda = Boolean(principal && !banho && dados && !dados.ags.length);
+  const frase = !dados ? "" : contaNova && frente === "loja" ? "Tudo pronto para começar. O primeiro passo é cadastrar o que você vende."
+    : contaNova ? (posso("clientes") ? "Tudo pronto para começar. O primeiro passo é cadastrar um pet, ou trazer os seus clientes de uma planilha." : "Tudo pronto para começar.")
+    : frente === "loja" ? `${dados.acabando.length === 0 ? "Nenhum produto acabando" : dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}.${vendas ? (vendas.quantas ? ` Hoje ${vendas.quantas === 1 ? "saiu 1 venda" : `saíram ${vendas.quantas} vendas`} de produtos: ${brl(vendas.total)}.` : " Nenhuma venda de produtos hoje, por enquanto.") : ""}${ativos.length ? ` Na agenda, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
+    : frente === "casa" ? `${temCasa ? linhaCasa : "Nenhum pet na casa agora"}.${ativos.length ? ` No banho e tosa, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : soCasa && !ativos.length ? (temCasa ? `${linhaCasa}.` : `Nenhum pet na casa agora.`)
     : !ativos.length ? `Nenhum horário marcado para hoje.${linhaCasa ? ` ${linhaCasa}.` : ""}`
     : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? ", todos concluídos" : ""}.`;
@@ -184,6 +196,7 @@ export default function Hoje() {
   const faltam = destaque ? Math.round((new Date(destaque.inicio).getTime() - agora.getTime()) / 60000) : 0;
   const quando = !destaque ? "" : faltam <= 0 ? "acontecendo agora" : faltam < 60 ? `em ${faltam} min` : `em ${Math.floor(faltam / 60)} h${faltam % 60 ? ` ${faltam % 60} min` : ""}`;
   const semana = dados?.semana ?? [];
+  const kpiCasa = casa && <Kpi href="/gestao/app/creche-hotel" icone={BedDouble} tom="ceu" rotulo={rotuloCasa} valor={dados ? dados.emCasa : "–"} apoio={dados?.emCasa === 1 ? "pet na casa agora" : "pets na casa agora"} />;
   const totalSemana = semana.reduce((s, d) => s + d.valor, 0);
 
   return (
@@ -195,8 +208,10 @@ export default function Hoje() {
         </div>
         <div className="g-acoes">
           {posso("agenda") && banho && !contaNova && <LinkRapido rotulo="Mandar link de agendamento" />}
-          {contaNova && posso("clientes") ? <Link className="g-btn pri" href="/gestao/app/clientes"><Plus />Cadastrar o primeiro pet</Link>
-            : soCasa ? <Link className="g-btn pri" href="/gestao/app/creche-hotel"><Plus />Fazer check-in</Link>
+          {contaNova && frente === "loja" ? <Link className="g-btn pri" href="/gestao/app/estoque"><Plus />Cadastrar o primeiro produto</Link>
+            : contaNova && posso("clientes") ? <Link className="g-btn pri" href="/gestao/app/clientes"><Plus />Cadastrar o primeiro pet</Link>
+            : frente === "loja" ? <Link className="g-btn pri" href={ROTA_VENDER}><ShoppingBag />Vender</Link>
+            : soCasa ? <Link className="g-btn pri" href="/gestao/app/creche-hotel"><Plus />{principal === "hotel" ? "Nova reserva" : "Fazer check-in"}</Link>
             : posso("agenda") && <Link className="g-btn pri" href="/gestao/app/agenda?novo=1"><Plus />Marcar horário</Link>}
         </div>
       </header>
@@ -223,12 +238,12 @@ export default function Hoje() {
             <div className="g-pilha p">
               <div className="g-fila"><button className="g-btn pri" onClick={() => abrirAssistente()}><Mic />Falar com o Mozart</button></div>
               <div className="g-sugestoes">
-                {PEDIDOS.filter((p) => vejoFinanceiro || !p.startsWith("Quanto")).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
+                {pedidosDaFrente(frente, PEDIDOS).filter((p) => vejoFinanceiro || !p.startsWith("Quanto")).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
               </div>
             </div>
           </section>
 
-          {destaque?.pets ? (
+          {destaque?.pets && frente !== "casa" && frente !== "loja" ? (
             <button className="g-proximo" style={{ textAlign: "left", color: "inherit", "--cor": destaque.servicos?.cor ?? "#f97316" } as React.CSSProperties} onClick={() => setAberto(destaque.id)}>
               <div className="g-fila entre" style={{ flexWrap: "nowrap" }}>
                 <span className="g-rotulo" style={{ color: "#8a4a17" }}>{emAndamento ? "Na mesa agora" : "Próximo atendimento"}</span>
@@ -248,7 +263,7 @@ export default function Hoje() {
               </div>
             </button>
           ) : (
-            contaNova && posso("clientes") ? (
+            contaNova && posso("clientes") && frente !== "loja" ? (
             <div className="g-proximo vazio">
               <span className="g-rotulo" style={{ color: "#24543b" }}>Já tem clientes?</span>
               <div className="quem">
@@ -260,7 +275,9 @@ export default function Hoje() {
               </div>
               <button type="button" className="g-btn verde" style={{ justifySelf: "start" }} onClick={() => { if (liberado) setImportando(true); }}><FileSpreadsheet />Trazer de uma planilha</button>
             </div>
-            ) : soCasa && !(dados && ativos.length) ? (
+            ) : frente === "loja" ? (
+            <FrenteDaLoja carregando={!dados} produtos={dados?.produtosTotal ?? 0} acabando={dados?.acabando ?? []} vendas={vendas} novo={dados?.produtosTotal === 0} />
+            ) : soCasa && (frente === "casa" || !(dados && ativos.length)) ? (
             <div className="g-proximo vazio">
               <span className="g-rotulo" style={{ color: "#24543b" }}>{rotuloCasa}</span>
               <div className="quem">
@@ -269,8 +286,9 @@ export default function Hoje() {
                   <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{!dados ? "Olhando a casa…" : dados.emCasa === 0 ? "Nenhum pet na casa agora" : dados.emCasa === 1 ? "1 pet na casa agora" : `${dados.emCasa} pets na casa agora`}</b>
                 </div>
               </div>
-              {temCasa && <Link className="g-hoje-casa" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
-              <Link className="g-btn verde" href="/gestao/app/creche-hotel" style={{ justifySelf: "start" }}><Plus />{dados?.estadiasTotal === 0 ? "Fazer o primeiro check-in" : "Fazer check-in"}</Link>
+              {frente === "casa" ? dados && <ChegamESaem chegam={dados.chegamHoje} saem={dados.saemHoje} />
+                : temCasa && <Link className="g-hoje-casa" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
+              <Link className="g-btn verde" href="/gestao/app/creche-hotel" style={{ justifySelf: "start" }}><Plus />{principal === "hotel" ? "Nova reserva" : dados?.estadiasTotal === 0 ? "Fazer o primeiro check-in" : "Fazer check-in"}</Link>
             </div>
             ) : (
             <div className="g-proximo vazio">
@@ -288,7 +306,10 @@ export default function Hoje() {
           )}
         </div>
 
-        {temCasa && destaque?.pets && <Link className="g-hoje-casa solta" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
+        {temCasa && (destaque?.pets || frente === "loja") && frente !== "casa" && <Link className="g-hoje-casa solta" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
+        {(frente === "casa" || frente === "loja") && destaque?.pets && posso("agenda") && (
+          <Link className="g-hoje-casa solta" href="/gestao/app/agenda"><Scissors aria-hidden /><span>Banho e tosa: {n(ativos.length, "atendimento", "atendimentos")} hoje. {emAndamento ? `${destaque.pets.nome} está na mesa agora.` : `O próximo é ${destaque.pets.nome}, às ${hora(destaque.inicio)}.`}</span><ChevronRight aria-hidden /></Link>
+        )}
 
         {posso("agenda") && <PedidosLink />}
 
@@ -296,21 +317,23 @@ export default function Hoje() {
         {temResumo && <ResumoSemana modo={cartaoResumo ? "cartao" : "linha"} />}
 
         {!contaNova && <div className="g-grade kpis">
-          <Kpi href="/gestao/app/agenda" icone={Scissors} tom="pessego" rotulo="Atendimentos hoje" valor={dados ? ativos.length : "–"}
+          {frente === "casa" && kpiCasa}
+          {frente === "loja" && <Kpi href="/gestao/app/estoque" icone={Package} tom="rosa" rotulo="Produtos acabando" valor={dados ? dados.acabando.length : "–"} apoio={dados?.produtosTotal === 1 ? "de 1 na prateleira" : `de ${dados?.produtosTotal ?? 0} na prateleira`} />}
+          {!semAgenda && <Kpi href="/gestao/app/agenda" icone={Scissors} tom="pessego" rotulo="Atendimentos hoje" valor={dados ? ativos.length : "–"}
             apoio={dados ? (ativos.length ? `${feitos} ${feitos === 1 ? "concluído" : "concluídos"}` : "agenda livre") : " "}
-            lado={dados && ativos.length > 0 ? <Anel parte={feitos / ativos.length} cor="var(--g-laranja)">{Math.round((feitos / ativos.length) * 100)}%</Anel> : undefined} />
-          {casa && <Kpi href="/gestao/app/creche-hotel" icone={BedDouble} tom="ceu" rotulo={rotuloCasa} valor={dados ? dados.emCasa : "–"} apoio={dados?.emCasa === 1 ? "pet na casa agora" : "pets na casa agora"} />}
+            lado={dados && ativos.length > 0 ? <Anel parte={feitos / ativos.length} cor="var(--g-laranja)">{Math.round((feitos / ativos.length) * 100)}%</Anel> : undefined} />}
+          {frente !== "casa" && kpiCasa}
           {vejoFinanceiro ? (
             <Kpi href="/gestao/app/caixa" icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"} apoio={dados && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : "ver o caixa"}
               lado={dados ? <Tendencia valores={dados.entradas7} /> : undefined} />
           ) : (
             <Kpi href="/gestao/app/clientes" icone={PawPrint} tom="menta" rotulo="Pets cadastrados" valor={dados ? dados.pets : "–"} apoio="ver todos" />
           )}
-          <Kpi href="/gestao/app/agenda" icone={CalendarDays} tom="lilas" rotulo="Nesta semana" valor={dados ? totalSemana : "–"} apoio={totalSemana === 1 ? "horário marcado" : "horários marcados"} />
+          {!semAgenda && <Kpi href="/gestao/app/agenda" icone={CalendarDays} tom="lilas" rotulo="Nesta semana" valor={dados ? totalSemana : "–"} apoio={totalSemana === 1 ? "horário marcado" : "horários marcados"} />}
         </div>}
 
-        <div className="g-duas">
-          <section>
+        <div className={semAgenda ? "g-pilha g" : "g-duas"}>
+          {!semAgenda && <section>
             <div className="g-card-t">
               <h2>Agenda de hoje</h2>
               {posso("agenda") && <Link className="g-btn fantasma p" href="/gestao/app/agenda">Ver a semana<ChevronRight /></Link>}
@@ -355,7 +378,7 @@ export default function Hoje() {
                 })}
               </div>
             )}
-          </section>
+          </section>}
 
           <div className="g-pilha g">
             {posso("clientes") && posso("agenda") && <DicasMozart semDicas={[...(sumidos.length ? ["sumidos"] : []), ...(niver.length ? ["niver"] : [])]} />}
@@ -382,7 +405,7 @@ export default function Hoje() {
 
             <MetaMes />
 
-            {!contaNova && <section className="g-card">
+            {!contaNova && !semAgenda && <section className="g-card">
               <div className="g-card-t"><h3>Movimento da semana</h3><span className="g-muted g-pp">horários por dia</span></div>
               {!dados ? <Esqueleto linhas={2} /> : totalSemana ? <Barras itens={semana} destaque={(hoje.getDay() + 6) % 7} /> : <p className="g-muted g-p">Nenhum horário marcado nesta semana ainda.</p>}
             </section>}

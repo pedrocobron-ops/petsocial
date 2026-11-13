@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarDays, Check, Clock, FileSpreadsheet, Link2, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Undo2, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarDays, Check, Clock, FileSpreadsheet, ImagePlus, Link2, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Undo2, Users, X } from "lucide-react";
 import type { Horario, Servico } from "@/lib/gestao/tipos";
 import { vagasDe } from "@/lib/gestao/agenda";
 import { nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
@@ -13,13 +13,18 @@ import { Tile } from "./painel";
 import { brl, lerValor, valor2 } from "@/lib/gestao/util";
 import { Campo, CampoValor, avisarMudanca, ok, useAvisos } from "./ui";
 import Importar from "./importar";
+import { TEMAS, aplicarTema, enviarLogo, tirarLogo } from "@/lib/gestao/identidade";
+import { FalaMozart, PERGUNTAS, PreviaPainel, TrilhoBoasVindas, chaveBoasVindas, oQueDeixeiPronto } from "./boas-vindas";
+import { guardarLembrado, lerLembrado } from "./lembrado";
+import LogoLoja from "./logo-loja";
+import "./ajustes/identidade.css";
 import "./guia-inicial.css";
 
 /** Evento para abrir o guia de novo (botão em Meu pet shop). */
 export const EVENTO_GUIA = "gestao:guia";
 export const abrirGuia = () => window.dispatchEvent(new Event(EVENTO_GUIA));
 
-type IdPasso = "horario" | "equipe" | "servicos" | "casa" | "link";
+type IdPasso = "cor" | "logo" | "horario" | "equipe" | "servicos" | "casa" | "link";
 type PassoDoGuia = { id: IdPasso };
 
 const DIA = { abre: "08:00", fecha: "18:00" };
@@ -75,6 +80,8 @@ function CampoPreco({ porte, servico, valor, aoMudar }: { porte: string; servico
  * Guia da primeira vez. Os passos seguem o que o negócio faz (`petshops.modulos`): horário para todos; quem atende,
  * serviços com preço e link do cliente para quem faz banho e tosa; diária e vagas para creche e hotel.
  * Cada passo grava ao continuar e pode ficar para depois. O que é definido aqui regula a agenda, o link e o Mozart.
+ * Quem acabou de criar o pet shop pelas boas-vindas (ver `boas-vindas.tsx`) passa antes por duas perguntas do Mozart:
+ * a cor e a logo. O ponto em que parou fica no aparelho, então recarregar a página não repete a pergunta já respondida.
  * Aparece sozinho para o dono enquanto `petshops.guia_feito_em` está vazio; depois, só pelo botão em Meu pet shop.
  */
 export default function GuiaInicial() {
@@ -120,13 +127,17 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
   const banho = usaModulo(petshop, "banho_tosa"), creche = usaModulo(petshop, "creche"), hotel = usaModulo(petshop, "hotel");
   const casa = nomeDaCasa(petshop);
   // os passos ficam fixos enquanto o guia está aberto
+  // boas-vindas: só para quem acabou de criar o pet shop neste aparelho e ainda não passou pela cor e pela logo
+  const chaveBV = chaveBoasVindas(petshop.id);
   const [passos] = useState<PassoDoGuia[]>(() => [
+    ...(!petshop.guia_feito_em && ["cor", "logo"].includes(lerLembrado(chaveBV) ?? "") ? [{ id: "cor" as const }, { id: "logo" as const }] : []),
     { id: "horario" as const },
     ...(banho ? [{ id: "equipe" as const }, { id: "servicos" as const }] : []),
     ...(creche || hotel ? [{ id: "casa" as const }] : []),
     ...(banho ? [{ id: "link" as const }] : []),
   ]);
-  const [passo, setPasso] = useState(0); // passos.length = pronto
+  // passos.length = pronto. Quem recarregou a página na pergunta da logo volta para ela (e ainda pode voltar para a cor).
+  const [passo, setPasso] = useState(() => (passos[1]?.id === "logo" && lerLembrado(chaveBV) === "logo" ? 1 : 0));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -145,6 +156,16 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
   const [vagasCreche, setVagasCreche] = useState(petshop.vagas_creche == null ? "" : String(petshop.vagas_creche));
   const [vagasHotel, setVagasHotel] = useState(petshop.vagas_hotel == null ? "" : String(petshop.vagas_hotel));
   const [linkLigado, setLinkLigado] = useState(petshop.link_ativo);
+  const [tema, setTema] = useState(petshop.tema);
+  const [enviando, setEnviando] = useState(false);
+  const arquivo = useRef<HTMLInputElement>(null);
+  // veio das boas-vindas: o Mozart conta o que deixou pronto antes de começar os passos
+  const [veioDasBoasVindas] = useState(() => !petshop.guia_feito_em && lerLembrado(chaveBV) != null);
+  const perguntas = passos.filter((p) => p.id === "cor" || p.id === "logo").length;
+  // fechou o guia com uma cor só experimentada: o painel volta para a cor gravada
+  const temaGravado = useRef(petshop.tema);
+  useEffect(() => { temaGravado.current = petshop.tema; }, [petshop.tema]);
+  useEffect(() => () => aplicarTema(temaGravado.current), []);
   const corpo = useRef<HTMLDivElement>(null);
   // o erro aparece junto do botão; se o campo errado ficou fora da tela, rola até ele
   useEffect(() => {
@@ -159,10 +180,13 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
   const atendem = (euAtendo ? 1 : 0) + outros.length + novos.length;
   const vagasAgora = vagas ?? Math.max(1, atendem);
   const primeiro = eu.nome.split(" ")[0];
-  const total = passos.length;
+  // os passos de configuração contam à parte das perguntas do Mozart
+  const total = passos.length - perguntas;
   const atual = passos[passo]?.id;
-  const fim = passo >= total;
-  const n = passo + 1;
+  const fim = passo >= passos.length;
+  const n = passo + 1 - perguntas;
+  const pergunta = atual === "cor" || atual === "logo";
+  const nPergunta = PERGUNTAS - perguntas + passo + 1;
 
   function juntarNome() {
     const t = nome.trim();
@@ -173,7 +197,8 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
 
   /** Vai para o passo seguinte; depois do último, o guia fica marcado como feito. */
   async function avancar() {
-    if (passo === total - 1 && !petshop.guia_feito_em) {
+    if (pergunta) guardarLembrado(chaveBV, atual === "cor" && passos[passo + 1]?.id === "logo" ? "logo" : "feito");
+    if (passo === passos.length - 1 && !petshop.guia_feito_em) {
       ok(await sb.from("petshops").update({ guia_feito_em: new Date().toISOString() }).eq("id", petshop.id).select("id"));
     }
     await recarregarBase();
@@ -185,13 +210,44 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
   async function pular() {
     setErro(null);
     setSalvando(true);
+    // a cor que a pessoa só experimentou não fica
+    if (atual === "cor") { aplicarTema(petshop.tema); setTema(petshop.tema); }
     try { await avancar(); } catch (e) { avisarErro(e); } finally { setSalvando(false); }
+  }
+
+  /** "Com pressa?": deixa a cor e a logo para depois, de uma vez. */
+  function pularCorELogo() {
+    setErro(null);
+    aplicarTema(petshop.tema); setTema(petshop.tema);
+    guardarLembrado(chaveBV, "feito");
+    setPasso(perguntas);
+  }
+
+  function experimentarCor(id: string) {
+    setTema(id);
+    aplicarTema(id); // o painel muda na hora; só grava ao continuar
+  }
+
+  async function subirLogo(f: File | undefined) {
+    if (!f) return;
+    setErro(null);
+    setEnviando(true);
+    try { await enviarLogo(sb, petshop, f); await recarregarBase(); }
+    catch (e) { avisarErro(e); } finally { setEnviando(false); if (arquivo.current) arquivo.current.value = ""; }
+  }
+  async function semLogo() {
+    setEnviando(true);
+    try { await tirarLogo(sb, petshop); await recarregarBase(); }
+    catch (e) { avisarErro(e); } finally { setEnviando(false); }
   }
 
   async function continuar() {
     setErro(null);
     setSalvando(true);
     try {
+      if (atual === "cor" && tema !== petshop.tema) {
+        ok(await sb.from("petshops").update({ tema }).eq("id", petshop.id).select("id"));
+      }
       if (atual === "horario") {
         const ruim = erroDoHorario(horario);
         if (ruim) { setErro(ruim); return; }
@@ -275,17 +331,69 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
     <div className="g-guia" role="dialog" aria-modal="true" aria-label="Guia de configuração">
       <div className="g-guia-caixa">
         <header className="g-guia-topo">
-          <Selo tamanho={36} tom="verde" />
-          <div className="g-guia-trilho" role="img" aria-label={fim ? "Guia concluído" : `Passo ${n} de ${total}`}>
-            {passos.map((p, i) => <span key={p.id} className={i < passo ? "feito" : i === passo ? "agora" : ""}><i /></span>)}
-          </div>
+          {!pergunta && <Selo tamanho={36} tom="verde" />}
+          {pergunta ? <TrilhoBoasVindas agora={nPergunta} /> : (
+            <div className="g-guia-trilho" role="img" aria-label={fim ? "Guia concluído" : `Passo ${n} de ${total}`}>
+              {passos.slice(perguntas).map((p, i) => <span key={p.id} className={i < n - 1 ? "feito" : i === n - 1 ? "agora" : ""}><i /></span>)}
+            </div>
+          )}
           <button className="g-ico" onClick={aoFechar} aria-label="Fechar o guia" title={petshop.guia_feito_em ? "Fechar" : "Fechar e fazer depois"}><X /></button>
         </header>
 
         <div className="g-guia-corpo" ref={corpo}>
-          {passo === 0 && (
-            <p className="g-guia-intro">
-              <b>{primeiro}, {total === 1 ? "é um passo só" : `são ${total} passos curtos`} para deixar o {petshop.nome} pronto.</b>{" "}
+          {atual === "cor" && (
+            <div className="g-pilha">
+              <FalaMozart>Pronto, o seu espaço já existe. Agora a cor: toque em uma e veja o painel mudar.</FalaMozart>
+              <div>
+                <p className="g-rotulo">Pergunta {nPergunta} de {PERGUNTAS}</p>
+                <h2 className="g-guia-h">Qual cor combina com o seu negócio?</h2>
+                <button type="button" className="g-link g-bv-pressa" onClick={pularCorELogo} disabled={salvando}>Com pressa? Pular a cor e a logo</button>
+              </div>
+              <div className="g-idt-temas" role="radiogroup" aria-label="Cores do pet shop">
+                {TEMAS.map((t) => (
+                  <button key={t.id} type="button" role="radio" aria-checked={t.id === tema} className={`g-idt-tema${t.id === tema ? " on" : ""}`} onClick={() => experimentarCor(t.id)}>
+                    <span className="amostra" style={{ background: t.tema }} aria-hidden><i style={{ background: t.destaque }} />{t.id === tema && <Check />}</span>
+                    <span className="nome">{t.nome}</span>
+                  </button>
+                ))}
+              </div>
+              <PreviaPainel petshop={petshop} primeiroNome={primeiro} />
+              <p className="g-bv-nota">Tem as cores da sua marca? Depois dá para usar exatamente elas, em Meu pet shop.</p>
+            </div>
+          )}
+
+          {atual === "logo" && (
+            <div className="g-pilha">
+              <FalaMozart>{petshop.logo ? "Ficou com a sua cara. Olha onde ela aparece." : "Tem logo? Eu coloco no menu, no link que o cliente recebe e na agenda impressa."}</FalaMozart>
+              <div>
+                <p className="g-rotulo">Pergunta {nPergunta} de {PERGUNTAS}</p>
+                <h2 className="g-guia-h">Quer colocar a sua logo?</h2>
+              </div>
+              <div className="g-bv-logo">
+                <LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={64} />
+                <div>
+                  <span className="g-muted g-p">{petshop.logo ? "Sua logo está no lugar." : "Se não tiver agora, ficam as iniciais do nome. Imagem quadrada fica melhor."}</span>
+                  <div className="acoes">
+                    <input ref={arquivo} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => void subirLogo(e.target.files?.[0])} />
+                    <button type="button" className="g-btn sec p" disabled={enviando} onClick={() => arquivo.current?.click()}><ImagePlus />{enviando ? "Enviando…" : petshop.logo ? "Trocar a logo" : "Escolher a imagem"}</button>
+                    {petshop.logo && <button type="button" className="g-btn fantasma p" disabled={enviando} onClick={() => void semLogo()}><Trash2 />Tirar</button>}
+                  </div>
+                </div>
+              </div>
+              <div className="g-bv-onde">
+                <p className="g-rotulo">Onde ela aparece</p>
+                <PreviaPainel petshop={petshop} primeiroNome={primeiro} />
+                <div className="g-bv-cliente" aria-hidden>
+                  <LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={38} />
+                  <span><b>{petshop.nome}</b><span>Assim o cliente vê o seu link.</span></span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!pergunta && !fim && n === 1 && (
+            <p className="g-guia-intro">{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? <>{oQueDeixeiPronto(petshop)}{" "}</> : null}
+              <b>{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? "Agora" : `${primeiro},`} {total === 1 ? "é um passo só" : `são ${total} passos curtos`} para deixar o {petshop.nome} pronto.</b>{" "}
               O que não souber agora, toque em Faço depois: dá para mudar tudo em Meu pet shop.
             </p>
           )}
@@ -457,7 +565,7 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
             <>
               {passo > 0 && <button className="g-btn fantasma g-guia-volta" onClick={() => { setErro(null); setPasso((p) => p - 1); }} disabled={salvando} aria-label="Voltar ao passo anterior"><ArrowLeft /></button>}
               <button className="g-btn fantasma g-guia-depois" onClick={() => void pular()} disabled={salvando}>Faço depois</button>
-              <button className="g-btn pri" onClick={() => void continuar()} disabled={salvando}>{salvando ? "Salvando…" : passo === total - 1 ? "Concluir" : "Continuar"}<ArrowRight /></button>
+              <button className="g-btn pri" onClick={() => void continuar()} disabled={salvando || enviando}>{salvando ? "Salvando…" : passo === passos.length - 1 ? "Concluir" : "Continuar"}<ArrowRight /></button>
             </>
           )}
         </footer>
