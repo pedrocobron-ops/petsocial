@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
 import type { Banco } from "@/lib/gestao/supabase";
 import { chamar, dataAmigavel, deIsoDia, fmtTelefone, haQuanto, inicioDoDia, linkWhatsApp, soDigitos } from "@/lib/gestao/util";
+import { buscarVisitas, diasSemVir, sumiu } from "@/lib/gestao/visitas";
 import { useGestao } from "../contexto";
 import { guardarLembrado, lerLembrado } from "../lembrado";
 import { AvatarPet, Esqueleto, Folha, Vazio, useDados } from "../ui";
@@ -30,38 +31,15 @@ type Resposta<T> = PromiseLike<{ data: T[] | null; error: { message: string } | 
 
 /** Pets ativos com a última visita de cada um e se há horário ou estadia por vir. Só leitura, página a página. */
 export async function buscarParaChamar(sb: Banco, petshopId: string): Promise<ParaChamar[]> {
-  const pets = await buscarTudo<PetChamar>((de, ate) => sb.from("pets").select("id, nome, foto, especie, nascimento, cliente_id, clientes(id, nome, telefone)")
-    .eq("petshop_id", petshopId).eq("ativo", true).order("nome").order("id").range(de, ate) as unknown as Resposta<PetChamar>);
-  if (!pets.length) return [];
-  const agora = new Date();
-  const ultima = new Map<string, { quando: string; servico: string | null }>();
-  const faltam = new Set(pets.map((p) => p.id));
-  // do mais novo para o mais antigo: para quando todos os pets já apareceram
-  await buscarTudo<{ pet_id: string; inicio: string; servicos: { nome: string } | null }>(
-    (de, ate) => sb.from("agendamentos").select("pet_id, inicio, servicos(nome)").eq("petshop_id", petshopId).eq("status", "concluido")
-      .order("inicio", { ascending: false }).order("id").range(de, ate) as unknown as Resposta<{ pet_id: string; inicio: string; servicos: { nome: string } | null }>,
-    (linhas) => {
-      for (const l of linhas) if (!ultima.has(l.pet_id)) { ultima.set(l.pet_id, { quando: l.inicio, servico: l.servicos?.nome ?? null }); faltam.delete(l.pet_id); }
-      return faltam.size === 0;
-    });
-  const marcado = new Set<string>();
-  // creche e hotel também é visita; reserva ou pet na casa conta como "já tem algo marcado"
-  await buscarTudo<{ pet_id: string; entrada: string; saida: string | null; status: string; tipo: string }>(
-    (de, ate) => sb.from("estadias").select("pet_id, entrada, saida, status, tipo").eq("petshop_id", petshopId).in("status", ["encerrada", "em_casa", "reservada"])
-      .order("entrada", { ascending: false }).order("id").range(de, ate),
-    (linhas) => {
-      for (const l of linhas) {
-        if (l.status !== "encerrada") { marcado.add(l.pet_id); continue; }
-        const quando = l.saida ?? l.entrada, u = ultima.get(l.pet_id);
-        if (!u || new Date(quando) > new Date(u.quando)) ultima.set(l.pet_id, { quando, servico: l.tipo === "hotel" ? "Hotel" : "Creche" });
-      }
-      return false;
-    });
-  await buscarTudo<{ pet_id: string }>(
-    (de, ate) => sb.from("agendamentos").select("pet_id").eq("petshop_id", petshopId).gte("inicio", inicioDoDia(agora).toISOString())
-      .in("status", ["marcado", "confirmado", "em_atendimento"]).order("inicio").order("id").range(de, ate),
-    (linhas) => { for (const l of linhas) marcado.add(l.pet_id); return false; });
-  return pets.map((pet) => ({ pet, ultima: ultima.get(pet.id)?.quando ?? null, servico: ultima.get(pet.id)?.servico ?? null, marcado: marcado.has(pet.id) }));
+  const [pets, visitas] = await Promise.all([
+    buscarTudo<PetChamar>((de, ate) => sb.from("pets").select("id, nome, foto, especie, nascimento, cliente_id, clientes(id, nome, telefone)")
+      .eq("petshop_id", petshopId).eq("ativo", true).order("nome").order("id").range(de, ate) as unknown as Resposta<PetChamar>),
+    buscarVisitas(sb, petshopId),
+  ]);
+  return pets.map((pet) => {
+    const v = visitas.get(pet.id);
+    return { pet, ultima: v?.ultima ?? null, servico: v?.servico ?? null, marcado: v?.marcado ?? false };
+  });
 }
 
 type PetDoGrupo = { pet: PetChamar; detalhe: string; ordem: number };
@@ -82,13 +60,12 @@ function agrupar(itens: PetDoGrupo[]): GrupoChamar[] {
 
 const diasEntre = (de: Date, ate: Date) => Math.round((inicioDoDia(ate).getTime() - inicioDoDia(de).getTime()) / 864e5);
 
-/** Quem já veio, não vem há mais de `dias` dias e não tem nada marcado. Quem saiu há menos tempo vem primeiro. */
+/** Quem já veio, não vem há mais de `dias` dias e não tem nada marcado (a regra é `sumiu`, a mesma da lista de Clientes). Quem saiu há menos tempo vem primeiro. */
 export function quemSumiu(lista: ParaChamar[], dias: number, hoje = new Date()): GrupoChamar[] {
   const itens: PetDoGrupo[] = [];
   for (const x of lista) {
-    if (!x.ultima || x.marcado) continue;
-    const faz = diasEntre(new Date(x.ultima), hoje);
-    if (faz <= dias) continue;
+    if (!x.ultima || !sumiu(x, dias, hoje)) continue;
+    const faz = diasSemVir(x.ultima, hoje);
     itens.push({ pet: x.pet, ordem: faz, detalhe: `${faz < 90 ? `há ${faz} dias` : haQuanto(x.ultima)}${x.servico ? ` · ${x.servico}` : ""}` });
   }
   return agrupar(itens);
@@ -171,6 +148,7 @@ export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: {
   const { dados, carregando, erro, recarregar } = useDados(() => buscarParaChamar(sb, petshop.id), [petshop.id]);
 
   const sumidos = dados ? quemSumiu(dados, dias) : [];
+  const petsSumidos = sumidos.reduce((n, g) => n + g.pets.length, 0);
   const niver = dados ? aniversariantes(dados) : [];
   const grupos = aba === "volta" ? sumidos : niver;
   const comTelefone = grupos.filter((g) => g.telefone);
@@ -246,6 +224,11 @@ export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: {
               {exemplo && <p className="g-cv-previa"><span className="g-pp g-muted">Para {chamar(exemplo.nome) || "o tutor"}, vai assim:</span>{mensagem(exemplo)}</p>}
             </div>
 
+            {aba === "volta" && (
+              <p className="g-pp g-muted">
+                {petsSumidos === 1 ? "1 pet" : `${petsSumidos} pets`} de {sumidos.length === 1 ? "1 tutor" : `${sumidos.length} tutores`}: já vieram, estão há mais de {dias} dias sem vir e não têm nada marcado.
+              </p>
+            )}
             <p className="g-lb-topo" role="status">
               {!comTelefone.length ? "Nenhum tutor desta lista tem telefone na ficha."
                 : faltam.length ? <><b>{faltam.length === 1 ? "1 tutor para chamar" : `${faltam.length} tutores para chamar`}</b>. Toque em Chamar: o WhatsApp abre com a mensagem pronta e você só aperta enviar.</>

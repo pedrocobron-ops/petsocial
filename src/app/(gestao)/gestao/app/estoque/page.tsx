@@ -1,7 +1,8 @@
 "use client";
 
 import { COLS_MOVIMENTO, COLS_PRODUTO, comCustos, comCustosDeMovimento } from "@/lib/gestao/reservado";
-import { useMemo, useState } from "react";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
+import { useEffect, useMemo, useState } from "react";
 import Importar from "@/components/gestao/importar";
 import { AlertTriangle, ArrowUpFromLine, Minus, Package, PackageX, Plus, Search, ShoppingBag, Sparkles, Wallet, Upload } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
@@ -21,6 +22,8 @@ const FILTROS = [
   { id: "zerados", rotulo: "Zerados" },
 ] as const;
 type Filtro = (typeof FILTROS)[number]["id"];
+/** Quantos produtos aparecem por vez na lista. */
+const PASSO = 60;
 const MOTIVOS = [
   { id: "Venda", rotulo: "Venda" },
   { id: "Uso no banho", rotulo: "Uso no banho" },
@@ -52,13 +55,13 @@ export default function Estoque() {
   const [importando, setImportando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () =>
-    (await comCustos(sb, petshop.id, ok(await sb.from("produtos").select(COLS_PRODUTO).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as unknown as { id: string }[])) as unknown as Produto[],
+    (await comCustos(sb, petshop.id, await lerTudo<{ id: string }>((de, ate, contar) => sb.from("produtos").select(COLS_PRODUTO, contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)))) as unknown as Produto[],
   [petshop.id]);
 
   // saídas dos últimos 30 dias: só para o resumo do topo (se a busca falhar, o cartão fica de fora)
   const { dados: saidas, recarregar: recarregarSaidas } = useDados(async () => {
     const desde = new Date(Date.now() - 30 * 864e5).toISOString();
-    return ok(await sb.from("movimentos_estoque").select("motivo").eq("petshop_id", petshop.id).eq("tipo", "saida").gte("criado_em", desde).limit(2000)) as { motivo: string | null }[];
+    return lerTudo<{ motivo: string | null }>((de, ate, contar) => sb.from("movimentos_estoque").select("motivo", contando(contar)).eq("petshop_id", petshop.id).eq("tipo", "saida").gte("criado_em", desde).order("criado_em").order("id").range(de, ate));
   }, [petshop.id]);
 
   const produtos = useMemo(() => dados ?? [], [dados]);
@@ -68,6 +71,10 @@ export default function Estoque() {
   const lista = produtos.filter((p) =>
     (filtro === "todos" || (filtro === "acabando" ? acabando(p) : zerado(p))) &&
     (!alvo || semAcento(p.nome).includes(alvo) || semAcento(p.categoria ?? "").includes(alvo)));
+
+  // lista comprida aparece aos poucos (a busca e os filtros olham todos os produtos)
+  const [mostrar, setMostrar] = useState(PASSO);
+  useEffect(() => { setMostrar(PASSO); }, [q, filtro]);
 
   const abrir = (a: Aberta) => { if (a.tipo !== "ficha" && somenteLeitura()) return; setAberta(a); };
   const fechar = () => setAberta(null);
@@ -149,7 +156,7 @@ export default function Estoque() {
             </p>
           ) : (
             <div className="g-est-grade">
-              {lista.map((p) => {
+              {lista.slice(0, mostrar).map((p) => {
                 const n = nivel(p), min = Number(p.estoque_minimo);
                 return (
                   <div key={p.id} className={`g-card g-est-prod ${n.tom}`}>
@@ -183,6 +190,11 @@ export default function Estoque() {
                   </div>
                 );
               })}
+              {lista.length > mostrar && (
+                <button type="button" className="g-btn sec" style={{ gridColumn: "1 / -1", justifySelf: "center" }} onClick={() => setMostrar(mostrar + PASSO)}>
+                  Mostrar mais ({lista.length - mostrar} {lista.length - mostrar === 1 ? "produto" : "produtos"})
+                </button>
+              )}
             </div>
           )}
         </div>

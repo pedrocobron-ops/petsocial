@@ -1,0 +1,17 @@
+/* "O que o seu negócio faz?": opções de um toque, com ícone. Prefixo g-mod-. */
+.g-mod { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.g-mod.apoio { grid-template-columns: 1fr; }
+@media (min-width: 560px) { .g-mod.apoio { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.g-mod-op { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 10px; border-radius: 16px; border: 2px solid var(--g-linha); background: var(--g-carta); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
+.g-mod-op .ic { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 11px; background: var(--g-carta-2); color: var(--g-cinza); transition: background .15s, color .15s; }
+.g-mod-op .ic svg { width: 18px; height: 18px; }
+.g-mod-op .t { flex: 1; min-width: 0; display: grid; gap: 1px; line-height: 1.2; }
+.g-mod-op .t b { font-weight: 600; font-size: .9375rem; }
+.g-mod-op .t small { font-size: .8125rem; color: var(--g-cinza); }
+.g-mod-op .ok { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid var(--g-linha-forte); color: #fff; }
+.g-mod-op .ok svg { width: 14px; height: 14px; stroke-width: 3; }
+.g-mod-op[aria-pressed="true"] { border-color: var(--g-verde); background: var(--g-verde-tint); }
+.g-mod-op[aria-pressed="true"] .ic { background: var(--g-verde); color: #f6f1e8; }
+.g-mod-op[aria-pressed="true"] .ok { background: var(--g-verde); border-color: var(--g-verde); }
+/* a última opção, sozinha na linha, ocupa a largura toda */
+.g-mod:not(.apoio) .g-mod-op:last-child:nth-child(odd) { grid-column: 1 / -1; }

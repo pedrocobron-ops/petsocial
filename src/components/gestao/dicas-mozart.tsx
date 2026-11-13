@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Cake, CalendarPlus, MessageCircle, Ticket, UserX, X } from "lucide-react";
 import { deIsoDia, horarioDoDia, inicioDoDia, isoDia, nomeDia, somaDias } from "@/lib/gestao/util";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useGestao } from "./contexto";
+import { usaModulo } from "@/lib/gestao/modulos";
 import { Selo } from "./marca";
 import { Tile, type Tom } from "./painel";
 import { abrirAssistente, useDados } from "./ui";
@@ -23,7 +25,8 @@ export default function DicasMozart({ semDicas = [] }: {
   /** Dicas que a tela já mostra de outro jeito (ex.: a linha que abre direto a lista de quem chamar). */
   semDicas?: string[];
 }) {
-  const { sb, petshop } = useGestao();
+  const { sb, petshop, posso } = useGestao();
+  const vejoPacotes = posso("pacotes");
   const hoje = inicioDoDia(new Date());
   const hojeIso = isoDia(hoje);
   const [escondidas, setEscondidas] = useState<string[]>([]);
@@ -44,10 +47,11 @@ export default function DicasMozart({ semDicas = [] }: {
   const { dados } = useDados(async (): Promise<Dica[]> => {
     const amanha = somaDias(hoje, 1);
     const [passados, futuros, pacotes, pets] = await Promise.all([
-      sb.from("agendamentos").select("pet_id, inicio, status, pets(nome, ativo)").eq("petshop_id", petshop.id).gte("inicio", somaDias(hoje, -150).toISOString()).lt("inicio", amanha.toISOString()).order("inicio", { ascending: false }).limit(3000),
-      sb.from("agendamentos").select("pet_id, inicio, status").eq("petshop_id", petshop.id).gte("inicio", hoje.toISOString()).lt("inicio", somaDias(hoje, 60).toISOString()).limit(3000),
-      sb.from("pacotes_clientes").select("total, usados, pets(nome)").eq("petshop_id", petshop.id).eq("ativo", true).limit(500),
-      sb.from("pets").select("nome, nascimento").eq("petshop_id", petshop.id).eq("ativo", true).not("nascimento", "is", null).limit(2000),
+      lerTudo((de, ate, contar) => sb.from("agendamentos").select("pet_id, inicio, status, pets(nome, ativo)", contando(contar)).eq("petshop_id", petshop.id).gte("inicio", somaDias(hoje, -150).toISOString()).lt("inicio", amanha.toISOString()).order("inicio", { ascending: false }).order("id").range(de, ate)).then((data) => ({ data })),
+      lerTudo((de, ate, contar) => sb.from("agendamentos").select("pet_id, inicio, status", contando(contar)).eq("petshop_id", petshop.id).gte("inicio", hoje.toISOString()).lt("inicio", somaDias(hoje, 60).toISOString()).order("inicio").order("id").range(de, ate)).then((data) => ({ data })),
+      // pacote é assunto de quem cuida de pacotes
+      vejoPacotes ? sb.from("pacotes_clientes").select("total, usados, pets(nome)").eq("petshop_id", petshop.id).eq("ativo", true).limit(500) : Promise.resolve({ data: [] }),
+      lerTudo((de, ate, contar) => sb.from("pets").select("nome, nascimento", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).not("nascimento", "is", null).order("id").range(de, ate)).then((data) => ({ data })),
     ]);
     type Ag = { pet_id: string; inicio: string; status: string; pets?: { nome: string; ativo: boolean } | null };
     const antes = (passados.data ?? []) as unknown as Ag[];
@@ -78,7 +82,7 @@ export default function DicasMozart({ semDicas = [] }: {
 
     // pacote no último uso
     const acabando = ((pacotes.data ?? []) as unknown as { total: number; usados: number; pets: { nome: string } | null }[]).filter((p) => p.total - p.usados === 1 && p.pets);
-    if (acabando.length) dicas.push({
+    if (acabando.length && usaModulo(petshop, "pacotes")) dicas.push({
       id: "pacotes", icone: Ticket, tom: "lilas",
       texto: `O pacote de ${lista(acabando.map((p) => p.pets!.nome))} acaba no próximo uso. Boa hora para oferecer a renovação.`,
       acao: "Ver os pacotes", href: "/gestao/app/pacotes",
@@ -109,7 +113,7 @@ export default function DicasMozart({ semDicas = [] }: {
     });
 
     return dicas;
-  }, [petshop.id, hojeIso]);
+  }, [petshop.id, hojeIso, vejoPacotes]);
 
   const visiveis = (dados ?? []).filter((d) => !escondidas.includes(d.id) && !semDicas.includes(d.id)).slice(0, 3);
   if (!visiveis.length) return null;

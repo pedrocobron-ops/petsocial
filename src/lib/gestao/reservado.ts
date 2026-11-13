@@ -22,7 +22,7 @@ export const COLS_PACOTE_CLIENTE = "id, petshop_id, pet_id, pacote_id, nome, ser
 export const COLS_PROFISSIONAL = "id, petshop_id, user_id, nome, papel, ve_financeiro, cor, escala, atende, ativo, criado_em, funcao, acessos";
 
 /** Tudo do pet shop menos a meta do mês e os dados da assinatura na Cakto. */
-export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, diaria_creche, diaria_hotel, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde";
+export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, diaria_creche, diaria_hotel, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos";
 
 type Linhas = Record<string, unknown>[];
 /**
@@ -89,6 +89,29 @@ export async function comCustosDeMovimento<M extends { id: string }>(sb: Banco, 
   const extra = movimentos.length ? porId(await reservado(sb, "custos_dos_movimentos", { p_produto: produtoId },
     () => sb.from("movimentos_estoque").select("id, custo_unitario").eq("produto_id", produtoId))) : new Map<string, Record<string, unknown>>();
   return movimentos.map((m) => ({ ...m, custo_unitario: num(extra.get(m.id)?.custo_unitario) }));
+}
+
+/**
+ * Custo unitário de todos os movimentos do pet shop, por id do movimento (cópia de segurança).
+ * Uma função só no banco; se ela ainda não existe (banco antes da atualização), pede produto por produto, seis de cada vez.
+ */
+export async function custosDeTodosOsMovimentos(sb: Banco, petshopId: string, movimentos: { id: string; produto_id: string }[]): Promise<Map<string, number | null>> {
+  const custos = new Map<string, number | null>();
+  if (!movimentos.length) return custos;
+  let semFuncao = false;
+  const linhas = await reservado(sb, "custos_dos_movimentos_do_petshop", { p: petshopId }, async () => { semFuncao = true; return { data: [], error: null }; });
+  if (!semFuncao) {
+    for (const l of linhas) custos.set(String(l.id), num(l.custo_unitario));
+    return custos;
+  }
+  const porProduto = new Map<string, { id: string }[]>();
+  for (const m of movimentos) porProduto.set(m.produto_id, [...(porProduto.get(m.produto_id) ?? []), m]);
+  const grupos = [...porProduto];
+  for (let i = 0; i < grupos.length; i += 6) {
+    const lidos = await Promise.all(grupos.slice(i, i + 6).map(([produtoId, lista]) => comCustosDeMovimento(sb, produtoId, lista)));
+    for (const m of lidos.flat()) custos.set(m.id, m.custo_unitario);
+  }
+  return custos;
 }
 
 /** Junta o preço aos pacotes (modelos e vendidos). Sem a área de pacotes, o preço vem 0. */

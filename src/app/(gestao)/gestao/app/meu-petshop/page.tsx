@@ -5,6 +5,8 @@ import Identidade from "@/components/gestao/ajustes/identidade";
 import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
 import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
+import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
+import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { useState } from "react";
 import { CalendarDays, Check, Clock, Copy, ExternalLink, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
 import { Kpi, Tile } from "@/components/gestao/painel";
@@ -61,12 +63,13 @@ export default function MeuPetshop() {
           <Kpi icone={CalendarDays} tom="ceu" rotulo="Dias abertos" valor={abertos} apoio="por semana" />
           <Kpi icone={Clock} tom="lilas" rotulo="Hoje" valor={deHoje ? `${horaCurta(deHoje.abre)}–${horaCurta(deHoje.fecha)}` : "Fechado"} apoio={deHoje ? "horário de hoje" : "sem atendimento"} />
         </div>
+        <OQueUsa />
         <div className="g-duas meio">
           <div className="g-pilha g">
             <Dados />
             <HorarioDaLoja />
-            <VagasBanho />
-            <AjustesCrecheHotel />
+            {usaModulo(petshop, "banho_tosa") && <VagasBanho />}
+            {usaCasa(petshop) && <AjustesCrecheHotel />}
           </div>
           <div className="g-pilha g">
             <Identidade />

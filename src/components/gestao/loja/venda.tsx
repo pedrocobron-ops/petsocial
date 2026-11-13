@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Search, UserPlus, X } from "lucide-react";
 import { lancarPago } from "@/lib/gestao/dinheiro";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { brl, fmtTelefone, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -120,7 +121,7 @@ function BuscaTutor({ aoEscolher, aoDesistir }: { aoEscolher: (t: Tutor) => void
   const { sb, petshop } = useGestao();
   const [q, setQ] = useState("");
   const { dados, erro } = useDados(async () =>
-    ok(await sb.from("clientes").select("id, nome, telefone").eq("petshop_id", petshop.id).order("nome").limit(2000)) as Tutor[],
+    lerTudo<Tutor>((de, ate, contar) => sb.from("clientes").select("id, nome, telefone", contando(contar)).eq("petshop_id", petshop.id).order("nome").order("id").range(de, ate)),
   [petshop.id]);
   const alvo = semAcento(q);
   const achados = alvo ? (dados ?? []).filter((c) => semAcento(c.nome).includes(alvo)).slice(0, 6) : [];

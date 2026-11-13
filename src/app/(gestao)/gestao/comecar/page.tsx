@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Porta from "@/components/gestao/porta";
 import { banco } from "@/lib/gestao/supabase";
+import EscolherModulos from "@/components/gestao/modulos";
+import type { Modulo } from "@/lib/gestao/modulos";
 
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 
@@ -20,6 +22,8 @@ export default function Comecar() {
   const [telefone, setTelefone] = useState("");
   const [cidade, setCidade] = useState("");
   const [uf, setUf] = useState("");
+  // o mais comum já vem marcado; cada opção é um toque
+  const [modulos, setModulos] = useState<Modulo[]>(["banho_tosa"]);
   const [erro, setErro] = useState<string | null>(null);
   const [indo, setIndo] = useState(false);
 
@@ -46,9 +50,10 @@ export default function Comecar() {
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
-    setIndo(true);
     if (telefone.trim() && !telefoneValido(telefone)) { setErro(ERRO_TELEFONE); return; }
-    const { error } = await banco().rpc("criar_petshop", { p_nome: nome, p_seu_nome: seuNome, p_telefone: telefone.replace(/\D/g, ""), p_cidade: cidade, p_uf: uf });
+    if (!modulos.length) { setErro("Marque pelo menos uma coisa que o seu negócio faz."); return; }
+    setIndo(true);
+    const { error } = await banco().rpc("criar_petshop", { p_nome: nome, p_seu_nome: seuNome, p_telefone: telefone.replace(/\D/g, ""), p_cidade: cidade, p_uf: uf, p_modulos: modulos });
     setIndo(false);
     if (error) { setErro("Não consegui criar o pet shop. Confira os dados e tente de novo."); return; }
     router.replace("/gestao/app?boas-vindas=1");
@@ -91,6 +96,10 @@ export default function Comecar() {
         <label className="g-campo"><span>Nome do pet shop, banho e tosa, creche ou hotel</span>
           <input className="g-input" required minLength={2} maxLength={80} placeholder="Ex.: Banho & Cia ou Creche Patinhas" value={nome} onChange={(e) => setNome(e.target.value)} autoFocus />
         </label>
+        <div className="g-campo"><span>O que o seu negócio faz?</span>
+          <EscolherModulos valor={modulos} aoMudar={(v) => { setModulos(v); setErro(null); }} />
+          <small>Marque tudo o que vale. O sistema abre só com as telas do que você usa, e dá para mudar depois.</small>
+        </div>
         <label className="g-campo"><span>Como você quer ser chamado</span>
           <input className="g-input" required maxLength={80} value={seuNome} onChange={(e) => setSeuNome(e.target.value)} />
         </label>

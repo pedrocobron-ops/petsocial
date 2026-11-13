@@ -1,0 +1,116 @@
+/* Manual (/gestao/app/manual) e o botão "Como usar esta tela" da barra de cima. */
+
+/* ---------- botão na barra de cima ---------- */
+.g-man-botao {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 40px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--g-linha-forte); background: transparent; color: var(--g-tinta); font: 600 .8125rem/1 var(--sans); white-space: nowrap;
+}
+.g-man-botao:hover { background: rgba(31, 27, 23, .05); }
+.g-man-botao svg { width: 18px; height: 18px; color: var(--g-verde); }
+.g-man-botao i { font-style: normal; display: none; }
+@media (min-width: 1180px) { .g-man-botao i { display: inline; } }
+@media (max-width: 359px) { .g-man-botao { padding: 0 10px; } .g-man-botao span { display: none; } }
+
+/* ---------- um tópico: título que abre o passo a passo ---------- */
+.g-man-lista { display: grid; }
+.g-man-item { border-bottom: 1px solid var(--g-linha); scroll-margin-top: 16px; }
+.g-man-item:last-child { border-bottom: 0; }
+.g-man-cab {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 56px; padding: 12px 2px; border: 0; background: none; color: inherit; text-align: left; font: inherit;
+}
+.g-man-cab .t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.g-man-cab b { font-weight: 600; line-height: 1.3; }
+.g-man-apoio { font-size: .8125rem; color: var(--g-cinza); }
+.g-man-cab .seta { flex: none; width: 20px; height: 20px; color: var(--g-cinza); transition: rotate .18s; }
+.g-man-item.aberto .seta { rotate: 180deg; }
+.g-man-item.aberto .g-man-cab b { color: var(--g-verde); }
+.g-man-cab:hover b { text-decoration: underline; text-decoration-color: var(--g-linha-forte); text-underline-offset: 3px; }
+.g-man-quem { flex: none; }
+.g-man-dobra { display: none; }
+.g-man-item.aberto .g-man-dobra { display: block; }
+/* celular: a etiqueta de quem pode desce para baixo do título, que fica com a linha inteira */
+@media (max-width: 599px) {
+  .g-man-cab { display: grid; grid-template-columns: minmax(0, 1fr) 20px; gap: 6px 10px; }
+  .g-man-cab .t { grid-column: 1; grid-row: 1; }
+  .g-man-cab .seta { grid-column: 2; grid-row: 1; }
+  .g-man-quem { grid-column: 1; grid-row: 2; justify-self: start; }
+}
+
+.g-man-corpo { display: grid; gap: 12px; padding: 2px 2px 18px; }
+.g-man-passos { list-style: none; counter-reset: passo; display: grid; gap: 10px; margin: 0; padding: 0; }
+.g-man-passos li { counter-increment: passo; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; line-height: 1.45; }
+.g-man-passos li::before {
+  content: counter(passo); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--g-verde-tint); color: var(--g-verde); font: 700 .8125rem/1 var(--sans); font-variant-numeric: tabular-nums;
+}
+.g-man-passos li span { padding-top: 3px; }
+.g-man-nota { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; padding: 12px 14px; border-radius: var(--g-raio-p); background: var(--g-carta-2, rgba(31, 27, 23, .04)); font-size: .9375rem; line-height: 1.45; }
+.g-man-nota > svg { width: 18px; height: 18px; margin-top: 2px; color: var(--g-cinza); }
+.g-man-nota ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.g-man-nota.atencao { background: var(--g-amarelo-tint); color: #5b4708; }
+.g-man-nota.atencao > svg { color: #8a6a0c; }
+.g-man-ir .g-btn { gap: 8px; }
+.g-man-tela { font-weight: 500; color: var(--g-cinza); }
+.g-man-tela::before { content: "· "; }
+.g-man-ir .g-btn svg { width: 16px; height: 16px; }
+
+/* ---------- folha "Como usar esta tela" ---------- */
+.g-man-folha { display: grid; gap: 10px; }
+.g-man-saidas { display: grid; gap: 8px; margin-top: 8px; }
+@media (min-width: 720px) { .g-man-saidas { grid-template-columns: 1fr 1fr; } }
+
+/* ---------- tela do manual ---------- */
+.g-man { max-width: 860px; }
+.g-man-papel { display: none; }
+.g-man-busca { display: grid; gap: 10px; }
+.g-man-busca .g-busca .g-input { min-height: 52px; padding-right: 48px; font-size: 1rem; }
+.g-man-busca input[type="search"]::-webkit-search-cancel-button { display: none; }
+.g-man-limpar { position: absolute; right: 6px; top: 50%; translate: 0 -50%; }
+.g-man-busca .g-busca .g-man-limpar svg { position: static; translate: none; pointer-events: auto; }
+.g-man-legenda { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.g-man-tudo.escondido { display: none; }
+.g-man-secao { scroll-margin-top: 16px; }
+.g-man-secao-t { margin-bottom: 6px; }
+.g-man-secao-t h2, .g-man-achados h2, .g-man-fim h2 { font: 500 1.375rem/1.2 var(--display); }
+.g-man-indice { display: flex; flex-wrap: wrap; gap: 8px; }
+.g-man-indice .g-chip { text-decoration: none; }
+.g-man-ordem { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+@media (min-width: 720px) { .g-man-ordem { grid-template-columns: 1fr 1fr; grid-auto-flow: column; grid-template-rows: repeat(4, auto); column-gap: 12px; } }
+.g-man-ordem a {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; align-items: center; min-height: 52px; padding: 8px 12px; border-radius: var(--g-raio-p);
+  border: 1px solid var(--g-linha); background: #fffdf9; color: inherit; text-decoration: none; font-weight: 600; line-height: 1.3;
+}
+.g-man-ordem a:hover { border-color: var(--g-linha-forte); }
+.g-man-ordem i { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--g-verde); color: #f6f1e8; font: 700 .875rem/1 var(--sans); font-style: normal; }
+.g-man-fim { display: grid; gap: 14px; align-items: center; }
+@media (min-width: 720px) { .g-man-fim { grid-template-columns: minmax(0, 1fr) auto; } }
+
+/* ---------- no papel: o manual inteiro, com tudo aberto e sem o menu ---------- */
+@media print {
+  .g-app:has(.g-man) .g-barra, .g-app:has(.g-man) .g-aviso, .g-app:has(.g-man) .g-guia, .g-app:has(.g-man) .g-ass { display: none !important; }
+  .g-man { max-width: none; }
+  .g-man-papel { display: block; margin: -14px 0 14px; font-size: .875rem; color: #444; }
+  .g-man-busca .g-busca, .g-man-achados, .g-man-indice, .g-man-fim, .g-man-ir, .g-man-cab .seta { display: none !important; }
+  .g-app:has(.g-man) { display: block; min-height: 0; }
+  .g-app:has(.g-man) .g-main { overflow: visible; max-width: none; }
+  /* grade não quebra bem entre páginas: no papel, tudo em bloco */
+  .g-man .g-pilha, .g-man-tudo, .g-man-tudo.escondido, .g-man-lista { display: block; }
+  .g-man-secao, .g-man-zero { margin-bottom: 18px; }
+  .g-man .g-card { border: 0; padding: 0; background: none; box-shadow: none; break-inside: auto; }
+  .g-man-secao { break-before: auto; }
+  .g-man-secao-t { break-after: avoid; border-bottom: 2px solid #222; padding-bottom: 4px; margin-bottom: 8px; }
+  .g-man .g-man-dobra { display: block; }
+  .g-man-item { break-inside: avoid; border-bottom: 1px solid #ccc; }
+  .g-man-cab { min-height: 0; padding: 10px 0 6px; }
+  .g-man-item .g-man-cab b, .g-man-item.aberto .g-man-cab b { color: #000; font-size: 1.0625rem; }
+  .g-man-corpo { padding-bottom: 12px; gap: 8px; }
+  .g-man-passos { gap: 4px; }
+  .g-man-passos li::before { background: none; border: 1px solid #555; color: #000; width: 22px; height: 22px; }
+  .g-man-passos li { grid-template-columns: 22px minmax(0, 1fr); }
+  .g-man-passos li span { padding-top: 1px; }
+  .g-man-nota, .g-man-nota.atencao { background: none; border: 1px solid #bbb; color: #000; padding: 8px 10px; }
+  .g-man-ordem { grid-template-columns: 1fr 1fr; grid-auto-flow: column; grid-template-rows: repeat(4, auto); gap: 4px 12px; }
+  .g-man-ordem a { min-height: 0; padding: 4px 0; border: 0; background: none; }
+  .g-man-ordem i { background: none; border: 1px solid #555; color: #000; width: 24px; height: 24px; }
+  .g-man .g-tag { border: 1px solid #999; background: none; color: #000; }
+}

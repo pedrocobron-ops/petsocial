@@ -17,12 +17,14 @@ export function Tile({ icone: Icone, tom = "menta", tamanho }: { icone: React.Co
 export function Kpi({ rotulo, valor, apoio, icone, tom = "menta", href, lado }: {
   rotulo: string; valor: React.ReactNode; apoio?: React.ReactNode; icone: React.ComponentType<{ size?: number }>; tom?: Tom; href?: string; lado?: React.ReactNode;
 }) {
+  // valor comprido (R$ 148.253,71, R$ 2.644.373,68) não cabe no cartão do celular: a letra diminui
+  const tamanho = typeof valor === "string" ? (valor.length >= 16 ? " mlongo" : valor.length >= 13 ? " longo" : "") : "";
   const dentro = (
     <>
       <div className="g-kpi-cab"><Tile icone={icone} tom={tom} /><span className="g-rotulo">{rotulo}</span></div>
       <div className="g-kpi-meio">
         <div style={{ minWidth: 0 }}>
-          <p className="g-num">{valor}</p>
+          <p className={`g-num${tamanho}`}>{valor}</p>
           {apoio != null && <p className="g-muted g-p g-kpi-apoio">{apoio}</p>}
         </div>
         {lado && <div className="g-kpi-lado">{lado}</div>}

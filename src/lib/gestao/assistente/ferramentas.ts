@@ -1,4 +1,6 @@
 import { COLS_PACOTE, comCustos, comPrecosDePacote, type PacoteLinha } from "../reservado";
+import { contando, lerTudo } from "../paginas";
+import { buscarVisitas } from "../visitas";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
@@ -364,7 +366,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     case "buscar_pets": {
       const alvo = semAcento(texto(e.termo, 80));
       const digitos = alvo.replace(/\D/g, "");
-      const todos = ok(await sb.from("pets").select("id, nome, especie, raca, porte, alertas, ativo, clientes(id, nome, telefone)").eq("petshop_id", petshop.id).eq("ativo", true).limit(3000));
+      type PetAchado = { id: string; nome: string; especie: string; raca: string | null; porte: string | null; alertas: string | null; ativo: boolean; clientes: { id: string; nome: string; telefone: string | null } | null };
+      const todos = await lerTudo<PetAchado>((de, ate, contar) => sb.from("pets").select("id, nome, especie, raca, porte, alertas, ativo, clientes(id, nome, telefone)", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate));
       const achados = todos.filter((p) => semAcento(p.nome).includes(alvo) || semAcento(p.clientes?.nome ?? "").includes(alvo) || (digitos.length >= 4 && (p.clientes?.telefone ?? "").replace(/\D/g, "").includes(digitos))).slice(0, 12);
       if (!achados.length) return { resultado: { pets: [], aviso: "Nenhum pet encontrado com esse nome. Pergunte se quer cadastrar." } };
       const ids = achados.map((p) => p.id);
@@ -420,17 +423,19 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     }
     case "clientes_sumidos": {
       const dias = Math.max(1, Math.min(720, numero(e.dias) ?? 30));
-      const [pets, ags] = await Promise.all([
-        sb.from("pets").select("id, nome, clientes(nome, telefone)").eq("petshop_id", petshop.id).eq("ativo", true).limit(3000),
-        sb.from("agendamentos").select("pet_id, inicio, status").eq("petshop_id", petshop.id).order("inicio", { ascending: false }).limit(5000),
+      // a mesma conta de visitas da tela (src/lib/gestao/visitas.ts), lida em páginas; aqui também entra quem nunca veio
+      const [pets, visitas] = await Promise.all([
+        lerTudo<{ id: string; nome: string; clientes: { nome: string; telefone: string | null } | null }>((de, ate, contar) =>
+          sb.from("pets").select("id, nome, clientes(nome, telefone)", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)),
+        buscarVisitas(sb, petshop.id),
       ]);
       const ultimo = new Map<string, string>(), futuro = new Set<string>();
-      for (const a of ags.data ?? []) {
-        if (new Date(a.inicio) > new Date() && !["cancelado", "faltou"].includes(a.status)) futuro.add(a.pet_id);
-        if (a.status === "concluido" && !ultimo.has(a.pet_id)) ultimo.set(a.pet_id, a.inicio);
+      for (const [petId, v] of visitas) {
+        if (v.marcado) futuro.add(petId);
+        if (v.ultima) ultimo.set(petId, v.ultima);
       }
       const corte = Date.now() - dias * 864e5;
-      const lista = (pets.data ?? []).filter((p) => !futuro.has(p.id) && (!ultimo.has(p.id) || new Date(ultimo.get(p.id)!).getTime() < corte))
+      const lista = pets.filter((p) => !futuro.has(p.id) && (!ultimo.has(p.id) || new Date(ultimo.get(p.id)!).getTime() < corte))
         .map((p) => ({ pet_id: p.id, pet: p.nome, tutor: p.clientes?.nome, telefone: p.clientes?.telefone ? fmtTelefone(p.clientes.telefone) : null,
           ultimo: ultimo.has(p.id) ? utcParaLocal(ultimo.get(p.id)!, c.fusoMin).slice(0, 10) : "nunca veio" }))
         .sort((a, b) => a.ultimo.localeCompare(b.ultimo));
@@ -438,7 +443,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     }
     case "ver_estoque": {
       const alvo = semAcento(texto(e.termo, 80));
-      const prods = await comCustos(sb, petshop.id, ok(await sb.from("produtos").select("id, nome, categoria, unidade, estoque, estoque_minimo, preco_venda").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(1000)));
+      const prods = await comCustos(sb, petshop.id, await lerTudo<{ id: string; nome: string; categoria: string | null; unidade: string; estoque: number; estoque_minimo: number; preco_venda: number | null }>((de, ate, contar) =>
+        sb.from("produtos").select("id, nome, categoria, unidade, estoque, estoque_minimo, preco_venda", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)));
       const lista = prods.filter((p) => !alvo || semAcento(p.nome).includes(alvo))
         .map((p) => ({ produto_id: p.id, nome: p.nome, unidade: p.unidade, saldo: Number(p.estoque), minimo: Number(p.estoque_minimo), acabando: Number(p.estoque_minimo) > 0 && Number(p.estoque) <= Number(p.estoque_minimo), preco_venda: p.preco_venda, ...(c.vejoFinanceiro ? { custo: p.custo } : {}) }))
         .sort((a, b) => Number(b.acabando) - Number(a.acabando));
@@ -448,7 +454,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       exigir(c.vejoFinanceiro, "Esta pessoa não tem acesso ao financeiro.");
       exigir(RE_DIA.test(String(e.de)) && RE_DIA.test(String(e.ate)), "Datas no formato AAAA-MM-DD.");
       const [ls, caixa] = await Promise.all([
-        sb.from("lancamentos").select("tipo, valor, forma, categoria, pagamentos").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).gte("data", String(e.de)).lte("data", String(e.ate)).limit(5000),
+        lerTudo<{ tipo: string; valor: number; forma: string | null; categoria: string; pagamentos: unknown }>((de, ate, contar) => sb.from("lancamentos").select("tipo, valor, forma, categoria, pagamentos", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).gte("data", String(e.de)).lte("data", String(e.ate)).order("data").order("id").range(de, ate)).then((data) => ({ data })),
         sb.from("caixas").select("aberto_em, valor_inicial").eq("petshop_id", petshop.id).is("fechado_em", null).maybeSingle(),
       ]);
       // por forma, o pagamento dividido entra repartido (parte no Pix, parte em dinheiro)
