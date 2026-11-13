@@ -452,7 +452,7 @@ export function DetalheDaEstadia({ estadia: e, aoFechar, aoCorrigir }: { estadia
             {conta.pagamento && <div className="l fraca"><span>Pagamento{junto > 0 ? ` (${brl(centavos(conta.a_pagar + junto))})` : ""}</span><span>{textoDoPagamentoDaConta(conta.pagamento)}</span></div>}
           </div>
         ) : e.status === "cancelada" ? (
-          dados?.sinal_estado ? <p className="g-p">Sinal de {brl(dados.sinal)}: {dados.sinal_estado === "devolvido" ? `devolvido${dados.sinal_devolvido_em ? ` em ${dataCompleta(dados.sinal_devolvido_em)}` : ""}` : dados.sinal_estado === "mantido" ? "ficou com o negócio" : dados.sinal_estado === "pago" ? "pago" : "a receber"}.</p> : null
+          dados?.sinal_estado ? <p className="g-p">Sinal de {brl(dados.sinal)}: {dados.sinal_estado === "devolvido" ? `devolvido${dados.sinal_devolvido_em ? ` em ${dataCompleta(dados.sinal_devolvido_em)}` : ""}` : dados.sinal_estado === "mantido" ? "não foi devolvido" : dados.sinal_estado === "pago" ? "pago" : "a receber"}.</p> : null
         ) : (
           <div className="g-ht-conta">
             <div className="l"><span>Cobrado na saída</span><span>{e.mensalista ? "dia do plano" : e.obs?.includes(NOTA_PACOTE) ? "pacote" : e.valor_cobrado == null ? "sem valor lançado" : Number(e.valor_cobrado) === 0 ? "cortesia" : brl(e.valor_cobrado)}</span></div>

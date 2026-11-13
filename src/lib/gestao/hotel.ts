@@ -115,7 +115,7 @@ export type EstadiaDoTutor = Pick<Estadia, "id" | "pet_id" | "tipo" | "status" |
 
 /**
  * Noites desta estadia em que ela é a do "segundo pet": outro pet do mesmo tutor está hospedado no hotel na mesma noite
- * e entrou antes (no empate da hora, vale a ordem de criação). O primeiro paga a diária cheia.
+ * e entrou antes (no empate exato da hora, sempre a mesma das duas). O primeiro paga a diária cheia.
  */
 export function diasDeSegundoPet(esta: { id: string | null; pet_id: string; entrada: string | Date }, dias: string[], outras: EstadiaDoTutor[], hoje: Date): Set<string> {
   const minha = new Date(esta.entrada).getTime();

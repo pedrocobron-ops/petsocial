@@ -161,7 +161,8 @@ export default function PedidosLink() {
       const tutor = decisao.tutor;
       if (tutor) setTutores((t) => ({ ...t, ...Object.fromEntries(feitos.map((p) => [p.id, tutor])) }));
       void recarregar();
-      avisar(feitos.length === 1 ? (ehEstadia(feitos[0]) ? `Reserva de ${feitos[0].pet_nome} feita. Ela está em Creche e hotel.` : `Horário de ${feitos[0].pet_nome} marcado.`) : `Horários de ${listaDe(feitos.map((p) => p.pet_nome))} marcados.`);
+      avisar(feitos.length === 1 ? (ehEstadia(feitos[0]) ? `Reserva de ${feitos[0].pet_nome} feita. Ela está em Creche e hotel.` : `Horário de ${feitos[0].pet_nome} marcado.`)
+        : feitos.every(ehEstadia) ? `Reservas de ${listaDe(feitos.map((p) => p.pet_nome))} feitas. Elas estão em Creche e hotel.` : `Horários de ${listaDe(feitos.map((p) => p.pet_nome))} marcados.`);
       avisarMudanca();
     }
     if (falha) { avisarErro(falha); void recarregar(); }
@@ -214,7 +215,7 @@ export default function PedidosLink() {
     const base = `${window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
     const acompanhar = `\n\nVeja a confirmação aqui: ${base}/pedido/${p.id}`;
     if (ehEstadia(p)) {
-      const oQue = `${p.tipo === "hotel" ? "o hotel" : "a creche"} de ${p.pet_nome}, ${periodoDe(p)}`;
+      const oQue = `${p.tipo === "hotel" ? "o hotel" : "a creche"} de ${nomes}, ${periodoDe(p)}`;
       return lista[0].resposta === "recusado"
         ? `${oi} Recebemos o seu pedido para ${oQue}, mas não temos vaga nessas datas. Você pode escolher outras datas aqui: ${base}\n\nSe preferir, me diga o período que fica bom para você.`
         : `${oi} Está confirmado: ${oQue}, com chegada às ${hora(p.inicio)}${p.tipo === "hotel" ? ` e saída às ${hora(p.fim)}` : ""}.${fraseDoSinal(p)} Esperamos vocês!${acompanhar}`;
@@ -264,6 +265,7 @@ export default function PedidosLink() {
                   <b>{listaDe(g.lista.map((r) => r.pedido.pet_nome))}</b>
                   <span>
                     {!aceito ? (varios ? "Pedidos recusados." : "Pedido recusado.")
+                      : varios && ehEstadia(p) ? `Reservas de ${p.tipo === "hotel" ? "hotel" : "creche"} feitas: ${periodoDe(p)}.`
                       : varios ? `Marcados para ${quandoNaTela(p.inicio)}: ${listaDe(g.lista.map((r) => `${r.pedido.pet_nome} às ${hora(r.pedido.inicio)}`))}.`
                       : ehEstadia(p) ? `Reserva de ${p.tipo === "hotel" ? "hotel" : "creche"} feita: ${periodoDe(p)}.`
                       : `Marcado para ${quandoNaTela(p.inicio)}, às ${hora(p.inicio)}.`} Avise {primeiroNome(g.lista[0].tutor ?? p.tutor_nome)}.
@@ -325,7 +327,7 @@ export default function PedidosLink() {
           }
 
           return (
-            <article key={g.id} className="g-pl-item" style={{ "--cor": corServico(p.servico_id) } as React.CSSProperties}>
+            <article key={g.id} className="g-pl-item" style={{ "--cor": p.tipo === "creche" ? "#3b9bd9" : p.tipo === "hotel" ? "#7c6bd6" : corServico(p.servico_id) } as React.CSSProperties}>
               <div className="g-pl-quem">
                 <span className="g-pl-varios" aria-hidden>
                   {g.lista.slice(0, 3).map((x) => <AvatarPet key={x.id} pet={{ nome: x.pet_nome, especie: x.especie }} />)}
@@ -337,16 +339,16 @@ export default function PedidosLink() {
               </div>
               <div className="g-pl-quando">
                 <span className="g-pl-serv"><i aria-hidden />{servico ?? "Serviço"}</span>
-                <span className="g-pl-hora"><Clock aria-hidden />{quandoNaTela(p.inicio)}, das {hora(p.inicio)} às {hora(fim)}</span>
-                <span className="g-tag azul">{g.lista.length} pets, um depois do outro</span>
-                {passou && <span className="g-tag vermelho">horário já passou</span>}
+                <span className="g-pl-hora"><Clock aria-hidden />{ehEstadia(p) ? `${periodoDe(p)}, chega às ${hora(p.inicio)} e sai às ${hora(p.fim)}` : `${quandoNaTela(p.inicio)}, das ${hora(p.inicio)} às ${hora(fim)}`}</span>
+                <span className="g-tag azul">{ehEstadia(p) ? `${g.lista.length} pets do mesmo tutor` : `${g.lista.length} pets, um depois do outro`}</span>
+                {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
               </div>
               <ul className="g-pl-pets">
                 {g.lista.map((x) => {
                   const detalhes = detalhesDe(x);
                   return (
                     <li key={x.id}>
-                      <span className="g-pl-pet-h">{hora(x.inicio)}</span>
+                      {!ehEstadia(x) && <span className="g-pl-pet-h">{hora(x.inicio)}</span>}
                       <span className="g-pl-pet-n"><b>{x.pet_nome}</b>{detalhes && <small>{detalhes}</small>}</span>
                       <span className="g-pl-pet-b">
                         <button type="button" className="g-btn sec p" disabled={ocupado !== null} aria-label={`Aceitar só ${x.pet_nome}`} onClick={() => void aceitar([x], g.id)}>{ocupado === x.id ? "…" : "Aceitar"}</button>
