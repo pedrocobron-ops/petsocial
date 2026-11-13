@@ -53,7 +53,7 @@
 .g-cm-col { display: grid; justify-items: center; gap: 4px; text-align: center; min-width: 0; }
 .g-cm-col b { font: 480 1.25rem/1 var(--display); }
 .g-cm-col b small { font: 500 .75rem/1 var(--corpo, inherit); color: var(--g-cinza); }
-.g-cm-col .barra { display: flex; align-items: flex-end; width: 100%; max-width: 44px; height: 56px; border-radius: 10px; background: var(--g-carta-2); overflow: hidden; }
+.g-cm-col .barra { display: flex; align-items: flex-end; width: 100%; max-width: 44px; height: 56px; border-radius: 10px; background: var(--g-carta-2); box-shadow: inset 0 0 0 1px var(--g-linha); overflow: hidden; }
 .g-cm-col .barra i { display: block; width: 100%; min-height: 3px; border-radius: 10px 10px 0 0; background: #d9a520; }
 .g-cm-col.cheio .barra i { background: var(--g-vermelho); }
 .g-cm-col.cheio b { color: var(--g-vermelho); }
