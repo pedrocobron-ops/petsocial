@@ -12,7 +12,7 @@ export const MODULOS = [
 ] as const;
 
 export type Modulo = (typeof MODULOS)[number]["id"];
-type ComModulos = { modulos?: string[] | null };
+type ComModulos = { modulos?: string[] | null; principal?: string | null };
 
 const IDS = MODULOS.map((m) => m.id) as Modulo[];
 
@@ -38,6 +38,42 @@ export function rotaForaDoMenu(petshop: ComModulos, href: string): boolean {
 export function nomeDaCasa(petshop: ComModulos): string {
   const c = usaModulo(petshop, "creche"), h = usaModulo(petshop, "hotel");
   return c && !h ? "Creche" : h && !c ? "Hotel" : "Creche e hotel";
+}
+
+/**
+ * Área principal: a que aparece primeiro no menu e na tela inicial (`petshops.principal`).
+ * Pacotes não entra: é um jeito de vender, não uma área. Vazio (null) = sem área principal, tudo na ordem de sempre.
+ */
+export const AREAS_PRINCIPAIS = ["banho_tosa", "creche", "hotel", "loja"] as const;
+export type Principal = (typeof AREAS_PRINCIPAIS)[number];
+/** Como o Mozart chama cada área numa frase ("Deixei a creche em primeiro lugar"). */
+export const NOME_DA_AREA: Record<Principal, string> = { banho_tosa: "o banho e tosa", creche: "a creche", hotel: "o hotel", loja: "a loja" };
+
+/** A tela de cada área principal no menu e o nome do botão laranja da tela inicial. */
+export const TELA_DA_AREA: Record<Principal, { rotulo: string; menu: string; acao: string }> = {
+  banho_tosa: { rotulo: "Banho e tosa", menu: "Agenda", acao: "Marcar horário" },
+  creche: { rotulo: "Creche", menu: "Creche", acao: "Fazer check-in" },
+  hotel: { rotulo: "Hotel", menu: "Hotel", acao: "Nova reserva" },
+  loja: { rotulo: "Venda de produtos", menu: "Estoque", acao: "Vender" },
+};
+
+/** As áreas que podem ser a principal, entre as marcadas. */
+export const areasParaPrincipal = (modulos: readonly string[]): Principal[] => AREAS_PRINCIPAIS.filter((a) => modulos.includes(a));
+/** A principal que vale para uma escolha: a que a pessoa apontou, ou a única área marcada. Sem isso, nenhuma. */
+export function principalPara(modulos: readonly string[], escolhida: string | null | undefined): Principal | null {
+  const areas = areasParaPrincipal(modulos);
+  return areas.find((a) => a === escolhida) ?? (areas.length === 1 ? areas[0] : null);
+}
+/** A área principal gravada no pet shop (null quando não há, ou quando ela saiu do que o pet shop usa). */
+export function principalDe(petshop: ComModulos): Principal | null {
+  const p = AREAS_PRINCIPAIS.find((a) => a === petshop.principal);
+  return p && usaModulo(petshop, p) ? p : null;
+}
+/** Qual assunto vai na frente da tela inicial: a agenda, a casa (creche e hotel) ou a loja. */
+export type Frente = "banho" | "casa" | "loja";
+export function frenteDe(petshop: ComModulos): Frente | null {
+  const p = principalDe(petshop);
+  return p === "banho_tosa" ? "banho" : p === "creche" || p === "hotel" ? "casa" : p === "loja" ? "loja" : null;
 }
 
 /** Serviços que entram junto com o banho e tosa (os mesmos de quem cria o pet shop já com banho e tosa). Sem preço. */

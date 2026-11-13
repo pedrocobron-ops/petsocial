@@ -78,6 +78,13 @@ export default function Estoque() {
 
   const abrir = (a: Aberta) => { if (a.tipo !== "ficha" && somenteLeitura()) return; setAberta(a); };
   const fechar = () => setAberta(null);
+  // atalho "Vender" da tela inicial (/gestao/app/estoque?vender=1): já abre a venda, uma vez só
+  const temProdutos = produtos.length > 0;
+  useEffect(() => {
+    if (!temProdutos || !new URLSearchParams(window.location.search).has("vender")) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (!somenteLeitura()) setAberta({ tipo: "venda" });
+  }, [temProdutos, somenteLeitura]);
   const gravou = () => { fechar(); void recarregar(); void recarregarSaidas(); avisarMudanca(); };
 
   const categorias = new Set(produtos.map((p) => p.categoria?.trim()).filter(Boolean)).size;

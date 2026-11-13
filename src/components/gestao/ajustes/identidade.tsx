@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Check, ImagePlus, Link2, Palette, Trash2 } from "lucide-react";
-import { TEMAS, aplicarTema, corPropria, corSegura, reduzirLogo } from "@/lib/gestao/identidade";
+import { TEMAS, aplicarTema, corPropria, corSegura, enviarLogo, tirarLogo } from "@/lib/gestao/identidade";
 import { useGestao } from "../contexto";
 import LogoLoja from "../logo-loja";
 import { Tile } from "../painel";
@@ -45,13 +45,7 @@ export default function Identidade() {
     if (!arquivo.type.startsWith("image/")) { avisar("Escolha um arquivo de imagem (PNG, JPG ou WebP)."); return; }
     setEnviando(true);
     try {
-      const blob = await reduzirLogo(arquivo);
-      const caminho = `${petshop.id}/logo-${crypto.randomUUID()}.webp`;
-      const up = await sb.storage.from("pets").upload(caminho, blob, { contentType: "image/webp" });
-      if (up.error) throw new Error(up.error.message);
-      const antiga = petshop.logo;
-      ok(await sb.from("petshops").update({ logo: caminho }).eq("id", petshop.id).select("id"));
-      if (antiga) await sb.storage.from("pets").remove([antiga]);
+      await enviarLogo(sb, petshop, arquivo);
       await recarregarBase();
       avisar("Logo trocada.");
     } catch (e) { avisarErro(e); } finally { setEnviando(false); if (entrada.current) entrada.current.value = ""; }
@@ -61,9 +55,7 @@ export default function Identidade() {
     if (!petshop.logo || somenteLeitura()) return;
     setEnviando(true);
     try {
-      const antiga = petshop.logo;
-      ok(await sb.from("petshops").update({ logo: null }).eq("id", petshop.id).select("id"));
-      await sb.storage.from("pets").remove([antiga]);
+      await tirarLogo(sb, petshop);
       await recarregarBase();
       avisar("Logo removida.");
     } catch (e) { avisarErro(e); } finally { setEnviando(false); }

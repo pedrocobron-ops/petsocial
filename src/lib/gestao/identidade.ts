@@ -1,3 +1,5 @@
+import type { Banco } from "./supabase";
+
 /** Combinações de cor que o pet shop escolhe. As cores em si moram no CSS (`.g-raiz[data-tema=…]`); aqui ficam os nomes e a amostra. */
 export const TEMAS = [
   { id: "floresta", nome: "Floresta", tema: "#1e3a2f", destaque: "#f97316" },
@@ -53,4 +55,25 @@ export async function reduzirLogo(arquivo: File, maximo = 512): Promise<Blob> {
   const blob = await new Promise<Blob | null>((ok) => tela.toBlob(ok, "image/webp", 0.9));
   if (!blob) throw new Error("Não consegui ler essa imagem. Escolha um arquivo PNG ou JPG.");
   return blob;
+}
+
+/** Sobe a logo nova (reduzida), grava no pet shop e apaga a antiga do armazenamento. Devolve o caminho gravado. */
+export async function enviarLogo(sb: Banco, petshop: { id: string; logo: string | null }, arquivo: File): Promise<string> {
+  if (!arquivo.type.startsWith("image/")) throw new Error("Escolha um arquivo de imagem (PNG, JPG ou WebP).");
+  const blob = await reduzirLogo(arquivo);
+  const caminho = `${petshop.id}/logo-${crypto.randomUUID()}.webp`;
+  const up = await sb.storage.from("pets").upload(caminho, blob, { contentType: "image/webp" });
+  if (up.error) throw new Error(up.error.message);
+  const r = await sb.from("petshops").update({ logo: caminho }).eq("id", petshop.id).select("id");
+  if (r.error) throw new Error(r.error.message);
+  if (petshop.logo) await sb.storage.from("pets").remove([petshop.logo]);
+  return caminho;
+}
+
+/** Tira a logo do pet shop e apaga o arquivo. */
+export async function tirarLogo(sb: Banco, petshop: { id: string; logo: string | null }) {
+  if (!petshop.logo) return;
+  const r = await sb.from("petshops").update({ logo: null }).eq("id", petshop.id).select("id");
+  if (r.error) throw new Error(r.error.message);
+  await sb.storage.from("pets").remove([petshop.logo]);
 }
