@@ -1,3 +1,4 @@
+import { COLS_PACOTE, comCustos, comPrecosDePacote, type PacoteLinha } from "../reservado";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
@@ -287,7 +288,8 @@ async function planoDoCheckout(c: Contexto, e: Entrada) {
 async function planoDaVenda(c: Contexto, e: Entrada) {
   const pet = await petPorId(c, e.pet_id);
   exigir(uuid(e.pacote_id), "pacote_id inválido: use ver_pacotes para ver os modelos à venda.");
-  const { data: modelo } = await c.sb.from("pacotes").select("*").eq("petshop_id", c.petshop.id).eq("id", String(e.pacote_id)).maybeSingle();
+  const { data: semPreco } = await c.sb.from("pacotes").select(COLS_PACOTE).eq("petshop_id", c.petshop.id).eq("id", String(e.pacote_id)).maybeSingle();
+  const modelo = semPreco ? (await comPrecosDePacote(c.sb, c.petshop.id, [semPreco as unknown as { id: string }]))[0] as unknown as PacoteLinha : null;
   exigir(modelo, "Modelo de pacote não encontrado: use ver_pacotes.");
   exigir(modelo.ativo, `O modelo "${modelo.nome}" está desativado. Use ver_pacotes para ver os que estão à venda.`);
   const hoje = c.agora.slice(0, 10);
@@ -436,7 +438,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     }
     case "ver_estoque": {
       const alvo = semAcento(texto(e.termo, 80));
-      const prods = ok(await sb.from("produtos").select("id, nome, categoria, unidade, estoque, estoque_minimo, preco_venda, custo").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(1000));
+      const prods = await comCustos(sb, petshop.id, ok(await sb.from("produtos").select("id, nome, categoria, unidade, estoque, estoque_minimo, preco_venda").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(1000)));
       const lista = prods.filter((p) => !alvo || semAcento(p.nome).includes(alvo))
         .map((p) => ({ produto_id: p.id, nome: p.nome, unidade: p.unidade, saldo: Number(p.estoque), minimo: Number(p.estoque_minimo), acabando: Number(p.estoque_minimo) > 0 && Number(p.estoque) <= Number(p.estoque_minimo), preco_venda: p.preco_venda, ...(c.vejoFinanceiro ? { custo: p.custo } : {}) }))
         .sort((a, b) => Number(b.acabando) - Number(a.acabando));
@@ -491,13 +493,15 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     case "ver_pacotes": {
       const pet = e.pet_id ? await petPorId(c, e.pet_id) : null;
       const [modelos, ativos] = await Promise.all([
-        sb.from("pacotes").select("id, nome, quantidade, validade_dias, preco, servicos(nome)").eq("petshop_id", petshop.id).eq("ativo", true).order("nome"),
-        (pet ? sb.from("pacotes_clientes").select("id, pet_id, nome, total, usados, vence_em, preco, pets(nome, clientes(nome))").eq("pet_id", pet.id) : sb.from("pacotes_clientes").select("id, pet_id, nome, total, usados, vence_em, preco, pets(nome, clientes(nome))"))
+        sb.from("pacotes").select("id, nome, quantidade, validade_dias, servicos(nome)").eq("petshop_id", petshop.id).eq("ativo", true).order("nome"),
+        (pet ? sb.from("pacotes_clientes").select("id, pet_id, nome, total, usados, vence_em, pets(nome, clientes(nome))").eq("pet_id", pet.id) : sb.from("pacotes_clientes").select("id, pet_id, nome, total, usados, vence_em, pets(nome, clientes(nome))"))
           .eq("petshop_id", petshop.id).eq("ativo", true).order("criado_em", { ascending: false }).limit(1000),
       ]);
+      // preço: só chega para quem cuida de pacotes ou vê o financeiro
+      const precos = new Map((await comPrecosDePacote(sb, petshop.id, [...ok(modelos), ...ok(ativos)].map((x) => ({ id: x.id })))).map((x) => [x.id, x.preco]));
       const lista = ok(ativos).map((p) => ({ pacote_cliente_id: p.id, pet_id: p.pet_id, pet: p.pets?.nome ?? "pet removido", tutor: p.pets?.clientes?.nome, pacote: p.nome, usados: p.usados, total: p.total, restam: Math.max(0, p.total - p.usados),
-        vence_em: p.vence_em, ...(p.vence_em ? { validade: situacaoDoVencimento(p.vence_em, hoje) } : {}), ...(c.vejoFinanceiro ? { valor: p.preco } : {}) }));
-      return { resultado: { modelos_a_venda: ok(modelos).map((m) => ({ pacote_id: m.id, nome: m.nome, quantidade: m.quantidade, validade_dias: m.validade_dias, preco: m.preco, servico: m.servicos?.nome ?? "qualquer serviço" })),
+        vence_em: p.vence_em, ...(p.vence_em ? { validade: situacaoDoVencimento(p.vence_em, hoje) } : {}), ...(c.vejoFinanceiro ? { valor: precos.get(p.id) ?? 0 } : {}) }));
+      return { resultado: { modelos_a_venda: ok(modelos).map((m) => ({ pacote_id: m.id, nome: m.nome, quantidade: m.quantidade, validade_dias: m.validade_dias, preco: precos.get(m.id) ?? 0, servico: m.servicos?.nome ?? "qualquer serviço" })),
         ...(pet ? { pet: pet.nome } : {}), pacotes_ativos: lista.slice(0, 60), total_ativos: lista.length,
         ...(pet && !lista.length ? { aviso: `${pet.nome} não tem pacote ativo.` } : {}) } };
     }

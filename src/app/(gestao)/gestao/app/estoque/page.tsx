@@ -1,12 +1,13 @@
 "use client";
 
+import { COLS_MOVIMENTO, COLS_PRODUTO, comCustos, comCustosDeMovimento } from "@/lib/gestao/reservado";
 import { useMemo, useState } from "react";
 import Importar from "@/components/gestao/importar";
 import { AlertTriangle, ArrowUpFromLine, Minus, Package, PackageX, Plus, Search, ShoppingBag, Sparkles, Wallet, Upload } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { abrirAssistente, avisarMudanca, Campo, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { Kpi, Tile } from "@/components/gestao/painel";
-import { CampoDinheiro, Chips, ChipsForma, ErroTela, fmtQtd, lerQtd, type Forma } from "@/components/gestao/loja/pecas";
+import { AvisoCaixaFechado, CampoDinheiro, Chips, ChipsForma, erroDeValor, ErroTela, EscolhaPagamento, fecharPagamento, fmtQtd, lembrarForma, lerQtd, useCaixaAberto, usePagamento, type Forma } from "@/components/gestao/loja/pecas";
 import VendaBalcao from "@/components/gestao/loja/venda";
 import { lancarPago } from "@/lib/gestao/dinheiro";
 import type { MovimentoEstoque, Produto } from "@/lib/gestao/tipos";
@@ -51,7 +52,7 @@ export default function Estoque() {
   const [importando, setImportando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () =>
-    ok(await sb.from("produtos").select("*").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as Produto[],
+    (await comCustos(sb, petshop.id, ok(await sb.from("produtos").select(COLS_PRODUTO).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as unknown as { id: string }[])) as unknown as Produto[],
   [petshop.id]);
 
   // saídas dos últimos 30 dias: só para o resumo do topo (se a busca falhar, o cartão fica de fora)
@@ -102,7 +103,7 @@ export default function Estoque() {
           <Kpi icone={AlertTriangle} tom="manteiga" rotulo="Acabando" valor={baixos.length}
             apoio={baixos.length ? "no mínimo ou abaixo" : "nada perto do mínimo"} />
           {vejoFinanceiro ? (
-            <Kpi icone={Wallet} tom="menta" rotulo="Valor em estoque" valor={brlCurto(Math.round(valorParado))}
+            <Kpi icone={Wallet} tom="menta" rotulo="Valor em estoque" valor={brl(valorParado)}
               apoio={semCusto ? `a preço de custo · ${semCusto} sem custo` : "a preço de custo"} />
           ) : (
             <Kpi icone={PackageX} tom="lilas" rotulo="Zerados" valor={semSaldo.length} apoio={semSaldo.length ? "sem nada na prateleira" : "nenhum em falta"} />
@@ -285,7 +286,10 @@ function Entrada({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: 
   const [qtd, setQtd] = useState("");
   const [custo, setCusto] = useState<number | null>(produto.custo);
   const [despesa, setDespesa] = useState(true);
-  const [forma, setForma] = useState<Forma>("pix");
+  // despesa é uma forma só, e nada vem marcado: a pessoa diz como pagou o fornecedor
+  const [forma, setForma] = useState<Forma | null>(null);
+  const [erroForma, setErroForma] = useState<string | null>(null);
+  const caixa = useCaixaAberto();
   const [salvando, setSalvando] = useState(false);
 
   const n = lerQtd(qtd);
@@ -294,13 +298,16 @@ function Entrada({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: 
 
   async function salvar() {
     if (!n) { avisarErro("Diga quantas unidades entraram."); return; }
+    const custoRuim = erroDeValor(custo, "O custo") ?? (lanca ? erroDeValor(total, "O total da compra") : null);
+    if (custoRuim) { avisarErro(custoRuim); return; }
+    if (lanca && !forma) { setErroForma("Escolha como você pagou a compra."); avisarErro("Escolha a forma de pagamento."); return; }
     setSalvando(true);
     try {
       ok(await sb.from("movimentos_estoque").insert({
         petshop_id: petshop.id, produto_id: produto.id, tipo: "entrada", quantidade: n, custo_unitario: custo || null,
         motivo: "Compra", criado_por: user.id,
       }).select("id").single());
-      if (lanca) {
+      if (lanca && forma) {
         try {
           await lancarPago(sb, petshop.id, {
             tipo: "saida", valor: total, forma, categoria: "Produtos e material",
@@ -327,7 +334,7 @@ function Entrada({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: 
           <Campo rotulo={`Quantidade (${produto.unidade})`}>
             <input className="g-input g-tab" inputMode="decimal" value={qtd} onChange={(e) => setQtd(e.target.value)} placeholder="0" autoFocus />
           </Campo>
-          <Campo rotulo={`Custo por ${produto.unidade}`} dica="Opcional"><CampoDinheiro valor={custo} aoMudar={setCusto} /></Campo>
+          <Campo rotulo={`Custo por ${produto.unidade}`} dica="Opcional" erro={erroDeValor(custo, "O custo")}><CampoDinheiro valor={custo} aoMudar={setCusto} /></Campo>
         </div>
         {vejoFinanceiro && (
           <>
@@ -335,7 +342,8 @@ function Entrada({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: 
               <input type="checkbox" checked={despesa && total > 0} disabled={total <= 0} onChange={(e) => setDespesa(e.target.checked)} />
               <span>Lançar a compra como despesa{total > 0 ? ` (${brl(total)})` : ""}</span>
             </label>
-            {lanca && <ChipsForma valor={forma} aoMudar={setForma} />}
+            {lanca && <ChipsForma valor={forma} aoMudar={(f) => { setForma(f); setErroForma(null); }} erro={erroForma} />}
+            {lanca && <AvisoCaixaFechado aberto={caixa} />}
           </>
         )}
       </div>
@@ -351,7 +359,10 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
   const [qtd, setQtd] = useState("1");
   const [motivo, setMotivo] = useState<Motivo>("Venda");
   const [valorEditado, setValorEditado] = useState<number | null | undefined>(undefined);
-  const [forma, setForma] = useState<Forma>("pix");
+  // mesmo recebimento da venda no balcão: uma forma ou dividido em até três
+  const [pagamento, setPagamento] = usePagamento();
+  const [erroForma, setErroForma] = useState<string | null>(null);
+  const caixa = useCaixaAberto();
   const [salvando, setSalvando] = useState(false);
 
   const n = lerQtd(qtd);
@@ -365,15 +376,20 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
     if (!n) { avisarErro("Diga quantas unidades saíram."); return; }
     if (passou) { avisarErro(`Só tem ${fmtQtd(saldo)} ${produto.unidade}. Se o saldo estiver errado, corrija na ficha do produto.`); return; }
     if (venda && vejoFinanceiro && !valor) { avisarErro("Diga o valor da venda."); return; }
+    const valorRuim = venda && vejoFinanceiro ? erroDeValor(valor, "O valor da venda") : null;
+    if (valorRuim) { avisarErro(valorRuim); return; }
+    const pg = venda && vejoFinanceiro && valor ? fecharPagamento(pagamento, valor) : null;
+    if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return; }
     setSalvando(true);
     try {
       ok(await sb.from("movimentos_estoque").insert({
         petshop_id: petshop.id, produto_id: produto.id, tipo: "saida", quantidade: n, motivo, criado_por: user.id,
       }).select("id").single());
-      if (venda && vejoFinanceiro && valor) {
+      if (pg && !("erro" in pg) && valor) {
         try {
+          lembrarForma(pg.forma);
           await lancarPago(sb, petshop.id, {
-            tipo: "entrada", valor, forma, categoria: "Venda de produtos",
+            tipo: "entrada", valor, forma: pg.forma, pagamentos: pg.pagamentos, categoria: "Venda de produtos",
             descricao: `Venda: ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}`,
             // com os itens, apagar esta venda depois devolve o produto ao estoque
             itens: [{ tipo: "produto", nome: produto.nome, qtd: n, valor: Math.round((valor / n) * 100) / 100, produto_id: produto.id }],
@@ -403,10 +419,11 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
         </div>
         {venda && (vejoFinanceiro ? (
           <>
-            <Campo rotulo="Valor da venda" dica={produto.preco_venda != null ? `${brl(produto.preco_venda)} por ${produto.unidade}` : "Este produto ainda não tem preço de venda."}>
-              <CampoDinheiro valor={valor} aoMudar={setValorEditado} />
+            <Campo rotulo="Valor da venda" erro={erroDeValor(valor, "O valor da venda")} dica={produto.preco_venda != null ? `${brl(produto.preco_venda)} por ${produto.unidade}` : "Este produto ainda não tem preço de venda."}>
+              <CampoDinheiro valor={valor} aoMudar={(v) => { setValorEditado(v); setErroForma(null); }} />
             </Campo>
-            <ChipsForma valor={forma} aoMudar={setForma} />
+            <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErroForma(null); }} total={valor ?? 0} erro={erroForma} />
+            <AvisoCaixaFechado aberto={caixa} />
           </>
         ) : (
           <p className="g-muted g-p">A venda sai do estoque. O dinheiro fica para quem cuida do financeiro lançar.</p>
@@ -432,8 +449,8 @@ function Ficha({ produto, aoFechar, aoMudar, aoGravar }: { produto: Produto; aoF
   const [salvando, setSalvando] = useState(false);
 
   const { dados: movs, carregando, erro, recarregar } = useDados(async () =>
-    ok(await sb.from("movimentos_estoque").select("*").eq("petshop_id", petshop.id).eq("produto_id", produto.id)
-      .order("criado_em", { ascending: false }).limit(20)) as MovimentoEstoque[],
+    (await comCustosDeMovimento(sb, produto.id, ok(await sb.from("movimentos_estoque").select(COLS_MOVIMENTO).eq("petshop_id", petshop.id).eq("produto_id", produto.id)
+      .order("criado_em", { ascending: false }).limit(20)) as unknown as { id: string }[])) as unknown as MovimentoEstoque[],
   [petshop.id, produto.id]);
 
   async function salvar() {

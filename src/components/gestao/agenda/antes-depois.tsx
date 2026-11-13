@@ -5,7 +5,7 @@ import { Camera, MessageCircle, Send, Trash2 } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { reduzirFoto } from "@/lib/gestao/foto";
 import { fotoPet } from "@/lib/gestao/supabase";
-import { linkWhatsApp } from "@/lib/gestao/util";
+import { linkWhatsApp, chamar } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { avisarMudanca, ok, useAvisos, useSomenteLeitura } from "../ui";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
@@ -102,7 +102,7 @@ export default function AntesDepois({ agendamento: a, aoMudar }: { agendamento: 
   const prontos = caminhos.map((c) => arquivos[c]).filter(Boolean);
   const texto = fotos.depois ? `Olha como ${nomePet} ficou!` : `Olha ${nomePet} aqui com a gente!`;
   const compartilha = toque && caminhos.length > 0 && prontos.length === caminhos.length && navigator.canShare({ files: prontos });
-  const zap = linkWhatsApp(tutor?.telefone, `${tutor?.nome ? `Oi, ${tutor.nome.split(" ")[0]}! ` : ""}${texto} ${fotoPet(fotos.depois ?? fotos.antes) ?? ""}`.trim());
+  const zap = linkWhatsApp(tutor?.telefone, `${tutor?.nome ? `Oi, ${chamar(tutor.nome)}! ` : ""}${texto} ${fotoPet(fotos.depois ?? fotos.antes) ?? ""}`.trim());
 
   async function compartilhar() {
     try { await navigator.share({ files: prontos, text: texto }); }

@@ -5,7 +5,7 @@ import { Check, Clock, Link2, MessageCircle, X } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPet, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import type { Database } from "@/lib/gestao/banco";
-import { dataCurta, fmtTelefone, hora, inicioDoDia, linkWhatsApp, nomeDia } from "@/lib/gestao/util";
+import { dataCurta, fmtTelefone, hora, inicioDoDia, linkWhatsApp, nomeDia, chamar } from "@/lib/gestao/util";
 import "./pedidos-link.css";
 
 type Pedido = Database["public"]["Tables"]["pedidos_agendamento"]["Row"];
@@ -35,7 +35,8 @@ function periodoDe(p: Pedido) {
   const a = new Date(p.inicio), b = new Date(p.fim);
   return inicioDoDia(a).getTime() === inicioDoDia(b).getTime() ? `${nomeDia(a)}, ${dataCurta(a)}` : `de ${dataCurta(a)} a ${dataCurta(b)}`;
 }
-const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0];
+const primeiroNome = (nome: string) => chamar(nome);
+const textoDoErro = (e: unknown) => (e instanceof Error ? e.message : String((e as { message?: unknown })?.message ?? e ?? ""));
 /** "Nina", "Nina e Bob", "Nina, Bob e Mel". */
 const listaDe = (itens: string[]) => (itens.length <= 1 ? itens.join("") : `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`);
 /** Pedidos feitos juntos (vários pets do mesmo tutor) têm o mesmo `grupo_id`; pedido sozinho é o próprio grupo. */
@@ -90,10 +91,25 @@ export default function PedidosLink() {
     const feitos: Pedido[] = [];
     let falha: unknown = null;
     for (const p of lista) {
+      const args = { p_id: p.id, p_profissional: ehEstadia(p) ? undefined : profissional };
       try {
-        ok(await sb.rpc("pedido_aceitar", { p_id: p.id, p_profissional: ehEstadia(p) ? undefined : profissional }));
+        ok(await sb.rpc("pedido_aceitar", args));
         feitos.push(p);
-      } catch (e) { falha ??= e; }
+      } catch (e) {
+        // creche ou hotel sem vaga em algum dia: o banco recusa e explica; a pessoa decide se aceita assim mesmo
+        const cheia = /CASA_CHEIA:\s*(.+)/.exec(textoDoErro(e))?.[1]?.trim();
+        if (!cheia) { falha ??= e; continue; }
+        const forcar = await confirmar({
+          titulo: "Casa cheia",
+          texto: `${cheia.charAt(0).toUpperCase()}${cheia.slice(1)} Aceitar o pedido de ${p.pet_nome} mesmo assim? Se não, o pedido continua esperando a sua resposta.`,
+          confirmar: "Aceitar mesmo assim", perigo: true,
+        });
+        if (!forcar) continue; // desistiu: o pedido segue pendente
+        try {
+          ok(await sb.rpc("pedido_aceitar", { ...args, p_forcar: true }));
+          feitos.push(p);
+        } catch (e2) { falha ??= e2; }
+      }
     }
     if (feitos.length) {
       setRespondidos((r) => [...r, ...feitos.map((p) => ({ pedido: p, servico: rotulo(p), resposta: "aceito" as const }))]);
@@ -109,7 +125,7 @@ export default function PedidosLink() {
     const nomes = listaDe(lista.map((p) => p.pet_nome));
     const sim = await confirmar({
       titulo: lista.length > 1 ? `Recusar os pedidos de ${nomes}?` : `Recusar o pedido de ${nomes}?`,
-      texto: `${lista.length > 1 ? "Os horários voltam a ficar livres" : "O horário volta a ficar livre"} no link. Depois é só avisar o tutor pelo WhatsApp.`,
+      texto: `${lista.every(ehEstadia) ? (lista.length > 1 ? "As vagas voltam a ficar livres" : "A vaga volta a ficar livre") : lista.length > 1 ? "Os horários voltam a ficar livres" : "O horário volta a ficar livre"} no link. Depois é só avisar o tutor pelo WhatsApp.`,
       confirmar: lista.length > 1 ? "Recusar todos" : "Recusar", perigo: true,
     });
     if (!sim) return;
@@ -138,7 +154,7 @@ export default function PedidosLink() {
     if (ehEstadia(p)) {
       const oQue = `${p.tipo === "hotel" ? "o hotel" : "a creche"} de ${p.pet_nome}, ${periodoDe(p)}`;
       return lista[0].resposta === "recusado"
-        ? `${oi} Recebemos o seu pedido para ${oQue}, mas não vamos ter vaga nessas datas. Você pode escolher outros dias aqui: ${base}`
+        ? `${oi} Recebemos o seu pedido para ${oQue}, mas não temos vaga nessas datas. Você pode escolher outras datas aqui: ${base}\n\nSe preferir, me diga o período que fica bom para você.`
         : `${oi} Está confirmado: ${oQue}. Esperamos vocês!${acompanhar}`;
     }
     if (lista[0].resposta === "recusado") {
@@ -158,7 +174,8 @@ export default function PedidosLink() {
   }
 
   if (!pendentes.length && !respondidos.length) return null;
-  const esperam = gruposPendentes.length;
+  // conta gente, não pedido: o mesmo tutor (telefone) com vários pedidos é um só
+  const esperam = new Set(pendentes.map((p) => p.telefone.replace(/\D/g, "").slice(-8) || p.id)).size;
 
   return (
     <section className="g-pl" aria-label="Pedidos pelo link">
@@ -194,7 +211,7 @@ export default function PedidosLink() {
               <div className="g-pl-acoes">
                 {zap && (
                   <a className="g-btn zap p" href={zap} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle />{aceito ? "Confirmar no WhatsApp" : "Sugerir outro horário"}
+                    <MessageCircle />{aceito ? "Confirmar no WhatsApp" : ehEstadia(p) ? "Sugerir outras datas" : "Sugerir outro horário"}
                   </a>
                 )}
                 <button type="button" className="g-btn fantasma p" onClick={() => setRespondidos((l) => l.filter((x) => !g.lista.includes(x)))}>Fechar</button>

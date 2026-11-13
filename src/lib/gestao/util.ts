@@ -130,3 +130,14 @@ export function mascaraTelefone(s: string | null | undefined) {
 }
 /** "135,50" (sempre com duas casas, sem o R$). */
 export const valor2 = (n: number | null | undefined) => Number(n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * Como chamar a pessoa numa mensagem: o primeiro nome, mantendo o tratamento quando houver
+ * ("Dona Zefa", "Seu João", "Dr. Paulo"), para não sair "Oi, Dona!".
+ */
+export function chamar(nome: string | null | undefined) {
+  const partes = (nome ?? "").trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return "";
+  const tratamento = /^(dona|d\.|seu|sr\.?|sra\.?|srta\.?|dr\.?|dra\.?|tio|tia|professor|professora|prof\.?)$/i;
+  return tratamento.test(partes[0]) && partes[1] ? `${partes[0]} ${partes[1]}` : partes[0];
+}

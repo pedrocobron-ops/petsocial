@@ -62,7 +62,7 @@ export function AjustesCrecheHotel() {
     e.preventDefault();
     if (somenteLeitura() || salvando) return;
     const vc = lerVagas(vagasCreche), vh = lerVagas(vagasHotel);
-    if ([diariaCreche, diariaHotel].some((v) => v != null && (v < 0 || v > 99999))) return setErro("Confira o preço da diária: não pode ser negativo.");
+    if ([diariaCreche, diariaHotel].some((v) => v != null && (v < 0 || v > 99999))) return setErro("Confira o preço da diária: use um valor entre 0 e R$ 99.999.");
     if ([vc, vh].some((v) => v != null && (Number.isNaN(v) || v < 1 || v > 500))) return setErro("As vagas ficam entre 1 e 500. Deixe em branco se não quiser limite.");
     setErro(null);
     setSalvando(true);

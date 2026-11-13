@@ -532,7 +532,7 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo }: {
   caixa: Caixa; lancamentos: Lancamento[]; dinheiroFora: number; aoFechar: () => void; aoSalvo: () => Promise<void>;
 }) {
   const { sb, petshop, user } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const [contado, setContado] = useState<number | null>(null);
   const [obs, setObs] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -544,6 +544,13 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo }: {
     if (salvando) return;
     if (contado == null || contado < 0) { setErro("Conte o dinheiro da gaveta e escreva aqui. Se está vazia, escreva 0."); return; }
     if (contado >= 1e8) { setErro("Esse valor é grande demais. Confira os números."); return; }
+    // fechar não tem volta: confirma mostrando se bateu, sobrou ou faltou
+    const sim = await confirmar({
+      titulo: "Fechar o caixa de hoje?",
+      texto: `Você contou ${brl(contado)} e o sistema esperava ${brl(r.esperado)}. ${dif?.curto ? `Resultado: ${dif.curto}. ` : ""}Depois de fechado, os lançamentos deste caixa não podem mais ser alterados.`,
+      confirmar: "Fechar o caixa",
+    });
+    if (!sim) return;
     setSalvando(true);
     try {
       const u = await sb.from("caixas").update({ fechado_em: new Date().toISOString(), fechado_por: user.id, valor_contado: contado, obs: obs.trim() || null })

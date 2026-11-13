@@ -167,7 +167,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
             <div className="g-eq-opcoes">
               <Opcao icone={iconeDoNao(escolha.atende)} tom="pessego"
                 titulo={escolha.atende ? "Não, só aparece na agenda" : "Não, por enquanto"}
-                texto={socio ? "Sócio precisa de login para mexer no sistema." : escolha.atende ? "Você marca os horários por ela. Não ocupa acesso." : "Fica na equipe, sem entrar no sistema. Não ocupa acesso."}
+                texto={socio ? "Sócio precisa de login para mexer no sistema." : escolha.atende ? "Você marca os horários por essa pessoa. Não ocupa acesso." : "Fica na equipe, sem entrar no sistema. Não ocupa acesso."}
                 selo={sugerido === false ? "mais comum" : undefined} travado={socio}
                 marcado={comLogin === false && !socio} aoEscolher={() => { setComLogin(false); setErro(null); }}>
                 <p className="g-eq-nota">
@@ -177,13 +177,13 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
                 </p>
               </Opcao>
               <Opcao icone={KeyRound} tom="menta" titulo="Sim, com o próprio login"
-                texto={semVaga ? "Agora não dá: o plano está sem acesso livre." : "Usa no celular dela. Ocupa 1 acesso do plano."}
+                texto={semVaga ? "Agora não dá: o plano está sem acesso livre." : "Usa no próprio celular. Ocupa 1 acesso do plano."}
                 selo={sugerido && !semVaga ? (socio ? "precisa" : "mais comum") : undefined}
                 travado={semVaga} marcado={comLogin === true && !semVaga} aoEscolher={() => { setComLogin(true); setErro(null); }}>
                 <label className="g-campo"><span>E-mail de {primeiro}</span>
                   <input className="g-input" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="nome@email.com" value={email}
                     onChange={(ev) => { setEmail(ev.target.value); setErro(null); }} />
-                  <small>É com esse e-mail que ela vai criar a conta. Precisa ser exatamente o mesmo: é assim que o sistema sabe que ela é da sua equipe. A senha é ela quem escolhe.</small>
+                  <small>É com esse e-mail que a pessoa vai criar a conta. Precisa ser exatamente o mesmo: é assim que o sistema sabe que ela é da sua equipe. A senha é a própria pessoa quem escolhe.</small>
                 </label>
               </Opcao>
             </div>
@@ -242,7 +242,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
               <p className="g-muted">
                 {feito.atende
                   ? `${primeiroNome(feito.nome)} já aparece na agenda para você marcar os horários. Não ocupa acesso do plano.`
-                  : `${primeiroNome(feito.nome)} já está na lista da equipe. Se quiser dar login depois, é só tocar no cartão dela.`}
+                  : `${primeiroNome(feito.nome)} já está na lista da equipe. Se quiser dar login depois, é só tocar no cartão.`}
               </p>
             )}
           </div>

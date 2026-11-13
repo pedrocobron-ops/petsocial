@@ -76,7 +76,7 @@ export function materialDoAviso(dados: Record<string, unknown>): Material | null
 /* ---------- aulas gratuitas ---------- */
 
 export type Aula = {
-  id: string; titulo: string; resumo: string; minutos: number; tema: "Preço" | "Agenda" | "Clientes" | "Dinheiro" | "Equipe";
+  id: string; titulo: string; resumo: string; minutos: number; tema: "Preço" | "Agenda" | "Clientes" | "Dinheiro" | "Equipe" | "Creche e hotel" | "Divulgação" | "Estoque";
   /** Parágrafos e listas, na ordem. */
   corpo: ({ p: string } | { lista: string[] } | { t: string })[];
   /** Onde fazer isso no sistema. */
@@ -115,7 +115,7 @@ export const AULAS: Aula[] = [
       ] },
       { p: "Vale também olhar em que dia e horário as faltas se concentram. Às vezes o problema é um horário ruim para o bairro, e não o cliente." },
     ],
-    naPratica: { texto: "Na Agenda, o botão \"Lembretes de amanhã\" abre o WhatsApp de cada tutor com a mensagem pronta. As faltas de cada pet aparecem na ficha e em Relatórios.", rotulo: "Abrir a Agenda", href: "/gestao/app/agenda" },
+    naPratica: { texto: "Na tela inicial, em Pede a sua atenção, os lembretes de amanhã abrem o WhatsApp de cada tutor com a mensagem pronta. As faltas de cada pet aparecem na ficha e em Relatórios.", rotulo: "Abrir a tela inicial", href: "/gestao/app" },
   },
   {
     id: "pacote-mensal", titulo: "Pacote de banhos: quando vale e como montar", tema: "Clientes", minutos: 4,
@@ -183,6 +183,161 @@ export const AULAS: Aula[] = [
       { p: "Deixe as regras por escrito, mesmo que seja numa mensagem. E mostre a conta: quem vê de onde veio cada valor confia no número e para de fazer a própria planilha paralela." },
     ],
     naPratica: { texto: "O percentual de cada pessoa fica em Equipe. A conta do período sai pronta em Relatórios, usando o valor cobrado de cada atendimento.", rotulo: "Abrir Relatórios", href: "/gestao/app/relatorios" },
+  },
+  {
+    id: "lotacao-creche", titulo: "Creche e hotel: quantos cães cabem de verdade", tema: "Creche e hotel", minutos: 4,
+    resumo: "Como chegar ao número de vagas e por que respeitar esse número.",
+    corpo: [
+      { p: "Na creche e no hotel, o que você vende é atenção e espaço. Os dois acabam. Definir o número de vagas antes do feriado é o que evita aceitar por impulso um cão a mais do que a equipe dá conta." },
+      { t: "Como chegar ao número" },
+      { lista: [
+        "Espaço: conte quantos cães ficam soltos com conforto na área, sem disputa por canto, água ou sombra.",
+        "Gente: quantos cães cada monitor acompanha com segurança ao mesmo tempo. Com filhotes, idosos ou cães reativos, esse número cai.",
+        "Hotel: conte os lugares de dormir de verdade, não os improvisados.",
+        "Use o menor dos números. A vaga que falta em qualquer um deles é a que dá problema.",
+      ] },
+      { p: "Creche e hotel têm contas separadas: a creche esvazia no fim do dia, o hotel não. No hotel, quem sai de manhã libera a vaga para quem chega à tarde." },
+      { p: "Defina também o que fazer quando lota: lista de espera, prioridade para mensalista, e a resposta pronta para o cliente que pede em cima da hora. Dizer que não há vaga, com educação, costuma passar mais confiança do que aceitar todo mundo." },
+    ],
+    naPratica: { texto: "Em Meu pet shop você define as vagas da creche e do hotel. A tela Creche e hotel mostra quantas estão ocupadas e avisa quando a reserva passa do limite.", rotulo: "Abrir Creche e hotel", href: "/gestao/app/creche-hotel" },
+  },
+  {
+    id: "regras-de-entrada", titulo: "Vacina em dia e outras regras de entrada", tema: "Creche e hotel", minutos: 3,
+    resumo: "O que pedir ao tutor antes de aceitar um cão e como cobrar isso sem atrito.",
+    corpo: [
+      { p: "Quem junta cães no mesmo espaço responde pela saúde de todos. Uma regra de entrada clara protege os animais, a equipe e o próprio negócio, e é mais fácil de cumprir quando o tutor a conhece antes de chegar." },
+      { t: "O que costuma entrar na regra" },
+      { lista: [
+        "Vacinas em dia, com a carteira conferida. Pergunte ao veterinário de confiança quais exigir para convivência em grupo.",
+        "Controle de pulgas e carrapatos e vermífugo dentro do prazo.",
+        "Uma conversa ou um período de adaptação antes da primeira diária, para conhecer o temperamento do cão.",
+        "O que o tutor precisa trazer: ração, remédio com horário e dose por escrito, contato de emergência.",
+        "O que fazer se o cão passar mal: quem é avisado e para qual veterinário ele vai.",
+      ] },
+      { p: "Anote a data de vencimento de cada vacina. Avisar o tutor uns dias antes de vencer é um cuidado que ele agradece, e evita a cena de recusar o cão na porta." },
+      { p: "Regra só funciona se vale para todos. Abrir exceção para um cliente antigo é o jeito mais rápido de a regra deixar de existir." },
+    ],
+    naPratica: { texto: "Na ficha do pet, em Saúde, você anota vacina, vermífugo e antipulgas com a data de vencer. O sistema avisa na tela inicial e na hora da entrada na creche ou no hotel.", rotulo: "Abrir Clientes e pets", href: "/gestao/app/clientes" },
+  },
+  {
+    id: "link-de-agendamento", titulo: "Como fazer o cliente usar o link de agendamento", tema: "Divulgação", minutos: 3,
+    resumo: "O link só economiza o seu tempo se o cliente souber que ele existe.",
+    corpo: [
+      { p: "Cada \"tem horário sábado?\" respondido no WhatsApp custa alguns minutos, várias vezes por dia. O link de agendamento tira essa conversa da sua mão: o cliente vê os horários livres e manda o pedido, e você só aceita." },
+      { t: "Onde colocar" },
+      { lista: [
+        "Na descrição do perfil do Instagram e do WhatsApp do pet shop.",
+        "Na resposta automática ou na mensagem de saudação do WhatsApp.",
+        "No lembrete e na mensagem de \"pet pronto\": o cliente satisfeito já deixa o próximo marcado.",
+        "Num aviso no balcão, com um código para apontar a câmera do celular.",
+      ] },
+      { p: "Nas primeiras semanas, quando alguém perguntar por horário, responda com o link e uma frase curta: \"por aqui você já vê o que está livre\". Depois de duas ou três vezes, o cliente vai direto." },
+      { p: "Responda os pedidos rápido. Se o cliente pede pelo link e fica horas sem resposta, ele volta a chamar no WhatsApp e o hábito não se forma. Vale olhar os pedidos em horários fixos do dia." },
+    ],
+    naPratica: { texto: "O botão \"Link do cliente\", na tela inicial e na Agenda, copia o link e manda no WhatsApp. Lá você também escolhe se o link recebe pedido de creche e de hotel.", rotulo: "Abrir a Agenda", href: "/gestao/app/agenda" },
+  },
+  {
+    id: "fiado", titulo: "Cliente que paga depois: como controlar", tema: "Dinheiro", minutos: 3,
+    resumo: "Vender fiado sem perder o dinheiro nem o cliente.",
+    corpo: [
+      { p: "Em bairro, deixar para pagar depois faz parte. O risco não está em confiar no cliente, e sim em confiar na memória: o que não é anotado na hora vira dúvida depois, para os dois lados." },
+      { t: "Regras simples" },
+      { lista: [
+        "Anote na hora, com valor e data combinada para pagar. Sem data, a conta não vence nunca.",
+        "Combine um limite: quantas contas abertas um cliente pode ter antes de quitar as anteriores.",
+        "No dia combinado, uma mensagem curta e sem cobrança no tom: \"passando para lembrar do banho do dia 10, R$ 70\".",
+        "Olhe a lista de contas a receber uma vez por semana, no mesmo dia.",
+        "Conta antiga demais merece uma conversa franca, de preferência pessoalmente.",
+      ] },
+      { p: "Separe na cabeça o que foi vendido do que foi recebido. Um mês cheio de atendimentos e com muito fiado em aberto pode terminar com pouco dinheiro na conta. Acompanhar os dois números evita susto." },
+    ],
+    naPratica: { texto: "Ao fechar a conta, escolha \"Cliente paga depois\" e a data. A conta aparece em Financeiro, na aba A receber, e na ficha do tutor. Quando ele pagar, é só dar baixa.", rotulo: "Abrir o Financeiro", href: "/gestao/app/financeiro" },
+  },
+  {
+    id: "estoque-minimo", titulo: "Estoque: o que não pode faltar e o que não pode sobrar", tema: "Estoque", minutos: 3,
+    resumo: "Um número mínimo por produto resolve a maior parte do problema.",
+    corpo: [
+      { p: "Estoque dá dois tipos de prejuízo. Faltar shampoo no meio do sábado para a operação. Sobrar produto parado na prateleira é dinheiro que você já gastou e ainda não voltou." },
+      { t: "O mínimo de cada produto" },
+      { lista: [
+        "Veja quanto você gasta ou vende do produto por semana.",
+        "Veja quantos dias o fornecedor leva para entregar.",
+        "O mínimo é o que você consome nesse prazo, com uma folga. Chegou nele, é hora de pedir.",
+        "Produto que vence (ração, petisco, remédio) pede compra menor e mais frequente.",
+      ] },
+      { p: "Separe o que é de uso (shampoo, perfume, lâmina) do que é de venda (ração, acessório). O de uso entra no custo do banho. O de venda precisa de preço que cubra o custo, e é o que vale conferir quando o fornecedor reajusta." },
+      { p: "Uma vez por mês, conte o que tem na prateleira e compare com o sistema. A diferença mostra perda, erro de lançamento ou produto que saiu sem ser anotado." },
+    ],
+    naPratica: { texto: "No Estoque, cada produto tem custo, preço de venda e estoque mínimo. O sistema avisa na tela inicial quando um produto está acabando.", rotulo: "Abrir o Estoque", href: "/gestao/app/estoque" },
+  },
+  {
+    id: "meta-do-mes", titulo: "Meta do mês: como escolher um número que ajuda", tema: "Dinheiro", minutos: 3,
+    resumo: "A meta serve para orientar o dia a dia, e não para enfeitar a parede.",
+    corpo: [
+      { p: "Meta boa é a que você consegue traduzir em quantos atendimentos precisa fazer por dia. Um número solto, escolhido porque parece bonito, não muda nenhuma decisão." },
+      { t: "De onde tirar o número" },
+      { lista: [
+        "Comece pelo que o negócio precisa pagar no mês: aluguel, salários, fornecedores, impostos e a sua retirada.",
+        "Compare com o que entrou nos últimos meses. A meta fica entre o que já acontece e um pouco acima.",
+        "Divida pelos dias em que o pet shop abre. Esse é o valor por dia.",
+        "Divida pelo valor médio de um atendimento. Esse é o número de pets por dia.",
+      ] },
+      { p: "Olhe a meta toda semana, não só no dia 30. No meio do mês ainda dá para reagir: chamar clientes que sumiram, oferecer pacote, abrir um horário extra. No último dia, só resta anotar o resultado." },
+      { p: "Se a meta nunca é batida, o número está errado ou falta agenda para tanto. As duas respostas são úteis." },
+    ],
+    naPratica: { texto: "Na tela inicial, o cartão da meta do mês mostra quanto já entrou, quanto falta e quanto precisa entrar por dia aberto até o fim do mês.", rotulo: "Abrir a tela inicial", href: "/gestao/app" },
+  },
+  {
+    id: "retirada-do-dono", titulo: "O dinheiro do pet shop e o seu dinheiro", tema: "Dinheiro", minutos: 3,
+    resumo: "Separar as duas contas é o que mostra se o negócio se paga.",
+    corpo: [
+      { p: "Quando a conta do pet shop paga o mercado de casa e o cartão pessoal paga o fornecedor, fica impossível saber se o negócio dá resultado. O problema é a mistura, mais do que a falta de dinheiro." },
+      { t: "Como separar" },
+      { lista: [
+        "Uma conta bancária só para o pet shop, mesmo que simples.",
+        "Um valor fixo de retirada por mês, em data certa, como se fosse o seu salário.",
+        "Gasto pessoal sai da sua conta. Gasto do pet shop sai da conta do pet shop.",
+        "Precisou tirar a mais? Anote como retirada, para a conta do mês continuar fazendo sentido.",
+      ] },
+      { p: "Com a retirada definida, o que sobra depois dela e das despesas é o resultado do negócio. É com esse número que você decide contratar, reformar ou guardar para um mês fraco." },
+      { p: "Se você ainda não sabe quanto dá para retirar, comece com um valor baixo que o caixa aguente todo mês. Um valor pequeno e constante ensina mais sobre o negócio do que retiradas grandes e irregulares." },
+    ],
+    naPratica: { texto: "No Financeiro, lance a sua retirada como uma saída na categoria Retirada do dono. O resultado do mês passa a mostrar o que o negócio rendeu depois dela.", rotulo: "Abrir o Financeiro", href: "/gestao/app/financeiro" },
+  },
+  {
+    id: "antes-e-depois", titulo: "A foto de antes e depois como divulgação", tema: "Divulgação", minutos: 3,
+    resumo: "O melhor anúncio de um banho e tosa é o resultado, mostrado com cuidado.",
+    corpo: [
+      { p: "O tutor escolhe banho e tosa pelo que vê. Uma foto do pet limpo e bem tosado, mandada na hora em que ele fica pronto, costuma ser mostrada para a família e para os amigos sem você pedir." },
+      { t: "Como fazer bem" },
+      { lista: [
+        "Mesmo lugar, mesma luz, fundo limpo. A foto fica parecida com as outras e o seu trabalho aparece.",
+        "Antes do banho e depois de pronto, no mesmo ângulo.",
+        "Mande ao tutor junto com o aviso de que o pet está pronto.",
+        "Para publicar nas redes, peça autorização. Um \"posso postar a foto do Thor?\" basta, e a maioria gosta.",
+        "Nunca exponha o animal em mau estado de um jeito que constranja o tutor.",
+      ] },
+      { p: "Guarde as fotos na ficha do pet. Além da divulgação, elas servem de referência para a próxima tosa e de registro de como o animal chegou." },
+    ],
+    naPratica: { texto: "No detalhe do horário, em Antes e depois, você tira as duas fotos e manda ao tutor pelo WhatsApp quando o pet fica pronto.", rotulo: "Abrir a Agenda", href: "/gestao/app/agenda" },
+  },
+  {
+    id: "delegar", titulo: "Quando chega a primeira pessoa para ajudar", tema: "Equipe", minutos: 3,
+    resumo: "O que combinar e o que liberar no sistema para cada função.",
+    corpo: [
+      { p: "Contratar a primeira pessoa muda o trabalho do dono: além de atender, você passa a organizar o trabalho de outra pessoa. O que ajuda é ter poucas regras claras desde o primeiro dia." },
+      { t: "O que combinar" },
+      { lista: [
+        "O que a pessoa faz e o que não faz. Quem atende o telefone, quem recebe, quem fecha o caixa.",
+        "Como cada serviço é feito do seu jeito. Mostre uma vez, acompanhe outra, e só então deixe sozinha.",
+        "Horário, folga e como avisar quando não puder vir.",
+        "Como o trabalho é conferido: uma olhada rápida no fim do dia vale mais do que uma bronca no fim do mês.",
+      ] },
+      { t: "O que liberar" },
+      { p: "Cada pessoa vê só o que precisa para a função. Quem dá banho precisa da agenda e da ficha do pet. Quem fica na recepção marca horário e recebe. O financeiro e os relatórios ficam com você, e com quem dividir essa responsabilidade." },
+      { p: "Acesso a mais não é sinal de confiança, é só risco sem necessidade. Dá para aumentar depois, conforme a pessoa assume mais tarefas." },
+    ],
+    naPratica: { texto: "Em Equipe, você adiciona a pessoa, escolhe um perfil pronto (recepção, financeiro, gerente, sócio) e ajusta área por área o que ela abre.", rotulo: "Abrir Equipe", href: "/gestao/app/equipe" },
   },
 ];
 

@@ -3,6 +3,10 @@
 import { Marca, Selo } from "@/components/gestao/marca";
 import { Anel, Barras, Kpi, Ranking, Tendencia, Tile, type Tom } from "@/components/gestao/painel";
 import { useState } from "react";
+import FimDoTeste, { DIAS_DE_AVISO, chaveAgoraNao, fimDoTeste } from "@/components/gestao/fim-do-teste";
+import PrimeirosPassos, { usePrimeirosPassos } from "@/components/gestao/primeiros-passos";
+import ResumoSemana, { temSemanaPassada } from "@/components/gestao/resumo-semana";
+import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import Link from "next/link";
 import { BedDouble, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, Wallet } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
@@ -23,7 +27,7 @@ const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa sema
 
 /** Tela inicial: o dia de relance, o que precisa de atenção e o atalho para pedir ao Mozart. */
 export default function Hoje() {
-  const { sb, petshop, eu, servicos, vejoFinanceiro, souDono, posso } = useGestao();
+  const { sb, petshop, eu, vejoFinanceiro, souDono, posso, liberado } = useGestao();
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
   const [lembretes, setLembretes] = useState(false);
@@ -33,7 +37,7 @@ export default function Hoje() {
   const { dados, carregando, recarregar } = useDados(async () => {
     const amanha = somaDias(hoje, 1), depois = somaDias(hoje, 2);
     const seg = inicioDaSemana(hoje), ha30 = somaDias(hoje, -30), ha6 = somaDias(hoje, -6);
-    const [ags, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes, daSemana, doMes, ultimos7] = await Promise.all([
+    const [ags, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes, daSemana, doMes, ultimos7, concluidos, lembrados] = await Promise.all([
       sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id).gte("inicio", hoje.toISOString()).lt("inicio", amanha.toISOString()).order("inicio"),
       sb.from("agendamentos").select("id, lembrete_em, status, pets(clientes(id, telefone))").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).lt("inicio", depois.toISOString()),
       sb.from("estadias").select("id, status, entrada, saida_prevista").eq("petshop_id", petshop.id).in("status", ["em_casa", "reservada"]).limit(1000),
@@ -46,6 +50,9 @@ export default function Hoje() {
       sb.from("agendamentos").select("inicio, status").eq("petshop_id", petshop.id).gte("inicio", seg.toISOString()).lt("inicio", somaDias(seg, 7).toISOString()),
       sb.from("agendamentos").select("status, servicos(nome, cor)").eq("petshop_id", petshop.id).gte("inicio", ha30.toISOString()).lt("inicio", amanha.toISOString()).limit(2000),
       vejoFinanceiro ? sb.from("lancamentos").select("valor, data").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").is("movimento", null).gte("data", isoDia(ha6)).lte("data", hojeIso) : Promise.resolve({ data: [] }),
+      // primeiros passos e aviso de fim de teste: duas contagens, sem trazer linha nenhuma
+      sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("status", "concluido"),
+      sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).not("lembrete_em", "is", null),
     ]);
     const saude = await buscarSaudeVencendo(sb, petshop.id).catch(() => null);
     const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
@@ -75,6 +82,8 @@ export default function Hoje() {
       acabando: (produtos.data ?? []).filter((p) => Number(p.estoque) <= Number(p.estoque_minimo)),
       pets: pets.count ?? 0,
       totalAgs: totalAgs.count ?? 0,
+      concluidos: concluidos.count ?? 0,
+      lembrados: lembrados.count ?? 0,
       entrou: (entradas.data ?? []).filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0),
       saiu: (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0),
       contas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "saida"),
@@ -98,13 +107,18 @@ export default function Hoje() {
   const proximo = ativos.find((a) => a.status !== "concluido" && new Date(a.fim) > new Date());
   const selecionado = aberto ? dados?.ags.find((a) => a.id === aberto) ?? null : null;
 
-  const semPreco = servicos.filter((s) => s.ativo).every((s) => s.preco_p == null && s.preco_m == null && s.preco_g == null && s.preco_gg == null);
-  const passos = dados ? [
-    { feito: !semPreco, texto: "Colocar os preços dos serviços", href: "/gestao/app/meu-petshop", so: souDono },
-    { feito: dados.pets > 0, texto: "Cadastrar o primeiro pet", href: "/gestao/app/clientes", so: true },
-    { feito: dados.totalAgs > 0, texto: "Marcar o primeiro horário", href: "/gestao/app/agenda", so: true },
-  ].filter((p) => p.so) : [];
-  const comecando = passos.some((p) => !p.feito);
+  // retenção: no máximo um cartão em destaque, nesta ordem: fim de teste > primeiros passos > resumo da semana
+  const teste = fimDoTeste(petshop);
+  const testePerto = Boolean(teste && teste.dias <= DIAS_DE_AVISO);
+  const [agoraNao, setAgoraNao] = useState(() => lerLembrado(chaveAgoraNao(petshop.id)) === hojeIso);
+  const cartaoTeste = testePerto && souDono && (!liberado || !agoraNao);
+  const pp = usePrimeirosPassos(
+    dados ? { pets: dados.pets, horarios: dados.totalAgs, concluidos: dados.concluidos, lembretes: dados.lembrados, amanha: dados.amanha } : null,
+    () => setLembretes(true),
+  );
+  const cartaoPassos = !cartaoTeste && pp.estado !== "some";
+  const temResumo = vejoFinanceiro && temSemanaPassada(petshop.criado_em, hoje);
+  const cartaoResumo = temResumo && hoje.getDay() === 1 && !cartaoTeste && !cartaoPassos;
 
   // creche e hotel: a casa pode estar cheia mesmo com a agenda de banho vazia
   const n = (q: number, um: string, varios: string) => (q === 1 ? `1 ${um}` : `${q} ${varios}`);
@@ -147,6 +161,12 @@ export default function Hoje() {
       </header>
 
       <div className="g-pilha g">
+        {testePerto && souDono && (
+          <FimDoTeste modo={cartaoTeste ? "cartao" : "linha"} numeros={dados ? { pets: dados.pets, horarios: dados.totalAgs, concluidos: dados.concluidos } : null}
+            aoDispensar={() => { guardarLembrado(chaveAgoraNao(petshop.id), hojeIso); setAgoraNao(true); }} />
+        )}
+        {testePerto && !souDono && liberado && <FimDoTeste modo="equipe" numeros={null} aoDispensar={() => {}} />}
+
         <div className="g-heroi">
           <section className="g-mozart">
             <Marca tamanho={300} className="fundo" />
@@ -203,20 +223,8 @@ export default function Hoje() {
 
         {posso("agenda") && <PedidosLink />}
 
-        {comecando && (
-          <section>
-            <div className="g-card-t"><h2>Primeiros passos</h2><span className="g-muted g-p">{passos.filter((p) => p.feito).length} de {passos.length}</span></div>
-            <div className="g-passos">
-              {passos.map((p, i) => (
-                <Link key={p.texto} href={p.href} className={`g-passo${p.feito ? " feito" : ""}`}>
-                  <span className="n">{p.feito ? <Check /> : i + 1}</span>
-                  <span className="g-cresce">{p.texto}</span>
-                  {!p.feito && <ChevronRight size={18} />}
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
+        <PrimeirosPassos pp={pp} modo={cartaoPassos ? "cartao" : "linha"} />
+        {temResumo && <ResumoSemana modo={cartaoResumo ? "cartao" : "linha"} />}
 
         <div className="g-grade kpis">
           <Kpi href="/gestao/app/agenda" icone={Scissors} tom="pessego" rotulo="Atendimentos hoje" valor={dados ? ativos.length : "–"}

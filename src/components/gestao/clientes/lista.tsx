@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Importar from "@/components/gestao/importar";
 import { AlertTriangle, Cat, ChevronRight, Dog, Download, PawPrint, Phone, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
@@ -61,6 +61,8 @@ export default function Lista({ aoAbrir, irPara }: {
   const [aba, setAba] = useState<"pets" | "tutores">("pets");
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  // atalho vindo da tela Hoje: /gestao/app/clientes?filtro=sumidos30
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("filtro") === "sumidos30") setFiltro("sumidos30"); }, []);
   const [mostrar, setMostrar] = useState(PASSO);
   const [petNovo, setPetNovo] = useState(false);
   const [tutorNovo, setTutorNovo] = useState(false);

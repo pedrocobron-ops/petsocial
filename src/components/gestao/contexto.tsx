@@ -1,5 +1,7 @@
 "use client";
 
+import { lerEquipe } from "@/lib/gestao/reservado";
+import { temCheckout } from "@/lib/gestao/planos";
 import { Selo } from "./marca";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -52,7 +54,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   const carregarBase = useCallback(async (petshopId: string) => {
     const [p, e, s] = await Promise.all([
       sb.from("petshops").select("*").eq("id", petshopId).single(),
-      sb.from("profissionais").select("*").eq("petshop_id", petshopId).order("criado_em"),
+      lerEquipe(sb, petshopId),
       sb.from("servicos").select("*").eq("petshop_id", petshopId).order("ordem").order("nome"),
     ]);
     if (p.error) throw p.error;
@@ -97,7 +99,8 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     const resta = new Date(petshop.teste_ate).getTime() - Date.now();
     // quem cancelou continua usando até o fim do período que já pagou
     const pagoAinda = petshop.status === "cancelada" && petshop.pago_ate != null && new Date(petshop.pago_ate).getTime() > Date.now();
-    const liberado = ["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && resta > 0) || pagoAinda;
+    // enquanto a assinatura não abriu (sem link de pagamento), o teste não bloqueia ninguém: a pessoa não teria como pagar
+    const liberado = ["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && (resta > 0 || !temCheckout())) || pagoAinda;
     return {
       sb, user, petshop, eu, equipe, servicos,
       souDono: eu.papel === "dono",

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Lock, Plus, Split, Trash2 } from "lucide-react";
 import { caixaAberto, formaPrincipal, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
-import { brl, lerValor } from "@/lib/gestao/util";
+import { brl, isoDia, lerValor, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { useDados } from "../ui";
 import "./loja.css";
@@ -168,6 +168,58 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
       </div>
     </div>
   );
+}
+
+/* ---------- paga agora (uma forma ou dividido) ou paga depois ---------- */
+
+/** "Cliente paga depois": a conta fica em A receber, com o dia combinado. */
+export type PagaDepois = { ativo: boolean; quando: string };
+/** Começa em "Paga agora"; se mudar para depois, o dia combinado já vem daqui a 7 dias. */
+export const pagaDepoisInicial = (): PagaDepois => ({ ativo: false, quando: isoDia(somaDias(new Date(), 7)) });
+
+/**
+ * Como a conta é recebida, igual em toda tela que recebe dinheiro (comanda, pacote, check-out):
+ * "Paga agora" com a forma de pagamento (que pode ser dividida) ou "Cliente paga depois" com o dia combinado.
+ */
+export function QuandoPaga({ total, pagamento, aoPagamento, depois, aoDepois, erro }: {
+  total: number; pagamento: EstadoPagamento; aoPagamento: (e: EstadoPagamento) => void;
+  depois: PagaDepois; aoDepois: (d: PagaDepois) => void; erro?: string | null;
+}) {
+  return (
+    <>
+      {total > 0 && (
+        <div className="g-seg g-pg-quando" role="group" aria-label="Quando o cliente paga">
+          <button type="button" aria-pressed={!depois.ativo} onClick={() => aoDepois({ ...depois, ativo: false })}>Paga agora</button>
+          <button type="button" aria-pressed={depois.ativo} onClick={() => aoDepois({ ...depois, ativo: true })}>Cliente paga depois</button>
+        </div>
+      )}
+      {depois.ativo && total > 0 ? (
+        <label className="g-campo">
+          <span>Quando vai pagar</span>
+          <input type="date" className="g-input" value={depois.quando} min={isoDia(new Date())} onChange={(e) => aoDepois({ ...depois, quando: e.target.value })} />
+          <small>A conta fica anotada em Financeiro, A receber, e na ficha do tutor. Quando o cliente pagar, é só dar baixa.</small>
+          {erro && <small className="erro" role="alert">{erro}</small>}
+        </label>
+      ) : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erro} />}
+    </>
+  );
+}
+
+/**
+ * Confere o recebimento escolhido em `QuandoPaga`. Devolve o erro em português (`noCampo` é o texto para mostrar junto do campo),
+ * ou o que gravar: a conta a receber (`fiado`, com o dia) ou o pagamento de agora (`forma` e `pagamentos`).
+ */
+export function fecharRecebimento(pagamento: EstadoPagamento, depois: PagaDepois, total: number):
+  { erro: string; noCampo: string } | { fiado: true; quando: string } | { fiado: false; forma: Forma; pagamentos: PartePagamento[] | null } {
+  const ruim = erroDeValor(total);
+  if (ruim) return { erro: ruim, noCampo: ruim };
+  if (depois.ativo) {
+    if (!depois.quando || depois.quando < isoDia(new Date())) return { erro: "Escolha quando o cliente vai pagar.", noCampo: "Escolha um dia de hoje em diante." };
+    return { fiado: true, quando: depois.quando };
+  }
+  const pg = fecharPagamento(pagamento, total);
+  if ("erro" in pg) return { erro: pg.erro, noCampo: pagamento.dividido ? pg.erro : "Escolha como o cliente pagou." };
+  return { fiado: false, ...pg };
 }
 
 /* ---------- dinheiro ---------- */

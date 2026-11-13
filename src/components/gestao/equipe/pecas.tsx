@@ -80,7 +80,7 @@ export function EscolherPerfil({ valor, aoMudar }: { valor: Escolha; aoMudar: (e
         <Opcao key={c.id} icone={VISUAL[c.id].icone} tom={VISUAL[c.id].tom} titulo={c.titulo} texto={c.texto} marcado={valor.perfil === c.id} aoEscolher={() => aoMudar(comPerfil(valor, c.id))}>
           {c.id === "atendimento" && (
             <div className="g-pilha p">
-              <p className="g-eq-mini">Como aparece no cartão dela</p>
+              <p className="g-eq-mini">Como aparece no cartão da pessoa</p>
               <div className="g-chips">
                 {ROTULOS_ATENDE.map((r) => <button key={r} type="button" className="g-chip" aria-pressed={valor.rotulo === r} onClick={() => aoMudar({ ...valor, rotulo: r })}>{r}</button>)}
               </div>
@@ -246,7 +246,7 @@ export function DetalhesAgenda({ nome, cor, aoCor, comissao, aoComissao, segueLo
             <b>Segue o horário do pet shop</b><small>Trabalha em todos os dias em que vocês abrem.</small>
           </button>
           <button type="button" className={`g-eq-curta${!segueLoja ? " on" : ""}`} aria-pressed={!segueLoja} onClick={() => aoSegueLoja(false)}>
-            <b>Tem dias próprios</b><small>Você marca os dias e as horas dela.</small>
+            <b>Tem dias próprios</b><small>Você marca os dias e as horas dessa pessoa.</small>
           </button>
         </div>
         {!segueLoja && <GradeHorario valor={escala} aoMudar={aoEscala} aberto="Trabalha" fechado="Folga" base={loja} />}

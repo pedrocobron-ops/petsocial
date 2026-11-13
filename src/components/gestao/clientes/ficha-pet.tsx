@@ -1,5 +1,6 @@
 "use client";
 
+import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { Fragment, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
@@ -40,7 +41,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
     const [pet, atendimentos, pacotes, estadias, concluidos, saude, hospedagens] = await Promise.all([
       sb.from("pets").select("*, clientes(*)").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
       sb.from("agendamentos").select("id, inicio, status, preco, servico_id").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
-      sb.from("pacotes_clientes").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).eq("ativo", true).order("comprado_em", { ascending: false }),
+      sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", id).eq("ativo", true).order("comprado_em", { ascending: false }),
       sb.from("estadias").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("entrada", { ascending: false }).limit(8),
       // visitas concluídas: a conta exata, a mais recente e os valores para somar
       sb.from("agendamentos").select("inicio, preco", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).eq("status", "concluido").order("inicio", { ascending: false }).limit(1000),

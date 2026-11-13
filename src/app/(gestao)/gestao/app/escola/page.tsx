@@ -10,7 +10,7 @@ import { Folha, Vazio, ok, useDados } from "@/components/gestao/ui";
 import { AULAS, MATERIAIS, linkDeCompra, type Aula, type Material } from "@/lib/gestao/escola";
 import { brlCurto } from "@/lib/gestao/util";
 
-const TOM: Record<Aula["tema"], "pessego" | "menta" | "ceu" | "lilas" | "manteiga"> = { Preço: "manteiga", Agenda: "pessego", Clientes: "menta", Dinheiro: "ceu", Equipe: "lilas" };
+const TOM: Record<Aula["tema"], "pessego" | "menta" | "ceu" | "lilas" | "manteiga" | "rosa"> = { Preço: "manteiga", Agenda: "pessego", Clientes: "menta", Dinheiro: "ceu", Equipe: "lilas", "Creche e hotel": "ceu", Divulgação: "rosa", Estoque: "pessego" };
 
 /**
  * Escola de Gestão: aulas curtas e gratuitas sobre a rotina do pet shop, a estante de materiais da Maestro Pet
@@ -21,6 +21,7 @@ export default function Escola() {
   const [aulaAberta, setAulaAberta] = useState<Aula | null>(null);
   const [materialAberto, setMaterialAberto] = useState<Material | null>(null);
   const [lendo, setLendo] = useState<Material | null>(null);
+  const [tema, setTema] = useState<Aula["tema"] | "Todas">("Todas");
 
   const { dados } = useDados(async () => {
     const [compras, arquivos] = await Promise.all([
@@ -51,7 +52,7 @@ export default function Escola() {
 
         {meus.length > 0 && (
           <section className="g-pilha">
-            <div className="g-card-t" style={{ marginBottom: 0 }}><h2><Library style={{ width: 20, height: 20, verticalAlign: "-3px", marginRight: 8 }} />Meus materiais</h2></div>
+            <div className="g-card-t" style={{ marginBottom: 0 }}><h2 className="g-esc-tit"><Library aria-hidden />Meus materiais</h2></div>
             <div className="g-esc-estante">
               {meus.map((m) => (
                 <div key={m.slug} className="g-card g-esc-item" style={{ cursor: "default" }}>
@@ -74,10 +75,15 @@ export default function Escola() {
         <section className="g-pilha">
           <div>
             <h2>Aulas gratuitas</h2>
-            <p className="g-muted g-p">Leitura de três a quatro minutos. No fim de cada uma, o atalho para fazer no sistema.</p>
+            <p className="g-muted g-p">{AULAS.length} leituras de três a quatro minutos. No fim de cada uma, o atalho para fazer no sistema.</p>
+          </div>
+          <div className="g-chips">
+            {(["Todas", ...Array.from(new Set(AULAS.map((a) => a.tema)))] as (Aula["tema"] | "Todas")[]).map((t) => (
+              <button key={t} className="g-chip" aria-pressed={tema === t} onClick={() => setTema(t)}>{t}</button>
+            ))}
           </div>
           <div className="g-esc-aulas">
-            {AULAS.map((a) => (
+            {AULAS.filter((a) => tema === "Todas" || a.tema === tema).map((a) => (
               <button key={a.id} className="g-card g-esc-aula" onClick={() => setAulaAberta(a)}>
                 <span className="g-esc-meta"><span className={`g-tile p ${TOM[a.tema]}`} aria-hidden><BookOpen /></span>{a.tema}<span aria-hidden>·</span><Clock style={{ width: 14, height: 14 }} aria-hidden />{a.minutos} min</span>
                 <b>{a.titulo}</b>
@@ -90,7 +96,7 @@ export default function Escola() {
         {estante.length > 0 && (
           <section className="g-pilha">
             <div>
-              <h2><Store style={{ width: 20, height: 20, verticalAlign: "-3px", marginRight: 8 }} />Um serviço novo para o seu pet shop</h2>
+              <h2 className="g-esc-tit"><Store aria-hidden /><span>Um serviço novo para o seu pet shop</span></h2>
               <p className="g-muted g-p">Materiais completos da Maestro Pet, cada um sobre um serviço que dá para somar ao que você já faz. Toque para ver o que ensina e para quem serve.</p>
             </div>
             <div className="g-esc-estante">

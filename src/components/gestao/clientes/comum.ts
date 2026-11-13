@@ -1,6 +1,6 @@
 import type { Cliente, Pet } from "@/lib/gestao/tipos";
 import { PORTES } from "@/lib/gestao/tipos";
-import { fmtTelefone } from "@/lib/gestao/util";
+import { fmtTelefone, chamar } from "@/lib/gestao/util";
 
 export const BASE = "/gestao/app/clientes";
 export const linkPet = (id: string) => `${BASE}?pet=${id}`;
@@ -10,7 +10,7 @@ export type PetDaLista = Pet & { clientes: Pick<Cliente, "id" | "nome" | "telefo
 
 export const ESPECIES: Record<string, string> = { cao: "Cachorro", gato: "Gato", outro: "Outro" };
 export const nomePorte = (p: string | null | undefined) => PORTES.find((x) => x.id === p)?.rotulo ?? "";
-export const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? "";
+export const primeiroNome = (nome: string) => chamar(nome);
 
 type Resposta<T> = { data: T[] | null; error: { message: string } | null };
 

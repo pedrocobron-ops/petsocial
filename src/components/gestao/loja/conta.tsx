@@ -1,5 +1,6 @@
 "use client";
 
+import { COLS_PRODUTO } from "@/lib/gestao/reservado";
 import { useEffect, useRef, useState } from "react";
 import { Minus, Package, Plus, Scissors, Search, Sparkles, Trash2, Truck } from "lucide-react";
 import type { ItemLancamento } from "@/lib/gestao/dinheiro";
@@ -9,7 +10,9 @@ import { brl, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { ok, useDados } from "../ui";
-import { CampoDinheiro, erroDeValor, EscolhaPagamento, fmtQtd, lerQtd, type EstadoPagamento } from "./pecas";
+import { CampoDinheiro, erroDeValor, EscolhaPagamento, fmtQtd, lerQtd, QuandoPaga, type EstadoPagamento, type PagaDepois } from "./pecas";
+
+export type { PagaDepois } from "./pecas";
 import "./venda.css";
 
 /**
@@ -102,7 +105,7 @@ export async function baixarEstoque(sb: Banco, petshopId: string, userId: string
 export function useProdutosDaLoja() {
   const { sb, petshop } = useGestao();
   const { dados, carregando, erro } = useDados(async () =>
-    ok(await sb.from("produtos").select("*").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as Produto[],
+    (ok(await sb.from("produtos").select(COLS_PRODUTO).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000)) as unknown as Omit<Produto, "custo">[]).map((p) => ({ ...p, custo: null })) as Produto[],
   [petshop.id]);
   return { produtos: dados ?? [], carregando: carregando && !dados, erro };
 }
@@ -211,9 +214,6 @@ export function LinhaDaConta({ item, produto, aoMudar, aoTirar, apoio }: {
 
 /* ---------- desconto, pagamento e total ---------- */
 
-/** "Cliente paga depois": a conta fica em A receber, com o dia combinado. */
-export type PagaDepois = { ativo: boolean; quando: string };
-
 export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, pagamento, aoPagamento, comPagamento = true, erroForma, depois, aoDepois }: {
   subtotal: number; desconto: number; total: number; descontoDigitado: number | null; aoDesconto: (v: number | null) => void;
   pagamento: EstadoPagamento; aoPagamento: (e: EstadoPagamento) => void; comPagamento?: boolean; erroForma?: string | null;
@@ -230,20 +230,9 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
             <CampoDinheiro valor={descontoDigitado} aoMudar={aoDesconto} />
             {passou && <small>O desconto não passa do valor da conta.</small>}
           </label>
-          {depois && aoDepois && total > 0 && (
-            <div className="g-seg g-pg-quando" role="group" aria-label="Quando o cliente paga">
-              <button type="button" aria-pressed={!depois.ativo} onClick={() => aoDepois({ ...depois, ativo: false })}>Paga agora</button>
-              <button type="button" aria-pressed={depois.ativo} onClick={() => aoDepois({ ...depois, ativo: true })}>Cliente paga depois</button>
-            </div>
-          )}
-          {depois?.ativo && aoDepois && total > 0 ? (
-            <label className="g-campo">
-              <span>Quando vai pagar</span>
-              <input type="date" className="g-input" value={depois.quando} onChange={(e) => aoDepois({ ...depois, quando: e.target.value })} />
-              <small>A conta fica anotada em Financeiro, A receber, e na ficha do tutor. Quando o cliente pagar, é só dar baixa.</small>
-              {erroForma && <small className="erro" role="alert">{erroForma}</small>}
-            </label>
-          ) : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erroForma} />}
+          {depois && aoDepois
+            ? <QuandoPaga total={total} pagamento={pagamento} aoPagamento={aoPagamento} depois={depois} aoDepois={aoDepois} erro={erroForma} />
+            : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erroForma} />}
         </>
       )}
       <div className="g-vd-total" role="status">

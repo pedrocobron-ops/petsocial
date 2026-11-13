@@ -1,5 +1,6 @@
 "use client";
 
+import { ERRO_TELEFONE, mascaraTelefone, telefoneValido } from "@/lib/gestao/util";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Porta from "@/components/gestao/porta";
@@ -46,7 +47,8 @@ export default function Comecar() {
     e.preventDefault();
     setErro(null);
     setIndo(true);
-    const { error } = await banco().rpc("criar_petshop", { p_nome: nome, p_seu_nome: seuNome, p_telefone: telefone, p_cidade: cidade, p_uf: uf });
+    if (telefone.trim() && !telefoneValido(telefone)) { setErro(ERRO_TELEFONE); return; }
+    const { error } = await banco().rpc("criar_petshop", { p_nome: nome, p_seu_nome: seuNome, p_telefone: telefone.replace(/\D/g, ""), p_cidade: cidade, p_uf: uf });
     setIndo(false);
     if (error) { setErro("Não consegui criar o pet shop. Confira os dados e tente de novo."); return; }
     router.replace("/gestao/app?boas-vindas=1");
@@ -93,7 +95,7 @@ export default function Comecar() {
           <input className="g-input" required maxLength={80} value={seuNome} onChange={(e) => setSeuNome(e.target.value)} />
         </label>
         <label className="g-campo"><span>WhatsApp do pet shop</span>
-          <input className="g-input" type="tel" inputMode="tel" placeholder="(11) 99999-9999" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
+          <input className="g-input" type="tel" inputMode="tel" placeholder="(11) 99999-9999" value={telefone} onChange={(e) => setTelefone(mascaraTelefone(e.target.value))} />
         </label>
         <div className="dupla">
           <label className="g-campo"><span>Cidade</span>

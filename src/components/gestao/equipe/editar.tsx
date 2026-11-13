@@ -168,7 +168,7 @@ export default function EditarPessoa({ pessoa, foco, aoFechar }: { pessoa: Profi
       <label className="g-campo"><span>E-mail de {primeiro}</span>
         <input className="g-input" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="nome@email.com" value={email}
           onChange={(ev) => { setEmail(ev.target.value); setErroAcesso(null); }} />
-        <small>É com esse e-mail que ela vai criar a conta. Precisa ser exatamente o mesmo: é assim que o sistema sabe que ela é da sua equipe.</small>
+        <small>É com esse e-mail que a pessoa vai criar a conta. Precisa ser exatamente o mesmo: é assim que o sistema sabe que ela é da sua equipe.</small>
       </label>
       {acesso === "sem" && <p className="g-muted g-pp">As áreas que {primeiro} vai abrir estão logo abaixo. Confira antes de dar o login.</p>}
       {erroAcesso && <p className="g-erro" role="alert">{erroAcesso}</p>}
@@ -259,7 +259,7 @@ export default function EditarPessoa({ pessoa, foco, aoFechar }: { pessoa: Profi
                 <i className="g-eq-estado-i" aria-hidden>{pessoa.atende ? <CalendarDays /> : <Lock />}</i>
                 <p className="g-eq-estado-t">
                   <b>{pessoa.atende ? "Sem login, só na agenda" : "Sem login"}</b>
-                  <small>{pessoa.atende ? "Você marca os horários por ela. Não ocupa acesso do plano." : "Não entra no sistema e não ocupa acesso do plano."}</small>
+                  <small>{pessoa.atende ? "Você marca os horários por essa pessoa. Não ocupa acesso do plano." : "Não entra no sistema e não ocupa acesso do plano."}</small>
                 </p>
               </div>
               {dando ? (

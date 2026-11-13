@@ -102,6 +102,11 @@ export default function Comanda({ agendamento: a, aoFechar, aoPronto }: {
         avisarErro(`${depois.ativo ? "A conta foi anotada" : "O valor foi recebido"}, mas o atendimento não ficou como concluído. Conclua pela agenda. (${mensagemDeErro(e)})`);
         avisarMudanca();
         aoPronto();
+      } else if (e instanceof Error && /já tem recebimento/.test(e.message)) {
+        // outra pessoa recebeu no mesmo instante: fecha a conta e mostra o horário atualizado
+        avisarErro(e);
+        avisarMudanca();
+        aoPronto();
       } else { avisarErro(e); setSalvando(false); }
     }
   }

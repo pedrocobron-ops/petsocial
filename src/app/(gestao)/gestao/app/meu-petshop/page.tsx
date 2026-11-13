@@ -10,7 +10,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { Campo, CampoValor, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
 import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import { PORTES, type Horario, type Porte, type Servico } from "@/lib/gestao/tipos";
-import { brlCurto, fmtTelefone, soDigitos } from "@/lib/gestao/util";
+import { brlCurto, fmtTelefone, soDigitos, mascaraTelefone } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./meu-petshop.css";
 
@@ -113,7 +113,7 @@ function Dados() {
       <Campo rotulo="Nome do pet shop"><input className="g-input" value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} /></Campo>
       <Campo rotulo="WhatsApp" dica="O número que os clientes usam para falar com vocês.">
         <input className="g-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 91234-5678" value={telefone}
-          onChange={(e) => setTelefone(e.target.value)} onBlur={() => setTelefone(fmtTelefone(telefone))} />
+          onChange={(e) => setTelefone(mascaraTelefone(e.target.value))} />
       </Campo>
       <div className="dupla" style={{ gridTemplateColumns: "1fr 6.5rem" }}>
         <Campo rotulo="Cidade"><input className="g-input" value={cidade} maxLength={80} onChange={(e) => setCidade(e.target.value)} /></Campo>
