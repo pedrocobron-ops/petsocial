@@ -1035,3 +1035,9 @@ a.g-ret-linha:hover, button.g-ret-linha:hover { border-color: var(--g-linha-fort
 .g-ch-previsto { margin: 0; }
 .g-ch-cobrado { white-space: nowrap; }
 .g-ch-cobrado small { font-weight: 400; opacity: .75; }
+
+/* fidelidade: anel com a contagem e o aviso de prêmio ganho */
+.g-fid { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.g-fid > div { min-width: 0; display: grid; gap: 2px; }
+.g-fid-ganhou { margin: 0; }
+.g-fid-ganhou b { overflow-wrap: anywhere; }

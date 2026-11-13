@@ -7,7 +7,7 @@ import { caixaAberto, formaPrincipal, VALOR_MAXIMO, type PartePagamento } from "
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, isoDia, lerValor, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
-import { useDados } from "../ui";
+import { AVISO_SEM_MENOS, useAvisos, useDados } from "../ui";
 import "./loja.css";
 
 export type Forma = (typeof FORMAS)[number]["id"];
@@ -243,6 +243,7 @@ export function CampoDinheiro({ valor, aoMudar, placeholder = "0,00", autoFocus,
 }) {
   const [texto, setTexto] = useState(valor == null ? "" : duasCasas(valor));
   const ultimo = useRef(valor);
+  const { avisar } = useAvisos();
   useEffect(() => {
     if (valor !== ultimo.current) { ultimo.current = valor; setTexto(valor == null ? "" : duasCasas(valor)); }
   }, [valor]);
@@ -251,6 +252,7 @@ export function CampoDinheiro({ valor, aoMudar, placeholder = "0,00", autoFocus,
       aria-invalid={valor != null && valor > maximo ? true : undefined}
       onChange={(e) => {
         const limpo = e.target.value.replace(/-/g, "");
+        if (limpo !== e.target.value) avisar(AVISO_SEM_MENOS);
         setTexto(limpo);
         const n = lerValor(limpo);
         ultimo.current = n;

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Importar from "@/components/gestao/importar";
-import { AlertTriangle, Cat, ChevronRight, Dog, Download, PawPrint, Phone, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
+import { AlertTriangle, Cat, ChevronRight, Dog, Download, MessageCircle, PawPrint, Phone, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -11,6 +11,7 @@ import FormPet from "../form-pet";
 import { Anel, Kpi } from "../painel";
 import { abrirAssistente, AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { baixarCsv, buscarTudo, ESPECIES, linkPet, linkTutor, nomePorte, type PetDaLista } from "./comum";
+import ChamarDeVolta from "./chamar-de-volta";
 import FormTutor from "./form-tutor";
 import { EtiquetaSaude } from "./saude";
 import { buscarAlertasSaude } from "./saude-avisos";
@@ -55,7 +56,7 @@ export default function Lista({ aoAbrir, irPara }: {
   aoAbrir: () => void;
   irPara: (url: string) => void;
 }) {
-  const { sb, petshop } = useGestao();
+  const { sb, petshop, posso } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [aba, setAba] = useState<"pets" | "tutores">("pets");
@@ -67,6 +68,7 @@ export default function Lista({ aoAbrir, irPara }: {
   const [petNovo, setPetNovo] = useState(false);
   const [tutorNovo, setTutorNovo] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [chamando, setChamando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [pets, clientes] = await Promise.all([
@@ -188,6 +190,7 @@ export default function Lista({ aoAbrir, irPara }: {
           <p className="g-muted">{contagem}</p>
         </div>
         <div className="g-acoes">
+          {posso("clientes") && <button className="g-btn sec" onClick={() => setChamando(true)} disabled={!dados}><MessageCircle />Chamar de volta</button>}
           <button className="g-btn sec" onClick={exportar} disabled={!dados}><Download />Exportar</button>
           <button className="g-btn sec" onClick={() => setImportando(true)}><Upload />Trazer de planilha</button>
           <button className="g-btn pri" onClick={abrirPetNovo}><Plus />Pet novo</button>
@@ -325,6 +328,7 @@ export default function Lista({ aoAbrir, irPara }: {
         </>
       )}
 
+      {chamando && <ChamarDeVolta aoFechar={() => setChamando(false)} />}
       {importando && <Importar tipo="clientes" aoFechar={() => setImportando(false)} aoTerminar={() => void recarregar()} />}
       {petNovo && (
         <FormPet nomeInicial={aba === "pets" && petsFiltrados.length === 0 ? q.trim() : undefined} aoFechar={() => setPetNovo(false)}

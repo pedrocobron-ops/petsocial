@@ -2,7 +2,9 @@
 
 import { abrirGuia } from "@/components/gestao/guia-inicial";
 import Identidade from "@/components/gestao/ajustes/identidade";
+import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
+import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
 import { useState } from "react";
 import { CalendarDays, Check, Clock, Copy, ExternalLink, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
 import { Kpi, Tile } from "@/components/gestao/painel";
@@ -69,9 +71,11 @@ export default function MeuPetshop() {
           <div className="g-pilha g">
             <Identidade />
             <LinkAgendamento />
+            <AjusteFidelidade />
             <Servicos />
           </div>
         </div>
+        <CopiaSeguranca />
       </div>
     </>
   );

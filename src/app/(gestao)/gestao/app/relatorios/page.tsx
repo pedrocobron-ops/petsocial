@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, CircleCheck, Clock, CreditCard, Download, HandCoins, PawPrint, Printer, Receipt, Scissors, TrendingUp, UserPlus, Users, UserX } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, CalendarDays, CircleCheck, Clock, CreditCard, Download, HandCoins, Home, Moon, PawPrint, Printer, Receipt, Scissors, Sun, TrendingUp, UserPlus, Users, UserX } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPessoa, AvatarPet, Esqueleto, useAvisos, useDados, Vazio } from "@/components/gestao/ui";
 import { baixarPlanilha, brlMini, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, numeroCsv, PALETA, paginar, SemAcesso, somaPorForma, type Cel } from "@/components/gestao/financeiro/comum";
 import { Anel, Barras, Kpi, Rosca, Tile } from "@/components/gestao/painel";
 import { partesDoLancamento, percentuaisQueFecham } from "@/lib/gestao/dinheiro";
+import type { Banco } from "@/lib/gestao/supabase";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
 import "./relatorios.css";
@@ -35,6 +36,16 @@ function intervalo(p: Exclude<Periodo, "livre">, hoje: Date): { de: Date; ate: D
   return { de: somaDias(inicioDoDia(hoje), -89), ate: inicioDoDia(hoje) };
 }
 
+/**
+ * Período logo antes do escolhido, com o mesmo tamanho. Mês inteiro compara com o mês inteiro anterior;
+ * nos outros, os mesmos dias contados para trás a partir da véspera do começo.
+ */
+function periodoAnterior(p: Periodo, de: Date, ate: Date): { de: Date; ate: Date } {
+  if (p === "mes" || p === "mes_passado") return { de: new Date(de.getFullYear(), de.getMonth() - 1, 1), ate: new Date(de.getFullYear(), de.getMonth(), 0) };
+  const dias = Math.round((ate.getTime() - de.getTime()) / 864e5) + 1;
+  return { de: somaDias(de, -dias), ate: somaDias(de, -1) };
+}
+
 type Ag = {
   id: string; inicio: string; status: string; preco: number | null; pet_id: string; servico_id: string | null; profissional_id: string | null; pacote_cliente_id: string | null;
   pets: { id: string; nome: string; foto: string | null; especie: string | null; clientes: { id: string; nome: string } | null } | null;
@@ -51,10 +62,92 @@ type Recebimento = { agendamento_id: string | null; valor: number; itens: unknow
  * - pago com pacote: nada (o dinheiro entrou na venda do pacote);
  * - sem recebimento ainda: o preço combinado na agenda.
  */
-function cobradoDe(a: Ag, recebimento: Recebimento | undefined): { valor: number; como: "recebido" | "fiado" | "pacote" | "agenda" } {
+function cobradoDe(a: Pick<Ag, "preco" | "pacote_cliente_id">, recebimento: Recebimento | undefined): { valor: number; como: "recebido" | "fiado" | "pacote" | "agenda" } {
   if (recebimento) return { valor: partesDoLancamento(recebimento)?.servico ?? Number(recebimento.valor), como: recebimento.pago === false ? "fiado" : "recebido" };
   if (a.pacote_cliente_id) return { valor: 0, como: "pacote" };
   return { valor: Number(a.preco ?? 0), como: "agenda" };
+}
+
+/**
+ * A conta de cada atendimento concluído: a entrada recebida no período, se houver; senão a conta dele em qualquer data
+ * (paga em outro dia, ou ainda a receber porque o cliente paga depois).
+ */
+async function contasDosAtendimentos(sb: Banco, petshopId: string, concluidos: string[], entradas: Recebimento[]) {
+  const recebimentos = new Map<string, Recebimento>();
+  for (const l of entradas) if (l.agendamento_id) recebimentos.set(l.agendamento_id, l);
+  const sem = concluidos.filter((id) => !recebimentos.has(id));
+  const blocos: string[][] = [];
+  for (let i = 0; i < sem.length; i += 150) blocos.push(sem.slice(i, i + 150));
+  for (let i = 0; i < blocos.length; i += 4) {
+    const respostas = await Promise.all(blocos.slice(i, i + 4).map((ids) =>
+      sb.from("lancamentos").select("agendamento_id, valor, itens, pago").eq("petshop_id", petshopId).eq("tipo", "entrada").in("agendamento_id", ids)));
+    for (const r of respostas) {
+      if (r.error) throw new Error(r.error.message);
+      for (const l of r.data ?? []) if (l.agendamento_id) recebimentos.set(l.agendamento_id, l);
+    }
+  }
+  return recebimentos;
+}
+
+/** Valor médio cobrado por atendimento concluído; quem pagou com pacote fica de fora da conta. */
+function valorMedio(concluidos: Pick<Ag, "id" | "preco" | "pacote_cliente_id">[], recebimentos: Map<string, Recebimento>): number | null {
+  let soma = 0, pagantes = 0;
+  for (const a of concluidos) {
+    const c = cobradoDe(a, recebimentos.get(a.id));
+    if (c.como !== "pacote") pagantes++;
+    soma += c.valor;
+  }
+  return pagantes ? real(real(soma) / pagantes) : null;
+}
+
+/** Os quatro números do período anterior, com as mesmas contas do período escolhido. */
+async function carregarAnterior(sb: Banco, petshopId: string, de: Date, ate: Date) {
+  const comeco = de.toISOString(), final = somaDias(ate, 1).toISOString();
+  const [ags, entradas, novos] = await Promise.all([
+    paginar<Pick<Ag, "id" | "preco" | "pacote_cliente_id">>((a, b) => sb.from("agendamentos").select("id, preco, pacote_cliente_id")
+      .eq("petshop_id", petshopId).eq("status", "concluido").gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b)),
+    paginar<Recebimento>((a, b) => sb.from("lancamentos").select("agendamento_id, valor, itens").eq("petshop_id", petshopId).eq("pago", true).eq("tipo", "entrada")
+      .is("movimento", null).gte("data", isoDia(de)).lte("data", isoDia(ate)).order("data").order("id").range(a, b)),
+    sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshopId).gte("criado_em", comeco).lt("criado_em", final),
+  ]);
+  if (novos.error) throw new Error(novos.error.message);
+  const recebimentos = await contasDosAtendimentos(sb, petshopId, ags.map((a) => a.id), entradas);
+  return {
+    faturamento: real(entradas.reduce((s, l) => s + Number(l.valor), 0)),
+    concluidos: ags.length,
+    ticket: valorMedio(ags, recebimentos),
+    clientesNovos: novos.count ?? 0,
+  };
+}
+
+/** Estadia de creche ou hotel encerrada (a saída é a data que vale para o período). */
+type EstadiaRel = { id: string; tipo: string; entrada: string; saida: string | null; diarias_cobradas: number | null; valor_cobrado: number | null; obs: string | null };
+/** A mesma nota que o check-out de Creche e hotel grava na observação quando a saída é com pacote. */
+const NOTA_PACOTE = "Saiu usando o pacote.";
+/** A mesma conta de Creche e hotel: hotel cobra por noite; creche, por dia em que o pet esteve aqui. Sempre pelo menos 1. */
+function contarDiarias(e: Pick<EstadiaRel, "tipo" | "entrada">, fim: Date) {
+  const dias = Math.round((inicioDoDia(fim).getTime() - inicioDoDia(new Date(e.entrada)).getTime()) / 864e5);
+  return Math.max(1, e.tipo === "hotel" ? dias : dias + 1);
+}
+const TIPOS_ESTADIA = [{ id: "creche", nome: "Creche", icone: Sun }, { id: "hotel", nome: "Hotel", icone: Moon }] as const;
+
+/** Resumo das estadias encerradas de um tipo, como o Histórico de Creche e hotel mostra cada uma. */
+function resumoEstadias(lista: EstadiaRel[]) {
+  const x = { n: lista.length, diarias: 0, valor: 0, comValor: 0, pacote: 0, cortesia: 0, semValor: 0, estimadas: 0 };
+  for (const e of lista) {
+    if (e.diarias_cobradas == null) {
+      // estadia antiga, sem o que foi cobrado: diárias pelas datas, sem valor
+      x.diarias += contarDiarias(e, new Date(e.saida ?? e.entrada));
+      x.estimadas++;
+      continue;
+    }
+    x.diarias += e.diarias_cobradas;
+    if (e.obs?.includes(NOTA_PACOTE)) x.pacote++;
+    else if (e.valor_cobrado == null) x.semValor++;
+    else if (Number(e.valor_cobrado) === 0) x.cortesia++;
+    else { x.comValor++; x.valor = real(x.valor + Number(e.valor_cobrado)); }
+  }
+  return x;
 }
 
 const DIAS_DA_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
@@ -81,12 +174,14 @@ function Relatorios() {
     () => (periodo === "livre" ? { de: deIsoDia(livreValido.de), ate: deIsoDia(livreValido.ate) } : intervalo(periodo, deIsoDia(hojeIso))),
     [periodo, hojeIso, livreValido]);
   const deIso = isoDia(de), ateIso = isoDia(ate);
+  const antes = useMemo(() => periodoAnterior(periodo, de, ate), [periodo, de, ate]);
+  const antesDeIso = isoDia(antes.de), antesAteIso = isoDia(antes.ate);
   const nomeDoPeriodo = periodo === "livre" ? `De ${dataCompleta(de)} a ${dataCompleta(ate)}` : PERIODOS.find((p) => p.id === periodo)?.rotulo ?? "";
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const comeco = de.toISOString();
     const final = somaDias(ate, 1).toISOString();
-    const [ags, entradas, novos] = await Promise.all([
+    const [ags, entradas, novos, estadias, anterior] = await Promise.all([
       paginar<Ag>(async (a, b) => {
         const r = await sb.from("agendamentos")
           .select("id, inicio, status, preco, pet_id, servico_id, profissional_id, pacote_cliente_id, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome, cor)")
@@ -96,20 +191,16 @@ function Relatorios() {
       paginar<Entrada>((a, b) => sb.from("lancamentos").select("id, data, valor, cliente_id, agendamento_id, itens, forma, pagamentos").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
         .is("movimento", null).gte("data", deIso).lte("data", ateIso).order("data").order("id").range(a, b)),
       sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).gte("criado_em", comeco).lt("criado_em", final),
+      // creche e hotel: estadias encerradas, pela data da saída
+      paginar<EstadiaRel>((a, b) => sb.from("estadias").select("id, tipo, entrada, saida, diarias_cobradas, valor_cobrado, obs").eq("petshop_id", petshop.id).eq("status", "encerrada")
+        .gte("saida", comeco).lt("saida", final).order("saida").order("id").range(a, b)),
+      carregarAnterior(sb, petshop.id, antes.de, antes.ate),
     ]);
     if (novos.error) throw new Error(novos.error.message);
     // conta de cada atendimento concluído do período: paga em outro dia (fora do período) ou ainda a receber (cliente paga depois)
-    const recebimentos = new Map<string, Recebimento>();
-    for (const l of entradas) if (l.agendamento_id) recebimentos.set(l.agendamento_id, l);
-    const semRecebimento = ags.filter((a) => a.status === "concluido" && !recebimentos.has(a.id)).map((a) => a.id);
-    for (let i = 0; i < semRecebimento.length; i += 150) {
-      const r = await sb.from("lancamentos").select("agendamento_id, valor, itens, pago").eq("petshop_id", petshop.id).eq("tipo", "entrada")
-        .in("agendamento_id", semRecebimento.slice(i, i + 150));
-      if (r.error) throw new Error(r.error.message);
-      for (const l of r.data ?? []) if (l.agendamento_id) recebimentos.set(l.agendamento_id, l);
-    }
-    return { ags, entradas, recebimentos, clientesNovos: novos.count ?? 0 };
-  }, [petshop.id, deIso, ateIso]);
+    const recebimentos = await contasDosAtendimentos(sb, petshop.id, ags.filter((a) => a.status === "concluido").map((a) => a.id), entradas);
+    return { ags, entradas, recebimentos, clientesNovos: novos.count ?? 0, estadias, anterior };
+  }, [petshop.id, deIso, ateIso, antesDeIso, antesAteIso]);
 
   const r = useMemo(() => {
     if (!dados) return null;
@@ -127,8 +218,7 @@ function Relatorios() {
     // por forma de pagamento: o pagamento dividido entra repartido
     const porFormaMapa = somaPorForma(dados.entradas);
     const porForma = FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: porFormaMapa.get(f.id) ?? 0, cor: COR_FORMA[f.id] })).filter((f) => f.valor > 0);
-    const pagantes = concluidos.length - comPacote;
-    const baseTicket = real(concluidos.reduce((s, a) => s + valorDe(a), 0));
+    const ticket = valorMedio(concluidos, dados.recebimentos);
     // quanto cada tutor gastou no período: todas as entradas recebidas ligadas a ele (a mesma conta de "Já gastou aqui" na ficha)
     const gastoDoTutor = new Map<string, number>();
     for (const l of dados.entradas) if (l.cliente_id) gastoDoTutor.set(l.cliente_id, real((gastoDoTutor.get(l.cliente_id) ?? 0) + Number(l.valor)));
@@ -196,12 +286,15 @@ function Relatorios() {
     const melhor = comEntrada.reduce<{ dia: Date; valor: number } | null>((m, b) => (!m || b.valor > m.valor ? b : m), null);
     const diaCheio = porDia.reduce((m, d, i) => (d.n > porDia[m].n ? i : m), 0);
 
+    const estadias = TIPOS_ESTADIA.map((t) => ({ ...t, ...resumoEstadias(dados.estadias.filter((e) => e.tipo === t.id)) }));
+
     return {
       comEntrada: comEntrada.length, melhor, diaCheio,
       totalComissao: real(comissoes.reduce((s, c) => s + c.comissao, 0)),
       concluidos: concluidos.length, faltas, taxaFalta: concluidos.length + faltas ? (faltas / (concluidos.length + faltas)) * 100 : null,
-      faturamento, ticket: pagantes ? real(baseTicket / pagantes) : null, comPacote, aReceber, fiados: fiados.length, valorFiado, porForma,
+      faturamento, ticket, comPacote, aReceber, fiados: fiados.length, valorFiado, porForma,
       barras, porSemana, servicos, servicosTodos, pets, tutores, tutoresTodos, comissoes, porDia, horas, marcados: marcados.length,
+      estadias, totalEstadias: dados.estadias.length,
     };
   }, [dados, de, ate, equipe]);
 
@@ -223,6 +316,18 @@ function Relatorios() {
       ["Clientes novos", numeroCsv(dados.clientesNovos)],
       ["Comissão total", dinheiroCsv(r.totalComissao)],
       [],
+      ["Período anterior", `${dataCompleta(antes.de)} a ${dataCompleta(antes.ate)}`],
+      ["Faturamento (entradas já recebidas)", dinheiroCsv(dados.anterior.faturamento)],
+      ["Atendimentos concluídos", numeroCsv(dados.anterior.concluidos)],
+      ["Valor médio por atendimento", dados.anterior.ticket == null ? "" : dinheiroCsv(dados.anterior.ticket)],
+      ["Clientes novos", numeroCsv(dados.anterior.clientesNovos)],
+      [],
+      ...(r.totalEstadias ? [
+        ["Creche e hotel (estadias encerradas no período; o valor recebido já está no faturamento)"],
+        ["Tipo", "Estadias", "Diárias", "Valor cobrado", "Com pacote", "Cortesia", "Sem valor lançado", "Antigas (diárias pelas datas)"],
+        ...r.estadias.map((x): Cel[] => [x.nome, numeroCsv(x.n), numeroCsv(x.diarias), dinheiroCsv(x.valor), numeroCsv(x.pacote), numeroCsv(x.cortesia), numeroCsv(x.semValor), numeroCsv(x.estimadas)]),
+        [],
+      ] satisfies Cel[][] : []),
       ["Serviços mais feitos"],
       ["Serviço", "Vezes", "Com pacote", "Valor cobrado"],
       ...r.servicosTodos.map((x): Cel[] => [x.extra.nome, numeroCsv(x.n), numeroCsv(x.pacote), dinheiroCsv(x.valor)]),
@@ -244,7 +349,8 @@ function Relatorios() {
     avisar("Planilha baixada.");
   }
 
-  const semNada = r && !r.marcados && !r.faturamento && !dados?.clientesNovos && !r.faltas;
+  const semNada = r && !r.marcados && !r.faturamento && !dados?.clientesNovos && !r.faltas && !r.totalEstadias;
+  const emAndamento = ateIso >= hojeIso && deIso <= hojeIso;
 
   return (
     <>
@@ -283,14 +389,20 @@ function Relatorios() {
           <>
             <div className="g-grade kpis">
               <Kpi icone={CircleCheck} tom="pessego" rotulo="Atendimentos concluídos" valor={r.concluidos}
-                apoio={r.taxaFalta == null ? "nenhum no período" : `${(100 - r.taxaFalta).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% compareceram`}
+                apoio={<Apoio texto={r.taxaFalta == null ? "nenhum no período" : `${(100 - r.taxaFalta).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% compareceram`}
+                  atual={r.concluidos} anterior={dados.anterior.concluidos} />}
                 lado={r.taxaFalta == null ? undefined : <Anel parte={1 - r.taxaFalta / 100} cor="var(--g-laranja)">{Math.round(100 - r.taxaFalta)}%</Anel>} />
               <Kpi icone={UserX} tom="rosa" rotulo="Faltas" valor={r.faltas}
                 apoio={r.taxaFalta == null ? "nenhuma falta" : `${r.taxaFalta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de falta`} />
               <Kpi icone={Receipt} tom="ceu" rotulo="Valor médio por atendimento" valor={<span className="gf-kpi-v">{r.ticket == null ? "—" : brl(r.ticket)}</span>}
-                apoio={r.comPacote ? `cobrado · fora ${r.comPacote} com pacote` : "valor cobrado, com desconto"} />
-              <Kpi icone={UserPlus} tom="lilas" rotulo="Clientes novos" valor={dados.clientesNovos} apoio={dados.clientesNovos === 1 ? "cadastrado no período" : "cadastrados no período"} />
+                apoio={<Apoio texto={r.comPacote ? `cobrado · fora ${r.comPacote} com pacote` : "valor cobrado, com desconto"}
+                  atual={r.ticket} anterior={dados.anterior.ticket} formato={brl} />} />
+              <Kpi icone={UserPlus} tom="lilas" rotulo="Clientes novos" valor={dados.clientesNovos}
+                apoio={<Apoio texto={dados.clientesNovos === 1 ? "cadastrado no período" : "cadastrados no período"} atual={dados.clientesNovos} anterior={dados.anterior.clientesNovos} />} />
             </div>
+            <p className="g-muted g-pp g-rel-antes">
+              Período anterior: de {dataCompleta(antes.de)} a {dataCompleta(antes.ate)}.{emAndamento && " O período escolhido ainda não terminou, então a comparação pode mudar."}
+            </p>
 
             <div className="g-duas">
               <section className="g-card g-rel-fat">
@@ -300,6 +412,7 @@ function Relatorios() {
                 </div>
                 <p className="g-rotulo">Faturamento</p>
                 <p className="g-rel-total">{brl(r.faturamento)}</p>
+                <Comparacao atual={r.faturamento} anterior={dados.anterior.faturamento} formato={brl} longo />
                 {r.faturamento > 0 ? (
                   <>
                     {r.barras.length <= 7
@@ -350,6 +463,45 @@ function Relatorios() {
                 ) : <p className="g-muted g-p">Nenhum horário marcado neste período.</p>}
               </section>
             </div>
+
+            {r.totalEstadias > 0 && (
+              <section className="g-card">
+                <div className="g-card-t">
+                  <h3><Tile icone={Home} tom="ceu" tamanho="p" />Creche e hotel</h3>
+                  <span className="g-muted g-pp">estadias encerradas no período</span>
+                </div>
+                <div className="g-rel-ch">
+                  {r.estadias.map((x) => (
+                    <div key={x.id} className="g-rel-ch-tipo">
+                      <p className="g-rel-ch-nome"><Tile icone={x.icone} tom="ceu" tamanho="p" /><b>{x.nome}</b></p>
+                      {x.n ? (
+                        <>
+                          <div className="g-rel-ch-nums">
+                            <div><small>{x.n === 1 ? "Estadia" : "Estadias"}</small><b>{x.n}</b></div>
+                            <div><small>{x.diarias === 1 ? "Diária" : "Diárias"}</small><b>{x.diarias}</b></div>
+                            <div><small>Cobrado</small><b>{x.comValor ? brl(x.valor) : "—"}</b></div>
+                          </div>
+                          {(x.pacote > 0 || x.cortesia > 0 || x.semValor > 0 || x.estimadas > 0) && (
+                            <p className="g-muted g-pp">
+                              {[
+                                x.pacote > 0 && `${x.pacote} com pacote`,
+                                x.cortesia > 0 && `${x.cortesia} de cortesia`,
+                                x.semValor > 0 && `${x.semValor} sem valor lançado`,
+                                x.estimadas > 0 && `${x.estimadas} ${x.estimadas === 1 ? "antiga, com as diárias contadas" : "antigas, com as diárias contadas"} pelas datas`,
+                              ].filter(Boolean).join(" · ")}
+                            </p>
+                          )}
+                        </>
+                      ) : <p className="g-muted g-p">Nenhuma estadia de {x.nome.toLowerCase()} encerrada neste período.</p>}
+                    </div>
+                  ))}
+                </div>
+                <p className="g-muted g-pp g-rel-nota">
+                  Conta as estadias pela data da saída. O valor é o que foi cobrado no check-out e não soma de novo: o que já foi recebido está no faturamento lá em cima.
+                  O que o cliente ficou de pagar depois entra no faturamento quando você der baixa em Financeiro, A receber.
+                </p>
+              </section>
+            )}
 
             <div className="g-duas">
               <section className="g-card">
@@ -444,6 +596,32 @@ function Relatorios() {
         )}
       </div>
     </>
+  );
+}
+
+/** Linha de apoio do indicador, com a comparação logo abaixo. */
+function Apoio({ texto, ...comparacao }: { texto: string } & Parameters<typeof Comparacao>[0]) {
+  return <span className="g-rel-apoio"><span>{texto}</span><Comparacao {...comparacao} /></span>;
+}
+
+/**
+ * Comparação com o período anterior. A porcentagem só aparece quando o período anterior teve valor maior que zero
+ * e o atual existe: fora disso, só o texto.
+ */
+function Comparacao({ atual, anterior, formato = (n: number) => n.toLocaleString("pt-BR"), longo }: {
+  atual: number | null; anterior: number | null; formato?: (n: number) => string; longo?: boolean;
+}) {
+  if (anterior == null || !(anterior > 0)) return <span className="g-rel-comp">sem movimento no período anterior</span>;
+  const variacao = atual == null ? null : ((atual - anterior) / anterior) * 100;
+  const pct = variacao == null ? null : `${variacao > 0 ? "+" : variacao < 0 ? "-" : ""}${Math.abs(variacao).toLocaleString("pt-BR", { maximumFractionDigits: Math.abs(variacao) < 10 ? 1 : 0 })}%`;
+  const Seta = variacao != null && variacao < 0 ? ArrowDownRight : ArrowUpRight;
+  return (
+    <span className="g-rel-comp">
+      <span>{formato(anterior)} no período anterior</span>
+      {variacao != null && (variacao === 0
+        ? <span>{longo ? "igual ao período anterior" : "igual"}</span>
+        : <b className={variacao > 0 ? "sobe" : "desce"} title={`${pct} em relação ao período anterior`}><Seta aria-hidden />{pct}{longo ? " em relação ao período anterior" : <span className="g-rel-leitor"> em relação ao período anterior</span>}</b>)}
+    </span>
   );
 }
 

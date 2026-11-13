@@ -56,3 +56,28 @@
 @media (max-width: 480px) { .g-rel-horas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .g-rel-com span { white-space: normal; overflow-wrap: anywhere; }
+
+/* comparação com o período anterior */
+.g-kpi-apoio:has(.g-rel-apoio) { display: block; }
+.g-rel-apoio { display: grid; gap: 4px; min-width: 0; }
+.g-rel-comp { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: .8125rem; line-height: 1.35; color: var(--g-cinza); }
+.g-rel-comp b { display: inline-flex; align-items: center; gap: 2px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.g-rel-comp b svg { width: 14px; height: 14px; flex: none; }
+.g-rel-comp .sobe { color: #24543b; }
+.g-rel-comp .desce { color: #a03a2c; }
+.g-rel-fat > .g-rel-comp { margin: 8px 0 16px; }
+.g-rel-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* creche e hotel */
+.g-rel-ch { display: grid; gap: 14px; }
+.g-rel-ch-tipo { display: grid; gap: 10px; align-content: start; min-width: 0; padding: 14px; border-radius: 16px; background: var(--g-carta-2); }
+.g-rel-ch-nome { display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+.g-rel-ch-nums { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 8px 22px; }
+.g-rel-ch-nums > div { display: grid; gap: 2px; min-width: 0; }
+.g-rel-ch-nums small { font-size: .75rem; color: var(--g-cinza); }
+.g-rel-ch-nums b { font: 480 1.375rem/1.2 var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-raiz .g-rel-ch + .g-rel-nota { margin-top: 12px; }
+@media (min-width: 720px) { .g-rel-ch { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* o palco do gráfico não herda a classe .palco das páginas do site (proporção fixa deixava o gráfico estreito) */
+.g-rel-area .palco { display: block; aspect-ratio: auto; padding: 0; border-radius: 0; background: none; overflow: visible; }

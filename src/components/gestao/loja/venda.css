@@ -61,3 +61,8 @@
   .g-vd-preco > span { display: none; }
   .g-vd-preco .g-input { width: 84px; }
 }
+
+/* comprovante depois de fechar a conta */
+.g-vd-recibo { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 8px 0 4px; }
+.g-vd-recibo .g-num { font-size: 2rem; }
+.g-vd-recibo .g-btn { margin-top: 6px; }
