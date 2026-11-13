@@ -2,6 +2,7 @@
 
 import { abrirGuia } from "@/components/gestao/guia-inicial";
 import Identidade from "@/components/gestao/ajustes/identidade";
+import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
 import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
 import { useState } from "react";
@@ -74,6 +75,7 @@ export default function MeuPetshop() {
             <Servicos />
           </div>
         </div>
+        <CopiaSeguranca />
       </div>
     </>
   );

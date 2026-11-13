@@ -1,0 +1,9 @@
+/* Cópia de segurança (Meu pet shop). Prefixo gj-copia. */
+.gj-copia { display: grid; gap: 10px; }
+.gj-copia > .g-card-t { margin-bottom: 0; }
+.gj-copia-acao { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; margin-top: 2px; }
+.gj-copia-anda { flex: 1 1 200px; min-width: 0; display: grid; gap: 6px; font-size: .9375rem; font-weight: 600; }
+.gj-copia-barra { height: 6px; border-radius: 999px; background: var(--g-linha); overflow: hidden; }
+.gj-copia-barra > i { display: block; height: 100%; border-radius: inherit; background: var(--g-verde); transition: width .2s ease; }
+.gj-copia-feita { overflow-wrap: anywhere; }
+@media (max-width: 559px) { .gj-copia-acao > .g-btn { width: 100%; } }

@@ -30,11 +30,23 @@ type Linhas = Record<string, unknown>[];
  * Qualquer outro erro vira lista vazia: o valor reservado fica em branco, sem derrubar a tela.
  */
 async function reservado(sb: Banco, funcao: string, args: Record<string, unknown>, direto: () => PromiseLike<{ data: unknown; error: unknown }>): Promise<Linhas> {
-  const r = await (sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string } | null }> }).rpc(funcao, args);
-  if (!r.error) return (r.data as Linhas | null) ?? [];
-  if (r.error.code !== "PGRST202" && r.error.code !== "42883") return [];
-  const d = await direto();
-  return d.error ? [] : ((d.data as Linhas | null) ?? []);
+  type Pagina = PromiseLike<{ data: unknown; error: { code?: string } | null }>;
+  const banco = sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => { order: (coluna: string) => { range: (de: number, ate: number) => Pagina } } };
+  // o banco entrega no máximo 1000 linhas por vez, também nas funções: busca de mil em mil, sempre na mesma ordem
+  const tudo: Linhas = [];
+  for (let de = 0; de < 200000; de += 1000) {
+    const r = await banco.rpc(funcao, args).order("id").range(de, de + 999);
+    if (r.error) {
+      if (de > 0) return tudo;
+      if (r.error.code !== "PGRST202" && r.error.code !== "42883") return [];
+      const d = await direto();
+      return d.error ? [] : ((d.data as Linhas | null) ?? []);
+    }
+    const linhas = (r.data as Linhas | null) ?? [];
+    tudo.push(...linhas);
+    if (linhas.length < 1000) break;
+  }
+  return tudo;
 }
 const porId = (linhas: Linhas) => new Map(linhas.map((l) => [String(l.id), l]));
 const num = (v: unknown) => (v == null ? null : Number(v));
