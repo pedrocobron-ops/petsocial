@@ -112,3 +112,27 @@
 /* filtro de período das reservas */
 .g-ht-filtro { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .g-ht-filtro .g-input { width: auto; min-height: 40px; padding: 6px 10px; }
+
+/* feriados e dias fechados (Meu pet shop) */
+.g-ht-fer-novo { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 480px) { .g-ht-fer-novo { grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); } }
+.g-ht-fer-lista { display: grid; }
+.g-ht-fer { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; padding: 10px 0; border-bottom: 1px solid var(--g-linha); }
+.g-ht-fer:last-child { border-bottom: 0; }
+.g-ht-fer .q { flex: 1 1 150px; min-width: 0; display: grid; }
+.g-ht-fer .q small { font-weight: 600; color: var(--g-cinza); text-transform: uppercase; font-size: .6875rem; letter-spacing: .04em; }
+.g-ht-fer .q span { font-size: .875rem; color: var(--g-cinza); overflow-wrap: anywhere; }
+.g-ht-fer .g-check { min-height: 44px; }
+.g-ht-fer .g-ico { margin-left: auto; }
+/* dia fechado: aviso na reserva, na agenda e no calendário de ocupação */
+.g-ht-fechado { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--g-amarelo-tint); color: #5b4708; font-size: .9375rem; }
+.g-ht-fechado svg { width: 18px; height: 18px; flex: none; }
+.g-ht-dia .fer { font-size: .6875rem; font-weight: 600; color: #7a4310; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* taxa de busca fora do horário: a pessoa decide antes de fechar a conta */
+.g-ht-atraso { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--g-amarelo-tint); color: #4a3a06; }
+.g-ht-atraso.ok { background: var(--g-carta-2); color: inherit; }
+.g-ht-atraso p { font-size: .9375rem; }
+/* check-outs para cobrar */
+.g-ht-cobrar { display: grid; gap: 4px; }
+.g-ht-cobrar h3 { display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+.g-ht-cobrar .g-linha { align-items: center; }
