@@ -1,7 +1,7 @@
 "use client";
 
 import { saudacaoZap } from "@/lib/gestao/agenda";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
 import type { Banco } from "@/lib/gestao/supabase";
@@ -9,14 +9,14 @@ import { chamar, dataAmigavel, deIsoDia, fmtTelefone, haQuanto, inicioDoDia, lin
 import { buscarVisitas, diasSemVir, sumiu } from "@/lib/gestao/visitas";
 import { useGestao } from "../contexto";
 import { guardarLembrado, lerLembrado } from "../lembrado";
-import { AvatarPet, Esqueleto, Folha, Vazio, useDados } from "../ui";
+import { AvatarPet, Esqueleto, Folha, Vazio, useAvisos, useDados } from "../ui";
 import { buscarTudo, linkTutor } from "./comum";
 import "./chamar-de-volta.css";
 
 /**
  * "Chamar de volta": quem já veio e parou de vir (sem horário marcado) e os aniversariantes da semana,
- * um tutor por linha, com a mensagem pronta para abrir no WhatsApp. Só lê o banco: o texto das mensagens
- * e quem já foi chamado ficam guardados no aparelho.
+ * um tutor por linha, com a mensagem pronta para abrir no WhatsApp. O texto das mensagens é do pet shop
+ * (tabela `modelos_mensagem`: o mesmo em qualquer aparelho); quem já foi chamado fica guardado no aparelho.
  */
 
 export type AbaChamar = "volta" | "niver";
@@ -93,7 +93,7 @@ export function aniversariantes(lista: ParaChamar[], hoje = new Date()): GrupoCh
 /** "Thor", "Thor e Mel", "Thor, Mel e Luna". */
 export const juntarNomes = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(0, -1).join(", ")} e ${n[n.length - 1]}`);
 
-/* ---------- textos das mensagens (guardados no aparelho, por pet shop) ---------- */
+/* ---------- textos das mensagens (do pet shop; o aparelho guarda uma cópia para abrir sem esperar) ---------- */
 
 export const MODELOS_PADRAO: Record<AbaChamar, string> = {
   volta: "Faz um tempinho desde a última visita de [pet]. Quer que eu veja um horário?",
@@ -108,6 +108,29 @@ function lerJson<T extends object>(chave: string): Partial<T> {
 function lerModelos(petshopId: string): Record<AbaChamar, string> {
   const g = lerJson<Record<AbaChamar, string>>(chaveModelos(petshopId));
   return { volta: typeof g.volta === "string" ? g.volta : MODELOS_PADRAO.volta, niver: typeof g.niver === "string" ? g.niver : MODELOS_PADRAO.niver };
+}
+
+/** Como cada texto se chama na tabela `modelos_mensagem`. */
+const CHAVE_NO_BANCO: Record<AbaChamar, string> = { volta: "chamar.volta", niver: "chamar.niver" };
+
+/**
+ * Os textos do pet shop. Se o pet shop ainda não tem um texto guardado e este aparelho tinha um texto próprio
+ * (de quando ele ficava só no aparelho), o texto do aparelho sobe para o pet shop uma vez.
+ */
+async function lerModelosDoPetshop(sb: Banco, petshopId: string, doAparelho: Record<AbaChamar, string>): Promise<Record<AbaChamar, string>> {
+  const r = await sb.from("modelos_mensagem").select("chave, texto").eq("petshop_id", petshopId).in("chave", Object.values(CHAVE_NO_BANCO));
+  if (r.error) return doAparelho; // banco antes da atualização, ou sem conexão: segue com o texto do aparelho
+  const guardado = new Map((r.data ?? []).map((x) => [x.chave, x.texto]));
+  const final = { ...doAparelho };
+  for (const aba of ["volta", "niver"] as const) {
+    const t = guardado.get(CHAVE_NO_BANCO[aba]);
+    if (t != null) final[aba] = t;
+    else if (doAparelho[aba].trim() && doAparelho[aba] !== MODELOS_PADRAO[aba]) {
+      // `ignoreDuplicates`: se outro aparelho subiu o dele primeiro, vale o que já está lá
+      await sb.from("modelos_mensagem").upsert({ petshop_id: petshopId, chave: CHAVE_NO_BANCO[aba], texto: doAparelho[aba].slice(0, 1000) }, { onConflict: "petshop_id,chave", ignoreDuplicates: true }).select("chave");
+    }
+  }
+  return final;
 }
 
 /** A mensagem inteira: a saudação entra sozinha e `[pet]` vira o nome do pet (ou dos pets) do tutor. Texto em branco usa o padrão. */
@@ -138,13 +161,42 @@ const DIAS = [30, 45, 60, 90];
 const PASSO = 40;
 
 export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: { aoFechar: () => void; aba?: AbaChamar }) {
-  const { sb, petshop } = useGestao();
+  const { sb, petshop, posso } = useGestao();
+  const { avisarErro } = useAvisos();
+  const podeMudarTexto = posso("clientes") || posso("agenda");
   const [aba, setAba] = useState<AbaChamar>(abaInicial);
   const [dias, setDias] = useState(30);
   const [modelos, setModelos] = useState(() => lerModelos(petshop.id));
   const [editando, setEditando] = useState(false);
   const [chamados, setChamados] = useState(() => lerChamados(petshop.id));
   const [mostrar, setMostrar] = useState(PASSO);
+  // o texto guardado no pet shop chega logo depois de abrir e vale sobre a cópia do aparelho (menos se a pessoa já está escrevendo)
+  const mexeu = useRef(false);
+  const aGravar = useRef<Partial<Record<AbaChamar, string>>>({});
+  const relogio = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    void lerModelosDoPetshop(sb, petshop.id, lerModelos(petshop.id)).then((m) => {
+      if (!vivo || mexeu.current) return;
+      setModelos(m);
+      guardarLembrado(chaveModelos(petshop.id), JSON.stringify(m));
+    });
+    return () => { vivo = false; };
+  }, [sb, petshop.id]);
+
+  /** Grava no pet shop o que foi escrito (um instante depois de parar de digitar, ao tocar em Pronto e ao fechar). */
+  async function gravar() {
+    if (relogio.current) { clearTimeout(relogio.current); relogio.current = null; }
+    const pendentes = Object.entries(aGravar.current) as [AbaChamar, string][];
+    aGravar.current = {};
+    for (const [qual, texto] of pendentes) {
+      const g = await sb.from("modelos_mensagem").upsert({ petshop_id: petshop.id, chave: CHAVE_NO_BANCO[qual], texto: texto.slice(0, 1000), atualizado_em: new Date().toISOString() }, { onConflict: "petshop_id,chave" }).select("chave");
+      if (g.error || !g.data?.length) { avisarErro("Não consegui guardar o texto para o pet shop. Ele vale só neste aparelho por enquanto."); return; }
+    }
+  }
+  const gravarRef = useRef(gravar);
+  gravarRef.current = gravar;
+  useEffect(() => () => { void gravarRef.current(); }, []);
 
   const { dados, carregando, erro, recarregar } = useDados(() => buscarParaChamar(sb, petshop.id), [petshop.id]);
 
@@ -165,6 +217,10 @@ export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: {
     const novo = { ...modelos, [aba]: texto };
     setModelos(novo);
     guardarLembrado(chaveModelos(petshop.id), JSON.stringify(novo));
+    mexeu.current = true;
+    aGravar.current[aba] = texto;
+    if (relogio.current) clearTimeout(relogio.current);
+    relogio.current = setTimeout(() => void gravar(), 900);
   }
 
   function chamou(g: GrupoChamar) {
@@ -212,13 +268,13 @@ export default function ChamarDeVolta({ aoFechar, aba: abaInicial = "volta" }: {
             <div className="g-cv-msg">
               <div className="g-cv-msg-t">
                 <span className="g-rotulo">Mensagem</span>
-                <button type="button" className="g-btn fantasma p" aria-expanded={editando} onClick={() => setEditando(!editando)}>{editando ? "Pronto" : "Mudar o texto"}</button>
+                {podeMudarTexto && <button type="button" className="g-btn fantasma p" aria-expanded={editando} onClick={() => { if (editando) void gravar(); setEditando(!editando); }}>{editando ? "Pronto" : "Mudar o texto"}</button>}
               </div>
               {editando && (
                 <label className="g-campo">
                   <span>O que vai escrito depois do “Oi”</span>
                   <textarea className="g-textarea" data-sem-aviso rows={3} maxLength={500} value={modelo} onChange={(e) => mudarModelo(e.target.value)} />
-                  <small>Onde estiver [pet] entra o nome do pet. O começo, com o nome do tutor e do pet shop, entra sozinho. O texto fica guardado neste aparelho.</small>
+                  <small>Onde estiver [pet] entra o nome do pet. O começo, com o nome do tutor e do pet shop, entra sozinho. O texto vale para o pet shop inteiro, em qualquer aparelho.</small>
                   {modelo !== MODELOS_PADRAO[aba] && <button type="button" className="g-btn fantasma p g-cv-padrao" onClick={() => mudarModelo(MODELOS_PADRAO[aba])}>Voltar ao texto padrão</button>}
                 </label>
               )}

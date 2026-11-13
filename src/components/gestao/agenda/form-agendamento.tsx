@@ -12,12 +12,15 @@ import FormPet from "../form-pet";
 import { CampoDinheiro, erroDeValor } from "../loja/pecas";
 import { AvatarPet, Campo, EscolherPet, Folha, avisarMudanca, ok, useAvisos, useDados } from "../ui";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
+import { VEZES_POR_VEZ } from "./series-acabando";
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
 type Problema = { tipo: "fechado" | "bloqueio" | "conflito" | "vagas" | "fora" | "almoco"; texto: string };
 /** Até quantas vezes um horário pode se repetir de uma vez (toda semana, dá meio ano). */
 const MAX_VEZES = 26;
 const OPCOES_VEZES = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 26];
+/** "Até eu cancelar" no seletor de vezes: marca os primeiros horários e a Agenda avisa para continuar (series-acabando.tsx). */
+const SEM_FIM = 0;
 /** Horários livres separados por parte do dia. */
 const PARTES = [
   { rotulo: "Manhã", de: 0, ate: 12 * 60 },
@@ -88,7 +91,8 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   // datas da série (uma só quando não repete) e os bloqueios do período
   const diaOk = RE_DIA.test(dia);
   const repetindo = !agendamento && repetir > 0;
-  const datas = useMemo(() => (repetindo ? datasDaSerie(dia, repetir, vezes, MAX_VEZES) : [dia]), [repetindo, dia, repetir, vezes]);
+  const semFim = repetindo && vezes === SEM_FIM;
+  const datas = useMemo(() => (repetindo ? datasDaSerie(dia, repetir, vezes === SEM_FIM ? VEZES_POR_VEZ : vezes, MAX_VEZES) : [dia]), [repetindo, dia, repetir, vezes]);
   const ultimoDia = datas[datas.length - 1];
   const { dados: bloqueios } = useDados(async () => {
     if (!diaOk) return [];
@@ -229,12 +233,14 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
         if (ruins.length && !comProblema) { avisar("Algumas datas têm aviso. Escolha entre pular ou marcar mesmo assim."); setSalvando(false); return; }
         const usar = comProblema === "pular" ? datas.filter((d) => !problemas[d]?.length) : datas;
         if (!usar.length) { avisar("Não sobrou nenhuma data para marcar."); setSalvando(false); return; }
-        const serie = usar.length > 1 ? crypto.randomUUID() : null;
+        const serie = usar.length > 1 || semFim ? crypto.randomUUID() : null;
         ok(await sb.from("agendamentos").insert(usar.map((d) => {
           const ini = juntaDiaHora(d, hhmm);
           return { ...campos, inicio: ini.toISOString(), fim: new Date(ini.getTime() + duracao * 60000).toISOString(), serie_id: serie, petshop_id: petshop.id, criado_por: user.id };
         })).select("id"));
-        avisar(usar.length === 1 ? "1 horário marcado" : `${usar.length} horários marcados`);
+        // "até eu cancelar": a série fica marcada para a Agenda avisar quando estiver acabando
+        const guardou = semFim && serie ? await sb.from("series_agenda").insert({ serie_id: serie, petshop_id: petshop.id, cada_semanas: repetir }).select("serie_id") : null;
+        avisar(`${usar.length === 1 ? "1 horário marcado" : `${usar.length} horários marcados`}${!semFim ? "" : guardou?.error ? ". Não consegui guardar o Até eu cancelar: a repetição termina no último horário." : ". Perto do fim, a Agenda avisa para marcar os próximos."}`);
         avisarMudanca();
         aoSalvar();
         setSalvando(false);
@@ -377,6 +383,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
                   <Campo rotulo="Por quantas vezes">
                     <select className="g-select" value={vezes} onChange={(e) => setVezes(Number(e.target.value))}>
                       {OPCOES_VEZES.map((n) => <option key={n} value={n}>{n} vezes</option>)}
+                      <option value={SEM_FIM}>Até eu cancelar</option>
                     </select>
                   </Campo>
                 )}
@@ -384,7 +391,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
               {repetindo && diaOk && (
                 <>
                   <div className="g-agd-rep-t"><Repeat size={15} /><span>{hhmm ? `Sempre às ${hhmm}` : "Escolha o horário para conferir as datas"}</span></div>
-                  <p className="g-pp g-muted" style={{ margin: 0 }}>A repetição vai até <b>{dataCompleta(ultimaData)}</b>. Não existe repetição sem fim: perto dessa data, é só marcar de novo.</p>
+                  {semFim
+                    ? <p className="g-pp g-muted" style={{ margin: 0 }}>Marca agora os {datas.length} primeiros horários, até <b>{dataCompleta(ultimaData)}</b>. Quando estiverem acabando, a Agenda avisa e um toque marca os próximos. Para parar, desmarque um horário e escolha Desmarcar este e os próximos.</p>
+                    : <p className="g-pp g-muted" style={{ margin: 0 }}>A repetição vai até <b>{dataCompleta(ultimaData)}</b>. Para ela não ter data para acabar, escolha Até eu cancelar em Por quantas vezes.</p>}
                   <ul className="g-agd-datas">
                     {datas.map((d) => {
                       const p = previa?.[d] ?? [];
