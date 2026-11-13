@@ -239,6 +239,12 @@ export function estadoDaCobranca(c: CobrancaCompleta, hoje: string): { estado: E
   return { estado: "a_vencer", atraso: 0, semValor };
 }
 
+/** Quanto ainda falta receber de uma cobrança: o total, menos o que já foi recebido em partes (a conta dela guarda o que falta). */
+export function faltaDaCobranca(c: Pick<CobrancaCompleta, "total" | "lancamentos">): number {
+  const l = c.lancamentos;
+  return l && !l.pago && Number(l.valor) < Number(c.total) ? Number(l.valor) : Number(c.total);
+}
+
 /** "03/10, 10/10 e 17/10" */
 export const textoDasDatas = (dias: string[]) => juntar(dias.map((d) => dataCurta(d)));
 
@@ -250,6 +256,9 @@ function linhaDaMensagem(c: CobrancaCompleta) {
   let texto = partes.join(" + ");
   if (Number(c.desconto) > 0) texto += ` - desconto ${brl(c.desconto)}`;
   if (partes.length > 1 || Number(c.desconto) > 0) texto += ` = ${brl(c.total)}`;
+  // parte já recebida: a mensagem cobra só o que falta
+  const falta = faltaDaCobranca(c);
+  if (falta < Number(c.total)) texto += `. Já pago ${brl(centavos(Number(c.total) - falta))}, falta ${brl(falta)}`;
   return `${c.pets?.nome ?? "Pet"}: ${texto}`;
 }
 
@@ -262,7 +271,7 @@ export function mensagemDeCobranca(p: { tutor: string | null | undefined; petsho
   if (!cs.length) return "";
   const meses = [...new Set(cs.map((c) => c.mes))].sort().map((m) => nomeMes(deIsoDia(m)));
   const vencimentos = [...new Set(cs.map((c) => c.vencimento))].sort();
-  const total = centavos(cs.reduce((s, c) => s + Number(c.total), 0));
+  const total = centavos(cs.reduce((s, c) => s + faltaDaCobranca(c), 0));
   const atrasada = vencimentos[0] < p.hoje;
   const oi = saudacaoZap(p.tutor, p.petshop);
   const abre = atrasada

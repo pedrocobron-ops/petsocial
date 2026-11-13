@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { History, Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
-import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, desfazerVenda, ehDividido, itensDoLancamento, lancarPago, nomeDoMovimento, partesPorForma, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, desfazerVenda, ehDividido, itensDoLancamento, lancarPago, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -164,6 +165,13 @@ const fmtQtd = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits:
 const ICONE_ITEM = { servico: Scissors, produto: Package, extra: Sparkles } as const;
 const TOM_ITEM = { servico: "pessego", produto: "rosa", extra: "ceu" } as const;
 
+/**
+ * Linha de um serviço ("Banho · Nina"): a descrição já diz o que foi, então a categoria ("Banho e tosa") não precisa aparecer ao lado.
+ * Vale para a conta de um atendimento, a mensalidade e a estadia; despesas e vendas continuam com a categoria.
+ */
+export const ehDeServico = (l: { tipo: string; categoria: string; agendamento_id?: string | null; descricao?: string | null }) =>
+  l.tipo === "entrada" && Boolean(l.descricao?.trim()) && (Boolean(l.agendamento_id) || ["Banho e tosa", "Creche e hotel", "Creche: mensalidade"].includes(l.categoria));
+
 /** "3 itens" para o subtítulo das linhas de lista; vazio quando o lançamento não tem itens. */
 export function resumoDeItens(l: { itens?: unknown }) {
   const n = itensDoLancamento(l).length;
@@ -171,10 +179,13 @@ export function resumoDeItens(l: { itens?: unknown }) {
 }
 
 /** O que foi vendido neste lançamento: quantidade × nome, preço de cada um e total da linha. Só leitura. */
-export function ItensDoLancamento({ lancamento }: { lancamento: Pick<Lancamento, "itens" | "valor"> }) {
+export function ItensDoLancamento({ lancamento }: { lancamento: Pick<Lancamento, "itens" | "valor"> & { valor_original?: number | null; pago?: boolean } }) {
   const itens = itensDoLancamento(lancamento);
   if (!itens.length) return null;
-  const { soma: somaItens, desconto } = contaDosItens(itens, Number(lancamento.valor));
+  // conta recebida em partes: os itens são da conta cheia; o que já entrou aparece numa linha própria, não como desconto
+  const cheio = lancamento.valor_original != null && Number(lancamento.valor_original) > Number(lancamento.valor) ? Number(lancamento.valor_original) : Number(lancamento.valor);
+  const emPartes = centavos(cheio - Number(lancamento.valor));
+  const { soma: somaItens, desconto } = contaDosItens(itens, cheio);
   return (
     <section className="gf-itens" aria-label="Itens desta venda">
       <div className="gf-itens-t">
@@ -193,11 +204,12 @@ export function ItensDoLancamento({ lancamento }: { lancamento: Pick<Lancamento,
           </li>
         ))}
       </ul>
-      {desconto > 0 && (
+      {(desconto > 0 || emPartes > 0) && (
         <div className="gf-itens-pe">
           <div><span>Soma dos itens</span><span className="g-tab">{brl(somaItens)}</span></div>
-          <div><span>Desconto</span><span className="g-tab">− {brl(desconto)}</span></div>
-          <div className="forte"><span>Valor do lançamento</span><span className="g-tab">{brl(lancamento.valor)}</span></div>
+          {desconto > 0 && <div><span>Desconto</span><span className="g-tab">− {brl(desconto)}</span></div>}
+          {emPartes > 0 && <div><span>Recebido antes, em partes</span><span className="g-tab">− {brl(emPartes)}</span></div>}
+          <div className="forte"><span>{emPartes > 0 ? (lancamento.pago ? "Última parte" : "Falta receber") : "Valor do lançamento"}</span><span className="g-tab">{brl(lancamento.valor)}</span></div>
         </div>
       )}
     </section>
@@ -450,6 +462,10 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         )}
         {inicial && <ItensDoLancamento lancamento={inicial} />}
         {inicial && <HistoricoDeAlteracoes lancamento={inicial} />}
+        {inicial && <PartesRecebidas conta={inicial} />}
+        {inicial?.conta_id && !soVer && !travado && (
+          <p className="g-muted g-pp">Este valor é uma parte recebida de uma conta. Se você excluir ou diminuir, a diferença volta a ficar em aberto na conta do cliente.</p>
+        )}
         {escolheTipo && !inicial && (
           <div className="g-seg gf-seg-cheio" role="group" aria-label="Tipo">
             <button type="button" aria-pressed={entrada} onClick={() => trocarTipo("entrada")}>Entrada</button>
@@ -525,33 +541,89 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
 
 /* ---------- dar baixa em uma conta ---------- */
 
+/** "pago R$ 50,00 de R$ 120,00" para a conta que já teve parte recebida; vazio para as outras. */
+export function textoJaRecebido(c: Pick<Lancamento, "valor" | "valor_original">) {
+  const cheio = c.valor_original == null ? 0 : Number(c.valor_original);
+  return cheio > Number(c.valor) ? `pago ${brl(centavos(cheio - Number(c.valor)))} de ${brl(cheio)}` : "";
+}
+
+/** As partes já recebidas de uma conta: quando, quanto, como e quem recebeu. */
+export function PartesRecebidas({ conta }: { conta: Pick<Lancamento, "id" | "valor" | "valor_original"> }) {
+  const { sb } = useGestao();
+  const tem = conta.valor_original != null;
+  const { dados } = useDados(async () => {
+    if (!tem) return [];
+    const r = await sb.rpc("partes_da_conta", { p_conta: conta.id });
+    return r.data ?? [];
+  }, [conta.id, tem, conta.valor]);
+  if (!tem) return null;
+  return (
+    <section className="gf-alteracoes" aria-label="Partes já recebidas desta conta">
+      <span className="g-rotulo"><History size={14} aria-hidden />Já recebido desta conta</span>
+      {dados?.length
+        ? <ul>{dados.map((x) => <li key={x.id}><b className="g-tab">{brl(x.valor)}</b> em {dataCompleta(x.data)} · {textoDoPagamento(x)}{x.quem ? ` · recebido por ${x.quem}` : ""}</li>)}</ul>
+        : <p className="g-muted g-pp">{textoJaRecebido(conta) || "Nada recebido ainda."}</p>}
+    </section>
+  );
+}
+
+/**
+ * "Recebi" (ou "Paguei") uma conta. Conta a receber: dá para receber o valor inteiro ou só uma parte; a parte recebida
+ * entra como dinheiro de verdade (no caixa aberto, se foi hoje) e o resto continua na mesma conta, no mesmo vencimento ou num novo.
+ * Com a opção de multa ligada, a conta atrasada mostra o valor atualizado sugerido; a multa só entra se a pessoa somar.
+ */
 export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; aoFechar: () => void; aoSalvo: () => void | Promise<void> }) {
   const { sb, petshop, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const hoje = hojeIso();
   const entrada = conta.tipo === "entrada";
+  const devido = Number(conta.valor);
   // nenhuma forma vem marcada: a pessoa escolhe como o dinheiro entrou
   const [pagamento, setPagamento] = useState<EstadoPagamento>(() => pagamentoInicial());
   const caixaAgora = useCaixaAberto();
   const [data, setData] = useState(hoje);
+  const [valor, setValor] = useState<number | null>(devido);
+  const [novoVencimento, setNovoVencimento] = useState(conta.vencimento && conta.vencimento >= hoje ? conta.vencimento : "");
+  const sugerida = entrada ? multaSugerida(petshop, conta, hoje) : null;
+  const [multa, setMulta] = useState<number | null>(null);
+  const [comMulta, setComMulta] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [erroValor, setErroValor] = useState<string | null>(null);
+
+  const recebendo = entrada ? centavos(valor ?? 0) : devido;
+  const parcial = entrada && recebendo > 0 && recebendo < devido;
+  const falta = centavos(devido - recebendo);
+  const daMulta = comMulta ? centavos(multa ?? 0) : 0;
+  const total = centavos(recebendo + daMulta);
 
   async function salvar() {
     if (salvando) return;
-    const pg = fecharPagamento(pagamento, Number(conta.valor));
+    if (entrada && !(recebendo > 0)) { setErroValor("Escreva quanto o cliente pagou."); return; }
+    if (entrada && recebendo > devido) { setErroValor(`O cliente deve ${brl(devido)} nesta conta. Se pagou a mais, lance a diferença como outra entrada.`); return; }
+    const pg = fecharPagamento(pagamento, total);
     if ("erro" in pg) { setErro(pagamento.dividido ? pg.erro : entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
     if (!data || data > hoje) { setErro("Escolha um dia até hoje."); return; }
     if (data === hoje && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
-      // só entra no caixa aberto quando o dinheiro andou hoje
-      const caixa = data === hoje ? await caixaAberto(sb, petshop.id) : null;
-      const r = await sb.from("lancamentos").update({ pago: true, data, forma: pg.forma, pagamentos: pg.pagamentos, caixa_id: caixa?.id ?? null })
-        .eq("id", conta.id).eq("petshop_id", petshop.id).eq("pago", false).select("id");
-      if (r.error) throw new Error(r.error.message);
-      if (!r.data?.length) throw new Error("Esta conta já tinha sido baixada.");
-      avisar(entrada ? `Recebido: ${brl(conta.valor)}.` : `Pago: ${brl(conta.valor)}.`);
+      if (entrada) {
+        const partes = separarMulta(pg.forma, pg.pagamentos, daMulta);
+        const r = await receberConta(sb, conta.id, {
+          valor: recebendo, forma: partes.conta.forma, pagamentos: partes.conta.pagamentos, data: cuidoDoFinanceiro ? data : null,
+          novoVencimento: parcial && novoVencimento && novoVencimento !== conta.vencimento ? novoVencimento : null,
+          multa: daMulta > 0 ? { valor: daMulta, forma: partes.multa.forma, pagamentos: partes.multa.pagamentos } : null,
+        });
+        avisar(r.quitada ? `Recebido: ${brl(total)}.` : `Recebido: ${brl(total)}. Fica faltando ${brl(r.falta)}.`);
+      } else {
+        // só entra no caixa aberto quando o dinheiro andou hoje
+        const caixa = data === hoje ? await caixaAberto(sb, petshop.id) : null;
+        const r = await sb.from("lancamentos").update({ pago: true, data, forma: pg.forma, pagamentos: pg.pagamentos, caixa_id: caixa?.id ?? null })
+          .eq("id", conta.id).eq("petshop_id", petshop.id).eq("pago", false).select("id");
+        if (r.error) throw new Error(r.error.message);
+        if (!r.data?.length) throw new Error("Esta conta já tinha sido baixada.");
+        avisar(`Pago: ${brl(conta.valor)}.`);
+      }
       await aoSalvo();
       avisarMudanca();
       aoFechar();
@@ -566,15 +638,49 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     <Folha titulo={entrada ? "Recebi esta conta" : "Paguei esta conta"} aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Dar baixa"}</button>
+        <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : parcial || daMulta > 0 ? `Receber ${brl(total)}` : "Dar baixa"}</button>
       </>}>
       <div className="g-form">
         <div className="g-card areia">
           <LinhaResumo nome={conta.descricao || conta.categoria} valor={brl(conta.valor)} forte />
-          <p className="g-muted g-pp">{conta.categoria}{conta.vencimento ? ` · vencimento em ${dataCompleta(conta.vencimento)}` : ""}</p>
+          <p className="g-muted g-pp">{conta.categoria}{conta.vencimento ? ` · vencimento em ${dataCompleta(conta.vencimento)}` : ""}{textoJaRecebido(conta) ? ` · ${textoJaRecebido(conta)}` : ""}</p>
         </div>
+        {entrada && <PartesRecebidas conta={conta} />}
+        {entrada && (
+          <Campo rotulo="Quanto o cliente está pagando" erro={erroValor} dica={parcial ? undefined : "Se ele pagou só uma parte, escreva quanto. O resto continua anotado."}>
+            <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErroValor(null); setErro(null); }} maximo={99999999} rotulo="Quanto o cliente está pagando" />
+          </Campo>
+        )}
+        {parcial && (
+          <div className="gf-parcial" role="status">
+            <p>Fica faltando <b className="g-tab">{brl(falta)}</b>. Continua em A receber e na ficha do tutor.</p>
+            <Campo rotulo="Quando ele paga o resto (se combinou outro dia)">
+              <input type="date" className="g-input" value={novoVencimento} min={hoje} onChange={(e) => setNovoVencimento(e.target.value)} />
+            </Campo>
+          </div>
+        )}
+        {sugerida && (
+          <div className="gf-multa">
+            <p>
+              Venceu há {sugerida.dias === 1 ? "1 dia" : `${sugerida.dias} dias`}. Pela regra do pet shop ({regraDaMulta(petshop)}), o valor atualizado seria{" "}
+              <b className="g-tab">{brl(centavos(devido + sugerida.total))}</b>: {brl(devido)} + {brl(sugerida.total)} de multa e juros.
+            </p>
+            {comMulta ? (
+              <div className="gf-multa-linha">
+                <label>
+                  <span>Multa e juros</span>
+                  <CampoDinheiro valor={multa} aoMudar={(v) => { setMulta(v); setErro(null); }} rotulo="Multa e juros" />
+                </label>
+                <button type="button" className="g-btn fantasma p" onClick={() => { setComMulta(false); setErro(null); }}><Trash2 />Tirar</button>
+              </div>
+            ) : (
+              <div><button type="button" className="g-btn sec p" onClick={() => { setComMulta(true); setMulta(sugerida.total); setErro(null); }}>Somar multa e juros</button></div>
+            )}
+            <small>{comMulta ? "Entra separado, na categoria Multa e juros. Você pode mudar o valor ou tirar." : "Só entra se você somar. Sem tocar aqui, a conta é recebida pelo valor normal."}</small>
+          </div>
+        )}
         {entrada
-          ? <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={Number(conta.valor)} rotulo="Como recebeu" />
+          ? <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={total} rotulo="Como recebeu" />
           : <Grupo rotulo="Como pagou"><Chips opcoes={FORMAS} valor={pagamento.forma} aoMudar={(f) => { setPagamento(pagamentoInicial(f)); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>}
         {conta.itens != null && <ItensDoLancamento lancamento={conta} />}
         {cuidoDoFinanceiro ? (

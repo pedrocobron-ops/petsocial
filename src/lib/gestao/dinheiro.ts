@@ -300,3 +300,61 @@ export function percentuaisQueFecham(valores: number[]): number[] {
   for (const o of ordem) { if (falta <= 0) break; pct[o.i]++; falta--; }
   return pct;
 }
+
+/* ---------- receber uma conta (inteira ou uma parte) ---------- */
+
+/** O último valor contado ao fechar um caixa: é a sugestão de troco quando o próximo caixa abre. */
+export async function ultimoContado(sb: Banco, petshopId: string): Promise<number | null> {
+  const { data } = await sb.from("caixas").select("valor_contado").eq("petshop_id", petshopId).not("fechado_em", "is", null)
+    .order("fechado_em", { ascending: false }).limit(1).maybeSingle();
+  return data?.valor_contado == null ? null : Number(data.valor_contado);
+}
+
+/** O que o banco responde ao receber uma conta. */
+export type ContaRecebida = { quitada: boolean; recebido: number; falta: number; no_caixa: boolean };
+
+/**
+ * Recebe uma conta que um cliente ficou de pagar: inteira ou só uma parte. O banco faz tudo numa operação só:
+ * a parte recebida vira uma entrada paga (no caixa aberto, se foi hoje) e a conta fica com o que falta.
+ * `multa`: multa e juros que o cliente pagou junto; entra separado, na categoria "Multa e juros".
+ */
+export async function receberConta(sb: Banco, contaId: string, r: {
+  valor: number; forma: FormaPagamento; pagamentos?: PartePagamento[] | null; data?: string | null; novoVencimento?: string | null;
+  multa?: { valor: number; forma: FormaPagamento; pagamentos?: PartePagamento[] | null } | null;
+}): Promise<ContaRecebida> {
+  const { data, error } = await sb.rpc("receber_conta", {
+    p_conta: contaId, p_valor: r.valor, p_forma: r.forma,
+    ...(r.pagamentos && r.pagamentos.length > 1 ? { p_pagamentos: r.pagamentos } : {}),
+    ...(r.data ? { p_data: r.data } : {}),
+    ...(r.novoVencimento ? { p_novo_vencimento: r.novoVencimento } : {}),
+    ...(r.multa && r.multa.valor > 0 ? {
+      p_multa: r.multa.valor, p_multa_forma: r.multa.forma,
+      ...(r.multa.pagamentos && r.multa.pagamentos.length > 1 ? { p_multa_pagamentos: r.multa.pagamentos } : {}),
+    } : {}),
+  });
+  if (error) throw new Error(error.message);
+  const x = (data ?? {}) as Record<string, unknown>;
+  return { quitada: Boolean(x.quitada), recebido: Number(x.recebido ?? r.valor), falta: Number(x.falta ?? 0), no_caixa: Boolean(x.no_caixa) };
+}
+
+/**
+ * Separa a multa do resto de um pagamento: o cliente paga tudo junto (uma forma ou dividido) e o sistema anota
+ * a multa numa entrada e a conta em outra. No pagamento dividido, a multa sai das últimas partes.
+ */
+export function separarMulta(forma: FormaPagamento, pagamentos: PartePagamento[] | null, multa: number):
+  { conta: { forma: FormaPagamento; pagamentos: PartePagamento[] | null }; multa: { forma: FormaPagamento; pagamentos: PartePagamento[] | null } } {
+  if (!pagamentos || pagamentos.length < 2 || !(multa > 0)) return { conta: { forma, pagamentos: null }, multa: { forma, pagamentos: null } };
+  const daConta = pagamentos.map((p) => ({ ...p }));
+  const daMulta: PartePagamento[] = [];
+  let falta = centavos(multa);
+  for (let i = daConta.length - 1; i >= 0 && falta > 0; i--) {
+    const tira = Math.min(falta, daConta[i].valor);
+    daConta[i].valor = centavos(daConta[i].valor - tira);
+    daMulta.unshift({ forma: daConta[i].forma, valor: tira });
+    falta = centavos(falta - tira);
+  }
+  const limpa = (l: PartePagamento[]) => l.filter((p) => p.valor > 0);
+  const c = limpa(daConta), m = limpa(daMulta);
+  const fecha = (l: PartePagamento[]) => ({ forma: l.length ? formaPrincipal(l) : forma, pagamentos: l.length > 1 ? l : null });
+  return { conta: fecha(c), multa: fecha(m) };
+}

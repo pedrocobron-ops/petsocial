@@ -6,7 +6,7 @@ import Link from "next/link";
 import { BellRing, CalendarClock, CalendarX, Check, MessageCircle, Play, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
 import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { textoLembrete, textoPronto } from "@/lib/gestao/agenda";
+import { textoCancelado, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
 import { textoComprovante } from "@/lib/gestao/comprovante";
 import { desfazerVenda, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { brl, dataAmigavel, dataCompleta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
@@ -210,6 +210,12 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: a.servicos?.nome, quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
   }));
 
+  // remarcou ou cancelou: a mensagem para o tutor já vem pronta (quem manda é a pessoa, pelo WhatsApp)
+  const zapRemarcado = linkWhatsApp(tutor?.telefone, textoRemarcado({
+    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: a.servicos?.nome, quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+  }));
+  const zapCancelado = linkWhatsApp(tutor?.telefone, textoCancelado({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome }));
+
   const zapPronto = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", petshop: petshop.nome, servico: a.servicos?.nome }));
 
   // comprovante: só para quem vê o financeiro, com o atendimento concluído, a conta toda recebida e telefone na ficha
@@ -379,6 +385,14 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           {pet && posso("clientes") && <Link className="g-btn sec" href={`/gestao/app/clientes?pet=${pet.id}`}>Ver ficha</Link>}
         </div>
         {a.lembrete_em && <p className="g-pp g-muted">Lembrete aberto {dataAmigavel(a.lembrete_em)} às {hora(a.lembrete_em)}.</p>}
+        {(a.status === "marcado" || a.status === "confirmado") && zapRemarcado && (
+          <div className="g-fila">
+            <a className="g-btn sec g-cresce" href={zapRemarcado} target="_blank" rel="noopener noreferrer"><MessageCircle />Avisar remarcação</a>
+          </div>
+        )}
+        {a.status === "cancelado" && (zapCancelado
+          ? <a className="g-btn zap cheio" href={zapCancelado} target="_blank" rel="noopener noreferrer"><MessageCircle />Avisar cancelamento</a>
+          : <p className="g-pp g-muted">Sem telefone do tutor para avisar do cancelamento.</p>)}
 
         <hr className="g-sep" />
         <div className="g-fila">

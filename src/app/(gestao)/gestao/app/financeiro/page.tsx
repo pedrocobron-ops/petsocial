@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   ArrowDownLeft, ArrowUpRight, CalendarClock, CalendarDays, ChartColumn, Check, ChevronLeft, ChevronRight, CreditCard, Download, HandCoins, Plus, Receipt, Scale,
   Search, Target, TrendingUp, TriangleAlert,
@@ -9,8 +10,8 @@ import { useGestao } from "@/components/gestao/contexto";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
 import {
-  Apagados, baixarPlanilha, brlMini, categoriaAtual, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, SemAcesso, soma, somaPorForma,
-  TagAlterado, type Cel, type Tipo,
+  Apagados, baixarPlanilha, brlMini, categoriaAtual, Chips, COR_FORMA, dinheiroCsv, ehDeServico, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, SemAcesso, soma, somaPorForma,
+  TagAlterado, textoJaRecebido, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
 import { contasDaMeta, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
@@ -62,7 +63,7 @@ function porCategoria(lista: Lancamento[]) {
 }
 
 function Financeiro() {
-  const { sb, petshop, equipe } = useGestao();
+  const { sb, petshop, equipe, souDono } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const agora = new Date();
@@ -305,6 +306,9 @@ function Financeiro() {
                 aoBaixar={(c) => abrir({ tipo: "baixa", conta: c })}
                 aoCriar={() => abrir({ tipo: "conta", de: aba === "pagar" ? "saida" : "entrada" })} />
             )}
+            {aba === "receber" && souDono && (
+              <p className="g-muted g-pp">Multa e juros por atraso, chave Pix e a mensagem de cobrança: <Link className="g-link" href="/gestao/app/meu-petshop#opcoes-cobranca">Opções de cobrança</Link>.</p>
+            )}
 
             {aba === "lancamentos" && (
               <section className="g-card">
@@ -331,7 +335,7 @@ function Financeiro() {
                           <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
                           <span className="t">
                             <b>{l.descricao || categoriaAtual(l.categoria)} <TagAlterado lancamento={l} /></b>
-                            <span>{dataCurta(l.data)}{l.descricao ? ` · ${categoriaAtual(l.categoria)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {textoDoPagamento(l)}</i></span>
+                            <span>{dataCurta(l.data)}{l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {textoDoPagamento(l)}</i></span>
                           </span>
                           <span className="g-tag g-fin-so-largo">{textoDoPagamento(l)}</span>
                           <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
@@ -585,7 +589,7 @@ function Contas({ lista, receber, hoje, tutores, aoEditar, aoBaixar, aoCriar }: 
                 <span className="g-fin-so-largo"><Tile icone={v && v < hoje ? TriangleAlert : receber ? HandCoins : Receipt} tom={v && v < hoje ? "rosa" : receber ? "menta" : "manteiga"} /></span>
                 <span className="t">
                   <b>{c.descricao || c.categoria}</b>
-                  <span>{tutor ? `${tutor} · ` : ""}{categoriaAtual(c.categoria)}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
+                  <span>{tutor ? `${tutor} · ` : ""}{categoriaAtual(c.categoria)}{textoJaRecebido(c) ? ` · ${textoJaRecebido(c)}` : ""}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
                 </span>
                 <span className="d">
                   <b>{brl(c.valor)}</b>

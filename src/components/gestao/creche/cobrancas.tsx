@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Ban, CalendarClock, Check, ChevronLeft, ChevronRight, CircleCheck, HandCoins, MessageCircle, Pencil, RotateCcw, TriangleAlert, Undo2 } from "lucide-react";
 import {
-  cobraNoMes, estadoDaCobranca, extrasDaCobranca, isoMes, mensagemDeCobranca, SELECT_COBRANCA, sugestaoDoMes, textoDasDatas, vencimentoDoMes,
+  cobraNoMes, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, SELECT_COBRANCA, sugestaoDoMes, textoDasDatas, vencimentoDoMes,
   type CobrancaCompleta, type EstadoCobranca, type PlanoCompleto,
 } from "@/lib/gestao/creche";
 import { textoDoPagamento } from "@/lib/gestao/dinheiro";
@@ -35,7 +35,8 @@ function porTutor(lista: CobrancaCompleta[]): Grupo[] {
     const chave = t?.id ?? `pet-${c.pet_id}`;
     const g = mapa.get(chave) ?? { chave, tutor: t?.nome ?? null, telefone: t?.telefone ?? null, cobrancas: [], total: 0 };
     g.cobrancas.push(c);
-    g.total = centavos(g.total + Number(c.total));
+    // o total do tutor é o que ainda falta receber (mensalidade com parte já paga entra só com o resto)
+    g.total = centavos(g.total + (c.lancamentos?.pago ? Number(c.total) : faltaDaCobranca(c)));
     mapa.set(chave, g);
   }
   return [...mapa.values()].sort((a, b) => (a.cobrancas[0].vencimento).localeCompare(b.cobrancas[0].vencimento) || (a.tutor ?? "").localeCompare(b.tutor ?? "", "pt-BR"));
@@ -89,6 +90,9 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
   };
   const soma = (l: CobrancaCompleta[]) => centavos(l.reduce((s, c) => s + Number(c.total), 0));
   const pagas = abertas.filter((c) => c.lancamentos?.pago);
+  // mensalidade com parte recebida: o que falta fica no bloco dela; o que já entrou conta em "Já recebido"
+  const falta = (l: CobrancaCompleta[]) => centavos(l.reduce((s, c) => s + faltaDaCobranca(c), 0));
+  const emPartes = centavos(soma(abertas.filter((c) => !c.lancamentos?.pago)) - falta(abertas.filter((c) => !c.lancamentos?.pago)));
   const faltamGerar = planos.filter((p) => cobraNoMes(p, mes) && !(dados?.doMes ?? []).some((c) => c.plano_id === p.id));
 
   async function receber(c: CobrancaCompleta) {
@@ -136,9 +140,9 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
           {todas.length > 0 && (
             <div className="g-grade kpis">
               <Kpi icone={HandCoins} tom="menta" rotulo={`Cobrado em ${nomeMes(mes)}`} valor={brl(soma(abertas))} apoio={abertas.length === 1 ? "1 cobrança" : `${abertas.length} cobranças`} />
-              <Kpi icone={CircleCheck} tom="menta" rotulo="Já recebido" valor={brl(soma(pagas))} apoio={pagas.length === 1 ? "1 paga" : `${pagas.length} pagas`} />
-              <Kpi icone={CalendarClock} tom="manteiga" rotulo="Vencem hoje" valor={doBloco("hoje").length} apoio={doBloco("hoje").length ? brl(soma(doBloco("hoje"))) : "nenhuma"} />
-              <Kpi icone={TriangleAlert} tom="rosa" rotulo="Atrasadas" valor={doBloco("atrasada").length} apoio={doBloco("atrasada").length ? brl(soma(doBloco("atrasada"))) : "nenhuma"} />
+              <Kpi icone={CircleCheck} tom="menta" rotulo="Já recebido" valor={brl(centavos(soma(pagas) + emPartes))} apoio={`${pagas.length === 1 ? "1 paga" : `${pagas.length} pagas`}${emPartes > 0 ? ` · ${brl(emPartes)} em partes` : ""}`} />
+              <Kpi icone={CalendarClock} tom="manteiga" rotulo="Vencem hoje" valor={doBloco("hoje").length} apoio={doBloco("hoje").length ? brl(falta(doBloco("hoje"))) : "nenhuma"} />
+              <Kpi icone={TriangleAlert} tom="rosa" rotulo="Atrasadas" valor={doBloco("atrasada").length} apoio={doBloco("atrasada").length ? brl(falta(doBloco("atrasada"))) : "nenhuma"} />
             </div>
           )}
 
@@ -159,7 +163,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
               <section key={b.id} className={`g-cm-bloco ${b.id}`}>
                 <div className="g-card-t">
                   <h3>{b.titulo}</h3>
-                  <span className="g-muted g-pp g-tab">{doBloco(b.id).length} · {brl(soma(doBloco(b.id)))}</span>
+                  <span className="g-muted g-pp g-tab">{doBloco(b.id).length} · {brl(b.id === "paga" ? soma(doBloco(b.id)) : falta(doBloco(b.id)))}</span>
                 </div>
                 <div className="g-cm-grupos">
                   {grupos.map((g) => {
@@ -194,6 +198,9 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
                                       : e.estado === "atrasada" ? <span className="g-tag vermelho">venceu em {dataCurta(c.vencimento)} · {e.atraso === 1 ? "1 dia de atraso" : `${e.atraso} dias de atraso`}</span>
                                       : e.estado === "hoje" ? <span className="g-tag amarelo">vence hoje</span>
                                       : <span className="g-tag">vence em {dataCurta(c.vencimento)}</span>}
+                                    {e.estado !== "paga" && faltaDaCobranca(c) < Number(c.total) && (
+                                      <span className="g-tag verde">pago {brl(centavos(Number(c.total) - faltaDaCobranca(c)))} de {brl(c.total)} · falta {brl(faltaDaCobranca(c))}</span>
+                                    )}
                                     {c.obs && <span className="g-muted">{c.obs}</span>}
                                   </span>
                                 </div>
