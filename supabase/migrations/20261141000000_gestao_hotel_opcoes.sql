@@ -167,7 +167,10 @@ create trigger estadias_cuidados_conferir before insert on public.estadias_cuida
 revoke execute on function public.estadias_cuidados_conferir() from public, anon, authenticated;
 
 -- ---------- pedido pelo link: o tutor já foi avisado da resposta? ----------
+-- O aviso "avise o tutor" deixa de sumir ao recarregar a tela: fica no pedido até alguém avisar.
+-- Os pedidos respondidos antes desta mudança entram como já avisados, para não voltarem todos de uma vez.
 alter table public.pedidos_agendamento add column avisado_em timestamptz;
+update public.pedidos_agendamento set avisado_em = criado_em where status <> 'pendente';
 grant update (avisado_em) on public.pedidos_agendamento to authenticated;
 
 -- ---------- link do cliente ----------
