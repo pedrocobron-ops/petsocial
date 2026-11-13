@@ -37,8 +37,16 @@ export default function Diario() {
       sb.from("estadias_diario").select("*").eq("petshop_id", petshop.id).eq("dia", hoje).limit(1000),
       comOcorrencias ? sb.from("estadias_ocorrencias").select("*").eq("petshop_id", petshop.id).gte("quando", comeco).order("quando").limit(500) : Promise.resolve({ data: [] as Ocorrencia[], error: null }),
     ]);
-    const estadias = [...(ok(naCasa) as unknown as EstadiaDoDiario[]), ...(ok(sairam) as unknown as EstadiaDoDiario[])].filter((e) => e.pets);
-    return { estadias, registros: ok(registros), ocorrencias: (ocorrencias.data ?? []) as Ocorrencia[] };
+    const todas = [...(ok(naCasa) as unknown as EstadiaDoDiario[]), ...(ok(sairam) as unknown as EstadiaDoDiario[])].filter((e) => e.pets);
+    const diarios = ok(registros);
+    // um cartão por pet: quem está na casa agora; se já saiu, a estadia que já tem diário, ou a última do dia
+    const peso = (e: EstadiaDoDiario) => (e.status === "em_casa" ? 2 : diarios.some((r) => r.estadia_id === e.id) ? 1 : 0);
+    const porPet = new Map<string, EstadiaDoDiario>();
+    for (const e of todas) {
+      const atual = porPet.get(e.pet_id);
+      if (!atual || peso(e) > peso(atual) || (peso(e) === peso(atual) && (e.saida ?? "") > (atual.saida ?? ""))) porPet.set(e.pet_id, e);
+    }
+    return { estadias: [...porPet.values()], registros: diarios, ocorrencias: (ocorrencias.data ?? []) as Ocorrencia[] };
   }, [petshop.id, hoje, comOcorrencias]);
 
   const lista = useMemo(() => (dados?.estadias ?? []).filter((e) => tipo === "todos" || e.tipo === tipo)
@@ -71,7 +79,7 @@ export default function Diario() {
           <div className="g-cs-grade">
             {lista.map((e) => (
               <CartaoDiario key={e.id} estadia={e} dia={hoje} itens={opcoes.itens} registro={dados.registros.find((r) => r.estadia_id === e.id) ?? null}
-                ocorrencias={dados.ocorrencias.filter((o) => o.estadia_id === e.id)} comOcorrencias={comOcorrencias}
+                ocorrencias={dados.ocorrencias.filter((o) => o.pet_id === e.pet_id)} comOcorrencias={comOcorrencias}
                 aoOcorrencia={() => { if (!somenteLeitura()) setOcorrenciaDe(e); }} aoMudar={() => void recarregar()} />
             ))}
           </div>
@@ -182,7 +190,7 @@ function CartaoDiario({ estadia: e, dia, itens, registro, ocorrencias, comOcorre
 
       <footer>
         {zap ? (
-          <a className={`g-btn ${enviadoEm ? "sec" : "zap"}`} href={vazio ? undefined : zap} target="_blank" rel="noopener noreferrer" aria-disabled={vazio}
+          <a className={`g-btn ${enviadoEm ? "sec" : "zap"}`} href={vazio ? undefined : zap} target="_blank" rel="noopener noreferrer" aria-disabled={vazio} title={vazio ? "Marque pelo menos um item ou escreva um recado para mandar." : undefined}
             onClick={(ev) => {
               if (vazio || somenteLeitura()) { ev.preventDefault(); return; }
               const agora = new Date().toISOString(); setEnviadoEm(agora);
@@ -192,7 +200,6 @@ function CartaoDiario({ estadia: e, dia, itens, registro, ocorrencias, comOcorre
         <button type="button" className="g-btn fantasma p" onClick={() => setVerTexto((v) => !v)}>{verTexto ? "Esconder a mensagem" : "Ver a mensagem"}</button>
         {comOcorrencias && e.status === "em_casa" && <button type="button" className="g-btn fantasma p" onClick={aoOcorrencia}><ShieldAlert />Ocorrência</button>}
       </footer>
-      {zap && vazio && <p className="g-muted g-pp">Marque pelo menos um item ou escreva um recado para mandar.</p>}
     </article>
   );
 }

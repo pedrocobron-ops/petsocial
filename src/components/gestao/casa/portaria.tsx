@@ -127,10 +127,10 @@ export function QuemPodeBuscar({ pet, solto, aoMudar }: { pet: PetDaPortaria; so
   const corpo = (
     <>
       {erro && <p className="g-erro" role="alert">{erro}</p>}
-      <p className="g-muted g-p">{pet.clientes ? `${pet.clientes.nome} (tutor) sempre pode buscar. ` : ""}{busca.length ? "Além do tutor, estas pessoas estão autorizadas:" : "Ninguém mais foi autorizado ainda."}</p>
+      <p className="g-muted g-p">{pet.clientes ? `${pet.clientes.nome} (tutor) sempre pode buscar. ` : ""}{!dados ? (erro ? "" : "Buscando os autorizados…") : busca.length ? "Além do tutor, estas pessoas estão autorizadas:" : "Ninguém mais foi autorizado ainda."}</p>
       {busca.length > 0 && <div className="g-lista">{busca.map(linha)}</div>}
       <p className="g-rotulo" style={{ marginTop: 6 }}>Veterinário de emergência</p>
-      {vets.length ? <div className="g-lista">{vets.map(linha)}</div> : <p className="g-muted g-p">Nenhum contato de veterinário na ficha.</p>}
+      {vets.length ? <div className="g-lista">{vets.map(linha)}</div> : dados ? <p className="g-muted g-p">Nenhum contato de veterinário na ficha.</p> : null}
       {podeMudar && (
         <div className="g-fila">
           <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setNovo("busca"); }}><Plus />Autorizar uma pessoa</button>
