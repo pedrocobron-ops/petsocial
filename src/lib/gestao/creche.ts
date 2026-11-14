@@ -302,7 +302,7 @@ function linhaDaMensagem(c: CobrancaCompleta, comMes = false) {
   const partes = c.acerto_saida ? [] : [`mensalidade ${brl(c.valor_mensal)}`];
   if (extras.length) partes.push(`${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((e) => e.dia))})${valores.dias > 0 ? ` ${brl(valores.dias)}` : ""}`);
   if (taxas.length) partes.push(`${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((e) => e.dia))}) ${brl(valores.taxas)}`);
-  let texto = (c.acerto_saida ? "acerto da saída, " : "") + partes.join(" + ");
+  let texto = partes.join(" + ");
   if (Number(c.desconto) > 0) texto += ` - desconto ${brl(c.desconto)}`;
   if (partes.length > 1 || Number(c.desconto) > 0) texto += ` = ${brl(c.total)}`;
   // parte já recebida: a mensagem cobra só o que falta
@@ -311,7 +311,7 @@ function linhaDaMensagem(c: CobrancaCompleta, comMes = false) {
   return `${nomeNaMensagem(c, comMes)}: ${texto}`;
 }
 /** "Rex" ou, quando a mensagem junta meses diferentes, "Rex (novembro)". */
-const nomeNaMensagem = (c: CobrancaCompleta, comMes: boolean) => `${c.pets?.nome ?? "Pet"}${comMes ? ` (${c.acerto_saida ? "acerto da saída" : nomeMes(deIsoDia(c.mes))})` : ""}`;
+const nomeNaMensagem = (c: CobrancaCompleta, comMes: boolean) => `${c.pets?.nome ?? "Pet"}${c.acerto_saida ? " (acerto da saída)" : comMes ? ` (${nomeMes(deIsoDia(c.mes))})` : ""}`;
 
 /**
  * Mensagem de cobrança de um tutor: o mês, uma linha por pet (com os dias extras e as datas), o total e o vencimento.

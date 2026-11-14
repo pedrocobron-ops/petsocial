@@ -35,7 +35,8 @@ export function ResumoDosMeses({ plano, presencas, faltas }: { plano: PlanoCompl
   return (
     <>
     <div className="g-cm-meses">
-      {[agora, anterior(agora)].map((mes, i) => {
+      {/* o mês passado só aparece quando o plano já valia nele */}
+      {[agora, anterior(agora)].filter((mes, i) => i === 0 || plano.inicio < isoDia(new Date(agora.getFullYear(), agora.getMonth(), 1))).map((mes, i) => {
         const r = resumoDoMes(plano, mes, presencas, faltas, petshop.horario, hoje);
         const nada = !r.esperados && !r.vieram && !r.extras.length && !r.reposicoes.length && !r.faltas.length;
         return (
