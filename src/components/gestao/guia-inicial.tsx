@@ -36,7 +36,8 @@ const lerVagas = (s: string) => { const t = s.trim(); if (!t) return null; const
 /** Banho e tosa costumam mudar de preço com o porte; os serviços rápidos (unha, hidratação) quase sempre têm um preço só. */
 function comecaPorPorte(s: Preco): boolean {
   const v = CAMPOS_PRECO.map((c) => s[c]);
-  if (v.every((x) => x == null)) return s.categoria !== "outro";
+  // sem preço ainda: começa com um campo só (menos para digitar no primeiro dia); "Por porte" é um toque
+  if (v.every((x) => x == null)) return false;
   return !v.every((x) => x === v[0]);
 }
 const NOME_PORTE: Record<string, string> = { P: "pequeno", M: "médio", G: "grande", GG: "gigante" };
@@ -130,7 +131,14 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
     ...(banho ? [{ id: "link" as const }] : []),
   ]);
   // passos.length = pronto. Quem recarregou a página na pergunta da logo volta para ela (e ainda pode voltar para a cor).
-  const [passo, setPasso] = useState(() => (passos[1]?.id === "logo" && lerLembrado(chaveBV) === "logo" ? 1 : 0));
+  // Quem recarregou no meio dos passos (guia ainda não feito) volta para o passo em que estava; o que já gravou continua gravado.
+  const chavePasso = `maestro-gestao-guia-passo-${petshop.id}`;
+  const [passo, setPasso] = useState(() => {
+    if (passos[1]?.id === "logo" && lerLembrado(chaveBV) === "logo") return 1;
+    const guardado = petshop.guia_feito_em ? -1 : passos.findIndex((p) => p.id === lerLembrado(chavePasso));
+    return guardado > 0 && passos[guardado].id !== "cor" && passos[guardado].id !== "logo" ? guardado : 0;
+  });
+  useEffect(() => { if (!petshop.guia_feito_em && passos[passo]) guardarLembrado(chavePasso, passos[passo].id); }, [passo]); // eslint-disable-line react-hooks/exhaustive-deps
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -290,8 +298,15 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
           ...(hotel ? { diaria_hotel: diariaHotel, vagas_hotel: vh } : {}),
         }).eq("id", petshop.id).select("id"));
       }
-      if (atual === "link" && linkLigado !== petshop.link_ativo) {
-        ok(await sb.from("petshops").update({ link_ativo: linkLigado }).eq("id", petshop.id).select("id"));
+      if (atual === "link") {
+        // ligou o link e faz creche ou hotel: o cliente já pode pedir vaga também (desliga em Link do cliente)
+        const junto = linkLigado && !petshop.guia_feito_em ? {
+          ...(creche && !petshop.link_creche ? { link_creche: true } : {}),
+          ...(hotel && !petshop.link_hotel ? { link_hotel: true } : {}),
+        } : {};
+        if (linkLigado !== petshop.link_ativo || Object.keys(junto).length) {
+          ok(await sb.from("petshops").update({ link_ativo: linkLigado, ...junto }).eq("id", petshop.id).select("id"));
+        }
       }
       await avancar();
     } catch (e) { avisarErro(e); } finally { setSalvando(false); }
@@ -435,7 +450,8 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
 
           {atual === "servicos" && (
             <div className="g-pilha">
-              {cabeca("O que vocês fazem e quanto custa?", "Já deixei os serviços mais comuns. Tire pela lixeira o que vocês não oferecem e coloque o preço dos outros: um só, ou um para cada porte. Em branco também vale; você preenche depois.")}
+              {cabeca("O que vocês fazem e quanto custa?", "Já deixei os serviços mais comuns, sem preço: o valor é você quem coloca. Tire pela lixeira o que vocês não oferecem. Pode pôr só o preço do que mais sai (um banho, por exemplo) e deixar o resto em branco: você ajusta depois em Meu pet shop.")}
+              <div><button type="button" className="g-btn sec p" onClick={() => void pular()} disabled={salvando}>Pôr os preços depois</button></div>
               {!precos.length && <p className="g-guia-legenda">Nenhum serviço na lista ainda. Você cria os seus em Meu pet shop, em Serviços e preços.</p>}
               <div className="g-guia-servicos">
                 {naLista.map((s) => {

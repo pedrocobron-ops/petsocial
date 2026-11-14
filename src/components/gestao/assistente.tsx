@@ -4,17 +4,18 @@ import { Selo } from "./marca";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Check, CheckCheck, ChevronDown, MessageCircle, Mic, RotateCcw, Square } from "lucide-react";
 import { hora, isoDia } from "@/lib/gestao/util";
+import Link from "next/link";
 import { useGestao } from "./contexto";
 import { avisarMudanca } from "./ui";
 
 type Resumo = { titulo: string; linhas: [string, string][] };
 type Proposta = { id: string; ferramenta: string; resumo: Resumo; estado: "pendente" | "sim" | "nao" };
-type Link = { nome: string; texto: string; url: string };
+type LinkZap = { nome: string; texto: string; url: string };
 type Item =
-  | { tipo: "eu" | "ele" | "erro"; texto: string; quando?: string }
+  | { tipo: "eu" | "ele" | "erro"; texto: string; quando?: string; saidas?: boolean }
   | { tipo: "propostas"; lista: Proposta[]; enviado: boolean }
-  | { tipo: "links"; lista: Link[] };
-type Resposta = { mensagens: unknown[]; texto: string; propostas: Omit<Proposta, "estado">[]; parciais: unknown[]; links: Link[]; mudou: boolean; erro?: string; mensagem?: string };
+  | { tipo: "links"; lista: LinkZap[] };
+type Resposta = { mensagens: unknown[]; texto: string; propostas: Omit<Proposta, "estado">[]; parciais: unknown[]; links: LinkZap[]; mudou: boolean; erro?: string; mensagem?: string };
 
 /** A conversa continua enquanto o aplicativo está aberto, mesmo fechando e abrindo o painel. */
 const memoria: { petshop: string | null; itens: Item[]; mensagens: unknown[]; parciais: unknown[] } = { petshop: null, itens: [], mensagens: [], parciais: [] };
@@ -37,7 +38,7 @@ const SUGESTOES_DINHEIRO = ["Quanto entrou essa semana?", "Recebi 60 no Pix do b
 
 /** Painel do Mozart: a pessoa fala ou escreve, ele mostra o que vai fazer e só grava depois do Confirmar. */
 export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?: string; aoFechar: () => void }) {
-  const { sb, petshop, eu, cuidoDoFinanceiro: vejoFinanceiro } = useGestao();
+  const { sb, petshop, eu, posso, cuidoDoFinanceiro: vejoFinanceiro } = useGestao();
   if (memoria.petshop !== petshop.id) { memoria.petshop = petshop.id; memoria.itens = []; memoria.mensagens = []; memoria.parciais = []; }
   const [itens, setItens] = useState<Item[]>(memoria.itens);
   const [texto, setTexto] = useState("");
@@ -79,7 +80,8 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
         }),
       });
       const j = (await r.json().catch(() => null)) as Resposta | null;
-      if (!r.ok || !j || j.erro) { acrescentar({ tipo: "erro", texto: j?.mensagem ?? "Não consegui falar com o Mozart agora. Tente de novo em instantes." }); return; }
+      // o Mozart não respondeu: a frase do servidor (sem detalhe técnico) e o caminho para seguir sem ele
+      if (!r.ok || !j || j.erro) { acrescentar({ tipo: "erro", texto: j?.mensagem ?? "Não consegui falar com o Mozart agora. Tente de novo em instantes.", saidas: r.status >= 500 }); return; }
       memoria.mensagens = j.mensagens;
       memoria.parciais = j.parciais ?? [];
       const novos: Item[] = [];
@@ -158,13 +160,16 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   const sugestoes = [...SUGESTOES.slice(0, 2), ...(vejoFinanceiro ? SUGESTOES_DINHEIRO.slice(0, 1) : []), SUGESTOES[2]];
 
   const primeiro = eu.nome.split(" ")[0];
+  // a última resposta foi o servidor dizendo que o Mozart está fora do ar: o topo não diz "online"
+  const ultimo = itens[itens.length - 1];
+  const foraDoAr = Boolean(ultimo && ultimo.tipo === "erro" && ultimo.saidas);
 
   return (
     <div className="g-ass" onMouseDown={(e) => { if (e.target === e.currentTarget) aoFechar(); }}>
       <section className="g-ass-painel" role="dialog" aria-label="Conversa com o Mozart">
         <header className="g-ass-topo">
-          <span className="foto"><Selo tamanho={42} /><i aria-hidden /></span>
-          <div><b>Mozart</b><span>{pensando ? "digitando…" : ouvindo ? "ouvindo você…" : `online · ${petshop.nome}`}</span></div>
+          <span className={`foto${foraDoAr ? " fora" : ""}`}><Selo tamanho={42} /><i aria-hidden /></span>
+          <div><b>Mozart</b><span>{pensando ? "digitando…" : ouvindo ? "ouvindo você…" : foraDoAr ? `fora do ar agora · ${petshop.nome}` : `online · ${petshop.nome}`}</span></div>
           {itens.length > 0 && <button className="g-ico" onClick={novaConversa} aria-label="Começar conversa nova" title="Conversa nova"><RotateCcw /></button>}
           <button className="g-ico" style={itens.length ? { marginLeft: 0 } : undefined} onClick={aoFechar} aria-label="Fechar a conversa" title="Fechar"><ChevronDown /></button>
         </header>
@@ -203,6 +208,13 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
           ) : (
             <div key={i} className={`g-bolha ${item.tipo === "eu" ? "eu" : "ela"}${item.tipo === "erro" ? " erro" : ""}${itens[i - 1]?.tipo !== item.tipo ? " rabo" : ""}`}>
               {item.texto}
+              {item.tipo === "erro" && item.saidas && (
+                <span className="g-ass-saidas">
+                  Enquanto isso:{" "}
+                  {posso("agenda") && <><Link className="g-link alvo" href="/gestao/app/agenda?novo=1" onClick={aoFechar}>Marcar horário</Link>{" · "}</>}
+                  <Link className="g-link alvo" href="/gestao/app/manual" onClick={aoFechar}>Ver o manual</Link>
+                </span>
+              )}
               {item.quando && <span className="h">{item.quando}{item.tipo === "eu" && <CheckCheck size={14} />}</span>}
             </div>
           ))}
