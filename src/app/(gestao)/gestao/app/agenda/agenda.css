@@ -120,3 +120,22 @@ div.g-agd-faixa.almoco { cursor: default; }
 .g-agd-servicos li { display: flex; justify-content: space-between; gap: 12px; font-size: .9375rem; color: var(--g-cinza); }
 .g-agd-servicos li b { color: var(--g-tinta); font-weight: 600; }
 .g-vd-servicos { display: grid; gap: 8px; margin-top: 10px; padding: 12px; border-radius: var(--g-raio-p); background: var(--g-carta-2); }
+
+/* dia fechado (data marcada em Meu pet shop ou dia em que não abre na semana) */
+.g-dia.fech:not([aria-pressed="true"]) b { color: var(--g-cinza); text-decoration: line-through; text-decoration-thickness: 1px; }
+.g-aviso.g-agd-diafech { margin-bottom: 12px; flex-wrap: nowrap; align-items: flex-start; }
+.g-semana-cab > div small.g-agd-fech { display: block; margin-top: 3px; font-size: .6875rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: #7a281b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* semana no celular: uma linha por dia, o toque abre o dia */
+.g-agd-sem { display: grid; gap: 8px; }
+.g-agd-sem-dia { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 12px; border-radius: 16px; border: 1px solid var(--g-linha); background: var(--g-carta); text-align: left; color: inherit; }
+.g-agd-sem-dia.hoje { border-color: var(--g-laranja); }
+.g-agd-sem-dia.fech { background: var(--g-carta-2); }
+.g-agd-sem-dia .d { display: grid; justify-items: center; width: 44px; flex: none; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--g-cinza); }
+.g-agd-sem-dia .d b { font: 480 1.375rem/1.1 var(--display); color: var(--g-tinta); letter-spacing: 0; }
+.g-agd-sem-dia .t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.g-agd-sem-dia .t b { font-weight: 600; }
+.g-agd-sem-dia .t span { font-size: .875rem; color: var(--g-cinza); }
+.g-agd-sem-dia .n { display: inline-grid; place-items: center; min-width: 30px; height: 30px; padding: 0 8px; border-radius: 999px; background: var(--g-laranja-tint); font-weight: 700; flex: none; }
+.g-agd-sem-dia > svg { width: 18px; height: 18px; flex: none; color: var(--g-cinza); }
+.g-agd-porte.falta { box-shadow: inset 0 0 0 2px #c98a12; }

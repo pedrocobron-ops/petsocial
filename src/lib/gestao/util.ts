@@ -118,6 +118,14 @@ export function precoDoServico(s: Pick<Servico, "preco_p" | "preco_m" | "preco_g
   return doPorte ?? s.preco_p ?? s.preco_m ?? s.preco_g ?? s.preco_gg ?? null;
 }
 
+/** O preço do serviço muda conforme o porte? (dois preços diferentes preenchidos). Só aí vale perguntar o porte antes de marcar. */
+export function precoMudaComPorte(s: Pick<Servico, "preco_p" | "preco_m" | "preco_g" | "preco_gg"> | null | undefined): boolean {
+  if (!s) return false;
+  return new Set([s.preco_p, s.preco_m, s.preco_g, s.preco_gg].filter((v) => v != null).map(Number)).size > 1;
+}
+/** Anotação que acompanha o horário quando a pessoa marca sem saber o porte. */
+export const NOTA_PORTE = "Conferir o porte e o valor na hora.";
+
 /** Lê "1.234,56", "60", "60,5" ou "R$ 60" como número. */
 export function lerValor(s: string): number | null {
   const limpo = s.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");

@@ -21,6 +21,8 @@ import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
 
 import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
+import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { useCalendario } from "@/components/gestao/calendario";
 import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
 import MinhaComissao from "@/components/gestao/minha-comissao";
@@ -51,6 +53,9 @@ export default function Hoje() {
   const [importando, setImportando] = useState(false);
   const hoje = inicioDoDia(new Date());
   const hojeIso = isoDia(hoje);
+  // data marcada como fechada em Meu pet shop (feriado, folga): a tela diz o motivo, hoje e no aviso dos lembretes de amanhã
+  useCalendario();
+  const fechadoHoje = fraseDoDiaFechado(hojeIso), fechadoAmanha = fraseDoDiaFechado(isoDia(somaDias(hoje, 1)));
   // o que o negócio faz decide o que a tela mostra: quem não tem creche, loja ou pacotes não vê cartão nem aviso disso
   const banho = usaModulo(petshop, "banho_tosa"), casa = usaCasa(petshop) && posso("creche_hotel");
   const loja = usaModulo(petshop, "loja"), comPacotes = usaModulo(petshop, "pacotes");
@@ -211,7 +216,7 @@ export default function Hoje() {
     cr && cr.faltaram.length > 0 && { icone: UserX, tom: "rosa" as Tom, texto: `${cr.faltaram.length <= 2 ? cr.faltaram.join(" e ") : `${cr.faltaram.slice(0, 2).join(", ")} e mais ${cr.faltaram.length - 2}`} ${cr.faltaram.length === 1 ? "não veio" : "não vieram"} à creche hoje. Toque para ver a chamada e mandar uma mensagem ao tutor.`, href: "/gestao/app/creche-hotel?ver=chamada" },
     cr && cr.vencemHoje > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `Hoje ${cr.vencemHoje === 1 ? "vence 1 mensalidade" : `vencem ${cr.vencemHoje} mensalidades`} da creche. Toque para cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
     cr && cr.atrasadas > 0 && { icone: HandCoins, tom: "rosa" as Tom, texto: `${cr.atrasadas === 1 ? "1 mensalidade atrasada" : `${cr.atrasadas} mensalidades atrasadas`} na creche. Toque para ver e cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
-    posso("agenda") && dados.amanhaSemLembrete > 0 && { icone: MessageCircle, tom: "pessego" as Tom, texto: `Amanhã ${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}: toque para mandar pelo WhatsApp.${dados.amanhaSemTelefone > 0 ? ` ${dados.amanhaSemTelefone} sem telefone (não ${dados.amanhaSemTelefone === 1 ? "entra" : "entram"} na conta).` : ""}`, aoTocar: () => setLembretes(true) },
+    posso("agenda") && dados.amanhaSemLembrete > 0 && { icone: MessageCircle, tom: "pessego" as Tom, texto: `Amanhã ${fechadoAmanha ? `é ${fechadoAmanha.replace(/^Dia /, "dia ")}, mas ` : ""}${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}: toque para mandar pelo WhatsApp.${dados.amanhaSemTelefone > 0 ? ` ${dados.amanhaSemTelefone} sem telefone (não ${dados.amanhaSemTelefone === 1 ? "entra" : "entram"} na conta).` : ""}`, aoTocar: () => setLembretes(true) },
     sumidosAChamar.length > 0 && { icone: UserSearch, tom: "menta" as Tom, texto: `${petsSumidos.texto} ${petsSumidos.q === 1 ? "não vem" : "não vêm"} há mais de 30 dias e não ${petsSumidos.q === 1 ? "tem" : "têm"} horário marcado. Toque para chamar de volta pelo WhatsApp.`, aoTocar: () => setChamando("volta") },
     niverAChamar.length > 0 && { icone: Cake, tom: "manteiga" as Tom, texto: `${petsNiver.texto} ${petsNiver.q === 1 ? "faz" : "fazem"} aniversário ${niverHoje ? "hoje" : "nos próximos dias"}. Toque para mandar os parabéns pelo WhatsApp.`, aoTocar: () => setChamando("niver") },
     loja && dados.acabando.length > 0 && { icone: Package, tom: "rosa" as Tom, texto: `${dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}: ${dados.acabando.slice(0, 3).map((p) => p.nome).join(", ")}.`, href: "/gestao/app/estoque" },
@@ -372,8 +377,9 @@ export default function Hoje() {
           {!semAgenda && <section>
             <div className="g-card-t">
               <h2>Agenda de hoje</h2>
-              {posso("agenda") && <Link className="g-btn fantasma p" href="/gestao/app/agenda">Ver a semana<ChevronRight /></Link>}
+              {posso("agenda") && <Link className="g-btn fantasma p" href="/gestao/app/agenda?visao=semana">Ver a semana<ChevronRight /></Link>}
             </div>
+            {fechadoHoje && <p className="g-aviso" role="status" style={{ marginBottom: 12 }}><span className="g-cresce"><b>{fechadoHoje}.</b> O pet shop não abre hoje.{ativos.some((a) => a.status !== "concluido") ? " Os horários abaixo continuam marcados: confira com o tutor ou remarque." : ""}</span></p>}
             {carregando && !dados ? <Esqueleto /> : !dados?.ags.length ? (
               <div className="g-card">
                 {!banho ? (

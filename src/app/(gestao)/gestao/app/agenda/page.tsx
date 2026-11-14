@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BellRing, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, Truck, Printer, Users, Utensils } from "lucide-react";
+import { BellRing, CalendarOff, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, Truck, Printer, Users, Utensils } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
@@ -20,6 +20,8 @@ import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
 import LembretesDoDia, { BotaoLembrete, lembretesQueFaltam } from "@/components/gestao/agenda/lembretes";
 import FormBloqueio from "@/components/gestao/agenda/form-bloqueio";
+import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { useCalendario } from "@/components/gestao/calendario";
 import "./agenda.css";
 
 type Novo = { dia: string; hora?: string; pet?: PetComTutor | null; profissional?: string | null };
@@ -33,7 +35,7 @@ function Agenda() {
   const params = useSearchParams();
   const somenteLeitura = useSomenteLeitura();
   const [dia, setDia] = useState(() => params.get("dia") ?? isoDia(new Date()));
-  const [visao, setVisao] = useState<"dia" | "semana">("dia");
+  const [visao, setVisao] = useState<"dia" | "semana">(() => (params.get("visao") === "semana" ? "semana" : "dia"));
   const [prof, setProf] = useState<string | null>(null);
   const [novo, setNovo] = useState<Novo | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
@@ -43,6 +45,10 @@ function Agenda() {
   const [bloqueioAberto, setBloqueioAberto] = useState<Bloqueio | null>(null);
 
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
+  // dia marcado como fechado em Meu pet shop (feriado, folga, médico): vale como o dia em que o pet shop não abre na semana
+  useCalendario();
+  const fechadoEm = (d: Date) => fraseDoDiaFechado(isoDia(d));
+  const abreEm = (d: Date) => (fechadoEm(d) ? null : horarioDoDia(petshop.horario, d));
   const data = deIsoDia(dia);
   const segunda = inicioDaSemana(data);
   const semana = useMemo(() => Array.from({ length: 7 }, (_, i) => somaDias(segunda, i)), [segunda.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -91,9 +97,10 @@ function Agenda() {
   const abrirBloqueio = (b: Bloqueio) => { if (!somenteLeitura()) setBloqueioAberto(b); };
 
   // janelas livres do dia (entre um atendimento e outro, dentro do funcionamento)
-  const funcionamento = horarioDoDia(petshop.horario, data);
+  const diaFechadoHoje = fechadoEm(data);
+  const funcionamento = abreEm(data);
   // almoço do pet shop (Meu pet shop > Horário): intervalo fechado todo dia, sem bloqueio manual
-  const almoco = almocoDoDia(petshop.horario, data);
+  const almoco = diaFechadoHoje ? null : almocoDoDia(petshop.horario, data);
   const linhas = useMemo(() => {
     type Linha = { tipo: "ag"; a: AgendamentoCompleto } | { tipo: "livre"; de: number; ate: number } | { tipo: "bloq"; t: Trecho } | { tipo: "almoco"; de: number; ate: number };
     const out: { de: number; linha: Linha }[] = [];
@@ -166,7 +173,7 @@ function Agenda() {
           <p className="g-muted">{mesmoDia(data, new Date()) ? "Hoje, " : ""}{dataLonga(data)}</p>
         </div>
         <div className="g-acoes g-agd-acoes">
-          <div className="g-seg g-so-pc" role="group" aria-label="Visão">
+          <div className="g-seg" role="group" aria-label="Visão">
             <button aria-pressed={visao === "dia"} onClick={() => setVisao("dia")}>Dia</button>
             <button aria-pressed={visao === "semana"} onClick={() => setVisao("semana")}>Semana</button>
           </div>
@@ -184,7 +191,7 @@ function Agenda() {
           <button className="g-ico" aria-label="Semana anterior" onClick={() => setDia(isoDia(somaDias(data, -7)))}><ChevronLeft /></button>
           <div className="g-dias g-cresce">
             {semana.map((d) => (
-              <button key={d.getTime()} className={`g-dia${mesmoDia(d, new Date()) ? " hoje" : ""}${temNoDia(d) ? " tem" : ""}`} aria-pressed={mesmoDia(d, data)} onClick={() => setDia(isoDia(d))}>
+              <button key={d.getTime()} className={`g-dia${mesmoDia(d, new Date()) ? " hoje" : ""}${temNoDia(d) ? " tem" : ""}${abreEm(d) ? "" : " fech"}`} aria-pressed={mesmoDia(d, data)} title={abreEm(d) ? undefined : fechadoEm(d) ?? "O pet shop não abre neste dia"} onClick={() => setDia(isoDia(d))}>
                 {nomeDiaCurto(d)}<b>{d.getDate()}</b><i />
               </button>
             ))}
@@ -198,7 +205,7 @@ function Agenda() {
         {faltamLembretes > 0 && (
           <button className="g-lb-chamada" onClick={() => setLembretes(true)}>
             <MessageCircle aria-hidden />
-            <span><b>Mandar os lembretes {quandoDia === "hoje" || quandoDia === "amanhã" ? `de ${quandoDia}` : "deste dia"}</b> {faltamLembretes === 1 ? "Falta 1 tutor" : `Faltam ${faltamLembretes} tutores`}, um toque para cada.</span>
+            <span><b>Mandar os lembretes {quandoDia === "hoje" || quandoDia === "amanhã" ? `de ${quandoDia}` : "deste dia"}</b> {faltamLembretes === 1 ? "Falta 1 tutor" : `Faltam ${faltamLembretes} tutores`}, um toque para cada.{!funcionamento ? ` Atenção: ${(diaFechadoHoje ?? "o pet shop não abre neste dia").replace(/^Dia /, "dia ")}.` : ""}</span>
             <ChevronRight aria-hidden />
           </button>
         )}
@@ -212,10 +219,34 @@ function Agenda() {
 
         {erro && <p className="g-erro">{erro}</p>}
         {carregando && !dados ? <Esqueleto linhas={4} /> : visao === "semana" ? (
+          <>
+          <div className="g-agd-sem g-so-cel" role="list" aria-label="Dias da semana">
+            {semana.map((d) => {
+              const lista = todos.filter((a) => mesmoDia(new Date(a.inicio), d) && !["cancelado", "faltou"].includes(a.status));
+              const fechado = fechadoEm(d), abre = abreEm(d);
+              const quantos = lista.length === 0 ? null : lista.length === 1 ? "1 horário" : `${lista.length} horários`;
+              const horas = lista.length === 0 ? null : lista.length === 1 ? `às ${hora(lista[0].inicio)}` : `primeiro às ${hora(lista[0].inicio)}, último às ${hora(lista[lista.length - 1].inicio)}`;
+              const situacao = fechado ?? (abre ? null : "Fechado");
+              return (
+                <div role="listitem" key={d.getTime()}>
+                <button className={`g-agd-sem-dia${mesmoDia(d, new Date()) ? " hoje" : ""}${situacao ? " fech" : ""}`}
+                  onClick={() => { setDia(isoDia(d)); setVisao("dia"); }}>
+                  <span className="d">{nomeDiaCurto(d)}<b>{d.getDate()}</b></span>
+                  <span className="t">
+                    <b>{quantos ?? situacao ?? "Nenhum horário"}</b>
+                    <span>{[horas, quantos && situacao ? situacao.replace(/^Dia /, "dia ") : null, !quantos && abre ? `aberto das ${abre.abre} às ${abre.fecha}` : null, mesmoDia(d, new Date()) ? "hoje" : null].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  {quantos && <span className="n" aria-hidden>{lista.length}</span>}
+                  <ChevronRight aria-hidden />
+                </button>
+                </div>
+              );
+            })}
+          </div>
           <div className="g-semana g-so-pc" style={{ "--dias": diasDaSemana.length, "--h-hora": `${H_HORA}px` } as React.CSSProperties}>
             <div className="g-semana-cab">
               <div />
-              {diasDaSemana.map((d) => <div key={d.getTime()} className={mesmoDia(d, new Date()) ? "hoje" : ""}>{nomeDiaCurto(d)}<b>{d.getDate()}</b></div>)}
+              {diasDaSemana.map((d) => <div key={d.getTime()} className={mesmoDia(d, new Date()) ? "hoje" : ""}>{nomeDiaCurto(d)}<b>{d.getDate()}</b>{!abreEm(d) && <small className="g-agd-fech" title={fechadoEm(d) ?? "O pet shop não abre neste dia"}>{fechadoEm(d)?.replace(/^Dia fechado: /, "Fechado: ").replace(/^Dia marcado como fechado$/, "Fechado") ?? "Fechado"}</small>}</div>)}
             </div>
             <div className="g-semana-horas" style={{ height: ((faixa.fim - faixa.ini) / 60) * H_HORA }}>
               {Array.from({ length: (faixa.fim - faixa.ini) / 60 }, (_, i) => i).slice(1).map((i) => <span key={i} style={{ top: i * H_HORA }}>{deMin(faixa.ini + i * 60)}</span>)}
@@ -239,7 +270,7 @@ function Agenda() {
               const topoDe = (ms: number) => { const x = new Date(ms); return ((x.getHours() * 60 + x.getMinutes() - faixa.ini) / 60) * H_HORA; };
               const agora = new Date();
               return (
-                <div key={d.getTime()} className={`g-semana-col${horarioDoDia(petshop.horario, d) ? "" : " fechado"}${mesmoDia(d, new Date()) ? " hoje" : ""}`}
+                <div key={d.getTime()} className={`g-semana-col${abreEm(d) ? "" : " fechado"}${mesmoDia(d, new Date()) ? " hoje" : ""}`}
                   style={{ height: ((faixa.fim - faixa.ini) / 60) * H_HORA }}
                   onClick={(e) => {
                     if (e.target !== e.currentTarget) return;
@@ -250,7 +281,7 @@ function Agenda() {
                     <div className="g-agora" style={{ top: ((agora.getHours() * 60 + agora.getMinutes() - faixa.ini) / 60) * H_HORA }} />
                   )}
                   {(() => {
-                    const al = almocoDoDia(petshop.horario, d);
+                    const al = fechadoEm(d) ? null : almocoDoDia(petshop.horario, d);
                     return al && <div className="g-agd-faixa almoco" title={`Almoço, das ${al.de} às ${al.ate}. Muda em Meu pet shop, no horário de funcionamento.`}
                       style={{ top: ((al.inicio - faixa.ini) / 60) * H_HORA, height: ((al.fim - al.inicio) / 60) * H_HORA }}><Utensils aria-hidden /><span>Almoço</span></div>;
                   })()}
@@ -300,10 +331,11 @@ function Agenda() {
               );
             })}
           </div>
+          </>
         ) : !doDia.length && !bloqueiosDoDia.length && !almoco ? (
           <div className="g-card">
-            <Vazio titulo={funcionamento ? "Dia livre por enquanto" : "O pet shop não abre neste dia"}
-              texto={funcionamento ? `Nenhum horário marcado. Aberto das ${funcionamento.abre} às ${funcionamento.fecha}.` : "Se for atender mesmo assim, é só marcar."}>
+            <Vazio titulo={funcionamento ? "Dia livre por enquanto" : diaFechadoHoje ?? "O pet shop não abre neste dia"}
+              texto={funcionamento ? `Nenhum horário marcado. Aberto das ${funcionamento.abre} às ${funcionamento.fecha}.` : diaFechadoHoje ? "O pet shop não abre neste dia (a lista fica em Meu pet shop, em Feriados e dias fechados). Se for atender mesmo assim, é só marcar." : "Se for atender mesmo assim, é só marcar."}>
               <div className="g-fila" style={{ justifyContent: "center" }}>
                 <button className="g-btn pri" onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>
                 <button className="g-btn sec" onClick={() => abrirAssistente()}>Pedir ao Mozart</button>
@@ -313,6 +345,9 @@ function Agenda() {
         ) : (
           <div className="g-duas">
             <div className="g-tempo">
+              {!funcionamento && (
+                <div className="g-aviso g-agd-diafech" role="status"><CalendarOff aria-hidden /><span className="g-cresce"><b>{diaFechadoHoje ?? "O pet shop não abre neste dia"}.</b> {diaFechadoHoje ? "O pet shop não abre neste dia. " : ""}{doDia.some((a) => !["cancelado", "faltou"].includes(a.status)) ? "Os horários abaixo continuam marcados: confira com o tutor ou remarque." : "Se for atender mesmo assim, é só marcar."}</span></div>
+              )}
               {linhas.map((l, i) => l.tipo === "livre" ? (
                 <div className="g-hora-grupo livre" key={`l${i}`}>
                   <time>{deMin(l.de)}</time>

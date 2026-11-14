@@ -8,6 +8,9 @@ import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { servicosPorExtenso } from "@/lib/gestao/servicos-do-horario";
 import { saudacaoZap, textoLembrete } from "@/lib/gestao/agenda";
 import { dataAmigavel, dataLonga, deIsoDia, fmtTelefone, hora, linkWhatsApp, soDigitos, somaDias, chamar } from "@/lib/gestao/util";
+import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { horarioDoDia } from "@/lib/gestao/util";
+import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { AvatarPessoa, Esqueleto, Folha, Vazio, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 
@@ -97,6 +100,9 @@ export default function LembretesDoDia({ dia, aoFechar, aoMudar }: { dia: string
   const registrar = useRegistrarLembrete();
   const data = deIsoDia(dia);
   const [enviados, setEnviados] = useState<Record<string, string>>({});
+  // dia fechado (data marcada em Meu pet shop ou dia em que não abre): avisa antes de lembrar o tutor de um horário que talvez não vá acontecer
+  useCalendario();
+  const fechado = fraseDoDiaFechado(dia) ?? (horarioDoDia(petshop.horario, data) ? null : "O pet shop não abre neste dia");
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const ags = ok(await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id)
@@ -140,6 +146,7 @@ export default function LembretesDoDia({ dia, aoFechar, aoMudar }: { dia: string
         <Vazio titulo={`Nenhum horário ${doDia} esperando lembrete`} texto="Só entram os horários marcados ou confirmados." />
       ) : (
         <div className="g-pilha">
+          {fechado && <p className="g-aviso" role="alert" style={{ marginBottom: 0 }}><span className="g-cresce"><b>{fechado}.</b> Antes de mandar o lembrete, confira se estes horários continuam valendo. Se não, remarque pela agenda.</span></p>}
           <p className="g-lb-topo" role="status">
             {!comTelefone.length ? "Nenhum tutor deste dia tem telefone na ficha."
               : faltam.length ? <><b>{faltam.length === 1 ? "Falta 1 lembrete" : `Faltam ${faltam.length} lembretes`}</b> de {comTelefone.length}. Toque em Mandar: o WhatsApp abre com a mensagem pronta e você só aperta enviar. Depois volte aqui para o próximo.</>

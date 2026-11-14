@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarOff, Check, Clock, Lock, Plus, Repeat, TriangleAlert, Truck, Users, Utensils, X } from "lucide-react";
 import type { AgendamentoCompleto, PetComTutor, StatusAgendamento } from "@/lib/gestao/tipos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { PORTES } from "@/lib/gestao/tipos";
 import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, paraMin, vagasDe } from "@/lib/gestao/agenda";
 import { definirServicosAMais, juntarServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-horario";
-import { almocoDoDia, brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, nomeDiaCurto, precoDoServico, somaDias } from "@/lib/gestao/util";
+import { almocoDoDia, brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, nomeDiaCurto, NOTA_PORTE, precoDoServico, precoMudaComPorte, somaDias } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
@@ -75,6 +75,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   // o que está escrito no campo Valor (para avisar quando não é número) e o porte escolhido aqui mesmo
   const [textoValor, setTextoValor] = useState("");
   const [salvandoPorte, setSalvandoPorte] = useState(false);
+  // "Não sei ainda": a pessoa marcou sem saber o porte, de propósito (o valor fica para conferir na hora)
+  const [porteDepois, setPorteDepois] = useState(false);
+  const perguntaPorte = useRef<HTMLDivElement>(null);
   // repetição (só ao criar)
   const [repetir, setRepetir] = useState<number>(0);
   const [vezes, setVezes] = useState(4);
@@ -235,6 +238,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   // texto que não é número no campo Valor: mostra o erro em vez de salvar em branco
   const valorRuim = precoMexido && textoValor.trim() !== "" && lerValor(textoValor) == null;
   const semPorte = Boolean(pet && !pet.porte);
+  // o valor sugerido depende do porte (o serviço, ou um dos outros, tem preço diferente por porte) e a pessoa não escreveu outro
+  const valorPedePorte = semPorte && ((!precoMexido && precoMudaComPorte(servico)) || outros.some((o) => !o.mexido && precoMudaComPorte(servicos.find((x) => x.id === o.servicoId))));
+  const faltaPorte = valorPedePorte && !porteDepois && !agendamento;
   const ultimaData = datas[datas.length - 1];
 
   /** Escolhe o porte do pet aqui mesmo, na hora de marcar: grava na ficha e o valor sugerido se ajusta. */
@@ -255,6 +261,11 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     if (!hhmm) { avisar("Escolha o horário."); return; }
     if (!anoOk) { avisarErro("Confira o ano da data: ele parece errado."); return; }
     if (valorRuim) { avisarErro("Confira o valor: escreva só números, como 45,00."); return; }
+    if (faltaPorte) {
+      avisarErro(`Antes de marcar, diga o porte de ${pet.nome}: o valor muda com ele. Se não souber, toque em "Não sei ainda".`);
+      perguntaPorte.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
     const erroPreco = erroDeValor(preco);
     if (erroPreco) { avisarErro(erroPreco); return; }
     for (const o of outros) {
@@ -268,7 +279,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     try {
       const campos = {
         pet_id: pet.id, servico_id: servicoId, profissional_id: profId, preco,
-        leva_traz: levaTraz, endereco_leva_traz: levaTraz ? endereco.trim() || null : null, obs: obs.trim() || null,
+        leva_traz: levaTraz, endereco_leva_traz: levaTraz ? endereco.trim() || null : null,
+        // marcou sem saber o porte: o horário leva o lembrete para quem atender conferir
+        obs: (valorPedePorte && porteDepois && !obs.includes(NOTA_PORTE) ? [obs.trim(), NOTA_PORTE].filter(Boolean).join(" ").slice(0, 400) : obs.trim()) || null,
       };
       if (repetindo) {
         const problemas = await conferir(datas);
@@ -367,6 +380,21 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
             {!agendamento && <button type="button" className="g-btn fantasma p" onClick={() => setPet(null)}>Trocar</button>}
           </div>
           {pet.alertas && <p className="g-aviso" style={{ margin: 0 }}>{pet.alertas}</p>}
+          {semPorte && servico && (
+            <div className={`g-agd-alerta g-agd-porte${faltaPorte ? " falta" : ""}`} role="status" ref={perguntaPorte}><TriangleAlert />
+              <div>
+                {porteDepois ? (
+                  <span><b>Porte de {pet.nome}: a conferir na hora.</b> O valor abaixo é o primeiro preço do serviço e o horário vai com a anotação "{NOTA_PORTE}" Se já souber, escolha:</span>
+                ) : (
+                  <span><b>Qual é o porte de {pet.nome}?</b> {valorPedePorte ? "A ficha está sem porte e o valor deste serviço muda com ele." : precoMexido ? "A ficha está sem porte. O valor é o que você escreveu." : "A ficha está sem porte."}</span>
+                )}
+                <div className="g-chips" role="group" aria-label={`Porte de ${pet.nome}`}>
+                  {PORTES.map((x) => <button key={x.id} type="button" className="g-chip" disabled={salvandoPorte} onClick={() => void definirPorte(x.id)}>{x.rotulo}</button>)}
+                </div>
+                {valorPedePorte && !porteDepois && <div><button type="button" className="g-chip" aria-pressed={false} onClick={() => setPorteDepois(true)}>Não sei ainda — conferir o valor na hora</button></div>}
+              </div>
+            </div>
+          )}
 
           <div className="g-campo"><span>Serviço</span>
             <div className="g-chips">
@@ -538,16 +566,6 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
               <span>Total do horário, com {outros.length === 1 ? "o outro serviço" : `os outros ${outros.length} serviços`}</span>
               <b className="g-tab">{brl(totalDoHorario)}</b>
             </p>
-          )}
-          {semPorte && servico && (
-            <div className="g-agd-alerta g-agd-porte" role="status"><TriangleAlert />
-              <div>
-                <span><b>{pet.nome} está sem porte na ficha.</b> {precoMexido ? "O valor é o que você escreveu." : preco != null ? "O valor acima é o primeiro preço do serviço." : "O valor ficou em branco."} Qual é o porte?</span>
-                <div className="g-chips" role="group" aria-label={`Porte de ${pet.nome}`}>
-                  {PORTES.map((x) => <button key={x.id} type="button" className="g-chip" disabled={salvandoPorte} onClick={() => void definirPorte(x.id)}>{x.rotulo}</button>)}
-                </div>
-              </div>
-            </div>
           )}
 
           <label className="g-check"><input type="checkbox" checked={levaTraz} onChange={(e) => setLevaTraz(e.target.checked)} /><Truck size={18} /> Leva e traz</label>

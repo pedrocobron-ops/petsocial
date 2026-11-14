@@ -12,6 +12,8 @@ import { dataCurta, dataLonga, deIsoDia, fmtTelefone, hora, horarioDoDia, inicio
 import { useGestao } from "@/components/gestao/contexto";
 import { Esqueleto, ok, useDados } from "@/components/gestao/ui";
 import LogoLoja from "@/components/gestao/logo-loja";
+import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { useCalendario } from "@/components/gestao/calendario";
 import "./imprimir.css";
 
 /**
@@ -34,6 +36,9 @@ function Folha() {
   const dias = useMemo(() => (visao === "dia" ? [data] : Array.from({ length: 7 }, (_, i) => somaDias(inicioDaSemana(data), i))), [visao, dia]); // eslint-disable-line react-hooks/exhaustive-deps
   const de = dias[0], ate = somaDias(dias[dias.length - 1], 1);
   const atendem = equipe.filter((p) => p.ativo && p.atende);
+  // dia fechado: a data marcada em Meu pet shop (com o motivo) ou o dia em que o pet shop não abre na semana
+  useCalendario();
+  const fechadoEm = (d: Date) => fraseDoDiaFechado(isoDia(d)) ?? (horarioDoDia(petshop.horario, d) ? null : "O pet shop não abre neste dia");
 
   const { dados, carregando } = useDados(async () => {
     const [ags, bloqs] = await Promise.all([
@@ -54,8 +59,9 @@ function Folha() {
     ...mostrados.flatMap((d) => {
       const lista = doDia(d);
       const cab = visao === "semana" ? [``, `*${dataLonga(d)}*`] : [``];
-      if (!lista.length) return [...cab, "Sem horários marcados."];
-      return [...cab, ...lista.map((a) => `${hora(a.inicio)} ${a.pets?.nome ?? ""} · ${nomeDosServicos(a) ?? "atendimento"}${a.pets?.porte ? ` · porte ${a.pets.porte}` : ""}${!prof && a.profissionais ? ` · com ${a.profissionais.nome.split(" ")[0]}` : ""}${a.leva_traz ? " · leva e traz" : ""}${a.pets?.alertas ? ` · atenção: ${a.pets.alertas}` : ""}`)];
+      const fechado = fechadoEm(d);
+      if (!lista.length) return [...cab, fechado ? `${fechado}.` : "Sem horários marcados."];
+      return [...cab, ...(fechado ? [`(${fechado})`] : []), ...lista.map((a) => `${hora(a.inicio)} ${a.pets?.nome ?? ""} · ${nomeDosServicos(a) ?? "atendimento"}${a.pets?.porte ? ` · porte ${a.pets.porte}` : ""}${!prof && a.profissionais ? ` · com ${a.profissionais.nome.split(" ")[0]}` : ""}${a.leva_traz ? " · leva e traz" : ""}${a.pets?.alertas ? ` · atenção: ${a.pets.alertas}` : ""}`)];
     })].join("\n");
 
   return (
@@ -91,9 +97,10 @@ function Folha() {
           const lista = doDia(d), bloqs = bloqueiosDoDia(d);
           return (
             <section key={d.getTime()} className={`g-imp-dia${lista.length ? "" : " vazio"}`}>
-              {visao === "semana" && <h2>{dataLonga(d).replace(/^./, (c) => c.toUpperCase())}<small>{!lista.length ? "sem horários" : lista.length === 1 ? "1 horário" : `${lista.length} horários`}</small></h2>}
+              {visao === "semana" && <h2>{dataLonga(d).replace(/^./, (c) => c.toUpperCase())}<small>{[fechadoEm(d)?.replace(/^O pet shop não abre neste dia$/, "fechado").replace(/^Dia /, "dia "), !lista.length ? (fechadoEm(d) ? null : "sem horários") : lista.length === 1 ? "1 horário" : `${lista.length} horários`].filter(Boolean).join(" · ")}</small></h2>}
+              {visao === "dia" && fechadoEm(d) && <p className="g-imp-bloq"><Lock />{fechadoEm(d)}.</p>}
               {bloqs.map((b) => <p key={b.id} className="g-imp-bloq"><Lock />{hora(b.inicio)} às {hora(b.fim)} · {b.motivo || "Bloqueado"}{b.profissional_id ? ` · ${equipe.find((p) => p.id === b.profissional_id)?.nome.split(" ")[0] ?? ""}` : ""}</p>)}
-              {!lista.length ? (visao === "semana" ? null : <p className="g-imp-vazio">Sem horários marcados.</p>) : (
+              {!lista.length ? (visao === "semana" ? null : <p className="g-imp-vazio">{fechadoEm(d) ? "Nenhum horário marcado neste dia." : "Sem horários marcados."}</p>) : (
                 <table>
                   <thead><tr><th>Hora</th><th>Pet</th><th>Serviço</th>{!prof && atendem.length > 1 && <th>Com</th>}<th>Tutor</th><th>Atenção</th><th className="feito">Feito</th></tr></thead>
                   <tbody>

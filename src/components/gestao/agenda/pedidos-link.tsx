@@ -10,7 +10,8 @@ import { abreNoDia } from "@/lib/gestao/creche";
 import { diariaFixa, diariaSugerida } from "@/lib/gestao/hotel";
 import { porteDe, sinalDe } from "@/lib/gestao/hotel-opcoes";
 import { opcoesDoLink, prazoPorExtenso, usouOpcoesDoLink } from "@/lib/gestao/link-opcoes";
-import { brl } from "@/lib/gestao/util";
+import { brl, NOTA_PORTE, precoMudaComPorte } from "@/lib/gestao/util";
+import { PORTES } from "@/lib/gestao/tipos";
 import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar, semAcento } from "@/lib/gestao/util";
 import "./pedidos-link.css";
 
@@ -22,6 +23,11 @@ const diaHora = (iso: string) => `${dataCurta(new Date(iso))} às ${hora(iso)}`;
 type TutorDoTelefone = { id: string; nome: string; telefone: string | null };
 /** O telefone do pedido já é de outro nome: espera a pessoa dizer se é a mesma. */
 type Duvida = { lista: Pedido[]; grupo: string; existente: TutorDoTelefone };
+type Decisao = { como: "existente" | "novo"; tutor?: string };
+/** Porte respondido na hora de aceitar: P, M, G, GG ou "depois" (não sabe ainda: o valor fica para conferir na hora). */
+type Portes = Record<string, string>;
+/** Pedido de serviço sem porte e com preço que muda com o porte: espera a pessoa dizer o porte (ou que não sabe). */
+type PerguntaPorte = { lista: Pedido[]; grupo: string; decisao: Decisao; faltam: Pedido[]; respostas: Portes };
 
 const ESPECIE: Record<string, string> = { cao: "cão", gato: "gato", outro: "outro" };
 
@@ -73,7 +79,7 @@ const porHora = (a: Pedido, b: Pedido) => a.inicio.localeCompare(b.inicio) || ne
  * o pedido respondido continua na lista até alguém avisar o tutor (ou marcar "Já avisei"), e isso fica gravado no pedido.
  */
 export default function PedidosLink() {
-  const { sb, petshop, equipe, servicos } = useGestao();
+  const { sb, petshop, equipe, servicos, vejoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [quem, setQuem] = useState<Record<string, string>>({});
@@ -81,6 +87,7 @@ export default function PedidosLink() {
   // nome de quem ficou com o pedido, quando a pessoa escolheu usar a ficha de um tutor que já existia (vale até recarregar)
   const [tutores, setTutores] = useState<Record<string, string>>({});
   const [duvida, setDuvida] = useState<Duvida | null>(null);
+  const [perguntaPorte, setPerguntaPorte] = useState<PerguntaPorte | null>(null);
   const comOpcoes = usouOpcoesDoLink(petshop);
   const doLink = opcoesDoLink(petshop);
 
@@ -174,7 +181,7 @@ export default function PedidosLink() {
    * Antes, confere se o telefone do pedido já é de um tutor com outro nome: aí pergunta se é a mesma pessoa
    * (`decisao`: "existente" usa a ficha que já existe; "novo" cria ou usa um tutor com o nome do pedido).
    */
-  async function aceitar(lista: Pedido[], grupo: string, decisao?: { como: "existente" | "novo"; tutor?: string }) {
+  async function aceitar(lista: Pedido[], grupo: string, decisao?: Decisao, portes?: Portes) {
     if (somenteLeitura() || ocupado) return;
     const profissional = atendem.length > 1 ? quem[grupo] || undefined : atendem[0]?.id;
     setOcupado(lista.length > 1 ? grupo : lista[0].id);
@@ -192,12 +199,22 @@ export default function PedidosLink() {
       // já existe um tutor com esse telefone e esse nome: é ele (mesmo que não seja o mais antigo com o número)
       decisao ??= { como: igual > 0 ? "novo" : "existente" };
     }
+    // o valor depende do porte e ninguém disse o porte (nem o pedido, nem a ficha do pet): pergunta agora, antes de marcar
+    if (!portes) {
+      const faltam = await semPorteParaPerguntar(lista);
+      if (faltam.length) { setPerguntaPorte({ lista, grupo, decisao, faltam, respostas: {} }); setOcupado(null); return; }
+    } else {
+      const escolhidos = Object.entries(portes).filter(([, v]) => v !== "depois");
+      for (const [id, porte] of escolhidos) await sb.from("pedidos_agendamento").update({ porte }).eq("id", id).eq("petshop_id", petshop.id).eq("status", "pendente").select("id");
+    }
     const feitos: Pedido[] = [];
     let falha: unknown = null;
     for (const p of lista) {
       const args = { p_id: p.id, p_profissional: ehEstadia(p) ? undefined : profissional, p_tutor_novo: decisao.como === "novo" };
       try {
-        acertarDiaria(p, ok(await sb.rpc("pedido_aceitar_como", args)));
+        const criado = ok(await sb.rpc("pedido_aceitar_como", args));
+        acertarDiaria(p, criado);
+        if (portes?.[p.id]) await depoisDoPorte(criado, portes[p.id]);
         feitos.push(p);
       } catch (e) {
         // creche ou hotel sem vaga em algum dia: o banco recusa e explica; a pessoa decide se aceita assim mesmo
@@ -225,6 +242,30 @@ export default function PedidosLink() {
     }
     if (falha) { avisarErro(falha); void recarregar(); }
     setOcupado(null);
+  }
+
+  /** Dos pedidos da lista, os de serviço em que o valor muda com o porte e nem o pedido nem a ficha do pet dizem o porte. */
+  async function semPorteParaPerguntar(lista: Pedido[]): Promise<Pedido[]> {
+    const candidatos = lista.filter((p) => !ehEstadia(p) && !p.porte && precoMudaComPorte(servicos.find((s) => s.id === p.servico_id)));
+    if (!candidatos.length) return [];
+    // pet que já é da casa e tem porte na ficha: o banco usa o da ficha, não precisa perguntar
+    const r = await sb.rpc("pedido_tutores_do_telefone", { p_id: lista[0].id });
+    const donos = (r.error ? [] : r.data ?? []) as TutorDoTelefone[];
+    if (!donos.length) return candidatos;
+    const pets = (await sb.from("pets").select("nome, porte").eq("petshop_id", petshop.id).in("cliente_id", donos.map((d) => d.id)).not("porte", "is", null).limit(200)).data ?? [];
+    const comPorte = new Set(pets.map((x) => semAcento(x.nome)));
+    return candidatos.filter((p) => !comPorte.has(semAcento(p.pet_nome)));
+  }
+  /** Depois de aceitar com o porte respondido na hora: guarda o porte na ficha do pet (se estava em branco) ou deixa o lembrete no horário. */
+  async function depoisDoPorte(agendamentoId: unknown, resposta: string) {
+    if (typeof agendamentoId !== "string") return;
+    try {
+      const ag = (await sb.from("agendamentos").select("pet_id, obs").eq("id", agendamentoId).eq("petshop_id", petshop.id).maybeSingle()).data;
+      if (!ag) return;
+      if (resposta === "depois") {
+        if (!(ag.obs ?? "").includes(NOTA_PORTE)) await sb.from("agendamentos").update({ obs: [ag.obs, NOTA_PORTE].filter(Boolean).join(" ").slice(0, 400) }).eq("id", agendamentoId).eq("petshop_id", petshop.id).select("id");
+      } else await sb.from("pets").update({ porte: resposta }).eq("id", ag.pet_id).eq("petshop_id", petshop.id).is("porte", null).select("id");
+    } catch { /* o horário já foi marcado: o porte fica para a ficha */ }
   }
 
   /** Reserva de hotel aceita pelo link com a opção de diária por porte ligada: a diária da reserva passa a ser a do porte do pedido. */
@@ -483,6 +524,37 @@ export default function PedidosLink() {
           );
         })}
       </div>
+
+      {perguntaPorte && (() => {
+        const q = perguntaPorte;
+        const tudoRespondido = q.faltam.every((p) => q.respostas[p.id]);
+        const responder = (id: string, v: string) => setPerguntaPorte({ ...q, respostas: { ...q.respostas, [id]: v } });
+        return (
+          <Folha titulo={q.faltam.length > 1 ? "Qual é o porte de cada um?" : `Qual é o porte de ${q.faltam[0].pet_nome}?`} aoFechar={() => setPerguntaPorte(null)}
+            rodape={<>
+              <button type="button" className="g-btn sec" onClick={() => setPerguntaPorte(null)}>Voltar</button>
+              <button type="button" className="g-btn pri" disabled={!tudoRespondido} onClick={() => { setPerguntaPorte(null); void aceitar(q.lista, q.grupo, q.decisao, q.respostas); }}>{q.lista.length > 1 ? "Aceitar todos" : "Aceitar"}</button>
+            </>}>
+            <div className="g-pilha">
+              <p className="g-muted g-p">O pedido veio sem o porte, e o valor do serviço muda com ele. Escolha o porte para o horário já entrar com o valor certo. Fechando esta janela, o pedido continua esperando.</p>
+              {q.faltam.map((p) => {
+                const s = servicos.find((x) => x.id === p.servico_id);
+                const precoDe = (porte: string) => (s ? { P: s.preco_p, M: s.preco_m, G: s.preco_g, GG: s.preco_gg }[porte] ?? null : null);
+                return (
+                  <div key={p.id} className="g-card areia g-pilha p" role="group" aria-label={`Porte de ${p.pet_nome}`}>
+                    <div className="g-fila"><AvatarPet pet={{ nome: p.pet_nome, especie: p.especie }} /><div className="g-cresce"><b>{p.pet_nome}</b><div className="g-pp g-muted">{s?.nome ?? "Serviço"} · {quandoNaTela(p.inicio)}, {hora(p.inicio)}</div></div></div>
+                    <div className="g-chips">
+                      {PORTES.map((x) => <button key={x.id} type="button" className="g-chip" aria-pressed={q.respostas[p.id] === x.id} onClick={() => responder(p.id, x.id)}>{x.rotulo}{vejoFinanceiro && precoDe(x.id) != null ? ` · ${brl(precoDe(x.id))}` : ""}</button>)}
+                    </div>
+                    <button type="button" className="g-chip" aria-pressed={q.respostas[p.id] === "depois"} onClick={() => responder(p.id, "depois")}>Não sei ainda — conferir o valor na hora</button>
+                    {q.respostas[p.id] === "depois" && <p className="g-muted g-pp" role="status">O horário entra sem valor, com a anotação "{NOTA_PORTE}"</p>}
+                  </div>
+                );
+              })}
+            </div>
+          </Folha>
+        );
+      })()}
 
       {duvida && (
         <Folha titulo={`Este telefone já é de ${duvida.existente.nome}`} aoFechar={() => setDuvida(null)}
