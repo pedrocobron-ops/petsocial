@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Search, UserPlus, X } from "lucide-react";
 import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -32,6 +33,7 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
   const [erroTutor, setErroTutor] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const caixa = useCaixaAberto();
+  const op = useOperacao();
 
   const contas = fecharContas(itens, vejoFinanceiro ? desconto : null);
   const vendidos = produtosDaConta(itens);
@@ -45,39 +47,40 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
   }, [temItens]);
   const mudar = (chave: string, m: Partial<ItemConta>) => setItens((l) => l.map((i) => (i.chave === chave ? { ...i, ...m } : i)));
 
-  async function confirmar() {
-    if (salvando || somenteLeitura()) return;
-    if (!vendidos.length) { avisarErro("Escolha pelo menos um produto."); return; }
+  const confirmar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean> {
+    if (somenteLeitura()) return false;
+    if (!vendidos.length) { avisarErro("Escolha pelo menos um produto."); return false; }
     const problema = erroDaConta(itens, vejoFinanceiro ? desconto : null, contas.total);
-    if (problema) { avisarErro(problema); return; }
-    if (vejoFinanceiro && contas.total <= 0) { avisarErro("A venda está sem valor. Confira os preços e o desconto."); return; }
+    if (problema) { avisarErro(problema); return false; }
+    if (vejoFinanceiro && contas.total <= 0) { avisarErro("A venda está sem valor. Confira os preços e o desconto."); return false; }
     const pg = vejoFinanceiro ? fecharRecebimento(pagamento, depois, contas.total) : null;
-    if (pg && "erro" in pg) { setErroForma(pg.noCampo); avisarErro(pg.erro); return; }
+    if (pg && "erro" in pg) { setErroForma(pg.noCampo); avisarErro(pg.erro); return false; }
     const fiado = pg && !("erro" in pg) && pg.fiado ? pg : null;
     // fiado precisa de nome: sem o tutor a conta ficaria solta, sem ninguém para cobrar
-    if (fiado && !tutor) { setErroTutor("Para o cliente pagar depois, diga quem comprou."); avisarErro("Diga quem comprou para anotar a conta no nome dele."); return; }
+    if (fiado && !tutor) { setErroTutor("Para o cliente pagar depois, diga quem comprou."); avisarErro("Diga quem comprou para anotar a conta no nome dele."); return false; }
     const falta = faltaNoEstoque(itens, produtos);
-    if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return;
-    if (vejoFinanceiro && !(await conferirValorAlto(contas.total, perguntar))) return;
+    if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" })))  return false;
+    if (vejoFinanceiro && !(await conferirValorAlto(contas.total, perguntar)))  return false;
     // o caixa fechou enquanto esta venda estava aberta: pergunta antes de receber fora dele
-    if (pg && !("erro" in pg) && !pg.fiado && !(await conferirCaixa(sb, petshop.id, perguntar))) return;
+    if (pg && !("erro" in pg) && !pg.fiado && !(await conferirCaixa(sb, petshop.id, perguntar)))  return false;
     setSalvando(true);
     try {
-      const gravar = itensParaGravar(vendidos);
+      const linhas = itensParaGravar(vendidos);
       let lancamentoId: string | null = null;
       if (fiado) {
         lancamentoId = (await lancarAReceber(sb, petshop.id, {
           valor: contas.total, vencimento: fiado.quando, categoria: "Venda de produtos", clienteId: tutor?.id ?? null,
-          descricao: encurtar(`Venda: ${resumoDosItens(gravar)}`), itens: gravar,
+          descricao: encurtar(`Venda: ${resumoDosItens(linhas)}`), itens: linhas, chave,
         }))?.id ?? null;
       } else if (pg && !("erro" in pg) && !pg.fiado) {
         lancamentoId = (await lancarPago(sb, petshop.id, {
           tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: pg.pagamentos, categoria: "Venda de produtos", clienteId: tutor?.id ?? null,
-          descricao: encurtar(`Venda: ${resumoDosItens(gravar)}`), itens: gravar,
+          descricao: encurtar(`Venda: ${resumoDosItens(linhas)}`), itens: linhas, chave,
         }))?.id ?? null;
       }
       try {
-        await baixarEstoque(sb, petshop.id, user.id, vendidos, lancamentoId);
+        await baixarEstoque(sb, petshop.id, user.id, vendidos, lancamentoId, chave);
         avisar(fiado ? `Anotado: ${brl(contas.total)} a receber de ${tutor?.nome ?? "cliente"} até ${dataCompleta(fiado.quando)}.` : vejoFinanceiro ? `Venda de ${brl(contas.total)} anotada.` : "Venda anotada no estoque.");
       } catch (e) {
         if (!vejoFinanceiro) throw e;
@@ -86,14 +89,15 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
       avisarMudanca();
       aoPronto?.();
       aoFechar();
-    } catch (e) { avisarErro(e); setSalvando(false); }
+      return true;
+    } catch (e) { avisarErro(e); setSalvando(false); return false; }
   }
 
   return (
     <Folha larga titulo="Venda no balcão" aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || !vendidos.length}>
+        <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || !vendidos.length}>
           {salvando ? "Anotando…" : vejoFinanceiro ? (depois.ativo && contas.total > 0 ? `Anotar ${brl(contas.total)} a receber` : `Receber ${contas.total > 0 ? brl(contas.total) : ""}`.trim()) : "Dar baixa no estoque"}
         </button>
       </>}>

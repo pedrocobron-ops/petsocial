@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { HandCoins } from "lucide-react";
-import { MARCAS_DO_MODELO, mensagemDeDivida, MODELO_COBRANCA, multaSugerida, OPCOES_DINHEIRO as K, opcoesDeCobranca, opcoesDeComissao } from "@/lib/gestao/dinheiro-opcoes";
+import { MARCAS_DO_MODELO, mensagemDeDivida, MODELO_COBRANCA, multaSugerida, OPCOES_DINHEIRO as K, opcoesDeCobranca, opcoesDeComissao, travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { brl, isoDia, somaDias } from "@/lib/gestao/util";
@@ -46,6 +46,8 @@ export default function OpcoesDeCobranca() {
   const [pix, setPix] = useState(o.pix);
   const [modelo, setModelo] = useState(o.modelo.trim() || MODELO_COBRANCA);
   const [prodPct, setProdPct] = useState(pctTexto(c.produtosPct));
+  const trava = travaDePreco(petshop);
+  const [descMax, setDescMax] = useState(pctTexto(trava.descontoMax));
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [porServico, setPorServico] = useState(false);
@@ -69,13 +71,15 @@ export default function OpcoesDeCobranca() {
     const p = lerPct(pct), j = lerPct(juros), pp = lerPct(prodPct);
     if (p === null || j === null) { setErro("A multa e os juros em % ficam entre 0 e 100."); return; }
     if (pp === null) { setErro("A comissão sobre produtos fica entre 0 e 100%."); return; }
+    const dm = lerPct(descMax);
+    if (dm === null) { setErro("O desconto máximo do caixa fica entre 0 e 100%."); return; }
     if (fixa != null && (fixa < 0 || fixa > 99999.99)) { setErro("Confira a multa em reais."); return; }
     const texto = modelo.trim();
     if (texto && !texto.includes("{contas}")) { setErro("A mensagem precisa ter {contas}: é onde entra a lista do que o cliente deve."); return; }
     setErro(null);
     await gravar({
       [K.multaFixa]: fixa ?? 0, [K.multaPct]: p, [K.jurosMesPct]: j, [K.pix]: pix.trim().slice(0, 120),
-      [K.modelo]: !texto || texto === MODELO_COBRANCA ? "" : texto.slice(0, 1200), [K.comissaoProdutosPct]: pp,
+      [K.modelo]: !texto || texto === MODELO_COBRANCA ? "" : texto.slice(0, 1200), [K.comissaoProdutosPct]: pp, [K.descontoMaxCaixa]: dm,
     }, "Opções salvas.");
   }
 
@@ -130,6 +134,18 @@ export default function OpcoesDeCobranca() {
             <summary className="g-muted g-pp" style={{ cursor: "pointer" }}>Ver como fica (exemplo)</summary>
             <p className="g-p" style={{ whiteSpace: "pre-wrap", marginTop: 6 }}>{previa}</p>
           </details>
+        </div>
+
+        <div className="gr-op-bloco">
+          <div><b>Preço e desconto na venda</b><p className="g-muted g-pp">Toda venda com preço diferente da lista ou com desconto fica anotada (quem vendeu, de quanto para quanto) e aparece para você na tela Hoje. Isso vale sempre, sem ligar nada.</p></div>
+          <Chave nome="Só o dono e quem vê o financeiro mudam preço ou dão desconto" titulo="Só o dono e quem vê o financeiro mudam preço ou dão desconto" ligado={trava.ligada} desligado={ocupado}
+            apoio="Quem só opera o caixa vende pelo preço da lista: produto, serviço do horário e pacote. Desligado, qualquer pessoa que recebe pode mudar o preço (e fica anotado)."
+            aoMudar={() => void gravar({ [K.precoTravado]: !trava.ligada }, trava.ligada ? "Preço liberado para quem recebe. As mudanças continuam anotadas." : "Preço travado para quem só opera o caixa.")} />
+          {trava.ligada && (
+            <Campo rotulo="Desconto máximo que o caixa pode dar (%)" dica="Em branco ou zero, o caixa não dá desconto nenhum. O dono e quem vê o financeiro não têm limite.">
+              <input className="g-input g-tab" style={{ maxWidth: 140 }} inputMode="decimal" placeholder="0" value={descMax} aria-label="Desconto máximo do caixa em por cento" onChange={(e) => setDescMax(soPct(e.target.value))} />
+            </Campo>
+          )}
         </div>
 
         <div className="gr-op-bloco">
@@ -213,13 +229,13 @@ function FolhaPorServico({ aoFechar }: { aoFechar: () => void }) {
         <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || !dados}>{salvando ? "Salvando…" : "Salvar"}</button>
       </>}>
       <div className="g-form">
-        <p className="g-muted g-p">Escreva o percentual só nos serviços que têm regra própria. Em branco, vale o percentual de quem atendeu.</p>
+        <p className="g-muted g-p">Escreva o percentual só nos serviços que têm regra própria. Em branco (padrão), vale o percentual de quem atendeu.</p>
         {!dados ? <p className="g-muted g-p">Carregando…</p> : !ativos.length ? <p className="g-muted g-p">Nenhum serviço cadastrado ainda.</p> : (
           <div className="gr-op-pct">
             {ativos.map((s) => (
               <label key={s.id} style={{ display: "contents" }}>
                 <span>{s.nome}</span>
-                <input className="g-input g-tab" inputMode="decimal" placeholder="da pessoa" value={valores[s.id] ?? ""} aria-label={`Comissão de ${s.nome} em por cento`}
+                <input className="g-input g-tab" inputMode="decimal" placeholder="padrão" value={valores[s.id] ?? ""} aria-label={`Comissão de ${s.nome} em por cento`}
                   onChange={(e) => { setValores((v) => ({ ...v, [s.id]: soPct(e.target.value) })); setErro(null); }} />
               </label>
             ))}

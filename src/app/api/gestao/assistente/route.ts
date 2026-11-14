@@ -73,11 +73,14 @@ export async function POST(req: Request) {
       if (!def?.grava || !decisao?.ok) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A pessoa descartou esta ação. Nada foi gravado." }); continue; }
       if (!liberado) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Nada foi gravado.", is_error: true }); continue; }
       try {
+        // a chave desta ação: se o mesmo pedido chegar duas vezes (toque duplo, internet que repetiu), o banco grava uma vez só
+        c.chave = `mozart:${uso.id}`;
         const r = await gravar(c, uso.name, uso.input as Record<string, unknown>);
         mudou = true;
         await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao: uso.name, detalhes: uso.input as never });
         resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JSON.stringify(r) });
       } catch (err) {
+        if (err instanceof Error && /_chave_uniq/.test(err.message)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "Esta ação já tinha sido gravada (o pedido chegou repetido). Nada foi gravado de novo." }); continue; }
         const semPermissao = err instanceof Error && /row-level security|permission denied/i.test(err.message);
         resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: ehErroDeUso(err) ? err.message : semPermissao ? "Sem permissão para gravar isso." : "Não consegui gravar agora." });
       }

@@ -5,6 +5,7 @@ import { Check, MessageCircle, Plus, Scissors, Ticket, Truck } from "lucide-reac
 import type { AgendamentoCompleto, PacoteCliente } from "@/lib/gestao/tipos";
 import { textoComprovante } from "@/lib/gestao/comprovante";
 import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import { definirServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-horario";
 import { brl, dataCompleta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -54,11 +55,13 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   // conta recebida: antes de fechar, oferece o comprovante no WhatsApp do tutor
   const [recebida, setRecebida] = useState<{ valor: number; zap: string } | null>(null);
   const caixa = useCaixaAberto();
+  const op = useOperacao();
 
   const contas = fecharContas(itens, desconto);
   const vendidos = produtosDaConta(itens);
   const temLevaTraz = itens.some((i) => i.tipo === "extra" && i.nome === LEVA_E_TRAZ);
-  const nadaAFazer = contas.total <= 0 && a.status === "concluido" && !vendidos.length && !pacote;
+  // atendimento já concluído e conta zerada: quem recebe ainda pode dizer "não vou cobrar" (uma vez)
+  const nadaAFazer = contas.total <= 0 && a.status === "concluido" && !vendidos.length && !pacote && (a.sem_cobranca || !vejoFinanceiro);
   // serviços da lista do pet shop que ainda não estão nesta conta (para juntar mais um na hora de fechar)
   const servicosNaConta = itens.filter((i) => i.tipo === "servico" && i.servicoId).map((i) => i.servicoId!);
   const servicosParaJuntar = servicos.filter((x) => x.ativo && x.id !== a.servico_id && !servicosNaConta.includes(x.id));
@@ -83,19 +86,20 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     return a.servicos?.categoria === "creche" || a.servicos?.categoria === "hotel" ? "Creche e hotel" : "Banho e tosa";
   }
 
-  async function confirmar() {
-    if (salvando || nadaAFazer || somenteLeitura()) return;
+  const confirmar = () => op.fazer(gravarConta);
+  async function gravarConta(chave: string): Promise<boolean> {
+    if (nadaAFazer || somenteLeitura()) return false;
     const problema = erroDaConta(itens, desconto, contas.total);
-    if (problema) { avisarErro(problema); return; }
+    if (problema) { avisarErro(problema); return false; }
     const fiado = depois.ativo && contas.total > 0;
-    if (fiado && (!depois.quando || depois.quando < isoDia(new Date()))) { setErroForma(depois.quando ? "Essa data já passou. Escolha um dia de hoje em diante." : "Escolha um dia de hoje em diante."); avisarErro(depois.quando ? "A data em que o cliente vai pagar já passou. Escolha um dia de hoje em diante." : "Escolha quando o cliente vai pagar."); return; }
+    if (fiado && (!depois.quando || depois.quando < isoDia(new Date()))) { setErroForma(depois.quando ? "Essa data já passou. Escolha um dia de hoje em diante." : "Escolha um dia de hoje em diante."); avisarErro(depois.quando ? "A data em que o cliente vai pagar já passou. Escolha um dia de hoje em diante." : "Escolha quando o cliente vai pagar."); return false; }
     const pg = contas.total > 0 && !fiado ? fecharPagamento(pagamento, contas.total) : null;
-    if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return; }
+    if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return false; }
     const falta = faltaNoEstoque(itens, produtos);
-    if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return;
-    if (!(await conferirValorAlto(contas.total, perguntar))) return;
+    if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return false;
+    if (!(await conferirValorAlto(contas.total, perguntar))) return false;
     // o caixa fechou enquanto esta conta estava aberta: pergunta antes de receber fora dele
-    if (pg && !("erro" in pg) && !(await conferirCaixa(sb, petshop.id, perguntar))) return;
+    if (pg && !("erro" in pg) && !(await conferirCaixa(sb, petshop.id, perguntar))) return false;
     setSalvando(true);
     let recebeu = false;
     let usouPacote = false;
@@ -107,7 +111,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         avisarErro("Este atendimento já tem recebimento lançado.");
         avisarMudanca();
         aoPronto();
-        return;
+        return true;
       }
       // os serviços desta conta ficam no horário (juntou ou tirou um na hora de fechar): antes de lançar o dinheiro
       const antes = outrosDoHorario.map((o) => o.servico_id);
@@ -131,13 +135,13 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       let lancamentoId: string | null = null;
       if (fiado) {
         lancamentoId = (await lancarAReceber(sb, petshop.id, {
-          valor: contas.total, vencimento: depois.quando, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null, descricao, itens: gravar,
+          valor: contas.total, vencimento: depois.quando, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null, descricao, itens: gravar, chave,
         }))?.id ?? null;
         recebeu = true;
       } else if (pg && !("erro" in pg)) {
         const lancado = await lancarPago(sb, petshop.id, {
           tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: pg.pagamentos, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null,
-          descricao, itens: gravar,
+          descricao, itens: gravar, chave,
         });
         recebeu = true;
         lancamentoId = lancado?.id ?? null;
@@ -146,15 +150,18 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         }
       }
       let estoqueOk = true;
-      try { await baixarEstoque(sb, petshop.id, user.id, itens, lancamentoId); } catch (e) {
+      try { await baixarEstoque(sb, petshop.id, user.id, itens, lancamentoId, chave); } catch (e) {
         estoqueOk = false;
         avisarErro(`${recebeu ? (fiado ? "A conta foi anotada, mas o" : "O valor foi recebido, mas o") : "O"} estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
       }
-      if (a.status !== "concluido") ok(await sb.from("agendamentos").update({ status: "concluido" }).eq("id", a.id).select("id").single());
+      // conta zerada por quem recebe: fica anotado que este atendimento não vai ser cobrado (sai da lista "para cobrar")
+      const naoCobra = !recebeu && vejoFinanceiro && !a.sem_cobranca;
+      if (a.status !== "concluido" || naoCobra) ok(await sb.from("agendamentos").update({ status: "concluido", ...(naoCobra ? { sem_cobranca: true } : {}) }).eq("id", a.id).select("id").single());
       if (estoqueOk) avisar(fiado ? `Anotado: ${brl(contas.total)} a receber até ${dataCompleta(depois.quando)}.` : recebeu ? `Recebido ${brl(contas.total)}.${usouPacote ? ` ${servico} saiu do pacote.` : ""}` : usouPacote ? `Usado ${pacote!.usados + 1} de ${pacote!.total} do pacote.` : "Atendimento concluído sem cobrança.");
       avisarMudanca();
       if (zapComprovante) setRecebida({ valor: contas.total, zap: zapComprovante });
       else aoPronto();
+      return true;
     } catch (e) {
       if (recebeu) {
         avisarErro(`${depois.ativo ? "A conta foi anotada" : "O valor foi recebido"}, mas o atendimento não ficou como concluído. Conclua pela agenda. (${mensagemDeErro(e)})`);
@@ -169,7 +176,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         avisarErro(`${servico} saiu do pacote, mas o resto da conta não foi lançado. Abra o horário e feche a conta de novo. (${mensagemDeErro(e)})`);
         avisarMudanca();
         aoPronto();
-      } else { avisarErro(e); setSalvando(false); }
+      } else { avisarErro(e); setSalvando(false); return false; }
+      return true;
     }
   }
 
@@ -191,8 +199,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     <Folha larga titulo="Fechar a conta" aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || nadaAFazer}>
-          {salvando ? "Anotando…" : contas.total <= 0 ? (pacote ? "Concluir usando o pacote" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(contas.total)} a receber` : `Receber ${brl(contas.total)}`}
+        <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || nadaAFazer}>
+          {salvando ? "Anotando…" : contas.total <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(contas.total)} a receber` : `Receber ${brl(contas.total)}`}
         </button>
       </>}>
       <div className="g-form">

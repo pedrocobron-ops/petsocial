@@ -31,7 +31,8 @@ import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
 import { esperadoNoDia, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMudarPlano, type PlanoCompleto } from "@/lib/gestao/creche";
-import { conferirCaixa, conferirValorAlto, lancarPago, type ItemLancamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, lancarPago, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
 import {
   aceitaSinal, contaDasDiarias, contarDiarias, diariaFixa, diariaSugerida, estadiaSemCobranca, fatosDoDia, lerConta, lerCuidados, nivelDeOcupacao, nomeDaAcomodacao, ocupadasNoDia, ocupaNoDia, precoPorNoite, sinalSugerido,
@@ -915,7 +916,10 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ofereceSinal, sugerido, mexeuNoSinal, dia]);
 
-  async function salvar() {
+  // trava na hora do primeiro toque e chave da operação: toque duplo não marca a reserva nem lança o sinal duas vezes
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (!pet || salvando) return;
     setErro(null); setErroSinal(null);
     const falha = (m: string) => { setErro(m); avisarErro(m); };
@@ -1007,7 +1011,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
       }
       if (id && sinalPronto.modo !== "sem") {
         try {
-          await lancarSinal(sb, petshop.id, { id, tipo, entrada: entrada.toISOString(), pet: pet.nome, clienteId: pet.clientes?.id ?? null }, sinalPronto);
+          await lancarSinal(sb, petshop.id, { id, tipo, entrada: entrada.toISOString(), pet: pet.nome, clienteId: pet.clientes?.id ?? null }, sinalPronto, chave);
           avisar(sinalPronto.modo === "agora" ? `Sinal de ${brl(sinalPronto.valor)} recebido.` : `Sinal de ${brl(sinalPronto.valor)} em A receber, para ${dataCurta(sinalPronto.quando)}.`);
         } catch (e) {
           avisarErro(`A reserva foi marcada, mas o sinal não foi anotado. Toque em Sinal no cartão da reserva. (${e instanceof Error ? e.message : "erro"})`);
@@ -1228,7 +1232,10 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
   const totalTaxas = centavos(comTaxa.reduce((t, l) => t + l.taxa, 0));
   const horaDaRegra = atraso ? atraso.hora.replace(":", "h") : "";
 
-  async function salvar() {
+  // trava na hora do primeiro toque e chave da operação: toque duplo não lança o dinheiro duas vezes
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (!escolhidas.length || salvando) return;
     const valorRuim = escolhidas.map((l) => (l.recebe > 0 ? erroDeValor(l.recebe, `O valor de ${l.e.pets?.nome ?? "um pet"}`) : null)).find(Boolean);
     if (valorRuim) { avisarErro(valorRuim); return; }
@@ -1278,6 +1285,7 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
             const lanc = await lancarPago(sb, petshop.id, {
               tipo: "entrada", valor: l.recebe, forma, categoria: "Creche e hotel", itens,
               descricao: l.cobra ? `${diarias} · ${nome}${l.taxa > 0 ? ` + ${NOME_TAXA_ATRASO}` : ""}` : `Creche: ${NOME_TAXA_ATRASO.toLowerCase()} · ${nome}`, clienteId: l.e.pets?.clientes?.id ?? null,
+              chave: parteDaChave(chave, l.e.id),
             });
             recebido += l.recebe;
             // mensalista com a taxa recebida aqui: a anotação da saída fica ligada ao recebimento (não entra de novo na mensalidade)

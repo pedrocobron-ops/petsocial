@@ -105,3 +105,10 @@
 .gf-alterado { flex: none; font-size: .6875rem; padding: 1px 7px; }
 .gf-apagados { border-style: dashed; box-shadow: none; }
 .gf-apagados .d s { text-decoration-thickness: 1px; }
+
+/* aviso do dono: alterações em valores recebidos e em preços */
+button.gf-alt-aviso { width: 100%; text-align: left; cursor: pointer; font-family: inherit; border-color: rgba(201, 154, 46, .45); background: #fdf6e3; }
+button.gf-alt-aviso svg { color: #8a6412; }
+.gf-alt-lista { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.gf-alt-lista li { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--g-raio-p); border: 1px solid var(--g-linha); background: var(--g-carta); font-size: .9375rem; line-height: 1.4; min-width: 0; overflow-wrap: anywhere; }
+.gf-alt-lista li.nova { border-color: rgba(201, 154, 46, .5); background: #fdf6e3; }

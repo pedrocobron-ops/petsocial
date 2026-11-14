@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago, quitarConta, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago, parteDaChave, quitarConta, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { ValoresDaEstadia } from "@/lib/gestao/hotel";
 import { sinalDe } from "@/lib/gestao/hotel-opcoes";
 import type { Banco } from "@/lib/gestao/supabase";
@@ -52,18 +53,18 @@ export async function conferirSinal(sb: Banco, petshopId: string, s: SinalPronto
 }
 
 /** Lança o sinal (recebido ou a receber) e liga à reserva. */
-export async function lancarSinal(sb: Banco, petshopId: string, e: { id: string; tipo: string; entrada: string; pet: string; clienteId: string | null }, s: SinalPronto) {
+export async function lancarSinal(sb: Banco, petshopId: string, e: { id: string; tipo: string; entrada: string; pet: string; clienteId: string | null }, s: SinalPronto, chave?: string | null) {
   if (s.modo === "sem") return;
   const descricao = `Sinal da reserva: ${nomeTipo(e.tipo).toLowerCase()} de ${e.pet}, ${dataCurta(e.entrada)}`;
   const hoje = isoDia(new Date());
   if (s.modo === "agora") {
-    const l = await lancarPago(sb, petshopId, { tipo: "entrada", valor: s.valor, forma: s.forma, pagamentos: s.pagamentos, categoria: CATEGORIA_SINAL, descricao, clienteId: e.clienteId });
+    const l = await lancarPago(sb, petshopId, { tipo: "entrada", valor: s.valor, forma: s.forma, pagamentos: s.pagamentos, categoria: CATEGORIA_SINAL, descricao, clienteId: e.clienteId, chave: parteDaChave(chave, "sinal") });
     ok(await sb.from("estadias_valores").upsert({
       estadia_id: e.id, petshop_id: petshopId, sinal: s.valor, sinal_estado: "pago", sinal_lancamento_id: l.id, sinal_pago_em: hoje,
       sinal_pagamento: { forma: s.forma, pagamentos: s.pagamentos }, sinal_devolucao_id: null, sinal_devolvido_em: null,
     }, { onConflict: "estadia_id" }).select("estadia_id"));
   } else {
-    const l = await lancarAReceber(sb, petshopId, { valor: s.valor, vencimento: s.quando, categoria: CATEGORIA_SINAL, descricao, clienteId: e.clienteId });
+    const l = await lancarAReceber(sb, petshopId, { valor: s.valor, vencimento: s.quando, categoria: CATEGORIA_SINAL, descricao, clienteId: e.clienteId, chave: parteDaChave(chave, "sinal") });
     ok(await sb.from("estadias_valores").upsert({
       estadia_id: e.id, petshop_id: petshopId, sinal: s.valor, sinal_estado: "a_receber", sinal_lancamento_id: l.id, sinal_pago_em: null, sinal_pagamento: null,
       sinal_devolucao_id: null, sinal_devolvido_em: null,
@@ -147,7 +148,9 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
   // o sinal pode já ter tido uma parte recebida (pelo Financeiro ou pelo Caixa): aqui entra só o que falta
   const falta = pendente ? faltaDoSinal(pendente) : 0, jaEntrou = pendente ? sinalRecebidoDe(pendente) : 0;
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (salvando) return;
     setErro(null);
     try {
@@ -156,7 +159,7 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
         if ("erro" in pg) return setErro(pagamento.dividido ? pg.erro : "Escolha como o tutor pagou o sinal.");
         if (!(await conferirCaixa(sb, petshop.id, confirmar))) return;
         setSalvando(true);
-        await quitarConta(sb, petshop.id, pendente.sinal_lancamento_id!, pg, falta);
+        await quitarConta(sb, petshop.id, pendente.sinal_lancamento_id!, pg, falta, chave);
         avisar(jaEntrou > 0 ? `Sinal de ${nome} completo: ${brl(falta)} recebidos agora, ${brl(pendente.sinal)} no total.` : `Sinal de ${nome} recebido: ${brl(pendente.sinal)}.`);
       } else {
         const pronto = prepararSinal(estado);
@@ -170,7 +173,7 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
         }))) return;
         if (!(await conferirSinal(sb, petshop.id, pronto, confirmar))) return;
         setSalvando(true);
-        await lancarSinal(sb, petshop.id, { id: e.id, tipo: e.tipo, entrada: e.entrada, pet: nome, clienteId: e.pets?.clientes?.id ?? null }, pronto);
+        await lancarSinal(sb, petshop.id, { id: e.id, tipo: e.tipo, entrada: e.entrada, pet: nome, clienteId: e.pets?.clientes?.id ?? null }, pronto, chave);
         avisar(pronto.modo === "agora" ? `Sinal de ${nome} recebido: ${brl(pronto.valor)}.` : `Sinal de ${brl(pronto.valor)} anotado em A receber, para ${dataCurta(pronto.quando)}.`);
       }
       aoGravar();
@@ -219,7 +222,9 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
   const nome = e.pets?.nome ?? "o pet";
   const regra = sinalDe(petshop).politica.trim();
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (salvando) return;
     if (!escolha) return setErro(entrou ? "Escolha se o sinal fica ou é devolvido." : "Escolha o que fazer com a conta do sinal.");
     setErro(null);
@@ -239,7 +244,7 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
       }
       if (devolve) {
         // a devolução é uma saída de hoje; o recebimento do sinal fica como está, no dia em que entrou
-        const l = await lancarPago(sb, petshop.id, { tipo: "saida", valor: valor!, forma: forma!, categoria: CATEGORIA_DEVOLUCAO, descricao: `Devolução do sinal: ${nomeTipo(e.tipo).toLowerCase()} de ${nome}, ${dataCurta(e.entrada)}`, clienteId: e.pets?.clientes?.id ?? null });
+        const l = await lancarPago(sb, petshop.id, { tipo: "saida", valor: valor!, forma: forma!, categoria: CATEGORIA_DEVOLUCAO, descricao: `Devolução do sinal: ${nomeTipo(e.tipo).toLowerCase()} de ${nome}, ${dataCurta(e.entrada)}`, clienteId: e.pets?.clientes?.id ?? null, chave: parteDaChave(chave, "devolucao") });
         ok(await sb.from("estadias_valores").update({ sinal_estado: "devolvido", sinal_devolucao_id: l.id, sinal_devolvido_em: isoDia(new Date()) }).eq("estadia_id", e.id).select("estadia_id"));
       } else if (entrou || escolha === "ficar") {
         ok(await sb.from("estadias_valores").update({ sinal_estado: "mantido" }).eq("estadia_id", e.id).select("estadia_id"));

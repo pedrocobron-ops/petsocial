@@ -15,7 +15,8 @@ import Fornecedores, { EscolherFornecedor, pedeReposicao, useFornecedores, type 
 import { LerComCamera } from "@/components/gestao/loja/leitor";
 import OpcoesDaLoja from "@/components/gestao/ajustes/opcoes-loja";
 import { limparCodigo, margemDe, opcoesDaLoja, pct } from "@/lib/gestao/loja-opcoes";
-import { conferirCaixa, conferirValorAlto, lancarPago } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, gravarMovimentos, lancarPago, parteDaChave } from "@/lib/gestao/dinheiro";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { MovimentoEstoque, Produto } from "@/lib/gestao/tipos";
 import { brl, brlCurto, dataCurta, semAcento } from "@/lib/gestao/util";
 import "./estoque.css";
@@ -210,7 +211,7 @@ export default function Estoque() {
                       </span>
                       <span className="g-est-saldo">
                         <span className="g-num m">{fmtQtd(p.estoque)}</span>
-                        <small>{p.unidade}</small>
+                        {" "}<small>{p.unidade}</small>
                       </span>
                     </button>
                     <div className="g-est-nivel">
@@ -341,7 +342,9 @@ function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () =>
   const [inicial, setInicial] = useState("");
   const [salvando, setSalvando] = useState(false);
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     const nome = v.nome.trim();
     if (!nome) { avisarErro("Escreva o nome do produto."); return; }
     const minimo = v.minimo.trim() ? lerQtd(v.minimo) : 0;
@@ -356,10 +359,11 @@ function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () =>
         preco_venda: v.preco, custo: v.custo, estoque_minimo: minimo, ...camposDaLoja(loja, v),
       }).select("id").single());
       if (qtd > 0) {
-        ok(await sb.from("movimentos_estoque").insert({
+        await gravarMovimentos(sb, petshop.id, [{
           petshop_id: petshop.id, produto_id: novo.id, tipo: "entrada", quantidade: qtd, custo_unitario: v.custo,
           motivo: "Estoque inicial", criado_por: user.id, ...(loja.fornecedores && v.fornecedorId ? { fornecedor_id: v.fornecedorId } : {}),
-        }).select("id").single());
+          chave: parteDaChave(chave, "inicial"),
+        }]);
       }
       avisar(`${nome} está no estoque.`);
       aoGravar();
@@ -409,7 +413,9 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
   const total = n && custo ? centavos(n * custo) : 0;
   const lanca = vejoFinanceiro && despesa && total > 0;
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (!n) { avisarErro("Diga quantas unidades entraram."); return; }
     const custoRuim = erroDeValor(custo, "O custo") ?? (lanca ? erroDeValor(total, "O total da compra") : null);
     if (custoRuim) { avisarErro(custoRuim); return; }
@@ -418,15 +424,17 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
     if (lanca && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
-      ok(await sb.from("movimentos_estoque").insert({
+      await gravarMovimentos(sb, petshop.id, [{
         petshop_id: petshop.id, produto_id: produto.id, tipo: "entrada", quantidade: n, custo_unitario: custo || null,
         motivo: "Compra", criado_por: user.id, ...(loja.fornecedores && fornecedorId ? { fornecedor_id: fornecedorId } : {}),
-      }).select("id").single());
+        chave: parteDaChave(chave, "entrada"),
+      }]);
       if (lanca && forma) {
         try {
           await lancarPago(sb, petshop.id, {
             tipo: "saida", valor: total, forma, categoria: "Produtos e material",
             descricao: `Compra: ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}${loja.fornecedores && fornecedorId ? ` (${loja.lista.find((f) => f.id === fornecedorId)?.nome ?? "fornecedor"})` : ""}`,
+            chave,
           });
           avisar(`Entrada anotada e ${brl(total)} lançados como despesa.`);
         } catch (e) {
@@ -499,7 +507,9 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
   const venda = motivo === "Venda";
   const passou = n != null && n > saldo;
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (!n) { avisarErro("Diga quantas unidades saíram."); return; }
     if (passou) { avisarErro(`Só tem ${fmtQtd(saldo)} ${produto.unidade}. Se o saldo estiver errado, corrija na ficha do produto.`); return; }
     if (!motivo) { setErroMotivo(true); avisarErro("Escolha o motivo da saída."); return; }
@@ -512,9 +522,9 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
     if (pg && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
-      const saida = ok(await sb.from("movimentos_estoque").insert({
-        petshop_id: petshop.id, produto_id: produto.id, tipo: "saida", quantidade: n, motivo, criado_por: user.id,
-      }).select("id").single());
+      const [saida] = await gravarMovimentos(sb, petshop.id, [{
+        petshop_id: petshop.id, produto_id: produto.id, tipo: "saida", quantidade: n, motivo, criado_por: user.id, chave: parteDaChave(chave, "saida"),
+      }]);
       if (pg && !("erro" in pg) && valor) {
         try {
           lembrarForma(pg.forma);
@@ -523,9 +533,10 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
             descricao: `Venda: ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}`,
             // com os itens, apagar esta venda depois devolve o produto ao estoque
             itens: [{ tipo: "produto", nome: produto.nome, qtd: n, valor: Math.round((valor / n) * 100) / 100, produto_id: produto.id }],
+            chave,
           });
           // liga a saída à venda: é assim que o relatório de produtos acha o custo desta venda (se falhar, a venda fica "sem custo registrado")
-          if (lancado?.id) await sb.from("movimentos_estoque").update({ lancamento_id: lancado.id }).eq("id", saida.id).eq("petshop_id", petshop.id).select("id");
+          if (lancado?.id && saida) await sb.from("movimentos_estoque").update({ lancamento_id: lancado.id }).eq("id", saida.id).eq("petshop_id", petshop.id).select("id");
           avisar(`Venda de ${brl(valor)} anotada.`);
         } catch (e) {
           avisarErro(`O estoque foi atualizado, mas a venda não entrou no financeiro. Lance pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
@@ -609,14 +620,17 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
     } catch (e) { avisarErro(erroDeCodigo(e)); } finally { setSalvando(false); }
   }
 
-  async function corrigir() {
+  const op = useOperacao();
+  const corrigir = () => op.fazer(gravarContagem);
+  async function gravarContagem(chave: string): Promise<boolean | void> {
     const n = lerQtd(contado ?? "");
     if (n == null) { avisarErro("Diga quanto você contou."); return; }
     setSalvando(true);
     try {
-      ok(await sb.from("movimentos_estoque").insert({
+      await gravarMovimentos(sb, petshop.id, [{
         petshop_id: petshop.id, produto_id: produto.id, tipo: "ajuste", quantidade: n, motivo: razao.trim().slice(0, 120) || "Contagem", criado_por: user.id,
-      }).select("id").single());
+        chave: parteDaChave(chave, "ajuste"),
+      }]);
       avisar(`Saldo corrigido para ${fmtQtd(n)} ${produto.unidade}.`);
       setContado(null);
       setRazao("");

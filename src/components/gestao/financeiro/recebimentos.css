@@ -91,3 +91,5 @@
 .gr-com-topo .t span { font-size: .8125rem; color: var(--g-cinza); }
 .gr-com-pe { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-left: 50px; font-size: .8125rem; }
 @media (max-width: 420px) { .gr-com-pe { padding-left: 0; } }
+.g-aviso.gr-com-pend { display: grid; gap: 8px; margin: 10px 0 0; align-items: start; }
+.g-aviso.gr-com-pend .g-btn { margin-left: 0; }

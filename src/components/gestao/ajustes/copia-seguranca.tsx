@@ -8,13 +8,13 @@ import { Tile } from "@/components/gestao/painel";
 import { mensagemDeErro, useAvisos } from "@/components/gestao/ui";
 import { ESPECIES, nomePorte } from "@/components/gestao/clientes/comum";
 import {
-  baixarArquivo, categoriaAtual, dinheiroCsv, numeroCsv, paginar, resumoDoCaixa, rotuloForma, textoCsv, type Cel,
+  baixarArquivo, categoriaAtual, textoDaAlteracao, dinheiroCsv, numeroCsv, paginar, resumoDoCaixa, rotuloForma, textoCsv, type Cel,
 } from "@/components/gestao/financeiro/comum";
 import { itensDoLancamento, nomeDoMovimento, partesPorForma, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import {
   COLS_MOVIMENTO, COLS_PACOTE, COLS_PACOTE_CLIENTE, COLS_PRODUTO, comCustos, custosDeTodosOsMovimentos, comPrecosDePacote, lerEquipe, COLS_ESTADIA, comValoresDeEstadia,
 } from "@/lib/gestao/reservado";
-import { FORMAS, STATUS_AGENDAMENTO, type Caixa, type Cliente, type Estadia, type Lancamento, type Pet, type Servico, type StatusAgendamento } from "@/lib/gestao/tipos";
+import { FORMAS, STATUS_AGENDAMENTO, type AlteracaoLancamento, type Caixa, type Cliente, type Estadia, type Lancamento, type Pet, type Servico, type StatusAgendamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, hora, isoDia, semAcento } from "@/lib/gestao/util";
 import { montarZip, type ArquivoZip } from "@/lib/gestao/zip";
 import { acomodacoesDe } from "@/lib/gestao/hotel-opcoes";
@@ -106,6 +106,7 @@ const ASSUNTOS = [
   { arquivo: "mensalidades.csv", nome: "mensalidades da creche", explica: "As cobranças de cada mês: mensalidade, dias extras, taxas de busca fora do horário, desconto, total, vencimento, se foi paga e quanto falta." },
   { arquivo: "equipe.csv", nome: "equipe", explica: "As pessoas da equipe, com função, comissão e se têm acesso ao sistema." },
   { arquivo: "comissoes-pagas.csv", nome: "comissões pagas", explica: "Cada comissão marcada como paga: a pessoa, o período, o valor e o dia." },
+  { arquivo: "alteracoes-de-valores.csv", nome: "alterações em valores", explica: "O histórico de quem mexeu em dinheiro: valor recebido que foi alterado ou apagado (com o valor de antes) e venda com preço diferente da lista ou com desconto. O lançamento apagado só aparece aqui." },
   { arquivo: "servicos.csv", nome: "serviços", explica: "Os serviços e os preços por porte." },
 ] as const;
 type NomeArquivo = (typeof ASSUNTOS)[number]["arquivo"];
@@ -215,7 +216,7 @@ export default function CopiaSeguranca() {
       const caixaPorId = new Map(caixas.map((c) => [c.id, c]));
       const qtd = (x: number) => x.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
       tabelas.set("lancamentos.csv", [
-        ["Data", "Hora do lançamento", "Tipo", "Categoria", "Descrição", "Cliente", "Itens", "Forma", "Partes do pagamento", "Valor", "Pago", "Vencimento", "Movimento de gaveta", "Caixa aberto em", "Quem lançou", "Valor cheio da conta (recebida em partes)"],
+        ["Data", "Hora do lançamento", "Tipo", "Categoria", "Descrição", "Cliente", "Itens", "Forma", "Partes do pagamento", "Valor", "Pago", "Vencimento", "Movimento de gaveta", "Caixa aberto em", "Quem lançou", "Valor cheio da conta (recebida em partes)", "Alterado depois de recebido em"],
         ...lancamentos.map((l): Cel[] => [
           dataCompleta(l.data), hora(l.criado_em), l.tipo === "entrada" ? "Entrada" : "Saída", categoriaAtual(l.categoria), l.descricao ?? "",
           l.cliente_id ? nomeCliente.get(l.cliente_id) ?? "" : "",
@@ -225,7 +226,7 @@ export default function CopiaSeguranca() {
           dinheiroCsv(l.tipo === "entrada" ? Number(l.valor) : -Number(l.valor)),
           simNao(l.pago), quando(l.vencimento), nomeDoMovimento(l.movimento),
           l.caixa_id ? quando(caixaPorId.get(l.caixa_id)?.aberto_em) : "", autor(l.criado_por, l.origem),
-          l.valor_original != null ? dinheiroCsv(Number(l.valor_original)) : "",
+          l.valor_original != null ? dinheiroCsv(Number(l.valor_original)) : "", quando(l.alterado_em),
         ]),
       ]);
       const doCaixa = new Map<string, Lancamento[]>();
@@ -397,6 +398,34 @@ export default function CopiaSeguranca() {
       tabelas.set("comissoes-pagas.csv", [
         ["Pessoa", "Período de", "Período até", "Valor pago", "Marcada como paga em"],
         ...pagas.map((g): Cel[] => [nomeDaPessoa.get(g.profissional_id) ?? "", quando(g.de), quando(g.ate), dinheiro(g.valor), quando(g.pago_em)]),
+      ]);
+
+      etapa("alterações em valores");
+      // o histórico de quem mexeu em dinheiro recebido e de preço mudado na venda (o lançamento apagado só existe aqui)
+      const alteracoes = await todas<AlteracaoLancamento>((a, b) => sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", id).order("quando").order("id").range(a, b));
+      type PrecoLido = { id: string; lancamento_id: string | null; tipo: string; item: string; de: number | null; para: number; qtd: number | null; abaixo_do_custo: boolean; quem_nome: string | null; quando: string };
+      const precos = await todas<PrecoLido>((a, b) => sb.from("precos_alterados").select("id, lancamento_id, tipo, item, de, para, qtd, abaixo_do_custo, quem_nome, quando").eq("petshop_id", id).order("quando").order("id").range(a, b));
+      const lancPorId = new Map(lancamentos.map((l) => [l.id, l]));
+      const doLancamento = (lid: string | null, antes?: unknown) => {
+        const l = lid ? lancPorId.get(lid) : null;
+        const era = antes && typeof antes === "object" ? (antes as Record<string, unknown>) : {};
+        return (l?.descricao ?? (typeof era.descricao === "string" ? era.descricao : "")) || l?.categoria || (typeof era.categoria === "string" ? era.categoria : "");
+      };
+      const num = (v: unknown): Cel => (typeof v === "number" || (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) ? dinheiroCsv(Number(v)) : "");
+      const linhasDeAlteracao: { quando: string; linha: Cel[] }[] = [
+        ...alteracoes.map((a) => {
+          const antes = (a.antes ?? {}) as Record<string, unknown>, depois = (a.depois ?? {}) as Record<string, unknown>;
+          const apagou = a.acao === "apagou";
+          return { quando: a.quando, linha: [quando(a.quando), a.quem_nome ?? "", apagou ? "Apagou um valor recebido" : "Alterou um valor recebido", doLancamento(a.lancamento_id, a.antes),
+            num(antes.valor), apagou ? "" : num(depois.valor), apagou ? `era ${typeof antes.forma === "string" ? antes.forma : "sem forma"}, do dia ${typeof antes.data === "string" ? dataCompleta(antes.data) : ""}` : textoDaAlteracao(a)] as Cel[] };
+        }),
+        ...precos.map((x) => ({ quando: x.quando, linha: [quando(x.quando), x.quem_nome ?? "", x.tipo === "desconto" ? "Deu desconto na venda" : "Vendeu com preço diferente da lista",
+          x.tipo === "desconto" ? x.item : `${x.item}${x.lancamento_id && doLancamento(x.lancamento_id) ? ` (${doLancamento(x.lancamento_id)})` : ""}`,
+          dinheiro(x.de), dinheiro(x.para), x.abaixo_do_custo ? "abaixo do custo" : ""] as Cel[] })),
+      ].sort((a, b) => a.quando.localeCompare(b.quando));
+      tabelas.set("alteracoes-de-valores.csv", [
+        ["Quando", "Quem", "O que fez", "Lançamento ou item", "Valor de antes", "Valor de depois", "Detalhe"],
+        ...linhasDeAlteracao.map((x) => x.linha),
       ]);
 
       etapa("serviços");

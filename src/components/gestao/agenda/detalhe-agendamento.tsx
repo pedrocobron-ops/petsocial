@@ -9,7 +9,7 @@ import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento 
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoCancelado, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
 import { textoComprovante } from "@/lib/gestao/comprovante";
-import { desfazerVenda, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { desfazerVenda, itensDoLancamento, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { nomeDosServicos, servicosAMais, servicosPorExtenso, valorDoHorario } from "@/lib/gestao/servicos-do-horario";
 import { brl, dataAmigavel, dataCompleta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -48,10 +48,13 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
 
   // já foi pago? tem pacote que cobre este serviço?
   const { dados: extra, recarregar } = useDados(async () => {
-    const [pago, pacotes] = await Promise.all([
+    const diaDoHorario = isoDia(new Date(a.inicio));
+    const [pago, pacotes, semConta] = await Promise.all([
       // o recebimento deste horário vem por uma função do banco: quem só opera o caixa não lê o histórico, mas vê se este foi pago
       vejoFinanceiro ? sb.rpc("recebimentos_do_agendamento", { p_agendamento: a.id }) : Promise.resolve({ data: [] as Lancamento[], error: null }),
       sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", a.pet_id).eq("ativo", true),
+      // concluído e sem conta fechada? O banco responde sem mostrar valor (serve também para quem não mexe com dinheiro)
+      a.status === "concluido" ? sb.rpc("agendamentos_para_cobrar", { p: petshop.id, p_de: diaDoHorario, p_ate: diaDoHorario }) : Promise.resolve({ data: [] as { id: string }[], error: null }),
     ]);
     // horário que se repete: até quando vai a série (o último que ainda está de pé)
     let fimDaSerie: string | null = null;
@@ -68,8 +71,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     // o pagamento já está num caixa fechado? (aí só o dono reabre ou apaga)
     const caixas = [...new Set(lancados.filter((l) => l.pago && l.caixa_id).map((l) => l.caixa_id!))];
     const fechados = caixas.length ? await sb.from("caixas").select("id").in("id", caixas).not("fechado_em", "is", null) : { data: [] };
-    return { pago: lancados, pacote: validos[0] ?? null, fimDaSerie, semFim, emCaixaFechado: (fechados.data ?? []).length > 0 };
-  }, [a.id]);
+    return { pago: lancados, pacote: validos[0] ?? null, fimDaSerie, semFim, emCaixaFechado: (fechados.data ?? []).length > 0, faltaCobrar: (semConta.data ?? []).some((x) => x.id === a.id) };
+  }, [a.id, a.status, a.sem_cobranca]);
   // mais de um serviço no mesmo horário: o pacote cobre só o principal; os outros entram na conta
   const outros = servicosAMais(a);
   const valorOutros = Math.round(outros.reduce((t, o) => t + Number(o.preco ?? 0), 0) * 100) / 100;
@@ -84,6 +87,14 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const recebido = recebidos.reduce((t, l) => t + Number(l.valor), 0);
   const aReceber = devidos.reduce((t, l) => t + Number(l.valor), 0);
   const lancado = recebido + aReceber;
+  // concluído sem conta fechada (nem recebida, nem "paga depois"): não é a mesma coisa que pago
+  const faltaCobrar = a.status === "concluido" && Boolean(extra?.faltaCobrar);
+  // o horário mudou depois de a conta ser fechada (reabriu, aumentou o valor, concluiu de novo): a conta ficou menor que o horário
+  const daConta = (extra?.pago ?? []).reduce((t, l) => {
+    const servicos = itensDoLancamento(l).filter((i) => i.tipo === "servico");
+    return t + (servicos.length ? servicos.reduce((s, i) => s + i.qtd * i.valor, 0) : Number(l.valor_original ?? l.valor));
+  }, 0);
+  const diferenca = lancado > 0 && aCobrar != null ? Math.round((aCobrar - daConta) * 100) / 100 : 0;
   const formasDoRecebido = [...new Set(recebidos.map((l) => textoDoPagamento(l)))].join(" e ");
   // como chamar o que está lançado neste horário, nas perguntas de apagar
   const oLancado = recebido > 0 && aReceber > 0 ? "o recebimento e a conta a receber" : aReceber > 0 ? "a conta a receber" : "o recebimento";
@@ -322,7 +333,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
             {tutor?.telefone && <p className="g-muted g-pp">{fmtTelefone(tutor.telefone)}</p>}
           </div>
           <div className="g-pilha p" style={{ justifyItems: "end" }}>
-            <span className={`g-tag ${st.tom}`}>{st.rotulo}</span>
+            {faltaCobrar ? <span className="g-tag laranja">Concluído, falta cobrar</span> : <span className={`g-tag ${st.tom}`}>{st.rotulo}{a.status === "concluido" && vejoFinanceiro && sabe && recebido > 0 && !aReceber ? " e pago" : ""}</span>}
             {a.serie_id && <span className="g-tag azul"><Repeat size={12} aria-hidden />Repete</span>}
           </div>
         </div>
@@ -333,14 +344,16 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           <div className="g-fila entre"><span className="g-muted">{outros.length ? "Serviços" : "Serviço"}</span><b style={{ textAlign: "right" }}>{nomeDosServicos(a) ?? "A definir"}</b></div>
           <div className="g-fila entre"><span className="g-muted">Horário</span><b className="g-tab">{hora(a.inicio)} às {hora(a.fim)}</b></div>
           {a.profissionais && <div className="g-fila entre"><span className="g-muted">Com</span><b>{a.profissionais.nome}</b></div>}
-          <div className="g-fila entre"><span className="g-muted">{outros.length ? "Valor total" : "Valor"}</span><b className="g-tab">{total != null ? brl(total) : "A definir"}{pago && !lancado ? " · pago" : ""}</b></div>
-          {outros.length > 0 && (
+          {/* valores só para quem recebe: quem só atende vê o serviço, o horário e quem atende */}
+          {vejoFinanceiro && <div className="g-fila entre"><span className="g-muted">{outros.length ? "Valor total" : "Valor"}</span><b className="g-tab">{total != null ? brl(total) : "A definir"}{pago && !lancado ? " · pago" : ""}</b></div>}
+          {vejoFinanceiro && outros.length > 0 && (
             <ul className="g-agd-servicos" aria-label="Valor de cada serviço">
               <li><span>{a.servicos?.nome ?? "Serviço"}</span><b className="g-tab">{a.pacote_cliente_id ? "pelo pacote" : a.preco != null ? brl(a.preco) : "a definir"}</b></li>
               {outros.map((o) => <li key={o.id}><span>{o.servicos?.nome ?? "Serviço"}</span><b className="g-tab">{o.preco != null ? brl(o.preco) : "a definir"}</b></li>)}
             </ul>
           )}
-          {recebido > 0 && <div className="g-fila entre"><span className="g-muted">Recebido</span><b className="g-tab g-verde-t">{brl(recebido)}{formasDoRecebido ? ` · ${formasDoRecebido}` : ""}</b></div>}
+          {vejoFinanceiro && a.sem_cobranca && !lancado && a.status === "concluido" && <div className="g-fila entre"><span className="g-muted">Cobrança</span><b>Não cobrado</b></div>}
+          {vejoFinanceiro && recebido > 0 && <div className="g-fila entre"><span className="g-muted">Recebido</span><b className="g-tab g-verde-t">{brl(recebido)}{formasDoRecebido ? ` · ${formasDoRecebido}` : ""}</b></div>}
           {devidos.map((l) => (
             <div className="g-fila entre" key={l.id}>
               <span className="g-muted">A receber</span>
@@ -398,8 +411,20 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
             {(!vejoFinanceiro || pago) && <button className={`g-btn ${pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void mudar({ status: "concluido" }, "Atendimento concluído.").then((deu) => deu && aoFechar())}><Check />{pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}
           </div>
         )}
+        {faltaCobrar && (
+          <p className="g-aviso" style={{ margin: 0 }} role="status">
+            <span>{vejoFinanceiro
+              ? <><b>Este atendimento foi concluído, mas a conta não foi fechada.</b> Nada entrou no caixa nem ficou em A receber.</>
+              : <><b>Concluído, falta cobrar.</b> Quem cuida do caixa fecha a conta deste atendimento.</>}</span>
+          </p>
+        )}
         {a.status === "concluido" && vejoFinanceiro && !pago && (
           <button className="g-btn pri cheio" disabled={!sabe} onClick={() => { if (!somenteLeitura()) setComanda("sim"); }}><Receipt />Fechar a conta{aCobrar ? ` · ${brl(aCobrar)}` : ""}</button>
+        )}
+        {vejoFinanceiro && a.status === "concluido" && diferenca > 0.005 && (
+          <p className="g-aviso" style={{ margin: 0 }} role="status">
+            <span><b>Faltam {brl(diferenca)}.</b> O horário está em {brl(aCobrar ?? 0)} e a conta fechada foi de {brl(daConta)}: o valor mudou depois de a conta ser fechada. Para cobrar a diferença, lance uma entrada em Caixa (ou em Financeiro) com o nome do pet. A comissão segue o valor da conta fechada.</span>
+          </p>
         )}
 
         {devidos.length > 0 && (

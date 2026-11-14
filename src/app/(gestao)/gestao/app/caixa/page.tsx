@@ -16,6 +16,8 @@ import VendaBalcao from "@/components/gestao/loja/venda";
 import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
 import type { AlteracaoLancamento, Caixa, Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, hora, isoDia } from "@/lib/gestao/util";
+import { useOperacao } from "@/lib/gestao/uma-vez";
+import { AtendimentosParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import "./caixa.css";
 
 export default function PaginaCaixa() {
@@ -278,6 +280,7 @@ function CaixaDoDia() {
             </section>
           ) : null}
           {/* sempre no mesmo lugar da tela: abrir o caixa no meio de um recebimento não fecha a folha que está aberta */}
+          <AtendimentosParaCobrar aoMudar={() => void recarregar()} />
           <ContasDeClientes aoMudar={recarregar} largo={!aberto && Boolean(ultimo)} />
         </div>
 
@@ -499,7 +502,9 @@ function FolhaGaveta({ tipo, inicial, naGaveta, aoFechar, aoSalvo }: {
   const base = Math.round((inicial ? naGaveta + (tirar ? Number(inicial.valor) : -Number(inicial.valor)) : naGaveta) * 100) / 100;
   const depois = Math.round((base + (tirar ? -(valor ?? 0) : valor ?? 0)) * 100) / 100;
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (salvando) return;
     if (!valor || valor <= 0) { setErro("Escreva o valor."); return; }
     if (valor >= 1e8) { setErro("Esse valor é grande demais. Confira os números."); return; }
@@ -519,7 +524,7 @@ function FolhaGaveta({ tipo, inicial, naGaveta, aoFechar, aoSalvo }: {
       } else {
         await lancarPago(sb, petshop.id, {
           tipo: tirar ? "saida" : "entrada", valor, forma: "dinheiro", categoria: CATEGORIA_GAVETA, descricao: texto || (tirar ? null : "Troco"),
-          movimento: tipo, exigeCaixa: true,
+          movimento: tipo, exigeCaixa: true, chave,
         });
         avisar(tirar ? `Anotado: ${brl(valor)} saiu da gaveta.` : `Anotado: ${brl(valor)} entrou na gaveta.`);
       }
@@ -530,6 +535,7 @@ function FolhaGaveta({ tipo, inicial, naGaveta, aoFechar, aoSalvo }: {
       avisarErro(e);
       await aoSalvo();
       setSalvando(false);
+      return false;
     }
   }
 

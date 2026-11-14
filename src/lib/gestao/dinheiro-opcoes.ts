@@ -21,6 +21,10 @@ export const OPCOES_DINHEIRO = {
   pix: "dinheiro.pix",
   /** Modelo da mensagem de cobrança. Vazio = o modelo padrão. */
   modelo: "dinheiro.cobranca_modelo",
+  /** Só o dono e quem vê o financeiro mudam preço ou dão desconto na venda (quem só opera o caixa vende pelo preço da lista). */
+  precoTravado: "dinheiro.preco_travado",
+  /** Com o preço travado: desconto máximo, em %, que o caixa pode dar. Zero = nenhum desconto. */
+  descontoMaxCaixa: "dinheiro.desconto_max_caixa",
   /** Extras da conta contam para a comissão. */
   comissaoExtras: "comissao.em_extras",
   /** O percentual do serviço vale mais que o da pessoa. */
@@ -46,6 +50,11 @@ export function opcoesDeCobranca(petshop: ComOpcoes): OpcoesDeCobranca {
   };
 }
 
+/** Trava de preço na venda: ligada ou não, e o desconto máximo (em %) de quem só opera o caixa. */
+export function travaDePreco(petshop: ComOpcoes): { ligada: boolean; descontoMax: number } {
+  return { ligada: opcao(petshop, OPCOES_DINHEIRO.precoTravado, false), descontoMax: Math.min(100, Math.max(0, opcao(petshop, OPCOES_DINHEIRO.descontoMaxCaixa, 0))) };
+}
+
 export type OpcoesDeComissao = { extras: boolean; porServico: boolean; produtos: boolean; produtosPct: number };
 export function opcoesDeComissao(petshop: ComOpcoes): OpcoesDeComissao {
   const K = OPCOES_DINHEIRO;
@@ -64,13 +73,18 @@ export type Multa = { dias: number; multa: number; juros: number; total: number 
  * multa fixa + multa em % do que falta (uma vez) + juros em % ao mês, contados por dia de atraso (mês de 30 dias).
  * Devolve null quando a opção está desligada, a conta não venceu ou a regra dá zero. É só sugestão: quem recebe decide.
  */
-export function multaSugerida(petshop: ComOpcoes, conta: { valor: number; vencimento?: string | null }, hoje: string): Multa | null {
+export function multaSugerida(petshop: ComOpcoes, conta: { valor: number; vencimento?: string | null; multa_recebida?: number | null; multa_recebida_em?: string | null }, hoje: string): Multa | null {
   const o = opcoesDeCobranca(petshop);
   if (!o.multa || !conta.vencimento || conta.vencimento >= hoje) return null;
   const dias = Math.round((deIsoDia(hoje).getTime() - deIsoDia(conta.vencimento).getTime()) / 864e5);
   const valor = Number(conta.valor);
-  const multa = centavos(o.multaFixa + (valor * o.multaPct) / 100);
-  const juros = centavos((valor * o.jurosMesPct * dias) / 100 / 30);
+  // a multa é cobrada uma vez: se o cliente já pagou multa e juros desta conta (junto com uma parte), o resto só conta
+  // os juros dos dias que passaram desde esse pagamento
+  const jaCobrou = Number(conta.multa_recebida ?? 0) > 0;
+  const desde = jaCobrou && conta.multa_recebida_em && conta.multa_recebida_em > conta.vencimento ? conta.multa_recebida_em : conta.vencimento;
+  const diasDeJuros = jaCobrou ? Math.max(0, Math.round((deIsoDia(hoje).getTime() - deIsoDia(desde).getTime()) / 864e5)) : dias;
+  const multa = jaCobrou ? 0 : centavos(o.multaFixa + (valor * o.multaPct) / 100);
+  const juros = centavos((valor * o.jurosMesPct * diasDeJuros) / 100 / 30);
   const total = centavos(multa + juros);
   return total > 0 ? { dias, multa, juros, total } : null;
 }
