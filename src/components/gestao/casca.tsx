@@ -8,7 +8,7 @@ import {
   BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
 import { useGestao } from "./contexto";
-import { planoPorId, temCheckout } from "@/lib/gestao/planos";
+import { planoPorId } from "@/lib/gestao/planos";
 import { DIAS_DE_AVISO, fimDoTeste } from "./fim-do-teste";
 import { dataLonga } from "@/lib/gestao/util";
 import { AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
@@ -93,7 +93,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("pointerdown", tocou, true);
   }, []);
   const caminho = usePathname();
-  const { sb, user, petshop, eu, souDono, posso, liberado, diasDeTeste, sair } = useGestao();
+  const { sb, user, petshop, eu, souDono, posso, liberado, diasDeTeste, assinaturaAberta, sair } = useGestao();
   const [pedidos, setPedidos] = useState(0);
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
   const [mais, setMais] = useState(false);
@@ -225,9 +225,9 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           {souDono && diasDeTeste !== null && (
             <div className="g-lado-plano">
               <b>Teste grátis</b>
-              <span>{!teste || teste.vencido ? "Terminou." : teste.dias === 0 ? "Termina hoje." : teste.dias === 1 ? "Termina amanhã." : `Faltam ${teste.dias} dias.`}</span>
+              <span>{!teste || teste.vencido ? (liberado ? "Terminou. Você continua usando até a assinatura abrir." : "Terminou. A conta está só para consulta.") : teste.dias === 0 ? "Termina hoje." : teste.dias === 1 ? "Termina amanhã." : `Faltam ${teste.dias} dias.`}</span>
               <div className="g-prog"><i style={{ width: `${Math.max(4, Math.min(100, ((7 - diasDeTeste) / 7) * 100))}%` }} /></div>
-              <Link href="/gestao/app/assinatura">Ver os planos</Link>
+              <Link href="/gestao/app/assinatura">Ver assinatura</Link>
             </div>
           )}
           <div className="g-nav" style={{ marginTop: 10 }}>
@@ -264,10 +264,10 @@ export default function Casca({ children }: { children: React.ReactNode }) {
             {souDono && <Link className="g-btn p verde" href="/gestao/app/assinatura">Resolver</Link>}
           </div>
         )}
-        {liberado && diasDeTeste !== null && diasDeTeste <= 3 && souDono && !caminho.endsWith("/assinatura") && !cartaoNoHoje && (
+        {liberado && diasDeTeste !== null && diasDeTeste <= 3 && !teste?.vencido && souDono && !caminho.endsWith("/assinatura") && !cartaoNoHoje && (
           <div className="g-aviso">
             <span>{teste && teste.dias <= 1 ? `Seu teste grátis termina ${teste.quando}.` : `Faltam ${teste?.dias ?? diasDeTeste} dias do seu teste grátis.`}</span>
-            <Link className="g-btn p verde" href="/gestao/app/assinatura">{temCheckout() ? "Assinar" : "Ver a assinatura"}</Link>
+            <Link className="g-btn p verde" href="/gestao/app/assinatura">{assinaturaAberta ? "Assinar" : "Ver assinatura"}</Link>
           </div>
         )}
         {semAcesso ? (

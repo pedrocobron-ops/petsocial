@@ -13,7 +13,7 @@ import { deMin, paraMin, vagasDe } from "@/lib/gestao/agenda";
 import { almocoDoDia, dataAmigavel, dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
-import { AvatarPet, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
+import { AvatarPet, DICA_SO_CONSULTA, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import SeriesAcabando from "@/components/gestao/agenda/series-acabando";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
@@ -32,7 +32,7 @@ const H_HORA = 64; // altura de uma hora na visão de semana, em px
 type Trecho = { b: Bloqueio; de: number; ate: number; inteiro: boolean };
 
 function Agenda() {
-  const { sb, petshop, equipe } = useGestao();
+  const { sb, petshop, equipe, liberado } = useGestao();
   const router = useRouter();
   const params = useSearchParams();
   const somenteLeitura = useSomenteLeitura();
@@ -73,6 +73,8 @@ function Agenda() {
   // link "Agendar" vindo da ficha do pet: /gestao/app/agenda?novo=1&pet=<id>
   useEffect(() => {
     if (params.get("novo") !== "1") return;
+    // conta só para consulta: o atalho não abre o formulário (o banco recusaria a gravação)
+    if (somenteLeitura()) { router.replace("/gestao/app/agenda"); return; }
     const petId = params.get("pet");
     void (async () => {
       let pet: PetComTutor | null = null;
@@ -186,8 +188,8 @@ function Agenda() {
           </div>
           <Link className="g-btn sec" href={`/gestao/app/agenda/imprimir?dia=${dia}&visao=${visao}${prof ? `&prof=${prof}` : ""}`} title="Imprimir ou salvar a agenda em PDF"><Printer />Imprimir</Link>
           <LinkRapido />
-          <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear horário</button>
-          <button className="g-btn pri" onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>
+          <button className="g-btn sec" disabled={!liberado} title={liberado ? undefined : DICA_SO_CONSULTA} onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear horário</button>
+          <button className="g-btn pri" disabled={!liberado} title={liberado ? undefined : DICA_SO_CONSULTA} onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>
         </div>
       </header>
 

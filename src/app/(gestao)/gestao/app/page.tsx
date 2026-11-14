@@ -27,7 +27,7 @@ import { useCalendario } from "@/components/gestao/calendario";
 import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
 import MinhaComissao from "@/components/gestao/minha-comissao";
-import { AvatarPet, Esqueleto, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
+import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import { buscarSaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
@@ -258,11 +258,11 @@ export default function Hoje() {
         </div>
         <div className="g-acoes">
           {posso("agenda") && banho && !contaNova && <LinkRapido rotulo="Mandar link de agendamento" />}
-          {contaNova && frente === "loja" ? <Link className="g-btn pri" href="/gestao/app/estoque"><Plus />Cadastrar o primeiro produto</Link>
-            : contaNova && posso("clientes") ? <Link className="g-btn pri" href="/gestao/app/clientes?novo=1"><Plus />Cadastrar o primeiro pet</Link>
-            : frente === "loja" ? <Link className="g-btn pri" href={ROTA_VENDER}><ShoppingBag />Vender</Link>
-            : soCasa ? <Link className="g-btn pri" href="/gestao/app/creche-hotel"><Plus />{principal === "hotel" ? "Nova reserva" : "Fazer check-in"}</Link>
-            : posso("agenda") && <Link className="g-btn pri" href="/gestao/app/agenda?novo=1"><Plus />Marcar horário</Link>}
+          {contaNova && frente === "loja" ? <LinkDeGravar className="g-btn pri" href="/gestao/app/estoque"><Plus />Cadastrar o primeiro produto</LinkDeGravar>
+            : contaNova && posso("clientes") ? <LinkDeGravar className="g-btn pri" href="/gestao/app/clientes?novo=1"><Plus />Cadastrar o primeiro pet</LinkDeGravar>
+            : frente === "loja" ? <LinkDeGravar className="g-btn pri" href={ROTA_VENDER}><ShoppingBag />Vender</LinkDeGravar>
+            : soCasa ? <LinkDeGravar className="g-btn pri" href="/gestao/app/creche-hotel"><Plus />{principal === "hotel" ? "Nova reserva" : "Fazer check-in"}</LinkDeGravar>
+            : posso("agenda") && <LinkDeGravar className="g-btn pri" href="/gestao/app/agenda?novo=1"><Plus />Marcar horário</LinkDeGravar>}
         </div>
       </header>
 
@@ -325,7 +325,7 @@ export default function Hoje() {
                   <span style={{ whiteSpace: "normal" }}>Tutores e pets entram de uma vez, sem digitar um por um.</span>
                 </div>
               </div>
-              <button type="button" className="g-btn verde" style={{ justifySelf: "start" }} onClick={() => { if (liberado) setImportando(true); }}><FileSpreadsheet />Trazer de uma planilha</button>
+              <button type="button" className="g-btn verde" style={{ justifySelf: "start" }} disabled={!liberado} onClick={() => { if (liberado) setImportando(true); }}><FileSpreadsheet />Trazer de uma planilha</button>
             </div>
             ) : frente === "loja" ? (
             <FrenteDaLoja carregando={!dados} produtos={dados?.produtosTotal ?? 0} acabando={dados?.acabando ?? []} vendas={vendas} novo={dados?.produtosTotal === 0} />
@@ -340,7 +340,7 @@ export default function Hoje() {
               </div>
               {frente === "casa" ? dados && <ChegamESaem chegam={dados.chegamHoje} saem={dados.saemHoje} />
                 : temCasa && <Link className="g-hoje-casa" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
-              <Link className="g-btn verde" href="/gestao/app/creche-hotel" style={{ justifySelf: "start" }}><Plus />{principal === "hotel" ? "Nova reserva" : dados?.estadiasTotal === 0 ? "Fazer o primeiro check-in" : "Fazer check-in"}</Link>
+              <LinkDeGravar className="g-btn verde" href="/gestao/app/creche-hotel" style={{ justifySelf: "start" }}><Plus />{principal === "hotel" ? "Nova reserva" : dados?.estadiasTotal === 0 ? "Fazer o primeiro check-in" : "Fazer check-in"}</LinkDeGravar>
             </div>
             ) : (
             <div className="g-proximo vazio">
@@ -358,7 +358,7 @@ export default function Hoje() {
                 </div>
               </div>
               {temCasa && <Link className="g-hoje-casa" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
-              {posso("agenda") && <Link className="g-btn verde" href="/gestao/app/agenda?novo=1" style={{ justifySelf: "start" }}><Plus />Marcar horário</Link>}
+              {posso("agenda") && <LinkDeGravar className="g-btn verde" href="/gestao/app/agenda?novo=1" style={{ justifySelf: "start" }}><Plus />Marcar horário</LinkDeGravar>}
             </div>
             )
           )}
@@ -410,7 +410,7 @@ export default function Hoje() {
                   <Vazio mozart="acenando" titulo="Nenhum horário marcado para hoje" texto={casa ? `Serviços com hora marcada aparecem aqui. As estadias ficam em ${rotuloCasa}.` : "Serviços com hora marcada aparecem aqui."} />
                 ) : contaNova && posso("clientes") ? (
                   <Vazio mozart="acenando" titulo="A agenda começa pelo primeiro pet" texto="Cadastre um pet com o tutor. Depois é só marcar: o horário aparece aqui.">
-                    <Link className="g-btn verde" href="/gestao/app/clientes?novo=1">Cadastrar o primeiro pet</Link>
+                    <LinkDeGravar className="g-btn verde" href="/gestao/app/clientes?novo=1">Cadastrar o primeiro pet</LinkDeGravar>
                   </Vazio>
                 ) : (
                   <Vazio mozart="acenando" titulo="Nenhum banho marcado para hoje" texto="Que tal chamar quem está com o banho atrasado? O Mozart monta a lista para você.">

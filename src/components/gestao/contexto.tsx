@@ -29,6 +29,11 @@ export type Gestao = {
   liberado: boolean;
   /** Dias que faltam de teste (null quando não está em teste). */
   diasDeTeste: number | null;
+  /**
+   * A assinatura já abriu (dá para pagar)? Enquanto não abriu, o teste vencido não bloqueia nada (o banco segue a mesma
+   * regra, em `acesso_liberado`) e os botões de assinar ficam como "Disponível em breve".
+   */
+  assinaturaAberta: boolean;
   /** Recarrega pet shop, equipe e serviços depois de uma alteração. */
   recarregarBase: () => Promise<void>;
   sair: () => Promise<void>;
@@ -128,6 +133,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       posso: (area: Area) => podeArea(eu, area),
       liberado,
       diasDeTeste: emTeste ? Math.max(0, Math.ceil(resta / 864e5)) : null,
+      assinaturaAberta: aberto,
       recarregarBase: async () => {
         const todos = await carregarBase(petshop.id);
         const novo = todos.find((x) => x.id === eu.id);

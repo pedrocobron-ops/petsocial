@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Selo } from "./marca";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Cat, Dog, PawPrint, Search, X } from "lucide-react";
@@ -386,6 +387,19 @@ export function Vazio({ titulo, texto, children, mozart = "sorrindo" }: { titulo
 
 export function Esqueleto({ linhas = 3 }: { linhas?: number }) {
   return <div className="g-pilha p" aria-busy="true">{Array.from({ length: linhas }, (_, i) => <div key={i} className="g-esq" />)}</div>;
+}
+
+/** Aviso que acompanha um botão de gravar apagado (conta só para consulta). */
+export const DICA_SO_CONSULTA = "A conta está só para consulta. Veja a tela Assinatura para voltar a marcar e lançar.";
+
+/**
+ * Atalho para uma ação que grava (Marcar horário, Cadastrar pet): com a conta só para consulta, vira um botão apagado,
+ * para a tela não oferecer o que o banco vai recusar.
+ */
+export function LinkDeGravar({ href, className, style, children }: { href: string; className?: string; style?: React.CSSProperties; children: React.ReactNode }) {
+  const { liberado } = useGestao();
+  if (liberado) return <Link className={className} href={href} style={style}>{children}</Link>;
+  return <button type="button" className={className} style={style} disabled title={DICA_SO_CONSULTA}>{children}</button>;
 }
 
 /** Aviso de conta só para consulta. Use antes de abrir formulários de gravação. */
