@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import { MARCAS_DAS_MENSAGENS, MENSAGENS, MODELOS_PADRAO } from "@/lib/gestao/hotel";
 import {
-  acomodacoesDe, CHAVES_HOTEL, cuidadosLigados, modelosDe, novoCodigo, pixDe, porteDe, segundoPetDe, sinalDe, taxasDe, temporadasDe,
+  acomodacoesDe, CHAVES_HOTEL, cuidadosLigados, linkSemPreco, modelosDe, novoCodigo, pixDe, porteDe, segundoPetDe, sinalDe, taxasDe, temporadasDe, temporadasQueSeCruzam,
   type Acomodacao, type ModelosDeMensagem, type Taxa, type Temporada,
 } from "@/lib/gestao/hotel-opcoes";
 import { ATRASO_VAZIO, FERIADO_VAZIO, type RegraAtraso, type RegraFeriado } from "@/lib/gestao/feriados";
 import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
 import { PORTES } from "@/lib/gestao/tipos";
-import { isoDia } from "@/lib/gestao/util";
+import { dataCurta, isoDia } from "@/lib/gestao/util";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -40,7 +40,7 @@ const lerNumero = (s: string) => { const n = Number(s.replace(",", ".")); return
 
 export default function OpcoesHotel() {
   const { sb, petshop, souDono, recarregarBase } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [sinal, setSinal] = useState(() => sinalDe(petshop));
   const [pix, setPix] = useState(() => pixDe(petshop));
@@ -49,6 +49,7 @@ export default function OpcoesHotel() {
   const [segundo, setSegundo] = useState(() => segundoPetDe(petshop));
   const [taxas, setTaxas] = useState(() => taxasDe(petshop));
   const [cuidados, setCuidados] = useState(() => cuidadosLigados(petshop));
+  const [semPreco, setSemPreco] = useState(() => linkSemPreco(petshop));
   const [quartos, setQuartos] = useState(() => acomodacoesDe(petshop));
   const [modelos, setModelos] = useState<ModelosDeMensagem>(() => modelosDe(petshop));
   // preço de feriado e taxa de busca fora do horário têm valor: ficam numa tabela que só quem recebe lê (hotel_precos)
@@ -67,6 +68,13 @@ export default function OpcoesHotel() {
   const temHotel = usaModulo(petshop, "hotel"), temCreche = usaModulo(petshop, "creche");
   const m = <T,>(f: (v: T) => void) => (v: T) => { f(v); setMexeu(true); setErro(null); };
   const mp = <T,>(f: (v: T) => void) => (v: T) => { f(v); setMexeu(true); setMexeuNosPrecos(true); setErro(null); };
+  // temporadas que pegam as mesmas noites: vale a mais curta, e a tela diz qual
+  const cruzadas = temporadas.ativo ? temporadasQueSeCruzam(temporadas.lista.filter((t) => t.de && t.ate && t.ate >= t.de)) : [];
+  const nomeDe = (t: Temporada) => t.nome.trim() || "sem nome";
+  const fraseDoCruzamento = ([vale, outra]: [Temporada, Temporada]) => {
+    const de = vale.de > outra.de ? vale.de : outra.de, ate = vale.ate < outra.ate ? vale.ate : outra.ate;
+    return `${nomeDe(vale)} e ${nomeDe(outra)} pegam as mesmas noites (${de === ate ? dataCurta(de) : `${dataCurta(de)} a ${dataCurta(ate)}`}): nelas vale ${nomeDe(vale)}, que é a mais curta.`;
+  };
   const diasDeFeriado = (calendario?.dias ?? []).filter((d) => d.feriado && d.dia >= isoDia(new Date())).length;
 
   async function salvar() {
@@ -83,6 +91,11 @@ export default function OpcoesHotel() {
       if (!usados.length) return setErro("Na taxa de busca fora do horário, escreva a hora e o valor, ou desligue essa opção.");
       if (usados.some((t) => !t!.hora || !t!.valor)) return setErro("Na taxa de busca fora do horário, cada linha precisa da hora e do valor (ou fica toda em branco).");
     }
+    if (cruzadas.length && !(await confirmar({
+      titulo: cruzadas.length === 1 ? "Duas temporadas pegam as mesmas noites" : "Há temporadas que pegam as mesmas noites",
+      texto: `${cruzadas.slice(0, 3).map(fraseDoCruzamento).join(" ")}${cruzadas.length > 3 ? " E há outros casos na lista." : ""} Nas outras noites, cada uma vale sozinha. Se não é isso que você quer, volte e mude as datas.`,
+      confirmar: "Está certo, salvar",
+    }))) return;
     setErro(null); setSalvando(true);
     try {
       if (mexeuNosPrecos) {
@@ -98,6 +111,7 @@ export default function OpcoesHotel() {
         [CHAVES_HOTEL.segundoPet]: segundo,
         [CHAVES_HOTEL.taxas]: { ativo: taxas.ativo, lista: taxas.lista.map((t) => ({ ...t, nome: t.nome.trim() })) },
         [CHAVES_HOTEL.cuidados]: cuidados,
+        [CHAVES_HOTEL.linkSemPreco]: semPreco,
         [CHAVES_HOTEL.acomodacoes]: { ativo: quartos.ativo, lista: quartos.lista.map((a) => ({ ...a, nome: a.nome.trim() })) },
         [CHAVES_HOTEL.mensagens]: Object.fromEntries(Object.entries(modelos).filter(([k, v]) => v && v.trim() && v.trim() !== MODELOS_PADRAO[k as keyof typeof MODELOS_PADRAO])),
       });
@@ -170,13 +184,14 @@ export default function OpcoesHotel() {
               </div>
             ))}
             <div><button type="button" className="g-btn sec p" onClick={() => m(setTemporadas)({ ...temporadas, lista: [...temporadas.lista, { id: novoCodigo(), nome: "", de: hoje, ate: hoje, modo: "pct", valor: 0 }] })}><Plus />Nova temporada</button></div>
-            <p className="g-muted g-pp">A noite conta pelo dia em que começa: a noite de 31/12 para 01/01 é a de 31/12. Se duas temporadas pegarem a mesma noite, vale a que começa primeiro.</p>
+            {cruzadas.map((par) => <p key={`${par[0].id}-${par[1].id}`} className="g-ht-fechado" role="status"><span>{fraseDoCruzamento(par)}</span></p>)}
+            <p className="g-muted g-pp">A noite conta pelo dia em que começa: a noite de 31/12 para 01/01 é a de 31/12. Se duas temporadas pegarem a mesma noite, vale a mais curta (o Réveillon dentro das Férias vale nas noites dele); se tiverem o mesmo tamanho, a que começa depois.</p>
           </Opcao>
         )}
 
         {temHotel && (
-          <Opcao titulo="Desconto para o segundo pet" frase="Quando o mesmo tutor hospeda mais de um pet nas mesmas noites, o segundo em diante tem desconto na diária dessas noites." ligada={segundo.ativo} aoMudar={(v) => m(setSegundo)({ ...segundo, ativo: v })}>
-            <Campo rotulo="Desconto (%)" dica="O primeiro pet (o que entrou antes) paga a diária cheia."><input className="g-input g-tab" inputMode="decimal" value={segundo.pct ?? ""} placeholder="%" onChange={(e) => m(setSegundo)({ ...segundo, pct: lerNumero(e.target.value) })} /></Campo>
+          <Opcao titulo="Desconto para o segundo pet" frase="Quando o mesmo tutor hospeda mais de um pet nas mesmas noites, um paga a diária cheia e os outros têm desconto na diária dessas noites." ligada={segundo.ativo} aoMudar={(v) => m(setSegundo)({ ...segundo, ativo: v })}>
+            <Campo rotulo="Desconto (%)" dica="Paga a diária cheia o pet de diária mais alta; o desconto vai para os outros. Se a diária for igual, paga cheio o pet da reserva feita primeiro. É a mesma regra na reserva, no link do cliente e no check-out."><input className="g-input g-tab" inputMode="decimal" value={segundo.pct ?? ""} placeholder="%" onChange={(e) => m(setSegundo)({ ...segundo, pct: lerNumero(e.target.value) })} /></Campo>
           </Opcao>
         )}
 
@@ -194,6 +209,10 @@ export default function OpcoesHotel() {
             </Campo>
             <p className="g-muted g-pp">{diasDeFeriado ? `${diasDeFeriado === 1 ? "1 data marcada" : `${diasDeFeriado} datas marcadas`} como feriado no preço daqui para a frente.` : "Nenhuma data está marcada como feriado no preço ainda."} <a href="#feriados">Ver as datas</a></p>
           </Opcao>
+        )}
+
+        {temHotel && (
+          <Opcao titulo="Esconder o preço no link do cliente" frase="O link do cliente mostra a diária do hotel e uma estimativa para as datas escolhidas, feita pelas mesmas regras da conta (porte, temporada, feriado e segundo pet). Ligue aqui se prefere passar o valor você mesmo: o link deixa de mostrar preço no hotel." ligada={semPreco} aoMudar={m(setSemPreco)} />
         )}
 
         <Opcao titulo="Taxa de busca fora do horário" frase="Quando o pet sai depois da hora que você definir, o check-out sugere esta taxa. Quem está recebendo confirma ou tira: ela nunca entra sozinha." ligada={atraso.ativo} aoMudar={(v) => mp(setAtraso)({ ...atraso, ativo: v })}>

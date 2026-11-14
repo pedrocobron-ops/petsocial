@@ -130,8 +130,10 @@ export function EtiquetaSinal({ e, valores }: { e: Pick<EstadiaCompleta, "sinal_
 }
 
 /** No cartão da reserva: combinar o sinal (quando ainda não tem) ou receber o que ficou para depois. */
-export function FolhaSinal({ estadia: e, valores, sugerido, aoFechar, aoGravar }: {
+export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFechar, aoGravar }: {
   estadia: EstadiaCompleta; valores: ValoresDaEstadia | null; sugerido: number | null; aoFechar: () => void; aoGravar: () => void;
+  /** total previsto da reserva, para avisar quando o sinal digitado passa dele */
+  totalPrevisto?: number | null;
 }) {
   const { sb, petshop } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
@@ -160,6 +162,12 @@ export function FolhaSinal({ estadia: e, valores, sugerido, aoFechar, aoGravar }
         const pronto = prepararSinal(estado);
         if ("erro" in pronto) return setErro(pronto.erro);
         if (pronto.modo === "sem") return aoFechar();
+        // sinal maior do que a reserva inteira costuma ser erro de digitação (1080 no lugar de 108)
+        if (totalPrevisto && pronto.valor > totalPrevisto && !(await confirmar({
+          titulo: "O sinal é maior do que a reserva",
+          texto: `O sinal está em ${brl(pronto.valor)} e o total previsto da reserva é ${brl(totalPrevisto)}. Confira se não sobrou um número a mais.`,
+          confirmar: "Está certo, continuar",
+        }))) return;
         if (!(await conferirSinal(sb, petshop.id, pronto, confirmar))) return;
         setSalvando(true);
         await lancarSinal(sb, petshop.id, { id: e.id, tipo: e.tipo, entrada: e.entrada, pet: nome, clienteId: e.pets?.clientes?.id ?? null }, pronto);

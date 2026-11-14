@@ -5,7 +5,8 @@ import { saudacaoZap } from "./agenda";
 import { estadiaOcupa, mensalistasNoDia, type Falta, type PlanoCompleto, type Presenca } from "./creche";
 import type { PartePagamento } from "./dinheiro";
 import { feriadoDoDia, regraDeFeriado, type RegraFeriado } from "./feriados";
-import { acomodacoesDe, modelosDe, pixDe, porteDe, segundoPetDe, sinalDe, temporadasDe, type Taxa, type Temporada, type TipoDeMensagem } from "./hotel-opcoes";
+import { opcoesDeCobranca } from "./dinheiro-opcoes";
+import { acomodacoesDe, modelosDe, pixDe, porteDe, segundoPetDe, sinalDe, temporadaDoDia, temporadasDe, type Taxa, type Temporada, type TipoDeMensagem } from "./hotel-opcoes";
 import { brl, dataAmigavel, dataCompleta, dataCurta, hora, inicioDoDia, isoDia, somaDias } from "./util";
 
 /**
@@ -20,7 +21,11 @@ export type Mens = { planos: PlanoCompleto[]; presencas: Presenca[]; faltas: Fal
 type Periodo = Pick<Estadia, "tipo" | "entrada" | "saida_prevista" | "status">;
 type Passada = Pick<Estadia, "tipo" | "entrada" | "saida" | "saida_prevista" | "status">;
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
+/**
+ * Arredonda em centavos, meio centavo para cima, sem o resto que a conta em ponto flutuante deixa (96,6 × 1,25 = 120,74999…).
+ * É o mesmo arredondamento que o banco faz em `hotel_noite`: as duas contas têm de dar o mesmo centavo.
+ */
+export const centavos = (n: number) => Math.round(Number((n * 100).toPrecision(12))) / 100;
 
 /* ---------- ocupação ---------- */
 
@@ -100,24 +105,38 @@ export function diariaSugerida(petshop: Petshop, tipo: string, porte: string | n
 /** Uma noite da conta: a diária combinada, a temporada (se houver), o desconto do segundo pet e o valor final. */
 export type Noite = { dia: string; base: number; temporada: string | null; cheia: number; desconto: number; valor: number };
 
-/** As noites de uma estadia de hotel: `n` dias seguidos a partir do dia da entrada. */
-export function diasDasNoites(entrada: string | Date, n: number): string[] {
-  const ini = inicioDoDia(new Date(entrada));
-  return Array.from({ length: Math.max(0, Math.min(n, 400)) }, (_, i) => isoDia(somaDias(ini, i)));
+/**
+ * As noites de uma estadia de hotel: `n` dias seguidos a partir do dia da entrada.
+ * Com `ate` (o dia em que o pet saiu, ou hoje no check-out), as noites nunca passam da última noite de verdade:
+ * se a pessoa cobra mais noites do que as datas mostram (o check-in foi anotado depois da chegada), as noites a mais
+ * contam para trás, antes da entrada anotada, e não para a frente, em dias que ainda nem chegaram.
+ */
+export function diasDasNoites(entrada: string | Date, n: number, ate?: string | Date | null): string[] {
+  let ini = inicioDoDia(new Date(entrada));
+  const qtd = Math.max(0, Math.min(n, 400));
+  if (ate) {
+    const pelasDatas = Math.max(1, Math.round((inicioDoDia(new Date(ate)).getTime() - ini.getTime()) / 864e5));
+    if (qtd > pelasDatas) ini = somaDias(ini, pelasDatas - qtd);
+  }
+  return Array.from({ length: qtd }, (_, i) => isoDia(somaDias(ini, i)));
 }
+/** Das noites cobradas, as que caíram antes da entrada anotada (ver `diasDasNoites`). */
+export const noitesAntesDaEntrada = (entrada: string | Date, dias: string[]) => { const ini = isoDia(new Date(entrada)); return dias.filter((d) => d < ini); };
 
 /**
  * Preço noite a noite. Para cada noite: começa na diária combinada na reserva (`base`);
  * se a noite é de feriado (data marcada pelo dono, com o preço de feriado ligado), vale o preço de feriado;
- * senão, se cai numa temporada, vale a diária da temporada, ou a base com o acréscimo dela (em % ou em reais);
- * se é noite em que outro pet do mesmo tutor também está hospedado (e chegou antes), tira o desconto do segundo pet.
+ * senão, se cai numa temporada, vale a diária da temporada, ou a base com o acréscimo dela (em % ou em reais).
+ * Quando duas temporadas pegam a mesma noite, vale a mais curta (`temporadaDoDia`);
+ * se é noite de "segundo pet" (`diasDeSegundoPet`), tira o desconto do segundo pet.
  * Cada noite é arredondada em centavos; o total é a soma das noites. Em `temporada` vai o nome que aparece na conta.
+ * O banco faz a mesma conta em `hotel_noite` (para o link do cliente e para o sinal do pedido aceito): mudou aqui, mude lá.
  */
 export function precoDasNoites(p: { dias: string[]; base: number; temporadas: Temporada[]; segundoPct: number | null; diasDeSegundo: Set<string>; feriado?: { regra: RegraFeriado; nomeDe: (dia: string) => string | null } | null }): Noite[] {
-  const comRegra = (r: { modo: "valor" | "pct" | "mais"; valor: number }) => (r.modo === "valor" ? r.valor : r.modo === "mais" ? p.base + r.valor : p.base * (1 + r.valor / 100));
+  const comRegra = (r: { modo: "valor" | "pct" | "mais"; valor: number }) => (r.modo === "valor" ? r.valor : r.modo === "mais" ? p.base + r.valor : (p.base * (100 + r.valor)) / 100);
   return p.dias.map((dia) => {
     const f = p.feriado && p.feriado.regra.valor != null ? p.feriado.nomeDe(dia) : null;
-    const t = f != null ? null : p.temporadas.find((x) => x.de <= dia && dia <= x.ate) ?? null;
+    const t = f != null ? null : temporadaDoDia(p.temporadas, dia);
     const cheia = centavos(f != null ? comRegra({ modo: p.feriado!.regra.modo, valor: p.feriado!.regra.valor! }) : t ? comRegra(t) : p.base);
     const desconto = p.segundoPct && p.diasDeSegundo.has(dia) ? centavos((cheia * p.segundoPct) / 100) : 0;
     return { dia, base: p.base, temporada: f ?? t?.nome ?? null, cheia, desconto, valor: centavos(cheia - desconto) };
@@ -125,24 +144,35 @@ export function precoDasNoites(p: { dias: string[]; base: number; temporadas: Te
 }
 
 /** Estadia de hotel de outro pet do mesmo tutor, para o desconto do segundo pet. */
-export type EstadiaDoTutor = Pick<Estadia, "id" | "pet_id" | "tipo" | "status" | "entrada" | "saida_prevista" | "saida" | "diarias_cobradas">;
+export type EstadiaDoTutor = Pick<Estadia, "id" | "pet_id" | "tipo" | "status" | "entrada" | "saida_prevista" | "saida" | "diarias_cobradas"> & { valor_diaria?: number | string | null; criado_em?: string | null };
+/** A estadia cuja conta está sendo feita: a diária combinada e quando a reserva foi criada decidem quem paga cheio. */
+export type EstadiaDaConta = { id: string | null; pet_id: string; tipo: string; entrada: string | Date; criado_em?: string | null };
 
 /**
- * Noites desta estadia em que ela é a do "segundo pet": outro pet do mesmo tutor está hospedado no hotel na mesma noite
- * e entrou antes (no empate exato da hora, sempre a mesma das duas). O primeiro paga a diária cheia.
+ * Noites desta estadia em que ela é a do "segundo pet" (tem o desconto). A regra, uma só em todas as telas:
+ * na noite em que mais de um pet do mesmo tutor está no hotel, paga a diária cheia o pet de DIÁRIA COMBINADA MAIS ALTA;
+ * os outros têm o desconto. Se a diária é igual, paga cheio a reserva feita primeiro (a reserva que ainda está sendo
+ * digitada é sempre a mais nova). Não depende de quem chegou antes nem da ordem em que a tela leu as reservas.
+ * O banco usa a mesma regra em `hotel_previsto`.
  */
-export function diasDeSegundoPet(esta: { id: string | null; pet_id: string; entrada: string | Date }, dias: string[], outras: EstadiaDoTutor[], hoje: Date): Set<string> {
-  const minha = new Date(esta.entrada).getTime();
+export function diasDeSegundoPet(esta: EstadiaDaConta, base: number, dias: string[], outras: EstadiaDoTutor[], hoje: Date): Set<string> {
   const hojeIso = isoDia(hoje);
-  const antes = outras.filter((o) => o.tipo === "hotel" && o.status !== "cancelada" && o.pet_id !== esta.pet_id && o.id !== esta.id
-    && (new Date(o.entrada).getTime() < minha || (new Date(o.entrada).getTime() === minha && (esta.id == null || o.id < esta.id))));
+  // a outra paga cheio no meu lugar? (diária mais alta; no empate, a reserva mais antiga)
+  const passaNaFrente = (o: EstadiaDoTutor) => {
+    const dela = o.valor_diaria == null ? 0 : Number(o.valor_diaria);
+    if (dela !== base) return dela > base;
+    if (esta.id == null || !esta.criado_em) return true;
+    if (!o.criado_em) return false;
+    return o.criado_em !== esta.criado_em ? o.criado_em < esta.criado_em : o.id < esta.id;
+  };
+  const antes = outras.filter((o) => o.tipo === "hotel" && o.status !== "cancelada" && o.pet_id !== esta.pet_id && o.id !== esta.id && passaNaFrente(o));
   const cobre = (o: EstadiaDoTutor, dia: string) => {
     const ini = isoDia(new Date(o.entrada));
+    if (o.status === "encerrada") return diasDasNoites(o.entrada, o.diarias_cobradas ?? contarDiarias(o, new Date(o.saida ?? o.entrada)), o.saida ?? o.entrada).includes(dia);
     if (dia < ini) return false;
-    if (o.status === "encerrada") return diasDasNoites(o.entrada, o.diarias_cobradas ?? contarDiarias(o, new Date(o.saida ?? o.entrada))).includes(dia);
     if (!o.saida_prevista) return o.status === "em_casa" ? true : dia === ini;
     const fim = isoDia(new Date(o.saida_prevista));
-    return dia < fim || (o.status === "em_casa" && dia <= hojeIso);
+    return dia < fim || dia === ini || (o.status === "em_casa" && dia <= hojeIso);
   };
   return new Set(dias.filter((d) => antes.some((o) => cobre(o, d))));
 }
@@ -158,15 +188,18 @@ export function precoPorNoite(petshop: Petshop, tipo: string) {
   return lista.length || pct || feriado ? { temporadas: lista, segundoPct: pct, feriado } : null;
 }
 
-/** Diárias de uma estadia: noite a noite quando há regra ligada (hotel); senão, quantidade × diária, como sempre. */
-export function contaDasDiarias(petshop: Petshop, e: { id: string | null; pet_id: string; tipo: string; entrada: string | Date }, n: number, diaria: number | null, outras: EstadiaDoTutor[], hoje: Date):
+/**
+ * Diárias de uma estadia: noite a noite quando há regra ligada (hotel); senão, quantidade × diária, como sempre.
+ * `ate`: o dia em que o pet saiu (ou hoje, no check-out). Com ele, as noites cobradas nunca caem em dia que ainda não chegou.
+ */
+export function contaDasDiarias(petshop: Petshop, e: EstadiaDaConta, n: number, diaria: number | null, outras: EstadiaDoTutor[], hoje: Date, ate?: string | Date | null):
   { total: number | null; noites: Noite[] | null } {
   if (diaria == null) return { total: null, noites: null };
   const regra = precoPorNoite(petshop, e.tipo);
   if (!regra) return { total: centavos(n * diaria), noites: null };
-  const dias = diasDasNoites(e.entrada, n);
+  const dias = diasDasNoites(e.entrada, n, ate);
   const noites = precoDasNoites({
-    dias, base: diaria, temporadas: regra.temporadas, segundoPct: regra.segundoPct, diasDeSegundo: regra.segundoPct ? diasDeSegundoPet(e, dias, outras, hoje) : new Set(),
+    dias, base: diaria, temporadas: regra.temporadas, segundoPct: regra.segundoPct, diasDeSegundo: regra.segundoPct ? diasDeSegundoPet(e, diaria, dias, outras, hoje) : new Set(),
     feriado: regra.feriado ? { regra: regra.feriado, nomeDe: feriadoDoDia } : null,
   });
   return { total: centavos(noites.reduce((t, x) => t + x.valor, 0)), noites };
@@ -316,7 +349,7 @@ export function textoComprovanteEstadia(p: { petshop: string; tutor?: string | n
 /* ---------- ficha de cuidados ---------- */
 
 /** Um cuidado combinado para a estadia: comida ou remédio, quanto e em que horários. */
-export type Cuidado = { id: string; tipo: "comida" | "remedio"; oque: string; quanto: string; horas: string[] };
+export type Cuidado = { id: string; tipo: "comida" | "remedio"; oque: string; quanto: string; horas: string[]; /** só no formulário: a hora que está no campo e ainda não entrou na lista */ nova?: string };
 export function lerCuidados(e: { cuidados?: unknown } | null | undefined): Cuidado[] {
   if (!Array.isArray(e?.cuidados)) return [];
   return (e!.cuidados as unknown[]).flatMap((x) => {
@@ -370,7 +403,9 @@ export const MARCAS_DAS_MENSAGENS = [
 ];
 
 type PetDaMensagem = { nome: string; sexo?: string | null; clientes?: { nome: string | null } | null };
-type DadosDaMensagem = { petshop: Petshop; pet: PetDaMensagem; estadia: Pick<Estadia, "tipo" | "entrada" | "saida_prevista">; sinal?: number | null; fatos?: string };
+type DadosDaMensagem = { petshop: Petshop; pet: PetDaMensagem; estadia: Pick<Estadia, "tipo" | "entrada" | "saida_prevista">; sinal?: number | null; /** quanto do sinal já entrou (sinal pago em partes) */ sinalRecebido?: number | null; fatos?: string };
+/** A chave Pix que vai nas mensagens do sinal: a das opções do hotel; em branco, a das opções de cobrança. */
+export const pixDoSinal = (petshop: Petshop) => pixDe(petshop) || opcoesDeCobranca(petshop).pix;
 /** A mensagem inteira: "Oi, Ana! Aqui é …" e o corpo. */
 export const textoDaMensagem = (tipo: TipoDeMensagem, p: DadosDaMensagem) => `${saudacaoZap(p.pet.clientes?.nome, p.petshop.nome)} ${corpoDaMensagem(tipo, p)}`;
 /** Só o corpo, sem a saudação (para juntar vários pets do mesmo tutor numa mensagem). */
@@ -381,12 +416,13 @@ export function corpoDaMensagem(tipo: TipoDeMensagem, p: DadosDaMensagem) {
   const doPet = `${pet.sexo === "M" ? "do " : pet.sexo === "F" ? "da " : "de "}${pet.nome}`;
   const bem = pet.sexo === "M" ? `O ${pet.nome} está ótimo` : pet.sexo === "F" ? `A ${pet.nome} está ótima` : `${pet.nome} está muito bem`;
   const quando = (d: string | null) => (d ? `${dataAmigavel(new Date(d))}, às ${hora(d)}` : "o dia combinado");
-  const sinal = sinalDe(p.petshop), pix = pixDe(p.petshop);
+  const sinal = sinalDe(p.petshop), pix = pixDoSinal(p.petshop);
+  const jaEntrou = p.sinal && p.sinalRecebido && p.sinalRecebido > 0 && p.sinalRecebido < p.sinal ? p.sinalRecebido : 0;
   const trocas: [string, string][] = [
     ["[O pet está bem]", bem], ["[do pet]", doPet], ["[pet]", pet.nome], ["[lugar]", lugar],
     ["[entrada-dia]", dataCurta(e.entrada)], ["[saida-dia]", e.saida_prevista ? dataCurta(e.saida_prevista) : "a saída"],
     ["[entrada]", quando(e.entrada)], ["[saida]", quando(e.saida_prevista)],
-    ["[valor]", p.sinal ? brl(p.sinal) : "valor a combinar"],
+    ["[valor]", !p.sinal ? "valor a combinar" : jaEntrou ? `${brl(p.sinal)} (já recebemos ${brl(jaEntrou)}; falta ${brl(centavos(p.sinal - jaEntrou))})` : brl(p.sinal)],
     ["[politica]", sinal.politica.trim() ? ` ${sinal.politica.trim()}` : ""], ["[pix]", pix ? ` Pix: ${pix}` : ""],
     ["[cuidados]", p.fatos ? ` Hoje ${p.fatos}.` : ""],
   ];

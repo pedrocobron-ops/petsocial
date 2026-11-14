@@ -72,7 +72,7 @@ function MensagemPronta({ titulo, apoio, texto, telefone, enviadaEm, destaque, a
 
 /** Folha "Mensagens" do cartão da estadia: todas as mensagens que cabem agora, cada uma a um toque do WhatsApp. */
 export function MensagensDaEstadia({ estadia: e, sinal, fatos, aoFechar, aoMudar }: {
-  estadia: EstadiaCompleta; sinal: { valor: number; pago: boolean } | null; fatos?: string; aoFechar: () => void; aoMudar: () => void;
+  estadia: EstadiaCompleta; sinal: { valor: number; pago: boolean; /** quanto do sinal já entrou, quando ele é pago em partes */ recebido?: number } | null; fatos?: string; aoFechar: () => void; aoMudar: () => void;
 }) {
   const { petshop } = useGestao();
   const anotar = useAnotarAviso();
@@ -87,7 +87,7 @@ export function MensagensDaEstadia({ estadia: e, sinal, fatos, aoFechar, aoMudar
         <p className="g-muted g-p">O WhatsApp abre com a mensagem pronta e você só aperta enviar. Nada é mandado sozinho.</p>
         {tipos.map((m) => (
           <MensagemPronta key={m.id} titulo={m.rotulo} apoio={m.apoio} telefone={pet.clientes?.telefone}
-            texto={textoDaMensagem(m.id, { petshop, pet, estadia: e, sinal: sinal?.valor, fatos })} enviadaEm={enviadas[m.id] ?? avisoDe(e, m.id)}
+            texto={textoDaMensagem(m.id, { petshop, pet, estadia: e, sinal: sinal?.valor, sinalRecebido: sinal?.recebido, fatos })} enviadaEm={enviadas[m.id] ?? avisoDe(e, m.id)}
             aoMandar={() => { void anotar([e], m.id).then((em) => { if (em) { setEnviadas((x) => ({ ...x, [m.id]: em })); aoMudar(); } }); }} />
         ))}
       </div>
@@ -110,7 +110,13 @@ export function AvisarChegadas({ reservas, aoFechar, aoMudar }: { reservas: Esta
   for (const e of doDia) { const k = e.pets!.clientes?.id ?? `pet-${e.pet_id}`; grupos.set(k, [...(grupos.get(k) ?? []), e]); }
   const linhas = [...grupos.entries()].map(([chave, lista]) => {
     const tutor = lista[0].pets!.clientes;
-    const texto = `${saudacaoZap(tutor?.nome, petshop.nome)} ${lista.map((e) => corpoDaMensagem("chegada", { petshop, pet: e.pets!, estadia: e })).join(" ")}`;
+    // dois pets do mesmo tutor que chegam juntos (mesmo lugar, mesma hora): uma frase só, com os dois nomes
+    const juntos = lista.length > 1 && lista.every((e) => e.tipo === lista[0].tipo && e.entrada === lista[0].entrada);
+    const nomes = lista.map((e) => e.pets!.nome);
+    const corpo = juntos
+      ? corpoDaMensagem("chegada", { petshop, pet: { nome: `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`, sexo: null }, estadia: lista[0] })
+      : lista.map((e) => corpoDaMensagem("chegada", { petshop, pet: e.pets!, estadia: e })).join(" ");
+    const texto = `${saudacaoZap(tutor?.nome, petshop.nome)} ${corpo}`;
     const ja = lista.every((e) => avisoDe(e, "chegada")) ? lista.map((e) => avisoDe(e, "chegada")!).sort().pop()! : null;
     return { chave, lista, tutor, texto, enviadaEm: enviadas[chave] ?? ja, temFone: soDigitos(tutor?.telefone).length >= 8 };
   });

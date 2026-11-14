@@ -189,3 +189,10 @@
 .g-lk-meus li > button { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--g-cinza); border-radius: 12px; cursor: pointer; }
 .g-lk-meus li > button svg { width: 16px; height: 16px; }
 .g-lk-fim .g-lk-meus { width: 100%; text-align: left; margin-top: 8px; }
+
+/* estimativa do hotel (as contas vêm do banco, pelas regras do pet shop) */
+.g-lk-conta { display: grid; gap: 6px; padding: 12px 14px; border-radius: 14px; background: var(--g-carta); font-size: .9375rem; }
+.g-lk-conta .l { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.g-lk-conta .l > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-lk-conta .l.forte { font-weight: 700; border-top: 1px solid var(--g-linha); padding-top: 6px; }
+.g-lk-conta small { color: var(--g-cinza); font-size: .8125rem; line-height: 1.4; }

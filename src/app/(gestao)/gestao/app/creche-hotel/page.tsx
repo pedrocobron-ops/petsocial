@@ -22,7 +22,7 @@ import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
 import Mensalistas from "@/components/gestao/creche/mensalistas";
 import ReposicoesParaConferir from "@/components/gestao/creche/reposicoes";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
-import CheckOut, { comNota, DetalheDaEstadia, NoitePorNoite, NOTA_PACOTE, pacoteServe, pacotesParaEstadia, venceu } from "@/components/gestao/hotel/checkout";
+import CheckOut, { comNota, DetalheDaEstadia, estadiasDoTutor, NoitePorNoite, NOTA_PACOTE, pacoteServe, pacotesParaEstadia, venceu } from "@/components/gestao/hotel/checkout";
 import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/components/gestao/hotel/cuidados";
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
 import Ocupacao from "@/components/gestao/hotel/ocupacao";
@@ -34,8 +34,8 @@ import { esperadoNoDia, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMuda
 import { conferirCaixa, conferirValorAlto, lancarPago, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
 import {
-  aceitaSinal, contaDasDiarias, contarDiarias, diariaFixa, diariaSugerida, estadiaSemCobranca, fatosDoDia, lerCuidados, nivelDeOcupacao, nomeDaAcomodacao, ocupadasNoDia, ocupaNoDia, precoPorNoite, sinalSugerido,
-  taxaNaConta, taxasGuardadas, temNoiteDiferente, vagasDoTipo, type ContaDaEstadia, type Cuidado, type CuidadoFeito, type EstadiaDoTutor, type Mens, type ValoresDaEstadia,
+  aceitaSinal, contaDasDiarias, contarDiarias, diariaFixa, diariaSugerida, estadiaSemCobranca, fatosDoDia, lerConta, lerCuidados, nivelDeOcupacao, nomeDaAcomodacao, ocupadasNoDia, ocupaNoDia, precoPorNoite, sinalSugerido,
+  taxaNaConta, taxasGuardadas, temNoiteDiferente, textoDoCuidado, vagasDoTipo, type ContaDaEstadia, type Cuidado, type CuidadoFeito, type EstadiaDoTutor, type Mens, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
 import { acomodacoesDe, cuidadosLigados, porteDe, taxasDe } from "@/lib/gestao/hotel-opcoes";
 import { principalDe, usaModulo } from "@/lib/gestao/modulos";
@@ -122,7 +122,7 @@ const doMesmoTutor = (abertas: EstadiaCompleta[], clienteId: string | null | und
  * Diárias e total previstos de uma reserva ou estadia (null se a diária não foi combinada).
  * Com as opções de preço desligadas é diárias × diária, como sempre; ligadas, é a conta noite a noite mais as taxas marcadas.
  */
-function previsto(petshop: Petshop, e: { id: string | null; pet_id: string; tipo: string; entrada: string; saida_prevista: string | null; valor_diaria: number | null },
+function previsto(petshop: Petshop, e: { id: string | null; pet_id: string; tipo: string; entrada: string; saida_prevista: string | null; valor_diaria: number | null; criado_em?: string | null },
   outras: EstadiaDoTutor[], valores?: Pick<ValoresDaEstadia, "taxas"> | null) {
   if (e.valor_diaria == null) return null;
   const n = e.saida_prevista ? contarDiarias(e, new Date(e.saida_prevista)) : 1;
@@ -208,6 +208,8 @@ export default function CrecheHotel() {
     try { window.history.replaceState(null, "", `?ver=${novo}`); } catch { /* sem histórico: segue sem guardar */ }
     return novo;
   }), []);
+  /** O nome da tela para este negócio: quem só tem hotel lê "Hotel", não "Creche e hotel". */
+  const nomeDaTela = usaCreche && usaHotel ? "Creche e hotel" : usaHotel ? "Hotel" : usaCreche ? "Creche" : "Creche e hotel";
   const [novoPlano, setNovoPlano] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [mesCobranca, setMesCobranca] = useState(() => new Date());
@@ -220,7 +222,9 @@ export default function CrecheHotel() {
   const valorDaTaxa = vejoFinanceiro && calendario?.atraso.ativo ? calendario.atraso.creche.valor : null;
   const [aba, setAba] = useState<Aba>("casa");
   const [tipo, setTipo] = useState<"todos" | Tipo>("todos");
-  const [nova, setNova] = useState<{ dia?: string; tipo?: Tipo; pet?: PetDaEstadia | null; espera?: string } | null>(null);
+  const [nova, setNova] = useState<{ dia?: string; saida?: string; tipo?: Tipo; pet?: PetDaEstadia | null; espera?: string } | null>(null);
+  // check-in de reserva com a data já passada: a pessoa diz se o pet chegou agora ou no dia reservado
+  const [chegando, setChegando] = useState<EstadiaCompleta | null>(null);
   const [editando, setEditando] = useState<EstadiaCompleta | null>(null);
   const [lote, setLote] = useState(false);
   const [saindo, setSaindo] = useState<EstadiaCompleta | null>(null);
@@ -308,6 +312,8 @@ export default function CrecheHotel() {
   const naCasa = useMemo(() => abertas.filter((e) => e.status === "em_casa"), [abertas]);
   const reservas = useMemo(() => abertas.filter((e) => e.status === "reservada"), [abertas]);
   const historico = dados?.passadas ?? [];
+  // para o desconto do segundo pet: as estadias abertas e as que já saíram (o pet que saiu primeiro continua contando nas noites dele)
+  const doTutor = useMemo(() => [...abertas, ...(dados?.passadas ?? []).filter((e) => e.status === "encerrada" && e.tipo === "hotel")], [abertas, dados]);
   const tudoVazio = Boolean(dados) && !naCasa.length && !reservas.length && !historico.length && !dados?.semCobranca.length && !dados?.atrasos.length;
   const valoresDe = (e: EstadiaCompleta) => dados?.valores.get(e.id) ?? null;
 
@@ -316,9 +322,14 @@ export default function CrecheHotel() {
   const espera = useListaDeEspera(abertas, mens ?? null);
   const verEspera = () => { setVer("ocupacao"); setTimeout(() => document.getElementById("lista-de-espera")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); };
 
-  async function checkIn(e: EstadiaCompleta) {
+  /**
+   * Check-in pela reserva. Reserva de dia que já passou: pergunta antes se o pet chegou agora ou no dia reservado
+   * (`quando`), para a estadia não recomeçar em "agora" e as noites saírem nos dias certos.
+   */
+  async function checkIn(e: EstadiaCompleta, quando?: "agora" | "reservado") {
     if (somenteLeitura()) return;
     const nome = e.pets?.nome ?? "O pet";
+    if (!quando && isoDia(new Date(e.entrada)) < isoDia(new Date())) { setChegando(e); return; }
     // o mesmo pet não entra duas vezes na casa
     const jaAqui = abertas.find((x) => x.pet_id === e.pet_id && x.id !== e.id && x.status === "em_casa");
     if (jaAqui) { avisarErro(fraseConflito(nome, jaAqui)); return; }
@@ -348,10 +359,10 @@ export default function CrecheHotel() {
         texto: `${vencidas.join(", ")}. Confira a carteirinha antes de receber o pet.`,
         confirmar: "Fazer check-in mesmo assim", perigo: true,
       }))) return;
-      const r = ok(await sb.from("estadias").update({ status: "em_casa", entrada: new Date().toISOString() })
+      const r = ok(await sb.from("estadias").update(quando === "reservado" ? { status: "em_casa" } : { status: "em_casa", entrada: new Date().toISOString() })
         .eq("id", e.id).eq("petshop_id", petshop.id).eq("status", "reservada").select("id"));
       if (!r.length) avisar("Essa reserva já tinha sido alterada. Atualizei a lista.");
-      else avisar(`${nome} chegou.`);
+      else avisar(quando === "reservado" ? `${nome} está na casa desde ${dataCurta(e.entrada)}, como estava reservado.` : `${nome} chegou.`);
       mudou();
     } catch (x) {
       if (ehRepetido(x)) { avisarErro(`${nome} já está na casa. Atualizei a lista.`); mudou(); }
@@ -437,13 +448,14 @@ export default function CrecheHotel() {
     // com desconto do segundo pet a conta depende das outras estadias do tutor: o valor certo aparece ao abrir
     if (precoPorNoite(petshop, e.tipo)?.segundoPct) return null;
     const n = e.diarias_cobradas ?? 1, v = valoresDe(e);
-    const d = contaDasDiarias(petshop, e, n, Number(e.valor_diaria), [], new Date(e.saida ?? e.entrada));
+    const d = contaDasDiarias(petshop, e, n, Number(e.valor_diaria), [], new Date(e.saida ?? e.entrada), e.saida ?? e.entrada);
     const taxas = taxasGuardadas(v).reduce((t, x) => t + taxaNaConta(x, n).total, 0);
     const sinal = v?.sinal != null && (v.sinal_estado === "pago" || v.sinal_estado === "a_receber") ? Number(v.sinal) : 0;
     return Math.max(0, centavos((d.total ?? 0) + taxas - sinal));
   };
   const vagasCrecheHoje = vagasHoje.find((v) => v.id === "creche");
-  const sugeridoPara = (e: EstadiaCompleta) => sinalSugerido(petshop, previsto(petshop, { ...e, valor_diaria: e.valor_diaria == null ? null : Number(e.valor_diaria) }, doMesmoTutor(abertas, e.pets?.clientes?.id), valoresDe(e))?.total ?? null);
+  const previstoDe = (e: EstadiaCompleta) => { const p = previsto(petshop, { ...e, valor_diaria: e.valor_diaria == null ? null : Number(e.valor_diaria) }, doMesmoTutor(doTutor, e.pets?.clientes?.id), valoresDe(e)); return p && !p.aberto ? p.total : null; };
+  const sugeridoPara = (e: EstadiaCompleta) => sinalSugerido(petshop, previstoDe(e));
 
   /** Etiquetas do cartão que não são dinheiro: a acomodação. */
   const quarto = (e: EstadiaCompleta) => { const n = nomeDaAcomodacao(petshop, e.acomodacao); return n ? <p className="g-ch-obs"><BedDouble aria-hidden /><span>{n}</span></p> : null; };
@@ -453,7 +465,7 @@ export default function CrecheHotel() {
     <>
       <header className="g-topo">
         <div>
-          <h1>{usaCreche && !usaHotel ? "Creche" : usaHotel && !usaCreche ? "Hotel" : "Creche e hotel"}</h1>
+          <h1>{nomeDaTela}</h1>
           <p className="g-muted">
             {naCasa.length ? `${naCasa.length} ${naCasa.length === 1 ? "pet na casa agora" : "pets na casa agora"}` : "Quem está aqui, quem vem e quem já foi."}
           </p>
@@ -490,7 +502,7 @@ export default function CrecheHotel() {
           <div className="g-pilha">
             <Ocupacao abertas={abertas} mens={mens ?? null} aoNovaReserva={(dia, t) => { if (!somenteLeitura()) setNova({ dia, tipo: t }); }} />
             <ListaDeEspera espera={espera} aoNova={() => setEsperaNova({})}
-              aoReservar={(x) => setNova({ dia: x.entrada, tipo: x.tipo === "hotel" ? "hotel" : "creche", pet: x.pets, espera: x.id })} />
+              aoReservar={(x) => setNova({ dia: x.entrada, saida: x.saida, tipo: x.tipo === "hotel" ? "hotel" : "creche", pet: x.pets, espera: x.id })} />
           </div>
         )
         : tudoVazio ? (
@@ -570,7 +582,8 @@ export default function CrecheHotel() {
             {vagasHoje.map((v) => (
               <span key={v.id} className={`g-ch-vagas${v.ocupadas >= v.total! ? " cheia" : ""}`}>
                 {v.id === "hotel" ? <Moon aria-hidden /> : <Sun aria-hidden />}
-                <span>{v.rotulo} hoje: <b className="g-tab">{v.ocupadas} de {v.total} vagas</b>{v.ocupadas >= v.total! ? " · casa cheia" : ""}</span>
+                <span>{v.id === "hotel" ? "Hotel, noite de hoje" : `${v.rotulo} hoje`}: <b className="g-tab">{v.ocupadas} de {v.total} vagas</b>{v.ocupadas >= v.total! ? " · casa cheia" : ""}
+                  {v.id === "hotel" && saemHoje.filter((e) => e.tipo === "hotel").length > 0 ? ` (sem contar ${saemHoje.filter((e) => e.tipo === "hotel").length === 1 ? "1 que sai" : `${saemHoje.filter((e) => e.tipo === "hotel").length} que saem`} hoje)` : ""}</span>
               </span>
             ))}
             {chegamAmanha.length > 0 && <button type="button" className="g-btn sec p" style={{ minHeight: 44 }} onClick={() => setAvisando(true)}><MessageCircle />Avisar quem chega amanhã ({chegamAmanha.length})</button>}
@@ -626,7 +639,7 @@ export default function CrecheHotel() {
                         </div>
                       </div>
 
-                      <LinhaValor e={e} plano={planoDe(e)} abertas={abertas} valores={valoresDe(e)} />
+                      <LinhaValor e={e} plano={planoDe(e)} abertas={doTutor} valores={valoresDe(e)} />
                       {pet?.alertas && <div className="g-aviso vermelho" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce"><b>Atenção:</b> {pet.alertas}</span></div>}
                       {quarto(e)}
                       {e.obs && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{e.obs}</span></p>}
@@ -690,12 +703,12 @@ export default function CrecheHotel() {
                           : <span className={`g-tag ${dias === 0 ? "verde" : "azul"}`}>{dias === 0 ? "chega hoje" : dias === 1 ? "chega amanhã" : `em ${dias} dias`}</span>}
                       </div>
 
-                      <LinhaValor e={e} abertas={abertas} valores={v} />
+                      <LinhaValor e={e} abertas={doTutor} valores={v} />
                       {pet?.alertas && <p className="g-p g-vermelho-t"><b>Atenção:</b> {pet.alertas}</p>}
                       {quarto(e)}
                       {e.obs && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{e.obs}</span></p>}
                       <AceiteDoLink estadiaId={e.id} />
-                      {comCuidados && lerCuidados(e).length > 0 && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{lerCuidados(e).map((c) => [c.oque, c.quanto].filter(Boolean).join(", ")).join(" · ")}</span></p>}
+                      {comCuidados && lerCuidados(e).length > 0 && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{lerCuidados(e).map(textoDoCuidado).join(" · ")}</span></p>}
                       <div className="g-fila g-ch-acoes">
                         <button className="g-btn verde p" disabled={ocupado === e.id} onClick={() => checkIn(e)}><LogIn /> Check-in</button>
                         {!e.mensalista && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setEditando(e); }}><Pencil /> Editar</button>}
@@ -751,14 +764,14 @@ export default function CrecheHotel() {
       {ver === "casa" && dados && !tudoVazio && souDono && <div style={{ marginTop: 20 }}><LinkCrecheHotel titulo="Pedidos pelo link do cliente" /></div>}
       {(ver === "casa" || ver === "ocupacao") && dados && souDono && <p style={{ marginTop: 16 }}><Link className="g-btn fantasma p" href="/gestao/app/meu-petshop#opcoes-hotel"><Settings2 />Opções do hotel e da creche</Link></p>}
       {acertando && <AcertarEstadia key={acertando.id} estadia={acertando} aoFechar={() => setAcertando(null)} aoGravar={() => { setAcertando(null); mudou(); }} />}
-      {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} abertas={abertas}
+      {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} saidaInicial={nova.saida} abertas={abertas} doTutor={doTutor}
         aoFechar={() => setNova(null)} aoGravar={(emCasa) => {
           // a reserva veio da lista de espera: o pedido sai da fila
           const daEspera = nova.espera;
           if (daEspera) void sb.from("lista_espera").update({ status: "atendido" }).eq("id", daEspera).eq("petshop_id", petshop.id).select("id").then(() => espera.recarregar());
           setNova(null); setVer((v) => (v === "ocupacao" ? v : "casa")); setAba(emCasa ? "casa" : "reservas"); mudou();
         }} />}
-      {editando && <NovaEstadia mens={mens ?? null} key={editando.id} editar={editando} valores={valoresDe(editando)} jaAquiInicial={editando.status === "em_casa"} tipoInicial={editando.tipo === "hotel" ? "hotel" : "creche"} abertas={abertas}
+      {editando && <NovaEstadia mens={mens ?? null} key={editando.id} editar={editando} valores={valoresDe(editando)} jaAquiInicial={editando.status === "em_casa"} tipoInicial={editando.tipo === "hotel" ? "hotel" : "creche"} abertas={abertas} doTutor={doTutor}
         aoFechar={() => setEditando(null)} aoGravar={() => { setEditando(null); mudou(); }} />}
       {lote && <EncerrarCreche estadias={crecheNaCasa} valores={dados?.valores ?? new Map()} aoFechar={() => setLote(false)} aoGravar={() => { setLote(false); mudou(); }}
         aoCheckOut={(e) => { setLote(false); setSaindo(e); }} />}
@@ -766,12 +779,28 @@ export default function CrecheHotel() {
       {taxa && valorDaTaxa && <FolhaTaxaDeAtraso key={taxa.estadia_id} atraso={taxa} valor={valorDaTaxa} aoFechar={() => { setTaxa(null); mudou(); }} aoDecidir={() => { setTaxa(null); mudou(); }} />}
       {cobrando && <CheckOut key={cobrando.id} pendente estadia={cobrando} aoFechar={() => setCobrando(null)} aoGravar={() => { setCobrando(null); mudou(); }} />}
       {mensagens && <MensagensDaEstadia estadia={mensagens} aoFechar={() => setMensagens(null)} aoMudar={() => void recarregar()}
-        sinal={(() => { const v = valoresDe(mensagens); return v?.sinal != null && (v.sinal_estado === "a_receber" || v.sinal_estado === "pago") ? { valor: v.sinal_estado === "a_receber" ? faltaDoSinal(v) || Number(v.sinal) : Number(v.sinal), pago: v.sinal_estado === "pago" } : null; })()}
+        sinal={(() => { const v = valoresDe(mensagens); return v?.sinal != null && (v.sinal_estado === "a_receber" || v.sinal_estado === "pago") ? { valor: Number(v.sinal), pago: v.sinal_estado === "pago", recebido: v.sinal_estado === "a_receber" ? Math.max(0, centavos(Number(v.sinal) - faltaDoSinal(v))) : 0 } : null; })()}
         fatos={comCuidados ? fatosDoDia(lerCuidados(mensagens), dados?.feitos.filter((f) => f.estadia_id === mensagens.id) ?? [], hojeIso) : undefined} />}
-      {sinalDe && <FolhaSinal estadia={sinalDe} valores={valoresDe(sinalDe)} sugerido={sugeridoPara(sinalDe)} aoFechar={() => setSinalDe(null)} aoGravar={() => { setSinalDe(null); mudou(); }} />}
+      {sinalDe && <FolhaSinal estadia={sinalDe} valores={valoresDe(sinalDe)} sugerido={sugeridoPara(sinalDe)} totalPrevisto={previstoDe(sinalDe)} aoFechar={() => setSinalDe(null)} aoGravar={() => { setSinalDe(null); mudou(); }} />}
       {cancelando && valoresDe(cancelando) && <CancelarComSinal estadia={cancelando} valores={valoresDe(cancelando)!} aoFechar={() => setCancelando(null)} aoGravar={() => { setCancelando(null); mudou(); }} />}
       {detalhe && <DetalheDaEstadia estadia={detalhe} aoFechar={() => setDetalhe(null)}
         aoCorrigir={vejoFinanceiro && detalhe.status === "encerrada" && !detalhe.mensalista ? () => { const e = detalhe; setDetalhe(null); if (!somenteLeitura()) setAcertando(e); } : undefined} />}
+      {chegando && (
+        <Folha titulo={`Quando ${chegando.pets?.nome ?? "o pet"} chegou?`} aoFechar={() => setChegando(null)}
+          rodape={<>
+            <button type="button" className="g-btn sec" onClick={() => { const e = chegando; setChegando(null); void checkIn(e, "agora"); }}>Chegou agora</button>
+            <button type="button" className="g-btn pri" onClick={() => { const e = chegando; setChegando(null); void checkIn(e, "reservado"); }}>Chegou em {dataCurta(chegando.entrada)}</button>
+          </>}>
+          <div className="g-pilha">
+            <p>A reserva era para <b>{dataCompleta(chegando.entrada)}, {horaCurta(chegando.entrada)}</b>{chegando.saida_prevista ? <>, com saída em <b>{dataCompleta(chegando.saida_prevista)}</b></> : null}, e esse dia já passou.</p>
+            <p className="g-muted g-p">
+              Se o pet veio no dia reservado e só faltou anotar, toque em <b>Chegou em {dataCurta(chegando.entrada)}</b>: a estadia fica com as datas da reserva e {chegando.tipo === "hotel" ? "cada noite é cobrada no dia certo" : "os dias contam desde lá"}.
+              Se ele está chegando só agora, toque em <b>Chegou agora</b>: a estadia começa neste momento.
+            </p>
+            <p className="g-muted g-p">Chegou em outro dia? Escolha uma das duas e depois acerte a entrada em Editar, no cartão do hóspede.</p>
+          </div>
+        </Folha>
+      )}
       {buscando && <QuemBuscou key={buscando.id} estadia={buscando} aoFechar={() => setBuscando(null)}
         aoSeguir={async () => { const e = buscando; setBuscando(null); if (e.mensalista) await saidaDoMensalista(e); else setSaindo(e); }} />}
       {ocorrenciaDe && <FolhaOcorrencia estadia={ocorrenciaDe} aoFechar={() => setOcorrenciaDe(null)} aoGravar={() => { setOcorrenciaDe(null); void recarregar(); }} />}
@@ -786,8 +815,12 @@ export default function CrecheHotel() {
 
 const horaDe = (d: string | Date) => { const x = new Date(d); return `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
 
-function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, valores, mens, petInicial, aoEspera, aoFechar, aoGravar }: {
+function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abertas, doTutor, editar, valores, mens, petInicial, aoEspera, aoFechar, aoGravar }: {
   jaAquiInicial: boolean; tipoInicial: Tipo; diaInicial?: string; abertas: EstadiaCompleta[]; editar?: EstadiaCompleta; valores?: ValoresDaEstadia | null; mens: Mens | null;
+  /** dia da saída já escolhido (reserva que vem da lista de espera) */
+  saidaInicial?: string;
+  /** as estadias abertas e as encerradas de hotel, para o desconto do segundo pet */
+  doTutor: EstadiaCompleta[];
   /** pet já escolhido (reserva que vem da lista de espera) */
   petInicial?: PetDaEstadia;
   /** com a lista de espera ligada: em dia cheio, a pessoa pode pôr o pet na lista em vez de passar do limite */
@@ -810,7 +843,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, 
   const [jaAqui, setJaAqui] = useState(jaAqui0);
   const [dia, setDia] = useState(editar ? isoDia(new Date(editar.entrada)) : diaInicial ?? hojeIso);
   const [hhmm, setHhmm] = useState(editar ? horaDe(editar.entrada) : "08:00");
-  const [saidaDia, setSaidaDia] = useState(editar?.saida_prevista ? isoDia(new Date(editar.saida_prevista)) : "");
+  const [saidaDia, setSaidaDia] = useState(editar?.saida_prevista ? isoDia(new Date(editar.saida_prevista)) : saidaInicial && saidaInicial >= (diaInicial ?? "") ? saidaInicial : "");
   const [saidaHora, setSaidaHora] = useState(editar?.saida_prevista ? horaDe(editar.saida_prevista) : "18:00");
   // a diária sugerida é sempre o preço de Meu pet shop (ou o do porte, se a opção estiver ligada), nunca a última digitada
   const [diaria, setDiaria] = useState<number | null>(editar ? (editar.valor_diaria == null ? null : Number(editar.valor_diaria)) : diariaSugerida(petshop, tipo0, petInicial?.porte ?? null));
@@ -853,8 +886,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, 
   const periodoForm: Periodo | null = datasBoas ? { tipo, entrada: entradaForm!.toISOString(), saida_prevista: saidaForm?.toISOString() ?? null, status: emCasa ? "em_casa" : "reservada" } : null;
   const taxasDaReserva = opTaxas.ativo ? opTaxas.lista.filter((t) => taxasMarcadas.includes(t.id)) : taxasGuardadas(valores).filter((t) => taxasMarcadas.includes(t.id));
   const prev = pet && periodoForm && diaria != null
-    ? previsto(petshop, { id: editar?.id ?? null, pet_id: pet.id, tipo, entrada: periodoForm.entrada, saida_prevista: periodoForm.saida_prevista, valor_diaria: diaria },
-      doMesmoTutor(abertas, pet.clientes?.id), { taxas: taxasDaReserva as never }) : null;
+    ? previsto(petshop, { id: editar?.id ?? null, pet_id: pet.id, tipo, entrada: periodoForm.entrada, saida_prevista: periodoForm.saida_prevista, valor_diaria: diaria, criado_em: editar?.criado_em },
+      doMesmoTutor(doTutor, pet.clientes?.id), { taxas: taxasDaReserva as never }) : null;
   const trocouTipo = Boolean(editar) && tipo !== editar!.tipo;
 
   // vagas nas datas escolhidas, pela mesma conta do aviso de casa cheia
@@ -936,6 +969,12 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, abertas, editar, 
       }))) return;
     }
     if (vejoFinanceiro && diaria === 0 && !reservaExtra && !(await confirmar({ titulo: "Cortesia, sem cobrar?", texto: `A diária está em R$ 0,00. ${pet.nome} fica sem cobrança nesta estadia.`, confirmar: "Sim, é cortesia" }))) return;
+    // sinal maior do que a reserva inteira costuma ser erro de digitação (1080 no lugar de 108)
+    if (sinalPronto.modo !== "sem" && prev && !prev.aberto && prev.total > 0 && sinalPronto.valor > prev.total && !(await confirmar({
+      titulo: "O sinal é maior do que a reserva",
+      texto: `O sinal está em ${brl(sinalPronto.valor)} e o total previsto da reserva é ${brl(prev.total)}. Confira se não sobrou um número a mais.`,
+      confirmar: "Está certo, continuar",
+    }))) return;
     if (!(await conferirSinal(sb, petshop.id, sinalPronto, confirmar))) return;
 
     setSalvando(true);
@@ -1337,8 +1376,17 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
  * Check-outs para cobrar, que abre a conta completa (regras de preço, taxas, sinal e taxa de busca fora do horário).
  */
 function AcertarEstadia({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompleta; aoFechar: () => void; aoGravar: () => void }) {
-  const { sb, petshop } = useGestao();
+  const { sb, petshop, vejoFinanceiro } = useGestao();
   const { avisar, avisarErro } = useAvisos();
+  // a conta como foi cobrada (só quem recebe lê) e as outras estadias do tutor: para refazer as linhas com as datas certas
+  const { dados: guardado } = useDados(async () => {
+    if (!vejoFinanceiro) return null;
+    const [v, outras] = await Promise.all([
+      sb.from("estadias_valores").select("*").eq("estadia_id", estadia.id).maybeSingle(),
+      estadia.tipo === "hotel" ? estadiasDoTutor(sb, petshop.id, estadia.pets?.clientes?.id) : Promise.resolve([] as EstadiaDoTutor[]),
+    ]);
+    return { conta: lerConta((v.data ?? null) as ValoresDaEstadia | null), outras };
+  }, [petshop.id, estadia.id, vejoFinanceiro]);
   const pendente = estadiaSemCobranca(estadia);
   const fimInicial = estadia.saida ?? estadia.entrada;
   const [dia, setDia] = useState(isoDia(new Date(estadia.entrada)));
@@ -1358,6 +1406,23 @@ function AcertarEstadia({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompl
   const n = Number(diarias ?? (mexeuNasDatas ? contadas : estadia.diarias_cobradas ?? contadas));
   const nValido = Number.isInteger(n) && n >= 1;
   const nome = estadia.pets?.nome ?? "O pet";
+  /**
+   * A conta guardada com as linhas refeitas pelas datas e diárias corrigidas (as noites nos dias certos, com a temporada e o
+   * feriado de cada uma). O total cobrado e o dinheiro recebido NÃO mudam: se as diárias dão outro valor, a diferença
+   * aparece na conta como desconto ou acréscimo, e a tela diz quanto é.
+   */
+  const contaNova = (() => {
+    const c = guardado?.conta;
+    if (!c || c.pacote || !datasBoas || !nValido || c.valor_diaria == null) return null;
+    const d = contaDasDiarias(petshop, { ...estadia, entrada: entrada!.toISOString() }, n, c.valor_diaria, guardado!.outras, saida!, saida!);
+    if (d.total == null) return null;
+    const soma = centavos(c.soma - c.total_diarias + d.total);
+    const conta: ContaDaEstadia = { ...c, diarias: n, noites: d.noites, total_diarias: d.total, taxas: c.taxas.map((t) => (t.por === "noite" ? taxaNaConta(t, n) : t)), soma, ajuste: 0 };
+    conta.soma = centavos(conta.total_diarias + conta.taxas.reduce((t, x) => t + x.total, 0) + conta.extras.reduce((t, x) => t + x.valor, 0) + conta.produtos.reduce((t, x) => t + x.total, 0));
+    conta.ajuste = centavos(c.total - conta.soma);
+    const mudou = JSON.stringify(conta.noites) !== JSON.stringify(c.noites) || conta.diarias !== c.diarias || conta.total_diarias !== c.total_diarias || conta.soma !== c.soma;
+    return { conta, mudou, diferenca: centavos(conta.soma - c.total), cobrado: c.total, noites: d.noites };
+  })();
 
   async function salvar() {
     if (salvando) return;
@@ -1367,7 +1432,13 @@ function AcertarEstadia({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompl
     try {
       const r = ok(await sb.from("estadias").update({ entrada: entrada!.toISOString(), saida: saida!.toISOString(), diarias_cobradas: n })
         .eq("id", estadia.id).eq("petshop_id", petshop.id).eq("status", "encerrada").select("id"));
-      if (!r.length) avisar("Essa estadia já tinha sido alterada. Atualizei a lista."); else avisar("Estadia corrigida.");
+      if (r.length && contaNova?.mudou) {
+        // as linhas da conta acompanham as datas corrigidas (o comprovante e o histórico passam a mostrar as noites certas)
+        const g = await sb.from("estadias_valores").update({ conta: contaNova.conta as never }).eq("estadia_id", estadia.id).select("estadia_id");
+        if (g.error) avisarErro(`As datas foram corrigidas, mas o detalhe da conta não. (${g.error.message})`);
+      }
+      if (!r.length) avisar("Essa estadia já tinha sido alterada. Atualizei a lista.");
+      else avisar(contaNova?.mudou && contaNova.diferenca !== 0 ? `Estadia corrigida. A conta agora mostra as noites certas; o valor recebido (${brl(contaNova.cobrado)}) não mudou.` : "Estadia corrigida.");
       aoGravar();
     } catch (e) { avisarErro(e); setSalvando(false); }
   }
@@ -1391,6 +1462,16 @@ function AcertarEstadia({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompl
         <Campo rotulo="Diárias" dica={datasBoas ? `Pelas datas: ${contadas}.` : undefined} erro={nValido ? null : "Use um número inteiro, a partir de 1."}>
           <input className="g-input g-tab" inputMode="numeric" value={String(diarias ?? (Number.isFinite(n) ? n : ""))} onChange={(e) => setDiarias(e.target.value)} />
         </Campo>
+        {contaNova?.mudou && (
+          <div className="g-card areia g-pilha p" role="status">
+            <p className="g-p"><b>A conta acompanha a correção.</b> As linhas das diárias passam a mostrar {estadia.tipo === "hotel" ? "as noites" : "os dias"} das datas certas{contaNova.noites?.some((x) => x.temporada) ? ", com a temporada ou o feriado de cada uma" : ""}.</p>
+            {contaNova.noites && <NoitePorNoite noites={contaNova.noites} total={contaNova.conta.total_diarias} />}
+            {contaNova.diferenca !== 0
+              ? <p className="g-p">Pelas datas corrigidas, a conta daria <b className="g-tab">{brl(contaNova.conta.soma)}</b>; foram cobrados <b className="g-tab">{brl(contaNova.cobrado)}</b> ({brl(Math.abs(contaNova.diferenca))} a {contaNova.diferenca < 0 ? "mais" : "menos"}). O que já foi recebido não muda sozinho: a diferença aparece na conta como {contaNova.diferenca < 0 ? "acréscimo" : "desconto"}. Se for devolver ou cobrar essa diferença do tutor, lance no Financeiro.</p>
+              : <p className="g-muted g-p">O total cobrado continua o mesmo.</p>}
+            {guardado?.conta?.taxas.some((t) => t.id === ID_TAXA_ATRASO) && <p className="g-muted g-p">A taxa de busca fora do horário cobrada no check-out continua na conta: ela foi recebida. Se não era devida, devolva pelo Financeiro.</p>}
+          </div>
+        )}
         {pendente && <p className="g-muted g-p" role="status">Esta estadia ainda está sem cobrança. Depois de corrigir as datas, receba pela lista Check-outs para cobrar, no alto de Casa agora.</p>}
         {erro && <p className="g-erro" role="alert">{erro}</p>}
       </div>

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Check, Clock, MessageCircle, Plus } from "lucide-react";
 import { conferirCaixa, conferirValorAlto, formaPrincipal, lancarAReceber, lancarPago, quitarConta, type ItemLancamento, type PartePagamento } from "@/lib/gestao/dinheiro";
 import {
-  contaDasDiarias, contarDiarias, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDoPagamentoDaConta,
+  contaDasDiarias, contarDiarias, noitesAntesDaEntrada, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDoPagamentoDaConta,
   type ContaDaEstadia, type EstadiaDoTutor, type Noite, type TaxaDaConta, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
 import { taxasDe } from "@/lib/gestao/hotel-opcoes";
@@ -13,6 +13,7 @@ import { atrasoSugerido, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/f
 import { usaModulo } from "@/lib/gestao/modulos";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Lancamento, PacoteCliente, Servico } from "@/lib/gestao/tipos";
+import { comValoresDeEstadia } from "@/lib/gestao/reservado";
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, linkWhatsApp, soDigitos } from "@/lib/gestao/util";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
@@ -41,13 +42,16 @@ export async function pacotesParaEstadia(sb: Banco, petshopId: string, petIds: s
 export const pacoteServe = (p: PacoteDaEstadia, tipo: string, servicos: Servico[]) => !p.servico_id || servicos.find((s) => s.id === p.servico_id)?.categoria === tipo;
 export const venceu = (p: Pick<PacoteCliente, "vence_em">) => Boolean(p.vence_em) && deIsoDia(p.vence_em!) < inicioDoDia(new Date());
 
-/** Outras estadias de hotel dos pets do mesmo tutor (para o desconto do segundo pet). */
+/**
+ * Outras estadias de hotel dos pets do mesmo tutor (para o desconto do segundo pet), com a diária combinada de cada uma:
+ * quem paga cheio é o pet de diária mais alta (só quem recebe chama isto).
+ */
 export async function estadiasDoTutor(sb: Banco, petshopId: string, clienteId: string | null | undefined): Promise<EstadiaDoTutor[]> {
   if (!clienteId) return [];
-  const r = await sb.from("estadias").select("id, pet_id, tipo, status, entrada, saida_prevista, saida, diarias_cobradas, pets!inner(cliente_id)")
+  const r = await sb.from("estadias").select("id, pet_id, tipo, status, entrada, saida_prevista, saida, diarias_cobradas, criado_em, pets!inner(cliente_id)")
     .eq("petshop_id", petshopId).eq("tipo", "hotel").neq("status", "cancelada").eq("pets.cliente_id", clienteId).order("entrada", { ascending: false }).limit(60);
   if (r.error) return [];
-  return (r.data ?? []) as unknown as EstadiaDoTutor[];
+  return comValoresDeEstadia(sb, petshopId, (r.data ?? []) as unknown as (EstadiaDoTutor & { id: string })[]);
 }
 
 type Pendencia = Pick<Lancamento, "id" | "valor" | "descricao" | "categoria" | "data" | "vencimento">;
@@ -59,7 +63,7 @@ export function NoitePorNoite({ noites, total }: { noites: Noite[]; total: numbe
       <summary>Diárias: {brl(total)} · ver noite por noite</summary>
       {noites.map((x) => (
         <div key={x.dia} className="noite">
-          <span>{dataCurta(x.dia)} <small>{[x.temporada ?? `diária de ${brl(x.base)}`, x.temporada ? `${brl(x.cheia)}` : null, x.desconto > 0 ? `segundo pet: - ${brl(x.desconto)}` : null].filter(Boolean).join(" · ")}</small></span>
+          <span>{dataCurta(x.dia)} <small>{[x.temporada ?? `diária de ${brl(x.base)}`, x.temporada && x.desconto > 0 ? `${brl(x.cheia)}` : null, x.desconto > 0 ? `segundo pet: - ${brl(x.desconto)}` : null].filter(Boolean).join(" · ")}</small></span>
           <b className="g-tab">{brl(x.valor)}</b>
         </div>
       ))}
@@ -144,7 +148,10 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
 
   // a conta
   const diaria = estadia.valor_diaria == null ? null : Number(estadia.valor_diaria);
-  const dasDiarias = pacote || !nValido ? { total: pacote ? 0 : null, noites: null } : contaDasDiarias(petshop, estadia, n, diaria, mais?.outras ?? [], agora);
+  const dasDiarias = pacote || !nValido ? { total: pacote ? 0 : null, noites: null } : contaDasDiarias(petshop, estadia, n, diaria, mais?.outras ?? [], agora, agora);
+  // mais noites do que as datas mostram (check-in anotado depois da chegada): as noites a mais contam antes da entrada, nunca em dia que ainda não chegou
+  const noitesAntes = estadia.tipo === "hotel" && dasDiarias.noites ? noitesAntesDaEntrada(estadia.entrada, dasDiarias.noites.map((x) => x.dia)) : [];
+  const passaDasDatas = estadia.tipo === "hotel" && !pendente && nValido && n > contadas;
   const somaTaxas = centavos(taxas.reduce((t, x) => t + x.total, 0));
   const somaItens = centavos(itens.reduce((t, i) => t + valorDaLinha(i), 0));
   const temMais = taxas.length > 0 || itens.length > 0;
@@ -331,6 +338,13 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
         {vejoFinanceiro ? (
           <>
             {dasDiarias.noites && <NoitePorNoite noites={dasDiarias.noites} total={dasDiarias.total} />}
+            {passaDasDatas && (
+              <p className="g-ht-fechado" role="status"><Clock aria-hidden /><span>
+                <b>Pelas datas anotadas {contadas === 1 ? "é 1 noite" : `são ${contadas} noites`} (chegou {quando(estadia.entrada)}).</b>{" "}
+                {noitesAntes.length ? `As ${n - contadas === 1 ? "noite a mais conta" : "noites a mais contam"} antes da entrada anotada (${noitesAntes.length === 1 ? dataCurta(noitesAntes[0]) : `${dataCurta(noitesAntes[0])} a ${dataCurta(noitesAntes[noitesAntes.length - 1])}`}), e não em dias que ainda não chegaram. ` : ""}
+                Se o pet chegou em outro dia, volte e acerte a entrada em Editar antes do check-out: assim cada noite sai no dia certo.
+              </span></p>
+            )}
             {atraso && (
               <div id="g-ht-atraso" className={`g-ht-atraso${comAtraso === null ? "" : " ok"}`} role="group" aria-label="Taxa de busca fora do horário">
                 <p><Clock aria-hidden style={{ width: 16, height: 16, verticalAlign: "-3px", marginRight: 6 }} /><b>Saída às {atraso.saiu.replace(":", "h")}, depois das {atraso.hora.replace(":", "h")}.</b> A taxa de busca fora do horário é de {brl(atraso.valor)}. Ela entra na conta?</p>

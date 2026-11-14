@@ -11,7 +11,7 @@ type ComOpcoes = { opcoes?: unknown };
 export const CHAVES_HOTEL = {
   sinal: "hotel.sinal", pix: "hotel.pix", porte: "hotel.diaria_por_porte", temporadas: "hotel.temporadas",
   segundoPet: "hotel.desconto_segundo_pet", taxas: "hotel.taxas", cuidados: "hotel.cuidados", acomodacoes: "hotel.acomodacoes",
-  mensagens: "hotel.mensagens",
+  mensagens: "hotel.mensagens", linkSemPreco: "hotel.link_sem_preco",
 } as const;
 
 /** Sinal na reserva: sugestão em % do total previsto ou em valor fixo, e o texto da política (escrito pelo dono). */
@@ -35,7 +35,14 @@ const num = (v: unknown): number | null => (typeof v === "number" && Number.isFi
 const texto = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const lista = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.filter((x) => x && typeof x === "object").map(obj) : []);
-const ehDia = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+/** "2026-12-24" de uma data que existe (30 de fevereiro não passa). O banco confere igual em `dia_iso`. */
+const ehDia = (v: unknown): v is string => {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const [a, m, d] = v.split("-").map(Number);
+  const x = new Date(Date.UTC(a, m - 1, d));
+  return a >= 1 && x.getUTCFullYear() === a && x.getUTCMonth() === m - 1 && x.getUTCDate() === d;
+};
+const diasEntre = (de: string, ate: string) => Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / 864e5);
 
 export function sinalDe(p: ComOpcoes): OpcaoSinal {
   const o = obj(opcao<unknown>(p, CHAVES_HOTEL.sinal, {}));
@@ -55,6 +62,34 @@ export function temporadasDe(p: ComOpcoes): OpcaoTemporadas {
   });
   return { ativo: o.ativo === true, lista: itens.sort((a, b) => a.de.localeCompare(b.de)) };
 }
+/**
+ * A temporada que vale numa noite. Quando mais de uma pega a mesma noite, vale a MAIS CURTA (a mais específica:
+ * o Réveillon dentro das Férias); com o mesmo tamanho, a que começa depois; ainda igual, a primeira da lista.
+ * O banco escolhe igual em `hotel_noite`.
+ */
+export function temporadaDoDia(lista: Temporada[], dia: string): Temporada | null {
+  let melhor: Temporada | null = null;
+  for (const t of lista) {
+    if (t.de > dia || dia > t.ate) continue;
+    if (!melhor) { melhor = t; continue; }
+    const a = diasEntre(t.de, t.ate), b = diasEntre(melhor.de, melhor.ate);
+    if (a < b || (a === b && t.de > melhor.de)) melhor = t;
+  }
+  return melhor;
+}
+/** Pares de temporadas que pegam alguma noite em comum (para avisar o dono ao salvar). Em cada par, a primeira é a que vale. */
+export function temporadasQueSeCruzam(lista: Temporada[]): [Temporada, Temporada][] {
+  const pares: [Temporada, Temporada][] = [];
+  for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) {
+    const a = lista[i], b = lista[j];
+    if (!ehDia(a.de) || !ehDia(a.ate) || !ehDia(b.de) || !ehDia(b.ate) || a.de > b.ate || b.de > a.ate) continue;
+    const da = diasEntre(a.de, a.ate), db = diasEntre(b.de, b.ate);
+    pares.push(da < db || (da === db && a.de >= b.de) ? [a, b] : [b, a]);
+  }
+  return pares;
+}
+/** O link do cliente mostra preço (diária e estimativa das datas)? Vem mostrando; o dono pode esconder. */
+export const linkSemPreco = (p: ComOpcoes) => opcao<boolean>(p, CHAVES_HOTEL.linkSemPreco, false) === true;
 export function segundoPetDe(p: ComOpcoes): OpcaoSegundoPet {
   const o = obj(opcao<unknown>(p, CHAVES_HOTEL.segundoPet, {}));
   const pct = num(o.pct);
