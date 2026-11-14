@@ -1,5 +1,6 @@
 "use client";
 
+import CartaoPaginaDoTutor from "../casa/pagina-do-tutor";
 import { saudacaoZap } from "@/lib/gestao/agenda";
 import { COLS_ESTADIA, COLS_PACOTE_CLIENTE, comPrecosDeAgendamento } from "@/lib/gestao/reservado";
 import { Fragment, useState } from "react";
@@ -320,6 +321,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
           </section>}
 
           {usaCasa(petshop) && portariaLigada(petshop) && <QuemPodeBuscar pet={{ ...pet, clientes: tutor }} />}
+          {usaCasa(petshop) && tutor && <CartaoPaginaDoTutor cliente={tutor} pets={[pet]} />}
           <OcorrenciasDoPet petId={pet.id} />
 
           {pet.ativo && (

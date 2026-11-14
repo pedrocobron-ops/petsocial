@@ -8,6 +8,7 @@ import type { Cliente, Lancamento, Pet } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { CartaoFidelidade } from "../fidelidade";
+import CartaoPaginaDoTutor from "../casa/pagina-do-tutor";
 import { DividaDoTutor } from "../financeiro/contas-clientes";
 import { FolhaLancamento } from "../financeiro/comum";
 import FormPet from "../form-pet";
@@ -218,6 +219,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
           </section>
 
           <CartaoFidelidade clienteId={cliente.id} nome={cliente.nome} />
+          <CartaoPaginaDoTutor cliente={cliente} pets={pets} />
 
           {(souDono || posso("clientes")) && (
             <div className="g-pilha p">

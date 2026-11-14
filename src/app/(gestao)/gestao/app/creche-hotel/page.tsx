@@ -12,6 +12,7 @@ import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Fo
 import { AvisoCaixaFechado, Chips, ChipsForma, erroDeValor, ErroTela, lembrarForma, useCaixaAberto, useFormaLembrada } from "@/components/gestao/loja/pecas";
 import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import Diario from "@/components/gestao/casa/diario";
+import { BotaoFotos } from "@/components/gestao/casa/fotos-do-dia";
 import { AvisoDeVaga, FolhaEspera, ListaDeEspera, useListaDeEspera } from "@/components/gestao/casa/espera";
 import { FolhaOcorrencia, OcorrenciasDoCartao } from "@/components/gestao/casa/ocorrencias";
 import { FolhaQuemPodeBuscar, lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
@@ -653,6 +654,7 @@ export default function CrecheHotel() {
                       {comOcorrencias && <OcorrenciasDoCartao lista={dados.ocorrencias.filter((o) => o.estadia_id === e.id)} />}
                       <div className="g-fila g-ch-acoes">
                         {botaoMensagens(e)}
+                        <BotaoFotos estadia={e} />
                         {!e.mensalista && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setEditando(e); }}><Pencil /> Editar</button>}
                         {comOcorrencias && pet && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setOcorrenciaDe(e); }}><ShieldAlert /> Ocorrência</button>}
                         {comPortaria && pet && <button className="g-btn fantasma p" onClick={() => setAutorizadosDe(e)}><ShieldCheck /> Quem busca</button>}

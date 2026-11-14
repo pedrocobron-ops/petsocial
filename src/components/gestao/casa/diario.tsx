@@ -8,6 +8,7 @@ import { dataLonga, hora, inicioDoDia, isoDia, linkWhatsApp } from "@/lib/gestao
 import { useGestao } from "../contexto";
 import { AvatarPet, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { FolhaOcorrencia } from "./ocorrencias";
+import { BotaoFotos } from "./fotos-do-dia";
 import "./casa.css";
 
 /**
@@ -199,6 +200,7 @@ function CartaoDiario({ estadia: e, dia, itens, registro, ocorrencias, comOcorre
         ) : <span className="g-muted g-pp">Sem telefone na ficha do tutor.</span>}
         <button type="button" className="g-btn fantasma p" onClick={() => setVerTexto((v) => !v)}>{verTexto ? "Esconder a mensagem" : "Ver a mensagem"}</button>
         {comOcorrencias && e.status === "em_casa" && <button type="button" className="g-btn fantasma p" onClick={aoOcorrencia}><ShieldAlert />Ocorrência</button>}
+        <BotaoFotos estadia={e} />
       </footer>
     </article>
   );

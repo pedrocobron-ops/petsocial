@@ -6,6 +6,7 @@ import { CHAVES_CASA, diarioDe, esperaDe, ITENS_DO_DIARIO, MAX_ITENS_DO_DIARIO, 
 import { equipeMudaPlano, OPCAO_EQUIPE_MUDA_PLANO, OPCAO_REPOSICAO_PRAZO, OPCAO_REPOSICAO_SO_AVISOU, type PrazoDeReposicao } from "@/lib/gestao/creche";
 import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { opcao, salvarOpcoes } from "@/lib/gestao/opcoes";
+import { CHAVE_TUTOR, paginaDoTutorLigada } from "@/lib/gestao/tutor";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { avisarMudanca, useAvisos, useSomenteLeitura } from "../ui";
@@ -35,6 +36,7 @@ export default function OpcoesCasa() {
   const [portaria, setPortaria] = useState(() => portariaLigada(petshop));
   const [espera, setEspera] = useState(() => esperaDe(petshop));
   const [ocorrencias, setOcorrencias] = useState(() => ocorrenciasLigadas(petshop));
+  const [tutor, setTutor] = useState(() => paginaDoTutorLigada(petshop));
   const [equipePlano, setEquipePlano] = useState(() => equipeMudaPlano(petshop));
   // regra de reposição de falta: desligada, qualquer falta do plano pode ser reposta, sem prazo
   const [prazo, setPrazo] = useState<PrazoDeReposicao>(() => { const v = opcao<string>(petshop, OPCAO_REPOSICAO_PRAZO, ""); return v === "mes" || v === "mes_seguinte" ? v : ""; });
@@ -57,6 +59,7 @@ export default function OpcoesCasa() {
         [CHAVES_CASA.portaria]: portaria,
         [CHAVES_CASA.espera]: { ativo: espera.ativo, link: espera.ativo && espera.link },
         [CHAVES_CASA.ocorrencias]: ocorrencias,
+        [CHAVE_TUTOR]: { ativo: tutor },
         ...(usaModulo(petshop, "creche") ? { [OPCAO_EQUIPE_MUDA_PLANO]: equipePlano, [OPCAO_REPOSICAO_PRAZO]: prazo, [OPCAO_REPOSICAO_SO_AVISOU]: soAvisou } : {}),
       });
       await recarregarBase();
@@ -96,6 +99,10 @@ export default function OpcoesCasa() {
         </Opcao>
 
         <Opcao titulo="Ocorrências" frase="Briga, machucado, fuga ou vômito: a equipe anota na estadia com a hora e o nome de quem escreveu. Você vê no Hoje e na ficha do pet." ligada={ocorrencias} aoMudar={m(setOcorrencias)} />
+
+        <Opcao titulo="Página do tutor" frase="A equipe põe fotos no dia de cada pet. Cada tutor ganha um link só dele, sem senha, com o diário, as fotos, o que está marcado e os avisos de vacina, sem preços." ligada={tutor} aoMudar={m(setTutor)}>
+          <p className="g-muted g-pp">As fotos ficam guardadas só para a equipe e para o tutor do pet (até 10 por pet por dia). O link do tutor sai pelo botão Mandar a página do tutor, na ficha do tutor e nos cartões da creche e do hotel. Desligando esta opção, todos os links param de abrir na hora.</p>
+        </Opcao>
 
         {usaModulo(petshop, "creche") && (
           <Opcao titulo="A equipe pode mexer nos planos de mensalista" frase="Desligado, só você e quem cuida do financeiro cadastram um mensalista, mudam os dias, pausam ou encerram o plano, porque o plano decide o que é cobrado. Ligado, quem trabalha na creche também pode (sem ver nem preencher valores)." ligada={equipePlano} aoMudar={m(setEquipePlano)}>
