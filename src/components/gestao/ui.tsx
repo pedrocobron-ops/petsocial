@@ -7,7 +7,7 @@ import { fotoPet } from "@/lib/gestao/supabase";
 import type { PetComTutor } from "@/lib/gestao/tipos";
 import { corDoNome, iniciais, lerValor, semAcento, valor2 } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
-import { useGestao } from "./contexto";
+import { contaSoConsulta, useGestao } from "./contexto";
 
 /* ---------- carregar dados ---------- */
 
@@ -54,13 +54,18 @@ export function ok<T>(r: { data: T; error: { message: string } | null }): NonNul
   return r.data as NonNullable<T>;
 }
 
+/** Recusa do banco que o aplicativo não sabe explicar: só fala em "só para consulta" quando a conta está mesmo assim. */
+const semPermissao = () => (contaSoConsulta()
+  ? "Sua conta está só para consulta. Para voltar a gravar, veja a tela Assinatura."
+  : "Não consegui salvar agora. Tente de novo ou fale com o suporte.");
+
 /** Texto de erro que uma pessoa entende. */
 export function mensagemDeErro(e: unknown): string {
   const m = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e);
-  if (/row-level security|permission denied/i.test(m)) return "Sua conta está só para consulta ou você não tem permissão para isso.";
+  if (/row-level security|permission denied/i.test(m)) return semPermissao();
   if (/Failed to fetch|NetworkError|network/i.test(m)) return "Sem conexão. Confira a internet e tente de novo.";
   if (/duplicate key/i.test(m)) return "Isso já está cadastrado.";
-  if (/JSON object requested|0 rows|PGRST116/i.test(m)) return "Não deu para gravar: sua conta está só para consulta ou você não tem permissão para isso.";
+  if (/JSON object requested|0 rows|PGRST116/i.test(m)) return semPermissao();
   if (/caixas_um_aberto/i.test(m)) return "Já existe um caixa aberto.";
   if (/numeric field overflow|out of range/i.test(m)) return "Esse valor é grande demais. Confira os números.";
   if (/violates check constraint/i.test(m)) return "Confira os valores: algum número está negativo ou fora do permitido.";
@@ -70,9 +75,11 @@ export function mensagemDeErro(e: unknown): string {
 /* ---------- avisos rápidos e confirmação ---------- */
 
 const EVENTO_AVISOU = "gestao:avisou";
-type Toast = { id: number; texto: string; erro?: boolean };
+/** Botão dentro do aviso rápido (ex.: "Desfazer"). O aviso com botão fica mais tempo na tela. */
+export type AcaoDoAviso = { rotulo: string; fazer: () => void };
+type Toast = { id: number; texto: string; erro?: boolean; acao?: AcaoDoAviso };
 type Pergunta = { titulo: string; texto?: string; confirmar?: string; perigo?: boolean; resolver: (v: boolean) => void };
-const AvisosCtx = createContext<{ avisar: (t: string) => void; avisarErro: (e: unknown) => void; confirmar: (p: Omit<Pergunta, "resolver">) => Promise<boolean> } | null>(null);
+const AvisosCtx = createContext<{ avisar: (t: string, acao?: AcaoDoAviso) => void; avisarErro: (e: unknown) => void; confirmar: (p: Omit<Pergunta, "resolver">) => Promise<boolean> } | null>(null);
 
 export function useAvisos() {
   const v = useContext(AvisosCtx);
@@ -83,14 +90,14 @@ export function useAvisos() {
 export function AvisosProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [pergunta, setPergunta] = useState<Pergunta | null>(null);
-  const por = useCallback((texto: string, erro?: boolean) => {
+  const por = useCallback((texto: string, erro?: boolean, acao?: AcaoDoAviso) => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t.slice(-2), { id, texto, erro }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), erro ? 5000 : 2600);
+    setToasts((t) => [...t.slice(-2), { id, texto, erro, acao }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), acao ? 8000 : erro ? 5000 : 2600);
     // aviso de que deu certo = algo foi gravado: a folha aberta deixa de contar como "mexida"
     if (!erro) window.dispatchEvent(new Event(EVENTO_AVISOU));
   }, []);
-  const avisar = useCallback((t: string) => por(t), [por]);
+  const avisar = useCallback((t: string, acao?: AcaoDoAviso) => por(t, false, acao), [por]);
   const avisarErro = useCallback((e: unknown) => por(mensagemDeErro(e), true), [por]);
   const confirmar = useCallback((p: Omit<Pergunta, "resolver">) => new Promise<boolean>((resolver) => setPergunta({ ...p, resolver })), []);
   const responder = (v: boolean) => { pergunta?.resolver(v); setPergunta(null); };
@@ -98,7 +105,12 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
     <AvisosCtx.Provider value={{ avisar, avisarErro, confirmar }}>
       {children}
       <div className="g-toasts" role="status" aria-live="polite">
-        {toasts.map((t) => <div key={t.id} className={`g-toast${t.erro ? " erro" : ""}`}>{t.texto}</div>)}
+        {toasts.map((t) => (
+          <div key={t.id} className={`g-toast${t.erro ? " erro" : ""}${t.acao ? " com-acao" : ""}`}>
+            <span>{t.texto}</span>
+            {t.acao && <button type="button" onClick={() => { setToasts((l) => l.filter((x) => x.id !== t.id)); t.acao!.fazer(); }}>{t.acao.rotulo}</button>}
+          </div>
+        ))}
       </div>
       {pergunta && (
         <Folha titulo={pergunta.titulo} aoFechar={() => responder(false)}
@@ -211,6 +223,19 @@ if (typeof window !== "undefined") {
   if (id) guarda = retratoDaGuarda(id);
 }
 
+/**
+ * A folha acabou de fechar: por um instante, nada embaixo dela recebe toque. Sem isso, o segundo toque de um toque duplo
+ * no botão do rodapé caía no que estava atrás (o menu de baixo no celular, uma linha da lista) e a pessoa mudava de tela sem querer.
+ */
+function segurarSegundoToque() {
+  if (typeof document === "undefined") return;
+  const capa = document.createElement("div");
+  capa.setAttribute("aria-hidden", "true");
+  capa.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:transparent;touch-action:none";
+  document.body.appendChild(capa);
+  window.setTimeout(() => capa.remove(), 350);
+}
+
 export function Folha({ titulo, aoFechar, children, rodape, larga }: {
   titulo: React.ReactNode; aoFechar: () => void; children: React.ReactNode; rodape?: React.ReactNode; larga?: boolean;
 }) {
@@ -267,6 +292,7 @@ export function Folha({ titulo, aoFechar, children, rodape, larga }: {
       conferirGuarda();
       no?.removeEventListener("input", digitou); no?.removeEventListener("change", digitou); window.removeEventListener(EVENTO_AVISOU, gravou);
       document.documentElement.style.overflow = antes;
+      segurarSegundoToque();
     };
   }, []);
   return (

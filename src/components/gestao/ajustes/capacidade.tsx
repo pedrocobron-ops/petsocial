@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BedDouble, Minus, Plus, Users } from "lucide-react";
 import { vagasDe } from "@/lib/gestao/agenda";
+import { usaModulo } from "@/lib/gestao/modulos";
 import { brl } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -55,6 +56,7 @@ export function AjustesCrecheHotel() {
   const [diariaHotel, setDiariaHotel] = useState<number | null>(petshop.diaria_hotel == null ? null : Number(petshop.diaria_hotel));
   const [vagasCreche, setVagasCreche] = useState(petshop.vagas_creche == null ? "" : String(petshop.vagas_creche));
   const [vagasHotel, setVagasHotel] = useState(petshop.vagas_hotel == null ? "" : String(petshop.vagas_hotel));
+  const [bloqueia, setBloqueia] = useState(Boolean(petshop.creche_bloqueia_vacina));
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -67,7 +69,7 @@ export function AjustesCrecheHotel() {
     setErro(null);
     setSalvando(true);
     try {
-      ok(await sb.from("petshops").update({ diaria_creche: diariaCreche, diaria_hotel: diariaHotel, vagas_creche: vc, vagas_hotel: vh }).eq("id", petshop.id).select("id"));
+      ok(await sb.from("petshops").update({ diaria_creche: diariaCreche, diaria_hotel: diariaHotel, vagas_creche: vc, vagas_hotel: vh, creche_bloqueia_vacina: bloqueia }).eq("id", petshop.id).select("id"));
       await recarregarBase();
       avisarMudanca();
       avisar("Creche e hotel salvos.");
@@ -94,6 +96,16 @@ export function AjustesCrecheHotel() {
         {petshop.diaria_creche != null || petshop.diaria_hotel != null ? ` Hoje: ${[petshop.diaria_creche != null && `creche ${brl(petshop.diaria_creche)}`, petshop.diaria_hotel != null && `hotel ${brl(petshop.diaria_hotel)}`].filter(Boolean).join(" e ")}.` : ""}
         {" "}Quando a casa enche, o sistema avisa e pede confirmação antes de passar do limite.
       </p>
+      {usaModulo(petshop, "creche") && (
+        <div className="g-campo">
+          <label className="g-check">
+            <input type="checkbox" checked={bloqueia} onChange={(e) => setBloqueia(e.target.checked)} />
+            <span>Bloquear check-in na creche com vacina vencida</span>
+          </label>
+          <small>{bloqueia ? "Ligado: com vacina vencida na carteirinha, a equipe não consegue fazer o check-in na creche. Só o dono libera, caso a caso."
+            : "Desligado: a vacina vencida aparece como aviso e quem está na porta decide."}</small>
+        </div>
+      )}
       {erro && <p className="g-erro" role="alert">{erro}</p>}
       <div><button className="g-btn verde" disabled={salvando}>{salvando ? "Salvando…" : "Salvar creche e hotel"}</button></div>
     </form>

@@ -51,13 +51,13 @@
 .g-fin-prazos { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
 .g-fin-prazos > div { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px; border-radius: 14px; background: rgba(255, 251, 245, .78); border: 1px solid rgba(31, 27, 23, .06); }
 .g-fin-prazos > div.rosa { border-color: rgba(139, 52, 64, .28); }
-.g-fin-prazos span { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0 10px; flex: 1; min-width: 0; }
+.g-fin-prazos > div > span:not(.g-tile) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0 10px; flex: 1; min-width: 0; }
 .g-fin-prazos small { font-size: .8125rem; color: var(--g-cinza); }
 .g-fin-prazos small:first-child { grid-column: 1; font-weight: 600; color: var(--g-tinta); }
 .g-fin-prazos b { grid-column: 2; grid-row: 1 / span 2; align-self: center; font: 480 1.125rem/1.1 var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media (min-width: 720px) {
   .g-fin-prazos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .g-fin-prazos span { grid-template-columns: minmax(0, 1fr); }
+  .g-fin-prazos > div > span:not(.g-tile) { grid-template-columns: minmax(0, 1fr); }
   .g-fin-prazos b { grid-column: 1; grid-row: auto; margin: 2px 0; }
 }
 .g-fin-cab { flex-wrap: wrap; }

@@ -1,5 +1,11 @@
 "use client";
 
+import { CalendarCheck2, UserX } from "lucide-react";
+import { CATEGORIA_MENSALIDADE, resumoDaCrecheHoje } from "@/lib/gestao/creche";
+import { contarAtrasosPendentes } from "@/components/gestao/creche/atraso";
+import ChamadaDeHoje from "@/components/gestao/creche/chamada-hoje";
+import { OcorrenciasDeHoje } from "@/components/gestao/casa/ocorrencias";
+
 import { Marca, Selo } from "@/components/gestao/marca";
 import { Anel, Barras, Kpi, Ranking, Tendencia, Tile, type Tom } from "@/components/gestao/painel";
 import { useState } from "react";
@@ -8,13 +14,19 @@ import PrimeirosPassos, { usePrimeirosPassos } from "@/components/gestao/primeir
 import ResumoSemana, { temSemanaPassada } from "@/components/gestao/resumo-semana";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import Link from "next/link";
-import { BedDouble, FileSpreadsheet, Cake, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, UserSearch, Wallet } from "lucide-react";
+import { ShoppingBag, BedDouble, FileSpreadsheet, Cake, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, UserSearch, Wallet } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
+import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
+
 import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
-import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { useCalendario } from "@/components/gestao/calendario";
+import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
+import MinhaComissao from "@/components/gestao/minha-comissao";
 import { AvatarPet, Esqueleto, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
@@ -26,12 +38,17 @@ import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import Importar from "@/components/gestao/importar";
+import { idsParaCobrar } from "@/lib/gestao/reservado";
+import { AtendimentosParaCobrar, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
+import AlteracoesDeValores from "@/components/gestao/financeiro/alteracoes-de-valores";
 
 const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa semana?", "Quem não vem há mais de um mês?"];
 
 /** Tela inicial: o dia de relance, o que precisa de atenção e o atalho para pedir ao Mozart. */
 export default function Hoje() {
-  const { sb, petshop, eu, vejoFinanceiro, souDono, posso, liberado } = useGestao();
+  // vejoFinanceiro: recebe (Caixa, Financeiro ou Relatórios) e vê o que entrou hoje.
+  // cuidoDoFinanceiro: vê também o que saiu, as contas, a meta e o caminho para o Financeiro.
+  const { sb, petshop, eu, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso, liberado } = useGestao();
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
   const [lembretes, setLembretes] = useState(false);
@@ -39,10 +56,17 @@ export default function Hoje() {
   const [importando, setImportando] = useState(false);
   const hoje = inicioDoDia(new Date());
   const hojeIso = isoDia(hoje);
+  // data marcada como fechada em Meu pet shop (feriado, folga): a tela diz o motivo, hoje e no aviso dos lembretes de amanhã
+  useCalendario();
+  const fechadoHoje = fraseDoDiaFechado(hojeIso), fechadoAmanha = fraseDoDiaFechado(isoDia(somaDias(hoje, 1)));
   // o que o negócio faz decide o que a tela mostra: quem não tem creche, loja ou pacotes não vê cartão nem aviso disso
   const banho = usaModulo(petshop, "banho_tosa"), casa = usaCasa(petshop) && posso("creche_hotel");
   const loja = usaModulo(petshop, "loja"), comPacotes = usaModulo(petshop, "pacotes");
-  const soCasa = casa && !banho;
+  // área principal (`petshops.principal`): decide o que vai na frente da tela, dentro do que a pessoa pode abrir.
+  // Sem ela, vale a ordem de sempre.
+  const principal = principalDe(petshop), frenteDoNegocio = frenteDe(petshop);
+  const frente = frenteDoNegocio === "casa" ? (casa ? "casa" : null) : frenteDoNegocio === "loja" ? (posso("estoque") ? "loja" : null) : frenteDoNegocio === "banho" && posso("agenda") ? "banho" : null;
+  const soCasa = frente ? frente === "casa" : casa && !banho;
   const rotuloCasa = nomeDaCasa(petshop);
 
   const vejoEstoque = posso("estoque"), vejoPacotes = posso("pacotes");
@@ -57,12 +81,12 @@ export default function Hoje() {
       vejoEstoque ? lerTudo<{ id: string; nome: string; estoque: number; estoque_minimo: number }>((de, ate, contar) => sb.from("produtos").select("id, nome, estoque, estoque_minimo", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).gt("estoque_minimo", 0).order("nome").order("id").range(de, ate)).then((data) => ({ data })) : Promise.resolve({ data: [] }),
       sb.from("pets").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
       sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
-      vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).eq("data", hojeIso) : Promise.resolve({ data: [] }),
-      vejoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento, tipo").eq("petshop_id", petshop.id).eq("pago", false).lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
+      vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo, categoria").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).eq("data", hojeIso) : Promise.resolve({ data: [] }),
+      cuidoDoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento, tipo, categoria").eq("petshop_id", petshop.id).eq("pago", false).lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
       vejoPacotes ? sb.from("pacotes_clientes").select("id").eq("petshop_id", petshop.id).eq("ativo", true).gte("vence_em", hojeIso).lte("vence_em", isoDia(somaDias(hoje, 7))) : Promise.resolve({ data: [] }),
       sb.from("agendamentos").select("inicio, status").eq("petshop_id", petshop.id).gte("inicio", seg.toISOString()).lt("inicio", somaDias(seg, 7).toISOString()),
       lerTudo((de, ate, contar) => sb.from("agendamentos").select("status, servicos(nome, cor)", contando(contar)).eq("petshop_id", petshop.id).gte("inicio", ha30.toISOString()).lt("inicio", amanha.toISOString()).order("inicio").order("id").range(de, ate)).then((data) => ({ data })),
-      vejoFinanceiro ? lerTudo((de, ate, contar) => sb.from("lancamentos").select("valor, data", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").is("movimento", null).gte("data", isoDia(ha6)).lte("data", hojeIso).order("data").order("id").range(de, ate)).then((data) => ({ data })) : Promise.resolve({ data: [] }),
+      cuidoDoFinanceiro ? lerTudo((de, ate, contar) => sb.from("lancamentos").select("valor, data", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").is("movimento", null).gte("data", isoDia(ha6)).lte("data", hojeIso).order("data").order("id").range(de, ate)).then((data) => ({ data })) : Promise.resolve({ data: [] }),
       // primeiros passos e aviso de fim de teste: duas contagens, sem trazer linha nenhuma
       sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("status", "concluido"),
       sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).not("lembrete_em", "is", null),
@@ -70,6 +94,7 @@ export default function Hoje() {
       sb.from("produtos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
     ]);
     const saude = await buscarSaudeVencendo(sb, petshop.id).catch(() => null);
+    const creche = casa && usaModulo(petshop, "creche") ? await resumoDaCrecheHoje(sb, petshop, cuidoDoFinanceiro, liberado).catch(() => null) : null;
     const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
     const porServico = new Map<string, { rotulo: string; valor: number; cor: string | null }>();
     for (const a of (doMes.data ?? []) as unknown as { status: string; servicos: { nome: string; cor: string | null } | null }[]) {
@@ -102,25 +127,38 @@ export default function Hoje() {
       estadiasTotal: estadiasTotal.count ?? 0,
       produtosTotal: produtosTotal.count ?? 0,
       entrou: (entradas.data ?? []).filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0),
-      saiu: (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0),
+      saiu: cuidoDoFinanceiro ? (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0) : 0,
+      vendasHoje: ((entradas.data ?? []) as { valor: number; tipo: string; categoria?: string | null }[]).filter((l) => l.tipo === "entrada" && l.categoria === "Venda de produtos"),
       contas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "saida"),
-      aReceberVencidas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "entrada"),
+      // as mensalidades da creche têm a linha delas (com o atalho para Cobranças)
+      aReceberVencidas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string; categoria?: string }[]).filter((c) => c.tipo === "entrada" && c.categoria !== CATEGORIA_MENSALIDADE),
       pacotesVencendo: (pacotes.data ?? []).length,
       saude,
+      creche,
       semana: Array.from({ length: 7 }, (_, i) => {
         const d = somaDias(seg, i), iso = isoDia(d);
         return { rotulo: nomeDiaCurto(d), valor: (daSemana.data ?? []).filter((a) => valeAg(a.status) && isoDia(new Date(a.inicio)) === iso).length };
       }),
       servicosMes: [...porServico.values()].sort((a, b) => b.valor - a.valor).slice(0, 5),
+      // de segunda até hoje (a segunda desta semana está sempre dentro dos últimos 7 dias)
+      recebidoSemana: ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data >= isoDia(seg)).reduce((t, l) => t + Number(l.valor), 0),
       entradas7: Array.from({ length: 7 }, (_, i) => {
         const iso = isoDia(somaDias(ha6, i));
         return ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data === iso).reduce((t, l) => t + Number(l.valor), 0);
       }),
     };
-  }, [petshop.id, hojeIso, vejoFinanceiro, vejoEstoque, vejoPacotes]);
+  }, [petshop.id, hojeIso, vejoFinanceiro, cuidoDoFinanceiro, vejoEstoque, vejoPacotes, casa]);
 
   // quem chamar de volta e aniversariantes: consulta à parte, para não segurar o resto da tela
   const vejoClientes = posso("clientes");
+  // check-outs de creche e hotel que saíram sem cobrança (feitos por quem não mexe com dinheiro): quem recebe vê aqui
+  const { dados: semCobrar } = useDados(async () => {
+    if (!vejoFinanceiro || !posso("creche_hotel")) return 0;
+    return (await idsParaCobrar(sb, petshop.id)).length;
+  }, [petshop.id, hojeIso, vejoFinanceiro]);
+  const paraCobrar = semCobrar ?? 0;
+  // mensalistas que saíram depois do horário e esperam a decisão da taxa (só quem recebe lê)
+  const { dados: taxasPendentes } = useDados(async () => (vejoFinanceiro && posso("creche_hotel") ? contarAtrasosPendentes(sb, petshop.id) : 0), [petshop.id, hojeIso, vejoFinanceiro]);
   const { dados: paraChamar } = useDados(async () => (vejoClientes ? buscarParaChamar(sb, petshop.id) : null), [petshop.id, hojeIso, vejoClientes]);
   const chamados = paraChamar ? lerChamados(petshop.id) : {};
   const comFone = (grupos: GrupoChamar[]) => grupos.filter((g) => g.telefone);
@@ -137,6 +175,10 @@ export default function Hoje() {
 
   const ativos = (dados?.ags ?? []).filter((a) => !["cancelado", "faltou"].includes(a.status));
   const feitos = ativos.filter((a) => a.status === "concluido").length;
+  // concluídos de hoje que ninguém cobrou (o banco diz quais, sem valor): não são "tudo certo"
+  const { ids: semConta } = useParaCobrar(hoje, hoje);
+  const faltaCobrarHoje = ativos.filter((a) => semConta.has(a.id)).length;
+  const semConcluir = ativos.length - feitos;
   const proximo = ativos.find((a) => a.status !== "concluido" && new Date(a.fim) > new Date());
   const selecionado = aberto ? dados?.ags.find((a) => a.id === aberto) ?? null : null;
 
@@ -150,7 +192,7 @@ export default function Hoje() {
     () => setLembretes(true),
   );
   const cartaoPassos = !cartaoTeste && pp.estado !== "some";
-  const temResumo = vejoFinanceiro && temSemanaPassada(petshop.criado_em, hoje);
+  const temResumo = cuidoDoFinanceiro && temSemanaPassada(petshop.criado_em, hoje);
   const cartaoResumo = temResumo && hoje.getDay() === 1 && !cartaoTeste && !cartaoPassos;
 
   // creche e hotel: a casa pode estar cheia mesmo com a agenda de banho vazia
@@ -161,19 +203,36 @@ export default function Hoje() {
     : "";
 
   // conta que acabou de nascer: nada de zeros soltos, só o próximo passo
-  const contaNova = Boolean(dados && dados.pets === 0 && dados.totalAgs === 0 && dados.estadiasTotal === 0);
-  const frase = !dados ? "" : contaNova ? (posso("clientes") ? "Tudo pronto para começar. O primeiro passo é cadastrar um pet, ou trazer os seus clientes de uma planilha." : "Tudo pronto para começar.")
+  const contaNova = Boolean(dados && dados.pets === 0 && dados.totalAgs === 0 && dados.estadiasTotal === 0 && (frente !== "loja" || dados.produtosTotal === 0));
+  const vendas = dados && vejoFinanceiro ? { quantas: dados.vendasHoje.length, total: dados.vendasHoje.reduce((s, l) => s + Number(l.valor), 0) } : null;
+  // sem banho e tosa e sem horário hoje: a agenda não ocupa lugar na tela de quem escolheu outra área principal
+  const semAgenda = Boolean(principal && !banho && dados && !dados.ags.length);
+  const frase = !dados ? "" : contaNova && frente === "loja" ? "Tudo pronto para começar. O primeiro passo é cadastrar o que você vende."
+    : contaNova ? (posso("clientes") ? (souDono || eu.papel === "gerente" ? "Tudo pronto para começar. O primeiro passo é cadastrar um pet, ou trazer os seus clientes de uma planilha." : "Tudo pronto para começar. O primeiro passo é cadastrar um pet.") : "Tudo pronto para começar.")
+    : frente === "loja" ? `${dados.acabando.length === 0 ? "Nenhum produto acabando" : dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}.${vendas ? (vendas.quantas ? ` Hoje ${vendas.quantas === 1 ? "saiu 1 venda" : `saíram ${vendas.quantas} vendas`} de produtos: ${brl(vendas.total)}.` : " Nenhuma venda de produtos hoje, por enquanto.") : ""}${ativos.length ? ` Na agenda, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
+    : frente === "casa" ? `${temCasa ? linhaCasa : "Nenhum pet na casa agora"}.${ativos.length ? ` No banho e tosa, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : soCasa && !ativos.length ? (temCasa ? `${linhaCasa}.` : `Nenhum pet na casa agora.`)
     : !ativos.length ? `Nenhum horário marcado para hoje.${linhaCasa ? ` ${linhaCasa}.` : ""}`
-    : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? ", todos concluídos" : ""}.`;
+    : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? (faltaCobrarHoje > 0 ? `, todos concluídos. ${faltaCobrarHoje === 1 ? "Falta cobrar 1" : `Falta cobrar ${faltaCobrarHoje}`}` : ", todos concluídos") : ""}.`;
 
+  const cr = dados?.creche ?? null;
+  const cartaoDaChamada = Boolean(cr && cr.esperados > 0);
   const atencao = dados ? [
-    posso("agenda") && dados.amanhaSemLembrete > 0 && { icone: MessageCircle, tom: "pessego" as Tom, texto: `Amanhã ${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}: toque para mandar pelo WhatsApp.${dados.amanhaSemTelefone > 0 ? ` ${dados.amanhaSemTelefone} sem telefone (não ${dados.amanhaSemTelefone === 1 ? "entra" : "entram"} na conta).` : ""}`, aoTocar: () => setLembretes(true) },
+    paraCobrar > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${paraCobrar === 1 ? "1 check-out saiu" : `${paraCobrar} check-outs saíram`} sem cobrança na creche e hotel. Toque para receber.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
+    (taxasPendentes ?? 0) > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${taxasPendentes === 1 ? "1 mensalista saiu" : `${taxasPendentes} mensalistas saíram`} da creche depois do horário. Toque para decidir a taxa.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
+    cr && cr.reposicoes > 0 && { icone: CalendarCheck2, tom: "manteiga" as Tom, texto: `A equipe marcou ${cr.reposicoes === 1 ? "1 dia de mensalista como reposição" : `${cr.reposicoes} dias de mensalistas como reposição`} (sem cobrança). Toque para conferir: você aceita ou cobra como dia extra.`, href: "/gestao/app/creche-hotel?ver=chamada" },
+    cr && cr.semValor.length > 0 && { icone: HandCoins, tom: "manteiga" as Tom, texto: `${cr.semValor.length === 1 ? "1 mensalista está" : `${cr.semValor.length} mensalistas estão`} sem valor de mensalidade (${cr.semValor.slice(0, 3).join(", ")}${cr.semValor.length > 3 ? "…" : ""}). Sem o valor, a cobrança do mês não é gerada. Toque para preencher.`, href: "/gestao/app/creche-hotel?ver=mensalistas" },
+    // a chamada tem o cartão dela no alto da tela (ChamadaDeHoje): a linha não se repete aqui
+    cr && cr.esperados > 0 && !cartaoDaChamada && { icone: CalendarCheck2, tom: "manteiga" as Tom, texto: `Chamada de hoje: ${cr.esperados === 1 ? "1 cão esperado" : `${cr.esperados} cães esperados`}${cr.aindaNao > 0 ? `, ${cr.aindaNao === 1 ? "1 ainda não chegou" : `${cr.aindaNao} ainda não chegaram`}` : ", chamada feita"}.`, href: "/gestao/app/creche-hotel?ver=chamada" },
+    cr && cr.faltaram.length > 0 && { icone: UserX, tom: "rosa" as Tom, texto: `${cr.faltaram.length <= 2 ? cr.faltaram.join(" e ") : `${cr.faltaram.slice(0, 2).join(", ")} e mais ${cr.faltaram.length - 2}`} ${cr.faltaram.length === 1 ? "não veio" : "não vieram"} à creche hoje. Toque para ver a chamada e mandar uma mensagem ao tutor.`, href: "/gestao/app/creche-hotel?ver=chamada" },
+    cr && cr.vencemHoje > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `Hoje ${cr.vencemHoje === 1 ? "vence 1 mensalidade" : `vencem ${cr.vencemHoje} mensalidades`} da creche. Toque para cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
+    cr && cr.atrasadas > 0 && { icone: HandCoins, tom: "rosa" as Tom, texto: `${cr.atrasadas === 1 ? "1 mensalidade atrasada" : `${cr.atrasadas} mensalidades atrasadas`} na creche. Toque para ver e cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
+    posso("agenda") && dados.amanhaSemLembrete > 0 && { icone: MessageCircle, tom: "pessego" as Tom, texto: `Amanhã ${fechadoAmanha ? `é ${fechadoAmanha.replace(/^Dia /, "dia ")}, mas ` : ""}${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}: toque para mandar pelo WhatsApp.${dados.amanhaSemTelefone > 0 ? ` ${dados.amanhaSemTelefone} sem telefone (não ${dados.amanhaSemTelefone === 1 ? "entra" : "entram"} na conta).` : ""}`, aoTocar: () => setLembretes(true) },
     sumidosAChamar.length > 0 && { icone: UserSearch, tom: "menta" as Tom, texto: `${petsSumidos.texto} ${petsSumidos.q === 1 ? "não vem" : "não vêm"} há mais de 30 dias e não ${petsSumidos.q === 1 ? "tem" : "têm"} horário marcado. Toque para chamar de volta pelo WhatsApp.`, aoTocar: () => setChamando("volta") },
     niverAChamar.length > 0 && { icone: Cake, tom: "manteiga" as Tom, texto: `${petsNiver.texto} ${petsNiver.q === 1 ? "faz" : "fazem"} aniversário ${niverHoje ? "hoje" : "nos próximos dias"}. Toque para mandar os parabéns pelo WhatsApp.`, aoTocar: () => setChamando("niver") },
     loja && dados.acabando.length > 0 && { icone: Package, tom: "rosa" as Tom, texto: `${dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}: ${dados.acabando.slice(0, 3).map((p) => p.nome).join(", ")}.`, href: "/gestao/app/estoque" },
     dados.contas.length > 0 && { icone: Receipt, tom: "manteiga" as Tom, texto: `${dados.contas.length === 1 ? "1 conta vence" : `${dados.contas.length} contas vencem`} até hoje: ${brl(dados.contas.reduce((s, c) => s + Number(c.valor), 0))}.`, href: "/gestao/app/financeiro" },
-    dados.aReceberVencidas.length > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${dados.aReceberVencidas.length === 1 ? "1 cliente ficou de pagar" : `${dados.aReceberVencidas.length} contas de clientes venceram`} até hoje: ${brl(dados.aReceberVencidas.reduce((s, c) => s + Number(c.valor), 0))} a receber.`, href: "/gestao/app/financeiro" },
+    dados.aReceberVencidas.length > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${dados.aReceberVencidas.length === 1 ? "1 conta de cliente venceu" : `${dados.aReceberVencidas.length} contas de clientes venceram`} e ainda não ${dados.aReceberVencidas.length === 1 ? "foi paga" : "foram pagas"}: ${brl(dados.aReceberVencidas.reduce((s, c) => s + Number(c.valor), 0))} a receber.`, href: "/gestao/app/financeiro" },
     dados.saude && dados.saude.vencidos + dados.saude.vencendo > 0 && { icone: HeartPulse, tom: "ceu" as Tom, texto: dados.saude.frase, href: "/gestao/app/clientes" },
     comPacotes && dados.pacotesVencendo > 0 && { icone: Ticket, tom: "lilas" as Tom, texto: `${dados.pacotesVencendo === 1 ? "1 pacote vence" : `${dados.pacotesVencendo} pacotes vencem`} nos próximos 7 dias.`, href: "/gestao/app/pacotes" },
   ].filter(Boolean) as { icone: React.ComponentType<{ size?: number }>; tom: Tom; texto: string; href?: string; aoTocar?: () => void }[] : [];
@@ -184,6 +243,7 @@ export default function Hoje() {
   const faltam = destaque ? Math.round((new Date(destaque.inicio).getTime() - agora.getTime()) / 60000) : 0;
   const quando = !destaque ? "" : faltam <= 0 ? "acontecendo agora" : faltam < 60 ? `em ${faltam} min` : `em ${Math.floor(faltam / 60)} h${faltam % 60 ? ` ${faltam % 60} min` : ""}`;
   const semana = dados?.semana ?? [];
+  const kpiCasa = casa && <Kpi href="/gestao/app/creche-hotel" icone={BedDouble} tom="ceu" rotulo={rotuloCasa} valor={dados ? dados.emCasa : "–"} apoio={dados?.emCasa === 1 ? "pet na casa agora" : "pets na casa agora"} />;
   const totalSemana = semana.reduce((s, d) => s + d.valor, 0);
 
   return (
@@ -195,8 +255,10 @@ export default function Hoje() {
         </div>
         <div className="g-acoes">
           {posso("agenda") && banho && !contaNova && <LinkRapido rotulo="Mandar link de agendamento" />}
-          {contaNova && posso("clientes") ? <Link className="g-btn pri" href="/gestao/app/clientes"><Plus />Cadastrar o primeiro pet</Link>
-            : soCasa ? <Link className="g-btn pri" href="/gestao/app/creche-hotel"><Plus />Fazer check-in</Link>
+          {contaNova && frente === "loja" ? <Link className="g-btn pri" href="/gestao/app/estoque"><Plus />Cadastrar o primeiro produto</Link>
+            : contaNova && posso("clientes") ? <Link className="g-btn pri" href="/gestao/app/clientes?novo=1"><Plus />Cadastrar o primeiro pet</Link>
+            : frente === "loja" ? <Link className="g-btn pri" href={ROTA_VENDER}><ShoppingBag />Vender</Link>
+            : soCasa ? <Link className="g-btn pri" href="/gestao/app/creche-hotel"><Plus />{principal === "hotel" ? "Nova reserva" : "Fazer check-in"}</Link>
             : posso("agenda") && <Link className="g-btn pri" href="/gestao/app/agenda?novo=1"><Plus />Marcar horário</Link>}
         </div>
       </header>
@@ -207,6 +269,8 @@ export default function Hoje() {
             aoDispensar={() => { guardarLembrado(chaveAgoraNao(petshop.id), hojeIso); setAgoraNao(true); }} />
         )}
         {testePerto && !souDono && liberado && <FimDoTeste modo="equipe" numeros={null} aoDispensar={() => {}} />}
+
+        {cr && cartaoDaChamada && <ChamadaDeHoje esperados={cr.esperados} aindaNao={cr.aindaNao} naCasa={cr.naCasa} faltaram={cr.faltaram.length} />}
 
         {contaNova && cartaoPassos && <PrimeirosPassos pp={pp} modo="cartao" curto />}
 
@@ -223,12 +287,12 @@ export default function Hoje() {
             <div className="g-pilha p">
               <div className="g-fila"><button className="g-btn pri" onClick={() => abrirAssistente()}><Mic />Falar com o Mozart</button></div>
               <div className="g-sugestoes">
-                {PEDIDOS.filter((p) => vejoFinanceiro || !p.startsWith("Quanto")).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
+                {pedidosDaFrente(frente, PEDIDOS).filter((p) => cuidoDoFinanceiro || !p.startsWith("Quanto")).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
               </div>
             </div>
           </section>
 
-          {destaque?.pets ? (
+          {destaque?.pets && frente !== "casa" && frente !== "loja" ? (
             <button className="g-proximo" style={{ textAlign: "left", color: "inherit", "--cor": destaque.servicos?.cor ?? "#f97316" } as React.CSSProperties} onClick={() => setAberto(destaque.id)}>
               <div className="g-fila entre" style={{ flexWrap: "nowrap" }}>
                 <span className="g-rotulo" style={{ color: "#8a4a17" }}>{emAndamento ? "Na mesa agora" : "Próximo atendimento"}</span>
@@ -243,12 +307,12 @@ export default function Hoje() {
               </div>
               <div className="quando">
                 <b>{hora(destaque.inicio)}</b>
-                <span className="g-ag" style={{ width: "auto", padding: "6px 12px", boxShadow: "none", borderLeftWidth: 1, borderRadius: 999 }}><span className="serv"><i />{destaque.servicos?.nome ?? "Atendimento"}</span></span>
+                <span className="g-ag" style={{ width: "auto", padding: "6px 12px", boxShadow: "none", borderLeftWidth: 1, borderRadius: 999 }}><span className="serv"><i />{nomeDosServicos(destaque) ?? "Atendimento"}</span></span>
                 {destaque.profissionais && <span className="g-p" style={{ color: "#6b4a2f" }}>com {destaque.profissionais.nome.split(" ")[0]}</span>}
               </div>
             </button>
           ) : (
-            contaNova && posso("clientes") ? (
+            contaNova && posso("clientes") && frente !== "loja" && (souDono || eu.papel === "gerente") ? (
             <div className="g-proximo vazio">
               <span className="g-rotulo" style={{ color: "#24543b" }}>Já tem clientes?</span>
               <div className="quem">
@@ -260,7 +324,9 @@ export default function Hoje() {
               </div>
               <button type="button" className="g-btn verde" style={{ justifySelf: "start" }} onClick={() => { if (liberado) setImportando(true); }}><FileSpreadsheet />Trazer de uma planilha</button>
             </div>
-            ) : soCasa && !(dados && ativos.length) ? (
+            ) : frente === "loja" ? (
+            <FrenteDaLoja carregando={!dados} produtos={dados?.produtosTotal ?? 0} acabando={dados?.acabando ?? []} vendas={vendas} novo={dados?.produtosTotal === 0} />
+            ) : soCasa && (frente === "casa" || !(dados && ativos.length)) ? (
             <div className="g-proximo vazio">
               <span className="g-rotulo" style={{ color: "#24543b" }}>{rotuloCasa}</span>
               <div className="quem">
@@ -269,16 +335,22 @@ export default function Hoje() {
                   <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{!dados ? "Olhando a casa…" : dados.emCasa === 0 ? "Nenhum pet na casa agora" : dados.emCasa === 1 ? "1 pet na casa agora" : `${dados.emCasa} pets na casa agora`}</b>
                 </div>
               </div>
-              {temCasa && <Link className="g-hoje-casa" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
-              <Link className="g-btn verde" href="/gestao/app/creche-hotel" style={{ justifySelf: "start" }}><Plus />{dados?.estadiasTotal === 0 ? "Fazer o primeiro check-in" : "Fazer check-in"}</Link>
+              {frente === "casa" ? dados && <ChegamESaem chegam={dados.chegamHoje} saem={dados.saemHoje} />
+                : temCasa && <Link className="g-hoje-casa" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
+              <Link className="g-btn verde" href="/gestao/app/creche-hotel" style={{ justifySelf: "start" }}><Plus />{principal === "hotel" ? "Nova reserva" : dados?.estadiasTotal === 0 ? "Fazer o primeiro check-in" : "Fazer check-in"}</Link>
             </div>
             ) : (
             <div className="g-proximo vazio">
-              <span className="g-rotulo" style={{ color: "#24543b" }}>{dados && ativos.length ? "Dia concluído" : temCasa ? "Banho e tosa sem horários" : "Agenda livre"}</span>
+              <span className="g-rotulo" style={{ color: "#24543b" }}>{dados && ativos.length ? (semConcluir > 0 ? "Fim dos horários de hoje" : faltaCobrarHoje > 0 ? "Atendimentos concluídos" : "Dia concluído") : temCasa ? "Banho e tosa sem horários" : "Agenda livre"}</span>
               <div className="quem">
-                <Tile icone={dados && ativos.length ? Check : Sparkles} tom="menta" tamanho="g" />
+                <Tile icone={dados && ativos.length ? (semConcluir > 0 || faltaCobrarHoje > 0 ? HandCoins : Check) : Sparkles} tom={dados && ativos.length && (semConcluir > 0 || faltaCobrarHoje > 0) ? "manteiga" : "menta"} tamanho="g" />
                 <div style={{ minWidth: 0 }}>
-                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{dados && ativos.length ? "Tudo atendido por hoje" : "Nenhum horário por vir"}</b>
+                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{!(dados && ativos.length) ? "Nenhum horário por vir"
+                    : semConcluir > 0 ? `${semConcluir === 1 ? "1 horário ficou" : `${semConcluir} horários ficaram`} sem concluir`
+                    : faltaCobrarHoje > 0 ? `${faltaCobrarHoje === 1 ? "Falta cobrar 1 atendimento" : `Falta cobrar ${faltaCobrarHoje} atendimentos`}`
+                    : "Tudo atendido por hoje"}</b>
+                  {dados && ativos.length > 0 && semConcluir > 0 && <span style={{ whiteSpace: "normal" }}>Abra cada um na lista de hoje e diga se foi atendido ou se o cliente faltou.{faltaCobrarHoje > 0 ? ` E ${faltaCobrarHoje === 1 ? "1 concluído ainda está" : `${faltaCobrarHoje} concluídos ainda estão`} sem cobrança.` : ""}</span>}
+                  {dados && ativos.length > 0 && semConcluir === 0 && faltaCobrarHoje > 0 && <span style={{ whiteSpace: "normal" }}>{vejoFinanceiro ? "Todos foram atendidos, mas a conta ainda não foi fechada. Veja a lista Atendimentos para cobrar, logo abaixo." : "Todos foram atendidos. Quem cuida do caixa ainda precisa fechar a conta."}</span>}
                 </div>
               </div>
               {temCasa && <Link className="g-hoje-casa" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
@@ -288,40 +360,53 @@ export default function Hoje() {
           )}
         </div>
 
-        {temCasa && destaque?.pets && <Link className="g-hoje-casa solta" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
+        {temCasa && (destaque?.pets || frente === "loja") && frente !== "casa" && <Link className="g-hoje-casa solta" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
+        {(frente === "casa" || frente === "loja") && destaque?.pets && posso("agenda") && (
+          <Link className="g-hoje-casa solta" href="/gestao/app/agenda"><Scissors aria-hidden /><span>Banho e tosa: {n(ativos.length, "atendimento", "atendimentos")} hoje. {emAndamento ? `${destaque.pets.nome} está na mesa agora.` : `O próximo é ${destaque.pets.nome}, às ${hora(destaque.inicio)}.`}</span><ChevronRight aria-hidden /></Link>
+        )}
 
         {posso("agenda") && <PedidosLink />}
+        {vejoFinanceiro && <AtendimentosParaCobrar aoMudar={() => void recarregar()} />}
+        {cuidoDoFinanceiro && <AlteracoesDeValores />}
+        {casa && <OcorrenciasDeHoje />}
 
         {!(contaNova && cartaoPassos) && <PrimeirosPassos pp={pp} modo={cartaoPassos ? "cartao" : "linha"} />}
         {temResumo && <ResumoSemana modo={cartaoResumo ? "cartao" : "linha"} />}
 
         {!contaNova && <div className="g-grade kpis">
-          <Kpi href="/gestao/app/agenda" icone={Scissors} tom="pessego" rotulo="Atendimentos hoje" valor={dados ? ativos.length : "–"}
+          {frente === "casa" && kpiCasa}
+          {frente === "loja" && <Kpi href="/gestao/app/estoque" icone={Package} tom="rosa" rotulo="Produtos acabando" valor={dados ? dados.acabando.length : "–"} apoio={dados?.produtosTotal === 1 ? "de 1 na prateleira" : `de ${dados?.produtosTotal ?? 0} na prateleira`} />}
+          {!semAgenda && <Kpi href="/gestao/app/agenda" icone={Scissors} tom="pessego" rotulo="Atendimentos hoje" valor={dados ? ativos.length : "–"}
             apoio={dados ? (ativos.length ? `${feitos} ${feitos === 1 ? "concluído" : "concluídos"}` : "agenda livre") : " "}
-            lado={dados && ativos.length > 0 ? <Anel parte={feitos / ativos.length} cor="var(--g-laranja)">{Math.round((feitos / ativos.length) * 100)}%</Anel> : undefined} />
-          {casa && <Kpi href="/gestao/app/creche-hotel" icone={BedDouble} tom="ceu" rotulo={rotuloCasa} valor={dados ? dados.emCasa : "–"} apoio={dados?.emCasa === 1 ? "pet na casa agora" : "pets na casa agora"} />}
+            lado={dados && ativos.length > 0 ? <Anel parte={feitos / ativos.length} cor="var(--g-laranja)">{Math.round((feitos / ativos.length) * 100)}%</Anel> : undefined} />}
+          {frente !== "casa" && kpiCasa}
           {vejoFinanceiro ? (
-            <Kpi href="/gestao/app/caixa" icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"} apoio={dados && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : "ver o caixa"}
-              lado={dados ? <Tendencia valores={dados.entradas7} /> : undefined} />
+            <Kpi href={posso("caixa") ? "/gestao/app/caixa" : "/gestao/app/financeiro"} icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"}
+              apoio={dados && cuidoDoFinanceiro && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : posso("caixa") ? "ver o caixa" : "ver o financeiro"}
+              lado={dados && cuidoDoFinanceiro ? <Tendencia valores={dados.entradas7} /> : undefined} />
           ) : (
             <Kpi href="/gestao/app/clientes" icone={PawPrint} tom="menta" rotulo="Pets cadastrados" valor={dados ? dados.pets : "–"} apoio="ver todos" />
           )}
-          <Kpi href="/gestao/app/agenda" icone={CalendarDays} tom="lilas" rotulo="Nesta semana" valor={dados ? totalSemana : "–"} apoio={totalSemana === 1 ? "horário marcado" : "horários marcados"} />
+          {!semAgenda && <Kpi href="/gestao/app/agenda" icone={CalendarDays} tom="lilas" rotulo="Nesta semana" valor={dados ? totalSemana : "–"} apoio={totalSemana === 1 ? "horário marcado" : "horários marcados"} />}
         </div>}
 
-        <div className="g-duas">
-          <section>
+        {!contaNova && cuidoDoFinanceiro && dados && <RecebidoNaSemana valor={dados.recebidoSemana} hoje={dados.entrou} />}
+        <MinhaComissao />
+
+        <div className={semAgenda ? "g-pilha g" : "g-duas"}>
+          {!semAgenda && <section>
             <div className="g-card-t">
               <h2>Agenda de hoje</h2>
-              {posso("agenda") && <Link className="g-btn fantasma p" href="/gestao/app/agenda">Ver a semana<ChevronRight /></Link>}
+              {posso("agenda") && <Link className="g-btn fantasma p" href="/gestao/app/agenda?visao=semana">Ver a semana<ChevronRight /></Link>}
             </div>
+            {fechadoHoje && <p className="g-aviso" role="status" style={{ marginBottom: 12 }}><span className="g-cresce"><b>{fechadoHoje}.</b> O pet shop não abre hoje.{ativos.some((a) => a.status !== "concluido") ? " Os horários abaixo continuam marcados: confira com o tutor ou remarque." : ""}</span></p>}
             {carregando && !dados ? <Esqueleto /> : !dados?.ags.length ? (
               <div className="g-card">
                 {!banho ? (
                   <Vazio mozart="acenando" titulo="Nenhum horário marcado para hoje" texto={casa ? `Serviços com hora marcada aparecem aqui. As estadias ficam em ${rotuloCasa}.` : "Serviços com hora marcada aparecem aqui."} />
                 ) : contaNova && posso("clientes") ? (
                   <Vazio mozart="acenando" titulo="A agenda começa pelo primeiro pet" texto="Cadastre um pet com o tutor. Depois é só marcar: o horário aparece aqui.">
-                    <Link className="g-btn verde" href="/gestao/app/clientes">Cadastrar o primeiro pet</Link>
+                    <Link className="g-btn verde" href="/gestao/app/clientes?novo=1">Cadastrar o primeiro pet</Link>
                   </Vazio>
                 ) : (
                   <Vazio mozart="acenando" titulo="Nenhum banho marcado para hoje" texto="Que tal chamar quem está com o banho atrasado? O Mozart monta a lista para você.">
@@ -342,10 +427,11 @@ export default function Hoje() {
                           {a.pets && <AvatarPet pet={a.pets} />}
                           <span className="t">
                             <b>{a.pets?.nome}</b>
-                            <span className="serv"><i />{a.servicos?.nome ?? "Atendimento"}</span>
+                            <span className="serv"><i />{nomeDosServicos(a) ?? "Atendimento"}</span>
                             {a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {a.pets.clientes.nome}</span>}
                           </span>
-                          {a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}
+                          {semConta.has(a.id) ? <span className="g-tag laranja">Falta cobrar</span>
+                            : a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}
                           <ChevronRight size={18} className="g-muted g-so-pc" />
                         </button>
                         {posso("agenda") && <BotaoLembrete agendamento={a} doDia={dados.ags} aoMandar={() => void recarregar()} />}
@@ -355,7 +441,7 @@ export default function Hoje() {
                 })}
               </div>
             )}
-          </section>
+          </section>}
 
           <div className="g-pilha g">
             {posso("clientes") && posso("agenda") && <DicasMozart semDicas={[...(sumidos.length ? ["sumidos"] : []), ...(niver.length ? ["niver"] : [])]} />}
@@ -382,7 +468,7 @@ export default function Hoje() {
 
             <MetaMes />
 
-            {!contaNova && <section className="g-card">
+            {!contaNova && !semAgenda && <section className="g-card">
               <div className="g-card-t"><h3>Movimento da semana</h3><span className="g-muted g-pp">horários por dia</span></div>
               {!dados ? <Esqueleto linhas={2} /> : totalSemana ? <Barras itens={semana} destaque={(hoje.getDay() + 6) % 7} /> : <p className="g-muted g-p">Nenhum horário marcado nesta semana ainda.</p>}
             </section>}

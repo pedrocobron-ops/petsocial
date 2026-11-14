@@ -13,6 +13,8 @@ export type Bloqueio = T["bloqueios"]["Row"];
 export type Estadia = T["estadias"]["Row"];
 export type Caixa = T["caixas"]["Row"];
 export type Lancamento = T["lancamentos"]["Row"];
+/** Alteração ou exclusão de um valor já recebido, anotada pelo banco. */
+export type AlteracaoLancamento = T["lancamentos_alteracoes"]["Row"];
 export type Produto = T["produtos"]["Row"];
 export type MovimentoEstoque = T["movimentos_estoque"]["Row"];
 export type StatusAgendamento = Database["public"]["Enums"]["status_agendamento"];
@@ -29,11 +31,22 @@ export type AgendamentoCompleto = Agendamento & {
   }) | null;
   servicos: Pick<Servico, "id" | "nome" | "cor" | "categoria"> | null;
   profissionais: Pick<Profissional, "id" | "nome" | "cor"> | null;
+  /** Os outros serviços do mesmo horário (vazio quando o horário tem um serviço só). */
+  agendamento_servicos?: {
+    id: string; servico_id: string; preco: number | null; ordem: number;
+    servicos: Pick<Servico, "id" | "nome" | "cor" | "categoria"> | null;
+  }[] | null;
 };
 export const SELECT_AGENDAMENTO =
-  "*, pets(id, nome, foto, porte, especie, raca, alertas, clientes(id, nome, telefone)), servicos(id, nome, cor, categoria), profissionais(id, nome, cor)";
+  "*, pets(id, nome, foto, porte, especie, raca, alertas, clientes(id, nome, telefone)), servicos(id, nome, cor, categoria), profissionais(id, nome, cor), agendamento_servicos(id, servico_id, preco, ordem, servicos(id, nome, cor, categoria))";
 
-export type Horario = Record<string, { abre: string; fecha: string } | null>;
+/**
+ * Horário de funcionamento: uma chave por dia da semana ("0" domingo … "6" sábado), `null` = fechado.
+ * O almoço do pet shop vai dentro de cada dia aberto (`almoco: { de, ate }`), igual em todos: é um intervalo fechado,
+ * sem prazo. Quem lê só `abre` e `fecha` (versões antigas, escala da equipe, o link) continua funcionando sem saber dele.
+ */
+export type DiaDoHorario = { abre: string; fecha: string; almoco?: { de: string; ate: string } | null };
+export type Horario = Record<string, DiaDoHorario | null>;
 
 export const STATUS_AGENDAMENTO: Record<StatusAgendamento, { rotulo: string; tom: string }> = {
   marcado: { rotulo: "Marcado", tom: "cinza" },

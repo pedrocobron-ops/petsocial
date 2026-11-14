@@ -9,10 +9,17 @@ import FormPet from "@/components/gestao/form-pet";
 import { Anel, Kpi, Tile } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, EscolherPet, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { AvisoCaixaFechado, CampoDinheiro, erroDeValor, ErroTela, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, usePagamento, type PagaDepois } from "@/components/gestao/loja/pecas";
-import { lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { Cliente, Pacote, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
+import { usaModulo } from "@/lib/gestao/modulos";
 import "./pacotes.css";
+
+/** Exemplo de nome de pacote, no assunto do pet shop: quem não faz banho e tosa não lê "4 banhos no mês". */
+const exemploDePacote = (petshop: { modulos?: string[] | null }) =>
+  usaModulo(petshop, "banho_tosa") ? "4 banhos no mês" : usaModulo(petshop, "creche") ? "10 diárias de creche" : usaModulo(petshop, "hotel") ? "5 diárias de hotel" : "4 banhos no mês";
 
 type PetDoPacote = Pick<Pet, "id" | "nome" | "foto" | "especie"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
 type PacoteDoPet = PacoteCliente & { pets: PetDoPacote | null };
@@ -144,7 +151,7 @@ export default function Pacotes() {
       <header className="g-topo">
         <div>
           <h1>Pacotes</h1>
-          <p className="g-muted">{ativos.length ? `${ativos.length} ${ativos.length === 1 ? "pacote em uso" : "pacotes em uso"}` : "Banhos do mês e mensalistas, com a conta de quantos já foram."}</p>
+          <p className="g-muted">{ativos.length ? `${ativos.length} ${ativos.length === 1 ? "pacote em uso" : "pacotes em uso"}` : "Pacotes e planos, com a conta de quantos usos já foram."}</p>
         </div>
         <div className="g-acoes">
           <button className="g-btn pri" onClick={() => { if (!somenteLeitura()) setVenda({}); }}><Plus /> Vender pacote</button>
@@ -179,7 +186,7 @@ export default function Pacotes() {
 
         {carregando && !dados ? <Esqueleto linhas={4} /> : !dados ? null : aba === "clientes" ? (
           !vendidos.length ? (
-            <Vazio titulo="Nenhum pacote vendido ainda" texto="Quando um cliente fechar um pacote de banhos, venda por aqui e vá marcando cada uso.">
+            <Vazio titulo="Nenhum pacote vendido ainda" texto="Quando um cliente fechar um pacote ou plano, venda por aqui e vá marcando cada uso.">
               <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setVenda({}); }}>Vender o primeiro pacote</button>
             </Vazio>
           ) : (
@@ -244,7 +251,7 @@ export default function Pacotes() {
             </>
           )
         ) : !modelos.length ? (
-          <Vazio titulo="Nenhum modelo de pacote" texto="Monte os pacotes que você costuma vender, como 4 banhos no mês. Na hora da venda é só escolher.">
+          <Vazio titulo="Nenhum modelo de pacote" texto={`Monte os pacotes que você costuma vender, como ${exemploDePacote(petshop)}. Na hora da venda é só escolher.`}>
             <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setModelo("novo"); }}>Criar um modelo</button>
           </Vazio>
         ) : (
@@ -321,7 +328,7 @@ function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: Pacote | null; aoF
         <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
       </>}>
       <div className="g-form">
-        <Campo rotulo="Nome"><input className="g-input" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: 4 banhos no mês" autoFocus={!modelo} /></Campo>
+        <Campo rotulo="Nome"><input className="g-input" value={nome} onChange={(e) => setNome(e.target.value)} placeholder={`Ex.: ${exemploDePacote(petshop)}`} autoFocus={!modelo} /></Campo>
         <Campo rotulo="Serviço">
           <select className="g-select" value={servico} onChange={(e) => setServico(e.target.value)}>
             <option value="">Qualquer serviço</option>
@@ -341,8 +348,10 @@ function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: Pacote | null; aoF
 /* ---------- vender pacote ---------- */
 
 function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; modelos: Pacote[]; aoFechar: () => void; aoGravar: () => void }) {
-  const { sb, petshop, servicos, vejoFinanceiro } = useGestao();
+  const { sb, petshop, servicos, vejoFinanceiro, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
+  // preço travado (opção do dono): quem só opera o caixa vende o pacote da lista, pelo preço da lista
+  const precoTravado = travaDePreco(petshop).ligada && vejoFinanceiro && !cuidoDoFinanceiro;
   const [pet, setPet] = useState<PetDoPacote | null>(inicio.pet ?? null);
   const [criando, setCriando] = useState<string | null>(null);
   const [escolhido, setEscolhido] = useState(Boolean(inicio.base));
@@ -351,7 +360,11 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
   const [servico, setServico] = useState(inicio.base?.servico_id ?? "");
   const [total, setTotal] = useState(String(inicio.base?.total ?? 4));
   const [validade, setValidade] = useState(inicio.base ? (inicio.base.validade ? String(inicio.base.validade) : "") : "30");
-  const [preco, setPreco] = useState<number | null>(inicio.base ? Number(inicio.base.preco) : null);
+  const [preco, setPreco] = useState<number | null>(() => {
+    if (!inicio.base) return null;
+    const modelo = precoTravado ? modelos.find((m) => m.id === inicio.base!.pacote_id) : null;
+    return modelo ? Number(modelo.preco) : Number(inicio.base.preco);
+  });
   const [compra, setCompra] = useState(isoDia(new Date()));
   // mesmo recebimento da comanda: uma forma, dividido em até três, ou "Cliente paga depois" (vira conta a receber)
   const [pagamento, setPagamento] = usePagamento();
@@ -376,7 +389,9 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
   const hoje = isoDia(new Date());
   const nasceVencido = Boolean(venceEm && venceEm < hoje);
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (!pet) return;
     const t = Number(total);
     if (!nome.trim()) { avisarErro("Dê um nome ao pacote."); return; }
@@ -393,18 +408,23 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
       texto: `Com a compra em ${dataCompleta(compra)} e validade de ${dias} dias, ele venceu em ${dataCompleta(venceEm!)}. Confira a data da compra ou aumente a validade. Salvar assim mesmo?`,
       confirmar: "Salvar vencido", perigo: true,
     }))) return;
+    if (cobra && !(await conferirValorAlto(preco, confirmar))) return;
+    // recebendo hoje: se o caixa fechou enquanto esta venda estava aberta, pergunta antes de receber fora dele
+    if (rec && !("erro" in rec) && preco && !rec.fiado && compra === hoje && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
-      ok(await sb.from("pacotes_clientes").insert({
+      // com a chave da operação, um toque duplo (ou o pedido repetido) não vende o pacote duas vezes
+      const vendido = await sb.from("pacotes_clientes").upsert({
         petshop_id: petshop.id, pet_id: pet.id, pacote_id: pacoteId, nome: nome.trim(), servico_id: servico || null,
-        total: t, comprado_em: compra, vence_em: venceEm, preco: preco ?? 0,
-      }).select("id").single());
+        total: t, comprado_em: compra, vence_em: venceEm, preco: preco ?? 0, chave,
+      }, { onConflict: "petshop_id,chave", ignoreDuplicates: true }).select("id");
+      if (vendido.error) throw new Error(vendido.error.message);
       if (rec && !("erro" in rec) && preco && !rec.fiado) {
         try {
           lembrarForma(rec.forma);
           await lancarPago(sb, petshop.id, {
             tipo: "entrada", valor: preco, forma: rec.forma, pagamentos: rec.pagamentos, categoria: "Pacotes", descricao: `Pacote ${nome.trim()} · ${pet.nome}`,
-            clienteId: pet.clientes?.id ?? null, data: compra,
+            clienteId: pet.clientes?.id ?? null, data: compra, chave,
           });
           avisar(`Pacote vendido para ${pet.nome}. ${brl(preco)} no financeiro.`);
         } catch (e) {
@@ -414,7 +434,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
         // conta a receber: entrada ainda não paga, com vencimento e ligada ao cliente
         try {
           await lancarAReceber(sb, petshop.id, {
-            valor: preco, vencimento: rec.quando, categoria: "Pacotes", descricao: `Pacote ${nome.trim()} · ${pet.nome} (a receber)`, clienteId: pet.clientes?.id ?? null,
+            valor: preco, vencimento: rec.quando, categoria: "Pacotes", descricao: `Pacote ${nome.trim()} · ${pet.nome} (a receber)`, clienteId: pet.clientes?.id ?? null, chave,
           });
           avisar(`Pacote vendido para ${pet.nome}. ${brl(preco)} em A receber, para ${dataCurta(rec.quando)}.`);
         } catch (e) {
@@ -459,7 +479,9 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
             ))}
           </div>
           {!modelos.length && <p className="g-muted g-p">Você ainda não tem modelos de pacote. Monte um só para este cliente.</p>}
-          <button type="button" className="g-btn sec" onClick={() => escolherModelo(null)}>Montar um avulso</button>
+          {precoTravado
+            ? <p className="g-muted g-pp">Pacote avulso, com preço livre, é com o dono ou com quem vê o financeiro.</p>
+            : <button type="button" className="g-btn sec" onClick={() => escolherModelo(null)}>Montar um avulso</button>}
         </div>
       </Folha>
     );
@@ -475,7 +497,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
       </>}>
       <div className="g-form">
         {cabecalho}
-        <Campo rotulo="Pacote"><input className="g-input" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: 4 banhos no mês" /></Campo>
+        <Campo rotulo="Pacote"><input className="g-input" value={nome} onChange={(e) => setNome(e.target.value)} placeholder={`Ex.: ${exemploDePacote(petshop)}`} /></Campo>
         <Campo rotulo="Serviço">
           <select className="g-select" value={servico} onChange={(e) => setServico(e.target.value)}>
             <option value="">Qualquer serviço</option>
@@ -489,7 +511,9 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
           </Campo>
         </div>
         <div className="dupla">
-          <Campo rotulo="Preço" erro={erroDeValor(preco, "O preço")}><CampoDinheiro valor={preco} aoMudar={(v) => { setPreco(v); setErroForma(null); }} /></Campo>
+          <Campo rotulo="Preço" erro={erroDeValor(preco, "O preço")} dica={precoTravado ? "Preço da lista. Só o dono ou quem vê o financeiro muda." : undefined}>
+            <CampoDinheiro valor={preco} aoMudar={(v) => { setPreco(v); setErroForma(null); }} desligado={precoTravado} />
+          </Campo>
           <Campo rotulo="Data da compra"><input type="date" className="g-input" value={compra} max={isoDia(new Date())} onChange={(e) => setCompra(e.target.value)} /></Campo>
         </div>
         {cobra && preco ? (

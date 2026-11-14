@@ -1,9 +1,10 @@
 "use client";
 
-import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
+import { saudacaoZap } from "@/lib/gestao/agenda";
+import { COLS_ESTADIA, COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { Fragment, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowLeftRight, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
 import type { Agendamento, Cliente, Estadia, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, fmtTelefone, haQuanto, hora, idade, inicioDoDia, linkWhatsApp, nomeDiaCurto, telefoneValido } from "@/lib/gestao/util";
@@ -11,13 +12,19 @@ import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { Anel, Tile, type Tom } from "../painel";
 import { AvatarPet, avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
-import { linkTutor, nomePorte, primeiroNome } from "./comum";
+import { linkTutor, nomePorte } from "./comum";
 import FormTutor from "./form-tutor";
+import { FolhaTrocarTutor } from "./juntar";
 import { EtiquetaEspecie, tomDaVisita } from "./lista";
 import { CartaoSaude, EtiquetaSaude, resumoSaude, type CuidadoSaude } from "./saude";
+import { CartaoMensalista } from "../creche/resumo-mes";
+import { OcorrenciasDoPet } from "../casa/ocorrencias";
+import { QuemPodeBuscar } from "../casa/portaria";
+import { portariaLigada } from "@/lib/gestao/casa-opcoes";
+import { usaCasa } from "@/lib/gestao/modulos";
 
 type PetDaFicha = Pet & { clientes: Cliente | null };
-type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id">;
+type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id"> & { agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number }[] | null };
 
 const mesDoAno = (d: string) => new Date(d).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 const TOM_VISITA: Record<string, Tom> = { verde: "menta", amarelo: "manteiga", vermelho: "rosa" };
@@ -30,27 +37,29 @@ const STATUS_ESTADIA: Record<string, { rotulo: string; tom: string }> = {
 };
 
 export default function FichaPet({ id, voltar }: { id: string; voltar: () => void }) {
-  const { sb, petshop, servicos, vejoFinanceiro } = useGestao();
+  // o gasto do pet é histórico de dinheiro: só para o dono e quem cuida do financeiro (quem só opera o caixa não lê esse histórico)
+  const { sb, petshop, servicos, cuidoDoFinanceiro: vejoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = useState(false);
   const [editandoTutor, setEditandoTutor] = useState(false);
+  const [trocandoTutor, setTrocandoTutor] = useState(false);
   const [ocupado, setOcupado] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [pet, atendimentos, pacotes, estadias, concluidos, saude, hospedagens] = await Promise.all([
       sb.from("pets").select("*, clientes(*)").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
-      sb.from("agendamentos").select("id, inicio, status, preco, servico_id").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
+      sb.from("agendamentos").select("id, inicio, status, preco, servico_id, agendamento_servicos(servico_id, preco, ordem)").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
       sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", id).eq("ativo", true).order("comprado_em", { ascending: false }),
-      sb.from("estadias").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("entrada", { ascending: false }).limit(8),
+      sb.from("estadias").select(COLS_ESTADIA).eq("petshop_id", petshop.id).eq("pet_id", id).order("entrada", { ascending: false }).limit(8),
       // visitas concluídas: a conta exata, a mais recente e os valores para somar
-      sb.from("agendamentos").select("inicio, preco", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).eq("status", "concluido").order("inicio", { ascending: false }).limit(1000),
+      sb.from("agendamentos").select("inicio, preco, agendamento_servicos(preco)", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).eq("status", "concluido").order("inicio", { ascending: false }).limit(1000),
       sb.from("pets_saude").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("vence_em").order("criado_em").limit(500),
       // creche e hotel também é visita: estadias encerradas e a que está acontecendo agora
       sb.from("estadias").select("entrada, saida, status", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).in("status", ["encerrada", "em_casa"]).order("entrada", { ascending: false }).limit(1000),
     ]);
     for (const r of [pet, atendimentos, pacotes, estadias, concluidos, hospedagens]) if (r.error) throw new Error(r.error.message);
-    const feitos = (concluidos.data ?? []) as { inicio: string; preco: number | null }[];
+    const feitos = (concluidos.data ?? []) as { inicio: string; preco: number | null; agendamento_servicos?: { preco: number | null }[] | null }[];
     const ficou = (hospedagens.data ?? []) as { entrada: string; saida: string | null; status: string }[];
     const nEstadias = hospedagens.count ?? ficou.length;
     // quem está na casa agora veio hoje; estadia encerrada conta pelo dia em que saiu
@@ -69,11 +78,11 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       pet: pet.data as unknown as PetDaFicha | null,
       atendimentos: (atendimentos.data ?? []) as Atendimento[],
       pacotes: (pacotes.data ?? []) as PacoteCliente[],
-      estadias: (estadias.data ?? []) as Estadia[],
+      estadias: (estadias.data ?? []) as unknown as Estadia[],
       visitas: (concluidos.count ?? feitos.length) + nEstadias,
       nEstadias,
       ultimaVisita: ultimaEstadia && (!ultimoAtendimento || new Date(ultimaEstadia) > new Date(ultimoAtendimento)) ? ultimaEstadia : ultimoAtendimento,
-      gasto: feitos.reduce((t, a) => t + Number(a.preco ?? 0), 0) + gastoEstadias,
+      gasto: feitos.reduce((t, a) => t + Number(a.preco ?? 0) + (a.agendamento_servicos ?? []).reduce((x, o) => x + Number(o.preco ?? 0), 0), 0) + gastoEstadias,
       gastoEstadias,
       gastoParcial: (concluidos.count ?? 0) > feitos.length,
       // se a saúde falhar, o resto da ficha abre do mesmo jeito
@@ -94,12 +103,16 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
 
   const { pet, atendimentos, pacotes, estadias, visitas, nEstadias, ultimaVisita, gasto, gastoEstadias, gastoParcial, saude, erroSaude } = dados;
   const tutor = pet.clientes;
-  const zap = tutor ? linkWhatsApp(tutor.telefone, `Oi, ${primeiroNome(tutor.nome)}! Aqui é do ${petshop.nome}. `) : null;
+  const zap = tutor ? linkWhatsApp(tutor.telefone, `${saudacaoZap(tutor.nome, petshop.nome)} `) : null;
   const etiquetas = [pet.raca, pet.porte ? `Porte ${nomePorte(pet.porte).toLowerCase()}` : null, pet.sexo === "M" ? "Macho" : pet.sexo === "F" ? "Fêmea" : null, idade(pet.nascimento)]
     .filter((x): x is string => !!x);
   const agora = new Date();
   const hoje = inicioDoDia(agora);
   const servicoDe = (sid: string | null) => servicos.find((s) => s.id === sid);
+  // horário com mais de um serviço: os nomes juntos e o valor somado
+  const outrosDe = (a: Atendimento) => [...(a.agendamento_servicos ?? [])].sort((x, y) => x.ordem - y.ordem);
+  const nomesDe = (a: Atendimento) => [servicoDe(a.servico_id)?.nome, ...outrosDe(a).map((o) => servicoDe(o.servico_id)?.nome)].filter(Boolean).join(" + ") || "Atendimento";
+  const valorDe = (a: Atendimento) => (a.preco == null && !outrosDe(a).some((o) => o.preco != null) ? null : Number(a.preco ?? 0) + outrosDe(a).reduce((t, o) => t + Number(o.preco ?? 0), 0));
   // o histórico vem do mais novo para o mais antigo: o próximo horário é o último que ainda está por vir
   const porVir = atendimentos.filter((a) => new Date(a.inicio) > agora && !["cancelado", "faltou", "concluido"].includes(a.status));
   const proximo = porVir[porVir.length - 1] ?? null;
@@ -135,7 +148,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
               {tutor && <p className="tutor"><UserRound aria-hidden />Tutor: <Link className="g-link" href={linkTutor(tutor.id)} scroll={false}>{tutor.nome}</Link></p>}
               {tutor && (
                 <p className="tutor gc-fone">
-                  {tutor.telefone ? (telefoneValido(tutor.telefone) ? fmtTelefone(tutor.telefone) : <span className="g-vermelho-t">Telefone incompleto: {tutor.telefone}</span>) : <span>Sem telefone</span>}
+                  {tutor.telefone ? (telefoneValido(tutor.telefone) ? fmtTelefone(tutor.telefone) : <span className="g-vermelho-t">Telefone incompleto: {tutor.telefone}. Toque em Editar tutor para corrigir.</span>) : <span>Sem telefone</span>}
                 </p>
               )}
               <div className="g-cli-etqs">
@@ -151,6 +164,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
             {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />WhatsApp</a>}
             <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditando(true); }}><Pencil />Editar pet</button>
             {tutor && <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditandoTutor(true); }}><UserPen />Editar tutor</button>}
+            <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setTrocandoTutor(true); }}><ArrowLeftRight />Trocar tutor</button>
           </div>
         </section>
       </div>
@@ -182,7 +196,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
         </div>
         <div className="g-cli-num">
           <Tile icone={CalendarClock} tom="ceu" />
-          <div><span className="g-rotulo">Próximo horário</span><b>{proximo ? dataAmigavel(proximo.inicio) : "nada marcado"}</b>{proximo && <small>às {hora(proximo.inicio)} · {servicoDe(proximo.servico_id)?.nome ?? "Atendimento"}</small>}</div>
+          <div><span className="g-rotulo">Próximo horário</span><b>{proximo ? dataAmigavel(proximo.inicio) : "nada marcado"}</b>{proximo && <small>às {hora(proximo.inicio)} · {nomesDe(proximo)}</small>}</div>
         </div>
         {vejoFinanceiro ? (
           <div className="g-cli-num">
@@ -200,6 +214,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       <div className="gc-colunas">
         <div>
           <CartaoSaude pet={pet} tutor={tutor} itens={saude} erro={erroSaude} aoMudar={() => void recarregar()} />
+          <CartaoMensalista pet={pet} />
 
           <section className="g-card">
             <div className="g-card-t"><h3><Tile icone={History} tom="pessego" tamanho="p" />Histórico de atendimentos</h3>{atendimentos.length > 0 && <span className="g-muted g-pp" style={{ whiteSpace: "nowrap" }}>{atendimentos.length === 60 ? "60 mais recentes" : atendimentos.length === 1 ? "1 horário" : `${atendimentos.length} horários`}</span>}</div>
@@ -217,12 +232,12 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
                         <span className="ponto" aria-hidden />
                         <div className="c">
                           <div className="l">
-                            <b>{servicoDe(a.servico_id)?.nome ?? "Atendimento"}</b>
+                            <b>{nomesDe(a)}</b>
                             <span className={`g-tag ${st.tom}`}>{st.rotulo}</span>
                           </div>
                           <span className="q">
                             {nomeDiaCurto(new Date(a.inicio))}, {dataCurta(a.inicio)} às {hora(a.inicio)}
-                            {vejoFinanceiro && a.preco != null && <> · <b className="g-tab">{brl(a.preco)}</b></>}
+                            {vejoFinanceiro && valorDe(a) != null && <> · <b className="g-tab">{brl(valorDe(a)!)}</b></>}
                           </span>
                         </div>
                       </li>
@@ -287,6 +302,9 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
             )}
           </section>
 
+          {usaCasa(petshop) && portariaLigada(petshop) && <QuemPodeBuscar pet={{ ...pet, clientes: tutor }} />}
+          <OcorrenciasDoPet petId={pet.id} />
+
           {pet.ativo && (
             <div><button className="g-btn perigo p" onClick={() => void mudarAtivo(false)} disabled={ocupado}>Desativar pet</button></div>
           )}
@@ -294,6 +312,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       </div>
 
       {editando && <FormPet pet={pet} aoFechar={() => setEditando(false)} aoSalvar={() => { setEditando(false); avisarMudanca(); }} />}
+      {trocandoTutor && <FolhaTrocarTutor pet={pet} tutorAtual={tutor} aoFechar={() => setTrocandoTutor(false)} aoTrocar={() => setTrocandoTutor(false)} />}
       {editandoTutor && tutor && <FormTutor cliente={tutor} aoFechar={() => setEditandoTutor(false)} aoSalvar={() => { setEditandoTutor(false); avisarMudanca(); }} />}
     </div>
   );

@@ -267,6 +267,10 @@ button.g-linha:hover, a.g-linha:hover { background: rgba(31, 27, 23, .03); borde
 .g-toasts { position: fixed; left: 50%; translate: -50% 0; bottom: calc(var(--g-abas) + 28px + env(safe-area-inset-bottom)); z-index: 90; display: grid; gap: 8px; width: min(92vw, 420px); pointer-events: none; }
 .g-toast { background: #1f1b17; color: #f6f1e8; padding: 12px 18px; border-radius: 14px; font-size: .9375rem; box-shadow: var(--g-sombra-alta); animation: g-sobe .22s ease-out; text-align: center; }
 .g-toast.erro { background: var(--g-vermelho); }
+.g-toast.com-acao { display: flex; align-items: center; gap: 12px; text-align: left; pointer-events: auto; padding: 8px 8px 8px 18px; }
+.g-toast.com-acao span { flex: 1; min-width: 0; }
+.g-toast.com-acao button { flex: none; min-height: 40px; padding: 0 14px; border-radius: 10px; background: rgba(255, 255, 255, .16); color: inherit; font-weight: 700; }
+.g-toast.com-acao button:hover { background: rgba(255, 255, 255, .26); }
 @media (min-width: 960px) { .g-toasts { bottom: 32px; } }
 
 /* ---------- telas de entrada ---------- */
@@ -1042,3 +1046,31 @@ a.g-ret-linha:hover, button.g-ret-linha:hover { border-color: var(--g-linha-fort
 .g-fid > div { min-width: 0; display: grid; gap: 2px; }
 .g-fid-ganhou { margin: 0; }
 .g-fid-ganhou b { overflow-wrap: anywhere; }
+
+/* ---------- trazer de planilha: conferir as colunas, resumo e última importação ---------- */
+.g-imp-rolagem { overflow-x: auto; margin-inline: -4px; padding: 0 4px 6px; -webkit-overflow-scrolling: touch; }
+.g-imp-tabela { border-collapse: collapse; font-size: .8125rem; min-width: 100%; }
+.g-imp-tabela th { text-align: left; padding: 4px 10px 4px 0; font-weight: 600; white-space: nowrap; max-width: 11rem; overflow: hidden; text-overflow: ellipsis; }
+.g-imp-tabela thead td { padding: 0 8px 8px 0; }
+.g-imp-tabela tbody td { padding: 5px 10px 5px 0; border-top: 1px solid var(--g-linha); white-space: nowrap; max-width: 11rem; overflow: hidden; text-overflow: ellipsis; }
+.g-imp-tabela tbody td.fora { color: var(--g-cinza); opacity: .6; }
+.g-imp-sel { min-width: 7.5rem; width: 100%; min-height: 40px; padding-block: 6px; font-size: .875rem; color: var(--g-cinza); }
+.g-imp-sel.usa { color: var(--g-tinta); border-color: var(--g-verde); font-weight: 600; }
+.g-aviso.g-imp-resumo { display: grid; gap: 6px; align-items: start; margin-bottom: 0; }
+.g-aviso.g-imp-falta { align-items: flex-start; flex-wrap: nowrap; margin-bottom: 0; }
+.g-aviso.g-imp-falta > div { display: grid; gap: 8px; min-width: 0; justify-items: start; }
+.g-aviso.g-imp-falta .g-btn { margin-left: 0; }
+.g-imp-ultima p { margin: 0; }
+.g-imp-linha { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; margin-bottom: 14px; border-radius: 14px; background: var(--g-carta-2); color: inherit; text-align: left; font-size: .875rem; line-height: 1.35; }
+.g-imp-linha svg { width: 18px; height: 18px; flex: none; color: var(--g-cinza); }
+.g-imp-linha span { flex: 1; min-width: 0; }
+.g-imp-linha i { font-style: normal; font-weight: 700; color: var(--g-verde); flex: none; }
+
+/* O botão do Mozart não cobre o que a pessoa precisa tocar: some enquanto uma folha (formulário, cobrança, confirmação de saída)
+   está aberta e, em tela de computador mais estreita, fica só com a foto no canto (o nome volta ao passar o mouse ou com o foco). */
+body:has(.g-fundo) .g-fab:not(.aberta) { display: none; }
+@media (min-width: 960px) and (max-width: 1599px) {
+  .g-fab { right: 14px; bottom: 14px; }
+  .g-fab:not(.aberta):not(:hover):not(:focus-visible) { padding: 0 9px; }
+  .g-fab:not(.aberta):not(:hover):not(:focus-visible) .txt { display: none; }
+}

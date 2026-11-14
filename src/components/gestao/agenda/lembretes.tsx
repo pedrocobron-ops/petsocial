@@ -5,8 +5,12 @@ import Link from "next/link";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { textoLembrete } from "@/lib/gestao/agenda";
+import { servicosPorExtenso } from "@/lib/gestao/servicos-do-horario";
+import { saudacaoZap, textoLembrete } from "@/lib/gestao/agenda";
 import { dataAmigavel, dataLonga, deIsoDia, fmtTelefone, hora, linkWhatsApp, soDigitos, somaDias, chamar } from "@/lib/gestao/util";
+import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { horarioDoDia } from "@/lib/gestao/util";
+import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { AvatarPessoa, Esqueleto, Folha, Vazio, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 
@@ -37,11 +41,11 @@ export function mensagemDoLembrete(ags: Ag[], petshop: string) {
   const tutor = ags[0]?.pets?.clientes?.nome;
   if (ags.length === 1) {
     const a = ags[0];
-    return textoLembrete({ tutor, pet: a.pets?.nome ?? "seu pet", servico: a.servicos?.nome, quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop });
+    return textoLembrete({ tutor, pet: a.pets?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop });
   }
-  const partes = ags.map((a) => `${a.servicos?.nome ? a.servicos.nome.toLowerCase() : "horário"} de ${a.pets?.nome ?? "seu pet"} às ${hora(a.inicio)}`);
+  const partes = ags.map((a) => `${servicosPorExtenso(a)?.toLowerCase() ?? "horário"} de ${a.pets?.nome ?? "seu pet"} às ${hora(a.inicio)}`);
   const lista = `${partes.slice(0, -1).join(", ")} e ${partes[partes.length - 1]}`;
-  return `${tutor ? `Oi, ${chamar(tutor)}!` : "Oi!"} Aqui é do ${petshop}. Passando para lembrar dos horários de ${dataAmigavel(ags[0].inicio)}: ${lista}. Posso confirmar?`;
+  return `${saudacaoZap(tutor, petshop)} Passando para lembrar dos horários de ${dataAmigavel(ags[0].inicio)}: ${lista}. Posso confirmar?`;
 }
 
 /** Marca o lembrete como enviado nos horários (o mesmo campo que o detalhe do horário grava). */
@@ -96,12 +100,17 @@ export default function LembretesDoDia({ dia, aoFechar, aoMudar }: { dia: string
   const registrar = useRegistrarLembrete();
   const data = deIsoDia(dia);
   const [enviados, setEnviados] = useState<Record<string, string>>({});
+  // dia fechado (data marcada em Meu pet shop ou dia em que não abre): avisa antes de lembrar o tutor de um horário que talvez não vá acontecer
+  useCalendario();
+  const fechado = fraseDoDiaFechado(dia) ?? (horarioDoDia(petshop.horario, data) ? null : "O pet shop não abre neste dia");
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const ags = ok(await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id)
       .gte("inicio", data.toISOString()).lt("inicio", somaDias(data, 1).toISOString()).order("inicio")) as unknown as Ag[];
     const grupos = new Map<string, Grupo>();
-    for (const a of ags.filter(esperaLembrete)) {
+    // horário que já começou não entra: lembrar de algo que está acontecendo (ou já passou) só confunde o tutor
+    const agora = new Date();
+    for (const a of ags.filter((x) => esperaLembrete(x) && new Date(x.inicio) > agora)) {
       const c = a.pets?.clientes;
       const chave = c?.id ?? `pet-${a.pet_id}`;
       const g = grupos.get(chave) ?? { chave, nome: c?.nome ?? a.pets?.nome ?? "Sem tutor", telefone: temTelefone(a) ? c!.telefone : null, ficha: c?.id ? `/gestao/app/clientes?cliente=${c.id}` : a.pets?.id ? `/gestao/app/clientes?pet=${a.pets.id}` : null, ags: [], enviadoEm: null };
@@ -127,7 +136,7 @@ export default function LembretesDoDia({ dia, aoFechar, aoMudar }: { dia: string
     aoMudar?.();
   }
 
-  const resumo = (g: Grupo) => g.ags.map((a) => `${a.pets?.nome ?? "Pet"}, ${a.servicos?.nome?.toLowerCase() ?? "horário"} às ${hora(a.inicio)}`).join(" · ");
+  const resumo = (g: Grupo) => g.ags.map((a) => `${a.pets?.nome ?? "Pet"}, ${servicosPorExtenso(a)?.toLowerCase() ?? "horário"} às ${hora(a.inicio)}`).join(" · ");
 
   return (
     <Folha titulo={`Lembretes ${doDia}`} aoFechar={aoFechar} rodape={<button type="button" className="g-btn sec" onClick={aoFechar}>Fechar</button>}>
@@ -137,6 +146,7 @@ export default function LembretesDoDia({ dia, aoFechar, aoMudar }: { dia: string
         <Vazio titulo={`Nenhum horário ${doDia} esperando lembrete`} texto="Só entram os horários marcados ou confirmados." />
       ) : (
         <div className="g-pilha">
+          {fechado && <p className="g-aviso" role="alert" style={{ marginBottom: 0 }}><span className="g-cresce"><b>{fechado}.</b> Antes de mandar o lembrete, confira se estes horários continuam valendo. Se não, remarque pela agenda.</span></p>}
           <p className="g-lb-topo" role="status">
             {!comTelefone.length ? "Nenhum tutor deste dia tem telefone na ficha."
               : faltam.length ? <><b>{faltam.length === 1 ? "Falta 1 lembrete" : `Faltam ${faltam.length} lembretes`}</b> de {comTelefone.length}. Toque em Mandar: o WhatsApp abre com a mensagem pronta e você só aperta enviar. Depois volte aqui para o próximo.</>

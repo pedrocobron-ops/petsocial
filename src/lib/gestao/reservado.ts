@@ -15,14 +15,17 @@ export type PacoteClienteLinha = T["pacotes_clientes"]["Row"];
 export type ProfissionalLinha = T["profissionais"]["Row"];
 export type PetshopLinha = T["petshops"]["Row"];
 
-export const COLS_PRODUTO = "id, petshop_id, nome, categoria, unidade, preco_venda, estoque, estoque_minimo, ativo, criado_em";
-export const COLS_MOVIMENTO = "id, petshop_id, produto_id, tipo, quantidade, motivo, origem, criado_por, criado_em";
+export const COLS_PRODUTO = "id, petshop_id, nome, categoria, unidade, preco_venda, estoque, estoque_minimo, ativo, criado_em, codigo_barras, fornecedor_id";
+export const COLS_MOVIMENTO = "id, petshop_id, produto_id, tipo, quantidade, motivo, origem, criado_por, criado_em, fornecedor_id, lancamento_id";
 export const COLS_PACOTE = "id, petshop_id, nome, servico_id, quantidade, validade_dias, ativo, criado_em";
 export const COLS_PACOTE_CLIENTE = "id, petshop_id, pet_id, pacote_id, nome, servico_id, total, usados, comprado_em, vence_em, ativo, criado_em";
 export const COLS_PROFISSIONAL = "id, petshop_id, user_id, nome, papel, ve_financeiro, cor, escala, atende, ativo, criado_em, funcao, acessos";
 
-/** Tudo do pet shop menos a meta do mês e os dados da assinatura na Cakto. */
-export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, diaria_creche, diaria_hotel, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos";
+/** A estadia sem a diária e o valor cobrado (reservados: `comValoresDeEstadia`). O banco não entrega `select("*")` em estadias. */
+export const COLS_ESTADIA = "id, petshop_id, pet_id, tipo, entrada, saida_prevista, saida, status, obs, criado_em, diarias_cobradas, plano_id, mensalista, dia, cobranca_id, acomodacao, cuidados, avisos, sinal_estado";
+
+/** Tudo do pet shop menos a meta do mês, as opções (`petshop_opcoes`) e os dados da assinatura na Cakto. */
+export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, diaria_creche, diaria_hotel, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos, principal, creche_bloqueia_vacina";
 
 type Linhas = Record<string, unknown>[];
 /**
@@ -58,8 +61,51 @@ const num = (v: unknown) => (v == null ? null : Number(v));
 export async function lerPetshop(sb: Banco, petshopId: string): Promise<{ data: PetshopLinha | null; error: { message: string } | null }> {
   const base = await sb.from("petshops").select(COLS_PETSHOP).eq("id", petshopId).maybeSingle();
   if (base.error || !base.data) return { data: null, error: base.error };
-  const extra = await reservado(sb, "petshop_reservado", { p: petshopId }, () => sb.from("petshops").select("id, meta_mes").eq("id", petshopId));
-  return { data: { ...(base.data as unknown as PetshopLinha), meta_mes: num(extra[0]?.meta_mes), cakto_email: null, cakto_assinatura: null }, error: null };
+  const [extra, opcoes] = await Promise.all([
+    reservado(sb, "petshop_reservado", { p: petshopId }, () => sb.from("petshops").select("id, meta_mes").eq("id", petshopId)),
+    lerOpcoes(sb, petshopId),
+  ]);
+  return { data: { ...(base.data as unknown as PetshopLinha), opcoes: opcoes as PetshopLinha["opcoes"], meta_mes: num(extra[0]?.meta_mes), cakto_email: null, cakto_assinatura: null }, error: null };
+}
+
+/**
+ * As opções do negócio (`petshops.opcoes`). Vêm por uma função do banco: quem não recebe (sem Caixa, Financeiro nem Relatórios)
+ * recebe as listas de preço em branco (só a chave ligada/desligada). Banco antes da atualização: lê a coluna direto.
+ */
+export async function lerOpcoes(sb: Banco, petshopId: string): Promise<Record<string, unknown>> {
+  const objeto = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+  const r = await (sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string } | null }> }).rpc("petshop_opcoes", { p: petshopId });
+  if (!r.error) return objeto(r.data);
+  if (r.error.code !== "PGRST202" && r.error.code !== "42883") return {};
+  const d = await sb.from("petshops").select("opcoes").eq("id", petshopId).maybeSingle();
+  return objeto(d.data?.opcoes);
+}
+
+/**
+ * Junta a diária e o valor cobrado às estadias. Só quem recebe (Caixa, Financeiro, Relatórios ou o dono) recebe os valores;
+ * para os outros (e com `vejo` falso, sem nem perguntar ao banco) os dois campos vêm vazios.
+ */
+export async function comValoresDeEstadia<E extends { id: string }>(sb: Banco, petshopId: string, estadias: E[], vejo = true): Promise<(E & { valor_diaria: number | null; valor_cobrado: number | null })[]> {
+  const extra = new Map<string, Record<string, unknown>>();
+  if (vejo) {
+    const ids = estadias.map((e) => e.id);
+    const partes = await Promise.all(Array.from({ length: Math.ceil(ids.length / 400) }, (_, i) => ids.slice(i * 400, i * 400 + 400)).map((parte) =>
+      reservado(sb, "estadias_reservado", { p: petshopId, p_ids: parte }, () => sb.from("estadias").select("id, valor_diaria, valor_cobrado").eq("petshop_id", petshopId).in("id", parte))));
+    for (const l of partes.flat()) extra.set(String(l.id), l);
+  }
+  return estadias.map((e) => ({ ...e, valor_diaria: num(extra.get(e.id)?.valor_diaria), valor_cobrado: num(extra.get(e.id)?.valor_cobrado) }));
+}
+
+/**
+ * Ids das estadias encerradas que saíram sem valor lançado (a lista Check-outs para cobrar), da saída mais nova para a mais antiga.
+ * Vem por função do banco, só para quem recebe: a coluna do valor cobrado não pode ser filtrada pela API. No máximo 150 por vez.
+ */
+export async function idsParaCobrar(sb: Banco, petshopId: string): Promise<string[]> {
+  const r = await (sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }).rpc("estadias_para_cobrar", { p: petshopId });
+  if (r.error) return [];
+  const linhas = ((r.data as { id: string; saida: string | null }[] | null) ?? []).slice();
+  linhas.sort((a, b) => (b.saida ?? "").localeCompare(a.saida ?? ""));
+  return linhas.slice(0, 150).map((l) => l.id);
 }
 
 /** A equipe do pet shop, com comissão e e-mail de convite para quem pode ver (dono, relatórios, a própria pessoa). */
@@ -77,11 +123,20 @@ export async function lerEquipe(sb: Banco, petshopId: string): Promise<{ data: P
   };
 }
 
-/** Junta o custo aos produtos (null para quem não cuida do estoque nem vê o financeiro). */
-export async function comCustos<P extends { id: string }>(sb: Banco, petshopId: string, produtos: P[]): Promise<(P & { custo: number | null })[]> {
-  const extra = produtos.length ? porId(await reservado(sb, "custos_dos_produtos", { p: petshopId },
-    () => sb.from("produtos").select("id, custo").eq("petshop_id", petshopId))) : new Map<string, Record<string, unknown>>();
-  return produtos.map((p) => ({ ...p, custo: num(extra.get(p.id)?.custo) }));
+/**
+ * Junta o custo e o último custo aos produtos (null para quem não cuida do estoque nem vê o financeiro).
+ * Com a margem ligada, `custo` é o custo médio; desligada, é o da última entrada.
+ */
+export async function comCustos<P extends { id: string }>(sb: Banco, petshopId: string, produtos: P[]): Promise<(P & { custo: number | null; ultimo_custo: number | null })[]> {
+  const extra = produtos.length ? porId(await reservado(sb, "produtos_reservado", { p: petshopId },
+    () => sb.rpc("custos_dos_produtos", { p: petshopId }))) : new Map<string, Record<string, unknown>>();
+  return produtos.map((p) => ({ ...p, custo: num(extra.get(p.id)?.custo), ultimo_custo: num(extra.get(p.id)?.ultimo_custo) }));
+}
+
+/** Custo unitário de cada compra feita de um fornecedor, por id do movimento. */
+export async function custosDasCompras(sb: Banco, petshopId: string, fornecedorId: string): Promise<Map<string, number | null>> {
+  const linhas = await reservado(sb, "custos_das_compras", { p: petshopId, p_fornecedor: fornecedorId }, async () => ({ data: [], error: null }));
+  return new Map(linhas.map((l) => [String(l.id), num(l.custo_unitario)]));
 }
 
 /** Junta o custo unitário aos movimentos de um produto. */

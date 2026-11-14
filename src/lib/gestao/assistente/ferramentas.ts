@@ -1,4 +1,5 @@
-import { COLS_PACOTE, comCustos, comPrecosDePacote, type PacoteLinha } from "../reservado";
+import { COLS_PACOTE, comCustos, comPrecosDePacote, comValoresDeEstadia, type PacoteLinha } from "../reservado";
+import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -6,7 +7,8 @@ import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
 import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres, vagasDe } from "../agenda";
 import { partesPorForma } from "../dinheiro";
-import { brl, fmtTelefone, linkWhatsApp, precoDoServico, semAcento } from "../util";
+import { juntarServicosAMais, nomeDosServicos, valorDoHorario } from "../servicos-do-horario";
+import { almocoNoDiaDaSemana, brl, fmtTelefone, lerTelefone, linkWhatsApp, precoDoServico, semAcento, soDigitos } from "../util";
 
 /**
  * O que o Mozart sabe fazer no sistema.
@@ -22,11 +24,16 @@ export type Contexto = {
   eu: Profissional;
   equipe: Profissional[];
   servicos: Servico[];
+  /** Recebe e opera o caixa (Caixa, Financeiro ou Relatórios). */
   vejoFinanceiro: boolean;
+  /** Dono, ou quem tem Financeiro ou Relatórios: vê despesas, contas e o histórico. */
+  cuidoDoFinanceiro: boolean;
   /** Minutos a leste de UTC no aparelho de quem pediu (Brasília = -180). */
   fusoMin: number;
   /** Agora, no horário local: "AAAA-MM-DDTHH:mm". */
   agora: string;
+  /** Chave da ação que está sendo gravada: dinheiro e estoque entram com ela, e o banco recusa a mesma chave duas vezes. */
+  chave?: string;
 };
 
 export type Resumo = { titulo: string; linhas: [string, string][] };
@@ -95,8 +102,9 @@ export const FERRAMENTAS: Def[] = [
 
   { grava: true, name: "cadastrar_pet", description: "Cadastra um pet novo. Se o tutor já é cliente, passe cliente_id; senão, passe tutor_nome (e telefone, se a pessoa disse) e o tutor é criado junto.",
     input_schema: obj({ nome: S, cliente_id: S, tutor_nome: S, tutor_telefone: S, especie: { type: "string", enum: ["cao", "gato", "outro"] }, raca: S, porte: { type: "string", enum: ["P", "M", "G", "GG"] }, alertas: { ...S, description: "Cuidados: alergia, medo, comportamento" } }, ["nome"]) },
-  { grava: true, name: "marcar_horario", description: "Marca um horário na agenda para um pet já cadastrado. O valor é sugerido pelo serviço e porte se você não passar. Para horário que se repete (toda semana, de 15 em 15 dias, uma vez por mês), passe repetir_a_cada_semanas e repetir_vezes: cria todos de uma vez, no mesmo dia da semana e hora. Dá erro se cair em bloqueio do pet shop inteiro ou do profissional escolhido.",
+  { grava: true, name: "marcar_horario", description: "Marca um horário na agenda para um pet já cadastrado. O valor é sugerido pelo serviço e porte se você não passar. Se o pet vai fazer mais de um serviço no mesmo horário (ex.: banho e hidratação), passe os outros em outros_servicos_ids: cada um entra com o valor dele e o tempo soma. Para horário que se repete (toda semana, de 15 em 15 dias, uma vez por mês), passe repetir_a_cada_semanas e repetir_vezes: cria todos de uma vez, no mesmo dia da semana e hora. Dá erro se cair em bloqueio do pet shop inteiro ou do profissional escolhido.",
     input_schema: obj({ pet_id: S, servico_id: S, inicio: DIA_HORA, profissional_id: S, preco: N, obs: S, leva_traz: B,
+      outros_servicos_ids: { type: "array", items: S, description: "Opcional: ids de outros serviços do pet shop feitos no mesmo horário, além de servico_id" },
       repetir_a_cada_semanas: { type: "number", enum: [1, 2, 4], description: "Intervalo da repetição, em semanas: 1, 2 ou 4" },
       repetir_vezes: { ...N, description: "Quantos horários no total, contando o primeiro: de 2 a 12" } }, ["pet_id", "servico_id", "inicio"]) },
   { grava: true, name: "bloquear_horario", description: "Bloqueia um período da agenda (almoço, folga, feriado, manutenção) para ninguém marcar nele. Sem profissional_id vale para o pet shop inteiro. Sem de e ate, bloqueia o dia inteiro. Com repetir_semanas, repete o mesmo bloqueio em todos os dias úteis (os dias em que o pet shop abre) pelas próximas N semanas.",
@@ -105,7 +113,7 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ agendamento_id: S, inicio: DIA_HORA, servico_id: S, profissional_id: S, preco: N, status: { type: "string", enum: ["marcado", "confirmado", "em_atendimento", "concluido", "faltou", "cancelado"] } }, ["agendamento_id"]) },
   { grava: true, name: "remover_bloqueio", description: "Remove um bloqueio da agenda. Passe bloqueio_id (de ver_agenda) ou o dia; se houver mais de um bloqueio no dia, passe também hora, motivo ou profissional_id. Se o bloqueio faz parte de uma série e a pessoa quer tirar também os dias seguintes, passe e_os_proximos: true.",
     input_schema: obj({ bloqueio_id: S, dia: DIA, hora: { ...HORA, description: "Uma hora que cai dentro do bloqueio, HH:mm" }, motivo: S, profissional_id: S, e_os_proximos: { ...B, description: "Remove este e os próximos da mesma série" } }) },
-  { grava: true, name: "fazer_checkin", description: "Creche e hotel: registra que o pet chegou agora. Se o pet tem reserva do mesmo tipo para hoje (ou atrasada, ou para amanhã), a reserva vira check-in; senão, cria a estadia. Sem valor_diaria, usa a da reserva ou a última cobrada nesse tipo.",
+  { grava: true, name: "fazer_checkin", description: "Creche e hotel: registra que o pet chegou agora. Se o pet tem reserva do mesmo tipo para hoje (ou atrasada, ou para amanhã), a reserva vira check-in; senão, cria a estadia. Sem valor_diaria, usa a da reserva ou a diária de Meu pet shop.",
     input_schema: obj({ pet_id: S, tipo: { type: "string", enum: ["creche", "hotel"] }, saida_prevista: { ...S, description: "Opcional. AAAA-MM-DDTHH:mm (só o dia vale 18:00)" }, valor_diaria: N, obs: { ...S, description: "Ração, remédio, o que trouxe" } }, ["pet_id", "tipo"]) },
   { grava: true, name: "fazer_checkout", description: "Creche e hotel: encerra a estadia do pet que está na casa. Quem tem acesso ao financeiro recebe junto: o valor é diárias vezes o valor da diária, se você não passar, e precisa da forma de pagamento. Passe valor 0 para não cobrar agora.",
     input_schema: obj({ pet_id: S, diarias: { ...N, description: "Opcional. Padrão: contadas da entrada até hoje (hotel por noite, creche por dia)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] } }, ["pet_id"]) },
@@ -143,6 +151,18 @@ async function petPorId(c: Contexto, id: unknown) {
   return data;
 }
 const servicoPorId = (c: Contexto, id: unknown) => c.servicos.find((s) => s.id === id) ?? null;
+/** Os outros serviços pedidos para o mesmo horário (sem repetir e sem o principal). */
+function outrosServicosDoPedido(c: Contexto, e: Entrada, principalId: string): Servico[] {
+  const pedidos = Array.isArray(e.outros_servicos_ids) ? (e.outros_servicos_ids as unknown[]) : [];
+  const lista: Servico[] = [];
+  for (const id of pedidos) {
+    const sv = servicoPorId(c, id);
+    exigir(sv, "outros_servicos_ids tem um id inválido: use os serviços do pet shop.");
+    if (sv.id !== principalId && !lista.some((x) => x.id === sv.id)) lista.push(sv);
+  }
+  exigir(lista.length <= 10, "Um horário aceita até dez serviços a mais.");
+  return lista;
+}
 const profPorId = (c: Contexto, id: unknown) => c.equipe.find((p) => p.id === id) ?? null;
 
 /* ---------- bloqueios e séries ---------- */
@@ -242,7 +262,8 @@ async function planoDoCheckin(c: Contexto, e: Entrada) {
   const pet = await petPorId(c, e.pet_id);
   const tipo = String(e.tipo);
   exigir(TIPO_ESTADIA[tipo], "tipo deve ser creche ou hotel. Pergunte se o pet vem passar o dia (creche) ou dormir (hotel).");
-  const abertas = ok(await c.sb.from("estadias").select("id, tipo, entrada, saida_prevista, valor_diaria, status").eq("petshop_id", c.petshop.id).eq("pet_id", pet.id).in("status", ["reservada", "em_casa"]).order("entrada"));
+  // a diária vem à parte, só para quem recebe
+  const abertas = await comValoresDeEstadia(c.sb, c.petshop.id, ok(await c.sb.from("estadias").select("id, tipo, entrada, saida_prevista, status").eq("petshop_id", c.petshop.id).eq("pet_id", pet.id).in("status", ["reservada", "em_casa"]).order("entrada")), c.vejoFinanceiro);
   const emCasa = abertas.find((x) => x.status === "em_casa");
   exigir(!emCasa, `${pet.nome} já está na casa (${TIPO_ESTADIA[emCasa?.tipo ?? ""] ?? "estadia"} desde ${quandoLocal(utcParaLocal(emCasa?.entrada ?? new Date().toISOString(), c.fusoMin))}). Nada foi feito.`);
   // reserva do mesmo tipo para hoje, atrasada ou para amanhã: vira check-in, como o botão da tela
@@ -257,22 +278,26 @@ async function planoDoCheckin(c: Contexto, e: Entrada) {
     saida = RE_DIA.test(v) ? `${v}T18:00` : v.slice(0, 16);
     exigir(saida > c.agora, "A saída prevista precisa ser depois de agora.");
   }
-  let diaria = numero(e.valor_diaria);
+  // quem não recebe não escolhe nem vê a diária: o banco coloca a sugerida (a do porte, ou a de Meu pet shop)
+  let diaria = c.vejoFinanceiro ? numero(e.valor_diaria) : null;
   exigir(diaria == null || diaria >= 0, "valor_diaria inválido.");
+  const informada = diaria != null;
   let origemDiaria = "";
-  if (diaria == null && reserva) { diaria = reserva.valor_diaria; origemDiaria = " (da reserva)"; }
-  else if (diaria == null) {
-    const { data: ultima } = await c.sb.from("estadias").select("valor_diaria").eq("petshop_id", c.petshop.id).eq("tipo", tipo).not("valor_diaria", "is", null).order("entrada", { ascending: false }).limit(1).maybeSingle();
-    diaria = ultima?.valor_diaria ?? null;
-    if (diaria != null) origemDiaria = " (a última cobrada)";
+  if (c.vejoFinanceiro && diaria == null && reserva) { diaria = reserva.valor_diaria; origemDiaria = " (da reserva)"; }
+  else if (c.vejoFinanceiro && diaria == null) {
+    diaria = diariaSugerida(c.petshop, tipo, pet.porte);
+    if (diaria != null) origemDiaria = " (a de Meu pet shop)";
   }
-  return { pet, tipo, reserva, outra, saida, diaria, origemDiaria, obs: texto(e.obs, 400) || null };
+  return { pet, tipo, reserva, outra, saida, diaria, informada, origemDiaria, obs: texto(e.obs, 400) || null };
 }
 
 async function planoDoCheckout(c: Contexto, e: Entrada) {
   const pet = await petPorId(c, e.pet_id);
-  const { data: estadia } = await c.sb.from("estadias").select("id, tipo, entrada, valor_diaria").eq("petshop_id", c.petshop.id).eq("pet_id", pet.id).eq("status", "em_casa").order("entrada", { ascending: false }).limit(1).maybeSingle();
-  exigir(estadia, `${pet.nome} não está na casa agora. Use ver_hospedes para ver quem está.`);
+  const { data: semValor } = await c.sb.from("estadias").select("id, tipo, entrada, sinal_estado").eq("petshop_id", c.petshop.id).eq("pet_id", pet.id).eq("status", "em_casa").order("entrada", { ascending: false }).limit(1).maybeSingle();
+  exigir(semValor, `${pet.nome} não está na casa agora. Use ver_hospedes para ver quem está.`);
+  const [estadia] = await comValoresDeEstadia(c.sb, c.petshop.id, [semValor], c.vejoFinanceiro);
+  // estadia com sinal: a conta desconta o sinal, e isso só a tela faz
+  exigir(!estadia.sinal_estado, `A estadia de ${pet.nome} tem sinal na reserva. Faça o check-out pela tela Creche e hotel, que desconta o sinal da conta.`);
   const n = numero(e.diarias) ?? contarDiarias(c, estadia);
   exigir(Number.isInteger(n) && n >= 1, "diarias deve ser um número inteiro, a partir de 1.");
   // dinheiro só para quem vê o financeiro: sem acesso, o check-out só encerra a estadia (igual à tela)
@@ -391,12 +416,12 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     case "ver_agenda": {
       exigir(RE_DIA.test(String(e.de)) && RE_DIA.test(String(e.ate)), "Datas no formato AAAA-MM-DD.");
       const ini = localParaUtc(`${e.de}T00:00`, c.fusoMin), fim = localParaUtc(`${somaDiasLocal(String(e.ate), 1)}T00:00`, c.fusoMin);
-      const ags = ok(await sb.from("agendamentos").select("id, inicio, fim, status, preco, obs, lembrete_em, pets(nome, clientes(nome)), servicos(nome), profissionais(nome)").eq("petshop_id", petshop.id).gte("inicio", ini.toISOString()).lt("inicio", fim.toISOString()).order("inicio").limit(200));
+      const ags = ok(await sb.from("agendamentos").select("id, inicio, fim, status, preco, obs, lembrete_em, pets(nome, clientes(nome)), servicos(nome), profissionais(nome), agendamento_servicos(preco, ordem, servicos(nome))").eq("petshop_id", petshop.id).gte("inicio", ini.toISOString()).lt("inicio", fim.toISOString()).order("inicio").limit(200));
       const bloqueios = await bloqueiosEntre(c, ini, fim);
       return { resultado: { horarios: ags.map((a) => ({
         agendamento_id: a.id, inicio: utcParaLocal(a.inicio, c.fusoMin), fim: utcParaLocal(a.fim, c.fusoMin).slice(11), status: a.status,
-        pet: a.pets?.nome, tutor: a.pets?.clientes?.nome, servico: a.servicos?.nome, com: a.profissionais?.nome,
-        ...(c.vejoFinanceiro ? { valor: a.preco } : {}), obs: a.obs, lembrete_enviado: Boolean(a.lembrete_em),
+        pet: a.pets?.nome, tutor: a.pets?.clientes?.nome, servico: nomeDosServicos(a) ?? undefined, com: a.profissionais?.nome,
+        ...(c.vejoFinanceiro ? { valor: valorDoHorario(a) } : {}), obs: a.obs, lembrete_enviado: Boolean(a.lembrete_em),
       })), total: ags.length, bloqueios: bloqueios.map((b) => bloqueioParaModelo(c, b)) } };
     }
     case "horarios_livres": {
@@ -415,11 +440,14 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       // sem profissional escolhido, vale o número de vagas do pet shop; com profissional, a agenda dele
       const ocupados = ags.filter((a) => !["cancelado", "faltou"].includes(a.status) && (prof ? a.profissional_id === prof.id : true)).map(emMin);
       const bloqueados = bloqueios.filter((b) => !b.profissional_id || b.profissional_id === prof?.id || quemAtende.length <= 1).map(emMin);
+      // almoço do pet shop: fechado todos os dias, sem bloqueio na agenda
+      const almoco = almocoNoDiaDaSemana(petshop.horario, diaSemanaLocal(dia));
+      if (almoco) bloqueados.push({ inicio: almoco.inicio, fim: almoco.fim });
       const aPartirDe = dia === hoje ? Number(c.agora.slice(11, 13)) * 60 + Number(c.agora.slice(14, 16)) : undefined;
       const livres = horariosLivres({ abre: func.abre, fecha: func.fecha, duracaoMin: servico?.duracao_min ?? 60, ocupados, bloqueados, vagas: prof ? 1 : vagasDe(petshop, c.equipe), aPartirDe });
-      return { resultado: { dia, funcionamento: `${func.abre} às ${func.fecha}`, duracao_min: servico?.duracao_min ?? 60, livres, marcados: ags.filter((a) => !["cancelado", "faltou"].includes(a.status)).length,
+      return { resultado: { dia, funcionamento: `${func.abre} às ${func.fecha}`, ...(almoco ? { almoco: `fechado das ${almoco.de} às ${almoco.ate}` } : {}), duracao_min: servico?.duracao_min ?? 60, livres, marcados: ags.filter((a) => !["cancelado", "faltou"].includes(a.status)).length,
         bloqueios: bloqueios.map((b) => bloqueioParaModelo(c, b)),
-        ...(bloqueios.length ? { aviso: "Os horários livres já descontam os bloqueios. Não ofereça horário dentro de um bloqueio." } : {}) } };
+        ...(bloqueios.length || almoco ? { aviso: "Os horários livres já descontam os bloqueios e o almoço. Não ofereça horário dentro de um bloqueio nem na hora do almoço." } : {}) } };
     }
     case "clientes_sumidos": {
       const dias = Math.max(1, Math.min(720, numero(e.dias) ?? 30));
@@ -451,7 +479,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       return { resultado: { total: lista.length, produtos: lista.slice(0, 40) } };
     }
     case "resumo_financeiro": {
-      exigir(c.vejoFinanceiro, "Esta pessoa não tem acesso ao financeiro.");
+      exigir(c.cuidoDoFinanceiro, "Esta pessoa opera o caixa, mas não tem a área Financeiro: não vê o resumo do período nem as contas. O dono pode liberar em Equipe.");
       exigir(RE_DIA.test(String(e.de)) && RE_DIA.test(String(e.ate)), "Datas no formato AAAA-MM-DD.");
       const [ls, caixa] = await Promise.all([
         lerTudo<{ tipo: string; valor: number; forma: string | null; categoria: string; pagamentos: unknown }>((de, ate, contar) => sb.from("lancamentos").select("tipo, valor, forma, categoria, pagamentos", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).gte("data", String(e.de)).lte("data", String(e.ate)).order("data").order("id").range(de, ate)).then((data) => ({ data })),
@@ -474,17 +502,17 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
         lancamentos: (ls.data ?? []).length, caixa_aberto: caixa.data ? { desde: utcParaLocal(caixa.data.aberto_em, c.fusoMin), troco_inicial: caixa.data.valor_inicial } : null } };
     }
     case "contas_em_aberto": {
-      exigir(c.vejoFinanceiro, "Esta pessoa não tem acesso ao financeiro.");
+      exigir(c.cuidoDoFinanceiro, "Esta pessoa opera o caixa, mas não tem a área Financeiro: não vê o resumo do período nem as contas. O dono pode liberar em Equipe.");
       const ls = ok(await sb.from("lancamentos").select("id, tipo, valor, descricao, categoria, vencimento").eq("petshop_id", petshop.id).eq("pago", false).order("vencimento").limit(200));
       return { resultado: { hoje, a_pagar: ls.filter((l) => l.tipo === "saida").map((l) => ({ descricao: l.descricao ?? l.categoria, valor: l.valor, vencimento: l.vencimento, atrasada: (l.vencimento ?? hoje) < hoje })),
         a_receber: ls.filter((l) => l.tipo === "entrada").map((l) => ({ descricao: l.descricao ?? l.categoria, valor: l.valor, vencimento: l.vencimento })) } };
     }
     case "ver_hospedes": {
       const dias = Math.max(0, Math.min(60, numero(e.dias) ?? 7));
-      const abertas = ok(await sb.from("estadias").select("id, tipo, entrada, saida_prevista, valor_diaria, status, obs, pets(id, nome, alertas, clientes(nome))").eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500));
+      const abertas = await comValoresDeEstadia(sb, petshop.id, ok(await sb.from("estadias").select("id, tipo, entrada, saida_prevista, status, obs, pets(id, nome, alertas, clientes(nome))").eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500)), c.vejoFinanceiro);
       const ate = somaDiasLocal(hoje, dias);
       const comum = (x: (typeof abertas)[number]) => ({ estadia_id: x.id, pet_id: x.pets?.id, pet: x.pets?.nome ?? "pet removido", tutor: x.pets?.clientes?.nome, tipo: x.tipo,
-        ...(x.pets?.alertas ? { cuidados: x.pets.alertas } : {}), ...(x.obs ? { obs: x.obs } : {}), valor_diaria: x.valor_diaria });
+        ...(x.pets?.alertas ? { cuidados: x.pets.alertas } : {}), ...(x.obs ? { obs: x.obs } : {}), ...(c.vejoFinanceiro ? { valor_diaria: x.valor_diaria } : {}) });
       const naCasa = abertas.filter((x) => x.status === "em_casa").map((x) => {
         const sai = x.saida_prevista ? utcParaLocal(x.saida_prevista, c.fusoMin) : null;
         return { ...comum(x), desde: utcParaLocal(x.entrada, c.fusoMin), saida_prevista: sai, ...(sai && sai < c.agora ? { saida_atrasada: true } : {}), diarias_ate_agora: contarDiarias(c, x) };
@@ -527,8 +555,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       const { data: ultimo } = await sb.from("caixas").select("*").eq("petshop_id", petshop.id).not("fechado_em", "is", null).order("fechado_em", { ascending: false }).limit(1).maybeSingle();
       const ru = ultimo ? resumoDoCaixa(ultimo.valor_inicial, await movimentosDoCaixa(c, ultimo.id)) : null;
       return { resultado: { caixa: "fechado", lancado_hoje_sem_caixa: { entrou: r.entrou, saiu: r.saiu, por_forma: Object.fromEntries(r.porForma.filter((f) => f.entrou || f.saiu).map((f) => [f.rotulo, { entrou: f.entrou, saiu: f.saiu }])) },
-        ultimo_fechamento: ultimo && ru ? { aberto_em: utcParaLocal(ultimo.aberto_em, c.fusoMin), fechado_em: utcParaLocal(ultimo.fechado_em!, c.fusoMin), entrou: ru.entrou, saiu: ru.saiu, esperado_na_gaveta: ru.esperado, contado: ultimo.valor_contado,
-          ...(ultimo.valor_contado != null ? { diferenca: diferencaDoCaixa(ultimo.valor_contado, ru.esperado).texto } : {}), ...(ultimo.obs ? { obs: ultimo.obs } : {}) } : null } };
+        ultimo_fechamento: ultimo && ru ? { aberto_em: utcParaLocal(ultimo.aberto_em, c.fusoMin), fechado_em: utcParaLocal(ultimo.fechado_em!, c.fusoMin), ...(c.cuidoDoFinanceiro ? { entrou: ru.entrou, saiu: ru.saiu } : {}), esperado_na_gaveta: ultimo.valor_esperado ?? ru.esperado, contado: ultimo.valor_contado,
+          ...(ultimo.valor_contado != null ? { diferenca: diferencaDoCaixa(ultimo.valor_contado, Number(ultimo.valor_esperado ?? ru.esperado)).texto } : {}), ...(ultimo.obs ? { obs: ultimo.obs } : {}) } : null } };
     }
     case "ver_saude": {
       const aviso = "Você só informa o que está anotado e as datas. Não dê orientação veterinária.";
@@ -603,7 +631,9 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       const inicio = inicios[0];
       const prof = e.profissional_id ? profPorId(c, e.profissional_id) : null;
       exigir(!e.profissional_id || prof, "profissional_id inválido.");
-      const intervalos = inicios.map((i) => { const ini = localParaUtc(i, c.fusoMin); return { local: i, ini, fim: new Date(ini.getTime() + servico.duracao_min * 60000) }; });
+      const outros = outrosServicosDoPedido(c, e, servico.id);
+      const duracaoMin = Math.min(1440, servico.duracao_min + outros.reduce((t, x) => t + x.duracao_min, 0));
+      const intervalos = inicios.map((i) => { const ini = localParaUtc(i, c.fusoMin); return { local: i, ini, fim: new Date(ini.getTime() + duracaoMin * 60000) }; });
       // bloqueio do pet shop inteiro ou do profissional escolhido: não marca
       const bloqueios = await bloqueiosEntre(c, intervalos[0].ini, intervalos[intervalos.length - 1].fim);
       const barrados = intervalos.map((x) => ({ x, b: bloqueios.find((b) => bloqueioPega(b, prof?.id, x.ini.getTime(), x.fim.getTime())) })).filter((r) => r.b);
@@ -612,17 +642,33 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
         throw new ErroDeUso(`A série cai em horário bloqueado nestas datas: ${barrados.map((r) => `${quandoLocal(r.x.local.slice(0, 10))} (${bloqueioEmTexto(c, r.b!)})`).join("; ")}. Nada foi marcado. Avise a pessoa e combine outro horário ou outra repetição.`);
       }
       const preco = numero(e.preco) ?? precoDoServico(servico, pet.porte);
-      const linhas: [string, string][] = [["Pet", `${pet.nome}${pet.clientes?.nome ? ` (${pet.clientes.nome})` : ""}`], ["Serviço", servico.nome]];
+      const linhas: [string, string][] = [["Pet", `${pet.nome}${pet.clientes?.nome ? ` (${pet.clientes.nome})` : ""}`], [outros.length ? "Serviços" : "Serviço", [servico, ...outros].map((x) => x.nome).join(" + ")]];
       if (inicios.length > 1) {
         linhas.push(["Começa", quandoLocal(inicio)], ["Repete", `${aCada === 1 ? "toda semana" : `a cada ${aCada} semanas`}, ${inicios.length} horários`], ["Datas", inicios.map((i) => diaCurtoLocal(i.slice(0, 10))).join(", ")]);
       } else linhas.push(["Quando", quandoLocal(inicio)]);
       if (prof) linhas.push(["Com", prof.nome]);
-      linhas.push(["Valor", preco != null ? `${brl(preco)}${inicios.length > 1 ? " cada" : ""}` : "a definir"]);
+      if (outros.length) {
+        // cada serviço com o valor dele, e o total do horário
+        const precos = [preco, ...outros.map((x) => precoDoServico(x, pet.porte))];
+        const total = Math.round(precos.reduce<number>((t, v) => t + (v ?? 0), 0) * 100) / 100;
+        linhas.push(["Valor", `${brl(total)}${inicios.length > 1 ? " cada" : ""} (${[servico, ...outros].map((x, i) => `${x.nome} ${precos[i] != null ? brl(precos[i]!) : "a definir"}`).join(" + ")})`]);
+        linhas.push(["Duração", `${duracaoMin} min`]);
+      } else linhas.push(["Valor", preco != null ? `${brl(preco)}${inicios.length > 1 ? " cada" : ""}` : "a definir"]);
       if (e.leva_traz) linhas.push(["Leva e traz", "sim"]);
       if (texto(e.obs)) linhas.push(["Obs.", texto(e.obs, 300)]);
       const func = (c.petshop.horario as Horario | null)?.[String(diaSemanaLocal(inicio.slice(0, 10)))];
       if (!func) linhas.push(["Atenção", "o pet shop não abre nesse dia"]);
       else if (inicio.slice(11) < func.abre || inicio.slice(11) >= func.fecha) linhas.push(["Atenção", `fora do horário (${func.abre} às ${func.fecha})`]);
+      {
+        // almoço do pet shop: avisa (a pessoa pode confirmar mesmo assim, como na tela)
+        const noAlmoco = inicios.filter((i) => {
+          const al = almocoNoDiaDaSemana(c.petshop.horario, diaSemanaLocal(i.slice(0, 10)));
+          const ini = Number(i.slice(11, 13)) * 60 + Number(i.slice(14, 16));
+          return !!al && ini < al.fim && ini + duracaoMin > al.inicio;
+        });
+        const al = almocoNoDiaDaSemana(c.petshop.horario, diaSemanaLocal((noAlmoco[0] ?? inicio).slice(0, 10)));
+        if (noAlmoco.length && al) linhas.push(["Atenção", `cai no almoço do pet shop (${al.de} às ${al.ate})${inicios.length > 1 ? ` em ${noAlmoco.length === inicios.length ? "todas as datas" : noAlmoco.map((i) => diaCurtoLocal(i.slice(0, 10))).join(", ")}` : ""}`]);
+      }
       if (prof) {
         const batem: string[] = [];
         for (const x of intervalos) {
@@ -697,7 +743,7 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       if (p.reserva) linhas.push(["Reserva", `usa a reserva de ${quandoLocal(utcParaLocal(p.reserva.entrada, c.fusoMin))}`]);
       const sai = p.saida ?? (p.reserva?.saida_prevista ? utcParaLocal(p.reserva.saida_prevista, c.fusoMin) : null);
       linhas.push(["Saída prevista", sai ? quandoLocal(sai) : "sem saída prevista"]);
-      linhas.push(["Diária", p.diaria != null ? `${brl(p.diaria)} por ${p.tipo === "hotel" ? "noite" : "dia"}${p.origemDiaria}` : "a combinar"]);
+      if (c.vejoFinanceiro) linhas.push(["Diária", p.diaria != null ? `${brl(p.diaria)} por ${p.tipo === "hotel" ? "noite" : "dia"}${p.origemDiaria}` : "a combinar"]);
       if (p.obs) linhas.push(["Obs.", p.obs]);
       if (p.pet.alertas) linhas.push(["Cuidados", texto(p.pet.alertas, 300)]);
       if (p.outra) linhas.push(["Atenção", `a reserva de ${TIPO_ESTADIA[p.outra.tipo]?.toLowerCase() ?? "estadia"} de ${quandoLocal(utcParaLocal(p.outra.entrada, c.fusoMin))} continua marcada`]);
@@ -830,7 +876,7 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
   switch (nome) {
     case "cadastrar_pet": {
       let clienteId = uuid(e.cliente_id);
-      if (!clienteId) clienteId = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome: texto(e.tutor_nome, 120), telefone: texto(e.tutor_telefone, 30) || null }).select("id").single()).id;
+      if (!clienteId) clienteId = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome: texto(e.tutor_nome, 120), telefone: lerTelefone(texto(e.tutor_telefone, 40)).fone ?? (soDigitos(texto(e.tutor_telefone, 40)) || null) }).select("id").single()).id;
       const pet = ok(await sb.from("pets").insert({ petshop_id: petshop.id, cliente_id: clienteId, nome: texto(e.nome, 80), especie: ["cao", "gato", "outro"].includes(String(e.especie)) ? String(e.especie) : "cao",
         raca: texto(e.raca, 60) || null, porte: ["P", "M", "G", "GG"].includes(String(e.porte)) ? String(e.porte) : null, alertas: texto(e.alertas, 400) || null }).select("id, nome").single());
       return { feito: true, pet_id: pet.id, cliente_id: clienteId };
@@ -838,14 +884,18 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
     case "marcar_horario": {
       const pet = await petPorId(c, e.pet_id);
       const servico = servicoPorId(c, e.servico_id)!;
+      const outros = outrosServicosDoPedido(c, e, servico.id);
+      const duracaoMin = Math.min(1440, servico.duracao_min + outros.reduce((t, x) => t + x.duracao_min, 0));
       const { inicios } = iniciosDoPedido(e);
       const serie = inicios.length > 1 ? crypto.randomUUID() : null;
       const criados = ok(await sb.from("agendamentos").insert(inicios.map((i) => {
         const ini = localParaUtc(i, c.fusoMin);
         return { petshop_id: petshop.id, pet_id: pet.id, servico_id: servico.id, profissional_id: uuid(e.profissional_id), serie_id: serie,
-          inicio: ini.toISOString(), fim: new Date(ini.getTime() + servico.duracao_min * 60000).toISOString(), preco: numero(e.preco) ?? precoDoServico(servico, pet.porte),
+          inicio: ini.toISOString(), fim: new Date(ini.getTime() + duracaoMin * 60000).toISOString(), preco: numero(e.preco) ?? precoDoServico(servico, pet.porte),
           obs: texto(e.obs, 400) || null, leva_traz: Boolean(e.leva_traz), origem: "assistente", criado_por: c.userId };
       })).select("id, inicio"));
+      // os outros serviços do mesmo horário, cada um com o valor dele pelo porte
+      await juntarServicosAMais(sb, petshop.id, criados.map((x) => x.id), outros.map((x) => ({ servico_id: x.id, preco: precoDoServico(x, pet.porte) })));
       const emOrdem = [...criados].sort((x, y) => x.inicio.localeCompare(y.inicio));
       if (inicios.length === 1) return { feito: true, agendamento_id: emOrdem[0]?.id };
       return { feito: true, horarios_marcados: emOrdem.length, serie_id: serie, agendamento_id: emOrdem[0]?.id, datas: emOrdem.map((a) => utcParaLocal(a.inicio, c.fusoMin)) };
@@ -868,13 +918,13 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
       const saida = p.saida ? localParaUtc(p.saida, c.fusoMin).toISOString() : null;
       if (p.reserva) {
         const r = ok(await sb.from("estadias").update({ status: "em_casa", entrada: new Date().toISOString(), ...(saida ? { saida_prevista: saida } : {}),
-          ...(numero(e.valor_diaria) != null ? { valor_diaria: numero(e.valor_diaria) } : {}), ...(p.obs ? { obs: p.obs } : {}) })
+          ...(p.informada ? { valor_diaria: p.diaria } : {}), ...(p.obs ? { obs: p.obs } : {}) })
           .eq("id", p.reserva.id).eq("petshop_id", petshop.id).eq("status", "reservada").select("id"));
         exigir(r.length, "Essa reserva já tinha sido alterada. Use ver_hospedes para conferir.");
         return { feito: true, estadia_id: p.reserva.id, usou_reserva: true };
       }
       const nova = ok(await sb.from("estadias").insert({ petshop_id: petshop.id, pet_id: p.pet.id, tipo: p.tipo, entrada: new Date().toISOString(), saida_prevista: saida,
-        valor_diaria: p.diaria, status: "em_casa", obs: p.obs }).select("id").single());
+        ...(c.vejoFinanceiro ? { valor_diaria: p.diaria } : {}), status: "em_casa", obs: p.obs }).select("id").single());
       return { feito: true, estadia_id: nova.id, usou_reserva: false };
     }
     case "fazer_checkout": {
@@ -885,17 +935,17 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
       // a estadia já está encerrada: se o dinheiro falhar, avisa em vez de dar tudo como perdido (igual à tela)
       const pago = await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "entrada", valor: p.valor, forma: String(e.forma), categoria: "Creche e hotel",
         descricao: `${TIPO_ESTADIA[p.estadia.tipo] ?? "Estadia"}: ${p.n} ${p.n === 1 ? "diária" : "diárias"} · ${p.pet.nome}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c),
-        cliente_id: p.pet.clientes?.id ?? null, origem: "assistente", criado_por: c.userId }).select("id").single();
+        cliente_id: p.pet.clientes?.id ?? null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single();
       if (pago.error) return { feito: true, diarias: p.n, pagamento_lancado: false, aviso: "O check-out foi feito, mas o pagamento não foi lançado. Diga isso e peça para lançar pelo Financeiro." };
       return { feito: true, diarias: p.n, pagamento_lancado: true, valor: p.valor };
     }
     case "vender_pacote": {
       const p = await planoDaVenda(c, e);
       const vendido = ok(await sb.from("pacotes_clientes").insert({ petshop_id: petshop.id, pet_id: p.pet.id, pacote_id: p.modelo.id, nome: p.modelo.nome, servico_id: p.modelo.servico_id,
-        total: p.modelo.quantidade, comprado_em: p.hoje, vence_em: p.venceEm, preco: p.preco }).select("id").single());
+        total: p.modelo.quantidade, comprado_em: p.hoje, vence_em: p.venceEm, preco: p.preco, chave: c.chave ?? null }).select("id").single());
       if (!p.lanca) return { feito: true, pacote_cliente_id: vendido.id, pagamento_lancado: false };
       const pago = await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "entrada", valor: p.preco, forma: String(e.forma), categoria: "Pacotes", descricao: `Pacote ${p.modelo.nome} · ${p.pet.nome}`,
-        data: p.hoje, pago: true, caixa_id: await caixaAbertoId(c), cliente_id: p.pet.clientes?.id ?? null, origem: "assistente", criado_por: c.userId }).select("id").single();
+        data: p.hoje, pago: true, caixa_id: await caixaAbertoId(c), cliente_id: p.pet.clientes?.id ?? null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single();
       if (pago.error) return { feito: true, pacote_cliente_id: vendido.id, pagamento_lancado: false, aviso: "O pacote foi criado, mas o pagamento não foi lançado. Diga isso e peça para lançar pelo Financeiro." };
       return { feito: true, pacote_cliente_id: vendido.id, pagamento_lancado: true, valor: p.preco };
     }
@@ -922,10 +972,11 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
       const aberto = await caixaAbertoAgora(c);
       exigir(aberto, "Não há caixa aberto para fechar.");
       const contado = numero(e.valor_contado)!;
-      const esperado = resumoDoCaixa(aberto.valor_inicial, await movimentosDoCaixa(c, aberto.id)).esperado;
+      // o banco anota o dinheiro esperado na hora de fechar: a conta vale mesmo se alguém recebeu enquanto isso
       const r = ok(await sb.from("caixas").update({ fechado_em: new Date().toISOString(), fechado_por: c.userId, valor_contado: contado, obs: texto(e.obs, 500) || null })
-        .eq("id", aberto.id).eq("petshop_id", petshop.id).is("fechado_em", null).select("id"));
+        .eq("id", aberto.id).eq("petshop_id", petshop.id).is("fechado_em", null).select("id, valor_esperado"));
       exigir(r.length, "Este caixa já tinha sido fechado.");
+      const esperado = Number(r[0].valor_esperado ?? resumoDoCaixa(aberto.valor_inicial, await movimentosDoCaixa(c, aberto.id)).esperado);
       return { feito: true, esperado_na_gaveta: esperado, contado, diferenca: diferencaDoCaixa(contado, esperado).texto };
     }
     case "alterar_horario": {
@@ -950,27 +1001,32 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
       let clienteId: string | null = null;
       if (agId) clienteId = (await sb.from("agendamentos").select("pets(cliente_id)").eq("id", agId).maybeSingle()).data?.pets?.cliente_id ?? null;
       ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: String(e.tipo), valor: numero(e.valor)!, forma: String(e.forma), categoria: texto(e.categoria, 60) || "Outros",
-        descricao: texto(e.descricao) || null, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), agendamento_id: agId, cliente_id: clienteId, origem: "assistente", criado_por: c.userId }).select("id").single());
+        descricao: texto(e.descricao) || null, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), agendamento_id: agId, cliente_id: clienteId, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
       if (agId && e.tipo === "entrada") await sb.from("agendamentos").update({ status: "concluido" }).eq("petshop_id", petshop.id).eq("id", agId);
       return { feito: true };
     }
     case "criar_conta": {
       ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: e.tipo === "entrada" ? "entrada" : "saida", valor: numero(e.valor)!, categoria: texto(e.categoria, 60) || "Outros",
-        descricao: texto(e.descricao) || null, data: String(e.vencimento), vencimento: String(e.vencimento), pago: false, origem: "assistente", criado_por: c.userId }).select("id").single());
+        descricao: texto(e.descricao) || null, data: String(e.vencimento), vencimento: String(e.vencimento), pago: false, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
       return { feito: true };
     }
     case "movimentar_estoque": {
       let produtoId = uuid(e.produto_id);
+      // pedido repetido: o movimento desta ação já está gravado (não cria o produto de novo nem mexe no saldo outra vez)
+      if (c.chave) {
+        const ja = await sb.from("movimentos_estoque").select("id, produto_id").eq("petshop_id", petshop.id).eq("chave", c.chave).maybeSingle();
+        if (ja.data) return { feito: true, produto_id: ja.data.produto_id, despesa_lancada: false, repetido: true };
+      }
       const qtd = numero(e.quantidade)!, custo = numero(e.custo_unitario);
       let nomeProd = texto(e.produto_nome, 120), unidade = texto(e.unidade, 12) || "un";
       if (!produtoId) produtoId = ok(await sb.from("produtos").insert({ petshop_id: petshop.id, nome: nomeProd, unidade, custo }).select("id").single()).id;
       else { const p = ok(await sb.from("produtos").select("nome, unidade").eq("id", produtoId).single()); nomeProd = p.nome; unidade = p.unidade; }
       ok(await sb.from("movimentos_estoque").insert({ petshop_id: petshop.id, produto_id: produtoId, tipo: e.tipo === "saida" ? "saida" : "entrada", quantidade: qtd,
-        custo_unitario: e.tipo === "entrada" ? custo : null, motivo: texto(e.motivo, 80) || null, origem: "assistente", criado_por: c.userId }).select("id").single());
+        custo_unitario: e.tipo === "entrada" ? custo : null, motivo: texto(e.motivo, 80) || null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
       let despesa = false;
       if (e.lancar_despesa && custo != null && e.tipo === "entrada" && c.vejoFinanceiro) {
         ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "saida", valor: Math.round(custo * qtd * 100) / 100, forma: String(e.forma), categoria: "Produtos e material",
-          descricao: `Compra: ${qtd} ${unidade} de ${nomeProd}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), origem: "assistente", criado_por: c.userId }).select("id").single());
+          descricao: `Compra: ${qtd} ${unidade} de ${nomeProd}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
         despesa = true;
       }
       return { feito: true, produto_id: produtoId, despesa_lancada: despesa };

@@ -1,0 +1,155 @@
+/* Creche: mensalistas, chamada do dia e cobranças (prefixo g-cm-) */
+
+.g-cm-titulo { font: 480 1.5rem/1.15 var(--display); letter-spacing: -.01em; }
+.g-cm-titulo::first-letter { text-transform: uppercase; }
+
+/* dias da semana do plano: sete pastilhas, as do plano acesas */
+.g-cm-semana { display: inline-flex; gap: 3px; flex: none; }
+.g-cm-semana i { font-style: normal; display: inline-grid; place-items: center; min-width: 30px; height: 24px; padding: 0 4px; border-radius: 8px; font-size: .6875rem; font-weight: 700; letter-spacing: .02em; color: #b5aca0; background: transparent; border: 1px dashed var(--g-linha-forte); }
+.g-cm-semana i.on { color: #5c4300; background: var(--t-manteiga, #f8ecc9); border: 1px solid rgba(201, 154, 46, .5); }
+.g-cm-dias .g-chip { min-width: 52px; justify-content: center; text-transform: capitalize; }
+
+/* ---------- chamada ---------- */
+.g-cm-dia { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; }
+.g-cm-dia-acoes { gap: 8px; }
+.g-cm-data { width: auto; min-width: 150px; }
+.g-cm-placar { display: grid; grid-template-columns: repeat(auto-fit, minmax(74px, 1fr)); gap: 8px; }
+.g-cm-placar span { display: grid; gap: 2px; padding: 10px 12px; border-radius: 14px; background: var(--g-carta); border: 1px solid var(--g-linha); font-size: .8125rem; color: var(--g-cinza); line-height: 1.2; }
+.g-cm-placar b { font-size: 1.625rem; color: var(--g-tinta); }
+.g-cm-placar .esperado { background: var(--g-laranja-tint); border-color: transparent; }
+.g-cm-placar .casa { background: var(--g-verde-tint); border-color: transparent; }
+.g-cm-placar .faltou b { color: var(--g-vermelho); }
+.g-cm-vagas { font-size: .875rem; color: var(--g-cinza); }
+.g-cm-vagas b { color: var(--g-tinta); }
+.g-cm-vagas.cheia b { color: var(--g-vermelho); }
+
+.g-cm-chamada { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) { .g-cm-chamada { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.g-cm-linha { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px; align-items: center; padding: 14px; border-radius: 18px; background: var(--g-carta); border: 1px solid var(--g-linha); box-shadow: var(--g-sombra); min-width: 0; }
+.g-cm-linha.esperado { border-color: color-mix(in srgb, var(--g-laranja) 45%, transparent); }
+.g-cm-linha.na_casa { background: linear-gradient(180deg, var(--g-verde-tint), var(--g-carta)); }
+.g-cm-linha.saiu, .g-cm-linha.faltou { box-shadow: none; background: transparent; }
+.g-cm-linha.saiu .g-avatar, .g-cm-linha.faltou .g-avatar { opacity: .65; }
+.g-cm-linha .quem { min-width: 0; display: grid; gap: 2px; }
+.g-cm-linha .quem > b { font: 480 1.25rem/1.15 var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-cm-linha .quem > span { font-size: .875rem; color: var(--g-cinza); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-cm-linha .selos { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.g-cm-linha .selos:empty { display: none; }
+.g-cm-linha .selos .g-tag { white-space: normal; text-align: left; }
+.g-cm-linha .acoes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.g-cm-linha .acoes .g-btn { min-height: 48px; }
+.g-cm-linha .acoes .g-btn.verde, .g-cm-linha .acoes .g-btn.sec { flex: 1 1 130px; justify-content: center; font-size: 1rem; }
+.g-cm-linha .acoes .g-btn.fantasma { flex: 0 0 auto; }
+.g-cm-avisou { margin: 0; }
+.g-cm-rodape { gap: 8px; }
+@media (min-width: 720px) {
+  /* o nome do pet aparece sempre: a coluna dele tem um mínimo, e as ações (etiqueta + botões) é que encolhem e quebram de linha */
+  .g-cm-linha { grid-template-columns: auto minmax(9rem, 1fr) minmax(0, max-content); }
+  .g-cm-linha .acoes { grid-column: auto; justify-content: flex-end; min-width: 0; }
+  .g-cm-linha .acoes .g-tag { white-space: normal; text-align: left; }
+  /* nome comprido quebra de linha em vez de ser cortado */
+  .g-cm-linha .quem > b { white-space: normal; overflow-wrap: anywhere; }
+  .g-cm-linha .acoes .g-btn.verde, .g-cm-linha .acoes .g-btn.sec { flex: 0 0 auto; min-width: 120px; }
+}
+
+/* ---------- mensalistas ---------- */
+.g-cm-ocupacao { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-items: end; }
+.g-cm-col { display: grid; justify-items: center; gap: 4px; text-align: center; min-width: 0; }
+.g-cm-col b { font: 480 1.25rem/1 var(--display); }
+.g-cm-col b small { font: 500 .75rem/1 var(--corpo, inherit); color: var(--g-cinza); }
+.g-cm-col .barra { display: flex; align-items: flex-end; width: 100%; max-width: 44px; height: 56px; border-radius: 10px; background: var(--g-carta-2); box-shadow: inset 0 0 0 1px var(--g-linha); overflow: hidden; }
+.g-cm-col .barra i { display: block; width: 100%; min-height: 3px; border-radius: 10px 10px 0 0; background: #d9a520; }
+.g-cm-col.cheio .barra i { background: var(--g-vermelho); }
+.g-cm-col.cheio b { color: var(--g-vermelho); }
+.g-cm-col.fechado { opacity: .5; }
+.g-cm-col .dia { font-size: .8125rem; font-weight: 600; text-transform: capitalize; }
+.g-cm-col > small { font-size: .6875rem; color: var(--g-cinza); line-height: 1.1; min-height: 1.5em; }
+.g-cm-busca { flex: 1 1 240px; max-width: 420px; }
+
+.g-cm-lista { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1100px) { .g-cm-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.g-cm-plano { display: grid; gap: 8px; padding: 14px; border-radius: 18px; background: var(--g-carta); border: 1px solid var(--g-linha); box-shadow: var(--g-sombra); min-width: 0; }
+.g-cm-plano-topo { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; text-align: left; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.g-cm-plano-topo .t { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.g-cm-plano-topo .t b { font: 480 1.1875rem/1.15 var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-cm-plano-topo .t span { font-size: .875rem; color: var(--g-cinza); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-cm-plano-topo .seta { width: 20px; height: 20px; flex: none; color: var(--g-cinza); transition: transform .2s; }
+.g-cm-plano.aberto .seta { transform: rotate(180deg); }
+.g-cm-plano-info { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.g-cm-plano-corpo { display: grid; gap: 12px; padding-top: 10px; border-top: 1px solid var(--g-linha); }
+
+.g-cm-meses { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.g-cm-mes { display: grid; gap: 8px; align-content: start; padding: 12px; border-radius: 14px; background: var(--g-carta-2); }
+.g-cm-mes .g-rotulo::first-letter { text-transform: uppercase; }
+.g-cm-numeros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.g-cm-numeros span { display: grid; gap: 1px; }
+.g-cm-numeros b { font-size: 1.5rem; line-height: 1; }
+.g-cm-numeros small { font-size: .75rem; color: var(--g-cinza); line-height: 1.2; }
+.g-cm-detalhes { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: .8125rem; line-height: 1.4; }
+.g-cm-detalhes:empty { display: none; }
+
+/* ---------- cobranças ---------- */
+.g-cm-mes-nav { display: flex; align-items: center; gap: 8px; }
+.g-cm-mes-nav h2 { min-width: 0; text-align: center; flex: 0 1 auto; }
+.g-cm-falta-gerar { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-radius: var(--g-raio-p); background: var(--g-amarelo-tint); font-size: .875rem; line-height: 1.45; }
+.g-cm-falta-gerar svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+.g-cm-bloco { display: grid; gap: 10px; }
+.g-cm-bloco > .g-card-t h3 { font: 480 1.25rem/1.2 var(--display); }
+.g-cm-bloco.atrasada > .g-card-t h3 { color: var(--g-vermelho); }
+.g-cm-grupos { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1100px) { .g-cm-grupos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.g-cm-grupo { display: grid; gap: 10px; padding: 14px; border-radius: 18px; background: var(--g-carta); border: 1px solid var(--g-linha); box-shadow: var(--g-sombra); min-width: 0; }
+.g-cm-bloco.atrasada .g-cm-grupo { border-color: color-mix(in srgb, var(--g-vermelho) 35%, transparent); }
+.g-cm-bloco.paga .g-cm-grupo { box-shadow: none; background: transparent; }
+.g-cm-grupo-topo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.g-cm-grupo-topo .t { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.g-cm-grupo-topo .t b { font-weight: 600; overflow-wrap: anywhere; }
+.g-cm-grupo-topo .t span { font-size: .8125rem; color: var(--g-cinza); }
+.g-cm-grupo-topo .total { font-size: 1.375rem; white-space: nowrap; }
+.g-cm-itens { display: grid; gap: 8px; }
+.g-cm-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; align-items: start; padding: 10px; border-radius: 12px; background: var(--g-carta-2); }
+.g-cm-item .t { display: grid; gap: 3px; min-width: 0; }
+.g-cm-item .t b { font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: space-between; }
+.g-cm-item .t > span { font-size: .8125rem; color: var(--g-cinza); line-height: 1.4; overflow-wrap: anywhere; }
+.g-cm-item .selos { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.g-cm-item .selos .g-tag { white-space: normal; text-align: left; }
+.g-cm-item .acoes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.g-cm-item .acoes:empty { display: none; }
+.g-cm-grupo-pe { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.g-cm-grupo-pe .g-tag { margin-right: auto; }
+.g-cm-msg { min-height: 240px; font-size: .9375rem; line-height: 1.5; }
+.g-cm-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--g-verde-tint); }
+.g-cm-total b { font-size: 1.5rem; }
+
+.g-cm-gerar { display: grid; gap: 8px; }
+.g-cm-gerar-linha { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: start; padding: 12px; border-radius: 14px; border: 1px solid var(--g-linha); background: var(--g-carta); }
+.g-cm-gerar-linha .t { display: grid; gap: 2px; min-width: 0; }
+.g-cm-gerar-linha .t b { font-weight: 600; }
+.g-cm-gerar-linha .t span { font-size: .8125rem; color: var(--g-cinza); line-height: 1.4; }
+.g-cm-gerar-linha .t .g-cm-prorata { color: #5c4300; background: var(--g-amarelo-tint); padding: 6px 8px; border-radius: 8px; }
+.g-cm-gerar-linha .valor { grid-column: 1 / -1; display: flex; gap: 12px; align-items: flex-end; justify-content: flex-end; }
+.g-cm-gerar-linha .valor .g-campo { flex: 0 1 150px; margin: 0; }
+.g-cm-gerar-linha .valor b { font-size: 1.25rem; white-space: nowrap; padding-bottom: 8px; }
+@media (min-width: 720px) {
+  .g-cm-gerar-linha { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .g-cm-gerar-linha .valor { grid-column: auto; }
+  .g-cm-item { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .g-cm-item .acoes { grid-column: auto; }
+}
+
+/* seletor do alto da tela Creche e hotel: no celular, as quatro partes cabem na linha */
+.g-cm-ver { display: flex; width: 100%; }
+.g-cm-ver button { flex: 1 1 0; min-width: 0; padding: 0 8px; white-space: nowrap; font-size: .8125rem; }
+@media (min-width: 720px) { .g-cm-ver { width: auto; } .g-cm-ver button { flex: 0 0 auto; padding: 0 16px; font-size: .875rem; } }
+/* marca de mensalista no cartão de quem está na casa */
+.g-cm-marca { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .875rem; color: var(--g-cinza); }
+
+/* chamada de hoje no alto da tela Hoje */
+.g-cm-hoje { display: grid; gap: 12px; }
+.g-cm-hoje h2 { font-size: 1.125rem; }
+/* a escolha da primeira cobrança, na folha de gerar cobranças */
+.g-cm-gerar-linha .t .g-cm-primeira { margin: 4px 0 2px; padding: 8px; border-radius: 10px; background: var(--g-amarelo-tint); }
+.g-cm-gerar-linha .t .g-cm-primeira > span { color: #5c4300; font-size: .875rem; }
+/* aviso das primeiras cobranças: no celular o botão desce para baixo do texto */
+.g-cm-aviso-fora { flex-wrap: wrap; }
+.g-cm-aviso-fora > .g-cresce { flex: 1 1 220px; }

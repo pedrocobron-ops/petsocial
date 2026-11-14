@@ -1,0 +1,139 @@
+/* Hotel e creche com opções (prefixo g-ht-): ocupação, conta do check-out, sinal, cuidados e mensagens */
+
+/* as partes da tela (Chamada, Casa agora, Ocupação…): no celular rolam de lado quando não cabem */
+.g-ht-ver { display: flex; width: 100%; overflow-x: auto; scrollbar-width: none; }
+.g-ht-ver::-webkit-scrollbar { display: none; }
+.g-ht-ver button { flex: 1 0 auto; padding: 0 12px; white-space: nowrap; font-size: .8125rem; }
+@media (min-width: 720px) { .g-ht-ver { display: inline-flex; width: auto; } .g-ht-ver button { flex: 0 0 auto; padding: 0 16px; font-size: .875rem; } }
+.g-seg.g-ht-seg { display: flex; }
+.g-seg.g-ht-seg button { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0 8px; line-height: 1.15; }
+
+/* calendário de ocupação */
+.g-ht-cal-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.g-ht-cal-topo h2 { font: 480 1.375rem/1.2 var(--display); }
+.g-ht-cal-topo h2::first-letter { text-transform: uppercase; }
+.g-ht-cal-nav { display: flex; align-items: center; gap: 6px; }
+.g-ht-mes { display: none; }
+.g-ht-tira { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(78px, 1fr); gap: 8px; overflow-x: auto; padding: 2px 2px 10px; scroll-snap-type: x proximity; }
+.g-ht-tira .g-ht-dia { scroll-snap-align: start; min-height: 96px; }
+@media (min-width: 720px) {
+  .g-ht-mes { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .g-ht-tira { display: none; }
+}
+.g-ht-sem { font-size: .6875rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--g-cinza); text-align: center; padding: 2px 0 4px; }
+.g-ht-dia {
+  display: grid; align-content: start; gap: 4px; min-width: 0; min-height: 84px; padding: 8px; border-radius: 14px; border: 1px solid var(--g-linha);
+  background: var(--g-carta); color: var(--g-tinta); text-align: left; cursor: pointer; font: inherit;
+}
+.g-ht-dia:hover { border-color: var(--g-linha-forte); }
+.g-ht-dia.fora { visibility: hidden; }
+.g-ht-dia.hoje { box-shadow: 0 0 0 2px var(--g-verde); }
+.g-ht-dia.passado { opacity: .72; }
+.g-ht-dia .n { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; font-weight: 700; }
+.g-ht-dia .n small { font-size: .6875rem; font-weight: 600; color: var(--g-cinza); text-transform: uppercase; }
+.g-ht-oc { display: flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 8px; font-size: .75rem; font-weight: 600; white-space: nowrap; background: var(--g-carta-2); color: var(--g-cinza); }
+.g-ht-oc svg { width: 12px; height: 12px; flex: none; }
+.g-ht-oc.livre { background: #e3efe3; color: #24543b; }
+.g-ht-oc.meio { background: var(--g-amarelo-tint); color: #5b4708; }
+.g-ht-oc.quase { background: #f6d9b8; color: #7a4310; }
+.g-ht-oc.cheio { background: var(--g-vermelho-tint); color: #7a281b; }
+.g-ht-legenda { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: .8125rem; color: var(--g-cinza); }
+.g-ht-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.g-ht-legenda i { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+.g-ht-legenda i.livre { background: #e3efe3; } .g-ht-legenda i.meio { background: var(--g-amarelo-tint); } .g-ht-legenda i.quase { background: #f6d9b8; } .g-ht-legenda i.cheio { background: var(--g-vermelho-tint); }
+.g-ht-bloco { display: grid; gap: 6px; }
+.g-ht-bloco > h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .9375rem; }
+.g-ht-quem { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--g-linha); }
+.g-ht-quem:last-child { border-bottom: 0; }
+.g-ht-quem .t { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.g-ht-quem .t span { font-size: .875rem; color: var(--g-cinza); overflow-wrap: anywhere; }
+.g-ht-quem .t .alerta { color: var(--g-vermelho); }
+
+/* vagas das datas escolhidas, no formulário de reserva */
+.g-ht-vagas { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--g-carta-2); font-size: .9375rem; }
+.g-ht-vagas.cheio { background: var(--g-vermelho-tint); color: #7a281b; }
+.g-ht-vagas.quase { background: var(--g-amarelo-tint); color: #5b4708; }
+.g-ht-vagas svg { width: 18px; height: 18px; flex: none; }
+
+/* conta */
+.g-ht-conta { display: grid; gap: 2px; }
+.g-ht-conta .l { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: .9375rem; }
+.g-ht-conta .l span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.g-ht-conta .l.forte { font-weight: 700; border-top: 1px solid var(--g-linha); margin-top: 4px; padding-top: 9px; }
+.g-ht-conta .l.fraca { color: var(--g-cinza); font-size: .875rem; }
+.g-ht-det > summary { cursor: pointer; font-size: .875rem; font-weight: 600; color: var(--g-verde); padding: 6px 0; }
+.g-ht-det .noite { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: .875rem; border-bottom: 1px dashed var(--g-linha); }
+.g-ht-det .noite small { color: var(--g-cinza); }
+.g-ht-marcar { display: grid; gap: 6px; }
+.g-ht-marcar label { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 12px; border-radius: 12px; border: 1px solid var(--g-linha); background: var(--g-carta); cursor: pointer; }
+.g-ht-marcar label.on { border-color: rgba(36, 84, 59, .35); background: #f4f8f1; }
+.g-ht-marcar input { width: 20px; height: 20px; flex: none; accent-color: var(--g-verde); }
+.g-ht-marcar .t { flex: 1; min-width: 0; }
+.g-ht-marcar .t small { display: block; color: var(--g-cinza); font-size: .8125rem; }
+.g-ht-marcar b.v { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.g-ht-sinal { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: .9375rem; }
+
+/* cuidados */
+.g-ht-cuid { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: rgba(255, 251, 245, .75); border: 1px solid var(--g-linha); }
+.g-ht-cuid h4 { display: flex; align-items: center; gap: 6px; font-size: .8125rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--g-cinza); }
+.g-ht-cuid h4 svg { width: 14px; height: 14px; }
+.g-ht-cuid .item { display: grid; gap: 6px; }
+.g-ht-cuid .item > span { font-size: .9375rem; }
+.g-ht-cuid .horas { display: flex; flex-wrap: wrap; gap: 6px; }
+.g-ht-feito { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--g-linha-forte); background: #fffdf9; font: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; color: var(--g-tinta); }
+.g-ht-feito svg { width: 14px; height: 14px; }
+.g-ht-feito[aria-pressed="true"] { background: #e3efe3; border-color: rgba(36, 84, 59, .4); color: #24543b; }
+.g-ht-feito small { font-weight: 500; color: inherit; opacity: .85; }
+.g-ht-cuid-linha { display: grid; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--g-linha); background: var(--g-carta); }
+
+/* mensagens */
+.g-ht-msg { display: grid; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid var(--g-linha); background: var(--g-carta); }
+.g-ht-msg .c { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.g-ht-msg .c small { display: block; color: var(--g-cinza); font-size: .8125rem; }
+.g-ht-msg p.previa { font-size: .875rem; color: var(--g-cinza); white-space: pre-wrap; overflow-wrap: anywhere; padding: 8px 10px; border-radius: 10px; background: var(--g-carta-2); }
+.g-ht-msg .a { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* opções (Meu pet shop) */
+.g-ht-chave { position: relative; flex: none; width: 54px; height: 32px; padding: 0; border: 0; border-radius: 999px; background: #cfc6b8; cursor: pointer; transition: background .18s; }
+.g-ht-chave i { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fffdf9; box-shadow: 0 1px 3px rgba(31, 27, 23, .3); transition: transform .18s cubic-bezier(.2, .7, .2, 1); }
+.g-ht-chave[aria-checked="true"] { background: #2f6b4c; }
+.g-ht-chave[aria-checked="true"] i { transform: translateX(22px); }
+.g-ht-op { display: grid; gap: 10px; padding: 14px 0; border-top: 1px solid var(--g-linha); }
+.g-ht-op-t { display: flex; align-items: flex-start; gap: 12px; }
+.g-ht-op-t > div { flex: 1; min-width: 0; }
+.g-ht-op-t b { display: block; }
+.g-ht-op-t p { font-size: .875rem; color: var(--g-cinza); }
+.g-ht-op-c { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: var(--g-carta-2); }
+.g-ht-op-l { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; padding: 10px; border-radius: 12px; background: var(--g-carta); border: 1px solid var(--g-linha); }
+.g-ht-op-l .campos { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.g-ht-portes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 720px) { .g-ht-portes { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* filtro de período das reservas */
+.g-ht-filtro { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.g-ht-filtro .g-input { width: auto; min-height: 40px; padding: 6px 10px; }
+
+/* feriados e dias fechados (Meu pet shop) */
+.g-ht-fer-novo { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 480px) { .g-ht-fer-novo { grid-template-columns: minmax(150px, 190px) minmax(0, 1fr); } }
+.g-ht-fer-lista { display: grid; }
+.g-ht-fer { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; padding: 10px 0; border-bottom: 1px solid var(--g-linha); }
+.g-ht-fer:last-child { border-bottom: 0; }
+.g-ht-fer .q { flex: 1 1 100%; min-width: 0; display: grid; }
+@media (min-width: 560px) { .g-ht-fer .q { flex: 1 1 150px; } }
+.g-ht-fer .q small { font-weight: 600; color: var(--g-cinza); text-transform: uppercase; font-size: .6875rem; letter-spacing: .04em; }
+.g-ht-fer .q span { font-size: .875rem; color: var(--g-cinza); overflow-wrap: anywhere; }
+.g-ht-fer .g-check { min-height: 44px; }
+.g-ht-fer .g-ico { margin-left: auto; }
+/* dia fechado: aviso na reserva, na agenda e no calendário de ocupação */
+.g-ht-fechado { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--g-amarelo-tint); color: #5b4708; font-size: .9375rem; }
+.g-ht-fechado svg { width: 18px; height: 18px; flex: none; }
+.g-ht-dia .fer { font-size: .6875rem; font-weight: 600; color: #7a4310; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* taxa de busca fora do horário: a pessoa decide antes de fechar a conta */
+.g-ht-atraso { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--g-amarelo-tint); color: #4a3a06; }
+.g-ht-atraso.ok { background: var(--g-carta-2); color: inherit; }
+.g-ht-atraso p { font-size: .9375rem; }
+/* check-outs para cobrar */
+.g-ht-cobrar { display: grid; gap: 4px; }
+.g-ht-cobrar h3 { display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+.g-ht-cobrar .g-linha { align-items: center; }

@@ -1,3 +1,4 @@
+import type { Database } from "./banco";
 import type { Banco } from "./supabase";
 import { FORMAS } from "./tipos";
 import { brl, horarioDoDia, isoDia } from "./util";
@@ -9,14 +10,60 @@ export type PartePagamento = { forma: FormaPagamento; valor: number };
 /** Nome da categoria dos movimentos de gaveta (sangria e suprimento). */
 export const CATEGORIA_GAVETA = "Movimento de gaveta";
 
-/** Caixa aberto do pet shop (ou null). Só quem vê o financeiro consegue ler. */
-export async function caixaAberto(sb: Banco, petshopId: string) {
+/**
+ * O que cada tela viu por último: havia caixa aberto? Serve para avisar quando o caixa fecha em outro aparelho
+ * enquanto alguém está com uma venda aberta (o valor ficaria fora do caixa sem ninguém perceber).
+ */
+const caixaVisto = new Map<string, string | null>();
+
+async function lerCaixaAberto(sb: Banco, petshopId: string) {
   const { data } = await sb.from("caixas").select("*").eq("petshop_id", petshopId).is("fechado_em", null).maybeSingle();
   return data;
 }
 
+/** Caixa aberto do pet shop (ou null). Só quem recebe consegue ler. Guarda o que viu, para `conferirCaixa`. */
+export async function caixaAberto(sb: Banco, petshopId: string) {
+  const data = await lerCaixaAberto(sb, petshopId);
+  caixaVisto.set(petshopId, data?.id ?? null);
+  return data;
+}
+
+/** A tela de Caixa avisa o que mostrou (caixa aberto ou fechado). */
+export const lembrarCaixa = (petshopId: string, caixaId: string | null) => { caixaVisto.set(petshopId, caixaId); };
+
+type Perguntar = (p: { titulo: string; texto?: string; confirmar?: string; perigo?: boolean }) => Promise<boolean>;
+
+/**
+ * Antes de gravar dinheiro de hoje: se a tela foi aberta com o caixa aberto e ele fechou nesse meio tempo, pergunta.
+ * Devolve false quando a pessoa preferiu voltar (para abrir um caixa novo antes).
+ * Chame antes de `lancarPago` em toda tela que recebe, e antes de gravar qualquer outra coisa da mesma operação.
+ */
+export async function conferirCaixa(sb: Banco, petshopId: string, perguntar: Perguntar) {
+  const antes = caixaVisto.get(petshopId);
+  const agora = await lerCaixaAberto(sb, petshopId);
+  if (antes && !agora) {
+    const sim = await perguntar({
+      titulo: "O caixa foi fechado há pouco",
+      texto: "Este valor fica fora do caixa: conta no dia, mas não entra na conferência da gaveta. Para ele entrar, volte, abra um caixa novo na tela Caixa e lance de novo.",
+      confirmar: "Lançar fora do caixa",
+    });
+    if (!sim) return false;
+  }
+  caixaVisto.set(petshopId, agora?.id ?? null);
+  return true;
+}
+
+/** A partir deste valor, as telas pedem para conferir antes de gravar (um zero a mais é fácil de digitar). */
+export const VALOR_PARA_CONFERIR = 10000;
+/** "Confere? R$ 12.000,00": devolve false quando a pessoa quer corrigir. Abaixo de R$ 10.000,00 não pergunta. */
+export async function conferirValorAlto(valor: number | null | undefined, perguntar: Perguntar) {
+  if (valor == null || valor < VALOR_PARA_CONFERIR) return true;
+  return perguntar({ titulo: `Confere? ${brl(valor)}`, texto: "É um valor alto. Se digitou um número a mais, volte e corrija.", confirmar: "Está certo" });
+}
+
 /** Uma linha de uma venda ou comanda, como fica guardada em `lancamentos.itens`. `valor` é o preço de uma unidade. */
-export type ItemLancamento = { tipo: "servico" | "produto" | "extra"; nome: string; qtd: number; valor: number; produto_id?: string };
+/** `servico_id`: qual serviço da lista é esta linha (horário com mais de um serviço; sem ele, é o serviço principal do horário). */
+export type ItemLancamento = { tipo: "servico" | "produto" | "extra"; nome: string; qtd: number; valor: number; produto_id?: string; servico_id?: string };
 
 /**
  * Registra dinheiro que já entrou ou saiu hoje. Se houver caixa aberto, o lançamento entra nele.
@@ -32,23 +79,87 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
   movimento?: "sangria" | "suprimento" | null;
   /** Exige caixa aberto (movimentos de gaveta). */
   exigeCaixa?: boolean;
+  /** Chave da operação (`useOperacao`): o banco grava uma vez só; a mesma chave de novo devolve o que já foi gravado. */
+  chave?: string | null;
 }) {
+  const hoje = isoDia(new Date());
   const caixa = await caixaAberto(sb, petshopId);
   if (l.exigeCaixa && !caixa) throw new Error("O caixa não está aberto. Abra o caixa e tente de novo.");
   const { data: u } = await sb.auth.getUser();
   const dividido = l.pagamentos && l.pagamentos.length > 1 ? l.pagamentos : null;
-  const { data, error } = await sb.from("lancamentos").insert({
+  const linha = {
     petshop_id: petshopId, tipo: l.tipo, valor: l.valor, forma: l.forma, categoria: l.categoria, descricao: l.descricao ?? null,
-    data: l.data ?? isoDia(new Date()), pago: true, caixa_id: caixa?.id ?? null,
+    data: l.data ?? hoje, pago: true, caixa_id: caixa?.id ?? null,
     agendamento_id: l.agendamentoId ?? null, cliente_id: l.clienteId ?? null, origem: l.origem ?? "tela", criado_por: u.user?.id ?? null,
     ...(l.itens?.length ? { itens: l.itens } : {}),
     ...(dividido ? { pagamentos: dividido } : {}),
     ...(l.movimento ? { movimento: l.movimento } : {}),
-  }).select().single();
+  };
+  const { data, error } = await gravarLancamento(sb, petshopId, linha, l.chave);
   // outra pessoa recebeu este atendimento no mesmo instante: o banco aceita só um recebimento por atendimento
   if (error?.code === "23505") throw new Error("Este atendimento já tem recebimento lançado. Atualize a tela para ver.");
+  // quem só opera o caixa lança o dinheiro de hoje; outro dia é com quem cuida do financeiro
+  if (error && /row-level security/i.test(error.message) && l.data && l.data !== hoje) throw new Error("Só quem cuida do financeiro lança um valor em outro dia. Lance com a data de hoje ou peça para o dono.");
   if (error) throw new Error(error.message);
-  return data;
+  return data!;
+}
+
+/* ---------- uma vez só: a chave da operação ---------- */
+
+/** Uma chave nova de operação (aleatória). Nas telas, use `useOperacao()` (src/lib/gestao/uma-vez.ts), que já cuida disso. */
+export function novaChaveDeOperacao(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  } catch { /* segue para o plano B */ }
+  const h = (n: number) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  return `${h(8)}-${h(4)}-4${h(3)}-a${h(3)}-${h(12)}`;
+}
+
+/** A chave de uma das gravações de uma operação: "chave:estoque:idDoProduto". Sem chave, devolve undefined. */
+export const parteDaChave = (chave: string | null | undefined, ...partes: (string | number)[]) => (chave ? [chave, ...partes].join(":") : undefined);
+
+type LinhaLancamento = Database["public"]["Tables"]["lancamentos"]["Insert"];
+type LancamentoGravado = Database["public"]["Tables"]["lancamentos"]["Row"];
+
+/**
+ * Grava um lançamento. Com `chave`, grava uma vez só: se a mesma chave já foi gravada neste pet shop (toque duplo,
+ * internet que repetiu o pedido), devolve o lançamento da primeira vez, sem erro.
+ */
+export async function gravarLancamento(sb: Banco, petshopId: string, linha: LinhaLancamento, chave?: string | null):
+  Promise<{ data: LancamentoGravado; error: null } | { data: null; error: { code?: string; message: string } }> {
+  if (!chave) {
+    const r = await sb.from("lancamentos").insert(linha).select().single();
+    return r.error || !r.data ? { data: null, error: r.error ?? { message: "Não deu para gravar. Tente de novo." } } : { data: r.data, error: null };
+  }
+  const r = await sb.from("lancamentos").upsert({ ...linha, chave }, { onConflict: "petshop_id,chave", ignoreDuplicates: true }).select();
+  if (!r.error && r.data?.length) return { data: r.data[0], error: null };
+  // nada gravado (a chave já existia) ou esbarrou em outra trava do banco: se a primeira gravação está lá, é ela que vale
+  if (!r.error || r.error.code === "23505") {
+    const ja = await sb.from("lancamentos").select().eq("petshop_id", petshopId).eq("chave", chave).maybeSingle();
+    if (ja.data) return { data: ja.data, error: null };
+  }
+  return { data: null, error: r.error ?? { message: "Não deu para gravar. Tente de novo." } };
+}
+
+type LinhaMovimento = Database["public"]["Tables"]["movimentos_estoque"]["Insert"];
+
+/**
+ * Grava movimentos de estoque. Linha com `chave` é gravada uma vez só: a mesma chave de novo não mexe no saldo outra vez.
+ * Devolve o id de cada movimento (os da primeira gravação, quando a chave já existia), na ordem das linhas com chave.
+ */
+export async function gravarMovimentos(sb: Banco, petshopId: string, linhas: LinhaMovimento[]): Promise<{ id: string; chave: string | null }[]> {
+  if (!linhas.length) return [];
+  if (linhas.some((l) => !l.chave)) {
+    const r = await sb.from("movimentos_estoque").insert(linhas).select("id, chave");
+    if (r.error) throw new Error(r.error.message);
+    return r.data ?? [];
+  }
+  const r = await sb.from("movimentos_estoque").upsert(linhas, { onConflict: "petshop_id,chave", ignoreDuplicates: true }).select("id, chave");
+  if (r.error) throw new Error(r.error.message);
+  if ((r.data?.length ?? 0) === linhas.length) return r.data ?? [];
+  const ja = await sb.from("movimentos_estoque").select("id, chave").eq("petshop_id", petshopId).in("chave", linhas.map((l) => l.chave!));
+  if (ja.error) throw new Error(ja.error.message);
+  return ja.data ?? [];
 }
 
 /**
@@ -58,17 +169,19 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
 export async function lancarAReceber(sb: Banco, petshopId: string, l: {
   valor: number; vencimento: string; categoria: string; descricao?: string | null; agendamentoId?: string | null; clienteId?: string | null;
   itens?: ItemLancamento[] | null;
+  /** Chave da operação: grava uma vez só (veja `lancarPago`). */
+  chave?: string | null;
 }) {
   const { data: u } = await sb.auth.getUser();
-  const { data, error } = await sb.from("lancamentos").insert({
+  const { data, error } = await gravarLancamento(sb, petshopId, {
     petshop_id: petshopId, tipo: "entrada", valor: l.valor, forma: null, categoria: l.categoria, descricao: l.descricao ?? null,
     data: l.vencimento, vencimento: l.vencimento, pago: false,
     agendamento_id: l.agendamentoId ?? null, cliente_id: l.clienteId ?? null, origem: "tela", criado_por: u.user?.id ?? null,
     ...(l.itens?.length ? { itens: l.itens } : {}),
-  }).select().single();
+  }, l.chave);
   if (error?.code === "23505") throw new Error("Este atendimento já tem recebimento lançado. Atualize a tela para ver.");
   if (error) throw new Error(error.message);
-  return data;
+  return data!;
 }
 
 const centavos = (n: number) => Math.round(n * 100) / 100;
@@ -138,6 +251,7 @@ export function itensDoLancamento(l: { itens?: unknown } | null | undefined): It
     itens.push({
       tipo, nome: typeof i.nome === "string" && i.nome.trim() ? i.nome.trim() : "Item", qtd, valor,
       ...(typeof i.produto_id === "string" && i.produto_id ? { produto_id: i.produto_id } : {}),
+      ...(tipo === "servico" && typeof i.servico_id === "string" && i.servico_id ? { servico_id: i.servico_id } : {}),
     });
   }
   return itens;
@@ -251,4 +365,92 @@ export function percentuaisQueFecham(valores: number[]): number[] {
   const ordem = exatos.map((v, i) => ({ i, resto: v - Math.floor(v) })).sort((a, b) => b.resto - a.resto);
   for (const o of ordem) { if (falta <= 0) break; pct[o.i]++; falta--; }
   return pct;
+}
+
+/* ---------- receber uma conta (inteira ou uma parte) ---------- */
+
+/** O último valor contado ao fechar um caixa: é a sugestão de troco quando o próximo caixa abre. */
+export async function ultimoContado(sb: Banco, petshopId: string): Promise<number | null> {
+  const { data } = await sb.from("caixas").select("valor_contado").eq("petshop_id", petshopId).not("fechado_em", "is", null)
+    .order("fechado_em", { ascending: false }).limit(1).maybeSingle();
+  return data?.valor_contado == null ? null : Number(data.valor_contado);
+}
+
+/** O que o banco responde ao receber uma conta. */
+export type ContaRecebida = { quitada: boolean; recebido: number; falta: number; no_caixa: boolean };
+
+/**
+ * Recebe uma conta que um cliente ficou de pagar: inteira ou só uma parte. O banco faz tudo numa operação só:
+ * a parte recebida vira uma entrada paga (no caixa aberto, se foi hoje) e a conta fica com o que falta.
+ * `multa`: multa e juros que o cliente pagou junto; entra separado, na categoria "Multa e juros".
+ */
+export async function receberConta(sb: Banco, contaId: string, r: {
+  valor: number; forma: FormaPagamento; pagamentos?: PartePagamento[] | null; data?: string | null; novoVencimento?: string | null;
+  multa?: { valor: number; forma: FormaPagamento; pagamentos?: PartePagamento[] | null } | null;
+  /** Chave da operação: o banco recebe uma vez só; a mesma chave de novo devolve o que já foi recebido. */
+  chave?: string | null;
+}): Promise<ContaRecebida> {
+  const { data, error } = await sb.rpc("receber_conta", {
+    p_conta: contaId, p_valor: r.valor, p_forma: r.forma,
+    ...(r.pagamentos && r.pagamentos.length > 1 ? { p_pagamentos: r.pagamentos } : {}),
+    ...(r.data ? { p_data: r.data } : {}),
+    ...(r.novoVencimento ? { p_novo_vencimento: r.novoVencimento } : {}),
+    ...(r.multa && r.multa.valor > 0 ? {
+      p_multa: r.multa.valor, p_multa_forma: r.multa.forma,
+      ...(r.multa.pagamentos && r.multa.pagamentos.length > 1 ? { p_multa_pagamentos: r.multa.pagamentos } : {}),
+    } : {}),
+    ...(r.chave ? { p_chave: r.chave } : {}),
+  });
+  if (error) throw new Error(error.message);
+  const x = (data ?? {}) as Record<string, unknown>;
+  return { quitada: Boolean(x.quitada), recebido: Number(x.recebido ?? r.valor), falta: Number(x.falta ?? 0), no_caixa: Boolean(x.no_caixa) };
+}
+
+/**
+ * Separa a multa do resto de um pagamento: o cliente paga tudo junto (uma forma ou dividido) e o sistema anota
+ * a multa numa entrada e a conta em outra. No pagamento dividido, a multa sai das últimas partes.
+ */
+export function separarMulta(forma: FormaPagamento, pagamentos: PartePagamento[] | null, multa: number):
+  { conta: { forma: FormaPagamento; pagamentos: PartePagamento[] | null }; multa: { forma: FormaPagamento; pagamentos: PartePagamento[] | null } } {
+  // sem multa (ou com uma forma só) nada é separado: o pagamento dividido da conta segue inteiro, com as suas partes
+  if (!pagamentos || pagamentos.length < 2 || !(multa > 0)) return { conta: { forma, pagamentos: pagamentos && pagamentos.length > 1 ? pagamentos : null }, multa: { forma, pagamentos: null } };
+  const daConta = pagamentos.map((p) => ({ ...p }));
+  const daMulta: PartePagamento[] = [];
+  let falta = centavos(multa);
+  for (let i = daConta.length - 1; i >= 0 && falta > 0; i--) {
+    const tira = Math.min(falta, daConta[i].valor);
+    daConta[i].valor = centavos(daConta[i].valor - tira);
+    daMulta.unshift({ forma: daConta[i].forma, valor: tira });
+    falta = centavos(falta - tira);
+  }
+  const limpa = (l: PartePagamento[]) => l.filter((p) => p.valor > 0);
+  const c = limpa(daConta), m = limpa(daMulta);
+  const fecha = (l: PartePagamento[]) => ({ forma: l.length ? formaPrincipal(l) : forma, pagamentos: l.length > 1 ? l : null });
+  return { conta: fecha(c), multa: fecha(m) };
+}
+
+/* ---------- quitar de uma vez uma conta que estava em A receber ---------- */
+
+/**
+ * Quita uma conta a receber (o que falta dela), pelo mesmo caminho protegido de `receberConta` (o banco confere quem pode,
+ * põe no caixa aberto e mantém o histórico). Lança erro quando a conta já tinha sido baixada.
+ * `esperado`: quanto a tela mostrou que faltava. Se outra pessoa recebeu uma parte nesse meio tempo, para em vez de
+ * receber um valor diferente do que foi combinado no balcão.
+ * Usada pela conta do hotel (sinal e pendências recebidas junto).
+ */
+export async function quitarConta(sb: Banco, petshopId: string, contaId: string, pg: { forma: FormaPagamento; pagamentos?: PartePagamento[] | null }, esperado?: number, chave?: string | null) {
+  const c = await sb.from("lancamentos").select("id, valor, pago").eq("id", contaId).eq("petshop_id", petshopId).maybeSingle();
+  if (c.error) throw new Error(c.error.message);
+  if (!c.data) throw new Error("Esta conta já tinha sido baixada.");
+  if (c.data.pago) {
+    // a mesma operação de novo (toque duplo): o banco reconhece a chave e devolve o que já foi feito
+    if (chave) { await receberConta(sb, contaId, { valor: Number(c.data.valor), forma: pg.forma, chave }); return c.data; }
+    throw new Error("Esta conta já tinha sido baixada.");
+  }
+  const falta = Number(c.data.valor);
+  if (esperado != null && centavos(esperado) !== centavos(falta)) {
+    throw new Error(`Esta conta mudou enquanto a tela estava aberta: agora faltam ${falta.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}. Atualize e receba de novo.`);
+  }
+  await receberConta(sb, contaId, { valor: falta, forma: pg.forma, pagamentos: pg.pagamentos ?? null, chave });
+  return c.data;
 }

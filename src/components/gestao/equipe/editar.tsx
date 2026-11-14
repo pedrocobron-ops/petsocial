@@ -237,7 +237,7 @@ export default function EditarPessoa({ pessoa, foco, aoFechar }: { pessoa: Profi
               <div className="g-eq-estado espera">
                 <i className="g-eq-estado-i" aria-hidden><Hourglass /></i>
                 <p className="g-eq-estado-t">
-                  <b>Convite enviado, esperando criar a conta</b>
+                  <b>Convite criado: falta a pessoa criar a conta</b>
                   <small>{pessoa.email_convite} · já ocupa 1 acesso do plano</small>
                 </p>
               </div>

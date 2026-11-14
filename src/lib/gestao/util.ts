@@ -65,15 +65,46 @@ export function saudacao(d = new Date()) {
 }
 
 export const soDigitos = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
+
+/**
+ * Telefone como o sistema guarda: só DDD + número (10 ou 11 algarismos).
+ * Tira o código do país ("+55", "55") e o zero da frente ("021…"). A mesma regra vale no banco
+ * (função `telefone_limpo`), na planilha, nos formulários e na hora de comparar dois números.
+ * Número que continua fora do tamanho volta só com os algarismos, para a tela poder mostrar e pedir conserto.
+ */
+export function telefoneLimpo(s: string | null | undefined) {
+  let d = soDigitos(s).replace(/^0+/, "");
+  if ((d.length === 12 || d.length === 13) && d.startsWith("55")) d = d.slice(2).replace(/^0+/, "");
+  return d;
+}
+/** DDD + número de verdade: 10 ou 11 algarismos, DDD sem zero e, com 11, o nono dígito. */
+const foneCerto = (d: string) => (d.length === 10 || (d.length === 11 && d[2] === "9")) && d[0] !== "0" && d[1] !== "0";
+/**
+ * Lê o que veio numa célula ou num campo: devolve o primeiro telefone válido (já limpo) e avisa se havia mais de um.
+ * `incompleto` é quando havia algo escrito e nenhum número serviu.
+ */
+export function lerTelefone(s: string | null | undefined): { fone: string | null; tinhaOutro: boolean; incompleto: boolean } {
+  const bruto = (s ?? "").trim();
+  if (!soDigitos(bruto)) return { fone: null, tinhaOutro: false, incompleto: false };
+  const inteiro = telefoneLimpo(bruto);
+  if (foneCerto(inteiro)) return { fone: inteiro, tinhaOutro: false, incompleto: false };
+  const partes = bruto.split(/[\/;,|]|\s+(?:ou|e)\s+|\s{2,}/i).map(telefoneLimpo).filter(Boolean);
+  const bons = partes.filter(foneCerto);
+  if (bons.length) return { fone: bons[0], tinhaOutro: partes.length > 1, incompleto: false };
+  return { fone: null, tinhaOutro: false, incompleto: true };
+}
+/** Os oito últimos algarismos: é por eles que dois cadastros são "o mesmo telefone" (com ou sem o nono dígito). */
+export const fimDoTelefone = (s: string | null | undefined) => { const d = telefoneLimpo(s); return d.length >= 10 ? d.slice(-8) : ""; };
+
 export function fmtTelefone(s: string | null | undefined) {
-  const d = soDigitos(s);
+  const d = telefoneLimpo(s);
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
   if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   return s ?? "";
 }
 /** Abre o WhatsApp do aparelho com a mensagem pronta (a pessoa só aperta enviar). */
 export function linkWhatsApp(telefone: string | null | undefined, texto: string) {
-  let d = soDigitos(telefone);
+  let d = telefoneLimpo(telefone);
   if (!d) return null;
   if (d.length <= 11) d = `55${d}`;
   return `https://wa.me/${d}?text=${encodeURIComponent(texto)}`;
@@ -87,6 +118,14 @@ export function precoDoServico(s: Pick<Servico, "preco_p" | "preco_m" | "preco_g
   return doPorte ?? s.preco_p ?? s.preco_m ?? s.preco_g ?? s.preco_gg ?? null;
 }
 
+/** O preço do serviço muda conforme o porte? (dois preços diferentes preenchidos). Só aí vale perguntar o porte antes de marcar. */
+export function precoMudaComPorte(s: Pick<Servico, "preco_p" | "preco_m" | "preco_g" | "preco_gg"> | null | undefined): boolean {
+  if (!s) return false;
+  return new Set([s.preco_p, s.preco_m, s.preco_g, s.preco_gg].filter((v) => v != null).map(Number)).size > 1;
+}
+/** Anotação que acompanha o horário quando a pessoa marca sem saber o porte. */
+export const NOTA_PORTE = "Conferir o porte e o valor na hora.";
+
 /** Lê "1.234,56", "60", "60,5" ou "R$ 60" como número. */
 export function lerValor(s: string): number | null {
   const limpo = s.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");
@@ -98,6 +137,23 @@ export function lerValor(s: string): number | null {
 export function horarioDoDia(horario: unknown, d: Date) {
   const h = (horario as Horario | null)?.[String(d.getDay())];
   return h && h.abre && h.fecha ? h : null;
+}
+
+/**
+ * Almoço do pet shop num dia: vem dentro do dia, em `almoco: { de, ate }` (Meu pet shop > Horário de funcionamento).
+ * Só vale no dia em que o pet shop abre antes e continua aberto depois dele (sábado até as 13h não tem almoço).
+ * Devolve o intervalo em minutos desde 00:00, ou null.
+ */
+export function almocoDoDia(horario: unknown, d: Date) { return almocoNoDiaDaSemana(horario, d.getDay()); }
+/** O mesmo, pelo número do dia da semana (0 = domingo), para quem faz a conta fora do fuso do navegador. */
+export function almocoNoDiaDaSemana(horario: unknown, diaDaSemana: number): { inicio: number; fim: number; de: string; ate: string } | null {
+  const dia = (horario as Horario | null)?.[String(diaDaSemana)];
+  const a = dia?.almoco;
+  if (!dia || !dia.abre || !dia.fecha || !a || typeof a.de !== "string" || typeof a.ate !== "string") return null;
+  const min = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); };
+  const inicio = min(a.de), fim = min(a.ate);
+  if (!(fim > inicio) || min(dia.abre) >= inicio || min(dia.fecha) <= fim) return null;
+  return { inicio, fim, de: a.de.slice(0, 5), ate: a.ate.slice(0, 5) };
 }
 
 export const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
@@ -117,12 +173,10 @@ export const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "
 
 export const ERRO_TELEFONE = "Confira o WhatsApp: DDD e número.";
 /** Vazio vale; preenchido precisa ter DDD + número (10 ou 11 dígitos). */
-export const telefoneValido = (s: string | null | undefined) => { const d = soDigitos(s); return d.length === 0 || d.length === 10 || d.length === 11; };
+export const telefoneValido = (s: string | null | undefined) => { const d = telefoneLimpo(s); return d.length === 0 || d.length === 10 || d.length === 11; };
 /** Formata enquanto a pessoa digita: "(35) 99999-1234". Letras e sobras são descartadas. */
 export function mascaraTelefone(s: string | null | undefined) {
-  let d = soDigitos(s);
-  if (d.length > 11 && d.startsWith("55")) d = d.slice(2); // colou com o código do país
-  d = d.slice(0, 11);
+  const d = telefoneLimpo(s).slice(0, 11); // colou com +55 ou com o zero na frente: fica só DDD + número
   if (d.length <= 2) return d.length ? `(${d}` : "";
   if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
   if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;

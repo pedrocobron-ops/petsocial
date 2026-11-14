@@ -1,14 +1,24 @@
 "use client";
 
+import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
+
 import { abrirGuia } from "@/components/gestao/guia-inicial";
 import Identidade from "@/components/gestao/ajustes/identidade";
 import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
 import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
+import OpcoesDeCobranca from "@/components/gestao/ajustes/opcoes-cobranca";
+import OpcoesCasa from "@/components/gestao/ajustes/opcoes-casa";
+import OpcoesHotel from "@/components/gestao/ajustes/opcoes-hotel";
+import OpcoesDoLink from "@/components/gestao/ajustes/opcoes-link";
+import Feriados from "@/components/gestao/ajustes/feriados";
 import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
+import OpcoesDaLoja from "@/components/gestao/ajustes/opcoes-loja";
 import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
-import { useState } from "react";
-import { CalendarDays, Check, Clock, Copy, ExternalLink, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
+import { textoDoLink } from "@/lib/gestao/agenda";
+import { useEffect, useRef, useState } from "react";
+import { Archive, BedDouble, CalendarDays, Check, ChevronDown, Clock, Copy, ExternalLink, HandCoins, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
+import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import { Kpi, Tile } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
 import { Campo, CampoValor, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
@@ -47,6 +57,16 @@ export default function MeuPetshop() {
   const salvo = lerHorario(petshop.horario);
   const abertos = ORDEM_DIAS.filter((d) => salvo[d]).length;
   const deHoje = salvo[String(new Date().getDay())];
+  // os atalhos do alto: um por grupo que este pet shop vê
+  const grupos = [
+    { id: "servicos", titulo: "Serviços e preços" },
+    { id: "agenda", titulo: "Agenda e link" },
+    ...(usaCasa(petshop) ? [{ id: "casa", titulo: "Creche e hotel" }] : []),
+    ...(usaModulo(petshop, "loja") ? [{ id: "loja", titulo: "Loja" }] : []),
+    { id: "dinheiro", titulo: "Cobrança e fidelidade" },
+    { id: "negocio", titulo: "O negócio" },
+    { id: "copia", titulo: "Cópia de segurança" },
+  ];
   return (
     <>
       <header className="g-topo">
@@ -63,24 +83,96 @@ export default function MeuPetshop() {
           <Kpi icone={CalendarDays} tom="ceu" rotulo="Dias abertos" valor={abertos} apoio="por semana" />
           <Kpi icone={Clock} tom="lilas" rotulo="Hoje" valor={deHoje ? `${horaCurta(deHoje.abre)}–${horaCurta(deHoje.fecha)}` : "Fechado"} apoio={deHoje ? "horário de hoje" : "sem atendimento"} />
         </div>
-        <OQueUsa />
-        <div className="g-duas meio">
-          <div className="g-pilha g">
-            <Dados />
-            <HorarioDaLoja />
-            {usaModulo(petshop, "banho_tosa") && <VagasBanho />}
-            {usaCasa(petshop) && <AjustesCrecheHotel />}
-          </div>
-          <div className="g-pilha g">
-            <Identidade />
-            <LinkAgendamento />
-            <AjusteFidelidade />
-            <Servicos />
-          </div>
-        </div>
-        <CopiaSeguranca />
+        <nav className="g-mp-atalhos" aria-label="Ir direto para">
+          <span className="g-muted g-pp">Ir direto para</span>
+          {grupos.map((g) => <button key={g.id} type="button" className="g-chip" onClick={() => irParaGrupo(g.id)}>{g.titulo}</button>)}
+        </nav>
+        <Grupo id="servicos" titulo="Serviços e horário" icone={Scissors} tom="pessego" abertoDeInicio
+          cartoes={[["Serviços e preços", <Servicos key="s" />], ["Horário de funcionamento", <HorarioDaLoja key="h" />], ["Feriados e dias fechados", <Feriados key="f" />]]} />
+        <Grupo id="agenda" titulo="Agenda e link do cliente" icone={Link2} tom="ceu"
+          cartoes={[usaModulo(petshop, "banho_tosa") && ["Banho e tosa: pets ao mesmo tempo", <VagasBanho key="v" />], ["Link de agendamento", <LinkAgendamento key="l" />], ["Regras e cancelamento pelo link", <OpcoesDoLink key="o" />]]} />
+        {usaCasa(petshop) && (
+          <Grupo id="casa" titulo="Creche e hotel" icone={BedDouble} tom="lilas"
+            cartoes={[["Creche e hotel", <AjustesCrecheHotel key="a" />], ["Opções do hotel e da creche", <OpcoesHotel key="h" />], ["Cuidado com o tutor", <OpcoesCasa key="c" />]]} />
+        )}
+        {usaModulo(petshop, "loja") && <Grupo id="loja" titulo="Loja" icone={Store} tom="manteiga" cartoes={[["Opções da loja", <OpcoesDaLoja key="l" />]]} />}
+        <Grupo id="dinheiro" titulo="Cobrança e fidelidade" icone={HandCoins} tom="menta"
+          cartoes={[["Opções de cobrança", <OpcoesDeCobranca key="c" />], ["Fidelidade", <AjusteFidelidade key="f" />]]} />
+        <Grupo id="negocio" titulo="O negócio" icone={Store} tom="rosa"
+          cartoes={[["Dados", <Dados key="d" />], ["O que você usa", <OQueUsa key="o" />], ["Identidade do pet shop", <Identidade key="i" />]]} />
+        <Grupo id="copia" titulo="Cópia de segurança" icone={Archive} tom="ceu" largo cartoes={[["Cópia de segurança", <CopiaSeguranca key="c" />]]} />
       </div>
     </>
+  );
+}
+
+/* ---------- grupos de cartões ---------- */
+
+const EVENTO_GRUPO = "gestao:mp-grupo";
+/** Abre o grupo (se estiver fechado) e leva a tela até ele, ou até um cartão dele. */
+const irParaGrupo = (id: string, cartao?: number) => window.dispatchEvent(new CustomEvent(EVENTO_GRUPO, { detail: { id, cartao } }));
+
+/**
+ * Um grupo de cartões de Meu pet shop, que abre e fecha. Só o primeiro começa aberto; o aparelho lembra o que a pessoa
+ * deixou aberto. Fechado, o grupo mostra o nome de cada cartão: um toque no nome abre o grupo e desce até o cartão.
+ * Os cartões continuam na página mesmo com o grupo fechado: um atalho de outra tela (#opcoes-cobranca, #opcoes-hotel…)
+ * abre o grupo certo e desce até o cartão.
+ */
+function Grupo({ id, titulo, icone, tom, abertoDeInicio, largo, cartoes }: {
+  id: string; titulo: string; icone: React.ComponentProps<typeof Tile>["icone"]; tom: React.ComponentProps<typeof Tile>["tom"];
+  abertoDeInicio?: boolean; largo?: boolean; cartoes: (false | [string, React.ReactNode])[];
+}) {
+  const lista = cartoes.filter((c): c is [string, React.ReactNode] => Boolean(c));
+  const chave = `maestro:mp-grupo:${id}`;
+  const [aberto, setAberto] = useState(Boolean(abertoDeInicio));
+  const raiz = useRef<HTMLElement>(null);
+  const mudar = (v: boolean) => { setAberto(v); guardarLembrado(chave, v ? "1" : "0"); };
+  useEffect(() => {
+    const lembrado = lerLembrado(chave);
+    if (lembrado) setAberto(lembrado === "1");
+    // atalho de outra tela para um cartão daqui de dentro (#opcoes-cobranca…): o cartão pode demorar um instante para aparecer
+    let procurar = 0;
+    const pelaAncora = () => {
+      const ancora = window.location.hash.length > 1 ? decodeURIComponent(window.location.hash.slice(1)) : "";
+      if (!ancora) return;
+      let tentativas = 0;
+      window.clearInterval(procurar);
+      procurar = window.setInterval(() => {
+        const alvo = raiz.current?.querySelector(`#${CSS.escape(ancora)}`);
+        if (alvo) { setAberto(true); window.setTimeout(() => alvo.scrollIntoView({ block: "start" }), 80); }
+        if (alvo || ++tentativas > 25) window.clearInterval(procurar);
+      }, 150);
+    };
+    pelaAncora();
+    window.addEventListener("hashchange", pelaAncora);
+    const ir = (e: Event) => {
+      const d = (e as CustomEvent<{ id: string; cartao?: number }>).detail;
+      if (d.id !== id) return;
+      setAberto(true);
+      guardarLembrado(chave, "1");
+      window.setTimeout(() => (d.cartao == null ? raiz.current : raiz.current?.querySelector(`[data-cartao="${d.cartao}"]`) ?? raiz.current)?.scrollIntoView({ block: "start" }), 60);
+    };
+    window.addEventListener(EVENTO_GRUPO, ir);
+    return () => { window.removeEventListener(EVENTO_GRUPO, ir); window.removeEventListener("hashchange", pelaAncora); window.clearInterval(procurar); };
+  }, [id, chave]);
+  return (
+    <section className={`g-mp-grupo${aberto ? " aberto" : ""}`} id={`grupo-${id}`} ref={raiz} aria-label={titulo}>
+      <div className="g-mp-grupo-t">
+        <button type="button" className="g-mp-grupo-b" aria-expanded={aberto} aria-controls={`grupo-${id}-corpo`} onClick={() => mudar(!aberto)}>
+          <Tile icone={icone} tom={tom} tamanho="p" />
+          <span className="t"><b>{titulo}</b>{aberto && lista.length > 1 && <small>{lista.length} cartões</small>}</span>
+          <span className="g-mp-grupo-acao">{aberto ? "Fechar" : "Abrir"}<ChevronDown aria-hidden /></span>
+        </button>
+        {!aberto && (
+          <div className="g-mp-grupo-nomes">
+            {lista.map(([nome], i) => <button key={nome} type="button" className="g-chip" onClick={() => irParaGrupo(id, i)}>{nome}</button>)}
+          </div>
+        )}
+      </div>
+      <div className={`g-mp-grupo-corpo${largo ? " largo" : ""}`} id={`grupo-${id}-corpo`} hidden={!aberto}>
+        {lista.map(([nome, cartao], i) => <div key={nome} data-cartao={i} className="g-mp-cartao">{cartao}</div>)}
+      </div>
+    </section>
   );
 }
 
@@ -153,7 +245,7 @@ function LinkAgendamento() {
   const semServico = !servicos.some((s) => s.ativo && !["creche", "hotel"].includes(s.categoria));
   const semDia = !ORDEM_DIAS.some((d) => lerHorario(petshop.horario)[d]);
   const mudouAviso = aviso.trim() !== (petshop.link_aviso ?? "");
-  const zap = `https://wa.me/?text=${encodeURIComponent(`Agora dá para pedir horário no ${petshop.nome} pelo celular. Escolha o serviço, o dia e a hora, e a gente confirma por aqui: ${endereco}`)}`;
+  const zap = `https://wa.me/?text=${encodeURIComponent(textoDoLink(petshop, endereco))}`;
 
   async function ligar(valor: boolean) {
     if (somenteLeitura() || ligando) return;
@@ -189,8 +281,8 @@ function LinkAgendamento() {
     <section className={`g-card g-pilha g-mp-link${ativo ? " on" : ""}`}>
       <div className="g-mp-t">
         <Tile icone={Link2} tom="pessego" />
-        <div><h2>Link de agendamento</h2><p className="g-muted g-p">O cliente pede o horário pelo celular. Você aceita ou recusa.</p></div>
-        <button type="button" role="switch" aria-checked={ativo} aria-label="Link de agendamento ligado" className="g-mp-chave" disabled={ligando} onClick={() => void ligar(!ativo)}><i /></button>
+        <div><h2>Link de agendamento</h2><p className="g-muted g-p">{usaCasa(petshop) ? "O cliente pede horário ou vaga pelo celular. Você aceita ou recusa." : "O cliente pede o horário pelo celular. Você aceita ou recusa."}</p></div>
+        <button type="button" role="switch" aria-checked={ativo} aria-label="Link de agendamento" className="g-mp-chave" disabled={ligando} onClick={() => void ligar(!ativo)}><i /></button>
       </div>
 
       {ativo ? (
@@ -204,8 +296,14 @@ function LinkAgendamento() {
             <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar no WhatsApp</a>
           </div>
           {(semServico || semDia) && (
-            <p className="g-mp-link-falta">{semServico ? "Nenhum serviço da agenda está ativo, então o link abre sem opções. Creche e hotel não entram no link." : "Nenhum dia está aberto no horário de funcionamento, então o link não mostra horários."}</p>
+            <p className="g-mp-link-falta">{semServico
+              ? (usaCasa(petshop) && (petshop.link_creche || petshop.link_hotel)
+                ? `Nenhum serviço da agenda está ativo: pelo link, o cliente pede só vaga ${[petshop.link_creche && "na creche", petshop.link_hotel && "no hotel"].filter(Boolean).join(" ou ")}.`
+                : usaCasa(petshop) ? "Nenhum serviço da agenda está ativo e os pedidos de creche e hotel estão desligados, então o link abre sem opções. Marque abaixo o que o cliente pode pedir."
+                : "Nenhum serviço da agenda está ativo, então o link abre sem opções.")
+              : "Nenhum dia está aberto no horário de funcionamento, então o link não mostra horários."}</p>
           )}
+          <LinkCrecheHotel />
         </>
       ) : (
         <p className="g-mp-link-off">O link está desligado. Ligue a chave para receber pedidos de horário. Nada é marcado sem você aceitar.</p>
@@ -259,7 +357,7 @@ function HorarioDaLoja() {
           );
         })}
       </div>
-      <GradeHorario valor={horario} aoMudar={(h) => { setHorario(h); setErro(null); }} />
+      <GradeHorario valor={horario} aoMudar={(h) => { setHorario(h); setErro(null); }} modelos />
       {erro && <p className="g-erro" role="alert">{erro}</p>}
       <div><button className="g-btn verde" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar horário"}</button></div>
     </section>
@@ -387,7 +485,7 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
         <Campo rotulo="Nome"><input className="g-input" value={nome} maxLength={80} placeholder="Banho, Tosa higiênica…" autoFocus={!servico} onChange={(e) => setNome(e.target.value)} /></Campo>
         <Campo rotulo="Tipo">
           <select className="g-select" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-            {CATEGORIAS.map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
+            {CATEGORIAS.filter((c) => (c.id !== "creche" && c.id !== "hotel") || c.id === categoria || usaModulo(petshop, c.id)).map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
           </select>
         </Campo>
         <div className="g-campo">

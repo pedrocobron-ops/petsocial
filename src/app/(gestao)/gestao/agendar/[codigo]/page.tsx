@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import EstadiaPeloLink from "./estadia";
+import EstadiaPeloLink, { type PrecoDoHotel } from "./estadia";
 import { useParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, Cat, Check, Clock, Dog, MapPin, MessageCircle, PawPrint, Plus, Scissors, Sun, X } from "lucide-react";
 import { Marca, Selo } from "@/components/gestao/marca";
@@ -11,6 +11,8 @@ import { PORTES, type Porte } from "@/lib/gestao/tipos";
 import { brlCurto, deIsoDia, fmtTelefone, horarioDoDia, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, nomeMes, soDigitos, somaDias } from "@/lib/gestao/util";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { aplicarTema } from "@/lib/gestao/identidade";
+import { lembrarPedido } from "@/lib/gestao/link-opcoes";
+import { AceiteDosTermos, PedidosDesteAparelho, SEM_ACEITE, faltaAceitar, pedirPeloLink, useTermosDoLink } from "./termos";
 import "./agendar.css";
 
 type ServicoDoLink = {
@@ -115,7 +117,17 @@ export default function AgendarPeloLink() {
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState<Enviado | null>(null);
   const qtd = pets.length;
+  // regras que o tutor aceita antes de enviar (só quando quem recebe o pedido ligou isso)
+  const { termos, recarregarTermos } = useTermosDoLink(codigo);
+  const [aceite, setAceite] = useState(SEM_ACEITE);
+  // nome de quem é o link, para a página dizer com quem falar quando o link está desligado
+  const [nomeDoLink, setNomeDoLink] = useState<string | null>(null);
+  const [lembrados, setLembrados] = useState(0);
 
+  // dias que o negócio marcou como fechados (feriado, folga): o link não oferece horário neles
+  const [fechados, setFechados] = useState<Set<string>>(() => new Set());
+  // o preço do hotel no link: undefined = ainda lendo (não mostra nada); null = banco antes da atualização (mostra a diária comum)
+  const [precoHotel, setPrecoHotel] = useState<PrecoDoHotel | null | undefined>(undefined);
   const carregar = useCallback(async () => {
     setSemRede(false);
     setInfo(undefined);
@@ -125,9 +137,23 @@ export default function AgendarPeloLink() {
     const lido = data as unknown as Info | null;
     setInfo(lido && typeof lido === "object" && lido.nome ? { ...lido, servicos: Array.isArray(lido.servicos) ? lido.servicos : [] } : null);
     aplicarTema(lido && typeof lido === "object" ? lido.tema : null); // as cores do pet shop, não as da Maestro Pet
+    // se a função ainda não existe no banco, segue sem dias fechados (como sempre foi)
+    const f = await banco().rpc("link_fechados", { p_codigo: codigo });
+    setFechados(new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []));
+    if (lido && typeof lido === "object" && lido.hotel) {
+      const o = await banco().rpc("link_hotel_opcoes", { p_codigo: codigo });
+      const preco = (o.data as { preco?: PrecoDoHotel } | null)?.preco;
+      setPrecoHotel(preco && typeof preco === "object" ? preco : null);
+    }
   }, [codigo]);
   useEffect(() => { void carregar(); }, [carregar]);
-  useEffect(() => { if (info?.nome) document.title = `Agendar no ${info.nome}`; }, [info?.nome]);
+  useEffect(() => { if (info?.nome) document.title = `Agendar: ${info.nome}`; }, [info?.nome]);
+  useEffect(() => {
+    if (info !== null || !configurado || !codigo) return;
+    let vale = true;
+    void banco().rpc("link_nome", { p_codigo: codigo }).then(({ data }) => { if (vale && typeof data === "string" && data.trim()) setNomeDoLink(data.trim()); });
+    return () => { vale = false; };
+  }, [info, codigo]);
 
   const servico = info?.servicos.find((s) => s.id === servicoId) ?? null;
   const dias = useMemo(() => {
@@ -135,13 +161,17 @@ export default function AgendarPeloLink() {
     const base = deIsoDia(info.hoje);
     return Array.from({ length: DIAS_NA_FAIXA }, (_, i) => {
       const d = somaDias(base, i);
-      return { iso: isoDia(d), data: d, aberto: !!horarioDoDia(info.horario, d), hoje: i === 0 };
+      return { iso: isoDia(d), data: d, aberto: !!horarioDoDia(info.horario, d) && !fechados.has(isoDia(d)), hoje: i === 0 };
     });
-  }, [info]);
+  }, [info, fechados]);
   const meses = useMemo(() => [...new Set(dias.map((d) => nomeMes(d.data)))].join(" e "), [dias]);
 
   // horários livres do dia escolhido
   const vez = useRef(0);
+  // o dia que a página escolheu sozinha (o primeiro aberto): se ele não tem mais horário (lotado, ou hoje já no fim do dia),
+  // a página pula para o próximo dia aberto, até achar um com horário. Dia que a pessoa escolheu fica onde está.
+  const diaSozinho = useRef(false);
+  const pulos = useRef(0);
   const buscarHorarios = useCallback(async (s: string, d: string, n: number) => {
     const minha = ++vez.current;
     setHorarios(null);
@@ -150,9 +180,14 @@ export default function AgendarPeloLink() {
     if (minha !== vez.current) return;
     if (error) { setErroHorarios(true); setHorarios([]); return; }
     const lista = ((data ?? []) as string[]).map((h) => String(h).slice(0, 5));
+    if (!lista.length && diaSozinho.current && pulos.current < 10) {
+      const proximo = dias.find((x) => x.aberto && x.iso > d);
+      if (proximo) { pulos.current++; setDia(proximo.iso); return; }
+    }
+    diaSozinho.current = false;
     setHorarios(lista);
     setHoraEscolhida((h) => (h && lista.includes(h) ? h : null));
-  }, [codigo]);
+  }, [codigo, dias]);
   useEffect(() => {
     if (passo === "quando" && servicoId && dia) void buscarHorarios(servicoId, dia, qtd);
   }, [passo, servicoId, dia, qtd, buscarHorarios]);
@@ -194,10 +229,11 @@ export default function AgendarPeloLink() {
     setServicoId(id);
     setHoraEscolhida(null);
     setAvisoQuando(null);
-    if (!dia) setDia(dias.find((d) => d.aberto)?.iso ?? null);
+    if (!dia) { diaSozinho.current = true; pulos.current = 0; setDia(dias.find((d) => d.aberto)?.iso ?? null); }
     ir("quando");
   }
   function escolherDia(iso: string) {
+    diaSozinho.current = false;
     setDia(iso);
     setHoraEscolhida(null);
     setAvisoQuando(null);
@@ -213,18 +249,23 @@ export default function AgendarPeloLink() {
     if (lista.some((x) => !x.nome)) return setErro(lista.length > 1 ? "Escreva o nome de cada pet." : "Escreva o nome do pet.");
     if (nomeTutor.length < 2) return setErro("Escreva o seu nome.");
     if (fone.length !== 10 && fone.length !== 11) return setErro("Confira o WhatsApp: DDD e número.");
+    const falta = faltaAceitar(termos, aceite, info.nome);
+    if (falta) return setErro(falta);
     setErro(null);
     setEnviando(true);
-    const { data, error } = await banco().rpc("link_pedir", {
+    const { data, error } = await pedirPeloLink("link_pedir", {
       p_codigo: codigo, p_servico: servico.id, p_dia: dia, p_hora: horaEscolhida, p_tutor: nomeTutor, p_telefone: fone, p_pet: lista[0].nome,
       p_especie: lista[0].especie, p_porte: lista[0].porte ?? undefined, p_obs: obs.trim() || undefined,
       p_outros: lista.length > 1 ? lista.slice(1).map((x) => ({ nome: x.nome, especie: x.especie, porte: x.porte })) : undefined,
-    });
+    }, termos, aceite);
     setEnviando(false);
     if (error) return setErro("Não consegui enviar agora. Confira a internet e tente de novo.");
     const r = data as unknown as { ok: boolean; erro?: string; id?: string } | null;
     if (r?.ok) {
       setEnviado({ id: r.id ?? null, servico: servico.nome, dia, pets: lista.map((x, i) => ({ nome: x.nome, hora: somaMin(horaEscolhida, servico.duracao_min * i) })) });
+      // o endereço de acompanhar fica guardado neste aparelho: recarregar a página não perde o pedido
+      if (r.id) { lembrarPedido(codigo, r.id, `${servico.nome} de ${listaDeNomes(lista.map((x) => x.nome))}`); setLembrados((n) => n + 1); }
+      setAceite(SEM_ACEITE);
       setPasso("enviado");
       window.scrollTo({ top: 0 });
       return;
@@ -235,7 +276,12 @@ export default function AgendarPeloLink() {
       ir("quando");
     } else if (r?.erro === "limite") {
       setLimite(true);
-      setErro(`Não deu para enviar mais um pedido por aqui agora. Fale direto com o ${info.nome}.`);
+      setErro(`Não deu para enviar mais um pedido por aqui agora. Fale direto com ${info.nome}.`);
+    } else if (r?.erro === "termos") {
+      // as regras mudaram entre abrir a página e enviar: mostra o texto novo e pede o aceite de novo
+      await recarregarTermos();
+      setAceite(SEM_ACEITE);
+      setErro(`As regras de ${info.nome} mudaram agora há pouco. Leia de novo e marque para enviar.`);
     } else if (r?.erro === "fechado") {
       setInfo(null);
     } else if (r?.erro === "dados") {
@@ -285,13 +331,14 @@ export default function AgendarPeloLink() {
         <div className="g-lk-fim">
           <Selo tamanho={72} tom="suave" />
           <h1>Este link não está disponível</h1>
-          <p className="g-muted">O pet shop pode ter desligado o agendamento por aqui. Fale direto com ele para marcar o horário.</p>
+          <p className="g-muted">{nomeDoLink ? `${nomeDoLink} não está recebendo pedidos por aqui agora. Fale direto com ${nomeDoLink} para combinar.` : "Quem mandou este link pode ter desligado os pedidos por aqui. Fale direto com quem mandou para combinar."}</p>
+          <PedidosDesteAparelho codigo={codigo} />
         </div>
       </Moldura>
     );
   }
 
-  const zapLoja = linkWhatsApp(info.telefone, `Oi! Quero marcar um horário no ${info.nome}.`);
+  const zapLoja = linkWhatsApp(info.telefone, `Oi! Quero marcar um horário.`);
   const onde = [info.cidade, info.uf].filter(Boolean).join(" · ");
   const manha = (horarios ?? []).filter((h) => h < "12:00");
   const tarde = (horarios ?? []).filter((h) => h >= "12:00");
@@ -311,16 +358,20 @@ export default function AgendarPeloLink() {
             {onde && <p className="g-lk-onde"><MapPin aria-hidden />{onde}</p>}
           </div>
         </div>
-        {passo !== "enviado" && <p className="g-lk-cab-frase">{estadia ? "Peça uma vaga por aqui" : info.creche || info.hotel ? "Peça um horário ou uma vaga por aqui" : "Peça um horário por aqui"}. A confirmação chega pelo seu WhatsApp.</p>}
+        {passo !== "enviado" && <p className="g-lk-cab-frase">{estadia || (!info.servicos.length && (info.creche || info.hotel)) ? "Peça uma vaga por aqui" : info.creche || info.hotel ? "Peça um horário ou uma vaga por aqui" : "Peça um horário por aqui"}. A confirmação chega pelo seu WhatsApp.</p>}
       </header>
 
       {info.aviso && passo !== "enviado" && (
         <p className="g-lk-recado"><MessageCircle aria-hidden /><span>{info.aviso}</span></p>
       )}
 
+      {!estadia && passo === "servico" && <PedidosDesteAparelho codigo={codigo} versao={lembrados} />}
+
       {estadia && (
-        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome}
-          zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"} do ${info.nome}.`)}
+        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} fechados={fechados} horario={info.horario} termos={termos} recarregarTermos={recarregarTermos}
+          aoPedir={() => setLembrados((n) => n + 1)}
+          zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)}
+          preco={estadia === "hotel" ? precoHotel : undefined}
           diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)} />
       )}
 
@@ -350,7 +401,9 @@ export default function AgendarPeloLink() {
               {info.hotel && (
                 <button type="button" className="g-lk-serv" style={{ "--cor": "#7c6bd6" } as React.CSSProperties} onClick={() => setEstadia("hotel")}>
                   <i className="g-lk-serv-cor" aria-hidden><BedDouble /></i>
-                  <span className="g-lk-serv-t"><b>Hotel</b><span>Dormir com a gente{info.hotel.diaria != null && <em>{brlCurto(Number(info.hotel.diaria))} a diária</em>}</span></span>
+                  <span className="g-lk-serv-t"><b>Hotel</b><span>Dormir com a gente{precoHotel === undefined || precoHotel?.mostrar === false ? null
+                    : precoHotel?.de != null ? <em>{precoHotel.ate != null && precoHotel.ate !== precoHotel.de ? "a partir de " : ""}{brlCurto(Number(precoHotel.de))} a diária</em>
+                    : precoHotel === null && info.hotel.diaria != null ? <em>{brlCurto(Number(info.hotel.diaria))} a diária</em> : null}</span></span>
                   <ArrowRight className="g-lk-serv-seta" aria-hidden />
                 </button>
               )}
@@ -360,7 +413,7 @@ export default function AgendarPeloLink() {
             <div className="g-lk-vazio">
               <Scissors aria-hidden />
               <b>Nenhum serviço por aqui ainda</b>
-              <p>Fale direto com o pet shop para marcar o horário.</p>
+              <p>Fale direto com {info.nome} para marcar o horário.</p>
               {zapLoja && <a className="g-btn zap" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Chamar no WhatsApp</a>}
             </div>
           ) : (
@@ -414,7 +467,7 @@ export default function AgendarPeloLink() {
                 </button>
               ))}
             </div>
-            {!dias.some((d) => d.aberto) && <p className="g-muted g-p">O pet shop não abre nos próximos dias. Fale direto com ele.</p>}
+            {!dias.some((d) => d.aberto) && <p className="g-muted g-p">{info.nome} não abre nos próximos dias. Fale direto pelo WhatsApp.</p>}
           </div>
 
           {dia && (
@@ -523,7 +576,7 @@ export default function AgendarPeloLink() {
           </div>
 
           <div className="g-lk-bloco g-form">
-            <h2>Com quem o pet shop fala?</h2>
+            <h2>Com quem a gente fala?</h2>
             <label className="g-campo"><span>Seu nome</span>
               <input className="g-input" value={tutor} maxLength={120} autoComplete="name" onChange={(e) => setTutor(e.target.value)} />
             </label>
@@ -537,6 +590,8 @@ export default function AgendarPeloLink() {
             </label>
           </div>
 
+          <AceiteDosTermos termos={termos} loja={info.nome} pets={qtd} aceite={aceite} aoMudar={(a) => { setAceite(a); setErro(null); }} />
+
           {erro && (
             <div className="g-lk-alerta" role="alert">
               <span>{erro}</span>
@@ -548,7 +603,7 @@ export default function AgendarPeloLink() {
             <button type="button" className="g-btn sec" onClick={() => ir("quando")}><ArrowLeft />Voltar</button>
             <button className="g-btn pri" disabled={enviando}>{enviando ? "Enviando…" : "Enviar pedido"}</button>
           </div>
-          <p className="g-lk-nota">Isto é um pedido. O horário só vale depois que o {info.nome} confirmar.</p>
+          <p className="g-lk-nota">Isto é um pedido. O horário só vale depois que {info.nome} confirmar.</p>
         </form>
       )}
 
@@ -557,7 +612,7 @@ export default function AgendarPeloLink() {
         <section className="g-lk-secao g-lk-ok" aria-live="polite">
           <span className="g-lk-ok-selo" aria-hidden><Check /></span>
           <h2>{enviado.pets.length > 1 ? `Pedido enviado para ${listaDeNomes(enviado.pets.map((x) => x.nome))}.` : "Pedido enviado."}</h2>
-          <p>O {info.nome} confirma com você pelo WhatsApp.</p>
+          <p>{info.nome} confirma com você pelo WhatsApp.</p>
           <dl className="g-lk-resumo">
             <div><dt>Serviço</dt><dd>{enviado.servico}{enviado.pets.length > 1 && <small> para cada pet</small>}</dd></div>
             <div><dt>Dia</dt><dd>{diaPorExtenso(enviado.dia, info.hoje)}</dd></div>
@@ -577,11 +632,11 @@ export default function AgendarPeloLink() {
               </div>
             )}
           </dl>
-          <p className="g-lk-nota">{enviado.pets.length > 1 ? "Os horários ainda não estão marcados. Espere a confirmação do pet shop." : "O horário ainda não está marcado. Espere a confirmação do pet shop."}</p>
+          <p className="g-lk-nota">{enviado.pets.length > 1 ? "Os horários ainda não estão marcados. Espere a confirmação pelo WhatsApp." : "O horário ainda não está marcado. Espere a confirmação pelo WhatsApp."}</p>
           <div className="g-lk-ok-acoes">
             {enviado.id && <a className="g-btn verde" href={`/gestao/agendar/${codigo}/pedido/${enviado.id}`}>Acompanhar o pedido</a>}
             <button type="button" className="g-btn sec" onClick={pedirOutro}>Pedir outro horário</button>
-            {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com o pet shop</a>}
+            {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {info.nome}</a>}
           </div>
         </section>
       )}

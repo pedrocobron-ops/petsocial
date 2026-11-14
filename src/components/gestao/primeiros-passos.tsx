@@ -7,7 +7,14 @@ import { useGestao } from "./contexto";
 import { Tile } from "./painel";
 import { Folha } from "./ui";
 import { abrirLinkDeAgendamento, guardarLembrado, lerLembrado } from "./lembrado";
-import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { frenteDe, nomeDaCasa, usaCasa, usaModulo, type Frente } from "@/lib/gestao/modulos";
+
+/** Com área principal, os passos dela vêm primeiro; das outras áreas marcadas entra só o primeiro passo de cada uma. */
+const ORDEM: Record<Frente, string[]> = {
+  banho: ["precos", "pet", "horario", "concluir", "link", "lembrete", "checkin", "produto"],
+  casa: ["diaria", "pet", "checkin", "horario", "produto"],
+  loja: ["produto", "pet", "horario", "checkin"],
+};
 
 export type DadosDosPassos = { pets: number; horarios: number; concluidos: number; lembretes: number; amanha: number; estadias: number; produtos: number };
 type Passo = {
@@ -31,24 +38,29 @@ export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: ()
   // os passos seguem o que o negócio faz: banho e tosa passa pela agenda; creche e hotel, pelo check-in; loja, pelo estoque
   const banho = usaModulo(petshop, "banho_tosa"), casa = usaCasa(petshop), loja = usaModulo(petshop, "loja");
   const agenda = posso("agenda") && banho;
-  const soCasa = casa && !banho, soLoja = loja && !banho && !casa;
+  const frente = frenteDe(petshop);
+  // sem área principal, vale a regra de sempre: creche e hotel só entram para quem não faz banho e tosa; loja, para quem só vende
+  const soCasa = frente ? frente === "casa" : casa && !banho, soLoja = frente ? frente === "loja" : loja && !banho && !casa;
+  const comCasa = frente ? casa : soCasa, comLoja = frente ? loja : soLoja;
+  const banhoInteiro = !frente || frente === "banho";
   const temDiaria = (!usaModulo(petshop, "creche") || petshop.diaria_creche != null) && (!usaModulo(petshop, "hotel") || petshop.diaria_hotel != null);
   const todos: (Passo & { so: boolean })[] = dados ? [
-    { id: "precos", so: souDono && banho && ativos.length > 0, feito: temPreco, texto: "Colocar os preços dos serviços", dica: "Em Meu pet shop, na parte Serviços e preços.", href: "/gestao/app/meu-petshop" },
+    { id: "precos", so: souDono && banho && banhoInteiro && ativos.length > 0, feito: temPreco, texto: "Colocar os preços dos serviços", dica: "Em Meu pet shop, na parte Serviços e preços.", href: "/gestao/app/meu-petshop" },
     { id: "diaria", so: souDono && soCasa, feito: temDiaria, texto: "Colocar o preço da diária", dica: `Em Meu pet shop, na parte ${nomeDaCasa(petshop)}.`, href: "/gestao/app/meu-petshop" },
-    { id: "pet", so: posso("clientes"), feito: dados.pets > 0, texto: "Cadastrar o primeiro pet", dica: "Em Clientes e pets, no botão de novo pet.", href: "/gestao/app/clientes" },
-    { id: "checkin", so: soCasa && posso("creche_hotel"), feito: dados.estadias > 0, texto: "Fazer o primeiro check-in", dica: `Em ${nomeDaCasa(petshop)}, no botão Nova reserva / Check-in.`, href: "/gestao/app/creche-hotel" },
-    { id: "produto", so: soLoja && posso("estoque"), feito: dados.produtos > 0, texto: "Cadastrar o primeiro produto", dica: "Em Estoque, no botão de produto novo.", href: "/gestao/app/estoque" },
+    { id: "pet", so: posso("clientes"), feito: dados.pets > 0, texto: "Cadastrar o primeiro pet", dica: "Já abre a ficha para preencher.", href: "/gestao/app/clientes?novo=1" },
+    { id: "checkin", so: comCasa && posso("creche_hotel"), feito: dados.estadias > 0, texto: "Fazer o primeiro check-in", dica: `Em ${nomeDaCasa(petshop)}, no botão Nova reserva / Check-in.`, href: "/gestao/app/creche-hotel" },
+    { id: "produto", so: comLoja && posso("estoque"), feito: dados.produtos > 0, texto: "Cadastrar o primeiro produto", dica: "Em Estoque, no botão de produto novo.", href: "/gestao/app/estoque" },
     { id: "horario", so: agenda, feito: dados.horarios > 0, texto: "Marcar o primeiro horário", dica: "Já abre a janela para marcar.", href: "/gestao/app/agenda?novo=1" },
-    { id: "concluir", so: agenda, feito: dados.concluidos > 0, texto: "Concluir e receber um atendimento", dica: "Na Agenda, toque no horário e em Concluir.", href: "/gestao/app/agenda" },
-    { id: "link", so: souDono && agenda, feito: petshop.link_ativo, texto: "Ligar o link de agendamento", dica: "O cliente pede o horário pelo celular e você aceita.", aoTocar: abrirLinkDeAgendamento },
+    { id: "concluir", so: agenda && banhoInteiro, feito: dados.concluidos > 0, texto: "Concluir e receber um atendimento", dica: "Na Agenda, toque no horário e em Concluir.", href: "/gestao/app/agenda" },
+    { id: "link", so: souDono && agenda && banhoInteiro, feito: petshop.link_ativo, texto: "Ligar o link de agendamento", dica: "O cliente pede o horário pelo celular e você aceita.", aoTocar: abrirLinkDeAgendamento },
     dados.amanha > 0
-      ? { id: "lembrete", so: agenda, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Abre os lembretes dos horários de amanhã.", aoTocar: aoLembretes }
-      : { id: "lembrete", so: agenda, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Na Agenda, pelo botão do WhatsApp ao lado do horário.", href: "/gestao/app/agenda" },
+      ? { id: "lembrete", so: agenda && banhoInteiro, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Abre os lembretes dos horários de amanhã.", aoTocar: aoLembretes }
+      : { id: "lembrete", so: agenda && banhoInteiro, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Na Agenda, pelo botão do WhatsApp ao lado do horário.", href: "/gestao/app/agenda" },
     { id: "marca", so: souDono, opcional: true, feito: Boolean(petshop.logo) || petshop.tema !== "floresta", texto: "Colocar a sua logo e as suas cores", dica: "Em Meu pet shop.", href: "/gestao/app/meu-petshop" },
     { id: "escola", so: souDono, opcional: true, feito: escola, texto: "Conhecer a Escola de Gestão", dica: "Aulas gratuitas para o dia a dia do pet shop.", href: "/gestao/app/escola", aoTocar: () => { guardarLembrado(chaveEscola, "1"); setEscola(true); } },
   ] : [];
-  const passos: Passo[] = todos.filter((p) => p.so);
+  const lugar = (id: string) => { const i = frente ? ORDEM[frente].indexOf(id) : -1; return i < 0 ? 99 : i; };
+  const passos: Passo[] = todos.filter((p) => p.so).map((p, i) => ({ p, i })).sort((a, b) => lugar(a.p.id) - lugar(b.p.id) || a.i - b.i).map((x) => x.p);
   const principais = passos.filter((p) => !p.opcional);
   const feitos = principais.filter((p) => p.feito).length;
   const completo = principais.length > 0 && feitos === principais.length;
