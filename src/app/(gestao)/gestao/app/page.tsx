@@ -36,6 +36,8 @@ import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembre
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import Importar from "@/components/gestao/importar";
 import { idsParaCobrar } from "@/lib/gestao/reservado";
+import { AtendimentosParaCobrar, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
+import AlteracoesDeValores from "@/components/gestao/financeiro/alteracoes-de-valores";
 
 const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa semana?", "Quem não vem há mais de um mês?"];
 
@@ -167,6 +169,10 @@ export default function Hoje() {
 
   const ativos = (dados?.ags ?? []).filter((a) => !["cancelado", "faltou"].includes(a.status));
   const feitos = ativos.filter((a) => a.status === "concluido").length;
+  // concluídos de hoje que ninguém cobrou (o banco diz quais, sem valor): não são "tudo certo"
+  const { ids: semConta } = useParaCobrar(hoje, hoje);
+  const faltaCobrarHoje = ativos.filter((a) => semConta.has(a.id)).length;
+  const semConcluir = ativos.length - feitos;
   const proximo = ativos.find((a) => a.status !== "concluido" && new Date(a.fim) > new Date());
   const selecionado = aberto ? dados?.ags.find((a) => a.id === aberto) ?? null : null;
 
@@ -323,11 +329,16 @@ export default function Hoje() {
             </div>
             ) : (
             <div className="g-proximo vazio">
-              <span className="g-rotulo" style={{ color: "#24543b" }}>{dados && ativos.length ? "Dia concluído" : temCasa ? "Banho e tosa sem horários" : "Agenda livre"}</span>
+              <span className="g-rotulo" style={{ color: "#24543b" }}>{dados && ativos.length ? (semConcluir > 0 ? "Fim dos horários de hoje" : faltaCobrarHoje > 0 ? "Atendimentos concluídos" : "Dia concluído") : temCasa ? "Banho e tosa sem horários" : "Agenda livre"}</span>
               <div className="quem">
-                <Tile icone={dados && ativos.length ? Check : Sparkles} tom="menta" tamanho="g" />
+                <Tile icone={dados && ativos.length ? (semConcluir > 0 || faltaCobrarHoje > 0 ? HandCoins : Check) : Sparkles} tom={dados && ativos.length && (semConcluir > 0 || faltaCobrarHoje > 0) ? "manteiga" : "menta"} tamanho="g" />
                 <div style={{ minWidth: 0 }}>
-                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{dados && ativos.length ? "Tudo atendido por hoje" : "Nenhum horário por vir"}</b>
+                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{!(dados && ativos.length) ? "Nenhum horário por vir"
+                    : semConcluir > 0 ? `${semConcluir === 1 ? "1 horário ficou" : `${semConcluir} horários ficaram`} sem concluir`
+                    : faltaCobrarHoje > 0 ? `${faltaCobrarHoje === 1 ? "Falta cobrar 1 atendimento" : `Falta cobrar ${faltaCobrarHoje} atendimentos`}`
+                    : "Tudo atendido por hoje"}</b>
+                  {dados && ativos.length > 0 && semConcluir > 0 && <span style={{ whiteSpace: "normal" }}>Abra cada um na lista de hoje e diga se foi atendido ou se o cliente faltou.{faltaCobrarHoje > 0 ? ` E ${faltaCobrarHoje === 1 ? "1 concluído ainda está" : `${faltaCobrarHoje} concluídos ainda estão`} sem cobrança.` : ""}</span>}
+                  {dados && ativos.length > 0 && semConcluir === 0 && faltaCobrarHoje > 0 && <span style={{ whiteSpace: "normal" }}>{vejoFinanceiro ? "Todos foram atendidos, mas a conta ainda não foi fechada. Veja a lista Atendimentos para cobrar, logo abaixo." : "Todos foram atendidos. Quem cuida do caixa ainda precisa fechar a conta."}</span>}
                 </div>
               </div>
               {temCasa && <Link className="g-hoje-casa" href="/gestao/app/creche-hotel"><BedDouble aria-hidden /><span>{linhaCasa}</span><ChevronRight aria-hidden /></Link>}
@@ -343,6 +354,8 @@ export default function Hoje() {
         )}
 
         {posso("agenda") && <PedidosLink />}
+        {vejoFinanceiro && <AtendimentosParaCobrar aoMudar={() => void recarregar()} />}
+        {cuidoDoFinanceiro && <AlteracoesDeValores />}
         {casa && <OcorrenciasDeHoje />}
 
         {!(contaNova && cartaoPassos) && <PrimeirosPassos pp={pp} modo={cartaoPassos ? "cartao" : "linha"} />}
@@ -404,7 +417,8 @@ export default function Hoje() {
                             <span className="serv"><i />{nomeDosServicos(a) ?? "Atendimento"}</span>
                             {a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {a.pets.clientes.nome}</span>}
                           </span>
-                          {a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}
+                          {semConta.has(a.id) ? <span className="g-tag laranja">Falta cobrar</span>
+                            : a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}
                           <ChevronRight size={18} className="g-muted g-so-pc" />
                         </button>
                         {posso("agenda") && <BotaoLembrete agendamento={a} doDia={dados.ags} aoMandar={() => void recarregar()} />}

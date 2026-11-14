@@ -120,3 +120,16 @@ div.g-agd-faixa.almoco { cursor: default; }
 .g-agd-servicos li { display: flex; justify-content: space-between; gap: 12px; font-size: .9375rem; color: var(--g-cinza); }
 .g-agd-servicos li b { color: var(--g-tinta); font-weight: 600; }
 .g-vd-servicos { display: grid; gap: 8px; margin-top: 10px; padding: 12px; border-radius: var(--g-raio-p); background: var(--g-carta-2); }
+
+/* atendimentos concluídos que ninguém cobrou */
+.g-ag-cobrar { display: grid; gap: 4px; }
+.g-ag-cobrar h3 { display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+.g-ag-cobrar-linha { display: flex; align-items: center; gap: 6px; min-width: 0; border-bottom: 1px solid var(--g-linha); }
+.g-ag-cobrar-linha:last-child { border-bottom: 0; }
+.g-ag-cobrar-linha .g-linha { flex: 1; min-width: 0; align-items: center; border-bottom: 0; }
+.g-ag-cobrar-linha .g-linha .d { text-align: right; }
+.g-ag-cobrar-linha .g-linha .d span { display: block; font-size: .75rem; color: var(--g-muted, #6a625a); }
+@media (max-width: 520px) {
+  .g-ag-cobrar-linha { flex-wrap: wrap; }
+  .g-ag-cobrar-linha > .g-btn { margin: -4px 0 8px auto; }
+}

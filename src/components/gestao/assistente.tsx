@@ -42,6 +42,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   const [itens, setItens] = useState<Item[]>(memoria.itens);
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
+  const respondidos = useRef(new Set<string>());
   const [ouvindo, setOuvindo] = useState(false);
   const [temVoz, setTemVoz] = useState(false);
   const rec = useRef<Reconhecedor | null>(null);
@@ -118,8 +119,12 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   }, [pedidoInicial, enviar]);
 
   function decidir(grupo: Extract<Item, { tipo: "propostas" }>, id: string, sim: boolean) {
+    // toque duplo em "Pode fazer": o segundo toque chega antes de a tela desligar o botão; a resposta só vai uma vez
+    const grupoId = grupo.lista.map((p) => p.id).join(",");
+    if (respondidos.current.has(grupoId)) return;
     const lista = grupo.lista.map((p) => (p.id === id ? { ...p, estado: sim ? ("sim" as const) : ("nao" as const) } : p));
     const completo = lista.every((p) => p.estado !== "pendente");
+    if (completo) respondidos.current.add(grupoId);
     guardar(memoria.itens.map((i) => (i === grupo ? { ...grupo, lista, enviado: completo } : i)));
     if (completo) void chamar({ decisoes: lista.map((p) => ({ id: p.id, ok: p.estado === "sim" })), parciais: memoria.parciais });
   }

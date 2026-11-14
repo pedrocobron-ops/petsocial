@@ -17,6 +17,7 @@ import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
 import type { AlteracaoLancamento, Caixa, Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, hora, isoDia } from "@/lib/gestao/util";
 import { useOperacao } from "@/lib/gestao/uma-vez";
+import { AtendimentosParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import "./caixa.css";
 
 export default function PaginaCaixa() {
@@ -279,6 +280,7 @@ function CaixaDoDia() {
             </section>
           ) : null}
           {/* sempre no mesmo lugar da tela: abrir o caixa no meio de um recebimento não fecha a folha que está aberta */}
+          <AtendimentosParaCobrar aoMudar={() => void recarregar()} />
           <ContasDeClientes aoMudar={recarregar} largo={!aberto && Boolean(ultimo)} />
         </div>
 

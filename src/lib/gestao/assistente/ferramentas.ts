@@ -32,6 +32,8 @@ export type Contexto = {
   fusoMin: number;
   /** Agora, no horário local: "AAAA-MM-DDTHH:mm". */
   agora: string;
+  /** Chave da ação que está sendo gravada: dinheiro e estoque entram com ela, e o banco recusa a mesma chave duas vezes. */
+  chave?: string;
 };
 
 export type Resumo = { titulo: string; linhas: [string, string][] };
@@ -933,17 +935,17 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
       // a estadia já está encerrada: se o dinheiro falhar, avisa em vez de dar tudo como perdido (igual à tela)
       const pago = await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "entrada", valor: p.valor, forma: String(e.forma), categoria: "Creche e hotel",
         descricao: `${TIPO_ESTADIA[p.estadia.tipo] ?? "Estadia"}: ${p.n} ${p.n === 1 ? "diária" : "diárias"} · ${p.pet.nome}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c),
-        cliente_id: p.pet.clientes?.id ?? null, origem: "assistente", criado_por: c.userId }).select("id").single();
+        cliente_id: p.pet.clientes?.id ?? null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single();
       if (pago.error) return { feito: true, diarias: p.n, pagamento_lancado: false, aviso: "O check-out foi feito, mas o pagamento não foi lançado. Diga isso e peça para lançar pelo Financeiro." };
       return { feito: true, diarias: p.n, pagamento_lancado: true, valor: p.valor };
     }
     case "vender_pacote": {
       const p = await planoDaVenda(c, e);
       const vendido = ok(await sb.from("pacotes_clientes").insert({ petshop_id: petshop.id, pet_id: p.pet.id, pacote_id: p.modelo.id, nome: p.modelo.nome, servico_id: p.modelo.servico_id,
-        total: p.modelo.quantidade, comprado_em: p.hoje, vence_em: p.venceEm, preco: p.preco }).select("id").single());
+        total: p.modelo.quantidade, comprado_em: p.hoje, vence_em: p.venceEm, preco: p.preco, chave: c.chave ?? null }).select("id").single());
       if (!p.lanca) return { feito: true, pacote_cliente_id: vendido.id, pagamento_lancado: false };
       const pago = await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "entrada", valor: p.preco, forma: String(e.forma), categoria: "Pacotes", descricao: `Pacote ${p.modelo.nome} · ${p.pet.nome}`,
-        data: p.hoje, pago: true, caixa_id: await caixaAbertoId(c), cliente_id: p.pet.clientes?.id ?? null, origem: "assistente", criado_por: c.userId }).select("id").single();
+        data: p.hoje, pago: true, caixa_id: await caixaAbertoId(c), cliente_id: p.pet.clientes?.id ?? null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single();
       if (pago.error) return { feito: true, pacote_cliente_id: vendido.id, pagamento_lancado: false, aviso: "O pacote foi criado, mas o pagamento não foi lançado. Diga isso e peça para lançar pelo Financeiro." };
       return { feito: true, pacote_cliente_id: vendido.id, pagamento_lancado: true, valor: p.preco };
     }
@@ -999,27 +1001,32 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
       let clienteId: string | null = null;
       if (agId) clienteId = (await sb.from("agendamentos").select("pets(cliente_id)").eq("id", agId).maybeSingle()).data?.pets?.cliente_id ?? null;
       ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: String(e.tipo), valor: numero(e.valor)!, forma: String(e.forma), categoria: texto(e.categoria, 60) || "Outros",
-        descricao: texto(e.descricao) || null, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), agendamento_id: agId, cliente_id: clienteId, origem: "assistente", criado_por: c.userId }).select("id").single());
+        descricao: texto(e.descricao) || null, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), agendamento_id: agId, cliente_id: clienteId, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
       if (agId && e.tipo === "entrada") await sb.from("agendamentos").update({ status: "concluido" }).eq("petshop_id", petshop.id).eq("id", agId);
       return { feito: true };
     }
     case "criar_conta": {
       ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: e.tipo === "entrada" ? "entrada" : "saida", valor: numero(e.valor)!, categoria: texto(e.categoria, 60) || "Outros",
-        descricao: texto(e.descricao) || null, data: String(e.vencimento), vencimento: String(e.vencimento), pago: false, origem: "assistente", criado_por: c.userId }).select("id").single());
+        descricao: texto(e.descricao) || null, data: String(e.vencimento), vencimento: String(e.vencimento), pago: false, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
       return { feito: true };
     }
     case "movimentar_estoque": {
       let produtoId = uuid(e.produto_id);
+      // pedido repetido: o movimento desta ação já está gravado (não cria o produto de novo nem mexe no saldo outra vez)
+      if (c.chave) {
+        const ja = await sb.from("movimentos_estoque").select("id, produto_id").eq("petshop_id", petshop.id).eq("chave", c.chave).maybeSingle();
+        if (ja.data) return { feito: true, produto_id: ja.data.produto_id, despesa_lancada: false, repetido: true };
+      }
       const qtd = numero(e.quantidade)!, custo = numero(e.custo_unitario);
       let nomeProd = texto(e.produto_nome, 120), unidade = texto(e.unidade, 12) || "un";
       if (!produtoId) produtoId = ok(await sb.from("produtos").insert({ petshop_id: petshop.id, nome: nomeProd, unidade, custo }).select("id").single()).id;
       else { const p = ok(await sb.from("produtos").select("nome, unidade").eq("id", produtoId).single()); nomeProd = p.nome; unidade = p.unidade; }
       ok(await sb.from("movimentos_estoque").insert({ petshop_id: petshop.id, produto_id: produtoId, tipo: e.tipo === "saida" ? "saida" : "entrada", quantidade: qtd,
-        custo_unitario: e.tipo === "entrada" ? custo : null, motivo: texto(e.motivo, 80) || null, origem: "assistente", criado_por: c.userId }).select("id").single());
+        custo_unitario: e.tipo === "entrada" ? custo : null, motivo: texto(e.motivo, 80) || null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
       let despesa = false;
       if (e.lancar_despesa && custo != null && e.tipo === "entrada" && c.vejoFinanceiro) {
         ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "saida", valor: Math.round(custo * qtd * 100) / 100, forma: String(e.forma), categoria: "Produtos e material",
-          descricao: `Compra: ${qtd} ${unidade} de ${nomeProd}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), origem: "assistente", criado_por: c.userId }).select("id").single());
+          descricao: `Compra: ${qtd} ${unidade} de ${nomeProd}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
         despesa = true;
       }
       return { feito: true, produto_id: produtoId, despesa_lancada: despesa };
