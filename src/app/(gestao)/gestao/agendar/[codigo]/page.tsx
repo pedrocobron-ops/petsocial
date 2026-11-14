@@ -168,6 +168,10 @@ export default function AgendarPeloLink() {
 
   // horários livres do dia escolhido
   const vez = useRef(0);
+  // o dia que a página escolheu sozinha (o primeiro aberto): se ele não tem mais horário (lotado, ou hoje já no fim do dia),
+  // a página pula para o próximo dia aberto, até achar um com horário. Dia que a pessoa escolheu fica onde está.
+  const diaSozinho = useRef(false);
+  const pulos = useRef(0);
   const buscarHorarios = useCallback(async (s: string, d: string, n: number) => {
     const minha = ++vez.current;
     setHorarios(null);
@@ -176,9 +180,14 @@ export default function AgendarPeloLink() {
     if (minha !== vez.current) return;
     if (error) { setErroHorarios(true); setHorarios([]); return; }
     const lista = ((data ?? []) as string[]).map((h) => String(h).slice(0, 5));
+    if (!lista.length && diaSozinho.current && pulos.current < 10) {
+      const proximo = dias.find((x) => x.aberto && x.iso > d);
+      if (proximo) { pulos.current++; setDia(proximo.iso); return; }
+    }
+    diaSozinho.current = false;
     setHorarios(lista);
     setHoraEscolhida((h) => (h && lista.includes(h) ? h : null));
-  }, [codigo]);
+  }, [codigo, dias]);
   useEffect(() => {
     if (passo === "quando" && servicoId && dia) void buscarHorarios(servicoId, dia, qtd);
   }, [passo, servicoId, dia, qtd, buscarHorarios]);
@@ -220,10 +229,11 @@ export default function AgendarPeloLink() {
     setServicoId(id);
     setHoraEscolhida(null);
     setAvisoQuando(null);
-    if (!dia) setDia(dias.find((d) => d.aberto)?.iso ?? null);
+    if (!dia) { diaSozinho.current = true; pulos.current = 0; setDia(dias.find((d) => d.aberto)?.iso ?? null); }
     ir("quando");
   }
   function escolherDia(iso: string) {
+    diaSozinho.current = false;
     setDia(iso);
     setHoraEscolhida(null);
     setAvisoQuando(null);

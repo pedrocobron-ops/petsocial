@@ -90,6 +90,20 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
   const abertas = (dados?.doMes ?? []).filter((c) => c.status === "aberta");
   const canceladas = (dados?.doMes ?? []).filter((c) => c.status === "cancelada" && !c.por_fora);
   const pagasPorFora = (dados?.doMes ?? []).filter((c) => c.status === "cancelada" && c.por_fora);
+  // mensalista que ficou sem cobrança neste mês porque a primeira cobrança foi deixada para o mês seguinte
+  // ("já foi pago por fora", escolhido no cadastro ou em Gerar cobranças): dá para voltar atrás e cobrar por aqui
+  const proximoMesIso = isoMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1));
+  const semCobrancaPorFora = mesIso === isoMes(new Date()) && dados
+    ? planos.filter((p) => p.primeira_cobranca === proximoMesIso && cobraNoMes({ ...p, primeira_cobranca: null }, mes) && !dados.doMes.some((c) => c.plano_id === p.id))
+    : [];
+  async function cobrarPorAqui(p: PlanoCompleto) {
+    if (somenteLeitura()) return;
+    try {
+      ok(await sb.from("creche_planos").update({ primeira_cobranca: null }).eq("id", p.id).eq("petshop_id", petshop.id).select("id").single());
+      avisar(`${p.pets?.nome ?? "O pet"} voltou para a lista de quem falta cobrar em ${nomeMes(mes)}. Se a cobrança não aparecer sozinha, toque em Gerar cobranças e escolha como cobrar.`);
+      await mudou();
+    } catch (e) { avisarErro(e); }
+  }
   // podem ser marcadas como pagas por fora: abertas, com valor e ainda sem nenhum recebimento
   const semRecebimento = abertas.filter((c) => !c.lancamentos?.pago && Number(c.total) > 0 && faltaDaCobranca(c) === Number(c.total));
   const primeiras = semRecebimento.filter((c) => !dados?.comAnterior.has(c.plano_id));
@@ -179,7 +193,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
             </div>
           )}
 
-          {!todas.length && !canceladas.length && !pagasPorFora.length ? (
+          {!todas.length && !canceladas.length && !pagasPorFora.length && !semCobrancaPorFora.length ? (
             <Vazio titulo={`Nenhuma cobrança em ${nomeMes(mes)}`}
               texto={planos.length ? "Toque em Gerar cobranças para criar a mensalidade de cada mensalista. Cada cobrança vira uma conta em Financeiro, A receber." : "Cadastre os mensalistas primeiro. Depois, gere as cobranças do mês aqui."} />
           ) : BLOCOS.map((b) => {
@@ -278,10 +292,17 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
               </div>
             </section>
           )}
-          {pagasPorFora.length > 0 && (
+          {pagasPorFora.length + semCobrancaPorFora.length > 0 && (
             <section className="g-cm-bloco cancelada">
-              <div className="g-card-t"><h3>Pagas por fora do sistema</h3><span className="g-muted g-pp">{pagasPorFora.length}</span></div>
+              <div className="g-card-t"><h3>Pagas por fora do sistema</h3><span className="g-muted g-pp">{pagasPorFora.length + semCobrancaPorFora.length}</span></div>
               <div className="g-lista">
+                {semCobrancaPorFora.map((p) => (
+                  <div key={p.id} className="g-linha">
+                    <AvatarPet pet={p.pets ?? { nome: "?" }} />
+                    <span className="t"><b>{p.pets?.nome ?? "Pet"}</b><span>{p.pets?.clientes?.nome ?? "Sem tutor"} · {nomeMes(mes)} foi marcado como pago por fora: a primeira cobrança é a de {nomeMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}</span></span>
+                    <button className="g-btn fantasma p" onClick={() => void cobrarPorAqui(p)} aria-label={`Cobrar por aqui a mensalidade de ${p.pets?.nome ?? "pet"}`}><RotateCcw />Cobrar por aqui</button>
+                  </div>
+                ))}
                 {pagasPorFora.map((c) => (
                   <div key={c.id} className="g-linha">
                     <AvatarPet pet={c.pets ?? { nome: "?" }} />

@@ -20,6 +20,9 @@
 .g-pl-serv i { width: 8px; height: 8px; flex: none; border-radius: 3px; background: var(--cor); }
 .g-pl-hora { background: var(--g-carta-2); font-variant-numeric: tabular-nums; }
 .g-pl-hora svg { width: 14px; height: 14px; flex: none; }
+/* etiqueta comprida ("aceitou as regras e declarou vacinas em dia em…") quebra de linha em vez de passar do cartão */
+.g-pl-quando { min-width: 0; }
+.g-pl-quando .g-tag { white-space: normal; text-align: left; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .g-pl-obs { padding: 8px 12px; border-radius: 12px; background: var(--t-manteiga); color: #5b4708; font-size: .9375rem; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
 
 /* vários pets do mesmo tutor num cartão só */
@@ -35,7 +38,8 @@
 .g-pl-pet-b { display: flex; gap: 4px; flex: none; margin-left: auto; }
 
 .g-pl-acoes { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.g-pl-com { flex: 1 1 100%; min-width: 0; min-height: 40px; padding-block: 6px; font-size: .9375rem; }
+.g-pl-acoes { min-width: 0; }
+.g-pl-com { flex: 1 1 100%; width: 100%; max-width: 100%; min-width: 0; min-height: 40px; padding-block: 6px; font-size: .9375rem; text-overflow: ellipsis; }
 @media (min-width: 560px) { .g-pl-com { flex: 1 1 200px; } }
 
 /* já respondido: falta só avisar o tutor */

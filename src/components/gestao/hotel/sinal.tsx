@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago, parteDaChave, quitarConta, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago, parteDaChave, quitarConta, receberConta, type PartePagamento } from "@/lib/gestao/dinheiro";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { ValoresDaEstadia } from "@/lib/gestao/hotel";
 import { sinalDe } from "@/lib/gestao/hotel-opcoes";
@@ -147,6 +147,11 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
   const nome = e.pets?.nome ?? "o pet";
   // o sinal pode já ter tido uma parte recebida (pelo Financeiro ou pelo Caixa): aqui entra só o que falta
   const falta = pendente ? faltaDoSinal(pendente) : 0, jaEntrou = pendente ? sinalRecebidoDe(pendente) : 0;
+  // o tutor pode pagar só uma parte do que falta: o resto continua em A receber
+  const [agora, setAgora] = useState<number | null>(falta > 0 ? falta : null);
+  const centavos = (n: number) => Math.round(n * 100) / 100;
+  const recebeAgora = agora != null && agora > 0 && agora <= falta ? centavos(agora) : null;
+  const emParte = recebeAgora != null && recebeAgora < falta;
 
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
@@ -155,12 +160,19 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
     setErro(null);
     try {
       if (pendente) {
-        const pg = fecharPagamento(pagamento, falta);
+        if (recebeAgora == null) return setErro(`Escreva quanto o tutor pagou agora, até ${brl(falta)}.`);
+        const pg = fecharPagamento(pagamento, recebeAgora);
         if ("erro" in pg) return setErro(pagamento.dividido ? pg.erro : "Escolha como o tutor pagou o sinal.");
         if (!(await conferirCaixa(sb, petshop.id, confirmar))) return;
         setSalvando(true);
-        await quitarConta(sb, petshop.id, pendente.sinal_lancamento_id!, pg, falta, chave);
-        avisar(jaEntrou > 0 ? `Sinal de ${nome} completo: ${brl(falta)} recebidos agora, ${brl(pendente.sinal)} no total.` : `Sinal de ${nome} recebido: ${brl(pendente.sinal)}.`);
+        if (emParte) {
+          // só uma parte: entra no caixa de hoje e a conta do sinal fica com o que falta (a reserva segue com o sinal a receber)
+          await receberConta(sb, pendente.sinal_lancamento_id!, { valor: recebeAgora, forma: pg.forma, pagamentos: pg.pagamentos, chave });
+          avisar(`Sinal de ${nome}: ${brl(recebeAgora)} recebidos agora. Faltam ${brl(centavos(falta - recebeAgora))}, que continuam em A receber.`);
+        } else {
+          await quitarConta(sb, petshop.id, pendente.sinal_lancamento_id!, pg, falta, chave);
+          avisar(jaEntrou > 0 ? `Sinal de ${nome} completo: ${brl(falta)} recebidos agora, ${brl(pendente.sinal)} no total.` : `Sinal de ${nome} recebido: ${brl(pendente.sinal)}.`);
+        }
       } else {
         const pronto = prepararSinal(estado);
         if ("erro" in pronto) return setErro(pronto.erro);
@@ -185,14 +197,17 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
         <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando}>
-          {salvando ? "Salvando…" : pendente ? `Receber ${brl(falta)}` : estado.modo === "agora" && estado.valor ? `Receber ${brl(estado.valor)}` : estado.modo === "depois" && estado.valor ? `Anotar ${brl(estado.valor)} a receber` : "Salvar"}
+          {salvando ? "Salvando…" : pendente ? `Receber ${brl(recebeAgora ?? falta)}` : estado.modo === "agora" && estado.valor ? `Receber ${brl(estado.valor)}` : estado.modo === "depois" && estado.valor ? `Anotar ${brl(estado.valor)} a receber` : "Salvar"}
         </button>
       </>}>
       <div className="g-form">
         {pendente ? (
           <>
             <div className="g-card areia"><b className="g-tab">Sinal de {brl(pendente.sinal)}{jaEntrou > 0 ? ` · falta ${brl(falta)}` : ""}</b><p className="g-muted g-p">{jaEntrou > 0 ? `O tutor já pagou ${brl(jaEntrou)} deste sinal. Ao receber o que falta, entra no caixa de hoje e a reserva fica com o sinal pago.` : "Estava em A receber. Ao receber, entra no caixa de hoje e a reserva fica com o sinal pago."}</p></div>
-            <EscolhaPagamento valor={pagamento} aoMudar={(p) => { setPagamento(p); setErro(null); }} total={falta} rotulo="Como o tutor pagou o sinal" erro={erro} />
+            <Campo rotulo="Quanto o tutor pagou agora" dica={emParte ? `Faltam ${brl(centavos(falta - recebeAgora!))}: continuam em A receber, e a reserva segue com o sinal a receber.` : `Até ${brl(falta)}. Se ele pagou só uma parte, escreva a parte: o resto continua em A receber.`}>
+              <CampoDinheiro valor={agora} aoMudar={(v) => { setAgora(v); setErro(null); }} rotulo="Quanto o tutor pagou agora" maximo={falta} />
+            </Campo>
+            <EscolhaPagamento valor={pagamento} aoMudar={(p) => { setPagamento(p); setErro(null); }} total={recebeAgora ?? falta} rotulo="Como o tutor pagou o sinal" erro={erro} />
             <AvisoCaixaFechado aberto={caixa} />
           </>
         ) : <CamposSinal estado={estado} aoMudar={(s) => { setEstado(s); setErro(null); }} sugerido={sugerido} erro={erro} semTutor={!e.pets?.clientes?.id} />}

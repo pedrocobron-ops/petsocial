@@ -30,7 +30,7 @@ const CHECKOUTS: Record<PlanoId, Record<PeriodoId, string | undefined>> = {
 /** `preco` e `checkout` são os do plano mensal; para os outros períodos use `ofertaDe`. */
 export const PLANOS: { id: PlanoId; nome: string; acessos: number; preco: number; para: string; checkout: string }[] = [
   { id: "solo", nome: "Solo", acessos: 1, preco: PRECOS.solo.mensal, para: "Para quem atende sozinho", checkout: (CHECKOUTS.solo.mensal ?? "").trim() },
-  { id: "equipe", nome: "Equipe", acessos: 3, preco: PRECOS.equipe.mensal, para: "Para o pet shop com ajudante e recepção", checkout: (CHECKOUTS.equipe.mensal ?? "").trim() },
+  { id: "equipe", nome: "Equipe", acessos: 3, preco: PRECOS.equipe.mensal, para: "Para quem tem ajudante ou recepção", checkout: (CHECKOUTS.equipe.mensal ?? "").trim() },
   { id: "petshop", nome: "Pet shop", acessos: 6, preco: PRECOS.petshop.mensal, para: "Para a equipe completa", checkout: (CHECKOUTS.petshop.mensal ?? "").trim() },
 ];
 
