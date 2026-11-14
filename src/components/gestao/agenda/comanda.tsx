@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, MessageCircle, Plus, Scissors, Ticket, Truck } from "lucide-react";
 import type { AgendamentoCompleto, PacoteCliente } from "@/lib/gestao/tipos";
 import { textoComprovante } from "@/lib/gestao/comprovante";
-import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago, parteDaChave, receberConta } from "@/lib/gestao/dinheiro";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { definirServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-horario";
 import { brl, dataCompleta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
@@ -16,7 +16,7 @@ import {
   baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
   produtosDaConta, resumoDosItens, useProdutosDaLoja, valorDaLinha, type ItemConta, type PagaDepois,
 } from "../loja/conta";
-import { AvisoCaixaFechado, fecharPagamento, useCaixaAberto, usePagamento } from "../loja/pecas";
+import { AvisoCaixaFechado, dinheiroAMenos, fecharPagamento, useCaixaAberto, usePagamento } from "../loja/pecas";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 
 /**
@@ -58,6 +58,10 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   const op = useOperacao();
 
   const contas = fecharContas(itens, desconto);
+  // "Recebeu quanto?" menor que a conta (dinheiro, uma forma só): recebe o que entrou e o resto fica anotado para o tutor pagar depois
+  const aMenos = contas.total > 0 && !depois.ativo && !pagamento.dividido ? dinheiroAMenos(pagamento, contas.total) : null;
+  // a conta inteira já ficou anotada numa tentativa anterior (a parte em dinheiro é que falhou): a nova tentativa só recebe a parte
+  const contaDaParte = useRef<string | null>(null);
   const vendidos = produtosDaConta(itens);
   const temLevaTraz = itens.some((i) => i.tipo === "extra" && i.nome === LEVA_E_TRAZ);
   // atendimento já concluído e conta zerada: quem recebe ainda pode dizer "não vou cobrar" (uma vez)
@@ -93,6 +97,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     if (problema) { avisarErro(problema); return false; }
     const fiado = depois.ativo && contas.total > 0;
     if (fiado && (!depois.quando || depois.quando < isoDia(new Date()))) { setErroForma(depois.quando ? "Essa data já passou. Escolha um dia de hoje em diante." : "Escolha um dia de hoje em diante."); avisarErro(depois.quando ? "A data em que o cliente vai pagar já passou. Escolha um dia de hoje em diante." : "Escolha quando o cliente vai pagar."); return false; }
+    if (aMenos) return receberParte(chave, aMenos.entregue, aMenos.falta);
     const pg = contas.total > 0 && !fiado ? fecharPagamento(pagamento, contas.total) : null;
     if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return false; }
     const falta = faltaNoEstoque(itens, produtos);
@@ -181,6 +186,64 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     }
   }
 
+  /**
+   * O cliente pagou só uma parte em dinheiro: a conta inteira fica anotada para o tutor (como "Cliente paga depois") e a parte
+   * que entrou é recebida na hora (entra no caixa). Em A receber e na ficha fica só o que falta. Mesmo caminho do "Recebi" da ficha.
+   */
+  async function receberParte(chave: string, entregue: number, falta: number): Promise<boolean> {
+    if (!tutor?.id) { avisarErro("Para deixar o resto anotado, o pet precisa ter um tutor na ficha. Sem tutor, corrija o valor recebido."); return false; }
+    if (!depois.quando || depois.quando < isoDia(new Date())) { setErroForma("Escolha um dia de hoje em diante para o resto."); avisarErro("Escolha quando o cliente paga o resto (de hoje em diante)."); return false; }
+    const problema = erroDaConta(itens, desconto, contas.total);
+    if (problema) { avisarErro(problema); return false; }
+    const naoTem = faltaNoEstoque(itens, produtos);
+    if (!contaDaParte.current && naoTem.length && !(await perguntar({ titulo: naoTem.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${naoTem.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return false;
+    if (!contaDaParte.current && !(await conferirValorAlto(contas.total, perguntar))) return false;
+    if (!(await conferirCaixa(sb, petshop.id, perguntar))) return false;
+    setSalvando(true);
+    try {
+      let contaId = contaDaParte.current;
+      if (!contaId) {
+        const ja = ok(await sb.rpc("recebimentos_do_agendamento", { p_agendamento: a.id }));
+        if (ja.length) { avisarErro("Este atendimento já tem recebimento lançado."); avisarMudanca(); aoPronto(); return true; }
+        const antes = outrosDoHorario.map((o) => o.servico_id);
+        if (antes.length !== servicosNaConta.length || servicosNaConta.some((id) => !antes.includes(id))) {
+          await definirServicosAMais(sb, a.id, servicosNaConta.map((id) => {
+            const tinha = outrosDoHorario.find((o) => o.servico_id === id);
+            return { servico_id: id, preco: tinha ? tinha.preco : itens.find((i) => i.servicoId === id)?.valor ?? null };
+          }));
+        }
+        const gravar = itensParaGravar(itens);
+        const mais = resumoDosItens(gravar);
+        const nomes = gravar.filter((i) => i.tipo === "servico").map((i) => i.nome).join(" + ") || (peloPacote ? `${servico} (pacote)` : servico);
+        const descricao = encurtar(`${nomes} · ${pet?.nome ?? ""}`.trim().replace(/ ·$/, "") + (mais ? ` + ${mais}` : ""));
+        const conta = await lancarAReceber(sb, petshop.id, {
+          valor: contas.total, vencimento: depois.quando, categoria: categoria(), agendamentoId: a.id, clienteId: tutor.id, descricao, itens: gravar, chave: parteDaChave(chave, "conta"),
+        });
+        contaId = contaDaParte.current = conta.id;
+        if (pacote) {
+          const usados = pacote.usados + 1;
+          ok(await sb.from("pacotes_clientes").update({ usados, ativo: usados < pacote.total }).eq("id", pacote.id).select("id").single());
+          ok(await sb.from("agendamentos").update({ pacote_cliente_id: pacote.id }).eq("id", a.id).select("id").single());
+        }
+        try { await baixarEstoque(sb, petshop.id, user.id, itens, conta.id, chave); } catch (e) {
+          avisarErro(`A conta foi anotada, mas o estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
+        }
+        if (a.status !== "concluido") ok(await sb.from("agendamentos").update({ status: "concluido" }).eq("id", a.id).select("id").single());
+      }
+      await receberConta(sb, contaId, { valor: entregue, forma: "dinheiro", chave: parteDaChave(chave, "parte") });
+      contaDaParte.current = null;
+      avisar(`Recebido ${brl(entregue)}. Ficou ${brl(falta)} para ${tutor.nome?.split(" ")[0] ?? "o tutor"} pagar até ${dataCompleta(depois.quando)}, em A receber e na ficha.`);
+      avisarMudanca();
+      aoPronto();
+      return true;
+    } catch (e) {
+      // a conta já ficou anotada e a parte não entrou: a nova tentativa (mesma chave) só recebe a parte
+      avisarErro(contaDaParte.current ? `A conta ficou anotada em A receber, mas os ${brl(entregue)} em dinheiro não entraram. Toque de novo para receber. (${mensagemDeErro(e)})` : e);
+      setSalvando(false);
+      return false;
+    }
+  }
+
   if (recebida) {
     return (
       <Folha titulo="Conta fechada" aoFechar={aoPronto} rodape={<button type="button" className="g-btn sec" onClick={aoPronto}>Pronto</button>}>
@@ -200,7 +263,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
         <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || nadaAFazer}>
-          {salvando ? "Anotando…" : contas.total <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(contas.total)} a receber` : `Receber ${brl(contas.total)}`}
+          {salvando ? "Anotando…" : contas.total <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(contas.total)} a receber` : aMenos ? `Receber ${brl(aMenos.entregue)} e anotar ${brl(aMenos.falta)}` : `Receber ${brl(contas.total)}`}
         </button>
       </>}>
       <div className="g-form">
@@ -249,7 +312,20 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
 
         <FechamentoDaConta subtotal={contas.subtotal} desconto={contas.desconto} total={contas.total} descontoDigitado={desconto} aoDesconto={setDesconto}
           pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErroForma(null); }} erroForma={erroForma}
-          depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} />
+          depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} aceitaResto />
+        {aMenos && (
+          <div className="g-card liso g-pilha" role="group" aria-label="O que faltou fica anotado">
+            <p className="g-p"><b className="g-tab">{brl(aMenos.entregue)}</b> entram agora no caixa. Os <b className="g-tab">{brl(aMenos.falta)}</b> que faltaram ficam anotados para {tutor?.nome ?? "o tutor"} pagar depois, em Financeiro, A receber, e na ficha.</p>
+            {tutor?.id ? (
+              <label className="g-campo">
+                <span>Quando paga o resto</span>
+                <input type="date" className="g-input" value={depois.quando} min={isoDia(new Date())} onChange={(e) => { setDepois({ ...depois, quando: e.target.value }); setErroForma(null); }} />
+                <small>Se o cliente pagou tudo, corrija o valor em &quot;Recebeu quanto?&quot;.</small>
+                {erroForma && <small className="erro" role="alert">{erroForma}</small>}
+              </label>
+            ) : <p className="g-pp g-erro">Este pet está sem tutor na ficha: não dá para deixar o resto anotado. Corrija o valor recebido.</p>}
+          </div>
+        )}
         {contas.total > 0 && !depois.ativo && <AvisoCaixaFechado aberto={caixa} />}
         <p className="g-pp g-muted">
           {contas.total > 0 && depois.ativo ? "Nada entra no caixa agora: a conta fica em A receber" : contas.total > 0 ? (caixa === false ? "O valor entra no financeiro de hoje, fora do caixa" : "O valor entra no caixa de hoje") : "Nada entra no caixa"}

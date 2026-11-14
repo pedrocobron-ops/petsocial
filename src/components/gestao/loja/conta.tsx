@@ -278,11 +278,13 @@ export function LinhaDaConta({ item, produto, aoMudar, aoTirar, apoio }: {
 
 /* ---------- desconto, pagamento e total ---------- */
 
-export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, pagamento, aoPagamento, comPagamento = true, erroForma, depois, aoDepois }: {
+export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, pagamento, aoPagamento, comPagamento = true, erroForma, depois, aoDepois, aceitaResto }: {
   subtotal: number; desconto: number; total: number; descontoDigitado: number | null; aoDesconto: (v: number | null) => void;
   pagamento: EstadoPagamento; aoPagamento: (e: EstadoPagamento) => void; comPagamento?: boolean; erroForma?: string | null;
   /** Só na conta do atendimento: deixa escolher "Cliente paga depois". */
   depois?: PagaDepois; aoDepois?: (d: PagaDepois) => void;
+  /** Dinheiro entregue a menos pode ficar anotado (só a conta do atendimento). */
+  aceitaResto?: boolean;
 }) {
   const { petshop, cuidoDoFinanceiro } = useGestao();
   const passou = (descontoDigitado ?? 0) > subtotal && subtotal > 0;
@@ -307,7 +309,7 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
             </label>
           )}
           {depois && aoDepois
-            ? <QuandoPaga total={total} pagamento={pagamento} aoPagamento={aoPagamento} depois={depois} aoDepois={aoDepois} erro={erroForma} />
+            ? <QuandoPaga total={total} pagamento={pagamento} aoPagamento={aoPagamento} depois={depois} aoDepois={aoDepois} erro={erroForma} aceitaResto={aceitaResto} />
             : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erroForma} />}
         </>
       )}

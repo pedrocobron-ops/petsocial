@@ -109,7 +109,15 @@ export default function PedidosLink() {
       const v = await sb.from("estadias_valores").select("estadia_id, sinal, sinal_estado").eq("petshop_id", petshop.id).in("estadia_id", comReserva.map((p) => p.estadia_id!));
       for (const x of v.data ?? []) if (x.sinal != null && x.sinal_estado === "a_receber") sinais.set(x.estadia_id, Number(x.sinal));
     }
-    return { pendentes: ok(pendentes) as Pedido[], semAviso: (semAviso.data ?? []) as Pedido[], recados: (recados?.data ?? []) as Pedido[], sinais };
+    // o horário pode ter sido remarcado depois do pedido: o aviso e a mensagem usam a data de agora do horário, não a do pedido
+    const comHorario = [...(semAviso.data ?? []), ...(recados?.data ?? [])].filter((p) => p.agendamento_id && !ehEstadia(p as Pedido)) as Pedido[];
+    const atual = new Map<string, { inicio: string; fim: string }>();
+    if (comHorario.length) {
+      const h = await sb.from("agendamentos").select("id, inicio, fim").eq("petshop_id", petshop.id).in("id", [...new Set(comHorario.map((p) => p.agendamento_id!))]);
+      for (const x of h.data ?? []) atual.set(x.id, { inicio: x.inicio, fim: x.fim });
+    }
+    const emDia = (l: Pedido[]) => l.map((p) => (p.agendamento_id && atual.has(p.agendamento_id) && !ehEstadia(p) ? { ...p, ...atual.get(p.agendamento_id)! } : p));
+    return { pendentes: ok(pendentes) as Pedido[], semAviso: emDia((semAviso.data ?? []) as Pedido[]), recados: emDia((recados?.data ?? []) as Pedido[]), sinais };
   }, [petshop.id, comOpcoes, vejoFinanceiro]);
   const dados = tudo?.pendentes;
 
