@@ -476,7 +476,7 @@ function LinhaLancamento({ l, aoTocar }: { l: Lancamento; aoTocar?: () => void }
     <>
       <Tile icone={gaveta ? (entrada ? ArrowDownToLine : ArrowUpFromLine) : entrada ? ArrowDownLeft : ArrowUpRight} tom={gaveta ? "manteiga" : entrada ? "menta" : "rosa"} />
       <span className="t">
-        <b>{gaveta ? nomeDoMovimento(l.movimento) : l.descricao || categoriaAtual(l.categoria)} <TagAlterado lancamento={l} /></b>
+        <b className="g-cx-desc">{gaveta ? nomeDoMovimento(l.movimento) : l.descricao || categoriaAtual(l.categoria)} <TagAlterado lancamento={l} /></b>
         <span>{apoio}{!gaveta && <i className="g-cx-so-cel"> · {forma}</i>}</span>
       </span>
       {gaveta ? <span className="g-tag amarelo g-cx-so-largo">Gaveta</span> : <span className="g-tag g-cx-so-largo">{forma}</span>}

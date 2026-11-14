@@ -41,3 +41,6 @@
 @media (max-width: 559px) { .g-cx-so-largo { display: none !important; } }
 @media (min-width: 560px) { .g-cx-so-cel { display: none; } }
 @media (prefers-reduced-motion: reduce) { .g-cx-pulso { animation: none; } }
+
+/* o que entrou ou saiu: até 2 linhas, para o nome e o tamanho do produto não sumirem nas reticências */
+.g-linha .t b.g-cx-desc { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
