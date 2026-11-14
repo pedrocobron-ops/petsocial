@@ -567,6 +567,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"diario_fotos": {
+                  Row: {
+                    "bytes": number | null,"caminho": string,"criado_em": string,"criado_nome": string | null,"criado_por": string | null,"dia": string,"estadia_id": string,"id": string,"legenda": string | null,"pet_id": string,"petshop_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bytes"?: number | null,"caminho": string,"criado_em"?: string,"criado_nome"?: string | null,"criado_por"?: string | null,"dia": string,"estadia_id": string,"id"?: string,"legenda"?: string | null,"pet_id": string,"petshop_id": string
+                  }
+                  Update: {
+                    "bytes"?: number | null,"caminho"?: string,"criado_em"?: string,"criado_nome"?: string | null,"criado_por"?: string | null,"dia"?: string,"estadia_id"?: string,"id"?: string,"legenda"?: string | null,"pet_id"?: string,"petshop_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "diario_fotos_estadia_id_fkey"
+      columns: ["estadia_id"]
+isOneToOne: false
+      referencedRelation: "estadias"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "diario_fotos_pet_id_fkey"
+      columns: ["pet_id"]
+isOneToOne: false
+      referencedRelation: "pets"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "diario_fotos_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"dias_especiais": {
                   Row: {
                     "criado_em": string,"dia": string,"fechado": boolean,"feriado": boolean,"id": string,"nome": string,"petshop_id": string
@@ -1357,6 +1389,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"tutor_links": {
+                  Row: {
+                    "cliente_id": string,"criado_em": string,"criado_por": string | null,"petshop_id": string,"token": string,"visto_em": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cliente_id": string,"criado_em"?: string,"criado_por"?: string | null,"petshop_id": string,"token": string,"visto_em"?: string | null
+                  }
+                  Update: {
+                    "cliente_id"?: string,"criado_em"?: string,"criado_por"?: string | null,"petshop_id"?: string,"token"?: string,"visto_em"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "tutor_links_cliente_id_fkey"
+      columns: ["cliente_id"]
+isOneToOne: true
+      referencedRelation: "clientes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "tutor_links_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"uso_diario": {
                   Row: {
                     "area": string,"dia": string,"minutos": number,"petshop_id": string,"user_id": string
@@ -1657,6 +1715,9 @@ isOneToOne: false
                            },
 "diaria_sugerida":
 { Args: { "p_petshop": string,"p_porte": string,"p_tipo": string }; Returns: number
+                           },
+"diario_pasta":
+{ Args: { "p_nome": string }; Returns: string
                            },
 "em_reais":
 { Args: { "v": number }; Returns: string
@@ -1980,6 +2041,42 @@ isOneToOne: false
                            },
 "tirar_acesso":
 { Args: { "p_id": string }; Returns: undefined
+                           },
+"tutor_codigo_novo":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
+"tutor_do_codigo":
+{ Args: { "p_token": string }; Returns: {
+              "cliente_id": string,
+"criado_em": string,
+"criado_por": string | null,
+"petshop_id": string,
+"token": string,
+"visto_em": string | null
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "tutor_links"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"tutor_link":
+{ Args: { "p_cliente": string }; Returns: string
+                           },
+"tutor_link_desligar":
+{ Args: { "p_cliente": string }; Returns: undefined
+                           },
+"tutor_link_trocar":
+{ Args: { "p_cliente": string }; Returns: string
+                           },
+"tutor_pagina":
+{ Args: { "p_token": string }; Returns: Json
+                           },
+"tutor_pagina_ligada":
+{ Args: { "p": string }; Returns: boolean
+                           },
+"tutor_ve_foto":
+{ Args: { "p_nome": string }; Returns: boolean
                            },
 "valor_do_horario":
 { Args: { "p_agendamento": string }; Returns: number
