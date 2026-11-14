@@ -72,7 +72,7 @@ function FolhaDoDia() {
 
   type Coluna = "chega" | "sai" | "fica" | "naoveio";
   const tabela = (lista: EstadiaCompleta[], coluna: Coluna) => (
-    <table className={comCuidados ? "folha cuidados" : "folha"}>
+    <table className={comCuidados ? "g-imp-tab cuidados" : "g-imp-tab"}>
       <colgroup><col className="c-pet" /><col className="c-quando" /><col className="c-tutor" />{comCuidados && <col className="c-cuidados" />}<col className="c-atencao" /><col className="c-feito" /></colgroup>
       <thead><tr><th>Pet</th><th>{coluna === "chega" ? "Chega" : coluna === "sai" ? "Sai" : coluna === "naoveio" ? "Era para chegar" : "Até"}</th><th>Tutor</th>{comCuidados && <th>Comida e remédio</th>}<th>Atenção</th><th className="feito">Feito</th></tr></thead>
       <tbody>

@@ -128,7 +128,7 @@
 /* dia fechado: aviso na reserva, na agenda e no calendário de ocupação */
 .g-ht-fechado { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--g-amarelo-tint); color: #5b4708; font-size: .9375rem; }
 .g-ht-fechado svg { width: 18px; height: 18px; flex: none; }
-.g-ht-dia .fer { font-size: .6875rem; font-weight: 600; color: #7a4310; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-ht-dia .fer { font-size: .6875rem; font-weight: 600; color: #7a4310; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; line-height: 1.2; }
 /* taxa de busca fora do horário: a pessoa decide antes de fechar a conta */
 .g-ht-atraso { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--g-amarelo-tint); color: #4a3a06; }
 .g-ht-atraso.ok { background: var(--g-carta-2); color: inherit; }

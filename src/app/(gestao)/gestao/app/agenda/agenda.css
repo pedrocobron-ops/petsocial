@@ -153,3 +153,8 @@ div.g-agd-faixa.almoco { cursor: default; }
   .g-ag-cobrar-linha .g-linha { flex: 1 0 100%; }
   .g-ag-cobrar-linha > .g-btn { margin: -4px 0 8px auto; }
 }
+
+/* semana com horários lado a lado (tablet deitado): o nome quebra em vez de virar "P…" */
+.g-semana-col .g-bloco.estreito { padding: 4px 4px 4px 6px; }
+.g-semana-col .g-bloco.estreito b { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; font-size: .75rem; line-height: 1.15; }
+.g-semana-col .g-bloco.estreito span { text-overflow: clip; font-size: .6875rem; }

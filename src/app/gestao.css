@@ -1105,3 +1105,17 @@ body:has(.g-fundo) .g-fab:not(.aberta) { display: none; }
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 }
+@media print {
+  /* grade não se parte bem entre folhas: no papel, a pilha de cartões vira bloco */
+  .g-main .g-pilha { display: block; }
+  .g-main .g-pilha > * + * { margin-top: 14px; }
+}
+
+/* tablet deitado (960–1279): a data sai da barra de cima para a busca ter espaço; o "Dono · plano…" do menu quebra em vez de cortar */
+@media (min-width: 960px) and (max-width: 1279px) {
+  .g-barra-data { display: none !important; }
+  .g-buscar { min-width: 200px; }
+}
+.g-lado-eu .t span { white-space: normal; overflow-wrap: anywhere; }
+/* com uma janela aberta, o botão redondo do microfone (que sobe acima da barra de baixo) não encosta no rodapé dela */
+body:has(.g-fundo) .g-aba-mic { visibility: hidden; }

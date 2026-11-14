@@ -314,7 +314,7 @@ function Agenda() {
                         const alt = Math.max(26, ((f.getTime() - i.getTime()) / 36e5) * H_HORA - 2);
                         const tutor = a.pets?.clientes?.nome;
                         return (
-                          <button key={a.id} className={`g-bloco${["cancelado", "faltou"].includes(a.status) ? " apagado" : ""}${lotados.has(a.id) ? " lotado" : ""}`} onClick={() => setAberto(a.id)}
+                          <button key={a.id} className={`g-bloco${["cancelado", "faltou"].includes(a.status) ? " apagado" : ""}${lotados.has(a.id) ? " lotado" : ""}${colunas > 1 ? " estreito" : ""}`} onClick={() => setAberto(a.id)}
                             title={`${hora(a.inicio)} · ${a.pets?.nome ?? "Pet"}${tutor ? ` (${tutor})` : ""} · ${nomeDosServicos(a) ?? "Atendimento"}${lotados.has(a.id) ? ` · passa das vagas: ${lotados.get(a.id)} ao mesmo tempo` : ""}`}
                             style={{ top: topoDe(i.getTime()), height: alt, left: `calc(${(ri / colunas) * 100}% + 3px)`, right: `calc(${((colunas - ri - 1) / colunas) * 100}% + 3px)`, "--cor": a.servicos?.cor ?? "#f97316" } as React.CSSProperties}>
                             <b>{a.pets?.nome}</b>
