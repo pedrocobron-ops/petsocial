@@ -9,6 +9,7 @@ import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp, telefoneValido 
 import { useGestao } from "../contexto";
 import { CartaoFidelidade } from "../fidelidade";
 import { DividaDoTutor } from "../financeiro/contas-clientes";
+import { CreditoDoTutor } from "../hotel/credito";
 import { FolhaLancamento } from "../financeiro/comum";
 import FormPet from "../form-pet";
 import { Tile } from "../painel";
@@ -169,6 +170,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
           </section>
 
           {vejoFinanceiro && <DividaDoTutor tutor={cliente} aoMudar={recarregar} />}
+          {vejoFinanceiro && <CreditoDoTutor clienteId={cliente.id} nome={cliente.nome} />}
           {vejoFinanceiro && (
             <div className="g-fila" style={{ flexWrap: "wrap", gap: 8 }}>
               <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setAnotando(true); }}><HandCoins />Anotar o que {cliente.nome.split(" ")[0]} deve</button>

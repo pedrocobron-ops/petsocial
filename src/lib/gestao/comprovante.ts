@@ -52,15 +52,15 @@ export function textoComprovante(p: {
  * Imprime o mesmo comprovante numa folha simples (ou salva em PDF), sem a saudação do WhatsApp.
  * Usa uma moldura escondida na própria página: não abre janela nova nem esbarra no bloqueador de janelas.
  */
-export function imprimirComprovante(texto: string) {
+export function imprimirComprovante(texto: string, titulo = "Comprovante de atendimento") {
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const [, , loja = "", ...resto] = texto.split("\n");
-  const corpo = resto.map((l) => (l ? `<p${/^Total:/.test(l) ? ' class="t"' : ""}>${esc(l)}</p>` : "<hr>")).join("");
+  const corpo = resto.map((l) => (l ? `<p${/^(Total|Total da estadia|Valor na saída|Total pago agora):/.test(l) ? ' class="t"' : ""}>${esc(l)}</p>` : "<hr>")).join("");
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Comprovante · ${esc(loja)}</title><style>
     @page { margin: 14mm; } body { font: 15px/1.5 system-ui, sans-serif; color: #1f1b17; max-width: 380px; margin: 0 auto; }
     h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6a625a; margin: 0 0 14px; }
     p { margin: 2px 0; } p.t { font-weight: 700; font-size: 17px; margin-top: 8px; } hr { border: 0; border-top: 1px dashed #b9ae9f; margin: 10px 0; }
-  </style></head><body><h1>${esc(loja)}</h1><h2>Comprovante de atendimento</h2>${corpo}</body></html>`;
+  </style></head><body><h1>${esc(loja)}</h1><h2>${esc(titulo)}</h2>${corpo}</body></html>`;
   const f = document.createElement("iframe");
   f.setAttribute("aria-hidden", "true");
   f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
