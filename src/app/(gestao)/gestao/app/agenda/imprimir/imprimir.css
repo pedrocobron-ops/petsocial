@@ -54,7 +54,7 @@
 .g-imp-folha table.g-imp-tab.cuidados col.c-cuidados { width: 22%; }
 .g-imp-folha table.g-imp-tab td { overflow-wrap: break-word; }
 .g-imp-folha table.g-imp-tab td.hora { white-space: normal; }
-.g-imp-folha td.hora em { display: inline-block; margin-top: 3px; font: 700 .6875rem/1.2 var(--sans); font-style: normal; text-transform: uppercase; letter-spacing: .04em; color: #b3402e; border: 1.5px solid currentColor; border-radius: 4px; padding: 1px 4px; }
+.g-imp-folha td.hora em { display: inline-block; white-space: nowrap; margin-top: 3px; font: 700 .6875rem/1.2 var(--sans); font-style: normal; text-transform: uppercase; letter-spacing: .04em; color: #b3402e; border: 1.5px solid currentColor; border-radius: 4px; padding: 1px 4px; }
 .g-imp-folha td.hora.atrasada { color: #b3402e; }
 
 .g-imp-folha td small.tel { white-space: nowrap; overflow-wrap: normal; }

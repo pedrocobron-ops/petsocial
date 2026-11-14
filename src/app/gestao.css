@@ -1101,7 +1101,7 @@ body:has(.g-fundo) .g-fab:not(.aberta) { display: none; }
   .g-card-t, .g-card h3, .g-card h2, .g-rotulo { break-after: avoid; }
   .g-grade.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
   .g-prog, .g-prog i, .g-colunas i, .g-legenda i, .g-ranking i, .gf-barras i, .gf-barras span, .g-cm-barra, .g-cm-barra i,
-  .g-tile, .g-tag, .g-ht-oc, .g-ht-dia, .g-ht-legenda i, .g-anel, .g-rel-area .pico, .g-ch-barra, .g-ch-barra i {
+  .g-tile, .g-tag, .g-avatar, .g-ht-oc, .g-ht-dia, .g-ht-legenda i, .g-anel, .g-rel-area .pico, .g-ch-barra, .g-ch-barra i {
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 }
