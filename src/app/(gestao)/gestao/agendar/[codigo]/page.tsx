@@ -96,7 +96,14 @@ export default function AgendarPeloLink() {
   const [info, setInfo] = useState<Info | null | undefined>(undefined);
   const [semRede, setSemRede] = useState(false);
   const [passo, setPasso] = useState<Passo>("servico");
-  const [estadia, setEstadia] = useState<"creche" | "hotel" | null>(null);
+  const [estadia, setEstadiaJa] = useState<"creche" | "hotel" | null>(null);
+  // a escolha de creche ou hotel fica nesta aba: recarregar a página volta para o pedido que estava sendo feito
+  const chaveEstadia = `maestro-link-estadia:${codigo}`;
+  const setEstadia = (t: "creche" | "hotel" | null) => {
+    setEstadiaJa(t);
+    try { if (t) sessionStorage.setItem(chaveEstadia, t); else sessionStorage.removeItem(chaveEstadia); } catch { /* sem armazenamento: segue sem lembrar */ }
+  };
+  const voltouDaEstadia = useRef(false);
 
   const [servicoId, setServicoId] = useState<string | null>(null);
   const [dia, setDia] = useState<string | null>(null);
@@ -148,6 +155,14 @@ export default function AgendarPeloLink() {
   }, [codigo]);
   useEffect(() => { void carregar(); }, [carregar]);
   useEffect(() => { if (info?.nome) document.title = `Agendar: ${info.nome}`; }, [info?.nome]);
+  useEffect(() => {
+    if (!info || voltouDaEstadia.current) return;
+    voltouDaEstadia.current = true;
+    try {
+      const t = sessionStorage.getItem(chaveEstadia);
+      if ((t === "hotel" && info.hotel) || (t === "creche" && info.creche)) setEstadiaJa(t);
+    } catch { /* sem armazenamento */ }
+  }, [info, chaveEstadia]);
   useEffect(() => {
     if (info !== null || !configurado || !codigo) return;
     let vale = true;

@@ -104,12 +104,27 @@ export default function PedidosLink() {
     ]);
     // o sinal das reservas aceitas que ainda esperam o aviso: só quem recebe lê o valor (para a mensagem levar quanto é)
     const sinais = new Map<string, number>();
-    const comReserva = ((semAviso.data ?? []) as Pedido[]).filter((p) => p.estadia_id);
+    const sinaisPagos = new Map<string, number>();
+    let respondidosAinda = (semAviso.data ?? []) as Pedido[];
+    // aceito e depois cancelado em Hotel (ou na Agenda): esse pet sai do aviso; se todos foram cancelados, o aviso some.
+    // Assim a mensagem nunca confirma uma reserva que já não existe.
+    const idsEstadia = respondidosAinda.filter((p) => p.status === "aceito" && p.estadia_id).map((p) => p.estadia_id!);
+    const idsHorario = respondidosAinda.filter((p) => p.status === "aceito" && p.agendamento_id).map((p) => p.agendamento_id!);
+    const [estEstadias, estHorarios] = await Promise.all([
+      idsEstadia.length ? sb.from("estadias").select("id, status").eq("petshop_id", petshop.id).in("id", idsEstadia) : null,
+      idsHorario.length ? sb.from("agendamentos").select("id, status").eq("petshop_id", petshop.id).in("id", idsHorario) : null,
+    ]);
+    const canceladas = new Set([...(estEstadias?.data ?? []).filter((e) => e.status === "cancelada"), ...(estHorarios?.data ?? []).filter((a) => a.status === "cancelado")].map((x) => x.id));
+    if (canceladas.size) respondidosAinda = respondidosAinda.filter((p) => !(p.status === "aceito" && !p.cliente_cancelou_em && ((p.estadia_id && canceladas.has(p.estadia_id)) || (p.agendamento_id && canceladas.has(p.agendamento_id)))));
+    const comReserva = respondidosAinda.filter((p) => p.estadia_id);
     if (vejoFinanceiro && sinalDe(petshop).ativo && comReserva.length) {
       const v = await sb.from("estadias_valores").select("estadia_id, sinal, sinal_estado").eq("petshop_id", petshop.id).in("estadia_id", comReserva.map((p) => p.estadia_id!));
-      for (const x of v.data ?? []) if (x.sinal != null && x.sinal_estado === "a_receber") sinais.set(x.estadia_id, Number(x.sinal));
+      for (const x of v.data ?? []) {
+        if (x.sinal != null && x.sinal_estado === "a_receber") sinais.set(x.estadia_id, Number(x.sinal));
+        if (x.sinal != null && x.sinal_estado === "pago") sinaisPagos.set(x.estadia_id, Number(x.sinal));
+      }
     }
-    return { pendentes: ok(pendentes) as Pedido[], semAviso: (semAviso.data ?? []) as Pedido[], recados: (recados?.data ?? []) as Pedido[], sinais };
+    return { pendentes: ok(pendentes) as Pedido[], semAviso: respondidosAinda, recados: (recados?.data ?? []) as Pedido[], sinais, sinaisPagos };
   }, [petshop.id, comOpcoes, vejoFinanceiro]);
   const dados = tudo?.pendentes;
 
@@ -351,6 +366,20 @@ export default function PedidosLink() {
     if (!s.ativo || !s.valor || (p.tipo !== "hotel" && !s.creche)) return "";
     const politica = s.politica.trim() ? ` ${s.politica.trim()}` : "";
     const valores = lista.map((x) => (x.estadia_id ? tudo?.sinais.get(x.estadia_id) : undefined));
+    const pagos = lista.map((x) => (x.estadia_id ? tudo?.sinaisPagos.get(x.estadia_id) : undefined));
+    // o sinal de todos já entrou: a mensagem diz que foi recebido, sem pedir de novo
+    if (pagos.every((v): v is number => v != null)) {
+      const total = Math.round(pagos.reduce((t, v) => t + v, 0) * 100) / 100;
+      return ` O sinal de ${brl(total)} já foi recebido.${politica}`;
+    }
+    // parte pago, parte a receber: pede só o que falta
+    if (valores.some((v) => v != null) && valores.every((v, i) => v != null || pagos[i] != null)) {
+      const falta = lista.flatMap((x, i) => (valores[i] != null ? [{ nome: x.pet_nome, v: valores[i]! }] : []));
+      const total = Math.round(falta.reduce((t, x) => t + x.v, 0) * 100) / 100;
+      const partes = lista.length > 1 ? ` (${listaDe(falta.map((x) => `${brl(x.v)} de ${x.nome}`))})` : "";
+      const pix = pixDoSinal(petshop);
+      return ` Para garantir a reserva, pedimos um sinal de ${brl(total)}${partes}.${politica}${pix ? ` Pix: ${pix}.` : " Me diga como prefere pagar."}`;
+    }
     if (valores.every((v): v is number => v != null)) {
       const total = Math.round(valores.reduce((t, v) => t + v, 0) * 100) / 100;
       const partes = lista.length > 1 ? ` (${listaDe(lista.map((x, i) => `${brl(valores[i])} de ${x.pet_nome}`))})` : "";
