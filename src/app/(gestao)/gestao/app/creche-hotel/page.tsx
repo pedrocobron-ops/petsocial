@@ -799,7 +799,7 @@ export default function CrecheHotel() {
             <button type="button" className="g-btn pri" onClick={() => { const e = chegando; setChegando(null); void checkIn(e, "reservado"); }}>Chegou em {dataCurta(chegando.entrada)}</button>
           </>}>
           <div className="g-pilha">
-            <p>A reserva era para <b>{dataCompleta(chegando.entrada)}, {horaCurta(chegando.entrada)}</b>{chegando.saida_prevista ? <>, com saída em <b>{dataCompleta(chegando.saida_prevista)}</b></> : null}, e esse dia já passou.</p>
+            <p>A chegada estava marcada para <b>{dataCompleta(chegando.entrada)}, {horaCurta(chegando.entrada)}</b>, e esse dia já passou{chegando.saida_prevista ? <>. A saída continua em <b>{dataCompleta(chegando.saida_prevista)}</b></> : null}.</p>
             <p className="g-muted g-p">
               Se o pet veio no dia reservado e só faltou anotar, toque em <b>Chegou em {dataCurta(chegando.entrada)}</b>: a estadia fica com as datas da reserva e {chegando.tipo === "hotel" ? "cada noite é cobrada no dia certo" : "os dias contam desde lá"}.
               Se ele está chegando só agora, toque em <b>Chegou agora</b>: a estadia começa neste momento.
@@ -959,7 +959,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
     // reserva com a data que já passou
     if (!emCasa && isoDia(entrada) < isoDia(agora) && !(await confirmar({
       titulo: "Essa data já passou",
-      texto: `A entrada está em ${dataCompleta(entrada)}, antes de hoje. Se o pet já veio, volte e escolha "Chegou agora". Marcar a reserva nessa data mesmo assim?`,
+      texto: `A entrada está em ${dataCompleta(entrada)}, antes de hoje. Se o pet está aqui desde esse dia, marque mesmo assim e, no check-in, escolha "Chegou em ${dataCurta(entrada)}": cada noite fica no dia certo. Marcar a reserva em ${dataCurta(entrada)}?`,
       confirmar: "Marcar mesmo assim",
     }))) return;
     // casa cheia em algum dia do período

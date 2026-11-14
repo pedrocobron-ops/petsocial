@@ -543,18 +543,21 @@ const BASE: TopicoBase[] = [
       "Se o tutor ainda deve alguma conta, ela aparece em ainda deve, com a pergunta receber junto? Marque para dar baixa nela neste mesmo pagamento.",
       "Escolha Paga agora e a forma de pagamento, ou Cliente paga depois.",
       "Toque em Receber, o botão que mostra o valor.",
-      "Na janela Conta fechada, toque em Mandar comprovante para abrir o WhatsApp do tutor com o comprovante pronto.",
+      "Na janela Conta fechada, toque em Mandar comprovante para abrir o WhatsApp do tutor com o comprovante pronto, ou em Imprimir comprovante para imprimir ou salvar em PDF.",
     ],
     dicas: [
       "Usando o pacote, o botão vira Usar o pacote e encerrar, e nenhum dinheiro é lançado.",
+      { so: ["hotel"], texto: "Pet que sai antes e já tinha pago mais do que a estadia: a conta mostra Pago a mais e pergunta o que fazer. Devolver lança uma saída de hoje na categoria Devolução, ligada ao tutor. Deixar como crédito do tutor guarda o valor na ficha dele, e o próximo check-out oferece usar. Não devolver (multa ou combinado) deixa o valor com o hotel, com o motivo que você escrever. Sem escolher, a conta não fecha." },
+      { so: ["hotel"], texto: "Tutor com crédito: no check-out aparece Usar o crédito, já marcado. Desmarque se não for usar agora." },
+      { so: ["hotel"], texto: "Dois pets do mesmo tutor buscados juntos: a taxa de busca fora do horário entra na conta do primeiro. No segundo, a folha avisa que já foi cobrada e vem marcado Não cobrar de novo." },
       "Quem não cuida do caixa toca em Fazer check-out: a estadia encerra e a cobrança fica na lista Check-outs para cobrar, para quem cuida do caixa.",
       "Se a taxa de busca fora do horário está ligada e o pet saiu depois da hora, a folha pergunta se a taxa entra na conta: toque em Cobrar ou em Não cobrar a taxa. Sem escolher, a conta não fecha.",
-      "Reserva com sinal: o sinal aparece numa linha própria e sai da conta sozinho.",
+      "Reserva com sinal: o sinal aparece numa linha própria e sai da conta sozinho. O que foi pago a mais nunca vira acréscimo: o comprovante mostra o total da estadia, o que foi pago antes e o que foi devolvido ou ficou de crédito.",
       { so: ["hotel"], texto: "Com temporada, preço de feriado ou desconto do segundo pet ligados, toque em ver noite por noite para conferir a diária de cada noite." },
       "Depois, em Histórico, toque na estadia para ver a conta como foi cobrada e mandar o comprovante de novo.",
       "O comprovante não é nota fiscal, e o texto diz isso.",
     ],
-    palavras: ["check-out", "checkout", "check out", "fazer check-out", "fazer o check-out", "check-out do hotel", "check-out da creche", "foi embora", "encerrar estadia", "receber hotel", "receber creche", "diarias", "check-out sem cobranca", "acertar estadia", "check-outs para cobrar", "extra no hotel", "conta do hotel", "comprovante do hotel", "comprovante da estadia", "recibo do hotel", "receber junto", "ainda deve", "vai embora", "indo embora", "hospede vai embora", "saiu do hotel", "saida do hospede", "cobrar a estadia", "cobrar o hotel", "cobrar a hospedagem", "fechar a conta do hotel", "veio buscar", "buscar do hotel", "dono veio buscar", "buscar o cachorro do hotel", "veio buscar o cachorro", "hora de ir embora", "receber a diaria", "recebo a diaria", "receber a diaria da creche", "cobrar a diaria", "cobro a diaria"] },
+    palavras: ["check-out", "checkout", "check out", "fazer check-out", "fazer o check-out", "check-out do hotel", "check-out da creche", "foi embora", "encerrar estadia", "receber hotel", "receber creche", "diarias", "check-out sem cobranca", "acertar estadia", "check-outs para cobrar", "extra no hotel", "conta do hotel", "comprovante do hotel", "comprovante da estadia", "recibo do hotel", "imprimir comprovante", "recibo impresso", "comprovante em pdf", "saiu antes", "buscou antes", "pagou adiantado", "pagou a mais", "devolver a diferenca", "devolucao", "credito do tutor", "credito", "sobrou do sinal", "receber junto", "ainda deve", "vai embora", "indo embora", "hospede vai embora", "saiu do hotel", "saida do hospede", "cobrar a estadia", "cobrar o hotel", "cobrar a hospedagem", "fechar a conta do hotel", "veio buscar", "buscar do hotel", "dono veio buscar", "buscar o cachorro do hotel", "veio buscar o cachorro", "hora de ir embora", "receber a diaria", "recebo a diaria", "receber a diaria da creche", "cobrar a diaria", "cobro a diaria"] },
   { id: "creche-encerrar", titulo: "Como encerrar o dia da creche de uma vez", secao: "creche", usa: ["creche"], quem: "todos", rota: CRECHE,
     passos: [
       "No fim do dia, em Creche e hotel, abra Casa agora e toque em Encerrar o dia da creche, na faixa do alto.",
@@ -649,8 +652,7 @@ const BASE: TopicoBase[] = [
       "Toque em Imprimir ou salvar em PDF.",
     ],
     dicas: [
-      "A folha mostra quem está na casa, quem chega e quem sai, com o telefone do tutor, as observações e os alertas do pet.",
-      "A folha mostra quem está na casa, quem chega e quem sai, com o telefone do tutor, as observações e os alertas do pet. Quem passou da hora de saída sai marcado com Saída atrasada, e a reserva que não fez check-in vai para Reservas que não chegaram.",
+      "A folha mostra quem está na casa, quem chega e quem sai, com o telefone do tutor, os alertas e as observações da ficha do pet (remédio, cuidados) e a observação da reserva. Quem passou da hora de saída sai marcado com Saída atrasada, e a reserva que não fez check-in vai para Reservas que não chegaram.",
       { so: ["creche"], texto: "Os mensalistas esperados na creche vêm numa lista à parte." },
     ],
     atencao: ["A folha não mostra valores."],
@@ -729,13 +731,16 @@ const BASE: TopicoBase[] = [
       "O dono liga a opção uma vez: em Meu pet shop, no cartão Cuidado com o tutor, liga Lista de espera e toca em Salvar opções.",
       "Ao marcar uma reserva num dia cheio, toque em Colocar na lista de espera, embaixo do aviso de vagas. Ou, em Ocupação, no cartão Lista de espera, toque em Colocar na lista.",
       "Confira o pet e as datas e toque em Colocar na lista.",
-      "Quando abrir vaga em todos os dias pedidos, aparece o aviso Abriu vaga, em Casa agora e na Chamada. Toque nele.",
+      { so: ["creche"], texto: "Quando abrir vaga em todos os dias pedidos, aparece o aviso Abriu vaga, em Casa agora e na Chamada. Toque nele." },
+      { sem: ["creche"], texto: "Quando abrir vaga em todos os dias pedidos, aparece o aviso Abriu vaga, em Casa agora e na tela Hoje. Toque nele." },
       "No cartão Lista de espera, toque em Avisar que abriu vaga: o WhatsApp abre com a mensagem pronta.",
       "O tutor quis? Toque em Marcar reserva: o formulário abre com a entrada e a saída que estavam na lista. Confira e salve. O pet sai da lista sozinho.",
     ],
     dicas: [
-      "A vaga abre quando uma reserva é cancelada, quando um hóspede sai antes ou quando um mensalista leva falta no dia.",
-      "A ordem da lista é a de chegada.",
+      { so: ["creche"], texto: "A vaga abre quando uma reserva é cancelada, quando um hóspede sai antes ou quando um mensalista leva falta no dia." },
+      { sem: ["creche"], texto: "A vaga abre quando uma reserva é cancelada ou quando um hóspede sai antes." },
+      "A ordem da lista é a de chegada, e cada um mostra o lugar na fila (1º da fila, 2º da fila). Se abriu uma vaga só, só o primeiro que cabe nos dias dele fica com Abriu vaga; os outros mostram que a vaga é de quem chegou antes. Se o primeiro não quiser, toque em Tirar: a vaga passa para o próximo.",
+      { so: ["hotel"], texto: "No hotel, a lista guarda também a hora de chegada e a de buscar. Marcar reserva já abre o formulário com elas." },
       "Com a caixa do link do cliente marcada, o tutor que escolhe um dia cheio pode pedir para entrar na lista. Ele aparece com a etiqueta pediu pelo link.",
       "Tirar remove o pet da lista. Pedido de dia que já passou some sozinho.",
     ],
@@ -2203,9 +2208,22 @@ function tituloPara(titulo: string, petshop: ComModulos | null): string {
     .replace("cuidados do hóspede", creche ? "cuidados do pet na creche" : "cuidados do hóspede");
 }
 
+/** Quem tem só hotel (ou só creche) lê nos passos o nome que a tela dele mostra ("Opções do hotel", o cartão "Hotel"). */
+function textoDaCasa(texto: string, petshop: ComModulos | null): string {
+  if (!petshop) return texto;
+  const creche = usaModulo(petshop, "creche"), hotel = usaModulo(petshop, "hotel");
+  if (creche === hotel) return texto;
+  const casa = creche ? "Creche" : "Hotel";
+  return texto
+    .replaceAll("Opções do hotel e da creche", creche ? "Opções da creche" : "Opções do hotel")
+    .replaceAll("cartão Creche e hotel", `cartão ${casa}`)
+    .replaceAll("Em Creche e hotel,", `Em ${casa},`)
+    .replaceAll("em Creche e hotel", `em ${casa}`);
+}
+
 /** O tópico em texto puro. Com pet shop, saem os passos e as dicas das partes que ele não usa. */
 function pronto(t: TopicoBase, petshop: ComModulos | null): Topico {
-  const linhas = (l?: Passo[]) => (l ?? []).filter((x) => typeof x === "string" || valePasso(petshop, x)).map((x) => (typeof x === "string" ? x : x.texto));
+  const linhas = (l?: Passo[]) => (l ?? []).filter((x) => typeof x === "string" || valePasso(petshop, x)).map((x) => textoDaCasa(typeof x === "string" ? x : x.texto, petshop));
   const passos = linhas(t.passos), dicas = linhas(t.dicas), atencao = linhas(t.atencao);
   const limpo = { ...t, titulo: tituloPara(t.titulo, petshop), passos, dicas: dicas.length ? dicas : undefined, atencao: atencao.length ? atencao : undefined };
   return { ...limpo, resposta: respostaDe(limpo) };
