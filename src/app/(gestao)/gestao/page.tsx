@@ -11,7 +11,8 @@ import { PLANOS } from "@/lib/gestao/planos";
 import { brlCurto } from "@/lib/gestao/util";
 import "./produto.css";
 
-const DESDE = brlCurto(PLANOS[0].preco);
+// espaço que não quebra: "R$ 59" fica sempre na mesma linha
+const DESDE = brlCurto(PLANOS[0].preco).replace(" ", "\u00a0");
 const TITULO = `Maestro Pet Gestão: banho e tosa, creche, hotel e loja num sistema só, desde ${DESDE}`;
 
 export const metadata: Metadata = {
@@ -171,9 +172,7 @@ function Tela({ arquivo, alt, celular, prioridade }: TelaVenda & { prioridade?: 
   return (
     <span className={celular ? "gp-fone" : "gp-tela"}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={`/gestao/telas/${arquivo}.webp`} alt={alt} width={celular ? 780 : 1760} height={celular ? 1328 : 1093}
-        sizes={celular ? "(min-width: 900px) 300px, 70vw" : "(min-width: 1200px) 640px, (min-width: 900px) 55vw, 100vw"}
-        loading={prioridade ? "eager" : "lazy"} fetchPriority={prioridade ? "high" : undefined} decoding="async" />
+      <img src={`/gestao/telas/${arquivo}.webp`} alt={alt} width={celular ? 780 : 1760} height={celular ? 1328 : 1093}        loading={prioridade ? "eager" : "lazy"} fetchPriority={prioridade ? "high" : undefined} decoding="async" />
     </span>
   );
 }
@@ -201,9 +200,9 @@ export default function Pagina() {
         <div className="gp-c gp-capa-grade">
           <div className="gp-capa-texto">
             <h1>Banho e tosa, creche, hotel e loja. <em>Um sistema só</em>, no celular.</h1>
-            <p>Todas as funções em todos os planos, desde {DESDE} por mês. Você marca o que o seu negócio faz e o sistema mostra só isso. E fala “banho da Mel sexta às 10”: o Mozart deixa pronto para você confirmar.</p>
+            <p>Você marca o que o seu negócio faz e o sistema mostra só isso. E fala “banho da Mel sexta às 10”: o Mozart deixa pronto para você confirmar.</p>
             <ul className="gp-selos">
-              <li><Check />Todas as funções em todos os planos</li>
+              <li><Check />Todas as funções em todos os planos, desde {DESDE}</li>
               <li><Check />Mozart, assistente por voz e texto, sem pagar à parte</li>
               <li><Check />Link para o cliente pedir banho, creche e hotel</li>
             </ul>
