@@ -1133,7 +1133,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
           <div className="g-aviso" role="status" style={{ marginBottom: 0 }}><CalendarCheck /><span className="g-cresce"><b>{pet.nome} é mensalista e esse dia não é do plano.</b> A reserva entra como dia extra: guarda a vaga, aparece na Chamada do dia e, quando ele vier, vai para a próxima mensalidade{vejoFinanceiro && valorDoExtra != null ? ` (${brl(valorDoExtra)})` : ""}. Nada é cobrado na porta. Se não vier, é só cancelar a reserva.</span></div>
         )}
         {planoDoPet && jaAqui && (
-          <p className="g-muted g-pp" role="status">{pet.nome} é mensalista: a chegada dele se marca na Chamada (em dia fora do plano, por Veio fora do dia, e o dia vai para a mensalidade). Por aqui entra como diária avulsa, cobrada na saída.</p>
+          <p className="g-muted g-pp" role="status">{pet.nome} é mensalista: a chegada se marca na Chamada (em dia fora do plano, por Veio fora do dia, e o dia vai para a mensalidade). Por aqui entra como diária avulsa, cobrada na saída.</p>
         )}
         {vejoFinanceiro && !reservaExtra && <Campo rotulo={`Valor da diária (${tipo === "hotel" ? "por noite" : "por dia"})`}
           dica={fixa == null ? "Defina o preço da diária em Meu pet shop para ele já vir preenchido."
