@@ -203,9 +203,6 @@ export default function PedidosLink() {
     if (!portes) {
       const faltam = await semPorteParaPerguntar(lista);
       if (faltam.length) { setPerguntaPorte({ lista, grupo, decisao, faltam, respostas: {} }); setOcupado(null); return; }
-    } else {
-      const escolhidos = Object.entries(portes).filter(([, v]) => v !== "depois");
-      for (const [id, porte] of escolhidos) await sb.from("pedidos_agendamento").update({ porte }).eq("id", id).eq("petshop_id", petshop.id).eq("status", "pendente").select("id");
     }
     const feitos: Pedido[] = [];
     let falha: unknown = null;
@@ -256,16 +253,25 @@ export default function PedidosLink() {
     const comPorte = new Set(pets.map((x) => semAcento(x.nome)));
     return candidatos.filter((p) => !comPorte.has(semAcento(p.pet_nome)));
   }
-  /** Depois de aceitar com o porte respondido na hora: guarda o porte na ficha do pet (se estava em branco) ou deixa o lembrete no horário. */
+  /**
+   * Depois de aceitar com o porte respondido na hora. Com o porte: guarda na ficha do pet (se estava em branco) e coloca no
+   * horário o preço do serviço para esse porte (o banco deixou em branco, porque o pedido veio sem porte).
+   * Com "Não sei ainda": o horário segue sem valor e ganha o lembrete para conferir na hora.
+   */
   async function depoisDoPorte(agendamentoId: unknown, resposta: string) {
     if (typeof agendamentoId !== "string") return;
     try {
-      const ag = (await sb.from("agendamentos").select("pet_id, obs").eq("id", agendamentoId).eq("petshop_id", petshop.id).maybeSingle()).data;
+      const ag = (await sb.from("agendamentos").select("pet_id, servico_id, preco, obs").eq("id", agendamentoId).eq("petshop_id", petshop.id).maybeSingle()).data;
       if (!ag) return;
       if (resposta === "depois") {
         if (!(ag.obs ?? "").includes(NOTA_PORTE)) await sb.from("agendamentos").update({ obs: [ag.obs, NOTA_PORTE].filter(Boolean).join(" ").slice(0, 400) }).eq("id", agendamentoId).eq("petshop_id", petshop.id).select("id");
-      } else await sb.from("pets").update({ porte: resposta }).eq("id", ag.pet_id).eq("petshop_id", petshop.id).is("porte", null).select("id");
-    } catch { /* o horário já foi marcado: o porte fica para a ficha */ }
+        return;
+      }
+      await sb.from("pets").update({ porte: resposta }).eq("id", ag.pet_id).eq("petshop_id", petshop.id).is("porte", null).select("id");
+      const s = servicos.find((x) => x.id === ag.servico_id);
+      const preco = s ? { P: s.preco_p, M: s.preco_m, G: s.preco_g, GG: s.preco_gg }[resposta] ?? null : null;
+      if (ag.preco == null && preco != null) await sb.from("agendamentos").update({ preco }).eq("id", agendamentoId).eq("petshop_id", petshop.id).is("preco", null).select("id");
+    } catch { /* o horário já foi marcado: o porte e o valor ficam para acertar na ficha e no horário */ }
   }
 
   /** Reserva de hotel aceita pelo link com a opção de diária por porte ligada: a diária da reserva passa a ser a do porte do pedido. */

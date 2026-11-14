@@ -130,17 +130,30 @@ function Grupo({ id, titulo, icone, tom, abertoDeInicio, largo, cartoes }: {
   useEffect(() => {
     const lembrado = lerLembrado(chave);
     if (lembrado) setAberto(lembrado === "1");
-    // atalho de outra tela para um cartão daqui de dentro
-    const alvo = window.location.hash.length > 1 ? raiz.current?.querySelector(`#${CSS.escape(decodeURIComponent(window.location.hash.slice(1)))}`) : null;
-    if (alvo) { setAberto(true); setTimeout(() => alvo.scrollIntoView({ block: "start" }), 60); }
+    // atalho de outra tela para um cartão daqui de dentro (#opcoes-cobranca…): o cartão pode demorar um instante para aparecer
+    let procurar = 0;
+    const pelaAncora = () => {
+      const ancora = window.location.hash.length > 1 ? decodeURIComponent(window.location.hash.slice(1)) : "";
+      if (!ancora) return;
+      let tentativas = 0;
+      window.clearInterval(procurar);
+      procurar = window.setInterval(() => {
+        const alvo = raiz.current?.querySelector(`#${CSS.escape(ancora)}`);
+        if (alvo) { setAberto(true); window.setTimeout(() => alvo.scrollIntoView({ block: "start" }), 80); }
+        if (alvo || ++tentativas > 25) window.clearInterval(procurar);
+      }, 150);
+    };
+    pelaAncora();
+    window.addEventListener("hashchange", pelaAncora);
     const ir = (e: Event) => {
       const d = (e as CustomEvent<{ id: string; cartao?: number }>).detail;
       if (d.id !== id) return;
       setAberto(true);
-      setTimeout(() => (d.cartao == null ? raiz.current : raiz.current?.querySelector(`[data-cartao="${d.cartao}"]`) ?? raiz.current)?.scrollIntoView({ block: "start", behavior: "smooth" }), 30);
+      guardarLembrado(chave, "1");
+      window.setTimeout(() => (d.cartao == null ? raiz.current : raiz.current?.querySelector(`[data-cartao="${d.cartao}"]`) ?? raiz.current)?.scrollIntoView({ block: "start" }), 60);
     };
     window.addEventListener(EVENTO_GRUPO, ir);
-    return () => window.removeEventListener(EVENTO_GRUPO, ir);
+    return () => { window.removeEventListener(EVENTO_GRUPO, ir); window.removeEventListener("hashchange", pelaAncora); window.clearInterval(procurar); };
   }, [id, chave]);
   return (
     <section className={`g-mp-grupo${aberto ? " aberto" : ""}`} id={`grupo-${id}`} ref={raiz} aria-label={titulo}>
