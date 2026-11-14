@@ -136,7 +136,8 @@ export default function BlocoComissao({ de, ate, aoCalcular }: { de: string; ate
       ) : <p className="g-muted g-p">Ninguém da equipe tem comissão definida. A porcentagem de cada pessoa fica no cadastro da equipe.</p>}
       {(() => {
         // diferenças de períodos já pagos que não aparecem nas linhas acima (o período escolhido não cobre aquele pagamento inteiro)
-        const outras = (dados?.pendencias ?? []).filter((x) => !(x.de >= de && x.ate <= ate));
+        // (com o período ainda aberto, a linha mostra o que falta mas não paga: o botão fica aqui, no período que foi pago)
+        const outras = (dados?.pendencias ?? []).filter((x) => !(x.de >= de && x.ate <= ate && ate <= hoje));
         if (!outras.length) return null;
         return (
           <div className="g-aviso amarelo gr-com-pend" role="status">

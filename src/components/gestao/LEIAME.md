@@ -28,6 +28,13 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
 - Opções do negócio: chegam em `petshop.opcoes` pela função `petshop_opcoes` (nunca `select("opcoes")`). Opção nova com preço
   dentro entra na lista da função `opcoes_sem_valores`, no banco, para a equipe sem dinheiro não ler pela API.
 - Dinheiro que entra ou sai na hora: `lancarPago()` de `src/lib/gestao/dinheiro.ts` (já liga ao caixa aberto).
+- Toque duplo não lança duas vezes: toda folha que grava dinheiro ou estoque usa `useOperacao()` (`src/lib/gestao/uma-vez.ts`).
+  `op.fazer(async (chave) => …)` trava na hora do primeiro toque e entrega a chave da operação; passe a chave para
+  `lancarPago`, `lancarAReceber`, `receberConta`, `quitarConta`, `baixarEstoque`, `gravarMovimentos` (ou `p_chave` nas funções do banco).
+  O banco aceita cada chave uma vez por pet shop e, repetida, devolve o que já gravou. Operação com mais de uma gravação:
+  `parteDaChave(chave, "nome")` para cada uma. Devolva `false` quando gravou só uma parte e deu erro (a nova tentativa reaproveita a chave).
+- Atendimento concluído sem conta fechada: `useParaCobrar()` e `<AtendimentosParaCobrar />` (`agenda/para-cobrar.tsx`); o banco diz
+  quais são, sem valor. Preço mudado e desconto na venda ficam em `precos_alterados` (o banco anota sozinho; só quem cuida do financeiro lê).
 - Datas: `agendamentos.inicio/fim` são `timestamptz`; campos `date` são texto `AAAA-MM-DD` (use `isoDia`, `deIsoDia`).
   Formatação em `src/lib/gestao/util.ts` (`brl`, `hora`, `dataAmigavel`, `dataCurta`, `fmtTelefone`, `linkWhatsApp`…).
 

@@ -129,7 +129,9 @@ div.g-agd-faixa.almoco { cursor: default; }
 .g-ag-cobrar-linha .g-linha { flex: 1; min-width: 0; align-items: center; border-bottom: 0; }
 .g-ag-cobrar-linha .g-linha .d { text-align: right; }
 .g-ag-cobrar-linha .g-linha .d span { display: block; font-size: .75rem; color: var(--g-muted, #6a625a); }
+.g-ag-cobrar h3 svg { flex: none; }
 @media (max-width: 520px) {
   .g-ag-cobrar-linha { flex-wrap: wrap; }
+  .g-ag-cobrar-linha .g-linha { flex: 1 0 100%; }
   .g-ag-cobrar-linha > .g-btn { margin: -4px 0 8px auto; }
 }

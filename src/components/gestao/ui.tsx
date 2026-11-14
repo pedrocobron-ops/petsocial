@@ -223,6 +223,19 @@ if (typeof window !== "undefined") {
   if (id) guarda = retratoDaGuarda(id);
 }
 
+/**
+ * A folha acabou de fechar: por um instante, nada embaixo dela recebe toque. Sem isso, o segundo toque de um toque duplo
+ * no botão do rodapé caía no que estava atrás (o menu de baixo no celular, uma linha da lista) e a pessoa mudava de tela sem querer.
+ */
+function segurarSegundoToque() {
+  if (typeof document === "undefined") return;
+  const capa = document.createElement("div");
+  capa.setAttribute("aria-hidden", "true");
+  capa.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:transparent;touch-action:none";
+  document.body.appendChild(capa);
+  window.setTimeout(() => capa.remove(), 350);
+}
+
 export function Folha({ titulo, aoFechar, children, rodape, larga }: {
   titulo: React.ReactNode; aoFechar: () => void; children: React.ReactNode; rodape?: React.ReactNode; larga?: boolean;
 }) {
@@ -279,6 +292,7 @@ export function Folha({ titulo, aoFechar, children, rodape, larga }: {
       conferirGuarda();
       no?.removeEventListener("input", digitou); no?.removeEventListener("change", digitou); window.removeEventListener(EVENTO_AVISOU, gravou);
       document.documentElement.style.overflow = antes;
+      segurarSegundoToque();
     };
   }, []);
   return (
