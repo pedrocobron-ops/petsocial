@@ -65,9 +65,12 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
 
   // cães por dia da semana: a média dos dias em que a creche abriu no período (até hoje)
   const diaDe = (e: (typeof vieram)[number]) => e.dia ?? isoDia(new Date(e.entrada));
+  // começa no primeiro dia com creche de verdade (o primeiro plano ou a primeira presença): antes disso não tinha cão para contar
+  const comeco = [...dados.planos.map((p) => p.inicio), ...vieram.map(diaDe)].sort()[0] ?? deIso;
+  const desde = comeco > deIso ? deIsoDia(comeco) : new Date(de);
   const porDia = DIAS_SEMANA.map((d) => {
     let abertos = 0;
-    for (let x = new Date(de); isoDia(x) <= ateIso && isoDia(x) <= hoje; x = somaDias(x, 1)) {
+    for (let x = new Date(desde); isoDia(x) <= ateIso && isoDia(x) <= hoje; x = somaDias(x, 1)) {
       if (x.getDay() === d.id && abreNoDia(petshop.horario, isoDia(x)) && !diaFechado(isoDia(x))) abertos++;
     }
     const caes = vieram.filter((e) => deIsoDia(diaDe(e)).getDay() === d.id).length;
