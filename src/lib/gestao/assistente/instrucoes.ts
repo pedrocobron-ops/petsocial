@@ -45,7 +45,8 @@ export function contextoDoPetshop(c: Contexto) {
   const al = [1, 2, 3, 4, 5, 6, 0].map((d) => h?.[String(d)]?.almoco).find((x) => x?.de && x.ate);
   const almoco = al ? `${al.de} às ${al.ate}` : null;
   const preco = (v: number | null) => (v == null ? "-" : String(v));
-  const servicos = c.servicos.filter((s) => s.ativo).map((s) => `- ${s.nome} | id ${s.id} | ${s.duracao_min} min | preço por porte P ${preco(s.preco_p)}, M ${preco(s.preco_m)}, G ${preco(s.preco_g)}, GG ${preco(s.preco_gg)}`).join("\n");
+  // quem não recebe não vê a lista de preços (o banco nem entrega): o Mozart também não fala de valor
+  const servicos = c.servicos.filter((s) => s.ativo).map((s) => `- ${s.nome} | id ${s.id} | ${s.duracao_min} min${c.vejoFinanceiro ? ` | preço por porte P ${preco(s.preco_p)}, M ${preco(s.preco_m)}, G ${preco(s.preco_g)}, GG ${preco(s.preco_gg)}` : ""}`).join("\n");
   const equipe = c.equipe.filter((p) => p.ativo).map((p) => `- ${p.nome} | id ${p.id} | ${p.papel}${p.atende ? " | atende na agenda" : ""}`).join("\n");
   return `Pet shop: ${c.petshop.nome}${c.petshop.cidade ? ` (${c.petshop.cidade}${c.petshop.uf ? `/${c.petshop.uf}` : ""})` : ""}
 Funcionamento: ${horario}${almoco ? `\nAlmoço: fechado das ${almoco}, nos dias que continuam abertos depois (não ofereça horário nesse intervalo)` : ""}

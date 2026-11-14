@@ -1,6 +1,6 @@
 "use client";
 
-import { COLS_MOVIMENTO, COLS_PRODUTO, comCustos, comCustosDeMovimento } from "@/lib/gestao/reservado";
+import { COLS_MOVIMENTO, COLS_PRODUTO, comCustos, comCustosDeMovimento, comPrecosDeProduto } from "@/lib/gestao/reservado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -72,7 +72,7 @@ export default function Estoque() {
   const [importando, setImportando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () =>
-    (await comCustos(sb, petshop.id, await lerTudo<{ id: string }>((de, ate, contar) => sb.from("produtos").select(COLS_PRODUTO, contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)))) as unknown as Produto[],
+    (await comCustos(sb, petshop.id, await comPrecosDeProduto(sb, petshop.id, await lerTudo<{ id: string }>((de, ate, contar) => sb.from("produtos").select(COLS_PRODUTO, contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate))))) as unknown as Produto[],
   [petshop.id]);
 
   // saídas dos últimos 30 dias: só para o resumo do topo (se a busca falhar, o cartão fica de fora)

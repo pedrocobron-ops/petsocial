@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronRight, HandCoins } from "lucide-react";
 import { nomeDosServicos, valorDoHorario, servicosAMais } from "@/lib/gestao/servicos-do-horario";
-import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
+import { COLS_PACOTE_CLIENTE, comPrecosDeAgendamento } from "@/lib/gestao/reservado";
 import { SELECT_AGENDAMENTO, type AgendamentoCompleto, type PacoteCliente } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, hora, isoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -51,7 +51,7 @@ export function AtendimentosParaCobrar({ aoMudar }: { aoMudar?: () => void }) {
     if (!vejoFinanceiro || !ids) return { lista: [] as AgendamentoCompleto[], pacotes: new Map<string, PacoteCliente>() };
     const r = await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id).in("id", ids.split(",").slice(0, 200)).order("inicio");
     if (r.error) throw new Error(r.error.message);
-    const lista = (r.data ?? []) as unknown as AgendamentoCompleto[];
+    const lista = await comPrecosDeAgendamento(sb, petshop.id, (r.data ?? []) as unknown as AgendamentoCompleto[]) as unknown as AgendamentoCompleto[];
     // pet com pacote que cobre o serviço principal (a mesma regra do cartão do horário): a conta oferece o pacote primeiro,
     // para ninguém cobrar de novo o que o cliente já pagou no pacote
     const pacotes = new Map<string, PacoteCliente>();

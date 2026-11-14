@@ -1437,12 +1437,20 @@ isOneToOne: false
 "admin_uso":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"agendamento_preco_da_tabela":
+{ Args: { "p_id": string }; Returns: boolean
+                           },
 "agendamento_servicos_definir":
 { Args: { "p_agendamento": string,"p_servicos": Json }; Returns: number
                            },
 "agendamentos_para_cobrar":
 { Args: { "p": string,"p_ate"?: string,"p_de"?: string }; Returns: {
               "id": string,"inicio": string
+            }[]
+                           },
+"agendamentos_precos":
+{ Args: { "p": string,"p_ids": (string)[] }; Returns: {
+              "agendamento_id": string,"id": string,"preco": number
             }[]
                            },
 "alteracoes_de_valores":
@@ -1821,6 +1829,11 @@ isOneToOne: false
               "id": string,"nome": string,"telefone": string
             }[]
                            },
+"petshop_diarias":
+{ Args: { "p": string }; Returns: {
+              "diaria_creche": number,"diaria_hotel": number,"id": string
+            }[]
+                           },
 "petshop_opcoes":
 { Args: { "p": string }; Returns: Json
                            },
@@ -1835,9 +1848,17 @@ isOneToOne: false
 "petshops_do_financeiro":
 { Args: Record<PropertyKey, never>; Returns: string[]
                            },
+"preco_de_tabela":
+{ Args: { "p_pet": string,"p_petshop": string,"p_servico": string }; Returns: number
+                           },
 "precos_dos_pacotes":
 { Args: { "p": string }; Returns: {
               "id": string,"preco": number,"vendido": boolean
+            }[]
+                           },
+"produtos_precos":
+{ Args: { "p": string }; Returns: {
+              "id": string,"preco_venda": number
             }[]
                            },
 "produtos_reservado":
@@ -1896,6 +1917,11 @@ isOneToOne: false
 "series_acabando":
 { Args: { "p": string }; Returns: {
               "cada_semanas": number,"pet_id": string,"pet_nome": string,"restantes": number,"serie_id": string,"servico_nome": string,"tutor_nome": string,"ultimo": string
+            }[]
+                           },
+"servicos_precos":
+{ Args: { "p": string }; Returns: {
+              "id": string,"preco_g": number,"preco_gg": number,"preco_m": number,"preco_p": number,"varia": boolean
             }[]
                            },
 "sou_admin":

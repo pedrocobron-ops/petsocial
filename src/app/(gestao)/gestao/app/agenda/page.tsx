@@ -24,6 +24,7 @@ import FormBloqueio from "@/components/gestao/agenda/form-bloqueio";
 import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "@/components/gestao/calendario";
 import "./agenda.css";
+import { comPrecosDeAgendamento } from "@/lib/gestao/reservado";
 
 type Novo = { dia: string; hora?: string; pet?: PetComTutor | null; profissional?: string | null };
 const H_HORA = 64; // altura de uma hora na visão de semana, em px
@@ -54,9 +55,11 @@ function Agenda() {
   const segunda = inicioDaSemana(data);
   const semana = useMemo(() => Array.from({ length: 7 }, (_, i) => somaDias(segunda, i)), [segunda.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // o preço de cada horário vem à parte; o banco só entrega a quem recebe (sempre pergunta: o formulário de editar
+  // regrava o preço que leu, e com o banco antes da atualização quem não recebe ainda lê o preço direto)
   const { dados, carregando, erro, recarregar } = useDados(async () =>
-    ok(await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id)
-      .gte("inicio", segunda.toISOString()).lt("inicio", somaDias(segunda, 7).toISOString()).order("inicio")) as unknown as AgendamentoCompleto[],
+    await comPrecosDeAgendamento(sb, petshop.id, ok(await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id)
+      .gte("inicio", segunda.toISOString()).lt("inicio", somaDias(segunda, 7).toISOString()).order("inicio")) as unknown as AgendamentoCompleto[]) as unknown as AgendamentoCompleto[],
   [petshop.id, segunda.getTime()]);
 
   // concluídos da semana que ninguém cobrou (o banco diz quais, sem valor): a marca "Falta cobrar" no lugar de "Concluído"

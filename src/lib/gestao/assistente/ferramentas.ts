@@ -1,4 +1,4 @@
-import { COLS_PACOTE, comCustos, comPrecosDePacote, comValoresDeEstadia, type PacoteLinha } from "../reservado";
+import { COLS_PACOTE, comCustos, comPrecosDeAgendamento, comPrecosDePacote, comPrecosDeProduto, comValoresDeEstadia, type PacoteLinha } from "../reservado";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
@@ -416,7 +416,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     case "ver_agenda": {
       exigir(RE_DIA.test(String(e.de)) && RE_DIA.test(String(e.ate)), "Datas no formato AAAA-MM-DD.");
       const ini = localParaUtc(`${e.de}T00:00`, c.fusoMin), fim = localParaUtc(`${somaDiasLocal(String(e.ate), 1)}T00:00`, c.fusoMin);
-      const ags = ok(await sb.from("agendamentos").select("id, inicio, fim, status, preco, obs, lembrete_em, pets(nome, clientes(nome)), servicos(nome), profissionais(nome), agendamento_servicos(preco, ordem, servicos(nome))").eq("petshop_id", petshop.id).gte("inicio", ini.toISOString()).lt("inicio", fim.toISOString()).order("inicio").limit(200));
+      // o valor de cada horário vem à parte, só para quem recebe
+      const ags = await comPrecosDeAgendamento(sb, petshop.id, ok(await sb.from("agendamentos").select("id, inicio, fim, status, obs, lembrete_em, pets(nome, clientes(nome)), servicos(nome), profissionais(nome), agendamento_servicos(id, ordem, servicos(nome))").eq("petshop_id", petshop.id).gte("inicio", ini.toISOString()).lt("inicio", fim.toISOString()).order("inicio").limit(200)), c.vejoFinanceiro);
       const bloqueios = await bloqueiosEntre(c, ini, fim);
       return { resultado: { horarios: ags.map((a) => ({
         agendamento_id: a.id, inicio: utcParaLocal(a.inicio, c.fusoMin), fim: utcParaLocal(a.fim, c.fusoMin).slice(11), status: a.status,
@@ -471,8 +472,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     }
     case "ver_estoque": {
       const alvo = semAcento(texto(e.termo, 80));
-      const prods = await comCustos(sb, petshop.id, await lerTudo<{ id: string; nome: string; categoria: string | null; unidade: string; estoque: number; estoque_minimo: number; preco_venda: number | null }>((de, ate, contar) =>
-        sb.from("produtos").select("id, nome, categoria, unidade, estoque, estoque_minimo, preco_venda", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)));
+      const prods = await comCustos(sb, petshop.id, await comPrecosDeProduto(sb, petshop.id, await lerTudo<{ id: string; nome: string; categoria: string | null; unidade: string; estoque: number; estoque_minimo: number }>((de, ate, contar) =>
+        sb.from("produtos").select("id, nome, categoria, unidade, estoque, estoque_minimo", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate))));
       const lista = prods.filter((p) => !alvo || semAcento(p.nome).includes(alvo))
         .map((p) => ({ produto_id: p.id, nome: p.nome, unidade: p.unidade, saldo: Number(p.estoque), minimo: Number(p.estoque_minimo), acabando: Number(p.estoque_minimo) > 0 && Number(p.estoque) <= Number(p.estoque_minimo), preco_venda: p.preco_venda, ...(c.vejoFinanceiro ? { custo: p.custo } : {}) }))
         .sort((a, b) => Number(b.acabando) - Number(a.acabando));
@@ -647,7 +648,10 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
         linhas.push(["Começa", quandoLocal(inicio)], ["Repete", `${aCada === 1 ? "toda semana" : `a cada ${aCada} semanas`}, ${inicios.length} horários`], ["Datas", inicios.map((i) => diaCurtoLocal(i.slice(0, 10))).join(", ")]);
       } else linhas.push(["Quando", quandoLocal(inicio)]);
       if (prof) linhas.push(["Com", prof.nome]);
-      if (outros.length) {
+      // valor só para quem recebe (para os outros, o banco coloca o preço da lista sem mostrar)
+      if (!c.vejoFinanceiro) {
+        if (outros.length) linhas.push(["Duração", `${duracaoMin} min`]);
+      } else if (outros.length) {
         // cada serviço com o valor dele, e o total do horário
         const precos = [preco, ...outros.map((x) => precoDoServico(x, pet.porte))];
         const total = Math.round(precos.reduce<number>((t, v) => t + (v ?? 0), 0) * 100) / 100;

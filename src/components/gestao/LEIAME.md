@@ -25,6 +25,15 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   Também não dá para filtrar nem ordenar `estadias` por `valor_diaria` ou `valor_cobrado` pela API: a lista de check-outs para cobrar
   vem de `idsParaCobrar` (função `estadias_para_cobrar`) e o acerto de um check-out pendente é pela função `estadia_acertar`.
   Gravação em `estadias` sempre com `.select("id")` (sem isso o banco devolve a linha inteira e recusa).
+- Preços da agenda, da lista de serviços, de venda e diárias padrão: o banco não entrega `agendamentos.preco`,
+  `agendamento_servicos.preco`, `servicos.preco_p/m/g/gg`, `produtos.preco_venda` nem `petshops.diaria_creche/diaria_hotel`
+  direto da tabela (nem `select("*")` em agendamentos, agendamento_servicos e servicos). Leia `COLS_AGENDAMENTO` / `SELECT_AGENDAMENTO`
+  (serviços a mais com `id, servico_id, ordem`), `COLS_SERVICO` / `lerServicos`, `COLS_PRODUTO` e junte os valores com
+  `comPrecosDeAgendamento`, `comPrecosDeServico`, `comPrecosDeProduto` (`reservado.ts`); as diárias vêm em `lerPetshop`. Quem não recebe
+  recebe os valores vazios; ao marcar ou trocar o serviço, o banco coloca o preço da lista (o que a tela mandar é ignorado).
+  Não filtre nem ordene por essas colunas pela API. Coluna nova em `agendamentos`, `agendamento_servicos` ou `servicos` precisa de
+  `grant select (coluna)` (migração 20261157). Gravação nessas tabelas sempre com `.select("id")`.
+- Link do cliente: todo pedido vai por `pedirPeloLink` (função `link_pedir_com_termos`); as funções de pedido não aceitam chamada direta.
 - Opções do negócio: chegam em `petshop.opcoes` pela função `petshop_opcoes` (nunca `select("opcoes")`). Opção nova com preço
   dentro entra na lista da função `opcoes_sem_valores`, no banco, para a equipe sem dinheiro não ler pela API.
 - Dinheiro que entra ou sai na hora: `lancarPago()` de `src/lib/gestao/dinheiro.ts` (já liga ao caixa aberto).

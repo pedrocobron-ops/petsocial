@@ -18,8 +18,8 @@ type ComServicos = { servicos?: { nome: string } | null; agendamento_servicos?: 
 const emOrdem = <T extends NaOrdem>(lista: T[] | null | undefined): T[] =>
   [...(lista ?? [])].sort((x, y) => x.ordem - y.ordem || ((x.servico_id ?? "") < (y.servico_id ?? "") ? -1 : 1));
 
-/** O pedaço do `select` que traz os outros serviços do horário. */
-export const SELECT_SERVICOS_A_MAIS = "agendamento_servicos(id, servico_id, preco, ordem, servicos(id, nome, cor, categoria))";
+/** O pedaço do `select` que traz os outros serviços do horário (o preço vem por `comPrecosDeAgendamento`). */
+export const SELECT_SERVICOS_A_MAIS = "agendamento_servicos(id, servico_id, ordem, servicos(id, nome, cor, categoria))";
 
 /** Os outros serviços do horário, na ordem em que foram juntados (a mesma ordem que o banco usa nas contas). */
 export function servicosAMais<T extends NaOrdem = ServicoAMais>(a: { agendamento_servicos?: T[] | null } | null | undefined): T[] {

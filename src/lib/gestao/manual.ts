@@ -1790,6 +1790,8 @@ const BASE: TopicoBase[] = [
       "Caixa é para receber, vender e conferir a gaveta: a pessoa vê o que entrou hoje, mas não as contas, as despesas nem o histórico.",
       "Financeiro e Relatórios mostram todo o dinheiro. Só quem tem uma delas (ou o dono) altera um valor já recebido que outra pessoa lançou.",
       "Com Caixa, Financeiro e Relatórios desligados, a pessoa não vê valor nenhum.",
+      "Isso vale também na agenda: quem não vê valor marca e remarca horários sem o campo Valor, e o sistema coloca sozinho o preço da lista para o porte do pet. A comissão de cada um continua em Minha comissão.",
+      "O preço de venda dos produtos aparece para quem tem Caixa (para vender) ou Estoque (para cadastrar).",
       { so: ["casa"], texto: "Isso vale para a creche e o hotel: sem essas áreas, a pessoa faz reserva, check-in, check-out e chamada sem ver a diária, o valor cobrado nem as listas de preço (porte, temporada, taxas). A diária entra sozinha pela regra de Meu pet shop, e quem cuida do caixa acerta o valor depois." },
       "O cartão Quem pode o quê, na tela Equipe, mostra o que cada perfil abre.",
     ],

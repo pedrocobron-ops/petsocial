@@ -17,7 +17,7 @@ import type { Banco } from "@/lib/gestao/supabase";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
 import "./relatorios.css";
-import { comValoresDeEstadia } from "@/lib/gestao/reservado";
+import { comPrecosDeAgendamento, comValoresDeEstadia } from "@/lib/gestao/reservado";
 
 export default function PaginaRelatorios() {
   const { cuidoDoFinanceiro } = useGestao();
@@ -122,8 +122,9 @@ function valorMedio(concluidos: (DaConta & Pick<Ag, "id">)[], recebimentos: Map<
 async function carregarAnterior(sb: Banco, petshopId: string, de: Date, ate: Date) {
   const comeco = de.toISOString(), final = somaDias(ate, 1).toISOString();
   const [ags, entradas, novos] = await Promise.all([
-    paginar<DaConta & Pick<Ag, "id">>((a, b) => sb.from("agendamentos").select("id, preco, pacote_cliente_id, servico_id, agendamento_servicos(servico_id, preco, ordem)")
-      .eq("petshop_id", petshopId).eq("status", "concluido").gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b)),
+    paginar<{ id: string; pacote_cliente_id: string | null; servico_id: string | null; agendamento_servicos: { id: string; servico_id: string; ordem: number }[] | null }>((a, b) => sb.from("agendamentos").select("id, pacote_cliente_id, servico_id, agendamento_servicos(id, servico_id, ordem)")
+      .eq("petshop_id", petshopId).eq("status", "concluido").gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b))
+      .then((l) => comPrecosDeAgendamento(sb, petshopId, l) as Promise<(DaConta & Pick<Ag, "id">)[]>),
     paginar<Recebimento>((a, b) => sb.from("lancamentos").select("agendamento_id, valor, itens, valor_original").eq("petshop_id", petshopId).eq("pago", true).eq("tipo", "entrada")
       .is("movimento", null).gte("data", isoDia(de)).lte("data", isoDia(ate)).order("data").order("id").range(a, b)),
     sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshopId).gte("criado_em", comeco).lt("criado_em", final),
@@ -206,10 +207,10 @@ function Relatorios() {
     const [ags, entradas, novos, estadias, anterior] = await Promise.all([
       paginar<Ag>(async (a, b) => {
         const r = await sb.from("agendamentos")
-          .select("id, inicio, status, preco, pet_id, servico_id, profissional_id, pacote_cliente_id, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome, cor), agendamento_servicos(servico_id, preco, ordem, servicos(id, nome, cor))")
+          .select("id, inicio, status, pet_id, servico_id, profissional_id, pacote_cliente_id, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome, cor), agendamento_servicos(id, servico_id, ordem, servicos(id, nome, cor))")
           .eq("petshop_id", petshop.id).gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b);
         return { data: r.data as unknown as Ag[] | null, error: r.error };
-      }),
+      }).then((l) => comPrecosDeAgendamento(sb, petshop.id, l as (Ag & { agendamento_servicos?: { id: string }[] | null })[]) as unknown as Promise<Ag[]>),
       paginar<Entrada>((a, b) => sb.from("lancamentos").select("id, data, valor, cliente_id, agendamento_id, itens, forma, pagamentos, valor_original").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
         .is("movimento", null).gte("data", deIso).lte("data", ateIso).order("data").order("id").range(a, b)),
       sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).gte("criado_em", comeco).lt("criado_em", final),

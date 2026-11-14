@@ -38,7 +38,7 @@ import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import Importar from "@/components/gestao/importar";
-import { idsParaCobrar } from "@/lib/gestao/reservado";
+import { comPrecosDeAgendamento, idsParaCobrar } from "@/lib/gestao/reservado";
 import { AtendimentosParaCobrar, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import AlteracoesDeValores from "@/components/gestao/financeiro/alteracoes-de-valores";
 
@@ -102,7 +102,8 @@ export default function Hoje() {
       const x = porServico.get(a.servicos.nome) ?? { rotulo: a.servicos.nome, valor: 0, cor: a.servicos.cor };
       x.valor++; porServico.set(a.servicos.nome, x);
     }
-    const lista = (ags.data ?? []) as unknown as AgendamentoCompleto[];
+    // o preço de cada horário vem à parte; o banco só entrega a quem recebe (o formulário de editar regrava o que leu)
+    const lista = await comPrecosDeAgendamento(sb, petshop.id, (ags.data ?? []) as unknown as AgendamentoCompleto[]) as unknown as AgendamentoCompleto[];
     const amanhaAtivos = ((agsAmanha.data ?? []) as unknown as { id: string; lembrete_em: string | null; status: string; pets: { clientes: { id: string; telefone: string | null } | null } | null }[])
       .filter((a) => !["cancelado", "faltou"].includes(a.status));
     // um lembrete por tutor: quem tem dois pets amanhã recebe uma mensagem só

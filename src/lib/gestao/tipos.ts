@@ -1,11 +1,13 @@
 import type { Database } from "./banco";
+import { COLS_AGENDAMENTO } from "./reservado";
 
 type T = Database["public"]["Tables"];
 export type Petshop = T["petshops"]["Row"];
 export type Profissional = T["profissionais"]["Row"];
 export type Cliente = T["clientes"]["Row"];
 export type Pet = T["pets"]["Row"];
-export type Servico = T["servicos"]["Row"];
+/** `preco_varia`: o preço muda com o porte (vem do banco mesmo para quem não vê os preços, que chegam vazios). */
+export type Servico = T["servicos"]["Row"] & { preco_varia?: boolean | null };
 export type Pacote = T["pacotes"]["Row"];
 export type PacoteCliente = T["pacotes_clientes"]["Row"];
 export type Agendamento = T["agendamentos"]["Row"];
@@ -37,8 +39,9 @@ export type AgendamentoCompleto = Agendamento & {
     servicos: Pick<Servico, "id" | "nome" | "cor" | "categoria"> | null;
   }[] | null;
 };
+/** O horário com pet, tutor, serviços e profissional, sem os preços: junte com `comPrecosDeAgendamento` (`reservado.ts`). */
 export const SELECT_AGENDAMENTO =
-  "*, pets(id, nome, foto, porte, especie, raca, alertas, clientes(id, nome, telefone)), servicos(id, nome, cor, categoria), profissionais(id, nome, cor), agendamento_servicos(id, servico_id, preco, ordem, servicos(id, nome, cor, categoria))";
+  `${COLS_AGENDAMENTO}, pets(id, nome, foto, porte, especie, raca, alertas, clientes(id, nome, telefone)), servicos(id, nome, cor, categoria), profissionais(id, nome, cor), agendamento_servicos(id, servico_id, ordem, servicos(id, nome, cor, categoria))`;
 
 /**
  * Horário de funcionamento: uma chave por dia da semana ("0" domingo … "6" sábado), `null` = fechado.
