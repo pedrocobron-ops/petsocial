@@ -303,7 +303,7 @@ export function AvisoCaixaFechado({ aberto }: { aberto: boolean | null }) {
   const [salvando, setSalvando] = useState(false);
   // abriu o caixa daqui: a confirmação fica na tela até a pessoa terminar o recebimento
   if (abriu) {
-    return <p className="g-cx-fora ok" role="status"><Lock aria-hidden /><span>Caixa aberto. Este valor entra na contagem da gaveta.</span></p>;
+    return <p className="g-cx-fora ok" role="status"><Lock aria-hidden /><span>Caixa aberto. Este valor entra no caixa de hoje; o que for pago em dinheiro entra também na contagem da gaveta.</span></p>;
   }
   if (aberto !== false) return null;
   async function comecar() {

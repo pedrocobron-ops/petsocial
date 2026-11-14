@@ -71,6 +71,8 @@
 .g-ht-marcar .t { flex: 1; min-width: 0; }
 .g-ht-marcar .t small { display: block; color: var(--g-cinza); font-size: .8125rem; }
 .g-ht-marcar b.v { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* o total mudou depois do sinal: aviso com Acertar / Deixar assim, em linha própria */
+.g-ht-sinal-ajuste { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: .875rem; color: var(--g-cinza); }
 .g-ht-sinal { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: .9375rem; }
 
 /* cuidados */

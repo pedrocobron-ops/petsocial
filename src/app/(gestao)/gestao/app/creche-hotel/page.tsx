@@ -26,7 +26,7 @@ import CheckOut, { comNota, DetalheDaEstadia, estadiasDoTutor, NoitePorNoite, NO
 import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/components/gestao/hotel/cuidados";
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
 import Ocupacao from "@/components/gestao/hotel/ocupacao";
-import { CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
+import { AjusteDoSinal, CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
 import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
@@ -154,6 +154,7 @@ function LinhaValor({ e, plano, abertas, valores }: { e: EstadiaCompleta; plano?
         : p.aberto ? <span className="g-muted">sem saída prevista</span>
         : <span>Total previsto <b className="g-tab">{brl(p.total)}</b> <span className="g-muted">({p.n} {p.n === 1 ? "diária" : "diárias"}{p.comRegra ? ", com temporada, feriado ou desconto" : ""}{p.taxas ? " e taxas" : ""})</span></span>}
       {sinal}
+      {e.status === "reservada" && !p.aberto && <AjusteDoSinal estadiaId={e.id} valores={valores} total={p.total} aoGravar={avisarMudanca} />}
     </p>
   );
 }

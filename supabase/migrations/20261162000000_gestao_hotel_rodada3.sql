@@ -184,3 +184,28 @@ language sql stable security definer set search_path = '' as $$
   from public.petshops p
   where p.link_codigo = p_codigo and p.link_ativo and public.acesso_liberado(p.id)
 $$;
+
+-- 4. Caixa: a hora em que a conta foi PAGA. O sinal criado em A receber às 17h59 e recebido às 18h32 aparecia às 17h59
+--    (a hora em que foi criado), antes até de o caixa abrir. Coluna nova `lancamentos.pago_em`, preenchida só pelo banco:
+--    lançado já pago = agora; conta que passa de a receber para paga = agora; volta para a receber = vazio.
+--    As linhas antigas ficam vazias e a tela usa `criado_em`, como sempre. O app antigo não lê a coluna e segue igual.
+alter table public.lancamentos add column if not exists pago_em timestamptz;
+
+create or replace function public.lancamento_pago_em() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    new.pago_em := case when new.pago then now() else null end;
+  elsif new.pago and not coalesce(old.pago, false) then
+    new.pago_em := now();
+  elsif not new.pago then
+    new.pago_em := null;
+  else
+    new.pago_em := old.pago_em;
+  end if;
+  return new;
+end $$;
+revoke execute on function public.lancamento_pago_em() from public, anon, authenticated;
+drop trigger if exists lancamento_pago_em on public.lancamentos;
+create trigger lancamento_pago_em before insert or update on public.lancamentos
+  for each row execute function public.lancamento_pago_em();

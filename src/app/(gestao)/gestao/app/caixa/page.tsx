@@ -53,17 +53,20 @@ function diferenca(contado: number | null, esperado: number) {
  * Planilha de um caixa: os movimentos (pagamento dividido vira uma linha por forma) e, embaixo, as mesmas contas
  * que a tela mostra (`resumoDoCaixa` e `diferenca`).
  */
+/** Quando o dinheiro entrou: a hora do pagamento (conta a receber paga depois), ou a hora em que foi lançado. */
+const quandoPagou = (l: Lancamento) => l.pago_em ?? l.criado_em;
+const porPagamento = (a: Lancamento, b: Lancamento) => quandoPagou(b).localeCompare(quandoPagou(a)) || b.id.localeCompare(a.id);
 function exportarCaixa(caixa: Caixa, lancamentos: Lancamento[]) {
   const r = resumoDoCaixa(caixa.valor_inicial, lancamentos);
   const esperado = esperadoDo(caixa, lancamentos);
   const dif = diferenca(caixa.valor_contado, esperado);
-  const emOrdem = [...lancamentos].sort((a, b) => a.criado_em.localeCompare(b.criado_em) || a.id.localeCompare(b.id));
+  const emOrdem = [...lancamentos].sort((a, b) => quandoPagou(a).localeCompare(quandoPagou(b)) || a.id.localeCompare(b.id));
   const movimentos = emOrdem.flatMap((l): Cel[][] => {
     const gaveta = Boolean(l.movimento), entrada = l.tipo === "entrada";
     const tipo = l.movimento === "sangria" ? "Sangria" : l.movimento === "suprimento" ? "Suprimento" : entrada ? "Entrada" : "Saída";
     const descricao = gaveta ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [l.descricao, resumoDeItens(l)].filter(Boolean).join(" · ");
     return partesPorForma(l).map((p): Cel[] => [
-      dataCompleta(l.criado_em), hora(l.criado_em), descricao, categoriaAtual(l.categoria), tipo, rotuloForma(p.forma), dinheiroCsv(entrada ? p.valor : -p.valor),
+      dataCompleta(quandoPagou(l)), hora(quandoPagou(l)), descricao, categoriaAtual(l.categoria), tipo, rotuloForma(p.forma), dinheiroCsv(entrada ? p.valor : -p.valor),
     ]);
   });
   const linha = (nome: string, valor: number): Cel[] => [nome, dinheiroCsv(valor)];
@@ -131,6 +134,7 @@ function CaixaDoDia() {
         return aberto ? l.caixa_id === aberto.id || (!l.caixa_id && l.data === hoje) : l.data === hoje;
       });
     }
+    dosCaixas.sort(porPagamento); doDia.sort(porPagamento); soltos.sort(porPagamento);
     return { aberto, fechados, dosCaixas, soltos, doDia, apagados };
   }, [petshop.id, hoje, fin]);
 
@@ -470,8 +474,8 @@ function LinhaLancamento({ l, aoTocar }: { l: Lancamento; aoTocar?: () => void }
   const gaveta = Boolean(l.movimento);
   const forma = textoDoPagamento(l);
   const apoio = gaveta
-    ? `${hora(l.criado_em)} · ${l.descricao || "não é venda nem despesa"}`
-    : `${hora(l.criado_em)}${l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria)}` : ""}${resumoDeItens(l) ? ` · ${resumoDeItens(l)}` : ""}`;
+    ? `${hora(quandoPagou(l))} · ${l.descricao || "não é venda nem despesa"}`
+    : `${hora(quandoPagou(l))}${l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria)}` : ""}${resumoDeItens(l) ? ` · ${resumoDeItens(l)}` : ""}`;
   const dentro = (
     <>
       <Tile icone={gaveta ? (entrada ? ArrowDownToLine : ArrowUpFromLine) : entrada ? ArrowDownLeft : ArrowUpRight} tom={gaveta ? "manteiga" : entrada ? "menta" : "rosa"} />
