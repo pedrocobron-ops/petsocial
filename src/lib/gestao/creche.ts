@@ -390,6 +390,29 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
   };
 }
 
+/**
+ * Comprovante das mensalidades recebidas de uma vez (Receber tudo de um tutor), em texto simples para o WhatsApp.
+ * Não é documento fiscal, e o texto diz isso no fim.
+ */
+export function textoComprovanteMensalidades(p: {
+  petshop: string; tutor?: string | null; dia: string; forma: string;
+  itens: { pet: string; mes: string; valor: number; multa: number }[];
+}) {
+  const total = Math.round(p.itens.reduce((t, i) => t + i.valor + i.multa, 0) * 100) / 100;
+  return [
+    `${saudacaoZap(p.tutor, p.petshop).replace(/ Aqui é .*$/, "")} Segue o comprovante ${p.itens.length === 1 ? "da mensalidade" : "das mensalidades"} da creche.`,
+    "",
+    p.petshop,
+    `Data: ${dataCompleta(p.dia)}`,
+    "",
+    ...p.itens.map((i) => `${i.pet}: mensalidade de ${nomeMes(deIsoDia(i.mes))} ${brl(i.valor)}${i.multa > 0 ? ` + multa e juros por atraso ${brl(i.multa)}` : ""}`),
+    `Total: ${brl(total)}`,
+    `Pagamento: ${p.forma}`,
+    "",
+    "Este comprovante não é nota fiscal.",
+  ].join("\n");
+}
+
 /* ---------- saldo de reposição ---------- */
 
 /** Regra de reposição do negócio (Meu pet shop). Desligada: qualquer falta do plano pode ser reposta, sem prazo. */

@@ -3,20 +3,21 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Ban, CalendarClock, Check, ChevronLeft, ChevronRight, CircleCheck, HandCoins, MessageCircle, Pencil, RotateCcw, TriangleAlert, Undo2 } from "lucide-react";
 import {
-  cobraNoMes, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, vencimentoDoMes,
+  cobraNoMes, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, textoComprovanteMensalidades, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, vencimentoDoMes,
   type CobrancaCompleta, type EstadoCobranca, type PlanoCompleto, type PrimeiraCobranca,
 } from "@/lib/gestao/creche";
 import { conferirCaixa, parteDaChave, receberConta, textoDoPagamento, type FormaPagamento } from "@/lib/gestao/dinheiro";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { AvisoCaixaFechado, ChipsForma, useCaixaAberto } from "../loja/pecas";
-import type { Lancamento } from "@/lib/gestao/tipos";
+import { FORMAS, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, fmtTelefone, isoDia, linkWhatsApp, nomeMes } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { FolhaBaixa } from "../financeiro/comum";
-import { Kpi } from "../painel";
+import { Kpi, Tile } from "../painel";
 import { AvatarPessoa, AvatarPet, avisarMudanca, Campo, CampoValor, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import "./creche.css";
+import "../loja/venda.css";
 import "@/components/gestao/hotel/hotel.css";
 
 const centavos = (n: number) => Math.round(n * 100) / 100;
@@ -329,7 +330,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
         </>
       )}
 
-      {familia && <ReceberFamilia grupo={familia} contas={aReceberDe(familia)} aoFechar={() => setFamilia(null)} aoFeito={async () => { setFamilia(null); await mudou(); }} />}
+      {familia && <ReceberFamilia grupo={familia} contas={aReceberDe(familia)} aoFechar={() => setFamilia(null)} aoFeito={mudou} />}
       {porFora && <PagasPorFora mes={mes} cobrancas={semRecebimento} marcadas={primeiras.map((c) => c.id)} aoFechar={() => setPorFora(false)} aoFeito={async () => { setPorFora(false); await mudou(); }} />}
       {gerar && dados && <GerarCobrancas mes={mes} planos={faltamGerar} comCobranca={dados.comCobranca} aoFechar={aoFecharGerar} aoGerar={async () => { aoFecharGerar(); await mudou(); }} />}
       {editando && <EditarCobranca cobranca={editando} aoFechar={() => setEditando(null)} aoSalvo={async () => { setEditando(null); await mudou(); }} />}
@@ -594,6 +595,8 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
   const [comMulta, setComMulta] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // depois de receber, a folha mostra o recibo com o comprovante pronto para o WhatsApp do tutor
+  const [recibo, setRecibo] = useState<{ total: number; texto: string; n: number } | null>(null);
   // multa e juros pela regra do dono, contados até o dia do recebimento; só entram se a pessoa somar
   const multas = contas.map((c) => multaSugerida(petshop, { valor: faltaDaCobranca(c), vencimento: c.vencimento }, data || hoje)?.total ?? 0);
   const totalMulta = centavos(multas.reduce((s, m) => s + m, 0));
@@ -611,18 +614,38 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
     setErro(null); setSalvando(true);
     let feitas = 0, recebido = 0;
     const falhas: string[] = [];
+    const itens: { pet: string; mes: string; valor: number; multa: number }[] = [];
     for (let i = 0; i < contas.length; i++) {
       const c = contas[i], m = comMulta ? multas[i] : 0;
       try {
         await receberConta(sb, c.lancamento_id!, { valor: faltaDaCobranca(c), forma, data, multa: m > 0 ? { valor: m, forma } : null, chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) });
         feitas++; recebido = centavos(recebido + faltaDaCobranca(c) + m);
+        itens.push({ pet: c.pets?.nome ?? "Pet", mes: c.mes, valor: faltaDaCobranca(c), multa: m });
       } catch (e) { falhas.push(`${c.pets?.nome ?? "pet"} (${e instanceof Error ? e.message : "erro"})`); }
     }
     if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join("; ")}`);
-    if (feitas) avisar(`Recebido de ${grupo.tutor ?? "tutor"}: ${brl(recebido)} (${feitas === 1 ? "1 mensalidade" : `${feitas} mensalidades`}).`);
+    if (feitas) {
+      avisar(`Recebido de ${grupo.tutor ?? "tutor"}: ${brl(recebido)} (${feitas === 1 ? "1 mensalidade" : `${feitas} mensalidades`}).`);
+      setRecibo({ total: recebido, n: feitas, texto: textoComprovanteMensalidades({ petshop: petshop.nome, tutor: grupo.tutor, dia: data, forma: FORMAS.find((f) => f.id === forma)?.rotulo ?? "Outro", itens }) });
+    }
     await aoFeito();
     // deu certo só com uma parte: uma nova tentativa com a mesma folha não recebe de novo as que já entraram
     if (falhas.length) return false;
+  }
+
+  if (recibo) {
+    const zap = linkWhatsApp(grupo.telefone, recibo.texto);
+    return (
+      <Folha titulo="Recebido" aoFechar={aoFechar} rodape={<button type="button" className="g-btn sec" onClick={aoFechar}>Pronto</button>}>
+        <div className="g-vd-recibo">
+          <Tile icone={Check} tom="menta" tamanho="g" />
+          <p className="g-num">{brl(recibo.total)}</p>
+          <p><b>Recebido.</b> {recibo.n === 1 ? "1 mensalidade paga" : `${recibo.n} mensalidades pagas`} de {grupo.tutor ?? "tutor"}.</p>
+          {zap ? <a className="g-btn zap cheio" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar comprovante</a> : <p className="g-pp g-muted">O tutor está sem telefone na ficha: não dá para mandar o comprovante pelo WhatsApp.</p>}
+          {zap && <p className="g-pp g-muted">O WhatsApp de {grupo.tutor ?? "quem paga"} abre com o comprovante pronto e você só aperta enviar. Não é nota fiscal.</p>}
+        </div>
+      </Folha>
+    );
   }
 
   return (

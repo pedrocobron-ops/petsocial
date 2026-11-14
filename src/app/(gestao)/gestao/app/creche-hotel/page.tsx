@@ -628,7 +628,10 @@ export default function CrecheHotel() {
 
                       <div className={`g-ch-periodo${atrasada ? " atrasada" : ""}${parte == null ? " aberta" : ""}`}>
                         <div className="g-fila entre g-pp">
-                          <span className="g-muted">{diarias === 1 ? "1ª diária" : `${diarias}ª diária`}</span>
+                          <span className="g-muted">{e.tipo === "creche"
+                            // creche é um dia só: o que vale dizer é como o dia conta (mensalista ou diária avulsa), não "1ª diária"
+                            ? (e.mensalista === "extra" ? "mensalista · dia extra" : e.mensalista === "reposicao" ? "mensalista · reposição" : e.mensalista ? "mensalista · dia do plano" : "diária avulsa")
+                            : diarias === 1 ? "1ª diária" : `${diarias}ª diária`}</span>
                           {atrasada ? <span className="g-tag vermelho">saída atrasada</span> : parte != null && <span className="g-muted g-tab">{Math.round(parte * 100)}% do período</span>}
                         </div>
                         <div className="g-ch-barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={parte == null ? undefined : Math.round(parte * 100)} aria-label="Quanto do período já passou">
