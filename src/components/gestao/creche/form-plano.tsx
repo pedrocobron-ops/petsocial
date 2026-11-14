@@ -120,10 +120,14 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
         ...(perguntaPrimeira && primeira ? { primeira_cobranca: isoMes(primeira === "fora" ? proximoMes : mesAtual) } : {}),
       };
       let id = plano?.id;
+      // modelo escolhido mas com outro preço: o plano fica com preço próprio (e a tela avisa)
+      let saiuDoModelo = "";
       if (plano) ok(await sb.from("creche_planos").update(campos).eq("id", plano.id).eq("petshop_id", petshop.id).select("id").single());
       else id = ok(await sb.from("creche_planos").insert({ ...campos, petshop_id: petshop.id, pet_id: pet.id }).select("id").single()).id;
       if (vejoFinanceiro && mensal != null && id) {
         const modelo = modelos.find((m) => m.id === modeloId && Number(m.valor_mensal) === mensal) ? modeloId : null;
+        const escolhido = modelos.find((m) => m.id === modeloId);
+        if (escolhido && !modelo) saiuDoModelo = ` Com ${brl(mensal)}, o plano fica com preço próprio, fora do modelo ${escolhido.nome}: o reajuste do modelo não muda este plano.`;
         ok(await sb.from("creche_planos_valores").upsert({ plano_id: id, petshop_id: petshop.id, valor_mensal: mensal, valor_extra: extra, modelo_id: modelo, atualizado_em: new Date().toISOString() }).select("plano_id"));
       }
       let cobrou = "";
@@ -133,7 +137,7 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
         if (r.error) avisarErro(`O plano foi salvo, mas a primeira cobrança não foi criada (${r.error.message}). Gere em Cobranças.`);
         else cobrou = ` A cobrança de ${nomeMes(mesAtual)} (${brl(valor)}) vence em ${dataCurta(vencDaPrimeira)}.`;
       } else if (perguntaPrimeira && primeira === "fora") cobrou = ` A primeira cobrança é a de ${nomeMes(proximoMes)}.`;
-      avisar((plano ? "Plano salvo." : `${pet.nome} agora é mensalista da creche.`) + cobrou);
+      avisar((plano ? "Plano salvo." : `${pet.nome} agora é mensalista da creche.`) + cobrou + saiuDoModelo);
       avisarMudanca();
       aoSalvo();
     } catch (e) { avisarErro(e); } finally { setSalvando(false); }

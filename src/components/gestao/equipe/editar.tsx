@@ -91,7 +91,7 @@ export default function EditarPessoa({ pessoa, foco, aoFechar }: { pessoa: Profi
       await gravar({
         nome: n.slice(0, 80), cor, comissao_pct: c, escala: segueLoja ? null : escala, atende: escolha.atende,
         // só troca função e áreas se a pessoa mexeu nelas; assim quem veio do modelo antigo continua como estava
-        ...(mudaFuncao ? camposDaEscolha(escolha, acesso !== "sem") : {}),
+        ...(mudaFuncao ? camposDaEscolha(escolha, acesso !== "sem", petshop) : {}),
       });
       avisar("Salvo.");
       aoFechar();
@@ -111,7 +111,7 @@ export default function EditarPessoa({ pessoa, foco, aoFechar }: { pessoa: Profi
     setMexendo(true);
     try {
       // ao dar login, as áreas escolhidas entram junto; ao só trocar o e-mail, nada mais muda
-      await gravar(acesso === "sem" ? { email_convite: e, ...camposDaEscolha(escolha, true) } : { email_convite: e });
+      await gravar(acesso === "sem" ? { email_convite: e, ...camposDaEscolha(escolha, true, petshop) } : { email_convite: e });
       if (acesso === "sem") setMexeu(false);
       setDando(false);
       setVerConvite(true);

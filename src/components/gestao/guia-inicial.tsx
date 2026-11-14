@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarDays, Check, Clock, FileSpreadsheet, ImagePlus, Link2, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Undo2, Users, X } from "lucide-react";
 import type { Horario, Servico } from "@/lib/gestao/tipos";
 import { vagasDe } from "@/lib/gestao/agenda";
-import { nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { artigoDe, nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { GradeHorario, erroDoHorario, lerHorario } from "./ajustes/grade-horario";
 import { useGestao } from "./contexto";
 import { Selo } from "./marca";
@@ -386,7 +386,7 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
 
           {!pergunta && !fim && n === 1 && (
             <p className="g-guia-intro">{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? <>{oQueDeixeiPronto(petshop)}{" "}</> : null}
-              <b>{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? "Agora" : `${primeiro},`} {total === 1 ? "é um passo só" : `são ${total} passos curtos`} para deixar o {petshop.nome} pronto.</b>{" "}
+              <b>{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? "Agora" : `${primeiro},`} {total === 1 ? "é um passo só" : `são ${total} passos curtos`} para deixar {artigoDe(petshop.nome).o} {petshop.nome} {artigoDe(petshop.nome).o === "a" ? "pronta" : "pronto"}.</b>{" "}
               O que não souber agora, toque em Faço depois: dá para mudar tudo em Meu pet shop.
             </p>
           )}

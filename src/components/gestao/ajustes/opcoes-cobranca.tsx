@@ -88,7 +88,11 @@ export default function OpcoesDeCobranca() {
   const rascunho = { opcoes: { ...(petshop.opcoes as object), [K.multa]: true, [K.multaFixa]: fixa ?? 0, [K.multaPct]: lerPct(pct) ?? 0, [K.jurosMesPct]: lerPct(juros) ?? 0, [K.pix]: pix, [K.modelo]: modelo } };
   const exemplo = multaSugerida(rascunho, { valor: 100, vencimento: isoDia(somaDias(new Date(), -15)) }, hoje);
   const previa = mensagemDeDivida({ ...rascunho, opcoes: { ...rascunho.opcoes, [K.multa]: o.multa }, nome: petshop.nome }, "Ana", [
-    { valor: 70, valor_original: 120, descricao: "Banho · Nina", categoria: "Banho e tosa", vencimento: isoDia(somaDias(new Date(), -3)) },
+    // o exemplo fala do que o negócio faz: banho, creche, hotel ou loja
+    usaModulo(petshop, "banho_tosa") ? { valor: 70, valor_original: 120, descricao: "Banho · Nina", categoria: "Banho e tosa", vencimento: isoDia(somaDias(new Date(), -3)) }
+      : usaModulo(petshop, "creche") ? { valor: 70, valor_original: 120, descricao: "Creche · Nina", categoria: "Creche", vencimento: isoDia(somaDias(new Date(), -3)) }
+      : usaModulo(petshop, "hotel") ? { valor: 70, valor_original: 120, descricao: "Hotel · Nina", categoria: "Hotel", vencimento: isoDia(somaDias(new Date(), -3)) }
+      : { valor: 70, valor_original: 120, descricao: "Ração e petiscos", categoria: "Produtos", vencimento: isoDia(somaDias(new Date(), -3)) },
   ], hoje);
 
   return (

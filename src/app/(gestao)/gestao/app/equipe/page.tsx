@@ -12,6 +12,7 @@ import EditarPessoa, { FolhaConvite } from "@/components/gestao/equipe/editar";
 import { Areas, Vagas } from "@/components/gestao/equipe/pecas";
 import { acessoDe, erroDeLimite, fraseDoLimite, funcaoDe, nAcessos, pilulasDe, primeiroNome, titularDe, usoDoPlano, type Uso } from "@/components/gestao/equipe/modelo";
 import { perfisPara } from "@/lib/gestao/acessos";
+import { usaModulo } from "@/lib/gestao/modulos";
 import type { Profissional } from "@/lib/gestao/tipos";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./equipe.css";
@@ -84,13 +85,15 @@ export default function Equipe() {
             <div className="g-eq-convida-t">
               <p className="g-rotulo">Sua equipe</p>
               <h2>Trabalha sozinha ou sozinho? Então está tudo pronto.</h2>
-              <p>A agenda, o caixa e o resto já estão no seu nome. Você não precisa mexer nesta tela.</p>
-              <p>Se um dia tiver ajuda, é aqui que você coloca a pessoa: quem dá banho e tosa aparece na agenda sem precisar de senha, e quem usa o sistema (recepção, financeiro, sócio) ganha um acesso próprio.</p>
+              <p>{usaModulo(petshop, "banho_tosa") ? "A agenda, o caixa" : "O caixa"} e o resto já estão no seu nome. Você não precisa mexer nesta tela.</p>
+              <p>Se um dia tiver ajuda, é aqui que você coloca a pessoa: {usaModulo(petshop, "banho_tosa") ? "quem dá banho e tosa aparece na agenda sem precisar de senha, e " : ""}quem usa o sistema (recepção, financeiro, sócio) ganha um acesso próprio.</p>
               <div><button className="g-btn verde" onClick={() => abrir({ tipo: "novo" })}><UserPlus />Tenho ajuda: adicionar pessoa</button></div>
             </div>
             <ul className="g-eq-convida-l">
+              {usaModulo(petshop, "banho_tosa") && <>
               <li><Tile icone={CalendarDays} tom="pessego" /><p className="g-eq-convida-i"><b>Agenda por pessoa</b><small>Cada um com a sua cor e o seu filtro na agenda.</small></p></li>
               <li><Tile icone={Percent} tom="menta" /><p className="g-eq-convida-i"><b>Comissão calculada</b><small>A conta de cada um sai pronta em Relatórios.</small></p></li>
+              </>}
               <li><Tile icone={Smartphone} tom="ceu" /><p className="g-eq-convida-i"><b>Login só para quem precisa</b><small>Você escolhe, área por área, o que a pessoa abre.</small></p></li>
             </ul>
           </section>
@@ -111,7 +114,7 @@ export default function Equipe() {
                       <AvatarPessoa nome={p.nome} cor={p.cor} tamanho="g" />
                       <div className="g-eq-topo-t">
                         <b className="g-eq-nome">{p.nome}{p.id === eu.id ? " (você)" : ""}</b>
-                        <span className="g-eq-funcao">{funcaoDe(p)}{dono && <span className={`g-tag ${p.id === titular ? "laranja" : "azul"}`}>{p.id === titular ? "Titular" : "Sócio"}</span>}</span>
+                        <span className="g-eq-funcao">{funcaoDe(p, petshop)}{dono && <span className={`g-tag ${p.id === titular ? "laranja" : "azul"}`}>{p.id === titular ? "Titular" : "Sócio"}</span>}</span>
                       </div>
                       <ChevronRight className="g-eq-seta" size={18} aria-hidden />
                     </div>
@@ -158,7 +161,7 @@ export default function Equipe() {
                   {inativos.map((p) => (
                     <div key={p.id} className="g-linha">
                       <AvatarPessoa nome={p.nome} cor="#a39a90" tamanho="p" />
-                      <span className="t"><b className="g-muted">{p.nome}</b><span>{funcaoDe(p)}</span></span>
+                      <span className="t"><b className="g-muted">{p.nome}</b><span>{funcaoDe(p, petshop)}</span></span>
                       <button className="g-btn p sec" onClick={() => reativar(p)}>Reativar</button>
                     </div>
                   ))}

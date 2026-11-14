@@ -76,6 +76,18 @@ export function frenteDe(petshop: ComModulos): Frente | null {
   return p === "banho_tosa" ? "banho" : p === "creche" || p === "hotel" ? "casa" : p === "loja" ? "loja" : null;
 }
 
+/**
+ * Artigo do nome do negócio: "a Creche Au Au", "o Pet Shop Bidu". Vai pela primeira palavra; sem pista, fica "o".
+ * `artigoDe("Creche Au Au")` = { o: "a", no: "na", do: "da" }.
+ */
+const FEMININOS = new Set(["creche", "casa", "casinha", "escola", "escolinha", "clinica", "loja", "lojinha", "estetica", "hospedagem", "toca", "vila", "fazenda",
+  "chacara", "estacao", "boutique", "academia", "pousada", "cia", "companhia", "turma", "turminha", "patota", "matilha", "familia", "central", "oficina",
+  "barbearia", "veterinaria", "agropecuaria", "mansao", "morada", "republica", "ilha", "cabana", "granja"]);
+export function artigoDe(nome: string | null | undefined): { o: "o" | "a"; no: "no" | "na"; do: "do" | "da" } {
+  const primeira = ((nome ?? "").trim().split(/\s+/)[0] ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return FEMININOS.has(primeira) ? { o: "a", no: "na", do: "da" } : { o: "o", no: "no", do: "do" };
+}
+
 /** Serviços que entram junto com o banho e tosa (os mesmos de quem cria o pet shop já com banho e tosa). Sem preço. */
 export const SERVICOS_BANHO_TOSA = [
   { nome: "Banho", categoria: "banho", duracao_min: 60, cor: "#3b82a0", ordem: 1 },

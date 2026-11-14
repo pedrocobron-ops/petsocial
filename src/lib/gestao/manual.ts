@@ -529,7 +529,7 @@ const BASE: TopicoBase[] = [
       "O pet passa a aparecer em Na casa agora.",
       "Reserva de um dia que já passou: ao tocar em Check-in, o sistema pergunta Quando ele chegou? Toque em Chegou em (o dia reservado) se o pet veio no dia combinado e só faltou anotar: a estadia fica com as datas da reserva. Toque em Chegou agora se ele está chegando só agora.",
       "Diária em R$ 0,00 vira cortesia: o sistema pede confirmação.",
-      { so: ["creche"], texto: "Mensalista da creche não entra por aqui: a chegada dele é um toque em Chegou, na Chamada." },
+      { so: ["creche"], texto: "Mensalista da creche não entra por aqui: a chegada é um toque em Chegou, na Chamada." },
     ],
     palavras: ["check-in", "checkin", "check in", "fazer check-in", "fazer o check-in", "check-in do hotel", "check-in da creche", "chegou na creche", "chegou no hotel", "pet chegou", "chegou pro hotel", "chegou para o hotel", "chegou para a creche", "cachorro chegou", "hospede chegou", "entrada do hospede", "dar entrada no hotel"] },
   { id: "creche-checkout", titulo: "Como fazer o check-out e receber a estadia", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
@@ -937,7 +937,7 @@ const BASE: TopicoBase[] = [
       { so: ["banho"], texto: "Quem tem banho e tosa também acha o link na tela Hoje, em Mandar link de agendamento, e na Agenda, em Link do cliente." },
     ],
     palavras: ["pedido de creche", "pedido de hotel", "pedidos de creche", "creche e hotel pelo link", "reserva pelo link", "cliente reservar", "reserva online", "hospedagem pelo link", "pedir vaga", "vaga pelo link"] },
-  { id: "mensalista", titulo: "Como cadastrar um mensalista da creche", secao: "creche", usa: ["creche"], quem: "todos", rota: CRECHE, tambem: [CLIENTES],
+  { id: "mensalista", titulo: "Como cadastrar um mensalista da creche", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE, tambem: [CLIENTES],
     passos: [
       "Abra Creche e hotel e toque em Mensalistas, no alto.",
       "Toque em Novo mensalista e escolha o pet.",
@@ -948,6 +948,7 @@ const BASE: TopicoBase[] = [
       "Toque em Cadastrar mensalista.",
     ],
     dicas: [
+      "Quem cadastra é o dono ou quem cuida do financeiro. A equipe também pode, se você ligar A equipe pode mexer nos planos de mensalista em Meu pet shop, em Cuidado com o tutor.",
       "Também dá para criar o plano pela ficha do pet, no cartão Creche: mensalista, em Tornar mensalista.",
       "Para mudar os dias ou o valor, toque no mensalista e em Alterar plano. Lá também ficam Pausar o plano por uns dias e Encerrar o plano hoje.",
       "Na pausa (viagem, doença) o pet não entra na chamada, não leva falta e não ocupa vaga.",
@@ -977,15 +978,20 @@ const BASE: TopicoBase[] = [
     passos: [
       "Em Creche e hotel, na Chamada, toque em Veio fora do dia.",
       "Toque no mensalista que veio num dia que não é do plano dele.",
-      "Se for reposição de uma falta, marque É reposição de falta (não cobrar). Marcada por quem não recebe, a reposição fica para quem cuida do financeiro conferir.",
+      "Se for reposição de uma falta, marque É reposição de falta (não cobrar). A folha mostra quantas faltas o pet tem para repor e quais.",
       "Toque em Marcar dia extra (ou Marcar reposição).",
     ],
+    atencao: [
+      "Toda reposição precisa de uma falta para repor. Sem falta, a equipe marca o dia como dia extra; o dono ou quem cuida do financeiro pode tocar em Liberar sem cobrança, e fica anotado que foi liberado sem falta.",
+    ],
     dicas: [
+      "Marcada por quem não recebe, a reposição fica para quem cuida do financeiro conferir. A marcada por você já entra aceita, e também fica anotada com a falta que repõe.",
+      "No cartão do mensalista (toque nele em Mensalistas) aparecem as faltas que ainda podem ser repostas e qual falta cada reposição repôs.",
       "O dia extra não é cobrado na porta: ele entra, com a data, na cobrança do mês seguinte.",
       "A saída é igual à dos outros: toque em Saiu.",
       "Em dia marcado como fechado (feriado, folga) ninguém tem o dia no plano. A tela pergunta Cobrar como dia extra ou Não cobrar, e nada vem marcado: o dia só vira dia extra se você escolher.",
     ],
-    palavras: ["dia extra", "extra", "veio fora do dia", "reposicao", "repor falta", "dia avulso do mensalista", "mensalista", "escolinha", "day care", "dia que nao e dele", "nao e o dia dele", "veio em outro dia", "fora do dia dele", "veio um dia a mais"] },
+    palavras: ["dia extra", "extra", "veio fora do dia", "reposicao", "repor falta", "saldo de reposicao", "faltas para repor", "quantas faltas", "reposicao sem falta", "dia avulso do mensalista", "mensalista", "escolinha", "day care", "dia que nao e dele", "nao e o dia dele", "veio em outro dia", "fora do dia dele", "veio um dia a mais"] },
   { id: "cobrancas-creche", titulo: "Como gerar e mandar as cobranças do mês", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE, tambem: [HOJE],
     passos: [
       "Abra Creche e hotel e toque em Cobranças, no alto.",
@@ -1036,8 +1042,10 @@ const BASE: TopicoBase[] = [
       "Em Creche e hotel, toque em Cobranças.",
       "No cartão do tutor que tem mais de um pet com mensalidade em aberto, toque em Receber tudo.",
       "Confira a lista e o total, escolha como recebeu e o dia, e toque em Receber.",
+      "Na folha Recebido, toque em Mandar comprovante: o WhatsApp do tutor abre com o comprovante das mensalidades pronto, e você só aperta enviar.",
     ],
     dicas: [
+      "O comprovante não é nota fiscal, e o texto diz isso.",
       "Cada mensalidade é baixada inteira, com a mesma forma de pagamento. Para receber só uma parte, ou dividir em duas formas, use o Receber de cada pet.",
       "Com multa e juros ligados em Opções de cobrança, a folha mostra o valor sugerido das atrasadas. Só entra se você marcar.",
     ],
@@ -1064,6 +1072,20 @@ const BASE: TopicoBase[] = [
       "Reposição marcada por você ou por quem cuida do financeiro não passa por conferência.",
     ],
     palavras: ["reposicao", "conferir reposicao", "nao cobrar", "monitor marcou", "equipe marcou", "dia sem cobranca", "aceitar reposicao", "mensalista", "escolinha", "day care"] },
+  { id: "regra-reposicao", titulo: "Como escolher a regra para repor falta", secao: "creche", usa: ["creche"], quem: "dono", rota: "/gestao/app/meu-petshop", tambem: [CRECHE],
+    passos: [
+      "Abra Meu pet shop e vá até Cuidado com o tutor.",
+      "Ligue Regra para repor falta.",
+      "Em Até quando dá para repor, escolha Sem prazo, No mesmo mês da falta ou Até o fim do mês seguinte à falta.",
+      "Se só a falta avisada pode ser reposta, marque Só repõe falta que o tutor avisou.",
+      "Toque em Salvar opções.",
+    ],
+    dicas: [
+      "Desligada, qualquer falta do plano pode ser reposta, sem prazo. Mesmo assim, cada reposição precisa de uma falta para repor.",
+      "A reposição sempre repõe a falta mais antiga que ainda vale. Falta que passou do prazo aparece no cartão do mensalista.",
+      "Você pode liberar um dia sem cobrança mesmo sem falta para repor: fica anotado.",
+    ],
+    palavras: ["regra de reposicao", "prazo de reposicao", "repor ate quando", "reposicao no mes seguinte", "so falta avisada", "repor falta", "reposicao", "mensalista", "escolinha", "day care"] },
   { id: "reserva-dia-extra", titulo: "Como reservar um dia extra para um mensalista", secao: "creche", usa: ["creche"], quem: "todos", rota: CRECHE,
     passos: [
       "Em Creche e hotel, toque em Nova reserva / Check-in e escolha o mensalista.",

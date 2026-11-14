@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CalendarCheck2, Check, HandCoins } from "lucide-react";
 import type { Cliente, Pet } from "@/lib/gestao/tipos";
-import { dataLonga, deIsoDia } from "@/lib/gestao/util";
+import { dataCurta, dataLonga, deIsoDia } from "@/lib/gestao/util";
 import { useTrava } from "@/lib/gestao/uma-vez";
 import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
@@ -15,7 +15,7 @@ import { AvatarPet, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } 
  * Nada é decidido sozinho. A regra mora no banco (`creche_chamada` e `creche_reposicao_decidir`).
  */
 type Linha = {
-  estadia_id: string; dia: string; marcado_por: string | null;
+  estadia_id: string; dia: string; marcado_por: string | null; falta_dia?: string | null;
   pets: (Pick<Pet, "id" | "nome" | "foto" | "especie"> & { clientes: Pick<Cliente, "id" | "nome"> | null }) | null;
 };
 
@@ -28,7 +28,7 @@ export default function ReposicoesParaConferir() {
 
   const { dados, recarregar } = useDados(async () => {
     if (!pode) return null;
-    const r = await sb.from("creche_reposicoes").select("estadia_id, dia, marcado_por, pets(id, nome, foto, especie, clientes(id, nome))")
+    const r = await sb.from("creche_reposicoes").select("estadia_id, dia, marcado_por, falta_dia, pets(id, nome, foto, especie, clientes(id, nome))")
       .eq("petshop_id", petshop.id).eq("estado", "pendente").order("dia").limit(200);
     if (r.error || !r.data?.length) return { linhas: [] as Linha[], nomes: new Map<string, string>() };
     const equipe = await sb.from("profissionais").select("user_id, nome").eq("petshop_id", petshop.id).limit(500);
@@ -62,7 +62,7 @@ export default function ReposicoesParaConferir() {
             <AvatarPet pet={l.pets ?? { nome: "?" }} />
             <span className="t">
               <b>{l.pets?.nome ?? "Pet removido"}</b>
-              <span>{[dataLonga(deIsoDia(l.dia)), l.pets?.clientes?.nome, l.marcado_por && dados.nomes.get(l.marcado_por) ? `marcada por ${dados.nomes.get(l.marcado_por)}` : null].filter(Boolean).join(" · ")}</span>
+              <span>{[dataLonga(deIsoDia(l.dia)), l.falta_dia ? `repõe a falta de ${dataCurta(l.falta_dia)}` : null, l.pets?.clientes?.nome, l.marcado_por && dados.nomes.get(l.marcado_por) ? `marcada por ${dados.nomes.get(l.marcado_por)}` : null].filter(Boolean).join(" · ")}</span>
             </span>
             <button type="button" className="g-btn sec p" disabled={ocupado === l.estadia_id} onClick={() => void decidir(l, "aceitar")} aria-label={`Aceitar a reposição de ${l.pets?.nome ?? "pet"}`}><Check />Aceitar</button>
             <button type="button" className="g-btn verde p" disabled={ocupado === l.estadia_id} onClick={() => void decidir(l, "extra")} aria-label={`Cobrar como dia extra o dia de ${l.pets?.nome ?? "pet"}`}><HandCoins />Cobrar como dia extra</button>

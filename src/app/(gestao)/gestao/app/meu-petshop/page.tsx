@@ -24,7 +24,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { Campo, CampoValor, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
 import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import { PORTES, type Horario, type Porte, type Servico } from "@/lib/gestao/tipos";
-import { brlCurto, fmtTelefone, soDigitos, mascaraTelefone } from "@/lib/gestao/util";
+import { brl, brlCurto, fmtTelefone, soDigitos, mascaraTelefone } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./meu-petshop.css";
 
@@ -53,7 +53,12 @@ export default function MeuPetshop() {
   if (!souDono) return <Vazio titulo="Só o dono do pet shop mexe aqui." />;
   const ativos = servicos.filter((s) => s.ativo);
   const faltaPreco = ativos.filter((s) => !precos(s).length).length;
-  const semPreco = faltaPreco > 0;
+  // sem banho e tosa, os serviços da agenda não são o assunto: o alto mostra a diária e as vagas da casa
+  const comAgenda = usaModulo(petshop, "banho_tosa");
+  const semPreco = comAgenda && faltaPreco > 0;
+  const daCasa = usaModulo(petshop, "creche") ? "creche" : "hotel";
+  const diaria = daCasa === "creche" ? petshop.diaria_creche : petshop.diaria_hotel;
+  const vagas = daCasa === "creche" ? petshop.vagas_creche : petshop.vagas_hotel;
   const salvo = lerHorario(petshop.horario);
   const abertos = ORDEM_DIAS.filter((d) => salvo[d]).length;
   const deHoje = salvo[String(new Date().getDay())];
@@ -78,8 +83,13 @@ export default function MeuPetshop() {
       )}
       <div className="g-pilha g">
         <div className="g-grade kpis">
+          {comAgenda || !usaCasa(petshop) ? <>
           <Kpi icone={Scissors} tom="pessego" rotulo="Serviços" valor={ativos.length} apoio={ativos.length === 1 ? "ativo na agenda" : "ativos na agenda"} />
           <Kpi icone={Tag} tom={semPreco ? "manteiga" : "menta"} rotulo="Sem preço" valor={faltaPreco} apoio={semPreco ? "faltam os valores" : "todos com valor"} />
+          </> : <>
+          <Kpi icone={Tag} tom={diaria == null ? "manteiga" : "menta"} rotulo={daCasa === "creche" ? "Diária da creche" : "Diária do hotel"} valor={diaria == null ? "–" : brl(diaria)} apoio={diaria == null ? "sem valor ainda" : daCasa === "creche" ? "por dia" : "por noite"} />
+          <Kpi icone={BedDouble} tom="ceu" rotulo="Vagas" valor={vagas ?? "–"} apoio={vagas == null ? "sem limite" : daCasa === "creche" ? "pets por dia" : "pets por noite"} />
+          </>}
           <Kpi icone={CalendarDays} tom="ceu" rotulo="Dias abertos" valor={abertos} apoio="por semana" />
           <Kpi icone={Clock} tom="lilas" rotulo="Hoje" valor={deHoje ? `${horaCurta(deHoje.abre)}–${horaCurta(deHoje.fecha)}` : "Fechado"} apoio={deHoje ? "horário de hoje" : "sem atendimento"} />
         </div>

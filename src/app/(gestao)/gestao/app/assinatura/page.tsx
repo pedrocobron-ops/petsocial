@@ -7,6 +7,7 @@ import { Tile, type Tom } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
 import { Vazio } from "@/components/gestao/ui";
 import { linkSuporte } from "@/lib/gestao/contato";
+import { artigoDe } from "@/lib/gestao/modulos";
 import { PERIODOS, PLANOS, ofertaDe, planoPorId, temCheckout, textoAcessos, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
 import { brlCurto, dataCompleta, dataCurta } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
@@ -68,7 +69,7 @@ export default function Assinatura() {
   return (
     <div>
       <header className="g-topo">
-        <div><h1>Assinatura</h1><p className="g-muted">O plano do {petshop.nome}.</p></div>
+        <div><h1>Assinatura</h1><p className="g-muted">O plano {artigoDe(petshop.nome).do} {petshop.nome}.</p></div>
       </header>
       <div className="g-pilha g">
         {estado()}

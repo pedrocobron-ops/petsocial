@@ -5,6 +5,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { Database } from "@/lib/gestao/banco";
 import type { Banco } from "@/lib/gestao/supabase";
 import { brl } from "@/lib/gestao/util";
+import { juntar } from "@/lib/gestao/creche";
 import { useGestao } from "../contexto";
 import { avisarMudanca, Campo, CampoValor, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 
@@ -35,11 +36,17 @@ export default function ModelosDePlano({ aoFechar, aoMudar }: { aoFechar: () => 
   const { dados, carregando, recarregar } = useDados(async () => {
     const [modelos, usos] = await Promise.all([
       lerModelos(sb, petshop.id),
-      sb.from("creche_planos_valores").select("plano_id, modelo_id, valor_mensal").eq("petshop_id", petshop.id).not("modelo_id", "is", null).limit(5000),
+      sb.from("creche_planos_valores").select("plano_id, modelo_id, valor_mensal, creche_planos(pets(nome))").eq("petshop_id", petshop.id).not("modelo_id", "is", null).limit(5000),
     ]);
     const porModelo = new Map<string, number>();
-    for (const u of usos.data ?? []) if (u.modelo_id) porModelo.set(u.modelo_id, (porModelo.get(u.modelo_id) ?? 0) + 1);
-    return { modelos, porModelo };
+    // os nomes dos pets de cada modelo, para a pergunta do reajuste dizer quem muda
+    const nomes = new Map<string, string[]>();
+    for (const u of (usos.data ?? []) as unknown as { modelo_id: string | null; creche_planos: { pets: { nome: string } | null } | null }[]) {
+      if (!u.modelo_id) continue;
+      porModelo.set(u.modelo_id, (porModelo.get(u.modelo_id) ?? 0) + 1);
+      nomes.set(u.modelo_id, [...(nomes.get(u.modelo_id) ?? []), u.creche_planos?.pets?.nome ?? "pet"]);
+    }
+    return { modelos, porModelo, nomes };
   }, [petshop.id]);
 
   const sugerirNome = (x: Rascunho) => (x.nome.trim() ? x.nome : x.vezes ? `${x.vezes}x por semana` : "");
@@ -59,8 +66,8 @@ export default function ModelosDePlano({ aoFechar, aoMudar }: { aoFechar: () => 
     if (mudouPreco && usam > 0) {
       acompanhar = await confirmar({
         titulo: `Mudar também ${usam === 1 ? "o mensalista" : `os ${usam} mensalistas`} deste modelo?`,
-        texto: `A mensalidade do modelo passa de ${brl(antes!.valor_mensal)} para ${brl(r.mensal)}. Se você confirmar, ${usam === 1 ? "o plano que usa este modelo passa" : `os ${usam} planos que usam este modelo passam`} a valer o preço novo nas próximas cobranças. Cobrança que já foi gerada não muda. Se voltar, só o modelo muda e os planos atuais ficam como estão.`,
-        confirmar: "Mudar os planos também",
+        texto: `A mensalidade do modelo passa de ${brl(antes!.valor_mensal)} para ${brl(r.mensal)}. ${usam === 1 ? "Usa este modelo" : "Usam este modelo"}: ${juntar(dados?.nomes.get(r.id!) ?? [])}. Em Mudar os planos também, ${usam === 1 ? "o plano passa" : "os planos passam"} a valer o preço novo nas próximas cobranças (cobrança que já foi gerada não muda). Em Só o modelo, o modelo fica com o preço novo e os planos atuais continuam como estão.`,
+        confirmar: "Mudar os planos também", voltar: "Só o modelo",
       });
     }
     setSalvando(true);

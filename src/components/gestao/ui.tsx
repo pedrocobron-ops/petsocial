@@ -78,7 +78,7 @@ const EVENTO_AVISOU = "gestao:avisou";
 /** Botão dentro do aviso rápido (ex.: "Desfazer"). O aviso com botão fica mais tempo na tela. */
 export type AcaoDoAviso = { rotulo: string; fazer: () => void };
 type Toast = { id: number; texto: string; erro?: boolean; acao?: AcaoDoAviso };
-type Pergunta = { titulo: string; texto?: string; confirmar?: string; perigo?: boolean; resolver: (v: boolean) => void };
+type Pergunta = { titulo: string; texto?: string; confirmar?: string; perigo?: boolean; /** nome do botão que responde não (padrão: Voltar) */ voltar?: string; resolver: (v: boolean) => void };
 const AvisosCtx = createContext<{ avisar: (t: string, acao?: AcaoDoAviso) => void; avisarErro: (e: unknown) => void; confirmar: (p: Omit<Pergunta, "resolver">) => Promise<boolean> } | null>(null);
 
 export function useAvisos() {
@@ -115,7 +115,7 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
       {pergunta && (
         <Folha titulo={pergunta.titulo} aoFechar={() => responder(false)}
           rodape={<>
-            <button className="g-btn sec" onClick={() => responder(false)}>Voltar</button>
+            <button className="g-btn sec" onClick={() => responder(false)}>{pergunta.voltar ?? "Voltar"}</button>
             <button className={`g-btn ${pergunta.perigo ? "perigo" : "pri"}`} onClick={() => responder(true)} autoFocus>{pergunta.confirmar ?? "Confirmar"}</button>
           </>}>
           {pergunta.texto && <p className="g-muted">{pergunta.texto}</p>}

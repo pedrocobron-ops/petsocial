@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, ChevronDown, Lightbulb, TriangleAlert } from "lucide-react";
 import { QUEM, nomeDaTela, type Topico } from "@/lib/gestao/manual";
+import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { useGestao } from "../contexto";
 import "./manual.css";
 
@@ -17,21 +18,31 @@ export function QuemPode({ quem }: { quem: Topico["quem"] }) {
   return <span className={`g-tag ${QUEM[quem].tom} g-man-quem`}>{QUEM[quem].rotulo}</span>;
 }
 
+/**
+ * O manual fala da tela "Creche e hotel"; quem usa só uma das duas vê no menu "Creche" ou "Hotel". Troca só quando o texto
+ * fala da tela (Em, Abra, a tela, o cartão), não da categoria do Financeiro, que continua se chamando Creche e hotel.
+ */
+function comNomeDaCasa(texto: string, nome: string) {
+  if (nome === "Creche e hotel") return texto;
+  return texto.replace(/\b(Em|em|Abra|abra|tela|Tela|menu|aba|Toque em|toque em) Creche e hotel\b/g, `$1 ${nome}`);
+}
+
 /** O passo a passo de um tópico: passos numerados, avisos, dicas e o botão que leva para a tela. */
 export function CorpoTopico({ topico: t, semTela, aoIr }: { topico: Topico; /** tela já aberta: não repete o botão para ela */ semTela?: string | null; aoIr?: () => void }) {
   const { petshop } = useGestao();
+  const casa = nomeDaCasa(petshop), x = (texto: string) => comNomeDaCasa(texto, casa);
   return (
     <div className="g-man-corpo">
       <ol className="g-man-passos">
-        {t.passos.map((p, i) => <li key={i}><span>{p}</span></li>)}
+        {t.passos.map((p, i) => <li key={i}><span>{x(p)}</span></li>)}
       </ol>
       {t.atencao?.map((a, i) => (
-        <p key={i} className="g-man-nota atencao"><TriangleAlert aria-hidden /><span><b>Atenção.</b> {a}</span></p>
+        <p key={i} className="g-man-nota atencao"><TriangleAlert aria-hidden /><span><b>Atenção.</b> {x(a)}</span></p>
       ))}
       {t.dicas?.length ? (
         <div className="g-man-nota">
           <Lightbulb aria-hidden />
-          <ul>{t.dicas.map((d, i) => <li key={i}>{d}</li>)}</ul>
+          <ul>{t.dicas.map((d, i) => <li key={i}>{x(d)}</li>)}</ul>
         </div>
       ) : null}
       {t.rota && t.rota !== semTela && (

@@ -21,7 +21,7 @@ import { CartaoMensalista } from "../creche/resumo-mes";
 import { OcorrenciasDoPet } from "../casa/ocorrencias";
 import { QuemPodeBuscar } from "../casa/portaria";
 import { portariaLigada } from "@/lib/gestao/casa-opcoes";
-import { usaCasa } from "@/lib/gestao/modulos";
+import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 
 type PetDaFicha = Pet & { clientes: Cliente | null };
 type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id"> & { agendamento_servicos?: { id: string; servico_id: string; preco: number | null; ordem: number }[] | null };
@@ -38,7 +38,11 @@ const STATUS_ESTADIA: Record<string, { rotulo: string; tom: string }> = {
 
 export default function FichaPet({ id, voltar }: { id: string; voltar: () => void }) {
   // o gasto do pet é histórico de dinheiro: só para o dono e quem cuida do financeiro (quem só opera o caixa não lê esse histórico)
-  const { sb, petshop, servicos, cuidoDoFinanceiro: vejoFinanceiro } = useGestao();
+  const { sb, petshop, servicos, cuidoDoFinanceiro: vejoFinanceiro, posso } = useGestao();
+  // a ficha fala do que o negócio faz: sem banho e tosa (ou sem a agenda liberada), nada de "Agendar" nem de "atendimentos"
+  const comBanho = usaModulo(petshop, "banho_tosa");
+  const comAgenda = comBanho && posso("agenda");
+  const casa = usaCasa(petshop);
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = useState(false);
@@ -71,11 +75,13 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
     // o check-out lança a estadia no financeiro ligada ao tutor, com o nome do pet na descrição
     const petLido = pet.data as unknown as PetDaFicha | null;
     let gastoEstadias = 0;
-    if (vejoFinanceiro && petLido?.cliente_id && nEstadias > 0) {
+    if (vejoFinanceiro && petLido?.cliente_id && (nEstadias > 0 || usaModulo(petshop, "creche"))) {
+      // diárias e mensalidades da creche: a descrição traz "· Nome do pet" (às vezes seguido de "(parte)" ou "+ taxa")
       const l = await sb.from("lancamentos").select("valor, descricao").eq("petshop_id", petshop.id).eq("cliente_id", petLido.cliente_id)
-        .eq("tipo", "entrada").eq("pago", true).eq("categoria", "Creche e hotel").limit(1000);
-      const fim = `· ${petLido.nome}`.toLowerCase();
-      gastoEstadias = (l.data ?? []).filter((x) => (x.descricao ?? "").trim().toLowerCase().endsWith(fim)).reduce((t, x) => t + Number(x.valor), 0);
+        .eq("tipo", "entrada").eq("pago", true).in("categoria", ["Creche e hotel", "Creche: mensalidade"]).limit(1000);
+      const nome = `· ${petLido.nome}`.toLowerCase();
+      const doPet = (d: string) => { const i = d.indexOf(nome); return i >= 0 && /^($|\s|\(|\+)/.test(d.slice(i + nome.length)); };
+      gastoEstadias = (l.data ?? []).filter((x) => doPet((x.descricao ?? "").trim().toLowerCase())).reduce((t, x) => t + Number(x.valor), 0);
     }
     return {
       pet: pet.data as unknown as PetDaFicha | null,
@@ -119,6 +125,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
   // o histórico vem do mais novo para o mais antigo: o próximo horário é o último que ainda está por vir
   const porVir = atendimentos.filter((a) => new Date(a.inicio) > agora && !["cancelado", "faltou", "concluido"].includes(a.status));
   const proximo = porVir[porVir.length - 1] ?? null;
+  const proximaReserva = estadias.filter((e) => e.status === "reservada" && new Date(e.saida_prevista ?? e.entrada) >= agora).sort((a, b) => a.entrada.localeCompare(b.entrada))[0] ?? null;
   const tomHeroi = pet.especie === "gato" ? "lilas" : pet.especie === "cao" ? "pessego" : "menta";
   const tomVisita = TOM_VISITA[tomDaVisita(ultimaVisita, agora.getTime())] ?? "ceu";
 
@@ -163,7 +170,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
             </div>
           </div>
           <div className="gc-botoes">
-            {pet.ativo && <Link className="g-btn pri" href={`/gestao/app/agenda?novo=1&pet=${pet.id}`}><CalendarPlus />Agendar</Link>}
+            {pet.ativo && comAgenda && <Link className="g-btn pri" href={`/gestao/app/agenda?novo=1&pet=${pet.id}`}><CalendarPlus />Agendar</Link>}
             {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />WhatsApp</a>}
             <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditando(true); }}><Pencil />Editar pet</button>
             {tutor && <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setEditandoTutor(true); }}><UserPen />Editar tutor</button>}
@@ -190,8 +197,8 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
 
       <div className="g-cli-nums">
         <div className="g-cli-num">
-          <Tile icone={Scissors} tom="pessego" />
-          <div><span className="g-rotulo">Visitas</span><b className="g-tab">{visitas}</b><small>{nEstadias > 0 ? `${visitas - nEstadias} na agenda + ${nEstadias} na creche ou hotel` : visitas === 1 ? "atendimento concluído" : "atendimentos concluídos"}</small></div>
+          <Tile icone={comBanho ? Scissors : PawPrint} tom="pessego" />
+          <div><span className="g-rotulo">Visitas</span><b className="g-tab">{visitas}</b><small>{nEstadias > 0 ? (comBanho ? `${visitas - nEstadias} na agenda + ${nEstadias} ${usaModulo(petshop, "hotel") && !usaModulo(petshop, "creche") ? "no hotel" : usaModulo(petshop, "creche") && !usaModulo(petshop, "hotel") ? "na creche" : "na creche ou hotel"}` : `${nEstadias === 1 ? "1 dia ou estadia" : `${nEstadias} dias e estadias`}`) : !comBanho ? "ainda não veio" : visitas === 1 ? "atendimento concluído" : "atendimentos concluídos"}</small></div>
         </div>
         <div className="g-cli-num">
           <Tile icone={History} tom={tomVisita} />
@@ -199,12 +206,19 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
         </div>
         <div className="g-cli-num">
           <Tile icone={CalendarClock} tom="ceu" />
-          <div><span className="g-rotulo">Próximo horário</span><b>{proximo ? dataAmigavel(proximo.inicio) : "nada marcado"}</b>{proximo && <small>às {hora(proximo.inicio)} · {nomesDe(proximo)}</small>}</div>
+          {comBanho || !casa
+            ? <div><span className="g-rotulo">Próximo horário</span><b>{proximo ? dataAmigavel(proximo.inicio) : "nada marcado"}</b>{proximo && <small>às {hora(proximo.inicio)} · {nomesDe(proximo)}</small>}</div>
+            : <div><span className="g-rotulo">Próxima reserva</span><b>{proximaReserva ? dataAmigavel(proximaReserva.entrada) : "nada marcado"}</b>{proximaReserva && <small>{proximaReserva.tipo === "hotel" ? "hotel" : "creche"}</small>}</div>}
         </div>
         {vejoFinanceiro ? (
           <div className="g-cli-num">
             <Tile icone={Wallet} tom="menta" />
-            <div><span className="g-rotulo">{gastoEstadias > 0 ? "Gasto aqui" : "Gasto em atendimentos"}</span><b className="g-tab">{brl(gasto)}</b><small>{gastoParcial ? "nos 1.000 mais recentes" : gastoEstadias > 0 ? `${brl(gastoEstadias)} de creche e hotel` : "soma dos concluídos"}</small></div>
+            <div><span className="g-rotulo">{gastoEstadias > 0 || !comBanho ? "Gasto aqui" : "Gasto em atendimentos"}</span><b className="g-tab">{brl(gasto)}</b><small>{gastoParcial ? "nos 1.000 mais recentes" : gastoEstadias > 0 ? (comBanho ? `${brl(gastoEstadias)} de ${nomeDaCasa(petshop).toLowerCase()}` : "diárias e mensalidades pagas") : comBanho ? "soma dos concluídos" : "nada pago ainda"}</small></div>
+          </div>
+        ) : !usaModulo(petshop, "pacotes") && casa ? (
+          <div className="g-cli-num">
+            <Tile icone={BedDouble} tom="ceu" />
+            <div><span className="g-rotulo">{nomeDaCasa(petshop)}</span><b className="g-tab">{nEstadias}</b><small>{nEstadias === 1 ? "dia ou estadia" : "dias e estadias"}</small></div>
           </div>
         ) : (
           <div className="g-cli-num">
@@ -219,7 +233,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
           <CartaoSaude pet={pet} tutor={tutor} itens={saude} erro={erroSaude} aoMudar={() => void recarregar()} />
           <CartaoMensalista pet={pet} />
 
-          <section className="g-card">
+          {(comBanho || atendimentos.length > 0) && <section className="g-card">
             <div className="g-card-t"><h3><Tile icone={History} tom="pessego" tamanho="p" />Histórico de atendimentos</h3>{atendimentos.length > 0 && <span className="g-muted g-pp" style={{ whiteSpace: "nowrap" }}>{atendimentos.length === 60 ? "60 mais recentes" : atendimentos.length === 1 ? "1 horário" : `${atendimentos.length} horários`}</span>}</div>
             {!atendimentos.length ? <p className="g-muted g-p">{pet.nome} ainda não tem atendimento marcado.</p> : (
               <ol className="g-cli-tempo">
@@ -250,7 +264,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
               </ol>
             )}
             {atendimentos.length === 60 && <p className="g-pp g-muted" style={{ marginTop: 8 }}>Aqui aparecem os 60 mais recentes.</p>}
-          </section>
+          </section>}
         </div>
 
         <div>
@@ -261,7 +275,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
             </section>
           )}
 
-          <section className="g-card">
+          {(usaModulo(petshop, "pacotes") || pacotes.length > 0) && <section className="g-card">
             <div className="g-card-t"><h3><Tile icone={Ticket} tom="lilas" tamanho="p" />Pacotes ativos</h3></div>
             {!pacotes.length ? <p className="g-muted g-p">Nenhum pacote em uso.</p> : pacotes.map((p) => {
               const venceu = !!p.vence_em && deIsoDia(p.vence_em) < hoje;
@@ -282,10 +296,10 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
                 </div>
               );
             })}
-          </section>
+          </section>}
 
-          <section className="g-card">
-            <div className="g-card-t"><h3><Tile icone={BedDouble} tom="ceu" tamanho="p" />Creche e hotel</h3></div>
+          {(casa || estadias.length > 0) && <section className="g-card">
+            <div className="g-card-t"><h3><Tile icone={BedDouble} tom="ceu" tamanho="p" />{nomeDaCasa(petshop)}</h3></div>
             {!estadias.length ? <p className="g-muted g-p">Nenhuma estadia por enquanto.</p> : (
               <div className="g-lista">
                 {estadias.map((e) => {
@@ -303,7 +317,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
                 })}
               </div>
             )}
-          </section>
+          </section>}
 
           {usaCasa(petshop) && portariaLigada(petshop) && <QuemPodeBuscar pet={{ ...pet, clientes: tutor }} />}
           <OcorrenciasDoPet petId={pet.id} />

@@ -5,8 +5,8 @@ import { AlertTriangle, CalendarPlus, Check, DoorOpen, LogIn, MessageCircle, Sea
 import { lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { cuidadosVigentes, estadoSaude, tipoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import { portariaLigada, type Retirada } from "@/lib/gestao/casa-opcoes";
-import { abreNoDia, emPausa, erroDaChamada, esperadoNoDia, lerPresencas, mensagemDeFalta, montarChamada, planoVale, podeMudarPlano, type LinhaChamada, type PlanoCompleto } from "@/lib/gestao/creche";
-import { dataAmigavel, dataLonga, deIsoDia, isoDia, linkWhatsApp, semAcento, somaDias } from "@/lib/gestao/util";
+import { abreNoDia, emPausa, erroDaChamada, esperadoNoDia, fraseDoSaldo, lerPresencas, lerSaldoDeReposicao, mensagemDeFalta, montarChamada, planoVale, podeMudarPlano, type LinhaChamada, type PlanoCompleto } from "@/lib/gestao/creche";
+import { dataAmigavel, dataCurta, dataLonga, deIsoDia, isoDia, linkWhatsApp, semAcento, somaDias } from "@/lib/gestao/util";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
@@ -16,7 +16,7 @@ import { DiasDoPlano } from "./resumo-mes";
 import "./creche.css";
 import "@/components/gestao/hotel/hotel.css";
 
-type Acao = "chegou" | "extra" | "reposicao" | "saiu" | "faltou" | "desfazer";
+type Acao = "chegou" | "extra" | "reposicao" | "reposicao_livre" | "saiu" | "faltou" | "desfazer";
 type Saude = { vacinas: string[]; outros: string[] };
 
 const horaCurta = (d: string | Date) => { const x = new Date(d); return x.getMinutes() ? `${x.getHours()}h${String(x.getMinutes()).padStart(2, "0")}` : `${x.getHours()}h`; };
@@ -94,12 +94,15 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
     const nome = plano.pets?.nome ?? "O pet";
     setOcupado(plano.id);
     try {
-      const r = ok(await sb.rpc("creche_chamada", { p_plano: plano.id, p_dia: dia, p_acao: acao, p_avisou: opcoes.avisou ?? false, p_forcar: opcoes.forcar ?? false })) as { repetido?: boolean; atraso?: boolean; estadia?: string; conferir?: boolean; reserva?: string };
+      const r = ok(await sb.rpc("creche_chamada", { p_plano: plano.id, p_dia: dia, p_acao: acao, p_avisou: opcoes.avisou ?? false, p_forcar: opcoes.forcar ?? false })) as { repetido?: boolean; atraso?: boolean; estadia?: string; conferir?: boolean; reserva?: string; repoe?: string | null; sem_falta?: boolean };
       if (r.repetido) avisar("Outra pessoa já tinha marcado. Atualizei a chamada.");
       else if (acao === "chegou") avisar(ehHoje ? `${nome} chegou.` : `${nome}: presença marcada em ${dataAmigavel(dia)}.`);
       else if (acao === "extra") avisar(`${nome}: dia extra anotado. Entra na cobrança do mês.`);
       // reposição marcada por quem não recebe: fica anotada e quem cuida do financeiro confere (aceita ou cobra como dia extra)
-      else if (acao === "reposicao") avisar(r.conferir ? `${nome}: reposição anotada. Quem cuida do financeiro confere se o dia fica sem cobrança.` : `${nome}: reposição anotada, sem cobrança.`);
+      else if (acao === "reposicao" || acao === "reposicao_livre") {
+        const qual = r.repoe ? ` Repõe a falta de ${dataCurta(r.repoe)}.` : r.sem_falta ? " Ficou anotado que foi liberada sem falta para repor." : "";
+        avisar(r.conferir ? `${nome}: reposição anotada.${qual} Quem cuida do financeiro confere se o dia fica sem cobrança.` : `${nome}: reposição anotada, sem cobrança.${qual}`);
+      }
       else if (acao === "faltou" && r.reserva) avisar(`${nome} não veio: a reserva do dia extra foi cancelada. Nada é cobrado.`);
       else if (acao === "saiu" && r.atraso) {
         // saiu depois do horário: quem recebe decide a taxa agora; os outros só ficam sabendo que ficou anotado (sem valor)
@@ -275,7 +278,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
       {taxa && valorDaTaxa && <FolhaTaxaDeAtraso key={taxa.estadia_id} atraso={taxa} valor={valorDaTaxa} aoFechar={() => { setTaxa(null); avisarMudanca(); }} aoDecidir={() => { setTaxa(null); avisarMudanca(); }} />}
       {fora && dados && <ForaDoDia planos={planos} dia={dia} jaVieram={new Set(linhas.map((l) => l.plano.id))} saude={dados.saude}
         cheia={ehHoje && vagas != null && ocupadas != null && ocupadas >= vagas ? { ocupadas: ocupadas!, vagas } : null}
-        aoFechar={() => setFora(false)} aoMarcar={async (p, reposicao) => { if (await marcar(p, reposicao ? "reposicao" : "extra")) setFora(false); }} />}
+        aoFechar={() => setFora(false)} aoMarcar={async (p, como) => { if (await marcar(p, como)) setFora(false); }} />}
     </div>
   );
 }
@@ -283,9 +286,9 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
 /** Mensalista que veio num dia que não é do plano: vira dia extra (entra na cobrança) ou reposição de falta (não cobra). */
 function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: {
   planos: PlanoCompleto[]; dia: string; jaVieram: Set<string>; saude: Map<string, Saude>; cheia: { ocupadas: number; vagas: number } | null;
-  aoFechar: () => void; aoMarcar: (p: PlanoCompleto, reposicao: boolean) => Promise<void>;
+  aoFechar: () => void; aoMarcar: (p: PlanoCompleto, como: "extra" | "reposicao" | "reposicao_livre") => Promise<void>;
 }) {
-  const { petshop, souDono, cuidoDoFinanceiro } = useGestao();
+  const { sb, petshop, souDono, cuidoDoFinanceiro } = useGestao();
   // quem não recebe pode marcar "não cobrar", mas o dia fica para quem recebe conferir
   const confere = !(souDono || cuidoDoFinanceiro);
   const { confirmar } = useAvisos();
@@ -303,6 +306,11 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
     .filter((p) => !alvo || semAcento(p.pets?.nome ?? "").includes(alvo) || semAcento(p.pets?.clientes?.nome ?? "").includes(alvo))
     .sort((a, b) => (a.pets?.nome ?? "").localeCompare(b.pets?.nome ?? "", "pt-BR"));
   const s = escolhido ? saude.get(escolhido.pet_id) : undefined;
+  // saldo de reposição: só repõe quem tem falta para repor (pela regra de Meu pet shop). Sem falta, a equipe marca dia extra;
+  // o dono ou quem cuida do financeiro pode liberar assim mesmo (fica anotado).
+  const { dados: saldo } = useDados(async () => (escolhido ? lerSaldoDeReposicao(sb, escolhido.id, dia) : null), [escolhido?.id, dia]);
+  const semSaldo = Boolean(semCobrar && saldo && !saldo.cabe);
+  const nomeEscolhido = escolhido?.pets?.nome ?? "O pet";
 
   async function salvar() {
     if (!escolhido || salvando || (fechado && !conta)) return;
@@ -311,8 +319,9 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
       texto: `A creche já está com todas as vagas de hoje tomadas, contando os mensalistas que ainda vão chegar. Receber ${escolhido.pets?.nome ?? "o pet"} passando do limite?`,
       confirmar: "Passar do limite", perigo: true,
     }))) return;
+    if (semSaldo && confere) return;
     setSalvando(true);
-    await aoMarcar(escolhido, semCobrar);
+    await aoMarcar(escolhido, !semCobrar ? "extra" : semSaldo ? "reposicao_livre" : "reposicao");
     setSalvando(false);
   }
 
@@ -320,7 +329,7 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
     <Folha titulo="Veio fora do dia" aoFechar={aoFechar}
       rodape={escolhido ? <>
         <button className="g-btn sec" onClick={() => { setEscolhido(null); setConta(null); }}>Voltar</button>
-        <button className="g-btn pri" onClick={salvar} disabled={salvando || Boolean(fechado && !conta)}>{salvando ? "Salvando…" : fechado ? (conta === "extra" ? "Marcar dia extra" : conta === "sem" ? "Marcar sem cobrança" : "Escolha como conta") : reposicao ? "Marcar reposição" : "Marcar dia extra"}</button>
+        <button className="g-btn pri" onClick={salvar} disabled={salvando || Boolean(fechado && !conta) || (semSaldo && confere)}>{salvando ? "Salvando…" : semSaldo ? (confere ? "Sem falta para repor" : "Liberar sem cobrança") : fechado ? (conta === "extra" ? "Marcar dia extra" : conta === "sem" ? "Marcar sem cobrança" : "Escolha como conta") : reposicao ? "Marcar reposição" : "Marcar dia extra"}</button>
       </> : <button className="g-btn sec" onClick={aoFechar}>Fechar</button>}>
       {!escolhido ? (
         <div className="g-pilha p">
@@ -367,11 +376,20 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
                 <input type="checkbox" checked={reposicao} onChange={(e) => setReposicao(e.target.checked)} />
                 <span>É reposição de falta (não cobrar)</span>
               </label>
-              <p className="g-muted g-p">
+              {!semSaldo && <p className="g-muted g-p">
                 {reposicao ? (confere ? "O dia fica anotado como reposição. Quem cuida do financeiro é avisado e confere se fica sem cobrança ou se vira dia extra." : "O dia fica anotado como reposição e não entra na cobrança.")
                   : "O dia fica anotado como dia extra e entra na cobrança do mês que vem. Nada é cobrado na porta."}
-              </p>
+              </p>}
             </>
+          )}
+          {saldo && <p className="g-muted g-p" role="status">{fraseDoSaldo(nomeEscolhido, saldo)}</p>}
+          {semSaldo && (
+            <div className="g-aviso" role="alert" style={{ marginBottom: 0 }}>
+              <AlertTriangle />
+              <span className="g-cresce">{confere
+                ? "Sem falta para repor, o dia não pode ser reposição. Marque como dia extra (desmarque a reposição) ou fale com o dono."
+                : "Sem falta para repor. Se quiser dar este dia sem cobrança assim mesmo, toque em Liberar sem cobrança: fica anotado que foi liberado sem falta."}</span>
+            </div>
           )}
         </div>
       )}

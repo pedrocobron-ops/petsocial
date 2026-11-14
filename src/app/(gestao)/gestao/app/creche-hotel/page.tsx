@@ -30,7 +30,7 @@ import { AjusteDoSinal, CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSi
 import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
-import { esperadoNoDia, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMudarPlano, type PlanoCompleto } from "@/lib/gestao/creche";
+import { abreNoDia, esperadoNoDia, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMudarPlano, type PlanoCompleto } from "@/lib/gestao/creche";
 import { conferirCaixa, conferirValorAlto, lancarPago, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import { useOperacao, useTrava } from "@/lib/gestao/uma-vez";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
@@ -629,7 +629,10 @@ export default function CrecheHotel() {
 
                       <div className={`g-ch-periodo${atrasada ? " atrasada" : ""}${parte == null ? " aberta" : ""}`}>
                         <div className="g-fila entre g-pp">
-                          <span className="g-muted">{diarias === 1 ? "1ª diária" : `${diarias}ª diária`}</span>
+                          <span className="g-muted">{e.tipo === "creche"
+                            // creche é um dia só: o que vale dizer é como o dia conta (mensalista ou diária avulsa), não "1ª diária"
+                            ? (e.mensalista === "extra" ? "mensalista · dia extra" : e.mensalista === "reposicao" ? "mensalista · reposição" : e.mensalista ? "mensalista · dia do plano" : "diária avulsa")
+                            : diarias === 1 ? "1ª diária" : `${diarias}ª diária`}</span>
                           {atrasada ? <span className="g-tag vermelho">saída atrasada</span> : parte != null && <span className="g-muted g-tab">{Math.round(parte * 100)}% do período</span>}
                         </div>
                         <div className="g-ch-barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={parte == null ? undefined : Math.round(parte * 100)} aria-label="Quanto do período já passou">
@@ -1052,7 +1055,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
   const diaDaEntrada = entradaForm && !Number.isNaN(entradaForm.getTime()) ? isoDia(entradaForm) : null;
   const diaDaSaida = saidaForm && !Number.isNaN(saidaForm.getTime()) ? isoDia(saidaForm) : null;
   const diasFechados = (tipo === "creche" ? (diasDoPeriodo.length ? diasDoPeriodo : diaDaEntrada ? [diaDaEntrada] : []) : [diaDaEntrada, diaDaSaida].filter((d): d is string => Boolean(d)))
-    .filter((d, i, l) => diaFechado(d) && l.indexOf(d) === i);
+    // na creche também conta o dia da semana em que vocês não abrem (sábado, domingo), pelo horário de Meu pet shop
+    .filter((d, i, l) => (diaFechado(d) || (tipo === "creche" && !abreNoDia(petshop.horario, d))) && l.indexOf(d) === i);
+  const fraseDoFechado = (d: string) => fraseDoDiaFechado(d) ?? `Pelo horário de Meu pet shop, vocês não abrem ${["no domingo", "na segunda", "na terça", "na quarta", "na quinta", "na sexta", "no sábado"][deIsoDia(d).getDay()]}`;
   const nivel = maisCheio && vagas != null ? nivelDeOcupacao(maisCheio.n, vagas) : null;
 
   return (
@@ -1101,7 +1106,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
           <p className="g-ht-fechado" role="status">
             <CalendarOff aria-hidden />
             <span>{diasFechados.length === 1
-              ? <><b>{fraseDoDiaFechado(diasFechados[0])} ({dataCurta(diasFechados[0])}).</b> {tipo === "creche" ? "A creche não abre nesse dia." : diasFechados[0] === diaDaEntrada ? "A chegada cai num dia em que vocês não abrem." : "A saída cai num dia em que vocês não abrem."}</>
+              ? <><b>{fraseDoFechado(diasFechados[0])} ({dataCurta(diasFechados[0])}).</b> {tipo === "creche" ? "A creche não abre nesse dia." : diasFechados[0] === diaDaEntrada ? "A chegada cai num dia em que vocês não abrem." : "A saída cai num dia em que vocês não abrem."}</>
               : <><b>{diasFechados.length} dias fechados no período</b> ({diasFechados.slice(0, 5).map((d) => dataCurta(d)).join(", ")}{diasFechados.length > 5 ? "…" : ""}).</>} Dá para salvar assim mesmo.</span>
           </p>
         )}
@@ -1130,7 +1135,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
           <div className="g-aviso" role="status" style={{ marginBottom: 0 }}><CalendarCheck /><span className="g-cresce"><b>{pet.nome} é mensalista e esse dia não é do plano.</b> A reserva entra como dia extra: guarda a vaga, aparece na Chamada do dia e, quando ele vier, vai para a próxima mensalidade{vejoFinanceiro && valorDoExtra != null ? ` (${brl(valorDoExtra)})` : ""}. Nada é cobrado na porta. Se não vier, é só cancelar a reserva.</span></div>
         )}
         {planoDoPet && jaAqui && (
-          <p className="g-muted g-pp" role="status">{pet.nome} é mensalista: a chegada dele se marca na Chamada (em dia fora do plano, por Veio fora do dia, e o dia vai para a mensalidade). Por aqui entra como diária avulsa, cobrada na saída.</p>
+          <p className="g-muted g-pp" role="status">{pet.nome} é mensalista: a chegada se marca na Chamada (em dia fora do plano, por Veio fora do dia, e o dia vai para a mensalidade). Por aqui entra como diária avulsa, cobrada na saída.</p>
         )}
         {vejoFinanceiro && !reservaExtra && <Campo rotulo={`Valor da diária (${tipo === "hotel" ? "por noite" : "por dia"})`}
           dica={fixa == null ? "Defina o preço da diária em Meu pet shop para ele já vir preenchido."
