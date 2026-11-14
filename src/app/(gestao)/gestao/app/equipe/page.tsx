@@ -12,6 +12,7 @@ import EditarPessoa, { FolhaConvite } from "@/components/gestao/equipe/editar";
 import { Areas, Vagas } from "@/components/gestao/equipe/pecas";
 import { acessoDe, erroDeLimite, fraseDoLimite, funcaoDe, nAcessos, pilulasDe, primeiroNome, titularDe, usoDoPlano, type Uso } from "@/components/gestao/equipe/modelo";
 import { perfisPara } from "@/lib/gestao/acessos";
+import { usaModulo } from "@/lib/gestao/modulos";
 import type { Profissional } from "@/lib/gestao/tipos";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./equipe.css";
@@ -84,13 +85,15 @@ export default function Equipe() {
             <div className="g-eq-convida-t">
               <p className="g-rotulo">Sua equipe</p>
               <h2>Trabalha sozinha ou sozinho? Então está tudo pronto.</h2>
-              <p>A agenda, o caixa e o resto já estão no seu nome. Você não precisa mexer nesta tela.</p>
-              <p>Se um dia tiver ajuda, é aqui que você coloca a pessoa: quem dá banho e tosa aparece na agenda sem precisar de senha, e quem usa o sistema (recepção, financeiro, sócio) ganha um acesso próprio.</p>
+              <p>{usaModulo(petshop, "banho_tosa") ? "A agenda, o caixa" : "O caixa"} e o resto já estão no seu nome. Você não precisa mexer nesta tela.</p>
+              <p>Se um dia tiver ajuda, é aqui que você coloca a pessoa: {usaModulo(petshop, "banho_tosa") ? "quem dá banho e tosa aparece na agenda sem precisar de senha, e " : ""}quem usa o sistema (recepção, financeiro, sócio) ganha um acesso próprio.</p>
               <div><button className="g-btn verde" onClick={() => abrir({ tipo: "novo" })}><UserPlus />Tenho ajuda: adicionar pessoa</button></div>
             </div>
             <ul className="g-eq-convida-l">
+              {usaModulo(petshop, "banho_tosa") && <>
               <li><Tile icone={CalendarDays} tom="pessego" /><p className="g-eq-convida-i"><b>Agenda por pessoa</b><small>Cada um com a sua cor e o seu filtro na agenda.</small></p></li>
               <li><Tile icone={Percent} tom="menta" /><p className="g-eq-convida-i"><b>Comissão calculada</b><small>A conta de cada um sai pronta em Relatórios.</small></p></li>
+              </>}
               <li><Tile icone={Smartphone} tom="ceu" /><p className="g-eq-convida-i"><b>Login só para quem precisa</b><small>Você escolhe, área por área, o que a pessoa abre.</small></p></li>
             </ul>
           </section>

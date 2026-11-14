@@ -9,6 +9,7 @@ import { AvatarPessoa, useAvisos } from "@/components/gestao/ui";
 import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS } from "@/components/gestao/ajustes/grade-horario";
 import type { Horario } from "@/lib/gestao/tipos";
 import { areasPara, perfisPara, type Area } from "@/lib/gestao/acessos";
+import { usaModulo } from "@/lib/gestao/modulos";
 import { ROTULOS_ATENDE, SO_DONOS, TODAS_AREAS, comPerfil, fraseDoLimite, nAcessos, primeiroNome, textoDoConvite, type Escolha, type PerfilId, type Uso } from "./modelo";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./equipe-form.css";
@@ -67,11 +68,13 @@ const VISUAL: Record<PerfilId, { icone: Icone; tom: Tom }> = {
   outra: { icone: PenLine, tom: "manteiga" },
 };
 /** Na pergunta "o que faz", quem atende os pets vem primeiro e é apresentado pelo trabalho, não pelo que acessa. */
-const cartoesPara = (petshop: { modulos?: string[] | null }): { id: PerfilId; titulo: string; texto: string }[] => [
-  { id: "atendimento", titulo: "Banhista ou tosador(a)", texto: "Atende os pets e aparece na agenda. Quase sempre sem login." },
-  ...perfisPara(petshop).filter((p) => p.id !== "atendimento").map((p) => ({ id: p.id as PerfilId, titulo: p.titulo, texto: p.apoio })),
-  { id: "outra", titulo: "Outra função", texto: "Você dá o nome e escolhe o que a pessoa abre." },
-];
+// sem banho e tosa, quem atende na agenda vai para o fim da lista (a casa contrata mais monitor ou cuidador)
+const cartoesPara = (petshop: { modulos?: string[] | null }): { id: PerfilId; titulo: string; texto: string }[] => {
+  const banhista = { id: "atendimento" as PerfilId, titulo: "Banhista ou tosador(a)", texto: "Atende os pets e aparece na agenda. Quase sempre sem login." };
+  const outros = perfisPara(petshop).filter((p) => p.id !== "atendimento").map((p) => ({ id: p.id as PerfilId, titulo: p.titulo, texto: p.apoio }));
+  const banho = usaModulo(petshop, "banho_tosa");
+  return [...(banho ? [banhista] : []), ...outros, ...(banho ? [] : [banhista]), { id: "outra", titulo: "Outra função", texto: "Você dá o nome e escolhe o que a pessoa abre." }];
+};
 
 /** "O que essa pessoa faz?": cartões dos perfis prontos. Escolher um só preenche a função e as áreas. */
 export function EscolherPerfil({ valor, aoMudar }: { valor: Escolha; aoMudar: (e: Escolha) => void }) {
@@ -215,13 +218,16 @@ export function DetalhesAgenda({ nome, cor, aoCor, comissao, aoComissao, segueLo
   nome: string; cor: string; aoCor: (c: string) => void; comissao: string; aoComissao: (c: string) => void;
   segueLoja: boolean; aoSegueLoja: (v: boolean) => void; escala: Horario; aoEscala: (h: Horario) => void; loja: Horario;
 }) {
+  const { petshop } = useGestao();
   const primeiro = primeiroNome(nome) || "Nome";
   const dias = segueLoja ? loja : escala;
+  // comissão é uma parte de cada atendimento da agenda: sem banho e tosa, só aparece se já tinha uma
+  const comAgenda = usaModulo(petshop, "banho_tosa");
   return (
     <div className="g-eq-detalhes">
       <section className="g-eq-bloco">
         <h4 className="g-eq-bloco-t">Cor</h4>
-        <p className="g-muted g-p">Ajuda a bater o olho e saber de quem é o dia. Aparece no filtro da agenda e na escala.</p>
+        <p className="g-muted g-p">Ajuda a bater o olho e saber de quem é o dia. {comAgenda ? "Aparece no filtro da agenda e na escala." : "Aparece na escala."}</p>
         <EscolherCor valor={cor} aoMudar={aoCor} />
         <div className="g-eq-previa" style={{ "--cor": cor } as React.CSSProperties} aria-hidden>
           <span className="g-eq-previa-r">Prévia</span>
@@ -235,7 +241,7 @@ export function DetalhesAgenda({ nome, cor, aoCor, comissao, aoComissao, segueLo
         </div>
       </section>
 
-      <section className="g-eq-bloco">
+      {(comAgenda || comissao.trim() !== "") && <section className="g-eq-bloco">
         <h4 className="g-eq-bloco-t">Comissão</h4>
         <p className="g-muted g-p">Uma parte do valor de cada atendimento que a pessoa conclui. A conta aparece pronta em Relatórios. Em branco, não tem comissão.</p>
         <label className="g-eq-pct">
@@ -243,7 +249,7 @@ export function DetalhesAgenda({ nome, cor, aoCor, comissao, aoComissao, segueLo
             onChange={(e) => aoComissao(e.target.value.replace(/[^\d,.]/g, "").slice(0, 6))} />
           <span className="g-eq-pct-s">% de cada atendimento</span>
         </label>
-      </section>
+      </section>}
 
       <section className="g-eq-bloco">
         <h4 className="g-eq-bloco-t">Dias de trabalho</h4>

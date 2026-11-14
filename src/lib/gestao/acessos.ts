@@ -1,5 +1,5 @@
 import type { Profissional } from "./tipos";
-import { rotaForaDoMenu, usaCasa } from "./modulos";
+import { rotaForaDoMenu, usaCasa, usaModulo } from "./modulos";
 
 /**
  * Áreas do aplicativo que o dono libera para cada pessoa com login.
@@ -34,8 +34,22 @@ export const PERFIS = [
 ] as const;
 
 type ComModulos = { modulos?: string[] | null };
-/** Os perfis prontos que fazem sentido para o pet shop: monitor(a) de creche só aparece para quem tem creche ou hotel. */
-export const perfisPara = (petshop: ComModulos) => PERFIS.filter((p) => p.id !== "monitor" || usaCasa(petshop));
+type Perfil = { id: (typeof PERFIS)[number]["id"]; funcao: string; titulo: string; apoio: string; areas: Area[]; socio: boolean };
+/** Quem cuida dos pets num negócio só de hotel (sem creche): o mesmo perfil, com um nome que não fala em creche. */
+export const FUNCAO_CUIDADOR = "Cuidador(a)";
+/** O perfil com o nome que serve para o pet shop: sem creche, "Monitor(a) de creche" vira "Cuidador(a)". */
+export function perfilParaOPetshop(p: Perfil, petshop: ComModulos): Perfil {
+  if (p.id !== "monitor" || usaModulo(petshop, "creche")) return p;
+  return { ...p, funcao: FUNCAO_CUIDADOR, titulo: FUNCAO_CUIDADOR, apoio: "Faz o check-in e o check-out e vê as fichas dos pets. Não vê dinheiro." };
+}
+/**
+ * Os perfis prontos que fazem sentido para o pet shop: monitor(a) de creche só aparece para quem tem creche ou hotel
+ * (e, sem banho e tosa, vem logo no começo, que é quem a casa mais contrata).
+ */
+export const perfisPara = (petshop: ComModulos): Perfil[] => {
+  const lista = PERFIS.filter((p) => p.id !== "monitor" || usaCasa(petshop)).map((p) => perfilParaOPetshop(p, petshop));
+  return usaModulo(petshop, "banho_tosa") ? lista : [...lista.filter((p) => p.id === "monitor"), ...lista.filter((p) => p.id !== "monitor")];
+};
 /** As áreas que viram chave na tela da equipe: as de módulos que o pet shop não usa ficam de fora (como no menu). */
 export const areasPara = (petshop: ComModulos) => AREAS.filter((a) => !rotaForaDoMenu(petshop, a.rota));
 
