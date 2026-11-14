@@ -7,15 +7,20 @@ import ChatVendas from "@/components/gestao/chat-vendas";
 import { Marca } from "@/components/gestao/marca";
 import { linkSuporte } from "@/lib/gestao/contato";
 import PlanosVenda from "@/components/gestao/planos-venda";
+import { PLANOS } from "@/lib/gestao/planos";
+import { brlCurto } from "@/lib/gestao/util";
 import "./produto.css";
 
+const DESDE = brlCurto(PLANOS[0].preco);
+const TITULO = `Maestro Pet Gestão: banho e tosa, creche, hotel e loja num sistema só, desde ${DESDE}`;
+
 export const metadata: Metadata = {
-  title: { absolute: "Maestro Pet Gestão: sistema para banho e tosa, creche, hotel e pet shop" },
-  description: "Agenda de banho e tosa, creche com mensalistas, hotel com reservas, loja com estoque e o caixa num lugar só, com link para o cliente pedir horário e assistente de inteligência artificial. 7 dias grátis, sem cartão.",
+  title: { absolute: TITULO },
+  description: `Banho e tosa, creche, hotel e loja no mesmo sistema, com todas as funções em todos os planos, desde ${DESDE} por mês. Creche com a cobrança do mês, hotel com diária por porte e temporada, dinheiro protegido quando tem equipe e o Mozart, assistente por voz e texto, sem pagar à parte. 7 dias grátis, sem cartão.`,
   // A página de venda aparece no Google; o aplicativo e as telas de entrada continuam fora (layout do grupo).
   robots: { index: true, follow: true },
   alternates: { canonical: "/gestao" },
-  openGraph: { title: "Maestro Pet Gestão: sistema para banho e tosa, creche, hotel e pet shop", description: "Agenda, creche, hotel, loja e caixa num lugar só. Você liga só o que usa. Com assistente de inteligência artificial. 7 dias grátis, sem cartão.", url: "/gestao" },
+  openGraph: { title: TITULO, description: `Todas as funções em todos os planos, desde ${DESDE}. Creche que fecha a conta do mês, hotel com o preço certo até no link do cliente, dinheiro protegido quando tem equipe e o Mozart, assistente por voz e texto. 7 dias grátis, sem cartão.`, url: "/gestao" },
 };
 
 const CRIAR = "/gestao/criar-conta";
@@ -29,8 +34,75 @@ const PEDIDOS: [string, string][] = [
   ["“Quem não aparece há dois meses?”", "Lista os pets e prepara a mensagem de WhatsApp para cada tutor. Quem envia é você."],
 ];
 
+type TelaVenda = { arquivo: string; alt: string; celular?: boolean };
+
+/** As quatro coisas que a página mostra primeiro (a quinta é o Mozart, na seção seguinte). Cada frase tem a tela real ao lado. */
+const DIFERENCAS: { id: string; titulo: React.ReactNode; texto: string; itens: string[]; telas: TelaVenda[] }[] = [
+  {
+    id: "tudo", titulo: <>Tudo num plano só, <em>desde {DESDE}.</em></>,
+    texto: `Banho e tosa, creche, hotel e loja no mesmo sistema. Todas as funções estão em todos os planos, inclusive no de ${DESDE}. Você escolhe o plano só pelo número de pessoas que entram.`,
+    itens: [
+      "Você marca o que o seu negócio faz, e o menu mostra só isso.",
+      "O resto fica guardado. Quando precisar, você liga, sem trocar de plano.",
+      "Sem fidelidade. 7 dias grátis, sem cartão.",
+    ],
+    telas: [{ arquivo: "pc-o-que-usa", alt: "Meu pet shop, cartão O que você usa: banho e tosa, creche, hotel, venda de produtos e pacotes marcados, e a área principal escolhida" }],
+  },
+  {
+    id: "creche", titulo: <>Creche que <em>fecha a conta do mês.</em></>,
+    texto: "Cada mensalista tem um plano pelos dias da semana. A chamada é um toque quando o pet chega e outro quando sai.",
+    itens: [
+      "Falta fica anotada. A reposição não é cobrada e segue a regra que você escolher: até quando vale e se só conta falta avisada.",
+      "Dia extra entra na cobrança do mês seguinte.",
+      "As cobranças do mês saem juntas por tutor: quem tem dois pets recebe uma mensagem só.",
+      "A mensagem de cobrança sai pronta para o seu WhatsApp: você só aperta enviar.",
+    ],
+    telas: [
+      { arquivo: "pc-mensalistas", alt: "Mensalistas da creche: quantos pets vêm em cada dia da semana e o plano de cada um, com os dias, o vencimento e o valor" },
+      { arquivo: "cel-chamada", alt: "Chamada do dia da creche no celular, com os botões Chegou, Faltou e Saiu em cada pet", celular: true },
+    ],
+  },
+  {
+    id: "hotel", titulo: <>Hotel com o preço certo, <em>até no link do cliente.</em></>,
+    texto: "Diária por porte, por temporada e em feriado, com desconto para o segundo pet do mesmo tutor. O tutor pede a vaga pelo seu link e já vê uma estimativa calculada pelas mesmas regras.",
+    itens: [
+      "Reserva com sinal, recebido na hora ou a receber. No check-out, o sinal sai da conta.",
+      "Se preferir, você esconde o valor no link.",
+      "O link não recebe pagamento: o sinal é pago direto a você, e a confirmação sai pronta com a sua chave Pix.",
+    ],
+    telas: [
+      { arquivo: "cel-hotel-precos", alt: "Opções do hotel no celular: diária por porte (pequeno, médio, grande e gigante) e temporada de férias com preço próprio", celular: true },
+      { arquivo: "cel-link-hotel", alt: "Pedido de vaga no hotel pelo link do cliente, com as datas e a estimativa do valor conforme o porte", celular: true },
+    ],
+  },
+  {
+    id: "dinheiro", titulo: <>Dinheiro protegido <em>quando tem equipe.</em></>,
+    texto: "Quem não cuida do dinheiro trabalha normalmente, sem ver valores. Se alguém mudar um preço, der desconto ou alterar um valor recebido, fica anotado quem fez, quando e de quanto para quanto.",
+    itens: [
+      "Trava de preço: se você ligar, quem só opera o caixa vende pelo preço da lista, com o desconto máximo que você definir.",
+      "Atendimento concluído que ficou sem cobrar aparece numa lista para você conferir.",
+      "Cada pessoa vê só a própria comissão.",
+      "Toque duplo no botão não lança o mesmo valor duas vezes.",
+    ],
+    telas: [
+      { arquivo: "pc-alteracoes", alt: "Alterações em valores: a recepcionista deu desconto numa venda, marcou um banho e tosa abaixo da lista e vendeu um produto fora do preço, com o dia e a hora de cada uma" },
+      { arquivo: "cel-trava", alt: "Opções de cobrança no celular: só o dono e quem vê o financeiro mudam preço ou dão desconto, e o desconto máximo do caixa", celular: true },
+    ],
+  },
+];
+
+/** Dito com franqueza, perto das perguntas: o que o sistema ainda não faz. */
+const NAO_FAZ: string[] = [
+  "Não emite nota fiscal nem cupom fiscal.",
+  "Não envia WhatsApp sozinho. As mensagens saem prontas: você só aperta enviar.",
+  "Não recebe pagamento pela internet, nem sinal nem mensalidade. O tutor paga a você, e você anota.",
+  "Não avisa a hora do remédio. Ele guarda a ficha de cuidados e mostra a lista do dia.",
+  "Não é para clínica veterinária: não tem prontuário, receita nem internação.",
+  "Não tem aplicativo de loja para o tutor. O cliente usa o seu link.",
+];
+
 const INCLUI: [string, string][] = [
-  ["Assistente de inteligência artificial", "Diga o que precisa, por áudio ou texto. Ele prepara e você confirma."],
+  ["Mozart, assistente por voz e texto", "Diga o que precisa, por áudio ou texto. Ele prepara e você confirma. Vem em todos os planos."],
   ["Começo guiado", "Você marca o que o seu negócio faz e qual é a área principal. O menu mostra só o que você usa."],
   ["Você liga só o que usa", "Sinal, multa, comissão por serviço, código de barras, diário: cada opção começa desligada. Quem não liga nada não vê nada a mais."],
   ["Agenda de banho e tosa", "Por dia e por semana, por profissional, com os horários livres à vista e vários serviços no mesmo horário."],
@@ -56,7 +128,7 @@ const INCLUI: [string, string][] = [
   ["Equipe com acesso por área", "Você escolhe o que cada pessoa abre. Quem não cuida do dinheiro não vê valores."],
   ["Comissão", "Por pessoa, por serviço e sobre produtos. Cada um vê a própria no cartão Minha comissão."],
   ["Quem mudou o quê", "Alguém alterou ou apagou um valor recebido, ou vendeu fora do preço da lista? Fica anotado quem foi, quando e de quanto para quanto."],
-  ["Preço travado no caixa", "Se quiser, só você e quem vê o financeiro mudam preço ou dão desconto na venda."],
+  ["Preço travado no caixa", "Se quiser, só você e quem vê o financeiro mudam preço ou dão desconto. O caixa dá, no máximo, o desconto que você definir."],
   ["Agenda em PDF", "Baixe ou imprima a agenda do dia para deixar na bancada."],
   ["Relatórios", "Atendimentos, faltas, serviços mais feitos, faturamento, comissão, creche, hotel e vendas por produto, ao lado do período anterior."],
   ["Leva e traz", "Marque quem precisa ser buscado, com o endereço no próprio horário."],
@@ -66,6 +138,8 @@ const INCLUI: [string, string][] = [
 ];
 
 const PERGUNTAS: [string, React.ReactNode][] = [
+  ["O que vocês têm de diferente?", `Dizemos o que fazemos, sem comparar com ninguém. Todas as funções estão em todos os planos, desde ${DESDE}: banho e tosa, creche, hotel e loja no mesmo sistema. A creche tem plano por dia da semana, reposição de falta com a sua regra e as cobranças do mês juntas por tutor. O hotel calcula a diária por porte, temporada e feriado, e o tutor vê a estimativa no seu link. Quem tem equipe conta com trava de preço, valores escondidos de quem não cuida do dinheiro e o histórico de quem mudou um valor. E o Mozart, assistente por voz e texto, vem em todos os planos, sem pagar à parte. O que o sistema ainda não faz está logo acima destas perguntas.`],
+  ["Quanto custa?", `O plano Solo custa ${DESDE} por mês, para 1 pessoa com login. O Equipe, para até 3 pessoas, custa ${brlCurto(PLANOS[1].preco)}, e o Pet shop, para até 6, ${brlCurto(PLANOS[2].preco)}. Todos têm as mesmas funções. Pagando 3 ou 6 meses de uma vez, sai mais barato. Antes, são 7 dias grátis, sem cartão.`],
   ["Precisa instalar alguma coisa?", "Não. O sistema abre no navegador. Se quiser, você coloca na tela inicial do celular e ele fica como um aplicativo."],
   ["Atendo sozinho, só banho e tosa. Não é coisa demais para mim?", "Não. Ao criar a conta você marca só banho e tosa, e o menu não mostra creche, hotel nem estoque. Se um dia você precisar, é só ligar em Meu pet shop."],
   ["Preciso configurar muita coisa para começar?", "Não. Ao criar a conta, você marca o que o seu negócio faz (banho e tosa, creche, hotel, venda de produtos, pacotes) e qual é a área principal. O menu e a tela inicial se arrumam para ela. Em seguida, um guia curto acerta o horário, a equipe, os preços e o link do cliente. Cada passo pode ficar para depois, e tudo pode ser mudado mais tarde."],
@@ -73,8 +147,10 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["Serve para hotel de pets?", "Sim. Tem reserva com sinal, diária por porte, por temporada e em feriado, desconto para o segundo pet, calendário de ocupação com aviso de casa cheia, folha do dia para imprimir, ficha de cuidados com comida e remédio e check-out com taxas. O sistema guarda a ficha de cuidados e mostra a lista do dia, mas não avisa a hora do remédio."],
   ["Tenho só loja. Serve?", "Serve para controlar o estoque, vender no balcão com leitor de código de barras, guardar fornecedores, ver a margem de cada produto e anotar o fiado. O sistema não emite nota fiscal nem cupom fiscal."],
   ["Funciona no celular?", "Sim. Ele foi feito primeiro para o celular. No computador funciona igual, com a tela maior."],
-  ["O assistente faz as coisas sozinho?", "Não. Ele entende o pedido, mostra o que vai fazer e espera o seu “confirmar”. Nada entra na agenda, no caixa ou no estoque sem você ver."],
-  ["O sistema manda mensagem no WhatsApp sozinho?", "Não. Ele deixa a mensagem pronta: lembrete, aviso de pet pronto, confirmação, cobrança, diário. Você toca no botão, o seu WhatsApp abre com o texto escrito e você aperta enviar. A mensagem sai do seu número."],
+  ["O assistente faz as coisas sozinho?", "Não. O Mozart entende o pedido, mostra o que vai fazer e espera o seu “confirmar”. Nada entra na agenda, no caixa ou no estoque sem você ver."],
+  ["O Mozart custa à parte?", "Não. Ele vem em todos os planos, inclusive no Solo. Existe um limite de pedidos por dia, igual em todos os planos. Se ele for atingido, o Mozart volta no dia seguinte e as telas continuam funcionando normalmente."],
+  ["Quem é a Nina e quem é o Mozart?", "A Nina responde dúvidas aqui no site, antes de você criar a conta. O Mozart trabalha dentro do sistema: marca horário, faz check-in, dá entrada no estoque e responde sobre o seu caixa. Os dois são assistentes de inteligência artificial."],
+  ["O sistema manda mensagem no WhatsApp sozinho?", "Não. As mensagens do WhatsApp saem prontas: lembrete, aviso de pet pronto, confirmação, cobrança, diário. Você toca no botão, o seu WhatsApp abre com o texto escrito e você só aperta enviar. A mensagem sai do seu número."],
   ["Como o meu cliente agenda pelo link?", "Você manda o link pelo WhatsApp ou deixa no Instagram. O cliente escolhe banho, creche ou hotel, o dia e a hora, e você recebe o pedido para aceitar ou recusar. No hotel, ele já vê uma estimativa do valor. Ele não vê a sua agenda nem os dados de outros clientes, só os horários que estão livres."],
   ["O cliente paga pelo link?", "Não. Pelo link o cliente só pede. O sistema não recebe pagamento pela internet: o tutor paga direto para você, e você anota no sistema. Se você usa sinal na reserva, o link avisa que o sinal vai ser pedido e a mensagem de confirmação leva o valor e a sua chave Pix."],
   ["O cliente pode cancelar pelo link?", "Só se você deixar. É uma opção: você liga e escolhe até quantas horas antes ele pode cancelar ou pedir outra data. Você fica sabendo na tela inicial e na agenda."],
@@ -85,17 +161,18 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["Meus dados ficam presos no sistema?", "Não. Clientes, caixa, financeiro e relatórios saem em planilha. Em Meu pet shop, você também baixa uma cópia de segurança com tudo em planilhas, que abrem no Excel e no Google Planilhas. Essa cópia é para guardar e consultar: ainda não dá para trazê-la de volta para o sistema automaticamente, e as fotos não entram."],
   ["Estou em outro sistema. Consigo trazer meus clientes?", "Sim. Você traz clientes, pets e produtos de uma planilha, colando as células ou enviando o arquivo. Na planilha de clientes, o sistema mostra o que entendeu de cada coluna e você corrige antes de trazer. O que já está no sistema não é apagado. Trouxe a planilha errada? Dá para desfazer a importação."],
   ["Serve para clínica veterinária?", "O sistema é feito para banho e tosa, creche, hotel e loja de pet shop. Ele não tem prontuário, receituário nem internação. Uma clínica que também faz banho e tosa pode usá-lo para essa parte."],
-  ["Posso colocar a minha equipe?", "Sim. Cada pessoa entra com o próprio acesso, e você escolhe o que ela abre: agenda, clientes, creche e hotel, pacotes, estoque, caixa, financeiro, relatórios. Quem não cuida do dinheiro não vê valores. Dá para ter mais de um dono. O número de acessos depende do plano: 1, 3 ou 6."],
-  ["Tem contrato de fidelidade?", "Não. No plano mensal a cobrança é todo mês. Nos planos de 3 e 6 meses você paga o período de uma vez, por um valor menor. Em qualquer um, você cancela quando quiser e usa até o fim do período já pago."],
+  ["Posso colocar a minha equipe?", "Sim. Cada pessoa entra com o próprio acesso, e você escolhe o que ela abre: agenda, clientes, creche e hotel, pacotes, estoque, caixa, financeiro, relatórios. Quem não cuida do dinheiro não vê valores. Dá para ter mais de um dono. O número de pessoas com login depende do plano: 1, 3 ou 6. Banhista ou tosador que só aparece na agenda, sem entrar no sistema, não conta."],
+  ["Tem contrato de fidelidade?", "Não. A cobrança da assinatura é feita pela Cakto, a empresa que cuida dos pagamentos para nós. No plano mensal a cobrança é todo mês. Nos planos de 3 e 6 meses você paga o período de uma vez, por um valor menor. Em qualquer um, você cancela quando quiser e usa até o fim do período já pago."],
   ["Posso trocar de plano depois?", "Pode. Hoje a troca é feita cancelando o plano atual e assinando o novo; os dados continuam os mesmos."],
   ["O que acontece quando os 7 dias acabam?", "A conta fica só para consulta e os dados continuam guardados. Para voltar a usar, é só escolher um plano. Nada é cobrado sozinho, porque o teste não pede cartão."],
 ];
 
-function Tela({ arquivo, alt, celular, prioridade }: { arquivo: string; alt: string; celular?: boolean; prioridade?: boolean }) {
+function Tela({ arquivo, alt, celular, prioridade }: TelaVenda & { prioridade?: boolean }) {
   return (
     <span className={celular ? "gp-fone" : "gp-tela"}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={`/gestao/telas/${arquivo}.webp`} alt={alt} width={celular ? 780 : 1760} height={celular ? 1328 : 1093}
+        sizes={celular ? "(min-width: 900px) 300px, 70vw" : "(min-width: 1200px) 640px, (min-width: 900px) 55vw, 100vw"}
         loading={prioridade ? "eager" : "lazy"} fetchPriority={prioridade ? "high" : undefined} decoding="async" />
     </span>
   );
@@ -111,10 +188,10 @@ export default function Pagina() {
             <span>Maestro Pet <em>Gestão</em></span>
           </Link>
           <nav aria-label="Página">
+            <a href="#diferencas" className="gp-link so-pc">O que muda</a>
             <a href="#para-quem" className="gp-link so-pc">Para quem é</a>
             <a href="#funcoes" className="gp-link so-pc">Funções</a>
-            <a href="#link" className="gp-link so-pc">Link do cliente</a>
-            <a href="#plano" className="gp-link so-pc">Planos</a>
+            <a href="#plano" className="gp-link gp-link-precos">Preços</a>
             <a href="#perguntas" className="gp-link so-pc">Perguntas</a>
             <Link href="/gestao/entrar" className="gp-btn contorno">Entrar</Link>
             <Link href={CRIAR} className="gp-btn verde">Teste grátis</Link>
@@ -124,22 +201,71 @@ export default function Pagina() {
         <div className="gp-c gp-capa-grade">
           <div className="gp-capa-texto">
             <h1>Banho e tosa, creche, hotel e loja. <em>Um sistema só</em>, no celular.</h1>
-            <p>Você marca o que o seu negócio faz e o sistema mostra só isso. O cliente pede horário ou vaga pelo seu link. E você fala “banho da Mel sexta às 10”: o assistente deixa pronto para você confirmar.</p>
+            <p>Todas as funções em todos os planos, desde {DESDE} por mês. Você marca o que o seu negócio faz e o sistema mostra só isso. E fala “banho da Mel sexta às 10”: o Mozart deixa pronto para você confirmar.</p>
             <ul className="gp-selos">
-              <li><Check />Assistente de inteligência artificial incluído</li>
+              <li><Check />Todas as funções em todos os planos</li>
+              <li><Check />Mozart, assistente por voz e texto, sem pagar à parte</li>
               <li><Check />Link para o cliente pedir banho, creche e hotel</li>
-              <li><Check />Todas as funções em qualquer plano</li>
             </ul>
             <div className="gp-acao">
               <Link href={CRIAR} className="gp-btn pri grande">Teste grátis por 7 dias <ArrowRight /></Link>
               <span>Sem cartão. Sem fidelidade.</span>
             </div>
+            <a href="#plano" className="gp-preco-curto">Planos desde <b>{DESDE} por mês</b>, com tudo incluído. Ver os preços</a>
             <a href="#instalar" className="gp-baixar"><Smartphone /><Monitor />Instale direto pelo site, no celular e no computador</a>
           </div>
           <div className="gp-capa-telas">
             <Tela arquivo="pc-hoje" alt="Tela inicial do Maestro Pet Gestão no computador: a chamada da creche, o resumo do dia e o atendimento que está na mesa" prioridade />
             <Tela arquivo="cel-agenda" alt="Agenda do dia no celular, com os horários de cada pet" celular prioridade />
           </div>
+        </div>
+      </section>
+
+      <section className="gp-dif-sec" id="diferencas">
+        <div className="gp-c">
+          <h2>O que muda <em>no seu dia a dia.</em></h2>
+          <p className="gp-lead">Cinco coisas que o sistema faz por você, cada uma com a tela de verdade.</p>
+          <ol className="gp-dif">
+            {DIFERENCAS.map((d, i) => (
+              <li key={d.id} id={`dif-${d.id}`} className={`gp-dif-item${i % 2 ? " inverte" : ""}`}>
+                <div className="gp-dif-texto">
+                  <span className="gp-dif-num" aria-hidden>{String(i + 1).padStart(2, "0")}</span>
+                  <h3>{d.titulo}</h3>
+                  <p>{d.texto}</p>
+                  <ul>{d.itens.map((t) => <li key={t}><Check />{t}</li>)}</ul>
+                </div>
+                <div className={`gp-dif-telas${d.telas.every((t) => t.celular) ? " dois-fones" : d.telas.length > 1 ? " com-fone" : ""}`}>
+                  {d.telas.map((t) => <Tela key={t.arquivo} {...t} />)}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section className="gp-pedir" id="mozart">
+        <div className="gp-c gp-pedir-grade">
+          <div>
+            <p className="gp-ia"><Sparkles />05 · Mozart, assistente de inteligência artificial</p>
+            <h2>Mozart em todas as áreas, <em>em todos os planos.</em></h2>
+            <p className="gp-lead">Toque no microfone ou escreva, do seu jeito. O Mozart ajuda na agenda, no check-in da creche e do hotel, no estoque e nas perguntas sobre o caixa. Vem em todos os planos, sem pagar à parte.</p>
+            <ul className="gp-falas">
+              {PEDIDOS.map(([fala, faz]) => (
+                <li key={fala}><q>{fala.slice(1, -1)}</q><span>{faz}</span></li>
+              ))}
+            </ul>
+            <p className="gp-nota"><Check />Antes de gravar, ele mostra o que vai fazer. Você confirma com um toque.</p>
+          </div>
+          <Tela arquivo="cel-assistente" alt="O assistente Mozart aberto no celular, com o microfone e exemplos de pedidos" celular />
+        </div>
+      </section>
+
+      <section className="gp-planos" id="plano">
+        <div className="gp-c">
+          <h2>Planos <em>e preços</em></h2>
+          <p className="gp-lead">Todos os planos têm todas as funções e o Mozart. A diferença é só quantas pessoas entram no sistema, cada uma com o próprio login, e de quanto em quanto tempo você quer pagar. Creche, hotel e loja usam qualquer plano.</p>
+          <PlanosVenda criar={CRIAR} />
+          <p className="gp-planos-nota">7 dias grátis, sem cartão. Sem fidelidade: você cancela quando quiser e usa até o fim do período já pago. Durante o teste, até 6 pessoas podem entrar. Banhista ou tosador que só aparece na agenda, sem entrar no sistema, não conta como pessoa com login.</p>
         </div>
       </section>
 
@@ -152,20 +278,10 @@ export default function Pagina() {
         </div>
       </section>
 
-      <section className="gp-pedir">
-        <div className="gp-c gp-pedir-grade">
-          <div>
-            <p className="gp-ia"><Sparkles />Assistente de inteligência artificial</p>
-            <h2>Peça como você fala <em>no dia a dia.</em></h2>
-            <p className="gp-lead">Toque no microfone e diga o que aconteceu. O assistente de inteligência artificial entende, encontra o pet certo e prepara tudo.</p>
-            <ul className="gp-falas">
-              {PEDIDOS.map(([fala, faz]) => (
-                <li key={fala}><q>{fala.slice(1, -1)}</q><span>{faz}</span></li>
-              ))}
-            </ul>
-            <p className="gp-nota"><Check />Antes de gravar, ele mostra o que vai fazer. Você confirma com um toque.</p>
-          </div>
-          <Tela arquivo="cel-assistente" alt="O assistente Mozart aberto no celular, com o microfone e exemplos de pedidos" celular />
+      <section className="gp-mostra" id="funcoes">
+        <div className="gp-c">
+          <h2>Conheça o sistema <em>por dentro</em></h2>
+          <Vitrine />
         </div>
       </section>
 
@@ -189,13 +305,6 @@ export default function Pagina() {
         </div>
       </section>
 
-      <section className="gp-mostra" id="funcoes">
-        <div className="gp-c">
-          <h2>Conheça o sistema <em>por dentro</em></h2>
-          <Vitrine />
-        </div>
-      </section>
-
       <section className="gp-inclui">
         <div className="gp-c">
           <div className="gp-inclui-cab">
@@ -208,12 +317,11 @@ export default function Pagina() {
         </div>
       </section>
 
-      <section className="gp-planos" id="plano">
-        <div className="gp-c">
-          <h2>Planos <em>e preços</em></h2>
-          <p className="gp-lead">Todos os planos têm todas as funções e o assistente de inteligência artificial. Você escolhe pelo número de pessoas que entram no sistema e de quanto em quanto tempo quer pagar. O nome do plano não limita o tipo de negócio: creche, hotel e loja usam qualquer um.</p>
-          <PlanosVenda criar={CRIAR} />
-          <p className="gp-planos-nota">7 dias grátis, sem cartão. Sem fidelidade: você cancela quando quiser e usa até o fim do período já pago. Durante o teste, até 6 pessoas podem entrar.</p>
+      <section className="gp-nao-faz gp-c" aria-labelledby="nao-faz">
+        <h2 id="nao-faz">O que o sistema <em>não faz.</em></h2>
+        <div>
+          <p className="gp-lead">Melhor saber antes de começar.</p>
+          <ul>{NAO_FAZ.map((t) => <li key={t}>{t}</li>)}</ul>
         </div>
       </section>
 

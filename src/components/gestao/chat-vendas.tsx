@@ -19,6 +19,15 @@ export default function ChatVendas() {
   const fim = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLInputElement>(null);
 
+  // o botão só aparece depois da primeira tela, para não cobrir o "Sem cartão. Sem fidelidade" da capa no celular
+  const [depoisDaCapa, setDepoisDaCapa] = useState(false);
+  useEffect(() => {
+    const ver = () => setDepoisDaCapa(window.scrollY > window.innerHeight * 0.6);
+    ver();
+    window.addEventListener("scroll", ver, { passive: true });
+    return () => window.removeEventListener("scroll", ver);
+  }, []);
+
   useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [falas, pensando, aberto]);
   useEffect(() => {
     if (!aberto) return;
@@ -48,7 +57,8 @@ export default function ChatVendas() {
 
   if (!aberto) {
     return (
-      <button type="button" className="gp-chat-botao" onClick={() => setAberto(true)} aria-label="Tirar dúvidas com o assistente">
+      <button type="button" className={`gp-chat-botao${depoisDaCapa ? "" : " escondido"}`} onClick={() => setAberto(true)} aria-label="Tirar dúvidas com a Nina, assistente do site"
+        tabIndex={depoisDaCapa ? undefined : -1} aria-hidden={depoisDaCapa ? undefined : true}>
         <MessageCircle /><span>Fale com a Nina</span>
       </button>
     );
@@ -58,7 +68,7 @@ export default function ChatVendas() {
     <section className="gp-chat" role="dialog" aria-label="Conversa com a Nina, assistente virtual">
       <header>
         <span className="gp-chat-rosto">N<i /></span>
-        <span><b>Nina</b><small>Assistente virtual do Maestro Pet</small></span>
+        <span><b>Nina</b><small>Tira dúvidas aqui no site. No sistema, quem ajuda é o Mozart.</small></span>
         <button type="button" onClick={() => setAberto(false)} aria-label="Fechar conversa"><X /></button>
       </header>
       <div className="gp-chat-falas" aria-live="polite">
