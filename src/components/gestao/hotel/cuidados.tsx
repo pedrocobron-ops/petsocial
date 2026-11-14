@@ -17,8 +17,10 @@ import "./hotel.css";
 
 /** Editor dos cuidados, dentro do formulário da reserva ou da estadia. */
 export function EditorDeCuidados({ valor, aoMudar }: { valor: Cuidado[]; aoMudar: (c: Cuidado[]) => void }) {
-  const [novaHora, setNovaHora] = useState<Record<string, string>>({});
   const mudar = (id: string, m: Partial<Cuidado>) => aoMudar(valor.map((c) => (c.id === id ? { ...c, ...m } : c)));
+  const ehHora = (h: string | undefined): h is string => /^\d{2}:\d{2}$/.test(h ?? "");
+  /** A hora que está no campo entra na lista (ao sair do campo, ao tocar em Horário ou ao salvar: nunca se perde). */
+  const guardarHora = (c: Cuidado) => { if (ehHora(c.nova)) mudar(c.id, { horas: c.horas.includes(c.nova) ? c.horas : [...c.horas, c.nova].sort(), nova: "" }); };
   const novo = (tipo: Cuidado["tipo"]) => aoMudar([...valor, { id: novoCodigo(), tipo, oque: tipo === "comida" ? "Ração" : "", quanto: "", horas: [] }]);
   return (
     <div className="g-campo">
@@ -37,9 +39,9 @@ export function EditorDeCuidados({ valor, aoMudar }: { valor: Cuidado[]; aoMudar
             {c.horas.map((h) => (
               <button key={h} type="button" className="g-chip" aria-pressed onClick={() => mudar(c.id, { horas: c.horas.filter((x) => x !== h) })} aria-label={`Tirar o horário das ${horaFalada(h)}`}>{horaFalada(h)} ×</button>
             ))}
-            <input type="time" className="g-input" style={{ width: 120 }} value={novaHora[c.id] ?? ""} aria-label="Horário" onChange={(e) => setNovaHora((n) => ({ ...n, [c.id]: e.target.value }))} />
-            <button type="button" className="g-btn fantasma p" disabled={!/^\d{2}:\d{2}$/.test(novaHora[c.id] ?? "")}
-              onClick={() => { const h = novaHora[c.id]; if (!c.horas.includes(h)) mudar(c.id, { horas: [...c.horas, h].sort() }); setNovaHora((n) => ({ ...n, [c.id]: "" })); }}><Plus />Horário</button>
+            <input type="time" className="g-input" style={{ width: 120 }} value={c.nova ?? ""} aria-label={`Horário de ${c.oque.trim() || (c.tipo === "remedio" ? "remédio" : "comida")}`}
+              onChange={(e) => mudar(c.id, { nova: e.target.value })} onBlur={() => guardarHora(c)} />
+            <button type="button" className="g-btn fantasma p" disabled={!ehHora(c.nova)} onClick={() => guardarHora(c)}><Plus />Horário</button>
             <button type="button" className="g-ico" style={{ marginLeft: "auto" }} onClick={() => aoMudar(valor.filter((x) => x.id !== c.id))} aria-label="Tirar este cuidado"><Trash2 /></button>
           </div>
         </div>
@@ -48,13 +50,19 @@ export function EditorDeCuidados({ valor, aoMudar }: { valor: Cuidado[]; aoMudar
         <button type="button" className="g-chip" onClick={() => novo("comida")}><Utensils />Comida</button>
         <button type="button" className="g-chip" onClick={() => novo("remedio")}><Pill />Remédio</button>
       </div>
-      <small>Escreva o que foi combinado com o tutor. A equipe marca no cartão do hóspede o que já foi feito em cada dia.</small>
+      <small>Escreva o que foi combinado com o tutor. Para cada horário, escolha a hora: ela entra na lista ao sair do campo (ou toque em Horário para pôr mais um). A equipe marca no cartão do hóspede o que já foi feito em cada dia.</small>
     </div>
   );
 }
 
 /** Tira o que está em branco antes de gravar. */
-export const cuidadosParaGravar = (c: Cuidado[]) => { const l = c.filter((x) => x.oque.trim()).map((x) => ({ ...x, oque: x.oque.trim(), quanto: x.quanto.trim() })); return l.length ? l : null; };
+export const cuidadosParaGravar = (c: Cuidado[]) => {
+  // a hora que ficou digitada no campo, sem tocar em Horário, também é gravada
+  const l = c.filter((x) => x.oque.trim()).map(({ nova, ...x }) => ({
+    ...x, oque: x.oque.trim(), quanto: x.quanto.trim(), horas: nova && /^\d{2}:\d{2}$/.test(nova) && !x.horas.includes(nova) ? [...x.horas, nova].sort() : x.horas,
+  }));
+  return l.length ? l : null;
+};
 
 /** A lista de hoje no cartão do hóspede: um botão por horário combinado. */
 export function CuidadosDoDia({ estadia: e, feitos, aoMudar }: { estadia: EstadiaCompleta; feitos: CuidadoFeito[]; aoMudar: () => void }) {

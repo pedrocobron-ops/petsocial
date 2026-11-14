@@ -22,14 +22,21 @@ const petVazio = (): PetDoPedido => ({ nome: "", especie: "cao", porte: null });
 const MAX_PETS = 4;
 /** Sinal da reserva, como o dono definiu nas opções do hotel (o link só avisa: nada é pago por aqui). */
 type SinalDoLink = { modo: string | null; valor: number | null; politica: string | null; creche: boolean };
+/** O preço do hotel no link (`link_hotel_opcoes`): se o dono deixa mostrar, e a menor e a maior diária comum. */
+export type PrecoDoHotel = { mostrar: boolean; de?: number | null; ate?: number | null; varia?: boolean };
+/** A estimativa das datas e dos pets, calculada no banco pelas regras da conta (`link_hotel_estimativa`). */
+type Estimativa = { noites: number; total: number; varia: boolean; desconto: boolean; sinal: number | null; pets: { porte: string | null; diaria: number; total: number; sinal: number | null }[] };
+const PORTES_DA_FAIXA = [null, "P", "M", "G", "GG"];
 const listaE = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(0, -1).join(", ")} e ${n[n.length - 1]}`);
 
 /**
  * Pedido de creche (um ou mais dias) ou de hotel (entrada e saída) pelo link do cliente.
  * O cliente só fica sabendo se um dia está cheio; não vê quem está na casa nem quantas vagas existem.
  */
-export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapLoja, aoVoltar, termos = null, recarregarTermos, aoPedir, fechados }: {
+export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, preco, zapLoja, aoVoltar, termos = null, recarregarTermos, aoPedir, fechados }: {
   codigo: string; tipo: Tipo; hoje: string; loja: string; diaria: number | null; zapLoja: string | null; aoVoltar: () => void;
+  /** hotel: o preço que o link pode mostrar. undefined = ainda lendo; null = banco antes da atualização (fica a diária comum, como era). */
+  preco?: PrecoDoHotel | null;
   /** Regras que o tutor aceita antes de enviar (null = não pede aceite). */
   termos?: TermosDoLink | null; recarregarTermos?: () => Promise<unknown>; aoPedir?: () => void;
   /** dias que o negócio marcou como fechados (a creche não recebe neles) */
@@ -77,6 +84,38 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
   const datasOk = erroDatas === null;
   const [repetido, setRepetido] = useState(false);
   const total = diaria != null && datasOk ? diaria * dias : null;
+  // hotel: a estimativa vem do banco, pelas mesmas regras da conta (porte, temporada, feriado, segundo pet), para as datas escolhidas
+  const comEstimativa = hotel && Boolean(preco?.mostrar);
+  const semPreco = hotel && (preco === undefined || preco?.mostrar === false);
+  // antes de saber o porte: de quanto a quanto fica, conforme o porte
+  const [faixa, setFaixa] = useState<{ chave: string; min: number; max: number; varia: boolean; sinalMin: number | null; sinalMax: number | null } | null>(null);
+  const chaveDasDatas = `${entrada}|${saida}`;
+  useEffect(() => {
+    if (!comEstimativa || !datasOk) return;
+    let vale = true;
+    void banco().rpc("link_hotel_estimativa", { p_codigo: codigo, p_entrada: entrada, p_saida: saida, p_pets: PORTES_DA_FAIXA.map((porte) => ({ porte })), p_juntos: false }).then(({ data }) => {
+      const e = data as unknown as Estimativa | null;
+      if (!vale || !e || !Array.isArray(e.pets) || !e.pets.length) return;
+      const totais = e.pets.map((x) => Number(x.total)), sinais = e.pets.map((x) => (x.sinal == null ? null : Number(x.sinal))).filter((x): x is number => x != null);
+      setFaixa({ chave: `${entrada}|${saida}`, min: Math.min(...totais), max: Math.max(...totais), varia: Boolean(e.varia), sinalMin: sinais.length ? Math.min(...sinais) : null, sinalMax: sinais.length ? Math.max(...sinais) : null });
+    });
+    return () => { vale = false; };
+  }, [codigo, comEstimativa, datasOk, entrada, saida]);
+  const faixaBoa = faixa && faixa.chave === chaveDasDatas ? faixa : null;
+  // com os pets (e o porte de cada um): a conta de cada pet, o total e o sinal
+  const [estim, setEstim] = useState<{ chave: string; e: Estimativa } | null>(null);
+  const chaveDosPets = `${chaveDasDatas}|${pets.map((x) => x.porte ?? "-").join(",")}`;
+  useEffect(() => {
+    if (!comEstimativa || !datasOk || passo === "quando" || passo === "enviado") return;
+    let vale = true;
+    const chave = chaveDosPets;
+    void banco().rpc("link_hotel_estimativa", { p_codigo: codigo, p_entrada: entrada, p_saida: saida, p_pets: chave.split("|")[2].split(",").map((x) => ({ porte: x === "-" ? null : x })) }).then(({ data }) => {
+      const e = data as unknown as Estimativa | null;
+      if (vale) setEstim(e && Array.isArray(e.pets) ? { chave, e } : null);
+    });
+    return () => { vale = false; };
+  }, [codigo, comEstimativa, datasOk, passo, entrada, saida, chaveDosPets]);
+  const estimativa = estim && estim.chave === chaveDosPets ? estim.e : null;
 
   // dias cheios do período escolhido (no hotel, o dia da saída não ocupa vaga)
   useEffect(() => {
@@ -98,7 +137,15 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
     });
     return () => { vale = false; };
   }, [codigo, hotel]);
-  const fraseDoSinal = sinal ? `${loja} pede um sinal de ${sinal.modo === "valor" ? `${brl(sinal.valor)} por pet` : `${sinal.valor}% do valor da reserva`} para garantir a vaga.` : null;
+  // o sinal em % é anunciado sobre a estimativa das datas (não sobre a diária comum)
+  const sinalDaFaixa = sinal && sinal.modo !== "valor" && faixaBoa?.sinalMin != null && faixaBoa.sinalMax != null
+    ? (faixaBoa.sinalMin === faixaBoa.sinalMax ? `, cerca de ${brl(faixaBoa.sinalMin)}` : `, de ${brl(faixaBoa.sinalMin)} a ${brl(faixaBoa.sinalMax)} conforme o porte`) : "";
+  const fraseDoSinal = sinal ? `${loja} pede um sinal de ${sinal.modo === "valor" ? `${brl(sinal.valor)} por pet` : `${sinal.valor}% do valor da reserva${sinalDaFaixa}`} para garantir a vaga.` : null;
+  const fraseDoSinalEnviado = sinal && estimativa?.sinal != null
+    ? `${loja} pede um sinal de ${brl(estimativa.sinal)}${sinal.modo === "valor" ? (pets.length > 1 ? ` (${brl(sinal.valor)} por pet)` : "") : ` (${sinal.valor}% de ${brl(estimativa.total)})`} para garantir a vaga.` : fraseDoSinal;
+  // telefone fixo no campo do WhatsApp: só um lembrete, não impede o pedido
+  const foneDigitado = telefone.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  const pareceFixo = foneDigitado.length === 10 && /[2-5]/.test(foneDigitado[2]);
 
   function mudarEntrada(v: string) {
     setEntrada(v);
@@ -222,9 +269,10 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
           <div><dt>{nomes.length > 1 ? "Pets" : "Pet"}</dt><dd>{listaE(nomes)}</dd></div>
           <div><dt>{hotel ? "Entrada" : "Dia"}</dt><dd>{dia(entrada)}, às {horaEntrada}</dd></div>
           {(hotel || saida !== entrada) ? <div><dt>{hotel ? "Saída" : "Até"}</dt><dd>{dia(saida)}, às {horaSaida}</dd></div> : <div><dt>Buscar</dt><dd>às {horaSaida}</dd></div>}
+          {estimativa && <div><dt>Estimativa</dt><dd>cerca de {brl(estimativa.total)} <small>({dias} {dias === 1 ? "noite" : "noites"}{estimativa.pets.length > 1 ? `, ${estimativa.pets.length} pets` : ""})</small></dd></div>}
         </dl>
         <p className="g-lk-nota">A vaga ainda não está reservada. Espere a confirmação.</p>
-        {fraseDoSinal && <p className="g-lk-nota">Depois da confirmação, {fraseDoSinal}{sinal?.politica ? ` ${sinal.politica}` : ""} O pagamento é combinado direto com {loja}: nada é pago por aqui.</p>}
+        {fraseDoSinalEnviado && <p className="g-lk-nota">Depois da confirmação, {fraseDoSinalEnviado}{sinal?.politica ? ` ${sinal.politica}` : ""} O pagamento é combinado direto com {loja}: nada é pago por aqui.</p>}
         <div className="g-lk-ok-acoes">
           {pedidoId && <a className="g-btn verde" href={`/gestao/agendar/${codigo}/pedido/${pedidoId}`}>Acompanhar o pedido</a>}
           <button type="button" className="g-btn sec" onClick={aoVoltar}>Fazer outro pedido</button>
@@ -257,7 +305,9 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
           {datasOk && (
             <p className="g-p">
               <b>{dias} {hotel ? (dias === 1 ? "noite" : "noites") : (dias === 1 ? "dia" : "dias")}</b>
-              {diaria != null && <> · diária de {brlCurto(diaria)}{total != null && dias > 1 ? `, cerca de ${brlCurto(total)} no total` : ""}</>}
+              {comEstimativa
+                ? faixaBoa && <> · {faixaBoa.min === faixaBoa.max ? `cerca de ${brl(faixaBoa.min)} no total` : `de ${brl(faixaBoa.min)} a ${brl(faixaBoa.max)} no total, conforme o porte do pet`}{faixaBoa.varia ? ". Essas datas têm preço de temporada ou feriado" : ""}</>
+                : !semPreco && diaria != null && <> · diária de {brlCurto(diaria)}{total != null && dias > 1 ? `, cerca de ${brlCurto(total)} no total` : ""}</>}
             </p>
           )}
           {fraseDoSinal && <p className="g-muted g-pp">{fraseDoSinal}{sinal?.politica ? ` ${sinal.politica}` : ""} Nada é pago por aqui.</p>}
@@ -315,6 +365,22 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
         {pets.length < MAX_PETS
           ? <button type="button" className="g-btn sec p" style={{ justifySelf: "start" }} onClick={() => setPets((l) => [...l, petVazio()])}><Plus />Outro pet do mesmo tutor</button>
           : <p className="g-muted g-pp">Até {MAX_PETS} pets por pedido. Para mais, faça outro pedido.</p>}
+        {comEstimativa && !naEspera && estimativa && (
+          <div className="g-lk-conta" role="status" aria-live="polite">
+            <b>Estimativa para {dias} {dias === 1 ? "noite" : "noites"}</b>
+            {estimativa.pets.map((x, i) => (
+              <div key={i} className="l"><span>{pets[i]?.nome.trim() || `Pet ${i + 1}`} <small>{x.porte ? `porte ${x.porte}` : "sem porte"}</small></span><span>{brl(x.total)}</span></div>
+            ))}
+            {estimativa.pets.length > 1 && <div className="l forte"><span>Total</span><span>{brl(estimativa.total)}</span></div>}
+            {estimativa.sinal != null && sinal && <div className="l"><span>Sinal para garantir a vaga{sinal.modo === "valor" ? "" : ` (${sinal.valor}%)`}</span><span>{brl(estimativa.sinal)}</span></div>}
+            <small>
+              {estimativa.varia ? "Essas datas têm preço de temporada ou feriado. " : ""}
+              {estimativa.desconto ? "Já com o desconto para mais de um pet. " : ""}
+              {preco?.de != null && preco.ate != null && preco.de !== preco.ate && estimativa.pets.some((x) => !x.porte) ? "O preço muda com o porte: escolha o porte para a conta ficar certa. " : ""}
+              É uma estimativa: quem confirma o valor é {loja}. Nada é pago por aqui.
+            </small>
+          </div>
+        )}
 
       </div>
       <div className="g-lk-bloco g-form">
@@ -326,6 +392,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
           <input className="g-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 91234-5678" value={telefone} maxLength={20}
             onChange={(e) => setTelefone(e.target.value)} onBlur={() => setTelefone(fmtTelefone(telefone))} />
           <small>É por ele que a confirmação chega.</small>
+          {pareceFixo && <small role="status">Esse número parece de telefone fixo. Confira se ele recebe WhatsApp, ou coloque o celular.</small>}
         </label>
         <label className="g-campo"><span>Quer avisar alguma coisa? <small>(opcional)</small></span>
           <textarea className="g-textarea" value={obs} maxLength={300} placeholder="Vacinas em dia, toma remédio, primeira vez, o que ele come…" onChange={(e) => setObs(e.target.value)} />

@@ -339,7 +339,7 @@ export function textoComprovanteEstadia(p: { petshop: string; tutor?: string | n
 /* ---------- ficha de cuidados ---------- */
 
 /** Um cuidado combinado para a estadia: comida ou remédio, quanto e em que horários. */
-export type Cuidado = { id: string; tipo: "comida" | "remedio"; oque: string; quanto: string; horas: string[] };
+export type Cuidado = { id: string; tipo: "comida" | "remedio"; oque: string; quanto: string; horas: string[]; /** só no formulário: a hora que está no campo e ainda não entrou na lista */ nova?: string };
 export function lerCuidados(e: { cuidados?: unknown } | null | undefined): Cuidado[] {
   if (!Array.isArray(e?.cuidados)) return [];
   return (e!.cuidados as unknown[]).flatMap((x) => {

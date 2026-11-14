@@ -7,8 +7,9 @@ import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPessoa, AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import type { Database } from "@/lib/gestao/banco";
 import { abreNoDia } from "@/lib/gestao/creche";
-import { diariaFixa, diariaSugerida } from "@/lib/gestao/hotel";
+import { pixDoSinal } from "@/lib/gestao/hotel";
 import { porteDe, sinalDe } from "@/lib/gestao/hotel-opcoes";
+import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { opcoesDoLink, prazoPorExtenso, usouOpcoesDoLink } from "@/lib/gestao/link-opcoes";
 import { brl } from "@/lib/gestao/util";
 import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar, semAcento } from "@/lib/gestao/util";
@@ -73,7 +74,8 @@ const porHora = (a: Pedido, b: Pedido) => a.inicio.localeCompare(b.inicio) || ne
  * o pedido respondido continua na lista até alguém avisar o tutor (ou marcar "Já avisei"), e isso fica gravado no pedido.
  */
 export default function PedidosLink() {
-  const { sb, petshop, equipe, servicos } = useGestao();
+  const { sb, petshop, equipe, servicos, vejoFinanceiro } = useGestao();
+  const casa = nomeDaCasa(petshop);
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [quem, setQuem] = useState<Record<string, string>>({});
@@ -92,8 +94,15 @@ export default function PedidosLink() {
       // o tutor pediu outra data, ou pediu para cancelar algo que tem dinheiro no meio: só para quem ligou isso no link
       comOpcoes ? sb.from("pedidos_agendamento").select("*").eq("petshop_id", petshop.id).not("cliente_pediu", "is", null).is("cliente_pedido_visto_em", null).order("inicio").limit(40) : null,
     ]);
-    return { pendentes: ok(pendentes) as Pedido[], semAviso: (semAviso.data ?? []) as Pedido[], recados: (recados?.data ?? []) as Pedido[] };
-  }, [petshop.id, comOpcoes]);
+    // o sinal das reservas aceitas que ainda esperam o aviso: só quem recebe lê o valor (para a mensagem levar quanto é)
+    const sinais = new Map<string, number>();
+    const comReserva = ((semAviso.data ?? []) as Pedido[]).filter((p) => p.estadia_id);
+    if (vejoFinanceiro && sinalDe(petshop).ativo && comReserva.length) {
+      const v = await sb.from("estadias_valores").select("estadia_id, sinal, sinal_estado").eq("petshop_id", petshop.id).in("estadia_id", comReserva.map((p) => p.estadia_id!));
+      for (const x of v.data ?? []) if (x.sinal != null && x.sinal_estado === "a_receber") sinais.set(x.estadia_id, Number(x.sinal));
+    }
+    return { pendentes: ok(pendentes) as Pedido[], semAviso: (semAviso.data ?? []) as Pedido[], recados: (recados?.data ?? []) as Pedido[], sinais };
+  }, [petshop.id, comOpcoes, vejoFinanceiro]);
   const dados = tudo?.pendentes;
 
   // o pedido chega de fora: olha de novo a cada minuto e quando a pessoa volta para a aba
@@ -197,7 +206,7 @@ export default function PedidosLink() {
     for (const p of lista) {
       const args = { p_id: p.id, p_profissional: ehEstadia(p) ? undefined : profissional, p_tutor_novo: decisao.como === "novo" };
       try {
-        acertarDiaria(p, ok(await sb.rpc("pedido_aceitar_como", args)));
+        ok(await sb.rpc("pedido_aceitar_como", args));
         feitos.push(p);
       } catch (e) {
         // creche ou hotel sem vaga em algum dia: o banco recusa e explica; a pessoa decide se aceita assim mesmo
@@ -210,17 +219,24 @@ export default function PedidosLink() {
         });
         if (!forcar) continue; // desistiu: o pedido segue pendente
         try {
-          acertarDiaria(p, ok(await sb.rpc("pedido_aceitar_como", { ...args, p_forcar: true })));
+          ok(await sb.rpc("pedido_aceitar_como", { ...args, p_forcar: true }));
           feitos.push(p);
         } catch (e2) { falha ??= e2; }
       }
     }
+    // com todas as reservas do pedido criadas: a diária de cada pet (pelo porte) e, por último, o sinal da regra do dono.
+    // Nessa ordem a conta do sinal já enxerga os outros pets do mesmo tutor (desconto do segundo pet).
+    const reservas = feitos.filter(ehEstadia);
+    for (const p of reservas) await acertarDiaria(p);
+    let comSinal = 0;
+    for (const p of reservas) if (await criarSinal(p)) comSinal++;
     if (feitos.length) {
       const tutor = decisao.tutor;
       if (tutor) setTutores((t) => ({ ...t, ...Object.fromEntries(feitos.map((p) => [p.id, tutor])) }));
       void recarregar();
-      avisar(feitos.length === 1 ? (ehEstadia(feitos[0]) ? `Reserva de ${feitos[0].pet_nome} feita. Ela está em Creche e hotel.` : `Horário de ${feitos[0].pet_nome} marcado.`)
-        : feitos.every(ehEstadia) ? `Reservas de ${listaDe(feitos.map((p) => p.pet_nome))} feitas. Elas estão em Creche e hotel.` : `Horários de ${listaDe(feitos.map((p) => p.pet_nome))} marcados.`);
+      const doSinal = comSinal ? ` ${comSinal === 1 ? "O sinal já ficou" : "Os sinais já ficaram"} em A receber, pela sua regra.` : "";
+      avisar(feitos.length === 1 ? (ehEstadia(feitos[0]) ? `Reserva de ${feitos[0].pet_nome} feita. Ela está em ${casa}.${doSinal}` : `Horário de ${feitos[0].pet_nome} marcado.`)
+        : feitos.every(ehEstadia) ? `Reservas de ${listaDe(feitos.map((p) => p.pet_nome))} feitas. Elas estão em ${casa}.${doSinal}` : `Horários de ${listaDe(feitos.map((p) => p.pet_nome))} marcados.`);
       avisarMudanca();
     }
     if (falha) { avisarErro(falha); void recarregar(); }
@@ -228,11 +244,21 @@ export default function PedidosLink() {
   }
 
   /** Reserva de hotel aceita pelo link com a opção de diária por porte ligada: a diária da reserva passa a ser a do porte do pedido. */
-  function acertarDiaria(p: Pedido, estadiaId: unknown) {
-    if (p.tipo !== "hotel" || typeof estadiaId !== "string") return;
+  async function acertarDiaria(p: Pedido) {
     // a conta é do banco: quem aceita o pedido pode não ver a lista de preços
-    if (!porteDe(petshop).ativo || !p.porte) return;
-    void sb.rpc("pedido_acertar_diaria", { p_id: p.id }).then(() => {}, () => {});
+    if (p.tipo !== "hotel" || !porteDe(petshop).ativo || !p.porte) return;
+    await sb.rpc("pedido_acertar_diaria", { p_id: p.id }).then(() => {}, () => {});
+  }
+
+  /**
+   * Com "Sinal na reserva" ligado, a reserva aceita pelo link já nasce com o sinal em A receber, como a reserva feita aqui dentro.
+   * A conta é do banco, pela regra do dono (quem aceita pode não mexer com dinheiro). Banco antes da atualização: segue sem sinal.
+   */
+  async function criarSinal(p: Pedido) {
+    const regra = sinalDe(petshop);
+    if (!regra.ativo || !regra.valor || (p.tipo !== "hotel" && !regra.creche)) return false;
+    const r = await sb.rpc("pedido_criar_sinal", { p_id: p.id });
+    return !r.error && (r.data as { criado?: boolean } | null)?.criado === true;
   }
 
   async function recusar(lista: Pedido[], grupo: string) {
@@ -257,11 +283,23 @@ export default function PedidosLink() {
     } finally { setOcupado(null); }
   }
 
-  /** Com o sinal ligado nas opções do hotel, a confirmação já avisa que ele vai ser pedido (valor e o texto que o dono escreveu). */
-  function fraseDoSinal(p: Pedido) {
+  /**
+   * Com o sinal ligado nas opções do hotel, a confirmação já pede o sinal: quanto é (o valor que ficou em A receber em cada reserva),
+   * o texto que o dono escreveu e a chave Pix. Quem não mexe com dinheiro não lê o valor: a mensagem dele fala só da regra.
+   */
+  function fraseDoSinal(lista: Pedido[]) {
+    const p = lista[0];
     const s = sinalDe(petshop);
     if (!s.ativo || !s.valor || (p.tipo !== "hotel" && !s.creche)) return "";
-    return ` Para garantir a reserva, pedimos um sinal de ${s.modo === "valor" ? brl(s.valor) : `${s.valor}% do valor da reserva`}.${s.politica.trim() ? ` ${s.politica.trim()}` : ""}`;
+    const politica = s.politica.trim() ? ` ${s.politica.trim()}` : "";
+    const valores = lista.map((x) => (x.estadia_id ? tudo?.sinais.get(x.estadia_id) : undefined));
+    if (valores.every((v): v is number => v != null)) {
+      const total = Math.round(valores.reduce((t, v) => t + v, 0) * 100) / 100;
+      const partes = lista.length > 1 ? ` (${listaDe(lista.map((x, i) => `${brl(valores[i])} de ${x.pet_nome}`))})` : "";
+      const pix = pixDoSinal(petshop);
+      return ` Para garantir a reserva, pedimos um sinal de ${brl(total)}${partes}.${politica}${pix ? ` Pix: ${pix}` : " Me diga como prefere pagar."}`;
+    }
+    return ` Para garantir a reserva, pedimos um sinal de ${s.modo === "valor" ? `${brl(s.valor)}${lista.length > 1 ? " por pet" : ""}` : `${s.valor}% do valor da reserva`}.${politica}${vejoFinanceiro ? "" : " O valor certo e a forma de pagar eu te passo em seguida."}`;
   }
 
   /** Mensagem pronta para o tutor: cita todos os pets da mesma resposta e o horário de cada um. */
@@ -272,12 +310,14 @@ export default function PedidosLink() {
     // endereços para o tutor: a página do pedido (confirmação) e o link para escolher outro horário (recusa)
     const base = `${window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
     // com o cancelamento pelo link ligado, a confirmação já diz que é por esse endereço que o tutor cancela ou pede outra data
-    const acompanhar = `\n\nVeja a confirmação aqui: ${base}/pedido/${p.id}${doLink.cancelar ? `\nPor esse endereço você também cancela ou pede outra data, ${prazoPorExtenso(doLink.cancelarHoras)}.` : ""}`;
+    // o prazo de cancelar pelo link conta da chegada: se ele já passou (reserva para amanhã, prazo de 2 dias), a mensagem não promete
+    const noPrazo = new Date(p.inicio).getTime() - doLink.cancelarHoras * 36e5 > Date.now();
+    const acompanhar = `\n\nVeja a confirmação aqui: ${base}/pedido/${p.id}${!doLink.cancelar ? "" : noPrazo ? `\nPor esse endereço você também cancela ou pede outra data, ${prazoPorExtenso(doLink.cancelarHoras)}.` : "\nSe precisar mudar ou cancelar, fale com a gente por aqui."}`;
     if (ehEstadia(p)) {
       const oQue = `${p.tipo === "hotel" ? "o hotel" : "a creche"} de ${nomes}, ${periodoDe(p)}`;
       return lista[0].resposta === "recusado"
         ? `${oi} Recebemos o seu pedido para ${oQue}, mas não temos vaga nessas datas. Você pode escolher outras datas aqui: ${base}\n\nSe preferir, me diga o período que fica bom para você.`
-        : `${oi} Está confirmado: ${oQue}, com chegada às ${hora(p.inicio)}${p.tipo === "hotel" ? ` e saída às ${hora(p.fim)}` : ""}.${fraseDoSinal(p)} Esperamos vocês!${acompanhar}`;
+        : `${oi} Está confirmado: ${oQue}, com chegada às ${hora(p.inicio)}${p.tipo === "hotel" ? ` e saída às ${hora(p.fim)}` : ""}.${fraseDoSinal(lista.map((r) => r.pedido))} Esperamos vocês!${acompanhar}`;
     }
     if (lista[0].resposta === "recusado") {
       return `${oi} Recebemos o seu pedido para ${nomes}, mas ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}, não vamos conseguir atender. Você pode escolher outro horário livre aqui: ${base}\n\nSe preferir, me diga os dias e períodos que ficam bons para você.`;
@@ -306,9 +346,9 @@ export default function PedidosLink() {
         <span className="g-pl-ico" aria-hidden><Link2 /></span>
         <div>
           <h2>Pedidos pelo link</h2>
-          <p className="g-p">{esperam === 0 ? (novidadeDoCliente ? "Tem novidade de cliente nos pedidos." : "Tudo respondido. Falta só avisar o tutor.") : esperam === 1 ? "1 tutor espera a sua resposta." : `${esperam} tutores esperam a sua resposta.`}</p>
+          <p className="g-p">{esperam === 0 ? (novidadeDoCliente ? "Tem novidade de cliente nos pedidos." : "Tudo respondido. Falta só avisar o tutor.") : `${esperam === 1 ? "1 tutor espera" : `${esperam} tutores esperam`} a sua resposta${pendentes.length > esperam ? ` (${pendentes.length} pedidos)` : ""}.`}</p>
         </div>
-        {pendentes.length > 0 && <span className="g-tag laranja">{pendentes.length}</span>}
+        {pendentes.length > 0 && <span className="g-tag laranja" title={pendentes.length === 1 ? "1 pedido esperando" : `${pendentes.length} pedidos esperando`}>{pendentes.length}</span>}
       </div>
 
       <div className="g-pl-lista">
@@ -326,8 +366,8 @@ export default function PedidosLink() {
                     {primeiroNome(p.tutor_nome)} {mudar ? "pediu pelo link para mudar" : "pediu pelo link para cancelar"} {oQueFoi(g.lista)}{p.status === "pendente" ? " (ainda esperando a sua resposta)" : ""}.
                     {p.cliente_recado ? ` Recado: “${p.cliente_recado}”.` : ""}
                     {mudar
-                      ? ` Nada foi desmarcado. Para mudar, ${p.status === "pendente" ? "recuse este pedido e combine a nova data" : ehEstadia(p) ? "abra a reserva em Creche e hotel" : "abra o horário na Agenda"}.`
-                      : ` Há ${ehEstadia(p) ? "sinal nesta reserva" : "pagamento neste horário"}, então nada foi cancelado: ${ehEstadia(p) ? "cancele a reserva em Creche e hotel" : "desmarque o horário na Agenda"} e decida o que fazer com o valor.`}
+                      ? ` Nada foi desmarcado. Para mudar, ${p.status === "pendente" ? "recuse este pedido e combine a nova data" : ehEstadia(p) ? `abra a reserva em ${casa}` : "abra o horário na Agenda"}.`
+                      : ` Há ${ehEstadia(p) ? "sinal nesta reserva" : "pagamento neste horário"}, então nada foi cancelado: ${ehEstadia(p) ? `cancele a reserva em ${casa}` : "desmarque o horário na Agenda"} e decida o que fazer com o valor.`}
                   </span>
                 </div>
               </div>
@@ -352,7 +392,7 @@ export default function PedidosLink() {
                   <b>{listaDe(lista.map((x) => x.pet_nome))} <span className="g-tag vermelho">cancelado pelo cliente</span></b>
                   <span>
                     {primeiroNome(p.tutor_nome)} cancelou pelo link {oQueFoi(lista)}{p.cliente_cancelou_em ? `, em ${diaHora(p.cliente_cancelou_em)}` : ""}.
-                    {tinhaAceito ? (ehEstadia(p) ? " A reserva saiu de Creche e hotel e a vaga voltou." : " O horário foi desmarcado na Agenda e voltou a ficar livre.") : " O pedido ainda esperava a sua resposta."}
+                    {tinhaAceito ? (ehEstadia(p) ? ` A reserva saiu de ${casa} e a vaga voltou.` : " O horário foi desmarcado na Agenda e voltou a ficar livre.") : " O pedido ainda esperava a sua resposta."}
                     {p.cliente_recado ? ` Motivo: “${p.cliente_recado}”.` : ""}
                   </span>
                 </div>

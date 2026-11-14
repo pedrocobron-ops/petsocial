@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import EstadiaPeloLink from "./estadia";
+import EstadiaPeloLink, { type PrecoDoHotel } from "./estadia";
 import { useParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, Cat, Check, Clock, Dog, MapPin, MessageCircle, PawPrint, Plus, Scissors, Sun, X } from "lucide-react";
 import { Marca, Selo } from "@/components/gestao/marca";
@@ -126,6 +126,8 @@ export default function AgendarPeloLink() {
 
   // dias que o negócio marcou como fechados (feriado, folga): o link não oferece horário neles
   const [fechados, setFechados] = useState<Set<string>>(() => new Set());
+  // o preço do hotel no link: undefined = ainda lendo (não mostra nada); null = banco antes da atualização (mostra a diária comum)
+  const [precoHotel, setPrecoHotel] = useState<PrecoDoHotel | null | undefined>(undefined);
   const carregar = useCallback(async () => {
     setSemRede(false);
     setInfo(undefined);
@@ -138,6 +140,11 @@ export default function AgendarPeloLink() {
     // se a função ainda não existe no banco, segue sem dias fechados (como sempre foi)
     const f = await banco().rpc("link_fechados", { p_codigo: codigo });
     setFechados(new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []));
+    if (lido && typeof lido === "object" && lido.hotel) {
+      const o = await banco().rpc("link_hotel_opcoes", { p_codigo: codigo });
+      const preco = (o.data as { preco?: PrecoDoHotel } | null)?.preco;
+      setPrecoHotel(preco && typeof preco === "object" ? preco : null);
+    }
   }, [codigo]);
   useEffect(() => { void carregar(); }, [carregar]);
   useEffect(() => { if (info?.nome) document.title = `Agendar: ${info.nome}`; }, [info?.nome]);
@@ -354,6 +361,7 @@ export default function AgendarPeloLink() {
         <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} fechados={fechados} termos={termos} recarregarTermos={recarregarTermos}
           aoPedir={() => setLembrados((n) => n + 1)}
           zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)}
+          preco={estadia === "hotel" ? precoHotel : undefined}
           diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)} />
       )}
 
@@ -383,7 +391,9 @@ export default function AgendarPeloLink() {
               {info.hotel && (
                 <button type="button" className="g-lk-serv" style={{ "--cor": "#7c6bd6" } as React.CSSProperties} onClick={() => setEstadia("hotel")}>
                   <i className="g-lk-serv-cor" aria-hidden><BedDouble /></i>
-                  <span className="g-lk-serv-t"><b>Hotel</b><span>Dormir com a gente{info.hotel.diaria != null && <em>{brlCurto(Number(info.hotel.diaria))} a diária</em>}</span></span>
+                  <span className="g-lk-serv-t"><b>Hotel</b><span>Dormir com a gente{precoHotel === undefined || precoHotel?.mostrar === false ? null
+                    : precoHotel?.de != null ? <em>{precoHotel.ate != null && precoHotel.ate !== precoHotel.de ? "a partir de " : ""}{brlCurto(Number(precoHotel.de))} a diária</em>
+                    : precoHotel === null && info.hotel.diaria != null ? <em>{brlCurto(Number(info.hotel.diaria))} a diária</em> : null}</span></span>
                   <ArrowRight className="g-lk-serv-seta" aria-hidden />
                 </button>
               )}
