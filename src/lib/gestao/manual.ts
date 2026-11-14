@@ -1263,6 +1263,7 @@ const BASE: TopicoBase[] = [
       "Na Agenda e na lista de Hoje, o atendimento concluído sem conta aparece como Falta cobrar. Depois de recebido, volta a aparecer como Concluído.",
       "Acontece quando quem atende toca em Concluir atendimento e o cliente sai sem passar no caixa.",
       "Não vai cobrar (cortesia, retorno)? Toque em Não cobrar, na linha: o atendimento sai da lista e fica anotado como não cobrado.",
+      "Pet com pacote que cobre o serviço: a linha avisa Tem pacote e a conta já abre usando o pacote, cobrando só o resto (os outros serviços do horário). Para cobrar tudo sem gastar o pacote, toque em Cobrar sem usar o pacote.",
       "A tela Hoje só diz Tudo atendido por hoje quando não sobra horário sem concluir nem atendimento sem cobrança.",
       "Entram na lista os atendimentos dos últimos 45 dias.",
     ],
