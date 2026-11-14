@@ -13,6 +13,8 @@ type Especie = "cao" | "gato" | "outro";
 const ESPECIES: { id: Especie; rotulo: string; icone: React.ComponentType<{ size?: number }> }[] = [
   { id: "cao", rotulo: "Cão", icone: Dog }, { id: "gato", rotulo: "Gato", icone: Cat }, { id: "outro", rotulo: "Outro", icone: PawPrint },
 ];
+/** "Na sexta, 11/12," ou "No sábado, 12/12," (começo de frase). */
+const naDia = (iso: string) => { const g = new Date(`${iso}T12:00:00`).getDay(); return `${g === 0 || g === 6 ? "No" : "Na"} ${dia(iso)},`; };
 const soma = (iso: string, dias: number) => isoDia(somaDias(deIsoDia(iso), dias));
 const dia = (iso: string) => { const d = new Date(`${iso}T12:00:00`); return `${["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"][d.getDay()]}, ${dataCurta(d)}`; };
 /** O negócio abre nesse dia da semana? Sem horário preenchido, vale todo dia (a mesma regra de `creche_abre` no banco). */
@@ -123,7 +125,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
     if (fechados?.has(d) || !abreNoDia(horario, d)) return `Não abrimos em ${dia(d)}. Escolha outro dia para ${chegada ? "a chegada" : "buscar o pet"}.`;
     const h = horasDoDia(d);
     if (!h || !/^\d{2}:\d{2}$/.test(hh)) return null;
-    if (hh < h.abre.slice(0, 5) || hh > h.fecha.slice(0, 5)) return `Em ${dia(d)} atendemos das ${fala(h.abre.slice(0, 5))} às ${fala(h.fecha.slice(0, 5))}. Escolha uma hora de ${chegada ? "chegada" : "buscar"} nesse horário.`;
+    if (hh < h.abre.slice(0, 5) || hh > h.fecha.slice(0, 5)) return `${naDia(d)} atendemos das ${fala(h.abre.slice(0, 5))} às ${fala(h.fecha.slice(0, 5))}. Escolha uma hora de ${chegada ? "chegada" : "buscar"} nesse horário.`;
     return null;
   };
   // diz qual é o problema das datas (as mesmas regras do banco); null = datas boas
@@ -221,11 +223,12 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
   // guarda o que já foi preenchido nesta aba (o aceite das regras não: a pessoa marca de novo)
   useEffect(() => {
     try {
-      if (passo === "enviado") { sessionStorage.removeItem(chaveRascunho); return; }
+      // pedido enviado: o rascunho e a escolha de creche ou hotel saem (recarregar volta para o começo do link)
+      if (passo === "enviado") { sessionStorage.removeItem(chaveRascunho); sessionStorage.removeItem(`maestro-link-estadia:${codigo}`); return; }
       const r: Rascunho = { passo, entrada, saida, horaEntrada, horaSaida, pets, tutor, telefone, obs, naEspera };
       sessionStorage.setItem(chaveRascunho, JSON.stringify(r));
     } catch { /* sem armazenamento: segue sem guardar */ }
-  }, [chaveRascunho, passo, entrada, saida, horaEntrada, horaSaida, pets, tutor, telefone, obs, naEspera]);
+  }, [chaveRascunho, codigo, passo, entrada, saida, horaEntrada, horaSaida, pets, tutor, telefone, obs, naEspera]);
   // telefone fixo no campo do WhatsApp: só um lembrete, não impede o pedido
   const foneDigitado = telefone.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
   const pareceFixo = foneDigitado.length === 10 && /[2-5]/.test(foneDigitado[2]);
@@ -306,7 +309,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
           : r.erro === "repetido" ? `Você já pediu vaga para ${listaE(nomes)} nessas datas. Acompanhe o pedido ou fale com a gente.`
           : r.erro === "horas" ? "No mesmo dia, a hora de buscar vem depois da hora de chegada."
           : r.erro === "dia_fechado" ? `Não abrimos em ${r.dia ? dia(r.dia) : "um dos dias"}. Escolha outro dia para ${r.quando === "saida" ? "buscar o pet" : "a chegada"}.`
-          : r.erro === "fora_do_horario" ? `Em ${r.dia ? dia(r.dia) : "esse dia"} atendemos das ${fala(r.abre ?? "")} às ${fala(r.fecha ?? "")}. Escolha uma hora de ${r.quando === "saida" ? "buscar" : "chegada"} nesse horário.`
+          : r.erro === "fora_do_horario" ? `${r.dia ? naDia(r.dia) : "Nesse dia"} atendemos das ${fala(r.abre ?? "")} às ${fala(r.fecha ?? "")}. Escolha uma hora de ${r.quando === "saida" ? "buscar" : "chegada"} nesse horário.`
           : r.erro === "dados" ? "Confira o nome do pet, o seu nome e o WhatsApp com DDD."
           : "Algo deu errado. Tente de novo em instantes.");
         setRepetido(r.erro === "repetido");
