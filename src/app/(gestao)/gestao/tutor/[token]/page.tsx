@@ -138,8 +138,9 @@ export default async function PaginaDoTutor({ params }: { params: Promise<{ toke
                   )}
                   {d.fotos.length > 0 && (
                     <ul className="g-tt-fotos" aria-label={`Fotos de ${pet.nome}, ${nomeDoDia(d.dia).toLowerCase()}`}>
-                      {d.fotos.map((f) => {
+                      {d.fotos.map((f, i) => {
                         const u = urls.get(f.caminho);
+                        const legenda = f.legenda && f.legenda !== d.fotos[i - 1]?.legenda ? f.legenda : null; // o mesmo recado em várias fotos aparece uma vez
                         return (
                           <li key={f.id}>
                             {u ? (
@@ -148,7 +149,7 @@ export default async function PaginaDoTutor({ params }: { params: Promise<{ toke
                                 <img src={u} alt={f.legenda ?? `${pet.nome}, às ${hora(f.em)}`} loading="lazy" decoding="async" />
                               </a>
                             ) : <span className="sem"><Camera aria-hidden /></span>}
-                            {f.legenda && <small>{f.legenda}</small>}
+                            {legenda && <small>{legenda}</small>}
                           </li>
                         );
                       })}
@@ -157,6 +158,7 @@ export default async function PaginaDoTutor({ params }: { params: Promise<{ toke
                 </article>
               ))}
 
+              {pet.na_casa && !pet.dias.some((d) => d.dia === p.hoje) && <p className="g-tt-vazio">O diário e as fotos de hoje aparecem aqui assim que a equipe puser.</p>}
               {!temAlgo && <p className="g-tt-vazio">Ainda não tem diário nem fotos de {pet.nome}. Quando {pet.sexo === "F" ? "ela" : pet.sexo === "M" ? "ele" : "o pet"} vier, o dia aparece aqui.</p>}
             </section>
           );
