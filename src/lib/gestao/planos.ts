@@ -2,7 +2,8 @@
  * Planos do Maestro Pet Gestão. Todos têm as mesmas funções; muda quantas pessoas entram com login
  * e de quanto em quanto tempo a cobrança acontece (todo mês, a cada 3 ou a cada 6 meses).
  * Durante o teste de 7 dias a conta fica no plano maior, para a equipe inteira experimentar.
- * Os links de checkout da Cakto vêm das variáveis da Vercel; sem link, o botão aparece como "em breve".
+ * Os links de checkout da Cakto vêm do banco (painel do administrador, aba Cakto, lidos pela função `gestao_assinatura`)
+ * e, na falta deles, das variáveis da Vercel; sem link, o botão aparece como "em breve".
  */
 export type PlanoId = "solo" | "equipe" | "petshop";
 export type PeriodoId = "mensal" | "trimestral" | "semestral";
@@ -27,11 +28,22 @@ const CHECKOUTS: Record<PlanoId, Record<PeriodoId, string | undefined>> = {
   petshop: { mensal: process.env.NEXT_PUBLIC_GESTAO_CHECKOUT_PETSHOP, trimestral: process.env.NEXT_PUBLIC_GESTAO_CHECKOUT_PETSHOP_3, semestral: process.env.NEXT_PUBLIC_GESTAO_CHECKOUT_PETSHOP_6 },
 };
 
+const MESES: Record<PeriodoId, number> = { mensal: 1, trimestral: 3, semestral: 6 };
+
+/** Links gravados no banco, por "plano:meses" ("solo:1", "equipe:3"…). Quem carrega é o GestaoProvider, ao abrir o app. */
+let doBanco: Record<string, string> = {};
+export function usarLinksDoBanco(links: Record<string, string> | null | undefined) { doBanco = links ?? {}; }
+
+/** Link de pagamento de um plano e período: primeiro o do banco, depois o da variável da Vercel. */
+export function linkDe(plano: PlanoId, periodo: PeriodoId) {
+  return (doBanco[`${plano}:${MESES[periodo]}`] || CHECKOUTS[plano][periodo] || "").trim();
+}
+
 /** `preco` e `checkout` são os do plano mensal; para os outros períodos use `ofertaDe`. */
-export const PLANOS: { id: PlanoId; nome: string; acessos: number; preco: number; para: string; checkout: string }[] = [
-  { id: "solo", nome: "Solo", acessos: 1, preco: PRECOS.solo.mensal, para: "Para quem atende sozinho", checkout: (CHECKOUTS.solo.mensal ?? "").trim() },
-  { id: "equipe", nome: "Equipe", acessos: 3, preco: PRECOS.equipe.mensal, para: "Para quem tem ajudante ou recepção", checkout: (CHECKOUTS.equipe.mensal ?? "").trim() },
-  { id: "petshop", nome: "Pet shop", acessos: 6, preco: PRECOS.petshop.mensal, para: "Para a equipe completa", checkout: (CHECKOUTS.petshop.mensal ?? "").trim() },
+export const PLANOS: { id: PlanoId; nome: string; acessos: number; preco: number; para: string; readonly checkout: string }[] = [
+  { id: "solo", nome: "Solo", acessos: 1, preco: PRECOS.solo.mensal, para: "Para quem atende sozinho", get checkout() { return linkDe("solo", "mensal"); } },
+  { id: "equipe", nome: "Equipe", acessos: 3, preco: PRECOS.equipe.mensal, para: "Para quem tem ajudante ou recepção", get checkout() { return linkDe("equipe", "mensal"); } },
+  { id: "petshop", nome: "Pet shop", acessos: 6, preco: PRECOS.petshop.mensal, para: "Para a equipe completa", get checkout() { return linkDe("petshop", "mensal"); } },
 ];
 
 /** Preço, link e as contas de um plano em um período. `porMes` e `economia` comparam com pagar mês a mês pelo mesmo tempo. */
@@ -39,8 +51,10 @@ export function ofertaDe(plano: PlanoId, periodo: PeriodoId) {
   const p = PERIODOS.find((x) => x.id === periodo) ?? PERIODOS[0];
   const preco = PRECOS[plano][p.id];
   const cheio = PRECOS[plano].mensal * p.meses;
-  return { periodo: p, preco, porMes: preco / p.meses, economia: cheio - preco, checkout: (CHECKOUTS[plano][p.id] ?? "").trim() };
+  return { periodo: p, preco, porMes: preco / p.meses, economia: cheio - preco, checkout: linkDe(plano, p.id) };
 }
+/** Preço de tabela, para o painel do administrador conferir com a oferta da Cakto. */
+export const precoDe = (plano: PlanoId, periodo: PeriodoId) => PRECOS[plano][periodo];
 export const temCheckout = () => PLANOS.some((pl) => PERIODOS.some((pe) => ofertaDe(pl.id, pe.id).checkout));
 
 export const planoPorId = (id: string | null | undefined) => PLANOS.find((p) => p.id === id) ?? PLANOS[2];

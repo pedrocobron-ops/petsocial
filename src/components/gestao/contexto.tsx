@@ -1,7 +1,7 @@
 "use client";
 
 import { lerEquipe, lerPetshop } from "@/lib/gestao/reservado";
-import { temCheckout } from "@/lib/gestao/planos";
+import { temCheckout, usarLinksDoBanco } from "@/lib/gestao/planos";
 import { Selo } from "./marca";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -57,6 +57,8 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   const [equipe, setEquipe] = useState<Profissional[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [erro, setErro] = useState<string | null>(null);
+  /** A assinatura abriu (o fim do teste vale)? null = não deu para ler do banco: segue a regra antiga, pelos links. */
+  const [aberta, setAberta] = useState<boolean | null>(null);
 
   const carregarBase = useCallback(async (petshopId: string) => {
     const [p, e, s] = await Promise.all([
@@ -85,8 +87,15 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       if (!vinculos?.length) { router.replace("/gestao/comecar"); return; }
       const preferido = typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_LOJA) : null;
       const meu = vinculos.find((v) => v.petshop_id === preferido) ?? vinculos[0];
+      // links de pagamento e se a assinatura abriu: vêm do banco, para trocar um link sem publicar o site de novo
+      const assinatura = sb.rpc("gestao_assinatura").then((r) => {
+        if (r.error || !r.data) return;
+        const a = r.data as { aberta?: boolean; links?: Record<string, string> };
+        usarLinksDoBanco(a.links);
+        if (vivo) setAberta(Boolean(a.aberta));
+      }, () => undefined);
       try {
-        const todos = await carregarBase(meu.petshop_id);
+        const [todos] = await Promise.all([carregarBase(meu.petshop_id), assinatura]);
         if (!vivo) return;
         setEu(todos.find((x) => x.id === meu.id) ?? meu);
         setUser(u);
@@ -106,8 +115,9 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     const resta = new Date(petshop.teste_ate).getTime() - Date.now();
     // quem cancelou continua usando até o fim do período que já pagou
     const pagoAinda = petshop.status === "cancelada" && petshop.pago_ate != null && new Date(petshop.pago_ate).getTime() > Date.now();
-    // enquanto a assinatura não abriu (sem link de pagamento), o teste não bloqueia ninguém: a pessoa não teria como pagar
-    const liberado = ["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && (resta > 0 || !temCheckout())) || pagoAinda;
+    // enquanto a assinatura não abriu, o teste não bloqueia ninguém: a pessoa não teria como pagar (mesma regra do banco)
+    const aberto = aberta ?? temCheckout();
+    const liberado = ["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && (resta > 0 || !aberto)) || pagoAinda;
     // as mensagens de erro só falam em "conta só para consulta" quando a conta está mesmo assim
     soConsulta = !liberado;
     return {
@@ -125,7 +135,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       },
       sair: async () => { await sb.auth.signOut(); router.replace("/gestao/entrar"); },
     };
-  }, [sb, user, eu, petshop, equipe, servicos, carregarBase, router]);
+  }, [sb, user, eu, petshop, equipe, servicos, carregarBase, router, aberta]);
 
   if (erro) {
     return (

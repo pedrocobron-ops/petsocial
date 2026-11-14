@@ -37,25 +37,33 @@ function Acessos({ n }: { n: number }) {
   return <span className="g-as-acessos" aria-hidden>{Array.from({ length: MAIOR }, (_, i) => <i key={i} className={i < n ? "on" : undefined}><User /></i>)}</span>;
 }
 
-function linkDoCheckout(CHECKOUT: string, email: string | undefined) {
-  if (!email) return CHECKOUT;
+/**
+ * Link de pagamento com o e-mail da conta já preenchido (parâmetros `email` e `confirmEmail` do checkout da Cakto)
+ * e o id do pet shop em `callback`, que a Cakto devolve no aviso de pagamento: assim a compra cai na conta certa
+ * mesmo se a pessoa trocar o e-mail na hora de pagar.
+ */
+function linkDoCheckout(checkout: string, email: string | undefined, petshopId?: string) {
+  const extras: [string, string][] = [];
+  if (email) extras.push(["email", email], ["confirmEmail", email]);
+  if (petshopId) extras.push(["callback", petshopId]);
   try {
-    const u = new URL(CHECKOUT);
-    u.searchParams.set("email", email);
+    const u = new URL(checkout);
+    for (const [k, v] of extras) u.searchParams.set(k, v);
     return u.toString();
   } catch {
-    return `${CHECKOUT}${CHECKOUT.includes("?") ? "&" : "?"}email=${encodeURIComponent(email)}`;
+    const q = extras.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+    return q ? `${checkout}${checkout.includes("?") ? "&" : "?"}${q}` : checkout;
   }
 }
 
 export default function Assinatura() {
   const { souDono, petshop, user, liberado, diasDeTeste } = useGestao();
+  const [periodo, setPeriodo] = useState<PeriodoId>("mensal");
   if (!souDono) return <Vazio titulo="Só o dono do pet shop mexe aqui." />;
   const status = petshop.status;
   const podeAssinar = status === "teste" || status === "cancelada";
   const temAssinatura = status === "ativa" || status === "atrasada";
   const atual = planoPorId(petshop.plano);
-  const [periodo, setPeriodo] = useState<PeriodoId>("mensal");
 
   return (
     <div>
@@ -107,7 +115,7 @@ export default function Assinatura() {
                     <p className="g-muted g-pp" style={{ minHeight: "2.6em" }}>{o.periodo.meses > 1 ? `Equivale a ${brlCurto(Math.round(o.porMes * 100) / 100)} por mês: ${brlCurto(o.economia)} a menos do que no mensal.` : "Cobrado todo mês."}</p>
                     <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoAcessos(p.acessos)}</b> ao sistema</p></div>
                     {o.checkout
-                      ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(o.checkout, user.email)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
+                      ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(o.checkout, user.email, petshop.id)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
                       : <button className="g-btn cheio" disabled>Disponível em breve</button>}
                   </div>
                 );
@@ -150,6 +158,15 @@ export default function Assinatura() {
           <section className="g-as-estado neutro">
             <div className="g-as-estado-t"><Tile icone={Lock} tom="manteiga" tamanho="g" /><div><p className="g-rotulo">Teste grátis</p><h2>Teste grátis: terminou em {dataCurta(fim)}</h2></div></div>
             <p className="g-p">Seus dados continuam guardados e a conta fica só para consulta até você assinar.</p>
+          </section>
+        );
+      }
+      if (dias === 0) {
+        // o prazo passou, mas a assinatura ainda não abriu: ninguém fica bloqueado sem ter como pagar
+        return (
+          <section className="g-as-estado teste">
+            <div className="g-as-estado-t"><Tile icone={Clock} tom="pessego" tamanho="g" /><div><p className="g-rotulo">Teste grátis</p><h2>Teste grátis: terminou em {dataCurta(fim)}</h2></div></div>
+            <p className="g-p">Como a assinatura ainda não abriu, você continua usando tudo normalmente.</p>
           </section>
         );
       }

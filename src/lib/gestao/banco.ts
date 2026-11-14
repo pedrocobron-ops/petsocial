@@ -1383,6 +1383,30 @@ isOneToOne: false
 "admin_atualizar":
 { Args: { "p_nota"?: string,"p_petshop": string,"p_plano"?: string,"p_status"?: Database["public"]['Enums']["status_assinatura"],"p_teste_ate"?: string }; Returns: undefined
                            },
+"admin_cakto":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"admin_cakto_abrir":
+{ Args: { "p_aberta": boolean }; Returns: undefined
+                           },
+"admin_cakto_descartar":
+{ Args: { "p_evento": number }; Returns: undefined
+                           },
+"admin_cakto_ligar":
+{ Args: { "p_evento": number,"p_petshop": string }; Returns: number
+                           },
+"admin_cakto_oferta":
+{ Args: { "p_link": string,"p_meses": number,"p_oferta": string,"p_plano": string }; Returns: undefined
+                           },
+"admin_cakto_produto":
+{ Args: { "p_produto": string }; Returns: undefined
+                           },
+"admin_cakto_segredo":
+{ Args: { "p_qual": string,"p_segredo": string }; Returns: undefined
+                           },
+"admin_cakto_sem_conta":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "admin_conversas":
 { Args: { "p_canal"?: string,"p_limite"?: number,"p_petshop"?: string }; Returns: Json
                            },
@@ -1435,8 +1459,14 @@ isOneToOne: false
 "caixa_esperado":
 { Args: { "p_caixa": string }; Returns: number
                            },
+"cakto_aplicar":
+{ Args: { "p_assinatura": string,"p_email": string,"p_evento": string,"p_oferta": string,"p_petshop": string,"p_quando"?: string }; Returns: string
+                           },
 "cakto_evento":
-{ Args: { "p_assinatura": string,"p_email": string,"p_evento": string,"p_oferta"?: string,"p_payload": Json,"p_segredo": string }; Returns: string
+{ Args: { "p_assinatura": string,"p_callback"?: string,"p_email": string,"p_evento": string,"p_oferta"?: string,"p_payload": Json,"p_produto"?: string,"p_produto_curto"?: string,"p_segredo": string }; Returns: string
+                           },
+"cakto_segredo_ok":
+{ Args: { "p_segredo": string }; Returns: boolean
                            },
 "casa_quem_escreve":
 { Args: { "p_petshop": string }; Returns: string
@@ -1650,6 +1680,9 @@ isOneToOne: false
                            },
 "fuso_da_uf":
 { Args: { "p_uf": string }; Returns: string
+                           },
+"gestao_assinatura":
+{ Args: Record<PropertyKey, never>; Returns: Json
                            },
 "hotel_noite":
 { Args: { "p_base": number,"p_dia": string,"p_petshop": string,"p_segundo": boolean }; Returns: {
