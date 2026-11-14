@@ -125,8 +125,9 @@ export const noitesAntesDaEntrada = (entrada: string | Date, dias: string[]) => 
 
 /**
  * Preço noite a noite. Para cada noite: começa na diária combinada na reserva (`base`);
- * se a noite é de feriado (data marcada pelo dono, com o preço de feriado ligado), vale o preço de feriado;
- * senão, se cai numa temporada, vale a diária da temporada, ou a base com o acréscimo dela (em % ou em reais).
+ * se a noite cai numa temporada com DIÁRIA PRÓPRIA, vale a diária da temporada (mesmo em feriado: o Réveillon a R$ 180
+ * vale no 31/12 e no 01/01); senão, se é noite de feriado (data marcada pelo dono, com o preço de feriado ligado), vale o
+ * preço de feriado; senão, se cai numa temporada com acréscimo, vale a base com o acréscimo dela (em % ou em reais).
  * Quando duas temporadas pegam a mesma noite, vale a mais curta (`temporadaDoDia`);
  * se é noite de "segundo pet" (`diasDeSegundoPet`), tira o desconto do segundo pet.
  * Cada noite é arredondada em centavos; o total é a soma das noites. Em `temporada` vai o nome que aparece na conta.
@@ -135,8 +136,10 @@ export const noitesAntesDaEntrada = (entrada: string | Date, dias: string[]) => 
 export function precoDasNoites(p: { dias: string[]; base: number; temporadas: Temporada[]; segundoPct: number | null; diasDeSegundo: Set<string>; feriado?: { regra: RegraFeriado; nomeDe: (dia: string) => string | null } | null }): Noite[] {
   const comRegra = (r: { modo: "valor" | "pct" | "mais"; valor: number }) => (r.modo === "valor" ? r.valor : r.modo === "mais" ? p.base + r.valor : (p.base * (100 + r.valor)) / 100);
   return p.dias.map((dia) => {
-    const f = p.feriado && p.feriado.regra.valor != null ? p.feriado.nomeDe(dia) : null;
-    const t = f != null ? null : temporadaDoDia(p.temporadas, dia);
+    const daTemporada = temporadaDoDia(p.temporadas, dia);
+    // temporada com diária própria (o Réveillon a R$ 180) vale mais que o feriado; com acréscimo, cede ao feriado
+    const f = p.feriado && p.feriado.regra.valor != null && daTemporada?.modo !== "valor" ? p.feriado.nomeDe(dia) : null;
+    const t = f != null ? null : daTemporada;
     const cheia = centavos(f != null ? comRegra({ modo: p.feriado!.regra.modo, valor: p.feriado!.regra.valor! }) : t ? comRegra(t) : p.base);
     const desconto = p.segundoPct && p.diasDeSegundo.has(dia) ? centavos((cheia * p.segundoPct) / 100) : 0;
     return { dia, base: p.base, temporada: f ?? t?.nome ?? null, cheia, desconto, valor: centavos(cheia - desconto) };

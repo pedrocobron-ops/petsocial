@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import { MARCAS_DAS_MENSAGENS, MENSAGENS, MODELOS_PADRAO } from "@/lib/gestao/hotel";
+import { temporadaDoDia } from "@/lib/gestao/hotel-opcoes";
 import {
   acomodacoesDe, CHAVES_HOTEL, cuidadosLigados, linkSemPreco, modelosDe, novoCodigo, pixDe, porteDe, segundoPetDe, sinalDe, taxasDe, temporadasDe, temporadasQueSeCruzam,
   type Acomodacao, type ModelosDeMensagem, type Taxa, type Temporada,
@@ -58,6 +59,8 @@ export default function OpcoesHotel() {
   const [atraso, setAtraso] = useState<RegraAtraso>(calendario?.atraso ?? ATRASO_VAZIO);
   const [mexeuNosPrecos, setMexeuNosPrecos] = useState(false);
   const [mexeu, setMexeu] = useState(false);
+  // o aviso de temporadas que se cruzam só aparece ao salvar quando as temporadas mudaram
+  const [mexeuNasTemporadas, setMexeuNasTemporadas] = useState(false);
   useEffect(() => {
     if (!calendario || mexeuNosPrecos) return;
     setFeriado(calendario.feriado); setAtraso(calendario.atraso);
@@ -66,15 +69,37 @@ export default function OpcoesHotel() {
   const [salvando, setSalvando] = useState(false);
   if (!souDono || !usaCasa(petshop)) return null;
   const temHotel = usaModulo(petshop, "hotel"), temCreche = usaModulo(petshop, "creche");
+  const tituloOpcoes = temHotel && !temCreche ? "Opções do hotel" : temCreche && !temHotel ? "Opções da creche" : "Opções do hotel e da creche";
   const m = <T,>(f: (v: T) => void) => (v: T) => { f(v); setMexeu(true); setErro(null); };
   const mp = <T,>(f: (v: T) => void) => (v: T) => { f(v); setMexeu(true); setMexeuNosPrecos(true); setErro(null); };
+  const feriadoAtivo = feriado.ativo && feriado.valor != null;
+  const juntarDatas = (l: string[]) => { const d = l.map(dataCurta); return d.length <= 1 ? d[0] ?? "" : `${d.slice(0, -1).join(", ")} e ${d[d.length - 1]}`; };
   // temporadas que pegam as mesmas noites: vale a mais curta, e a tela diz qual
   const cruzadas = temporadas.ativo ? temporadasQueSeCruzam(temporadas.lista.filter((t) => t.de && t.ate && t.ate >= t.de)) : [];
   const nomeDe = (t: Temporada) => t.nome.trim() || "sem nome";
   const fraseDoCruzamento = ([vale, outra]: [Temporada, Temporada]) => {
     const de = vale.de > outra.de ? vale.de : outra.de, ate = vale.ate < outra.ate ? vale.ate : outra.ate;
-    return `${nomeDe(vale)} e ${nomeDe(outra)} pegam as mesmas noites (${de === ate ? dataCurta(de) : `${dataCurta(de)} a ${dataCurta(ate)}`}): nelas vale ${nomeDe(vale)}, que é a mais curta.`;
+    const fer = feriadoAtivo ? (calendario?.dias ?? []).filter((d) => d.feriado && d.dia >= de && d.dia <= ate).map((d) => d.dia) : [];
+    const noFeriado = !fer.length ? "" : vale.modo === "valor"
+      ? ` Nos feriados desse período (${juntarDatas(fer)}) também vale ${nomeDe(vale)}, que tem diária própria.`
+      : ` Nos feriados desse período (${juntarDatas(fer)}) vale o preço de feriado.`;
+    return `${nomeDe(vale)} e ${nomeDe(outra)} pegam as mesmas noites (${de === ate ? dataCurta(de) : `${dataCurta(de)} a ${dataCurta(ate)}`}): nelas vale ${nomeDe(vale)}, que é a mais curta.${noFeriado}`;
   };
+  // feriados que caem numa temporada: qual preço vale em cada um (a mesma regra da conta)
+  const feriadosNasTemporadas = (() => {
+    if (!feriadoAtivo || !temporadas.ativo) return [];
+    const validas = temporadas.lista.filter((t) => t.de && t.ate && t.ate >= t.de);
+    const grupos = new Map<string, { t: Temporada; dias: string[] }>();
+    for (const d of (calendario?.dias ?? []).filter((x) => x.feriado && x.dia >= isoDia(new Date()))) {
+      const t = temporadaDoDia(validas, d.dia);
+      if (!t) continue;
+      const g = grupos.get(t.id) ?? { t, dias: [] };
+      g.dias.push(d.dia); grupos.set(t.id, g);
+    }
+    return [...grupos.values()].map(({ t, dias }) => t.modo === "valor"
+      ? `${juntarDatas(dias)}: feriado dentro de ${nomeDe(t)}, que tem diária própria. Vale a diária de ${nomeDe(t)}.`
+      : `${juntarDatas(dias)}: feriado dentro de ${nomeDe(t)}. Vale o preço de feriado.`);
+  })();
   const diasDeFeriado = (calendario?.dias ?? []).filter((d) => d.feriado && d.dia >= isoDia(new Date())).length;
 
   async function salvar() {
@@ -91,7 +116,7 @@ export default function OpcoesHotel() {
       if (!usados.length) return setErro("Na taxa de busca fora do horário, escreva a hora e o valor, ou desligue essa opção.");
       if (usados.some((t) => !t!.hora || !t!.valor)) return setErro("Na taxa de busca fora do horário, cada linha precisa da hora e do valor (ou fica toda em branco).");
     }
-    if (cruzadas.length && !(await confirmar({
+    if (cruzadas.length && mexeuNasTemporadas && !(await confirmar({
       titulo: cruzadas.length === 1 ? "Duas temporadas pegam as mesmas noites" : "Há temporadas que pegam as mesmas noites",
       texto: `${cruzadas.slice(0, 3).map(fraseDoCruzamento).join(" ")}${cruzadas.length > 3 ? " E há outros casos na lista." : ""} Nas outras noites, cada uma vale sozinha. Se não é isso que você quer, volte e mude as datas.`,
       confirmar: "Está certo, salvar",
@@ -117,12 +142,13 @@ export default function OpcoesHotel() {
       });
       await recarregarBase();
       avisarMudanca();
-      setMexeu(false);
-      avisar("Opções do hotel e da creche salvas.");
+      setMexeu(false); setMexeuNasTemporadas(false);
+      avisar(`${tituloOpcoes} salvas.`);
     } catch (x) { avisarErro(x); } finally { setSalvando(false); }
   }
 
-  const mudaTemporada = (id: string, x: Partial<Temporada>) => m(setTemporadas)({ ...temporadas, lista: temporadas.lista.map((t) => (t.id === id ? { ...t, ...x } : t)) });
+  const mt = (v: typeof temporadas) => { m(setTemporadas)(v); setMexeuNasTemporadas(true); };
+  const mudaTemporada = (id: string, x: Partial<Temporada>) => mt({ ...temporadas, lista: temporadas.lista.map((t) => (t.id === id ? { ...t, ...x } : t)) });
   const mudaTaxa = (id: string, x: Partial<Taxa>) => m(setTaxas)({ ...taxas, lista: taxas.lista.map((t) => (t.id === id ? { ...t, ...x } : t)) });
   const mudaQuarto = (id: string, x: Partial<Acomodacao>) => m(setQuartos)({ ...quartos, lista: quartos.lista.map((a) => (a.id === id ? { ...a, ...x } : a)) });
   const hoje = isoDia(new Date());
@@ -131,7 +157,7 @@ export default function OpcoesHotel() {
     <section className="g-card g-pilha" id="opcoes-hotel">
       <div className="g-mp-t">
         <Tile icone={SlidersHorizontal} tom="ceu" />
-        <div><h2>Opções do hotel e da creche</h2><p className="g-muted g-p">Ligue só o que você usa. Desligado, nada muda nas telas nem na conta.</p></div>
+        <div><h2>{tituloOpcoes}</h2><p className="g-muted g-p">Ligue só o que você usa. Desligado, nada muda nas telas nem na conta.</p></div>
       </div>
       <div>
         <Opcao titulo="Sinal na reserva" frase="A reserva pode ter um sinal: recebido na hora ou a receber. No check-out ele é descontado da conta." ligada={sinal.ativo} aoMudar={(v) => m(setSinal)({ ...sinal, ativo: v })}>
@@ -163,7 +189,7 @@ export default function OpcoesHotel() {
         )}
 
         {temHotel && (
-          <Opcao titulo="Temporadas" frase="Períodos com preço diferente no hotel (feriado, férias). A estadia que cruza uma temporada é cobrada noite por noite." ligada={temporadas.ativo} aoMudar={(v) => m(setTemporadas)({ ...temporadas, ativo: v })}>
+          <Opcao titulo="Temporadas" frase="Períodos com preço diferente no hotel (feriado, férias). A estadia que cruza uma temporada é cobrada noite por noite." ligada={temporadas.ativo} aoMudar={(v) => mt({ ...temporadas, ativo: v })}>
             {temporadas.lista.map((t) => (
               <div key={t.id} className="g-ht-op-l">
                 <div className="campos">
@@ -180,12 +206,13 @@ export default function OpcoesHotel() {
                       : <CampoValor valor={t.valor} aoMudar={(v) => mudaTemporada(t.id, { valor: v ?? 0 })} />}
                   </Campo>
                 </div>
-                <button type="button" className="g-ico" aria-label={`Tirar a temporada ${t.nome}`} onClick={() => m(setTemporadas)({ ...temporadas, lista: temporadas.lista.filter((x) => x.id !== t.id) })}><Trash2 /></button>
+                <button type="button" className="g-ico" aria-label={`Tirar a temporada ${t.nome}`} onClick={() => mt({ ...temporadas, lista: temporadas.lista.filter((x) => x.id !== t.id) })}><Trash2 /></button>
               </div>
             ))}
-            <div><button type="button" className="g-btn sec p" onClick={() => m(setTemporadas)({ ...temporadas, lista: [...temporadas.lista, { id: novoCodigo(), nome: "", de: hoje, ate: hoje, modo: "pct", valor: 0 }] })}><Plus />Nova temporada</button></div>
+            <div><button type="button" className="g-btn sec p" onClick={() => mt({ ...temporadas, lista: [...temporadas.lista, { id: novoCodigo(), nome: "", de: hoje, ate: hoje, modo: "pct", valor: 0 }] })}><Plus />Nova temporada</button></div>
             {cruzadas.map((par) => <p key={`${par[0].id}-${par[1].id}`} className="g-ht-fechado" role="status"><span>{fraseDoCruzamento(par)}</span></p>)}
-            <p className="g-muted g-pp">A noite conta pelo dia em que começa: a noite de 31/12 para 01/01 é a de 31/12. Se duas temporadas pegarem a mesma noite, vale a mais curta (o Réveillon dentro das Férias vale nas noites dele); se tiverem o mesmo tamanho, a que começa depois.</p>
+            {feriadosNasTemporadas.map((f) => <p key={f} className="g-ht-fechado"><span>{f}</span></p>)}
+            <p className="g-muted g-pp">A noite conta pelo dia em que começa: a noite de 31/12 para 01/01 é a de 31/12. Se duas temporadas pegarem a mesma noite, vale a mais curta (o Réveillon dentro das Férias vale nas noites dele); se tiverem o mesmo tamanho, a que começa depois. Com preço de feriado ligado: temporada com diária própria vale também nos feriados dela; temporada com acréscimo cede ao preço de feriado.</p>
           </Opcao>
         )}
 
@@ -203,7 +230,7 @@ export default function OpcoesHotel() {
               </select>
             </Campo>
             <Campo rotulo={feriado.modo === "pct" ? "Quanto (%)" : feriado.modo === "mais" ? "Quanto a mais por noite" : "Diária de feriado"}
-              dica="Se a noite também cai numa temporada, vale o preço de feriado. O desconto do segundo pet continua valendo.">
+              dica="Se o feriado cai numa temporada com diária própria (por exemplo, um Réveillon a R$ 180), vale a diária da temporada. Numa temporada com acréscimo (% ou R$), vale o preço de feriado, calculado sobre a diária de sempre. O desconto do segundo pet continua valendo.">
               {feriado.modo === "pct" ? <input className="g-input g-tab" inputMode="decimal" value={feriado.valor ?? ""} placeholder="%" onChange={(e) => mp(setFeriado)({ ...feriado, valor: lerNumero(e.target.value) })} />
                 : <CampoValor key={feriado.modo} valor={feriado.valor} aoMudar={(v) => mp(setFeriado)({ ...feriado, valor: v })} />}
             </Campo>

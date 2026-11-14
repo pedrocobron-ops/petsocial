@@ -26,7 +26,7 @@ import CheckOut, { comNota, DetalheDaEstadia, estadiasDoTutor, NoitePorNoite, NO
 import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/components/gestao/hotel/cuidados";
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
 import Ocupacao from "@/components/gestao/hotel/ocupacao";
-import { CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
+import { AjusteDoSinal, CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
 import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
@@ -154,6 +154,7 @@ function LinhaValor({ e, plano, abertas, valores }: { e: EstadiaCompleta; plano?
         : p.aberto ? <span className="g-muted">sem saída prevista</span>
         : <span>Total previsto <b className="g-tab">{brl(p.total)}</b> <span className="g-muted">({p.n} {p.n === 1 ? "diária" : "diárias"}{p.comRegra ? ", com temporada, feriado ou desconto" : ""}{p.taxas ? " e taxas" : ""})</span></span>}
       {sinal}
+      {e.status === "reservada" && !p.aberto && <AjusteDoSinal estadiaId={e.id} valores={valores} total={p.total} aoGravar={avisarMudanca} />}
     </p>
   );
 }
@@ -507,7 +508,7 @@ export default function CrecheHotel() {
           </div>
         )
         : tudoVazio ? (
-        <Vazio titulo={usaHotel ? "Nenhum hóspede ainda" : "Nenhum pet na creche ainda"} texto={usaHotel ? "Quando um pet vier passar o dia ou dormir aqui, faça o check-in e acompanhe por esta tela." : "Quando um pet vier passar o dia, faça o check-in e acompanhe por esta tela. Quem vem em dias fixos entra em Mensalistas."} mozart="acenando">
+        <Vazio titulo={usaHotel ? "Nenhum hóspede ainda" : "Nenhum pet na creche ainda"} texto={usaHotel ? `Quando um pet vier ${usaCreche ? "passar o dia ou " : ""}dormir aqui, faça o check-in e acompanhe por esta tela.` : "Quando um pet vier passar o dia, faça o check-in e acompanhe por esta tela. Quem vem em dias fixos entra em Mensalistas."} mozart="acenando">
           <button className="g-btn sec" onClick={abrirNova}>Fazer o primeiro check-in</button>
         </Vazio>
       ) : (
@@ -763,7 +764,7 @@ export default function CrecheHotel() {
       )}
 
       {ver === "casa" && dados && !tudoVazio && souDono && <div style={{ marginTop: 20 }}><LinkCrecheHotel titulo="Pedidos pelo link do cliente" /></div>}
-      {(ver === "casa" || ver === "ocupacao") && dados && souDono && <p style={{ marginTop: 16 }}><Link className="g-btn fantasma p" href="/gestao/app/meu-petshop#opcoes-hotel"><Settings2 />Opções do hotel e da creche</Link></p>}
+      {(ver === "casa" || ver === "ocupacao") && dados && souDono && <p style={{ marginTop: 16 }}><Link className="g-btn fantasma p" href="/gestao/app/meu-petshop#opcoes-hotel"><Settings2 />{usaCreche && usaHotel ? "Opções do hotel e da creche" : usaHotel ? "Opções do hotel" : "Opções da creche"}</Link></p>}
       {acertando && <AcertarEstadia key={acertando.id} estadia={acertando} aoFechar={() => setAcertando(null)} aoGravar={() => { setAcertando(null); mudou(); }} />}
       {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} saidaInicial={nova.saida} abertas={abertas} doTutor={doTutor}
         aoFechar={() => setNova(null)} aoGravar={(emCasa) => {
@@ -866,7 +867,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
   // na edição a entrada sempre aparece; no check-in novo a entrada é agora
   const escolheEntrada = editar ? true : !jaAqui;
   const fixa = diariaSugerida(petshop, tipo, pet?.porte);
-  const doPorte = tipo === "hotel" && opPorte.ativo && fixa != null && fixa !== diariaFixa(petshop, tipo);
+  // diária do porte ligada e o pet tem porte com preço: a dica fala do porte, mesmo quando o valor é igual ao da diária de sempre
+  const doPorte = tipo === "hotel" && opPorte.ativo && fixa != null && (pet?.porte === "P" || pet?.porte === "M" || pet?.porte === "G" || pet?.porte === "GG") && opPorte[pet.porte] != null;
   const { dados: vencidas } = useDados(async () => (pet ? vacinasVencidas(sb, petshop.id, pet.id).catch(() => []) : []), [petshop.id, pet?.id]);
 
   function escolherPet(p: PetDaEstadia) {

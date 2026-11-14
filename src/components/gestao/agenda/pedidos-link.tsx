@@ -104,12 +104,28 @@ export default function PedidosLink() {
     ]);
     // o sinal das reservas aceitas que ainda esperam o aviso: só quem recebe lê o valor (para a mensagem levar quanto é)
     const sinais = new Map<string, number>();
-    const comReserva = ((semAviso.data ?? []) as Pedido[]).filter((p) => p.estadia_id);
+    const sinaisPagos = new Map<string, number>();
+    let respondidosAinda = (semAviso.data ?? []) as Pedido[];
+    // aceito e depois cancelado em Hotel (ou na Agenda): esse pet sai do aviso; se todos foram cancelados, o aviso some.
+    // Assim a mensagem nunca confirma uma reserva que já não existe.
+    const recadosLidos = (recados?.data ?? []) as Pedido[];
+    const idsEstadia = [...respondidosAinda, ...recadosLidos].filter((p) => p.status === "aceito" && p.estadia_id).map((p) => p.estadia_id!);
+    const idsHorario = [...respondidosAinda, ...recadosLidos].filter((p) => p.status === "aceito" && p.agendamento_id).map((p) => p.agendamento_id!);
+    const [estEstadias, estHorarios] = await Promise.all([
+      idsEstadia.length ? sb.from("estadias").select("id, status").eq("petshop_id", petshop.id).in("id", idsEstadia) : null,
+      idsHorario.length ? sb.from("agendamentos").select("id, status").eq("petshop_id", petshop.id).in("id", idsHorario) : null,
+    ]);
+    const canceladas = new Set([...(estEstadias?.data ?? []).filter((e) => e.status === "cancelada"), ...(estHorarios?.data ?? []).filter((a) => a.status === "cancelado")].map((x) => x.id));
+    if (canceladas.size) respondidosAinda = respondidosAinda.filter((p) => !(p.status === "aceito" && !p.cliente_cancelou_em && ((p.estadia_id && canceladas.has(p.estadia_id)) || (p.agendamento_id && canceladas.has(p.agendamento_id)))));
+    const comReserva = respondidosAinda.filter((p) => p.estadia_id);
     if (vejoFinanceiro && sinalDe(petshop).ativo && comReserva.length) {
       const v = await sb.from("estadias_valores").select("estadia_id, sinal, sinal_estado").eq("petshop_id", petshop.id).in("estadia_id", comReserva.map((p) => p.estadia_id!));
-      for (const x of v.data ?? []) if (x.sinal != null && x.sinal_estado === "a_receber") sinais.set(x.estadia_id, Number(x.sinal));
+      for (const x of v.data ?? []) {
+        if (x.sinal != null && x.sinal_estado === "a_receber") sinais.set(x.estadia_id, Number(x.sinal));
+        if (x.sinal != null && x.sinal_estado === "pago") sinaisPagos.set(x.estadia_id, Number(x.sinal));
+      }
     }
-    return { pendentes: ok(pendentes) as Pedido[], semAviso: (semAviso.data ?? []) as Pedido[], recados: (recados?.data ?? []) as Pedido[], sinais };
+    return { pendentes: ok(pendentes) as Pedido[], semAviso: respondidosAinda, recados: recadosLidos, sinais, sinaisPagos, canceladas };
   }, [petshop.id, comOpcoes, vejoFinanceiro]);
   const dados = tudo?.pendentes;
 
@@ -129,6 +145,8 @@ export default function PedidosLink() {
   // recados do tutor (outra data ou cancelamento que depende de você), um cartão por tutor
   const gruposRecados = agrupar(tudo?.recados ?? [], (p) => `${chaveDe(p)}:${p.cliente_pediu}`).map((g) => ({ ...g, lista: [...g.lista].sort(porHora) }));
 
+  /** Todos os pets do recado já tiveram a reserva (ou o horário) cancelada aqui dentro? */
+  const jaCancelada = (lista: Pedido[]) => lista.every((x) => (x.estadia_id && tudo?.canceladas.has(x.estadia_id)) || (x.agendamento_id && tudo?.canceladas.has(x.agendamento_id)));
   /** A pessoa respondeu (ou resolveu) o recado do tutor: ele sai da lista, em todos os aparelhos. */
   async function recadoVisto(lista: Pedido[]) {
     try {
@@ -351,6 +369,20 @@ export default function PedidosLink() {
     if (!s.ativo || !s.valor || (p.tipo !== "hotel" && !s.creche)) return "";
     const politica = s.politica.trim() ? ` ${s.politica.trim()}` : "";
     const valores = lista.map((x) => (x.estadia_id ? tudo?.sinais.get(x.estadia_id) : undefined));
+    const pagos = lista.map((x) => (x.estadia_id ? tudo?.sinaisPagos.get(x.estadia_id) : undefined));
+    // o sinal de todos já entrou: a mensagem diz que foi recebido, sem pedir de novo
+    if (pagos.every((v): v is number => v != null)) {
+      const total = Math.round(pagos.reduce((t, v) => t + v, 0) * 100) / 100;
+      return ` O sinal de ${brl(total)} já foi recebido.${politica}`;
+    }
+    // parte pago, parte a receber: pede só o que falta
+    if (valores.some((v) => v != null) && valores.every((v, i) => v != null || pagos[i] != null)) {
+      const falta = lista.flatMap((x, i) => (valores[i] != null ? [{ nome: x.pet_nome, v: valores[i]! }] : []));
+      const total = Math.round(falta.reduce((t, x) => t + x.v, 0) * 100) / 100;
+      const partes = lista.length > 1 ? ` (${listaDe(falta.map((x) => `${brl(x.v)} de ${x.nome}`))})` : "";
+      const pix = pixDoSinal(petshop);
+      return ` Para garantir a reserva, pedimos um sinal de ${brl(total)}${partes}.${politica}${pix ? ` Pix: ${pix}.` : " Me diga como prefere pagar."}`;
+    }
     if (valores.every((v): v is number => v != null)) {
       const total = Math.round(valores.reduce((t, v) => t + v, 0) * 100) / 100;
       const partes = lista.length > 1 ? ` (${listaDe(lista.map((x, i) => `${brl(valores[i])} de ${x.pet_nome}`))})` : "";
@@ -422,10 +454,11 @@ export default function PedidosLink() {
                   <b>{listaDe(g.lista.map((x) => x.pet_nome))} <span className={`g-tag ${mudar ? "azul" : "amarelo"}`}>{mudar ? "pediu outra data" : "pediu para cancelar"}</span></b>
                   <span>
                     {primeiroNome(p.tutor_nome)} {mudar ? "pediu pelo link para mudar" : "pediu pelo link para cancelar"} {oQueFoi(g.lista)}{p.status === "pendente" ? " (ainda esperando a sua resposta)" : ""}.
-                    {p.cliente_recado ? ` Recado: “${p.cliente_recado}”.` : ""}
-                    {mudar
+                    {p.cliente_recado ? ` Recado: “${p.cliente_recado.trim()}”${/[.!?…]$/.test(p.cliente_recado.trim()) ? "" : "."}` : ""}
+                    {jaCancelada(g.lista) ? ` A reserva já foi cancelada em ${casa}. Falta só responder ao tutor.`
+                      : mudar
                       ? ` Nada foi desmarcado. Para mudar, ${p.status === "pendente" ? "recuse este pedido e combine a nova data" : ehEstadia(p) ? `abra a reserva em ${casa}` : "abra o horário na Agenda"}.`
-                      : ` Há ${ehEstadia(p) ? "sinal nesta reserva" : "pagamento neste horário"}, então nada foi cancelado: ${ehEstadia(p) ? `cancele a reserva em ${casa}` : "desmarque o horário na Agenda"} e decida o que fazer com o valor.`}
+                      : ` ${ehEstadia(p) ? "Esta reserva tem sinal combinado (pago ou a receber)" : "Há pagamento neste horário"}, então nada foi cancelado: ${ehEstadia(p) ? `cancele a reserva em ${casa}` : "desmarque o horário na Agenda"} e decida o que fazer com o valor.`}
                   </span>
                 </div>
               </div>
@@ -451,7 +484,7 @@ export default function PedidosLink() {
                   <span>
                     {primeiroNome(p.tutor_nome)} cancelou pelo link {oQueFoi(lista)}{p.cliente_cancelou_em ? `, em ${diaHora(p.cliente_cancelou_em)}` : ""}.
                     {tinhaAceito ? (ehEstadia(p) ? ` A reserva saiu de ${casa} e a vaga voltou.` : " O horário foi desmarcado na Agenda e voltou a ficar livre.") : " O pedido ainda esperava a sua resposta."}
-                    {p.cliente_recado ? ` Motivo: “${p.cliente_recado}”.` : ""}
+                    {p.cliente_recado ? ` Motivo: “${p.cliente_recado.trim()}”${/[.!?…]$/.test(p.cliente_recado.trim()) ? "" : "."}` : ""}
                   </span>
                 </div>
               </div>

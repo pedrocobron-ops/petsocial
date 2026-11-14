@@ -321,3 +321,38 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
     </Folha>
   );
 }
+
+/**
+ * O total da reserva mudou depois que o sinal foi anotado (outro pet do mesmo tutor entrou nas mesmas noites e esta ficou
+ * com o desconto do segundo pet, ou mudaram as datas): o sinal em A receber, sem nada pago ainda, ficou fora da regra.
+ * Mostra a diferença e deixa acertar com um toque, ou deixar como está (fica lembrado neste aparelho). Nada muda sozinho.
+ */
+export function AjusteDoSinal({ estadiaId, valores, total, aoGravar }: { estadiaId: string; valores: ValoresDaEstadia | null | undefined; total: number | null; aoGravar: () => void }) {
+  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { avisar, avisarErro } = useAvisos();
+  const [salvando, setSalvando] = useState(false);
+  const regra = sinalDe(petshop);
+  const chave = `maestro-sinal-assim:${estadiaId}:${valores?.sinal ?? ""}`;
+  const [deixou, setDeixou] = useState(() => { try { return typeof window !== "undefined" && localStorage.getItem(chave) === "1"; } catch { return false; } });
+  if (!vejoFinanceiro || !valores || deixou || !regra.ativo || regra.modo !== "pct" || !regra.valor || !total) return null;
+  if (valores.sinal_estado !== "a_receber" || !valores.sinal_lancamento_id || valores.sinal == null || Number(valores.sinal_recebido ?? 0) > 0) return null;
+  const pela = Math.round(Number((total * regra.valor).toPrecision(12))) / 100;
+  if (Math.abs(pela - Number(valores.sinal)) < 0.005 || pela <= 0) return null;
+  async function acertar() {
+    if (salvando) return;
+    setSalvando(true);
+    try {
+      // só a conta ainda a receber e sem parte paga; o banco leva o valor novo para o sinal da reserva
+      ok(await sb.from("lancamentos").update({ valor: pela }).eq("id", valores!.sinal_lancamento_id!).eq("petshop_id", petshop.id).eq("pago", false).is("valor_original", null).select("id"));
+      avisar(`Sinal acertado: ${brl(pela)} (${regra.valor}% de ${brl(total!)}).`);
+      aoGravar();
+    } catch (x) { avisarErro(x); } finally { setSalvando(false); }
+  }
+  return (
+    <span className="g-ht-sinal-ajuste" role="status">
+      O total mudou para {brl(total)}: pela sua regra ({regra.valor}%) o sinal fica {brl(pela)}, e está anotado {brl(valores.sinal)}.{" "}
+      <button type="button" className="g-btn sec p" onClick={() => void acertar()} disabled={salvando}>{salvando ? "Acertando…" : `Acertar para ${brl(pela)}`}</button>{" "}
+      <button type="button" className="g-btn fantasma p" onClick={() => { try { localStorage.setItem(chave, "1"); } catch { /* sem armazenamento */ } setDeixou(true); }}>Deixar assim</button>
+    </span>
+  );
+}
