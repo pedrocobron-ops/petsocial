@@ -209,3 +209,5 @@ revoke execute on function public.lancamento_pago_em() from public, anon, authen
 drop trigger if exists lancamento_pago_em on public.lancamentos;
 create trigger lancamento_pago_em before insert or update on public.lancamentos
   for each row execute function public.lancamento_pago_em();
+
+notify pgrst, 'reload schema';
