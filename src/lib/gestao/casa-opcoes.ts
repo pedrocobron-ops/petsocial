@@ -102,7 +102,10 @@ export function diasDaEspera(e: Pick<Espera, "tipo" | "entrada" | "saida">, hoje
   return dias;
 }
 /** "20/11" ou "20/11 a 23/11" */
-export const periodoDaEspera = (e: Pick<Espera, "entrada" | "saida">) => (e.saida === e.entrada ? dataCurta(deIsoDia(e.entrada)) : `${dataCurta(deIsoDia(e.entrada))} a ${dataCurta(deIsoDia(e.saida))}`);
+export const periodoDaEspera = (e: Pick<Espera, "entrada" | "saida"> & Partial<Pick<Espera, "hora_entrada" | "hora_saida">>) => {
+  const h = (x: string | null | undefined) => (x ? ` ${x.replace(":", "h").replace(/h00$/, "h")}` : "");
+  return e.saida === e.entrada ? `${dataCurta(deIsoDia(e.entrada))}${h(e.hora_entrada)}` : `${dataCurta(deIsoDia(e.entrada))}${h(e.hora_entrada)} a ${dataCurta(deIsoDia(e.saida))}${h(e.hora_saida)}`;
+};
 /** A lista ainda vale? (o último dia não passou) */
 export const esperaVale = (e: Pick<Espera, "status" | "saida" | "entrada" | "tipo">, hoje: string) => (e.status === "esperando" || e.status === "chamado") && diasDaEspera(e, hoje).length > 0;
 

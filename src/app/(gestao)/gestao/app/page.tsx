@@ -1,10 +1,11 @@
 "use client";
 
-import { CalendarCheck2, UserX } from "lucide-react";
+import { BellRing, CalendarCheck2, UserX } from "lucide-react";
 import { CATEGORIA_MENSALIDADE, resumoDaCrecheHoje } from "@/lib/gestao/creche";
 import { contarAtrasosPendentes } from "@/components/gestao/creche/atraso";
 import ChamadaDeHoje from "@/components/gestao/creche/chamada-hoje";
 import { OcorrenciasDeHoje } from "@/components/gestao/casa/ocorrencias";
+import { useVagaNaEsperaDoHotel } from "@/components/gestao/casa/espera";
 
 import { Marca, Selo } from "@/components/gestao/marca";
 import { Anel, Barras, Kpi, Ranking, Tendencia, Tile, type Tom } from "@/components/gestao/painel";
@@ -158,6 +159,8 @@ export default function Hoje() {
     return (await idsParaCobrar(sb, petshop.id)).length;
   }, [petshop.id, hojeIso, vejoFinanceiro]);
   const paraCobrar = semCobrar ?? 0;
+  // lista de espera do hotel: abriu vaga para alguém (mesma conta da Ocupação)
+  const vagaNaEspera = useVagaNaEsperaDoHotel(posso("creche_hotel"));
   // mensalistas que saíram depois do horário e esperam a decisão da taxa (só quem recebe lê)
   const { dados: taxasPendentes } = useDados(async () => (vejoFinanceiro && posso("creche_hotel") ? contarAtrasosPendentes(sb, petshop.id) : 0), [petshop.id, hojeIso, vejoFinanceiro]);
   const { dados: paraChamar } = useDados(async () => (vejoClientes ? buscarParaChamar(sb, petshop.id) : null), [petshop.id, hojeIso, vejoClientes]);
@@ -222,6 +225,7 @@ export default function Hoje() {
   const cartaoDaChamada = Boolean(cr && cr.esperados > 0);
   const atencao = dados ? [
     paraCobrar > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${paraCobrar === 1 ? "1 check-out saiu" : `${paraCobrar} check-outs saíram`} sem cobrança ${rotuloCasa === "Hotel" ? "no hotel" : rotuloCasa === "Creche" ? "na creche" : "na creche e hotel"}. Toque para receber.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
+    vagaNaEspera.n > 0 && { icone: BellRing, tom: "manteiga" as Tom, texto: `${vagaNaEspera.n === 1 ? `Abriu vaga no hotel para 1 pet da lista de espera: ${vagaNaEspera.nomes[0]}` : `Abriu vaga no hotel para ${vagaNaEspera.n} pets da lista de espera: ${vagaNaEspera.nomes.slice(0, 3).join(", ")}${vagaNaEspera.n > 3 ? "…" : ""}`}. Toque para avisar o tutor.`, href: "/gestao/app/creche-hotel?ver=espera" },
     (taxasPendentes ?? 0) > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${taxasPendentes === 1 ? "1 mensalista saiu" : `${taxasPendentes} mensalistas saíram`} da creche depois do horário. Toque para decidir a taxa.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
     cr && cr.reposicoes > 0 && { icone: CalendarCheck2, tom: "manteiga" as Tom, texto: `A equipe marcou ${cr.reposicoes === 1 ? "1 dia de mensalista como reposição" : `${cr.reposicoes} dias de mensalistas como reposição`} (sem cobrança). Toque para conferir: você aceita ou cobra como dia extra.`, href: "/gestao/app/creche-hotel?ver=chamada" },
     cr && cr.semValor.length > 0 && { icone: HandCoins, tom: "manteiga" as Tom, texto: `${cr.semValor.length === 1 ? "1 mensalista está" : `${cr.semValor.length} mensalistas estão`} sem valor de mensalidade (${cr.semValor.slice(0, 3).join(", ")}${cr.semValor.length > 3 ? "…" : ""}). Sem o valor, a cobrança do mês não é gerada. Toque para preencher.`, href: "/gestao/app/creche-hotel?ver=mensalistas" },

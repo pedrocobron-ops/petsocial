@@ -18,7 +18,11 @@ import "./casa.css";
  * A conta de vagas é a mesma do aviso de casa cheia (`ocupadasNoDia`). Estar na lista não reserva nem ocupa vaga.
  */
 export type EsperaComPet = Espera & { pets: PetDaEstadia | null };
-export type LinhaDaEspera = { e: EsperaComPet; temVaga: boolean; cheioEm: string | null };
+/**
+ * `posicao`: lugar na fila (1 = chegou primeiro na lista), contado dentro do tipo. `vez`: abriu vaga, mas a vaga já é de quem
+ * chegou antes (o nome dele), então esta linha espera a vez.
+ */
+export type LinhaDaEspera = { e: EsperaComPet; temVaga: boolean; cheioEm: string | null; posicao: number; vez: string | null };
 export type ListaEspera = { ligada: boolean; linhas: LinhaDaEspera[]; comVaga: LinhaDaEspera[]; recarregar: () => Promise<void> };
 
 /** A lista de espera que ainda vale (de hoje em diante), na ordem de chegada, com a conta de quem já tem vaga. */
@@ -28,17 +32,33 @@ export function useListaDeEspera(abertas: EstadiaCompleta[], mens: Mens | null):
   const hoje = isoDia(new Date());
   const { dados, recarregar } = useDados(async () => {
     if (!ligada) return [];
+    // a ordem é a de chegada na lista: quem entrou primeiro é avisado primeiro
     const r = await sb.from("lista_espera").select("*, pets(id, nome, foto, especie, sexo, alertas, porte, clientes(id, nome, telefone))").eq("petshop_id", petshop.id)
-      .in("status", ["esperando", "chamado"]).gte("saida", hoje).order("entrada").order("criado_em").order("id").limit(500);
+      .in("status", ["esperando", "chamado"]).gte("saida", hoje).order("criado_em").order("id").limit(500);
     return ok(r) as unknown as EsperaComPet[];
   }, [petshop.id, ligada, hoje]);
   const agora = new Date();
+  // As vagas livres de cada dia vão para a fila na ordem de chegada: cada pedido que cabe em todos os dias dele fica com
+  // uma vaga em cada dia, e o próximo só vê o que sobrou. Uma vaga aberta é oferecida a um pet, não a todos.
+  const usadas = new Map<string, number>();
+  const dono = new Map<string, string>();
+  const posicoes = new Map<string, number>();
   const linhas = (dados ?? []).filter((e) => esperaVale(e, hoje)).map((e): LinhaDaEspera => {
+    const posicao = (posicoes.get(e.tipo) ?? 0) + 1;
+    posicoes.set(e.tipo, posicao);
     const vagas = vagasDoTipo(petshop, e.tipo);
-    const cheioEm = vagas == null ? null : diasDaEspera(e, hoje).find((d) => ocupadasNoDia(e.tipo, abertas, null, d, agora, mens, petshop.horario) >= vagas) ?? null;
-    return { e, temVaga: cheioEm == null, cheioEm };
+    if (vagas == null) return { e, temVaga: true, cheioEm: null, posicao, vez: null };
+    const dias = diasDaEspera(e, hoje);
+    const livres = (d: string) => vagas - ocupadasNoDia(e.tipo, abertas, null, d, agora, mens, petshop.horario) - (usadas.get(`${e.tipo}:${d}`) ?? 0);
+    const cheioEm = dias.find((d) => livres(d) <= 0) ?? null;
+    if (cheioEm == null) {
+      for (const d of dias) { usadas.set(`${e.tipo}:${d}`, (usadas.get(`${e.tipo}:${d}`) ?? 0) + 1); if (!dono.has(`${e.tipo}:${d}`)) dono.set(`${e.tipo}:${d}`, nomeDoPet(e)); }
+      return { e, temVaga: true, cheioEm: null, posicao, vez: null };
+    }
+    // o dia está cheio só porque a vaga que abriu já foi oferecida a quem chegou antes
+    const vez = (usadas.get(`${e.tipo}:${cheioEm}`) ?? 0) > 0 && livres(cheioEm) + (usadas.get(`${e.tipo}:${cheioEm}`) ?? 0) > 0 ? dono.get(`${e.tipo}:${cheioEm}`) ?? null : null;
+    return { e, temVaga: false, cheioEm, posicao, vez };
   });
-  // quem está há mais tempo na fila do mesmo dia vem primeiro (a ordem da consulta já é a de chegada)
   return { ligada, linhas, comVaga: linhas.filter((l) => l.temVaga), recarregar: async () => { await recarregar(); } };
 }
 
@@ -53,7 +73,7 @@ export function AvisoDeVaga({ espera, aoVer }: { espera: ListaEspera; aoVer: () 
   return (
     <button type="button" className="g-cs-vaga" onClick={aoVer}>
       <BellRing aria-hidden />
-      <span><b>{n === 1 ? "Abriu vaga para 1 pet da lista de espera" : `Abriu vaga para ${n} pets da lista de espera`}:</b> {espera.comVaga.slice(0, 3).map((l) => `${nomeDoPet(l.e)} (${periodoDaEspera(l.e)})`).join(", ")}{n > 3 ? ` e mais ${n - 3}` : ""}. Toque para avisar.</span>
+      <span><b>{n === 1 ? "Abriu vaga para 1 pet da lista de espera" : `Abriu vaga para ${n} pets da lista de espera`}:</b> {espera.comVaga.slice(0, 3).map((l) => `${nomeDoPet(l.e)} (${periodoDaEspera(l.e)})`).join(", ")}{n > 3 ? ` e mais ${n - 3}` : ""}. Toque para avisar{n > 1 ? ", na ordem da lista" : ""}.</span>
     </button>
   );
 }
@@ -77,17 +97,19 @@ export function ListaDeEspera({ espera, aoReservar, aoNova }: { espera: ListaEsp
     if (!(await confirmar({ titulo: `Tirar ${nomeDoPet(e)} da lista de espera?`, texto: `${e.tipo === "hotel" ? "Hotel" : "Creche"}, ${periodoDaEspera(e)}.`, confirmar: "Tirar da lista", perigo: true }))) return;
     await mudar(e, { status: "desistiu" }, `${nomeDoPet(e)} saiu da lista de espera.`);
   }
-  const linha = ({ e, temVaga, cheioEm }: LinhaDaEspera) => {
+  const linha = ({ e, temVaga, cheioEm, posicao, vez }: LinhaDaEspera) => {
     const zap = temVaga ? linkWhatsApp(foneDe(e), mensagemDeVaga({ tutor: tutorDe(e), petshop: petshop.nome, pet: nomeDoPet(e), tipo: e.tipo, entrada: e.entrada, saida: e.saida })) : null;
     return (
       <div key={e.id} className={`g-cs-espera${temVaga ? " vaga" : ""}`}>
         <AvatarPet pet={e.pets ?? { nome: e.pet_nome, especie: e.especie }} />
         <div className="t">
-          <b>{nomeDoPet(e)}</b>
+          <b><span className="g-tag" title="Lugar na fila, pela ordem de chegada na lista">{posicao}º da fila</span> {nomeDoPet(e)}</b>
           <span>{[tutorDe(e) ?? "Sem tutor", foneDe(e) ? fmtTelefone(foneDe(e)) : null].filter(Boolean).join(" · ")}</span>
-          <span>{e.tipo === "hotel" ? "Hotel" : "Creche"} · {periodoDaEspera(e)}{e.origem === "link" ? ` · pediu pelo link${e.termos_aceitos_em ? " e aceitou as regras" : ""}` : ""}{e.obs ? ` · ${e.obs}` : ""}</span>
+          <span>{e.tipo === "hotel" ? "Hotel" : "Creche"} · {periodoDaEspera(e)}{` · na lista desde ${dataCurta(new Date(e.criado_em))}`}{e.origem === "link" ? ` · pediu pelo link${e.termos_aceitos_em ? " e aceitou as regras" : ""}` : ""}{e.obs ? ` · ${e.obs}` : ""}</span>
           <div className="selos">
-            {temVaga ? <span className="g-tag verde"><Check size={12} aria-hidden />abriu vaga</span> : <span className="g-tag"><Hourglass size={12} aria-hidden />cheio em {dataCurta(deIsoDia(cheioEm!))}</span>}
+            {temVaga ? <span className="g-tag verde"><Check size={12} aria-hidden />abriu vaga</span>
+              : vez ? <span className="g-tag"><Hourglass size={12} aria-hidden />a vaga de {dataCurta(deIsoDia(cheioEm!))} é de {vez}, que chegou antes</span>
+              : <span className="g-tag"><Hourglass size={12} aria-hidden />cheio em {dataCurta(deIsoDia(cheioEm!))}</span>}
             {e.status === "chamado" && e.chamado_em && <span className="g-tag azul">avisado {dataCurta(new Date(e.chamado_em))}</span>}
           </div>
         </div>
@@ -101,7 +123,6 @@ export function ListaDeEspera({ espera, aoReservar, aoNova }: { espera: ListaEsp
       </div>
     );
   };
-  const esperando = espera.linhas.filter((l) => !l.temVaga);
   return (
     <section className="g-card g-pilha p" id="lista-de-espera">
       <div className="g-card-t" style={{ marginBottom: 0 }}>
@@ -110,8 +131,8 @@ export function ListaDeEspera({ espera, aoReservar, aoNova }: { espera: ListaEsp
       </div>
       {!espera.linhas.length ? <p className="g-muted g-p">Ninguém esperando vaga. Quando um dia estiver cheio, coloque o pet aqui: se abrir lugar, ele aparece em destaque com a mensagem pronta.</p> : (
         <>
-          {espera.comVaga.length > 0 && <p className="g-p"><b>{espera.comVaga.length === 1 ? "Abriu vaga para 1 pet." : `Abriu vaga para ${espera.comVaga.length} pets.`}</b> Avise o tutor e, se ele quiser, marque a reserva. A ordem é a de chegada na lista.</p>}
-          <div className="g-cs-esperas">{espera.comVaga.map(linha)}{esperando.map(linha)}</div>
+          {espera.comVaga.length > 0 && <p className="g-p"><b>{espera.comVaga.length === 1 ? "Abriu vaga para 1 pet." : `Abriu vaga para ${espera.comVaga.length} pets.`}</b> Cada vaga que abriu vai para quem chegou primeiro na lista. Avise o tutor e, se ele quiser, marque a reserva. Se ele não quiser, tire da lista: a vaga passa para o próximo.</p>}
+          <div className="g-cs-esperas">{espera.linhas.map(linha)}</div>
           <p className="g-muted g-pp">Estar na lista não reserva nem ocupa vaga. Pedidos de dias que já passaram saem sozinhos.</p>
         </>
       )}
@@ -121,7 +142,7 @@ export function ListaDeEspera({ espera, aoReservar, aoNova }: { espera: ListaEsp
 
 /** Folha para colocar um pet na lista de espera. Vem preenchida quando a pessoa tentou reservar um dia cheio. */
 export function FolhaEspera({ inicial, aoFechar, aoGravar }: {
-  inicial?: { pet?: PetDaEstadia | null; tipo?: Tipo; entrada?: string; saida?: string }; aoFechar: () => void; aoGravar: () => void;
+  inicial?: { pet?: PetDaEstadia | null; tipo?: Tipo; entrada?: string; saida?: string; horaEntrada?: string; horaSaida?: string }; aoFechar: () => void; aoGravar: () => void;
 }) {
   const { sb, petshop } = useGestao();
   const { avisar, avisarErro } = useAvisos();
@@ -132,6 +153,8 @@ export function FolhaEspera({ inicial, aoFechar, aoGravar }: {
   const [entrada, setEntrada] = useState(inicial?.entrada ?? hoje);
   const [saida, setSaida] = useState(inicial?.saida ?? "");
   const [obs, setObs] = useState("");
+  const [horaEntrada, setHoraEntrada] = useState(inicial?.horaEntrada ?? "");
+  const [horaSaida, setHoraSaida] = useState(inicial?.horaSaida ?? "");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const hotel = tipo === "hotel";
@@ -147,6 +170,7 @@ export function FolhaEspera({ inicial, aoFechar, aoGravar }: {
       ok(await sb.from("lista_espera").insert({
         petshop_id: petshop.id, tipo, entrada, saida: fim, pet_id: pet.id, pet_nome: pet.nome, tutor_nome: pet.clientes?.nome ?? null,
         telefone: soDigitos(pet.clientes?.telefone) || null, especie: ["cao", "gato", "outro"].includes(pet.especie ?? "") ? pet.especie : null, obs: obs.trim() || null,
+        ...(hotel && /^\d{2}:\d{2}$/.test(horaEntrada) ? { hora_entrada: horaEntrada } : {}), ...(hotel && /^\d{2}:\d{2}$/.test(horaSaida) ? { hora_saida: horaSaida } : {}),
       }).select("id"));
       avisar(`${pet.nome} está na lista de espera ${hotel ? "do hotel" : "da creche"}.`);
       aoGravar();
@@ -172,10 +196,32 @@ export function FolhaEspera({ inicial, aoFechar, aoGravar }: {
           <Campo rotulo={hotel ? "Entrada" : "Dia"}><input type="date" className="g-input" value={entrada} min={hoje} onChange={(e) => { setEntrada(e.target.value); setErro(null); }} /></Campo>
           <Campo rotulo={hotel ? "Saída" : "Até o dia"} dica={hotel ? undefined : "Em branco, é um dia só."}><input type="date" className="g-input" value={saida} min={entrada} onChange={(e) => { setSaida(e.target.value); setErro(null); }} /></Campo>
         </div>
+        {hotel && (
+          <div className="dupla">
+            <Campo rotulo="Hora de chegada" dica="Opcional."><input type="time" className="g-input" value={horaEntrada} onChange={(e) => setHoraEntrada(e.target.value)} /></Campo>
+            <Campo rotulo="Hora de buscar" dica="Opcional."><input type="time" className="g-input" value={horaSaida} onChange={(e) => setHoraSaida(e.target.value)} /></Campo>
+          </div>
+        )}
         <Campo rotulo="Observação" dica="Opcional."><input className="g-input" value={obs} maxLength={300} onChange={(e) => setObs(e.target.value)} /></Campo>
         <p className="g-muted g-pp">A lista não reserva a vaga. Se abrir lugar nesses dias, {pet.nome} aparece em destaque na Ocupação, com a mensagem pronta para o tutor.</p>
         {erro && <p className="g-erro" role="alert">{erro}</p>}
       </div>
     </Folha>
   );
+}
+
+/**
+ * Para a tela Hoje: quantos pets da lista de espera do hotel já têm vaga (mesma conta da Ocupação, na ordem de chegada).
+ * Só o hotel: na creche a conta depende dos mensalistas, que a Ocupação carrega.
+ */
+export function useVagaNaEsperaDoHotel(ligado: boolean): { n: number; nomes: string[] } {
+  const { sb, petshop } = useGestao();
+  const { dados } = useDados(async () => {
+    if (!ligado || !esperaDe(petshop).ativo || !usaModulo(petshop, "hotel")) return [];
+    const r = await sb.from("estadias").select("id, pet_id, tipo, status, entrada, saida_prevista").eq("petshop_id", petshop.id).eq("tipo", "hotel").in("status", ["reservada", "em_casa"]).limit(1000);
+    return (r.data ?? []) as unknown as EstadiaCompleta[];
+  }, [petshop.id, ligado]);
+  const espera = useListaDeEspera(dados ?? [], null);
+  const comVaga = dados ? espera.comVaga.filter((l) => l.e.tipo === "hotel") : [];
+  return { n: comVaga.length, nomes: comVaga.map((l) => nomeDoPet(l.e)) };
 }
