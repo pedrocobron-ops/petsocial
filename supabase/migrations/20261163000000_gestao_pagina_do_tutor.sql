@@ -244,7 +244,7 @@ begin
   from public.pets p where p.cliente_id = l.cliente_id and p.petshop_id = s.id and p.ativo;
 
   return jsonb_build_object(
-    'petshop', jsonb_build_object('nome', s.nome, 'logo', s.logo, 'tema', s.tema, 'telefone', coalesce(s.whatsapp, s.telefone), 'cidade', s.cidade, 'uf', s.uf, 'fuso', coalesce(s.fuso, 'America/Sao_Paulo')),
+    'petshop', jsonb_build_object('nome', s.nome, 'logo', s.logo, 'tema', s.tema, 'telefone', s.telefone, 'cidade', s.cidade, 'uf', s.uf, 'fuso', coalesce(s.fuso, 'America/Sao_Paulo')),
     'tutor', (select split_part(trim(c.nome), ' ', 1) from public.clientes c where c.id = l.cliente_id),
     'hoje', v_hoje,
     'pets', v_pets
