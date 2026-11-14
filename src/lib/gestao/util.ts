@@ -31,6 +31,12 @@ export const dataLonga = (d: Date | string) => { const x = new Date(d); return `
 export const dataCurta = (d: Date | string) => { const x = typeof d === "string" && d.length === 10 ? deIsoDia(d) : new Date(d); return `${dois(x.getDate())}/${dois(x.getMonth() + 1)}`; };
 /** "14/11/2026" */
 export const dataCompleta = (d: Date | string) => { const x = typeof d === "string" && d.length === 10 ? deIsoDia(d) : new Date(d); return `${dataCurta(x)}/${x.getFullYear()}`; };
+/** "14/11", ou "14/11/2027" quando a data não é deste ano ou está a mais de 300 dias (para não ler "até 14/11" como hoje). */
+export const dataCurtaOuAno = (d: Date | string) => {
+  const x = typeof d === "string" && d.length === 10 ? deIsoDia(d) : new Date(d);
+  const longe = Math.abs(x.getTime() - Date.now()) > 300 * 864e5;
+  return x.getFullYear() !== new Date().getFullYear() || longe ? dataCompleta(x) : dataCurta(x);
+};
 /** "hoje", "amanhã", "ontem" ou "sexta, 14/11" */
 export function dataAmigavel(d: Date | string) {
   const x = typeof d === "string" && d.length === 10 ? deIsoDia(d) : new Date(d);
