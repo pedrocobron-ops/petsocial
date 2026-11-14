@@ -437,7 +437,7 @@ export type SaldoDeReposicao = {
 };
 
 export async function lerSaldoDeReposicao(sb: Banco, planoId: string, dia?: string): Promise<SaldoDeReposicao | null> {
-  const r = await sb.rpc("creche_reposicao_saldo" as never, { p_plano: planoId, ...(dia ? { p_dia: dia } : {}) } as never);
+  const r = await sb.rpc("creche_reposicao_saldo", { p_plano: planoId, ...(dia ? { p_dia: dia } : {}) });
   // banco ainda sem a função: a tela segue sem o saldo
   if (r.error) return null;
   return r.data as unknown as SaldoDeReposicao;
