@@ -139,8 +139,8 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
   }, [codigo, hotel]);
   // o sinal em % é anunciado sobre a estimativa das datas (não sobre a diária comum)
   const sinalDaFaixa = sinal && sinal.modo !== "valor" && faixaBoa?.sinalMin != null && faixaBoa.sinalMax != null
-    ? (faixaBoa.sinalMin === faixaBoa.sinalMax ? `, cerca de ${brl(faixaBoa.sinalMin)}` : `, de ${brl(faixaBoa.sinalMin)} a ${brl(faixaBoa.sinalMax)} conforme o porte`) : "";
-  const fraseDoSinal = sinal ? `${loja} pede um sinal de ${sinal.modo === "valor" ? `${brl(sinal.valor)} por pet` : `${sinal.valor}% do valor da reserva${sinalDaFaixa}`} para garantir a vaga.` : null;
+    ? (faixaBoa.sinalMin === faixaBoa.sinalMax ? ` (cerca de ${brl(faixaBoa.sinalMin)})` : ` (de ${brl(faixaBoa.sinalMin)} a ${brl(faixaBoa.sinalMax)}, conforme o porte)`) : "";
+  const fraseDoSinal = sinal ? `${loja} pede um sinal de ${sinal.modo === "valor" ? `${brl(sinal.valor)} por pet` : `${sinal.valor}% do valor da reserva`} para garantir a vaga${sinal.modo === "valor" ? "" : sinalDaFaixa}.` : null;
   const fraseDoSinalEnviado = sinal && estimativa?.sinal != null
     ? `${loja} pede um sinal de ${brl(estimativa.sinal)}${sinal.modo === "valor" ? (pets.length > 1 ? ` (${brl(sinal.valor)} por pet)` : "") : ` (${sinal.valor}% de ${brl(estimativa.total)})`} para garantir a vaga.` : fraseDoSinal;
   // telefone fixo no campo do WhatsApp: só um lembrete, não impede o pedido
@@ -306,7 +306,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
             <p className="g-p">
               <b>{dias} {hotel ? (dias === 1 ? "noite" : "noites") : (dias === 1 ? "dia" : "dias")}</b>
               {comEstimativa
-                ? faixaBoa && <> · {faixaBoa.min === faixaBoa.max ? `cerca de ${brl(faixaBoa.min)} no total` : `de ${brl(faixaBoa.min)} a ${brl(faixaBoa.max)} no total, conforme o porte do pet`}{faixaBoa.varia ? ". Essas datas têm preço de temporada ou feriado" : ""}</>
+                ? faixaBoa && <> · {faixaBoa.min === faixaBoa.max ? `cerca de ${brl(faixaBoa.min)} no total` : `de ${brl(faixaBoa.min)} a ${brl(faixaBoa.max)} no total, conforme o porte do pet`}{faixaBoa.varia ? ". Essas datas têm preço de temporada ou feriado." : "."}</>
                 : !semPreco && diaria != null && <> · diária de {brlCurto(diaria)}{total != null && dias > 1 ? `, cerca de ${brlCurto(total)} no total` : ""}</>}
             </p>
           )}

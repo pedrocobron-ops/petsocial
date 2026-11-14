@@ -297,7 +297,7 @@ export default function PedidosLink() {
       const total = Math.round(valores.reduce((t, v) => t + v, 0) * 100) / 100;
       const partes = lista.length > 1 ? ` (${listaDe(lista.map((x, i) => `${brl(valores[i])} de ${x.pet_nome}`))})` : "";
       const pix = pixDoSinal(petshop);
-      return ` Para garantir a reserva, pedimos um sinal de ${brl(total)}${partes}.${politica}${pix ? ` Pix: ${pix}` : " Me diga como prefere pagar."}`;
+      return ` Para garantir a reserva, pedimos um sinal de ${brl(total)}${partes}.${politica}${pix ? ` Pix: ${pix}.` : " Me diga como prefere pagar."}`;
     }
     return ` Para garantir a reserva, pedimos um sinal de ${s.modo === "valor" ? `${brl(s.valor)}${lista.length > 1 ? " por pet" : ""}` : `${s.valor}% do valor da reserva`}.${politica}${vejoFinanceiro ? "" : " O valor certo e a forma de pagar eu te passo em seguida."}`;
   }
