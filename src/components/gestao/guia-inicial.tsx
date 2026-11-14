@@ -386,7 +386,7 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
 
           {!pergunta && !fim && n === 1 && (
             <p className="g-guia-intro">{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? <>{oQueDeixeiPronto(petshop)}{" "}</> : null}
-              <b>{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? "Agora" : `${primeiro},`} {total === 1 ? "é um passo só" : `são ${total} passos curtos`} para deixar {artigoDe(petshop.nome).o} {petshop.nome} pronto.</b>{" "}
+              <b>{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? "Agora" : `${primeiro},`} {total === 1 ? "é um passo só" : `são ${total} passos curtos`} para deixar {artigoDe(petshop.nome).o} {petshop.nome} {artigoDe(petshop.nome).o === "a" ? "pronta" : "pronto"}.</b>{" "}
               O que não souber agora, toque em Faço depois: dá para mudar tudo em Meu pet shop.
             </p>
           )}
