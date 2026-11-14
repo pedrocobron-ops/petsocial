@@ -61,7 +61,7 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
         {tipos.map((t) => {
           const n = conta(t, dia), v = vagasDoTipo(petshop, t);
           // dia da semana em que o negócio não abre: a creche mostra "fechado" no lugar de 0 vagas tomadas
-          if (t === "creche" && n === 0 && !abreNoDia(petshop.horario, dia)) return <span key={t} className="g-ht-oc vazio"><Sun aria-hidden />fechado</span>;
+          if (t === "creche" && n === 0 && (!abreNoDia(petshop.horario, dia) || diaFechado(dia))) return <span key={t} className="g-ht-oc vazio"><Sun aria-hidden />fechado</span>;
           return <span key={t} className={`g-ht-oc ${nivelDeOcupacao(n, v)}`}>{t === "hotel" ? <Moon aria-hidden /> : <Sun aria-hidden />}{n}{v != null ? `/${v}` : ""}</span>;
         })}
       </button>
@@ -100,7 +100,7 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
           </>
         )}
         <div className="g-ht-legenda">
-          <span><Moon size={14} aria-hidden />hotel (noites)</span>
+          {tipos.includes("hotel") && <span><Moon size={14} aria-hidden />hotel (noites)</span>}
           {tipos.includes("creche") && <span><Sun size={14} aria-hidden />creche (dias)</span>}
           <span><i className="livre" />tem vaga</span><span><i className="meio" />metade</span><span><i className="quase" />quase cheio</span><span><i className="cheio" />cheio</span>
         </div>
