@@ -44,6 +44,11 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   `parteDaChave(chave, "nome")` para cada uma. Devolva `false` quando gravou só uma parte e deu erro (a nova tentativa reaproveita a chave).
 - Atendimento concluído sem conta fechada: `useParaCobrar()` e `<AtendimentosParaCobrar />` (`agenda/para-cobrar.tsx`); o banco diz
   quais são, sem valor. Preço mudado e desconto na venda ficam em `precos_alterados` (o banco anota sozinho; só quem cuida do financeiro lê).
+  Também anotados pelo banco (migração 20261160): horário marcado abaixo da lista (`preco_agenda`), serviço já feito tirado da conta
+  (`servico_tirado`), "não cobrar" (`sem_cobranca`, com `agendamentos.sem_cobranca_nome/_em`) e pacote fora do modelo (`pacote`). Com a trava
+  (`dinheiro.preco_travado`), quem não cuida do financeiro é recusado nesses casos e ao baixar o valor de uma venda já recebida.
+- "Recebeu quanto?" fica em `EstadoPagamento.entregue`: `fecharPagamento` recusa dinheiro a menos; a conta do atendimento usa `dinheiroAMenos`
+  (recebe a parte e anota o resto para o tutor).
 - Datas: `agendamentos.inicio/fim` são `timestamptz`; campos `date` são texto `AAAA-MM-DD` (use `isoDia`, `deIsoDia`).
   Formatação em `src/lib/gestao/util.ts` (`brl`, `hora`, `dataAmigavel`, `dataCurta`, `fmtTelefone`, `linkWhatsApp`…).
 
