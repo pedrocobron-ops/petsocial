@@ -219,7 +219,7 @@ export default function Hoje() {
   const cr = dados?.creche ?? null;
   const cartaoDaChamada = Boolean(cr && cr.esperados > 0);
   const atencao = dados ? [
-    paraCobrar > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${paraCobrar === 1 ? "1 check-out saiu" : `${paraCobrar} check-outs saíram`} sem cobrança na creche e hotel. Toque para receber.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
+    paraCobrar > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${paraCobrar === 1 ? "1 check-out saiu" : `${paraCobrar} check-outs saíram`} sem cobrança ${rotuloCasa === "Hotel" ? "no hotel" : rotuloCasa === "Creche" ? "na creche" : "na creche e hotel"}. Toque para receber.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
     (taxasPendentes ?? 0) > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${taxasPendentes === 1 ? "1 mensalista saiu" : `${taxasPendentes} mensalistas saíram`} da creche depois do horário. Toque para decidir a taxa.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
     cr && cr.reposicoes > 0 && { icone: CalendarCheck2, tom: "manteiga" as Tom, texto: `A equipe marcou ${cr.reposicoes === 1 ? "1 dia de mensalista como reposição" : `${cr.reposicoes} dias de mensalistas como reposição`} (sem cobrança). Toque para conferir: você aceita ou cobra como dia extra.`, href: "/gestao/app/creche-hotel?ver=chamada" },
     cr && cr.semValor.length > 0 && { icone: HandCoins, tom: "manteiga" as Tom, texto: `${cr.semValor.length === 1 ? "1 mensalista está" : `${cr.semValor.length} mensalistas estão`} sem valor de mensalidade (${cr.semValor.slice(0, 3).join(", ")}${cr.semValor.length > 3 ? "…" : ""}). Sem o valor, a cobrança do mês não é gerada. Toque para preencher.`, href: "/gestao/app/creche-hotel?ver=mensalistas" },

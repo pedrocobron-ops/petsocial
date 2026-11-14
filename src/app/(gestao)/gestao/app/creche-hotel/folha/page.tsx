@@ -7,7 +7,7 @@ import { ArrowLeft, Printer } from "lucide-react";
 import { esperadoNoDia, lerPlanos, lerPresencas } from "@/lib/gestao/creche";
 import { lerCuidados, nomeDaAcomodacao, quemOcupa, textoDoCuidado } from "@/lib/gestao/hotel";
 import { cuidadosLigados } from "@/lib/gestao/hotel-opcoes";
-import { usaModulo } from "@/lib/gestao/modulos";
+import { nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { dataCurta, dataLonga, deIsoDia, fmtTelefone, hora, isoDia, somaDias } from "@/lib/gestao/util";
 import { useCalendario } from "@/components/gestao/calendario";
 import { useGestao } from "@/components/gestao/contexto";
@@ -95,7 +95,7 @@ function FolhaDoDia() {
   return (
     <div className="g-imp">
       <div className="g-imp-controles">
-        <Link className="g-voltar" href="/gestao/app/creche-hotel"><ArrowLeft />Voltar para Creche e hotel</Link>
+        <Link className="g-voltar" href="/gestao/app/creche-hotel"><ArrowLeft />Voltar para {nomeDaCasa(petshop)}</Link>
         <div className="g-imp-linha">
           <input className="g-input" type="date" value={dia} aria-label="Dia" onChange={(e) => e.target.value && setDia(e.target.value)} />
           <button className="g-btn pri" onClick={() => window.print()}><Printer />Imprimir ou salvar em PDF</button>

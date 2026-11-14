@@ -69,6 +69,7 @@ export default function OpcoesHotel() {
   const [salvando, setSalvando] = useState(false);
   if (!souDono || !usaCasa(petshop)) return null;
   const temHotel = usaModulo(petshop, "hotel"), temCreche = usaModulo(petshop, "creche");
+  const tituloOpcoes = temHotel && !temCreche ? "Opções do hotel" : temCreche && !temHotel ? "Opções da creche" : "Opções do hotel e da creche";
   const m = <T,>(f: (v: T) => void) => (v: T) => { f(v); setMexeu(true); setErro(null); };
   const mp = <T,>(f: (v: T) => void) => (v: T) => { f(v); setMexeu(true); setMexeuNosPrecos(true); setErro(null); };
   const feriadoAtivo = feriado.ativo && feriado.valor != null;
@@ -142,7 +143,7 @@ export default function OpcoesHotel() {
       await recarregarBase();
       avisarMudanca();
       setMexeu(false); setMexeuNasTemporadas(false);
-      avisar("Opções do hotel e da creche salvas.");
+      avisar(`${tituloOpcoes} salvas.`);
     } catch (x) { avisarErro(x); } finally { setSalvando(false); }
   }
 
@@ -156,7 +157,7 @@ export default function OpcoesHotel() {
     <section className="g-card g-pilha" id="opcoes-hotel">
       <div className="g-mp-t">
         <Tile icone={SlidersHorizontal} tom="ceu" />
-        <div><h2>Opções do hotel e da creche</h2><p className="g-muted g-p">Ligue só o que você usa. Desligado, nada muda nas telas nem na conta.</p></div>
+        <div><h2>{tituloOpcoes}</h2><p className="g-muted g-p">Ligue só o que você usa. Desligado, nada muda nas telas nem na conta.</p></div>
       </div>
       <div>
         <Opcao titulo="Sinal na reserva" frase="A reserva pode ter um sinal: recebido na hora ou a receber. No check-out ele é descontado da conta." ligada={sinal.ativo} aoMudar={(v) => m(setSinal)({ ...sinal, ativo: v })}>

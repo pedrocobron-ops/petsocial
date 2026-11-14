@@ -508,7 +508,7 @@ export default function CrecheHotel() {
           </div>
         )
         : tudoVazio ? (
-        <Vazio titulo={usaHotel ? "Nenhum hóspede ainda" : "Nenhum pet na creche ainda"} texto={usaHotel ? "Quando um pet vier passar o dia ou dormir aqui, faça o check-in e acompanhe por esta tela." : "Quando um pet vier passar o dia, faça o check-in e acompanhe por esta tela. Quem vem em dias fixos entra em Mensalistas."} mozart="acenando">
+        <Vazio titulo={usaHotel ? "Nenhum hóspede ainda" : "Nenhum pet na creche ainda"} texto={usaHotel ? `Quando um pet vier ${usaCreche ? "passar o dia ou " : ""}dormir aqui, faça o check-in e acompanhe por esta tela.` : "Quando um pet vier passar o dia, faça o check-in e acompanhe por esta tela. Quem vem em dias fixos entra em Mensalistas."} mozart="acenando">
           <button className="g-btn sec" onClick={abrirNova}>Fazer o primeiro check-in</button>
         </Vazio>
       ) : (
@@ -867,7 +867,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
   // na edição a entrada sempre aparece; no check-in novo a entrada é agora
   const escolheEntrada = editar ? true : !jaAqui;
   const fixa = diariaSugerida(petshop, tipo, pet?.porte);
-  const doPorte = tipo === "hotel" && opPorte.ativo && fixa != null && fixa !== diariaFixa(petshop, tipo);
+  // diária do porte ligada e o pet tem porte com preço: a dica fala do porte, mesmo quando o valor é igual ao da diária de sempre
+  const doPorte = tipo === "hotel" && opPorte.ativo && fixa != null && (pet?.porte === "P" || pet?.porte === "M" || pet?.porte === "G" || pet?.porte === "GG") && opPorte[pet.porte] != null;
   const { dados: vencidas } = useDados(async () => (pet ? vacinasVencidas(sb, petshop.id, pet.id).catch(() => []) : []), [petshop.id, pet?.id]);
 
   function escolherPet(p: PetDaEstadia) {

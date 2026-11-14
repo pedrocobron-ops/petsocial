@@ -47,7 +47,9 @@ export default function Feriados() {
       ok(await sb.from("dias_especiais").insert({ petshop_id: petshop.id, dia, nome: nome.trim(), fechado, feriado: temHotel && feriado }).select("id"));
       setDia(""); setNome("");
       await mudou();
-      avisar(`${dataCompleta(dia)} entrou na lista.`);
+      // data que já passou (para acertar o preço de uma estadia anotada depois): abre a lista das que passaram, para ela ficar à vista
+      if (dia < hoje) setVerPassados(true);
+      avisar(dia < hoje ? `${dataCompleta(dia)} entrou na lista. Como já passou, ela fica em Datas que já passaram, aqui embaixo.` : `${dataCompleta(dia)} entrou na lista.`);
     } catch (x) { avisarErro(x); } finally { setOcupado(false); }
   }
 
@@ -112,7 +114,7 @@ export default function Feriados() {
       </div>
       <div className="g-ht-op-c">
         <div className="g-ht-fer-novo">
-          <Campo rotulo="Data"><input type="date" className="g-input" value={dia} min={hoje} onChange={(e) => { setDia(e.target.value); setErro(null); }} /></Campo>
+          <Campo rotulo="Data"><input type="date" className="g-input" value={dia} onChange={(e) => { setDia(e.target.value); setErro(null); }} /></Campo>
           <Campo rotulo="Nome (opcional)"><input className="g-input" value={nome} maxLength={60} placeholder="Ex.: Natal, folga da equipe" onChange={(e) => setNome(e.target.value)} /></Campo>
         </div>
         <label className="g-check"><input type="checkbox" checked={fechado} onChange={(e) => { setFechado(e.target.checked); setErro(null); }} /><span>Fechado: não atendemos nesse dia</span></label>
@@ -124,7 +126,7 @@ export default function Feriados() {
         </div>
       </div>
       {futuros.length === 0
-        ? <p className="g-muted g-p">Nenhuma data marcada daqui para a frente.</p>
+        ? <p className="g-muted g-p">Nenhuma data marcada daqui para a frente.{passados.length ? " As que já passaram estão logo abaixo." : ""}</p>
         : <div className="g-ht-fer-lista">{futuros.map(linha)}</div>}
       {passados.length > 0 && (
         <details className="g-ht-det" open={verPassados} onToggle={(e) => setVerPassados((e.target as HTMLDetailsElement).open)}>
@@ -134,7 +136,7 @@ export default function Feriados() {
       )}
       <p className="g-muted g-pp">
         Dia fechado: o link do cliente não oferece horário de banho nem vaga de creche, a agenda avisa quando alguém marca nele e a chamada da creche não espera ninguém (não vira falta). Quem está hospedado no hotel continua hospedado.
-        {temHotel ? " Feriado no preço: a noite que começa nesse dia usa o preço de feriado, que você liga em Opções do hotel e da creche." : ""}
+        {temHotel ? ` Feriado no preço: a noite que começa nesse dia usa o preço de feriado, que você liga em ${usaModulo(petshop, "creche") ? "Opções do hotel e da creche" : "Opções do hotel"}.` : ""}
       </p>
     </section>
   );

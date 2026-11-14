@@ -14,7 +14,7 @@ import OpcoesDoLink from "@/components/gestao/ajustes/opcoes-link";
 import Feriados from "@/components/gestao/ajustes/feriados";
 import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
 import OpcoesDaLoja from "@/components/gestao/ajustes/opcoes-loja";
-import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { textoDoLink } from "@/lib/gestao/agenda";
 import { useEffect, useRef, useState } from "react";
 import { Archive, BedDouble, CalendarDays, Check, ChevronDown, Clock, Copy, ExternalLink, HandCoins, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
@@ -61,7 +61,7 @@ export default function MeuPetshop() {
   const grupos = [
     { id: "servicos", titulo: "Serviços e preços" },
     { id: "agenda", titulo: "Agenda e link" },
-    ...(usaCasa(petshop) ? [{ id: "casa", titulo: "Creche e hotel" }] : []),
+    ...(usaCasa(petshop) ? [{ id: "casa", titulo: nomeDaCasa(petshop) }] : []),
     ...(usaModulo(petshop, "loja") ? [{ id: "loja", titulo: "Loja" }] : []),
     { id: "dinheiro", titulo: "Cobrança e fidelidade" },
     { id: "negocio", titulo: "O negócio" },
@@ -92,8 +92,8 @@ export default function MeuPetshop() {
         <Grupo id="agenda" titulo="Agenda e link do cliente" icone={Link2} tom="ceu"
           cartoes={[usaModulo(petshop, "banho_tosa") && ["Banho e tosa: pets ao mesmo tempo", <VagasBanho key="v" />], ["Link de agendamento", <LinkAgendamento key="l" />], ["Regras e cancelamento pelo link", <OpcoesDoLink key="o" />]]} />
         {usaCasa(petshop) && (
-          <Grupo id="casa" titulo="Creche e hotel" icone={BedDouble} tom="lilas"
-            cartoes={[["Creche e hotel", <AjustesCrecheHotel key="a" />], ["Opções do hotel e da creche", <OpcoesHotel key="h" />], ["Cuidado com o tutor", <OpcoesCasa key="c" />]]} />
+          <Grupo id="casa" titulo={nomeDaCasa(petshop)} icone={BedDouble} tom="lilas"
+            cartoes={[[nomeDaCasa(petshop), <AjustesCrecheHotel key="a" />], [!usaModulo(petshop, "creche") ? "Opções do hotel" : !usaModulo(petshop, "hotel") ? "Opções da creche" : "Opções do hotel e da creche", <OpcoesHotel key="h" />], ["Cuidado com o tutor", <OpcoesCasa key="c" />]]} />
         )}
         {usaModulo(petshop, "loja") && <Grupo id="loja" titulo="Loja" icone={Store} tom="manteiga" cartoes={[["Opções da loja", <OpcoesDaLoja key="l" />]]} />}
         <Grupo id="dinheiro" titulo="Cobrança e fidelidade" icone={HandCoins} tom="menta"
