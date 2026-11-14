@@ -99,14 +99,23 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
   async function cobrarPorAqui(p: PlanoCompleto) {
     if (somenteLeitura()) return;
     try {
-      ok(await sb.from("creche_planos").update({ primeira_cobranca: null }).eq("id", p.id).eq("petshop_id", petshop.id).select("id").single());
+      // a primeira cobrança passa a ser a deste mês: é escolha de quem recebe (o aviso de "pagas por fora" não volta a sugerir).
+      // Se já passou do vencimento, Gerar cobranças pergunta se é proporcional ou o mês inteiro (nada nasce vencido).
+      ok(await sb.from("creche_planos").update({ primeira_cobranca: mesIso }).eq("id", p.id).eq("petshop_id", petshop.id).select("id").single());
       avisar(`${p.pets?.nome ?? "O pet"} voltou para a lista de quem falta cobrar em ${nomeMes(mes)}. Se a cobrança não aparecer sozinha, toque em Gerar cobranças e escolha como cobrar.`);
       await mudou();
     } catch (e) { avisarErro(e); }
   }
   // podem ser marcadas como pagas por fora: abertas, com valor e ainda sem nenhum recebimento
   const semRecebimento = abertas.filter((c) => !c.lancamentos?.pago && Number(c.total) > 0 && faltaDaCobranca(c) === Number(c.total));
-  const primeiras = semRecebimento.filter((c) => !dados?.comAnterior.has(c.plano_id));
+  // o aviso de "já foram pagas por fora" só sugere a cobrança que o sistema criou sozinho no mês em que o mensalista foi
+  // cadastrado (ele já vinha antes do sistema): nunca a de um plano em que quem recebe já escolheu como fica a primeira
+  // cobrança (pago por fora, proporcional, mês inteiro, Cobrar por aqui), nem a de um mês depois do cadastro.
+  const primeiras = semRecebimento.filter((c) => {
+    if (dados?.comAnterior.has(c.plano_id)) return false;
+    const p = planos.find((x) => x.id === c.plano_id);
+    return Boolean(p && !p.primeira_cobranca && c.mes <= isoMes(new Date(p.criado_em)));
+  });
   const todas = [...(dados?.antigas ?? []), ...abertas];
   const doBloco = (b: EstadoCobranca) => todas.filter((c) => estadoDaCobranca(c, hoje).estado === b);
   /**
@@ -390,7 +399,8 @@ function GerarCobrancas({ mes, planos, comCobranca, aoFechar, aoGerar }: { mes: 
   const linhas: LinhaGerar[] = planos.map((plano) => {
     const sugestao = plano.valor_mensal == null ? null : sugestaoDoMes(plano, mes, plano.valor_mensal, petshop.horario);
     const vencimento = vencimentoDoMes(plano, mes);
-    const primeira = !plano.primeira_cobranca && !comCobranca.has(plano.id) && vencimento < hoje;
+    // primeira cobrança do plano que já nasceria vencida: sem escolha ainda, ou escolhida como a deste mês em "Cobrar por aqui"
+    const primeira = (!plano.primeira_cobranca || plano.primeira_cobranca === mesIso) && !comCobranca.has(plano.id) && vencimento < hoje;
     const escolha = primeira ? escolhas[plano.id] ?? null : null;
     // "de hoje em diante" só faz sentido no mês corrente
     const daquiPraFrente = primeira && mesIso === mesDeHoje && plano.valor_mensal != null ? proporcionalDesde(plano, mes, plano.valor_mensal, petshop.horario, hoje) : null;
@@ -467,7 +477,7 @@ function GerarCobrancas({ mes, planos, comCobranca, aoFechar, aoGerar }: { mes: 
                       <select className="g-select" value={l.escolha ?? ""} aria-label={`Primeira cobrança de ${l.plano.pets?.nome ?? "pet"}`}
                         onChange={(e) => setEscolhas((x) => { const n = { ...x }; if (e.target.value) n[l.plano.id] = e.target.value as PrimeiraCobranca; else delete n[l.plano.id]; return n; })}>
                         <option value="">Escolha…</option>
-                        <option value="fora">Este mês já foi pago por fora (a primeira cobrança é a de {nomeMes(proximoMes)})</option>
+                        {l.plano.primeira_cobranca !== mesIso && <option value="fora">Este mês já foi pago por fora (a primeira cobrança é a de {nomeMes(proximoMes)})</option>}
                         {l.daquiPraFrente && l.daquiPraFrente.restam > 0 && <option value="proporcional">Cobrar este mês, proporcional a partir de hoje ({brl(l.daquiPraFrente.valor)})</option>}
                         <option value="inteiro">{l.sugestao?.proporcional ? `Cobrar desde o começo do plano (${brl(l.sugestao.valor)})` : `Cobrar o mês inteiro (${brl(l.plano.valor_mensal)})`}</option>
                       </select>
