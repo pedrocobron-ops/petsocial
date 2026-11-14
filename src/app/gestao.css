@@ -982,6 +982,9 @@ a.g-ret-linha:hover, button.g-ret-linha:hover { border-color: var(--g-linha-fort
 .g-ret-linha.parada { background: var(--g-amarelo-tint); border-color: transparent; color: #5b4708; }
 .g-ret-linha > svg { width: 18px; height: 18px; flex: none; color: var(--g-cinza); }
 .g-ret-linha.parada > svg { color: inherit; }
+.g-ret-progresso { background: linear-gradient(160deg, #fff6ea 0%, var(--t-pessego) 100%); border-color: rgba(180, 80, 11, .14); }
+.g-ret-progresso > span { flex: 1; min-width: 0; }
+.g-ret-progresso button.g-link { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 .g-ret-linha > span { flex: 1; min-width: 0; }
 
 .g-ret-teste { display: grid; gap: 14px; background: linear-gradient(160deg, #fff6ea 0%, var(--t-pessego) 100%); border-color: rgba(180, 80, 11, .14); }

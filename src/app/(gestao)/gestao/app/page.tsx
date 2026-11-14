@@ -9,7 +9,7 @@ import { OcorrenciasDeHoje } from "@/components/gestao/casa/ocorrencias";
 import { Marca, Selo } from "@/components/gestao/marca";
 import { Anel, Barras, Kpi, Ranking, Tendencia, Tile, type Tom } from "@/components/gestao/painel";
 import { useState } from "react";
-import FimDoTeste, { DIAS_DE_AVISO, chaveAgoraNao, fimDoTeste } from "@/components/gestao/fim-do-teste";
+import FimDoTeste, { DIAS_DE_AVISO, ProgressoDoTeste, chaveAgoraNao, fimDoTeste } from "@/components/gestao/fim-do-teste";
 import PrimeirosPassos, { usePrimeirosPassos } from "@/components/gestao/primeiros-passos";
 import ResumoSemana, { temSemanaPassada } from "@/components/gestao/resumo-semana";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
@@ -20,7 +20,7 @@ import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
 
-import { brl, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "@/components/gestao/calendario";
@@ -73,7 +73,7 @@ export default function Hoje() {
   const { dados, carregando, recarregar } = useDados(async () => {
     const amanha = somaDias(hoje, 1), depois = somaDias(hoje, 2);
     const seg = inicioDaSemana(hoje), ha30 = somaDias(hoje, -30), ha6 = somaDias(hoje, -6);
-    const [ags, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes, daSemana, doMes, ultimos7, concluidos, lembrados, estadiasTotal, produtosTotal] = await Promise.all([
+    const [ags, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes, daSemana, doMes, ultimos7, concluidos, lembrados, estadiasTotal, produtosTotal, proximosDias, semFechar] = await Promise.all([
       sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id).gte("inicio", hoje.toISOString()).lt("inicio", amanha.toISOString()).order("inicio"),
       sb.from("agendamentos").select("id, lembrete_em, status, pets(clientes(id, telefone))").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).lt("inicio", depois.toISOString()),
       sb.from("estadias").select("id, status, entrada, saida_prevista").eq("petshop_id", petshop.id).in("status", ["em_casa", "reservada"]).limit(1000),
@@ -92,6 +92,10 @@ export default function Hoje() {
       sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).not("lembrete_em", "is", null),
       sb.from("estadias").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
       sb.from("produtos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
+      // os próximos horários depois de hoje: a tela não diz "nada por vir" quando há banho marcado para segunda
+      sb.from("agendamentos").select("id, inicio, pets(nome)").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).in("status", ["marcado", "confirmado"]).order("inicio").order("id").limit(2),
+      // horários de dias anteriores que ninguém fechou (nem concluído, nem falta, nem cancelado)
+      sb.from("agendamentos").select("id, inicio, pets(nome)", { count: "exact" }).eq("petshop_id", petshop.id).lt("inicio", hoje.toISOString()).in("status", ["marcado", "confirmado", "em_atendimento"]).order("inicio").order("id").limit(3),
     ]);
     const saude = await buscarSaudeVencendo(sb, petshop.id).catch(() => null);
     const creche = casa && usaModulo(petshop, "creche") ? await resumoDaCrecheHoje(sb, petshop, cuidoDoFinanceiro, liberado).catch(() => null) : null;
@@ -112,8 +116,11 @@ export default function Hoje() {
     const semTelefone = (a: (typeof amanhaAtivos)[number]) => soDigitos(a.pets?.clientes?.telefone).length < 8;
     const estadias = emCasa.data ?? [];
     const noDia = (iso: string | null) => Boolean(iso) && isoDia(new Date(iso!)) === hojeIso;
+    type Curto = { id: string; inicio: string; pets: { nome: string } | null };
     return {
       ags: lista,
+      proximosDias: (proximosDias.data ?? []) as unknown as Curto[],
+      semFechar: { total: semFechar.count ?? 0, primeiros: (semFechar.data ?? []) as unknown as Curto[] },
       amanha: amanhaAtivos.length,
       amanhaSemLembrete: tutores(amanhaAtivos.filter((a) => !a.lembrete_em && !semTelefone(a))),
       amanhaSemTelefone: tutores(amanhaAtivos.filter((a) => !a.lembrete_em && semTelefone(a))),
@@ -205,6 +212,12 @@ export default function Hoje() {
     ? `${rotuloCasa}: ${dados.emCasa} na casa, ${n(dados.chegamHoje, "chega", "chegam")} hoje, ${n(dados.saemHoje, "sai", "saem")} hoje`
     : "";
 
+  // próximos horários depois de hoje e horários de dias anteriores que ficaram sem fechar
+  const quandoFoi = (iso: string) => `${dataAmigavel(iso)} às ${hora(iso)}`;
+  const proximoDia = posso("agenda") ? dados?.proximosDias[0] ?? null : null;
+  const depoisDele = posso("agenda") ? dados?.proximosDias[1] ?? null : null;
+  const semFechar = posso("agenda") && dados ? dados.semFechar : { total: 0, primeiros: [] };
+
   // conta que acabou de nascer: nada de zeros soltos, só o próximo passo
   const contaNova = Boolean(dados && dados.pets === 0 && dados.totalAgs === 0 && dados.estadiasTotal === 0 && (frente !== "loja" || dados.produtosTotal === 0));
   const vendas = dados && vejoFinanceiro ? { quantas: dados.vendasHoje.length, total: dados.vendasHoje.reduce((s, l) => s + Number(l.valor), 0) } : null;
@@ -215,7 +228,7 @@ export default function Hoje() {
     : frente === "loja" ? `${dados.acabando.length === 0 ? "Nenhum produto acabando" : dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}.${vendas ? (vendas.quantas ? ` Hoje ${vendas.quantas === 1 ? "saiu 1 venda" : `saíram ${vendas.quantas} vendas`} de produtos: ${brl(vendas.total)}.` : " Nenhuma venda de produtos hoje, por enquanto.") : ""}${ativos.length ? ` Na agenda, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : frente === "casa" ? `${temCasa ? linhaCasa : "Nenhum pet na casa agora"}.${ativos.length ? ` No banho e tosa, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : soCasa && !ativos.length ? (temCasa ? `${linhaCasa}.` : `Nenhum pet na casa agora.`)
-    : !ativos.length ? `Nenhum horário marcado para hoje.${linhaCasa ? ` ${linhaCasa}.` : ""}`
+    : !ativos.length ? `Nenhum horário marcado para hoje.${proximoDia ? ` O próximo é ${proximoDia.pets?.nome ?? "um pet"}, ${quandoFoi(proximoDia.inicio)}.` : ""}${linhaCasa ? ` ${linhaCasa}.` : ""}`
     : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? (faltaCobrarHoje > 0 ? `, todos concluídos. ${faltaCobrarHoje === 1 ? "Falta cobrar 1" : `Falta cobrar ${faltaCobrarHoje}`}` : ", todos concluídos") : ""}.`;
 
   const cr = dados?.creche ?? null;
@@ -230,6 +243,7 @@ export default function Hoje() {
     cr && cr.faltaram.length > 0 && { icone: UserX, tom: "rosa" as Tom, texto: `${cr.faltaram.length <= 2 ? cr.faltaram.join(" e ") : `${cr.faltaram.slice(0, 2).join(", ")} e mais ${cr.faltaram.length - 2}`} ${cr.faltaram.length === 1 ? "não veio" : "não vieram"} à creche hoje. Toque para ver a chamada e mandar uma mensagem ao tutor.`, href: "/gestao/app/creche-hotel?ver=chamada" },
     cr && cr.vencemHoje > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `Hoje ${cr.vencemHoje === 1 ? "vence 1 mensalidade" : `vencem ${cr.vencemHoje} mensalidades`} da creche. Toque para cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
     cr && cr.atrasadas > 0 && { icone: HandCoins, tom: "rosa" as Tom, texto: `${cr.atrasadas === 1 ? "1 mensalidade atrasada" : `${cr.atrasadas} mensalidades atrasadas`} na creche. Toque para ver e cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
+    semFechar.total > 0 && { icone: HandCoins, tom: "manteiga" as Tom, texto: `${semFechar.total === 1 ? "1 atendimento de dias anteriores ficou" : `${semFechar.total} atendimentos de dias anteriores ficaram`} sem fechar (${semFechar.primeiros.map((a) => `${a.pets?.nome ?? "pet"}, ${dataAmigavel(a.inicio)}`).join("; ")}${semFechar.total > semFechar.primeiros.length ? "; …" : ""}). Toque para abrir a agenda do dia, dizer se foi atendido ou faltou e cobrar.`, href: `/gestao/app/agenda?dia=${isoDia(new Date(semFechar.primeiros[0].inicio))}` },
     posso("agenda") && dados.amanhaSemLembrete > 0 && { icone: MessageCircle, tom: "pessego" as Tom, texto: `Amanhã ${fechadoAmanha ? `é ${fechadoAmanha.replace(/^Dia /, "dia ")}, mas ` : ""}${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}: toque para mandar pelo WhatsApp.${dados.amanhaSemTelefone > 0 ? ` ${dados.amanhaSemTelefone} sem telefone (não ${dados.amanhaSemTelefone === 1 ? "entra" : "entram"} na conta).` : ""}`, aoTocar: () => setLembretes(true) },
     sumidosAChamar.length > 0 && { icone: UserSearch, tom: "menta" as Tom, texto: `${petsSumidos.texto} ${petsSumidos.q === 1 ? "não vem" : "não vêm"} há mais de 30 dias e não ${petsSumidos.q === 1 ? "tem" : "têm"} horário marcado. Toque para chamar de volta pelo WhatsApp.`, aoTocar: () => setChamando("volta") },
     niverAChamar.length > 0 && { icone: Cake, tom: "manteiga" as Tom, texto: `${petsNiver.texto} ${petsNiver.q === 1 ? "faz" : "fazem"} aniversário ${niverHoje ? "hoje" : "nos próximos dias"}. Toque para mandar os parabéns pelo WhatsApp.`, aoTocar: () => setChamando("niver") },
@@ -272,6 +286,7 @@ export default function Hoje() {
             aoDispensar={() => { guardarLembrado(chaveAgoraNao(petshop.id), hojeIso); setAgoraNao(true); }} />
         )}
         {testePerto && !souDono && liberado && <FimDoTeste modo="equipe" numeros={null} aoDispensar={() => {}} />}
+        {!testePerto && souDono && liberado && <ProgressoDoTeste numeros={dados ? { pets: dados.pets, horarios: dados.totalAgs } : null} proximo={pp.proximo} />}
 
         {cr && cartaoDaChamada && <ChamadaDeHoje esperados={cr.esperados} aindaNao={cr.aindaNao} naCasa={cr.naCasa} faltaram={cr.faltaram.length} />}
 
@@ -344,14 +359,15 @@ export default function Hoje() {
             </div>
             ) : (
             <div className="g-proximo vazio">
-              <span className="g-rotulo" style={{ color: "#24543b" }}>{dados && ativos.length ? (semConcluir > 0 ? "Fim dos horários de hoje" : faltaCobrarHoje > 0 ? "Atendimentos concluídos" : "Dia concluído") : temCasa ? "Banho e tosa sem horários" : "Agenda livre"}</span>
+              <span className="g-rotulo" style={{ color: "#24543b" }}>{dados && ativos.length ? (semConcluir > 0 ? "Fim dos horários de hoje" : faltaCobrarHoje > 0 ? "Atendimentos concluídos" : "Dia concluído") : temCasa ? "Banho e tosa sem horários hoje" : "Agenda livre hoje"}</span>
               <div className="quem">
                 <Tile icone={dados && ativos.length ? (semConcluir > 0 || faltaCobrarHoje > 0 ? HandCoins : Check) : Sparkles} tom={dados && ativos.length && (semConcluir > 0 || faltaCobrarHoje > 0) ? "manteiga" : "menta"} tamanho="g" />
                 <div style={{ minWidth: 0 }}>
-                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{!(dados && ativos.length) ? "Nenhum horário por vir"
+                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{!(dados && ativos.length) ? (proximoDia ? `Próximo: ${proximoDia.pets?.nome ?? "um pet"}, ${quandoFoi(proximoDia.inicio)}` : "Nenhum horário marcado por vir")
                     : semConcluir > 0 ? `${semConcluir === 1 ? "1 horário ficou" : `${semConcluir} horários ficaram`} sem concluir`
                     : faltaCobrarHoje > 0 ? `${faltaCobrarHoje === 1 ? "Falta cobrar 1 atendimento" : `Falta cobrar ${faltaCobrarHoje} atendimentos`}`
                     : "Tudo atendido por hoje"}</b>
+                  {!(dados && ativos.length) && depoisDele && <span style={{ whiteSpace: "normal" }}>Depois: {depoisDele.pets?.nome ?? "um pet"}, {quandoFoi(depoisDele.inicio)}.</span>}
                   {dados && ativos.length > 0 && semConcluir > 0 && <span style={{ whiteSpace: "normal" }}>Abra cada um na lista de hoje e diga se foi atendido ou se o cliente faltou.{faltaCobrarHoje > 0 ? ` E ${faltaCobrarHoje === 1 ? "1 concluído ainda está" : `${faltaCobrarHoje} concluídos ainda estão`} sem cobrança.` : ""}</span>}
                   {dados && ativos.length > 0 && semConcluir === 0 && faltaCobrarHoje === 0 && naoCobradosHoje.length > 0 && <span style={{ whiteSpace: "normal" }}>{naoCobradosHoje.length === 1 ? "1 atendimento foi marcado como não cobrado" : `${naoCobradosHoje.length} atendimentos foram marcados como não cobrados`}{(() => { const quem = [...new Set(naoCobradosHoje.map((a) => a.sem_cobranca_nome?.split(" ")[0]).filter(Boolean))]; return quem.length ? ` (por ${quem.join(" e ")})` : ""; })()}.</span>}
                   {dados && ativos.length > 0 && semConcluir === 0 && faltaCobrarHoje > 0 && <span style={{ whiteSpace: "normal" }}>{vejoFinanceiro ? "Todos foram atendidos, mas a conta ainda não foi fechada. Veja a lista Atendimentos para cobrar, logo abaixo." : "Todos foram atendidos. Quem cuida do caixa ainda precisa fechar a conta."}</span>}

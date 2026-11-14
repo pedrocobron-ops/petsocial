@@ -114,3 +114,39 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
     </section>
   );
 }
+
+/**
+ * Teste grátis no meio do caminho (antes dos 2 últimos dias): uma linha calma na tela Hoje, para o dono, com os dias que
+ * faltam, o que já está pronto e o próximo passo. Some quando o cartão de fim de teste aparece.
+ */
+export function ProgressoDoTeste({ numeros, proximo }: {
+  numeros: { pets: number; horarios: number } | null;
+  /** O próximo dos Primeiros passos, quando há. */
+  proximo: { texto: string; href?: string; aoTocar?: () => void } | null;
+}) {
+  const { petshop, servicos } = useGestao();
+  const teste = fimDoTeste(petshop);
+  if (!teste || teste.vencido || teste.dias <= DIAS_DE_AVISO || !numeros) return null;
+  const n = (q: number, um: string, varios: string) => (q === 1 ? `1 ${um}` : `${q} ${varios}`);
+  const comPreco = servicos.some((s) => s.ativo && [s.preco_p, s.preco_m, s.preco_g, s.preco_gg].some((v) => v != null));
+  const pronto = [
+    comPreco && "preços dos serviços",
+    numeros.pets > 0 && n(numeros.pets, "pet", "pets"),
+    numeros.horarios > 0 && n(numeros.horarios, "horário marcado", "horários marcados"),
+    petshop.link_ativo && "link do cliente ligado",
+  ].filter(Boolean) as string[];
+  const passo = proximo && (proximo.href
+    ? <Link className="g-link alvo" href={proximo.href} onClick={proximo.aoTocar}>{proximo.texto}</Link>
+    : <button type="button" className="g-link alvo" onClick={proximo.aoTocar}>{proximo.texto}</button>);
+  return (
+    <section className="g-ret-linha g-ret-progresso" aria-label="Teste grátis">
+      <Clock aria-hidden />
+      <span>
+        <b>Teste grátis: faltam {teste.dias} dias</b> (até {teste.quando}).{" "}
+        {pronto.length ? `Já está pronto: ${pronto.join(", ")}.` : "Ainda não tem nada lançado."}
+        {passo && <> Próximo passo: {passo}.</>}
+      </span>
+      <Link className="g-ico" href={ASSINATURA} aria-label="Ver assinatura" title="Ver assinatura"><ChevronRight aria-hidden /></Link>
+    </section>
+  );
+}

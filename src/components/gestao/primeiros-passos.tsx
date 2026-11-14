@@ -57,7 +57,7 @@ export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: ()
       ? { id: "lembrete", so: agenda && banhoInteiro, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Abre os lembretes dos horários de amanhã.", aoTocar: aoLembretes }
       : { id: "lembrete", so: agenda && banhoInteiro, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Na Agenda, pelo botão do WhatsApp ao lado do horário.", href: "/gestao/app/agenda" },
     { id: "marca", so: souDono, opcional: true, feito: Boolean(petshop.logo) || petshop.tema !== "floresta", texto: "Colocar a sua logo e as suas cores", dica: "Em Meu pet shop.", href: "/gestao/app/meu-petshop" },
-    { id: "escola", so: souDono, opcional: true, feito: escola, texto: "Conhecer a Escola de Gestão", dica: "Aulas gratuitas para o dia a dia do pet shop.", href: "/gestao/app/escola", aoTocar: () => { guardarLembrado(chaveEscola, "1"); setEscola(true); } },
+    { id: "escola", so: souDono, opcional: true, feito: escola, texto: "Ver as aulas grátis sobre o dia a dia do pet shop", dica: "Na Escola de Gestão: aulas curtas, já incluídas, nada para comprar.", href: "/gestao/app/escola", aoTocar: () => { guardarLembrado(chaveEscola, "1"); setEscola(true); } },
   ] : [];
   const lugar = (id: string) => { const i = frente ? ORDEM[frente].indexOf(id) : -1; return i < 0 ? 99 : i; };
   const passos: Passo[] = todos.filter((p) => p.so).map((p, i) => ({ p, i })).sort((a, b) => lugar(a.p.id) - lugar(b.p.id) || a.i - b.i).map((x) => x.p);
