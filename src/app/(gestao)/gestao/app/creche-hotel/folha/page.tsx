@@ -56,7 +56,8 @@ function FolhaDoDia() {
   const abertas = dados?.abertas ?? [], encerradas = dados?.encerradas ?? [];
   const noDia = (d: string | null) => Boolean(d) && isoDia(new Date(d!)) === dia;
   const ocupam = (["hotel", "creche"] as const).flatMap((t) => quemOcupa(t, dia, hoje, abertas, encerradas));
-  const chegam = [...abertas, ...encerradas].filter((e) => noDia(e.entrada) && (e.status !== "reservada" || dia >= hojeIso));
+  // quem já chegou hoje e está na casa fica em "Na casa" (não em "Chegam")
+  const chegam = [...abertas, ...encerradas].filter((e) => noDia(e.entrada) && (e.status !== "reservada" || dia >= hojeIso) && !(e.status === "em_casa" && dia === hojeIso));
   const saem = [...abertas.filter((e) => noDia(e.saida_prevista)), ...encerradas.filter((e) => noDia(e.saida))];
   // na casa: quem ocupa vaga no dia e não está chegando nem saindo nele
   const naCasa = ocupam.filter((e) => !chegam.includes(e) && !saem.includes(e));

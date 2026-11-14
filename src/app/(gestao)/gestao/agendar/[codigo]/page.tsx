@@ -351,7 +351,7 @@ export default function AgendarPeloLink() {
       {!estadia && passo === "servico" && <PedidosDesteAparelho codigo={codigo} versao={lembrados} />}
 
       {estadia && (
-        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} fechados={fechados} termos={termos} recarregarTermos={recarregarTermos}
+        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} fechados={fechados} horario={info.horario} termos={termos} recarregarTermos={recarregarTermos}
           aoPedir={() => setLembrados((n) => n + 1)}
           zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)}
           diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)} />

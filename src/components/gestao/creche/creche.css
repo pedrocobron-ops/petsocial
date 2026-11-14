@@ -139,3 +139,13 @@
 @media (min-width: 720px) { .g-cm-ver { width: auto; } .g-cm-ver button { flex: 0 0 auto; padding: 0 16px; font-size: .875rem; } }
 /* marca de mensalista no cartão de quem está na casa */
 .g-cm-marca { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .875rem; color: var(--g-cinza); }
+
+/* chamada de hoje no alto da tela Hoje */
+.g-cm-hoje { display: grid; gap: 12px; }
+.g-cm-hoje h2 { font-size: 1.125rem; }
+/* a escolha da primeira cobrança, na folha de gerar cobranças */
+.g-cm-gerar-linha .t .g-cm-primeira { margin: 4px 0 2px; padding: 8px; border-radius: 10px; background: var(--g-amarelo-tint); }
+.g-cm-gerar-linha .t .g-cm-primeira > span { color: #5c4300; font-size: .875rem; }
+/* aviso das primeiras cobranças: no celular o botão desce para baixo do texto */
+.g-cm-aviso-fora { flex-wrap: wrap; }
+.g-cm-aviso-fora > .g-cresce { flex: 1 1 220px; }

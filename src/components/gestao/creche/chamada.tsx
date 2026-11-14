@@ -5,9 +5,9 @@ import { AlertTriangle, CalendarPlus, Check, DoorOpen, LogIn, MessageCircle, Sea
 import { lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { cuidadosVigentes, estadoSaude, tipoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import { portariaLigada, type Retirada } from "@/lib/gestao/casa-opcoes";
-import { abreNoDia, emPausa, erroDaChamada, esperadoNoDia, lerPresencas, mensagemDeFalta, montarChamada, planoVale, type LinhaChamada, type PlanoCompleto } from "@/lib/gestao/creche";
+import { abreNoDia, emPausa, erroDaChamada, esperadoNoDia, lerPresencas, mensagemDeFalta, montarChamada, planoVale, podeMudarPlano, type LinhaChamada, type PlanoCompleto } from "@/lib/gestao/creche";
 import { dataAmigavel, dataLonga, deIsoDia, isoDia, linkWhatsApp, semAcento, somaDias } from "@/lib/gestao/util";
-import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { atrasoSugerido, diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
@@ -54,7 +54,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
   /** faixa opcional acima da lista (abriu vaga para quem está na lista de espera) */
   aviso?: React.ReactNode;
 }) {
-  const { sb, petshop, souDono, vejoFinanceiro } = useGestao();
+  const { sb, petshop, souDono, vejoFinanceiro, cuidoDoFinanceiro } = useGestao();
   const { calendario } = useCalendario(); // dia marcado como fechado: ninguém é esperado e ninguém leva falta
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
@@ -94,11 +94,13 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
     const nome = plano.pets?.nome ?? "O pet";
     setOcupado(plano.id);
     try {
-      const r = ok(await sb.rpc("creche_chamada", { p_plano: plano.id, p_dia: dia, p_acao: acao, p_avisou: opcoes.avisou ?? false, p_forcar: opcoes.forcar ?? false })) as { repetido?: boolean; atraso?: boolean; estadia?: string };
+      const r = ok(await sb.rpc("creche_chamada", { p_plano: plano.id, p_dia: dia, p_acao: acao, p_avisou: opcoes.avisou ?? false, p_forcar: opcoes.forcar ?? false })) as { repetido?: boolean; atraso?: boolean; estadia?: string; conferir?: boolean; reserva?: string };
       if (r.repetido) avisar("Outra pessoa já tinha marcado. Atualizei a chamada.");
       else if (acao === "chegou") avisar(ehHoje ? `${nome} chegou.` : `${nome}: presença marcada em ${dataAmigavel(dia)}.`);
       else if (acao === "extra") avisar(`${nome}: dia extra anotado. Entra na cobrança do mês.`);
-      else if (acao === "reposicao") avisar(`${nome}: reposição anotada, sem cobrança.`);
+      // reposição marcada por quem não recebe: fica anotada e quem cuida do financeiro confere (aceita ou cobra como dia extra)
+      else if (acao === "reposicao") avisar(r.conferir ? `${nome}: reposição anotada. Quem cuida do financeiro confere se o dia fica sem cobrança.` : `${nome}: reposição anotada, sem cobrança.`);
+      else if (acao === "faltou" && r.reserva) avisar(`${nome} não veio: a reserva do dia extra foi cancelada. Nada é cobrado.`);
       else if (acao === "saiu" && r.atraso) {
         // saiu depois do horário: quem recebe decide a taxa agora; os outros só ficam sabendo que ficou anotado (sem valor)
         const a = valorDaTaxa && r.estadia ? await lerAtraso(sb, r.estadia) : null;
@@ -137,7 +139,9 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
       naCasa.length ? `marca a saída de ${naCasa.length === 1 ? "1 mensalista" : `${naCasa.length} mensalistas`}` : "",
       faltam.length ? `marca falta para ${faltam.length === 1 ? "1 que não veio" : `${faltam.length} que não vieram`} (${faltam.slice(0, 4).map((l) => l.plano.pets?.nome).join(", ")}${faltam.length > 4 ? "…" : ""})` : "",
     ].filter(Boolean).join(" e ");
-    if (!(await confirmar({ titulo: ehHoje ? "Encerrar a chamada de hoje?" : "Encerrar a chamada deste dia?", texto: `Isto ${partes}. Nada é cobrado. Dá para desfazer um por um depois.`, confirmar: "Encerrar a chamada" }))) return;
+    // a saída é marcada com a hora de agora: se já passou do horário de busca, o banco anota como saída fora do horário
+    const tarde = ehHoje && naCasa.length > 0 && Boolean(atrasoSugerido("creche", new Date(), calendario?.atraso));
+    if (!(await confirmar({ titulo: ehHoje ? "Encerrar a chamada de hoje?" : "Encerrar a chamada deste dia?", texto: `Isto ${partes}. Nada é cobrado. Dá para desfazer um por um depois.${tarde ? ` Atenção: a saída fica com a hora de agora, que já passou do horário de busca. ${naCasa.length === 1 ? "Ela vai" : "Elas vão"} para Check-outs para cobrar, para decidir a taxa (dá para escolher Não cobrar).` : ""}`, confirmar: "Encerrar a chamada" }))) return;
     let saidas = 0, faltas = 0, atrasos = 0;
     for (const l of naCasa) { const r = await sb.rpc("creche_chamada", { p_plano: l.plano.id, p_dia: dia, p_acao: "saiu" }); if (!r.error) { saidas++; if ((r.data as { atraso?: boolean } | null)?.atraso) atrasos++; } }
     for (const l of faltam) { const r = await sb.rpc("creche_chamada", { p_plano: l.plano.id, p_dia: dia, p_acao: "faltou" }); if (!r.error) faltas++; }
@@ -149,7 +153,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
   if (!planos.length) {
     return (
       <Vazio titulo="A chamada começa com os mensalistas" texto="Cadastre os pets que vêm em dias fixos da semana. A cada dia, a chamada mostra quem deve vir, e um toque marca quem chegou, quem saiu e quem faltou.">
-        <button className="g-btn sec" onClick={aoNovoMensalista}>Cadastrar o primeiro mensalista</button>
+        {podeMudarPlano({ petshop, souDono, cuidoDoFinanceiro }) && <button className="g-btn sec" onClick={aoNovoMensalista}>Cadastrar o primeiro mensalista</button>}
       </Vazio>
     );
   }
@@ -205,10 +209,10 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
                       <b>{pet.nome}</b>
                       <span>{pet.clientes?.nome ?? "Sem tutor"}</span>
                       <div className="selos">
-                        {l.conta === "extra" && <span className="g-tag amarelo">dia extra</span>}
+                        {l.conta === "extra" && <span className="g-tag amarelo">{l.presenca?.status === "reservada" ? "dia extra reservado" : "dia extra"}</span>}
                         {l.conta === "reposicao" && <span className="g-tag azul">reposição</span>}
                         {l.conta === "avulsa" && <span className="g-tag">check-in avulso</span>}
-                        {s?.vacinas.length ? <span className="g-tag vermelho" title={s.vacinas.join(", ")}><Syringe size={12} aria-hidden />vacina vencida: {s.vacinas.join(", ")}</span> : null}
+                        {s?.vacinas.length ? <span className="g-tag vermelho" title={s.vacinas.join(", ")}><Syringe size={12} aria-hidden />vacina vencida: {s.vacinas.join(", ")}{ehHoje && l.estado === "esperado" && petshop.creche_bloqueia_vacina ? (souDono ? " · entrada bloqueada (você pode liberar)" : " · entrada bloqueada: só o dono libera") : ""}</span> : null}
                         {s?.outros.length ? <span className="g-tag amarelo" title={s.outros.join(", ")}>vencido: {s.outros.join(", ")}</span> : null}
                         {pet.alertas && <span className="g-tag vermelho"><AlertTriangle size={12} aria-hidden />{pet.alertas}</span>}
                       </div>
@@ -217,7 +221,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
                       {l.estado === "esperado" && (
                         <>
                           <button className="g-btn verde" disabled={trava} onClick={() => fazer("chegou")}><LogIn />{ehHoje ? "Chegou" : "Veio"}</button>
-                          <button className="g-btn fantasma" disabled={trava} onClick={() => fazer("faltou")}><UserX />Faltou</button>
+                          <button className="g-btn fantasma" disabled={trava} onClick={() => fazer("faltou")}><UserX />{l.presenca?.status === "reservada" ? "Não veio" : "Faltou"}</button>
                         </>
                       )}
                       {l.estado === "na_casa" && (
@@ -281,7 +285,9 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
   planos: PlanoCompleto[]; dia: string; jaVieram: Set<string>; saude: Map<string, Saude>; cheia: { ocupadas: number; vagas: number } | null;
   aoFechar: () => void; aoMarcar: (p: PlanoCompleto, reposicao: boolean) => Promise<void>;
 }) {
-  const { petshop } = useGestao();
+  const { petshop, souDono, cuidoDoFinanceiro } = useGestao();
+  // quem não recebe pode marcar "não cobrar", mas o dia fica para quem recebe conferir
+  const confere = !(souDono || cuidoDoFinanceiro);
   const { confirmar } = useAvisos();
   const [q, setQ] = useState("");
   const [escolhido, setEscolhido] = useState<PlanoCompleto | null>(null);
@@ -351,7 +357,7 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
               </div>
               <p className="g-pp">
                 {conta === "extra" ? "O dia fica anotado como dia extra e entra na cobrança do mês que vem. Nada é cobrado na porta."
-                  : conta === "sem" ? "O dia fica anotado como reposição, sem cobrança."
+                  : conta === "sem" ? (confere ? "O dia fica anotado como reposição. Quem cuida do financeiro é avisado e confere se fica sem cobrança ou se vira dia extra." : "O dia fica anotado como reposição, sem cobrança.")
                   : "Nada vem marcado: o dia só vira dia extra se você escolher."}
               </p>
             </div>
@@ -362,7 +368,7 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
                 <span>É reposição de falta (não cobrar)</span>
               </label>
               <p className="g-muted g-p">
-                {reposicao ? "O dia fica anotado como reposição e não entra na cobrança."
+                {reposicao ? (confere ? "O dia fica anotado como reposição. Quem cuida do financeiro é avisado e confere se fica sem cobrança ou se vira dia extra." : "O dia fica anotado como reposição e não entra na cobrança.")
                   : "O dia fica anotado como dia extra e entra na cobrança do mês que vem. Nada é cobrado na porta."}
               </p>
             </>

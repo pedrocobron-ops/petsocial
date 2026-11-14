@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Moon, Plus, Printer, Sun } from "lucide-react";
-import { esperadoNoDia, lerPresencas } from "@/lib/gestao/creche";
+import { abreNoDia, esperadoNoDia, lerPresencas } from "@/lib/gestao/creche";
 import { nivelDeOcupacao, nomeDaAcomodacao, ocupacaoDoDia, quemOcupa, vagasDoTipo, type Mens } from "@/lib/gestao/hotel";
 import { acomodacoesDe } from "@/lib/gestao/hotel-opcoes";
 import { usaModulo } from "@/lib/gestao/modulos";
@@ -37,7 +37,8 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
 
   // dias que já passaram: as estadias encerradas que tocam o mês. De hoje em diante: as faltas avisadas dos mensalistas.
   const { dados, carregando } = useDados(async () => {
-    const temPassado = primeiro < hojeIso;
+    // as encerradas de hoje também entram: na creche, quem já veio e saiu conta na ocupação do dia
+    const temPassado = primeiro <= hojeIso;
     const encerradas = temPassado ? await lerTudo<EstadiaCompleta>((de, ate, contar) =>
       sb.from("estadias").select(SELECT_ESTADIA, contando(contar)).eq("petshop_id", petshop.id).eq("status", "encerrada")
         .lte("entrada", somaDias(deIsoDia(ultimo), 1).toISOString()).gte("saida", deIsoDia(primeiro).toISOString()).order("entrada").order("id").range(de, ate) as never) : [];
@@ -59,6 +60,8 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
         {(diaFechado(dia) || feriadoDoDia(dia)) && <span className="fer" title={fraseDoDiaFechado(dia) ?? feriadoDoDia(dia) ?? undefined}>{diaFechado(dia) ? (nomeDoDiaFechado(dia) || "fechado") : feriadoDoDia(dia)}</span>}
         {tipos.map((t) => {
           const n = conta(t, dia), v = vagasDoTipo(petshop, t);
+          // dia da semana em que o negócio não abre: a creche mostra "fechado" no lugar de 0 vagas tomadas
+          if (t === "creche" && n === 0 && !abreNoDia(petshop.horario, dia)) return <span key={t} className="g-ht-oc vazio"><Sun aria-hidden />fechado</span>;
           return <span key={t} className={`g-ht-oc ${nivelDeOcupacao(n, v)}`}>{t === "hotel" ? <Moon aria-hidden /> : <Sun aria-hidden />}{n}{v != null ? `/${v}` : ""}</span>;
         })}
       </button>
@@ -156,7 +159,7 @@ function DiaDaOcupacao({ dia, hoje, abertas, encerradas, mens, tipos, aoFechar, 
               </h3>
               {!total ? <p className="g-muted g-p">Ninguém.</p> : (
                 <div>
-                  {ocupam.map((e) => linha(e, noDia(e.entrada) ? `chega às ${horaCurta(e.entrada)}` : e.saida_prevista ? `até ${new Date(e.saida_prevista).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : "sem saída prevista"))}
+                  {ocupam.map((e) => linha(e, e.status === "encerrada" && e.saida ? `veio, saiu às ${horaCurta(e.saida)}` : e.status === "em_casa" && noDia(e.entrada) ? `na casa desde ${horaCurta(e.entrada)}` : noDia(e.entrada) ? `chega às ${horaCurta(e.entrada)}` : e.saida_prevista ? `até ${new Date(e.saida_prevista).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : "sem saída prevista"))}
                   {esperados.map((p) => (
                     <div key={p.id} className="g-ht-quem">
                       <AvatarPet pet={p.pets ?? { nome: "?" }} tamanho="p" />

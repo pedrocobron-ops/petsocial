@@ -3,6 +3,7 @@
 import { CalendarCheck2, UserX } from "lucide-react";
 import { CATEGORIA_MENSALIDADE, resumoDaCrecheHoje } from "@/lib/gestao/creche";
 import { contarAtrasosPendentes } from "@/components/gestao/creche/atraso";
+import ChamadaDeHoje from "@/components/gestao/creche/chamada-hoje";
 import { OcorrenciasDeHoje } from "@/components/gestao/casa/ocorrencias";
 
 import { Marca, Selo } from "@/components/gestao/marca";
@@ -209,10 +210,14 @@ export default function Hoje() {
     : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? ", todos concluídos" : ""}.`;
 
   const cr = dados?.creche ?? null;
+  const cartaoDaChamada = Boolean(cr && cr.esperados > 0);
   const atencao = dados ? [
     paraCobrar > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${paraCobrar === 1 ? "1 check-out saiu" : `${paraCobrar} check-outs saíram`} sem cobrança na creche e hotel. Toque para receber.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
     (taxasPendentes ?? 0) > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${taxasPendentes === 1 ? "1 mensalista saiu" : `${taxasPendentes} mensalistas saíram`} da creche depois do horário. Toque para decidir a taxa.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
-    cr && cr.esperados > 0 && { icone: CalendarCheck2, tom: "manteiga" as Tom, texto: `Chamada de hoje: ${cr.esperados === 1 ? "1 cão esperado" : `${cr.esperados} cães esperados`}${cr.aindaNao > 0 ? `, ${cr.aindaNao === 1 ? "1 ainda não chegou" : `${cr.aindaNao} ainda não chegaram`}` : ", chamada feita"}.`, href: "/gestao/app/creche-hotel?ver=chamada" },
+    cr && cr.reposicoes > 0 && { icone: CalendarCheck2, tom: "manteiga" as Tom, texto: `A equipe marcou ${cr.reposicoes === 1 ? "1 dia de mensalista como reposição" : `${cr.reposicoes} dias de mensalistas como reposição`} (sem cobrança). Toque para conferir: você aceita ou cobra como dia extra.`, href: "/gestao/app/creche-hotel?ver=chamada" },
+    cr && cr.semValor.length > 0 && { icone: HandCoins, tom: "manteiga" as Tom, texto: `${cr.semValor.length === 1 ? "1 mensalista está" : `${cr.semValor.length} mensalistas estão`} sem valor de mensalidade (${cr.semValor.slice(0, 3).join(", ")}${cr.semValor.length > 3 ? "…" : ""}). Sem o valor, a cobrança do mês não é gerada. Toque para preencher.`, href: "/gestao/app/creche-hotel?ver=mensalistas" },
+    // a chamada tem o cartão dela no alto da tela (ChamadaDeHoje): a linha não se repete aqui
+    cr && cr.esperados > 0 && !cartaoDaChamada && { icone: CalendarCheck2, tom: "manteiga" as Tom, texto: `Chamada de hoje: ${cr.esperados === 1 ? "1 cão esperado" : `${cr.esperados} cães esperados`}${cr.aindaNao > 0 ? `, ${cr.aindaNao === 1 ? "1 ainda não chegou" : `${cr.aindaNao} ainda não chegaram`}` : ", chamada feita"}.`, href: "/gestao/app/creche-hotel?ver=chamada" },
     cr && cr.faltaram.length > 0 && { icone: UserX, tom: "rosa" as Tom, texto: `${cr.faltaram.length <= 2 ? cr.faltaram.join(" e ") : `${cr.faltaram.slice(0, 2).join(", ")} e mais ${cr.faltaram.length - 2}`} ${cr.faltaram.length === 1 ? "não veio" : "não vieram"} à creche hoje. Toque para ver a chamada e mandar uma mensagem ao tutor.`, href: "/gestao/app/creche-hotel?ver=chamada" },
     cr && cr.vencemHoje > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `Hoje ${cr.vencemHoje === 1 ? "vence 1 mensalidade" : `vencem ${cr.vencemHoje} mensalidades`} da creche. Toque para cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
     cr && cr.atrasadas > 0 && { icone: HandCoins, tom: "rosa" as Tom, texto: `${cr.atrasadas === 1 ? "1 mensalidade atrasada" : `${cr.atrasadas} mensalidades atrasadas`} na creche. Toque para ver e cobrar.`, href: "/gestao/app/creche-hotel?ver=cobrancas" },
@@ -258,6 +263,8 @@ export default function Hoje() {
             aoDispensar={() => { guardarLembrado(chaveAgoraNao(petshop.id), hojeIso); setAgoraNao(true); }} />
         )}
         {testePerto && !souDono && liberado && <FimDoTeste modo="equipe" numeros={null} aoDispensar={() => {}} />}
+
+        {cr && cartaoDaChamada && <ChamadaDeHoje esperados={cr.esperados} aindaNao={cr.aindaNao} naCasa={cr.naCasa} faltaram={cr.faltaram.length} />}
 
         {contaNova && cartaoPassos && <PrimeirosPassos pp={pp} modo="cartao" curto />}
 

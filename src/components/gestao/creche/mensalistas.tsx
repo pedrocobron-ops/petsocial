@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, Pencil, Plus, Search } from "lucide-react";
-import { abreNoDia, DIAS_SEMANA, lerPresencas, planoAtivo, resumoDoMes, type PlanoCompleto } from "@/lib/gestao/creche";
+import { ChevronDown, ListChecks, Pencil, Plus, Search } from "lucide-react";
+import { abreNoDia, DIAS_SEMANA, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, type PlanoCompleto } from "@/lib/gestao/creche";
 import { brl, dataCompleta, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Esqueleto, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { Chips } from "../loja/pecas";
 import FormPlano, { mensalistasPorDia } from "./form-plano";
+import ModelosDePlano from "./modelos";
 import { DiasDoPlano, ResumoDosMeses } from "./resumo-mes";
 import "./creche.css";
 
@@ -23,8 +24,11 @@ const umDia = (dow: number) => isoDia(somaDias(new Date(2024, 0, 7), dow));
 export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, aoMudar }: {
   planos: PlanoCompleto[]; novo: boolean; aoAbrirNovo: () => void; aoFecharNovo: () => void; aoMudar: () => void;
 }) {
-  const { sb, petshop, cuidoDoFinanceiro: vejoFinanceiro } = useGestao();
+  const { sb, petshop, cuidoDoFinanceiro: vejoFinanceiro, souDono } = useGestao();
   const somenteLeitura = useSomenteLeitura();
+  // só o dono e quem cuida do financeiro mexem no plano (a equipe, se o dono liberou em Meu pet shop)
+  const pode = podeMudarPlano({ petshop, souDono, cuidoDoFinanceiro: vejoFinanceiro });
+  const [modelos, setModelos] = useState(false);
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<"ativos" | "encerrados">("ativos");
   const [aberto, setAberto] = useState<string | null>(null);
@@ -49,8 +53,9 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
   return (
     <>
       {!planos.length ? (
-        <Vazio titulo="Nenhum mensalista ainda" texto="Mensalista é o pet que vem em dias fixos da semana e paga por mês. Cadastre o plano e a chamada do dia já sabe quem esperar.">
-          <button className="g-btn sec" onClick={aoAbrirNovo}><Plus />Cadastrar o primeiro mensalista</button>
+        <Vazio titulo="Nenhum mensalista ainda" texto={pode ? "Mensalista é o pet que vem em dias fixos da semana e paga por mês. Cadastre o plano e a chamada do dia já sabe quem esperar." : "Mensalista é o pet que vem em dias fixos da semana e paga por mês. Quem cadastra o plano é o dono ou quem cuida do financeiro."}>
+          {pode && <button className="g-btn sec" onClick={aoAbrirNovo}><Plus />Cadastrar o primeiro mensalista</button>}
+          {vejoFinanceiro && <button className="g-btn fantasma" onClick={() => setModelos(true)}><ListChecks />Modelos de plano</button>}
         </Vazio>
       ) : (
         <div className="g-pilha">
@@ -81,6 +86,7 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
               <input className="g-input" type="search" placeholder="Nome do pet ou do tutor" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar mensalista" />
             </div>
             {encerrados > 0 && <Chips opcoes={FILTROS} valor={filtro} aoMudar={setFiltro} />}
+            {vejoFinanceiro && <button className="g-btn sec p" onClick={() => setModelos(true)}><ListChecks />Modelos de plano</button>}
           </div>
           <p className="g-muted g-p">{ativos.length === 1 ? "1 mensalista ativo" : `${ativos.length} mensalistas ativos`}{encerrados ? ` · ${encerrados === 1 ? "1 plano encerrado" : `${encerrados} planos encerrados`}` : ""}</p>
 
@@ -118,9 +124,11 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
                       <div className="g-cm-plano-corpo">
                         {carregando && !mov ? <Esqueleto linhas={1} /> : mov && <ResumoDosMeses plano={p} presencas={mov.presencas} faltas={mov.faltas} />}
                         {p.obs && <p className="g-muted g-p">{p.obs}</p>}
-                        <div className="g-fila">
-                          <button className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setEditando(p); }}><Pencil />Alterar plano</button>
-                        </div>
+                        {pode ? (
+                          <div className="g-fila">
+                            <button className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setEditando(p); }}><Pencil />Alterar plano</button>
+                          </div>
+                        ) : <p className="g-muted g-pp">Para mudar os dias, pausar ou encerrar o plano, fale com o dono ou com quem cuida do financeiro.</p>}
                       </div>
                     )}
                   </div>
@@ -131,6 +139,7 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
         </div>
       )}
 
+      {modelos && <ModelosDePlano aoFechar={() => setModelos(false)} aoMudar={aoMudar} />}
       {novo && <FormPlano planos={planos} aoFechar={aoFecharNovo} aoSalvo={() => { aoFecharNovo(); aoMudar(); }} />}
       {editando && <FormPlano key={editando.id} plano={editando} planos={planos} aoFechar={() => setEditando(null)} aoSalvo={() => { setEditando(null); aoMudar(); }} />}
     </>

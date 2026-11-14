@@ -48,13 +48,23 @@ export function esteveNoDia(e: Passada, dia: string): boolean {
 /** Quem ocupa vaga do tipo no dia: de hoje em diante pela regra de vagas; dia passado, quem esteve na casa. */
 export function quemOcupa<E extends Passada & { id: string; pet_id: string }>(tipo: string, dia: string, hoje: Date, abertas: E[], encerradas: E[]): E[] {
   const hojeIso = isoDia(hoje);
+  // hoje, na creche, quem já veio e foi embora continua contando no dia (a ocupação do dia é quem veio, não só quem ainda está)
+  if (dia === hojeIso && tipo === "creche") {
+    const ainda = abertas.filter((e) => e.tipo === tipo && ocupaNoDia(e, dia, hojeIso));
+    return [...ainda, ...encerradas.filter((e) => e.tipo === tipo && esteveNoDia(e, dia) && !ainda.some((a) => a.id === e.id))];
+  }
   if (dia >= hojeIso) return abertas.filter((e) => e.tipo === tipo && ocupaNoDia(e, dia, hojeIso));
   return [...abertas, ...encerradas].filter((e) => e.tipo === tipo && esteveNoDia(e, dia));
 }
 
 /** Vagas tomadas no dia, para o calendário. De hoje em diante é exatamente `ocupadasNoDia`. */
 export function ocupacaoDoDia<E extends Passada & { id: string; pet_id: string }>(tipo: string, dia: string, hoje: Date, abertas: E[], encerradas: E[], mens: Mens | null, horario: unknown): number {
-  if (dia >= isoDia(hoje)) return ocupadasNoDia(tipo, abertas, null, dia, hoje, mens, horario);
+  const hojeIso = isoDia(hoje);
+  // hoje, na creche: as vagas ainda tomadas (quem está e quem ainda vai chegar) mais quem já veio e saiu
+  if (dia === hojeIso && tipo === "creche") {
+    return ocupadasNoDia(tipo, abertas, null, dia, hoje, mens, horario) + encerradas.filter((e) => e.tipo === tipo && esteveNoDia(e, dia) && !abertas.some((a) => a.id === e.id)).length;
+  }
+  if (dia >= hojeIso) return ocupadasNoDia(tipo, abertas, null, dia, hoje, mens, horario);
   return quemOcupa(tipo, dia, hoje, abertas, encerradas).length;
 }
 

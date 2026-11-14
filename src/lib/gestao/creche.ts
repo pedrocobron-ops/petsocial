@@ -4,6 +4,8 @@ import type { Cliente, Estadia, Pet } from "./tipos";
 import { contando, lerTudo } from "./paginas";
 import { saudacaoZap } from "./agenda";
 import { calendarioGuardado, diaFechado, lerCalendario } from "./feriados";
+import { multaSugerida, opcoesDeCobranca } from "./dinheiro-opcoes";
+import { opcao } from "./opcoes";
 import { brl, dataCompleta, dataCurta, deIsoDia, horarioDoDia, isoDia, nomeMes, somaDias } from "./util";
 
 /**
@@ -18,12 +20,20 @@ export type Falta = T["creche_faltas"]["Row"];
 export type Cobranca = T["creche_cobrancas"]["Row"];
 export type PetDoPlano = Pick<Pet, "id" | "nome" | "foto" | "especie" | "sexo" | "alertas" | "ativo"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
 /** Plano com o pet e, para quem vê o financeiro, os valores (senão ficam vazios). */
-export type PlanoCompleto = Plano & { pets: PetDoPlano | null; valor_mensal: number | null; valor_extra: number | null; temValor: boolean };
+export type PlanoCompleto = Plano & { pets: PetDoPlano | null; valor_mensal: number | null; valor_extra: number | null; temValor: boolean; modelo_id?: string | null };
 export type Presenca = Pick<Estadia, "id" | "pet_id" | "tipo" | "status" | "entrada" | "saida" | "saida_prevista" | "plano_id" | "mensalista" | "dia" | "cobranca_id">;
 
 export const SELECT_PLANO = "*, pets(id, nome, foto, especie, sexo, alertas, ativo, clientes(id, nome, telefone))";
 export const COLS_PRESENCA = "id, pet_id, tipo, status, entrada, saida, saida_prevista, plano_id, mensalista, dia, cobranca_id";
 export const CATEGORIA_MENSALIDADE = "Creche: mensalidade";
+
+/**
+ * Quem mexe no plano de um mensalista (cadastrar, mudar os dias, pausar, encerrar): o dono e quem cuida do financeiro, porque o plano
+ * decide o que é cobrado. O dono pode liberar para a equipe em Meu pet shop (opção abaixo). O banco confere a mesma regra.
+ */
+export const OPCAO_EQUIPE_MUDA_PLANO = "creche.equipe_muda_plano";
+export const equipeMudaPlano = (petshop: { opcoes?: unknown }) => opcao<boolean>(petshop, OPCAO_EQUIPE_MUDA_PLANO, false) === true;
+export const podeMudarPlano = (x: { petshop: { opcoes?: unknown }; souDono: boolean; cuidoDoFinanceiro: boolean }) => x.souDono || x.cuidoDoFinanceiro || equipeMudaPlano(x.petshop);
 
 /** Dias da semana na ordem de quem trabalha: segunda primeiro. O número é o do banco (0 = domingo). */
 export const DIAS_SEMANA = [
@@ -42,13 +52,13 @@ export const juntar = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(
 export async function lerPlanos(sb: Banco, petshopId: string, vejoFinanceiro: boolean): Promise<PlanoCompleto[]> {
   const planos = await lerTudo<Plano & { pets: PetDoPlano | null }>((de, ate, contar) =>
     sb.from("creche_planos").select(SELECT_PLANO, contando(contar)).eq("petshop_id", petshopId).order("inicio").order("id").range(de, ate));
-  const valores = new Map<string, { valor_mensal: number; valor_extra: number | null }>();
+  const valores = new Map<string, { valor_mensal: number; valor_extra: number | null; modelo_id: string | null }>();
   if (vejoFinanceiro && planos.length) {
-    const v = await lerTudo<{ plano_id: string; valor_mensal: number; valor_extra: number | null }>((de, ate, contar) =>
-      sb.from("creche_planos_valores").select("plano_id, valor_mensal, valor_extra", contando(contar)).eq("petshop_id", petshopId).order("plano_id").range(de, ate)).catch(() => []);
-    for (const x of v) valores.set(x.plano_id, { valor_mensal: Number(x.valor_mensal), valor_extra: x.valor_extra == null ? null : Number(x.valor_extra) });
+    const v = await lerTudo<{ plano_id: string; valor_mensal: number; valor_extra: number | null; modelo_id: string | null }>((de, ate, contar) =>
+      sb.from("creche_planos_valores").select("plano_id, valor_mensal, valor_extra, modelo_id", contando(contar)).eq("petshop_id", petshopId).order("plano_id").range(de, ate)).catch(() => []);
+    for (const x of v) valores.set(x.plano_id, { valor_mensal: Number(x.valor_mensal), valor_extra: x.valor_extra == null ? null : Number(x.valor_extra), modelo_id: x.modelo_id });
   }
-  return planos.map((p) => ({ ...p, valor_mensal: valores.get(p.id)?.valor_mensal ?? null, valor_extra: valores.get(p.id)?.valor_extra ?? null, temValor: valores.has(p.id) }));
+  return planos.map((p) => ({ ...p, valor_mensal: valores.get(p.id)?.valor_mensal ?? null, valor_extra: valores.get(p.id)?.valor_extra ?? null, temValor: valores.has(p.id), modelo_id: valores.get(p.id)?.modelo_id ?? null }));
 }
 
 /** Presenças de creche (mensalistas e avulsas) e faltas entre dois dias, inclusive. */
@@ -144,7 +154,8 @@ export function montarChamada(planos: PlanoCompleto[], dia: string, presencas: P
     const falta = faltas.find((f) => f.pet_id === plano.pet_id && f.dia === dia) ?? null;
     const esperado = esperadoNoDia(plano, dia, horario);
     if (!esperado && !presenca) continue;
-    const estado: EstadoChamada = presenca ? (presenca.status === "em_casa" ? "na_casa" : "saiu") : falta ? "faltou" : "esperado";
+    // dia extra reservado que ainda não chegou: é esperado, como os do plano
+    const estado: EstadoChamada = presenca ? (presenca.status === "reservada" ? "esperado" : presenca.status === "em_casa" ? "na_casa" : "saiu") : falta ? "faltou" : "esperado";
     linhas.push({ plano, estado, presenca, falta, conta: presenca ? ((presenca.mensalista as LinhaChamada["conta"] | null) ?? "avulsa") : "plano" });
   }
   const ordem: Record<EstadoChamada, number> = { esperado: 0, na_casa: 1, saiu: 2, faltou: 3 };
@@ -166,7 +177,8 @@ export const isoMes = (mes: Date) => isoDia(primeiroDoMes(mes));
 /** Presenças, faltas e extras de um pet num mês (até hoje). */
 export function resumoDoMes(plano: Vigencia & { pet_id: string }, mes: Date, presencas: Presenca[], faltas: Pick<Falta, "pet_id" | "dia" | "avisou">[], horario: unknown, hoje: string): ResumoDoMes {
   const de = isoDia(primeiroDoMes(mes)), ate = isoDia(ultimoDoMes(mes));
-  const doPet = presencas.filter((e) => e.pet_id === plano.pet_id && diaDaPresenca(e) >= de && diaDaPresenca(e) <= ate);
+  // reserva de dia extra que ainda não virou presença não conta como vinda
+  const doPet = presencas.filter((e) => e.pet_id === plano.pet_id && e.status !== "reservada" && diaDaPresenca(e) >= de && diaDaPresenca(e) <= ate);
   const veio = new Set(doPet.map(diaDaPresenca));
   // falta anotada num dia que depois foi marcado como fechado não conta
   const faltou = faltas.filter((f) => f.pet_id === plano.pet_id && f.dia >= de && f.dia <= ate && !diaFechado(f.dia)).sort((a, b) => a.dia.localeCompare(b.dia));
@@ -216,9 +228,21 @@ export function vencimentoDoMes(plano: Pick<Plano, "inicio" | "vence_dia">, mes:
   return comeco > combinado ? comeco : combinado;
 }
 
-/** O plano entra na cobrança desse mês (vale em algum dia dele)? */
-export function cobraNoMes(plano: Vigencia, mes: Date) {
+/** O plano entra na cobrança desse mês (vale em algum dia dele e o mês não é anterior à primeira cobrança escolhida)? */
+export function cobraNoMes(plano: Vigencia & { primeira_cobranca?: string | null }, mes: Date) {
+  if (plano.primeira_cobranca && isoDia(primeiroDoMes(mes)) < plano.primeira_cobranca) return false;
   return plano.inicio <= isoDia(ultimoDoMes(mes)) && (!plano.fim || plano.fim >= isoDia(primeiroDoMes(mes)));
+}
+
+/**
+ * A primeira cobrança de um plano, quando o mês já começou: quem recebe escolhe (nada vem marcado).
+ * "fora": o mês foi pago por fora do sistema, a primeira cobrança é a do mês seguinte.
+ * "proporcional": cobra os dias do plano de hoje (ou do começo do plano) até o fim do mês. "inteiro": a mensalidade cheia.
+ */
+export type PrimeiraCobranca = "fora" | "proporcional" | "inteiro";
+/** A conta do proporcional da primeira cobrança: os dias do plano de `desde` em diante, sobre todos os dias do plano no mês. */
+export function proporcionalDesde(plano: Vigencia, mes: Date, valor: number, horario: unknown, desde: string) {
+  return sugestaoDoMes({ ...plano, inicio: plano.inicio > desde ? plano.inicio : desde }, mes, valor, horario);
 }
 
 export type ExtraCobrado = { dia: string; valor: number };
@@ -288,9 +312,9 @@ function linhaDaMensagem(c: CobrancaCompleta) {
 
 /**
  * Mensagem de cobrança de um tutor: o mês, uma linha por pet (com os dias extras e as datas), o total e o vencimento.
- * Tom neutro e educado: sem multa, sem juros, sem ameaça. A pessoa pode mudar o texto antes de mandar.
+ * Tom neutro e educado, sem ameaça. A chave Pix e a multa seguem as Opções de cobrança. A pessoa pode mudar o texto antes de mandar.
  */
-export function mensagemDeCobranca(p: { tutor: string | null | undefined; petshop: string; cobrancas: CobrancaCompleta[]; hoje: string }) {
+export function mensagemDeCobranca(p: { tutor: string | null | undefined; petshop: string; cobrancas: CobrancaCompleta[]; hoje: string; opcoes?: { opcoes?: unknown } }) {
   const cs = [...p.cobrancas].sort((a, b) => (a.pets?.nome ?? "").localeCompare(b.pets?.nome ?? "", "pt-BR"));
   if (!cs.length) return "";
   const meses = [...new Set(cs.map((c) => c.mes))].sort().map((m) => nomeMes(deIsoDia(m)));
@@ -304,7 +328,17 @@ export function mensagemDeCobranca(p: { tutor: string | null | undefined; petsho
   const vence = vencimentos.length === 1
     ? `Vencimento: ${dataCompleta(vencimentos[0])}`
     : `Vencimentos: ${cs.map((c) => `${c.pets?.nome ?? "Pet"} em ${dataCompleta(c.vencimento)}`).join(", ")}`;
-  return [abre, "", ...cs.map(linhaDaMensagem), "", ...(cs.length > 1 ? [`Total: ${brl(total)}`] : []), vence, "", "Qualquer dúvida, é só chamar. Obrigado!"].join("\n");
+  // as mesmas regras das outras mensagens de cobrança (Meu pet shop, Opções de cobrança): a chave Pix, se preenchida,
+  // e a multa com os juros só quando o dono ligou a multa e marcou "mostrar na mensagem" (e a mensalidade está atrasada)
+  const o = p.opcoes ? opcoesDeCobranca(p.opcoes) : null;
+  let multas = 0;
+  const linhas = cs.map((c) => {
+    const m = o?.multaNaMensagem && p.opcoes ? multaSugerida(p.opcoes, { valor: faltaDaCobranca(c), vencimento: c.vencimento }, p.hoje) : null;
+    if (m) multas = centavos(multas + m.total);
+    return `${linhaDaMensagem(c)}${m ? ` + multa e juros por atraso ${brl(m.total)}` : ""}`;
+  });
+  const linhaTotal = multas > 0 ? [`Total: ${brl(total)} + multa e juros ${brl(multas)} = ${brl(centavos(total + multas))}`] : cs.length > 1 ? [`Total: ${brl(total)}`] : [];
+  return [abre, "", ...linhas, "", ...linhaTotal, vence, ...(o?.pix ? [`Chave Pix: ${o.pix}`] : []), "", "Qualquer dúvida, é só chamar. Obrigado!"].join("\n");
 }
 
 /** Erros que as funções da chamada devolvem com um código na frente. */
@@ -331,15 +365,27 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
   // dia marcado como fechado: a chamada não espera ninguém
   if (!calendarioGuardado(petshop.id, vejoFinanceiro)) await lerCalendario(sb, petshop.id, vejoFinanceiro);
   const mov = await lerPresencas(sb, petshop.id, hoje, hoje);
-  const linhas = montarChamada(planos, hoje, mov.presencas, mov.faltas, petshop.horario).filter((l) => l.conta === "plano" || l.conta === "avulsa");
-  let vencemHoje = 0, atrasadas = 0;
+  const linhas = montarChamada(planos, hoje, mov.presencas, mov.faltas, petshop.horario).filter((l) => l.conta === "plano" || l.conta === "avulsa" || l.presenca?.status === "reservada");
+  let vencemHoje = 0, atrasadas = 0, reposicoes = 0;
+  const semValor: string[] = [];
   if (vejoFinanceiro) {
+    // o que a equipe marcou e espera a conferência de quem recebe: reposição ("não cobrar") e plano ainda sem valor
+    const [rep, valores] = await Promise.all([
+      sb.from("creche_reposicoes").select("estadia_id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("estado", "pendente"),
+      sb.from("creche_planos_valores").select("plano_id").eq("petshop_id", petshop.id).limit(5000),
+    ]);
+    reposicoes = rep.count ?? 0;
+    if (!valores.error) {
+      const com = new Set((valores.data ?? []).map((v) => v.plano_id));
+      for (const pl of planos) if (planoAtivo(pl, hoje) && pl.pets?.ativo !== false && !com.has(pl.id)) semValor.push(pl.pets?.nome ?? "Pet");
+    }
     if (liberado) await sb.rpc("creche_gerar_cobrancas", { p_petshop: petshop.id });
     const r = await sb.from("creche_cobrancas").select("vencimento, lancamentos!inner(pago)").eq("petshop_id", petshop.id).eq("status", "aberta").eq("lancamentos.pago", false).lte("vencimento", hoje).limit(1000);
     for (const c of r.data ?? []) { if (c.vencimento === hoje) vencemHoje++; else atrasadas++; }
   }
   return {
     esperados: linhas.length, aindaNao: linhas.filter((l) => l.estado === "esperado").length,
-    faltaram: linhas.filter((l) => l.estado === "faltou").map((l) => l.plano.pets?.nome ?? "Pet"), vencemHoje, atrasadas,
+    faltaram: linhas.filter((l) => l.estado === "faltou").map((l) => l.plano.pets?.nome ?? "Pet"), vencemHoje, atrasadas, reposicoes, semValor,
+    naCasa: linhas.filter((l) => l.estado === "na_casa").length,
   };
 }

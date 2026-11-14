@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Cat, Check, Dog, MessageCircle, PawPrint, Plus, Trash2 } from "lucide-react";
 import { banco } from "@/lib/gestao/supabase";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
-import { brl, brlCurto, dataCurta, deIsoDia, fmtTelefone, isoDia, somaDias } from "@/lib/gestao/util";
+import { brl, brlCurto, dataCurta, deIsoDia, fmtTelefone, horarioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
 import { lembrarPedido } from "@/lib/gestao/link-opcoes";
 import { AceiteDosTermos, SEM_ACEITE, faltaAceitar, pedirPeloLink, type TermosDoLink } from "./termos";
 
@@ -15,6 +15,11 @@ const ESPECIES: { id: Especie; rotulo: string; icone: React.ComponentType<{ size
 ];
 const soma = (iso: string, dias: number) => isoDia(somaDias(deIsoDia(iso), dias));
 const dia = (iso: string) => { const d = new Date(`${iso}T12:00:00`); return `${["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"][d.getDay()]}, ${dataCurta(d)}`; };
+/** O negócio abre nesse dia da semana? Sem horário preenchido, vale todo dia (a mesma regra de `creche_abre` no banco). */
+function abreNoDia(horario: unknown, iso: string) {
+  const algum = Array.from({ length: 7 }, (_, i) => horarioDoDia(horario, new Date(2024, 0, 7 + i))).some(Boolean);
+  return !algum || Boolean(horarioDoDia(horario, new Date(`${iso}T12:00:00`)));
+}
 const entre = (a: string, b: string) => Math.round((new Date(`${b}T12:00:00`).getTime() - new Date(`${a}T12:00:00`).getTime()) / 864e5);
 type PetDoPedido = { nome: string; especie: Especie; porte: Porte | null };
 const petVazio = (): PetDoPedido => ({ nome: "", especie: "cao", porte: null });
@@ -28,17 +33,23 @@ const listaE = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(0, -1).
  * Pedido de creche (um ou mais dias) ou de hotel (entrada e saída) pelo link do cliente.
  * O cliente só fica sabendo se um dia está cheio; não vê quem está na casa nem quantas vagas existem.
  */
-export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapLoja, aoVoltar, termos = null, recarregarTermos, aoPedir, fechados }: {
+export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapLoja, aoVoltar, termos = null, recarregarTermos, aoPedir, fechados, horario }: {
   codigo: string; tipo: Tipo; hoje: string; loja: string; diaria: number | null; zapLoja: string | null; aoVoltar: () => void;
   /** Regras que o tutor aceita antes de enviar (null = não pede aceite). */
   termos?: TermosDoLink | null; recarregarTermos?: () => Promise<unknown>; aoPedir?: () => void;
   /** dias que o negócio marcou como fechados (a creche não recebe neles) */
   fechados?: Set<string>;
+  /** horário de funcionamento: a creche não recebe no dia da semana em que o negócio não abre */
+  horario?: unknown;
 }) {
   const hotel = tipo === "hotel";
+  /** A creche não abre nesse dia (dia da semana fechado ou data marcada como fechada)? O hotel não depende disso. */
+  const naoAbre = (d: string) => !hotel && (Boolean(fechados?.has(d)) || !abreNoDia(horario, d));
+  // a creche já abre no próximo dia em que o negócio funciona (nunca num dia fechado)
+  const primeiroDia = () => { for (let i = 1; i <= 21; i++) { const d = soma(hoje, i); if (!naoAbre(d)) return d; } return soma(hoje, 1); };
   const [passo, setPasso] = useState<"quando" | "dados" | "enviado">("quando");
-  const [entrada, setEntrada] = useState(soma(hoje, 1));
-  const [saida, setSaida] = useState(soma(hoje, hotel ? 2 : 1));
+  const [entrada, setEntrada] = useState(() => (hotel ? soma(hoje, 1) : primeiroDia()));
+  const [saida, setSaida] = useState(() => (hotel ? soma(hoje, 2) : primeiroDia()));
   const [cheios, setCheios] = useState<string[] | null>(null);
   const [horaEntrada, setHoraEntrada] = useState("08:00");
   const [horaSaida, setHoraSaida] = useState("18:00");
@@ -236,6 +247,9 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
 
   if (passo === "quando") {
     const temCheio = (cheios?.length ?? 0) > 0;
+    // dia fechado não é "sem vaga": diz que não abre, e não oferece lista de espera para ele
+    const diasFechados = (cheios ?? []).filter(naoAbre), lotados = (cheios ?? []).filter((d) => !naoAbre(d));
+    const lista = (l: string[]) => `${l.slice(0, 4).map(dia).join("; ")}${l.length > 4 ? " e outros dias" : ""}`;
     return (
       <section className="g-lk-secao">
         <h2>{hotel ? "Quando o seu pet fica com a gente?" : "Que dia o seu pet vem para a creche?"}</h2>
@@ -264,9 +278,9 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, zapL
           {erroDatas && <p className="g-lk-alerta" role="alert"><span>{erroDatas}</span></p>}
           {erro && !erroDatas && <p className="g-lk-alerta" role="alert"><span>{erro}</span></p>}
           {temCheio && (
-            <p className="g-lk-alerta" role="alert"><span>{cheios!.every((d) => fechados?.has(d)) ? "Não abrimos em" : "Sem vaga em"} {cheios!.slice(0, 4).map(dia).join("; ")}{cheios!.length > 4 ? " e outros dias" : ""}. Escolha outras datas{esperaAtiva ? " ou entre na lista de espera" : ""}.</span></p>
+            <p className="g-lk-alerta" role="alert"><span>{diasFechados.length ? `Não abrimos em ${lista(diasFechados)}. ` : ""}{lotados.length ? `Sem vaga em ${lista(lotados)}. ` : ""}{diasFechados.length ? (dias === 1 ? "Escolha outro dia." : "Escolha outras datas.") : `Escolha outras datas${esperaAtiva ? " ou entre na lista de espera" : ""}.`}</span></p>
           )}
-          {temCheio && esperaAtiva && !cheios!.every((d) => fechados?.has(d)) && (
+          {temCheio && esperaAtiva && lotados.length > 0 && !diasFechados.length && (
             <div style={{ display: "grid", gap: 6, justifyItems: "start" }}>
               <button type="button" className="g-btn sec" onClick={() => { setErro(null); setNaEspera(true); setPasso("dados"); }}>Entrar na lista de espera</button>
               <small className="g-muted">Se abrir vaga nessas datas, {loja} chama você. Entrar na lista não reserva a vaga.</small>

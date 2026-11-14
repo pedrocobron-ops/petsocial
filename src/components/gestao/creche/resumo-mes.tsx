@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CalendarCheck2, Pencil, Plus } from "lucide-react";
-import { DIAS_SEMANA, diasEmOrdem, lerPlanos, lerPresencas, planoAtivo, resumoDoMes, textoDasDatas, type Falta, type PetDoPlano, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
+import { DIAS_SEMANA, diasEmOrdem, lerPlanos, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, textoDasDatas, type Falta, type PetDoPlano, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { brl, dataCompleta, isoDia, nomeMes } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -58,7 +58,7 @@ export function ResumoDosMeses({ plano, presencas, faltas }: { plano: PlanoCompl
 
 /** Cartão da ficha do pet: o plano de mensalista (ou o atalho para criar) e o resumo deste mês e do mês passado. */
 export function CartaoMensalista({ pet }: { pet: PetDoPlano }) {
-  const { sb, petshop, cuidoDoFinanceiro: vejoFinanceiro, posso } = useGestao();
+  const { sb, petshop, cuidoDoFinanceiro: vejoFinanceiro, posso, souDono } = useGestao();
   const somenteLeitura = useSomenteLeitura();
   const [form, setForm] = useState<"novo" | "editar" | null>(null);
   const hoje = isoDia(new Date());
@@ -75,7 +75,9 @@ export function CartaoMensalista({ pet }: { pet: PetDoPlano }) {
   }, [petshop.id, pet.id, usa, vejoFinanceiro]);
   if (!usa || !dados) return null;
   const { plano } = dados;
-  const pode = posso("creche_hotel");
+  // mexer no plano: o dono e quem cuida do financeiro (a equipe, se o dono liberou em Meu pet shop)
+  const ve = posso("creche_hotel");
+  const pode = ve && podeMudarPlano({ petshop, souDono, cuidoDoFinanceiro: vejoFinanceiro });
   const ativo = Boolean(plano && planoAtivo(plano, hoje));
   if (!plano && !pode) return null;
   return (
