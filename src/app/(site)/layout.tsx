@@ -1,6 +1,7 @@
 import SiteHeader from "@/components/site-header";
 import Rodape from "@/components/rodape";
 import { linkInstagram, redes } from "@/lib/empresa";
+import { jsonLd } from "@/lib/json-ld";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
@@ -17,7 +18,7 @@ const organizacaoLd = {
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizacaoLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(organizacaoLd) }} />
       <SiteHeader />
       <main>{children}</main>
       <Rodape />

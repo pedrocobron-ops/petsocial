@@ -5,7 +5,7 @@ import { ArrowLeft, Cat, Check, Dog, MessageCircle, PawPrint, Plus, Trash2 } fro
 import { banco } from "@/lib/gestao/supabase";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
 import { brl, brlCurto, dataCurta, deIsoDia, fmtTelefone, horarioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
-import { lembrarPedido } from "@/lib/gestao/link-opcoes";
+import { MUITOS_PEDIDOS, lembrarPedido } from "@/lib/gestao/link-opcoes";
 import { AceiteDosTermos, SEM_ACEITE, faltaAceitar, pedirPeloLink, type TermosDoLink } from "./termos";
 
 type Tipo = "creche" | "hotel";
@@ -261,7 +261,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
             p_codigo: codigo, p_tipo: tipo, p_entrada: entrada, p_saida: saida, p_tutor: tutor.trim(), p_telefone: fone, p_pet: x.nome.trim(),
             p_especie: x.especie, p_porte: x.porte ?? undefined, p_obs: obs.trim() || undefined,
           }, termos, aceite);
-          const r = data as { ok?: boolean; erro?: string } | null;
+          const r = data as { ok?: boolean; erro?: string; motivo?: string } | null;
           if (error || !r) { setErro("Não deu para enviar agora. Confira a internet e tente de novo."); return; }
           if (!r.ok && r.erro === "termos") {
             await recarregarTermos?.();
@@ -273,6 +273,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
             setErro(r.erro === "tem_vaga" ? "Abriu vaga nessas datas. Volte e faça o pedido normal."
               : r.erro === "repetido" ? `${x.nome.trim()} já está na lista de espera para essas datas.`
               : r.erro === "nao_abre" ? "Um dos dias escolhidos não tem atendimento. Escolha outras datas."
+              : r.erro === "limite" && r.motivo === "muitos" ? MUITOS_PEDIDOS
               : r.erro === "limite" ? "Você já tem pedidos esperando. Fale direto com a gente para combinar."
               : r.erro === "fechado" ? "A lista de espera não está aberta agora. Fale direto com a gente."
               : r.erro === "datas" ? "Confira as datas e tente de novo."
@@ -291,7 +292,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
         p_hora_entrada: horaEntrada, p_hora_saida: horaSaida,
         ...(pets.length > 1 ? { p_mais_pets: pets.slice(1).map((x) => ({ nome: x.nome.trim(), especie: x.especie, porte: x.porte })) } : {}),
       }, termos, aceite);
-      const r = data as { ok?: boolean; erro?: string; id?: string; dia?: string; quando?: string; abre?: string; fecha?: string } | null;
+      const r = data as { ok?: boolean; erro?: string; motivo?: string; id?: string; dia?: string; quando?: string; abre?: string; fecha?: string } | null;
       if (error || !r) { setErro("Não deu para enviar agora. Confira a internet e tente de novo."); return; }
       if (!r.ok) {
         if (r.erro === "termos") {
@@ -303,6 +304,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
         }
         setErro(r.erro === "lotado" && pets.length > 1 ? `Não há vaga para os ${pets.length} pets em ${r.dia ? dia(r.dia) : "um dos dias"}. Escolha outras datas ou peça para menos pets.`
           : r.erro === "lotado" ? `Não dá para receber em ${r.dia ? dia(r.dia) : "um dos dias"}: a casa está cheia ou não abre nesse dia. Escolha outras datas.`
+          : r.erro === "limite" && r.motivo === "muitos" ? MUITOS_PEDIDOS
           : r.erro === "limite" ? "Você já tem pedidos esperando resposta. Fale direto com a gente para combinar."
           : r.erro === "fechado" ? "Este link não está recebendo pedidos agora."
           : r.erro === "datas" ? "Confira as datas: a entrada não pode ser no passado, a saída vem depois da entrada e o período vai até 60 dias."

@@ -8,7 +8,7 @@ import { Marca } from "@/components/gestao/marca";
 import { dataLonga, deIsoDia, hora as horaDe, linkWhatsApp } from "@/lib/gestao/util";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { aplicarTema } from "@/lib/gestao/identidade";
-import { prazoPorExtenso } from "@/lib/gestao/link-opcoes";
+import { MUITOS_PEDIDOS, prazoPorExtenso } from "@/lib/gestao/link-opcoes";
 import "./pedido.css";
 
 type Situacao = "pendente" | "aceito" | "recusado" | "cancelado" | "concluido" | "cliente";
@@ -123,8 +123,9 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
           : r.erro === "desligado" ? `${loja} não está recebendo isso por aqui agora. Fale pelo WhatsApp.`
           : r.erro === "fechado" ? "Este pedido já foi encerrado. Atualizei a página."
           : r.erro === "recado" ? "Escreva que dia e horário ficam bons para você."
+          : r.erro === "muitos" ? MUITOS_PEDIDOS
           : "Algo deu errado. Tente de novo em instantes.");
-        if (r.erro !== "recado") void buscar();
+        if (r.erro !== "recado" && r.erro !== "muitos") void buscar();
         return;
       }
       setFeito(qual === "mudar" ? `Recado enviado. ${loja} responde pelo seu WhatsApp. Até lá, o que está combinado continua valendo.`

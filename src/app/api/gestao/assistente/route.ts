@@ -5,6 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import { definicao, descrever, ehErroDeUso, ferramentasPara, gravar, rodarConsulta, type Contexto, type LinkZap, type Resumo } from "@/lib/gestao/assistente/ferramentas";
 import { INSTRUCOES, contextoDoPetshop } from "@/lib/gestao/assistente/instrucoes";
+import { ferramentaLiberada } from "@/lib/gestao/assistente/permissao";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -71,6 +72,8 @@ export async function POST(req: Request) {
       const def = definicao(uso.name);
       const decisao = corpo.decisoes?.find((d) => d.id === uso.id);
       if (!def?.grava || !decisao?.ok) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A pessoa descartou esta ação. Nada foi gravado." }); continue; }
+      // a conversa vem do navegador: confere de novo se esta pessoa pode usar a ferramenta (igual à volta do modelo, mais abaixo)
+      if (!ferramentaLiberada(def, c)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: "Ferramenta indisponível para esta pessoa. Nada foi gravado." }); continue; }
       if (!liberado) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Nada foi gravado.", is_error: true }); continue; }
       try {
         // a chave desta ação: se o mesmo pedido chegar duas vezes (toque duplo, internet que repetiu), o banco grava uma vez só
@@ -136,7 +139,7 @@ export async function POST(req: Request) {
       for (const uso of usos) {
         if (uso.type !== "tool_use") continue;
         const def = definicao(uso.name);
-        if (!def || (def.financeiro && !c.vejoFinanceiro)) { parciais.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: "Ferramenta indisponível para esta pessoa." }); continue; }
+        if (!def || !ferramentaLiberada(def, c)) { parciais.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: "Ferramenta indisponível para esta pessoa." }); continue; }
         if (!def.grava) {
           const r = await rodarConsulta(c, uso.name, uso.input);
           if (r.links) links.push(...r.links);

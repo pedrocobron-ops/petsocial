@@ -83,3 +83,6 @@ export function esquecerPedido(codigo: string, id: string) {
     window.localStorage.setItem(chaveDosPedidos(codigo), JSON.stringify(pedidosLembrados(codigo).filter((x) => x.id !== id)));
   } catch { /* nada a fazer */ }
 }
+
+/** Resposta do banco quando o link recebeu envios demais na última hora (da loja, do mesmo WhatsApp ou da mesma rede). */
+export const MUITOS_PEDIDOS = "Recebemos muitos pedidos agora. Tente de novo mais tarde ou chame no WhatsApp.";

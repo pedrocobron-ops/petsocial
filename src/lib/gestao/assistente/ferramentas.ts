@@ -1,4 +1,5 @@
 import { COLS_PACOTE, comCustos, comPrecosDeAgendamento, comPrecosDePacote, comPrecosDeProduto, comValoresDeEstadia, type PacoteLinha } from "../reservado";
+import { ferramentaLiberada } from "./permissao";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
@@ -136,7 +137,7 @@ export const FERRAMENTAS: Def[] = [
 ];
 
 export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro">): Anthropic.Tool[] =>
-  FERRAMENTAS.filter((f) => !f.financeiro || c.vejoFinanceiro).map(({ grava: _g, financeiro: _f, ...t }) => t);
+  FERRAMENTAS.filter((f) => ferramentaLiberada(f, c)).map(({ grava: _g, financeiro: _f, ...t }) => t);
 export const definicao = (nome: string) => FERRAMENTAS.find((f) => f.name === nome);
 
 /* ---------- consultas ---------- */

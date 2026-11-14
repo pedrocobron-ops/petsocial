@@ -11,7 +11,7 @@ import { PORTES, type Porte } from "@/lib/gestao/tipos";
 import { brlCurto, deIsoDia, fmtTelefone, horarioDoDia, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, nomeMes, soDigitos, somaDias } from "@/lib/gestao/util";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { aplicarTema } from "@/lib/gestao/identidade";
-import { lembrarPedido } from "@/lib/gestao/link-opcoes";
+import { MUITOS_PEDIDOS, lembrarPedido } from "@/lib/gestao/link-opcoes";
 import { AceiteDosTermos, PedidosDesteAparelho, SEM_ACEITE, faltaAceitar, pedirPeloLink, useTermosDoLink } from "./termos";
 import "./agendar.css";
 
@@ -275,7 +275,7 @@ export default function AgendarPeloLink() {
     }, termos, aceite);
     setEnviando(false);
     if (error) return setErro("Não consegui enviar agora. Confira a internet e tente de novo.");
-    const r = data as unknown as { ok: boolean; erro?: string; id?: string } | null;
+    const r = data as unknown as { ok: boolean; erro?: string; motivo?: string; id?: string } | null;
     if (r?.ok) {
       setEnviado({ id: r.id ?? null, servico: servico.nome, dia, pets: lista.map((x, i) => ({ nome: x.nome, hora: somaMin(horaEscolhida, servico.duracao_min * i) })) });
       // o endereço de acompanhar fica guardado neste aparelho: recarregar a página não perde o pedido
@@ -291,7 +291,7 @@ export default function AgendarPeloLink() {
       ir("quando");
     } else if (r?.erro === "limite") {
       setLimite(true);
-      setErro(`Não deu para enviar mais um pedido por aqui agora. Fale direto com ${info.nome}.`);
+      setErro(r.motivo === "muitos" ? MUITOS_PEDIDOS : `Não deu para enviar mais um pedido por aqui agora. Fale direto com ${info.nome}.`);
     } else if (r?.erro === "termos") {
       // as regras mudaram entre abrir a página e enviar: mostra o texto novo e pede o aceite de novo
       await recarregarTermos();

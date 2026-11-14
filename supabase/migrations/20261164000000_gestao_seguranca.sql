@@ -265,8 +265,8 @@ grant execute on function public.link_pedir_com_termos(text, jsonb, text, boolea
   public.link_pedido_cancelar(uuid, text), public.link_pedido_pedir_mudanca(uuid, text) to anon, authenticated;
 
 -- ---------- 2. webhook: o mesmo aviso repetido não vale duas vezes ----------
--- Chave do aviso: evento + pedido da Cakto (+ data do pagamento, quando o app novo manda). Aviso sem pedido não tem chave
--- (não dá para saber se é repetido) e segue como antes.
+-- Chave do aviso: evento + id do pedido da Cakto (data.id, que o app já guarda em payload.pedido desde a 20261158).
+-- Aviso sem pedido não tem chave (não dá para saber se é repetido) e segue como antes.
 create table if not exists public.webhook_vistos (
   chave text primary key check (char_length(chave) <= 300),
   visto_em timestamptz not null default now()
@@ -305,8 +305,11 @@ begin
   end if;
 
   -- o mesmo aviso de novo (reenvio da Cakto ou alguém repetindo): não estende o pago_ate outra vez
-  if v_pedido is not null and not public.webhook_primeira_vez(
-       'cakto:' || coalesce(p_evento, '') || ':' || v_pedido || coalesce(':' || nullif(p_payload ->> 'quando', ''), '')) then
+  -- (a doc da Cakto manda usar o id do pedido como chave; os três avisos de pagamento contam como um só: o mesmo pedido pago
+  --  não paga duas vezes, nem chegando como purchase_approved e depois como subscription_renewed)
+  if v_pedido is not null and not public.webhook_primeira_vez('cakto:'
+       || case when p_evento in ('purchase_approved', 'subscription_renewed', 'subscription_late_recovered') then 'pago' else coalesce(p_evento, '') end
+       || ':' || v_pedido) then
     return 'repetido';
   end if;
 

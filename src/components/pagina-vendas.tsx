@@ -24,6 +24,7 @@ import type { PaginaVendas as Conteudo, FichaExemplo, IconeLucide, ContaExemplo 
 import { FIXAS } from "@/lib/faq";
 import Conta from "@/components/conta";
 import { FaixaMercado } from "@/components/mercado";
+import { jsonLd } from "@/lib/json-ld";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://maestropet.com";
 
@@ -194,8 +195,8 @@ export default function PaginaVendas({ c, p }: { c: Conteudo; p: Produto }) {
 
   return (
     <div className="com-barra venda" data-sem-rv>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(produtoLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(produtoLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(faqLd) }} />
       <VerProduto nome={p.nome} preco={p.preco} />
 
       {/* 1 · Dobra */}

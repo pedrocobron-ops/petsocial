@@ -2146,6 +2146,15 @@ const BASE: TopicoBase[] = [
     ],
     atencao: ["O sistema não recebe pagamento pela internet: o tutor paga direto para você. O link do cliente só avisa que o sinal vai ser pedido."],
     palavras: ["sinal", "adiantamento", "adiantado", "antecipado", "pagamento antecipado", "cobrar um sinal", "sinal na reserva", "sinal da reserva", "entrada na reserva", "caucao", "garantir a reserva"] },
+  { id: "link-muitos-pedidos", titulo: "Quantos pedidos o link do cliente aceita?", secao: "limites", quem: "todos", rota: null,
+    passos: [
+      "O link aceita os pedidos do dia a dia sem você fazer nada. Um tutor pode mandar vários pedidos, para vários pets.",
+      "Para ninguém encher a sua lista com pedidos falsos, o link para de aceitar por um tempo quando chega pedido demais de uma vez: muitos do mesmo WhatsApp, da mesma internet ou da loja toda na mesma hora.",
+      "Nesse caso, o tutor vê: Recebemos muitos pedidos agora. Tente de novo mais tarde ou chame no WhatsApp. Depois de uma hora, volta ao normal sozinho.",
+      "Um mesmo WhatsApp pode ter até 6 pedidos esperando resposta. Responda os pedidos no bloco Pedidos pelo link, na tela Hoje ou na Agenda, e ele volta a poder pedir.",
+    ],
+    atencao: ["Se uma promoção trouxer muito mais pedidos que o normal e o link parar, fale com a nossa equipe para ajustar o limite."],
+    palavras: ["limite de pedidos", "link parou", "link nao aceita", "muitos pedidos", "recebemos muitos pedidos", "pedido falso", "spam no link", "encheram o link", "tutor nao consegue pedir", "link bloqueado"] },
   { id: "restaurar", titulo: "Dá para restaurar a cópia de segurança?", secao: "limites", quem: "todos", rota: null,
     passos: [
       "Não. A cópia de segurança serve para guardar e consultar: o sistema não traz esses arquivos de volta.",
