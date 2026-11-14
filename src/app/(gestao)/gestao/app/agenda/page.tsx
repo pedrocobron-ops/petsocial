@@ -190,7 +190,7 @@ function Agenda() {
             <button aria-pressed={visao === "semana"} onClick={() => setVisao("semana")}>Semana</button>
           </div>
           <Link className="g-btn sec" href={`/gestao/app/agenda/imprimir?dia=${dia}&visao=${visao}${prof ? `&prof=${prof}` : ""}`} title="Imprimir ou salvar a agenda em PDF"><Printer />Imprimir</Link>
-          <LinkRapido />
+          {liberado && <LinkRapido />}
           <button className="g-btn sec" disabled={!liberado} title={liberado ? undefined : DICA_SO_CONSULTA} onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear horário</button>
           <button className="g-btn pri" disabled={!liberado} title={liberado ? undefined : DICA_SO_CONSULTA} onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>
         </div>

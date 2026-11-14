@@ -250,7 +250,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           <div className="g-barra-data"><CalendarClock />{dataLonga(new Date())}</div>
         </div>
         <AvisoDeFuso />
-        {!liberado && !cartaoNoHoje && (
+        {!liberado && !cartaoNoHoje && !caminho.endsWith("/assinatura") && (
           <div className="g-aviso vermelho" role="alert">
             <TriangleAlert />
             <span>{petshop.status === "teste" ? "Seu teste grátis terminou." : "Sua assinatura está inativa."} Seus dados estão guardados e a conta fica só para consulta até você assinar.</span>

@@ -216,7 +216,7 @@ export default function Hoje() {
   const quandoFoi = (iso: string) => `${dataAmigavel(iso)} às ${hora(iso)}`;
   const proximoDia = posso("agenda") ? dados?.proximosDias[0] ?? null : null;
   const depoisDele = posso("agenda") ? dados?.proximosDias[1] ?? null : null;
-  const semFechar = posso("agenda") && dados ? dados.semFechar : { total: 0, primeiros: [] };
+  const semFechar = posso("agenda") && liberado && dados ? dados.semFechar : { total: 0, primeiros: [] };
 
   // conta que acabou de nascer: nada de zeros soltos, só o próximo passo
   const contaNova = Boolean(dados && dados.pets === 0 && dados.totalAgs === 0 && dados.estadiasTotal === 0 && (frente !== "loja" || dados.produtosTotal === 0));
@@ -271,7 +271,7 @@ export default function Hoje() {
           <h1>{saudacao()}, <em className="it">{eu.nome.split(" ")[0]}</em></h1>
         </div>
         <div className="g-acoes">
-          {posso("agenda") && banho && !contaNova && <LinkRapido rotulo="Mandar link de agendamento" />}
+          {posso("agenda") && banho && !contaNova && liberado && <LinkRapido rotulo="Mandar link de agendamento" />}
           {contaNova && frente === "loja" ? <LinkDeGravar className="g-btn pri" href="/gestao/app/estoque"><Plus />Cadastrar o primeiro produto</LinkDeGravar>
             : contaNova && posso("clientes") ? <LinkDeGravar className="g-btn pri" href="/gestao/app/clientes?novo=1"><Plus />Cadastrar o primeiro pet</LinkDeGravar>
             : frente === "loja" ? <LinkDeGravar className="g-btn pri" href={ROTA_VENDER}><ShoppingBag />Vender</LinkDeGravar>
