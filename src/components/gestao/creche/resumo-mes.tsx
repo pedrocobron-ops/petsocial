@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CalendarCheck2, Pencil, Plus } from "lucide-react";
 import { DIAS_SEMANA, diasEmOrdem, fraseDoSaldo, lerPlanos, lerSaldoDeReposicao, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, textoDasDatas, type Falta, type PetDoPlano, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
+import { calendarioGuardado, lerCalendario } from "@/lib/gestao/feriados";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { brl, dataCompleta, dataCurta, isoDia, nomeMes } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -75,7 +76,11 @@ export function CartaoMensalista({ pet }: { pet: PetDoPlano }) {
   const usa = usaModulo(petshop, "creche");
   const { dados, recarregar } = useDados(async () => {
     if (!usa) return null;
-    const planos = await lerPlanos(sb, petshop.id, vejoFinanceiro);
+    // dia marcado como fechado (feriado, folga) não é dia do plano: a conta da ficha é a mesma da tela Mensalistas
+    const [planos] = await Promise.all([
+      lerPlanos(sb, petshop.id, vejoFinanceiro),
+      calendarioGuardado(petshop.id, false) ? null : lerCalendario(sb, petshop.id, false).catch(() => null),
+    ]);
     const meu = planos.filter((p) => p.pet_id === pet.id).sort((a, b) => b.inicio.localeCompare(a.inicio));
     const plano = meu.find((p) => planoAtivo(p, hoje)) ?? meu[0] ?? null;
     if (!plano) return { planos, plano, presencas: [] as Presenca[], faltas: [] as Falta[] };

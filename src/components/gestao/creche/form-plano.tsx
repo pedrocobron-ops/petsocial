@@ -13,6 +13,7 @@ import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Folha, ok, useAvisos, useDados } from "../ui";
 import { lerModelos, type ModeloDePlano } from "./modelos";
+import AcertoDaSaida from "./saida";
 import "./creche.css";
 import "@/components/gestao/hotel/hotel.css";
 
@@ -59,6 +60,12 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
   const [vencPrimeira, setVencPrimeira] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // o plano ganhou data de fim (o cão vai sair): quem cuida do financeiro confere as cobranças do mês da saída em diante
+  const [saida, setSaida] = useState<PlanoCompleto | null>(null);
+  const conferirSaida = (novoFim: string | null, campos: Partial<PlanoCompleto>) => {
+    if (!plano || !vejoFinanceiro || !novoFim || novoFim === plano.fim) { aoSalvo(); return; }
+    setSaida({ ...plano, ...campos, fim: novoFim, valor_mensal: mensal ?? plano.valor_mensal, valor_extra: extra });
+  };
 
   // modelos de plano (2x, 3x, 5x por semana com preço) e se este plano já teve alguma cobrança: só para quem cuida do financeiro
   const { dados: apoio } = useDados(async () => {
@@ -139,7 +146,7 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
       } else if (perguntaPrimeira && primeira === "fora") cobrou = ` A primeira cobrança é a de ${nomeMes(proximoMes)}.`;
       avisar((plano ? "Plano salvo." : `${pet.nome} agora é mensalista da creche.`) + cobrou + saiuDoModelo);
       avisarMudanca();
-      aoSalvo();
+      conferirSaida(campos.fim, campos);
     } catch (e) { avisarErro(e); } finally { setSalvando(false); }
   }
 
@@ -148,7 +155,7 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
     const naoComecou = plano.inicio > hoje;
     if (!(await confirmar({
       titulo: naoComecou ? `Apagar o plano de ${pet.nome}?` : `Encerrar o plano de ${pet.nome}?`,
-      texto: naoComecou ? "O plano ainda não começou: ele some da lista." : "Hoje é o último dia do plano. A chamada deixa de esperar o pet e as cobranças dos próximos meses não são geradas. O histórico fica guardado.",
+      texto: naoComecou ? "O plano ainda não começou: ele some da lista." : `Hoje é o último dia do plano. A chamada deixa de esperar o pet e as cobranças dos próximos meses não são geradas. O histórico fica guardado.${vejoFinanceiro ? " Depois você confere a mensalidade deste mês e os dias extras que ficaram sem cobrança." : ""}`,
       confirmar: naoComecou ? "Apagar o plano" : "Encerrar hoje", perigo: true,
     }))) return;
     setSalvando(true);
@@ -157,10 +164,11 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
       else ok(await sb.from("creche_planos").update({ fim: hoje }).eq("id", plano.id).eq("petshop_id", petshop.id).select("id").single());
       avisar(naoComecou ? "Plano apagado." : `Plano de ${pet.nome} encerrado.`);
       avisarMudanca();
-      aoSalvo();
+      if (naoComecou) aoSalvo(); else conferirSaida(hoje, {});
     } catch (e) { avisarErro(e); } finally { setSalvando(false); }
   }
 
+  if (saida) return <AcertoDaSaida plano={saida} aoFechar={aoSalvo} />;
   if (!pode) {
     return (
       <Folha titulo="Plano do mensalista" aoFechar={aoFechar} rodape={<button className="g-btn sec" onClick={aoFechar}>Fechar</button>}>

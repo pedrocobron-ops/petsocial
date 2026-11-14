@@ -202,7 +202,7 @@ export function resumoDoMes(plano: Vigencia & { pet_id: string }, mes: Date, pre
 const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Mensalidade sugerida para o mês: cheia, ou proporcional aos dias do plano quando ele começa no meio do mês ou tem pausa no mês.
+ * Mensalidade sugerida para o mês: cheia, ou proporcional aos dias do plano quando ele começa ou termina no meio do mês ou tem pausa no mês.
  * Dia que o negócio não abre fica fora da conta dos dois lados (não é dia do plano): tanto o dia da semana fechado quanto a
  * data marcada como fechada (feriado, folga). Por isso feriado no mês não muda a mensalidade.
  * (Mesma conta de `creche_sugestao_mensal` no banco.)
@@ -214,7 +214,7 @@ export function sugestaoDoMes(plano: Vigencia, mes: Date, valor: number, horario
     const dia = isoDia(d);
     if (!plano.dias.includes(d.getDay()) || !abreNoDia(horario, dia) || diaFechado(dia)) continue;
     todos++;
-    if (dia >= plano.inicio && !emPausa(plano, dia)) restam++;
+    if (dia >= plano.inicio && (!plano.fim || dia <= plano.fim) && !emPausa(plano, dia)) restam++;
   }
   const proporcional = todos > 0 && restam < todos;
   return { valor: proporcional ? centavos((valor * restam) / todos) : valor, proporcional, restam, todos };
@@ -296,38 +296,44 @@ export function faltaDaCobranca(c: Pick<CobrancaCompleta, "total" | "lancamentos
 export const textoDasDatas = (dias: string[]) => juntar(dias.map((d) => dataCurta(d)));
 
 /** Linha de um pet na mensagem: "Thor: mensalidade R$ 600,00 + 2 dias extras (03/10 e 17/10) R$ 120,00 = R$ 720,00". */
-function linhaDaMensagem(c: CobrancaCompleta) {
+function linhaDaMensagem(c: CobrancaCompleta, comMes = false) {
   const extras = extrasDaCobranca(c), taxas = taxasDaCobranca(c), valores = partesDosExtras(c);
-  const partes = [`mensalidade ${brl(c.valor_mensal)}`];
+  // acerto da saída (o plano já acabou): não tem mensalidade, só o que ficou sem cobrar
+  const partes = c.acerto_saida ? [] : [`mensalidade ${brl(c.valor_mensal)}`];
   if (extras.length) partes.push(`${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((e) => e.dia))})${valores.dias > 0 ? ` ${brl(valores.dias)}` : ""}`);
   if (taxas.length) partes.push(`${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((e) => e.dia))}) ${brl(valores.taxas)}`);
-  let texto = partes.join(" + ");
+  let texto = (c.acerto_saida ? "acerto da saída, " : "") + partes.join(" + ");
   if (Number(c.desconto) > 0) texto += ` - desconto ${brl(c.desconto)}`;
   if (partes.length > 1 || Number(c.desconto) > 0) texto += ` = ${brl(c.total)}`;
   // parte já recebida: a mensagem cobra só o que falta
   const falta = faltaDaCobranca(c);
   if (falta < Number(c.total)) texto += `. Já pago ${brl(centavos(Number(c.total) - falta))}, falta ${brl(falta)}`;
-  return `${c.pets?.nome ?? "Pet"}: ${texto}`;
+  return `${nomeNaMensagem(c, comMes)}: ${texto}`;
 }
+/** "Rex" ou, quando a mensagem junta meses diferentes, "Rex (novembro)". */
+const nomeNaMensagem = (c: CobrancaCompleta, comMes: boolean) => `${c.pets?.nome ?? "Pet"}${comMes ? ` (${c.acerto_saida ? "acerto da saída" : nomeMes(deIsoDia(c.mes))})` : ""}`;
 
 /**
  * Mensagem de cobrança de um tutor: o mês, uma linha por pet (com os dias extras e as datas), o total e o vencimento.
  * Tom neutro e educado, sem ameaça. A chave Pix e a multa seguem as Opções de cobrança. A pessoa pode mudar o texto antes de mandar.
  */
 export function mensagemDeCobranca(p: { tutor: string | null | undefined; petshop: string; cobrancas: CobrancaCompleta[]; hoje: string; opcoes?: { opcoes?: unknown } }) {
-  const cs = [...p.cobrancas].sort((a, b) => (a.pets?.nome ?? "").localeCompare(b.pets?.nome ?? "", "pt-BR"));
+  const cs = [...p.cobrancas].sort((a, b) => (a.pets?.nome ?? "").localeCompare(b.pets?.nome ?? "", "pt-BR") || a.mes.localeCompare(b.mes));
   if (!cs.length) return "";
-  const meses = [...new Set(cs.map((c) => c.mes))].sort().map((m) => nomeMes(deIsoDia(m)));
+  const meses = [...new Set(cs.filter((c) => !c.acerto_saida).map((c) => c.mes))].sort().map((m) => nomeMes(deIsoDia(m)));
+  // o mesmo pet com mais de uma cobrança (ou meses diferentes): cada linha diz de que mês é
+  const comMes = new Set(cs.map((c) => c.mes)).size > 1 || cs.some((c) => c.acerto_saida);
   const vencimentos = [...new Set(cs.map((c) => c.vencimento))].sort();
   const total = centavos(cs.reduce((s, c) => s + faltaDaCobranca(c), 0));
   const atrasada = vencimentos[0] < p.hoje;
   const oi = saudacaoZap(p.tutor, p.petshop);
+  const doQue = meses.length ? `da mensalidade da creche de ${juntar(meses)}` : "do acerto da creche";
   const abre = atrasada
-    ? `${oi} Passando para lembrar da mensalidade da creche de ${juntar(meses)}:`
-    : `${oi} Segue a mensalidade da creche de ${juntar(meses)}:`;
+    ? `${oi} Passando para lembrar ${doQue}${meses.length && cs.some((c) => c.acerto_saida) ? " e do acerto da saída" : ""}:`
+    : `${oi} Segue ${meses.length ? `a mensalidade da creche de ${juntar(meses)}${cs.some((c) => c.acerto_saida) ? " e o acerto da saída" : ""}` : "o acerto da creche"}:`;
   const vence = vencimentos.length === 1
     ? `Vencimento: ${dataCompleta(vencimentos[0])}`
-    : `Vencimentos: ${cs.map((c) => `${c.pets?.nome ?? "Pet"} em ${dataCompleta(c.vencimento)}`).join(", ")}`;
+    : `Vencimentos: ${cs.map((c) => `${nomeNaMensagem(c, comMes)} em ${dataCompleta(c.vencimento)}`).join(", ")}`;
   // as mesmas regras das outras mensagens de cobrança (Meu pet shop, Opções de cobrança): a chave Pix, se preenchida,
   // e a multa com os juros só quando o dono ligou a multa e marcou "mostrar na mensagem" (e a mensalidade está atrasada)
   const o = p.opcoes ? opcoesDeCobranca(p.opcoes) : null;
@@ -335,7 +341,7 @@ export function mensagemDeCobranca(p: { tutor: string | null | undefined; petsho
   const linhas = cs.map((c) => {
     const m = o?.multaNaMensagem && p.opcoes ? multaSugerida(p.opcoes, { valor: faltaDaCobranca(c), vencimento: c.vencimento }, p.hoje) : null;
     if (m) multas = centavos(multas + m.total);
-    return `${linhaDaMensagem(c)}${m ? ` + multa e juros por atraso ${brl(m.total)}` : ""}`;
+    return `${linhaDaMensagem(c, comMes)}${m ? ` + multa e juros por atraso ${brl(m.total)}` : ""}`;
   });
   const linhaTotal = multas > 0 ? [`Total: ${brl(total)} + multa e juros ${brl(multas)} = ${brl(centavos(total + multas))}`] : cs.length > 1 ? [`Total: ${brl(total)}`] : [];
   return [abre, "", ...linhas, "", ...linhaTotal, vence, ...(o?.pix ? [`Chave Pix: ${o.pix}`] : []), "", "Qualquer dúvida, é só chamar. Obrigado!"].join("\n");
@@ -385,7 +391,9 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
   }
   return {
     esperados: linhas.length, aindaNao: linhas.filter((l) => l.estado === "esperado").length,
-    faltaram: linhas.filter((l) => l.estado === "faltou").map((l) => l.plano.pets?.nome ?? "Pet"), vencemHoje, atrasadas, reposicoes, semValor,
+    faltaram: linhas.filter((l) => l.estado === "faltou").map((l) => l.plano.pets?.nome ?? "Pet"),
+    // quem faltou sem o tutor avisar: só para esses vale mandar mensagem perguntando
+    semAviso: linhas.filter((l) => l.estado === "faltou" && !l.falta?.avisou).map((l) => l.plano.pets?.nome ?? "Pet"), vencemHoje, atrasadas, reposicoes, semValor,
     naCasa: linhas.filter((l) => l.estado === "na_casa").length,
   };
 }
@@ -396,7 +404,7 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
  */
 export function textoComprovanteMensalidades(p: {
   petshop: string; tutor?: string | null; dia: string; forma: string;
-  itens: { pet: string; mes: string; valor: number; multa: number }[];
+  itens: { pet: string; mes: string; valor: number; multa: number; acerto?: boolean }[];
 }) {
   const total = Math.round(p.itens.reduce((t, i) => t + i.valor + i.multa, 0) * 100) / 100;
   return [
@@ -405,7 +413,7 @@ export function textoComprovanteMensalidades(p: {
     p.petshop,
     `Data: ${dataCompleta(p.dia)}`,
     "",
-    ...p.itens.map((i) => `${i.pet}: mensalidade de ${nomeMes(deIsoDia(i.mes))} ${brl(i.valor)}${i.multa > 0 ? ` + multa e juros por atraso ${brl(i.multa)}` : ""}`),
+    ...p.itens.map((i) => `${i.pet}: ${i.acerto ? "acerto da saída" : `mensalidade de ${nomeMes(deIsoDia(i.mes))}`} ${brl(i.valor)}${i.multa > 0 ? ` + multa e juros por atraso ${brl(i.multa)}` : ""}`),
     `Total: ${brl(total)}`,
     `Pagamento: ${p.forma}`,
     "",
