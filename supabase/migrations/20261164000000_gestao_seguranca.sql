@@ -338,8 +338,8 @@ end $$;
 revoke execute on function public.cakto_evento(text, text, text, text, jsonb, text, text, text, text) from public;
 grant execute on function public.cakto_evento(text, text, text, text, jsonb, text, text, text, text) to anon, authenticated;
 
--- Escola: mesma assinatura. Compra repetida já não duplicava (on conflict); agora um aviso repetido também não devolve o acesso
--- depois de um reembolso, e o reembolso de um pedido antigo não apaga a compra de um pedido novo.
+-- Escola: mesma assinatura e mesmo efeito. Compra repetida já não duplicava (on conflict); agora o aviso de compra repetido
+-- (mesmo pedido) também não devolve o acesso depois de um reembolso, e o reembolso repetido não apaga uma compra nova.
 create or replace function public.escola_evento(p_segredo text, p_evento text, p_email text, p_slug text, p_pedido text default null) returns text
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -357,8 +357,7 @@ begin
       on conflict (email, slug) do nothing;
     return 'ok';
   end if;
-  delete from public.escola_compras
-    where email = v_email and slug = p_slug and origem = 'cakto' and (v_pedido is null or pedido is null or pedido = v_pedido);
+  delete from public.escola_compras where email = v_email and slug = p_slug and origem = 'cakto';
   return 'ok';
 end $$;
 revoke execute on function public.escola_evento(text, text, text, text, text) from public;
