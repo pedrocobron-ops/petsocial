@@ -48,6 +48,8 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
   const [recado, setRecado] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [feito, setFeito] = useState<string | null>(null);
+  // o sinal da reserva (creche ou hotel), quando quem recebe o pedido combinou um: quanto é e se já foi pago
+  const [sinal, setSinal] = useState<{ valor: number; estado: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const travado = useRef(false);
 
@@ -68,6 +70,11 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
     aplicarTema(lido?.tema);
     setAcoes(a);
     setPedido(lido);
+    if (lido?.itens?.some((i) => (i.tipo === "creche" || i.tipo === "hotel") && i.status === "aceito")) {
+      const r = await banco().rpc("link_pedido_sinal", { p_id: id });
+      const x = r.error ? null : (r.data as { valor?: number; estado?: string } | null);
+      setSinal(x && Number(x.valor) > 0 ? { valor: Number(x.valor), estado: String(x.estado) } : null);
+    } else setSinal(null);
   }, [id]);
 
   useEffect(() => { void buscar(); }, [buscar]);
@@ -159,7 +166,7 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
                   <li key={n}>
                     <div>
                       <b>{i.pet}</b>
-                      <span>{[i.servico, dataLonga(deIsoDia(i.dia)), i.ate && i.ate !== i.dia ? `até ${dataLonga(deIsoDia(i.ate))}` : null].filter(Boolean).join(" · ")}</span>
+                      <span>{[i.servico, `${dataLonga(deIsoDia(i.dia))}${ehEstadia(i) && i.hora ? `, chegada às ${i.hora}` : ""}`, i.ate && i.ate !== i.dia ? `até ${dataLonga(deIsoDia(i.ate))}` : null].filter(Boolean).join(" · ")}</span>
                     </div>
                     <div className="lado">
                       {(!i.tipo || i.tipo === "servico") && <span className="hora"><Clock aria-hidden />{i.hora}</span>}
@@ -168,6 +175,13 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
                   </li>
                 ))}
               </ul>
+              {sinal && geral !== "recusado" && !desistiu && (
+                <p className="g-lkp-recado" role="status">
+                  <span>{sinal.estado === "pago"
+                    ? `Sinal de ${sinal.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}: já recebido. Obrigado!`
+                    : `Para garantir a vaga, ${pedido.petshop} pede um sinal de ${sinal.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}. O pagamento é combinado direto com ${pedido.petshop}: nada é pago por aqui.`}</span>
+                </p>
+              )}
               {feito && <p className="g-lkp-feito" role="status">{feito}</p>}
               {acoes?.pediu && acoes.aberto && !painel && (
                 <p className="g-lkp-recado">
@@ -193,7 +207,7 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
                 </p>
                 <div className="g-lkp-acoes">
                   <button type="button" className="g-btn sec" onClick={() => abrir("mudar")}><CalendarClock />Pedir outra data</button>
-                  <button type="button" className="g-btn perigo" onClick={() => abrir("cancelar")}><CalendarX />Cancelar o pedido</button>
+                  {acoes!.pediu !== "cancelar" && <button type="button" className="g-btn perigo" onClick={() => abrir("cancelar")}><CalendarX />Cancelar o pedido</button>}
                 </div>
               </section>
             )}
