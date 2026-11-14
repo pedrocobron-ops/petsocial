@@ -65,7 +65,7 @@ export default function AjusteFidelidade() {
       <div className="g-mp-t">
         <Tile icone={Gift} tom="lilas" />
         <div><h2>Fidelidade</h2><p className="g-muted g-p">A cada tantos atendimentos concluídos, o tutor ganha um prêmio.</p></div>
-        <button type="button" role="switch" aria-checked={!!programa} aria-label="Fidelidade ligada" className="g-mp-chave" disabled={ocupado} onClick={() => void (programa ? desligar() : ligar())}><i /></button>
+        <button type="button" role="switch" aria-checked={!!programa} aria-label="Programa de fidelidade" className="g-mp-chave" disabled={ocupado} onClick={() => void (programa ? desligar() : ligar())}><i /></button>
       </div>
       <form className="g-form" onSubmit={salvar}>
         <div className="g-campo">

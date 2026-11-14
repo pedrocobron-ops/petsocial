@@ -1,7 +1,7 @@
 "use client";
 
 import { Selo } from "./marca";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -22,6 +22,7 @@ import Ajuda from "./ajuda";
 import AjudaDaTela from "./manual/ajuda-da-tela";
 import GuiaInicial from "./guia-inicial";
 import LogoLoja from "./logo-loja";
+import AvisoDeFuso from "./aviso-fuso";
 import { aplicarTema } from "@/lib/gestao/identidade";
 
 type Item = { href: string; rotulo: string; icone: React.ComponentType; tom: Tom; so?: "financeiro" | "dono" };
@@ -85,6 +86,12 @@ function montarMenu(petshop: ComMenu, semAgenda: boolean) {
 
 /** Navegação, avisos de assinatura e o botão da assistente em volta de todas as telas do aplicativo. */
 export default function Casca({ children }: { children: React.ReactNode }) {
+  const toqueNaFolha = useRef(0);
+  useEffect(() => {
+    const tocou = (e: PointerEvent) => { if ((e.target as Element | null)?.closest?.('[role="dialog"], [role="alertdialog"]')) toqueNaFolha.current = Date.now(); };
+    document.addEventListener("pointerdown", tocou, true);
+    return () => document.removeEventListener("pointerdown", tocou, true);
+  }, []);
   const caminho = usePathname();
   const { sb, user, petshop, eu, souDono, posso, liberado, diasDeTeste, sair } = useGestao();
   const [pedidos, setPedidos] = useState(0);
@@ -236,6 +243,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           <AjudaDaTela aoPerguntar={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }} />
           <div className="g-barra-data"><CalendarClock />{dataLonga(new Date())}</div>
         </div>
+        <AvisoDeFuso />
         {!liberado && !cartaoNoHoje && (
           <div className="g-aviso vermelho" role="alert">
             <TriangleAlert />
@@ -266,7 +274,8 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         ) : children}
       </main>
 
-      <nav className="g-abas" aria-label="Menu">
+      {/* toque duplo no botão de uma folha: ela fecha no primeiro toque e o segundo cairia na aba que fica embaixo */}
+      <nav className="g-abas" aria-label="Menu" onClickCapture={(e) => { if (Date.now() - toqueNaFolha.current < 500) { e.preventDefault(); e.stopPropagation(); } }}>
         <Link href="/gestao/app" aria-current={atual("/gestao/app") ? "page" : undefined}><Sun />Hoje</Link>
         <Link href={podeAba ? aba.href : "/gestao/app"} aria-current={atual(aba.href) ? "page" : undefined} style={{ position: "relative", opacity: podeAba ? 1 : .35 }}><aba.icone />{aba.rotulo}{aba.href === AGENDA && pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
         <button className="g-aba-mic" onClick={() => setAssistente({ aberta: true, pedido: "" })} aria-label="Falar com o Mozart, o assistente">

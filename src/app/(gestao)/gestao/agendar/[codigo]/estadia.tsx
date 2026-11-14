@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Cat, Check, Dog, MessageCircle, PawPrint, Plus, Trash2 } from "lucide-react";
 import { banco } from "@/lib/gestao/supabase";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
-import { brl, brlCurto, dataCurta, fmtTelefone } from "@/lib/gestao/util";
+import { brl, brlCurto, dataCurta, deIsoDia, fmtTelefone, isoDia, somaDias } from "@/lib/gestao/util";
 import { lembrarPedido } from "@/lib/gestao/link-opcoes";
 import { AceiteDosTermos, SEM_ACEITE, faltaAceitar, pedirPeloLink, type TermosDoLink } from "./termos";
 
@@ -13,7 +13,7 @@ type Especie = "cao" | "gato" | "outro";
 const ESPECIES: { id: Especie; rotulo: string; icone: React.ComponentType<{ size?: number }> }[] = [
   { id: "cao", rotulo: "Cão", icone: Dog }, { id: "gato", rotulo: "Gato", icone: Cat }, { id: "outro", rotulo: "Outro", icone: PawPrint },
 ];
-const soma = (iso: string, dias: number) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + dias); return d.toISOString().slice(0, 10); };
+const soma = (iso: string, dias: number) => isoDia(somaDias(deIsoDia(iso), dias));
 const dia = (iso: string) => { const d = new Date(`${iso}T12:00:00`); return `${["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"][d.getDay()]}, ${dataCurta(d)}`; };
 const entre = (a: string, b: string) => Math.round((new Date(`${b}T12:00:00`).getTime() - new Date(`${a}T12:00:00`).getTime()) / 864e5);
 type PetDoPedido = { nome: string; especie: Especie; porte: Porte | null };

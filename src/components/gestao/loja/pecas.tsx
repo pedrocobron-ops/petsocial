@@ -168,15 +168,19 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
  */
 export function Troco({ devido, parte }: { devido: number; parte?: boolean }) {
   const [recebeu, setRecebeu] = useState<number | null>(null);
+  // o que está escrito no campo: texto que não é número ("cem") ganha um aviso em vez de ficar sem resposta
+  const [escrito, setEscrito] = useState("");
+  const naoENumero = escrito.trim() !== "" && recebeu == null;
   const troco = recebeu == null ? null : centavos(recebeu - devido);
   return (
     <div className="g-pg-troco">
-      <label>
+      <label onInput={(e) => setEscrito((e.target as HTMLInputElement).value ?? "")}>
         <span>Recebeu quanto?</span>
         <CampoDinheiro valor={recebeu} aoMudar={setRecebeu} rotulo="Recebeu quanto em dinheiro" maximo={99999999} />
       </label>
       <p role="status" className={troco != null && troco < 0 ? "falta" : undefined}>
-        {troco == null ? <span className="g-muted">{parte ? "Se quiser, escreva quanto ele entregou em dinheiro para ver o troco." : "Se quiser, escreva quanto o cliente entregou para ver o troco."}</span>
+        {naoENumero ? <span className="g-erro">Escreva o valor só com números, como 100,00.</span>
+          : troco == null ? <span className="g-muted">{parte ? "Se quiser, escreva quanto ele entregou em dinheiro para ver o troco." : "Se quiser, escreva quanto o cliente entregou para ver o troco."}</span>
           : troco > 0 ? <>Troco: <b className="g-tab">{brl(troco)}</b></>
           : troco === 0 ? "Sem troco." : <>Faltam <b className="g-tab">{brl(-troco)}</b> para {brl(devido)}.</>}
       </p>
@@ -228,7 +232,8 @@ export function fecharRecebimento(pagamento: EstadoPagamento, depois: PagaDepois
   const ruim = erroDeValor(total);
   if (ruim) return { erro: ruim, noCampo: ruim };
   if (depois.ativo) {
-    if (!depois.quando || depois.quando < isoDia(new Date())) return { erro: "Escolha quando o cliente vai pagar.", noCampo: "Escolha um dia de hoje em diante." };
+    if (!depois.quando) return { erro: "Escolha quando o cliente vai pagar.", noCampo: "Escolha um dia de hoje em diante." };
+    if (depois.quando < isoDia(new Date())) return { erro: "A data em que o cliente vai pagar já passou. Escolha um dia de hoje em diante.", noCampo: "Essa data já passou. Escolha um dia de hoje em diante." };
     return { fiado: true, quando: depois.quando };
   }
   const pg = fecharPagamento(pagamento, total);
