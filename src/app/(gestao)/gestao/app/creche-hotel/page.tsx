@@ -477,7 +477,7 @@ export default function CrecheHotel() {
       {erro && <ErroTela erro={erro} aoTentar={() => void recarregar()} />}
 
       {usaCreche && (souDono || cuidoDoFinanceiro) && (ver === "chamada" || ver === "casa" || ver === "cobrancas") && <ReposicoesParaConferir />}
-      {ver === "casa" && posso("agenda") && <PedidosLink />}
+      {ver === "casa" && posso("agenda") && <div className="g-ht-acima"><PedidosLink /></div>}
 
       {usaCreche && !mens ? <Esqueleto linhas={4} />
         : ver === "diario" && comDiario ? <Diario />

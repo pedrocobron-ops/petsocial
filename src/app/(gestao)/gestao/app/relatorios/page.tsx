@@ -515,7 +515,7 @@ function Relatorios() {
                   <span className="g-muted g-pp">estadias encerradas no período</span>
                 </div>
                 <div className="g-rel-ch">
-                  {r.estadias.map((x) => (
+                  {r.estadias.filter((x) => x.n > 0 || usaModulo(petshop, x.id)).map((x) => (
                     <div key={x.id} className="g-rel-ch-tipo">
                       <p className="g-rel-ch-nome"><Tile icone={x.icone} tom="ceu" tamanho="p" /><b>{x.nome}</b></p>
                       {x.n ? (

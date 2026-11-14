@@ -20,7 +20,7 @@ export default function ChamadaDeHoje({ esperados, aindaNao, naCasa, faltaram }:
         <span className="casa"><b className="g-num">{naCasa}</b>na casa</span>
         <span className="faltou"><b className="g-num">{faltaram}</b>{faltaram === 1 ? "faltou" : "faltaram"}</span>
       </div>
-      <div><Link className="g-btn pri" href="/gestao/app/creche-hotel?ver=chamada"><CalendarCheck2 />{aindaNao > 0 ? "Fazer a chamada" : "Ver a chamada"}</Link></div>
+      <div><Link className="g-btn verde" href="/gestao/app/creche-hotel?ver=chamada"><CalendarCheck2 />{aindaNao > 0 ? "Fazer a chamada" : "Ver a chamada"}</Link></div>
     </section>
   );
 }

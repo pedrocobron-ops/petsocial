@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarCheck2, CalendarDays, HandCoins, Sun, TriangleAlert, UserX } from "lucide-react";
+import { CalendarCheck2, CalendarDays, HandCoins, Sun, UserX } from "lucide-react";
 import {
   abreNoDia, DIAS_SEMANA, estadoDaCobranca, faltaDaCobranca, lerPlanos, lerPresencas, partesDosExtras, SELECT_COBRANCA, type CobrancaCompleta,
 } from "@/lib/gestao/creche";
@@ -156,7 +156,7 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
               <div key={m.mes} className="g-linha">
                 <Tile icone={HandCoins} tom="menta" tamanho="p" />
                 <span className="t">
-                  <b style={{ textTransform: "capitalize" }}>{nomeMes(deIsoDia(m.mes))} · {brl(m.total)} cobrados</b>
+                  <b>{nomeMes(deIsoDia(m.mes))[0].toUpperCase() + nomeMes(deIsoDia(m.mes)).slice(1)} · {brl(m.total)} cobrados</b>
                   <span>{[`recebido ${brl(m.recebido)}`, m.aVencer > 0 ? `a vencer ${brl(m.aVencer)}` : null, m.atrasado > 0 ? `atrasado ${brl(m.atrasado)} (${um(m.nAtrasadas, "mensalidade", "mensalidades")})` : null].filter(Boolean).join(" · ")}</span>
                 </span>
                 <span className="d g-tab">{m.total > 0 ? `${Math.round((m.recebido / m.total) * 100)}% recebido` : ""}</span>
@@ -168,7 +168,7 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
 
       {devendo.length > 0 && (
         <div>
-          <p className="g-rotulo" style={{ marginBottom: 8 }}><TriangleAlert size={14} aria-hidden style={{ verticalAlign: "-2px" }} /> Quem está devendo</p>
+          <p className="g-rotulo" style={{ marginBottom: 8 }}>Quem está devendo</p>
           <div className="g-lista">
             {devendo.slice(0, 8).map((c) => (
               <div key={c.id} className="g-linha">

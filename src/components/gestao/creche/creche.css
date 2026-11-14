@@ -146,3 +146,6 @@
 /* a escolha da primeira cobrança, na folha de gerar cobranças */
 .g-cm-gerar-linha .t .g-cm-primeira { margin: 4px 0 2px; padding: 8px; border-radius: 10px; background: var(--g-amarelo-tint); }
 .g-cm-gerar-linha .t .g-cm-primeira > span { color: #5c4300; font-size: .875rem; }
+/* aviso das primeiras cobranças: no celular o botão desce para baixo do texto */
+.g-cm-aviso-fora { flex-wrap: wrap; }
+.g-cm-aviso-fora > .g-cresce { flex: 1 1 220px; }

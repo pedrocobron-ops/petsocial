@@ -171,7 +171,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
           )}
 
           {primeiras.length > 0 && (
-            <div className="g-aviso" role="status" style={{ marginBottom: 0 }}>
+            <div className="g-aviso g-cm-aviso-fora" role="status" style={{ marginBottom: 0 }}>
               <AlertTriangle />
               <span className="g-cresce">{primeiras.length === 1 ? "1 mensalidade" : `${primeiras.length} mensalidades`} de {nomeMes(mes)} {primeiras.length === 1 ? "é a primeira cobrança do mensalista" : "são a primeira cobrança de cada mensalista"} aqui. Se {primeiras.length === 1 ? "já foi paga" : "já foram pagas"} antes de você começar a usar o sistema, marque como {primeiras.length === 1 ? "paga" : "pagas"} por fora: {primeiras.length === 1 ? "ela sai" : "elas saem"} de A receber sem entrar no caixa.</span>
               <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setPorFora(true); }}>Já foram pagas por fora</button>
@@ -244,7 +244,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
                         </div>
                         {b.id !== "paga" && (
                           <div className="g-cm-grupo-pe">
-                            {aReceberDe(g).length > 1 && <button type="button" className="g-btn verde p" onClick={() => { if (!somenteLeitura()) setFamilia(g); }} aria-label={`Receber de uma vez as mensalidades de ${g.tutor ?? "o tutor"}`}><HandCoins />Receber tudo · {brl(g.total)}</button>}
+                            {aReceberDe(g).length > 1 && <button type="button" className="g-btn verde p" onClick={() => { if (!somenteLeitura()) setFamilia(g); }} ><HandCoins />Receber tudo · {brl(g.total)}</button>}
                             {cobradoEm && <span className="g-tag verde"><Check size={12} aria-hidden />cobrado em {dataCurta(isoDia(new Date(cobradoEm)))}</span>}
                             {zap ? (
                               <>
