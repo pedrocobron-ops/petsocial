@@ -74,3 +74,13 @@ A plataforma não pode parecer "pobrinha": cada tela abre com um resumo visual a
 Português do Brasil, frases curtas, tom de gente ("Nenhum banho marcado para hoje."), sem jargão de sistema
 ("registro", "cadastro efetuado com sucesso"). Sem promessa de resultado, sem número inventado, sem urgência falsa.
 O assistente se chama Mozart. Para abrir o assistente com um pedido pronto: `abrirAssistente("texto")`.
+
+## Cakto (assinatura)
+
+- Aviso de pagamento: `src/app/api/gestao/cakto/route.ts` → função `cakto_evento` (casa a loja pela assinatura, pelo `callback` do link
+  = id do pet shop, pelo e-mail da compra e pelo e-mail do dono) → `cakto_aplicar` (status, plano, período, `pago_ate`).
+- Tudo se configura no painel do administrador, aba **Cakto** (`src/components/gestao/admin/cakto.tsx`): chave secreta de cada
+  webhook (o banco guarda só o sha256), link e código de cada uma das 9 ofertas, código do produto, abrir a assinatura e
+  ligar pagamentos que chegaram com outro e-mail. Nada disso precisa de SQL nem de publicar o site.
+- Links de pagamento: `linkDe()` em `src/lib/gestao/planos.ts` (banco primeiro, pela função pública `gestao_assinatura`; variável
+  `NEXT_PUBLIC_GESTAO_CHECKOUT_*` da Vercel como reserva). O app carrega os links no `GestaoProvider`.
