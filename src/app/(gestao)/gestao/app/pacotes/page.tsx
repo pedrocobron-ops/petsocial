@@ -441,7 +441,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
         // conta a receber: entrada ainda não paga, com vencimento e ligada ao cliente
         try {
           await lancarAReceber(sb, petshop.id, {
-            valor: preco, vencimento: rec.quando, categoria: "Pacotes", descricao: `Pacote ${nome.trim()} · ${pet.nome} (a receber)`, clienteId: pet.clientes?.id ?? null, chave,
+            valor: preco, vencimento: rec.quando, categoria: "Pacotes", descricao: `Pacote ${nome.trim()} · ${pet.nome}`, clienteId: pet.clientes?.id ?? null, chave,
           });
           avisar(`Pacote vendido para ${pet.nome}. ${brl(preco)} em A receber, para ${dataCurta(rec.quando)}.`);
         } catch (e) {
