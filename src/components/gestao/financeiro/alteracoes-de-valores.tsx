@@ -18,6 +18,11 @@ export function fraseDaAlteracao(x: AlteracaoDeValor): string {
   const de = x.de == null ? "" : brl(x.de), para = x.para == null ? "" : brl(x.para);
   if (x.tipo === "apagou") return `${quem} apagou um valor recebido: ${x.descricao}${de ? ` (${de})` : ""}`;
   if (x.tipo === "preco") return `${quem} vendeu ${x.descricao} por ${para}${de ? `: o preço da lista é ${de}` : ""}${x.abaixo_do_custo ? " (abaixo do custo)" : ""}`;
+  if (x.tipo === "sem_cobranca") return `${quem} marcou como não cobrado: ${x.descricao}${de ? ` (${de})` : ""}`;
+  if (x.tipo === "servico_tirado") return `${quem} tirou da conta ${x.descricao}${de ? ` (${de})` : ""}`;
+  if (x.tipo === "preco_agenda") return `${quem} marcou ${x.descricao} por ${para}${de ? `: o preço da lista é ${de}` : ""}`;
+  if (x.tipo === "pacote") return `${quem} vendeu ${x.descricao}${para ? `, por ${para}` : ""}`;
+  if (x.tipo === "alterou_venda") return `${quem} baixou o valor de uma venda já recebida: ${x.descricao}, de ${de} para ${para}${x.abaixo_do_custo ? " (abaixo do custo)" : ""}`;
   if (x.tipo === "desconto") return `${quem} deu desconto de ${brl(Math.max(0, Number(x.de ?? 0) - Number(x.para ?? 0)))} em ${x.descricao}: de ${de} para ${para}`;
   return x.de != null && x.para != null && Number(x.de) !== Number(x.para)
     ? `${quem} alterou um valor recebido: ${x.descricao}, de ${de} para ${para}`
@@ -67,7 +72,7 @@ export default function AlteracoesDeValores() {
       {aberta && (
         <Folha titulo="Alterações em valores" aoFechar={fechar} rodape={<button type="button" className="g-btn sec" onClick={fechar}>Fechar</button>}>
           <div className="g-pilha">
-            <p className="g-muted g-p">O que outras pessoas da equipe alteraram ou apagaram em dinheiro já recebido, e as vendas com preço diferente da lista ou com desconto. O que você mesmo fez não entra aqui.</p>
+            <p className="g-muted g-p">O que outras pessoas da equipe alteraram ou apagaram em dinheiro já recebido, as vendas com preço diferente da lista ou com desconto, os horários marcados abaixo da lista, os serviços tirados da conta, os atendimentos marcados como não cobrados e os pacotes vendidos fora do modelo. O que você mesmo fez não entra aqui.</p>
             {lista.length ? (
               <ul className="gf-alt-lista">
                 {lista.map((x) => (

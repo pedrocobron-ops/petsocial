@@ -4,6 +4,7 @@ import { useState } from "react";
 import { History, Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
 import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
+import { usaCasa } from "@/lib/gestao/modulos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
@@ -332,9 +333,11 @@ export const categoriaAtual = (c: string) => (c === "Produtos e insumos" ? "Prod
  * Cria ou edita um lançamento.
  * `modo = "pago"`: dinheiro que já entrou ou saiu. `modo = "conta"`: conta a pagar ou a receber, com vencimento.
  */
-export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData, escolheTipo, aoFechar, aoSalvo }: {
+export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData, escolheTipo, aoFechar, aoSalvo, tutor: tutorFixo }: {
   modo: "pago" | "conta"; tipo: Tipo; inicial?: Lancamento | null; escolheData?: boolean; escolheTipo?: boolean;
   aoFechar: () => void; aoSalvo: () => void | Promise<void>;
+  /** Conta a receber anotada na ficha de um tutor (taxa de falta, diferença esquecida): já vem com ele. */
+  tutor?: { id: string; nome: string } | null;
 }) {
   const { sb, petshop, user, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
@@ -364,11 +367,26 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   const [meses, setMeses] = useState(6);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // conta a receber nova: de qual tutor (aparece na ficha dele e na cobrança)
+  const [tutorConta, setTutorConta] = useState<{ id: string; nome: string } | null>(tutorFixo ?? null);
+  // valor recebido corrigido para menos, de um cliente: a diferença ainda é devida? (null: a pessoa ainda não disse)
+  const [restoDevido, setRestoDevido] = useState<boolean | null>(null);
+  const [restoQuando, setRestoQuando] = useState(() => isoDia(new Date(Date.now() + 7 * 864e5)));
 
   const conta = modo === "conta";
   const entrada = tipo === "entrada";
   const voltam = produtosDaVenda(inicial).length;
-  const lista = categoriasDe(tipo);
+  // entrada recebida de um cliente corrigida para menos: a diferença pode continuar devida (não some calada)
+  const baixou = inicial && inicial.pago && inicial.tipo === "entrada" && inicial.cliente_id && !inicial.conta_id && !inicial.movimento && !travado && !soVer && valor != null && valor > 0
+    ? Math.max(0, Math.round((Number(inicial.valor) - valor) * 100) / 100) : 0;
+  const { dados: nomeDoClienteLido } = useDados(async () => {
+    if (!inicial?.cliente_id) return null;
+    const r = await sb.from("clientes").select("nome").eq("id", inicial.cliente_id).maybeSingle();
+    return r.data?.nome ?? null;
+  }, [inicial?.cliente_id]);
+  const nomeDoCliente = nomeDoClienteLido?.split(" ")[0] ?? "O cliente";
+  // quem não tem creche nem hotel não vê essa categoria (lançamento antigo com ela continua mostrando)
+  const lista = categoriasDe(tipo).filter((c) => c !== "Creche e hotel" || usaCasa(petshop));
   const categorias = (lista.includes(categoria) ? lista : [categoria, ...lista]).map((c) => ({ id: c, rotulo: c }));
   const titulo = conta
     ? `${inicial ? "Editar conta" : "Nova conta"} ${entrada ? "a receber" : "a pagar"}`
@@ -395,6 +413,8 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     const forma = pg && !("erro" in pg) ? pg.forma : null;
     const pagamentos = pg && !("erro" in pg) ? pg.pagamentos : null;
     const vezes = conta && !inicial && repetir ? Math.min(36, Math.max(2, Math.round(meses) || 2)) : 1;
+    if (baixou && restoDevido == null) { setErro(`Diga se ${nomeDoCliente} ainda deve os ${brl(baixou)} da diferença.`); return; }
+    if (baixou && restoDevido && (!restoQuando || restoQuando < hoje)) { setErro("Escolha um dia de hoje em diante para o cliente pagar a diferença."); return; }
     setErro(null);
     // um zero a mais é fácil de digitar: valor alto pede uma conferência (na edição, só se o valor mudou)
     if ((!inicial || Number(inicial.valor) !== valor) && !(await conferirValorAlto(valor, confirmar))) return;
@@ -411,20 +431,29 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         const r = await sb.from("lancamentos").update(mudancas).eq("id", inicial.id).eq("petshop_id", petshop.id).select("id");
         if (r.error) throw new Error(r.error.message);
         if (!r.data?.length) throw new Error("Não deu para salvar. Este lançamento pode ter sido apagado, ou só o dono e quem cuida do financeiro podem alterar.");
-        avisar("Alteração salva.");
+        if (baixou && restoDevido && inicial.cliente_id) {
+          // a diferença vira uma conta a receber do mesmo cliente: não some do que ele deve
+          const resto = await gravarLancamento(sb, petshop.id, {
+            petshop_id: petshop.id, tipo: "entrada", valor: baixou, categoria, pago: false, forma: null, vencimento: restoQuando, data: restoQuando,
+            descricao: `Resto de ${texto || inicial.categoria}`.slice(0, 120), cliente_id: inicial.cliente_id, origem: "tela", criado_por: user.id,
+          }, parteDaChave(chave, "resto"));
+          if (resto.error) throw new Error(`A alteração foi salva, mas a diferença não ficou anotada. Anote ${brl(baixou)} na ficha do cliente. (${resto.error.message})`);
+          avisar(`Alteração salva. ${brl(baixou)} ficaram anotados para ${nomeDoCliente} pagar até ${dataCompleta(restoQuando)}.`);
+        } else avisar("Alteração salva.");
       } else if (conta) {
         const linhas = Array.from({ length: vezes }, (_, i) => {
           const dia = somaMeses(vencimento, i);
           return {
             petshop_id: petshop.id, tipo, valor, categoria, pago: false, forma: null, vencimento: dia, data: dia,
             descricao: vezes > 1 ? `${texto} (${i + 1}/${vezes})` : texto, origem: "tela", criado_por: user.id,
+            ...(entrada && tutorConta ? { cliente_id: tutorConta.id } : {}),
             chave: parteDaChave(chave, "conta", i + 1),
           };
         });
         // a chave de cada conta é única: um toque duplo (ou o pedido repetido) não anota as contas duas vezes
         const r = await sb.from("lancamentos").upsert(linhas, { onConflict: "petshop_id,chave", ignoreDuplicates: true });
         if (r.error) throw new Error(r.error.message);
-        avisar(vezes > 1 ? `${vezes} contas anotadas, uma por mês.` : "Conta anotada.");
+        avisar(vezes > 1 ? `${vezes} contas anotadas, uma por mês.` : entrada && tutorConta ? `Conta anotada: ${tutorConta.nome.split(" ")[0]} deve ${brl(valor)}. Aparece na ficha e em A receber.` : "Conta anotada.");
       } else if (!forma) {
         setSalvando(false);
         return;
@@ -509,10 +538,14 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
             <button type="button" aria-pressed={!entrada} onClick={() => trocarTipo("saida")}>Saída</button>
           </div>
         )}
+        {conta && entrada && !inicial && (
+          tutorFixo ? <Grupo rotulo="Cliente"><p className="g-p">{tutorFixo.nome}</p></Grupo>
+            : <EscolhaTutor valor={tutorConta} aoMudar={setTutorConta} />
+        )}
         {conta && (
           <Campo rotulo="Do que é">
             <input className="g-input" value={descricao} maxLength={120} autoFocus={!inicial} onChange={(e) => setDescricao(e.target.value)}
-              placeholder={entrada ? "Ex.: pacote da Mel, fiado da Dona Lúcia" : "Ex.: aluguel, conta de luz"} />
+              placeholder={entrada ? (tutorFixo || tutorConta ? "Ex.: taxa de falta do dia 14/11" : "Ex.: pacote da Mel, fiado da Dona Lúcia") : "Ex.: aluguel, conta de luz"} />
           </Campo>
         )}
         <div className={conta || escolheData ? "dupla" : undefined}>
@@ -551,6 +584,20 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
             <input className="g-input" value={descricao} maxLength={120} onChange={(e) => setDescricao(e.target.value)}
               placeholder={entrada ? "Ex.: banho da Mel" : "Ex.: shampoo, troco do motoboy"} />
           </Campo>
+        )}
+        {baixou > 0 && (
+          <div className="g-card liso g-pilha p" role="group" aria-label="A diferença ainda é devida?">
+            <p className="g-p">O valor baixou {brl(baixou)}. {nomeDoCliente} ainda deve essa diferença?</p>
+            <div className="g-seg" role="group" aria-label="A diferença">
+              <button type="button" aria-pressed={restoDevido === true} onClick={() => { setRestoDevido(true); setErro(null); }}>Ainda deve</button>
+              <button type="button" aria-pressed={restoDevido === false} onClick={() => { setRestoDevido(false); setErro(null); }}>Não deve, foi engano</button>
+            </div>
+            {restoDevido && (
+              <Campo rotulo="Quando paga a diferença" dica="Fica em Financeiro, A receber, e na ficha do cliente.">
+                <input type="date" className="g-input" value={restoQuando} min={hoje} onChange={(e) => setRestoQuando(e.target.value)} />
+              </Campo>
+            )}
+          </div>
         )}
         {recebido && !soVer && !travado && (
           <p className="g-muted g-pp">Este valor já foi recebido. Se você alterar ou excluir, fica anotado quem mudou, quando e o valor de antes.</p>
@@ -695,7 +742,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
         )}
         {parcial && (
           <div className="gf-parcial" role="status">
-            <p>Fica faltando <b className="g-tab">{brl(falta)}</b>. Continua em A receber e na ficha do tutor.</p>
+            <p>Fica faltando <b className="g-tab">{brl(falta)}</b>. Continua em A receber{conta.cliente_id ? " e na ficha do tutor" : ""}.</p>
             <Campo rotulo="Quando ele paga o resto (se combinou outro dia)">
               <input type="date" className="g-input" value={novoVencimento} min={hoje} onChange={(e) => setNovoVencimento(e.target.value)} />
             </Campo>
@@ -743,5 +790,36 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
         {data === hoje && <AvisoCaixaFechado aberto={caixaAgora} />}
       </div>
     </Folha>
+  );
+}
+
+/** Escolher o tutor de uma conta a receber: busca pelo nome ou telefone. Sem tutor, a conta fica solta (só em A receber). */
+export function EscolhaTutor({ valor, aoMudar }: { valor: { id: string; nome: string } | null; aoMudar: (t: { id: string; nome: string } | null) => void }) {
+  const { sb, petshop } = useGestao();
+  const [busca, setBusca] = useState("");
+  const termo = busca.trim();
+  const { dados: achados } = useDados(async () => {
+    if (termo.length < 2) return [] as { id: string; nome: string; telefone: string | null }[];
+    const digitos = termo.replace(/\D/g, "");
+    const q = sb.from("clientes").select("id, nome, telefone").eq("petshop_id", petshop.id).order("nome").limit(6);
+    const r = digitos.length >= 4 && digitos.length === termo.replace(/[\s()+-]/g, "").length ? await q.ilike("telefone", `%${digitos}%`) : await q.ilike("nome", `%${termo.replace(/[%_]/g, "")}%`);
+    return r.data ?? [];
+  }, [petshop.id, termo]);
+  if (valor) {
+    return (
+      <Grupo rotulo="Cliente">
+        <div className="g-fila entre"><p className="g-p">{valor.nome}</p><button type="button" className="g-btn fantasma p" onClick={() => aoMudar(null)}>Trocar</button></div>
+      </Grupo>
+    );
+  }
+  return (
+    <Campo rotulo="Cliente (se tiver)" dica="Com o cliente, a conta aparece na ficha dele e entra na cobrança pelo WhatsApp.">
+      <input className="g-input" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nome ou telefone do tutor" aria-label="Buscar o tutor da conta" />
+      {(achados ?? []).length > 0 && (
+        <div className="g-chips" style={{ marginTop: 8 }} role="group" aria-label="Tutores encontrados">
+          {(achados ?? []).map((t) => <button key={t.id} type="button" className="g-chip" onClick={() => { aoMudar({ id: t.id, nome: t.nome }); setBusca(""); }}>{t.nome}</button>)}
+        </div>
+      )}
+    </Campo>
   );
 }

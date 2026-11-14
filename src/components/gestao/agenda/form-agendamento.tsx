@@ -13,6 +13,7 @@ import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { CampoDinheiro, erroDeValor } from "../loja/pecas";
+import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { AvatarPet, Campo, EscolherPet, Folha, avisarMudanca, ok, useAvisos, useDados } from "../ui";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 import { VEZES_POR_VEZ } from "./series-acabando";
@@ -50,7 +51,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   aoFechar: () => void; aoSalvar: () => void;
 }) {
   // quem não mexe com dinheiro (sem Caixa, Financeiro nem Relatórios) marca o horário sem ver valor: o preço da lista vai junto, calado
-  const { sb, petshop, equipe, servicos, user, vejoFinanceiro } = useGestao();
+  const { sb, petshop, equipe, servicos, user, vejoFinanceiro, cuidoDoFinanceiro } = useGestao();
+  // preço travado (opção do dono): quem só opera o caixa marca pelo preço da lista. Serviço sem preço na lista continua livre.
+  const travado = travaDePreco(petshop).ligada && !cuidoDoFinanceiro;
   useCalendario(); // feriados e dias fechados: a tela avisa quando o dia escolhido é um deles
   const { avisar, avisarErro, confirmar } = useAvisos();
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
@@ -422,7 +425,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
                     return (
                       <li key={o.servicoId}>
                         <div className="t"><b>{s?.nome ?? "Serviço"}</b><small>mais {tempo(s?.duracao_min ?? 0)}</small></div>
-                        {vejoFinanceiro && (
+                        {vejoFinanceiro && travado && precoDoServico(s, porte) != null ? (
+                          <span className="g-agd-valor fixo" title="Preço da lista. Só o dono ou quem vê o financeiro muda."><b className="g-tab">{brl(o.preco ?? 0)}</b></span>
+                        ) : vejoFinanceiro && (
                           <label className="g-agd-valor" aria-label={`Valor de ${s?.nome ?? "serviço"}`}>
                             <CampoDinheiro valor={o.preco} aoMudar={(v) => setOutros((l) => l.map((x) => (x.servicoId === o.servicoId ? { ...x, preco: v, mexido: true } : x)))} placeholder="definir" />
                           </label>
@@ -557,7 +562,11 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
                   .map((m) => <option key={m} value={m}>{tempo(m)}</option>)}
               </select>
             </Campo>
-            {vejoFinanceiro && <Campo rotulo={outros.length && servico ? `Valor de ${servico.nome}` : "Valor"} erro={valorRuim ? "Isso não é um valor. Escreva só números, como 45,00." : null}
+            {vejoFinanceiro && travado && servico && precoDoServico(servico, pet?.porte) != null ? (
+              <Campo rotulo={outros.length ? `Valor de ${servico.nome}` : "Valor"} dica="Preço da lista. Só o dono ou quem vê o financeiro marca com outro valor.">
+                <span className="g-agd-valor fixo"><b className="g-tab">{brl(preco ?? 0)}</b></span>
+              </Campo>
+            ) : vejoFinanceiro && <Campo rotulo={outros.length && servico ? `Valor de ${servico.nome}` : "Valor"} erro={valorRuim ? "Isso não é um valor. Escreva só números, como 45,00." : null}
               dica={semPorte && servico && !precoMexido ? "Pet sem porte: confira o valor." : undefined}>
               <span className={`g-agd-valor${valorRuim ? " ruim" : semPorte && servico && !precoMexido ? " atencao" : ""}`} onInput={(e) => setTextoValor((e.target as HTMLInputElement).value)}>
                 <CampoDinheiro valor={preco} aoMudar={(v) => { setPreco(v); setPrecoMexido(true); }} placeholder="definir" />

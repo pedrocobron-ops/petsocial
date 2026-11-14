@@ -39,7 +39,7 @@ import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembre
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import Importar from "@/components/gestao/importar";
 import { comPrecosDeAgendamento, idsParaCobrar } from "@/lib/gestao/reservado";
-import { AtendimentosParaCobrar, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
+import { AtendimentosParaCobrar, MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import AlteracoesDeValores from "@/components/gestao/financeiro/alteracoes-de-valores";
 
 const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa semana?", "Quem não vem há mais de um mês?"];
@@ -180,6 +180,8 @@ export default function Hoje() {
   const { ids: semConta } = useParaCobrar(hoje, hoje);
   const faltaCobrarHoje = ativos.filter((a) => semConta.has(a.id)).length;
   const semConcluir = ativos.length - feitos;
+  // marcados como "não cobrar" hoje: o dia fecha, mas o dono vê quantos foram e quem marcou
+  const naoCobradosHoje = ativos.filter((a) => semCobranca(a));
   const proximo = ativos.find((a) => a.status !== "concluido" && new Date(a.fim) > new Date());
   const selecionado = aberto ? dados?.ags.find((a) => a.id === aberto) ?? null : null;
 
@@ -351,6 +353,7 @@ export default function Hoje() {
                     : faltaCobrarHoje > 0 ? `${faltaCobrarHoje === 1 ? "Falta cobrar 1 atendimento" : `Falta cobrar ${faltaCobrarHoje} atendimentos`}`
                     : "Tudo atendido por hoje"}</b>
                   {dados && ativos.length > 0 && semConcluir > 0 && <span style={{ whiteSpace: "normal" }}>Abra cada um na lista de hoje e diga se foi atendido ou se o cliente faltou.{faltaCobrarHoje > 0 ? ` E ${faltaCobrarHoje === 1 ? "1 concluído ainda está" : `${faltaCobrarHoje} concluídos ainda estão`} sem cobrança.` : ""}</span>}
+                  {dados && ativos.length > 0 && semConcluir === 0 && faltaCobrarHoje === 0 && naoCobradosHoje.length > 0 && <span style={{ whiteSpace: "normal" }}>{naoCobradosHoje.length === 1 ? "1 atendimento foi marcado como não cobrado" : `${naoCobradosHoje.length} atendimentos foram marcados como não cobrados`}{(() => { const quem = [...new Set(naoCobradosHoje.map((a) => a.sem_cobranca_nome?.split(" ")[0]).filter(Boolean))]; return quem.length ? ` (por ${quem.join(" e ")})` : ""; })()}.</span>}
                   {dados && ativos.length > 0 && semConcluir === 0 && faltaCobrarHoje > 0 && <span style={{ whiteSpace: "normal" }}>{vejoFinanceiro ? "Todos foram atendidos, mas a conta ainda não foi fechada. Veja a lista Atendimentos para cobrar, logo abaixo." : "Todos foram atendidos. Quem cuida do caixa ainda precisa fechar a conta."}</span>}
                 </div>
               </div>
@@ -432,6 +435,7 @@ export default function Hoje() {
                             {a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {a.pets.clientes.nome}</span>}
                           </span>
                           {semConta.has(a.id) ? <span className="g-tag laranja">Falta cobrar</span>
+                            : semCobranca(a) ? <MarcaSemCobranca a={a} />
                             : a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}
                           <ChevronRight size={18} className="g-muted g-so-pc" />
                         </button>

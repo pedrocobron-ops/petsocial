@@ -125,7 +125,15 @@ export default function PedidosLink() {
         if (x.sinal != null && x.sinal_estado === "pago") sinaisPagos.set(x.estadia_id, Number(x.sinal));
       }
     }
-    return { pendentes: ok(pendentes) as Pedido[], semAviso: respondidosAinda, recados: recadosLidos, sinais, sinaisPagos, canceladas };
+    // o horário pode ter sido remarcado depois do pedido: o aviso e a mensagem usam a data de agora do horário, não a do pedido
+    const comHorario = [...respondidosAinda, ...recadosLidos].filter((p) => p.agendamento_id && !ehEstadia(p as Pedido)) as Pedido[];
+    const atual = new Map<string, { inicio: string; fim: string }>();
+    if (comHorario.length) {
+      const h = await sb.from("agendamentos").select("id, inicio, fim").eq("petshop_id", petshop.id).in("id", [...new Set(comHorario.map((p) => p.agendamento_id!))]);
+      for (const x of h.data ?? []) atual.set(x.id, { inicio: x.inicio, fim: x.fim });
+    }
+    const emDia = (l: Pedido[]) => l.map((p) => (p.agendamento_id && atual.has(p.agendamento_id) && !ehEstadia(p) ? { ...p, ...atual.get(p.agendamento_id)! } : p));
+    return { pendentes: ok(pendentes) as Pedido[], semAviso: emDia(respondidosAinda), recados: emDia(recadosLidos), sinais, sinaisPagos, canceladas };
   }, [petshop.id, comOpcoes, vejoFinanceiro]);
   const dados = tudo?.pendentes;
 

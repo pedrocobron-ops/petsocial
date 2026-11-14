@@ -18,6 +18,8 @@ revoke select on public.agendamentos from anon, authenticated;
 grant select (id, petshop_id, pet_id, servico_id, profissional_id, inicio, fim, status, obs, leva_traz, endereco_leva_traz, checklist,
   pacote_cliente_id, lembrete_em, origem, criado_por, criado_em, serie_id, foto_antes, foto_depois, pronto_avisado_em, sem_cobranca)
   on public.agendamentos to authenticated;
+-- colunas da 20261160 (quem marcou "não cobrar" e quando), que vem antes desta
+grant select (sem_cobranca_por, sem_cobranca_em, sem_cobranca_nome) on public.agendamentos to authenticated;
 
 revoke select on public.agendamento_servicos from anon, authenticated;
 grant select (id, petshop_id, agendamento_id, servico_id, ordem, criado_em) on public.agendamento_servicos to authenticated;

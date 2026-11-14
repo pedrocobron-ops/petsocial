@@ -27,7 +27,7 @@ type Passo = {
  * O estado fica no aparelho: "visto" (já apareceu faltando algo), "dispensado" (Já sei usar) ou "feito".
  */
 export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: () => void) {
-  const { petshop, servicos, souDono, posso, liberado } = useGestao();
+  const { petshop, servicos, souDono, posso, liberado, vejoFinanceiro } = useGestao();
   const chave = `maestro-gestao-passos-${petshop.id}`;
   const chaveEscola = `${chave}-escola`;
   const [mem, setMem] = useState(() => lerLembrado(chave));
@@ -51,7 +51,7 @@ export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: ()
     { id: "checkin", so: comCasa && posso("creche_hotel"), feito: dados.estadias > 0, texto: "Fazer o primeiro check-in", dica: `Em ${nomeDaCasa(petshop)}, no botão Nova reserva / Check-in.`, href: "/gestao/app/creche-hotel" },
     { id: "produto", so: comLoja && posso("estoque"), feito: dados.produtos > 0, texto: "Cadastrar o primeiro produto", dica: "Em Estoque, no botão de produto novo.", href: "/gestao/app/estoque" },
     { id: "horario", so: agenda, feito: dados.horarios > 0, texto: "Marcar o primeiro horário", dica: "Já abre a janela para marcar.", href: "/gestao/app/agenda?novo=1" },
-    { id: "concluir", so: agenda && banhoInteiro, feito: dados.concluidos > 0, texto: "Concluir e receber um atendimento", dica: "Na Agenda, toque no horário e em Concluir.", href: "/gestao/app/agenda" },
+    { id: "concluir", so: agenda && banhoInteiro, feito: dados.concluidos > 0, texto: vejoFinanceiro ? "Concluir e receber um atendimento" : "Concluir um atendimento", dica: vejoFinanceiro ? "Na Agenda, toque no horário e em Fechar a conta." : "Na Agenda, toque no horário e em Concluir atendimento.", href: "/gestao/app/agenda" },
     { id: "link", so: souDono && agenda && banhoInteiro, feito: petshop.link_ativo, texto: "Ligar o link de agendamento", dica: "O cliente pede o horário pelo celular e você aceita.", aoTocar: abrirLinkDeAgendamento },
     dados.amanha > 0
       ? { id: "lembrete", so: agenda && banhoInteiro, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Abre os lembretes dos horários de amanhã.", aoTocar: aoLembretes }

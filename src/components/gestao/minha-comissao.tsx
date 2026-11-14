@@ -17,7 +17,7 @@ type Mes = { de: string; ate: string; atendimentos: number; com_pacote: number; 
  * Não aparece para quem não tem comissão.
  */
 export default function MinhaComissao() {
-  const { sb, petshop, eu } = useGestao();
+  const { sb, petshop, eu, vejoFinanceiro } = useGestao();
   const op = opcoesDeComissao(petshop);
   // só pergunta ao banco quando pode haver comissão: percentual da pessoa, por serviço ou sobre produtos
   const pode = Number(eu.comissao_pct) > 0 || op.porServico || op.produtos;
@@ -43,7 +43,7 @@ export default function MinhaComissao() {
             <div key={m.de}>
               <small>{i === 0 ? `${nomeMes(deIsoDia(m.de))}, até agora` : nomeMes(deIsoDia(m.de))}</small>
               <b className="g-tab">{brl(m.comissao)}</b>
-              <small>{n(m.atendimentos)} · base {brl(m.base)}{Number(m.comissao_produtos) > 0 ? ` · produtos ${brl(m.comissao_produtos)}` : ""}</small>
+              <small>{n(m.atendimentos)}{vejoFinanceiro ? ` · base ${brl(m.base)}` : ""}{Number(m.comissao_produtos) > 0 ? ` · produtos ${brl(m.comissao_produtos)}` : ""}</small>
               {m.pagos.length > 0
                 ? <small><span className="g-tag verde">{brl(pago)} pago</span> {[...new Set(m.pagos.map((p) => `${dataCurta(p.de)} a ${dataCurta(p.ate)}`))].join(", ")}</small>
                 : Number(m.comissao) > 0 ? <small><span className="g-tag">ainda não marcada como paga</span></small> : null}

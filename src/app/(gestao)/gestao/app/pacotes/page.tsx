@@ -2,7 +2,7 @@
 
 import { COLS_PACOTE, COLS_PACOTE_CLIENTE, comPrecosDePacote } from "@/lib/gestao/reservado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Check, Layers, Plus, RotateCcw, Sparkles, Ticket, Undo2 } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import FormPet from "@/components/gestao/form-pet";
@@ -13,7 +13,7 @@ import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { Cliente, Pacote, PacoteCliente, Pet } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, dataCurtaOuAno, deIsoDia, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
 import { usaModulo } from "@/lib/gestao/modulos";
 import "./pacotes.css";
 
@@ -43,7 +43,7 @@ function etiquetaValidade(vence: string | null) {
   if (d === 0) return { texto: "vence hoje", tom: "laranja" };
   if (d === 1) return { texto: "vence amanhã", tom: "laranja" };
   if (d <= 7) return { texto: `vence em ${d} dias`, tom: "laranja" };
-  return { texto: `até ${dataCurta(vence!)}`, tom: "" };
+  return { texto: `até ${dataCurtaOuAno(vence!)}`, tom: "" };
 }
 
 /** Indicador que também é botão: toca e a tela mostra aquele recorte. */
@@ -373,6 +373,13 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
   const caixa = useCaixaAberto();
   const [salvando, setSalvando] = useState(false);
 
+  // com a trava, o pacote do modelo sai como o modelo (o banco também confere): usos e validade a mais são desconto
+  const modeloAtual = pacoteId ? modelos.find((m) => m.id === pacoteId) ?? null : null;
+  const doModeloFixo = precoTravado && Boolean(modeloAtual);
+  useEffect(() => {
+    if (!doModeloFixo || !modeloAtual) return;
+    setTotal(String(modeloAtual.quantidade)); setValidade(String(modeloAtual.validade_dias)); setServico(modeloAtual.servico_id ?? "");
+  }, [doModeloFixo, modeloAtual]);
   function escolherModelo(m: Pacote | null) {
     setPacoteId(m?.id ?? null);
     setNome(m?.nome ?? "");
@@ -434,7 +441,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
         // conta a receber: entrada ainda não paga, com vencimento e ligada ao cliente
         try {
           await lancarAReceber(sb, petshop.id, {
-            valor: preco, vencimento: rec.quando, categoria: "Pacotes", descricao: `Pacote ${nome.trim()} · ${pet.nome} (a receber)`, clienteId: pet.clientes?.id ?? null, chave,
+            valor: preco, vencimento: rec.quando, categoria: "Pacotes", descricao: `Pacote ${nome.trim()} · ${pet.nome}`, clienteId: pet.clientes?.id ?? null, chave,
           });
           avisar(`Pacote vendido para ${pet.nome}. ${brl(preco)} em A receber, para ${dataCurta(rec.quando)}.`);
         } catch (e) {
@@ -499,17 +506,18 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
         {cabecalho}
         <Campo rotulo="Pacote"><input className="g-input" value={nome} onChange={(e) => setNome(e.target.value)} placeholder={`Ex.: ${exemploDePacote(petshop)}`} /></Campo>
         <Campo rotulo="Serviço">
-          <select className="g-select" value={servico} onChange={(e) => setServico(e.target.value)}>
+          <select className="g-select" value={servico} onChange={(e) => setServico(e.target.value)} disabled={doModeloFixo}>
             <option value="">Qualquer serviço</option>
             {servicos.filter((s) => s.ativo || s.id === servico).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
           </select>
         </Campo>
         <div className="dupla">
-          <Campo rotulo="Quantidade"><input className="g-input g-tab" inputMode="numeric" value={total} onChange={(e) => setTotal(e.target.value)} /></Campo>
-          <Campo rotulo="Validade (dias)" erro={nasceVencido ? `Já nasce vencido: venceu em ${dataCurta(venceEm!)}` : null} dica={venceEm ? `Vence em ${dataCurta(venceEm)}` : "Sem data para vencer"}>
-            <input className="g-input g-tab" inputMode="numeric" value={validade} onChange={(e) => setValidade(e.target.value)} />
+          <Campo rotulo="Quantidade" dica={doModeloFixo ? "Do modelo." : undefined}><input className="g-input g-tab" inputMode="numeric" value={total} onChange={(e) => setTotal(e.target.value)} disabled={doModeloFixo} /></Campo>
+          <Campo rotulo="Validade (dias)" erro={nasceVencido ? `Já nasce vencido: venceu em ${dataCurta(venceEm!)}` : null} dica={venceEm ? `Vence em ${dataCurtaOuAno(venceEm)}` : "Sem data para vencer"}>
+            <input className="g-input g-tab" inputMode="numeric" value={validade} onChange={(e) => setValidade(e.target.value)} disabled={doModeloFixo} />
           </Campo>
         </div>
+        {doModeloFixo && <p className="g-pp g-muted" style={{ margin: 0 }}>Com o preço travado, o pacote sai como o modelo: serviço, quantidade, validade e preço. Só o dono ou quem vê o financeiro muda.</p>}
         <div className="dupla">
           <Campo rotulo="Preço" erro={erroDeValor(preco, "O preço")} dica={precoTravado ? "Preço da lista. Só o dono ou quem vê o financeiro muda." : undefined}>
             <CampoDinheiro valor={preco} aoMudar={(v) => { setPreco(v); setErroForma(null); }} desligado={precoTravado} />

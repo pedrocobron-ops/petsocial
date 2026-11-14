@@ -48,9 +48,27 @@ const MAX_PARTES = 3;
 /** Uma parte enquanto a pessoa digita. */
 export type ParteDigitada = { forma: Forma | null; valor: number | null };
 /** O que a pessoa escolheu para receber: uma forma só, ou o pagamento dividido em partes. */
-export type EstadoPagamento = { forma: Forma | null; dividido: boolean; partes: ParteDigitada[]; ultimaManual: boolean };
+/** `entregue`: o que a pessoa escreveu em "Recebeu quanto?" (dinheiro entregue pelo cliente), para o troco e para não lançar mais do que entrou. */
+export type EstadoPagamento = { forma: Forma | null; dividido: boolean; partes: ParteDigitada[]; ultimaManual: boolean; entregue?: number | null };
 
-export const pagamentoInicial = (forma: Forma | null = null): EstadoPagamento => ({ forma, dividido: false, partes: [], ultimaManual: false });
+export const pagamentoInicial = (forma: Forma | null = null): EstadoPagamento => ({ forma, dividido: false, partes: [], ultimaManual: false, entregue: null });
+
+/**
+ * O cliente entregou em dinheiro menos do que a parte em dinheiro da conta ("Recebeu quanto?" 50 numa conta de 70)?
+ * Devolve quanto entrou e quanto falta; null quando não é o caso (sem valor escrito, troco, ou outra forma).
+ */
+export function dinheiroAMenos(e: EstadoPagamento, total: number): { devido: number; entregue: number; falta: number } | null {
+  const entregue = e.entregue;
+  if (entregue == null || !(entregue > 0)) return null;
+  let devido: number | null = null;
+  if (!e.dividido) devido = e.forma === "dinheiro" ? total : null;
+  else {
+    const p = contasDoPagamento(e, total).partes.find((x) => x.forma === "dinheiro" && Number(x.valor) > 0);
+    devido = p ? Number(p.valor) : null;
+  }
+  if (devido == null || entregue >= devido - 0.005) return null;
+  return { devido, entregue: centavos(entregue), falta: centavos(devido - entregue) };
+}
 
 /** Pagamento de uma tela que recebe: começa sem forma marcada. */
 export function usePagamento() {
@@ -71,6 +89,9 @@ export function contasDoPagamento(e: EstadoPagamento, total: number) {
  * `forma` (no dividido, a de maior valor) e `pagamentos` (as partes; null quando é uma forma só).
  */
 export function fecharPagamento(e: EstadoPagamento, total: number): { erro: string } | { forma: Forma; pagamentos: PartePagamento[] | null } {
+  // nunca lança mais do que entrou: "Recebeu quanto?" menor que a conta pede uma decisão
+  const menos = dinheiroAMenos(e, total);
+  if (menos) return { erro: `O cliente entregou ${brl(menos.entregue)} em dinheiro e ${e.dividido ? "a parte em dinheiro" : "a conta"} é de ${brl(menos.devido)}. Corrija o valor em "Recebeu quanto?", divida o pagamento ou mude a forma.` };
   if (!e.dividido) return e.forma ? { forma: e.forma, pagamentos: null } : { erro: "Escolha a forma de pagamento." };
   const c = contasDoPagamento(e, total);
   if (c.partes.some((p) => !p.forma)) return { erro: "Escolha a forma de cada parte do pagamento." };
@@ -86,20 +107,23 @@ export function fecharPagamento(e: EstadoPagamento, total: number): { erro: stri
  * Forma de pagamento com a opção de dividir em duas ou três formas (parte no Pix, parte em dinheiro).
  * A última parte se completa sozinha com o que falta para o total.
  */
-export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "Forma de pagamento" }: {
+export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "Forma de pagamento", aceitaResto }: {
   valor: EstadoPagamento; aoMudar: (e: EstadoPagamento) => void; total: number; erro?: string | null; rotulo?: string;
+  /** A tela deixa o que faltou anotado para o cliente pagar depois (conta do atendimento): o "Faltam" diz isso. */
+  aceitaResto?: boolean;
 }) {
+  const entregue = { valor: e.entregue ?? null, aoMudar: (v: number | null) => aoMudar({ ...e, entregue: v }) };
   if (!e.dividido) {
     return (
       <div className="g-campo">
         <span>{rotulo}</span>
         <div className="g-chips" role="group" aria-label={rotulo}>
           {FORMAS.map((f) => (
-            <button key={f.id} type="button" className="g-chip" aria-pressed={e.forma === f.id} onClick={() => aoMudar({ ...e, forma: f.id })}>{f.rotulo}</button>
+            <button key={f.id} type="button" className="g-chip" aria-pressed={e.forma === f.id} onClick={() => aoMudar({ ...e, forma: f.id, entregue: f.id === "dinheiro" ? e.entregue ?? null : null })}>{f.rotulo}</button>
           ))}
         </div>
         {erro && <small className="erro" role="alert">{erro}</small>}
-        {e.forma === "dinheiro" && total > 0 && <Troco devido={total} />}
+        {e.forma === "dinheiro" && total > 0 && <Troco devido={total} {...entregue} aceitaResto={aceitaResto} />}
         {total > 0.01 && (
           <div>
             <button type="button" className="g-btn fantasma p g-pg-dividir"
@@ -149,7 +173,7 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
           )}
         </p>
       )}
-      {emDinheiro && <Troco devido={Number(emDinheiro.valor)} parte />}
+      {emDinheiro && <Troco devido={Number(emDinheiro.valor)} parte {...entregue} />}
       {!e.ultimaManual && c.passou === 0 && <small>A última parte se completa sozinha com o que falta.</small>}
       {erro && <small className="erro" role="alert">{erro}</small>}
       <div className="g-pg-acoes">
@@ -164,10 +188,15 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
 
 /**
  * Calculadora de troco: aparece quando o pagamento (ou uma parte dele) é em dinheiro.
- * É só uma ajuda para quem está no balcão: o que fica anotado é sempre o valor da conta, nunca o que foi digitado aqui.
+ * Com troco, o que fica anotado é o valor da conta. Com menos do que a conta, a tela não lança o valor cheio:
+ * a conta do atendimento (`aceitaResto`) recebe o que entrou e deixa o resto anotado; as outras telas pedem para corrigir.
  */
-export function Troco({ devido, parte }: { devido: number; parte?: boolean }) {
-  const [recebeu, setRecebeu] = useState<number | null>(null);
+export function Troco({ devido, parte, valor, aoMudar, aceitaResto }: {
+  devido: number; parte?: boolean; valor?: number | null; aoMudar?: (v: number | null) => void; aceitaResto?: boolean;
+}) {
+  const [proprio, setProprio] = useState<number | null>(null);
+  const recebeu = aoMudar ? valor ?? null : proprio;
+  const setRecebeu = aoMudar ?? setProprio;
   // o que está escrito no campo: texto que não é número ("cem") ganha um aviso em vez de ficar sem resposta
   const [escrito, setEscrito] = useState("");
   const naoENumero = escrito.trim() !== "" && recebeu == null;
@@ -184,6 +213,7 @@ export function Troco({ devido, parte }: { devido: number; parte?: boolean }) {
           : troco > 0 ? <>Troco: <b className="g-tab">{brl(troco)}</b></>
           : troco === 0 ? "Sem troco." : <>Faltam <b className="g-tab">{brl(-troco)}</b> para {brl(devido)}.</>}
       </p>
+      {troco != null && troco < 0 && !aceitaResto && <small className="g-erro" style={{ gridColumn: "1 / -1" }}>Assim a conta não fecha: corrija o valor, divida o pagamento ou mude a forma.</small>}
     </div>
   );
 }
@@ -199,9 +229,9 @@ export const pagaDepoisInicial = (): PagaDepois => ({ ativo: false, quando: isoD
  * Como a conta é recebida, igual em toda tela que recebe dinheiro (comanda, pacote, check-out):
  * "Paga agora" com a forma de pagamento (que pode ser dividida) ou "Cliente paga depois" com o dia combinado.
  */
-export function QuandoPaga({ total, pagamento, aoPagamento, depois, aoDepois, erro }: {
+export function QuandoPaga({ total, pagamento, aoPagamento, depois, aoDepois, erro, aceitaResto }: {
   total: number; pagamento: EstadoPagamento; aoPagamento: (e: EstadoPagamento) => void;
-  depois: PagaDepois; aoDepois: (d: PagaDepois) => void; erro?: string | null;
+  depois: PagaDepois; aoDepois: (d: PagaDepois) => void; erro?: string | null; aceitaResto?: boolean;
 }) {
   return (
     <>
@@ -218,7 +248,7 @@ export function QuandoPaga({ total, pagamento, aoPagamento, depois, aoDepois, er
           <small>A conta fica anotada em Financeiro, A receber, e na ficha do tutor. Quando o cliente pagar, é só dar baixa.</small>
           {erro && <small className="erro" role="alert">{erro}</small>}
         </label>
-      ) : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erro} />}
+      ) : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erro} aceitaResto={aceitaResto} />}
     </>
   );
 }

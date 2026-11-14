@@ -65,7 +65,9 @@ export function textoLembrete(p: { tutor?: string | null; pet: string; servico?:
 export function textoPronto(p: { tutor?: string | null; pet: string; petshop: string; servico?: string | null }) {
   const s = (p.servico ?? "").trim().toLowerCase();
   const oQue = /^banho/.test(s) ? `O ${s}` : /^(tosa|hidratação|escovação)/.test(s) ? `A ${s}` : "O atendimento";
-  return `${saudacaoZap(p.tutor, p.petshop)} ${oQue} de ${p.pet} terminou. Já pode vir buscar.`;
+  // dois serviços ("banho e hidratação"): o verbo vai para o plural
+  const varios = / e |, /.test(s.replace(/^banho e tosa( higiênica)?/, "banho"));
+  return `${saudacaoZap(p.tutor, p.petshop)} ${oQue} de ${p.pet} ${varios && oQue !== "O atendimento" ? "terminaram" : "terminou"}. Já pode vir buscar.`;
 }
 
 /** Aviso de que o horário mudou: "O banho de Nina foi remarcado para amanhã às 14:00." A pessoa manda pelo WhatsApp. */

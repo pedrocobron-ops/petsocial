@@ -9,6 +9,7 @@ import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp, telefoneValido 
 import { useGestao } from "../contexto";
 import { CartaoFidelidade } from "../fidelidade";
 import { DividaDoTutor } from "../financeiro/contas-clientes";
+import { FolhaLancamento } from "../financeiro/comum";
 import FormPet from "../form-pet";
 import { Tile } from "../painel";
 import { AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
@@ -28,6 +29,8 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
   const [petNovo, setPetNovo] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [juntando, setJuntando] = useState(false);
+  // "deve R$ 20" solto: taxa de falta, diferença esquecida (vira conta a receber deste tutor)
+  const [anotando, setAnotando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [cliente, pets, entradas] = await Promise.all([
@@ -166,6 +169,13 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
           </section>
 
           {vejoFinanceiro && <DividaDoTutor tutor={cliente} aoMudar={recarregar} />}
+          {vejoFinanceiro && (
+            <div className="g-fila" style={{ flexWrap: "wrap", gap: 8 }}>
+              <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setAnotando(true); }}><HandCoins />Anotar o que {cliente.nome.split(" ")[0]} deve</button>
+              <span className="g-pp g-muted">Taxa de falta, diferença esquecida: fica na ficha e em A receber.</span>
+            </div>
+          )}
+          {anotando && <FolhaLancamento modo="conta" tipo="entrada" tutor={{ id: cliente.id, nome: cliente.nome }} aoFechar={() => setAnotando(false)} aoSalvo={recarregar} />}
 
           {cuidoDoFinanceiro && (
             <section className="g-card">

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
+import { MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BellRing, CalendarOff, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, Truck, Printer, Users, Utensils } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/tipos";
@@ -403,6 +403,7 @@ function Agenda() {
                     {l.a.leva_traz && <Truck size={18} aria-label="Leva e traz" />}
                     {l.a.pronto_avisado_em && <span className="g-agd-avisado" role="img" aria-label={`Tutor avisado às ${hora(l.a.pronto_avisado_em)}`} title={`Tutor avisado às ${hora(l.a.pronto_avisado_em)}`}><BellRing aria-hidden /></span>}
                     {semConta.has(l.a.id) ? <span className="g-tag laranja">Falta cobrar</span>
+                      : semCobranca(l.a) ? <MarcaSemCobranca a={l.a} />
                       : l.a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[l.a.status].tom}`}>{STATUS_AGENDAMENTO[l.a.status].rotulo}</span>}
                   </button>
                   <BotaoLembrete agendamento={l.a} doDia={dados ?? []} aoMandar={() => void recarregar()} />

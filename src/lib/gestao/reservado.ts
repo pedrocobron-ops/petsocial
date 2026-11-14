@@ -26,7 +26,7 @@ export const COLS_SERVICO = "id, petshop_id, nome, categoria, duracao_min, cor, 
  * O horário sem o preço (`comPrecosDeAgendamento`). O banco não entrega `select("*")` em agendamentos nem o preço
  * dos serviços a mais (`agendamento_servicos.preco`): leia `id, servico_id, ordem` e junte o preço depois.
  */
-export const COLS_AGENDAMENTO = "id, petshop_id, pet_id, servico_id, profissional_id, inicio, fim, status, obs, leva_traz, endereco_leva_traz, checklist, pacote_cliente_id, lembrete_em, origem, criado_por, criado_em, serie_id, foto_antes, foto_depois, pronto_avisado_em, sem_cobranca";
+export const COLS_AGENDAMENTO = "id, petshop_id, pet_id, servico_id, profissional_id, inicio, fim, status, obs, leva_traz, endereco_leva_traz, checklist, pacote_cliente_id, lembrete_em, origem, criado_por, criado_em, serie_id, foto_antes, foto_depois, pronto_avisado_em, sem_cobranca, sem_cobranca_em, sem_cobranca_nome";
 export const COLS_PROFISSIONAL = "id, petshop_id, user_id, nome, papel, ve_financeiro, cor, escala, atende, ativo, criado_em, funcao, acessos";
 
 /** A estadia sem a diária e o valor cobrado (reservados: `comValoresDeEstadia`). O banco não entrega `select("*")` em estadias. */
