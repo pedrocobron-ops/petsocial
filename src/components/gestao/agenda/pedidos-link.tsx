@@ -4,6 +4,7 @@ import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useEffect, useState } from "react";
 import { CalendarClock, Check, Clock, Link2, MessageCircle, UserX, X } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
+import { useTrava } from "@/lib/gestao/uma-vez";
 import { AvatarPessoa, AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import type { Database } from "@/lib/gestao/banco";
 import { abreNoDia } from "@/lib/gestao/creche";
@@ -190,7 +191,11 @@ export default function PedidosLink() {
    * Antes, confere se o telefone do pedido já é de um tutor com outro nome: aí pergunta se é a mesma pessoa
    * (`decisao`: "existente" usa a ficha que já existe; "novo" cria ou usa um tutor com o nome do pedido).
    */
-  async function aceitar(lista: Pedido[], grupo: string, decisao?: Decisao, portes?: Portes) {
+  // trava na hora do primeiro toque: dois toques seguidos em Aceitar não respondem o pedido duas vezes
+  // (o banco aceitaria só o primeiro, mas a pessoa veria um erro de "já foi respondido" sem ter feito nada errado)
+  const umaVez = useTrava();
+  const aceitar = (lista: Pedido[], grupo: string, decisao?: Decisao, portes?: Portes) => umaVez(() => aceitarJa(lista, grupo, decisao, portes));
+  async function aceitarJa(lista: Pedido[], grupo: string, decisao?: Decisao, portes?: Portes) {
     if (somenteLeitura() || ocupado) return;
     const profissional = atendem.length > 1 ? quem[grupo] || undefined : atendem[0]?.id;
     setOcupado(lista.length > 1 ? grupo : lista[0].id);
@@ -307,7 +312,8 @@ export default function PedidosLink() {
     return !r.error && (r.data as { criado?: boolean } | null)?.criado === true;
   }
 
-  async function recusar(lista: Pedido[], grupo: string) {
+  const recusar = (lista: Pedido[], grupo: string) => umaVez(() => recusarJa(lista, grupo));
+  async function recusarJa(lista: Pedido[], grupo: string) {
     if (somenteLeitura() || ocupado) return;
     const nomes = listaDe(lista.map((p) => p.pet_nome));
     const sim = await confirmar({

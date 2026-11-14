@@ -43,8 +43,12 @@
 .g-cm-avisou { margin: 0; }
 .g-cm-rodape { gap: 8px; }
 @media (min-width: 720px) {
-  .g-cm-linha { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .g-cm-linha .acoes { grid-column: auto; justify-content: flex-end; }
+  /* o nome do pet aparece sempre: a coluna dele tem um mínimo, e as ações (etiqueta + botões) é que encolhem e quebram de linha */
+  .g-cm-linha { grid-template-columns: auto minmax(9rem, 1fr) minmax(0, max-content); }
+  .g-cm-linha .acoes { grid-column: auto; justify-content: flex-end; min-width: 0; }
+  .g-cm-linha .acoes .g-tag { white-space: normal; text-align: left; }
+  /* nome comprido quebra de linha em vez de ser cortado */
+  .g-cm-linha .quem > b { white-space: normal; overflow-wrap: anywhere; }
   .g-cm-linha .acoes .g-btn.verde, .g-cm-linha .acoes .g-btn.sec { flex: 0 0 auto; min-width: 120px; }
 }
 

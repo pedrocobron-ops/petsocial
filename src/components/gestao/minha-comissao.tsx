@@ -45,7 +45,7 @@ export default function MinhaComissao() {
               <b className="g-tab">{brl(m.comissao)}</b>
               <small>{n(m.atendimentos)} · base {brl(m.base)}{Number(m.comissao_produtos) > 0 ? ` · produtos ${brl(m.comissao_produtos)}` : ""}</small>
               {m.pagos.length > 0
-                ? <small><span className="g-tag verde">{brl(pago)} pago</span> {m.pagos.map((p) => `${dataCurta(p.de)} a ${dataCurta(p.ate)}`).join(", ")}</small>
+                ? <small><span className="g-tag verde">{brl(pago)} pago</span> {[...new Set(m.pagos.map((p) => `${dataCurta(p.de)} a ${dataCurta(p.ate)}`))].join(", ")}</small>
                 : Number(m.comissao) > 0 ? <small><span className="g-tag">ainda não marcada como paga</span></small> : null}
             </div>
           );

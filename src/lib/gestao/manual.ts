@@ -768,7 +768,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "O cartão da reserva mostra Sinal pago ou Sinal a receber.",
-      "Se o tutor pagar só uma parte do sinal (pelo Recebi, em Financeiro ou em Caixa), o cartão mostra quanto falta e o botão Receber o sinal recebe só o resto. No check-out, o sinal inteiro é descontado e o que falta dele vem marcado para receber junto.",
+      "Se o tutor pagar só uma parte do sinal, toque em Receber o sinal e escreva a parte em Quanto o tutor pagou agora: o resto continua em A receber. O cartão mostra quanto falta e, da próxima vez, o botão Receber o sinal já vem com o resto. No check-out, o sinal inteiro é descontado e o que falta dele vem marcado para receber junto.",
       "A mensagem Pedir o sinal leva o valor, o texto que o dono escreveu e a chave Pix, se ela estiver preenchida nas opções.",
       "Reserva que já existe e ainda não tem sinal: toque em Sinal no cartão dela.",
       "No link do cliente, o pedido já mostra o sinal sobre a estimativa das datas. Ao aceitar o pedido, a reserva nasce com o sinal em A receber, pelo valor da sua regra, e a mensagem de confirmação leva o valor e a chave Pix.",
@@ -1009,7 +1009,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "Nenhuma cobrança nasce vencida sozinha. Se o plano ficou sem essa escolha (cadastrado pela equipe, ou antes de você preencher o valor), a pergunta aparece em Cobranças, em Gerar cobranças, na linha do pet.",
-      "Mudou de ideia depois de escolher pago por fora? Em Cobranças, volte ao mês e gere a cobrança: ela aparece em Gerar cobranças se você alterar o plano e escolher de novo, ou cobre o valor como uma conta em Financeiro.",
+      "Escolheu pago por fora e mudou de ideia? Abra Cobranças no mesmo mês: o pet aparece no bloco Pagas por fora do sistema. Toque em Cobrar por aqui, na linha dele. Depois toque em Gerar cobranças e escolha proporcional ou o mês inteiro.",
     ],
     palavras: ["primeira cobranca", "primeira mensalidade", "comecou no meio do mes", "ja pagou", "pago por fora", "proporcional", "pro-rata", "mensalista novo", "cobranca atrasada sem querer", "nasce atrasada", "escolinha", "day care"] },
   { id: "pagas-por-fora", titulo: "Como marcar mensalidades que já foram pagas por fora", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE,
@@ -1263,6 +1263,7 @@ const BASE: TopicoBase[] = [
       "Na Agenda e na lista de Hoje, o atendimento concluído sem conta aparece como Falta cobrar. Depois de recebido, volta a aparecer como Concluído.",
       "Acontece quando quem atende toca em Concluir atendimento e o cliente sai sem passar no caixa.",
       "Não vai cobrar (cortesia, retorno)? Toque em Não cobrar, na linha: o atendimento sai da lista e fica anotado como não cobrado.",
+      "Pet com pacote que cobre o serviço: a linha avisa Tem pacote e a conta já abre usando o pacote, cobrando só o resto (os outros serviços do horário). Para cobrar tudo sem gastar o pacote, toque em Cobrar sem usar o pacote.",
       "A tela Hoje só diz Tudo atendido por hoje quando não sobra horário sem concluir nem atendimento sem cobrança.",
       "Entram na lista os atendimentos dos últimos 45 dias.",
     ],

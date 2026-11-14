@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Cat, Check, Dog, MessageCircle, PawPrint, Plus, Trash2 } from "lucide-react";
 import { banco } from "@/lib/gestao/supabase";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
@@ -58,6 +58,8 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
   const [entrada, setEntrada] = useState(() => (hotel ? soma(hoje, 1) : primeiroDia()));
   const [saida, setSaida] = useState(() => (hotel ? soma(hoje, 2) : primeiroDia()));
   const [cheios, setCheios] = useState<string[] | null>(null);
+  const mexeuNasDatas = useRef(false);
+  const pulos = useRef(0);
   const [horaEntrada, setHoraEntrada] = useState("08:00");
   const [horaSaida, setHoraSaida] = useState("18:00");
   const [pets, setPets] = useState<PetDoPedido[]>([petVazio()]);
@@ -134,7 +136,18 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
     let vale = true;
     setCheios(null);
     void banco().rpc("link_estadia_cheios", { p_codigo: codigo, p_tipo: tipo, p_de: entrada, p_ate: hotel ? soma(saida, -1) : saida }).then(({ data }) => {
-      if (vale) setCheios(Array.isArray(data) ? (data as unknown as string[]) : []);
+      if (!vale) return;
+      const lista = Array.isArray(data) ? (data as unknown as string[]) : [];
+      // as datas que a página sugeriu sozinha caíram em dia lotado: pula para o próximo dia (aberto), até achar vaga.
+      // Depois que a pessoa mexe nas datas, nada muda sozinho.
+      if (lista.length && !mexeuNasDatas.current && pulos.current < 14) {
+        pulos.current++;
+        let d = soma(entrada, 1);
+        for (let i = 0; i < 21 && naoAbre(d); i++) d = soma(d, 1);
+        setEntrada(d); setSaida(hotel ? soma(d, 1) : d);
+        return;
+      }
+      setCheios(lista);
     });
     return () => { vale = false; };
   }, [codigo, tipo, entrada, saida, hotel, datasOk]);
@@ -159,6 +172,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
   const pareceFixo = foneDigitado.length === 10 && /[2-5]/.test(foneDigitado[2]);
 
   function mudarEntrada(v: string) {
+    mexeuNasDatas.current = true;
     setEntrada(v);
     if (v && (hotel ? saida <= v : saida < v)) setSaida(soma(v, hotel ? 1 : 0));
   }
@@ -306,7 +320,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
             <input className="g-input" type="date" min={hoje} max={soma(hoje, 365)} value={entrada} onChange={(e) => { setErro(null); mudarEntrada(e.target.value); }} />
           </label>
           <label className="g-campo"><span>{hotel ? "Dia da saída" : "Até o dia"} {!hotel && <small>(igual, se for um dia só)</small>}</span>
-            <input className="g-input" type="date" min={!entrada ? hoje : hotel ? soma(entrada, 1) : entrada} max={entrada ? soma(entrada, 60) : undefined} value={saida} onChange={(e) => { setErro(null); setSaida(e.target.value); }} />
+            <input className="g-input" type="date" min={!entrada ? hoje : hotel ? soma(entrada, 1) : entrada} max={entrada ? soma(entrada, 60) : undefined} value={saida} onChange={(e) => { setErro(null); mexeuNasDatas.current = true; setSaida(e.target.value); }} />
           </label>
           <div className="dupla">
             <label className="g-campo"><span>Hora de chegada</span>

@@ -39,3 +39,18 @@ export function useOperacao() {
   }, []);
   return { fazer, ocupado };
 }
+
+/**
+ * Só a trava do primeiro toque, para gravações que não levam chave (o banco já aceita uma vez só, ou não é dinheiro):
+ *   const umaVez = useTrava();
+ *   const aceitar = (p: Pedido) => umaVez(async () => { … });
+ * Enquanto a primeira chamada não termina, as outras voltam na hora, sem fazer nada (devolvem undefined).
+ */
+export function useTrava() {
+  const preso = useRef(false);
+  return useCallback(async <T,>(trabalho: () => Promise<T>): Promise<T | undefined> => {
+    if (preso.current) return undefined;
+    preso.current = true;
+    try { return await trabalho(); } finally { preso.current = false; }
+  }, []);
+}

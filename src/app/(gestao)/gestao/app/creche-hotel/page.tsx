@@ -32,7 +32,7 @@ import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEs
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
 import { esperadoNoDia, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMudarPlano, type PlanoCompleto } from "@/lib/gestao/creche";
 import { conferirCaixa, conferirValorAlto, lancarPago, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
-import { useOperacao } from "@/lib/gestao/uma-vez";
+import { useOperacao, useTrava } from "@/lib/gestao/uma-vez";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
 import {
   aceitaSinal, contaDasDiarias, contarDiarias, diariaFixa, diariaSugerida, estadiaSemCobranca, fatosDoDia, lerConta, lerCuidados, nivelDeOcupacao, nomeDaAcomodacao, ocupadasNoDia, ocupaNoDia, precoPorNoite, sinalSugerido,
@@ -1001,7 +1001,14 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
         const r = ok(await sb.from("estadias").update(campos).eq("id", editar.id).eq("petshop_id", petshop.id).eq("status", editar.status).select("id"));
         if (!r.length) avisar("Essa estadia já tinha sido alterada. Atualizei a lista."); else avisar("Alteração salva.");
       } else {
-        id = ok(await sb.from("estadias").insert({ ...campos, petshop_id: petshop.id, pet_id: pet.id, status }).select("id").single()).id;
+        // a reserva leva a chave da operação: a mesma operação de novo (toque duplo, internet que repetiu) devolve a que já foi marcada
+        const chaveDaEstadia = parteDaChave(chave, "estadia")!;
+        const nova = await sb.from("estadias").upsert({ ...campos, petshop_id: petshop.id, pet_id: pet.id, status, chave: chaveDaEstadia }, { onConflict: "petshop_id,chave", ignoreDuplicates: true }).select("id");
+        id = nova.data?.[0]?.id ?? null;
+        if (!id && (!nova.error || nova.error.code === "23505")) {
+          id = (await sb.from("estadias").select("id").eq("petshop_id", petshop.id).eq("chave", chaveDaEstadia).maybeSingle()).data?.id ?? null;
+        }
+        if (!id) throw nova.error ?? new Error("Não deu para marcar. Tente de novo.");
         avisar(emCasa ? `${pet.nome} está na casa.` : `Reserva de ${pet.nome} marcada para ${dataAmigavel(entrada)}.`);
       }
       // as taxas combinadas e o sinal ficam à parte, só para quem recebe
@@ -1432,7 +1439,9 @@ function AcertarEstadia({ estadia, aoFechar, aoGravar }: { estadia: EstadiaCompl
     return { conta, mudou, diferenca: centavos(conta.soma - c.total), cobrado: c.total, noites: d.noites };
   })();
 
-  async function salvar() {
+  const umaVez = useTrava();
+  const salvar = () => umaVez(gravar);
+  async function gravar() {
     if (salvando) return;
     if (!datasBoas) return setErro("Confira as datas: a saída vem depois da entrada e não pode ser no futuro.");
     if (!nValido) return setErro("Confira o número de diárias.");

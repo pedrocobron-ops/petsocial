@@ -5,6 +5,8 @@ import { Download, FileSpreadsheet, History, TriangleAlert, Undo2, Upload } from
 import { dataCurta, fimDoTelefone, hora, lerTelefone, semAcento } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { limparCodigo, opcoesDaLoja } from "@/lib/gestao/loja-opcoes";
+import { gravarMovimentos, parteDaChave } from "@/lib/gestao/dinheiro";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import { useGestao } from "./contexto";
 import { guardarLembrado, lerLembrado } from "./lembrado";
 import { Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "./ui";
@@ -323,7 +325,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     ];
   }
 
-  async function importarProdutos(linhas: Record<string, string>[]) {
+  async function importarProdutos(linhas: Record<string, string>[], chave: string) {
     const existentes = { data: await lerTudo<{ nome: string; codigo_barras: string | null; ativo: boolean }>((de, ate, contar) =>
       sb.from("produtos").select("nome, codigo_barras, ativo", contando(contar)).eq("petshop_id", petshop.id).order("id").range(de, ate)) };
     const tem = new Set((existentes.data ?? []).map((p) => semAcento(p.nome)));
@@ -333,7 +335,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     const { data: u } = await sb.auth.getUser();
     let novos = 0, pulados = 0, ignorados = 0;
     const ruim = (v: string | undefined) => Boolean((v ?? "").trim()) && numero(v) == null;
-    for (const l of linhas) {
+    for (const [i, l] of linhas.entries()) {
       const nome = l.nome.trim().slice(0, 120);
       if (tem.has(semAcento(nome))) { pulados++; continue; }
       const preco = numero(l.preco), custo = numero(l.custo), qtd = numero(l.estoque), minimo = numero(l.minimo);
@@ -350,10 +352,11 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
       if (codigo) codigos.add(codigo);
       novos++;
       if (qtd && qtd > 0) {
-        const m = await sb.from("movimentos_estoque").insert({
+        // o saldo de cada linha da planilha entra uma vez só por importação (a chave é da folha + o número da linha)
+        await gravarMovimentos(sb, petshop.id, [{
           petshop_id: petshop.id, produto_id: r.data.id, tipo: "ajuste", quantidade: qtd, motivo: "Saldo trazido da planilha", criado_por: u.user?.id ?? null,
-        }).select("id");
-        if (m.error) throw new Error(m.error.message);
+          chave: parteDaChave(chave, "saldo", i),
+        }]);
       }
     }
     return [
@@ -364,14 +367,17 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     ];
   }
 
-  async function importar() {
+  // trava na hora do primeiro toque: dois toques seguidos em Trazer não criam os produtos (nem o saldo) duas vezes
+  const op = useOperacao();
+  const importar = () => op.fazer(trazer);
+  async function trazer(chave: string): Promise<boolean | void> {
     if (!lido || lido.faltou || !lido.linhas.length || indo || somenteLeitura()) return;
     if (semColuna.length && !mesmoAssim) return;
     if (lido.linhas.length > MAXIMO) { setErro(`São ${lido.linhas.length} linhas. Traga até ${MAXIMO} por vez.`); return; }
     setIndo(true); setErro(null);
     const criados = { clientes: [] as string[], pets: [] as string[] };
     try {
-      const r = tipo === "clientes" ? await importarClientes(lido.linhas, criados) : await importarProdutos(lido.linhas);
+      const r = tipo === "clientes" ? await importarClientes(lido.linhas, criados) : await importarProdutos(lido.linhas, chave);
       setResultado(r);
       guardarUltima({ em: new Date().toISOString(), linhas: r, ...criados });
       avisar("Planilha trazida para o sistema.");

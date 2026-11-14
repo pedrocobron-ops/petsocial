@@ -49,7 +49,8 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   agendamento?: AgendamentoCompleto; petInicial?: PetComTutor | null; diaInicial?: string; horaInicial?: string; profissionalInicial?: string | null;
   aoFechar: () => void; aoSalvar: () => void;
 }) {
-  const { sb, petshop, equipe, servicos, user } = useGestao();
+  // quem não mexe com dinheiro (sem Caixa, Financeiro nem Relatórios) marca o horário sem ver valor: o preço da lista vai junto, calado
+  const { sb, petshop, equipe, servicos, user, vejoFinanceiro } = useGestao();
   useCalendario(); // feriados e dias fechados: a tela avisa quando o dia escolhido é um deles
   const { avisar, avisarErro, confirmar } = useAvisos();
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
@@ -384,9 +385,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
             <div className={`g-agd-alerta g-agd-porte${faltaPorte ? " falta" : ""}`} role="status" ref={perguntaPorte}><TriangleAlert />
               <div>
                 {porteDepois ? (
-                  <span><b>Porte de {pet.nome}: a conferir na hora.</b> O valor abaixo é o primeiro preço do serviço e o horário vai com a anotação "{NOTA_PORTE}" Se já souber, escolha:</span>
+                  <span><b>Porte de {pet.nome}: a conferir na hora.</b> {vejoFinanceiro ? "O valor abaixo é o primeiro preço do serviço e o" : "O"} horário vai com a anotação "{NOTA_PORTE}" Se já souber, escolha:</span>
                 ) : (
-                  <span><b>Qual é o porte de {pet.nome}?</b> {valorPedePorte ? "A ficha está sem porte e o valor deste serviço muda com ele." : precoMexido ? "A ficha está sem porte. O valor é o que você escreveu." : "A ficha está sem porte."}</span>
+                  <span><b>Qual é o porte de {pet.nome}?</b> {valorPedePorte ? "A ficha está sem porte e o valor deste serviço muda com ele." : precoMexido && vejoFinanceiro ? "A ficha está sem porte. O valor é o que você escreveu." : "A ficha está sem porte."}</span>
                 )}
                 <div className="g-chips" role="group" aria-label={`Porte de ${pet.nome}`}>
                   {PORTES.map((x) => <button key={x.id} type="button" className="g-chip" disabled={salvandoPorte} onClick={() => void definirPorte(x.id)}>{x.rotulo}</button>)}
@@ -414,16 +415,18 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
                   <button key={s.id} type="button" className="g-chip" aria-pressed={outros.some((o) => o.servicoId === s.id)} onClick={() => alternarOutro(s.id)}><i style={{ background: s.cor }} />{s.nome}</button>
                 ))}
               </div>
-              {outros.length === 0 ? <p className="g-pp g-muted" style={{ margin: 0 }}>Toque nos serviços que o pet vai fazer junto com {servico.nome}. Cada um entra com o seu valor e o tempo soma.</p> : (
+              {outros.length === 0 ? <p className="g-pp g-muted" style={{ margin: 0 }}>Toque nos serviços que o pet vai fazer junto com {servico.nome}. {vejoFinanceiro ? "Cada um entra com o seu valor e o tempo soma." : "O tempo de cada um soma."}</p> : (
                 <ul className="g-agd-outros-l">
                   {outros.map((o) => {
                     const s = servicos.find((x) => x.id === o.servicoId);
                     return (
                       <li key={o.servicoId}>
                         <div className="t"><b>{s?.nome ?? "Serviço"}</b><small>mais {tempo(s?.duracao_min ?? 0)}</small></div>
-                        <label className="g-agd-valor" aria-label={`Valor de ${s?.nome ?? "serviço"}`}>
-                          <CampoDinheiro valor={o.preco} aoMudar={(v) => setOutros((l) => l.map((x) => (x.servicoId === o.servicoId ? { ...x, preco: v, mexido: true } : x)))} placeholder="definir" />
-                        </label>
+                        {vejoFinanceiro && (
+                          <label className="g-agd-valor" aria-label={`Valor de ${s?.nome ?? "serviço"}`}>
+                            <CampoDinheiro valor={o.preco} aoMudar={(v) => setOutros((l) => l.map((x) => (x.servicoId === o.servicoId ? { ...x, preco: v, mexido: true } : x)))} placeholder="definir" />
+                          </label>
+                        )}
                         <button type="button" className="g-ico" aria-label={`Tirar ${s?.nome ?? "serviço"} deste horário`} onClick={() => alternarOutro(o.servicoId)}><X /></button>
                       </li>
                     );
@@ -554,14 +557,14 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
                   .map((m) => <option key={m} value={m}>{tempo(m)}</option>)}
               </select>
             </Campo>
-            <Campo rotulo={outros.length && servico ? `Valor de ${servico.nome}` : "Valor"} erro={valorRuim ? "Isso não é um valor. Escreva só números, como 45,00." : null}
+            {vejoFinanceiro && <Campo rotulo={outros.length && servico ? `Valor de ${servico.nome}` : "Valor"} erro={valorRuim ? "Isso não é um valor. Escreva só números, como 45,00." : null}
               dica={semPorte && servico && !precoMexido ? "Pet sem porte: confira o valor." : undefined}>
               <span className={`g-agd-valor${valorRuim ? " ruim" : semPorte && servico && !precoMexido ? " atencao" : ""}`} onInput={(e) => setTextoValor((e.target as HTMLInputElement).value)}>
                 <CampoDinheiro valor={preco} aoMudar={(v) => { setPreco(v); setPrecoMexido(true); }} placeholder="definir" />
               </span>
-            </Campo>
+            </Campo>}
           </div>
-          {outros.length > 0 && (
+          {vejoFinanceiro && outros.length > 0 && (
             <p className="g-agd-total" role="status">
               <span>Total do horário, com {outros.length === 1 ? "o outro serviço" : `os outros ${outros.length} serviços`}</span>
               <b className="g-tab">{brl(totalDoHorario)}</b>
