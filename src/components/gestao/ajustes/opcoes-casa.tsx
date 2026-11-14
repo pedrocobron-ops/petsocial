@@ -71,7 +71,7 @@ export default function OpcoesCasa() {
     <section className="g-card g-pilha" id="opcoes-casa">
       <div className="g-mp-t">
         <Tile icone={HeartHandshake} tom="ceu" />
-        <div><h2>Cuidado com o tutor</h2><p className="g-muted g-p">Para a creche e o hotel. Ligue só o que você usa: desligado, nada aparece nas telas.</p></div>
+        <div><h2>Cuidado com o tutor</h2><p className="g-muted g-p">Para {usaModulo(petshop, "creche") && usaModulo(petshop, "hotel") ? "a creche e o hotel" : usaModulo(petshop, "creche") ? "a creche" : "o hotel"}. Ligue só o que você usa: desligado, nada aparece nas telas.</p></div>
       </div>
       <div>
         <Opcao titulo="Diário do dia" frase="Para cada pet na casa, a equipe marca em um toque o que ele fez e manda um resumo pronto para o WhatsApp do tutor." ligada={diario.ativo} aoMudar={(v) => m(setDiario)({ ...diario, ativo: v })}>

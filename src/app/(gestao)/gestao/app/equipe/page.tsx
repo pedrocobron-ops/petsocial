@@ -201,6 +201,7 @@ export default function Equipe() {
 
 function BlocoDoPlano({ uso, aoAdicionar }: { uso: Uso; aoAdicionar: () => void }) {
   const { plano, proximo, livres, cheio, emTeste } = uso;
+  const { petshop } = useGestao();
   const linha = emTeste
     ? "Durante o teste valem os 6 acessos do plano Pet shop. Na hora de assinar, você escolhe pelo número de pessoas com login."
     : cheio
@@ -216,7 +217,7 @@ function BlocoDoPlano({ uso, aoAdicionar }: { uso: Uso; aoAdicionar: () => void 
         <h2>Acessos do plano {plano.nome}: <em>{uso.usados} de {uso.limite} em uso</em></h2>
       </div>
       <Vagas uso={uso} aoAdicionar={aoAdicionar} />
-      <p className="g-eq-plano-n">{linha} <span className="g-eq-plano-c">Conta quem entra no sistema: você, recepção, financeiro, gerente, sócio. Quem só aparece na agenda, como banhista e tosador, não ocupa acesso.</span></p>
+      <p className="g-eq-plano-n">{linha} <span className="g-eq-plano-c">Conta quem entra no sistema: você, {usaModulo(petshop, "banho_tosa") ? "" : "monitor(a), "}recepção, financeiro, gerente, sócio.{usaModulo(petshop, "banho_tosa") ? " Quem só aparece na agenda, como banhista e tosador, não ocupa acesso." : " Quem trabalha sem login não ocupa acesso."}</span></p>
       <div><Link className="g-eq-plano-l" href="/gestao/app/assinatura">{mostraPlanos ? "Ver os planos" : "Ver a assinatura"}<ArrowRight size={16} aria-hidden /></Link></div>
     </section>
   );
