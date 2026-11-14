@@ -4,6 +4,7 @@ import { useState } from "react";
 import { History, Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
 import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
+import { usaCasa } from "@/lib/gestao/modulos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
@@ -384,7 +385,8 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     return r.data?.nome ?? null;
   }, [inicial?.cliente_id]);
   const nomeDoCliente = nomeDoClienteLido?.split(" ")[0] ?? "O cliente";
-  const lista = categoriasDe(tipo);
+  // quem não tem creche nem hotel não vê essa categoria (lançamento antigo com ela continua mostrando)
+  const lista = categoriasDe(tipo).filter((c) => c !== "Creche e hotel" || usaCasa(petshop));
   const categorias = (lista.includes(categoria) ? lista : [categoria, ...lista]).map((c) => ({ id: c, rotulo: c }));
   const titulo = conta
     ? `${inicial ? "Editar conta" : "Nova conta"} ${entrada ? "a receber" : "a pagar"}`

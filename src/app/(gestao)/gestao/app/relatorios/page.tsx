@@ -596,7 +596,8 @@ function Relatorios() {
             </div>
 
             <div className={semBanho ? "g-pilha" : "g-duas"}>
-              <BlocoComissao de={deIso} ate={ateIso} aoCalcular={setComissaoBanco} />
+              {/* quem trabalha sozinha, sem comissão para ninguém, não precisa do bloco de comissão */}
+              {(equipe.filter((x) => x.ativo).length > 1 || equipe.some((x) => Number(x.comissao_pct) > 0)) && <BlocoComissao de={deIso} ate={ateIso} aoCalcular={setComissaoBanco} />}
 
               <section className="g-card" style={some}>
                 <div className="g-card-t"><h3><Tile icone={Users} tom="ceu" tamanho="p" />Tutores que mais vieram</h3></div>
