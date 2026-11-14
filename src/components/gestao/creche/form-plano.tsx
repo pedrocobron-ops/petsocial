@@ -8,6 +8,7 @@ import {
 } from "@/lib/gestao/creche";
 import type { PetComTutor } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, isoDia, nomeMes, somaDias } from "@/lib/gestao/util";
+import { useTrava } from "@/lib/gestao/uma-vez";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Folha, ok, useAvisos, useDados } from "../ui";
@@ -95,7 +96,10 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
   const vencPadrao = (() => { const v = inicio ? vencimentoDoMes({ inicio, vence_dia: venceDia }, mesAtual) : hoje; return v < hoje ? hoje : v; })();
   const vencDaPrimeira = vencPrimeira || vencPadrao;
 
-  async function salvar() {
+  // trava na hora do primeiro toque: dois toques seguidos não criam o plano (nem a primeira cobrança) duas vezes
+  const umaVez = useTrava();
+  const salvar = () => umaVez(gravar);
+  async function gravar() {
     if (!pet || salvando) return;
     const falha = (m: string) => { setErro(m); avisarErro(m); };
     if (outro) return falha(`${pet.nome} já tem um plano. Altere o plano que já existe.`);

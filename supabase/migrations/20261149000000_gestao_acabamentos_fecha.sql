@@ -9,7 +9,7 @@
 -- Coluna nova em `estadias` daqui para a frente precisa de `grant select (coluna)`.
 revoke select on public.estadias from anon, authenticated;
 grant select (id, petshop_id, pet_id, tipo, entrada, saida_prevista, saida, status, obs, criado_em, diarias_cobradas,
-  plano_id, mensalista, dia, cobranca_id, acomodacao, cuidados, avisos, sinal_estado) on public.estadias to authenticated;
+  plano_id, mensalista, dia, cobranca_id, acomodacao, cuidados, avisos, sinal_estado, chave) on public.estadias to authenticated;
 
 -- ---------- opções: só pela função petshop_opcoes (que tira as listas de preço de quem não recebe) ----------
 revoke select (opcoes) on public.petshops from authenticated;

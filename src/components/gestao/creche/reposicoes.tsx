@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CalendarCheck2, Check, HandCoins } from "lucide-react";
 import type { Cliente, Pet } from "@/lib/gestao/tipos";
 import { dataLonga, deIsoDia } from "@/lib/gestao/util";
+import { useTrava } from "@/lib/gestao/uma-vez";
 import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 
@@ -34,7 +35,9 @@ export default function ReposicoesParaConferir() {
     return { linhas: r.data as unknown as Linha[], nomes: new Map((equipe.data ?? []).filter((p) => p.user_id).map((p) => [p.user_id as string, p.nome])) };
   }, [petshop.id, pode]);
 
-  async function decidir(l: Linha, decisao: "aceitar" | "extra") {
+  const umaVez = useTrava();
+  const decidir = (l: Linha, decisao: "aceitar" | "extra") => umaVez(() => decidirJa(l, decisao));
+  async function decidirJa(l: Linha, decisao: "aceitar" | "extra") {
     if (somenteLeitura() || ocupado) return;
     setOcupado(l.estadia_id);
     try {

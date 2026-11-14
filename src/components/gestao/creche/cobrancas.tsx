@@ -6,7 +6,8 @@ import {
   cobraNoMes, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, vencimentoDoMes,
   type CobrancaCompleta, type EstadoCobranca, type PlanoCompleto, type PrimeiraCobranca,
 } from "@/lib/gestao/creche";
-import { conferirCaixa, receberConta, textoDoPagamento, type FormaPagamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, parteDaChave, receberConta, textoDoPagamento, type FormaPagamento } from "@/lib/gestao/dinheiro";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { AvisoCaixaFechado, ChipsForma, useCaixaAberto } from "../loja/pecas";
 import type { Lancamento } from "@/lib/gestao/tipos";
@@ -388,7 +389,11 @@ function GerarCobrancas({ mes, planos, comCobranca, aoFechar, aoGerar }: { mes: 
   const totalDe = (l: LinhaGerar) => centavos((l.valor ?? 0) + l.extras.length * l.unit + l.taxas.reduce((s, x) => s + x.valor, 0));
   const total = centavos(prontas.reduce((s, l) => s + totalDe(l), 0));
 
-  async function gerar() {
+  // trava na hora do primeiro toque: dois toques seguidos não geram (nem tentam gerar) as cobranças duas vezes.
+  // No banco, cada plano tem uma cobrança só por mês: a segunda chamada devolve a que já existe.
+  const op = useOperacao();
+  const gerar = () => op.fazer(gerarTudo);
+  async function gerarTudo() {
     if (salvando || !(prontas.length + porFora.length)) return;
     setSalvando(true);
     let feitas = 0, fora = 0;
@@ -564,7 +569,10 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
   const devido = centavos(contas.reduce((s, c) => s + faltaDaCobranca(c), 0));
   const total = centavos(devido + (comMulta ? totalMulta : 0));
 
-  async function salvar() {
+  // trava na hora do primeiro toque; cada mensalidade leva a sua parte da chave (o banco recebe cada uma uma vez só)
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (salvando) return;
     if (!forma) { setErro("Escolha como recebeu."); return; }
     if (!data || data > hoje) { setErro("Escolha um dia até hoje."); return; }
@@ -575,13 +583,15 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
     for (let i = 0; i < contas.length; i++) {
       const c = contas[i], m = comMulta ? multas[i] : 0;
       try {
-        await receberConta(sb, c.lancamento_id!, { valor: faltaDaCobranca(c), forma, data, multa: m > 0 ? { valor: m, forma } : null });
+        await receberConta(sb, c.lancamento_id!, { valor: faltaDaCobranca(c), forma, data, multa: m > 0 ? { valor: m, forma } : null, chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) });
         feitas++; recebido = centavos(recebido + faltaDaCobranca(c) + m);
       } catch (e) { falhas.push(`${c.pets?.nome ?? "pet"} (${e instanceof Error ? e.message : "erro"})`); }
     }
     if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join("; ")}`);
     if (feitas) avisar(`Recebido de ${grupo.tutor ?? "tutor"}: ${brl(recebido)} (${feitas === 1 ? "1 mensalidade" : `${feitas} mensalidades`}).`);
     await aoFeito();
+    // deu certo só com uma parte: uma nova tentativa com a mesma folha não recebe de novo as que já entraram
+    if (falhas.length) return false;
   }
 
   return (
@@ -632,7 +642,9 @@ function PagasPorFora({ mes, cobrancas, marcadas, aoFechar, aoFeito }: { mes: Da
   const lista = [...cobrancas].sort((a, b) => (a.pets?.nome ?? "").localeCompare(b.pets?.nome ?? "", "pt-BR"));
   const total = centavos(lista.filter((c) => ids.includes(c.id)).reduce((s, c) => s + Number(c.total), 0));
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar() {
     if (salvando || !ids.length) return;
     setSalvando(true);
     try {
