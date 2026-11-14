@@ -376,10 +376,10 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
                 <input type="checkbox" checked={reposicao} onChange={(e) => setReposicao(e.target.checked)} />
                 <span>É reposição de falta (não cobrar)</span>
               </label>
-              <p className="g-muted g-p">
+              {!semSaldo && <p className="g-muted g-p">
                 {reposicao ? (confere ? "O dia fica anotado como reposição. Quem cuida do financeiro é avisado e confere se fica sem cobrança ou se vira dia extra." : "O dia fica anotado como reposição e não entra na cobrança.")
                   : "O dia fica anotado como dia extra e entra na cobrança do mês que vem. Nada é cobrado na porta."}
-              </p>
+              </p>}
             </>
           )}
           {saldo && <p className="g-muted g-p" role="status">{fraseDoSaldo(nomeEscolhido, saldo)}</p>}
@@ -387,8 +387,8 @@ function ForaDoDia({ planos, dia, jaVieram, saude, cheia, aoFechar, aoMarcar }: 
             <div className="g-aviso" role="alert" style={{ marginBottom: 0 }}>
               <AlertTriangle />
               <span className="g-cresce">{confere
-                ? `${nomeEscolhido} não tem falta para repor. Marque como dia extra ou fale com o dono.`
-                : `${nomeEscolhido} não tem falta para repor. Se quiser dar este dia sem cobrança assim mesmo, toque em Liberar sem cobrança: fica anotado que foi liberado sem falta.`}</span>
+                ? "Sem falta para repor, o dia não pode ser reposição. Marque como dia extra (desmarque a reposição) ou fale com o dono."
+                : "Sem falta para repor. Se quiser dar este dia sem cobrança assim mesmo, toque em Liberar sem cobrança: fica anotado que foi liberado sem falta."}</span>
             </div>
           )}
         </div>
