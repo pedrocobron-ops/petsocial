@@ -6,6 +6,9 @@ import { Check } from "lucide-react";
 import { PERIODOS, PLANOS, ofertaDe, textoAcessos, type PeriodoId } from "@/lib/gestao/planos";
 import { brlCurto } from "@/lib/gestao/util";
 
+/** "Para quem é" de cada plano, na página de venda: vale para banho e tosa, creche, hotel e loja (o nome do plano não muda). */
+const PARA: Record<string, string> = { solo: "Para quem atende sozinho", equipe: "Para quem tem ajudante ou recepção", petshop: "Para a equipe completa" };
+
 /** Planos da página de venda: a pessoa escolhe de quanto em quanto tempo paga e os três preços mudam juntos. */
 export default function PlanosVenda({ criar }: { criar: string }) {
   const [periodo, setPeriodo] = useState<PeriodoId>("mensal");
@@ -22,7 +25,7 @@ export default function PlanosVenda({ criar }: { criar: string }) {
           return (
             <li key={p.id} className={p.id === "equipe" ? "destaque" : undefined}>
               <h3>{p.nome}</h3>
-              <p className="gp-para">{p.para}</p>
+              <p className="gp-para">{PARA[p.id] ?? p.para}</p>
               <p className="gp-valor">{brlCurto(o.preco)}<small> {o.periodo.cada}</small></p>
               <p className="gp-conta">{o.periodo.meses > 1 ? <>Equivale a <b>{brlCurto(Math.round(o.porMes * 100) / 100)} por mês</b>. Você paga {brlCurto(o.economia)} a menos do que no mensal.</> : "Cobrado todo mês."}</p>
               <p className="gp-acessos">{textoAcessos(p.acessos)}<span> ao sistema</span></p>
