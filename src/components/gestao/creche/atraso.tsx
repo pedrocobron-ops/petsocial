@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Clock } from "lucide-react";
 import { AvisoCaixaFechado, ChipsForma, useCaixaAberto, useFormaLembrada } from "@/components/gestao/loja/pecas";
 import { conferirCaixa, lancarPago } from "@/lib/gestao/dinheiro";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import { NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Cliente, Pet } from "@/lib/gestao/tipos";
@@ -77,7 +78,9 @@ export function FolhaTaxaDeAtraso({ atraso, valor, aoFechar, aoDecidir }: {
   const caixa = useCaixaAberto();
   const nome = atraso.pets?.nome ?? "O pet";
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (cobra === null || salvando) return;
     if (cobra && como === "agora" && !forma) { setErroForma("Escolha como o cliente pagou."); return; }
     if (cobra && como === "agora" && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
@@ -96,7 +99,7 @@ export function FolhaTaxaDeAtraso({ atraso, valor, aoFechar, aoDecidir }: {
         try {
           lanc = await lancarPago(sb, petshop.id, {
             tipo: "entrada", valor, forma: forma!, categoria: "Creche e hotel", clienteId: atraso.pets?.clientes?.id ?? null,
-            descricao: `Creche: ${NOME_TAXA_ATRASO.toLowerCase()} · ${nome}`, itens: [{ tipo: "extra", nome: NOME_TAXA_ATRASO, qtd: 1, valor }],
+            descricao: `Creche: ${NOME_TAXA_ATRASO.toLowerCase()} · ${nome}`, itens: [{ tipo: "extra", nome: NOME_TAXA_ATRASO, qtd: 1, valor }], chave,
           });
         } catch (e) {
           await decidirAtraso(sb, atraso.estadia_id, "pendente").catch(() => undefined);

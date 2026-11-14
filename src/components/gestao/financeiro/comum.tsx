@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { History, Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
-import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, desfazerVenda, ehDividido, itensDoLancamento, lancarPago, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -350,7 +351,9 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     if (!categoriasDe(t).includes(categoria)) setCategoria(categoriasDe(t)[0]);
   }
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (salvando || soVer) return;
     if (!valor || valor <= 0) { setErro("Escreva o valor."); return; }
     if (valor >= 1e8) { setErro("Esse valor é grande demais."); return; }
@@ -386,23 +389,25 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
           return {
             petshop_id: petshop.id, tipo, valor, categoria, pago: false, forma: null, vencimento: dia, data: dia,
             descricao: vezes > 1 ? `${texto} (${i + 1}/${vezes})` : texto, origem: "tela", criado_por: user.id,
+            chave: parteDaChave(chave, "conta", i + 1),
           };
         });
-        const r = await sb.from("lancamentos").insert(linhas);
+        // a chave de cada conta é única: um toque duplo (ou o pedido repetido) não anota as contas duas vezes
+        const r = await sb.from("lancamentos").upsert(linhas, { onConflict: "petshop_id,chave", ignoreDuplicates: true });
         if (r.error) throw new Error(r.error.message);
         avisar(vezes > 1 ? `${vezes} contas anotadas, uma por mês.` : "Conta anotada.");
       } else if (!forma) {
         setSalvando(false);
         return;
       } else if (!escolheData || data === hoje) {
-        await lancarPago(sb, petshop.id, { tipo, valor, forma, pagamentos, categoria, descricao: texto });
+        await lancarPago(sb, petshop.id, { tipo, valor, forma, pagamentos, categoria, descricao: texto, chave });
         avisar(entrada ? `Entrada de ${brl(valor)} anotada.` : `Saída de ${brl(valor)} anotada.`);
       } else {
         // dia que já passou: não entra no caixa de hoje
-        const r = await sb.from("lancamentos").insert({
+        const r = await gravarLancamento(sb, petshop.id, {
           petshop_id: petshop.id, tipo, valor, forma, categoria, descricao: texto, data, pago: true, origem: "tela", criado_por: user.id,
           ...(pagamentos ? { pagamentos } : {}),
-        });
+        }, chave);
         if (r.error) throw new Error(r.error.message);
         avisar(`${entrada ? "Entrada" : "Saída"} de ${brl(valor)} anotada em ${dataCompleta(data)}.`);
       }
@@ -412,6 +417,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     } catch (e) {
       avisarErro(e);
       setSalvando(false);
+      return false;
     }
   }
 
@@ -438,6 +444,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
       avisarErro(e);
       await aoSalvo();
       setSalvando(false);
+      return false;
     }
   }
 
@@ -445,7 +452,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     <Folha titulo={titulo} aoFechar={aoFechar}
       rodape={soVer ? <button type="button" className="g-btn sec" onClick={aoFechar}>Fechar</button> : <>
         {inicial && !travado && <button type="button" className="g-btn perigo" onClick={excluir} disabled={salvando}><Trash2 />Excluir</button>}
-        <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : inicial ? "Salvar" : conta ? "Anotar conta" : "Lançar"}</button>
+        <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || op.ocupado}>{salvando ? "Salvando…" : inicial ? "Salvar" : conta ? "Anotar conta" : "Lançar"}</button>
       </>}>
       <form className="g-form" onSubmit={(e) => { e.preventDefault(); void salvar(); }}>
         {soVer && !travado && (
@@ -585,6 +592,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
   const [valor, setValor] = useState<number | null>(devido);
   const [novoVencimento, setNovoVencimento] = useState(conta.vencimento && conta.vencimento >= hoje ? conta.vencimento : "");
   const sugerida = entrada ? multaSugerida(petshop, conta, hoje) : null;
+  const jaMulta = Number(conta.multa_recebida ?? 0);
   const [multa, setMulta] = useState<number | null>(null);
   const [comMulta, setComMulta] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -597,7 +605,9 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
   const daMulta = comMulta ? centavos(multa ?? 0) : 0;
   const total = centavos(recebendo + daMulta);
 
-  async function salvar() {
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (salvando) return;
     if (entrada && !(recebendo > 0)) { setErroValor("Escreva quanto o cliente pagou."); return; }
     if (entrada && recebendo > devido) { setErroValor(`O cliente deve ${brl(devido)} nesta conta. Se pagou a mais, lance a diferença como outra entrada.`); return; }
@@ -613,6 +623,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
           valor: recebendo, forma: partes.conta.forma, pagamentos: partes.conta.pagamentos, data: cuidoDoFinanceiro ? data : null,
           novoVencimento: parcial && novoVencimento && novoVencimento !== conta.vencimento ? novoVencimento : null,
           multa: daMulta > 0 ? { valor: daMulta, forma: partes.multa.forma, pagamentos: partes.multa.pagamentos } : null,
+          chave,
         });
         avisar(r.quitada ? `Recebido: ${brl(total)}.` : `Recebido: ${brl(total)}. Fica faltando ${brl(r.falta)}.`);
       } else {
@@ -638,7 +649,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     <Folha titulo={entrada ? "Recebi esta conta" : "Paguei esta conta"} aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button type="button" className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : parcial || daMulta > 0 ? `Receber ${brl(total)}` : "Dar baixa"}</button>
+        <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || op.ocupado}>{salvando ? "Salvando…" : parcial || daMulta > 0 ? `Receber ${brl(total)}` : "Dar baixa"}</button>
       </>}>
       <div className="g-form">
         <div className="g-card areia">
@@ -659,12 +670,22 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
             </Campo>
           </div>
         )}
+        {!sugerida && jaMulta > 0 && entrada && (
+          <p className="g-muted g-pp">Multa e juros desta conta já cobrados: {brl(jaMulta)}{conta.multa_recebida_em ? ` em ${dataCompleta(conta.multa_recebida_em)}` : ""}. Não há mais nada a somar hoje.</p>
+        )}
         {sugerida && (
           <div className="gf-multa">
-            <p>
-              Venceu há {sugerida.dias === 1 ? "1 dia" : `${sugerida.dias} dias`}. Pela regra do pet shop ({regraDaMulta(petshop)}), o valor atualizado seria{" "}
-              <b className="g-tab">{brl(centavos(devido + sugerida.total))}</b>: {brl(devido)} + {brl(sugerida.total)} de multa e juros.
-            </p>
+            {jaMulta > 0 ? (
+              <p>
+                Venceu há {sugerida.dias === 1 ? "1 dia" : `${sugerida.dias} dias`}. A multa e os juros desta conta já foram cobrados ({brl(jaMulta)}{conta.multa_recebida_em ? ` em ${dataCompleta(conta.multa_recebida_em)}` : ""}).
+                {" "}Do que falta, só os juros dos dias depois disso: <b className="g-tab">{brl(sugerida.total)}</b>, o que daria <b className="g-tab">{brl(centavos(devido + sugerida.total))}</b>.
+              </p>
+            ) : (
+              <p>
+                Venceu há {sugerida.dias === 1 ? "1 dia" : `${sugerida.dias} dias`}. Pela regra do pet shop ({regraDaMulta(petshop)}), o valor atualizado seria{" "}
+                <b className="g-tab">{brl(centavos(devido + sugerida.total))}</b>: {brl(devido)} + {brl(sugerida.total)} de multa e juros.
+              </p>
+            )}
             {comMulta ? (
               <div className="gf-multa-linha">
                 <label>

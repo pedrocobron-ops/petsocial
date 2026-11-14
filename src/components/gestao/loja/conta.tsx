@@ -4,11 +4,12 @@ import { COLS_PRODUTO } from "@/lib/gestao/reservado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useEffect, useRef, useState } from "react";
 import { Minus, Package, Plus, Scissors, Search, Sparkles, Trash2, Truck } from "lucide-react";
-import type { ItemLancamento } from "@/lib/gestao/dinheiro";
+import { gravarMovimentos, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Produto } from "@/lib/gestao/tipos";
 import { brl, semAcento } from "@/lib/gestao/util";
 import { limparCodigo, opcoesDaLoja } from "@/lib/gestao/loja-opcoes";
+import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { ok, useDados } from "../ui";
@@ -104,12 +105,14 @@ export const encurtar = (s: string, max = 200) => (s.length > max ? `${s.slice(0
  * `lancamentoId` liga a saída à venda no financeiro: é por essa ligação que o relatório de produtos acha o custo de cada venda
  * (o banco guarda o custo do produto na hora da saída).
  */
-export async function baixarEstoque(sb: Banco, petshopId: string, userId: string, itens: ItemConta[], lancamentoId?: string | null) {
+export async function baixarEstoque(sb: Banco, petshopId: string, userId: string, itens: ItemConta[], lancamentoId?: string | null, chave?: string | null) {
   const linhas = produtosDaConta(itens).map((i) => ({
     petshop_id: petshopId, produto_id: i.produtoId!, tipo: "saida", quantidade: i.qtd, motivo: "Venda", criado_por: userId,
     ...(lancamentoId ? { lancamento_id: lancamentoId } : {}),
+    // com a chave da operação, tentar de novo (ou um toque duplo) não baixa o mesmo produto duas vezes
+    ...(chave ? { chave: parteDaChave(chave, "estoque", i.produtoId!) } : {}),
   }));
-  if (linhas.length) ok(await sb.from("movimentos_estoque").insert(linhas).select("id"));
+  await gravarMovimentos(sb, petshopId, linhas);
 }
 
 /** Produtos à venda, com o saldo de agora. */
@@ -223,7 +226,12 @@ function CampoQtd({ valor, aoMudar, nome }: { valor: number; aoMudar: (n: number
 export function LinhaDaConta({ item, produto, aoMudar, aoTirar, apoio }: {
   item: ItemConta; produto?: Produto; aoMudar: (m: Partial<ItemConta>) => void; aoTirar?: () => void; apoio?: string;
 }) {
+  const { petshop, cuidoDoFinanceiro } = useGestao();
   const ehProduto = item.tipo === "produto", ehExtra = item.tipo === "extra";
+  // preço travado (opção do dono): quem só opera o caixa vende pelo preço da lista. Item sem preço na lista continua livre.
+  const veioCom = useRef(item.valor);
+  const daLista = ehProduto ? (produto?.preco_venda == null ? null : Number(produto.preco_venda)) : ehExtra ? null : veioCom.current;
+  const travado = travaDePreco(petshop).ligada && !cuidoDoFinanceiro && daLista != null;
   const saldo = produto ? Number(produto.estoque) : null;
   const falta = ehProduto && saldo != null && item.qtd > saldo;
   const nome = item.nome.trim() || (ehExtra ? "extra" : "item");
@@ -242,10 +250,17 @@ export function LinhaDaConta({ item, produto, aoMudar, aoTirar, apoio }: {
       <b className="g-vd-soma g-tab">{brl(valorDaLinha(item))}</b>
       <div className="g-vd-ctrl">
         {ehProduto && <CampoQtd valor={item.qtd} aoMudar={(qtd) => aoMudar({ qtd })} nome={item.nome} />}
-        <label className="g-vd-preco">
-          <span>{ehProduto ? "cada" : "Valor"}</span>
-          <CampoDinheiro valor={item.valor} aoMudar={(valor) => aoMudar({ valor })} />
-        </label>
+        {travado ? (
+          <span className="g-vd-preco" title="Só o dono ou quem vê o financeiro muda o preço">
+            <span>{ehProduto ? "cada" : "Valor"}</span>
+            <b className="g-tab">{brl(item.valor ?? 0)}</b>
+          </span>
+        ) : (
+          <label className="g-vd-preco">
+            <span>{ehProduto ? "cada" : "Valor"}</span>
+            <CampoDinheiro valor={item.valor} aoMudar={(valor) => aoMudar({ valor })} />
+          </label>
+        )}
         {aoTirar && <button type="button" className="g-ico" onClick={aoTirar} aria-label={`Tirar ${nome} da conta`}><Trash2 /></button>}
       </div>
       {falta && (
@@ -268,16 +283,28 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
   /** Só na conta do atendimento: deixa escolher "Cliente paga depois". */
   depois?: PagaDepois; aoDepois?: (d: PagaDepois) => void;
 }) {
+  const { petshop, cuidoDoFinanceiro } = useGestao();
   const passou = (descontoDigitado ?? 0) > subtotal && subtotal > 0;
+  // preço travado: o caixa dá desconto só até o máximo que o dono definiu (sem máximo, não dá desconto)
+  const trava = travaDePreco(petshop);
+  const limitado = trava.ligada && !cuidoDoFinanceiro;
+  const maximo = limitado ? centavos((subtotal * trava.descontoMax) / 100) : null;
+  const passouDoMaximo = maximo != null && (descontoDigitado ?? 0) > maximo + 0.005;
   return (
     <>
       {comPagamento && (
         <>
-          <label className="g-campo g-vd-desconto">
-            <span>Desconto em reais (se tiver)</span>
-            <CampoDinheiro valor={descontoDigitado} aoMudar={aoDesconto} />
-            {passou && <small>O desconto não passa do valor da conta.</small>}
-          </label>
+          {limitado && trava.descontoMax <= 0 ? (
+            <p className="g-muted g-pp">Desconto e mudança de preço: só com o dono ou com quem vê o financeiro.</p>
+          ) : (
+            <label className="g-campo g-vd-desconto">
+              <span>Desconto em reais (se tiver)</span>
+              <CampoDinheiro valor={descontoDigitado} aoMudar={aoDesconto} />
+              {passou ? <small>O desconto não passa do valor da conta.</small>
+                : passouDoMaximo ? <small className="erro" role="alert">O caixa pode dar até {trava.descontoMax.toLocaleString("pt-BR")}% de desconto ({brl(maximo!)} nesta conta). Mais que isso, só com o dono ou com quem vê o financeiro.</small>
+                : limitado ? <small>Até {trava.descontoMax.toLocaleString("pt-BR")}% ({brl(maximo!)} nesta conta).</small> : null}
+            </label>
+          )}
           {depois && aoDepois
             ? <QuandoPaga total={total} pagamento={pagamento} aoPagamento={aoPagamento} depois={depois} aoDepois={aoDepois} erro={erroForma} />
             : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erroForma} />}

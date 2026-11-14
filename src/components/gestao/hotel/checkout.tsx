@@ -3,7 +3,8 @@
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { useEffect, useState } from "react";
 import { Check, Clock, MessageCircle, Plus } from "lucide-react";
-import { conferirCaixa, conferirValorAlto, formaPrincipal, lancarAReceber, lancarPago, quitarConta, type ItemLancamento, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, formaPrincipal, lancarAReceber, lancarPago, parteDaChave, quitarConta, type ItemLancamento, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import {
   contaDasDiarias, contarDiarias, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDoPagamentoDaConta,
   type ContaDaEstadia, type EstadiaDoTutor, type Noite, type TaxaDaConta, type ValoresDaEstadia,
@@ -192,7 +193,10 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
     return linhas;
   }
 
-  async function salvar() {
+  // trava na hora do primeiro toque e chave da operação: toque duplo não lança a conta duas vezes
+  const op = useOperacao();
+  const salvar = () => op.fazer(gravar);
+  async function gravar(chave: string): Promise<boolean | void> {
     if (salvando) return;
     if (!nValido) { avisarErro("Confira o número de diárias."); return; }
     if (atraso && comAtraso === null) { setErroAtraso(true); document.getElementById("g-ht-atraso")?.scrollIntoView({ block: "center", behavior: "smooth" }); avisarErro("Diga se a taxa de busca fora do horário entra na conta ou não."); return; }
@@ -246,7 +250,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
         const descricao = encurtar(`${nomeTipo(estadia.tipo)}: ${n} ${n === 1 ? "diária" : "diárias"} · ${nome}${resumo ? ` + ${resumo}` : ""}`);
         try {
           if (rec.fiado) {
-            const l = await lancarAReceber(sb, petshop.id, { valor: valor!, vencimento: rec.quando, categoria: "Creche e hotel", descricao, clienteId: tutor?.id ?? null, itens: linhas });
+            const l = await lancarAReceber(sb, petshop.id, { valor: valor!, vencimento: rec.quando, categoria: "Creche e hotel", descricao, clienteId: tutor?.id ?? null, itens: linhas, chave });
             lancamentoId = l.id; pg = { fiado: true, quando: rec.quando };
             recado = `${foi} ${brl(valor)} em A receber, para ${dataCurta(rec.quando)}.`;
           } else {
@@ -256,13 +260,13 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
             const [daEstadia, ...dasOutras] = repartirPagamento(partes, [cobra ? valor! : 0, ...recebeJunto.map((p) => p.valor)]);
             if (cobra && valor) {
               const l = await lancarPago(sb, petshop.id, {
-                tipo: "entrada", valor, forma: formaPrincipal(daEstadia), pagamentos: daEstadia.length > 1 ? daEstadia : null, categoria: "Creche e hotel", descricao, clienteId: tutor?.id ?? null, itens: linhas,
+                tipo: "entrada", valor, forma: formaPrincipal(daEstadia), pagamentos: daEstadia.length > 1 ? daEstadia : null, categoria: "Creche e hotel", descricao, clienteId: tutor?.id ?? null, itens: linhas, chave,
               });
               lancamentoId = l.id;
             }
             const falhas: string[] = [];
             for (const [i, p] of recebeJunto.entries()) {
-              try { await quitarConta(sb, petshop.id, p.id, { forma: formaPrincipal(dasOutras[i]), pagamentos: dasOutras[i] }, p.valor); }
+              try { await quitarConta(sb, petshop.id, p.id, { forma: formaPrincipal(dasOutras[i]), pagamentos: dasOutras[i] }, p.valor, parteDaChave(chave, "conta", p.id)); }
               catch (e) { falhas.push(`${p.descricao || p.categoria} (${mensagemDeErro(e)})`); }
             }
             if (falhas.length) { dinheiroOk = false; avisarErro(`${pendente ? "A estadia foi acertada" : "O check-out foi feito"}, mas não consegui dar baixa em: ${falhas.join("; ")}. Dê baixa pelo Financeiro, em A receber.`); }
@@ -274,7 +278,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
           avisarErro(`${pendente ? "A estadia foi acertada" : "O check-out foi feito"}, mas ${rec.fiado ? "a conta a receber não foi anotada. Anote" : "o pagamento não foi lançado. Lance"} pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
         }
       }
-      try { await baixarEstoque(sb, petshop.id, user.id, itens); } catch (e) {
+      try { await baixarEstoque(sb, petshop.id, user.id, itens, null, chave); } catch (e) {
         avisarErro(`O estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
       }
       const conta = montarConta(pg, lancamentoId, saida);
