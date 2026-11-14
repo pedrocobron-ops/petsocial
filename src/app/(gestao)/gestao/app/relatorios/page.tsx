@@ -1,6 +1,8 @@
 "use client";
 
+import { usaModulo } from "@/lib/gestao/modulos";
 import HotelNoRelatorio from "@/components/gestao/hotel/relatorio";
+import CrecheNoRelatorio from "@/components/gestao/creche/relatorio";
 import { useMemo, useState } from "react";
 import BlocoComissao, { type LinhaComissao } from "@/components/gestao/relatorios/comissao";
 import { ArrowDownRight, ArrowUpRight, CalendarDays, CircleCheck, Clock, CreditCard, Download, HandCoins, Home, Moon, PawPrint, Printer, Receipt, Scissors, Sun, TrendingUp, UserPlus, Users, UserX } from "lucide-react";
@@ -388,6 +390,9 @@ function Relatorios() {
 
   const semNada = r && !r.marcados && !r.faturamento && !dados?.clientesNovos && !r.faltas && !r.totalEstadias;
   const emAndamento = ateIso >= hojeIso && deIso <= hojeIso;
+  // negócio sem banho e tosa (creche, hotel ou loja) e sem nada na agenda no período: os blocos de atendimento não aparecem
+  const semBanho = !usaModulo(petshop, "banho_tosa") && Boolean(r) && !r!.marcados;
+  const some = semBanho ? { display: "none" } : undefined;
 
   return (
     <>
@@ -424,7 +429,7 @@ function Relatorios() {
           <Vazio titulo="Nada por aqui neste período." texto="Quando houver atendimentos e pagamentos, os números aparecem aqui." />
         ) : (
           <>
-            <div className="g-grade kpis">
+            <div className="g-grade kpis" style={some}>
               <Kpi icone={CircleCheck} tom="pessego" rotulo="Atendimentos concluídos" valor={r.concluidos}
                 apoio={<Apoio texto={r.taxaFalta == null ? "nenhum no período" : `${(100 - r.taxaFalta).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% compareceram`}
                   atual={r.concluidos} anterior={dados.anterior.concluidos} />}
@@ -441,7 +446,9 @@ function Relatorios() {
               Período anterior: de {dataCompleta(antes.de)} a {dataCompleta(antes.ate)}.{emAndamento && " O período escolhido ainda não terminou, então a comparação pode mudar."}
             </p>
 
-            <div className="g-duas">
+            {semBanho && <CrecheNoRelatorio de={de} ate={ate} />}
+
+            <div className={semBanho ? "g-pilha" : "g-duas"}>
               <section className="g-card g-rel-fat">
                 <div className="g-card-t">
                   <h3><Tile icone={TrendingUp} tom="menta" tamanho="p" />Faturamento por {r.porSemana ? "semana" : "dia"}</h3>
@@ -482,7 +489,7 @@ function Relatorios() {
                 )}
               </section>
 
-              <section className="g-card">
+              <section className="g-card" style={some}>
                 <div className="g-card-t"><h3><Tile icone={CalendarDays} tom="pessego" tamanho="p" />Dias mais cheios</h3><span className="g-muted g-pp">por dia da semana</span></div>
                 {r.marcados ? (
                   <>
@@ -540,11 +547,12 @@ function Relatorios() {
                 </p>
               </section>
             )}
+            {!semBanho && <CrecheNoRelatorio de={de} ate={ate} />}
             <HotelNoRelatorio de={de} ate={ate} antes={antes} />
 
             <RelatorioProdutos de={deIso} ate={ateIso} />
 
-            <div className="g-duas">
+            <div className="g-duas" style={some}>
               <section className="g-card">
                 <div className="g-card-t"><h3><Tile icone={Scissors} tom="pessego" tamanho="p" />Serviços mais feitos</h3><span className="g-muted g-pp">concluídos</span></div>
                 {r.servicos.length ? (
@@ -586,10 +594,10 @@ function Relatorios() {
               </section>
             </div>
 
-            <div className="g-duas">
+            <div className={semBanho ? "g-pilha" : "g-duas"}>
               <BlocoComissao de={deIso} ate={ateIso} aoCalcular={setComissaoBanco} />
 
-              <section className="g-card">
+              <section className="g-card" style={some}>
                 <div className="g-card-t"><h3><Tile icone={Users} tom="ceu" tamanho="p" />Tutores que mais vieram</h3></div>
                 {r.tutores.length ? (
                   <div className="g-lista">

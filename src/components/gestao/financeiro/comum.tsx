@@ -584,7 +584,8 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
   const [data, setData] = useState(hoje);
   const [valor, setValor] = useState<number | null>(devido);
   const [novoVencimento, setNovoVencimento] = useState(conta.vencimento && conta.vencimento >= hoje ? conta.vencimento : "");
-  const sugerida = entrada ? multaSugerida(petshop, conta, hoje) : null;
+  // a multa sugerida conta os dias de atraso até o dia em que o cliente pagou (não até hoje)
+  const sugerida = entrada ? multaSugerida(petshop, conta, data && data <= hoje ? data : hoje) : null;
   const [multa, setMulta] = useState<number | null>(null);
   const [comMulta, setComMulta] = useState(false);
   const [salvando, setSalvando] = useState(false);
