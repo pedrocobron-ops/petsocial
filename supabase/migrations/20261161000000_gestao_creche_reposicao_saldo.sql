@@ -81,7 +81,10 @@ begin
   select count(*) into v_depois from public.creche_reposicao_casar(p_plano, p_dia) c where c.falta is null;
   -- (uma reposição que já existe nesse dia conta igual nas duas contas: cabe)
   cabe := v_depois <= v_antes;
-  select c.falta into repoe from public.creche_reposicao_casar(p_plano, p_dia) c where c.reposicao = p_dia and c.falta is not null limit 1;
+  -- sem lugar, ela não repõe falta nenhuma (a conta a deixaria com a falta de outra reposição)
+  if cabe then
+    select c.falta into repoe from public.creche_reposicao_casar(p_plano, p_dia) c where c.reposicao = p_dia and c.falta is not null limit 1;
+  end if;
 end $$;
 revoke all on function public.creche_reposicao_cabe(uuid, date) from public, anon, authenticated;
 
