@@ -30,7 +30,7 @@ import { CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSin
 import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
-import { esperadoNoDia, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMudarPlano, type PlanoCompleto } from "@/lib/gestao/creche";
+import { abreNoDia, esperadoNoDia, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMudarPlano, type PlanoCompleto } from "@/lib/gestao/creche";
 import { conferirCaixa, conferirValorAlto, lancarPago, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import { useOperacao, useTrava } from "@/lib/gestao/uma-vez";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
@@ -1053,7 +1053,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
   const diaDaEntrada = entradaForm && !Number.isNaN(entradaForm.getTime()) ? isoDia(entradaForm) : null;
   const diaDaSaida = saidaForm && !Number.isNaN(saidaForm.getTime()) ? isoDia(saidaForm) : null;
   const diasFechados = (tipo === "creche" ? (diasDoPeriodo.length ? diasDoPeriodo : diaDaEntrada ? [diaDaEntrada] : []) : [diaDaEntrada, diaDaSaida].filter((d): d is string => Boolean(d)))
-    .filter((d, i, l) => diaFechado(d) && l.indexOf(d) === i);
+    // na creche também conta o dia da semana em que vocês não abrem (sábado, domingo), pelo horário de Meu pet shop
+    .filter((d, i, l) => (diaFechado(d) || (tipo === "creche" && !abreNoDia(petshop.horario, d))) && l.indexOf(d) === i);
+  const fraseDoFechado = (d: string) => fraseDoDiaFechado(d) ?? `Pelo horário de Meu pet shop, vocês não abrem ${["no domingo", "na segunda", "na terça", "na quarta", "na quinta", "na sexta", "no sábado"][deIsoDia(d).getDay()]}`;
   const nivel = maisCheio && vagas != null ? nivelDeOcupacao(maisCheio.n, vagas) : null;
 
   return (
@@ -1102,7 +1104,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, abe
           <p className="g-ht-fechado" role="status">
             <CalendarOff aria-hidden />
             <span>{diasFechados.length === 1
-              ? <><b>{fraseDoDiaFechado(diasFechados[0])} ({dataCurta(diasFechados[0])}).</b> {tipo === "creche" ? "A creche não abre nesse dia." : diasFechados[0] === diaDaEntrada ? "A chegada cai num dia em que vocês não abrem." : "A saída cai num dia em que vocês não abrem."}</>
+              ? <><b>{fraseDoFechado(diasFechados[0])} ({dataCurta(diasFechados[0])}).</b> {tipo === "creche" ? "A creche não abre nesse dia." : diasFechados[0] === diaDaEntrada ? "A chegada cai num dia em que vocês não abrem." : "A saída cai num dia em que vocês não abrem."}</>
               : <><b>{diasFechados.length} dias fechados no período</b> ({diasFechados.slice(0, 5).map((d) => dataCurta(d)).join(", ")}{diasFechados.length > 5 ? "…" : ""}).</>} Dá para salvar assim mesmo.</span>
           </p>
         )}
