@@ -5,7 +5,7 @@ import { Check } from "lucide-react";
 
 const ABAS: { id: string; rotulo: string; frase: string; alt: string }[] = [
   { id: "agenda", rotulo: "Agenda", frase: "A semana inteira de relance, por profissional, com os horários livres à vista. Feriado e dia fechado já aparecem marcados.", alt: "Agenda da semana no computador, com os atendimentos de cada dia coloridos por profissional" },
-  { id: "assistente", rotulo: "Assistente de IA", frase: "Um assistente de inteligência artificial: fale ou escreva o que precisa. Ele prepara e você confirma com um toque.", alt: "Painel do assistente Mozart aberto ao lado da tela inicial, com exemplos de pedidos" },
+  { id: "assistente", rotulo: "Mozart", frase: "O Mozart, assistente de inteligência artificial: fale ou escreva o que precisa. Ele prepara e você confirma com um toque. Vem em todos os planos.", alt: "Painel do assistente Mozart aberto ao lado da tela inicial, com exemplos de pedidos" },
   { id: "clientes", rotulo: "Clientes e pets", frase: "Cada pet com tutor, porte, cuidados e a data da última visita. Dá para trazer a lista de uma planilha.", alt: "Lista de clientes e pets, com o total de pets, de tutores, os sumidos e os que têm alerta" },
   { id: "chamar-de-volta", rotulo: "Chamar de volta", frase: "Quem não vem há 30, 45, 60 ou 90 dias e os aniversariantes da semana, com a mensagem pronta. Você toca e envia pelo seu WhatsApp.", alt: "Chamar de volta: lista de tutores com a mensagem pronta para abrir no WhatsApp" },
   { id: "caixa", rotulo: "Caixa", frase: "Abra o caixa, lance entradas e saídas e feche o dia conferindo a gaveta. Ao lado, quem ficou de pagar depois.", alt: "Caixa aberto, com o dinheiro na gaveta, o recebido no dia e as contas de clientes que ficaram para depois" },
@@ -42,6 +42,7 @@ const AREAS: { id: string; rotulo: string; titulo: string; itens: string[]; tela
       "Chamada do dia: um toque quando o pet chega, outro quando sai.",
       "Dia extra entra na cobrança do mês seguinte. Reposição de falta não é cobrada.",
       "Cobranças do mês juntas por tutor: quem tem dois pets paga tudo de uma vez.",
+      "Reposição de falta sem cobrança, com a regra que você escolher.",
       "Taxa de busca fora do horário, se você quiser cobrar. O sistema pergunta antes.",
       "Diário do dia para o tutor, pronto para você enviar pelo WhatsApp.",
       "Quem pode buscar cada pet e lista de espera para dia cheio.",
