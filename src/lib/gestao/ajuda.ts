@@ -3,32 +3,20 @@
  * com a chave da IA ligada, o modelo responde com base nele; sem a chave, a busca por palavras devolve o tópico.
  * Mudou uma tela? Atualize o tópico em manual.ts.
  */
-import { semAcento, TOPICOS, type Topico } from "./manual";
+import { notaDaPergunta, TOPICOS, type Topico } from "./manual";
 
 export { TOPICOS };
 export type { Topico };
 
-const limpar = (s: string) => ` ${semAcento(s).replace(/[^a-z0-9 -]/g, " ").replace(/\s+/g, " ").trim()} `;
-
 /**
- * Acha o tópico que melhor responde a pergunta, por palavras em comum. Devolve null se nada combina.
- * Palavra-chave inteira na pergunta vale o dobro de um começo de palavra ("troco" não é "trocar").
+ * Acha o tópico que melhor responde a pergunta, pelas palavras-chave e pelo título (a conta é `notaDaPergunta`, em manual.ts,
+ * a mesma que põe em ordem a busca do Manual). Devolve null se nada combina.
  * `lista`: os tópicos do pet shop (topicosPara), para a resposta falar só do que ele usa.
  */
 export function procurarTopico(pergunta: string, lista: Topico[] = TOPICOS): Topico | null {
-  const p = limpar(pergunta);
   let melhor: Topico | null = null, pontos = 0;
   for (const t of lista) {
-    let n = 0;
-    for (const w of t.palavras) {
-      const c = limpar(w);
-      if (p.includes(c)) n += w.includes(" ") ? 6 : 4;
-      else if (p.includes(c.trimEnd())) n += w.includes(" ") ? 3 : 2;
-    }
-    const titulo = limpar(t.titulo);
-    // o título inteiro na pergunta (sugestões rápidas, link do manual) decide
-    if (p.includes(titulo)) n += 10;
-    for (const w of titulo.trim().split(" ")) if (w.length > 4 && p.includes(` ${w}`)) n += 1;
+    const n = notaDaPergunta(pergunta, t);
     if (n > pontos) { pontos = n; melhor = t; }
   }
   return pontos >= 2 ? melhor : null;
