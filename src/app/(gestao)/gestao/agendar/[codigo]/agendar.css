@@ -7,7 +7,7 @@
 
 .g-lk-rodape { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 14px; padding: 18px 16px calc(22px + env(safe-area-inset-bottom)); font-size: .8125rem; color: var(--g-cinza); }
 .g-lk-rodape span { display: inline-flex; align-items: center; gap: 7px; }
-.g-lk-rodape a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.g-lk-rodape a { color: inherit; text-decoration: underline; text-underline-offset: 3px; display: inline-flex; align-items: center; min-height: 32px; }
 
 /* cabeçalho com o nome do pet shop */
 .g-lk-cab {

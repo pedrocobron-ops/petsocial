@@ -858,7 +858,9 @@ body:has(.g-fundo) .g-toasts { bottom: auto; top: calc(14px + env(safe-area-inse
   .g-imp .g-imp-folha.semana thead { display: table-header-group; }
   .g-imp .g-imp-folha.semana th { padding: 2px 6px; font-size: .5625rem; }
   .g-imp .g-imp-folha.semana td { padding: 3px 6px; }
-  .g-imp .g-imp-folha.semana td small { display: inline; font-size: .6875rem; margin-left: 5px; white-space: nowrap; }
+  .g-imp .g-imp-folha.semana td small { display: inline; font-size: .6875rem; margin-left: 5px; white-space: normal; }
+  .g-imp .g-imp-folha.semana td small.tel { white-space: nowrap; }
+  .g-imp .g-imp-folha.semana .g-imp-dia h2 small { white-space: nowrap; }
   .g-imp .g-imp-folha.semana td.hora, .g-imp .g-imp-folha.semana td b { font-size: .8125rem; }
   .g-imp .g-imp-folha.semana td.feito i { width: 13px; height: 13px; }
   .g-imp .g-imp-folha.semana .g-imp-bloq { font-size: .75rem; margin-top: 2px; }
@@ -1073,4 +1075,33 @@ body:has(.g-fundo) .g-fab:not(.aberta) { display: none; }
   .g-fab { right: 14px; bottom: 14px; }
   .g-fab:not(.aberta):not(:hover):not(:focus-visible) { padding: 0 9px; }
   .g-fab:not(.aberta):not(:hover):not(:focus-visible) .txt { display: none; }
+}
+/* e o conteúdo para antes do botão: nada do lado direito (Cobrar, Saída, Renovar…) fica por baixo dele */
+@media screen and (min-width: 960px) and (max-width: 1599px) {
+  .g-main { padding-right: max(40px, calc(86px - max(0px, (100vw - var(--g-lado) - 1180px) / 2))); }
+}
+
+/* alvos de toque: links no meio do texto e cabeçalhos de ordenar com pelo menos 32 px de altura (sem mudar a linha) */
+.g-link.alvo { padding-block: 7px; }
+@media (min-width: 900px) { .g-lj-rel-l.cab > button { min-height: 32px; } }
+
+/* Papel: qualquer tela impressa (Ctrl+P) sai sem o que é do aplicativo (barra do topo, busca, Como usar, Mozart, abas, botões),
+   com as barras dos gráficos visíveis mesmo com "gráficos de fundo" desligado, e sem meia folha em branco antes de cada cartão. */
+.g-so-papel { display: none; }
+@media print {
+  @page { margin: 12mm; }
+  body, .g-raiz { background: #fff !important; }
+  .g-app { display: block; min-height: 0; }
+  .g-main { max-width: none !important; padding: 0 !important; overflow: visible; }
+  .g-barra, .g-abas, .g-fab, .g-lado, .g-ass, .g-guia, .g-toasts, .g-topo .g-acoes,
+  .g-main .g-btn, .g-main .g-chips, .g-main button.g-ico, .g-main .g-seg, .g-nao-imprime { display: none !important; }
+  .g-so-papel { display: block; }
+  .g-card { box-shadow: none; break-inside: auto; }
+  .g-kpi, .g-grade.kpis > *, .g-linha, .g-lj-rel-l, .g-ranking > div, .g-colunas, .gf-barras, .g-legenda > div, .g-rel-ch-tipo, .g-ht-quem, tr { break-inside: avoid; }
+  .g-card-t, .g-card h3, .g-card h2, .g-rotulo { break-after: avoid; }
+  .g-grade.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .g-prog, .g-prog i, .g-colunas i, .g-legenda i, .g-ranking i, .gf-barras i, .gf-barras span, .g-cm-barra, .g-cm-barra i,
+  .g-tile, .g-tag, .g-ht-oc, .g-ht-dia, .g-ht-legenda i, .g-anel, .g-rel-area .pico, .g-ch-barra, .g-ch-barra i {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
 }

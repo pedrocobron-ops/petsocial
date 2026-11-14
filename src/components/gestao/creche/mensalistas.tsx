@@ -71,7 +71,7 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
                 return (
                   <div key={d.id} role="listitem" className={`g-cm-col${cheio ? " cheio" : ""}${fechado ? " fechado" : ""}`}>
                     <b className="g-tab">{n}{vagas != null && !fechado ? <small>/{vagas}</small> : null}</b>
-                    <span className="barra" aria-hidden><i style={{ height: `${Math.round((n / maior) * 100)}%` }} /></span>
+                    <span className="g-cm-barra" aria-hidden><i style={{ height: `${Math.round((n / maior) * 100)}%` }} /></span>
                     <span className="dia">{d.curto}</span>
                     {fechado ? <small>fechado</small> : cheio ? <small>cheio</small> : vagas != null ? <small>{vagas - n === 1 ? "1 vaga" : `${vagas - n} vagas`}</small> : null}
                   </div>

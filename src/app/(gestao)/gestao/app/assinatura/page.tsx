@@ -136,13 +136,13 @@ export default function Assinatura() {
           <h2 className="g-as-dados-t"><Tile icone={Database} tom="ceu" tamanho="p" />Seus dados</h2>
           <p className="g-p">
             Tudo o que você lança aqui é do seu pet shop. Dá para levar quando quiser: em{" "}
-            <Link className="g-link" href="/gestao/app/clientes">Clientes → Exportar</Link> e em{" "}
-            <Link className="g-link" href="/gestao/app/financeiro">Financeiro → Exportar</Link>.
+            <Link className="g-link alvo" href="/gestao/app/clientes">Clientes → Exportar</Link> e em{" "}
+            <Link className="g-link alvo" href="/gestao/app/financeiro">Financeiro → Exportar</Link>.
           </p>
           <p className="g-p g-muted">
-            <Link className="g-link" href="/gestao/privacidade" target="_blank">Política de privacidade</Link>{" · "}
-            <Link className="g-link" href="/gestao/termos" target="_blank">Termos de uso</Link>{" · "}
-            <a className="g-link" href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer">Fale com a gente no WhatsApp</a>
+            <Link className="g-link alvo" href="/gestao/privacidade" target="_blank">Política de privacidade</Link>{" · "}
+            <Link className="g-link alvo" href="/gestao/termos" target="_blank">Termos de uso</Link>{" · "}
+            <a className="g-link alvo" href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer">Fale com a gente no WhatsApp</a>
           </p>
         </section>
       </div>

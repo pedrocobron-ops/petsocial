@@ -58,24 +58,37 @@ function FolhaDoDia() {
   const ocupam = (["hotel", "creche"] as const).flatMap((t) => quemOcupa(t, dia, hoje, abertas, encerradas));
   // quem já chegou hoje e está na casa fica em "Na casa" (não em "Chegam")
   const chegam = [...abertas, ...encerradas].filter((e) => noDia(e.entrada) && (e.status !== "reservada" || dia >= hojeIso) && !(e.status === "em_casa" && dia === hojeIso));
-  const saem = [...abertas.filter((e) => noDia(e.saida_prevista)), ...encerradas.filter((e) => noDia(e.saida))];
   // na casa: quem ocupa vaga no dia e não está chegando nem saindo nele
-  const naCasa = ocupam.filter((e) => !chegam.includes(e) && !saem.includes(e));
-  const jaTem = new Set([...ocupam, ...chegam].map((e) => e.pet_id));
+  // reserva cuja chegada já passou e que nunca fez check-in ("não veio" na tela) segura a vaga, mas não está na casa
+  const naoVeio = (e: EstadiaCompleta) => e.status === "reservada" && isoDia(new Date(e.entrada)) < hojeIso;
+  const naoChegaram = dia >= hojeIso ? abertas.filter(naoVeio) : [];
+  const saem = [...abertas.filter((e) => noDia(e.saida_prevista) && !naoVeio(e)), ...encerradas.filter((e) => noDia(e.saida))];
+  const naCasa = ocupam.filter((e) => !naoVeio(e) && !chegam.includes(e) && !saem.includes(e));
+  const jaTem = new Set([...ocupam, ...chegam].filter((e) => !naoVeio(e)).map((e) => e.pet_id));
+  // saída prevista que já passou e o pet continua na casa: na tela é "saída atrasada"
+  const agora = hoje.getTime();
+  const atrasada = (e: EstadiaCompleta) => e.status === "em_casa" && Boolean(e.saida_prevista) && new Date(e.saida_prevista!).getTime() < agora;
   const esperados = (dados?.esperados ?? []).filter((p) => !jaTem.has(p.petId));
 
-  const tabela = (lista: EstadiaCompleta[], coluna: "chega" | "sai" | "fica") => (
-    <table>
-      <thead><tr><th>Pet</th><th>{coluna === "chega" ? "Chega" : coluna === "sai" ? "Sai" : "Até"}</th><th>Tutor</th>{comCuidados && <th>Comida e remédio</th>}<th>Atenção</th><th className="feito">Feito</th></tr></thead>
+  type Coluna = "chega" | "sai" | "fica" | "naoveio";
+  const tabela = (lista: EstadiaCompleta[], coluna: Coluna) => (
+    <table className={comCuidados ? "folha cuidados" : "folha"}>
+      <colgroup><col className="c-pet" /><col className="c-quando" /><col className="c-tutor" />{comCuidados && <col className="c-cuidados" />}<col className="c-atencao" /><col className="c-feito" /></colgroup>
+      <thead><tr><th>Pet</th><th>{coluna === "chega" ? "Chega" : coluna === "sai" ? "Sai" : coluna === "naoveio" ? "Era para chegar" : "Até"}</th><th>Tutor</th>{comCuidados && <th>Comida e remédio</th>}<th>Atenção</th><th className="feito">Feito</th></tr></thead>
       <tbody>
         {lista.map((e) => {
           const fim = e.status === "encerrada" ? e.saida : e.saida_prevista;
           return (
             <tr key={e.id}>
               <td><b>{e.pets?.nome ?? "Pet"}</b><small>{[nomeTipo(e.tipo), e.pets?.porte ? `porte ${e.pets.porte}` : null, nomeDaAcomodacao(petshop, e.acomodacao)].filter(Boolean).join(" · ")}</small></td>
-              <td className="hora">{coluna === "chega" ? horaCurta(e.entrada) : fim ? (coluna === "sai" ? horaCurta(fim) : dataCurta(fim)) : "—"}
-                <small>{coluna === "chega" ? (fim ? `até ${dataCurta(fim)}` : "sem saída prevista") : coluna === "sai" ? `desde ${dataCurta(e.entrada)}` : fim ? `às ${horaCurta(fim)}` : "sem saída prevista"}</small></td>
-              <td>{e.pets?.clientes?.nome ?? "—"}<small>{fmtTelefone(e.pets?.clientes?.telefone)}</small></td>
+              {coluna === "naoveio" ? (
+                <td className="hora">{dataCurta(e.entrada)}<small>às {horaCurta(e.entrada)} · não fez check-in</small></td>
+              ) : (
+                <td className={`hora${coluna !== "chega" && atrasada(e) ? " atrasada" : ""}`}>{coluna === "chega" ? horaCurta(e.entrada) : fim ? (coluna === "sai" ? horaCurta(fim) : dataCurta(fim)) : "—"}
+                  <small>{coluna === "chega" ? (fim ? `até ${dataCurta(fim)}` : "sem saída prevista") : coluna === "sai" ? `desde ${dataCurta(e.entrada)}` : fim ? `às ${horaCurta(fim)}` : "sem saída prevista"}</small>
+                  {coluna !== "chega" && atrasada(e) && <em>saída atrasada</em>}</td>
+              )}
+              <td>{e.pets?.clientes?.nome ?? "—"}<small className="tel">{fmtTelefone(e.pets?.clientes?.telefone)}</small></td>
               {comCuidados && <td className="atencao">{lerCuidados(e).map((c) => <span key={c.id}>{c.tipo === "remedio" ? "Remédio: " : ""}{textoDoCuidado(c)}</span>)}</td>}
               <td className="atencao">{e.pets?.alertas && <span><b>{e.pets.alertas}</b></span>}{e.obs && <span>{e.obs}</span>}</td>
               <td className="feito"><i /></td>
@@ -85,7 +98,7 @@ function FolhaDoDia() {
       </tbody>
     </table>
   );
-  const secao = (titulo: string, lista: EstadiaCompleta[], coluna: "chega" | "sai" | "fica", vazio: string) => (
+  const secao = (titulo: string, lista: EstadiaCompleta[], coluna: Coluna, vazio: string) => (
     <section className={`g-imp-dia${lista.length ? "" : " vazio"}`}>
       <h2>{titulo}<small>{!lista.length ? vazio : lista.length === 1 ? "1 pet" : `${lista.length} pets`}</small></h2>
       {lista.length > 0 && tabela(lista, coluna)}
@@ -113,12 +126,13 @@ function FolhaDoDia() {
             {secao("Na casa", naCasa, "fica", "ninguém")}
             {secao(dia < hojeIso ? "Chegaram" : "Chegam", chegam, "chega", "ninguém")}
             {secao(dia < hojeIso ? "Saíram" : "Saem", saem, "sai", "ninguém")}
+            {naoChegaram.length > 0 && secao("Reservas que não chegaram", naoChegaram, "naoveio", "")}
             {esperados.length > 0 && (
               <section className="g-imp-dia">
                 <h2>Mensalistas esperados na creche<small>{esperados.length === 1 ? "1 pet" : `${esperados.length} pets`}</small></h2>
                 <table>
                   <thead><tr><th>Pet</th><th>Tutor</th><th>Atenção</th><th className="feito">Veio</th></tr></thead>
-                  <tbody>{esperados.map((p) => <tr key={p.id}><td><b>{p.nome}</b></td><td>{p.tutor || "—"}<small>{fmtTelefone(p.telefone)}</small></td><td className="atencao">{p.alertas && <span><b>{p.alertas}</b></span>}</td><td className="feito"><i /></td></tr>)}</tbody>
+                  <tbody>{esperados.map((p) => <tr key={p.id}><td><b>{p.nome}</b></td><td>{p.tutor || "—"}<small className="tel">{fmtTelefone(p.telefone)}</small></td><td className="atencao">{p.alertas && <span><b>{p.alertas}</b></span>}</td><td className="feito"><i /></td></tr>)}</tbody>
                 </table>
               </section>
             )}

@@ -8,7 +8,7 @@
 .g-imp-cab h1 { font-size: 1.75rem; }
 .g-imp-cab p { font-size: .9375rem; }
 .g-imp-quando { font-size: .75rem !important; color: #6a625a; }
-.g-imp-dia { display: grid; gap: 8px; break-inside: avoid-page; }
+.g-imp-dia { display: grid; gap: 8px; }
 .g-imp-dia h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font: 600 1.0625rem/1.2 var(--sans); padding: 6px 10px; background: #f1eadd; border-radius: 8px; }
 .g-imp-dia h2 small { font-weight: 500; font-size: .8125rem; color: #6a625a; text-transform: none; }
 .g-imp-bloq { display: flex; align-items: center; gap: 6px; font-size: .875rem; color: #6a625a; }
@@ -42,3 +42,33 @@
 .g-imp-marca .g-logo { border: 1px solid #ddd5c8; }
 .g-imp-cab { border-bottom-color: var(--g-verde); }
 .g-imp-cab h1 { color: var(--g-verde); }
+
+/* Folha do dia: as tabelas com as mesmas colunas, para alinharem; saída atrasada marcada no papel */
+.g-imp-folha table.folha { table-layout: fixed; }
+.g-imp-folha table.folha col.c-pet { width: 22%; }
+.g-imp-folha table.folha col.c-quando { width: 15%; }
+.g-imp-folha table.folha col.c-tutor { width: 21%; }
+.g-imp-folha table.folha col.c-feito { width: 52px; }
+.g-imp-folha table.folha.cuidados col.c-pet { width: 18%; }
+.g-imp-folha table.folha.cuidados col.c-tutor { width: 18%; }
+.g-imp-folha table.folha.cuidados col.c-cuidados { width: 22%; }
+.g-imp-folha table.folha td { overflow-wrap: anywhere; }
+.g-imp-folha table.folha td.hora { white-space: normal; }
+.g-imp-folha td.hora em { display: inline-block; margin-top: 3px; font: 700 .6875rem/1.2 var(--sans); font-style: normal; text-transform: uppercase; letter-spacing: .04em; color: #b3402e; border: 1.5px solid currentColor; border-radius: 4px; padding: 1px 4px; }
+.g-imp-folha td.hora.atrasada { color: #b3402e; }
+
+.g-imp-folha td small.tel { white-space: nowrap; overflow-wrap: normal; }
+.g-imp-folha td.feito .ja { font-size: .6875rem; color: #6a625a; text-transform: uppercase; letter-spacing: .04em; }
+
+/* Impressão: a folha cabe na largura do papel e um dia cheio começa logo abaixo do cabeçalho (sem pular página) */
+@media print {
+  .g-imp { display: block !important; }
+  .g-imp > *, .g-imp-folha, .g-imp-dia { min-width: 0; max-width: 100%; }
+  .g-imp-folha table { width: 100%; }
+  .g-imp-dia { break-inside: auto; }
+  .g-imp-dia h2 { break-after: avoid; }
+  .g-imp-folha thead { display: table-header-group; }
+  .g-imp-folha td, .g-imp-folha th { overflow-wrap: anywhere; }
+  .g-imp-folha td small.tel { white-space: nowrap; overflow-wrap: normal; }
+  .g-imp-cab { break-after: avoid; }
+}

@@ -110,9 +110,9 @@ function Folha() {
                         <td><b>{a.pets?.nome}</b><small>{[a.pets?.raca, a.pets?.porte ? `porte ${a.pets.porte}` : null].filter(Boolean).join(" · ")}</small></td>
                         <td>{nomeDosServicos(a) ?? "Atendimento"}{a.status !== "marcado" && <small>{STATUS_AGENDAMENTO[a.status].rotulo}</small>}</td>
                         {!prof && atendem.length > 1 && <td>{a.profissionais?.nome.split(" ")[0] ?? "—"}</td>}
-                        <td>{a.pets?.clientes?.nome ?? "—"}<small>{fmtTelefone(a.pets?.clientes?.telefone)}</small></td>
+                        <td>{a.pets?.clientes?.nome ?? "—"}<small className="tel">{fmtTelefone(a.pets?.clientes?.telefone)}</small></td>
                         <td className="atencao">{a.leva_traz && <span><Truck />Leva e traz{a.endereco_leva_traz ? `: ${a.endereco_leva_traz}` : ""}</span>}{a.pets?.alertas && <span>{a.pets.alertas}</span>}{a.obs && <span>{a.obs}</span>}</td>
-                        <td className="feito"><i /></td>
+                        <td className="feito">{a.status === "concluido" ? <span className="ja">feito</span> : a.status === "faltou" || a.status === "cancelado" ? <span className="ja">—</span> : <i />}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -178,7 +178,7 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
               </div>
             ))}
           </div>
-          <p className="g-pp" style={{ marginTop: 10 }}>{devendo.length > 8 ? `E mais ${devendo.length - 8}. ` : ""}<Link href="/gestao/app/creche-hotel?ver=cobrancas">Abrir as cobranças para cobrar pelo WhatsApp</Link></p>
+          <p className="g-pp" style={{ marginTop: 10 }}>{devendo.length > 8 ? `E mais ${devendo.length - 8}. ` : ""}<Link className="g-link alvo g-nao-imprime" href="/gestao/app/creche-hotel?ver=cobrancas">Abrir as cobranças para cobrar pelo WhatsApp</Link></p>
         </div>
       )}
     </section>
