@@ -211,7 +211,7 @@ export default function Estoque() {
                       </span>
                       <span className="g-est-saldo">
                         <span className="g-num m">{fmtQtd(p.estoque)}</span>
-                        <small>{p.unidade}</small>
+                        {" "}<small>{p.unidade}</small>
                       </span>
                     </button>
                     <div className="g-est-nivel">

@@ -229,13 +229,13 @@ function FolhaPorServico({ aoFechar }: { aoFechar: () => void }) {
         <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || !dados}>{salvando ? "Salvando…" : "Salvar"}</button>
       </>}>
       <div className="g-form">
-        <p className="g-muted g-p">Escreva o percentual só nos serviços que têm regra própria. Em branco, vale o percentual de quem atendeu.</p>
+        <p className="g-muted g-p">Escreva o percentual só nos serviços que têm regra própria. Em branco (padrão), vale o percentual de quem atendeu.</p>
         {!dados ? <p className="g-muted g-p">Carregando…</p> : !ativos.length ? <p className="g-muted g-p">Nenhum serviço cadastrado ainda.</p> : (
           <div className="gr-op-pct">
             {ativos.map((s) => (
               <label key={s.id} style={{ display: "contents" }}>
                 <span>{s.nome}</span>
-                <input className="g-input g-tab" inputMode="decimal" placeholder="da pessoa" value={valores[s.id] ?? ""} aria-label={`Comissão de ${s.nome} em por cento`}
+                <input className="g-input g-tab" inputMode="decimal" placeholder="padrão" value={valores[s.id] ?? ""} aria-label={`Comissão de ${s.nome} em por cento`}
                   onChange={(e) => { setValores((v) => ({ ...v, [s.id]: soPct(e.target.value) })); setErro(null); }} />
               </label>
             ))}

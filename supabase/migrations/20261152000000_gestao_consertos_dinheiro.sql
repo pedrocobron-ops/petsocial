@@ -31,6 +31,9 @@ end $$;
 create unique index if not exists lancamentos_chave_uniq on public.lancamentos (petshop_id, chave);
 create unique index if not exists movimentos_estoque_chave_uniq on public.movimentos_estoque (petshop_id, chave);
 create unique index if not exists pacotes_clientes_chave_uniq on public.pacotes_clientes (petshop_id, chave);
+-- estas duas tabelas têm leitura por coluna (o custo e o preço são reservados): a chave precisa poder ser lida para o "on conflict"
+grant select (chave) on public.movimentos_estoque to authenticated;
+grant select (chave) on public.pacotes_clientes to authenticated;
 
 -- Operações feitas por função do banco (receber conta, pagar comissão): a chave e o que a função respondeu da primeira vez.
 create table if not exists public.operacoes_feitas (

@@ -228,7 +228,8 @@ export function fecharRecebimento(pagamento: EstadoPagamento, depois: PagaDepois
   const ruim = erroDeValor(total);
   if (ruim) return { erro: ruim, noCampo: ruim };
   if (depois.ativo) {
-    if (!depois.quando || depois.quando < isoDia(new Date())) return { erro: "Escolha quando o cliente vai pagar.", noCampo: "Escolha um dia de hoje em diante." };
+    if (!depois.quando) return { erro: "Escolha quando o cliente vai pagar.", noCampo: "Escolha um dia de hoje em diante." };
+    if (depois.quando < isoDia(new Date())) return { erro: "O dia combinado já passou. Escolha de hoje em diante.", noCampo: "Esse dia já passou. Escolha de hoje em diante." };
     return { fiado: true, quando: depois.quando };
   }
   const pg = fecharPagamento(pagamento, total);

@@ -92,7 +92,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     const problema = erroDaConta(itens, desconto, contas.total);
     if (problema) { avisarErro(problema); return false; }
     const fiado = depois.ativo && contas.total > 0;
-    if (fiado && (!depois.quando || depois.quando < isoDia(new Date()))) { setErroForma("Escolha um dia de hoje em diante."); avisarErro("Escolha quando o cliente vai pagar."); return false; }
+    if (fiado && (!depois.quando || depois.quando < isoDia(new Date()))) { setErroForma(depois.quando ? "Esse dia já passou. Escolha de hoje em diante." : "Escolha um dia de hoje em diante."); avisarErro(depois.quando ? "O dia combinado já passou. Escolha de hoje em diante." : "Escolha quando o cliente vai pagar."); return false; }
     const pg = contas.total > 0 && !fiado ? fecharPagamento(pagamento, contas.total) : null;
     if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return false; }
     const falta = faltaNoEstoque(itens, produtos);
