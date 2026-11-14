@@ -4,11 +4,11 @@ import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { useState } from "react";
 import Link from "next/link";
-import { BellRing, CalendarClock, CalendarX, Check, MessageCircle, Play, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
+import { BellRing, CalendarClock, CalendarX, Check, MessageCircle, Play, Printer, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
 import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoCancelado, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
-import { textoComprovante } from "@/lib/gestao/comprovante";
+import { imprimirComprovante, textoComprovante } from "@/lib/gestao/comprovante";
 import { desfazerVenda, itensDoLancamento, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { nomeDosServicos, servicosAMais, servicosPorExtenso, valorDoHorario } from "@/lib/gestao/servicos-do-horario";
 import { brl, dataAmigavel, dataCompleta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
@@ -265,6 +265,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const zapComprovante = vejoFinanceiro && a.status === "concluido" && recebidos.length > 0 && !devidos.length && soDigitos(tutor?.telefone).length >= 8
     ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico: nomeDosServicos(a), quando: a.inicio, recebidos }))
     : null;
+  // o mesmo comprovante no papel (não precisa de telefone na ficha)
+  const comprovanteNoPapel = vejoFinanceiro && a.status === "concluido" && recebidos.length > 0 && !devidos.length;
 
   if (comanda) {
     return <Comanda agendamento={a} pacote={comanda === "sim" ? null : comanda} aoFechar={() => setComanda(false)} aoPronto={() => { aoMudar(); aoFechar(); }} />;
@@ -435,6 +437,11 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
 
         {zapComprovante && (
           <a className="g-btn sec cheio" href={zapComprovante} target="_blank" rel="noopener noreferrer"><Receipt />Mandar comprovante</a>
+        )}
+        {comprovanteNoPapel && (
+          <button type="button" className="g-btn fantasma cheio" onClick={() => imprimirComprovante(textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico: nomeDosServicos(a), quando: a.inicio, recebidos }))}>
+            <Printer />Imprimir comprovante
+          </button>
         )}
 
         {podeAvisarPronto && (zapPronto ? (

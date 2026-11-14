@@ -650,7 +650,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "A folha mostra quem está na casa, quem chega e quem sai, com o telefone do tutor, as observações e os alertas do pet.",
-      "Com a Ficha de cuidados ligada, traz também a comida e o remédio de cada hóspede.",
+      "A folha mostra quem está na casa, quem chega e quem sai, com o telefone do tutor, as observações e os alertas do pet. Quem passou da hora de saída sai marcado com Saída atrasada, e a reserva que não fez check-in vai para Reservas que não chegaram.",
       { so: ["creche"], texto: "Os mensalistas esperados na creche vêm numa lista à parte." },
     ],
     atencao: ["A folha não mostra valores."],
@@ -1131,7 +1131,7 @@ const BASE: TopicoBase[] = [
     dicas: [
       "O valor entra no caixa aberto. Com o caixa fechado, o valor entra só no financeiro do dia, fora da contagem da gaveta.",
       { so: ["loja"], texto: "Os produtos da conta saem do estoque sozinhos." },
-      "Depois de receber, aparece o botão Mandar comprovante.",
+      "Depois de receber, aparece o botão Mandar comprovante. Ao abrir o atendimento já recebido na agenda, também dá para tocar em Imprimir comprovante (ou salvar em PDF).",
       "O pet fez mais um serviço da sua lista (uma hidratação, um corte de unha)? Toque em Outro serviço e escolha: ele entra na conta com o valor dele e conta para a comissão. Outro extra é para o que não está na lista de serviços.",
       "Pagando em Dinheiro, aparece Recebeu quanto?: escreva quanto o cliente entregou para ver o troco.",
       "Tocou duas vezes no botão sem querer? O valor entra uma vez só. Vale para toda tela que recebe, vende ou mexe no estoque.",
