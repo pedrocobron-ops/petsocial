@@ -377,7 +377,7 @@ function HorarioDaLoja() {
 /* ---------- serviços e preços ---------- */
 
 function Servicos() {
-  const { sb, servicos, recarregarBase } = useGestao();
+  const { sb, servicos, recarregarBase, petshop } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = useState<Servico | "novo" | null>(null);
@@ -403,7 +403,7 @@ function Servicos() {
         <button className="g-btn p pri" onClick={() => abrir("novo")}><Plus />Serviço novo</button>
       </div>
       {!ativos.length ? (
-        <Vazio titulo="Nenhum serviço na lista" texto="Coloque o primeiro: banho, tosa, creche, o que vocês fazem." />
+        <Vazio titulo="Nenhum serviço na lista" texto={`Coloque o primeiro: ${usaModulo(petshop, "banho_tosa") ? "banho, tosa" : usaModulo(petshop, "hotel") ? "diária do hotel, banho de saída" : "diária da creche"}, o que vocês fazem.`} />
       ) : (
         <div className="g-mp-servicos">
           {ativos.map((s) => {

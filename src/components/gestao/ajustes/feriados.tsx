@@ -135,7 +135,13 @@ export default function Feriados() {
         </details>
       )}
       <p className="g-muted g-pp">
-        Dia fechado: o link do cliente não oferece horário de banho nem vaga de creche, a agenda avisa quando alguém marca nele e a chamada da creche não espera ninguém (não vira falta). Quem está hospedado no hotel continua hospedado.
+        {[
+          `Dia fechado: o link do cliente não oferece ${[usaModulo(petshop, "banho_tosa") && "horário de banho", usaModulo(petshop, "creche") && "vaga de creche", temHotel && "chegada nem busca no hotel"].filter(Boolean).join(" nem ") || "pedido"} nesse dia`,
+          usaModulo(petshop, "banho_tosa") ? ", a agenda avisa quando alguém marca nele" : "",
+          usaModulo(petshop, "creche") ? " e a chamada da creche não espera ninguém (não vira falta)" : "",
+          ".",
+          temHotel ? " Quem está hospedado no hotel continua hospedado." : "",
+        ].join("")}
         {temHotel ? ` Feriado no preço: a noite que começa nesse dia usa o preço de feriado, que você liga em ${usaModulo(petshop, "creche") ? "Opções do hotel e da creche" : "Opções do hotel"}.` : ""}
       </p>
     </section>

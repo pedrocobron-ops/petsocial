@@ -291,7 +291,7 @@ export default function OpcoesHotel() {
         )}
 
         <div className="g-ht-op">
-          <div className="g-ht-op-t"><div><b>Textos das mensagens</b><p>O texto de cada mensagem de WhatsApp do hotel e da creche, igual em todos os aparelhos. A saudação (Oi, nome! Aqui é {petshop.nome}.) entra sozinha na frente.</p></div></div>
+          <div className="g-ht-op-t"><div><b>Textos das mensagens</b><p>O texto de cada mensagem de WhatsApp {temHotel && !temCreche ? "do hotel" : temCreche && !temHotel ? "da creche" : "do hotel e da creche"}, igual em todos os aparelhos. A saudação (Oi, nome! Aqui é {petshop.nome}.) entra sozinha na frente.</p></div></div>
           <details className="g-ht-det">
             <summary>Mudar os textos</summary>
             <div className="g-ht-op-c" style={{ marginTop: 8 }}>
