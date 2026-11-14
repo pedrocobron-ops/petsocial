@@ -260,6 +260,35 @@ function HistoricoDeAlteracoes({ lancamento }: { lancamento: Pick<Lancamento, "i
   );
 }
 
+/**
+ * Dentro do lançamento, para o dono e quem cuida do financeiro: o que foi vendido com preço diferente da lista ou com desconto,
+ * e quem vendeu. O banco anota sozinho na hora da venda (tabela `precos_alterados`); quem só opera o caixa não lê.
+ */
+function PrecosMudados({ lancamento }: { lancamento: Pick<Lancamento, "id"> }) {
+  const { sb, petshop, cuidoDoFinanceiro } = useGestao();
+  const { dados } = useDados(async () => {
+    if (!cuidoDoFinanceiro) return [];
+    const r = await sb.from("precos_alterados").select("id, tipo, item, de, para, qtd, abaixo_do_custo, quem_nome, quando").eq("petshop_id", petshop.id).eq("lancamento_id", lancamento.id).order("quando");
+    return r.data ?? [];
+  }, [lancamento.id, cuidoDoFinanceiro]);
+  if (!dados?.length) return null;
+  return (
+    <section className="gf-alteracoes" aria-label="Preço mudado ou desconto nesta venda">
+      <span className="g-rotulo"><History size={14} aria-hidden />Preço e desconto</span>
+      <ul>
+        {dados.map((x) => (
+          <li key={x.id}>
+            {x.tipo === "desconto"
+              ? <>Desconto de <b className="g-tab">{brl(Math.max(0, Number(x.de ?? 0) - Number(x.para)))}</b> dado por <b>{x.quem_nome ?? "alguém da equipe"}</b>: de {brl(Number(x.de ?? 0))} para {brl(Number(x.para))}</>
+              : <>{x.item}: preço mudado de <b className="g-tab">{x.de == null ? "sem preço" : brl(Number(x.de))}</b> para <b className="g-tab">{brl(Number(x.para))}</b> por <b>{x.quem_nome ?? "alguém da equipe"}</b>{x.abaixo_do_custo ? " (abaixo do custo)" : ""}</>}
+            {" "}em {quandoFoi(x.quando)}.
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** Etiqueta discreta das listas para o lançamento recebido que foi alterado depois. */
 export function TagAlterado({ lancamento }: { lancamento: Pick<Lancamento, "alterado_em"> }) {
   return lancamento.alterado_em ? <span className="g-tag amarelo gf-alterado" title={`Alterado em ${quandoFoi(lancamento.alterado_em)}`}>alterado</span> : null;
@@ -469,6 +498,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         )}
         {inicial && <ItensDoLancamento lancamento={inicial} />}
         {inicial && <HistoricoDeAlteracoes lancamento={inicial} />}
+        {inicial && <PrecosMudados lancamento={inicial} />}
         {inicial && <PartesRecebidas conta={inicial} />}
         {inicial?.conta_id && !soVer && !travado && (
           <p className="g-muted g-pp">Este valor é uma parte recebida de uma conta. Se você excluir ou diminuir, a diferença volta a ficar em aberto na conta do cliente.</p>

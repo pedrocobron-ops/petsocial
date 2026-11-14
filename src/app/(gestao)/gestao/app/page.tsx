@@ -202,7 +202,7 @@ export default function Hoje() {
   // sem banho e tosa e sem horário hoje: a agenda não ocupa lugar na tela de quem escolheu outra área principal
   const semAgenda = Boolean(principal && !banho && dados && !dados.ags.length);
   const frase = !dados ? "" : contaNova && frente === "loja" ? "Tudo pronto para começar. O primeiro passo é cadastrar o que você vende."
-    : contaNova ? (posso("clientes") ? "Tudo pronto para começar. O primeiro passo é cadastrar um pet, ou trazer os seus clientes de uma planilha." : "Tudo pronto para começar.")
+    : contaNova ? (posso("clientes") ? (souDono || eu.papel === "gerente" ? "Tudo pronto para começar. O primeiro passo é cadastrar um pet, ou trazer os seus clientes de uma planilha." : "Tudo pronto para começar. O primeiro passo é cadastrar um pet.") : "Tudo pronto para começar.")
     : frente === "loja" ? `${dados.acabando.length === 0 ? "Nenhum produto acabando" : dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}.${vendas ? (vendas.quantas ? ` Hoje ${vendas.quantas === 1 ? "saiu 1 venda" : `saíram ${vendas.quantas} vendas`} de produtos: ${brl(vendas.total)}.` : " Nenhuma venda de produtos hoje, por enquanto.") : ""}${ativos.length ? ` Na agenda, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : frente === "casa" ? `${temCasa ? linhaCasa : "Nenhum pet na casa agora"}.${ativos.length ? ` No banho e tosa, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : soCasa && !ativos.length ? (temCasa ? `${linhaCasa}.` : `Nenhum pet na casa agora.`)
@@ -300,7 +300,7 @@ export default function Hoje() {
               </div>
             </button>
           ) : (
-            contaNova && posso("clientes") && frente !== "loja" ? (
+            contaNova && posso("clientes") && frente !== "loja" && (souDono || eu.papel === "gerente") ? (
             <div className="g-proximo vazio">
               <span className="g-rotulo" style={{ color: "#24543b" }}>Já tem clientes?</span>
               <div className="quem">

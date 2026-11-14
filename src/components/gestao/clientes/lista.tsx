@@ -57,7 +57,9 @@ export default function Lista({ aoAbrir, irPara }: {
   aoAbrir: () => void;
   irPara: (url: string) => void;
 }) {
-  const { sb, petshop, posso } = useGestao();
+  const { sb, petshop, posso, eu } = useGestao();
+  // a lista inteira de clientes (baixar a planilha, trazer de planilha) é com o dono e o gerente; quem atende consulta um por um
+  const listaInteira = eu.papel === "dono" || eu.papel === "gerente";
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [aba, setAba] = useState<"pets" | "tutores">("pets");
@@ -180,13 +182,13 @@ export default function Lista({ aoAbrir, irPara }: {
         </div>
         <div className="g-acoes">
           {posso("clientes") && <button className="g-btn sec" onClick={() => setChamando(true)} disabled={!dados}><MessageCircle />Chamar de volta</button>}
-          <button className="g-btn sec" onClick={exportar} disabled={!dados}><Download />Exportar</button>
-          <button className="g-btn sec" onClick={() => setImportando(true)}><Upload />Trazer de planilha</button>
+          {listaInteira && <button className="g-btn sec" onClick={exportar} disabled={!dados}><Download />Exportar</button>}
+          {listaInteira && <button className="g-btn sec" onClick={() => setImportando(true)}><Upload />Trazer de planilha</button>}
           <button className="g-btn pri" onClick={abrirPetNovo}><Plus />Pet novo</button>
         </div>
       </header>
 
-      <UltimaImportacao tipo="clientes" versao={versaoImportacao} aoAbrir={() => setImportando(true)} />
+      {listaInteira && <UltimaImportacao tipo="clientes" versao={versaoImportacao} aoAbrir={() => setImportando(true)} />}
 
       {dados && (pets.length > 0 || clientes.length > 0) && (
         <div className="g-grade kpis g-cli-kpis">
@@ -320,7 +322,7 @@ export default function Lista({ aoAbrir, irPara }: {
       )}
 
       {chamando && <ChamarDeVolta aoFechar={() => setChamando(false)} />}
-      {importando && <Importar tipo="clientes" aoFechar={() => { setImportando(false); setVersaoImportacao((v) => v + 1); }} aoTerminar={() => void recarregar()} />}
+      {importando && listaInteira && <Importar tipo="clientes" aoFechar={() => { setImportando(false); setVersaoImportacao((v) => v + 1); }} aoTerminar={() => void recarregar()} />}
       {petNovo && (
         <FormPet nomeInicial={aba === "pets" && petsFiltrados.length === 0 ? q.trim() : undefined} aoFechar={() => setPetNovo(false)}
           aoSalvar={(p) => { setPetNovo(false); avisarMudanca(); aoAbrir(); irPara(linkPet(p.id)); }} />
