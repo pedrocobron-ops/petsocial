@@ -332,7 +332,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
 
       {familia && <ReceberFamilia grupo={familia} contas={aReceberDe(familia)} aoFechar={() => setFamilia(null)} aoFeito={mudou} />}
       {porFora && <PagasPorFora mes={mes} cobrancas={semRecebimento} marcadas={primeiras.map((c) => c.id)} aoFechar={() => setPorFora(false)} aoFeito={async () => { setPorFora(false); await mudou(); }} />}
-      {gerar && dados && <GerarCobrancas mes={mes} planos={faltamGerar} comCobranca={dados.comCobranca} aoFechar={aoFecharGerar} aoGerar={async () => { aoFecharGerar(); await mudou(); }} />}
+      {gerar && dados && <GerarCobrancas mes={mes} planos={faltamGerar} comCobranca={dados.comAnterior} aoFechar={aoFecharGerar} aoGerar={async () => { aoFecharGerar(); await mudou(); }} />}
       {editando && <EditarCobranca cobranca={editando} aoFechar={() => setEditando(null)} aoSalvo={async () => { setEditando(null); await mudou(); }} />}
       {baixando && <FolhaBaixa conta={baixando} aoFechar={() => setBaixando(null)} aoSalvo={async () => { await recarregar(); }} />}
       {mensagem && <MensagemDeCobranca grupo={mensagem} texto={textoDe(mensagem)} aoFechar={() => setMensagem(null)} aoMandar={() => { void cobrou(mensagem); setMensagem(null); }} />}

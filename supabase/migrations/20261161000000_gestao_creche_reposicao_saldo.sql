@@ -318,8 +318,9 @@ begin
       and not exists (select 1 from public.creche_cobrancas c where c.plano_id = pl.id and c.mes = v_mes)
       and (pl.primeira_cobranca is null or pl.primeira_cobranca <= v_mes)
       -- primeira cobrança do plano, sem escolha do jeito de cobrar, e que já nasceria vencida: espera a escolha na tela
+      -- (cobrança de um mês seguinte, gerada antes, não conta: a primeira é a primeira até este mês)
       and not ((pl.primeira_cobranca is null or pl.primeira_cobranca = v_mes)
-        and not exists (select 1 from public.creche_cobrancas c where c.plano_id = pl.id)
+        and not exists (select 1 from public.creche_cobrancas c where c.plano_id = pl.id and c.mes < v_mes)
         and greatest(make_date(extract(year from v_mes)::int, extract(month from v_mes)::int, pl.vence_dia), least(pl.inicio, v_fim)) < v_hoje)
   loop
     if public.creche_sugestao_mensal(r.id, v_mes, r.valor_mensal) = r.valor_mensal then
