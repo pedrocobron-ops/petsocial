@@ -47,6 +47,21 @@ const aCobrarDe = (a: AgendamentoCompleto, comPacote = false) => (a.pacote_clien
   ? Math.round(servicosAMais(a).reduce((t, o) => t + Number(o.preco ?? 0), 0) * 100) / 100
   : valorDoHorario(a) ?? 0);
 
+/** Quantos atendimentos estão para cobrar e quanto somam (para o fechamento do caixa). Só para quem recebe. */
+export function useParaCobrarComValor() {
+  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { lista } = useParaCobrar();
+  const ids = lista.map((x) => x.id).join(",");
+  const { dados } = useDados(async () => {
+    if (!vejoFinanceiro || !ids) return { n: 0, total: 0 };
+    const r = await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id).in("id", ids.split(",").slice(0, 200));
+    if (r.error) return { n: lista.length, total: 0 };
+    const ags = await comPrecosDeAgendamento(sb, petshop.id, (r.data ?? []) as unknown as AgendamentoCompleto[]) as unknown as AgendamentoCompleto[];
+    return { n: ags.length, total: Math.round(ags.reduce((t, a) => t + aCobrarDe(a), 0) * 100) / 100 };
+  }, [petshop.id, ids, vejoFinanceiro]);
+  return dados ?? { n: 0, total: 0 };
+}
+
 /**
  * Lista "Atendimentos para cobrar", para quem recebe (Caixa ou Financeiro): um toque abre a conta do atendimento.
  * Some quando não há nada. `aoMudar`: a tela que mostra a lista recarrega o que depende dela.

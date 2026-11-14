@@ -17,7 +17,7 @@ import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
 import type { AlteracaoLancamento, Caixa, Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, hora, isoDia } from "@/lib/gestao/util";
 import { useOperacao } from "@/lib/gestao/uma-vez";
-import { AtendimentosParaCobrar } from "@/components/gestao/agenda/para-cobrar";
+import { AtendimentosParaCobrar, useParaCobrarComValor } from "@/components/gestao/agenda/para-cobrar";
 import "./caixa.css";
 
 export default function PaginaCaixa() {
@@ -688,6 +688,14 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo, aoMu
   const [mudou, setMudou] = useState<{ texto: string; esperado: number } | null>(null);
   const r = resumoDoCaixa(caixa.valor_inicial, lancamentos);
   const esperado = mudou?.esperado ?? r.esperado;
+  // antes de fechar: o que ficou sem cobrar e quantas alterações em valores houve desde que este caixa abriu
+  const paraCobrar = useParaCobrarComValor();
+  const { dados: alteracoes } = useDados(async () => {
+    const x = await sb.rpc("caixa_alteracoes", { p_caixa: caixa.id });
+    return x.error ? 0 : Number(x.data ?? 0);
+  }, [caixa.id]);
+  const avisoCobrar = paraCobrar.n ? `${paraCobrar.n === 1 ? "1 atendimento concluído está" : `${paraCobrar.n} atendimentos concluídos estão`} sem conta fechada (${brl(paraCobrar.total)}).` : "";
+  const avisoAlteracoes = alteracoes ? `${alteracoes === 1 ? "1 alteração" : `${alteracoes} alterações`} em valores desde que este caixa abriu.` : "";
   const dif = diferenca(contado, esperado);
 
   async function salvar() {
@@ -697,7 +705,7 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo, aoMu
     // fechar não tem volta: confirma mostrando se bateu, sobrou ou faltou
     const sim = await confirmar({
       titulo: "Fechar o caixa de hoje?",
-      texto: `Você contou ${brl(contado)} e o sistema esperava ${brl(esperado)}. ${dif?.curto ? `Resultado: ${dif.curto}. ` : ""}Depois de fechado, os lançamentos deste caixa não podem mais ser alterados.`,
+      texto: `Você contou ${brl(contado)} e o sistema esperava ${brl(esperado)}. ${dif?.curto ? `Resultado: ${dif.curto}. ` : ""}${avisoCobrar ? `${avisoCobrar} ` : ""}${avisoAlteracoes ? `${avisoAlteracoes} ` : ""}Depois de fechado, os lançamentos deste caixa não podem mais ser alterados.`,
       confirmar: "Fechar o caixa",
     });
     if (!sim) return;
@@ -742,6 +750,16 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo, aoMu
         <div className="g-card areia">
           <ResumoCaixa caixa={caixa} lancamentos={lancamentos} soGaveta={!cuidoDoFinanceiro} esperado={mudou?.esperado} />
         </div>
+        {avisoCobrar && (
+          <p className="g-aviso" style={{ margin: 0 }} role="status">
+            <span><b>{avisoCobrar}</b> Nada disso entrou no caixa. Feche a conta deles na lista Atendimentos para cobrar antes de fechar o caixa, ou eles ficam para cobrar depois.</span>
+          </p>
+        )}
+        {avisoAlteracoes && (
+          <p className="g-aviso" style={{ margin: 0 }} role="status">
+            <span><b>{avisoAlteracoes}</b> {cuidoDoFinanceiro ? "Veja cada uma em Alterações em valores, na tela Hoje." : "O dono vê cada uma em Alterações em valores."}</span>
+          </p>
+        )}
         {dinheiroFora > 0 && (
           <p className="g-aviso" style={{ margin: 0 }} role="status">
             <span>Hoje também {dinheiroFora === 1 ? "entrou" : "entraram"} <b>{brl(dinheiroFora)} em dinheiro fora do caixa</b> (recebido com o caixa fechado). Esse valor não está na conta acima: se ele foi para a gaveta, vai aparecer como sobra.</span>
