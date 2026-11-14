@@ -187,10 +187,12 @@ export function ItensDoLancamento({ lancamento }: { lancamento: Pick<Lancamento,
   const cheio = lancamento.valor_original != null && Number(lancamento.valor_original) > Number(lancamento.valor) ? Number(lancamento.valor_original) : Number(lancamento.valor);
   const emPartes = centavos(cheio - Number(lancamento.valor));
   const { soma: somaItens, desconto } = contaDosItens(itens, cheio);
+  // "venda" só quando tem produto; mensalidade, diária e serviço são "o que está nesta conta"
+  const titulo = itens.some((i) => i.tipo === "produto") ? "Itens desta venda" : "O que está nesta conta";
   return (
-    <section className="gf-itens" aria-label="Itens desta venda">
+    <section className="gf-itens" aria-label={titulo}>
       <div className="gf-itens-t">
-        <span className="g-rotulo">Itens desta venda</span>
+        <span className="g-rotulo">{titulo}</span>
         <span className="g-muted g-pp">{itens.length === 1 ? "1 item" : `${itens.length} itens`}</span>
       </div>
       <ul>
@@ -198,8 +200,8 @@ export function ItensDoLancamento({ lancamento }: { lancamento: Pick<Lancamento,
           <li key={n}>
             <Tile icone={ICONE_ITEM[i.tipo]} tom={TOM_ITEM[i.tipo]} tamanho="p" />
             <span className="n">
-              <b><span className="g-tab">{fmtQtd(i.qtd)} ×</span> {i.nome}</b>
-              <small className="g-tab">{brl(i.valor)} cada</small>
+              <b>{i.qtd !== 1 && <span className="g-tab">{fmtQtd(i.qtd)} × </span>}{i.nome}</b>
+              {i.qtd !== 1 && <small className="g-tab">{brl(i.valor)} cada</small>}
             </span>
             <b className="g-tab v">{brl(Math.round(i.qtd * i.valor * 100) / 100)}</b>
           </li>
