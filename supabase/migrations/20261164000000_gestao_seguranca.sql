@@ -5,7 +5,7 @@
 --    para gravar (pedido de serviço, creche, hotel, lista de espera, cancelar, pedir outra data).
 --    Os limites antigos continuam valendo dentro de link_pedir/link_pedir_estadia/link_espera_pedir (6 pendentes por telefone,
 --    60 por dia por loja). Os novos ficam em config_interna (o administrador pode mudar sem migração):
---      link_limite_loja_hora (25), link_limite_loja_dia (120), link_limite_fone_hora (5), link_limite_fone_abertos (6),
+--      link_limite_loja_hora (25), link_limite_loja_dia (120), link_limite_fone_hora (8), link_limite_fone_abertos (6),
 --      link_limite_rede_hora (10), link_limite_pedido_hora (6).
 --    Resposta quando passa do limite: { ok:false, erro:'limite', motivo:'muitos', mensagem:'...' } nos pedidos novos (o app
 --    antigo já entende 'limite') e { ok:false, erro:'muitos', mensagem } em cancelar/pedir outra data.
@@ -66,7 +66,7 @@ begin
   end if;
   if p_fone is not null then
     if (select count(*) from public.link_envios where petshop_id = p_petshop and fone = p_fone and tipo in ('pedido', 'espera') and em > now() - interval '1 hour')
-         >= public.link_limite('link_limite_fone_hora', 5) then
+         >= public.link_limite('link_limite_fone_hora', 8) then
       return true;
     end if;
     -- pedidos ainda sem resposta deste WhatsApp (um pedido com vários pets conta uma vez) + lista de espera em aberto
