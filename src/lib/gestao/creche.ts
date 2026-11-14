@@ -389,3 +389,48 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
     naCasa: linhas.filter((l) => l.estado === "na_casa").length,
   };
 }
+
+/* ---------- saldo de reposição ---------- */
+
+/** Regra de reposição do negócio (Meu pet shop). Desligada: qualquer falta do plano pode ser reposta, sem prazo. */
+export const OPCAO_REPOSICAO_PRAZO = "creche.reposicao_prazo";
+export const OPCAO_REPOSICAO_SO_AVISOU = "creche.reposicao_so_avisou";
+export type PrazoDeReposicao = "" | "mes" | "mes_seguinte";
+
+/** O que a função `creche_reposicao_saldo` devolve: só datas, nada de valor. */
+export type SaldoDeReposicao = {
+  /** dá para marcar mais uma reposição no dia pedido */
+  cabe: boolean;
+  /** a falta que a reposição desse dia repõe */
+  repoe: string | null;
+  prazo: PrazoDeReposicao; so_avisou: boolean;
+  /** faltas que ainda podem ser repostas no dia */
+  livres: string[];
+  /** faltas sem reposição cujo prazo já passou */
+  vencidas: string[];
+  pares: { falta: string; reposicao: string }[];
+  /** reposições liberadas sem falta para repor (pelo dono ou por quem cuida do financeiro) */
+  sem_falta: string[];
+};
+
+export async function lerSaldoDeReposicao(sb: Banco, planoId: string, dia?: string): Promise<SaldoDeReposicao | null> {
+  const r = await sb.rpc("creche_reposicao_saldo" as never, { p_plano: planoId, ...(dia ? { p_dia: dia } : {}) } as never);
+  // banco ainda sem a função: a tela segue sem o saldo
+  if (r.error) return null;
+  return r.data as unknown as SaldoDeReposicao;
+}
+
+/** "só falta com aviso, até o fim do mês seguinte à falta": a regra numa frase (vazia quando não há regra). */
+export function textoDaRegraDeReposicao(s: Pick<SaldoDeReposicao, "prazo" | "so_avisou">) {
+  const prazo = s.prazo === "mes" ? "no mesmo mês da falta" : s.prazo === "mes_seguinte" ? "até o fim do mês seguinte à falta" : "";
+  return [s.so_avisou ? "só falta com aviso" : "", prazo].filter(Boolean).join(", ");
+}
+
+/** "Luna tem 1 falta para repor (10/11)." / "Luna não tem falta para repor. A falta de 10/11 já foi reposta em 13/11." */
+export function fraseDoSaldo(nome: string, s: SaldoDeReposicao) {
+  const regra = textoDaRegraDeReposicao(s);
+  if (s.livres.length) return `${nome} tem ${s.livres.length === 1 ? "1 falta" : `${s.livres.length} faltas`} para repor (${textoDasDatas(s.livres)})${regra ? `. Regra: ${regra}` : ""}.`;
+  const usadas = s.pares.length ? ` ${s.pares.length === 1 ? "A falta" : "As faltas"} já ${s.pares.length === 1 ? "foi reposta" : "foram repostas"}: ${juntar(s.pares.map((p) => `${dataCurta(p.falta)} em ${dataCurta(p.reposicao)}`))}.` : "";
+  const vencidas = s.vencidas.length ? ` ${s.vencidas.length === 1 ? "A falta de" : "As faltas de"} ${textoDasDatas(s.vencidas)} já ${s.vencidas.length === 1 ? "passou" : "passaram"} do prazo.` : "";
+  return `${nome} não tem falta para repor${regra ? ` (regra: ${regra})` : ""}.${usadas}${vencidas}`;
+}

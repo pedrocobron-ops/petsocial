@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { HeartHandshake, Plus, Trash2 } from "lucide-react";
 import { CHAVES_CASA, diarioDe, esperaDe, ITENS_DO_DIARIO, MAX_ITENS_DO_DIARIO, ocorrenciasLigadas, portariaLigada } from "@/lib/gestao/casa-opcoes";
-import { equipeMudaPlano, OPCAO_EQUIPE_MUDA_PLANO } from "@/lib/gestao/creche";
+import { equipeMudaPlano, OPCAO_EQUIPE_MUDA_PLANO, OPCAO_REPOSICAO_PRAZO, OPCAO_REPOSICAO_SO_AVISOU, type PrazoDeReposicao } from "@/lib/gestao/creche";
 import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
-import { salvarOpcoes } from "@/lib/gestao/opcoes";
+import { opcao, salvarOpcoes } from "@/lib/gestao/opcoes";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { avisarMudanca, useAvisos, useSomenteLeitura } from "../ui";
@@ -36,6 +36,9 @@ export default function OpcoesCasa() {
   const [espera, setEspera] = useState(() => esperaDe(petshop));
   const [ocorrencias, setOcorrencias] = useState(() => ocorrenciasLigadas(petshop));
   const [equipePlano, setEquipePlano] = useState(() => equipeMudaPlano(petshop));
+  // regra de reposição de falta: desligada, qualquer falta do plano pode ser reposta, sem prazo
+  const [prazo, setPrazo] = useState<PrazoDeReposicao>(() => { const v = opcao<string>(petshop, OPCAO_REPOSICAO_PRAZO, ""); return v === "mes" || v === "mes_seguinte" ? v : ""; });
+  const [soAvisou, setSoAvisou] = useState(() => opcao<boolean>(petshop, OPCAO_REPOSICAO_SO_AVISOU, false) === true);
   const [mexeu, setMexeu] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -54,7 +57,7 @@ export default function OpcoesCasa() {
         [CHAVES_CASA.portaria]: portaria,
         [CHAVES_CASA.espera]: { ativo: espera.ativo, link: espera.ativo && espera.link },
         [CHAVES_CASA.ocorrencias]: ocorrencias,
-        ...(usaModulo(petshop, "creche") ? { [OPCAO_EQUIPE_MUDA_PLANO]: equipePlano } : {}),
+        ...(usaModulo(petshop, "creche") ? { [OPCAO_EQUIPE_MUDA_PLANO]: equipePlano, [OPCAO_REPOSICAO_PRAZO]: prazo, [OPCAO_REPOSICAO_SO_AVISOU]: soAvisou } : {}),
       });
       await recarregarBase();
       avisarMudanca();
@@ -97,6 +100,20 @@ export default function OpcoesCasa() {
         {usaModulo(petshop, "creche") && (
           <Opcao titulo="A equipe pode mexer nos planos de mensalista" frase="Desligado, só você e quem cuida do financeiro cadastram um mensalista, mudam os dias, pausam ou encerram o plano, porque o plano decide o que é cobrado. Ligado, quem trabalha na creche também pode (sem ver nem preencher valores)." ligada={equipePlano} aoMudar={m(setEquipePlano)}>
             <p className="g-muted g-pp">Plano cadastrado pela equipe fica sem valor até você preencher: a tela Hoje avisa. A reposição de falta (dia sem cobrança) marcada pela equipe sempre passa pela sua conferência, com esta opção ligada ou não.</p>
+          </Opcao>
+        )}
+        {usaModulo(petshop, "creche") && (
+          <Opcao titulo="Regra para repor falta" frase="Toda reposição (dia sem cobrança) precisa de uma falta para repor. Desligado, vale qualquer falta do plano, sem prazo. Ligado, você escolhe até quando e quais faltas valem."
+            ligada={Boolean(prazo) || soAvisou} aoMudar={(v) => { m(setPrazo)(v ? "mes_seguinte" : ""); setSoAvisou(false); }}>
+            <label className="g-campo"><span>Até quando dá para repor</span>
+              <select className="g-select" value={prazo} onChange={(e) => m(setPrazo)(e.target.value as PrazoDeReposicao)}>
+                <option value="">Sem prazo</option>
+                <option value="mes">No mesmo mês da falta</option>
+                <option value="mes_seguinte">Até o fim do mês seguinte à falta</option>
+              </select>
+            </label>
+            <label className="g-check"><input type="checkbox" checked={soAvisou} onChange={(e) => m(setSoAvisou)(e.target.checked)} /><span>Só repõe falta que o tutor avisou</span></label>
+            <p className="g-muted g-pp">Sem falta para repor, a equipe marca o dia como dia extra. Você pode liberar um dia sem cobrança assim mesmo: fica anotado.</p>
           </Opcao>
         )}
       </div>

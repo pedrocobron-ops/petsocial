@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { CalendarCheck2, Pencil, Plus } from "lucide-react";
-import { DIAS_SEMANA, diasEmOrdem, lerPlanos, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, textoDasDatas, type Falta, type PetDoPlano, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
+import { DIAS_SEMANA, diasEmOrdem, fraseDoSaldo, lerPlanos, lerSaldoDeReposicao, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, textoDasDatas, type Falta, type PetDoPlano, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
 import { usaModulo } from "@/lib/gestao/modulos";
-import { brl, dataCompleta, isoDia, nomeMes } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, isoDia, nomeMes } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { useDados, useSomenteLeitura } from "../ui";
@@ -24,9 +24,15 @@ const anterior = (d: Date) => new Date(d.getFullYear(), d.getMonth() - 1, 1);
 
 /** Presenças, faltas e dias extras de um mensalista neste mês e no mês passado. */
 export function ResumoDosMeses({ plano, presencas, faltas }: { plano: PlanoCompleto; presencas: Presenca[]; faltas: Falta[] }) {
-  const { petshop } = useGestao();
+  const { sb, petshop } = useGestao();
   const agora = new Date(), hoje = isoDia(agora);
+  // saldo de reposição (só datas): quantas faltas ainda podem ser repostas, e qual falta cada reposição repôs
+  const { dados: saldo } = useDados(async () => lerSaldoDeReposicao(sb, plano.id), [plano.id, presencas.length, faltas.length]);
+  const repoe = new Map((saldo?.pares ?? []).map((p) => [p.reposicao, p.falta]));
+  const semFalta = new Set(saldo?.sem_falta ?? []);
+  const textoDaReposicao = (d: string) => `${dataCurta(d)}${repoe.has(d) ? ` (repôs ${dataCurta(repoe.get(d)!)})` : semFalta.has(d) ? " (liberada sem falta)" : ""}`;
   return (
+    <>
     <div className="g-cm-meses">
       {[agora, anterior(agora)].map((mes, i) => {
         const r = resumoDoMes(plano, mes, presencas, faltas, petshop.horario, hoje);
@@ -44,7 +50,7 @@ export function ResumoDosMeses({ plano, presencas, faltas }: { plano: PlanoCompl
                 <ul className="g-cm-detalhes">
                   {r.extras.length > 0 && <li><b>Extras:</b> {textoDasDatas(r.extras)}</li>}
                   {r.faltas.length > 0 && <li><b>Faltas:</b> {r.faltas.map((f) => `${textoDasDatas([f.dia])}${f.avisou ? " (avisou)" : ""}`).join(", ")}</li>}
-                  {r.reposicoes.length > 0 && <li><b>Reposições:</b> {textoDasDatas(r.reposicoes)}</li>}
+                  {r.reposicoes.length > 0 && <li><b>Reposições:</b> {saldo ? r.reposicoes.map(textoDaReposicao).join(", ") : textoDasDatas(r.reposicoes)}</li>}
                   {r.semChamada.length > 0 && <li className="g-muted"><b>Sem chamada:</b> {textoDasDatas(r.semChamada)}</li>}
                 </ul>
               </>
@@ -53,6 +59,10 @@ export function ResumoDosMeses({ plano, presencas, faltas }: { plano: PlanoCompl
         );
       })}
     </div>
+    {saldo && (saldo.livres.length > 0 || saldo.pares.length > 0 || saldo.sem_falta.length > 0 || saldo.vencidas.length > 0) && (
+      <p className="g-muted g-p g-cm-saldo" role="status">{fraseDoSaldo(plano.pets?.nome ?? "O pet", saldo)}</p>
+    )}
+    </>
   );
 }
 
