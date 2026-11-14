@@ -70,6 +70,14 @@ export function textoPronto(p: { tutor?: string | null; pet: string; petshop: st
   return `${saudacaoZap(p.tutor, p.petshop)} ${oQue} de ${p.pet} ${varios && oQue !== "O atendimento" ? "terminaram" : "terminou"}. Já pode vir buscar.`;
 }
 
+/** Confirmação de um horário recém-marcado: "O banho de Mel ficou marcado para segunda, 16/11 às 09:00." */
+export function textoConfirmacao(p: { tutor?: string | null; pet: string; servico?: string | null; quando: string; hora: string; petshop: string }) {
+  const s = (p.servico ?? "").trim().toLowerCase();
+  const oQue = /^banho/.test(s) ? `O ${s}` : /^(tosa|hidratação|escovação)/.test(s) ? `A ${s}` : "O horário";
+  const ficou = oQue.startsWith("A ") ? "ficou marcada" : "ficou marcado";
+  return `${saudacaoZap(p.tutor, p.petshop)} ${oQue} de ${p.pet} ${ficou} para ${p.quando} às ${p.hora}. Qualquer coisa, é só chamar por aqui.`;
+}
+
 /** Aviso de que o horário mudou: "O banho de Nina foi remarcado para amanhã às 14:00." A pessoa manda pelo WhatsApp. */
 export function textoRemarcado(p: { tutor?: string | null; pet: string; servico?: string | null; quando: string; hora: string; petshop: string }) {
   const s = (p.servico ?? "").trim().toLowerCase();

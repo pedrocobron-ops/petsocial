@@ -46,9 +46,13 @@ function anoFazSentido(dia: string) {
  * Marca um horário novo ou altera um existente. Avisa (sem impedir) quando bate com outro atendimento ou com um bloqueio.
  * Ao criar, o horário pode se repetir: todos os da série dividem o mesmo `serie_id`.
  */
+/** O horário que acabou de ser marcado: a Agenda vai para o dia dele e oferece a confirmação no WhatsApp. */
+export type Marcado = { id: string; inicio: string; quantos: number };
+
 export default function FormAgendamento({ agendamento, petInicial, diaInicial, horaInicial, profissionalInicial, aoFechar, aoSalvar }: {
   agendamento?: AgendamentoCompleto; petInicial?: PetComTutor | null; diaInicial?: string; horaInicial?: string; profissionalInicial?: string | null;
-  aoFechar: () => void; aoSalvar: () => void;
+  /** `marcado`: horário novo que acabou de ser marcado (o primeiro, numa série), para a Agenda abrir o dia dele. */
+  aoFechar: () => void; aoSalvar: (marcado?: Marcado) => void;
 }) {
   // quem não mexe com dinheiro (sem Caixa, Financeiro nem Relatórios) marca o horário sem ver valor: o preço da lista vai junto, calado
   const { sb, petshop, equipe, servicos, user, vejoFinanceiro, cuidoDoFinanceiro } = useGestao();
@@ -181,9 +185,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
 
   // vagas: quantos pets o pet shop atende ao mesmo tempo, somando todos os profissionais e os "a definir"
   const vagas = vagasDe(petshop, equipe);
-  type Marcado = { id: string; inicio: string; fim: string; status: string };
+  type JaMarcado = { id: string; inicio: string; fim: string; status: string };
   /** O máximo de outros pets ao mesmo tempo dentro do horário escolhido, no dia `d`. */
-  const juntosEm = (lista: Marcado[], d: string) => {
+  const juntosEm = (lista: JaMarcado[], d: string) => {
     const ini = juntaDiaHora(d, hhmm).getTime(), fim = ini + duracao * 60000;
     const outros = lista.filter((a) => a.id !== agendamento?.id && !["cancelado", "faltou"].includes(a.status))
       .map((a) => ({ de: new Date(a.inicio).getTime(), ate: new Date(a.fim).getTime() })).filter((a) => a.de < fim && a.ate > ini);
@@ -304,7 +308,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
         const guardou = semFim && serie ? await sb.from("series_agenda").insert({ serie_id: serie, petshop_id: petshop.id, cada_semanas: repetir }).select("serie_id") : null;
         avisar(`${usar.length === 1 ? "1 horário marcado" : `${usar.length} horários marcados`}${!semFim ? "" : guardou?.error ? ". Não consegui guardar o Até eu cancelar: a repetição termina no último horário." : ". Perto do fim, a Agenda avisa para marcar os próximos."}`);
         avisarMudanca();
-        aoSalvar();
+        aoSalvar(marcados[0] ? { id: marcados[0].id, inicio: juntaDiaHora(usar[0], hhmm).toISOString(), quantos: usar.length } : undefined);
         setSalvando(false);
         return;
       }
@@ -349,13 +353,16 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
             return;
           }
         }
-      } else {
+      }
+      let marcado: Marcado | undefined;
+      if (!agendamento) {
         const novo = ok(await sb.from("agendamentos").insert({ ...campos, ...quando, petshop_id: petshop.id, criado_por: user.id }).select("id").single());
         if (aMais.length) await juntarAosMarcados([novo.id], aMais);
+        marcado = { id: novo.id, inicio: inicio.toISOString(), quantos: 1 };
       }
       avisar(agendamento ? "Horário alterado." : `${pet.nome} marcado para ${dataAmigavel(inicio)} às ${hhmm}.`);
       avisarMudanca();
-      aoSalvar();
+      aoSalvar(marcado);
     } catch (err) { avisarErro(err); }
     setSalvando(false);
   }
