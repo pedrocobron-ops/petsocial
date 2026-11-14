@@ -34,7 +34,8 @@ export default function Comecar() {
   const [cidade, setCidade] = useState("");
   const [uf, setUf] = useState("");
   // o mais comum já vem marcado; cada opção é um toque
-  const [modulos, setModulos] = useState<Modulo[]>(["banho_tosa"]);
+  // nada vem marcado: cada negócio marca o que faz (uma creche não começa com banho e tosa ligado)
+  const [modulos, setModulos] = useState<Modulo[]>([]);
   const [principal, setPrincipal] = useState<Principal | null>(null);
   const [passo, setPasso] = useState<0 | 1>(0);
   const [userId, setUserId] = useState("");

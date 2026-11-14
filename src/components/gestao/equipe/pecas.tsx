@@ -9,7 +9,7 @@ import { AvatarPessoa, useAvisos } from "@/components/gestao/ui";
 import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS } from "@/components/gestao/ajustes/grade-horario";
 import type { Horario } from "@/lib/gestao/tipos";
 import { areasPara, perfisPara, type Area } from "@/lib/gestao/acessos";
-import { usaModulo } from "@/lib/gestao/modulos";
+import { artigoDe, usaModulo } from "@/lib/gestao/modulos";
 import { ROTULOS_ATENDE, SO_DONOS, TODAS_AREAS, comPerfil, fraseDoLimite, nAcessos, primeiroNome, textoDoConvite, type Escolha, type PerfilId, type Uso } from "./modelo";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./equipe-form.css";
@@ -290,7 +290,7 @@ export function Convite({ nome, email }: { nome: string; email: string }) {
       <ol className="g-eq-convite-passos">
         <li><b>1</b><span className="g-eq-convite-p">{primeiroNome(nome) || "A pessoa"} abre o link que você mandar.</span></li>
         <li><b>2</b><span className="g-eq-convite-p">Cria a conta com o e-mail <strong>{email}</strong>. É esse e-mail que liga a conta à sua equipe.</span></li>
-        <li><b>3</b><span className="g-eq-convite-p">Pronto: ao entrar, já cai no {petshop.nome}.</span></li>
+        <li><b>3</b><span className="g-eq-convite-p">Pronto: ao entrar, já cai {artigoDe(petshop.nome).no} {petshop.nome}.</span></li>
       </ol>
       <div className="g-eq-convite-acoes">
         <a className="g-btn verde" href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar pelo WhatsApp</a>
