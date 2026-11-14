@@ -114,7 +114,7 @@ export default function Equipe() {
                       <AvatarPessoa nome={p.nome} cor={p.cor} tamanho="g" />
                       <div className="g-eq-topo-t">
                         <b className="g-eq-nome">{p.nome}{p.id === eu.id ? " (você)" : ""}</b>
-                        <span className="g-eq-funcao">{funcaoDe(p)}{dono && <span className={`g-tag ${p.id === titular ? "laranja" : "azul"}`}>{p.id === titular ? "Titular" : "Sócio"}</span>}</span>
+                        <span className="g-eq-funcao">{funcaoDe(p, petshop)}{dono && <span className={`g-tag ${p.id === titular ? "laranja" : "azul"}`}>{p.id === titular ? "Titular" : "Sócio"}</span>}</span>
                       </div>
                       <ChevronRight className="g-eq-seta" size={18} aria-hidden />
                     </div>
@@ -161,7 +161,7 @@ export default function Equipe() {
                   {inativos.map((p) => (
                     <div key={p.id} className="g-linha">
                       <AvatarPessoa nome={p.nome} cor="#a39a90" tamanho="p" />
-                      <span className="t"><b className="g-muted">{p.nome}</b><span>{funcaoDe(p)}</span></span>
+                      <span className="t"><b className="g-muted">{p.nome}</b><span>{funcaoDe(p, petshop)}</span></span>
                       <button className="g-btn p sec" onClick={() => reativar(p)}>Reativar</button>
                     </div>
                   ))}

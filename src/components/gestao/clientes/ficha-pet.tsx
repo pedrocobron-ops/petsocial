@@ -197,7 +197,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
 
       <div className="g-cli-nums">
         <div className="g-cli-num">
-          <Tile icone={Scissors} tom="pessego" />
+          <Tile icone={comBanho ? Scissors : PawPrint} tom="pessego" />
           <div><span className="g-rotulo">Visitas</span><b className="g-tab">{visitas}</b><small>{nEstadias > 0 ? (comBanho ? `${visitas - nEstadias} na agenda + ${nEstadias} ${usaModulo(petshop, "hotel") && !usaModulo(petshop, "creche") ? "no hotel" : usaModulo(petshop, "creche") && !usaModulo(petshop, "hotel") ? "na creche" : "na creche ou hotel"}` : `${nEstadias === 1 ? "1 dia ou estadia" : `${nEstadias} dias e estadias`}`) : !comBanho ? "ainda não veio" : visitas === 1 ? "atendimento concluído" : "atendimentos concluídos"}</small></div>
         </div>
         <div className="g-cli-num">

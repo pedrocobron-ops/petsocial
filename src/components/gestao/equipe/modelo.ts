@@ -89,8 +89,11 @@ export function escolhaDe(p: Profissional): Escolha {
 }
 
 /** O nome da função para mostrar no cartão da pessoa. */
-export function funcaoDe(p: Pick<Profissional, "papel" | "funcao" | "atende">): string {
+export function funcaoDe(p: Pick<Profissional, "papel" | "funcao" | "atende">, petshop?: { modulos?: string[] | null }): string {
   const f = p.funcao?.trim();
+  // o nome pronto de monitor(a) segue o negócio: sem creche, aparece como Cuidador(a)
+  const monitor = PERFIS.find((x) => x.id === "monitor");
+  if (f && petshop && monitor && f === monitor.funcao) return perfilParaOPetshop(monitor, petshop).funcao;
   if (f) return f;
   if (p.papel === "dono") return "Dono";
   if (p.papel === "gerente") return "Gerente";
