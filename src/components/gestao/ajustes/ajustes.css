@@ -52,4 +52,6 @@
 .gj-almoco small { font-size: .8125rem; line-height: 1.4; }
 
 /* aparelho no formato de 12 h: "08:00 AM" cabe inteiro quando há espaço na linha */
-@media (min-width: 600px) { .gj-horas .g-input { width: 8.75rem; } }
+.gj-horas { min-width: 0; max-width: 100%; }
+.gj-horas .g-input { width: auto; flex: 1 1 7.25rem; max-width: 8.75rem; }
+.gj-dias, .gj-dia, .g-pilha:has(> .gj-dias) { min-width: 0; grid-template-columns: minmax(0, 1fr); }
