@@ -1,0 +1,111 @@
+import type { Banco } from "./supabase";
+import { saudacaoZap } from "./agenda";
+import { reduzirFoto } from "./foto";
+import { opcao } from "./opcoes";
+
+/**
+ * Página do tutor (opção "casa.tutor", desligada por padrão): a equipe põe fotos no dia do pet na creche e no hotel, e cada
+ * tutor tem um link particular (/gestao/tutor/<código>) com o diário, as fotos, o que está marcado e os avisos de vacina.
+ * As fotos ficam no bucket privado "diario" (nunca endereço público). Banco: supabase/migrations/20261163000000_gestao_pagina_do_tutor.sql.
+ */
+type ComOpcoes = { opcoes?: unknown };
+export const CHAVE_TUTOR = "casa.tutor";
+export const BUCKET_DIARIO = "diario";
+/** O banco aceita até 10 fotos por pet por dia e 1,5 MB por foto. */
+export const MAX_FOTOS_DIA = 10;
+const LIMITE_BYTES = 1_400_000;
+
+export function paginaDoTutorLigada(p: ComOpcoes): boolean {
+  const o = opcao<unknown>(p, CHAVE_TUTOR, {});
+  return Boolean(o && typeof o === "object" && (o as Record<string, unknown>).ativo === true);
+}
+
+export const enderecoDaPagina = (token: string) => `${typeof window === "undefined" ? "" : window.location.origin}/gestao/tutor/${token}`;
+
+/** O link do tutor (o banco cria na primeira vez). */
+export async function linkDoTutor(sb: Banco, clienteId: string): Promise<string> {
+  const r = await sb.rpc("tutor_link", { p_cliente: clienteId });
+  if (r.error || !r.data) throw new Error(r.error?.message ?? "Não consegui fazer o link do tutor.");
+  return enderecoDaPagina(r.data);
+}
+/** Troca o código: o link antigo para de abrir na hora. Só o dono. */
+export async function trocarLinkDoTutor(sb: Banco, clienteId: string): Promise<string> {
+  const r = await sb.rpc("tutor_link_trocar", { p_cliente: clienteId });
+  if (r.error || !r.data) throw new Error(r.error?.message ?? "Não consegui trocar o link.");
+  return enderecoDaPagina(r.data);
+}
+export async function desligarLinkDoTutor(sb: Banco, clienteId: string): Promise<void> {
+  const r = await sb.rpc("tutor_link_desligar", { p_cliente: clienteId });
+  if (r.error) throw new Error(r.error.message);
+}
+
+const listaDeNomes = (nomes: string[]) => (nomes.length <= 1 ? nomes[0] ?? "seu pet" : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`);
+
+/** Mensagem com o link da página. O sistema só prepara: quem manda é a pessoa. */
+export function mensagemDaPagina(p: { tutor: string | null | undefined; petshop: string; pets: string[]; url: string }) {
+  return `${saudacaoZap(p.tutor, p.petshop)} Esta é a página de ${listaDeNomes(p.pets)} aqui com a gente: o diário do dia, as fotos e o que está marcado. É só sua, não precisa de senha. Guarde o link: ${p.url}`;
+}
+export function mensagemDasFotos(p: { tutor: string | null | undefined; petshop: string; pet: string; fotos: number; url: string }) {
+  const quantas = p.fotos === 1 ? "uma foto" : `${p.fotos} fotos`;
+  return `${saudacaoZap(p.tutor, p.petshop)} Saíram ${quantas} de ${p.pet} hoje. Veja aqui: ${p.url}`;
+}
+
+export type FotoDoDia = { id: string; caminho: string; legenda: string | null; criado_em: string; criado_por: string | null; criado_nome: string | null; pet_id: string; url: string | null };
+
+/** As fotos de hoje dos pets, com endereço assinado (vale 1 hora) para a equipe ver. */
+export async function fotosDoDia(sb: Banco, petshopId: string, petIds: string[], dia: string): Promise<FotoDoDia[]> {
+  if (!petIds.length) return [];
+  const r = await sb.from("diario_fotos").select("id, caminho, legenda, criado_em, criado_por, criado_nome, pet_id")
+    .eq("petshop_id", petshopId).eq("dia", dia).in("pet_id", petIds).order("criado_em").limit(500);
+  if (r.error) throw new Error(r.error.message);
+  const linhas = r.data ?? [];
+  if (!linhas.length) return [];
+  const s = await sb.storage.from(BUCKET_DIARIO).createSignedUrls(linhas.map((f) => f.caminho), 3600);
+  const urls = new Map((s.data ?? []).map((x) => [x.path, x.signedUrl]));
+  return linhas.map((f) => ({ ...f, url: urls.get(f.caminho) ?? null }));
+}
+
+/** Reduz a foto para no máximo 1600 px, JPEG leve (o celular manda fotos de vários MB). */
+async function prepararFoto(f: File): Promise<Blob> {
+  if (f.type && !f.type.startsWith("image/")) throw new Error(`"${f.name}" não é uma foto.`);
+  try {
+    let b = await reduzirFoto(f, 1600, 0.8);
+    if (b.size > LIMITE_BYTES) b = await reduzirFoto(f, 1280, 0.7);
+    if (b.size > LIMITE_BYTES) b = await reduzirFoto(f, 1024, 0.6);
+    return b;
+  } catch { throw new Error(`Não consegui ler "${f.name}". Escolha uma foto JPG ou PNG.`); }
+}
+
+/**
+ * Manda as fotos para o dia do pet: reduz no aparelho, sobe três de cada vez e anota no diário.
+ * Devolve quantas entraram e os erros (uma foto com problema não segura as outras).
+ */
+export async function enviarFotos(sb: Banco, p: { petshopId: string; estadiaId: string; petId: string; dia: string; legenda?: string },
+  arquivos: File[], aoAvancar?: (feitas: number) => void): Promise<{ enviadas: number; erros: string[] }> {
+  const erros: string[] = [];
+  let enviadas = 0, feitas = 0, i = 0;
+  const legenda = p.legenda?.trim().slice(0, 200) || null;
+  async function uma(f: File) {
+    try {
+      const blob = await prepararFoto(f);
+      const caminho = `${p.petshopId}/${p.petId}/${p.dia}/${crypto.randomUUID()}.jpg`;
+      const up = await sb.storage.from(BUCKET_DIARIO).upload(caminho, blob, { contentType: "image/jpeg" });
+      if (up.error) throw new Error(up.error.message.includes("size") ? "A foto ficou grande demais." : up.error.message);
+      const ins = await sb.from("diario_fotos").insert({ petshop_id: p.petshopId, estadia_id: p.estadiaId, pet_id: p.petId, dia: p.dia, caminho, legenda }).select("id");
+      if (ins.error) { void sb.storage.from(BUCKET_DIARIO).remove([caminho]); throw new Error(ins.error.message); }
+      enviadas++;
+    } catch (e) { erros.push(e instanceof Error ? e.message : String(e)); }
+    aoAvancar?.(++feitas);
+  }
+  const fila = async () => { while (i < arquivos.length) await uma(arquivos[i++]); };
+  await Promise.all([fila(), fila(), fila()]);
+  return { enviadas, erros: [...new Set(erros)] };
+}
+
+/** Tira a foto do diário e apaga o arquivo (o dono, ou quem mandou). */
+export async function apagarFoto(sb: Banco, foto: Pick<FotoDoDia, "id" | "caminho">): Promise<void> {
+  const r = await sb.from("diario_fotos").delete().eq("id", foto.id).select("id");
+  if (r.error) throw new Error(r.error.message);
+  if (!r.data?.length) throw new Error("Só o dono ou quem mandou a foto pode apagar.");
+  await sb.storage.from(BUCKET_DIARIO).remove([foto.caminho]);
+}

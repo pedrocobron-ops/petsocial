@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { BotaoFotos } from "../casa/fotos-do-dia";
 import { AlertTriangle, CalendarPlus, Check, DoorOpen, LogIn, MessageCircle, Search, Sunset, Syringe, Undo2, UserX } from "lucide-react";
 import { lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { cuidadosVigentes, estadoSaude, tipoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
@@ -230,6 +231,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
                       {l.estado === "na_casa" && (
                         <>
                           <span className="g-tag verde"><Check size={12} aria-hidden />na casa desde {isoDia(new Date(l.presenca!.entrada)) === hoje ? horaCurta(l.presenca!.entrada) : dataAmigavel(l.presenca!.entrada)}</span>
+                          {ehHoje && l.presenca && <BotaoFotos estadia={{ id: l.presenca.id, pet_id: pet.id, pets: pet }} />}
                           {l.presenca?.mensalista ? (
                             <>
                               <button className="g-btn sec" disabled={trava} onClick={() => { if (comPortaria && ehHoje && l.presenca) { if (!somenteLeitura()) setBuscando(l); } else fazer("saiu"); }}><DoorOpen />Saiu</button>

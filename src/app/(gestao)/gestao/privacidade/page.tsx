@@ -68,7 +68,7 @@ export default function PrivacidadeDoGestao() {
       <h3>Que o pet shop lança (nós como operadora)</h3>
       <ul>
         <li><b>Tutores:</b> nome, telefone, e-mail, endereço e observações.</li>
-        <li><b>Pets:</b> nome, espécie, raça, porte, sexo, nascimento, alertas, observações, foto, ficha de saúde (vacinas, vermífugo, antipulgas e vencimentos) e fotos de antes e depois do atendimento.</li>
+        <li><b>Pets:</b> nome, espécie, raça, porte, sexo, nascimento, alertas, observações, foto, ficha de saúde (vacinas, vermífugo, antipulgas e vencimentos), fotos de antes e depois do atendimento e, se o pet shop ligar a Página do tutor, fotos do dia na creche e no hotel.</li>
         <li><b>Agenda, creche e hotel:</b> horários, serviços, profissional, situação e valores.</li>
         <li><b>Dinheiro:</b> caixa, entradas e saídas, pacotes vendidos, comissões e estoque.</li>
       </ul>
@@ -197,6 +197,7 @@ export default function PrivacidadeDoGestao() {
         <li>O banco de dados separa os pet shops: as regras ficam no próprio banco e cada login só alcança os dados do pet shop a que pertence.</li>
         <li>Dentro do pet shop, o dono decide quem vê o financeiro.</li>
         <li>As fotos de pets ficam em endereços com nome aleatório. Quem tiver o endereço exato de uma foto consegue abrir a imagem, por isso não compartilhe esses endereços com quem não deve ver.</li>
+        <li>Página do tutor (opcional, o pet shop liga): as fotos do dia ficam num espaço fechado, sem endereço público. Só a equipe do pet shop e o tutor, pelo link particular dele, conseguem ver, e os endereços das fotos na página valem poucos minutos. O pet shop pode trocar ou desligar o link de cada tutor e apagar fotos; desligada a opção, nenhum link abre.</li>
         <li>Na {EMPRESA.marca}, o acesso aos dados dos pet shops é restrito a quem cuida da operação e só acontece para suporte, manutenção, segurança ou obrigação legal.</li>
       </ul>
       <p>
