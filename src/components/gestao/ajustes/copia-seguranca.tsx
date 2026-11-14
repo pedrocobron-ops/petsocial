@@ -421,7 +421,7 @@ export default function CopiaSeguranca() {
           return { quando: a.quando, linha: [quando(a.quando), a.quem_nome ?? "", apagou ? "Apagou um valor recebido" : "Alterou um valor recebido", doLancamento(a.lancamento_id, a.antes),
             num(antes.valor), apagou ? "" : num(depois.valor), apagou ? `era ${typeof antes.forma === "string" ? antes.forma : "sem forma"}, do dia ${typeof antes.data === "string" ? dataCompleta(antes.data) : ""}` : textoDaAlteracao(a)] as Cel[] };
         }),
-        ...precos.map((x) => ({ quando: x.quando, linha: [quando(x.quando), x.quem_nome ?? "", x.tipo === "desconto" ? "Deu desconto na venda" : "Vendeu com preço diferente da lista",
+        ...precos.map((x) => ({ quando: x.quando, linha: [quando(x.quando), x.quem_nome ?? "", ({ desconto: "Deu desconto na venda", sem_cobranca: "Marcou como não cobrado", servico_tirado: "Tirou um serviço feito da conta", preco_agenda: "Marcou o horário abaixo da lista", pacote: "Vendeu pacote fora do modelo" } as Record<string, string>)[x.tipo] ?? "Vendeu com preço diferente da lista",
           x.tipo === "desconto" ? x.item : `${x.item}${x.lancamento_id && doLancamento(x.lancamento_id) ? ` (${doLancamento(x.lancamento_id)})` : ""}`,
           dinheiro(x.de), dinheiro(x.para), x.abaixo_do_custo ? "abaixo do custo" : ""] as Cel[] })),
       ].sort((a, b) => a.quando.localeCompare(b.quando));

@@ -153,3 +153,4 @@ div.g-agd-faixa.almoco { cursor: default; }
   .g-ag-cobrar-linha .g-linha { flex: 1 0 100%; }
   .g-ag-cobrar-linha > .g-btn { margin: -4px 0 8px auto; }
 }
+.g-agd-valor.fixo { display: flex; align-items: center; min-height: 44px; }

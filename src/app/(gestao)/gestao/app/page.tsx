@@ -39,7 +39,7 @@ import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembre
 import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
 import Importar from "@/components/gestao/importar";
 import { comPrecosDeAgendamento, idsParaCobrar } from "@/lib/gestao/reservado";
-import { AtendimentosParaCobrar, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
+import { AtendimentosParaCobrar, MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import AlteracoesDeValores from "@/components/gestao/financeiro/alteracoes-de-valores";
 
 const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa semana?", "Quem não vem há mais de um mês?"];
@@ -432,6 +432,7 @@ export default function Hoje() {
                             {a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {a.pets.clientes.nome}</span>}
                           </span>
                           {semConta.has(a.id) ? <span className="g-tag laranja">Falta cobrar</span>
+                            : semCobranca(a) ? <MarcaSemCobranca a={a} />
                             : a.status !== "marcado" && <span className={`g-tag ${STATUS_AGENDAMENTO[a.status].tom}`}>{STATUS_AGENDAMENTO[a.status].rotulo}</span>}
                           <ChevronRight size={18} className="g-muted g-so-pc" />
                         </button>

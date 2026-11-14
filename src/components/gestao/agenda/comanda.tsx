@@ -10,6 +10,7 @@ import { definirServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-ho
 import { brl, dataCompleta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { usaModulo } from "@/lib/gestao/modulos";
+import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { Tile } from "../painel";
 import { AvatarPet, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "../ui";
 import {
@@ -41,6 +42,10 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   const outrosDoHorario = servicosAMais(a);
   // horário que já usou o pacote: o banco só deixa quem cuida do financeiro juntar ou tirar serviços (a mesma trava de atendimento pago)
   const mexeNosServicos = !a.pacote_cliente_id || cuidoDoFinanceiro;
+  // preço travado: quem só opera o caixa não tira da conta um serviço que já foi feito (seria um desconto); o banco também recusa
+  const jaFeito = a.status === "concluido" || new Date(a.inicio) <= new Date();
+  const naoTiraFeito = travaDePreco(petshop).ligada && !cuidoDoFinanceiro && jaFeito;
+  const doHorario = new Set(outrosDoHorario.map((o) => o.servico_id));
   const [itens, setItens] = useState<ItemConta[]>(() => [
     ...(peloPacote ? [] : [{ chave: novaChave(), tipo: "servico" as const, nome: servico, qtd: 1, valor: a.preco == null ? null : Number(a.preco) }]),
     ...outrosDoHorario.map((o) => ({ chave: novaChave(), tipo: "servico" as const, nome: o.servicos?.nome ?? "Serviço", qtd: 1, valor: o.preco == null ? null : Number(o.preco), servicoId: o.servico_id })),
@@ -288,7 +293,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
           )}
           {itens.map((i) => (
             <LinhaDaConta key={i.chave} item={i} produto={produtos.find((p) => p.id === i.produtoId)} apoio={a.profissionais ? `com ${a.profissionais.nome}` : undefined}
-              aoMudar={(m) => mudar(i.chave, m)} aoTirar={i.tipo === "servico" && (!i.servicoId || !mexeNosServicos) ? undefined : () => setItens((l) => l.filter((x) => x.chave !== i.chave))} />
+              aoMudar={(m) => mudar(i.chave, m)} aoTirar={i.tipo === "servico" && (!i.servicoId || !mexeNosServicos || (naoTiraFeito && doHorario.has(i.servicoId))) ? undefined : () => setItens((l) => l.filter((x) => x.chave !== i.chave))} />
           ))}
         </div>
 

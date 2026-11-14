@@ -6,6 +6,7 @@ import { nomeDosServicos, valorDoHorario, servicosAMais } from "@/lib/gestao/ser
 import { COLS_PACOTE_CLIENTE, comPrecosDeAgendamento } from "@/lib/gestao/reservado";
 import { SELECT_AGENDAMENTO, type AgendamentoCompleto, type PacoteCliente } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, hora, isoDia } from "@/lib/gestao/util";
+import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import Comanda from "./comanda";
@@ -32,6 +33,15 @@ export function useParaCobrar(de?: Date, ate?: Date) {
   return { ids: new Set(lista.map((x) => x.id)), lista, recarregar };
 }
 
+/** Concluído e marcado como não cobrado (fora o uso de pacote sem mais nada): a agenda mostra com quem decidiu. */
+export const semCobranca = (a: { status: string; sem_cobranca?: boolean | null; pacote_cliente_id?: string | null }) =>
+  a.status === "concluido" && Boolean(a.sem_cobranca) && !a.pacote_cliente_id;
+/** "Sem cobrança · por Bia" */
+export function MarcaSemCobranca({ a }: { a: { sem_cobranca_nome?: string | null } }) {
+  const quem = a.sem_cobranca_nome?.split(" ")[0];
+  return <span className="g-tag amarelo">Sem cobrança{quem ? ` · por ${quem}` : ""}</span>;
+}
+
 /** O que a conta deste horário ainda cobra: tudo, ou só os outros serviços quando o principal foi (ou vai) pelo pacote. */
 const aCobrarDe = (a: AgendamentoCompleto, comPacote = false) => (a.pacote_cliente_id || comPacote
   ? Math.round(servicosAMais(a).reduce((t, o) => t + Number(o.preco ?? 0), 0) * 100) / 100
@@ -42,7 +52,9 @@ const aCobrarDe = (a: AgendamentoCompleto, comPacote = false) => (a.pacote_clien
  * Some quando não há nada. `aoMudar`: a tela que mostra a lista recarrega o que depende dela.
  */
 export function AtendimentosParaCobrar({ aoMudar }: { aoMudar?: () => void }) {
-  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { sb, petshop, vejoFinanceiro, cuidoDoFinanceiro } = useGestao();
+  // preço travado: "não cobrar" um atendimento com valor é decisão do dono ou de quem vê o financeiro
+  const podeNaoCobrar = !travaDePreco(petshop).ligada || cuidoDoFinanceiro;
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const { lista, recarregar } = useParaCobrar();
@@ -77,7 +89,7 @@ export function AtendimentosParaCobrar({ aoMudar }: { aoMudar?: () => void }) {
 
   async function naoCobrar(a: AgendamentoCompleto) {
     if (ocupado || somenteLeitura()) return;
-    if (!(await confirmar({ titulo: "Não cobrar este atendimento?", texto: `${a.pets?.nome ?? "O pet"}, ${dataAmigavel(a.inicio)} às ${hora(a.inicio)}. Ele sai desta lista e fica anotado como não cobrado. Para a comissão, continua valendo o preço da agenda.`, confirmar: "Não cobrar" }))) return;
+    if (!(await confirmar({ titulo: "Não cobrar este atendimento?", texto: `${a.pets?.nome ?? "O pet"}, ${dataAmigavel(a.inicio)} às ${hora(a.inicio)}. Ele sai desta lista e fica anotado como não cobrado, com o seu nome e a hora. O dono vê em Alterações em valores. Para a comissão, continua valendo o preço da agenda.`, confirmar: "Não cobrar" }))) return;
     setOcupado(true);
     try {
       const r = await sb.from("agendamentos").update({ sem_cobranca: true }).eq("id", a.id).eq("petshop_id", petshop.id).select("id");
@@ -107,11 +119,11 @@ export function AtendimentosParaCobrar({ aoMudar }: { aoMudar?: () => void }) {
               <ChevronRight size={18} className="g-muted" aria-hidden />
             </button>
             {pacote && <button type="button" className="g-btn fantasma p" disabled={ocupado} onClick={() => { if (!somenteLeitura()) setAberta({ a, pacote: null }); }}>Cobrar sem usar o pacote</button>}
-            <button type="button" className="g-btn fantasma p" disabled={ocupado} onClick={() => void naoCobrar(a)}>Não cobrar</button>
+            {podeNaoCobrar && <button type="button" className="g-btn fantasma p" disabled={ocupado} onClick={() => void naoCobrar(a)}>Não cobrar</button>}
           </div>
         ); })}
       </div>
-      <p className="g-muted g-pp">O atendimento foi concluído, mas a conta não foi fechada: nada entrou no caixa nem ficou em A receber. Toque para receber agora ou anotar para o cliente pagar depois.</p>
+      <p className="g-muted g-pp">O atendimento foi concluído, mas a conta não foi fechada: nada entrou no caixa nem ficou em A receber. Toque para receber agora ou anotar para o cliente pagar depois.{podeNaoCobrar ? "" : " Com o preço travado, deixar de cobrar é com o dono ou com quem vê o financeiro."}</p>
       {aberta && <Comanda agendamento={aberta.a} pacote={aberta.pacote} aoFechar={() => setAberta(null)} aoPronto={() => { setAberta(null); mudou(); }} />}
     </section>
   );

@@ -11,7 +11,7 @@ import { textoCancelado, textoLembrete, textoPronto, textoRemarcado } from "@/li
 import { textoComprovante } from "@/lib/gestao/comprovante";
 import { desfazerVenda, itensDoLancamento, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { nomeDosServicos, servicosAMais, servicosPorExtenso, valorDoHorario } from "@/lib/gestao/servicos-do-horario";
-import { brl, dataAmigavel, dataCompleta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { FolhaBaixa } from "../financeiro/comum";
@@ -49,12 +49,15 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   // já foi pago? tem pacote que cobre este serviço?
   const { dados: extra, recarregar } = useDados(async () => {
     const diaDoHorario = isoDia(new Date(a.inicio));
-    const [pago, pacotes, semConta] = await Promise.all([
+    const [pago, pacotes, semConta, mexidas] = await Promise.all([
       // o recebimento deste horário vem por uma função do banco: quem só opera o caixa não lê o histórico, mas vê se este foi pago
       vejoFinanceiro ? sb.rpc("recebimentos_do_agendamento", { p_agendamento: a.id }) : Promise.resolve({ data: [] as Lancamento[], error: null }),
       sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", a.pet_id).eq("ativo", true),
       // concluído e sem conta fechada? O banco responde sem mostrar valor (serve também para quem não mexe com dinheiro)
       a.status === "concluido" ? sb.rpc("agendamentos_para_cobrar", { p: petshop.id, p_de: diaDoHorario, p_ate: diaDoHorario }) : Promise.resolve({ data: [] as { id: string }[], error: null }),
+      // serviço tirado da conta e preço abaixo da lista ficam anotados: o dono vê no próprio horário (o que foi feito não some)
+      cuidoDoFinanceiro ? sb.from("precos_alterados").select("id, tipo, item, de, para, quem_nome, quando").eq("petshop_id", petshop.id).eq("agendamento_id", a.id).in("tipo", ["servico_tirado", "preco_agenda"]).order("quando").limit(20)
+        : Promise.resolve({ data: [] as { id: string; tipo: string; item: string; de: number | null; para: number; quem_nome: string | null; quando: string }[], error: null }),
     ]);
     // horário que se repete: até quando vai a série (o último que ainda está de pé)
     let fimDaSerie: string | null = null;
@@ -71,7 +74,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     // o pagamento já está num caixa fechado? (aí só o dono reabre ou apaga)
     const caixas = [...new Set(lancados.filter((l) => l.pago && l.caixa_id).map((l) => l.caixa_id!))];
     const fechados = caixas.length ? await sb.from("caixas").select("id").in("id", caixas).not("fechado_em", "is", null) : { data: [] };
-    return { pago: lancados, pacote: validos[0] ?? null, fimDaSerie, semFim, emCaixaFechado: (fechados.data ?? []).length > 0, faltaCobrar: (semConta.data ?? []).some((x) => x.id === a.id) };
+    return { pago: lancados, pacote: validos[0] ?? null, fimDaSerie, semFim, emCaixaFechado: (fechados.data ?? []).length > 0, faltaCobrar: (semConta.data ?? []).some((x) => x.id === a.id), mexidas: mexidas.data ?? [] };
   }, [a.id, a.status, a.sem_cobranca]);
   // mais de um serviço no mesmo horário: o pacote cobre só o principal; os outros entram na conta
   const outros = servicosAMais(a);
@@ -352,7 +355,16 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
               {outros.map((o) => <li key={o.id}><span>{o.servicos?.nome ?? "Serviço"}</span><b className="g-tab">{o.preco != null ? brl(o.preco) : "a definir"}</b></li>)}
             </ul>
           )}
-          {vejoFinanceiro && a.sem_cobranca && !lancado && a.status === "concluido" && <div className="g-fila entre"><span className="g-muted">Cobrança</span><b>Não cobrado</b></div>}
+          {a.sem_cobranca && !lancado && a.status === "concluido" && !a.pacote_cliente_id && (
+            <div className="g-fila entre"><span className="g-muted">Cobrança</span><b style={{ textAlign: "right" }}>Não cobrado{a.sem_cobranca_nome ? ` · por ${a.sem_cobranca_nome.split(" ")[0]}` : ""}{a.sem_cobranca_em ? ` em ${dataCurta(new Date(a.sem_cobranca_em))} às ${hora(a.sem_cobranca_em)}` : ""}</b></div>
+          )}
+          {a.sem_cobranca && !lancado && a.status === "concluido" && !a.pacote_cliente_id && a.profissionais && <p className="g-pp g-muted" style={{ margin: 0 }}>Não cobrar não muda a comissão de {a.profissionais.nome.split(" ")[0]}: ela conta o preço da agenda.</p>}
+          {(extra?.mexidas ?? []).map((m) => (
+            <p key={m.id} className="g-pp g-muted" style={{ margin: 0 }}>
+              {m.tipo === "servico_tirado" ? `Tirado da conta: ${m.item}${m.de != null ? ` (${brl(m.de)})` : ""}` : `Marcado abaixo da lista: ${m.item} por ${brl(m.para)}${m.de != null ? ` (lista ${brl(m.de)})` : ""}`}
+              {m.quem_nome ? ` · por ${m.quem_nome.split(" ")[0]}` : ""} em {dataCurta(new Date(m.quando))} às {hora(m.quando)}.
+            </p>
+          ))}
           {vejoFinanceiro && recebido > 0 && <div className="g-fila entre"><span className="g-muted">Recebido</span><b className="g-tab g-verde-t">{brl(recebido)}{formasDoRecebido ? ` · ${formasDoRecebido}` : ""}</b></div>}
           {devidos.map((l) => (
             <div className="g-fila entre" key={l.id}>
