@@ -138,7 +138,7 @@ declare
   v_servico uuid;
   v_nome text;
 begin
-  if current_user <> 'authenticated' or (select auth.uid()) is null or pg_trigger_depth() > 1 then return new; end if;
+  if (select auth.uid()) is null or pg_trigger_depth() > 1 then return new; end if;
   if tg_op = 'UPDATE' and new.preco is not distinct from old.preco and new.servico_id is not distinct from old.servico_id
      and (to_jsonb(new) ->> 'pet_id') is not distinct from (to_jsonb(old) ->> 'pet_id') then return new; end if;
   if new.preco is null or not public.preco_travado(new.petshop_id) or public.cuido_do_financeiro(new.petshop_id)
@@ -172,7 +172,7 @@ declare
   v_ag uuid;
   v_item text;
 begin
-  if current_user <> 'authenticated' or (select auth.uid()) is null or pg_trigger_depth() > 1 or new.preco is null then return null; end if;
+  if (select auth.uid()) is null or pg_trigger_depth() > 1 or new.preco is null then return null; end if;
   if tg_op = 'UPDATE' and new.preco is not distinct from old.preco and new.servico_id is not distinct from old.servico_id then return null; end if;
   if not public.tenho_area(new.petshop_id, array['caixa', 'financeiro', 'relatorios']) then return null; end if;
   if tg_table_name = 'agendamento_servicos' then
@@ -249,7 +249,7 @@ declare
   v_pet text;
   v_trava boolean;
 begin
-  if current_user <> 'authenticated' or (select auth.uid()) is null or pg_trigger_depth() > 1 then
+  if (select auth.uid()) is null or pg_trigger_depth() > 1 then
     if tg_when = 'BEFORE' then return new; end if;
     return null;
   end if;
