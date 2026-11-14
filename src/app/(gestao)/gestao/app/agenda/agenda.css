@@ -159,3 +159,8 @@ div.g-agd-faixa.almoco { cursor: default; }
 .g-semana-col .g-bloco.estreito b { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; font-size: .75rem; line-height: 1.15; }
 .g-semana-col .g-bloco.estreito span { text-overflow: clip; font-size: .6875rem; }
 .g-agd-valor.fixo { display: flex; align-items: center; min-height: 44px; }
+
+/* horário que acabou de ser marcado */
+.g-agd-recem { display: grid; gap: 12px; background: var(--g-verde-tint); border-color: transparent; }
+.g-agd-recem > .g-fila > svg { width: 22px; height: 22px; flex: none; color: var(--g-verde, #24543b); margin-top: 2px; }
+.g-ag.recem { outline: 3px solid var(--tema, #2f6b4f); outline-offset: 2px; }

@@ -174,12 +174,15 @@ const BASE: TopicoBase[] = [
     palavras: ["senha", "esqueci", "recuperar", "nao consigo entrar", "trocar senha", "email de confirmacao", "entrar", "login"] },
   { id: "consulta", titulo: "Por que a conta ficou só para consulta", secao: "primeiros", quem: "todos", rota: ASSINATURA,
     passos: [
-      "Quando o teste grátis termina ou a assinatura fica inativa, aparece um aviso vermelho no alto.",
-      "Nesse estado você continua vendo tudo o que lançou, mas não consegue marcar, lançar nem alterar.",
+      "Quando o teste grátis termina (depois que a assinatura abriu) ou a assinatura fica inativa, aparece um aviso no alto da tela. Na tela Hoje, ele vem no cartão Teste grátis.",
+      "Nesse estado você continua vendo tudo o que lançou, mas não consegue marcar, lançar nem alterar. Os botões de marcar e cadastrar ficam apagados.",
       "O dono toca em Ver assinatura, no aviso, e escolhe um plano.",
       "Depois de assinar, o sistema volta a funcionar com os mesmos dados.",
     ],
-    dicas: ["Os dados continuam guardados. Quem não é dono precisa pedir ao dono para resolver."],
+    dicas: [
+      "Enquanto a assinatura ainda não abriu, o fim do teste não trava nada: você continua usando tudo normalmente, sem pagar, e a tela Hoje avisa isso.",
+      "Os dados continuam guardados. Quem não é dono precisa pedir ao dono para resolver.",
+    ],
     palavras: ["so para consulta", "nao consigo marcar", "nao deixa salvar", "bloqueado", "teste terminou", "teste acabou", "inativa", "travou"] },
 
   /* ---------- Agenda ---------- */
@@ -2155,9 +2158,10 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "Todos os planos têm as mesmas funções e o Mozart. Muda quantas pessoas têm login.",
+      "A tela Hoje mostra quantos dias faltam de teste, o que você já deixou pronto e o próximo passo.",
       "Quando o teste termina, a conta fica só para consulta e os dados continuam guardados.",
+      "Se a assinatura ainda não abriu, os botões aparecem como Disponível em breve e o fim do teste não trava nada: você continua usando normalmente até ela abrir.",
       "Quem já assina usa Trocar cartão ou cancelar.",
-      "Se a assinatura ainda não abriu, o botão aparece como Disponível em breve.",
     ],
     atencao: ["Problema com cobrança ou cancelamento? Fale com a nossa equipe pela Ajuda."],
     palavras: ["assinatura", "assinar", "plano", "planos", "teste", "gratis", "preco do sistema", "cancelar assinatura", "mudar de plano", "cobranca", "trocar cartao", "mensalidade do sistema"] },

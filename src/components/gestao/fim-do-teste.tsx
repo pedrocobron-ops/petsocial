@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ChevronRight, Clock, Lock } from "lucide-react";
 import type { Petshop } from "@/lib/gestao/tipos";
-import { temCheckout } from "@/lib/gestao/planos";
 import { brl, dataCurta, hora, inicioDoDia, nomeDia } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";
 import { Tile } from "./painel";
@@ -27,8 +26,16 @@ export function fimDoTeste(petshop: Pick<Petshop, "status" | "teste_ate">, agora
 }
 export const chaveAgoraNao = (petshopId: string) => `maestro-gestao-teste-agora-nao-${petshopId}`;
 
-/** O que acontece depois do teste: o mesmo que a tela Assinatura e os Termos dizem. */
-const SE_NAO_ASSINAR = "Se você não assinar, a conta fica só para consulta: você continua vendo o que lançou, mas não consegue marcar, lançar nem alterar. Os dados continuam guardados e, para voltar a usar, é só assinar.";
+/**
+ * O que acontece depois do teste: o mesmo que a tela Assinatura, o Manual e o banco (`acesso_liberado`) dizem.
+ * Enquanto a assinatura não abriu, o teste vencido não bloqueia nada; depois que abriu, a conta fica só para consulta.
+ */
+export const TEXTO_TESTE = {
+  seNaoAssinar: "Se você não assinar, a conta fica só para consulta: você continua vendo o que lançou, mas não consegue marcar, lançar nem alterar. Os dados continuam guardados e, para voltar a usar, é só assinar.",
+  soConsulta: "A conta está só para consulta: você continua vendo o que lançou, mas não consegue marcar, lançar nem alterar. Os dados continuam guardados e, para voltar a usar, é só assinar.",
+  antesDeAbrir: "A assinatura ainda não abriu. Até ela abrir, você continua usando o sistema normalmente, sem pagar nada. Avisamos por aqui quando os planos estiverem disponíveis.",
+  vencidoSemAbrir: "Você continua usando tudo normalmente, sem pagar nada, até a assinatura abrir. Avisamos por aqui quando os planos estiverem disponíveis. Os seus dados ficam guardados.",
+};
 
 /**
  * Aviso de fim de teste na tela Hoje.
@@ -41,7 +48,7 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
   numeros: { pets: number; horarios: number; concluidos: number } | null;
   aoDispensar: () => void;
 }) {
-  const { sb, petshop, cuidoDoFinanceiro } = useGestao();
+  const { sb, petshop, cuidoDoFinanceiro, assinaturaAberta: abre } = useGestao();
   const teste = fimDoTeste(petshop);
   const cartao = modo === "cartao";
   // dinheiro lançado: só entradas recebidas, sem contar movimentos internos do caixa
@@ -53,12 +60,13 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
   if (!teste) return null;
 
   if (modo === "equipe") {
+    if (teste.vencido) return null;
     return <p className="g-ret-linha parada"><Clock aria-hidden /><span>O teste grátis do pet shop termina {teste.quando}. Para continuar usando depois, fale com o dono.</span></p>;
   }
   if (modo === "linha") {
     return (
       <Link className="g-ret-linha" href={ASSINATURA}>
-        <Clock aria-hidden /><span>Seu teste grátis termina {teste.quando}. <b>{temCheckout() ? "Ver os planos" : "Ver a assinatura"}</b></span><ChevronRight aria-hidden />
+        <Clock aria-hidden /><span>{teste.vencido ? `Seu teste grátis terminou ${teste.quando}. Você continua usando normalmente até a assinatura abrir.` : `Seu teste grátis termina ${teste.quando}.`} <b>Ver assinatura</b></span><ChevronRight aria-hidden />
       </Link>
     );
   }
@@ -70,12 +78,13 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
     numeros.concluidos > 0 && n(numeros.concluidos, "atendimento concluído", "atendimentos concluídos"),
     (dinheiro ?? 0) > 0 && `${brl(dinheiro)} em entradas lançadas`,
   ].filter(Boolean) as string[] : null;
-  const abre = temCheckout();
+  // vencido de verdade: a assinatura abriu e o banco já recusa gravar
+  const bloqueado = teste.vencido && abre;
 
   return (
-    <section className={`g-card g-ret-teste${teste.vencido ? " vencido" : ""}`} aria-label="Teste grátis">
+    <section className={`g-card g-ret-teste${bloqueado ? " vencido bloqueado" : ""}`} aria-label="Teste grátis" role={bloqueado ? "alert" : undefined}>
       <div className="g-ret-cab">
-        <Tile icone={teste.vencido ? Lock : Clock} tom={teste.vencido ? "manteiga" : "pessego"} tamanho="g" />
+        <Tile icone={bloqueado ? Lock : Clock} tom={bloqueado ? "rosa" : "pessego"} tamanho="g" />
         <div>
           <p className="g-rotulo">Teste grátis</p>
           <h2>{teste.vencido ? `Seu teste grátis terminou ${teste.quando}` : `Seu teste grátis termina ${teste.quando}`}</h2>
@@ -84,27 +93,60 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
 
       {feito && (feito.length ? (
         <div className="g-pilha p">
-          <p className="g-p">{teste.vencido ? "O que você colocou no sistema continua aqui:" : "O que você já colocou no sistema:"}</p>
+          <p className="g-p">{bloqueado ? "O que você colocou no sistema continua aqui:" : "O que você já colocou no sistema:"}</p>
           <ul className="g-ret-feito">{feito.map((f) => <li key={f}>{f}</li>)}</ul>
         </div>
       ) : (
-        <p className="g-p">{teste.vencido
+        <p className="g-p">{bloqueado
           ? "Você ainda não chegou a lançar nada por aqui. Quando voltar, a conta está do jeito que você deixou."
           : "Ainda dá tempo de experimentar: cadastre um pet e marque um horário para ver como o seu dia fica na tela."}</p>
       ))}
 
       <p className="g-p g-ret-explica">
-        {abre
-          ? (teste.vencido ? "A conta está só para consulta: você continua vendo o que lançou, mas não consegue marcar, lançar nem alterar. Os dados continuam guardados e, para voltar a usar, é só assinar." : SE_NAO_ASSINAR)
-          : (teste.vencido
-            ? "A assinatura ainda não abriu. Até ela abrir, você continua usando o sistema normalmente, sem pagar nada, e os seus dados ficam guardados."
-            : "A assinatura ainda não abriu. Até ela abrir, você continua usando o sistema normalmente, sem pagar nada. Avisamos por aqui quando os planos estiverem disponíveis.")}
+        {abre ? (teste.vencido ? TEXTO_TESTE.soConsulta : TEXTO_TESTE.seNaoAssinar)
+          : teste.vencido ? TEXTO_TESTE.vencidoSemAbrir : TEXTO_TESTE.antesDeAbrir}
       </p>
 
       <div className="g-fila">
-        <Link className="g-btn verde" href={ASSINATURA}>{abre ? "Ver os planos" : "Ver a assinatura"}</Link>
-        {!teste.vencido && <button className="g-btn fantasma" onClick={aoDispensar}>Agora não</button>}
+        <Link className="g-btn verde" href={ASSINATURA}>Ver assinatura</Link>
+        {!bloqueado && <button className="g-btn fantasma" onClick={aoDispensar}>Agora não</button>}
       </div>
+    </section>
+  );
+}
+
+/**
+ * Teste grátis no meio do caminho (antes dos 2 últimos dias): uma linha calma na tela Hoje, para o dono, com os dias que
+ * faltam, o que já está pronto e o próximo passo. Some quando o cartão de fim de teste aparece.
+ */
+export function ProgressoDoTeste({ numeros, proximo }: {
+  numeros: { pets: number; horarios: number } | null;
+  /** O próximo dos Primeiros passos, quando há. */
+  proximo: { texto: string; href?: string; aoTocar?: () => void } | null;
+}) {
+  const { petshop, servicos } = useGestao();
+  const teste = fimDoTeste(petshop);
+  if (!teste || teste.vencido || teste.dias <= DIAS_DE_AVISO || !numeros) return null;
+  const n = (q: number, um: string, varios: string) => (q === 1 ? `1 ${um}` : `${q} ${varios}`);
+  const comPreco = servicos.some((s) => s.ativo && [s.preco_p, s.preco_m, s.preco_g, s.preco_gg].some((v) => v != null));
+  const pronto = [
+    comPreco && "preços dos serviços",
+    numeros.pets > 0 && n(numeros.pets, "pet", "pets"),
+    numeros.horarios > 0 && n(numeros.horarios, "horário marcado", "horários marcados"),
+    petshop.link_ativo && "link do cliente ligado",
+  ].filter(Boolean) as string[];
+  const passo = proximo && (proximo.href
+    ? <Link className="g-link alvo" href={proximo.href} onClick={proximo.aoTocar}>{proximo.texto}</Link>
+    : <button type="button" className="g-link alvo" onClick={proximo.aoTocar}>{proximo.texto}</button>);
+  return (
+    <section className="g-ret-linha g-ret-progresso" aria-label="Teste grátis">
+      <Clock aria-hidden />
+      <span>
+        <b>Teste grátis: faltam {teste.dias} dias</b> (até {teste.quando}).{" "}
+        {pronto.length ? `Já está pronto: ${pronto.join(", ")}.` : "Ainda não tem nada lançado."}
+        {passo && <> Próximo passo: {passo}.</>}
+      </span>
+      <Link className="g-ico" href={ASSINATURA} aria-label="Ver assinatura" title="Ver assinatura"><ChevronRight aria-hidden /></Link>
     </section>
   );
 }

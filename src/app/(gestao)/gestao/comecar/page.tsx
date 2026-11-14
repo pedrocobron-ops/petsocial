@@ -14,7 +14,7 @@ import "@/components/gestao/guia-inicial.css";
 
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 
-/** O que a pessoa já respondeu fica guardado enquanto a aba está aberta: recarregar a página não perde nada. */
+/** O que a pessoa já respondeu fica guardado no aparelho (por conta): recarregar a página ou voltar depois não perde nada. */
 const RASCUNHO = "maestro-gestao-comecar";
 type Rascunho = { user: string; passo: 0 | 1; nome: string; seuNome: string; telefone: string; cidade: string; uf: string; modulos: Modulo[]; principal: Principal | null };
 
@@ -55,7 +55,7 @@ export default function Comecar() {
       setUserId(u.id);
       // recarregou no meio da conversa: volta para onde estava, com o que já tinha respondido
       try {
-        const r = JSON.parse(sessionStorage.getItem(RASCUNHO) ?? "null") as Rascunho | null;
+        const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? sessionStorage.getItem(RASCUNHO) ?? "null") as Rascunho | null;
         if (r && r.user === u.id) {
           setNome(r.nome); setSeuNome(r.seuNome); setTelefone(r.telefone); setCidade(r.cidade); setUf(r.uf);
           setModulos(r.modulos.filter((m) => MODULOS.some((x) => x.id === m))); setPrincipal(r.principal); setPasso(r.passo === 1 ? 1 : 0);
@@ -74,7 +74,7 @@ export default function Comecar() {
   useEffect(() => {
     if (!pronto || !userId) return;
     const r: Rascunho = { user: userId, passo, nome, seuNome, telefone, cidade, uf, modulos, principal };
-    try { sessionStorage.setItem(RASCUNHO, JSON.stringify(r)); } catch { /* sem armazenamento: só não lembra */ }
+    try { localStorage.setItem(RASCUNHO, JSON.stringify(r)); } catch { /* sem armazenamento: só não lembra */ }
   }, [pronto, userId, passo, nome, seuNome, telefone, cidade, uf, modulos, principal]);
 
   const areas = areasParaPrincipal(modulos);
@@ -93,7 +93,7 @@ export default function Comecar() {
     setErro(null);
     if (!depois && !modulos.length) { setErro("Marque pelo menos uma coisa que o seu negócio faz."); return; }
     const escolhida = depois ? null : principalPara(modulos, principal);
-    if (!depois && areas.length > 1 && !escolhida) { setErro("Toque em qual delas é a atividade principal."); return; }
+    if (!depois && areas.length > 1 && !escolhida) { setErro("Toque no que vocês mais fazem."); return; }
     setIndo(true);
     const { data: id, error } = await banco().rpc("criar_petshop", {
       p_nome: nome, p_seu_nome: seuNome, p_telefone: telefone.replace(/\D/g, ""), p_cidade: cidade, p_uf: uf,
@@ -103,7 +103,7 @@ export default function Comecar() {
     // a conversa continua dentro do aplicativo, pela cor
     guardarLembrado(chaveBoasVindas(id), "cor");
     guardarLembrado("maestro-gestao-petshop", id);
-    try { sessionStorage.removeItem(RASCUNHO); } catch { /* tudo bem */ }
+    try { localStorage.removeItem(RASCUNHO); sessionStorage.removeItem(RASCUNHO); } catch { /* tudo bem */ }
     router.replace("/gestao/app");
   }
 
@@ -199,9 +199,9 @@ export default function Comecar() {
               <EscolherModulos valor={modulos} aoMudar={(v) => { setModulos(v); setErro(null); }} />
               {areas.length > 1 && (
                 <div className="g-bv-qual">
-                  <h3>E qual é a atividade principal?</h3>
+                  <h3>E o que vocês mais fazem?</h3>
                   <EscolherPrincipal modulos={modulos} valor={principalPara(modulos, principal)} aoMudar={(v) => { setPrincipal(v); setErro(null); }} />
-                  <p>Ela aparece primeiro no menu e na tela inicial. As outras continuam à mão.</p>
+                  <p>Isso aparece primeiro no menu e na tela inicial. O resto continua à mão.</p>
                 </div>
               )}
             </div>

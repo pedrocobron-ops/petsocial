@@ -59,3 +59,5 @@ export const temCheckout = () => PLANOS.some((pl) => PERIODOS.some((pe) => ofert
 
 export const planoPorId = (id: string | null | undefined) => PLANOS.find((p) => p.id === id) ?? PLANOS[2];
 export const textoAcessos = (n: number) => (n === 1 ? "1 acesso" : `até ${n} acessos`);
+/** O mesmo, em palavras de gente: "1 pessoa entra (você)", "até 3 pessoas entram". */
+export const textoPessoas = (n: number) => (n === 1 ? "1 pessoa entra (você)" : `até ${n} pessoas entram`);

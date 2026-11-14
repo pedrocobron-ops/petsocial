@@ -17,7 +17,9 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   `buscarVisitas` e `sumiu` (`src/lib/gestao/visitas.ts`), para a lista de Clientes, o Chamar de volta e o Hoje darem o mesmo número.
 - Gravar: `try { ok(await sb.from(...).insert(...)) ; avisar("…") } catch (e) { avisarErro(e) }`.
 - Antes de abrir um formulário de gravação: `if (somenteLeitura()) return;` (`useSomenteLeitura()`), porque a conta
-  com teste vencido fica só para consulta.
+  com teste vencido fica só para consulta. Atalho que leva a gravar (Marcar horário, Cadastrar pet) é `<LinkDeGravar>`: com a conta
+  só para consulta vira botão apagado. Teste vencido só trava quando a assinatura abriu (`assinaturaAberta` no `useGestao()`, mesma
+  regra do banco em `acesso_liberado`); os textos do fim do teste ficam em `TEXTO_TESTE` (`fim-do-teste.tsx`).
 - Dinheiro só aparece para `vejoFinanceiro`. Ajustes do pet shop só para `souDono`.
 - Estadias: nunca `select("*")` em `estadias` (o banco recusa). Use `COLS_ESTADIA` / `SELECT_ESTADIA`; a diária e o valor cobrado
   vêm por `comValoresDeEstadia` (`src/lib/gestao/reservado.ts`), só para quem recebe. Quem não recebe não manda `valor_diaria`:

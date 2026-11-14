@@ -40,7 +40,7 @@ export function TrilhoBoasVindas({ agora }: { agora: number }) {
 /** "Qual é a atividade principal?": uma só, entre as áreas marcadas. Pacotes não entra: é um jeito de vender. */
 export function EscolherPrincipal({ modulos, valor, aoMudar }: { modulos: readonly string[]; valor: Principal | null; aoMudar: (v: Principal) => void }) {
   return (
-    <div className="g-bv-principal" role="radiogroup" aria-label="Atividade principal">
+    <div className="g-bv-principal" role="radiogroup" aria-label="O que vocês mais fazem">
       {areasParaPrincipal(modulos).map((a) => {
         const Icone = ICONE[a];
         const on = a === valor;

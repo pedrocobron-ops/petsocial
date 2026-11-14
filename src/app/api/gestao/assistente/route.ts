@@ -24,11 +24,14 @@ type Corpo = {
   decisoes?: { id: string; ok: boolean }[]; parciais?: Resultado[];
 };
 
+/** O que a pessoa lê quando a inteligência artificial não está disponível (o motivo técnico vai só para o registro). */
+const FORA_DO_AR = "O Mozart está fora do ar agora. Tente de novo mais tarde.";
+
 const erro = (status: number, codigo: string, mensagem: string) => NextResponse.json({ erro: codigo, mensagem }, { status });
 
 export async function POST(req: Request) {
   if (!configurado) return erro(503, "sem_banco", "O sistema ainda não está ligado neste endereço.");
-  if (!process.env.ANTHROPIC_API_KEY) return erro(503, "sem_chave", "O Mozart ainda não foi ligado neste endereço. Falta configurar a chave da inteligência artificial.");
+  if (!process.env.ANTHROPIC_API_KEY) { console.error("[assistente] sem ANTHROPIC_API_KEY"); return erro(503, "sem_chave", FORA_DO_AR); }
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return erro(401, "sem_login", "Entre de novo para falar com o Mozart.");
   const corpo = (await req.json().catch(() => null)) as Corpo | null;
@@ -162,7 +165,7 @@ export async function POST(req: Request) {
     }
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) return erro(429, "ocupado", "O Mozart está com muitos pedidos agora. Tente de novo em um minuto.");
-    if (err instanceof Anthropic.AuthenticationError) return erro(503, "sem_chave", "A chave da inteligência artificial não está válida. Avise o suporte da Maestro Pet.");
+    if (err instanceof Anthropic.AuthenticationError) { console.error("[assistente] chave recusada pela Anthropic"); return erro(503, "sem_chave", FORA_DO_AR); }
     if (err instanceof Anthropic.APIError) return erro(502, "ia_fora", "O Mozart não respondeu agora. Tente de novo em instantes.");
     // o motivo vai para o registro do servidor; a pessoa vê só a frase
     console.error("[assistente] falha", err);

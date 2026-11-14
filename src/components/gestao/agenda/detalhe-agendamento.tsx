@@ -7,7 +7,7 @@ import Link from "next/link";
 import { BellRing, CalendarClock, CalendarX, Check, MessageCircle, Play, Printer, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
 import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { textoCancelado, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
+import { textoCancelado, textoConfirmacao, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
 import { imprimirComprovante, textoComprovante } from "@/lib/gestao/comprovante";
 import { desfazerVenda, itensDoLancamento, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { nomeDosServicos, servicosAMais, servicosPorExtenso, valorDoHorario } from "@/lib/gestao/servicos-do-horario";
@@ -256,6 +256,18 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
   }));
 
+  // remarcado de verdade? o banco anota quando o início muda (migração 20261166). Sem a função no banco, vale o de antes.
+  const { dados: remarcadoEm } = useDados(async () => {
+    const r = await sb.rpc("agendamento_remarcado_em", { p_id: a.id });
+    return r.error ? "?" : (r.data as string | null);
+  }, [a.id, a.inicio]);
+  const foiRemarcado = remarcadoEm === "?" || Boolean(remarcadoEm);
+  // marcado há pouco e ainda sem lembrete: a mensagem certa é a confirmação, não a remarcação
+  const recemMarcado = !foiRemarcado && remarcadoEm !== undefined && !a.lembrete_em && Date.now() - new Date(a.criado_em).getTime() < 864e5;
+  const zapConfirmacao = recemMarcado ? linkWhatsApp(tutor?.telefone, textoConfirmacao({
+    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+  })) : null;
+
   // remarcou ou cancelou: a mensagem para o tutor já vem pronta (quem manda é a pessoa, pelo WhatsApp)
   const zapRemarcado = linkWhatsApp(tutor?.telefone, textoRemarcado({
     tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
@@ -472,9 +484,14 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           {pet && posso("clientes") && <Link className="g-btn sec" href={`/gestao/app/clientes?pet=${pet.id}`}>Ver ficha</Link>}
         </div>
         {a.lembrete_em && <p className="g-pp g-muted">Lembrete aberto {dataAmigavel(a.lembrete_em)} às {hora(a.lembrete_em)}.</p>}
-        {(a.status === "marcado" || a.status === "confirmado") && zapRemarcado && (
+        {(a.status === "marcado" || a.status === "confirmado") && foiRemarcado && zapRemarcado && (
           <div className="g-fila">
             <a className="g-btn sec g-cresce" href={zapRemarcado} target="_blank" rel="noopener noreferrer"><MessageCircle />Avisar remarcação</a>
+          </div>
+        )}
+        {(a.status === "marcado" || a.status === "confirmado") && zapConfirmacao && (
+          <div className="g-fila">
+            <a className="g-btn sec g-cresce" href={zapConfirmacao} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar confirmação</a>
           </div>
         )}
         {a.status === "cancelado" && (zapCancelado

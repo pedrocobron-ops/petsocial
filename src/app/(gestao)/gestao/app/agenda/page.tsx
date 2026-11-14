@@ -4,20 +4,21 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BellRing, CalendarOff, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, Truck, Printer, Users, Utensils } from "lucide-react";
+import { BellRing, CalendarCheck2, CalendarOff, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, Truck, Printer, Users, Utensils, X } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
+import { nomeDosServicos, servicosPorExtenso } from "@/lib/gestao/servicos-do-horario";
 
-import { deMin, paraMin, vagasDe } from "@/lib/gestao/agenda";
-import { almocoDoDia, dataAmigavel, dataLonga, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
+import { deMin, paraMin, textoConfirmacao, vagasDe } from "@/lib/gestao/agenda";
+
+import { almocoDoDia, dataAmigavel, dataLonga, linkWhatsApp, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
-import { AvatarPet, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
+import { AvatarPet, DICA_SO_CONSULTA, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import SeriesAcabando from "@/components/gestao/agenda/series-acabando";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
-import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
+import FormAgendamento, { type Marcado } from "@/components/gestao/agenda/form-agendamento";
 import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
 import LembretesDoDia, { BotaoLembrete, lembretesQueFaltam } from "@/components/gestao/agenda/lembretes";
 import FormBloqueio from "@/components/gestao/agenda/form-bloqueio";
@@ -32,7 +33,7 @@ const H_HORA = 64; // altura de uma hora na visão de semana, em px
 type Trecho = { b: Bloqueio; de: number; ate: number; inteiro: boolean };
 
 function Agenda() {
-  const { sb, petshop, equipe } = useGestao();
+  const { sb, petshop, equipe, liberado } = useGestao();
   const router = useRouter();
   const params = useSearchParams();
   const somenteLeitura = useSomenteLeitura();
@@ -45,6 +46,8 @@ function Agenda() {
   const [bloqueando, setBloqueando] = useState(false);
   const [lembretes, setLembretes] = useState(false);
   const [bloqueioAberto, setBloqueioAberto] = useState<Bloqueio | null>(null);
+  // horário que acabou de ser marcado: a agenda fica no dia dele, com ele em destaque e a confirmação para o tutor à mão
+  const [recem, setRecem] = useState<Marcado | null>(null);
 
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
   // dia marcado como fechado em Meu pet shop (feriado, folga, médico): vale como o dia em que o pet shop não abre na semana
@@ -73,6 +76,8 @@ function Agenda() {
   // link "Agendar" vindo da ficha do pet: /gestao/app/agenda?novo=1&pet=<id>
   useEffect(() => {
     if (params.get("novo") !== "1") return;
+    // conta só para consulta: o atalho não abre o formulário (o banco recusaria a gravação)
+    if (somenteLeitura()) { router.replace("/gestao/app/agenda"); return; }
     const petId = params.get("pet");
     void (async () => {
       let pet: PetComTutor | null = null;
@@ -185,13 +190,14 @@ function Agenda() {
             <button aria-pressed={visao === "semana"} onClick={() => setVisao("semana")}>Semana</button>
           </div>
           <Link className="g-btn sec" href={`/gestao/app/agenda/imprimir?dia=${dia}&visao=${visao}${prof ? `&prof=${prof}` : ""}`} title="Imprimir ou salvar a agenda em PDF"><Printer />Imprimir</Link>
-          <LinkRapido />
-          <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear horário</button>
-          <button className="g-btn pri" onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>
+          {liberado && <LinkRapido />}
+          <button className="g-btn sec" disabled={!liberado} title={liberado ? undefined : DICA_SO_CONSULTA} onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear horário</button>
+          <button className="g-btn pri" disabled={!liberado} title={liberado ? undefined : DICA_SO_CONSULTA} onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>
         </div>
       </header>
 
       <div className="g-pilha">
+        {recem && <MarcadoAgora marcado={recem} lista={dados ?? []} aoAbrir={() => setAberto(recem.id)} aoFechar={() => setRecem(null)} />}
         <PedidosLink />
         <SeriesAcabando aoMudar={() => void recarregar()} />
         <div className="g-fila g-card g-ag-faixa">
@@ -392,7 +398,7 @@ function Agenda() {
                   <time>{hora(l.a.inicio)}</time>
                   <span className="ponto" aria-hidden />
                   <div className="g-lb-par">
-                  <button className={`g-ag${["cancelado", "faltou"].includes(l.a.status) ? " apagado" : ""}`} onClick={() => setAberto(l.a.id)}>
+                  <button className={`g-ag${["cancelado", "faltou"].includes(l.a.status) ? " apagado" : ""}${recem?.id === l.a.id ? " recem" : ""}`} onClick={() => setAberto(l.a.id)}>
                     {l.a.pets && <AvatarPet pet={l.a.pets} />}
                     <span className="t">
                       <b>{l.a.pets?.nome}</b>
@@ -434,13 +440,47 @@ function Agenda() {
       </div>
 
       {novo && <FormAgendamento diaInicial={novo.dia} horaInicial={novo.hora} petInicial={novo.pet} profissionalInicial={novo.profissional}
-        aoFechar={() => setNovo(null)} aoSalvar={() => { setNovo(null); void recarregar(); }} />}
+        aoFechar={() => setNovo(null)} aoSalvar={(m) => {
+          setNovo(null);
+          if (m) { setDia(isoDia(new Date(m.inicio))); setVisao("dia"); setRecem(m); }
+          void recarregar();
+        }} />}
       {selecionado && !editando && <DetalheAgendamento agendamento={selecionado} aoFechar={() => setAberto(null)} aoMudar={() => void recarregar()} aoEditar={() => setEditando(selecionado)} />}
       {lembretes && <LembretesDoDia dia={dia} aoFechar={() => setLembretes(false)} aoMudar={() => void recarregar()} />}
       {bloqueando && <FormBloqueio diaInicial={dia} profissionalInicial={prof} aoFechar={() => setBloqueando(false)} aoSalvar={() => { setBloqueando(false); void recarregarBloqueios(); }} />}
       {bloqueioAberto && <FormBloqueio key={bloqueioAberto.id} bloqueio={bloqueioAberto} aoFechar={() => setBloqueioAberto(null)} aoSalvar={() => { setBloqueioAberto(null); void recarregarBloqueios(); }} />}
       {editando && <FormAgendamento agendamento={editando} aoFechar={() => setEditando(null)} aoSalvar={() => { setEditando(null); setAberto(null); void recarregar(); }} />}
     </>
+  );
+}
+
+/**
+ * Depois de "Marcar": fica no alto da agenda até a pessoa fechar, com o dia e a hora por extenso e a confirmação pronta
+ * para o tutor no WhatsApp (quem manda é a pessoa). Assim ninguém fica na dúvida se gravou e marca de novo.
+ */
+function MarcadoAgora({ marcado, lista, aoAbrir, aoFechar }: { marcado: Marcado; lista: AgendamentoCompleto[]; aoAbrir: () => void; aoFechar: () => void }) {
+  const { petshop } = useGestao();
+  const a = lista.find((x) => x.id === marcado.id);
+  const tutor = a?.pets?.clientes;
+  const zap = a ? linkWhatsApp(tutor?.telefone, textoConfirmacao({
+    tutor: tutor?.nome, pet: a.pets?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+  })) : null;
+  return (
+    <section className="g-card g-agd-recem" role="status" aria-live="polite">
+      <div className="g-fila" style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
+        <CalendarCheck2 aria-hidden />
+        <div className="g-cresce">
+          <b>Marcado: {a?.pets?.nome ?? "o horário"}, {dataAmigavel(marcado.inicio)} às {hora(marcado.inicio)}.</b>
+          <p className="g-muted g-pp">{marcado.quantos > 1 ? `E mais ${marcado.quantos - 1 === 1 ? "1 data" : `${marcado.quantos - 1} datas`} da repetição. ` : ""}O horário está em destaque logo abaixo.</p>
+        </div>
+        <button className="g-ico" aria-label="Fechar o aviso" onClick={aoFechar}><X /></button>
+      </div>
+      <div className="g-fila">
+        {zap ? <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar confirmação no WhatsApp</a>
+          : a && <span className="g-muted g-pp">Sem telefone do tutor para mandar a confirmação.</span>}
+        <button className="g-btn fantasma p" onClick={aoAbrir} disabled={!a}>Abrir o horário</button>
+      </div>
+    </section>
   );
 }
 
