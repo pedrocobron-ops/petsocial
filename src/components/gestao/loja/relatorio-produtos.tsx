@@ -7,7 +7,7 @@ import { margemDaLinha, vendasPorProduto, type LinhaProduto, type SaidaLida, typ
 import { itensDoLancamento } from "@/lib/gestao/dinheiro";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
-import { COLS_PRODUTO, comCustos } from "@/lib/gestao/reservado";
+import { COLS_PRODUTO, comCustos, comPrecosDeProduto } from "@/lib/gestao/reservado";
 import type { Produto } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -56,7 +56,7 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
         .not("itens", "is", null).gte("data", de).lte("data", ate).order("data").order("id").range(a, b)),
       paginar<SaidaLida & { id: string }>((a, b) => sb.rpc("custos_das_vendas", { p: petshop.id, p_de: de, p_ate: ate }).order("id").range(a, b)),
       lerTudo<{ id: string }>((a, b, contar) => sb.from("produtos").select(COLS_PRODUTO, contando(contar)).eq("petshop_id", petshop.id).order("nome").order("id").range(a, b))
-        .then((l) => comCustos(sb, petshop.id, l)) as Promise<unknown> as Promise<Produto[]>,
+        .then(async (l) => comCustos(sb, petshop.id, await comPrecosDeProduto(sb, petshop.id, l))) as Promise<unknown> as Promise<Produto[]>,
     ]);
     return { vendas: vendas.filter(temProduto), aReceber: fiado.filter(temProduto).length, saidas, produtos };
   }, [petshop.id, de, ate]);

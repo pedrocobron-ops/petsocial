@@ -1,6 +1,6 @@
 "use client";
 
-import { lerEquipe, lerPetshop } from "@/lib/gestao/reservado";
+import { lerEquipe, lerPetshop, lerServicos } from "@/lib/gestao/reservado";
 import { temCheckout } from "@/lib/gestao/planos";
 import { Selo } from "./marca";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -62,7 +62,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     const [p, e, s] = await Promise.all([
       lerPetshop(sb, petshopId),
       lerEquipe(sb, petshopId),
-      sb.from("servicos").select("*").eq("petshop_id", petshopId).order("ordem").order("nome"),
+      lerServicos(sb, petshopId),
     ]);
     if (p.error || !p.data) throw p.error ?? new Error("pet shop");
     setPetshop(p.data);

@@ -34,13 +34,15 @@ export function faltaAceitar(termos: TermosDoLink | null, aceite: Aceite, loja: 
 }
 
 /**
- * Envia o pedido. Sem regras para aceitar, chama a função de sempre. Com regras, o banco confere se o tutor aceitou
- * exatamente o texto que está valendo e guarda o aceite junto com o pedido.
+ * Envia o pedido, sempre pela função do banco que confere o aceite: com regras ligadas, só entra se o tutor aceitou
+ * exatamente o texto que está valendo (e o aceite fica guardado junto com o pedido); sem regras, ela chama a função de sempre.
+ * As funções de pedido não são chamadas direto: assim ninguém pula as regras chamando o banco por fora da página.
  */
 export function pedirPeloLink(funcao: "link_pedir" | "link_pedir_estadia" | "link_espera_pedir", args: Record<string, unknown>, termos: TermosDoLink | null, aceite: Aceite) {
-  const sb = banco();
-  if (!termos) return sb.rpc(funcao, args as never);
-  return sb.rpc("link_pedir_com_termos", { p_funcao: funcao, p_args: args as never, p_termos: termos.texto, p_vacinas: aceite.vacinas });
+  return banco().rpc("link_pedir_com_termos", {
+    p_funcao: funcao, p_args: args as never,
+    ...(termos ? { p_termos: termos.texto, p_vacinas: aceite.vacinas } : {}),
+  });
 }
 
 /** Regras escritas por quem recebe o pedido, com as caixas que o tutor marca antes de enviar. */

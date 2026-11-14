@@ -1,7 +1,7 @@
 "use client";
 
 import { saudacaoZap } from "@/lib/gestao/agenda";
-import { COLS_ESTADIA, COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
+import { COLS_ESTADIA, COLS_PACOTE_CLIENTE, comPrecosDeAgendamento } from "@/lib/gestao/reservado";
 import { Fragment, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, ArrowLeftRight, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
@@ -24,7 +24,7 @@ import { portariaLigada } from "@/lib/gestao/casa-opcoes";
 import { usaCasa } from "@/lib/gestao/modulos";
 
 type PetDaFicha = Pet & { clientes: Cliente | null };
-type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id"> & { agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number }[] | null };
+type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id"> & { agendamento_servicos?: { id: string; servico_id: string; preco: number | null; ordem: number }[] | null };
 
 const mesDoAno = (d: string) => new Date(d).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 const TOM_VISITA: Record<string, Tom> = { verde: "menta", amarelo: "manteiga", vermelho: "rosa" };
@@ -49,17 +49,20 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [pet, atendimentos, pacotes, estadias, concluidos, saude, hospedagens] = await Promise.all([
       sb.from("pets").select("*, clientes(*)").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
-      sb.from("agendamentos").select("id, inicio, status, preco, servico_id, agendamento_servicos(servico_id, preco, ordem)").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
+      sb.from("agendamentos").select("id, inicio, status, servico_id, agendamento_servicos(id, servico_id, ordem)").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
       sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", id).eq("ativo", true).order("comprado_em", { ascending: false }),
       sb.from("estadias").select(COLS_ESTADIA).eq("petshop_id", petshop.id).eq("pet_id", id).order("entrada", { ascending: false }).limit(8),
       // visitas concluídas: a conta exata, a mais recente e os valores para somar
-      sb.from("agendamentos").select("inicio, preco, agendamento_servicos(preco)", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).eq("status", "concluido").order("inicio", { ascending: false }).limit(1000),
+      sb.from("agendamentos").select("id, inicio, agendamento_servicos(id)", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).eq("status", "concluido").order("inicio", { ascending: false }).limit(1000),
       sb.from("pets_saude").select("*").eq("petshop_id", petshop.id).eq("pet_id", id).order("vence_em").order("criado_em").limit(500),
       // creche e hotel também é visita: estadias encerradas e a que está acontecendo agora
       sb.from("estadias").select("entrada, saida, status", { count: "exact" }).eq("petshop_id", petshop.id).eq("pet_id", id).in("status", ["encerrada", "em_casa"]).order("entrada", { ascending: false }).limit(1000),
     ]);
     for (const r of [pet, atendimentos, pacotes, estadias, concluidos, hospedagens]) if (r.error) throw new Error(r.error.message);
-    const feitos = (concluidos.data ?? []) as { inicio: string; preco: number | null; agendamento_servicos?: { preco: number | null }[] | null }[];
+    // os valores vêm à parte, só para quem cuida do financeiro
+    type Feito = { inicio: string; preco: number | null; agendamento_servicos?: { preco: number | null }[] | null };
+    const feitos: Feito[] = await comPrecosDeAgendamento(sb, petshop.id, (concluidos.data ?? []) as { id: string; inicio: string; agendamento_servicos?: { id: string }[] | null }[], vejoFinanceiro);
+    const historico = await comPrecosDeAgendamento(sb, petshop.id, (atendimentos.data ?? []) as unknown as Atendimento[], vejoFinanceiro);
     const ficou = (hospedagens.data ?? []) as { entrada: string; saida: string | null; status: string }[];
     const nEstadias = hospedagens.count ?? ficou.length;
     // quem está na casa agora veio hoje; estadia encerrada conta pelo dia em que saiu
@@ -76,7 +79,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
     }
     return {
       pet: pet.data as unknown as PetDaFicha | null,
-      atendimentos: (atendimentos.data ?? []) as Atendimento[],
+      atendimentos: historico as unknown as Atendimento[],
       pacotes: (pacotes.data ?? []) as PacoteCliente[],
       estadias: (estadias.data ?? []) as unknown as Estadia[],
       visitas: (concluidos.count ?? feitos.length) + nEstadias,

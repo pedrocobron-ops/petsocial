@@ -281,16 +281,22 @@ export default function PedidosLink() {
   async function depoisDoPorte(agendamentoId: unknown, resposta: string) {
     if (typeof agendamentoId !== "string") return;
     try {
-      const ag = (await sb.from("agendamentos").select("pet_id, servico_id, preco, obs").eq("id", agendamentoId).eq("petshop_id", petshop.id).maybeSingle()).data;
+      const ag = (await sb.from("agendamentos").select("pet_id, servico_id, obs").eq("id", agendamentoId).eq("petshop_id", petshop.id).maybeSingle()).data;
       if (!ag) return;
       if (resposta === "depois") {
         if (!(ag.obs ?? "").includes(NOTA_PORTE)) await sb.from("agendamentos").update({ obs: [ag.obs, NOTA_PORTE].filter(Boolean).join(" ").slice(0, 400) }).eq("id", agendamentoId).eq("petshop_id", petshop.id).select("id");
         return;
       }
       await sb.from("pets").update({ porte: resposta }).eq("id", ag.pet_id).eq("petshop_id", petshop.id).is("porte", null).select("id");
-      const s = servicos.find((x) => x.id === ag.servico_id);
-      const preco = s ? { P: s.preco_p, M: s.preco_m, G: s.preco_g, GG: s.preco_gg }[resposta] ?? null : null;
-      if (ag.preco == null && preco != null) await sb.from("agendamentos").update({ preco }).eq("id", agendamentoId).eq("petshop_id", petshop.id).is("preco", null).select("id");
+      // o banco coloca o preço da lista para esse porte, só se o horário estava sem valor (quem aceita pode não ver a lista)
+      const r = await (sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ error: { code?: string } | null }> }).rpc("agendamento_preco_da_tabela", { p_id: agendamentoId });
+      if (r.error && (r.error.code === "PGRST202" || r.error.code === "42883")) {
+        // banco antes da atualização: a mesma conta aqui
+        const atual = (await sb.from("agendamentos").select("preco").eq("id", agendamentoId).eq("petshop_id", petshop.id).maybeSingle()).data as { preco: number | null } | null;
+        const s = servicos.find((x) => x.id === ag.servico_id);
+        const preco = s ? { P: s.preco_p, M: s.preco_m, G: s.preco_g, GG: s.preco_gg }[resposta] ?? null : null;
+        if (atual && atual.preco == null && preco != null) await sb.from("agendamentos").update({ preco }).eq("id", agendamentoId).eq("petshop_id", petshop.id).is("preco", null).select("id");
+      }
     } catch { /* o horário já foi marcado: o porte e o valor ficam para acertar na ficha e no horário */ }
   }
 

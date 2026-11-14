@@ -1,6 +1,6 @@
 "use client";
 
-import { COLS_PRODUTO } from "@/lib/gestao/reservado";
+import { COLS_PRODUTO, comPrecosDeProduto } from "@/lib/gestao/reservado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useEffect, useRef, useState } from "react";
 import { Minus, Package, Plus, Scissors, Search, Sparkles, Trash2, Truck } from "lucide-react";
@@ -119,7 +119,8 @@ export async function baixarEstoque(sb: Banco, petshopId: string, userId: string
 export function useProdutosDaLoja() {
   const { sb, petshop } = useGestao();
   const { dados, carregando, erro } = useDados(async () =>
-    (await lerTudo<Omit<Produto, "custo">>((de, ate, contar) => sb.from("produtos").select(COLS_PRODUTO, contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate))).map((p) => ({ ...p, custo: null, ultimo_custo: null })) as Produto[],
+    // o preço de venda vem à parte (o banco só entrega a quem vende, cuida do estoque ou vê o dinheiro)
+    (await comPrecosDeProduto(sb, petshop.id, await lerTudo<Omit<Produto, "custo" | "ultimo_custo" | "preco_venda">>((de, ate, contar) => sb.from("produtos").select(COLS_PRODUTO, contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)))).map((p) => ({ ...p, custo: null, ultimo_custo: null })) as Produto[],
   [petshop.id]);
   return { produtos: dados ?? [], carregando: carregando && !dados, erro };
 }

@@ -1,5 +1,5 @@
 import { podeArea } from "@/lib/gestao/acessos";
-import { lerEquipe, lerPetshop } from "@/lib/gestao/reservado";
+import { lerEquipe, lerPetshop, lerServicos } from "@/lib/gestao/reservado";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   const [p, e, s] = await Promise.all([
     lerPetshop(sb, corpo.petshopId),
     lerEquipe(sb, corpo.petshopId),
-    sb.from("servicos").select("*").eq("petshop_id", corpo.petshopId).order("ordem"),
+    lerServicos(sb, corpo.petshopId),
   ]);
   const eu = (e.data ?? []).find((x) => x.user_id === u.user!.id && x.ativo);
   if (!p.data || !eu) return erro(403, "sem_acesso", "Você não faz parte deste pet shop.");

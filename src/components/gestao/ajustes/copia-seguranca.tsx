@@ -13,6 +13,7 @@ import {
 import { itensDoLancamento, nomeDoMovimento, partesPorForma, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import {
   COLS_MOVIMENTO, COLS_PACOTE, COLS_PACOTE_CLIENTE, COLS_PRODUTO, comCustos, custosDeTodosOsMovimentos, comPrecosDePacote, lerEquipe, COLS_ESTADIA, comValoresDeEstadia,
+  comPrecosDeAgendamento, comPrecosDeProduto, COLS_SERVICO, comPrecosDeServico,
 } from "@/lib/gestao/reservado";
 import { FORMAS, STATUS_AGENDAMENTO, type AlteracaoLancamento, type Caixa, type Cliente, type Estadia, type Lancamento, type Pet, type Servico, type StatusAgendamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, hora, isoDia, semAcento } from "@/lib/gestao/util";
@@ -27,9 +28,9 @@ type DoPet = { nome: string; clientes: Tutor } | null;
 type PetLido = Pet & { clientes: Tutor };
 type SaudeLida = { tipo: string; nome: string; aplicado_em: string | null; vence_em: string | null; obs: string | null; criado_em: string; pets: DoPet };
 type AgendamentoLido = {
-  inicio: string; fim: string; status: StatusAgendamento; preco: number | null; obs: string | null; origem: string; criado_por: string | null; leva_traz: boolean;
+  id: string; inicio: string; fim: string; status: StatusAgendamento; preco: number | null; obs: string | null; origem: string; criado_por: string | null; leva_traz: boolean;
   endereco_leva_traz: string | null; pacote_cliente_id: string | null; pets: DoPet; servicos: { nome: string } | null; profissionais: { nome: string } | null;
-  agendamento_servicos?: { preco: number | null; ordem: number; servicos: { nome: string } | null }[] | null;
+  agendamento_servicos?: { id: string; preco: number | null; ordem: number; servicos: { nome: string } | null }[] | null;
 };
 type ProdutoLido = { id: string; nome: string; categoria: string | null; unidade: string; preco_venda: number | null; estoque: number; estoque_minimo: number; ativo: boolean; criado_em: string; codigo_barras: string | null; fornecedor_id: string | null };
 type MovimentoLido = { id: string; produto_id: string; tipo: string; quantidade: number; motivo: string | null; origem: string; criado_por: string | null; criado_em: string; fornecedor_id: string | null };
@@ -193,9 +194,10 @@ export default function CopiaSeguranca() {
         origem === "assistente" ? `${(userId && quem.get(userId)) || "Alguém"}, pelo Mozart` : (userId && quem.get(userId)) || "";
 
       etapa("agendamentos");
-      const agendamentos = await todas<AgendamentoLido>((a, b) => sb.from("agendamentos")
-        .select("inicio, fim, status, preco, obs, origem, criado_por, leva_traz, endereco_leva_traz, pacote_cliente_id, pets(nome, clientes(nome, telefone)), servicos(nome), profissionais(nome), agendamento_servicos(preco, ordem, servicos(nome))")
-        .eq("petshop_id", id).order("inicio").order("id").range(a, b));
+      // o preço de cada horário (e dos serviços a mais) vem à parte, pela função do banco
+      const agendamentos = await comPrecosDeAgendamento(sb, id, await todas<AgendamentoLido>((a, b) => sb.from("agendamentos")
+        .select("id, inicio, fim, status, obs, origem, criado_por, leva_traz, endereco_leva_traz, pacote_cliente_id, pets(nome, clientes(nome, telefone)), servicos(nome), profissionais(nome), agendamento_servicos(id, ordem, servicos(nome))")
+        .eq("petshop_id", id).order("inicio").order("id").range(a, b)));
       tabelas.set("agendamentos.csv", [
         ["Dia", "Começa", "Termina", "Pet", "Tutor", "Telefone do tutor", "Serviço", "Profissional", "Situação", "Preço", "Usou pacote", "Leva e traz", "Endereço do leva e traz", "Observações", "Marcado por", "Outros serviços no mesmo horário", "Preço dos outros serviços"],
         ...agendamentos.map((g): Cel[] => [
@@ -247,7 +249,7 @@ export default function CopiaSeguranca() {
       ]);
 
       etapa("produtos");
-      const produtos = await comCustos(sb, id, await todas<ProdutoLido>((a, b) => sb.from("produtos").select(COLS_PRODUTO).eq("petshop_id", id).order("nome").order("id").range(a, b)));
+      const produtos = await comCustos(sb, id, await comPrecosDeProduto(sb, id, await todas<ProdutoLido>((a, b) => sb.from("produtos").select(COLS_PRODUTO).eq("petshop_id", id).order("nome").order("id").range(a, b))));
       const nomeProduto = new Map(produtos.map((p) => [p.id, p]));
       const fornecedores = await todas<FornecedorLido>((a, b) => sb.from("fornecedores").select("id, nome, telefone, observacoes, ativo, criado_em").eq("petshop_id", id).order("nome").order("id").range(a, b));
       const nomeFornecedor = new Map(fornecedores.map((f) => [f.id, f.nome]));
@@ -429,7 +431,7 @@ export default function CopiaSeguranca() {
       ]);
 
       etapa("serviços");
-      const servicos = await todas<Servico>((a, b) => sb.from("servicos").select("*").eq("petshop_id", id).order("ordem").order("id").range(a, b));
+      const servicos = await comPrecosDeServico(sb, id, await todas<Omit<Servico, "preco_p" | "preco_m" | "preco_g" | "preco_gg">>((a, b) => sb.from("servicos").select(COLS_SERVICO).eq("petshop_id", id).order("ordem").order("id").range(a, b)));
       tabelas.set("servicos.csv", [
         ["Serviço", "Tipo", "Duração (minutos)", "Preço P", "Preço M", "Preço G", "Preço GG", "Ativo"],
         ...servicos.map((s): Cel[] => [s.nome, rotulo(TIPO_SERVICO, s.categoria), numero(s.duracao_min), dinheiro(s.preco_p), dinheiro(s.preco_m), dinheiro(s.preco_g), dinheiro(s.preco_gg), simNao(s.ativo)]),
