@@ -211,8 +211,9 @@ export function Troco({ devido, parte, valor, aoMudar, aceitaResto }: {
         {naoENumero ? <span className="g-erro">Escreva o valor só com números, como 100,00.</span>
           : troco == null ? <span className="g-muted">{parte ? "Se quiser, escreva quanto ele entregou em dinheiro para ver o troco." : "Se quiser, escreva quanto o cliente entregou para ver o troco."}</span>
           : troco > 0 ? <>Troco: <b className="g-tab">{brl(troco)}</b></>
-          : troco === 0 ? "Sem troco." : <>Faltam <b className="g-tab">{brl(-troco)}</b> para {brl(devido)}.{aceitaResto ? " Veja abaixo: o que faltou pode ficar anotado para o cliente pagar depois." : " Assim a conta não fecha: corrija o valor ou mude a forma de pagamento."}</>}
+          : troco === 0 ? "Sem troco." : <>Faltam <b className="g-tab">{brl(-troco)}</b> para {brl(devido)}.</>}
       </p>
+      {troco != null && troco < 0 && !aceitaResto && <small className="g-erro" style={{ gridColumn: "1 / -1" }}>Assim a conta não fecha: corrija o valor, divida o pagamento ou mude a forma.</small>}
     </div>
   );
 }

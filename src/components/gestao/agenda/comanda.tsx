@@ -268,7 +268,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
         <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || nadaAFazer}>
-          {salvando ? "Anotando…" : contas.total <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(contas.total)} a receber` : aMenos ? `Receber ${brl(aMenos.entregue)} e anotar ${brl(aMenos.falta)}` : `Receber ${brl(contas.total)}`}
+          {salvando ? "Anotando…" : contas.total <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(contas.total)} a receber` : aMenos ? `Receber ${brl(aMenos.entregue)}` : `Receber ${brl(contas.total)}`}
         </button>
       </>}>
       <div className="g-form">

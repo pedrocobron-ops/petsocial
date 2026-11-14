@@ -1134,7 +1134,7 @@ const BASE: TopicoBase[] = [
       "Depois de receber, aparece o botão Mandar comprovante.",
       "O pet fez mais um serviço da sua lista (uma hidratação, um corte de unha)? Toque em Outro serviço e escolha: ele entra na conta com o valor dele e conta para a comissão. Outro extra é para o que não está na lista de serviços.",
       "Pagando em Dinheiro, aparece Recebeu quanto?: escreva quanto o cliente entregou para ver o troco.",
-      "O cliente entregou menos do que a conta (R$ 50,00 numa conta de R$ 70,00)? O botão vira Receber R$ 50,00 e anotar R$ 20,00: os R$ 50,00 entram no caixa e os R$ 20,00 ficam em A receber e na ficha do tutor. Escolha em Quando paga o resto o dia combinado.",
+      "O cliente entregou menos do que a conta (R$ 50,00 numa conta de R$ 70,00)? O botão vira Receber R$ 50,00: os R$ 50,00 entram no caixa e os R$ 20,00 que faltaram ficam em A receber e na ficha do tutor. Escolha em Quando paga o resto o dia combinado.",
       "Tocou duas vezes no botão sem querer? O valor entra uma vez só. Vale para toda tela que recebe, vende ou mexe no estoque.",
     ],
     atencao: ["Só quem tem a área Caixa ou Financeiro recebe. Os outros tocam em Concluir atendimento, e o atendimento fica na lista Atendimentos para cobrar, em Hoje e em Caixa."],
@@ -1177,7 +1177,7 @@ const BASE: TopicoBase[] = [
     palavras: ["cliente pagou", "pagou o que devia", "recebi o fiado", "quitar", "quitou", "a receber", "pagou a conta", "dar baixa", "recebi", "paguei"] },
   { id: "receber-parte", titulo: "Como receber só uma parte do que o cliente deve", secao: "dinheiro", quem: "caixa", rota: CAIXA, tambem: [FINANCEIRO, CLIENTES, CRECHE],
     passos: [
-      { so: ["banho"], texto: "Fechando a conta do atendimento agora, em dinheiro: escolha Dinheiro e escreva em Recebeu quanto? o que o cliente entregou. O botão vira Receber e anotar o resto: o que entrou vai para o caixa e o resto fica anotado para o tutor, com o dia que você escolher em Quando paga o resto." },
+      { so: ["banho"], texto: "Fechando a conta do atendimento agora, em dinheiro: escolha Dinheiro e escreva em Recebeu quanto? o que o cliente entregou. O botão passa a receber só o que entrou: isso vai para o caixa e o resto fica anotado para o tutor, com o dia que você escolher em Quando paga o resto." },
       { so: ["banho"], texto: "Fechando a conta agora no Pix ou no cartão: escolha Cliente paga depois e toque em Anotar a receber. Logo depois, na ficha do tutor, toque em Recebi e escreva só o que ele pagou." },
       "Conta que já estava anotada: ache a conta do cliente em Caixa, no cartão Contas de clientes, ou na ficha do tutor.",
       "Toque em Recebi.",
