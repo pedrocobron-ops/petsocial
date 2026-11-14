@@ -1065,3 +1065,12 @@ a.g-ret-linha:hover, button.g-ret-linha:hover { border-color: var(--g-linha-fort
 .g-imp-linha svg { width: 18px; height: 18px; flex: none; color: var(--g-cinza); }
 .g-imp-linha span { flex: 1; min-width: 0; }
 .g-imp-linha i { font-style: normal; font-weight: 700; color: var(--g-verde); flex: none; }
+
+/* O botão do Mozart não cobre o que a pessoa precisa tocar: some enquanto uma folha (formulário, cobrança, confirmação de saída)
+   está aberta e, em tela de computador mais estreita, fica só com a foto no canto (o nome volta ao passar o mouse ou com o foco). */
+body:has(.g-fundo) .g-fab:not(.aberta) { display: none; }
+@media (min-width: 960px) and (max-width: 1599px) {
+  .g-fab { right: 14px; bottom: 14px; }
+  .g-fab:not(.aberta):not(:hover):not(:focus-visible) { padding: 0 9px; }
+  .g-fab:not(.aberta):not(:hover):not(:focus-visible) .txt { display: none; }
+}

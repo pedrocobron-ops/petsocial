@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { HeartHandshake, Plus, Trash2 } from "lucide-react";
 import { CHAVES_CASA, diarioDe, esperaDe, ITENS_DO_DIARIO, MAX_ITENS_DO_DIARIO, ocorrenciasLigadas, portariaLigada } from "@/lib/gestao/casa-opcoes";
-import { usaCasa } from "@/lib/gestao/modulos";
+import { equipeMudaPlano, OPCAO_EQUIPE_MUDA_PLANO } from "@/lib/gestao/creche";
+import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -34,6 +35,7 @@ export default function OpcoesCasa() {
   const [portaria, setPortaria] = useState(() => portariaLigada(petshop));
   const [espera, setEspera] = useState(() => esperaDe(petshop));
   const [ocorrencias, setOcorrencias] = useState(() => ocorrenciasLigadas(petshop));
+  const [equipePlano, setEquipePlano] = useState(() => equipeMudaPlano(petshop));
   const [mexeu, setMexeu] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -52,6 +54,7 @@ export default function OpcoesCasa() {
         [CHAVES_CASA.portaria]: portaria,
         [CHAVES_CASA.espera]: { ativo: espera.ativo, link: espera.ativo && espera.link },
         [CHAVES_CASA.ocorrencias]: ocorrencias,
+        ...(usaModulo(petshop, "creche") ? { [OPCAO_EQUIPE_MUDA_PLANO]: equipePlano } : {}),
       });
       await recarregarBase();
       avisarMudanca();
@@ -90,6 +93,12 @@ export default function OpcoesCasa() {
         </Opcao>
 
         <Opcao titulo="Ocorrências" frase="Briga, machucado, fuga ou vômito: a equipe anota na estadia com a hora e o nome de quem escreveu. Você vê no Hoje e na ficha do pet." ligada={ocorrencias} aoMudar={m(setOcorrencias)} />
+
+        {usaModulo(petshop, "creche") && (
+          <Opcao titulo="A equipe pode mexer nos planos de mensalista" frase="Desligado, só você e quem cuida do financeiro cadastram um mensalista, mudam os dias, pausam ou encerram o plano, porque o plano decide o que é cobrado. Ligado, quem trabalha na creche também pode (sem ver nem preencher valores)." ligada={equipePlano} aoMudar={m(setEquipePlano)}>
+            <p className="g-muted g-pp">Plano cadastrado pela equipe fica sem valor até você preencher: a tela Hoje avisa. A reposição de falta (dia sem cobrança) marcada pela equipe sempre passa pela sua conferência, com esta opção ligada ou não.</p>
+          </Opcao>
+        )}
       </div>
       {erro && <p className="g-erro" role="alert">{erro}</p>}
       <div className="g-fila">
