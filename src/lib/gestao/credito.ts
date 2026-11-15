@@ -13,11 +13,16 @@ const real = (n: number) => Math.round(n * 100) / 100;
 /** Saldo e movimentos de crédito de um tutor (os mais novos primeiro). Sem acesso, ou sem a tabela, volta zero. */
 export async function creditoDoTutor(sb: Banco, petshopId: string, clienteId: string | null | undefined): Promise<{ saldo: number; movimentos: MovimentoDeCredito[] }> {
   if (!clienteId) return { saldo: 0, movimentos: [] };
-  const r = await sb.from("clientes_creditos").select("id, valor, motivo, criado_em, estadia_id").eq("petshop_id", petshopId).eq("cliente_id", clienteId)
-    .order("criado_em", { ascending: false }).order("id").limit(200);
+  // o saldo é somado no banco (todos os movimentos); a lista traz só os 200 mais novos, para mostrar
+  const [r, s] = await Promise.all([
+    sb.from("clientes_creditos").select("id, valor, motivo, criado_em, estadia_id").eq("petshop_id", petshopId).eq("cliente_id", clienteId)
+      .order("criado_em", { ascending: false }).order("id").limit(200),
+    sb.rpc("credito_saldo", { p_petshop: petshopId, p_cliente: clienteId }),
+  ]);
   if (r.error) return { saldo: 0, movimentos: [] };
   const movimentos = (r.data ?? []) as MovimentoDeCredito[];
-  return { saldo: real(movimentos.reduce((t, m) => t + Number(m.valor), 0)), movimentos };
+  const somaDaLista = real(movimentos.reduce((t, m) => t + Number(m.valor), 0));
+  return { saldo: s.error || s.data == null ? somaDaLista : real(Number(s.data)), movimentos };
 }
 
 /** Deixa (valor > 0) ou usa (valor < 0) crédito. A mesma chave de novo não grava outra vez. */

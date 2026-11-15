@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { History, Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
-import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, creditoDaEntrada, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberComCredito, receberConta, separarMulta, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, creditoDaEntrada, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento, type ContaRecebida } from "@/lib/gestao/dinheiro";
+import { fazerTudoOuNada, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { diaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
@@ -767,9 +768,23 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
       if (entrada) {
         // primeiro o crédito (o banco tira do crédito do tutor na mesma gravação), depois o resto pela forma escolhida
         const vencimento = parcial && novoVencimento && novoVencimento !== conta.vencimento ? novoVencimento : null;
-        let r = credito > 0 ? await receberComCredito(sb, conta.id, credito, parteDaChave(chave, "credito")) : null;
         const resto = centavos(recebendo - credito);
-        if (resto > 0) {
+        let r: ContaRecebida | null;
+        if (credito > 0) {
+          // crédito e resto numa chamada só: os dois entram juntos, ou nenhum (a nova tentativa, com a mesma chave, não usa o crédito duas vezes)
+          const passos: Passo[] = [{ t: "receber_credito", conta: conta.id, valor: credito, chave: parteDaChave(chave, "credito") }];
+          if (resto > 0) {
+            const partes = separarMulta(pg.forma, pg.pagamentos, daMulta);
+            passos.push({
+              t: "receber", conta: conta.id, valor: resto, forma: partes.conta.forma, pagamentos: partes.conta.pagamentos, data: cuidoDoFinanceiro ? data : null,
+              novo_vencimento: vencimento, chave,
+              ...(daMulta > 0 ? { multa: daMulta, multa_forma: partes.multa.forma, multa_pagamentos: partes.multa.pagamentos } : {}),
+            });
+          }
+          const feito = await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "conta_receber_junto", conta: conta.id }, passos);
+          const ultimo = feito.passos[feito.passos.length - 1] ?? {};
+          r = { quitada: Boolean(ultimo.quitada), recebido: Number(ultimo.recebido ?? recebendo), falta: Number(ultimo.falta ?? 0), no_caixa: Boolean(ultimo.no_caixa) };
+        } else {
           const partes = separarMulta(pg.forma, pg.pagamentos, daMulta);
           r = await receberConta(sb, conta.id, {
             valor: resto, forma: partes.conta.forma, pagamentos: partes.conta.pagamentos, data: cuidoDoFinanceiro ? data : null,
@@ -796,6 +811,8 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
       avisarErro(e);
       await aoSalvo();
       setSalvando(false);
+      // a mesma chave na nova tentativa: se algo já entrou (a resposta não chegou), o banco não recebe de novo
+      return false;
     }
   }
 

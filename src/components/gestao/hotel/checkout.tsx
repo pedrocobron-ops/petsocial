@@ -3,7 +3,8 @@
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { useEffect, useState } from "react";
 import { Check, Clock, MessageCircle, Plus, Printer } from "lucide-react";
-import { conferirCaixa, conferirValorAlto, formaPrincipal, lancarAReceber, lancarPago, parteDaChave, quitarConta, type ItemLancamento, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, formaPrincipal, parteDaChave, type ItemLancamento, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { casoDoErro, fazerTudoOuNada, partesOuNada, passoDoEstoque, ref, type Passo, type ResultadoDaOperacao } from "@/lib/gestao/tudo-ou-nada";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import {
   contaDasDiarias, contarDiarias, fechoDaConta, noitesAntesDaEntrada, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDoPagamentoDaConta,
@@ -15,14 +16,15 @@ import { usaModulo } from "@/lib/gestao/modulos";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Lancamento, PacoteCliente, Servico } from "@/lib/gestao/tipos";
 import { comValoresDeEstadia } from "@/lib/gestao/reservado";
-import { creditoDoTutor, moverCredito } from "@/lib/gestao/credito";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
+import { creditoDoTutor } from "@/lib/gestao/credito";
 import { imprimirComprovante } from "@/lib/gestao/comprovante";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, linkWhatsApp, soDigitos } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, linkWhatsApp, soDigitos } from "@/lib/gestao/util";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
-import { AvatarPet, Campo, Folha, mensagemDeErro, ok, useAvisos, useDados } from "../ui";
-import { baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, LinhaDaConta, novaChave, produtosDaConta, useProdutosDaLoja, valorDaLinha, type ItemConta } from "../loja/conta";
+import { AvatarPet, Campo, Folha, mensagemDeErro, useAvisos, useDados } from "../ui";
+import { BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, LinhaDaConta, novaChave, produtosDaConta, useProdutosDaLoja, valorDaLinha, type ItemConta } from "../loja/conta";
 import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
 import { horaCurta, nomeTipo, type EstadiaCompleta } from "./tipos";
 import "./hotel.css";
@@ -130,7 +132,8 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
     const [v, outras, p, credito, atrasoJa] = await Promise.all([
       sb.from("estadias_valores").select("*").eq("estadia_id", estadia.id).maybeSingle(),
       estadia.tipo === "hotel" ? estadiasDoTutor(sb, petshop.id, tutor?.id) : Promise.resolve([]),
-      tutor?.id ? sb.from("lancamentos").select("id, valor, descricao, categoria, data, vencimento").eq("petshop_id", petshop.id).eq("cliente_id", tutor.id).eq("tipo", "entrada").eq("pago", false).order("data").limit(20) : Promise.resolve({ data: [] }),
+      // todas as contas abertas do tutor (em páginas: o banco entrega no máximo mil por vez)
+      tutor?.id ? lerTudo<Pendencia>((de, ate, contar) => sb.from("lancamentos").select("id, valor, descricao, categoria, data, vencimento", contando(contar)).eq("petshop_id", petshop.id).eq("cliente_id", tutor.id).eq("tipo", "entrada").eq("pago", false).order("data").order("id").range(de, ate)).then((data) => ({ data }), () => ({ data: [] as Pendencia[] })) : Promise.resolve({ data: [] }),
       creditoDoTutor(sb, petshop.id, tutor?.id).then((c) => c.saldo).catch(() => 0),
       atrasoJaCobrado(sb, petshop.id, tutor?.id, estadia, agora),
     ]);
@@ -267,105 +270,95 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
       // com sobra do sinal: a estadia custou a soma (mais o que ficou com o hotel, quando a pessoa escolheu não devolver)
       const cobrado = !vejoFinanceiro ? (pacote ? 0 : calculado === 0 ? 0 : null) : sobraDoSinal > 0 ? centavos(soma + (destino === "mantido" ? sobraDoSinal : 0))
         : pacote && !temMais && !sinalNaConta ? 0 : valor == null && !sinalNaConta ? null : centavos((valor ?? 0) + sinalNaConta);
-      const comObs = pacote ? { obs: comNota(estadia.obs, NOTA_PACOTE) } : {};
-      const r = pendente
-        // o banco só grava se a estadia ainda está sem valor (a coluna do valor não é filtrada pela API)
-        ? (ok(await sb.rpc("estadia_acertar", { p_id: estadia.id, p_diarias: n, p_valor: cobrado ?? 0, ...(pacote ? { p_obs: comNota(estadia.obs, NOTA_PACOTE) } : {}) })) ? [{ id: estadia.id }] : [])
-        : ok(await sb.from("estadias").update({ status: "encerrada", saida, diarias_cobradas: n, valor_cobrado: cobrado, ...comObs })
-          .eq("id", estadia.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
-      if (!r.length) { avisar(pendente ? "Essa estadia já tinha sido acertada. Atualizei a lista." : "Esse check-out já tinha sido feito. Atualizei a lista."); aoGravar(); return; }
+      const obs = pacote ? { obs: comNota(estadia.obs, NOTA_PACOTE) } : {};
       const nome = pet?.nome ?? "O pet";
       const foi = pendente ? `Estadia de ${nome} acertada.` : `${nome} foi para casa.`;
-      let recado = foi;
-      if (pacote) {
-        // mesma baixa da tela Pacotes: só grava se ninguém mexeu no meio do caminho; não lança dinheiro
-        const usados = pacote.usados + n;
-        const b = await sb.from("pacotes_clientes").update({ usados, ativo: usados < pacote.total })
-          .eq("id", pacote.id).eq("petshop_id", petshop.id).eq("usados", pacote.usados).select("id");
-        if (b.error || !b.data?.length) avisarErro("O check-out foi feito, mas não consegui dar baixa no pacote. Dê baixa pela tela Pacotes.");
-        else recado = `${foi} ${n === 1 ? "1 uso" : `${n} usos`} do pacote, ${pacote.total - usados === 0 ? "que terminou" : `restam ${pacote.total - usados}`}.`;
-      }
-      let lancamentoId: string | null = null;
-      let pg: ContaDaEstadia["pagamento"] = null;
-      let dinheiroOk = true;
-      const falhou = (o: string, e: unknown) => { dinheiroOk = false; avisarErro(`${pendente ? "A estadia foi acertada" : "O check-out foi feito"}, mas ${o} (${mensagemDeErro(e)})`); };
+      const hoje = isoDia(new Date());
+      // tudo numa chamada só (o banco grava tudo ou nada): encerrar, pacote, sinal, crédito, devolução, pagamento, contas antigas,
+      // estoque e a conta guardada. Se a internet cair no meio, nada fica pela metade; tocar de novo (mesma chave) não repete.
+      const passos: Passo[] = [pendente
+        // o banco só grava se a estadia ainda está sem valor (a coluna do valor não é filtrada pela API)
+        ? { t: "estadia_acertar", id: estadia.id, diarias: n, valor: cobrado ?? 0, ...obs }
+        : { t: "estadia_fechar", id: estadia.id, saida, diarias: n, valor_cobrado: cobrado, ...obs }];
+      // o pacote soma no banco (nunca passa do total, mesmo com duas telas ao mesmo tempo); não lança dinheiro
+      if (pacote) passos.push({ t: "pacote", id: pacote.id, n });
       // sinal a receber maior do que a estadia: a conta do que faltava dele sai de A receber (o que já entrou dele fica)
-      if (cortaSinal && valores?.sinal_lancamento_id) {
-        try { ok(await sb.from("lancamentos").delete().eq("id", valores.sinal_lancamento_id).eq("petshop_id", petshop.id).eq("pago", false).select("id")); }
-        catch (e) { falhou("a conta do sinal continua em A receber. Tire pelo Financeiro.", e); }
-      }
+      if (cortaSinal && valores?.sinal_lancamento_id) passos.push({ t: "apagar_aberto", id: valores.sinal_lancamento_id });
       // crédito do tutor usado nesta conta
-      if (creditoUsado > 0 && tutor?.id) {
-        try { await moverCredito(sb, petshop.id, { clienteId: tutor.id, valor: -creditoUsado, estadiaId: estadia.id, motivo: `Usado na estadia de ${nome}, saída ${dataCurta(saida)}`, chave: parteDaChave(chave, "credito-usado") }); }
-        catch (e) { falhou(`o crédito de ${brl(creditoUsado)} não foi usado. Receba esse valor pelo Financeiro.`, e); }
-      }
+      if (creditoUsado > 0 && tutor?.id) passos.push({ t: "credito", cliente: tutor.id, valor: -creditoUsado, estadia: estadia.id, motivo: `Usado na estadia de ${nome}, saída ${dataCurta(saida)}`, chave: parteDaChave(chave, "credito-usado") });
       // pago antes a mais: devolve (saída de hoje), deixa de crédito ou fica com o hotel (com a nota)
       let sobra: ContaDaEstadia["sobra"] = null;
+      let recado = foi;
       if (sobraDoSinal > 0 && destino) {
         sobra = { valor: sobraDoSinal, destino, nota: notaSobra.trim() || null };
-        try {
-          if (destino === "devolvido") {
-            const l = await lancarPago(sb, petshop.id, {
-              tipo: "saida", valor: sobraDoSinal, forma: formaDevolucao!, categoria: CATEGORIA_DEVOLUCAO_SAIDA, clienteId: tutor?.id ?? null, chave: parteDaChave(chave, "devolucao"),
-              descricao: encurtar(`Devolução: ${nomeTipo(estadia.tipo).toLowerCase()} de ${nome}, ${dataCurta(estadia.entrada)} a ${dataCurta(saida)} (pago antes ${brl(sinalNaConta)}, estadia ${brl(soma)})`),
-            });
-            sobra = { ...sobra, forma: formaDevolucao, lancamento_id: l.id };
-            recado = `${foi} ${brl(sobraDoSinal)} devolvidos, lançados como saída de hoje.`;
-          } else if (destino === "credito") {
-            await moverCredito(sb, petshop.id, { clienteId: tutor!.id, valor: sobraDoSinal, estadiaId: estadia.id, motivo: `Pago a mais na estadia de ${nome} (${dataCurta(estadia.entrada)} a ${dataCurta(saida)})`, chave: parteDaChave(chave, "credito") });
-            recado = `${foi} ${brl(sobraDoSinal)} ficaram de crédito para ${tutor?.nome?.split(/\s+/)[0] ?? "o tutor"}.`;
-          } else recado = `${foi} Os ${brl(sobraDoSinal)} pagos a mais ficaram com o hotel${notaSobra.trim() ? ` (${notaSobra.trim()})` : ""}.`;
-        } catch (e) { falhou(destino === "devolvido" ? `a devolução não foi lançada. Lance a saída de ${brl(sobraDoSinal)} no Caixa ou no Financeiro.` : `o crédito de ${brl(sobraDoSinal)} não foi guardado.`, e); }
+        if (destino === "devolvido") {
+          passos.push({ t: "lancamento", nome: "devolucao", chave: parteDaChave(chave, "devolucao"), linha: {
+            tipo: "saida", valor: sobraDoSinal, forma: formaDevolucao!, categoria: CATEGORIA_DEVOLUCAO_SAIDA, cliente_id: tutor?.id ?? null, pago: true, data: hoje,
+            descricao: encurtar(`Devolução: ${nomeTipo(estadia.tipo).toLowerCase()} de ${nome}, ${dataCurta(estadia.entrada)} a ${dataCurta(saida)} (pago antes ${brl(sinalNaConta)}, estadia ${brl(soma)})`),
+          } });
+          sobra = { ...sobra, forma: formaDevolucao, lancamento_id: ref("devolucao") };
+          recado = `${foi} ${brl(sobraDoSinal)} devolvidos, lançados como saída de hoje.`;
+        } else if (destino === "credito") {
+          passos.push({ t: "credito", cliente: tutor!.id, valor: sobraDoSinal, estadia: estadia.id, motivo: `Pago a mais na estadia de ${nome} (${dataCurta(estadia.entrada)} a ${dataCurta(saida)})`, chave: parteDaChave(chave, "credito") });
+          recado = `${foi} ${brl(sobraDoSinal)} ficaram de crédito para ${tutor?.nome?.split(/\s+/)[0] ?? "o tutor"}.`;
+        } else recado = `${foi} Os ${brl(sobraDoSinal)} pagos a mais ficaram com o hotel${notaSobra.trim() ? ` (${notaSobra.trim()})` : ""}.`;
       }
+      let pg: ContaDaEstadia["pagamento"] = null;
+      let lancamento: string | null = null;
       if (rec && !("erro" in rec)) {
         const previa = montarConta(null, null, saida, sobra);
         const linhas = itensDoLancamento(previa);
         const resumo = [...previa.taxas.map((t) => t.nome), ...previa.extras.map((e) => e.nome), ...previa.produtos.map((p) => `${p.qtd.toLocaleString("pt-BR")} ${p.nome}`)].join(" + ");
         const descricao = encurtar(`${nomeTipo(estadia.tipo)}: ${n} ${n === 1 ? "diária" : "diárias"} · ${nome}${resumo ? ` + ${resumo}` : ""}`);
-        try {
-          if (rec.fiado) {
-            const l = await lancarAReceber(sb, petshop.id, { valor: daEstadia, vencimento: rec.quando, categoria: "Creche e hotel", descricao, clienteId: tutor?.id ?? null, itens: linhas, chave });
-            lancamentoId = l.id; pg = { fiado: true, quando: rec.quando };
-            recado = `${foi} ${brl(daEstadia)} em A receber, para ${dataCurta(rec.quando)}.`;
-          } else {
-            lembrarForma(rec.forma);
-            // um pagamento só para a conta da estadia e para as contas antigas: cada uma fica com a sua parte de cada forma
-            const partes: PartePagamento[] = rec.pagamentos ?? [{ forma: rec.forma, valor: recebido }];
-            const [partesDaEstadia, ...dasOutras] = repartirPagamento(partes, [daEstadia, ...recebeJunto.map((p) => p.valor)]);
-            if (daEstadia > 0) {
-              const l = await lancarPago(sb, petshop.id, {
-                tipo: "entrada", valor: daEstadia, forma: formaPrincipal(partesDaEstadia), pagamentos: partesDaEstadia.length > 1 ? partesDaEstadia : null, categoria: "Creche e hotel", descricao, clienteId: tutor?.id ?? null, itens: linhas, chave,
-              });
-              lancamentoId = l.id;
-            }
-            const falhas: string[] = [];
-            for (const [i, p] of recebeJunto.entries()) {
-              try { await quitarConta(sb, petshop.id, p.id, { forma: formaPrincipal(dasOutras[i]), pagamentos: dasOutras[i] }, p.valor, parteDaChave(chave, "conta", p.id)); }
-              catch (e) { falhas.push(`${p.descricao || p.categoria} (${mensagemDeErro(e)})`); }
-            }
-            if (falhas.length) { dinheiroOk = false; avisarErro(`${pendente ? "A estadia foi acertada" : "O check-out foi feito"}, mas não consegui dar baixa em: ${falhas.join("; ")}. Dê baixa pelo Financeiro, em A receber.`); }
-            pg = { fiado: false, forma: rec.forma, pagamentos: rec.pagamentos };
-            recado = `${foi} ${brl(recebido)} no financeiro.`;
+        if (rec.fiado) {
+          passos.push({ t: "lancamento", nome: "principal", chave, linha: { tipo: "entrada", valor: daEstadia, forma: null, categoria: "Creche e hotel", descricao, data: rec.quando, vencimento: rec.quando, pago: false, cliente_id: tutor?.id ?? null, itens: linhas } });
+          lancamento = ref("principal"); pg = { fiado: true, quando: rec.quando };
+          recado = `${foi} ${brl(daEstadia)} em A receber, para ${dataCurta(rec.quando)}.`;
+        } else {
+          lembrarForma(rec.forma);
+          // um pagamento só para a conta da estadia e para as contas antigas: cada uma fica com a sua parte de cada forma
+          const partes: PartePagamento[] = rec.pagamentos ?? [{ forma: rec.forma, valor: recebido }];
+          const [partesDaEstadia, ...dasOutras] = repartirPagamento(partes, [daEstadia, ...recebeJunto.map((p) => p.valor)]);
+          if (daEstadia > 0) {
+            passos.push({ t: "lancamento", nome: "principal", chave, linha: {
+              tipo: "entrada", valor: daEstadia, forma: formaPrincipal(partesDaEstadia), pagamentos: partesOuNada(partesDaEstadia), categoria: "Creche e hotel", descricao, cliente_id: tutor?.id ?? null, itens: linhas, pago: true, data: hoje,
+            } });
+            lancamento = ref("principal");
           }
-        } catch (e) {
-          dinheiroOk = false;
-          avisarErro(`${pendente ? "A estadia foi acertada" : "O check-out foi feito"}, mas ${rec.fiado ? "a conta a receber não foi anotada. Anote" : "o pagamento não foi lançado. Lance"} pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
+          // as contas antigas recebidas junto: o banco confere que cada uma ainda falta o mesmo valor que a tela mostrou
+          for (const [i, p] of recebeJunto.entries()) {
+            passos.push({ t: "receber", conta: p.id, valor: p.valor, forma: formaPrincipal(dasOutras[i]), pagamentos: partesOuNada(dasOutras[i]), esperado: p.valor, chave: parteDaChave(chave, "conta", p.id) });
+          }
+          pg = { fiado: false, forma: rec.forma, pagamentos: rec.pagamentos };
+          recado = `${foi} ${brl(recebido)} no financeiro.`;
         }
       }
       // ligada à conta (ou à estadia, quando nada foi lançado agora), o banco sabe que o produto saiu vendido
-      try { await baixarEstoque(sb, petshop.id, user.id, itens, lancamentoId, chave, lancamentoId ? null : estadia.id); } catch (e) {
-        avisarErro(`O estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
+      const estoque = passoDoEstoque(produtosDaConta(itens), chave, lancamento, lancamento ? null : estadia.id);
+      if (estoque) passos.push(estoque);
+      // a conta como foi cobrada: o histórico e os relatórios leem daqui, sem refazer a conta
+      const conta = montarConta(pg, lancamento, saida, sobra);
+      if (vejoFinanceiro) passos.push({ t: "estadia_valores", estadia: estadia.id, modo: "upsert", campos: { conta } });
+      let feito: ResultadoDaOperacao;
+      try {
+        feito = await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "estadia_checkout", estadia: estadia.id }, passos);
+      } catch (e) {
+        if (casoDoErro(e) === "maestro:estadia_ja") { avisar(pendente ? "Essa estadia já tinha sido acertada. Atualizei a lista." : "Esse check-out já tinha sido feito. Atualizei a lista."); aoGravar(); return; }
+        // nada ficou gravado (ou a resposta não chegou): a mesma chave na nova tentativa não lança nada duas vezes
+        avisarErro(`${pendente ? "A estadia não foi acertada" : "O check-out não foi feito"}: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`);
+        return false;
       }
-      const conta = montarConta(pg, lancamentoId, saida, sobra);
-      if (vejoFinanceiro && dinheiroOk) {
-        // a conta como foi cobrada: o histórico e os relatórios leem daqui, sem refazer a conta
-        const g = await sb.from("estadias_valores").upsert({ estadia_id: estadia.id, petshop_id: petshop.id, conta: conta as never }, { onConflict: "estadia_id" }).select("estadia_id");
-        if (g.error) avisarErro(`O check-out foi feito, mas o detalhe da conta não foi guardado. (${g.error.message})`);
+      if (pacote) {
+        const u = feito.passos.find((p) => p.t === "pacote");
+        const usados = u?.usados ?? pacote.usados + n, total = u?.total ?? pacote.total;
+        if (recado === foi) recado = `${foi} ${n === 1 ? "1 uso" : `${n} usos`} do pacote, ${total - usados === 0 ? "que terminou" : `restam ${total - usados}`}.`;
       }
+      const principal = feito.ids?.principal ?? null;
+      const gravada: ContaDaEstadia = { ...conta, lancamento_id: principal, ...(conta.sobra ? { sobra: { ...conta.sobra, lancamento_id: conta.sobra.destino === "devolvido" ? feito.ids?.devolucao ?? null : conta.sobra.lancamento_id ?? null } } : {}) };
       avisar(recado);
-      if (vejoFinanceiro && dinheiroOk && (conta.total > 0 || conta.pendencias.length > 0 || conta.sobra)) setFechada({ conta, saida });
+      if (vejoFinanceiro && (gravada.total > 0 || gravada.pendencias.length > 0 || gravada.sobra)) setFechada({ conta: gravada, saida });
       else aoGravar();
-    } catch (e) { avisarErro(e); } finally { setSalvando(false); }
+    } catch (e) { avisarErro(e); return false; } finally { setSalvando(false); }
   }
 
   if (fechada) return <ContaFechada estadia={estadia} conta={fechada.conta} saida={fechada.saida} aoPronto={aoGravar} pendente={pendente} />;

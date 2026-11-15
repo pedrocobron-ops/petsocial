@@ -1,7 +1,7 @@
 "use client";
 
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, CalendarOff, DoorOpen, Home, HandCoins, Hourglass, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, ShieldAlert, ShieldCheck, Sun, Sunset, Syringe } from "lucide-react";
 import { useCalendario } from "@/components/gestao/calendario";
@@ -964,6 +964,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   // trava na hora do primeiro toque e chave da operação: toque duplo não marca a reserva nem lança o sinal duas vezes
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
+  // a reserva já foi marcada nesta operação e só o sinal falhou: a nova tentativa (mesma chave) não confere de novo o conflito com ela mesma
+  const marcadaNaChave = useRef<string | null>(null);
   async function gravar(chave: string): Promise<boolean | void> {
     if (!pet || salvando) return;
     setErro(null); setErroSinal(null);
@@ -987,7 +989,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
     const status = emCasa ? "em_casa" : "reservada";
     const novo: Periodo = { tipo, entrada: entrada.toISOString(), saida_prevista: saida?.toISOString() ?? null, status };
     // o mesmo pet não fica duas vezes na casa nem com duas reservas no mesmo período (sem opção de forçar)
-    const bate = conflitoDoPet(pet.id, novo, abertas, editar?.id ?? null, agora);
+    const bate = marcadaNaChave.current === chave ? null : conflitoDoPet(pet.id, novo, abertas, editar?.id ?? null, agora);
     if (bate) {
       return falha(!editar && jaAqui && bate.status === "reservada" && isoDia(new Date(bate.entrada)) === isoDia(agora)
         ? `${pet.nome} tem reserva para hoje. Faça o check-in pela reserva, na aba Reservas.` : fraseConflito(pet.nome, bate));
@@ -1056,6 +1058,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
           id = (await sb.from("estadias").select("id").eq("petshop_id", petshop.id).eq("chave", chaveDaEstadia).maybeSingle()).data?.id ?? null;
         }
         if (!id) throw nova.error ?? new Error("Não deu para marcar. Tente de novo.");
+        marcadaNaChave.current = chave;
         avisar(`${emCasa ? `${pet.nome} está na casa.` : `Reserva de ${pet.nome} marcada para ${dataAmigavel(entrada)}.`}${comExp ? " É o dia de experiência." : ""}`);
       }
       // as taxas combinadas e o sinal ficam à parte, só para quem recebe
@@ -1068,7 +1071,11 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
           await lancarSinal(sb, petshop.id, { id, tipo, entrada: entrada.toISOString(), pet: pet.nome, clienteId: pet.clientes?.id ?? null }, sinalPronto, chave);
           avisar(sinalPronto.modo === "agora" ? `Sinal de ${brl(sinalPronto.valor)} recebido.` : `Sinal de ${brl(sinalPronto.valor)} em A receber, para ${dataCurta(sinalPronto.quando)}.`);
         } catch (e) {
-          avisarErro(`A reserva foi marcada, mas o sinal não foi anotado. Toque em Sinal no cartão da reserva. (${e instanceof Error ? e.message : "erro"})`);
+          // o sinal e a ligação com a reserva vão juntos: nada dele ficou gravado. A mesma chave na nova tentativa encontra a
+          // reserva já marcada e anota o sinal uma vez só
+          setErroSinal("O sinal não foi anotado. Toque de novo para anotar.");
+          avisarErro(`A reserva foi marcada, mas o sinal não foi anotado (nada dele foi lançado). Toque de novo para anotar o sinal. (${e instanceof Error ? e.message : "erro"})`);
+          return false;
         }
       }
       aoGravar(emCasa);
@@ -1078,6 +1085,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         const { data: la } = await sb.from("estadias").select("entrada").eq("petshop_id", petshop.id).eq("pet_id", pet.id).eq("status", "em_casa").maybeSingle();
         falha(`${pet.nome} já está na casa${la ? ` desde ${quando(la.entrada)}` : ""}.`);
       } else avisarErro(e);
+      // pode ter gravado uma parte (a reserva): a nova tentativa usa a mesma chave
+      return false;
     } finally { setSalvando(false); }
   }
 

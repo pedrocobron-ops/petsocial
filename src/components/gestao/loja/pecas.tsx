@@ -94,8 +94,12 @@ export function pagoAMenos(e: EstadoPagamento, total: number): { entregue: numbe
   const usadas = c.partes.filter((p) => Number(p.valor) > 0);
   if (!(c.falta > 0) || c.passou > 0 || !usadas.length || usadas.some((p) => !p.forma)) return null;
   if (new Set(usadas.map((p) => p.forma)).size !== usadas.length) return null;
-  const pagamentos = usadas.map((p) => ({ forma: p.forma!, valor: centavos(p.valor!) }));
-  return { entregue: c.soma, falta: c.falta, forma: formaPrincipal(pagamentos), pagamentos: pagamentos.length > 1 ? pagamentos : null };
+  // a parte em dinheiro entra pelo que o cliente entregou de verdade ("Recebeu quanto?" menor que a parte): o que faltou nela
+  // também fica para depois, em vez de entrar no caixa um dinheiro que não veio
+  const naMao = dinheiroAMenos(e, total);
+  const pagamentos = usadas.map((p) => ({ forma: p.forma!, valor: centavos(p.forma === "dinheiro" && naMao ? naMao.entregue : p.valor!) }));
+  const soma = centavos(pagamentos.reduce((t, p) => t + p.valor, 0));
+  return { entregue: soma, falta: centavos(total - soma), forma: formaPrincipal(pagamentos), pagamentos: pagamentos.length > 1 ? pagamentos : null };
 }
 
 /** Pagamento de uma tela que recebe: começa sem forma marcada. */

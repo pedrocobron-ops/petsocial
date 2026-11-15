@@ -12,6 +12,7 @@ import { imprimirComprovante, textoComprovante } from "@/lib/gestao/comprovante"
 import { conferirCaixa, desfazerVenda, itensDoLancamento, lancarAReceber, lancarPago, produtosDaVenda, textoDoPagamento, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import { taxaDeFalta, travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useOperacao } from "@/lib/gestao/uma-vez";
+import { fazerTudoOuNada } from "@/lib/gestao/tudo-ou-nada";
 import { nomeDosServicos, servicosAMais, servicosPorExtenso, valorDoHorario } from "@/lib/gestao/servicos-do-horario";
 import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -178,20 +179,22 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     } catch (e) { avisarErro(e); } finally { setOcupado(false); }
   }
 
-  async function usarPacote(p: PacoteCliente) {
-    if (somenteLeitura()) return;
+  // o uso do pacote soma no banco (nunca volta um número lido antes) e o horário conclui junto: tudo ou nada
+  const opPacote = useOperacao();
+  const usarPacote = (p: PacoteCliente) => opPacote.fazer(async (chave) => {
+    if (somenteLeitura()) return false;
     setOcupado(true);
     try {
-      const usados = p.usados + 1;
-      ok(await sb.from("pacotes_clientes").update({ usados, ativo: usados < p.total }).eq("id", p.id).select("id").single());
-      ok(await sb.from("agendamentos").update({ status: "concluido", pacote_cliente_id: p.id }).eq("id", a.id).select("id").single());
-      avisar(`Usado ${usados} de ${p.total} do pacote.`);
+      const feito = await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "agendamento_fechar_conta", agendamento: a.id },
+        [{ t: "pacote", id: p.id, n: 1 }, { t: "agendamento", id: a.id, status: "concluido", pacote_cliente_id: p.id }]);
+      const u = feito.passos.find((x) => x.t === "pacote");
+      avisar(`Usado ${u?.usados ?? p.usados + 1} de ${u?.total ?? p.total} do pacote.`);
       avisarMudanca();
       aoMudar();
       aoFechar();
-    } catch (e) { avisarErro(e); }
-    setOcupado(false);
-  }
+      return true;
+    } catch (e) { avisarErro(e); return false; } finally { setOcupado(false); }
+  });
 
   /** Volta um horário encerrado para "marcado". Se já tem dinheiro lançado, explica antes o que acontece com ele. */
   async function reabrir() {

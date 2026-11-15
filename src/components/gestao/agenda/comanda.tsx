@@ -1,25 +1,27 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Check, MessageCircle, Plus, Scissors, Ticket, Truck } from "lucide-react";
-import type { AgendamentoCompleto, PacoteCliente } from "@/lib/gestao/tipos";
+import type { AgendamentoCompleto, Lancamento, PacoteCliente } from "@/lib/gestao/tipos";
 import { textoComprovante, textoComprovanteDaParte } from "@/lib/gestao/comprovante";
-import { conferirCaixa, conferirValorAlto, formaPrincipal, lancarAReceber, lancarPago, pagamentoComCredito, parteDaChave, receberComCredito, receberConta, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, formaPrincipal, pagamentoComCredito, parteDaChave, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { casoDoErro, fazerTudoOuNada, lancamentoDe, partesOuNada, passoDoEstoque, ref, type Passo } from "@/lib/gestao/tudo-ou-nada";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { UsarCredito } from "../financeiro/comum";
 import { multaSugerida } from "@/lib/gestao/dinheiro-opcoes";
 import { repartirPagamento } from "@/lib/gestao/hotel";
 import { useOperacao } from "@/lib/gestao/uma-vez";
-import { definirServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-horario";
+import { servicosAMais } from "@/lib/gestao/servicos-do-horario";
 import { brl, dataCompleta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useGestao } from "../contexto";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { Tile } from "../painel";
-import { AvatarPet, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
+import { AvatarPet, Folha, avisarMudanca, mensagemDeErro, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import {
-  baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
+  BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
   produtosDaConta, resumoDosItens, useProdutosDaLoja, valorDaLinha, type ItemConta, type PagaDepois,
 } from "../loja/conta";
 import { AvisoCaixaFechado, fecharPagamento, pagoAMenos, useCaixaAberto, usePagamento } from "../loja/pecas";
@@ -84,10 +86,11 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   // o que o tutor deve de antes (só para quem recebe): pode entrar nesta conta e ter baixa no mesmo pagamento
   const { dados: antigasLidas } = useDados(async () => {
     if (!vejoFinanceiro || !tutor?.id) return [] as Antiga[];
-    const r = await sb.from("lancamentos").select("id, valor, descricao, categoria, data, vencimento, agendamento_id, multa_recebida, multa_recebida_em")
-      .eq("petshop_id", petshop.id).eq("cliente_id", tutor.id).eq("tipo", "entrada").eq("pago", false).order("data").order("id").limit(20);
-    if (r.error) return [] as Antiga[];
-    return ((r.data ?? []) as Antiga[]).filter((l) => l.agendamento_id !== a.id).map((l) => ({ ...l, valor: Number(l.valor) }));
+    // todas as contas abertas do tutor (em páginas: o banco entrega no máximo mil por vez)
+    const lidas = await lerTudo<Antiga>((de, ate, contar) => sb.from("lancamentos").select("id, valor, descricao, categoria, data, vencimento, agendamento_id, multa_recebida, multa_recebida_em", contando(contar))
+      .eq("petshop_id", petshop.id).eq("cliente_id", tutor.id).eq("tipo", "entrada").eq("pago", false).order("data").order("id").range(de, ate)).catch(() => null);
+    if (!lidas) return [] as Antiga[];
+    return lidas.filter((l) => l.agendamento_id !== a.id).map((l) => ({ ...l, valor: Number(l.valor) }));
   }, [petshop.id, tutor?.id ?? "", vejoFinanceiro, a.id]);
   const antigas = antigasLidas ?? [];
   const devido = centavos(antigas.reduce((t, l) => t + l.valor, 0));
@@ -111,8 +114,6 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   const entregue = !pagamento.dividido && pagamento.forma === "dinheiro" ? pagamento.entregue ?? 0 : 0;
   const trocoQuePaga = !comDivida && devido > 0 && !depois.ativo && entregue > daConta + 0.005 ? centavos(Math.min(devido, entregue - daConta)) : 0;
   const primeiroNome = tutor?.nome?.split(" ")[0] ?? "O tutor";
-  // a conta inteira já ficou anotada numa tentativa anterior (a parte em dinheiro é que falhou): a nova tentativa só recebe a parte
-  const contaDaParte = useRef<string | null>(null);
   const vendidos = produtosDaConta(itens);
   const temLevaTraz = itens.some((i) => i.tipo === "extra" && i.nome === LEVA_E_TRAZ);
   // atendimento já concluído e conta zerada: quem recebe ainda pode dizer "não vou cobrar" (uma vez)
@@ -167,119 +168,118 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       : null;
     let pagouAntigas = 0;
     setSalvando(true);
-    let recebeu = false;
-    let usouPacote = false;
     let zapComprovante: string | null = null;
     try {
-      // outra pessoa pode ter recebido enquanto esta conta estava aberta
-      const ja = ok(await sb.rpc("recebimentos_do_agendamento", { p_agendamento: a.id }));
-      if (ja.length) {
-        avisarErro("Este atendimento já tem recebimento lançado.");
-        avisarMudanca();
-        aoPronto();
-        return true;
-      }
-      // os serviços desta conta ficam no horário (juntou ou tirou um na hora de fechar): antes de lançar o dinheiro
-      const antes = outrosDoHorario.map((o) => o.servico_id);
-      if (antes.length !== servicosNaConta.length || servicosNaConta.some((id) => !antes.includes(id))) {
-        await definirServicosAMais(sb, a.id, servicosNaConta.map((id) => {
-          const tinha = outrosDoHorario.find((o) => o.servico_id === id);
-          return { servico_id: id, preco: tinha ? tinha.preco : itens.find((i) => i.servicoId === id)?.valor ?? null };
-        }));
-      }
-      // o serviço principal sai do pacote: um uso a menos, antes de cobrar o resto
-      if (pacote) {
-        const usados = pacote.usados + 1;
-        ok(await sb.from("pacotes_clientes").update({ usados, ativo: usados < pacote.total }).eq("id", pacote.id).select("id").single());
-        ok(await sb.from("agendamentos").update({ pacote_cliente_id: pacote.id }).eq("id", a.id).select("id").single());
-        usouPacote = true;
-      }
+      // tudo numa chamada só (o banco grava tudo ou nada): serviços do horário, pacote, a conta, o crédito, as contas antigas,
+      // o estoque e o atendimento concluído. Se a internet cair no meio, nada fica pela metade; tocar de novo não repete.
+      const passos = passosDoComeco();
       const gravar = itensParaGravar(itens);
-      const mais = resumoDosItens(gravar);
-      const nomes = gravar.filter((i) => i.tipo === "servico").map((i) => i.nome).join(" + ") || (peloPacote ? `${servico} (pacote)` : servico);
-      const descricao = encurtar(`${nomes} · ${pet?.nome ?? ""}`.trim().replace(/ ·$/, "") + (mais ? ` + ${mais}` : ""));
-      let lancamentoId: string | null = null;
+      const descricao = descricaoDaConta(gravar);
+      let lanca = false;
       if (fiado) {
-        lancamentoId = (await lancarAReceber(sb, petshop.id, {
-          valor: contas.total, vencimento: depois.quando, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null, descricao, itens: gravar, chave,
-        }))?.id ?? null;
-        recebeu = true;
+        passos.push({ t: "lancamento", nome: "principal", chave, linha: {
+          tipo: "entrada", valor: contas.total, forma: null, categoria: categoria(), descricao, data: depois.quando, vencimento: depois.quando, pago: false,
+          agendamento_id: a.id, cliente_id: tutor?.id ?? null, itens: gravar,
+        } });
+        lanca = true;
         // o crédito do tutor paga uma parte agora; o resto fica a receber
-        if (credito > 0 && lancamentoId) await receberComCredito(sb, lancamentoId, credito, parteDaChave(chave, "credito"));
+        if (credito > 0) passos.push({ t: "receber_credito", conta: ref("principal"), valor: credito, chave: parteDaChave(chave, "credito") });
       } else if ((pg && !("erro" in pg)) || soCredito) {
         const cash = pg && !("erro" in pg) ? pg : null;
         const dinheiroDaConta: PartePagamento[] | null = repartido ? repartido[0] : null;
         const pgDaConta = dinheiroDaConta?.length ? { forma: formaPrincipal(dinheiroDaConta), pagamentos: dinheiroDaConta.length > 1 ? dinheiroDaConta : null } : cash;
         const comCredito = credito > 0 ? pagamentoComCredito(credito, pgDaConta && daConta > 0 ? pgDaConta : null, daConta) : { forma: pgDaConta!.forma, pagamentos: pgDaConta!.pagamentos ?? null };
-        const lancado = contas.total > 0 ? await lancarPago(sb, petshop.id, {
-          tipo: "entrada", valor: contas.total,
-          forma: comCredito.forma, pagamentos: comCredito.pagamentos,
-          categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null, descricao, itens: gravar, chave, creditoUsado: credito,
-        }) : null;
-        recebeu = contas.total > 0;
-        lancamentoId = lancado?.id ?? null;
+        if (contas.total > 0) {
+          passos.push({ t: "lancamento", nome: "principal", chave, linha: {
+            tipo: "entrada", valor: contas.total, forma: comCredito.forma, pagamentos: partesOuNada(comCredito.pagamentos), pago: true, data: isoDia(new Date()),
+            categoria: categoria(), agendamento_id: a.id, cliente_id: tutor?.id ?? null, descricao, itens: gravar, credito_usado: credito > 0 ? credito : null,
+          } });
+          lanca = true;
+        }
         // o que devia de antes: baixa nas contas antigas, no mesmo pagamento (nada de "Troco" para dinheiro que paga dívida)
-        const falhas: string[] = [];
         for (const [i, x] of paraAntigas.entries()) {
           const partes = repartido?.[i + 1] ?? [];
           if (!(x.valor > 0) || !partes.length) continue;
-          try {
-            await receberConta(sb, x.conta.id, { valor: x.valor, forma: formaPrincipal(partes), pagamentos: partes.length > 1 ? partes : null, chave: parteDaChave(chave, "antiga", x.conta.id) });
-            pagouAntigas = centavos(pagouAntigas + x.valor);
-          } catch (e) { falhas.push(`${x.conta.descricao || x.conta.categoria} (${mensagemDeErro(e)})`); }
-        }
-        if (falhas.length) avisarErro(`A conta de hoje foi recebida, mas não consegui dar baixa em: ${falhas.join("; ")}. Receba pela ficha do tutor, em Recebi.`);
-        if (vejoFinanceiro && cash && soDigitos(tutor?.telefone).length >= 8 && (lancado || pagouAntigas > 0)) {
-          const formas = cash.pagamentos ?? [{ forma: cash.forma, valor: recebendo }];
-          zapComprovante = junto > 0
-            ? linkWhatsApp(tutor?.telefone, textoComprovanteDaParte({
-                petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, itens: gravar, total: contas.total, desconto: contas.desconto,
-                pago: centavos(contas.total + pagouAntigas), formas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas,
-              }))
-            : lancado ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] })) : null;
-        } else if (vejoFinanceiro && lancado && soDigitos(tutor?.telefone).length >= 8) {
-          zapComprovante = linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] }));
+          passos.push({ t: "receber", conta: x.conta.id, valor: x.valor, forma: formaPrincipal(partes), pagamentos: partesOuNada(partes), chave: parteDaChave(chave, "antiga", x.conta.id) });
+          pagouAntigas = centavos(pagouAntigas + x.valor);
         }
       }
-      let estoqueOk = true;
-      try { await baixarEstoque(sb, petshop.id, user.id, itens, lancamentoId, chave); } catch (e) {
-        estoqueOk = false;
-        avisarErro(`${recebeu ? (fiado ? "A conta foi anotada, mas o" : "O valor foi recebido, mas o") : "O"} estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
-      }
+      const estoque = passoDoEstoque(produtosDaConta(itens), chave, lanca ? ref("principal") : null);
+      if (estoque) passos.push(estoque);
       // conta zerada por quem recebe: fica anotado que este atendimento não vai ser cobrado (sai da lista "para cobrar")
-      const naoCobra = !recebeu && vejoFinanceiro && !a.sem_cobranca;
-      if (a.status !== "concluido" || naoCobra) ok(await sb.from("agendamentos").update({ status: "concluido", ...(naoCobra ? { sem_cobranca: true } : {}) }).eq("id", a.id).select("id").single());
+      const naoCobra = !lanca && vejoFinanceiro && !a.sem_cobranca;
+      if (a.status !== "concluido" || naoCobra) passos.push({ t: "agendamento", id: a.id, status: "concluido", ...(naoCobra ? { sem_cobranca: true } : {}) });
+      const feito = await fecharNoBanco(chave, passos);
+      if (!feito) return true;
+      const usos = feito.passos.find((p) => p.t === "pacote");
+      const lancado = lanca && !fiado ? (lancamentoDe(feito, "principal") as unknown as Lancamento | null) : null;
+      if (vejoFinanceiro && pg && !("erro" in pg) && soDigitos(tutor?.telefone).length >= 8 && (lancado || pagouAntigas > 0)) {
+        const formas = pg.pagamentos ?? [{ forma: pg.forma, valor: recebendo }];
+        zapComprovante = junto > 0
+          ? linkWhatsApp(tutor?.telefone, textoComprovanteDaParte({
+              petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, itens: gravar, total: contas.total, desconto: contas.desconto,
+              pago: centavos(contas.total + pagouAntigas), formas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas,
+            }))
+          : lancado ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] })) : null;
+      } else if (vejoFinanceiro && lancado && soDigitos(tutor?.telefone).length >= 8) {
+        zapComprovante = linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] }));
+      }
+      const recebeu = lanca;
       const notaAntigas = pagouAntigas > 0
         ? ` Recebido também ${brl(pagouAntigas)} do que ${primeiroNome} devia${devido - pagouAntigas > 0.005 ? `: ainda deve ${brl(devido - pagouAntigas)}` : ", que ficou quitado"}.`
         : "";
       const notaCredito = credito > 0 ? ` ${brl(credito)} saíram do crédito de ${primeiroNome}.` : "";
-      if (estoqueOk) avisar(fiado ? `Anotado: ${brl(daConta)} a receber até ${dataCompleta(depois.quando)}.${notaCredito}` : recebeu ? `Recebido ${brl(contas.total)}.${notaCredito}${usouPacote ? ` ${servico} saiu do pacote.` : ""}${notaAntigas}` : pagouAntigas > 0 ? `Atendimento concluído.${notaAntigas}` : usouPacote ? `Usado ${pacote!.usados + 1} de ${pacote!.total} do pacote.` : "Atendimento concluído sem cobrança.");
+      const usados = usos?.usados ?? (pacote ? pacote.usados + 1 : 0), total = usos?.total ?? pacote?.total ?? 0;
+      avisar(fiado ? `Anotado: ${brl(daConta)} a receber até ${dataCompleta(depois.quando)}.${notaCredito}` : recebeu ? `Recebido ${brl(contas.total)}.${notaCredito}${pacote ? ` ${servico} saiu do pacote.` : ""}${notaAntigas}` : pagouAntigas > 0 ? `Atendimento concluído.${notaAntigas}` : pacote ? `Usado ${usados} de ${total} do pacote.` : "Atendimento concluído sem cobrança.");
       avisarMudanca();
       if (zapComprovante) setRecebida({ valor: centavos(contas.total + pagouAntigas), zap: zapComprovante, nota: `${notaCredito}${notaAntigas}`.trim() || undefined });
       else aoPronto();
       return true;
+    } catch (e) { avisarErro(e); setSalvando(false); return false; }
+  }
+
+  /** Os primeiros passos de toda conta: ninguém recebeu antes, os serviços do horário, e o pacote (um uso, somado no banco). */
+  function passosDoComeco(): Passo[] {
+    const passos: Passo[] = [{ t: "sem_recebimento", agendamento: a.id }];
+    // os serviços desta conta ficam no horário (juntou ou tirou um na hora de fechar): antes de lançar o dinheiro
+    const antes = outrosDoHorario.map((o) => o.servico_id);
+    if (antes.length !== servicosNaConta.length || servicosNaConta.some((id) => !antes.includes(id))) {
+      passos.push({ t: "servicos", agendamento: a.id, servicos: servicosNaConta.map((id) => {
+        const tinha = outrosDoHorario.find((o) => o.servico_id === id);
+        return { servico_id: id, preco: tinha ? tinha.preco : itens.find((i) => i.servicoId === id)?.valor ?? null };
+      }) });
+    }
+    // o serviço principal sai do pacote: um uso a menos, antes de cobrar o resto
+    if (pacote) passos.push({ t: "pacote", id: pacote.id, n: 1 }, { t: "agendamento", id: a.id, pacote_cliente_id: pacote.id });
+    return passos;
+  }
+
+  function descricaoDaConta(gravar: ReturnType<typeof itensParaGravar>) {
+    const mais = resumoDosItens(gravar);
+    const nomes = gravar.filter((i) => i.tipo === "servico").map((i) => i.nome).join(" + ") || (peloPacote ? `${servico} (pacote)` : servico);
+    return encurtar(`${nomes} · ${pet?.nome ?? ""}`.trim().replace(/ ·$/, "") + (mais ? ` + ${mais}` : ""));
+  }
+
+  /** Manda a conta para o banco. Devolve null quando outra pessoa já tinha recebido (a folha fecha); erro: nada foi gravado. */
+  async function fecharNoBanco(chave: string, passos: Passo[]) {
+    try {
+      return await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "agendamento_fechar_conta", agendamento: a.id }, passos);
     } catch (e) {
-      if (recebeu) {
-        avisarErro(`${depois.ativo ? "A conta foi anotada" : "O valor foi recebido"}, mas o atendimento não ficou como concluído. Conclua pela agenda. (${mensagemDeErro(e)})`);
+      if (casoDoErro(e) === "maestro:ja_recebido") {
+        // outra pessoa recebeu enquanto esta conta estava aberta: fecha a conta e mostra o horário atualizado
+        avisarErro("Este atendimento já tem recebimento lançado.");
         avisarMudanca();
         aoPronto();
-      } else if (e instanceof Error && /já tem recebimento/.test(e.message)) {
-        // outra pessoa recebeu no mesmo instante: fecha a conta e mostra o horário atualizado
-        avisarErro(e);
-        avisarMudanca();
-        aoPronto();
-      } else if (usouPacote) {
-        avisarErro(`${servico} saiu do pacote, mas o resto da conta não foi lançado. Abra o horário e feche a conta de novo. (${mensagemDeErro(e)})`);
-        avisarMudanca();
-        aoPronto();
-      } else { avisarErro(e); setSalvando(false); return false; }
-      return true;
+        return null;
+      }
+      throw new Error(`A conta não foi fechada: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`);
     }
   }
 
   /**
-   * O cliente pagou só uma parte em dinheiro: a conta inteira fica anotada para o tutor (como "Cliente paga depois") e a parte
+   * O cliente pagou só uma parte: a conta inteira fica anotada para o tutor (como "Cliente paga depois") e a parte
    * que entrou é recebida na hora (entra no caixa). Em A receber e na ficha fica só o que falta. Mesmo caminho do "Recebi" da ficha.
+   * Tudo numa chamada só: a conta, o pacote, o estoque, o atendimento concluído, o crédito e a parte paga entram juntos ou nada entra.
    */
   async function receberParte(chave: string, m: { entregue: number; forma: PartePagamento["forma"]; pagamentos: PartePagamento[] | null }): Promise<boolean> {
     const entregue = m.entregue, falta = centavos(daConta - m.entregue);
@@ -289,63 +289,43 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     const problema = erroDaConta(itens, desconto, contas.total);
     if (problema) { avisarErro(problema); return false; }
     const naoTem = faltaNoEstoque(itens, produtos);
-    if (!contaDaParte.current && naoTem.length && !(await perguntar({ titulo: naoTem.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${naoTem.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return false;
-    if (!contaDaParte.current && !(await conferirValorAlto(contas.total, perguntar))) return false;
+    if (naoTem.length && !(await perguntar({ titulo: naoTem.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${naoTem.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return false;
+    if (!(await conferirValorAlto(contas.total, perguntar))) return false;
     if (!(await conferirCaixa(sb, petshop.id, perguntar))) return false;
     setSalvando(true);
     try {
-      let contaId = contaDaParte.current;
-      if (!contaId) {
-        const ja = ok(await sb.rpc("recebimentos_do_agendamento", { p_agendamento: a.id }));
-        if (ja.length) { avisarErro("Este atendimento já tem recebimento lançado."); avisarMudanca(); aoPronto(); return true; }
-        const antes = outrosDoHorario.map((o) => o.servico_id);
-        if (antes.length !== servicosNaConta.length || servicosNaConta.some((id) => !antes.includes(id))) {
-          await definirServicosAMais(sb, a.id, servicosNaConta.map((id) => {
-            const tinha = outrosDoHorario.find((o) => o.servico_id === id);
-            return { servico_id: id, preco: tinha ? tinha.preco : itens.find((i) => i.servicoId === id)?.valor ?? null };
-          }));
-        }
-        const gravar = itensParaGravar(itens);
-        const mais = resumoDosItens(gravar);
-        const nomes = gravar.filter((i) => i.tipo === "servico").map((i) => i.nome).join(" + ") || (peloPacote ? `${servico} (pacote)` : servico);
-        const descricao = encurtar(`${nomes} · ${pet?.nome ?? ""}`.trim().replace(/ ·$/, "") + (mais ? ` + ${mais}` : ""));
-        const conta = await lancarAReceber(sb, petshop.id, {
-          valor: contas.total, vencimento: depois.quando, categoria: categoria(), agendamentoId: a.id, clienteId: tutor.id, descricao, itens: gravar, chave: parteDaChave(chave, "conta"),
-        });
-        contaId = contaDaParte.current = conta.id;
-        if (pacote) {
-          const usados = pacote.usados + 1;
-          ok(await sb.from("pacotes_clientes").update({ usados, ativo: usados < pacote.total }).eq("id", pacote.id).select("id").single());
-          ok(await sb.from("agendamentos").update({ pacote_cliente_id: pacote.id }).eq("id", a.id).select("id").single());
-        }
-        try { await baixarEstoque(sb, petshop.id, user.id, itens, conta.id, chave); } catch (e) {
-          avisarErro(`A conta foi anotada, mas o estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
-        }
-        if (a.status !== "concluido") ok(await sb.from("agendamentos").update({ status: "concluido" }).eq("id", a.id).select("id").single());
-      }
-      // o crédito do tutor entra primeiro (a mesma chave de novo não usa outra vez), depois a parte que ele deu
-      if (credito > 0) await receberComCredito(sb, contaId, credito, parteDaChave(chave, "credito"));
-      await receberConta(sb, contaId, { valor: entregue, forma: m.forma, pagamentos: m.pagamentos, chave: parteDaChave(chave, "parte") });
-      contaDaParte.current = null;
+      const passos = passosDoComeco();
+      const gravar = itensParaGravar(itens);
+      passos.push({ t: "lancamento", nome: "conta", chave: parteDaChave(chave, "conta"), linha: {
+        tipo: "entrada", valor: contas.total, forma: null, categoria: categoria(), descricao: descricaoDaConta(gravar), data: depois.quando, vencimento: depois.quando, pago: false,
+        agendamento_id: a.id, cliente_id: tutor.id, itens: gravar,
+      } });
+      const estoque = passoDoEstoque(produtosDaConta(itens), chave, ref("conta"));
+      if (estoque) passos.push(estoque);
+      if (a.status !== "concluido") passos.push({ t: "agendamento", id: a.id, status: "concluido" });
+      // o crédito do tutor entra primeiro, depois a parte que ele deu
+      if (credito > 0) passos.push({ t: "receber_credito", conta: ref("conta"), valor: credito, chave: parteDaChave(chave, "credito") });
+      passos.push({ t: "receber", conta: ref("conta"), valor: entregue, forma: m.forma, pagamentos: partesOuNada(m.pagamentos), chave: parteDaChave(chave, "parte") });
+      const feito = await fecharNoBanco(chave, passos);
+      if (!feito) return true;
       const nota = `${credito > 0 ? `${brl(credito)} saíram do crédito de ${primeiroNome}. ` : ""}Ficou ${brl(falta)} para ${primeiroNome} pagar até ${dataCompleta(depois.quando)}, em A receber e na ficha.${junto > 0 ? ` O que ${primeiroNome} devia de antes (${brl(devido)}) continua anotado.` : ""}`;
       avisar(`Recebido ${brl(entregue)}. ${nota}`);
       avisarMudanca();
       // quem fica devendo é quem mais precisa do comprovante do que já pagou
       const zap = vejoFinanceiro ? linkWhatsApp(tutor.telefone, textoComprovanteDaParte({
-        petshop: petshop.nome, tutor: tutor.nome, pet: pet?.nome, quando: a.inicio, itens: itensParaGravar(itens), total: contas.total, desconto: contas.desconto,
+        petshop: petshop.nome, tutor: tutor.nome, pet: pet?.nome, quando: a.inicio, itens: gravar, total: contas.total, desconto: contas.desconto,
         pago: entregue, formas: m.pagamentos ?? [{ forma: m.forma, valor: entregue }], falta, pagaAte: depois.quando,
       })) : null;
       if (zap && soDigitos(tutor.telefone).length >= 8) setRecebida({ valor: entregue, nota, zap });
       else aoPronto();
       return true;
     } catch (e) {
-      // a conta já ficou anotada e a parte não entrou: a nova tentativa (mesma chave) só recebe a parte
-      avisarErro(contaDaParte.current ? `A conta ficou anotada em A receber, mas os ${brl(entregue)} em dinheiro não entraram. Toque de novo para receber. (${mensagemDeErro(e)})` : e);
+      // nada ficou gravado (ou a resposta não chegou): a nova tentativa usa a mesma chave e não repete nada
+      avisarErro(e);
       setSalvando(false);
       return false;
     }
   }
-
   if (recebida) {
     return (
       <Folha titulo="Conta fechada" aoFechar={aoPronto} rodape={<button type="button" className="g-btn sec" onClick={aoPronto}>Pronto</button>}>
@@ -441,7 +421,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         {trocoQuePaga > 0 && (
           <p className="g-aviso" style={{ margin: 0 }} role="status">
             <span>
-              <b>{primeiroNome} deve {brl(devido)} de antes.</b> Em vez de dar {brl(entregue - contas.total)} de troco, o dinheiro pode pagar {trocoQuePaga >= devido - 0.005 ? "essa conta inteira" : `${brl(trocoQuePaga)} dela`}.{" "}
+              <b>{primeiroNome} deve {brl(devido)} de antes.</b> Em vez de dar {brl(entregue - daConta)} de troco, o dinheiro pode pagar {trocoQuePaga >= devido - 0.005 ? "essa conta inteira" : `${brl(trocoQuePaga)} dela`}.{" "}
               <button type="button" className="g-link" onClick={() => { setComDivida(true); setErroForma(null); }}>Usar para pagar o que deve</button>
             </span>
           </p>

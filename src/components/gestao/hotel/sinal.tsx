@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago, parteDaChave, quitarConta, receberConta, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, parteDaChave, quitarConta, receberConta, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { casoDoErro, fazerTudoOuNada, partesOuNada, ref, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { ValoresDaEstadia } from "@/lib/gestao/hotel";
 import { sinalDe } from "@/lib/gestao/hotel-opcoes";
@@ -52,24 +53,27 @@ export async function conferirSinal(sb: Banco, petshopId: string, s: SinalPronto
   return true;
 }
 
-/** Lança o sinal (recebido ou a receber) e liga à reserva. */
-export async function lancarSinal(sb: Banco, petshopId: string, e: { id: string; tipo: string; entrada: string; pet: string; clienteId: string | null }, s: SinalPronto, chave?: string | null) {
+/**
+ * Lança o sinal (recebido ou a receber) e liga à reserva, numa chamada só: ou os dois ficam gravados, ou nenhum.
+ * Com a mesma chave de novo (a resposta não chegou, toque de novo), o banco devolve o que já foi feito, sem lançar outra vez.
+ */
+export async function lancarSinal(sb: Banco, petshopId: string, e: { id: string; tipo: string; entrada: string; pet: string; clienteId: string | null }, s: SinalPronto, chave: string) {
   if (s.modo === "sem") return;
   const descricao = `Sinal da reserva: ${nomeTipo(e.tipo).toLowerCase()} de ${e.pet}, ${dataCurta(e.entrada)}`;
   const hoje = isoDia(new Date());
-  if (s.modo === "agora") {
-    const l = await lancarPago(sb, petshopId, { tipo: "entrada", valor: s.valor, forma: s.forma, pagamentos: s.pagamentos, categoria: CATEGORIA_SINAL, descricao, clienteId: e.clienteId, chave: parteDaChave(chave, "sinal") });
-    ok(await sb.from("estadias_valores").upsert({
-      estadia_id: e.id, petshop_id: petshopId, sinal: s.valor, sinal_estado: "pago", sinal_lancamento_id: l.id, sinal_pago_em: hoje,
+  const passos: Passo[] = s.modo === "agora" ? [
+    { t: "lancamento", nome: "sinal", chave: parteDaChave(chave, "sinal"), linha: { tipo: "entrada", valor: s.valor, forma: s.forma, pagamentos: partesOuNada(s.pagamentos), categoria: CATEGORIA_SINAL, descricao, cliente_id: e.clienteId, pago: true, data: hoje } },
+    { t: "estadia_valores", estadia: e.id, modo: "upsert", campos: {
+      sinal: s.valor, sinal_estado: "pago", sinal_lancamento_id: ref("sinal"), sinal_pago_em: hoje,
       sinal_pagamento: { forma: s.forma, pagamentos: s.pagamentos }, sinal_devolucao_id: null, sinal_devolvido_em: null,
-    }, { onConflict: "estadia_id" }).select("estadia_id"));
-  } else {
-    const l = await lancarAReceber(sb, petshopId, { valor: s.valor, vencimento: s.quando, categoria: CATEGORIA_SINAL, descricao, clienteId: e.clienteId, chave: parteDaChave(chave, "sinal") });
-    ok(await sb.from("estadias_valores").upsert({
-      estadia_id: e.id, petshop_id: petshopId, sinal: s.valor, sinal_estado: "a_receber", sinal_lancamento_id: l.id, sinal_pago_em: null, sinal_pagamento: null,
-      sinal_devolucao_id: null, sinal_devolvido_em: null,
-    }, { onConflict: "estadia_id" }).select("estadia_id"));
-  }
+    } },
+  ] : [
+    { t: "lancamento", nome: "sinal", chave: parteDaChave(chave, "sinal"), linha: { tipo: "entrada", valor: s.valor, forma: null, categoria: CATEGORIA_SINAL, descricao, cliente_id: e.clienteId, pago: false, data: s.quando, vencimento: s.quando } },
+    { t: "estadia_valores", estadia: e.id, modo: "upsert", campos: {
+      sinal: s.valor, sinal_estado: "a_receber", sinal_lancamento_id: ref("sinal"), sinal_pago_em: null, sinal_pagamento: null, sinal_devolucao_id: null, sinal_devolvido_em: null,
+    } },
+  ];
+  await fazerTudoOuNada(sb, petshopId, parteDaChave(chave, "sinal")!, { funcao: "estadia_sinal", estadia: e.id }, passos);
 }
 
 /** Os campos do sinal dentro de um formulário: sem sinal, recebi agora ou vai pagar depois. */
@@ -193,7 +197,10 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
         avisar(pronto.modo === "agora" ? `Sinal de ${nome} recebido: ${brl(pronto.valor)}.` : `Sinal de ${brl(pronto.valor)} anotado em A receber, para ${dataCurta(pronto.quando)}.`);
       }
       aoGravar();
-    } catch (x) { avisarErro(x); setSalvando(false); }
+    } catch (x) {
+      // nada ficou pela metade; se a resposta não chegou, a mesma chave na nova tentativa não lança de novo
+      avisarErro(x); setSalvando(false); return false;
+    }
   }
 
   return (
@@ -255,28 +262,37 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
         if (!(await conferirCaixa(sb, petshop.id, confirmar))) return;
       }
       setSalvando(true);
-      if ((parcial && escolha !== "cobrar") || (!entrou && escolha === "devolver")) {
-        // tira a conta do que ainda não foi pago (não é dinheiro recebido). Se já tinha entrado uma parte,
-        // o banco passa a reserva para "sinal pago" com o que entrou, e as partes seguem no financeiro como recebidas.
-        const r = ok(await sb.from("lancamentos").delete().eq("id", valores.sinal_lancamento_id!).eq("petshop_id", petshop.id).eq("pago", false).select("id"));
-        if (!r.length) { setSalvando(false); return setErro(`Não consegui tirar essa conta: ela pode já ter sido paga, ou foi anotada por outra pessoa. Escolha ${parcial ? "continuar cobrando o que falta" : "deixar em A receber"}, ou peça para quem cuida do financeiro.`); }
-      }
+      // tudo numa chamada só: tirar a conta, a devolução, o sinal da reserva e o cancelamento entram juntos, ou nada entra
+      const passos: Passo[] = [];
+      // tira a conta do que ainda não foi pago (não é dinheiro recebido). Se já tinha entrado uma parte,
+      // o banco passa a reserva para "sinal pago" com o que entrou, e as partes seguem no financeiro como recebidas.
+      if ((parcial && escolha !== "cobrar") || (!entrou && escolha === "devolver")) passos.push({ t: "apagar_aberto", id: valores.sinal_lancamento_id!, exige: true });
       if (devolve) {
         // a devolução é uma saída de hoje; o recebimento do sinal fica como está, no dia em que entrou
-        const l = await lancarPago(sb, petshop.id, { tipo: "saida", valor: valor!, forma: forma!, categoria: CATEGORIA_DEVOLUCAO, descricao: `Devolução do sinal: ${nomeTipo(e.tipo).toLowerCase()} de ${nome}, ${dataCurta(e.entrada)}`, clienteId: e.pets?.clientes?.id ?? null, chave: parteDaChave(chave, "devolucao") });
-        ok(await sb.from("estadias_valores").update({ sinal_estado: "devolvido", sinal_devolucao_id: l.id, sinal_devolvido_em: isoDia(new Date()) }).eq("estadia_id", e.id).select("estadia_id"));
+        passos.push({ t: "lancamento", nome: "devolucao", chave: parteDaChave(chave, "devolucao"), linha: { tipo: "saida", valor: valor!, forma: forma!, categoria: CATEGORIA_DEVOLUCAO, descricao: `Devolução do sinal: ${nomeTipo(e.tipo).toLowerCase()} de ${nome}, ${dataCurta(e.entrada)}`, cliente_id: e.pets?.clientes?.id ?? null, pago: true, data: isoDia(new Date()) } });
+        passos.push({ t: "estadia_valores", estadia: e.id, modo: "update", campos: { sinal_estado: "devolvido", sinal_devolucao_id: ref("devolucao"), sinal_devolvido_em: isoDia(new Date()) } });
       } else if (entrou || escolha === "ficar") {
-        ok(await sb.from("estadias_valores").update({ sinal_estado: "mantido" }).eq("estadia_id", e.id).select("estadia_id"));
+        passos.push({ t: "estadia_valores", estadia: e.id, modo: "update", campos: { sinal_estado: "mantido" } });
       }
-      const c = ok(await sb.from("estadias").update({ status: "cancelada" }).eq("id", e.id).eq("petshop_id", petshop.id).eq("status", "reservada").select("id"));
-      avisar(!c.length ? "Essa reserva já tinha sido alterada. Atualizei a lista."
-        : devolve ? `Reserva cancelada. ${brl(valor)} devolvidos, lançados como saída de hoje.${parcial ? " A conta do que faltava saiu de A receber." : ""}`
+      passos.push({ t: "estadia_cancelar", id: e.id });
+      try {
+        await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "estadia_sinal", estadia: e.id }, passos);
+      } catch (x) {
+        setSalvando(false);
+        if (casoDoErro(x) === "maestro:estadia_ja") { avisar("Essa reserva já tinha sido alterada. Atualizei a lista. Nada foi lançado."); aoGravar(); return; }
+        if (casoDoErro(x) === "maestro:apagar") { setErro(`Não consegui tirar essa conta: ela pode já ter sido paga, ou foi anotada por outra pessoa. Escolha ${parcial ? "continuar cobrando o que falta" : "deixar em A receber"}, ou peça para quem cuida do financeiro. Nada foi lançado.`); return false; }
+        throw x;
+      }
+      avisar(devolve ? `Reserva cancelada. ${brl(valor)} devolvidos, lançados como saída de hoje.${parcial ? " A conta do que faltava saiu de A receber." : ""}`
         : pago ? `Reserva cancelada. O sinal de ${brl(valores.sinal)} continua como recebido.`
         : parcial && escolha === "cobrar" ? `Reserva cancelada. Os ${brl(recebido)} recebidos ficam, e os ${brl(falta)} que faltam continuam em A receber.`
         : parcial ? `Reserva cancelada. Os ${brl(recebido)} recebidos ficam, e a conta do que faltava saiu de A receber.`
         : escolha === "devolver" ? "Reserva cancelada. A conta do sinal saiu de A receber." : "Reserva cancelada. A conta do sinal continua em A receber.");
       aoGravar();
-    } catch (x) { avisarErro(x); setSalvando(false); }
+    } catch (x) {
+      // nada ficou pela metade: a reserva segue como estava. A mesma chave na nova tentativa não devolve duas vezes
+      avisarErro(x); setSalvando(false); return false;
+    }
   }
 
   const opcao = (id: "ficar" | "devolver" | "cobrar", titulo: string, apoio: string) => (

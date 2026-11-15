@@ -85,8 +85,11 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
   creditoUsado?: number | null;
 }) {
   const hoje = isoDia(new Date());
-  const caixa = await caixaAberto(sb, petshopId);
+  // só o dinheiro de hoje entra no caixa aberto: um valor de outro dia (pacote comprado ontem) fica fora da conferência da gaveta
+  const deHoje = (l.data ?? hoje) === hoje;
+  const caixa = deHoje || l.exigeCaixa ? await caixaAberto(sb, petshopId) : null;
   if (l.exigeCaixa && !caixa) throw new Error("O caixa não está aberto. Abra o caixa e tente de novo.");
+  if (l.exigeCaixa && !deHoje) throw new Error("Movimento de gaveta é sempre de hoje.");
   const { data: u } = await sb.auth.getUser();
   const dividido = l.pagamentos && l.pagamentos.length > 1 ? l.pagamentos : null;
   const linha = {
