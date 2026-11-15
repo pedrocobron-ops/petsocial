@@ -73,12 +73,13 @@ end $$;
 create trigger diario_fotos_para_lixo after delete on public.diario_fotos
   for each row execute function public.diario_fotos_para_lixo();
 
--- O arquivo está na fila do pet shop de quem pede (e não tem mais foto no diário)? O bucket pergunta antes de apagar.
+-- O arquivo está na fila do pet shop de quem pede, com acesso à creche e ao hotel (e não tem mais foto no diário)?
+-- O bucket pergunta antes de apagar.
 create function public.diario_pode_limpar(p_nome text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.diario_fotos_lixo l
                   where l.caminho = p_nome and l.petshop_id = public.diario_pasta(p_nome)
-                    and l.petshop_id in (select public.meus_petshops()))
+                    and public.tenho_area(l.petshop_id, array['creche_hotel']))
      and not exists (select 1 from public.diario_fotos f where f.caminho = p_nome)
 $$;
 
