@@ -2312,6 +2312,9 @@ isOneToOne: false
 "vejo_financeiro":
 { Args: { "p": string }; Returns: boolean
                            },
+"visitas_dos_pets":
+{ Args: { "p": string,"p_agora"?: string,"p_hoje": string }; Returns: Json
+                           },
 "webhook_primeira_vez":
 { Args: { "p_chave": string }; Returns: boolean
                            }
