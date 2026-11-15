@@ -46,8 +46,9 @@ export default function DicasMozart({ semDicas = [] }: {
 
   const { dados } = useDados(async (): Promise<Dica[]> => {
     const amanha = somaDias(hoje, 1);
+    // dos últimos 150 dias só importam os concluídos (quem parou de vir) e as faltas (quem não remarcou): o resto nem desce
     const [passados, futuros, pacotes, pets] = await Promise.all([
-      lerTudo((de, ate, contar) => sb.from("agendamentos").select("pet_id, inicio, status, pets(nome, ativo)", contando(contar)).eq("petshop_id", petshop.id).gte("inicio", somaDias(hoje, -150).toISOString()).lt("inicio", amanha.toISOString()).order("inicio", { ascending: false }).order("id").range(de, ate)).then((data) => ({ data })),
+      lerTudo((de, ate, contar) => sb.from("agendamentos").select("pet_id, inicio, status, pets(nome, ativo)", contando(contar)).eq("petshop_id", petshop.id).in("status", ["concluido", "faltou"]).gte("inicio", somaDias(hoje, -150).toISOString()).lt("inicio", amanha.toISOString()).order("inicio", { ascending: false }).order("id").range(de, ate)).then((data) => ({ data })),
       lerTudo((de, ate, contar) => sb.from("agendamentos").select("pet_id, inicio, status", contando(contar)).eq("petshop_id", petshop.id).gte("inicio", hoje.toISOString()).lt("inicio", somaDias(hoje, 60).toISOString()).order("inicio").order("id").range(de, ate)).then((data) => ({ data })),
       // pacote é assunto de quem cuida de pacotes
       vejoPacotes ? sb.from("pacotes_clientes").select("total, usados, pets(nome)").eq("petshop_id", petshop.id).eq("ativo", true).limit(500) : Promise.resolve({ data: [] }),
