@@ -735,6 +735,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     if (salvando) return;
     if (entrada && !(recebendo > 0)) { setErroValor("Escreva quanto o cliente pagou."); return; }
     if (entrada && recebendo > devido) { setErroValor(`O cliente deve ${brl(devido)} nesta conta. Se pagou a mais, lance a diferença como outra entrada.`); return; }
+    if (credito > 0 && data !== hoje) { setErro("Com o crédito do tutor, o recebimento é de hoje."); return; }
     if (credito > 0 && credito >= recebendo - 0.005 && daMulta > 0) { setErro("Com o crédito pagando a conta toda, a multa fica de fora: tire a multa ou use menos crédito."); return; }
     const pg = total > 0 ? fecharPagamento(pagamento, total) : { forma: "outro" as const, pagamentos: null };
     if ("erro" in pg) { setErro(pagamento.dividido ? pg.erro : entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
