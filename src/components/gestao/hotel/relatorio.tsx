@@ -86,14 +86,18 @@ export default function HotelNoRelatorio({ de, ate, antes }: { de: Date; ate: Da
   const ultima = futuras.length ? futuras.reduce((m, d) => (d > m ? d : m)) : null;
 
   const somar = (a: string, b: string) => {
-    const x = { n: 0, diarias: 0, taxas: 0, extras: 0, produtos: 0, total: 0 };
+    const x = { n: 0, diarias: 0, taxas: 0, extras: 0, produtos: 0, total: 0, devolvido: 0, devolucoes: 0, credito: 0, mantido: 0 };
     for (const v of dados.contas) {
       const c = lerConta(v);
       if (!c || isoDia(new Date(c.quando)) < a || isoDia(new Date(c.quando)) > b) continue;
       const taxas = c.taxas.reduce((t, k) => t + k.total, 0), extras = c.extras.reduce((t, k) => t + k.valor, 0), produtos = c.produtos.reduce((t, k) => t + k.total, 0);
       x.n++; x.taxas = real(x.taxas + taxas); x.extras = real(x.extras + extras); x.produtos = real(x.produtos + produtos);
       // o que a pessoa mudou na mão (desconto ou acréscimo) fica nas diárias, para as partes somarem o total
+      // pago antes a mais (o pet saiu antes): não é diária. Devolvido e crédito ficam à parte; o que ficou com o hotel soma no total
       x.diarias = real(x.diarias + c.total - taxas - extras - produtos); x.total = real(x.total + c.total);
+      if (c.sobra?.destino === "devolvido") { x.devolvido = real(x.devolvido + c.sobra.valor); x.devolucoes++; }
+      if (c.sobra?.destino === "credito") x.credito = real(x.credito + c.sobra.valor);
+      if (c.sobra?.destino === "mantido") { x.mantido = real(x.mantido + c.sobra.valor); x.total = real(x.total + c.sobra.valor); }
     }
     return x;
   };
@@ -132,10 +136,12 @@ export default function HotelNoRelatorio({ de, ate, antes }: { de: Date; ate: Da
                 <div><small>Taxas</small><b>{brl(contas.taxas)}</b></div>
                 <div><small>Extras e produtos</small><b>{brl(real(contas.extras + contas.produtos))}</b></div>
               </div>
-              <p className="g-muted g-pp">{contas.n === 1 ? "1 conta fechada" : `${contas.n} contas fechadas`} de creche e hotel no período, somando {brl(contas.total)} (com o sinal dentro). Período anterior: {contasAntes.n ? brl(contasAntes.total) : "sem conta fechada"}.</p>
+              {contas.mantido > 0 && <p className="g-p">Pago antes e não devolvido (multa ou combinado): <b className="g-tab">{brl(contas.mantido)}</b>. Não entra nas diárias.</p>}
+              <p className="g-muted g-pp">{contas.n === 1 ? "1 conta fechada" : `${contas.n} contas fechadas`} {usaModulo(petshop, "creche") ? "de creche e hotel" : "do hotel"} no período, somando {brl(contas.total)} (com o sinal dentro). Período anterior: {contasAntes.n ? brl(contasAntes.total) : "sem conta fechada"}.</p>
             </>
           ) : <p className="g-muted g-p">Nenhuma conta de estadia fechada com o detalhe neste período.{contasAntes.n ? ` Período anterior: ${brl(contasAntes.total)}.` : ""}</p>}
-          <p className="g-p">Sinais recebidos: <b className="g-tab">{brl(sinalRecebido)}</b>{sinaisRecebidos ? ` (${sinaisRecebidos})` : ""} · devolvidos: <b className="g-tab">{brl(dados.devolvido)}</b>{dados.devolucoes ? ` (${dados.devolucoes})` : ""}</p>
+          <p className="g-p">Sinais recebidos: <b className="g-tab">{brl(sinalRecebido)}</b>{sinaisRecebidos ? ` (${sinaisRecebidos})` : ""} · devolvidos: <b className="g-tab">{brl(real(dados.devolvido + contas.devolvido))}</b>{dados.devolucoes + contas.devolucoes ? ` (${dados.devolucoes + contas.devolucoes})` : ""}{contas.credito > 0 ? <> · deixados como crédito do tutor: <b className="g-tab">{brl(contas.credito)}</b></> : null}</p>
+          {contas.devolvido > 0 && <p className="g-muted g-pp">Devolvido no check-out ({brl(contas.devolvido)}): o pet saiu antes e o tutor tinha pago mais. Está no Caixa e no Financeiro como saída, na categoria Devolução.</p>}
         </div>
       </div>
       <p className="g-muted g-pp g-rel-nota">

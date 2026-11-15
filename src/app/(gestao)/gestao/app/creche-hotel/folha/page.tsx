@@ -20,9 +20,13 @@ import "../../agenda/imprimir/imprimir.css";
  * Folha do dia da creche e do hotel, para imprimir ou salvar em PDF: quem está na casa, quem chega e quem sai,
  * com as observações, a comida e o remédio, e o telefone do tutor. Não mostra valores.
  */
+/** As observações da ficha do pet ("toma Apoquel de manhã"), lidas junto com a estadia só nesta folha. */
+const obsDoPet = (e: EstadiaCompleta) => (e.pets as { obs?: string | null } | null)?.obs?.trim() || null;
 function FolhaDoDia() {
   const params = useSearchParams();
   const { sb, petshop } = useGestao();
+  // a folha mostra também as observações da ficha do pet (remédio, cuidados), além dos alertas e da observação da reserva
+  const SELECT_DA_FOLHA = SELECT_ESTADIA.replace("alertas, porte", "alertas, obs, porte");
   const { pronto: calendarioPronto } = useCalendario(); // dia fechado: nenhum mensalista esperado
   const [dia, setDia] = useState(() => params.get("dia") ?? isoDia(new Date()));
   const [hoje] = useState(() => new Date());
@@ -38,17 +42,17 @@ function FolhaDoDia() {
 
   const { dados, carregando } = useDados(async () => {
     const [abertas, encerradas] = await Promise.all([
-      sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500),
-      sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).eq("status", "encerrada")
+      sb.from("estadias").select(SELECT_DA_FOLHA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500),
+      sb.from("estadias").select(SELECT_DA_FOLHA).eq("petshop_id", petshop.id).eq("status", "encerrada")
         .lte("entrada", somaDias(data, 1).toISOString()).gte("saida", data.toISOString()).order("entrada").limit(500),
     ]);
     // mensalistas esperados no dia (de hoje em diante), sem quem avisou que falta
-    let esperados: { id: string; petId: string; nome: string; tutor: string; telefone: string | null; alertas: string | null }[] = [];
+    let esperados: { id: string; petId: string; nome: string; tutor: string; telefone: string | null; alertas: string | null; obs?: string | null }[] = [];
     if (usaCreche && dia >= hojeIso) {
       const planos = await lerPlanos(sb, petshop.id, false);
       const mov = planos.length ? await lerPresencas(sb, petshop.id, dia, dia) : { presencas: [], faltas: [] };
       esperados = planos.filter((p) => p.pets?.ativo && esperadoNoDia(p, dia, petshop.horario) && !mov.faltas.some((f) => f.pet_id === p.pet_id && f.dia === dia))
-        .map((p) => ({ id: p.id, petId: p.pet_id, nome: p.pets!.nome, tutor: p.pets!.clientes?.nome ?? "", telefone: p.pets!.clientes?.telefone ?? null, alertas: p.pets!.alertas }));
+        .map((p) => ({ id: p.id, petId: p.pet_id, nome: p.pets!.nome, tutor: p.pets!.clientes?.nome ?? "", telefone: p.pets!.clientes?.telefone ?? null, alertas: p.pets!.alertas, obs: (p.pets as { obs?: string | null }).obs ?? null }));
     }
     return { abertas: ok(abertas) as unknown as EstadiaCompleta[], encerradas: ok(encerradas) as unknown as EstadiaCompleta[], esperados };
   }, [petshop.id, dia, usaCreche, calendarioPronto]);
@@ -90,7 +94,7 @@ function FolhaDoDia() {
               )}
               <td>{e.pets?.clientes?.nome ?? "—"}<small className="tel">{fmtTelefone(e.pets?.clientes?.telefone)}</small></td>
               {comCuidados && <td className="atencao">{lerCuidados(e).map((c) => <span key={c.id}>{c.tipo === "remedio" ? "Remédio: " : ""}{textoDoCuidado(c)}</span>)}</td>}
-              <td className="atencao">{e.pets?.alertas && <span><b>{e.pets.alertas}</b></span>}{e.obs && <span>{e.obs}</span>}</td>
+              <td className="atencao">{e.pets?.alertas && <span><b>{e.pets.alertas}</b></span>}{obsDoPet(e) && <span>{obsDoPet(e)}</span>}{e.obs && <span>{e.obs}</span>}</td>
               <td className="feito"><i /></td>
             </tr>
           );
@@ -132,7 +136,7 @@ function FolhaDoDia() {
                 <h2>Mensalistas esperados na creche<small>{esperados.length === 1 ? "1 pet" : `${esperados.length} pets`}</small></h2>
                 <table>
                   <thead><tr><th>Pet</th><th>Tutor</th><th>Atenção</th><th className="feito">Veio</th></tr></thead>
-                  <tbody>{esperados.map((p) => <tr key={p.id}><td><b>{p.nome}</b></td><td>{p.tutor || "—"}<small className="tel">{fmtTelefone(p.telefone)}</small></td><td className="atencao">{p.alertas && <span><b>{p.alertas}</b></span>}</td><td className="feito"><i /></td></tr>)}</tbody>
+                  <tbody>{esperados.map((p) => <tr key={p.id}><td><b>{p.nome}</b></td><td>{p.tutor || "—"}<small className="tel">{fmtTelefone(p.telefone)}</small></td><td className="atencao">{p.alertas && <span><b>{p.alertas}</b></span>}{p.obs && <span>{p.obs}</span>}</td><td className="feito"><i /></td></tr>)}</tbody>
                 </table>
               </section>
             )}

@@ -10,6 +10,7 @@ import { useGestao } from "../contexto";
 import { CartaoFidelidade } from "../fidelidade";
 import CartaoPaginaDoTutor from "../casa/pagina-do-tutor";
 import { DividaDoTutor } from "../financeiro/contas-clientes";
+import { CreditoDoTutor } from "../hotel/credito";
 import { FolhaLancamento } from "../financeiro/comum";
 import FormPet from "../form-pet";
 import { Tile } from "../painel";
@@ -34,18 +35,23 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
   const [anotando, setAnotando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
-    const [cliente, pets, entradas] = await Promise.all([
+    const [cliente, pets, entradas, devolucoes] = await Promise.all([
       sb.from("clientes").select("*").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
       sb.from("pets").select("*").eq("petshop_id", petshop.id).eq("cliente_id", id).order("ativo", { ascending: false }).order("nome"),
       cuidoDoFinanceiro
         ? sb.from("lancamentos").select("id, valor, data, categoria, descricao, pago").eq("petshop_id", petshop.id).eq("cliente_id", id).eq("tipo", "entrada").is("movimento", null)
           .order("data", { ascending: false }).order("criado_em", { ascending: false }).limit(1000)
         : null,
+      // o que foi devolvido ao tutor (pagou a mais, sinal devolvido) sai do que ele gastou
+      cuidoDoFinanceiro
+        ? sb.from("lancamentos").select("valor").eq("petshop_id", petshop.id).eq("cliente_id", id).eq("tipo", "saida").eq("pago", true).in("categoria", ["Devolução", "Devolução de sinal"]).limit(1000)
+        : null,
     ]);
     if (cliente.error) throw new Error(cliente.error.message);
     if (pets.error) throw new Error(pets.error.message);
     if (entradas?.error) throw new Error(entradas.error.message);
-    return { cliente: cliente.data as Cliente | null, pets: (pets.data ?? []) as Pet[], entradas: (entradas?.data ?? []) as Entrada[] };
+    const devolvido = Math.round(((devolucoes?.data ?? []) as { valor: number }[]).reduce((s, l) => s + Number(l.valor), 0) * 100) / 100;
+    return { cliente: cliente.data as Cliente | null, pets: (pets.data ?? []) as Pet[], entradas: (entradas?.data ?? []) as Entrada[], devolvido };
   }, [petshop.id, id, cuidoDoFinanceiro]);
 
   const botaoVoltar = <button className="g-voltar" onClick={voltar}><ArrowLeft />Voltar</button>;
@@ -59,10 +65,10 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
     return <>{botaoVoltar}<Vazio titulo="Não achei esse cliente" texto="Pode ser que a ficha tenha sido apagada."><button className="g-btn verde" onClick={voltar}>Ver a lista</button></Vazio></>;
   }
 
-  const { cliente, pets, entradas } = dados;
+  const { cliente, pets, entradas, devolvido } = dados;
   const zap = linkWhatsApp(cliente.telefone, `${saudacaoZap(cliente.nome, petshop.nome)} `);
   const pagas = entradas.filter((l) => l.pago);
-  const total = pagas.reduce((s, l) => s + Number(l.valor), 0);
+  const total = Math.max(0, pagas.reduce((s, l) => s + Number(l.valor), 0) - devolvido);
   const emAberto = entradas.filter((l) => !l.pago);
   const aReceber = emAberto.reduce((s, l) => s + Number(l.valor), 0);
   const ativos = pets.filter((p) => p.ativo).length;
@@ -170,6 +176,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
           </section>
 
           {vejoFinanceiro && <DividaDoTutor tutor={cliente} aoMudar={recarregar} />}
+          {vejoFinanceiro && <CreditoDoTutor clienteId={cliente.id} nome={cliente.nome} />}
           {vejoFinanceiro && (
             <div className="g-fila" style={{ flexWrap: "wrap", gap: 8 }}>
               <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setAnotando(true); }}><HandCoins />Anotar o que {cliente.nome.split(" ")[0]} deve</button>
@@ -183,7 +190,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
               <div className="g-card-t"><h3><Tile icone={Wallet} tom="menta" tamanho="p" />Quanto já gastou aqui</h3></div>
               <p className="g-num m">{brl(total)}</p>
               <p className="g-pp g-muted" style={{ marginTop: 4 }}>
-                {!pagas.length ? "Nenhuma entrada ligada a este cliente." : pagas.length === 1 ? "Em 1 entrada recebida." : `Em ${pagas.length} entradas recebidas.`}
+                {!pagas.length ? "Nenhuma entrada ligada a este cliente." : pagas.length === 1 ? "Em 1 entrada recebida." : `Em ${pagas.length} entradas recebidas.`}{devolvido > 0 ? ` Já sem ${brl(devolvido)} devolvidos a ${cliente.nome.split(" ")[0]}.` : ""}
               </p>
               {entradas.length > 0 && (
                 <div className="g-lista" style={{ marginTop: 8 }}>

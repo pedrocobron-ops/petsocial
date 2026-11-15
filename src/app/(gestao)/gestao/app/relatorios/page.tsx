@@ -1,6 +1,6 @@
 "use client";
 
-import { usaModulo } from "@/lib/gestao/modulos";
+import { nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
 import HotelNoRelatorio from "@/components/gestao/hotel/relatorio";
 import CrecheNoRelatorio from "@/components/gestao/creche/relatorio";
 import { useMemo, useState } from "react";
@@ -512,7 +512,7 @@ function Relatorios() {
             {r.totalEstadias > 0 && (
               <section className="g-card">
                 <div className="g-card-t">
-                  <h3><Tile icone={Home} tom="ceu" tamanho="p" />Creche e hotel</h3>
+                  <h3><Tile icone={Home} tom="ceu" tamanho="p" />{nomeDaCasa(petshop)}</h3>
                   <span className="g-muted g-pp">estadias encerradas no período</span>
                 </div>
                 <div className="g-rel-ch">

@@ -263,7 +263,16 @@ export type ContaDaEstadia = {
   pendencias: { descricao: string; valor: number }[];
   pagamento: { fiado: true; quando: string } | { fiado: false; forma: string; pagamentos: PartePagamento[] | null } | null;
   lancamento_id: string | null;
+  /**
+   * O que foi pago antes (sinal) passou do total da estadia (o pet saiu antes): o que foi feito com a diferença.
+   * Com ela, `total` é o que a estadia custou de verdade e `ajuste` é 0 (a diferença nunca vira acréscimo).
+   */
+  sobra?: SobraDaConta | null;
+  /** crédito do tutor usado nesta conta (sai do "Valor na saída") */
+  credito_usado?: number;
 };
+export type DestinoDaSobra = "devolvido" | "credito" | "mantido";
+export type SobraDaConta = { valor: number; destino: DestinoDaSobra; forma?: string | null; nota?: string | null; lancamento_id?: string | null };
 
 export function lerConta(v: Pick<ValoresDaEstadia, "conta"> | null | undefined): ContaDaEstadia | null {
   const c = v?.conta as Partial<ContaDaEstadia> | null | undefined;
@@ -324,6 +333,23 @@ export function linhasDaConta(c: ContaDaEstadia): { texto: string; valor: string
   return linhas;
 }
 
+/** "Devolvido ao tutor (Pix)", "Ficou de crédito para a próxima conta", "Não devolvido (multa)". */
+export function textoDaSobra(x: SobraDaConta) {
+  if (x.destino === "devolvido") return `Devolvido ao tutor${x.forma ? ` (${nomeDaForma(x.forma)})` : ""}`;
+  if (x.destino === "credito") return "Ficou de crédito para a próxima conta";
+  return `Não devolvido (${x.nota?.trim() || "combinado"})`;
+}
+
+/** O fim da conta, depois do total: o que foi pago antes, o que foi feito com a sobra, o crédito usado e o valor na saída. */
+export function fechoDaConta(c: ContaDaEstadia): { texto: string; valor: string }[] {
+  const l: { texto: string; valor: string }[] = [];
+  if (c.sinal > 0) l.push(c.sobra ? { texto: "Pago antes (sinal)", valor: brl(c.sinal) } : { texto: `Sinal ${c.sinal_pago ? "já pago" : "combinado"}`, valor: `- ${brl(c.sinal)}` });
+  if (c.sobra) l.push({ texto: textoDaSobra(c.sobra), valor: brl(c.sobra.valor) });
+  if (c.credito_usado) l.push({ texto: "Crédito usado", valor: `- ${brl(c.credito_usado)}` });
+  if (c.sinal > 0 || c.credito_usado) l.push({ texto: "Valor na saída", valor: brl(c.a_pagar) });
+  return l;
+}
+
 /**
  * Comprovante da estadia em texto simples, para mandar ao tutor pelo WhatsApp: período, diárias (com a composição),
  * taxas, extras, sinal, total e como foi pago. Não é documento fiscal, e o texto diz isso no fim.
@@ -341,7 +367,7 @@ export function textoComprovanteEstadia(p: { petshop: string; tutor?: string | n
     "",
     ...linhasDaConta(c).map((l) => `${l.texto}: ${l.valor}`),
     `Total da estadia: ${brl(c.total)}`,
-    ...(c.sinal > 0 ? [`Sinal ${c.sinal_pago ? "já pago" : "combinado"}: - ${brl(c.sinal)}`, `Valor na saída: ${brl(c.a_pagar)}`] : []),
+    ...fechoDaConta(c).map((l) => `${l.texto}: ${l.valor}`),
     ...(junto > 0 ? ["", ...c.pendencias.map((x) => `Conta anterior (${x.descricao}): ${brl(x.valor)}`), `Total pago agora: ${brl(centavos(c.a_pagar + junto))}`] : []),
     ...(c.pagamento ? [`Pagamento: ${textoDoPagamentoDaConta(c.pagamento)}`] : []),
     "",

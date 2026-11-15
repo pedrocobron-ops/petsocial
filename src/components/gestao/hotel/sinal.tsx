@@ -163,6 +163,10 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
         if (recebeAgora == null) return setErro(`Escreva quanto o tutor pagou agora, até ${brl(falta)}.`);
         const pg = fecharPagamento(pagamento, recebeAgora);
         if ("erro" in pg) return setErro(pagamento.dividido ? pg.erro : "Escolha como o tutor pagou o sinal.");
+        // outra tela (ou outro aparelho) pode ter recebido este sinal enquanto esta estava aberta: diz isso em vez de ficar parada
+        const atual = await sb.from("lancamentos").select("pago, valor").eq("id", pendente.sinal_lancamento_id!).eq("petshop_id", petshop.id).maybeSingle();
+        if (!atual.error && (!atual.data || atual.data.pago)) { avisar(`O sinal de ${nome} já foi recebido, em outra tela ou aparelho. Nada foi lançado de novo.`); aoGravar(); return; }
+        if (atual.data && centavos(Number(atual.data.valor)) !== centavos(falta)) return setErro(`Este sinal mudou enquanto a tela estava aberta: agora faltam ${brl(Number(atual.data.valor))}. Feche e abra de novo.`);
         if (!(await conferirCaixa(sb, petshop.id, confirmar))) return;
         setSalvando(true);
         if (emParte) {
