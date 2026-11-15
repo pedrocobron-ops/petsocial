@@ -8,7 +8,7 @@ import { nivelDeOcupacao, nomeDaAcomodacao, ocupacaoDoDia, quemOcupa, vagasDoTip
 import { acomodacoesDe } from "@/lib/gestao/hotel-opcoes";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
-import { dataLonga, deIsoDia, isoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
+import { dataCurta, dataLonga, deIsoDia, hora, isoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { diaFechado, feriadoDoDia, fraseDoDiaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
@@ -77,11 +77,15 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
   const semLimite = tipos.filter((t) => vagasDoTipo(petshop, t) == null);
 
   return (
-    <div className="g-pilha">
+    <div className="g-pilha g-ht-ocup">
+      {/* no papel: o mês numa folha A4 deitada, sem o resto da tela */}
+      <style>{"@media print { @page { size: A4 landscape; margin: 10mm; } }"}</style>
       <div className="g-card g-pilha">
+        <p className="g-so-papel g-ht-papel"><b>{petshop.nome}</b> · Ocupação{tipos.length > 1 ? " do hotel e da creche" : tipos[0] === "hotel" ? " do hotel" : " da creche"} · impresso em {dataCurta(new Date())}, {hora(new Date())}</p>
         <div className="g-ht-cal-topo">
           <h2>{nomeMes(mes)} de {mes.getFullYear()}</h2>
           <div className="g-ht-cal-nav">
+            <button type="button" className="g-btn sec p" onClick={() => window.print()} title="Imprimir ou salvar em PDF o mês"><Printer />Imprimir</button>
             <button type="button" className="g-btn sec p" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))} aria-label="Mês anterior"><ChevronLeft /></button>
             <button type="button" className="g-btn sec p" onClick={() => setMes(new Date(hoje.getFullYear(), hoje.getMonth(), 1))}>Hoje</button>
             <button type="button" className="g-btn sec p" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))} aria-label="Próximo mês"><ChevronRight /></button>
@@ -104,7 +108,7 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
           {tipos.includes("creche") && <span><Sun size={14} aria-hidden />creche (dias)</span>}
           <span><i className="livre" />tem vaga</span><span><i className="meio" />metade</span><span><i className="quase" />quase cheio</span><span><i className="cheio" />cheio</span>
         </div>
-        <p className="g-muted g-pp">
+        <p className="g-muted g-pp g-nao-imprime">
           Toque num dia para ver quem está, quem chega e quem sai. Os números contam estadias, reservas{tipos.includes("creche") ? " e mensalistas esperados" : ""}, igual ao aviso de casa cheia.
           {semLimite.length > 0 && ` Para ver "cheio", preencha as vagas ${semLimite.map((t) => (t === "hotel" ? "do hotel" : "da creche")).join(" e ")} em Meu pet shop.`}
         </p>

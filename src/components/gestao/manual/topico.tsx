@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ChevronDown, Lightbulb, TriangleAlert } from "lucide-react";
+import { ArrowRight, ChevronDown, Lightbulb, Printer, TriangleAlert } from "lucide-react";
 import { QUEM, nomeDaTela, type Topico } from "@/lib/gestao/manual";
 import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { useGestao } from "../contexto";
@@ -55,13 +55,14 @@ export function CorpoTopico({ topico: t, semTela, aoIr }: { topico: Topico; /** 
 }
 
 /** Um tópico na lista: o título abre e fecha o passo a passo no lugar. No papel, todos saem abertos. */
-export function ItemTopico({ topico: t, aberto, aoAlternar, semTela, aoIr, apoio, prefixo, semQuem }: {
+export function ItemTopico({ topico: t, aberto, aoAlternar, semTela, aoIr, apoio, prefixo, semQuem, aoImprimir, imprime }: {
   topico: Topico; aberto: boolean; aoAlternar: () => void; semTela?: string | null; aoIr?: () => void; apoio?: string;
+  /** "Imprimir este tópico": o manual imprime só ele */ aoImprimir?: () => void; /** é o tópico que está saindo no papel */ imprime?: boolean;
   /** pet shop de um login só: "quem consegue fazer" não diz nada, então a etiqueta some */ semQuem?: boolean;
   /** começo do id na página: a mesma lista pode aparecer em dois lugares (seções e resultado da busca) */ prefixo: string;
 }) {
   return (
-    <div className={`g-man-item${aberto ? " aberto" : ""}`} id={`${prefixo}-${t.id}`}>
+    <div className={`g-man-item${aberto ? " aberto" : ""}${imprime ? " imprime" : ""}`} id={`${prefixo}-${t.id}`}>
       <button type="button" className="g-man-cab" aria-expanded={aberto} aria-controls={`${prefixo}c-${t.id}`} onClick={aoAlternar}>
         <span className="t"><b>{t.titulo}</b>{apoio && <span className="g-man-apoio">{apoio}</span>}</span>
         {!semQuem && <QuemPode quem={t.quem} />}
@@ -69,6 +70,7 @@ export function ItemTopico({ topico: t, aberto, aoAlternar, semTela, aoIr, apoio
       </button>
       <div className="g-man-dobra" id={`${prefixo}c-${t.id}`}>
         <CorpoTopico topico={t} semTela={semTela} aoIr={aoIr} />
+        {aoImprimir && <button type="button" className="g-btn fantasma p g-man-imprimir" onClick={aoImprimir}><Printer />Imprimir este tópico</button>}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { LifeBuoy, Printer, Search, Sprout, X } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
@@ -24,6 +25,15 @@ function Manual() {
   const nomeSecao = (id: string) => secoes.find((s) => s.id === id)?.titulo ?? "";
   const achados = useMemo(() => (busca.trim().length > 1 ? buscarNoManual(busca, topicos) : null), [busca, topicos]);
 
+  // "Imprimir este tópico": o papel sai só com ele; depois de imprimir, volta o manual inteiro
+  const [soEste, setSoEste] = useState<string | null>(null);
+  useEffect(() => {
+    if (!soEste) return;
+    const voltar = () => setSoEste(null);
+    window.addEventListener("afterprint", voltar);
+    const t = setTimeout(() => window.print(), 50);
+    return () => { clearTimeout(t); window.removeEventListener("afterprint", voltar); };
+  }, [soEste]);
   const alternar = (id: string) => setAbertos((a) => { const n = new Set(a); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   /** Abre o tópico na lista das seções e leva a tela até ele. */
   const mostrar = (id: string, guardar = true) => {
@@ -39,14 +49,14 @@ function Manual() {
   useEffect(() => { if (pedido && topicoPorId(pedido, topicos)) mostrar(pedido, false); }, [pedido]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="g-man">
+    <div className={`g-man${soEste ? " so-um" : ""}`}>
       <header className="g-topo">
         <div>
           <h1>Manual</h1>
           <p className="g-muted">O passo a passo de cada tela, na ordem em que você toca.</p>
         </div>
         <div className="g-acoes">
-          <button type="button" className="g-btn sec" onClick={() => window.print()}><Printer />Imprimir</button>
+          <button type="button" className="g-btn sec" onClick={() => { flushSync(() => setSoEste(null)); window.print(); }} title="Imprimir o manual inteiro. Para um tópico só, abra o tópico e toque em Imprimir este tópico."><Printer />Imprimir</button>
         </div>
       </header>
       <p className="g-man-papel">Manual do Maestro Pet Gestão · {petshop.nome}</p>
@@ -74,7 +84,8 @@ function Manual() {
                 <div className="g-card-t"><h2>{achados.length === 1 ? "1 tópico encontrado" : `${achados.length} tópicos encontrados`}</h2></div>
                 <div className="g-man-lista">
                   {achados.map((t) => (
-                    <ItemTopico key={t.id} prefixo="b" topico={t} apoio={nomeSecao(t.secao)} aberto={abertos.has(t.id) || achados.length === 1} aoAlternar={() => alternar(t.id)} semQuem={umLogin} />
+                    <ItemTopico key={t.id} prefixo="b" topico={t} apoio={nomeSecao(t.secao)} aberto={abertos.has(t.id) || achados.length === 1} aoAlternar={() => alternar(t.id)} semQuem={umLogin}
+                      aoImprimir={() => setSoEste(t.id)} imprime={soEste === t.id} />
                   ))}
                 </div>
               </>
@@ -116,7 +127,8 @@ function Manual() {
                   <p className="g-muted g-p">{s.apoio}</p>
                 </div>
                 <div className="g-man-lista">
-                  {lista.map((t) => <ItemTopico key={t.id} prefixo="t" topico={t} aberto={abertos.has(t.id)} aoAlternar={() => alternar(t.id)} semQuem={umLogin} />)}
+                  {lista.map((t) => <ItemTopico key={t.id} prefixo="t" topico={t} aberto={abertos.has(t.id)} aoAlternar={() => alternar(t.id)} semQuem={umLogin}
+                    aoImprimir={() => setSoEste(t.id)} imprime={soEste === t.id} />)}
                 </div>
               </section>
             );
