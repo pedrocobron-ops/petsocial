@@ -462,9 +462,9 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
             ) : <p className="g-pp g-erro">Este pet está sem tutor na ficha: não dá para deixar o resto anotado. Corrija o valor recebido.</p>}
           </div>
         )}
-        {contas.total > 0 && !depois.ativo && <AvisoCaixaFechado aberto={caixa} />}
+        {aPagar > 0 && !depois.ativo && <AvisoCaixaFechado aberto={caixa} />}
         <p className="g-pp g-muted">
-          {contas.total > 0 && depois.ativo ? "Nada entra no caixa agora: a conta fica em A receber" : contas.total > 0 ? (caixa === false ? "O valor entra no financeiro de hoje, fora do caixa" : "O valor entra no caixa de hoje") : "Nada entra no caixa"}
+          {contas.total > 0 && depois.ativo ? "Nada entra no caixa agora: a conta fica em A receber" : contas.total > 0 && credito > 0 && aPagar <= 0 ? "O crédito do tutor paga a conta: nada entra no caixa agora" : contas.total > 0 ? (caixa === false ? "O valor entra no financeiro de hoje, fora do caixa" : "O valor entra no caixa de hoje") : "Nada entra no caixa"}
           {pacote ? `, ${servico} sai do pacote` : ""}
           {vendidos.length ? ", os produtos saem do estoque" : ""}
           {a.status !== "concluido" ? " e o atendimento fica como concluído." : "."}

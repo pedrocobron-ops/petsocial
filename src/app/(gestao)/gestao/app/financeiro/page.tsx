@@ -149,8 +149,7 @@ function Financeiro() {
     for (const l of doMes) {
       const dia = deIsoDia(l.data).getDate(), v = Number(l.valor), sem = semanas[Math.floor((dia - 1) / 7)];
       if (ehDevolucao(l)) {
-        // devolveu ao tutor: o que entrou diminui naquele dia
-        nSaidas++;
+        // devolveu ao tutor: o que entrou diminui naquele dia (não é uma despesa)
         if (sem) sem.entrou -= v;
         porDia[dia - 1] -= v;
       } else if (l.tipo === "entrada") {
