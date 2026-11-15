@@ -77,7 +77,7 @@ export default function DuvidaNoLink({ codigo, loja, telefone, aoPedir }: {
       </div>
       <div className="g-lk-duv-falas" aria-live="polite">
         <p className="g-lk-duv-aviso">Não coloque dados pessoais aqui (nome completo, telefone, endereço, documentos). A conversa não fica guardada.</p>
-        {!falas.length && <p className="g-lk-duv-ia">Oi! Pergunte sobre horário, serviços, preços que aparecem aqui, creche ou hotel. Para marcar, você mesmo envia o pedido nesta página.</p>}
+        {!falas.length && <p className="g-lk-duv-ia g-lk-duv-ola">Oi! Pergunte sobre horário, serviços, preços que aparecem aqui, creche ou hotel. Para marcar, você mesmo envia o pedido nesta página.</p>}
         {falas.map((f, i) => (
           <div key={i} className={f.de === "eu" ? "g-lk-duv-eu" : "g-lk-duv-ia"}>
             <span>{f.texto}</span>
