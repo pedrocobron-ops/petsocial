@@ -89,12 +89,12 @@ const T = require('../lib/teste')('link-ia');
   let ultima;
   for (let i = 0; i < 31; i++) ultima = await pergunta(COD, 'Vocês abrem no domingo?', [], mesmaRede);
   T.ok('31ª pergunta do mesmo endereço na hora: limite', ultima.j?.limite === true, ultima.j);
-  const antesDia = B.sql(`select valor from config_interna where chave='link_ia_dia'`) || null;
-  T.depois(() => B.sql(antesDia == null ? `delete from config_interna where chave='link_ia_dia'` : `update config_interna set valor='${antesDia}' where chave='link_ia_dia'`));
-  B.sql(`insert into config_interna (chave, valor) values ('link_ia_dia', '${usoHoje() + 1}') on conflict (chave) do update set valor = excluded.valor`);
+  // limite do dia: sem mexer na configuração global, a contagem de hoje desta loja sobe até faltar uma
+  const lim = B.num(`select public.link_limite('link_ia_dia', 100)`);
+  B.sql(`update link_ia_uso set perguntas = ${lim - 1} where petshop_id='${P}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
   r = await pergunta(COD, 'Vocês abrem no domingo?');
   T.ok('ainda cabe uma no dia', r.j && !r.j.limite, r.j);
   r = await pergunta(COD, 'Vocês abrem no domingo?');
   T.ok('limite do dia por pet shop: mensagem com o nome e WhatsApp', r.j?.limite === true && r.j.texto.includes(NOME), r.j);
-  T.ok('a contagem para no limite', usoHoje() === Number(B.sql(`select valor from config_interna where chave='link_ia_dia'`)));
+  T.ok('a contagem para no limite', usoHoje() === lim, { uso: usoHoje(), lim });
 }))();

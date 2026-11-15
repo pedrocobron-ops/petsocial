@@ -73,7 +73,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   hotel em dia fechado e fora do horário, dia de experiência, nada vira cliente antes de aceitar, link desligado, **freios de envio**
   (por WhatsApp, por rede, por loja; o teste põe os limites padrão em `config_interna` durante o teste e devolve os de antes).
 - `link-ia.js`: rota `/api/gestao/link-ia` e funções: ligar/desligar (só o dono), respostas pelo contexto, dados de outro pet shop
-  nunca entram, contagens sem texto, limites por conversa, por rede e por dia. Precisa do servidor com `GESTAO_LINK_IA_FALSO=1`.
+  nunca entram, contagens sem texto, limites por conversa, por rede e por dia (o do dia sem mexer na configuração global: a contagem
+  da loja de teste sobe até faltar uma). Precisa do servidor com `GESTAO_LINK_IA_FALSO=1`.
 - `tutor.js`: página do tutor: só os pets do tutor, fotos pela rota do servidor (assinatura e caminho reserva, bytes certos, cache privado),
   prazo das fotos, faxina dos arquivos (fila, órfãos), quem lê e grava, freio de 30 acessos por minuto. Precisa do servidor.
 - `admin.js`: funções do painel do administrador recusadas para anônimo e dono; o admin recebe só dados da conta e quantidades;
