@@ -92,6 +92,8 @@ export default function AbaCakto({ lojas, aoMudar }: { lojas: LojaCakto[]; aoMud
         <p className="g-pp g-muted">O sistema aceita o aviso que chegar com qualquer uma das duas. Se a Cakto trocar a chave, cole a nova por cima.</p>
       </section>
 
+      <TravaDoServidor />
+
       <section className="g-card g-pilha">
         <div className="g-fila entre">
           <div>
@@ -125,7 +127,7 @@ export default function AbaCakto({ lojas, aoMudar }: { lojas: LojaCakto[]; aoMud
       <section className="g-pilha">
         <div>
           <h2>Pagamentos sem conta</h2>
-          <p className="g-muted g-p">Pagamento que chegou com um e-mail que não é de nenhuma conta. Confira com a pessoa qual é o pet shop e ligue: a assinatura passa a valer para ele e as próximas cobranças caem lá sozinhas.</p>
+          <p className="g-muted g-p">Pagamento que chegou com um e-mail que não é de nenhuma conta, ou para uma conta que já tem outra assinatura em dia (o sistema não troca a assinatura de ninguém sozinho). Confira com a pessoa qual é o pet shop e ligue: a assinatura passa a valer para ele e as próximas cobranças caem lá sozinhas.</p>
         </div>
         {!soltos.length ? <p className="g-muted g-p">Nenhum pagamento solto.</p> : (
           <div className="g-card g-lista" style={{ paddingBlock: 6 }}>
@@ -290,5 +292,48 @@ function Ligar({ pagamento, lojas, aoFechar, aoLigar }: { pagamento: SemConta; l
         )}
       </div>
     </Folha>
+  );
+}
+
+/**
+ * Trava do servidor: o "Tirar dúvida" do link e o chat de venda contam o uso no banco por funções que qualquer pessoa
+ * alcança com a chave pública. Com a trava ligada, o banco só aceita a contagem que vem do servidor (que manda um
+ * segredo que só ele conhece). O botão pede ao servidor para gravar o segredo dele; o banco guarda só uma impressão.
+ */
+function TravaDoServidor() {
+  const { avisar, avisarErro } = useAvisos();
+  const [estado, setEstado] = useState<{ ligada: boolean; em: string | null } | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const carregar = useCallback(async () => {
+    const r = await banco().rpc("admin_servidor_estado");
+    setEstado(r.error ? null : (r.data as unknown as { ligada: boolean; em: string | null }));
+  }, []);
+  useEffect(() => { void carregar(); }, [carregar]);
+  async function ligar() {
+    setOcupado(true);
+    try {
+      const { data } = await banco().auth.getSession();
+      const r = await fetch("/api/gestao/servidor", { method: "POST", headers: { authorization: `Bearer ${data.session?.access_token ?? ""}` } });
+      const j = (await r.json().catch(() => null)) as { mensagem?: string } | null;
+      if (!r.ok) throw new Error(j?.mensagem ?? "Não deu para gravar agora.");
+      avisar("Trava do servidor ligada.");
+      await carregar();
+    } catch (e) { avisarErro(e); } finally { setOcupado(false); }
+  }
+  if (!estado) return null;
+  return (
+    <section className="g-card g-pilha">
+      <div className="g-fila entre">
+        <div>
+          <h2>Trava do servidor</h2>
+          <p className="g-muted g-p">{estado.ligada
+            ? `Ligada${estado.em ? ` em ${quando(estado.em)}` : ""}. Só o sistema conta as perguntas do Tirar dúvida do link e as mensagens do chat de venda: ninguém gasta a cota de fora.`
+            : "Desligada: alguém de fora pode gastar a cota do dia do Tirar dúvida do link de um pet shop ou do chat de venda. Ligue uma vez neste endereço."}</p>
+          <p className="g-pp g-muted">Se a chave da inteligência artificial for trocada no servidor, toque de novo para gravar a nova trava.</p>
+        </div>
+        <span className={`g-tag ${estado.ligada ? "verde" : "amarelo"}`}>{estado.ligada ? "ligada" : "desligada"}</span>
+      </div>
+      <div><button className={`g-btn ${estado.ligada ? "sec" : "verde"}`} disabled={ocupado} onClick={() => void ligar()}>{ocupado ? "Um instante…" : estado.ligada ? "Gravar de novo" : "Ligar a trava"}</button></div>
+    </section>
   );
 }

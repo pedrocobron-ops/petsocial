@@ -946,7 +946,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const umDiaSo = !saidaDia || saidaDia === dia;
   const diaDoPlano = Boolean(planoDoPet && !jaAqui && umDiaSo && esperadoNoDia(planoDoPet, dia, petshop.horario));
   const reservaExtra = Boolean(planoDoPet && !jaAqui && umDiaSo && dia >= hojeIso && !diaDoPlano);
-  const valorDoExtra = planoDoPet ? planoDoPet.valor_extra ?? (petshop.diaria_creche == null ? null : Number(petshop.diaria_creche)) : null;
+  // o valor do dia extra só aparece quando o valor do plano veio (quem não cuida do financeiro não recebe o preço próprio
+  // do plano, e a diária padrão não é o que vai para a mensalidade)
+  const valorDoExtra = planoDoPet?.temValor ? planoDoPet.valor_extra ?? (petshop.diaria_creche == null ? null : Number(petshop.diaria_creche)) : null;
   const temPlano = Boolean(pet && mens?.planos.some((p) => p.pet_id === pet.id));
   const ofereceExp = tipo === "creche" && !temPlano && (regraExp.ativo || Boolean(editar?.experiencia)) && editar?.status !== "encerrada";
   const comExp = ofereceExp && experiencia;

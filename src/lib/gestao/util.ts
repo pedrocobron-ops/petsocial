@@ -202,3 +202,10 @@ export function chamar(nome: string | null | undefined) {
   const tratamento = /^(dona|d\.|seu|sr\.?|sra\.?|srta\.?|dr\.?|dra\.?|tio|tia|professor|professora|prof\.?)$/i;
   return tratamento.test(partes[0]) && partes[1] ? `${partes[0]} ${partes[1]}` : partes[0];
 }
+
+/**
+ * Arredonda em centavos, meio centavo para cima, sem o resto que a conta em ponto flutuante deixa (96,6 × 1,25 = 120,74999…).
+ * É o mesmo arredondamento que o banco faz (`round(..., 2)` em `hotel_noite`, `creche_sugestao_mensal`): as contas da tela
+ * e do banco têm de dar o mesmo centavo.
+ */
+export const centavos = (n: number) => Math.round(Number((n * 100).toPrecision(12))) / 100;

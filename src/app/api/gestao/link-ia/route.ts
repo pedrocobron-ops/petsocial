@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/gestao/banco";
 import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "@/lib/gestao/supabase";
+import { segredoDoServidor } from "@/lib/gestao/servidor";
 import {
   FERRAMENTA_HORARIOS, FERRAMENTA_HOTEL, INSTRUCOES_LINK_IA, MAX_PERGUNTAS_CONVERSA, contextoDoLink, entradaHorarios, entradaHotel,
   ferramentasDoLink, foraTexto, lerResposta, limiteConversaTexto, limiteTexto, limparFalas, perguntasNaConversa, respostaDeTeste, resumoDaEstimativa, type DadosDoLink,
@@ -78,13 +79,16 @@ export async function POST(req: Request) {
   const rede = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "sem-rede";
   if (perguntasNaConversa(corpo?.falas) > MAX_PERGUNTAS_CONVERSA || !liberado(`${codigo}:${rede}`)) return responder({ texto: limiteConversaTexto(nome), limite: true });
   if (!DE_TESTE && !process.env.ANTHROPIC_API_KEY) { console.error("[link-ia] sem ANTHROPIC_API_KEY"); return responder({ texto: foraTexto(nome), fora: true }); }
-  const conta = await sb.rpc("link_ia_contar", { p_codigo: codigo });
+  // a contagem leva o segredo do servidor: quem chama a função direto com a chave pública não gasta a cota do pet shop
+  const segredo = segredoDoServidor() ?? undefined;
+  const conta = await sb.rpc("link_ia_contar", { p_codigo: codigo, p_segredo: segredo });
   const contou = conta.data as { ok?: boolean; motivo?: string } | null;
   if (conta.error) return responder({ texto: foraTexto(nome), fora: true });
+  if (contou?.motivo === "recusado") { console.error("[link-ia] o banco recusou o segredo do servidor: grave de novo no painel (aba Cakto)"); return responder({ texto: foraTexto(nome), fora: true }); }
   if (!contou?.ok) return contou?.motivo === "desligado" ? NextResponse.json({ erro: "desligado" }, { status: 403 }) : responder({ texto: limiteTexto(nome), limite: true });
 
   const contexto = contextoDoLink(d);
-  const registrar = async (respondida: boolean) => { try { await sb.rpc("link_ia_registrar", { p_codigo: codigo, p_respondida: respondida }); } catch { /* segue */ } };
+  const registrar = async (respondida: boolean) => { try { await sb.rpc("link_ia_registrar", { p_codigo: codigo, p_respondida: respondida, p_segredo: segredo }); } catch { /* segue */ } };
 
   let bruto = "";
   if (DE_TESTE) {
@@ -122,7 +126,8 @@ async function perguntarAoModelo(sb: Banco, codigo: string, d: DadosDoLink, cont
         { type: "text", text: INSTRUCOES_LINK_IA, cache_control: { type: "ephemeral" } },
         { type: "text", text: `<dados_do_pet_shop>\n${contexto}\n</dados_do_pet_shop>` },
       ],
-      ...(ferramentas.length && volta < MAX_VOLTAS - 1 ? { tools: ferramentas } : {}),
+      // as mesmas ferramentas em todas as voltas (o histórico tem os usos delas); na última, o modelo só pode responder
+      ...(ferramentas.length ? { tools: ferramentas, ...(volta === MAX_VOLTAS - 1 ? { tool_choice: { type: "none" as const } } : {}) } : {}),
       messages: mensagens,
     });
     if (r.stop_reason === "refusal" || r.stop_reason === "max_tokens") return "[[NAO_SEI]]";

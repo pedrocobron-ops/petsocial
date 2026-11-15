@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, MessageCircle, MessageCircleQuestion, Send, X } from "lucide-react";
-import { MAX_LETRAS_PERGUNTA, MAX_PERGUNTAS_CONVERSA, limiteConversaTexto, type Sugestao } from "@/lib/gestao/link-ia";
+import { MAX_LETRAS_PERGUNTA, MAX_PERGUNTAS_CONVERSA, limiteConversaTexto, type Sugestao } from "@/lib/gestao/link-ia-comum";
 import { linkWhatsApp } from "@/lib/gestao/util";
 
 type Fala = { de: "eu" | "ia"; texto: string; zap?: boolean; sugestao?: Sugestao | null };

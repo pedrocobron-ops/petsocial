@@ -7,7 +7,7 @@ import type { PartePagamento } from "./dinheiro";
 import { feriadoDoDia, regraDeFeriado, type RegraFeriado } from "./feriados";
 import { opcoesDeCobranca } from "./dinheiro-opcoes";
 import { acomodacoesDe, modelosDe, pixDe, porteDe, segundoPetDe, sinalDe, temporadaDoDia, temporadasDe, type Taxa, type Temporada, type TipoDeMensagem } from "./hotel-opcoes";
-import { brl, dataAmigavel, dataCompleta, dataCurta, hora, inicioDoDia, isoDia, somaDias } from "./util";
+import { brl, centavos, dataAmigavel, dataCompleta, dataCurta, hora, inicioDoDia, isoDia, somaDias } from "./util";
 
 /**
  * Hotel e creche: ocupação por dia, preço noite a noite, a conta do check-out e as mensagens para o tutor.
@@ -21,11 +21,8 @@ export type Mens = { planos: PlanoCompleto[]; presencas: Presenca[]; faltas: Fal
 type Periodo = Pick<Estadia, "tipo" | "entrada" | "saida_prevista" | "status">;
 type Passada = Pick<Estadia, "tipo" | "entrada" | "saida" | "saida_prevista" | "status">;
 
-/**
- * Arredonda em centavos, meio centavo para cima, sem o resto que a conta em ponto flutuante deixa (96,6 × 1,25 = 120,74999…).
- * É o mesmo arredondamento que o banco faz em `hotel_noite`: as duas contas têm de dar o mesmo centavo.
- */
-export const centavos = (n: number) => Math.round(Number((n * 100).toPrecision(12))) / 100;
+/** Arredondamento em centavos igual ao do banco (fica em util.ts, que a creche também usa). */
+export { centavos };
 
 /* ---------- ocupação ---------- */
 

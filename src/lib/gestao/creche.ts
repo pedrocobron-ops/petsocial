@@ -6,7 +6,7 @@ import { saudacaoZap } from "./agenda";
 import { calendarioGuardado, diaFechado, lerCalendario } from "./feriados";
 import { multaSugerida, opcoesDeCobranca } from "./dinheiro-opcoes";
 import { opcao } from "./opcoes";
-import { brl, dataCompleta, dataCurta, deIsoDia, horarioDoDia, isoDia, nomeMes, somaDias } from "./util";
+import { brl, centavos, dataCompleta, dataCurta, deIsoDia, horarioDoDia, isoDia, nomeMes, somaDias } from "./util";
 
 /**
  * Creche com mensalistas: plano por pet (dias fixos da semana), chamada do dia, dias extras e cobrança do mês.
@@ -202,7 +202,6 @@ export function resumoDoMes(plano: Vigencia & { pet_id: string }, mes: Date, pre
 
 /* ---------- cobrança ---------- */
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Mensalidade sugerida para o mês: cheia, ou proporcional aos dias do plano quando ele começa ou termina no meio do mês ou tem pausa no mês.

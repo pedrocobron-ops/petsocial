@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, BadgeCheck, Check, Clock, Database, ExternalLink, Gift, Lock, Sparkles, Store, User, Users } from "lucide-react";
 import { Tile, type Tom } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
-import { Vazio } from "@/components/gestao/ui";
+import { Vazio, useDados } from "@/components/gestao/ui";
 import { linkSuporte } from "@/lib/gestao/contato";
 import { artigoDe } from "@/lib/gestao/modulos";
 import { PERIODOS, PLANOS, ofertaDe, planoPorId, textoPessoas, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
@@ -41,13 +41,14 @@ function Acessos({ n }: { n: number }) {
 
 /**
  * Link de pagamento com o e-mail da conta já preenchido (parâmetros `email` e `confirmEmail` do checkout da Cakto)
- * e o id do pet shop em `callback`, que a Cakto devolve no aviso de pagamento: assim a compra cai na conta certa
- * mesmo se a pessoa trocar o e-mail na hora de pagar.
+ * e a marca do pet shop em `callback`, que a Cakto devolve no aviso de pagamento: assim a compra cai na conta certa
+ * mesmo se a pessoa trocar o e-mail na hora de pagar. A marca é assinada pelo banco (`assinatura_callback`:
+ * id do pet shop e uma ficha secreta dele), para ninguém mandar uma compra para a conta de outra pessoa.
  */
-function linkDoCheckout(checkout: string, email: string | undefined, petshopId?: string) {
+function linkDoCheckout(checkout: string, email: string | undefined, callback?: string | null) {
   const extras: [string, string][] = [];
   if (email) extras.push(["email", email], ["confirmEmail", email]);
-  if (petshopId) extras.push(["callback", petshopId]);
+  if (callback) extras.push(["callback", callback]);
   try {
     const u = new URL(checkout);
     for (const [k, v] of extras) u.searchParams.set(k, v);
@@ -59,8 +60,14 @@ function linkDoCheckout(checkout: string, email: string | undefined, petshopId?:
 }
 
 export default function Assinatura() {
-  const { souDono, petshop, user, liberado, diasDeTeste, assinaturaAberta } = useGestao();
+  const { sb, souDono, petshop, user, liberado, diasDeTeste, assinaturaAberta } = useGestao();
   const [periodo, setPeriodo] = useState<PeriodoId>("mensal");
+  // sem a marca assinada (banco antes da atualização ou sem internet), o link segue só com o e-mail
+  const { dados: callback } = useDados(async () => {
+    if (!souDono) return null;
+    const r = await sb.rpc("assinatura_callback", { p: petshop.id });
+    return r.error || typeof r.data !== "string" ? null : r.data;
+  }, [petshop.id, souDono]);
   if (!souDono) return <Vazio titulo="Só o dono do pet shop mexe aqui." />;
   const status = petshop.status;
   const podeAssinar = status === "teste" || status === "cancelada";
@@ -118,7 +125,7 @@ export default function Assinatura() {
                     <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoPessoas(p.acessos)}</b> com login próprio</p></div>
                     {/* enquanto a assinatura não abriu, ninguém paga: o botão espera, mesmo com o link já cadastrado */}
                     {o.checkout && assinaturaAberta
-                      ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(o.checkout, user.email, petshop.id)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
+                      ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(o.checkout, user.email, callback)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
                       : <button className="g-btn cheio" disabled>Disponível em breve</button>}
                   </div>
                 );

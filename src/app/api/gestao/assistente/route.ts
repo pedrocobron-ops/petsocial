@@ -14,7 +14,12 @@ export const maxDuration = 60;
 const MODELO = process.env.GESTAO_MODELO ?? "claude-haiku-5-5";
 /** Pedidos por pet shop por dia: segura o custo de uma conta que dispare. */
 const LIMITE_DIA = Number(process.env.GESTAO_ASSISTENTE_LIMITE_DIA ?? 150);
+/** Chamadas ao modelo por pet shop por dia (cada pedido usa uma ou mais; os cartões confirmados também contam). */
+const LIMITE_CHAMADAS = Number(process.env.GESTAO_ASSISTENTE_LIMITE_CHAMADAS ?? LIMITE_DIA * 4);
 const MAX_VOLTAS = 8;
+/** Teto do histórico que o navegador devolve: mensagens e tamanho total (em caracteres do JSON). */
+const MAX_MENSAGENS = 60;
+const MAX_HISTORICO = 300_000;
 
 type Msg = Anthropic.Beta.BetaMessageParam;
 type Resultado = Anthropic.Beta.BetaToolResultBlockParam;
@@ -28,6 +33,57 @@ type Corpo = {
 const FORA_DO_AR = "O Mozart está fora do ar agora. Enquanto isso, tudo funciona pelos botões das telas, e o Manual, no menu, explica cada passo. Tente de novo mais tarde.";
 
 const erro = (status: number, codigo: string, mensagem: string) => NextResponse.json({ erro: codigo, mensagem }, { status });
+const LIMITE_TEXTO = "O Mozart atingiu o limite de pedidos de hoje. Amanhã ele volta; enquanto isso, as telas funcionam normalmente.";
+
+type Bloco = Record<string, unknown>;
+const ehTexto = (v: unknown, max = 8000) => typeof v === "string" && v.length <= max;
+/** Confere um bloco que o navegador devolveu: só os tipos que o próprio servidor manda e devolve. */
+function blocoValido(b: unknown, role: "user" | "assistant"): boolean {
+  if (!b || typeof b !== "object") return false;
+  const x = b as Bloco;
+  if (x.type === "text") return ehTexto(x.text);
+  if (role === "assistant") {
+    if (x.type === "tool_use") return ehTexto(x.id, 200) && ehTexto(x.name, 80) && !!x.input && typeof x.input === "object" && JSON.stringify(x.input).length <= 8000;
+    if (x.type === "thinking") return ehTexto(x.thinking, 100_000) && ehTexto(x.signature, 100_000);
+    if (x.type === "redacted_thinking") return ehTexto(x.data, 100_000);
+    return false;
+  }
+  if (x.type === "tool_result") {
+    const c = x.content;
+    return ehTexto(x.tool_use_id, 200) && (c === undefined || ehTexto(c, 20_000) || (Array.isArray(c) && c.every((t) => t && typeof t === "object" && (t as Bloco).type === "text" && ehTexto((t as Bloco).text, 20_000))));
+  }
+  return false;
+}
+const soTextoDaPessoa = (m: Msg) => m.role === "user" && (typeof m.content === "string" || (Array.isArray(m.content) && m.content.length > 0 && m.content.every((b) => b.type === "text")));
+/**
+ * O histórico que o navegador devolve, conferido: só mensagens e blocos que o servidor produz, com teto de tamanho.
+ * Se passar do teto, corta do começo e recomeça numa mensagem de texto da pessoa (nunca num resultado de ferramenta
+ * solto); e, como cortar muda o começo da conversa, tira o raciocínio guardado das respostas antigas (o modelo recusa
+ * raciocínio de uma conversa que mudou). Histórico com formato estranho é descartado (a conversa recomeça).
+ */
+function historico(bruto: unknown): Msg[] {
+  if (!Array.isArray(bruto)) return [];
+  const ok = bruto.every((m) => m && typeof m === "object" && ((m as Msg).role === "user" || (m as Msg).role === "assistant")
+    && (ehTexto((m as Msg).content) || (Array.isArray((m as Msg).content) && ((m as Msg).content as unknown[]).length <= 40 && ((m as Msg).content as unknown[]).every((b) => blocoValido(b, (m as Msg).role as "user" | "assistant")))));
+  if (!ok) return [];
+  let lista = bruto as Msg[];
+  const grande = () => lista.length > MAX_MENSAGENS || JSON.stringify(lista).length > MAX_HISTORICO;
+  if (!grande()) return lista;
+  while (lista.length && grande()) lista = lista.slice(1);
+  while (lista.length && !soTextoDaPessoa(lista[0])) lista = lista.slice(1);
+  return lista.map((m) => (m.role === "assistant" && Array.isArray(m.content)
+    ? { ...m, content: m.content.filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking") }
+    : m)).filter((m) => !(Array.isArray(m.content) && m.content.length === 0));
+}
+/** Agora no fuso do pet shop ("AAAA-MM-DDTHH:MM") e a diferença para o UTC em minutos, pelo relógio do servidor. */
+function agoraNoFuso(fuso: string) {
+  const d = new Date();
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: fuso, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d).map((x) => [x.type, x.value]));
+    const local = `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+    return { agora: local, fusoMin: Math.round((Date.parse(`${local}:00Z`) - Math.floor(d.getTime() / 60000) * 60000) / 60000) };
+  } catch { return null; }
+}
 
 export async function POST(req: Request) {
   if (!configurado) return erro(503, "sem_banco", "O sistema ainda não está ligado neste endereço.");
@@ -57,8 +113,19 @@ export async function POST(req: Request) {
     cuidoDoFinanceiro: podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
     fusoMin: corpo.fusoMin, agora: corpo.agora!.slice(0, 16),
   };
+  // o relógio que vale é o do servidor: o do aparelho só é usado se bate com ele (aparelho em outro fuso de propósito)
+  const doServidor = agoraNoFuso(p.data.fuso || "America/Sao_Paulo");
+  const noAparelho = new Date(Date.now() + c.fusoMin * 60000).toISOString().slice(0, 16);
+  if (doServidor && Math.abs(Date.parse(`${c.agora}:00Z`) - Date.parse(`${noAparelho}:00Z`)) > 15 * 60000) { c.agora = doServidor.agora; c.fusoMin = doServidor.fusoMin; }
 
-  const mensagens: Msg[] = Array.isArray(corpo.mensagens) ? corpo.mensagens.slice(-60) : [];
+  // toda chamada ao modelo conta no dia do pet shop (no banco; a conta só para consulta conta igual)
+  const contar = async (tipo: "pedido" | "chamada") => {
+    const r = await sb.rpc("assistente_contar", { p_petshop: c.petshop.id, p_canal: "mozart", p_tipo: tipo, p_limite: tipo === "pedido" ? LIMITE_DIA : LIMITE_CHAMADAS });
+    if (r.error) { console.error("[assistente] contagem falhou", r.error.code); return false; }
+    return r.data === true;
+  };
+
+  const mensagens: Msg[] = historico(corpo.mensagens);
   const links: LinkZap[] = [];
   let mudou = false;
 
@@ -95,9 +162,7 @@ export async function POST(req: Request) {
   } else {
     const texto = (corpo.texto ?? "").trim().slice(0, 2000);
     if (!texto) return erro(400, "pedido_vazio", "Diga ou escreva o que você precisa.");
-    const inicioDoDia = new Date(Date.parse(`${c.agora.slice(0, 10)}T00:00:00Z`) - c.fusoMin * 60000).toISOString();
-    const { count } = await sb.from("assistente_eventos").select("id", { count: "exact", head: true }).eq("petshop_id", c.petshop.id).eq("acao", "pedido").gte("criado_em", inicioDoDia);
-    if ((count ?? 0) >= LIMITE_DIA) return erro(429, "limite", "O Mozart atingiu o limite de pedidos de hoje. Amanhã ele volta; enquanto isso, as telas funcionam normalmente.");
+    if (!(await contar("pedido"))) return erro(429, "limite", LIMITE_TEXTO);
     await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao: "pedido", pedido: texto });
     const dia = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"][new Date(`${c.agora.slice(0, 10)}T00:00:00Z`).getUTCDay()];
     mensagens.push({ role: "user", content: [{ type: "text", text: texto }, { type: "text", text: `(Agora: ${dia}, ${c.agora.replace("T", " ")}, horário local do pet shop.)` }] });
@@ -117,6 +182,10 @@ export async function POST(req: Request) {
 
   try {
     for (let volta = 0; volta < MAX_VOLTAS; volta++) {
+      if (!(await contar("chamada"))) {
+        if (!texto) return erro(429, "limite", LIMITE_TEXTO);
+        break;
+      }
       const resposta = await cliente.beta.messages.create({
         model: MODELO,
         max_tokens: 4000,

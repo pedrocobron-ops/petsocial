@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/gestao/banco";
+import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "@/lib/gestao/supabase";
+import { segredoDoServidor, visitante } from "@/lib/gestao/servidor";
 import { INSTRUCOES_VENDAS, MARCA_PESSOA, RESPOSTA_SEM_IA } from "@/lib/gestao/vendas";
 
 export const runtime = "nodejs";
@@ -7,7 +11,8 @@ export const maxDuration = 30;
 
 /** Modelo do chat de venda: conversa curta, então usa o modelo mais leve. */
 const MODELO = process.env.GESTAO_VENDAS_MODELO ?? "claude-haiku-5-5";
-/** Freios de gasto: o chat é público (sem login). Valem por instância do servidor. */
+/** Freios de gasto: o chat é público (sem login). Estes valem por instância do servidor; o teto que dura (por hora e por dia,
+ *  somando tudo) fica no banco (vendas_contar, limites em config_interna). */
 const POR_VISITANTE = Number(process.env.GESTAO_VENDAS_LIMITE_VISITANTE ?? 30); // mensagens por hora, por endereço
 const POR_HORA = Number(process.env.GESTAO_VENDAS_LIMITE_HORA ?? 400); // mensagens por hora, somando todo mundo
 
@@ -36,11 +41,18 @@ export async function POST(req: Request) {
   if (!ultima || ultima.de !== "eu") return NextResponse.json({ erro: "pedido_invalido" }, { status: 400 });
 
   const semIa = () => NextResponse.json({ texto: RESPOSTA_SEM_IA, pessoa: true });
-  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "sem-ip";
-  if (!process.env.ANTHROPIC_API_KEY || !liberado(ip)) return semIa();
+  const quem = visitante(req);
+  if (!process.env.ANTHROPIC_API_KEY || !configurado || !liberado(quem)) return semIa();
+  // teto no banco: sem conseguir contar, não chama o modelo
+  try {
+    const sb = createClient<Database>(SUPABASE_URL, SUPABASE_CHAVE, { auth: { persistSession: false, autoRefreshToken: false } });
+    const conta = await sb.rpc("vendas_contar", { p_segredo: segredoDoServidor() as string, p_visitante: quem });
+    if (conta.error || conta.data !== true) return semIa();
+  } catch { return semIa(); }
 
   try {
-    const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, "") });
+    // sem repetir sozinho em 429/5xx (o SDK repete duas vezes por padrão): no chat público, repetir só dobra o gasto
+    const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, ""), maxRetries: 0, timeout: 20_000 });
     const pedido = {
       model: MODELO,
       system: [{ type: "text" as const, text: INSTRUCOES_VENDAS, cache_control: { type: "ephemeral" as const } }],
@@ -48,9 +60,13 @@ export async function POST(req: Request) {
     };
     // Conversa de venda não precisa de raciocínio longo: sem "pensar" a resposta sai mais rápida e mais barata.
     // (Com o pensamento ligado ele conta no limite de tokens e a resposta saía cortada ou vazia.)
-    // Se o modelo configurado não aceitar desligar, tenta de novo com folga no limite.
+    // Se o modelo configurado não aceitar desligar (pedido recusado como inválido), tenta de novo com folga no limite.
+    // Outros erros (muitos pedidos, fora do ar) não repetem: a pessoa recebe o contato da equipe.
     const r = await cliente.messages.create({ ...pedido, max_tokens: 500, thinking: { type: "disabled" } })
-      .catch(() => cliente.messages.create({ ...pedido, max_tokens: 3000 }));
+      .catch((e: unknown) => {
+        if (e instanceof Anthropic.BadRequestError) return cliente.messages.create({ ...pedido, max_tokens: 3000, output_config: { effort: "low" as const } });
+        throw e;
+      });
     if (r.stop_reason === "max_tokens" || r.stop_reason === "refusal") return semIa();
     const bruto = r.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
     const texto = bruto.replace(MARCA_PESSOA, "").trim();

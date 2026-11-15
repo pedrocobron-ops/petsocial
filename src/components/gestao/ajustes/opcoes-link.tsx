@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ScrollText } from "lucide-react";
 import { EXEMPLO_DE_REGRAS, MAX_HORAS, MAX_TERMOS, OPCOES_LINK as K, opcoesDoLink, prazoPorExtenso } from "@/lib/gestao/link-opcoes";
 import { opcao, salvarOpcoes } from "@/lib/gestao/opcoes";
-import { OPCAO_LINK_IA } from "@/lib/gestao/link-ia";
+import { OPCAO_LINK_IA } from "@/lib/gestao/link-ia-comum";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { avisarMudanca, Campo, useAvisos, useSomenteLeitura } from "../ui";

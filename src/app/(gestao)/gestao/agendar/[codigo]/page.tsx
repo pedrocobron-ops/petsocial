@@ -14,7 +14,7 @@ import { aplicarTema } from "@/lib/gestao/identidade";
 import { MUITOS_PEDIDOS, lembrarPedido } from "@/lib/gestao/link-opcoes";
 import { AceiteDosTermos, PedidosDesteAparelho, SEM_ACEITE, faltaAceitar, pedirPeloLink, useTermosDoLink } from "./termos";
 import DuvidaNoLink from "./duvida";
-import type { Sugestao } from "@/lib/gestao/link-ia";
+import type { Sugestao } from "@/lib/gestao/link-ia-comum";
 import "./agendar.css";
 
 type ServicoDoLink = {

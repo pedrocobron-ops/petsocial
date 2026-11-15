@@ -5,12 +5,12 @@
  * A rota `/api/gestao/link-ia` lê as funções públicas do link (as mesmas da página), passa por `contextoDoLink`
  * e manda ao modelo só esse texto. Nada de cliente, pet ou dinheiro do caixa entra aqui: só o que a página do link já mostra.
  * O preço segue a página: serviço sem preço fica "não informado"; hotel com "Esconder o preço no link" fica sem diária e sem estimativa.
+ * Só o servidor importa este arquivo (as instruções do assistente não vão para o navegador); as telas importam
+ * `link-ia-comum.ts`, que este arquivo reexporta.
  */
+import { MAX_LETRAS_PERGUNTA, MAX_PERGUNTAS_CONVERSA, OPCAO_LINK_IA, limiteConversaTexto, type Sugestao } from "./link-ia-comum";
+export { MAX_LETRAS_PERGUNTA, MAX_PERGUNTAS_CONVERSA, OPCAO_LINK_IA, limiteConversaTexto, type Sugestao };
 
-export const OPCAO_LINK_IA = "link.ia";
-/** Perguntas por conversa (o navegador também conta; o servidor confere de novo). */
-export const MAX_PERGUNTAS_CONVERSA = 15;
-export const MAX_LETRAS_PERGUNTA = 300;
 export const MAX_LETRAS_RESPOSTA = 900;
 /** Quantos dias à frente o link oferece horário (igual à página). */
 export const DIAS_NO_LINK = 14;
@@ -45,7 +45,6 @@ export type DadosDoLink = {
 };
 
 export type Fala = { de: "eu" | "ia"; texto: string };
-export type Sugestao = { tipo: "servico"; servicoId: string; nome: string; dia: string | null } | { tipo: "creche" | "hotel"; dia: null };
 export type Resposta = { texto: string; naoSei: boolean; sugestao: Sugestao | null };
 
 const SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -223,7 +222,6 @@ export function lerResposta(bruto: string, d: DadosDoLink): Resposta {
 
 export const naoSeiTexto = (nome: string) => `Não sei responder isso. Fale com ${nome} no WhatsApp.`;
 export const limiteTexto = (nome: string) => `Por hoje não consigo responder mais perguntas por aqui. Fale com ${nome} no WhatsApp, que eles respondem.`;
-export const limiteConversaTexto = (nome: string) => `Esta conversa chegou ao limite de perguntas. Para continuar, fale com ${nome} no WhatsApp.`;
 export const foraTexto = (nome: string) => `Não consegui responder agora. Fale com ${nome} no WhatsApp.`;
 
 /* ---------- ferramentas (só leitura, só deste link) ---------- */
