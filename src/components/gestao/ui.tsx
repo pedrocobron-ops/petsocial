@@ -18,6 +18,9 @@ export const avisarMudanca = () => window.dispatchEvent(new Event(EVENTO_MUDOU))
 export const EVENTO_ASSISTENTE = "gestao:assistente";
 /** Abre a assistente, opcionalmente já com um pedido escrito. */
 export const abrirAssistente = (pedido?: string) => window.dispatchEvent(new CustomEvent(EVENTO_ASSISTENTE, { detail: pedido ?? "" }));
+/** Evento para abrir o guia inicial de novo (botão em Meu pet shop). Fica aqui, e não no guia, para o guia carregar só quando abre. */
+export const EVENTO_GUIA = "gestao:guia";
+export const abrirGuia = () => window.dispatchEvent(new Event(EVENTO_GUIA));
 
 /** Busca dados e guarda o resultado. `recarregar()` busca de novo sem piscar a tela. */
 export function useDados<T>(buscar: () => Promise<T>, deps: unknown[]) {

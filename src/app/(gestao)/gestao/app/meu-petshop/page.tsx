@@ -2,7 +2,7 @@
 
 import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
 
-import { abrirGuia } from "@/components/gestao/guia-inicial";
+import { abrirGuia } from "@/components/gestao/ui";
 import Identidade from "@/components/gestao/ajustes/identidade";
 import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";

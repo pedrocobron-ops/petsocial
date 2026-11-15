@@ -67,13 +67,14 @@ const num = (v: unknown) => (v == null ? null : Number(v));
  * (Caixa, Financeiro ou Relatórios); os dados da assinatura na Cakto não vêm para ninguém (o painel do administrador lê por outra função).
  */
 export async function lerPetshop(sb: Banco, petshopId: string): Promise<{ data: PetshopLinha | null; error: { message: string } | null }> {
-  const base = await sb.from("petshops").select(COLS_PETSHOP).eq("id", petshopId).maybeSingle();
-  if (base.error || !base.data) return { data: null, error: base.error };
-  const [extra, diarias, opcoes] = await Promise.all([
+  // tudo de uma vez: no celular com internet fraca, cada ida e volta ao banco pesa
+  const [base, extra, diarias, opcoes] = await Promise.all([
+    sb.from("petshops").select(COLS_PETSHOP).eq("id", petshopId).maybeSingle(),
     reservado(sb, "petshop_reservado", { p: petshopId }, () => sb.from("petshops").select("id, meta_mes").eq("id", petshopId)),
     reservado(sb, "petshop_diarias", { p: petshopId }, () => sb.from("petshops").select("id, diaria_creche, diaria_hotel").eq("id", petshopId)),
     lerOpcoes(sb, petshopId),
   ]);
+  if (base.error || !base.data) return { data: null, error: base.error };
   return {
     data: {
       ...(base.data as unknown as PetshopLinha), opcoes: opcoes as PetshopLinha["opcoes"], meta_mes: num(extra[0]?.meta_mes),
@@ -125,10 +126,12 @@ export async function idsParaCobrar(sb: Banco, petshopId: string): Promise<strin
 
 /** A equipe do pet shop, com comissão e e-mail de convite para quem pode ver (dono, relatórios, a própria pessoa). */
 export async function lerEquipe(sb: Banco, petshopId: string): Promise<{ data: ProfissionalLinha[] | null; error: { message: string } | null }> {
-  const base = await sb.from("profissionais").select(COLS_PROFISSIONAL).eq("petshop_id", petshopId).order("criado_em");
+  const [base, reservadas] = await Promise.all([
+    sb.from("profissionais").select(COLS_PROFISSIONAL).eq("petshop_id", petshopId).order("criado_em"),
+    reservado(sb, "equipe_reservado", { p: petshopId }, () => sb.from("profissionais").select("id, comissao_pct, email_convite").eq("petshop_id", petshopId)),
+  ]);
   if (base.error) return { data: null, error: base.error };
-  const extra = porId(await reservado(sb, "equipe_reservado", { p: petshopId },
-    () => sb.from("profissionais").select("id, comissao_pct, email_convite").eq("petshop_id", petshopId)));
+  const extra = porId(reservadas);
   return {
     data: (base.data as unknown as ProfissionalLinha[]).map((p) => {
       const x = extra.get(p.id);
@@ -202,8 +205,14 @@ export async function comPrecosDePacote<P extends { id: string }>(sb: Banco, pet
  * o banco coloca o da lista para o porte do pet.
  */
 export async function comPrecosDeServico<S extends { id: string }>(sb: Banco, petshopId: string, servicos: S[]): Promise<(S & { preco_p: number | null; preco_m: number | null; preco_g: number | null; preco_gg: number | null; preco_varia: boolean })[]> {
-  const extra = servicos.length ? porId(await reservado(sb, "servicos_precos", { p: petshopId },
-    () => sb.from("servicos").select("id, preco_p, preco_m, preco_g, preco_gg").eq("petshop_id", petshopId))) : new Map<string, Record<string, unknown>>();
+  return juntarPrecosDeServico(servicos, servicos.length ? await precosDeServico(sb, petshopId) : []);
+}
+
+const precosDeServico = (sb: Banco, petshopId: string) => reservado(sb, "servicos_precos", { p: petshopId },
+  () => sb.from("servicos").select("id, preco_p, preco_m, preco_g, preco_gg").eq("petshop_id", petshopId));
+
+function juntarPrecosDeServico<S extends { id: string }>(servicos: S[], linhas: Linhas) {
+  const extra = porId(linhas);
   return servicos.map((s) => {
     const x = extra.get(s.id);
     const precos = { preco_p: num(x?.preco_p), preco_m: num(x?.preco_m), preco_g: num(x?.preco_g), preco_gg: num(x?.preco_gg) };
@@ -215,9 +224,13 @@ export async function comPrecosDeServico<S extends { id: string }>(sb: Banco, pe
 
 /** Os serviços do pet shop, com os preços para quem pode ver, na ordem da tela. */
 export async function lerServicos(sb: Banco, petshopId: string): Promise<{ data: (T["servicos"]["Row"] & { preco_varia: boolean })[] | null; error: { message: string } | null }> {
-  const base = await sb.from("servicos").select(COLS_SERVICO).eq("petshop_id", petshopId).order("ordem").order("nome").order("id");
+  // a lista e os preços ao mesmo tempo (uma ida ao banco a menos ao abrir o aplicativo)
+  const [base, precos] = await Promise.all([
+    sb.from("servicos").select(COLS_SERVICO).eq("petshop_id", petshopId).order("ordem").order("nome").order("id"),
+    precosDeServico(sb, petshopId),
+  ]);
   if (base.error) return { data: null, error: base.error };
-  return { data: await comPrecosDeServico(sb, petshopId, base.data as unknown as T["servicos"]["Row"][]), error: null };
+  return { data: juntarPrecosDeServico(base.data as unknown as T["servicos"]["Row"][], precos), error: null };
 }
 
 /** Junta o preço de venda aos produtos. Vem para quem vende (Caixa), cuida do estoque ou vê o dinheiro; para os outros, null. */

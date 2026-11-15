@@ -17,13 +17,18 @@ import { areaDaRota } from "@/lib/gestao/acessos";
 import { TELA_DA_AREA, nomeDaCasa, principalDe, rotaForaDoMenu, usaModulo, type Principal } from "@/lib/gestao/modulos";
 import { guardarLembrado, lerLembrado } from "./lembrado";
 import type { Tom } from "./painel";
-import Assistente from "./assistente";
-import Ajuda from "./ajuda";
-import AjudaDaTela from "./manual/ajuda-da-tela";
-import GuiaInicial from "./guia-inicial";
+import dynamic from "next/dynamic";
+import { EVENTO_GUIA } from "./ui";
 import LogoLoja from "./logo-loja";
 import AvisoDeFuso from "./aviso-fuso";
 import { aplicarTema } from "@/lib/gestao/identidade";
+
+// O que só abre com um toque (Mozart, Ajuda, guia inicial) e o "Como usar esta tela" (o manual inteiro) vêm à parte, depois
+// da tela: no celular com internet fraca, a tela não espera baixar o que a pessoa talvez nem abra.
+const Assistente = dynamic(() => import("./assistente"), { ssr: false });
+const Ajuda = dynamic(() => import("./ajuda"), { ssr: false });
+const AjudaDaTela = dynamic(() => import("./manual/ajuda-da-tela"), { ssr: false });
+const GuiaInicial = dynamic(() => import("./guia-inicial"), { ssr: false });
 
 type Item = { href: string; rotulo: string; icone: React.ComponentType; tom: Tom; so?: "financeiro" | "dono" };
 const GRUPOS: { titulo: string; itens: Item[] }[] = [
@@ -99,6 +104,21 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   const [mais, setMais] = useState(false);
   const [ajuda, setAjuda] = useState(false);
   const [admin, setAdmin] = useState(false);
+  // o guia inicial só carrega quando vai abrir: na primeira entrada (guia ainda não feito) ou pelo botão em Meu pet shop
+  const [guia, setGuia] = useState<"fechado" | "inicio" | "botao">(() => (petshop.guia_feito_em ? "fechado" : "inicio"));
+  useEffect(() => {
+    const abrir = () => setGuia((g) => (g === "fechado" ? "botao" : g));
+    window.addEventListener(EVENTO_GUIA, abrir);
+    return () => window.removeEventListener(EVENTO_GUIA, abrir);
+  }, []);
+  // o "Como usar esta tela" entra quando o aparelho folga, depois que a tela abriu
+  const [depois, setDepois] = useState(false);
+  useEffect(() => {
+    const w = window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number };
+    const ja = () => setDepois(true);
+    if (w.requestIdleCallback) w.requestIdleCallback(ja, { timeout: 4000 });
+    else setTimeout(ja, 1500);
+  }, []);
   const [outrasAbertas, setOutrasAbertas] = useState(() => lerLembrado(CHAVE_OUTRAS) === "1");
   const abrirOutras = () => setOutrasAbertas((a) => { guardarLembrado(CHAVE_OUTRAS, a ? "0" : "1"); return !a; });
 
@@ -246,7 +266,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           <div className="g-barra-marca"><LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={34} padrao="selo" tomSelo="verde" /><span>{petshop.nome}</span></div>
           {aqui && <div className="g-barra-onde"><span className={`g-tile p ${aqui.item.tom}`} aria-hidden><aqui.item.icone /></span><span>{aqui.grupo} / <b>{aqui.item.rotulo}</b></span></div>}
           {posso("clientes") ? <BuscaGeral /> : <span style={{ flex: 1 }} />}
-          <AjudaDaTela aoPerguntar={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }} />
+          {depois && <AjudaDaTela aoPerguntar={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }} />}
           <div className="g-barra-data"><CalendarClock />{dataLonga(new Date())}</div>
         </div>
         <AvisoDeFuso />
@@ -333,7 +353,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         </Folha>
       )}
 
-      <GuiaInicial />
+      {guia !== "fechado" && <GuiaInicial abrirAgora={guia === "botao"} />}
       {ajuda && <Ajuda aoFechar={() => setAjuda(false)} />}
       {assistente.aberta && <Assistente pedidoInicial={assistente.pedido} aoFechar={() => setAssistente({ aberta: false, pedido: "" })} />}
     </div>

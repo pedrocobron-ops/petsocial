@@ -48,6 +48,8 @@ export function useGestao(): Gestao {
 }
 
 const CHAVE_LOJA = "maestro-gestao-petshop";
+/** Último pet shop aberto neste aparelho (conta:pet shop): só para adiantar a leitura, não decide qual abre. */
+const CHAVE_ULTIMA = "maestro-gestao-ultima-loja";
 
 let soConsulta = false;
 /** A conta está só para consulta (teste vencido ou assinatura cancelada)? Para as mensagens de erro, fora dos componentes. */
@@ -65,18 +67,22 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   /** A assinatura abriu (o fim do teste vale)? null = não deu para ler do banco: segue a regra antiga, pelos links. */
   const [aberta, setAberta] = useState<boolean | null>(null);
 
-  const carregarBase = useCallback(async (petshopId: string) => {
+  const buscarBase = useCallback(async (petshopId: string) => {
     const [p, e, s] = await Promise.all([
       lerPetshop(sb, petshopId),
       lerEquipe(sb, petshopId),
       lerServicos(sb, petshopId),
     ]);
     if (p.error || !p.data) throw p.error ?? new Error("pet shop");
-    setPetshop(p.data);
-    setEquipe(e.data ?? []);
-    setServicos(s.data ?? []);
-    return e.data ?? [];
+    return { petshop: p.data, equipe: e.data ?? [], servicos: s.data ?? [] };
   }, [sb]);
+  const aplicarBase = useCallback((b: Awaited<ReturnType<typeof buscarBase>>) => {
+    setPetshop(b.petshop);
+    setEquipe(b.equipe);
+    setServicos(b.servicos);
+    return b.equipe;
+  }, []);
+  const carregarBase = useCallback(async (petshopId: string) => aplicarBase(await buscarBase(petshopId)), [buscarBase, aplicarBase]);
 
   useEffect(() => {
     let vivo = true;
@@ -86,21 +92,28 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       if (!vivo) return;
       if (!data.session) { router.replace("/gestao/entrar"); return; }
       const u = data.session.user;
-      const { data: vinculos, error } = await sb.rpc("entrar");
-      if (!vivo) return;
-      if (error) { setErro("Não consegui carregar a sua conta. Tente de novo em instantes."); return; }
-      if (!vinculos?.length) { router.replace("/gestao/comecar"); return; }
-      const preferido = typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_LOJA) : null;
-      const meu = vinculos.find((v) => v.petshop_id === preferido) ?? vinculos[0];
-      // links de pagamento e se a assinatura abriu: vêm do banco, para trocar um link sem publicar o site de novo
+      let preferido: string | null = null, ultimo: string | null = null;
+      try { preferido = localStorage.getItem(CHAVE_LOJA); ultimo = localStorage.getItem(CHAVE_ULTIMA); } catch { /* sem armazenamento: segue */ }
+      // o pet shop aberto da última vez neste aparelho já começa a carregar junto com a conta (uma ida ao banco a menos no
+      // celular). Só vale se for o mesmo que a conta abre agora; senão (ou se a conta não estiver mais nele) é descartado.
+      const palpite = ultimo && ultimo.startsWith(`${u.id}:`) ? ultimo.slice(u.id.length + 1) : null;
+      const adiantado = palpite ? buscarBase(palpite).catch(() => null) : null;
+      // links de pagamento e se a assinatura abriu: vêm do banco (junto com a conta), para trocar um link sem publicar o site de novo
       const assinatura = sb.rpc("gestao_assinatura").then((r) => {
         if (r.error || !r.data) return;
         const a = r.data as { aberta?: boolean; links?: Record<string, string> };
         usarLinksDoBanco(a.links);
         if (vivo) setAberta(Boolean(a.aberta));
       }, () => undefined);
+      const { data: vinculos, error } = await sb.rpc("entrar");
+      if (!vivo) return;
+      if (error) { setErro("Não consegui carregar a sua conta. Tente de novo em instantes."); return; }
+      if (!vinculos?.length) { router.replace("/gestao/comecar"); return; }
+      const meu = vinculos.find((v) => v.petshop_id === preferido) ?? vinculos[0];
       try {
-        const [todos] = await Promise.all([carregarBase(meu.petshop_id), assinatura]);
+        const base = (meu.petshop_id === palpite ? await adiantado : null) ?? await buscarBase(meu.petshop_id);
+        try { localStorage.setItem(CHAVE_ULTIMA, `${u.id}:${meu.petshop_id}`); } catch { /* sem armazenamento: segue */ }
+        const [todos] = await Promise.all([aplicarBase(base), assinatura]);
         if (!vivo) return;
         setEu(todos.find((x) => x.id === meu.id) ?? meu);
         setUser(u);
@@ -112,7 +125,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       if (evento === "SIGNED_OUT") router.replace("/gestao/entrar");
     });
     return () => { vivo = false; sub.subscription.unsubscribe(); };
-  }, [sb, router, carregarBase]);
+  }, [sb, router, buscarBase, aplicarBase]);
 
   const valor = useMemo<Gestao | null>(() => {
     if (!user || !eu || !petshop) return null;

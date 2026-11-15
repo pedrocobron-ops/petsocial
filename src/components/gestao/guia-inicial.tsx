@@ -11,7 +11,7 @@ import { useGestao } from "./contexto";
 import { Selo } from "./marca";
 import { Tile } from "./painel";
 import { brl, lerValor, valor2 } from "@/lib/gestao/util";
-import { Campo, CampoValor, avisarMudanca, ok, useAvisos } from "./ui";
+import { Campo, CampoValor, EVENTO_GUIA, avisarMudanca, ok, useAvisos } from "./ui";
 import Importar from "./importar";
 import { TEMAS, aplicarTema, enviarLogo, tirarLogo } from "@/lib/gestao/identidade";
 import { FalaMozart, PERGUNTAS, PreviaPainel, TrilhoBoasVindas, chaveBoasVindas, oQueDeixeiPronto } from "./boas-vindas";
@@ -20,9 +20,7 @@ import LogoLoja from "./logo-loja";
 import "./ajustes/identidade.css";
 import "./guia-inicial.css";
 
-/** Evento para abrir o guia de novo (botão em Meu pet shop). */
-export const EVENTO_GUIA = "gestao:guia";
-export const abrirGuia = () => window.dispatchEvent(new Event(EVENTO_GUIA));
+export { EVENTO_GUIA, abrirGuia } from "./ui";
 
 type IdPasso = "cor" | "logo" | "horario" | "equipe" | "servicos" | "casa" | "link";
 type PassoDoGuia = { id: IdPasso };
@@ -84,11 +82,11 @@ function CampoPreco({ porte, servico, valor, aoMudar }: { porte: string; servico
  * a cor e a logo. O ponto em que parou fica no aparelho, então recarregar a página não repete a pergunta já respondida.
  * Aparece sozinho para o dono enquanto `petshops.guia_feito_em` está vazio; depois, só pelo botão em Meu pet shop.
  */
-export default function GuiaInicial() {
+export default function GuiaInicial({ abrirAgora = false }: { /** a casca só carrega o guia quando ele vai abrir: veio pelo botão em Meu pet shop */ abrirAgora?: boolean }) {
   const { sb, petshop, souDono, liberado, recarregarBase } = useGestao();
   const { avisarErro } = useAvisos();
   // aberto desde a primeira entrada (guia ainda não feito) ou pelo botão em Meu pet shop; fica aberto até a pessoa fechar
-  const [aberto, setAberto] = useState(() => !petshop.guia_feito_em);
+  const [aberto, setAberto] = useState(() => abrirAgora || !petshop.guia_feito_em);
   const [vez, setVez] = useState(0); // cada abertura começa do primeiro passo, com os dados de agora
   const [importando, setImportando] = useState(false);
 

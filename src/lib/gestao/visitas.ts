@@ -20,6 +20,21 @@ export type Visita = {
 
 /** As visitas de todos os pets do pet shop que já vieram ou têm algo marcado. Só leitura. */
 export async function buscarVisitas(sb: Banco, petshopId: string, agora = new Date()): Promise<Map<string, Visita>> {
+  // a conta é feita no banco (função visitas_dos_pets, a mesma regra daqui de baixo) e chega numa resposta só:
+  // sem baixar todos os atendimentos e estadias do pet shop. Banco antes da atualização: a conta é feita aqui.
+  const r = await (sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string; message: string } | null }> })
+    .rpc("visitas_dos_pets", { p: petshopId, p_hoje: inicioDoDia(agora).toISOString(), p_agora: agora.toISOString() });
+  if (!r.error && Array.isArray(r.data)) {
+    const mapa = new Map<string, Visita>();
+    for (const [pet, ultima, servico, marcado] of r.data as [string, string | null, string | null, boolean][]) mapa.set(pet, { ultima, servico, marcado });
+    return mapa;
+  }
+  if (r.error && r.error.code !== "PGRST202" && r.error.code !== "42883") throw new Error(r.error.message);
+  return buscarVisitasAqui(sb, petshopId, agora);
+}
+
+/** A mesma conta, feita no navegador (banco antes da migração 20261174). Também serve para conferir a função do banco. */
+export async function buscarVisitasAqui(sb: Banco, petshopId: string, agora = new Date()): Promise<Map<string, Visita>> {
   const [concluidos, estadias, futuros] = await Promise.all([
     lerTudo<{ pet_id: string; inicio: string; servicos: { nome: string } | null }>((de, ate, contar) =>
       sb.from("agendamentos").select("pet_id, inicio, servicos(nome)", contando(contar)).eq("petshop_id", petshopId).eq("status", "concluido")

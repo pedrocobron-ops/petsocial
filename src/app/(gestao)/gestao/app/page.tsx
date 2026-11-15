@@ -75,8 +75,11 @@ export default function Hoje() {
   const { dados, carregando, recarregar } = useDados(async () => {
     const amanha = somaDias(hoje, 1), depois = somaDias(hoje, 2);
     const seg = inicioDaSemana(hoje), ha30 = somaDias(hoje, -30), ha6 = somaDias(hoje, -6);
-    const [ags, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes, daSemana, doMes, ultimos7, concluidos, lembrados, estadiasTotal, produtosTotal, proximosDias, semFechar] = await Promise.all([
-      sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id).gte("inicio", hoje.toISOString()).lt("inicio", amanha.toISOString()).order("inicio"),
+    // tudo ao mesmo tempo: no celular com internet fraca, cada consulta esperando a outra soma uma ida e volta
+    const [lista, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes, daSemana, doMes, ultimos7, concluidos, lembrados, estadiasTotal, produtosTotal, proximosDias, semFechar, saude, aj, creche, experiencias] = await Promise.all([
+      // o preço de cada horário vem à parte; o banco só entrega a quem recebe (o formulário de editar regrava o que leu)
+      sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id).gte("inicio", hoje.toISOString()).lt("inicio", amanha.toISOString()).order("inicio")
+        .then(async (ags) => await comPrecosDeAgendamento(sb, petshop.id, (ags.data ?? []) as unknown as AgendamentoCompleto[]) as unknown as AgendamentoCompleto[]),
       sb.from("agendamentos").select("id, lembrete_em, status, pets(clientes(id, telefone))").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).lt("inicio", depois.toISOString()),
       sb.from("estadias").select("id, status, entrada, saida_prevista").eq("petshop_id", petshop.id).in("status", ["em_casa", "reservada"]).limit(1000),
       // estoque e pacotes só entram no aviso de quem tem a área
@@ -98,14 +101,14 @@ export default function Hoje() {
       sb.from("agendamentos").select("id, inicio, pets(nome)").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).in("status", ["marcado", "confirmado"]).order("inicio").order("id").limit(2),
       // horários de dias anteriores que ninguém fechou (nem concluído, nem falta, nem cancelado)
       sb.from("agendamentos").select("id, inicio, pets(nome)", { count: "exact" }).eq("petshop_id", petshop.id).lt("inicio", hoje.toISOString()).in("status", ["marcado", "confirmado", "em_atendimento"]).order("inicio").order("id").limit(3),
+      buscarSaudeVencendo(sb, petshop.id).catch(() => null),
+      // devolução ao tutor e crédito deixado para ele saem do que entrou (a mesma regra do faturamento nos Relatórios)
+      cuidoDoFinanceiro ? ajustesDoFaturamento(sb, petshop.id, isoDia(ha6), hojeIso).catch(() => SEM_AJUSTES) : Promise.resolve(SEM_AJUSTES),
+      casa && usaModulo(petshop, "creche") ? resumoDaCrecheHoje(sb, petshop, cuidoDoFinanceiro, liberado).catch(() => null) : Promise.resolve(null),
+      // dia de experiência (opção da creche): quem vem hoje e quem já fez e espera a conversa com o tutor
+      casa && usaModulo(petshop, "creche") && experienciaDe(petshop).ativo ? lerExperiencias(sb, petshop.id).catch(() => null) : Promise.resolve(null),
     ]);
-    const saude = await buscarSaudeVencendo(sb, petshop.id).catch(() => null);
-    // devolução ao tutor e crédito deixado para ele saem do que entrou (a mesma regra do faturamento nos Relatórios)
-    const aj = cuidoDoFinanceiro ? await ajustesDoFaturamento(sb, petshop.id, isoDia(ha6), hojeIso).catch(() => SEM_AJUSTES) : SEM_AJUSTES;
     const ajusteDe = (iso: string) => aj.porDia.get(iso) ?? 0;
-    const creche = casa && usaModulo(petshop, "creche") ? await resumoDaCrecheHoje(sb, petshop, cuidoDoFinanceiro, liberado).catch(() => null) : null;
-    // dia de experiência (opção da creche): quem vem hoje e quem já fez e espera a conversa com o tutor
-    const experiencias = casa && usaModulo(petshop, "creche") && experienciaDe(petshop).ativo ? await lerExperiencias(sb, petshop.id).catch(() => null) : null;
     const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
     const porServico = new Map<string, { rotulo: string; valor: number; cor: string | null }>();
     for (const a of (doMes.data ?? []) as unknown as { status: string; servicos: { nome: string; cor: string | null } | null }[]) {
@@ -113,8 +116,6 @@ export default function Hoje() {
       const x = porServico.get(a.servicos.nome) ?? { rotulo: a.servicos.nome, valor: 0, cor: a.servicos.cor };
       x.valor++; porServico.set(a.servicos.nome, x);
     }
-    // o preço de cada horário vem à parte; o banco só entrega a quem recebe (o formulário de editar regrava o que leu)
-    const lista = await comPrecosDeAgendamento(sb, petshop.id, (ags.data ?? []) as unknown as AgendamentoCompleto[]) as unknown as AgendamentoCompleto[];
     const amanhaAtivos = ((agsAmanha.data ?? []) as unknown as { id: string; lembrete_em: string | null; status: string; pets: { clientes: { id: string; telefone: string | null } | null } | null }[])
       .filter((a) => !["cancelado", "faltou"].includes(a.status));
     // um lembrete por tutor: quem tem dois pets amanhã recebe uma mensagem só
