@@ -13,6 +13,8 @@ import LogoLoja from "@/components/gestao/logo-loja";
 import { aplicarTema } from "@/lib/gestao/identidade";
 import { MUITOS_PEDIDOS, lembrarPedido } from "@/lib/gestao/link-opcoes";
 import { AceiteDosTermos, PedidosDesteAparelho, SEM_ACEITE, faltaAceitar, pedirPeloLink, useTermosDoLink } from "./termos";
+import DuvidaNoLink from "./duvida";
+import type { Sugestao } from "@/lib/gestao/link-ia";
 import "./agendar.css";
 
 type ServicoDoLink = {
@@ -135,6 +137,8 @@ export default function AgendarPeloLink() {
   const [fechados, setFechados] = useState<Set<string>>(() => new Set());
   // o preço do hotel no link: undefined = ainda lendo (não mostra nada); null = banco antes da atualização (mostra a diária comum)
   const [precoHotel, setPrecoHotel] = useState<PrecoDoHotel | null | undefined>(undefined);
+  // "Tirar dúvida" (opção do dono; banco antes da atualização ou erro = sem o botão)
+  const [comDuvida, setComDuvida] = useState(false);
   const carregar = useCallback(async () => {
     setSemRede(false);
     setInfo(undefined);
@@ -147,6 +151,7 @@ export default function AgendarPeloLink() {
     // se a função ainda não existe no banco, segue sem dias fechados (como sempre foi)
     const f = await banco().rpc("link_fechados", { p_codigo: codigo });
     setFechados(new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []));
+    if (lido && typeof lido === "object" && lido.nome) void banco().rpc("link_ia_ligada", { p_codigo: codigo }).then(({ data: ia }) => setComDuvida(ia === true));
     if (lido && typeof lido === "object" && lido.hotel) {
       const o = await banco().rpc("link_hotel_opcoes", { p_codigo: codigo });
       const preco = (o.data as { preco?: PrecoDoHotel } | null)?.preco;
@@ -306,6 +311,20 @@ export default function AgendarPeloLink() {
     }
   }
 
+  /** O "Tirar dúvida" ofereceu o pedido: abre o formulário já no serviço (e no dia), e o cliente continua dali. Nada é enviado. */
+  function pedirPelaDuvida(s: Sugestao) {
+    if (passo === "enviado") { setEnviado(null); setPets([novoPet()]); setObs(""); }
+    if (s.tipo !== "servico") { if (s.tipo === "hotel" ? info?.hotel : info?.creche) { setEstadia(s.tipo); ir("servico"); } return; }
+    if (!info?.servicos.some((x) => x.id === s.servicoId)) return;
+    setEstadia(null);
+    setServicoId(s.servicoId);
+    setHoraEscolhida(null);
+    setAvisoQuando(null);
+    if (s.dia && dias.some((x) => x.iso === s.dia && x.aberto)) { diaSozinho.current = false; setDia(s.dia); }
+    else if (!dia) { diaSozinho.current = true; pulos.current = 0; setDia(dias.find((x) => x.aberto)?.iso ?? null); }
+    ir("quando");
+  }
+
   function pedirOutro() {
     setEnviado(null);
     setHoraEscolhida(null);
@@ -363,7 +382,7 @@ export default function AgendarPeloLink() {
   const fimEstimado = servico && horaEscolhida ? somaMin(horaEscolhida, servico.duracao_min * qtd) : null;
 
   return (
-    <Moldura>
+    <Moldura duvida={comDuvida ? <DuvidaNoLink codigo={codigo} loja={info.nome} telefone={info.telefone} aoPedir={pedirPelaDuvida} /> : null}>
       <header className="g-lk-cab">
         <Marca tamanho={220} className="g-lk-cab-fundo" />
         <div className="g-lk-cab-quem">
@@ -659,10 +678,11 @@ export default function AgendarPeloLink() {
   );
 }
 
-function Moldura({ children }: { children: React.ReactNode }) {
+function Moldura({ children, duvida }: { children: React.ReactNode; duvida?: React.ReactNode }) {
   return (
-    <div className="g-lk">
+    <div className={duvida ? "g-lk com-duvida" : "g-lk"}>
       <main className="g-lk-miolo">{children}</main>
+      {duvida}
       <footer className="g-lk-rodape">
         <span><Marca tamanho={16} />Feito com Maestro Pet Gestão</span>
         <Link href="/gestao/privacidade" target="_blank">Privacidade</Link>

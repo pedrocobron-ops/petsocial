@@ -15,6 +15,8 @@ export type UsoConta = {
   id: string; nome: string; status: string; plano: string; teste_ate: string; criado_em: string; limite: number; pessoas: number;
   ultimo_login: string | null; visto_em: string | null; ultima_gravacao: string | null; dias_14: number;
   agendamentos_14: number; vendas_14: number; creche_14: number; hotel_14: number; clientes_14: number; areas_14: string[];
+  /** perguntas no "Tirar dúvida" do link (banco antes da 20261176: ausente) */
+  ia_link_14?: number;
 };
 
 const DIA = 864e5;
@@ -155,7 +157,7 @@ export default function AbaUso({ lojas, uso, contas, aoAbrir }: { lojas: LojaBas
                   )}
                   {c && (
                     <span className="g-pp g-tab" style={{ overflowWrap: "anywhere" }}>
-                      Usou em <b>{c.dias_14} de 14 dias</b> · {c.agendamentos_14} agendamentos · {c.vendas_14} vendas e recebimentos · {c.creche_14} presenças na creche · {c.hotel_14} hospedagens · {c.clientes_14} clientes novos
+                      Usou em <b>{c.dias_14} de 14 dias</b> · {c.agendamentos_14} agendamentos · {c.vendas_14} vendas e recebimentos · {c.creche_14} presenças na creche · {c.hotel_14} hospedagens · {c.clientes_14} clientes novos{c.ia_link_14 ? ` · ${c.ia_link_14} dúvidas no link` : ""}
                     </span>
                   )}
                   {c && (

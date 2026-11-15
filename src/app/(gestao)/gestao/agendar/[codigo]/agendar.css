@@ -196,3 +196,41 @@
 .g-lk-conta .l > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .g-lk-conta .l.forte { font-weight: 700; border-top: 1px solid var(--g-linha); padding-top: 6px; }
 .g-lk-conta small { color: var(--g-cinza); font-size: .8125rem; line-height: 1.4; }
+
+/* tirar dúvida (só quando o dono liga em Meu pet shop) */
+.g-lk.com-duvida .g-lk-rodape { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+.g-lk-duv-abrir {
+  position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 40; display: inline-flex; align-items: center; gap: 8px;
+  min-height: 48px; padding: 0 18px 0 14px; border: 0; border-radius: 999px; background: var(--g-verde); color: #f6f1e8;
+  font: 600 .9375rem/1 var(--g-fonte, inherit); cursor: pointer; box-shadow: 0 12px 28px -12px rgba(23, 48, 42, .7), 0 2px 6px rgba(31, 27, 23, .15);
+}
+.g-lk-duv-abrir svg { width: 20px; height: 20px; }
+.g-lk-duv-abrir:focus-visible { outline: 3px solid var(--g-laranja); outline-offset: 2px; }
+.g-lk-duv {
+  position: fixed; inset: auto 0 0 0; z-index: 50; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: min(78dvh, 640px);
+  background: var(--g-carta); border-radius: 22px 22px 0 0; border: 1px solid var(--g-linha); box-shadow: 0 -20px 50px -20px rgba(23, 48, 42, .45);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@media (min-width: 720px) {
+  .g-lk-duv { inset: auto 24px 24px auto; width: 380px; border-radius: 22px; box-shadow: 0 30px 60px -24px rgba(23, 48, 42, .55); }
+  .g-lk-duv-abrir { right: 24px; bottom: 24px; }
+}
+.g-lk-duv-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 14px 10px 18px; border-bottom: 1px solid var(--g-linha); }
+.g-raiz .g-lk-duv-cab h2 { font-size: 1.125rem; }
+.g-lk-duv-cab p { margin-top: 2px; font-size: .8125rem; color: var(--g-cinza); line-height: 1.35; }
+.g-lk-duv-x { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border: 0; border-radius: 50%; background: rgba(31, 27, 23, .06); color: inherit; cursor: pointer; }
+.g-lk-duv-x svg { width: 18px; height: 18px; }
+.g-lk-duv-falas { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; overflow-y: auto; overscroll-behavior: contain; min-height: 160px; }
+.g-lk-duv-aviso { padding: 8px 12px; border-radius: 12px; background: var(--t-manteiga); color: #5b4708; font-size: .8125rem; line-height: 1.35; }
+.g-lk-duv-eu, .g-lk-duv-ia { display: grid; gap: 8px; max-width: 88%; padding: 10px 13px; border-radius: 16px; font-size: .9375rem; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
+.g-lk-duv-eu { align-self: flex-end; background: var(--g-verde); color: #f6f1e8; border-bottom-right-radius: 6px; }
+.g-lk-duv-ia { align-self: flex-start; background: rgba(31, 27, 23, .05); border-bottom-left-radius: 6px; }
+.g-lk-duv-ia .g-btn { justify-self: start; white-space: normal; text-align: left; }
+.g-lk-duv-pensa { display: flex; gap: 5px; padding: 14px; }
+.g-lk-duv-pensa i { width: 7px; height: 7px; border-radius: 50%; background: var(--g-cinza); animation: g-lk-pensa 1s infinite ease-in-out; }
+.g-lk-duv-pensa i:nth-child(2) { animation-delay: .15s; } .g-lk-duv-pensa i:nth-child(3) { animation-delay: .3s; }
+@keyframes g-lk-pensa { 0%, 80%, 100% { opacity: .25; transform: none; } 40% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .g-lk-duv-pensa i { animation: none; } }
+.g-lk-duv-form { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 12px; border-top: 1px solid var(--g-linha); }
+.g-lk-duv-form .g-textarea { flex: 1; min-height: 46px; max-height: 120px; resize: none; }
+.g-lk-duv-form .g-btn { min-width: 46px; height: 46px; padding: 0 12px; }

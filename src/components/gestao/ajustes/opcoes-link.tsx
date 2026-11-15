@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScrollText } from "lucide-react";
 import { EXEMPLO_DE_REGRAS, MAX_HORAS, MAX_TERMOS, OPCOES_LINK as K, opcoesDoLink, prazoPorExtenso } from "@/lib/gestao/link-opcoes";
-import { salvarOpcoes } from "@/lib/gestao/opcoes";
+import { opcao, salvarOpcoes } from "@/lib/gestao/opcoes";
+import { OPCAO_LINK_IA } from "@/lib/gestao/link-ia";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { avisarMudanca, Campo, useAvisos, useSomenteLeitura } from "../ui";
@@ -31,6 +32,14 @@ export default function OpcoesDoLink() {
   const [horas, setHoras] = useState(String(o.cancelarHoras));
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const ia = opcao<boolean>(petshop, OPCAO_LINK_IA, false) === true;
+  // quantas dúvidas o link recebeu neste mês (só números: o texto das perguntas não é guardado)
+  const [mes, setMes] = useState<{ perguntas: number; respondidas: number; sem_resposta: number; limite_dia: number } | null>(null);
+  useEffect(() => {
+    let vale = true;
+    void sb.rpc("link_ia_mes", { p_petshop: petshop.id }).then(({ data }) => { if (vale && data && typeof data === "object") setMes(data as never); });
+    return () => { vale = false; };
+  }, [sb, petshop.id, ia]);
 
   async function gravar(mudancas: Record<string, unknown>, aviso: string) {
     if (somenteLeitura() || ocupado) return;
@@ -59,7 +68,7 @@ export default function OpcoesDoLink() {
     <section className="g-card g-pilha" id="opcoes-link">
       <div className="g-mp-t">
         <Tile icone={ScrollText} tom="pessego" />
-        <div><h2>Regras e cancelamento pelo link</h2><p className="g-muted g-p">Para quem recebe pedidos pelo link do cliente. Ligue só o que você usa: desligado, nada muda.</p></div>
+        <div><h2>Regras, cancelamento e dúvidas pelo link</h2><p className="g-muted g-p">Para quem recebe pedidos pelo link do cliente. Ligue só o que você usa: desligado, nada muda.</p></div>
       </div>
       <div className="gr-op">
         <div className="gr-op-bloco">
@@ -107,6 +116,19 @@ export default function OpcoesDoLink() {
                 Dinheiro já recebido nunca é devolvido sozinho: reserva com sinal ou horário com pagamento vira um pedido de cancelamento, e é você quem cancela e decide.
               </p>
             </>
+          )}
+        </div>
+
+        <div className="gr-op-bloco">
+          <Chave titulo="Tirar dúvidas do cliente no link" ligado={ia} desligado={ocupado}
+            apoio="O link ganha um botão Tirar dúvida. As respostas são automáticas e usam só o que o link já mostra: horário, dias fechados, serviços, preços que aparecem no link, creche, hotel e as suas regras. Quando não sabe, manda falar com você no WhatsApp. Nunca marca nada sozinho."
+            aoMudar={() => void gravar({ [OPCAO_LINK_IA]: !ia }, ia ? "O link não mostra mais o Tirar dúvida." : "Ligado. Abra o seu link e faça uma pergunta para ver como fica.")} />
+          {(ia || (mes && mes.perguntas > 0)) && (
+            <p className="g-muted g-pp" data-teste="ia-mes">
+              {mes ? `Neste mês: ${mes.perguntas === 1 ? "1 pergunta" : `${mes.perguntas} perguntas`}, ${mes.respondidas === 1 ? "1 respondida" : `${mes.respondidas} respondidas`}${mes.sem_resposta ? `, ${mes.sem_resposta} mandadas para o seu WhatsApp` : ""}. ` : ""}
+              Cabem até {mes?.limite_dia ?? 100} perguntas por dia; passando disso, o link manda falar com você no WhatsApp.
+              O texto das perguntas não fica guardado.
+            </p>
           )}
         </div>
       </div>

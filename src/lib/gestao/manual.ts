@@ -2173,7 +2173,7 @@ const BASE: TopicoBase[] = [
     palavras: ["pedido", "pedidos", "aceitar", "recusar", "pedido pelo link", "cliente pediu horario", "confirmar pedido", "pedido sem porte", "aceitar pedido", "como aceito"] },
   { id: "link-regras", titulo: "Como pedir que o cliente aceite as suas regras no link", secao: "divulgacao", quem: "dono", rota: PETSHOP,
     passos: [
-      "Abra Meu pet shop e ache o cartão Regras e cancelamento pelo link.",
+      "Abra Meu pet shop e ache o cartão Regras, cancelamento e dúvidas pelo link.",
       "Ligue a chave Pedir que o cliente aceite as suas regras.",
       "Em Suas regras, escreva o texto com as suas palavras e toque em Salvar regras.",
       "Se quiser, marque Pedir que o cliente marque “As vacinas do meu pet estão em dia”.",
@@ -2188,7 +2188,7 @@ const BASE: TopicoBase[] = [
     palavras: ["regras", "termos", "termo", "contrato", "aceite", "aceitar termos", "vacinas em dia", "declaracao de vacina", "termo de responsabilidade", "regras do hotel", "regras da creche"] },
   { id: "link-cancelar", titulo: "Como deixar o cliente cancelar ou pedir outra data pelo link", secao: "divulgacao", quem: "dono", rota: PETSHOP, tambem: [HOJE, AGENDA],
     passos: [
-      "Abra Meu pet shop e ache o cartão Regras e cancelamento pelo link.",
+      "Abra Meu pet shop e ache o cartão Regras, cancelamento e dúvidas pelo link.",
       "Ligue a chave O cliente pode cancelar ou pedir outra data pelo link.",
       "Em Até quantas horas antes, escreva o prazo e toque em Salvar prazo.",
       "O cliente abre a página de acompanhar o pedido e toca em Cancelar o pedido ou em Pedir outra data.",
@@ -2204,6 +2204,26 @@ const BASE: TopicoBase[] = [
     ],
     atencao: ["Dinheiro já recebido nunca é devolvido sozinho. Reserva com sinal ou horário com pagamento não é cancelado pelo cliente: chega um pedido de cancelamento, e é você quem cancela e decide o que fazer com o valor."],
     palavras: ["cancelar pelo link", "cliente cancelar", "cliente cancelou", "cancelado pelo cliente", "remarcar pelo link", "pedir outra data", "mudar a data", "prazo para cancelar", "desmarcar", "cancelamento"] },
+  { id: "link-duvidas", titulo: "Como deixar o link responder as dúvidas do cliente", secao: "divulgacao", quem: "dono", rota: PETSHOP,
+    passos: [
+      "Abra Meu pet shop e ache o cartão Regras, cancelamento e dúvidas pelo link.",
+      "Ligue a chave Tirar dúvidas do cliente no link.",
+      "Pronto: o link do cliente ganha o botão Tirar dúvida, no canto da tela.",
+      "O cliente pergunta, por exemplo, se abre no sábado ou quanto custa o banho, e a resposta aparece na hora.",
+      "Quando o cliente quer marcar, a resposta mostra Quer pedir um horário? Toque aqui. O pedido abre já com o serviço e o dia, e é o cliente quem termina e envia.",
+    ],
+    dicas: [
+      "As respostas usam só o que o seu link já mostra: horário de funcionamento, dias fechados, serviços, preços que aparecem no link, creche, hotel, sinal e as suas regras.",
+      "Serviço sem preço e hotel com Esconder o preço no link ficam sem valor nas respostas: o cliente é mandado para o seu WhatsApp.",
+      "Quando a resposta não está no link, aparece Não sei responder isso. Fale com o seu pet shop no WhatsApp, com o botão.",
+      "No mesmo cartão você vê quantas perguntas o link recebeu no mês e quantas foram para o seu WhatsApp.",
+    ],
+    atencao: [
+      "As respostas são automáticas e não marcam nada: o horário só vale depois que você confirma, como em qualquer pedido pelo link.",
+      "O texto das perguntas não fica guardado; o sistema guarda só a quantidade. O link pede para o cliente não escrever dados pessoais ali.",
+      "Cabem até 100 perguntas por dia em cada pet shop e 15 por conversa. Passando disso, o link manda falar com você no WhatsApp.",
+    ],
+    palavras: ["duvida", "dúvidas", "tirar duvida", "perguntas do cliente", "responder cliente", "atendimento automatico", "robo", "robô", "inteligencia artificial", "chat no link", "assistente no link"] },
   { id: "lembrete", titulo: "Como mandar lembretes pelo WhatsApp", secao: "divulgacao", usa: ["banho"], quem: "todos", rota: AGENDA, tambem: [HOJE],
     passos: [
       "Na Agenda, toque na faixa Mandar os lembretes, que aparece no dia que tem lembrete faltando. Na tela Hoje, toque no aviso de lembretes de amanhã, em Pede a sua atenção.",
