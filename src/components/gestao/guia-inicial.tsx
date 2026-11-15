@@ -40,6 +40,12 @@ function comecaPorPorte(s: Preco): boolean {
   if (v.every((x) => x == null)) return false;
   return !v.every((x) => x === v[0]);
 }
+/** O que o guia guarda no aparelho enquanto não é gravado. */
+type RascunhoGuia = {
+  horario?: Horario; euAtendo?: boolean; novos?: string[]; vagas?: number | null; fora?: string[]; porPorte?: Record<string, boolean>;
+  diariaCreche?: number | null; diariaHotel?: number | null; vagasCreche?: string; vagasHotel?: string; linkLigado?: boolean;
+  precos?: Pick<Preco, "id" | "duracao_min" | "preco_p" | "preco_m" | "preco_g" | "preco_gg">[];
+};
 const NOME_PORTE: Record<string, string> = { P: "pequeno", M: "médio", G: "grande", GG: "gigante" };
 
 /** O que está errado no preço digitado (null = certo ou em branco). */
@@ -142,21 +148,40 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  const [horario, setHorario] = useState<Horario>(() => lerHorario(petshop.horario));
-  const [euAtendo, setEuAtendo] = useState(eu.atende);
-  const [novos, setNovos] = useState<string[]>([]);
+  // o que foi digitado e ainda não gravado (preços, horas, diária) fica no aparelho, por pessoa: a aba que recarrega
+  // ou fecha no meio do guia volta com tudo. Guia feito: o rascunho some.
+  const chaveRascunho = `maestro-gestao-guia-rascunho-${petshop.id}-${eu.id}`;
+  const [rascunho] = useState<RascunhoGuia | null>(() => {
+    if (petshop.guia_feito_em) { try { localStorage.removeItem(chaveRascunho); } catch { /* tudo bem */ } return null; }
+    try { return JSON.parse(lerLembrado(chaveRascunho) ?? "null") as RascunhoGuia | null; } catch { return null; }
+  });
+  const servicosDaLista = servicos.filter((s) => !["creche", "hotel"].includes(s.categoria));
+  const [horario, setHorario] = useState<Horario>(() => (rascunho?.horario ? lerHorario(rascunho.horario) : lerHorario(petshop.horario)));
+  const [euAtendo, setEuAtendo] = useState(rascunho?.euAtendo ?? eu.atende);
+  const [novos, setNovos] = useState<string[]>(rascunho?.novos ?? []);
   const [nome, setNome] = useState("");
-  const [vagas, setVagas] = useState<number | null>(petshop.vagas ?? null);
-  const [precos, setPrecos] = useState<Preco[]>(() => servicos.filter((s) => !["creche", "hotel"].includes(s.categoria)).map((s) => ({ ...s })));
+  const [vagas, setVagas] = useState<number | null>(rascunho && "vagas" in rascunho ? rascunho.vagas ?? null : petshop.vagas ?? null);
+  const [precos, setPrecos] = useState<Preco[]>(() => servicosDaLista.map((s) => {
+    const r = rascunho?.precos?.find((x) => x.id === s.id);
+    return r ? { ...s, duracao_min: r.duracao_min, preco_p: r.preco_p, preco_m: r.preco_m, preco_g: r.preco_g, preco_gg: r.preco_gg } : { ...s };
+  }));
   // serviços que o pet shop não oferece: saem da lista ao continuar
-  const [fora, setFora] = useState<string[]>(() => servicos.filter((s) => !s.ativo).map((s) => s.id));
-  const [porPorte, setPorPorte] = useState<Record<string, boolean>>(() => Object.fromEntries(servicos.map((s) => [s.id, comecaPorPorte(s)])));
+  const [fora, setFora] = useState<string[]>(() => rascunho?.fora?.filter((id) => servicos.some((s) => s.id === id)) ?? servicos.filter((s) => !s.ativo).map((s) => s.id));
+  const [porPorte, setPorPorte] = useState<Record<string, boolean>>(() => ({ ...Object.fromEntries(servicos.map((s) => [s.id, comecaPorPorte(s)])), ...(rascunho?.porPorte ?? {}) }));
   const [errosPreco, setErrosPreco] = useState<Record<string, string>>({});
-  const [diariaCreche, setDiariaCreche] = useState<number | null>(petshop.diaria_creche == null ? null : Number(petshop.diaria_creche));
-  const [diariaHotel, setDiariaHotel] = useState<number | null>(petshop.diaria_hotel == null ? null : Number(petshop.diaria_hotel));
-  const [vagasCreche, setVagasCreche] = useState(petshop.vagas_creche == null ? "" : String(petshop.vagas_creche));
-  const [vagasHotel, setVagasHotel] = useState(petshop.vagas_hotel == null ? "" : String(petshop.vagas_hotel));
-  const [linkLigado, setLinkLigado] = useState(petshop.link_ativo);
+  const [diariaCreche, setDiariaCreche] = useState<number | null>(rascunho && "diariaCreche" in rascunho ? rascunho.diariaCreche ?? null : petshop.diaria_creche == null ? null : Number(petshop.diaria_creche));
+  const [diariaHotel, setDiariaHotel] = useState<number | null>(rascunho && "diariaHotel" in rascunho ? rascunho.diariaHotel ?? null : petshop.diaria_hotel == null ? null : Number(petshop.diaria_hotel));
+  const [vagasCreche, setVagasCreche] = useState(rascunho?.vagasCreche ?? (petshop.vagas_creche == null ? "" : String(petshop.vagas_creche)));
+  const [vagasHotel, setVagasHotel] = useState(rascunho?.vagasHotel ?? (petshop.vagas_hotel == null ? "" : String(petshop.vagas_hotel)));
+  const [linkLigado, setLinkLigado] = useState(rascunho?.linkLigado ?? petshop.link_ativo);
+  useEffect(() => {
+    if (petshop.guia_feito_em) return;
+    const r: RascunhoGuia = {
+      horario, euAtendo, novos, vagas, fora, porPorte, diariaCreche, diariaHotel, vagasCreche, vagasHotel, linkLigado,
+      precos: precos.map((x) => ({ id: x.id, duracao_min: x.duracao_min, preco_p: x.preco_p, preco_m: x.preco_m, preco_g: x.preco_g, preco_gg: x.preco_gg })),
+    };
+    guardarLembrado(chaveRascunho, JSON.stringify(r));
+  }, [horario, euAtendo, novos, vagas, fora, porPorte, diariaCreche, diariaHotel, vagasCreche, vagasHotel, linkLigado, precos]); // eslint-disable-line react-hooks/exhaustive-deps
   const [tema, setTema] = useState(petshop.tema);
   const [enviando, setEnviando] = useState(false);
   const arquivo = useRef<HTMLInputElement>(null);
@@ -201,6 +226,7 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
     if (pergunta) guardarLembrado(chaveBV, atual === "cor" && passos[passo + 1]?.id === "logo" ? "logo" : "feito");
     if (passo === passos.length - 1 && !petshop.guia_feito_em) {
       ok(await sb.from("petshops").update({ guia_feito_em: new Date().toISOString() }).eq("id", petshop.id).select("id"));
+      try { localStorage.removeItem(chaveRascunho); } catch { /* tudo bem */ }
     }
     await recarregarBase();
     avisarMudanca();
