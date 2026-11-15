@@ -20,9 +20,27 @@ export function paginaDoTutorLigada(p: ComOpcoes): boolean {
   return Boolean(o && typeof o === "object" && (o as Record<string, unknown>).ativo === true);
 }
 
+/** Por quantos dias as fotos ficam guardadas (o banco aceita só estes; o padrão é 90). Depois disso, a faxina apaga. */
+export const DIAS_DAS_FOTOS = [30, 60, 90, 180] as const;
+export type DiasDasFotos = (typeof DIAS_DAS_FOTOS)[number];
+export function diasDasFotos(p: ComOpcoes): DiasDasFotos {
+  const o = opcao<unknown>(p, CHAVE_TUTOR, {});
+  const v = o && typeof o === "object" ? Number((o as Record<string, unknown>).dias_fotos) : NaN;
+  return (DIAS_DAS_FOTOS as readonly number[]).includes(v) ? (v as DiasDasFotos) : 90;
+}
+/** A opção já foi ligada alguma vez (então pode haver fotos para a faxina, mesmo desligada agora). */
+export const tutorJaUsado = (p: ComOpcoes) => opcao<unknown>(p, CHAVE_TUTOR, null) !== null;
+
 export const enderecoDaPagina = (token: string) => `${typeof window === "undefined" ? "" : window.location.origin}/gestao/tutor/${token}`;
 
-/** O link do tutor (o banco cria na primeira vez). */
+/** O link que o tutor já tem, sem criar um novo (abrir uma tela não cria link: só Mandar ou Copiar). */
+export async function linkExistente(sb: Banco, clienteId: string): Promise<{ url: string | null; visto: string | null }> {
+  const r = await sb.from("tutor_links").select("token, visto_em").eq("cliente_id", clienteId).maybeSingle();
+  if (r.error) throw new Error(r.error.message);
+  return { url: r.data?.token ? enderecoDaPagina(r.data.token) : null, visto: r.data?.visto_em ?? null };
+}
+
+/** O link do tutor (o banco cria na primeira vez). Só chamar quando alguém toca em Mandar ou Copiar. */
 export async function linkDoTutor(sb: Banco, clienteId: string): Promise<string> {
   const r = await sb.rpc("tutor_link", { p_cliente: clienteId });
   if (r.error || !r.data) throw new Error(r.error?.message ?? "Não consegui fazer o link do tutor.");
@@ -93,12 +111,16 @@ export async function enviarFotos(sb: Banco, p: { petshopId: string; estadiaId: 
       if (up.error) throw new Error(up.error.message.includes("size") ? "A foto ficou grande demais." : up.error.message);
       const ins = await sb.from("diario_fotos").insert({ petshop_id: p.petshopId, estadia_id: p.estadiaId, pet_id: p.petId, dia: p.dia, caminho, legenda }).select("id");
       if (ins.error) { void sb.storage.from(BUCKET_DIARIO).remove([caminho]); throw new Error(ins.error.message); }
+      if (ins.data?.[0]?.id) novas.push({ id: ins.data[0].id, caminho });
       enviadas++;
     } catch (e) { erros.push(e instanceof Error ? e.message : String(e)); }
     aoAvancar?.(++feitas);
   }
+  const novas: { id: string; caminho: string }[] = [];
   const fila = async () => { while (i < arquivos.length) await uma(arquivos[i++]); };
   await Promise.all([fila(), fila(), fila()]);
+  // a assinatura deixa o tutor abrir a foto já (se falhar, a faxina assina depois)
+  if (novas.length) await assinarFotos(sb, p.petshopId, novas).catch(() => 0);
   return { enviadas, erros: [...new Set(erros)] };
 }
 
@@ -108,4 +130,48 @@ export async function apagarFoto(sb: Banco, foto: Pick<FotoDoDia, "id" | "caminh
   if (r.error) throw new Error(r.error.message);
   if (!r.data?.length) throw new Error("Só o dono ou quem mandou a foto pode apagar.");
   await sb.storage.from(BUCKET_DIARIO).remove([foto.caminho]);
+}
+
+/** A assinatura vale 30 dias; a faxina renova as que vencem em menos de 7. */
+const SEGUNDOS_DA_ASSINATURA = 30 * 86400;
+
+/**
+ * Assina o endereço de cada foto (o Storage só assina para quem pode ver o arquivo: a equipe) e guarda só o código da
+ * assinatura no banco. O servidor da página do tutor usa esse código para entregar a foto, sem depender do cabeçalho x-tutor-token.
+ */
+export async function assinarFotos(sb: Banco, petshopId: string, fotos: { id: string; caminho: string }[]): Promise<number> {
+  if (!fotos.length) return 0;
+  const s = await sb.storage.from(BUCKET_DIARIO).createSignedUrls(fotos.map((f) => f.caminho), SEGUNDOS_DA_ASSINATURA);
+  if (s.error) throw new Error(s.error.message);
+  const porCaminho = new Map(fotos.map((f) => [f.caminho, f.id]));
+  const lista: { id: string; assinatura: string; segundos: number }[] = [];
+  for (const x of s.data ?? []) {
+    const id = x.path ? porCaminho.get(x.path) : undefined;
+    if (!id || !x.signedUrl) continue;
+    const assinatura = new URL(x.signedUrl, "http://x").searchParams.get("token");
+    if (assinatura) lista.push({ id, assinatura, segundos: SEGUNDOS_DA_ASSINATURA });
+  }
+  if (!lista.length) return 0;
+  const r = await sb.rpc("diario_fotos_assinar", { p_petshop: petshopId, p_lista: lista });
+  if (r.error) throw new Error(r.error.message);
+  return r.data ?? 0;
+}
+
+/**
+ * A faxina das fotos: o banco apaga as fotos fora do prazo e devolve os arquivos que ficaram sem foto (foto apagada, estadia,
+ * pet ou tutor apagado, prazo vencido, envio que falhou no meio) para apagar pela API do Storage, e as fotos sem assinatura.
+ * Repetir não estraga nada: o que já sumiu sai da fila na próxima vez.
+ */
+export async function faxinaDasFotos(sb: Banco, petshopId: string): Promise<{ apagados: number; assinadas: number; vencidas: number }> {
+  const r = await sb.rpc("diario_faxina", { p_petshop: petshopId });
+  if (r.error) throw new Error(r.error.message);
+  const d = (r.data ?? {}) as { apagar?: string[]; assinar?: { id: string; caminho: string }[]; vencidas?: number };
+  let apagados = 0;
+  const apagar = d.apagar ?? [];
+  for (let i = 0; i < apagar.length; i += 100) {
+    const x = await sb.storage.from(BUCKET_DIARIO).remove(apagar.slice(i, i + 100));
+    if (!x.error) apagados += x.data?.length ?? 0;
+  }
+  const assinadas = await assinarFotos(sb, petshopId, d.assinar ?? []).catch(() => 0);
+  return { apagados, assinadas, vencidas: d.vencidas ?? 0 };
 }

@@ -12,7 +12,7 @@ import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Fo
 import { AvisoCaixaFechado, Chips, ChipsForma, erroDeValor, ErroTela, lembrarForma, useCaixaAberto, useFormaLembrada } from "@/components/gestao/loja/pecas";
 import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import Diario from "@/components/gestao/casa/diario";
-import { BotaoFotos } from "@/components/gestao/casa/fotos-do-dia";
+import { BotaoFotos, useFaxinaDasFotos } from "@/components/gestao/casa/fotos-do-dia";
 import { AvisoDeVaga, FolhaEspera, ListaDeEspera, useListaDeEspera } from "@/components/gestao/casa/espera";
 import { FolhaOcorrencia, OcorrenciasDoCartao } from "@/components/gestao/casa/ocorrencias";
 import { FolhaQuemPodeBuscar, lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
@@ -198,6 +198,7 @@ const PERIODOS = [{ id: "todas", rotulo: "Todas" }, { id: "7", rotulo: "Próximo
 
 export default function CrecheHotel() {
   const { sb, petshop, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso } = useGestao();
+  useFaxinaDasFotos(); // Página do tutor: apaga fotos fora do prazo e arquivos sem foto (nada aparece na tela)
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const usaCreche = usaModulo(petshop, "creche");

@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus, Link2, MessageCircle, Trash2 } from "lucide-react";
-import { apagarFoto, enviarFotos, fotosDoDia, linkDoTutor, MAX_FOTOS_DIA, mensagemDaPagina, mensagemDasFotos, paginaDoTutorLigada, type FotoDoDia } from "@/lib/gestao/tutor";
+import { apagarFoto, diasDasFotos, enviarFotos, faxinaDasFotos, fotosDoDia, MAX_FOTOS_DIA, mensagemDaPagina, mensagemDasFotos, paginaDoTutorLigada, tutorJaUsado, type FotoDoDia } from "@/lib/gestao/tutor";
 import { isoDia, linkWhatsApp } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { avisarMudanca, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura } from "../ui";
+import { abrirZapComLink, useLinkDoTutor } from "./link-do-tutor";
 import "./casa.css";
 
 /**
@@ -42,20 +43,11 @@ export function FolhaFotos({ estadia: e, aoFechar }: { estadia: EstadiaComTutor;
   const galeria = useRef<HTMLInputElement>(null);
   const [legenda, setLegenda] = useState("");
   const [enviando, setEnviando] = useState<{ feitas: number; total: number } | null>(null);
-  const [link, setLink] = useState<string | null>(null);
-  const [erroLink, setErroLink] = useState<string | null>(null);
+  const { link, erro: erroLink, garantir } = useLinkDoTutor(tutor?.id, true);
 
   const { dados, carregando, erro, recarregar } = useDados(() => fotosDoDia(sb, petshop.id, [e.pet_id], hoje), [petshop.id, e.pet_id, hoje]);
   const fotos = dados ?? [];
   const cabem = Math.max(0, MAX_FOTOS_DIA - fotos.length);
-
-  // o link do tutor fica pronto ao abrir: o WhatsApp só abre direto de um toque
-  useEffect(() => {
-    if (!tutor) return;
-    let vivo = true;
-    linkDoTutor(sb, tutor.id).then((u) => { if (vivo) setLink(u); }).catch((x) => { if (vivo) setErroLink(x instanceof Error ? x.message : String(x)); });
-    return () => { vivo = false; };
-  }, [sb, tutor?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function escolher(ev: React.ChangeEvent<HTMLInputElement>) {
     const lista = Array.from(ev.target.files ?? []);
@@ -78,19 +70,26 @@ export function FolhaFotos({ estadia: e, aoFechar }: { estadia: EstadiaComTutor;
     try { await apagarFoto(sb, f); avisar("Foto apagada."); avisarMudanca(); void recarregar(); } catch (x) { avisarErro(x); }
   }
 
-  const zapFotos = link && fotos.length ? linkWhatsApp(tutor?.telefone, mensagemDasFotos({ tutor: tutor?.nome, petshop: petshop.nome, pet: pet.nome, fotos: fotos.length, url: link })) : null;
-  const zapPagina = link ? linkWhatsApp(tutor?.telefone, mensagemDaPagina({ tutor: tutor?.nome, petshop: petshop.nome, pets: [pet.nome], url: link })) : null;
+  const temZap = Boolean(tutor && linkWhatsApp(tutor.telefone, "x"));
+  const montarFotos = (url: string) => linkWhatsApp(tutor?.telefone, mensagemDasFotos({ tutor: tutor?.nome, petshop: petshop.nome, pet: pet.nome, fotos: fotos.length, url }));
+  const montarPagina = (url: string) => linkWhatsApp(tutor?.telefone, mensagemDaPagina({ tutor: tutor?.nome, petshop: petshop.nome, pets: [pet.nome], url }));
+  // com o link já feito, é um endereço comum; sem link, o toque cria o link e abre o WhatsApp
+  const mandar = (montar: (url: string) => string | null) => { if (!link && somenteLeitura()) return; abrirZapComLink(garantir, montar).catch(avisarErro); };
+  const botaoZap = !temZap ? null : fotos.length
+    ? (link ? <a className="g-btn zap" href={montarFotos(link)!} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar as fotos de hoje</a>
+      : <button type="button" className="g-btn zap" onClick={() => mandar(montarFotos)}><MessageCircle />Mandar as fotos de hoje</button>)
+    : (link ? <a className="g-btn sec" href={montarPagina(link)!} target="_blank" rel="noopener noreferrer"><Link2 />Mandar a página do tutor</a>
+      : <button type="button" className="g-btn sec" onClick={() => mandar(montarPagina)}><Link2 />Mandar a página do tutor</button>);
 
   return (
     <Folha titulo={`Fotos de hoje · ${pet.nome}`} aoFechar={aoFechar} rodape={
       <>
-        {zapFotos ? <a className="g-btn zap" href={zapFotos} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar as fotos de hoje</a>
-          : zapPagina ? <a className="g-btn sec" href={zapPagina} target="_blank" rel="noopener noreferrer"><Link2 />Mandar a página do tutor</a> : null}
+        {botaoZap}
         <button type="button" className="g-btn fantasma" onClick={aoFechar}>Fechar</button>
       </>
     }>
       <div className="g-pilha">
-        <p className="g-muted g-p">As fotos ficam guardadas só para a equipe e para {tutor ? tutor.nome.split(" ")[0] : "o tutor"}, na página do tutor. Até {MAX_FOTOS_DIA} por dia.</p>
+        <p className="g-muted g-p">As fotos ficam guardadas só para a equipe e para {tutor ? tutor.nome.split(" ")[0] : "o tutor"}, na página do tutor. Até {MAX_FOTOS_DIA} por dia, guardadas por {diasDasFotos(petshop)} dias.</p>
         <div className="g-fila">
           <button type="button" className="g-btn pri" disabled={Boolean(enviando) || !cabem} onClick={() => { if (!somenteLeitura()) camera.current?.click(); }}><Camera />Tirar foto</button>
           <button type="button" className="g-btn sec" disabled={Boolean(enviando) || !cabem} onClick={() => { if (!somenteLeitura()) galeria.current?.click(); }}><ImagePlus />Escolher fotos</button>
@@ -123,4 +122,21 @@ export function FolhaFotos({ estadia: e, aoFechar }: { estadia: EstadiaComTutor;
       </div>
     </Folha>
   );
+}
+
+/**
+ * A faxina das fotos, quando o dono ou a equipe da creche e do hotel abre a tela (no máximo a cada 6 horas por aparelho):
+ * apaga as fotos fora do prazo e os arquivos que ficaram sem foto, e assina as fotos novas para a página do tutor.
+ * Não aparece nada na tela; numa loja que nunca ligou a Página do tutor, não faz nada.
+ */
+export function useFaxinaDasFotos() {
+  const { sb, petshop, posso } = useGestao();
+  const usado = tutorJaUsado(petshop);
+  const pode = posso("creche_hotel");
+  useEffect(() => {
+    if (!usado || !pode) return;
+    const chave = `g-faxina-diario:${petshop.id}`;
+    try { const ultima = Number(localStorage.getItem(chave) ?? 0); if (Date.now() - ultima < 6 * 3600e3) return; localStorage.setItem(chave, String(Date.now())); } catch { /* sem guardar: roda mesmo assim */ }
+    void faxinaDasFotos(sb, petshop.id).catch(() => { try { localStorage.removeItem(chave); } catch { /* nada */ } });
+  }, [sb, petshop.id, usado, pode]);
 }

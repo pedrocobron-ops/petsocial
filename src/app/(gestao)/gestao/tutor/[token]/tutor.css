@@ -41,3 +41,6 @@
 @media (min-width: 560px) { .g-tt-fotos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 .g-tt-vazio { font-size: .9375rem; color: var(--g-cinza); }
+
+.g-tt-aviso { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 14px; border-radius: 14px; background: var(--t-manteiga); color: var(--i-manteiga); font-size: .9375rem; }
+.g-tt-aviso button { font: inherit; font-weight: 600; color: inherit; background: none; border: 1px solid currentColor; border-radius: 999px; padding: 6px 14px; min-height: 40px; cursor: pointer; }

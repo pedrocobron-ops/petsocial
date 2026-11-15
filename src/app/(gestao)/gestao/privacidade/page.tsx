@@ -169,7 +169,8 @@ export default function PrivacidadeDoGestao() {
       <ul>
         <li><b>Enquanto a conta existir,</b> os dados ficam guardados. Isso inclui o período em que a conta está só para consulta, depois do teste ou do cancelamento da assinatura.</li>
         <li><b>Exportação:</b> o pet shop baixa os dados em planilha pela própria tela, em Clientes e pets (Exportar) e em Financeiro (Exportar).</li>
-        <li><b>Apagar um tutor ou um pet:</b> a equipe do pet shop apaga pela própria tela, na ficha do cliente.</li>
+        <li><b>Apagar um tutor ou um pet:</b> a equipe do pet shop apaga pela própria tela, na ficha do cliente. As fotos do dia ligadas a ele também são apagadas.</li>
+        <li><b>Fotos da Página do tutor:</b> ficam guardadas pelo prazo que o pet shop escolhe (30, 60, 90 ou 180 dias; o normal é 90) e depois são apagadas. A página do tutor mostra o prazo.</li>
         <li><b>Exclusão da conta:</b> o dono da conta pede pelo nosso contato. Confirmamos que o pedido é dele e apagamos a conta e os dados do pet shop. Cópias de segurança são sobrescritas com o tempo, conforme o ciclo do fornecedor do banco de dados.</li>
         <li><b>O que pode ficar:</b> registros de pagamento e outros dados que a lei nos obriga a manter, pelo prazo legal, e o necessário para nos defendermos em processo.</li>
       </ul>
@@ -197,7 +198,7 @@ export default function PrivacidadeDoGestao() {
         <li>O banco de dados separa os pet shops: as regras ficam no próprio banco e cada login só alcança os dados do pet shop a que pertence.</li>
         <li>Dentro do pet shop, o dono decide quem vê o financeiro.</li>
         <li>As fotos de pets ficam em endereços com nome aleatório. Quem tiver o endereço exato de uma foto consegue abrir a imagem, por isso não compartilhe esses endereços com quem não deve ver.</li>
-        <li>Página do tutor (opcional, o pet shop liga): as fotos do dia ficam num espaço fechado, sem endereço público. Só a equipe do pet shop e o tutor, pelo link particular dele, conseguem ver, e os endereços das fotos na página valem poucos minutos. O pet shop pode trocar ou desligar o link de cada tutor e apagar fotos; desligada a opção, nenhum link abre.</li>
+        <li>Página do tutor (opcional, o pet shop liga): as fotos do dia ficam num espaço fechado, sem endereço público. Só a equipe do pet shop e o tutor, pelo link particular dele, conseguem ver: cada foto passa pelo nosso servidor, que confere o link antes de entregar. O pet shop pode trocar ou desligar o link de cada tutor e apagar fotos; desligada a opção, nenhum link abre.</li>
         <li>Na {EMPRESA.marca}, o acesso aos dados dos pet shops é restrito a quem cuida da operação e só acontece para suporte, manutenção, segurança ou obrigação legal.</li>
       </ul>
       <p>

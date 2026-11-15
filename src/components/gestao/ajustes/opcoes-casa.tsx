@@ -6,7 +6,8 @@ import { CHAVES_CASA, diarioDe, esperaDe, ITENS_DO_DIARIO, MAX_ITENS_DO_DIARIO, 
 import { equipeMudaPlano, OPCAO_EQUIPE_MUDA_PLANO, OPCAO_REPOSICAO_PRAZO, OPCAO_REPOSICAO_SO_AVISOU, type PrazoDeReposicao } from "@/lib/gestao/creche";
 import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { opcao, salvarOpcoes } from "@/lib/gestao/opcoes";
-import { CHAVE_TUTOR, paginaDoTutorLigada } from "@/lib/gestao/tutor";
+import { CHAVE_TUTOR, DIAS_DAS_FOTOS, diasDasFotos, faxinaDasFotos, paginaDoTutorLigada, type DiasDasFotos } from "@/lib/gestao/tutor";
+import ConferirFotosDoTutor from "../casa/conferir-fotos";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { avisarMudanca, useAvisos, useSomenteLeitura } from "../ui";
@@ -37,6 +38,7 @@ export default function OpcoesCasa() {
   const [espera, setEspera] = useState(() => esperaDe(petshop));
   const [ocorrencias, setOcorrencias] = useState(() => ocorrenciasLigadas(petshop));
   const [tutor, setTutor] = useState(() => paginaDoTutorLigada(petshop));
+  const [diasFotos, setDiasFotos] = useState<DiasDasFotos>(() => diasDasFotos(petshop));
   const [equipePlano, setEquipePlano] = useState(() => equipeMudaPlano(petshop));
   // regra de reposição de falta: desligada, qualquer falta do plano pode ser reposta, sem prazo
   const [prazo, setPrazo] = useState<PrazoDeReposicao>(() => { const v = opcao<string>(petshop, OPCAO_REPOSICAO_PRAZO, ""); return v === "mes" || v === "mes_seguinte" ? v : ""; });
@@ -59,11 +61,13 @@ export default function OpcoesCasa() {
         [CHAVES_CASA.portaria]: portaria,
         [CHAVES_CASA.espera]: { ativo: espera.ativo, link: espera.ativo && espera.link },
         [CHAVES_CASA.ocorrencias]: ocorrencias,
-        [CHAVE_TUTOR]: { ativo: tutor },
+        [CHAVE_TUTOR]: { ativo: tutor, dias_fotos: diasFotos },
         ...(usaModulo(petshop, "creche") ? { [OPCAO_EQUIPE_MUDA_PLANO]: equipePlano, [OPCAO_REPOSICAO_PRAZO]: prazo, [OPCAO_REPOSICAO_SO_AVISOU]: soAvisou } : {}),
       });
       await recarregarBase();
       avisarMudanca();
+      // um prazo menor vale já: a faxina apaga as fotos que passaram dele
+      if (diasFotos < diasDasFotos(petshop)) void faxinaDasFotos(sb, petshop.id).catch(() => undefined);
       setDiario((d) => ({ ...d, itens: itens.length ? itens : ITENS_DO_DIARIO }));
       setMexeu(false);
       avisar("Opções de cuidado com o tutor salvas.");
@@ -102,6 +106,13 @@ export default function OpcoesCasa() {
 
         <Opcao titulo="Página do tutor" frase="A equipe põe fotos no dia de cada pet. Cada tutor ganha um link só dele, sem senha, com o diário, as fotos, o que está marcado e os avisos de vacina, sem preços." ligada={tutor} aoMudar={m(setTutor)}>
           <p className="g-muted g-pp">As fotos ficam guardadas só para a equipe e para o tutor do pet (até 10 por pet por dia). O link do tutor sai pelo botão Mandar a página do tutor, na ficha do tutor e nos cartões da creche e do hotel. Desligando esta opção, todos os links param de abrir na hora.</p>
+          <label className="g-campo"><span>Guardar as fotos por</span>
+            <select className="g-select" value={diasFotos} onChange={(e) => m(setDiasFotos)(Number(e.target.value) as DiasDasFotos)}>
+              {DIAS_DAS_FOTOS.map((d) => <option key={d} value={d}>{d} dias{d === 90 ? " (o normal)" : ""}</option>)}
+            </select>
+            <small>Depois disso a foto é apagada de vez, para a equipe e para o tutor. A página do tutor mostra esse prazo.</small>
+          </label>
+          {paginaDoTutorLigada(petshop) && <ConferirFotosDoTutor />}
         </Opcao>
 
         {usaModulo(petshop, "creche") && (

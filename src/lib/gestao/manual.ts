@@ -735,10 +735,13 @@ const BASE: TopicoBase[] = [
     dicas: [
       "Cada tutor tem um link só dele, sem senha. A página mostra o nome e a logo do pet shop, os pets do tutor, o diário dos últimos dias, as fotos, o que está marcado e as vacinas vencendo. Não mostra preço.",
       "As fotos ficam guardadas só para a equipe e para o tutor do pet. Até 10 fotos por pet por dia.",
+      "Em Guardar as fotos por, escolha 30, 60, 90 ou 180 dias (o normal é 90). Passado o prazo, a foto é apagada de vez. A página do tutor mostra o prazo.",
+      "Quando uma foto, uma estadia, um pet ou um tutor é apagado, os arquivos das fotos também são apagados, na próxima vez que alguém abrir Creche e hotel.",
+      "Para saber se o tutor consegue ver as fotos, toque em Conferir se as fotos abrem para o tutor. Precisa de uma foto de um pet cujo tutor já recebeu a página.",
       "Desligando a opção, todos os links param de abrir na hora. Ligando de novo, os mesmos links voltam a valer.",
     ],
     atencao: ["Se um link foi parar com quem não devia, abra a ficha do tutor e toque em Trocar o link: o antigo para de abrir na hora."],
-    palavras: ["pagina do tutor", "app do tutor", "fotos do dia", "link do tutor", "tutor ver fotos", "acompanhar o pet", "ligar fotos", "camera da creche", "boletim com foto"] },
+    palavras: ["guardar fotos", "prazo das fotos", "apagar fotos antigas", "conferir fotos", "pagina do tutor", "app do tutor", "fotos do dia", "link do tutor", "tutor ver fotos", "acompanhar o pet", "ligar fotos", "camera da creche", "boletim com foto"] },
   { id: "casa-fotos", titulo: "Como pôr as fotos do dia do pet", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
     passos: [
       "Em Creche e hotel, no cartão do pet em Casa agora (ou na Chamada, em quem está na casa, ou no Diário), toque em Fotos.",
@@ -763,6 +766,7 @@ const BASE: TopicoBase[] = [
       "Para tirar o acesso de um tutor, o dono toca em Desligar.",
     ],
     dicas: [
+      "O link só é criado na primeira vez que alguém toca em Mandar ou Copiar. Abrir a ficha não cria link.",
       "O cartão mostra quando o tutor abriu a página pela última vez.",
       "Copiar o link serve para colar em outro lugar, como um e-mail.",
       "Cada tutor vê só os pets dele. O link é longo e não dá para adivinhar.",

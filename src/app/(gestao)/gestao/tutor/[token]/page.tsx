@@ -1,20 +1,19 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-import { BedDouble, CalendarDays, Camera, Check, MessageCircle, PawPrint, ShieldAlert, Sun, Syringe } from "lucide-react";
+import { BedDouble, CalendarDays, Check, MessageCircle, PawPrint, ShieldAlert, Sun, Syringe } from "lucide-react";
 import LogoLoja from "@/components/gestao/logo-loja";
-import type { Database } from "@/lib/gestao/banco";
 import { corPropria, TEMAS } from "@/lib/gestao/identidade";
-import { SUPABASE_CHAVE, SUPABASE_URL, fotoPet } from "@/lib/gestao/supabase";
-import { BUCKET_DIARIO } from "@/lib/gestao/tutor";
+import { fotoPet } from "@/lib/gestao/supabase";
+import { bancoDoTutor, codigoValido } from "@/lib/gestao/tutor-servidor";
 import { linkWhatsApp } from "@/lib/gestao/util";
 import "../../agendar/[codigo]/agendar.css";
+import { AvisoDasFotos, FotoDoTutor } from "./fotos";
 import "./tutor.css";
 
 /**
  * Página do tutor: o link particular de cada tutor (opção "Página do tutor", em Meu pet shop › Cuidado com o tutor).
- * Sem login. O servidor lê tudo pela função `tutor_pagina` (só com o código certo, a opção ligada e a conta liberada) e
- * pede ao bucket privado endereços das fotos que valem 15 minutos, com o código no cabeçalho x-tutor-token.
+ * Sem login. O servidor lê tudo pela função `tutor_pagina` (só com o código certo, a opção ligada e a conta liberada; no máximo
+ * 30 aberturas por minuto por link). Cada foto vem de /gestao/tutor/<código>/foto/<id>, que confere o link de novo (tutor-servidor.ts).
  * Código errado, trocado ou opção desligada: 404. Sem preços.
  */
 export const dynamic = "force-dynamic";
@@ -30,35 +29,35 @@ type PetDaPagina = {
 };
 type Pagina = {
   petshop: { nome: string; logo: string | null; tema: string | null; telefone: string | null; cidade: string | null; uf: string | null; fuso: string };
-  tutor: string | null; hoje: string; pets: PetDaPagina[];
+  tutor: string | null; hoje: string; dias_fotos?: number; pets: PetDaPagina[];
 };
 
 const OCORRENCIAS: Record<string, string> = { briga: "Briga", machucado: "Machucado", fugiu: "Tentou fugir", vomitou: "Vomitou", outro: "Para você saber" };
 const SAUDE: Record<string, string> = { vacina: "Vacina", vermifugo: "Vermífugo", antipulgas: "Antipulgas", outro: "Cuidado" };
 
-async function ler(token: string) {
-  if (!/^[0-9a-f]{40,100}$/.test(token)) return null;
-  const sb = createClient<Database>(SUPABASE_URL, SUPABASE_CHAVE, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { "x-tutor-token": token }, fetch: (u, i) => fetch(u, { ...i, cache: "no-store" }) },
-  });
-  const r = await sb.rpc("tutor_pagina", { p_token: token });
+async function ler(token: string): Promise<Pagina | "devagar" | null> {
+  if (!codigoValido(token)) return null;
+  const r = await bancoDoTutor(token).rpc("tutor_pagina", { p_token: token });
+  if (r.error?.code === "PT429") return "devagar";
   if (r.error || !r.data) return null;
-  const p = r.data as unknown as Pagina;
-  const caminhos = p.pets.flatMap((x) => x.dias.flatMap((d) => d.fotos.map((f) => f.caminho)));
-  const urls = new Map<string, string>();
-  if (caminhos.length) {
-    const s = await sb.storage.from(BUCKET_DIARIO).createSignedUrls(caminhos, 900);
-    for (const x of s.data ?? []) if (x.path && x.signedUrl) urls.set(x.path, x.signedUrl);
-  }
-  return { p, urls };
+  return r.data as unknown as Pagina;
+}
+
+function Devagar() {
+  return (
+    <div className="g-raiz g-tt">
+      <main className="g-lk-miolo"><p className="g-tt-vazio" role="status">Esta página foi aberta muitas vezes no último minuto. Espere um minuto e abra de novo.</p></main>
+    </div>
+  );
 }
 
 export default async function PaginaDoTutor({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const lido = await ler(token);
-  if (!lido) notFound();
-  const { p, urls } = lido;
+  const p = await ler(token);
+  if (!p) notFound();
+  if (p === "devagar") return <Devagar />;
+  const dias = p.dias_fotos ?? 90;
+  const foto = (id: string) => `/gestao/tutor/${token}/foto/${id}`;
   const fuso = p.petshop.fuso || "America/Sao_Paulo";
   const fmt = (o: Intl.DateTimeFormatOptions, tz = fuso) => new Intl.DateTimeFormat("pt-BR", { ...o, timeZone: tz });
   const diaDe = (iso: string) => new Date(`${iso}T12:00:00Z`);
@@ -88,6 +87,8 @@ export default async function PaginaDoTutor({ params }: { params: Promise<{ toke
           </div>
           <p className="g-lk-cab-frase">{p.tutor ? `Oi, ${p.tutor}! ` : ""}Aqui está o dia {p.pets.length === 1 ? `de ${p.pets[0].nome}` : "dos seus pets"} com a gente.</p>
         </header>
+
+        <AvisoDasFotos />
 
         {!p.pets.length && <p className="g-tt-vazio">Nenhum pet ativo nesta página.</p>}
 
@@ -139,16 +140,10 @@ export default async function PaginaDoTutor({ params }: { params: Promise<{ toke
                   {d.fotos.length > 0 && (
                     <ul className="g-tt-fotos" aria-label={`Fotos de ${pet.nome}, ${nomeDoDia(d.dia).toLowerCase()}`}>
                       {d.fotos.map((f, i) => {
-                        const u = urls.get(f.caminho);
                         const legenda = f.legenda && f.legenda !== d.fotos[i - 1]?.legenda ? f.legenda : null; // o mesmo recado em várias fotos aparece uma vez
                         return (
                           <li key={f.id}>
-                            {u ? (
-                              <a href={u} target="_blank" rel="noopener noreferrer" aria-label={f.legenda ?? `Abrir a foto de ${pet.nome}`}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={u} alt={f.legenda ?? `${pet.nome}, às ${hora(f.em)}`} loading="lazy" decoding="async" />
-                              </a>
-                            ) : <span className="sem"><Camera aria-hidden /></span>}
+                            <FotoDoTutor src={foto(f.id)} alt={f.legenda ?? `${pet.nome}, às ${hora(f.em)}`} abrir={f.legenda ?? `Abrir a foto de ${pet.nome}`} />
                             {legenda && <small>{legenda}</small>}
                           </li>
                         );
@@ -167,7 +162,7 @@ export default async function PaginaDoTutor({ params }: { params: Promise<{ toke
         {zap && <a className="g-btn zap cheio" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {p.petshop.nome}</a>}
       </main>
       <footer className="g-lk-rodape">
-        <span>Esta página é só sua. Não repasse o link.</span>
+        <span>Esta página é só sua. Não repasse o link. As fotos ficam guardadas por {dias} dias e depois são apagadas.</span>
         <a href="/gestao/privacidade">Privacidade</a>
       </footer>
     </div>

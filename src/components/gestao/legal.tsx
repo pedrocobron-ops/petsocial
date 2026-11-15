@@ -6,6 +6,8 @@ import "./legal.css";
 
 /** Data da última revisão dos Termos e da Política do Gestão (os dois mudam juntos). */
 export const LEGAL_ATUALIZADO_EM = "11 de novembro de 2026";
+/** Cada documento tem a própria data: mudou o texto, mude a data dele. */
+export const ATUALIZADO_EM: Record<"termos" | "privacidade", string> = { termos: LEGAL_ATUALIZADO_EM, privacidade: "15 de novembro de 2026" };
 
 /** Dado que ainda não existe no repositório: fica à vista até alguém preencher. */
 export function Preencher({ children }: { children: React.ReactNode }) {
@@ -39,7 +41,7 @@ export default function Legal({ pagina, titulo, resumo, children }: { pagina: "t
       <main className="g-leg-folha">
         <div className="g-leg-abre">
           <h1>{titulo}</h1>
-          <p className="g-leg-data">Última atualização: {LEGAL_ATUALIZADO_EM}</p>
+          <p className="g-leg-data">Última atualização: {ATUALIZADO_EM[pagina]}</p>
           <p className="g-leg-resumo">{resumo}</p>
         </div>
         <div className="g-leg-texto">{children}</div>
