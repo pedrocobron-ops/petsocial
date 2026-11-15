@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarCheck2, Pencil, Plus } from "lucide-react";
-import { DIAS_SEMANA, diasEmOrdem, fraseDoSaldo, lerPlanos, lerSaldoDeReposicao, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, textoDasDatas, type Falta, type PetDoPlano, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
+import Link from "next/link";
+import { CalendarCheck2, Pencil, Plus, Printer } from "lucide-react";
+import { DIAS_SEMANA, diasEmOrdem, extratoDoPetLigado, fraseDoSaldo, linkDoExtratoDoPet, lerPlanos, lerSaldoDeReposicao, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, textoDasDatas, type Falta, type PetDoPlano, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
 import { calendarioGuardado, lerCalendario } from "@/lib/gestao/feriados";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { brl, dataCompleta, dataCurta, isoDia, nomeMes } from "@/lib/gestao/util";
@@ -95,11 +96,14 @@ export function CartaoMensalista({ pet }: { pet: PetDoPlano }) {
   const ve = posso("creche_hotel");
   const pode = ve && podeMudarPlano({ petshop, souDono, cuidoDoFinanceiro: vejoFinanceiro });
   const ativo = Boolean(plano && planoAtivo(plano, hoje));
-  if (!plano && !pode) return null;
+  // extrato do mês por cachorro (opção da creche): para quem trabalha na creche, com ou sem plano
+  const extrato = ve && extratoDoPetLigado(petshop);
+  if (!plano && !pode && !extrato) return null;
   return (
     <section className="g-card">
       <div className="g-card-t">
         <h3><Tile icone={CalendarCheck2} tom="manteiga" tamanho="p" />Creche: mensalista</h3>
+        {extrato && <Link className="g-btn fantasma p" href={linkDoExtratoDoPet(pet.id)} target="_blank" aria-label={`Extrato do mês de ${pet.nome} na creche`}><Printer />Extrato do mês</Link>}
         {pode && (ativo
           ? <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setForm("editar"); }}><Pencil />Alterar plano</button>
           : <button className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setForm("novo"); }}><Plus />Tornar mensalista</button>)}

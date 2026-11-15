@@ -597,3 +597,66 @@ export function mensagemDaExperiencia(p: { tutor: string | null | undefined; pet
 export const OPCAO_EXTRATO_PET = "creche.extrato_pet";
 export const extratoDoPetLigado = (p: { opcoes?: unknown }) => opcao<boolean>(p, OPCAO_EXTRATO_PET, false) === true;
 export const linkDoExtratoDoPet = (petId: string, mes?: Date) => `/gestao/app/creche-hotel/extrato?pet=${petId}${mes ? `&mes=${isoMes(mes)}` : ""}`;
+
+/** O que o extrato do mês de um cão mostra. Dinheiro (`cobranca`, `taxas` com valor) só para quem vê o financeiro. */
+export type ExtratoDoPet = {
+  mes: Date; pet: string; tutor: string | null;
+  plano: Pick<Plano, "dias"> | null;
+  /** dias do plano no mês até hoje (com a creche aberta) */
+  esperados: number;
+  presencas: string[]; faltas: { dia: string; avisou: boolean }[];
+  reposicoes: { dia: string; repoe: string | null }[];
+  extras: string[]; avulsos: string[]; experiencias: string[];
+  /** saídas depois do horário (só quem vê o financeiro lê): valor e o que foi feito com a taxa */
+  taxas: { dia: string; valor: number | null; estado: string }[];
+  cobranca: CobrancaCompleta | null;
+};
+
+/** As linhas da cobrança do mês, para o extrato (papel e texto). */
+export function linhasDaCobrancaDoPet(c: CobrancaCompleta) {
+  const extras = extrasDaCobranca(c), taxas = taxasDaCobranca(c), partes = partesDosExtras(c), d = partesDoDesconto(c);
+  return [
+    ...(c.acerto_saida ? [] : [{ nome: `Mensalidade de ${nomeMes(deIsoDia(c.mes))}${Number(c.valor_mensal) < Number(c.valor_cheio) ? " (proporcional)" : ""}`, valor: Number(c.valor_mensal) }]),
+    ...(extras.length ? [{ nome: `${extras.length === 1 ? "Dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})`, valor: partes.dias }] : []),
+    ...(taxas.length ? [{ nome: `${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((x) => x.dia))})`, valor: partes.taxas }] : []),
+    ...(d.irmao > 0 ? [{ nome: "Desconto irmão", valor: -d.irmao }] : []),
+    ...(d.outro > 0 ? [{ nome: "Desconto", valor: -d.outro }] : []),
+  ];
+}
+
+/** "10/11 (avisou), 17/11" */
+const textoDasFaltas = (f: { dia: string; avisou: boolean }[]) => juntar(f.map((x) => `${dataCurta(x.dia)}${x.avisou ? " (avisou)" : ""}`));
+
+/**
+ * O extrato do mês de um cão em texto simples, para o WhatsApp do tutor. Sem `comValores`, só as presenças (para a equipe que
+ * não vê o financeiro): nenhum valor entra no texto.
+ */
+export function textoDoExtratoDoPet(x: ExtratoDoPet, petshop: string, comValores: boolean) {
+  const mes = nomeMes(x.mes);
+  const linhas: string[] = [];
+  if (x.plano) linhas.push(`Plano: ${textoDosDias(x.plano.dias)}`);
+  if (x.plano) linhas.push(`Presenças: ${x.presencas.length}${x.esperados ? ` de ${x.esperados} dias do plano` : ""}${x.presencas.length ? ` (${textoDasDatas(x.presencas)})` : ""}`);
+  else if (x.presencas.length) linhas.push(`Presenças: ${x.presencas.length} (${textoDasDatas(x.presencas)})`);
+  if (x.faltas.length) linhas.push(`Faltas: ${x.faltas.length} (${textoDasFaltas(x.faltas)})`);
+  if (x.reposicoes.length) linhas.push(`Reposições: ${x.reposicoes.length} (${juntar(x.reposicoes.map((r) => `${dataCurta(r.dia)}${r.repoe ? `, repôs a falta de ${dataCurta(r.repoe)}` : ""}`))})`);
+  if (x.extras.length) linhas.push(`Dias extras: ${x.extras.length} (${textoDasDatas(x.extras)}), entram na mensalidade seguinte`);
+  if (x.experiencias.length) linhas.push(`Dia de experiência: ${textoDasDatas(x.experiencias)}`);
+  if (x.avulsos.length) linhas.push(`Dias avulsos: ${x.avulsos.length} (${textoDasDatas(x.avulsos)})`);
+  const taxas = comValores ? x.taxas.filter((t) => t.estado !== "dispensada") : [];
+  if (taxas.length) linhas.push(`Saídas depois do horário: ${juntar(taxas.map((t) => `${dataCurta(t.dia)}${t.valor != null ? ` (taxa ${brl(t.valor)})` : ""}`))}`);
+  if (!linhas.length) linhas.push(`Nenhum dia na creche em ${mes}.`);
+  const conta: string[] = [];
+  if (comValores && x.cobranca) {
+    for (const l of linhasDaCobrancaDoPet(x.cobranca)) conta.push(`${l.nome}: ${l.valor < 0 ? `− ${brl(-l.valor)}` : brl(l.valor)}`);
+    const c = x.cobranca, falta = faltaDaCobranca(c), paga = Boolean(c.lancamentos?.pago) || Number(c.total) <= 0;
+    conta.push(`Total: ${brl(c.total)}${paga ? (Number(c.total) > 0 && c.lancamentos?.data ? `, pago em ${dataCurta(c.lancamentos.data)}` : "") : falta < Number(c.total) ? `. Já pago ${brl(centavos(Number(c.total) - falta))}, falta ${brl(falta)}` : `, vence em ${dataCurta(c.vencimento)}`}`);
+  }
+  return [
+    `${saudacaoZap(x.tutor, petshop)} Segue o extrato de ${mes} de ${x.pet} na creche:`,
+    "",
+    ...linhas,
+    ...(conta.length ? ["", ...conta] : []),
+    "",
+    "Qualquer dúvida, é só chamar.",
+  ].join("\n");
+}
