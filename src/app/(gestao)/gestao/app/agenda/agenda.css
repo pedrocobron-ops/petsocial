@@ -159,3 +159,12 @@ div.g-agd-faixa.almoco { cursor: default; }
 .g-semana-col .g-bloco.estreito b { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; font-size: .75rem; line-height: 1.15; }
 .g-semana-col .g-bloco.estreito span { text-overflow: clip; font-size: .6875rem; }
 .g-agd-valor.fixo { display: flex; align-items: center; min-height: 44px; }
+/* conta do atendimento: o que o tutor devia de antes, para receber junto */
+.g-agd-junto { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--g-linha); background: var(--g-carta); cursor: pointer; }
+.g-agd-junto.on { border-color: rgba(36, 84, 59, .35); background: #f4f8f1; }
+.g-agd-junto input { width: 20px; height: 20px; flex: none; accent-color: var(--g-verde); }
+.g-agd-junto .t { flex: 1; min-width: 0; }
+.g-agd-junto .t small { display: block; color: var(--g-cinza); font-size: .8125rem; overflow-wrap: anywhere; }
+.g-agd-junto b.v { white-space: nowrap; }
+/* deve de antes, no horário */
+.g-agd-deve { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
