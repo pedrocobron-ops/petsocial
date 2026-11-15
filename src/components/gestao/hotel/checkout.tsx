@@ -132,7 +132,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
       estadia.tipo === "hotel" ? estadiasDoTutor(sb, petshop.id, tutor?.id) : Promise.resolve([]),
       tutor?.id ? sb.from("lancamentos").select("id, valor, descricao, categoria, data, vencimento").eq("petshop_id", petshop.id).eq("cliente_id", tutor.id).eq("tipo", "entrada").eq("pago", false).order("data").limit(20) : Promise.resolve({ data: [] }),
       creditoDoTutor(sb, petshop.id, tutor?.id).then((c) => c.saldo).catch(() => 0),
-      atrasoJaCobrado(sb, petshop.id, tutor?.id, estadia.id, agora),
+      atrasoJaCobrado(sb, petshop.id, tutor?.id, estadia, agora),
     ]);
     return { valores: (v.data ?? null) as ValoresDaEstadia | null, outras, pendencias: ((p as { data: Pendencia[] | null }).data ?? []) as Pendencia[], credito, atrasoJa };
   }, [petshop.id, estadia.id, vejoFinanceiro]);
@@ -556,13 +556,13 @@ function imprimirDaEstadia(petshop: string, e: EstadiaCompleta, conta: ContaDaEs
 }
 
 /**
- * Outro pet do mesmo tutor saiu há pouco (até 3 horas antes desta saída, no mesmo dia) com a taxa de busca fora do horário
+ * Outro pet do mesmo tutor (não o mesmo pet) saiu há pouco (até 3 horas antes desta saída, no mesmo dia) com a taxa de busca fora do horário
  * na conta: é a mesma busca, e a taxa não precisa entrar de novo. Só quem recebe chama.
  */
-async function atrasoJaCobrado(sb: Banco, petshopId: string, clienteId: string | null | undefined, estadiaId: string, agora: Date): Promise<AtrasoJaCobrado | null> {
+async function atrasoJaCobrado(sb: Banco, petshopId: string, clienteId: string | null | undefined, esta: Pick<EstadiaCompleta, "id" | "pet_id">, agora: Date): Promise<AtrasoJaCobrado | null> {
   if (!clienteId) return null;
   const desde = new Date(Math.max(inicioDoDia(agora).getTime(), agora.getTime() - 3 * 3600e3)).toISOString();
-  const r = await sb.from("estadias").select("id, saida, pets!inner(nome, cliente_id)").eq("petshop_id", petshopId).eq("status", "encerrada").neq("id", estadiaId)
+  const r = await sb.from("estadias").select("id, saida, pets!inner(nome, cliente_id)").eq("petshop_id", petshopId).eq("status", "encerrada").neq("id", esta.id).neq("pet_id", esta.pet_id)
     .eq("pets.cliente_id", clienteId).gte("saida", desde).lte("saida", new Date(agora.getTime() + 60e3).toISOString()).order("saida", { ascending: false }).limit(10);
   const saidas = (r.data ?? []) as unknown as { id: string; saida: string; pets: { nome: string } | null }[];
   if (r.error || !saidas.length) return null;
