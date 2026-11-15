@@ -57,12 +57,13 @@ async function criarLoja(T, o = {}) {
   if (T && !process.env.MANTER_DADOS) T.depois(() => limpar(L));
   L.limpar = () => limpar(L);
   L.ids.dono = B.sql(`select id from profissionais where petshop_id='${L.P}' and papel='dono'`);
-  B.must(await L.sb.dono.from('petshops').update({ guia_feito_em: new Date().toISOString(), diaria_creche: 70, diaria_hotel: 120, horario: HORARIO, link_ativo: true, vagas_creche: 20, vagas_hotel: 20 }).eq('id', L.P).select('id'), 'ajustes do pet shop');
+  B.must(await L.sb.dono.from('petshops').update({ guia_feito_em: new Date().toISOString(), diaria_creche: 70, diaria_hotel: 120, horario: HORARIO, link_ativo: true, link_hotel: true, link_creche: true, vagas_creche: 20, vagas_hotel: 20 }).eq('id', L.P).select('id'), 'ajustes do pet shop');
   const ps = B.sql(`select fuso || '|' || link_codigo from petshops where id='${L.P}'`).split('|');
   L.fuso = ps[0]; L.codigo = ps[1];
   L.hoje = B.hojeNo(L.fuso);
   L.dia = (n) => B.somaDias(L.hoje, n);
   L.mes1 = L.hoje.slice(0, 8) + '01';
+  L.mesAnterior = B.somaDias(L.mes1, -1).slice(0, 8) + '01';
 
   // serviços (os que criar_petshop já deixa) com preço por porte
   const servs = B.must(await L.sb.dono.from('servicos').select('id, nome').eq('petshop_id', L.P), 'serviços');
