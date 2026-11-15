@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Ban, CalendarClock, Check, ChevronLeft, ChevronRight, CircleCheck, HandCoins, MessageCircle, Pencil, Printer, RotateCcw, TriangleAlert, Undo2 } from "lucide-react";
 import {
-  cobraNoMes, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, textoComprovanteMensalidades, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, vencimentoDoMes,
+  regraIrmaoDe, cobraNoMes, descontoIrmao, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, textoComprovanteMensalidades, partesDoDesconto, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, vencimentoDoMes,
   type CobrancaCompleta, type EstadoCobranca, type PlanoCompleto, type PrimeiraCobranca,
 } from "@/lib/gestao/creche";
 import { conferirCaixa, parteDaChave, receberComCredito, receberConta, textoDoPagamento, type FormaPagamento } from "@/lib/gestao/dinheiro";
@@ -254,7 +254,8 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
                                     {c.acerto_saida ? "Acerto da saída: " : `${c.mes !== mesIso ? `${nomeMes(deIsoDia(c.mes))} · ` : ""}Mensalidade ${brl(c.valor_mensal)}${Number(c.valor_mensal) < Number(c.valor_cheio) ? " (proporcional)" : ""}`}
                                     {extras.length ? `${c.acerto_saida ? "" : " + "}${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})${partes.dias > 0 ? ` ${brl(partes.dias)}` : " sem valor"}` : ""}
                                     {taxas.length ? `${c.acerto_saida && !extras.length ? "" : " + "}${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((x) => x.dia))}) ${brl(partes.taxas)}` : ""}
-                                    {Number(c.desconto) > 0 ? ` − desconto ${brl(c.desconto)}` : ""}
+                                    {partesDoDesconto(c).irmao > 0 ? ` − desconto irmão ${brl(partesDoDesconto(c).irmao)}` : ""}
+                                    {partesDoDesconto(c).outro > 0 ? ` − desconto ${brl(partesDoDesconto(c).outro)}` : ""}
                                   </span>
                                   <span className="selos">
                                     {e.estado === "paga" ? (e.semValor ? <span className="g-tag">sem valor a cobrar</span>
@@ -350,9 +351,9 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
       {familia && <ReceberFamilia grupo={familia} contas={aReceberDe(familia)} aoFechar={() => setFamilia(null)} aoFeito={mudou} />}
       {porFora && <PagasPorFora mes={mes} cobrancas={semRecebimento} marcadas={primeiras.map((c) => c.id)} aoFechar={() => setPorFora(false)} aoFeito={async () => { setPorFora(false); await mudou(); }} />}
       {acertando && <AcertoDaSaida plano={acertando} aoFechar={() => { setAcertando(null); void mudou(); }} />}
-      {cobrandoAqui && <CobrarPorAqui plano={cobrandoAqui} mes={mes} aoFechar={() => setCobrandoAqui(null)} aoFeito={async () => { setCobrandoAqui(null); await mudou(); }} />}
-      {gerar && dados && <GerarCobrancas sobras={sobras ?? []} mes={mes} planos={faltamGerar} comCobranca={dados.comAnterior} aoFechar={aoFecharGerar} aoGerar={async () => { aoFecharGerar(); await mudou(); }} />}
-      {editando && <EditarCobranca cobranca={editando} aoFechar={() => setEditando(null)} aoSalvo={async () => { setEditando(null); await mudou(); }} />}
+      {cobrandoAqui && <CobrarPorAqui plano={cobrandoAqui} planos={planos} mes={mes} aoFechar={() => setCobrandoAqui(null)} aoFeito={async () => { setCobrandoAqui(null); await mudou(); }} />}
+      {gerar && dados && <GerarCobrancas sobras={sobras ?? []} mes={mes} planos={faltamGerar} todos={planos} comCobranca={dados.comAnterior} aoFechar={aoFecharGerar} aoGerar={async () => { aoFecharGerar(); await mudou(); }} />}
+      {editando && <EditarCobranca cobranca={editando} planos={planos} aoFechar={() => setEditando(null)} aoSalvo={async () => { setEditando(null); await mudou(); }} />}
       {baixando && <FolhaBaixa conta={baixando} aoFechar={() => setBaixando(null)} aoSalvo={async () => { await recarregar(); }} />}
       {mensagem && <MensagemDeCobranca grupo={mensagem} texto={textoDe(mensagem)} aoFechar={() => setMensagem(null)} aoMandar={() => { void cobrou(mensagem); setMensagem(null); }} />}
     </div>
@@ -383,11 +384,13 @@ function MensagemDeCobranca({ grupo, texto: inicial, aoFechar, aoMandar }: { gru
 
 type LinhaGerar = {
   plano: PlanoCompleto; valor: number | null; sugestao: ReturnType<typeof sugestaoDoMes> | null; extras: string[]; unit: number; taxas: { dia: string; valor: number }[]; vencimento: string;
+  /** desconto para irmãos (opção da creche), sobre a mensalidade desta linha */
+  irmao: number;
   /** primeira cobrança do plano e o vencimento já passou: quem recebe escolhe como fica (nada vem marcado) */
   primeira: boolean; escolha: PrimeiraCobranca | null; daquiPraFrente: ReturnType<typeof sugestaoDoMes> | null;
 };
 
-function GerarCobrancas({ sobras, mes, planos, comCobranca, aoFechar, aoGerar }: { sobras: SobrasDaSaida[]; mes: Date; planos: PlanoCompleto[]; comCobranca: Set<string>; aoFechar: () => void; aoGerar: () => Promise<void> }) {
+function GerarCobrancas({ sobras, mes, planos, todos, comCobranca, aoFechar, aoGerar }: { sobras: SobrasDaSaida[]; mes: Date; planos: PlanoCompleto[]; todos: PlanoCompleto[]; comCobranca: Set<string>; aoFechar: () => void; aoGerar: () => Promise<void> }) {
   const { sb, petshop } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const mesIso = isoMes(mes);
@@ -425,9 +428,10 @@ function GerarCobrancas({ sobras, mes, planos, comCobranca, aoFechar, aoGerar }:
     // "de hoje em diante" só faz sentido no mês corrente
     const daquiPraFrente = primeira && mesIso === mesDeHoje && plano.valor_mensal != null ? proporcionalDesde(plano, mes, plano.valor_mensal, petshop.horario, hoje) : null;
     const digitado = plano.id in valores ? valores[plano.id] : sugestao?.valor ?? null;
+    const valor = escolha === "proporcional" ? daquiPraFrente?.valor ?? null : digitado;
     return {
-      plano, sugestao, primeira, escolha, daquiPraFrente,
-      valor: escolha === "proporcional" ? daquiPraFrente?.valor ?? null : digitado,
+      plano, sugestao, primeira, escolha, daquiPraFrente, valor,
+      irmao: valor == null ? 0 : descontoIrmao(petshop, todos, plano, mes, valor, petshop.horario),
       extras: extras?.get(plano.pet_id) ?? [], unit: plano.valor_extra ?? diaria, taxas: taxas?.get(plano.pet_id) ?? [], vencimento: primeira ? hoje : vencimento,
     };
   }).sort((a, b) => (a.plano.pets?.nome ?? "").localeCompare(b.plano.pets?.nome ?? "", "pt-BR"));
@@ -437,7 +441,7 @@ function GerarCobrancas({ sobras, mes, planos, comCobranca, aoFechar, aoGerar }:
   const porFora = comValor.filter((l) => l.primeira && l.escolha === "fora");
   const semEscolha = comValor.filter((l) => l.primeira && !l.escolha);
   const semValor = linhas.filter((l) => !l.plano.temValor);
-  const totalDe = (l: LinhaGerar) => centavos((l.valor ?? 0) + l.extras.length * l.unit + l.taxas.reduce((s, x) => s + x.valor, 0));
+  const totalDe = (l: LinhaGerar) => centavos((l.valor ?? 0) + l.extras.length * l.unit + l.taxas.reduce((s, x) => s + x.valor, 0) - l.irmao);
   const total = centavos(prontas.reduce((s, l) => s + totalDe(l), 0));
 
   // trava na hora do primeiro toque: dois toques seguidos não geram (nem tentam gerar) as cobranças duas vezes.
@@ -512,6 +516,7 @@ function GerarCobrancas({ sobras, mes, planos, comCobranca, aoFechar, aoGerar }:
                   )}
                   {l.extras.length > 0 && <span>{l.extras.length === 1 ? "1 dia extra" : `${l.extras.length} dias extras`} ({textoDasDatas(l.extras)}){l.unit > 0 ? `: ${brl(l.extras.length * l.unit)}` : ": sem preço de dia extra definido"}</span>}
                   {l.taxas.length > 0 && <span>{textoDasTaxas(l.taxas.length)} ({textoDasDatas(l.taxas.map((x) => x.dia))}): {brl(centavos(l.taxas.reduce((s, x) => s + x.valor, 0)))}</span>}
+                  {l.irmao > 0 && l.escolha !== "fora" && <span>Desconto irmão: − {brl(l.irmao)}</span>}
                 </div>
                 <div className="valor">
                   {l.sugestao?.proporcional && l.escolha !== "proporcional" && l.escolha !== "fora"
@@ -535,17 +540,22 @@ function GerarCobrancas({ sobras, mes, planos, comCobranca, aoFechar, aoGerar }:
 
 /* ---------- alterar ou cancelar uma cobrança ainda não paga ---------- */
 
-function EditarCobranca({ cobranca: c, aoFechar, aoSalvo }: { cobranca: CobrancaCompleta; aoFechar: () => void; aoSalvo: () => Promise<void> }) {
-  const { sb } = useGestao();
+function EditarCobranca({ cobranca: c, planos, aoFechar, aoSalvo }: { cobranca: CobrancaCompleta; planos: PlanoCompleto[]; aoFechar: () => void; aoSalvo: () => Promise<void> }) {
+  const { sb, petshop } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const [valor, setValor] = useState<number | null>(Number(c.valor_mensal));
-  const [desconto, setDesconto] = useState<number | null>(Number(c.desconto) || null);
+  // o desconto do campo é o combinado; o desconto para irmãos fica à parte (o banco refaz se a mensalidade mudar)
+  const [desconto, setDesconto] = useState<number | null>(partesDoDesconto(c).outro || null);
   const [vencimento, setVencimento] = useState(c.vencimento);
   const [obs, setObs] = useState(c.obs ?? "");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const extras = extrasDaCobranca(c), taxas = taxasDaCobranca(c), partes = partesDosExtras(c);
-  const total = centavos((valor ?? 0) + Number(c.valor_extras) - (desconto ?? 0));
+  const planoDaCobranca = planos.find((p) => p.id === c.plano_id);
+  const irmao = valor == null || valor === Number(c.valor_mensal) || c.acerto_saida ? partesDoDesconto(c).irmao
+    : regraIrmaoDe(petshop).ativo ? (planoDaCobranca ? descontoIrmao(petshop, planos, planoDaCobranca, deIsoDia(c.mes), valor, petshop.horario) : 0)
+    : Math.min(partesDoDesconto(c).irmao, valor);
+  const total = centavos((valor ?? 0) + Number(c.valor_extras) - (desconto ?? 0) - irmao);
 
   async function salvar() {
     if (salvando) return;
@@ -588,6 +598,7 @@ function EditarCobranca({ cobranca: c, aoFechar, aoSalvo }: { cobranca: Cobranca
         {taxas.length > 0 && (
           <p className="g-p"><b>{textoDasTaxas(taxas.length)}:</b> {textoDasDatas(taxas.map((x) => x.dia))} · {brl(partes.taxas)}</p>
         )}
+        {irmao > 0 && <p className="g-p"><b>Desconto irmão:</b> − {brl(irmao)} <span className="g-muted g-pp">(regra de Meu pet shop, Opções da creche)</span></p>}
         <Campo rotulo="Vencimento"><input type="date" className="g-input" value={vencimento} onChange={(e) => { setVencimento(e.target.value); setErro(null); }} /></Campo>
         <Campo rotulo="Observação" dica="Só para vocês. Não vai na mensagem.">
           <input className="g-input" value={obs} maxLength={300} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: desconto combinado por indicação" />
@@ -726,7 +737,7 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
  * nasce aqui mesmo. Se o vencimento do mês já passou, quem recebe escolhe entre o mês inteiro e o proporcional a partir de hoje
  * (nada vem marcado, e a cobrança vence hoje: não nasce atrasada). Dias extras e taxas de meses anteriores entram junto, como em Gerar.
  */
-function CobrarPorAqui({ plano, mes, aoFechar, aoFeito }: { plano: PlanoCompleto; mes: Date; aoFechar: () => void; aoFeito: () => Promise<void> }) {
+function CobrarPorAqui({ plano, planos, mes, aoFechar, aoFeito }: { plano: PlanoCompleto; planos: PlanoCompleto[]; mes: Date; aoFechar: () => void; aoFeito: () => Promise<void> }) {
   const { sb, petshop } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const op = useOperacao();
@@ -738,6 +749,8 @@ function CobrarPorAqui({ plano, mes, aoFechar, aoFeito }: { plano: PlanoCompleto
   const daqui = passou && mesIso === isoMes(new Date()) && plano.valor_mensal != null ? proporcionalDesde(plano, mes, plano.valor_mensal, petshop.horario, hoje) : null;
   const [escolha, setEscolha] = useState<"inteiro" | "proporcional" | null>(passou ? null : "inteiro");
   const valor = escolha === "proporcional" ? daqui?.valor ?? null : cheio?.valor ?? null;
+  // desconto para irmãos (opção da creche): o banco aplica ao gerar; aqui só mostra
+  const irmao = valor == null ? 0 : descontoIrmao(petshop, planos, plano, mes, valor, petshop.horario);
 
   const gerar = () => op.fazer(async () => {
     if (!escolha || valor == null) return false;
@@ -745,7 +758,7 @@ function CobrarPorAqui({ plano, mes, aoFechar, aoFeito }: { plano: PlanoCompleto
       // a primeira cobrança passa a ser a deste mês (escolha de quem recebe: o aviso de "pagas por fora" não volta a sugerir)
       ok(await sb.from("creche_planos").update({ primeira_cobranca: mesIso }).eq("id", plano.id).eq("petshop_id", petshop.id).select("id").single());
       ok(await sb.rpc("creche_cobranca_criar", { p_plano: plano.id, p_mes: mesIso, p_valor: valor, ...(passou ? { p_vencimento: hoje } : {}) }));
-      avisar(`Cobrança de ${nomeMes(mes)} de ${nome} gerada: ${brl(valor)}${passou ? ", vence hoje" : `, vence em ${dataCurta(vencimento)}`}. Ela já está em A receber.`);
+      avisar(`Cobrança de ${nomeMes(mes)} de ${nome} gerada: ${brl(centavos(valor - irmao))}${irmao > 0 ? " (com o desconto irmão)" : ""}${passou ? ", vence hoje" : `, vence em ${dataCurta(vencimento)}`}. Ela já está em A receber.`);
       await aoFeito();
     } catch (e) { avisarErro(e); return false; }
   });
@@ -754,7 +767,7 @@ function CobrarPorAqui({ plano, mes, aoFechar, aoFeito }: { plano: PlanoCompleto
     <Folha titulo={`Cobrar ${nomeMes(mes)} de ${nome} por aqui`} aoFechar={aoFechar}
       rodape={<>
         <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button className="g-btn pri" onClick={gerar} disabled={op.ocupado || !escolha || valor == null}>{op.ocupado ? "Gerando…" : escolha && valor != null ? `Gerar a cobrança · ${brl(valor)}` : "Escolha como cobrar"}</button>
+        <button className="g-btn pri" onClick={gerar} disabled={op.ocupado || !escolha || valor == null}>{op.ocupado ? "Gerando…" : escolha && valor != null ? `Gerar a cobrança · ${brl(centavos(valor - irmao))}` : "Escolha como cobrar"}</button>
       </>}>
       <div className="g-pilha">
         <p className="g-muted g-p">{nomeMes(mes)[0].toUpperCase() + nomeMes(mes).slice(1)} estava marcado como pago por fora. Ao gerar, a mensalidade volta para A receber{plano.pets?.clientes?.nome ? `, no nome de ${plano.pets.clientes.nome}` : ""}. Dias extras e taxas de meses anteriores que ainda não foram cobrados entram junto.</p>
@@ -771,6 +784,7 @@ function CobrarPorAqui({ plano, mes, aoFechar, aoFeito }: { plano: PlanoCompleto
               <small>A cobrança vence hoje, para não nascer atrasada.</small>
             </div>
           ) : <p className="g-p"><b>{brl(cheio?.valor ?? plano.valor_mensal)}</b> · vence em {dataCurta(vencimento)}{cheio?.proporcional ? ` (${cheio.restam} de ${cheio.todos} dias do plano no mês)` : ""}</p>}
+        {irmao > 0 && <p className="g-p">Desconto irmão: − {brl(irmao)}</p>}
       </div>
     </Folha>
   );

@@ -142,7 +142,12 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
         const valor = primeira === "proporcional" ? prop!.valor : mensal;
         const r = await sb.rpc("creche_cobranca_criar", { p_plano: id, p_mes: isoMes(mesAtual), p_valor: valor, p_vencimento: vencDaPrimeira });
         if (r.error) avisarErro(`O plano foi salvo, mas a primeira cobrança não foi criada (${r.error.message}). Gere em Cobranças.`);
-        else cobrou = ` A cobrança de ${nomeMes(mesAtual)} (${brl(valor)}) vence em ${dataCurta(vencDaPrimeira)}.`;
+        else {
+          // o banco já aplica o desconto para irmãos (opção da creche): o aviso diz o total que ficou
+          const g = await sb.from("creche_cobrancas").select("total, desconto_irmao").eq("id", r.data as string).maybeSingle();
+          const irmao = Number(g.data?.desconto_irmao ?? 0);
+          cobrou = ` A cobrança de ${nomeMes(mesAtual)} (${brl(irmao > 0 ? Number(g.data!.total) : valor)}${irmao > 0 ? `, com ${brl(irmao)} de desconto irmão` : ""}) vence em ${dataCurta(vencDaPrimeira)}.`;
+        }
       } else if (perguntaPrimeira && primeira === "fora") cobrou = ` A primeira cobrança é a de ${nomeMes(proximoMes)}.`;
       avisar((plano ? "Plano salvo." : `${pet.nome} agora é mensalista da creche.`) + cobrou + saiuDoModelo);
       avisarMudanca();

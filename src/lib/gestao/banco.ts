@@ -415,14 +415,14 @@ isOneToOne: false
                   ]
                 },"creche_cobrancas": {
                   Row: {
-                    "acerto_saida": boolean,"cliente_id": string | null,"cobrado_em": string | null,"criado_em": string,"criado_por": string | null,"desconto": number,"extras": NonNullable<Json>,"id": string,"lancamento_id": string | null,"mes": string,"obs": string | null,"pet_id": string,"petshop_id": string,"plano_id": string,"por_fora": boolean,"status": string,"taxas": NonNullable<Json>,"total": number,"valor_cheio": number,"valor_extras": number,"valor_mensal": number,"vencimento": string
+                    "acerto_saida": boolean,"cliente_id": string | null,"cobrado_em": string | null,"criado_em": string,"criado_por": string | null,"desconto": number,"desconto_irmao": number,"extras": NonNullable<Json>,"id": string,"lancamento_id": string | null,"mes": string,"obs": string | null,"pet_id": string,"petshop_id": string,"plano_id": string,"por_fora": boolean,"status": string,"taxas": NonNullable<Json>,"total": number,"valor_cheio": number,"valor_extras": number,"valor_mensal": number,"vencimento": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "acerto_saida"?: boolean,"cliente_id"?: string | null,"cobrado_em"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"desconto"?: number,"extras"?: NonNullable<Json>,"id"?: string,"lancamento_id"?: string | null,"mes": string,"obs"?: string | null,"pet_id": string,"petshop_id": string,"plano_id": string,"por_fora"?: boolean,"status"?: string,"taxas"?: NonNullable<Json>,"total": number,"valor_cheio": number,"valor_extras"?: number,"valor_mensal": number,"vencimento": string
+                    "acerto_saida"?: boolean,"cliente_id"?: string | null,"cobrado_em"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"desconto"?: number,"desconto_irmao"?: number,"extras"?: NonNullable<Json>,"id"?: string,"lancamento_id"?: string | null,"mes": string,"obs"?: string | null,"pet_id": string,"petshop_id": string,"plano_id": string,"por_fora"?: boolean,"status"?: string,"taxas"?: NonNullable<Json>,"total": number,"valor_cheio": number,"valor_extras"?: number,"valor_mensal": number,"vencimento": string
                   }
                   Update: {
-                    "acerto_saida"?: boolean,"cliente_id"?: string | null,"cobrado_em"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"desconto"?: number,"extras"?: NonNullable<Json>,"id"?: string,"lancamento_id"?: string | null,"mes"?: string,"obs"?: string | null,"pet_id"?: string,"petshop_id"?: string,"plano_id"?: string,"por_fora"?: boolean,"status"?: string,"taxas"?: NonNullable<Json>,"total"?: number,"valor_cheio"?: number,"valor_extras"?: number,"valor_mensal"?: number,"vencimento"?: string
+                    "acerto_saida"?: boolean,"cliente_id"?: string | null,"cobrado_em"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"desconto"?: number,"desconto_irmao"?: number,"extras"?: NonNullable<Json>,"id"?: string,"lancamento_id"?: string | null,"mes"?: string,"obs"?: string | null,"pet_id"?: string,"petshop_id"?: string,"plano_id"?: string,"por_fora"?: boolean,"status"?: string,"taxas"?: NonNullable<Json>,"total"?: number,"valor_cheio"?: number,"valor_extras"?: number,"valor_mensal"?: number,"vencimento"?: string
                   }
                   Relationships: [
                     {
@@ -701,14 +701,14 @@ isOneToOne: false
                   ]
                 },"estadias": {
                   Row: {
-                    "acomodacao": string | null,"avisos": NonNullable<Json>,"chave": string | null,"cobranca_id": string | null,"criado_em": string,"cuidados": Json | null,"dia": string | null,"diarias_cobradas": number | null,"entrada": string,"id": string,"mensalista": string | null,"obs": string | null,"pet_id": string,"petshop_id": string,"plano_id": string | null,"saida": string | null,"saida_prevista": string | null,"sinal_estado": string | null,"status": string,"tipo": string,"valor_cobrado": number | null,"valor_diaria": number | null
+                    "acomodacao": string | null,"avisos": NonNullable<Json>,"chave": string | null,"cobranca_id": string | null,"criado_em": string,"cuidados": Json | null,"dia": string | null,"diarias_cobradas": number | null,"entrada": string,"experiencia": boolean,"id": string,"mensalista": string | null,"obs": string | null,"pet_id": string,"petshop_id": string,"plano_id": string | null,"saida": string | null,"saida_prevista": string | null,"sinal_estado": string | null,"status": string,"tipo": string,"valor_cobrado": number | null,"valor_diaria": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "acomodacao"?: string | null,"avisos"?: NonNullable<Json>,"chave"?: string | null,"cobranca_id"?: string | null,"criado_em"?: string,"cuidados"?: Json | null,"dia"?: string | null,"diarias_cobradas"?: number | null,"entrada": string,"id"?: string,"mensalista"?: string | null,"obs"?: string | null,"pet_id": string,"petshop_id": string,"plano_id"?: string | null,"saida"?: string | null,"saida_prevista"?: string | null,"sinal_estado"?: string | null,"status"?: string,"tipo": string,"valor_cobrado"?: number | null,"valor_diaria"?: number | null
+                    "acomodacao"?: string | null,"avisos"?: NonNullable<Json>,"chave"?: string | null,"cobranca_id"?: string | null,"criado_em"?: string,"cuidados"?: Json | null,"dia"?: string | null,"diarias_cobradas"?: number | null,"entrada": string,"experiencia"?: boolean,"id"?: string,"mensalista"?: string | null,"obs"?: string | null,"pet_id": string,"petshop_id": string,"plano_id"?: string | null,"saida"?: string | null,"saida_prevista"?: string | null,"sinal_estado"?: string | null,"status"?: string,"tipo": string,"valor_cobrado"?: number | null,"valor_diaria"?: number | null
                   }
                   Update: {
-                    "acomodacao"?: string | null,"avisos"?: NonNullable<Json>,"chave"?: string | null,"cobranca_id"?: string | null,"criado_em"?: string,"cuidados"?: Json | null,"dia"?: string | null,"diarias_cobradas"?: number | null,"entrada"?: string,"id"?: string,"mensalista"?: string | null,"obs"?: string | null,"pet_id"?: string,"petshop_id"?: string,"plano_id"?: string | null,"saida"?: string | null,"saida_prevista"?: string | null,"sinal_estado"?: string | null,"status"?: string,"tipo"?: string,"valor_cobrado"?: number | null,"valor_diaria"?: number | null
+                    "acomodacao"?: string | null,"avisos"?: NonNullable<Json>,"chave"?: string | null,"cobranca_id"?: string | null,"criado_em"?: string,"cuidados"?: Json | null,"dia"?: string | null,"diarias_cobradas"?: number | null,"entrada"?: string,"experiencia"?: boolean,"id"?: string,"mensalista"?: string | null,"obs"?: string | null,"pet_id"?: string,"petshop_id"?: string,"plano_id"?: string | null,"saida"?: string | null,"saida_prevista"?: string | null,"sinal_estado"?: string | null,"status"?: string,"tipo"?: string,"valor_cobrado"?: number | null,"valor_diaria"?: number | null
                   }
                   Relationships: [
                     {
@@ -1213,14 +1213,14 @@ isOneToOne: false
                   ]
                 },"pedidos_agendamento": {
                   Row: {
-                    "agendamento_id": string | null,"avisado_em": string | null,"cliente_cancelou_em": string | null,"cliente_pedido_visto_em": string | null,"cliente_pediu": string | null,"cliente_pediu_em": string | null,"cliente_recado": string | null,"criado_em": string,"especie": string,"estadia_id": string | null,"fim": string,"grupo_id": string | null,"id": string,"inicio": string,"obs": string | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"servico_id": string | null,"status": string,"telefone": string,"termos_aceitos_em": string | null,"termos_texto": string | null,"termos_vacinas": boolean | null,"tipo": string,"tutor_nome": string
+                    "agendamento_id": string | null,"avisado_em": string | null,"cliente_cancelou_em": string | null,"cliente_pedido_visto_em": string | null,"cliente_pediu": string | null,"cliente_pediu_em": string | null,"cliente_recado": string | null,"criado_em": string,"especie": string,"estadia_id": string | null,"experiencia": boolean,"fim": string,"grupo_id": string | null,"id": string,"inicio": string,"obs": string | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"servico_id": string | null,"status": string,"telefone": string,"termos_aceitos_em": string | null,"termos_texto": string | null,"termos_vacinas": boolean | null,"tipo": string,"tutor_nome": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"fim": string,"grupo_id"?: string | null,"id"?: string,"inicio": string,"obs"?: string | null,"pet_nome": string,"petshop_id": string,"porte"?: string | null,"servico_id"?: string | null,"status"?: string,"telefone": string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome": string
+                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim": string,"grupo_id"?: string | null,"id"?: string,"inicio": string,"obs"?: string | null,"pet_nome": string,"petshop_id": string,"porte"?: string | null,"servico_id"?: string | null,"status"?: string,"telefone": string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome": string
                   }
                   Update: {
-                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"fim"?: string,"grupo_id"?: string | null,"id"?: string,"inicio"?: string,"obs"?: string | null,"pet_nome"?: string,"petshop_id"?: string,"porte"?: string | null,"servico_id"?: string | null,"status"?: string,"telefone"?: string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome"?: string
+                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim"?: string,"grupo_id"?: string | null,"id"?: string,"inicio"?: string,"obs"?: string | null,"pet_nome"?: string,"petshop_id"?: string,"porte"?: string | null,"servico_id"?: string | null,"status"?: string,"telefone"?: string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome"?: string
                   }
                   Relationships: [
                     {
@@ -1768,8 +1768,26 @@ isOneToOne: false
 "creche_cobrancas_por_fora":
 { Args: { "p_ids": (string)[] }; Returns: number
                            },
+"creche_desconto_irmao":
+{ Args: { "p_cheio": number,"p_mensal": number,"p_mes": string,"p_plano": string }; Returns: number
+                           },
+"creche_experiencia_ligada":
+{ Args: { "p_petshop": string }; Returns: boolean
+                           },
+"creche_experiencia_max":
+{ Args: { "p_petshop": string }; Returns: number
+                           },
 "creche_gerar_cobrancas":
 { Args: { "p_petshop": string }; Returns: number
+                           },
+"creche_irmao_ligado":
+{ Args: { "p_petshop": string }; Returns: boolean
+                           },
+"creche_irmaos_aplicar":
+{ Args: { "p_petshop": string }; Returns: number
+                           },
+"creche_irmaos_refazer":
+{ Args: { "p_cliente": string,"p_forcar"?: boolean,"p_mes"?: string,"p_petshop": string }; Returns: number
                            },
 "creche_nome_mes":
 { Args: { "p": string }; Returns: string
@@ -1957,6 +1975,9 @@ isOneToOne: false
                            },
 "limite_de_acessos":
 { Args: { "p_plano": string }; Returns: number
+                           },
+"link_creche_experiencia":
+{ Args: { "p_codigo": string }; Returns: Json
                            },
 "link_espera_ativa":
 { Args: { "p_codigo": string }; Returns: boolean

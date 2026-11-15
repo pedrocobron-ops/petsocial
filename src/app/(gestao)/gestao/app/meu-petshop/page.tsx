@@ -9,6 +9,7 @@ import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capa
 import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
 import OpcoesDeCobranca from "@/components/gestao/ajustes/opcoes-cobranca";
 import OpcoesCasa from "@/components/gestao/ajustes/opcoes-casa";
+import OpcoesCreche from "@/components/gestao/ajustes/opcoes-creche";
 import OpcoesHotel from "@/components/gestao/ajustes/opcoes-hotel";
 import OpcoesDoLink from "@/components/gestao/ajustes/opcoes-link";
 import Feriados from "@/components/gestao/ajustes/feriados";
@@ -103,7 +104,7 @@ export default function MeuPetshop() {
           cartoes={[usaModulo(petshop, "banho_tosa") && ["Banho e tosa: pets ao mesmo tempo", <VagasBanho key="v" />], ["Link de agendamento", <LinkAgendamento key="l" />], ["Regras e cancelamento pelo link", <OpcoesDoLink key="o" />]]} />
         {usaCasa(petshop) && (
           <Grupo id="casa" titulo={nomeDaCasa(petshop)} icone={BedDouble} tom="lilas"
-            cartoes={[[nomeDaCasa(petshop), <AjustesCrecheHotel key="a" />], [!usaModulo(petshop, "creche") ? "Opções do hotel" : !usaModulo(petshop, "hotel") ? "Opções da creche" : "Opções do hotel e da creche", <OpcoesHotel key="h" />], ["Cuidado com o tutor", <OpcoesCasa key="c" />]]} />
+            cartoes={[[nomeDaCasa(petshop), <AjustesCrecheHotel key="a" />], [!usaModulo(petshop, "creche") ? "Opções do hotel" : !usaModulo(petshop, "hotel") ? "Opções da creche" : "Opções do hotel e da creche", <OpcoesHotel key="h" />], ["Cuidado com o tutor", <OpcoesCasa key="c" />], usaModulo(petshop, "creche") && ["Mais opções da creche", <OpcoesCreche key="cr" />]]} />
         )}
         {usaModulo(petshop, "loja") && <Grupo id="loja" titulo="Loja" icone={Store} tom="manteiga" cartoes={[["Opções da loja", <OpcoesDaLoja key="l" />]]} />}
         <Grupo id="dinheiro" titulo="Cobrança e fidelidade" icone={HandCoins} tom="menta"

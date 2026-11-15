@@ -5,6 +5,7 @@ import { AlertTriangle, Check } from "lucide-react";
 import {
   faltaDaCobranca, isoMes, SELECT_COBRANCA, sugestaoDoMes, textoDasDatas, textoDasTaxas,
   type CobrancaCompleta, type PlanoCompleto,
+  partesDoDesconto, regraIrmaoDe, valorDoDescontoIrmao,
 } from "@/lib/gestao/creche";
 import { calendarioGuardado, lerCalendario } from "@/lib/gestao/feriados";
 import { brl, dataCompleta, dataCurta, deIsoDia, isoDia, nomeMes } from "@/lib/gestao/util";
@@ -112,8 +113,11 @@ export default function AcertoDaSaida({ plano, aoFechar }: { plano: PlanoComplet
     if (c.mes === mesFim) {
       const s = sugestaoDoMes(plano, deIsoDia(c.mes), Number(c.valor_cheio), petshop.horario);
       if (!(s.valor < Number(c.valor_mensal))) return [];
-      const desconto = Math.min(Number(c.desconto), s.valor + Number(c.valor_extras));
-      const novoTotal = centavos(s.valor + Number(c.valor_extras) - desconto);
+      // o desconto combinado segue; o desconto para irmãos (opção da creche) é refeito sobre a mensalidade nova, como no banco
+      const partes = partesDoDesconto(c), regra = regraIrmaoDe(petshop);
+      const irmao = partes.irmao > 0 ? (regra.ativo ? valorDoDescontoIrmao(regra, s.valor, Number(c.valor_cheio)) : Math.min(partes.irmao, s.valor)) : 0;
+      const desconto = Math.min(partes.outro, Math.max(0, s.valor + Number(c.valor_extras) - irmao));
+      const novoTotal = centavos(s.valor + Number(c.valor_extras) - desconto - irmao);
       const pago = Boolean(c.lancamentos?.pago) || recebido >= novoTotal;
       return [{ c, tipo: "mes", s, desconto, novoTotal, pago, recebido, aMais: centavos(recebido - novoTotal) }];
     }

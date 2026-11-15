@@ -303,7 +303,10 @@ function linhaDaMensagem(c: CobrancaCompleta, comMes = false) {
   if (extras.length) partes.push(`${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((e) => e.dia))})${valores.dias > 0 ? ` ${brl(valores.dias)}` : ""}`);
   if (taxas.length) partes.push(`${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((e) => e.dia))}) ${brl(valores.taxas)}`);
   let texto = partes.join(" + ");
-  if (Number(c.desconto) > 0) texto += ` - desconto ${brl(c.desconto)}`;
+  // desconto para irmãos (opção da creche) numa linha própria; o resto do desconto, como sempre
+  const d = partesDoDesconto(c);
+  if (d.irmao > 0) texto += ` - desconto irmão ${brl(d.irmao)}`;
+  if (d.outro > 0) texto += ` - desconto ${brl(d.outro)}`;
   if (partes.length > 1 || Number(c.desconto) > 0) texto += ` = ${brl(c.total)}`;
   // parte já recebida: a mensagem cobra só o que falta
   const falta = faltaDaCobranca(c);
@@ -466,3 +469,131 @@ export function fraseDoSaldo(nome: string, s: SaldoDeReposicao) {
   const vencidas = s.vencidas.length ? ` ${s.vencidas.length === 1 ? "A falta de" : "As faltas de"} ${textoDasDatas(s.vencidas)} já ${s.vencidas.length === 1 ? "passou" : "passaram"} do prazo.` : "";
   return `${nome} não tem falta para repor${regra ? ` (regra: ${regra})` : ""}.${usadas}${vencidas}`;
 }
+
+/* ---------- desconto para irmãos (opção da creche) ---------- */
+
+/**
+ * Desconto para irmãos (Meu pet shop, Opções da creche): o mesmo tutor com mais de um cão com plano no mês paga a mensalidade
+ * cheia de um e os outros têm o desconto. Quem paga cheio: o plano de mensalidade mais alta ("mais_barato": o desconto vai para
+ * os mais baratos) ou o plano que começou antes ("segundo"). Empate: o que começou antes. A conta é a de `creche_desconto_irmao`
+ * no banco (migração 20261173); se mudar lá, mude aqui. O desconto fica dentro de `desconto` na cobrança, e a parte do irmão em
+ * `desconto_irmao`.
+ */
+export const OPCAO_DESCONTO_IRMAO = "creche.desconto_irmao";
+export type RegraIrmao = { ativo: boolean; tipo: "pct" | "reais"; valor: number | null; qual: "mais_barato" | "segundo" };
+export function regraIrmaoDe(p: { opcoes?: unknown }): RegraIrmao {
+  const o = opcao<unknown>(p, OPCAO_DESCONTO_IRMAO, null);
+  const x = o && typeof o === "object" && !Array.isArray(o) ? (o as Record<string, unknown>) : {};
+  return {
+    ativo: x.ativo === true, tipo: x.tipo === "reais" ? "reais" : "pct",
+    valor: typeof x.valor === "number" && x.valor > 0 ? x.valor : null, qual: x.qual === "segundo" ? "segundo" : "mais_barato",
+  };
+}
+const irmaoLigado = (r: RegraIrmao) => r.ativo && r.valor != null && r.valor > 0;
+/** Arredonda para o centavo como o banco (metade para cima), sem o erro de conta do número quebrado. */
+const aoCentavo = (n: number) => Math.round(n * 100 + 1e-6) / 100;
+/** O valor do desconto de um cão que tem o desconto: em %, sobre a mensalidade do mês; em R$, proporcional num mês proporcional. */
+export function valorDoDescontoIrmao(r: RegraIrmao, mensal: number, cheio: number): number {
+  if (!irmaoLigado(r) || mensal <= 0) return 0;
+  const d = r.tipo === "pct" ? aoCentavo((mensal * Math.min(r.valor!, 100)) / 100)
+    : cheio > 0 && mensal < cheio ? aoCentavo((r.valor! * mensal) / cheio) : r.valor!;
+  return Math.min(Math.max(d, 0), mensal);
+}
+/** O plano tem algum dia no mês (não está em pausa o mês todo)? Mesma conta do banco: `creche_sugestao_mensal(plano, mês, 1) > 0`. */
+function temDiaNoMes(p: Vigencia, mes: Date, horario: unknown) {
+  if (p.inicio > isoDia(ultimoDoMes(mes)) || (p.fim && p.fim < isoDia(primeiroDoMes(mes)))) return false;
+  const s = sugestaoDoMes(p, mes, 1, horario);
+  return s.todos === 0 || s.restam > 0;
+}
+/** Os planos do mesmo tutor que contam como irmãos no mês, na ordem em que o primeiro paga cheio. */
+export function irmaosNoMes(petshop: { opcoes?: unknown }, planos: PlanoCompleto[], plano: Pick<PlanoCompleto, "pets">, mes: Date, horario: unknown): PlanoCompleto[] {
+  const tutor = plano.pets?.clientes?.id;
+  if (!tutor) return [];
+  const r = regraIrmaoDe(petshop);
+  return planos.filter((p) => p.pets?.clientes?.id === tutor && p.temValor && p.valor_mensal != null && temDiaNoMes(p, mes, horario))
+    .sort((a, b) => (r.qual === "segundo" ? 0 : Number(b.valor_mensal) - Number(a.valor_mensal)) || a.inicio.localeCompare(b.inicio)
+      || new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+/** O desconto de irmão de um plano num mês, para a mensalidade `mensal` (precisa dos valores dos planos: só quem cuida do financeiro). */
+export function descontoIrmao(petshop: { opcoes?: unknown }, planos: PlanoCompleto[], plano: PlanoCompleto, mes: Date, mensal: number, horario: unknown): number {
+  const r = regraIrmaoDe(petshop);
+  if (!irmaoLigado(r) || mensal <= 0 || plano.valor_mensal == null) return 0;
+  const ordem = irmaosNoMes(petshop, planos, plano, mes, horario);
+  if (ordem.length < 2 || !ordem.some((p) => p.id === plano.id) || ordem[0].id === plano.id) return 0;
+  return valorDoDescontoIrmao(r, mensal, Number(plano.valor_mensal));
+}
+/** "10%" ou "R$ 50,00" */
+export const textoDaRegraIrmao = (r: RegraIrmao) => (r.valor == null ? "" : r.tipo === "pct" ? `${String(r.valor).replace(".", ",")}%` : brl(r.valor));
+/** A parte do desconto que é de irmão e a que foi combinada à parte (as duas somam `desconto`). */
+export function partesDoDesconto(c: Pick<Cobranca, "desconto"> & { desconto_irmao?: number | null }) {
+  const total = Number(c.desconto) || 0, irmao = Math.min(Number(c.desconto_irmao ?? 0) || 0, total);
+  return { irmao: centavos(irmao), outro: centavos(total - irmao) };
+}
+
+/* ---------- dia de experiência (opção da creche) ---------- */
+
+/**
+ * Dia de experiência: um dia avulso de creche para um cão novo, marcado em `estadias.experiencia`. O banco confere a opção, se o cão
+ * já é mensalista e o limite por cão, e põe o preço (zero = gratuito). O preço fica em outra chave, que a equipe sem dinheiro não lê.
+ */
+export const OPCAO_EXPERIENCIA = "creche.experiencia";
+export const OPCAO_EXPERIENCIA_PRECO = "creche.experiencia_preco";
+export type RegraExperiencia = { ativo: boolean; max: number; link: boolean };
+export function experienciaDe(p: { opcoes?: unknown }): RegraExperiencia {
+  const o = opcao<unknown>(p, OPCAO_EXPERIENCIA, null);
+  const x = o && typeof o === "object" && !Array.isArray(o) ? (o as Record<string, unknown>) : {};
+  const max = typeof x.max === "number" ? Math.max(1, Math.min(10, Math.round(x.max))) : 1;
+  return { ativo: x.ativo === true, max, link: x.link === true };
+}
+/** Preço do dia de experiência (só chega para quem vê o financeiro). null = não definido, que vale como gratuito. */
+export const precoDaExperiencia = (p: { opcoes?: unknown }) => { const v = opcao<number | null>(p, OPCAO_EXPERIENCIA_PRECO, null); return typeof v === "number" && v >= 0 ? v : null; };
+/** Quantos dias depois do dia de experiência a tela ainda lembra de conversar com o tutor. */
+export const DIAS_PARA_CONVERSAR = 14;
+
+export type Experiencia = Pick<Estadia, "id" | "pet_id" | "status" | "entrada" | "saida" | "avisos"> & {
+  pets: (Pick<Pet, "id" | "nome" | "foto" | "especie" | "sexo"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null }) | null;
+};
+/** Os dias de experiência de hoje e os que já passaram e esperam a conversa com o tutor (cão ainda sem plano, sem "já conversei"). */
+export async function lerExperiencias(sb: Banco, petshopId: string) {
+  const hoje = isoDia(new Date()), desde = somaDias(deIsoDia(hoje), -DIAS_PARA_CONVERSAR);
+  const [r, planos] = await Promise.all([
+    sb.from("estadias").select("id, pet_id, status, entrada, saida, avisos, pets(id, nome, foto, especie, sexo, clientes(id, nome, telefone))")
+      .eq("petshop_id", petshopId).eq("experiencia", true).neq("status", "cancelada").gte("entrada", desde.toISOString()).order("entrada").order("id").limit(500),
+    sb.from("creche_planos").select("pet_id").eq("petshop_id", petshopId).limit(5000),
+  ]);
+  // banco ainda sem a coluna: a tela segue sem o dia de experiência
+  if (r.error) return { hoje: [] as Experiencia[], conversar: [] as Experiencia[] };
+  const comPlano = new Set((planos.data ?? []).map((p) => p.pet_id));
+  const lista = (r.data ?? []) as unknown as Experiencia[];
+  return {
+    hoje: lista.filter((e) => isoDia(new Date(e.entrada)) === hoje),
+    conversar: lista.filter((e) => e.status === "encerrada" && !comPlano.has(e.pet_id) && !jaConversou(e)),
+  };
+}
+/** A equipe já mandou (ou marcou que conversou) a mensagem depois do dia de experiência. */
+export const jaConversou = (e: Pick<Estadia, "avisos">) => Boolean(e.avisos && typeof e.avisos === "object" && (e.avisos as Record<string, unknown>).experiencia);
+
+/**
+ * Mensagem para o tutor depois do dia de experiência: pergunta como foi e oferece os planos (os modelos de plano, com preço
+ * só para quem vê o financeiro). Sem nada inventado sobre o dia: quem manda pode acrescentar o que viu.
+ */
+export function mensagemDaExperiencia(p: { tutor: string | null | undefined; pet: string; sexo?: string | null; petshop: string; planos?: { nome: string; valor: number | null }[] }) {
+  const doPet = p.sexo === "M" ? `do ${p.pet}` : p.sexo === "F" ? `da ${p.pet}` : `de ${p.pet}`;
+  const planos = (p.planos ?? []).filter((x) => x.nome.trim());
+  return [
+    `${saudacaoZap(p.tutor, p.petshop)} Como foi o dia de experiência ${doPet} na creche? Queremos saber o que vocês acharam.`,
+    "",
+    planos.length
+      ? [`Se quiser que ${p.pet} venha sempre, estes são os nossos planos:`, ...planos.map((x) => `- ${x.nome}${x.valor != null ? `: ${brl(x.valor)} por mês` : ""}`)].join("\n")
+      : `Se quiser que ${p.pet} venha sempre, temos planos mensais com dias fixos na semana. A gente explica como funciona.`,
+    "",
+    "É só responder aqui que a gente combina os dias.",
+  ].join("\n");
+}
+
+/* ---------- extrato do mês por cachorro (opção da creche) ---------- */
+
+/** Extrato do mês de um cão (presenças, faltas, reposições, extras, taxas e, para quem vê o financeiro, a cobrança). */
+export const OPCAO_EXTRATO_PET = "creche.extrato_pet";
+export const extratoDoPetLigado = (p: { opcoes?: unknown }) => opcao<boolean>(p, OPCAO_EXTRATO_PET, false) === true;
+export const linkDoExtratoDoPet = (petId: string, mes?: Date) => `/gestao/app/creche-hotel/extrato?pet=${petId}${mes ? `&mes=${isoMes(mes)}` : ""}`;

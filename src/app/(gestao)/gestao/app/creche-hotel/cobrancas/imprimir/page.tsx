@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, lerPlanos, partesDosExtras, SELECT_COBRANCA, taxasDaCobranca, textoDasDatas, textoDasTaxas, textoDosDias,
+  estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, lerPlanos, partesDoDesconto, partesDosExtras, SELECT_COBRANCA, taxasDaCobranca, textoDasDatas, textoDasTaxas, textoDosDias,
   type CobrancaCompleta, type PlanoCompleto,
 } from "@/lib/gestao/creche";
 import { opcoesDeCobranca } from "@/lib/gestao/dinheiro-opcoes";
@@ -60,7 +60,8 @@ function textoDosExtras(c: CobrancaCompleta) {
   return [
     extras.length ? `${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})${partes.dias > 0 ? ` ${brl(partes.dias)}` : " sem valor"}` : null,
     taxas.length ? `${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((x) => x.dia))}) ${brl(partes.taxas)}` : null,
-    Number(c.desconto) > 0 ? `Desconto − ${brl(c.desconto)}` : null,
+    partesDoDesconto(c).irmao > 0 ? `Desconto irmão − ${brl(partesDoDesconto(c).irmao)}` : null,
+    partesDoDesconto(c).outro > 0 ? `Desconto − ${brl(partesDoDesconto(c).outro)}` : null,
   ].filter(Boolean) as string[];
 }
 
@@ -194,7 +195,8 @@ function Extrato({ f, mes, mesTexto, hoje, planoDe, modeloDe }: {
       ...(extras.some((x) => x.valor > 0) ? extras.map((x) => ({ nome: `Dia extra em ${dataCurta(x.dia)}`, valor: brl(x.valor), recuo: true }))
         : extras.length ? [{ nome: `${extras.length === 1 ? "Dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})`, valor: partes.dias > 0 ? brl(partes.dias) : "sem valor", recuo: true }] : []),
       ...taxas.map((x) => ({ nome: `Busca fora do horário em ${dataCurta(x.dia)}`, valor: brl(x.valor), recuo: true })),
-      Number(c.desconto) > 0 && { nome: "Desconto", valor: `− ${brl(c.desconto)}`, recuo: true },
+      partesDoDesconto(c).irmao > 0 && { nome: "Desconto irmão", valor: `− ${brl(partesDoDesconto(c).irmao)}`, recuo: true },
+      partesDoDesconto(c).outro > 0 && { nome: "Desconto", valor: `− ${brl(partesDoDesconto(c).outro)}`, recuo: true },
       { nome: "Total", valor: brl(c.total), forte: true },
     ];
   };
