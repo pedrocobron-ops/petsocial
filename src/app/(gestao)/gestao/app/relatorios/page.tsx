@@ -62,7 +62,7 @@ type Ag = {
   /** Os outros serviços do mesmo horário (cada um com o seu preço). */
   agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number; servicos: { id: string; nome: string; cor: string | null } | null }[] | null;
 };
-type DaConta = Pick<Ag, "servico_id" | "preco" | "pacote_cliente_id"> & { agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number }[] | null };
+type DaConta = Pick<Ag, "servico_id" | "preco" | "pacote_cliente_id"> & { agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number }[] | null; sem_cobranca?: boolean | null };
 type Entrada = { id: string; data: string; valor: number; cliente_id: string | null; agendamento_id: string | null; itens: unknown; forma: string | null; pagamentos: unknown; valor_original?: number | null; credito_usado?: number | null; categoria?: string; conta_id?: string | null };
 /** Conta de um atendimento (uma por atendimento): já recebida, ou anotada para o cliente pagar depois (`pago: false`). */
 type Recebimento = { agendamento_id: string | null; valor: number; itens: unknown; pago?: boolean; valor_original?: number | null };
@@ -118,7 +118,10 @@ async function contasDosAtendimentos(sb: Banco, petshopId: string, concluidos: s
 function valorMedio(concluidos: (DaConta & Pick<Ag, "id">)[], recebimentos: Map<string, Recebimento>, diferencas: Map<string, number>, pacotes: number[]): { valor: number | null; contas: number; pacotes: number } {
   let soma = 0, contas = 0;
   for (const a of concluidos) {
-    const c = cobradoDe(a, recebimentos.get(a.id), diferencas.get(a.id) ?? 0);
+    const rec = recebimentos.get(a.id);
+    // marcado como "não cobrar": não é conta cobrada
+    if (a.sem_cobranca && !rec) continue;
+    const c = cobradoDe(a, rec, diferencas.get(a.id) ?? 0);
     if (!(c.valor > 0)) continue;
     contas++;
     soma += c.valor;
@@ -146,7 +149,7 @@ const pacotesVendidos = (entradas: Pick<Entrada, "categoria" | "conta_id" | "val
 async function carregarAnterior(sb: Banco, petshopId: string, de: Date, ate: Date) {
   const comeco = de.toISOString(), final = somaDias(ate, 1).toISOString();
   const [ags, entradas, novos] = await Promise.all([
-    paginar<{ id: string; pacote_cliente_id: string | null; servico_id: string | null; agendamento_servicos: { id: string; servico_id: string; ordem: number }[] | null }>((a, b) => sb.from("agendamentos").select("id, pacote_cliente_id, servico_id, agendamento_servicos(id, servico_id, ordem)")
+    paginar<{ id: string; pacote_cliente_id: string | null; servico_id: string | null; sem_cobranca: boolean | null; agendamento_servicos: { id: string; servico_id: string; ordem: number }[] | null }>((a, b) => sb.from("agendamentos").select("id, pacote_cliente_id, servico_id, sem_cobranca, agendamento_servicos(id, servico_id, ordem)")
       .eq("petshop_id", petshopId).eq("status", "concluido").gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b))
       .then((l) => comPrecosDeAgendamento(sb, petshopId, l) as Promise<(DaConta & Pick<Ag, "id">)[]>),
     paginar<Recebimento & Pick<Entrada, "categoria" | "conta_id">>((a, b) => sb.from("lancamentos").select("agendamento_id, valor, itens, valor_original, categoria, conta_id").eq("petshop_id", petshopId).eq("pago", true).eq("tipo", "entrada")
@@ -235,7 +238,7 @@ function Relatorios() {
     const [ags, entradas, novos, estadias, anterior] = await Promise.all([
       paginar<Ag>(async (a, b) => {
         const r = await sb.from("agendamentos")
-          .select("id, inicio, status, pet_id, servico_id, profissional_id, pacote_cliente_id, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome, cor), agendamento_servicos(id, servico_id, ordem, servicos(id, nome, cor))")
+          .select("id, inicio, status, pet_id, servico_id, profissional_id, pacote_cliente_id, sem_cobranca, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome, cor), agendamento_servicos(id, servico_id, ordem, servicos(id, nome, cor))")
           .eq("petshop_id", petshop.id).gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b);
         return { data: r.data as unknown as Ag[] | null, error: r.error };
       }).then((l) => comPrecosDeAgendamento(sb, petshop.id, l as (Ag & { agendamento_servicos?: { id: string }[] | null })[]) as unknown as Promise<Ag[]>),
