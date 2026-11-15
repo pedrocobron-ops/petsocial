@@ -81,6 +81,8 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
   exigeCaixa?: boolean;
   /** Chave da operação (`useOperacao`): o banco grava uma vez só; a mesma chave de novo devolve o que já foi gravado. */
   chave?: string | null;
+  /** Parte da conta paga com o crédito do tutor (vai como parte "outro" no pagamento; o banco tira do crédito na mesma gravação). */
+  creditoUsado?: number | null;
 }) {
   const hoje = isoDia(new Date());
   const caixa = await caixaAberto(sb, petshopId);
@@ -94,6 +96,7 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
     ...(l.itens?.length ? { itens: l.itens } : {}),
     ...(dividido ? { pagamentos: dividido } : {}),
     ...(l.movimento ? { movimento: l.movimento } : {}),
+    ...(l.creditoUsado && l.creditoUsado > 0 ? { credito_usado: centavos(l.creditoUsado) } : {}),
   };
   const { data, error } = await gravarLancamento(sb, petshopId, linha, l.chave);
   // outra pessoa recebeu este atendimento no mesmo instante: o banco aceita só um recebimento por atendimento
@@ -219,11 +222,20 @@ export function partesPorForma(l: { valor: number; forma?: string | null; pagame
 export const ehDividido = (l: { valor: number; forma?: string | null; pagamentos?: unknown }) => partesPorForma(l).length > 1;
 
 /** "Pix" para pagamento inteiro; "Pix R$ 30,00 + Dinheiro R$ 20,00" para o dividido. Sem forma (conta ainda não paga), "Sem forma". */
-export function textoDoPagamento(l: { valor: number; forma?: string | null; pagamentos?: unknown }) {
+export function textoDoPagamento(l: { valor: number; forma?: string | null; pagamentos?: unknown; credito_usado?: number | null }) {
   const partes = partesPorForma(l);
+  // parte paga com o crédito do tutor: no pagamento é "outro"; aqui aparece pelo nome
+  const credito = creditoDaEntrada(l);
+  if (credito > 0) {
+    const resto = partes.map((p) => (p.forma === "outro" ? { ...p, valor: centavos(p.valor - credito) } : p)).filter((p) => p.valor > 0.005);
+    return [`Crédito do tutor ${brl(credito)}`, ...resto.map((p) => `${nomeDaForma(p.forma)} ${brl(p.valor)}`)].join(" + ");
+  }
   if (partes.length > 1) return partes.map((p) => `${nomeDaForma(p.forma)} ${brl(p.valor)}`).join(" + ");
   return l.forma ? nomeDaForma(partes[0].forma) : "Sem forma";
 }
+
+/** Quanto de uma entrada foi pago com o crédito do tutor (não é dinheiro que entrou no dia). */
+export const creditoDaEntrada = (l: { credito_usado?: number | null }) => centavos(Math.max(0, Number(l.credito_usado ?? 0)));
 
 /** Forma que fica no campo `forma` de um pagamento dividido: a de maior valor (empate: a primeira). */
 export function formaPrincipal(partes: PartePagamento[]): FormaPagamento {
@@ -453,4 +465,26 @@ export async function quitarConta(sb: Banco, petshopId: string, contaId: string,
   }
   await receberConta(sb, contaId, { valor: falta, forma: pg.forma, pagamentos: pg.pagamentos ?? null, chave });
   return c.data;
+}
+
+/* ---------- crédito do tutor numa conta ---------- */
+
+/**
+ * O pagamento de uma conta em que uma parte (`credito`) sai do crédito do tutor: o crédito vai como a parte "outro" e o resto
+ * como a pessoa recebeu. Tudo no crédito: forma "outro", sem partes. Lance com `lancarPago(..., { creditoUsado: credito })`.
+ */
+export function pagamentoComCredito(credito: number, pg: { forma: FormaPagamento; pagamentos?: PartePagamento[] | null } | null, dinheiro: number): { forma: FormaPagamento; pagamentos: PartePagamento[] | null } {
+  const c = centavos(credito), resto = centavos(dinheiro);
+  if (!(resto > 0) || !pg) return { forma: "outro", pagamentos: null };
+  const partes: PartePagamento[] = [{ forma: "outro", valor: c }, ...(pg.pagamentos && pg.pagamentos.length > 1 ? pg.pagamentos : [{ forma: pg.forma, valor: resto }])];
+  if (partes.length > 3) throw new Error("Com o crédito do tutor, o resto pode ser dividido em até duas formas.");
+  return { forma: formaPrincipal(partes), pagamentos: partes };
+}
+
+/** Paga com o crédito do tutor uma conta a receber (uma parte ou tudo). A mesma chave de novo não usa o crédito outra vez. */
+export async function receberComCredito(sb: Banco, contaId: string, valor: number, chave?: string | null): Promise<ContaRecebida> {
+  const { data, error } = await sb.rpc("receber_conta_com_credito", { p_conta: contaId, p_valor: centavos(valor), ...(chave ? { p_chave: chave } : {}) });
+  if (error) throw new Error(error.message);
+  const x = (data ?? {}) as Record<string, unknown>;
+  return { quitada: Boolean(x.quitada), recebido: Number(x.recebido ?? valor), falta: Number(x.falta ?? 0), no_caixa: Boolean(x.no_caixa) };
 }

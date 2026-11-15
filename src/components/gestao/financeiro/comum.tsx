@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { History, Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
-import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, creditoDaEntrada, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberComCredito, receberConta, separarMulta, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { creditoDoTutor } from "@/lib/gestao/credito";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { diaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
 import { usaCasa } from "@/lib/gestao/modulos";
@@ -15,6 +16,7 @@ import { Tile } from "../painel";
 import { AvisoCaixaFechado, CampoDinheiro, EscolhaPagamento, fecharPagamento, pagamentoInicial, useCaixaAberto, type EstadoPagamento } from "../loja/pecas";
 import { avisarMudanca, Campo, Folha, useAvisos, useDados, Vazio } from "../ui";
 import "./financeiro.css";
+import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 
 /* ---------- contas ---------- */
 
@@ -28,21 +30,30 @@ export const soma = (lista: { valor: number }[]) => centavos(lista.reduce((s, l)
 /** Valor curto para rótulo de gráfico: "850", "1,2 mil". */
 export const brlMini = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil` : String(Math.round(n)));
 /** Cor de cada forma de pagamento nos gráficos. */
-export const COR_FORMA: Record<string, string> = { pix: "#2f6b4c", dinheiro: "#c99a2e", debito: "#2f6f8a", credito: "#5b4590", outro: "#a39a90" };
+export const COR_FORMA: Record<string, string> = { pix: "#2f6b4c", dinheiro: "#c99a2e", debito: "#2f6f8a", credito: "#5b4590", outro: "#a39a90", credito_tutor: "#b3402e" };
 /** Cores para fatias e barras quando o item não tem cor própria. */
 export const PALETA = ["#2f6b4c", "#ea670c", "#2f6f8a", "#5b4590", "#c99a2e", "#b3402e", "#6a625a", "#a39a90"];
 
-type Movimento = Pick<Lancamento, "tipo" | "valor" | "forma"> & { pagamentos?: unknown; movimento?: string | null };
+type Movimento = Pick<Lancamento, "tipo" | "valor" | "forma"> & { pagamentos?: unknown; movimento?: string | null; credito_usado?: number | null };
 
 /** Tira sangrias e suprimentos: dinheiro que só entrou ou saiu da gaveta não é receita nem despesa. */
 export const semMovimentos = <T extends { movimento?: string | null }>(lista: T[]) => lista.filter((l) => !l.movimento);
 
 /** Soma por forma de pagamento, repartindo o pagamento dividido entre as formas dele. */
-export function somaPorForma(lista: { valor: number; forma?: string | null; pagamentos?: unknown }[]) {
+export function somaPorForma(lista: { valor: number; forma?: string | null; pagamentos?: unknown; credito_usado?: number | null }[]) {
   const mapa = new Map<string, number>();
-  for (const l of lista) for (const p of partesPorForma(l)) mapa.set(p.forma, centavos((mapa.get(p.forma) ?? 0) + p.valor));
+  const somar = (k: string, v: number) => mapa.set(k, centavos((mapa.get(k) ?? 0) + v));
+  for (const l of lista) {
+    // a parte paga com o crédito do tutor fica à parte (FORMA_CREDITO): não é dinheiro que entrou no dia
+    const credito = creditoDaEntrada(l);
+    for (const p of partesPorForma(l)) somar(p.forma, p.forma === "outro" && credito > 0 ? p.valor - credito : p.valor);
+    if (credito > 0) somar(FORMA_CREDITO, credito);
+  }
+  for (const [k, v] of mapa) if (Math.abs(v) < 0.005) mapa.delete(k);
   return mapa;
 }
+/** A chave, nas somas por forma, da parte paga com o crédito do tutor. */
+export const FORMA_CREDITO = "credito_tutor";
 
 /**
  * Quanto entrou e saiu por forma de pagamento, e quanto deve ter de dinheiro na gaveta:
@@ -58,8 +69,10 @@ export function resumoDoCaixa(valorInicial: number, lancamentos: Movimento[]) {
   const dinheiro = porForma.find((f) => f.id === "dinheiro")!;
   const suprimentos = soma(lancamentos.filter((l) => l.movimento === "suprimento"));
   const sangrias = soma(lancamentos.filter((l) => l.movimento === "sangria"));
+  // o que foi pago com o crédito do tutor não entrou no caixa (é dinheiro de antes)
+  const credito = centavos(entradas.reduce((t, l) => t + creditoDaEntrada(l), 0));
   return {
-    entrou: soma(entradas), saiu: soma(saidas), porForma, suprimentos, sangrias,
+    entrou: centavos(soma(entradas) - credito), saiu: soma(saidas), porForma, suprimentos, sangrias, credito,
     nEntradas: entradas.length, nSaidas: saidas.length,
     esperado: centavos(Number(valorInicial) + dinheiro.entrou + suprimentos - dinheiro.saiu - sangrias),
   };
@@ -662,6 +675,26 @@ export function PartesRecebidas({ conta }: { conta: Pick<Lancamento, "id" | "val
  */
 const fechadoNoResto = (dia: string) => `${dataCompleta(dia)} é dia fechado${nomeDoDiaFechado(dia) ? ` (${nomeDoDiaFechado(dia)})` : ""}. Escolha um dia em que vocês abrem.`;
 
+/**
+ * "Usar o crédito": o tutor tem crédito (pagou a mais antes) e ele paga esta conta, ou uma parte. A mesma peça na conta do
+ * atendimento, no Recebi, na creche. `usado`: quanto do crédito entra; `resto`: o que falta pagar de outro jeito.
+ */
+export function UsarCredito({ saldo, usar, aoMudar, usado, resto }: { saldo: number; usar: boolean; aoMudar: (v: boolean) => void; usado: number; resto: number }) {
+  return (
+    <div className="g-campo" role="group" aria-label="Crédito do tutor">
+      <span>Crédito do tutor: {brl(saldo)}</span>
+      <label className={`g-agd-junto${usar ? " on" : ""}`}>
+        <input type="checkbox" checked={usar} onChange={(e) => aoMudar(e.target.checked)} />
+        <span className="t">
+          <b>Usar o crédito</b>
+          <small>{usar ? (resto > 0 ? `${brl(usado)} saem do crédito. Falta ${brl(resto)}, pela forma que você escolher.` : `${brl(usado)} saem do crédito e pagam tudo.${saldo - usado > 0.005 ? ` Sobram ${brl(centavos(saldo - usado))} de crédito.` : ""}`) : "O tutor pagou a mais antes. Marque para descontar daqui."}</small>
+        </span>
+        <b className="v g-tab">{usar ? `- ${brl(usado)}` : brl(saldo)}</b>
+      </label>
+    </div>
+  );
+}
+
 export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; aoFechar: () => void; aoSalvo: () => void | Promise<void> }) {
   const { sb, petshop, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
@@ -688,7 +721,11 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
   const parcial = entrada && recebendo > 0 && recebendo < devido;
   const falta = centavos(devido - recebendo);
   const daMulta = comMulta ? centavos(multa ?? 0) : 0;
-  const total = centavos(recebendo + daMulta);
+  // crédito do tutor (pagou a mais antes): paga esta conta, ou uma parte dela, se a pessoa quiser
+  const { dados: saldoCredito } = useDados(async () => (entrada && conta.cliente_id && !conta.pago ? (await creditoDoTutor(sb, petshop.id, conta.cliente_id)).saldo : 0), [petshop.id, conta.id, conta.cliente_id ?? ""]);
+  const [usarCredito, setUsarCredito] = useState(false);
+  const credito = usarCredito && (saldoCredito ?? 0) > 0 ? centavos(Math.min(saldoCredito ?? 0, recebendo)) : 0;
+  const total = centavos(recebendo + daMulta - credito);
 
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
@@ -696,7 +733,8 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     if (salvando) return;
     if (entrada && !(recebendo > 0)) { setErroValor("Escreva quanto o cliente pagou."); return; }
     if (entrada && recebendo > devido) { setErroValor(`O cliente deve ${brl(devido)} nesta conta. Se pagou a mais, lance a diferença como outra entrada.`); return; }
-    const pg = fecharPagamento(pagamento, total);
+    if (credito > 0 && credito >= recebendo - 0.005 && daMulta > 0) { setErro("Com o crédito pagando a conta toda, a multa fica de fora: tire a multa ou use menos crédito."); return; }
+    const pg = total > 0 ? fecharPagamento(pagamento, total) : { forma: "outro" as const, pagamentos: null };
     if ("erro" in pg) { setErro(pagamento.dividido ? pg.erro : entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
     if (!data || data > hoje) { setErro("Escolha um dia até hoje."); return; }
     // o resto não vence num dia em que o negócio está fechado (feriado, folga marcada em Meu pet shop)
@@ -705,14 +743,21 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     setSalvando(true);
     try {
       if (entrada) {
-        const partes = separarMulta(pg.forma, pg.pagamentos, daMulta);
-        const r = await receberConta(sb, conta.id, {
-          valor: recebendo, forma: partes.conta.forma, pagamentos: partes.conta.pagamentos, data: cuidoDoFinanceiro ? data : null,
-          novoVencimento: parcial && novoVencimento && novoVencimento !== conta.vencimento ? novoVencimento : null,
-          multa: daMulta > 0 ? { valor: daMulta, forma: partes.multa.forma, pagamentos: partes.multa.pagamentos } : null,
-          chave,
-        });
-        avisar(r.quitada ? `Recebido: ${brl(total)}.` : `Recebido: ${brl(total)}. Fica faltando ${brl(r.falta)}.`);
+        // primeiro o crédito (o banco tira do crédito do tutor na mesma gravação), depois o resto pela forma escolhida
+        const vencimento = parcial && novoVencimento && novoVencimento !== conta.vencimento ? novoVencimento : null;
+        let r = credito > 0 ? await receberComCredito(sb, conta.id, credito, parteDaChave(chave, "credito")) : null;
+        const resto = centavos(recebendo - credito);
+        if (resto > 0) {
+          const partes = separarMulta(pg.forma, pg.pagamentos, daMulta);
+          r = await receberConta(sb, conta.id, {
+            valor: resto, forma: partes.conta.forma, pagamentos: partes.conta.pagamentos, data: cuidoDoFinanceiro ? data : null,
+            novoVencimento: vencimento,
+            multa: daMulta > 0 ? { valor: daMulta, forma: partes.multa.forma, pagamentos: partes.multa.pagamentos } : null,
+            chave,
+          });
+        }
+        const comCredito = credito > 0 ? ` ${brl(credito)} saíram do crédito do tutor.` : "";
+        avisar(r!.quitada ? `Recebido: ${brl(centavos(total + credito))}.${comCredito}` : `Recebido: ${brl(centavos(total + credito))}.${comCredito} Fica faltando ${brl(r!.falta)}.`);
       } else {
         // só entra no caixa aberto quando o dinheiro andou hoje
         const caixa = data === hoje ? await caixaAberto(sb, petshop.id) : null;
@@ -736,7 +781,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     <Folha titulo={entrada ? "Recebi esta conta" : "Paguei esta conta"} aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || op.ocupado}>{salvando ? "Salvando…" : parcial || daMulta > 0 ? `Receber ${brl(total)}` : "Dar baixa"}</button>
+        <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || op.ocupado}>{salvando ? "Salvando…" : credito > 0 ? (total > 0 ? `Receber ${brl(total)} e usar o crédito` : "Pagar com o crédito") : parcial || daMulta > 0 ? `Receber ${brl(total)}` : "Dar baixa"}</button>
       </>}>
       <div className="g-form">
         <div className="g-card areia">
@@ -788,7 +833,10 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
             <small>{comMulta ? "Entra separado, na categoria Multa e juros. Você pode mudar o valor ou tirar." : "Só entra se você somar. Sem tocar aqui, a conta é recebida pelo valor normal."}</small>
           </div>
         )}
-        {entrada
+        {entrada && (saldoCredito ?? 0) > 0 && (
+          <UsarCredito saldo={saldoCredito!} usar={usarCredito} aoMudar={(v) => { setUsarCredito(v); setErro(null); }} usado={credito} resto={total} />
+        )}
+        {entrada && total <= 0 && credito > 0 ? null : entrada
           ? <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={total} rotulo="Como recebeu" />
           : <Grupo rotulo="Como pagou"><Chips opcoes={FORMAS} valor={pagamento.forma} aoMudar={(f) => { setPagamento(pagamentoInicial(f)); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>}
         {conta.itens != null && <ItensDoLancamento lancamento={conta} />}

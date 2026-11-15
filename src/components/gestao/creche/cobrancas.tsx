@@ -6,14 +6,15 @@ import {
   cobraNoMes, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, textoComprovanteMensalidades, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, vencimentoDoMes,
   type CobrancaCompleta, type EstadoCobranca, type PlanoCompleto, type PrimeiraCobranca,
 } from "@/lib/gestao/creche";
-import { conferirCaixa, parteDaChave, receberConta, textoDoPagamento, type FormaPagamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, parteDaChave, receberComCredito, receberConta, textoDoPagamento, type FormaPagamento } from "@/lib/gestao/dinheiro";
+import { creditoDoTutor } from "@/lib/gestao/credito";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { AvisoCaixaFechado, ChipsForma, useCaixaAberto } from "../loja/pecas";
 import { FORMAS, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, fmtTelefone, isoDia, linkWhatsApp, nomeMes } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
-import { FolhaBaixa } from "../financeiro/comum";
+import { FolhaBaixa, UsarCredito } from "../financeiro/comum";
 import { Kpi, Tile } from "../painel";
 import { AvatarPessoa, AvatarPet, avisarMudanca, Campo, CampoValor, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import AcertoDaSaida, { AvisoSobras, lerSobrasDaSaida, type SobrasDaSaida } from "./saida";
@@ -618,24 +619,36 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
   const multas = contas.map((c) => multaSugerida(petshop, { valor: faltaDaCobranca(c), vencimento: c.vencimento }, data || hoje)?.total ?? 0);
   const totalMulta = centavos(multas.reduce((s, m) => s + m, 0));
   const devido = centavos(contas.reduce((s, c) => s + faltaDaCobranca(c), 0));
-  const total = centavos(devido + (comMulta ? totalMulta : 0));
+  // crédito do tutor (pagou a mais antes): paga as mensalidades, das primeiras para as últimas, se a pessoa quiser
+  const tutorId = contas.find((c) => c.pets?.clientes?.id)?.pets?.clientes?.id ?? null;
+  const { dados: saldoCredito } = useDados(async () => (tutorId ? (await creditoDoTutor(sb, petshop.id, tutorId)).saldo : 0), [petshop.id, tutorId ?? ""]);
+  const [usarCredito, setUsarCredito] = useState(true);
+  const credito = usarCredito && (saldoCredito ?? 0) > 0 ? centavos(Math.min(saldoCredito ?? 0, devido)) : 0;
+  const total = centavos(devido + (comMulta ? totalMulta : 0) - credito);
 
   // trava na hora do primeiro toque; cada mensalidade leva a sua parte da chave (o banco recebe cada uma uma vez só)
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
   async function gravar(chave: string): Promise<boolean | void> {
     if (salvando) return;
-    if (!forma) { setErro("Escolha como recebeu."); return; }
+    if (!forma && total > 0) { setErro("Escolha como recebeu."); return; }
     if (!data || data > hoje) { setErro("Escolha um dia até hoje."); return; }
+    if (credito > 0 && data !== hoje) { setErro("Com o crédito do tutor, o recebimento é de hoje."); return; }
     if (data === hoje && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setErro(null); setSalvando(true);
     let feitas = 0, recebido = 0;
     const falhas: string[] = [];
     const itens: { pet: string; mes: string; valor: number; multa: number; acerto?: boolean }[] = [];
+    let sobraCredito = credito;
     for (let i = 0; i < contas.length; i++) {
-      const c = contas[i], m = comMulta ? multas[i] : 0;
+      const c = contas[i];
+      // o crédito vai primeiro para as mensalidades mais antigas da lista; a multa só entra na parte paga de outro jeito
+      const doCredito = centavos(Math.min(sobraCredito, faltaDaCobranca(c)));
+      const resto = centavos(faltaDaCobranca(c) - doCredito);
+      const m = comMulta && resto > 0 ? multas[i] : 0;
       try {
-        await receberConta(sb, c.lancamento_id!, { valor: faltaDaCobranca(c), forma, data, multa: m > 0 ? { valor: m, forma } : null, chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) });
+        if (doCredito > 0) { await receberComCredito(sb, c.lancamento_id!, doCredito, parteDaChave(chave, "credito", c.lancamento_id!)); sobraCredito = centavos(sobraCredito - doCredito); }
+        if (resto > 0) await receberConta(sb, c.lancamento_id!, { valor: resto, forma: forma!, data, multa: m > 0 ? { valor: m, forma: forma! } : null, chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) });
         feitas++; recebido = centavos(recebido + faltaDaCobranca(c) + m);
         itens.push({ pet: c.pets?.nome ?? "Pet", mes: c.mes, valor: faltaDaCobranca(c), multa: m, acerto: c.acerto_saida });
       } catch (e) { falhas.push(`${c.pets?.nome ?? "pet"} (${e instanceof Error ? e.message : "erro"})`); }
@@ -643,7 +656,8 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
     if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join("; ")}`);
     if (feitas) {
       avisar(`Recebido de ${grupo.tutor ?? "tutor"}: ${brl(recebido)} (${feitas === 1 ? "1 mensalidade" : `${feitas} mensalidades`}).`);
-      setRecibo({ total: recebido, n: feitas, texto: textoComprovanteMensalidades({ petshop: petshop.nome, tutor: grupo.tutor, dia: data, forma: FORMAS.find((f) => f.id === forma)?.rotulo ?? "Outro", itens }) });
+      const comoPagou = [credito > 0 ? `crédito do tutor (${brl(credito)})` : "", forma && total > 0 ? FORMAS.find((f) => f.id === forma)?.rotulo ?? "Outro" : ""].filter(Boolean).join(" e ");
+      setRecibo({ total: recebido, n: feitas, texto: textoComprovanteMensalidades({ petshop: petshop.nome, tutor: grupo.tutor, dia: data, forma: comoPagou || "Outro", itens }) });
     }
     await aoFeito();
     // deu certo só com uma parte: uma nova tentativa com a mesma folha não recebe de novo as que já entraram
@@ -669,7 +683,7 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
     <Folha titulo={`Receber de ${grupo.tutor ?? "tutor"}`} aoFechar={aoFechar}
       rodape={<>
         <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button className="g-btn pri" onClick={() => void salvar()} disabled={salvando}>{salvando ? "Recebendo…" : `Receber ${brl(total)}`}</button>
+        <button className="g-btn pri" onClick={() => void salvar()} disabled={salvando}>{salvando ? "Recebendo…" : total <= 0 && credito > 0 ? "Pagar com o crédito" : `Receber ${brl(total)}${credito > 0 ? " e usar o crédito" : ""}`}</button>
       </>}>
       <div className="g-form">
         <p className="g-muted g-p">{contas.length} mensalidades num recebimento só. Cada uma é baixada inteira; para receber só uma parte, use o Receber de cada pet.</p>
@@ -688,8 +702,9 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
             <small>Pela regra de Opções de cobrança ({regraDaMulta(petshop)}). Só entra se você marcar; entra separado, na categoria Multa e juros.</small>
           </div>
         )}
-        <p className="g-cm-total">Total a receber <b className="g-num g-tab">{brl(total)}</b></p>
-        <ChipsForma valor={forma} aoMudar={(f) => { setForma(f); setErro(null); }} />
+        {(saldoCredito ?? 0) > 0 && <UsarCredito saldo={saldoCredito!} usar={usarCredito} aoMudar={(v) => { setUsarCredito(v); setErro(null); }} usado={credito} resto={total} />}
+        <p className="g-cm-total">{credito > 0 ? "A pagar agora" : "Total a receber"} <b className="g-num g-tab">{brl(total)}</b></p>
+        {total > 0 && <ChipsForma valor={forma} aoMudar={(f) => { setForma(f); setErro(null); }} />}
         <Campo rotulo="Dia em que recebeu" erro={erro}>
           <input type="date" className="g-input" value={data} max={hoje} onChange={(e) => { setData(e.target.value); setErro(null); }} />
         </Campo>

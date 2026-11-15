@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 import { Check, MessageCircle, Plus, Scissors, Ticket, Truck } from "lucide-react";
 import type { AgendamentoCompleto, PacoteCliente } from "@/lib/gestao/tipos";
 import { textoComprovante, textoComprovanteDaParte } from "@/lib/gestao/comprovante";
-import { conferirCaixa, conferirValorAlto, formaPrincipal, lancarAReceber, lancarPago, parteDaChave, receberConta, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, formaPrincipal, lancarAReceber, lancarPago, pagamentoComCredito, parteDaChave, receberComCredito, receberConta, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { creditoDoTutor } from "@/lib/gestao/credito";
+import { UsarCredito } from "../financeiro/comum";
 import { multaSugerida } from "@/lib/gestao/dinheiro-opcoes";
 import { repartirPagamento } from "@/lib/gestao/hotel";
 import { useOperacao } from "@/lib/gestao/uma-vez";
@@ -93,14 +95,20 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   const [comDivida, setComDivida] = useState(false);
   // o que entra junto do que ele devia (nada quando a conta toda fica para depois)
   const junto = comDivida && !depois.ativo && devido > 0 ? devido : 0;
-  const aPagar = centavos(contas.total + junto);
+  // crédito do tutor (pagou a mais antes, por exemplo no hotel): paga a conta de hoje, ou uma parte dela
+  const { dados: saldoCredito } = useDados(async () => (vejoFinanceiro && tutor?.id ? (await creditoDoTutor(sb, petshop.id, tutor.id)).saldo : 0), [petshop.id, tutor?.id ?? "", vejoFinanceiro]);
+  const [usarCredito, setUsarCredito] = useState(true);
+  const credito = usarCredito && (saldoCredito ?? 0) > 0 && contas.total > 0 ? centavos(Math.min(saldoCredito ?? 0, contas.total)) : 0;
+  // o que sai do bolso agora: a conta de hoje sem o crédito, mais o que devia (se entrou junto)
+  const daConta = centavos(contas.total - credito);
+  const aPagar = centavos(daConta + junto);
   // pagou menos do que a conta (em qualquer forma): recebe o que entrou e o resto fica anotado para o tutor pagar depois
   const aMenos = aPagar > 0 && !depois.ativo ? pagoAMenos(pagamento, aPagar) : null;
   // com o que devia junto e o que entrou cobre a conta de hoje: a conta fecha e o resto vai para as contas antigas
-  const parteDasAntigas = Boolean(aMenos && junto > 0 && aMenos.entregue >= contas.total - 0.005);
+  const parteDasAntigas = Boolean(aMenos && junto > 0 && aMenos.entregue >= daConta - 0.005);
   // dinheiro entregue a mais que a conta, com dívida de antes fora da conta: o "troco" pode pagar a dívida
   const entregue = !pagamento.dividido && pagamento.forma === "dinheiro" ? pagamento.entregue ?? 0 : 0;
-  const trocoQuePaga = !comDivida && devido > 0 && !depois.ativo && entregue > contas.total + 0.005 ? centavos(Math.min(devido, entregue - contas.total)) : 0;
+  const trocoQuePaga = !comDivida && devido > 0 && !depois.ativo && entregue > daConta + 0.005 ? centavos(Math.min(devido, entregue - daConta)) : 0;
   const primeiroNome = tutor?.nome?.split(" ")[0] ?? "O tutor";
   // a conta inteira já ficou anotada numa tentativa anterior (a parte em dinheiro é que falhou): a nova tentativa só recebe a parte
   const contaDaParte = useRef<string | null>(null);
@@ -143,16 +151,18 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     // o que entra agora: a conta (e o que devia, se entrou junto); pago em parte, o que o cliente deu
     const recebendo = aMenos ? aMenos.entregue : aPagar;
     const pg = aPagar > 0 && !fiado ? (aMenos ? { forma: aMenos.forma, pagamentos: aMenos.pagamentos } : fecharPagamento(pagamento, aPagar)) : null;
+    // o crédito paga a conta inteira: entra sem forma escolhida
+    const soCredito = !fiado && credito > 0 && aPagar <= 0;
     if (pg && "erro" in pg) { setErroForma(pagamento.dividido ? pg.erro : "Escolha como o cliente pagou."); avisarErro(pg.erro); return false; }
     const falta = faltaNoEstoque(itens, produtos);
     if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return false;
     if (!(await conferirValorAlto(aPagar, perguntar))) return false;
     // o caixa fechou enquanto esta conta estava aberta: pergunta antes de receber fora dele
     if (pg && !("erro" in pg) && !(await conferirCaixa(sb, petshop.id, perguntar))) return false;
-    // cada forma do pagamento vai primeiro para a conta de hoje e depois para as antigas
-    const paraAntigas = junto > 0 ? alocarNasAntigas(antigas, centavos(recebendo - contas.total)) : [];
+    // cada forma do pagamento vai primeiro para a conta de hoje (sem o crédito) e depois para as antigas
+    const paraAntigas = junto > 0 ? alocarNasAntigas(antigas, centavos(recebendo - daConta)) : [];
     const repartido = pg && !("erro" in pg) && junto > 0
-      ? repartirPagamento(pg.pagamentos ?? [{ forma: pg.forma, valor: recebendo }], [contas.total, ...paraAntigas.map((x) => x.valor)])
+      ? repartirPagamento(pg.pagamentos ?? [{ forma: pg.forma, valor: recebendo }], [daConta, ...paraAntigas.map((x) => x.valor)])
       : null;
     let pagouAntigas = 0;
     setSalvando(true);
@@ -193,12 +203,17 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
           valor: contas.total, vencimento: depois.quando, categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null, descricao, itens: gravar, chave,
         }))?.id ?? null;
         recebeu = true;
-      } else if (pg && !("erro" in pg)) {
-        const daConta: PartePagamento[] | null = repartido ? repartido[0] : null;
+        // o crédito do tutor paga uma parte agora; o resto fica a receber
+        if (credito > 0 && lancamentoId) await receberComCredito(sb, lancamentoId, credito, parteDaChave(chave, "credito"));
+      } else if ((pg && !("erro" in pg)) || soCredito) {
+        const cash = pg && !("erro" in pg) ? pg : null;
+        const dinheiroDaConta: PartePagamento[] | null = repartido ? repartido[0] : null;
+        const pgDaConta = dinheiroDaConta?.length ? { forma: formaPrincipal(dinheiroDaConta), pagamentos: dinheiroDaConta.length > 1 ? dinheiroDaConta : null } : cash;
+        const comCredito = credito > 0 ? pagamentoComCredito(credito, pgDaConta && daConta > 0 ? pgDaConta : null, daConta) : { forma: pgDaConta!.forma, pagamentos: pgDaConta!.pagamentos ?? null };
         const lancado = contas.total > 0 ? await lancarPago(sb, petshop.id, {
           tipo: "entrada", valor: contas.total,
-          forma: daConta?.length ? formaPrincipal(daConta) : pg.forma, pagamentos: daConta ? (daConta.length > 1 ? daConta : null) : pg.pagamentos,
-          categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null, descricao, itens: gravar, chave,
+          forma: comCredito.forma, pagamentos: comCredito.pagamentos,
+          categoria: categoria(), agendamentoId: a.id, clienteId: tutor?.id ?? null, descricao, itens: gravar, chave, creditoUsado: credito,
         }) : null;
         recebeu = contas.total > 0;
         lancamentoId = lancado?.id ?? null;
@@ -213,14 +228,16 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
           } catch (e) { falhas.push(`${x.conta.descricao || x.conta.categoria} (${mensagemDeErro(e)})`); }
         }
         if (falhas.length) avisarErro(`A conta de hoje foi recebida, mas não consegui dar baixa em: ${falhas.join("; ")}. Receba pela ficha do tutor, em Recebi.`);
-        if (vejoFinanceiro && soDigitos(tutor?.telefone).length >= 8 && (lancado || pagouAntigas > 0)) {
-          const formas = pg.pagamentos ?? [{ forma: pg.forma, valor: recebendo }];
+        if (vejoFinanceiro && cash && soDigitos(tutor?.telefone).length >= 8 && (lancado || pagouAntigas > 0)) {
+          const formas = cash.pagamentos ?? [{ forma: cash.forma, valor: recebendo }];
           zapComprovante = junto > 0
             ? linkWhatsApp(tutor?.telefone, textoComprovanteDaParte({
                 petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, itens: gravar, total: contas.total, desconto: contas.desconto,
                 pago: centavos(contas.total + pagouAntigas), formas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas,
               }))
             : lancado ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] })) : null;
+        } else if (vejoFinanceiro && lancado && soDigitos(tutor?.telefone).length >= 8) {
+          zapComprovante = linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] }));
         }
       }
       let estoqueOk = true;
@@ -234,9 +251,10 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       const notaAntigas = pagouAntigas > 0
         ? ` Recebido também ${brl(pagouAntigas)} do que ${primeiroNome} devia${devido - pagouAntigas > 0.005 ? `: ainda deve ${brl(devido - pagouAntigas)}` : ", que ficou quitado"}.`
         : "";
-      if (estoqueOk) avisar(fiado ? `Anotado: ${brl(contas.total)} a receber até ${dataCompleta(depois.quando)}.` : recebeu ? `Recebido ${brl(contas.total)}.${usouPacote ? ` ${servico} saiu do pacote.` : ""}${notaAntigas}` : pagouAntigas > 0 ? `Atendimento concluído.${notaAntigas}` : usouPacote ? `Usado ${pacote!.usados + 1} de ${pacote!.total} do pacote.` : "Atendimento concluído sem cobrança.");
+      const notaCredito = credito > 0 ? ` ${brl(credito)} saíram do crédito de ${primeiroNome}.` : "";
+      if (estoqueOk) avisar(fiado ? `Anotado: ${brl(daConta)} a receber até ${dataCompleta(depois.quando)}.${notaCredito}` : recebeu ? `Recebido ${brl(contas.total)}.${notaCredito}${usouPacote ? ` ${servico} saiu do pacote.` : ""}${notaAntigas}` : pagouAntigas > 0 ? `Atendimento concluído.${notaAntigas}` : usouPacote ? `Usado ${pacote!.usados + 1} de ${pacote!.total} do pacote.` : "Atendimento concluído sem cobrança.");
       avisarMudanca();
-      if (zapComprovante) setRecebida({ valor: centavos(contas.total + pagouAntigas), zap: zapComprovante, nota: notaAntigas.trim() || undefined });
+      if (zapComprovante) setRecebida({ valor: centavos(contas.total + pagouAntigas), zap: zapComprovante, nota: `${notaCredito}${notaAntigas}`.trim() || undefined });
       else aoPronto();
       return true;
     } catch (e) {
@@ -263,7 +281,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
    * que entrou é recebida na hora (entra no caixa). Em A receber e na ficha fica só o que falta. Mesmo caminho do "Recebi" da ficha.
    */
   async function receberParte(chave: string, m: { entregue: number; forma: PartePagamento["forma"]; pagamentos: PartePagamento[] | null }): Promise<boolean> {
-    const entregue = m.entregue, falta = centavos(contas.total - m.entregue);
+    const entregue = m.entregue, falta = centavos(daConta - m.entregue);
     if (!tutor?.id) { avisarErro("Para deixar o resto anotado, o pet precisa ter um tutor na ficha. Sem tutor, corrija o valor recebido."); return false; }
     if (!depois.quando || depois.quando < isoDia(new Date())) { setErroForma("Escolha um dia de hoje em diante para o resto."); avisarErro("Escolha quando o cliente paga o resto (de hoje em diante)."); return false; }
     const problema = erroDaConta(itens, desconto, contas.total);
@@ -303,9 +321,11 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         }
         if (a.status !== "concluido") ok(await sb.from("agendamentos").update({ status: "concluido" }).eq("id", a.id).select("id").single());
       }
+      // o crédito do tutor entra primeiro (a mesma chave de novo não usa outra vez), depois a parte que ele deu
+      if (credito > 0) await receberComCredito(sb, contaId, credito, parteDaChave(chave, "credito"));
       await receberConta(sb, contaId, { valor: entregue, forma: m.forma, pagamentos: m.pagamentos, chave: parteDaChave(chave, "parte") });
       contaDaParte.current = null;
-      const nota = `Ficou ${brl(falta)} para ${primeiroNome} pagar até ${dataCompleta(depois.quando)}, em A receber e na ficha.${junto > 0 ? ` O que ${primeiroNome} devia de antes (${brl(devido)}) continua anotado.` : ""}`;
+      const nota = `${credito > 0 ? `${brl(credito)} saíram do crédito de ${primeiroNome}. ` : ""}Ficou ${brl(falta)} para ${primeiroNome} pagar até ${dataCompleta(depois.quando)}, em A receber e na ficha.${junto > 0 ? ` O que ${primeiroNome} devia de antes (${brl(devido)}) continua anotado.` : ""}`;
       avisar(`Recebido ${brl(entregue)}. ${nota}`);
       avisarMudanca();
       // quem fica devendo é quem mais precisa do comprovante do que já pagou
@@ -344,7 +364,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
         <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || nadaAFazer}>
-          {salvando ? "Anotando…" : aPagar <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(contas.total)} a receber` : aMenos ? `Receber ${brl(aMenos.entregue)}` : `Receber ${brl(aPagar)}`}
+          {salvando ? "Anotando…" : aPagar <= 0 && credito > 0 ? "Pagar com o crédito" : aPagar <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(daConta)} a receber` : aMenos ? `Receber ${brl(aMenos.entregue)}` : `Receber ${brl(aPagar)}`}
         </button>
       </>}>
       <div className="g-form">
@@ -410,9 +430,12 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         )}
         {devido > 0 && depois.ativo && <p className="g-pp g-muted">{primeiroNome} também deve {brl(devido)} de antes. Continua anotado como está.</p>}
 
+        {(saldoCredito ?? 0) > 0 && contas.total > 0 && (
+          <UsarCredito saldo={saldoCredito!} usar={usarCredito} aoMudar={(v) => { setUsarCredito(v); setErroForma(null); }} usado={credito} resto={depois.ativo ? daConta : aPagar} />
+        )}
         <FechamentoDaConta subtotal={contas.subtotal} desconto={contas.desconto} total={contas.total} descontoDigitado={desconto} aoDesconto={setDesconto}
           pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErroForma(null); }} erroForma={erroForma}
-          depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} aceitaResto receberAgora={aPagar} junto={junto} />
+          depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} aceitaResto receberAgora={aPagar} junto={junto} credito={credito} />
         {trocoQuePaga > 0 && (
           <p className="g-aviso" style={{ margin: 0 }} role="status">
             <span>
@@ -423,12 +446,12 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         )}
         {aMenos && parteDasAntigas && (
           <div className="g-card liso g-pilha" role="group" aria-label="O que entra agora">
-            <p className="g-p"><b className="g-tab">{brl(aMenos.entregue)}</b> entram agora: a conta de hoje inteira ({brl(contas.total)}) e <b className="g-tab">{brl(centavos(aMenos.entregue - contas.total))}</b> do que {primeiroNome} devia. Ainda fica devendo <b className="g-tab">{brl(aMenos.falta)}</b>, com a data que já estava combinada.</p>
+            <p className="g-p"><b className="g-tab">{brl(aMenos.entregue)}</b> entram agora: a conta de hoje inteira ({brl(daConta)}) e <b className="g-tab">{brl(centavos(aMenos.entregue - daConta))}</b> do que {primeiroNome} devia. Ainda fica devendo <b className="g-tab">{brl(aMenos.falta)}</b>, com a data que já estava combinada.</p>
           </div>
         )}
         {aMenos && !parteDasAntigas && (
           <div className="g-card liso g-pilha" role="group" aria-label="O que faltou fica anotado">
-            <p className="g-p"><b className="g-tab">{brl(aMenos.entregue)}</b> entram agora{aMenos.forma === "dinheiro" && !aMenos.pagamentos ? " no caixa" : ""}. Os <b className="g-tab">{brl(centavos(contas.total - aMenos.entregue))}</b> que faltaram ficam anotados para {tutor?.nome ?? "o tutor"} pagar depois, em Financeiro, A receber, e na ficha.{junto > 0 ? ` O que devia de antes (${brl(devido)}) continua anotado.` : ""}</p>
+            <p className="g-p"><b className="g-tab">{brl(aMenos.entregue)}</b> entram agora{aMenos.forma === "dinheiro" && !aMenos.pagamentos ? " no caixa" : ""}. Os <b className="g-tab">{brl(centavos(daConta - aMenos.entregue))}</b> que faltaram ficam anotados para {tutor?.nome ?? "o tutor"} pagar depois, em Financeiro, A receber, e na ficha.{junto > 0 ? ` O que devia de antes (${brl(devido)}) continua anotado.` : ""}</p>
             {tutor?.id ? (
               <label className="g-campo">
                 <span>Quando paga o resto</span>
