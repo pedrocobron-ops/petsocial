@@ -369,27 +369,32 @@ export function mensagemDeFalta(tutor: string | null | undefined, pet: string, s
  */
 export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horario: unknown }, vejoFinanceiro: boolean, liberado: boolean) {
   const hoje = isoDia(new Date());
-  const planos = await lerPlanos(sb, petshop.id, false);
+  // os planos, o calendário (dia marcado como fechado: a chamada não espera ninguém) e o movimento de hoje ao mesmo tempo:
+  // no celular com internet fraca, cada espera em fila soma uma ida e volta
+  const [planos, , mov] = await Promise.all([
+    lerPlanos(sb, petshop.id, false),
+    calendarioGuardado(petshop.id, vejoFinanceiro) ? null : lerCalendario(sb, petshop.id, vejoFinanceiro),
+    lerPresencas(sb, petshop.id, hoje, hoje),
+  ]);
   if (!planos.length) return null;
-  // dia marcado como fechado: a chamada não espera ninguém
-  if (!calendarioGuardado(petshop.id, vejoFinanceiro)) await lerCalendario(sb, petshop.id, vejoFinanceiro);
-  const mov = await lerPresencas(sb, petshop.id, hoje, hoje);
   const linhas = montarChamada(planos, hoje, mov.presencas, mov.faltas, petshop.horario).filter((l) => l.conta === "plano" || l.conta === "avulsa" || l.presenca?.status === "reservada");
   let vencemHoje = 0, atrasadas = 0, reposicoes = 0;
   const semValor: string[] = [];
   if (vejoFinanceiro) {
     // o que a equipe marcou e espera a conferência de quem recebe: reposição ("não cobrar") e plano ainda sem valor
-    const [rep, valores] = await Promise.all([
+    const [rep, valores, r] = await Promise.all([
       sb.from("creche_reposicoes").select("estadia_id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("estado", "pendente"),
       sb.from("creche_planos_valores").select("plano_id").eq("petshop_id", petshop.id).limit(5000),
+      (async () => {
+        if (liberado) await sb.rpc("creche_gerar_cobrancas", { p_petshop: petshop.id });
+        return await sb.from("creche_cobrancas").select("vencimento, lancamentos!inner(pago)").eq("petshop_id", petshop.id).eq("status", "aberta").eq("lancamentos.pago", false).lte("vencimento", hoje).limit(1000);
+      })(),
     ]);
     reposicoes = rep.count ?? 0;
     if (!valores.error) {
       const com = new Set((valores.data ?? []).map((v) => v.plano_id));
       for (const pl of planos) if (planoAtivo(pl, hoje) && pl.pets?.ativo !== false && !com.has(pl.id)) semValor.push(pl.pets?.nome ?? "Pet");
     }
-    if (liberado) await sb.rpc("creche_gerar_cobrancas", { p_petshop: petshop.id });
-    const r = await sb.from("creche_cobrancas").select("vencimento, lancamentos!inner(pago)").eq("petshop_id", petshop.id).eq("status", "aberta").eq("lancamentos.pago", false).lte("vencimento", hoje).limit(1000);
     for (const c of r.data ?? []) { if (c.vencimento === hoje) vencemHoje++; else atrasadas++; }
   }
   return {

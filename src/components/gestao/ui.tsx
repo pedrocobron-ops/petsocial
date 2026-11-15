@@ -23,16 +23,28 @@ export const EVENTO_GUIA = "gestao:guia";
 export const abrirGuia = () => window.dispatchEvent(new Event(EVENTO_GUIA));
 
 /**
+ * Chama `fazer` quando a tela terminou de abrir: sem nenhum "carregando" (`aria-busy`) na tela por um segundo e o aparelho
+ * folgado. Serve para baixar em segundo plano o que não é da tela (manual, folhas), sem disputar a internet fraca com ela.
+ * Devolve a função que cancela.
+ */
+export function quandoATelaAbrir(fazer: () => void, maximo = 15000): () => void {
+  const w = window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number };
+  let quietas = 0, feito = false;
+  const comeco = Date.now();
+  const ir = () => { if (!feito) { feito = true; clearInterval(t); fazer(); } };
+  const t = setInterval(() => {
+    quietas = document.querySelector('[aria-busy="true"]') ? 0 : quietas + 1;
+    if (quietas >= 2 || Date.now() - comeco > maximo) { clearInterval(t); if (w.requestIdleCallback) w.requestIdleCallback(ir, { timeout: 3000 }); else ir(); }
+  }, 500);
+  return () => { feito = true; clearInterval(t); };
+}
+
+/**
  * Folhas que só abrem com um toque (marcar horário, detalhe, conta) vêm à parte (`next/dynamic`), para a tela abrir antes
- * no celular com internet fraca. Depois que a tela abriu e o aparelho folgou, elas baixam em segundo plano: no toque, já estão aqui.
+ * no celular com internet fraca. Depois que a tela abriu, elas baixam em segundo plano: no toque, já estão aqui.
  */
 export function useAdiantar(...carregar: (() => Promise<unknown>)[]) {
-  useEffect(() => {
-    const w = window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number };
-    const baixar = () => { for (const c of carregar) void c().catch(() => undefined); };
-    const t = setTimeout(() => (w.requestIdleCallback ? w.requestIdleCallback(baixar, { timeout: 5000 }) : baixar()), 4000);
-    return () => clearTimeout(t);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => quandoATelaAbrir(() => { for (const c of carregar) void c().catch(() => undefined); }), []); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /** Busca dados e guarda o resultado. `recarregar()` busca de novo sem piscar a tela. */

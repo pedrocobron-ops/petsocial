@@ -18,14 +18,15 @@ import { TELA_DA_AREA, nomeDaCasa, principalDe, rotaForaDoMenu, usaModulo, type 
 import { guardarLembrado, lerLembrado } from "./lembrado";
 import type { Tom } from "./painel";
 import dynamic from "next/dynamic";
-import { EVENTO_GUIA } from "./ui";
+import { EVENTO_GUIA, quandoATelaAbrir } from "./ui";
 import LogoLoja from "./logo-loja";
 import AvisoDeFuso from "./aviso-fuso";
 import { aplicarTema } from "@/lib/gestao/identidade";
 
 // O que só abre com um toque (Mozart, Ajuda, guia inicial) e o "Como usar esta tela" (o manual inteiro) vêm à parte, depois
 // da tela: no celular com internet fraca, a tela não espera baixar o que a pessoa talvez nem abra.
-const Assistente = dynamic(() => import("./assistente"), { ssr: false });
+const carregarAssistente = () => import("./assistente");
+const Assistente = dynamic(carregarAssistente, { ssr: false });
 const Ajuda = dynamic(() => import("./ajuda"), { ssr: false });
 const AjudaDaTela = dynamic(() => import("./manual/ajuda-da-tela"), { ssr: false });
 const GuiaInicial = dynamic(() => import("./guia-inicial"), { ssr: false });
@@ -111,14 +112,9 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     window.addEventListener(EVENTO_GUIA, abrir);
     return () => window.removeEventListener(EVENTO_GUIA, abrir);
   }, []);
-  // o "Como usar esta tela" entra quando o aparelho folga, depois que a tela abriu
+  // o "Como usar esta tela" (o manual inteiro) entra depois que a tela abriu; o Mozart baixa junto, para abrir na hora do toque
   const [depois, setDepois] = useState(false);
-  useEffect(() => {
-    const w = window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number };
-    const ja = () => setDepois(true);
-    if (w.requestIdleCallback) w.requestIdleCallback(ja, { timeout: 4000 });
-    else setTimeout(ja, 1500);
-  }, []);
+  useEffect(() => quandoATelaAbrir(() => { setDepois(true); void carregarAssistente().catch(() => undefined); }), []);
   const [outrasAbertas, setOutrasAbertas] = useState(() => lerLembrado(CHAVE_OUTRAS) === "1");
   const abrirOutras = () => setOutrasAbertas((a) => { guardarLembrado(CHAVE_OUTRAS, a ? "0" : "1"); return !a; });
 
