@@ -161,3 +161,10 @@
 
 /* Ctrl+P na aba Cobranças: a família não se parte entre folhas (a impressão própria fica em Imprimir) */
 @media print { .g-cm-grupo { break-inside: avoid; } }
+
+/* dias de experiência: no celular, os botões descem para baixo do nome */
+.g-cm-exp .g-linha { flex-wrap: wrap; }
+.g-cm-exp .g-linha .t { flex: 1 1 calc(100% - 60px); }
+.g-cm-exp .g-linha .t span { white-space: normal; }
+.g-cm-exp .g-linha .acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: 56px; }
+@media (min-width: 720px) { .g-cm-exp .g-linha { flex-wrap: nowrap; } .g-cm-exp .g-linha .t { flex: 1; } .g-cm-exp .g-linha .acoes { margin-left: 0; flex: none; } }
