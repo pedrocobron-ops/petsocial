@@ -147,7 +147,7 @@ begin
 
     elsif v_t = 'agendamento' then
       v_sets := array[]::text[];
-      if v_passo ? 'status' then v_sets := v_sets || 'status = $3 ->> ''status'''::text; end if;
+      if v_passo ? 'status' then v_sets := v_sets || 'status = ($3 ->> ''status'')::public.status_agendamento'::text; end if;
       if v_passo ? 'pacote_cliente_id' then v_sets := v_sets || '"pacote_cliente_id" = ($3 ->> ''pacote_cliente_id'')::uuid'::text; end if;
       if v_passo ? 'sem_cobranca' then v_sets := v_sets || 'sem_cobranca = ($3 ->> ''sem_cobranca'')::boolean'::text; end if;
       if cardinality(v_sets) > 0 then
