@@ -27,7 +27,8 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
 - Dinheiro só aparece para `vejoFinanceiro`. Ajustes do pet shop só para `souDono`.
 - Estadias: nunca `select("*")` em `estadias` (o banco recusa). Use `COLS_ESTADIA` / `SELECT_ESTADIA`; a diária e o valor cobrado
   vêm por `comValoresDeEstadia` (`src/lib/gestao/reservado.ts`), só para quem recebe. Quem não recebe não manda `valor_diaria`:
-  o banco coloca a sugerida. Coluna nova em `estadias` precisa de `grant select (coluna)`.
+  o banco coloca a sugerida. Coluna nova em `estadias` precisa de `grant select (coluna)`. Em produção a 49 e a 57 rodam DEPOIS
+  das outras: coluna nova que o app lê direto também entra na lista de `grant` delas (confira com o script de ordem de produção).
   Também não dá para filtrar nem ordenar `estadias` por `valor_diaria` ou `valor_cobrado` pela API: a lista de check-outs para cobrar
   vem de `idsParaCobrar` (função `estadias_para_cobrar`) e o acerto de um check-out pendente é pela função `estadia_acertar`.
   Gravação em `estadias` sempre com `.select("id")` (sem isso o banco devolve a linha inteira e recusa).
@@ -125,7 +126,12 @@ O manual troca sozinho (`textoDaCasa` em `manual.ts`). Interruptor (`role="switc
 ## Cakto (assinatura)
 
 - Aviso de pagamento: `src/app/api/gestao/cakto/route.ts` → função `cakto_evento` (casa a loja pela assinatura, pelo `callback` do link
-  = id do pet shop, pelo e-mail da compra e pelo e-mail do dono) → `cakto_aplicar` (status, plano, período, `pago_ate`).
+  = `<id do pet shop>.<ficha>` assinado pelo banco em `assinatura_callback`, pelo e-mail da compra e pelo e-mail do dono) →
+  `cakto_aplicar` (status, plano, período, `pago_ate`). Por callback ou e-mail, compra para uma conta com outra assinatura em dia
+  vira "conflito" (fica em Pagamentos sem conta), e cancelamento/reembolso só vale para a assinatura gravada ou o mesmo pedido.
+- Contagens de uso de IA: Mozart e Ajuda contam no banco (`assistente_contar`, por dia no fuso do pet shop; toda chamada ao
+  modelo conta). O "Tirar dúvida" do link e o chat de venda contam com o segredo do servidor (`src/lib/gestao/servidor.ts`;
+  ligue a "Trava do servidor" na aba Cakto do painel depois de publicar).
 - Tudo se configura no painel do administrador, aba **Cakto** (`src/components/gestao/admin/cakto.tsx`): chave secreta de cada
   webhook (o banco guarda só o sha256), link e código de cada uma das 9 ofertas, código do produto, abrir a assinatura e
   ligar pagamentos que chegaram com outro e-mail. Nada disso precisa de SQL nem de publicar o site.
