@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, Download, History, Lock, Minus, Plus, Scale, ShoppingBag, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
-import { caixaAberto, CATEGORIA_GAVETA, conferirValorAlto, desfazerVenda, lancarPago, lembrarCaixa, nomeDoMovimento, partesPorForma, percentuaisQueFecham, textoDoPagamento, ultimoContado } from "@/lib/gestao/dinheiro";
+import { caixaAberto, CATEGORIA_GAVETA, conferirValorAlto, creditoDaEntrada, desfazerVenda, lancarPago, lembrarCaixa, nomeDoMovimento, partesPorForma, percentuaisQueFecham, textoDoPagamento, ultimoContado } from "@/lib/gestao/dinheiro";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import "@/components/gestao/financeiro/recebimentos.css";
 import {
@@ -119,7 +119,7 @@ function CaixaDoDia() {
       ? await paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true)
         .in("caixa_id", ids).order("criado_em", { ascending: false }).order("id").range(de, ate))
       : [];
-    // tudo o que foi pago hoje, com ou sem caixa: é a mesma conta da tela Hoje ("Entrou hoje")
+    // tudo o que foi pago hoje, com ou sem caixa (a tela Hoje parte disto e ainda tira as devoluções e o crédito deixado para o tutor)
     const doDia = await paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id)
       .eq("pago", true).eq("data", hoje).order("criado_em", { ascending: false }).order("id").range(de, ate));
     // o que foi lançado hoje com o caixa fechado fica solto (sem caixa) e não entra na conferência da gaveta
@@ -177,11 +177,13 @@ function CaixaDoDia() {
   // o dia inteiro (bate com a tela Hoje) e o que ficou fora do caixa
   // sangria e suprimento só mexem na gaveta: não são entrada nem saída do dia
   const vendasDoDia = semMovimentos(doDia), vendasSoltas = semMovimentos(soltos);
-  const entrouNoDia = soma(vendasDoDia.filter((l) => l.tipo === "entrada")), saiuNoDia = soma(vendasDoDia.filter((l) => l.tipo === "saida"));
-  const entrouFora = soma(vendasSoltas.filter((l) => l.tipo === "entrada")), saiuFora = soma(vendasSoltas.filter((l) => l.tipo === "saida"));
+  // o que foi pago com o crédito do tutor não é dinheiro que entrou hoje
+  const entrouDe = (lista: Lancamento[]) => Math.round((soma(lista) - lista.reduce((t, l) => t + creditoDaEntrada(l), 0)) * 100) / 100;
+  const entrouNoDia = entrouDe(vendasDoDia.filter((l) => l.tipo === "entrada")), saiuNoDia = soma(vendasDoDia.filter((l) => l.tipo === "saida"));
+  const entrouFora = entrouDe(vendasSoltas.filter((l) => l.tipo === "entrada")), saiuFora = soma(vendasSoltas.filter((l) => l.tipo === "saida"));
   // dinheiro em espécie fora do caixa: no pagamento dividido, só a parte em dinheiro
   const dinheiroFora = Math.round(((somaPorForma(vendasSoltas.filter((l) => l.tipo === "entrada")).get("dinheiro") ?? 0) - (somaPorForma(vendasSoltas.filter((l) => l.tipo === "saida")).get("dinheiro") ?? 0)) * 100) / 100;
-  const emOutrosCaixas = Math.round((entrouNoDia - entrouFora - (aberto ? soma(semMovimentos(doCaixa(aberto.id)).filter((l) => l.tipo === "entrada" && l.data === hoje)) : 0)) * 100) / 100;
+  const emOutrosCaixas = Math.round((entrouNoDia - entrouFora - (aberto ? entrouDe(semMovimentos(doCaixa(aberto.id)).filter((l) => l.tipo === "entrada" && l.data === hoje)) : 0)) * 100) / 100;
   const resumo = aberto ? resumoDoCaixa(aberto.valor_inicial, lancamentos) : null;
   const abertoEmOutroDia = aberto && isoDia(new Date(aberto.aberto_em)) !== hoje;
   const ultimo = fechados[0];

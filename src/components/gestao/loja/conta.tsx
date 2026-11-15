@@ -105,10 +105,11 @@ export const encurtar = (s: string, max = 200) => (s.length > max ? `${s.slice(0
  * `lancamentoId` liga a saída à venda no financeiro: é por essa ligação que o relatório de produtos acha o custo de cada venda
  * (o banco guarda o custo do produto na hora da saída).
  */
-export async function baixarEstoque(sb: Banco, petshopId: string, userId: string, itens: ItemConta[], lancamentoId?: string | null, chave?: string | null) {
+export async function baixarEstoque(sb: Banco, petshopId: string, userId: string, itens: ItemConta[], lancamentoId?: string | null, chave?: string | null, estadiaId?: string | null) {
   const linhas = produtosDaConta(itens).map((i) => ({
     petshop_id: petshopId, produto_id: i.produtoId!, tipo: "saida", quantidade: i.qtd, motivo: "Venda", criado_por: userId,
-    ...(lancamentoId ? { lancamento_id: lancamentoId } : {}),
+    // a saída fica ligada à venda: o lançamento da conta, ou (check-out sem lançamento: o sinal ou o crédito pagaram) a estadia
+    ...(lancamentoId ? { lancamento_id: lancamentoId } : estadiaId ? { estadia_id: estadiaId } : {}),
     // com a chave da operação, tentar de novo (ou um toque duplo) não baixa o mesmo produto duas vezes
     ...(chave ? { chave: parteDaChave(chave, "estoque", i.produtoId!) } : {}),
   }));

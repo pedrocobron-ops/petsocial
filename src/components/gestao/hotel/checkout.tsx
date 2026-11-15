@@ -352,7 +352,8 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
           avisarErro(`${pendente ? "A estadia foi acertada" : "O check-out foi feito"}, mas ${rec.fiado ? "a conta a receber não foi anotada. Anote" : "o pagamento não foi lançado. Lance"} pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
         }
       }
-      try { await baixarEstoque(sb, petshop.id, user.id, itens, null, chave); } catch (e) {
+      // ligada à conta (ou à estadia, quando nada foi lançado agora), o banco sabe que o produto saiu vendido
+      try { await baixarEstoque(sb, petshop.id, user.id, itens, lancamentoId, chave, lancamentoId ? null : estadia.id); } catch (e) {
         avisarErro(`O estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
       }
       const conta = montarConta(pg, lancamentoId, saida, sobra);

@@ -141,11 +141,12 @@ export default function HotelNoRelatorio({ de, ate, antes }: { de: Date; ate: Da
             </>
           ) : <p className="g-muted g-p">Nenhuma conta de estadia fechada com o detalhe neste período.{contasAntes.n ? ` Período anterior: ${brl(contasAntes.total)}.` : ""}</p>}
           <p className="g-p">Sinais recebidos: <b className="g-tab">{brl(sinalRecebido)}</b>{sinaisRecebidos ? ` (${sinaisRecebidos})` : ""} · devolvidos: <b className="g-tab">{brl(real(dados.devolvido + contas.devolvido))}</b>{dados.devolucoes + contas.devolucoes ? ` (${dados.devolucoes + contas.devolucoes})` : ""}{contas.credito > 0 ? <> · deixados como crédito do tutor: <b className="g-tab">{brl(contas.credito)}</b></> : null}</p>
-          {contas.devolvido > 0 && <p className="g-muted g-pp">Devolvido no check-out ({brl(contas.devolvido)}): o pet saiu antes e o tutor tinha pago mais. Está no Caixa e no Financeiro como saída, na categoria Devolução.</p>}
+          {contas.devolvido > 0 && <p className="g-muted g-pp">Devolvido no check-out ({brl(contas.devolvido)}): o pet saiu antes e o tutor tinha pago mais. Está no Caixa como saída, na categoria Devolução, e sai do faturamento (não é despesa).</p>}
         </div>
       </div>
       <p className="g-muted g-pp g-rel-nota">
         Estes valores são o detalhe das contas e não somam de novo: o que foi recebido já está no faturamento lá em cima, no dia em que entrou (o sinal recebido em partes conta cada parte no dia dela).
+        O faturamento já tira o que foi devolvido e o que ficou de crédito para o tutor; o crédito conta quando ele usar.
         A noite conta pelo dia em que começa.
       </p>
     </section>

@@ -383,7 +383,7 @@ create index if not exists movimentos_estoque_estadia_idx on public.movimentos_e
 grant select (estadia_id) on public.movimentos_estoque to authenticated;
 
 -- Mesma função da migração 20261169 (mesma assinatura). Diferença: saída como "Venda" ligada a uma estadia encerrada há
--- pouco (o produto saiu na conta do check-out) também vale como venda com o dinheiro junto.
+-- pouco (até 3 dias: o check-out que ficou para acertar depois) também vale como venda com o dinheiro junto.
 create or replace function public.saida_de_estoque_conferir() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -399,7 +399,7 @@ begin
   if new.tipo = 'saida' and new.motivo = 'Venda' then
     -- a conta do check-out que não lançou dinheiro (sinal ou crédito pagaram): a saída aponta para a estadia acertada agora
     if new.estadia_id is not null and new.lancamento_id is null and exists (select 1 from public.estadias e where e.id = new.estadia_id
-        and e.petshop_id = new.petshop_id and e.status = 'encerrada' and e.saida >= now() - interval '1 day')
+        and e.petshop_id = new.petshop_id and e.status = 'encerrada' and e.saida >= now() - interval '3 days')
         and public.tenho_area(new.petshop_id, array['caixa', 'financeiro', 'relatorios']) then
       return new;
     end if;

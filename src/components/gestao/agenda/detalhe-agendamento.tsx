@@ -202,7 +202,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         : "O uso do pacote continua contado. ";
       const sim = await confirmar({
         titulo: "Reabrir um atendimento que já foi pago?",
-        texto: `${dinheiro}A conta fechada continua como está: a comissão e os relatórios seguem o que foi cobrado nela. Se o valor do horário subir, o horário mostra Cobrar a diferença. Para corrigir o dinheiro recebido, altere o lançamento em Financeiro: a alteração fica anotada.`,
+        texto: `${dinheiro}A conta fechada continua como está: a comissão e os relatórios seguem o que foi cobrado (a conta fechada e a diferença cobrada depois). Se o valor do horário subir, o horário mostra Cobrar a diferença. Para corrigir o dinheiro recebido, altere o lançamento em Financeiro: a alteração fica anotada.`,
         confirmar: "Reabrir",
       });
       if (!sim) return;
@@ -445,6 +445,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           ))}
           {vejoFinanceiro && recebido > 0 && <div className="g-fila entre"><span className="g-muted">Recebido</span><b className="g-tab g-verde-t">{brl(recebido)}{formasDoRecebido ? ` · ${formasDoRecebido}` : ""}</b></div>}
           {vejoFinanceiro && (extra?.diferencaCobrada ?? 0) > 0 && <div className="g-fila entre"><span className="g-muted">Diferença recebida</span><b className="g-tab g-verde-t">{brl(extra!.diferencaCobrada)}</b></div>}
+          {vejoFinanceiro && (extra?.diferencaCobrada ?? 0) > 0 && lancado > 0 && <div className="g-fila entre"><span className="g-muted">Total cobrado</span><b className="g-tab">{brl(Math.round((lancado + extra!.diferencaCobrada) * 100) / 100)}</b></div>}
           {devidos.map((l) => (
             <div className="g-fila entre" key={l.id}>
               <span className="g-muted">A receber</span>
@@ -514,7 +515,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         )}
         {vejoFinanceiro && a.status === "concluido" && diferenca > 0.005 && (
           <p className="g-aviso" style={{ margin: 0 }} role="status">
-            <span><b>Faltam {brl(diferenca)}.</b> O horário está em {brl(aCobrar ?? 0)} e a conta fechada foi de {brl(daConta + (extra?.diferencaCobrada ?? 0))}: o valor mudou depois de a conta ser fechada. A comissão e os relatórios seguem o que foi cobrado na conta fechada.</span>
+            <span><b>Faltam {brl(diferenca)}.</b> O horário está em {brl(aCobrar ?? 0)} e a conta fechada foi de {brl(daConta + (extra?.diferencaCobrada ?? 0))}: o valor mudou depois de a conta ser fechada. A comissão e os relatórios seguem o que foi cobrado: quando você receber a diferença, ela entra neste atendimento.</span>
           </p>
         )}
         {vejoFinanceiro && a.status === "concluido" && diferenca > 0.005 && (
@@ -586,7 +587,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
 
 /**
  * Atendimento já pago que ficou mais caro (reabriu e mudou o serviço ou o valor): recebe a diferença na hora, numa entrada à
- * parte com o nome do pet. A conta fechada do horário continua como está (é dela que saem a comissão e os relatórios).
+ * parte com o nome do pet, ligada ao atendimento (`lancamentos.diferenca_de`, que o banco preenche pela marca do item e confere:
+ * a diferença não entra duas vezes). A comissão, os relatórios e o horário somam a conta fechada e a diferença.
  */
 function CobrarDiferenca({ agendamento: a, valor, aoFechar, aoPronto }: { agendamento: AgendamentoCompleto; valor: number; aoFechar: () => void; aoPronto: () => void | Promise<void> }) {
   const { sb, petshop } = useGestao();
@@ -619,7 +621,7 @@ function CobrarDiferenca({ agendamento: a, valor, aoFechar, aoPronto }: { agenda
         <p className="g-p">{a.pets?.nome ?? "O pet"}, {servicos}, {dataAmigavel(a.inicio)}. O horário ficou mais caro depois de a conta ser fechada: faltam <b className="g-tab">{brl(valor)}</b>.</p>
         <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={valor} erro={erro} />
         <AvisoCaixaFechado aberto={caixa} />
-        <p className="g-pp g-muted">Entra no caixa de hoje como uma entrada à parte, com o nome do pet. A conta fechada do horário não muda: a comissão e os relatórios seguem o que foi cobrado nela.</p>
+        <p className="g-pp g-muted">Entra no caixa de hoje como uma entrada à parte, com o nome do pet, ligada a este atendimento: a comissão e os relatórios passam a contar a conta fechada mais a diferença.</p>
       </div>
     </Folha>
   );
