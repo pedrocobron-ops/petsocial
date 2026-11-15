@@ -1035,6 +1035,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"link_ia_uso": {
+                  Row: {
+                    "dia": string,"perguntas": number,"petshop_id": string,"respondidas": number,"sem_resposta": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "dia": string,"perguntas"?: number,"petshop_id": string,"respondidas"?: number,"sem_resposta"?: number
+                  }
+                  Update: {
+                    "dia"?: string,"perguntas"?: number,"petshop_id"?: string,"respondidas"?: number,"sem_resposta"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "link_ia_uso_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"lista_espera": {
                   Row: {
                     "chamado_em": string | null,"criado_em": string,"criado_nome": string | null,"criado_por": string | null,"entrada": string,"especie": string | null,"hora_entrada": string | null,"hora_saida": string | null,"id": string,"obs": string | null,"origem": string,"pet_id": string | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"saida": string,"status": string,"telefone": string | null,"termos_aceitos_em": string | null,"tipo": string,"tutor_nome": string | null
@@ -2034,6 +2054,18 @@ isOneToOne: false
                            },
 "link_hotel_opcoes":
 { Args: { "p_codigo": string }; Returns: Json
+                           },
+"link_ia_contar":
+{ Args: { "p_codigo": string }; Returns: Json
+                           },
+"link_ia_ligada":
+{ Args: { "p_codigo": string }; Returns: boolean
+                           },
+"link_ia_mes":
+{ Args: { "p_petshop": string }; Returns: Json
+                           },
+"link_ia_registrar":
+{ Args: { "p_codigo": string,"p_respondida": boolean }; Returns: undefined
                            },
 "link_info":
 { Args: { "p_codigo": string }; Returns: Json
