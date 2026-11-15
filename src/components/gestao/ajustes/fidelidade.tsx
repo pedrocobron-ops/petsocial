@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Gift, Minus, Plus } from "lucide-react";
 import { FIDELIDADE_MAX, FIDELIDADE_MIN, FIDELIDADE_PREMIO_MAX, programaDe } from "@/lib/gestao/fidelidade";
 import { dataCompleta, isoDia } from "@/lib/gestao/util";
+import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { Campo, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "../ui";
@@ -20,6 +21,11 @@ export default function AjusteFidelidade() {
   const [ocupado, setOcupado] = useState(false);
   const texto = premio.trim().replace(/\s+/g, " ");
   const mudou = !!programa && (cada !== programa.cada || texto !== programa.premio);
+  // a contagem é dos horários concluídos da Agenda: diária de creche e de hotel não entra (dito com as palavras do negócio)
+  const banho = usaModulo(petshop, "banho_tosa"), casa = usaCasa(petshop);
+  const descricao = !casa ? "A cada tantos atendimentos concluídos, o tutor ganha um prêmio."
+    : banho ? "A cada tantos atendimentos concluídos na agenda, o tutor ganha um prêmio. Diárias de creche e de hotel não entram na conta."
+    : "A cada tantos serviços com horário concluídos na Agenda (banho, tosa), o tutor ganha um prêmio. Diárias de creche e de hotel não entram na conta."
 
   async function gravar(campos: { fidelidade_cada?: number; fidelidade_premio?: string; fidelidade_desde?: string | null }, aviso: string) {
     setOcupado(true);
@@ -64,12 +70,12 @@ export default function AjusteFidelidade() {
     <section className="g-card g-pilha">
       <div className="g-mp-t">
         <Tile icone={Gift} tom="lilas" />
-        <div><h2>Fidelidade</h2><p className="g-muted g-p">A cada tantos atendimentos concluídos, o tutor ganha um prêmio.</p></div>
+        <div><h2>Fidelidade</h2><p className="g-muted g-p">{descricao}</p></div>
         <button type="button" role="switch" aria-checked={!!programa} aria-label="Programa de fidelidade" className="g-mp-chave" disabled={ocupado} onClick={() => void (programa ? desligar() : ligar())}><i /></button>
       </div>
       <form className="g-form" onSubmit={salvar}>
         <div className="g-campo">
-          <span>A cada quantos atendimentos</span>
+          <span>A cada quantos {banho ? "atendimentos" : "serviços concluídos"}</span>
           <div className="gj-conta-linha">
             <div className="gj-conta" role="group" aria-label="Atendimentos para ganhar o prêmio">
               <button type="button" className="g-ico" aria-label="Menos" disabled={cada <= FIDELIDADE_MIN} onClick={() => setCada(Math.max(FIDELIDADE_MIN, cada - 1))}><Minus /></button>

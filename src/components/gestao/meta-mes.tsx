@@ -37,7 +37,7 @@ export default function MetaMes() {
     if (!souDono) return null;
     return (
       <Link href={FINANCEIRO} className="g-meta-convite">
-        <Target aria-hidden /><span>Definir meta do mês</span><ChevronRight aria-hidden />
+        <Target aria-hidden /><span>Quanto você quer que entre no mês?</span><ChevronRight aria-hidden />
       </Link>
     );
   }

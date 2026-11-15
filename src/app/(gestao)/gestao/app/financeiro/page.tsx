@@ -408,10 +408,10 @@ function CartaoMeta({ entrou, aoEditar }: { entrou: number; aoEditar: () => void
       <section className="g-card g-fin-meta vazia">
         <Tile icone={Target} tom="menta" tamanho="g" />
         <div className="g-fin-meta-txt">
-          <h3>Meta do mês</h3>
-          <p className="g-muted g-p">Diga quanto você quer que entre no mês. O progresso aparece aqui e na tela inicial.</p>
+          <h3>Quanto você quer que entre no mês?</h3>
+          <p className="g-muted g-p">Escreva um valor e o sistema mostra quanto já entrou e quanto falta, aqui e na tela inicial.</p>
         </div>
-        <button className="g-btn sec" onClick={aoEditar}><Target />Definir meta</button>
+        <button className="g-btn sec" onClick={aoEditar}><Target />Escrever o valor</button>
       </section>
     );
   }
@@ -489,7 +489,7 @@ function FolhaMeta({ aoFechar }: { aoFechar: () => void }) {
   }
 
   return (
-    <Folha titulo="Meta do mês" aoFechar={aoFechar}
+    <Folha titulo="Quanto você quer que entre no mês" aoFechar={aoFechar}
       rodape={<>
         {atual != null && atual > 0 && <button type="button" className="g-btn sec" onClick={() => void gravar(null)} disabled={salvando}>Tirar a meta</button>}
         <button type="button" className="g-btn pri" onClick={() => void gravar(valor)} disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
