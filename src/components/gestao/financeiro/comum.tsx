@@ -725,7 +725,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
   const daMulta = comMulta ? centavos(multa ?? 0) : 0;
   // crédito do tutor (pagou a mais antes): paga esta conta, ou uma parte dela, se a pessoa quiser
   const { dados: saldoCredito } = useDados(async () => (entrada && conta.cliente_id && !conta.pago ? (await creditoDoTutor(sb, petshop.id, conta.cliente_id)).saldo : 0), [petshop.id, conta.id, conta.cliente_id ?? ""]);
-  const [usarCredito, setUsarCredito] = useState(false);
+  const [usarCredito, setUsarCredito] = useState(true);
   const credito = usarCredito && (saldoCredito ?? 0) > 0 ? centavos(Math.min(saldoCredito ?? 0, recebendo)) : 0;
   const total = centavos(recebendo + daMulta - credito);
 
