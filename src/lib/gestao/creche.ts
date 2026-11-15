@@ -624,8 +624,8 @@ export function linhasDaCobrancaDoPet(c: CobrancaCompleta) {
   ];
 }
 
-/** "10/11 (avisou), 17/11" */
-const textoDasFaltas = (f: { dia: string; avisou: boolean }[]) => juntar(f.map((x) => `${dataCurta(x.dia)}${x.avisou ? " (avisou)" : ""}`));
+/** "10/11, com aviso; 17/11" */
+const textoDasFaltas = (f: { dia: string; avisou: boolean }[]) => f.map((x) => `${dataCurta(x.dia)}${x.avisou ? ", com aviso" : ""}`).join("; ");
 
 /**
  * O extrato do mês de um cão em texto simples, para o WhatsApp do tutor. Sem `comValores`, só as presenças (para a equipe que

@@ -103,7 +103,6 @@ export function CartaoMensalista({ pet }: { pet: PetDoPlano }) {
     <section className="g-card">
       <div className="g-card-t">
         <h3><Tile icone={CalendarCheck2} tom="manteiga" tamanho="p" />Creche: mensalista</h3>
-        {extrato && <Link className="g-btn fantasma p" href={linkDoExtratoDoPet(pet.id)} target="_blank" aria-label={`Extrato do mês de ${pet.nome} na creche`}><Printer />Extrato do mês</Link>}
         {pode && (ativo
           ? <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setForm("editar"); }}><Pencil />Alterar plano</button>
           : <button className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setForm("novo"); }}><Plus />Tornar mensalista</button>)}
@@ -120,6 +119,7 @@ export function CartaoMensalista({ pet }: { pet: PetDoPlano }) {
           <ResumoDosMeses plano={plano} presencas={dados.presencas} faltas={dados.faltas} />
         </div>
       )}
+      {extrato && <div style={{ marginTop: 12 }}><Link className="g-btn sec p" href={linkDoExtratoDoPet(pet.id)} target="_blank" aria-label={`Extrato do mês de ${pet.nome} na creche`}><Printer />Extrato do mês</Link></div>}
       {form && <FormPlano plano={form === "editar" && plano ? plano : undefined} pet={pet} planos={dados.planos}
         aoFechar={() => setForm(null)} aoSalvo={() => { setForm(null); void recarregar(); }} />}
     </section>

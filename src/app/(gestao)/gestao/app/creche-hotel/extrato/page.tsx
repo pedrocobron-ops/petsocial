@@ -116,7 +116,7 @@ function ExtratoDoCao() {
         <section className="g-pa-ext-pet">
           <h2 className="g-pa-t">Dias na creche<small>{x.plano ? `plano: ${textoDosDias(x.plano.dias)}` : "sem plano de mensalista"}</small></h2>
           <Pares linhas={[
-            x.plano && { nome: `Presenças${x.esperados ? ` (de ${x.esperados} dias do plano até hoje)` : ""}`, valor: x.presencas.length },
+            x.plano && { nome: `Presenças${x.esperados ? ` (de ${x.esperados} dias do plano${mesIso === isoMes(agora) ? " até hoje" : ""})` : ""}`, valor: x.presencas.length },
             x.plano && x.presencas.length > 0 && { nome: dias(x.presencas), valor: "", recuo: true },
             (x.plano || x.faltas.length > 0) && { nome: "Faltas", valor: x.faltas.length },
             x.faltas.length > 0 && { nome: x.faltas.map((f) => `${dataCurta(f.dia)}${f.avisou ? " (avisou)" : ""}`).join(", "), valor: "", recuo: true },
