@@ -54,6 +54,15 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   para marcado, apagar, concluir de novo por menos, tirar serviço, mudar o preço de venda de produto, saída de estoque como "Venda" sem a venda
   (a saída deve nascer com `lancamento_id` de uma venda com o produto nos itens) e perda/saldo corrigido para menos. Porte trocado para
   menor com horário recente e forma de pagamento trocada (`alterou_forma`) também aparecem em Alterações em valores.
+- Faturamento (Relatórios, Hoje, Financeiro, meta): sempre por `ajustesDoFaturamento` + `faturamentoLiquido` (`src/lib/gestao/faturamento.ts`):
+  entradas − devoluções (saídas em `CATEGORIAS_DEVOLUCAO`) − crédito deixado para o tutor + crédito usado fora de uma entrada. O Caixa conta só dinheiro.
+- Crédito do tutor numa conta: a entrada vai pelo valor cheio com `creditoUsado` em `lancarPago` (parte "outro" no pagamento, montada por
+  `pagamentoComCredito`); conta a receber paga com crédito por `receberComCredito` (função `receber_conta_com_credito`). O banco tira do crédito
+  na mesma gravação (`clientes_creditos.lancamento_id`; apagar a entrada devolve). Na tela: `<UsarCredito>` (`financeiro/comum.tsx`).
+  Somas por forma: `somaPorForma` separa a parte do crédito em `FORMA_CREDITO`; `textoDoPagamento` mostra "Crédito do tutor".
+- "Cobrar a diferença": a entrada fica em `lancamentos.diferenca_de` (o banco liga pela marca do item e recusa a segunda); comissão, relatórios
+  (`cobradoPorServico(..., diferenca)`) e o horário somam a conta fechada e a diferença.
+- Saída de estoque de uma conta: `baixarEstoque(..., lancamentoId, chave, estadiaId)`; sem lançamento (check-out pago pelo sinal ou pelo crédito), a estadia.
 - Conta do atendimento: o que o tutor deve de antes entra com "Incluir nesta conta?" (baixa por `receberConta` com `parteDaChave`); pagamento em
   parte em qualquer forma por `pagoAMenos` (`EstadoPagamento.parte`/`resto`, só com `aceitaResto`).
 - "Recebeu quanto?" fica em `EstadoPagamento.entregue`: `fecharPagamento` recusa dinheiro a menos; a conta do atendimento usa `dinheiroAMenos`
