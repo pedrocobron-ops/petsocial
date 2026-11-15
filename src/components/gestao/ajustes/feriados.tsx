@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CalendarOff, Plus, Trash2 } from "lucide-react";
 import { feriadosNacionais, type DiaEspecial } from "@/lib/gestao/feriados";
 import { juntar } from "@/lib/gestao/creche";
@@ -32,6 +32,9 @@ export default function Feriados() {
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [verPassados, setVerPassados] = useState(false);
+  // toque duplo: o segundo toque chega antes da tela trocar; a trava é na hora, e o toque logo depois de gravar não vira erro
+  const trava = useRef(false);
+  const gravouEm = useRef(0);
   if (!souDono) return null;
 
   const todos = calendario?.dias ?? [];
@@ -39,24 +42,27 @@ export default function Feriados() {
   const mudou = async () => { await recarregar(); avisarMudanca(); };
 
   async function adicionar() {
-    if (somenteLeitura() || ocupado) return;
-    if (!dia) return setErro("Escolha a data.");
+    if (somenteLeitura() || ocupado || trava.current) return;
+    if (!dia) { if (Date.now() - gravouEm.current < 3000) return; return setErro("Escolha a data."); }
     if (!fechado && !feriado) return setErro("Marque se o dia é fechado, se conta como feriado no preço, ou os dois.");
     if (todos.some((d) => d.dia === dia)) return setErro(`${dataCompleta(dia)} já está na lista. Mude as marcações dela aqui embaixo.`);
-    setErro(null); setOcupado(true);
+    setErro(null); setOcupado(true); trava.current = true;
     try {
-      ok(await sb.from("dias_especiais").insert({ petshop_id: petshop.id, dia, nome: nome.trim(), fechado, feriado: temHotel && feriado }).select("id"));
+      const r = await sb.from("dias_especiais").insert({ petshop_id: petshop.id, dia, nome: nome.trim(), fechado, feriado: temHotel && feriado }).select("id");
+      // a mesma data já entrou (outro toque, outra aba): é o que a pessoa queria, segue como gravado
+      if (r.error?.code !== "23505") ok(r);
+      gravouEm.current = Date.now();
       setDia(""); setNome("");
       await mudou();
       // data que já passou (para acertar o preço de uma estadia anotada depois): abre a lista das que passaram, para ela ficar à vista
       if (dia < hoje) setVerPassados(true);
       avisar(dia < hoje ? `${dataCompleta(dia)} entrou na lista. Como já passou, ela fica em Datas que já passaram, aqui embaixo.` : `${dataCompleta(dia)} entrou na lista.`);
-    } catch (x) { avisarErro(x); } finally { setOcupado(false); }
+    } catch (x) { avisarErro(x); } finally { setOcupado(false); trava.current = false; }
   }
 
   /** Coloca na lista os feriados nacionais que ainda vão acontecer (deste ano e do próximo) e que ainda não estão nela. */
   async function nacionais() {
-    if (somenteLeitura() || ocupado) return;
+    if (somenteLeitura() || ocupado || trava.current) return;
     const ano = new Date().getFullYear();
     const novos = [...feriadosNacionais(ano), ...feriadosNacionais(ano + 1)].filter((f) => f.dia >= hoje && !todos.some((d) => d.dia === f.dia));
     if (!novos.length) { avisar("Os feriados nacionais deste ano e do próximo já estão na lista."); return; }

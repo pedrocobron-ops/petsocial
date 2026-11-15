@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarOff, Check, Clock, Lock, Plus, Repeat, TriangleAlert, Truck, Users, Utensils, X } from "lucide-react";
+import { CalendarCheck2, CalendarOff, Check, Clock, Lock, MessageCircle, Plus, Repeat, TriangleAlert, Truck, Users, Utensils, X } from "lucide-react";
 import type { AgendamentoCompleto, PetComTutor, StatusAgendamento } from "@/lib/gestao/tipos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { PORTES } from "@/lib/gestao/tipos";
-import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, paraMin, vagasDe } from "@/lib/gestao/agenda";
+import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, paraMin, textoRemarcado, vagasDe } from "@/lib/gestao/agenda";
 import { definirServicosAMais, juntarServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-horario";
-import { almocoDoDia, brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, nomeDiaCurto, NOTA_PORTE, precoDoServico, precoMudaComPorte, somaDias } from "@/lib/gestao/util";
+import { almocoDoDia, brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, linkWhatsApp, nomeDiaCurto, NOTA_PORTE, precoDoServico, precoMudaComPorte, somaDias } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
@@ -80,6 +80,8 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const [outros, setOutros] = useState<OutroServico[]>(() => outrosDoHorario.map((o) => ({ servicoId: o.servico_id, preco: o.preco == null ? null : Number(o.preco), mexido: true })));
   const [juntando, setJuntando] = useState(outrosDoHorario.length > 0);
   const [salvando, setSalvando] = useState(false);
+  // remarcou (mudou o dia ou a hora): antes de fechar, oferece o aviso pronto para o tutor, com a data nova
+  const [remarcado, setRemarcado] = useState<{ quando: string; hora: string; zap: string | null } | null>(null);
   // o que está escrito no campo Valor (para avisar quando não é número) e o porte escolhido aqui mesmo
   const [textoValor, setTextoValor] = useState("");
   const [salvandoPorte, setSalvandoPorte] = useState(false);
@@ -362,6 +364,17 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
       }
       avisar(agendamento ? "Horário alterado." : `${pet.nome} marcado para ${dataAmigavel(inicio)} às ${hhmm}.`);
       avisarMudanca();
+      if (agendamento && new Date(agendamento.inicio).getTime() !== inicio.getTime()) {
+        const nomes = [servicos.find((x) => x.id === servicoId)?.nome, ...aMais.map((o) => servicos.find((x) => x.id === o.servico_id)?.nome)].filter((n): n is string => Boolean(n));
+        const oQue = nomes.length < 2 ? nomes[0] ?? null : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+        const quandoTexto = dataAmigavel(inicio);
+        setRemarcado({
+          quando: quandoTexto, hora: hhmm,
+          zap: linkWhatsApp(pet.clientes?.telefone, textoRemarcado({ tutor: pet.clientes?.nome, pet: pet.nome, servico: oQue, quando: quandoTexto, hora: hhmm, petshop: petshop.nome })),
+        });
+        setSalvando(false);
+        return;
+      }
       aoSalvar(marcado);
     } catch (err) { avisarErro(err); }
     setSalvando(false);
@@ -376,6 +389,25 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
 
   if (petNovo !== null) {
     return <FormPet nomeInicial={petNovo} aoFechar={() => setPetNovo(null)} aoSalvar={(p) => { setPet(p); setPetNovo(null); }} />;
+  }
+
+  if (remarcado && pet) {
+    const tutor = pet.clientes?.nome?.split(" ")[0];
+    return (
+      <Folha titulo="Horário remarcado" aoFechar={() => aoSalvar()}
+        rodape={<><button type="button" className="g-btn sec" onClick={() => aoSalvar()}>Fechar</button>
+          {remarcado.zap && <a className="g-btn zap" href={remarcado.zap} target="_blank" rel="noopener noreferrer" onClick={() => aoSalvar()}><MessageCircle />Avisar {tutor ?? "o tutor"} no WhatsApp</a>}</>}>
+        <div className="g-pilha" role="status">
+          <div className="g-card areia g-fila">
+            <CalendarCheck2 aria-hidden />
+            <div className="g-cresce"><b>{pet.nome}: {remarcado.quando} às {remarcado.hora}.</b><div className="g-pp g-muted">O horário já mudou na agenda.</div></div>
+          </div>
+          <p className="g-muted g-p">{remarcado.zap
+            ? `Quer avisar ${tutor ?? "o tutor"}? A mensagem sai pronta com o dia e a hora novos. Você só aperta enviar no WhatsApp.`
+            : "O tutor não tem telefone na ficha, então não dá para mandar o aviso pelo WhatsApp."}</p>
+        </div>
+      </Folha>
+    );
   }
 
   return (

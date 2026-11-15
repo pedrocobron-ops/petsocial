@@ -385,7 +385,7 @@ export default function AgendarPeloLink() {
       {estadia && (
         <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} fechados={fechados} horario={info.horario} termos={termos} recarregarTermos={recarregarTermos}
           aoPedir={() => setLembrados((n) => n + 1)}
-          zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)}
+          zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)} zapCom={(t) => linkWhatsApp(info.telefone, t)}
           preco={estadia === "hotel" ? precoHotel : undefined}
           diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)} />
       )}
@@ -651,7 +651,7 @@ export default function AgendarPeloLink() {
           <div className="g-lk-ok-acoes">
             {enviado.id && <a className="g-btn verde" href={`/gestao/agendar/${codigo}/pedido/${enviado.id}`}>Acompanhar o pedido</a>}
             <button type="button" className="g-btn sec" onClick={pedirOutro}>Pedir outro horário</button>
-            {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {info.nome}</a>}
+            {zapLoja && <a className="g-btn fantasma" href={linkWhatsApp(info.telefone, `Oi! Acabei de pedir ${enviado.servico.toLowerCase()} para ${listaDeNomes(enviado.pets.map((x) => x.nome))} pelo link, ${diaPorExtenso(enviado.dia, info.hoje)} às ${enviado.pets[0]?.hora ?? ""}.`) ?? zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {info.nome}</a>}
           </div>
         </section>
       )}

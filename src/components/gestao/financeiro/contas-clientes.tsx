@@ -64,7 +64,7 @@ function LinhaConta({ conta, hoje, aoReceber }: { conta: Lancamento; hoje: strin
   const { petshop } = useGestao();
   const v = conta.vencimento;
   const multa = multaSugerida(petshop, conta, hoje);
-  const nome = conta.descricao?.trim() || categoriaAtual(conta.categoria);
+  const nome = conta.descricao?.trim() || categoriaAtual(conta.categoria, petshop);
   return (
     <div className="gr-conta">
       <span className="t">

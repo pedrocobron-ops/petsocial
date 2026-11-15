@@ -1,4 +1,4 @@
-import { AREAS, FUNCAO_CUIDADOR, PERFIS, areasDe, perfilParaOPetshop, veDinheiro, type Area } from "@/lib/gestao/acessos";
+import { AREAS, FUNCAO_CUIDADOR, PERFIS, areasDe, areasPara, perfilParaOPetshop, veDinheiro, type Area } from "@/lib/gestao/acessos";
 import { PLANOS, planoPorId } from "@/lib/gestao/planos";
 import type { Petshop, Profissional } from "@/lib/gestao/tipos";
 
@@ -101,9 +101,11 @@ export function funcaoDe(p: Pick<Profissional, "papel" | "funcao" | "atende">, p
 }
 
 /** Áreas em pílulas: "Tudo" quando abre as oito. */
-export function pilulasDe(p: Pick<Profissional, "papel" | "ve_financeiro" | "acessos">): string[] {
+export function pilulasDe(p: Pick<Profissional, "papel" | "ve_financeiro" | "acessos">, petshop?: { modulos?: string[] | null }): string[] {
   const areas = areasDe(p);
-  return areas.length === TODAS_AREAS.length ? ["Tudo"] : AREAS.filter((a) => areas.includes(a.id)).map((a) => a.rotulo);
+  if (areas.length === TODAS_AREAS.length) return ["Tudo"];
+  // área de algo que o negócio não faz (creche e hotel numa loja sem os dois) não aparece; a casa com o nome do menu
+  return (petshop ? areasPara(petshop) : AREAS).filter((a) => areas.includes(a.id)).map((a) => a.rotulo);
 }
 
 /* ---------- donos ---------- */

@@ -195,7 +195,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
                 <p className="g-eq-uso-t">Acessos do plano {uso.plano.nome}: <b>{uso.usados + (comLogin && !semVaga ? 1 : 0)} de {uso.limite} em uso</b></p>
                 <Vagas uso={uso} nova={comLogin && !semVaga ? { nome: n, cor } : null} />
                 <p className="g-eq-uso-n">
-                  {uso.emTeste ? "Durante o teste valem os 6 acessos do plano Pet shop. " : ""}Só conta quem tem login ou convite. Quem só aparece na agenda não ocupa acesso.
+                  {uso.emTeste ? "Durante o teste valem os 6 acessos do plano Pet shop. " : ""}Só conta quem tem login ou convite. {usaModulo(petshop, "banho_tosa") ? "Quem só aparece na agenda" : "Quem trabalha sem login"} não ocupa acesso.
                 </p>
                 {semVaga && <PlanoCheio uso={uso} ainda={socio ? undefined : `${primeiro} ainda pode entrar na equipe sem login.`} />}
               </div>

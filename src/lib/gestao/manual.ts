@@ -2375,7 +2375,18 @@ function textoDaCasa(texto: string, petshop: ComModulos | null): string {
     .replaceAll("Opções do hotel e da creche", creche ? "Opções da creche" : "Opções do hotel")
     .replaceAll("cartão Creche e hotel", `cartão ${casa}`)
     .replaceAll("Em Creche e hotel,", `Em ${casa},`)
-    .replaceAll("em Creche e hotel", `em ${casa}`);
+    .replaceAll("em Creche e hotel", `em ${casa}`)
+    // frases que juntam as duas, para quem usa só uma (a categoria do Financeiro também aparece com o nome da casa)
+    .replaceAll("Creche e hotel têm", `${casa} tem`)
+    .replaceAll("Para quem usa só uma das duas, o menu mostra Creche ou Hotel.", "")
+    .replaceAll("Creche e hotel", casa)
+    .replaceAll("opções do hotel e da creche", creche ? "opções da creche" : "opções do hotel")
+    .replace(/\b([dn])[ao] (creche|hotel) (e|ou) [dn][ao] (creche|hotel)\b/g, (_m, p: string) => (creche ? `${p}a creche` : `${p}o hotel`))
+    .replaceAll("para a creche e o hotel", creche ? "para a creche" : "para o hotel")
+    .replaceAll("creche ou hotel", casa.toLowerCase())
+    .replaceAll("de creche e de hotel", creche ? "de creche" : "de hotel")
+    .replaceAll("Escolha Creche ou Hotel e toque", "Toque")
+    .replace(/\s+$/, "");
 }
 
 /** O tópico em texto puro. Com pet shop, saem os passos e as dicas das partes que ele não usa. */

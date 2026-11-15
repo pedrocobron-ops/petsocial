@@ -472,17 +472,18 @@ function CaixaDoDia() {
 
 /** Uma linha de lançamento. Sem `aoTocar` (caixa já fechado), é só leitura. Sangria e suprimento têm rótulo e cor próprios. */
 function LinhaLancamento({ l, aoTocar }: { l: Lancamento; aoTocar?: () => void }) {
+  const { petshop } = useGestao();
   const entrada = l.tipo === "entrada";
   const gaveta = Boolean(l.movimento);
   const forma = textoDoPagamento(l);
   const apoio = gaveta
     ? `${hora(quandoPagou(l))} · ${l.descricao || "não é venda nem despesa"}`
-    : `${hora(quandoPagou(l))}${l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria)}` : ""}${resumoDeItens(l) ? ` · ${resumoDeItens(l)}` : ""}`;
+    : `${hora(quandoPagou(l))}${l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria, petshop)}` : ""}${resumoDeItens(l) ? ` · ${resumoDeItens(l)}` : ""}`;
   const dentro = (
     <>
       <Tile icone={gaveta ? (entrada ? ArrowDownToLine : ArrowUpFromLine) : entrada ? ArrowDownLeft : ArrowUpRight} tom={gaveta ? "manteiga" : entrada ? "menta" : "rosa"} />
       <span className="t">
-        <b className="g-cx-desc">{gaveta ? nomeDoMovimento(l.movimento) : l.descricao || categoriaAtual(l.categoria)} <TagAlterado lancamento={l} /></b>
+        <b className="g-cx-desc">{gaveta ? nomeDoMovimento(l.movimento) : l.descricao || categoriaAtual(l.categoria, petshop)} <TagAlterado lancamento={l} /></b>
         <span>{apoio}{!gaveta && <i className="g-cx-so-cel"> · {forma}</i>}</span>
       </span>
       {gaveta ? <span className="g-tag amarelo g-cx-so-largo">Gaveta</span> : <span className="g-tag g-cx-so-largo">{forma}</span>}

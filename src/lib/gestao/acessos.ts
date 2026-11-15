@@ -1,5 +1,5 @@
 import type { Profissional } from "./tipos";
-import { rotaForaDoMenu, usaCasa, usaModulo } from "./modulos";
+import { nomeDaCasa, rotaForaDoMenu, usaCasa, usaModulo } from "./modulos";
 
 /**
  * Áreas do aplicativo que o dono libera para cada pessoa com login.
@@ -51,7 +51,15 @@ export const perfisPara = (petshop: ComModulos): Perfil[] => {
   return usaModulo(petshop, "banho_tosa") ? lista : [...lista.filter((p) => p.id === "monitor"), ...lista.filter((p) => p.id !== "monitor")];
 };
 /** As áreas que viram chave na tela da equipe: as de módulos que o pet shop não usa ficam de fora (como no menu). */
-export const areasPara = (petshop: ComModulos) => AREAS.filter((a) => !rotaForaDoMenu(petshop, a.rota));
+export const areasPara = (petshop: ComModulos) => AREAS.filter((a) => !rotaForaDoMenu(petshop, a.rota)).map((a) => comNomeDoNegocio(a, petshop));
+
+/** O nome da área como o menu mostra: só hotel lê "Hotel", só creche lê "Creche" (com o que cada uma faz). */
+export function comNomeDoNegocio<A extends (typeof AREAS)[number]>(a: A, petshop: ComModulos): A | (Omit<A, "rotulo" | "apoio"> & { rotulo: string; apoio: string }) {
+  if (a.id !== "creche_hotel") return a;
+  const c = usaModulo(petshop, "creche"), h = usaModulo(petshop, "hotel");
+  if (c === h) return a;
+  return { ...a, rotulo: nomeDaCasa(petshop), apoio: c ? "Chamada, check-in e check-out." : "Reservas, check-in e check-out." };
+}
 
 /** As áreas que a pessoa abre, valendo o que foi marcado ou, se nada foi marcado, o padrão do papel. */
 export function areasDe(p: Pick<Profissional, "papel" | "ve_financeiro" | "acessos">): Area[] {

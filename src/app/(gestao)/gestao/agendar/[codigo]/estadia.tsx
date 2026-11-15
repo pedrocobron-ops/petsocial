@@ -61,8 +61,9 @@ const listaE = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(0, -1).
  * Pedido de creche (um ou mais dias) ou de hotel (entrada e saída) pelo link do cliente.
  * O cliente só fica sabendo se um dia está cheio; não vê quem está na casa nem quantas vagas existem.
  */
-export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, preco, zapLoja, aoVoltar, termos = null, recarregarTermos, aoPedir, fechados, horario }: {
+export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, preco, zapLoja, zapCom, aoVoltar, termos = null, recarregarTermos, aoPedir, fechados, horario }: {
   codigo: string; tipo: Tipo; hoje: string; loja: string; diaria: number | null; zapLoja: string | null; aoVoltar: () => void;
+  /** WhatsApp da loja com outro texto (depois do pedido, a conversa já começa falando dele) */ zapCom?: (texto: string) => string | null;
   /** hotel: o preço que o link pode mostrar. undefined = ainda lendo; null = banco antes da atualização (fica a diária comum, como era). */
   preco?: PrecoDoHotel | null;
   /** Regras que o tutor aceita antes de enviar (null = não pede aceite). */
@@ -354,7 +355,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
         <p className="g-lk-nota">Isto não é uma reserva: a vaga só vale se {loja} chamar e confirmar com você.</p>
         <div className="g-lk-ok-acoes">
           <button type="button" className="g-btn sec" onClick={aoVoltar}>Fazer outro pedido</button>
-          {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com a gente</a>}
+          {zapLoja && <a className="g-btn fantasma" href={zapCom?.(`Oi! Entrei na lista de espera ${hotel ? "do hotel" : "da creche"} para ${listaE(nomes)} pelo link, ${periodo}.`) ?? zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com a gente</a>}
         </div>
       </section>
     );
@@ -378,7 +379,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
         <div className="g-lk-ok-acoes">
           {pedidoId && <a className="g-btn verde" href={`/gestao/agendar/${codigo}/pedido/${pedidoId}`}>Acompanhar o pedido</a>}
           <button type="button" className="g-btn sec" onClick={aoVoltar}>Fazer outro pedido</button>
-          {zapLoja && <a className="g-btn fantasma" href={zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {loja}</a>}
+          {zapLoja && <a className="g-btn fantasma" href={zapCom?.(`Oi! Acabei de pedir uma vaga ${hotel ? "no hotel" : "na creche"} para ${listaE(nomes)} pelo link, ${periodo}.`) ?? zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {loja}</a>}
         </div>
       </section>
     );

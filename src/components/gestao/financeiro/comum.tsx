@@ -6,7 +6,7 @@ import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, creditoDa
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { diaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
-import { usaCasa } from "@/lib/gestao/modulos";
+import { nomeDaCasa, usaCasa } from "@/lib/gestao/modulos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
@@ -344,7 +344,12 @@ export function Apagados({ linhas, titulo = "Apagados" }: { linhas: AlteracaoLan
 
 const categoriasDe = (tipo: Tipo) => (tipo === "entrada" ? CATEGORIAS_ENTRADA : CATEGORIAS_SAIDA);
 /** Nome de hoje para uma categoria gravada com o nome antigo. */
-export const categoriaAtual = (c: string) => (c === "Produtos e insumos" ? "Produtos e material" : c);
+/**
+ * O nome da categoria na tela. Com o pet shop, "Creche e hotel" (o valor gravado, que não muda) aparece como o menu chama
+ * a casa: "Hotel" num hotel só, "Creche" numa creche só. Sem o pet shop (estado do formulário, planilha), o nome gravado.
+ */
+export const categoriaAtual = (c: string, petshop?: { modulos?: string[] | null }) =>
+  c === "Produtos e insumos" ? "Produtos e material" : c === "Creche e hotel" && petshop ? nomeDaCasa(petshop) : c;
 
 /**
  * Cria ou edita um lançamento.
@@ -406,7 +411,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   const nomeDoCliente = nomeDoClienteLido?.split(" ")[0] ?? "O cliente";
   // quem não tem creche nem hotel não vê essa categoria (lançamento antigo com ela continua mostrando)
   const lista = categoriasDe(tipo).filter((c) => c !== "Creche e hotel" || usaCasa(petshop));
-  const categorias = (lista.includes(categoria) ? lista : [categoria, ...lista]).map((c) => ({ id: c, rotulo: c }));
+  const categorias = (lista.includes(categoria) ? lista : [categoria, ...lista]).map((c) => ({ id: c, rotulo: categoriaAtual(c, petshop) }));
   const titulo = conta
     ? `${inicial ? "Editar conta" : "Nova conta"} ${entrada ? "a receber" : "a pagar"}`
     : inicial ? `Editar ${entrada ? "entrada" : "saída"}` : escolheTipo ? "Novo lançamento" : entrada ? "Nova entrada" : "Nova saída";
@@ -596,7 +601,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
           ? <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={valor ?? 0} rotulo="Como recebeu" />
           : <Grupo rotulo="Como pagou"><Chips opcoes={FORMAS} valor={pagamento.forma} aoMudar={(f) => { setPagamento(pagamentoInicial(f)); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>)}
         {soVer
-          ? <Grupo rotulo="Categoria"><p className="g-p">{categoria}{descricao ? ` · ${descricao}` : ""}</p></Grupo>
+          ? <Grupo rotulo="Categoria"><p className="g-p">{categoriaAtual(categoria, petshop)}{descricao ? ` · ${descricao}` : ""}</p></Grupo>
           : <Grupo rotulo="Categoria"><Chips opcoes={categorias} valor={categoria} aoMudar={setCategoria} rotulo="Categoria" /></Grupo>}
         {!conta && !soVer && (
           <Campo rotulo="Descrição (se quiser)">
@@ -789,7 +794,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
       <div className="g-form">
         <div className="g-card areia">
           <LinhaResumo nome={conta.descricao || conta.categoria} valor={brl(conta.valor)} forte />
-          <p className="g-muted g-pp">{conta.categoria}{conta.vencimento ? ` · vencimento em ${dataCompleta(conta.vencimento)}` : ""}{textoJaRecebido(conta) ? ` · ${textoJaRecebido(conta)}` : ""}</p>
+          <p className="g-muted g-pp">{categoriaAtual(conta.categoria, petshop)}{conta.vencimento ? ` · vencimento em ${dataCompleta(conta.vencimento)}` : ""}{textoJaRecebido(conta) ? ` · ${textoJaRecebido(conta)}` : ""}</p>
         </div>
         {entrada && <PartesRecebidas conta={conta} />}
         {entrada && (

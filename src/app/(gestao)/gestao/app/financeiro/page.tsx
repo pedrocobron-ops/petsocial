@@ -54,13 +54,13 @@ const ehDevolucao = (l: Pick<Lancamento, "tipo" | "categoria">) => l.tipo === "s
  * Soma por categoria. Uma conta com serviço, produto e extra é repartida: o serviço fica na categoria do lançamento,
  * o produto em "Venda de produtos" e o extra em "Extras", com o desconto rateado na proporção de cada parte.
  */
-function porCategoria(lista: Lancamento[]) {
+function porCategoria(lista: Lancamento[], petshop: { modulos?: string[] | null }) {
   const mapa = new Map<string, number>();
   const por = (nome: string, valor: number) => { if (valor) mapa.set(nome, (mapa.get(nome) ?? 0) + valor); };
   for (const l of lista) {
     const partes = l.tipo === "entrada" ? partesDoLancamento(l) : null;
-    if (!partes) { por(categoriaAtual(l.categoria), Number(l.valor)); continue; }
-    por(categoriaAtual(l.categoria), partes.servico);
+    if (!partes) { por(categoriaAtual(l.categoria, petshop), Number(l.valor)); continue; }
+    por(categoriaAtual(l.categoria, petshop), partes.servico);
     por("Venda de produtos", partes.produto);
     por("Extras", partes.extra);
   }
@@ -122,7 +122,7 @@ function Financeiro() {
     const devolvido = soma(devolucoes);
     return {
       entrou: Math.round((soma(entradas) - devolvido) * 100) / 100, saiu: soma(saidas), bruto: soma(entradas), devolvido,
-      entradasPorCategoria: porCategoria(entradas), saidasPorCategoria: porCategoria(saidas),
+      entradasPorCategoria: porCategoria(entradas, petshop), saidasPorCategoria: porCategoria(saidas, petshop),
       entrouAntes: Math.round((soma(anterior.filter((l) => l.tipo === "entrada")) - soma(anterior.filter(ehDevolucao))) * 100) / 100,
       saiuAntes: soma(anterior.filter((l) => l.tipo === "saida" && !ehDevolucao(l))),
       temAnterior: anterior.length > 0,
@@ -366,8 +366,8 @@ function Financeiro() {
                         <button key={l.id} className="g-linha" onClick={() => abrir({ tipo: "editar", lancamento: l })}>
                           <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
                           <span className="t">
-                            <b>{l.descricao || categoriaAtual(l.categoria)} <TagAlterado lancamento={l} /></b>
-                            <span>{dataCurta(l.data)}{l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {textoDoPagamento(l)}</i></span>
+                            <b>{l.descricao || categoriaAtual(l.categoria, petshop)} <TagAlterado lancamento={l} /></b>
+                            <span>{dataCurta(l.data)}{l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria, petshop)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {textoDoPagamento(l)}</i></span>
                           </span>
                           <span className="g-tag g-fin-so-largo">{textoDoPagamento(l)}</span>
                           <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
@@ -566,6 +566,7 @@ function Contas({ lista, receber, hoje, tutores, aoEditar, aoBaixar, aoCriar }: 
   lista: Lancamento[]; receber: boolean; hoje: string; tutores: Map<string, string>;
   aoEditar: (c: Lancamento) => void; aoBaixar: (c: Lancamento) => void; aoCriar: () => void;
 }) {
+  const { petshop } = useGestao();
   if (!lista.length) {
     return (
       <Vazio titulo={receber ? "Ninguém está devendo." : "Nenhuma conta para pagar."}
@@ -622,7 +623,7 @@ function Contas({ lista, receber, hoje, tutores, aoEditar, aoBaixar, aoCriar }: 
                 <span className="g-fin-so-largo"><Tile icone={v && v < hoje ? TriangleAlert : receber ? HandCoins : Receipt} tom={v && v < hoje ? "rosa" : receber ? "menta" : "manteiga"} /></span>
                 <span className="t">
                   <b>{c.descricao || c.categoria}</b>
-                  <span>{tutor ? `${tutor} · ` : ""}{categoriaAtual(c.categoria)}{textoJaRecebido(c) ? ` · ${textoJaRecebido(c)}` : ""}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
+                  <span>{tutor ? `${tutor} · ` : ""}{categoriaAtual(c.categoria, petshop)}{textoJaRecebido(c) ? ` · ${textoJaRecebido(c)}` : ""}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
                 </span>
                 <span className="d">
                   <b>{brl(c.valor)}</b>

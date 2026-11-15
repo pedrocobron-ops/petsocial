@@ -74,7 +74,7 @@ export default function Equipe() {
           <BlocoDoPlano uso={uso} aoAdicionar={() => abrir({ tipo: "novo" })} />
           <div className="g-grade kpis g-eq-kpis">
             <Kpi icone={Users} tom="ceu" rotulo="Na equipe" valor={ativos.length} apoio={ativos.length === 1 ? "pessoa ativa" : "pessoas ativas"} />
-            <Kpi icone={Scissors} tom="pessego" rotulo="Atendem" valor={atendem} apoio="aparecem na agenda" />
+            <Kpi icone={Scissors} tom="pessego" rotulo="Atendem" valor={atendem} apoio={usaModulo(petshop, "banho_tosa") ? "aparecem na agenda" : "cuidam dos pets"} />
             <Kpi icone={CalendarCheck} tom="menta" rotulo="Trabalham hoje" valor={trabalhamHoje} apoio={loja[hoje] ? `${NOME_DIAS[hoje]}, pela escala` : "pet shop fechado hoje"} />
             <Kpi icone={Mail} tom="manteiga" rotulo="Convites" valor={convites} apoio={convites ? "esperando criar a conta" : "nenhum pendente"} />
           </div>
@@ -122,7 +122,7 @@ export default function Equipe() {
                     <div className={`g-eq-acesso ${acesso}`}>
                       <i className="g-eq-acesso-i" aria-hidden>{acesso === "login" ? <KeyRound /> : acesso === "convite" ? <Hourglass /> : p.atende ? <CalendarDays /> : <Lock />}</i>
                       <p className="g-eq-acesso-t">
-                        <b>{acesso === "login" ? "Com login" : acesso === "convite" ? "Convite criado: falta a pessoa criar a conta" : p.atende ? "Sem login, só na agenda" : "Sem login"}</b>
+                        <b>{acesso === "login" ? "Com login" : acesso === "convite" ? "Convite criado: falta a pessoa criar a conta" : p.atende && usaModulo(petshop, "banho_tosa") ? "Sem login, só na agenda" : "Sem login"}</b>
                         {acesso === "convite" && <small>{p.email_convite}</small>}
                       </p>
                       {acesso === "convite" && <button type="button" className="g-btn p sec g-eq-acao" onClick={() => abrir({ tipo: "convite", id: p.id })}><Send />Reenviar</button>}
@@ -132,14 +132,14 @@ export default function Equipe() {
                     {acesso !== "sem" && (
                       <div className="g-eq-abre">
                         <span className="g-eq-abre-r">Abre</span>
-                        {pilulasDe(p).map((a) => <span key={a} className={`g-eq-pilula${a === "Tudo" ? " tudo" : ""}`}>{a}</span>)}
+                        {pilulasDe(p, petshop).map((a) => <span key={a} className={`g-eq-pilula${a === "Tudo" ? " tudo" : ""}`}>{a}</span>)}
                         {dono && <span className="g-eq-pilula tudo">Equipe e assinatura</span>}
                       </div>
                     )}
 
                     {(p.atende || Number(p.comissao_pct) > 0) && (
                       <div className="g-eq-tags">
-                        {p.atende && <span className="g-tag verde"><Scissors aria-hidden />atende na agenda</span>}
+                        {p.atende && <span className="g-tag verde"><Scissors aria-hidden />{usaModulo(petshop, "banho_tosa") ? "atende na agenda" : "cuida dos pets"}</span>}
                         {Number(p.comissao_pct) > 0 && <span className="g-tag">comissão de {pct(p.comissao_pct)}</span>}
                       </div>
                     )}
@@ -186,7 +186,7 @@ export default function Equipe() {
               </div>
             ))}
           </div>
-          <p className="g-muted g-pp g-eq-pode-n">Vale para quem entra com o próprio login. Quem só aparece na agenda não abre nada. Caixa, Financeiro e Relatórios são as áreas que mostram valores.</p>
+          <p className="g-muted g-pp g-eq-pode-n">Vale para quem entra com o próprio login. {usaModulo(petshop, "banho_tosa") ? "Quem só aparece na agenda" : "Quem trabalha sem login"} não abre nada. Caixa, Financeiro e Relatórios são as áreas que mostram valores.</p>
         </details>}
       </div>
 
