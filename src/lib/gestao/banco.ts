@@ -607,14 +607,14 @@ isOneToOne: false
                   ]
                 },"diario_fotos": {
                   Row: {
-                    "bytes": number | null,"caminho": string,"criado_em": string,"criado_nome": string | null,"criado_por": string | null,"dia": string,"estadia_id": string,"id": string,"legenda": string | null,"pet_id": string,"petshop_id": string
+                    "assinatura": string | null,"assinatura_vale_ate": string | null,"bytes": number | null,"caminho": string,"criado_em": string,"criado_nome": string | null,"criado_por": string | null,"dia": string,"estadia_id": string,"id": string,"legenda": string | null,"pet_id": string,"petshop_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "bytes"?: number | null,"caminho": string,"criado_em"?: string,"criado_nome"?: string | null,"criado_por"?: string | null,"dia": string,"estadia_id": string,"id"?: string,"legenda"?: string | null,"pet_id": string,"petshop_id": string
+                    "assinatura"?: string | null,"assinatura_vale_ate"?: string | null,"bytes"?: number | null,"caminho": string,"criado_em"?: string,"criado_nome"?: string | null,"criado_por"?: string | null,"dia": string,"estadia_id": string,"id"?: string,"legenda"?: string | null,"pet_id": string,"petshop_id": string
                   }
                   Update: {
-                    "bytes"?: number | null,"caminho"?: string,"criado_em"?: string,"criado_nome"?: string | null,"criado_por"?: string | null,"dia"?: string,"estadia_id"?: string,"id"?: string,"legenda"?: string | null,"pet_id"?: string,"petshop_id"?: string
+                    "assinatura"?: string | null,"assinatura_vale_ate"?: string | null,"bytes"?: number | null,"caminho"?: string,"criado_em"?: string,"criado_nome"?: string | null,"criado_por"?: string | null,"dia"?: string,"estadia_id"?: string,"id"?: string,"legenda"?: string | null,"pet_id"?: string,"petshop_id"?: string
                   }
                   Relationships: [
                     {
@@ -636,6 +636,20 @@ isOneToOne: false
       referencedRelation: "petshops"
       referencedColumns: ["id"]
     }
+                  ]
+                },"diario_fotos_lixo": {
+                  Row: {
+                    "caminho": string,"criado_em": string,"motivo": string,"petshop_id": string,"tentativas": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "caminho": string,"criado_em"?: string,"motivo"?: string,"petshop_id": string,"tentativas"?: number
+                  }
+                  Update: {
+                    "caminho"?: string,"criado_em"?: string,"motivo"?: string,"petshop_id"?: string,"tentativas"?: number
+                  }
+                  Relationships: [
+                    
                   ]
                 },"dias_especiais": {
                   Row: {
@@ -1459,6 +1473,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"tutor_acessos": {
+                  Row: {
+                    "cliente_id": string,"minuto": string,"n": number,"tipo": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cliente_id": string,"minuto": string,"n"?: number,"tipo": string
+                  }
+                  Update: {
+                    "cliente_id"?: string,"minuto"?: string,"n"?: number,"tipo"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "tutor_acessos_cliente_id_fkey"
+      columns: ["cliente_id"]
+isOneToOne: false
+      referencedRelation: "clientes"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"tutor_links": {
                   Row: {
                     "cliente_id": string,"criado_em": string,"criado_por": string | null,"petshop_id": string,"token": string,"visto_em": string | null
@@ -1818,8 +1852,17 @@ isOneToOne: false
 "diaria_sugerida":
 { Args: { "p_petshop": string,"p_porte": string,"p_tipo": string }; Returns: number
                            },
+"diario_faxina":
+{ Args: { "p_petshop": string }; Returns: Json
+                           },
+"diario_fotos_assinar":
+{ Args: { "p_lista": Json,"p_petshop": string }; Returns: number
+                           },
 "diario_pasta":
 { Args: { "p_nome": string }; Returns: string
+                           },
+"diario_pode_limpar":
+{ Args: { "p_nome": string }; Returns: boolean
                            },
 "diferenca_que_falta":
 { Args: { "p_agendamento": string,"p_sem"?: string }; Returns: number
@@ -2192,6 +2235,9 @@ isOneToOne: false
 "tutor_codigo_novo":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"tutor_dias_fotos":
+{ Args: { "p": string }; Returns: number
+                           },
 "tutor_do_codigo":
 { Args: { "p_token": string }; Returns: {
               "cliente_id": string,
@@ -2207,6 +2253,12 @@ isOneToOne: false
         isOneToOne: true
         isSetofReturn: false
       } },
+"tutor_foto":
+{ Args: { "p_foto": string,"p_token": string }; Returns: Json
+                           },
+"tutor_frear":
+{ Args: { "p_cliente": string,"p_limite": number,"p_tipo": string }; Returns: undefined
+                           },
 "tutor_link":
 { Args: { "p_cliente": string }; Returns: string
                            },
