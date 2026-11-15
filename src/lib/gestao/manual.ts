@@ -2373,6 +2373,15 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["Os dados que você lança são do seu pet shop."],
     palavras: ["dados", "exportar", "planilha", "lgpd", "apagar", "excluir conta", "privacidade", "meus dados"] },
+  { id: "o-que-a-maestro-ve", titulo: "O que a equipe Maestro Pet vê da minha conta", secao: "ajustes", quem: "dono", rota: null,
+    passos: [
+      "A equipe Maestro Pet vê os dados da conta: nome do pet shop, cidade, telefone, nome e e-mail do dono, nomes das pessoas da equipe, plano, situação da assinatura e datas do teste e do pagamento.",
+      "Vê também números de uso: quando alguém da equipe entrou, em quantos dias o sistema foi usado e quantos agendamentos, vendas, presenças na creche e hospedagens foram lançados.",
+      "São só quantidades. O painel da Maestro Pet não mostra nomes, telefones ou endereços dos seus clientes, nem os pets, nem quanto o seu pet shop recebe ou gasta.",
+      "As conversas com o Mozart e com a Ajuda ficam guardadas para a nossa equipe melhorar as respostas e ajudar quando você pede.",
+      "A Maestro Pet pode mandar mensagem pelo telefone do pet shop para dar boas-vindas, avisar do fim do teste ou de um pagamento que não passou. Nada é enviado sozinho.",
+    ],
+    palavras: ["o que voces veem", "maestro ve", "equipe maestro", "privacidade", "quem ve meus dados", "voces veem meus clientes", "espionar", "acesso da maestro", "lgpd"] },
   { id: "assinatura", titulo: "Como funciona o teste grátis, os planos e a assinatura", secao: "ajustes", quem: "dono", rota: ASSINATURA,
     passos: [
       "Abra Assinatura.",

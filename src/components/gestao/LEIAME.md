@@ -115,6 +115,13 @@ Nome da casa: quem usa só hotel lê "Hotel", só creche lê "Creche" (`nomeDaCa
 use `categoriaAtual(categoria, petshop)` (Financeiro, Caixa, contas). Áreas da equipe com `areasPara(petshop)` / `pilulasDe(p, petshop)`.
 O manual troca sozinho (`textoDaCasa` em `manual.ts`). Interruptor (`role="switch"`) sempre com `aria-label` ou texto dentro.
 
+## Painel do administrador (`/gestao/admin`, só `sou_admin()`)
+- Abas: Visão geral (`admin/visao.tsx`, função `admin_visao_geral`), Uso (`admin/uso.tsx`, `admin_uso` + `admin_uso_contas`, sinais em `sinaisDe`),
+  Contas (lista de `admin_painel`; a folha usa `admin/conta.tsx` com `admin_conta`: histórico e mensagens prontas), Conversas, Escola, Cakto.
+- Regra: o painel recebe só dados da conta e quantidades. Nada de nome/telefone de cliente, pets ou valores do pet shop. Função nova de admin
+  é security definer, começa com `if not public.sou_admin() then raise exception`, e tira o `execute` de `public, anon`.
+- Trocas de status ficam em `petshop_status_hist` (gatilho em `petshops`, migração 20261175); sem regra de RLS, só as funções leem.
+
 ## Cakto (assinatura)
 
 - Aviso de pagamento: `src/app/api/gestao/cakto/route.ts` → função `cakto_evento` (casa a loja pela assinatura, pelo `callback` do link

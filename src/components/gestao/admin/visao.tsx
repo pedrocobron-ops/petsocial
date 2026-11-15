@@ -105,7 +105,7 @@ export default function AbaVisao() {
         <Num rotulo="Atrasadas" valor={s.atrasada} dica="a Cakto avisou que a cobrança não passou" />
         <Num rotulo="Canceladas" valor={s.cancelada} />
         <Num rotulo="Cortesia" valor={s.cortesia} dica="usam sem pagar" />
-        <div className="g-card verde">
+        <div className="g-card verde" style={{ gridColumn: "1 / -1" }}>
           <p className="g-rotulo">Receita por mês (estimativa)</p>
           <p className="g-num m" style={{ marginTop: 10 }}>{brl(mrr)}</p>
           <p className="g-pp g-muted" style={{ marginTop: 6 }}>
@@ -115,8 +115,8 @@ export default function AbaVisao() {
         </div>
       </section>
 
-      <section className="g-grade c2">
-        <div className="g-card">
+      <section className="g-grade c2" style={{ minWidth: 0 }}>
+        <div className="g-card" style={{ minWidth: 0 }}>
           <div className="g-card-t">
             <p className="g-rotulo">Cadastros novos</p>
             <span className="g-pp g-muted">{totalBarras} {escala === "dia" ? "em 30 dias" : "em 90 dias"}</span>
@@ -125,29 +125,29 @@ export default function AbaVisao() {
             <button className="g-chip" aria-pressed={escala === "dia"} onClick={() => setEscala("dia")}>Por dia · 30 dias</button>
             <button className="g-chip" aria-pressed={escala === "semana"} onClick={() => setEscala("semana")}>Por semana · 90 dias</button>
           </div>
-          <div className="g-barras" style={{ gap: escala === "dia" ? 2 : 6 }} role="img" aria-label={`Cadastros ${escala === "dia" ? "por dia nos últimos 30 dias" : "por semana nos últimos 90 dias"}: ${totalBarras} no total.`}>
+          <div className="g-barras" style={{ gap: escala === "dia" ? 2 : 6, gridAutoColumns: "minmax(0, 1fr)" }} role="img" aria-label={`Cadastros ${escala === "dia" ? "por dia nos últimos 30 dias" : "por semana nos últimos 90 dias"}: ${totalBarras} no total.`}>
             {barras.map((b, i) => (
               <div key={b.chave} title={`${b.titulo}: ${b.n} ${b.n === 1 ? "cadastro" : "cadastros"}`}>
-                <span className="g-tab">{b.n || ""}</span>
-                <i className={b.n ? undefined : "fraco"} style={{ height: `${(b.n / maior) * 100}%` }} />
-                <span style={{ visibility: escala === "semana" || i % 5 === 4 || i === barras.length - 1 ? "visible" : "hidden" }}>{b.rotulo}</span>
+                <span className="g-tab">{b.n && (escala === "semana" || b.n === maior) ? b.n : ""}</span>
+                <i className={b.n ? undefined : "fraco"} style={{ height: `${Math.round((b.n / maior) * 96)}px` }} />
+                <span style={{ whiteSpace: "nowrap", visibility: (barras.length - 1 - i) % (escala === "semana" ? 3 : 5) === 0 ? "visible" : "hidden" }}>{b.rotulo}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="g-card">
+        <div className="g-card" style={{ minWidth: 0 }}>
           <div className="g-card-t">
             <p className="g-rotulo">Cancelamentos por mês</p>
             <span className="g-pp g-muted">{totalCanc} em 12 meses</span>
           </div>
-          <div className="g-barras" style={{ marginTop: 14 }} role="img" aria-label={`Cancelamentos por mês nos últimos 12 meses: ${totalCanc} no total.`}>
+          <div className="g-barras" style={{ marginTop: 14, gap: 3, gridAutoColumns: "minmax(0, 1fr)" }} role="img" aria-label={`Cancelamentos por mês nos últimos 12 meses: ${totalCanc} no total.`}>
             {v.cancelamentos.map((c) => {
               const [a, m] = c.mes.split("-").map(Number);
               return (
                 <div key={c.mes} title={`${MESES_CURTOS[m - 1]}/${a}: ${c.n}`}>
                   <span className="g-tab">{c.n || ""}</span>
-                  <i className={c.n ? undefined : "fraco"} style={{ height: `${(c.n / maiorCanc) * 100}%`, background: c.n ? "var(--g-vermelho, #b4412f)" : undefined }} />
+                  <i className={c.n ? undefined : "fraco"} style={{ height: `${Math.round((c.n / maiorCanc) * 96)}px`, background: c.n ? "var(--g-vermelho, #b4412f)" : undefined }} />
                   <span>{MESES_CURTOS[m - 1]}</span>
                 </div>
               );
@@ -160,7 +160,7 @@ export default function AbaVisao() {
         </div>
       </section>
 
-      <section className="g-card">
+      <section className="g-card" style={{ minWidth: 0 }}>
         <p className="g-rotulo">Do teste à assinatura, por semana de cadastro</p>
         <p className="g-pp g-muted" style={{ marginTop: 4 }}>
           A porcentagem conta só quem já terminou o teste. Cortesias ficam de fora.
@@ -170,7 +170,7 @@ export default function AbaVisao() {
           <table className="g-tabela" style={{ width: "100%", borderCollapse: "collapse", fontSize: ".875rem" }}>
             <thead>
               <tr style={{ textAlign: "left" }}>
-                <th style={th}>Semana</th><th style={thN}>Cadastros</th><th style={thN}>Ainda testando</th><th style={thN}>Assinaram</th><th style={{ ...th, minWidth: 110 }}>Viraram assinantes</th>
+                <th style={th}>Semana</th><th style={thN}>Cadastros</th><th style={thN}>Testando</th><th style={thN}>Assinaram</th><th style={{ ...th, minWidth: 110 }}>Viraram</th>
               </tr>
             </thead>
             <tbody>
