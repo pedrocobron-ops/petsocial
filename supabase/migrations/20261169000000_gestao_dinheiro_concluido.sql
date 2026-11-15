@@ -131,26 +131,28 @@ begin
   if v_quem and coalesce(v_frio, 0) > 0 and not old.sem_cobranca and old.pacote_cliente_id is null
      and (old.status = 'concluido' or new.status = 'concluido') then
     v_conta := exists (select 1 from public.lancamentos l where l.agendamento_id = old.id and l.tipo = 'entrada');
-    if not v_conta then
-      if old.status = 'concluido' and new.status <> 'concluido' then
+    if old.status = 'concluido' and new.status <> 'concluido' then
+      -- com conta fechada, o dinheiro está no lançamento (e reabrir já é só com o dono ou o financeiro: proteger_concluido)
+      if not v_conta then
         v_rotulo := case new.status when 'cancelado' then 'desmarcado' when 'faltou' then 'falta' when 'em_atendimento' then 'em atendimento' when 'confirmado' then 'confirmado' else 'marcado' end;
         perform public.conferir_valor_baixou(old.petshop_id, 'atendimento_reaberto',
           public.servicos_do_horario_texto(old.id, old.servico_id) || ' de ' || public.pet_e_dia(old.petshop_id, old.pet_id, old.inicio)
             || ', concluído e sem conta fechada, voltou para ' || v_rotulo,
           v_frio, 0, 'Com o preço travado, só o dono ou quem vê o financeiro volta para marcado um atendimento que já foi concluído. Se falta cobrar, feche a conta pelo preço do horário.',
           old.id);
-      elsif new.status = 'concluido' then
-        v_agora := public.valor_cheio_do_horario(new.id, new.preco);
-        if v_agora < v_frio - 0.005 then
-          v_antes := coalesce(old.concluido_servicos, public.servicos_do_horario_texto(old.id, old.servico_id));
-          v_depois := public.servicos_do_horario_texto(new.id, new.servico_id);
-          perform public.conferir_valor_baixou(old.petshop_id, 'atendimento_baixou',
-            public.pet_e_dia(old.petshop_id, old.pet_id, old.inicio) || ': ' ||
-              case when v_antes = v_depois then v_depois else v_antes || ' virou ' || v_depois end,
-            v_frio, v_agora,
-            'Com o preço travado, só o dono ou quem vê o financeiro baixa o valor de um atendimento já concluído (era ' || public.em_reais(v_frio) || ').',
-            old.id);
-        end if;
+      end if;
+    elsif new.status = 'concluido' and (old.status <> 'concluido' or not v_conta) then
+      -- concluído de novo (a conta pode ter sido fechada agora, pelo valor já baixado) ou mudado enquanto concluído e sem conta
+      v_agora := public.valor_cheio_do_horario(new.id, new.preco);
+      if v_agora < v_frio - 0.005 then
+        v_antes := coalesce(old.concluido_servicos, public.servicos_do_horario_texto(old.id, old.servico_id));
+        v_depois := public.servicos_do_horario_texto(new.id, new.servico_id);
+        perform public.conferir_valor_baixou(old.petshop_id, 'atendimento_baixou',
+          public.pet_e_dia(old.petshop_id, old.pet_id, old.inicio) || ': ' ||
+            case when v_antes = v_depois then v_depois else v_antes || ' virou ' || v_depois end,
+          v_frio, v_agora,
+          'Com o preço travado, só o dono ou quem vê o financeiro baixa o valor de um atendimento já concluído (era ' || public.em_reais(v_frio) || ').',
+          old.id);
       end if;
     end if;
   end if;

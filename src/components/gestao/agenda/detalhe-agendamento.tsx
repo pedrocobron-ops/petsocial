@@ -432,6 +432,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
             </p>
           ))}
           {vejoFinanceiro && recebido > 0 && <div className="g-fila entre"><span className="g-muted">Recebido</span><b className="g-tab g-verde-t">{brl(recebido)}{formasDoRecebido ? ` · ${formasDoRecebido}` : ""}</b></div>}
+          {vejoFinanceiro && (extra?.diferencaCobrada ?? 0) > 0 && <div className="g-fila entre"><span className="g-muted">Diferença recebida</span><b className="g-tab g-verde-t">{brl(extra!.diferencaCobrada)}</b></div>}
           {devidos.map((l) => (
             <div className="g-fila entre" key={l.id}>
               <span className="g-muted">A receber</span>
