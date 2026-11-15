@@ -20,6 +20,13 @@ grant select (id, petshop_id, pet_id, servico_id, profissional_id, inicio, fim, 
   on public.agendamentos to authenticated;
 -- colunas da 20261160 (quem marcou "não cobrar" e quando), que vem antes desta
 grant select (sem_cobranca_por, sem_cobranca_em, sem_cobranca_nome) on public.agendamentos to authenticated;
+-- colunas de migrações que, em produção, rodam ANTES desta (o `revoke` acima apaga o grant que elas deram).
+-- `valor_concluido` e `concluido_servicos` (20261169) ficam fechadas de propósito: são a referência de dinheiro do banco.
+do $$ begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'agendamentos' and column_name = 'remarcado_em') then
+    grant select (remarcado_em) on public.agendamentos to authenticated;  -- 20261166
+  end if;
+end $$;
 
 revoke select on public.agendamento_servicos from anon, authenticated;
 grant select (id, petshop_id, agendamento_id, servico_id, ordem, criado_em) on public.agendamento_servicos to authenticated;

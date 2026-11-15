@@ -10,6 +10,12 @@
 revoke select on public.estadias from anon, authenticated;
 grant select (id, petshop_id, pet_id, tipo, entrada, saida_prevista, saida, status, obs, criado_em, diarias_cobradas,
   plano_id, mensalista, dia, cobranca_id, acomodacao, cuidados, avisos, sinal_estado, chave) on public.estadias to authenticated;
+-- colunas criadas por migrações que, em produção, rodam ANTES desta (o `revoke` acima apaga o grant que elas deram)
+do $$ begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'estadias' and column_name = 'experiencia') then
+    grant select (experiencia) on public.estadias to authenticated;  -- 20261173
+  end if;
+end $$;
 
 -- ---------- opções: só pela função petshop_opcoes (que tira as listas de preço de quem não recebe) ----------
 revoke select (opcoes) on public.petshops from authenticated;
