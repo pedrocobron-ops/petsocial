@@ -149,4 +149,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 
 ## Tempo
 
-Medido numa máquina de desenvolvimento, servidor já no ar: veja o fim de `npm run test:tudo` (cada arquivo mostra o seu).
+Medido em 15/11/2026 (servidor já no ar, banco local): `npm run test:tudo` levou 193 a 206 s em quatro rodadas seguidas, 588
+conferências em 15 arquivos. Por parte: unidade + banco ~60 s, migrações ~9 s, telas ~130 s (o passeio sozinho ~110 s).
+Duas rodadas seguidas passaram sem limpar nada entre elas (cada teste cria e apaga a sua loja).
+
+Cuidado com banco compartilhado: `link.js` e `cakto.js` mudam `config_interna` (global) durante alguns segundos e devolvem no fim.
+Outro processo testando o link ou a Cakto no mesmo banco ao mesmo tempo pode ver esses valores.
