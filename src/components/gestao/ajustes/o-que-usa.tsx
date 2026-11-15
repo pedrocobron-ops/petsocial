@@ -32,14 +32,24 @@ export default function OQueUsa() {
     setErro(null);
     setSalvando(true);
     try {
-      ok(await sb.from("petshops").update({ modulos: valor, principal }).eq("id", petshop.id).select("id"));
+      // creche ou hotel ligados agora, com o link do cliente já ligado: o link passa a receber pedido de vaga também,
+      // como nas boas-vindas (desliga em Link do cliente). A diária e as vagas ficam em branco até o dono colocar.
+      const novas = (["creche", "hotel"] as const).filter((m) => valor.includes(m) && !salvo.includes(m));
+      const link = petshop.link_ativo ? {
+        ...(novas.includes("creche") && !petshop.link_creche ? { link_creche: true } : {}),
+        ...(novas.includes("hotel") && !petshop.link_hotel ? { link_hotel: true } : {}),
+      } : {};
+      ok(await sb.from("petshops").update({ modulos: valor, principal, ...link }).eq("id", petshop.id).select("id"));
       // passou a fazer banho e tosa e a lista de serviços está vazia: entram os mais comuns, sem preço
       if (valor.includes("banho_tosa") && !servicos.some((s) => !["creche", "hotel"].includes(s.categoria))) {
         ok(await sb.from("servicos").insert(SERVICOS_BANHO_TOSA.map((s) => ({ ...s, petshop_id: petshop.id }))).select("id"));
       }
       await recarregarBase();
       avisarMudanca();
-      avisar(principal ? "Salvo. O menu e a tela inicial já estão na nova ordem." : "Salvo. O menu já mostra na frente só o que você usa.");
+      const nomeNovas = novas.map((m) => (m === "creche" ? "creche" : "hotel")).join(" e ");
+      avisar(`${principal ? "Salvo. O menu e a tela inicial já estão na nova ordem." : "Salvo. O menu já mostra na frente só o que você usa."}${novas.length
+        ? ` Coloque a diária e as vagas ${novas.length > 1 ? "da creche e do hotel" : novas[0] === "creche" ? "da creche" : "do hotel"} no grupo ${novas.length > 1 || (valor.includes("creche") && valor.includes("hotel")) ? "Creche e hotel" : novas[0] === "creche" ? "Creche" : "Hotel"}, aqui em Meu pet shop.${Object.keys(link).length ? ` O link do cliente também passa a receber pedido de ${nomeNovas}.` : ""}`
+        : ""}`);
     } catch (x) { avisarErro(x); } finally { setSalvando(false); }
   }
 

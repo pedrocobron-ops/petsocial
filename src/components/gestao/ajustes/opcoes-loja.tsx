@@ -42,7 +42,7 @@ export default function OpcoesDaLoja({ solto }: { solto?: boolean }) {
                 <b id={`op-${o.chave}`}>{o.rotulo}</b>
                 <p className="g-muted g-p">{o.texto}</p>
               </div>
-              <button type="button" role="switch" aria-checked={ligada} aria-labelledby={`op-${o.chave}`} className="g-lj-chave"
+              <button type="button" role="switch" aria-checked={ligada} aria-label={o.rotulo} className="g-lj-chave"
                 disabled={!souDono || mudando !== null} onClick={() => void mudar(o.chave, o.rotulo, !ligada)}><i /></button>
             </div>
           );

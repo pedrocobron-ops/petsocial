@@ -69,6 +69,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
   const [familia, setFamilia] = useState<Grupo | null>(null);
   const [porFora, setPorFora] = useState(false);
   const [acertando, setAcertando] = useState<PlanoCompleto | null>(null);
+  const [cobrandoAqui, setCobrandoAqui] = useState<PlanoCompleto | null>(null);
   const mesIso = isoMes(mes);
   useEffect(() => { aoMes(mes); }, [mesIso]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -108,15 +109,10 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
   const semCobrancaPorFora = mesIso === isoMes(new Date()) && dados
     ? planos.filter((p) => p.primeira_cobranca === proximoMesIso && cobraNoMes({ ...p, primeira_cobranca: null }, mes) && !dados.doMes.some((c) => c.plano_id === p.id))
     : [];
-  async function cobrarPorAqui(p: PlanoCompleto) {
+  // desfaz o "pago por fora" do plano e já gera a cobrança deste mês, sem passar por Gerar cobranças
+  function cobrarPorAqui(p: PlanoCompleto) {
     if (somenteLeitura()) return;
-    try {
-      // a primeira cobrança passa a ser a deste mês: é escolha de quem recebe (o aviso de "pagas por fora" não volta a sugerir).
-      // Se já passou do vencimento, Gerar cobranças pergunta se é proporcional ou o mês inteiro (nada nasce vencido).
-      ok(await sb.from("creche_planos").update({ primeira_cobranca: mesIso }).eq("id", p.id).eq("petshop_id", petshop.id).select("id").single());
-      avisar(`${p.pets?.nome ?? "O pet"} voltou para a lista de quem falta cobrar em ${nomeMes(mes)}. Se a cobrança não aparecer sozinha, toque em Gerar cobranças e escolha como cobrar.`);
-      await mudou();
-    } catch (e) { avisarErro(e); }
+    setCobrandoAqui(p);
   }
   // podem ser marcadas como pagas por fora: abertas, com valor e ainda sem nenhum recebimento
   const semRecebimento = abertas.filter((c) => !c.lancamentos?.pago && Number(c.total) > 0 && faltaDaCobranca(c) === Number(c.total));
@@ -346,6 +342,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
       {familia && <ReceberFamilia grupo={familia} contas={aReceberDe(familia)} aoFechar={() => setFamilia(null)} aoFeito={mudou} />}
       {porFora && <PagasPorFora mes={mes} cobrancas={semRecebimento} marcadas={primeiras.map((c) => c.id)} aoFechar={() => setPorFora(false)} aoFeito={async () => { setPorFora(false); await mudou(); }} />}
       {acertando && <AcertoDaSaida plano={acertando} aoFechar={() => { setAcertando(null); void mudou(); }} />}
+      {cobrandoAqui && <CobrarPorAqui plano={cobrandoAqui} mes={mes} aoFechar={() => setCobrandoAqui(null)} aoFeito={async () => { setCobrandoAqui(null); await mudou(); }} />}
       {gerar && dados && <GerarCobrancas sobras={sobras ?? []} mes={mes} planos={faltamGerar} comCobranca={dados.comAnterior} aoFechar={aoFecharGerar} aoGerar={async () => { aoFecharGerar(); await mudou(); }} />}
       {editando && <EditarCobranca cobranca={editando} aoFechar={() => setEditando(null)} aoSalvo={async () => { setEditando(null); await mudou(); }} />}
       {baixando && <FolhaBaixa conta={baixando} aoFechar={() => setBaixando(null)} aoSalvo={async () => { await recarregar(); }} />}
@@ -709,6 +706,63 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
           <input type="date" className="g-input" value={data} max={hoje} onChange={(e) => { setData(e.target.value); setErro(null); }} />
         </Campo>
         {data === hoje && <AvisoCaixaFechado aberto={caixaAgora} />}
+      </div>
+    </Folha>
+  );
+}
+
+/* ---------- voltar a cobrar por aqui um mês marcado como pago por fora ---------- */
+
+/**
+ * O mês do plano foi marcado como pago por fora (no cadastro ou em Gerar cobranças) e o tutor não pagou: a cobrança deste mês
+ * nasce aqui mesmo. Se o vencimento do mês já passou, quem recebe escolhe entre o mês inteiro e o proporcional a partir de hoje
+ * (nada vem marcado, e a cobrança vence hoje: não nasce atrasada). Dias extras e taxas de meses anteriores entram junto, como em Gerar.
+ */
+function CobrarPorAqui({ plano, mes, aoFechar, aoFeito }: { plano: PlanoCompleto; mes: Date; aoFechar: () => void; aoFeito: () => Promise<void> }) {
+  const { sb, petshop } = useGestao();
+  const { avisar, avisarErro } = useAvisos();
+  const op = useOperacao();
+  const mesIso = isoMes(mes), hoje = isoDia(new Date());
+  const nome = plano.pets?.nome ?? "o pet";
+  const vencimento = vencimentoDoMes(plano, mes);
+  const passou = vencimento < hoje;
+  const cheio = plano.valor_mensal == null ? null : sugestaoDoMes(plano, mes, plano.valor_mensal, petshop.horario);
+  const daqui = passou && mesIso === isoMes(new Date()) && plano.valor_mensal != null ? proporcionalDesde(plano, mes, plano.valor_mensal, petshop.horario, hoje) : null;
+  const [escolha, setEscolha] = useState<"inteiro" | "proporcional" | null>(passou ? null : "inteiro");
+  const valor = escolha === "proporcional" ? daqui?.valor ?? null : cheio?.valor ?? null;
+
+  const gerar = () => op.fazer(async () => {
+    if (!escolha || valor == null) return false;
+    try {
+      // a primeira cobrança passa a ser a deste mês (escolha de quem recebe: o aviso de "pagas por fora" não volta a sugerir)
+      ok(await sb.from("creche_planos").update({ primeira_cobranca: mesIso }).eq("id", plano.id).eq("petshop_id", petshop.id).select("id").single());
+      ok(await sb.rpc("creche_cobranca_criar", { p_plano: plano.id, p_mes: mesIso, p_valor: valor, ...(passou ? { p_vencimento: hoje } : {}) }));
+      avisar(`Cobrança de ${nomeMes(mes)} de ${nome} gerada: ${brl(valor)}${passou ? ", vence hoje" : `, vence em ${dataCurta(vencimento)}`}. Ela já está em A receber.`);
+      await aoFeito();
+    } catch (e) { avisarErro(e); return false; }
+  });
+
+  return (
+    <Folha titulo={`Cobrar ${nomeMes(mes)} de ${nome} por aqui`} aoFechar={aoFechar}
+      rodape={<>
+        <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
+        <button className="g-btn pri" onClick={gerar} disabled={op.ocupado || !escolha || valor == null}>{op.ocupado ? "Gerando…" : escolha && valor != null ? `Gerar a cobrança · ${brl(valor)}` : "Escolha como cobrar"}</button>
+      </>}>
+      <div className="g-pilha">
+        <p className="g-muted g-p">{nomeMes(mes)[0].toUpperCase() + nomeMes(mes).slice(1)} estava marcado como pago por fora. Ao gerar, a mensalidade volta para A receber{plano.pets?.clientes?.nome ? `, no nome de ${plano.pets.clientes.nome}` : ""}. Dias extras e taxas de meses anteriores que ainda não foram cobrados entram junto.</p>
+        {plano.valor_mensal == null ? <p className="g-aviso" role="status">Defina o valor da mensalidade deste plano antes de gerar a cobrança.</p>
+          : passou ? (
+            <div className="g-campo">
+              <span>O vencimento deste mês ({dataCurta(vencimento)}) já passou. Como fica?</span>
+              <div className="g-pilha p" role="radiogroup" aria-label="Como cobrar">
+                <label className="g-check"><input type="radio" name="como" checked={escolha === "inteiro"} onChange={() => setEscolha("inteiro")} />
+                  <span>{cheio?.proporcional ? `Desde o começo do plano (${brl(cheio.valor)})` : `O mês inteiro (${brl(plano.valor_mensal)})`}</span></label>
+                {daqui && daqui.restam > 0 && <label className="g-check"><input type="radio" name="como" checked={escolha === "proporcional"} onChange={() => setEscolha("proporcional")} />
+                  <span>Proporcional a partir de hoje ({brl(daqui.valor)}, {daqui.restam} de {daqui.todos} dias do plano)</span></label>}
+              </div>
+              <small>A cobrança vence hoje, para não nascer atrasada.</small>
+            </div>
+          ) : <p className="g-p"><b>{brl(cheio?.valor ?? plano.valor_mensal)}</b> · vence em {dataCurta(vencimento)}{cheio?.proporcional ? ` (${cheio.restam} de ${cheio.todos} dias do plano no mês)` : ""}</p>}
       </div>
     </Folha>
   );
