@@ -1513,20 +1513,6 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"r19b_falha": {
-                  Row: {
-                    "campo": string,"campo2": string | null,"tabela": string,"valor": string,"valor2": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "campo": string,"campo2"?: string | null,"tabela": string,"valor": string,"valor2"?: string | null
-                  }
-                  Update: {
-                    "campo"?: string,"campo2"?: string | null,"tabela"?: string,"valor"?: string,"valor2"?: string | null
-                  }
-                  Relationships: [
-                    
-                  ]
                 },"series_agenda": {
                   Row: {
                     "cada_semanas": number,"criado_em": string,"encerrada_em": string | null,"petshop_id": string,"serie_id": string
