@@ -109,7 +109,10 @@ export function FolhaTaxaDeAtraso({ atraso, valor, aoFechar, aoDecidir }: {
         avisar(`${nome}: ${brl(valor)} de taxa no financeiro.`);
       }
       aoDecidir();
-    } catch (e) { avisarErro(e); setSalvando(false); }
+    } catch (e) {
+      // a mesma chave na nova tentativa: o pagamento que já entrou não é lançado de novo
+      avisarErro(e); setSalvando(false); return false;
+    }
   }
 
   return (

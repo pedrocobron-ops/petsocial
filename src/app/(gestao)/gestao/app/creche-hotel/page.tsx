@@ -1,14 +1,14 @@
 "use client";
 
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, CalendarOff, DoorOpen, Home, HandCoins, Hourglass, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, ShieldAlert, ShieldCheck, Sun, Sunset, Syringe } from "lucide-react";
 import { useCalendario } from "@/components/gestao/calendario";
 import { useGestao } from "@/components/gestao/contexto";
 import FormPet from "@/components/gestao/form-pet";
 import { Kpi } from "@/components/gestao/painel";
-import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
+import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, mensagemDeErro, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { AvisoCaixaFechado, Chips, ChipsForma, erroDeValor, ErroTela, lembrarForma, useCaixaAberto, useFormaLembrada } from "@/components/gestao/loja/pecas";
 import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import Diario from "@/components/gestao/casa/diario";
@@ -33,7 +33,8 @@ import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
 import { abreNoDia, esperadoNoDia, experienciaDe, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMudarPlano, precoDaExperiencia, type PlanoCompleto } from "@/lib/gestao/creche";
-import { conferirCaixa, conferirValorAlto, lancarPago, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
+import { casoDoErro, fazerTudoOuNada, ref, type Passo, type ResultadoDaOperacao } from "@/lib/gestao/tudo-ou-nada";
 import { useOperacao, useTrava } from "@/lib/gestao/uma-vez";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
 import {
@@ -966,6 +967,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   // trava na hora do primeiro toque e chave da operação: toque duplo não marca a reserva nem lança o sinal duas vezes
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
+  // a reserva já foi marcada nesta operação e só o sinal falhou: a nova tentativa (mesma chave) não confere de novo o conflito com ela mesma
+  const marcadaNaChave = useRef<string | null>(null);
   async function gravar(chave: string): Promise<boolean | void> {
     if (!pet || salvando) return;
     setErro(null); setErroSinal(null);
@@ -989,7 +992,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
     const status = emCasa ? "em_casa" : "reservada";
     const novo: Periodo = { tipo, entrada: entrada.toISOString(), saida_prevista: saida?.toISOString() ?? null, status };
     // o mesmo pet não fica duas vezes na casa nem com duas reservas no mesmo período (sem opção de forçar)
-    const bate = conflitoDoPet(pet.id, novo, abertas, editar?.id ?? null, agora);
+    const bate = marcadaNaChave.current === chave ? null : conflitoDoPet(pet.id, novo, abertas, editar?.id ?? null, agora);
     if (bate) {
       return falha(!editar && jaAqui && bate.status === "reservada" && isoDia(new Date(bate.entrada)) === isoDia(agora)
         ? `${pet.nome} tem reserva para hoje. Faça o check-in pela reserva, na aba Reservas.` : fraseConflito(pet.nome, bate));
@@ -1058,6 +1061,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
           id = (await sb.from("estadias").select("id").eq("petshop_id", petshop.id).eq("chave", chaveDaEstadia).maybeSingle()).data?.id ?? null;
         }
         if (!id) throw nova.error ?? new Error("Não deu para marcar. Tente de novo.");
+        marcadaNaChave.current = chave;
         avisar(`${emCasa ? `${pet.nome} está na casa.` : `Reserva de ${pet.nome} marcada para ${dataAmigavel(entrada)}.`}${comExp ? " É o dia de experiência." : ""}`);
       }
       // as taxas combinadas e o sinal ficam à parte, só para quem recebe
@@ -1070,7 +1074,11 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
           await lancarSinal(sb, petshop.id, { id, tipo, entrada: entrada.toISOString(), pet: pet.nome, clienteId: pet.clientes?.id ?? null }, sinalPronto, chave);
           avisar(sinalPronto.modo === "agora" ? `Sinal de ${brl(sinalPronto.valor)} recebido.` : `Sinal de ${brl(sinalPronto.valor)} em A receber, para ${dataCurta(sinalPronto.quando)}.`);
         } catch (e) {
-          avisarErro(`A reserva foi marcada, mas o sinal não foi anotado. Toque em Sinal no cartão da reserva. (${e instanceof Error ? e.message : "erro"})`);
+          // o sinal e a ligação com a reserva vão juntos: nada dele ficou gravado. A mesma chave na nova tentativa encontra a
+          // reserva já marcada e anota o sinal uma vez só
+          setErroSinal("O sinal não foi anotado. Toque de novo para anotar.");
+          avisarErro(`A reserva foi marcada, mas o sinal não foi anotado (nada dele foi lançado). Toque de novo para anotar o sinal. (${e instanceof Error ? e.message : "erro"})`);
+          return false;
         }
       }
       aoGravar(emCasa);
@@ -1080,6 +1088,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         const { data: la } = await sb.from("estadias").select("entrada").eq("petshop_id", petshop.id).eq("pet_id", pet.id).eq("status", "em_casa").maybeSingle();
         falha(`${pet.nome} já está na casa${la ? ` desde ${quando(la.entrada)}` : ""}.`);
       } else avisarErro(e);
+      // pode ter gravado uma parte (a reserva): a nova tentativa usa a mesma chave
+      return false;
     } finally { setSalvando(false); }
   }
 
@@ -1323,56 +1333,61 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
       const nome = l.e.pets?.nome ?? "Pet";
       try {
         const saida = new Date().toISOString();
-        // guarda o que foi cobrado: com pacote fica 0 (ou só a taxa) e a nota; quem saiu sem cobrar fica com o valor em branco (cortesia fica com 0)
-        const r = ok(await sb.from("estadias").update({
-          status: "encerrada", saida, diarias_cobradas: l.n,
+        // cada pet numa chamada só (o banco grava tudo ou nada): a saída, o pacote, o dinheiro e a conta. Nunca fica "saiu, mas o
+        // pagamento não foi lançado"; tocar de novo (mesma chave) não repete o que já entrou
+        const passos: Passo[] = [{
+          // guarda o que foi cobrado: com pacote fica 0 (ou só a taxa) e a nota; quem saiu sem cobrar fica com o valor em branco (cortesia fica com 0)
+          t: "estadia_fechar", id: l.e.id, saida, diarias: l.n,
           valor_cobrado: l.mensal ? null : l.usaPacote ? l.taxa : l.cobra && forma ? l.recebe : l.cortesia ? l.taxa : null,
           ...(l.usaPacote ? { obs: comNota(l.e.obs, NOTA_PACOTE) } : {}),
-        }).eq("id", l.e.id).eq("petshop_id", petshop.id).eq("status", "em_casa").select("id"));
-        if (!r.length) continue; // já tinha saído por outra tela
+        }];
+        // o pacote soma no banco (nunca passa do total)
+        if (l.usaPacote && l.pacote) passos.push({ t: "pacote", id: l.pacote.id, n: l.n });
+        const lanca = l.recebe > 0 && forma;
+        if (lanca) {
+          const diarias = `Creche: ${l.n} ${l.n === 1 ? "diária" : "diárias"}`;
+          const itens: ItemLancamento[] | null = l.taxa > 0 && l.cobra
+            ? [{ tipo: "servico", nome: diarias, qtd: 1, valor: l.valor }, { tipo: "extra", nome: NOME_TAXA_ATRASO, qtd: 1, valor: l.taxa }] : null;
+          passos.push({ t: "lancamento", nome: "principal", chave: parteDaChave(chave, l.e.id), linha: {
+            tipo: "entrada", valor: l.recebe, forma, categoria: "Creche e hotel", itens, pago: true, data: isoDia(new Date()),
+            descricao: l.cobra ? `${diarias} · ${nome}${l.taxa > 0 ? ` + ${NOME_TAXA_ATRASO}` : ""}` : `Creche: ${NOME_TAXA_ATRASO.toLowerCase()} · ${nome}`, cliente_id: l.e.pets?.clientes?.id ?? null,
+          } });
+          if (l.taxa > 0 && !l.mensal) {
+            // conta com taxa: o histórico mostra como o total foi montado
+            const dasDiarias = l.cobra ? l.valor : 0;
+            const conta: ContaDaEstadia = {
+              v: 1, tipo: "creche", quando: saida, diarias: l.n, valor_diaria: l.e.valor_diaria == null ? null : Number(l.e.valor_diaria), noites: null, pacote: l.usaPacote ? l.pacote?.nome ?? null : null,
+              total_diarias: dasDiarias, taxas: [{ id: ID_TAXA_ATRASO, nome: NOME_TAXA_ATRASO, por: "fixa", valor: l.taxa, qtd: 1, total: l.taxa }], extras: [], produtos: [],
+              soma: l.recebe, ajuste: 0, total: l.recebe, sinal: 0, sinal_pago: false, a_pagar: l.recebe, pendencias: [],
+              pagamento: { fiado: false, forma, pagamentos: null }, lancamento_id: ref("principal"),
+            };
+            passos.push({ t: "estadia_valores", estadia: l.e.id, modo: "upsert", campos: { conta } });
+          }
+        }
+        let feito: ResultadoDaOperacao;
+        try {
+          feito = await fazerTudoOuNada(sb, petshop.id, parteDaChave(chave, "saida", l.e.id)!, { funcao: "estadia_checkout", estadia: l.e.id }, passos);
+        } catch (e) {
+          if (casoDoErro(e) === "maestro:estadia_ja") continue; // já tinha saído por outra tela
+          throw e;
+        }
         feitos++;
+        if (l.usaPacote && l.pacote) comPacote++;
+        if (lanca) recebido += l.recebe;
         // mensalista: o banco confere a hora e anota a saída fora do horário (sem valor); a decisão vem logo abaixo ou fica para quem recebe
         const anotada = l.mensal && (await sb.rpc("creche_atraso_anotar", { p_estadia: l.e.id })).data === true;
         if (l.mensal && l.podeTaxa && l.taxa === 0) await decidirAtraso(sb, l.e.id, "dispensada").catch(() => undefined);
         else if (anotada && !(l.podeTaxa && l.taxa > 0 && forma)) anotadas++;
-        if (l.usaPacote && l.pacote) {
-          // mesma baixa do check-out do pet: só grava se ninguém mexeu no pacote no meio do caminho
-          const usados = l.pacote.usados + l.n;
-          const b = await sb.from("pacotes_clientes").update({ usados, ativo: usados < l.pacote.total })
-            .eq("id", l.pacote.id).eq("petshop_id", petshop.id).eq("usados", l.pacote.usados).select("id");
-          if (b.error || !b.data?.length) falhas.push(`${nome} (saiu, mas o pacote não teve baixa)`); else comPacote++;
-        }
-        if (l.recebe > 0 && forma) {
-          const diarias = `Creche: ${l.n} ${l.n === 1 ? "diária" : "diárias"}`;
-          const itens: ItemLancamento[] | null = l.taxa > 0 && l.cobra
-            ? [{ tipo: "servico", nome: diarias, qtd: 1, valor: l.valor }, { tipo: "extra", nome: NOME_TAXA_ATRASO, qtd: 1, valor: l.taxa }] : null;
-          try {
-            const lanc = await lancarPago(sb, petshop.id, {
-              tipo: "entrada", valor: l.recebe, forma, categoria: "Creche e hotel", itens,
-              descricao: l.cobra ? `${diarias} · ${nome}${l.taxa > 0 ? ` + ${NOME_TAXA_ATRASO}` : ""}` : `Creche: ${NOME_TAXA_ATRASO.toLowerCase()} · ${nome}`, clienteId: l.e.pets?.clientes?.id ?? null,
-              chave: parteDaChave(chave, l.e.id),
-            });
-            recebido += l.recebe;
-            // mensalista com a taxa recebida aqui: a anotação da saída fica ligada ao recebimento (não entra de novo na mensalidade)
-            if (l.taxa > 0 && l.mensal) await decidirAtraso(sb, l.e.id, "recebida", l.taxa, lanc.id).catch(() => undefined);
-            if (l.taxa > 0 && !l.mensal) {
-              // conta com taxa: o histórico mostra como o total foi montado
-              const dasDiarias = l.cobra ? l.valor : 0;
-              const conta: ContaDaEstadia = {
-                v: 1, tipo: "creche", quando: saida, diarias: l.n, valor_diaria: l.e.valor_diaria == null ? null : Number(l.e.valor_diaria), noites: null, pacote: l.usaPacote ? l.pacote?.nome ?? null : null,
-                total_diarias: dasDiarias, taxas: [{ id: ID_TAXA_ATRASO, nome: NOME_TAXA_ATRASO, por: "fixa", valor: l.taxa, qtd: 1, total: l.taxa }], extras: [], produtos: [],
-                soma: l.recebe, ajuste: 0, total: l.recebe, sinal: 0, sinal_pago: false, a_pagar: l.recebe, pendencias: [],
-                pagamento: { fiado: false, forma, pagamentos: null }, lancamento_id: lanc.id,
-              };
-              await sb.from("estadias_valores").upsert({ estadia_id: l.e.id, petshop_id: petshop.id, conta: conta as never }, { onConflict: "estadia_id" }).select("estadia_id");
-            }
-          } catch { falhas.push(`${nome} (saiu, mas o pagamento não foi lançado)`); }
-        }
-      } catch { falhas.push(nome); }
+        // mensalista com a taxa recebida aqui: a anotação da saída fica ligada ao recebimento (não entra de novo na mensalidade)
+        const lancId = feito.ids?.principal;
+        if (lanca && lancId && l.taxa > 0 && l.mensal) await decidirAtraso(sb, l.e.id, "recebida", l.taxa, lancId).catch(() => undefined);
+      } catch (e) { falhas.push(`${nome} (não saiu: nada foi gravado. ${mensagemDeErro(e)})`); }
     }
     setSalvando(false);
-    if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join(", ")}. Confira${vejoFinanceiro ? " e, se precisar, lance pelo Financeiro" : ""}.`);
+    if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join(", ")}. Toque de novo para tentar: quem já saiu não é lançado outra vez.`);
     if (feitos) avisar(`${feitos === 1 ? "1 pet foi" : `${feitos} pets foram`} para casa.${comPacote ? ` ${comPacote === 1 ? "1 usou" : `${comPacote} usaram`} o pacote.` : ""}${recebido ? ` ${brl(recebido)} no financeiro.` : ""}${anotadas ? ` ${anotadas === 1 ? "1 mensalista saiu" : `${anotadas} mensalistas saíram`} depois do horário: a taxa fica em Check-outs para cobrar, para ${vejoFinanceiro ? "você decidir" : "quem cuida do caixa decidir"}.` : ""}`);
+    // algum não saiu: a folha fica aberta e a mesma chave vale para a nova tentativa
+    if (falhas.length) return false;
     aoGravar();
   }
 

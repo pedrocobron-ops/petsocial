@@ -94,8 +94,12 @@ export function pagoAMenos(e: EstadoPagamento, total: number): { entregue: numbe
   const usadas = c.partes.filter((p) => Number(p.valor) > 0);
   if (!(c.falta > 0) || c.passou > 0 || !usadas.length || usadas.some((p) => !p.forma)) return null;
   if (new Set(usadas.map((p) => p.forma)).size !== usadas.length) return null;
-  const pagamentos = usadas.map((p) => ({ forma: p.forma!, valor: centavos(p.valor!) }));
-  return { entregue: c.soma, falta: c.falta, forma: formaPrincipal(pagamentos), pagamentos: pagamentos.length > 1 ? pagamentos : null };
+  // a parte em dinheiro entra pelo que o cliente entregou de verdade ("Recebeu quanto?" menor que a parte): o que faltou nela
+  // também fica para depois, em vez de entrar no caixa um dinheiro que não veio
+  const naMao = dinheiroAMenos(e, total);
+  const pagamentos = usadas.map((p) => ({ forma: p.forma!, valor: centavos(p.forma === "dinheiro" && naMao ? naMao.entregue : p.valor!) }));
+  const soma = centavos(pagamentos.reduce((t, p) => t + p.valor, 0));
+  return { entregue: soma, falta: centavos(total - soma), forma: formaPrincipal(pagamentos), pagamentos: pagamentos.length > 1 ? pagamentos : null };
 }
 
 /** Pagamento de uma tela que recebe: começa sem forma marcada. */
@@ -190,6 +194,8 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
   // "Fecha certinho" só depois de a pessoa escolher as formas e os valores: antes disso a frase não quer dizer nada
   const preenchido = c.partes.every((p) => p.forma && Number(p.valor) > 0);
   const emDinheiro = c.partes.find((p) => p.forma === "dinheiro" && Number(p.valor) > 0);
+  // "o resto fica para depois" com menos dinheiro entregue do que a parte em dinheiro: entra só o que veio
+  const naMao = aceitaResto && e.resto ? dinheiroAMenos(e, total) : null;
   return (
     <div className="g-campo g-pg">
       <span>Pagamento dividido</span>
@@ -211,7 +217,9 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
       {(c.falta > 0 || c.passou > 0 || preenchido) && (
         <p className={`g-pg-conta${(c.falta > 0 && !(e.resto && aceitaResto)) || c.passou > 0 ? " erro" : " certo"}`} role="status">
           {c.passou > 0 ? `Passou ${brl(c.passou)} do total de ${brl(total)}.`
-            : c.falta > 0 && e.resto && aceitaResto ? `Entram ${brl(c.soma)} agora. Faltam ${brl(c.falta)}, que ficam anotados para depois.`
+            : c.falta > 0 && e.resto && aceitaResto ? (naMao
+              ? `Entram ${brl(centavos(c.soma - naMao.falta))} agora (em dinheiro, só os ${brl(naMao.entregue)} entregues). Faltam ${brl(centavos(c.falta + naMao.falta))}, que ficam anotados para depois.`
+              : `Entram ${brl(c.soma)} agora. Faltam ${brl(c.falta)}, que ficam anotados para depois.`)
             : c.falta > 0 ? `Falta ${brl(c.falta)} para fechar ${brl(total)}.`
             : `Fecha certinho com o total de ${brl(total)}.`}
           {(c.falta > 0 || (c.passou > 0 && e.ultimaManual)) && (

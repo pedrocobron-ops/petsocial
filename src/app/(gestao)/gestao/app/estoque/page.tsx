@@ -2,7 +2,7 @@
 
 import { COLS_MOVIMENTO, COLS_PRODUTO, comCustos, comCustosDeMovimento, comPrecosDeProduto } from "@/lib/gestao/reservado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Importar from "@/components/gestao/importar";
 import { AlertTriangle, ArrowUpFromLine, BarChart3, Minus, Package, PackageX, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Truck, Wallet, Upload } from "lucide-react";
@@ -348,6 +348,7 @@ function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () =>
   const [salvando, setSalvando] = useState(false);
 
   const op = useOperacao();
+  const criado = useRef<{ chave: string; id: string } | null>(null);
   const salvar = () => op.fazer(gravar);
   async function gravar(chave: string): Promise<boolean | void> {
     const nome = v.nome.trim();
@@ -359,10 +360,12 @@ function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () =>
     if (repetido) { avisarErro(`Este código de barras já está em ${repetido.nome}. Cada produto tem o seu.`); return; }
     setSalvando(true);
     try {
-      const novo = ok(await sb.from("produtos").insert({
+      // o produto já foi criado nesta operação e só o estoque inicial falhou: a nova tentativa não cria outro
+      const novo = criado.current?.chave === chave ? { id: criado.current.id } : ok(await sb.from("produtos").insert({
         petshop_id: petshop.id, nome, categoria: v.categoria.trim() || null, unidade: v.unidade,
         preco_venda: v.preco, custo: v.custo, estoque_minimo: minimo, ...camposDaLoja(loja, v),
       }).select("id").single());
+      criado.current = { chave, id: novo.id };
       if (qtd > 0) {
         await gravarMovimentos(sb, petshop.id, [{
           petshop_id: petshop.id, produto_id: novo.id, tipo: "entrada", quantidade: qtd, custo_unitario: v.custo,
@@ -372,7 +375,7 @@ function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () =>
       }
       avisar(`${nome} está no estoque.`);
       aoGravar();
-    } catch (e) { avisarErro(erroDeCodigo(e)); } finally { setSalvando(false); }
+    } catch (e) { avisarErro(erroDeCodigo(e)); return false; } finally { setSalvando(false); }
   }
 
   return (
@@ -443,11 +446,13 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
           });
           avisar(`Entrada anotada e ${brl(total)} lançados como despesa.`);
         } catch (e) {
-          avisarErro(`O estoque foi atualizado, mas a despesa não foi lançada. Lance pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
+          // a entrada no estoque não se repete (mesma chave): tocar de novo só lança a despesa
+          avisarErro(`O estoque foi atualizado, mas a despesa não foi lançada. Toque de novo para lançar. (${e instanceof Error ? e.message : "erro"})`);
+          return false;
         }
       } else avisar(`Entraram ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}.`);
       aoGravar();
-    } catch (e) { avisarErro(e); } finally { setSalvando(false); }
+    } catch (e) { avisarErro(e); return false; } finally { setSalvando(false); }
   }
 
   return (
@@ -663,7 +668,7 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
       setRazao("");
       void recarregar();
       aoMudar();
-    } catch (e) { avisarErro(e); } finally { setSalvando(false); }
+    } catch (e) { avisarErro(e); return false; } finally { setSalvando(false); }
   }
 
   async function desativar() {

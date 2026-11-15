@@ -10,6 +10,8 @@ import {
 import { conferirCaixa, parteDaChave, receberComCredito, receberConta, textoDoPagamento, type FormaPagamento } from "@/lib/gestao/dinheiro";
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { useOperacao } from "@/lib/gestao/uma-vez";
+import { contando, lerTudo } from "@/lib/gestao/paginas";
+import { fazerTudoOuNada } from "@/lib/gestao/tudo-ou-nada";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { AvisoCaixaFechado, ChipsForma, useCaixaAberto } from "../loja/pecas";
 import { FORMAS, type Lancamento } from "@/lib/gestao/tipos";
@@ -83,7 +85,8 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
       sb.from("creche_cobrancas").select(SELECT_COBRANCA.replace("lancamentos(", "lancamentos!inner(")).eq("petshop_id", petshop.id).eq("status", "aberta")
         .lt("mes", mesIso).eq("lancamentos.pago", false).order("vencimento").order("id").limit(1000),
       // que planos já tiveram cobrança, e em que meses (para saber qual é a primeira cobrança de cada um)
-      sb.from("creche_cobrancas").select("plano_id, mes").eq("petshop_id", petshop.id).order("mes").order("id").limit(5000),
+      // em páginas: o banco entrega no máximo mil por vez, e as mais novas ficariam de fora
+      lerTudo<{ plano_id: string; mes: string }>((de, ate, contar) => sb.from("creche_cobrancas").select("plano_id, mes", contando(contar)).eq("petshop_id", petshop.id).order("mes").order("id").range(de, ate)).then((data) => ({ data })),
       // acerto da saída de um mês seguinte (o cão já saiu) ainda sem pagar: aparece junto, para não ficar esquecido
       sb.from("creche_cobrancas").select(SELECT_COBRANCA.replace("lancamentos(", "lancamentos!inner(")).eq("petshop_id", petshop.id).eq("status", "aberta")
         .eq("acerto_saida", true).gt("mes", mesIso).eq("lancamentos.pago", false).order("vencimento").order("id").limit(1000),
@@ -663,8 +666,15 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
       const resto = centavos(faltaDaCobranca(c) - doCredito);
       const m = comMulta && resto > 0 ? multas[i] : 0;
       try {
-        if (doCredito > 0) { await receberComCredito(sb, c.lancamento_id!, doCredito, parteDaChave(chave, "credito", c.lancamento_id!)); sobraCredito = centavos(sobraCredito - doCredito); }
-        if (resto > 0) await receberConta(sb, c.lancamento_id!, { valor: resto, forma: forma!, data, multa: m > 0 ? { valor: m, forma: forma! } : null, chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) });
+        if (doCredito > 0 && resto > 0) {
+          // crédito e o resto da mesma mensalidade entram juntos, ou nenhum (a nova tentativa não usa o crédito duas vezes)
+          await fazerTudoOuNada(sb, petshop.id, parteDaChave(chave, "junto", c.lancamento_id!)!, { funcao: "conta_receber_junto", conta: c.lancamento_id! }, [
+            { t: "receber_credito", conta: c.lancamento_id!, valor: doCredito, chave: parteDaChave(chave, "credito", c.lancamento_id!) },
+            { t: "receber", conta: c.lancamento_id!, valor: resto, forma: forma!, data, ...(m > 0 ? { multa: m, multa_forma: forma! } : {}), chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) },
+          ]);
+          sobraCredito = centavos(sobraCredito - doCredito);
+        } else if (doCredito > 0) { await receberComCredito(sb, c.lancamento_id!, doCredito, parteDaChave(chave, "credito", c.lancamento_id!)); sobraCredito = centavos(sobraCredito - doCredito); }
+        else if (resto > 0) await receberConta(sb, c.lancamento_id!, { valor: resto, forma: forma!, data, multa: m > 0 ? { valor: m, forma: forma! } : null, chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) });
         feitas++; recebido = centavos(recebido + faltaDaCobranca(c) + m);
         itens.push({ pet: c.pets?.nome ?? "Pet", mes: c.mes, valor: faltaDaCobranca(c), multa: m, acerto: c.acerto_saida });
       } catch (e) { falhas.push(`${c.pets?.nome ?? "pet"} (${e instanceof Error ? e.message : "erro"})`); }
@@ -813,7 +823,7 @@ function PagasPorFora({ mes, cobrancas, marcadas, aoFechar, aoFeito }: { mes: Da
       const n = ok(await sb.rpc("creche_cobrancas_por_fora", { p_ids: ids })) as number;
       avisar(n === 1 ? "1 mensalidade marcada como paga por fora. Saiu de A receber." : `${n} mensalidades marcadas como pagas por fora. Saíram de A receber.`);
       await aoFeito();
-    } catch (e) { avisarErro(e); setSalvando(false); }
+    } catch (e) { avisarErro(e); setSalvando(false); return false; }
   }
 
   return (
