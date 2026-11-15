@@ -6,7 +6,7 @@ import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, creditoDa
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { diaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
-import { nomeDaCasa, usaCasa } from "@/lib/gestao/modulos";
+import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
@@ -410,7 +410,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   }, [inicial?.cliente_id]);
   const nomeDoCliente = nomeDoClienteLido?.split(" ")[0] ?? "O cliente";
   // quem não tem creche nem hotel não vê essa categoria (lançamento antigo com ela continua mostrando)
-  const lista = categoriasDe(tipo).filter((c) => c !== "Creche e hotel" || usaCasa(petshop));
+  const lista = categoriasDe(tipo).filter((c) => (c !== "Creche e hotel" || usaCasa(petshop)) && (c !== "Banho e tosa" || usaModulo(petshop, "banho_tosa")));
   const categorias = (lista.includes(categoria) ? lista : [categoria, ...lista]).map((c) => ({ id: c, rotulo: categoriaAtual(c, petshop) }));
   const titulo = conta
     ? `${inicial ? "Editar conta" : "Nova conta"} ${entrada ? "a receber" : "a pagar"}`
