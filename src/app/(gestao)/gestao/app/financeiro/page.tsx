@@ -88,6 +88,10 @@ function Financeiro() {
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     // sangria e suprimento (movimento de gaveta) não são receita nem despesa: ficam fora de tudo aqui
+    // os apagados do mês e os ajustes do faturamento não dependem do resto: saem na mesma leva (no celular, cada espera soma)
+    const apP = Promise.resolve(sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", petshop.id).eq("acao", "apagou")
+      .gte("antes->>data", inicio).lte("antes->>data", fim).order("quando", { ascending: false }).limit(200));
+    const ajustesP = ajustesDoFaturamento(sb, petshop.id, inicio, fim).catch(() => SEM_AJUSTES);
     const [doMes, anterior, contas] = await Promise.all([
       paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null)
         .gte("data", inicio).lte("data", fim).order("data", { ascending: false }).order("criado_em", { ascending: false }).order("id").range(de, ate)),
@@ -99,16 +103,17 @@ function Financeiro() {
     // quem deve: o nome do tutor de cada conta a receber
     const devedores = [...new Set(contas.filter((c) => c.tipo === "entrada" && c.cliente_id).map((c) => c.cliente_id!))];
     const tutores = new Map<string, string>();
-    for (let i = 0; i < devedores.length; i += 150) {
-      const r = await sb.from("clientes").select("id, nome").eq("petshop_id", petshop.id).in("id", devedores.slice(i, i + 150));
-      for (const c of r.data ?? []) tutores.set(c.id, c.nome);
-    }
-    // valores recebidos neste mês que alguém apagou depois
-    const ap = await sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", petshop.id).eq("acao", "apagou")
-      .gte("antes->>data", inicio).lte("antes->>data", fim).order("quando", { ascending: false }).limit(200);
+    const lotes: string[][] = [];
+    for (let i = 0; i < devedores.length; i += 150) lotes.push(devedores.slice(i, i + 150));
+    const [nomes, ap, ajustes] = await Promise.all([
+      Promise.all(lotes.map((ids) => sb.from("clientes").select("id, nome").eq("petshop_id", petshop.id).in("id", ids))),
+      // valores recebidos neste mês que alguém apagou depois
+      apP,
+      // crédito do tutor deixado e usado no mês (o resultado não conta o crédito que ainda é do tutor)
+      ajustesP,
+    ]);
+    for (const r of nomes) for (const c of r.data ?? []) tutores.set(c.id, c.nome);
     const apagados: AlteracaoLancamento[] = ap.data ?? [];
-    // crédito do tutor deixado e usado no mês (o resultado não conta o crédito que ainda é do tutor)
-    const ajustes = await ajustesDoFaturamento(sb, petshop.id, inicio, fim).catch(() => SEM_AJUSTES);
     return { doMes, anterior, contas, tutores, apagados, ajustes };
   }, [petshop.id, inicio]);
 

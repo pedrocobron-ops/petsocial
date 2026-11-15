@@ -50,14 +50,17 @@ export const juntar = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(
 
 /** Todos os planos do pet shop, com o pet. Os valores só vêm para quem vê o financeiro (o banco não entrega para os outros). */
 export async function lerPlanos(sb: Banco, petshopId: string, vejoFinanceiro: boolean): Promise<PlanoCompleto[]> {
-  const planos = await lerTudo<Plano & { pets: PetDoPlano | null }>((de, ate, contar) =>
-    sb.from("creche_planos").select(SELECT_PLANO, contando(contar)).eq("petshop_id", petshopId).order("inicio").order("id").range(de, ate));
+  // os planos e os valores ao mesmo tempo (no celular com internet fraca, uma ida e volta a menos)
+  const [planos, v] = await Promise.all([
+    lerTudo<Plano & { pets: PetDoPlano | null }>((de, ate, contar) =>
+      sb.from("creche_planos").select(SELECT_PLANO, contando(contar)).eq("petshop_id", petshopId).order("inicio").order("id").range(de, ate)),
+    vejoFinanceiro
+      ? lerTudo<{ plano_id: string; valor_mensal: number; valor_extra: number | null; modelo_id: string | null }>((de, ate, contar) =>
+        sb.from("creche_planos_valores").select("plano_id, valor_mensal, valor_extra, modelo_id", contando(contar)).eq("petshop_id", petshopId).order("plano_id").range(de, ate)).catch(() => [])
+      : Promise.resolve([]),
+  ]);
   const valores = new Map<string, { valor_mensal: number; valor_extra: number | null; modelo_id: string | null }>();
-  if (vejoFinanceiro && planos.length) {
-    const v = await lerTudo<{ plano_id: string; valor_mensal: number; valor_extra: number | null; modelo_id: string | null }>((de, ate, contar) =>
-      sb.from("creche_planos_valores").select("plano_id, valor_mensal, valor_extra, modelo_id", contando(contar)).eq("petshop_id", petshopId).order("plano_id").range(de, ate)).catch(() => []);
-    for (const x of v) valores.set(x.plano_id, { valor_mensal: Number(x.valor_mensal), valor_extra: x.valor_extra == null ? null : Number(x.valor_extra), modelo_id: x.modelo_id });
-  }
+  for (const x of v) valores.set(x.plano_id, { valor_mensal: Number(x.valor_mensal), valor_extra: x.valor_extra == null ? null : Number(x.valor_extra), modelo_id: x.modelo_id });
   return planos.map((p) => ({ ...p, valor_mensal: valores.get(p.id)?.valor_mensal ?? null, valor_extra: valores.get(p.id)?.valor_extra ?? null, temValor: valores.has(p.id), modelo_id: valores.get(p.id)?.modelo_id ?? null }));
 }
 
@@ -371,12 +374,13 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
   const hoje = isoDia(new Date());
   // os planos, o calendário (dia marcado como fechado: a chamada não espera ninguém) e o movimento de hoje ao mesmo tempo:
   // no celular com internet fraca, cada espera em fila soma uma ida e volta
-  const [planos, , mov] = await Promise.all([
+  const [planos, , lido] = await Promise.all([
     lerPlanos(sb, petshop.id, false),
     calendarioGuardado(petshop.id, vejoFinanceiro) ? null : lerCalendario(sb, petshop.id, vejoFinanceiro),
-    lerPresencas(sb, petshop.id, hoje, hoje),
+    lerPresencas(sb, petshop.id, hoje, hoje).catch(() => null),
   ]);
   if (!planos.length) return null;
+  const mov = lido ?? await lerPresencas(sb, petshop.id, hoje, hoje);
   const linhas = montarChamada(planos, hoje, mov.presencas, mov.faltas, petshop.horario).filter((l) => l.conta === "plano" || l.conta === "avulsa" || l.presenca?.status === "reservada");
   let vencemHoje = 0, atrasadas = 0, reposicoes = 0;
   const semValor: string[] = [];

@@ -260,6 +260,14 @@ export default function CrecheHotel() {
   const [esperaNova, setEsperaNova] = useState<{ pet?: PetDaEstadia | null; tipo?: Tipo; entrada?: string; saida?: string; horaEntrada?: string; horaSaida?: string } | null>(null);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
+    // tudo o que não depende das estadias sai já na primeira leva (no celular com internet fraca, cada espera em fila soma)
+    const feitosP = comCuidados
+      ? (async () => ((await sb.from("estadias_cuidados").select("*").eq("petshop_id", petshop.id).eq("dia", isoDia(new Date())).limit(1000)).data ?? []) as CuidadoFeito[])()
+      : Promise.resolve([] as CuidadoFeito[]);
+    // saídas de mensalista fora do horário que esperam a decisão da taxa (só quem recebe lê)
+    const atrasosP = vejoFinanceiro && usaCreche ? lerAtrasosPendentes(sb, petshop.id) : Promise.resolve([] as AtrasoPendente[]);
+    // (se a primeira leva falhar, a tela mostra o erro dela; estas duas não deixam aviso solto no navegador)
+    feitosP.catch(() => undefined); atrasosP.catch(() => undefined);
     const [abertas, passadas, pendentes] = await Promise.all([
       sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500),
       sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["encerrada", "cancelada"]).order("entrada", { ascending: false }).limit(100),
@@ -277,30 +285,32 @@ export default function CrecheHotel() {
     ]);
     const semCobranca = pend.filter(estadiaSemCobranca);
     // sinal e taxas das reservas e estadias abertas: só quem recebe lê (o banco não entrega para os outros)
-    const valores = new Map<string, ValoresDaEstadia>();
-    if (vejoFinanceiro && lista.length + semCobranca.length) {
-      const v = await sb.from("estadias_valores").select("*").eq("petshop_id", petshop.id).in("estadia_id", [...lista, ...semCobranca].map((e) => e.id));
-      for (const x of v.data ?? []) valores.set(x.estadia_id, x);
-    }
-    let feitos: CuidadoFeito[] = [];
-    if (comCuidados) feitos = (await sb.from("estadias_cuidados").select("*").eq("petshop_id", petshop.id).eq("dia", isoDia(new Date())).limit(1000)).data ?? [];
     const encerradas = antigas;
-    // ocorrências das estadias abertas e quem levou cada pet das encerradas (só com as opções ligadas)
-    let ocorrencias: Ocorrencia[] = [];
     const naCasaIds = lista.filter((e) => e.status === "em_casa").map((e) => e.id);
-    if (comOcorrencias && naCasaIds.length) ocorrencias = (await sb.from("estadias_ocorrencias").select("*").eq("petshop_id", petshop.id).in("estadia_id", naCasaIds).order("quando").limit(1000)).data ?? [];
-    const retiradas = comPortaria ? await lerRetiradas(sb, petshop.id, encerradas.filter((e) => e.status === "encerrada").map((e) => e.id)).catch(() => new Map<string, Retirada>()) : new Map<string, Retirada>();
-    // saídas de mensalista fora do horário que esperam a decisão da taxa (só quem recebe lê)
-    const atrasos = vejoFinanceiro && usaCreche ? await lerAtrasosPendentes(sb, petshop.id) : [];
+    const [v, feitos, ocorrencias, retiradas, atrasos] = await Promise.all([
+      vejoFinanceiro && lista.length + semCobranca.length
+        ? sb.from("estadias_valores").select("*").eq("petshop_id", petshop.id).in("estadia_id", [...lista, ...semCobranca].map((e) => e.id))
+        : Promise.resolve(null),
+      feitosP,
+      // ocorrências das estadias abertas e quem levou cada pet das encerradas (só com as opções ligadas)
+      comOcorrencias && naCasaIds.length
+        ? sb.from("estadias_ocorrencias").select("*").eq("petshop_id", petshop.id).in("estadia_id", naCasaIds).order("quando").limit(1000).then((r) => (r.data ?? []) as Ocorrencia[])
+        : Promise.resolve([] as Ocorrencia[]),
+      comPortaria ? lerRetiradas(sb, petshop.id, encerradas.filter((e) => e.status === "encerrada").map((e) => e.id)).catch(() => new Map<string, Retirada>()) : Promise.resolve(new Map<string, Retirada>()),
+      atrasosP,
+    ]);
+    const valores = new Map<string, ValoresDaEstadia>();
+    for (const x of v?.data ?? []) valores.set(x.estadia_id, x);
     return { abertas: lista, passadas: encerradas, valores, feitos, ocorrencias, retiradas, semCobranca, atrasos };
   }, [petshop.id, vejoFinanceiro, comCuidados, comOcorrencias, comPortaria, usaCreche]);
 
   // mensalistas: os planos e o que já aconteceu hoje (para a chamada e para a conta de vagas)
   const { dados: mens } = useDados<Mens | null>(async () => {
     if (!usaCreche) return null;
-    const planos = await lerPlanos(sb, petshop.id, cuidoDoFinanceiro);
     const dia = isoDia(new Date());
-    const mov = planos.length ? await lerPresencas(sb, petshop.id, dia, dia) : { presencas: [], faltas: [] };
+    // os planos e o movimento de hoje ao mesmo tempo (sem plano, o movimento não é usado)
+    const [planos, lido] = await Promise.all([lerPlanos(sb, petshop.id, cuidoDoFinanceiro), lerPresencas(sb, petshop.id, dia, dia).catch(() => null)]);
+    const mov = planos.length ? lido ?? await lerPresencas(sb, petshop.id, dia, dia) : { presencas: [], faltas: [] };
     return { planos, ...mov };
   }, [petshop.id, usaCreche, cuidoDoFinanceiro]);
   const temMensalista = Boolean(mens?.planos.some((p) => planoAtivo(p, isoDia(new Date()))));
