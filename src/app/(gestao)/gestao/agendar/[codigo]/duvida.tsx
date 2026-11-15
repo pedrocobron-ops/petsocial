@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, MessageCircle, MessageCircleQuestion, Send, X } from "lucide-react";
-import { MAX_LETRAS_PERGUNTA, MAX_PERGUNTAS_CONVERSA, limiteTexto, type Sugestao } from "@/lib/gestao/link-ia";
+import { MAX_LETRAS_PERGUNTA, MAX_PERGUNTAS_CONVERSA, limiteConversaTexto, type Sugestao } from "@/lib/gestao/link-ia";
 import { linkWhatsApp } from "@/lib/gestao/util";
 
 type Fala = { de: "eu" | "ia"; texto: string; zap?: boolean; sugestao?: Sugestao | null };
@@ -94,7 +94,7 @@ export default function DuvidaNoLink({ codigo, loja, telefone, aoPedir }: {
         {esperando && <div className="g-lk-duv-ia g-lk-duv-pensa" aria-label="Escrevendo a resposta"><i /><i /><i /></div>}
         {acabou && !esperando && (
           <div className="g-lk-duv-ia">
-            <span>{limiteTexto(loja)}</span>
+            <span>{limiteConversaTexto(loja)}</span>
             {zap && <a className="g-btn zap p" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden />Falar com {loja} no WhatsApp</a>}
           </div>
         )}

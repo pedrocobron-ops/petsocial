@@ -223,6 +223,7 @@ export function lerResposta(bruto: string, d: DadosDoLink): Resposta {
 
 export const naoSeiTexto = (nome: string) => `Não sei responder isso. Fale com ${nome} no WhatsApp.`;
 export const limiteTexto = (nome: string) => `Por hoje não consigo responder mais perguntas por aqui. Fale com ${nome} no WhatsApp, que eles respondem.`;
+export const limiteConversaTexto = (nome: string) => `Esta conversa chegou ao limite de perguntas. Para continuar, fale com ${nome} no WhatsApp.`;
 export const foraTexto = (nome: string) => `Não consegui responder agora. Fale com ${nome} no WhatsApp.`;
 
 /* ---------- ferramentas (só leitura, só deste link) ---------- */

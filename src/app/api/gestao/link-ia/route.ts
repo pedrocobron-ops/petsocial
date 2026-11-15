@@ -5,7 +5,7 @@ import type { Database } from "@/lib/gestao/banco";
 import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "@/lib/gestao/supabase";
 import {
   FERRAMENTA_HORARIOS, FERRAMENTA_HOTEL, INSTRUCOES_LINK_IA, MAX_PERGUNTAS_CONVERSA, contextoDoLink, entradaHorarios, entradaHotel,
-  ferramentasDoLink, foraTexto, lerResposta, limiteTexto, limparFalas, perguntasNaConversa, respostaDeTeste, resumoDaEstimativa, type DadosDoLink,
+  ferramentasDoLink, foraTexto, lerResposta, limiteConversaTexto, limiteTexto, limparFalas, perguntasNaConversa, respostaDeTeste, resumoDaEstimativa, type DadosDoLink,
 } from "@/lib/gestao/link-ia";
 
 export const runtime = "nodejs";
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
 
   // freios: por conversa, por endereço de internet e por dia (no banco)
   const rede = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "sem-rede";
-  if (perguntasNaConversa(corpo?.falas) > MAX_PERGUNTAS_CONVERSA || !liberado(`${codigo}:${rede}`)) return responder({ texto: limiteTexto(nome), limite: true });
+  if (perguntasNaConversa(corpo?.falas) > MAX_PERGUNTAS_CONVERSA || !liberado(`${codigo}:${rede}`)) return responder({ texto: limiteConversaTexto(nome), limite: true });
   if (!DE_TESTE && !process.env.ANTHROPIC_API_KEY) { console.error("[link-ia] sem ANTHROPIC_API_KEY"); return responder({ texto: foraTexto(nome), fora: true }); }
   const conta = await sb.rpc("link_ia_contar", { p_codigo: codigo });
   const contou = conta.data as { ok?: boolean; motivo?: string } | null;
