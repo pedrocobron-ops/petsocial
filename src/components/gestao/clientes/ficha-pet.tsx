@@ -3,7 +3,7 @@
 import CartaoPaginaDoTutor from "../casa/pagina-do-tutor";
 import { saudacaoZap } from "@/lib/gestao/agenda";
 import { COLS_ESTADIA, COLS_PACOTE_CLIENTE, comPrecosDeAgendamento } from "@/lib/gestao/reservado";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, ArrowLeftRight, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
 import type { Agendamento, Cliente, Estadia, PacoteCliente, Pet } from "@/lib/gestao/tipos";
@@ -37,7 +37,7 @@ const STATUS_ESTADIA: Record<string, { rotulo: string; tom: string }> = {
   cancelada: { rotulo: "Cancelada", tom: "vermelho" },
 };
 
-export default function FichaPet({ id, voltar }: { id: string; voltar: () => void }) {
+export default function FichaPet({ id, voltar, aoAbrir }: { id: string; voltar: () => void; /** a ficha terminou de carregar */ aoAbrir?: () => void }) {
   // o gasto do pet é histórico de dinheiro: só para o dono e quem cuida do financeiro (quem só opera o caixa não lê esse histórico)
   const { sb, petshop, servicos, cuidoDoFinanceiro: vejoFinanceiro, posso } = useGestao();
   // a ficha fala do que o negócio faz: sem banho e tosa (ou sem a agenda liberada), nada de "Agendar" nem de "atendimentos"
@@ -66,24 +66,27 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
     for (const r of [pet, atendimentos, pacotes, estadias, concluidos, hospedagens]) if (r.error) throw new Error(r.error.message);
     // os valores vêm à parte, só para quem cuida do financeiro
     type Feito = { inicio: string; preco: number | null; agendamento_servicos?: { preco: number | null }[] | null };
-    const feitos: Feito[] = await comPrecosDeAgendamento(sb, petshop.id, (concluidos.data ?? []) as { id: string; inicio: string; agendamento_servicos?: { id: string }[] | null }[], vejoFinanceiro);
-    const historico = await comPrecosDeAgendamento(sb, petshop.id, (atendimentos.data ?? []) as unknown as Atendimento[], vejoFinanceiro);
     const ficou = (hospedagens.data ?? []) as { entrada: string; saida: string | null; status: string }[];
     const nEstadias = hospedagens.count ?? ficou.length;
+    // o check-out lança a estadia no financeiro ligada ao tutor, com o nome do pet na descrição
+    const petLido = pet.data as unknown as PetDaFicha | null;
+    // os preços dos atendimentos e o que o tutor pagou de estadias: ao mesmo tempo (no celular, cada espera soma)
+    const [feitos, historico, gastoEstadias] = await Promise.all([
+      comPrecosDeAgendamento(sb, petshop.id, (concluidos.data ?? []) as { id: string; inicio: string; agendamento_servicos?: { id: string }[] | null }[], vejoFinanceiro) as Promise<Feito[]>,
+      comPrecosDeAgendamento(sb, petshop.id, (atendimentos.data ?? []) as unknown as Atendimento[], vejoFinanceiro),
+      (async () => {
+        if (!(vejoFinanceiro && petLido?.cliente_id && (nEstadias > 0 || usaModulo(petshop, "creche")))) return 0;
+        // diárias e mensalidades da creche: a descrição traz "· Nome do pet" (às vezes seguido de "(parte)" ou "+ taxa")
+        const l = await sb.from("lancamentos").select("valor, descricao").eq("petshop_id", petshop.id).eq("cliente_id", petLido.cliente_id)
+          .eq("tipo", "entrada").eq("pago", true).in("categoria", ["Creche e hotel", "Creche: mensalidade"]).limit(1000);
+        const nome = `· ${petLido.nome}`.toLowerCase();
+        const doPet = (d: string) => { const i = d.indexOf(nome); return i >= 0 && /^($|\s|\(|\+)/.test(d.slice(i + nome.length)); };
+        return (l.data ?? []).filter((x) => doPet((x.descricao ?? "").trim().toLowerCase())).reduce((t, x) => t + Number(x.valor), 0);
+      })(),
+    ]);
     // quem está na casa agora veio hoje; estadia encerrada conta pelo dia em que saiu
     const ultimaEstadia = ficou.map((e) => (e.status === "em_casa" ? new Date().toISOString() : e.saida ?? e.entrada)).sort().pop() ?? null;
     const ultimoAtendimento = feitos[0]?.inicio ?? null;
-    // o check-out lança a estadia no financeiro ligada ao tutor, com o nome do pet na descrição
-    const petLido = pet.data as unknown as PetDaFicha | null;
-    let gastoEstadias = 0;
-    if (vejoFinanceiro && petLido?.cliente_id && (nEstadias > 0 || usaModulo(petshop, "creche"))) {
-      // diárias e mensalidades da creche: a descrição traz "· Nome do pet" (às vezes seguido de "(parte)" ou "+ taxa")
-      const l = await sb.from("lancamentos").select("valor, descricao").eq("petshop_id", petshop.id).eq("cliente_id", petLido.cliente_id)
-        .eq("tipo", "entrada").eq("pago", true).in("categoria", ["Creche e hotel", "Creche: mensalidade"]).limit(1000);
-      const nome = `· ${petLido.nome}`.toLowerCase();
-      const doPet = (d: string) => { const i = d.indexOf(nome); return i >= 0 && /^($|\s|\(|\+)/.test(d.slice(i + nome.length)); };
-      gastoEstadias = (l.data ?? []).filter((x) => doPet((x.descricao ?? "").trim().toLowerCase())).reduce((t, x) => t + Number(x.valor), 0);
-    }
     return {
       pet: pet.data as unknown as PetDaFicha | null,
       atendimentos: historico as unknown as Atendimento[],
@@ -100,6 +103,7 @@ export default function FichaPet({ id, voltar }: { id: string; voltar: () => voi
       erroSaude: saude.error?.message ?? null,
     };
   }, [petshop.id, id, vejoFinanceiro]);
+  useEffect(() => { if (!carregando) aoAbrir?.(); }, [carregando]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const botaoVoltar = <button className="g-voltar" onClick={voltar}><ArrowLeft />Voltar</button>;
 

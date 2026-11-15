@@ -93,35 +93,37 @@ function CaixaDoDia() {
   const hoje = hojeIso();
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
-    const a = await sb.from("caixas").select("*").eq("petshop_id", petshop.id).is("fechado_em", null).maybeSingle();
+    // o caixa aberto, os últimos fechados e o que foi pago hoje ao mesmo tempo (no celular, cada espera soma uma ida e volta)
+    const [a, f, doDia] = await Promise.all([
+      sb.from("caixas").select("*").eq("petshop_id", petshop.id).is("fechado_em", null).maybeSingle(),
+      sb.from("caixas").select("*").eq("petshop_id", petshop.id).not("fechado_em", "is", null)
+        .order("fechado_em", { ascending: false }).limit(14),
+      // tudo o que foi pago hoje, com ou sem caixa (a tela Hoje parte disto e ainda tira as devoluções e o crédito deixado para o tutor)
+      paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id)
+        .eq("pago", true).eq("data", hoje).order("criado_em", { ascending: false }).order("id").range(de, ate)),
+    ]);
     if (a.error) throw new Error(a.error.message);
     const aberto: Caixa | null = a.data;
-    const f = await sb.from("caixas").select("*").eq("petshop_id", petshop.id).not("fechado_em", "is", null)
-      .order("fechado_em", { ascending: false }).limit(14);
     if (f.error) throw new Error(f.error.message);
     const fechados: Caixa[] = f.data ?? [];
     lembrarCaixa(petshop.id, aberto?.id ?? null);
     // quem só opera o caixa não lê os lançamentos de caixas fechados: o resumo deles vem do que o banco anotou ao fechar
     const ids = [...(aberto ? [aberto.id] : []), ...(fin ? fechados.map((c) => c.id) : [])];
-    const dosCaixas = ids.length
-      ? await paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true)
-        .in("caixa_id", ids).order("criado_em", { ascending: false }).order("id").range(de, ate))
-      : [];
-    // tudo o que foi pago hoje, com ou sem caixa (a tela Hoje parte disto e ainda tira as devoluções e o crédito deixado para o tutor)
-    const doDia = await paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id)
-      .eq("pago", true).eq("data", hoje).order("criado_em", { ascending: false }).order("id").range(de, ate));
+    const desde = aberto ? aberto.aberto_em : new Date(`${hoje}T00:00:00`).toISOString();
+    const [dosCaixas, ap] = await Promise.all([
+      ids.length
+        ? paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true)
+          .in("caixa_id", ids).order("criado_em", { ascending: false }).order("id").range(de, ate))
+        : Promise.resolve([] as Lancamento[]),
+      // valores recebidos que alguém apagou: deste caixa (ou de hoje, com o caixa fechado). Só chega para quem cuida do financeiro.
+      fin ? sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", petshop.id).eq("acao", "apagou").gte("quando", desde).order("quando", { ascending: false }).limit(200) : null,
+    ]);
     // o que foi lançado hoje com o caixa fechado fica solto (sem caixa) e não entra na conferência da gaveta
     const soltos = doDia.filter((l) => !l.caixa_id);
-    // valores recebidos que alguém apagou: deste caixa (ou de hoje, com o caixa fechado). Só chega para quem cuida do financeiro.
-    let apagados: AlteracaoLancamento[] = [];
-    if (fin) {
-      const desde = aberto ? aberto.aberto_em : new Date(`${hoje}T00:00:00`).toISOString();
-      const ap = await sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", petshop.id).eq("acao", "apagou").gte("quando", desde).order("quando", { ascending: false }).limit(200);
-      apagados = (ap.data ?? []).filter((a) => {
-        const l = (a.antes ?? {}) as { caixa_id?: string | null; data?: string };
-        return aberto ? l.caixa_id === aberto.id || (!l.caixa_id && l.data === hoje) : l.data === hoje;
-      });
-    }
+    const apagados: AlteracaoLancamento[] = (ap?.data ?? []).filter((a) => {
+      const l = (a.antes ?? {}) as { caixa_id?: string | null; data?: string };
+      return aberto ? l.caixa_id === aberto.id || (!l.caixa_id && l.data === hoje) : l.data === hoje;
+    });
     dosCaixas.sort(porPagamento); doDia.sort(porPagamento); soltos.sort(porPagamento);
     return { aberto, fechados, dosCaixas, soltos, doDia, apagados };
   }, [petshop.id, hoje, fin]);

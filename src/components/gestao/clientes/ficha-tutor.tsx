@@ -1,7 +1,7 @@
 "use client";
 
 import { saudacaoZap } from "@/lib/gestao/agenda";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, Merge, MessageCircle, NotebookPen, PawPrint, Pencil, Phone, Plus, Receipt, Users, Wallet } from "lucide-react";
 import type { Cliente, Lancamento, Pet } from "@/lib/gestao/tipos";
@@ -22,7 +22,7 @@ import { EtiquetaEspecie } from "./lista";
 
 type Entrada = Pick<Lancamento, "id" | "valor" | "data" | "categoria" | "descricao" | "pago">;
 
-export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; voltar: () => void; aoExcluir: () => void }) {
+export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: string; voltar: () => void; aoExcluir: () => void; /** a ficha terminou de carregar */ aoAbrir?: () => void }) {
   // `vejoFinanceiro` (Caixa, Financeiro ou Relatórios): vê e recebe o que o tutor deve. `cuidoDoFinanceiro`: vê também quanto ele já gastou.
   const { sb, petshop, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
@@ -57,6 +57,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
       .reduce((s, c) => s + (Number(c.valor) > 0 ? -Number(c.valor) : c.lancamento_id ? 0 : -Number(c.valor)), 0) * 100) / 100;
     return { cliente: cliente.data as Cliente | null, pets: (pets.data ?? []) as Pet[], entradas: (entradas?.data ?? []) as Entrada[], devolvido, ajusteCredito };
   }, [petshop.id, id, cuidoDoFinanceiro]);
+  useEffect(() => { if (!carregando) aoAbrir?.(); }, [carregando]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const botaoVoltar = <button className="g-voltar" onClick={voltar}><ArrowLeft />Voltar</button>;
 

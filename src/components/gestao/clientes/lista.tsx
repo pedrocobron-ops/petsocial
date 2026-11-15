@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Importar, { UltimaImportacao } from "@/components/gestao/importar";
 import { AlertTriangle, Cat, ChevronRight, Dog, Download, HandCoins, MessageCircle, PawPrint, Phone, PiggyBank, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
@@ -99,11 +99,17 @@ export default function Lista({ aoAbrir, irPara }: {
 
   // Última visita de cada pet e se já tem algo marcado: a mesma conta da folha "Chamar de volta" (src/lib/gestao/visitas.ts).
   // Refaz quando a lista de pets muda.
+  // As duas buscam junto com a lista (no celular com internet fraca, esperar a lista para pedir somava uma ida e volta)
+  // e buscam de novo quando o número de pets muda depois disso.
   const totalPets = dados?.pets.length ?? null;
-  const { dados: ultimos, erro: erroUltimos } = useDados(async () => {
-    if (totalPets === null) return null; // a lista ainda não chegou
-    return buscarVisitas(sb, petshop.id);
-  }, [petshop.id, totalPets]);
+  const [versaoPets, setVersaoPets] = useState(0);
+  const totalAntes = useRef<number | null>(null);
+  useEffect(() => {
+    if (totalPets === null) return;
+    if (totalAntes.current !== null && totalAntes.current !== totalPets) setVersaoPets((v) => v + 1);
+    totalAntes.current = totalPets;
+  }, [totalPets]);
+  const { dados: ultimos, erro: erroUltimos } = useDados(() => buscarVisitas(sb, petshop.id), [petshop.id, versaoPets]);
 
   // quem deve e quem tem crédito (só para quem mexe com dinheiro): uma linha por tutor, sem valores para a equipe
   const { dados: dinheiro } = useDados(async () => {
@@ -111,7 +117,7 @@ export default function Lista({ aoAbrir, irPara }: {
     const r = await sb.rpc("tutores_dinheiro", { p_petshop: petshop.id });
     if (r.error) return null;
     return new Map(((r.data ?? []) as ({ cliente_id: string } & DinheiroDoTutor)[]).map((x) => [x.cliente_id, { deve: Number(x.deve), vencido: Number(x.vencido), contas: x.contas, credito: Number(x.credito) }]));
-  }, [petshop.id, vejoFinanceiro, totalPets]);
+  }, [petshop.id, vejoFinanceiro, versaoPets]);
   const totalDevido = useMemo(() => {
     let v = 0, n = 0, cred = 0, nc = 0;
     for (const x of dinheiro?.values() ?? []) { if (x.deve > 0) { v += x.deve; n++; } if (x.credito > 0) { cred += x.credito; nc++; } }
