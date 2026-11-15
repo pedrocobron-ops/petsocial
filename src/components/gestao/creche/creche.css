@@ -155,3 +155,6 @@
 .g-cm-aviso-fora { flex-wrap: wrap; }
 .g-cm-aviso-fora > .g-cresce { flex: 1 1 220px; }
 .g-cm-conta { margin: 2px 0; padding: 6px 10px; border-radius: 8px; background: var(--g-amarelo-tint); color: #5c4300; font-size: .9375rem; }
+
+/* Ctrl+P na aba Cobranças: a família não se parte entre folhas (a impressão própria fica em Imprimir) */
+@media print { .g-cm-grupo { break-inside: avoid; } }

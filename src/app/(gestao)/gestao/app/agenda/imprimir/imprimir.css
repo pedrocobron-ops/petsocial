@@ -72,3 +72,8 @@
   .g-imp-folha td small.tel { white-space: nowrap; overflow-wrap: normal; }
   .g-imp-cab { break-after: avoid; }
 }
+
+/* Folha do dia: a etiqueta "saída atrasada" cabe na coluna (não invade a do tutor) */
+.g-imp-folha table.g-imp-tab col.c-quando { width: 17%; }
+.g-imp-folha table.g-imp-tab.cuidados col.c-cuidados { width: 20%; }
+.g-imp-folha table.g-imp-tab td.hora em { max-width: 100%; white-space: normal; font-size: .625rem; letter-spacing: .02em; }
