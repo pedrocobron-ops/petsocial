@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CalendarOff, Plus, Trash2 } from "lucide-react";
 import { feriadosNacionais, type DiaEspecial } from "@/lib/gestao/feriados";
+import { juntar } from "@/lib/gestao/creche";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { dataCompleta, deIsoDia, isoDia, nomeDiaCurto } from "@/lib/gestao/util";
 import { useCalendario } from "../calendario";
@@ -135,9 +136,20 @@ export default function Feriados() {
         </details>
       )}
       <p className="g-muted g-pp">
-        Dia fechado: o link do cliente não oferece horário de banho nem vaga de creche, a agenda avisa quando alguém marca nele e a chamada da creche não espera ninguém (não vira falta). Quem está hospedado no hotel continua hospedado.
+        {fraseDoFechado(usaModulo(petshop, "banho_tosa"), usaModulo(petshop, "creche"), temHotel)}
         {temHotel ? ` Feriado no preço: a noite que começa nesse dia usa o preço de feriado, que você liga em ${usaModulo(petshop, "creche") ? "Opções do hotel e da creche" : "Opções do hotel"}.` : ""}
       </p>
     </section>
   );
+}
+
+/** O que um dia fechado faz, só com as áreas que o negócio usa (creche sem banho não lê "horário de banho"). */
+function fraseDoFechado(banho: boolean, creche: boolean, hotel: boolean) {
+  const link = [banho ? "horário de banho" : "", creche ? "vaga de creche" : ""].filter(Boolean).join(" nem ");
+  const partes = [
+    link ? `o link do cliente não oferece ${link}` : "",
+    banho ? "a agenda avisa quando alguém marca nele" : "",
+    creche ? "a chamada da creche não espera ninguém (não vira falta)" : "",
+  ].filter(Boolean);
+  return `Dia fechado: ${partes.length ? juntar(partes) : "fica marcado no calendário"}.${hotel ? " Quem está hospedado no hotel continua hospedado." : ""}`;
 }

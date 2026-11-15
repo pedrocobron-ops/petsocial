@@ -7,7 +7,7 @@ import { Folha, avisarMudanca, ok, useAvisos } from "@/components/gestao/ui";
 import { CORES, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import type { Horario } from "@/lib/gestao/tipos";
 import { perfilParaOPetshop } from "@/lib/gestao/acessos";
-import { usaModulo } from "@/lib/gestao/modulos";
+import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ESCOLHA_VAZIA, camposDaEscolha, ehSocio, emailValido, erroDeLimite, lerComissao, nAcessos, perfilPorId, primeiroNome, sugereLogin, usoDoPlano, type Escolha } from "./modelo";
 import { Areas, Chave, Convite, DetalhesAgenda, EscolherPerfil, ModelosProntos, Opcao, PlanoCheio, Trilho, Vagas } from "./pecas";
 
@@ -162,7 +162,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
               <p className="g-muted g-p">
                 {sugerido === false
                   ? "Banhista e tosador quase nunca precisam: você marca os horários e eles aparecem na agenda. Login é para quem usa o sistema, como recepção, financeiro, gerente ou sócio."
-                  : "Login é para quem usa o sistema no dia a dia: recepção, financeiro, gerente ou sócio. Cada pessoa com login ocupa 1 acesso do plano."}
+                  : `Login é para quem usa o sistema no dia a dia: ${usaModulo(petshop, "banho_tosa") ? "" : usaCasa(petshop) ? "monitor(a), " : ""}recepção, financeiro, gerente ou sócio. Cada pessoa com login ocupa 1 acesso do plano.`}
               </p>
             </div>
 

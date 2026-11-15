@@ -1037,6 +1037,26 @@ const BASE: TopicoBase[] = [
       "Em dia marcado como fechado (feriado, folga) ninguém tem o dia no plano. A tela pergunta Cobrar como dia extra ou Não cobrar, e nada vem marcado: o dia só vira dia extra se você escolher.",
     ],
     palavras: ["dia extra", "extra", "veio fora do dia", "reposicao", "repor falta", "saldo de reposicao", "faltas para repor", "quantas faltas", "reposicao sem falta", "dia avulso do mensalista", "mensalista", "escolinha", "day care", "dia que nao e dele", "nao e o dia dele", "veio em outro dia", "fora do dia dele", "veio um dia a mais"] },
+  { id: "creche-saida", titulo: "Quando um cão sai da creche", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE,
+    passos: [
+      "Abra Creche e hotel, Mensalistas, e toque em Alterar plano no cão que vai sair (ou abra a ficha do pet).",
+      "Saindo hoje, toque em Encerrar o plano hoje. Saindo noutro dia, preencha Termina em com o último dia e toque em Salvar plano.",
+      "Abre a folha Saída: as cobranças. Ela mostra a mensalidade do mês da saída e a conta dos dias do plano até o último dia, por exemplo R$ 480,00 × 3/9 = R$ 160,00.",
+      "Toque em Acertar a mensalidade para cobrar só esses dias, ou em Deixar como está para manter o valor combinado.",
+      "Se o mês seguinte já tinha cobrança, a folha oferece Cancelar a cobrança desse mês. Dias extras e taxas de busca que ficaram sem cobrança entram na mensalidade da saída ou numa cobrança à parte, o acerto da saída.",
+    ],
+    atencao: [
+      "Nada muda sozinho: sem a sua escolha, a cobrança fica como estava.",
+      "Mensalidade já paga não muda. A folha mostra quanto o tutor pagou a mais e oferece Anotar para devolver: fica uma observação na cobrança. Devolver o dinheiro é com você.",
+    ],
+    dicas: [
+      "A conta é a mesma da primeira cobrança: o dia fechado (feriado, folga) e o dia da semana em que a casa não abre ficam fora dos dois lados.",
+      "Com o fim marcado, a cobrança do mês da saída que ainda não foi gerada já vem com o valor proporcional em Gerar cobranças, e você pode mudar.",
+      "Depois que o plano acaba, Cobranças avisa quando o cão deixou dia extra ou taxa sem cobrança. Toque em Acertar.",
+      "O acerto da saída aparece em Cobranças e em Financeiro, A receber, e vai na mensagem ao tutor como acerto da saída.",
+      "A chamada deixa de esperar o cão depois do último dia, e as cobranças dos meses seguintes não são geradas. O histórico fica guardado.",
+    ],
+    palavras: ["cao saiu", "cachorro saiu", "saiu da creche", "vai sair da creche", "saida da creche", "deixou a creche", "encerrar plano", "encerrar o plano", "fim do plano", "termina em", "cancelar mensalista", "parar de vir", "ultimo dia", "acerto da saida", "proporcional da saida", "devolver mensalidade", "pagou a mais", "dia extra de quem saiu", "mensalista saiu", "escolinha", "day care"] },
   { id: "cobrancas-creche", titulo: "Como gerar e mandar as cobranças do mês", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE, tambem: [HOJE],
     passos: [
       "Abra Creche e hotel e toque em Cobranças, no alto.",

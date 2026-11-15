@@ -4,10 +4,12 @@ import { useState } from "react";
 import { History, Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
 import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
+import { diaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
 import { usaCasa } from "@/lib/gestao/modulos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
+import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { AvisoCaixaFechado, CampoDinheiro, EscolhaPagamento, fecharPagamento, pagamentoInicial, useCaixaAberto, type EstadoPagamento } from "../loja/pecas";
@@ -658,9 +660,12 @@ export function PartesRecebidas({ conta }: { conta: Pick<Lancamento, "id" | "val
  * entra como dinheiro de verdade (no caixa aberto, se foi hoje) e o resto continua na mesma conta, no mesmo vencimento ou num novo.
  * Com a opção de multa ligada, a conta atrasada mostra o valor atualizado sugerido; a multa só entra se a pessoa somar.
  */
+const fechadoNoResto = (dia: string) => `${dataCompleta(dia)} é dia fechado${nomeDoDiaFechado(dia) ? ` (${nomeDoDiaFechado(dia)})` : ""}. Escolha um dia em que vocês abrem.`;
+
 export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; aoFechar: () => void; aoSalvo: () => void | Promise<void> }) {
   const { sb, petshop, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
+  useCalendario(); // dia fechado: o resto não vence nele
   const hoje = hojeIso();
   const entrada = conta.tipo === "entrada";
   const devido = Number(conta.valor);
@@ -694,6 +699,8 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     const pg = fecharPagamento(pagamento, total);
     if ("erro" in pg) { setErro(pagamento.dividido ? pg.erro : entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
     if (!data || data > hoje) { setErro("Escolha um dia até hoje."); return; }
+    // o resto não vence num dia em que o negócio está fechado (feriado, folga marcada em Meu pet shop)
+    if (parcial && novoVencimento && diaFechado(novoVencimento)) { setErro(fechadoNoResto(novoVencimento)); return; }
     if (data === hoje && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
@@ -746,8 +753,9 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
           <div className="gf-parcial" role="status">
             <p>Fica faltando <b className="g-tab">{brl(falta)}</b>. Continua em A receber{conta.cliente_id ? " e na ficha do tutor" : ""}.</p>
             <Campo rotulo="Quando ele paga o resto (se combinou outro dia)">
-              <input type="date" className="g-input" value={novoVencimento} min={hoje} onChange={(e) => setNovoVencimento(e.target.value)} />
+              <input type="date" className="g-input" value={novoVencimento} min={hoje} onChange={(e) => { setNovoVencimento(e.target.value); setErro(null); }} />
             </Campo>
+            {novoVencimento && diaFechado(novoVencimento) && <p className="g-erro" role="alert">{fechadoNoResto(novoVencimento)}</p>}
           </div>
         )}
         {!sugerida && jaMulta > 0 && entrada && (

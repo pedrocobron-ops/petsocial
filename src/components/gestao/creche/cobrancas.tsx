@@ -16,6 +16,7 @@ import { useGestao } from "../contexto";
 import { FolhaBaixa } from "../financeiro/comum";
 import { Kpi, Tile } from "../painel";
 import { AvatarPessoa, AvatarPet, avisarMudanca, Campo, CampoValor, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
+import AcertoDaSaida, { AvisoSobras, lerSobrasDaSaida, type SobrasDaSaida } from "./saida";
 import "./creche.css";
 import "../loja/venda.css";
 import "@/components/gestao/hotel/hotel.css";
@@ -66,28 +67,37 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
   // receber de uma vez todas as mensalidades de um tutor, e marcar de uma vez as que foram pagas por fora do sistema
   const [familia, setFamilia] = useState<Grupo | null>(null);
   const [porFora, setPorFora] = useState(false);
+  const [acertando, setAcertando] = useState<PlanoCompleto | null>(null);
   const mesIso = isoMes(mes);
   useEffect(() => { aoMes(mes); }, [mesIso]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     // quem vê o financeiro abriu o mês corrente: as cobranças de mensalidade cheia que faltam são criadas (nunca duplica)
     if (mesIso === isoMes(new Date()) && liberado) await sb.rpc("creche_gerar_cobrancas", { p_petshop: petshop.id });
-    const [doMes, antigas, todasAsCobrancas] = await Promise.all([
+    const [doMes, antigas, todasAsCobrancas, acertos] = await Promise.all([
       sb.from("creche_cobrancas").select(SELECT_COBRANCA).eq("petshop_id", petshop.id).eq("mes", mesIso).order("vencimento").order("id").limit(1000),
       // o que ficou sem pagar de outros meses continua aparecendo em Atrasadas
       sb.from("creche_cobrancas").select(SELECT_COBRANCA.replace("lancamentos(", "lancamentos!inner(")).eq("petshop_id", petshop.id).eq("status", "aberta")
         .lt("mes", mesIso).eq("lancamentos.pago", false).order("vencimento").order("id").limit(1000),
       // que planos já tiveram cobrança, e em que meses (para saber qual é a primeira cobrança de cada um)
       sb.from("creche_cobrancas").select("plano_id, mes").eq("petshop_id", petshop.id).order("mes").order("id").limit(5000),
+      // acerto da saída de um mês seguinte (o cão já saiu) ainda sem pagar: aparece junto, para não ficar esquecido
+      sb.from("creche_cobrancas").select(SELECT_COBRANCA.replace("lancamentos(", "lancamentos!inner(")).eq("petshop_id", petshop.id).eq("status", "aberta")
+        .eq("acerto_saida", true).gt("mes", mesIso).eq("lancamentos.pago", false).order("vencimento").order("id").limit(1000),
     ]);
     const meses = (todasAsCobrancas.data ?? []) as { plano_id: string; mes: string }[];
     return {
-      doMes: ok(doMes) as unknown as CobrancaCompleta[], antigas: ok(antigas) as unknown as CobrancaCompleta[],
+      doMes: ok(doMes) as unknown as CobrancaCompleta[],
+      antigas: [...ok(antigas), ...(acertos.data ?? [])] as unknown as CobrancaCompleta[],
       comCobranca: new Set(meses.map((x) => x.plano_id)), comAnterior: new Set(meses.filter((x) => x.mes < mesIso).map((x) => x.plano_id)),
     };
   }, [petshop.id, mesIso]);
 
-  const mudou = async () => { await recarregar(); avisarMudanca(); };
+  // quem saiu e deixou dia extra ou taxa sem cobrança (nenhuma cobrança futura vai levar)
+  const diaria = petshop.diaria_creche == null ? null : Number(petshop.diaria_creche);
+  const { dados: sobras, recarregar: recarregarSobras } = useDados(() => lerSobrasDaSaida(sb, petshop.id, planos, diaria, hoje),
+    [petshop.id, planos.map((p) => `${p.id}:${p.fim ?? ""}`).join(","), hoje]);
+  const mudou = async () => { await Promise.all([recarregar(), recarregarSobras()]); avisarMudanca(); };
   const abertas = (dados?.doMes ?? []).filter((c) => c.status === "aberta");
   const canceladas = (dados?.doMes ?? []).filter((c) => c.status === "cancelada" && !c.por_fora);
   const pagasPorFora = (dados?.doMes ?? []).filter((c) => c.status === "cancelada" && c.por_fora);
@@ -195,6 +205,8 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
             </p>
           )}
 
+          <AvisoSobras sobras={sobras ?? []} aoAcertar={(p) => { if (!somenteLeitura()) setAcertando(p); }} />
+
           {primeiras.length > 0 && (
             <div className="g-aviso g-cm-aviso-fora" role="status" style={{ marginBottom: 0 }}>
               <AlertTriangle />
@@ -225,7 +237,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
                           <AvatarPessoa nome={g.tutor ?? "?"} />
                           <span className="t">
                             <b>{g.tutor ?? "Sem tutor"}</b>
-                            <span className="g-tab">{g.telefone ? fmtTelefone(g.telefone) : "sem telefone na ficha"}{g.cobrancas.length > 1 ? ` · ${g.cobrancas.length} pets numa mensagem só` : ""}</span>
+                            <span className="g-tab">{g.telefone ? fmtTelefone(g.telefone) : "sem telefone na ficha"}{g.cobrancas.length > 1 ? ` · ${new Set(g.cobrancas.map((c) => c.pet_id)).size > 1 ? `${new Set(g.cobrancas.map((c) => c.pet_id)).size} pets` : `${g.cobrancas.length} cobranças`} numa mensagem só` : ""}</span>
                           </span>
                           <b className="g-num total">{brl(g.total)}</b>
                         </div>
@@ -238,9 +250,9 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
                                 <div className="t">
                                   <b>{c.pets?.nome ?? "Pet removido"} <span className="g-tab">{brl(c.total)}</span></b>
                                   <span>
-                                    {c.mes !== mesIso ? `${nomeMes(deIsoDia(c.mes))} · ` : ""}Mensalidade {brl(c.valor_mensal)}{Number(c.valor_mensal) < Number(c.valor_cheio) ? " (proporcional)" : ""}
-                                    {extras.length ? ` + ${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})${partes.dias > 0 ? ` ${brl(partes.dias)}` : " sem valor"}` : ""}
-                                    {taxas.length ? ` + ${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((x) => x.dia))}) ${brl(partes.taxas)}` : ""}
+                                    {c.acerto_saida ? "Acerto da saída: " : `${c.mes !== mesIso ? `${nomeMes(deIsoDia(c.mes))} · ` : ""}Mensalidade ${brl(c.valor_mensal)}${Number(c.valor_mensal) < Number(c.valor_cheio) ? " (proporcional)" : ""}`}
+                                    {extras.length ? `${c.acerto_saida ? "" : " + "}${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})${partes.dias > 0 ? ` ${brl(partes.dias)}` : " sem valor"}` : ""}
+                                    {taxas.length ? `${c.acerto_saida && !extras.length ? "" : " + "}${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((x) => x.dia))}) ${brl(partes.taxas)}` : ""}
                                     {Number(c.desconto) > 0 ? ` − desconto ${brl(c.desconto)}` : ""}
                                   </span>
                                   <span className="selos">
@@ -295,8 +307,8 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
                 {canceladas.map((c) => (
                   <div key={c.id} className="g-linha">
                     <AvatarPet pet={c.pets ?? { nome: "?" }} />
-                    <span className="t"><b>{c.pets?.nome ?? "Pet removido"}</b><span>{c.pets?.clientes?.nome ?? "Sem tutor"} · cobrança cancelada</span></span>
-                    <button className="g-btn fantasma p" onClick={() => void reabrir(c)}><RotateCcw />Gerar de novo</button>
+                    <span className="t"><b>{c.pets?.nome ?? "Pet removido"}</b><span>{c.pets?.clientes?.nome ?? "Sem tutor"} · {c.acerto_saida ? "acerto da saída cancelado" : "cobrança cancelada"}</span></span>
+                    {!c.acerto_saida && <button className="g-btn fantasma p" onClick={() => void reabrir(c)}><RotateCcw />Gerar de novo</button>}
                   </div>
                 ))}
               </div>
@@ -332,7 +344,8 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
 
       {familia && <ReceberFamilia grupo={familia} contas={aReceberDe(familia)} aoFechar={() => setFamilia(null)} aoFeito={mudou} />}
       {porFora && <PagasPorFora mes={mes} cobrancas={semRecebimento} marcadas={primeiras.map((c) => c.id)} aoFechar={() => setPorFora(false)} aoFeito={async () => { setPorFora(false); await mudou(); }} />}
-      {gerar && dados && <GerarCobrancas mes={mes} planos={faltamGerar} comCobranca={dados.comAnterior} aoFechar={aoFecharGerar} aoGerar={async () => { aoFecharGerar(); await mudou(); }} />}
+      {acertando && <AcertoDaSaida plano={acertando} aoFechar={() => { setAcertando(null); void mudou(); }} />}
+      {gerar && dados && <GerarCobrancas sobras={sobras ?? []} mes={mes} planos={faltamGerar} comCobranca={dados.comAnterior} aoFechar={aoFecharGerar} aoGerar={async () => { aoFecharGerar(); await mudou(); }} />}
       {editando && <EditarCobranca cobranca={editando} aoFechar={() => setEditando(null)} aoSalvo={async () => { setEditando(null); await mudou(); }} />}
       {baixando && <FolhaBaixa conta={baixando} aoFechar={() => setBaixando(null)} aoSalvo={async () => { await recarregar(); }} />}
       {mensagem && <MensagemDeCobranca grupo={mensagem} texto={textoDe(mensagem)} aoFechar={() => setMensagem(null)} aoMandar={() => { void cobrou(mensagem); setMensagem(null); }} />}
@@ -368,7 +381,7 @@ type LinhaGerar = {
   primeira: boolean; escolha: PrimeiraCobranca | null; daquiPraFrente: ReturnType<typeof sugestaoDoMes> | null;
 };
 
-function GerarCobrancas({ mes, planos, comCobranca, aoFechar, aoGerar }: { mes: Date; planos: PlanoCompleto[]; comCobranca: Set<string>; aoFechar: () => void; aoGerar: () => Promise<void> }) {
+function GerarCobrancas({ sobras, mes, planos, comCobranca, aoFechar, aoGerar }: { sobras: SobrasDaSaida[]; mes: Date; planos: PlanoCompleto[]; comCobranca: Set<string>; aoFechar: () => void; aoGerar: () => Promise<void> }) {
   const { sb, petshop } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const mesIso = isoMes(mes);
@@ -460,10 +473,14 @@ function GerarCobrancas({ mes, planos, comCobranca, aoFechar, aoGerar }: { mes: 
         </button>
       </>}>
       {!linhas.length ? (
+        <div className="g-pilha">
         <Vazio titulo={`As cobranças de ${nomeMes(mes)} já foram geradas`} texto="Todo mensalista com plano neste mês já tem cobrança. Se entrar um mensalista novo, volte aqui: só a dele é criada." />
+        <AvisoSobras sobras={sobras} />
+        </div>
       ) : carregando && !extras ? <Esqueleto linhas={3} /> : (
         <div className="g-pilha">
           <p className="g-muted g-p">Uma cobrança por mensalista: a mensalidade, mais os dias extras e as taxas de busca fora do horário de meses anteriores que ainda não foram cobrados. Quem já tem cobrança em {nomeMes(mes)} não entra de novo. As de mensalidade cheia do mês corrente já são criadas quando você abre esta tela; aqui ficam as que pedem conferência.</p>
+          <AvisoSobras sobras={sobras} />
           {mesIso > mesDeHoje && <p className="g-aviso" role="status" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce">{nomeMes(new Date())[0].toUpperCase() + nomeMes(new Date()).slice(1)} ainda não acabou. Dia extra ou taxa de busca marcados depois de gerar não entram nesta cobrança: vão para a do mês seguinte.</span></p>}
           <div className="g-cm-gerar">
             {comValor.map((l) => (
@@ -485,7 +502,7 @@ function GerarCobrancas({ mes, planos, comCobranca, aoFechar, aoGerar }: { mes: 
                     </label>
                   )}
                   {l.sugestao?.proporcional && l.escolha !== "proporcional" && l.escolha !== "fora" && (
-                    <span className="g-cm-prorata">{l.plano.inicio > mesIso ? `Começou em ${dataCurta(l.plano.inicio)}` : "Plano com pausa no mês"}: {l.sugestao.restam} de {l.sugestao.todos} dias do plano no mês. Sugestão: {brl(l.sugestao.valor)} (a mensalidade cheia é {brl(l.plano.valor_mensal)}). Mude o valor se combinou outro.</span>
+                    <span className="g-cm-prorata">{l.plano.inicio > mesIso ? `Começou em ${dataCurta(l.plano.inicio)}` : l.plano.fim && l.plano.fim < isoDia(new Date(mes.getFullYear(), mes.getMonth() + 1, 0)) ? `Termina em ${dataCurta(l.plano.fim)}` : "Plano com pausa no mês"}: {l.sugestao.restam} de {l.sugestao.todos} dias do plano no mês. Sugestão: {brl(l.sugestao.valor)} (a mensalidade cheia é {brl(l.plano.valor_mensal)}). Mude o valor se combinou outro.</span>
                   )}
                   {l.extras.length > 0 && <span>{l.extras.length === 1 ? "1 dia extra" : `${l.extras.length} dias extras`} ({textoDasDatas(l.extras)}){l.unit > 0 ? `: ${brl(l.extras.length * l.unit)}` : ": sem preço de dia extra definido"}</span>}
                   {l.taxas.length > 0 && <span>{textoDasTaxas(l.taxas.length)} ({textoDasDatas(l.taxas.map((x) => x.dia))}): {brl(centavos(l.taxas.reduce((s, x) => s + x.valor, 0)))}</span>}
@@ -614,13 +631,13 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
     setErro(null); setSalvando(true);
     let feitas = 0, recebido = 0;
     const falhas: string[] = [];
-    const itens: { pet: string; mes: string; valor: number; multa: number }[] = [];
+    const itens: { pet: string; mes: string; valor: number; multa: number; acerto?: boolean }[] = [];
     for (let i = 0; i < contas.length; i++) {
       const c = contas[i], m = comMulta ? multas[i] : 0;
       try {
         await receberConta(sb, c.lancamento_id!, { valor: faltaDaCobranca(c), forma, data, multa: m > 0 ? { valor: m, forma } : null, chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) });
         feitas++; recebido = centavos(recebido + faltaDaCobranca(c) + m);
-        itens.push({ pet: c.pets?.nome ?? "Pet", mes: c.mes, valor: faltaDaCobranca(c), multa: m });
+        itens.push({ pet: c.pets?.nome ?? "Pet", mes: c.mes, valor: faltaDaCobranca(c), multa: m, acerto: c.acerto_saida });
       } catch (e) { falhas.push(`${c.pets?.nome ?? "pet"} (${e instanceof Error ? e.message : "erro"})`); }
     }
     if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join("; ")}`);
@@ -660,7 +677,7 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
           {contas.map((c, i) => (
             <div key={c.id} className="g-linha">
               <AvatarPet pet={c.pets ?? { nome: "?" }} tamanho="p" />
-              <span className="t"><b>{c.pets?.nome ?? "Pet"}</b><span>{nomeMes(deIsoDia(c.mes))} · venc. {dataCurta(c.vencimento)}{comMulta && multas[i] > 0 ? ` · + ${brl(multas[i])} de multa e juros` : ""}</span></span>
+              <span className="t"><b>{c.pets?.nome ?? "Pet"}</b><span>{c.acerto_saida ? "acerto da saída" : nomeMes(deIsoDia(c.mes))} · venc. {dataCurta(c.vencimento)}{comMulta && multas[i] > 0 ? ` · + ${brl(multas[i])} de multa e juros` : ""}</span></span>
               <b className="g-num g-tab">{brl(faltaDaCobranca(c))}</b>
             </div>
           ))}

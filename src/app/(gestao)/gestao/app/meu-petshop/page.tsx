@@ -377,10 +377,11 @@ function HorarioDaLoja() {
 /* ---------- serviços e preços ---------- */
 
 function Servicos() {
-  const { sb, servicos, recarregarBase } = useGestao();
+  const { sb, servicos, recarregarBase, petshop } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = useState<Servico | "novo" | null>(null);
+  const exemplos = [usaModulo(petshop, "banho_tosa") ? "banho, tosa" : "", usaModulo(petshop, "creche") ? "creche" : "", usaModulo(petshop, "hotel") ? "hotel" : ""].filter(Boolean).join(", ");
   const ativos = servicos.filter((s) => s.ativo);
   const inativos = servicos.filter((s) => !s.ativo);
   const abrir = (s: Servico | "novo") => { if (!somenteLeitura()) setEditando(s); };
@@ -403,7 +404,7 @@ function Servicos() {
         <button className="g-btn p pri" onClick={() => abrir("novo")}><Plus />Serviço novo</button>
       </div>
       {!ativos.length ? (
-        <Vazio titulo="Nenhum serviço na lista" texto="Coloque o primeiro: banho, tosa, creche, o que vocês fazem." />
+        <Vazio titulo="Nenhum serviço na lista" texto={`Coloque o primeiro: ${exemplos ? `${exemplos}, ` : ""}o que vocês fazem.`} />
       ) : (
         <div className="g-mp-servicos">
           {ativos.map((s) => {
