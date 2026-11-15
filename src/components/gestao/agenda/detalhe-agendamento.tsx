@@ -9,12 +9,15 @@ import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento 
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoCancelado, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
 import { imprimirComprovante, textoComprovante } from "@/lib/gestao/comprovante";
-import { desfazerVenda, itensDoLancamento, produtosDaVenda, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, desfazerVenda, itensDoLancamento, lancarAReceber, lancarPago, produtosDaVenda, textoDoPagamento, type ItemLancamento } from "@/lib/gestao/dinheiro";
+import { taxaDeFalta, travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
+import { useOperacao } from "@/lib/gestao/uma-vez";
 import { nomeDosServicos, servicosAMais, servicosPorExtenso, valorDoHorario } from "@/lib/gestao/servicos-do-horario";
 import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { FolhaBaixa } from "../financeiro/comum";
+import { AvisoCaixaFechado, EscolhaPagamento, fecharPagamento, useCaixaAberto, usePagamento } from "../loja/pecas";
 import { FidelidadeNoHorario } from "../fidelidade";
 import Comanda from "./comanda";
 import AntesDepois from "./antes-depois";
@@ -35,6 +38,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const [checklist, setChecklist] = useState<Record<string, boolean>>((a.checklist as Record<string, boolean>) ?? {});
   const [ocupado, setOcupado] = useState(false);
   const [avisadoEm, setAvisadoEm] = useState(a.pronto_avisado_em);
+  // "Cobrar a diferença" aberto (atendimento pago que ficou mais caro depois)
+  const [cobrandoDiferenca, setCobrandoDiferenca] = useState(false);
 
   const pet = a.pets;
   const tutor = pet?.clientes;
@@ -49,15 +54,21 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   // já foi pago? tem pacote que cobre este serviço?
   const { dados: extra, recarregar } = useDados(async () => {
     const diaDoHorario = isoDia(new Date(a.inicio));
-    const [pago, pacotes, semConta, mexidas] = await Promise.all([
+    const [pago, pacotes, semConta, mexidas, deve, diferencas] = await Promise.all([
       // o recebimento deste horário vem por uma função do banco: quem só opera o caixa não lê o histórico, mas vê se este foi pago
       vejoFinanceiro ? sb.rpc("recebimentos_do_agendamento", { p_agendamento: a.id }) : Promise.resolve({ data: [] as Lancamento[], error: null }),
       sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", a.pet_id).eq("ativo", true),
       // concluído e sem conta fechada? O banco responde sem mostrar valor (serve também para quem não mexe com dinheiro)
       a.status === "concluido" ? sb.rpc("agendamentos_para_cobrar", { p: petshop.id, p_de: diaDoHorario, p_ate: diaDoHorario }) : Promise.resolve({ data: [] as { id: string }[], error: null }),
       // serviço tirado da conta e preço abaixo da lista ficam anotados: o dono vê no próprio horário (o que foi feito não some)
-      cuidoDoFinanceiro ? sb.from("precos_alterados").select("id, tipo, item, de, para, quem_nome, quando").eq("petshop_id", petshop.id).eq("agendamento_id", a.id).in("tipo", ["servico_tirado", "preco_agenda"]).order("quando").limit(20)
+      cuidoDoFinanceiro ? sb.from("precos_alterados").select("id, tipo, item, de, para, quem_nome, quando").eq("petshop_id", petshop.id).eq("agendamento_id", a.id).in("tipo", ["servico_tirado", "preco_agenda", "atendimento_baixou", "atendimento_reaberto"]).order("quando").limit(20)
         : Promise.resolve({ data: [] as { id: string; tipo: string; item: string; de: number | null; para: number; quem_nome: string | null; quando: string }[], error: null }),
+      // o que o tutor deve de antes (fiado, taxa de falta, resto): aparece aqui e em Fechar a conta, para receber junto
+      vejoFinanceiro && a.pets?.clientes?.id
+        ? sb.from("lancamentos").select("id, valor, descricao, categoria, vencimento, agendamento_id").eq("petshop_id", petshop.id).eq("cliente_id", a.pets.clientes.id).eq("tipo", "entrada").eq("pago", false).order("data").limit(20)
+        : Promise.resolve({ data: [] as { id: string; valor: number; descricao: string | null; categoria: string; vencimento: string | null; agendamento_id: string | null }[], error: null }),
+      // a diferença de um atendimento pago que ficou mais caro, já cobrada por "Cobrar a diferença"
+      vejoFinanceiro && a.status === "concluido" ? sb.rpc("diferencas_do_agendamento", { p_agendamento: a.id }) : Promise.resolve({ data: 0, error: null }),
     ]);
     // horário que se repete: até quando vai a série (o último que ainda está de pé)
     let fimDaSerie: string | null = null;
@@ -74,7 +85,11 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     // o pagamento já está num caixa fechado? (aí só o dono reabre ou apaga)
     const caixas = [...new Set(lancados.filter((l) => l.pago && l.caixa_id).map((l) => l.caixa_id!))];
     const fechados = caixas.length ? await sb.from("caixas").select("id").in("id", caixas).not("fechado_em", "is", null) : { data: [] };
-    return { pago: lancados, pacote: validos[0] ?? null, fimDaSerie, semFim, emCaixaFechado: (fechados.data ?? []).length > 0, faltaCobrar: (semConta.data ?? []).some((x) => x.id === a.id), mexidas: mexidas.data ?? [] };
+    const antigas = ((deve.data ?? []) as { id: string; valor: number; descricao: string | null; categoria: string; vencimento: string | null; agendamento_id: string | null }[]).filter((l) => l.agendamento_id !== a.id);
+    return {
+      pago: lancados, pacote: validos[0] ?? null, fimDaSerie, semFim, emCaixaFechado: (fechados.data ?? []).length > 0, faltaCobrar: (semConta.data ?? []).some((x) => x.id === a.id), mexidas: mexidas.data ?? [],
+      antigas, diferencaCobrada: Number(diferencas.error ? 0 : diferencas.data ?? 0),
+    };
   }, [a.id, a.status, a.sem_cobranca]);
   // mais de um serviço no mesmo horário: o pacote cobre só o principal; os outros entram na conta
   const outros = servicosAMais(a);
@@ -97,7 +112,9 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     const servicos = itensDoLancamento(l).filter((i) => i.tipo === "servico");
     return t + (servicos.length ? servicos.reduce((s, i) => s + i.qtd * i.valor, 0) : Number(l.valor_original ?? l.valor));
   }, 0);
-  const diferenca = lancado > 0 && aCobrar != null ? Math.round((aCobrar - daConta) * 100) / 100 : 0;
+  // o que já foi cobrado à parte por "Cobrar a diferença" conta como pago
+  const diferenca = lancado > 0 && aCobrar != null ? Math.max(0, Math.round((aCobrar - daConta - (extra?.diferencaCobrada ?? 0)) * 100) / 100) : 0;
+  const deveAntes = Math.round((extra?.antigas ?? []).reduce((t, l) => t + Number(l.valor), 0) * 100) / 100;
   const formasDoRecebido = [...new Set(recebidos.map((l) => textoDoPagamento(l)))].join(" e ");
   // como chamar o que está lançado neste horário, nas perguntas de apagar
   const oLancado = recebido > 0 && aReceber > 0 ? "o recebimento e a conta a receber" : aReceber > 0 ? "a conta a receber" : "o recebimento";
@@ -106,11 +123,15 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   // concluído sem dinheiro lançado, quem recebe. Enquanto não sabe se foi pago, não oferece.
   const temConta = lancado > 0 || Boolean(a.pacote_cliente_id);
   const sabe = extra != null;
-  const podeMexerNoPago = extra?.emCaixaFechado ? souDono : temConta ? cuidoDoFinanceiro : vejoFinanceiro;
+  // preço travado: quem só opera o caixa não volta para marcado nem apaga um concluído que ainda não foi cobrado (seria tirar o dinheiro dele)
+  const travado = travaDePreco(petshop).ligada && !cuidoDoFinanceiro;
+  const concluidoTravado = travado && a.status === "concluido" && !temConta && !a.sem_cobranca && (total ?? 0) > 0;
+  const podeMexerNoPago = extra?.emCaixaFechado ? souDono : temConta ? cuidoDoFinanceiro : vejoFinanceiro && !concluidoTravado;
   const podeReabrir = a.status !== "concluido" || (sabe && podeMexerNoPago);
   const podeApagar = sabe && (a.status === "concluido" || temConta ? podeMexerNoPago : true);
   const porQueNao = extra?.emCaixaFechado ? "O pagamento deste atendimento está em um caixa já fechado: só o dono do pet shop pode reabrir, alterar ou apagar."
     : temConta ? "Atendimento com pagamento lançado: só o dono ou quem cuida do financeiro pode reabrir, alterar ou apagar."
+    : concluidoTravado ? "Com o preço travado, só o dono ou quem vê o financeiro volta para marcado ou apaga um atendimento concluído. Falta cobrar? Feche a conta pelo valor do horário."
     : "Atendimento concluído: só quem cuida do caixa ou do financeiro pode reabrir, alterar ou apagar.";
 
   async function mudar(campos: Partial<{ status: StatusAgendamento; checklist: Record<string, boolean>; lembrete_em: string; pronto_avisado_em: string; pacote_cliente_id: string }>, aviso?: string) {
@@ -180,7 +201,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         : "O uso do pacote continua contado. ";
       const sim = await confirmar({
         titulo: "Reabrir um atendimento que já foi pago?",
-        texto: `${dinheiro}Se você mudar o valor ou quem atendeu, a comissão e os relatórios passam a seguir o que ficar no horário. Para corrigir o dinheiro recebido, altere o lançamento em Financeiro: a alteração fica anotada.`,
+        texto: `${dinheiro}A conta fechada continua como está: a comissão e os relatórios seguem o que foi cobrado nela. Se o valor do horário subir, o horário mostra Cobrar a diferença. Para corrigir o dinheiro recebido, altere o lançamento em Financeiro: a alteração fica anotada.`,
         confirmar: "Reabrir",
       });
       if (!sim) return;
@@ -238,6 +259,12 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
       && !(await confirmar({ titulo: "Marcar como falta?", texto: `O horário de ${pet?.nome ?? "este pet"} é ${dataAmigavel(a.inicio)} às ${hora(a.inicio)} e ainda não chegou. Se o cliente avisou que não vem, prefira Desmarcar horário.`, confirmar: "Marcar falta" }))) return;
     const antes = a.status;
     if (!(await mudar({ status: "faltou" }))) return;
+    // taxa de falta ligada em Opções de cobrança: oferece anotar (quem decide é a pessoa)
+    if (taxa > 0 && vejoFinanceiro && tutor?.id && (await confirmar({
+      titulo: `Anotar a taxa de falta de ${brl(taxa)}?`,
+      texto: `Fica na ficha de ${tutor.nome ?? "o tutor"} e em A receber. No próximo atendimento, aparece em Fechar a conta como "Deve de antes", para receber junto.`,
+      confirmar: "Anotar a taxa", voltar: "Não cobrar",
+    }))) void anotarTaxa();
     avisar(`${pet?.nome ?? "O pet"} ficou como falta.`, {
       rotulo: "Desfazer",
       fazer: () => {
@@ -251,6 +278,23 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
       },
     });
   }
+
+  const taxa = taxaDeFalta(petshop);
+  const opTaxa = useOperacao();
+  /** Anota a taxa de falta para o tutor (uma vez só, mesmo com toque duplo). */
+  const anotarTaxa = () => opTaxa.fazer(async (chave) => {
+    if (!tutor?.id) return false;
+    try {
+      const vence = isoDia(somaDias(new Date(), 7));
+      await lancarAReceber(sb, petshop.id, {
+        valor: taxa, vencimento: vence, categoria: "Outros", clienteId: tutor.id, chave,
+        descricao: `Taxa de falta ${dataCurta(new Date(a.inicio))}${pet?.nome ? ` (${pet.nome})` : ""}`,
+      });
+      avisar(`Taxa de falta de ${brl(taxa)} anotada para ${tutor.nome?.split(" ")[0] ?? "o tutor"}.`);
+      avisarMudanca();
+      return true;
+    } catch (e) { avisarErro(e); return false; }
+  });
 
   const zap = linkWhatsApp(tutor?.telefone, textoLembrete({
     tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
@@ -273,6 +317,10 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
 
   if (comanda) {
     return <Comanda agendamento={a} pacote={comanda === "sim" ? null : comanda} aoFechar={() => setComanda(false)} aoPronto={() => { aoMudar(); aoFechar(); }} />;
+  }
+
+  if (cobrandoDiferenca && diferenca > 0.005) {
+    return <CobrarDiferenca agendamento={a} valor={diferenca} aoFechar={() => setCobrandoDiferenca(false)} aoPronto={async () => { setCobrandoDiferenca(false); await recarregar(); aoMudar(); }} />;
   }
 
   if (baixando) {
@@ -338,12 +386,24 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
             {tutor?.telefone && <p className="g-muted g-pp">{fmtTelefone(tutor.telefone)}</p>}
           </div>
           <div className="g-pilha p" style={{ justifyItems: "end" }}>
-            {faltaCobrar ? <span className="g-tag laranja">Concluído, falta cobrar</span> : <span className={`g-tag ${st.tom}`}>{st.rotulo}{a.status === "concluido" && vejoFinanceiro && sabe && recebido > 0 && !aReceber ? " e pago" : ""}</span>}
+            {faltaCobrar ? <span className="g-tag laranja">Concluído, falta cobrar</span>
+              : a.status === "concluido" && a.sem_cobranca && !lancado && !a.pacote_cliente_id ? <span className="g-tag amarelo">Sem cobrança</span>
+              : a.status === "concluido" && vejoFinanceiro && diferenca > 0.005 ? <span className="g-tag laranja">Concluído, falta a diferença</span>
+              : <span className={`g-tag ${st.tom}`}>{st.rotulo}{a.status === "concluido" && vejoFinanceiro && sabe && recebido > 0 && !aReceber ? " e pago" : ""}</span>}
             {a.serie_id && <span className="g-tag azul"><Repeat size={12} aria-hidden />Repete</span>}
           </div>
         </div>
 
         {pet?.alertas && <p className="g-aviso" style={{ margin: 0 }}>{pet.alertas}</p>}
+        {vejoFinanceiro && deveAntes > 0.005 && a.status !== "cancelado" && (
+          <p className="g-aviso g-agd-deve" style={{ margin: 0 }} role="status">
+            <span>
+              <b>{tutor?.nome?.split(" ")[0] ?? "O tutor"} deve {brl(deveAntes)} de antes</b>{" "}
+              ({(extra?.antigas ?? []).map((l) => l.descricao?.trim() || l.categoria).join(", ")}).{" "}
+              {pago ? "Para receber, use O cliente pagou ou a ficha do tutor." : "Em Fechar a conta dá para incluir e receber junto."}
+            </span>
+          </p>
+        )}
 
         <div className="g-card liso g-pilha p">
           <div className="g-fila entre"><span className="g-muted">{outros.length ? "Serviços" : "Serviço"}</span><b style={{ textAlign: "right" }}>{nomeDosServicos(a) ?? "A definir"}</b></div>
@@ -363,7 +423,10 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           {a.sem_cobranca && !lancado && a.status === "concluido" && !a.pacote_cliente_id && a.profissionais && <p className="g-pp g-muted" style={{ margin: 0 }}>Não cobrar não muda a comissão de {a.profissionais.nome.split(" ")[0]}: ela conta o preço da agenda.</p>}
           {(extra?.mexidas ?? []).map((m) => (
             <p key={m.id} className="g-pp g-muted" style={{ margin: 0 }}>
-              {m.tipo === "servico_tirado" ? `Tirado da conta: ${m.item}${m.de != null ? ` (${brl(m.de)})` : ""}` : `Marcado abaixo da lista: ${m.item} por ${brl(m.para)}${m.de != null ? ` (lista ${brl(m.de)})` : ""}`}
+              {m.tipo === "servico_tirado" ? `Tirado da conta: ${m.item}${m.de != null ? ` (${brl(m.de)})` : ""}`
+                : m.tipo === "atendimento_baixou" ? `Mudou depois de concluído: ${m.item}, de ${brl(m.de ?? 0)} para ${brl(m.para)}`
+                : m.tipo === "atendimento_reaberto" ? `Voltou para marcado depois de concluído (${brl(m.de ?? 0)})`
+                : `Marcado abaixo da lista: ${m.item} por ${brl(m.para)}${m.de != null ? ` (lista ${brl(m.de)})` : ""}`}
               {m.quem_nome ? ` · por ${m.quem_nome.split(" ")[0]}` : ""} em {dataCurta(new Date(m.quando))} às {hora(m.quando)}.
             </p>
           ))}
@@ -437,8 +500,11 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         )}
         {vejoFinanceiro && a.status === "concluido" && diferenca > 0.005 && (
           <p className="g-aviso" style={{ margin: 0 }} role="status">
-            <span><b>Faltam {brl(diferenca)}.</b> O horário está em {brl(aCobrar ?? 0)} e a conta fechada foi de {brl(daConta)}: o valor mudou depois de a conta ser fechada. Para cobrar a diferença, lance uma entrada em Caixa (ou em Financeiro) com o nome do pet. A comissão segue o valor da conta fechada.</span>
+            <span><b>Faltam {brl(diferenca)}.</b> O horário está em {brl(aCobrar ?? 0)} e a conta fechada foi de {brl(daConta + (extra?.diferencaCobrada ?? 0))}: o valor mudou depois de a conta ser fechada. A comissão e os relatórios seguem o que foi cobrado na conta fechada.</span>
           </p>
+        )}
+        {vejoFinanceiro && a.status === "concluido" && diferenca > 0.005 && (
+          <button type="button" className="g-btn pri cheio" disabled={ocupado} onClick={() => { if (!somenteLeitura()) setCobrandoDiferenca(true); }}><Receipt />Cobrar a diferença · {brl(diferenca)}</button>
         )}
 
         {devidos.length > 0 && (
@@ -494,6 +560,47 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
             ? <p className="g-pp g-muted">{porQueNao}</p>
             : <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirApagar()}><Trash2 />Apagar da agenda</button>}
         </div>
+      </div>
+    </Folha>
+  );
+}
+
+/**
+ * Atendimento já pago que ficou mais caro (reabriu e mudou o serviço ou o valor): recebe a diferença na hora, numa entrada à
+ * parte com o nome do pet. A conta fechada do horário continua como está (é dela que saem a comissão e os relatórios).
+ */
+function CobrarDiferenca({ agendamento: a, valor, aoFechar, aoPronto }: { agendamento: AgendamentoCompleto; valor: number; aoFechar: () => void; aoPronto: () => void | Promise<void> }) {
+  const { sb, petshop } = useGestao();
+  const { avisar, avisarErro, confirmar } = useAvisos();
+  const [pagamento, setPagamento] = usePagamento();
+  const [erro, setErro] = useState<string | null>(null);
+  const caixa = useCaixaAberto();
+  const op = useOperacao();
+  const servicos = nomeDosServicos(a) ?? "Atendimento";
+  const receber = () => op.fazer(async (chave) => {
+    const pg = fecharPagamento(pagamento, valor);
+    if ("erro" in pg) { setErro(pg.erro); avisarErro(pg.erro); return false; }
+    if (!(await conferirCaixa(sb, petshop.id, confirmar))) return false;
+    try {
+      const item = { tipo: "extra", nome: `Diferença de ${servicos}`, qtd: 1, valor, diferenca_de: a.id } as ItemLancamento;
+      await lancarPago(sb, petshop.id, {
+        tipo: "entrada", valor, forma: pg.forma, pagamentos: pg.pagamentos, categoria: a.servicos?.categoria === "creche" || a.servicos?.categoria === "hotel" ? "Creche e hotel" : "Banho e tosa",
+        clienteId: a.pets?.clientes?.id ?? null, descricao: `Diferença: ${servicos} · ${a.pets?.nome ?? "pet"} (${dataCurta(new Date(a.inicio))})`.slice(0, 200), itens: [item], chave,
+      });
+      avisar(`Diferença de ${brl(valor)} recebida.`);
+      avisarMudanca();
+      await aoPronto();
+      return true;
+    } catch (e) { avisarErro(e); return false; }
+  });
+  return (
+    <Folha titulo="Cobrar a diferença" aoFechar={aoFechar}
+      rodape={<><button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button><button type="button" className="g-btn pri" disabled={op.ocupado} onClick={() => void receber()}>Receber {brl(valor)}</button></>}>
+      <div className="g-form">
+        <p className="g-p">{a.pets?.nome ?? "O pet"}, {servicos}, {dataAmigavel(a.inicio)}. O horário ficou mais caro depois de a conta ser fechada: faltam <b className="g-tab">{brl(valor)}</b>.</p>
+        <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={valor} erro={erro} />
+        <AvisoCaixaFechado aberto={caixa} />
+        <p className="g-pp g-muted">Entra no caixa de hoje como uma entrada à parte, com o nome do pet. A conta fechada do horário não muda: a comissão e os relatórios seguem o que foi cobrado nela.</p>
       </div>
     </Folha>
   );
