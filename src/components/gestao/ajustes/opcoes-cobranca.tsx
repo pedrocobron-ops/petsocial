@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { HandCoins } from "lucide-react";
-import { MARCAS_DO_MODELO, mensagemDeDivida, MODELO_COBRANCA, multaSugerida, OPCOES_DINHEIRO as K, opcoesDeCobranca, opcoesDeComissao, travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
+import { MARCAS_DO_MODELO, mensagemDeDivida, MODELO_COBRANCA, multaSugerida, OPCOES_DINHEIRO as K, opcoesDeCobranca, opcoesDeComissao, taxaDeFalta, travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { brl, isoDia, somaDias } from "@/lib/gestao/util";
@@ -48,6 +48,7 @@ export default function OpcoesDeCobranca() {
   const [prodPct, setProdPct] = useState(pctTexto(c.produtosPct));
   const trava = travaDePreco(petshop);
   const [descMax, setDescMax] = useState(pctTexto(trava.descontoMax));
+  const [taxa, setTaxa] = useState<number | null>(taxaDeFalta(petshop) || null);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [porServico, setPorServico] = useState(false);
@@ -74,12 +75,14 @@ export default function OpcoesDeCobranca() {
     const dm = lerPct(descMax);
     if (dm === null) { setErro("O desconto máximo do caixa fica entre 0 e 100%."); return; }
     if (fixa != null && (fixa < 0 || fixa > 99999.99)) { setErro("Confira a multa em reais."); return; }
+    if (taxa != null && (taxa < 0 || taxa > 99999.99)) { setErro("Confira a taxa de falta."); return; }
     const texto = modelo.trim();
     if (texto && !texto.includes("{contas}")) { setErro("A mensagem precisa ter {contas}: é onde entra a lista do que o cliente deve."); return; }
     setErro(null);
     await gravar({
       [K.multaFixa]: fixa ?? 0, [K.multaPct]: p, [K.jurosMesPct]: j, [K.pix]: pix.trim().slice(0, 120),
       [K.modelo]: !texto || texto === MODELO_COBRANCA ? "" : texto.slice(0, 1200), [K.comissaoProdutosPct]: pp, [K.descontoMaxCaixa]: dm,
+      [K.taxaFalta]: taxa ?? 0,
     }, "Opções salvas.");
   }
 
@@ -143,13 +146,20 @@ export default function OpcoesDeCobranca() {
         <div className="gr-op-bloco">
           <div><b>Preço e desconto na venda</b><p className="g-muted g-pp">Toda venda com preço diferente da lista ou com desconto fica anotada (quem vendeu, de quanto para quanto) e aparece para você na tela Hoje. Isso vale sempre, sem ligar nada.</p></div>
           <Chave nome="Só o dono e quem vê o financeiro mudam preço ou dão desconto" titulo="Só o dono e quem vê o financeiro mudam preço ou dão desconto" ligado={trava.ligada} desligado={ocupado}
-            apoio="Quem só opera o caixa vende pelo preço da lista: produto, serviço do horário e pacote. Desligado, qualquer pessoa que recebe pode mudar o preço (e fica anotado)."
+            apoio="Quem só opera o caixa vende pelo preço da lista (produto, serviço do horário e pacote) e não diminui o valor de um atendimento já concluído: não volta para marcado, não apaga da agenda, não troca o serviço nem o porte para baixar a conta. Também não muda o preço dos produtos no Estoque, nem dá saída como venda sem o dinheiro entrar. Desligado, tudo isso pode, e fica anotado com o nome de quem fez."
             aoMudar={() => void gravar({ [K.precoTravado]: !trava.ligada }, trava.ligada ? "Preço liberado para quem recebe. As mudanças continuam anotadas." : "Preço travado para quem só opera o caixa.")} />
           {trava.ligada && (
             <Campo rotulo="Desconto máximo que o caixa pode dar (%)" dica="Em branco ou zero, o caixa não dá desconto nenhum. O dono e quem vê o financeiro não têm limite.">
               <input className="g-input g-tab" style={{ maxWidth: 140 }} inputMode="decimal" placeholder="0" value={descMax} aria-label="Desconto máximo do caixa em por cento" onChange={(e) => setDescMax(soPct(e.target.value))} />
             </Campo>
           )}
+        </div>
+
+        <div className="gr-op-bloco">
+          <div><b>Taxa de falta</b><p className="g-muted g-pp">Com um valor aqui, quando você marca Faltou na agenda o sistema pergunta se quer anotar a taxa para o tutor. Ela fica na ficha e em A receber, e aparece em Fechar a conta do próximo atendimento como &quot;Deve de antes&quot;. Em branco, o Faltou não pergunta nada.</p></div>
+          <Campo rotulo="Taxa de falta (se cobrar)">
+            <div style={{ maxWidth: 160 }}><CampoDinheiro valor={taxa} aoMudar={setTaxa} rotulo="Taxa de falta" /></div>
+          </Campo>
         </div>
 
         <div className="gr-op-bloco">
