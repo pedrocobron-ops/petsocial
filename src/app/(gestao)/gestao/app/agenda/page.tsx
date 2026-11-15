@@ -14,18 +14,24 @@ import { deMin, paraMin, textoConfirmacao, vagasDe } from "@/lib/gestao/agenda";
 import { almocoDoDia, dataAmigavel, dataLonga, linkWhatsApp, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
-import { AvatarPet, DICA_SO_CONSULTA, Esqueleto, Vazio, abrirAssistente, ok, useDados, useSomenteLeitura } from "@/components/gestao/ui";
+import { AvatarPet, DICA_SO_CONSULTA, Esqueleto, Vazio, abrirAssistente, ok, useAdiantar, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import SeriesAcabando from "@/components/gestao/agenda/series-acabando";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
-import FormAgendamento, { type Marcado } from "@/components/gestao/agenda/form-agendamento";
-import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
+import type { Marcado } from "@/components/gestao/agenda/form-agendamento";
+import dynamic from "next/dynamic";
 import LembretesDoDia, { BotaoLembrete, lembretesQueFaltam } from "@/components/gestao/agenda/lembretes";
-import FormBloqueio from "@/components/gestao/agenda/form-bloqueio";
 import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "@/components/gestao/calendario";
 import "./agenda.css";
 import { comPrecosDeAgendamento } from "@/lib/gestao/reservado";
+
+// folhas que só abrem com um toque: vêm à parte e baixam depois que a agenda abriu (useAdiantar)
+const carregarForm = () => import("@/components/gestao/agenda/form-agendamento");
+const carregarDetalhe = () => import("@/components/gestao/agenda/detalhe-agendamento");
+const FormAgendamento = dynamic(carregarForm, { ssr: false });
+const DetalheAgendamento = dynamic(carregarDetalhe, { ssr: false });
+const FormBloqueio = dynamic(() => import("@/components/gestao/agenda/form-bloqueio"), { ssr: false });
 
 type Novo = { dia: string; hora?: string; pet?: PetComTutor | null; profissional?: string | null };
 const H_HORA = 64; // altura de uma hora na visão de semana, em px
@@ -37,6 +43,7 @@ function Agenda() {
   const router = useRouter();
   const params = useSearchParams();
   const somenteLeitura = useSomenteLeitura();
+  useAdiantar(carregarForm, carregarDetalhe);
   const [dia, setDia] = useState(() => params.get("dia") ?? isoDia(new Date()));
   const [visao, setVisao] = useState<"dia" | "semana">(() => (params.get("visao") === "semana" ? "semana" : "dia"));
   const [prof, setProf] = useState<string | null>(null);

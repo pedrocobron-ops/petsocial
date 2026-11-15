@@ -29,20 +29,25 @@ import { useCalendario } from "@/components/gestao/calendario";
 import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
 import MinhaComissao from "@/components/gestao/minha-comissao";
-import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, useDados } from "@/components/gestao/ui";
+import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, useAdiantar, useDados } from "@/components/gestao/ui";
+import dynamic from "next/dynamic";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import { buscarSaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
 import MetaMes from "@/components/gestao/meta-mes";
 import DicasMozart from "@/components/gestao/dicas-mozart";
 import ChamarDeVolta, { aniversariantes, buscarParaChamar, chamadoEm, lerChamados, quemSumiu, type AbaChamar, type GrupoChamar } from "@/components/gestao/clientes/chamar-de-volta";
-import DetalheAgendamento from "@/components/gestao/agenda/detalhe-agendamento";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
-import FormAgendamento from "@/components/gestao/agenda/form-agendamento";
-import Importar from "@/components/gestao/importar";
 import { comPrecosDeAgendamento, idsParaCobrar } from "@/lib/gestao/reservado";
 import { AtendimentosParaCobrar, MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import AlteracoesDeValores from "@/components/gestao/financeiro/alteracoes-de-valores";
+
+// folhas que só abrem com um toque: vêm à parte e baixam depois que a tela abriu (useAdiantar)
+const carregarDetalhe = () => import("@/components/gestao/agenda/detalhe-agendamento");
+const carregarForm = () => import("@/components/gestao/agenda/form-agendamento");
+const DetalheAgendamento = dynamic(carregarDetalhe, { ssr: false });
+const FormAgendamento = dynamic(carregarForm, { ssr: false });
+const Importar = dynamic(() => import("@/components/gestao/importar"), { ssr: false });
 
 const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa semana?", "Quem não vem há mais de um mês?"];
 
@@ -53,6 +58,7 @@ export default function Hoje() {
   const { sb, petshop, eu, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso, liberado } = useGestao();
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
+  useAdiantar(carregarDetalhe, carregarForm);
   const [lembretes, setLembretes] = useState(false);
   const [chamando, setChamando] = useState<AbaChamar | null>(null);
   const [importando, setImportando] = useState(false);

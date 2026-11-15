@@ -22,6 +22,19 @@ export const abrirAssistente = (pedido?: string) => window.dispatchEvent(new Cus
 export const EVENTO_GUIA = "gestao:guia";
 export const abrirGuia = () => window.dispatchEvent(new Event(EVENTO_GUIA));
 
+/**
+ * Folhas que só abrem com um toque (marcar horário, detalhe, conta) vêm à parte (`next/dynamic`), para a tela abrir antes
+ * no celular com internet fraca. Depois que a tela abriu e o aparelho folgou, elas baixam em segundo plano: no toque, já estão aqui.
+ */
+export function useAdiantar(...carregar: (() => Promise<unknown>)[]) {
+  useEffect(() => {
+    const w = window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number };
+    const baixar = () => { for (const c of carregar) void c().catch(() => undefined); };
+    const t = setTimeout(() => (w.requestIdleCallback ? w.requestIdleCallback(baixar, { timeout: 5000 }) : baixar()), 4000);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 /** Busca dados e guarda o resultado. `recarregar()` busca de novo sem piscar a tela. */
 export function useDados<T>(buscar: () => Promise<T>, deps: unknown[]) {
   const [dados, setDados] = useState<T | null>(null);

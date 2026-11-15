@@ -9,7 +9,10 @@ import { brl, dataAmigavel, hora, isoDia } from "@/lib/gestao/util";
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, useAvisos, useDados, useSomenteLeitura } from "../ui";
-import Comanda from "./comanda";
+import dynamic from "next/dynamic";
+
+// a conta abre com um toque: vem à parte, para não pesar nas telas que só mostram a lista
+const Comanda = dynamic(() => import("./comanda"), { ssr: false });
 
 /**
  * Atendimento concluído que ninguém cobrou: o tosador concluiu no celular e o cliente foi embora sem passar no caixa.
