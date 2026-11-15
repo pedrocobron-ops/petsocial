@@ -1813,6 +1813,17 @@ const BASE: TopicoBase[] = [
       "Duas telas não usam o mesmo crédito: o banco confere o saldo na hora de gravar, e toque duplo não usa duas vezes.",
     ],
     palavras: ["credito do tutor", "usar o credito", "tem credito", "credito", "pagou a mais", "saldo do tutor", "desconta da proxima", "abater", "abater do credito", "usar o saldo", "pagar com credito"] },
+  { id: "internet-caiu", titulo: "A internet caiu no meio de um recebimento: e agora?", secao: "dinheiro", quem: "caixa", rota: CAIXA, tambem: [AGENDA, CRECHE],
+    passos: [
+      "Se aparecer Nada ficou pela metade. Toque de novo para tentar, a folha continua aberta: confira a internet e toque de novo no mesmo botão.",
+      "Não feche a folha para lançar de outro jeito. Tocando de novo na mesma folha, o que já tiver entrado não entra outra vez.",
+    ],
+    dicas: [
+      "Check-out do hotel e da creche, Encerrar o dia da creche, sinal da reserva, cancelar com sinal, Fechar a conta do atendimento (inteira, em parte ou para pagar depois), Recebi com o crédito do tutor e a Venda no balcão gravam tudo junto: a estadia, o pacote, o dinheiro, o crédito, o estoque e o atendimento concluído entram juntos, ou nada entra.",
+      "Se a internet caiu na volta, depois de gravar, a nova tentativa só mostra o que já tinha sido feito.",
+      "Pacote: o uso é somado na hora de gravar. Duas telas usando o mesmo pacote não fazem um uso sumir, e o pacote nunca passa do total.",
+    ],
+    palavras: ["internet caiu", "sem internet", "caiu a internet", "deu erro", "erro ao receber", "lancou duas vezes", "lançou duas vezes", "duplicou", "ficou pela metade", "nao gravou", "não gravou", "toque de novo", "sem conexao"] },
   { id: "relatorio-exportar", titulo: "Como exportar ou imprimir um relatório", secao: "dinheiro", quem: "financeiro", rota: RELATORIOS,
     passos: [
       "Abra Relatórios e escolha o período.",
