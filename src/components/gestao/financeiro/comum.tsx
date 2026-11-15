@@ -365,7 +365,8 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   const [pagamento, setPagamento] = useState<EstadoPagamento>(() => pagamentoInicial(inicial ? (inicial.forma as FormaId | null) ?? "pix" : null));
   // lançamento já dividido: as partes aparecem só para leitura até a pessoa trocar para uma forma só
   const [manterDividido, setManterDividido] = useState(() => Boolean(inicial && inicial.pago && ehDividido(inicial)));
-  const [categoria, setCategoria] = useState(inicial ? categoriaAtual(inicial.categoria) : categoriasDe(tipoInicial)[0]);
+  // conta anotada na ficha do tutor (taxa de falta, diferença esquecida): começa em Outros, não em Banho e tosa
+  const [categoria, setCategoria] = useState(inicial ? categoriaAtual(inicial.categoria) : tutorFixo && categoriasDe(tipoInicial).includes("Outros") ? "Outros" : categoriasDe(tipoInicial)[0]);
   // lançamento de um caixa que já foi fechado: valor, forma e dia não mudam mais, e ele não pode ser excluído (o banco também recusa)
   const { dados: caixaFechadoEm } = useDados(async () => {
     if (!inicial?.caixa_id) return null;
@@ -379,7 +380,8 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   const caixa = useCaixaAberto();
   const [descricao, setDescricao] = useState(inicial?.descricao ?? "");
   const [data, setData] = useState(inicial?.data ?? hoje);
-  const [vencimento, setVencimento] = useState(inicial?.vencimento ?? hoje);
+  // na ficha do tutor, a dívida solta costuma ser paga no próximo atendimento: o vencimento começa daqui a 7 dias
+  const [vencimento, setVencimento] = useState(inicial?.vencimento ?? (tutorFixo ? isoDia(new Date(Date.now() + 7 * 864e5)) : hoje));
   const [repetir, setRepetir] = useState(false);
   const [meses, setMeses] = useState(6);
   const [erro, setErro] = useState<string | null>(null);
@@ -570,7 +572,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
             <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus={!conta && !inicial} desligado={travado || manterDividido || soVer} maximo={99999999} />
           </Campo>
           {conta && (
-            <Campo rotulo="Vencimento">
+            <Campo rotulo="Vencimento" dica={tutorFixo && !inicial ? "Quando ele paga. Vai pagar no próximo banho? Ponha o dia do horário." : undefined}>
               <input type="date" className="g-input" value={vencimento} onChange={(e) => setVencimento(e.target.value)} />
             </Campo>
           )}
@@ -620,7 +622,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
           <p className="g-muted g-pp">Este valor já foi recebido. Se você alterar ou excluir, fica anotado quem mudou, quando e o valor de antes.</p>
         )}
         {!inicial && !conta && (!escolheData || data === hoje) && <AvisoCaixaFechado aberto={caixa} />}
-        {conta && !inicial && (
+        {conta && !inicial && !tutorFixo && (
           <>
             <label className="g-check">
               <input type="checkbox" checked={repetir} onChange={(e) => setRepetir(e.target.checked)} />
