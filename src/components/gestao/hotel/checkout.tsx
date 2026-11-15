@@ -587,7 +587,7 @@ function ContaFechada({ estadia, conta, saida, aoPronto, pendente }: { estadia: 
       <div className="g-vd-recibo">
         <Tile icone={Check} tom="menta" tamanho="g" />
         <p className="g-num">{brl(agora > 0 || !sobra ? agora : sobra.valor)}</p>
-        <p><b>{fiado ? "Anotado em A receber." : agora > 0 ? "Recebido." : sobra?.destino === "devolvido" ? "Devolvido ao tutor." : sobra?.destino === "credito" ? "Ficou de crédito para o tutor." : sobra ? "Ficou com o hotel." : "Check-out feito."}</b> {pendente ? `Estadia de ${estadia.pets?.nome ?? "pet"} acertada.` : `${estadia.pets?.nome ?? "O pet"} foi para casa.`}</p>
+        <p><b>{fiado ? "Anotado em A receber." : agora > 0 ? "Recebido." : sobra?.destino === "devolvido" ? "Devolvido ao tutor." : sobra?.destino === "credito" ? "Ficou de crédito para o tutor." : sobra ? "Ficou com o hotel." : conta.credito_usado ? "Pago com o crédito do tutor." : "Check-out feito."}</b> {pendente ? `Estadia de ${estadia.pets?.nome ?? "pet"} acertada.` : `${estadia.pets?.nome ?? "O pet"} foi para casa.`}</p>
         <div className="g-ht-conta" style={{ width: "100%", textAlign: "left" }}>
           <div className="l forte"><span>Total da estadia</span><span>{brl(conta.total)}</span></div>
           {fechoDaConta(conta).map((l, i) => <div key={i} className="l"><span>{l.texto}</span><span>{l.valor}</span></div>)}
