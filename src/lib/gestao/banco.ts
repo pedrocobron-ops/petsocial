@@ -1315,6 +1315,26 @@ isOneToOne: false
       referencedColumns: ["id","petshop_id"]
     }
                   ]
+                },"petshop_status_hist": {
+                  Row: {
+                    "de": Database["public"]['Enums']["status_assinatura"] | null,"em": string,"id": number,"para": Database["public"]['Enums']["status_assinatura"],"petshop_id": string,"plano": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "de"?: Database["public"]['Enums']["status_assinatura"] | null,"em"?: string,"id"?: never,"para": Database["public"]['Enums']["status_assinatura"],"petshop_id": string,"plano"?: string | null
+                  }
+                  Update: {
+                    "de"?: Database["public"]['Enums']["status_assinatura"] | null,"em"?: string,"id"?: never,"para"?: Database["public"]['Enums']["status_assinatura"],"petshop_id"?: string,"plano"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "petshop_status_hist_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"petshops": {
                   Row: {
                     "assinatura_desde": string | null,"cakto_assinatura": string | null,"cakto_email": string | null,"cidade": string | null,"creche_bloqueia_vacina": boolean,"criado_em": string,"criado_por": string | null,"diaria_creche": number | null,"diaria_hotel": number | null,"fidelidade_cada": number | null,"fidelidade_desde": string | null,"fidelidade_premio": string | null,"fuso": string,"guia_feito_em": string | null,"horario": NonNullable<Json>,"id": string,"link_ativo": boolean,"link_aviso": string | null,"link_codigo": string,"link_creche": boolean,"link_hotel": boolean,"logo": string | null,"meta_mes": number | null,"modulos": (string)[] | null,"nome": string,"opcoes": NonNullable<Json>,"pago_ate": string | null,"periodo_meses": number,"plano": string,"principal": string | null,"status": Database["public"]['Enums']["status_assinatura"],"telefone": string | null,"tema": string,"teste_ate": string,"uf": string | null,"vagas": number | null,"vagas_creche": number | null,"vagas_hotel": number | null,"whatsapp": boolean
@@ -1589,6 +1609,9 @@ isOneToOne: false
 "admin_cakto_sem_conta":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"admin_conta":
+{ Args: { "p_petshop": string }; Returns: Json
+                           },
 "admin_conversas":
 { Args: { "p_canal"?: string,"p_limite"?: number,"p_petshop"?: string }; Returns: Json
                            },
@@ -1617,6 +1640,12 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
 "admin_uso":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"admin_uso_contas":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"admin_visao_geral":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
 "agendamento_preco_da_tabela":
