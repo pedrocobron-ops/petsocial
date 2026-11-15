@@ -149,7 +149,7 @@ export default function AcertoDaSaida({ plano, aoFechar }: { plano: PlanoComplet
         <div className="g-pilha p">
           <div className="g-fila" style={{ flexWrap: "nowrap" }}>
             <AvatarPet pet={plano.pets ?? { nome: "?" }} />
-            <p className="g-p g-cresce">O plano de {nome} {fim < hoje ? "terminou" : fim === hoje ? "termina hoje" : "termina"} em {dataCompleta(fim)}. Confira o que já foi cobrado. Nada muda sem a sua escolha.</p>
+            <p className="g-p g-cresce">O plano de {nome} {fim < hoje ? `terminou em ${dataCompleta(fim)}` : fim === hoje ? `termina hoje, ${dataCompleta(fim)}` : `termina em ${dataCompleta(fim)}`}. Confira o que já foi cobrado. Nada muda sem a sua escolha.</p>
           </div>
           {itens.map((it) => {
             const c = it.c, feita = feitas[c.id];
