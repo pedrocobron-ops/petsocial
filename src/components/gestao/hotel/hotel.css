@@ -150,12 +150,12 @@
   .g-ht-ocup .g-ht-cal-topo h2 { font-size: 1.25rem; margin-bottom: 4px; }
   .g-ht-ocup .g-ht-mes { display: grid !important; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
   .g-ht-ocup .g-ht-sem { padding: 0 0 2px; color: #1f1b17; }
-  .g-ht-ocup .g-ht-dia { min-height: 0; padding: 4px 6px; gap: 2px; border-radius: 6px; border-color: #9c9184; background: #fff; opacity: 1; break-inside: avoid; }
+  .g-ht-ocup .g-ht-dia { min-height: 0; padding: 3px 6px; gap: 2px; border-radius: 6px; border-color: #9c9184; background: #fff; opacity: 1; break-inside: avoid; }
   .g-ht-ocup .g-ht-dia.passado { color: #6a625a; }
   .g-ht-ocup .g-ht-dia.passado .g-ht-oc { opacity: .75; }
   .g-ht-ocup .g-ht-dia.hoje { box-shadow: none; border: 2px solid #1f1b17; }
-  .g-ht-ocup .g-ht-dia .n { font-size: .875rem; }
-  .g-ht-ocup .g-ht-oc { font-size: .8125rem; padding: 1px 5px; border-radius: 4px; color: #1f1b17; }
+  .g-ht-ocup .g-ht-dia .n { font-size: .9375rem; line-height: 1.15; }
+  .g-ht-ocup .g-ht-oc { font-size: .8125rem; padding: 0 5px; border-radius: 4px; color: #1f1b17; }
   .g-ht-ocup .g-ht-oc.cheio { font-weight: 800; outline: 1.5px solid #7a281b; outline-offset: -1.5px; }
   .g-ht-ocup .g-ht-dia .fer { -webkit-line-clamp: 1; line-clamp: 1; font-size: .625rem; }
   .g-ht-ocup .g-ht-legenda { margin-top: 6px; font-size: .75rem; color: #1f1b17; }

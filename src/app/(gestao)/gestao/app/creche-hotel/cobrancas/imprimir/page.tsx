@@ -51,10 +51,8 @@ function Situacao({ c, hoje }: { c: CobrancaCompleta; hoje: string }) {
 function textoDoPlano(c: CobrancaCompleta, plano: PlanoCompleto | undefined, modelo: string | null) {
   if (c.acerto_saida) return { linha: "Acerto da saída", apoio: plano?.dias.length ? `plano de ${textoDosDias(plano.dias)}` : "" };
   const dias = plano?.dias.length ? textoDosDias(plano.dias) : "";
-  return {
-    linha: [modelo, dias].filter(Boolean).join(" · ") || "Mensalidade",
-    apoio: `Mensalidade ${brl(c.valor_mensal)}${Number(c.valor_mensal) < Number(c.valor_cheio) ? " (proporcional)" : ""}`,
-  };
+  const valor = `mensalidade ${brl(c.valor_mensal)}${Number(c.valor_mensal) < Number(c.valor_cheio) ? " (proporcional)" : ""}`;
+  return modelo ? { linha: modelo, apoio: [dias, valor].filter(Boolean).join(" · ") } : { linha: dias || "Mensalidade", apoio: valor };
 }
 
 function textoDosExtras(c: CobrancaCompleta) {
@@ -140,40 +138,35 @@ function CobrancasNoPapel() {
               <div><small>Falta receber</small><b>{brl(falta(doMes))}</b><span>deste mês</span></div>
               <div><small>Atrasadas</small><b>{atrasadas.length}</b><span>{atrasadas.length ? brl(falta(atrasadas)) : "nenhuma"}</span></div>
             </div>
-            {!todas.length ? <p className="g-pa-vazio">Nenhuma cobrança em {nomeMes(mes)}. Gere as cobranças do mês em {nomeDaCasa(petshop)}, Cobranças.</p> : todas.map((f) => {
-              const linhas = [...f.antigas, ...f.doMes];
-              const deve = falta(linhas);
-              return (
-                <section key={f.chave} className="g-pa-fam">
-                  <div className="g-pa-fam-t">
-                    <b>{f.tutor}</b>
-                    <span>{fmtTelefone(f.telefone) || "sem telefone"} · {deve > 0 ? `falta ${brl(deve)}` : "tudo pago"}</span>
-                  </div>
-                  <table>
-                    <colgroup><col className="c-pet" /><col className="c-plano" /><col className="c-extras" /><col className="c-total" /><col className="c-vence" /><col className="c-sit" /></colgroup>
-                    <thead><tr><th>Pet</th><th>Plano</th><th>Extras e taxas</th><th className="num">Total</th><th>Vence</th><th>Situação</th></tr></thead>
-                    <tbody>
+            {!todas.length ? <p className="g-pa-vazio">Nenhuma cobrança em {nomeMes(mes)}. Gere as cobranças do mês em {nomeDaCasa(petshop)}, Cobranças.</p> : (
+              <table className="g-pa-lista">
+                <colgroup><col className="c-pet" /><col className="c-plano" /><col className="c-extras" /><col className="c-total" /><col className="c-vence" /><col className="c-sit" /></colgroup>
+                <thead><tr><th>Pet</th><th>Plano</th><th>Extras e taxas</th><th className="pa-num">Total</th><th>Vence</th><th>Situação</th></tr></thead>
+                {todas.map((f) => {
+                  const linhas = [...f.antigas, ...f.doMes];
+                  const deve = falta(linhas);
+                  return (
+                    <tbody key={f.chave}>
+                      <tr className="fam"><td colSpan={6}><b>{f.tutor}</b><span>{fmtTelefone(f.telefone) || "sem telefone"} · {deve > 0 ? `falta ${brl(deve)}` : "tudo pago"}</span></td></tr>
                       {linhas.map((c) => {
                         const p = textoDoPlano(c, planoDe(c), modeloDe(c)), x = textoDosExtras(c);
                         return (
                           <tr key={c.id}>
                             <td><b>{c.pets?.nome ?? "Pet removido"}</b>{c.mes !== mesIso && <small>de {nomeMes(deIsoDia(c.mes))}</small>}</td>
                             <td>{p.linha}{p.apoio && <small>{p.apoio}</small>}</td>
-                            <td>{x.length ? x.map((t, i) => <small key={i} style={{ color: "inherit" }}>{t}</small>) : "—"}</td>
-                            <td className="num"><b>{brl(c.total)}</b></td>
+                            <td>{x.length ? x.map((t, i) => <span key={i} style={{ display: "block" }}>{t}</span>) : "—"}</td>
+                            <td className="pa-num"><span className="valor">{brl(c.total)}</span></td>
                             <td>{dataCurta(c.vencimento)}</td>
                             <td><Situacao c={c} hoje={hoje} /></td>
                           </tr>
                         );
                       })}
+                      {linhas.length > 1 && <tr className="soma"><td colSpan={3}>Total da família</td><td className="pa-num">{brl(soma(linhas))}</td><td colSpan={2}>{deve > 0 ? `falta ${brl(deve)}` : "tudo pago"}</td></tr>}
                     </tbody>
-                    {linhas.length > 1 && (
-                      <tfoot><tr><td colSpan={3}>Total da família</td><td className="num">{brl(soma(linhas))}</td><td colSpan={2}>{deve > 0 ? `falta ${brl(deve)}` : "tudo pago"}</td></tr></tfoot>
-                    )}
-                  </table>
-                </section>
-              );
-            })}
+                  );
+                })}
+              </table>
+            )}
             <p className="g-pa-nota">Lista das mensalidades de {nomeMes(mes)} (canceladas e pagas por fora do sistema não entram) e do que ficou em aberto de meses anteriores. A situação é a de agora, na hora da impressão.</p>
           </>
         )}

@@ -3,7 +3,7 @@
 .g-pa h2.g-pa-t { font: 600 1rem/1.25 var(--sans); padding: 6px 10px; background: #f1eadd; border-radius: 8px; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .g-pa h2.g-pa-t small { font-weight: 500; font-size: .8125rem; color: #6a625a; }
 .g-pa .g-pa-nota { font-size: .8125rem; color: #6a625a; }
-.g-pa .num, .g-pa td.num, .g-pa th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-pa .pa-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .g-pa .g-pa-vazio { font-size: .9375rem; color: #6a625a; padding: 4px 2px; }
 
 /* resumo: pares nome / valor */
@@ -32,18 +32,18 @@
 .g-pa .sit.aberta { color: #1f1b17; }
 .g-pa td small.sit { display: inline-block; margin-top: 2px; }
 
-/* lista de cobranças: uma família por bloco, que não se parte entre folhas */
-.g-pa-fam { break-inside: avoid; display: grid; gap: 4px; }
-.g-pa-fam + .g-pa-fam { margin-top: 10px; }
-.g-pa-fam-t { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-bottom: 1.5px solid #1f1b17; padding: 2px 0 3px; }
-.g-pa-fam-t b { font-size: 1rem; }
-.g-pa-fam-t span { font-size: .8125rem; color: #4a433c; }
-.g-pa-fam table { min-width: 0 !important; font-size: .8125rem; table-layout: fixed; }
-.g-pa-fam td { padding: 5px 6px !important; }
-.g-pa-fam th { padding: 3px 6px !important; font-size: .625rem !important; }
-.g-pa-fam col.c-pet { width: 17%; } .g-pa-fam col.c-plano { width: 25%; } .g-pa-fam col.c-extras { width: 24%; }
-.g-pa-fam col.c-total { width: 12%; } .g-pa-fam col.c-vence { width: 9%; } .g-pa-fam col.c-sit { width: 13%; }
-.g-pa-fam tfoot td { border-bottom: 0; font-weight: 700; }
+/* lista de cobranças: uma tabela só; cada família é um bloco (tbody) que não se parte entre folhas */
+.g-pa table.g-pa-lista { min-width: 0 !important; font-size: .8125rem; table-layout: fixed; }
+.g-pa-lista td { padding: 4px 6px !important; }
+.g-pa-lista th { padding: 3px 6px !important; font-size: .625rem !important; }
+.g-pa-lista tbody { break-inside: avoid; }
+.g-pa-lista tr.fam td { padding-top: 9px !important; border-bottom: 1.5px solid #1f1b17; }
+.g-pa-lista tr.fam b { font-size: .9375rem; }
+.g-pa-lista tr.fam span { float: right; font-size: .8125rem; color: #4a433c; }
+.g-pa-lista tr.soma td { border-bottom: 0; font-weight: 700; }
+.g-pa-lista col.c-pet { width: 15%; } .g-pa-lista col.c-plano { width: 27%; } .g-pa-lista col.c-extras { width: 24%; }
+.g-pa-lista col.c-total { width: 11%; } .g-pa-lista col.c-vence { width: 8%; } .g-pa-lista col.c-sit { width: 15%; }
+.g-pa-lista .valor { font-weight: 700; }
 
 /* extrato do tutor */
 .g-pa-ext-pet { break-inside: avoid; display: grid; gap: 4px; }
@@ -53,8 +53,15 @@
 .g-pa-total.pago { border-color: #24543b; }
 .g-pa-pagar { font-size: .875rem; line-height: 1.5; }
 
+/* tabela compacta (lançamentos do caixa) */
+.g-pa table.g-pa-tab { font-size: .8125rem; }
+.g-pa table.g-pa-tab td { padding: 4px 6px; }
+.g-pa table.g-pa-tab td.hora { font-size: .8125rem; }
+.g-pa table.g-pa-tab td small { display: inline; margin-left: 6px; }
+.g-pa table.g-pa-tab th { padding: 3px 6px; }
+
 /* assinatura de quem conferiu */
-.g-pa-assina { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 26px; font-size: .8125rem; color: #4a433c; }
+.g-pa .g-pa-assina { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 30px; break-inside: avoid; font-size: .8125rem; color: #4a433c; }
 .g-pa-assina span { border-top: 1px solid #1f1b17; padding-top: 4px; }
 
 /* ficha de cuidados */
@@ -75,6 +82,7 @@
 .g-pa-horas { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .g-pa-horas span { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .g-pa-horas i { display: inline-block; width: 12px; height: 12px; border: 1.5px solid #1f1b17; border-radius: 3px; }
+.g-pa-anota i { display: block; height: 24px; border-bottom: 1px solid #bdb3a4; }
 .g-pa-ficha.compacta { gap: 6px; padding-bottom: 10px; border-bottom: 1.5px solid #1f1b17; break-inside: avoid; }
 .g-pa-ficha.compacta .g-pa-ficha-t h2 { font-size: 1.125rem; }
 .g-pa-ficha.compacta .g-pa-caixa { padding: 5px 8px; }
@@ -82,6 +90,10 @@
 
 @media print {
   .g-pa { gap: 12px !important; }
+  /* compactas: três cuidados por linha, para caber mais fichas por folha */
+  .g-pa-ficha.compacta .g-pa-caixas { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .g-pa-ficha.compacta .g-pa-caixa.larga:not(.alerta) { grid-column: auto; }
+  .g-pa-ficha.compacta .g-avatar { width: 32px; height: 32px; }
   .g-pa-duas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); display: grid !important; }
   .g-pa-caixas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); display: grid !important; }
   .g-pa-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); display: grid !important; }

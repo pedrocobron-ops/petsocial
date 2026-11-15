@@ -142,8 +142,12 @@
   .g-man-cab { padding: 4px 0 2px; gap: 6px; break-after: avoid; break-inside: avoid; }
   .g-man-item .g-man-cab b, .g-man-item.aberto .g-man-cab b { font-size: 10pt; }
   .g-man .g-man-quem { font-size: 7pt; padding: 0 5px; min-height: 0; line-height: 1.5; }
-  .g-man-corpo { padding: 0 0 6px; gap: 4px; }
-  .g-man-passos { gap: 2px; }
+  /* grade não se parte bem entre colunas e folhas (o texto encavala): no papel, bloco */
+  .g-man-corpo { display: block; padding: 0 0 6px; }
+  .g-man-corpo > * + * { margin-top: 4px; }
+  .g-man-passos { display: block; }
+  .g-man-passos li + li { margin-top: 2px; }
+  .g-man-nota, .g-man-nota.atencao { break-inside: avoid; }
   .g-man-passos li { grid-template-columns: 15px minmax(0, 1fr); gap: 5px; line-height: 1.35; break-inside: avoid; }
   .g-man-passos li:first-child { break-before: avoid; }
   .g-man-passos li::before { width: 15px; height: 15px; font-size: 7.5pt; border-width: 1px; }

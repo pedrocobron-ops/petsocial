@@ -107,7 +107,7 @@ function FechamentoNoPapel() {
                       <h2 className="g-pa-t" style={{ marginTop: 10 }}>Saídas</h2>
                       <Pares linhas={[
                         ...r.porForma.filter((f) => f.saiu > 0).map((f) => ({ nome: f.rotulo, valor: brl(f.saiu), recuo: true })),
-                        { nome: r.nSaidas === 1 ? "Saídas (1 lançamento)" : `Saídas (${r.nSaidas} lançamentos)`, valor: brl(r.saiu), forte: true },
+                        { nome: !r.nSaidas ? "Nenhuma saída neste caixa" : r.nSaidas === 1 ? "Saídas (1 lançamento)" : `Saídas (${r.nSaidas} lançamentos)`, valor: brl(r.saiu), forte: true },
                       ]} />
                     </>
                   )}
@@ -131,21 +131,21 @@ function FechamentoNoPapel() {
             </section>
 
             {comMovimentos && lancVisiveis.length > 0 && (
-              <section className="g-imp-dia">
+              <section>
                 <h2 className="g-pa-t">Lançamentos deste caixa<small>{lancVisiveis.length}</small></h2>
-                <table>
-                  <thead><tr><th>Hora</th><th>Descrição</th><th>Forma</th><th className="num">Entrou</th><th className="num">Saiu</th></tr></thead>
+                <table className="g-pa-tab">
+                  <thead><tr><th>Hora</th><th>Descrição</th><th>Forma</th><th className="pa-num">Entrou</th><th className="pa-num">Saiu</th></tr></thead>
                   <tbody>
                     {lancVisiveis.map((l) => {
                       const entrada = l.tipo === "entrada" ? l.movimento !== "sangria" : l.movimento === "suprimento";
                       const valor = Number(l.valor) - (l.tipo === "entrada" ? creditoDaEntrada(l) : 0);
                       return (
                         <tr key={l.id}>
-                          <td className="hora" style={{ fontSize: ".8125rem" }}>{hora(quandoPagou(l))}</td>
+                          <td className="hora">{hora(quandoPagou(l))}</td>
                           <td>{l.movimento ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [l.descricao, resumoDeItens(l)].filter(Boolean).join(" · ") || "Lançamento"}{!l.movimento && <small>{categoriaAtual(l.categoria, petshop)}</small>}</td>
                           <td>{l.movimento ? "Dinheiro" : textoDoPagamento(l)}</td>
-                          <td className="num">{entrada ? brl(valor) : ""}</td>
-                          <td className="num">{entrada ? "" : brl(valor)}</td>
+                          <td className="pa-num">{entrada ? brl(valor) : ""}</td>
+                          <td className="pa-num">{entrada ? "" : brl(valor)}</td>
                         </tr>
                       );
                     })}

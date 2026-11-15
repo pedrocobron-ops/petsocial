@@ -1097,6 +1097,8 @@ body:has(.g-fundo) .g-fab:not(.aberta) { display: none; }
 @media print {
   @page { margin: 12mm; }
   body, .g-raiz { background: #fff !important; }
+  /* a altura mínima da tela (100dvh) não vale no papel: sem ela, não sobra uma folha em branco no fim */
+  .g-raiz { min-height: 0 !important; }
   .g-app { display: block; min-height: 0; }
   .g-main { max-width: none !important; padding: 0 !important; overflow: visible; }
   .g-barra, .g-abas, .g-fab, .g-lado, .g-ass, .g-guia, .g-toasts, .g-topo .g-acoes,

@@ -29,7 +29,7 @@ function FichaNoPapel() {
   const estadiaId = params.get("estadia");
   const ambos = usaModulo(petshop, "creche") && usaModulo(petshop, "hotel");
   const [modo, setModo] = useState<"pagina" | "compacta">(params.get("modo") === "compacta" ? "compacta" : "pagina");
-  const [tipo, setTipo] = useState<"todos" | "hotel" | "creche">(() => { const t = params.get("tipo"); return t === "hotel" || t === "creche" ? t : ambos ? "hotel" : "todos"; });
+  const [tipo, setTipo] = useState<"todos" | "hotel" | "creche">(() => { const t = params.get("tipo"); return t === "hotel" || t === "creche" || t === "todos" ? t : ambos ? "hotel" : "todos"; });
   const hoje = isoDia(new Date());
 
   const { dados, carregando, erro } = useDados(async () => {
@@ -77,8 +77,11 @@ function FichaNoPapel() {
       </ControlesDoPapel>
 
       <Papel pe="Ficha de cuidados">
-        <CabecalhoDoPapel titulo={umSo ? `Ficha de cuidados · ${nomeTipo(umSo.tipo)}` : `Fichas de cuidados · na casa agora${tipo !== "todos" ? ` (${nomeTipo(tipo).toLowerCase()})` : ""}`}
-          apoio={!umSo && lista.length ? (lista.length === 1 ? "1 pet" : `${lista.length} pets`) : undefined} />
+        {/* uma ficha por folha: cada folha leva o próprio cabeçalho */}
+        {(umSo || modo !== "pagina" || !lista.length) && (
+          <CabecalhoDoPapel titulo={umSo ? `Ficha de cuidados · ${nomeTipo(umSo.tipo)}` : `Fichas de cuidados · na casa agora${tipo !== "todos" ? ` (${nomeTipo(tipo).toLowerCase()})` : ""}`}
+            apoio={!umSo && lista.length ? (lista.length === 1 ? "1 pet" : `${lista.length} pets`) : undefined} />
+        )}
         {erro && <p className="g-erro" role="alert">{erro}</p>}
         {carregando && !dados ? <Esqueleto linhas={5} /> : !lista.length ? (
           <p className="g-pa-vazio">{estadiaId ? "Não achei esta estadia." : "Ninguém na casa agora."}</p>
@@ -98,6 +101,7 @@ function Ficha({ e, compacta, pagina, hoje, contatos, vacinas }: { e: Estadia; c
   const comida = cuidados.filter((c) => c.tipo === "comida"), remedio = cuidados.filter((c) => c.tipo === "remedio");
   const busca = contatos.filter((c) => c.tipo === "busca"), vets = contatos.filter((c) => c.tipo === "veterinario");
   const fim = e.status === "encerrada" ? e.saida : e.saida_prevista;
+  const atrasada = e.status === "em_casa" && Boolean(e.saida_prevista) && new Date(e.saida_prevista!).getTime() < Date.now();
   const sobre = [pet?.raca, pet?.porte ? `porte ${pet.porte}` : null, pet?.sexo === "M" ? "macho" : pet?.sexo === "F" ? "fêmea" : null, pet?.nascimento ? idade(pet.nascimento) : null].filter(Boolean).join(" · ");
   // a última de cada vacina (pelo nome), vencida ou não
   const porNome = new Map<string, Vacina>();
@@ -109,12 +113,14 @@ function Ficha({ e, compacta, pagina, hoje, contatos, vacinas }: { e: Estadia; c
   );
   return (
     <section className={`g-pa-ficha${compacta ? " compacta" : ""}${pagina ? " pagina" : ""}`}>
+      {pagina && <CabecalhoDoPapel titulo={`Ficha de cuidados · ${nomeTipo(e.tipo)}`} />}
       <div className="g-pa-ficha-t">
         <AvatarPet pet={pet ?? { nome: "?" }} tamanho={compacta ? undefined : "g"} />
         <div>
           <h2>{pet?.nome ?? "Pet removido"}</h2>
           <p>{[nomeTipo(e.tipo), sobre].filter(Boolean).join(" · ")}</p>
-          <p>Entrou {dataCurta(e.entrada)} às {horaCurta(e.entrada)} · {fim ? `${e.status === "encerrada" ? "saiu" : "sai"} ${dataCurta(fim)} às ${horaCurta(fim)}` : "sem saída prevista"}{nomeDaAcomodacao(petshop, e.acomodacao) ? ` · ${nomeDaAcomodacao(petshop, e.acomodacao)}` : ""}</p>
+          <p>Entrou {dataCurta(e.entrada)} às {horaCurta(e.entrada)} · {fim ? `${e.status === "encerrada" ? "saiu" : "sai"} ${dataCurta(fim)} às ${horaCurta(fim)}` : "sem saída prevista"}
+            {atrasada && <b> (saída atrasada)</b>}{nomeDaAcomodacao(petshop, e.acomodacao) ? ` · ${nomeDaAcomodacao(petshop, e.acomodacao)}` : ""}</p>
         </div>
       </div>
       {(pet?.alertas || pet?.obs || e.obs) && (
@@ -134,16 +140,18 @@ function Ficha({ e, compacta, pagina, hoje, contatos, vacinas }: { e: Estadia; c
           <h3>Remédio</h3>
           {remedio.length ? <ul>{remedio.map(cuidado)}</ul> : <p className="vazio">Nenhum remédio anotado.</p>}
         </div>
+        {!compacta && (
+          <div className="g-pa-caixa">
+            <h3>Tutor</h3>
+            <p><b>{pet?.clientes?.nome ?? "Sem tutor na ficha"}</b>{pet?.clientes?.telefone ? ` · ${fmtTelefone(pet.clientes.telefone)}` : ""}</p>
+            {pet?.clientes?.email && <p>{pet.clientes.email}</p>}
+            {pet?.clientes?.endereco && <p>{pet.clientes.endereco}</p>}
+          </div>
+        )}
         <div className="g-pa-caixa">
-          <h3>Tutor</h3>
-          <p><b>{pet?.clientes?.nome ?? "Sem tutor na ficha"}</b>{pet?.clientes?.telefone ? ` · ${fmtTelefone(pet.clientes.telefone)}` : ""}</p>
-          {!compacta && pet?.clientes?.email && <p>{pet.clientes.email}</p>}
-          {!compacta && pet?.clientes?.endereco && <p>{pet.clientes.endereco}</p>}
-        </div>
-        <div className="g-pa-caixa">
-          <h3>Quem pode buscar</h3>
+          <h3>{compacta ? "Tutor e quem pode buscar" : "Quem pode buscar"}</h3>
           <ul>
-            <li>{pet?.clientes?.nome ? `${pet.clientes.nome} (tutor)` : "O tutor"}</li>
+            <li>{pet?.clientes?.nome ? `${pet.clientes.nome} (tutor)` : "O tutor"}{compacta && pet?.clientes?.telefone ? ` · ${fmtTelefone(pet.clientes.telefone)}` : ""}</li>
             {busca.map((c) => <li key={c.id}>{nomeComRelacao(c)}{c.telefone ? ` · ${fmtTelefone(c.telefone)}` : ""}{c.obs ? ` · ${c.obs}` : ""}</li>)}
           </ul>
           {vets.map((v) => <p key={v.id}><b>Veterinário:</b> {v.nome}{v.telefone ? ` · ${fmtTelefone(v.telefone)}` : ""}{v.obs ? ` · ${v.obs}` : ""}</p>)}
@@ -157,6 +165,12 @@ function Ficha({ e, compacta, pagina, hoje, contatos, vacinas }: { e: Estadia; c
             })}</ul>
           ) : <p className="vazio">Nenhuma vacina anotada na ficha do pet.</p>}
         </div>
+        {!compacta && (
+          <div className="g-pa-caixa larga g-pa-anota">
+            <h3>Anotações da equipe</h3>
+            {Array.from({ length: 6 }, (_, i) => <i key={i} />)}
+          </div>
+        )}
       </div>
     </section>
   );
