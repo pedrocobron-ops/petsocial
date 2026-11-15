@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { Search, UserPlus, X } from "lucide-react";
-import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto } from "@/lib/gestao/dinheiro";
+import { fazerTudoOuNada, partesOuNada, passoDoEstoque, ref, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { Cliente } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, fmtTelefone, semAcento } from "@/lib/gestao/util";
+import { brl, dataCompleta, fmtTelefone, isoDia, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPessoa, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import {
-  baixarEstoque, BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LinhaDaConta, produtosDaConta,
+  BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LinhaDaConta, produtosDaConta,
   resumoDosItens, useProdutosDaLoja, type ItemConta,
 } from "./conta";
 import { AvisoCaixaFechado, fecharRecebimento, pagaDepoisInicial, useCaixaAberto, usePagamento, type PagaDepois } from "./pecas";
@@ -67,25 +68,29 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
     setSalvando(true);
     try {
       const linhas = itensParaGravar(vendidos);
-      let lancamentoId: string | null = null;
+      // o dinheiro e a saída do estoque numa chamada só: os dois entram, ou nenhum (tocar de novo não repete)
+      const passos: Passo[] = [];
+      let lanca = false;
       if (fiado) {
-        lancamentoId = (await lancarAReceber(sb, petshop.id, {
-          valor: contas.total, vencimento: fiado.quando, categoria: "Venda de produtos", clienteId: tutor?.id ?? null,
-          descricao: encurtar(`Venda: ${resumoDosItens(linhas)}`), itens: linhas, chave,
-        }))?.id ?? null;
+        passos.push({ t: "lancamento", nome: "venda", chave, linha: {
+          tipo: "entrada", valor: contas.total, forma: null, categoria: "Venda de produtos", cliente_id: tutor?.id ?? null, pago: false, data: fiado.quando, vencimento: fiado.quando,
+          descricao: encurtar(`Venda: ${resumoDosItens(linhas)}`), itens: linhas,
+        } });
+        lanca = true;
       } else if (pg && !("erro" in pg) && !pg.fiado) {
-        lancamentoId = (await lancarPago(sb, petshop.id, {
-          tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: pg.pagamentos, categoria: "Venda de produtos", clienteId: tutor?.id ?? null,
-          descricao: encurtar(`Venda: ${resumoDosItens(linhas)}`), itens: linhas, chave,
-        }))?.id ?? null;
+        passos.push({ t: "lancamento", nome: "venda", chave, linha: {
+          tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: partesOuNada(pg.pagamentos), categoria: "Venda de produtos", cliente_id: tutor?.id ?? null, pago: true, data: isoDia(new Date()),
+          descricao: encurtar(`Venda: ${resumoDosItens(linhas)}`), itens: linhas,
+        } });
+        lanca = true;
       }
-      try {
-        await baixarEstoque(sb, petshop.id, user.id, vendidos, lancamentoId, chave);
-        avisar(fiado ? `Anotado: ${brl(contas.total)} a receber de ${tutor?.nome ?? "cliente"} até ${dataCompleta(fiado.quando)}.` : vejoFinanceiro ? `Venda de ${brl(contas.total)} anotada.` : "Venda anotada no estoque.");
-      } catch (e) {
-        if (!vejoFinanceiro) throw e;
-        avisarErro(`${fiado ? "A conta foi anotada" : "O dinheiro foi lançado"}, mas o estoque não baixou. Dê a saída pela tela de Estoque. (${mensagemDeErro(e)})`);
+      const estoque = passoDoEstoque(produtosDaConta(vendidos), chave, lanca ? ref("venda") : null);
+      if (estoque) passos.push(estoque);
+      if (passos.length) {
+        try { await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "venda_registrar" }, passos); }
+        catch (e) { throw new Error(`A venda não foi anotada: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`); }
       }
+      avisar(fiado ? `Anotado: ${brl(contas.total)} a receber de ${tutor?.nome ?? "cliente"} até ${dataCompleta(fiado.quando)}.` : vejoFinanceiro ? `Venda de ${brl(contas.total)} anotada.` : "Venda anotada no estoque.");
       avisarMudanca();
       aoPronto?.();
       aoFechar();

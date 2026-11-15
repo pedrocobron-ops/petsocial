@@ -53,13 +53,15 @@ export const casoDoErro = (e: unknown) => (e instanceof ErroDaOperacao ? e.dica 
 type Alvo =
   | { funcao: "estadia_checkout" | "estadia_sinal"; estadia: string }
   | { funcao: "agendamento_fechar_conta"; agendamento: string }
-  | { funcao: "conta_receber_junto"; conta: string };
+  | { funcao: "conta_receber_junto"; conta: string }
+  | { funcao: "venda_registrar" };
 
 /** Manda os passos numa chamada só. Lança `ErroDaOperacao` (nada foi gravado, ou a resposta não chegou: tente com a mesma chave). */
 export async function fazerTudoOuNada(sb: Banco, petshopId: string, chave: string, alvo: Alvo, passos: Passo[]): Promise<ResultadoDaOperacao> {
   const args = { p_petshop: petshopId, p_chave: chave, p_passos: passos as unknown as never };
   const r = alvo.funcao === "agendamento_fechar_conta" ? await sb.rpc(alvo.funcao, { ...args, p_agendamento: alvo.agendamento })
     : alvo.funcao === "conta_receber_junto" ? await sb.rpc(alvo.funcao, { ...args, p_conta: alvo.conta })
+    : alvo.funcao === "venda_registrar" ? await sb.rpc(alvo.funcao, args)
     : await sb.rpc(alvo.funcao, { ...args, p_estadia: alvo.estadia });
   if (r.error) throw new ErroDaOperacao(r.error.message, (r.error as { hint?: string | null }).hint ?? null);
   return r.data as unknown as ResultadoDaOperacao;

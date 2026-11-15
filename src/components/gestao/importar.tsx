@@ -389,6 +389,8 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
         guardarUltima({ em: new Date().toISOString(), linhas: [`A importação parou no meio. Entraram ${plural(criados.clientes.length, "tutor", "tutores")} e ${plural(criados.pets.length, "pet", "pets")} antes do erro.`], ...criados });
       }
       aoTerminar?.();
+      // parou no meio: a mesma chave na nova tentativa não dá entrada duas vezes no mesmo estoque
+      return false;
     } finally { setIndo(false); }
   }
 

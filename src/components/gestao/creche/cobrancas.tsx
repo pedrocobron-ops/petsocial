@@ -823,7 +823,7 @@ function PagasPorFora({ mes, cobrancas, marcadas, aoFechar, aoFeito }: { mes: Da
       const n = ok(await sb.rpc("creche_cobrancas_por_fora", { p_ids: ids })) as number;
       avisar(n === 1 ? "1 mensalidade marcada como paga por fora. Saiu de A receber." : `${n} mensalidades marcadas como pagas por fora. Saíram de A receber.`);
       await aoFeito();
-    } catch (e) { avisarErro(e); setSalvando(false); }
+    } catch (e) { avisarErro(e); setSalvando(false); return false; }
   }
 
   return (

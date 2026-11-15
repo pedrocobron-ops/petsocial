@@ -338,6 +338,15 @@ end $$;
 revoke execute on function public.agendamento_fechar_conta(uuid, uuid, text, jsonb) from public, anon;
 grant execute on function public.agendamento_fechar_conta(uuid, uuid, text, jsonb) to authenticated;
 
+-- Venda no balcão: o lançamento (pago ou a receber) e a saída dos produtos do estoque, junto.
+create or replace function public.venda_registrar(p_petshop uuid, p_chave text, p_passos jsonb) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+begin
+  return public.operacao_tudo_ou_nada(p_petshop, p_chave, p_passos, array['lancamento', 'estoque']);
+end $$;
+revoke execute on function public.venda_registrar(uuid, text, jsonb) from public, anon;
+grant execute on function public.venda_registrar(uuid, text, jsonb) to authenticated;
+
 -- Receber uma conta a receber com o crédito do tutor e o resto pela forma escolhida, junto.
 create or replace function public.conta_receber_junto(p_petshop uuid, p_conta uuid, p_chave text, p_passos jsonb) returns jsonb
 language plpgsql security invoker set search_path = '' as $$

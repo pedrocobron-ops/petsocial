@@ -435,7 +435,9 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
           });
           avisar(`Pacote vendido para ${pet.nome}. ${brl(preco)} no financeiro.`);
         } catch (e) {
-          avisarErro(`O pacote foi criado, mas o pagamento não foi lançado. Lance pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
+          // o pacote não é vendido de novo (mesma chave): tocar de novo só lança o pagamento
+          avisarErro(`O pacote foi criado, mas o pagamento não foi lançado. Toque de novo para lançar. (${e instanceof Error ? e.message : "erro"})`);
+          return false;
         }
       } else if (rec && !("erro" in rec) && preco && rec.fiado) {
         // conta a receber: entrada ainda não paga, com vencimento e ligada ao cliente
@@ -445,11 +447,12 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
           });
           avisar(`Pacote vendido para ${pet.nome}. ${brl(preco)} em A receber, para ${dataCurta(rec.quando)}.`);
         } catch (e) {
-          avisarErro(`O pacote foi criado, mas a conta a receber não foi anotada. Anote pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
+          avisarErro(`O pacote foi criado, mas a conta a receber não foi anotada. Toque de novo para anotar. (${e instanceof Error ? e.message : "erro"})`);
+          return false;
         }
       } else avisar(`Pacote vendido para ${pet.nome}.`);
       aoGravar();
-    } catch (e) { avisarErro(e); } finally { setSalvando(false); }
+    } catch (e) { avisarErro(e); return false; } finally { setSalvando(false); }
   }
 
   if (criando !== null) {
