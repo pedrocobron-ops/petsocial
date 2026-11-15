@@ -51,7 +51,11 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
     if (pets.error) throw new Error(pets.error.message);
     if (entradas?.error) throw new Error(entradas.error.message);
     const devolvido = Math.round(((devolucoes?.data ?? []) as { valor: number }[]).reduce((s, l) => s + Number(l.valor), 0) * 100) / 100;
-    return { cliente: cliente.data as Cliente | null, pets: (pets.data ?? []) as Pet[], entradas: (entradas?.data ?? []) as Entrada[], devolvido };
+    // crédito do tutor (a mesma regra do faturamento): o que ficou com ele ainda é dele; o usado no check-out (fora de uma entrada) conta
+    const creditos = cuidoDoFinanceiro ? await sb.from("clientes_creditos").select("valor, lancamento_id").eq("petshop_id", petshop.id).eq("cliente_id", id).limit(1000) : null;
+    const ajusteCredito = Math.round(((creditos?.data ?? []) as { valor: number; lancamento_id: string | null }[])
+      .reduce((s, c) => s + (Number(c.valor) > 0 ? -Number(c.valor) : c.lancamento_id ? 0 : -Number(c.valor)), 0) * 100) / 100;
+    return { cliente: cliente.data as Cliente | null, pets: (pets.data ?? []) as Pet[], entradas: (entradas?.data ?? []) as Entrada[], devolvido, ajusteCredito };
   }, [petshop.id, id, cuidoDoFinanceiro]);
 
   const botaoVoltar = <button className="g-voltar" onClick={voltar}><ArrowLeft />Voltar</button>;
@@ -65,10 +69,10 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
     return <>{botaoVoltar}<Vazio titulo="Não achei esse cliente" texto="Pode ser que a ficha tenha sido apagada."><button className="g-btn verde" onClick={voltar}>Ver a lista</button></Vazio></>;
   }
 
-  const { cliente, pets, entradas, devolvido } = dados;
+  const { cliente, pets, entradas, devolvido, ajusteCredito } = dados;
   const zap = linkWhatsApp(cliente.telefone, `${saudacaoZap(cliente.nome, petshop.nome)} `);
   const pagas = entradas.filter((l) => l.pago);
-  const total = Math.max(0, pagas.reduce((s, l) => s + Number(l.valor), 0) - devolvido);
+  const total = Math.max(0, Math.round((pagas.reduce((s, l) => s + Number(l.valor), 0) - devolvido + ajusteCredito) * 100) / 100);
   const emAberto = entradas.filter((l) => !l.pago);
   const aReceber = emAberto.reduce((s, l) => s + Number(l.valor), 0);
   const ativos = pets.filter((p) => p.ativo).length;
@@ -190,7 +194,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
               <div className="g-card-t"><h3><Tile icone={Wallet} tom="menta" tamanho="p" />Quanto já gastou aqui</h3></div>
               <p className="g-num m">{brl(total)}</p>
               <p className="g-pp g-muted" style={{ marginTop: 4 }}>
-                {!pagas.length ? "Nenhuma entrada ligada a este cliente." : pagas.length === 1 ? "Em 1 entrada recebida." : `Em ${pagas.length} entradas recebidas.`}{devolvido > 0 ? ` Já sem ${brl(devolvido)} devolvidos a ${cliente.nome.split(" ")[0]}.` : ""}
+                {!pagas.length ? "Nenhuma entrada ligada a este cliente." : pagas.length === 1 ? "Em 1 entrada recebida." : `Em ${pagas.length} entradas recebidas.`}{devolvido > 0 ? ` Já sem ${brl(devolvido)} devolvidos a ${cliente.nome.split(" ")[0]}.` : ""}{ajusteCredito < 0 ? ` O que ficou de crédito para ele não conta duas vezes (${brl(-ajusteCredito)} a menos aqui; conta quando ele usa).` : ""}
               </p>
               {entradas.length > 0 && (
                 <div className="g-lista" style={{ marginTop: 8 }}>
