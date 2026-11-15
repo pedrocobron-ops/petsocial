@@ -19,6 +19,7 @@ type Acoes = {
   ligado: boolean; horas: number; aberto: boolean; limite: string | null; limite_dia?: string | null; limite_hora?: string | null; no_prazo: boolean;
   itens: { chave: string; cancelado_cliente: boolean }[];
   pediu: "cancelar" | "mudar" | null; pediu_em: string | null; recado: string | null;
+  /** depois do pedido de outra data, o horário já foi remarcado (banco com a migração 20261171) */ remarcado_depois?: boolean;
 };
 
 const TEXTO: Record<Situacao, { rotulo: string; tom: string }> = {
@@ -188,8 +189,10 @@ export default function AcompanharPedido({ params }: { params: Promise<{ codigo:
                 <p className="g-lkp-recado">
                   <CalendarClock aria-hidden />
                   <span>
-                    {acoes.pediu === "mudar" ? "Você pediu outra data" : "Você pediu para cancelar"}{acoes.pediu_em ? ` em ${diaEHora(acoes.pediu_em)}` : ""}.
-                    {acoes.recado ? ` Seu recado: “${acoes.recado}”` : ""} {pedido.petshop} responde pelo seu WhatsApp.{acoes.pediu === "mudar" ? " Até lá, o que está combinado continua valendo." : ""}
+                    {acoes.pediu === "mudar" && acoes.remarcado_depois
+                      ? <>Você pediu outra data{acoes.pediu_em ? ` em ${diaEHora(acoes.pediu_em)}` : ""}, e {pedido.petshop} já remarcou. A data que vale é a que está aqui em cima.</>
+                      : <>{acoes.pediu === "mudar" ? "Você pediu outra data" : "Você pediu para cancelar"}{acoes.pediu_em ? ` em ${diaEHora(acoes.pediu_em)}` : ""}.
+                    {acoes.recado ? ` Seu recado: “${acoes.recado}”` : ""} {pedido.petshop} responde pelo seu WhatsApp.{acoes.pediu === "mudar" ? " Até lá, o que está combinado continua valendo." : ""}</>}
                   </span>
                 </p>
               )}

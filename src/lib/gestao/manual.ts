@@ -101,7 +101,7 @@ const BASE: TopicoBase[] = [
       "Na quarta, toque em Escolher a imagem para colocar a sua logo e em Continuar.",
       "Cor e logo podem ficar para depois: toque em Faço depois em cada uma, ou em Com pressa? Pular a cor e a logo.",
       "Em seguida abre um guia curto, com um assunto por passo: horário, equipe e vagas, serviços e preços, diária e vagas da creche e do hotel, link do cliente. Só aparecem os passos do que você marcou.",
-      "No horário, toque em uma semana pronta, como Segunda a sexta ou Terça a sábado, e acerte as horas. Se vocês fecham para almoçar, marque Fecha para o almoço?.",
+      "No horário, toque nos dias prontos (Seg a sex, Seg a sáb, Ter a sáb ou Todos os dias), depois nas horas prontas (8h às 18h ou 9h às 19h) e, se for o caso, em Sábado meio período. O botão que bate com a grade fica marcado. Se vocês fecham para almoçar, marque Fecha para o almoço?.",
       "Em cada passo, toque em Continuar para gravar ou em Faço depois para pular.",
       "Nos preços, escolha Um preço só para usar o mesmo valor em todos os portes, ou Por porte para separar.",
       "No fim, escolha Cadastrar o primeiro pet (já abre a ficha para preencher) ou Trazer meus clientes de uma planilha.",
@@ -269,6 +269,7 @@ const BASE: TopicoBase[] = [
     passos: [
       "Toque no horário, na Agenda ou na tela Hoje.",
       "Para mudar dia, hora, serviço ou valor, toque em Remarcar ou alterar, mude o que precisa e toque em Salvar.",
+      { so: ["banho"], texto: "Mudou o dia ou a hora? Logo depois de salvar aparece Horário remarcado, com o botão Avisar no WhatsApp: a mensagem sai pronta com o dia e a hora novos. Você só aperta enviar." },
       "Se o cliente avisou que não vem, toque em Desmarcar horário.",
       "Se o cliente não apareceu, toque em Faltou.",
     ],
@@ -1092,7 +1093,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "Nenhuma cobrança nasce vencida sozinha. Se o plano ficou sem essa escolha (cadastrado pela equipe, ou antes de você preencher o valor), a pergunta aparece em Cobranças, em Gerar cobranças, na linha do pet.",
-      "Escolheu pago por fora e mudou de ideia? Abra Cobranças no mesmo mês: o pet aparece no bloco Pagas por fora do sistema. Toque em Cobrar por aqui, na linha dele. Depois toque em Gerar cobranças e escolha proporcional ou o mês inteiro.",
+      "Escolheu pago por fora e mudou de ideia? Abra Cobranças no mesmo mês: o pet aparece no bloco Pagas por fora do sistema. Toque em Cobrar por aqui, na linha dele. Se o vencimento do mês já passou, escolha o mês inteiro ou o proporcional a partir de hoje, e toque em Gerar a cobrança: ela já vai para A receber.",
     ],
     palavras: ["primeira cobranca", "primeira mensalidade", "comecou no meio do mes", "ja pagou", "pago por fora", "proporcional", "pro-rata", "mensalista novo", "cobranca atrasada sem querer", "nasce atrasada", "escolinha", "day care"] },
   { id: "pagas-por-fora", titulo: "Como marcar mensalidades que já foram pagas por fora", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE,
@@ -2164,7 +2165,7 @@ const BASE: TopicoBase[] = [
     passos: [
       "Abra Meu pet shop.",
       "No cartão Dados, mude o nome, o WhatsApp e a cidade e toque em Salvar dados.",
-      "No cartão Horário de funcionamento, toque em uma semana pronta: Segunda a sexta, Segunda a sábado, Terça a sábado ou Todos os dias.",
+      "No cartão Horário de funcionamento, toque nos dias prontos (Seg a sex, Seg a sáb, Ter a sáb ou Todos os dias) e nas horas prontas (8h às 18h ou 9h às 19h). Sábado meio período deixa o sábado até as 13h. O botão que bate com o que está na grade fica marcado.",
       "Acerte cada dia: marque Aberto e escreva a hora de abrir e a de fechar. Dia desmarcado fica Fechado.",
       "Se os dias abertos têm o mesmo horário, toque em Usar o mesmo horário em todos os dias abertos: ele copia o horário do primeiro dia aberto.",
       "Se vocês fecham para almoçar, marque Fecha para o almoço? e escreva de que horas a que horas.",
@@ -2173,6 +2174,7 @@ const BASE: TopicoBase[] = [
     dicas: [
       "A agenda, o link do cliente e o Mozart só oferecem horário dentro do funcionamento e fora do almoço.",
       "O almoço vale toda semana, sem prazo para acabar. Não precisa bloquear a agenda.",
+      "Dia que fecha durante o almoço (sábado até as 13h com almoço das 12h às 13h) não para para o almoço: a agenda oferece horário até a hora de fechar. Se no sábado vocês também param ao meio-dia, mude o fim do sábado para 12h.",
       "Usar o mesmo horário não abre dia fechado: dia fechado continua fechado.",
       "Preencha o estado (UF) em Dados: é por ele que o sistema sabe a hora do seu pet shop. Acre, Amazonas, Roraima, Rondônia, Mato Grosso e Mato Grosso do Sul têm hora diferente de Brasília, e sem o estado o link do cliente ofereceria os horários uma ou duas horas fora.",
       "Se aparecer o aviso O relógio deste aparelho está na frente (ou atrás) do horário do pet shop, acerte o fuso do aparelho ou confira o estado em Dados. Com o relógio fora, a agenda aparece deslocada.",

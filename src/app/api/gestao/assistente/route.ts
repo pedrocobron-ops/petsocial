@@ -25,7 +25,7 @@ type Corpo = {
 };
 
 /** O que a pessoa lê quando a inteligência artificial não está disponível (o motivo técnico vai só para o registro). */
-const FORA_DO_AR = "O Mozart está fora do ar agora. Tente de novo mais tarde.";
+const FORA_DO_AR = "O Mozart está fora do ar agora. Enquanto isso, tudo funciona pelos botões das telas, e o Manual, no menu, explica cada passo. Tente de novo mais tarde.";
 
 const erro = (status: number, codigo: string, mensagem: string) => NextResponse.json({ erro: codigo, mensagem }, { status });
 
