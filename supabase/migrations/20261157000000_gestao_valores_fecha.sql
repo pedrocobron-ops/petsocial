@@ -224,6 +224,7 @@ declare
   m public.agendamentos;
   v_fuso text;
   v_ultimo timestamptz;
+  v_ativo timestamptz;
   v_local timestamp;
   v_quando timestamptz;
   v_feitos integer := 0;
@@ -235,7 +236,12 @@ begin
   if not public.tenho_area(s.petshop_id, array['agenda']) or not public.acesso_liberado(s.petshop_id) then return 0; end if;
   perform 1 from public.series_agenda where serie_id = p_serie for update;
   select max(a.inicio) into v_ultimo from public.agendamentos a where a.serie_id = p_serie and a.petshop_id = s.petshop_id;
-  if v_ultimo is null or v_ultimo > p_depois_de then return 0; end if;
+  select max(a.inicio) into v_ativo from public.agendamentos a
+    where a.serie_id = p_serie and a.petshop_id = s.petshop_id and a.status not in ('cancelado', 'faltou');
+  -- p_depois_de é o último horário que a tela viu (o cartão manda o último de pé; o horário aberto, o último de todos).
+  -- Outra pessoa já ter continuado aparece como um horário de pé depois dele. (O último horário cancelado ou com falta
+  -- não trava mais a série: 20261177.)
+  if v_ultimo is null or v_ativo is null or v_ativo > p_depois_de then return 0; end if;
   select * into m from public.agendamentos a
     where a.serie_id = p_serie and a.petshop_id = s.petshop_id and a.status not in ('cancelado', 'faltou') order by a.inicio desc limit 1;
   if not found then return 0; end if;
@@ -277,7 +283,9 @@ begin
       and inicio < p_fim and fim > p_inicio
       and (p_ignorar is null or id <> p_ignorar)
   loop
-    if not v_vejo then r.preco := null; end if;
+    -- sem área de dinheiro: o preço e o valor guardado na conclusão (20261169) saem em branco
+    -- (jsonb_populate_record ignora a coluna que ainda não existe)
+    if not v_vejo then r := jsonb_populate_record(r, '{"preco": null, "valor_concluido": null, "concluido_servicos": null}'::jsonb); end if;
     return next r;
   end loop;
 end $$;
