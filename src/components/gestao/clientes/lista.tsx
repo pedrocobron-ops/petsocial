@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Importar, { UltimaImportacao } from "@/components/gestao/importar";
-import { AlertTriangle, Cat, ChevronRight, Dog, Download, MessageCircle, PawPrint, Phone, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
+import { AlertTriangle, Cat, ChevronRight, Dog, Download, HandCoins, MessageCircle, PawPrint, Phone, PiggyBank, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
-import { fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
+import { brl, fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
 import { buscarVisitas, sumiu } from "@/lib/gestao/visitas";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
@@ -27,6 +27,10 @@ const FILTROS: { id: Filtro; rotulo: string }[] = [
   { id: "saude", rotulo: "Saúde vencendo" },
 ];
 const PASSO = 100;
+/** Filtro da aba Tutores (o de dinheiro só aparece para quem mexe com dinheiro). */
+type FiltroTutor = "todos" | "deve" | "credito";
+/** O que cada tutor deve (contas a receber em aberto) e o crédito que tem, pela função `tutores_dinheiro`. */
+type DinheiroDoTutor = { deve: number; vencido: number; contas: number; credito: number };
 
 /** Cor da última visita: verde até 30 dias, amarelo até 60, vermelho depois. Sem visita fica cinza. */
 export function tomDaVisita(quando: string | null | undefined, agora: number) {
@@ -57,7 +61,7 @@ export default function Lista({ aoAbrir, irPara }: {
   aoAbrir: () => void;
   irPara: (url: string) => void;
 }) {
-  const { sb, petshop, posso, eu } = useGestao();
+  const { sb, petshop, posso, eu, vejoFinanceiro } = useGestao();
   // a lista inteira de clientes (baixar a planilha, trazer de planilha) é com o dono e o gerente; quem atende consulta um por um
   const listaInteira = eu.papel === "dono" || eu.papel === "gerente";
   const { avisar, avisarErro } = useAvisos();
@@ -65,6 +69,7 @@ export default function Lista({ aoAbrir, irPara }: {
   const [aba, setAba] = useState<"pets" | "tutores">("pets");
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [filtroTutor, setFiltroTutor] = useState<FiltroTutor>("todos");
   // atalho vindo da tela Hoje: /gestao/app/clientes?filtro=sumidos30
   useEffect(() => { if (new URLSearchParams(window.location.search).get("filtro") === "sumidos30") setFiltro("sumidos30"); }, []);
   const [mostrar, setMostrar] = useState(PASSO);
@@ -100,6 +105,19 @@ export default function Lista({ aoAbrir, irPara }: {
     return buscarVisitas(sb, petshop.id);
   }, [petshop.id, totalPets]);
 
+  // quem deve e quem tem crédito (só para quem mexe com dinheiro): uma linha por tutor, sem valores para a equipe
+  const { dados: dinheiro } = useDados(async () => {
+    if (!vejoFinanceiro) return null;
+    const r = await sb.rpc("tutores_dinheiro", { p_petshop: petshop.id });
+    if (r.error) return null;
+    return new Map(((r.data ?? []) as ({ cliente_id: string } & DinheiroDoTutor)[]).map((x) => [x.cliente_id, { deve: Number(x.deve), vencido: Number(x.vencido), contas: x.contas, credito: Number(x.credito) }]));
+  }, [petshop.id, vejoFinanceiro, totalPets]);
+  const totalDevido = useMemo(() => {
+    let v = 0, n = 0, cred = 0, nc = 0;
+    for (const x of dinheiro?.values() ?? []) { if (x.deve > 0) { v += x.deve; n++; } if (x.credito > 0) { cred += x.credito; nc++; } }
+    return { valor: Math.round(v * 100) / 100, tutores: n, credito: Math.round(cred * 100) / 100, comCredito: nc };
+  }, [dinheiro]);
+
   // Saúde: pets com cuidado vencido ou vencendo em 30 dias (consulta leve, só de leitura)
   const { dados: saude, erro: erroSaude } = useDados(() => buscarAlertasSaude(sb, petshop.id), [petshop.id]);
 
@@ -132,10 +150,16 @@ export default function Lista({ aoAbrir, irPara }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pets, ultimos, saude, alvo, alvoFone, filtro]);
 
-  const tutoresFiltrados = useMemo(() => clientes.filter((c) =>
-    !alvo || bate(c.nome, ...(petsPorTutor.get(c.id) ?? []).map((p) => p.nome)) || bateFone(c.telefone)),
+  const tutoresFiltrados = useMemo(() => {
+    const lista = clientes.filter((c) =>
+      (!alvo || bate(c.nome, ...(petsPorTutor.get(c.id) ?? []).map((p) => p.nome)) || bateFone(c.telefone))
+      && (filtroTutor === "todos" || (filtroTutor === "deve" ? (dinheiro?.get(c.id)?.deve ?? 0) > 0 : (dinheiro?.get(c.id)?.credito ?? 0) > 0)));
+    // "Quem deve": quem deve mais (e em atraso) primeiro
+    if (filtroTutor === "deve") lista.sort((a, b) => (dinheiro?.get(b.id)?.vencido ?? 0) - (dinheiro?.get(a.id)?.vencido ?? 0) || (dinheiro?.get(b.id)?.deve ?? 0) - (dinheiro?.get(a.id)?.deve ?? 0));
+    return lista;
+  },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [clientes, petsPorTutor, alvo, alvoFone]);
+  [clientes, petsPorTutor, alvo, alvoFone, filtroTutor, dinheiro]);
 
   // números do topo: tudo sai do que a lista já carregou
   const resumo = useMemo(() => {
@@ -223,6 +247,19 @@ export default function Lista({ aoAbrir, irPara }: {
           <input className="g-input" type="search" placeholder="Nome do pet, do tutor ou telefone" aria-label="Buscar" value={q}
             onChange={(e) => { setQ(e.target.value); setMostrar(PASSO); }} />
         </div>
+        {aba === "tutores" && dinheiro && (totalDevido.tutores > 0 || totalDevido.comCredito > 0 || filtroTutor !== "todos") && (
+          <div className="g-chips" role="group" aria-label="Filtro dos tutores">
+            <button className="g-chip" aria-pressed={filtroTutor === "todos"} onClick={() => { setFiltroTutor("todos"); setMostrar(PASSO); }}>Todos</button>
+            <button className="g-chip" aria-pressed={filtroTutor === "deve"} onClick={() => { setFiltroTutor("deve"); setMostrar(PASSO); }}><HandCoins />Quem deve{totalDevido.tutores ? ` (${totalDevido.tutores})` : ""}</button>
+            {totalDevido.comCredito > 0 && <button className="g-chip" aria-pressed={filtroTutor === "credito"} onClick={() => { setFiltroTutor("credito"); setMostrar(PASSO); }}><PiggyBank />Com crédito ({totalDevido.comCredito})</button>}
+          </div>
+        )}
+        {aba === "tutores" && filtroTutor === "deve" && dinheiro && (
+          <p className="g-p" role="status"><b className="g-tab">{brl(totalDevido.valor)}</b> a receber de {totalDevido.tutores === 1 ? "1 tutor" : `${totalDevido.tutores} tutores`}, sem multa e juros. Para cobrar, abra a ficha de cada um ou o Caixa, em Contas de clientes.</p>
+        )}
+        {aba === "tutores" && filtroTutor === "credito" && dinheiro && (
+          <p className="g-p" role="status"><b className="g-tab">{brl(totalDevido.credito)}</b> de crédito com {totalDevido.comCredito === 1 ? "1 tutor" : `${totalDevido.comCredito} tutores`}: é dinheiro deles, que desconta da próxima conta.</p>
+        )}
         {aba === "pets" && (
           <div className="g-chips" role="group" aria-label="Filtro">
             {FILTROS.map((f) => <button key={f.id} className="g-chip" aria-pressed={filtro === f.id} onClick={() => { setFiltro(f.id); setMostrar(PASSO); }}>{f.rotulo}{f.id === "semvisita" && ultimos && resumo.semVisita ? ` (${resumo.semVisita})` : ""}</button>)}
@@ -286,14 +323,21 @@ export default function Lista({ aoAbrir, irPara }: {
           <button className="g-btn sec" onClick={() => abrirAssistente(PEDIDO_EXEMPLO)}><Sparkles />Pedir ao Mozart</button>
         </Vazio>
       ) : !tutoresFiltrados.length ? (
+        filtroTutor !== "todos" && !alvo ? (
+          <Vazio titulo={filtroTutor === "deve" ? "Ninguém está devendo" : "Ninguém com crédito"} texto={filtroTutor === "deve" ? "Conta que o cliente ficou de pagar depois aparece aqui, com o nome dele." : "Crédito nasce quando o tutor paga a mais (por exemplo, o pet sai antes do fim de uma estadia paga adiantado)."}>
+            <button className="g-btn sec" onClick={() => setFiltroTutor("todos")}>Ver todos</button>
+          </Vazio>
+        ) : (
         <Vazio titulo="Não achei ninguém com esse nome" texto="Confira como está escrito ou busque pelo telefone.">
-          <button className="g-btn sec" onClick={() => setQ("")}>Ver todos</button>
+          <button className="g-btn sec" onClick={() => { setQ(""); setFiltroTutor("todos"); }}>Ver todos</button>
         </Vazio>
+        )
       ) : (
         <>
           <div className="g-cli-grade">
             {tutoresFiltrados.slice(0, mostrar).map((c) => {
               const dele = petsPorTutor.get(c.id) ?? [];
+              const din = dinheiro?.get(c.id);
               return (
                 <Link key={c.id} href={linkTutor(c.id)} scroll={false} className="g-cli-pet tutor" onClick={aoAbrir}>
                   <span className="cab">
@@ -311,7 +355,11 @@ export default function Lista({ aoAbrir, irPara }: {
                         <span className="nomes">{dele.map((p) => p.nome).join(", ")}</span>
                       </span>
                     ) : <span className="g-pp g-muted">Sem pet na lista</span>}
-                    <span className="g-cli-etq">{dele.length === 1 ? "1 pet" : `${dele.length} pets`}</span>
+                    <span className="g-cli-etqs">
+                      {din && din.deve > 0 && <span className={`g-cli-etq ${din.vencido > 0 ? "rosa" : "manteiga"}`} title={din.vencido > 0 ? `${brl(din.vencido)} em atraso` : "a vencer"}><HandCoins aria-hidden />Deve {brl(din.deve)}{din.vencido > 0 ? " · atrasado" : ""}</span>}
+                      {din && din.credito > 0 && <span className="g-cli-etq menta"><PiggyBank aria-hidden />Crédito {brl(din.credito)}</span>}
+                      <span className="g-cli-etq">{dele.length === 1 ? "1 pet" : `${dele.length} pets`}</span>
+                    </span>
                   </span>
                 </Link>
               );
