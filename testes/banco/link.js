@@ -89,26 +89,25 @@ const LIMITES = { link_limite_fone_abertos: 6, link_limite_fone_hora: 8, link_li
   for (let i = 0; i < 6; i++) { r = await pedir(rede, formatos[i % 4]); if (r.ok) n++; else break; }
   // PROBLEMA CONHECIDO: a 20261164 pôs o freio (link_muitos_envios + link_envios) em link_pedir_com_termos, mas a 20261168 e a
   // 20261173 trocaram a função de novo sem ele. Hoje o link não freia envio nenhum. Ver testes/LEIAME.md.
-  const SEM_FREIO = 'freio de envios sumiu de link_pedir_com_termos (migrações 68 e 73 reescreveram a função da 64 sem ele)';
   T.ok('6 pedidos pendentes do mesmo WhatsApp passam (quem tem vários pets)', n === 6, r);
   r = await pedir(rede, formatos[1]);
-  T.conhecido('7º pendente do mesmo número (escrito de outro jeito): "muitos", com a frase para o tutor', r.ok === false && r.erro === 'limite' && r.motivo === 'muitos' && /Recebemos muitos pedidos agora/.test(r.mensagem ?? ''), SEM_FREIO, r);
-  T.conhecido('o banco anota cada envio com a rede em hash (o IP não fica)', B.num(`select count(distinct rede) from link_envios where petshop_id='${P}'`) === 1 && !/\d+\.\d+\.\d+\.\d+/.test(B.sql(`select coalesce(string_agg(rede, ','), '') from link_envios where petshop_id='${P}'`)), SEM_FREIO);
+  T.ok('7º pendente do mesmo número (escrito de outro jeito): "muitos", com a frase para o tutor', r.ok === false && r.erro === 'limite' && r.motivo === 'muitos' && /Recebemos muitos pedidos agora/.test(r.mensagem ?? ''), r);
+  T.ok('o banco anota cada envio com a rede em hash (o IP não fica)', B.num(`select count(distinct rede) from link_envios where petshop_id='${P}'`) === 1 && !/\d+\.\d+\.\d+\.\d+/.test(B.sql(`select coalesce(string_agg(rede, ','), '') from link_envios where petshop_id='${P}'`)));
   limpar(); n = 0;
   const rede2 = anon();
   for (let i = 0; i < 12; i++) { r = await pedir(rede2, `119876510${String(i).padStart(2, '0')}`); if (r.ok) n++; else break; }
-  T.conhecido('mesma rede, números diferentes: 10 por hora, o 11º é recusado', n === 10 && r.motivo === 'muitos', SEM_FREIO, `${n} ${JSON.stringify(r)}`);
+  T.ok('mesma rede, números diferentes: 10 por hora, o 11º é recusado', n === 10 && r.motivo === 'muitos', `${n} ${JSON.stringify(r)}`);
   limpar(); n = 0;
   for (let i = 0; i < 30; i++) { r = await pedir(anon(), `219876520${String(i).padStart(2, '0')}`); if (r.ok) n++; else break; }
-  T.conhecido('loja toda: 25 por hora, o 26º é recusado', n === 25 && r.motivo === 'muitos', SEM_FREIO, `${n} ${JSON.stringify(r)}`);
+  T.ok('loja toda: 25 por hora, o 26º é recusado', n === 25 && r.motivo === 'muitos', `${n} ${JSON.stringify(r)}`);
   const lojaBarrou = n === 25;
   poe('link_limite_loja_hora', 27);
   r = await pedir(anon(), '21987659999');
-  T.conhecido('o administrador sobe o limite em config_interna, sem migração (com 27, o 26º passa)', lojaBarrou && r.ok === true, SEM_FREIO, r);
+  T.ok('o administrador sobe o limite em config_interna, sem migração (com 27, o 26º passa)', lojaBarrou && r.ok === true, r);
   poe('link_limite_loja_hora', 25);
   limpar(); n = 0;
   for (let i = 0; i < 10; i++) { r = await pedir(anon(), '31987653333'); if (r.ok) { n++; B.sql(`update pedidos_agendamento set status='recusado' where petshop_id='${P}' and status='pendente'`); } else break; }
-  T.conhecido('mesmo número, já respondidos: 8 por hora, o 9º é recusado', n === 8 && r.motivo === 'muitos', SEM_FREIO, `${n} ${JSON.stringify(r)}`);
+  T.ok('mesmo número, já respondidos: 8 por hora, o 9º é recusado', n === 8 && r.motivo === 'muitos', `${n} ${JSON.stringify(r)}`);
   // o que ainda segura (dentro de link_pedir): no máximo 6 pets pendentes por WhatsApp
   limpar(); n = 0;
   for (let i = 0; i < 8; i++) { r = await pedir(anon(), '41987654444'); if (r.ok) n++; else break; }

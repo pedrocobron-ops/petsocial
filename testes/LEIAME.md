@@ -116,10 +116,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 `T.conhecido(...)` marca uma conferência de algo que está errado e ainda não foi consertado: roda sempre, aparece no resumo como
 "conhecido" e não derruba a suíte (com `ESTRITO=1`, derruba). Quando começa a passar, o teste avisa para virar `T.ok`.
 
-- **Freio de envios do link** (`link.js`, 6 conferências): a migração 20261164 pôs `link_muitos_envios` e o registro em `link_envios`
-  dentro de `link_pedir_com_termos`, mas a 20261168 e a 20261173 reescreveram a função a partir de uma versão anterior e o freio
-  sumiu. Com só as migrações deste ramo, o link não freia envio nenhum (sobra o limite antigo de 6 pendentes por WhatsApp, que tem
-  teste próprio). A migração 20261177 (em outro ramo) devolve o freio: num banco com ela, essas conferências passam.
+Nenhum no momento. (O freio de envios do link, que a 20261168 e a 20261173 tinham perdido, voltou com a 20261177.)
 
 ## Como acrescentar um teste
 
