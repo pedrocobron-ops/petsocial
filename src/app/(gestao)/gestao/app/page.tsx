@@ -308,7 +308,9 @@ export default function Hoje() {
         {testePerto && !souDono && liberado && <FimDoTeste modo="equipe" numeros={null} aoDispensar={() => {}} />}
         {!testePerto && souDono && liberado && <ProgressoDoTeste numeros={dados ? { pets: dados.pets, horarios: dados.totalAgs } : null} proximo={pp.proximo} />}
 
-        {cr && cartaoDaChamada && <ChamadaDeHoje esperados={cr.esperados} aindaNao={cr.aindaNao} naCasa={cr.naCasa} faltaram={cr.faltaram.length} />}
+        {/* dia fechado sem a agenda na tela (creche ou hotel): o aviso vem no alto, antes do botão de check-in */}
+        {fechadoHoje && casa && !banho && <p className="g-aviso" role="status" style={{ margin: 0 }}><span className="g-cresce"><b>{fechadoHoje}.</b> {rotuloCasa === "Hotel" ? "O hotel não recebe chegadas hoje. Quem está hospedado continua hospedado." : rotuloCasa === "Creche" ? "A creche não abre hoje: ninguém é esperado na chamada e ninguém leva falta." : "A creche não abre hoje e ninguém leva falta. Quem está hospedado no hotel continua hospedado."}</span></p>}
+        {cr && cartaoDaChamada && <ChamadaDeHoje esperados={cr.esperados} aindaNao={cr.aindaNao} naCasa={cr.naCasa} sairam={cr.sairam} faltaram={cr.faltaram.length} />}
 
         {contaNova && cartaoPassos && <PrimeirosPassos pp={pp} modo="cartao" curto />}
 
@@ -439,7 +441,7 @@ export default function Hoje() {
               <h2>Agenda de hoje</h2>
               {posso("agenda") && <Link className="g-btn fantasma p" href="/gestao/app/agenda?visao=semana">Ver a semana<ChevronRight /></Link>}
             </div>
-            {fechadoHoje && <p className="g-aviso" role="status" style={{ marginBottom: 12 }}><span className="g-cresce"><b>{fechadoHoje}.</b> O pet shop não abre hoje.{ativos.some((a) => a.status !== "concluido") ? " Os horários abaixo continuam marcados: confira com o tutor ou remarque." : ""}</span></p>}
+            {fechadoHoje && !(casa && !banho) && <p className="g-aviso" role="status" style={{ marginBottom: 12 }}><span className="g-cresce"><b>{fechadoHoje}.</b> O pet shop não abre hoje.{ativos.some((a) => a.status !== "concluido") ? " Os horários abaixo continuam marcados: confira com o tutor ou remarque." : ""}</span></p>}
             {carregando && !dados ? <Esqueleto /> : !dados?.ags.length ? (
               <div className="g-card">
                 {!banho ? (

@@ -362,7 +362,7 @@ export function textoComprovanteEstadia(p: { petshop: string; tutor?: string | n
     `${saudacaoZap(p.tutor, p.petshop).replace(/ Aqui é .*$/, "")} Segue o comprovante da estadia${p.pet ? ` de ${p.pet}` : ""}.`,
     "",
     p.petshop,
-    `${lugar}: ${dataCompleta(p.entrada)} a ${dataCompleta(p.saida)}`,
+    dataCompleta(p.entrada) === dataCompleta(p.saida) ? `${lugar}: ${dataCompleta(p.entrada)}` : `${lugar}: ${dataCompleta(p.entrada)} a ${dataCompleta(p.saida)}`,
     ...(p.pet ? [`Pet: ${p.pet}`] : []),
     "",
     ...linhasDaConta(c).map((l) => `${l.texto}: ${l.valor}`),

@@ -12,6 +12,7 @@ import { repartirPagamento } from "@/lib/gestao/hotel";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { definirServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-horario";
 import { brl, dataCompleta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
+import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useGestao } from "../contexto";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
@@ -284,6 +285,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     const entregue = m.entregue, falta = centavos(daConta - m.entregue);
     if (!tutor?.id) { avisarErro("Para deixar o resto anotado, o pet precisa ter um tutor na ficha. Sem tutor, corrija o valor recebido."); return false; }
     if (!depois.quando || depois.quando < isoDia(new Date())) { setErroForma("Escolha um dia de hoje em diante para o resto."); avisarErro("Escolha quando o cliente paga o resto (de hoje em diante)."); return false; }
+    if (diaFechado(depois.quando)) { const n = fraseDoDiaFechado(depois.quando); setErroForma(`${dataCompleta(depois.quando)} é dia fechado${n ? ` (${n.replace(/^Dia fechado: /, "")})` : ""}. Escolha um dia em que vocês abrem.`); return false; }
     const problema = erroDaConta(itens, desconto, contas.total);
     if (problema) { avisarErro(problema); return false; }
     const naoTem = faltaNoEstoque(itens, produtos);
@@ -457,6 +459,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
                 <span>Quando paga o resto</span>
                 <input type="date" className="g-input" value={depois.quando} min={isoDia(new Date())} onChange={(e) => { setDepois({ ...depois, quando: e.target.value }); setErroForma(null); }} />
                 <small>Se o cliente pagou tudo, corrija o valor que entrou.</small>
+                {!erroForma && depois.quando && diaFechado(depois.quando) && <small className="erro" role="alert">{dataCompleta(depois.quando)} é dia fechado. Escolha um dia em que vocês abrem.</small>}
                 {erroForma && <small className="erro" role="alert">{erroForma}</small>}
               </label>
             ) : <p className="g-pp g-erro">Este pet está sem tutor na ficha: não dá para deixar o resto anotado. Corrija o valor recebido.</p>}

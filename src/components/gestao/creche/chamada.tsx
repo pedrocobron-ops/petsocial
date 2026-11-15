@@ -98,7 +98,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
       const r = ok(await sb.rpc("creche_chamada", { p_plano: plano.id, p_dia: dia, p_acao: acao, p_avisou: opcoes.avisou ?? false, p_forcar: opcoes.forcar ?? false })) as { repetido?: boolean; atraso?: boolean; estadia?: string; conferir?: boolean; reserva?: string; repoe?: string | null; sem_falta?: boolean };
       if (r.repetido) avisar("Outra pessoa já tinha marcado. Atualizei a chamada.");
       else if (acao === "chegou") avisar(ehHoje ? `${nome} chegou.` : `${nome}: presença marcada em ${dataAmigavel(dia)}.`);
-      else if (acao === "extra") avisar(`${nome}: dia extra anotado. Entra na cobrança do mês.`);
+      else if (acao === "extra") avisar(`${nome}: dia extra anotado. Entra na cobrança do mês que vem.`);
       // reposição marcada por quem não recebe: fica anotada e quem cuida do financeiro confere (aceita ou cobra como dia extra)
       else if (acao === "reposicao" || acao === "reposicao_livre") {
         const qual = r.repoe ? ` Repõe a falta de ${dataCurta(r.repoe)}.` : r.sem_falta ? " Ficou anotado que foi liberada sem falta para repor." : "";

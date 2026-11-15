@@ -395,6 +395,7 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
     // quem faltou sem o tutor avisar: só para esses vale mandar mensagem perguntando
     semAviso: linhas.filter((l) => l.estado === "faltou" && !l.falta?.avisou).map((l) => l.plano.pets?.nome ?? "Pet"), vencemHoje, atrasadas, reposicoes, semValor,
     naCasa: linhas.filter((l) => l.estado === "na_casa").length,
+    sairam: linhas.filter((l) => l.estado === "saiu").length,
   };
 }
 
