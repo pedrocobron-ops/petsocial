@@ -120,6 +120,19 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
     void banco().rpc("link_espera_ativa", { p_codigo: codigo }).then(({ data }) => { if (vale) setEsperaAtiva(data === true); });
     return () => { vale = false; };
   }, [codigo]);
+  // dia de experiência da creche (só quando o negócio ligou no link): o tutor marca no pedido de um dia só
+  const [expLink, setExpLink] = useState<{ ativo: boolean; max: number; preco: number | null } | null>(null);
+  const [experiencia, setExperiencia] = useState(false);
+  useEffect(() => {
+    if (hotel) return;
+    let vale = true;
+    void banco().rpc("link_creche_experiencia", { p_codigo: codigo }).then(({ data, error }) => {
+      const x = data as { ativo?: boolean; max?: number; preco?: number | null } | null;
+      if (vale && !error && x?.ativo) setExpLink({ ativo: true, max: Number(x.max) || 1, preco: x.preco == null ? null : Number(x.preco) });
+    });
+    return () => { vale = false; };
+  }, [codigo, hotel]);
+  const podeExperiencia = Boolean(expLink?.ativo) && !hotel && !naEspera && entrada === saida;
 
   const dias = hotel ? entre(entrada, saida) : entre(entrada, saida) + 1;
   // hotel: a chegada e a busca precisam cair num dia em que o negócio abre, dentro do horário daquele dia (o banco confere igual)
@@ -303,6 +316,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
         p_especie: pets[0].especie, p_porte: pets[0].porte ?? undefined, p_obs: obs.trim() || undefined,
         p_hora_entrada: horaEntrada, p_hora_saida: horaSaida,
         ...(pets.length > 1 ? { p_mais_pets: pets.slice(1).map((x) => ({ nome: x.nome.trim(), especie: x.especie, porte: x.porte })) } : {}),
+        ...(podeExperiencia && experiencia ? { p_experiencia: true } : {}),
       }, termos, aceite);
       const r = data as { ok?: boolean; erro?: string; motivo?: string; id?: string; dia?: string; quando?: string; abre?: string; fecha?: string; ate?: string | null } | null;
       if (error || !r) { setErro("Não deu para enviar agora. Confira a internet e tente de novo."); return; }
@@ -325,7 +339,9 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
           : r.erro === "dia_fechado" ? `Não abrimos em ${r.dia ? dia(r.dia) : "um dos dias"}. Escolha outro dia para ${r.quando === "saida" ? "buscar o pet" : "a chegada"}.`
           : r.erro === "fora_do_horario" ? `${r.dia ? naDia(r.dia) : "Nesse dia"} atendemos das ${fala(r.abre ?? "")} às ${fala(r.fecha ?? "")}. ${r.quando === "saida" && r.ate ? `Buscar depois disso tem taxa e vai até as ${fala(r.ate)}. Escolha uma hora até as ${fala(r.ate)}.` : `Escolha uma hora de ${r.quando === "saida" ? "buscar" : "chegada"} nesse horário.`}`
           : r.erro === "dados" ? "Confira o nome do pet, o seu nome e o WhatsApp com DDD."
+          : r.erro === "experiencia" ? "O dia de experiência é para um dia só na creche. Confira o dia ou tire a marca de dia de experiência."
           : "Algo deu errado. Tente de novo em instantes.");
+        if (r.erro === "experiencia") setExperiencia(false);
         setRepetido(r.erro === "repetido");
         if (r.erro === "lotado" || r.erro === "datas" || r.erro === "horas" || r.erro === "dia_fechado" || r.erro === "fora_do_horario") setPasso("quando");
         return;
@@ -368,7 +384,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
         <h2>Pedido enviado.</h2>
         <p>{loja} confirma com você pelo WhatsApp.</p>
         <dl className="g-lk-resumo">
-          <div><dt>Pedido</dt><dd>{nome}</dd></div>
+          <div><dt>Pedido</dt><dd>{nome}{podeExperiencia && experiencia ? " · dia de experiência" : ""}</dd></div>
           <div><dt>{nomes.length > 1 ? "Pets" : "Pet"}</dt><dd>{listaE(nomes)}</dd></div>
           <div><dt>{hotel ? "Entrada" : "Dia"}</dt><dd>{dia(entrada)}, às {horaEntrada}</dd></div>
           {(hotel || saida !== entrada) ? <div><dt>{hotel ? "Saída" : "Até"}</dt><dd>{dia(saida)}, às {horaSaida}</dd></div> : <div><dt>Buscar</dt><dd>às {horaSaida}</dd></div>}
@@ -472,6 +488,12 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
         {pets.length < MAX_PETS
           ? <button type="button" className="g-btn sec p" style={{ justifySelf: "start" }} onClick={() => setPets((l) => [...l, petVazio()])}><Plus />Outro pet do mesmo tutor</button>
           : <p className="g-muted g-pp">Até {MAX_PETS} pets por pedido. Para mais, faça outro pedido.</p>}
+        {podeExperiencia && (
+          <label className="g-check">
+            <input type="checkbox" checked={experiencia} onChange={(e) => { setExperiencia(e.target.checked); setErro(null); }} />
+            <span><b>Quero o dia de experiência</b> · {pets.length > 1 ? "o primeiro dia dos pets" : "o primeiro dia do pet"} na creche, para conhecer{expLink!.preco == null ? "" : expLink!.preco > 0 ? ` (${brl(expLink!.preco)})` : " (gratuito)"}. {loja} confirma com você.</span>
+          </label>
+        )}
         {comEstimativa && !naEspera && estimativa && (
           <div className="g-lk-conta" role="status" aria-live="polite">
             <b>Estimativa para {dias} {dias === 1 ? "noite" : "noites"}</b>

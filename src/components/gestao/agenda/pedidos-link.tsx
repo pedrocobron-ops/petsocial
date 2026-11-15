@@ -566,6 +566,7 @@ export default function PedidosLink() {
                   <span className="g-pl-serv"><i aria-hidden />{servico ?? "Serviço"}</span>
                   <span className="g-pl-hora"><Clock aria-hidden />{ehEstadia(p) ? periodoDe(p) : `${quandoNaTela(p.inicio)}, ${hora(p.inicio)}`}</span>
                   {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
+                  {p.experiencia && <span className="g-tag azul">pediu dia de experiência</span>}
                   {p.tipo === "creche" && fechadosDe(p, petshop.horario).length > 0 && <span className="g-tag amarelo">pelo seu horário, a creche não abre em {fechadosDe(p, petshop.horario).map((d) => dataCurta(d)).join(", ")}</span>}
                   {aceiteDe(p)}
                 </div>
@@ -595,6 +596,7 @@ export default function PedidosLink() {
                 <span className="g-pl-hora"><Clock aria-hidden />{ehEstadia(p) ? `${periodoDe(p)}, chega às ${hora(p.inicio)} e sai às ${hora(p.fim)}` : `${quandoNaTela(p.inicio)}, das ${hora(p.inicio)} às ${hora(fim)}`}</span>
                 <span className="g-tag azul">{ehEstadia(p) ? `${g.lista.length} pets do mesmo tutor` : `${g.lista.length} pets, um depois do outro`}</span>
                 {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
+                {p.experiencia && <span className="g-tag azul">pediram dia de experiência</span>}
                 {aceiteDe(p)}
               </div>
               <ul className="g-pl-pets">

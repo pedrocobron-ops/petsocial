@@ -2,7 +2,7 @@
 
 import { ajustesDoFaturamento, CATEGORIAS_DEVOLUCAO, SEM_AJUSTES } from "@/lib/gestao/faturamento";
 import { BellRing, CalendarCheck2, UserX } from "lucide-react";
-import { CATEGORIA_MENSALIDADE, resumoDaCrecheHoje } from "@/lib/gestao/creche";
+import { CATEGORIA_MENSALIDADE, experienciaDe, juntar, lerExperiencias, resumoDaCrecheHoje } from "@/lib/gestao/creche";
 import { contarAtrasosPendentes } from "@/components/gestao/creche/atraso";
 import ChamadaDeHoje from "@/components/gestao/creche/chamada-hoje";
 import { OcorrenciasDeHoje } from "@/components/gestao/casa/ocorrencias";
@@ -104,6 +104,8 @@ export default function Hoje() {
     const aj = cuidoDoFinanceiro ? await ajustesDoFaturamento(sb, petshop.id, isoDia(ha6), hojeIso).catch(() => SEM_AJUSTES) : SEM_AJUSTES;
     const ajusteDe = (iso: string) => aj.porDia.get(iso) ?? 0;
     const creche = casa && usaModulo(petshop, "creche") ? await resumoDaCrecheHoje(sb, petshop, cuidoDoFinanceiro, liberado).catch(() => null) : null;
+    // dia de experiência (opção da creche): quem vem hoje e quem já fez e espera a conversa com o tutor
+    const experiencias = casa && usaModulo(petshop, "creche") && experienciaDe(petshop).ativo ? await lerExperiencias(sb, petshop.id).catch(() => null) : null;
     const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
     const porServico = new Map<string, { rotulo: string; valor: number; cor: string | null }>();
     for (const a of (doMes.data ?? []) as unknown as { status: string; servicos: { nome: string; cor: string | null } | null }[]) {
@@ -149,6 +151,7 @@ export default function Hoje() {
       pacotesVencendo: (pacotes.data ?? []).length,
       saude,
       creche,
+      experiencias,
       semana: Array.from({ length: 7 }, (_, i) => {
         const d = somaDias(seg, i), iso = isoDia(d);
         return { rotulo: nomeDiaCurto(d), valor: (daSemana.data ?? []).filter((a) => valeAg(a.status) && isoDia(new Date(a.inicio)) === iso).length };
@@ -246,6 +249,8 @@ export default function Hoje() {
     paraCobrar > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${paraCobrar === 1 ? "1 check-out saiu" : `${paraCobrar} check-outs saíram`} sem cobrança ${rotuloCasa === "Hotel" ? "no hotel" : rotuloCasa === "Creche" ? "na creche" : "na creche e hotel"}. Toque para receber.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
     vagaNaEspera.n > 0 && { icone: BellRing, tom: "manteiga" as Tom, texto: `${vagaNaEspera.n === 1 ? `Abriu vaga no hotel para 1 pet da lista de espera: ${vagaNaEspera.nomes[0]}` : `Abriu vaga no hotel para ${vagaNaEspera.n} pets da lista de espera: ${vagaNaEspera.nomes.slice(0, 3).join(", ")}${vagaNaEspera.n > 3 ? "…" : ""}`}. Toque para avisar o tutor.`, href: "/gestao/app/creche-hotel?ver=espera" },
     (taxasPendentes ?? 0) > 0 && { icone: HandCoins, tom: "menta" as Tom, texto: `${taxasPendentes === 1 ? "1 mensalista saiu" : `${taxasPendentes} mensalistas saíram`} da creche depois do horário. Toque para decidir a taxa.`, href: "/gestao/app/creche-hotel?ver=cobrar" },
+    (dados.experiencias?.hoje.length ?? 0) > 0 && { icone: Sparkles, tom: "manteiga" as Tom, texto: `Hoje é dia de experiência de ${juntar(dados.experiencias!.hoje.map((e) => e.pets?.nome ?? "um cão novo"))} na creche.`, href: "/gestao/app/creche-hotel?ver=casa" },
+    (dados.experiencias?.conversar.length ?? 0) > 0 && { icone: MessageCircle, tom: "manteiga" as Tom, texto: `${juntar(dados.experiencias!.conversar.map((e) => e.pets?.nome ?? "Um cão"))} ${dados.experiencias!.conversar.length === 1 ? "fez" : "fizeram"} o dia de experiência. Toque para perguntar ao tutor como foi e oferecer os planos.`, href: "/gestao/app/creche-hotel?ver=casa#experiencias" },
     cr && cr.reposicoes > 0 && { icone: CalendarCheck2, tom: "manteiga" as Tom, texto: `A equipe marcou ${cr.reposicoes === 1 ? "1 dia de mensalista como reposição" : `${cr.reposicoes} dias de mensalistas como reposição`} (sem cobrança). Toque para conferir: você aceita ou cobra como dia extra.`, href: "/gestao/app/creche-hotel?ver=chamada" },
     cr && cr.semValor.length > 0 && { icone: HandCoins, tom: "manteiga" as Tom, texto: `${cr.semValor.length === 1 ? "1 mensalista está" : `${cr.semValor.length} mensalistas estão`} sem valor de mensalidade (${cr.semValor.slice(0, 3).join(", ")}${cr.semValor.length > 3 ? "…" : ""}). Sem o valor, a cobrança do mês não é gerada. Toque para preencher.`, href: "/gestao/app/creche-hotel?ver=mensalistas" },
     // a chamada tem o cartão dela no alto da tela (ChamadaDeHoje): a linha não se repete aqui

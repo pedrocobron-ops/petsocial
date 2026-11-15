@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarCheck2, CalendarDays, HandCoins, Sun, UserX } from "lucide-react";
+import { CalendarCheck2, CalendarDays, HandCoins, Sparkles, Sun, UserX } from "lucide-react";
 import {
-  abreNoDia, DIAS_SEMANA, estadoDaCobranca, faltaDaCobranca, lerPlanos, lerPresencas, partesDosExtras, SELECT_COBRANCA, type CobrancaCompleta,
+  abreNoDia, DIAS_SEMANA, estadoDaCobranca, experienciaDe, faltaDaCobranca, juntar, lerPlanos, lerPresencas, partesDoDesconto, partesDosExtras, SELECT_COBRANCA, type CobrancaCompleta,
 } from "@/lib/gestao/creche";
 import { diaFechado } from "@/lib/gestao/feriados";
 import { usaModulo } from "@/lib/gestao/modulos";
@@ -43,7 +43,13 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
     // diárias avulsas (pet sem plano, ou check-in avulso): o valor cobrado no check-out
     const avulsas = mov.presencas.filter((e) => !e.mensalista && e.status === "encerrada");
     const comValor = avulsas.length ? await comValoresDeEstadia(sb, petshop.id, avulsas, true).catch(() => []) : [];
+    // dias de experiência do período (opção da creche): quem fez e quem virou mensalista depois
+    const exp = experienciaDe(petshop).ativo
+      ? await sb.from("estadias").select("pet_id, entrada, pets(nome)").eq("petshop_id", petshop.id).eq("experiencia", true).in("status", ["em_casa", "encerrada"])
+        .gte("entrada", deIsoDia(deIso).toISOString()).lt("entrada", somaDias(deIsoDia(ateIso), 1).toISOString()).order("entrada").order("id").limit(2000)
+      : null;
     return {
+      experiencias: ((exp?.data ?? []) as unknown as { pet_id: string; entrada: string; pets: { nome: string } | null }[]),
       planos, ...mov, cobrancas: (cobrancas.data ?? []) as unknown as CobrancaCompleta[],
       taxasNaHora: real((taxas.data ?? []).reduce((s, a) => s + Number(a.valor ?? 0), 0)),
       avulsasCobrado: real(comValor.reduce((s, e) => s + Number(e.valor_cobrado ?? 0), 0)),
@@ -60,7 +66,11 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
   const comAviso = faltas.filter((f) => f.avisou).length;
   const esperados = doPlano + faltas.length;
   const presenca = esperados ? Math.round((doPlano / esperados) * 100) : null;
-  const nada = !vieram.length && !faltas.length && !dados.cobrancas.length;
+  // conversão do dia de experiência: cão que fez o dia no período e ganhou um plano de mensalista depois dele (até hoje)
+  const primeiraExp = new Map<string, { dia: string; nome: string }>();
+  for (const e of dados.experiencias) if (!primeiraExp.has(e.pet_id)) primeiraExp.set(e.pet_id, { dia: isoDia(new Date(e.entrada)), nome: e.pets?.nome ?? "Pet" });
+  const viraram = [...primeiraExp].filter(([pet, x]) => dados.planos.some((p) => p.pet_id === pet && isoDia(new Date(p.criado_em)) >= x.dia)).map(([, x]) => x.nome);
+  const nada = !vieram.length && !faltas.length && !dados.cobrancas.length && !primeiraExp.size;
   if (nada && !dados.planos.length) return null;
 
   // cães por dia da semana: a média dos dias em que a creche abriu no período (até hoje)
@@ -82,10 +92,11 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
   // o que foi cobrado nas mensalidades dos meses do período, por parte
   const abertas = dados.cobrancas;
   const mensalidades = real(abertas.reduce((s, c) => s + Number(c.valor_mensal) - Number(c.desconto), 0));
+  const dosIrmaos = real(abertas.reduce((s, c) => s + partesDoDesconto(c).irmao, 0));
   const dosExtras = real(abertas.reduce((s, c) => s + partesDosExtras(c).dias, 0));
   const dasTaxas = real(abertas.reduce((s, c) => s + partesDosExtras(c).taxas, 0) + dados.taxasNaHora);
   const partes = [
-    { nome: "Mensalidades", valor: mensalidades, apoio: um(abertas.length, "cobrança", "cobranças") },
+    { nome: "Mensalidades", valor: mensalidades, apoio: `${um(abertas.length, "cobrança", "cobranças")}${dosIrmaos > 0 ? `, já com ${brl(dosIrmaos)} de desconto irmão` : ""}` },
     { nome: "Dias extras", valor: dosExtras, apoio: "na cobrança do mês seguinte" },
     { nome: "Taxa de busca fora do horário", valor: dasTaxas, apoio: "na mensalidade ou recebida na hora" },
     { nome: "Diárias avulsas", valor: dados.avulsasCobrado, apoio: `${um(avulsas, "dia", "dias")} de pet sem plano` },
@@ -150,6 +161,17 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
           <p className="g-muted g-pp" style={{ marginTop: 10 }}>Mensalidades e extras: as cobranças dos meses do período (cobrado, não só o que já entrou). Diárias avulsas: os check-outs do período.</p>
         </div>
       </div>
+
+      {primeiraExp.size > 0 && (
+        <div className="g-linha" aria-label="Dias de experiência">
+          <Tile icone={Sparkles} tom="manteiga" tamanho="p" />
+          <span className="t">
+            <b>Dia de experiência: {um(primeiraExp.size, "cão fez", "cães fizeram")} · {viraram.length === 1 ? "1 virou mensalista" : `${viraram.length} viraram mensalistas`}</b>
+            <span>{viraram.length ? `Viraram mensalistas: ${juntar(viraram)}.` : "Nenhum virou mensalista até agora."} Conta o cão que ganhou plano depois do dia de experiência.</span>
+          </span>
+          <span className="d g-tab">{Math.round((viraram.length / primeiraExp.size) * 100)}%</span>
+        </div>
+      )}
 
       {meses.length > 0 && (
         <div>
