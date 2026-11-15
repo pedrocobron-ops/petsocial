@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, Download, History, Lock, Minus, Plus, Scale, ShoppingBag, Wallet } from "lucide-react";
+import Link from "next/link";
+import { ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, Download, History, Lock, Minus, Plus, Printer, Scale, ShoppingBag, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
 import { caixaAberto, CATEGORIA_GAVETA, conferirValorAlto, creditoDaEntrada, desfazerVenda, lancarPago, lembrarCaixa, nomeDoMovimento, partesPorForma, percentuaisQueFecham, textoDoPagamento, ultimoContado } from "@/lib/gestao/dinheiro";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import "@/components/gestao/financeiro/recebimentos.css";
 import {
-  Apagados, baixarPlanilha, brlMini, categoriaAtual, COR_FORMA, dinheiroCsv, ehDeServico, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDeItens, resumoDoCaixa, rotuloForma, SemAcesso, semMovimentos, soma,
+  Apagados, baixarPlanilha, diferencaDoCaixa as diferenca, esperadoDoCaixa as esperadoDo, brlMini, categoriaAtual, COR_FORMA, dinheiroCsv, ehDeServico, ErroDeCarga, FolhaLancamento, hojeIso, LinhaResumo, paginar, resumoDeItens, resumoDoCaixa, rotuloForma, SemAcesso, semMovimentos, soma,
   somaPorForma, TagAlterado, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import { ContasDeClientes } from "@/components/gestao/financeiro/contas-clientes";
@@ -25,11 +26,6 @@ export default function PaginaCaixa() {
   return vejoFinanceiro ? <CaixaDoDia /> : <SemAcesso />;
 }
 
-/** Dinheiro esperado na gaveta: num caixa fechado vale o que o banco anotou na hora de fechar. */
-function esperadoDo(caixa: Caixa, lancamentos: Lancamento[]) {
-  return caixa.fechado_em && caixa.valor_esperado != null ? Number(caixa.valor_esperado) : resumoDoCaixa(caixa.valor_inicial, lancamentos).esperado;
-}
-
 type FolhaAberta =
   | { tipo: "abrir" }
   | { tipo: "novo"; de: Tipo }
@@ -40,14 +36,6 @@ type FolhaAberta =
   | { tipo: "resumo"; caixaId: string };
 
 type Gaveta = "sangria" | "suprimento";
-
-function diferenca(contado: number | null, esperado: number) {
-  if (contado == null) return null;
-  const d = Math.round((contado - esperado) * 100) / 100;
-  if (d === 0) return { tom: "certo", etiqueta: "verde", texto: "Bateu certinho.", curto: "bateu" } as const;
-  if (d > 0) return { tom: "sobra", etiqueta: "azul", texto: `Sobra de ${brl(d)}.`, curto: `sobra ${brl(d)}` } as const;
-  return { tom: "falta", etiqueta: "vermelho", texto: `Falta de ${brl(-d)}.`, curto: `falta ${brl(-d)}` } as const;
-}
 
 /**
  * Planilha de um caixa: os movimentos (pagamento dividido vira uma linha por forma) e, embaixo, as mesmas contas
@@ -442,6 +430,7 @@ function CaixaDoDia() {
       {caixaDoResumo && (
         <Folha titulo={`Caixa de ${dataCurta(caixaDoResumo.aberto_em)}`} aoFechar={() => setFolha(null)}
           rodape={<>
+            <Link className="g-btn sec" href={`/gestao/app/caixa/imprimir?caixa=${caixaDoResumo.id}`} target="_blank"><Printer />Imprimir o fechamento</Link>
             {fin && <button className="g-btn sec" onClick={() => exportarCaixa(caixaDoResumo, doCaixa(caixaDoResumo.id))}><Download />Exportar</button>}
             <button className="g-btn sec" onClick={() => setFolha(null)}>Fechar</button>
           </>}>

@@ -8,7 +8,7 @@ import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { diaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
 import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
-import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Lancamento } from "@/lib/gestao/tipos";
+import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Caixa, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
@@ -76,6 +76,20 @@ export function resumoDoCaixa(valorInicial: number, lancamentos: Movimento[]) {
     nEntradas: entradas.length, nSaidas: saidas.length,
     esperado: centavos(Number(valorInicial) + dinheiro.entrou + suprimentos - dinheiro.saiu - sangrias),
   };
+}
+
+/** Dinheiro esperado na gaveta: num caixa fechado vale o que o banco anotou na hora de fechar. */
+export function esperadoDoCaixa(caixa: Caixa, lancamentos: Lancamento[]) {
+  return caixa.fechado_em && caixa.valor_esperado != null ? Number(caixa.valor_esperado) : resumoDoCaixa(caixa.valor_inicial, lancamentos).esperado;
+}
+
+/** Contado menos esperado: bateu, sobra ou falta (null antes de contar). */
+export function diferencaDoCaixa(contado: number | null, esperado: number) {
+  if (contado == null) return null;
+  const d = Math.round((contado - esperado) * 100) / 100;
+  if (d === 0) return { tom: "certo", etiqueta: "verde", texto: "Bateu certinho.", curto: "bateu", valor: 0 } as const;
+  if (d > 0) return { tom: "sobra", etiqueta: "azul", texto: `Sobra de ${brl(d)}.`, curto: `sobra ${brl(d)}`, valor: d } as const;
+  return { tom: "falta", etiqueta: "vermelho", texto: `Falta de ${brl(-d)}.`, curto: `falta ${brl(-d)}`, valor: d } as const;
 }
 
 /* ---------- planilha (CSV) ---------- */

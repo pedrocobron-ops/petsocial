@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Ban, CalendarClock, Check, ChevronLeft, ChevronRight, CircleCheck, HandCoins, MessageCircle, Pencil, RotateCcw, TriangleAlert, Undo2 } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Ban, CalendarClock, Check, ChevronLeft, ChevronRight, CircleCheck, HandCoins, MessageCircle, Pencil, Printer, RotateCcw, TriangleAlert, Undo2 } from "lucide-react";
 import {
   cobraNoMes, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, textoComprovanteMensalidades, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, vencimentoDoMes,
   type CobrancaCompleta, type EstadoCobranca, type PlanoCompleto, type PrimeiraCobranca,
@@ -173,6 +174,8 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
     setCobrados((m) => ({ ...m, ...Object.fromEntries(ids.map((id) => [id, em])) }));
   }
   const textoDe = (g: Grupo) => mensagemDeCobranca({ tutor: g.tutor, petshop: petshop.nome, cobrancas: g.cobrancas, hoje, opcoes: petshop });
+  /** Extrato do mês do tutor, para imprimir ou salvar em PDF e mandar para ele. */
+  const extratoDe = (g: Grupo) => `/gestao/app/creche-hotel/cobrancas/imprimir?mes=${mesIso}&tutor=${encodeURIComponent(g.chave)}`;
   const aReceberDe = (g: Grupo) => g.cobrancas.filter((c) => c.lancamento_id && !c.lancamentos?.pago && Number(c.total) > 0);
 
   return (
@@ -181,6 +184,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
         <button type="button" className="g-ico" aria-label="Mês anterior" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}><ChevronLeft /></button>
         <h2 className="g-cm-titulo">{mesComAno(mes)}</h2>
         <button type="button" className="g-ico" aria-label="Mês seguinte" disabled={mesIso > isoMes(agora)} onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}><ChevronRight /></button>
+        <Link className="g-btn sec p g-cm-imprimir" href={`/gestao/app/creche-hotel/cobrancas/imprimir?mes=${mesIso}`} target="_blank" title={`Imprimir ou salvar em PDF a lista de ${nomeMes(mes)}`}><Printer />Imprimir</Link>
       </div>
 
       {erro && <p className="g-erro" role="alert">{erro}</p>}
@@ -276,8 +280,12 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
                             );
                           })}
                         </div>
+                        {b.id === "paga" && (
+                          <div className="g-cm-grupo-pe"><Link className="g-btn fantasma p" href={extratoDe(g)} target="_blank" aria-label={`Extrato do mês de ${g.tutor ?? "o tutor"}`}><Printer />Extrato</Link></div>
+                        )}
                         {b.id !== "paga" && (
                           <div className="g-cm-grupo-pe">
+                            <Link className="g-btn fantasma p" href={extratoDe(g)} target="_blank" aria-label={`Extrato do mês de ${g.tutor ?? "o tutor"}`}><Printer />Extrato</Link>
                             {aReceberDe(g).length > 1 && <button type="button" className="g-btn verde p" onClick={() => { if (!somenteLeitura()) setFamilia(g); }} ><HandCoins />Receber tudo · {brl(g.total)}</button>}
                             {cobradoEm && <span className="g-tag verde"><Check size={12} aria-hidden />cobrado em {dataCurta(isoDia(new Date(cobradoEm)))}</span>}
                             {zap ? (
