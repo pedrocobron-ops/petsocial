@@ -66,10 +66,11 @@ export type ParteDoServico = { servicoId: string | null; valor: number; principa
  * - cada parte em centavos; o centavo que sobra vai para a maior (empate: a primeira, com o principal na frente).
  * A soma das partes é sempre a parte de serviço da conta.
  */
-export function partesPorServico(a: HorarioDaConta, conta: ContaDoHorario): ParteDoServico[] {
+export function partesPorServico(a: HorarioDaConta, conta: ContaDoHorario, mais = 0): ParteDoServico[] {
   const outros = emOrdem(a.agendamento_servicos);
   const partes = partesDoLancamento(conta);
-  const total = emCentavos(partes ? partes.servico : conta.valor);
+  // `mais`: a diferença recebida à parte depois de a conta fechar ("Cobrar a diferença"), dividida como a conta
+  const total = emCentavos(partes ? partes.servico : conta.valor) + emCentavos(mais);
   const ids: (string | null)[] = [a.servico_id, ...outros.map((s) => s.servico_id)];
   const pesos = ids.map(() => 0);
   if (partes) {
@@ -99,18 +100,19 @@ export function partesPorServico(a: HorarioDaConta, conta: ContaDoHorario): Part
 /**
  * Quanto foi realmente cobrado por cada serviço de um atendimento concluído (a soma é o que os relatórios chamam de
  * "valor cobrado" do atendimento):
- * - com conta fechada (recebida ou a receber): a parte de serviço da conta, dividida entre os serviços;
+ * - com conta fechada (recebida ou a receber): a parte de serviço da conta, mais a diferença recebida à parte depois
+ *   (`diferenca`, "Cobrar a diferença"), dividida entre os serviços;
  * - pago com pacote: o principal não soma (o dinheiro entrou na venda do pacote);
  * - sem conta ainda: o preço combinado na agenda.
  */
-export function cobradoPorServico(a: HorarioDaConta, conta: ContaDoHorario | undefined): ParteDoServico[] {
+export function cobradoPorServico(a: HorarioDaConta, conta: ContaDoHorario | undefined, diferenca = 0): ParteDoServico[] {
   const outros = emOrdem(a.agendamento_servicos);
   if (!outros.length) {
-    const valor = conta ? partesDoLancamento(conta)?.servico ?? Number(conta.valor) : a.pacote_cliente_id ? 0 : Number(a.preco ?? 0);
+    const valor = conta ? (emCentavos(partesDoLancamento(conta)?.servico ?? Number(conta.valor)) + emCentavos(diferenca)) / 100 : a.pacote_cliente_id ? 0 : Number(a.preco ?? 0);
     return [{ servicoId: a.servico_id, valor, principal: true }];
   }
   if (conta) {
-    const partes = partesPorServico(a, conta);
+    const partes = partesPorServico(a, conta, diferenca);
     // o principal aparece sempre (mesmo com zero, quando foi pelo pacote), para contar a vez dele
     return partes.some((p) => p.principal) ? partes : [{ servicoId: a.servico_id, valor: 0, principal: true }, ...partes];
   }

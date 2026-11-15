@@ -81,3 +81,8 @@
 
 /* o palco do gráfico não herda a classe .palco das páginas do site (proporção fixa deixava o gráfico estreito) */
 .g-rel-area .palco { display: block; aspect-ratio: auto; padding: 0; border-radius: 0; background: none; overflow: visible; }
+
+/* como o faturamento foi contado (devolução e crédito do tutor) */
+.g-rel-conta { display: grid; gap: 2px; margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; background: var(--g-carta-2); font-size: .875rem; }
+.g-rel-conta b { font-weight: 700; }
+.g-rel-conta small { margin-top: 4px; font-size: .78rem; line-height: 1.4; }

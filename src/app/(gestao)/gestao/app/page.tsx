@@ -1,5 +1,6 @@
 "use client";
 
+import { ajustesDoFaturamento, CATEGORIAS_DEVOLUCAO, SEM_AJUSTES } from "@/lib/gestao/faturamento";
 import { BellRing, CalendarCheck2, UserX } from "lucide-react";
 import { CATEGORIA_MENSALIDADE, resumoDaCrecheHoje } from "@/lib/gestao/creche";
 import { contarAtrasosPendentes } from "@/components/gestao/creche/atraso";
@@ -99,6 +100,9 @@ export default function Hoje() {
       sb.from("agendamentos").select("id, inicio, pets(nome)", { count: "exact" }).eq("petshop_id", petshop.id).lt("inicio", hoje.toISOString()).in("status", ["marcado", "confirmado", "em_atendimento"]).order("inicio").order("id").limit(3),
     ]);
     const saude = await buscarSaudeVencendo(sb, petshop.id).catch(() => null);
+    // devolução ao tutor e crédito deixado para ele saem do que entrou (a mesma regra do faturamento nos Relatórios)
+    const aj = cuidoDoFinanceiro ? await ajustesDoFaturamento(sb, petshop.id, isoDia(ha6), hojeIso).catch(() => SEM_AJUSTES) : SEM_AJUSTES;
+    const ajusteDe = (iso: string) => aj.porDia.get(iso) ?? 0;
     const creche = casa && usaModulo(petshop, "creche") ? await resumoDaCrecheHoje(sb, petshop, cuidoDoFinanceiro, liberado).catch(() => null) : null;
     const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
     const porServico = new Map<string, { rotulo: string; valor: number; cor: string | null }>();
@@ -135,8 +139,9 @@ export default function Hoje() {
       lembrados: lembrados.count ?? 0,
       estadiasTotal: estadiasTotal.count ?? 0,
       produtosTotal: produtosTotal.count ?? 0,
-      entrou: (entradas.data ?? []).filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0),
-      saiu: cuidoDoFinanceiro ? (entradas.data ?? []).filter((l) => l.tipo === "saida").reduce((s, l) => s + Number(l.valor), 0) : 0,
+      entrou: Math.round(((entradas.data ?? []).filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0) + ajusteDe(hojeIso)) * 100) / 100,
+      ajusteHoje: ajusteDe(hojeIso),
+      saiu: cuidoDoFinanceiro ? (entradas.data ?? []).filter((l) => l.tipo === "saida" && !CATEGORIAS_DEVOLUCAO.includes((l as { categoria?: string }).categoria ?? "")).reduce((s, l) => s + Number(l.valor), 0) : 0,
       vendasHoje: ((entradas.data ?? []) as { valor: number; tipo: string; categoria?: string | null }[]).filter((l) => l.tipo === "entrada" && l.categoria === "Venda de produtos"),
       contas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "saida"),
       // as mensalidades da creche têm a linha delas (com o atalho para Cobranças)
@@ -150,10 +155,11 @@ export default function Hoje() {
       }),
       servicosMes: [...porServico.values()].sort((a, b) => b.valor - a.valor).slice(0, 5),
       // de segunda até hoje (a segunda desta semana está sempre dentro dos últimos 7 dias)
-      recebidoSemana: ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data >= isoDia(seg)).reduce((t, l) => t + Number(l.valor), 0),
+      recebidoSemana: Math.round((((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data >= isoDia(seg)).reduce((t, l) => t + Number(l.valor), 0)
+        + [...aj.porDia].filter(([d]) => d >= isoDia(seg)).reduce((t, [, v]) => t + v, 0)) * 100) / 100,
       entradas7: Array.from({ length: 7 }, (_, i) => {
         const iso = isoDia(somaDias(ha6, i));
-        return ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data === iso).reduce((t, l) => t + Number(l.valor), 0);
+        return ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data === iso).reduce((t, l) => t + Number(l.valor), 0) + ajusteDe(iso);
       }),
     };
   }, [petshop.id, hojeIso, vejoFinanceiro, cuidoDoFinanceiro, vejoEstoque, vejoPacotes, casa]);
@@ -408,7 +414,7 @@ export default function Hoje() {
           {frente !== "casa" && kpiCasa}
           {vejoFinanceiro ? (
             <Kpi href={posso("caixa") ? "/gestao/app/caixa" : "/gestao/app/financeiro"} icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"}
-              apoio={dados && cuidoDoFinanceiro && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : posso("caixa") ? "ver o caixa" : "ver o financeiro"}
+              apoio={dados && cuidoDoFinanceiro && dados.ajusteHoje < 0 ? `já sem ${brl(-dados.ajusteHoje)} devolvidos ou de crédito` : dados && cuidoDoFinanceiro && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : posso("caixa") ? "ver o caixa" : "ver o financeiro"}
               lado={dados && cuidoDoFinanceiro ? <Tendencia valores={dados.entradas7} /> : undefined} />
           ) : (
             <Kpi href="/gestao/app/clientes" icone={PawPrint} tom="menta" rotulo="Pets cadastrados" valor={dados ? dados.pets : "–"} apoio="ver todos" />

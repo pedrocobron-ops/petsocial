@@ -18,6 +18,8 @@ import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
 import "./relatorios.css";
 import { comPrecosDeAgendamento, comValoresDeEstadia } from "@/lib/gestao/reservado";
+import { ajustesDoFaturamento, faturamentoLiquido, temAjuste, type AjustesDoFaturamento } from "@/lib/gestao/faturamento";
+import { FORMA_CREDITO } from "@/components/gestao/financeiro/comum";
 
 export default function PaginaRelatorios() {
   const { cuidoDoFinanceiro } = useGestao();
@@ -61,7 +63,7 @@ type Ag = {
   agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number; servicos: { id: string; nome: string; cor: string | null } | null }[] | null;
 };
 type DaConta = Pick<Ag, "servico_id" | "preco" | "pacote_cliente_id"> & { agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number }[] | null };
-type Entrada = { id: string; data: string; valor: number; cliente_id: string | null; agendamento_id: string | null; itens: unknown; forma: string | null; pagamentos: unknown; valor_original?: number | null };
+type Entrada = { id: string; data: string; valor: number; cliente_id: string | null; agendamento_id: string | null; itens: unknown; forma: string | null; pagamentos: unknown; valor_original?: number | null; credito_usado?: number | null; categoria?: string; conta_id?: string | null };
 /** Conta de um atendimento (uma por atendimento): já recebida, ou anotada para o cliente pagar depois (`pago: false`). */
 type Recebimento = { agendamento_id: string | null; valor: number; itens: unknown; pago?: boolean; valor_original?: number | null };
 /** O valor cheio da conta: a que foi recebida em partes guarda em `valor` só o que falta (ou a última parte). */
@@ -76,8 +78,9 @@ const cheio = (l: Recebimento) => ({ valor: Number(l.valor_original ?? l.valor),
  * Horário com mais de um serviço: `partes` traz o valor de cada serviço (a soma é `valor`); com pacote, só o serviço
  * principal sai do pacote e os outros entram pelo que foi cobrado. `pacote`: o serviço principal foi pelo pacote.
  */
-function cobradoDe(a: DaConta, recebimento: Recebimento | undefined): { valor: number; como: "recebido" | "fiado" | "pacote" | "agenda"; pacote: boolean; partes: ParteDoServico[] } {
-  const partes = cobradoPorServico(a, recebimento ? cheio(recebimento) : undefined);
+function cobradoDe(a: DaConta, recebimento: Recebimento | undefined, diferenca = 0): { valor: number; como: "recebido" | "fiado" | "pacote" | "agenda"; pacote: boolean; partes: ParteDoServico[] } {
+  // "Cobrar a diferença": o que entrou à parte depois de a conta fechar soma no serviço (como na comissão)
+  const partes = cobradoPorServico(a, recebimento ? cheio(recebimento) : undefined, recebimento ? diferenca : 0);
   const valor = real(partes.reduce((s, p) => s + p.valor, 0));
   const pacote = Boolean(a.pacote_cliente_id) && (!recebimento || Boolean(a.agendamento_servicos?.length));
   if (recebimento) return { valor, como: recebimento.pago === false ? "fiado" : "recebido", pacote, partes };
@@ -107,16 +110,37 @@ async function contasDosAtendimentos(sb: Banco, petshopId: string, concluidos: s
   return recebimentos;
 }
 
-/** Valor médio cobrado por atendimento concluído; quem pagou com pacote fica de fora da conta. */
-function valorMedio(concluidos: (DaConta & Pick<Ag, "id">)[], recebimentos: Map<string, Recebimento>): number | null {
-  let soma = 0, pagantes = 0;
+/**
+ * Valor médio por conta: a média das contas cobradas no período. Cada atendimento concluído com valor é uma conta (com a
+ * diferença cobrada depois); a visita paga só com pacote não é conta (não entrou dinheiro nela); o pacote conta uma vez,
+ * pelo valor da venda, no período em que foi vendido.
+ */
+function valorMedio(concluidos: (DaConta & Pick<Ag, "id">)[], recebimentos: Map<string, Recebimento>, diferencas: Map<string, number>, pacotes: number[]): { valor: number | null; contas: number; pacotes: number } {
+  let soma = 0, contas = 0;
   for (const a of concluidos) {
-    const c = cobradoDe(a, recebimentos.get(a.id));
-    if (c.como !== "pacote") pagantes++;
+    const c = cobradoDe(a, recebimentos.get(a.id), diferencas.get(a.id) ?? 0);
+    if (!(c.valor > 0)) continue;
+    contas++;
     soma += c.valor;
   }
-  return pagantes ? real(real(soma) / pagantes) : null;
+  for (const p of pacotes) { soma += p; contas++; }
+  return { valor: contas ? real(real(soma) / contas) : null, contas, pacotes: pacotes.length };
 }
+
+/** Diferenças recebidas à parte ("Cobrar a diferença") de cada atendimento. */
+async function diferencasDe(sb: Banco, petshopId: string, ids: string[]): Promise<Map<string, number>> {
+  const m = new Map<string, number>();
+  for (let i = 0; i < ids.length; i += 1000) {
+    const r = await sb.rpc("diferencas_dos_agendamentos", { p_petshop: petshopId, p_ids: ids.slice(i, i + 1000) });
+    if (r.error) continue;
+    for (const x of (r.data ?? []) as { agendamento_id: string; valor: number }[]) m.set(x.agendamento_id, Number(x.valor));
+  }
+  return m;
+}
+
+/** O valor de cada pacote vendido no período (a entrada da venda, inteira; a parte de um pacote pago em partes não conta de novo). */
+const pacotesVendidos = (entradas: Pick<Entrada, "categoria" | "conta_id" | "valor" | "valor_original">[]) =>
+  entradas.filter((l) => l.categoria === "Pacotes" && !l.conta_id).map((l) => Number(l.valor_original ?? l.valor));
 
 /** Os quatro números do período anterior, com as mesmas contas do período escolhido. */
 async function carregarAnterior(sb: Banco, petshopId: string, de: Date, ate: Date) {
@@ -125,16 +149,20 @@ async function carregarAnterior(sb: Banco, petshopId: string, de: Date, ate: Dat
     paginar<{ id: string; pacote_cliente_id: string | null; servico_id: string | null; agendamento_servicos: { id: string; servico_id: string; ordem: number }[] | null }>((a, b) => sb.from("agendamentos").select("id, pacote_cliente_id, servico_id, agendamento_servicos(id, servico_id, ordem)")
       .eq("petshop_id", petshopId).eq("status", "concluido").gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b))
       .then((l) => comPrecosDeAgendamento(sb, petshopId, l) as Promise<(DaConta & Pick<Ag, "id">)[]>),
-    paginar<Recebimento>((a, b) => sb.from("lancamentos").select("agendamento_id, valor, itens, valor_original").eq("petshop_id", petshopId).eq("pago", true).eq("tipo", "entrada")
+    paginar<Recebimento & Pick<Entrada, "categoria" | "conta_id">>((a, b) => sb.from("lancamentos").select("agendamento_id, valor, itens, valor_original, categoria, conta_id").eq("petshop_id", petshopId).eq("pago", true).eq("tipo", "entrada")
       .is("movimento", null).gte("data", isoDia(de)).lte("data", isoDia(ate)).order("data").order("id").range(a, b)),
     sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshopId).gte("criado_em", comeco).lt("criado_em", final),
   ]);
   if (novos.error) throw new Error(novos.error.message);
-  const recebimentos = await contasDosAtendimentos(sb, petshopId, ags.map((a) => a.id), entradas);
+  const [recebimentos, diferencas, ajustes] = await Promise.all([
+    contasDosAtendimentos(sb, petshopId, ags.map((a) => a.id), entradas),
+    diferencasDe(sb, petshopId, ags.map((a) => a.id)),
+    ajustesDoFaturamento(sb, petshopId, isoDia(de), isoDia(ate)),
+  ]);
   return {
-    faturamento: real(entradas.reduce((s, l) => s + Number(l.valor), 0)),
+    faturamento: faturamentoLiquido(real(entradas.reduce((s, l) => s + Number(l.valor), 0)), ajustes),
     concluidos: ags.length,
-    ticket: valorMedio(ags, recebimentos),
+    ticket: valorMedio(ags, recebimentos, diferencas, pacotesVendidos(entradas)).valor,
     clientesNovos: novos.count ?? 0,
   };
 }
@@ -211,7 +239,7 @@ function Relatorios() {
           .eq("petshop_id", petshop.id).gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b);
         return { data: r.data as unknown as Ag[] | null, error: r.error };
       }).then((l) => comPrecosDeAgendamento(sb, petshop.id, l as (Ag & { agendamento_servicos?: { id: string }[] | null })[]) as unknown as Promise<Ag[]>),
-      paginar<Entrada>((a, b) => sb.from("lancamentos").select("id, data, valor, cliente_id, agendamento_id, itens, forma, pagamentos, valor_original").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
+      paginar<Entrada>((a, b) => sb.from("lancamentos").select("id, data, valor, cliente_id, agendamento_id, itens, forma, pagamentos, valor_original, credito_usado, categoria, conta_id").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
         .is("movimento", null).gte("data", deIso).lte("data", ateIso).order("data").order("id").range(a, b)),
       sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).gte("criado_em", comeco).lt("criado_em", final),
       // creche e hotel: estadias encerradas, pela data da saída
@@ -221,8 +249,15 @@ function Relatorios() {
     ]);
     if (novos.error) throw new Error(novos.error.message);
     // conta de cada atendimento concluído do período: paga em outro dia (fora do período) ou ainda a receber (cliente paga depois)
-    const recebimentos = await contasDosAtendimentos(sb, petshop.id, ags.filter((a) => a.status === "concluido").map((a) => a.id), entradas);
-    return { ags, entradas, recebimentos, clientesNovos: novos.count ?? 0, estadias, anterior };
+    const concluidosIds = ags.filter((a) => a.status === "concluido").map((a) => a.id);
+    const [recebimentos, diferencas, ajustes] = await Promise.all([
+      contasDosAtendimentos(sb, petshop.id, concluidosIds, entradas),
+      // "Cobrar a diferença": o que entrou à parte, ligado a cada atendimento
+      diferencasDe(sb, petshop.id, concluidosIds),
+      // devoluções e crédito do tutor: o que entrou e voltou, e o que ainda é do tutor, saem do faturamento
+      ajustesDoFaturamento(sb, petshop.id, deIso, ateIso),
+    ]);
+    return { ags, entradas, recebimentos, diferencas, ajustes, clientesNovos: novos.count ?? 0, estadias, anterior };
   }, [petshop.id, deIso, ateIso, antesDeIso, antesAteIso]);
 
   const r = useMemo(() => {
@@ -230,7 +265,7 @@ function Relatorios() {
     const concluidos = dados.ags.filter((a) => a.status === "concluido");
     const faltas = dados.ags.filter((a) => a.status === "faltou").length;
     // valor realmente cobrado de cada atendimento concluído (não o preço combinado na agenda)
-    const cobrado = new Map(concluidos.map((a) => [a.id, cobradoDe(a, dados.recebimentos.get(a.id))]));
+    const cobrado = new Map(concluidos.map((a) => [a.id, cobradoDe(a, dados.recebimentos.get(a.id), dados.diferencas.get(a.id) ?? 0)]));
     const valorDe = (a: Ag) => cobrado.get(a.id)?.valor ?? 0;
     const pagoComPacote = (a: Ag) => Boolean(cobrado.get(a.id)?.pacote);
     const comPacote = concluidos.filter(pagoComPacote).length;
@@ -240,12 +275,18 @@ function Relatorios() {
     const valorFiado = real(fiados.reduce((s, a) => s + Number(dados.recebimentos.get(a.id)?.valor ?? 0), 0));
     // por forma de pagamento: o pagamento dividido entra repartido
     const porFormaMapa = somaPorForma(dados.entradas);
-    const porForma = FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: porFormaMapa.get(f.id) ?? 0, cor: COR_FORMA[f.id] })).filter((f) => f.valor > 0);
-    const ticket = valorMedio(concluidos, dados.recebimentos);
+    const porForma = [...FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: porFormaMapa.get(f.id) ?? 0, cor: COR_FORMA[f.id] })),
+      // a parte das contas paga com o crédito do tutor (dinheiro que ele deixou antes)
+      { id: FORMA_CREDITO, rotulo: "Crédito do tutor", valor: porFormaMapa.get(FORMA_CREDITO) ?? 0, cor: COR_FORMA[FORMA_CREDITO] }].filter((f) => f.valor > 0);
+    const medio = valorMedio(concluidos, dados.recebimentos, dados.diferencas, pacotesVendidos(dados.entradas));
+    const ticket = medio.valor;
     // quanto cada tutor gastou no período: todas as entradas recebidas ligadas a ele (a mesma conta de "Já gastou aqui" na ficha)
     const gastoDoTutor = new Map<string, number>();
     for (const l of dados.entradas) if (l.cliente_id) gastoDoTutor.set(l.cliente_id, real((gastoDoTutor.get(l.cliente_id) ?? 0) + Number(l.valor)));
-    const faturamento = real(dados.entradas.reduce((s, l) => s + Number(l.valor), 0));
+    // sem o que foi devolvido e sem o crédito que ficou com ele (a mesma regra do faturamento)
+    for (const [c, v] of dados.ajustes.porCliente) gastoDoTutor.set(c, real((gastoDoTutor.get(c) ?? 0) + v));
+    const entrou = real(dados.entradas.reduce((s, l) => s + Number(l.valor), 0));
+    const faturamento = faturamentoLiquido(entrou, dados.ajustes);
 
     // faturamento por dia, ou por semana quando o período é comprido
     const dias = Math.round((ate.getTime() - de.getTime()) / 864e5) + 1;
@@ -258,6 +299,11 @@ function Relatorios() {
       const n = Math.round((deIsoDia(l.data).getTime() - de.getTime()) / 864e5);
       const b = barras[porSemana ? Math.floor(n / 7) : n];
       if (b) b.valor = real(b.valor + Number(l.valor));
+    }
+    for (const [dia, v] of dados.ajustes.porDia) {
+      const n = Math.round((deIsoDia(dia).getTime() - de.getTime()) / 864e5);
+      const b = barras[porSemana ? Math.floor(n / 7) : n];
+      if (b) b.valor = real(b.valor + v);
     }
 
     const contar = <T,>(lista: Ag[], chave: (a: Ag) => string | null | undefined, extra: (a: Ag) => T) => {
@@ -330,7 +376,7 @@ function Relatorios() {
       comEntrada: comEntrada.length, melhor, diaCheio,
       totalComissao: real(comissoes.reduce((s, c) => s + c.comissao, 0)),
       concluidos: concluidos.length, faltas, taxaFalta: concluidos.length + faltas ? (faltas / (concluidos.length + faltas)) * 100 : null,
-      faturamento, ticket, comPacote, aReceber, fiados: fiados.length, valorFiado, porForma,
+      faturamento, entrou, ajustes: dados.ajustes, ticket, medio, comPacote, aReceber, fiados: fiados.length, valorFiado, porForma,
       barras, porSemana, servicos, servicosTodos, pets, tutores, tutoresTodos, comissoes, porDia, horas, marcados: marcados.length,
       estadias, totalEstadias: dados.estadias.length,
     };
@@ -344,20 +390,26 @@ function Relatorios() {
       ["Período", `${dataCompleta(de)} a ${dataCompleta(ate)}`],
       [],
       ["Resumo do período"],
-      ["Faturamento (entradas já recebidas)", dinheiroCsv(r.faturamento)],
+      ["Faturamento (entradas recebidas, sem devoluções e sem crédito deixado)", dinheiroCsv(r.faturamento)],
+      ...(temAjuste(r.ajustes) ? [
+        ["Entradas recebidas", dinheiroCsv(r.entrou)],
+        ["Devolvido ao tutor", dinheiroCsv(-r.ajustes.devolvido)],
+        ["Ficou de crédito para o tutor", dinheiroCsv(-r.ajustes.creditoDeixado)],
+        ["Crédito usado no check-out", dinheiroCsv(r.ajustes.creditoUsadoFora)],
+      ] satisfies Cel[][] : []),
       ["A receber de atendimentos do período (cliente paga depois)", dinheiroCsv(r.valorFiado)],
       ["Contas a receber de atendimentos do período", numeroCsv(r.fiados)],
       ["Atendimentos concluídos", numeroCsv(r.concluidos)],
       ["Faltas", numeroCsv(r.faltas)],
       ["Atendimentos pagos com pacote", numeroCsv(r.comPacote)],
-      ["Valor médio por atendimento", r.ticket == null ? "" : dinheiroCsv(r.ticket)],
+      ["Valor médio por conta (atendimentos cobrados e pacotes vendidos)", r.ticket == null ? "" : dinheiroCsv(r.ticket)],
       ["Clientes novos", numeroCsv(dados.clientesNovos)],
       ["Comissão total", dinheiroCsv(comissaoBanco ? real(comissaoBanco.reduce((t, c) => t + c.comissao, 0)) : r.totalComissao)],
       [],
       ["Período anterior", `${dataCompleta(antes.de)} a ${dataCompleta(antes.ate)}`],
-      ["Faturamento (entradas já recebidas)", dinheiroCsv(dados.anterior.faturamento)],
+      ["Faturamento (entradas recebidas, sem devoluções e sem crédito deixado)", dinheiroCsv(dados.anterior.faturamento)],
       ["Atendimentos concluídos", numeroCsv(dados.anterior.concluidos)],
-      ["Valor médio por atendimento", dados.anterior.ticket == null ? "" : dinheiroCsv(dados.anterior.ticket)],
+      ["Valor médio por conta (atendimentos cobrados e pacotes vendidos)", dados.anterior.ticket == null ? "" : dinheiroCsv(dados.anterior.ticket)],
       ["Clientes novos", numeroCsv(dados.anterior.clientesNovos)],
       [],
       ...(r.totalEstadias ? [
@@ -379,7 +431,7 @@ function Relatorios() {
       ["Por forma de pagamento (entradas recebidas)"],
       ["Forma", "Valor"],
       ...r.porForma.map((f): Cel[] => [f.rotulo, dinheiroCsv(f.valor)]),
-      ["Total", dinheiroCsv(r.faturamento)],
+      ["Total", dinheiroCsv(r.entrou)],
       [],
       ["Tutores que mais vieram"],
       ["Tutor", "Vezes", "Com pacote", "Pagou no período"],
@@ -389,7 +441,7 @@ function Relatorios() {
     avisar("Planilha baixada.");
   }
 
-  const semNada = r && !r.marcados && !r.faturamento && !dados?.clientesNovos && !r.faltas && !r.totalEstadias;
+  const semNada = r && !r.marcados && !r.faturamento && !r.entrou && !dados?.clientesNovos && !r.faltas && !r.totalEstadias;
   const emAndamento = ateIso >= hojeIso && deIso <= hojeIso;
   // negócio sem banho e tosa (creche, hotel ou loja) e sem nada na agenda no período: os blocos de atendimento não aparecem
   const semBanho = !usaModulo(petshop, "banho_tosa") && Boolean(r) && !r!.marcados;
@@ -438,7 +490,7 @@ function Relatorios() {
               <Kpi icone={UserX} tom="rosa" rotulo="Faltas" valor={r.faltas}
                 apoio={r.taxaFalta == null ? "nenhuma falta" : `${r.taxaFalta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de falta`} />
               <Kpi icone={Receipt} tom="ceu" rotulo="Valor médio por atendimento" valor={<span className="gf-kpi-v">{r.ticket == null ? "—" : brl(r.ticket)}</span>}
-                apoio={<Apoio texto={r.comPacote ? `cobrado · fora ${r.comPacote} com pacote` : "valor cobrado, com desconto"}
+                apoio={<Apoio texto={r.medio.contas ? `média de ${r.medio.contas === 1 ? "1 conta" : `${r.medio.contas} contas`}${r.medio.pacotes ? ` (${r.medio.pacotes === 1 ? "1 pacote vendido" : `${r.medio.pacotes} pacotes vendidos`})` : ""}${r.comPacote ? " · uso de pacote não conta" : ""}` : "valor cobrado, com desconto"}
                   atual={r.ticket} anterior={dados.anterior.ticket} formato={brl} />} />
               <Kpi icone={UserPlus} tom="lilas" rotulo="Clientes novos" valor={dados.clientesNovos}
                 apoio={<Apoio texto={dados.clientesNovos === 1 ? "cadastrado no período" : "cadastrados no período"} atual={dados.clientesNovos} anterior={dados.anterior.clientesNovos} />} />
@@ -458,7 +510,8 @@ function Relatorios() {
                 <p className="g-rotulo">Faturamento</p>
                 <p className="g-rel-total">{brl(r.faturamento)}</p>
                 <Comparacao atual={r.faturamento} anterior={dados.anterior.faturamento} formato={brl} longo />
-                {r.faturamento > 0 ? (
+                {temAjuste(r.ajustes) && <ContaDoFaturamento entrou={r.entrou} ajustes={r.ajustes} faturamento={r.faturamento} />}
+                {r.faturamento > 0 || r.entrou > 0 ? (
                   <>
                     {r.barras.length <= 7
                       ? <Barras itens={r.barras.map((b) => ({ rotulo: nomeDiaCurto(b.dia), valor: b.valor }))} formato={brlMini} altura={176}
@@ -622,6 +675,20 @@ function Relatorios() {
         )}
       </div>
     </>
+  );
+}
+
+/** Como o faturamento foi montado, quando houve devolução ou crédito do tutor no período (para conferir à mão). */
+function ContaDoFaturamento({ entrou, ajustes: a, faturamento }: { entrou: number; ajustes: AjustesDoFaturamento; faturamento: number }) {
+  return (
+    <div className="g-rel-conta g-tab" role="group" aria-label="Como o faturamento foi contado">
+      <span>Entradas recebidas {brl(entrou)}</span>
+      {a.devolvido > 0 && <span>Devolvido ao tutor − {brl(a.devolvido)}</span>}
+      {a.creditoDeixado > 0 && <span>Ficou de crédito para o tutor − {brl(a.creditoDeixado)}</span>}
+      {a.creditoUsadoFora > 0 && <span>Crédito usado no check-out + {brl(a.creditoUsadoFora)}</span>}
+      <span>Faturamento <b>{brl(faturamento)}</b></span>
+      <small className="g-muted">O dinheiro que entrou e voltou para o tutor não é faturamento. Crédito que ficou com o tutor ainda é dele: conta quando ele usar.</small>
+    </div>
   );
 }
 
