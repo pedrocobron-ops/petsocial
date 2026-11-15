@@ -556,12 +556,12 @@ function imprimirDaEstadia(petshop: string, e: EstadiaCompleta, conta: ContaDaEs
 }
 
 /**
- * Outro pet do mesmo tutor (não o mesmo pet) saiu há pouco (até 3 horas antes desta saída, no mesmo dia) com a taxa de busca fora do horário
+ * Outro pet do mesmo tutor (não o mesmo pet) saiu há pouco (até 1 hora antes desta saída, no mesmo dia) com a taxa de busca fora do horário
  * na conta: é a mesma busca, e a taxa não precisa entrar de novo. Só quem recebe chama.
  */
 async function atrasoJaCobrado(sb: Banco, petshopId: string, clienteId: string | null | undefined, esta: Pick<EstadiaCompleta, "id" | "pet_id">, agora: Date): Promise<AtrasoJaCobrado | null> {
   if (!clienteId) return null;
-  const desde = new Date(Math.max(inicioDoDia(agora).getTime(), agora.getTime() - 3 * 3600e3)).toISOString();
+  const desde = new Date(Math.max(inicioDoDia(agora).getTime(), agora.getTime() - 3600e3)).toISOString();
   const r = await sb.from("estadias").select("id, saida, pets!inner(nome, cliente_id)").eq("petshop_id", petshopId).eq("status", "encerrada").neq("id", esta.id).neq("pet_id", esta.pet_id)
     .eq("pets.cliente_id", clienteId).gte("saida", desde).lte("saida", new Date(agora.getTime() + 60e3).toISOString()).order("saida", { ascending: false }).limit(10);
   const saidas = (r.data ?? []) as unknown as { id: string; saida: string; pets: { nome: string } | null }[];
