@@ -20,6 +20,7 @@ import { FolhaBaixa } from "../financeiro/comum";
 import { AvisoCaixaFechado, EscolhaPagamento, fecharPagamento, useCaixaAberto, usePagamento } from "../loja/pecas";
 import { FidelidadeNoHorario } from "../fidelidade";
 import Comanda from "./comanda";
+import { MarcaSemCobranca, semCobranca } from "./para-cobrar";
 import AntesDepois from "./antes-depois";
 import { continuarSerie, encerrarSerie, textoContinuou, VEZES_POR_VEZ } from "./series-acabando";
 
@@ -387,7 +388,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           </div>
           <div className="g-pilha p" style={{ justifyItems: "end" }}>
             {faltaCobrar ? <span className="g-tag laranja">Concluído, falta cobrar</span>
-              : a.status === "concluido" && a.sem_cobranca && !lancado && !a.pacote_cliente_id ? <span className="g-tag amarelo">Sem cobrança</span>
+              : semCobranca(a) && !lancado ? <MarcaSemCobranca a={a} />
               : a.status === "concluido" && vejoFinanceiro && diferenca > 0.005 ? <span className="g-tag laranja">Concluído, falta a diferença</span>
               : <span className={`g-tag ${st.tom}`}>{st.rotulo}{a.status === "concluido" && vejoFinanceiro && sabe && recebido > 0 && !aReceber ? " e pago" : ""}</span>}
             {a.serie_id && <span className="g-tag azul"><Repeat size={12} aria-hidden />Repete</span>}
@@ -417,10 +418,10 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
               {outros.map((o) => <li key={o.id}><span>{o.servicos?.nome ?? "Serviço"}</span><b className="g-tab">{o.preco != null ? brl(o.preco) : "a definir"}</b></li>)}
             </ul>
           )}
-          {a.sem_cobranca && !lancado && a.status === "concluido" && !a.pacote_cliente_id && (
+          {semCobranca(a) && !lancado && (
             <div className="g-fila entre"><span className="g-muted">Cobrança</span><b style={{ textAlign: "right" }}>Não cobrado{a.sem_cobranca_nome ? ` · por ${a.sem_cobranca_nome.split(" ")[0]}` : ""}{a.sem_cobranca_em ? ` em ${dataCurta(new Date(a.sem_cobranca_em))} às ${hora(a.sem_cobranca_em)}` : ""}</b></div>
           )}
-          {a.sem_cobranca && !lancado && a.status === "concluido" && !a.pacote_cliente_id && a.profissionais && <p className="g-pp g-muted" style={{ margin: 0 }}>Não cobrar não muda a comissão de {a.profissionais.nome.split(" ")[0]}: ela conta o preço da agenda.</p>}
+          {semCobranca(a) && !lancado && a.profissionais && <p className="g-pp g-muted" style={{ margin: 0 }}>Não cobrar não muda a comissão de {a.profissionais.nome.split(" ")[0]}: ela conta o preço da agenda.</p>}
           {(extra?.mexidas ?? []).map((m) => (
             <p key={m.id} className="g-pp g-muted" style={{ margin: 0 }}>
               {m.tipo === "servico_tirado" ? `Tirado da conta: ${m.item}${m.de != null ? ` (${brl(m.de)})` : ""}`
