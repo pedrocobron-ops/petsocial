@@ -1128,3 +1128,7 @@ body:has(.g-fundo) .g-fab:not(.aberta) { display: none; }
 .g-lado-eu .t span { white-space: normal; overflow-wrap: anywhere; }
 /* com uma janela aberta, o botão redondo do microfone (que sobe acima da barra de baixo) não encosta no rodapé dela */
 body:has(.g-fundo) .g-aba-mic { visibility: hidden; }
+
+/* painel do administrador: as abas quebram linha no celular */
+.g-seg.g-adm-abas { display: flex; flex-wrap: wrap; border-radius: 20px; width: fit-content; max-width: 100%; }
+.g-seg.g-adm-abas button { padding: 0 14px; }
