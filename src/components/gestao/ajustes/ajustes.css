@@ -1,4 +1,5 @@
 /* Ajustes (meu pet shop, equipe, assinatura): só o que o gestao.css não cobre. Prefixo gj-. */
+.gj-prontos { display: grid; gap: 8px; }
 .gj-dias { display: grid; }
 .gj-dia { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px 0; border-bottom: 1px solid var(--g-linha); min-height: 58px; }
 .gj-dia:last-child { border-bottom: 0; }

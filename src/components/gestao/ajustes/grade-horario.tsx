@@ -60,15 +60,38 @@ export function erroDoHorario(h: Horario): string | null {
   return null;
 }
 
-const DIA_UTIL = { abre: "08:00", fecha: "18:00" }, SABADO = { abre: "08:00", fecha: "13:00" };
-/** Semanas prontas, para começar com um toque. */
-export const MODELOS_HORARIO: { rotulo: string; dias: Record<string, { abre: string; fecha: string } | null> }[] = [
-  { rotulo: "Segunda a sexta", dias: { "1": DIA_UTIL, "2": DIA_UTIL, "3": DIA_UTIL, "4": DIA_UTIL, "5": DIA_UTIL, "6": null, "0": null } },
-  { rotulo: "Segunda a sábado", dias: { "1": DIA_UTIL, "2": DIA_UTIL, "3": DIA_UTIL, "4": DIA_UTIL, "5": DIA_UTIL, "6": SABADO, "0": null } },
-  { rotulo: "Terça a sábado", dias: { "1": null, "2": DIA_UTIL, "3": DIA_UTIL, "4": DIA_UTIL, "5": DIA_UTIL, "6": DIA_UTIL, "0": null } },
-  { rotulo: "Todos os dias", dias: { "1": DIA_UTIL, "2": DIA_UTIL, "3": DIA_UTIL, "4": DIA_UTIL, "5": DIA_UTIL, "6": DIA_UTIL, "0": DIA_UTIL } },
+/** Semanas prontas, para começar com um toque: os dias abertos (as horas ficam as de agora). */
+export const MODELOS_DIAS: { rotulo: string; dias: string[] }[] = [
+  { rotulo: "Seg a sex", dias: ["1", "2", "3", "4", "5"] },
+  { rotulo: "Seg a sáb", dias: ["1", "2", "3", "4", "5", "6"] },
+  { rotulo: "Ter a sáb", dias: ["2", "3", "4", "5", "6"] },
+  { rotulo: "Todos os dias", dias: ["1", "2", "3", "4", "5", "6", "0"] },
 ];
-const mesmosDias = (a: Horario, b: Horario) => ORDEM_DIAS.every((d) => (a[d]?.abre ?? "") === (b[d]?.abre ?? "") && (a[d]?.fecha ?? "") === (b[d]?.fecha ?? ""));
+/** Horas prontas: valem para todos os dias abertos (o sábado de meio período continua de meio período). */
+export const MODELOS_HORAS = [{ abre: "08:00", fecha: "18:00" }, { abre: "09:00", fecha: "19:00" }];
+/** Sábado de meio período: abre na mesma hora dos outros dias e fecha às 13h. */
+const FIM_MEIO_PERIODO = "13:00";
+const textoHoras = (h: { abre: string; fecha: string }) => `${Number(h.abre.slice(0, 2))}h às ${Number(h.fecha.slice(0, 2))}h`;
+const sabadoMeio = (h: Horario) => !!h["6"] && h["6"]!.fecha === FIM_MEIO_PERIODO;
+/** As horas que valem para a semana: as do primeiro dia aberto que não é o sábado de meio período. */
+function horasDaSemana(h: Horario): { abre: string; fecha: string } | null {
+  const d = ORDEM_DIAS.find((x) => h[x] && !(x === "6" && sabadoMeio(h) && ORDEM_DIAS.some((y) => y !== "6" && h[y])));
+  return d ? { abre: h[d]!.abre, fecha: h[d]!.fecha } : null;
+}
+
+/**
+ * Por que o almoço não vale num dia aberto. O dia que termina dentro do almoço (sábado até as 13h com almoço das 12h às 13h)
+ * segue com horário até fechar; quem também para nesse dia muda a hora de fechar.
+ */
+function fraseSemAlmoco(h: Horario, a: Almoco, dias: string[]): string {
+  const nomes = (l: string[]) => l.map((d) => NOME_DIAS[d]).join(" e ");
+  const dentro = dias.filter((d) => h[d]!.fecha > a.de && h[d]!.abre < a.de);
+  const fora = dias.filter((d) => !dentro.includes(d));
+  const partes: string[] = [];
+  if (dentro.length) partes.push(`Em ${nomes(dentro)}, que ${dentro.length === 1 ? "fecha" : "fecham"} durante o almoço, o almoço não vale: a agenda e o link oferecem horário até a hora de fechar. Se nesse dia vocês param às ${a.de}, mude a hora de fechar para ${a.de}.`);
+  if (fora.length) partes.push(`Em ${nomes(fora)} não muda nada, porque o dia termina antes ou começa depois do almoço.`);
+  return partes.join(" ");
+}
 
 /**
  * Uma linha por dia (seg → dom): chave aberto/fechado e as horas de abrir e fechar.
@@ -103,14 +126,32 @@ export function GradeHorario({ valor, aoMudar, aberto = "Aberto", fechado = "Fec
   const semAlmocoNoDia = almoco && !almocoRuim ? abertos.filter((d) => !valem.includes(d)) : [];
   return (
     <div className="g-pilha p">
-      {modelos && (
-        <div className="g-chips" role="group" aria-label="Semanas prontas">
-          {MODELOS_HORARIO.map((m) => (
-            <button key={m.rotulo} type="button" className="g-chip" aria-pressed={mesmosDias(m.dias, valor)}
-              onClick={() => mudar(Object.fromEntries(ORDEM_DIAS.map((d) => [d, m.dias[d] ? { ...m.dias[d]! } : null])))}>{m.rotulo}</button>
-          ))}
-        </div>
-      )}
+      {modelos && (() => {
+        const horas = horasDaSemana(valor) ?? PADRAO;
+        const meio = sabadoMeio(valor);
+        const comDias = (dias: string[]) => mudar(Object.fromEntries(ORDEM_DIAS.map((d) => [d, !dias.includes(d) ? null
+          : valor[d] && !(d === "6" && !meio) ? { abre: valor[d]!.abre, fecha: valor[d]!.fecha } : { ...horas }])));
+        const comHoras = (x: { abre: string; fecha: string }) => mudar(Object.fromEntries(ORDEM_DIAS.map((d) => [d, !valor[d] ? null
+          : d === "6" && meio ? { abre: x.abre, fecha: FIM_MEIO_PERIODO } : { ...x }])));
+        // cada dia aberto (fora o sábado de meio período) com estas horas
+        const soEstas = (x: { abre: string; fecha: string }) => abertos.length > 0 && abertos.every((d) => (d === "6" && meio && abertos.length > 1) || (valor[d]!.abre === x.abre && valor[d]!.fecha === x.fecha));
+        return (
+          <div className="gj-prontos">
+            <div className="g-chips" role="group" aria-label="Dias abertos">
+              {MODELOS_DIAS.map((m) => (
+                <button key={m.rotulo} type="button" className="g-chip" aria-pressed={ORDEM_DIAS.every((d) => !!valor[d] === m.dias.includes(d))} onClick={() => comDias(m.dias)}>{m.rotulo}</button>
+              ))}
+            </div>
+            <div className="g-chips" role="group" aria-label="Horas prontas">
+              {MODELOS_HORAS.map((x) => (
+                <button key={x.abre} type="button" className="g-chip" aria-pressed={soEstas(x)} onClick={() => comHoras(x)}>{textoHoras(x)}</button>
+              ))}
+              <button type="button" className="g-chip" aria-pressed={meio}
+                onClick={() => por("6", meio ? { ...horas } : { abre: horas.abre < FIM_MEIO_PERIODO ? horas.abre : "08:00", fecha: FIM_MEIO_PERIODO })}>Sábado meio período</button>
+            </div>
+          </div>
+        );
+      })()}
       <div className="gj-dias">
         {ORDEM_DIAS.map((d) => {
           const v = valor[d];
@@ -155,7 +196,7 @@ export function GradeHorario({ valor, aoMudar, aberto = "Aberto", fechado = "Fec
               </span>
               <small className="g-muted">
                 Nesse intervalo a agenda e o link do cliente não oferecem horário. Vale toda semana, sem prazo para acabar.
-                {semAlmocoNoDia.length > 0 && ` Em ${semAlmocoNoDia.map((d) => NOME_DIAS[d]).join(" e ")} não muda nada, porque o dia termina antes ou começa depois do almoço.`}
+                {semAlmocoNoDia.length > 0 && ` ${fraseSemAlmoco(valor, almoco, semAlmocoNoDia)}`}
               </small>
             </>
           ) : <small className="g-muted">Se fecha, marque aqui: não precisa bloquear a agenda toda semana.</small>}
