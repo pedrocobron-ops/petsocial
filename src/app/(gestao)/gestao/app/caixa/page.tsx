@@ -430,7 +430,7 @@ function CaixaDoDia() {
       {caixaDoResumo && (
         <Folha titulo={`Caixa de ${dataCurta(caixaDoResumo.aberto_em)}`} aoFechar={() => setFolha(null)}
           rodape={<>
-            <Link className="g-btn sec" href={`/gestao/app/caixa/imprimir?caixa=${caixaDoResumo.id}`} target="_blank"><Printer />Imprimir o fechamento</Link>
+            <Link className="g-btn sec" href={`/gestao/app/caixa/imprimir?caixa=${caixaDoResumo.id}`} target="_blank" title="Imprimir ou salvar em PDF o fechamento deste caixa" aria-label="Imprimir o fechamento"><Printer />Imprimir</Link>
             {fin && <button className="g-btn sec" onClick={() => exportarCaixa(caixaDoResumo, doCaixa(caixaDoResumo.id))}><Download />Exportar</button>}
             <button className="g-btn sec" onClick={() => setFolha(null)}>Fechar</button>
           </>}>

@@ -153,7 +153,7 @@ const BASE: TopicoBase[] = [
       "Não achou? Toque em Ajuda, no menu, e escreva a sua dúvida.",
       "Se a Ajuda não resolver, ela mostra o botão Abrir o WhatsApp para falar com a nossa equipe.",
     ],
-    dicas: ["No Manual, o botão Imprimir coloca todos os tópicos no papel ou em PDF."],
+    dicas: ["No Manual, o botão Imprimir coloca todos os tópicos no papel ou em PDF, em duas colunas. Para um tópico só, abra o tópico e toque em Imprimir este tópico."],
     palavras: ["ajuda", "manual", "duvida", "suporte", "tutorial", "passo a passo", "falar com alguem", "atendimento"] },
   { id: "instalar", titulo: "Como instalar no celular ou no computador", secao: "primeiros", quem: "todos", rota: null,
     passos: [
@@ -645,6 +645,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "Os números contam estadias, reservas e, na creche, os mensalistas esperados. É a mesma conta do aviso de casa cheia.",
+      "Para pôr o mês no papel ou em PDF, toque em Imprimir, ao lado das setas: sai o mês inteiro numa folha deitada.",
       "Para aparecer cheio, o dono preenche as vagas em Meu pet shop, no cartão Creche e hotel.",
       { so: ["hotel"], texto: "Quem usa Acomodações vê, no dia, quantos hóspedes cada uma tem." },
     ],
@@ -661,6 +662,19 @@ const BASE: TopicoBase[] = [
     ],
     atencao: ["A folha não mostra valores."],
     palavras: ["folha do dia", "imprimir hotel", "imprimir creche", "lista do dia", "quem esta na casa", "pdf do hotel", "folha de hospedes", "imprimir a lista", "imprimir quem esta no hotel", "lista de quem esta no hotel hoje", "imprimir a lista do hotel"] },
+  { id: "ficha-cuidados", titulo: "Como imprimir a ficha de cuidados do hóspede", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
+    passos: [
+      "Em Creche e hotel, em Casa agora, toque em Ficha no cartão do pet.",
+      "Para todos que estão na casa, toque em Fichas de cuidados, na faixa do alto.",
+      "Escolha Uma por folha (para deixar junto de cada pet) ou Compactas (várias na mesma folha).",
+      "Toque em Imprimir ou salvar em PDF.",
+    ],
+    dicas: [
+      "A ficha traz a comida e o remédio com os horários (com uma caixinha para marcar), os alertas e as observações, o tutor e o telefone, quem pode buscar, o veterinário de emergência e as vacinas. Na folha inteira sobra espaço para anotações da equipe.",
+      "A comida e o remédio vêm da reserva; as vacinas, da ficha do pet. O que não foi anotado aparece como não anotado.",
+    ],
+    atencao: ["A ficha não mostra valores."],
+    palavras: ["ficha de cuidados", "ficha do hospede", "imprimir ficha", "ficha do pet", "remedio", "horario do remedio", "cuidados", "quem pode buscar", "vacinas do hospede", "ficha para o canil"] },
   { id: "hotel-mensagens", titulo: "Como mandar as mensagens do hotel e avisar quem chega amanhã", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
     passos: [
       "No cartão do pet, toque em Mensagens.",
@@ -1083,6 +1097,19 @@ const BASE: TopicoBase[] = [
     ],
     atencao: ["O sistema não manda mensagem nem cobra sozinho. A mensagem leva a chave Pix de Opções de cobrança, em Meu pet shop. A multa e os juros só aparecem na mensalidade atrasada, e só se você ligou a multa e marcou Mostrar a multa e os juros na mensagem de cobrança."],
     palavras: ["cobranca", "cobrancas", "mensalidade", "mensalidades", "gerar cobrancas", "cobrar mensalidade", "vencimento", "atrasada", "inadimplente", "pro-rata", "proporcional", "escolinha", "day care", "mensalista", "dia extra", "cobrar a mensalidade", "cobro a mensalidade", "mensalidade da creche"] },
+  { id: "cobrancas-imprimir", titulo: "Como imprimir as cobranças do mês e o extrato do tutor", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE,
+    passos: [
+      "Em Creche e hotel, toque em Cobranças, no alto, e escolha o mês com as setas.",
+      "Para a lista do mês, toque em Imprimir, ao lado do mês. Sai cada família com os pets, o plano, os dias extras, as taxas, o total, o vencimento e se está pago ou em aberto.",
+      "Para o extrato de um tutor, toque em Extrato no cartão dele.",
+      "Toque em Imprimir ou salvar em PDF. Para mandar ao tutor, escolha Salvar como PDF e envie o arquivo pelo WhatsApp.",
+    ],
+    dicas: [
+      "Na folha dá para trocar o mês e escolher outra família sem voltar.",
+      "O extrato mostra cada dia extra e cada taxa com a data, o desconto, o que já foi pago e o total a pagar. Com a chave Pix preenchida em Opções de cobrança, ela sai embaixo.",
+    ],
+    atencao: ["A lista e o extrato mostram valores: só quem cuida do financeiro abre. O extrato não é nota fiscal."],
+    palavras: ["imprimir cobrancas", "extrato", "extrato do tutor", "extrato da creche", "pdf da mensalidade", "lista de quem deve", "imprimir mensalidades", "relatorio de cobrancas", "mandar extrato"] },
   { id: "primeira-cobranca", titulo: "Como fica a primeira cobrança de um mensalista", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE,
     passos: [
       "Ao cadastrar o mensalista com o mês já começado, a tela pergunta como fica a mensalidade deste mês. Nada vem marcado.",
@@ -1584,6 +1611,18 @@ const BASE: TopicoBase[] = [
     ],
     atencao: ["Depois de fechado, os lançamentos daquele caixa não mudam mais de valor nem podem ser excluídos. Para corrigir, lance um ajuste no caixa de hoje."],
     palavras: ["fechar caixa", "fechar o caixa", "conferir", "bateu", "sobrou", "faltou dinheiro", "quebra de caixa", "fim do dia", "fechamento", "nao fechou certo", "caixa nao fechou", "caixa nao bateu", "nao bateu", "nao bate", "diferenca no caixa", "sobrou dinheiro"] },
+  { id: "caixa-imprimir", titulo: "Como imprimir o fechamento do caixa", secao: "dinheiro", quem: "caixa", rota: CAIXA,
+    passos: [
+      "Feche o caixa: o resumo dele abre sozinho.",
+      "Toque em Imprimir, embaixo do resumo.",
+      "Para um caixa de outro dia, toque nele em Caixas fechados e em Imprimir. Na folha também dá para trocar de caixa.",
+      "Toque em Imprimir ou salvar em PDF.",
+    ],
+    dicas: [
+      "Sai o troco inicial, as entradas por forma de pagamento, as saídas, o dinheiro esperado e o contado, a diferença, os atendimentos que ficaram para cobrar, quantas alterações em valores houve, quem abriu e quem fechou, e os lançamentos. Embaixo ficam as linhas para assinar.",
+    ],
+    atencao: ["Quem só usa o caixa (sem Financeiro) imprime a conferência da gaveta de um caixa fechado, sem os lançamentos."],
+    palavras: ["imprimir caixa", "imprimir fechamento", "fechamento do caixa", "relatorio do caixa", "pdf do caixa", "conferencia do caixa", "papel do caixa"] },
   { id: "caixa-exportar", titulo: "Como ver os caixas antigos e exportar", secao: "dinheiro", quem: "financeiro", rota: CAIXA,
     passos: [
       "Abra Caixa.",

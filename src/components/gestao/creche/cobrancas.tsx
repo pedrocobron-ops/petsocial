@@ -184,7 +184,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
         <button type="button" className="g-ico" aria-label="Mês anterior" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}><ChevronLeft /></button>
         <h2 className="g-cm-titulo">{mesComAno(mes)}</h2>
         <button type="button" className="g-ico" aria-label="Mês seguinte" disabled={mesIso > isoMes(agora)} onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}><ChevronRight /></button>
-        <Link className="g-btn sec p g-cm-imprimir" href={`/gestao/app/creche-hotel/cobrancas/imprimir?mes=${mesIso}`} target="_blank" title={`Imprimir ou salvar em PDF a lista de ${nomeMes(mes)}`}><Printer />Imprimir</Link>
+        <Link className="g-btn sec p g-cm-imprimir" href={`/gestao/app/creche-hotel/cobrancas/imprimir?mes=${mesIso}`} target="_blank" title={`Imprimir ou salvar em PDF a lista de ${nomeMes(mes)}`} aria-label={`Imprimir a lista de ${nomeMes(mes)}`}><Printer /><span>Imprimir</span></Link>
       </div>
 
       {erro && <p className="g-erro" role="alert">{erro}</p>}

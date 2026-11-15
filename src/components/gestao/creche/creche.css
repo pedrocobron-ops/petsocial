@@ -91,7 +91,10 @@
 /* ---------- cobranças ---------- */
 .g-cm-mes-nav { display: flex; align-items: center; gap: 8px; }
 .g-cm-mes-nav h2 { min-width: 0; text-align: center; flex: 0 1 auto; }
-.g-cm-mes-nav .g-cm-imprimir { margin-left: auto; }
+.g-cm-mes-nav { min-width: 0; }
+.g-cm-mes-nav .g-cm-imprimir { margin-left: auto; flex: none; }
+/* celular: só o ícone, para o mês caber numa linha */
+@media (max-width: 520px) { .g-cm-mes-nav .g-cm-imprimir span { display: none; } .g-cm-mes-nav .g-cm-imprimir { min-width: 44px; min-height: 44px; padding: 0 10px; } }
 .g-cm-falta-gerar { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-radius: var(--g-raio-p); background: var(--g-amarelo-tint); font-size: .875rem; line-height: 1.45; }
 .g-cm-falta-gerar svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
 .g-cm-bloco { display: grid; gap: 10px; }

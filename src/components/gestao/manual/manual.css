@@ -165,3 +165,4 @@
   .g-man.so-um .g-man-passos li { grid-template-columns: 20px minmax(0, 1fr); gap: 8px; }
   .g-man.so-um .g-man-passos li::before { width: 20px; height: 20px; font-size: 9pt; }
 }
+@media print { .g-man.so-um .g-man-nota, .g-man.so-um .g-man-nota.atencao { font-size: 10pt; padding: 6px 8px; } }
