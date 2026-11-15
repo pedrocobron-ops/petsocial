@@ -22,6 +22,7 @@ import Cobrancas from "@/components/gestao/creche/cobrancas";
 import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
 import Mensalistas from "@/components/gestao/creche/mensalistas";
 import ReposicoesParaConferir from "@/components/gestao/creche/reposicoes";
+import ExperienciasDaCreche from "@/components/gestao/creche/experiencias";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import CheckOut, { comNota, DetalheDaEstadia, estadiasDoTutor, NoitePorNoite, NOTA_PACOTE, pacoteServe, pacotesParaEstadia, venceu } from "@/components/gestao/hotel/checkout";
 import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/components/gestao/hotel/cuidados";
@@ -31,7 +32,7 @@ import { AjusteDoSinal, CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSi
 import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
-import { abreNoDia, esperadoNoDia, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMudarPlano, type PlanoCompleto } from "@/lib/gestao/creche";
+import { abreNoDia, esperadoNoDia, experienciaDe, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMudarPlano, precoDaExperiencia, type PlanoCompleto } from "@/lib/gestao/creche";
 import { conferirCaixa, conferirValorAlto, lancarPago, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import { useOperacao, useTrava } from "@/lib/gestao/uma-vez";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
@@ -144,6 +145,15 @@ function LinhaValor({ e, plano, abertas, valores }: { e: EstadiaCompleta; plano?
       </p>
     );
   }
+  // dia de experiência (opção da creche): a etiqueta para todos; o preço só para quem vê o financeiro
+  if (e.experiencia) {
+    return (
+      <p className="g-cm-marca">
+        <span className="g-tag azul">Dia de experiência</span>
+        {vejoFinanceiro && <span>{e.valor_diaria == null || Number(e.valor_diaria) === 0 ? "gratuito" : <>dia de experiência a <b className="g-tab">{brl(e.valor_diaria)}</b>, cobrado na saída</>}</span>}
+      </p>
+    );
+  }
   if (!vejoFinanceiro) return e.sinal_estado ? <p className="g-ht-sinal"><EtiquetaSinal e={e} /></p> : null;
   const p = previsto(petshop, { ...e, valor_diaria: e.valor_diaria == null ? null : Number(e.valor_diaria) }, doMesmoTutor(abertas, e.pets?.clientes?.id), valores);
   const sinal = <EtiquetaSinal e={e} valores={valores} />;
@@ -226,7 +236,7 @@ export default function CrecheHotel() {
   const valorDaTaxa = vejoFinanceiro && calendario?.atraso.ativo ? calendario.atraso.creche.valor : null;
   const [aba, setAba] = useState<Aba>("casa");
   const [tipo, setTipo] = useState<"todos" | Tipo>("todos");
-  const [nova, setNova] = useState<{ dia?: string; saida?: string; hora?: string | null; saidaHora?: string | null; tipo?: Tipo; pet?: PetDaEstadia | null; espera?: string } | null>(null);
+  const [nova, setNova] = useState<{ dia?: string; saida?: string; hora?: string | null; saidaHora?: string | null; tipo?: Tipo; pet?: PetDaEstadia | null; espera?: string; experiencia?: boolean } | null>(null);
   // check-in de reserva com a data já passada: a pessoa diz se o pet chegou agora ou no dia reservado
   const [chegando, setChegando] = useState<EstadiaCompleta | null>(null);
   const [editando, setEditando] = useState<EstadiaCompleta | null>(null);
@@ -495,12 +505,14 @@ export default function CrecheHotel() {
       {erro && <ErroTela erro={erro} aoTentar={() => void recarregar()} />}
 
       {usaCreche && (souDono || cuidoDoFinanceiro) && (ver === "chamada" || ver === "casa" || ver === "cobrancas") && <ReposicoesParaConferir />}
+      {usaCreche && (ver === "chamada" || ver === "casa") && <div className="g-ht-acima"><ExperienciasDaCreche /></div>}
       {ver === "casa" && posso("agenda") && <div className="g-ht-acima"><PedidosLink /></div>}
 
       {usaCreche && !mens ? <Esqueleto linhas={4} />
         : ver === "diario" && comDiario ? <Diario />
         : ver === "chamada" && mens ? <Chamada aviso={<AvisoDeVaga espera={espera} aoVer={verEspera} />} planos={mens.planos} vagasHoje={vagasCrecheHoje ? { ocupadas: vagasCrecheHoje.ocupadas, total: vagasCrecheHoje.total! } : null}
-            aoNovoMensalista={() => { if (!somenteLeitura()) { setVer("mensalistas"); setNovoPlano(true); } }} />
+            aoNovoMensalista={() => { if (!somenteLeitura()) { setVer("mensalistas"); setNovoPlano(true); } }}
+            aoExperiencia={experienciaDe(petshop).ativo ? () => { if (!somenteLeitura()) setNova({ tipo: "creche", experiencia: true }); } : undefined} />
         : ver === "mensalistas" && mens ? <Mensalistas planos={mens.planos} novo={novoPlano} aoAbrirNovo={() => { if (!somenteLeitura()) setNovoPlano(true); }} aoFecharNovo={() => setNovoPlano(false)} aoMudar={mudou} />
         : ver === "cobrancas" && mens && cuidoDoFinanceiro ? <Cobrancas planos={mens.planos} gerar={gerando} aoFecharGerar={() => setGerando(false)} aoMes={setMesCobranca} />
         : carregando && !dados ? <Esqueleto linhas={4} /> : !dados ? null
@@ -636,7 +648,7 @@ export default function CrecheHotel() {
                         <div className="g-fila entre g-pp">
                           <span className="g-muted">{e.tipo === "creche"
                             // creche é um dia só: o que vale dizer é como o dia conta (mensalista ou diária avulsa), não "1ª diária"
-                            ? (e.mensalista === "extra" ? "mensalista · dia extra" : e.mensalista === "reposicao" ? "mensalista · reposição" : e.mensalista ? "mensalista · dia do plano" : "diária avulsa")
+                            ? (e.mensalista === "extra" ? "mensalista · dia extra" : e.mensalista === "reposicao" ? "mensalista · reposição" : e.mensalista ? "mensalista · dia do plano" : e.experiencia ? "dia de experiência" : "diária avulsa")
                             : diarias === 1 ? "1ª diária" : `${diarias}ª diária`}</span>
                           {atrasada ? <span className="g-tag vermelho">saída atrasada</span> : parte != null && <span className="g-muted g-tab">{Math.round(parte * 100)}% do período</span>}
                         </div>
@@ -776,7 +788,7 @@ export default function CrecheHotel() {
       {ver === "casa" && dados && !tudoVazio && souDono && <div style={{ marginTop: 20 }}><LinkCrecheHotel titulo="Pedidos pelo link do cliente" /></div>}
       {(ver === "casa" || ver === "ocupacao") && dados && souDono && <p style={{ marginTop: 16 }}><Link className="g-btn fantasma p" href="/gestao/app/meu-petshop#opcoes-hotel"><Settings2 />{usaCreche && usaHotel ? "Opções do hotel e da creche" : usaHotel ? "Opções do hotel" : "Opções da creche"}</Link></p>}
       {acertando && <AcertarEstadia key={acertando.id} estadia={acertando} aoFechar={() => setAcertando(null)} aoGravar={() => { setAcertando(null); mudou(); }} />}
-      {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} saidaInicial={nova.saida} horaInicial={nova.hora ?? undefined} saidaHoraInicial={nova.saidaHora ?? undefined} abertas={abertas} doTutor={doTutor}
+      {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} experienciaInicial={nova.experiencia} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} saidaInicial={nova.saida} horaInicial={nova.hora ?? undefined} saidaHoraInicial={nova.saidaHora ?? undefined} abertas={abertas} doTutor={doTutor}
         aoFechar={() => setNova(null)} aoGravar={(emCasa) => {
           // a reserva veio da lista de espera: o pedido sai da fila
           const daEspera = nova.espera;
@@ -827,7 +839,9 @@ export default function CrecheHotel() {
 
 const horaDe = (d: string | Date) => { const x = new Date(d); return `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
 
-function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, horaInicial, saidaHoraInicial, abertas, doTutor, editar, valores, mens, petInicial, aoEspera, aoFechar, aoGravar }: {
+function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, horaInicial, saidaHoraInicial, abertas, doTutor, editar, valores, mens, petInicial, experienciaInicial, aoEspera, aoFechar, aoGravar }: {
+  /** vindo da Chamada (Dia de experiência): já marcado como dia de experiência */
+  experienciaInicial?: boolean;
   /** vindo da lista de espera: as horas que o tutor pediu */
   horaInicial?: string; saidaHoraInicial?: string;
   jaAquiInicial: boolean; tipoInicial: Tipo; diaInicial?: string; abertas: EstadiaCompleta[]; editar?: EstadiaCompleta; valores?: ValoresDaEstadia | null; mens: Mens | null;
@@ -866,6 +880,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const [obs, setObs] = useState(editar?.obs ?? "");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // dia de experiência (opção da creche): só para cão sem plano, num dia de creche que ainda não terminou
+  const regraExp = experienciaDe(petshop);
+  const [experiencia, setExperiencia] = useState(Boolean(editar?.experiencia ?? experienciaInicial));
   // opções do hotel e da creche (todas desligadas = nada disto aparece)
   const opTaxas = taxasDe(petshop), opQuartos = acomodacoesDe(petshop), opPorte = porteDe(petshop), comCuidados = cuidadosLigados(petshop);
   const [taxasMarcadas, setTaxasMarcadas] = useState<string[]>(() => taxasGuardadas(valores).map((t) => t.id));
@@ -920,6 +937,10 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const diaDoPlano = Boolean(planoDoPet && !jaAqui && umDiaSo && esperadoNoDia(planoDoPet, dia, petshop.horario));
   const reservaExtra = Boolean(planoDoPet && !jaAqui && umDiaSo && dia >= hojeIso && !diaDoPlano);
   const valorDoExtra = planoDoPet ? planoDoPet.valor_extra ?? (petshop.diaria_creche == null ? null : Number(petshop.diaria_creche)) : null;
+  const temPlano = Boolean(pet && mens?.planos.some((p) => p.pet_id === pet.id));
+  const ofereceExp = tipo === "creche" && !temPlano && (regraExp.ativo || Boolean(editar?.experiencia)) && editar?.status !== "encerrada";
+  const comExp = ofereceExp && experiencia;
+  const precoExp = precoDaExperiencia(petshop) ?? 0;
 
   // sinal: só em reserva nova, para quem recebe. O valor acompanha a regra até a pessoa mexer.
   const ofereceSinal = !editar && !jaAqui && vejoFinanceiro && aceitaSinal(petshop, tipo) && !reservaExtra;
@@ -986,7 +1007,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         texto: `Colocar ${pet.nome} em ${quarto.nome} mesmo assim?`, confirmar: "Colocar mesmo assim",
       }))) return;
     }
-    if (vejoFinanceiro && diaria === 0 && !reservaExtra && !(await confirmar({ titulo: "Cortesia, sem cobrar?", texto: `A diária está em R$ 0,00. ${pet.nome} fica sem cobrança nesta estadia.`, confirmar: "Sim, é cortesia" }))) return;
+    if (vejoFinanceiro && diaria === 0 && !reservaExtra && !comExp && !(await confirmar({ titulo: "Cortesia, sem cobrar?", texto: `A diária está em R$ 0,00. ${pet.nome} fica sem cobrança nesta estadia.`, confirmar: "Sim, é cortesia" }))) return;
     // sinal maior do que a reserva inteira costuma ser erro de digitação (1080 no lugar de 108)
     if (sinalPronto.modo !== "sem" && prev && !prev.aberto && prev.total > 0 && sinalPronto.valor > prev.total && !(await confirmar({
       titulo: "O sinal é maior do que a reserva",
@@ -1006,7 +1027,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
       const campos = {
         tipo, entrada: entrada.toISOString(), saida_prevista: saida?.toISOString() ?? null, obs: obs.trim() || null,
         // quem não recebe não vê nem manda a diária: o banco coloca a sugerida (a do porte, ou a de Meu pet shop)
-        ...(vejoFinanceiro ? { valor_diaria: diaria } : {}),
+        // dia de experiência: o banco põe o preço do dia de experiência
+        ...(vejoFinanceiro ? { valor_diaria: comExp ? precoExp : diaria } : {}),
+        ...(comExp || editar?.experiencia ? { experiencia: comExp } : {}),
         ...(opQuartos.ativo || editar?.acomodacao ? { acomodacao: tipo === "hotel" && quarto ? quarto.id : null } : {}),
         ...(comCuidados || editar?.cuidados ? { cuidados: cuidadosParaGravar(cuidados) as never } : {}),
       };
@@ -1023,7 +1046,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
           id = (await sb.from("estadias").select("id").eq("petshop_id", petshop.id).eq("chave", chaveDaEstadia).maybeSingle()).data?.id ?? null;
         }
         if (!id) throw nova.error ?? new Error("Não deu para marcar. Tente de novo.");
-        avisar(emCasa ? `${pet.nome} está na casa.` : `Reserva de ${pet.nome} marcada para ${dataAmigavel(entrada)}.`);
+        avisar(`${emCasa ? `${pet.nome} está na casa.` : `Reserva de ${pet.nome} marcada para ${dataAmigavel(entrada)}.`}${comExp ? " É o dia de experiência." : ""}`);
       }
       // as taxas combinadas e o sinal ficam à parte, só para quem recebe
       if (id && vejoFinanceiro && (taxasDaReserva.length || taxasGuardadas(valores).length)) {
@@ -1146,7 +1169,14 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         {planoDoPet && jaAqui && (
           <p className="g-muted g-pp" role="status">{pet.nome} é mensalista: a chegada se marca na Chamada (em dia fora do plano, por Veio fora do dia, e o dia vai para a mensalidade). Por aqui entra como diária avulsa, cobrada na saída.</p>
         )}
-        {vejoFinanceiro && !reservaExtra && <Campo rotulo={`Valor da diária (${tipo === "hotel" ? "por noite" : "por dia"})`}
+        {ofereceExp && (
+          <div className="g-campo">
+            <label className="g-check"><input type="checkbox" checked={experiencia} onChange={(ev) => { setExperiencia(ev.target.checked); setErro(null); }} />
+              <span><b>Dia de experiência</b> · primeiro dia de {pet.nome} para conhecer a creche{vejoFinanceiro ? ` (${precoExp > 0 ? brl(precoExp) : "gratuito"})` : ""}</span></label>
+            <small>Fica anotado como dia de experiência, não como diária comum. Depois do dia, a tela traz a mensagem para perguntar ao tutor como foi.{regraExp.max > 1 ? ` Até ${regraExp.max} por cão.` : " Um por cão."}</small>
+          </div>
+        )}
+        {vejoFinanceiro && !reservaExtra && !comExp && <Campo rotulo={`Valor da diária (${tipo === "hotel" ? "por noite" : "por dia"})`}
           dica={fixa == null ? "Defina o preço da diária em Meu pet shop para ele já vir preenchido."
             : doPorte ? (diaria === fixa ? `Diária do hotel para o porte ${pet.porte}, das opções do hotel.` : `A diária do hotel para o porte ${pet.porte} é ${brl(fixa)}.`)
             : diaria === fixa ? `Preço fixo ${tipo === "hotel" ? "do hotel" : "da creche"}, definido em Meu pet shop.`
@@ -1177,7 +1207,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
             <small>Só entra a taxa que você marcar. No check-out dá para marcar ou desmarcar de novo.</small>
           </div>
         )}
-        {vejoFinanceiro && prev && !reservaExtra && (
+        {vejoFinanceiro && prev && !reservaExtra && !comExp && (
           <p className="g-ch-valor g-ch-previsto" aria-live="polite">
             {prev.total === 0 ? <span className="g-tag">cortesia</span>
               : prev.aberto ? <span className="g-muted">Sem saída prevista: o total sai no check-out.</span>

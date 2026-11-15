@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { BotaoFotos } from "../casa/fotos-do-dia";
-import { AlertTriangle, CalendarPlus, Check, DoorOpen, LogIn, MessageCircle, Search, Sunset, Syringe, Undo2, UserX } from "lucide-react";
+import { AlertTriangle, CalendarPlus, Check, DoorOpen, LogIn, MessageCircle, Search, Sparkles, Sunset, Syringe, Undo2, UserX } from "lucide-react";
 import { lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { cuidadosVigentes, estadoSaude, tipoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import { portariaLigada, type Retirada } from "@/lib/gestao/casa-opcoes";
@@ -50,8 +50,10 @@ async function saudeVencida(sb: ReturnType<typeof useGestao>["sb"], petshopId: s
  * Saída depois do horário, com a taxa de busca fora do horário ligada: o banco anota (sem valor). Quem recebe vê a pergunta
  * "Cobrar / Não cobrar" na hora; quem não mexe com dinheiro só é avisado de que a saída ficou para quem recebe decidir.
  */
-export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: {
+export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, aoExperiencia }: {
   planos: PlanoCompleto[]; vagasHoje: { ocupadas: number; total: number } | null; aoNovoMensalista: () => void;
+  /** com o dia de experiência ligado (Opções da creche): abre o check-in de um cão novo já marcado como dia de experiência */
+  aoExperiencia?: () => void;
   /** faixa opcional acima da lista (abriu vaga para quem está na lista de espera) */
   aviso?: React.ReactNode;
 }) {
@@ -158,6 +160,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
     return (
       <Vazio titulo="A chamada começa com os mensalistas" texto="Cadastre os pets que vêm em dias fixos da semana. A cada dia, a chamada mostra quem deve vir, e um toque marca quem chegou, quem saiu e quem faltou.">
         {podeMudarPlano({ petshop, souDono, cuidoDoFinanceiro }) && <button className="g-btn sec" onClick={aoNovoMensalista}>Cadastrar o primeiro mensalista</button>}
+        {aoExperiencia && <button className="g-btn sec" onClick={aoExperiencia}><Sparkles />Dia de experiência</button>}
       </Vazio>
     );
   }
@@ -269,6 +272,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso }: 
 
           <div className="g-fila g-cm-rodape">
             <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setFora(true); }}><CalendarPlus />Veio fora do dia</button>
+            {aoExperiencia && ehHoje && <button className="g-btn sec" onClick={aoExperiencia}><Sparkles />Dia de experiência</button>}
             {(naCasa.length > 0 || conta("esperado") > 0) && <button className="g-btn sec" onClick={() => void encerrarChamada()}><Sunset />Encerrar a chamada</button>}
           </div>
           <p className="g-muted g-pp">A chegada de um mensalista não cobra diária: o dia já está no plano. Pet sem plano entra pelo botão Nova reserva / Check-in, como sempre.</p>
