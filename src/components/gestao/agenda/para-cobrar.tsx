@@ -33,9 +33,12 @@ export function useParaCobrar(de?: Date, ate?: Date) {
   return { ids: new Set(lista.map((x) => x.id)), lista, recarregar };
 }
 
-/** Concluído e marcado como não cobrado (fora o uso de pacote sem mais nada): a agenda mostra com quem decidiu. */
-export const semCobranca = (a: { status: string; sem_cobranca?: boolean | null; pacote_cliente_id?: string | null }) =>
-  a.status === "concluido" && Boolean(a.sem_cobranca) && !a.pacote_cliente_id;
+/**
+ * Concluído e marcado como não cobrado (fora o uso de pacote sem mais nada): a agenda mostra com quem decidiu.
+ * Pelo pacote com outro serviço junto (Banho do pacote + Corte de unhas) que ninguém cobrou também é "sem cobrança".
+ */
+export const semCobranca = (a: { status: string; sem_cobranca?: boolean | null; pacote_cliente_id?: string | null; agendamento_servicos?: unknown[] | null }) =>
+  a.status === "concluido" && Boolean(a.sem_cobranca) && (!a.pacote_cliente_id || (a.agendamento_servicos?.length ?? 0) > 0);
 /** "Sem cobrança · por Bia" */
 export function MarcaSemCobranca({ a }: { a: { sem_cobranca_nome?: string | null } }) {
   const quem = a.sem_cobranca_nome?.split(" ")[0];

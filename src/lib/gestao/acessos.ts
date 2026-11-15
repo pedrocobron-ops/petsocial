@@ -12,7 +12,7 @@ export const AREAS = [
   { id: "clientes", rotulo: "Clientes e pets", apoio: "Cadastro, fichas, saúde e histórico.", rota: "/gestao/app/clientes", dinheiro: false },
   { id: "creche_hotel", rotulo: "Creche e hotel", apoio: "Reservas, check-in e check-out.", rota: "/gestao/app/creche-hotel", dinheiro: false },
   { id: "pacotes", rotulo: "Pacotes", apoio: "Vender pacote e dar baixa nos usos.", rota: "/gestao/app/pacotes", dinheiro: false },
-  { id: "estoque", rotulo: "Estoque", apoio: "Produtos, entradas e saídas.", rota: "/gestao/app/estoque", dinheiro: false },
+  { id: "estoque", rotulo: "Estoque", apoio: "Produtos, entradas e saídas. Também muda o preço dos produtos e dá baixa por perda: fica anotado, e com o preço travado o preço só muda com você.", rota: "/gestao/app/estoque", dinheiro: false },
   { id: "caixa", rotulo: "Caixa", apoio: "Abrir, receber e fechar o caixa do dia.", rota: "/gestao/app/caixa", dinheiro: true },
   { id: "financeiro", rotulo: "Financeiro", apoio: "Contas a pagar e a receber, resultado do mês.", rota: "/gestao/app/financeiro", dinheiro: true },
   { id: "relatorios", rotulo: "Relatórios", apoio: "Faturamento, comissão e desempenho.", rota: "/gestao/app/relatorios", dinheiro: true },

@@ -49,6 +49,13 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   Também anotados pelo banco (migração 20261160): horário marcado abaixo da lista (`preco_agenda`), serviço já feito tirado da conta
   (`servico_tirado`), "não cobrar" (`sem_cobranca`, com `agendamentos.sem_cobranca_nome/_em`) e pacote fora do modelo (`pacote`). Com a trava
   (`dinheiro.preco_travado`), quem não cuida do financeiro é recusado nesses casos e ao baixar o valor de uma venda já recebida.
+  Regra única do dinheiro de um atendimento concluído (migração 20261169, função `conferir_valor_baixou`): o banco guarda o valor na hora de
+  concluir (`agendamentos.valor_concluido`, sem leitura pela API) e anota (ou, com a trava, recusa para quem não cuida do financeiro) voltar
+  para marcado, apagar, concluir de novo por menos, tirar serviço, mudar o preço de venda de produto, saída de estoque como "Venda" sem a venda
+  (a saída deve nascer com `lancamento_id` de uma venda com o produto nos itens) e perda/saldo corrigido para menos. Porte trocado para
+  menor com horário recente e forma de pagamento trocada (`alterou_forma`) também aparecem em Alterações em valores.
+- Conta do atendimento: o que o tutor deve de antes entra com "Incluir nesta conta?" (baixa por `receberConta` com `parteDaChave`); pagamento em
+  parte em qualquer forma por `pagoAMenos` (`EstadoPagamento.parte`/`resto`, só com `aceitaResto`).
 - "Recebeu quanto?" fica em `EstadoPagamento.entregue`: `fecharPagamento` recusa dinheiro a menos; a conta do atendimento usa `dinheiroAMenos`
   (recebe a parte e anota o resto para o tutor).
 - Datas: `agendamentos.inicio/fim` são `timestamptz`; campos `date` são texto `AAAA-MM-DD` (use `isoDia`, `deIsoDia`).

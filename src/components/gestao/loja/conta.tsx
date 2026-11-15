@@ -278,20 +278,26 @@ export function LinhaDaConta({ item, produto, aoMudar, aoTirar, apoio }: {
 
 /* ---------- desconto, pagamento e total ---------- */
 
-export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, pagamento, aoPagamento, comPagamento = true, erroForma, depois, aoDepois, aceitaResto }: {
+export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, pagamento, aoPagamento, comPagamento = true, erroForma, depois, aoDepois, aceitaResto, receberAgora, junto }: {
   subtotal: number; desconto: number; total: number; descontoDigitado: number | null; aoDesconto: (v: number | null) => void;
   pagamento: EstadoPagamento; aoPagamento: (e: EstadoPagamento) => void; comPagamento?: boolean; erroForma?: string | null;
   /** Só na conta do atendimento: deixa escolher "Cliente paga depois". */
   depois?: PagaDepois; aoDepois?: (d: PagaDepois) => void;
   /** Dinheiro entregue a menos pode ficar anotado (só a conta do atendimento). */
   aceitaResto?: boolean;
+  /** O que o cliente paga agora, quando é mais que a conta (a conta e o que ele devia de antes, recebidos juntos). */
+  receberAgora?: number;
+  /** Quanto de `receberAgora` é do que ele devia de antes (para o total dizer). */
+  junto?: number;
 }) {
   const { petshop, cuidoDoFinanceiro } = useGestao();
+  const aPagar = receberAgora != null && receberAgora > total ? receberAgora : total;
   const passou = (descontoDigitado ?? 0) > subtotal && subtotal > 0;
   // preço travado: o caixa dá desconto só até o máximo que o dono definiu (sem máximo, não dá desconto)
   const trava = travaDePreco(petshop);
   const limitado = trava.ligada && !cuidoDoFinanceiro;
-  const maximo = limitado ? centavos((subtotal * trava.descontoMax) / 100) : null;
+  // o limite arredonda para baixo (5% de R$ 127,50 = R$ 6,37): nunca passa do percentual
+  const maximo = limitado ? Math.floor((subtotal * trava.descontoMax) + 1e-6) / 100 : null;
   const passouDoMaximo = maximo != null && (descontoDigitado ?? 0) > maximo + 0.005;
   return (
     <>
@@ -309,8 +315,8 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
             </label>
           )}
           {depois && aoDepois
-            ? <QuandoPaga total={total} pagamento={pagamento} aoPagamento={aoPagamento} depois={depois} aoDepois={aoDepois} erro={erroForma} aceitaResto={aceitaResto} />
-            : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erroForma} />}
+            ? <QuandoPaga total={depois.ativo ? total : aPagar} pagamento={pagamento} aoPagamento={aoPagamento} depois={depois} aoDepois={aoDepois} erro={erroForma} aceitaResto={aceitaResto} />
+            : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={aPagar} erro={erroForma} />}
         </>
       )}
       <div className="g-vd-total" role="status">
@@ -318,10 +324,11 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
           <span className="g-rotulo">Total</span>
           <p className="g-num">{brl(total)}</p>
         </div>
-        {desconto > 0 && (
+        {(desconto > 0 || aPagar > total) && (
           <div className="g-vd-contas g-tab">
-            <span>Soma {brl(subtotal)}</span>
-            <span>Desconto − {brl(desconto)}</span>
+            {desconto > 0 && <span>Soma {brl(subtotal)}</span>}
+            {desconto > 0 && <span>Desconto − {brl(desconto)}</span>}
+            {aPagar > total && !depois?.ativo && <span>Com o que devia ({brl(junto ?? aPagar - total)}): <b>{brl(aPagar)}</b></span>}
           </div>
         )}
       </div>

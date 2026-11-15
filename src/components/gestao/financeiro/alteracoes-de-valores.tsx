@@ -24,6 +24,14 @@ export function fraseDaAlteracao(x: AlteracaoDeValor): string {
   if (x.tipo === "pacote") return `${quem} vendeu ${x.descricao}${para ? `, por ${para}` : ""}`;
   if (x.tipo === "alterou_venda") return `${quem} baixou o valor de uma venda já recebida: ${x.descricao}, de ${de} para ${para}${x.abaixo_do_custo ? " (abaixo do custo)" : ""}`;
   if (x.tipo === "desconto") return `${quem} deu desconto de ${brl(Math.max(0, Number(x.de ?? 0) - Number(x.para ?? 0)))} em ${x.descricao}: de ${de} para ${para}`;
+  if (x.tipo === "atendimento_baixou") return `${quem} baixou o valor de um atendimento já concluído: ${x.descricao}, de ${de} para ${para}`;
+  if (x.tipo === "atendimento_reaberto") return `${quem} tirou um atendimento de concluído: ${x.descricao}${de ? ` (${de} sem cobrar)` : ""}`;
+  if (x.tipo === "atendimento_apagado") return `${quem} apagou da agenda um atendimento já feito: ${x.descricao}${de ? ` (${de})` : ""}`;
+  if (x.tipo === "preco_produto") return `${quem} mudou o preço de ${x.descricao}: de ${de} para ${x.para ? para : "sem preço"}`;
+  if (x.tipo === "estoque_venda") return `${quem} deu saída de ${x.descricao}${de ? ` (${de} pelo preço da lista)` : ""}`;
+  if (x.tipo === "estoque_saida") return `${quem} deu baixa no estoque: ${x.descricao}${de ? `, ${de} no custo` : ""}`;
+  if (x.tipo === "porte") return `${quem} trocou o porte para menor: ${x.descricao}. O preço da lista do porte menor é mais baixo`;
+  if (x.tipo === "alterou_forma") return `${quem} trocou a forma de pagamento de um valor recebido: ${x.descricao}${para ? `, ${para}` : ""}`;
   return x.de != null && x.para != null && Number(x.de) !== Number(x.para)
     ? `${quem} alterou um valor recebido: ${x.descricao}, de ${de} para ${para}`
     : `${quem} alterou um valor recebido (forma de pagamento ou dia): ${x.descricao}${para ? `, ${para}` : ""}`;
@@ -72,7 +80,7 @@ export default function AlteracoesDeValores() {
       {aberta && (
         <Folha titulo="Alterações em valores" aoFechar={fechar} rodape={<button type="button" className="g-btn sec" onClick={fechar}>Fechar</button>}>
           <div className="g-pilha">
-            <p className="g-muted g-p">O que outras pessoas da equipe alteraram ou apagaram em dinheiro já recebido, as vendas com preço diferente da lista ou com desconto, os horários marcados abaixo da lista, os serviços tirados da conta, os atendimentos marcados como não cobrados e os pacotes vendidos fora do modelo. O que você mesmo fez não entra aqui.</p>
+            <p className="g-muted g-p">O que outras pessoas da equipe alteraram ou apagaram em dinheiro já recebido, as vendas com preço diferente da lista ou com desconto, os horários marcados abaixo da lista, os serviços tirados da conta, os atendimentos marcados como não cobrados, os atendimentos concluídos que voltaram para marcado, ficaram mais baratos ou foram apagados, os pacotes vendidos fora do modelo, os preços de produto mudados e as saídas de estoque por perda ou sem o dinheiro. O que você mesmo fez não entra aqui.</p>
             {lista.length ? (
               <ul className="gf-alt-lista">
                 {lista.map((x) => (

@@ -70,3 +70,37 @@ export function imprimirComprovante(texto: string, titulo = "Comprovante de aten
   d.open(); d.write(html); d.close();
   setTimeout(() => { f.contentWindow?.focus(); f.contentWindow?.print(); setTimeout(() => f.remove(), 60000); }, 150);
 }
+
+/**
+ * Comprovante de uma conta paga em parte (ou com o que o cliente devia de antes recebido junto): o que foi feito, o total da
+ * conta, quanto entrou agora e como, e o que ficou para pagar depois. Mesmo formato do comprovante inteiro.
+ */
+export function textoComprovanteDaParte(p: {
+  petshop: string; tutor?: string | null; pet?: string | null; quando: Date | string;
+  itens: { nome: string; qtd: number; valor: number }[]; total: number; desconto?: number;
+  pago: number; formas: { forma: string; valor: number }[]; falta: number; pagaAte?: string | null; antigo?: number;
+}) {
+  const centavos = (n: number) => Math.round(n * 100) / 100;
+  const nome = (f: string) => FORMAS.find((x) => x.id === f)?.rotulo ?? "Outro";
+  const linhas = p.itens.map((i) => {
+    const varios = i.qtd !== 1;
+    return `${varios ? `${i.qtd.toLocaleString("pt-BR")} x ` : ""}${i.nome}${varios ? ` (${brl(i.valor)} cada)` : ""}: ${brl(centavos(i.qtd * i.valor))}`;
+  });
+  const pagamento = p.formas.length > 1 ? p.formas.map((x) => `${nome(x.forma)} ${brl(x.valor)}`).join(" + ") : p.formas.length ? nome(p.formas[0].forma) : "";
+  return [
+    `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} Segue o comprovante do atendimento${p.pet ? ` de ${p.pet}` : ""}.`,
+    "",
+    p.petshop,
+    `Data: ${dataCompleta(new Date(p.quando))}`,
+    ...(p.pet ? [`Pet: ${p.pet}`] : []),
+    "",
+    ...linhas,
+    ...(p.desconto && p.desconto > 0 ? [`Desconto: - ${brl(p.desconto)}`] : []),
+    `Total da conta: ${brl(p.total)}`,
+    ...(p.antigo && p.antigo > 0 ? [`Do que estava em aberto antes: ${brl(p.antigo)}`] : []),
+    `Pago agora: ${brl(p.pago)}${pagamento ? ` (${pagamento})` : ""}`,
+    ...(p.falta > 0 ? [`Fica para pagar depois: ${brl(p.falta)}${p.pagaAte ? `, até ${dataCompleta(p.pagaAte)}` : ""}`] : []),
+    "",
+    "Este comprovante não é nota fiscal.",
+  ].join("\n");
+}

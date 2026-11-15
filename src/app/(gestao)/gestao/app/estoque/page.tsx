@@ -17,6 +17,7 @@ import OpcoesDaLoja from "@/components/gestao/ajustes/opcoes-loja";
 import { limparCodigo, margemDe, opcoesDaLoja, pct } from "@/lib/gestao/loja-opcoes";
 import { conferirCaixa, conferirValorAlto, gravarMovimentos, lancarPago, parteDaChave } from "@/lib/gestao/dinheiro";
 import { useOperacao } from "@/lib/gestao/uma-vez";
+import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import type { MovimentoEstoque, Produto } from "@/lib/gestao/tipos";
 import { brl, brlCurto, dataCurta, semAcento } from "@/lib/gestao/util";
 import "./estoque.css";
@@ -266,8 +267,10 @@ export default function Estoque() {
 
 type CamposProduto = { nome: string; categoria: string; unidade: string; preco: number | null; custo: number | null; minimo: string; codigo: string; fornecedorId: string | null };
 
-function CamposDoProduto({ v, mudar, categorias, loja, produto }: {
+function CamposDoProduto({ v, mudar, categorias, loja, produto, precoFixo }: {
   v: CamposProduto; mudar: (p: Partial<CamposProduto>) => void; categorias?: string[]; loja: Loja; /** Na ficha: o produto como está gravado. */ produto?: Produto;
+  /** Preço travado e a pessoa não é o dono nem cuida do financeiro: o preço de venda não muda por aqui. */
+  precoFixo?: boolean;
 }) {
   const mg = loja.margem ? margemDe(v.preco, v.custo) : null;
   const repetido = loja.codigoBarras ? donoDoCodigo(loja.produtos, limparCodigo(v.codigo), produto?.id) : null;
@@ -297,7 +300,9 @@ function CamposDoProduto({ v, mudar, categorias, loja, produto }: {
       </div>
       {categorias && <datalist id="ge-categorias">{categorias.map((c) => <option key={c} value={c} />)}</datalist>}
       <div className="dupla">
-        <Campo rotulo="Preço de venda"><CampoDinheiro valor={v.preco} aoMudar={(n) => mudar({ preco: n })} /></Campo>
+        <Campo rotulo="Preço de venda" dica={precoFixo ? "Com o preço travado, só o dono ou quem vê o financeiro muda o preço de venda." : produto ? "Mudar o preço fica anotado, com o seu nome, para o dono ver." : undefined}>
+          <CampoDinheiro valor={v.preco} aoMudar={(n) => mudar({ preco: n })} desligado={precoFixo} />
+        </Campo>
         <Campo rotulo={loja.margem && produto ? "Custo médio" : "Custo"}><CampoDinheiro valor={v.custo} aoMudar={(n) => mudar({ custo: n })} /></Campo>
       </div>
       {loja.margem && (
@@ -487,7 +492,9 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
 /* ---------- saída ---------- */
 
 function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: () => void; aoGravar: () => void }) {
-  const { sb, petshop, user, vejoFinanceiro } = useGestao();
+  const { sb, petshop, user, vejoFinanceiro, cuidoDoFinanceiro, souDono } = useGestao();
+  // preço travado: quem só opera o caixa vende pelo preço da lista; quem não recebe não vende por aqui
+  const travado = travaDePreco(petshop).ligada && !cuidoDoFinanceiro;
   const { avisar, avisarErro, confirmar } = useAvisos();
   const [qtd, setQtd] = useState("1");
   // nada vem marcado: a pessoa diz por que saiu (venda, uso no banho ou perda)
@@ -503,8 +510,10 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
   const n = lerQtd(qtd);
   const saldo = Number(produto.estoque);
   const calculado = n && produto.preco_venda != null ? centavos(n * Number(produto.preco_venda)) : null;
-  const valor = valorEditado === undefined ? calculado : valorEditado;
+  const valor = travado ? calculado : valorEditado === undefined ? calculado : valorEditado;
   const venda = motivo === "Venda";
+  // com a trava, venda sem o dinheiro entrar junto não sai (o banco também recusa)
+  const vendaSemDinheiro = venda && !vejoFinanceiro && travaDePreco(petshop).ligada;
   const passou = n != null && n > saldo;
 
   const op = useOperacao();
@@ -513,6 +522,7 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
     if (!n) { avisarErro("Diga quantas unidades saíram."); return; }
     if (passou) { avisarErro(`Só tem ${fmtQtd(saldo)} ${produto.unidade}. Se o saldo estiver errado, corrija na ficha do produto.`); return; }
     if (!motivo) { setErroMotivo(true); avisarErro("Escolha o motivo da saída."); return; }
+    if (vendaSemDinheiro) { avisarErro("Com o preço travado, a venda de um produto é com quem cuida do caixa, pelo Vender."); return; }
     if (venda && vejoFinanceiro && !valor) { avisarErro("Diga o valor da venda."); return; }
     const valorRuim = venda && vejoFinanceiro ? erroDeValor(valor, "O valor da venda") : null;
     if (valorRuim) { avisarErro(valorRuim); return; }
@@ -522,35 +532,42 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
     if (pg && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
-      const [saida] = await gravarMovimentos(sb, petshop.id, [{
-        petshop_id: petshop.id, produto_id: produto.id, tipo: "saida", quantidade: n, motivo, criado_por: user.id, chave: parteDaChave(chave, "saida"),
-      }]);
       if (pg && !("erro" in pg) && valor) {
+        // primeiro o dinheiro, depois o estoque: se a venda for recusada (preço, caixa), nada sai do estoque
+        lembrarForma(pg.forma);
+        const lancado = await lancarPago(sb, petshop.id, {
+          tipo: "entrada", valor, forma: pg.forma, pagamentos: pg.pagamentos, categoria: "Venda de produtos",
+          descricao: `Venda: ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}`,
+          // com os itens, apagar esta venda depois devolve o produto ao estoque
+          itens: [{ tipo: "produto", nome: produto.nome, qtd: n, valor: Math.round((valor / n) * 100) / 100, produto_id: produto.id }],
+          chave,
+        });
         try {
-          lembrarForma(pg.forma);
-          const lancado = await lancarPago(sb, petshop.id, {
-            tipo: "entrada", valor, forma: pg.forma, pagamentos: pg.pagamentos, categoria: "Venda de produtos",
-            descricao: `Venda: ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}`,
-            // com os itens, apagar esta venda depois devolve o produto ao estoque
-            itens: [{ tipo: "produto", nome: produto.nome, qtd: n, valor: Math.round((valor / n) * 100) / 100, produto_id: produto.id }],
-            chave,
-          });
-          // liga a saída à venda: é assim que o relatório de produtos acha o custo desta venda (se falhar, a venda fica "sem custo registrado")
-          if (lancado?.id && saida) await sb.from("movimentos_estoque").update({ lancamento_id: lancado.id }).eq("id", saida.id).eq("petshop_id", petshop.id).select("id");
+          // a saída já nasce ligada à venda: é assim que o relatório de produtos acha o custo desta venda
+          await gravarMovimentos(sb, petshop.id, [{
+            petshop_id: petshop.id, produto_id: produto.id, tipo: "saida", quantidade: n, motivo, criado_por: user.id, chave: parteDaChave(chave, "saida"),
+            ...(lancado?.id ? { lancamento_id: lancado.id } : {}),
+          }]);
           avisar(`Venda de ${brl(valor)} anotada.`);
         } catch (e) {
-          avisarErro(`O estoque foi atualizado, mas a venda não entrou no financeiro. Lance pelo Financeiro. (${e instanceof Error ? e.message : "erro"})`);
+          avisarErro(`A venda de ${brl(valor)} entrou, mas o estoque não baixou. Toque de novo em Anotar venda (não lança duas vezes) ou corrija o saldo na ficha. (${e instanceof Error ? e.message : "erro"})`);
+          return false;
         }
-      } else avisar(`Saíram ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}.`);
+      } else {
+        await gravarMovimentos(sb, petshop.id, [{
+          petshop_id: petshop.id, produto_id: produto.id, tipo: "saida", quantidade: n, motivo, criado_por: user.id, chave: parteDaChave(chave, "saida"),
+        }]);
+        avisar(`Saíram ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}.`);
+      }
       aoGravar();
-    } catch (e) { avisarErro(e); } finally { setSalvando(false); }
+    } catch (e) { avisarErro(e); return false; } finally { setSalvando(false); }
   }
 
   return (
     <Folha titulo={`Saída de ${produto.nome}`} aoFechar={aoFechar}
       rodape={<>
         <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : venda ? "Anotar venda" : "Anotar saída"}</button>
+        <button className="g-btn pri" onClick={salvar} disabled={salvando || vendaSemDinheiro}>{salvando ? "Salvando…" : venda ? "Anotar venda" : "Anotar saída"}</button>
       </>}>
       <div className="g-form">
         <Campo rotulo={`Quantidade (${produto.unidade})`} erro={passou ? `Só tem ${fmtQtd(saldo)} ${produto.unidade}.` : null} dica={`Tem ${fmtQtd(saldo)} ${produto.unidade}.`}>
@@ -567,15 +584,20 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
         </div>
         {venda && (vejoFinanceiro ? (
           <>
-            <Campo rotulo="Valor da venda" erro={erroDeValor(valor, "O valor da venda")} dica={produto.preco_venda != null ? `${brl(produto.preco_venda)} por ${produto.unidade}` : "Este produto ainda não tem preço de venda."}>
-              <CampoDinheiro valor={valor} aoMudar={(v) => { setValorEditado(v); setErroForma(null); }} />
+            <Campo rotulo="Valor da venda" erro={erroDeValor(valor, "O valor da venda")}
+              dica={travado ? `Preço da lista: ${produto.preco_venda != null ? `${brl(produto.preco_venda)} por ${produto.unidade}` : "sem preço"}. Com o preço travado, outro valor só com o dono ou com quem vê o financeiro.`
+                : produto.preco_venda != null ? `${brl(produto.preco_venda)} por ${produto.unidade}. Vender por outro valor fica anotado.` : "Este produto ainda não tem preço de venda."}>
+              <CampoDinheiro valor={valor} aoMudar={(v) => { setValorEditado(v); setErroForma(null); }} desligado={travado} />
             </Campo>
             <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErroForma(null); }} total={valor ?? 0} erro={erroForma} />
             <AvisoCaixaFechado aberto={caixa} />
           </>
         ) : (
-          <p className="g-muted g-p">A venda sai do estoque. O dinheiro fica para quem cuida do financeiro lançar.</p>
+          vendaSemDinheiro
+            ? <p className="g-aviso" style={{ margin: 0 }} role="status"><span>Com o preço travado, a venda de um produto é com quem cuida do caixa, pelo Vender: assim o dinheiro entra junto com a saída do estoque.</span></p>
+            : <p className="g-muted g-p">A venda sai do estoque. O dinheiro fica para quem cuida do financeiro lançar. A saída fica anotada para o dono ver, com o seu nome.</p>
         ))}
+        {motivo && motivo !== "Venda" && motivo !== "Uso no banho" && !souDono && <p className="g-muted g-pp">A saída fica anotada com o seu nome, e o dono vê em Alterações em valores.</p>}
       </div>
     </Folha>
   );
@@ -586,7 +608,10 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
 const TIPO_MOV: Record<string, string> = { entrada: "Entrada", saida: "Saída", ajuste: "Saldo corrigido" };
 
 function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produto; loja: Loja; aoFechar: () => void; aoMudar: () => void; aoGravar: () => void }) {
-  const { sb, petshop, user } = useGestao();
+  const { sb, petshop, user, equipe, cuidoDoFinanceiro } = useGestao();
+  const precoFixo = travaDePreco(petshop).ligada && !cuidoDoFinanceiro;
+  // quem deu cada saída ou corrigiu o saldo (nome de quem está na equipe)
+  const nomeDe = (id: string | null | undefined) => (id ? equipe.find((x) => x.user_id === id)?.nome?.split(" ")[0] ?? null : null);
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [v, setV] = useState<CamposProduto>({
@@ -612,8 +637,10 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
     if (repetido) { avisarErro(`Este código de barras já está em ${repetido.nome}. Cada produto tem o seu.`); return; }
     setSalvando(true);
     try {
+      // o preço só vai quando mudou: mudar o preço fica anotado (e, com a trava, só o dono ou quem vê o financeiro muda)
+      const mudouPreco = (v.preco ?? null) !== (produto.preco_venda == null ? null : Number(produto.preco_venda));
       ok(await sb.from("produtos").update({
-        nome, categoria: v.categoria.trim() || null, unidade: v.unidade, preco_venda: v.preco, custo: v.custo, estoque_minimo: minimo, ...camposDaLoja(loja, v),
+        nome, categoria: v.categoria.trim() || null, unidade: v.unidade, ...(mudouPreco && !precoFixo ? { preco_venda: v.preco } : {}), custo: v.custo, estoque_minimo: minimo, ...camposDaLoja(loja, v),
       }).eq("id", produto.id).eq("petshop_id", petshop.id).select("id").single());
       avisar("Produto atualizado.");
       aoGravar();
@@ -666,7 +693,7 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
           </div>
           {contado !== null && (
             <div className="g-form" style={{ marginTop: 14 }}>
-              <Campo rotulo={`Quanto você contou (${produto.unidade})`} dica="O saldo passa a ser este número.">
+              <Campo rotulo={`Quanto você contou (${produto.unidade})`} dica="O saldo passa a ser este número. Saldo corrigido para menos fica anotado, com o seu nome, para o dono ver.">
                 <input className="g-input g-tab" inputMode="decimal" value={contado} onChange={(e) => setContado(e.target.value)} placeholder="0" autoFocus />
               </Campo>
               <Campo rotulo="Motivo (se quiser)" dica="Fica anotado no histórico do produto.">
@@ -681,7 +708,7 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
         </div>
 
         <div className="g-form">
-          <CamposDoProduto v={v} mudar={(p) => setV((a) => ({ ...a, ...p }))} loja={loja} produto={produto} />
+          <CamposDoProduto v={v} mudar={(p) => setV((a) => ({ ...a, ...p }))} loja={loja} produto={produto} precoFixo={precoFixo} />
         </div>
 
         <section>
@@ -695,6 +722,7 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
                   <time>{dataCurta(m.criado_em)}</time>
                   <span>
                     {TIPO_MOV[m.tipo] ?? m.tipo}{m.motivo && (m.tipo !== "ajuste" || m.motivo !== "Contagem") ? ` · ${m.motivo}` : ""}{m.origem === "assistente" ? " · pelo Mozart" : ""}
+                    {nomeDe(m.criado_por) ? ` · ${nomeDe(m.criado_por)}` : ""}
                     {(loja.margem || loja.fornecedores) && m.tipo === "entrada" && m.custo_unitario != null ? ` · ${brl(m.custo_unitario)} cada` : ""}
                     {loja.fornecedores && m.fornecedor_id ? ` · ${loja.lista.find((f) => f.id === m.fornecedor_id)?.nome ?? "fornecedor"}` : ""}
                   </span>

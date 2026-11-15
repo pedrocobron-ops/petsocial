@@ -49,7 +49,8 @@ const MAX_PARTES = 3;
 export type ParteDigitada = { forma: Forma | null; valor: number | null };
 /** O que a pessoa escolheu para receber: uma forma só, ou o pagamento dividido em partes. */
 /** `entregue`: o que a pessoa escreveu em "Recebeu quanto?" (dinheiro entregue pelo cliente), para o troco e para não lançar mais do que entrou. */
-export type EstadoPagamento = { forma: Forma | null; dividido: boolean; partes: ParteDigitada[]; ultimaManual: boolean; entregue?: number | null };
+/** `parte`: com Pix, cartão ou outro, o cliente pagou só uma parte (o valor vai em `entregue`); `resto`: no dividido, o que falta fica para depois. */
+export type EstadoPagamento = { forma: Forma | null; dividido: boolean; partes: ParteDigitada[]; ultimaManual: boolean; entregue?: number | null; parte?: boolean; resto?: boolean };
 
 export const pagamentoInicial = (forma: Forma | null = null): EstadoPagamento => ({ forma, dividido: false, partes: [], ultimaManual: false, entregue: null });
 
@@ -68,6 +69,33 @@ export function dinheiroAMenos(e: EstadoPagamento, total: number): { devido: num
   }
   if (devido == null || entregue >= devido - 0.005) return null;
   return { devido, entregue: centavos(entregue), falta: centavos(devido - entregue) };
+}
+
+/**
+ * O cliente pagou menos do que a conta, em qualquer forma (só nas telas que deixam o resto anotado, `aceitaResto`):
+ * dinheiro com "Recebeu quanto?" menor; Pix, cartão ou outro com "Pagou só uma parte"; ou o dividido com "O resto fica para depois".
+ * Devolve o que entra agora (com a forma e as partes) e o que falta; null quando a conta fecha inteira.
+ */
+export function pagoAMenos(e: EstadoPagamento, total: number): { entregue: number; falta: number; forma: Forma; pagamentos: PartePagamento[] | null } | null {
+  if (!(total > 0)) return null;
+  if (!e.dividido) {
+    if (!e.forma) return null;
+    if (e.forma === "dinheiro") {
+      const m = dinheiroAMenos(e, total);
+      return m ? { entregue: m.entregue, falta: m.falta, forma: "dinheiro", pagamentos: null } : null;
+    }
+    const v = e.parte ? e.entregue : null;
+    if (v == null || !(v > 0) || v >= total - 0.005) return null;
+    return { entregue: centavos(v), falta: centavos(total - v), forma: e.forma, pagamentos: null };
+  }
+  if (!e.resto) return null;
+  const c = contasDoPagamento(e, total);
+  // a parte que ficou vazia (sem valor) é o resto: não entra agora
+  const usadas = c.partes.filter((p) => Number(p.valor) > 0);
+  if (!(c.falta > 0) || c.passou > 0 || !usadas.length || usadas.some((p) => !p.forma)) return null;
+  if (new Set(usadas.map((p) => p.forma)).size !== usadas.length) return null;
+  const pagamentos = usadas.map((p) => ({ forma: p.forma!, valor: centavos(p.valor!) }));
+  return { entregue: c.soma, falta: c.falta, forma: formaPrincipal(pagamentos), pagamentos: pagamentos.length > 1 ? pagamentos : null };
 }
 
 /** Pagamento de uma tela que recebe: começa sem forma marcada. */
@@ -119,15 +147,32 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
         <span>{rotulo}</span>
         <div className="g-chips" role="group" aria-label={rotulo}>
           {FORMAS.map((f) => (
-            <button key={f.id} type="button" className="g-chip" aria-pressed={e.forma === f.id} onClick={() => aoMudar({ ...e, forma: f.id, entregue: f.id === "dinheiro" ? e.entregue ?? null : null })}>{f.rotulo}</button>
+            <button key={f.id} type="button" className="g-chip" aria-pressed={e.forma === f.id} onClick={() => aoMudar({ ...e, forma: f.id, parte: false, entregue: f.id === "dinheiro" ? (e.forma === "dinheiro" ? e.entregue ?? null : null) : null })}>{f.rotulo}</button>
           ))}
         </div>
         {erro && <small className="erro" role="alert">{erro}</small>}
         {e.forma === "dinheiro" && total > 0 && <Troco devido={total} {...entregue} aceitaResto={aceitaResto} />}
+        {/* Pix, cartão ou outro: o cliente pagou só uma parte (só onde o resto fica anotado para depois) */}
+        {aceitaResto && e.forma && e.forma !== "dinheiro" && total > 0.01 && (e.parte ? (
+          <div className="g-pg-troco">
+            <label>
+              <span>Pagou quanto no {FORMAS.find((f) => f.id === e.forma)?.rotulo ?? "pagamento"}?</span>
+              <CampoDinheiro valor={e.entregue ?? null} aoMudar={(v) => aoMudar({ ...e, entregue: v })} rotulo="Quanto pagou agora" />
+            </label>
+            <p role="status" className={e.entregue != null && e.entregue < total - 0.005 ? "falta" : undefined}>
+              {e.entregue == null ? <span className="g-muted">Escreva quanto entrou agora.</span>
+                : e.entregue >= total - 0.005 ? <span className="g-erro">Isso já é a conta inteira. Para pagar tudo, toque em Pagou tudo.</span>
+                : <>Faltam <b className="g-tab">{brl(total - e.entregue)}</b>: ficam anotados para depois.</>}
+            </p>
+            <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, parte: false, entregue: null })}>Pagou tudo</button>
+          </div>
+        ) : (
+          <div><button type="button" className="g-btn fantasma p" onClick={() => aoMudar({ ...e, parte: true, entregue: null })}>Pagou só uma parte?</button></div>
+        ))}
         {total > 0.01 && (
           <div>
             <button type="button" className="g-btn fantasma p g-pg-dividir"
-              onClick={() => aoMudar({ ...e, dividido: true, ultimaManual: false, partes: [{ forma: e.forma, valor: null }, { forma: null, valor: null }] })}>
+              onClick={() => aoMudar({ ...e, dividido: true, ultimaManual: false, parte: false, resto: false, partes: [{ forma: e.forma, valor: null }, { forma: null, valor: null }] })}>
               <Split />Dividir o pagamento
             </button>
           </div>
@@ -164,15 +209,27 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
         ))}
       </div>
       {(c.falta > 0 || c.passou > 0 || preenchido) && (
-        <p className={`g-pg-conta${c.falta > 0 || c.passou > 0 ? " erro" : " certo"}`} role="status">
+        <p className={`g-pg-conta${(c.falta > 0 && !(e.resto && aceitaResto)) || c.passou > 0 ? " erro" : " certo"}`} role="status">
           {c.passou > 0 ? `Passou ${brl(c.passou)} do total de ${brl(total)}.`
+            : c.falta > 0 && e.resto && aceitaResto ? `Entram ${brl(c.soma)} agora. Faltam ${brl(c.falta)}, que ficam anotados para depois.`
             : c.falta > 0 ? `Falta ${brl(c.falta)} para fechar ${brl(total)}.`
             : `Fecha certinho com o total de ${brl(total)}.`}
           {(c.falta > 0 || (c.passou > 0 && e.ultimaManual)) && (
-            <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, ultimaManual: false })}>Completar a última parte</button>
+            <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, ultimaManual: false, resto: false })}>Completar a última parte</button>
           )}
         </p>
       )}
+      {/* conta do atendimento: pagou uma parte agora (em uma ou mais formas) e o resto fica anotado */}
+      {aceitaResto && !e.resto && c.passou === 0 && (c.falta > 0 || !e.partes[ultima]?.forma) && (
+        <div>
+          <button type="button" className="g-btn fantasma p" onClick={() => aoMudar({
+            ...e, resto: true, ultimaManual: true,
+            // a última parte sem forma é o resto: fica vazia (o que ela mostrava sozinha não entra agora)
+            partes: e.partes.map((p, n) => (n === ultima && !p.forma && !e.ultimaManual ? { ...p, valor: null } : p)),
+          })}>Pagou só isso, o resto fica para depois</button>
+        </div>
+      )}
+      {aceitaResto && e.resto && <small>O que faltar fica anotado para o cliente pagar depois. <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, resto: false, ultimaManual: false })}>Pagou tudo</button></small>}
       {emDinheiro && <Troco devido={Number(emDinheiro.valor)} parte {...entregue} />}
       {!e.ultimaManual && c.passou === 0 && <small>A última parte se completa sozinha com o que falta.</small>}
       {erro && <small className="erro" role="alert">{erro}</small>}
@@ -180,7 +237,7 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
         {e.partes.length < MAX_PARTES && (
           <button type="button" className="g-btn fantasma p" onClick={() => aoMudar({ ...e, partes: [...e.partes, { forma: null, valor: null }], ultimaManual: false })}><Plus />Mais uma forma</button>
         )}
-        <button type="button" className="g-btn fantasma p" onClick={() => aoMudar({ ...e, dividido: false, partes: [], ultimaManual: false, forma: e.partes[0]?.forma ?? e.forma })}>Pagar com uma forma só</button>
+        <button type="button" className="g-btn fantasma p" onClick={() => aoMudar({ ...e, dividido: false, partes: [], ultimaManual: false, resto: false, forma: e.partes[0]?.forma ?? e.forma })}>Pagar com uma forma só</button>
       </div>
     </div>
   );

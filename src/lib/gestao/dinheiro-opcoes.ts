@@ -33,6 +33,8 @@ export const OPCOES_DINHEIRO = {
   comissaoProdutos: "comissao.em_produtos",
   /** Percentual da comissão sobre produtos. */
   comissaoProdutosPct: "comissao.produtos_pct",
+  /** Taxa de falta em reais: com valor, o "Faltou" da agenda oferece anotar a taxa para o tutor (zero ou vazio = não oferece). */
+  taxaFalta: "dinheiro.taxa_falta",
 } as const;
 
 type ComOpcoes = { opcoes?: unknown };
@@ -53,6 +55,12 @@ export function opcoesDeCobranca(petshop: ComOpcoes): OpcoesDeCobranca {
 /** Trava de preço na venda: ligada ou não, e o desconto máximo (em %) de quem só opera o caixa. */
 export function travaDePreco(petshop: ComOpcoes): { ligada: boolean; descontoMax: number } {
   return { ligada: opcao(petshop, OPCOES_DINHEIRO.precoTravado, false), descontoMax: Math.min(100, Math.max(0, opcao(petshop, OPCOES_DINHEIRO.descontoMaxCaixa, 0))) };
+}
+
+/** Taxa de falta que o "Faltou" oferece anotar (0 = desligada). Quem não vê o dinheiro recebe 0 (o banco não entrega o valor). */
+export function taxaDeFalta(petshop: ComOpcoes): number {
+  const v = Number(opcao(petshop, OPCOES_DINHEIRO.taxaFalta, 0));
+  return Number.isFinite(v) && v > 0 ? centavos(Math.min(v, 99999.99)) : 0;
 }
 
 export type OpcoesDeComissao = { extras: boolean; porServico: boolean; produtos: boolean; produtosPct: number };
