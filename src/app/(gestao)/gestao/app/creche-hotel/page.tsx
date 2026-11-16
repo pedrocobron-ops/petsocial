@@ -247,38 +247,56 @@ export default function CrecheHotel() {
     const atrasosP = vejoFinanceiro && usaCreche ? lerAtrasosPendentes(sb, petshop.id) : Promise.resolve([] as AtrasoPendente[]);
     // (se a primeira leva falhar, a tela mostra o erro dela; estas duas não deixam aviso solto no navegador)
     feitosP.catch(() => undefined); atrasosP.catch(() => undefined);
-    // cada lista segue sozinha para a diária e o valor cobrado (só para quem recebe; para os outros ficam em branco), sem esperar
-    // as outras: no celular, cada espera em fila soma
-    const [lista, antigas, pend] = await Promise.all([
+    // cada lista segue sozinha, sem esperar as outras (no celular, cada espera em fila soma uma ida e volta): a diária e o valor
+    // cobrado (só para quem recebe; para os outros ficam em branco), o sinal e as taxas, as ocorrências e quem buscou.
+    // O que só precisa dos ids sai junto com a própria lista.
+    const valoresDe = (ids: string[]) => vejoFinanceiro && ids.length
+      ? sb.from("estadias_valores").select("*").eq("petshop_id", petshop.id).in("estadia_id", ids).then((r) => (r.data ?? []) as ValoresDaEstadia[])
+      : Promise.resolve([] as ValoresDaEstadia[]);
+    const [[lista, vAbertas, ocorrencias], [encerradas, retiradas], [pend, vPend], feitos, atrasos] = await Promise.all([
       sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500)
-        .then((r) => comValoresDeEstadia(sb, petshop.id, ok(r) as unknown as EstadiaCompleta[], vejoFinanceiro)),
+        .then((r) => {
+          const l = ok(r) as unknown as EstadiaCompleta[];
+          const naCasaIds = l.filter((e) => e.status === "em_casa").map((e) => e.id);
+          return Promise.all([
+            comValoresDeEstadia(sb, petshop.id, l, vejoFinanceiro),
+            // sinal e taxas das reservas e estadias abertas: só quem recebe lê (o banco não entrega para os outros)
+            valoresDe(l.map((e) => e.id)),
+            // ocorrências das estadias abertas (só com a opção ligada)
+            comOcorrencias && naCasaIds.length
+              ? sb.from("estadias_ocorrencias").select("*").eq("petshop_id", petshop.id).in("estadia_id", naCasaIds).order("quando").limit(1000).then((x) => (x.data ?? []) as Ocorrencia[])
+              : Promise.resolve([] as Ocorrencia[]),
+          ]);
+        }),
       sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["encerrada", "cancelada"]).order("entrada", { ascending: false }).limit(100)
-        .then((r) => comValoresDeEstadia(sb, petshop.id, ok(r) as unknown as EstadiaCompleta[], vejoFinanceiro)),
-      // check-outs que fecharam sem cobrança (feitos por quem não mexe com dinheiro): todos, não só os últimos do histórico
+        .then((r) => {
+          const l = ok(r) as unknown as EstadiaCompleta[];
+          return Promise.all([
+            comValoresDeEstadia(sb, petshop.id, l, vejoFinanceiro),
+            // quem levou cada pet (só com "Quem pode buscar" ligado)
+            comPortaria ? lerRetiradas(sb, petshop.id, l.filter((e) => e.status === "encerrada").map((e) => e.id)).catch(() => new Map<string, Retirada>()) : Promise.resolve(new Map<string, Retirada>()),
+          ]);
+        }),
+      // check-outs que fecharam sem cobrança (feitos por quem não mexe com dinheiro): todos, não só os últimos do histórico.
+      // Com os ids na mão, a estadia, a diária e o sinal saem juntos.
       (async () => {
         const ids = vejoFinanceiro ? await idsParaCobrar(sb, petshop.id) : [];
-        const r = ids.length ? await sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("id", ids).order("saida", { ascending: false }) : { data: [] };
-        return comValoresDeEstadia(sb, petshop.id, (r.data ?? []) as unknown as EstadiaCompleta[], vejoFinanceiro);
+        if (!ids.length) return [[] as EstadiaCompleta[], [] as ValoresDaEstadia[]] as const;
+        const [r, comValor, v] = await Promise.all([
+          sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("id", ids).order("saida", { ascending: false }),
+          comValoresDeEstadia(sb, petshop.id, ids.map((id) => ({ id })), true),
+          valoresDe(ids),
+        ]);
+        const porId = new Map(comValor.map((x) => [x.id, x]));
+        const l = ((r.data ?? []) as unknown as EstadiaCompleta[]).map((e) => ({ ...e, valor_diaria: porId.get(e.id)?.valor_diaria ?? null, valor_cobrado: porId.get(e.id)?.valor_cobrado ?? null }));
+        return [l, v] as const;
       })(),
-    ]);
-    const semCobranca = pend.filter(estadiaSemCobranca);
-    // sinal e taxas das reservas e estadias abertas: só quem recebe lê (o banco não entrega para os outros)
-    const encerradas = antigas;
-    const naCasaIds = lista.filter((e) => e.status === "em_casa").map((e) => e.id);
-    const [v, feitos, ocorrencias, retiradas, atrasos] = await Promise.all([
-      vejoFinanceiro && lista.length + semCobranca.length
-        ? sb.from("estadias_valores").select("*").eq("petshop_id", petshop.id).in("estadia_id", [...lista, ...semCobranca].map((e) => e.id))
-        : Promise.resolve(null),
       feitosP,
-      // ocorrências das estadias abertas e quem levou cada pet das encerradas (só com as opções ligadas)
-      comOcorrencias && naCasaIds.length
-        ? sb.from("estadias_ocorrencias").select("*").eq("petshop_id", petshop.id).in("estadia_id", naCasaIds).order("quando").limit(1000).then((r) => (r.data ?? []) as Ocorrencia[])
-        : Promise.resolve([] as Ocorrencia[]),
-      comPortaria ? lerRetiradas(sb, petshop.id, encerradas.filter((e) => e.status === "encerrada").map((e) => e.id)).catch(() => new Map<string, Retirada>()) : Promise.resolve(new Map<string, Retirada>()),
       atrasosP,
     ]);
+    const semCobranca = pend.filter(estadiaSemCobranca);
     const valores = new Map<string, ValoresDaEstadia>();
-    for (const x of v?.data ?? []) valores.set(x.estadia_id, x);
+    for (const x of [...vAbertas, ...vPend.filter((x) => semCobranca.some((e) => e.id === x.estadia_id))]) valores.set(x.estadia_id, x);
     return { abertas: lista, passadas: encerradas, valores, feitos, ocorrencias, retiradas, semCobranca, atrasos };
   }, [petshop.id, vejoFinanceiro, comCuidados, comOcorrencias, comPortaria, usaCreche]);
 
