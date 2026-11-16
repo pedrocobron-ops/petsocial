@@ -31,6 +31,7 @@ import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFren
 import MinhaComissao from "@/components/gestao/minha-comissao";
 import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, useAdiantar, useDados } from "@/components/gestao/ui";
 import dynamic from "next/dynamic";
+import { ErroDeTeste } from "@/components/gestao/erros";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import { buscarSaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
@@ -297,6 +298,7 @@ export default function Hoje() {
 
   return (
     <>
+      <ErroDeTeste />
       <header className="g-topo">
         <div>
           <p className="g-rotulo" style={{ marginBottom: 6 }}>{dataLonga(hoje)}</p>

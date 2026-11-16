@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/gestao/banco";
 import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "@/lib/gestao/supabase";
 import { materialDoAviso } from "@/lib/gestao/escola";
+import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,7 @@ export const runtime = "nodejs";
  * Formato conferido na doc da Cakto (docs.cakto.com.br/conceitos/webhooks): corpo { secret, event, data }; `data` é objeto
  * no webhook V1 e lista no V2.
  */
-export async function POST(req: Request) {
+async function tratar(req: Request) {
   if (!configurado) return NextResponse.json({ ok: false }, { status: 503 });
   const corpo = (await req.json().catch(() => null)) as { secret?: unknown; event?: unknown; data?: unknown } | null;
   if (!corpo || typeof corpo.secret !== "string" || typeof corpo.event !== "string") return NextResponse.json({ ok: false }, { status: 400 });
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     const comprador = (item.customer ?? {}) as { email?: string };
     const emailItem = typeof comprador.email === "string" ? comprador.email : typeof item.customerEmail === "string" ? item.customerEmail : null;
     const r = await sb.rpc("escola_evento", { p_segredo: corpo.secret, p_evento: corpo.event, p_email: emailItem as string, p_slug: m.slug, p_pedido: (typeof item.id === "string" ? item.id : undefined) });
-    if (r.error) return NextResponse.json({ ok: false }, { status: 500 });
+    if (r.error) { await registrarErroServidor("/api/gestao/cakto", erroDoBanco(r.error, "escola_evento")); return NextResponse.json({ ok: false }, { status: 500 }); }
     if (r.data === "recusado") return NextResponse.json({ ok: false }, { status: 401 });
   }
   if (daEscola === lista.filter(Boolean).length && daEscola > 0) return NextResponse.json({ ok: true, resultado: "escola" });
@@ -64,7 +65,9 @@ export async function POST(req: Request) {
     // guarda só o necessário para conferir depois (sem documento nem telefone do comprador)
     p_payload: { oferta: oferta?.id ?? null, assinatura: idAssinatura, pedido: dados.id ?? null, status: dados.status ?? null, produto: produto.short_id ?? produto.id ?? null, valor: dados.amount ?? null, metodo: dados.paymentMethod ?? null } as never,
   });
-  if (error) return NextResponse.json({ ok: false }, { status: 500 });
+  if (error) { await registrarErroServidor("/api/gestao/cakto", erroDoBanco(error, "cakto_evento")); return NextResponse.json({ ok: false }, { status: 500 }); }
   if (data === "recusado") return NextResponse.json({ ok: false }, { status: 401 });
   return NextResponse.json({ ok: true, resultado: data });
 }
+
+export const POST = comRegistro("/api/gestao/cakto", tratar);

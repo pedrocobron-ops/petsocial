@@ -9,6 +9,7 @@ import type { User } from "@supabase/supabase-js";
 import { banco, configurado, type Banco } from "@/lib/gestao/supabase";
 import type { Petshop, Profissional, Servico } from "@/lib/gestao/tipos";
 import { podeArea, type Area } from "@/lib/gestao/acessos";
+import { definirLoja } from "@/lib/gestao/erros-navegador";
 
 export type Gestao = {
   sb: Banco;
@@ -138,6 +139,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     const liberado = ["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && (resta > 0 || !aberto)) || pagoAinda;
     // as mensagens de erro só falam em "conta só para consulta" quando a conta está mesmo assim
     soConsulta = !liberado;
+    definirLoja(petshop.id, !liberado); // o registro de erros leva o pet shop aberto
     return {
       sb, user, petshop, eu, equipe, servicos,
       souDono: eu.papel === "dono",

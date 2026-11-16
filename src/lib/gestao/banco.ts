@@ -711,6 +711,68 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"erros_app": {
+                  Row: {
+                    "aparelho": string,"areas": (string)[] | null,"assinatura": string,"contagem": number,"id": number,"mensagem": string,"navegador": string | null,"nome": string | null,"origem": string,"papel": string | null,"petshop_id": string | null,"pilha": string | null,"primeiro_em": string,"rota": string | null,"tela": string | null,"tipo": string,"ultimo_em": string,"versao": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "aparelho": string,"areas"?: (string)[] | null,"assinatura": string,"contagem"?: number,"id"?: never,"mensagem": string,"navegador"?: string | null,"nome"?: string | null,"origem": string,"papel"?: string | null,"petshop_id"?: string | null,"pilha"?: string | null,"primeiro_em"?: string,"rota"?: string | null,"tela"?: string | null,"tipo": string,"ultimo_em"?: string,"versao"?: string | null
+                  }
+                  Update: {
+                    "aparelho"?: string,"areas"?: (string)[] | null,"assinatura"?: string,"contagem"?: number,"id"?: never,"mensagem"?: string,"navegador"?: string | null,"nome"?: string | null,"origem"?: string,"papel"?: string | null,"petshop_id"?: string | null,"pilha"?: string | null,"primeiro_em"?: string,"rota"?: string | null,"tela"?: string | null,"tipo"?: string,"ultimo_em"?: string,"versao"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "erros_app_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"erros_app_contagem": {
+                  Row: {
+                    "dia": string,"n": number,"tipo": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "dia": string,"n"?: number,"tipo": string
+                  }
+                  Update: {
+                    "dia"?: string,"n"?: number,"tipo"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"erros_app_freio": {
+                  Row: {
+                    "chave": string,"janela": string,"n": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "chave": string,"janela": string,"n"?: number
+                  }
+                  Update: {
+                    "chave"?: string,"janela"?: string,"n"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"erros_app_resolvidos": {
+                  Row: {
+                    "assinatura": string,"por": string | null,"resolvido_em": string,"versoes": (string)[]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "assinatura": string,"por"?: string | null,"resolvido_em"?: string,"versoes"?: (string)[]
+                  }
+                  Update: {
+                    "assinatura"?: string,"por"?: string | null,"resolvido_em"?: string,"versoes"?: (string)[]
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"escola_compras": {
                   Row: {
                     "criado_em": string,"email": string,"id": string,"origem": string,"pedido": string | null,"slug": string
@@ -1689,6 +1751,12 @@ isOneToOne: false
 "admin_conversas":
 { Args: { "p_canal"?: string,"p_limite"?: number,"p_petshop"?: string }; Returns: Json
                            },
+"admin_erro_resolver":
+{ Args: { "p_assinatura": string,"p_resolvido"?: boolean }; Returns: undefined
+                           },
+"admin_erros":
+{ Args: { "p_horas"?: number,"p_resolvidos"?: boolean }; Returns: Json
+                           },
 "admin_escola":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
@@ -2048,6 +2116,12 @@ isOneToOne: false
 { Args: { "p": string }; Returns: {
               "comissao_pct": number,"email_convite": string,"id": string
             }[]
+                           },
+"erro_limpar":
+{ Args: { "p": string,"p_max": number }; Returns: string
+                           },
+"erro_registrar":
+{ Args: { "p_aparelho"?: string,"p_mensagem": string,"p_navegador"?: string,"p_nome"?: string,"p_origem": string,"p_petshop"?: string,"p_pilha"?: string,"p_rota"?: string,"p_sem_internet"?: boolean,"p_tela"?: string,"p_tipo": string,"p_versao"?: string }; Returns: undefined
                            },
 "escola_evento":
 { Args: { "p_email": string,"p_evento": string,"p_pedido"?: string,"p_segredo": string,"p_slug": string }; Returns: string

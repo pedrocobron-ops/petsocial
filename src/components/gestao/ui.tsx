@@ -9,6 +9,7 @@ import type { PetComTutor } from "@/lib/gestao/tipos";
 import { corDoNome, iniciais, lerValor, semAcento, valor2 } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { contaSoConsulta, useGestao } from "./contexto";
+import { registrarErroMostrado } from "@/lib/gestao/erros-navegador";
 
 /* ---------- carregar dados ---------- */
 
@@ -61,7 +62,7 @@ export function useDados<T>(buscar: () => Promise<T>, deps: unknown[]) {
       const r = await fn.current();
       if (minha === vez.current) { setDados(r); setErro(null); }
     } catch (e) {
-      if (minha === vez.current) setErro(mensagemDeErro(e));
+      if (minha === vez.current) { setErro(mensagemDeErro(e)); registrarErroMostrado(e); }
     } finally {
       if (minha === vez.current) setCarregando(false);
     }
@@ -77,9 +78,9 @@ export function useDados<T>(buscar: () => Promise<T>, deps: unknown[]) {
   return { dados, carregando, erro, recarregar };
 }
 
-/** Lança o erro do Supabase, se houver, e devolve os dados. */
+/** Lança o erro do Supabase, se houver (com o código, para o registro de erros), e devolve os dados. */
 export function ok<T>(r: { data: T; error: { message: string } | null }): NonNullable<T> {
-  if (r.error) throw new Error(r.error.message);
+  if (r.error) throw Object.assign(new Error(r.error.message), { code: (r.error as { code?: string }).code ?? "" });
   return r.data as NonNullable<T>;
 }
 
@@ -127,7 +128,7 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
     if (!erro) window.dispatchEvent(new Event(EVENTO_AVISOU));
   }, []);
   const avisar = useCallback((t: string, acao?: AcaoDoAviso) => por(t, false, acao), [por]);
-  const avisarErro = useCallback((e: unknown) => por(mensagemDeErro(e), true), [por]);
+  const avisarErro = useCallback((e: unknown) => { por(mensagemDeErro(e), true); registrarErroMostrado(e); }, [por]);
   const confirmar = useCallback((p: Omit<Pergunta, "resolver">) => new Promise<boolean>((resolver) => setPergunta({ ...p, resolver })), []);
   const responder = (v: boolean) => { pergunta?.resolver(v); setPergunta(null); };
   return (

@@ -5,6 +5,7 @@ import type { Database } from "@/lib/gestao/banco";
 import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "@/lib/gestao/supabase";
 import { segredoDoServidor, visitante } from "@/lib/gestao/servidor";
 import { INSTRUCOES_VENDAS, MARCA_PESSOA, RESPOSTA_SEM_IA } from "@/lib/gestao/vendas";
+import { comRegistro, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -31,7 +32,7 @@ function liberado(ip: string) {
 }
 
 /** Chat de venda da página /gestao: público, sem login e sem acesso a dado de cliente. Devolve { texto, pessoa }. */
-export async function POST(req: Request) {
+async function tratar(req: Request) {
   const corpo = (await req.json().catch(() => null)) as { falas?: Fala[] } | null;
   const falas = (Array.isArray(corpo?.falas) ? corpo!.falas : [])
     .filter((f) => (f?.de === "eu" || f?.de === "nina") && typeof f.texto === "string" && f.texto.trim())
@@ -72,7 +73,10 @@ export async function POST(req: Request) {
     const texto = bruto.replace(MARCA_PESSOA, "").trim();
     if (!texto) return semIa();
     return NextResponse.json({ texto, pessoa: bruto.includes(MARCA_PESSOA) });
-  } catch {
+  } catch (err) {
+    if (!(err instanceof Anthropic.APIError)) await registrarErroServidor("/api/gestao/vendas", err);
     return semIa();
   }
 }
+
+export const POST = comRegistro("/api/gestao/vendas", tratar);
