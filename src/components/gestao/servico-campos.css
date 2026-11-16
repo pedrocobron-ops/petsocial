@@ -1,0 +1,19 @@
+/* peças do serviço (guia da primeira vez e Meu pet shop): preço único ou por porte, área e cor */
+.g-sv-precos { display: grid; gap: 10px; }
+.g-sv-precos .g-seg { justify-self: start; }
+.g-sv-precos .g-seg button { min-height: 34px; padding: 0 12px; font-size: .8125rem; }
+.g-sv-precos .precos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.g-sv-precos .precos label { display: grid; gap: 4px; }
+.g-sv-precos .precos span { font-size: .75rem; font-weight: 700; letter-spacing: .06em; color: var(--g-cinza); text-align: center; }
+.g-sv-precos .precos .g-input { min-height: 42px; padding: 6px 8px; text-align: center; }
+.g-sv-precos .precos .g-input.ruim { border-color: var(--g-vermelho); box-shadow: 0 0 0 3px rgba(179, 64, 46, .14); }
+.g-sv-precos .precos small.erro { font-size: .6875rem; line-height: 1.2; color: var(--g-vermelho); text-align: center; font-weight: 600; }
+.g-sv-precos .precos.um { grid-template-columns: minmax(0, 150px) minmax(0, 1fr); align-items: end; }
+.g-sv-precos .precos.um label span { text-align: left; }
+.g-sv-precos .precos.um .g-input { text-align: left; padding-inline: 12px; }
+.g-sv-precos .precos.um > small { font-size: .8125rem; color: var(--g-cinza); padding-bottom: 12px; }
+.g-sv-area, .g-sv-cor { display: grid; gap: 6px; }
+.g-sv-area .g-chips { flex-wrap: wrap; }
+/* serviço novo no guia: o nome é um campo; o botão de pôr mais um fica no fim da lista */
+.g-guia-servico .cabeca .g-input.nome { flex: 1; min-width: 0; min-height: 40px; font: 480 1rem/1.2 var(--display); }
+.g-guia-mais { justify-self: start; }

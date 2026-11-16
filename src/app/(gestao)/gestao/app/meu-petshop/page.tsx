@@ -15,29 +15,22 @@ import OpcoesDoLink from "@/components/gestao/ajustes/opcoes-link";
 import Feriados from "@/components/gestao/ajustes/feriados";
 import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
 import OpcoesDaLoja from "@/components/gestao/ajustes/opcoes-loja";
-import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { AREAS_DE_SERVICO, areaDoServico, areasDeServicoPara, categoriaDaArea, nomeDaCasa, usaCasa, usaModulo, type AreaDoServico } from "@/lib/gestao/modulos";
+import { CAMPOS_PRECO, EscolherArea, PrecosDoServico, comecaPorPorte, corLivre, inserirServico, mudarServico, umPrecoSo, type Precos } from "@/components/gestao/servico-campos";
 import { textoDoLink } from "@/lib/gestao/agenda";
 import { useEffect, useRef, useState } from "react";
 import { Archive, BedDouble, CalendarDays, Check, ChevronDown, Clock, Copy, ExternalLink, HandCoins, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import { Kpi, Tile } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
-import { Campo, CampoValor, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
+import { Campo, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
 import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
-import { PORTES, type Horario, type Porte, type Servico } from "@/lib/gestao/tipos";
+import { PORTES, type Horario, type Servico } from "@/lib/gestao/tipos";
 import { brl, brlCurto, fmtTelefone, soDigitos, mascaraTelefone } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./meu-petshop.css";
 
 const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
-const CATEGORIAS = [
-  { id: "banho", rotulo: "Banho" },
-  { id: "tosa", rotulo: "Tosa" },
-  { id: "banho_tosa", rotulo: "Banho e tosa" },
-  { id: "creche", rotulo: "Creche" },
-  { id: "hotel", rotulo: "Hotel" },
-  { id: "outro", rotulo: "Outro" },
-];
 const DURACOES = [15, 30, 45, 60, 90, 120];
 const CAMPO_PRECO = { P: "preco_p", M: "preco_m", G: "preco_g", GG: "preco_gg" } as const;
 
@@ -385,6 +378,8 @@ function Servicos() {
   const exemplos = [usaModulo(petshop, "banho_tosa") ? "banho, tosa" : "", usaModulo(petshop, "creche") ? "creche" : "", usaModulo(petshop, "hotel") ? "hotel" : ""].filter(Boolean).join(", ");
   const ativos = servicos.filter((s) => s.ativo);
   const inativos = servicos.filter((s) => !s.ativo);
+  // com mais de uma área, cada serviço diz de qual é
+  const variasAreas = areasDeServicoPara(petshop).length > 1;
   const abrir = (s: Servico | "novo") => { if (!somenteLeitura()) setEditando(s); };
 
   async function reativar(s: Servico) {
@@ -414,7 +409,7 @@ function Servicos() {
               <button key={s.id} type="button" className="g-mp-serv" style={{ "--cor": s.cor } as React.CSSProperties} onClick={() => abrir(s)}>
                 <i className="g-mp-cor" aria-hidden><Scissors /></i>
                 <span className="t">
-                  <span className="g-mp-nome"><b>{s.nome}</b><span className="g-mp-tempo"><Clock aria-hidden />{duracao(s.duracao_min)}</span></span>
+                  <span className="g-mp-nome"><b>{s.nome}</b><span className="g-mp-tempo"><Clock aria-hidden />{duracao(s.duracao_min)}{variasAreas && ` · ${AREAS_DE_SERVICO.find((x) => x.id === areaDoServico(s.categoria))?.rotulo}`}</span></span>
                   {p.length ? (
                     <span className="g-mp-precos">
                       {p.map((x) => <span key={x.porte} className="g-mp-preco"><i>{x.porte}</i>{brlCurto(x.valor)}</span>)}
@@ -449,36 +444,39 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
   const { sb, petshop, servicos, recarregarBase } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const [nome, setNome] = useState(servico?.nome ?? "");
-  const [categoria, setCategoria] = useState(servico?.categoria ?? "banho");
+  // área do serviço: as mesmas do guia da primeira vez (só as que o pet shop usa; com uma só, a escolha não aparece)
+  const areas = areasDeServicoPara(petshop, servico ? areaDoServico(servico.categoria) : null);
+  const [area, setArea] = useState<AreaDoServico>(servico ? areaDoServico(servico.categoria) : areas.includes("banho_tosa") ? "banho_tosa" : areas[0]);
   const [minutos, setMinutos] = useState(String(servico?.duracao_min ?? 60));
-  const [valores, setValores] = useState<Record<Porte, number | null>>({
-    P: servico?.preco_p ?? null, M: servico?.preco_m ?? null, G: servico?.preco_g ?? null, GG: servico?.preco_gg ?? null,
+  const [valores, setValores] = useState<Precos>({
+    preco_p: servico?.preco_p ?? null, preco_m: servico?.preco_m ?? null, preco_g: servico?.preco_g ?? null, preco_gg: servico?.preco_gg ?? null,
   });
-  const [cor, setCor] = useState(servico?.cor ?? "#f97316");
+  const [porPorte, setPorPorte] = useState(() => comecaPorPorte(valores));
+  const [errosPreco, setErrosPreco] = useState<Record<string, string>>({});
+  // serviço novo já vem com uma cor que nenhum outro usa
+  const [cor, setCor] = useState(servico?.cor ?? corLivre(servicos.filter((s) => s.ativo).map((s) => s.cor)));
   const [ativo, setAtivo] = useState(servico?.ativo ?? true);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const primeiro = valores.P ?? valores.M ?? valores.G ?? valores.GG;
 
   async function salvar() {
     const n = nome.trim();
     const min = Number(minutos);
     if (!n) return setErro("Dê um nome ao serviço.");
     if (!Number.isInteger(min) || min < 5 || min > 1440) return setErro("A duração fica entre 5 minutos e 24 horas.");
-    if (PORTES.some((p) => (valores[p.id] ?? 0) < 0)) return setErro("O preço não pode ser negativo.");
-    if (PORTES.some((p) => (valores[p.id] ?? 0) > 99999)) return setErro("Confira os preços.");
+    if (Object.keys(errosPreco).length) return setErro("Confira os preços: use só números, sem valor negativo.");
+    const precosDele = porPorte ? valores : umPrecoSo(valores);
+    if (CAMPOS_PRECO.some((c) => (precosDele[c] ?? 0) < 0)) return setErro("O preço não pode ser negativo.");
+    if (CAMPOS_PRECO.some((c) => (precosDele[c] ?? 0) > 99999)) return setErro("Confira os preços.");
     setErro(null);
     setSalvando(true);
-    const campos = {
-      nome: n.slice(0, 80), categoria, duracao_min: min, cor, ativo,
-      preco_p: valores.P, preco_m: valores.M, preco_g: valores.G, preco_gg: valores.GG,
-    };
+    const campos = { nome: n.slice(0, 80), categoria: categoriaDaArea(area, servico?.categoria), duracao_min: min, cor, ativo, ...precosDele };
     try {
       if (servico) {
-        ok(await sb.from("servicos").update(campos).eq("id", servico.id).eq("petshop_id", petshop.id).select("id"));
+        await mudarServico(sb, petshop.id, servico.id, campos);
       } else {
         const ordem = servicos.reduce((m, s) => Math.max(m, s.ordem), 0) + 1;
-        ok(await sb.from("servicos").insert({ ...campos, petshop_id: petshop.id, ordem }).select("id"));
+        await inserirServico(sb, petshop.id, { ...campos, ordem });
       }
       await recarregarBase();
       avisarMudanca();
@@ -495,11 +493,7 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
       </>}>
       <div className="g-form">
         <Campo rotulo="Nome"><input className="g-input" value={nome} maxLength={80} placeholder="Banho, Tosa higiênica…" autoFocus={!servico} onChange={(e) => setNome(e.target.value)} /></Campo>
-        <Campo rotulo="Tipo">
-          <select className="g-select" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-            {CATEGORIAS.filter((c) => (c.id !== "creche" && c.id !== "hotel") || c.id === categoria || usaModulo(petshop, c.id)).map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
-          </select>
-        </Campo>
+        <EscolherArea areas={areas} valor={area} aoMudar={setArea} servico={nome.trim() || "serviço"} />
         <div className="g-campo">
           <span>Quanto tempo leva</span>
           <div className="g-chips">
@@ -513,21 +507,11 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
           </div>
         </div>
         <div className="g-campo">
-          <span>Preço por porte</span>
-          <div className="dupla">
-            {PORTES.map((p) => (
-              <Campo key={p.id} rotulo={`${p.id} · ${p.rotulo}`}>
-                <CampoValor valor={valores[p.id]} aoMudar={(v) => setValores((a) => ({ ...a, [p.id]: v }))} />
-              </Campo>
-            ))}
-          </div>
-          <div>
-            <button type="button" className="g-link g-p" disabled={primeiro == null}
-              onClick={() => setValores({ P: primeiro, M: primeiro, G: primeiro, GG: primeiro })}>
-              Usar o mesmo preço para todos
-            </button>
-          </div>
-          <small>P = pequeno, M = médio, G = grande, GG = gigante. Pode deixar em branco o porte que vocês não atendem.</small>
+          <span>Preço</span>
+          <PrecosDoServico servico={nome.trim() || "serviço"} valores={valores} porPorte={porPorte}
+            aoTrocarModo={(v) => { setPorPorte(v); setErrosPreco({}); if (!v) setValores(umPrecoSo(valores)); }}
+            aoMudar={(c, chave, ruim) => { setValores((a) => ({ ...a, ...c })); setErrosPreco((m) => { const x = { ...m }; if (ruim) x[chave] = ruim; else delete x[chave]; return x; }); }} />
+          <small>{porPorte ? "P = pequeno, M = médio, G = grande, GG = gigante. Pode deixar em branco o porte que vocês não atendem." : "Pode deixar em branco e pôr o preço depois."}</small>
         </div>
         <div className="g-campo"><span>Cor na agenda</span><EscolherCor valor={cor} aoMudar={setCor} /></div>
         {servico && (

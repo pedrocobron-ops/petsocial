@@ -43,10 +43,6 @@
 .g-guia-servico .cabeca > i { display: none; }
 .g-guia-servico .cabeca b { flex: 1; min-width: 0; font: 480 1.125rem/1.2 var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-guia-servico .cabeca .g-select { width: auto; min-height: 38px; padding: 4px 10px; font-size: .875rem; }
-.g-guia-servico .precos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.g-guia-servico .precos label { display: grid; gap: 4px; }
-.g-guia-servico .precos span { font-size: .75rem; font-weight: 700; letter-spacing: .06em; color: var(--g-cinza); text-align: center; }
-.g-guia-servico .precos .g-input { min-height: 42px; padding: 6px 8px; text-align: center; }
 .g-guia-chave { position: relative; width: 46px; height: 28px; flex: none; border: 0; border-radius: 999px; background: rgba(31, 27, 23, .2); transition: background .15s; }
 .g-guia-chave i { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(31, 27, 23, .3); transition: translate .18s cubic-bezier(.2, .7, .2, 1); }
 .g-guia-chave[aria-checked="true"] { background: var(--g-verde); } .g-guia-chave[aria-checked="true"] i { translate: 18px 0; }
@@ -65,9 +61,6 @@
 .g-guia .g-tile { flex: none; width: 38px; }
 
 /* correções do teste de uso: erro de preço ao lado do campo, erro junto do botão, legenda dos portes, toque de 44px */
-.g-guia-servico .precos { align-items: start; }
-.g-guia-servico .precos .g-input.ruim { border-color: var(--g-vermelho); box-shadow: 0 0 0 3px rgba(179, 64, 46, .14); }
-.g-guia-servico .precos small.erro { font-size: .6875rem; line-height: 1.2; color: var(--g-vermelho); text-align: center; font-weight: 600; }
 .g-guia-legenda { font-size: .8125rem; color: var(--g-cinza); padding: 8px 12px; border-radius: 12px; background: var(--g-carta-2); }
 .g-guia-legenda b { color: var(--g-tinta); }
 .g-guia-erro { padding: 10px 20px; background: var(--g-vermelho-tint); color: #7a281b; font-weight: 600; border-top: 1px solid rgba(179, 64, 46, .2); }
@@ -82,13 +75,6 @@
 .g-guia-pe { align-items: center; }
 .g-guia-pe .g-guia-depois { margin-left: auto; }
 .g-guia-pe .g-guia-volta { padding-inline: 10px; min-width: 44px; }
-.g-guia-modo { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.g-guia-modo .g-seg button { min-height: 34px; padding: 0 12px; font-size: .8125rem; }
-.g-guia-modo .g-btn { color: var(--g-cinza); }
-.g-guia-servico .precos.um { grid-template-columns: minmax(0, 150px) minmax(0, 1fr); align-items: end; }
-.g-guia-servico .precos.um label span { text-align: left; }
-.g-guia-servico .precos.um .g-input { text-align: left; padding-inline: 12px; }
-.g-guia-servico .precos.um > small { font-size: .8125rem; color: var(--g-cinza); padding-bottom: 12px; }
 .g-guia-fora { display: grid; gap: 4px; padding: 12px 14px; border-radius: 16px; border: 1px dashed var(--g-linha-forte); }
 .g-guia-fora > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; }
 .g-guia-fora > div span { color: var(--g-cinza); text-decoration: line-through; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

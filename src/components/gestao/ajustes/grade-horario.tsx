@@ -211,10 +211,10 @@ const NOME_COR: Record<string, string> = {
   "#f97316": "laranja", "#3b82a0": "azul", "#4d8f6b": "verde", "#7c6fb0": "roxo", "#b0763f": "caramelo", "#b0563f": "telha", "#a05a82": "rosa", "#1e3a2f": "verde-garrafa",
 };
 
-export function EscolherCor({ valor, aoMudar }: { valor: string; aoMudar: (c: string) => void }) {
+export function EscolherCor({ valor, aoMudar, rotulo = "Cor" }: { valor: string; aoMudar: (c: string) => void; rotulo?: string }) {
   const cores = CORES.includes(valor) ? CORES : [valor, ...CORES];
   return (
-    <div className="gj-cores" role="group" aria-label="Cor">
+    <div className="gj-cores" role="group" aria-label={rotulo}>
       {cores.map((c) => (
         <button key={c} type="button" className="gj-cor" style={{ background: c }} aria-pressed={c === valor} aria-label={NOME_COR[c] ?? "cor atual"} onClick={() => aoMudar(c)} />
       ))}
