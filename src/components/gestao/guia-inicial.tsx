@@ -18,6 +18,7 @@ import { TEMAS, aplicarTema, enviarLogo, tirarLogo } from "@/lib/gestao/identida
 import { FalaMozart, PERGUNTAS, PreviaPainel, TrilhoBoasVindas, chaveBoasVindas, oQueDeixeiPronto } from "./boas-vindas";
 import { guardarLembrado, lerLembrado } from "./lembrado";
 import LogoLoja from "./logo-loja";
+import OpcoesDaLoja from "./ajustes/opcoes-loja";
 import "./ajustes/identidade.css";
 import "./guia-inicial.css";
 
@@ -582,6 +583,13 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
                 {hotel && <li><BedDouble /><span>{resumoCasa("Hotel", petshop.diaria_hotel, petshop.vagas_hotel)}</span></li>}
                 {banho && <li><Link2 /><span>Link do cliente {petshop.link_ativo ? "ligado" : "desligado"}</span></li>}
               </ul>
+              {usaModulo(petshop, "loja") && (
+                <section className="g-guia-bloco g-guia-loja" aria-label="Opções da loja">
+                  <h3>Para a venda de produtos</h3>
+                  <p className="g-muted g-pp">Usa leitor de código de barras ou quer ver a margem de cada produto? Ligue aqui. Também ficam em Meu pet shop, Loja, e no Estoque, em Opções.</p>
+                  <OpcoesDaLoja solto />
+                </section>
+              )}
               <p className="g-muted">O que ficou para depois está em Meu pet shop. Agora, por onde quer começar?</p>
               <div className="g-guia-proximos">
                 <Link className="g-btn pri" href="/gestao/app/clientes?novo=1" onClick={aoFechar}><PawPrint />Cadastrar o primeiro pet</Link>
