@@ -106,9 +106,10 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
 
   // quem saiu e deixou dia extra ou taxa sem cobrança (nenhuma cobrança futura vai levar)
   const diaria = petshop.diaria_creche == null ? null : Number(petshop.diaria_creche);
-  const { dados: sobras, recarregar: recarregarSobras } = useDados(() => lerSobrasDaSaida(sb, petshop.id, planos, diaria, hoje),
+  const { dados: sobras } = useDados(() => lerSobrasDaSaida(sb, petshop.id, planos, diaria, hoje),
     [petshop.id, planos.map((p) => `${p.id}:${p.fim ?? ""}`).join(","), hoje]);
-  const mudou = async () => { await Promise.all([recarregar(), recarregarSobras()]); avisarMudanca(); };
+  // o aviso faz as duas listas (e as outras telas abertas) buscarem de novo
+  const mudou = async () => { avisarMudanca(); };
   const abertas = (dados?.doMes ?? []).filter((c) => c.status === "aberta");
   const canceladas = (dados?.doMes ?? []).filter((c) => c.status === "cancelada" && !c.por_fora);
   const pagasPorFora = (dados?.doMes ?? []).filter((c) => c.status === "cancelada" && c.por_fora);
@@ -510,7 +511,7 @@ function GerarCobrancas({ sobras, mes, planos, todos, comCobranca, aoFechar, aoG
         </div>
       ) : carregando && !extras ? <Esqueleto linhas={3} /> : (
         <div className="g-pilha">
-          <p className="g-muted g-p">Uma cobrança por mensalista: a mensalidade, mais os dias extras e as taxas de busca fora do horário de meses anteriores que ainda não foram cobrados. Quem já tem cobrança em {nomeMes(mes)} não entra de novo. As de mensalidade cheia do mês corrente já são criadas quando você abre esta tela; aqui ficam as que pedem conferência.</p>
+          <p className="g-muted g-p">Uma cobrança por mensalista: a mensalidade, mais os dias extras e as taxas de busca fora do horário de meses anteriores que ainda não foram cobrados. Quem já tem cobrança em {nomeMes(mes)} não entra de novo. A mensalidade cheia de quem vem o mês inteiro o sistema já cria sozinho. Aqui ficam só as que você precisa conferir antes: a primeira de cada mensalista, as proporcionais (entrada, saída ou pausa no mês) e as que você deixou para depois.</p>
           <AvisoSobras sobras={sobras} />
           {mesIso > mesDeHoje && <p className="g-aviso" role="status" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce">{nomeMes(new Date())[0].toUpperCase() + nomeMes(new Date()).slice(1)} ainda não acabou. Dia extra ou taxa de busca marcados depois de gerar não entram nesta cobrança: vão para a do mês seguinte.</span></p>}
           <div className="g-cm-gerar">

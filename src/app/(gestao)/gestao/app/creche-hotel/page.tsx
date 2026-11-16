@@ -247,20 +247,19 @@ export default function CrecheHotel() {
     const atrasosP = vejoFinanceiro && usaCreche ? lerAtrasosPendentes(sb, petshop.id) : Promise.resolve([] as AtrasoPendente[]);
     // (se a primeira leva falhar, a tela mostra o erro dela; estas duas não deixam aviso solto no navegador)
     feitosP.catch(() => undefined); atrasosP.catch(() => undefined);
-    const [abertas, passadas, pendentes] = await Promise.all([
-      sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500),
-      sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["encerrada", "cancelada"]).order("entrada", { ascending: false }).limit(100),
-      // check-outs que fecharam sem cobrança (feitos por quem não mexe com dinheiro): todos, não só os últimos do histórico
-      (async (): Promise<{ data: unknown[] | null }> => {
-        const ids = vejoFinanceiro ? await idsParaCobrar(sb, petshop.id) : [];
-        return ids.length ? await sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("id", ids).order("saida", { ascending: false }) : { data: [] };
-      })(),
-    ]);
-    // a diária e o valor cobrado vêm à parte, só para quem recebe (para os outros ficam em branco)
+    // cada lista segue sozinha para a diária e o valor cobrado (só para quem recebe; para os outros ficam em branco), sem esperar
+    // as outras: no celular, cada espera em fila soma
     const [lista, antigas, pend] = await Promise.all([
-      comValoresDeEstadia(sb, petshop.id, ok(abertas) as unknown as EstadiaCompleta[], vejoFinanceiro),
-      comValoresDeEstadia(sb, petshop.id, ok(passadas) as unknown as EstadiaCompleta[], vejoFinanceiro),
-      comValoresDeEstadia(sb, petshop.id, (pendentes.data ?? []) as unknown as EstadiaCompleta[], vejoFinanceiro),
+      sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500)
+        .then((r) => comValoresDeEstadia(sb, petshop.id, ok(r) as unknown as EstadiaCompleta[], vejoFinanceiro)),
+      sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["encerrada", "cancelada"]).order("entrada", { ascending: false }).limit(100)
+        .then((r) => comValoresDeEstadia(sb, petshop.id, ok(r) as unknown as EstadiaCompleta[], vejoFinanceiro)),
+      // check-outs que fecharam sem cobrança (feitos por quem não mexe com dinheiro): todos, não só os últimos do histórico
+      (async () => {
+        const ids = vejoFinanceiro ? await idsParaCobrar(sb, petshop.id) : [];
+        const r = ids.length ? await sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("id", ids).order("saida", { ascending: false }) : { data: [] };
+        return comValoresDeEstadia(sb, petshop.id, (r.data ?? []) as unknown as EstadiaCompleta[], vejoFinanceiro);
+      })(),
     ]);
     const semCobranca = pend.filter(estadiaSemCobranca);
     // sinal e taxas das reservas e estadias abertas: só quem recebe lê (o banco não entrega para os outros)
@@ -322,7 +321,8 @@ export default function CrecheHotel() {
   const tudoVazio = Boolean(dados) && !naCasa.length && !reservas.length && !historico.length && !dados?.semCobranca.length && !dados?.atrasos.length;
   const valoresDe = (e: EstadiaCompleta) => dados?.valores.get(e.id) ?? null;
 
-  const mudou = () => { void recarregar(); avisarMudanca(); };
+  // avisarMudanca já faz esta tela (e as outras abertas) buscar de novo: chamar recarregar() junto buscava tudo duas vezes
+  const mudou = () => avisarMudanca();
   const abrirNova = () => { if (!somenteLeitura()) setNova({}); };
   const espera = useListaDeEspera(abertas, mens ?? null);
   const verEspera = () => { setVer("ocupacao"); setTimeout(() => document.getElementById("lista-de-espera")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); };
@@ -1016,7 +1016,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
     try {
       if (reservaExtra && planoDoPet) {
         ok(await sb.rpc("creche_reservar_extra", { p_plano: planoDoPet.id, p_dia: dia, p_obs: obs.trim() || undefined }));
-        avisar(`Dia extra de ${pet.nome} reservado para ${dataAmigavel(deIsoDia(dia))}. Quando ele vier, o dia entra na próxima mensalidade.`);
+        avisar(`Dia extra de ${pet.nome} reservado para ${dataAmigavel(deIsoDia(dia))}. No dia, a chegada entra na próxima mensalidade.`);
         aoGravar(false);
         return;
       }

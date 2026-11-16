@@ -305,7 +305,9 @@ export const textoDasDatas = (dias: string[]) => juntar(dias.map((d) => dataCurt
 function linhaDaMensagem(c: CobrancaCompleta, comMes = false) {
   const extras = extrasDaCobranca(c), taxas = taxasDaCobranca(c), valores = partesDosExtras(c);
   // acerto da saída (o plano já acabou): não tem mensalidade, só o que ficou sem cobrar
-  const partes = c.acerto_saida ? [] : [`mensalidade ${brl(c.valor_mensal)}`];
+  // mensalidade menor que a cheia (entrada ou saída no meio do mês, pausa): o tutor lê que é proporcional, para não estranhar o valor
+  const proporcional = Number(c.valor_mensal) < Number(c.valor_cheio) ? ` (proporcional aos dias do plano no mês; cheia ${brl(c.valor_cheio)})` : "";
+  const partes = c.acerto_saida ? [] : [`mensalidade ${brl(c.valor_mensal)}${proporcional}`];
   if (extras.length) partes.push(`${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((e) => e.dia))})${valores.dias > 0 ? ` ${brl(valores.dias)}` : ""}`);
   if (taxas.length) partes.push(`${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((e) => e.dia))}) ${brl(valores.taxas)}`);
   let texto = partes.join(" + ");
@@ -384,7 +386,9 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
   ]);
   if (!planos.length) return null;
   const mov = lido ?? await lerPresencas(sb, petshop.id, hoje, hoje);
-  const linhas = montarChamada(planos, hoje, mov.presencas, mov.faltas, petshop.horario).filter((l) => l.conta === "plano" || l.conta === "avulsa" || l.presenca?.status === "reservada");
+  // quem veio fora do dia (dia extra, reposição) não é "esperado", mas conta em "na casa" e "já saíram", como na Chamada
+  const todas = montarChamada(planos, hoje, mov.presencas, mov.faltas, petshop.horario);
+  const linhas = todas.filter((l) => l.conta === "plano" || l.conta === "avulsa" || l.presenca?.status === "reservada");
   let vencemHoje = 0, atrasadas = 0, reposicoes = 0;
   const semValor: string[] = [];
   if (vejoFinanceiro) {
@@ -409,8 +413,8 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
     faltaram: linhas.filter((l) => l.estado === "faltou").map((l) => l.plano.pets?.nome ?? "Pet"),
     // quem faltou sem o tutor avisar: só para esses vale mandar mensagem perguntando
     semAviso: linhas.filter((l) => l.estado === "faltou" && !l.falta?.avisou).map((l) => l.plano.pets?.nome ?? "Pet"), vencemHoje, atrasadas, reposicoes, semValor,
-    naCasa: linhas.filter((l) => l.estado === "na_casa").length,
-    sairam: linhas.filter((l) => l.estado === "saiu").length,
+    naCasa: todas.filter((l) => l.estado === "na_casa").length,
+    sairam: todas.filter((l) => l.estado === "saiu").length,
   };
 }
 
@@ -578,7 +582,8 @@ export async function lerExperiencias(sb: Banco, petshopId: string) {
   const comPlano = new Set((planos.data ?? []).map((p) => p.pet_id));
   const lista = (r.data ?? []) as unknown as Experiencia[];
   return {
-    hoje: lista.filter((e) => isoDia(new Date(e.entrada)) === hoje),
+    // depois que o cão foi para casa (ou virou mensalista), o dia de experiência sai do "hoje" e vai para "conversar"
+    hoje: lista.filter((e) => isoDia(new Date(e.entrada)) === hoje && e.status !== "encerrada" && !comPlano.has(e.pet_id)),
     conversar: lista.filter((e) => e.status === "encerrada" && !comPlano.has(e.pet_id) && !jaConversou(e)),
   };
 }
@@ -613,6 +618,8 @@ export const linkDoExtratoDoPet = (petId: string, mes?: Date) => `/gestao/app/cr
 /** O que o extrato do mês de um cão mostra. Dinheiro (`cobranca`, `taxas` com valor) só para quem vê o financeiro. */
 export type ExtratoDoPet = {
   mes: Date; pet: string; tutor: string | null;
+  /** "M" ou "F" (para "do Thor", "da Mel"); sem sexo na ficha, "de" */
+  sexo?: string | null;
   plano: Pick<Plano, "dias"> | null;
   /** dias do plano no mês até hoje (com a creche aberta) */
   esperados: number;
@@ -664,7 +671,7 @@ export function textoDoExtratoDoPet(x: ExtratoDoPet, petshop: string, comValores
     conta.push(`Total: ${brl(c.total)}${paga ? (Number(c.total) > 0 && c.lancamentos?.data ? `, pago em ${dataCurta(c.lancamentos.data)}` : "") : falta < Number(c.total) ? `. Já pago ${brl(centavos(Number(c.total) - falta))}, falta ${brl(falta)}` : `, vence em ${dataCurta(c.vencimento)}`}`);
   }
   return [
-    `${saudacaoZap(x.tutor, petshop)} Segue o extrato de ${mes} de ${x.pet} na creche:`,
+    `${saudacaoZap(x.tutor, petshop)} Segue o extrato de ${mes} ${x.sexo === "M" ? "do" : x.sexo === "F" ? "da" : "de"} ${x.pet} na creche:`,
     "",
     ...linhas,
     ...(conta.length ? ["", ...conta] : []),

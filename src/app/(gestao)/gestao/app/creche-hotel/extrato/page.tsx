@@ -64,7 +64,7 @@ function ExtratoDoCao() {
     const repoe = new Map((saldo?.pares ?? []).map((p) => [p.reposicao, p.falta]));
     const doMes = ((cobrancas?.data ?? []) as unknown as CobrancaCompleta[]);
     const extrato: ExtratoDoPet = {
-      mes, pet: pet.nome, tutor: pet.clientes?.nome ?? null,
+      mes, pet: pet.nome, sexo: pet.sexo, tutor: pet.clientes?.nome ?? null,
       plano: plano ? { dias: plano.dias } : null, esperados: r?.esperados ?? 0,
       presencas: presencas.filter((e) => e.mensalista === "plano").map(diaDe).sort(),
       faltas: r?.faltas ?? [],

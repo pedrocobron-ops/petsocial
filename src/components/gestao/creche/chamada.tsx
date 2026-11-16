@@ -107,7 +107,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
       try {
         await anotarFaltaAvisada(sb, plano.id, dia, acao === "faltou");
         avisar(acao === "faltou" ? `${nome} vai faltar em ${dataAmigavel(dia)}: falta com aviso anotada. A vaga do dia fica livre.` : `Tirei a falta de ${dataAmigavel(dia)}.`);
-        await recarregar(); avisarMudanca();
+        avisarMudanca(); // a chamada busca de novo pelo aviso
         return true;
       } catch (e) { avisarErro(e); return false; } finally { setOcupado(null); }
     }
@@ -130,7 +130,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
       } else if (acao === "saiu") avisar(`${nome} foi para casa.`);
       else if (acao === "faltou") avisar(opcoes.avisou ? `${nome}: falta com aviso.` : `${nome}: falta marcada.`);
       else avisar("Desfeito.");
-      await recarregar();
+      // a chamada (e a contagem de vagas da tela) buscam de novo pelo aviso: chamar recarregar() junto buscava duas vezes
       avisarMudanca();
       return true;
     } catch (e) {
@@ -168,7 +168,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
     for (const l of faltam) { const r = await sb.rpc("creche_chamada", { p_plano: l.plano.id, p_dia: dia, p_acao: "faltou" }); if (!r.error) faltas++; }
     avisar([saidas ? `${saidas === 1 ? "1 saída" : `${saidas} saídas`}` : "", faltas ? `${faltas === 1 ? "1 falta" : `${faltas} faltas`}` : ""].filter(Boolean).join(" e ") + " na chamada."
       + (atrasos ? ` ${atrasos === 1 ? "1 saída foi" : `${atrasos} saídas foram`} depois do horário: ${atrasos === 1 ? "ficou" : "ficaram"} em Check-outs para cobrar, para ${vejoFinanceiro ? "você decidir" : "quem cuida do caixa decidir"} a taxa.` : ""));
-    await recarregar(); avisarMudanca();
+    avisarMudanca(); // a chamada busca de novo pelo aviso
   }
 
   if (!planos.length) {

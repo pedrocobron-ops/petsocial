@@ -1067,7 +1067,8 @@ const BASE: TopicoBase[] = [
       "Abra Creche e hotel, Mensalistas, e toque em Alterar plano no cão que vai sair (ou abra a ficha do pet).",
       "Saindo hoje, toque em Encerrar o plano hoje. Saindo noutro dia, preencha Termina em com o último dia e toque em Salvar plano.",
       "Abre a folha Saída: as cobranças. Ela mostra a mensalidade do mês da saída e a conta dos dias do plano até o último dia, por exemplo R$ 480,00 × 3/9 = R$ 160,00.",
-      "Toque em Acertar a mensalidade para cobrar só esses dias, ou em Deixar como está para manter o valor combinado.",
+      "Toque em Acertar a mensalidade para cobrar só esses dias, ou em Deixar como está para manter o valor combinado (fica anotado na cobrança).",
+      "Fechou a folha sem escolher? O aviso volta: em Cobranças e no cartão do cão em Mensalistas aparece Plano de Bolt terminou em 18/11: a mensalidade ainda está cheia, com o botão Acertar, que abre a mesma folha. Em Alterar, na cobrança, também tem Recalcular pela saída.",
       "Se o mês seguinte já tinha cobrança, a folha oferece Cancelar a cobrança desse mês. Dias extras e taxas de busca que ficaram sem cobrança entram na mensalidade da saída ou numa cobrança à parte, o acerto da saída.",
     ],
     atencao: [
@@ -1082,6 +1083,33 @@ const BASE: TopicoBase[] = [
       "A chamada deixa de esperar o cão depois do último dia, e as cobranças dos meses seguintes não são geradas. O histórico fica guardado.",
     ],
     palavras: ["cao saiu", "cachorro saiu", "saiu da creche", "vai sair da creche", "saida da creche", "deixou a creche", "encerrar plano", "encerrar o plano", "fim do plano", "termina em", "cancelar mensalista", "parar de vir", "ultimo dia", "acerto da saida", "proporcional da saida", "devolver mensalidade", "pagou a mais", "dia extra de quem saiu", "mensalista saiu", "escolinha", "day care"] },
+  { id: "creche-falta-avisada", titulo: "Quando o tutor avisa antes que o cão vai faltar", secao: "creche", usa: ["creche"], quem: "todos", rota: CRECHE,
+    passos: [
+      "Abra Creche e hotel e toque em Mensalistas.",
+      "Toque no cão e em Vai faltar.",
+      "Aparecem os próximos dias do plano. Toque em Vai faltar no dia que o tutor avisou. Para tirar, toque de novo.",
+    ],
+    atencao: [
+      "Fica como falta com aviso: conta para a reposição, que pode ser marcada depois do dia da falta (pela regra de Opções da creche).",
+      "Não é pausa: o plano e a mensalidade não mudam. A vaga do dia fica livre para outro cão.",
+    ],
+    dicas: [
+      "Na Chamada, dá para escolher um dia à frente (Amanhã, ou a data) e tocar em Vai faltar (avisou) no cão.",
+      "Falta de hoje ou de um dia que passou é marcada na Chamada, com Faltou e Avisou.",
+    ],
+    palavras: ["vai faltar", "avisou que vai faltar", "falta avisada", "avisou antes", "nao vem quinta", "nao vem amanha", "falta futura", "falta com antecedencia", "avisar falta", "anotar falta", "tutor avisou", "mensalista", "escolinha", "day care"] },
+  { id: "creche-corrigir-hora", titulo: "Como corrigir a hora de chegada ou de saída", secao: "creche", usa: ["creche", "hotel"], quem: "financeiro", rota: CRECHE,
+    passos: [
+      "Na Chamada, no cão que chegou ou saiu, toque em Hora. Para quem não é mensalista, o botão Hora fica no cartão em Casa agora ou na linha do Histórico.",
+      "Mude Chegou às e, se o cão já saiu, Saiu às.",
+      "Escreva o motivo (ex.: a monitora marcou a saída mais tarde) e toque em Salvar a hora.",
+    ],
+    atencao: [
+      "Só o dono e quem cuida do financeiro corrigem a hora. Fica anotado quem corrigiu, quando e por quê.",
+      "Num dia de creche, a chegada e a saída ficam no mesmo dia. A hora não pode ficar no futuro.",
+      "Com a taxa de busca fora do horário ligada, a taxa do mensalista é refeita pela hora nova enquanto não foi cobrada: sai se a saída ficou no horário, ou volta para Cobrar ou Não cobrar. Taxa já cobrada não muda; para pôr a saída no horário, cancele antes a cobrança ou apague o recebimento da taxa.",
+    ],
+    palavras: ["corrigir hora", "hora de saida", "hora de chegada", "saiu mais cedo", "marcou saida atrasada", "trocar a hora", "errei a hora", "hora errada", "horario de saida", "taxa de busca", "saida registrada", "check-out hora", "mudar horario da saida"] },
   { id: "cobrancas-creche", titulo: "Como gerar e mandar as cobranças do mês", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE, tambem: [HOJE],
     passos: [
       "Abra Creche e hotel e toque em Cobranças, no alto.",

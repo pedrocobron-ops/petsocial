@@ -152,3 +152,13 @@ begin
 end $$;
 revoke all on function public.estadia_corrigir_horas(uuid, timestamptz, timestamptz, text) from public, anon;
 grant execute on function public.estadia_corrigir_horas(uuid, timestamptz, timestamptz, text) to authenticated;
+
+-- ============================================================
+-- 3. Índices para Casa agora, Chamada e Mensalistas
+-- ============================================================
+-- Medido numa loja cheia (120 mensalistas, 2 anos de chamada, ~35 mil estadias): "quem está na casa e as reservas" e
+-- "a chamada do dia" liam todas as estadias da loja para achar as poucas abertas / do dia. Com estes, leem só as que servem.
+create index if not exists estadias_abertas_idx on public.estadias (petshop_id, entrada) where status in ('reservada', 'em_casa');
+create index if not exists estadias_dia_idx on public.estadias (petshop_id, dia) where dia is not null;
+-- as faltas de um plano (saldo de reposição, feito a cada "Veio fora do dia" e a cada cartão aberto)
+create index if not exists creche_faltas_plano_dia_idx on public.creche_faltas (plano_id, dia);
