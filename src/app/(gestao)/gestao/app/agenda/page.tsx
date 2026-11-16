@@ -39,7 +39,7 @@ const H_HORA = 64; // altura de uma hora na visão de semana, em px
 type Trecho = { b: Bloqueio; de: number; ate: number; inteiro: boolean };
 
 function Agenda() {
-  const { sb, petshop, equipe, liberado } = useGestao();
+  const { sb, petshop, equipe, liberado, souDono } = useGestao();
   const router = useRouter();
   const params = useSearchParams();
   const somenteLeitura = useSomenteLeitura();
@@ -112,6 +112,12 @@ function Agenda() {
       .filter((t) => t.ate > t.de).map((t) => ({ ...t, inteiro: t.de === 0 && t.ate >= fimDoDia }));
   };
   const bloqueiosDoDia = trechosDe(data);
+  /** O pet shop inteiro bloqueado o dia todo (ou todo o horário em que abre): na semana, o dia aparece como bloqueado, não "aberto". */
+  const bloqueioDoDiaTodo = (d: Date) => {
+    const h = horarioDoDia(petshop.horario, d);
+    return trechosDe(d).find((t) => !t.b.profissional_id && (t.inteiro || (h && t.de <= paraMin(h.abre) && t.ate >= paraMin(h.fecha))))?.b ?? null;
+  };
+  const textoDoBloqueio = (b: Bloqueio) => `Bloqueado${b.motivo ? `: ${b.motivo}` : ""}`;
   const textoDoTrecho = (t: Trecho) => (t.inteiro ? "Dia inteiro" : `${deMin(t.de)} às ${deMin(t.ate)}`);
   const abrirBloqueio = (b: Bloqueio) => { if (!somenteLeitura()) setBloqueioAberto(b); };
 
@@ -119,7 +125,7 @@ function Agenda() {
   const diaFechadoHoje = fechadoEm(data);
   const funcionamento = abreEm(data);
   // almoço do pet shop (Meu pet shop > Horário): intervalo fechado todo dia, sem bloqueio manual
-  const almoco = diaFechadoHoje ? null : almocoDoDia(petshop.horario, data);
+  const almoco = diaFechadoHoje || bloqueioDoDiaTodo(data) ? null : almocoDoDia(petshop.horario, data);
   const linhas = useMemo(() => {
     type Linha = { tipo: "ag"; a: AgendamentoCompleto } | { tipo: "livre"; de: number; ate: number } | { tipo: "bloq"; t: Trecho } | { tipo: "almoco"; de: number; ate: number };
     const out: { de: number; linha: Linha }[] = [];
@@ -246,7 +252,8 @@ function Agenda() {
               const fechado = fechadoEm(d), abre = abreEm(d);
               const quantos = lista.length === 0 ? null : lista.length === 1 ? "1 horário" : `${lista.length} horários`;
               const horas = lista.length === 0 ? null : lista.length === 1 ? `às ${hora(lista[0].inicio)}` : `primeiro às ${hora(lista[0].inicio)}, último às ${hora(lista[lista.length - 1].inicio)}`;
-              const situacao = fechado ?? (abre ? null : "Fechado");
+              const bloqueado = bloqueioDoDiaTodo(d);
+              const situacao = fechado ?? (abre ? (bloqueado ? textoDoBloqueio(bloqueado) : null) : "Fechado");
               return (
                 <div role="listitem" key={d.getTime()}>
                 <button className={`g-agd-sem-dia${mesmoDia(d, new Date()) ? " hoje" : ""}${situacao ? " fech" : ""}`}
@@ -254,7 +261,7 @@ function Agenda() {
                   <span className="d">{nomeDiaCurto(d)}<b>{d.getDate()}</b></span>
                   <span className="t">
                     <b>{quantos ?? situacao ?? "Nenhum horário"}</b>
-                    <span>{[horas, quantos && situacao ? situacao.replace(/^Dia /, "dia ") : null, !quantos && abre ? `aberto das ${abre.abre} às ${abre.fecha}` : null, mesmoDia(d, new Date()) ? "hoje" : null].filter(Boolean).join(" · ")}</span>
+                    <span>{[horas, quantos && situacao ? situacao.replace(/^Dia /, "dia ") : null, !quantos && abre && !bloqueado ? `aberto das ${abre.abre} às ${abre.fecha}` : null, mesmoDia(d, new Date()) ? "hoje" : null].filter(Boolean).join(" · ")}</span>
                   </span>
                   {quantos && <span className="n" aria-hidden>{lista.length}</span>}
                   <ChevronRight aria-hidden />
@@ -266,7 +273,8 @@ function Agenda() {
           <div className="g-semana g-so-pc" style={{ "--dias": diasDaSemana.length, "--h-hora": `${H_HORA}px` } as React.CSSProperties}>
             <div className="g-semana-cab">
               <div />
-              {diasDaSemana.map((d) => <div key={d.getTime()} className={mesmoDia(d, new Date()) ? "hoje" : ""}>{nomeDiaCurto(d)}<b>{d.getDate()}</b>{!abreEm(d) && <small className="g-agd-fech" title={fechadoEm(d) ?? "O pet shop não abre neste dia"}>{fechadoEm(d)?.replace(/^Dia fechado: /, "Fechado: ").replace(/^Dia marcado como fechado$/, "Fechado") ?? "Fechado"}</small>}</div>)}
+              {diasDaSemana.map((d) => <div key={d.getTime()} className={mesmoDia(d, new Date()) ? "hoje" : ""}>{nomeDiaCurto(d)}<b>{d.getDate()}</b>{!abreEm(d) ? <small className="g-agd-fech" title={fechadoEm(d) ?? "O pet shop não abre neste dia"}>{fechadoEm(d)?.replace(/^Dia fechado: /, "Fechado: ").replace(/^Dia marcado como fechado$/, "Fechado") ?? "Fechado"}</small>
+                : bloqueioDoDiaTodo(d) ? <small className="g-agd-fech" title="O pet shop inteiro está bloqueado neste dia">{textoDoBloqueio(bloqueioDoDiaTodo(d)!)}</small> : null}</div>)}
             </div>
             <div className="g-semana-horas" style={{ height: ((faixa.fim - faixa.ini) / 60) * H_HORA }}>
               {Array.from({ length: (faixa.fim - faixa.ini) / 60 }, (_, i) => i).slice(1).map((i) => <span key={i} style={{ top: i * H_HORA }}>{deMin(faixa.ini + i * 60)}</span>)}
@@ -290,7 +298,7 @@ function Agenda() {
               const topoDe = (ms: number) => { const x = new Date(ms); return ((x.getHours() * 60 + x.getMinutes() - faixa.ini) / 60) * H_HORA; };
               const agora = new Date();
               return (
-                <div key={d.getTime()} className={`g-semana-col${abreEm(d) ? "" : " fechado"}${mesmoDia(d, new Date()) ? " hoje" : ""}`}
+                <div key={d.getTime()} className={`g-semana-col${abreEm(d) && !bloqueioDoDiaTodo(d) ? "" : " fechado"}${mesmoDia(d, new Date()) ? " hoje" : ""}`}
                   style={{ height: ((faixa.fim - faixa.ini) / 60) * H_HORA }}
                   onClick={(e) => {
                     if (e.target !== e.currentTarget) return;
@@ -301,7 +309,7 @@ function Agenda() {
                     <div className="g-agora" style={{ top: ((agora.getHours() * 60 + agora.getMinutes() - faixa.ini) / 60) * H_HORA }} />
                   )}
                   {(() => {
-                    const al = fechadoEm(d) ? null : almocoDoDia(petshop.horario, d);
+                    const al = fechadoEm(d) || bloqueioDoDiaTodo(d) ? null : almocoDoDia(petshop.horario, d);
                     return al && <div className="g-agd-faixa almoco" title={`Almoço, das ${al.de} às ${al.ate}. Muda em Meu pet shop, no horário de funcionamento.`}
                       style={{ top: ((al.inicio - faixa.ini) / 60) * H_HORA, height: ((al.fim - al.inicio) / 60) * H_HORA }}><Utensils aria-hidden /><span>Almoço</span></div>;
                   })()}
@@ -356,6 +364,7 @@ function Agenda() {
           <div className="g-card">
             <Vazio titulo={funcionamento ? "Dia livre por enquanto" : diaFechadoHoje ?? "O pet shop não abre neste dia"}
               texto={funcionamento ? `Nenhum horário marcado. Aberto das ${funcionamento.abre} às ${funcionamento.fecha}.` : diaFechadoHoje ? "O pet shop não abre neste dia (a lista fica em Meu pet shop, em Feriados e dias fechados). Se for atender mesmo assim, é só marcar." : "Se for atender mesmo assim, é só marcar."}>
+              {!funcionamento && souDono && <p className="g-pp" style={{ textAlign: "center" }}><Link className="g-link" href="/gestao/app/meu-petshop#feriados">Feriados e dias fechados</Link>: lá o botão Colocar os feriados nacionais põe todos os do ano de uma vez.</p>}
               <div className="g-fila" style={{ justifyContent: "center" }}>
                 <button className="g-btn pri" onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>
                 <button className="g-btn sec" onClick={() => abrirAssistente()}>Pedir ao Mozart</button>
@@ -366,7 +375,7 @@ function Agenda() {
           <div className="g-duas">
             <div className="g-tempo">
               {!funcionamento && (
-                <div className="g-aviso g-agd-diafech" role="status"><CalendarOff aria-hidden /><span className="g-cresce"><b>{diaFechadoHoje ?? "O pet shop não abre neste dia"}.</b> {diaFechadoHoje ? "O pet shop não abre neste dia. " : ""}{doDia.some((a) => !["cancelado", "faltou"].includes(a.status)) ? "Os horários abaixo continuam marcados: confira com o tutor ou remarque." : "Se for atender mesmo assim, é só marcar."}</span></div>
+                <div className="g-aviso g-agd-diafech" role="status"><CalendarOff aria-hidden /><span className="g-cresce"><b>{diaFechadoHoje ?? "O pet shop não abre neste dia"}.</b> {diaFechadoHoje ? "O pet shop não abre neste dia. " : ""}{doDia.some((a) => !["cancelado", "faltou"].includes(a.status)) ? "Os horários abaixo continuam marcados: confira com o tutor ou remarque." : "Se for atender mesmo assim, é só marcar."}{souDono && <> <Link className="g-link" href="/gestao/app/meu-petshop#feriados">Feriados e dias fechados</Link> (com o botão Colocar os feriados nacionais).</>}</span></div>
               )}
               {linhas.map((l, i) => l.tipo === "livre" ? (
                 <div className="g-hora-grupo livre" key={`l${i}`}>

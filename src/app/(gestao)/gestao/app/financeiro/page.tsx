@@ -68,7 +68,7 @@ function porCategoria(lista: Lancamento[], petshop: { modulos?: string[] | null 
 }
 
 function Financeiro() {
-  const { sb, petshop, equipe, souDono } = useGestao();
+  const { sb, petshop, equipe, souDono, posso } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const agora = new Date();
@@ -342,6 +342,9 @@ function Financeiro() {
                 aoEditar={(c) => abrir({ tipo: "conta", de: c.tipo as Tipo, conta: c })}
                 aoBaixar={(c) => abrir({ tipo: "baixa", conta: c })}
                 aoCriar={() => abrir({ tipo: "conta", de: aba === "pagar" ? "saida" : "entrada" })} />
+            )}
+            {aba === "receber" && contas.aReceber.length > 0 && posso("clientes") && (
+              <p className="g-muted g-pp">Por pessoa, como no caderno: <Link className="g-link" href="/gestao/app/clientes?filtro=deve">Quem me deve</Link>, em Clientes (também no Caixa, em Contas de clientes).</p>
             )}
             {aba === "receber" && souDono && (
               <p className="g-muted g-pp">Multa e juros por atraso, chave Pix e a mensagem de cobrança: <Link className="g-link" href="/gestao/app/meu-petshop#opcoes-cobranca">Opções de cobrança</Link>.</p>

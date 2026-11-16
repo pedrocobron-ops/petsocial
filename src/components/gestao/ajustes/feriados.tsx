@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarOff, Plus, Trash2 } from "lucide-react";
 import { feriadosNacionais, type DiaEspecial } from "@/lib/gestao/feriados";
 import { juntar } from "@/lib/gestao/creche";
@@ -37,6 +37,9 @@ export default function Feriados() {
   // toque duplo: o segundo toque chega antes da tela trocar; a trava é na hora, e o toque logo depois de gravar não vira erro
   const trava = useRef(false);
   const gravouEm = useRef(0);
+  // atalho vindo da Agenda (dia fechado, bloqueio de feriado): /gestao/app/meu-petshop#feriados
+  const raiz = useRef<HTMLElement>(null);
+  useEffect(() => { if (window.location.hash === "#feriados") raiz.current?.scrollIntoView({ block: "start" }); }, []);
   if (!souDono) return null;
 
   const todos = calendario?.dias ?? [];
@@ -118,7 +121,7 @@ export default function Feriados() {
   );
 
   return (
-    <section className="g-card g-pilha" id="feriados">
+    <section className="g-card g-pilha" id="feriados" ref={raiz}>
       <div className="g-mp-t">
         <Tile icone={CalendarOff} tom="manteiga" />
         <div><h2>Feriados e dias fechados</h2><p className="g-muted g-p">As datas em que vocês não abrem{temHotel ? ", ou que contam como feriado no preço do hotel" : ""}. Lista vazia, nada muda.</p></div>

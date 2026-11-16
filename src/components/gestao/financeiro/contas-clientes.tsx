@@ -126,7 +126,7 @@ export function ContasDeClientes({ aoMudar, largo }: { aoMudar?: () => void | Pr
   const mudou = async () => { await recarregar(); await aoMudar?.(); };
 
   return (
-    <section className={`g-card gr-card${largo ? " largo" : ""}`} aria-label="Contas de clientes">
+    <section id="contas-clientes" className={`g-card gr-card${largo ? " largo" : ""}`} aria-label="Contas de clientes">
       <div className="g-card-t">
         <h3><Tile icone={HandCoins} tom="manteiga" tamanho="p" />Contas de clientes</h3>
         {devedores.length > 0 && <b className="g-tab">{brl(total)}</b>}

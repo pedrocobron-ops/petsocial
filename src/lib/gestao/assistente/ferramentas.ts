@@ -88,8 +88,10 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ termo: S }) },
   { grava: false, financeiro: true, name: "resumo_financeiro", description: "Soma o dinheiro que entrou e saiu entre dois dias (inclusive), por categoria e por forma de pagamento, e informa se há caixa aberto.",
     input_schema: obj({ de: DIA, ate: DIA }, ["de", "ate"]) },
-  { grava: false, financeiro: true, name: "contas_em_aberto", description: "Lista contas a pagar e a receber ainda não pagas, com vencimento.",
+  { grava: false, financeiro: true, name: "contas_em_aberto", description: "Lista contas a pagar e a receber ainda não pagas, com vencimento (as a receber dizem de qual tutor são). Para \"quem me deve\", use quem_me_deve.",
     input_schema: obj({}) },
+  { grava: false, financeiro: true, name: "quem_me_deve", description: "Quem está devendo: os clientes que ficaram de pagar depois, um por pessoa, com o total, quantas contas, o que está atrasado e desde quando (igual ao Caixa, Contas de clientes). Use para \"quem me deve?\", \"quanto a Joana deve?\" (com cliente_id, só aquele tutor e as contas dele).",
+    input_schema: obj({ cliente_id: S }) },
   { grava: false, name: "ver_hospedes", description: "Creche e hotel: mostra quem está na casa agora (desde quando, saída prevista, diárias até aqui) e as reservas dos próximos dias.",
     input_schema: obj({ dias: { ...N, description: "Até quantos dias à frente olhar as reservas. Padrão: 7" } }) },
   { grava: false, name: "ver_pacotes", description: "Lista os modelos de pacote à venda (com pacote_id e preço) e os pacotes ativos, com usados e restantes. Com pet_id, só os pacotes daquele pet.",
@@ -128,10 +130,14 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ troco_inicial: N }) },
   { grava: true, financeiro: true, name: "fechar_caixa", description: "Fecha o caixa aberto. Passe o dinheiro contado na gaveta (só dinheiro; Pix e cartão não entram). O cartão mostra o esperado, o contado e a diferença.",
     input_schema: obj({ valor_contado: N, obs: S }, ["valor_contado"]) },
-  { grava: true, financeiro: true, name: "lancar_dinheiro", description: "Registra dinheiro que já entrou ou saiu hoje (entra no caixa aberto). Para receber um atendimento, passe agendamento_id: ele fica como concluído.",
-    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e material, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S }, ["tipo", "valor", "forma", "categoria"]) },
-  { grava: true, financeiro: true, name: "criar_conta", description: "Cria uma conta a pagar (saida) ou a receber (entrada) com vencimento futuro.",
+  { grava: true, financeiro: true, name: "lancar_dinheiro", description: "Registra dinheiro NOVO que entrou ou saiu hoje (entra no caixa aberto): venda, serviço sem horário, despesa. Para receber um atendimento, passe agendamento_id: ele fica como concluído. Nunca use para um cliente pagando o que devia (fiado, conta anotada, taxa de falta): isso é receber_de_cliente, que dá baixa nas contas. Se o dinheiro veio de um cliente, passe cliente_id; se ele tem contas em aberto, a ferramenta recusa e manda usar receber_de_cliente, a não ser que a pessoa tenha dito que é outra coisa (aí passe nao_e_divida: true).",
+    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e material, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S, cliente_id: { ...S, description: "Tutor que pagou (de buscar_pets)" }, nao_e_divida: { ...B, description: "true só quando a pessoa disse que este dinheiro não é pagamento do que o cliente devia" } }, ["tipo", "valor", "forma", "categoria"]) },
+  { grava: true, financeiro: true, name: "criar_conta", description: "Cria uma conta a pagar (saida) ou uma conta a receber (entrada) que não é de um cliente. O que um cliente ficou devendo é anotar_divida.",
     input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, vencimento: DIA, descricao: S, categoria: S }, ["tipo", "valor", "vencimento", "descricao"]) },
+  { grava: true, financeiro: true, name: "anotar_divida", description: "Anota o que um cliente ficou devendo (fiado, taxa de falta, perfume que levou e vai pagar depois). Fica na ficha do tutor (\"Deve R$ X\"), em Caixa, Contas de clientes, em A receber e aparece como \"Deve de antes\" no próximo atendimento. Precisa do cliente_id (de buscar_pets). Sem vencimento, vence em 7 dias.",
+    input_schema: obj({ cliente_id: S, valor: N, descricao: { ...S, description: "Do que é (ex.: Perfume, Taxa de falta de 18/11)" }, vencimento: DIA, categoria: { ...S, description: "Padrão: Outros" } }, ["cliente_id", "valor", "descricao"]) },
+  { grava: true, financeiro: true, name: "receber_de_cliente", description: "Um cliente pagou o que devia (\"o dono do Bob me pagou os 35\", \"a Joana acertou o fiado\"): dá baixa nas contas em aberto dele, da mais antiga para a mais nova, e o dinheiro entra uma vez só. Pode ser só uma parte: o resto continua devido. Se pagou mais do que deve, pergunte se a diferença fica de crédito para ele (sobra: \"credito\"). O cartão mostra quanto ele deve, quais contas quita e o que fica faltando.",
+    input_schema: obj({ cliente_id: { ...S, description: "Tutor (de buscar_pets)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, sobra: { type: "string", enum: ["credito"], description: "Só quando pagou a mais e a pessoa disse que a diferença fica de crédito" } }, ["cliente_id", "valor", "forma"]) },
   { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar. Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento.",
     input_schema: obj({ produto_id: S, produto_nome: S, unidade: { ...S, description: "un, kg, g, L, ml, pacote, saco" }, tipo: { type: "string", enum: ["entrada", "saida"] }, quantidade: N, custo_unitario: N, lancar_despesa: B, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, motivo: S }, ["tipo", "quantidade"]) },
 ];
@@ -151,6 +157,81 @@ async function petPorId(c: Contexto, id: unknown) {
   exigir(data, "Pet não encontrado: use buscar_pets.");
   return data;
 }
+/* ---------- o que os clientes devem (as mesmas contas do Caixa, Contas de clientes, e da ficha do tutor) ---------- */
+
+type ContaDeCliente = { id: string; valor: number; descricao: string | null; categoria: string; vencimento: string | null; data: string; criado_em: string; cliente_id: string | null };
+const real = (n: number) => Math.round(n * 100) / 100;
+/** Da mais antiga para a mais nova: vencimento (ou o dia da conta) e, no empate, quando foi anotada. */
+const maisAntigaPrimeiro = (a: ContaDeCliente, b: ContaDeCliente) =>
+  (a.vencimento ?? a.data).localeCompare(b.vencimento ?? b.data) || a.criado_em.localeCompare(b.criado_em) || a.id.localeCompare(b.id);
+/** Contas a receber em aberto ligadas a um cliente (de um só, ou de todos). */
+async function contasDeClientes(c: Contexto, clienteId?: string): Promise<ContaDeCliente[]> {
+  let q = c.sb.from("lancamentos").select("id, valor, descricao, categoria, vencimento, data, criado_em, cliente_id").eq("petshop_id", c.petshop.id).eq("pago", false).eq("tipo", "entrada").not("cliente_id", "is", null);
+  if (clienteId) q = q.eq("cliente_id", clienteId);
+  const ls = ok(await q.order("id").limit(1000)) as ContaDeCliente[];
+  return ls.map((l) => ({ ...l, valor: Number(l.valor) })).sort(maisAntigaPrimeiro);
+}
+const nomeDaConta = (l: { descricao: string | null; categoria: string }) => l.descricao?.trim() || l.categoria;
+const umaOuMais = (n: number) => (n === 1 ? "1 conta" : `${n} contas`);
+/** Por pessoa: total, contas, atrasado e desde quando. */
+function devedores(contas: ContaDeCliente[], nomes: Map<string, string>, hoje: string) {
+  const m = new Map<string, { cliente_id: string; tutor: string; total: number; contas: ContaDeCliente[]; atrasado: number; desde: string }>();
+  for (const l of contas) {
+    const id = l.cliente_id!;
+    const d = m.get(id) ?? { cliente_id: id, tutor: nomes.get(id) ?? "Tutor", total: 0, contas: [], atrasado: 0, desde: l.criado_em };
+    d.total = real(d.total + l.valor);
+    d.contas.push(l);
+    if (l.vencimento && l.vencimento < hoje) d.atrasado = real(d.atrasado + l.valor);
+    if (l.criado_em < d.desde) d.desde = l.criado_em;
+    m.set(id, d);
+  }
+  return [...m.values()].sort((a, b) => b.atrasado - a.atrasado || b.total - a.total);
+}
+async function nomesDosClientes(c: Contexto, ids: string[]) {
+  const m = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data } = await c.sb.from("clientes").select("id, nome").eq("petshop_id", c.petshop.id).in("id", ids.slice(i, i + 150));
+    for (const x of data ?? []) m.set(x.id, x.nome);
+  }
+  return m;
+}
+async function clientePorId(c: Contexto, id: unknown) {
+  const cid = uuid(id);
+  exigir(cid, "cliente_id inválido: use buscar_pets para pegar o cliente_id do tutor.");
+  const { data } = await c.sb.from("clientes").select("id, nome").eq("petshop_id", c.petshop.id).eq("id", cid).maybeSingle();
+  exigir(data, "Tutor não encontrado: use buscar_pets.");
+  return data;
+}
+const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] || nome;
+const FORMA_FRASE: Record<string, string> = { pix: "no Pix", dinheiro: "em dinheiro", debito: "no débito", credito: "no crédito", outro: "de outro jeito" };
+const EXTENSO = ["", "a conta", "as duas", "as três", "as quatro", "as cinco"];
+
+/** Como o pagamento de um cliente quita as contas dele: da mais antiga para a mais nova; a última pode ficar em parte. */
+async function planoDoRecebimento(c: Contexto, e: Entrada) {
+  exigir(c.vejoFinanceiro, "Esta pessoa não tem acesso ao financeiro.");
+  const cliente = await clientePorId(c, e.cliente_id);
+  const valor = numero(e.valor);
+  exigir(valor && valor > 0 && valor < 1e6, "Falta o valor que o cliente pagou.");
+  exigir(FORMA[String(e.forma)], "Falta a forma de pagamento: pergunte (Pix, dinheiro, débito ou crédito).");
+  const contas = await contasDeClientes(c, cliente.id);
+  const nome = primeiroNome(cliente.nome);
+  exigir(contas.length, `${cliente.nome} não tem nenhuma conta em aberto. Nada foi feito. Se este dinheiro é de outra coisa (um serviço ou venda nova), use lancar_dinheiro com cliente_id e nao_e_divida: true.`);
+  const total = real(contas.reduce((s, l) => s + l.valor, 0));
+  const pago = real(valor);
+  const sobra = real(Math.max(0, pago - total));
+  exigir(!(sobra > 0) || e.sobra === "credito", `${cliente.nome} deve só ${brl(total)} (${umaOuMais(contas.length)}), e o pagamento foi de ${brl(pago)}. Nada foi feito. Pergunte à pessoa se os ${brl(sobra)} a mais ficam de crédito para ${nome} (aí chame de novo com sobra: "credito") ou se o valor certo é ${brl(total)}.`);
+  let resta = real(pago - sobra);
+  const partes: { conta: ContaDeCliente; valor: number; quita: boolean }[] = [];
+  for (const l of contas) {
+    if (!(resta > 0)) break;
+    const v = real(Math.min(resta, l.valor));
+    partes.push({ conta: l, valor: v, quita: v >= l.valor });
+    resta = real(resta - v);
+  }
+  const fica = real(total - (pago - sobra));
+  return { cliente, nome, contas, total, pago, sobra, partes, fica };
+}
+
 const servicoPorId = (c: Contexto, id: unknown) => c.servicos.find((s) => s.id === id) ?? null;
 /** Os outros serviços pedidos para o mesmo horário (sem repetir e sem o principal). */
 function outrosServicosDoPedido(c: Contexto, e: Entrada, principalId: string): Servico[] {
@@ -385,6 +466,49 @@ function situacaoDoVencimento(vence: string | null, hoje: string) {
   return d < 0 ? `venceu há ${-d} ${d === -1 ? "dia" : "dias"}` : d === 0 ? "vence hoje" : d === 1 ? "vence amanhã" : `vence em ${d} dias`;
 }
 
+async function planoDaDivida(c: Contexto, e: Entrada) {
+  exigir(c.vejoFinanceiro, "Esta pessoa não tem acesso ao financeiro.");
+  const cliente = await clientePorId(c, e.cliente_id);
+  const valor = numero(e.valor);
+  exigir(valor && valor > 0 && valor < 1e6, "Falta o valor.");
+  const descricao = texto(e.descricao, 120);
+  exigir(descricao, "Falta dizer do que é a conta (ex.: Perfume, Taxa de falta).");
+  const hoje = c.agora.slice(0, 10);
+  const vencimento = e.vencimento ? String(e.vencimento) : somaDiasLocal(hoje, 7);
+  exigir(RE_DIA.test(vencimento), "vencimento no formato AAAA-MM-DD.");
+  const jaDeve = real((await contasDeClientes(c, cliente.id)).reduce((s, l) => s + l.valor, 0));
+  return { cliente, valor: real(valor), descricao, vencimento, categoria: texto(e.categoria, 60) || "Outros", jaDeve };
+}
+
+/**
+ * Entrada de dinheiro solta que parece ser pagamento de dívida: recusa e manda usar receber_de_cliente (senão o dinheiro
+ * entra duas vezes: agora e quando derem baixa na conta). Vale quando o cliente informado deve, ou quando a descrição cita
+ * o nome de um tutor (ou de um pet dele) que tem conta em aberto.
+ */
+async function conferirSeEDivida(c: Contexto, e: Entrada) {
+  if (e.tipo !== "entrada" || uuid(e.agendamento_id) || e.nao_e_divida === true) return;
+  const contas = await contasDeClientes(c);
+  if (!contas.length) return;
+  const ids = [...new Set(contas.map((l) => l.cliente_id!))];
+  const cid = uuid(e.cliente_id);
+  let suspeitos: string[] = [];
+  if (cid && ids.includes(cid)) suspeitos = [cid];
+  else if (!cid) {
+    const frase = ` ${semAcento(texto(e.descricao)).replace(/[^a-z0-9]+/g, " ")} `;
+    if (frase.trim()) {
+      const { data: pets } = await c.sb.from("pets").select("nome, cliente_id").eq("petshop_id", c.petshop.id).in("cliente_id", ids.slice(0, 300));
+      const nomes = await nomesDosClientes(c, ids.slice(0, 300));
+      const cita = (n: string) => { const w = semAcento(n).replace(/[^a-z0-9]+/g, " ").trim(); return w.length >= 3 && frase.includes(` ${w} `); };
+      suspeitos = ids.filter((id) => cita(primeiroNome(nomes.get(id) ?? "")) || cita(nomes.get(id) ?? "") || (pets ?? []).some((p) => p.cliente_id === id && cita(p.nome)));
+    }
+  }
+  if (!suspeitos.length) return;
+  const nomes = await nomesDosClientes(c, suspeitos);
+  const quem = devedores(contas.filter((l) => suspeitos.includes(l.cliente_id!)), nomes, c.agora.slice(0, 10))
+    .map((d) => `${d.tutor} (cliente_id ${d.cliente_id}) deve ${brl(d.total)} em ${umaOuMais(d.contas.length)}`).join("; ");
+  throw new ErroDeUso(`Nada foi lançado: ${quem}. Se este dinheiro é pagamento do que o cliente devia, use receber_de_cliente com esse cliente_id: ele dá baixa nas contas e o dinheiro entra uma vez só. Lançar como entrada solta deixaria a dívida aberta e contaria o dinheiro duas vezes. Só use lancar_dinheiro de novo, com nao_e_divida: true, se a pessoa disser que é outra coisa (um serviço ou venda nova).`);
+}
+
 async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resultado: unknown; links?: LinkZap[] }> {
   const { sb, petshop } = c;
   const hoje = c.agora.slice(0, 10);
@@ -397,10 +521,19 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       const achados = todos.filter((p) => semAcento(p.nome).includes(alvo) || semAcento(p.clientes?.nome ?? "").includes(alvo) || (digitos.length >= 4 && (p.clientes?.telefone ?? "").replace(/\D/g, "").includes(digitos))).slice(0, 12);
       if (!achados.length) return { resultado: { pets: [], aviso: "Nenhum pet encontrado com esse nome. Pergunte se quer cadastrar." } };
       const ids = achados.map((p) => p.id);
-      const [ags, pacotes] = await Promise.all([
+      const tutores = [...new Set(achados.map((p) => p.clientes?.id).filter((x): x is string => Boolean(x)))];
+      const [ags, pacotes, abertas] = await Promise.all([
         sb.from("agendamentos").select("pet_id, inicio, status, servicos(nome)").eq("petshop_id", petshop.id).in("pet_id", ids).order("inicio", { ascending: false }).limit(200),
         sb.from("pacotes_clientes").select("pet_id, nome, total, usados, vence_em").eq("petshop_id", petshop.id).in("pet_id", ids).eq("ativo", true),
+        // quanto cada tutor deve (só para quem mexe com dinheiro): o Mozart sabe que um pagamento pode ser de dívida
+        c.vejoFinanceiro && tutores.length
+          ? sb.from("lancamentos").select("cliente_id, valor").eq("petshop_id", petshop.id).eq("pago", false).eq("tipo", "entrada").in("cliente_id", tutores).limit(1000)
+          : Promise.resolve({ data: [] as { cliente_id: string | null; valor: number }[] }),
       ]);
+      const deve = (id: string | undefined) => {
+        const ls = (abertas.data ?? []).filter((l) => id && l.cliente_id === id);
+        return ls.length ? `${brl(real(ls.reduce((s, l) => s + Number(l.valor), 0)))} em ${umaOuMais(ls.length)}` : null;
+      };
       return { resultado: { pets: achados.map((p) => {
         const meus = (ags.data ?? []).filter((a) => a.pet_id === p.id);
         const ultimo = meus.find((a) => a.status === "concluido");
@@ -411,6 +544,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
           ultimo_atendimento: ultimo ? `${utcParaLocal(ultimo.inicio, c.fusoMin).slice(0, 10)} (${ultimo.servicos?.nome ?? "atendimento"})` : "nunca",
           proximo_horario: proximo ? utcParaLocal(proximo.inicio, c.fusoMin) : null,
           pacotes: (pacotes.data ?? []).filter((x) => x.pet_id === p.id).map((x) => `${x.nome}: ${x.usados}/${x.total}`),
+          ...(c.vejoFinanceiro ? { tutor_deve: deve(p.clientes?.id) ?? "nada" } : {}),
         };
       }) } };
     }
@@ -505,9 +639,25 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     }
     case "contas_em_aberto": {
       exigir(c.cuidoDoFinanceiro, "Esta pessoa opera o caixa, mas não tem a área Financeiro: não vê o resumo do período nem as contas. O dono pode liberar em Equipe.");
-      const ls = ok(await sb.from("lancamentos").select("id, tipo, valor, descricao, categoria, vencimento").eq("petshop_id", petshop.id).eq("pago", false).order("vencimento").limit(200));
+      const ls = ok(await sb.from("lancamentos").select("id, tipo, valor, descricao, categoria, vencimento, cliente_id").eq("petshop_id", petshop.id).eq("pago", false).order("vencimento").limit(200));
+      const nomes = await nomesDosClientes(c, [...new Set(ls.map((l) => l.cliente_id).filter((x): x is string => Boolean(x)))]);
       return { resultado: { hoje, a_pagar: ls.filter((l) => l.tipo === "saida").map((l) => ({ descricao: l.descricao ?? l.categoria, valor: l.valor, vencimento: l.vencimento, atrasada: (l.vencimento ?? hoje) < hoje })),
-        a_receber: ls.filter((l) => l.tipo === "entrada").map((l) => ({ descricao: l.descricao ?? l.categoria, valor: l.valor, vencimento: l.vencimento })) } };
+        a_receber: ls.filter((l) => l.tipo === "entrada").map((l) => ({ descricao: l.descricao ?? l.categoria, tutor: l.cliente_id ? nomes.get(l.cliente_id) ?? null : null, valor: l.valor, vencimento: l.vencimento })),
+        dica: "Para dizer quem deve, some por tutor (ou use quem_me_deve)." } };
+    }
+    case "quem_me_deve": {
+      const so = e.cliente_id ? (await clientePorId(c, e.cliente_id)).id : undefined;
+      const contas = await contasDeClientes(c, so);
+      const nomes = await nomesDosClientes(c, [...new Set(contas.map((l) => l.cliente_id!))]);
+      const lista = devedores(contas, nomes, hoje);
+      const total = real(lista.reduce((s, d) => s + d.total, 0));
+      return { resultado: {
+        hoje, total_a_receber: total, pessoas: lista.length,
+        devedores: lista.slice(0, 30).map((d) => ({ tutor: d.tutor, cliente_id: d.cliente_id, deve: d.total, contas: d.contas.length, atrasado: d.atrasado, desde: utcParaLocal(d.desde, c.fusoMin).slice(0, 10),
+          ...(so || lista.length <= 5 ? { quais: d.contas.map((l) => ({ descricao: nomeDaConta(l), valor: l.valor, vencimento: l.vencimento })) } : {}) })),
+        ...(lista.length > 30 ? { aviso: `Mostrando 30 de ${lista.length}. A lista inteira fica em Caixa, Contas de clientes.` } : {}),
+        onde_ver: "Caixa, Contas de clientes (e na ficha de cada tutor)",
+      } };
     }
     case "ver_hospedes": {
       const dias = Math.max(0, Math.min(60, numero(e.dias) ?? 7));
@@ -828,12 +978,34 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       exigir(FORMA[String(e.forma)], "Falta a forma de pagamento: pergunte (Pix, dinheiro, débito ou crédito).");
       const linhas: [string, string][] = [[e.tipo === "saida" ? "Saiu" : "Entrou", brl(valor)], ["Forma", FORMA[String(e.forma)]], ["Categoria", texto(e.categoria, 60) || "Outros"]];
       if (texto(e.descricao)) linhas.push(["Descrição", texto(e.descricao)]);
+      await conferirSeEDivida(c, e);
+      if (uuid(e.cliente_id)) linhas.push(["Cliente", (await clientePorId(c, e.cliente_id)).nome]);
       if (e.agendamento_id) {
         const { data: a } = await c.sb.from("agendamentos").select("pets(nome), servicos(nome)").eq("petshop_id", c.petshop.id).eq("id", uuid(e.agendamento_id) ?? "00000000-0000-0000-0000-000000000000").maybeSingle();
         exigir(a, "agendamento_id inválido.");
         linhas.push(["Atendimento", `${a.servicos?.nome ?? "atendimento"} · ${a.pets?.nome ?? ""} (fica concluído)`]);
       }
       return { titulo: e.tipo === "saida" ? "Lançar saída" : "Lançar entrada", linhas };
+    }
+    case "anotar_divida": {
+      const p = await planoDaDivida(c, e);
+      const linhas: [string, string][] = [["Cliente", p.cliente.nome], ["O quê", p.descricao], ["Valor", brl(p.valor)], ["Vence", quandoLocal(p.vencimento)], ["Categoria", p.categoria]];
+      if (p.jaDeve > 0) linhas.push(["Já devia", `${brl(p.jaDeve)}: fica devendo ${brl(real(p.jaDeve + p.valor))}`]);
+      linhas.push(["Onde aparece", "na ficha do tutor, em Contas de clientes e no próximo atendimento"]);
+      return { titulo: `Anotar o que ${primeiroNome(p.cliente.nome)} deve`, linhas };
+    }
+    case "receber_de_cliente": {
+      const p = await planoDoRecebimento(c, e);
+      const todas = p.partes.length === p.contas.length && p.partes.every((x) => x.quita);
+      const n = p.partes.filter((x) => x.quita).length;
+      const pedido = `${p.nome} deve ${brl(p.total)} (${umaOuMais(p.contas.length)}). Receber ${brl(p.pago)} ${FORMA_FRASE[String(e.forma)]} e ${todas ? `quitar ${p.contas.length <= 5 ? EXTENSO[p.contas.length] : `as ${p.contas.length}`}` : n ? `quitar ${n === 1 ? "1 conta" : `${n} contas`}, ficando ${brl(p.fica)}` : `abater, ficando ${brl(p.fica)}`}${p.sobra > 0 ? `, com ${brl(p.sobra)} de crédito` : ""}?`;
+      const linhas: [string, string][] = [["Resumo", pedido], ["Recebe", `${brl(p.pago)} ${FORMA_FRASE[String(e.forma)]}`]];
+      for (const x of p.partes) linhas.push([`· ${nomeDaConta(x.conta)}`, x.quita ? `${brl(x.valor)}: quitada` : `${brl(x.valor)} de ${brl(x.conta.valor)}: faltam ${brl(real(x.conta.valor - x.valor))}`]);
+      const intocadas = p.contas.length - p.partes.length;
+      if (intocadas > 0) linhas.push(["Continua em aberto", `${umaOuMais(intocadas)} mais nova${intocadas === 1 ? "" : "s"}`]);
+      linhas.push(["Fica devendo", p.fica > 0 ? brl(p.fica) : "nada"]);
+      if (p.sobra > 0) linhas.push(["Fica de crédito", `${brl(p.sobra)} para ${p.nome} usar depois`]);
+      return { titulo: `Receber de ${p.nome}`, linhas };
     }
     case "criar_conta": {
       exigir(c.vejoFinanceiro, "Esta pessoa não tem acesso ao financeiro.");
@@ -877,6 +1049,11 @@ async function caixaAbertoId(c: Contexto) {
 export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unknown> {
   const { sb, petshop } = c;
   const hoje = c.agora.slice(0, 10);
+  if (nome === "receber_de_cliente" && c.chave) {
+    // o mesmo "Pode fazer" chegou de novo: as contas já estão pagas, e o banco devolve o que a primeira vez fez
+    const ja = await sb.rpc("lote_ja_feito", { p_petshop: petshop.id, p_chave: c.chave });
+    if (ja.data) return { feito: true, repetido: true, aviso: "Isso já tinha sido recebido. Nada foi recebido de novo." };
+  }
   await descrever(c, nome, e); // confere de novo na hora de gravar
   switch (nome) {
     case "cadastrar_pet": {
@@ -1005,10 +1182,31 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
       const agId = uuid(e.agendamento_id);
       let clienteId: string | null = null;
       if (agId) clienteId = (await sb.from("agendamentos").select("pets(cliente_id)").eq("id", agId).maybeSingle()).data?.pets?.cliente_id ?? null;
+      else if (uuid(e.cliente_id)) clienteId = (await clientePorId(c, e.cliente_id)).id;
       ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: String(e.tipo), valor: numero(e.valor)!, forma: String(e.forma), categoria: texto(e.categoria, 60) || "Outros",
         descricao: texto(e.descricao) || null, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), agendamento_id: agId, cliente_id: clienteId, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
       if (agId && e.tipo === "entrada") await sb.from("agendamentos").update({ status: "concluido" }).eq("petshop_id", petshop.id).eq("id", agId);
       return { feito: true };
+    }
+    case "anotar_divida": {
+      const p = await planoDaDivida(c, e);
+      // igual a "Anotar o que X deve" da ficha do tutor: conta a receber ligada ao cliente
+      const r = await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "entrada", valor: p.valor, categoria: p.categoria, descricao: p.descricao, data: p.vencimento, vencimento: p.vencimento,
+        pago: false, forma: null, cliente_id: p.cliente.id, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single();
+      return { feito: true, conta_id: ok(r).id, cliente: p.cliente.nome, agora_deve: real(p.jaDeve + p.valor) };
+    }
+    case "receber_de_cliente": {
+      const p = await planoDoRecebimento(c, e);
+      const chave = c.chave ?? `mozart:${crypto.randomUUID()}`;
+      const forma = String(e.forma);
+      const passos: Record<string, unknown>[] = p.partes.map((x, i) => ({ t: "receber", conta: x.conta.id, valor: x.valor, forma, esperado: x.conta.valor, chave: `${chave}:r${i + 1}` }));
+      if (p.sobra > 0) {
+        passos.push({ t: "lancamento", chave: `${chave}:sobra`, linha: { tipo: "entrada", valor: p.sobra, forma, categoria: "Outros", descricao: `Pago a mais por ${p.nome} (ficou de crédito)`, pago: true, cliente_id: p.cliente.id, origem: "assistente" } });
+        passos.push({ t: "credito", cliente: p.cliente.id, valor: p.sobra, motivo: "Pagou a mais ao acertar o que devia", chave: `${chave}:credito` });
+      }
+      const r = await sb.rpc("cliente_receber_contas", { p_petshop: petshop.id, p_cliente: p.cliente.id, p_chave: chave, p_passos: passos as never });
+      if (r.error) throw new ErroDeUso(`Nada foi recebido: ${r.error.message}`);
+      return { feito: true, recebido: p.pago, contas_quitadas: p.partes.filter((x) => x.quita).length, ainda_deve: p.fica, credito_deixado: p.sobra };
     }
     case "criar_conta": {
       ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: e.tipo === "entrada" ? "entrada" : "saida", valor: numero(e.valor)!, categoria: texto(e.categoria, 60) || "Outros",

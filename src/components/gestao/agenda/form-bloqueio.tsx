@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Check, Lock, Repeat, Store, Trash2 } from "lucide-react";
 import type { Bloqueio } from "@/lib/gestao/tipos";
@@ -21,7 +22,7 @@ type Alcance = "este" | "proximos";
 export default function FormBloqueio({ bloqueio, diaInicial, profissionalInicial, aoFechar, aoSalvar }: {
   bloqueio?: Bloqueio; diaInicial?: string; profissionalInicial?: string | null; aoFechar: () => void; aoSalvar: () => void;
 }) {
-  const { sb, petshop, equipe, user } = useGestao();
+  const { sb, petshop, equipe, user, souDono } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
@@ -210,6 +211,9 @@ export default function FormBloqueio({ bloqueio, diaInicial, profissionalInicial
             {MOTIVOS_BLOQUEIO.map((m) => <button key={m} type="button" className="g-chip" aria-pressed={motivo === m} onClick={() => setMotivo(m)}>{m}</button>)}
           </div>
           <input className="g-input" value={motivo} maxLength={80} onChange={(e) => setMotivo(e.target.value)} placeholder="Ou escreva o motivo" aria-label="Motivo" />
+          {!bloqueio && !profId && /feriado/i.test(motivo) && (
+            <small>Feriado? {souDono ? <>Em <Link className="g-link" href="/gestao/app/meu-petshop#feriados">Feriados e dias fechados</Link></> : "Em Meu pet shop, Feriados e dias fechados,"} o botão Colocar os feriados nacionais põe todos os do ano de uma vez: a agenda e o link do cliente já sabem que o dia é fechado.</small>
+          )}
           {!bloqueio && !profId && /^almo[cç]o$/i.test(motivo.trim()) && (
             <small>O pet shop fecha para o almoço todo dia? Em Meu pet shop, no horário de funcionamento, dá para marcar o almoço uma vez só, sem prazo para acabar. O bloqueio daqui serve para um dia ou para algumas semanas.</small>
           )}
