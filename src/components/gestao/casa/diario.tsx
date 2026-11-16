@@ -10,6 +10,7 @@ import { AvatarPet, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio
 import { FolhaOcorrencia } from "./ocorrencias";
 import { BotaoFotos } from "./fotos-do-dia";
 import "./casa.css";
+import { CampoComVoz } from "../ditado";
 
 /**
  * Diário do dia (opção "casa.diario"): cada pet que está ou esteve na casa hoje, com os itens que o dono escolheu para marcar
@@ -168,8 +169,13 @@ function CartaoDiario({ estadia: e, dia, itens, registro, ocorrencias, comOcorre
 
       <label className="g-campo">
         <span>Recado para o tutor <small>(opcional)</small></span>
-        <textarea className="g-textarea" rows={2} maxLength={600} value={nota} placeholder="Ex.: fez amizade com a Mel e dormiu a tarde toda."
-          onChange={(ev) => { mexi.current = true; setNota(ev.target.value); setMeuTexto(null); }} onBlur={() => { if (!somenteLeitura() && (nota.trim() || registro?.nota)) void gravar({ itens: marcados, nota }); else mexi.current = false; }} />
+        {/* ditado: o falado entra depois do escrito e grava quando a pessoa para de falar (como ao sair do campo) */}
+        <CampoComVoz valor={nota} maxLength={600} rotulo="Ditar o recado para o tutor"
+          aoMudar={(t) => { mexi.current = true; setNota(t); setMeuTexto(null); }}
+          aoTerminar={(t) => { if (!somenteLeitura() && t.trim()) void gravar({ itens: marcados, nota: t }); }}>
+          <textarea className="g-textarea" rows={2} maxLength={600} value={nota} placeholder="Ex.: fez amizade com a Mel e dormiu a tarde toda."
+            onChange={(ev) => { mexi.current = true; setNota(ev.target.value); setMeuTexto(null); }} onBlur={() => { if (!somenteLeitura() && (nota.trim() || registro?.nota)) void gravar({ itens: marcados, nota }); else mexi.current = false; }} />
+        </CampoComVoz>
       </label>
 
       {ocorrencias.length > 0 && (

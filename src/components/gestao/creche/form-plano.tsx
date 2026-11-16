@@ -18,6 +18,7 @@ import { lerModelos, type ModeloDePlano } from "./modelos";
 import AcertoDaSaida from "./saida";
 import "./creche.css";
 import "@/components/gestao/hotel/hotel.css";
+import { CampoComVoz } from "../ditado";
 
 /** Quantos mensalistas (com plano que ainda vale) vêm em cada dia da semana. Índice = dia do banco (0 = domingo). */
 export function mensalistasPorDia(planos: PlanoCompleto[], hoje: string, semPlano?: string): number[] {
@@ -327,7 +328,7 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
           </div>
         )}
         <Campo rotulo="Observações">
-          <textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder="Horário que costuma chegar, quem busca, combinados com o tutor…" />
+          <CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações do plano"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder="Horário que costuma chegar, quem busca, combinados com o tutor…" /></CampoComVoz>
         </Campo>
         {erro && <p className="g-erro" role="alert">{erro}</p>}
         {plano && !encerrado && (

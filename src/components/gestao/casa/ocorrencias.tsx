@@ -11,6 +11,7 @@ import { Tile } from "../painel";
 import { AvatarPet, avisarMudanca, Campo, Folha, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { lerContatos, VeterinarioDoPet } from "./portaria";
 import "./casa.css";
+import { CampoComVoz } from "../ditado";
 
 /**
  * Ocorrências da estadia (opção "casa.ocorrencias"): briga, machucado, fuga, vômito. Um registro curto, com a hora e o nome
@@ -69,7 +70,7 @@ export function FolhaOcorrencia({ estadia, aoFechar, aoGravar }: { estadia: { id
           </div>
         </div>
         <Campo rotulo="Conte em poucas palavras" dica={tipo && tipo !== "outro" ? "Opcional: com quem, onde, o que foi feito." : undefined}>
-          <textarea className="g-textarea" rows={3} value={texto} maxLength={500} placeholder="Ex.: disputa por brinquedo com o Thor, sem ferimento. Separados na hora." onChange={(e) => { setTexto(e.target.value); setErro(null); }} />
+          <CampoComVoz valor={texto} aoMudar={(t) => { setTexto(t); setErro(null); }} maxLength={500} rotulo="Ditar o que aconteceu"><textarea className="g-textarea" rows={3} value={texto} maxLength={500} placeholder="Ex.: disputa por brinquedo com o Thor, sem ferimento. Separados na hora." onChange={(e) => { setTexto(e.target.value); setErro(null); }} /></CampoComVoz>
         </Campo>
         <Campo rotulo="A que horas (hoje)"><input type="time" className="g-input" style={{ maxWidth: 160 }} value={hhmm} onChange={(e) => setHhmm(e.target.value)} /></Campo>
         {comDiario && <label className="g-check"><input type="checkbox" checked={noDiario} onChange={(e) => setNoDiario(e.target.checked)} /><span>Contar ao tutor na mensagem do diário de hoje</span></label>}

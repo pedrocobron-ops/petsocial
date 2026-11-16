@@ -388,6 +388,39 @@ button.g-linha:hover, a.g-linha:hover { background: rgba(31, 27, 23, .03); borde
 .g-mic.enviar { background: var(--g-verde); color: #f6f1e8; }
 .g-mic:disabled { opacity: .5; }
 @keyframes g-pulsa { 0%, 100% { box-shadow: 0 0 0 0 rgba(179, 64, 46, .5); } 50% { box-shadow: 0 0 0 12px rgba(179, 64, 46, 0); } }
+/* falar com o Mozart (voz.tsx): microfone grande, segurar ou tocar; faixa "Ouvindo…" e "Enviando… · Editar" */
+.g-mic.voz { width: 56px; height: 56px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+.g-mic.voz svg { width: 26px; height: 26px; }
+.g-mic.voz:active { transform: scale(.95); }
+.g-mic.voz:focus-visible { outline: 3px solid var(--g-verde); outline-offset: 2px; }
+.g-voz-faixa { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 16px; border-top: 1px solid var(--g-linha); background: #fffdf9; font-size: .875rem; color: var(--g-escuro-b, var(--g-tinta)); overflow: hidden; }
+.g-voz-faixa span { color: var(--g-cinza); }
+.g-voz-faixa .g-link { margin-left: auto; min-height: 32px; padding: 0 4px; font-weight: 600; }
+.g-voz-faixa.ouvindo b { color: var(--g-vermelho); }
+.g-voz-faixa.erro { background: var(--g-vermelho-tint); color: #7a281b; }
+.g-voz-faixa.erro span { color: inherit; }
+.g-voz-ponto { width: 12px; height: 12px; flex: none; border-radius: 50%; background: var(--g-vermelho); animation: g-voz-ponto 1s ease-in-out infinite; }
+@keyframes g-voz-ponto { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+.g-voz-barra { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--g-verde); transform-origin: left; animation: g-voz-barra 2s linear forwards; }
+@keyframes g-voz-barra { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.g-ass-topo > div { min-width: 0; }
+.g-ass-topo > div span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-ass-topo .g-ico { flex: none; }
+.g-ass-ajustes { display: grid; gap: 4px; padding: 8px 16px; border-bottom: 1px solid var(--g-linha); background: var(--g-carta); }
+.g-ass-ajustes .g-check span { display: grid; gap: 1px; }
+.g-ass-ajustes small { font-size: .75rem; color: var(--g-cinza); }
+.g-ass-ouvir { display: inline-grid; place-items: center; width: 30px; height: 30px; margin: -8px 2px -8px -6px; border: 0; border-radius: 50%; background: transparent; color: var(--g-verde); cursor: pointer; }
+.g-ditado { position: relative; display: grid; gap: 6px; }
+.g-ditado > textarea, .g-ditado > input { padding-right: 56px; }
+.g-ditado-mic { position: absolute; right: 6px; top: 6px; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--g-carta-2, #f1ebe0); color: var(--g-verde); cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.g-ditado-mic svg { width: 20px; height: 20px; }
+.g-ditado-mic:hover { filter: brightness(.96); }
+.g-ditado-mic:focus-visible { outline: 3px solid var(--g-verde); outline-offset: 2px; }
+.g-ditado-mic.ouvindo { background: var(--g-vermelho); color: #fff; animation: g-pulsa 1.2s ease-in-out infinite; }
+.g-ditado-faixa { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .8125rem; color: var(--g-cinza); }
+.g-ditado-faixa b { color: var(--g-vermelho); }
+.g-ditado-faixa.erro { padding: 6px 10px; border-radius: 10px; background: var(--g-vermelho-tint); color: #7a281b; }
+.g-ass-ouvir:hover, .g-ass-ouvir[aria-pressed="true"] { background: var(--g-menta, rgba(30, 58, 47, .08)); }
 
 /* ---------- gráficos simples ---------- */
 .g-barras { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: end; gap: 6px; height: 140px; }
