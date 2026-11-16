@@ -19,6 +19,7 @@ import { TEMAS, aplicarTema, enviarLogo, tirarLogo } from "@/lib/gestao/identida
 import { FalaMozart, PERGUNTAS, PreviaPainel, TrilhoBoasVindas, chaveBoasVindas, oQueDeixeiPronto } from "./boas-vindas";
 import { guardarLembrado, lerLembrado } from "./lembrado";
 import LogoLoja from "./logo-loja";
+import { LojaNoGoogle } from "./ajustes/opcoes-boletim";
 import OpcoesDaLoja from "./ajustes/opcoes-loja";
 import "./ajustes/identidade.css";
 import "./guia-inicial.css";
@@ -606,6 +607,10 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
                   <OpcoesDaLoja solto />
                 </section>
               )}
+              <section className="g-guia-bloco" aria-label="Sua loja aparece no Google?">
+                <h3>Sua loja aparece no Google?</h3>
+                <LojaNoGoogle solto />
+              </section>
               <p className="g-muted">O que ficou para depois está em Meu pet shop. Agora, por onde quer começar?</p>
               <div className="g-guia-proximos">
                 <Link className="g-btn pri" href="/gestao/app/clientes?novo=1" onClick={aoFechar}><PawPrint />Cadastrar o primeiro pet</Link>

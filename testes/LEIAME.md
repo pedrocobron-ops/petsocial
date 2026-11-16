@@ -15,6 +15,9 @@ npx supabase start            # contêiner supabase_db_petsocial; o .env.local a
 #    GESTAO_CADERNO_FALSO=1: "Trazer do caderno" devolve uma leitura fixa (caderno-ia.ts, leituraDeTeste) sem chamar o modelo.
 npx next build
 ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_CADERNO_FALSO=1 npx next start -p 3214
+#    GESTAO_BOLETIM_FALSO=1: "Escrever com o Mozart" no boletim do pet responde sem chamar o modelo.
+npx next build
+ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_BOLETIM_FALSO=1 npx next start -p 3214
 
 # 3. Testes
 npm run test:banco       # unidade + banco/API + rotas do servidor   (~1,5 min)
@@ -53,6 +56,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 **unidade/**
 - `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, regras), a leitura da resposta
   (não sei, sugestão de pedido só com serviço e dia válidos, sem links), limites de conversa. Sem banco.
+- `boletim.js`: textos do boletim do pet (`src/lib/gestao/boletim.ts`): "Oi, Ana! O boletim do Thor de hoje: <link>" (primeiro nome
+  do tutor, do/da/de pelo sexo do pet), texto pronto só com os recados marcados, recados guardados e lidos de volta, dados do
+  modelo sem nada do tutor, limpeza da resposta do modelo (markdown, link, telefone) e o link do Google (aceitos e recusados).
 - `valor.js`: leitura estrita do dinheiro digitado (`lerValorEstrito`, `lerValor`, `lerNumeroEstrito`): "abc-5" e "52o,00" são recusados
   (nunca viram 5,00 ou 52,00), milhar e centavos com vírgula ou ponto, "R$" na frente, negativo só onde pode.
 - `proporcional.js`: primeira cobrança proporcional do mensalista **desde o começo do plano** (`sugestaoDoMes`), conferida à mão ao
@@ -106,6 +112,17 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   da loja de teste sobe até faltar uma). Precisa do servidor com `GESTAO_LINK_IA_FALSO=1`.
 - `tutor.js`: página do tutor: só os pets do tutor, fotos pela rota do servidor (assinatura e caminho reserva, bytes certos, cache privado),
   prazo das fotos, faxina dos arquivos (fila, órfãos), quem lê e grava, freio de 30 acessos por minuto. Precisa do servidor.
+- `boletim.js`: boletim do pet (migração 20261189): quem sobe foto e grava por área (agenda para o banho, creche e hotel para a
+  estadia; estoque, outro pet shop e anônimo não), conferências do `boletim_salvar` (visita, pet, pasta, assinatura, até 4 fotos,
+  foto de outro boletim), leitura por área, gravar direto na tabela recusado, foto trocada vai para a fila, `boletim_enviado`;
+  página pública (`boletim_publico`: só o que mostra, nada do tutor, nenhum caminho de foto), rota da foto (bytes, 404), página com
+  og:image e noindex; **valor e pagamento** só com `boletim.valores` (sem conta: R$ 90 falta 90; conta a receber paga em parte:
+  pago 50, falta 40; outra dívida do tutor nunca entra; creche sem valor); link do Google (válido, recusado, no link de
+  agendamento); rota "Escrever com o Mozart" (`GESTAO_BOLETIM_FALSO=1`: texto de teste, nunca o modelo; 401, 403; **limite do dia**
+  `boletim_ia_dia` sem mexer na configuração global: a contagem da loja sobe até faltar um, depois volta o texto pronto);
+  prazo de 60 dias (página e foto somem, as fotos ficam), freio de 60 aberturas por minuto (PT429); álbum (`album_criar`,
+  `album_publico`, rota da foto, vencido some); foto apagada só pelo dono (sai do boletim e do álbum, vai para a fila), faxina dos
+  arquivos (fila, órfãos de mais de um dia), faxina geral e pet apagado. Precisa do servidor com `GESTAO_BOLETIM_FALSO=1`.
 - `admin.js`: funções do painel do administrador recusadas para anônimo e dono; o admin recebe só dados da conta e quantidades;
   troca de status vai para o histórico. (O admin de teste é criado por SQL: ninguém vira admin pela API.)
 - `cakto.js`: webhook da Cakto de ponta a ponta pela rota do servidor: 9 ofertas, ciclo da assinatura (renovada, atrasada, recuperada,
@@ -194,6 +211,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   folha que a primeira linha dela (cada parte empurrada para o pé da página em 21 pontos). 390 e 1366.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
+- `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente
+  de verdade) reduzidas a 1600 px no aparelho, recados, atenção à saúde, texto pronto, "Escrever com o Mozart" (de teste), salvar,
+  o WhatsApp com "Oi, Ana! O boletim do Thor de hoje: <link>" e o "Boletim enviado". 1366: a monitora, pelo cartão da creche em
+  Casa agora ("Fez amizade com Mel"). A página pública em 390 e 1366 (fotos carregadas, atenção, serviços, Avaliar no Google, Marcar
+  o próximo, sem telefone do tutor, sem rolagem para o lado) e o álbum na ficha do pet com o link para o tutor. Capturas em
+  `testes/saida/boletim-*.png` e `album-390.png`.
 
 ## Resultados que são assim de propósito
 

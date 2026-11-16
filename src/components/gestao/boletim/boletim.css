@@ -1,0 +1,55 @@
+/* Boletim do pet, lado da equipe (folha "Mandar boletim", álbum na ficha, opções). Prefixo g-bol-. */
+.g-bol { gap: 18px; }
+.g-bol-parte { display: grid; gap: 10px; min-width: 0; }
+.g-bol-t { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.g-bol-t b { font-size: 1rem; }
+.g-bol-t small { font-size: .8125rem; color: var(--g-cinza); }
+
+.g-bol-estado { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border-radius: 14px; background: var(--t-ceu); color: var(--i-ceu); font-size: .9375rem; }
+.g-bol-estado.ok { background: var(--t-menta); color: var(--i-menta); }
+.g-bol-estado > svg { width: 18px; height: 18px; flex: none; }
+.g-bol-estado > span { flex: 1 1 220px; min-width: 0; }
+.g-bol-estado a { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.g-bol-estado a svg { width: 14px; height: 14px; }
+
+/* fotos: quadrados, o último é o botão de pôr mais */
+.g-bol-fotos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 520px) { .g-bol-fotos { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.g-bol-fotos li { position: relative; aspect-ratio: 1; border-radius: 16px; overflow: hidden; background: var(--g-carta-2); min-width: 0; }
+.g-bol-fotos img, .g-bol-fotos .sem { width: 100%; height: 100%; object-fit: cover; display: grid; place-items: center; color: var(--g-cinza); }
+.g-bol-fotos li.subindo { display: grid; place-items: center; color: var(--g-cinza); }
+.g-bol-fotos li.subindo svg { width: 26px; height: 26px; }
+.g-bol-fotos li.mais { display: grid; grid-template-rows: 1fr 1fr; gap: 1px; background: var(--g-linha); border: 1.5px dashed color-mix(in srgb, var(--g-verde) 35%, transparent); }
+.g-bol-fotos li.mais button { display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: var(--g-carta); color: var(--g-verde); font: inherit; font-weight: 600; font-size: .875rem; cursor: pointer; min-height: 44px; }
+.g-bol-fotos li.mais button:active { background: var(--g-verde-tint); }
+.g-bol-fotos li.mais svg { width: 18px; height: 18px; }
+.g-bol-foto-x { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(31, 27, 23, .62); color: #fff; cursor: pointer; }
+.g-bol-foto-x svg { width: 17px; height: 17px; }
+
+.g-bol-amigo { max-width: 360px; }
+.g-bol-atencao .g-chip[aria-pressed="true"] { background: var(--i-manteiga); border-color: var(--i-manteiga); }
+.g-bol-texto { min-height: 120px; font-size: 1rem; line-height: 1.5; }
+
+.g-btn.g-bol-enviado { color: var(--i-menta); }
+.g-gira { animation: g-bol-gira 1s linear infinite; }
+@keyframes g-bol-gira { to { transform: rotate(360deg); } }
+
+/* como pegar o link do Google */
+.g-bol-como { border: 1px solid var(--g-linha); border-radius: 14px; padding: 10px 14px; font-size: .9375rem; }
+.g-bol-como summary { cursor: pointer; font-weight: 600; color: var(--g-verde); min-height: 28px; }
+.g-bol-como ol { margin: 8px 0 6px; padding-left: 20px; display: grid; gap: 6px; }
+.g-bol-como p { color: var(--g-cinza); font-size: .875rem; }
+
+/* álbum na ficha do pet */
+.g-bol-album { display: grid; gap: 14px; }
+.g-bol-album-visita { display: grid; gap: 8px; }
+.g-bol-album-visita p { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: .9375rem; }
+.g-bol-album-visita p b::first-letter { text-transform: uppercase; }
+.g-bol-album-visita .g-tag { display: inline-flex; align-items: center; gap: 4px; }
+.g-bol-album-visita ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+@media (min-width: 720px) { .g-bol-album-visita ul { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.g-bol-album-visita li { position: relative; min-width: 0; }
+.g-bol-album-visita a { display: block; border-radius: 12px; overflow: hidden; background: var(--g-carta-2); }
+.g-bol-album-visita img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.g-bol-album-visita small { position: absolute; left: 6px; bottom: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(31, 27, 23, .62); color: #fff; font-size: .75rem; font-weight: 600; }
+.g-bol-album-visita .g-bol-foto-x { width: 30px; height: 30px; top: 4px; right: 4px; }
