@@ -4,6 +4,13 @@
 .g-bv-pagina .g-guia-caixa { min-height: 100dvh; max-height: none; border-radius: 0; box-shadow: none; background: none; animation: none; }
 .g-bv-pagina .g-guia-corpo { overflow: visible; }
 .g-bv-pagina .g-guia-pe { position: sticky; bottom: 0; }
+/* três botões no rodapé (voltar, Faço depois, Criar meu pet shop): no celular o principal desce para uma linha só dele,
+   larga, e nada passa da borda (em 390 px o "Criar meu pet shop" saía 6 px para fora) */
+@media (max-width: 519px) {
+  .g-bv-pe3 { flex-wrap: wrap; row-gap: 10px; }
+  .g-bv-pe3 .g-btn.pri { flex: 1 1 100%; order: -1; }
+  .g-bv-pe3 .g-guia-depois { margin-left: auto; }
+}
 @media (min-width: 720px) {
   .g-bv-pagina { place-items: center; padding: 24px; }
   .g-bv-pagina .g-guia-caixa { min-height: 0; border-radius: 28px; background: var(--g-fundo); box-shadow: var(--g-sombra-alta); }

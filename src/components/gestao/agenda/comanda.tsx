@@ -220,7 +220,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         zapComprovante = junto > 0
           ? linkWhatsApp(tutor?.telefone, textoComprovanteDaParte({
               petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, itens: gravar, total: contas.total, desconto: contas.desconto,
-              pago: centavos(contas.total + pagouAntigas), formas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas,
+              pago: centavos(contas.total + pagouAntigas), formas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas, antigoDevia: devido,
             }))
           : lancado ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] })) : null;
       } else if (vejoFinanceiro && lancado && soDigitos(tutor?.telefone).length >= 8) {

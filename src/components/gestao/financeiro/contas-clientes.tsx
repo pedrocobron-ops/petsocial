@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Check, HandCoins, MessageCircle, TriangleAlert } from "lucide-react";
 import { mensagemDeDivida, multaSugerida } from "@/lib/gestao/dinheiro-opcoes";
 import type { Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, dataCurta, hora, isoDia, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, dataCurtaOuAno, hora, isoDia, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { AvatarPessoa, avisarMudanca, Campo, Folha, useAvisos, useDados, useSomenteLeitura } from "../ui";
@@ -43,16 +43,20 @@ export function useContasDeClientes(clienteId?: string) {
   }, [petshop.id, vejoFinanceiro, clienteId ?? ""]);
 }
 
+/** Desde quando o cliente deve esta conta: o dia anotado (dívida trazida do caderno) ou o dia em que foi anotada. */
+export const desdeDaConta = (c: Pick<Lancamento, "devido_desde" | "criado_em">) => c.devido_desde ?? c.criado_em;
+
 /** Junta as contas por tutor: quanto deve, quanto está atrasado, desde quando e quando foi cobrado. */
 export function porDevedor(contas: Lancamento[], tutores: Map<string, Tutor>, hoje: string): Devedor[] {
   const mapa = new Map<string, Devedor>();
   for (const c of contas) {
     const chave = c.cliente_id ?? "sem";
-    const d = mapa.get(chave) ?? { chave, tutor: c.cliente_id ? tutores.get(c.cliente_id) ?? null : null, contas: [], total: 0, atrasado: 0, desde: c.criado_em, cobradoEm: null };
+    const d = mapa.get(chave) ?? { chave, tutor: c.cliente_id ? tutores.get(c.cliente_id) ?? null : null, contas: [], total: 0, atrasado: 0, desde: desdeDaConta(c), cobradoEm: null };
     d.contas.push(c);
     d.total = centavos(d.total + Number(c.valor));
     if (c.vencimento && c.vencimento < hoje) d.atrasado = centavos(d.atrasado + Number(c.valor));
-    if (c.criado_em < d.desde) d.desde = c.criado_em;
+    // "2026-03-10" (dia anotado) e "2026-11-16T…" (quando foi anotada) se comparam pelo começo, que é o dia
+    if (desdeDaConta(c) < d.desde) d.desde = desdeDaConta(c);
     if (c.cobrado_em && (!d.cobradoEm || c.cobrado_em > d.cobradoEm)) d.cobradoEm = c.cobrado_em;
     mapa.set(chave, d);
   }
@@ -72,6 +76,7 @@ function LinhaConta({ conta, hoje, aoReceber }: { conta: Lancamento; hoje: strin
         <span>
           {!v ? "sem data" : v < hoje ? <span className="g-vermelho-t">venceu em {dataCompleta(v)}</span> : v === hoje ? "vence hoje" : `vence em ${dataCompleta(v)}`}
           {textoJaRecebido(conta) ? ` · ${textoJaRecebido(conta)}` : ""}
+          {conta.devido_desde ? ` · deve desde ${dataCurtaOuAno(conta.devido_desde)}` : ""}
           {multa ? ` · com multa e juros: ${brl(centavos(Number(conta.valor) + multa.total))}` : ""}
         </span>
       </span>
@@ -91,7 +96,7 @@ function BlocoDevedor({ d, hoje, aoReceber, aoCobrar, semNome }: { d: Devedor; h
         <span className="t">
           <b>{semNome ? `Deve ${brl(d.total)}` : d.tutor?.nome ?? "Sem tutor na conta"}</b>
           <span>
-            {semNome ? "" : `Deve ${brl(d.total)} · `}{d.contas.length === 1 ? "1 conta" : `${d.contas.length} contas`} · desde {dataCurta(d.desde)}
+            {semNome ? "" : `Deve ${brl(d.total)} · `}{d.contas.length === 1 ? "1 conta" : `${d.contas.length} contas`} · desde {dataCurtaOuAno(d.desde.length === 10 ? d.desde : isoDia(new Date(d.desde)))}
             {d.cobradoEm ? ` · cobrado em ${quandoFoi(d.cobradoEm)}` : ""}
           </span>
         </span>

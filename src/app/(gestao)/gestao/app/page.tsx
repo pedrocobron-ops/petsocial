@@ -326,6 +326,9 @@ export default function Hoje() {
         {fechadoHoje && casa && !banho && <p className="g-aviso" role="status" style={{ margin: 0 }}><span className="g-cresce"><b>{fechadoHoje}.</b> {rotuloCasa === "Hotel" ? "O hotel não recebe chegadas hoje. Quem está hospedado continua hospedado." : rotuloCasa === "Creche" ? "A creche não abre hoje: ninguém é esperado na chamada e ninguém leva falta." : "A creche não abre hoje e ninguém leva falta. Quem está hospedado no hotel continua hospedado."}</span></p>}
         {cr && cartaoDaChamada && <ChamadaDeHoje esperados={cr.esperados} aindaNao={cr.aindaNao} naCasa={cr.naCasa} sairam={cr.sairam} faltaram={cr.faltaram.length} />}
 
+        {/* pedidos que chegaram pelo link vêm no alto: no celular, abaixo dos primeiros passos e do Mozart ficavam longe da vista */}
+        {posso("agenda") && <PedidosLink />}
+
         {contaNova && cartaoPassos && <PrimeirosPassos pp={pp} modo="cartao" curto />}
 
         <div className="g-heroi">
@@ -421,7 +424,6 @@ export default function Hoje() {
           <Link className="g-hoje-casa solta" href="/gestao/app/agenda"><Scissors aria-hidden /><span>Banho e tosa: {n(ativos.length, "atendimento", "atendimentos")} hoje. {emAndamento ? `${destaque.pets.nome} está na mesa agora.` : `O próximo é ${destaque.pets.nome}, às ${hora(destaque.inicio)}.`}</span><ChevronRight aria-hidden /></Link>
         )}
 
-        {posso("agenda") && <PedidosLink />}
         {vejoFinanceiro && <AtendimentosParaCobrar aoMudar={() => void recarregar()} />}
         {cuidoDoFinanceiro && <AlteracoesDeValores />}
         {casa && <OcorrenciasDeHoje />}

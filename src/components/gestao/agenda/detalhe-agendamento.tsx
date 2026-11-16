@@ -24,6 +24,7 @@ import Comanda from "./comanda";
 import { MarcaSemCobranca, semCobranca } from "./para-cobrar";
 import AntesDepois from "./antes-depois";
 import { continuarSerie, encerrarSerie, textoContinuou, VEZES_POR_VEZ } from "./series-acabando";
+import "@/components/gestao/hotel/hotel.css";
 
 /** Tudo sobre um horário: quem é o pet, o que fazer agora (confirmar, iniciar, concluir e fechar a conta) e o lembrete no WhatsApp. */
 export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, aoEditar }: {
@@ -56,7 +57,9 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const podeAvisarPronto = deHoje && (a.status === "em_atendimento" || a.status === "concluido");
 
   // já foi pago? tem pacote que cobre este serviço?
-  const { dados: extra, recarregar } = useDados(async () => {
+  // Tudo junto, e só então os botões de dinheiro aparecem: sem saber se já foi pago, se tem pacote ou se o tutor deve de antes,
+  // a folha mostraria só "Fechar a conta" e a cobrança em dobro ficaria a um toque. Se uma leitura falha, não mostra nada de cobrar.
+  const { dados: extra, erro: erroExtra, recarregar } = useDados(async () => {
     const diaDoHorario = isoDia(new Date(a.inicio));
     const [pago, pacotes, semConta, mexidas, deve, diferencas] = await Promise.all([
       // o recebimento deste horário vem por uma função do banco: quem só opera o caixa não lê o histórico, mas vê se este foi pago
@@ -74,6 +77,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
       // a diferença de um atendimento pago que ficou mais caro, já cobrada por "Cobrar a diferença"
       vejoFinanceiro && a.status === "concluido" ? sb.rpc("diferencas_do_agendamento", { p_agendamento: a.id }) : Promise.resolve({ data: 0, error: null }),
     ]);
+    for (const r of [pago, pacotes, semConta, deve]) if (r.error) throw new Error(r.error.message);
     // horário que se repete: até quando vai a série (o último que ainda está de pé)
     let fimDaSerie: string | null = null;
     // repetição marcada como "até eu cancelar" (ainda valendo)?
@@ -511,8 +515,9 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           <div className="g-pilha p">
             {a.status === "marcado" && <button className="g-btn verde cheio" disabled={ocupado} onClick={() => void mudar({ status: "confirmado" }, "Horário confirmado.")}><Check />Cliente confirmou</button>}
             {(a.status === "marcado" || a.status === "confirmado") && <button className="g-btn sec cheio" disabled={ocupado} onClick={() => void mudar({ status: "em_atendimento" }, `${pet?.nome ?? "Pet"} em atendimento.`)}><Play />Chegou: iniciar atendimento</button>}
+            {!sabe && <ContaCarregando erro={erroExtra} aoTentar={() => void recarregar()} vejoFinanceiro={vejoFinanceiro} />}
             {/* pet com pacote que cobre este serviço: usar o pacote vem primeiro, para ninguém cobrar duas vezes */}
-            {pacote && !pago && (
+            {sabe && pacote && !pago && (
               <>
                 <p className="g-aviso" style={{ margin: 0 }} role="status">
                   <span><b>{pet?.nome ?? "Este pet"} tem pacote para {outros.length ? a.servicos?.nome ?? "o primeiro serviço" : "este serviço"}</b> ({pacote.nome}: {pacote.total - pacote.usados === 1 ? "sobra 1 uso" : `sobram ${pacote.total - pacote.usados} usos`} de {pacote.total}). Use o pacote para não cobrar de novo.{outros.length ? ` ${outros.length === 1 ? "O outro serviço entra" : "Os outros serviços entram"} na conta normalmente.` : ""}</span>
@@ -522,12 +527,12 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
                   : <button className="g-btn pri cheio" disabled={ocupado} onClick={() => void usarPacote(pacote)}><Check />{outros.length ? "Concluir usando o pacote (o resto fica para o caixa cobrar)" : "Concluir usando o pacote (sem cobrar)"}</button>}
               </>
             )}
-            {vejoFinanceiro && !pago && (
+            {sabe && vejoFinanceiro && !pago && (
               <button className={`g-btn ${pacote ? "sec" : "pri"} cheio`} disabled={ocupado || !sabe} onClick={() => { if (!somenteLeitura()) setComanda("sim"); }}>
                 <Receipt />{pacote ? "Cobrar à parte, sem usar o pacote" : "Fechar a conta"}{aCobrar ? ` · ${brl(aCobrar)}` : ""}
               </button>
             )}
-            {(!vejoFinanceiro || pago) && <button className={`g-btn ${pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void mudar({ status: "concluido" }, "Atendimento concluído.").then((deu) => deu && aoFechar())}><Check />{pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}
+            {sabe && (!vejoFinanceiro || pago) && <button className={`g-btn ${pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void mudar({ status: "concluido" }, "Atendimento concluído.").then((deu) => deu && aoFechar())}><Check />{pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}
           </div>
         )}
         {faltaCobrar && (
@@ -537,7 +542,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
               : <><b>Concluído, falta cobrar.</b> Quem cuida do caixa fecha a conta deste atendimento.</>}</span>
           </p>
         )}
-        {a.status === "concluido" && vejoFinanceiro && !pago && (
+        {a.status === "concluido" && vejoFinanceiro && !sabe && <ContaCarregando erro={erroExtra} aoTentar={() => void recarregar()} vejoFinanceiro />}
+        {a.status === "concluido" && vejoFinanceiro && sabe && !pago && (
           <button className="g-btn pri cheio" disabled={!sabe} onClick={() => { if (!somenteLeitura()) setComanda("sim"); }}><Receipt />Fechar a conta{aCobrar ? ` · ${brl(aCobrar)}` : ""}</button>
         )}
         {vejoFinanceiro && a.status === "concluido" && diferenca > 0.005 && (
@@ -619,6 +625,24 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         </div>
       </div>
     </Folha>
+  );
+}
+
+/** Enquanto a conta do horário não chegou inteira (pago? pacote? deve de antes?), nada de cobrar: só o aviso, ou o erro e tentar de novo. */
+function ContaCarregando({ erro, aoTentar, vejoFinanceiro }: { erro: string | null; aoTentar: () => void; vejoFinanceiro: boolean }) {
+  if (erro) {
+    return (
+      <div className="g-card areia g-pilha p" role="alert">
+        <p className="g-p" style={{ margin: 0 }}><b>Não consegui buscar a conta deste horário</b> (se já foi pago, o pacote ou o que o tutor deve). Sem isso dava para cobrar errado, então os botões de cobrar ficam escondidos.</p>
+        <div><button type="button" className="g-btn sec p" onClick={aoTentar}>Tentar de novo</button></div>
+      </div>
+    );
+  }
+  return (
+    <div className="g-card areia g-ht-carregando g-agd-carregando" role="status" aria-live="polite">
+      <span className="g-spin" aria-hidden />
+      <p className="g-p">{vejoFinanceiro ? "Carregando a conta: vendo se já foi pago, se tem pacote e se o tutor deve de antes…" : "Carregando…"}</p>
+    </div>
   );
 }
 

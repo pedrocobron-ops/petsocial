@@ -665,6 +665,9 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-bolha.ela.rabo::before { left: -7px; background: #fffdf9; clip-path: polygon(100% 0, 0 0, 100% 100%); }
 .g-bolha.eu.rabo::before { right: -7px; background: #d6ecd2; clip-path: polygon(0 0, 100% 0, 0 100%); }
 .g-bolha.erro { background: var(--g-vermelho-tint); color: #7a281b; }
+.g-bolha.g-ass-fila { opacity: .78; border: 1px dashed rgba(30, 58, 47, .35); }
+.g-ass-fila-nota { display: block; margin-top: 4px; font-size: .75rem; color: rgba(31, 27, 23, .65); white-space: normal; }
+.g-ass-fila-aviso { justify-self: center; max-width: 92%; margin: 6px 0 0; padding: 6px 12px; border-radius: 12px; background: rgba(255, 251, 245, .95); font-size: .8125rem; color: var(--g-escuro-b); text-align: center; }
 .g-bolha.erro.rabo::before { background: var(--g-vermelho-tint); }
 .g-bolha .h { float: right; display: inline-flex; align-items: center; gap: 3px; margin: 7px -2px -3px 12px; font-size: .6875rem; color: rgba(31, 27, 23, .5); font-variant-numeric: tabular-nums; }
 .g-bolha.eu .h svg { color: #2f8fbf; }

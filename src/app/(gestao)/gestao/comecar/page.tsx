@@ -208,7 +208,7 @@ export default function Comecar() {
               )}
             </div>
             {erro && <p className="g-erro g-guia-erro" role="alert">{erro}</p>}
-            <footer className="g-guia-pe">
+            <footer className="g-guia-pe g-bv-pe3">
               <button type="button" className="g-btn fantasma g-guia-volta" onClick={() => { setErro(null); setPasso(0); }} disabled={indo} aria-label="Voltar à pergunta anterior"><ArrowLeft /></button>
               <button type="button" className="g-btn fantasma g-guia-depois" onClick={() => void criar(true)} disabled={indo}>Faço depois</button>
               <button type="button" className="g-btn pri" onClick={() => void criar(false)} disabled={indo}>{indo ? "Criando…" : "Criar meu pet shop"}<ArrowRight /></button>

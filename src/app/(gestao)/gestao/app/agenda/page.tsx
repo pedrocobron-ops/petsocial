@@ -486,7 +486,7 @@ function MarcadoAgora({ marcado, lista, aoAbrir, aoFechar }: { marcado: Marcado;
       <div className="g-fila" style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
         <CalendarCheck2 aria-hidden />
         <div className="g-cresce">
-          <b>Marcado: {a?.pets?.nome ?? "o horário"}, {dataAmigavel(marcado.inicio)} às {hora(marcado.inicio)}.</b>
+          <b>{a?.pets?.nome ?? marcado.pet ? `${a?.pets?.nome ?? marcado.pet} marcado` : "Horário marcado"}: {dataAmigavel(marcado.inicio)} às {hora(marcado.inicio)}.</b>
           <p className="g-muted g-pp">{marcado.quantos > 1 ? `E mais ${marcado.quantos - 1 === 1 ? "1 data" : `${marcado.quantos - 1} datas`} da repetição. ` : ""}O horário está em destaque logo abaixo.</p>
         </div>
         <button className="g-ico" aria-label="Fechar o aviso" onClick={aoFechar}><X /></button>

@@ -56,6 +56,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   (nunca viram 5,00 ou 52,00), milhar e centavos com vírgula ou ponto, "R$" na frente, negativo só onde pode.
 - `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
   outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
+- `textos.js`: textos que as testadoras acharam confusos: o comprovante com parte da dívida antiga ("Pagou R$ 40,00 do que devia de
+  antes (R$ 75,00); ainda deve R$ 35,00", sem repetir o resto; quitado; chamada antiga sem o total) e as iniciais sem as palavras
+  pequenas ("Banho e Tosa" = BT, "Hotelzinho da Bia" = HB).
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
@@ -106,6 +109,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   e o mês ganha 35 uma vez só (a entrada solta é recusada; o toque duplo não recebe de novo), pagamento em parte, pagou a mais (pergunta;
   com `sobra: "credito"` vira crédito), `anotar_divida` ligada ao tutor, `quem_me_deve` por pessoa, papéis (`cliente_receber_contas`
   recusado para quem não mexe com dinheiro, conta e crédito de outro cliente recusados) e o teto de voltas e de tempo.
+- `divida-caderno.js`: dívida trazida do caderno (migração 20261186, `lancamentos.devido_desde`): dono e recepção anotam com o dia
+  em que começou; o banco recusa dia depois de hoje, valor já recebido, saída, antes de 2000 e o tosador; anotar não vira dinheiro em
+  dia nenhum; receber uma parte entra hoje, no caixa, e a conta segue "desde" o dia do caderno; a dona corrige o dia depois.
 - `visitas.js`: última visita de cada pet: a função do banco (`visitas_dos_pets`) = a conta do navegador, para o dono e para o tosador.
 
 **migracoes/**
@@ -129,6 +135,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `checkout-lento.js`: check-out do hotel com a leitura do sinal atrasada 2,5 s (390 e 1366): enquanto carrega, a folha não mostra valor
   e o botão fica apagado (clicar não grava); depois, "Receber R$ 2,75" (110 − sinal 107,25) e "Receber R$ 1,60" (80 − 20% do segundo
   pet − sinal 62,40), uma entrada só cada.
+- `agenda-lenta.js`: ficha do horário com a leitura dos pacotes e do que já foi pago atrasada 2,5 s (390 e 1366): enquanto carrega,
+  nenhum botão de cobrar, concluir ou usar o pacote (só "Carregando a conta"; Cliente confirmou continua); depois, o pacote primeiro,
+  o aviso do que o tutor deve de antes e "Cobrar à parte, sem usar o pacote · R$ 50,00". Com a leitura falhando: nada de cobrar,
+  só "Tentar de novo", que traz a conta inteira.
+- `mozart-fila.js`: escrever enquanto o Mozart responde (o servidor do Mozart vira um roteiro lento com `page.route`): depois do
+  "Pode fazer", o Enter põe a mensagem na conversa com "Na fila" e ela vai sozinha, uma vez, quando ele termina; se a resposta trouxer
+  um cartão para confirmar, a mensagem volta para a caixa com o aviso e o cartão não é descartado.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 
