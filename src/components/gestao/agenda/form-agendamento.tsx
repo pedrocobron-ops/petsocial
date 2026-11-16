@@ -18,6 +18,7 @@ import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { AvatarPet, Campo, EscolherPet, Folha, avisarMudanca, ok, useAvisos, useDados } from "../ui";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 import { VEZES_POR_VEZ } from "./series-acabando";
+import { CampoComVoz } from "../ditado";
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
 type Problema = { tipo: "fechado" | "bloqueio" | "conflito" | "vagas" | "fora" | "almoco"; texto: string };
@@ -647,7 +648,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
 
           <label className="g-check"><input type="checkbox" checked={levaTraz} onChange={(e) => setLevaTraz(e.target.checked)} /><Truck size={18} /> Leva e traz</label>
           {levaTraz && <Campo rotulo="Endereço para buscar"><input className="g-input" value={endereco} onChange={(e) => setEndereco(e.target.value)} /></Campo>}
-          <Campo rotulo="Observação"><textarea className="g-textarea" value={obs} maxLength={400} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: tosa na máquina 4, laço rosa" /></Campo>
+          <Campo rotulo="Observação"><CampoComVoz valor={obs} aoMudar={setObs} maxLength={400} rotulo="Ditar a observação"><textarea className="g-textarea" value={obs} maxLength={400} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: tosa na máquina 4, laço rosa" /></CampoComVoz></Campo>
         </form>
       )}
     </Folha>

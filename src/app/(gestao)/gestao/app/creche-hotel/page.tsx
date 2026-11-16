@@ -45,6 +45,7 @@ import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoD
 import { conflitoDoPet, type Periodo } from "@/lib/gestao/conflito-estadia";
 import "./creche-hotel.css";
 import "@/components/gestao/hotel/hotel.css";
+import { CampoComVoz } from "@/components/gestao/ditado";
 
 // As outras partes da tela (Chamada, Ocupação, Diário, Mensalistas, Cobranças) vêm à parte: a Casa agora abre sem esperar
 // baixar todas. Depois que a tela abriu, elas baixam em segundo plano (useAdiantar): no toque, já estão aqui.
@@ -1263,7 +1264,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         {ofereceSinal && <CamposSinal estado={sinal} aoMudar={(s) => { setMexeuNoSinal(true); setSinal(s); setErroSinal(null); }} sugerido={sugerido} erro={erroSinal} semTutor={!pet.clientes?.id} />}
         {comCuidados && <EditorDeCuidados valor={cuidados} aoMudar={setCuidados} />}
         <Campo rotulo="Observações">
-          <textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder="Ração, remédio, horário de passeio, o que trouxe na mochila…" />
+          <CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações da estadia"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder="Ração, remédio, horário de passeio, o que trouxe na mochila…" /></CampoComVoz>
         </Campo>
         {erro && <p className="g-erro" role="alert">{erro}</p>}
       </div>

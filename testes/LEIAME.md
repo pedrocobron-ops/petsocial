@@ -60,6 +60,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   plano de 01/11, que agora é o mês inteiro); seg a sex 9 de 21 × 1.100 = 471,43; dia fechado fora da conta; pausa no mês.
 - `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
   outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
+- `parecido.js`: nomes parecidos para pedidos falados (`assistente/parecido.ts`, usado por `buscar_pets` quando o nome não bate):
+  "tor" acha o Thor, "luna" a Lunna, "mau" a Mel (e a Bel: mais de um, o Mozart pergunta), pelo tutor e pelo começo do nome; nada
+  inventado para nomes longe.
 - `textos.js`: textos que as testadoras acharam confusos: o comprovante com parte da dívida antiga ("Pagou R$ 40,00 do que devia de
   antes (R$ 75,00); ainda deve R$ 35,00", sem repetir o resto; quitado; chamada antiga sem o total) e as iniciais sem as palavras
   pequenas ("Banho e Tosa" = BT, "Hotelzinho da Bia" = HB).
@@ -171,6 +174,16 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `mozart-fila.js`: escrever enquanto o Mozart responde (o servidor do Mozart vira um roteiro lento com `page.route`): depois do
   "Pode fazer", o Enter põe a mensagem na conversa com "Na fila" e ela vai sozinha, uma vez, quando ele termina; se a resposta trouxer
   um cartão para confirmar, a mensagem volta para a caixa com o aviso e o cartão não é descartado.
+- `mozart-voz.js`: falar com o Mozart com um ditado de mentira (`lib/voz-falsa.js`, por `addInitScript`; o servidor do Mozart é um
+  roteiro lento por `page.route`). 390 e 1366: microfone de 56 px, pt-BR com resultados provisórios na caixa, "Ouvindo…" com a bolinha
+  vermelha; ao terminar, "Enviando… 2 · Editar" e o envio vai uma vez só depois de 2 s; tocar na caixa ou em Editar cancela; "Enviar
+  sozinho depois de falar" desligado deixa o texto na caixa (guardado no aparelho); "Ler as respostas em voz alta" (desligado de início)
+  e o alto-falante de cada resposta; segurar para falar (toque de dedo no 390, mouse no 1366) e tocar para parar; "Não ouvi nada";
+  microfone bloqueado ("Libere o microfone nas configurações do navegador"); microfone na Ajuda (não manda sozinho); para sozinho em
+  8 s de silêncio e em 30 s (`page.clock`); navegador sem ditado: sem botão, escrever continua igual. Capturas em `testes/saida/mozart-voz-*`.
+- `ditado.js`: microfone nos campos de texto livre (`CampoComVoz`, `src/components/gestao/ditado.tsx`): na ficha do pet nova (cuidados e
+  alertas, observações) e em Marcar horário (observação), o falado entra depois do que estava escrito, com espaço, ao vivo; respeita o
+  tamanho do campo; nada é salvo sozinho; bloqueado mostra a ajuda; navegador sem ditado não mostra botão. 390 e 1366.
 - `creche-sobras.js`: sobras da creche (Rafael). Opções da creche (os três cartões) num botão só, com "Falta salvar: …", e sair da
   tela com mudança sem salvar pergunta "Sair sem salvar?"; **rascunho no aparelho**: recarregar no meio das opções ou do cadastro do
   mensalista volta com tudo ("Rascunho recuperado · Descartar", "Ficou sem salvar · Continuar"), salvar apaga; primeira cobrança

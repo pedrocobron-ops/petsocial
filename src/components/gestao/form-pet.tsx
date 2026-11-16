@@ -10,6 +10,7 @@ import { useGestao } from "./contexto";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { AvatarPet, Campo, Folha, ok, useAvisos } from "./ui";
 import { FolhaMesmaPessoa, acharTutorIgual, useTutores, type TutorCurto } from "./clientes/juntar";
+import { CampoComVoz } from "./ditado";
 
 /**
  * Cadastro ou edição de um pet. Em cadastro novo, escolhe um tutor existente ou cria o tutor junto.
@@ -183,9 +184,9 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
             onChange={(e) => { setNascimento(e.target.value); setErroNasc(e.target.value && e.target.value > hoje ? "O nascimento não pode ser depois de hoje." : null); }} />
         </Campo>
         <Campo rotulo="Cuidados e alertas" dica={comBanho ? "Aparece em destaque na agenda. Ex.: alergia a shampoo, medo de secador, morde." : "Aparece em destaque junto do nome do pet. Ex.: alergia, briga com outros cães, foge no portão."}>
-          <textarea className="g-textarea" value={alertas} maxLength={400} onChange={(e) => setAlertas(e.target.value)} />
+          <CampoComVoz valor={alertas} aoMudar={setAlertas} maxLength={400} rotulo="Ditar os cuidados e alertas"><textarea className="g-textarea" value={alertas} maxLength={400} onChange={(e) => setAlertas(e.target.value)} /></CampoComVoz>
         </Campo>
-        <Campo rotulo="Observações"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} /></Campo>
+        <Campo rotulo="Observações"><CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} /></CampoComVoz></Campo>
       </form>
     </Folha>
   );

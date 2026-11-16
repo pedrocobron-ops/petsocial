@@ -7,6 +7,7 @@ import { linkSuporte } from "@/lib/gestao/contato";
 import { hora } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";
 import { abrirAssistente } from "./ui";
+import { BotaoMic, FaixaVoz, useDitado } from "./voz";
 
 type Item = { de: "eu" | "ajuda"; texto: string; quando: string; avaliar?: boolean; avaliado?: "sim" | "nao"; registro?: string | null; /** a Ajuda não soube responder, ou o caso é da equipe */ semSaida?: boolean };
 type Resposta = { texto?: string; equipe?: boolean; semResposta?: boolean; novo?: boolean; assunto?: string; erro?: string; mensagem?: string };
@@ -33,6 +34,11 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
+  const caixa = useRef<HTMLTextAreaElement>(null);
+  const textoAgora = useRef(texto);
+  textoAgora.current = texto;
+  // falar a dúvida: o texto vai para a caixa e a pessoa toca em enviar
+  const ditado = useDitado((t) => setTexto(t), (t, falou) => { if (falou) { setTexto(t); caixa.current?.focus(); } });
 
   const guardar = (novos: Item[]) => { memoria.itens = novos; setItens(novos); };
   const falhou = () => { memoria.falhas += 1; setFalhas(memoria.falhas); };
@@ -148,11 +154,16 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
         </div>
 
         <div className="g-ajuda-mozart">Quer que algo seja feito por você? <button onClick={() => { aoFechar(); abrirAssistente(); }}>Fale com o Mozart</button></div>
+        <FaixaVoz ditado={ditado} />
         <form className="g-ass-entrada" onSubmit={(e) => { e.preventDefault(); void enviar(texto); }}>
-          <textarea rows={1} value={texto} placeholder="Sua dúvida" aria-label="Sua dúvida"
+          <textarea ref={caixa} rows={1} value={texto} placeholder={ditado.ouvindo ? "Estou ouvindo…" : "Sua dúvida"} aria-label="Sua dúvida" readOnly={ditado.ouvindo}
             onChange={(e) => setTexto(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void enviar(texto); } }} />
-          <button className="g-mic enviar" disabled={pensando || !texto.trim()} aria-label="Enviar"><ArrowUp /></button>
+          {ditado.suportado && (ditado.ouvindo || !texto.trim()) ? (
+            <BotaoMic ditado={ditado} jaEscrito={() => textoAgora.current} />
+          ) : (
+            <button className="g-mic enviar" disabled={pensando || !texto.trim()} aria-label="Enviar"><ArrowUp /></button>
+          )}
         </form>
       </section>
     </div>
