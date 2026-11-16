@@ -21,6 +21,9 @@ export const abrirAssistente = (pedido?: string) => window.dispatchEvent(new Cus
 /** Evento para abrir o guia inicial de novo (botão em Meu pet shop). Fica aqui, e não no guia, para o guia carregar só quando abre. */
 export const EVENTO_GUIA = "gestao:guia";
 export const abrirGuia = () => window.dispatchEvent(new Event(EVENTO_GUIA));
+/** Abre a folha "O que o seu negócio faz?" (Personalizar o menu Dia a dia), que fica na casca. */
+export const EVENTO_PERSONALIZAR_MENU = "gestao:personalizar-menu";
+export const abrirPersonalizarMenu = () => window.dispatchEvent(new Event(EVENTO_PERSONALIZAR_MENU));
 
 /**
  * Chama `fazer` quando a tela terminou de abrir: sem nenhum "carregando" (`aria-busy`) na tela por um segundo e o aparelho

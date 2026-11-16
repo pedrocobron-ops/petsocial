@@ -2,16 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarDays, Check, Clock, FileSpreadsheet, ImagePlus, Link2, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Undo2, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarDays, Check, Clock, FileSpreadsheet, ImagePlus, LayoutGrid, Link2, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Undo2, Users, X } from "lucide-react";
 import type { Horario, Servico } from "@/lib/gestao/tipos";
 import { vagasDe } from "@/lib/gestao/agenda";
-import { artigoDe, nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
-import { GradeHorario, erroDoHorario, lerHorario } from "./ajustes/grade-horario";
+import { areasDeServicoPara, artigoDe, categoriaDaArea, nomeDaCasa, usaModulo, type AreaDoServico } from "@/lib/gestao/modulos";
+import { EscolherCor, GradeHorario, erroDoHorario, lerHorario } from "./ajustes/grade-horario";
+import { CAMPOS_PRECO, EscolherArea, PrecosDoServico, comecaPorPorte, corLivre, inserirServico, umPrecoSo, type Precos } from "./servico-campos";
 import { useGestao } from "./contexto";
 import { Selo } from "./marca";
 import { Tile } from "./painel";
-import { brl, lerValor, valor2 } from "@/lib/gestao/util";
-import { Campo, CampoValor, EVENTO_GUIA, avisarMudanca, ok, useAvisos } from "./ui";
+import { brl } from "@/lib/gestao/util";
+import { Campo, CampoValor, EVENTO_GUIA, abrirPersonalizarMenu, avisarMudanca, ok, useAvisos } from "./ui";
 import Importar from "./importar";
 import { TEMAS, aplicarTema, enviarLogo, tirarLogo } from "@/lib/gestao/identidade";
 import { FalaMozart, PERGUNTAS, PreviaPainel, TrilhoBoasVindas, chaveBoasVindas, oQueDeixeiPronto } from "./boas-vindas";
@@ -29,50 +30,16 @@ const CORES = ["#4d8f6b", "#3b82a0", "#7c6fb0", "#b0563f", "#8a7a3a", "#a05a82",
 const DURACOES = [15, 30, 45, 60, 90, 120, 150, 180];
 const textoDuracao = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}`);
 type Preco = Pick<Servico, "id" | "nome" | "cor" | "ativo" | "categoria" | "duracao_min" | "preco_p" | "preco_m" | "preco_g" | "preco_gg">;
-const CAMPOS_PRECO = ["preco_p", "preco_m", "preco_g", "preco_gg"] as const;
 const lerVagas = (s: string) => { const t = s.trim(); if (!t) return null; const n = Number(t); return Number.isInteger(n) ? n : NaN; };
-/** Banho e tosa costumam mudar de preço com o porte; os serviços rápidos (unha, hidratação) quase sempre têm um preço só. */
-function comecaPorPorte(s: Preco): boolean {
-  const v = CAMPOS_PRECO.map((c) => s[c]);
-  // sem preço ainda: começa com um campo só (menos para digitar no primeiro dia); "Por porte" é um toque
-  if (v.every((x) => x == null)) return false;
-  return !v.every((x) => x === v[0]);
-}
+/** Serviço que o dono acrescenta no guia ("Adicionar outro serviço"): só vai para o banco ao continuar. */
+type ServicoNovo = { chave: string; nome: string; duracao_min: number; cor: string; area: AreaDoServico; porPorte: boolean } & Precos;
 /** O que o guia guarda no aparelho enquanto não é gravado. */
 type RascunhoGuia = {
   horario?: Horario; euAtendo?: boolean; novos?: string[]; vagas?: number | null; fora?: string[]; porPorte?: Record<string, boolean>;
   diariaCreche?: number | null; diariaHotel?: number | null; vagasCreche?: string; vagasHotel?: string; linkLigado?: boolean;
   precos?: Pick<Preco, "id" | "duracao_min" | "preco_p" | "preco_m" | "preco_g" | "preco_gg">[];
+  servicosNovos?: ServicoNovo[];
 };
-const NOME_PORTE: Record<string, string> = { P: "pequeno", M: "médio", G: "grande", GG: "gigante" };
-
-/** O que está errado no preço digitado (null = certo ou em branco). */
-function erroDoPreco(texto: string): string | null {
-  const t = texto.trim();
-  if (!t) return null;
-  if (!/^(R\$)?\s*-?[\d.,\s]+$/.test(t)) return "use só números";
-  const n = lerValor(t);
-  if (n == null) return "use só números";
-  if (n < 0) return "não pode ser negativo";
-  if (n > 99999) return "valor alto demais";
-  return null;
-}
-
-/** Preço de um porte: guarda o texto, avisa o que está errado embaixo do campo e só passa adiante valor que vale. */
-function CampoPreco({ porte, servico, valor, aoMudar }: { porte: string; servico: string; valor: number | null; aoMudar: (v: number | null, erro: string | null) => void }) {
-  const [texto, setTexto] = useState(valor == null ? "" : valor2(valor));
-  const erro = erroDoPreco(texto);
-  return (
-    <label>
-      <span>{porte === "todos" ? "Preço" : porte}</span>
-      <input className={`g-input g-tab${erro ? " ruim" : ""}`} inputMode="decimal" placeholder="R$" value={texto} aria-invalid={!!erro}
-        aria-label={porte === "todos" ? `${servico}, preço para todos os portes` : `${servico}, porte ${NOME_PORTE[porte] ?? porte}`}
-        onChange={(e) => { setTexto(e.target.value); const ruim = erroDoPreco(e.target.value); aoMudar(ruim ? null : lerValor(e.target.value), ruim); }}
-        onBlur={() => { if (!erro && texto.trim()) { const n = lerValor(texto); if (n != null) setTexto(valor2(n)); } }} />
-      {erro && <small className="erro" role="alert">{erro}</small>}
-    </label>
-  );
-}
 
 /**
  * Guia da primeira vez. Os passos seguem o que o negócio faz (`petshops.modulos`): horário para todos; quem atende,
@@ -167,6 +134,10 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
   const [fora, setFora] = useState<string[]>(() => rascunho?.fora?.filter((id) => servicos.some((s) => s.id === id)) ?? servicos.filter((s) => !s.ativo).map((s) => s.id));
   const [porPorte, setPorPorte] = useState<Record<string, boolean>>(() => ({ ...Object.fromEntries(servicos.map((s) => [s.id, comecaPorPorte(s)])), ...(rascunho?.porPorte ?? {}) }));
   const [errosPreco, setErrosPreco] = useState<Record<string, string>>({});
+  // serviços que o dono acrescenta aqui: cartões em branco, gravados junto com os outros ao continuar
+  const [servicosNovos, setServicosNovos] = useState<ServicoNovo[]>(() => rascunho?.servicosNovos ?? []);
+  const [faltaNome, setFaltaNome] = useState(false);
+  const areasDoServico = areasDeServicoPara(petshop);
   const [diariaCreche, setDiariaCreche] = useState<number | null>(rascunho && "diariaCreche" in rascunho ? rascunho.diariaCreche ?? null : petshop.diaria_creche == null ? null : Number(petshop.diaria_creche));
   const [diariaHotel, setDiariaHotel] = useState<number | null>(rascunho && "diariaHotel" in rascunho ? rascunho.diariaHotel ?? null : petshop.diaria_hotel == null ? null : Number(petshop.diaria_hotel));
   const [vagasCreche, setVagasCreche] = useState(rascunho?.vagasCreche ?? (petshop.vagas_creche == null ? "" : String(petshop.vagas_creche)));
@@ -177,9 +148,10 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
     const r: RascunhoGuia = {
       horario, euAtendo, novos, vagas, fora, porPorte, diariaCreche, diariaHotel, vagasCreche, vagasHotel, linkLigado,
       precos: precos.map((x) => ({ id: x.id, duracao_min: x.duracao_min, preco_p: x.preco_p, preco_m: x.preco_m, preco_g: x.preco_g, preco_gg: x.preco_gg })),
+      servicosNovos,
     };
     guardarLembrado(chaveRascunho, JSON.stringify(r));
-  }, [horario, euAtendo, novos, vagas, fora, porPorte, diariaCreche, diariaHotel, vagasCreche, vagasHotel, linkLigado, precos]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [horario, euAtendo, novos, vagas, fora, porPorte, diariaCreche, diariaHotel, vagasCreche, vagasHotel, linkLigado, precos, servicosNovos]); // eslint-disable-line react-hooks/exhaustive-deps
   const [tema, setTema] = useState(petshop.tema);
   const [enviando, setEnviando] = useState(false);
   const arquivo = useRef<HTMLInputElement>(null);
@@ -237,7 +209,11 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
     setSalvando(true);
     // a cor que a pessoa só experimentou não fica
     if (atual === "cor") { aplicarTema(petshop.tema); setTema(petshop.tema); }
-    try { await avancar(); } catch (e) { avisarErro(e); } finally { setSalvando(false); }
+    try {
+      // os preços ficam para depois, mas o serviço que o dono acrescentou e já tem nome não se perde (entra sem preço)
+      if (atual === "servicos") await gravarServicosNovos(servicosNovos.filter((s) => s.nome.trim()).map((s) => ({ ...s, preco_p: null, preco_m: null, preco_g: null, preco_gg: null })));
+      await avancar();
+    } catch (e) { avisarErro(e); } finally { setSalvando(false); }
   }
 
   /** "Com pressa?": deixa a cor e a logo para depois, de uma vez. */
@@ -292,8 +268,9 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
       }
       if (atual === "servicos") {
         const ficam = precos.filter((s) => !fora.includes(s.id));
-        if (precos.length && !ficam.length) { setErro("Deixe pelo menos um serviço na lista, ou toque em Faço depois."); return; }
-        const comErro = ficam.find((s) => Object.keys(errosPreco).some((k) => k.startsWith(`${s.id}:`)));
+        if (precos.length && !ficam.length && !servicosNovos.length) { setErro("Deixe pelo menos um serviço na lista, ou toque em Faço depois."); return; }
+        if (servicosNovos.some((s) => !s.nome.trim())) { setFaltaNome(true); setErro("Dê um nome ao serviço novo, ou tire pela lixeira."); return; }
+        const comErro = [...ficam, ...servicosNovos.map((s) => ({ id: s.chave, nome: s.nome.trim() }))].find((s) => Object.keys(errosPreco).some((k) => k.startsWith(`${s.id}:`)));
         if (comErro) { setErro(`Confira o preço de ${comErro.nome}: use só números, sem valor negativo.`); return; }
         if (ficam.some((s) => CAMPOS_PRECO.some((c) => s[c] != null && s[c]! < 0))) { setErro("O preço não pode ser negativo."); return; }
         const apagados: string[] = [];
@@ -312,6 +289,7 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
           if (mudou) ok(await sb.from("servicos").update({ ativo: true, duracao_min: s.duracao_min, preco_p: s.preco_p, preco_m: s.preco_m, preco_g: s.preco_g, preco_gg: s.preco_gg }).eq("id", s.id).eq("petshop_id", petshop.id).select("id"));
         }
         if (apagados.length) { setPrecos((l) => l.filter((s) => !apagados.includes(s.id))); setFora((l) => l.filter((id) => !apagados.includes(id))); }
+        await gravarServicosNovos(servicosNovos);
       }
       if (atual === "casa") {
         const vc = lerVagas(vagasCreche), vh = lerVagas(vagasHotel);
@@ -336,6 +314,28 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
     } catch (e) { avisarErro(e); } finally { setSalvando(false); }
   }
 
+  /** Grava os serviços acrescentados aqui e passa cada um para a lista de cima (voltar a este passo mostra como os outros). */
+  async function gravarServicosNovos(lista: ServicoNovo[]) {
+    let ordem = servicos.reduce((m, s) => Math.max(m, s.ordem), 0);
+    for (const s of lista) {
+      const precosDele = s.porPorte ? { preco_p: s.preco_p, preco_m: s.preco_m, preco_g: s.preco_g, preco_gg: s.preco_gg } : umPrecoSo(s);
+      const linha = { nome: s.nome.trim().slice(0, 80), categoria: categoriaDaArea(s.area), duracao_min: s.duracao_min, cor: s.cor, ordem: ++ordem, ...precosDele };
+      const id = await inserirServico(sb, petshop.id, linha);
+      setServicosNovos((l) => l.filter((x) => x.chave !== s.chave));
+      setPrecos((l) => [...l, { id, ativo: true, ...linha }]);
+      setPorPorte((m) => ({ ...m, [id]: s.porPorte }));
+      semErros(s.chave);
+    }
+  }
+  function adicionarServico() {
+    setErro(null); setFaltaNome(false);
+    const usadas = [...precos.filter((s) => !fora.includes(s.id)).map((s) => s.cor), ...servicosNovos.map((s) => s.cor)];
+    setServicosNovos((l) => [...l, {
+      chave: `novo-${Date.now()}`, nome: "", duracao_min: 60, cor: corLivre(usadas), area: areasDoServico.includes("banho_tosa") ? "banho_tosa" : areasDoServico[0],
+      porPorte: false, preco_p: null, preco_m: null, preco_g: null, preco_gg: null,
+    }]);
+  }
+  const mudarNovo = (chave: string, campos: Partial<ServicoNovo>) => setServicosNovos((l) => l.map((s) => (s.chave === chave ? { ...s, ...campos } : s)));
   const mudarPreco = (id: string, campos: Partial<Preco>) => setPrecos((l) => l.map((s) => (s.id === id ? { ...s, ...campos } : s)));
   const semErros = (id: string) => setErrosPreco((m) => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith(`${id}:`))));
   const anotarErro = (chave: string, ruim: string | null) => setErrosPreco((m) => { const x = { ...m }; if (ruim) x[chave] = ruim; else delete x[chave]; return x; });
@@ -344,7 +344,7 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
     semErros(s.id);
     setErro(null);
     // um preço só: o primeiro valor preenchido passa a valer para todos os portes
-    if (!comPorte) { const v = CAMPOS_PRECO.map((c) => s[c]).find((x) => x != null) ?? null; mudarPreco(s.id, { preco_p: v, preco_m: v, preco_g: v, preco_gg: v }); }
+    if (!comPorte) mudarPreco(s.id, umPrecoSo(s));
   }
   const cabeca = (titulo: string, texto: string) => (
     <div>
@@ -489,31 +489,36 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
                         </select>
                         <button type="button" className="g-ico" title="Não ofereço: tirar da lista" aria-label={`Não ofereço ${s.nome}: tirar da lista`} onClick={() => { setFora((l) => [...l, s.id]); semErros(s.id); setErro(null); }}><Trash2 /></button>
                       </div>
-                      <div className="g-guia-modo">
-                        <div className="g-seg" role="group" aria-label={`Como é o preço de ${s.nome}`}>
-                          <button type="button" aria-pressed={!comPorte} onClick={() => trocarModo(s, false)}>Um preço só</button>
-                          <button type="button" aria-pressed={comPorte} onClick={() => trocarModo(s, true)}>Por porte</button>
-                        </div>
-                      </div>
-                      {comPorte ? (
-                        <div className="precos">
-                          {CAMPOS_PRECO.map((c) => (
-                            <CampoPreco key={c} porte={c.replace("preco_", "").toUpperCase()} servico={s.nome} valor={s[c]}
-                              aoMudar={(v, ruim) => { mudarPreco(s.id, { [c]: v }); setErro(null); anotarErro(`${s.id}:${c}`, ruim); }} />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="precos um">
-                          <CampoPreco key="todos" porte="todos" servico={s.nome} valor={s.preco_p}
-                            aoMudar={(v, ruim) => { mudarPreco(s.id, { preco_p: v, preco_m: v, preco_g: v, preco_gg: v }); setErro(null); anotarErro(`${s.id}:todos`, ruim); }} />
-                          <small>Vale para todos os portes.</small>
-                        </div>
-                      )}
+                      <PrecosDoServico servico={s.nome} valores={s} porPorte={comPorte} aoTrocarModo={(v) => trocarModo(s, v)}
+                        aoMudar={(campos, c, ruim) => { mudarPreco(s.id, campos); setErro(null); anotarErro(`${s.id}:${c}`, ruim); }} />
                     </section>
                   );
                 })}
+                {servicosNovos.map((s) => {
+                  const nomeDele = s.nome.trim() || "serviço novo";
+                  return (
+                    <section key={s.chave} className="g-guia-servico novo" style={{ "--cor": s.cor } as React.CSSProperties} aria-label={s.nome.trim() ? `Serviço novo: ${s.nome.trim()}` : "Serviço novo"}>
+                      <div className="cabeca">
+                        <input className={`g-input nome${faltaNome && !s.nome.trim() ? " ruim" : ""}`} value={s.nome} maxLength={80} placeholder="Nome do serviço" aria-label="Nome do serviço novo"
+                          aria-invalid={faltaNome && !s.nome.trim()} autoFocus={!s.nome}
+                          onChange={(e) => { mudarNovo(s.chave, { nome: e.target.value }); setErro(null); }} />
+                        <select className="g-select" aria-label={`Duração de ${nomeDele}`} value={s.duracao_min} onChange={(e) => mudarNovo(s.chave, { duracao_min: Number(e.target.value) })}>
+                          {DURACOES.map((m) => <option key={m} value={m}>{textoDuracao(m)}</option>)}
+                        </select>
+                        <button type="button" className="g-ico" title="Tirar este serviço" aria-label={`Tirar ${nomeDele} da lista`}
+                          onClick={() => { setServicosNovos((l) => l.filter((x) => x.chave !== s.chave)); semErros(s.chave); setErro(null); }}><Trash2 /></button>
+                      </div>
+                      <EscolherArea areas={areasDoServico} valor={s.area} servico={nomeDele} aoMudar={(area) => mudarNovo(s.chave, { area })} />
+                      <PrecosDoServico servico={nomeDele} valores={s} porPorte={s.porPorte}
+                        aoTrocarModo={(v) => { semErros(s.chave); setErro(null); mudarNovo(s.chave, v ? { porPorte: true } : { porPorte: false, ...umPrecoSo(s) }); }}
+                        aoMudar={(campos, c, ruim) => { mudarNovo(s.chave, campos); setErro(null); anotarErro(`${s.chave}:${c}`, ruim); }} />
+                      <div className="g-sv-cor"><span className="g-rotulo">Cor na agenda</span><EscolherCor valor={s.cor} aoMudar={(cor) => mudarNovo(s.chave, { cor })} rotulo={`Cor de ${nomeDele}`} /></div>
+                    </section>
+                  );
+                })}
+                <button type="button" className="g-btn sec g-guia-mais" onClick={adicionarServico}><Plus />Adicionar outro serviço</button>
               </div>
-              {naLista.some((s) => porPorte[s.id] ?? true) && <p className="g-guia-legenda"><b>P</b> = pequeno · <b>M</b> = médio · <b>G</b> = grande · <b>GG</b> = gigante</p>}
+              {[...naLista.map((s) => porPorte[s.id] ?? true), ...servicosNovos.map((s) => s.porPorte)].some(Boolean) && <p className="g-guia-legenda"><b>P</b> = pequeno · <b>M</b> = médio · <b>G</b> = grande · <b>GG</b> = gigante</p>}
               {tirados.length > 0 && (
                 <div className="g-guia-fora">
                   <p className="g-rotulo">Fora da lista</p>
@@ -582,6 +587,7 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
                 <Link className="g-btn pri" href="/gestao/app/clientes?novo=1" onClick={aoFechar}><PawPrint />Cadastrar o primeiro pet</Link>
                 <button type="button" className="g-btn sec" onClick={aoImportar}><FileSpreadsheet />Trazer meus clientes de uma planilha</button>
                 <Link className="g-btn fantasma" href="/gestao/app/manual" onClick={aoFechar}><BookOpen />Ver o manual</Link>
+                <button type="button" className="g-btn fantasma" onClick={() => { aoFechar(); abrirPersonalizarMenu(); }}><LayoutGrid />Escolher o que aparece no menu</button>
               </div>
             </div>
           )}

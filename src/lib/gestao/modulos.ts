@@ -96,3 +96,36 @@ export const SERVICOS_BANHO_TOSA = [
   { nome: "Hidratação", categoria: "outro", duracao_min: 30, cor: "#4d8f6b", ordem: 4 },
   { nome: "Corte de unhas", categoria: "outro", duracao_min: 15, cor: "#b0763f", ordem: 5 },
 ] as const;
+
+/**
+ * A área de cada serviço vem de `servicos.categoria`: banho, tosa, banho_tosa e outro são do banho e tosa; creche, hotel e loja,
+ * de cada uma. A diária da creche e do hotel não vem daqui (fica no pet shop): um serviço da creche ou do hotel é um a mais
+ * (um pacote, um transporte). A categoria 'loja' entrou com a migração 20261179; antes dela, o serviço da loja vira 'outro'.
+ */
+export const AREAS_DE_SERVICO = [
+  { id: "banho_tosa", rotulo: "Banho e tosa" },
+  { id: "creche", rotulo: "Creche" },
+  { id: "hotel", rotulo: "Hotel" },
+  { id: "loja", rotulo: "Loja" },
+] as const;
+export type AreaDoServico = (typeof AREAS_DE_SERVICO)[number]["id"];
+export const areaDoServico = (categoria: string | null | undefined): AreaDoServico =>
+  categoria === "creche" || categoria === "hotel" || categoria === "loja" ? categoria : "banho_tosa";
+/** A categoria que vai para o banco: a de antes, se a área não mudou; serviço novo do banho e tosa entra como "outro". */
+export const categoriaDaArea = (area: AreaDoServico, antes?: string | null): string =>
+  antes && areaDoServico(antes) === area ? antes : area === "banho_tosa" ? "outro" : area;
+/** As áreas que o pet shop usa (mais a do serviço aberto, se ela saiu do que o pet shop usa). Sem nenhuma, banho e tosa. */
+export function areasDeServicoPara(petshop: ComModulos, atual?: AreaDoServico | null): AreaDoServico[] {
+  const l = AREAS_DE_SERVICO.map((a) => a.id).filter((a) => usaModulo(petshop, a) || a === atual);
+  return l.length ? l : ["banho_tosa"];
+}
+
+/** O que cada área põe no menu, para a frase "Pronto: o menu agora mostra …". */
+export function telasDoMenu(petshop: ComModulos): string[] {
+  return [
+    usaModulo(petshop, "banho_tosa") ? "Agenda" : null,
+    usaCasa(petshop) ? nomeDaCasa(petshop) : null,
+    usaModulo(petshop, "pacotes") ? "Pacotes" : null,
+    usaModulo(petshop, "loja") ? "Estoque" : null,
+  ].filter((x): x is string => x != null);
+}

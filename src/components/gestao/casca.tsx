@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
+  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, Pencil, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
 import { useGestao } from "./contexto";
 import { planoPorId } from "@/lib/gestao/planos";
@@ -18,7 +18,7 @@ import { TELA_DA_AREA, nomeDaCasa, principalDe, rotaForaDoMenu, usaModulo, type 
 import { guardarLembrado, lerLembrado } from "./lembrado";
 import type { Tom } from "./painel";
 import dynamic from "next/dynamic";
-import { EVENTO_GUIA, quandoATelaAbrir } from "./ui";
+import { EVENTO_GUIA, EVENTO_PERSONALIZAR_MENU, quandoATelaAbrir } from "./ui";
 import LogoLoja from "./logo-loja";
 import AvisoDeFuso from "./aviso-fuso";
 import { aplicarTema } from "@/lib/gestao/identidade";
@@ -30,6 +30,7 @@ const Assistente = dynamic(carregarAssistente, { ssr: false });
 const Ajuda = dynamic(() => import("./ajuda"), { ssr: false });
 const AjudaDaTela = dynamic(() => import("./manual/ajuda-da-tela"), { ssr: false });
 const GuiaInicial = dynamic(() => import("./guia-inicial"), { ssr: false });
+const PersonalizarMenu = dynamic(() => import("./personalizar-menu"), { ssr: false });
 
 type Item = { href: string; rotulo: string; icone: React.ComponentType; tom: Tom; so?: "financeiro" | "dono" };
 const GRUPOS: { titulo: string; itens: Item[] }[] = [
@@ -111,6 +112,13 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     const abrir = () => setGuia((g) => (g === "fechado" ? "botao" : g));
     window.addEventListener(EVENTO_GUIA, abrir);
     return () => window.removeEventListener(EVENTO_GUIA, abrir);
+  }, []);
+  // Personalizar, ao lado de Dia a dia (e pelo guia, pelos Primeiros passos): a folha "O que o seu negócio faz?". Só o dono.
+  const [personalizar, setPersonalizar] = useState(false);
+  useEffect(() => {
+    const abrir = () => { setMais(false); setPersonalizar(true); };
+    window.addEventListener(EVENTO_PERSONALIZAR_MENU, abrir);
+    return () => window.removeEventListener(EVENTO_PERSONALIZAR_MENU, abrir);
   }, []);
   // o "Como usar esta tela" (o manual inteiro) entra depois que a tela abriu; o Mozart baixa junto, para abrir na hora do toque
   const [depois, setDepois] = useState(false);
@@ -202,11 +210,18 @@ export default function Casca({ children }: { children: React.ReactNode }) {
 
   const aqui = [...menu.grupos, { titulo: "Outras áreas", itens: menu.outras }].flatMap((g) => g.itens.map((item) => ({ grupo: g.titulo, item }))).find((x) => atual(x.item.href));
 
+  const botaoPersonalizar = (classe: string) => (
+    <button type="button" className={classe} aria-label="Personalizar o menu Dia a dia" title="Escolher o que aparece no menu"
+      onClick={() => { setMais(false); setPersonalizar(true); }}><Pencil aria-hidden />Personalizar</button>
+  );
+
   const nav = (
     <nav className="g-nav" aria-label="Menu">
       {grupos.map((g) => (
         <div key={g.titulo}>
-          <div className="g-nav-t">{g.titulo}</div>
+          {g.titulo === "Dia a dia" && souDono ? (
+            <div className="g-nav-t com-botao"><span>{g.titulo}</span>{botaoPersonalizar("g-nav-personalizar")}</div>
+          ) : <div className="g-nav-t">{g.titulo}</div>}
           {g.itens.map((i) => (
             <Link key={i.href} href={i.href} aria-current={atual(i.href) ? "page" : undefined}><i.icone />{i.rotulo}{i.href.endsWith("/agenda") && pedidos > 0 && <span className="g-nav-n" aria-label={`${pedidos} pedidos pelo link esperando resposta`}>{pedidos}</span>}</Link>
           ))}
@@ -317,7 +332,9 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           <div className="g-pilha">
             {grupos.map((g) => (
               <div key={g.titulo}>
-                <div className="g-rotulo" style={{ marginBottom: 4 }}>{g.titulo}</div>
+                {g.titulo === "Dia a dia" && souDono ? (
+                  <div className="g-mais-t"><span className="g-rotulo">{g.titulo}</span>{botaoPersonalizar("g-btn fantasma p")}</div>
+                ) : <div className="g-rotulo" style={{ marginBottom: 4 }}>{g.titulo}</div>}
                 <div className="g-lista">
                   {g.itens.map((i) => (
                     <Link key={i.href} href={i.href} className="g-linha"><span className="g-ico" aria-hidden><i.icone /></span><span className="t"><b>{i.rotulo}</b></span></Link>
@@ -349,6 +366,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         </Folha>
       )}
 
+      {personalizar && souDono && <PersonalizarMenu aoFechar={() => setPersonalizar(false)} />}
       {guia !== "fechado" && <GuiaInicial abrirAgora={guia === "botao"} />}
       {ajuda && <Ajuda aoFechar={() => setAjuda(false)} />}
       {assistente.aberta && <Assistente pedidoInicial={assistente.pedido} aoFechar={() => setAssistente({ aberta: false, pedido: "" })} />}
