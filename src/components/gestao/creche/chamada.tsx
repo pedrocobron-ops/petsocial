@@ -14,6 +14,7 @@ import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { FolhaTaxaDeAtraso, lerAtraso, type AtrasoPendente } from "./atraso";
 import { DiasDoPlano } from "./resumo-mes";
+import { anotarFaltaAvisada } from "./falta-avisada";
 import "./creche.css";
 import "@/components/gestao/hotel/hotel.css";
 
@@ -72,7 +73,9 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
   const [taxa, setTaxa] = useState<AtrasoPendente | null>(null);
   const valorDaTaxa = vejoFinanceiro && calendario?.atraso.ativo ? calendario.atraso.creche.valor : null;
   const ehHoje = dia === hoje;
-  const minimo = primeiroDia(agora);
+  // dia que ainda vai chegar: só dá para anotar a falta que o tutor já avisou (a chegada é marcada no dia)
+  const futuro = dia > hoje;
+  const minimo = primeiroDia(agora), maximo = isoDia(somaDias(agora, 60)), amanha = isoDia(somaDias(agora, 1));
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [mov, saude] = await Promise.all([
@@ -96,6 +99,14 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
     if (somenteLeitura()) return false;
     const nome = plano.pets?.nome ?? "O pet";
     setOcupado(plano.id);
+    if (futuro) {
+      try {
+        await anotarFaltaAvisada(sb, plano.id, dia, acao === "faltou");
+        avisar(acao === "faltou" ? `${nome} vai faltar em ${dataAmigavel(dia)}: falta com aviso anotada. A vaga do dia fica livre.` : `Tirei a falta de ${dataAmigavel(dia)}.`);
+        await recarregar(); avisarMudanca();
+        return true;
+      } catch (e) { avisarErro(e); return false; } finally { setOcupado(null); }
+    }
     try {
       const r = ok(await sb.rpc("creche_chamada", { p_plano: plano.id, p_dia: dia, p_acao: acao, p_avisou: opcoes.avisou ?? false, p_forcar: opcoes.forcar ?? false })) as { repetido?: boolean; atraso?: boolean; estadia?: string; conferir?: boolean; reserva?: string; repoe?: string | null; sem_falta?: boolean };
       if (r.repetido) avisar("Outra pessoa já tinha marcado. Atualizei a chamada.");
@@ -169,16 +180,17 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
     <div className="g-pilha">
       <div className="g-cm-dia">
         <div>
-          <p className="g-rotulo">{ehHoje ? "Chamada de hoje" : "Chamada de um dia que passou"}</p>
+          <p className="g-rotulo">{ehHoje ? "Chamada de hoje" : futuro ? "Um dia que ainda vai chegar" : "Chamada de um dia que passou"}</p>
           <h2 className="g-cm-titulo">{dataLonga(deIsoDia(dia))}</h2>
         </div>
         <div className="g-fila g-cm-dia-acoes">
           <div className="g-seg" role="group" aria-label="Dia da chamada">
             <button type="button" aria-pressed={ehHoje} onClick={() => setDia(hoje)}>Hoje</button>
             {isoDia(somaDias(agora, -1)) >= minimo && <button type="button" aria-pressed={dia === isoDia(somaDias(agora, -1))} onClick={() => setDia(isoDia(somaDias(agora, -1)))}>Ontem</button>}
+            <button type="button" aria-pressed={dia === amanha} onClick={() => setDia(amanha)}>Amanhã</button>
           </div>
-          <input type="date" className="g-input g-cm-data" aria-label="Outro dia deste mês" value={dia} min={minimo} max={hoje}
-            onChange={(e) => { const v = e.target.value; if (v && v >= minimo && v <= hoje) setDia(v); }} />
+          <input type="date" className="g-input g-cm-data" aria-label="Outro dia" value={dia} min={minimo} max={maximo}
+            onChange={(e) => { const v = e.target.value; if (v && v >= minimo && v <= maximo) setDia(v); }} />
         </div>
       </div>
 
@@ -186,12 +198,13 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
       {carregando && !dados ? <Esqueleto linhas={4} /> : !dados ? null : (
         <>
           <div className="g-cm-placar" role="status">
-            <span className="esperado"><b className="g-num">{conta("esperado")}</b>{ehHoje ? "ainda não chegaram" : "sem chamada"}</span>
-            <span className="casa"><b className="g-num">{ehHoje ? conta("na_casa") : conta("na_casa") + conta("saiu")}</b>{ehHoje ? "na casa" : "vieram"}</span>
+            <span className="esperado"><b className="g-num">{conta("esperado")}</b>{ehHoje ? "ainda não chegaram" : futuro ? (conta("esperado") === 1 ? "esperado" : "esperados") : "sem chamada"}</span>
+            {!futuro && <span className="casa"><b className="g-num">{ehHoje ? conta("na_casa") : conta("na_casa") + conta("saiu")}</b>{ehHoje ? "na casa" : "vieram"}</span>}
             {ehHoje && <span className="saiu"><b className="g-num">{conta("saiu")}</b>já saíram</span>}
-            <span className="faltou"><b className="g-num">{conta("faltou")}</b>{conta("faltou") === 1 ? "faltou" : "faltaram"}</span>
+            <span className="faltou"><b className="g-num">{conta("faltou")}</b>{futuro ? (conta("faltou") === 1 ? "vai faltar (avisou)" : "vão faltar (avisaram)") : conta("faltou") === 1 ? "faltou" : "faltaram"}</span>
           </div>
           {ehHoje && aviso}
+          {futuro && <p className="g-muted g-p" role="status">Dia que ainda vai chegar: a chegada é marcada no dia. Se o tutor já avisou que o cão não vem, toque em Vai faltar. Fica como falta com aviso (vale para a reposição depois do dia) e a vaga fica livre.</p>}
           {diaFechado(dia) && linhas.length > 0 && <p className="g-muted g-p" role="status"><b>{fraseDoDiaFechado(dia)}.</b> Ninguém é esperado e ninguém leva falta. Aqui embaixo fica só quem veio mesmo assim.</p>}
           {emPausaHoje.length > 0 && !diaFechado(dia) && <p className="g-muted g-p">Em pausa neste dia (não é falta): {emPausaHoje.map((p) => p.pets?.nome).join(", ")}.</p>}
           {ehHoje && vagas != null && ocupadas != null && (
@@ -225,7 +238,10 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
                       </div>
                     </div>
                     <div className="acoes">
-                      {l.estado === "esperado" && (
+                      {l.estado === "esperado" && futuro && (l.presenca
+                        ? <span className="g-muted g-pp">reserva de dia extra: para cancelar, use o cartão em Casa agora</span>
+                        : <button className="g-btn sec" disabled={trava} onClick={() => fazer("faltou")} aria-label={`${pet.nome} vai faltar (o tutor avisou)`}><UserX />Vai faltar (avisou)</button>)}
+                      {l.estado === "esperado" && !futuro && (
                         <>
                           <button className="g-btn verde" disabled={trava} onClick={() => fazer("chegou")}><LogIn />{ehHoje ? "Chegou" : "Veio"}</button>
                           <button className="g-btn fantasma" disabled={trava} onClick={() => fazer("faltou")}><UserX />{l.presenca?.status === "reservada" ? "Não veio" : "Faltou"}</button>
@@ -249,7 +265,13 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
                           {l.presenca?.mensalista && <button className="g-btn fantasma p" disabled={trava} onClick={() => fazer("desfazer")} aria-label={`Desfazer a ${ehHoje ? "saída" : "presença"} de ${pet.nome}`}><Undo2 />Desfazer</button>}
                         </>
                       )}
-                      {l.estado === "faltou" && (
+                      {l.estado === "faltou" && futuro && (
+                        <>
+                          <span className="g-tag amarelo">vai faltar · avisou</span>
+                          <button className="g-btn fantasma p" disabled={trava} onClick={() => fazer("desfazer")} aria-label={`Desfazer a falta avisada de ${pet.nome}`}><Undo2 />Desfazer</button>
+                        </>
+                      )}
+                      {l.estado === "faltou" && !futuro && (
                         <>
                           <span className="g-tag vermelho">faltou{l.falta?.avisou ? " · avisou" : ""}</span>
                           <label className="g-check g-cm-avisou">
@@ -270,11 +292,11 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
             </div>
           )}
 
-          <div className="g-fila g-cm-rodape">
+          {!futuro && <div className="g-fila g-cm-rodape">
             <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setFora(true); }}><CalendarPlus />Veio fora do dia</button>
             {aoExperiencia && ehHoje && <button className="g-btn sec" onClick={aoExperiencia}><Sparkles />Dia de experiência</button>}
             {(naCasa.length > 0 || conta("esperado") > 0) && <button className="g-btn sec" onClick={() => void encerrarChamada()}><Sunset />Encerrar a chamada</button>}
-          </div>
+          </div>}
           <p className="g-muted g-pp">A chegada de um mensalista não cobra diária: o dia já está no plano. Pet sem plano entra pelo botão Nova reserva / Check-in, como sempre.</p>
         </>
       )}

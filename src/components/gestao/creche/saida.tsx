@@ -73,6 +73,49 @@ export function AvisoSobras({ sobras, aoAcertar }: { sobras: SobrasDaSaida[]; ao
   );
 }
 
+/** Marca, na observação da cobrança, de que a saída já foi conferida (acertada, anotada ou deixada como está). */
+export const notaDaSaida = (fim: string) => `Saída em ${dataCurta(fim)}`;
+
+/** Cobrança de um plano que terminou e ainda pede conferência: a do mês da saída cheia, ou a de um mês em que ele já não vem. */
+export type SaidaParaAcertar = { plano: PlanoCompleto; cobranca: CobrancaCompleta; frase: string };
+
+/**
+ * O que ficou para acertar depois que um plano ganhou data de fim (a folha do acerto pode ter fechado sem escolha):
+ * a mensalidade do mês da saída maior que a conta pelos dias até a saída, ou uma cobrança de um mês depois da saída.
+ * Some quando a mensalidade é acertada, a cobrança cancelada, ou a observação diz que a saída foi conferida.
+ */
+export function saidasParaAcertar(planos: PlanoCompleto[], cobrancas: CobrancaCompleta[], horario: unknown): SaidaParaAcertar[] {
+  const lista: SaidaParaAcertar[] = [];
+  for (const p of planos) {
+    if (!p.fim) continue;
+    const mesFim = isoMes(deIsoDia(p.fim));
+    const nome = p.pets?.nome ?? "Pet";
+    const quando = `${p.fim < isoDia(new Date()) ? "terminou" : "termina"} em ${dataCurta(p.fim)}`;
+    for (const c of cobrancas) {
+      if (c.plano_id !== p.id || c.status !== "aberta" || c.acerto_saida || c.mes < mesFim || (c.obs ?? "").includes(notaDaSaida(p.fim))) continue;
+      if (c.mes === mesFim) {
+        const sug = sugestaoDoMes(p, deIsoDia(c.mes), Number(c.valor_cheio), horario);
+        if (!(centavos(sug.valor) < centavos(Number(c.valor_mensal)))) continue;
+        lista.push({ plano: p, cobranca: c, frase: `Plano de ${nome} ${quando}: a mensalidade de ${nomeMes(deIsoDia(c.mes))} ainda está em ${brl(c.valor_mensal)}. Pelos dias até a saída, ${brl(sug.valor)}.` });
+      } else if (Number(c.total) > 0) {
+        lista.push({ plano: p, cobranca: c, frase: `Plano de ${nome} ${quando}, mas a cobrança de ${nomeMes(deIsoDia(c.mes))} (${brl(c.total)}) continua aberta.` });
+      }
+    }
+  }
+  return lista;
+}
+
+/** Lê as cobranças dos planos que terminaram (do mês da saída em diante) e diz o que ainda pede acerto. */
+export async function lerSaidasParaAcertar(sb: ReturnType<typeof useGestao>["sb"], petshopId: string, planos: PlanoCompleto[], horario: unknown): Promise<SaidaParaAcertar[]> {
+  const comFim = planos.filter((p) => p.fim);
+  if (!comFim.length) return [];
+  const desde = comFim.map((p) => isoMes(deIsoDia(p.fim!))).sort()[0];
+  if (!calendarioGuardado(petshopId, false)) await lerCalendario(sb, petshopId, false).catch(() => null);
+  const r = await sb.from("creche_cobrancas").select(SELECT_COBRANCA).eq("petshop_id", petshopId).eq("status", "aberta").eq("acerto_saida", false)
+    .in("plano_id", comFim.map((p) => p.id)).gte("mes", desde).order("mes").order("id").limit(1000);
+  return saidasParaAcertar(comFim, ok(r) as unknown as CobrancaCompleta[], horario);
+}
+
 type Decisao = { texto: string; ok: boolean };
 type Item = {
   c: CobrancaCompleta; tipo: "mes" | "depois"; s: ReturnType<typeof sugestaoDoMes> | null;
@@ -108,7 +151,7 @@ export default function AcertoDaSaida({ plano, aoFechar }: { plano: PlanoComplet
     return { cobrancas: ok(cs) as unknown as CobrancaCompleta[], sobras: sobras[0] ?? null };
   }, [petshop.id, plano.id, fim]);
 
-  const atuais: Item[] = (dados?.cobrancas ?? []).filter((c) => c.status === "aberta" && !c.acerto_saida).flatMap((c): Item[] => {
+  const atuais: Item[] = (dados?.cobrancas ?? []).filter((c) => c.status === "aberta" && !c.acerto_saida && !(c.obs ?? "").includes(notaDaSaida(fim))).flatMap((c): Item[] => {
     const recebido = centavos(Number(c.total) - (c.lancamentos?.pago ? 0 : faltaDaCobranca(c)));
     if (c.mes === mesFim) {
       const s = sugestaoDoMes(plano, deIsoDia(c.mes), Number(c.valor_cheio), petshop.horario);
@@ -190,12 +233,12 @@ export default function AcertoDaSaida({ plano, aoFechar }: { plano: PlanoComplet
                       }, `Cobrança de ${mesDe(c)} de ${nome} cancelada. Saiu de A receber.`)}>Cancelar a cobrança de {mesDe(c)}</button>
                     )}
                     {it.pago && it.aMais > 0 && (
-                      <button type="button" className="g-btn verde p" disabled={ocupado} onClick={() => void fazer(chave, () => anotar(c, `Saída em ${dataCurta(fim)}: ${brl(it.aMais)} pagos a mais, para devolver ou abater`),
+                      <button type="button" className="g-btn verde p" disabled={ocupado} onClick={() => void fazer(chave, () => anotar(c, `${notaDaSaida(fim)}: ${brl(it.aMais)} pagos a mais, para devolver ou abater`),
                         `Anotado na cobrança de ${mesDe(c)}: ${brl(it.aMais)} para devolver ou abater.`)}>Anotar {brl(it.aMais)} para devolver</button>
                     )}
-                    <button type="button" className="g-btn fantasma p" disabled={ocupado} onClick={() => deixar(chave, it.pago
+                    <button type="button" className="g-btn fantasma p" disabled={ocupado} onClick={() => void fazer(chave, () => anotar(c, `${notaDaSaida(fim)}: ${it.pago ? "conferida, sem mudança" : "mensalidade mantida"}`), it.pago
                       ? `Fica como está: a cobrança de ${mesDe(c)} continua paga, sem anotação.`
-                      : `Fica como está: a cobrança de ${mesDe(c)} continua em ${brl(c.total)}.`)}>Deixar como está</button>
+                      : `Fica como está: a cobrança de ${mesDe(c)} continua em ${brl(c.total)}. O aviso de acerto não volta.`)}>Deixar como está</button>
                   </div>
                 )}
               </div>

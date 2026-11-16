@@ -172,6 +172,8 @@ export type ResumoDoMes = {
   esperados: number; vieram: number; extras: string[]; reposicoes: string[]; faltas: { dia: string; avisou: boolean }[];
   /** dias do plano que já passaram e ficaram sem chamada (nem presença nem falta) */
   semChamada: string[];
+  /** faltas avisadas com antecedência, de dias que ainda vão chegar (não contam como falta até o dia) */
+  vaiFaltar: string[];
 };
 const primeiroDoMes = (mes: Date) => new Date(mes.getFullYear(), mes.getMonth(), 1);
 const ultimoDoMes = (mes: Date) => new Date(mes.getFullYear(), mes.getMonth() + 1, 0);
@@ -180,16 +182,18 @@ export const isoMes = (mes: Date) => isoDia(primeiroDoMes(mes));
 /** Presenças, faltas e extras de um pet num mês (até hoje). */
 export function resumoDoMes(plano: Vigencia & { pet_id: string }, mes: Date, presencas: Presenca[], faltas: Pick<Falta, "pet_id" | "dia" | "avisou">[], horario: unknown, hoje: string): ResumoDoMes {
   const de = isoDia(primeiroDoMes(mes)), ate = isoDia(ultimoDoMes(mes));
-  // reserva de dia extra que ainda não virou presença não conta como vinda
-  const doPet = presencas.filter((e) => e.pet_id === plano.pet_id && e.status !== "reservada" && diaDaPresenca(e) >= de && diaDaPresenca(e) <= ate);
+  // reserva de dia extra que ainda não virou presença não conta como vinda; dia de antes do plano (o dia de experiência) também não
+  const doPet = presencas.filter((e) => e.pet_id === plano.pet_id && e.status !== "reservada" && diaDaPresenca(e) >= de && diaDaPresenca(e) <= ate
+    && planoVale(plano, diaDaPresenca(e)));
   const veio = new Set(doPet.map(diaDaPresenca));
-  // falta anotada num dia que depois foi marcado como fechado não conta
-  const faltou = faltas.filter((f) => f.pet_id === plano.pet_id && f.dia >= de && f.dia <= ate && !diaFechado(f.dia)).sort((a, b) => a.dia.localeCompare(b.dia));
+  // falta anotada num dia que depois foi marcado como fechado não conta; a avisada para um dia que ainda vai chegar fica à parte
+  const doMes = faltas.filter((f) => f.pet_id === plano.pet_id && f.dia >= de && f.dia <= ate && !diaFechado(f.dia)).sort((a, b) => a.dia.localeCompare(b.dia));
+  const faltou = doMes.filter((f) => f.dia <= hoje);
   const r: ResumoDoMes = {
     esperados: 0, vieram: doPet.filter((e) => e.mensalista !== "extra" && e.mensalista !== "reposicao").length,
     extras: doPet.filter((e) => e.mensalista === "extra").map(diaDaPresenca).sort(),
     reposicoes: doPet.filter((e) => e.mensalista === "reposicao").map(diaDaPresenca).sort(),
-    faltas: faltou.map((f) => ({ dia: f.dia, avisou: f.avisou })), semChamada: [],
+    faltas: faltou.map((f) => ({ dia: f.dia, avisou: f.avisou })), semChamada: [], vaiFaltar: doMes.filter((f) => f.dia > hoje).map((f) => f.dia),
   };
   for (let d = primeiroDoMes(mes); isoDia(d) <= ate && isoDia(d) <= hoje; d = somaDias(d, 1)) {
     const dia = isoDia(d);

@@ -39,7 +39,7 @@ export function ResumoDosMeses({ plano, presencas, faltas }: { plano: PlanoCompl
       {/* o mês passado só aparece quando o plano já valia nele */}
       {[agora, anterior(agora)].filter((mes, i) => i === 0 || plano.inicio < isoDia(new Date(agora.getFullYear(), agora.getMonth(), 1))).map((mes, i) => {
         const r = resumoDoMes(plano, mes, presencas, faltas, petshop.horario, hoje);
-        const nada = !r.esperados && !r.vieram && !r.extras.length && !r.reposicoes.length && !r.faltas.length;
+        const nada = !r.esperados && !r.vieram && !r.extras.length && !r.reposicoes.length && !r.faltas.length && !r.vaiFaltar.length;
         return (
           <div key={i} className="g-cm-mes">
             <p className="g-rotulo">{nomeMes(mes)}{i === 0 ? " (até hoje)" : ""}</p>
@@ -53,6 +53,7 @@ export function ResumoDosMeses({ plano, presencas, faltas }: { plano: PlanoCompl
                 <ul className="g-cm-detalhes">
                   {r.extras.length > 0 && <li><b>Extras:</b> {textoDasDatas(r.extras)}</li>}
                   {r.faltas.length > 0 && <li><b>Faltas:</b> {r.faltas.map((f) => `${textoDasDatas([f.dia])}${f.avisou ? " (avisou)" : ""}`).join(", ")}</li>}
+                  {r.vaiFaltar.length > 0 && <li><b>Vai faltar (avisou):</b> {textoDasDatas(r.vaiFaltar)}</li>}
                   {r.reposicoes.length > 0 && <li><b>Reposições:</b> {saldo ? r.reposicoes.map(textoDaReposicao).join(", ") : textoDasDatas(r.reposicoes)}</li>}
                   {r.semChamada.length > 0 && <li className="g-muted"><b>Sem chamada:</b> {textoDasDatas(r.semChamada)}</li>}
                 </ul>
