@@ -13,6 +13,7 @@ import { useOperacao } from "@/lib/gestao/uma-vez";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { fazerTudoOuNada } from "@/lib/gestao/tudo-ou-nada";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
+import { calendarioGuardado, lerCalendario } from "@/lib/gestao/feriados";
 import { AvisoCaixaFechado, ChipsForma, useCaixaAberto } from "../loja/pecas";
 import { FORMAS, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, fmtTelefone, isoDia, linkWhatsApp, nomeMes } from "@/lib/gestao/util";
@@ -20,7 +21,7 @@ import { useGestao } from "../contexto";
 import { FolhaBaixa, UsarCredito } from "../financeiro/comum";
 import { Kpi, Tile } from "../painel";
 import { AvatarPessoa, AvatarPet, avisarMudanca, Campo, CampoValor, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
-import AcertoDaSaida, { AvisoSobras, lerSobrasDaSaida, type SobrasDaSaida } from "./saida";
+import AcertoDaSaida, { AvisoSobras, lerSobrasDaSaida, saidasParaAcertar, type SobrasDaSaida } from "./saida";
 import "./creche.css";
 import "../loja/venda.css";
 import "@/components/gestao/hotel/hotel.css";
@@ -78,7 +79,11 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     // quem vê o financeiro abriu o mês corrente: as cobranças de mensalidade cheia que faltam são criadas (nunca duplica)
-    if (mesIso === isoMes(new Date()) && liberado) await sb.rpc("creche_gerar_cobrancas", { p_petshop: petshop.id });
+    // (junto: dia fechado não é dia do plano, e a conta do acerto da saída precisa do calendário)
+    await Promise.all([
+      mesIso === isoMes(new Date()) && liberado ? sb.rpc("creche_gerar_cobrancas", { p_petshop: petshop.id }) : null,
+      calendarioGuardado(petshop.id, false) ? null : lerCalendario(sb, petshop.id, false).catch(() => null),
+    ]);
     const [doMes, antigas, todasAsCobrancas, acertos] = await Promise.all([
       sb.from("creche_cobrancas").select(SELECT_COBRANCA).eq("petshop_id", petshop.id).eq("mes", mesIso).order("vencimento").order("id").limit(1000),
       // o que ficou sem pagar de outros meses continua aparecendo em Atrasadas
@@ -101,9 +106,10 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
 
   // quem saiu e deixou dia extra ou taxa sem cobrança (nenhuma cobrança futura vai levar)
   const diaria = petshop.diaria_creche == null ? null : Number(petshop.diaria_creche);
-  const { dados: sobras, recarregar: recarregarSobras } = useDados(() => lerSobrasDaSaida(sb, petshop.id, planos, diaria, hoje),
+  const { dados: sobras } = useDados(() => lerSobrasDaSaida(sb, petshop.id, planos, diaria, hoje),
     [petshop.id, planos.map((p) => `${p.id}:${p.fim ?? ""}`).join(","), hoje]);
-  const mudou = async () => { await Promise.all([recarregar(), recarregarSobras()]); avisarMudanca(); };
+  // o aviso faz as duas listas (e as outras telas abertas) buscarem de novo
+  const mudou = async () => { avisarMudanca(); };
   const abertas = (dados?.doMes ?? []).filter((c) => c.status === "aberta");
   const canceladas = (dados?.doMes ?? []).filter((c) => c.status === "cancelada" && !c.por_fora);
   const pagasPorFora = (dados?.doMes ?? []).filter((c) => c.status === "cancelada" && c.por_fora);
@@ -129,6 +135,8 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
     return Boolean(p && !p.primeira_cobranca && c.mes <= isoMes(new Date(p.criado_em)));
   });
   const todas = [...(dados?.antigas ?? []), ...abertas];
+  // plano que terminou e a mensalidade do mês da saída ficou cheia (a folha do acerto pode ter fechado sem escolha)
+  const saidas = saidasParaAcertar(planos, todas, petshop.horario);
   const doBloco = (b: EstadoCobranca) => todas.filter((c) => estadoDaCobranca(c, hoje).estado === b);
   /**
    * Os grupos de um bloco. O tutor aparece num bloco só, o da cobrança mais urgente dele (atrasada, hoje, a vencer),
@@ -210,6 +218,17 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
           )}
 
           <AvisoSobras sobras={sobras ?? []} aoAcertar={(p) => { if (!somenteLeitura()) setAcertando(p); }} />
+          {saidas.length > 0 && (
+            <div className="g-aviso" role="status" style={{ marginBottom: 0, flexDirection: "column", alignItems: "stretch" }}>
+              {saidas.map((x) => (
+                <div key={x.cobranca.id} className="g-fila" style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
+                  <AlertTriangle />
+                  <span className="g-cresce">{x.frase}</span>
+                  <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setAcertando(x.plano); }}>Acertar</button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {primeiras.length > 0 && (
             <div className="g-aviso g-cm-aviso-fora" role="status" style={{ marginBottom: 0 }}>
@@ -492,7 +511,7 @@ function GerarCobrancas({ sobras, mes, planos, todos, comCobranca, aoFechar, aoG
         </div>
       ) : carregando && !extras ? <Esqueleto linhas={3} /> : (
         <div className="g-pilha">
-          <p className="g-muted g-p">Uma cobrança por mensalista: a mensalidade, mais os dias extras e as taxas de busca fora do horário de meses anteriores que ainda não foram cobrados. Quem já tem cobrança em {nomeMes(mes)} não entra de novo. As de mensalidade cheia do mês corrente já são criadas quando você abre esta tela; aqui ficam as que pedem conferência.</p>
+          <p className="g-muted g-p">Uma cobrança por mensalista: a mensalidade, mais os dias extras e as taxas de busca fora do horário de meses anteriores que ainda não foram cobrados. Quem já tem cobrança em {nomeMes(mes)} não entra de novo. A mensalidade cheia de quem vem o mês inteiro o sistema já cria sozinho. Aqui ficam só as que você precisa conferir antes: a primeira de cada mensalista, as proporcionais (entrada, saída ou pausa no mês) e as que você deixou para depois.</p>
           <AvisoSobras sobras={sobras} />
           {mesIso > mesDeHoje && <p className="g-aviso" role="status" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce">{nomeMes(new Date())[0].toUpperCase() + nomeMes(new Date()).slice(1)} ainda não acabou. Dia extra ou taxa de busca marcados depois de gerar não entram nesta cobrança: vão para a do mês seguinte.</span></p>}
           <div className="g-cm-gerar">
@@ -559,6 +578,9 @@ function EditarCobranca({ cobranca: c, planos, aoFechar, aoSalvo }: { cobranca: 
     : regraIrmaoDe(petshop).ativo ? (planoDaCobranca ? descontoIrmao(petshop, planos, planoDaCobranca, deIsoDia(c.mes), valor, petshop.horario) : 0)
     : Math.min(partesDoDesconto(c).irmao, valor);
   const total = centavos((valor ?? 0) + Number(c.valor_extras) - (desconto ?? 0) - irmao);
+  // o plano termina neste mês: a mensalidade pelos dias até a saída (a mesma conta do acerto da saída)
+  const fim = planoDaCobranca?.fim && !c.acerto_saida && isoMes(deIsoDia(planoDaCobranca.fim)) === c.mes ? planoDaCobranca.fim : null;
+  const pelaSaida = fim && planoDaCobranca ? sugestaoDoMes(planoDaCobranca, deIsoDia(c.mes), Number(c.valor_cheio), petshop.horario) : null;
 
   async function salvar() {
     if (salvando) return;
@@ -595,6 +617,13 @@ function EditarCobranca({ cobranca: c, planos, aoFechar, aoSalvo }: { cobranca: 
           <Campo rotulo="Mensalidade"><CampoValor valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} /></Campo>
           <Campo rotulo="Desconto" dica="Opcional"><CampoValor valor={desconto} aoMudar={(v) => { setDesconto(v); setErro(null); }} /></Campo>
         </div>
+        {fim && pelaSaida && pelaSaida.valor !== valor && (
+          <div className="g-ht-atraso">
+            <p>O plano de {c.pets?.nome ?? "pet"} termina em {dataCurta(fim)}: {pelaSaida.restam} dos {pelaSaida.todos} dias do plano em {nomeMes(deIsoDia(c.mes))} (dia fechado não conta).</p>
+            <p className="g-cm-conta g-tab">{brl(c.valor_cheio)} × {pelaSaida.restam}/{pelaSaida.todos} = <b>{brl(pelaSaida.valor)}</b></p>
+            <div><button type="button" className="g-btn sec p" onClick={() => { setValor(pelaSaida.valor); setErro(null); }}>Recalcular pela saída</button></div>
+          </div>
+        )}
         {extras.length > 0 && (
           <p className="g-p"><b>{extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`}:</b> {textoDasDatas(extras.map((x) => x.dia))} · {partes.dias > 0 ? brl(partes.dias) : "sem valor"}</p>
         )}
@@ -644,12 +673,14 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
   const [usarCredito, setUsarCredito] = useState(true);
   const credito = usarCredito && (saldoCredito ?? 0) > 0 ? centavos(Math.min(saldoCredito ?? 0, devido)) : 0;
   const total = centavos(devido + (comMulta ? totalMulta : 0) - credito);
+  // o crédito do tutor chega depois da folha abrir: até lá, nada de valor no botão
+  const lendoCredito = saldoCredito == null;
 
   // trava na hora do primeiro toque; cada mensalidade leva a sua parte da chave (o banco recebe cada uma uma vez só)
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
   async function gravar(chave: string): Promise<boolean | void> {
-    if (salvando) return;
+    if (salvando || lendoCredito) return;
     if (!forma && total > 0) { setErro("Escolha como recebeu."); return; }
     if (!data || data > hoje) { setErro("Escolha um dia até hoje."); return; }
     if (credito > 0 && data !== hoje) { setErro("Com o crédito do tutor, o recebimento é de hoje."); return; }
@@ -709,7 +740,7 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
     <Folha titulo={`Receber de ${grupo.tutor ?? "tutor"}`} aoFechar={aoFechar}
       rodape={<>
         <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button className="g-btn pri" onClick={() => void salvar()} disabled={salvando}>{salvando ? "Recebendo…" : total <= 0 && credito > 0 ? "Pagar com o crédito" : `Receber ${brl(total)}${credito > 0 ? " e usar o crédito" : ""}`}</button>
+        <button className="g-btn pri" onClick={() => void salvar()} disabled={salvando || lendoCredito} aria-busy={lendoCredito}>{salvando ? "Recebendo…" : lendoCredito ? "Carregando…" : total <= 0 && credito > 0 ? "Pagar com o crédito" : `Receber ${brl(total)}${credito > 0 ? " e usar o crédito" : ""}`}</button>
       </>}>
       <div className="g-form">
         <p className="g-muted g-p">{contas.length} mensalidades num recebimento só. Cada uma é baixada inteira; para receber só uma parte, use o Receber de cada pet.</p>

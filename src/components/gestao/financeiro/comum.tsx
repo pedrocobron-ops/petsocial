@@ -297,17 +297,21 @@ function HistoricoDeAlteracoes({ lancamento }: { lancamento: Pick<Lancamento, "i
  * Dentro do lançamento, para o dono e quem cuida do financeiro: o que foi vendido com preço diferente da lista ou com desconto,
  * e quem vendeu. O banco anota sozinho na hora da venda (tabela `precos_alterados`); quem só opera o caixa não lê.
  */
-function PrecosMudados({ lancamento }: { lancamento: Pick<Lancamento, "id"> }) {
+export function PrecosMudados({ lancamento }: { lancamento: Pick<Lancamento, "id"> & { conta_id?: string | null } }) {
   const { sb, petshop, cuidoDoFinanceiro } = useGestao();
+  // parte recebida de uma conta (pagamento em parte): o desconto e o preço mudado ficam anotados na conta inteira
+  const conta = lancamento.conta_id ?? null;
   const { dados } = useDados(async () => {
     if (!cuidoDoFinanceiro) return [];
-    const r = await sb.from("precos_alterados").select("id, tipo, item, de, para, qtd, abaixo_do_custo, quem_nome, quando").eq("petshop_id", petshop.id).eq("lancamento_id", lancamento.id).order("quando");
+    const r = await sb.from("precos_alterados").select("id, tipo, item, de, para, qtd, abaixo_do_custo, quem_nome, quando").eq("petshop_id", petshop.id)
+      .in("lancamento_id", conta ? [lancamento.id, conta] : [lancamento.id]).order("quando");
     return r.data ?? [];
-  }, [lancamento.id, cuidoDoFinanceiro]);
+  }, [lancamento.id, conta, cuidoDoFinanceiro]);
   if (!dados?.length) return null;
   return (
     <section className="gf-alteracoes" aria-label="Preço mudado ou desconto nesta venda">
       <span className="g-rotulo"><History size={14} aria-hidden />Preço e desconto</span>
+      {conta && <p className="g-muted g-pp">Esta é uma parte de uma conta recebida em partes. Na conta inteira:</p>}
       <ul>
         {dados.map((x) => (
           <li key={x.id}>
@@ -751,8 +755,10 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
 
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
+  // o crédito do tutor chega depois da folha abrir: até lá, nada de valor no botão
+  const lendoCredito = saldoCredito == null;
   async function gravar(chave: string): Promise<boolean | void> {
-    if (salvando) return;
+    if (salvando || lendoCredito) return;
     if (entrada && !(recebendo > 0)) { setErroValor("Escreva quanto o cliente pagou."); return; }
     if (entrada && recebendo > devido) { setErroValor(`O cliente deve ${brl(devido)} nesta conta. Se pagou a mais, lance a diferença como outra entrada.`); return; }
     if (credito > 0 && data !== hoje) { setErro("Com o crédito do tutor, o recebimento é de hoje."); return; }
@@ -820,7 +826,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     <Folha titulo={entrada ? "Recebi esta conta" : "Paguei esta conta"} aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || op.ocupado}>{salvando ? "Salvando…" : credito > 0 ? (total > 0 ? `Receber ${brl(total)} e usar o crédito` : "Pagar com o crédito") : parcial || daMulta > 0 ? `Receber ${brl(total)}` : "Dar baixa"}</button>
+        <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || op.ocupado || lendoCredito} aria-busy={lendoCredito}>{salvando ? "Salvando…" : lendoCredito ? "Carregando…" : credito > 0 ? (total > 0 ? `Receber ${brl(total)} e usar o crédito` : "Pagar com o crédito") : parcial || daMulta > 0 ? `Receber ${brl(total)}` : "Dar baixa"}</button>
       </>}>
       <div className="g-form">
         <div className="g-card areia">
@@ -879,6 +885,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
           ? <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErro(null); }} total={total} rotulo="Como recebeu" />
           : <Grupo rotulo="Como pagou"><Chips opcoes={FORMAS} valor={pagamento.forma} aoMudar={(f) => { setPagamento(pagamentoInicial(f)); setErro(null); }} rotulo="Forma de pagamento" /></Grupo>}
         {conta.itens != null && <ItensDoLancamento lancamento={conta} />}
+        {conta.itens != null && <PrecosMudados lancamento={conta} />}
         {cuidoDoFinanceiro ? (
           <Campo rotulo={entrada ? "Dia em que recebeu" : "Dia em que pagou"} erro={erro}>
             <input type="date" className="g-input" value={data} max={hoje} onChange={(e) => { setData(e.target.value); setErro(null); }} />

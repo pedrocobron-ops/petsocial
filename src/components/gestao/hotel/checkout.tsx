@@ -51,11 +51,12 @@ export const venceu = (p: Pick<PacoteCliente, "vence_em">) => Boolean(p.vence_em
  * Outras estadias de hotel dos pets do mesmo tutor (para o desconto do segundo pet), com a diária combinada de cada uma:
  * quem paga cheio é o pet de diária mais alta (só quem recebe chama isto).
  */
-export async function estadiasDoTutor(sb: Banco, petshopId: string, clienteId: string | null | undefined): Promise<EstadiaDoTutor[]> {
+export async function estadiasDoTutor(sb: Banco, petshopId: string, clienteId: string | null | undefined, estrito = false): Promise<EstadiaDoTutor[]> {
   if (!clienteId) return [];
   const r = await sb.from("estadias").select("id, pet_id, tipo, status, entrada, saida_prevista, saida, diarias_cobradas, criado_em, pets!inner(cliente_id)")
     .eq("petshop_id", petshopId).eq("tipo", "hotel").neq("status", "cancelada").eq("pets.cliente_id", clienteId).order("entrada", { ascending: false }).limit(60);
-  if (r.error) return [];
+  // estrito (a conta do check-out): sem as outras estadias o desconto do segundo pet some; melhor avisar do que cobrar a mais
+  if (r.error) { if (estrito) throw new Error(r.error.message); return []; }
   return comValoresDeEstadia(sb, petshopId, (r.data ?? []) as unknown as (EstadiaDoTutor & { id: string })[]);
 }
 
@@ -97,7 +98,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
   const [agora] = useState(() => (pendente && estadia.saida ? new Date(estadia.saida) : new Date()));
   const contadas = pendente && estadia.diarias_cobradas ? estadia.diarias_cobradas : contarDiarias(estadia, agora);
   // feriados (preço da noite) e a taxa de busca fora do horário: só chegam para quem recebe
-  const { calendario } = useCalendario();
+  const { calendario, pronto: calendarioPronto } = useCalendario();
   const atraso = vejoFinanceiro && !estadia.mensalista ? atrasoSugerido(estadia.tipo, agora, calendario?.atraso) : null;
   // a taxa de atraso nunca entra sozinha: null = a pessoa ainda não disse se cobra ou não
   const [comAtraso, setComAtraso] = useState<boolean | null>(null);
@@ -123,22 +124,27 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
   const nValido = Number.isInteger(n) && n >= 1;
   const palavra = estadia.tipo === "hotel" ? (n === 1 ? "noite" : "noites") : (n === 1 ? "dia" : "dias");
 
-  const { dados: pacotes } = useDados(async () =>
-    (await pacotesParaEstadia(sb, petshop.id, [estadia.pet_id]).catch(() => [])).filter((p) => pacoteServe(p, estadia.tipo, servicos)),
+  const { dados: pacotes, erro: erroPacotes, recarregar: lerPacotes } = useDados(async () =>
+    (await pacotesParaEstadia(sb, petshop.id, [estadia.pet_id])).filter((p) => pacoteServe(p, estadia.tipo, servicos)),
   [petshop.id, estadia.pet_id]);
   // o que só quem recebe lê: o sinal e as taxas da reserva, as outras estadias do tutor e o que ele ainda deve
-  const { dados: mais } = useDados(async () => {
+  // Tudo junto, e só então a conta aparece: sem o sinal pago, o desconto do segundo pet ou o crédito, o valor sairia cheio
+  // (e quem é rápido cobraria o sinal duas vezes). Se uma leitura falha, a folha avisa e não mostra valor nenhum.
+  const { dados: mais, erro: erroMais, recarregar: lerMais } = useDados(async () => {
     if (!vejoFinanceiro) return { valores: null as ValoresDaEstadia | null, outras: [] as EstadiaDoTutor[], pendencias: [] as Pendencia[], credito: 0, atrasoJa: null as AtrasoJaCobrado | null };
-    const [v, outras, p, credito, atrasoJa] = await Promise.all([
-      sb.from("estadias_valores").select("*").eq("estadia_id", estadia.id).maybeSingle(),
-      estadia.tipo === "hotel" ? estadiasDoTutor(sb, petshop.id, tutor?.id) : Promise.resolve([]),
+    const [v, outras, pendencias, credito, atrasoJa] = await Promise.all([
+      sb.from("estadias_valores").select("*").eq("estadia_id", estadia.id).maybeSingle().then((r) => { if (r.error) throw new Error(r.error.message); return r.data; }),
+      estadia.tipo === "hotel" ? estadiasDoTutor(sb, petshop.id, tutor?.id, true) : Promise.resolve([]),
       // todas as contas abertas do tutor (em páginas: o banco entrega no máximo mil por vez)
-      tutor?.id ? lerTudo<Pendencia>((de, ate, contar) => sb.from("lancamentos").select("id, valor, descricao, categoria, data, vencimento", contando(contar)).eq("petshop_id", petshop.id).eq("cliente_id", tutor.id).eq("tipo", "entrada").eq("pago", false).order("data").order("id").range(de, ate)).then((data) => ({ data }), () => ({ data: [] as Pendencia[] })) : Promise.resolve({ data: [] }),
-      creditoDoTutor(sb, petshop.id, tutor?.id).then((c) => c.saldo).catch(() => 0),
+      tutor?.id ? lerTudo<Pendencia>((de, ate, contar) => sb.from("lancamentos").select("id, valor, descricao, categoria, data, vencimento", contando(contar)).eq("petshop_id", petshop.id).eq("cliente_id", tutor.id).eq("tipo", "entrada").eq("pago", false).order("data").order("id").range(de, ate)) : Promise.resolve([] as Pendencia[]),
+      creditoDoTutor(sb, petshop.id, tutor?.id).then((c) => c.saldo),
       atrasoJaCobrado(sb, petshop.id, tutor?.id, estadia, agora),
     ]);
-    return { valores: (v.data ?? null) as ValoresDaEstadia | null, outras, pendencias: ((p as { data: Pendencia[] | null }).data ?? []) as Pendencia[], credito, atrasoJa };
+    return { valores: (v ?? null) as ValoresDaEstadia | null, outras, pendencias: (pendencias ?? []) as Pendencia[], credito, atrasoJa };
   }, [petshop.id, estadia.id, vejoFinanceiro]);
+  // a conta só vale com tudo lido: pacotes, sinal, taxas, outras estadias do tutor, contas antigas, crédito e o calendário (feriados)
+  const contaPronta = pacotes != null && mais != null && (!vejoFinanceiro || calendarioPronto);
+  const erroDaLeitura = contaPronta ? null : erroMais ?? erroPacotes;
   const valores = mais?.valores ?? null;
 
   // quem tem pacote com saldo sai usando o pacote, a não ser que a pessoa escolha cobrar a diária
@@ -236,6 +242,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
   const salvar = () => op.fazer(gravar);
   async function gravar(chave: string): Promise<boolean | void> {
     if (salvando) return;
+    if (!contaPronta) { avisarErro("Espere a conta terminar de carregar."); return; }
     if (!nValido) { avisarErro("Confira o número de diárias."); return; }
     if (atraso && comAtraso === null) { setErroAtraso(true); document.getElementById("g-ht-atraso")?.scrollIntoView({ block: "center", behavior: "smooth" }); avisarErro("Diga se a taxa de busca fora do horário entra na conta ou não."); return; }
     const valorRuim = erroDeValor(valor) ?? (vejoFinanceiro ? erroDaConta(itens, null, soma) : null);
@@ -344,6 +351,8 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
         feito = await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "estadia_checkout", estadia: estadia.id }, passos);
       } catch (e) {
         if (casoDoErro(e) === "maestro:estadia_ja") { avisar(pendente ? "Essa estadia já tinha sido acertada. Atualizei a lista." : "Esse check-out já tinha sido feito. Atualizei a lista."); aoGravar(); return; }
+        // o banco conferiu com o que já foi pago (sinal, crédito) e o valor passava do que falta: lê tudo de novo e mostra a conta certa
+        if (casoDoErro(e) === "maestro:passa_do_devido") { avisarErro(`Nada foi cobrado. ${mensagemDeErro(e)}`); setValorEditado(undefined); void lerMais(); return; }
         // nada ficou gravado (ou a resposta não chegou): a mesma chave na nova tentativa não lança nada duas vezes
         avisarErro(`${pendente ? "A estadia não foi acertada" : "O check-out não foi feito"}: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`);
         return false;
@@ -364,13 +373,13 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
   if (fechada) return <ContaFechada estadia={estadia} conta={fechada.conta} saida={fechada.saida} aoPronto={aoGravar} pendente={pendente} />;
 
   const mudar = (chave: string, m: Partial<ItemConta>) => setItens((l) => l.map((i) => (i.chave === chave ? { ...i, ...m } : i)));
-  const rotuloDoBotao = salvando ? "Salvando…" : fiado ? `Anotar ${brl(daEstadia)} a receber` : recebido > 0 ? `Receber ${brl(recebido)}` : pacote ? (pendente ? "Usar o pacote" : "Usar o pacote e encerrar") : pendente ? "Fechar sem cobrar" : "Fazer check-out";
+  const rotuloDoBotao = salvando ? "Salvando…" : !contaPronta ? (erroDaLeitura ? "Conta não carregou" : "Carregando a conta…") : fiado ? `Anotar ${brl(daEstadia)} a receber` : recebido > 0 ? `Receber ${brl(recebido)}` : pacote ? (pendente ? "Usar o pacote" : "Usar o pacote e encerrar") : pendente ? "Fechar sem cobrar" : "Fazer check-out";
 
   return (
     <Folha titulo={pendente ? `Receber a estadia${pet ? ` de ${pet.nome}` : ""}` : `Check-out${pet ? ` de ${pet.nome}` : ""}`} aoFechar={aoFechar} larga={vejoFinanceiro && temMais}
       rodape={<>
         <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button className="g-btn pri" onClick={salvar} disabled={salvando}>{rotuloDoBotao}</button>
+        <button className="g-btn pri" onClick={salvar} disabled={salvando || !contaPronta} aria-busy={!contaPronta && !erroDaLeitura}>{rotuloDoBotao}</button>
       </>}>
       <div className="g-form">
         <div className="g-card areia">
@@ -386,6 +395,19 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
           erro={nValido ? null : "Use um número inteiro, a partir de 1."}>
           <input className="g-input g-tab" inputMode="numeric" value={diarias} onChange={(e) => { setDiarias(e.target.value); setValorEditado(undefined); }} />
         </Campo>
+        {!contaPronta ? (
+          erroDaLeitura ? (
+            <div className="g-card areia" role="alert">
+              <p className="g-p"><b>Não consegui buscar a conta inteira</b> (sinal, descontos, crédito ou o que o tutor deve). Sem isso o valor pode sair errado, então nada é cobrado.</p>
+              <button type="button" className="g-btn sec p" onClick={() => { void lerMais(); void lerPacotes(); }}>Tentar de novo</button>
+            </div>
+          ) : (
+            <div className="g-card areia g-ht-carregando" role="status" aria-live="polite">
+              <span className="g-spin" aria-hidden />
+              <p className="g-p">{vejoFinanceiro ? "Buscando o sinal, os descontos, o crédito e o que o tutor deve antes de mostrar o valor…" : "Carregando…"}</p>
+            </div>
+          )
+        ) : <>
         {Boolean(pacotes?.length) && (
           <div className="g-campo">
             <span>Como fica a conta</span>
@@ -531,6 +553,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
         ) : pacote ? null : (
           <p className="g-muted g-p">O check-out encerra a estadia. A cobrança fica como pendência para quem cuida do financeiro acertar.</p>
         )}
+        </>}
       </div>
     </Folha>
   );
@@ -538,15 +561,16 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
 
 /* ---------- conta fechada: mandar o comprovante ---------- */
 
-function zapDoComprovante(petshop: string, e: EstadiaCompleta, conta: ContaDaEstadia, saida: string) {
+type LojaDoComprovante = { nome: string; telefone?: string | null };
+function zapDoComprovante(loja: LojaDoComprovante, e: EstadiaCompleta, conta: ContaDaEstadia, saida: string) {
   const tutor = e.pets?.clientes;
   if (soDigitos(tutor?.telefone).length < 8) return null;
-  return linkWhatsApp(tutor?.telefone, textoComprovanteEstadia({ petshop, tutor: tutor?.nome, pet: e.pets?.nome, entrada: e.entrada, saida, conta }));
+  return linkWhatsApp(tutor?.telefone, textoComprovanteEstadia({ petshop: loja.nome, telefone: loja.telefone, tutor: tutor?.nome, pet: e.pets?.nome, entrada: e.entrada, saida, conta }));
 }
 
 /** O mesmo comprovante numa folha para imprimir ou salvar em PDF (não precisa de telefone na ficha). */
-function imprimirDaEstadia(petshop: string, e: EstadiaCompleta, conta: ContaDaEstadia, saida: string) {
-  imprimirComprovante(textoComprovanteEstadia({ petshop, tutor: e.pets?.clientes?.nome, pet: e.pets?.nome, entrada: e.entrada, saida, conta }), e.tipo === "hotel" ? "Comprovante de hospedagem" : "Comprovante da creche");
+function imprimirDaEstadia(loja: LojaDoComprovante, e: EstadiaCompleta, conta: ContaDaEstadia, saida: string) {
+  imprimirComprovante(textoComprovanteEstadia({ petshop: loja.nome, telefone: loja.telefone, tutor: e.pets?.clientes?.nome, pet: e.pets?.nome, entrada: e.entrada, saida, conta }), e.tipo === "hotel" ? "Comprovante de hospedagem" : "Comprovante da creche");
 }
 
 /**
@@ -571,7 +595,7 @@ async function atrasoJaCobrado(sb: Banco, petshopId: string, clienteId: string |
 
 function ContaFechada({ estadia, conta, saida, aoPronto, pendente }: { estadia: EstadiaCompleta; conta: ContaDaEstadia; saida: string; aoPronto: () => void; pendente?: boolean }) {
   const { petshop } = useGestao();
-  const zap = zapDoComprovante(petshop.nome, estadia, conta, saida);
+  const zap = zapDoComprovante(petshop, estadia, conta, saida);
   const junto = centavos(conta.pendencias.reduce((t, p) => t + p.valor, 0));
   const fiado = conta.pagamento?.fiado;
   const agora = centavos(conta.a_pagar + junto);
@@ -580,6 +604,8 @@ function ContaFechada({ estadia, conta, saida, aoPronto, pendente }: { estadia: 
     <Folha titulo="Conta fechada" aoFechar={aoPronto} rodape={<button type="button" className="g-btn sec" onClick={aoPronto}>Pronto</button>}>
       <div className="g-vd-recibo">
         <Tile icone={Check} tom="menta" tamanho="g" />
+        {/* o número grande diz o que é: recebido agora, ou o que foi pago a mais (crédito, devolução), nunca parece dinheiro entrando */}
+        <p className="g-pp g-muted" style={{ margin: 0 }}>{fiado ? "Anotado em A receber" : agora > 0 ? "Recebido agora" : sobra?.destino === "credito" ? "Ficou de crédito para o tutor" : sobra?.destino === "devolvido" ? "Devolvido ao tutor" : sobra ? "Pago a mais, ficou com o hotel" : "Recebido agora"}</p>
         <p className="g-num">{brl(agora > 0 || !sobra ? agora : sobra.valor)}</p>
         <p><b>{fiado ? "Anotado em A receber." : agora > 0 ? "Recebido." : sobra?.destino === "devolvido" ? "Devolvido ao tutor." : sobra?.destino === "credito" ? "Ficou de crédito para o tutor." : sobra ? "Ficou com o hotel." : conta.credito_usado ? "Pago com o crédito do tutor." : "Check-out feito."}</b> {pendente ? `Estadia de ${estadia.pets?.nome ?? "pet"} acertada.` : `${estadia.pets?.nome ?? "O pet"} foi para casa.`}</p>
         <div className="g-ht-conta" style={{ width: "100%", textAlign: "left" }}>
@@ -587,7 +613,7 @@ function ContaFechada({ estadia, conta, saida, aoPronto, pendente }: { estadia: 
           {fechoDaConta(conta).map((l, i) => <div key={i} className="l"><span>{l.texto}</span><span>{l.valor}</span></div>)}
         </div>
         {zap ? <a className="g-btn zap cheio" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar comprovante</a> : <p className="g-pp g-muted">O tutor está sem telefone na ficha: não dá para mandar o comprovante pelo WhatsApp.</p>}
-        <button type="button" className="g-btn fantasma cheio" onClick={() => imprimirDaEstadia(petshop.nome, estadia, conta, saida)}><Printer />Imprimir comprovante</button>
+        <button type="button" className="g-btn fantasma cheio" onClick={() => imprimirDaEstadia(petshop, estadia, conta, saida)}><Printer />Imprimir comprovante</button>
         <p className="g-pp g-muted">{zap ? `O WhatsApp de ${estadia.pets?.clientes?.nome ?? "quem trouxe o pet"} abre com o comprovante pronto e você só aperta enviar. ` : ""}Imprimir abre a folha para imprimir ou salvar em PDF. Não é nota fiscal.</p>
       </div>
     </Folha>
@@ -606,7 +632,7 @@ export function DetalheDaEstadia({ estadia: e, aoFechar, aoCorrigir }: { estadia
   const conta = lerConta(dados);
   const fim = e.saida ?? e.saida_prevista ?? e.entrada;
   const n = e.diarias_cobradas ?? contarDiarias(e, new Date(fim));
-  const zap = conta ? zapDoComprovante(petshop.nome, e, conta, fim) : null;
+  const zap = conta ? zapDoComprovante(petshop, e, conta, fim) : null;
   const junto = conta ? centavos(conta.pendencias.reduce((t, p) => t + p.valor, 0)) : 0;
   return (
     <Folha titulo={`Estadia de ${e.pets?.nome ?? "pet"}`} aoFechar={aoFechar}
@@ -645,7 +671,7 @@ export function DetalheDaEstadia({ estadia: e, aoFechar, aoCorrigir }: { estadia
           </div>
         )}
         {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar comprovante</a>}
-        {conta && <button type="button" className="g-btn fantasma" onClick={() => imprimirDaEstadia(petshop.nome, e, conta, fim)}><Printer />Imprimir comprovante</button>}
+        {conta && <button type="button" className="g-btn fantasma" onClick={() => imprimirDaEstadia(petshop, e, conta, fim)}><Printer />Imprimir comprovante</button>}
       </div>
     </Folha>
   );

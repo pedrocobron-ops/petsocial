@@ -71,7 +71,12 @@ export default function Lista({ aoAbrir, irPara }: {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [filtroTutor, setFiltroTutor] = useState<FiltroTutor>("todos");
   // atalho vindo da tela Hoje: /gestao/app/clientes?filtro=sumidos30
-  useEffect(() => { if (new URLSearchParams(window.location.search).get("filtro") === "sumidos30") setFiltro("sumidos30"); }, []);
+  // e "quem me deve", por pessoa, vindo do Financeiro (A receber): /gestao/app/clientes?filtro=deve
+  useEffect(() => {
+    const f = new URLSearchParams(window.location.search).get("filtro");
+    if (f === "sumidos30") setFiltro("sumidos30");
+    if (f === "deve") { setAba("tutores"); setFiltroTutor("deve"); }
+  }, []);
   const [mostrar, setMostrar] = useState(PASSO);
   const [petNovo, setPetNovo] = useState(false);
   const [tutorNovo, setTutorNovo] = useState(false);
@@ -253,6 +258,14 @@ export default function Lista({ aoAbrir, irPara }: {
           <input className="g-input" type="search" placeholder="Nome do pet, do tutor ou telefone" aria-label="Buscar" value={q}
             onChange={(e) => { setQ(e.target.value); setMostrar(PASSO); }} />
         </div>
+        {/* "quem me deve", como a página do caderno: um toque leva à lista por pessoa */}
+        {aba === "pets" && dinheiro && totalDevido.tutores > 0 && (
+          <div>
+            <button type="button" className="g-btn fantasma p" onClick={() => { setAba("tutores"); setFiltroTutor("deve"); setMostrar(PASSO); }}>
+              <HandCoins />Quem me deve: {totalDevido.tutores === 1 ? "1 pessoa" : `${totalDevido.tutores} pessoas`}, {brl(totalDevido.valor)}
+            </button>
+          </div>
+        )}
         {aba === "tutores" && dinheiro && (totalDevido.tutores > 0 || totalDevido.comCredito > 0 || filtroTutor !== "todos") && (
           <div className="g-chips" role="group" aria-label="Filtro dos tutores">
             <button className="g-chip" aria-pressed={filtroTutor === "todos"} onClick={() => { setFiltroTutor("todos"); setMostrar(PASSO); }}>Todos</button>
@@ -261,7 +274,7 @@ export default function Lista({ aoAbrir, irPara }: {
           </div>
         )}
         {aba === "tutores" && filtroTutor === "deve" && dinheiro && (
-          <p className="g-p" role="status"><b className="g-tab">{brl(totalDevido.valor)}</b> a receber de {totalDevido.tutores === 1 ? "1 tutor" : `${totalDevido.tutores} tutores`}, sem multa e juros. Para cobrar, abra a ficha de cada um ou o Caixa, em Contas de clientes.</p>
+          <p className="g-p" role="status"><b className="g-tab">{brl(totalDevido.valor)}</b> a receber de {totalDevido.tutores === 1 ? "1 tutor" : `${totalDevido.tutores} tutores`}, sem multa e juros. Para cobrar, abra a ficha de cada um ou {posso("caixa") ? <Link className="g-link" href="/gestao/app/caixa#contas-clientes">o Caixa, em Contas de clientes</Link> : "o Caixa, em Contas de clientes"}.</p>
         )}
         {aba === "tutores" && filtroTutor === "credito" && dinheiro && (
           <p className="g-p" role="status"><b className="g-tab">{brl(totalDevido.credito)}</b> de crédito com {totalDevido.comCredito === 1 ? "1 tutor" : `${totalDevido.comCredito} tutores`}: é dinheiro deles, que desconta da próxima conta.</p>

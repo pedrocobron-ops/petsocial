@@ -20,7 +20,9 @@ import "./equipe.css";
 const pct = (n: number) => `${String(Number(n)).replace(".", ",")}%`;
 
 /** Quem aparece na escala e o horário da pessoa em cada dia (a escala própria ou, sem ela, o horário do pet shop). */
-const naEscala = (p: Profissional) => p.atende || !!p.escala;
+/** Cuida dos pets na creche ou no hotel (monitor(a)), mesmo sem login e sem aparecer na agenda. */
+const cuidaDaCasa = (p: Profissional) => p.papel !== "dono" && (p.acessos ?? []).includes("creche_hotel") && !(p.acessos ?? []).some((a) => ["caixa", "financeiro"].includes(a));
+const naEscala = (p: Profissional) => p.atende || !!p.escala || cuidaDaCasa(p);
 const horaCurta = (h: string) => { const [a, m] = h.split(":"); return m === "00" ? `${Number(a)}h` : `${Number(a)}:${m}`; };
 
 type Aberto = { tipo: "novo" } | { tipo: "editar"; id: string; foco?: "acesso" } | { tipo: "convite"; id: string } | null;
@@ -42,7 +44,8 @@ export default function Equipe() {
   const loja = lerHorario(petshop.horario);
   const diaDe = (p: Profissional, d: string) => (p.escala ? lerHorario(p.escala)[d] : loja[d]);
   const hoje = String(new Date().getDay());
-  const atendem = ativos.filter((p) => p.atende).length;
+  // sem banho e tosa, "atendem" é quem cuida dos pets: quem atende e a monitora da creche
+  const atendem = ativos.filter((p) => p.atende || (!usaModulo(petshop, "banho_tosa") && cuidaDaCasa(p))).length;
   const trabalhamHoje = ativos.filter((p) => naEscala(p) && diaDe(p, hoje)).length;
   const convites = ativos.filter((p) => acessoDe(p) === "convite").length;
   const soEu = ativos.length <= 1;

@@ -76,12 +76,16 @@ function CobrancasNoPapel() {
 
   const { dados, carregando, erro } = useDados(async () => {
     if (!cuidoDoFinanceiro) return null;
-    const [doMes, antigas, planos] = await Promise.all([
+    const fimDoMes = isoDia(new Date(mes.getFullYear(), mes.getMonth() + 1, 0));
+    const [doMes, antigas, planos, pendentes] = await Promise.all([
       sb.from("creche_cobrancas").select(SELECT_COBRANCA).eq("petshop_id", petshop.id).eq("mes", mesIso).eq("status", "aberta").order("vencimento").order("id").limit(1000),
       // o que ficou sem pagar de meses anteriores
       sb.from("creche_cobrancas").select(SELECT_COBRANCA.replace("lancamentos(", "lancamentos!inner(")).eq("petshop_id", petshop.id).eq("status", "aberta")
         .lt("mes", mesIso).eq("lancamentos.pago", false).order("vencimento").order("id").limit(1000),
       lerPlanos(sb, petshop.id, true),
+      // dias extras do mês que ainda não estão em cobrança nenhuma: vão para a mensalidade seguinte (a lista diz, para ninguém achar que sumiram)
+      sb.from("estadias").select("plano_id, dia").eq("petshop_id", petshop.id).eq("mensalista", "extra").in("status", ["em_casa", "encerrada"])
+        .is("cobranca_id", null).gte("dia", mesIso).lte("dia", fimDoMes).order("dia").limit(1000),
     ]);
     // nome do modelo de plano ("3x por semana"), quando o plano veio de um modelo
     const idsModelo = [...new Set(planos.map((p) => p.modelo_id).filter(Boolean))] as string[];
@@ -90,7 +94,9 @@ function CobrancasNoPapel() {
       const m = await sb.from("creche_modelos").select("id, nome").eq("petshop_id", petshop.id).in("id", idsModelo);
       for (const x of m.data ?? []) modelos.set(x.id, x.nome);
     }
-    return { doMes: ok(doMes) as unknown as CobrancaCompleta[], antigas: ok(antigas) as unknown as CobrancaCompleta[], planos, modelos };
+    const extrasDepois = new Map<string, string[]>();
+    for (const e of pendentes.data ?? []) if (e.plano_id && e.dia) extrasDepois.set(e.plano_id, [...(extrasDepois.get(e.plano_id) ?? []), e.dia]);
+    return { doMes: ok(doMes) as unknown as CobrancaCompleta[], antigas: ok(antigas) as unknown as CobrancaCompleta[], planos, modelos, extrasDepois };
   }, [petshop.id, mesIso, cuidoDoFinanceiro]);
 
   const todas = useMemo(() => familias(dados?.doMes ?? [], dados?.antigas ?? []), [dados]);
@@ -150,7 +156,9 @@ function CobrancasNoPapel() {
                     <tbody key={f.chave}>
                       <tr className="fam"><td colSpan={6}><b>{f.tutor}</b><span>{fmtTelefone(f.telefone) || "sem telefone"} · {deve > 0 ? `falta ${brl(deve)}` : "tudo pago"}</span></td></tr>
                       {linhas.map((c) => {
-                        const p = textoDoPlano(c, planoDe(c), modeloDe(c)), x = textoDosExtras(c);
+                        const p = textoDoPlano(c, planoDe(c), modeloDe(c));
+                        const depois = c.mes === mesIso && !c.acerto_saida ? dados?.extrasDepois.get(c.plano_id) ?? [] : [];
+                        const x = [...textoDosExtras(c), ...(depois.length ? [`${depois.length === 1 ? "1 dia extra" : `${depois.length} dias extras`} (${textoDasDatas(depois)}) vai para a mensalidade de ${nomeMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}`] : [])];
                         return (
                           <tr key={c.id}>
                             <td><b>{c.pets?.nome ?? "Pet removido"}</b>{c.mes !== mesIso && <small>de {nomeMes(deIsoDia(c.mes))}</small>}</td>

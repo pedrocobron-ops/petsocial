@@ -27,22 +27,26 @@ function FechamentoNoPapel() {
 
   const { dados, carregando, erro } = useDados(async () => {
     if (!vejoFinanceiro) return null;
-    const f = await sb.from("caixas").select("*").eq("petshop_id", petshop.id).not("fechado_em", "is", null).order("fechado_em", { ascending: false }).limit(30);
+    const doCaixa = (cid: string) => Promise.all([
+      paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true)
+        .eq("caixa_id", cid).order("criado_em").order("id").range(de, ate)),
+      sb.rpc("caixa_alteracoes", { p_caixa: cid }),
+    ]);
+    // veio do Caixa com o caixa escolhido (`?caixa=`): tudo sai junto, numa leva só (no celular, cada espera soma)
+    const [f, doId, adiantado] = await Promise.all([
+      sb.from("caixas").select("*").eq("petshop_id", petshop.id).not("fechado_em", "is", null).order("fechado_em", { ascending: false }).limit(30),
+      id ? sb.from("caixas").select("*").eq("petshop_id", petshop.id).eq("id", id).maybeSingle() : null,
+      id ? doCaixa(id) : null,
+    ]);
     if (f.error) throw new Error(f.error.message);
     const fechados = (f.data ?? []) as Caixa[];
-    let caixa = id ? fechados.find((c) => c.id === id) ?? null : fechados[0] ?? null;
-    if (id && !caixa) {
-      // caixa mais antigo que a lista, ou ainda aberto
-      const r = await sb.from("caixas").select("*").eq("petshop_id", petshop.id).eq("id", id).maybeSingle();
-      caixa = (r.data as Caixa | null) ?? null;
-    }
+    // sem id: o último fechado; com id: o da lista ou (mais antigo que a lista, ou ainda aberto) o lido à parte
+    const caixa = id ? fechados.find((c) => c.id === id) ?? ((doId?.data as Caixa | null) ?? null) : fechados[0] ?? null;
     if (!caixa) return { fechados, caixa: null, lancamentos: [] as Lancamento[], alteracoes: 0 };
     const c = caixa;
-    const [lancamentos, alt] = await Promise.all([
-      fin || !c.fechado_em ? paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true)
-        .eq("caixa_id", c.id).order("criado_em").order("id").range(de, ate)) : Promise.resolve([] as Lancamento[]),
-      sb.rpc("caixa_alteracoes", { p_caixa: c.id }),
-    ]);
+    const [lidos, alt] = adiantado ?? await doCaixa(c.id);
+    // quem só opera o caixa não recebe os lançamentos de um caixa fechado (o banco também não entrega)
+    const lancamentos = fin || !c.fechado_em ? lidos : [];
     lancamentos.sort((a, b) => quandoPagou(a).localeCompare(quandoPagou(b)) || a.id.localeCompare(b.id));
     return { fechados, caixa: c, lancamentos, alteracoes: alt.error ? 0 : Number(alt.data ?? 0) };
   }, [petshop.id, id, vejoFinanceiro, fin]);
@@ -120,16 +124,6 @@ function FechamentoNoPapel() {
               )}
             </div>
 
-            <section>
-              <h2 className="g-pa-t">Para conferir</h2>
-              <Pares linhas={[
-                { nome: "Atendimentos concluídos sem conta fechada (na hora da impressão)", valor: paraCobrar.n ? `${paraCobrar.n} · ${brl(paraCobrar.total)}` : "nenhum" },
-                { nome: "Alterações em valores enquanto este caixa esteve aberto", valor: dados!.alteracoes ? String(dados!.alteracoes) : "nenhuma" },
-              ]} />
-              {(paraCobrar.n > 0 || dados!.alteracoes > 0) && <p className="g-pa-nota">{paraCobrar.n > 0 ? "Os atendimentos para cobrar não entraram no caixa: feche a conta deles em Caixa, Atendimentos para cobrar. " : ""}{dados!.alteracoes > 0 ? (fin ? "Cada alteração está em Alterações em valores, na tela Hoje." : "O dono vê cada alteração em Alterações em valores.") : ""}</p>}
-              {caixa.obs && <p className="g-pa-nota" style={{ color: "#1f1b17" }}><b>Observação:</b> {caixa.obs}</p>}
-            </section>
-
             {comMovimentos && lancVisiveis.length > 0 && (
               <section>
                 <h2 className="g-pa-t">Lançamentos deste caixa<small>{lancVisiveis.length}</small></h2>
@@ -142,7 +136,7 @@ function FechamentoNoPapel() {
                       return (
                         <tr key={l.id}>
                           <td className="hora">{hora(quandoPagou(l))}</td>
-                          <td>{l.movimento ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [l.descricao, resumoDeItens(l)].filter(Boolean).join(" · ") || "Lançamento"}{!l.movimento && <small>{categoriaAtual(l.categoria, petshop)}</small>}</td>
+                          <td>{l.movimento ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [l.descricao, resumoDeItens(l)].filter(Boolean).join(" · ") || "Lançamento"}{!l.movimento && <small>{categoriaAtual(l.categoria, petshop)}{l.alterado_em ? ` · alterado em ${dataCurta(l.alterado_em)} às ${hora(l.alterado_em)}` : ""}</small>}</td>
                           <td>{l.movimento ? "Dinheiro" : textoDoPagamento(l)}</td>
                           <td className="pa-num">{entrada ? brl(valor) : ""}</td>
                           <td className="pa-num">{entrada ? "" : brl(valor)}</td>
@@ -154,7 +148,19 @@ function FechamentoNoPapel() {
               </section>
             )}
 
-            <div className="g-pa-assina"><span>Fechado por</span><span>Conferido por</span></div>
+            {/* o que conferir e as assinaturas ficam juntos na mesma folha (sem as linhas de assinar sozinhas na página 2) */}
+            <div className="g-pa-fim">
+              <section>
+                <h2 className="g-pa-t">Para conferir</h2>
+                <Pares linhas={[
+                  { nome: "Atendimentos concluídos sem conta fechada (na hora da impressão)", valor: paraCobrar.n ? `${paraCobrar.n} · ${brl(paraCobrar.total)}` : "nenhum" },
+                  { nome: "Alterações em valores enquanto este caixa esteve aberto", valor: dados!.alteracoes ? String(dados!.alteracoes) : "nenhuma" },
+                ]} />
+                {(paraCobrar.n > 0 || dados!.alteracoes > 0) && <p className="g-pa-nota">{paraCobrar.n > 0 ? "Os atendimentos para cobrar não entraram no caixa: feche a conta deles em Caixa, Atendimentos para cobrar. " : ""}{dados!.alteracoes > 0 ? (fin ? "Cada alteração está no aplicativo, em Financeiro, Alterações (período: este caixa)." : "O dono vê cada alteração em Financeiro, Alterações.") : ""}</p>}
+                {caixa.obs && <p className="g-pa-nota" style={{ color: "#1f1b17" }}><b>Observação:</b> {caixa.obs}</p>}
+              </section>
+              <div className="g-pa-assina"><span>Fechado por</span><span>Conferido por</span></div>
+            </div>
           </>
         )}
       </Papel>

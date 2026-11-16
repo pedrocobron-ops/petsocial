@@ -432,7 +432,7 @@ function CaixaDoDia() {
       {caixaDoResumo && (
         <Folha titulo={`Caixa de ${dataCurta(caixaDoResumo.aberto_em)}`} aoFechar={() => setFolha(null)}
           rodape={<>
-            <Link className="g-btn sec g-cx-imp" href={`/gestao/app/caixa/imprimir?caixa=${caixaDoResumo.id}`} target="_blank" title="Imprimir ou salvar em PDF o fechamento deste caixa" aria-label="Imprimir o fechamento"><Printer />Imprimir</Link>
+            <Link className="g-btn sec g-cx-imp" href={`/gestao/app/caixa/imprimir?caixa=${caixaDoResumo.id}`} title="Imprimir ou salvar em PDF o fechamento deste caixa" aria-label="Imprimir o fechamento"><Printer />Imprimir</Link>
             {fin && <button className="g-btn sec" onClick={() => exportarCaixa(caixaDoResumo, doCaixa(caixaDoResumo.id))}><Download />Exportar</button>}
             <button className="g-btn sec" onClick={() => setFolha(null)}>Fechar</button>
           </>}>
@@ -755,7 +755,7 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo, aoMu
         )}
         {avisoAlteracoes && (
           <p className="g-aviso" style={{ margin: 0 }} role="status">
-            <span><b>{avisoAlteracoes}</b> {cuidoDoFinanceiro ? "Veja cada uma em Alterações em valores, na tela Hoje." : "O dono vê cada uma em Alterações em valores."}</span>
+            <span><b>{avisoAlteracoes}</b> {cuidoDoFinanceiro ? <>Veja cada uma em <Link href={`/gestao/app/financeiro?aba=alteracoes&caixa=${caixa.id}`}>Financeiro, Alterações</Link>.</> : "O dono vê cada uma em Financeiro, Alterações."}</span>
           </p>
         )}
         {dinheiroFora > 0 && (

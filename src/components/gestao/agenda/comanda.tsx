@@ -142,7 +142,9 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     return a.servicos?.categoria === "creche" || a.servicos?.categoria === "hotel" ? "Creche e hotel" : "Banho e tosa";
   }
 
-  const confirmar = () => op.fazer(gravarConta);
+  // o crédito do tutor e o que ele deve de antes chegam depois da folha abrir: até lá, nada de valor no botão (sem o crédito, sairia cheio)
+  const lendoConta = vejoFinanceiro && (antigasLidas == null || saldoCredito == null);
+  const confirmar = () => (lendoConta ? undefined : op.fazer(gravarConta));
   async function gravarConta(chave: string): Promise<boolean> {
     if (nadaAFazer || somenteLeitura()) return false;
     const problema = erroDaConta(itens, desconto, contas.total);
@@ -345,8 +347,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     <Folha larga titulo="Fechar a conta" aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || nadaAFazer}>
-          {salvando ? "Anotando…" : aPagar <= 0 && credito > 0 ? "Pagar com o crédito" : aPagar <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(daConta)} a receber` : aMenos ? `Receber ${brl(aMenos.entregue)}` : `Receber ${brl(aPagar)}`}
+        <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || nadaAFazer || lendoConta} aria-busy={lendoConta}>
+          {salvando ? "Anotando…" : lendoConta ? "Carregando a conta…" : aPagar <= 0 && credito > 0 ? "Pagar com o crédito" : aPagar <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(daConta)} a receber` : aMenos ? `Receber ${brl(aMenos.entregue)}` : `Receber ${brl(aPagar)}`}
         </button>
       </>}>
       <div className="g-form">

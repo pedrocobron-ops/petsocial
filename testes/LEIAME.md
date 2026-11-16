@@ -52,6 +52,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 **unidade/**
 - `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, regras), a leitura da resposta
   (não sei, sugestão de pedido só com serviço e dia válidos, sem links), limites de conversa. Sem banco.
+- `valor.js`: leitura estrita do dinheiro digitado (`lerValorEstrito`, `lerValor`, `lerNumeroEstrito`): "abc-5" e "52o,00" são recusados
+  (nunca viram 5,00 ou 52,00), milhar e centavos com vírgula ou ponto, "R$" na frente, negativo só onde pode.
+- `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
+  outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
@@ -70,9 +74,16 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   reserva com sinal, venda de balcão com estoque, entrada de mercadoria, pagamento de comissão.
 - `creche.js`: mensalidade cheia, proporcional na entrada e na saída do plano (banco = `sugestaoDoMes` do app = conta à mão),
   dia extra cobrado no mês seguinte, desconto de irmão (banco = `descontoIrmao` do app) e a troca de quem paga cheio, recebimento.
+- `creche-rafael.js`: falta avisada com antecedência (quem marca, que dias, vaga livre, reposição só depois do dia, resumo do cartão),
+  corrigir a hora de chegada e de saída (só dono e financeiro, mesmo dia, motivo anotado, taxa de busca anotada/tirada/mantida/recusada),
+  o acerto da saída que volta até ser feito, e o Mozart `ver_planos_creche` (falta avisada; valor só para quem recebe).
 - `hotel.js`: **preço do hotel, banco × aplicativo**: ~740 noites comparadas (`hotel_noite` × `precoDasNoites`) com temporadas
   sobrepostas e empatadas, feriado nos três modos, segundo pet; estadia inteira (`hotel_previsto` × `contaDasDiarias`) com diária por porte;
   faixa de preço do link e "Esconder o preço".
+- `hotel-checkout.js`: check-out conferido com o que já foi pago (migração 20261181): receber na saída o total sem descontar o sinal
+  pago (ou o sinal a receber em parte) é recusado sem gravar nada (`maestro:passa_do_devido`); a conta certa, o acréscimo digitado, o
+  pago a mais virando crédito e a conta paga com o crédito passam; crédito + dinheiro acima do total é recusado. Desfazer check-in:
+  a data reservada fica guardada, a monitora desfaz no mesmo dia, tosador/estoque/anônimo não, de novo ou em outro dia não, o check-out apaga.
 - `link.js`: link do cliente anônimo: o que mostra, pedido de banho, chamada direta recusada, regras e aceite (texto e vacinas),
   hotel em dia fechado e fora do horário, dia de experiência, nada vira cliente antes de aceitar, link desligado, **freios de envio**
   (por WhatsApp, por rede, por loja; o teste põe os limites padrão em `config_interna` durante o teste e devolve os de antes).
@@ -90,6 +101,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   banco; limpeza e limites no banco; repetição junta (mesmo aparelho e versão, 10 min); freio por aparelho (30/min), por pet shop
   (60/min) e geral (1000/h, posto no limite durante o teste e devolvido); sem internet só conta; resolvido some e volta numa versão
   nova; rota do servidor que quebra vira registro com origem "servidor". Precisa do servidor com `GESTAO_ERRO_TESTE=1`.
+- `mozart.js`: o Mozart e o dinheiro dos clientes com um **modelo de mentira** (roteiro fixo; as voltas de `assistente/conversa.ts` e as
+  ferramentas rodam de verdade, com o login de cada papel): "o dono do Bob me pagou os 35" com duas contas abertas (5 + 30) quita as duas
+  e o mês ganha 35 uma vez só (a entrada solta é recusada; o toque duplo não recebe de novo), pagamento em parte, pagou a mais (pergunta;
+  com `sobra: "credito"` vira crédito), `anotar_divida` ligada ao tutor, `quem_me_deve` por pessoa, papéis (`cliente_receber_contas`
+  recusado para quem não mexe com dinheiro, conta e crédito de outro cliente recusados) e o teto de voltas e de tempo.
 - `visitas.js`: última visita de cada pet: a função do banco (`visitas_dos_pets`) = a conta do navegador, para o dono e para o tosador.
 
 **migracoes/**
@@ -106,6 +122,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `erros.js`: com `GESTAO_ERRO_TESTE=1`, a tela Hoje quebra de propósito (tela, erro solto, promessa) em 390 e 1366: tela
   "Opa, esta tela travou" com Tentar de novo e Voltar para Hoje e o menu, registro no banco (papel, tamanho da tela, versão, sem
   consulta) e a aba Erros do painel (agrupado, detalhes, filtros 24 h / 7 / 30 dias, marcar como resolvido e desfazer).
+- `servicos.js`: Marcar horário com vários serviços ("O que o pet vai fazer?"): quatro serviços em 390 (ordem do toque, preço por
+  porte, Tempo total e Total, o banco com o principal e os 3 a mais, a agenda, a conta de R$ 145,00 e a comissão por serviço ao centavo);
+  em 1366, tirar o primeiro (o seguinte assume), alterar um horário com três serviços, pet sem porte; tosador sem nenhum valor na tela
+  (o banco põe o preço da lista) e preço travado para a recepção.
+- `checkout-lento.js`: check-out do hotel com a leitura do sinal atrasada 2,5 s (390 e 1366): enquanto carrega, a folha não mostra valor
+  e o botão fica apagado (clicar não grava); depois, "Receber R$ 2,75" (110 − sinal 107,25) e "Receber R$ 1,60" (80 − 20% do segundo
+  pet − sinal 62,40), uma entrada só cada.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 

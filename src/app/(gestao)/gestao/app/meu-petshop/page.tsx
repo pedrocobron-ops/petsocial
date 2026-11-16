@@ -255,9 +255,13 @@ function LinkAgendamento() {
     if (somenteLeitura() || ligando) return;
     setLigando(true);
     try {
-      ok(await sb.from("petshops").update({ link_ativo: valor }).eq("id", petshop.id).select("id"));
+      // quem só faz hotel (ou creche) e liga o link pela primeira vez: o link já sai pedindo vaga, para não abrir sem opções
+      const casa = valor && semServico && !petshop.link_creche && !petshop.link_hotel
+        ? { ...(usaModulo(petshop, "hotel") ? { link_hotel: true } : {}), ...(usaModulo(petshop, "creche") ? { link_creche: true } : {}) } : {};
+      ok(await sb.from("petshops").update({ link_ativo: valor, ...casa }).eq("id", petshop.id).select("id"));
       await recarregarBase();
-      avisar(valor ? "Link ligado. Já pode mandar para os clientes." : "Link desligado.");
+      const vagas = [("link_creche" in casa) && "creche", ("link_hotel" in casa) && "hotel"].filter(Boolean).join(" e ");
+      avisar(valor ? (vagas ? `Link ligado, recebendo pedido de vaga de ${vagas}. Já pode mandar para os clientes.` : "Link ligado. Já pode mandar para os clientes.") : "Link desligado.");
     } catch (x) { avisarErro(x); } finally { setLigando(false); }
   }
 
@@ -400,7 +404,10 @@ function Servicos() {
         <button className="g-btn p pri" onClick={() => abrir("novo")}><Plus />Serviço novo</button>
       </div>
       {!ativos.length ? (
-        <Vazio titulo="Nenhum serviço na lista" texto={`Coloque o primeiro: ${exemplos ? `${exemplos}, ` : ""}o que vocês fazem.`} />
+        <Vazio titulo="Nenhum serviço na lista" texto={!usaModulo(petshop, "banho_tosa") && usaCasa(petshop)
+          // só creche e/ou hotel: a diária fica no cartão da casa e os planos em Mensalistas; aqui é só o que é cobrado à parte
+          ? `Não precisa colocar nada aqui para a ${nomeDaCasa(petshop).toLowerCase()} funcionar: a diária e as vagas ficam no cartão ${nomeDaCasa(petshop)} desta tela${usaModulo(petshop, "creche") ? " e os planos, em Mensalistas" : ""}. Use esta lista só para o que vocês cobram à parte (ex.: banho, transporte).`
+          : `Coloque o primeiro: ${exemplos ? `${exemplos}, ` : ""}o que vocês fazem.`} />
       ) : (
         <div className="g-mp-servicos">
           {ativos.map((s) => {

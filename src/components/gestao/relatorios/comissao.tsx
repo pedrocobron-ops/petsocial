@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, HandCoins } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, HandCoins } from "lucide-react";
 import { opcoesDeComissao } from "@/lib/gestao/dinheiro-opcoes";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
@@ -38,6 +38,7 @@ export default function BlocoComissao({ de, ate, aoCalcular }: { de: string; ate
   const op = opcoesDeComissao(petshop);
   const hoje = isoDia(new Date());
   const [pagando, setPagando] = useState<APagar | null>(null);
+  const [aberto, setAberto] = useState<string | null>(null);
   const { dados, erro, recarregar } = useDados(async () => {
     const [c, p, pend] = await Promise.all([
       sb.rpc("comissao_do_periodo", { p_petshop: petshop.id, p_de: de, p_ate: ate }),
@@ -108,6 +109,11 @@ export default function BlocoComissao({ de, ate, aoCalcular }: { de: string; ate
                   <span className="d"><b>{brl(c.comissao)}</b></span>
                 </div>
                 <div className="gr-com-pe">
+                  {(c.atendimentos > 0 || c.comissao > 0) && (
+                    <button type="button" className="g-btn fantasma p" aria-expanded={aberto === c.profissional_id} onClick={() => setAberto(aberto === c.profissional_id ? null : c.profissional_id)}>
+                      {aberto === c.profissional_id ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}Linha por linha
+                    </button>
+                  )}
                   {dele.map((g) => (
                     <span key={g.id} className="g-fila" style={{ gap: 8 }}>
                       <span className="g-tag verde"><Check size={12} aria-hidden /> paga {brl(g.valor)} em {dataCurta(g.pago_em)}</span>
@@ -129,6 +135,7 @@ export default function BlocoComissao({ de, ate, aoCalcular }: { de: string; ate
                     ? <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setPagando({ profissional_id: c.profissional_id, nome: c.nome, de, ate, valor: c.comissao, comissao: c.comissao, jaPago: 0, apoio: `${atendimentos(c.atendimentos)} · base ${brl(c.base)}${c.comissao_produtos > 0 ? ` · produtos ${brl(c.comissao_produtos)}` : ""}` }); }}>Marcar como paga</button>
                     : <span className="g-muted">Este período ainda não terminou. Para pagar o que já foi feito, escolha Personalizado com datas até hoje: o que a pessoa ganhar depois aparece como diferença a pagar.</span>) : null}
                 </div>
+                {aberto === c.profissional_id && <ComissaoLinhaPorLinha profissionalId={c.profissional_id} de={de} ate={ate} total={c.comissao} />}
               </div>
             );
           })}
@@ -209,6 +216,10 @@ function FolhaPagar({ pagar: x, aoFechar, aoPago }: { pagar: APagar; aoFechar: (
           {diferenca && <LinhaResumo nome="Falta pagar" valor={brl(x.valor)} forte />}
           {x.apoio && <p className="g-muted g-pp">{x.apoio}</p>}
         </div>
+        <details className="gr-com-det">
+          <summary>Ver a conta linha por linha</summary>
+          <ComissaoLinhaPorLinha profissionalId={x.profissional_id} de={x.de} ate={x.ate} total={x.comissao} />
+        </details>
         <Grupo rotulo="Como pagou">
           <Chips opcoes={FORMAS} valor={forma} aoMudar={(f) => { setForma(f); setErro(null); }} rotulo="Forma de pagamento" />
           {erro && <small className="erro" role="alert">{erro}</small>}
@@ -219,5 +230,45 @@ function FolhaPagar({ pagar: x, aoFechar, aoPago }: { pagar: APagar; aoFechar: (
         </p>
       </div>
     </Folha>
+  );
+}
+
+/** Uma linha do extrato (função `comissao_extrato`): atendimento, serviço, base, percentual e valor. */
+type LinhaDoExtrato = { agendamento_id: string; inicio: string; tipo: string; pet: string | null; servico: string; base: number; pct: number; valor: number; valor_exato: number };
+
+/**
+ * A comissão de uma pessoa linha por linha: cada serviço de cada atendimento (com o desconto já repartido), os extras,
+ * o pacote e os produtos, com a base, o percentual e o valor. É a mesma conta do total (o banco soma estas linhas).
+ */
+export function ComissaoLinhaPorLinha({ profissionalId, de, ate, total }: { profissionalId: string; de: string; ate: string; total: number }) {
+  const { sb, petshop } = useGestao();
+  const { dados, erro } = useDados(async () => {
+    const r = await sb.rpc("comissao_extrato", { p_petshop: petshop.id, p_de: de, p_ate: ate, p_profissional: profissionalId });
+    if (r.error) throw new Error(r.error.message);
+    const p = (Array.isArray(r.data) ? r.data : []) as unknown as { profissional_id: string; linhas: LinhaDoExtrato[] }[];
+    return p.find((x) => x.profissional_id === profissionalId)?.linhas ?? [];
+  }, [petshop.id, profissionalId, de, ate]);
+  if (erro) return <p className="g-muted g-pp">{erro}</p>;
+  if (!dados) return <p className="g-muted g-pp">Calculando…</p>;
+  if (!dados.length) return <p className="g-muted g-pp">Nenhum atendimento com comissão nestas datas.</p>;
+  const somaLinhas = real(dados.reduce((t, l) => t + Number(l.valor), 0));
+  const pct = (n: number) => `${Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+  return (
+    <div className="gr-com-extrato">
+      <ul aria-label="Comissão linha por linha">
+        {dados.map((l, i) => (
+          <li key={i}>
+            <span className="q">{dataCurta(l.inicio)}{l.pet ? ` · ${l.pet}` : ""}</span>
+            <span className="s">{l.servico}{l.tipo === "pacote" ? " (pacote: preço da agenda)" : ""}</span>
+            <span className="c g-tab">{brl(l.base)} × {pct(l.pct)}</span>
+            <b className="v g-tab">{Math.abs(Number(l.valor_exato) - Number(l.valor)) > 0.0001 ? `${brl(l.valor)}*` : brl(l.valor)}</b>
+          </li>
+        ))}
+      </ul>
+      <p className="g-muted g-pp">
+        {dados.length === 1 ? "1 linha" : `${dados.length} linhas`}. Total {brl(total)}.
+        {somaLinhas !== total ? ` As linhas com * têm fração de centavo: a soma é feita com o valor exato e arredondada uma vez só, no fim (arredondadas uma a uma, as linhas dariam ${brl(somaLinhas)}).` : ""}
+      </p>
+    </div>
   );
 }

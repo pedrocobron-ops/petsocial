@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, ListChecks, Pencil, Plus, Search } from "lucide-react";
+import { AlertTriangle, CalendarX2, ChevronDown, ListChecks, Pencil, Plus, Search } from "lucide-react";
 import { abreNoDia, DIAS_SEMANA, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, type PlanoCompleto } from "@/lib/gestao/creche";
-import { brl, dataCompleta, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Esqueleto, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { Chips } from "../loja/pecas";
 import FormPlano, { mensalistasPorDia } from "./form-plano";
 import ModelosDePlano from "./modelos";
+import FaltaAvisada from "./falta-avisada";
+import AcertoDaSaida, { lerSaidasParaAcertar, type SaidaParaAcertar } from "./saida";
 import { DiasDoPlano, ResumoDosMeses } from "./resumo-mes";
 import "./creche.css";
 
@@ -33,6 +35,8 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
   const [filtro, setFiltro] = useState<"ativos" | "encerrados">("ativos");
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<PlanoCompleto | null>(null);
+  const [faltando, setFaltando] = useState<PlanoCompleto | null>(null);
+  const [acertando, setAcertando] = useState<PlanoCompleto | null>(null);
   const agora = new Date(), hoje = isoDia(agora);
 
   const { dados: mov, carregando } = useDados(async () => {
@@ -40,6 +44,9 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
     return lerPresencas(sb, petshop.id, isoDia(new Date(agora.getFullYear(), agora.getMonth() - 1, 1)), isoDia(new Date(agora.getFullYear(), agora.getMonth() + 1, 0)));
   }, [petshop.id, planos.length, hoje]);
 
+  // plano que terminou com a mensalidade do mês da saída ainda cheia (ou cobrança de mês em que ele já não vem): o acerto volta aqui
+  const { dados: saidas, recarregar: recarregarSaidas } = useDados(async () => (vejoFinanceiro ? lerSaidasParaAcertar(sb, petshop.id, planos, petshop.horario) : [] as SaidaParaAcertar[]),
+    [petshop.id, vejoFinanceiro, planos.map((p) => `${p.id}:${p.fim ?? ""}`).join(",")]);
   const ativos = useMemo(() => planos.filter((p) => planoAtivo(p, hoje)), [planos, hoje]);
   const encerrados = planos.length - ativos.length;
   const porDia = mensalistasPorDia(planos, hoje);
@@ -113,22 +120,31 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
                       {p.fim && p.fim >= hoje && <span className="g-tag amarelo">até {dataCompleta(p.fim)}</span>}
                       {vejoFinanceiro && (p.temValor ? <span className="g-tag verde g-tab">{brl(p.valor_mensal)}</span> : <span className="g-tag amarelo">sem valor</span>)}
                     </div>
-                    {r && (r.esperados > 0 || r.vieram > 0 || r.extras.length > 0) && (
+                    {r && (r.esperados > 0 || r.vieram > 0 || r.extras.length > 0 || r.reposicoes.length > 0) && (
                       <p className="g-cm-plano-mes g-muted g-pp">
                         {nomeMes(agora)}: {r.vieram} {r.vieram === 1 ? "presença" : "presenças"}{r.esperados ? ` de ${r.esperados}` : ""}
                         {r.faltas.length ? ` · ${r.faltas.length === 1 ? "1 falta" : `${r.faltas.length} faltas`}` : ""}
+                        {r.reposicoes.length ? ` · ${r.reposicoes.length === 1 ? "1 reposição" : `${r.reposicoes.length} reposições`}` : ""}
                         {r.extras.length ? ` · ${r.extras.length === 1 ? "1 dia extra" : `${r.extras.length} dias extras`}` : ""}
                       </p>
                     )}
+                    {r && r.vaiFaltar.length > 0 && <p className="g-cm-plano-mes g-pp"><span className="g-tag amarelo">vai faltar {r.vaiFaltar.map(dataCurta).join(", ")} · avisou</span></p>}
+                    {(saidas ?? []).filter((x) => x.plano.id === p.id).map((x) => (
+                      <div key={x.cobranca.id} className="g-aviso g-cm-saida-aviso" role="status" style={{ marginBottom: 0 }}>
+                        <AlertTriangle />
+                        <span className="g-cresce">{x.frase}</span>
+                        <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setAcertando(p); }}>Acertar</button>
+                      </div>
+                    ))}
                     {aberta && (
                       <div className="g-cm-plano-corpo">
                         {carregando && !mov ? <Esqueleto linhas={1} /> : mov && <ResumoDosMeses plano={p} presencas={mov.presencas} faltas={mov.faltas} />}
                         {p.obs && <p className="g-muted g-p">{p.obs}</p>}
-                        {pode ? (
-                          <div className="g-fila">
-                            <button className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setEditando(p); }}><Pencil />Alterar plano</button>
-                          </div>
-                        ) : <p className="g-muted g-pp">Para mudar os dias, pausar ou encerrar o plano, fale com o dono ou com quem cuida do financeiro.</p>}
+                        <div className="g-fila">
+                          {planoAtivo(p, hoje) && <button className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setFaltando(p); }}><CalendarX2 />Vai faltar</button>}
+                          {pode && <button className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setEditando(p); }}><Pencil />Alterar plano</button>}
+                        </div>
+                        {!pode && <p className="g-muted g-pp">Para mudar os dias, pausar ou encerrar o plano, fale com o dono ou com quem cuida do financeiro.</p>}
                       </div>
                     )}
                   </div>
@@ -139,6 +155,8 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
         </div>
       )}
 
+      {faltando && <FaltaAvisada key={faltando.id} plano={faltando} aoFechar={() => { setFaltando(null); aoMudar(); }} />}
+      {acertando && <AcertoDaSaida plano={acertando} aoFechar={() => { setAcertando(null); void recarregarSaidas(); aoMudar(); }} />}
       {modelos && <ModelosDePlano aoFechar={() => setModelos(false)} aoMudar={aoMudar} />}
       {novo && <FormPlano planos={planos} aoFechar={aoFecharNovo} aoSalvo={() => { aoFecharNovo(); aoMudar(); }} />}
       {editando && <FormPlano key={editando.id} plano={editando} planos={planos} aoFechar={() => setEditando(null)} aoSalvo={() => { setEditando(null); aoMudar(); }} />}

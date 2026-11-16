@@ -62,7 +62,8 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
   const extras = vieram.filter((e) => e.mensalista === "extra").length;
   const reposicoes = vieram.filter((e) => e.mensalista === "reposicao").length;
   const avulsas = vieram.filter((e) => !e.mensalista).length;
-  const faltas = dados.faltas.filter((f) => !diaFechado(f.dia));
+  // falta avisada com antecedência para um dia que ainda vai chegar não conta (ainda)
+  const faltas = dados.faltas.filter((f) => !diaFechado(f.dia) && f.dia <= isoDia(new Date()));
   const comAviso = faltas.filter((f) => f.avisou).length;
   const esperados = doPlano + faltas.length;
   const presenca = esperados ? Math.round((doPlano / esperados) * 100) : null;

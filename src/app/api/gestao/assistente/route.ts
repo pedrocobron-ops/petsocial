@@ -3,9 +3,9 @@ import { lerEquipe, lerPetshop, lerServicos } from "@/lib/gestao/reservado";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
-import { definicao, descrever, ehErroDeUso, ferramentasPara, gravar, rodarConsulta, type Contexto, type LinkZap, type Resumo } from "@/lib/gestao/assistente/ferramentas";
+import { ferramentasPara, type Contexto, type LinkZap } from "@/lib/gestao/assistente/ferramentas";
+import { responderCartoes, voltas, type Msg, type Resultado } from "@/lib/gestao/assistente/conversa";
 import { INSTRUCOES, contextoDoPetshop } from "@/lib/gestao/assistente/instrucoes";
-import { ferramentaLiberada } from "@/lib/gestao/assistente/permissao";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 
 export const runtime = "nodejs";
@@ -17,14 +17,10 @@ const MODELO = process.env.GESTAO_MODELO ?? "claude-haiku-5-5";
 const LIMITE_DIA = Number(process.env.GESTAO_ASSISTENTE_LIMITE_DIA ?? 150);
 /** Chamadas ao modelo por pet shop por dia (cada pedido usa uma ou mais; os cartões confirmados também contam). */
 const LIMITE_CHAMADAS = Number(process.env.GESTAO_ASSISTENTE_LIMITE_CHAMADAS ?? LIMITE_DIA * 4);
-const MAX_VOLTAS = 8;
 /** Teto do histórico que o navegador devolve: mensagens e tamanho total (em caracteres do JSON). */
 const MAX_MENSAGENS = 60;
 const MAX_HISTORICO = 300_000;
 
-type Msg = Anthropic.Beta.BetaMessageParam;
-type Resultado = Anthropic.Beta.BetaToolResultBlockParam;
-type Proposta = { id: string; ferramenta: string; resumo: Resumo };
 type Corpo = {
   petshopId?: string; mensagens?: Msg[]; texto?: string; agora?: string; fusoMin?: number;
   decisoes?: { id: string; ok: boolean }[]; parciais?: Resultado[];
@@ -127,7 +123,6 @@ async function tratar(req: Request) {
   };
 
   const mensagens: Msg[] = historico(corpo.mensagens);
-  const links: LinkZap[] = [];
   let mudou = false;
 
   const ultima = mensagens[mensagens.length - 1];
@@ -135,31 +130,12 @@ async function tratar(req: Request) {
 
   if (pendentes.length) {
     // a pessoa respondeu aos cartões: grava o que foi confirmado e devolve o resultado de cada ferramenta ao modelo
-    const resultados: Resultado[] = [];
-    for (const uso of pendentes) {
-      if (uso.type !== "tool_use") continue;
-      const parcial = corpo.parciais?.find((r) => r.tool_use_id === uso.id);
-      if (parcial) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: typeof parcial.content === "string" ? parcial.content : "", is_error: Boolean(parcial.is_error) }); continue; }
-      const def = definicao(uso.name);
-      const decisao = corpo.decisoes?.find((d) => d.id === uso.id);
-      if (!def?.grava || !decisao?.ok) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A pessoa descartou esta ação. Nada foi gravado." }); continue; }
-      // a conversa vem do navegador: confere de novo se esta pessoa pode usar a ferramenta (igual à volta do modelo, mais abaixo)
-      if (!ferramentaLiberada(def, c)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: "Ferramenta indisponível para esta pessoa. Nada foi gravado." }); continue; }
-      if (!liberado) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Nada foi gravado.", is_error: true }); continue; }
-      try {
-        // a chave desta ação: se o mesmo pedido chegar duas vezes (toque duplo, internet que repetiu), o banco grava uma vez só
-        c.chave = `mozart:${uso.id}`;
-        const r = await gravar(c, uso.name, uso.input as Record<string, unknown>);
-        mudou = true;
-        await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao: uso.name, detalhes: uso.input as never });
-        resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JSON.stringify(r) });
-      } catch (err) {
-        if (err instanceof Error && /_chave_uniq/.test(err.message)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "Esta ação já tinha sido gravada (o pedido chegou repetido). Nada foi gravado de novo." }); continue; }
-        const semPermissao = err instanceof Error && /row-level security|permission denied/i.test(err.message);
-        resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: ehErroDeUso(err) ? err.message : semPermissao ? "Sem permissão para gravar isso." : "Não consegui gravar agora." });
-      }
-    }
-    mensagens.push({ role: "user", content: resultados });
+    const r = await responderCartoes({
+      c, pendentes, liberado, decisoes: corpo.decisoes, parciais: corpo.parciais,
+      anotar: async (acao, detalhes) => { await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao, detalhes: detalhes as never }); },
+    });
+    mudou = r.mudou;
+    mensagens.push({ role: "user", content: r.resultados });
   } else {
     const texto = (corpo.texto ?? "").trim().slice(0, 2000);
     if (!texto) return erro(400, "pedido_vazio", "Diga ou escreva o que você precisa.");
@@ -177,17 +153,16 @@ async function tratar(req: Request) {
     try { await sb.rpc("registrar_conversa", { p_petshop: c.petshop.id, p_canal: "mozart", p_pergunta: pedidoDaVez, p_resposta: resposta }); } catch { /* segue */ }
   };
 
-  const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, "") });
+  // cada chamada tem prazo: o pedido inteiro precisa caber no tempo da rota (e a pessoa não fica 50 s olhando "digitando…")
+  const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, ""), timeout: 25_000, maxRetries: 1 });
   const comFallback = /^claude-(opus-5-5|fable-5-2)/.test(MODELO);
   let texto = "";
+  let links: LinkZap[] = [];
 
   try {
-    for (let volta = 0; volta < MAX_VOLTAS; volta++) {
-      if (!(await contar("chamada"))) {
-        if (!texto) return erro(429, "limite", LIMITE_TEXTO);
-        break;
-      }
-      const resposta = await cliente.beta.messages.create({
+    const r = await voltas({
+      c, mensagens, liberado, contar: () => contar("chamada"),
+      chamar: (msgs) => cliente.beta.messages.create({
         model: MODELO,
         max_tokens: 4000,
         output_config: { effort: "low" },
@@ -197,41 +172,16 @@ async function tratar(req: Request) {
           { type: "text", text: contextoDoPetshop(c) },
         ],
         tools: ferramentasPara(c),
-        messages: mensagens,
-      });
-      mensagens.push({ role: "assistant", content: resposta.content as Extract<Msg, { role: "assistant" }>["content"] });
-      const fala = resposta.content.filter((b) => b.type === "text").map((b) => (b.type === "text" ? b.text : "")).join("\n").trim();
-      if (fala) texto = texto ? `${texto}\n\n${fala}` : fala;
-
-      if (resposta.stop_reason === "refusal") return NextResponse.json({ mensagens: mensagens.slice(0, -1), texto: "Com isso eu não consigo ajudar. Posso cuidar da agenda, dos clientes, do caixa e do estoque.", propostas: [], parciais: [], links, mudou });
-      if (resposta.stop_reason !== "tool_use") break;
-
-      const usos = resposta.content.filter((b) => b.type === "tool_use");
-      const parciais: Resultado[] = [];
-      const propostas: Proposta[] = [];
-      for (const uso of usos) {
-        if (uso.type !== "tool_use") continue;
-        const def = definicao(uso.name);
-        if (!def || !ferramentaLiberada(def, c)) { parciais.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: "Ferramenta indisponível para esta pessoa." }); continue; }
-        if (!def.grava) {
-          const r = await rodarConsulta(c, uso.name, uso.input);
-          if (r.links) links.push(...r.links);
-          parciais.push({ type: "tool_result", tool_use_id: uso.id, content: r.conteudo, is_error: r.erro });
-          continue;
-        }
-        if (!liberado) { parciais.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Diga isso à pessoa e indique a tela Assinatura." }); continue; }
-        try {
-          propostas.push({ id: uso.id, ferramenta: uso.name, resumo: await descrever(c, uso.name, uso.input as Record<string, unknown>) });
-        } catch (err) {
-          parciais.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: ehErroDeUso(err) ? err.message : "Não consegui preparar essa ação." });
-        }
-      }
-      // há algo para a pessoa confirmar: para aqui e espera os botões
-      if (propostas.length) {
-        await guardarConversa([texto, ...propostas.map((p) => `[cartão] ${p.resumo.titulo}`)].filter(Boolean).join("\n"));
-        return NextResponse.json({ mensagens, texto, propostas, parciais, links, mudou });
-      }
-      mensagens.push({ role: "user", content: parciais });
+        messages: msgs,
+      }),
+    });
+    if (r.tipo === "limite") return erro(429, "limite", LIMITE_TEXTO);
+    if (r.tipo === "recusa") return NextResponse.json({ mensagens: r.mensagens, texto: "Com isso eu não consigo ajudar. Posso cuidar da agenda, dos clientes, do caixa e do estoque.", propostas: [], parciais: [], links: [], mudou });
+    texto = r.texto;
+    links = r.links;
+    if (r.propostas.length) {
+      await guardarConversa([texto, ...r.propostas.map((p) => `[cartão] ${p.resumo.titulo}`)].filter(Boolean).join("\n"));
+      return NextResponse.json({ mensagens, texto, propostas: r.propostas, parciais: r.parciais, links, mudou });
     }
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) return erro(429, "ocupado", "O Mozart está com muitos pedidos agora. Tente de novo em um minuto.");
