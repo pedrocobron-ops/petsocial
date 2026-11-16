@@ -106,6 +106,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `erros.js`: com `GESTAO_ERRO_TESTE=1`, a tela Hoje quebra de propósito (tela, erro solto, promessa) em 390 e 1366: tela
   "Opa, esta tela travou" com Tentar de novo e Voltar para Hoje e o menu, registro no banco (papel, tamanho da tela, versão, sem
   consulta) e a aba Erros do painel (agrupado, detalhes, filtros 24 h / 7 / 30 dias, marcar como resolvido e desfazer).
+- `servicos.js`: Marcar horário com vários serviços ("O que o pet vai fazer?"): quatro serviços em 390 (ordem do toque, preço por
+  porte, Tempo total e Total, o banco com o principal e os 3 a mais, a agenda, a conta de R$ 145,00 e a comissão por serviço ao centavo);
+  em 1366, tirar o primeiro (o seguinte assume), alterar um horário com três serviços, pet sem porte; tosador sem nenhum valor na tela
+  (o banco põe o preço da lista) e preço travado para a recepção.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 
