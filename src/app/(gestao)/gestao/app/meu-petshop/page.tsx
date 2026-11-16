@@ -11,6 +11,7 @@ import OpcoesDeCobranca from "@/components/gestao/ajustes/opcoes-cobranca";
 import OpcoesCasa from "@/components/gestao/ajustes/opcoes-casa";
 import OpcoesCreche from "@/components/gestao/ajustes/opcoes-creche";
 import OpcoesHotel from "@/components/gestao/ajustes/opcoes-hotel";
+import { SalvarJunto } from "@/components/gestao/ajustes/salvar-junto";
 import OpcoesDoLink from "@/components/gestao/ajustes/opcoes-link";
 import Feriados from "@/components/gestao/ajustes/feriados";
 import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
@@ -96,7 +97,7 @@ export default function MeuPetshop() {
         <Grupo id="agenda" titulo="Agenda e link do cliente" icone={Link2} tom="ceu"
           cartoes={[usaModulo(petshop, "banho_tosa") && ["Banho e tosa: pets ao mesmo tempo", <VagasBanho key="v" />], ["Link de agendamento", <LinkAgendamento key="l" />], ["Regras, cancelamento e dúvidas pelo link", <OpcoesDoLink key="o" />]]} />
         {usaCasa(petshop) && (
-          <Grupo id="casa" titulo={nomeDaCasa(petshop)} icone={BedDouble} tom="lilas"
+          <Grupo id="casa" titulo={nomeDaCasa(petshop)} icone={BedDouble} tom="lilas" salvarJunto
             cartoes={[[nomeDaCasa(petshop), <AjustesCrecheHotel key="a" />], [!usaModulo(petshop, "creche") ? "Opções do hotel" : !usaModulo(petshop, "hotel") ? "Opções da creche" : "Opções do hotel e da creche", <OpcoesHotel key="h" />], ["Cuidado com o tutor", <OpcoesCasa key="c" />], usaModulo(petshop, "creche") && ["Mais opções da creche", <OpcoesCreche key="cr" />]]} />
         )}
         {usaModulo(petshop, "loja") && <Grupo id="loja" titulo="Loja" icone={Store} tom="manteiga" cartoes={[["Opções da loja", <OpcoesDaLoja key="l" />]]} />}
@@ -122,9 +123,10 @@ const irParaGrupo = (id: string, cartao?: number) => window.dispatchEvent(new Cu
  * Os cartões continuam na página mesmo com o grupo fechado: um atalho de outra tela (#opcoes-cobranca, #opcoes-hotel…)
  * abre o grupo certo e desce até o cartão.
  */
-function Grupo({ id, titulo, icone, tom, abertoDeInicio, largo, cartoes }: {
+function Grupo({ id, titulo, icone, tom, abertoDeInicio, largo, salvarJunto, cartoes }: {
   id: string; titulo: string; icone: React.ComponentProps<typeof Tile>["icone"]; tom: React.ComponentProps<typeof Tile>["tom"];
-  abertoDeInicio?: boolean; largo?: boolean; cartoes: (false | [string, React.ReactNode])[];
+  /** os cartões de opções do grupo salvam juntos, num botão só no pé do grupo (ver ajustes/salvar-junto.tsx) */
+  abertoDeInicio?: boolean; largo?: boolean; salvarJunto?: boolean; cartoes: (false | [string, React.ReactNode])[];
 }) {
   const lista = cartoes.filter((c): c is [string, React.ReactNode] => Boolean(c));
   const chave = `maestro:mp-grupo:${id}`;
@@ -174,7 +176,9 @@ function Grupo({ id, titulo, icone, tom, abertoDeInicio, largo, cartoes }: {
         )}
       </div>
       <div className={`g-mp-grupo-corpo${largo ? " largo" : ""}`} id={`grupo-${id}-corpo`} hidden={!aberto}>
-        {lista.map(([nome, cartao], i) => <div key={nome} data-cartao={i} className="g-mp-cartao">{cartao}</div>)}
+        {salvarJunto
+          ? <SalvarJunto aoTerMudanca={() => setAberto(true)}>{lista.map(([nome, cartao], i) => <div key={nome} data-cartao={i} className="g-mp-cartao">{cartao}</div>)}</SalvarJunto>
+          : lista.map(([nome, cartao], i) => <div key={nome} data-cartao={i} className="g-mp-cartao">{cartao}</div>)}
       </div>
     </section>
   );

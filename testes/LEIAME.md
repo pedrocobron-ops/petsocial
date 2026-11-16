@@ -54,6 +54,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   (não sei, sugestão de pedido só com serviço e dia válidos, sem links), limites de conversa. Sem banco.
 - `valor.js`: leitura estrita do dinheiro digitado (`lerValorEstrito`, `lerValor`, `lerNumeroEstrito`): "abc-5" e "52o,00" são recusados
   (nunca viram 5,00 ou 52,00), milhar e centavos com vírgula ou ponto, "R$" na frente, negativo só onde pode.
+- `proporcional.js`: primeira cobrança proporcional do mensalista **desde o começo do plano** (`sugestaoDoMes`), conferida à mão ao
+  centavo em novembro de 2026: 8 de 13 dias × R$ 720 = 443,08; 7 de 13 = 387,69 (o valor que a tela dava "a partir de hoje" para um
+  plano de 01/11, que agora é o mês inteiro); seg a sex 9 de 21 × 1.100 = 471,43; dia fechado fora da conta; pausa no mês.
 - `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
   outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
 - `textos.js`: textos que as testadoras acharam confusos: o comprovante com parte da dívida antiga ("Pagou R$ 40,00 do que devia de
@@ -142,6 +145,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `mozart-fila.js`: escrever enquanto o Mozart responde (o servidor do Mozart vira um roteiro lento com `page.route`): depois do
   "Pode fazer", o Enter põe a mensagem na conversa com "Na fila" e ela vai sozinha, uma vez, quando ele termina; se a resposta trouxer
   um cartão para confirmar, a mensagem volta para a caixa com o aviso e o cartão não é descartado.
+- `creche-sobras.js`: sobras da creche (Rafael). Opções da creche (os três cartões) num botão só, com "Falta salvar: …", e sair da
+  tela com mudança sem salvar pergunta "Sair sem salvar?"; **rascunho no aparelho**: recarregar no meio das opções ou do cadastro do
+  mensalista volta com tudo ("Rascunho recuperado · Descartar", "Ficou sem salvar · Continuar"), salvar apaga; primeira cobrança
+  **proporcional desde o começo do plano** pela tela, gravada ao centavo; com 800 ms por pedido, o primeiro mensalista aparece na
+  lista logo que a janela fecha e, na chamada, o placar e a linha das vagas mudam juntos depois de uma reposição; **folhas para
+  imprimir** (lista e extrato das cobranças, extrato do cão, folha do dia, fichas de cuidados) na mesma aba, com Voltar, os dados
+  numa leva só (ondas de pedidos com 600 ms de atraso), PDF A4 (`page.pdf`) e o título de cada parte da folha do dia na mesma
+  folha que a primeira linha dela (cada parte empurrada para o pé da página em 21 pontos). 390 e 1366.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 

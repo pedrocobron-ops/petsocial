@@ -613,7 +613,9 @@ export function mensagemDaExperiencia(p: { tutor: string | null | undefined; pet
 /** Extrato do mês de um cão (presenças, faltas, reposições, extras, taxas e, para quem vê o financeiro, a cobrança). */
 export const OPCAO_EXTRATO_PET = "creche.extrato_pet";
 export const extratoDoPetLigado = (p: { opcoes?: unknown }) => opcao<boolean>(p, OPCAO_EXTRATO_PET, false) === true;
-export const linkDoExtratoDoPet = (petId: string, mes?: Date) => `/gestao/app/creche-hotel/extrato?pet=${petId}${mes ? `&mes=${isoMes(mes)}` : ""}`;
+/** Com o plano (`plano=`), a folha lê o saldo de reposição junto com o resto, numa leva só. */
+export const linkDoExtratoDoPet = (petId: string, mes?: Date, planoId?: string) =>
+  `/gestao/app/creche-hotel/extrato?pet=${petId}${mes ? `&mes=${isoMes(mes)}` : ""}${planoId ? `&plano=${planoId}` : ""}`;
 
 /** O que o extrato do mês de um cão mostra. Dinheiro (`cobranca`, `taxas` com valor) só para quem vê o financeiro. */
 export type ExtratoDoPet = {

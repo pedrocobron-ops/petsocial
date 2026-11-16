@@ -12,6 +12,8 @@ import { salvarOpcoes } from "@/lib/gestao/opcoes";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { avisarMudanca, Campo, CampoValor, useAvisos, useSomenteLeitura } from "../ui";
+import { AvisoDeRascunho, useRascunho } from "../rascunho";
+import { useSalvarJunto } from "./salvar-junto";
 import "../hotel/hotel.css";
 
 /**
@@ -44,15 +46,27 @@ export default function OpcoesCreche() {
   const [mexeu, setMexeu] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // o que foi mudado e não salvo fica no aparelho: recarregar a tela não perde
+  type Valores = { exp: typeof exp; preco: number | null; irmao: RegraIrmao; textoIrmao: string; extrato: boolean };
+  const aplicar = (v: Valores) => { setExp(v.exp); setPreco(v.preco); setIrmao(v.irmao); setTextoIrmao(v.textoIrmao); setExtrato(v.extrato); };
+  const rascunho = useRascunho<Valores>("opcoes-creche", { exp, preco, irmao, textoIrmao, extrato }, mexeu, (v) => { aplicar(v); setMexeu(true); });
+  const descartar = () => {
+    const r = regraIrmaoDe(petshop);
+    aplicar({ exp: experienciaDe(petshop), preco: precoDaExperiencia(petshop), irmao: r, textoIrmao: r.valor == null ? "" : String(r.valor).replace(".", ","), extrato: extratoDoPetLigado(petshop) });
+    setMexeu(false); setErro(null);
+  };
+  const junto = useSalvarJunto("opcoes-creche", { nome: "Mais opções da creche", mexeu, salvar });
   if (!souDono || !usaModulo(petshop, "creche")) return null;
   const m = <T,>(f: (v: T) => void) => (v: T) => { f(v); setMexeu(true); setErro(null); };
 
-  async function salvar() {
-    if (somenteLeitura() || salvando) return;
+  async function salvarAqui() { const r = await salvar(); if (r) avisar(r); }
+  async function salvar(): Promise<string | false> {
+    if (somenteLeitura() || salvando) return false;
+    const falha = (t: string) => { setErro(t); return false as const; };
     if (irmao.ativo && (irmao.valor == null || (irmao.tipo === "pct" && irmao.valor > 100))) {
-      return setErro(irmao.tipo === "pct" ? "Escreva o desconto para irmãos, de 1 a 100%." : "Escreva o valor do desconto para irmãos.");
+      return falha(irmao.tipo === "pct" ? "Escreva o desconto para irmãos, de 1 a 100%." : "Escreva o valor do desconto para irmãos.");
     }
-    if (exp.ativo && preco != null && preco > 99999) return setErro("Confira o preço do dia de experiência.");
+    if (exp.ativo && preco != null && preco > 99999) return falha("Confira o preço do dia de experiência.");
     setErro(null); setSalvando(true);
     const antes = regraIrmaoDe(petshop);
     const mudouIrmao = antes.ativo !== irmao.ativo || antes.tipo !== irmao.tipo || antes.valor !== irmao.valor || antes.qual !== irmao.qual;
@@ -72,8 +86,8 @@ export default function OpcoesCreche() {
       await recarregarBase();
       avisarMudanca();
       setMexeu(false);
-      avisar(`Opções da creche salvas.${refeitas ? ` ${refeitas === 1 ? "1 mensalidade em aberto foi refeita" : `${refeitas} mensalidades em aberto foram refeitas`} com a regra nova do desconto para irmãos.` : ""}`);
-    } catch (x) { avisarErro(x); } finally { setSalvando(false); }
+      return `Mais opções da creche salvas.${refeitas ? ` ${refeitas === 1 ? "1 mensalidade em aberto foi refeita" : `${refeitas} mensalidades em aberto foram refeitas`} com a regra nova do desconto para irmãos.` : ""}`;
+    } catch (x) { avisarErro(x); return false; } finally { setSalvando(false); }
   }
 
   return (
@@ -82,6 +96,7 @@ export default function OpcoesCreche() {
         <Tile icone={Sparkles} tom="manteiga" />
         <div><h2>Mais opções da creche</h2><p className="g-muted g-p">Ligue só o que você usa: desligado, nada aparece nas telas.</p></div>
       </div>
+      {rascunho.recuperado && mexeu && <AvisoDeRascunho aoDescartar={descartar} />}
       <div>
         <Opcao titulo="Dia de experiência" frase="Um dia avulso para o cão novo conhecer a creche, com preço próprio ou gratuito. Fica anotado como dia de experiência (não como dia de mensalista) e, depois dele, a tela traz a mensagem pronta para perguntar ao tutor como foi e oferecer os planos."
           ligada={exp.ativo} aoMudar={(v) => m(setExp)({ ...exp, ativo: v })}>
@@ -124,10 +139,12 @@ export default function OpcoesCreche() {
           ligada={extrato} aoMudar={m(setExtrato)} />
       </div>
       {erro && <p className="g-erro" role="alert">{erro}</p>}
-      <div className="g-fila">
-        <button type="button" className="g-btn verde" onClick={() => void salvar()} disabled={salvando || !mexeu}>{salvando ? "Salvando…" : "Salvar opções"}</button>
-        {mexeu && <span className="g-muted g-pp">Você mudou as opções. Elas só valem depois de salvar.</span>}
-      </div>
+      {junto ? (mexeu && <p className="g-muted g-pp">Você mudou estas opções: salve no botão Salvar opções, no pé do grupo.</p>) : (
+        <div className="g-fila">
+          <button type="button" className="g-btn verde" onClick={() => void salvarAqui()} disabled={salvando || !mexeu}>{salvando ? "Salvando…" : "Salvar opções"}</button>
+          {mexeu && <span className="g-muted g-pp">Você mudou as opções. Elas só valem depois de salvar.</span>}
+        </div>
+      )}
     </section>
   );
 }

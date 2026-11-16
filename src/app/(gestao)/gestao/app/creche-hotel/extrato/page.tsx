@@ -29,6 +29,8 @@ function ExtratoDoCao() {
   const { avisar, avisarErro } = useAvisos();
   const params = useSearchParams();
   const petId = params.get("pet") ?? "";
+  // veio da ficha do pet com o plano: o saldo de reposição sai junto com o resto
+  const planoDaFicha = params.get("plano") ?? "";
   const agora = new Date(), hoje = isoDia(agora);
   const [mesIso, setMesIso] = useState(() => (params.get("mes") ?? isoMes(agora)).slice(0, 7) + "-01");
   const mes = deIsoDia(mesIso);
@@ -36,11 +38,10 @@ function ExtratoDoCao() {
 
   const { dados, carregando, erro } = useDados(async (): Promise<{ pet: Pet; extrato: ExtratoDoPet } | null> => {
     if (!petId || !ligado) return null;
-    // dia marcado como fechado não é dia do plano: a conta é a mesma da ficha e da chamada
-    if (!calendarioGuardado(petshop.id, false)) await lerCalendario(sb, petshop.id, false).catch(() => null);
     const ate = isoDia(new Date(mes.getFullYear(), mes.getMonth() + 1, 0));
     const inicio = deIsoDia(mesIso).toISOString(), fim = somaDias(deIsoDia(ate), 1).toISOString();
-    const [petLido, planos, comDia, avulsas, faltas, cobrancas, atrasos] = await Promise.all([
+    // tudo numa leva só (no celular, cada espera soma)
+    const [petLido, planos, comDia, avulsas, faltas, cobrancas, atrasos, saldoAdiantado] = await Promise.all([
       sb.from("pets").select("id, nome, sexo, clientes(id, nome, telefone)").eq("petshop_id", petshop.id).eq("id", petId).maybeSingle(),
       lerPlanos(sb, petshop.id, false),
       sb.from("estadias").select(`${COLS_PRESENCA}, experiencia`).eq("petshop_id", petshop.id).eq("pet_id", petId).eq("tipo", "creche").in("status", ["em_casa", "encerrada"])
@@ -51,6 +52,9 @@ function ExtratoDoCao() {
       // dinheiro só para quem cuida do financeiro (o banco também não entrega para os outros)
       cuidoDoFinanceiro ? sb.from("creche_cobrancas").select(SELECT_COBRANCA).eq("petshop_id", petshop.id).eq("pet_id", petId).eq("mes", mesIso).eq("status", "aberta").order("id").limit(5) : null,
       cuidoDoFinanceiro ? sb.from("creche_atrasos").select("dia, valor, estado").eq("petshop_id", petshop.id).eq("pet_id", petId).gte("dia", mesIso).lte("dia", ate).order("dia").limit(100) : null,
+      planoDaFicha ? lerSaldoDeReposicao(sb, planoDaFicha) : null,
+      // dia marcado como fechado não é dia do plano: a conta é a mesma da ficha e da chamada
+      calendarioGuardado(petshop.id, false) ? null : lerCalendario(sb, petshop.id, false).catch(() => null),
     ]);
     const pet = ok(petLido) as unknown as Pet | null;
     if (!pet) throw new Error("Pet não encontrado.");
@@ -60,7 +64,7 @@ function ExtratoDoCao() {
     const plano = planos.filter((p) => p.pet_id === petId && (planoVale(p, mesIso) || planoVale(p, ate) || (p.inicio >= mesIso && p.inicio <= ate)))
       .sort((a, b) => b.inicio.localeCompare(a.inicio))[0] ?? null;
     const r = plano ? resumoDoMes(plano, mes, presencas, ok(faltas) as Falta[], petshop.horario, hoje) : null;
-    const saldo = plano ? await lerSaldoDeReposicao(sb, plano.id) : null;
+    const saldo = !plano ? null : plano.id === planoDaFicha ? saldoAdiantado : await lerSaldoDeReposicao(sb, plano.id);
     const repoe = new Map((saldo?.pares ?? []).map((p) => [p.reposicao, p.falta]));
     const doMes = ((cobrancas?.data ?? []) as unknown as CobrancaCompleta[]);
     const extrato: ExtratoDoPet = {
@@ -76,7 +80,7 @@ function ExtratoDoCao() {
       cobranca: doMes.find((c) => !c.acerto_saida) ?? doMes[0] ?? null,
     };
     return { pet, extrato };
-  }, [petshop.id, petId, mesIso, cuidoDoFinanceiro, ligado]);
+  }, [petshop.id, petId, planoDaFicha, mesIso, cuidoDoFinanceiro, ligado]);
 
   useTituloDoPapel(dados ? `Extrato ${nomeMes(mes)} ${mes.getFullYear()} · ${dados.pet.nome} · ${petshop.nome}` : `Extrato da creche · ${petshop.nome}`);
   const meses = Array.from({ length: 13 }, (_, i) => new Date(agora.getFullYear(), agora.getMonth() - i, 1));

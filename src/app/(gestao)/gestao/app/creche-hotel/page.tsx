@@ -526,7 +526,7 @@ export default function CrecheHotel() {
 
       {usaCreche && !mens ? <Esqueleto linhas={4} />
         : ver === "diario" && comDiario ? <Diario />
-        : ver === "chamada" && mens ? <Chamada aviso={<AvisoDeVaga espera={espera} aoVer={verEspera} />} planos={mens.planos} vagasHoje={vagasCrecheHoje ? { ocupadas: vagasCrecheHoje.ocupadas, total: vagasCrecheHoje.total! } : null}
+        : ver === "chamada" && mens ? <Chamada aviso={<AvisoDeVaga espera={espera} aoVer={verEspera} />} planos={mens.planos} vagasHoje={vagasCrecheHoje ? { ocupadas: vagasCrecheHoje.ocupadas, total: vagasCrecheHoje.total!, avulsas: abertas.filter((e) => e.tipo === "creche" && (!e.mensalista || e.dia !== hojeIso)) } : null}
             aoNovoMensalista={() => { if (!somenteLeitura()) { setVer("mensalistas"); setNovoPlano(true); } }}
             aoExperiencia={experienciaDe(petshop).ativo ? () => { if (!somenteLeitura()) setNova({ tipo: "creche", experiencia: true }); } : undefined} />
         : ver === "mensalistas" && mens ? <Mensalistas planos={mens.planos} novo={novoPlano} aoAbrirNovo={() => { if (!somenteLeitura()) setNovoPlano(true); }} aoFecharNovo={() => setNovoPlano(false)} aoMudar={mudou} />
@@ -621,8 +621,8 @@ export default function CrecheHotel() {
               </span>
             ))}
             {chegamAmanha.length > 0 && <button type="button" className="g-btn sec p" style={{ minHeight: 44 }} onClick={() => setAvisando(true)}><MessageCircle />Avisar quem chega amanhã ({chegamAmanha.length})</button>}
-            <Link className="g-btn sec p" style={{ minHeight: 44 }} href={`/gestao/app/creche-hotel/folha?dia=${hojeIso}`} target="_blank"><Printer />Folha do dia</Link>
-            {naCasa.length > 0 && <Link className="g-btn sec p" style={{ minHeight: 44 }} href="/gestao/app/creche-hotel/ficha" target="_blank"><Printer />Fichas de cuidados</Link>}
+            <Link className="g-btn sec p" style={{ minHeight: 44 }} href={`/gestao/app/creche-hotel/folha?dia=${hojeIso}`}><Printer />Folha do dia</Link>
+            {naCasa.length > 0 && <Link className="g-btn sec p" style={{ minHeight: 44 }} href="/gestao/app/creche-hotel/ficha"><Printer />Fichas de cuidados</Link>}
             {crecheNaCasa.length > 0 && (
               <button type="button" className="g-btn sec p g-ch-lote" onClick={() => { if (!somenteLeitura()) setLote(true); }}><Sunset />Encerrar o dia da creche</button>
             )}
@@ -688,7 +688,7 @@ export default function CrecheHotel() {
                       <div className="g-fila g-ch-acoes">
                         {botaoMensagens(e)}
                         <BotaoFotos estadia={e} />
-                        <Link className="g-btn fantasma p" href={`/gestao/app/creche-hotel/ficha?estadia=${e.id}`} target="_blank" aria-label={`Imprimir a ficha de cuidados de ${pet?.nome ?? "pet"}`}><Printer /> Ficha</Link>
+                        <Link className="g-btn fantasma p" href={`/gestao/app/creche-hotel/ficha?estadia=${e.id}`} aria-label={`Imprimir a ficha de cuidados de ${pet?.nome ?? "pet"}`}><Printer /> Ficha</Link>
                         {!e.mensalista && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setEditando(e); }}><Pencil /> Editar</button>}
                         {comOcorrencias && pet && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setOcorrenciaDe(e); }}><ShieldAlert /> Ocorrência</button>}
                         {comPortaria && pet && <button className="g-btn fantasma p" onClick={() => setAutorizadosDe(e)}><ShieldCheck /> Quem busca</button>}

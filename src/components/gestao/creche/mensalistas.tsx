@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AlertTriangle, CalendarX2, ChevronDown, ListChecks, Pencil, Plus, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CalendarX2, ChevronDown, History, ListChecks, Pencil, Plus, Search } from "lucide-react";
 import { abreNoDia, DIAS_SEMANA, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, type PlanoCompleto } from "@/lib/gestao/creche";
 import { brl, dataCompleta, dataCurta, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Esqueleto, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { Chips } from "../loja/pecas";
+import { rascunhosQueComecam } from "../rascunho";
 import FormPlano, { mensalistasPorDia } from "./form-plano";
 import ModelosDePlano from "./modelos";
 import FaltaAvisada from "./falta-avisada";
@@ -23,10 +24,18 @@ const umDia = (dow: number) => isoDia(somaDias(new Date(2024, 0, 7), dow));
  * Mensalistas: quem tem plano na creche, em que dias vem, quando vence e (para quem vê o financeiro) quanto paga.
  * No alto, quantos mensalistas vêm em cada dia da semana, contra as vagas da creche.
  */
-export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, aoMudar }: {
+export default function Mensalistas({ planos: lidos, novo, aoAbrirNovo, aoFecharNovo, aoMudar }: {
   planos: PlanoCompleto[]; novo: boolean; aoAbrirNovo: () => void; aoFecharNovo: () => void; aoMudar: () => void;
 }) {
-  const { sb, petshop, cuidoDoFinanceiro: vejoFinanceiro, souDono } = useGestao();
+  // o plano que acabou de ser salvo aparece na hora (com internet lenta, a tela inteira demora a buscar de novo e o
+  // primeiro mensalista parecia não ter entrado). Quando a lista nova chega do banco, ela vale.
+  const [recente, setRecente] = useState<{ plano: PlanoCompleto; de: PlanoCompleto[] } | null>(null);
+  const planos = useMemo(() => {
+    if (!recente || recente.de !== lidos) return lidos;
+    return [...lidos.filter((p) => p.id !== recente.plano.id), recente.plano];
+  }, [lidos, recente]);
+  const lembrar = (salvo?: PlanoCompleto) => setRecente(salvo ? { plano: salvo, de: lidos } : null);
+  const { sb, petshop, eu, cuidoDoFinanceiro: vejoFinanceiro, souDono } = useGestao();
   const somenteLeitura = useSomenteLeitura();
   // só o dono e quem cuida do financeiro mexem no plano (a equipe, se o dono liberou em Meu pet shop)
   const pode = podeMudarPlano({ petshop, souDono, cuidoDoFinanceiro: vejoFinanceiro });
@@ -38,6 +47,21 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
   const [faltando, setFaltando] = useState<PlanoCompleto | null>(null);
   const [acertando, setAcertando] = useState<PlanoCompleto | null>(null);
   const agora = new Date(), hoje = isoDia(agora);
+  // cadastro ou alteração de plano começado e não salvo (a tela recarregou, ou fechou no meio): "Continuar" abre de novo com o que foi escrito
+  const [rascunhos, setRascunhos] = useState<{ nome: string; v: { pet?: { nome?: string } | null } }[]>([]);
+  const formAberto = novo || Boolean(editando);
+  useEffect(() => { if (!formAberto) setRascunhos(rascunhosQueComecam(petshop.id, eu.id, "plano:")); }, [formAberto, petshop.id, eu.id]);
+  const pendentes = !pode ? [] : rascunhos.flatMap((r) => {
+    if (r.nome === "plano:novo") return r.v.pet?.nome ? [{ chave: r.nome, texto: `cadastro de ${r.v.pet.nome} como mensalista`, abrir: aoAbrirNovo }] : [];
+    const p = planos.find((x) => `plano:${x.id}` === r.nome);
+    return p ? [{ chave: r.nome, texto: `alteração do plano de ${p.pets?.nome ?? "pet"}`, abrir: () => setEditando(p) }] : [];
+  });
+  const avisoRascunhos = pendentes.length > 0 && (
+    <div className="g-rascunho" role="status">
+      <History aria-hidden /><span className="g-cresce">Ficou sem salvar: {pendentes.map((x) => x.texto).join("; ")}.</span>
+      {pendentes.map((x) => <button key={x.chave} type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) x.abrir(); }}>Continuar{pendentes.length > 1 ? ` (${x.texto.split(" de ").pop()})` : ""}</button>)}
+    </div>
+  );
 
   const { dados: mov, carregando } = useDados(async () => {
     if (!planos.length) return { presencas: [], faltas: [] };
@@ -59,13 +83,15 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
 
   return (
     <>
-      {!planos.length ? (
+      {!planos.length ? (<>
+        {avisoRascunhos}
         <Vazio titulo="Nenhum mensalista ainda" texto={pode ? "Mensalista é o pet que vem em dias fixos da semana e paga por mês. Cadastre o plano e a chamada do dia já sabe quem esperar." : "Mensalista é o pet que vem em dias fixos da semana e paga por mês. Quem cadastra o plano é o dono ou quem cuida do financeiro."}>
           {pode && <button className="g-btn sec" onClick={aoAbrirNovo}><Plus />Cadastrar o primeiro mensalista</button>}
           {vejoFinanceiro && <button className="g-btn fantasma" onClick={() => setModelos(true)}><ListChecks />Modelos de plano</button>}
         </Vazio>
-      ) : (
+      </>) : (
         <div className="g-pilha">
+          {avisoRascunhos}
           <section className="g-card">
             <div className="g-card-t">
               <h3>Mensalistas por dia da semana</h3>
@@ -158,8 +184,8 @@ export default function Mensalistas({ planos, novo, aoAbrirNovo, aoFecharNovo, a
       {faltando && <FaltaAvisada key={faltando.id} plano={faltando} aoFechar={() => { setFaltando(null); aoMudar(); }} />}
       {acertando && <AcertoDaSaida plano={acertando} aoFechar={() => { setAcertando(null); void recarregarSaidas(); aoMudar(); }} />}
       {modelos && <ModelosDePlano aoFechar={() => setModelos(false)} aoMudar={aoMudar} />}
-      {novo && <FormPlano planos={planos} aoFechar={aoFecharNovo} aoSalvo={() => { aoFecharNovo(); aoMudar(); }} />}
-      {editando && <FormPlano key={editando.id} plano={editando} planos={planos} aoFechar={() => setEditando(null)} aoSalvo={() => { setEditando(null); aoMudar(); }} />}
+      {novo && <FormPlano planos={planos} aoFechar={aoFecharNovo} aoSalvo={(salvo) => { lembrar(salvo); aoFecharNovo(); aoMudar(); }} />}
+      {editando && <FormPlano key={editando.id} plano={editando} planos={planos} aoFechar={() => setEditando(null)} aoSalvo={(salvo) => { lembrar(salvo); setEditando(null); aoMudar(); }} />}
     </>
   );
 }

@@ -11,6 +11,8 @@ import ConferirFotosDoTutor from "../casa/conferir-fotos";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { avisarMudanca, useAvisos, useSomenteLeitura } from "../ui";
+import { AvisoDeRascunho, useRascunho } from "../rascunho";
+import { useSalvarJunto } from "./salvar-junto";
 import "../hotel/hotel.css";
 
 /**
@@ -41,19 +43,35 @@ export default function OpcoesCasa() {
   const [diasFotos, setDiasFotos] = useState<DiasDasFotos>(() => diasDasFotos(petshop));
   const [equipePlano, setEquipePlano] = useState(() => equipeMudaPlano(petshop));
   // regra de reposição de falta: desligada, qualquer falta do plano pode ser reposta, sem prazo
-  const [prazo, setPrazo] = useState<PrazoDeReposicao>(() => { const v = opcao<string>(petshop, OPCAO_REPOSICAO_PRAZO, ""); return v === "mes" || v === "mes_seguinte" ? v : ""; });
+  const prazoGuardado = (): PrazoDeReposicao => { const v = opcao<string>(petshop, OPCAO_REPOSICAO_PRAZO, ""); return v === "mes" || v === "mes_seguinte" ? v : ""; };
+  const [prazo, setPrazo] = useState<PrazoDeReposicao>(prazoGuardado);
   const [soAvisou, setSoAvisou] = useState(() => opcao<boolean>(petshop, OPCAO_REPOSICAO_SO_AVISOU, false) === true);
   const [mexeu, setMexeu] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // o que foi mudado e não salvo fica no aparelho: recarregar a tela não perde
+  const valores = { diario, portaria, espera, ocorrencias, tutor, diasFotos, equipePlano, prazo, soAvisou };
+  type Valores = typeof valores;
+  const aplicar = (v: Valores) => {
+    setDiario(v.diario); setPortaria(v.portaria); setEspera(v.espera); setOcorrencias(v.ocorrencias); setTutor(v.tutor);
+    setDiasFotos(v.diasFotos); setEquipePlano(v.equipePlano); setPrazo(v.prazo); setSoAvisou(v.soAvisou);
+  };
+  const rascunho = useRascunho<Valores>("opcoes-casa", valores, mexeu, (v) => { aplicar(v); setMexeu(true); });
+  const descartar = () => {
+    aplicar({ diario: diarioDe(petshop), portaria: portariaLigada(petshop), espera: esperaDe(petshop), ocorrencias: ocorrenciasLigadas(petshop), tutor: paginaDoTutorLigada(petshop),
+      diasFotos: diasDasFotos(petshop), equipePlano: equipeMudaPlano(petshop), prazo: prazoGuardado(), soAvisou: opcao<boolean>(petshop, OPCAO_REPOSICAO_SO_AVISOU, false) === true });
+    setMexeu(false); setErro(null);
+  };
+  const junto = useSalvarJunto("opcoes-casa", { nome: "Cuidado com o tutor", mexeu, salvar });
   if (!souDono || !usaCasa(petshop)) return null;
   const m = <T,>(f: (v: T) => void) => (v: T) => { f(v); setMexeu(true); setErro(null); };
   const mudaItem = (i: number, v: string) => m(setDiario)({ ...diario, itens: diario.itens.map((x, j) => (j === i ? v : x)) });
 
-  async function salvar() {
-    if (somenteLeitura() || salvando) return;
+  async function salvarAqui() { const r = await salvar(); if (r) avisar(r); }
+  async function salvar(): Promise<string | false> {
+    if (somenteLeitura() || salvando) return false;
     const itens = [...new Set(diario.itens.map((x) => x.trim()).filter(Boolean))];
-    if (diario.ativo && !itens.length) return setErro("O diário precisa de pelo menos um item para marcar.");
+    if (diario.ativo && !itens.length) { setErro("O diário precisa de pelo menos um item para marcar."); return false; }
     setErro(null); setSalvando(true);
     try {
       await salvarOpcoes(sb, petshop.id, {
@@ -70,8 +88,8 @@ export default function OpcoesCasa() {
       if (diasFotos < diasDasFotos(petshop)) void faxinaDasFotos(sb, petshop.id).catch(() => undefined);
       setDiario((d) => ({ ...d, itens: itens.length ? itens : ITENS_DO_DIARIO }));
       setMexeu(false);
-      avisar("Opções de cuidado com o tutor salvas.");
-    } catch (x) { avisarErro(x); } finally { setSalvando(false); }
+      return "Opções de cuidado com o tutor salvas.";
+    } catch (x) { avisarErro(x); return false; } finally { setSalvando(false); }
   }
 
   return (
@@ -80,6 +98,7 @@ export default function OpcoesCasa() {
         <Tile icone={HeartHandshake} tom="ceu" />
         <div><h2>Cuidado com o tutor</h2><p className="g-muted g-p">Para {usaModulo(petshop, "creche") && usaModulo(petshop, "hotel") ? "a creche e o hotel" : usaModulo(petshop, "creche") ? "a creche" : "o hotel"}. Ligue só o que você usa: desligado, nada aparece nas telas.</p></div>
       </div>
+      {rascunho.recuperado && mexeu && <AvisoDeRascunho aoDescartar={descartar} />}
       <div>
         <Opcao titulo="Diário do dia" frase="Para cada pet na casa, a equipe marca em um toque o que ele fez e manda um resumo pronto para o WhatsApp do tutor." ligada={diario.ativo} aoMudar={(v) => m(setDiario)({ ...diario, ativo: v })}>
           <div className="g-campo">
@@ -136,10 +155,12 @@ export default function OpcoesCasa() {
         )}
       </div>
       {erro && <p className="g-erro" role="alert">{erro}</p>}
-      <div className="g-fila">
-        <button type="button" className="g-btn verde" onClick={() => void salvar()} disabled={salvando || !mexeu}>{salvando ? "Salvando…" : "Salvar opções"}</button>
-        {mexeu && <span className="g-muted g-pp">Você mudou as opções. Elas só valem depois de salvar.</span>}
-      </div>
+      {junto ? (mexeu && <p className="g-muted g-pp">Você mudou estas opções: salve no botão Salvar opções, no pé do grupo.</p>) : (
+        <div className="g-fila">
+          <button type="button" className="g-btn verde" onClick={() => void salvarAqui()} disabled={salvando || !mexeu}>{salvando ? "Salvando…" : "Salvar opções"}</button>
+          {mexeu && <span className="g-muted g-pp">Você mudou as opções. Elas só valem depois de salvar.</span>}
+        </div>
+      )}
     </section>
   );
 }
