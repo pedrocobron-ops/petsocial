@@ -143,9 +143,10 @@ const BASE: TopicoBase[] = [
     dicas: [
       "Ele também cadastra pet, bloqueia horário, faz check-in e check-out, vende e usa pacote, anota vacina, abre e fecha o caixa e prepara mensagens de WhatsApp.",
       "Perguntas sobre dinheiro só funcionam para quem vê o financeiro (dono, ou quem tem Financeiro ou Relatórios).",
+      "Cliente que pagou o que devia? Diga \"o dono do Bob me pagou os 35 em dinheiro\": o cartão mostra quanto ele deve e quais contas quita, e o dinheiro entra uma vez só. Para anotar uma dívida, diga \"anota que a Joana me deve 20 do perfume\": fica na ficha dela. \"Quem me deve?\" responde por pessoa.",
       "Se o microfone não funcionar, libere a permissão no navegador ou use o microfone do teclado.",
     ],
-    palavras: ["mozart", "assistente", "voz", "audio", "microfone", "falar", "ditado", "ia", "inteligencia artificial", "o que posso pedir"] },
+    palavras: ["mozart", "assistente", "voz", "audio", "microfone", "falar", "ditado", "ia", "inteligencia artificial", "o que posso pedir", "mozart receber divida", "mozart fiado", "me pagou o que devia"] },
   { id: "ajuda", titulo: "Como achar ajuda e este manual", secao: "primeiros", quem: "todos", rota: ROTA_MANUAL,
     passos: [
       "Em qualquer tela, toque em Como usar esta tela, no alto: abre o passo a passo daquela tela.",
@@ -316,6 +317,8 @@ const BASE: TopicoBase[] = [
     dicas: [
       "Fecha para o almoço todo dia? Não bloqueie a agenda: o dono abre Meu pet shop e, no cartão Horário de funcionamento, marca Fecha para o almoço?. Vale toda semana, sem prazo para acabar.",
       "Para mudar ou tirar um bloqueio, toque nele na agenda. Se ele se repete, o sistema pergunta: Só este ou Este e os próximos.",
+      "O dia bloqueado inteiro para o pet shop todo aparece como Bloqueado, com o motivo, na visão Semana.",
+      "Feriado? O dono põe todos os feriados nacionais do ano de uma vez em Meu pet shop, Feriados e dias fechados, no botão Colocar os feriados nacionais. A Agenda leva até lá pelo aviso do dia fechado e pelo motivo Feriado.",
     ],
     atencao: ["O bloqueio que se repete vale por até 8 semanas. Depois disso, é preciso bloquear de novo."],
     palavras: ["bloquear", "bloqueio", "almoco", "folga", "feriado", "fechar agenda", "nao atender", "ferias", "manutencao", "fechar a agenda", "fecho a agenda", "compromisso", "medico", "bloquear a manha", "sair mais cedo"] },
@@ -1414,6 +1417,7 @@ const BASE: TopicoBase[] = [
       "Quando ele pagar, toque em Recebi, como em qualquer conta.",
       "No próximo atendimento, a conta anotada aparece no horário e em Fechar a conta, em Deve de antes. Marque Incluir nesta conta? e ela recebe baixa junto com o banho.",
       "Quer que o Faltou pergunte da taxa? Em Meu pet shop, Opções de cobrança, escreva o valor em Taxa de falta. Ao marcar Faltou, o sistema pergunta se anota a taxa para o tutor.",
+      "Sem a taxa definida, o horário que ficou como falta mostra Anotar o que ele deve: anota ali mesmo, sem ir à ficha.",
       "Quem vê o financeiro também anota em Financeiro, A receber, Nova conta a receber, escolhendo o cliente.",
     ],
     atencao: [
@@ -1432,7 +1436,8 @@ const BASE: TopicoBase[] = [
     dicas: [
       "O cartão aparece com o caixa aberto ou fechado.",
       "Na ficha do tutor, o cartão Ficou de pagar mostra só as contas dele.",
-      "Quem vê o financeiro tem a lista completa em Financeiro, na aba A receber, com as contas que não são de clientes.",
+      "Quem vê o financeiro tem a lista completa em Financeiro, na aba A receber, com as contas que não são de clientes. Lá, Quem me deve leva à lista por pessoa, em Clientes.",
+      "Em Clientes, na aba Pets, o botão Quem me deve mostra quantas pessoas devem e o total, como a página do caderno.",
     ],
     palavras: ["fiado", "deve", "devendo", "quem deve", "quem esta devendo", "devedores", "contas de clientes", "em aberto", "pendurado", "caderneta", "ficou de pagar", "me devendo", "quem me deve", "me deve", "me deve faz tempo", "cliente me deve", "quanto me devem"] },
   { id: "cobrar", titulo: "Como cobrar pelo WhatsApp quem está devendo", secao: "dinheiro", quem: "caixa", rota: CAIXA, tambem: [CLIENTES],
@@ -2068,8 +2073,11 @@ const BASE: TopicoBase[] = [
       "Escolha Paga agora e a forma de pagamento, ou Cliente paga depois.",
       "Toque em Receber, o botão que mostra o valor.",
     ],
-    dicas: ["Pago na hora, o valor entra no caixa. Se o cliente paga depois, a conta fica em Financeiro, A receber."],
-    palavras: ["pacote", "pacotes", "vender pacote", "vender um pacote", "mensalidade", "plano de banho", "pacote de banho", "mensalista"] },
+    dicas: [
+      "Pago na hora, o valor entra no caixa. Se o cliente paga depois, a conta fica em Financeiro, A receber.",
+      "Pagou só uma parte? Em Pix ou cartão, toque em Pagou só uma parte? e escreva quanto; em dinheiro, escreva em Recebeu quanto? o que ele entregou. Escolha quando ele paga o resto: a parte entra no caixa e o resto fica na ficha do tutor e em A receber.",
+    ],
+    palavras: ["pacote pago em parte", "pacote metade", "pacote parcelado", "pacote", "pacotes", "vender pacote", "vender um pacote", "mensalidade", "plano de banho", "pacote de banho", "mensalista"] },
   { id: "pacotes-usar", titulo: "Como usar, renovar ou encerrar um pacote", secao: "estoque", usa: ["pacotes"], quem: "todos", rota: PACOTES,
     passos: [
       { so: ["banho"], texto: "No dia do banho: na Agenda, toque no horário do pet e em Concluir usando o pacote (sem cobrar). O atendimento fica concluído e um uso sai do pacote. Se o horário tem outro serviço, a conta cobra só ele." },
@@ -2082,6 +2090,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       { so: ["banho"], texto: "Na Agenda, o pet com pacote para o serviço ganha o botão Concluir usando o pacote (sem cobrar): ele conclui o atendimento e já dá baixa em um uso." },
+      { so: ["banho"], texto: "Se o tutor deve alguma coisa de antes, o horário mostra o aviso e o botão Receber agora: dá para receber antes de concluir pelo pacote, sem ir à ficha." },
       { so: ["casa"], texto: "No check-out da creche e do hotel, em Como fica a conta, escolha Usar 1 do pacote: a diária sai do pacote e nenhum dinheiro é lançado." },
       "Os filtros Ativos, Vencendo em 7 dias e Encerrados ajudam a achar.",
       "Pacote vencido ainda pode ser usado: o sistema pede confirmação.",
