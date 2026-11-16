@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "../gestao.css";
+import { VigiaDeErros } from "@/components/gestao/erros";
 
 /** Maestro Pet Gestão: aplicativo e telas de entrada. Fora do Google enquanto o produto não é lançado. */
 export const metadata: Metadata = {
@@ -13,5 +14,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#1e3a2f", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return <div className="g g-raiz">{children}</div>;
+  return <div className="g g-raiz"><VigiaDeErros />{children}</div>;
 }

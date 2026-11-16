@@ -1,10 +1,18 @@
 import type { NextConfig } from "next";
+import { execSync } from "node:child_process";
+
+/** Versão do aplicativo para o registro de erros da Gestão: o commit da Vercel ou, no build local, o do git. */
+function versao(): string {
+  if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 12);
+  try { return execSync("git rev-parse --short=12 HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim() || "local"; } catch { return "local"; }
+}
 
 const nextConfig: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
   },
   poweredByHeader: false,
+  env: { NEXT_PUBLIC_GESTAO_VERSAO: versao() },
 
   /**
    * Redirecionamentos permanentes (301) das versões antigas do domínio
