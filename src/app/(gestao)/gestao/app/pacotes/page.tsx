@@ -8,8 +8,8 @@ import { useGestao } from "@/components/gestao/contexto";
 import FormPet from "@/components/gestao/form-pet";
 import { Anel, Kpi, Tile } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, EscolherPet, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
-import { AvisoCaixaFechado, CampoDinheiro, erroDeValor, ErroTela, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, usePagamento, type PagaDepois } from "@/components/gestao/loja/pecas";
-import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago } from "@/lib/gestao/dinheiro";
+import { AvisoCaixaFechado, CampoDinheiro, erroDeValor, ErroTela, fecharRecebimento, lembrarForma, pagaDepoisInicial, pagoAMenos, QuandoPaga, useCaixaAberto, usePagamento, type PagaDepois } from "@/components/gestao/loja/pecas";
+import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago, parteDaChave, receberConta } from "@/lib/gestao/dinheiro";
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { Cliente, Pacote, PacoteCliente, Pet } from "@/lib/gestao/tipos";
@@ -395,6 +395,9 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
   const cobra = vejoFinanceiro && Number(preco) > 0;
   const hoje = isoDia(new Date());
   const nasceVencido = Boolean(venceEm && venceEm < hoje);
+  // pagou só uma parte (como na conta do atendimento): a parte entra agora e o resto fica anotado para o tutor
+  const tutorId = pet?.clientes?.id ?? null;
+  const aMenos = cobra && preco && !depois.ativo && tutorId ? pagoAMenos(pagamento, preco) : null;
 
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
@@ -408,7 +411,8 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
     if (compra > hoje) { avisarErro("A data da compra não pode ser depois de hoje."); return; }
     const precoRuim = erroDeValor(preco, "O preço");
     if (precoRuim) { avisarErro(precoRuim); return; }
-    const rec = cobra && preco ? fecharRecebimento(pagamento, depois, preco) : null;
+    if (aMenos && (!depois.quando || depois.quando < hoje)) { setErroForma("Escolha um dia de hoje em diante para o resto."); avisarErro("Escolha quando o cliente paga o resto (de hoje em diante)."); return; }
+    const rec = cobra && preco && !aMenos ? fecharRecebimento(pagamento, depois, preco) : null;
     if (rec && "erro" in rec) { setErroForma(rec.noCampo); avisarErro(rec.erro); return; }
     if (nasceVencido && !(await confirmar({
       titulo: "Este pacote já nasce vencido",
@@ -417,7 +421,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
     }))) return;
     if (cobra && !(await conferirValorAlto(preco, confirmar))) return;
     // recebendo hoje: se o caixa fechou enquanto esta venda estava aberta, pergunta antes de receber fora dele
-    if (rec && !("erro" in rec) && preco && !rec.fiado && compra === hoje && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
+    if (((rec && !("erro" in rec) && preco && !rec.fiado) || aMenos) && compra === hoje && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
     try {
       // com a chave da operação, um toque duplo (ou o pedido repetido) não vende o pacote duas vezes
@@ -426,7 +430,21 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
         total: t, comprado_em: compra, vence_em: venceEm, preco: preco ?? 0, chave,
       }, { onConflict: "petshop_id,chave", ignoreDuplicates: true }).select("id");
       if (vendido.error) throw new Error(vendido.error.message);
-      if (rec && !("erro" in rec) && preco && !rec.fiado) {
+      if (aMenos && preco && tutorId) {
+        // o pacote inteiro vira conta do tutor e a parte paga é recebida dela (mesmo caminho do "Recebi" da ficha).
+        // Cada passo tem a sua chave: tocar de novo depois de uma falha termina o que faltou, sem repetir nada.
+        try {
+          lembrarForma(aMenos.forma);
+          const contaDoPacote = await lancarAReceber(sb, petshop.id, {
+            valor: preco, vencimento: depois.quando, categoria: "Pacotes", descricao: `Pacote ${nome.trim()} · ${pet.nome}`, clienteId: tutorId, chave,
+          });
+          await receberConta(sb, contaDoPacote.id, { valor: aMenos.entregue, forma: aMenos.forma, pagamentos: aMenos.pagamentos, data: compra === hoje ? null : compra, chave: parteDaChave(chave, "parte") });
+          avisar(`Pacote vendido para ${pet.nome}. Recebido ${brl(aMenos.entregue)}; ${brl(aMenos.falta)} ficam para ${pet.clientes?.nome?.split(" ")[0] ?? "o tutor"} pagar até ${dataCurta(depois.quando)}, em A receber e na ficha.`);
+        } catch (e) {
+          avisarErro(`O pacote foi criado, mas o pagamento não terminou. Toque de novo para terminar. (${e instanceof Error ? e.message : "erro"})`);
+          return false;
+        }
+      } else if (rec && !("erro" in rec) && preco && !rec.fiado) {
         try {
           lembrarForma(rec.forma);
           await lancarPago(sb, petshop.id, {
@@ -502,7 +520,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
       rodape={<>
         <button className="g-btn sec" onClick={inicio.base ? aoFechar : () => setEscolhido(false)}>Voltar</button>
         <button className="g-btn pri" onClick={salvar} disabled={salvando}>
-          {salvando ? "Salvando…" : cobra && depois.ativo ? `Anotar ${brl(preco)} a receber` : cobra ? `Receber ${brl(preco)}` : inicio.base ? "Renovar" : "Vender pacote"}
+          {salvando ? "Salvando…" : aMenos ? `Receber ${brl(aMenos.entregue)}` : cobra && depois.ativo ? `Anotar ${brl(preco)} a receber` : cobra ? `Receber ${brl(preco)}` : inicio.base ? "Renovar" : "Vender pacote"}
         </button>
       </>}>
       <div className="g-form">
@@ -530,7 +548,17 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
         {cobra && preco ? (
           <>
             <QuandoPaga total={preco} pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErroForma(null); }}
-              depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} erro={erroForma} />
+              depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} erro={erroForma} aceitaResto={Boolean(tutorId)} />
+            {aMenos && (
+              <div className="g-card liso g-pilha" role="group" aria-label="O que faltou fica anotado">
+                <p className="g-p"><b className="g-tab">{brl(aMenos.entregue)}</b> entram agora. Os <b className="g-tab">{brl(aMenos.falta)}</b> que faltaram ficam anotados para {pet.clientes?.nome ?? "o tutor"} pagar depois, em Financeiro, A receber, e na ficha.</p>
+                <label className="g-campo">
+                  <span>Quando paga o resto</span>
+                  <input type="date" className="g-input" value={depois.quando} min={hoje} onChange={(e) => { setDepois({ ...depois, quando: e.target.value }); setErroForma(null); }} />
+                  <small>Se o cliente pagou tudo, corrija o valor que entrou.</small>
+                </label>
+              </div>
+            )}
             {!depois.ativo && <AvisoCaixaFechado aberto={caixa} />}
             <p className="g-pp g-muted">
               {depois.ativo ? "Nada entra no caixa agora: a conta fica em A receber." : caixa === false ? "O valor entra no financeiro, fora do caixa." : "O valor entra no caixa de hoje."}

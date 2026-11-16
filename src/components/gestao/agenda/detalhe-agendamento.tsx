@@ -4,7 +4,7 @@ import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { useState } from "react";
 import Link from "next/link";
-import { BellRing, CalendarClock, CalendarX, Check, MessageCircle, Play, Printer, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
+import { BellRing, CalendarClock, CalendarX, Check, HandCoins, MessageCircle, Play, Printer, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
 import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoCancelado, textoConfirmacao, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
@@ -17,7 +17,7 @@ import { nomeDosServicos, servicosAMais, servicosPorExtenso, valorDoHorario } fr
 import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
-import { FolhaBaixa } from "../financeiro/comum";
+import { FolhaBaixa, FolhaLancamento } from "../financeiro/comum";
 import { AvisoCaixaFechado, EscolhaPagamento, fecharPagamento, useCaixaAberto, usePagamento } from "../loja/pecas";
 import { FidelidadeNoHorario } from "../fidelidade";
 import Comanda from "./comanda";
@@ -37,6 +37,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const [cancelando, setCancelando] = useState(false);
   const [apagando, setApagando] = useState(false);
   const [baixando, setBaixando] = useState<Lancamento | null>(null);
+  // falta sem taxa configurada: anotar o que o tutor deve daqui mesmo (sem ir à ficha)
+  const [anotandoFalta, setAnotandoFalta] = useState(false);
   const [checklist, setChecklist] = useState<Record<string, boolean>>((a.checklist as Record<string, boolean>) ?? {});
   const [ocupado, setOcupado] = useState(false);
   const [avisadoEm, setAvisadoEm] = useState(a.pronto_avisado_em);
@@ -283,6 +285,14 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     });
   }
 
+  /** Abre o "Recebi" de uma conta antiga do tutor (a linha inteira vem do banco, como na ficha). */
+  async function abrirBaixa(id: string) {
+    if (somenteLeitura()) return;
+    const r = await sb.from("lancamentos").select("*").eq("id", id).eq("petshop_id", petshop.id).eq("pago", false).maybeSingle();
+    if (r.error || !r.data) { avisarErro(r.error ?? new Error("Esta conta já foi recebida. Atualize a tela.")); void recarregar(); return; }
+    setBaixando(r.data as Lancamento);
+  }
+
   const taxa = taxaDeFalta(petshop);
   const opTaxa = useOperacao();
   /** Anota a taxa de falta para o tutor (uma vez só, mesmo com toque duplo). */
@@ -337,6 +347,10 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
 
   if (cobrandoDiferenca && diferenca > 0.005) {
     return <CobrarDiferenca agendamento={a} valor={diferenca} aoFechar={() => setCobrandoDiferenca(false)} aoPronto={async () => { setCobrandoDiferenca(false); await recarregar(); aoMudar(); }} />;
+  }
+
+  if (anotandoFalta && tutor?.id) {
+    return <FolhaLancamento modo="conta" tipo="entrada" tutor={{ id: tutor.id, nome: tutor.nome ?? "Tutor" }} aoFechar={() => setAnotandoFalta(false)} aoSalvo={async () => { setAnotandoFalta(false); await recarregar(); aoMudar(); }} />;
   }
 
   if (baixando) {
@@ -416,9 +430,19 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
             <span>
               <b>{tutor?.nome?.split(" ")[0] ?? "O tutor"} deve {brl(deveAntes)} de antes</b>{" "}
               ({(extra?.antigas ?? []).map((l) => l.descricao?.trim() || l.categoria).join(", ")}).{" "}
-              {pago ? "Para receber, use O cliente pagou ou a ficha do tutor." : "Em Fechar a conta dá para incluir e receber junto."}
+              {pago ? "Para receber, use O cliente pagou ou a ficha do tutor." : pacote && !encerrado ? "Usando o pacote, a conta não abre: se ele for pagar agora, receba aqui." : "Em Fechar a conta dá para incluir e receber junto."}
             </span>
           </p>
+        )}
+        {/* concluir pelo pacote fecha sem tela de conta: o que ele devia de antes dá para receber aqui mesmo */}
+        {vejoFinanceiro && deveAntes > 0.005 && pacote && !pago && !encerrado && (
+          <div className="g-fila" style={{ flexWrap: "wrap", gap: 8 }} role="group" aria-label="Receber o que deve de antes">
+            {(extra?.antigas ?? []).slice(0, 4).map((l) => (
+              <button key={l.id} type="button" className="g-btn verde p" disabled={ocupado} onClick={() => void abrirBaixa(l.id)}>
+                <HandCoins />{(extra?.antigas ?? []).length === 1 ? `Receber agora · ${brl(l.valor)}` : `Receber ${l.descricao?.trim() || l.categoria} · ${brl(l.valor)}`}
+              </button>
+            ))}
+          </div>
         )}
 
         <div className="g-card liso g-pilha p">
@@ -564,6 +588,16 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         {(a.status === "marcado" || a.status === "confirmado") && zapConfirmacao && (
           <div className="g-fila">
             <a className="g-btn sec g-cresce" href={zapConfirmacao} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar confirmação</a>
+          </div>
+        )}
+        {/* faltou e não há taxa de falta definida: diz onde definir, e dá para anotar agora */}
+        {a.status === "faltou" && vejoFinanceiro && !(taxa > 0) && (
+          <div className="g-card liso g-pilha p" role="note">
+            <p className="g-pp" style={{ margin: 0 }}>
+              Quer cobrar taxa de falta?{" "}
+              {souDono ? <>Defina o valor em <Link className="g-link" href="/gestao/app/meu-petshop#opcoes-cobranca">Opções de cobrança</Link>: da próxima vez, o Faltou já pergunta se quer anotar.</> : "O dono define o valor em Meu pet shop, Opções de cobrança."}
+            </p>
+            {tutor?.id && <div><button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setAnotandoFalta(true); }}><HandCoins />Anotar o que {tutor.nome?.split(" ")[0] ?? "o tutor"} deve</button></div>}
           </div>
         )}
         {a.status === "cancelado" && (zapCancelado
