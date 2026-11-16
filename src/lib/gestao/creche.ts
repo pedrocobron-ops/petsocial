@@ -3,7 +3,7 @@ import type { Banco } from "./supabase";
 import type { Cliente, Estadia, Pet } from "./tipos";
 import { contando, lerTudo } from "./paginas";
 import { saudacaoZap } from "./agenda";
-import { calendarioGuardado, diaFechado, lerCalendario } from "./feriados";
+import { calendarioGuardado, diaFechado, lerCalendarioUmaVez } from "./feriados";
 import { multaSugerida, opcoesDeCobranca } from "./dinheiro-opcoes";
 import { opcao } from "./opcoes";
 import { brl, centavos, dataCompleta, dataCurta, deIsoDia, horarioDoDia, isoDia, nomeMes, somaDias } from "./util";
@@ -381,7 +381,7 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
   // no celular com internet fraca, cada espera em fila soma uma ida e volta
   const [planos, , lido] = await Promise.all([
     lerPlanos(sb, petshop.id, false),
-    calendarioGuardado(petshop.id, vejoFinanceiro) ? null : lerCalendario(sb, petshop.id, vejoFinanceiro),
+    calendarioGuardado(petshop.id, vejoFinanceiro) ? null : lerCalendarioUmaVez(sb, petshop.id, vejoFinanceiro),
     lerPresencas(sb, petshop.id, hoje, hoje).catch(() => null),
   ]);
   if (!planos.length) return null;

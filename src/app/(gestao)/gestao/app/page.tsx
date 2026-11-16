@@ -33,7 +33,6 @@ import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, useAdiantar
 import dynamic from "next/dynamic";
 import { ErroDeTeste } from "@/components/gestao/erros";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
-import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import { buscarSaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
 import MetaMes from "@/components/gestao/meta-mes";
 import DicasMozart from "@/components/gestao/dicas-mozart";
@@ -49,6 +48,8 @@ const carregarForm = () => import("@/components/gestao/agenda/form-agendamento")
 const DetalheAgendamento = dynamic(carregarDetalhe, { ssr: false });
 const FormAgendamento = dynamic(carregarForm, { ssr: false });
 const Importar = dynamic(() => import("@/components/gestao/importar"), { ssr: false });
+// pedidos pelo link: o cartão só aparece quando há pedido (até lá, nada na tela); vem à parte e não segura a tela
+const PedidosLink = dynamic(() => import("@/components/gestao/agenda/pedidos-link"), { ssr: false });
 
 const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa semana?", "Quem não vem há mais de um mês?"];
 
@@ -82,6 +83,23 @@ export default function Hoje() {
   const { dados, carregando, recarregar } = useDados(async () => {
     const amanha = somaDias(hoje, 1), depois = somaDias(hoje, 2);
     const seg = inicioDaSemana(hoje), ha30 = somaDias(hoje, -30), ha6 = somaDias(hoje, -6);
+    // primeiros passos e aviso de fim de teste: seis contagens, sem trazer linha nenhuma, numa ida só ao banco
+    // (banco antes da atualização, sem `gestao_contagens`: uma contagem por pedido, como antes)
+    type Contagens = { pets: number; agendamentos: number; concluidos: number; lembrados: number; estadias: number; produtos: number };
+    const contagens: Promise<Contagens> = Promise.resolve(sb.rpc("gestao_contagens", { p: petshop.id })).then(async (r) => {
+      if (!r.error && r.data && typeof r.data === "object") return r.data as unknown as Contagens;
+      const n = (x: { count: number | null }) => x.count ?? 0;
+      const [pets, agendamentos, concluidos, lembrados, estadias, produtos] = await Promise.all([
+        sb.from("pets").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).then(n),
+        sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).then(n),
+        sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("status", "concluido").then(n),
+        sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).not("lembrete_em", "is", null).then(n),
+        sb.from("estadias").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).then(n),
+        sb.from("produtos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).then(n),
+      ]);
+      return { pets, agendamentos, concluidos, lembrados, estadias, produtos };
+    });
+    const contagem = (k: keyof Contagens) => contagens.then((c) => ({ count: Number(c[k] ?? 0) }));
     // tudo ao mesmo tempo: no celular com internet fraca, cada consulta esperando a outra soma uma ida e volta
     const [lista, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes, daSemana, doMes, ultimos7, concluidos, lembrados, estadiasTotal, produtosTotal, proximosDias, semFechar, saude, aj, creche, experiencias] = await Promise.all([
       // o preço de cada horário vem à parte; o banco só entrega a quem recebe (o formulário de editar regrava o que leu)
@@ -91,19 +109,18 @@ export default function Hoje() {
       sb.from("estadias").select("id, status, entrada, saida_prevista").eq("petshop_id", petshop.id).in("status", ["em_casa", "reservada"]).limit(1000),
       // estoque e pacotes só entram no aviso de quem tem a área
       vejoEstoque ? lerTudo<{ id: string; nome: string; estoque: number; estoque_minimo: number }>((de, ate, contar) => sb.from("produtos").select("id, nome, estoque, estoque_minimo", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).gt("estoque_minimo", 0).order("nome").order("id").range(de, ate)).then((data) => ({ data })) : Promise.resolve({ data: [] }),
-      sb.from("pets").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
-      sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
+      contagem("pets"),
+      contagem("agendamentos"),
       vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo, categoria").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).eq("data", hojeIso) : Promise.resolve({ data: [] }),
       cuidoDoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento, tipo, categoria").eq("petshop_id", petshop.id).eq("pago", false).lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
       vejoPacotes ? sb.from("pacotes_clientes").select("id").eq("petshop_id", petshop.id).eq("ativo", true).gte("vence_em", hojeIso).lte("vence_em", isoDia(somaDias(hoje, 7))) : Promise.resolve({ data: [] }),
       sb.from("agendamentos").select("inicio, status").eq("petshop_id", petshop.id).gte("inicio", seg.toISOString()).lt("inicio", somaDias(seg, 7).toISOString()),
       lerTudo((de, ate, contar) => sb.from("agendamentos").select("status, servicos(nome, cor)", contando(contar)).eq("petshop_id", petshop.id).gte("inicio", ha30.toISOString()).lt("inicio", amanha.toISOString()).order("inicio").order("id").range(de, ate)).then((data) => ({ data })),
       cuidoDoFinanceiro ? lerTudo((de, ate, contar) => sb.from("lancamentos").select("valor, data", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").is("movimento", null).gte("data", isoDia(ha6)).lte("data", hojeIso).order("data").order("id").range(de, ate)).then((data) => ({ data })) : Promise.resolve({ data: [] }),
-      // primeiros passos e aviso de fim de teste: duas contagens, sem trazer linha nenhuma
-      sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("status", "concluido"),
-      sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).not("lembrete_em", "is", null),
-      sb.from("estadias").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
-      sb.from("produtos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id),
+      contagem("concluidos"),
+      contagem("lembrados"),
+      contagem("estadias"),
+      contagem("produtos"),
       // os próximos horários depois de hoje: a tela não diz "nada por vir" quando há banho marcado para segunda
       sb.from("agendamentos").select("id, inicio, pets(nome)").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).in("status", ["marcado", "confirmado"]).order("inicio").order("id").limit(2),
       // horários de dias anteriores que ninguém fechou (nem concluído, nem falta, nem cancelado)

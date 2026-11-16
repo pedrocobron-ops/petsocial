@@ -6,29 +6,23 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, CalendarOff, DoorOpen, Home, HandCoins, Hourglass, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, ShieldAlert, ShieldCheck, Sun, Sunset, Syringe } from "lucide-react";
 import { useCalendario } from "@/components/gestao/calendario";
 import { useGestao } from "@/components/gestao/contexto";
-import FormPet from "@/components/gestao/form-pet";
 import { Kpi } from "@/components/gestao/painel";
-import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, mensagemDeErro, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
+import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, mensagemDeErro, ok, useAdiantar, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { AvisoCaixaFechado, Chips, ChipsForma, erroDeValor, ErroTela, lembrarForma, useCaixaAberto, useFormaLembrada } from "@/components/gestao/loja/pecas";
 import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
-import Diario from "@/components/gestao/casa/diario";
 import { BotaoFotos, useFaxinaDasFotos } from "@/components/gestao/casa/fotos-do-dia";
 import { AvisoDeVaga, FolhaEspera, ListaDeEspera, useListaDeEspera } from "@/components/gestao/casa/espera";
+import dynamic from "next/dynamic";
 import { FolhaOcorrencia, OcorrenciasDoCartao } from "@/components/gestao/casa/ocorrencias";
 import { FolhaQuemPodeBuscar, lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { decidirAtraso, FolhaTaxaDeAtraso, fraseDoAtraso, lerAtraso, lerAtrasosPendentes, type AtrasoPendente } from "@/components/gestao/creche/atraso";
-import Chamada from "@/components/gestao/creche/chamada";
 import { BotaoCorrigirHoras, FolhaCorrigirHoras, usePodeCorrigirHoras } from "@/components/gestao/creche/corrigir-horas";
-import Cobrancas from "@/components/gestao/creche/cobrancas";
 import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
-import Mensalistas from "@/components/gestao/creche/mensalistas";
 import ReposicoesParaConferir from "@/components/gestao/creche/reposicoes";
 import ExperienciasDaCreche from "@/components/gestao/creche/experiencias";
-import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import CheckOut, { comNota, DetalheDaEstadia, estadiasDoTutor, NoitePorNoite, NOTA_PACOTE, pacoteServe, pacotesParaEstadia, venceu } from "@/components/gestao/hotel/checkout";
 import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/components/gestao/hotel/cuidados";
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
-import Ocupacao from "@/components/gestao/hotel/ocupacao";
 import { DesfazerCheckin, useCheckinsDeHoje } from "@/components/gestao/hotel/desfazer-checkin";
 import { AjusteDoSinal, CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
 import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
@@ -51,6 +45,25 @@ import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoD
 import { conflitoDoPet, type Periodo } from "@/lib/gestao/conflito-estadia";
 import "./creche-hotel.css";
 import "@/components/gestao/hotel/hotel.css";
+
+// As outras partes da tela (Chamada, Ocupação, Diário, Mensalistas, Cobranças) vêm à parte: a Casa agora abre sem esperar
+// baixar todas. Depois que a tela abriu, elas baixam em segundo plano (useAdiantar): no toque, já estão aqui.
+const carregarChamada = () => import("@/components/gestao/creche/chamada");
+const carregarOcupacao = () => import("@/components/gestao/hotel/ocupacao");
+const carregarDiario = () => import("@/components/gestao/casa/diario");
+const carregarMensalistas = () => import("@/components/gestao/creche/mensalistas");
+const carregarCobrancas = () => import("@/components/gestao/creche/cobrancas");
+const esperando = () => <Esqueleto linhas={4} />;
+const Chamada = dynamic(carregarChamada, { ssr: false, loading: esperando });
+const Ocupacao = dynamic(carregarOcupacao, { ssr: false, loading: esperando });
+const Diario = dynamic(carregarDiario, { ssr: false, loading: esperando });
+const Mensalistas = dynamic(carregarMensalistas, { ssr: false, loading: esperando });
+const Cobrancas = dynamic(carregarCobrancas, { ssr: false, loading: esperando });
+// cadastrar um pet novo no meio da reserva: só abre com um toque
+const carregarFormPet = () => import("@/components/gestao/form-pet");
+const FormPet = dynamic(carregarFormPet, { ssr: false });
+// pedidos pelo link: o cartão só aparece quando há pedido (até lá, nada na tela)
+const PedidosLink = dynamic(() => import("@/components/gestao/agenda/pedidos-link"), { ssr: false });
 
 const TIPOS = [{ id: "creche", rotulo: "Creche" }, { id: "hotel", rotulo: "Hotel" }] as const;
 const FILTRO_TIPO = [{ id: "todos", rotulo: "Todos" }, ...TIPOS] as const;
@@ -193,6 +206,7 @@ export default function CrecheHotel() {
   // plano de mensalista: só o dono e quem cuida do financeiro mexem (a equipe, se o dono liberou em Meu pet shop)
   const podePlano = podeMudarPlano({ petshop, souDono, cuidoDoFinanceiro });
   const [ver, setVerEstado] = useState<Ver>("casa");
+  useAdiantar(carregarChamada, carregarOcupacao, carregarDiario, carregarMensalistas, carregarCobrancas, carregarFormPet);
   // a parte aberta fica no endereço (?ver=...): recarregar a página não volta para a Chamada
   const setVer = useCallback((v: Ver | ((atual: Ver) => Ver)) => setVerEstado((atual) => {
     const novo = typeof v === "function" ? v(atual) : v;

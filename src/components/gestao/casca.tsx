@@ -3,7 +3,7 @@
 import { Selo } from "./marca";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, Pencil, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
@@ -139,16 +139,18 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   }, [sb, petshop.id, semBanho]);
 
   // só a equipe Maestro Pet vê o item "Administrador" no menu
-  useEffect(() => { let vale = true; void sb.rpc("sou_admin").then((r) => { if (vale) setAdmin(r.data === true); }); return () => { vale = false; }; }, [sb]);
+  // (pergunta depois que a tela abriu: não disputa a rede com o que a tela precisa para aparecer)
+  useEffect(() => { let vale = true; const parar = quandoATelaAbrir(() => void sb.rpc("sou_admin").then((r) => { if (vale) setAdmin(r.data === true); })); return () => { vale = false; parar(); }; }, [sb]);
 
   // marca de uso: a cada minuto com a tela aberta, diz em que parte do sistema a pessoa está
   useEffect(() => {
     const area = caminho.replace(/^\/gestao\/app\/?/, "").split("/")[0] || "hoje";
     const marcar = () => { if (document.visibilityState === "visible") void sb.rpc("marcar_uso", { p_petshop: petshop.id, p_area: area }).then(() => {}, () => {}); };
-    marcar();
+    // a primeira marca sai depois que a tela abriu (não disputa a rede com os dados da tela)
+    const parar = quandoATelaAbrir(marcar);
     const t = setInterval(marcar, 60000);
     document.addEventListener("visibilitychange", marcar);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", marcar); };
+    return () => { parar(); clearInterval(t); document.removeEventListener("visibilitychange", marcar); };
   }, [sb, petshop.id, caminho]);
 
   useEffect(() => {
@@ -204,6 +206,20 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   })();
   const aba = daFuncao ?? (podeRota(menu.aba.href) ? menu.aba : minhaPrimeira ?? menu.aba), podeAba = podeRota(aba.href);
 
+  // Antes, cada link do menu baixava a sua tela junto com a primeira (o menu inteiro, no computador), e a tela que a pessoa
+  // abriu esperava na fila. Agora as telas da barra de baixo (Hoje, a área principal e Clientes) baixam depois que a tela
+  // aberta apareceu; as outras do menu, quando o mouse passa por cima (ou o dedo encosta), um instante antes do clique.
+  const router = useRouter();
+  const adiantar = [...new Set([aba.href, "/gestao/app", ...(posso("clientes") ? ["/gestao/app/clientes"] : [])])].filter((h) => podeRota(h)).join(" ");
+  useEffect(() => {
+    let vivo = true;
+    const parar = quandoATelaAbrir(() => {
+      for (const h of adiantar.split(" ")) if (vivo) { try { router.prefetch(h); } catch { /* sem adiantar: abre no toque */ } }
+    });
+    return () => { vivo = false; parar(); };
+  }, [router, adiantar]);
+  const perto = (href: string) => () => { try { router.prefetch(href); } catch { /* sem adiantar: abre no clique */ } };
+
   // na tela Hoje, o dono vê o cartão de fim de teste (com os números da conta): a faixa de cima não repete o recado
   const teste = fimDoTeste(petshop);
   const cartaoNoHoje = souDono && caminho === "/gestao/app" && teste != null && teste.dias <= DIAS_DE_AVISO;
@@ -223,7 +239,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
             <div className="g-nav-t com-botao"><span>{g.titulo}</span>{botaoPersonalizar("g-nav-personalizar")}</div>
           ) : <div className="g-nav-t">{g.titulo}</div>}
           {g.itens.map((i) => (
-            <Link key={i.href} href={i.href} aria-current={atual(i.href) ? "page" : undefined}><i.icone />{i.rotulo}{i.href.endsWith("/agenda") && pedidos > 0 && <span className="g-nav-n" aria-label={`${pedidos} pedidos pelo link esperando resposta`}>{pedidos}</span>}</Link>
+            <Link prefetch={false} onMouseEnter={perto(i.href)} onTouchStart={perto(i.href)} onFocus={perto(i.href)} key={i.href} href={i.href} aria-current={atual(i.href) ? "page" : undefined}><i.icone />{i.rotulo}{i.href.endsWith("/agenda") && pedidos > 0 && <span className="g-nav-n" aria-label={`${pedidos} pedidos pelo link esperando resposta`}>{pedidos}</span>}</Link>
           ))}
         </div>
       ))}
@@ -231,14 +247,14 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         <div>
           <button type="button" className="g-nav-outras" aria-expanded={outrasVisiveis} onClick={abrirOutras}>Outras áreas<ChevronDown /></button>
           {outrasVisiveis && outras.map((i) => (
-            <Link key={i.href} href={i.href} aria-current={atual(i.href) ? "page" : undefined}><i.icone />{i.rotulo}</Link>
+            <Link prefetch={false} onMouseEnter={perto(i.href)} onTouchStart={perto(i.href)} onFocus={perto(i.href)} key={i.href} href={i.href} aria-current={atual(i.href) ? "page" : undefined}><i.icone />{i.rotulo}</Link>
           ))}
         </div>
       )}
       {admin && (
         <div>
           <div className="g-nav-t">Maestro Pet</div>
-          <Link href="/gestao/admin"><ShieldCheck />Administrador</Link>
+          <Link prefetch={false} href="/gestao/admin"><ShieldCheck />Administrador</Link>
         </div>
       )}
     </nav>
@@ -258,7 +274,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
               <b>Teste grátis</b>
               <span>{!teste || teste.vencido ? (liberado ? "Terminou. Você continua usando até a assinatura abrir." : "Terminou. A conta está só para consulta.") : teste.dias === 0 ? "Termina hoje." : teste.dias === 1 ? "Termina amanhã." : `Faltam ${teste.dias} dias.`}</span>
               <div className="g-prog"><i style={{ width: `${Math.max(4, Math.min(100, ((7 - diasDeTeste) / 7) * 100))}%` }} /></div>
-              <Link href="/gestao/app/assinatura">Ver assinatura</Link>
+              <Link prefetch={false} href="/gestao/app/assinatura">Ver assinatura</Link>
             </div>
           )}
           <div className="g-nav" style={{ marginTop: 10 }}>
@@ -313,12 +329,12 @@ export default function Casca({ children }: { children: React.ReactNode }) {
 
       {/* toque duplo no botão de uma folha: ela fecha no primeiro toque e o segundo cairia na aba que fica embaixo */}
       <nav className="g-abas" aria-label="Menu" onClickCapture={(e) => { if (Date.now() - toqueNaFolha.current < 500) { e.preventDefault(); e.stopPropagation(); } }}>
-        <Link href="/gestao/app" aria-current={atual("/gestao/app") ? "page" : undefined}><Sun />Hoje</Link>
-        <Link href={podeAba ? aba.href : "/gestao/app"} aria-current={atual(aba.href) ? "page" : undefined} style={{ position: "relative", opacity: podeAba ? 1 : .35 }}><aba.icone />{aba.rotulo}{aba.href === AGENDA && pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
+        <Link prefetch={false} href="/gestao/app" aria-current={atual("/gestao/app") ? "page" : undefined}><Sun />Hoje</Link>
+        <Link prefetch={false} href={podeAba ? aba.href : "/gestao/app"} aria-current={atual(aba.href) ? "page" : undefined} style={{ position: "relative", opacity: podeAba ? 1 : .35 }}><aba.icone />{aba.rotulo}{aba.href === AGENDA && pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
         <button className="g-aba-mic" onClick={() => setAssistente({ aberta: true, pedido: "" })} aria-label="Falar com o Mozart, o assistente">
           <span className="b"><Mic /></span>
         </button>
-        <Link href={posso("clientes") ? "/gestao/app/clientes" : "/gestao/app"} aria-current={atual("/gestao/app/clientes") ? "page" : undefined} style={{ opacity: posso("clientes") ? 1 : .35 }}><PawPrint />Clientes</Link>
+        <Link prefetch={false} href={posso("clientes") ? "/gestao/app/clientes" : "/gestao/app"} aria-current={atual("/gestao/app/clientes") ? "page" : undefined} style={{ opacity: posso("clientes") ? 1 : .35 }}><PawPrint />Clientes</Link>
         <button onClick={() => setMais(true)}><Menu />Mais</button>
       </nav>
 

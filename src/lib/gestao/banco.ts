@@ -2243,6 +2243,12 @@ isOneToOne: false
 "gestao_assinatura":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"gestao_base":
+{ Args: { "p": string }; Returns: Json
+                           },
+"gestao_contagens":
+{ Args: { "p": string }; Returns: Json
+                           },
 "hotel_busca_ate":
 { Args: { "p_petshop": string }; Returns: string
                            },
