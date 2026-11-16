@@ -36,7 +36,8 @@ function gravarPedidos(page) {
 }
 /** Ondas de pedidos: um pedido que começa mais de 400 ms depois do anterior abriu uma onda nova (o atraso é de 600 ms). */
 function ondas(l) {
-  const ts = l.map((x) => x.t).sort((a, b) => a - b);
+  // o aviso de uso (marcar_uso) sai depois que a tela abre, de propósito: não é dado da folha
+  const ts = l.filter((x) => !/rpc\/marcar_uso/.test(x.url)).map((x) => x.t).sort((a, b) => a - b);
   let n = ts.length ? 1 : 0;
   for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > 400) n++;
   return n;
