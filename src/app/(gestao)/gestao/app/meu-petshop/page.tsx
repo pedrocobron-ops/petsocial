@@ -378,7 +378,7 @@ function Servicos() {
   const exemplos = [usaModulo(petshop, "banho_tosa") ? "banho, tosa" : "", usaModulo(petshop, "creche") ? "creche" : "", usaModulo(petshop, "hotel") ? "hotel" : ""].filter(Boolean).join(", ");
   const ativos = servicos.filter((s) => s.ativo);
   const inativos = servicos.filter((s) => !s.ativo);
-  // com mais de uma área, cada serviço diz de qual é
+  // com mais de uma área, o serviço que não é do banho e tosa diz de qual área é
   const variasAreas = areasDeServicoPara(petshop).length > 1;
   const abrir = (s: Servico | "novo") => { if (!somenteLeitura()) setEditando(s); };
 
@@ -409,7 +409,7 @@ function Servicos() {
               <button key={s.id} type="button" className="g-mp-serv" style={{ "--cor": s.cor } as React.CSSProperties} onClick={() => abrir(s)}>
                 <i className="g-mp-cor" aria-hidden><Scissors /></i>
                 <span className="t">
-                  <span className="g-mp-nome"><b>{s.nome}</b><span className="g-mp-tempo"><Clock aria-hidden />{duracao(s.duracao_min)}{variasAreas && ` · ${AREAS_DE_SERVICO.find((x) => x.id === areaDoServico(s.categoria))?.rotulo}`}</span></span>
+                  <span className="g-mp-nome"><b>{s.nome}</b><span className="g-mp-tempo"><Clock aria-hidden />{duracao(s.duracao_min)}{variasAreas && areaDoServico(s.categoria) !== "banho_tosa" && ` · ${AREAS_DE_SERVICO.find((x) => x.id === areaDoServico(s.categoria))?.rotulo}`}</span></span>
                   {p.length ? (
                     <span className="g-mp-precos">
                       {p.map((x) => <span key={x.porte} className="g-mp-preco"><i>{x.porte}</i>{brlCurto(x.valor)}</span>)}
