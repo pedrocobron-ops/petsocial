@@ -5,9 +5,11 @@ import Link from "next/link";
 import { AlertTriangle, BadgeCheck, Check, Clock, Database, ExternalLink, Gift, Lock, Sparkles, Store, User, Users } from "lucide-react";
 import { Tile, type Tom } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
-import { Vazio } from "@/components/gestao/ui";
+import { Vazio, useDados } from "@/components/gestao/ui";
 import { linkSuporte } from "@/lib/gestao/contato";
-import { PERIODOS, PLANOS, ofertaDe, planoPorId, temCheckout, textoAcessos, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
+import { artigoDe } from "@/lib/gestao/modulos";
+import { PERIODOS, PLANOS, ofertaDe, planoPorId, textoPessoas, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
+import { TEXTO_TESTE } from "@/components/gestao/fim-do-teste";
 import { brlCurto, dataCompleta, dataCurta } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./assinatura.css";
@@ -37,37 +39,52 @@ function Acessos({ n }: { n: number }) {
   return <span className="g-as-acessos" aria-hidden>{Array.from({ length: MAIOR }, (_, i) => <i key={i} className={i < n ? "on" : undefined}><User /></i>)}</span>;
 }
 
-function linkDoCheckout(CHECKOUT: string, email: string | undefined) {
-  if (!email) return CHECKOUT;
+/**
+ * Link de pagamento com o e-mail da conta já preenchido (parâmetros `email` e `confirmEmail` do checkout da Cakto)
+ * e a marca do pet shop em `callback`, que a Cakto devolve no aviso de pagamento: assim a compra cai na conta certa
+ * mesmo se a pessoa trocar o e-mail na hora de pagar. A marca é assinada pelo banco (`assinatura_callback`:
+ * id do pet shop e uma ficha secreta dele), para ninguém mandar uma compra para a conta de outra pessoa.
+ */
+function linkDoCheckout(checkout: string, email: string | undefined, callback?: string | null) {
+  const extras: [string, string][] = [];
+  if (email) extras.push(["email", email], ["confirmEmail", email]);
+  if (callback) extras.push(["callback", callback]);
   try {
-    const u = new URL(CHECKOUT);
-    u.searchParams.set("email", email);
+    const u = new URL(checkout);
+    for (const [k, v] of extras) u.searchParams.set(k, v);
     return u.toString();
   } catch {
-    return `${CHECKOUT}${CHECKOUT.includes("?") ? "&" : "?"}email=${encodeURIComponent(email)}`;
+    const q = extras.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+    return q ? `${checkout}${checkout.includes("?") ? "&" : "?"}${q}` : checkout;
   }
 }
 
 export default function Assinatura() {
-  const { souDono, petshop, user, liberado, diasDeTeste } = useGestao();
+  const { sb, souDono, petshop, user, liberado, diasDeTeste, assinaturaAberta } = useGestao();
+  const [periodo, setPeriodo] = useState<PeriodoId>("mensal");
+  // sem a marca assinada (banco antes da atualização ou sem internet), o link segue só com o e-mail
+  const { dados: callback } = useDados(async () => {
+    if (!souDono) return null;
+    const r = await sb.rpc("assinatura_callback", { p: petshop.id });
+    return r.error || typeof r.data !== "string" ? null : r.data;
+  }, [petshop.id, souDono]);
   if (!souDono) return <Vazio titulo="Só o dono do pet shop mexe aqui." />;
   const status = petshop.status;
   const podeAssinar = status === "teste" || status === "cancelada";
   const temAssinatura = status === "ativa" || status === "atrasada";
   const atual = planoPorId(petshop.plano);
-  const [periodo, setPeriodo] = useState<PeriodoId>("mensal");
 
   return (
     <div>
       <header className="g-topo">
-        <div><h1>Assinatura</h1><p className="g-muted">O plano do {petshop.nome}.</p></div>
+        <div><h1>Assinatura</h1><p className="g-muted">O plano {artigoDe(petshop.nome).do} {petshop.nome}.</p></div>
       </header>
       <div className="g-pilha g">
         {estado()}
 
         {temAssinatura && (
           <section className="g-pilha">
-            <div className="g-card-t" style={{ marginBottom: 0 }}><h2>Seu plano</h2><span className="g-muted g-p">{textoAcessos(atual.acessos)} ao sistema</span></div>
+            <div className="g-card-t" style={{ marginBottom: 0 }}><h2>Seu plano</h2><span className="g-muted g-p">{textoPessoas(atual.acessos)}</span></div>
             <div className="g-as-planos">
               {PLANOS.map((p) => {
                 const meu = p.id === atual.id, v = VISUAL[p.id];
@@ -76,7 +93,7 @@ export default function Assinatura() {
                     {meu && <span className="g-as-marca"><BadgeCheck aria-hidden />Seu plano</span>}
                     <div className="g-as-plano-t"><Tile icone={v.icone} tom={v.tom} tamanho="g" /><div><h2>{p.nome}</h2><p className="g-muted g-pp">{p.para}</p></div></div>
                     <p className="g-as-preco"><span className="g-num">{brlCurto(p.preco)}</span><span className="g-muted g-p"> por mês</span></p>
-                    <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoAcessos(p.acessos)}</b> ao sistema</p></div>
+                    <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoPessoas(p.acessos)}</b> com login próprio</p></div>
                   </div>
                 );
               })}
@@ -92,7 +109,7 @@ export default function Assinatura() {
           <section className="g-pilha">
             <div>
               <h2>Escolha o plano</h2>
-              <p className="g-muted g-p">Todos têm as mesmas funções e o Mozart. Muda quantas pessoas têm acesso ao sistema. Pagando por 3 ou 6 meses, sai mais barato.</p>
+              <p className="g-muted g-p">Todos têm as mesmas funções e o Mozart. Muda quantas pessoas entram no sistema, cada uma com o seu login. Pagando por 3 ou 6 meses, sai mais barato.</p>
             </div>
             <div className="g-seg" role="group" aria-label="De quanto em quanto tempo pagar" style={{ justifySelf: "start" }}>
               {PERIODOS.map((pe) => <button key={pe.id} aria-pressed={periodo === pe.id} onClick={() => setPeriodo(pe.id)}>{pe.nome}</button>)}
@@ -105,9 +122,10 @@ export default function Assinatura() {
                     <div className="g-as-plano-t"><Tile icone={v.icone} tom={v.tom} tamanho="g" /><div><h2>{p.nome}</h2><p className="g-muted g-pp">{p.para}</p></div></div>
                     <p className="g-as-preco"><span className="g-num">{brlCurto(o.preco)}</span><span className="g-muted g-p"> {o.periodo.cada}</span></p>
                     <p className="g-muted g-pp" style={{ minHeight: "2.6em" }}>{o.periodo.meses > 1 ? `Equivale a ${brlCurto(Math.round(o.porMes * 100) / 100)} por mês: ${brlCurto(o.economia)} a menos do que no mensal.` : "Cobrado todo mês."}</p>
-                    <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoAcessos(p.acessos)}</b> ao sistema</p></div>
-                    {o.checkout
-                      ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(o.checkout, user.email)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
+                    <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoPessoas(p.acessos)}</b> com login próprio</p></div>
+                    {/* enquanto a assinatura não abriu, ninguém paga: o botão espera, mesmo com o link já cadastrado */}
+                    {o.checkout && assinaturaAberta
+                      ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(o.checkout, user.email, callback)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
                       : <button className="g-btn cheio" disabled>Disponível em breve</button>}
                   </div>
                 );
@@ -119,8 +137,8 @@ export default function Assinatura() {
                 {INCLUI.map((i) => <li key={i}><Check aria-hidden />{i}</li>)}
               </ul>
             </div>
-            {!temCheckout() && <p className="g-muted g-p">{liberado ? "A assinatura ainda não abriu. Enquanto isso, o seu acesso continua pelo teste." : "A assinatura ainda não abriu. Os seus dados continuam guardados."}</p>}
-            <p className="g-muted g-pp">Cobrança pela Cakto, que se renova sozinha ao fim de cada período até você cancelar. Você cancela quando quiser e usa até o fim do período já pago. Use na página de pagamento o mesmo e-mail da sua conta{user.email ? ` (${user.email})` : ""} para o acesso ser liberado sozinho.</p>
+            {!assinaturaAberta && <p className="g-muted g-p">A assinatura ainda não abriu. Enquanto isso, você continua usando tudo normalmente, sem pagar nada.</p>}
+            <p className="g-muted g-pp">O pagamento é feito na Cakto, a empresa que cuida da cobrança da Maestro Pet. A assinatura se renova sozinha ao fim de cada período até você cancelar. Você cancela quando quiser e usa até o fim do período já pago. Use na página de pagamento o mesmo e-mail da sua conta{user.email ? ` (${user.email})` : ""} para o acesso ser liberado sozinho.</p>
           </section>
         )}
 
@@ -128,13 +146,13 @@ export default function Assinatura() {
           <h2 className="g-as-dados-t"><Tile icone={Database} tom="ceu" tamanho="p" />Seus dados</h2>
           <p className="g-p">
             Tudo o que você lança aqui é do seu pet shop. Dá para levar quando quiser: em{" "}
-            <Link className="g-link" href="/gestao/app/clientes">Clientes → Exportar</Link> e em{" "}
-            <Link className="g-link" href="/gestao/app/financeiro">Financeiro → Exportar</Link>.
+            <Link className="g-link alvo" href="/gestao/app/clientes">Clientes → Exportar</Link> e em{" "}
+            <Link className="g-link alvo" href="/gestao/app/financeiro">Financeiro → Exportar</Link>.
           </p>
           <p className="g-p g-muted">
-            <Link className="g-link" href="/gestao/privacidade" target="_blank">Política de privacidade</Link>{" · "}
-            <Link className="g-link" href="/gestao/termos" target="_blank">Termos de uso</Link>{" · "}
-            <a className="g-link" href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer">Fale com a gente no WhatsApp</a>
+            <Link className="g-link alvo" href="/gestao/privacidade" target="_blank">Política de privacidade</Link>{" · "}
+            <Link className="g-link alvo" href="/gestao/termos" target="_blank">Termos de uso</Link>{" · "}
+            <a className="g-link alvo" href={linkSuporte("Oi! Preciso de ajuda com o Maestro Pet Gestão.")} target="_blank" rel="noopener noreferrer">Fale com a gente no WhatsApp</a>
           </p>
         </section>
       </div>
@@ -147,9 +165,18 @@ export default function Assinatura() {
       const dias = diasDeTeste ?? 0;
       if (!liberado) {
         return (
-          <section className="g-as-estado neutro">
-            <div className="g-as-estado-t"><Tile icone={Lock} tom="manteiga" tamanho="g" /><div><p className="g-rotulo">Teste grátis</p><h2>Teste grátis: terminou em {dataCurta(fim)}</h2></div></div>
-            <p className="g-p">Seus dados continuam guardados e a conta fica só para consulta até você assinar.</p>
+          <section className="g-as-estado alerta" role="alert">
+            <div className="g-as-estado-t"><Tile icone={Lock} tom="rosa" tamanho="g" /><div><p className="g-rotulo">Teste grátis</p><h2>Teste grátis: terminou em {dataCurta(fim)}</h2></div></div>
+            <p className="g-p">{TEXTO_TESTE.soConsulta} Escolha um plano logo abaixo.</p>
+          </section>
+        );
+      }
+      if (dias === 0) {
+        // o prazo passou, mas a assinatura ainda não abriu: ninguém fica bloqueado sem ter como pagar
+        return (
+          <section className="g-as-estado teste">
+            <div className="g-as-estado-t"><Tile icone={Clock} tom="pessego" tamanho="g" /><div><p className="g-rotulo">Teste grátis</p><h2>Teste grátis: terminou em {dataCurta(fim)}</h2></div></div>
+            <p className="g-p">{TEXTO_TESTE.vencidoSemAbrir}</p>
           </section>
         );
       }
@@ -164,7 +191,7 @@ export default function Assinatura() {
           <div className="g-as-barra" role="img" aria-label={`${restam} de ${DIAS_DE_TESTE} dias restantes`}>
             {Array.from({ length: DIAS_DE_TESTE }, (_, i) => <i key={i} className={i < restam ? "on" : undefined} />)}
           </div>
-          <p className="g-p">Vai até {dataCurta(fim)}. Durante o teste, tudo funciona e até 6 pessoas podem entrar.</p>
+          <p className="g-p">Vai até {dataCurta(fim)}. Durante o teste, tudo funciona e até 6 pessoas podem entrar.{assinaturaAberta ? "" : " Se o teste acabar antes de a assinatura abrir, você continua usando normalmente até ela abrir."}</p>
         </section>
       );
     }

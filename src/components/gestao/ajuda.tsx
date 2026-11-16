@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, ChevronDown, LifeBuoy, MessageCircle, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react";
-import { TOPICOS } from "@/lib/gestao/ajuda";
+import { rapidasPara } from "@/lib/gestao/manual";
 import { linkSuporte } from "@/lib/gestao/contato";
 import { hora } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";
 import { abrirAssistente } from "./ui";
 
-type Item = { de: "eu" | "ajuda"; texto: string; quando: string; avaliar?: boolean; avaliado?: "sim" | "nao"; registro?: string | null };
+type Item = { de: "eu" | "ajuda"; texto: string; quando: string; avaliar?: boolean; avaliado?: "sim" | "nao"; registro?: string | null; /** a Ajuda não soube responder, ou o caso é da equipe */ semSaida?: boolean };
 type Resposta = { texto?: string; equipe?: boolean; semResposta?: boolean; novo?: boolean; assunto?: string; erro?: string; mensagem?: string };
 
 /**
@@ -17,7 +17,6 @@ type Resposta = { texto?: string; equipe?: boolean; semResposta?: boolean; novo?
  * Abandonar a conversa não conta nada. Erro de conexão também não.
  */
 const TENTATIVAS = 2;
-const RAPIDAS = ["marcar", "conta", "link", "equipe", "caixa"];
 
 const memoria: { petshop: string | null; itens: Item[]; falhas: number; equipe: boolean; assunto: string | null } = { petshop: null, itens: [], falhas: 0, equipe: false, assunto: null };
 
@@ -73,7 +72,7 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
       const reg = await sb.rpc("registrar_conversa", { p_petshop: petshop.id, p_canal: "ajuda", p_pergunta: limpo, p_resposta: j.texto, p_pediu_equipe: j.equipe === true });
       const registro = typeof reg.data === "string" ? reg.data : null;
       if (j.semResposta && registro) void sb.rpc("avaliar_conversa", { p_id: registro, p_resolveu: false }).then(() => {}, () => {});
-      guardar([...comPergunta, { de: "ajuda", texto: j.texto, quando: hora(new Date()), avaliar: !j.semResposta && !j.equipe, registro }]);
+      guardar([...comPergunta, { de: "ajuda", texto: j.texto, quando: hora(new Date()), avaliar: !j.semResposta && !j.equipe, registro, semSaida: j.semResposta === true || j.equipe === true }]);
       if (j.semResposta) falhou();
       if (j.equipe) chamarEquipe();
     } catch {
@@ -98,8 +97,10 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
   }
 
   const comEquipe = equipe || falhas >= TENTATIVAS;
-  const perguntas = itens.filter((i) => i.de === "eu").map((i) => i.texto);
-  const resumo = `Oi! Sou ${eu.nome.split(" ")[0]}, do ${petshop.nome}. Preciso de ajuda com o Maestro Pet Gestão.${perguntas.length ? `\n\nJá tentei a ajuda do sistema e não resolveu. Minha dúvida:\n- ${perguntas.slice(-3).join("\n- ")}` : ""}`;
+  // vai para a equipe só o que ficou sem saída: a pessoa tocou em "Ainda não" ou a Ajuda não soube responder.
+  // Pergunta respondida e deixada sem avaliar não entra: não dá para dizer que não resolveu.
+  const perguntas = itens.filter((i, n) => i.de === "eu" && (itens[n + 1]?.avaliado === "nao" || itens[n + 1]?.semSaida === true)).map((i) => i.texto);
+  const resumo = `Oi! Sou ${eu.nome.split(" ")[0]} (${petshop.nome.trim()}). Preciso de ajuda com o Maestro Pet Gestão.${perguntas.length ? `\n\nJá tentei a ajuda do sistema e não resolveu. Minha dúvida:\n- ${perguntas.slice(-3).join("\n- ")}` : ""}`;
   const primeiro = eu.nome.split(" ")[0];
 
   return (
@@ -117,7 +118,7 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
           <div className="g-bolha ela rabo">Oi, {primeiro}! Aqui você tira dúvidas de como usar o sistema. Escreve o que você está tentando fazer.</div>
           {!itens.length && (
             <div className="g-ass-rapidas">
-              {TOPICOS.filter((t) => RAPIDAS.includes(t.id)).map((t) => <button key={t.id} onClick={() => void enviar(t.titulo)}>{t.titulo}</button>)}
+              {rapidasPara(petshop).map((t) => <button key={t.id} onClick={() => void enviar(t.titulo)}>{t.titulo}</button>)}
             </div>
           )}
           {itens.map((item, i) => (

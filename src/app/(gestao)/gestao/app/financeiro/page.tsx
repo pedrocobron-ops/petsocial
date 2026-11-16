@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   ArrowDownLeft, ArrowUpRight, CalendarClock, CalendarDays, ChartColumn, Check, ChevronLeft, ChevronRight, CreditCard, Download, HandCoins, Plus, Receipt, Scale,
   Search, Target, TrendingUp, TriangleAlert,
@@ -9,19 +10,23 @@ import { useGestao } from "@/components/gestao/contexto";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
 import {
-  baixarPlanilha, brlMini, categoriaAtual, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, SemAcesso, soma, somaPorForma,
-  type Cel, type Tipo,
+  Apagados, baixarPlanilha, brlMini, categoriaAtual, Chips, COR_FORMA, dinheiroCsv, ehDeServico, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, SemAcesso, soma, somaPorForma,
+  TagAlterado, textoJaRecebido, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
+import CustoDasVendas from "@/components/gestao/financeiro/custo-vendas";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
 import { contasDaMeta, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
-import type { Lancamento } from "@/lib/gestao/tipos";
+import type { AlteracaoLancamento, Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
+import { ajustesDoFaturamento, CATEGORIAS_DEVOLUCAO, faturamentoLiquido, SEM_AJUSTES } from "@/lib/gestao/faturamento";
+import { FORMA_CREDITO } from "@/components/gestao/financeiro/comum";
 import "./financeiro.css";
 
 export default function PaginaFinanceiro() {
-  const { vejoFinanceiro } = useGestao();
-  return vejoFinanceiro ? <Financeiro /> : <SemAcesso />;
+  // quem só opera o caixa não entra aqui: despesas, contas e o histórico são de quem cuida do financeiro
+  const { cuidoDoFinanceiro } = useGestao();
+  return cuidoDoFinanceiro ? <Financeiro /> : <SemAcesso />;
 }
 
 type Aba = "resumo" | "pagar" | "receber" | "lancamentos";
@@ -41,19 +46,21 @@ type FolhaAberta =
   | { tipo: "baixa"; conta: Lancamento }
   | { tipo: "meta" };
 
-type Movimento = Pick<Lancamento, "tipo" | "valor">;
+type Movimento = Pick<Lancamento, "tipo" | "valor" | "categoria">;
+/** Saída que devolveu dinheiro ao tutor: não é despesa, é dinheiro que entrou e voltou (sai do que entrou). */
+const ehDevolucao = (l: Pick<Lancamento, "tipo" | "categoria">) => l.tipo === "saida" && CATEGORIAS_DEVOLUCAO.includes(l.categoria);
 
 /**
  * Soma por categoria. Uma conta com serviço, produto e extra é repartida: o serviço fica na categoria do lançamento,
  * o produto em "Venda de produtos" e o extra em "Extras", com o desconto rateado na proporção de cada parte.
  */
-function porCategoria(lista: Lancamento[]) {
+function porCategoria(lista: Lancamento[], petshop: { modulos?: string[] | null }) {
   const mapa = new Map<string, number>();
   const por = (nome: string, valor: number) => { if (valor) mapa.set(nome, (mapa.get(nome) ?? 0) + valor); };
   for (const l of lista) {
     const partes = l.tipo === "entrada" ? partesDoLancamento(l) : null;
-    if (!partes) { por(categoriaAtual(l.categoria), Number(l.valor)); continue; }
-    por(categoriaAtual(l.categoria), partes.servico);
+    if (!partes) { por(categoriaAtual(l.categoria, petshop), Number(l.valor)); continue; }
+    por(categoriaAtual(l.categoria, petshop), partes.servico);
     por("Venda de produtos", partes.produto);
     por("Extras", partes.extra);
   }
@@ -61,7 +68,7 @@ function porCategoria(lista: Lancamento[]) {
 }
 
 function Financeiro() {
-  const { sb, petshop, equipe } = useGestao();
+  const { sb, petshop, equipe, souDono } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const agora = new Date();
@@ -81,32 +88,57 @@ function Financeiro() {
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     // sangria e suprimento (movimento de gaveta) não são receita nem despesa: ficam fora de tudo aqui
+    // os apagados do mês e os ajustes do faturamento não dependem do resto: saem na mesma leva (no celular, cada espera soma)
+    const apP = Promise.resolve(sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", petshop.id).eq("acao", "apagou")
+      .gte("antes->>data", inicio).lte("antes->>data", fim).order("quando", { ascending: false }).limit(200));
+    const ajustesP = ajustesDoFaturamento(sb, petshop.id, inicio, fim).catch(() => SEM_AJUSTES);
     const [doMes, anterior, contas] = await Promise.all([
       paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null)
         .gte("data", inicio).lte("data", fim).order("data", { ascending: false }).order("criado_em", { ascending: false }).order("id").range(de, ate)),
-      paginar<Movimento>((de, ate) => sb.from("lancamentos").select("tipo, valor").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null)
+      paginar<Movimento>((de, ate) => sb.from("lancamentos").select("tipo, valor, categoria").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null)
         .gte("data", isoDia(mesAnterior)).lt("data", inicio).order("id").range(de, ate)),
       paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", false)
         .order("vencimento", { ascending: true, nullsFirst: false }).order("id").range(de, ate)),
     ]);
-    return { doMes, anterior, contas };
+    // quem deve: o nome do tutor de cada conta a receber
+    const devedores = [...new Set(contas.filter((c) => c.tipo === "entrada" && c.cliente_id).map((c) => c.cliente_id!))];
+    const tutores = new Map<string, string>();
+    const lotes: string[][] = [];
+    for (let i = 0; i < devedores.length; i += 150) lotes.push(devedores.slice(i, i + 150));
+    const [nomes, ap, ajustes] = await Promise.all([
+      Promise.all(lotes.map((ids) => sb.from("clientes").select("id, nome").eq("petshop_id", petshop.id).in("id", ids))),
+      // valores recebidos neste mês que alguém apagou depois
+      apP,
+      // crédito do tutor deixado e usado no mês (o resultado não conta o crédito que ainda é do tutor)
+      ajustesP,
+    ]);
+    for (const r of nomes) for (const c of r.data ?? []) tutores.set(c.id, c.nome);
+    const apagados: AlteracaoLancamento[] = ap.data ?? [];
+    return { doMes, anterior, contas, tutores, apagados, ajustes };
   }, [petshop.id, inicio]);
 
   const contas = useMemo(() => {
     const doMes = dados?.doMes ?? [];
     const entradas = doMes.filter((l) => l.tipo === "entrada");
-    const saidas = doMes.filter((l) => l.tipo === "saida");
+    // devolução ao tutor: sai do que entrou (não é despesa)
+    const devolucoes = doMes.filter(ehDevolucao);
+    const saidas = doMes.filter((l) => l.tipo === "saida" && !ehDevolucao(l));
     const anterior = dados?.anterior ?? [];
+    const devolvido = soma(devolucoes);
     return {
-      entrou: soma(entradas), saiu: soma(saidas),
-      entradasPorCategoria: porCategoria(entradas), saidasPorCategoria: porCategoria(saidas),
-      entrouAntes: soma(anterior.filter((l) => l.tipo === "entrada")), saiuAntes: soma(anterior.filter((l) => l.tipo === "saida")),
+      entrou: Math.round((soma(entradas) - devolvido) * 100) / 100, saiu: soma(saidas), bruto: soma(entradas), devolvido,
+      entradasPorCategoria: porCategoria(entradas, petshop), saidasPorCategoria: porCategoria(saidas, petshop),
+      entrouAntes: Math.round((soma(anterior.filter((l) => l.tipo === "entrada")) - soma(anterior.filter(ehDevolucao))) * 100) / 100,
+      saiuAntes: soma(anterior.filter((l) => l.tipo === "saida" && !ehDevolucao(l))),
       temAnterior: anterior.length > 0,
       aPagar: (dados?.contas ?? []).filter((l) => l.tipo === "saida"),
       aReceber: (dados?.contas ?? []).filter((l) => l.tipo === "entrada"),
     };
   }, [dados]);
-  const resultado = Math.round((contas.entrou - contas.saiu) * 100) / 100;
+  // o resultado conta o faturamento: o crédito que ficou com o tutor ainda é dele (só conta quando ele usar)
+  const ajustes = dados?.ajustes ?? SEM_AJUSTES;
+  const faturamento = faturamentoLiquido(contas.bruto, ajustes);
+  const resultado = Math.round((faturamento - contas.saiu) * 100) / 100;
 
   // desenhos do resumo: semanas do mês, entradas acumuladas e formas de pagamento
   const graficos = useMemo(() => {
@@ -121,7 +153,11 @@ function Financeiro() {
     let nEntradas = 0, nSaidas = 0;
     for (const l of doMes) {
       const dia = deIsoDia(l.data).getDate(), v = Number(l.valor), sem = semanas[Math.floor((dia - 1) / 7)];
-      if (l.tipo === "entrada") {
+      if (ehDevolucao(l)) {
+        // devolveu ao tutor: o que entrou diminui naquele dia (não é uma despesa)
+        if (sem) sem.entrou -= v;
+        porDia[dia - 1] -= v;
+      } else if (l.tipo === "entrada") {
         nEntradas++;
         if (sem) sem.entrou += v;
         porDia[dia - 1] += v;
@@ -136,7 +172,8 @@ function Financeiro() {
     return {
       semanas, acumulado, ate, nEntradas, nSaidas,
       semanaAtual: mesAtual ? Math.floor((deIsoDia(hoje).getDate() - 1) / 7) : -1,
-      formas: FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: Math.round((formas.get(f.id) ?? 0) * 100) / 100, cor: COR_FORMA[f.id] })).filter((f) => f.valor > 0),
+      formas: [...FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: Math.round((formas.get(f.id) ?? 0) * 100) / 100, cor: COR_FORMA[f.id] })),
+        { id: FORMA_CREDITO, rotulo: "Crédito do tutor", valor: Math.round((formas.get(FORMA_CREDITO) ?? 0) * 100) / 100, cor: COR_FORMA[FORMA_CREDITO] }].filter((f) => f.valor > 0),
     };
   }, [dados, fim, mesAtual, hoje]);
   const atrasadasPagar = contas.aPagar.filter((c) => c.vencimento && c.vencimento < hoje);
@@ -217,12 +254,14 @@ function Financeiro() {
           <>
             <section className="g-grade kpis" aria-label={`Números de ${tituloMes}`}>
               <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Entrou" valor={<span className="gf-kpi-v">{brl(contas.entrou)}</span>}
-                apoio={graficos.nEntradas ? n(graficos.nEntradas, "entrada", "entradas") : "nada ainda"} />
+                apoio={contas.devolvido > 0 ? `já sem ${brl(contas.devolvido)} devolvidos` : graficos.nEntradas ? n(graficos.nEntradas, "entrada", "entradas") : "nada ainda"} />
               <Kpi icone={ArrowUpRight} tom="rosa" rotulo="Saiu" valor={<span className="gf-kpi-v">{brl(contas.saiu)}</span>}
                 apoio={graficos.nSaidas ? n(graficos.nSaidas, "saída", "saídas") : "nada ainda"} />
               <Kpi icone={Scale} tom={resultado < 0 ? "rosa" : "ceu"} rotulo="Resultado do mês"
                 valor={<span className={`gf-kpi-v${resultado < 0 ? " g-vermelho-t" : ""}`}>{brl(resultado)}</span>}
-                apoio={resultado < 0 ? "saiu mais do que entrou" : resultado > 0 ? (mesAtual ? "sobrando até agora" : "sobrou no mês") : "empatado"} />
+                apoio={ajustes.creditoDeixado > 0 || ajustes.creditoUsadoFora > 0
+                  ? `sem ${brl(Math.max(0, Math.round((ajustes.creditoDeixado - ajustes.creditoUsadoFora) * 100) / 100))} de crédito de tutores`
+                  : resultado < 0 ? "saiu mais do que entrou" : resultado > 0 ? (mesAtual ? "sobrando até agora" : "sobrou no mês") : "empatado"} />
               <Kpi icone={Receipt} tom="manteiga" rotulo="Contas a pagar" valor={<span className="gf-kpi-v">{brl(soma(contas.aPagar))}</span>}
                 apoio={!contas.aPagar.length ? "nenhuma em aberto" : atrasadasPagar.length ? `${n(atrasadasPagar.length, "atrasada", "atrasadas")} de ${contas.aPagar.length}` : n(contas.aPagar.length, "conta em aberto", "contas em aberto")} />
             </section>
@@ -239,7 +278,15 @@ function Financeiro() {
               </div>
             </div>
 
-            {aba === "resumo" && mesAtual && <CartaoMeta entrou={contas.entrou} aoEditar={() => abrir({ tipo: "meta" })} />}
+            {aba === "resumo" && mesAtual && <CartaoMeta entrou={faturamento} aoEditar={() => abrir({ tipo: "meta" })} />}
+            {aba === "resumo" && (ajustes.creditoDeixado > 0 || ajustes.creditoUsadoFora > 0 || contas.devolvido > 0) && (
+              <p className="g-muted g-pp" role="note">
+                {contas.devolvido > 0 && `Devolvido aos tutores neste mês: ${brl(contas.devolvido)} (já tirado do que entrou; não conta como despesa). `}
+                {ajustes.creditoDeixado > 0 && `Ficou de crédito para tutores: ${brl(ajustes.creditoDeixado)}. O dinheiro está com vocês, mas é deles: só conta no resultado quando eles usarem. `}
+                {ajustes.creditoUsadoFora > 0 && `Crédito usado no check-out do hotel: ${brl(ajustes.creditoUsadoFora)} (soma no resultado). `}
+                Resultado do mês: {brl(contas.bruto)} que entraram{contas.devolvido > 0 ? ` − ${brl(contas.devolvido)} devolvidos` : ""}{ajustes.creditoDeixado > 0 ? ` − ${brl(ajustes.creditoDeixado)} de crédito` : ""}{ajustes.creditoUsadoFora > 0 ? ` + ${brl(ajustes.creditoUsadoFora)} de crédito usado` : ""} − {brl(contas.saiu)} que saíram = {brl(resultado)}.
+              </p>
+            )}
 
             {aba === "resumo" && (
               dados.doMes.length ? (
@@ -278,8 +325,11 @@ function Financeiro() {
                     </div>
                   </div>
                   <div className="g-pilha">
-                    <Categorias titulo="De onde veio" icone={ArrowDownLeft} tom="menta" total={contas.entrou} linhas={contas.entradasPorCategoria} vazio="Nenhuma entrada neste mês." />
+                    <Categorias titulo="De onde veio" icone={ArrowDownLeft} tom="menta" total={contas.bruto} linhas={contas.entradasPorCategoria} vazio="Nenhuma entrada neste mês."
+                      nota={contas.devolvido > 0 ? `Antes das devoluções. Devolvido aos tutores: − ${brl(contas.devolvido)}.` : undefined} />
                     <Categorias titulo="Para onde foi" icone={ArrowUpRight} tom="rosa" total={contas.saiu} linhas={contas.saidasPorCategoria} vazio="Nenhuma saída neste mês." quente />
+                    <CustoDasVendas inicio={inicio} fim={fim} doMes={dados.doMes} resultado={resultado} mesAtual={mesAtual}
+                      entrouDeProdutos={contas.entradasPorCategoria.find((c) => c.nome === "Venda de produtos")?.valor ?? 0} />
                   </div>
                 </div>
               ) : (
@@ -288,10 +338,13 @@ function Financeiro() {
             )}
 
             {(aba === "pagar" || aba === "receber") && (
-              <Contas lista={aba === "pagar" ? contas.aPagar : contas.aReceber} receber={aba === "receber"} hoje={hoje}
+              <Contas lista={aba === "pagar" ? contas.aPagar : contas.aReceber} receber={aba === "receber"} hoje={hoje} tutores={dados.tutores}
                 aoEditar={(c) => abrir({ tipo: "conta", de: c.tipo as Tipo, conta: c })}
                 aoBaixar={(c) => abrir({ tipo: "baixa", conta: c })}
                 aoCriar={() => abrir({ tipo: "conta", de: aba === "pagar" ? "saida" : "entrada" })} />
+            )}
+            {aba === "receber" && souDono && (
+              <p className="g-muted g-pp">Multa e juros por atraso, chave Pix e a mensagem de cobrança: <Link className="g-link" href="/gestao/app/meu-petshop#opcoes-cobranca">Opções de cobrança</Link>.</p>
             )}
 
             {aba === "lancamentos" && (
@@ -318,8 +371,8 @@ function Financeiro() {
                         <button key={l.id} className="g-linha" onClick={() => abrir({ tipo: "editar", lancamento: l })}>
                           <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
                           <span className="t">
-                            <b>{l.descricao || categoriaAtual(l.categoria)}</b>
-                            <span>{dataCurta(l.data)}{l.descricao ? ` · ${categoriaAtual(l.categoria)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {textoDoPagamento(l)}</i></span>
+                            <b>{l.descricao || categoriaAtual(l.categoria, petshop)} <TagAlterado lancamento={l} /></b>
+                            <span>{dataCurta(l.data)}{l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria, petshop)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {textoDoPagamento(l)}</i></span>
                           </span>
                           <span className="g-tag g-fin-so-largo">{textoDoPagamento(l)}</span>
                           <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
@@ -334,6 +387,7 @@ function Financeiro() {
                 )}
               </section>
             )}
+            {aba === "lancamentos" && <Apagados linhas={dados.apagados} titulo={`Apagados de ${nomeMes(mes)}`} />}
           </>
         )}
       </div>
@@ -359,10 +413,10 @@ function CartaoMeta({ entrou, aoEditar }: { entrou: number; aoEditar: () => void
       <section className="g-card g-fin-meta vazia">
         <Tile icone={Target} tom="menta" tamanho="g" />
         <div className="g-fin-meta-txt">
-          <h3>Meta do mês</h3>
-          <p className="g-muted g-p">Diga quanto você quer que entre no mês. O progresso aparece aqui e na tela inicial.</p>
+          <h3>Quanto você quer que entre no mês?</h3>
+          <p className="g-muted g-p">Escreva um valor e o sistema mostra quanto já entrou e quanto falta, aqui e na tela inicial.</p>
         </div>
-        <button className="g-btn sec" onClick={aoEditar}><Target />Definir meta</button>
+        <button className="g-btn sec" onClick={aoEditar}><Target />Escrever o valor</button>
       </section>
     );
   }
@@ -440,7 +494,7 @@ function FolhaMeta({ aoFechar }: { aoFechar: () => void }) {
   }
 
   return (
-    <Folha titulo="Meta do mês" aoFechar={aoFechar}
+    <Folha titulo="Quanto você quer que entre no mês" aoFechar={aoFechar}
       rodape={<>
         {atual != null && atual > 0 && <button type="button" className="g-btn sec" onClick={() => void gravar(null)} disabled={salvando}>Tirar a meta</button>}
         <button type="button" className="g-btn pri" onClick={() => void gravar(valor)} disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
@@ -494,9 +548,9 @@ function Fluxo({ semanas, atual }: { semanas: { rotulo: string; entrou: number; 
 
 const QUENTES = ["#b3402e", "#ea670c", "#c99a2e", "#8b3440", "#5b4590", "#2f6f8a", "#6a625a", "#a39a90"];
 
-function Categorias({ titulo, total, linhas, vazio, quente, icone, tom }: {
+function Categorias({ titulo, total, linhas, vazio, quente, icone, tom, nota }: {
   titulo: string; total: number; linhas: { nome: string; valor: number }[]; vazio: string; quente?: boolean;
-  icone: React.ComponentType<{ size?: number }>; tom: "menta" | "rosa";
+  icone: React.ComponentType<{ size?: number }>; tom: "menta" | "rosa"; nota?: string;
 }) {
   const cores = quente ? QUENTES : PALETA;
   const pct = percentuaisQueFecham(linhas.map((c) => c.valor));
@@ -508,14 +562,16 @@ function Categorias({ titulo, total, linhas, vazio, quente, icone, tom }: {
         <Ranking itens={linhas.map((c, i) => ({ rotulo: c.nome, valor: c.valor, cor: cores[i % cores.length] }))}
           formato={(v) => `${brl(v)} · ${pctDe.get(v) ?? Math.round((v / total) * 100)}%`} />
       ) : <p className="g-muted g-p">{vazio}</p>}
+      {nota && <p className="g-muted g-pp" style={{ marginTop: 8 }}>{nota}</p>}
     </section>
   );
 }
 
-function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
-  lista: Lancamento[]; receber: boolean; hoje: string;
+function Contas({ lista, receber, hoje, tutores, aoEditar, aoBaixar, aoCriar }: {
+  lista: Lancamento[]; receber: boolean; hoje: string; tutores: Map<string, string>;
   aoEditar: (c: Lancamento) => void; aoBaixar: (c: Lancamento) => void; aoCriar: () => void;
 }) {
+  const { petshop } = useGestao();
   if (!lista.length) {
     return (
       <Vazio titulo={receber ? "Ninguém está devendo." : "Nenhuma conta para pagar."}
@@ -561,6 +617,7 @@ function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
       <div className="g-lista">
         {lista.map((c) => {
           const v = c.vencimento;
+          const tutor = receber && c.cliente_id ? tutores.get(c.cliente_id) : null;
           const etiqueta = !v ? { texto: "sem data", tom: "" }
             : v < hoje ? { texto: "atrasada", tom: " vermelho" }
             : v === hoje ? { texto: "vence hoje", tom: " amarelo" }
@@ -571,15 +628,15 @@ function Contas({ lista, receber, hoje, aoEditar, aoBaixar, aoCriar }: {
                 <span className="g-fin-so-largo"><Tile icone={v && v < hoje ? TriangleAlert : receber ? HandCoins : Receipt} tom={v && v < hoje ? "rosa" : receber ? "menta" : "manteiga"} /></span>
                 <span className="t">
                   <b>{c.descricao || c.categoria}</b>
-                  <span>{categoriaAtual(c.categoria)}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
+                  <span>{tutor ? `${tutor} · ` : ""}{categoriaAtual(c.categoria, petshop)}{textoJaRecebido(c) ? ` · ${textoJaRecebido(c)}` : ""}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
                 </span>
                 <span className="d">
                   <b>{brl(c.valor)}</b>
                   <span className={`g-tag${etiqueta.tom}`}>{etiqueta.texto}</span>
                 </span>
               </button>
-              <button className="g-btn p verde" onClick={() => aoBaixar(c)} aria-label={`Dar baixa em ${c.descricao || c.categoria}`}>
-                <Check /><span className="gf-so-largo">Dar baixa</span>
+              <button className="g-btn p verde" onClick={() => aoBaixar(c)} aria-label={`${receber ? "Recebi" : "Paguei"}: dar baixa em ${c.descricao || c.categoria}`}>
+                <Check />{receber ? "Recebi" : "Paguei"}
               </button>
             </div>
           );

@@ -1,27 +1,35 @@
 "use client";
 
 import { Selo } from "./marca";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
+  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
 import { useGestao } from "./contexto";
-import { planoPorId, temCheckout } from "@/lib/gestao/planos";
+import { planoPorId } from "@/lib/gestao/planos";
 import { DIAS_DE_AVISO, fimDoTeste } from "./fim-do-teste";
 import { dataLonga } from "@/lib/gestao/util";
 import { AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
 import BuscaGeral from "./busca-geral";
 import { areaDaRota } from "@/lib/gestao/acessos";
-import { rotaForaDoMenu } from "@/lib/gestao/modulos";
+import { TELA_DA_AREA, nomeDaCasa, principalDe, rotaForaDoMenu, usaModulo, type Principal } from "@/lib/gestao/modulos";
+import { guardarLembrado, lerLembrado } from "./lembrado";
 import type { Tom } from "./painel";
-import Assistente from "./assistente";
-import Ajuda from "./ajuda";
-import AjudaDaTela from "./manual/ajuda-da-tela";
-import GuiaInicial from "./guia-inicial";
+import dynamic from "next/dynamic";
+import { EVENTO_GUIA, quandoATelaAbrir } from "./ui";
 import LogoLoja from "./logo-loja";
+import AvisoDeFuso from "./aviso-fuso";
 import { aplicarTema } from "@/lib/gestao/identidade";
+
+// O que só abre com um toque (Mozart, Ajuda, guia inicial) e o "Como usar esta tela" (o manual inteiro) vêm à parte, depois
+// da tela: no celular com internet fraca, a tela não espera baixar o que a pessoa talvez nem abra.
+const carregarAssistente = () => import("./assistente");
+const Assistente = dynamic(carregarAssistente, { ssr: false });
+const Ajuda = dynamic(() => import("./ajuda"), { ssr: false });
+const AjudaDaTela = dynamic(() => import("./manual/ajuda-da-tela"), { ssr: false });
+const GuiaInicial = dynamic(() => import("./guia-inicial"), { ssr: false });
 
 type Item = { href: string; rotulo: string; icone: React.ComponentType; tom: Tom; so?: "financeiro" | "dono" };
 const GRUPOS: { titulo: string; itens: Item[] }[] = [
@@ -49,15 +57,78 @@ const GRUPOS: { titulo: string; itens: Item[] }[] = [
   ] },
 ];
 
+const AGENDA = "/gestao/app/agenda", CASA = "/gestao/app/creche-hotel", ESTOQUE = "/gestao/app/estoque", CAIXA = "/gestao/app/caixa";
+/** As telas de cada área principal, na ordem em que sobem para logo depois de Hoje. */
+const TELAS_DA_PRINCIPAL: Record<Principal, string[]> = { banho_tosa: [AGENDA], creche: [CASA], hotel: [CASA], loja: [ESTOQUE, CAIXA] };
+const CHAVE_OUTRAS = "maestro-gestao-outras-areas";
+type ComMenu = Parameters<typeof rotaForaDoMenu>[0];
+
+/**
+ * O menu do pet shop. A área principal vem primeiro no dia a dia, logo depois de Hoje; as outras áreas marcadas seguem.
+ * O que o pet shop não marcou não some: vai para "Outras áreas", um grupo fechado no fim do menu.
+ * Sem área principal (pet shops de antes), a ordem é a de sempre.
+ */
+function montarMenu(petshop: ComMenu, semAgenda: boolean) {
+  const principal = principalDe(petshop);
+  // quem não faz banho e tosa não precisa da Agenda na frente: com área principal escolhida, ou sem nenhum horário marcado até hoje
+  const fora = (i: Item) => rotaForaDoMenu(petshop, i.href) || (i.href === AGENDA && !usaModulo(petshop, "banho_tosa") && (principal != null || semAgenda));
+  const rotulo = (i: Item): Item => (i.href === CASA && !fora(i) ? { ...i, rotulo: nomeDaCasa(petshop) } : i);
+  const todos = GRUPOS.flatMap((g) => g.itens);
+  const sobem = principal ? TELAS_DA_PRINCIPAL[principal].map((h) => todos.find((i) => i.href === h)!).filter((i) => !fora(i)) : [];
+  const grupos = GRUPOS.map((g) => {
+    const itens = g.itens.filter((i) => !fora(i) && !sobem.includes(i));
+    if (g.titulo !== "Dia a dia" || !principal) return { ...g, itens: itens.map(rotulo) };
+    // Hoje, a área principal, as outras áreas marcadas e, depois, o resto
+    const areas = itens.filter((i) => i.href === AGENDA || i.href === CASA);
+    return { ...g, itens: [itens[0], ...sobem, ...areas, ...itens.slice(1).filter((i) => !areas.includes(i))].map(rotulo) };
+  });
+  // na barra de baixo do celular, a tela da área principal fica ao lado de Hoje
+  // sem Agenda no menu, o lugar dela na barra fica com a primeira tela de trabalho que o pet shop usa (creche e hotel, estoque…)
+  const agenda = todos.find((i) => i.href === AGENDA)!;
+  const semAgendaNoMenu = fora(agenda) ? [CASA, ESTOQUE, CAIXA].map((h) => todos.find((i) => i.href === h)!).find((i) => !fora(i)) : undefined;
+  const aba = sobem[0] ? { ...sobem[0], rotulo: principal ? TELA_DA_AREA[principal].menu : sobem[0].rotulo } : semAgendaNoMenu ? rotulo(semAgendaNoMenu) : agenda;
+  return { grupos, outras: todos.filter(fora), aba };
+}
+
 /** Navegação, avisos de assinatura e o botão da assistente em volta de todas as telas do aplicativo. */
 export default function Casca({ children }: { children: React.ReactNode }) {
+  const toqueNaFolha = useRef(0);
+  useEffect(() => {
+    const tocou = (e: PointerEvent) => { if ((e.target as Element | null)?.closest?.('[role="dialog"], [role="alertdialog"]')) toqueNaFolha.current = Date.now(); };
+    document.addEventListener("pointerdown", tocou, true);
+    return () => document.removeEventListener("pointerdown", tocou, true);
+  }, []);
   const caminho = usePathname();
-  const { sb, user, petshop, eu, souDono, posso, liberado, diasDeTeste, sair } = useGestao();
+  const { sb, user, petshop, eu, souDono, posso, liberado, diasDeTeste, assinaturaAberta, sair } = useGestao();
   const [pedidos, setPedidos] = useState(0);
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
   const [mais, setMais] = useState(false);
   const [ajuda, setAjuda] = useState(false);
   const [admin, setAdmin] = useState(false);
+  // o guia inicial só carrega quando vai abrir: na primeira entrada (guia ainda não feito) ou pelo botão em Meu pet shop
+  const [guia, setGuia] = useState<"fechado" | "inicio" | "botao">(() => (petshop.guia_feito_em ? "fechado" : "inicio"));
+  useEffect(() => {
+    const abrir = () => setGuia((g) => (g === "fechado" ? "botao" : g));
+    window.addEventListener(EVENTO_GUIA, abrir);
+    return () => window.removeEventListener(EVENTO_GUIA, abrir);
+  }, []);
+  // o "Como usar esta tela" (o manual inteiro) entra depois que a tela abriu; o Mozart baixa junto, para abrir na hora do toque
+  const [depois, setDepois] = useState(false);
+  useEffect(() => quandoATelaAbrir(() => { setDepois(true); void carregarAssistente().catch(() => undefined); }), []);
+  const [outrasAbertas, setOutrasAbertas] = useState(() => lerLembrado(CHAVE_OUTRAS) === "1");
+  const abrirOutras = () => setOutrasAbertas((a) => { guardarLembrado(CHAVE_OUTRAS, a ? "0" : "1"); return !a; });
+
+  // pet shop que não faz banho e tosa e nunca marcou horário: a Agenda vai para "Outras áreas" (continua abrindo por lá)
+  const semBanho = !usaModulo(petshop, "banho_tosa");
+  const [semAgenda, setSemAgenda] = useState(false);
+  useEffect(() => {
+    if (!semBanho) { setSemAgenda(false); return; }
+    let vale = true;
+    const olhar = () => void sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).then((r) => { if (vale && !r.error) setSemAgenda((r.count ?? 0) === 0); });
+    olhar();
+    window.addEventListener(EVENTO_MUDOU, olhar);
+    return () => { vale = false; window.removeEventListener(EVENTO_MUDOU, olhar); };
+  }, [sb, petshop.id, semBanho]);
 
   // só a equipe Maestro Pet vê o item "Administrador" no menu
   useEffect(() => { let vale = true; void sb.rpc("sou_admin").then((r) => { if (vale) setAdmin(r.data === true); }); return () => { vale = false; }; }, [sb]);
@@ -103,19 +174,33 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   }, [sb, petshop.id, petshop.link_ativo]);
 
   const podeRota = (href: string) => { const area = areaDaRota(href); return area ? posso(area) : true; };
-  // o que o pet shop não usa sai do menu (a tela continua abrindo pelo endereço)
-  const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href)) && !rotaForaDoMenu(petshop, i.href);
+  // as permissões de cada pessoa valem por cima da ordem do menu
+  const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href));
+  const menu = montarMenu(petshop, semAgenda);
   // tela aberta pelo endereço sem ter acesso: mostra o aviso no lugar da tela
   const soDeDono = ["/gestao/app/equipe", "/gestao/app/meu-petshop", "/gestao/app/assinatura", "/gestao/app/escola"].some((r) => caminho.startsWith(r));
   const semAcesso = (soDeDono && !souDono) || !podeRota(caminho);
   const atual = (href: string) => (href === "/gestao/app" ? caminho === href : caminho.startsWith(href));
-  const grupos = GRUPOS.map((g) => ({ ...g, itens: g.itens.filter(pode) })).filter((g) => g.itens.length);
+  const grupos = menu.grupos.map((g) => ({ ...g, itens: g.itens.filter(pode) })).filter((g) => g.itens.length);
+  // o que o pet shop não marcou: fica a um toque, num grupo fechado no fim do menu
+  const outras = menu.outras.filter(pode);
+  const outrasVisiveis = outrasAbertas || outras.some((i) => atual(i.href));
+  // quem não abre a tela da área principal fica, na barra de baixo, com a primeira tela que é dele
+  // (a monitora da creche vê Creche e hotel, e não uma Agenda apagada). Hoje e Clientes já têm o lugar deles na barra.
+  const minhaPrimeira = grupos.flatMap((g) => g.itens).find((i) => areaDaRota(i.href) != null && i.href !== "/gestao/app/clientes");
+  // a função da pessoa diz qual é o trabalho dela: o monitor da creche fica com Creche e hotel do lado de Hoje, mesmo vendo a Agenda
+  const daFuncao = souDono ? undefined : (() => {
+    const f = (eu.funcao ?? "").toLowerCase();
+    const h = /creche|hotel|monitor|hosped/.test(f) ? CASA : /banh|tos/.test(f) ? AGENDA : /estoque|loja|vend/.test(f) ? ESTOQUE : null;
+    return h && h !== menu.aba.href ? grupos.flatMap((g) => g.itens).find((i) => i.href === h) : undefined;
+  })();
+  const aba = daFuncao ?? (podeRota(menu.aba.href) ? menu.aba : minhaPrimeira ?? menu.aba), podeAba = podeRota(aba.href);
 
   // na tela Hoje, o dono vê o cartão de fim de teste (com os números da conta): a faixa de cima não repete o recado
   const teste = fimDoTeste(petshop);
   const cartaoNoHoje = souDono && caminho === "/gestao/app" && teste != null && teste.dias <= DIAS_DE_AVISO;
 
-  const aqui = GRUPOS.flatMap((g) => g.itens.map((item) => ({ grupo: g.titulo, item }))).find((x) => atual(x.item.href));
+  const aqui = [...menu.grupos, { titulo: "Outras áreas", itens: menu.outras }].flatMap((g) => g.itens.map((item) => ({ grupo: g.titulo, item }))).find((x) => atual(x.item.href));
 
   const nav = (
     <nav className="g-nav" aria-label="Menu">
@@ -127,6 +212,14 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           ))}
         </div>
       ))}
+      {outras.length > 0 && (
+        <div>
+          <button type="button" className="g-nav-outras" aria-expanded={outrasVisiveis} onClick={abrirOutras}>Outras áreas<ChevronDown /></button>
+          {outrasVisiveis && outras.map((i) => (
+            <Link key={i.href} href={i.href} aria-current={atual(i.href) ? "page" : undefined}><i.icone />{i.rotulo}</Link>
+          ))}
+        </div>
+      )}
       {admin && (
         <div>
           <div className="g-nav-t">Maestro Pet</div>
@@ -148,9 +241,9 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           {souDono && diasDeTeste !== null && (
             <div className="g-lado-plano">
               <b>Teste grátis</b>
-              <span>{!teste || teste.vencido ? "Terminou." : teste.dias === 0 ? "Termina hoje." : teste.dias === 1 ? "Termina amanhã." : `Faltam ${teste.dias} dias.`}</span>
+              <span>{!teste || teste.vencido ? (liberado ? "Terminou. Você continua usando até a assinatura abrir." : "Terminou. A conta está só para consulta.") : teste.dias === 0 ? "Termina hoje." : teste.dias === 1 ? "Termina amanhã." : `Faltam ${teste.dias} dias.`}</span>
               <div className="g-prog"><i style={{ width: `${Math.max(4, Math.min(100, ((7 - diasDeTeste) / 7) * 100))}%` }} /></div>
-              <Link href="/gestao/app/assinatura">Ver os planos</Link>
+              <Link href="/gestao/app/assinatura">Ver assinatura</Link>
             </div>
           )}
           <div className="g-nav" style={{ marginTop: 10 }}>
@@ -169,10 +262,11 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           <div className="g-barra-marca"><LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={34} padrao="selo" tomSelo="verde" /><span>{petshop.nome}</span></div>
           {aqui && <div className="g-barra-onde"><span className={`g-tile p ${aqui.item.tom}`} aria-hidden><aqui.item.icone /></span><span>{aqui.grupo} / <b>{aqui.item.rotulo}</b></span></div>}
           {posso("clientes") ? <BuscaGeral /> : <span style={{ flex: 1 }} />}
-          <AjudaDaTela aoPerguntar={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }} />
+          {depois && <AjudaDaTela aoPerguntar={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }} />}
           <div className="g-barra-data"><CalendarClock />{dataLonga(new Date())}</div>
         </div>
-        {!liberado && !cartaoNoHoje && (
+        <AvisoDeFuso />
+        {!liberado && !cartaoNoHoje && !caminho.endsWith("/assinatura") && (
           <div className="g-aviso vermelho" role="alert">
             <TriangleAlert />
             <span>{petshop.status === "teste" ? "Seu teste grátis terminou." : "Sua assinatura está inativa."} Seus dados estão guardados e a conta fica só para consulta até você assinar.</span>
@@ -186,10 +280,10 @@ export default function Casca({ children }: { children: React.ReactNode }) {
             {souDono && <Link className="g-btn p verde" href="/gestao/app/assinatura">Resolver</Link>}
           </div>
         )}
-        {liberado && diasDeTeste !== null && diasDeTeste <= 3 && souDono && !caminho.endsWith("/assinatura") && !cartaoNoHoje && (
+        {liberado && diasDeTeste !== null && diasDeTeste <= 3 && !teste?.vencido && souDono && !caminho.endsWith("/assinatura") && !cartaoNoHoje && (
           <div className="g-aviso">
             <span>{teste && teste.dias <= 1 ? `Seu teste grátis termina ${teste.quando}.` : `Faltam ${teste?.dias ?? diasDeTeste} dias do seu teste grátis.`}</span>
-            <Link className="g-btn p verde" href="/gestao/app/assinatura">{temCheckout() ? "Assinar" : "Ver a assinatura"}</Link>
+            <Link className="g-btn p verde" href="/gestao/app/assinatura">{assinaturaAberta ? "Assinar" : "Ver assinatura"}</Link>
           </div>
         )}
         {semAcesso ? (
@@ -202,9 +296,10 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         ) : children}
       </main>
 
-      <nav className="g-abas" aria-label="Menu">
+      {/* toque duplo no botão de uma folha: ela fecha no primeiro toque e o segundo cairia na aba que fica embaixo */}
+      <nav className="g-abas" aria-label="Menu" onClickCapture={(e) => { if (Date.now() - toqueNaFolha.current < 500) { e.preventDefault(); e.stopPropagation(); } }}>
         <Link href="/gestao/app" aria-current={atual("/gestao/app") ? "page" : undefined}><Sun />Hoje</Link>
-        <Link href={posso("agenda") ? "/gestao/app/agenda" : "/gestao/app"} aria-current={atual("/gestao/app/agenda") ? "page" : undefined} style={{ position: "relative", opacity: posso("agenda") ? 1 : .35 }}><CalendarDays />Agenda{pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
+        <Link href={podeAba ? aba.href : "/gestao/app"} aria-current={atual(aba.href) ? "page" : undefined} style={{ position: "relative", opacity: podeAba ? 1 : .35 }}><aba.icone />{aba.rotulo}{aba.href === AGENDA && pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
         <button className="g-aba-mic" onClick={() => setAssistente({ aberta: true, pedido: "" })} aria-label="Falar com o Mozart, o assistente">
           <span className="b"><Mic /></span>
         </button>
@@ -230,6 +325,18 @@ export default function Casca({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             ))}
+            {outras.length > 0 && (
+              <div>
+                <button type="button" className="g-mais-outras" aria-expanded={outrasVisiveis} onClick={abrirOutras}><span className="g-rotulo">Outras áreas</span><ChevronDown /></button>
+                {outrasVisiveis && (
+                  <div className="g-lista">
+                    {outras.map((i) => (
+                      <Link key={i.href} href={i.href} className="g-linha"><span className="g-ico" aria-hidden><i.icone /></span><span className="t"><b>{i.rotulo}</b></span></Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {admin && (
               <div>
                 <div className="g-rotulo" style={{ marginBottom: 4 }}>Maestro Pet</div>
@@ -242,7 +349,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         </Folha>
       )}
 
-      <GuiaInicial />
+      {guia !== "fechado" && <GuiaInicial abrirAgora={guia === "botao"} />}
       {ajuda && <Ajuda aoFechar={() => setAjuda(false)} />}
       {assistente.aberta && <Assistente pedidoInicial={assistente.pedido} aoFechar={() => setAssistente({ aberta: false, pedido: "" })} />}
     </div>

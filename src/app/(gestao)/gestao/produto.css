@@ -244,3 +244,78 @@
 }
 .gp-chat-rosto { position: relative; border-radius: 50%; font: 500 1.25rem/1 var(--display); }
 .gp-chat-rosto i { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: #3fbf7f; box-shadow: 0 0 0 2px var(--v); }
+
+/* ---------- para cada tipo de negócio ---------- */
+.gp-areas-sec { background: var(--creme2); padding-block: clamp(4rem, 3rem + 6vw, 7rem); scroll-margin-top: 1rem; }
+.gp-areas-sec h2 { color: var(--v); }
+.gp-areas { margin-top: 2.25rem; }
+.gp-areas .gp-abas { background: #fffdf9; margin-inline: 0; }
+.gp-areas-painel { display: grid; gap: 2.25rem; margin-top: 2rem; align-items: center; }
+.gp-areas-painel h3 { font: 500 clamp(1.5rem, 1.3rem + .9vw, 2rem)/1.15 var(--display); letter-spacing: -.015em; color: var(--v); margin: 0; text-wrap: balance; }
+.gp-areas-painel ul { list-style: none; padding: 0; margin: 1.25rem 0 0; display: grid; gap: .8rem; }
+.gp-areas-painel li { display: flex; gap: .7rem; align-items: flex-start; max-width: 52ch; }
+.gp-areas-painel li svg { width: 20px; height: 20px; flex: none; margin-top: .2rem; padding: 3px; border-radius: 50%; background: var(--v); color: #fff; }
+.gp-areas-telas { position: relative; min-width: 0; animation: gp-troca .35s cubic-bezier(.2, .7, .2, 1); }
+.gp-areas-telas .gp-tela { aspect-ratio: 1760 / 1093; }
+.gp-areas-telas.com-fone { padding: 0 0 1.75rem; }
+.gp-areas-telas.com-fone .gp-tela { width: 90%; }
+.gp-areas-telas.com-fone .gp-fone { position: absolute; right: 0; bottom: 0; width: 27%; border-width: 5px; border-radius: 24px; aspect-ratio: 780 / 1328; }
+@media (min-width: 900px) { .gp-areas-painel { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 3.5rem; } }
+@media (max-width: 479px) { .gp-areas .gp-abas button { padding: 0 .8rem; font-size: .9375rem; } }
+
+/* ---------- preço logo na capa e "Preços" no topo, também no celular ---------- */
+.gp-preco-curto { display: block; width: fit-content; margin-top: 1.1rem; font-size: 1rem; color: var(--v); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(30, 58, 47, .35); }
+.gp-preco-curto:hover { text-decoration-color: currentColor; }
+@media (max-width: 479px) {
+  .gp-topo nav { gap: .25rem; }
+  .gp-link-precos { padding: .5rem .55rem; font-size: .9375rem; }
+  .gp-topo .gp-btn.verde { padding: 0 .85rem; }
+}
+@media (max-width: 359px) { .gp-logo span { display: none; } }
+
+/* ---------- o que muda no dia a dia: texto e tela, alternando os lados ---------- */
+.gp-dif-sec { padding-block: clamp(4rem, 3rem + 6vw, 7rem); scroll-margin-top: 1rem; }
+.gp-dif-sec > .gp-c > h2 { color: var(--v); }
+.gp-dif { list-style: none; padding: 0; margin: clamp(2.5rem, 2rem + 3vw, 4.5rem) 0 0; display: grid; gap: clamp(3.5rem, 2.5rem + 5vw, 7rem); }
+.gp-dif-item { display: grid; gap: 2rem; align-items: center; scroll-margin-top: 1rem; }
+.gp-dif-num { display: block; font: 400 1rem/1 var(--display-italico); font-style: italic; color: var(--laranja2); margin-bottom: .6rem; }
+.gp-dif-texto h3 { font: 460 clamp(1.75rem, 1.35rem + 1.8vw, 2.625rem)/1.08 var(--display); letter-spacing: -.02em; color: var(--v); margin: 0; text-wrap: balance; }
+.gp-dif-texto h3 em { font-family: var(--display-italico); font-style: italic; font-weight: 400; }
+.gp-dif-texto > p { font-size: clamp(1.0625rem, 1rem + .3vw, 1.1875rem); color: var(--tinta); max-width: 46ch; margin-top: 1rem; }
+.gp-dif-texto ul { list-style: none; padding: 0; margin: 1.25rem 0 0; display: grid; gap: .7rem; }
+.gp-dif-texto li { display: flex; gap: .7rem; align-items: flex-start; color: var(--cinza); max-width: 50ch; }
+.gp-dif-texto li svg { width: 20px; height: 20px; flex: none; margin-top: .2rem; padding: 3px; border-radius: 50%; background: var(--v); color: #fff; }
+.gp-dif-telas { position: relative; min-width: 0; }
+.gp-dif-telas .gp-tela { aspect-ratio: 1760 / 1093; }
+.gp-dif-telas .gp-fone { aspect-ratio: 780 / 1328; }
+.gp-dif-telas.com-fone { padding-bottom: 1.75rem; }
+.gp-dif-telas.com-fone .gp-tela { width: 90%; }
+.gp-dif-telas.com-fone .gp-fone { position: absolute; right: 0; bottom: 0; width: 27%; border-width: 5px; border-radius: 24px; }
+.gp-dif-telas.dois-fones { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(.75rem, .5rem + 1.5vw, 1.75rem); max-width: 560px; margin-inline: auto; width: 100%; padding-bottom: 1.5rem; }
+.gp-dif-telas.dois-fones .gp-fone { border-width: 5px; border-radius: 26px; }
+.gp-dif-telas.dois-fones .gp-fone:last-child { translate: 0 1.5rem; }
+@media (min-width: 900px) {
+  .gp-dif-item { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 4rem; }
+  .gp-dif-item.inverte { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); }
+  .gp-dif-item.inverte .gp-dif-texto { order: 2; }
+}
+
+/* ---------- o que o sistema não faz ---------- */
+.gp-nao-faz { display: grid; gap: 1.5rem; padding-block: clamp(4rem, 3rem + 6vw, 7rem) 2.5rem; }
+.gp-nao-faz h2 { color: var(--v); }
+.gp-nao-faz .gp-lead { margin-top: 0 !important; }
+.gp-nao-faz ul { list-style: none; padding: 0; margin: 1.25rem 0 0; display: grid; }
+.gp-nao-faz li { padding: .8rem 0 .8rem 1.6rem; border-top: 1px solid rgba(31, 27, 23, .14); position: relative; max-width: 62ch; }
+.gp-nao-faz li::before { content: ""; position: absolute; left: .2rem; top: 1.45rem; width: 12px; height: 2px; background: var(--laranja2); }
+@media (min-width: 900px) { .gp-nao-faz { grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr); gap: 4rem; align-items: start; } }
+
+/* o Mozart vem logo depois das quatro primeiras, em fundo claro */
+.gp-pedir { background: #fffdf9; }
+
+/* o botão da Nina só aparece depois da capa, para não cobrir "Sem cartão. Sem fidelidade" */
+.gp-chat-botao { transition: transform .15s, opacity .2s; }
+.gp-chat-botao.escondido { opacity: 0; pointer-events: none; transform: translateY(12px); }
+
+/* a frase de cada plano ficou com duas ideias: para quem é e o que vem junto */
+@media (min-width: 820px) { .gp-para { min-height: 4.4em; } }
+@media (max-width: 819px) { .gp-para { min-height: 0; } }

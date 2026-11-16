@@ -1,11 +1,13 @@
 import type { Database } from "./banco";
+import { COLS_AGENDAMENTO } from "./reservado";
 
 type T = Database["public"]["Tables"];
 export type Petshop = T["petshops"]["Row"];
 export type Profissional = T["profissionais"]["Row"];
 export type Cliente = T["clientes"]["Row"];
 export type Pet = T["pets"]["Row"];
-export type Servico = T["servicos"]["Row"];
+/** `preco_varia`: o preço muda com o porte (vem do banco mesmo para quem não vê os preços, que chegam vazios). */
+export type Servico = T["servicos"]["Row"] & { preco_varia?: boolean | null };
 export type Pacote = T["pacotes"]["Row"];
 export type PacoteCliente = T["pacotes_clientes"]["Row"];
 export type Agendamento = T["agendamentos"]["Row"];
@@ -13,6 +15,8 @@ export type Bloqueio = T["bloqueios"]["Row"];
 export type Estadia = T["estadias"]["Row"];
 export type Caixa = T["caixas"]["Row"];
 export type Lancamento = T["lancamentos"]["Row"];
+/** Alteração ou exclusão de um valor já recebido, anotada pelo banco. */
+export type AlteracaoLancamento = T["lancamentos_alteracoes"]["Row"];
 export type Produto = T["produtos"]["Row"];
 export type MovimentoEstoque = T["movimentos_estoque"]["Row"];
 export type StatusAgendamento = Database["public"]["Enums"]["status_agendamento"];
@@ -29,11 +33,23 @@ export type AgendamentoCompleto = Agendamento & {
   }) | null;
   servicos: Pick<Servico, "id" | "nome" | "cor" | "categoria"> | null;
   profissionais: Pick<Profissional, "id" | "nome" | "cor"> | null;
+  /** Os outros serviços do mesmo horário (vazio quando o horário tem um serviço só). */
+  agendamento_servicos?: {
+    id: string; servico_id: string; preco: number | null; ordem: number;
+    servicos: Pick<Servico, "id" | "nome" | "cor" | "categoria"> | null;
+  }[] | null;
 };
+/** O horário com pet, tutor, serviços e profissional, sem os preços: junte com `comPrecosDeAgendamento` (`reservado.ts`). */
 export const SELECT_AGENDAMENTO =
-  "*, pets(id, nome, foto, porte, especie, raca, alertas, clientes(id, nome, telefone)), servicos(id, nome, cor, categoria), profissionais(id, nome, cor)";
+  `${COLS_AGENDAMENTO}, pets(id, nome, foto, porte, especie, raca, alertas, clientes(id, nome, telefone)), servicos(id, nome, cor, categoria), profissionais(id, nome, cor), agendamento_servicos(id, servico_id, ordem, servicos(id, nome, cor, categoria))`;
 
-export type Horario = Record<string, { abre: string; fecha: string } | null>;
+/**
+ * Horário de funcionamento: uma chave por dia da semana ("0" domingo … "6" sábado), `null` = fechado.
+ * O almoço do pet shop vai dentro de cada dia aberto (`almoco: { de, ate }`), igual em todos: é um intervalo fechado,
+ * sem prazo. Quem lê só `abre` e `fecha` (versões antigas, escala da equipe, o link) continua funcionando sem saber dele.
+ */
+export type DiaDoHorario = { abre: string; fecha: string; almoco?: { de: string; ate: string } | null };
+export type Horario = Record<string, DiaDoHorario | null>;
 
 export const STATUS_AGENDAMENTO: Record<StatusAgendamento, { rotulo: string; tom: string }> = {
   marcado: { rotulo: "Marcado", tom: "cinza" },
@@ -53,7 +69,7 @@ export const FORMAS = [
 ] as const;
 
 export const CATEGORIAS_ENTRADA = ["Banho e tosa", "Creche e hotel", "Pacotes", "Venda de produtos", "Outros"];
-export const CATEGORIAS_SAIDA = ["Produtos e material", "Salários e comissões", "Aluguel", "Água, luz e internet", "Impostos e taxas", "Manutenção", "Marketing", "Retirada do dono", "Outros"];
+export const CATEGORIAS_SAIDA = ["Produtos e material", "Salários e comissões", "Aluguel", "Água, luz e internet", "Impostos e taxas", "Manutenção", "Marketing", "Retirada do dono", "Devolução", "Outros"];
 
 export const PORTES: { id: Porte; rotulo: string }[] = [
   { id: "P", rotulo: "Pequeno" },

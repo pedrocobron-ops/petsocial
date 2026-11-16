@@ -11,7 +11,8 @@ import AdicionarPessoa from "@/components/gestao/equipe/adicionar";
 import EditarPessoa, { FolhaConvite } from "@/components/gestao/equipe/editar";
 import { Areas, Vagas } from "@/components/gestao/equipe/pecas";
 import { acessoDe, erroDeLimite, fraseDoLimite, funcaoDe, nAcessos, pilulasDe, primeiroNome, titularDe, usoDoPlano, type Uso } from "@/components/gestao/equipe/modelo";
-import { PERFIS } from "@/lib/gestao/acessos";
+import { perfisPara } from "@/lib/gestao/acessos";
+import { usaModulo } from "@/lib/gestao/modulos";
 import type { Profissional } from "@/lib/gestao/tipos";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./equipe.css";
@@ -73,7 +74,7 @@ export default function Equipe() {
           <BlocoDoPlano uso={uso} aoAdicionar={() => abrir({ tipo: "novo" })} />
           <div className="g-grade kpis g-eq-kpis">
             <Kpi icone={Users} tom="ceu" rotulo="Na equipe" valor={ativos.length} apoio={ativos.length === 1 ? "pessoa ativa" : "pessoas ativas"} />
-            <Kpi icone={Scissors} tom="pessego" rotulo="Atendem" valor={atendem} apoio="aparecem na agenda" />
+            <Kpi icone={Scissors} tom="pessego" rotulo="Atendem" valor={atendem} apoio={usaModulo(petshop, "banho_tosa") ? "aparecem na agenda" : "cuidam dos pets"} />
             <Kpi icone={CalendarCheck} tom="menta" rotulo="Trabalham hoje" valor={trabalhamHoje} apoio={loja[hoje] ? `${NOME_DIAS[hoje]}, pela escala` : "pet shop fechado hoje"} />
             <Kpi icone={Mail} tom="manteiga" rotulo="Convites" valor={convites} apoio={convites ? "esperando criar a conta" : "nenhum pendente"} />
           </div>
@@ -84,13 +85,15 @@ export default function Equipe() {
             <div className="g-eq-convida-t">
               <p className="g-rotulo">Sua equipe</p>
               <h2>Trabalha sozinha ou sozinho? Então está tudo pronto.</h2>
-              <p>A agenda, o caixa e o resto já estão no seu nome. Você não precisa mexer nesta tela.</p>
-              <p>Se um dia tiver ajuda, é aqui que você coloca a pessoa: quem dá banho e tosa aparece na agenda sem precisar de senha, e quem usa o sistema (recepção, financeiro, sócio) ganha um acesso próprio.</p>
+              <p>{usaModulo(petshop, "banho_tosa") ? "A agenda, o caixa" : "O caixa"} e o resto já estão no seu nome. Você não precisa mexer nesta tela.</p>
+              <p>Se um dia tiver ajuda, é aqui que você coloca a pessoa: {usaModulo(petshop, "banho_tosa") ? "quem dá banho e tosa aparece na agenda sem precisar de senha, e " : ""}quem usa o sistema (recepção, financeiro, sócio) ganha um acesso próprio.</p>
               <div><button className="g-btn verde" onClick={() => abrir({ tipo: "novo" })}><UserPlus />Tenho ajuda: adicionar pessoa</button></div>
             </div>
             <ul className="g-eq-convida-l">
+              {usaModulo(petshop, "banho_tosa") && <>
               <li><Tile icone={CalendarDays} tom="pessego" /><p className="g-eq-convida-i"><b>Agenda por pessoa</b><small>Cada um com a sua cor e o seu filtro na agenda.</small></p></li>
               <li><Tile icone={Percent} tom="menta" /><p className="g-eq-convida-i"><b>Comissão calculada</b><small>A conta de cada um sai pronta em Relatórios.</small></p></li>
+              </>}
               <li><Tile icone={Smartphone} tom="ceu" /><p className="g-eq-convida-i"><b>Login só para quem precisa</b><small>Você escolhe, área por área, o que a pessoa abre.</small></p></li>
             </ul>
           </section>
@@ -111,7 +114,7 @@ export default function Equipe() {
                       <AvatarPessoa nome={p.nome} cor={p.cor} tamanho="g" />
                       <div className="g-eq-topo-t">
                         <b className="g-eq-nome">{p.nome}{p.id === eu.id ? " (você)" : ""}</b>
-                        <span className="g-eq-funcao">{funcaoDe(p)}{dono && <span className={`g-tag ${p.id === titular ? "laranja" : "azul"}`}>{p.id === titular ? "Titular" : "Sócio"}</span>}</span>
+                        <span className="g-eq-funcao">{funcaoDe(p, petshop)}{dono && <span className={`g-tag ${p.id === titular ? "laranja" : "azul"}`}>{p.id === titular ? "Titular" : "Sócio"}</span>}</span>
                       </div>
                       <ChevronRight className="g-eq-seta" size={18} aria-hidden />
                     </div>
@@ -119,7 +122,7 @@ export default function Equipe() {
                     <div className={`g-eq-acesso ${acesso}`}>
                       <i className="g-eq-acesso-i" aria-hidden>{acesso === "login" ? <KeyRound /> : acesso === "convite" ? <Hourglass /> : p.atende ? <CalendarDays /> : <Lock />}</i>
                       <p className="g-eq-acesso-t">
-                        <b>{acesso === "login" ? "Com login" : acesso === "convite" ? "Convite enviado, esperando criar a conta" : p.atende ? "Sem login, só na agenda" : "Sem login"}</b>
+                        <b>{acesso === "login" ? "Com login" : acesso === "convite" ? "Convite criado: falta a pessoa criar a conta" : p.atende && usaModulo(petshop, "banho_tosa") ? "Sem login, só na agenda" : "Sem login"}</b>
                         {acesso === "convite" && <small>{p.email_convite}</small>}
                       </p>
                       {acesso === "convite" && <button type="button" className="g-btn p sec g-eq-acao" onClick={() => abrir({ tipo: "convite", id: p.id })}><Send />Reenviar</button>}
@@ -129,14 +132,14 @@ export default function Equipe() {
                     {acesso !== "sem" && (
                       <div className="g-eq-abre">
                         <span className="g-eq-abre-r">Abre</span>
-                        {pilulasDe(p).map((a) => <span key={a} className={`g-eq-pilula${a === "Tudo" ? " tudo" : ""}`}>{a}</span>)}
+                        {pilulasDe(p, petshop).map((a) => <span key={a} className={`g-eq-pilula${a === "Tudo" ? " tudo" : ""}`}>{a}</span>)}
                         {dono && <span className="g-eq-pilula tudo">Equipe e assinatura</span>}
                       </div>
                     )}
 
                     {(p.atende || Number(p.comissao_pct) > 0) && (
                       <div className="g-eq-tags">
-                        {p.atende && <span className="g-tag verde"><Scissors aria-hidden />atende na agenda</span>}
+                        {p.atende && <span className="g-tag verde"><Scissors aria-hidden />{usaModulo(petshop, "banho_tosa") ? "atende na agenda" : "cuida dos pets"}</span>}
                         {Number(p.comissao_pct) > 0 && <span className="g-tag">comissão de {pct(p.comissao_pct)}</span>}
                       </div>
                     )}
@@ -158,7 +161,7 @@ export default function Equipe() {
                   {inativos.map((p) => (
                     <div key={p.id} className="g-linha">
                       <AvatarPessoa nome={p.nome} cor="#a39a90" tamanho="p" />
-                      <span className="t"><b className="g-muted">{p.nome}</b><span>{funcaoDe(p)}</span></span>
+                      <span className="t"><b className="g-muted">{p.nome}</b><span>{funcaoDe(p, petshop)}</span></span>
                       <button className="g-btn p sec" onClick={() => reativar(p)}>Reativar</button>
                     </div>
                   ))}
@@ -176,14 +179,14 @@ export default function Equipe() {
             <ChevronRight className="g-eq-pode-seta" size={18} aria-hidden />
           </summary>
           <div className="g-eq-compara">
-            {PERFIS.map((c) => (
+            {perfisPara(petshop).map((c) => (
               <div key={c.id} className="g-eq-quadro">
                 <p className="g-eq-quadro-t">{c.titulo}</p>
                 <Areas areas={c.areas} socio={c.socio} curto />
               </div>
             ))}
           </div>
-          <p className="g-muted g-pp g-eq-pode-n">Vale para quem entra com o próprio login. Quem só aparece na agenda não abre nada. Caixa, Financeiro e Relatórios são as áreas que mostram valores.</p>
+          <p className="g-muted g-pp g-eq-pode-n">Vale para quem entra com o próprio login. {usaModulo(petshop, "banho_tosa") ? "Quem só aparece na agenda" : "Quem trabalha sem login"} não abre nada. Caixa, Financeiro e Relatórios são as áreas que mostram valores.</p>
         </details>}
       </div>
 
@@ -198,6 +201,7 @@ export default function Equipe() {
 
 function BlocoDoPlano({ uso, aoAdicionar }: { uso: Uso; aoAdicionar: () => void }) {
   const { plano, proximo, livres, cheio, emTeste } = uso;
+  const { petshop } = useGestao();
   const linha = emTeste
     ? "Durante o teste valem os 6 acessos do plano Pet shop. Na hora de assinar, você escolhe pelo número de pessoas com login."
     : cheio
@@ -213,7 +217,7 @@ function BlocoDoPlano({ uso, aoAdicionar }: { uso: Uso; aoAdicionar: () => void 
         <h2>Acessos do plano {plano.nome}: <em>{uso.usados} de {uso.limite} em uso</em></h2>
       </div>
       <Vagas uso={uso} aoAdicionar={aoAdicionar} />
-      <p className="g-eq-plano-n">{linha} <span className="g-eq-plano-c">Conta quem entra no sistema: você, recepção, financeiro, gerente, sócio. Quem só aparece na agenda, como banhista e tosador, não ocupa acesso.</span></p>
+      <p className="g-eq-plano-n">{linha} <span className="g-eq-plano-c">Conta quem entra no sistema: você, {usaModulo(petshop, "banho_tosa") ? "" : "monitor(a), "}recepção, financeiro, gerente, sócio.{usaModulo(petshop, "banho_tosa") ? " Quem só aparece na agenda, como banhista e tosador, não ocupa acesso." : " Quem trabalha sem login não ocupa acesso."}</span></p>
       <div><Link className="g-eq-plano-l" href="/gestao/app/assinatura">{mostraPlanos ? "Ver os planos" : "Ver a assinatura"}<ArrowRight size={16} aria-hidden /></Link></div>
     </section>
   );

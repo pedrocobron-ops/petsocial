@@ -1,0 +1,5 @@
+/* Repetições que estão acabando: no celular o texto fica em cima e os botões embaixo, sem cortar o nome do pet */
+.g-sa-linha { flex-wrap: wrap; row-gap: 10px; }
+.g-sa-linha .t { flex: 1 1 240px; }
+.g-sa-linha .t b, .g-sa-linha .t span { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.g-sa-linha .d { display: flex; flex-wrap: wrap; gap: 8px; text-align: left; }

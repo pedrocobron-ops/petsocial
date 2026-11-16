@@ -16,18 +16,35 @@ type Resposta<T> = { data: T[] | null; error: { message: string } | null };
 
 /**
  * O banco devolve no máximo 1000 linhas por consulta. Aqui buscamos página a página até acabar
- * (ou até `parar` dizer que já chega).
+ * (ou até `parar` dizer que já chega). Sem `parar`, depois da primeira página cheia as seguintes vão de quatro em quatro
+ * ao mesmo tempo (no celular com internet fraca, uma página esperando a outra somava uma ida e volta por mil linhas);
+ * a ordem e o resultado são os mesmos.
  */
 export async function buscarTudo<T>(pagina: (de: number, ate: number) => PromiseLike<Resposta<T>>, parar?: (linhas: T[]) => boolean, maxPaginas = 30): Promise<T[]> {
-  const TAM = 1000;
+  const TAM = 1000, JUNTAS = 4;
   const tudo: T[] = [];
-  for (let i = 0; i < maxPaginas; i++) {
+  const ler = async (i: number) => {
     const r = await pagina(i * TAM, i * TAM + TAM - 1);
     if (r.error) throw new Error(r.error.message);
-    const linhas = r.data ?? [];
-    tudo.push(...linhas);
-    const chega = parar?.(linhas) ?? false;
-    if (chega || linhas.length < TAM) break;
+    return r.data ?? [];
+  };
+  if (parar) {
+    for (let i = 0; i < maxPaginas; i++) {
+      const linhas = await ler(i);
+      tudo.push(...linhas);
+      if (parar(linhas) || linhas.length < TAM) break;
+    }
+    return tudo;
+  }
+  const primeira = await ler(0);
+  tudo.push(...primeira);
+  if (primeira.length < TAM) return tudo;
+  for (let i = 1; i < maxPaginas; i += JUNTAS) {
+    const lote = await Promise.all(Array.from({ length: Math.min(JUNTAS, maxPaginas - i) }, (_, k) => ler(i + k)));
+    for (const linhas of lote) {
+      tudo.push(...linhas);
+      if (linhas.length < TAM) return tudo;
+    }
   }
   return tudo;
 }

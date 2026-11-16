@@ -1,4 +1,4 @@
-import { AREAS, PERFIS, areasDe, veDinheiro, type Area } from "@/lib/gestao/acessos";
+import { AREAS, FUNCAO_CUIDADOR, PERFIS, areasDe, areasPara, perfilParaOPetshop, veDinheiro, type Area } from "@/lib/gestao/acessos";
 import { PLANOS, planoPorId } from "@/lib/gestao/planos";
 import type { Petshop, Profissional } from "@/lib/gestao/tipos";
 
@@ -51,21 +51,22 @@ export const ehSocio = (e: Escolha) => e.perfil === "socio";
 /** Login é o caminho comum para este perfil? (null = tanto faz) */
 export const sugereLogin = (id: PerfilId | null): boolean | null => (id === "atendimento" ? false : id === null || id === "outra" ? null : true);
 
-export function nomeDaFuncao(e: Escolha): string | null {
+export function nomeDaFuncao(e: Escolha, petshop?: { modulos?: string[] | null }): string | null {
   if (e.perfil === "atendimento") return e.rotulo;
   if (e.perfil === "outra" || !e.perfil) return e.nome.trim().slice(0, 40) || null;
-  return perfilPorId(e.perfil)?.funcao ?? null;
+  const p = perfilPorId(e.perfil);
+  return p ? (petshop ? perfilParaOPetshop(p, petshop).funcao : p.funcao) : null;
 }
 
 const emOrdem = (areas: Area[]) => TODAS_AREAS.filter((a) => areas.includes(a));
 
 /** O que vai para papel, funcao, acessos e ve_financeiro. Sem login não há áreas. */
-export function camposDaEscolha(e: Escolha, comLogin: boolean) {
+export function camposDaEscolha(e: Escolha, comLogin: boolean, petshop?: { modulos?: string[] | null }) {
   const socio = ehSocio(e);
   const areas = socio ? TODAS_AREAS : emOrdem(e.areas);
   return {
     papel: socio ? ("dono" as const) : ("funcionario" as const),
-    funcao: nomeDaFuncao(e),
+    funcao: nomeDaFuncao(e, petshop),
     acessos: comLogin ? areas : null,
     ve_financeiro: socio || (comLogin && veDinheiro(areas)),
   };
@@ -78,6 +79,7 @@ export function escolhaDe(p: Profissional): Escolha {
   const perfil: PerfilId =
     p.papel === "dono" ? "socio"
     : rotulo ? "atendimento"
+    : f === FUNCAO_CUIDADOR ? "monitor"
     : PERFIS.find((x) => !x.socio && x.funcao === f)?.id
     ?? (p.papel === "gerente" ? "gerente" : !f && p.atende && !p.ve_financeiro ? "atendimento" : "outra");
   const pronto = perfilPorId(perfil);
@@ -87,8 +89,11 @@ export function escolhaDe(p: Profissional): Escolha {
 }
 
 /** O nome da função para mostrar no cartão da pessoa. */
-export function funcaoDe(p: Pick<Profissional, "papel" | "funcao" | "atende">): string {
+export function funcaoDe(p: Pick<Profissional, "papel" | "funcao" | "atende">, petshop?: { modulos?: string[] | null }): string {
   const f = p.funcao?.trim();
+  // o nome pronto de monitor(a) segue o negócio: sem creche, aparece como Cuidador(a)
+  const monitor = PERFIS.find((x) => x.id === "monitor");
+  if (f && petshop && monitor && f === monitor.funcao) return perfilParaOPetshop(monitor, petshop).funcao;
   if (f) return f;
   if (p.papel === "dono") return "Dono";
   if (p.papel === "gerente") return "Gerente";
@@ -96,9 +101,11 @@ export function funcaoDe(p: Pick<Profissional, "papel" | "funcao" | "atende">): 
 }
 
 /** Áreas em pílulas: "Tudo" quando abre as oito. */
-export function pilulasDe(p: Pick<Profissional, "papel" | "ve_financeiro" | "acessos">): string[] {
+export function pilulasDe(p: Pick<Profissional, "papel" | "ve_financeiro" | "acessos">, petshop?: { modulos?: string[] | null }): string[] {
   const areas = areasDe(p);
-  return areas.length === TODAS_AREAS.length ? ["Tudo"] : AREAS.filter((a) => areas.includes(a.id)).map((a) => a.rotulo);
+  if (areas.length === TODAS_AREAS.length) return ["Tudo"];
+  // área de algo que o negócio não faz (creche e hotel numa loja sem os dois) não aparece; a casa com o nome do menu
+  return (petshop ? areasPara(petshop) : AREAS).filter((a) => areas.includes(a.id)).map((a) => a.rotulo);
 }
 
 /* ---------- donos ---------- */
@@ -152,7 +159,7 @@ export function linkDoConvite(origem: string, email: string) {
 export function textoDoConvite({ nome, petshop, email, origem }: { nome: string; petshop: string; email: string; origem: string }) {
   const e = email.trim().toLowerCase();
   return [
-    `Oi${primeiroNome(nome) ? `, ${primeiroNome(nome)}` : ""}! Você agora faz parte da equipe do ${petshop} no Maestro Pet Gestão.`,
+    `Oi${primeiroNome(nome) ? `, ${primeiroNome(nome)}` : ""}! Aqui é ${petshop.trim()}. Você agora faz parte da nossa equipe no Maestro Pet Gestão.`,
     "",
     "Para entrar:",
     `1. Abra este link: ${linkDoConvite(origem, e)}`,

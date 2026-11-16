@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, CircleHelp, LifeBuoy } from "lucide-react";
-import { NOME_TELA, ROTA_MANUAL, telaDoCaminho, topicosDaRota } from "@/lib/gestao/manual";
+import { ROTA_MANUAL, nomeDaTela, telaDoCaminho, topicosDaRota } from "@/lib/gestao/manual";
+import { useGestao } from "../contexto";
 import { Folha } from "../ui";
-import { ItemTopico } from "./topico";
+import { ItemTopico, useUmLoginSo } from "./topico";
 import "./manual.css";
 
 /** Evento para abrir a conversa da Ajuda de qualquer tela (o Manual usa quando a busca não acha nada). */
@@ -18,11 +19,14 @@ export const abrirAjuda = () => window.dispatchEvent(new Event(EVENTO_AJUDA));
  * que pertencem à tela aberta. Fica na casca, uma vez só, e se orienta pelo endereço.
  */
 export default function AjudaDaTela({ aoPerguntar }: { /** abre a conversa da Ajuda */ aoPerguntar: () => void }) {
+  const { petshop } = useGestao();
+  const umLogin = useUmLoginSo();
   const caminho = usePathname();
   const tela = telaDoCaminho(caminho);
   const [aberta, setAberta] = useState(false);
   const [topico, setTopico] = useState<string | null>(null);
-  const topicos = topicosDaRota(caminho);
+  // só os tópicos do que o pet shop usa: quem não tem creche não lê sobre a chamada
+  const topicos = topicosDaRota(caminho, petshop);
 
   useEffect(() => { setAberta(false); }, [caminho]);
   useEffect(() => {
@@ -33,7 +37,7 @@ export default function AjudaDaTela({ aoPerguntar }: { /** abre a conversa da Aj
 
   // no próprio Manual o botão seria repetição
   if (!tela || tela === ROTA_MANUAL || !topicos.length) return null;
-  const nome = NOME_TELA[tela];
+  const nome = nomeDaTela(tela, petshop);
   const abrir = () => { setTopico(topicos.length <= 2 ? topicos[0].id : null); setAberta(true); };
 
   return (
@@ -48,7 +52,7 @@ export default function AjudaDaTela({ aoPerguntar }: { /** abre a conversa da Aj
             <div className="g-man-lista">
               {topicos.map((t) => (
                 <ItemTopico key={t.id} prefixo="f" topico={t} aberto={topico === t.id} aoAlternar={() => setTopico((a) => (a === t.id ? null : t.id))}
-                  semTela={tela} aoIr={() => setAberta(false)} />
+                  semTela={tela} aoIr={() => setAberta(false)} semQuem={umLogin} />
               ))}
             </div>
             <div className="g-man-saidas">

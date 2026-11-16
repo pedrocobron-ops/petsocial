@@ -1,0 +1,46 @@
+/* Página do tutor (link particular, sem login). Primeiro o celular. Prefixo g-tt-. */
+.g-tt { min-height: 100dvh; display: grid; grid-template-rows: 1fr auto; overflow-x: clip; }
+.g-tt-pet { display: grid; gap: 14px; padding: 18px 16px; border-radius: 22px; background: var(--g-carta); box-shadow: var(--g-sombra); min-width: 0; }
+.g-tt-pet-t { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.g-tt-pet-t > div { min-width: 0; }
+.g-tt-avatar { width: 56px; height: 56px; flex: none; display: grid; place-items: center; border-radius: 18px; overflow: hidden; background: var(--t-pessego); color: var(--i-pessego); }
+.g-tt-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.g-tt-avatar svg { width: 26px; height: 26px; }
+.g-raiz .g-tt-pet h2 { font-size: 1.5rem; overflow-wrap: anywhere; }
+.g-tt-agora, .g-tt-apoio { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: .9375rem; color: var(--g-cinza); }
+.g-tt-agora { color: var(--i-ceu); font-weight: 600; }
+.g-tt-agora svg { width: 16px; height: 16px; flex: none; }
+
+.g-tt-avisos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.g-tt-avisos li { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 14px; background: var(--t-manteiga); color: var(--i-manteiga); font-size: .9375rem; }
+.g-tt-avisos li.vencido { background: var(--t-rosa); color: var(--i-rosa); }
+.g-tt-avisos svg { width: 17px; height: 17px; flex: none; margin-top: 2px; }
+
+.g-tt-bloco { display: grid; gap: 8px; }
+.g-tt-bloco h3, .g-tt-dia h3 { display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+.g-tt-bloco h3 svg { width: 17px; height: 17px; color: var(--g-cinza); }
+.g-tt-marcados { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.g-tt-marcados li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--g-linha); font-size: .9375rem; }
+.g-tt-marcados span { color: var(--g-cinza); }
+
+.g-tt-dia { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--g-linha); }
+.g-tt-dia h3 small { font-weight: 500; font-size: .8125rem; color: var(--g-cinza); padding: 2px 8px; border-radius: 999px; background: var(--g-linha); }
+.g-tt-itens { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.g-tt-itens li { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--g-verde-tint); color: var(--g-verde); font-size: .9375rem; font-weight: 600; }
+.g-tt-itens svg { width: 15px; height: 15px; }
+.g-tt-nota { font-size: 1rem; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+.g-tt-ocs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.g-tt-ocs li { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--t-rosa); color: var(--i-rosa); font-size: .9375rem; }
+.g-tt-ocs svg { width: 17px; height: 17px; flex: none; margin-top: 2px; }
+
+.g-tt-fotos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.g-tt-fotos li { display: grid; gap: 4px; min-width: 0; }
+.g-tt-fotos a { display: block; border-radius: 14px; overflow: hidden; }
+.g-tt-fotos img, .g-tt-fotos .sem { display: grid; place-items: center; width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--g-linha); color: var(--g-cinza); border-radius: 14px; }
+.g-tt-fotos small { font-size: .8125rem; color: var(--g-cinza); overflow-wrap: anywhere; }
+@media (min-width: 560px) { .g-tt-fotos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.g-tt-vazio { font-size: .9375rem; color: var(--g-cinza); }
+
+.g-tt-aviso { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 14px; border-radius: 14px; background: var(--t-manteiga); color: var(--i-manteiga); font-size: .9375rem; }
+.g-tt-aviso button { font: inherit; font-weight: 600; color: inherit; background: none; border: 1px solid currentColor; border-radius: 999px; padding: 6px 14px; min-height: 40px; cursor: pointer; }

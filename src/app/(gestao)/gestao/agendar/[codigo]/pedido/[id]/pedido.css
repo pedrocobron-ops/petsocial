@@ -26,3 +26,13 @@
 
 .g-lkp-loja { display: flex; align-items: center; gap: 8px; }
 .g-lkp-selo.confirmado, .g-lkp-selo.misto { background: var(--g-verde); }
+
+/* cancelar ou pedir outra data pela página do pedido */
+.g-lkp-mexer { display: grid; gap: 10px; padding: 18px 20px; border-radius: 20px; }
+.g-lkp-mexer h2 { font-size: 1.125rem; }
+.g-lkp-mexer .g-campo { width: 100%; }
+.g-lkp-feito { width: 100%; padding: 10px 14px; border-radius: 14px; background: var(--g-verde-tint, #e2f0df); color: #1f4d36; font-size: .9375rem; line-height: 1.4; }
+.g-lkp-recado { width: 100%; display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-radius: 14px; background: var(--t-manteiga); color: #5b4708; font-size: .9375rem; line-height: 1.4; }
+.g-lkp-recado svg { width: 18px; height: 18px; flex: none; margin-top: 2px; }
+.g-lkp-recado span { min-width: 0; overflow-wrap: anywhere; }
+.g-lkp-erro { padding: 10px 14px; border-radius: 14px; background: var(--g-vermelho-tint); color: #7a281b; font-size: .9375rem; line-height: 1.4; }

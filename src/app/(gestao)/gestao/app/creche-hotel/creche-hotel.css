@@ -78,3 +78,6 @@
 .g-ch-lote-linha .t small { color: var(--g-cinza); font-size: .8125rem; }
 .g-ch-lote-linha .cobra { padding-left: 32px; font-size: .9375rem; }
 .g-ch-lote-linha > small { padding-left: 32px; font-size: .8125rem; }
+
+/* cartões que ficam acima da tela (pedidos pelo link): só ocupam espaço quando aparecem */
+.g-ht-acima > * { margin-bottom: 16px; }

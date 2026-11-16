@@ -15,11 +15,63 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   (`src/lib/gestao/paginas.ts`), sempre com ordem fixa terminando em `.order("id")`.
 - Última visita de um pet e "sumido" (já veio, sem vir há mais de N dias e sem nada marcado): só por
   `buscarVisitas` e `sumiu` (`src/lib/gestao/visitas.ts`), para a lista de Clientes, o Chamar de volta e o Hoje darem o mesmo número.
+  A conta é feita no banco (função `visitas_dos_pets`, migração 20261174), numa resposta só; `buscarVisitasAqui` é a mesma conta no navegador.
+- Celular com internet fraca: consultas que não dependem uma da outra vão juntas (`Promise.all`), nunca uma esperando a outra.
+  Folha que só abre com um toque (formulário, detalhe, conta) entra por `next/dynamic` e baixa em segundo plano com `useAdiantar`;
+  o que é de fundo espera a tela abrir (`quandoATelaAbrir`, em `ui.tsx`). Nada disso muda o que a tela mostra.
 - Gravar: `try { ok(await sb.from(...).insert(...)) ; avisar("…") } catch (e) { avisarErro(e) }`.
 - Antes de abrir um formulário de gravação: `if (somenteLeitura()) return;` (`useSomenteLeitura()`), porque a conta
-  com teste vencido fica só para consulta.
+  com teste vencido fica só para consulta. Atalho que leva a gravar (Marcar horário, Cadastrar pet) é `<LinkDeGravar>`: com a conta
+  só para consulta vira botão apagado. Teste vencido só trava quando a assinatura abriu (`assinaturaAberta` no `useGestao()`, mesma
+  regra do banco em `acesso_liberado`); os textos do fim do teste ficam em `TEXTO_TESTE` (`fim-do-teste.tsx`).
 - Dinheiro só aparece para `vejoFinanceiro`. Ajustes do pet shop só para `souDono`.
+- Estadias: nunca `select("*")` em `estadias` (o banco recusa). Use `COLS_ESTADIA` / `SELECT_ESTADIA`; a diária e o valor cobrado
+  vêm por `comValoresDeEstadia` (`src/lib/gestao/reservado.ts`), só para quem recebe. Quem não recebe não manda `valor_diaria`:
+  o banco coloca a sugerida. Coluna nova em `estadias` precisa de `grant select (coluna)`. Em produção a 49 e a 57 rodam DEPOIS
+  das outras: coluna nova que o app lê direto também entra na lista de `grant` delas (confira com o script de ordem de produção).
+  Também não dá para filtrar nem ordenar `estadias` por `valor_diaria` ou `valor_cobrado` pela API: a lista de check-outs para cobrar
+  vem de `idsParaCobrar` (função `estadias_para_cobrar`) e o acerto de um check-out pendente é pela função `estadia_acertar`.
+  Gravação em `estadias` sempre com `.select("id")` (sem isso o banco devolve a linha inteira e recusa).
+- Preços da agenda, da lista de serviços, de venda e diárias padrão: o banco não entrega `agendamentos.preco`,
+  `agendamento_servicos.preco`, `servicos.preco_p/m/g/gg`, `produtos.preco_venda` nem `petshops.diaria_creche/diaria_hotel`
+  direto da tabela (nem `select("*")` em agendamentos, agendamento_servicos e servicos). Leia `COLS_AGENDAMENTO` / `SELECT_AGENDAMENTO`
+  (serviços a mais com `id, servico_id, ordem`), `COLS_SERVICO` / `lerServicos`, `COLS_PRODUTO` e junte os valores com
+  `comPrecosDeAgendamento`, `comPrecosDeServico`, `comPrecosDeProduto` (`reservado.ts`); as diárias vêm em `lerPetshop`. Quem não recebe
+  recebe os valores vazios; ao marcar ou trocar o serviço, o banco coloca o preço da lista (o que a tela mandar é ignorado).
+  Não filtre nem ordene por essas colunas pela API. Coluna nova em `agendamentos`, `agendamento_servicos` ou `servicos` precisa de
+  `grant select (coluna)` (migração 20261157). Gravação nessas tabelas sempre com `.select("id")`.
+- Link do cliente: todo pedido vai por `pedirPeloLink` (função `link_pedir_com_termos`); as funções de pedido não aceitam chamada direta.
+- Opções do negócio: chegam em `petshop.opcoes` pela função `petshop_opcoes` (nunca `select("opcoes")`). Opção nova com preço
+  dentro entra na lista da função `opcoes_sem_valores`, no banco, para a equipe sem dinheiro não ler pela API.
 - Dinheiro que entra ou sai na hora: `lancarPago()` de `src/lib/gestao/dinheiro.ts` (já liga ao caixa aberto).
+- Toque duplo não lança duas vezes: toda folha que grava dinheiro ou estoque usa `useOperacao()` (`src/lib/gestao/uma-vez.ts`).
+  `op.fazer(async (chave) => …)` trava na hora do primeiro toque e entrega a chave da operação; passe a chave para
+  `lancarPago`, `lancarAReceber`, `receberConta`, `quitarConta`, `baixarEstoque`, `gravarMovimentos` (ou `p_chave` nas funções do banco).
+  O banco aceita cada chave uma vez por pet shop e, repetida, devolve o que já gravou. Operação com mais de uma gravação:
+  `parteDaChave(chave, "nome")` para cada uma. Devolva `false` quando gravou só uma parte e deu erro (a nova tentativa reaproveita a chave).
+- Atendimento concluído sem conta fechada: `useParaCobrar()` e `<AtendimentosParaCobrar />` (`agenda/para-cobrar.tsx`); o banco diz
+  quais são, sem valor. Preço mudado e desconto na venda ficam em `precos_alterados` (o banco anota sozinho; só quem cuida do financeiro lê).
+  Também anotados pelo banco (migração 20261160): horário marcado abaixo da lista (`preco_agenda`), serviço já feito tirado da conta
+  (`servico_tirado`), "não cobrar" (`sem_cobranca`, com `agendamentos.sem_cobranca_nome/_em`) e pacote fora do modelo (`pacote`). Com a trava
+  (`dinheiro.preco_travado`), quem não cuida do financeiro é recusado nesses casos e ao baixar o valor de uma venda já recebida.
+  Regra única do dinheiro de um atendimento concluído (migração 20261169, função `conferir_valor_baixou`): o banco guarda o valor na hora de
+  concluir (`agendamentos.valor_concluido`, sem leitura pela API) e anota (ou, com a trava, recusa para quem não cuida do financeiro) voltar
+  para marcado, apagar, concluir de novo por menos, tirar serviço, mudar o preço de venda de produto, saída de estoque como "Venda" sem a venda
+  (a saída deve nascer com `lancamento_id` de uma venda com o produto nos itens) e perda/saldo corrigido para menos. Porte trocado para
+  menor com horário recente e forma de pagamento trocada (`alterou_forma`) também aparecem em Alterações em valores.
+- Faturamento (Relatórios, Hoje, Financeiro, meta): sempre por `ajustesDoFaturamento` + `faturamentoLiquido` (`src/lib/gestao/faturamento.ts`):
+  entradas − devoluções (saídas em `CATEGORIAS_DEVOLUCAO`) − crédito deixado para o tutor + crédito usado fora de uma entrada. O Caixa conta só dinheiro.
+- Crédito do tutor numa conta: a entrada vai pelo valor cheio com `creditoUsado` em `lancarPago` (parte "outro" no pagamento, montada por
+  `pagamentoComCredito`); conta a receber paga com crédito por `receberComCredito` (função `receber_conta_com_credito`). O banco tira do crédito
+  na mesma gravação (`clientes_creditos.lancamento_id`; apagar a entrada devolve). Na tela: `<UsarCredito>` (`financeiro/comum.tsx`).
+  Somas por forma: `somaPorForma` separa a parte do crédito em `FORMA_CREDITO`; `textoDoPagamento` mostra "Crédito do tutor".
+- "Cobrar a diferença": a entrada fica em `lancamentos.diferenca_de` (o banco liga pela marca do item e recusa a segunda); comissão, relatórios
+  (`cobradoPorServico(..., diferenca)`) e o horário somam a conta fechada e a diferença.
+- Saída de estoque de uma conta: `baixarEstoque(..., lancamentoId, chave, estadiaId)`; sem lançamento (check-out pago pelo sinal ou pelo crédito), a estadia.
+- Conta do atendimento: o que o tutor deve de antes entra com "Incluir nesta conta?" (baixa por `receberConta` com `parteDaChave`); pagamento em
+  parte em qualquer forma por `pagoAMenos` (`EstadoPagamento.parte`/`resto`, só com `aceitaResto`).
+- "Recebeu quanto?" fica em `EstadoPagamento.entregue`: `fecharPagamento` recusa dinheiro a menos; a conta do atendimento usa `dinheiroAMenos`
+  (recebe a parte e anota o resto para o tutor).
 - Datas: `agendamentos.inicio/fim` são `timestamptz`; campos `date` são texto `AAAA-MM-DD` (use `isoDia`, `deIsoDia`).
   Formatação em `src/lib/gestao/util.ts` (`brl`, `hora`, `dataAmigavel`, `dataCurta`, `fmtTelefone`, `linkWhatsApp`…).
 
@@ -59,3 +111,29 @@ A plataforma não pode parecer "pobrinha": cada tela abre com um resumo visual a
 Português do Brasil, frases curtas, tom de gente ("Nenhum banho marcado para hoje."), sem jargão de sistema
 ("registro", "cadastro efetuado com sucesso"). Sem promessa de resultado, sem número inventado, sem urgência falsa.
 O assistente se chama Mozart. Para abrir o assistente com um pedido pronto: `abrirAssistente("texto")`.
+
+Nome da casa: quem usa só hotel lê "Hotel", só creche lê "Creche" (`nomeDaCasa`). A categoria gravada continua "Creche e hotel"; na tela,
+use `categoriaAtual(categoria, petshop)` (Financeiro, Caixa, contas). Áreas da equipe com `areasPara(petshop)` / `pilulasDe(p, petshop)`.
+O manual troca sozinho (`textoDaCasa` em `manual.ts`). Interruptor (`role="switch"`) sempre com `aria-label` ou texto dentro.
+
+## Painel do administrador (`/gestao/admin`, só `sou_admin()`)
+- Abas: Visão geral (`admin/visao.tsx`, função `admin_visao_geral`), Uso (`admin/uso.tsx`, `admin_uso` + `admin_uso_contas`, sinais em `sinaisDe`),
+  Contas (lista de `admin_painel`; a folha usa `admin/conta.tsx` com `admin_conta`: histórico e mensagens prontas), Conversas, Escola, Cakto.
+- Regra: o painel recebe só dados da conta e quantidades. Nada de nome/telefone de cliente, pets ou valores do pet shop. Função nova de admin
+  é security definer, começa com `if not public.sou_admin() then raise exception`, e tira o `execute` de `public, anon`.
+- Trocas de status ficam em `petshop_status_hist` (gatilho em `petshops`, migração 20261175); sem regra de RLS, só as funções leem.
+
+## Cakto (assinatura)
+
+- Aviso de pagamento: `src/app/api/gestao/cakto/route.ts` → função `cakto_evento` (casa a loja pela assinatura, pelo `callback` do link
+  = `<id do pet shop>.<ficha>` assinado pelo banco em `assinatura_callback`, pelo e-mail da compra e pelo e-mail do dono) →
+  `cakto_aplicar` (status, plano, período, `pago_ate`). Por callback ou e-mail, compra para uma conta com outra assinatura em dia
+  vira "conflito" (fica em Pagamentos sem conta), e cancelamento/reembolso só vale para a assinatura gravada ou o mesmo pedido.
+- Contagens de uso de IA: Mozart e Ajuda contam no banco (`assistente_contar`, por dia no fuso do pet shop; toda chamada ao
+  modelo conta). O "Tirar dúvida" do link e o chat de venda contam com o segredo do servidor (`src/lib/gestao/servidor.ts`;
+  ligue a "Trava do servidor" na aba Cakto do painel depois de publicar).
+- Tudo se configura no painel do administrador, aba **Cakto** (`src/components/gestao/admin/cakto.tsx`): chave secreta de cada
+  webhook (o banco guarda só o sha256), link e código de cada uma das 9 ofertas, código do produto, abrir a assinatura e
+  ligar pagamentos que chegaram com outro e-mail. Nada disso precisa de SQL nem de publicar o site.
+- Links de pagamento: `linkDe()` em `src/lib/gestao/planos.ts` (banco primeiro, pela função pública `gestao_assinatura`; variável
+  `NEXT_PUBLIC_GESTAO_CHECKOUT_*` da Vercel como reserva). O app carrega os links no `GestaoProvider`.

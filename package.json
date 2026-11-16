@@ -5,7 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:banco": "node testes/rodar.js banco",
+    "test:telas": "node testes/rodar.js telas",
+    "test:migracoes": "node testes/rodar.js migracoes",
+    "test:tudo": "node testes/rodar.js tudo",
+    "test:limpar": "node testes/rodar.js limpar"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

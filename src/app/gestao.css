@@ -267,6 +267,10 @@ button.g-linha:hover, a.g-linha:hover { background: rgba(31, 27, 23, .03); borde
 .g-toasts { position: fixed; left: 50%; translate: -50% 0; bottom: calc(var(--g-abas) + 28px + env(safe-area-inset-bottom)); z-index: 90; display: grid; gap: 8px; width: min(92vw, 420px); pointer-events: none; }
 .g-toast { background: #1f1b17; color: #f6f1e8; padding: 12px 18px; border-radius: 14px; font-size: .9375rem; box-shadow: var(--g-sombra-alta); animation: g-sobe .22s ease-out; text-align: center; }
 .g-toast.erro { background: var(--g-vermelho); }
+.g-toast.com-acao { display: flex; align-items: center; gap: 12px; text-align: left; pointer-events: auto; padding: 8px 8px 8px 18px; }
+.g-toast.com-acao span { flex: 1; min-width: 0; }
+.g-toast.com-acao button { flex: none; min-height: 40px; padding: 0 14px; border-radius: 10px; background: rgba(255, 255, 255, .16); color: inherit; font-weight: 700; }
+.g-toast.com-acao button:hover { background: rgba(255, 255, 255, .26); }
 @media (min-width: 960px) { .g-toasts { bottom: 32px; } }
 
 /* ---------- telas de entrada ---------- */
@@ -616,6 +620,8 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-fab .foto, .g-ass-topo .foto { position: relative; display: grid; flex: none; }
 .g-fab .foto .g-selo, .g-ass-topo .foto .g-selo { border-radius: 50% !important; }
 .g-fab .foto i, .g-ass-topo .foto i { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 50%; background: #35c26b; border: 2.5px solid var(--g-escuro-b); }
+.g-ass-topo .foto.fora i { background: #c9c2b6; }
+.g-ass-saidas { display: block; margin-top: 8px; font-size: .875rem; }
 .g-fab .txt { display: grid; text-align: left; line-height: 1.15; }
 .g-fab .txt b { font: 500 1.0625rem/1.1 var(--display); }
 .g-fab .txt span { font-size: .75rem; font-weight: 500; opacity: .72; }
@@ -854,7 +860,9 @@ body:has(.g-fundo) .g-toasts { bottom: auto; top: calc(14px + env(safe-area-inse
   .g-imp .g-imp-folha.semana thead { display: table-header-group; }
   .g-imp .g-imp-folha.semana th { padding: 2px 6px; font-size: .5625rem; }
   .g-imp .g-imp-folha.semana td { padding: 3px 6px; }
-  .g-imp .g-imp-folha.semana td small { display: inline; font-size: .6875rem; margin-left: 5px; white-space: nowrap; }
+  .g-imp .g-imp-folha.semana td small { display: inline; font-size: .6875rem; margin-left: 5px; white-space: normal; }
+  .g-imp .g-imp-folha.semana td small.tel { white-space: nowrap; }
+  .g-imp .g-imp-folha.semana .g-imp-dia h2 small { white-space: nowrap; }
   .g-imp .g-imp-folha.semana td.hora, .g-imp .g-imp-folha.semana td b { font-size: .8125rem; }
   .g-imp .g-imp-folha.semana td.feito i { width: 13px; height: 13px; }
   .g-imp .g-imp-folha.semana .g-imp-bloq { font-size: .75rem; margin-top: 2px; }
@@ -976,10 +984,14 @@ a.g-ret-linha:hover, button.g-ret-linha:hover { border-color: var(--g-linha-fort
 .g-ret-linha.parada { background: var(--g-amarelo-tint); border-color: transparent; color: #5b4708; }
 .g-ret-linha > svg { width: 18px; height: 18px; flex: none; color: var(--g-cinza); }
 .g-ret-linha.parada > svg { color: inherit; }
+.g-ret-progresso { background: linear-gradient(160deg, #fff6ea 0%, var(--t-pessego) 100%); border-color: rgba(180, 80, 11, .14); }
+.g-ret-progresso > span { flex: 1; min-width: 0; }
+.g-ret-progresso button.g-link { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 .g-ret-linha > span { flex: 1; min-width: 0; }
 
 .g-ret-teste { display: grid; gap: 14px; background: linear-gradient(160deg, #fff6ea 0%, var(--t-pessego) 100%); border-color: rgba(180, 80, 11, .14); }
 .g-ret-teste.vencido { background: var(--g-amarelo-tint); border-color: transparent; }
+.g-ret-teste.bloqueado { background: var(--g-vermelho-tint); border-color: rgba(179, 64, 46, .25); }
 .g-ret-feito { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .g-ret-feito li { padding: 7px 12px; border-radius: 999px; background: rgba(255, 251, 245, .82); border: 1px solid rgba(31, 27, 23, .08); font-size: .9375rem; font-weight: 600; }
 .g-ret-explica { max-width: 68ch; }
@@ -1042,3 +1054,81 @@ a.g-ret-linha:hover, button.g-ret-linha:hover { border-color: var(--g-linha-fort
 .g-fid > div { min-width: 0; display: grid; gap: 2px; }
 .g-fid-ganhou { margin: 0; }
 .g-fid-ganhou b { overflow-wrap: anywhere; }
+
+/* ---------- trazer de planilha: conferir as colunas, resumo e última importação ---------- */
+.g-imp-rolagem { overflow-x: auto; margin-inline: -4px; padding: 0 4px 6px; -webkit-overflow-scrolling: touch; }
+.g-imp-tabela { border-collapse: collapse; font-size: .8125rem; min-width: 100%; }
+.g-imp-tabela th { text-align: left; padding: 4px 10px 4px 0; font-weight: 600; white-space: nowrap; max-width: 11rem; overflow: hidden; text-overflow: ellipsis; }
+.g-imp-tabela thead td { padding: 0 8px 8px 0; }
+.g-imp-tabela tbody td { padding: 5px 10px 5px 0; border-top: 1px solid var(--g-linha); white-space: nowrap; max-width: 11rem; overflow: hidden; text-overflow: ellipsis; }
+.g-imp-tabela tbody td.fora { color: var(--g-cinza); opacity: .6; }
+.g-imp-sel { min-width: 7.5rem; width: 100%; min-height: 40px; padding-block: 6px; font-size: .875rem; color: var(--g-cinza); }
+.g-imp-sel.usa { color: var(--g-tinta); border-color: var(--g-verde); font-weight: 600; }
+.g-aviso.g-imp-resumo { display: grid; gap: 6px; align-items: start; margin-bottom: 0; }
+.g-aviso.g-imp-falta { align-items: flex-start; flex-wrap: nowrap; margin-bottom: 0; }
+.g-aviso.g-imp-falta > div { display: grid; gap: 8px; min-width: 0; justify-items: start; }
+.g-aviso.g-imp-falta .g-btn { margin-left: 0; }
+.g-imp-ultima p { margin: 0; }
+.g-imp-linha { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; margin-bottom: 14px; border-radius: 14px; background: var(--g-carta-2); color: inherit; text-align: left; font-size: .875rem; line-height: 1.35; }
+.g-imp-linha svg { width: 18px; height: 18px; flex: none; color: var(--g-cinza); }
+.g-imp-linha span { flex: 1; min-width: 0; }
+.g-imp-linha i { font-style: normal; font-weight: 700; color: var(--g-verde); flex: none; }
+
+/* O botão do Mozart não cobre o que a pessoa precisa tocar: some enquanto uma folha (formulário, cobrança, confirmação de saída)
+   está aberta e, em tela de computador mais estreita, fica só com a foto no canto (o nome volta ao passar o mouse ou com o foco). */
+body:has(.g-fundo) .g-fab:not(.aberta) { display: none; }
+@media (min-width: 960px) and (max-width: 1599px) {
+  .g-fab { right: 14px; bottom: 14px; }
+  .g-fab:not(.aberta):not(:hover):not(:focus-visible) { padding: 0 9px; }
+  .g-fab:not(.aberta):not(:hover):not(:focus-visible) .txt { display: none; }
+}
+/* e o conteúdo para antes do botão: nada do lado direito (Cobrar, Saída, Renovar…) fica por baixo dele */
+@media screen and (min-width: 960px) and (max-width: 1599px) {
+  .g-main { padding-right: max(40px, calc(86px - max(0px, (100vw - var(--g-lado) - 1180px) / 2))); }
+}
+
+/* alvos de toque: links no meio do texto e cabeçalhos de ordenar com pelo menos 32 px de altura (sem mudar a linha) */
+.g-link.alvo { padding-block: 7px; }
+@media (min-width: 900px) { .g-lj-rel-l.cab > button { min-height: 32px; } }
+
+/* Papel: qualquer tela impressa (Ctrl+P) sai sem o que é do aplicativo (barra do topo, busca, Como usar, Mozart, abas, botões),
+   com as barras dos gráficos visíveis mesmo com "gráficos de fundo" desligado, e sem meia folha em branco antes de cada cartão. */
+.g-so-papel { display: none; }
+@media print {
+  @page { margin: 12mm; }
+  body, .g-raiz { background: #fff !important; }
+  /* a altura mínima da tela (100dvh) não vale no papel: sem ela, não sobra uma folha em branco no fim */
+  .g-raiz, body:has(.g-raiz) { min-height: 0 !important; }
+  .g-app { display: block; min-height: 0; }
+  .g-main { max-width: none !important; padding: 0 !important; overflow: visible; }
+  .g-barra, .g-abas, .g-fab, .g-lado, .g-ass, .g-guia, .g-toasts, .g-topo .g-acoes,
+  .g-main .g-btn, .g-main .g-chips, .g-main button.g-ico, .g-main .g-seg, .g-nao-imprime { display: none !important; }
+  .g-so-papel { display: block; }
+  .g-card { box-shadow: none; break-inside: auto; }
+  .g-kpi, .g-grade.kpis > *, .g-linha, .g-lj-rel-l, .g-ranking > div, .g-colunas, .gf-barras, .g-legenda > div, .g-rel-ch-tipo, .g-ht-quem, tr { break-inside: avoid; }
+  .g-card-t, .g-card h3, .g-card h2, .g-rotulo { break-after: avoid; }
+  .g-grade.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .g-prog, .g-prog i, .g-colunas i, .g-legenda i, .g-ranking i, .gf-barras i, .gf-barras span, .g-cm-barra, .g-cm-barra i,
+  .g-tile, .g-tag, .g-avatar, .g-ht-oc, .g-ht-dia, .g-ht-legenda i, .g-anel, .g-rel-area .pico, .g-ch-barra, .g-ch-barra i,
+  .g-fin-fluxo i, .g-fin-leg i, .g-fin-meta-barra, .g-fin-meta-barra *, .g-legenda i, .g-fin-rosca i {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+}
+@media print {
+  /* grade não se parte bem entre folhas: no papel, a pilha de cartões vira bloco */
+  .g-main .g-pilha { display: block; }
+  .g-main .g-pilha > * + * { margin-top: 14px; }
+}
+
+/* tablet deitado (960–1279): a data sai da barra de cima para a busca ter espaço; o "Dono · plano…" do menu quebra em vez de cortar */
+@media (min-width: 960px) and (max-width: 1279px) {
+  .g-barra-data { display: none !important; }
+  .g-buscar { min-width: 200px; }
+}
+.g-lado-eu .t span { white-space: normal; overflow-wrap: anywhere; }
+/* com uma janela aberta, o botão redondo do microfone (que sobe acima da barra de baixo) não encosta no rodapé dela */
+body:has(.g-fundo) .g-aba-mic { visibility: hidden; }
+
+/* painel do administrador: as abas quebram linha no celular */
+.g-seg.g-adm-abas { display: flex; flex-wrap: wrap; border-radius: 20px; width: fit-content; max-width: 100%; }
+.g-seg.g-adm-abas button { padding: 0 14px; }

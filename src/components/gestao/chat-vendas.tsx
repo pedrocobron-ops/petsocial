@@ -7,8 +7,8 @@ import { linkSuporte } from "@/lib/gestao/contato";
 
 type Fala = { de: "eu" | "nina"; texto: string; pessoa?: boolean };
 
-const OLA: Fala = { de: "nina", texto: "Oi! Eu sou a Nina, assistente virtual do Maestro Pet. Adoro conhecer pet shop novo. Me conta: como você marca os horários hoje, no caderno, no WhatsApp ou em outro sistema?" };
-const RAPIDAS = ["Quanto custa?", "Como funciona o teste grátis?", "O cliente consegue agendar sozinho?", "Funciona no celular?"];
+const OLA: Fala = { de: "nina", texto: "Oi! Eu sou a Nina, assistente virtual do Maestro Pet. Me conta: o que o seu negócio faz? Banho e tosa, creche, hotel, loja?" };
+const RAPIDAS = ["Quanto custa?", "Como funciona o teste grátis?", "Serve para creche e hotel?", "O cliente consegue agendar sozinho?"];
 
 /** Botão flutuante da página de venda: abre uma conversa com a Nina, a consultora virtual. O WhatsApp fica como segundo caminho. */
 export default function ChatVendas() {
@@ -18,6 +18,15 @@ export default function ChatVendas() {
   const [pensando, setPensando] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLInputElement>(null);
+
+  // o botão só aparece depois da primeira tela, para não cobrir o "Sem cartão. Sem fidelidade" da capa no celular
+  const [depoisDaCapa, setDepoisDaCapa] = useState(false);
+  useEffect(() => {
+    const ver = () => setDepoisDaCapa(window.scrollY > window.innerHeight * 0.6);
+    ver();
+    window.addEventListener("scroll", ver, { passive: true });
+    return () => window.removeEventListener("scroll", ver);
+  }, []);
 
   useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [falas, pensando, aberto]);
   useEffect(() => {
@@ -48,7 +57,8 @@ export default function ChatVendas() {
 
   if (!aberto) {
     return (
-      <button type="button" className="gp-chat-botao" onClick={() => setAberto(true)} aria-label="Tirar dúvidas com o assistente">
+      <button type="button" className={`gp-chat-botao${depoisDaCapa ? "" : " escondido"}`} onClick={() => setAberto(true)} aria-label="Tirar dúvidas com a Nina, assistente do site"
+        tabIndex={depoisDaCapa ? undefined : -1} aria-hidden={depoisDaCapa ? undefined : true}>
         <MessageCircle /><span>Fale com a Nina</span>
       </button>
     );
@@ -58,7 +68,7 @@ export default function ChatVendas() {
     <section className="gp-chat" role="dialog" aria-label="Conversa com a Nina, assistente virtual">
       <header>
         <span className="gp-chat-rosto">N<i /></span>
-        <span><b>Nina</b><small>Assistente virtual do Maestro Pet</small></span>
+        <span><b>Nina</b><small>Tira dúvidas aqui no site. No sistema, quem ajuda é o Mozart.</small></span>
         <button type="button" onClick={() => setAberto(false)} aria-label="Fechar conversa"><X /></button>
       </header>
       <div className="gp-chat-falas" aria-live="polite">

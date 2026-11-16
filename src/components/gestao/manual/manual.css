@@ -114,3 +114,55 @@
   .g-man-ordem i { background: none; border: 1px solid #555; color: #000; width: 24px; height: 24px; }
   .g-man .g-tag { border: 1px solid #999; background: none; color: #000; }
 }
+
+/* ---------- no papel, compacto: duas colunas, letra menor, sem pular página por tópico ---------- */
+.g-man-imprimir { margin-top: 2px; }
+@media print {
+  @page { margin: 11mm 10mm; }
+  .g-man { font-size: 9.5pt; line-height: 1.38; }
+  .g-man .g-topo { margin-bottom: 4px; }
+  .g-man .g-topo h1 { font-size: 18pt; }
+  .g-man .g-topo p { display: none; }
+  .g-man-papel { margin: 0 0 8px; font-size: 9pt; }
+  .g-man-legenda { gap: 3px 6px; }
+  .g-man-legenda .g-pp { font-size: 8.5pt; }
+  .g-man-zero .g-card-t h2 { font-size: 12pt; }
+  .g-man-zero .g-tile { display: none; }
+  .g-man-zero > p { display: none; }
+  .g-man-ordem { margin-top: 4px; font-size: 9pt; }
+  .g-man-ordem i { width: 18px; height: 18px; font-size: 8pt; }
+  .g-man-ordem a { grid-template-columns: 18px minmax(0, 1fr); gap: 6px; padding: 1px 0; }
+  .g-man-secao, .g-man-zero { margin-bottom: 10px; }
+  .g-man-secao-t { margin-bottom: 4px; padding-bottom: 2px; border-bottom-width: 1.5px; }
+  .g-man-secao-t h2 { font-size: 13pt; }
+  .g-man-secao-t p { font-size: 8.5pt; }
+  /* os tópicos em duas colunas; um tópico pode continuar na coluna seguinte, mas o título nunca fica sozinho no pé */
+  .g-man-secao .g-man-lista { columns: 2; column-gap: 7mm; column-fill: balance; }
+  .g-man-item { break-inside: auto; border-bottom: 0; border-top: 1px solid #ccc; padding-top: 1px; }
+  .g-man-cab { padding: 4px 0 2px; gap: 6px; break-after: avoid; break-inside: avoid; }
+  .g-man-item .g-man-cab b, .g-man-item.aberto .g-man-cab b { font-size: 10pt; }
+  .g-man .g-man-quem { font-size: 7pt; padding: 0 5px; min-height: 0; line-height: 1.5; }
+  /* grade não se parte bem entre colunas e folhas (o texto encavala): no papel, bloco */
+  .g-man-corpo { display: block; padding: 0 0 6px; }
+  .g-man-corpo > * + * { margin-top: 4px; }
+  .g-man-passos { display: block; }
+  .g-man-passos li + li { margin-top: 2px; }
+  .g-man-nota, .g-man-nota.atencao { break-inside: avoid; }
+  .g-man-passos li { grid-template-columns: 15px minmax(0, 1fr); gap: 5px; line-height: 1.35; break-inside: avoid; }
+  .g-man-passos li:first-child { break-before: avoid; }
+  .g-man-passos li::before { width: 15px; height: 15px; font-size: 7.5pt; border-width: 1px; }
+  .g-man-passos li span { padding-top: 0; }
+  .g-man-nota, .g-man-nota.atencao { grid-template-columns: 12px minmax(0, 1fr); gap: 5px; padding: 3px 6px; font-size: 8.5pt; line-height: 1.3; border-radius: 4px; }
+  .g-man-nota > svg { width: 11px; height: 11px; margin-top: 1px; }
+  .g-man-nota ul { gap: 2px; }
+
+  /* um tópico só ("Imprimir este tópico"): o resto some e a letra volta ao tamanho de leitura */
+  .g-man.so-um .g-man-zero, .g-man.so-um .g-man-legenda, .g-man.so-um .g-man-item:not(.imprime), .g-man.so-um .g-man-secao:not(:has(.imprime)) { display: none !important; }
+  .g-man.so-um { font-size: 11pt; }
+  .g-man.so-um .g-man-secao .g-man-lista { columns: 1; }
+  .g-man.so-um .g-man-item { border-top: 0; }
+  .g-man.so-um .g-man-item .g-man-cab b { font-size: 14pt; }
+  .g-man.so-um .g-man-passos li { grid-template-columns: 20px minmax(0, 1fr); gap: 8px; }
+  .g-man.so-um .g-man-passos li::before { width: 20px; height: 20px; font-size: 9pt; }
+}
+@media print { .g-man.so-um .g-man-nota, .g-man.so-um .g-man-nota.atencao { font-size: 10pt; padding: 6px 8px; } }

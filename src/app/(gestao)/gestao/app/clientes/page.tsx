@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Esqueleto } from "@/components/gestao/ui";
 import { BASE } from "@/components/gestao/clientes/comum";
@@ -19,6 +19,15 @@ function Tela() {
   const cliente = params.get("cliente");
   const chave = pet ? `pet:${pet}` : cliente ? `cliente:${cliente}` : "lista";
   const rolagem = useRef(0);
+  // abriu direto numa ficha: a lista (que pode ter milhares de pets) começa a carregar depois que a ficha chegou,
+  // para não disputar a internet com ela; abrindo pela lista, ela vem na hora
+  const [comLista, setComLista] = useState(chave === "lista");
+  const montarLista = useCallback(() => setComLista(true), []);
+  useEffect(() => {
+    if (chave === "lista") { setComLista(true); return; }
+    const t = setTimeout(() => setComLista(true), 8000);
+    return () => clearTimeout(t);
+  }, [chave]);
 
   useEffect(() => {
     // voltou um passo (botão do celular ou do navegador): encurta o caminho; senão, anda para a frente
@@ -45,10 +54,10 @@ function Tela() {
     <>
       {/* a lista fica montada por baixo da ficha: busca, filtro e posição continuam como estavam */}
       <div hidden={chave !== "lista"}>
-        <Lista aoAbrir={guardarRolagem} irPara={irPara} />
+        {comLista && <Lista aoAbrir={guardarRolagem} irPara={irPara} />}
       </div>
-      {pet ? <FichaPet key={pet} id={pet} voltar={voltar} />
-        : cliente ? <FichaTutor key={cliente} id={cliente} voltar={voltar} aoExcluir={sairDaFicha} /> : null}
+      {pet ? <FichaPet key={pet} id={pet} voltar={voltar} aoAbrir={montarLista} />
+        : cliente ? <FichaTutor key={cliente} id={cliente} voltar={voltar} aoExcluir={sairDaFicha} aoAbrir={montarLista} /> : null}
     </>
   );
 }

@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Lock, Plus, Split, Trash2 } from "lucide-react";
-import { caixaAberto, formaPrincipal, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { caixaAberto, formaPrincipal, ultimoContado, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, isoDia, lerValor, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
-import { AVISO_SEM_MENOS, useAvisos, useDados } from "../ui";
+import { AVISO_SEM_MENOS, avisarMudanca, useAvisos, useDados } from "../ui";
 import "./loja.css";
+import "../financeiro/recebimentos.css";
 
 export type Forma = (typeof FORMAS)[number]["id"];
 
@@ -27,29 +27,17 @@ export function ChipsForma({ valor, aoMudar, erro }: { valor: Forma | null; aoMu
   );
 }
 
-/* ---------- forma de pagamento lembrada neste aparelho ---------- */
+/* ---------- forma de pagamento: sempre escolhida na hora ---------- */
 
-const CHAVE_FORMA = "maestro-gestao-forma";
-const ehForma = (s: unknown): s is Forma => FORMAS.some((f) => f.id === s);
-
-/** Última forma de pagamento usada neste aparelho (ou null). */
-export function formaLembrada(): Forma | null {
-  try {
-    const s = window.localStorage.getItem(CHAVE_FORMA);
-    return ehForma(s) ? s : null;
-  } catch { return null; }
-}
-/** Guarda a forma usada num recebimento, para vir marcada na próxima vez. */
-export function lembrarForma(f: Forma) {
-  try { window.localStorage.setItem(CHAVE_FORMA, f); } catch { /* aparelho sem armazenamento: segue sem lembrar */ }
-}
-/** Forma de pagamento que começa na última usada neste aparelho; sem nenhuma, começa vazia. */
+/**
+ * Toda tela que recebe dinheiro começa sem forma de pagamento marcada: a pessoa escolhe a cada recebimento.
+ * (Antes a última forma usada vinha marcada, e um Pix virava "Dinheiro" sem ninguém perceber.)
+ */
 export function useFormaLembrada() {
-  const [forma, setForma] = useState<Forma | null>(null);
-  const mexeu = useRef(false);
-  useEffect(() => { if (!mexeu.current) setForma(formaLembrada()); }, []);
-  return [forma, (f: Forma) => { mexeu.current = true; setForma(f); }] as const;
+  return useState<Forma | null>(null);
 }
+/** Não guarda mais nada: as telas começam sem forma marcada. Fica para as telas que ainda chamam. */
+export function lembrarForma(forma: Forma) { void forma; }
 
 /* ---------- pagamento dividido ---------- */
 
@@ -60,16 +48,63 @@ const MAX_PARTES = 3;
 /** Uma parte enquanto a pessoa digita. */
 export type ParteDigitada = { forma: Forma | null; valor: number | null };
 /** O que a pessoa escolheu para receber: uma forma só, ou o pagamento dividido em partes. */
-export type EstadoPagamento = { forma: Forma | null; dividido: boolean; partes: ParteDigitada[]; ultimaManual: boolean };
+/** `entregue`: o que a pessoa escreveu em "Recebeu quanto?" (dinheiro entregue pelo cliente), para o troco e para não lançar mais do que entrou. */
+/** `parte`: com Pix, cartão ou outro, o cliente pagou só uma parte (o valor vai em `entregue`); `resto`: no dividido, o que falta fica para depois. */
+export type EstadoPagamento = { forma: Forma | null; dividido: boolean; partes: ParteDigitada[]; ultimaManual: boolean; entregue?: number | null; parte?: boolean; resto?: boolean };
 
-export const pagamentoInicial = (forma: Forma | null = null): EstadoPagamento => ({ forma, dividido: false, partes: [], ultimaManual: false });
+export const pagamentoInicial = (forma: Forma | null = null): EstadoPagamento => ({ forma, dividido: false, partes: [], ultimaManual: false, entregue: null });
 
-/** Pagamento que começa na última forma usada neste aparelho. */
+/**
+ * O cliente entregou em dinheiro menos do que a parte em dinheiro da conta ("Recebeu quanto?" 50 numa conta de 70)?
+ * Devolve quanto entrou e quanto falta; null quando não é o caso (sem valor escrito, troco, ou outra forma).
+ */
+export function dinheiroAMenos(e: EstadoPagamento, total: number): { devido: number; entregue: number; falta: number } | null {
+  const entregue = e.entregue;
+  if (entregue == null || !(entregue > 0)) return null;
+  let devido: number | null = null;
+  if (!e.dividido) devido = e.forma === "dinheiro" ? total : null;
+  else {
+    const p = contasDoPagamento(e, total).partes.find((x) => x.forma === "dinheiro" && Number(x.valor) > 0);
+    devido = p ? Number(p.valor) : null;
+  }
+  if (devido == null || entregue >= devido - 0.005) return null;
+  return { devido, entregue: centavos(entregue), falta: centavos(devido - entregue) };
+}
+
+/**
+ * O cliente pagou menos do que a conta, em qualquer forma (só nas telas que deixam o resto anotado, `aceitaResto`):
+ * dinheiro com "Recebeu quanto?" menor; Pix, cartão ou outro com "Pagou só uma parte"; ou o dividido com "O resto fica para depois".
+ * Devolve o que entra agora (com a forma e as partes) e o que falta; null quando a conta fecha inteira.
+ */
+export function pagoAMenos(e: EstadoPagamento, total: number): { entregue: number; falta: number; forma: Forma; pagamentos: PartePagamento[] | null } | null {
+  if (!(total > 0)) return null;
+  if (!e.dividido) {
+    if (!e.forma) return null;
+    if (e.forma === "dinheiro") {
+      const m = dinheiroAMenos(e, total);
+      return m ? { entregue: m.entregue, falta: m.falta, forma: "dinheiro", pagamentos: null } : null;
+    }
+    const v = e.parte ? e.entregue : null;
+    if (v == null || !(v > 0) || v >= total - 0.005) return null;
+    return { entregue: centavos(v), falta: centavos(total - v), forma: e.forma, pagamentos: null };
+  }
+  if (!e.resto) return null;
+  const c = contasDoPagamento(e, total);
+  // a parte que ficou vazia (sem valor) é o resto: não entra agora
+  const usadas = c.partes.filter((p) => Number(p.valor) > 0);
+  if (!(c.falta > 0) || c.passou > 0 || !usadas.length || usadas.some((p) => !p.forma)) return null;
+  if (new Set(usadas.map((p) => p.forma)).size !== usadas.length) return null;
+  // a parte em dinheiro entra pelo que o cliente entregou de verdade ("Recebeu quanto?" menor que a parte): o que faltou nela
+  // também fica para depois, em vez de entrar no caixa um dinheiro que não veio
+  const naMao = dinheiroAMenos(e, total);
+  const pagamentos = usadas.map((p) => ({ forma: p.forma!, valor: centavos(p.forma === "dinheiro" && naMao ? naMao.entregue : p.valor!) }));
+  const soma = centavos(pagamentos.reduce((t, p) => t + p.valor, 0));
+  return { entregue: soma, falta: centavos(total - soma), forma: formaPrincipal(pagamentos), pagamentos: pagamentos.length > 1 ? pagamentos : null };
+}
+
+/** Pagamento de uma tela que recebe: começa sem forma marcada. */
 export function usePagamento() {
-  const [estado, setEstado] = useState<EstadoPagamento>(() => pagamentoInicial());
-  const mexeu = useRef(false);
-  useEffect(() => { if (!mexeu.current) setEstado(pagamentoInicial(formaLembrada())); }, []);
-  return [estado, (e: EstadoPagamento) => { mexeu.current = true; setEstado(e); }] as const;
+  return useState<EstadoPagamento>(() => pagamentoInicial());
 }
 
 /** As partes com a última completada sozinha (enquanto a pessoa não mexeu nela), e quanto falta ou passou do total. */
@@ -86,6 +121,9 @@ export function contasDoPagamento(e: EstadoPagamento, total: number) {
  * `forma` (no dividido, a de maior valor) e `pagamentos` (as partes; null quando é uma forma só).
  */
 export function fecharPagamento(e: EstadoPagamento, total: number): { erro: string } | { forma: Forma; pagamentos: PartePagamento[] | null } {
+  // nunca lança mais do que entrou: "Recebeu quanto?" menor que a conta pede uma decisão
+  const menos = dinheiroAMenos(e, total);
+  if (menos) return { erro: `O cliente entregou ${brl(menos.entregue)} em dinheiro e ${e.dividido ? "a parte em dinheiro" : "a conta"} é de ${brl(menos.devido)}. Corrija o valor em "Recebeu quanto?", divida o pagamento ou mude a forma.` };
   if (!e.dividido) return e.forma ? { forma: e.forma, pagamentos: null } : { erro: "Escolha a forma de pagamento." };
   const c = contasDoPagamento(e, total);
   if (c.partes.some((p) => !p.forma)) return { erro: "Escolha a forma de cada parte do pagamento." };
@@ -101,23 +139,44 @@ export function fecharPagamento(e: EstadoPagamento, total: number): { erro: stri
  * Forma de pagamento com a opção de dividir em duas ou três formas (parte no Pix, parte em dinheiro).
  * A última parte se completa sozinha com o que falta para o total.
  */
-export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "Forma de pagamento" }: {
+export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "Forma de pagamento", aceitaResto }: {
   valor: EstadoPagamento; aoMudar: (e: EstadoPagamento) => void; total: number; erro?: string | null; rotulo?: string;
+  /** A tela deixa o que faltou anotado para o cliente pagar depois (conta do atendimento): o "Faltam" diz isso. */
+  aceitaResto?: boolean;
 }) {
+  const entregue = { valor: e.entregue ?? null, aoMudar: (v: number | null) => aoMudar({ ...e, entregue: v }) };
   if (!e.dividido) {
     return (
       <div className="g-campo">
         <span>{rotulo}</span>
         <div className="g-chips" role="group" aria-label={rotulo}>
           {FORMAS.map((f) => (
-            <button key={f.id} type="button" className="g-chip" aria-pressed={e.forma === f.id} onClick={() => aoMudar({ ...e, forma: f.id })}>{f.rotulo}</button>
+            <button key={f.id} type="button" className="g-chip" aria-pressed={e.forma === f.id} onClick={() => aoMudar({ ...e, forma: f.id, parte: false, entregue: f.id === "dinheiro" ? (e.forma === "dinheiro" ? e.entregue ?? null : null) : null })}>{f.rotulo}</button>
           ))}
         </div>
         {erro && <small className="erro" role="alert">{erro}</small>}
+        {e.forma === "dinheiro" && total > 0 && <Troco devido={total} {...entregue} aceitaResto={aceitaResto} />}
+        {/* Pix, cartão ou outro: o cliente pagou só uma parte (só onde o resto fica anotado para depois) */}
+        {aceitaResto && e.forma && e.forma !== "dinheiro" && total > 0.01 && (e.parte ? (
+          <div className="g-pg-troco">
+            <label>
+              <span>Pagou quanto no {FORMAS.find((f) => f.id === e.forma)?.rotulo ?? "pagamento"}?</span>
+              <CampoDinheiro valor={e.entregue ?? null} aoMudar={(v) => aoMudar({ ...e, entregue: v })} rotulo="Quanto pagou agora" />
+            </label>
+            <p role="status" className={e.entregue != null && e.entregue < total - 0.005 ? "falta" : undefined}>
+              {e.entregue == null ? <span className="g-muted">Escreva quanto entrou agora.</span>
+                : e.entregue >= total - 0.005 ? <span className="g-erro">Isso já é a conta inteira. Para pagar tudo, toque em Pagou tudo.</span>
+                : <>Faltam <b className="g-tab">{brl(total - e.entregue)}</b>: ficam anotados para depois.</>}
+            </p>
+            <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, parte: false, entregue: null })}>Pagou tudo</button>
+          </div>
+        ) : (
+          <div><button type="button" className="g-btn fantasma p" onClick={() => aoMudar({ ...e, parte: true, entregue: null })}>Pagou só uma parte?</button></div>
+        ))}
         {total > 0.01 && (
           <div>
             <button type="button" className="g-btn fantasma p g-pg-dividir"
-              onClick={() => aoMudar({ ...e, dividido: true, ultimaManual: false, partes: [{ forma: e.forma, valor: null }, { forma: null, valor: null }] })}>
+              onClick={() => aoMudar({ ...e, dividido: true, ultimaManual: false, parte: false, resto: false, partes: [{ forma: e.forma, valor: null }, { forma: null, valor: null }] })}>
               <Split />Dividir o pagamento
             </button>
           </div>
@@ -132,6 +191,11 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
     ultimaManual: e.ultimaManual || (i === ultima && "valor" in m),
   });
   const usadas = (i: number) => new Set(e.partes.filter((_, n) => n !== i).map((p) => p.forma));
+  // "Fecha certinho" só depois de a pessoa escolher as formas e os valores: antes disso a frase não quer dizer nada
+  const preenchido = c.partes.every((p) => p.forma && Number(p.valor) > 0);
+  const emDinheiro = c.partes.find((p) => p.forma === "dinheiro" && Number(p.valor) > 0);
+  // "o resto fica para depois" com menos dinheiro entregue do que a parte em dinheiro: entra só o que veio
+  const naMao = aceitaResto && e.resto ? dinheiroAMenos(e, total) : null;
   return (
     <div className="g-campo g-pg">
       <span>Pagamento dividido</span>
@@ -150,22 +214,71 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
           </div>
         ))}
       </div>
-      <p className={`g-pg-conta${c.falta > 0 || c.passou > 0 ? " erro" : " certo"}`} role="status">
-        {c.passou > 0 ? `Passou ${brl(c.passou)} do total de ${brl(total)}.`
-          : c.falta > 0 ? `Falta ${brl(c.falta)} para fechar ${brl(total)}.`
-          : `Fecha certinho com o total de ${brl(total)}.`}
-        {(c.falta > 0 || (c.passou > 0 && e.ultimaManual)) && (
-          <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, ultimaManual: false })}>Completar a última parte</button>
-        )}
-      </p>
+      {(c.falta > 0 || c.passou > 0 || preenchido) && (
+        <p className={`g-pg-conta${(c.falta > 0 && !(e.resto && aceitaResto)) || c.passou > 0 ? " erro" : " certo"}`} role="status">
+          {c.passou > 0 ? `Passou ${brl(c.passou)} do total de ${brl(total)}.`
+            : c.falta > 0 && e.resto && aceitaResto ? (naMao
+              ? `Entram ${brl(centavos(c.soma - naMao.falta))} agora (em dinheiro, só os ${brl(naMao.entregue)} entregues). Faltam ${brl(centavos(c.falta + naMao.falta))}, que ficam anotados para depois.`
+              : `Entram ${brl(c.soma)} agora. Faltam ${brl(c.falta)}, que ficam anotados para depois.`)
+            : c.falta > 0 ? `Falta ${brl(c.falta)} para fechar ${brl(total)}.`
+            : `Fecha certinho com o total de ${brl(total)}.`}
+          {(c.falta > 0 || (c.passou > 0 && e.ultimaManual)) && (
+            <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, ultimaManual: false, resto: false })}>Completar a última parte</button>
+          )}
+        </p>
+      )}
+      {/* conta do atendimento: pagou uma parte agora (em uma ou mais formas) e o resto fica anotado */}
+      {aceitaResto && !e.resto && c.passou === 0 && (c.falta > 0 || !e.partes[ultima]?.forma) && (
+        <div>
+          <button type="button" className="g-btn fantasma p" onClick={() => aoMudar({
+            ...e, resto: true, ultimaManual: true,
+            // a última parte sem forma é o resto: fica vazia (o que ela mostrava sozinha não entra agora)
+            partes: e.partes.map((p, n) => (n === ultima && !p.forma && !e.ultimaManual ? { ...p, valor: null } : p)),
+          })}>Pagou só isso, o resto fica para depois</button>
+        </div>
+      )}
+      {aceitaResto && e.resto && <small>O que faltar fica anotado para o cliente pagar depois. <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, resto: false, ultimaManual: false })}>Pagou tudo</button></small>}
+      {emDinheiro && <Troco devido={Number(emDinheiro.valor)} parte {...entregue} />}
       {!e.ultimaManual && c.passou === 0 && <small>A última parte se completa sozinha com o que falta.</small>}
       {erro && <small className="erro" role="alert">{erro}</small>}
       <div className="g-pg-acoes">
         {e.partes.length < MAX_PARTES && (
           <button type="button" className="g-btn fantasma p" onClick={() => aoMudar({ ...e, partes: [...e.partes, { forma: null, valor: null }], ultimaManual: false })}><Plus />Mais uma forma</button>
         )}
-        <button type="button" className="g-btn fantasma p" onClick={() => aoMudar({ ...e, dividido: false, partes: [], ultimaManual: false, forma: e.partes[0]?.forma ?? e.forma })}>Pagar com uma forma só</button>
+        <button type="button" className="g-btn fantasma p" onClick={() => aoMudar({ ...e, dividido: false, partes: [], ultimaManual: false, resto: false, forma: e.partes[0]?.forma ?? e.forma })}>Pagar com uma forma só</button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Calculadora de troco: aparece quando o pagamento (ou uma parte dele) é em dinheiro.
+ * Com troco, o que fica anotado é o valor da conta. Com menos do que a conta, a tela não lança o valor cheio:
+ * a conta do atendimento (`aceitaResto`) recebe o que entrou e deixa o resto anotado; as outras telas pedem para corrigir.
+ */
+export function Troco({ devido, parte, valor, aoMudar, aceitaResto }: {
+  devido: number; parte?: boolean; valor?: number | null; aoMudar?: (v: number | null) => void; aceitaResto?: boolean;
+}) {
+  const [proprio, setProprio] = useState<number | null>(null);
+  const recebeu = aoMudar ? valor ?? null : proprio;
+  const setRecebeu = aoMudar ?? setProprio;
+  // o que está escrito no campo: texto que não é número ("cem") ganha um aviso em vez de ficar sem resposta
+  const [escrito, setEscrito] = useState("");
+  const naoENumero = escrito.trim() !== "" && recebeu == null;
+  const troco = recebeu == null ? null : centavos(recebeu - devido);
+  return (
+    <div className="g-pg-troco">
+      <label onInput={(e) => setEscrito((e.target as HTMLInputElement).value ?? "")}>
+        <span>Recebeu quanto?</span>
+        <CampoDinheiro valor={recebeu} aoMudar={setRecebeu} rotulo="Recebeu quanto em dinheiro" maximo={99999999} />
+      </label>
+      <p role="status" className={troco != null && troco < 0 ? "falta" : undefined}>
+        {naoENumero ? <span className="g-erro">Escreva o valor só com números, como 100,00.</span>
+          : troco == null ? <span className="g-muted">{parte ? "Se quiser, escreva quanto ele entregou em dinheiro para ver o troco." : "Se quiser, escreva quanto o cliente entregou para ver o troco."}</span>
+          : troco > 0 ? <>Troco: <b className="g-tab">{brl(troco)}</b></>
+          : troco === 0 ? "Sem troco." : <>Faltam <b className="g-tab">{brl(-troco)}</b> para {brl(devido)}.</>}
+      </p>
+      {troco != null && troco < 0 && !aceitaResto && <small className="g-erro" style={{ gridColumn: "1 / -1" }}>Assim a conta não fecha: corrija o valor, divida o pagamento ou mude a forma.</small>}
     </div>
   );
 }
@@ -181,9 +294,9 @@ export const pagaDepoisInicial = (): PagaDepois => ({ ativo: false, quando: isoD
  * Como a conta é recebida, igual em toda tela que recebe dinheiro (comanda, pacote, check-out):
  * "Paga agora" com a forma de pagamento (que pode ser dividida) ou "Cliente paga depois" com o dia combinado.
  */
-export function QuandoPaga({ total, pagamento, aoPagamento, depois, aoDepois, erro }: {
+export function QuandoPaga({ total, pagamento, aoPagamento, depois, aoDepois, erro, aceitaResto }: {
   total: number; pagamento: EstadoPagamento; aoPagamento: (e: EstadoPagamento) => void;
-  depois: PagaDepois; aoDepois: (d: PagaDepois) => void; erro?: string | null;
+  depois: PagaDepois; aoDepois: (d: PagaDepois) => void; erro?: string | null; aceitaResto?: boolean;
 }) {
   return (
     <>
@@ -200,7 +313,7 @@ export function QuandoPaga({ total, pagamento, aoPagamento, depois, aoDepois, er
           <small>A conta fica anotada em Financeiro, A receber, e na ficha do tutor. Quando o cliente pagar, é só dar baixa.</small>
           {erro && <small className="erro" role="alert">{erro}</small>}
         </label>
-      ) : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erro} />}
+      ) : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={total} erro={erro} aceitaResto={aceitaResto} />}
     </>
   );
 }
@@ -214,7 +327,8 @@ export function fecharRecebimento(pagamento: EstadoPagamento, depois: PagaDepois
   const ruim = erroDeValor(total);
   if (ruim) return { erro: ruim, noCampo: ruim };
   if (depois.ativo) {
-    if (!depois.quando || depois.quando < isoDia(new Date())) return { erro: "Escolha quando o cliente vai pagar.", noCampo: "Escolha um dia de hoje em diante." };
+    if (!depois.quando) return { erro: "Escolha quando o cliente vai pagar.", noCampo: "Escolha um dia de hoje em diante." };
+    if (depois.quando < isoDia(new Date())) return { erro: "A data em que o cliente vai pagar já passou. Escolha um dia de hoje em diante.", noCampo: "Essa data já passou. Escolha um dia de hoje em diante." };
     return { fiado: true, quando: depois.quando };
   }
   const pg = fecharPagamento(pagamento, total);
@@ -271,17 +385,58 @@ export function useCaixaAberto() {
   return dados ?? null;
 }
 
-/** Aviso curto ao receber com o caixa fechado, com atalho para abrir (só para quem tem acesso ao caixa). */
+/**
+ * Aviso ao receber com o caixa fechado. Quem tem a área Caixa abre o caixa ali mesmo, sem sair do que estava fazendo:
+ * o troco inicial já vem com o último valor contado.
+ */
 export function AvisoCaixaFechado({ aberto }: { aberto: boolean | null }) {
-  const { posso } = useGestao();
+  const { sb, petshop, user, posso, liberado } = useGestao();
+  const { avisar, avisarErro } = useAvisos();
+  const [abrindo, setAbrindo] = useState(false);
+  const [abriu, setAbriu] = useState(false);
+  const [troco, setTroco] = useState<number | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  // abriu o caixa daqui: a confirmação fica na tela até a pessoa terminar o recebimento
+  if (abriu) {
+    return <p className="g-cx-fora ok" role="status"><Lock aria-hidden /><span>Caixa aberto. Este valor entra no caixa de hoje; o que for pago em dinheiro entra também na contagem da gaveta.</span></p>;
+  }
   if (aberto !== false) return null;
+  async function comecar() {
+    setAbrindo(true);
+    const ultimo = await ultimoContado(sb, petshop.id);
+    if (ultimo != null) setTroco((t) => t ?? ultimo);
+  }
+  async function abrir() {
+    if (salvando) return;
+    if (troco != null && (troco < 0 || troco >= 1e8)) { avisarErro("Confira o troco inicial."); return; }
+    setSalvando(true);
+    try {
+      const r = await sb.from("caixas").insert({ petshop_id: petshop.id, valor_inicial: troco ?? 0, aberto_por: user.id });
+      // já havia um caixa aberto (alguém abriu em outro aparelho): vale o que está aberto
+      if (r.error && r.error.code !== "23505") throw new Error(r.error.message);
+      await caixaAberto(sb, petshop.id);
+      setAbriu(true);
+      avisar("Caixa aberto.");
+      avisarMudanca();
+    } catch (e) { avisarErro(e); } finally { setSalvando(false); }
+  }
   return (
-    <p className="g-cx-fora" role="status">
+    <div className="g-cx-fora" role="status">
       <Lock aria-hidden />
-      <span>O caixa está fechado: este valor não entra na conferência da gaveta.{" "}
-        {posso("caixa") && <Link href="/gestao/app/caixa">Abrir o caixa</Link>}
-      </span>
-    </p>
+      <div>
+        <span>O caixa de hoje não está aberto. O valor fica anotado, mas não entra na contagem da gaveta.</span>
+        {posso("caixa") && liberado && !abrindo && <div><button type="button" className="g-btn sec p" onClick={() => void comecar()}>Abrir o caixa agora</button></div>}
+        {abrindo && (
+          <div className="g-cx-abrir">
+            <label>
+              <span>Troco inicial em dinheiro</span>
+              <CampoDinheiro valor={troco} aoMudar={setTroco} rotulo="Troco inicial em dinheiro" maximo={99999999} />
+            </label>
+            <button type="button" className="g-btn sec p" onClick={() => void abrir()} disabled={salvando}>{salvando ? "Abrindo…" : "Abrir o caixa"}</button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

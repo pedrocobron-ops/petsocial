@@ -1,4 +1,5 @@
 import type { Profissional } from "./tipos";
+import { nomeDaCasa, rotaForaDoMenu, usaCasa, usaModulo } from "./modulos";
 
 /**
  * Áreas do aplicativo que o dono libera para cada pessoa com login.
@@ -11,7 +12,7 @@ export const AREAS = [
   { id: "clientes", rotulo: "Clientes e pets", apoio: "Cadastro, fichas, saúde e histórico.", rota: "/gestao/app/clientes", dinheiro: false },
   { id: "creche_hotel", rotulo: "Creche e hotel", apoio: "Reservas, check-in e check-out.", rota: "/gestao/app/creche-hotel", dinheiro: false },
   { id: "pacotes", rotulo: "Pacotes", apoio: "Vender pacote e dar baixa nos usos.", rota: "/gestao/app/pacotes", dinheiro: false },
-  { id: "estoque", rotulo: "Estoque", apoio: "Produtos, entradas e saídas.", rota: "/gestao/app/estoque", dinheiro: false },
+  { id: "estoque", rotulo: "Estoque", apoio: "Produtos, entradas e saídas. Também muda o preço dos produtos e dá baixa por perda: fica anotado, e com o preço travado o preço só muda com você.", rota: "/gestao/app/estoque", dinheiro: false },
   { id: "caixa", rotulo: "Caixa", apoio: "Abrir, receber e fechar o caixa do dia.", rota: "/gestao/app/caixa", dinheiro: true },
   { id: "financeiro", rotulo: "Financeiro", apoio: "Contas a pagar e a receber, resultado do mês.", rota: "/gestao/app/financeiro", dinheiro: true },
   { id: "relatorios", rotulo: "Relatórios", apoio: "Faturamento, comissão e desempenho.", rota: "/gestao/app/relatorios", dinheiro: true },
@@ -29,7 +30,36 @@ export const PERFIS = [
   { id: "gerente", funcao: "Gerente", titulo: "Gerente", apoio: "Abre todas as áreas. Só não mexe na equipe, nos ajustes do pet shop e na assinatura.", areas: TODAS, socio: false },
   { id: "socio", funcao: "Sócio", titulo: "Sócio (outro dono)", apoio: "Acesso a tudo, igual a você: equipe, ajustes e assinatura.", areas: TODAS, socio: true },
   { id: "atendimento", funcao: "Banhista e tosador(a)", titulo: "Banhista ou tosador(a)", apoio: "Vê a agenda e as fichas dos pets. Não vê dinheiro.", areas: ["agenda", "clientes"] as Area[], socio: false },
+  { id: "monitor", funcao: "Monitor(a) de creche", titulo: "Monitor(a) de creche", apoio: "Faz a chamada, o check-in e o check-out e vê as fichas dos pets. Não vê dinheiro.", areas: ["clientes", "creche_hotel"] as Area[], socio: false },
 ] as const;
+
+type ComModulos = { modulos?: string[] | null };
+type Perfil = { id: (typeof PERFIS)[number]["id"]; funcao: string; titulo: string; apoio: string; areas: Area[]; socio: boolean };
+/** Quem cuida dos pets num negócio só de hotel (sem creche): o mesmo perfil, com um nome que não fala em creche. */
+export const FUNCAO_CUIDADOR = "Cuidador(a)";
+/** O perfil com o nome que serve para o pet shop: sem creche, "Monitor(a) de creche" vira "Cuidador(a)". */
+export function perfilParaOPetshop(p: Perfil, petshop: ComModulos): Perfil {
+  if (p.id !== "monitor" || usaModulo(petshop, "creche")) return p;
+  return { ...p, funcao: FUNCAO_CUIDADOR, titulo: FUNCAO_CUIDADOR, apoio: "Faz o check-in e o check-out e vê as fichas dos pets. Não vê dinheiro." };
+}
+/**
+ * Os perfis prontos que fazem sentido para o pet shop: monitor(a) de creche só aparece para quem tem creche ou hotel
+ * (e, sem banho e tosa, vem logo no começo, que é quem a casa mais contrata).
+ */
+export const perfisPara = (petshop: ComModulos): Perfil[] => {
+  const lista = PERFIS.filter((p) => p.id !== "monitor" || usaCasa(petshop)).map((p) => perfilParaOPetshop(p, petshop));
+  return usaModulo(petshop, "banho_tosa") ? lista : [...lista.filter((p) => p.id === "monitor"), ...lista.filter((p) => p.id !== "monitor")];
+};
+/** As áreas que viram chave na tela da equipe: as de módulos que o pet shop não usa ficam de fora (como no menu). */
+export const areasPara = (petshop: ComModulos) => AREAS.filter((a) => !rotaForaDoMenu(petshop, a.rota)).map((a) => comNomeDoNegocio(a, petshop));
+
+/** O nome da área como o menu mostra: só hotel lê "Hotel", só creche lê "Creche" (com o que cada uma faz). */
+export function comNomeDoNegocio<A extends (typeof AREAS)[number]>(a: A, petshop: ComModulos): A | (Omit<A, "rotulo" | "apoio"> & { rotulo: string; apoio: string }) {
+  if (a.id !== "creche_hotel") return a;
+  const c = usaModulo(petshop, "creche"), h = usaModulo(petshop, "hotel");
+  if (c === h) return a;
+  return { ...a, rotulo: nomeDaCasa(petshop), apoio: c ? "Chamada, check-in e check-out." : "Reservas, check-in e check-out." };
+}
 
 /** As áreas que a pessoa abre, valendo o que foi marcado ou, se nada foi marcado, o padrão do papel. */
 export function areasDe(p: Pick<Profissional, "papel" | "ve_financeiro" | "acessos">): Area[] {

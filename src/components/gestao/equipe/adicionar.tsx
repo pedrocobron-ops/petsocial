@@ -6,6 +6,8 @@ import { useGestao } from "@/components/gestao/contexto";
 import { Folha, avisarMudanca, ok, useAvisos } from "@/components/gestao/ui";
 import { CORES, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import type { Horario } from "@/lib/gestao/tipos";
+import { perfilParaOPetshop } from "@/lib/gestao/acessos";
+import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ESCOLHA_VAZIA, camposDaEscolha, ehSocio, emailValido, erroDeLimite, lerComissao, nAcessos, perfilPorId, primeiroNome, sugereLogin, usoDoPlano, type Escolha } from "./modelo";
 import { Areas, Chave, Convite, DetalhesAgenda, EscolherPerfil, ModelosProntos, Opcao, PlanoCheio, Trilho, Vagas } from "./pecas";
 
@@ -94,7 +96,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
     setSalvando(true);
     try {
       ok(await sb.from("profissionais").insert({
-        petshop_id: petshop.id, nome: n.slice(0, 80), ...camposDaEscolha(escolha, !!comLogin), atende: escolha.atende, cor,
+        petshop_id: petshop.id, nome: n.slice(0, 80), ...camposDaEscolha(escolha, !!comLogin, petshop), atende: escolha.atende, cor,
         comissao_pct: lerComissao(comissao) ?? 0, escala: segueLoja ? null : escala, email_convite: comLogin ? e : null,
       }).select("id"));
       await recarregarBase();
@@ -142,7 +144,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
               <p className="g-eq-pergunta">O que essa pessoa faz?</p>
               <EscolherPerfil valor={escolha} aoMudar={(v) => { setEscolha(v); setErro(null); }} />
             </div>
-            {escolha.perfil && (
+            {escolha.perfil && (usaModulo(petshop, "banho_tosa") || escolha.atende) && (
               <div className="g-pilha p">
                 <p className="g-eq-pergunta">Essa pessoa atende os pets?</p>
                 <Chave titulo={escolha.atende ? "Sim, atende" : "Não atende"} texto={escolha.atende ? "Aparece na agenda para escolher em cada horário." : "Não aparece para escolher nos horários."}
@@ -160,7 +162,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
               <p className="g-muted g-p">
                 {sugerido === false
                   ? "Banhista e tosador quase nunca precisam: você marca os horários e eles aparecem na agenda. Login é para quem usa o sistema, como recepção, financeiro, gerente ou sócio."
-                  : "Login é para quem usa o sistema no dia a dia: recepção, financeiro, gerente ou sócio. Cada pessoa com login ocupa 1 acesso do plano."}
+                  : `Login é para quem usa o sistema no dia a dia: ${usaModulo(petshop, "banho_tosa") ? "" : usaCasa(petshop) ? "monitor(a), " : ""}recepção, financeiro, gerente ou sócio. Cada pessoa com login ocupa 1 acesso do plano.`}
               </p>
             </div>
 
@@ -193,7 +195,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
                 <p className="g-eq-uso-t">Acessos do plano {uso.plano.nome}: <b>{uso.usados + (comLogin && !semVaga ? 1 : 0)} de {uso.limite} em uso</b></p>
                 <Vagas uso={uso} nova={comLogin && !semVaga ? { nome: n, cor } : null} />
                 <p className="g-eq-uso-n">
-                  {uso.emTeste ? "Durante o teste valem os 6 acessos do plano Pet shop. " : ""}Só conta quem tem login ou convite. Quem só aparece na agenda não ocupa acesso.
+                  {uso.emTeste ? "Durante o teste valem os 6 acessos do plano Pet shop. " : ""}Só conta quem tem login ou convite. {usaModulo(petshop, "banho_tosa") ? "Quem só aparece na agenda" : "Quem trabalha sem login"} não ocupa acesso.
                 </p>
                 {semVaga && <PlanoCheio uso={uso} ainda={socio ? undefined : `${primeiro} ainda pode entrar na equipe sem login.`} />}
               </div>
@@ -209,7 +211,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
               <p className="g-muted g-p">
                 {socio
                   ? `${primeiro} é sócio: abre tudo, como você.`
-                  : `Já veio marcado o comum para ${perfilPorId(escolha.perfil)?.titulo ?? "essa função"}. Ligue e desligue à vontade: ${primeiro} só vê no menu o que estiver ligado.`}
+                  : `Já veio marcado o comum para ${(() => { const p = perfilPorId(escolha.perfil); return p ? perfilParaOPetshop(p, petshop).titulo : "essa função"; })()}. Ligue e desligue à vontade: ${primeiro} só vê no menu o que estiver ligado.`}
               </p>
             </div>
             <ModelosProntos valor={escolha} aoMudar={(v) => { setEscolha(v); setErro(null); }} />

@@ -16,7 +16,7 @@
 .g-eq-plano-n { font-size: .9375rem; line-height: 1.45; color: #33423a; }
 .g-eq-plano.cheio .g-eq-plano-n { color: #5a3a1c; }
 .g-eq-plano-c { display: block; margin-top: 4px; font-size: .8125rem; opacity: .8; }
-.g-eq-plano-l { display: inline-flex; align-items: center; gap: 6px; font-size: .9375rem; font-weight: 600; color: var(--g-verde); text-decoration: underline; text-underline-offset: 3px; }
+.g-eq-plano-l { display: inline-flex; align-items: center; min-height: 32px; gap: 6px; font-size: .9375rem; font-weight: 600; color: var(--g-verde); text-decoration: underline; text-underline-offset: 3px; }
 
 /* só o dono na equipe */
 .g-eq-convida { display: grid; gap: 18px; min-width: 0; padding: 22px 20px; border-radius: 22px; background: var(--g-carta); border: 1px solid var(--g-linha); box-shadow: var(--g-sombra);

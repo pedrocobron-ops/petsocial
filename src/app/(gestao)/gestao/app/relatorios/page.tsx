@@ -1,20 +1,29 @@
 "use client";
 
+import { nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
+import HotelNoRelatorio from "@/components/gestao/hotel/relatorio";
+import CrecheNoRelatorio from "@/components/gestao/creche/relatorio";
 import { useMemo, useState } from "react";
+import BlocoComissao, { type LinhaComissao } from "@/components/gestao/relatorios/comissao";
 import { ArrowDownRight, ArrowUpRight, CalendarDays, CircleCheck, Clock, CreditCard, Download, HandCoins, Home, Moon, PawPrint, Printer, Receipt, Scissors, Sun, TrendingUp, UserPlus, Users, UserX } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPessoa, AvatarPet, Esqueleto, useAvisos, useDados, Vazio } from "@/components/gestao/ui";
 import { baixarPlanilha, brlMini, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, numeroCsv, PALETA, paginar, SemAcesso, somaPorForma, type Cel } from "@/components/gestao/financeiro/comum";
 import { Anel, Barras, Kpi, Rosca, Tile } from "@/components/gestao/painel";
-import { partesDoLancamento, percentuaisQueFecham } from "@/lib/gestao/dinheiro";
+import RelatorioProdutos from "@/components/gestao/loja/relatorio-produtos";
+import { percentuaisQueFecham } from "@/lib/gestao/dinheiro";
+import { cobradoPorServico, type ParteDoServico } from "@/lib/gestao/servicos-do-horario";
 import type { Banco } from "@/lib/gestao/supabase";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
 import "./relatorios.css";
+import { comPrecosDeAgendamento, comValoresDeEstadia } from "@/lib/gestao/reservado";
+import { ajustesDoFaturamento, faturamentoLiquido, temAjuste, type AjustesDoFaturamento } from "@/lib/gestao/faturamento";
+import { FORMA_CREDITO } from "@/components/gestao/financeiro/comum";
 
 export default function PaginaRelatorios() {
-  const { vejoFinanceiro } = useGestao();
-  return vejoFinanceiro ? <Relatorios /> : <SemAcesso />;
+  const { cuidoDoFinanceiro } = useGestao();
+  return cuidoDoFinanceiro ? <Relatorios /> : <SemAcesso />;
 }
 
 const PERIODOS = [
@@ -50,10 +59,15 @@ type Ag = {
   id: string; inicio: string; status: string; preco: number | null; pet_id: string; servico_id: string | null; profissional_id: string | null; pacote_cliente_id: string | null;
   pets: { id: string; nome: string; foto: string | null; especie: string | null; clientes: { id: string; nome: string } | null } | null;
   servicos: { id: string; nome: string; cor: string | null } | null;
+  /** Os outros serviços do mesmo horário (cada um com o seu preço). */
+  agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number; servicos: { id: string; nome: string; cor: string | null } | null }[] | null;
 };
-type Entrada = { id: string; data: string; valor: number; cliente_id: string | null; agendamento_id: string | null; itens: unknown; forma: string | null; pagamentos: unknown };
+type DaConta = Pick<Ag, "servico_id" | "preco" | "pacote_cliente_id"> & { agendamento_servicos?: { servico_id: string; preco: number | null; ordem: number }[] | null; sem_cobranca?: boolean | null };
+type Entrada = { id: string; data: string; valor: number; cliente_id: string | null; agendamento_id: string | null; itens: unknown; forma: string | null; pagamentos: unknown; valor_original?: number | null; credito_usado?: number | null; categoria?: string; conta_id?: string | null };
 /** Conta de um atendimento (uma por atendimento): já recebida, ou anotada para o cliente pagar depois (`pago: false`). */
-type Recebimento = { agendamento_id: string | null; valor: number; itens: unknown; pago?: boolean };
+type Recebimento = { agendamento_id: string | null; valor: number; itens: unknown; pago?: boolean; valor_original?: number | null };
+/** O valor cheio da conta: a que foi recebida em partes guarda em `valor` só o que falta (ou a última parte). */
+const cheio = (l: Recebimento) => ({ valor: Number(l.valor_original ?? l.valor), itens: l.itens });
 
 /**
  * Quanto foi realmente cobrado pelo serviço de um atendimento concluído:
@@ -61,11 +75,18 @@ type Recebimento = { agendamento_id: string | null; valor: number; itens: unknow
  * - conta que o cliente paga depois (fiado): a mesma conta, pelo valor cobrado, mesmo sem o dinheiro ter entrado;
  * - pago com pacote: nada (o dinheiro entrou na venda do pacote);
  * - sem recebimento ainda: o preço combinado na agenda.
+ * Horário com mais de um serviço: `partes` traz o valor de cada serviço (a soma é `valor`); com pacote, só o serviço
+ * principal sai do pacote e os outros entram pelo que foi cobrado. `pacote`: o serviço principal foi pelo pacote.
  */
-function cobradoDe(a: Pick<Ag, "preco" | "pacote_cliente_id">, recebimento: Recebimento | undefined): { valor: number; como: "recebido" | "fiado" | "pacote" | "agenda" } {
-  if (recebimento) return { valor: partesDoLancamento(recebimento)?.servico ?? Number(recebimento.valor), como: recebimento.pago === false ? "fiado" : "recebido" };
-  if (a.pacote_cliente_id) return { valor: 0, como: "pacote" };
-  return { valor: Number(a.preco ?? 0), como: "agenda" };
+function cobradoDe(a: DaConta, recebimento: Recebimento | undefined, diferenca = 0): { valor: number; como: "recebido" | "fiado" | "pacote" | "agenda"; pacote: boolean; partes: ParteDoServico[] } {
+  // "Cobrar a diferença": o que entrou à parte depois de a conta fechar soma no serviço (como na comissão)
+  const partes = cobradoPorServico(a, recebimento ? cheio(recebimento) : undefined, recebimento ? diferenca : 0);
+  const valor = real(partes.reduce((s, p) => s + p.valor, 0));
+  const pacote = Boolean(a.pacote_cliente_id) && (!recebimento || Boolean(a.agendamento_servicos?.length));
+  if (recebimento) return { valor, como: recebimento.pago === false ? "fiado" : "recebido", pacote, partes };
+  // pago com pacote e mais nada a cobrar; com outros serviços ainda sem conta, eles contam pelo preço da agenda
+  if (a.pacote_cliente_id && valor === 0) return { valor: 0, como: "pacote", pacote, partes };
+  return { valor, como: "agenda", pacote, partes };
 }
 
 /**
@@ -80,7 +101,7 @@ async function contasDosAtendimentos(sb: Banco, petshopId: string, concluidos: s
   for (let i = 0; i < sem.length; i += 150) blocos.push(sem.slice(i, i + 150));
   for (let i = 0; i < blocos.length; i += 4) {
     const respostas = await Promise.all(blocos.slice(i, i + 4).map((ids) =>
-      sb.from("lancamentos").select("agendamento_id, valor, itens, pago").eq("petshop_id", petshopId).eq("tipo", "entrada").in("agendamento_id", ids)));
+      sb.from("lancamentos").select("agendamento_id, valor, itens, pago, valor_original").eq("petshop_id", petshopId).eq("tipo", "entrada").in("agendamento_id", ids)));
     for (const r of respostas) {
       if (r.error) throw new Error(r.error.message);
       for (const l of r.data ?? []) if (l.agendamento_id) recebimentos.set(l.agendamento_id, l);
@@ -89,39 +110,68 @@ async function contasDosAtendimentos(sb: Banco, petshopId: string, concluidos: s
   return recebimentos;
 }
 
-/** Valor médio cobrado por atendimento concluído; quem pagou com pacote fica de fora da conta. */
-function valorMedio(concluidos: Pick<Ag, "id" | "preco" | "pacote_cliente_id">[], recebimentos: Map<string, Recebimento>): number | null {
-  let soma = 0, pagantes = 0;
+/**
+ * Valor médio por conta: a média das contas cobradas no período. Cada atendimento concluído com valor é uma conta (com a
+ * diferença cobrada depois); a visita paga só com pacote não é conta (não entrou dinheiro nela); o pacote conta uma vez,
+ * pelo valor da venda, no período em que foi vendido.
+ */
+function valorMedio(concluidos: (DaConta & Pick<Ag, "id">)[], recebimentos: Map<string, Recebimento>, diferencas: Map<string, number>, pacotes: number[]): { valor: number | null; contas: number; pacotes: number } {
+  let soma = 0, contas = 0;
   for (const a of concluidos) {
-    const c = cobradoDe(a, recebimentos.get(a.id));
-    if (c.como !== "pacote") pagantes++;
+    const rec = recebimentos.get(a.id);
+    // marcado como "não cobrar": não é conta cobrada
+    if (a.sem_cobranca && !rec) continue;
+    const c = cobradoDe(a, rec, diferencas.get(a.id) ?? 0);
+    if (!(c.valor > 0)) continue;
+    contas++;
     soma += c.valor;
   }
-  return pagantes ? real(real(soma) / pagantes) : null;
+  for (const p of pacotes) { soma += p; contas++; }
+  return { valor: contas ? real(real(soma) / contas) : null, contas, pacotes: pacotes.length };
 }
+
+/** Diferenças recebidas à parte ("Cobrar a diferença") de cada atendimento. */
+async function diferencasDe(sb: Banco, petshopId: string, ids: string[]): Promise<Map<string, number>> {
+  const m = new Map<string, number>();
+  for (let i = 0; i < ids.length; i += 1000) {
+    const r = await sb.rpc("diferencas_dos_agendamentos", { p_petshop: petshopId, p_ids: ids.slice(i, i + 1000) });
+    if (r.error) continue;
+    for (const x of (r.data ?? []) as { agendamento_id: string; valor: number }[]) m.set(x.agendamento_id, Number(x.valor));
+  }
+  return m;
+}
+
+/** O valor de cada pacote vendido no período (a entrada da venda, inteira; a parte de um pacote pago em partes não conta de novo). */
+const pacotesVendidos = (entradas: Pick<Entrada, "categoria" | "conta_id" | "valor" | "valor_original">[]) =>
+  entradas.filter((l) => l.categoria === "Pacotes" && !l.conta_id).map((l) => Number(l.valor_original ?? l.valor));
 
 /** Os quatro números do período anterior, com as mesmas contas do período escolhido. */
 async function carregarAnterior(sb: Banco, petshopId: string, de: Date, ate: Date) {
   const comeco = de.toISOString(), final = somaDias(ate, 1).toISOString();
   const [ags, entradas, novos] = await Promise.all([
-    paginar<Pick<Ag, "id" | "preco" | "pacote_cliente_id">>((a, b) => sb.from("agendamentos").select("id, preco, pacote_cliente_id")
-      .eq("petshop_id", petshopId).eq("status", "concluido").gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b)),
-    paginar<Recebimento>((a, b) => sb.from("lancamentos").select("agendamento_id, valor, itens").eq("petshop_id", petshopId).eq("pago", true).eq("tipo", "entrada")
+    paginar<{ id: string; pacote_cliente_id: string | null; servico_id: string | null; sem_cobranca: boolean | null; agendamento_servicos: { id: string; servico_id: string; ordem: number }[] | null }>((a, b) => sb.from("agendamentos").select("id, pacote_cliente_id, servico_id, sem_cobranca, agendamento_servicos(id, servico_id, ordem)")
+      .eq("petshop_id", petshopId).eq("status", "concluido").gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b))
+      .then((l) => comPrecosDeAgendamento(sb, petshopId, l) as Promise<(DaConta & Pick<Ag, "id">)[]>),
+    paginar<Recebimento & Pick<Entrada, "categoria" | "conta_id">>((a, b) => sb.from("lancamentos").select("agendamento_id, valor, itens, valor_original, categoria, conta_id").eq("petshop_id", petshopId).eq("pago", true).eq("tipo", "entrada")
       .is("movimento", null).gte("data", isoDia(de)).lte("data", isoDia(ate)).order("data").order("id").range(a, b)),
     sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshopId).gte("criado_em", comeco).lt("criado_em", final),
   ]);
   if (novos.error) throw new Error(novos.error.message);
-  const recebimentos = await contasDosAtendimentos(sb, petshopId, ags.map((a) => a.id), entradas);
+  const [recebimentos, diferencas, ajustes] = await Promise.all([
+    contasDosAtendimentos(sb, petshopId, ags.map((a) => a.id), entradas),
+    diferencasDe(sb, petshopId, ags.map((a) => a.id)),
+    ajustesDoFaturamento(sb, petshopId, isoDia(de), isoDia(ate)),
+  ]);
   return {
-    faturamento: real(entradas.reduce((s, l) => s + Number(l.valor), 0)),
+    faturamento: faturamentoLiquido(real(entradas.reduce((s, l) => s + Number(l.valor), 0)), ajustes),
     concluidos: ags.length,
-    ticket: valorMedio(ags, recebimentos),
+    ticket: valorMedio(ags, recebimentos, diferencas, pacotesVendidos(entradas)).valor,
     clientesNovos: novos.count ?? 0,
   };
 }
 
 /** Estadia de creche ou hotel encerrada (a saída é a data que vale para o período). */
-type EstadiaRel = { id: string; tipo: string; entrada: string; saida: string | null; diarias_cobradas: number | null; valor_cobrado: number | null; obs: string | null };
+type EstadiaRel = { id: string; tipo: string; entrada: string; saida: string | null; diarias_cobradas: number | null; valor_cobrado: number | null; obs: string | null; mensalista?: string | null };
 /** A mesma nota que o check-out de Creche e hotel grava na observação quando a saída é com pacote. */
 const NOTA_PACOTE = "Saiu usando o pacote.";
 /** A mesma conta de Creche e hotel: hotel cobra por noite; creche, por dia em que o pet esteve aqui. Sempre pelo menos 1. */
@@ -133,7 +183,7 @@ const TIPOS_ESTADIA = [{ id: "creche", nome: "Creche", icone: Sun }, { id: "hote
 
 /** Resumo das estadias encerradas de um tipo, como o Histórico de Creche e hotel mostra cada uma. */
 function resumoEstadias(lista: EstadiaRel[]) {
-  const x = { n: lista.length, diarias: 0, valor: 0, comValor: 0, pacote: 0, cortesia: 0, semValor: 0, estimadas: 0 };
+  const x = { n: lista.length, diarias: 0, valor: 0, comValor: 0, pacote: 0, cortesia: 0, semValor: 0, estimadas: 0, mensalistas: 0 };
   for (const e of lista) {
     if (e.diarias_cobradas == null) {
       // estadia antiga, sem o que foi cobrado: diárias pelas datas, sem valor
@@ -142,7 +192,9 @@ function resumoEstadias(lista: EstadiaRel[]) {
       continue;
     }
     x.diarias += e.diarias_cobradas;
-    if (e.obs?.includes(NOTA_PACOTE)) x.pacote++;
+    // dia de mensalista: coberto pela mensalidade (ou cobrado como dia extra na cobrança do mês)
+    if (e.mensalista) x.mensalistas++;
+    else if (e.obs?.includes(NOTA_PACOTE)) x.pacote++;
     else if (e.valor_cobrado == null) x.semValor++;
     else if (Number(e.valor_cobrado) === 0) x.cortesia++;
     else { x.comValor++; x.valor = real(x.valor + Number(e.valor_cobrado)); }
@@ -160,6 +212,8 @@ function Relatorios() {
   const { sb, petshop, equipe } = useGestao();
   const { avisar } = useAvisos();
   const [periodo, setPeriodo] = useState<Periodo>("mes");
+  // a comissão do período como o banco calcula (com as opções de comissão); a planilha usa a mesma
+  const [comissaoBanco, setComissaoBanco] = useState<LinhaComissao[] | null>(null);
   const hojeIso = isoDia(new Date());
   // datas livres: começam no mês até hoje; só valem quando estão certas (ordem e no máximo 366 dias)
   const [livreDe, setLivreDe] = useState(() => `${hojeIso.slice(0, 8)}01`);
@@ -184,22 +238,29 @@ function Relatorios() {
     const [ags, entradas, novos, estadias, anterior] = await Promise.all([
       paginar<Ag>(async (a, b) => {
         const r = await sb.from("agendamentos")
-          .select("id, inicio, status, preco, pet_id, servico_id, profissional_id, pacote_cliente_id, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome, cor)")
+          .select("id, inicio, status, pet_id, servico_id, profissional_id, pacote_cliente_id, sem_cobranca, pets(id, nome, foto, especie, clientes(id, nome)), servicos(id, nome, cor), agendamento_servicos(id, servico_id, ordem, servicos(id, nome, cor))")
           .eq("petshop_id", petshop.id).gte("inicio", comeco).lt("inicio", final).order("inicio").order("id").range(a, b);
         return { data: r.data as unknown as Ag[] | null, error: r.error };
-      }),
-      paginar<Entrada>((a, b) => sb.from("lancamentos").select("id, data, valor, cliente_id, agendamento_id, itens, forma, pagamentos").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
+      }).then((l) => comPrecosDeAgendamento(sb, petshop.id, l as (Ag & { agendamento_servicos?: { id: string }[] | null })[]) as unknown as Promise<Ag[]>),
+      paginar<Entrada>((a, b) => sb.from("lancamentos").select("id, data, valor, cliente_id, agendamento_id, itens, forma, pagamentos, valor_original, credito_usado, categoria, conta_id").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
         .is("movimento", null).gte("data", deIso).lte("data", ateIso).order("data").order("id").range(a, b)),
       sb.from("clientes").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).gte("criado_em", comeco).lt("criado_em", final),
       // creche e hotel: estadias encerradas, pela data da saída
-      paginar<EstadiaRel>((a, b) => sb.from("estadias").select("id, tipo, entrada, saida, diarias_cobradas, valor_cobrado, obs").eq("petshop_id", petshop.id).eq("status", "encerrada")
-        .gte("saida", comeco).lt("saida", final).order("saida").order("id").range(a, b)),
+      paginar<Omit<EstadiaRel, "valor_cobrado">>((a, b) => sb.from("estadias").select("id, tipo, entrada, saida, diarias_cobradas, obs, mensalista").eq("petshop_id", petshop.id).eq("status", "encerrada")
+        .gte("saida", comeco).lt("saida", final).order("saida").order("id").range(a, b)).then((l) => comValoresDeEstadia(sb, petshop.id, l)),
       carregarAnterior(sb, petshop.id, antes.de, antes.ate),
     ]);
     if (novos.error) throw new Error(novos.error.message);
     // conta de cada atendimento concluído do período: paga em outro dia (fora do período) ou ainda a receber (cliente paga depois)
-    const recebimentos = await contasDosAtendimentos(sb, petshop.id, ags.filter((a) => a.status === "concluido").map((a) => a.id), entradas);
-    return { ags, entradas, recebimentos, clientesNovos: novos.count ?? 0, estadias, anterior };
+    const concluidosIds = ags.filter((a) => a.status === "concluido").map((a) => a.id);
+    const [recebimentos, diferencas, ajustes] = await Promise.all([
+      contasDosAtendimentos(sb, petshop.id, concluidosIds, entradas),
+      // "Cobrar a diferença": o que entrou à parte, ligado a cada atendimento
+      diferencasDe(sb, petshop.id, concluidosIds),
+      // devoluções e crédito do tutor: o que entrou e voltou, e o que ainda é do tutor, saem do faturamento
+      ajustesDoFaturamento(sb, petshop.id, deIso, ateIso),
+    ]);
+    return { ags, entradas, recebimentos, diferencas, ajustes, clientesNovos: novos.count ?? 0, estadias, anterior };
   }, [petshop.id, deIso, ateIso, antesDeIso, antesAteIso]);
 
   const r = useMemo(() => {
@@ -207,22 +268,28 @@ function Relatorios() {
     const concluidos = dados.ags.filter((a) => a.status === "concluido");
     const faltas = dados.ags.filter((a) => a.status === "faltou").length;
     // valor realmente cobrado de cada atendimento concluído (não o preço combinado na agenda)
-    const cobrado = new Map(concluidos.map((a) => [a.id, cobradoDe(a, dados.recebimentos.get(a.id))]));
+    const cobrado = new Map(concluidos.map((a) => [a.id, cobradoDe(a, dados.recebimentos.get(a.id), dados.diferencas.get(a.id) ?? 0)]));
     const valorDe = (a: Ag) => cobrado.get(a.id)?.valor ?? 0;
-    const pagoComPacote = (a: Ag) => cobrado.get(a.id)?.como === "pacote";
+    const pagoComPacote = (a: Ag) => Boolean(cobrado.get(a.id)?.pacote);
     const comPacote = concluidos.filter(pagoComPacote).length;
-    const aReceber = concluidos.filter((a) => cobrado.get(a.id)?.como === "agenda" && Number(a.preco ?? 0) > 0).length;
+    const aReceber = concluidos.filter((a) => cobrado.get(a.id)?.como === "agenda" && (cobrado.get(a.id)?.valor ?? 0) > 0).length;
     // contas que o cliente ficou de pagar depois: o serviço conta como feito, o dinheiro ainda não entrou
     const fiados = concluidos.filter((a) => cobrado.get(a.id)?.como === "fiado");
     const valorFiado = real(fiados.reduce((s, a) => s + Number(dados.recebimentos.get(a.id)?.valor ?? 0), 0));
     // por forma de pagamento: o pagamento dividido entra repartido
     const porFormaMapa = somaPorForma(dados.entradas);
-    const porForma = FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: porFormaMapa.get(f.id) ?? 0, cor: COR_FORMA[f.id] })).filter((f) => f.valor > 0);
-    const ticket = valorMedio(concluidos, dados.recebimentos);
+    const porForma = [...FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: porFormaMapa.get(f.id) ?? 0, cor: COR_FORMA[f.id] })),
+      // a parte das contas paga com o crédito do tutor (dinheiro que ele deixou antes)
+      { id: FORMA_CREDITO, rotulo: "Crédito do tutor", valor: porFormaMapa.get(FORMA_CREDITO) ?? 0, cor: COR_FORMA[FORMA_CREDITO] }].filter((f) => f.valor > 0);
+    const medio = valorMedio(concluidos, dados.recebimentos, dados.diferencas, pacotesVendidos(dados.entradas));
+    const ticket = medio.valor;
     // quanto cada tutor gastou no período: todas as entradas recebidas ligadas a ele (a mesma conta de "Já gastou aqui" na ficha)
     const gastoDoTutor = new Map<string, number>();
     for (const l of dados.entradas) if (l.cliente_id) gastoDoTutor.set(l.cliente_id, real((gastoDoTutor.get(l.cliente_id) ?? 0) + Number(l.valor)));
-    const faturamento = real(dados.entradas.reduce((s, l) => s + Number(l.valor), 0));
+    // sem o que foi devolvido e sem o crédito que ficou com ele (a mesma regra do faturamento)
+    for (const [c, v] of dados.ajustes.porCliente) gastoDoTutor.set(c, real((gastoDoTutor.get(c) ?? 0) + v));
+    const entrou = real(dados.entradas.reduce((s, l) => s + Number(l.valor), 0));
+    const faturamento = faturamentoLiquido(entrou, dados.ajustes);
 
     // faturamento por dia, ou por semana quando o período é comprido
     const dias = Math.round((ate.getTime() - de.getTime()) / 864e5) + 1;
@@ -235,6 +302,11 @@ function Relatorios() {
       const n = Math.round((deIsoDia(l.data).getTime() - de.getTime()) / 864e5);
       const b = barras[porSemana ? Math.floor(n / 7) : n];
       if (b) b.valor = real(b.valor + Number(l.valor));
+    }
+    for (const [dia, v] of dados.ajustes.porDia) {
+      const n = Math.round((deIsoDia(dia).getTime() - de.getTime()) / 864e5);
+      const b = barras[porSemana ? Math.floor(n / 7) : n];
+      if (b) b.valor = real(b.valor + v);
     }
 
     const contar = <T,>(lista: Ag[], chave: (a: Ag) => string | null | undefined, extra: (a: Ag) => T) => {
@@ -251,7 +323,22 @@ function Relatorios() {
       return [...mapa.values()].sort((a, b) => b.n - a.n || b.valor - a.valor);
     };
     const usadas = new Set<string>();
-    const servicosTodos = contar(concluidos, (a) => a.servico_id ?? "sem", (a) => ({ nome: a.servicos?.nome ?? "Sem serviço escolhido", cor: a.servicos?.cor ?? null }));
+    // serviços: cada serviço do horário conta uma vez, com o valor cobrado por ele (a soma fecha com o valor dos atendimentos)
+    const porServico = new Map<string, { chave: string; n: number; valor: number; pacote: number; extra: { nome: string; cor: string | null } }>();
+    for (const a of concluidos) {
+      const c = cobrado.get(a.id);
+      const outros = a.agendamento_servicos ?? [];
+      const todos = [{ id: a.servico_id, de: a.servicos, principal: true }, ...outros.map((o) => ({ id: o.servico_id as string | null, de: o.servicos, principal: false }))];
+      for (const sv of todos) {
+        const k = sv.id ?? "sem";
+        const x = porServico.get(k) ?? { chave: k, n: 0, valor: 0, pacote: 0, extra: { nome: sv.de?.nome ?? "Sem serviço escolhido", cor: sv.de?.cor ?? null } };
+        x.n++;
+        x.valor = real(x.valor + (c?.partes ?? []).filter((p) => p.principal === sv.principal && (sv.principal || p.servicoId === sv.id)).reduce((s, p) => s + p.valor, 0));
+        if (sv.principal && c?.pacote) x.pacote++;
+        porServico.set(k, x);
+      }
+    }
+    const servicosTodos = [...porServico.values()].sort((a, b) => b.n - a.n || b.valor - a.valor);
     const servicos = servicosTodos.slice(0, 8)
       .map((s) => {
         // cada fatia com uma cor só dela: a do serviço, ou a próxima livre da paleta
@@ -267,7 +354,7 @@ function Relatorios() {
     // comissão: sobre o que foi cobrado pelo serviço; atendimento pago com pacote conta pelo preço do serviço na agenda
     const comissoes = equipe.filter((p) => Number(p.comissao_pct) > 0).map((p) => {
       const dele = concluidos.filter((a) => a.profissional_id === p.id);
-      const base = real(dele.reduce((s, a) => s + (pagoComPacote(a) ? Number(a.preco ?? 0) : valorDe(a)), 0));
+      const base = real(dele.reduce((s, a) => s + (pagoComPacote(a) ? Number(a.preco ?? 0) : 0) + valorDe(a), 0));
       return { p, n: dele.length, pacote: dele.filter(pagoComPacote).length, base, comissao: real((base * Number(p.comissao_pct)) / 100) };
     }).filter((c) => c.p.ativo || c.n > 0).sort((a, b) => b.comissao - a.comissao);
 
@@ -292,7 +379,7 @@ function Relatorios() {
       comEntrada: comEntrada.length, melhor, diaCheio,
       totalComissao: real(comissoes.reduce((s, c) => s + c.comissao, 0)),
       concluidos: concluidos.length, faltas, taxaFalta: concluidos.length + faltas ? (faltas / (concluidos.length + faltas)) * 100 : null,
-      faturamento, ticket, comPacote, aReceber, fiados: fiados.length, valorFiado, porForma,
+      faturamento, entrou, ajustes: dados.ajustes, ticket, medio, comPacote, aReceber, fiados: fiados.length, valorFiado, porForma,
       barras, porSemana, servicos, servicosTodos, pets, tutores, tutoresTodos, comissoes, porDia, horas, marcados: marcados.length,
       estadias, totalEstadias: dados.estadias.length,
     };
@@ -306,20 +393,26 @@ function Relatorios() {
       ["Período", `${dataCompleta(de)} a ${dataCompleta(ate)}`],
       [],
       ["Resumo do período"],
-      ["Faturamento (entradas já recebidas)", dinheiroCsv(r.faturamento)],
+      ["Faturamento (entradas recebidas, sem devoluções e sem crédito deixado)", dinheiroCsv(r.faturamento)],
+      ...(temAjuste(r.ajustes) ? [
+        ["Entradas recebidas", dinheiroCsv(r.entrou)],
+        ["Devolvido ao tutor", dinheiroCsv(-r.ajustes.devolvido)],
+        ["Ficou de crédito para o tutor", dinheiroCsv(-r.ajustes.creditoDeixado)],
+        ["Crédito usado no check-out", dinheiroCsv(r.ajustes.creditoUsadoFora)],
+      ] satisfies Cel[][] : []),
       ["A receber de atendimentos do período (cliente paga depois)", dinheiroCsv(r.valorFiado)],
       ["Contas a receber de atendimentos do período", numeroCsv(r.fiados)],
       ["Atendimentos concluídos", numeroCsv(r.concluidos)],
       ["Faltas", numeroCsv(r.faltas)],
       ["Atendimentos pagos com pacote", numeroCsv(r.comPacote)],
-      ["Valor médio por atendimento", r.ticket == null ? "" : dinheiroCsv(r.ticket)],
+      ["Valor médio por conta (atendimentos cobrados e pacotes vendidos)", r.ticket == null ? "" : dinheiroCsv(r.ticket)],
       ["Clientes novos", numeroCsv(dados.clientesNovos)],
-      ["Comissão total", dinheiroCsv(r.totalComissao)],
+      ["Comissão total", dinheiroCsv(comissaoBanco ? real(comissaoBanco.reduce((t, c) => t + c.comissao, 0)) : r.totalComissao)],
       [],
       ["Período anterior", `${dataCompleta(antes.de)} a ${dataCompleta(antes.ate)}`],
-      ["Faturamento (entradas já recebidas)", dinheiroCsv(dados.anterior.faturamento)],
+      ["Faturamento (entradas recebidas, sem devoluções e sem crédito deixado)", dinheiroCsv(dados.anterior.faturamento)],
       ["Atendimentos concluídos", numeroCsv(dados.anterior.concluidos)],
-      ["Valor médio por atendimento", dados.anterior.ticket == null ? "" : dinheiroCsv(dados.anterior.ticket)],
+      ["Valor médio por conta (atendimentos cobrados e pacotes vendidos)", dados.anterior.ticket == null ? "" : dinheiroCsv(dados.anterior.ticket)],
       ["Clientes novos", numeroCsv(dados.anterior.clientesNovos)],
       [],
       ...(r.totalEstadias ? [
@@ -333,13 +426,15 @@ function Relatorios() {
       ...r.servicosTodos.map((x): Cel[] => [x.extra.nome, numeroCsv(x.n), numeroCsv(x.pacote), dinheiroCsv(x.valor)]),
       [],
       ["Comissão por profissional"],
-      ["Profissional", "Atendimentos", "Com pacote", "Base", "Percentual", "Comissão"],
-      ...r.comissoes.map((c): Cel[] => [c.p.nome, numeroCsv(c.n), numeroCsv(c.pacote), dinheiroCsv(c.base), numeroCsv(Number(c.p.comissao_pct)), dinheiroCsv(c.comissao)]),
+      ["Profissional", "Atendimentos", "Com pacote", "Base", "Percentual da pessoa", "Comissão"],
+      ...(comissaoBanco
+        ? comissaoBanco.map((c): Cel[] => [c.nome, numeroCsv(c.atendimentos), numeroCsv(c.com_pacote), dinheiroCsv(c.base), numeroCsv(c.pct), dinheiroCsv(c.comissao)])
+        : r.comissoes.map((c): Cel[] => [c.p.nome, numeroCsv(c.n), numeroCsv(c.pacote), dinheiroCsv(c.base), numeroCsv(Number(c.p.comissao_pct)), dinheiroCsv(c.comissao)])),
       [],
       ["Por forma de pagamento (entradas recebidas)"],
       ["Forma", "Valor"],
       ...r.porForma.map((f): Cel[] => [f.rotulo, dinheiroCsv(f.valor)]),
-      ["Total", dinheiroCsv(r.faturamento)],
+      ["Total", dinheiroCsv(r.entrou)],
       [],
       ["Tutores que mais vieram"],
       ["Tutor", "Vezes", "Com pacote", "Pagou no período"],
@@ -349,8 +444,11 @@ function Relatorios() {
     avisar("Planilha baixada.");
   }
 
-  const semNada = r && !r.marcados && !r.faturamento && !dados?.clientesNovos && !r.faltas && !r.totalEstadias;
+  const semNada = r && !r.marcados && !r.faturamento && !r.entrou && !dados?.clientesNovos && !r.faltas && !r.totalEstadias;
   const emAndamento = ateIso >= hojeIso && deIso <= hojeIso;
+  // negócio sem banho e tosa (creche, hotel ou loja) e sem nada na agenda no período: os blocos de atendimento não aparecem
+  const semBanho = !usaModulo(petshop, "banho_tosa") && Boolean(r) && !r!.marcados;
+  const some = semBanho ? { display: "none" } : undefined;
 
   return (
     <>
@@ -387,7 +485,7 @@ function Relatorios() {
           <Vazio titulo="Nada por aqui neste período." texto="Quando houver atendimentos e pagamentos, os números aparecem aqui." />
         ) : (
           <>
-            <div className="g-grade kpis">
+            <div className="g-grade kpis" style={some}>
               <Kpi icone={CircleCheck} tom="pessego" rotulo="Atendimentos concluídos" valor={r.concluidos}
                 apoio={<Apoio texto={r.taxaFalta == null ? "nenhum no período" : `${(100 - r.taxaFalta).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% compareceram`}
                   atual={r.concluidos} anterior={dados.anterior.concluidos} />}
@@ -395,7 +493,7 @@ function Relatorios() {
               <Kpi icone={UserX} tom="rosa" rotulo="Faltas" valor={r.faltas}
                 apoio={r.taxaFalta == null ? "nenhuma falta" : `${r.taxaFalta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de falta`} />
               <Kpi icone={Receipt} tom="ceu" rotulo="Valor médio por atendimento" valor={<span className="gf-kpi-v">{r.ticket == null ? "—" : brl(r.ticket)}</span>}
-                apoio={<Apoio texto={r.comPacote ? `cobrado · fora ${r.comPacote} com pacote` : "valor cobrado, com desconto"}
+                apoio={<Apoio texto={r.medio.contas ? `média de ${r.medio.contas === 1 ? "1 conta" : `${r.medio.contas} contas`}${r.medio.pacotes ? ` (${r.medio.pacotes === 1 ? "1 pacote vendido" : `${r.medio.pacotes} pacotes vendidos`})` : ""}${r.comPacote ? " · uso de pacote não conta" : ""}` : "valor cobrado, com desconto"}
                   atual={r.ticket} anterior={dados.anterior.ticket} formato={brl} />} />
               <Kpi icone={UserPlus} tom="lilas" rotulo="Clientes novos" valor={dados.clientesNovos}
                 apoio={<Apoio texto={dados.clientesNovos === 1 ? "cadastrado no período" : "cadastrados no período"} atual={dados.clientesNovos} anterior={dados.anterior.clientesNovos} />} />
@@ -404,7 +502,9 @@ function Relatorios() {
               Período anterior: de {dataCompleta(antes.de)} a {dataCompleta(antes.ate)}.{emAndamento && " O período escolhido ainda não terminou, então a comparação pode mudar."}
             </p>
 
-            <div className="g-duas">
+            {semBanho && <CrecheNoRelatorio de={de} ate={ate} />}
+
+            <div className={semBanho ? "g-pilha" : "g-duas"}>
               <section className="g-card g-rel-fat">
                 <div className="g-card-t">
                   <h3><Tile icone={TrendingUp} tom="menta" tamanho="p" />Faturamento por {r.porSemana ? "semana" : "dia"}</h3>
@@ -413,7 +513,8 @@ function Relatorios() {
                 <p className="g-rotulo">Faturamento</p>
                 <p className="g-rel-total">{brl(r.faturamento)}</p>
                 <Comparacao atual={r.faturamento} anterior={dados.anterior.faturamento} formato={brl} longo />
-                {r.faturamento > 0 ? (
+                {temAjuste(r.ajustes) && <ContaDoFaturamento entrou={r.entrou} ajustes={r.ajustes} faturamento={r.faturamento} />}
+                {r.faturamento > 0 || r.entrou > 0 ? (
                   <>
                     {r.barras.length <= 7
                       ? <Barras itens={r.barras.map((b) => ({ rotulo: nomeDiaCurto(b.dia), valor: b.valor }))} formato={brlMini} altura={176}
@@ -445,7 +546,7 @@ function Relatorios() {
                 )}
               </section>
 
-              <section className="g-card">
+              <section className="g-card" style={some}>
                 <div className="g-card-t"><h3><Tile icone={CalendarDays} tom="pessego" tamanho="p" />Dias mais cheios</h3><span className="g-muted g-pp">por dia da semana</span></div>
                 {r.marcados ? (
                   <>
@@ -467,11 +568,11 @@ function Relatorios() {
             {r.totalEstadias > 0 && (
               <section className="g-card">
                 <div className="g-card-t">
-                  <h3><Tile icone={Home} tom="ceu" tamanho="p" />Creche e hotel</h3>
+                  <h3><Tile icone={Home} tom="ceu" tamanho="p" />{nomeDaCasa(petshop)}</h3>
                   <span className="g-muted g-pp">estadias encerradas no período</span>
                 </div>
                 <div className="g-rel-ch">
-                  {r.estadias.map((x) => (
+                  {r.estadias.filter((x) => x.n > 0 || usaModulo(petshop, x.id)).map((x) => (
                     <div key={x.id} className="g-rel-ch-tipo">
                       <p className="g-rel-ch-nome"><Tile icone={x.icone} tom="ceu" tamanho="p" /><b>{x.nome}</b></p>
                       {x.n ? (
@@ -481,9 +582,10 @@ function Relatorios() {
                             <div><small>{x.diarias === 1 ? "Diária" : "Diárias"}</small><b>{x.diarias}</b></div>
                             <div><small>Cobrado</small><b>{x.comValor ? brl(x.valor) : "—"}</b></div>
                           </div>
-                          {(x.pacote > 0 || x.cortesia > 0 || x.semValor > 0 || x.estimadas > 0) && (
+                          {(x.pacote > 0 || x.cortesia > 0 || x.semValor > 0 || x.estimadas > 0 || x.mensalistas > 0) && (
                             <p className="g-muted g-pp">
                               {[
+                                x.mensalistas > 0 && `${x.mensalistas} de mensalista`,
                                 x.pacote > 0 && `${x.pacote} com pacote`,
                                 x.cortesia > 0 && `${x.cortesia} de cortesia`,
                                 x.semValor > 0 && `${x.semValor} sem valor lançado`,
@@ -502,8 +604,12 @@ function Relatorios() {
                 </p>
               </section>
             )}
+            {!semBanho && <CrecheNoRelatorio de={de} ate={ate} />}
+            <HotelNoRelatorio de={de} ate={ate} antes={antes} />
 
-            <div className="g-duas">
+            <RelatorioProdutos de={deIso} ate={ateIso} />
+
+            <div className="g-duas" style={some}>
               <section className="g-card">
                 <div className="g-card-t"><h3><Tile icone={Scissors} tom="pessego" tamanho="p" />Serviços mais feitos</h3><span className="g-muted g-pp">concluídos</span></div>
                 {r.servicos.length ? (
@@ -545,35 +651,11 @@ function Relatorios() {
               </section>
             </div>
 
-            <div className="g-duas">
-              <section className="g-card">
-                <div className="g-card-t">
-                  <h3><Tile icone={HandCoins} tom="menta" tamanho="p" />Comissão por profissional</h3>
-                  {r.comissoes.length > 0 && <b className="g-tab">{brl(r.totalComissao)}</b>}
-                </div>
-                {r.comissoes.length ? (
-                  <div className="g-lista">
-                    {r.comissoes.map((c) => (
-                      <div key={c.p.id} className="g-linha g-rel-com">
-                        <AvatarPessoa nome={c.p.nome} cor={c.p.cor} />
-                        <span className="t">
-                          <b>{c.p.nome}</b>
-                          <span>{atendimentos(c.n)}{c.pacote > 0 ? ` (${c.pacote} com pacote)` : ""} · base {brl(c.base)} · {Number(c.p.comissao_pct).toLocaleString("pt-BR")}%</span>
-                          {r.totalComissao > 0 && <span className="g-prog"><i style={{ width: `${(c.comissao / r.comissoes[0].comissao) * 100}%`, background: c.p.cor ?? undefined }} /></span>}
-                        </span>
-                        <span className="d"><b>{brl(c.comissao)}</b></span>
-                      </div>
-                    ))}
-                  </div>
-                ) : <p className="g-muted g-p">Ninguém da equipe tem comissão definida. A porcentagem de cada pessoa fica no cadastro da equipe.</p>}
-                <p className="g-muted g-pp" style={{ marginTop: 10 }}>
-                  A base é o valor cobrado pelo serviço nos atendimentos concluídos de cada profissional, já com o desconto (produto e extra ficam de fora).
-                  Atendimento pago com pacote conta pelo preço do serviço na agenda; o que ainda está sem conta fechada, também.
-                  Conta que o cliente ficou de pagar depois entra pelo valor cobrado, mesmo antes de o dinheiro entrar.
-                </p>
-              </section>
+            <div className={semBanho ? "g-pilha" : "g-duas"}>
+              {/* quem trabalha sozinha, sem comissão para ninguém, não precisa do bloco de comissão */}
+              {(equipe.filter((x) => x.ativo).length > 1 || equipe.some((x) => Number(x.comissao_pct) > 0)) && <BlocoComissao de={deIso} ate={ateIso} aoCalcular={setComissaoBanco} />}
 
-              <section className="g-card">
+              <section className="g-card" style={some}>
                 <div className="g-card-t"><h3><Tile icone={Users} tom="ceu" tamanho="p" />Tutores que mais vieram</h3></div>
                 {r.tutores.length ? (
                   <div className="g-lista">
@@ -596,6 +678,20 @@ function Relatorios() {
         )}
       </div>
     </>
+  );
+}
+
+/** Como o faturamento foi montado, quando houve devolução ou crédito do tutor no período (para conferir à mão). */
+function ContaDoFaturamento({ entrou, ajustes: a, faturamento }: { entrou: number; ajustes: AjustesDoFaturamento; faturamento: number }) {
+  return (
+    <div className="g-rel-conta g-tab" role="group" aria-label="Como o faturamento foi contado">
+      <span>Entradas recebidas {brl(entrou)}</span>
+      {a.devolvido > 0 && <span>Devolvido ao tutor − {brl(a.devolvido)}</span>}
+      {a.creditoDeixado > 0 && <span>Ficou de crédito para o tutor − {brl(a.creditoDeixado)}</span>}
+      {a.creditoUsadoFora > 0 && <span>Crédito usado no check-out + {brl(a.creditoUsadoFora)}</span>}
+      <span>Faturamento <b>{brl(faturamento)}</b></span>
+      <small className="g-muted">O dinheiro que entrou e voltou para o tutor não é faturamento. Crédito que ficou com o tutor ainda é dele: conta quando ele usar.</small>
+    </div>
   );
 }
 

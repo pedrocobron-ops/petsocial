@@ -1,43 +1,63 @@
 "use client";
 
-import { useState } from "react";
+import { saudacaoZap } from "@/lib/gestao/agenda";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, MessageCircle, NotebookPen, PawPrint, Pencil, Phone, Plus, Receipt, Users, Wallet } from "lucide-react";
+import { ArrowLeft, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, Merge, MessageCircle, NotebookPen, PawPrint, Pencil, Phone, Plus, Receipt, Users, Wallet } from "lucide-react";
 import type { Cliente, Lancamento, Pet } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp } from "@/lib/gestao/util";
+import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { CartaoFidelidade } from "../fidelidade";
+import CartaoPaginaDoTutor from "../casa/pagina-do-tutor";
+import { DividaDoTutor } from "../financeiro/contas-clientes";
+import { CreditoDoTutor } from "../hotel/credito";
+import { FolhaLancamento } from "../financeiro/comum";
 import FormPet from "../form-pet";
 import { Tile } from "../painel";
 import { AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
-import { linkPet, nomePorte, primeiroNome } from "./comum";
+import { linkPet, nomePorte } from "./comum";
 import FormTutor from "./form-tutor";
+import { FolhaJuntarTutor } from "./juntar";
 import { EtiquetaEspecie } from "./lista";
 
 type Entrada = Pick<Lancamento, "id" | "valor" | "data" | "categoria" | "descricao" | "pago">;
 
-export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; voltar: () => void; aoExcluir: () => void }) {
-  const { sb, petshop, vejoFinanceiro, souDono } = useGestao();
+export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: string; voltar: () => void; aoExcluir: () => void; /** a ficha terminou de carregar */ aoAbrir?: () => void }) {
+  // `vejoFinanceiro` (Caixa, Financeiro ou Relatórios): vê e recebe o que o tutor deve. `cuidoDoFinanceiro`: vê também quanto ele já gastou.
+  const { sb, petshop, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [editando, setEditando] = useState(false);
   const [petNovo, setPetNovo] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
+  const [juntando, setJuntando] = useState(false);
+  // "deve R$ 20" solto: taxa de falta, diferença esquecida (vira conta a receber deste tutor)
+  const [anotando, setAnotando] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
-    const [cliente, pets, entradas] = await Promise.all([
+    const [cliente, pets, entradas, devolucoes] = await Promise.all([
       sb.from("clientes").select("*").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
       sb.from("pets").select("*").eq("petshop_id", petshop.id).eq("cliente_id", id).order("ativo", { ascending: false }).order("nome"),
-      vejoFinanceiro
+      cuidoDoFinanceiro
         ? sb.from("lancamentos").select("id, valor, data, categoria, descricao, pago").eq("petshop_id", petshop.id).eq("cliente_id", id).eq("tipo", "entrada").is("movimento", null)
           .order("data", { ascending: false }).order("criado_em", { ascending: false }).limit(1000)
+        : null,
+      // o que foi devolvido ao tutor (pagou a mais, sinal devolvido) sai do que ele gastou
+      cuidoDoFinanceiro
+        ? sb.from("lancamentos").select("valor").eq("petshop_id", petshop.id).eq("cliente_id", id).eq("tipo", "saida").eq("pago", true).in("categoria", ["Devolução", "Devolução de sinal"]).limit(1000)
         : null,
     ]);
     if (cliente.error) throw new Error(cliente.error.message);
     if (pets.error) throw new Error(pets.error.message);
     if (entradas?.error) throw new Error(entradas.error.message);
-    return { cliente: cliente.data as Cliente | null, pets: (pets.data ?? []) as Pet[], entradas: (entradas?.data ?? []) as Entrada[] };
-  }, [petshop.id, id, vejoFinanceiro]);
+    const devolvido = Math.round(((devolucoes?.data ?? []) as { valor: number }[]).reduce((s, l) => s + Number(l.valor), 0) * 100) / 100;
+    // crédito do tutor (a mesma regra do faturamento): o que ficou com ele ainda é dele; o usado no check-out (fora de uma entrada) conta
+    const creditos = cuidoDoFinanceiro ? await sb.from("clientes_creditos").select("valor, lancamento_id").eq("petshop_id", petshop.id).eq("cliente_id", id).limit(1000) : null;
+    const ajusteCredito = Math.round(((creditos?.data ?? []) as { valor: number; lancamento_id: string | null }[])
+      .reduce((s, c) => s + (Number(c.valor) > 0 ? -Number(c.valor) : c.lancamento_id ? 0 : -Number(c.valor)), 0) * 100) / 100;
+    return { cliente: cliente.data as Cliente | null, pets: (pets.data ?? []) as Pet[], entradas: (entradas?.data ?? []) as Entrada[], devolvido, ajusteCredito };
+  }, [petshop.id, id, cuidoDoFinanceiro]);
+  useEffect(() => { if (!carregando) aoAbrir?.(); }, [carregando]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const botaoVoltar = <button className="g-voltar" onClick={voltar}><ArrowLeft />Voltar</button>;
 
@@ -50,11 +70,12 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
     return <>{botaoVoltar}<Vazio titulo="Não achei esse cliente" texto="Pode ser que a ficha tenha sido apagada."><button className="g-btn verde" onClick={voltar}>Ver a lista</button></Vazio></>;
   }
 
-  const { cliente, pets, entradas } = dados;
-  const zap = linkWhatsApp(cliente.telefone, `Oi, ${primeiroNome(cliente.nome)}! Aqui é do ${petshop.nome}. `);
+  const { cliente, pets, entradas, devolvido, ajusteCredito } = dados;
+  const zap = linkWhatsApp(cliente.telefone, `${saudacaoZap(cliente.nome, petshop.nome)} `);
   const pagas = entradas.filter((l) => l.pago);
-  const total = pagas.reduce((s, l) => s + Number(l.valor), 0);
-  const aReceber = entradas.filter((l) => !l.pago).reduce((s, l) => s + Number(l.valor), 0);
+  const total = Math.max(0, Math.round((pagas.reduce((s, l) => s + Number(l.valor), 0) - devolvido + ajusteCredito) * 100) / 100);
+  const emAberto = entradas.filter((l) => !l.pago);
+  const aReceber = emAberto.reduce((s, l) => s + Number(l.valor), 0);
   const ativos = pets.filter((p) => p.ativo).length;
 
   async function excluir() {
@@ -90,7 +111,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
             <AvatarPessoa nome={cliente.nome} tamanho="g" />
             <div>
               <h1>{cliente.nome}</h1>
-              <p className="tutor"><Phone aria-hidden />{fmtTelefone(cliente.telefone) || "Sem telefone"}</p>
+              <p className="tutor"><Phone aria-hidden />{!cliente.telefone ? "Sem telefone" : telefoneValido(cliente.telefone) ? fmtTelefone(cliente.telefone) : <span className="g-vermelho-t">Telefone incompleto: {cliente.telefone}</span>}</p>
               <div className="g-cli-etqs">
                 <span className="g-cli-etq pessego"><PawPrint aria-hidden />{pets.length === 1 ? "1 pet" : `${pets.length} pets`}</span>
                 <span className="g-cli-etq">Cliente desde {dataCompleta(cliente.criado_em)}</span>
@@ -104,7 +125,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
         </section>
       </div>
 
-      <div className={`g-cli-nums${vejoFinanceiro ? "" : " dois"}`}>
+      <div className={`g-cli-nums${cuidoDoFinanceiro ? "" : " dois"}`}>
         <div className="g-cli-num">
           <Tile icone={PawPrint} tom="pessego" />
           <div><span className="g-rotulo">Pets</span><b className="g-tab">{pets.length}</b><small>{ativos === pets.length ? (pets.length === 1 ? "na lista" : "todos na lista") : `${ativos} na lista, ${pets.length - ativos} ${pets.length - ativos === 1 ? "desativado" : "desativados"}`}</small></div>
@@ -113,7 +134,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
           <Tile icone={CalendarHeart} tom="ceu" />
           <div><span className="g-rotulo">Cliente</span><b>{haQuanto(cliente.criado_em)}</b><small>desde {dataCompleta(cliente.criado_em)}</small></div>
         </div>
-        {vejoFinanceiro && (
+        {cuidoDoFinanceiro && (
           <>
             <div className="g-cli-num">
               <Tile icone={Wallet} tom="menta" />
@@ -121,7 +142,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
             </div>
             <div className="g-cli-num">
               <Tile icone={HandCoins} tom="manteiga" />
-              <div><span className="g-rotulo">A receber</span><b className="g-tab">{brl(aReceber)}</b><small>{pagas.length ? `última entrada em ${dataCompleta(pagas[0].data)}` : "nada recebido ainda"}</small></div>
+              <div><span className="g-rotulo">Deve</span><b className="g-tab">{brl(aReceber)}</b><small>{!emAberto.length ? "nada em aberto" : emAberto.length === 1 ? "1 conta em aberto" : `${emAberto.length} contas em aberto`}</small></div>
             </div>
           </>
         )}
@@ -159,12 +180,22 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
             )}
           </section>
 
+          {vejoFinanceiro && <DividaDoTutor tutor={cliente} aoMudar={recarregar} />}
+          {vejoFinanceiro && <CreditoDoTutor clienteId={cliente.id} nome={cliente.nome} />}
           {vejoFinanceiro && (
+            <div className="g-fila" style={{ flexWrap: "wrap", gap: 8 }}>
+              <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setAnotando(true); }}><HandCoins />Anotar o que {cliente.nome.split(" ")[0]} deve</button>
+              <span className="g-pp g-muted">Taxa de falta, diferença esquecida: fica na ficha e em A receber.</span>
+            </div>
+          )}
+          {anotando && <FolhaLancamento modo="conta" tipo="entrada" tutor={{ id: cliente.id, nome: cliente.nome }} aoFechar={() => setAnotando(false)} aoSalvo={recarregar} />}
+
+          {cuidoDoFinanceiro && (
             <section className="g-card">
               <div className="g-card-t"><h3><Tile icone={Wallet} tom="menta" tamanho="p" />Quanto já gastou aqui</h3></div>
               <p className="g-num m">{brl(total)}</p>
               <p className="g-pp g-muted" style={{ marginTop: 4 }}>
-                {!pagas.length ? "Nenhuma entrada ligada a este cliente." : pagas.length === 1 ? "Em 1 entrada recebida." : `Em ${pagas.length} entradas recebidas.`}
+                {!pagas.length ? "Nenhuma entrada ligada a este cliente." : pagas.length === 1 ? "Em 1 entrada recebida." : `Em ${pagas.length} entradas recebidas.`}{devolvido > 0 ? ` Já sem ${brl(devolvido)} devolvidos a ${cliente.nome.split(" ")[0]}.` : ""}{ajusteCredito < 0 ? ` O que ficou de crédito para ele não conta duas vezes (${brl(-ajusteCredito)} a menos aqui; conta quando ele usa).` : ""}
               </p>
               {entradas.length > 0 && (
                 <div className="g-lista" style={{ marginTop: 8 }}>
@@ -200,6 +231,14 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
           </section>
 
           <CartaoFidelidade clienteId={cliente.id} nome={cliente.nome} />
+          <CartaoPaginaDoTutor cliente={cliente} pets={pets} />
+
+          {(souDono || posso("clientes")) && (
+            <div className="g-pilha p">
+              <div><button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setJuntando(true); }}><Merge />Juntar com outro tutor</button></div>
+              <p className="g-pp g-muted">A mesma pessoa foi cadastrada duas vezes? Junte as fichas: os pets e o histórico da outra vêm para esta.</p>
+            </div>
+          )}
 
           {souDono ? (
             <div className="g-pilha p">
@@ -212,6 +251,7 @@ export default function FichaTutor({ id, voltar, aoExcluir }: { id: string; volt
         </div>
       </div>
 
+      {juntando && <FolhaJuntarTutor cliente={cliente} aoFechar={() => setJuntando(false)} aoJuntar={() => { setJuntando(false); void recarregar(); }} />}
       {editando && <FormTutor cliente={cliente} aoFechar={() => setEditando(false)} aoSalvar={() => { setEditando(false); avisarMudanca(); }} />}
       {petNovo && (
         <FormPet clienteFixo={{ id: cliente.id, nome: cliente.nome, telefone: cliente.telefone }} aoFechar={() => setPetNovo(false)}

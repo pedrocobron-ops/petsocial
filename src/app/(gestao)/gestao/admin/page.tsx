@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronRight, Download, LogOut, Mail, MessageCircle, RefreshCw, Search } from "lucide-react";
-import AbaUso, { type Uso, tempo, vistoHa } from "@/components/gestao/admin/uso";
+import { ArrowLeft, ChevronDown, ChevronRight, Download, LogOut, RefreshCw, Search } from "lucide-react";
+import AbaUso, { type Uso, type UsoConta, SINAIS, sinaisDe, tempo, vistoHa } from "@/components/gestao/admin/uso";
+import AbaVisao from "@/components/gestao/admin/visao";
+import ContaAssinatura from "@/components/gestao/admin/conta";
 import AbaConversas from "@/components/gestao/admin/conversas";
 import AbaEscola from "@/components/gestao/admin/escola";
+import AbaCakto from "@/components/gestao/admin/cakto";
 import { AvisosProvider, Campo, Esqueleto, Folha, Vazio, mensagemDeErro, ok, useAvisos } from "@/components/gestao/ui";
 import { banco, configurado } from "@/lib/gestao/supabase";
-import { brl, dataCompleta, dataCurta, fmtTelefone, haQuanto, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDiaCurto, semAcento, somaDias } from "@/lib/gestao/util";
+import { dataCompleta, fmtTelefone, haQuanto, hora, isoDia, semAcento } from "@/lib/gestao/util";
 
 type Status = "teste" | "ativa" | "atrasada" | "cancelada" | "cortesia";
 
@@ -23,7 +26,7 @@ type Loja = {
 type EventoCakto = { id: number; evento: string | null; email: string | null; petshop_id: string | null; recebido_em: string };
 
 const DIA = 864e5;
-import { PLANOS as CATALOGO, planoPorId } from "@/lib/gestao/planos";
+import { PLANOS as CATALOGO } from "@/lib/gestao/planos";
 const PLANOS: Record<string, string> = Object.fromEntries(CATALOGO.map((p) => [p.id, `${p.nome} (${p.acessos})`]));
 const nomePlano = (p: string) => PLANOS[p] ?? p;
 
@@ -33,7 +36,6 @@ const emTeste = (l: Loja, agora: number) => l.status === "teste" && new Date(l.t
 const testeVencido = (l: Loja, agora: number) => l.status === "teste" && new Date(l.teste_ate).getTime() <= agora;
 const diasDeTeste = (l: Loja, agora: number) => Math.max(0, Math.ceil((new Date(l.teste_ate).getTime() - agora) / DIA));
 const venceEm2Dias = (l: Loja, agora: number) => emTeste(l, agora) && new Date(l.teste_ate).getTime() - agora <= 2 * DIA;
-const assinou = (l: Loja) => l.status === "ativa" || l.status === "atrasada" || Boolean(l.assinatura_desde);
 
 function etiqueta(l: Loja, agora: number): { cor: string; texto: string } {
   if (l.status === "teste") {
@@ -91,16 +93,18 @@ function Admin() {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [abertaId, setAbertaId] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
-  const [aba, setAba] = useState<"geral" | "uso" | "conversas" | "escola">("geral");
+  const [aba, setAba] = useState<"visao" | "geral" | "uso" | "conversas" | "escola" | "cakto">("visao");
   const [uso, setUso] = useState<Uso[]>([]);
+  const [contas, setContas] = useState<UsoConta[]>([]);
   const [vez, setVez] = useState(0);
 
   const carregar = useCallback(async () => {
     setAtualizando(true);
     try {
-      const [l, u] = await Promise.all([banco().rpc("admin_painel"), banco().rpc("admin_uso")]);
+      const [l, u, c] = await Promise.all([banco().rpc("admin_painel"), banco().rpc("admin_uso"), banco().rpc("admin_uso_contas")]);
       setLojas((ok(l) as unknown as Loja[]) ?? []);
       setUso((u.data as unknown as Uso[]) ?? []);
+      setContas((c.data as unknown as UsoConta[]) ?? []);
       setVez((v) => v + 1);
       setErro(null);
     } catch (e) {
@@ -134,38 +138,6 @@ function Admin() {
 
   // "agora" acompanha cada carga, para os prazos de teste não ficarem velhos na tela
   const agora = useMemo(() => Date.now(), [lojas]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const receita = useMemo(() => (lojas ?? []).filter((l) => l.status === "ativa").reduce((t, l) => t + planoPorId(l.plano).preco, 0), [lojas]);
-  const n = useMemo(() => {
-    const l = lojas ?? [];
-    const ativas = l.filter((x) => x.status === "ativa").length;
-    // teste encerrado: tudo que não está em teste correndo nem é cortesia
-    const encerrados = l.filter((x) => !emTeste(x, agora) && x.status !== "cortesia");
-    return {
-      total: l.length,
-      teste: l.filter((x) => emTeste(x, agora)).length,
-      ativas,
-      atrasadas: l.filter((x) => x.status === "atrasada").length,
-      vencidos: l.filter((x) => testeVencido(x, agora)).length,
-      canceladas: l.filter((x) => x.status === "cancelada").length,
-      cortesias: l.filter((x) => x.status === "cortesia").length,
-      novos7: l.filter((x) => agora - new Date(x.criado_em).getTime() <= 7 * DIA).length,
-      encerrados: encerrados.length,
-      viraram: encerrados.filter(assinou).length,
-    };
-  }, [lojas, agora]);
-
-  const porDia = useMemo(() => {
-    const hoje = inicioDoDia(new Date(agora));
-    const conta = new Map<string, number>();
-    for (const l of lojas ?? []) { const k = isoDia(new Date(l.criado_em)); conta.set(k, (conta.get(k) ?? 0) + 1); }
-    return Array.from({ length: 14 }, (_, i) => {
-      const d = somaDias(hoje, i - 13);
-      return { dia: d, qtd: conta.get(isoDia(d)) ?? 0 };
-    });
-  }, [lojas, agora]);
-  const maiorDia = Math.max(1, ...porDia.map((d) => d.qtd));
-  const total14 = porDia.reduce((s, d) => s + d.qtd, 0);
 
   const visiveis = useMemo(() => {
     const alvo = semAcento(busca);
@@ -218,60 +190,14 @@ function Admin() {
       </header>
 
       {erro && <p className="g-aviso vermelho" role="alert">{erro}</p>}
-      <div className="g-seg" role="group" aria-label="Partes do painel" style={{ marginBottom: 18 }}>
-        {([["geral", "Clientes"], ["uso", "Uso"], ["conversas", "Conversas"], ["escola", "Escola"]] as const).map(([id, r]) => (
+      <div className="g-seg g-adm-abas" role="group" aria-label="Partes do painel" style={{ marginBottom: 18 }}>
+        {([["visao", "Visão geral"], ["uso", "Uso"], ["geral", "Contas"], ["conversas", "Conversas"], ["escola", "Escola"], ["cakto", "Cakto"]] as const).map(([id, r]) => (
           <button key={id} aria-pressed={aba === id} onClick={() => setAba(id)}>{r}</button>
         ))}
       </div>
-      {!lojas ? (!erro && <Esqueleto linhas={6} />) : aba === "uso" ? <AbaUso lojas={lojas} uso={uso} aoAbrir={setAbertaId} />
-        : aba === "conversas" ? <AbaConversas key={vez} /> : aba === "escola" ? <AbaEscola /> : (
+      {!lojas ? (!erro && <Esqueleto linhas={6} />) : aba === "visao" ? <AbaVisao key={vez} /> : aba === "uso" ? <AbaUso lojas={lojas} uso={uso} contas={contas} aoAbrir={setAbertaId} />
+        : aba === "conversas" ? <AbaConversas key={vez} /> : aba === "escola" ? <AbaEscola /> : aba === "cakto" ? <AbaCakto lojas={lojas} aoMudar={carregar} /> : (
         <div className="g-pilha g">
-          <section className="g-grade c4" aria-label="Números">
-            <Numero rotulo="Pet shops cadastrados" valor={n.total} />
-            <Numero rotulo="Em teste" valor={n.teste} />
-            <Numero rotulo="Assinantes ativos" valor={n.ativas} />
-            <Numero rotulo="Atrasados" valor={n.atrasadas} />
-            <Numero rotulo="Testes vencidos sem assinar" valor={n.vencidos} />
-            <Numero rotulo="Cancelados" valor={n.canceladas} />
-            <Numero rotulo="Cadastros em 7 dias" valor={n.novos7} />
-            <div className="g-card verde">
-              <p className="g-rotulo">Receita mensal (estimativa)</p>
-              <p className="g-num m" style={{ marginTop: 10 }}>{brl(receita)}</p>
-              <p className="g-pp g-muted" style={{ marginTop: 6 }}>{n.ativas} {n.ativas === 1 ? "assinante" : "assinantes"}, pelo preço de cada plano, sem descontar taxas</p>
-            </div>
-          </section>
-
-          <section className="g-grade c2">
-            <div className="g-card">
-              <p className="g-rotulo">Do teste à assinatura</p>
-              {n.encerrados === 0 ? <p className="g-muted" style={{ marginTop: 10 }}>Ainda sem dados. Nenhum teste terminou.</p> : (
-                <>
-                  <p style={{ marginTop: 10 }}><span className="g-num">{Math.round((n.viraram / n.encerrados) * 100)}%</span></p>
-                  <p className="g-muted g-p" style={{ marginTop: 8 }}>
-                    De {n.encerrados} {n.encerrados === 1 ? "teste encerrado" : "testes encerrados"}, {n.viraram} {n.viraram === 1 ? "virou assinante" : "viraram assinantes"}.
-                  </p>
-                  <div className="g-prog" style={{ marginTop: 12 }}><i style={{ width: `${(n.viraram / n.encerrados) * 100}%` }} /></div>
-                </>
-              )}
-              {n.cortesias > 0 && <p className="g-pp g-muted" style={{ marginTop: 10 }}>{n.cortesias} em cortesia, fora desta conta.</p>}
-            </div>
-            <div className="g-card">
-              <div className="g-card-t">
-                <p className="g-rotulo">Cadastros por dia · 14 dias</p>
-                <span className="g-pp g-muted">{total14} no período</span>
-              </div>
-              <div className="g-barras" role="img" aria-label={`Cadastros por dia nos últimos 14 dias: ${total14} no total.`}>
-                {porDia.map(({ dia, qtd }) => (
-                  <div key={isoDia(dia)} title={`${nomeDiaCurto(dia)}, ${dataCurta(dia)}: ${qtd}`}>
-                    <span className="g-tab">{qtd || ""}</span>
-                    <i className={qtd ? undefined : "fraco"} style={{ height: `${(qtd / maiorDia) * 100}%` }} />
-                    <span>{dia.getDate()}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
           <section className="g-pilha">
             <div className="g-fila entre">
               <h2>Pet shops</h2>
@@ -321,29 +247,19 @@ function Admin() {
         </div>
       )}
 
-      {aberta && <Detalhe key={aberta.id} loja={aberta} uso={uso.find((u) => u.id === aberta.id)} agora={agora} aoFechar={() => setAbertaId(null)} aoMudar={carregar} />}
+      {aberta && <Detalhe key={aberta.id} loja={aberta} uso={uso.find((u) => u.id === aberta.id)} conta={contas.find((c) => c.id === aberta.id)} agora={agora} aoFechar={() => setAbertaId(null)} aoMudar={carregar} />}
     </main>
-  );
-}
-
-function Numero({ rotulo, valor }: { rotulo: string; valor: number }) {
-  return (
-    <div className="g-card">
-      <p className="g-rotulo">{rotulo}</p>
-      <p className="g-num" style={{ marginTop: 10 }}>{valor}</p>
-    </div>
   );
 }
 
 /* ---------- folha de um pet shop ---------- */
 
-function Detalhe({ loja, uso, agora, aoFechar, aoMudar }: { loja: Loja; uso?: Uso; agora: number; aoFechar: () => void; aoMudar: () => Promise<void> }) {
+function Detalhe({ loja, uso, conta, agora, aoFechar, aoMudar }: { loja: Loja; uso?: Uso; conta?: UsoConta; agora: number; aoFechar: () => void; aoMudar: () => Promise<void> }) {
   const { avisar, avisarErro, confirmar } = useAvisos();
   const [nota, setNota] = useState(loja.nota ?? "");
   const [indo, setIndo] = useState(false);
   const e = etiqueta(loja, agora), u = engajamento(loja);
-  const primeiroNome = (loja.dono_nome ?? "").trim().split(/\s+/)[0];
-  const zap = linkWhatsApp(loja.telefone, `Oi${primeiroNome ? `, ${primeiroNome}` : ""}! Aqui é da Maestro Pet. Tudo certo com o Maestro Pet Gestão no ${loja.nome}?`);
+  const sinais = conta ? sinaisDe(conta, agora) : [];
 
   async function gravar(args: { p_status?: Status; p_teste_ate?: string; p_plano?: string; p_nota?: string }, feito: string) {
     setIndo(true);
@@ -383,13 +299,15 @@ function Detalhe({ loja, uso, agora, aoFechar, aoMudar }: { loja: Loja; uso?: Us
     ["Criado em", dataHora(loja.criado_em)],
     ["Teste até", dataHora(loja.teste_ate)],
     ["Assinante desde", loja.assinatura_desde ? dataCompleta(new Date(loja.assinatura_desde)) : "não assinou"],
-    ["Equipe", `${loja.equipe} ${loja.equipe === 1 ? "pessoa" : "pessoas"}`],
+    ["Equipe", conta ? `${conta.pessoas} de ${conta.limite} ${conta.limite === 1 ? "pessoa" : "pessoas"} do plano` : `${loja.equipe} ${loja.equipe === 1 ? "pessoa" : "pessoas"}`],
     ["Clientes", loja.clientes],
     ["Pets", loja.pets],
     ["Agendamentos", `${loja.agendamentos} (${loja.agendamentos_7d} nos últimos 7 dias)`],
     ["Pedidos ao assistente", loja.pedidos_assistente],
     ["Último agendamento", loja.ultimo_agendamento ? `${haQuanto(loja.ultimo_agendamento)} (${dataCompleta(new Date(loja.ultimo_agendamento))})` : "nunca"],
     ["Última vez no sistema", vistoHa(uso?.visto_em ?? null)],
+    ["Último login", conta?.ultimo_login ? haQuanto(conta.ultimo_login) : "nunca"],
+    ["Dias de uso em 14", conta ? `${conta.dias_14} de 14` : "sem dados"],
     ["Tempo de uso", `${tempo(uso?.min_7d ?? 0)} em 7 dias · ${tempo(uso?.min_30d ?? 0)} em 30 dias`],
   ];
 
@@ -401,12 +319,13 @@ function Detalhe({ loja, uso, agora, aoFechar, aoMudar }: { loja: Loja; uso?: Us
           <span className={`g-tag ${u.cor}`}>{u.texto}</span>
         </div>
 
-        <div className="g-fila">
-          {zap
-            ? <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle /> WhatsApp</a>
-            : <span className="g-pp g-muted">Sem telefone para o WhatsApp.</span>}
-          {loja.dono_email && <a className="g-btn sec" href={`mailto:${loja.dono_email}`}><Mail /> E-mail</a>}
-        </div>
+        {sinais.length > 0 && (
+          <div className="g-fila" style={{ gap: 6 }}>
+            {sinais.map((m) => { const x = SINAIS.find((y) => y.id === m)!; return <span key={m} className={`g-tag ${x.cor}`}>{x.rotulo}</span>; })}
+          </div>
+        )}
+
+        <ContaAssinatura loja={loja} sumido={sinais.includes("sumido")} />
 
         <dl className="g-card liso" style={{ display: "grid", gridTemplateColumns: "minmax(0, auto) minmax(0, 1fr)", gap: "8px 16px", margin: 0, fontSize: ".9375rem" }}>
           {dados.map(([k, v]) => (

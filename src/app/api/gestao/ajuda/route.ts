@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import { INSTRUCOES_AJUDA, MARCA_EQUIPE, MARCA_NOVO, procurarTopico } from "@/lib/gestao/ajuda";
+import { topicosPara } from "@/lib/gestao/manual";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -37,33 +38,39 @@ export async function POST(req: Request) {
   const { data: eu } = await sb.from("profissionais").select("id").eq("petshop_id", corpo.petshopId).eq("user_id", u.user.id).eq("ativo", true).maybeSingle();
   if (!eu) return erro(403, "sem_acesso", "Você não faz parte deste pet shop.");
 
-  const local = () => {
-    const t = procurarTopico(ultima.texto);
+  // sem a IA, a resposta sai do manual: primeiro entre os tópicos do que este pet shop usa (com os passos dele);
+  // se nenhum combina, entre todos (quem só tem creche também pode perguntar da agenda)
+  const local = async () => {
+    const { data: loja } = await sb.from("petshops").select("modulos, principal").eq("id", corpo.petshopId!).maybeSingle();
+    const t = (loja ? procurarTopico(ultima.texto, topicosPara(loja)) : null) ?? procurarTopico(ultima.texto);
     return t ? { texto: t.resposta, equipe: false, assunto: t.id } : { texto: "Essa eu não sei responder com certeza. Pode me explicar de outro jeito, ou dizer em qual tela você está?", equipe: false, semResposta: true };
   };
 
-  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json(local());
+  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json(await local());
 
-  const desde = new Date(Date.now() - 864e5).toISOString();
-  const { count } = await sb.from("assistente_eventos").select("id", { count: "exact", head: true }).eq("petshop_id", corpo.petshopId).eq("acao", "ajuda").gte("criado_em", desde);
-  if ((count ?? 0) >= LIMITE_DIA) return NextResponse.json(local());
+  // a contagem do dia fica no banco (vale também para a conta só para consulta); se não der para contar, responde pelo manual
+  const conta = await sb.rpc("assistente_contar", { p_petshop: corpo.petshopId, p_canal: "ajuda", p_tipo: "pedido", p_limite: LIMITE_DIA });
+  if (conta.error || conta.data !== true) return NextResponse.json(await local());
 
   try {
     const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, "") });
     const r = await cliente.messages.create({
-      model: MODELO, max_tokens: 500,
+      // o raciocínio do modelo conta no limite de tokens: folga para ele e esforço baixo (dúvida de uso é simples)
+      model: MODELO, max_tokens: 3000, output_config: { effort: "low" },
       system: [{ type: "text", text: INSTRUCOES_AJUDA, cache_control: { type: "ephemeral" } }],
       messages: falas.map((f) => ({ role: f.de === "eu" ? ("user" as const) : ("assistant" as const), content: f.texto })),
     });
+    // resposta cortada (pode ter perdido a marca de chamar a equipe) ou recusada: responde pelo manual
+    if (r.stop_reason === "max_tokens" || r.stop_reason === "refusal") return NextResponse.json(await local());
     const bruto = r.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
     const equipe = bruto.includes(MARCA_EQUIPE);
     const novo = bruto.includes(MARCA_NOVO);
     const texto = bruto.replace(MARCA_EQUIPE, "").replace(MARCA_NOVO, "").trim();
-    // registro para o limite diário; se a conta estiver só para consulta, o registro é recusado e a resposta segue
+    // registro do que foi perguntado (o limite do dia já foi contado acima; se a conta estiver só para consulta, o registro é recusado e a resposta segue)
     await sb.from("assistente_eventos").insert({ petshop_id: corpo.petshopId, user_id: u.user.id, acao: "ajuda", pedido: ultima.texto.slice(0, 300) });
-    if (!texto) return NextResponse.json(local());
+    if (!texto) return NextResponse.json(await local());
     return NextResponse.json({ texto, equipe, novo });
   } catch {
-    return NextResponse.json(local());
+    return NextResponse.json(await local());
   }
 }

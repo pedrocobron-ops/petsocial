@@ -1,4 +1,5 @@
 /* Ajustes (meu pet shop, equipe, assinatura): só o que o gestao.css não cobre. Prefixo gj-. */
+.gj-prontos { display: grid; gap: 8px; }
 .gj-dias { display: grid; }
 .gj-dia { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 10px 0; border-bottom: 1px solid var(--g-linha); min-height: 58px; }
 .gj-dia:last-child { border-bottom: 0; }
@@ -45,3 +46,13 @@
 .gj-dia .g-check { min-height: 44px; padding: 0 8px 0 2px; }
 .gj-cor { position: relative; }
 .gj-cor::after { content: ""; position: absolute; inset: -5px; }
+
+/* almoço, logo abaixo da grade de dias */
+.gj-almoco { display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); }
+.gj-almoco .gj-horas { justify-self: start; margin-left: 0; }
+.gj-almoco small { font-size: .8125rem; line-height: 1.4; }
+
+/* aparelho no formato de 12 h: "08:00 AM" cabe inteiro quando há espaço na linha */
+.gj-horas { min-width: 0; max-width: 100%; }
+.gj-horas .g-input { width: auto; flex: 1 1 7.25rem; max-width: 8.75rem; }
+.gj-dias, .gj-dia, .g-pilha:has(> .gj-dias) { min-width: 0; grid-template-columns: minmax(0, 1fr); }
