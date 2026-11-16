@@ -28,6 +28,7 @@ import CheckOut, { comNota, DetalheDaEstadia, estadiasDoTutor, NoitePorNoite, NO
 import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/components/gestao/hotel/cuidados";
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
 import Ocupacao from "@/components/gestao/hotel/ocupacao";
+import { DesfazerCheckin, useCheckinsDeHoje } from "@/components/gestao/hotel/desfazer-checkin";
 import { AjusteDoSinal, CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
 import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
@@ -337,6 +338,8 @@ export default function CrecheHotel() {
   const doTipo = (e: EstadiaCompleta) => tipo === "todos" || e.tipo === tipo;
   const abertas = useMemo(() => dados?.abertas ?? [], [dados]);
   const naCasa = useMemo(() => abertas.filter((e) => e.status === "em_casa"), [abertas]);
+  // check-in feito hoje pela reserva: dá para desfazer (um toque sem querer numa reserva de outro dia)
+  const { checkins: checkinsDeHoje } = useCheckinsDeHoje(useMemo(() => naCasa.filter((e) => !e.mensalista).map((e) => e.id), [naCasa]));
   const reservas = useMemo(() => abertas.filter((e) => e.status === "reservada"), [abertas]);
   const historico = dados?.passadas ?? [];
   // para o desconto do segundo pet: as estadias abertas e as que já saíram (o pet que saiu primeiro continua contando nas noites dele)
@@ -357,6 +360,12 @@ export default function CrecheHotel() {
     if (somenteLeitura()) return;
     const nome = e.pets?.nome ?? "O pet";
     if (!quando && isoDia(new Date(e.entrada)) < isoDia(new Date())) { setChegando(e); return; }
+    // reserva para outro dia (mais para a frente): um toque sem querer não muda a estadia; pergunta antes (dá para desfazer hoje)
+    if (!quando && !e.mensalista && isoDia(new Date(e.entrada)) > isoDia(new Date()) && !(await confirmar({
+      titulo: `Check-in de ${nome} hoje?`,
+      texto: `A reserva era para ${dataCurta(e.entrada)}. Fazer o check-in hoje e recalcular ${e.tipo === "hotel" ? "as diárias" : "o dia"}? A entrada passa a ser agora.`,
+      confirmar: "Fazer o check-in hoje",
+    }))) return;
     // o mesmo pet não entra duas vezes na casa
     const jaAqui = abertas.find((x) => x.pet_id === e.pet_id && x.id !== e.id && x.status === "em_casa");
     if (jaAqui) { avisarErro(fraseConflito(nome, jaAqui)); return; }
@@ -389,7 +398,7 @@ export default function CrecheHotel() {
       const r = ok(await sb.from("estadias").update(quando === "reservado" ? { status: "em_casa" } : { status: "em_casa", entrada: new Date().toISOString() })
         .eq("id", e.id).eq("petshop_id", petshop.id).eq("status", "reservada").select("id"));
       if (!r.length) avisar("Essa reserva já tinha sido alterada. Atualizei a lista.");
-      else avisar(quando === "reservado" ? `${nome} está na casa desde ${dataCurta(e.entrada)}, como estava reservado.` : `${nome} chegou.`);
+      else avisar(quando === "reservado" ? `${nome} está na casa desde ${dataCurta(e.entrada)}, como estava reservado.` : `${nome} chegou.${isoDia(new Date(e.entrada)) !== isoDia(new Date()) ? " Foi engano? No cartão dele, Desfazer check-in volta para a reserva." : ""}`);
       mudou();
     } catch (x) {
       if (ehRepetido(x)) { avisarErro(`${nome} já está na casa. Atualizei a lista.`); mudou(); }
@@ -672,6 +681,7 @@ export default function CrecheHotel() {
                         </div>
                       </div>
 
+                      {checkinsDeHoje.get(e.id) && <DesfazerCheckin estadia={e} feito={checkinsDeHoje.get(e.id)!} aoDesfazer={mudou} />}
                       <LinhaValor e={e} plano={planoDe(e)} abertas={doTutor} valores={valoresDe(e)} />
                       {pet?.alertas && <div className="g-aviso vermelho" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce"><b>Atenção:</b> {pet.alertas}</span></div>}
                       {quarto(e)}

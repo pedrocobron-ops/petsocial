@@ -112,11 +112,18 @@ export default function PedidosLink() {
     const idsEstadia = [...respondidosAinda, ...recadosLidos].filter((p) => p.status === "aceito" && p.estadia_id).map((p) => p.estadia_id!);
     const idsHorario = [...respondidosAinda, ...recadosLidos].filter((p) => p.status === "aceito" && p.agendamento_id).map((p) => p.agendamento_id!);
     const [estEstadias, estHorarios] = await Promise.all([
-      idsEstadia.length ? sb.from("estadias").select("id, status").eq("petshop_id", petshop.id).in("id", idsEstadia) : null,
+      idsEstadia.length ? sb.from("estadias").select("id, status, entrada").eq("petshop_id", petshop.id).in("id", idsEstadia) : null,
       idsHorario.length ? sb.from("agendamentos").select("id, status").eq("petshop_id", petshop.id).in("id", idsHorario) : null,
     ]);
     const canceladas = new Set([...(estEstadias?.data ?? []).filter((e) => e.status === "cancelada"), ...(estHorarios?.data ?? []).filter((a) => a.status === "cancelado")].map((x) => x.id));
     if (canceladas.size) respondidosAinda = respondidosAinda.filter((p) => !(p.status === "aceito" && !p.cliente_cancelou_em && ((p.estadia_id && canceladas.has(p.estadia_id)) || (p.agendamento_id && canceladas.has(p.agendamento_id)))));
+    // a reserva aceita já andou: o pet chegou (ou já foi embora), ou a entrada mudou de dia. A confirmação com as datas do
+    // pedido não serve mais (mandaria as datas antigas): o aviso sai.
+    const entrouOuMudou = new Map((estEstadias?.data ?? []).map((e) => [e.id, e]));
+    respondidosAinda = respondidosAinda.filter((p) => {
+      const e = p.status === "aceito" && !p.cliente_cancelou_em && p.estadia_id ? entrouOuMudou.get(p.estadia_id) : undefined;
+      return !e || (e.status !== "em_casa" && e.status !== "encerrada" && !(e.status === "reservada" && isoDia(new Date(e.entrada)) !== isoDia(new Date(p.inicio))));
+    });
     const comReserva = respondidosAinda.filter((p) => p.estadia_id);
     if (vejoFinanceiro && sinalDe(petshop).ativo && comReserva.length) {
       const v = await sb.from("estadias_valores").select("estadia_id, sinal, sinal_estado").eq("petshop_id", petshop.id).in("estadia_id", comReserva.map((p) => p.estadia_id!));

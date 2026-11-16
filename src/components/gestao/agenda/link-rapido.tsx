@@ -6,6 +6,7 @@ import { Check, Copy, Link2, MessageCircle, Settings2 } from "lucide-react";
 import type { PetComTutor } from "@/lib/gestao/tipos";
 import { linkWhatsApp } from "@/lib/gestao/util";
 import { textoDoLink } from "@/lib/gestao/agenda";
+import { usaModulo } from "@/lib/gestao/modulos";
 import { useGestao } from "../contexto";
 import { EscolherPet, Folha, ok, useAvisos, useSomenteLeitura } from "../ui";
 import { EVENTO_LINK } from "../lembrado";
@@ -16,7 +17,7 @@ import "./link-rapido.css";
  * e ligar o link, sem precisar ir até Meu pet shop.
  */
 export default function LinkRapido({ rotulo = "Link do cliente" }: { rotulo?: string }) {
-  const { sb, petshop, souDono, recarregarBase } = useGestao();
+  const { sb, petshop, souDono, recarregarBase, servicos } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [aberto, setAberto] = useState(false);
@@ -40,7 +41,11 @@ export default function LinkRapido({ rotulo = "Link do cliente" }: { rotulo?: st
     if (somenteLeitura() || ligando) return;
     setLigando(true);
     try {
-      ok(await sb.from("petshops").update({ link_ativo: true }).eq("id", petshop.id).select("id"));
+      // só creche ou hotel, sem serviço da agenda: o link já sai pedindo vaga (senão abriria sem opções)
+      const semServico = !servicos.some((x) => x.ativo && !["creche", "hotel"].includes(x.categoria));
+      const casa = semServico && !petshop.link_creche && !petshop.link_hotel
+        ? { ...(usaModulo(petshop, "hotel") ? { link_hotel: true } : {}), ...(usaModulo(petshop, "creche") ? { link_creche: true } : {}) } : {};
+      ok(await sb.from("petshops").update({ link_ativo: true, ...casa }).eq("id", petshop.id).select("id"));
       await recarregarBase();
       avisar("Link ligado. Já pode mandar para os clientes.");
     } catch (e) { avisarErro(e); } finally { setLigando(false); }
