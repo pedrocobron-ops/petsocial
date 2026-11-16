@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ChevronRight, History } from "lucide-react";
 import { brl, dataAmigavel, hora } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -80,7 +81,7 @@ export default function AlteracoesDeValores() {
       {aberta && (
         <Folha titulo="Alterações em valores" aoFechar={fechar} rodape={<button type="button" className="g-btn sec" onClick={fechar}>Fechar</button>}>
           <div className="g-pilha">
-            <p className="g-muted g-p">O que outras pessoas da equipe alteraram ou apagaram em dinheiro já recebido, as vendas com preço diferente da lista ou com desconto, os horários marcados abaixo da lista, os serviços tirados da conta, os atendimentos marcados como não cobrados, os atendimentos concluídos que voltaram para marcado, ficaram mais baratos ou foram apagados, os pacotes vendidos fora do modelo, os preços de produto mudados e as saídas de estoque por perda ou sem o dinheiro. O que você mesmo fez não entra aqui.</p>
+            <p className="g-muted g-p">O que outras pessoas da equipe alteraram ou apagaram em dinheiro já recebido, as vendas com preço diferente da lista ou com desconto, os horários marcados abaixo da lista, os serviços tirados da conta, os atendimentos marcados como não cobrados, os atendimentos concluídos que voltaram para marcado, ficaram mais baratos ou foram apagados, os pacotes vendidos fora do modelo, os preços de produto mudados e as saídas de estoque por perda ou sem o dinheiro. O que você mesmo fez não entra aqui: para ver tudo, inclusive o que você mudou, em qualquer período, abra <Link href="/gestao/app/financeiro?aba=alteracoes">Financeiro, Alterações</Link>.</p>
             {lista.length ? (
               <ul className="gf-alt-lista">
                 {lista.map((x) => (

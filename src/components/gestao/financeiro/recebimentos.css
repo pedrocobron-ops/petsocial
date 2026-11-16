@@ -93,3 +93,18 @@
 @media (max-width: 420px) { .gr-com-pe { padding-left: 0; } }
 .g-aviso.gr-com-pend { display: grid; gap: 8px; margin: 10px 0 0; align-items: start; }
 .g-aviso.gr-com-pend .g-btn { margin-left: 0; }
+
+/* comissão linha por linha */
+.gr-com-extrato { padding-left: 50px; display: grid; gap: 6px; }
+.gr-com-extrato ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.gr-com-extrato li { display: grid; grid-template-columns: auto 1fr auto auto; gap: 4px 10px; align-items: baseline; font-size: .8125rem; padding: 4px 0; border-bottom: 1px dashed var(--g-linha); }
+.gr-com-extrato li .q { color: var(--g-cinza); white-space: nowrap; }
+.gr-com-extrato li .s { min-width: 0; overflow-wrap: anywhere; }
+.gr-com-extrato li .c { color: var(--g-cinza); white-space: nowrap; }
+@media (max-width: 520px) {
+  .gr-com-extrato { padding-left: 0; }
+  .gr-com-extrato li { grid-template-columns: 1fr auto; }
+  .gr-com-extrato li .q { grid-column: 1 / -1; }
+}
+.gr-com-det summary { cursor: pointer; font-size: .875rem; font-weight: 600; padding: 4px 0; }
+.gr-com-det .gr-com-extrato { padding-left: 0; }
