@@ -2,7 +2,8 @@
 
 import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useMemo, useState } from "react";
-import { Bug, HeartPulse, MessageCircle, Pill, Plus, RotateCw, ShieldPlus, Syringe, Trash2 } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Bug, Camera, HeartPulse, MessageCircle, Pill, Plus, RotateCw, ShieldPlus, Syringe, Trash2 } from "lucide-react";
 import type { Database } from "@/lib/gestao/banco";
 import { dataCompleta, deIsoDia, inicioDoDia, isoDia, linkWhatsApp, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -164,6 +165,8 @@ function somar(dia: string, { dias, meses }: { dias?: number; meses?: number }) 
 }
 
 type PetDaSaude = { id: string; nome: string; especie?: string | null };
+/** "Ler a carteirinha": só carrega quando a pessoa abre. */
+const FotoCaderno = dynamic(() => import("../caderno"), { ssr: false });
 
 /**
  * Anota ou edita um cuidado de saúde do pet. `inicial` abre um cuidado novo já com tipo e nome
@@ -275,6 +278,7 @@ export function CartaoSaude({ pet, tutor, itens, erro, aoMudar }: {
   const somenteLeitura = useSomenteLeitura();
   const [aberto, setAberto] = useState<Aberto | null>(null);
   const [verAntigas, setVerAntigas] = useState(false);
+  const [carteirinha, setCarteirinha] = useState(false);
 
   const { grupos, alerta, antigas } = useMemo(() => {
     const hoje = new Date();
@@ -325,7 +329,10 @@ export function CartaoSaude({ pet, tutor, itens, erro, aoMudar }: {
     <section className="g-card g-cli-saude">
       <div className="g-card-t">
         <h3><Tile icone={HeartPulse} tom="ceu" tamanho="p" />Saúde</h3>
-        <button type="button" className="g-btn sec p" onClick={() => abrir({})}><Plus />Adicionar</button>
+        <div className="g-fila">
+          <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setCarteirinha(true); }}><Camera />Ler a carteirinha</button>
+          <button type="button" className="g-btn sec p" onClick={() => abrir({})}><Plus />Adicionar</button>
+        </div>
       </div>
 
       {itens == null ? <p className="g-erro">{erro ? `Não consegui carregar os cuidados. ${erro}` : "Não consegui carregar os cuidados."}</p>
@@ -362,6 +369,7 @@ export function CartaoSaude({ pet, tutor, itens, erro, aoMudar }: {
         </>
       )}
 
+      {carteirinha && <FotoCaderno pet={{ id: pet.id, nome: pet.nome }} aoFechar={() => setCarteirinha(false)} aoTerminar={aoMudar} />}
       {aberto && (
         <FormSaude pet={pet} cuidado={aberto.cuidado} inicial={aberto.inicial} aoFechar={() => setAberto(null)}
           aoSalvar={() => { setAberto(null); aoMudar(); avisarMudanca(); }} />

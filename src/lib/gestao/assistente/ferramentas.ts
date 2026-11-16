@@ -11,6 +11,7 @@ import type { Horario, Petshop, Profissional, Servico } from "../tipos";
 import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres, vagasDe } from "../agenda";
 import { partesPorForma } from "../dinheiro";
 import { juntarServicosAMais, nomeDosServicos, valorDoHorario } from "../servicos-do-horario";
+import { parecidos } from "./parecido";
 import { almocoNoDiaDaSemana, brl, fmtTelefone, lerTelefone, linkWhatsApp, precoDoServico, semAcento, soDigitos } from "../util";
 
 /**
@@ -78,7 +79,7 @@ const DIA_HORA = { type: "string", description: "Dia e hora locais no formato AA
 const HORA = { type: "string", description: "Hora local no formato HH:mm" };
 
 export const FERRAMENTAS: Def[] = [
-  { grava: false, name: "buscar_pets", description: "Procura pets e tutores pelo nome do pet, nome do tutor ou telefone. Use sempre antes de marcar horário ou lançar algo para um pet, para pegar o id certo. Devolve também o último atendimento e os pacotes ativos.",
+  { grava: false, name: "buscar_pets", description: "Procura pets e tutores pelo nome do pet, nome do tutor ou telefone. Use sempre antes de marcar horário ou lançar algo para um pet, para pegar o id certo. Devolve também o último atendimento e os pacotes ativos. Sem o nome exato (erro do ditado), devolve os nomes parecidos com um aviso.",
     input_schema: obj({ termo: { ...S, description: "Nome do pet, do tutor ou parte do telefone" } }, ["termo"]) },
   { grava: false, name: "ver_agenda", description: "Lista os horários marcados entre dois dias (inclusive), com pet, tutor, serviço, profissional, status e valor, e os bloqueios de horário do período (almoço, folga, feriado), cada um com bloqueio_id e se faz parte de uma série.",
     input_schema: obj({ de: DIA, ate: DIA }, ["de", "ate"]) },
@@ -523,7 +524,13 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       const digitos = alvo.replace(/\D/g, "");
       type PetAchado = { id: string; nome: string; especie: string; raca: string | null; porte: string | null; alertas: string | null; ativo: boolean; clientes: { id: string; nome: string; telefone: string | null } | null };
       const todos = await lerTudo<PetAchado>((de, ate, contar) => sb.from("pets").select("id, nome, especie, raca, porte, alertas, ativo, clientes(id, nome, telefone)", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate));
-      const achados = todos.filter((p) => semAcento(p.nome).includes(alvo) || semAcento(p.clientes?.nome ?? "").includes(alvo) || (digitos.length >= 4 && (p.clientes?.telefone ?? "").replace(/\D/g, "").includes(digitos))).slice(0, 12);
+      let achados = todos.filter((p) => semAcento(p.nome).includes(alvo) || semAcento(p.clientes?.nome ?? "").includes(alvo) || (digitos.length >= 4 && (p.clientes?.telefone ?? "").replace(/\D/g, "").includes(digitos))).slice(0, 12);
+      // pedido falado: o ditado erra nomes ("tor" por "Thor"); sem o nome exato, vão os parecidos
+      let aviso: string | null = null;
+      if (!achados.length && digitos.length < 4) {
+        achados = parecidos(alvo, todos, (p) => [p.nome, p.clientes?.nome]);
+        if (achados.length) aviso = `Nenhum nome igual a "${texto(e.termo, 80)}". ${achados.length > 1 ? "Estes são parecidos (pode ser erro do ditado): pergunte qual é, citando o tutor de cada um." : "Este é parecido (pode ser erro do ditado): use o nome certo no cartão para a pessoa conferir."}`;
+      }
       if (!achados.length) return { resultado: { pets: [], aviso: "Nenhum pet encontrado com esse nome. Pergunte se quer cadastrar." } };
       const ids = achados.map((p) => p.id);
       const tutores = [...new Set(achados.map((p) => p.clientes?.id).filter((x): x is string => Boolean(x)))];
@@ -539,7 +546,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
         const ls = (abertas.data ?? []).filter((l) => id && l.cliente_id === id);
         return ls.length ? `${brl(real(ls.reduce((s, l) => s + Number(l.valor), 0)))} em ${umaOuMais(ls.length)}` : null;
       };
-      return { resultado: { pets: achados.map((p) => {
+      return { resultado: { ...(aviso ? { aviso } : {}), pets: achados.map((p) => {
         const meus = (ags.data ?? []).filter((a) => a.pet_id === p.id);
         const ultimo = meus.find((a) => a.status === "concluido");
         const proximo = meus.filter((a) => new Date(a.inicio) > new Date() && !["cancelado", "faltou"].includes(a.status)).pop();

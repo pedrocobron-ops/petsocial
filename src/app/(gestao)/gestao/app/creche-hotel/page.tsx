@@ -11,6 +11,7 @@ import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Fo
 import { AvisoCaixaFechado, Chips, ChipsForma, erroDeValor, ErroTela, lembrarForma, useCaixaAberto, useFormaLembrada } from "@/components/gestao/loja/pecas";
 import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import { BotaoFotos, useFaxinaDasFotos } from "@/components/gestao/casa/fotos-do-dia";
+import { BotaoBoletim, useBoletinsDeHoje, useFaxinaDoBoletim } from "@/components/gestao/boletim/boletim";
 import { AvisoDeVaga, FolhaEspera, ListaDeEspera, useListaDeEspera } from "@/components/gestao/casa/espera";
 import dynamic from "next/dynamic";
 import { FolhaOcorrencia, OcorrenciasDoCartao } from "@/components/gestao/casa/ocorrencias";
@@ -45,6 +46,7 @@ import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoD
 import { conflitoDoPet, type Periodo } from "@/lib/gestao/conflito-estadia";
 import "./creche-hotel.css";
 import "@/components/gestao/hotel/hotel.css";
+import { CampoComVoz } from "@/components/gestao/ditado";
 
 // As outras partes da tela (Chamada, Ocupação, Diário, Mensalistas, Cobranças) vêm à parte: a Casa agora abre sem esperar
 // baixar todas. Depois que a tela abriu, elas baixam em segundo plano (useAdiantar): no toque, já estão aqui.
@@ -199,6 +201,7 @@ const PERIODOS = [{ id: "todas", rotulo: "Todas" }, { id: "7", rotulo: "Próximo
 export default function CrecheHotel() {
   const { sb, petshop, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso } = useGestao();
   useFaxinaDasFotos(); // Página do tutor: apaga fotos fora do prazo e arquivos sem foto (nada aparece na tela)
+  useFaxinaDoBoletim(); // boletim do pet: apaga os arquivos da fila (nada aparece na tela)
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const usaCreche = usaModulo(petshop, "creche");
@@ -351,6 +354,10 @@ export default function CrecheHotel() {
   const { checkins: checkinsDeHoje } = useCheckinsDeHoje(useMemo(() => naCasa.filter((e) => !e.mensalista).map((e) => e.id), [naCasa]));
   const reservas = useMemo(() => abertas.filter((e) => e.status === "reservada"), [abertas]);
   const historico = dados?.passadas ?? [];
+  // boletim do dia: dos que estão na casa e dos que saíram hoje (o "Boletim enviado" do cartão e da linha)
+  const saiuHoje = (e: EstadiaCompleta) => e.status === "encerrada" && Boolean(e.saida) && isoDia(new Date(e.saida!)) === isoDia(new Date());
+  const boletins = useBoletinsDeHoje(useMemo(() => [...naCasa, ...(dados?.passadas ?? []).filter(saiuHoje)].map((e) => e.id), [naCasa, dados])); // eslint-disable-line react-hooks/exhaustive-deps
+  const visitaDe = (e: EstadiaCompleta) => ({ tipo: e.tipo === "hotel" ? "hotel" as const : "creche" as const, estadiaId: e.id, petId: e.pet_id, pet: e.pets?.nome ?? "Pet", tutor: e.pets?.clientes ? { nome: e.pets.clientes.nome, telefone: e.pets.clientes.telefone } : null });
   // para o desconto do segundo pet: as estadias abertas e as que já saíram (o pet que saiu primeiro continua contando nas noites dele)
   const doTutor = useMemo(() => [...abertas, ...(dados?.passadas ?? []).filter((e) => e.status === "encerrada" && e.tipo === "hotel")], [abertas, dados]);
   const tudoVazio = Boolean(dados) && !naCasa.length && !reservas.length && !historico.length && !dados?.semCobranca.length && !dados?.atrasos.length;
@@ -702,6 +709,7 @@ export default function CrecheHotel() {
                       <div className="g-fila g-ch-acoes">
                         {botaoMensagens(e)}
                         <BotaoFotos estadia={e} />
+                        {pet && <BotaoBoletim classe="g-btn fantasma p" estado={boletins.get(e.id) ?? null} visita={visitaDe(e)} />}
                         <Link className="g-btn fantasma p" href={`/gestao/app/creche-hotel/ficha?estadia=${e.id}`} aria-label={`Imprimir a ficha de cuidados de ${pet?.nome ?? "pet"}`}><Printer /> Ficha</Link>
                         {!e.mensalista && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setEditando(e); }}><Pencil /> Editar</button>}
                         {comOcorrencias && pet && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setOcorrenciaDe(e); }}><ShieldAlert /> Ocorrência</button>}
@@ -803,6 +811,7 @@ export default function CrecheHotel() {
                         {e.status === "cancelada"
                           ? <span className="g-tag vermelho">cancelada</span>
                           : <Cobrado e={e} />}
+                        {saiuHoje(e) && e.pets && <span onClick={(ev) => ev.stopPropagation()} onKeyDown={(ev) => ev.stopPropagation()}><BotaoBoletim classe="g-btn fantasma p" estado={boletins.get(e.id) ?? null} visita={visitaDe(e)} /></span>}
                         {corrigeHoras && e.status === "encerrada" && <BotaoCorrigirHoras nome={e.pets?.nome ?? "pet"} aoTocar={() => setHorasDe(e)} />}
                         {vejoFinanceiro && e.status === "encerrada" && !e.mensalista && (
                           <button className={`g-btn p ${estadiaSemCobranca(e) ? "sec" : "fantasma"}`} onClick={(ev) => { ev.stopPropagation(); if (somenteLeitura()) return; if (estadiaSemCobranca(e)) setCobrando(e); else setAcertando(e); }}
@@ -1263,7 +1272,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         {ofereceSinal && <CamposSinal estado={sinal} aoMudar={(s) => { setMexeuNoSinal(true); setSinal(s); setErroSinal(null); }} sugerido={sugerido} erro={erroSinal} semTutor={!pet.clientes?.id} />}
         {comCuidados && <EditorDeCuidados valor={cuidados} aoMudar={setCuidados} />}
         <Campo rotulo="Observações">
-          <textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder="Ração, remédio, horário de passeio, o que trouxe na mochila…" />
+          <CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações da estadia"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder="Ração, remédio, horário de passeio, o que trouxe na mochila…" /></CampoComVoz>
         </Campo>
         {erro && <p className="g-erro" role="alert">{erro}</p>}
       </div>

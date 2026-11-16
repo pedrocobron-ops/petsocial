@@ -8,7 +8,7 @@ import { linkSuporte } from "@/lib/gestao/contato";
 type Fala = { de: "eu" | "nina"; texto: string; pessoa?: boolean };
 
 const OLA: Fala = { de: "nina", texto: "Oi! Eu sou a Nina, assistente virtual do Maestro Pet. Me conta: o que o seu negócio faz? Banho e tosa, creche, hotel, loja?" };
-const RAPIDAS = ["Quanto custa?", "Como funciona o teste grátis?", "Serve para creche e hotel?", "O cliente consegue agendar sozinho?"];
+const RAPIDAS = ["Quanto custa?", "Como funciona o teste grátis?", "O que é o boletim do pet?", "Consigo trazer meu caderno?", "O cliente consegue agendar sozinho?"];
 
 /** Botão flutuante da página de venda: abre uma conversa com a Nina, a consultora virtual. O WhatsApp fica como segundo caminho. */
 export default function ChatVendas() {

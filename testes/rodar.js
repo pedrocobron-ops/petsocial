@@ -24,7 +24,7 @@ const GRUPOS = {
   migracoes: () => lista('migracoes'),
   tudo: () => [...lista('unidade'), ...lista('banco'), ...lista('migracoes'), ...lista('telas')],
 };
-const PRECISA_SERVIDOR = /^(telas\/|banco\/(tutor|link-ia|cakto|erros)\.js)/;
+const PRECISA_SERVIDOR = /^(telas\/|banco\/(tutor|link-ia|cakto|erros|caderno|boletim)\.js)/;
 
 function rodar(arq) {
   return new Promise((fim) => {

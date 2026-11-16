@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, FileSpreadsheet, History, TriangleAlert, Undo2, Upload } from "lucide-react";
+import { Camera, Download, FileSpreadsheet, History, TriangleAlert, Undo2, Upload } from "lucide-react";
 import { dataCurta, fimDoTelefone, hora, lerTelefone, semAcento } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { limparCodigo, opcoesDaLoja } from "@/lib/gestao/loja-opcoes";
@@ -10,6 +10,7 @@ import { useOperacao } from "@/lib/gestao/uma-vez";
 import { useGestao } from "./contexto";
 import { guardarLembrado, lerLembrado } from "./lembrado";
 import { Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "./ui";
+import FotoCaderno from "./caderno";
 
 type Tipo = "clientes" | "produtos";
 /**
@@ -166,6 +167,8 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
   /** Escolhas da pessoa: coluna da planilha → campo ("" = não usar). Só o que ela mudou; o resto vem do palpite. */
   const [escolhas, setEscolhas] = useState<Record<number, string>>({});
   const [mesmoAssim, setMesmoAssim] = useState(false);
+  // a lista está no caderno ou noutro sistema (print, PDF): a mesma folha vira a leitura por foto
+  const [caderno, setCaderno] = useState(false);
   const comCodigo = opcoesDaLoja(petshop).codigoBarras;
   const cols = useMemo(() => colunasDe(tipo, comCodigo), [tipo, comCodigo]);
   const principal = cols.find((c) => c.obrigatoria)!;
@@ -426,6 +429,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     <div><button className="g-btn sec p" disabled={desfazendo} onClick={() => void desfazer()}><Undo2 />{desfazendo ? "Desfazendo…" : "Desfazer esta importação"}</button></div>
   );
 
+  if (caderno) return <FotoCaderno aoFechar={aoFechar} aoTerminar={aoTerminar} tipoInicial="clientes" />;
   return (
     <Folha titulo={`Trazer ${oQue} de uma planilha`} aoFechar={aoFechar} larga>
       {resultado ? (
@@ -442,6 +446,12 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
               <b className="g-p"><History style={{ width: 18, height: 18, verticalAlign: "-3px", marginRight: 6 }} />Última importação: {quando(ultima.em)}{ultima.desfeitaEm ? " (desfeita)" : ""}</b>
               {ultima.linhas.map((r) => <p key={r} className="g-muted g-pp">{r}</p>)}
               {botaoDesfazer}
+            </div>
+          )}
+          {tipo === "clientes" && (
+            <div className="g-card liso g-fila entre g-imp-caderno">
+              <span className="g-p"><b>A lista está num caderno, num print ou num PDF do outro sistema?</b> Tire uma foto: eu leio e você confere antes de salvar.</span>
+              <button type="button" className="g-btn sec p" onClick={() => setCaderno(true)}><Camera />Tirar foto do caderno</button>
             </div>
           )}
           <p className="g-muted g-p">

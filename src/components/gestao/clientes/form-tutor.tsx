@@ -6,6 +6,7 @@ import { ERRO_TELEFONE, fmtTelefone, mascaraTelefone, telefoneLimpo, telefoneVal
 import { useGestao } from "../contexto";
 import { Campo, Folha, ok, useAvisos } from "../ui";
 import { FolhaMesmaPessoa, acharTutorIgual, useTutores, type TutorCurto } from "./juntar";
+import { CampoComVoz } from "../ditado";
 
 /** Cadastro ou edição de um tutor (cliente). */
 export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: Cliente; aoFechar: () => void; aoSalvar: (c: Cliente) => void }) {
@@ -89,7 +90,7 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
         </Campo>
         <Campo rotulo="E-mail"><input className="g-input" type="email" inputMode="email" autoComplete="off" maxLength={160} value={email} onChange={(e) => setEmail(e.target.value)} /></Campo>
         <Campo rotulo="Endereço" dica="Ajuda no leva e traz."><input className="g-input" autoComplete="off" maxLength={200} value={endereco} onChange={(e) => setEndereco(e.target.value)} /></Campo>
-        <Campo rotulo="Observações"><textarea className="g-textarea" maxLength={600} value={obs} onChange={(e) => setObs(e.target.value)} /></Campo>
+        <Campo rotulo="Observações"><CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações"><textarea className="g-textarea" maxLength={600} value={obs} onChange={(e) => setObs(e.target.value)} /></CampoComVoz></Campo>
       </form>
     </Folha>
   );

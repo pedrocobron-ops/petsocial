@@ -16,7 +16,7 @@ import PrimeirosPassos, { usePrimeirosPassos } from "@/components/gestao/primeir
 import ResumoSemana, { temSemanaPassada } from "@/components/gestao/resumo-semana";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import Link from "next/link";
-import { ShoppingBag, BedDouble, FileSpreadsheet, Cake, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, UserSearch, Wallet } from "lucide-react";
+import { ShoppingBag, BedDouble, Camera, FileSpreadsheet, Cake, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, UserSearch, Wallet } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
@@ -48,6 +48,7 @@ const carregarForm = () => import("@/components/gestao/agenda/form-agendamento")
 const DetalheAgendamento = dynamic(carregarDetalhe, { ssr: false });
 const FormAgendamento = dynamic(carregarForm, { ssr: false });
 const Importar = dynamic(() => import("@/components/gestao/importar"), { ssr: false });
+const FotoCaderno = dynamic(() => import("@/components/gestao/caderno"), { ssr: false });
 // pedidos pelo link: o cartão só aparece quando há pedido (até lá, nada na tela); vem à parte e não segura a tela
 const PedidosLink = dynamic(() => import("@/components/gestao/agenda/pedidos-link"), { ssr: false });
 
@@ -64,6 +65,7 @@ export default function Hoje() {
   const [lembretes, setLembretes] = useState(false);
   const [chamando, setChamando] = useState<AbaChamar | null>(null);
   const [importando, setImportando] = useState(false);
+  const [caderno, setCaderno] = useState(false);
   const hoje = inicioDoDia(new Date());
   const hojeIso = isoDia(hoje);
   // data marcada como fechada em Meu pet shop (feriado, folga): a tela diz o motivo, hoje e no aviso dos lembretes de amanhã
@@ -392,11 +394,12 @@ export default function Hoje() {
               <div className="quem">
                 <Tile icone={FileSpreadsheet} tom="menta" tamanho="g" />
                 <div style={{ minWidth: 0 }}>
-                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>Traga a sua lista de uma planilha</b>
-                  <span style={{ whiteSpace: "normal" }}>Tutores e pets entram de uma vez, sem digitar um por um.</span>
+                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>Traga a sua lista</b>
+                  <span style={{ whiteSpace: "normal" }}>Da planilha, do caderno ou do outro sistema: tutores e pets entram de uma vez, sem digitar um por um.</span>
                 </div>
               </div>
               <button type="button" className="g-btn verde" style={{ justifySelf: "start" }} disabled={!liberado} onClick={() => { if (liberado) setImportando(true); }}><FileSpreadsheet />Trazer de uma planilha</button>
+              <button type="button" className="g-btn sec" style={{ justifySelf: "start" }} disabled={!liberado} onClick={() => { if (liberado) setCaderno(true); }}><Camera />Tirar foto do caderno</button>
             </div>
             ) : frente === "loja" ? (
             <FrenteDaLoja carregando={!dados} produtos={dados?.produtosTotal ?? 0} acabando={dados?.acabando ?? []} vendas={vendas} novo={dados?.produtosTotal === 0} />
@@ -561,6 +564,7 @@ export default function Hoje() {
 
       {selecionado && !editando && <DetalheAgendamento agendamento={selecionado} aoFechar={() => setAberto(null)} aoMudar={() => void recarregar()} aoEditar={() => setEditando(selecionado)} />}
       {importando && <Importar tipo="clientes" aoFechar={() => setImportando(false)} aoTerminar={() => void recarregar()} />}
+      {caderno && <FotoCaderno tipoInicial="clientes" aoFechar={() => setCaderno(false)} aoTerminar={() => void recarregar()} />}
       {chamando && <ChamarDeVolta aba={chamando} aoFechar={() => setChamando(null)} />}
       {lembretes && <LembretesDoDia dia={isoDia(somaDias(hoje, 1))} aoFechar={() => setLembretes(false)} aoMudar={() => void recarregar()} />}
       {editando && <FormAgendamento agendamento={editando} aoFechar={() => setEditando(null)} aoSalvar={() => { setEditando(null); setAberto(null); void recarregar(); }} />}

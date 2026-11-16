@@ -1,5 +1,6 @@
 "use client";
 
+import AlbumDoPet from "../boletim/album";
 import CartaoPaginaDoTutor from "../casa/pagina-do-tutor";
 import { saudacaoZap } from "@/lib/gestao/agenda";
 import { COLS_ESTADIA, COLS_PACOTE_CLIENTE, comPrecosDeAgendamento } from "@/lib/gestao/reservado";
@@ -237,6 +238,7 @@ export default function FichaPet({ id, voltar, aoAbrir }: { id: string; voltar: 
         <div>
           <CartaoSaude pet={pet} tutor={tutor} itens={saude} erro={erroSaude} aoMudar={() => void recarregar()} />
           <CartaoMensalista pet={pet} />
+          <AlbumDoPet pet={{ id: pet.id, nome: pet.nome, sexo: pet.sexo }} tutor={tutor ? { nome: tutor.nome, telefone: tutor.telefone } : null} />
 
           {(comBanho || atendimentos.length > 0) && <section className="g-card">
             <div className="g-card-t"><h3><Tile icone={History} tom="pessego" tamanho="p" />Histórico de atendimentos</h3>{atendimentos.length > 0 && <span className="g-muted g-pp" style={{ whiteSpace: "nowrap" }}>{atendimentos.length === 60 ? "60 mais recentes" : atendimentos.length === 1 ? "1 horário" : `${atendimentos.length} horários`}</span>}</div>

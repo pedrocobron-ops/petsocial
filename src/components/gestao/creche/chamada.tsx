@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { BotaoFotos } from "../casa/fotos-do-dia";
+import { BotaoBoletim, useBoletinsDeHoje } from "../boletim/boletim";
 import { AlertTriangle, CalendarPlus, Check, DoorOpen, LogIn, MessageCircle, Search, Sparkles, Sunset, Syringe, Undo2, UserX } from "lucide-react";
 import { lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { cuidadosVigentes, estadoSaude, tipoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
@@ -95,6 +96,8 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const linhas = useMemo(() => (dados ? montarChamada(planos, dia, dados.presencas, dados.faltas, petshop.horario) : []), [dados, planos, dia, petshop.horario, calendario]);
   const conta = (e: LinhaChamada["estado"]) => linhas.filter((l) => l.estado === e).length;
+  // boletim do dia de quem já saiu hoje (o "Boletim enviado" da linha)
+  const boletins = useBoletinsDeHoje(ehHoje ? linhas.filter((l) => l.estado === "saiu" && l.presenca).map((l) => l.presenca!.id) : []);
   const naCasa = linhas.filter((l) => l.estado === "na_casa" && l.presenca?.mensalista);
   const abre = abreNoDia(petshop.horario, dia);
   const emPausaHoje = planos.filter((p) => p.pets?.ativo && planoVale(p, dia) && emPausa(p, dia) && p.dias.includes(deIsoDia(dia).getDay()));
@@ -273,6 +276,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
                       {l.estado === "saiu" && (
                         <>
                           <span className="g-tag">{ehHoje && l.presenca?.saida ? `saiu às ${horaCurta(l.presenca.saida)}` : "veio"}{l.presenca && dados.retiradas.get(l.presenca.id) ? ` ${textoDaRetirada(dados.retiradas.get(l.presenca.id)!)}` : ""}</span>
+                          {ehHoje && l.presenca && <BotaoBoletim estado={boletins.get(l.presenca.id) ?? null} visita={{ tipo: "creche", estadiaId: l.presenca.id, petId: pet.id, pet: pet.nome, tutor: pet.clientes ? { nome: pet.clientes.nome, telefone: pet.clientes.telefone } : null }} />}
                           {corrigeHoras && l.presenca && <BotaoCorrigirHoras nome={pet.nome} aoTocar={() => setHorasDe(l)} />}
                           {l.presenca?.mensalista && <button className="g-btn fantasma p" disabled={trava} onClick={() => fazer("desfazer")} aria-label={`Desfazer a ${ehHoje ? "saída" : "presença"} de ${pet.nome}`}><Undo2 />Desfazer</button>}
                         </>

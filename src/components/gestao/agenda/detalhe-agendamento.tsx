@@ -23,6 +23,7 @@ import { FidelidadeNoHorario } from "../fidelidade";
 import Comanda from "./comanda";
 import { MarcaSemCobranca, semCobranca } from "./para-cobrar";
 import AntesDepois from "./antes-depois";
+import { BotaoBoletim } from "../boletim/boletim";
 import { continuarSerie, encerrarSerie, textoContinuou, VEZES_POR_VEZ } from "./series-acabando";
 import "@/components/gestao/hotel/hotel.css";
 
@@ -510,6 +511,9 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         )}
 
         {comFotos && <AntesDepois agendamento={a} aoMudar={aoMudar} />}
+        {(a.status === "em_atendimento" || a.status === "concluido") && pet && (
+          <BotaoBoletim classe="g-btn sec cheio" visita={{ tipo: "banho", agendamentoId: a.id, petId: pet.id, pet: pet.nome, tutor: tutor ? { nome: tutor.nome, telefone: tutor.telefone } : null, servicos: servicosPorExtenso(a) }} />
+        )}
 
         {!encerrado && (
           <div className="g-pilha p">

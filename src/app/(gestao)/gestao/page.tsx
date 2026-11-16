@@ -4,6 +4,7 @@ import { ArrowRight, CalendarCheck, Check, MessageCircle, Monitor, Palette, Smar
 import Instalar from "@/components/gestao/instalar";
 import Vitrine, { Areas } from "@/components/gestao/vitrine";
 import ChatVendas from "@/components/gestao/chat-vendas";
+import NovidadesVenda from "@/components/gestao/novidades-venda";
 import { Marca } from "@/components/gestao/marca";
 import { linkSuporte } from "@/lib/gestao/contato";
 import PlanosVenda from "@/components/gestao/planos-venda";
@@ -17,11 +18,11 @@ const TITULO = `Maestro Pet Gestão: banho e tosa, creche, hotel e loja num sist
 
 export const metadata: Metadata = {
   title: { absolute: TITULO },
-  description: `Banho e tosa, creche, hotel e loja no mesmo sistema, com todas as funções em todos os planos, desde ${DESDE} por mês. Creche com a cobrança do mês, hotel com diária por porte e temporada, dinheiro protegido quando tem equipe e o Mozart, assistente por voz e texto, sem pagar à parte. 7 dias grátis, sem cartão.`,
+  description: `Banho e tosa, creche, hotel e loja no mesmo sistema, com todas as funções em todos os planos, desde ${DESDE} por mês. Boletim do pet com fotos pelo link, clientes trazidos da foto do caderno, creche com a cobrança do mês, hotel com diária por porte e o Mozart, assistente por voz e texto, sem pagar à parte. 7 dias grátis, sem cartão.`,
   // A página de venda aparece no Google; o aplicativo e as telas de entrada continuam fora (layout do grupo).
   robots: { index: true, follow: true },
   alternates: { canonical: "/gestao" },
-  openGraph: { title: TITULO, description: `Todas as funções em todos os planos, desde ${DESDE}. Creche que fecha a conta do mês, hotel com o preço certo até no link do cliente, dinheiro protegido quando tem equipe e o Mozart, assistente por voz e texto. 7 dias grátis, sem cartão.`, url: "/gestao" },
+  openGraph: { title: TITULO, description: `Todas as funções em todos os planos, desde ${DESDE}. Boletim do pet com fotos pelo link, sem o tutor instalar nada. Creche que fecha a conta do mês, hotel com o preço certo até no link do cliente, dinheiro protegido quando tem equipe e o Mozart, assistente por voz e texto. 7 dias grátis, sem cartão.`, url: "/gestao" },
 };
 
 const CRIAR = "/gestao/criar-conta";
@@ -95,7 +96,7 @@ const DIFERENCAS: { id: string; titulo: React.ReactNode; texto: string; itens: s
 /** Dito com franqueza, perto das perguntas: o que o sistema ainda não faz. */
 const NAO_FAZ: string[] = [
   "Não emite nota fiscal nem cupom fiscal.",
-  "Não envia WhatsApp sozinho. As mensagens saem prontas: você só aperta enviar.",
+  "Não envia WhatsApp sozinho, nem o boletim. As mensagens saem prontas: você só aperta enviar.",
   "Não recebe pagamento pela internet, nem sinal nem mensalidade. O tutor paga a você, e você anota.",
   "Não avisa a hora do remédio. Ele guarda a ficha de cuidados e mostra a lista do dia.",
   "Não é para clínica veterinária: não tem prontuário, receita nem internação.",
@@ -104,6 +105,11 @@ const NAO_FAZ: string[] = [
 
 const INCLUI: [string, string][] = [
   ["Mozart, assistente por voz e texto", "Diga o que precisa, por áudio ou texto. Ele prepara e você confirma. Vem em todos os planos."],
+  ["Boletim do pet", "Fotos, recado, o que foi feito e o quadro de atenção à saúde numa página que o tutor abre pelo link, sem instalar nada."],
+  ["Álbum do pet", "As fotos dos boletins e do antes e depois ficam na ficha do pet. Dá para mandar o álbum ao tutor."],
+  ["Botão Avaliar no Google", "Se você quiser, ele aparece no fim do boletim, do álbum e do link de agendamento, para todos os clientes."],
+  ["Trazer do caderno", "Foto do caderno, print ou PDF do sistema antigo: clientes, dívidas, agenda, preços e vacinas. Você confere tudo antes de salvar."],
+  ["Microfone nas observações", "Na ficha do pet, no horário, na estadia e no diário: você fala, o texto entra no campo e você salva."],
   ["Começo guiado", "Você marca o que o seu negócio faz e qual é a área principal. O menu mostra só o que você usa."],
   ["Você liga só o que usa", "Sinal, multa, comissão por serviço, código de barras, diário: cada opção começa desligada. Quem não liga nada não vê nada a mais."],
   ["Agenda de banho e tosa", "Por dia e por semana, por profissional, com os horários livres à vista e vários serviços no mesmo horário."],
@@ -139,8 +145,11 @@ const INCLUI: [string, string][] = [
 ];
 
 const PERGUNTAS: [string, React.ReactNode][] = [
-  ["O que vocês têm de diferente?", `Dizemos o que fazemos, sem comparar com ninguém. Todas as funções estão em todos os planos, desde ${DESDE}: banho e tosa, creche, hotel e loja no mesmo sistema. A creche tem plano por dia da semana, reposição de falta com a sua regra e as cobranças do mês juntas por tutor. O hotel calcula a diária por porte, temporada e feriado, e o tutor vê a estimativa no seu link. Quem tem equipe conta com trava de preço, valores escondidos de quem não cuida do dinheiro e o histórico de quem mudou um valor. E o Mozart, assistente por voz e texto, vem em todos os planos, sem pagar à parte. O que o sistema ainda não faz está logo acima destas perguntas.`],
+  ["O que vocês têm de diferente?", `Dizemos o que fazemos, sem comparar com ninguém. Todas as funções estão em todos os planos, desde ${DESDE}: banho e tosa, creche, hotel e loja no mesmo sistema. A creche tem plano por dia da semana, reposição de falta com a sua regra e as cobranças do mês juntas por tutor. O hotel calcula a diária por porte, temporada e feriado, e o tutor vê a estimativa no seu link. Quem tem equipe conta com trava de preço, valores escondidos de quem não cuida do dinheiro e o histórico de quem mudou um valor. E o Mozart, assistente por voz e texto, vem em todos os planos, sem pagar à parte. De novo: o boletim do pet com fotos, que o tutor abre pelo link sem instalar nada, e a leitura da foto do caderno ou do PDF do sistema antigo, que você confere antes de salvar. O que o sistema ainda não faz está logo acima destas perguntas.`],
   ["Quanto custa?", `O plano Solo custa ${DESDE} por mês, para 1 pessoa com login. O Equipe, para até 3 pessoas, custa ${brlCurto(PLANOS[1].preco)}, e o Pet shop, para até 6, ${brlCurto(PLANOS[2].preco)}. Todos têm as mesmas funções. Pagando 3 ou 6 meses de uma vez, sai mais barato. Antes, são 7 dias grátis, sem cartão.`],
+  ["O que é o boletim do pet?", "É uma página com as fotos do atendimento, o recado da equipe, o que foi feito e, se você viu algo na saúde, um quadro “Para você ficar de olho”. Você monta em poucos toques (o Mozart pode escrever o recado), e a mensagem com o link sai pronta para o seu WhatsApp. O tutor abre no celular, sem instalar nada. O valor só aparece se você ligar. O link vale 60 dias e as fotos ficam no álbum do pet."],
+  ["Tenho tudo num caderno. Preciso digitar de novo?", "Não precisa digitar um por um. Em Clientes e pets, toque em Foto do caderno, fotografe a página e o sistema lê: clientes e pets, quem te deve, agenda e tabela de preços. Tudo aparece numa tela para você conferir e corrigir. Nada entra antes de você tocar em Salvar, e o que não deu para ler fica em branco. Há um limite de 30 páginas por dia."],
+  ["Dá para falar em vez de digitar?", "Dá. No Mozart, toque no microfone e fale o pedido; o texto aparece na caixa e você corrige se precisar. Nos campos de observação também tem um microfone pequeno. Usa o ditado do próprio navegador (Chrome, Edge, Safari)."],
   ["Precisa instalar alguma coisa?", "Não. O sistema abre no navegador. Se quiser, você coloca na tela inicial do celular e ele fica como um aplicativo."],
   ["Atendo sozinho, só banho e tosa. Não é coisa demais para mim?", "Não. Ao criar a conta você marca só banho e tosa, e o menu não mostra creche, hotel nem estoque. Se um dia você precisar, é só ligar em Meu pet shop."],
   ["Preciso configurar muita coisa para começar?", "Não. Ao criar a conta, você marca o que o seu negócio faz (banho e tosa, creche, hotel, venda de produtos, pacotes) e qual é a área principal. O menu e a tela inicial se arrumam para ela. Em seguida, um guia curto acerta o horário, a equipe, os preços e o link do cliente. Cada passo pode ficar para depois, e tudo pode ser mudado mais tarde."],
@@ -160,7 +169,7 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["Emite nota fiscal?", "Não. Hoje o sistema não emite nota fiscal. O comprovante que ele monta para você mandar pelo WhatsApp não é documento fiscal."],
   ["Tem manual?", "Sim, dentro do sistema. São mais de 150 tópicos com o passo a passo de cada tarefa, com busca e opção de imprimir. No alto das telas, o botão “Como usar esta tela” abre a explicação daquela tela. Se ainda ficar dúvida, o suporte atende pelo WhatsApp."],
   ["Meus dados ficam presos no sistema?", "Não. Clientes, caixa, financeiro e relatórios saem em planilha. Em Meu pet shop, você também baixa uma cópia de segurança com tudo em planilhas, que abrem no Excel e no Google Planilhas. Essa cópia é para guardar e consultar: ainda não dá para trazê-la de volta para o sistema automaticamente, e as fotos não entram."],
-  ["Estou em outro sistema. Consigo trazer meus clientes?", "Sim. Você traz clientes, pets e produtos de uma planilha, colando as células ou enviando o arquivo. Na planilha de clientes, o sistema mostra o que entendeu de cada coluna e você corrige antes de trazer. O que já está no sistema não é apagado. Trouxe a planilha errada? Dá para desfazer a importação."],
+  ["Estou em outro sistema. Consigo trazer meus clientes?", "Sim. Se o sistema antigo gera PDF ou você tira print da lista, mande em Foto do caderno: o sistema lê e você confere antes de salvar. Também dá para trazer clientes, pets e produtos de uma planilha, colando as células ou enviando o arquivo. Na planilha de clientes, o sistema mostra o que entendeu de cada coluna e você corrige antes de trazer. O que já está no sistema não é apagado. Trouxe a planilha errada? Dá para desfazer a importação."],
   ["Serve para clínica veterinária?", "O sistema é feito para banho e tosa, creche, hotel e loja de pet shop. Ele não tem prontuário, receituário nem internação. Uma clínica que também faz banho e tosa pode usá-lo para essa parte."],
   ["Posso colocar a minha equipe?", "Sim. Cada pessoa entra com o próprio acesso, e você escolhe o que ela abre: agenda, clientes, creche e hotel, pacotes, estoque, caixa, financeiro, relatórios. Quem não cuida do dinheiro não vê valores. Dá para ter mais de um dono. O número de pessoas com login depende do plano: 1, 3 ou 6. Banhista ou tosador que só aparece na agenda, sem entrar no sistema, não conta."],
   ["Tem contrato de fidelidade?", "Não. A cobrança da assinatura é feita pela Cakto, a empresa que cuida dos pagamentos para nós. No plano mensal a cobrança é todo mês. Nos planos de 3 e 6 meses você paga o período de uma vez, por um valor menor. Em qualquer um, você cancela quando quiser e usa até o fim do período já pago."],
@@ -187,6 +196,7 @@ export default function Pagina() {
             <span>Maestro Pet <em>Gestão</em></span>
           </Link>
           <nav aria-label="Página">
+            <a href="#novidades" className="gp-link so-pc">Novidades</a>
             <a href="#diferencas" className="gp-link so-pc">O que muda</a>
             <a href="#para-quem" className="gp-link so-pc">Para quem é</a>
             <a href="#funcoes" className="gp-link so-pc">Funções</a>
@@ -204,7 +214,7 @@ export default function Pagina() {
             <ul className="gp-selos">
               <li><Check />Todas as funções em todos os planos, desde {DESDE}</li>
               <li><Check />Mozart, assistente por voz e texto, sem pagar à parte</li>
-              <li><Check />Link para o cliente pedir banho, creche e hotel</li>
+              <li><Check />Boletim do pet e link de agendamento, sem o tutor instalar nada</li>
             </ul>
             <div className="gp-acao">
               <Link href={CRIAR} className="gp-btn pri grande">Teste grátis por 7 dias <ArrowRight /></Link>
@@ -219,6 +229,8 @@ export default function Pagina() {
           </div>
         </div>
       </section>
+
+      <NovidadesVenda />
 
       <section className="gp-dif-sec" id="diferencas">
         <div className="gp-c">
@@ -254,6 +266,7 @@ export default function Pagina() {
               ))}
             </ul>
             <p className="gp-nota"><Check />Antes de gravar, ele mostra o que vai fazer. Você confirma com um toque.</p>
+            <p className="gp-nota"><Check />Nos campos de observação também tem microfone: você fala, confere e salva.</p>
           </div>
           <Tela arquivo="cel-assistente" alt="O assistente Mozart aberto no celular, com o microfone e exemplos de pedidos" celular />
         </div>
