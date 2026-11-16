@@ -1,5 +1,6 @@
 import { COLS_PACOTE, comCustos, comPrecosDeAgendamento, comPrecosDePacote, comPrecosDeProduto, comValoresDeEstadia, type PacoteLinha } from "../reservado";
 import { ferramentaLiberada } from "./permissao";
+import { consultarComissao, FERRAMENTAS_COMISSAO } from "./ferramenta-comissao";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
@@ -134,6 +135,7 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, vencimento: DIA, descricao: S, categoria: S }, ["tipo", "valor", "vencimento", "descricao"]) },
   { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar. Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento.",
     input_schema: obj({ produto_id: S, produto_nome: S, unidade: { ...S, description: "un, kg, g, L, ml, pacote, saco" }, tipo: { type: "string", enum: ["entrada", "saida"] }, quantidade: N, custo_unitario: N, lancar_despesa: B, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, motivo: S }, ["tipo", "quantidade"]) },
+  ...FERRAMENTAS_COMISSAO,
 ];
 
 export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro">): Anthropic.Tool[] =>
@@ -598,6 +600,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       return { resultado: { preparadas: links.length, sem_telefone: semTelefone, aviso: "As mensagens aparecem como botões na tela. Nada foi enviado: a pessoa toca para abrir o WhatsApp." }, links };
     }
   }
+  const extra = await consultarComissao(c, nome, e, (m) => new ErroDeUso(m));
+  if (extra) return extra;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 
