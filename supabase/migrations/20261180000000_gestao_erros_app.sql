@@ -163,8 +163,8 @@ begin
   v_nome := public.erro_limpar(regexp_replace(coalesce(p_nome, ''), '[^A-Za-z0-9_ .:-]', '', 'g'), 80);
   v_pilha := public.erro_limpar(array_to_string((string_to_array(left(coalesce(p_pilha, ''), 3000), E'\n'))[1:6], E'\n'), 1500);
   v_rota := public.erro_limpar(p_rota, 200);
-  v_versao := public.erro_limpar(regexp_replace(coalesce(p_versao, ''), '[^A-Za-z0-9_.-]', '', 'g'), 40);
-  v_nav := public.erro_limpar(regexp_replace(coalesce(p_navegador, ''), '[^A-Za-z0-9_ .()/-]', '', 'g'), 60);
+  v_versao := nullif(left(regexp_replace(coalesce(p_versao, ''), '[^A-Za-z0-9_.-]', '', 'g'), 40), ''); -- só letras, números e . _ -
+  v_nav := nullif(left(regexp_replace(coalesce(p_navegador, ''), '[^A-Za-z0-9_ .()/·-]', '', 'g'), 60), ''); -- só nome e número
   v_tela := left(regexp_replace(coalesce(p_tela, ''), '[^0-9x]', '', 'g'), 20);
 
   -- assinatura: origem + tipo + mensagem sem números + primeira linha da pilha + rota

@@ -59,6 +59,9 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   T.ok('pilha com no máximo 6 linhas, sem consulta, com linha:coluna', g[1].split('\n').length === 6 && !g[1].includes('?v=') && g[1].includes('a.js:0:1'), g[1]);
   T.ok('nome, rota, tela e versão só com caracteres permitidos', g[2] === 'TypeErrorscript' && g[3] === '/x' && g[4] === '390x844' && g[5] === 'v1', g.slice(2));
 
+  await reg(anon, { p_mensagem: `Versao ${marca}`, p_aparelho: ap('v'), p_versao: '8b06419281e7', p_navegador: 'Chrome 131 · Android' });
+  T.ok('versão (commit com muitos números) e navegador ficam inteiros', B.sql(`select versao || '|' || navegador from erros_app where aparelho='${ap('v')}'`) === '8b06419281e7|Chrome 131 · Android');
+
   T.secao('repetição junta, freio corta');
   for (let i = 0; i < 3; i++) await reg(anon, { p_mensagem: `Repetido ${marca}`, p_aparelho: ap('r') });
   T.ok('o mesmo erro 3 vezes no mesmo aparelho: 1 linha com contagem 3', B.sql(`select count(*) || '|' || sum(contagem) from erros_app where aparelho='${ap('r')}'`) === '1|3');
