@@ -644,12 +644,14 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
   const [usarCredito, setUsarCredito] = useState(true);
   const credito = usarCredito && (saldoCredito ?? 0) > 0 ? centavos(Math.min(saldoCredito ?? 0, devido)) : 0;
   const total = centavos(devido + (comMulta ? totalMulta : 0) - credito);
+  // o crédito do tutor chega depois da folha abrir: até lá, nada de valor no botão
+  const lendoCredito = saldoCredito == null;
 
   // trava na hora do primeiro toque; cada mensalidade leva a sua parte da chave (o banco recebe cada uma uma vez só)
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
   async function gravar(chave: string): Promise<boolean | void> {
-    if (salvando) return;
+    if (salvando || lendoCredito) return;
     if (!forma && total > 0) { setErro("Escolha como recebeu."); return; }
     if (!data || data > hoje) { setErro("Escolha um dia até hoje."); return; }
     if (credito > 0 && data !== hoje) { setErro("Com o crédito do tutor, o recebimento é de hoje."); return; }
@@ -709,7 +711,7 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
     <Folha titulo={`Receber de ${grupo.tutor ?? "tutor"}`} aoFechar={aoFechar}
       rodape={<>
         <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button className="g-btn pri" onClick={() => void salvar()} disabled={salvando}>{salvando ? "Recebendo…" : total <= 0 && credito > 0 ? "Pagar com o crédito" : `Receber ${brl(total)}${credito > 0 ? " e usar o crédito" : ""}`}</button>
+        <button className="g-btn pri" onClick={() => void salvar()} disabled={salvando || lendoCredito} aria-busy={lendoCredito}>{salvando ? "Recebendo…" : lendoCredito ? "Carregando…" : total <= 0 && credito > 0 ? "Pagar com o crédito" : `Receber ${brl(total)}${credito > 0 ? " e usar o crédito" : ""}`}</button>
       </>}>
       <div className="g-form">
         <p className="g-muted g-p">{contas.length} mensalidades num recebimento só. Cada uma é baixada inteira; para receber só uma parte, use o Receber de cada pet.</p>

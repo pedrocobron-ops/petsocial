@@ -751,8 +751,10 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
 
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
+  // o crédito do tutor chega depois da folha abrir: até lá, nada de valor no botão
+  const lendoCredito = saldoCredito == null;
   async function gravar(chave: string): Promise<boolean | void> {
-    if (salvando) return;
+    if (salvando || lendoCredito) return;
     if (entrada && !(recebendo > 0)) { setErroValor("Escreva quanto o cliente pagou."); return; }
     if (entrada && recebendo > devido) { setErroValor(`O cliente deve ${brl(devido)} nesta conta. Se pagou a mais, lance a diferença como outra entrada.`); return; }
     if (credito > 0 && data !== hoje) { setErro("Com o crédito do tutor, o recebimento é de hoje."); return; }
@@ -820,7 +822,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     <Folha titulo={entrada ? "Recebi esta conta" : "Paguei esta conta"} aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || op.ocupado}>{salvando ? "Salvando…" : credito > 0 ? (total > 0 ? `Receber ${brl(total)} e usar o crédito` : "Pagar com o crédito") : parcial || daMulta > 0 ? `Receber ${brl(total)}` : "Dar baixa"}</button>
+        <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || op.ocupado || lendoCredito} aria-busy={lendoCredito}>{salvando ? "Salvando…" : lendoCredito ? "Carregando…" : credito > 0 ? (total > 0 ? `Receber ${brl(total)} e usar o crédito` : "Pagar com o crédito") : parcial || daMulta > 0 ? `Receber ${brl(total)}` : "Dar baixa"}</button>
       </>}>
       <div className="g-form">
         <div className="g-card areia">
