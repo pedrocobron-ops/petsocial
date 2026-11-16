@@ -14,6 +14,7 @@ import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { CampoDinheiro, erroDeValor } from "../loja/pecas";
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
+import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { AvatarPet, Campo, EscolherPet, Folha, avisarMudanca, ok, useAvisos, useDados } from "../ui";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 import { VEZES_POR_VEZ } from "./series-acabando";
@@ -109,11 +110,21 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
 
   const porte = pet?.porte ?? null;
   const servicoDe = (id: string) => servicos.find((s) => s.id === id) ?? null;
-  // o principal é o primeiro escolhido; os outros vão para os serviços a mais, na mesma ordem
-  const servicoId = escolhidos[0]?.servicoId ?? null;
+  // pacotes do pet que ainda valem (com usos, no prazo, de um serviço certo): o pacote só cobre o serviço principal do horário
+  const { dados: servicosDePacote } = useDados(async () => {
+    if (!pet?.id) return [] as string[];
+    const r = await sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", pet.id).eq("ativo", true);
+    if (r.error) return [] as string[]; // quem não lê pacotes marca como sempre (o primeiro escolhido é o principal)
+    const hoje = isoDia(new Date());
+    return (r.data ?? []).filter((x) => x.servico_id && x.usados < x.total && (!x.vence_em || x.vence_em >= hoje)).map((x) => x.servico_id as string);
+  }, [pet?.id, petshop.id]);
+  // o principal é o primeiro escolhido, menos quando um dos escolhidos é o serviço de um pacote do pet: aí ele é o principal,
+  // para o pacote valer. A lista na tela continua na ordem do toque; os outros vão para os serviços a mais nessa ordem.
+  const principal = escolhidos.find((o) => servicosDePacote?.includes(o.servicoId)) ?? escolhidos[0] ?? null;
+  const servicoId = principal?.servicoId ?? null;
   const servico = servicoId ? servicoDe(servicoId) : null;
-  const preco = servico ? escolhidos[0].preco : precoSolto;
-  const outros = escolhidos.slice(1);
+  const preco = servico && principal ? principal.preco : precoSolto;
+  const outros = escolhidos.filter((o) => o !== principal);
   // valor sugerido pelo serviço e pelo porte, até a pessoa escrever outro
   useEffect(() => {
     setEscolhidos((l) => {

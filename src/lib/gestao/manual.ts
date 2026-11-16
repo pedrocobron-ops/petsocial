@@ -219,7 +219,7 @@ const BASE: TopicoBase[] = [
       "Em um horário já marcado, toque nele, depois em Remarcar ou alterar: os serviços dele já aparecem escolhidos. Toque para juntar ou tirar.",
       "Na hora de Fechar a conta, cada serviço aparece em uma linha, com o seu valor. Esqueceu de marcar um? Toque em Outro serviço, na própria conta.",
       "Cada serviço conta nos Relatórios e na comissão de quem atendeu. Com a comissão por serviço ligada, cada um rende o seu percentual.",
-      "Se o pet tem pacote, o pacote cobre só o primeiro serviço da lista: toque em Usar o pacote e cobrar o resto.",
+      "Se o pet tem pacote de um dos serviços escolhidos, o pacote cobre esse serviço e os outros entram na conta: na hora, toque em Usar o pacote e cobrar o resto.",
       "Quem não vê o financeiro marca do mesmo jeito, sem os valores: o preço da lista vai junto.",
       "Pelo Mozart: \"marca banho com hidratação da Mel sexta às 10h\".",
     ],
