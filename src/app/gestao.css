@@ -73,6 +73,16 @@
 .g-marca b { font: 500 1.0625rem/1.1 var(--display); display: block; }
 .g-marca span { font-size: .75rem; opacity: .7; display: block; margin-top: 2px; }
 .g-nav-t { font-size: .6875rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; opacity: .55; padding: 14px 12px 6px; }
+/* "Personalizar" ao lado de Dia a dia (só o dono): abre "O que o seu negócio faz?" */
+.g-nav-t.com-botao { display: flex; align-items: center; justify-content: space-between; gap: 8px; opacity: 1; padding-block: 8px 2px; }
+.g-nav-t.com-botao > span { opacity: .55; }
+.g-nav .g-nav-personalizar {
+  width: auto; gap: 5px; padding: 4px 9px; border-radius: 999px; border: 1px solid rgba(246, 241, 232, .28); font-size: .75rem; font-weight: 600;
+  letter-spacing: 0; text-transform: none; opacity: .9;
+}
+.g-nav .g-nav-personalizar svg { width: 13px; height: 13px; }
+.g-mais-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.g-mais-t .g-btn { min-height: 36px; }
 .g-nav a, .g-nav button {
   display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border-radius: 12px; border: 0; background: none;
   color: inherit; font-size: .9375rem; font-weight: 500; text-align: left; opacity: .86; transition: background .15s, opacity .15s;

@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LayoutGrid } from "lucide-react";
-import { MODULOS, SERVICOS_BANHO_TOSA, areasParaPrincipal, modulosDe, principalDe, principalPara, type Modulo, type Principal } from "@/lib/gestao/modulos";
+import { MODULOS, areasParaPrincipal, modulosDe, principalDe, principalPara, type Modulo, type Principal } from "@/lib/gestao/modulos";
 import { EscolherPrincipal } from "../boas-vindas";
 import { useGestao } from "../contexto";
 import EscolherModulos from "../modulos";
 import { Tile } from "../painel";
-import { avisarMudanca, ok, useAvisos, useSomenteLeitura } from "../ui";
+import { useAvisos, useSomenteLeitura } from "../ui";
+import { useSalvarModulos } from "../personalizar-menu";
 
 /** O que o negócio faz: mostra ou esconde telas do menu, passos e avisos. Não apaga nada. */
 export default function OQueUsa() {
-  const { sb, petshop, servicos, recarregarBase } = useGestao();
+  const { petshop } = useGestao();
+  const salvarModulos = useSalvarModulos();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const salvo = modulosDe(petshop);
@@ -21,6 +23,9 @@ export default function OQueUsa() {
   // área principal: a única área marcada vale sozinha; com mais de uma, é a que o dono apontar (ou nenhuma)
   const principalSalva = principalDe(petshop);
   const [escolhida, setEscolhida] = useState<Principal | null>(principalSalva);
+  // mudou pela folha Personalizar do menu com este cartão aberto: o cartão mostra o que ficou gravado
+  const gravado = `${(petshop.modulos ?? []).join()}|${petshop.principal ?? ""}`;
+  useEffect(() => { setValor(modulosDe(petshop)); setEscolhida(principalDe(petshop)); }, [gravado]); // eslint-disable-line react-hooks/exhaustive-deps
   const areas = areasParaPrincipal(valor);
   const principal = areas.length > 1 ? (areas.find((a) => a === escolhida) ?? null) : principalPara(valor, escolhida);
   const mudou = valor.length !== salvo.length || valor.some((m) => !salvo.includes(m)) || (areas.length > 1 && principal !== principalSalva);
@@ -32,23 +37,10 @@ export default function OQueUsa() {
     setErro(null);
     setSalvando(true);
     try {
-      // creche ou hotel ligados agora, com o link do cliente já ligado: o link passa a receber pedido de vaga também,
-      // como nas boas-vindas (desliga em Link do cliente). A diária e as vagas ficam em branco até o dono colocar.
-      const novas = (["creche", "hotel"] as const).filter((m) => valor.includes(m) && !salvo.includes(m));
-      const link = petshop.link_ativo ? {
-        ...(novas.includes("creche") && !petshop.link_creche ? { link_creche: true } : {}),
-        ...(novas.includes("hotel") && !petshop.link_hotel ? { link_hotel: true } : {}),
-      } : {};
-      ok(await sb.from("petshops").update({ modulos: valor, principal, ...link }).eq("id", petshop.id).select("id"));
-      // passou a fazer banho e tosa e a lista de serviços está vazia: entram os mais comuns, sem preço
-      if (valor.includes("banho_tosa") && !servicos.some((s) => !["creche", "hotel"].includes(s.categoria))) {
-        ok(await sb.from("servicos").insert(SERVICOS_BANHO_TOSA.map((s) => ({ ...s, petshop_id: petshop.id }))).select("id"));
-      }
-      await recarregarBase();
-      avisarMudanca();
+      const { novas, linkJunto } = await salvarModulos(valor, principal);
       const nomeNovas = novas.map((m) => (m === "creche" ? "creche" : "hotel")).join(" e ");
       avisar(`${principal ? "Salvo. O menu e a tela inicial já estão na nova ordem." : "Salvo. O menu já mostra na frente só o que você usa."}${novas.length
-        ? ` Coloque a diária e as vagas ${novas.length > 1 ? "da creche e do hotel" : novas[0] === "creche" ? "da creche" : "do hotel"} no grupo ${novas.length > 1 || (valor.includes("creche") && valor.includes("hotel")) ? "Creche e hotel" : novas[0] === "creche" ? "Creche" : "Hotel"}, aqui em Meu pet shop.${Object.keys(link).length ? ` O link do cliente também passa a receber pedido de ${nomeNovas}.` : ""}`
+        ? ` Coloque a diária e as vagas ${novas.length > 1 ? "da creche e do hotel" : novas[0] === "creche" ? "da creche" : "do hotel"} no grupo ${novas.length > 1 || (valor.includes("creche") && valor.includes("hotel")) ? "Creche e hotel" : novas[0] === "creche" ? "Creche" : "Hotel"}, aqui em Meu pet shop.${linkJunto ? ` O link do cliente também passa a receber pedido de ${nomeNovas}.` : ""}`
         : ""}`);
     } catch (x) { avisarErro(x); } finally { setSalvando(false); }
   }
@@ -57,7 +49,7 @@ export default function OQueUsa() {
     <section className="g-card g-pilha">
       <div className="g-mp-t">
         <Tile icone={LayoutGrid} tom="menta" />
-        <div><h2>O que você usa</h2><p className="g-muted g-p">Marque o que o seu negócio faz. O que você não marcar sai da frente e fica em Outras áreas, no fim do menu: nada é apagado, e dá para ligar de novo quando quiser.</p></div>
+        <div><h2>O que você usa</h2><p className="g-muted g-p">Marque o que o seu negócio faz. O que você não marcar sai da frente e fica em Outras áreas, no fim do menu: nada é apagado, e dá para ligar de novo quando quiser. Também muda pelo botão Personalizar, ao lado de Dia a dia, no menu.</p></div>
       </div>
       <EscolherModulos valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} comApoio />
       {areas.length > 1 && (

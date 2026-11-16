@@ -36,7 +36,8 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
     setIndo(true);
     const { data, error } = await banco().auth.signUp({
       email: email.trim(), password: senha,
-      options: { data: { nome: nome.trim(), ...(convidado ? { convidado: true } : {}) }, emailRedirectTo: `${location.origin}/gestao/comecar` },
+      // `app: "maestro"` deixa o modelo de e-mail do Supabase (projeto dividido com outro app) mostrar a marca certa.
+      options: { data: { app: "maestro", nome: nome.trim(), ...(convidado ? { convidado: true } : {}) }, emailRedirectTo: `${location.origin}/gestao/comecar` },
     });
     setIndo(false);
     if (error) {

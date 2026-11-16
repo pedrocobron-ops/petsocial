@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check, ChevronRight, ListChecks, PartyPopper } from "lucide-react";
 import { useGestao } from "./contexto";
 import { Tile } from "./painel";
-import { Folha } from "./ui";
+import { Folha, abrirPersonalizarMenu } from "./ui";
 import { abrirLinkDeAgendamento, guardarLembrado, lerLembrado } from "./lembrado";
 import { frenteDe, nomeDaCasa, usaCasa, usaModulo, type Frente } from "@/lib/gestao/modulos";
 
@@ -32,6 +32,8 @@ export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: ()
   const chaveEscola = `${chave}-escola`;
   const [mem, setMem] = useState(() => lerLembrado(chave));
   const [escola, setEscola] = useState(() => lerLembrado(chaveEscola) === "1");
+  const chaveMenu = `${chave}-menu`;
+  const [menu, setMenu] = useState(() => lerLembrado(chaveMenu) === "1");
 
   const ativos = servicos.filter((s) => s.ativo);
   const temPreco = ativos.some((s) => s.preco_p != null || s.preco_m != null || s.preco_g != null || s.preco_gg != null);
@@ -58,6 +60,7 @@ export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: ()
       ? { id: "lembrete", so: agenda && banhoInteiro, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Abre os lembretes dos horários de amanhã.", aoTocar: aoLembretes }
       : { id: "lembrete", so: agenda && banhoInteiro, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Na Agenda, pelo botão do WhatsApp ao lado do horário.", href: "/gestao/app/agenda" },
     { id: "marca", so: souDono, opcional: true, feito: Boolean(petshop.logo) || petshop.tema !== "floresta", texto: "Colocar a sua logo e as suas cores", dica: "Em Meu pet shop.", href: "/gestao/app/meu-petshop" },
+    { id: "menu", so: souDono, opcional: true, feito: menu, texto: "Escolher o que aparece no menu", dica: "Banho e tosa, creche, hotel, loja: o menu Dia a dia mostra só o que você liga.", aoTocar: () => { guardarLembrado(chaveMenu, "1"); setMenu(true); abrirPersonalizarMenu(); } },
     { id: "escola", so: souDono, opcional: true, feito: escola, texto: "Ver as aulas grátis sobre o dia a dia do pet shop", dica: "Na Escola de Gestão: aulas curtas, já incluídas, nada para comprar.", href: "/gestao/app/escola", aoTocar: () => { guardarLembrado(chaveEscola, "1"); setEscola(true); } },
   ] : [];
   const lugar = (id: string) => { const i = frente ? ORDEM[frente].indexOf(id) : -1; return i < 0 ? 99 : i; };

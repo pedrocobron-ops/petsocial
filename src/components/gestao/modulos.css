@@ -15,3 +15,6 @@
 .g-mod-op[aria-pressed="true"] .ok { background: var(--g-verde); border-color: var(--g-verde); }
 /* a última opção, sozinha na linha, ocupa a largura toda */
 .g-mod:not(.apoio) .g-mod-op:last-child:nth-child(odd) { grid-column: 1 / -1; }
+/* folha Personalizar do menu: o recado de que desligar não apaga nada */
+.g-mod-nota { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); font-size: .9375rem; line-height: 1.4; }
+.g-mod-nota svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--g-verde); }
