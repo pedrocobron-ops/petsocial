@@ -27,22 +27,26 @@ function FechamentoNoPapel() {
 
   const { dados, carregando, erro } = useDados(async () => {
     if (!vejoFinanceiro) return null;
-    const f = await sb.from("caixas").select("*").eq("petshop_id", petshop.id).not("fechado_em", "is", null).order("fechado_em", { ascending: false }).limit(30);
+    const doCaixa = (cid: string) => Promise.all([
+      paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true)
+        .eq("caixa_id", cid).order("criado_em").order("id").range(de, ate)),
+      sb.rpc("caixa_alteracoes", { p_caixa: cid }),
+    ]);
+    // veio do Caixa com o caixa escolhido (`?caixa=`): tudo sai junto, numa leva só (no celular, cada espera soma)
+    const [f, doId, adiantado] = await Promise.all([
+      sb.from("caixas").select("*").eq("petshop_id", petshop.id).not("fechado_em", "is", null).order("fechado_em", { ascending: false }).limit(30),
+      id ? sb.from("caixas").select("*").eq("petshop_id", petshop.id).eq("id", id).maybeSingle() : null,
+      id ? doCaixa(id) : null,
+    ]);
     if (f.error) throw new Error(f.error.message);
     const fechados = (f.data ?? []) as Caixa[];
-    let caixa = id ? fechados.find((c) => c.id === id) ?? null : fechados[0] ?? null;
-    if (id && !caixa) {
-      // caixa mais antigo que a lista, ou ainda aberto
-      const r = await sb.from("caixas").select("*").eq("petshop_id", petshop.id).eq("id", id).maybeSingle();
-      caixa = (r.data as Caixa | null) ?? null;
-    }
+    // sem id: o último fechado; com id: o da lista ou (mais antigo que a lista, ou ainda aberto) o lido à parte
+    const caixa = id ? fechados.find((c) => c.id === id) ?? ((doId?.data as Caixa | null) ?? null) : fechados[0] ?? null;
     if (!caixa) return { fechados, caixa: null, lancamentos: [] as Lancamento[], alteracoes: 0 };
     const c = caixa;
-    const [lancamentos, alt] = await Promise.all([
-      fin || !c.fechado_em ? paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true)
-        .eq("caixa_id", c.id).order("criado_em").order("id").range(de, ate)) : Promise.resolve([] as Lancamento[]),
-      sb.rpc("caixa_alteracoes", { p_caixa: c.id }),
-    ]);
+    const [lidos, alt] = adiantado ?? await doCaixa(c.id);
+    // quem só opera o caixa não recebe os lançamentos de um caixa fechado (o banco também não entrega)
+    const lancamentos = fin || !c.fechado_em ? lidos : [];
     lancamentos.sort((a, b) => quandoPagou(a).localeCompare(quandoPagou(b)) || a.id.localeCompare(b.id));
     return { fechados, caixa: c, lancamentos, alteracoes: alt.error ? 0 : Number(alt.data ?? 0) };
   }, [petshop.id, id, vejoFinanceiro, fin]);
