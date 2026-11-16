@@ -234,3 +234,5 @@
 .g-lk-duv-form { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 12px; border-top: 1px solid var(--g-linha); }
 .g-lk-duv-form .g-textarea { flex: 1; min-height: 46px; max-height: 120px; resize: none; }
 .g-lk-duv-form .g-btn { min-width: 46px; height: 46px; padding: 0 12px; }
+.g-lk-rodape .g-lk-google { flex-basis: 100%; justify-content: center; gap: 6px; font-weight: 600; color: var(--g-verde); text-decoration: none; }
+.g-lk-rodape .g-lk-google svg { width: 15px; height: 15px; color: #e3a008; fill: currentColor; }

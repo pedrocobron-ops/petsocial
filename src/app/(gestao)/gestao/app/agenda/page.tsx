@@ -1,5 +1,6 @@
 "use client";
 
+import { useFaxinaDoBoletim } from "@/components/gestao/boletim/boletim";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
@@ -40,6 +41,7 @@ type Trecho = { b: Bloqueio; de: number; ate: number; inteiro: boolean };
 
 function Agenda() {
   const { sb, petshop, equipe, liberado, souDono } = useGestao();
+  useFaxinaDoBoletim(); // boletim do pet: apaga os arquivos da fila (nada aparece na tela)
   const router = useRouter();
   const params = useSearchParams();
   const somenteLeitura = useSomenteLeitura();

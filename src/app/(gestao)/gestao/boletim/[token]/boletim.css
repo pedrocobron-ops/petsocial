@@ -1,0 +1,93 @@
+/* Boletim do pet (página pública, sem login). Primeiro o celular. Prefixo g-bo-. */
+.g-bo { min-height: 100dvh; display: grid; grid-template-rows: 1fr auto; overflow-x: clip; }
+.g-bo .g-lk-miolo { max-width: 600px; }
+
+/* cabeçalho: o pet é o assunto */
+.g-bo-cab {
+  position: relative; overflow: hidden; display: grid; gap: 6px; padding: 18px 20px 22px; border-radius: 26px; color: #f6f1e8;
+  background: radial-gradient(380px 240px at 112% -14%, color-mix(in srgb, var(--destaque, var(--g-laranja)) 40%, transparent), transparent 62%),
+    radial-gradient(320px 240px at -14% 118%, rgba(255, 255, 255, .1), transparent 60%), linear-gradient(140deg, var(--g-escuro-a) 0%, var(--g-escuro-b) 100%);
+  box-shadow: 0 2px 4px rgba(31, 27, 23, .1), 0 30px 50px -30px rgba(23, 48, 42, .8);
+}
+.g-bo-cab > *:not(.g-bo-pata) { position: relative; }
+.g-bo-pata { position: absolute; right: -18px; bottom: -26px; width: 150px; height: 150px; color: rgba(246, 241, 232, .07); transform: rotate(-18deg); pointer-events: none; }
+.g-bo-loja { display: flex; align-items: center; gap: 10px; min-width: 0; margin-bottom: 12px; }
+.g-bo-loja > div { display: grid; min-width: 0; }
+.g-bo-loja b { font-size: .9375rem; overflow-wrap: anywhere; }
+.g-bo-loja span { font-size: .8125rem; opacity: .75; }
+.g-bo-loja .g-logo { box-shadow: 0 8px 16px -10px rgba(0, 0, 0, .6); }
+.g-bo-sobre { font-size: .8125rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
+.g-raiz .g-bo-cab h1 { font-family: var(--display); font-weight: 500; font-size: clamp(2.25rem, 1.8rem + 2.6vw, 3.25rem); line-height: 1.02; overflow-wrap: anywhere; }
+.g-bo-quando { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; font-size: .9375rem; }
+.g-bo-quando > span:last-child::first-letter { text-transform: uppercase; }
+.g-bo-selo { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 9px; border-radius: 999px; background: rgba(246, 241, 232, .14); font-weight: 600; font-size: .8125rem; }
+.g-bo-selo svg { width: 15px; height: 15px; }
+
+/* fotos: a primeira grande; as outras embaixo */
+.g-bo-fotos { display: grid; gap: 8px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.g-bo-fotos a { display: block; overflow: hidden; border-radius: 18px; background: var(--g-carta-2); box-shadow: var(--g-sombra); grid-column: span 2; }
+.g-bo-fotos a:first-child { grid-column: 1 / -1; border-radius: 24px; }
+.g-bo-fotos img { display: block; width: 100%; height: 100%; aspect-ratio: 1; object-fit: cover; transition: transform .3s ease; }
+.g-bo-fotos a:first-child img { aspect-ratio: 4 / 5; max-height: 72vh; }
+.g-bo-fotos.n2 a:not(:first-child) { grid-column: 1 / -1; }
+.g-bo-fotos.n2 a:not(:first-child) img { aspect-ratio: 16 / 10; }
+.g-bo-fotos.n3 a:not(:first-child) { grid-column: span 3; }
+@media (hover: hover) { .g-bo-fotos a:hover img { transform: scale(1.02); } }
+@media (min-width: 720px) { .g-bo-fotos a:first-child img { aspect-ratio: 4 / 3.4; } }
+
+/* o recado da equipe, como uma cartinha */
+.g-bo-carta { position: relative; display: grid; gap: 10px; padding: 22px 20px 18px; border-radius: 22px; background: var(--g-carta); box-shadow: var(--g-sombra); }
+.g-bo-carta-ico { width: 22px; height: 22px; color: var(--destaque, var(--g-laranja)); }
+.g-bo-carta p { font-size: 1.125rem; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.g-bo-carta small { font-family: var(--display-italico); font-style: italic; font-size: 1rem; color: var(--g-cinza); }
+
+/* atenção à saúde: à parte, com carinho, nunca escondida */
+.g-bo-atencao { display: flex; gap: 12px; align-items: flex-start; padding: 16px 16px 14px; border-radius: 20px; background: var(--t-manteiga); color: var(--i-manteiga); border: 1px solid color-mix(in srgb, var(--i-manteiga) 18%, transparent); }
+.g-bo-atencao > svg { width: 22px; height: 22px; flex: none; margin-top: 1px; }
+.g-bo-atencao > div { display: grid; gap: 4px; min-width: 0; }
+.g-bo-atencao b { font-size: 1rem; }
+.g-bo-atencao p { font-size: 1rem; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-line; }
+.g-bo-atencao small { font-size: .8125rem; opacity: .85; }
+
+/* o que foi feito e como foi */
+.g-bo-bloco { display: grid; gap: 10px; padding: 18px 18px 20px; border-radius: 22px; background: var(--g-carta); box-shadow: var(--g-sombra); }
+.g-raiz .g-bo-bloco h2 { font-family: inherit; font-size: .8125rem; font-weight: 700; line-height: 1.2; letter-spacing: .06em; text-transform: uppercase; color: var(--g-cinza); }
+.g-bo-bloco h2:not(:first-child) { margin-top: 6px; }
+.g-bo-servicos, .g-bo-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.g-bo-servicos li { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px 7px 10px; border-radius: 999px; background: var(--g-verde-tint); color: var(--g-verde); font-weight: 600; font-size: .9375rem; }
+.g-bo-servicos svg { width: 15px; height: 15px; }
+.g-bo-chips li { padding: 7px 13px; border-radius: 999px; background: var(--t-pessego); color: var(--i-pessego); font-weight: 600; font-size: .9375rem; overflow-wrap: anywhere; }
+
+.g-bo-acoes { display: grid; gap: 10px; }
+@media (min-width: 560px) { .g-bo-acoes:has(> :nth-child(2)) { grid-template-columns: 1fr 1fr; } }
+.g-bo-vazio { font-size: .9375rem; color: var(--g-cinza); }
+
+/* valor e pagamento (só com a opção ligada) */
+.g-bo-valores { display: grid; gap: 0; margin: 6px 0 0; border-top: 1px dashed var(--g-linha); }
+.g-bo-valores > div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 2px; border-bottom: 1px dashed var(--g-linha); font-size: .9375rem; }
+.g-bo-valores dt { color: var(--g-cinza); }
+.g-bo-valores dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
+.g-bo-valores dd svg { width: 15px; height: 15px; }
+.g-bo-valores .falta dd { color: var(--i-rosa); }
+.g-bo-valores .pago dd { color: var(--i-menta); }
+
+/* avaliar no Google: para todos, sem filtro */
+.g-bo-google { display: grid; gap: 6px; justify-items: center; text-align: center; padding: 20px 18px 18px; border-radius: 22px; background: var(--g-carta); box-shadow: var(--g-sombra); }
+.g-bo-google .estrelas { display: inline-flex; gap: 3px; color: #e3a008; margin-bottom: 2px; }
+.g-bo-google .estrelas svg { width: 20px; height: 20px; fill: currentColor; }
+.g-bo-google b { font-size: 1.0625rem; overflow-wrap: anywhere; }
+.g-bo-google p { font-size: .9375rem; color: var(--g-cinza); max-width: 36ch; margin-bottom: 6px; }
+.g-bo-google .g-btn svg { color: #e3a008; fill: currentColor; }
+
+/* álbum do pet (página pública): uma visita por bloco */
+.g-al-visita { display: grid; gap: 10px; }
+.g-raiz .g-al-visita h2 { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; font-size: 1.125rem; padding: 0 4px; }
+.g-al-visita h2 > span::first-letter { text-transform: uppercase; }
+.g-al-visita h2 small { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: var(--g-verde-tint); color: var(--g-verde); font: 600 .8125rem/1.2 inherit; font-family: inherit; }
+.g-al-visita h2 small svg { width: 14px; height: 14px; }
+.g-al-fotos { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g-al-fotos.n1 { grid-template-columns: 1fr; }
+.g-al-fotos a { display: block; overflow: hidden; border-radius: 18px; background: var(--g-carta-2); box-shadow: var(--g-sombra); }
+.g-al-fotos img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+.g-al-fotos.n1 img { aspect-ratio: 4 / 3; }
+@media (min-width: 560px) { .g-al-fotos.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

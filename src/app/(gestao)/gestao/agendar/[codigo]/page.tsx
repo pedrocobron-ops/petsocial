@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import EstadiaPeloLink, { type PrecoDoHotel } from "./estadia";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, Cat, Check, Clock, Dog, MapPin, MessageCircle, PawPrint, Plus, Scissors, Sun, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, Cat, Check, Clock, Dog, MapPin, MessageCircle, PawPrint, Plus, Scissors, Star, Sun, X } from "lucide-react";
 import { Marca, Selo } from "@/components/gestao/marca";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
@@ -139,6 +139,8 @@ export default function AgendarPeloLink() {
   const [precoHotel, setPrecoHotel] = useState<PrecoDoHotel | null | undefined>(undefined);
   // "Tirar dúvida" (opção do dono; banco antes da atualização ou erro = sem o botão)
   const [comDuvida, setComDuvida] = useState(false);
+  // link do Google para avaliar a loja (opção do dono; sem link, nada aparece)
+  const [google, setGoogle] = useState<string | null>(null);
   const carregar = useCallback(async () => {
     setSemRede(false);
     setInfo(undefined);
@@ -148,6 +150,7 @@ export default function AgendarPeloLink() {
     const lido = data as unknown as Info | null;
     setInfo(lido && typeof lido === "object" && lido.nome ? { ...lido, servicos: Array.isArray(lido.servicos) ? lido.servicos : [] } : null);
     aplicarTema(lido && typeof lido === "object" ? lido.tema : null); // as cores do pet shop, não as da Maestro Pet
+    void banco().rpc("link_google", { p_codigo: codigo }).then((g) => setGoogle(typeof g.data === "string" ? g.data : null), () => setGoogle(null));
     // se a função ainda não existe no banco, segue sem dias fechados (como sempre foi)
     const f = await banco().rpc("link_fechados", { p_codigo: codigo });
     setFechados(new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []));
@@ -382,7 +385,7 @@ export default function AgendarPeloLink() {
   const fimEstimado = servico && horaEscolhida ? somaMin(horaEscolhida, servico.duracao_min * qtd) : null;
 
   return (
-    <Moldura duvida={comDuvida ? <DuvidaNoLink codigo={codigo} loja={info.nome} telefone={info.telefone} aoPedir={pedirPelaDuvida} /> : null}>
+    <Moldura google={google ? { link: google, loja: info.nome } : null} duvida={comDuvida ? <DuvidaNoLink codigo={codigo} loja={info.nome} telefone={info.telefone} aoPedir={pedirPelaDuvida} /> : null}>
       <header className="g-lk-cab">
         <Marca tamanho={220} className="g-lk-cab-fundo" />
         <div className="g-lk-cab-quem">
@@ -678,12 +681,13 @@ export default function AgendarPeloLink() {
   );
 }
 
-function Moldura({ children, duvida }: { children: React.ReactNode; duvida?: React.ReactNode }) {
+function Moldura({ children, duvida, google }: { children: React.ReactNode; duvida?: React.ReactNode; google?: { link: string; loja: string } | null }) {
   return (
     <div className={duvida ? "g-lk com-duvida" : "g-lk"}>
       <main className="g-lk-miolo">{children}</main>
       {duvida}
       <footer className="g-lk-rodape">
+        {google && <a className="g-lk-google" href={google.link} target="_blank" rel="noopener noreferrer"><Star aria-hidden />Avalie {google.loja} no Google</a>}
         <span><Marca tamanho={16} />Feito com Maestro Pet Gestão</span>
         <Link href="/gestao/privacidade" target="_blank">Privacidade</Link>
       </footer>
