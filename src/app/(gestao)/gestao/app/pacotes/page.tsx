@@ -83,7 +83,13 @@ export default function Pacotes() {
   }, [petshop.id]);
 
   const modelos = useMemo(() => dados?.modelos ?? [], [dados]);
-  const vendidos = useMemo(() => dados?.vendidos ?? [], [dados]);
+  // vendidos agora, nesta tela: aparecem antes de a lista do banco voltar (internet lenta), sem repetir quando ela volta
+  const [recentes, setRecentes] = useState<PacoteDoPet[]>([]);
+  const vendidos = useMemo(() => {
+    const doBanco = dados?.vendidos ?? [];
+    const novos = recentes.filter((r) => !doBanco.some((x) => x.id === r.id));
+    return novos.length ? [...novos, ...doBanco] : doBanco;
+  }, [dados, recentes]);
   const ativos = vendidos.filter((p) => p.ativo);
   const vencendo = ativos.filter((p) => { const d = diasParaVencer(p.vence_em); return d != null && d >= 0 && d <= 7; });
   const lista = filtro === "ativos" ? ativos : filtro === "vencendo" ? vencendo : vendidos.filter((p) => !p.ativo).slice(0, 100);
@@ -285,7 +291,7 @@ export default function Pacotes() {
       </div>
 
       {venda && <VenderPacote inicio={venda} modelos={modelos.filter((m) => m.ativo)} aoFechar={() => setVenda(null)}
-        aoGravar={() => { setVenda(null); setAba("clientes"); setFiltro("ativos"); mudou(); }} />}
+        aoGravar={(novo) => { setVenda(null); setAba("clientes"); setFiltro("ativos"); if (novo) setRecentes((l) => [novo, ...l.filter((x) => x.id !== novo.id)]); mudou(); }} />}
       {modelo && <FormModelo modelo={modelo === "novo" ? null : modelo} aoFechar={() => setModelo(null)} aoGravar={() => { setModelo(null); mudou(); }} />}
     </>
   );
@@ -347,7 +353,7 @@ function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: Pacote | null; aoF
 
 /* ---------- vender pacote ---------- */
 
-function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; modelos: Pacote[]; aoFechar: () => void; aoGravar: () => void }) {
+function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; modelos: Pacote[]; aoFechar: () => void; aoGravar: (vendido: PacoteDoPet | null) => void }) {
   const { sb, petshop, servicos, vejoFinanceiro, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   // preço travado (opção do dono): quem só opera o caixa vende o pacote da lista, pelo preço da lista
@@ -424,8 +430,11 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
       const vendido = await sb.from("pacotes_clientes").upsert({
         petshop_id: petshop.id, pet_id: pet.id, pacote_id: pacoteId, nome: nome.trim(), servico_id: servico || null,
         total: t, comprado_em: compra, vence_em: venceEm, preco: preco ?? 0, chave,
-      }, { onConflict: "petshop_id,chave", ignoreDuplicates: true }).select("id");
+      }, { onConflict: "petshop_id,chave", ignoreDuplicates: true }).select(COLS_PACOTE_CLIENTE);
       if (vendido.error) throw new Error(vendido.error.message);
+      // o pacote vendido entra na lista na hora (a lista do banco chega logo depois e confirma)
+      const linha = (vendido.data?.[0] ?? null) as unknown as PacoteCliente | null;
+      const novo: PacoteDoPet | null = linha ? { ...linha, preco: preco ?? 0, pets: pet } : null;
       if (rec && !("erro" in rec) && preco && !rec.fiado) {
         try {
           lembrarForma(rec.forma);
@@ -451,7 +460,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
           return false;
         }
       } else avisar(`Pacote vendido para ${pet.nome}.`);
-      aoGravar();
+      aoGravar(novo);
     } catch (e) { avisarErro(e); return false; } finally { setSalvando(false); }
   }
 
