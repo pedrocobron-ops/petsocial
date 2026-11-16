@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarDays, Check, Clock, FileSpreadsheet, ImagePlus, Link2, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Undo2, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarDays, Check, Clock, FileSpreadsheet, ImagePlus, LayoutGrid, Link2, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Undo2, Users, X } from "lucide-react";
 import type { Horario, Servico } from "@/lib/gestao/tipos";
 import { vagasDe } from "@/lib/gestao/agenda";
 import { areasDeServicoPara, artigoDe, categoriaDaArea, nomeDaCasa, usaModulo, type AreaDoServico } from "@/lib/gestao/modulos";
@@ -12,7 +12,7 @@ import { useGestao } from "./contexto";
 import { Selo } from "./marca";
 import { Tile } from "./painel";
 import { brl } from "@/lib/gestao/util";
-import { Campo, CampoValor, EVENTO_GUIA, avisarMudanca, ok, useAvisos } from "./ui";
+import { Campo, CampoValor, EVENTO_GUIA, abrirPersonalizarMenu, avisarMudanca, ok, useAvisos } from "./ui";
 import Importar from "./importar";
 import { TEMAS, aplicarTema, enviarLogo, tirarLogo } from "@/lib/gestao/identidade";
 import { FalaMozart, PERGUNTAS, PreviaPainel, TrilhoBoasVindas, chaveBoasVindas, oQueDeixeiPronto } from "./boas-vindas";
@@ -587,6 +587,7 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
                 <Link className="g-btn pri" href="/gestao/app/clientes?novo=1" onClick={aoFechar}><PawPrint />Cadastrar o primeiro pet</Link>
                 <button type="button" className="g-btn sec" onClick={aoImportar}><FileSpreadsheet />Trazer meus clientes de uma planilha</button>
                 <Link className="g-btn fantasma" href="/gestao/app/manual" onClick={aoFechar}><BookOpen />Ver o manual</Link>
+                <button type="button" className="g-btn fantasma" onClick={() => { aoFechar(); abrirPersonalizarMenu(); }}><LayoutGrid />Escolher o que aparece no menu</button>
               </div>
             </div>
           )}
