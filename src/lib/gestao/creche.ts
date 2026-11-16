@@ -672,3 +672,38 @@ export function textoDoExtratoDoPet(x: ExtratoDoPet, petshop: string, comValores
     "Qualquer dúvida, é só chamar.",
   ].join("\n");
 }
+
+/* ---------- saída do plano: o acerto que ficou para depois ---------- */
+
+/** Marca, na observação da cobrança, de que a saída já foi conferida (acertada, anotada ou deixada como está). */
+export const notaDaSaida = (fim: string) => `Saída em ${dataCurta(fim)}`;
+
+/** Cobrança de um plano que terminou e ainda pede conferência: a do mês da saída cheia, ou a de um mês em que ele já não vem. */
+export type SaidaParaAcertar = { plano: PlanoCompleto; cobranca: CobrancaCompleta; frase: string };
+
+/**
+ * O que ficou para acertar depois que um plano ganhou data de fim (a folha do acerto pode ter fechado sem escolha):
+ * a mensalidade do mês da saída maior que a conta pelos dias até a saída, ou uma cobrança de um mês depois da saída.
+ * Some quando a mensalidade é acertada, a cobrança cancelada, ou a observação diz que a saída foi conferida.
+ */
+export function saidasParaAcertar(planos: PlanoCompleto[], cobrancas: CobrancaCompleta[], horario: unknown): SaidaParaAcertar[] {
+  const lista: SaidaParaAcertar[] = [];
+  for (const p of planos) {
+    if (!p.fim) continue;
+    const mesFim = isoMes(deIsoDia(p.fim));
+    const nome = p.pets?.nome ?? "Pet";
+    const quando = `${p.fim < isoDia(new Date()) ? "terminou" : "termina"} em ${dataCurta(p.fim)}`;
+    for (const c of cobrancas) {
+      if (c.plano_id !== p.id || c.status !== "aberta" || c.acerto_saida || c.mes < mesFim || (c.obs ?? "").includes(notaDaSaida(p.fim))) continue;
+      if (c.mes === mesFim) {
+        const sug = sugestaoDoMes(p, deIsoDia(c.mes), Number(c.valor_cheio), horario);
+        if (!(centavos(sug.valor) < centavos(Number(c.valor_mensal)))) continue;
+        lista.push({ plano: p, cobranca: c, frase: `Plano de ${nome} ${quando}: a mensalidade de ${nomeMes(deIsoDia(c.mes))} ainda está em ${brl(c.valor_mensal)}. Pelos dias até a saída, ${brl(sug.valor)}.` });
+      } else if (Number(c.total) > 0) {
+        lista.push({ plano: p, cobranca: c, frase: `Plano de ${nome} ${quando}, mas a cobrança de ${nomeMes(deIsoDia(c.mes))} (${brl(c.total)}) continua aberta.` });
+      }
+    }
+  }
+  return lista;
+}
+

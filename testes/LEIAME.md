@@ -52,6 +52,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 **unidade/**
 - `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, regras), a leitura da resposta
   (não sei, sugestão de pedido só com serviço e dia válidos, sem links), limites de conversa. Sem banco.
+- `valor.js`: leitura estrita do dinheiro digitado (`lerValorEstrito`, `lerValor`, `lerNumeroEstrito`): "abc-5" e "52o,00" são recusados
+  (nunca viram 5,00 ou 52,00), milhar e centavos com vírgula ou ponto, "R$" na frente, negativo só onde pode.
+- `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
+  outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
@@ -70,6 +74,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   reserva com sinal, venda de balcão com estoque, entrada de mercadoria, pagamento de comissão.
 - `creche.js`: mensalidade cheia, proporcional na entrada e na saída do plano (banco = `sugestaoDoMes` do app = conta à mão),
   dia extra cobrado no mês seguinte, desconto de irmão (banco = `descontoIrmao` do app) e a troca de quem paga cheio, recebimento.
+- `creche-rafael.js`: falta avisada com antecedência (quem marca, que dias, vaga livre, reposição só depois do dia, resumo do cartão),
+  corrigir a hora de chegada e de saída (só dono e financeiro, mesmo dia, motivo anotado, taxa de busca anotada/tirada/mantida/recusada),
+  o acerto da saída que volta até ser feito, e o Mozart `ver_planos_creche` (falta avisada; valor só para quem recebe).
 - `hotel.js`: **preço do hotel, banco × aplicativo**: ~740 noites comparadas (`hotel_noite` × `precoDasNoites`) com temporadas
   sobrepostas e empatadas, feriado nos três modos, segundo pet; estadia inteira (`hotel_previsto` × `contaDasDiarias`) com diária por porte;
   faixa de preço do link e "Esconder o preço".
