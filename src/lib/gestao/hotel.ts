@@ -7,7 +7,7 @@ import type { PartePagamento } from "./dinheiro";
 import { feriadoDoDia, regraDeFeriado, type RegraFeriado } from "./feriados";
 import { opcoesDeCobranca } from "./dinheiro-opcoes";
 import { acomodacoesDe, modelosDe, pixDe, porteDe, segundoPetDe, sinalDe, temporadaDoDia, temporadasDe, type Taxa, type Temporada, type TipoDeMensagem } from "./hotel-opcoes";
-import { brl, centavos, dataAmigavel, dataCompleta, dataCurta, hora, inicioDoDia, isoDia, somaDias } from "./util";
+import { brl, centavos, dataAmigavel, dataCompleta, dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, soDigitos, somaDias } from "./util";
 
 /**
  * Hotel e creche: ocupação por dia, preço noite a noite, a conta do check-out e as mensagens para o tutor.
@@ -351,7 +351,7 @@ export function fechoDaConta(c: ContaDaEstadia): { texto: string; valor: string 
  * Comprovante da estadia em texto simples, para mandar ao tutor pelo WhatsApp: período, diárias (com a composição),
  * taxas, extras, sinal, total e como foi pago. Não é documento fiscal, e o texto diz isso no fim.
  */
-export function textoComprovanteEstadia(p: { petshop: string; tutor?: string | null; pet?: string | null; entrada: string; saida: string; conta: ContaDaEstadia }) {
+export function textoComprovanteEstadia(p: { petshop: string; telefone?: string | null; tutor?: string | null; pet?: string | null; entrada: string; saida: string; conta: ContaDaEstadia }) {
   const c = p.conta;
   const lugar = c.tipo === "hotel" ? "Hotel" : "Creche";
   const junto = centavos(c.pendencias.reduce((t, x) => t + x.valor, 0));
@@ -359,8 +359,12 @@ export function textoComprovanteEstadia(p: { petshop: string; tutor?: string | n
     `${saudacaoZap(p.tutor, p.petshop).replace(/ Aqui é .*$/, "")} Segue o comprovante da estadia${p.pet ? ` de ${p.pet}` : ""}.`,
     "",
     p.petshop,
-    dataCompleta(p.entrada) === dataCompleta(p.saida) ? `${lugar}: ${dataCompleta(p.entrada)}` : `${lugar}: ${dataCompleta(p.entrada)} a ${dataCompleta(p.saida)}`,
+    ...(soDigitos(p.telefone).length >= 8 ? [`Telefone: ${fmtTelefone(p.telefone)}`] : []),
+    "",
+    ...(p.tutor ? [`Tutor: ${p.tutor}`] : []),
     ...(p.pet ? [`Pet: ${p.pet}`] : []),
+    `${lugar}, entrada: ${dataCompleta(p.entrada)} às ${hora(p.entrada)}`,
+    `${lugar}, saída: ${dataCompleta(p.saida)} às ${hora(p.saida)}`,
     "",
     ...linhasDaConta(c).map((l) => `${l.texto}: ${l.valor}`),
     `Total da estadia: ${brl(c.total)}`,

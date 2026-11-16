@@ -34,6 +34,8 @@ export type DadosDoLink = {
     preco?: { mostrar?: boolean; de?: number | null; ate?: number | null; varia?: boolean | null } | null;
     sinal?: { modo?: string | null; valor?: unknown; politica?: string | null } | null;
     atraso?: { hora?: string | null; valor?: unknown; tolerancia?: number | null } | null;
+    /** % de desconto do segundo pet (migração 20261181; null: sem desconto ou preço escondido) */
+    segundo?: unknown;
     busca_ate?: string | null;
   } | null;
   /** `link_opcoes` */
@@ -140,6 +142,8 @@ export function contextoDoLink(d: DadosDoLink): string {
     else if (pr && num(pr.de) != null) {
       const de = num(pr.de)!, ate = num(pr.ate) ?? de;
       l.push(`- diária do hotel: ${de === ate ? reais(de) : `de ${reais(de)} a ${reais(ate)}, conforme o porte`}${pr.varia ? "; pode mudar em temporada ou feriado" : ""}`);
+      const seg = num(d.hotel?.segundo);
+      if (seg != null && seg > 0) l.push(`- dois ou mais pets do mesmo tutor nas mesmas noites: ${seg.toLocaleString("pt-BR")}% de desconto na diária de cada pet a mais (o de diária mais alta paga cheio); a estimativa já aplica`);
       l.push("- para um total de datas, use a ferramenta estimar_hotel (é uma estimativa; o valor final é o pet shop quem confirma)");
     } else if (!pr && num(i.hotel.diaria) != null) l.push(`- diária do hotel: ${reais(num(i.hotel.diaria)!)}`);
     else l.push("- valor do hotel: não informado no link");
@@ -302,6 +306,7 @@ export function respostaDeTeste(pergunta: string, contexto: string, d: DadosDoLi
     }
     if (d.info.hotel) return "Dá para pedir vaga no hotel pela página. [[PEDIR hotel]]";
   }
+  if (/desconto|dois|segundo|2 (cães|caes|cachorros|pets)/.test(p)) return linhas.find((l) => l.startsWith("- dois ou mais pets")) ?? MARCA_NAO_SEI;
   if (/hotel/.test(p)) return linhas.filter((l) => /hotel/i.test(l)).slice(0, 3).join(" ") || MARCA_NAO_SEI;
   if (/creche/.test(p)) return linhas.filter((l) => /creche|experiência/i.test(l)).slice(0, 3).join(" ") || MARCA_NAO_SEI;
   if (/feriado|fechad/.test(p)) return linhas.find((l) => l.startsWith("Dias fechados")) ?? MARCA_NAO_SEI;

@@ -561,15 +561,16 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
 
 /* ---------- conta fechada: mandar o comprovante ---------- */
 
-function zapDoComprovante(petshop: string, e: EstadiaCompleta, conta: ContaDaEstadia, saida: string) {
+type LojaDoComprovante = { nome: string; telefone?: string | null };
+function zapDoComprovante(loja: LojaDoComprovante, e: EstadiaCompleta, conta: ContaDaEstadia, saida: string) {
   const tutor = e.pets?.clientes;
   if (soDigitos(tutor?.telefone).length < 8) return null;
-  return linkWhatsApp(tutor?.telefone, textoComprovanteEstadia({ petshop, tutor: tutor?.nome, pet: e.pets?.nome, entrada: e.entrada, saida, conta }));
+  return linkWhatsApp(tutor?.telefone, textoComprovanteEstadia({ petshop: loja.nome, telefone: loja.telefone, tutor: tutor?.nome, pet: e.pets?.nome, entrada: e.entrada, saida, conta }));
 }
 
 /** O mesmo comprovante numa folha para imprimir ou salvar em PDF (não precisa de telefone na ficha). */
-function imprimirDaEstadia(petshop: string, e: EstadiaCompleta, conta: ContaDaEstadia, saida: string) {
-  imprimirComprovante(textoComprovanteEstadia({ petshop, tutor: e.pets?.clientes?.nome, pet: e.pets?.nome, entrada: e.entrada, saida, conta }), e.tipo === "hotel" ? "Comprovante de hospedagem" : "Comprovante da creche");
+function imprimirDaEstadia(loja: LojaDoComprovante, e: EstadiaCompleta, conta: ContaDaEstadia, saida: string) {
+  imprimirComprovante(textoComprovanteEstadia({ petshop: loja.nome, telefone: loja.telefone, tutor: e.pets?.clientes?.nome, pet: e.pets?.nome, entrada: e.entrada, saida, conta }), e.tipo === "hotel" ? "Comprovante de hospedagem" : "Comprovante da creche");
 }
 
 /**
@@ -594,7 +595,7 @@ async function atrasoJaCobrado(sb: Banco, petshopId: string, clienteId: string |
 
 function ContaFechada({ estadia, conta, saida, aoPronto, pendente }: { estadia: EstadiaCompleta; conta: ContaDaEstadia; saida: string; aoPronto: () => void; pendente?: boolean }) {
   const { petshop } = useGestao();
-  const zap = zapDoComprovante(petshop.nome, estadia, conta, saida);
+  const zap = zapDoComprovante(petshop, estadia, conta, saida);
   const junto = centavos(conta.pendencias.reduce((t, p) => t + p.valor, 0));
   const fiado = conta.pagamento?.fiado;
   const agora = centavos(conta.a_pagar + junto);
@@ -603,6 +604,8 @@ function ContaFechada({ estadia, conta, saida, aoPronto, pendente }: { estadia: 
     <Folha titulo="Conta fechada" aoFechar={aoPronto} rodape={<button type="button" className="g-btn sec" onClick={aoPronto}>Pronto</button>}>
       <div className="g-vd-recibo">
         <Tile icone={Check} tom="menta" tamanho="g" />
+        {/* o número grande diz o que é: recebido agora, ou o que foi pago a mais (crédito, devolução), nunca parece dinheiro entrando */}
+        <p className="g-pp g-muted" style={{ margin: 0 }}>{fiado ? "Anotado em A receber" : agora > 0 ? "Recebido agora" : sobra?.destino === "credito" ? "Ficou de crédito para o tutor" : sobra?.destino === "devolvido" ? "Devolvido ao tutor" : sobra ? "Pago a mais, ficou com o hotel" : "Recebido agora"}</p>
         <p className="g-num">{brl(agora > 0 || !sobra ? agora : sobra.valor)}</p>
         <p><b>{fiado ? "Anotado em A receber." : agora > 0 ? "Recebido." : sobra?.destino === "devolvido" ? "Devolvido ao tutor." : sobra?.destino === "credito" ? "Ficou de crédito para o tutor." : sobra ? "Ficou com o hotel." : conta.credito_usado ? "Pago com o crédito do tutor." : "Check-out feito."}</b> {pendente ? `Estadia de ${estadia.pets?.nome ?? "pet"} acertada.` : `${estadia.pets?.nome ?? "O pet"} foi para casa.`}</p>
         <div className="g-ht-conta" style={{ width: "100%", textAlign: "left" }}>
@@ -610,7 +613,7 @@ function ContaFechada({ estadia, conta, saida, aoPronto, pendente }: { estadia: 
           {fechoDaConta(conta).map((l, i) => <div key={i} className="l"><span>{l.texto}</span><span>{l.valor}</span></div>)}
         </div>
         {zap ? <a className="g-btn zap cheio" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar comprovante</a> : <p className="g-pp g-muted">O tutor está sem telefone na ficha: não dá para mandar o comprovante pelo WhatsApp.</p>}
-        <button type="button" className="g-btn fantasma cheio" onClick={() => imprimirDaEstadia(petshop.nome, estadia, conta, saida)}><Printer />Imprimir comprovante</button>
+        <button type="button" className="g-btn fantasma cheio" onClick={() => imprimirDaEstadia(petshop, estadia, conta, saida)}><Printer />Imprimir comprovante</button>
         <p className="g-pp g-muted">{zap ? `O WhatsApp de ${estadia.pets?.clientes?.nome ?? "quem trouxe o pet"} abre com o comprovante pronto e você só aperta enviar. ` : ""}Imprimir abre a folha para imprimir ou salvar em PDF. Não é nota fiscal.</p>
       </div>
     </Folha>
@@ -629,7 +632,7 @@ export function DetalheDaEstadia({ estadia: e, aoFechar, aoCorrigir }: { estadia
   const conta = lerConta(dados);
   const fim = e.saida ?? e.saida_prevista ?? e.entrada;
   const n = e.diarias_cobradas ?? contarDiarias(e, new Date(fim));
-  const zap = conta ? zapDoComprovante(petshop.nome, e, conta, fim) : null;
+  const zap = conta ? zapDoComprovante(petshop, e, conta, fim) : null;
   const junto = conta ? centavos(conta.pendencias.reduce((t, p) => t + p.valor, 0)) : 0;
   return (
     <Folha titulo={`Estadia de ${e.pets?.nome ?? "pet"}`} aoFechar={aoFechar}
@@ -668,7 +671,7 @@ export function DetalheDaEstadia({ estadia: e, aoFechar, aoCorrigir }: { estadia
           </div>
         )}
         {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar comprovante</a>}
-        {conta && <button type="button" className="g-btn fantasma" onClick={() => imprimirDaEstadia(petshop.nome, e, conta, fim)}><Printer />Imprimir comprovante</button>}
+        {conta && <button type="button" className="g-btn fantasma" onClick={() => imprimirDaEstadia(petshop, e, conta, fim)}><Printer />Imprimir comprovante</button>}
       </div>
     </Folha>
   );

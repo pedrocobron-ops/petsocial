@@ -12,7 +12,7 @@
 --    volta a estadia para "reservada", na data de antes, no mesmo dia do check-in. Na casa ainda não houve check-out, então
 --    não há cobrança para desfazer (o sinal fica como estava).
 --
--- Só acrescenta (uma tabela, um gatilho e funções; `estadia_checkout` mantém a assinatura). O código no ar continua igual:
+-- Só acrescenta (uma tabela, um gatilho e funções; `estadia_checkout` e `link_hotel_opcoes` mantêm a assinatura). O código no ar continua igual:
 -- ele já manda o total da estadia como "valor da estadia + sinal descontado", então a conferência só recusa o caso do erro.
 
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -141,3 +141,41 @@ begin
 end $$;
 revoke execute on function public.estadia_desfazer_checkin(uuid) from public, anon;
 grant execute on function public.estadia_desfazer_checkin(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 3. Link: o "Tirar dúvida" sabe do desconto do segundo pet (a mesma de 20261168, com a chave "segundo" a mais)
+-- ---------------------------------------------------------------------------------------------------------------------
+create or replace function public.link_hotel_opcoes(p_codigo text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'sinal', case when coalesce((p.opcoes -> 'hotel.sinal' ->> 'ativo')::boolean, false) then jsonb_build_object(
+      'modo', p.opcoes -> 'hotel.sinal' ->> 'modo', 'valor', p.opcoes -> 'hotel.sinal' -> 'valor',
+      'politica', p.opcoes -> 'hotel.sinal' ->> 'politica', 'creche', coalesce((p.opcoes -> 'hotel.sinal' ->> 'creche')::boolean, false)) else null end,
+    'preco', case when p.opcoes -> 'hotel.link_sem_preco' = 'true'::jsonb then jsonb_build_object('mostrar', false)
+      else (
+        select jsonb_build_object('mostrar', true, 'de', min(d.v), 'ate', max(d.v),
+          'varia', (p.opcoes -> 'hotel.temporadas' -> 'ativo' = 'true'::jsonb and jsonb_typeof(p.opcoes -> 'hotel.temporadas' -> 'lista') = 'array'
+                    and jsonb_array_length(p.opcoes -> 'hotel.temporadas' -> 'lista') > 0)
+                or exists (select 1 from public.hotel_precos h where h.petshop_id = p.id and h.feriado -> 'ativo' = 'true'::jsonb)
+                   and exists (select 1 from public.dias_especiais x where x.petshop_id = p.id and x.feriado and x.dia >= (now() at time zone p.fuso)::date))
+        from (select public.diaria_sugerida(p.id, 'hotel', t.porte) as v from (values (null::text), ('P'), ('M'), ('G'), ('GG')) as t(porte)) d
+      ) end,
+    'atraso', case when p.opcoes -> 'hotel.link_sem_preco' = 'true'::jsonb then null else (
+      select jsonb_build_object('hora', h.atraso -> 'hotel' ->> 'hora', 'valor', h.atraso -> 'hotel' -> 'valor',
+        'tolerancia', case when jsonb_typeof(h.atraso -> 'tolerancia') = 'number' then least(180, greatest(0, round((h.atraso ->> 'tolerancia')::numeric))) else 0 end)
+      from public.hotel_precos h
+      where h.petshop_id = p.id and h.atraso -> 'ativo' = 'true'::jsonb
+        and coalesce(h.atraso -> 'hotel' ->> 'hora', '') ~ '^([01]\d|2[0-3]):[0-5]\d$'
+        and jsonb_typeof(h.atraso -> 'hotel' -> 'valor') = 'number' and (h.atraso -> 'hotel' ->> 'valor')::numeric > 0
+    ) end,
+    -- desconto do segundo pet (o link já aplica na estimativa): o "Tirar dúvida" pode responder
+    'segundo', case when p.opcoes -> 'hotel.link_sem_preco' = 'true'::jsonb then null
+      when p.opcoes -> 'hotel.desconto_segundo_pet' -> 'ativo' = 'true'::jsonb and jsonb_typeof(p.opcoes -> 'hotel.desconto_segundo_pet' -> 'pct') = 'number'
+        and (p.opcoes -> 'hotel.desconto_segundo_pet' ->> 'pct')::numeric > 0
+      then least(100, (p.opcoes -> 'hotel.desconto_segundo_pet' ->> 'pct')::numeric) end,
+    'busca_ate', public.hotel_busca_ate(p.id),
+    'busca_hora', (select h.atraso -> 'hotel' ->> 'hora' from public.hotel_precos h where h.petshop_id = p.id and public.hotel_busca_ate(p.id) is not null)
+  )
+  from public.petshops p
+  where p.link_codigo = p_codigo and p.link_ativo and public.acesso_liberado(p.id)
+$$;
