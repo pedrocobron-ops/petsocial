@@ -911,6 +911,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"estadias_horas_hist": {
+                  Row: {
+                    "entrada_antes": string | null,"entrada_depois": string | null,"estadia_id": string,"feito_em": string,"feito_por": string | null,"id": string,"motivo": string,"petshop_id": string,"saida_antes": string | null,"saida_depois": string | null,"taxa": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "entrada_antes"?: string | null,"entrada_depois"?: string | null,"estadia_id": string,"feito_em"?: string,"feito_por"?: string | null,"id"?: string,"motivo"?: string,"petshop_id": string,"saida_antes"?: string | null,"saida_depois"?: string | null,"taxa"?: string
+                  }
+                  Update: {
+                    "entrada_antes"?: string | null,"entrada_depois"?: string | null,"estadia_id"?: string,"feito_em"?: string,"feito_por"?: string | null,"id"?: string,"motivo"?: string,"petshop_id"?: string,"saida_antes"?: string | null,"saida_depois"?: string | null,"taxa"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "estadias_horas_hist_estadia_id_fkey"
+      columns: ["estadia_id"]
+isOneToOne: false
+      referencedRelation: "estadias"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "estadias_horas_hist_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"estadias_ocorrencias": {
                   Row: {
                     "criado_em": string,"criado_nome": string | null,"criado_por": string | null,"estadia_id": string,"id": string,"no_diario": boolean,"pet_id": string,"petshop_id": string,"quando": string,"texto": string,"tipo": string
@@ -1849,6 +1875,11 @@ isOneToOne: false
               "abaixo_do_custo": boolean,"de": number,"descricao": string,"id": string,"nova": boolean,"para": number,"quando": string,"quem_nome": string,"tipo": string
             }[]
                            },
+"alteracoes_do_periodo":
+{ Args: { "p": string,"p_ate": string,"p_desde": string,"p_minhas"?: boolean }; Returns: {
+              "abaixo_do_custo": boolean,"de": number,"descricao": string,"id": string,"lancamento_id": string,"minha": boolean,"para": number,"quando": string,"quem_nome": string,"tipo": string
+            }[]
+                           },
 "alteracoes_marcar_vistas":
 { Args: { "p": string }; Returns: undefined
                            },
@@ -1893,6 +1924,14 @@ isOneToOne: false
 "comissao_do_periodo":
 { Args: { "p_ate": string,"p_de": string,"p_petshop": string }; Returns: {
               "atendimentos": number,"ativo": boolean,"base": number,"base_produtos": number,"com_pacote": number,"comissao": number,"comissao_produtos": number,"comissao_servicos": number,"cor": string,"nome": string,"pct": number,"profissional_id": string
+            }[]
+                           },
+"comissao_extrato":
+{ Args: { "p_ate": string,"p_de": string,"p_petshop": string,"p_profissional"?: string }; Returns: Json
+                           },
+"comissao_linhas_calc":
+{ Args: { "p_ate": string,"p_de": string,"p_petshop": string,"p_profissional"?: string }; Returns: {
+              "agendamento_id": string,"base": number,"inicio": string,"pacote": boolean,"pct": number,"profissional_id": string,"servico_id": string,"tipo": string,"valor": number
             }[]
                            },
 "comissao_pagar":
@@ -1994,6 +2033,9 @@ isOneToOne: false
                            },
 "creche_experiencia_max":
 { Args: { "p_petshop": string }; Returns: number
+                           },
+"creche_falta_futura":
+{ Args: { "p_dia": string,"p_marcar"?: boolean,"p_plano": string }; Returns: Json
                            },
 "creche_gerar_cobrancas":
 { Args: { "p_petshop": string }; Returns: number
@@ -2163,6 +2205,9 @@ isOneToOne: false
                            },
 "estadia_checkout_conferir":
 { Args: { "p_estadia": string,"p_passos": Json,"p_petshop": string,"p_res": Json }; Returns: undefined
+                           },
+"estadia_corrigir_horas":
+{ Args: { "p_entrada"?: string,"p_estadia": string,"p_motivo"?: string,"p_saida"?: string }; Returns: Json
                            },
 "estadia_desfazer_checkin":
 { Args: { "p_estadia": string }; Returns: Json
