@@ -120,16 +120,6 @@ function FechamentoNoPapel() {
               )}
             </div>
 
-            <section>
-              <h2 className="g-pa-t">Para conferir</h2>
-              <Pares linhas={[
-                { nome: "Atendimentos concluídos sem conta fechada (na hora da impressão)", valor: paraCobrar.n ? `${paraCobrar.n} · ${brl(paraCobrar.total)}` : "nenhum" },
-                { nome: "Alterações em valores enquanto este caixa esteve aberto", valor: dados!.alteracoes ? String(dados!.alteracoes) : "nenhuma" },
-              ]} />
-              {(paraCobrar.n > 0 || dados!.alteracoes > 0) && <p className="g-pa-nota">{paraCobrar.n > 0 ? "Os atendimentos para cobrar não entraram no caixa: feche a conta deles em Caixa, Atendimentos para cobrar. " : ""}{dados!.alteracoes > 0 ? (fin ? "Cada alteração está em Alterações em valores, na tela Hoje." : "O dono vê cada alteração em Alterações em valores.") : ""}</p>}
-              {caixa.obs && <p className="g-pa-nota" style={{ color: "#1f1b17" }}><b>Observação:</b> {caixa.obs}</p>}
-            </section>
-
             {comMovimentos && lancVisiveis.length > 0 && (
               <section>
                 <h2 className="g-pa-t">Lançamentos deste caixa<small>{lancVisiveis.length}</small></h2>
@@ -142,7 +132,7 @@ function FechamentoNoPapel() {
                       return (
                         <tr key={l.id}>
                           <td className="hora">{hora(quandoPagou(l))}</td>
-                          <td>{l.movimento ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [l.descricao, resumoDeItens(l)].filter(Boolean).join(" · ") || "Lançamento"}{!l.movimento && <small>{categoriaAtual(l.categoria, petshop)}</small>}</td>
+                          <td>{l.movimento ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [l.descricao, resumoDeItens(l)].filter(Boolean).join(" · ") || "Lançamento"}{!l.movimento && <small>{categoriaAtual(l.categoria, petshop)}{l.alterado_em ? ` · alterado em ${dataCurta(l.alterado_em)} às ${hora(l.alterado_em)}` : ""}</small>}</td>
                           <td>{l.movimento ? "Dinheiro" : textoDoPagamento(l)}</td>
                           <td className="pa-num">{entrada ? brl(valor) : ""}</td>
                           <td className="pa-num">{entrada ? "" : brl(valor)}</td>
@@ -154,7 +144,19 @@ function FechamentoNoPapel() {
               </section>
             )}
 
-            <div className="g-pa-assina"><span>Fechado por</span><span>Conferido por</span></div>
+            {/* o que conferir e as assinaturas ficam juntos na mesma folha (sem as linhas de assinar sozinhas na página 2) */}
+            <div className="g-pa-fim">
+              <section>
+                <h2 className="g-pa-t">Para conferir</h2>
+                <Pares linhas={[
+                  { nome: "Atendimentos concluídos sem conta fechada (na hora da impressão)", valor: paraCobrar.n ? `${paraCobrar.n} · ${brl(paraCobrar.total)}` : "nenhum" },
+                  { nome: "Alterações em valores enquanto este caixa esteve aberto", valor: dados!.alteracoes ? String(dados!.alteracoes) : "nenhuma" },
+                ]} />
+                {(paraCobrar.n > 0 || dados!.alteracoes > 0) && <p className="g-pa-nota">{paraCobrar.n > 0 ? "Os atendimentos para cobrar não entraram no caixa: feche a conta deles em Caixa, Atendimentos para cobrar. " : ""}{dados!.alteracoes > 0 ? (fin ? "Cada alteração está no aplicativo, em Financeiro, Alterações (período: este caixa)." : "O dono vê cada alteração em Financeiro, Alterações.") : ""}</p>}
+                {caixa.obs && <p className="g-pa-nota" style={{ color: "#1f1b17" }}><b>Observação:</b> {caixa.obs}</p>}
+              </section>
+              <div className="g-pa-assina"><span>Fechado por</span><span>Conferido por</span></div>
+            </div>
           </>
         )}
       </Papel>

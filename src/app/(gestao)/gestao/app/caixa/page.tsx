@@ -755,7 +755,7 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo, aoMu
         )}
         {avisoAlteracoes && (
           <p className="g-aviso" style={{ margin: 0 }} role="status">
-            <span><b>{avisoAlteracoes}</b> {cuidoDoFinanceiro ? "Veja cada uma em Alterações em valores, na tela Hoje." : "O dono vê cada uma em Alterações em valores."}</span>
+            <span><b>{avisoAlteracoes}</b> {cuidoDoFinanceiro ? <>Veja cada uma em <Link href={`/gestao/app/financeiro?aba=alteracoes&caixa=${caixa.id}`}>Financeiro, Alterações</Link>.</> : "O dono vê cada uma em Financeiro, Alterações."}</span>
           </p>
         )}
         {dinheiroFora > 0 && (

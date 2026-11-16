@@ -14,6 +14,7 @@ import {
   TagAlterado, textoJaRecebido, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import CustoDasVendas from "@/components/gestao/financeiro/custo-vendas";
+import AlteracoesDoPeriodo from "@/components/gestao/financeiro/alteracoes-periodo";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
 import { contasDaMeta, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
@@ -29,12 +30,13 @@ export default function PaginaFinanceiro() {
   return cuidoDoFinanceiro ? <Financeiro /> : <SemAcesso />;
 }
 
-type Aba = "resumo" | "pagar" | "receber" | "lancamentos";
+type Aba = "resumo" | "pagar" | "receber" | "lancamentos" | "alteracoes";
 const ABAS: { id: Aba; rotulo: string }[] = [
   { id: "resumo", rotulo: "Resumo" },
   { id: "pagar", rotulo: "A pagar" },
   { id: "receber", rotulo: "A receber" },
   { id: "lancamentos", rotulo: "Lançamentos" },
+  { id: "alteracoes", rotulo: "Alterações" },
 ];
 const FILTROS = [{ id: "tudo", rotulo: "Tudo" }, { id: "entrada", rotulo: "Entradas" }, { id: "saida", rotulo: "Saídas" }] as const;
 type Filtro = (typeof FILTROS)[number]["id"];
@@ -74,8 +76,8 @@ function Financeiro() {
   const agora = new Date();
   const [mes, setMes] = useState(() => new Date(agora.getFullYear(), agora.getMonth(), 1));
   const [aba, setAba] = useState<Aba>("resumo");
-  // atalho vindo da tela Hoje: /gestao/app/financeiro?aba=receber
-  useEffect(() => { if (new URLSearchParams(window.location.search).get("aba") === "receber") setAba("receber"); }, []);
+  // atalhos: /gestao/app/financeiro?aba=receber (tela Hoje) e ?aba=alteracoes (fechamento do caixa)
+  useEffect(() => { const a = new URLSearchParams(window.location.search).get("aba"); if (a === "receber" || a === "alteracoes") setAba(a); }, []);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("tudo");
   const [folha, setFolha] = useState<FolhaAberta | null>(null);
@@ -388,6 +390,7 @@ function Financeiro() {
               </section>
             )}
             {aba === "lancamentos" && <Apagados linhas={dados.apagados} titulo={`Apagados de ${nomeMes(mes)}`} />}
+            {aba === "alteracoes" && <AlteracoesDoPeriodo inicio={inicio} fim={fim} tituloMes={tituloMes} />}
           </>
         )}
       </div>

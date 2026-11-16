@@ -104,3 +104,5 @@
   .g-pa-ficha.pagina + .g-pa-ficha.pagina { break-before: page; }
   .g-pa-ficha.pagina .g-pa-caixa p, .g-pa-ficha.pagina .g-pa-caixa li { font-size: .9375rem; }
 }
+/* fechamento do caixa: "Para conferir" e as assinaturas não se separam */
+.g-pa .g-pa-fim { break-inside: avoid; page-break-inside: avoid; display: grid; gap: 0; }
