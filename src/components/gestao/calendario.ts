@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { calendarioGuardado, lerCalendario, ouvirCalendario, type Calendario } from "@/lib/gestao/feriados";
+import { calendarioGuardado, lerCalendario, lerCalendarioUmaVez, ouvirCalendario, type Calendario } from "@/lib/gestao/feriados";
 import { useGestao } from "./contexto";
 
 /**
@@ -10,14 +10,12 @@ import { useGestao } from "./contexto";
  * lista chega ou muda, e as regras (`diaFechado`, `feriadoDoDia`, `atrasoSugerido`) passam a responder com ela.
  * `pronto` fica falso só enquanto a primeira leitura não voltou (até lá, vale "nenhum dia fechado").
  */
-let emCurso: Promise<unknown> | null = null;
-
 export function useCalendario(): { calendario: Calendario | null; pronto: boolean; recarregar: () => Promise<void> } {
   const { sb, petshop, vejoFinanceiro } = useGestao();
   const [calendario, setCalendario] = useState<Calendario | null>(() => calendarioGuardado(petshop.id, vejoFinanceiro));
   const recarregar = useCallback(async () => { await lerCalendario(sb, petshop.id, vejoFinanceiro); }, [sb, petshop.id, vejoFinanceiro]);
-  // várias partes da mesma tela pedem ao mesmo tempo: a primeira leitura é uma só
-  const primeira = useCallback(() => { emCurso ??= recarregar().finally(() => { emCurso = null; }); }, [recarregar]);
+  // várias partes da mesma tela pedem ao mesmo tempo (e a tela Hoje também lê pela creche): a primeira leitura é uma só
+  const primeira = useCallback(() => { void lerCalendarioUmaVez(sb, petshop.id, vejoFinanceiro).catch(() => undefined); }, [sb, petshop.id, vejoFinanceiro]);
   useEffect(() => {
     const ler = () => setCalendario(calendarioGuardado(petshop.id, vejoFinanceiro));
     const parar = ouvirCalendario(ler);

@@ -75,12 +75,13 @@ export async function lerPetshop(sb: Banco, petshopId: string): Promise<{ data: 
     lerOpcoes(sb, petshopId),
   ]);
   if (base.error || !base.data) return { data: null, error: base.error };
+  return { data: montarPetshop(base.data, extra, diarias, opcoes), error: null };
+}
+
+function montarPetshop(base: unknown, extra: Linhas, diarias: Linhas, opcoes: Record<string, unknown>): PetshopLinha {
   return {
-    data: {
-      ...(base.data as unknown as PetshopLinha), opcoes: opcoes as PetshopLinha["opcoes"], meta_mes: num(extra[0]?.meta_mes),
-      diaria_creche: num(diarias[0]?.diaria_creche), diaria_hotel: num(diarias[0]?.diaria_hotel), cakto_email: null, cakto_assinatura: null,
-    },
-    error: null,
+    ...(base as PetshopLinha), opcoes: opcoes as PetshopLinha["opcoes"], meta_mes: num(extra[0]?.meta_mes),
+    diaria_creche: num(diarias[0]?.diaria_creche), diaria_hotel: num(diarias[0]?.diaria_hotel), cakto_email: null, cakto_assinatura: null,
   };
 }
 
@@ -131,14 +132,15 @@ export async function lerEquipe(sb: Banco, petshopId: string): Promise<{ data: P
     reservado(sb, "equipe_reservado", { p: petshopId }, () => sb.from("profissionais").select("id, comissao_pct, email_convite").eq("petshop_id", petshopId)),
   ]);
   if (base.error) return { data: null, error: base.error };
+  return { data: montarEquipe(base.data as unknown as ProfissionalLinha[], reservadas), error: null };
+}
+
+function montarEquipe(base: ProfissionalLinha[], reservadas: Linhas): ProfissionalLinha[] {
   const extra = porId(reservadas);
-  return {
-    data: (base.data as unknown as ProfissionalLinha[]).map((p) => {
-      const x = extra.get(p.id);
-      return { ...p, comissao_pct: num(x?.comissao_pct) ?? 0, email_convite: (x?.email_convite as string | null | undefined) ?? null };
-    }),
-    error: null,
-  };
+  return base.map((p) => {
+    const x = extra.get(p.id);
+    return { ...p, comissao_pct: num(x?.comissao_pct) ?? 0, email_convite: (x?.email_convite as string | null | undefined) ?? null };
+  });
 }
 
 /**
@@ -266,4 +268,27 @@ export async function comPrecosDeAgendamento<A extends ComServicosAMais>(sb: Ban
     preco: preco(a.id),
     agendamento_servicos: a.agendamento_servicos == null ? null : a.agendamento_servicos.map((o) => ({ ...o, preco: preco(o.id) })),
   })) as never;
+}
+
+type ServicoLido = T["servicos"]["Row"] & { preco_varia: boolean };
+/**
+ * O que o aplicativo lê ao abrir: o pet shop, a equipe e os serviços, com as partes reservadas (as mesmas regras de
+ * `lerPetshop`, `lerEquipe` e `lerServicos`). Vem numa ida só ao banco (`gestao_base`); se a função ainda não existe
+ * (banco antes da atualização) ou falhar, lê do jeito de antes, com um pedido por parte.
+ */
+export async function lerBase(sb: Banco, petshopId: string): Promise<{ petshop: PetshopLinha | null; erro: { message: string } | null; equipe: ProfissionalLinha[]; servicos: ServicoLido[] }> {
+  const r = await (sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }).rpc("gestao_base", { p: petshopId });
+  const b = (r.error ? null : r.data) as Record<string, unknown> | null;
+  if (!b) {
+    const [p, e, s] = await Promise.all([lerPetshop(sb, petshopId), lerEquipe(sb, petshopId), lerServicos(sb, petshopId)]);
+    return { petshop: p.data, erro: p.error, equipe: e.data ?? [], servicos: s.data ?? [] };
+  }
+  const lista = (v: unknown) => (Array.isArray(v) ? (v as Linhas) : []);
+  const objeto = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+  return {
+    petshop: b.petshop ? montarPetshop(b.petshop, lista(b.reservado), lista(b.diarias), objeto(b.opcoes)) : null,
+    erro: null,
+    equipe: montarEquipe(lista(b.equipe) as unknown as ProfissionalLinha[], lista(b.equipe_reservado)),
+    servicos: juntarPrecosDeServico(lista(b.servicos) as unknown as T["servicos"]["Row"][], lista(b.servicos_precos)),
+  };
 }

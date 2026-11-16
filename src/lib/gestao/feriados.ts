@@ -74,6 +74,18 @@ export async function lerCalendario(sb: Banco, petshopId: string, comPrecos: boo
   return c;
 }
 
+let lendo: { petshop: string; comPrecos: boolean; p: Promise<Calendario> } | null = null;
+/**
+ * A primeira leitura (quando ainda não há nada guardado): várias partes da mesma tela pedem ao mesmo tempo (a tela, a chamada
+ * da creche no Hoje, as cobranças) e recebem a mesma leitura, sem repetir o pedido. Para reler depois de uma mudança, `lerCalendario`.
+ */
+export function lerCalendarioUmaVez(sb: Banco, petshopId: string, comPrecos: boolean): Promise<Calendario> {
+  if (lendo && lendo.petshop === petshopId && (lendo.comPrecos || !comPrecos)) return lendo.p;
+  const p = lerCalendario(sb, petshopId, comPrecos).finally(() => { if (lendo?.p === p) lendo = null; });
+  lendo = { petshop: petshopId, comPrecos, p };
+  return p;
+}
+
 /** O negócio marcou esse dia (AAAA-MM-DD) como fechado? */
 export const diaFechado = (dia: string) => fechados.has(dia);
 /** O nome que o dono deu ao dia fechado ("Natal"), ou "" se não deu; null quando o dia não é fechado. */

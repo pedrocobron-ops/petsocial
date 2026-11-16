@@ -1,6 +1,6 @@
 "use client";
 
-import { lerEquipe, lerPetshop, lerServicos } from "@/lib/gestao/reservado";
+import { lerBase } from "@/lib/gestao/reservado";
 import { temCheckout, usarLinksDoBanco } from "@/lib/gestao/planos";
 import { Selo } from "./marca";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -69,13 +69,10 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   const [aberta, setAberta] = useState<boolean | null>(null);
 
   const buscarBase = useCallback(async (petshopId: string) => {
-    const [p, e, s] = await Promise.all([
-      lerPetshop(sb, petshopId),
-      lerEquipe(sb, petshopId),
-      lerServicos(sb, petshopId),
-    ]);
-    if (p.error || !p.data) throw p.error ?? new Error("pet shop");
-    return { petshop: p.data, equipe: e.data ?? [], servicos: s.data ?? [] };
+    // pet shop, equipe e serviços numa ida só ao banco (com o banco antes da atualização, um pedido por parte, como antes)
+    const b = await lerBase(sb, petshopId);
+    if (b.erro || !b.petshop) throw b.erro ?? new Error("pet shop");
+    return { petshop: b.petshop, equipe: b.equipe, servicos: b.servicos };
   }, [sb]);
   const aplicarBase = useCallback((b: Awaited<ReturnType<typeof buscarBase>>) => {
     setPetshop(b.petshop);
