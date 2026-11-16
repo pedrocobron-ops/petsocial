@@ -18,6 +18,7 @@ import { FolhaOcorrencia, OcorrenciasDoCartao } from "@/components/gestao/casa/o
 import { FolhaQuemPodeBuscar, lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { decidirAtraso, FolhaTaxaDeAtraso, fraseDoAtraso, lerAtraso, lerAtrasosPendentes, type AtrasoPendente } from "@/components/gestao/creche/atraso";
 import Chamada from "@/components/gestao/creche/chamada";
+import { BotaoCorrigirHoras, FolhaCorrigirHoras, usePodeCorrigirHoras } from "@/components/gestao/creche/corrigir-horas";
 import Cobrancas from "@/components/gestao/creche/cobrancas";
 import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
 import Mensalistas from "@/components/gestao/creche/mensalistas";
@@ -47,6 +48,7 @@ import { principalDe, usaModulo } from "@/lib/gestao/modulos";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Estadia, Petshop } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, juntaDiaHora, nomeMes, somaDias } from "@/lib/gestao/util";
+import { conflitoDoPet, type Periodo } from "@/lib/gestao/conflito-estadia";
 import "./creche-hotel.css";
 import "@/components/gestao/hotel/hotel.css";
 
@@ -60,7 +62,6 @@ type Ver = "chamada" | "casa" | "ocupacao" | "diario" | "mensalistas" | "cobranc
 const quando = (d: string | Date) => `${dataAmigavel(new Date(d))}, ${horaCurta(d)}`;
 const centavos = (n: number) => Math.round(n * 100) / 100;
 
-type Periodo = Pick<Estadia, "tipo" | "entrada" | "saida_prevista" | "status">;
 
 // A regra de ocupação de vaga (`estadiaOcupa`) mora em src/lib/gestao/creche.ts, junto da conta dos mensalistas;
 // `ocupaNoDia` e `ocupadasNoDia` (src/lib/gestao/hotel.ts) são as mesmas que o calendário de Ocupação usa.
@@ -79,32 +80,6 @@ function diasOcupados(e: Periodo, hoje: Date): string[] {
   return dias;
 }
 
-/** Primeiro e último dia do período no calendário (os dois contam). Quem está na casa sem saída prevista não tem fim. */
-function pontas(e: Periodo, hoje: string): [string, string] {
-  const ini = isoDia(new Date(e.entrada));
-  let fim = e.saida_prevista ? isoDia(new Date(e.saida_prevista)) : e.status === "em_casa" ? "9999-12-31" : ini;
-  if (e.status === "em_casa" && hoje > fim) fim = hoje;
-  return [ini, fim < ini ? ini : fim];
-}
-/**
- * Outra reserva ou estadia aberta do mesmo pet que cruza o período novo. É a mesma conta do aceite de pedido no banco:
- * as datas se cruzam no calendário, com o dia da saída contando. Quem já está na casa não entra de novo.
- */
-function conflitoDoPet(petId: string, novo: Periodo, abertas: EstadiaCompleta[], ignorar: string | null, hoje: Date): EstadiaCompleta | null {
-  const hojeIso = isoDia(hoje);
-  const [de, ate] = pontas(novo, hojeIso);
-  for (const e of abertas) {
-    if (e.pet_id !== petId || e.id === ignorar) continue;
-    if (novo.status === "em_casa" && e.status === "em_casa") return e;
-    const [a, b] = pontas(e, hojeIso);
-    // passa o dia na creche e dorme no hotel: a reserva do hotel pode começar no dia em que a creche termina, depois da saída
-    const fimDaCreche = e.tipo === "creche" && e.status === "em_casa" && !e.saida_prevista ? hojeIso : b;
-    if (novo.tipo === "hotel" && novo.status === "reservada" && e.tipo === "creche" && de === fimDaCreche
-      && new Date(novo.entrada) >= new Date(e.saida_prevista ?? e.entrada) && (e.status !== "em_casa" || new Date(novo.entrada) > hoje)) continue;
-    if (a <= ate && b >= de) return e;
-  }
-  return null;
-}
 function fraseConflito(nome: string, e: EstadiaCompleta) {
   if (e.status === "em_casa") return `${nome} já está na casa desde ${quando(e.entrada)}.`;
   const ate = e.saida_prevista && isoDia(new Date(e.saida_prevista)) !== isoDia(new Date(e.entrada)) ? ` a ${dataCurta(e.saida_prevista)}` : "";
@@ -230,6 +205,9 @@ export default function CrecheHotel() {
   const [gerando, setGerando] = useState(false);
   const [mesCobranca, setMesCobranca] = useState(() => new Date());
   const [acertando, setAcertando] = useState<EstadiaCompleta | null>(null);
+  // corrigir a hora de chegada ou de saída (dono e quem cuida do financeiro), com o motivo anotado
+  const [horasDe, setHorasDe] = useState<EstadiaCompleta | null>(null);
+  const corrigeHoras = usePodeCorrigirHoras();
   const [cobrando, setCobrando] = useState<EstadiaCompleta | null>(null);
   // mensalista que saiu depois do horário: a pergunta da taxa, só para quem recebe
   const [taxa, setTaxa] = useState<AtrasoPendente | null>(null);
@@ -270,39 +248,56 @@ export default function CrecheHotel() {
     const atrasosP = vejoFinanceiro && usaCreche ? lerAtrasosPendentes(sb, petshop.id) : Promise.resolve([] as AtrasoPendente[]);
     // (se a primeira leva falhar, a tela mostra o erro dela; estas duas não deixam aviso solto no navegador)
     feitosP.catch(() => undefined); atrasosP.catch(() => undefined);
-    const [abertas, passadas, pendentes] = await Promise.all([
-      sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500),
-      sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["encerrada", "cancelada"]).order("entrada", { ascending: false }).limit(100),
-      // check-outs que fecharam sem cobrança (feitos por quem não mexe com dinheiro): todos, não só os últimos do histórico
-      (async (): Promise<{ data: unknown[] | null }> => {
+    // cada lista segue sozinha, sem esperar as outras (no celular, cada espera em fila soma uma ida e volta): a diária e o valor
+    // cobrado (só para quem recebe; para os outros ficam em branco), o sinal e as taxas, as ocorrências e quem buscou.
+    // O que só precisa dos ids sai junto com a própria lista.
+    const valoresDe = (ids: string[]) => vejoFinanceiro && ids.length
+      ? sb.from("estadias_valores").select("*").eq("petshop_id", petshop.id).in("estadia_id", ids).then((r) => (r.data ?? []) as ValoresDaEstadia[])
+      : Promise.resolve([] as ValoresDaEstadia[]);
+    const [[lista, vAbertas, ocorrencias], [encerradas, retiradas], [pend, vPend], feitos, atrasos] = await Promise.all([
+      sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500)
+        .then((r) => {
+          const l = ok(r) as unknown as EstadiaCompleta[];
+          const naCasaIds = l.filter((e) => e.status === "em_casa").map((e) => e.id);
+          return Promise.all([
+            comValoresDeEstadia(sb, petshop.id, l, vejoFinanceiro),
+            // sinal e taxas das reservas e estadias abertas: só quem recebe lê (o banco não entrega para os outros)
+            valoresDe(l.map((e) => e.id)),
+            // ocorrências das estadias abertas (só com a opção ligada)
+            comOcorrencias && naCasaIds.length
+              ? sb.from("estadias_ocorrencias").select("*").eq("petshop_id", petshop.id).in("estadia_id", naCasaIds).order("quando").limit(1000).then((x) => (x.data ?? []) as Ocorrencia[])
+              : Promise.resolve([] as Ocorrencia[]),
+          ]);
+        }),
+      sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("status", ["encerrada", "cancelada"]).order("entrada", { ascending: false }).limit(100)
+        .then((r) => {
+          const l = ok(r) as unknown as EstadiaCompleta[];
+          return Promise.all([
+            comValoresDeEstadia(sb, petshop.id, l, vejoFinanceiro),
+            // quem levou cada pet (só com "Quem pode buscar" ligado)
+            comPortaria ? lerRetiradas(sb, petshop.id, l.filter((e) => e.status === "encerrada").map((e) => e.id)).catch(() => new Map<string, Retirada>()) : Promise.resolve(new Map<string, Retirada>()),
+          ]);
+        }),
+      // check-outs que fecharam sem cobrança (feitos por quem não mexe com dinheiro): todos, não só os últimos do histórico.
+      // Com os ids na mão, a estadia, a diária e o sinal saem juntos.
+      (async () => {
         const ids = vejoFinanceiro ? await idsParaCobrar(sb, petshop.id) : [];
-        return ids.length ? await sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("id", ids).order("saida", { ascending: false }) : { data: [] };
+        if (!ids.length) return [[] as EstadiaCompleta[], [] as ValoresDaEstadia[]] as const;
+        const [r, comValor, v] = await Promise.all([
+          sb.from("estadias").select(SELECT_ESTADIA).eq("petshop_id", petshop.id).in("id", ids).order("saida", { ascending: false }),
+          comValoresDeEstadia(sb, petshop.id, ids.map((id) => ({ id })), true),
+          valoresDe(ids),
+        ]);
+        const porId = new Map(comValor.map((x) => [x.id, x]));
+        const l = ((r.data ?? []) as unknown as EstadiaCompleta[]).map((e) => ({ ...e, valor_diaria: porId.get(e.id)?.valor_diaria ?? null, valor_cobrado: porId.get(e.id)?.valor_cobrado ?? null }));
+        return [l, v] as const;
       })(),
-    ]);
-    // a diária e o valor cobrado vêm à parte, só para quem recebe (para os outros ficam em branco)
-    const [lista, antigas, pend] = await Promise.all([
-      comValoresDeEstadia(sb, petshop.id, ok(abertas) as unknown as EstadiaCompleta[], vejoFinanceiro),
-      comValoresDeEstadia(sb, petshop.id, ok(passadas) as unknown as EstadiaCompleta[], vejoFinanceiro),
-      comValoresDeEstadia(sb, petshop.id, (pendentes.data ?? []) as unknown as EstadiaCompleta[], vejoFinanceiro),
-    ]);
-    const semCobranca = pend.filter(estadiaSemCobranca);
-    // sinal e taxas das reservas e estadias abertas: só quem recebe lê (o banco não entrega para os outros)
-    const encerradas = antigas;
-    const naCasaIds = lista.filter((e) => e.status === "em_casa").map((e) => e.id);
-    const [v, feitos, ocorrencias, retiradas, atrasos] = await Promise.all([
-      vejoFinanceiro && lista.length + semCobranca.length
-        ? sb.from("estadias_valores").select("*").eq("petshop_id", petshop.id).in("estadia_id", [...lista, ...semCobranca].map((e) => e.id))
-        : Promise.resolve(null),
       feitosP,
-      // ocorrências das estadias abertas e quem levou cada pet das encerradas (só com as opções ligadas)
-      comOcorrencias && naCasaIds.length
-        ? sb.from("estadias_ocorrencias").select("*").eq("petshop_id", petshop.id).in("estadia_id", naCasaIds).order("quando").limit(1000).then((r) => (r.data ?? []) as Ocorrencia[])
-        : Promise.resolve([] as Ocorrencia[]),
-      comPortaria ? lerRetiradas(sb, petshop.id, encerradas.filter((e) => e.status === "encerrada").map((e) => e.id)).catch(() => new Map<string, Retirada>()) : Promise.resolve(new Map<string, Retirada>()),
       atrasosP,
     ]);
+    const semCobranca = pend.filter(estadiaSemCobranca);
     const valores = new Map<string, ValoresDaEstadia>();
-    for (const x of v?.data ?? []) valores.set(x.estadia_id, x);
+    for (const x of [...vAbertas, ...vPend.filter((x) => semCobranca.some((e) => e.id === x.estadia_id))]) valores.set(x.estadia_id, x);
     return { abertas: lista, passadas: encerradas, valores, feitos, ocorrencias, retiradas, semCobranca, atrasos };
   }, [petshop.id, vejoFinanceiro, comCuidados, comOcorrencias, comPortaria, usaCreche]);
 
@@ -347,7 +342,8 @@ export default function CrecheHotel() {
   const tudoVazio = Boolean(dados) && !naCasa.length && !reservas.length && !historico.length && !dados?.semCobranca.length && !dados?.atrasos.length;
   const valoresDe = (e: EstadiaCompleta) => dados?.valores.get(e.id) ?? null;
 
-  const mudou = () => { void recarregar(); avisarMudanca(); };
+  // avisarMudanca já faz esta tela (e as outras abertas) buscar de novo: chamar recarregar() junto buscava tudo duas vezes
+  const mudou = () => avisarMudanca();
   const abrirNova = () => { if (!somenteLeitura()) setNova({}); };
   const espera = useListaDeEspera(abertas, mens ?? null);
   const verEspera = () => { setVer("ocupacao"); setTimeout(() => document.getElementById("lista-de-espera")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); };
@@ -696,6 +692,7 @@ export default function CrecheHotel() {
                         {!e.mensalista && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setEditando(e); }}><Pencil /> Editar</button>}
                         {comOcorrencias && pet && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setOcorrenciaDe(e); }}><ShieldAlert /> Ocorrência</button>}
                         {comPortaria && pet && <button className="g-btn fantasma p" onClick={() => setAutorizadosDe(e)}><ShieldCheck /> Quem busca</button>}
+                        {corrigeHoras && <BotaoCorrigirHoras nome={pet?.nome ?? "pet"} aoTocar={() => setHorasDe(e)} />}
                         {e.mensalista
                           ? <button className="g-btn verde p" style={{ marginLeft: "auto" }} disabled={ocupado === e.id} onClick={() => sair(e)}><LogOut /> Saiu</button>
                           : <button className="g-btn verde p" style={{ marginLeft: "auto" }} onClick={() => sair(e)}><LogOut /> Check-out</button>}
@@ -792,6 +789,7 @@ export default function CrecheHotel() {
                         {e.status === "cancelada"
                           ? <span className="g-tag vermelho">cancelada</span>
                           : <Cobrado e={e} />}
+                        {corrigeHoras && e.status === "encerrada" && <BotaoCorrigirHoras nome={e.pets?.nome ?? "pet"} aoTocar={() => setHorasDe(e)} />}
                         {vejoFinanceiro && e.status === "encerrada" && !e.mensalista && (
                           <button className={`g-btn p ${estadiaSemCobranca(e) ? "sec" : "fantasma"}`} onClick={(ev) => { ev.stopPropagation(); if (somenteLeitura()) return; if (estadiaSemCobranca(e)) setCobrando(e); else setAcertando(e); }}
                             aria-label={`${estadiaSemCobranca(e) ? "Receber" : "Corrigir"} a estadia de ${e.pets?.nome ?? "pet"}`}>{estadiaSemCobranca(e) ? <><HandCoins />Receber</> : <Pencil />}</button>
@@ -808,6 +806,7 @@ export default function CrecheHotel() {
 
       {ver === "casa" && dados && !tudoVazio && souDono && <div style={{ marginTop: 20 }}><LinkCrecheHotel titulo="Pedidos pelo link do cliente" /></div>}
       {(ver === "casa" || ver === "ocupacao") && dados && souDono && <p style={{ marginTop: 16 }}><Link className="g-btn fantasma p" href="/gestao/app/meu-petshop#opcoes-hotel"><Settings2 />{usaCreche && usaHotel ? "Opções do hotel e da creche" : usaHotel ? "Opções do hotel" : "Opções da creche"}</Link></p>}
+      {horasDe && <FolhaCorrigirHoras key={horasDe.id} estadia={horasDe} aoFechar={() => setHorasDe(null)} />}
       {acertando && <AcertarEstadia key={acertando.id} estadia={acertando} aoFechar={() => setAcertando(null)} aoGravar={() => { setAcertando(null); mudou(); }} />}
       {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} experienciaInicial={nova.experiencia} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} saidaInicial={nova.saida} horaInicial={nova.hora ?? undefined} saidaHoraInicial={nova.saidaHora ?? undefined} abertas={abertas} doTutor={doTutor}
         aoFechar={() => setNova(null)} aoGravar={(emCasa) => {
@@ -1045,7 +1044,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
     try {
       if (reservaExtra && planoDoPet) {
         ok(await sb.rpc("creche_reservar_extra", { p_plano: planoDoPet.id, p_dia: dia, p_obs: obs.trim() || undefined }));
-        avisar(`Dia extra de ${pet.nome} reservado para ${dataAmigavel(deIsoDia(dia))}. Quando ele vier, o dia entra na próxima mensalidade.`);
+        avisar(`Dia extra de ${pet.nome} reservado para ${dataAmigavel(deIsoDia(dia))}. No dia, a chegada entra na próxima mensalidade.`);
         aoGravar(false);
         return;
       }

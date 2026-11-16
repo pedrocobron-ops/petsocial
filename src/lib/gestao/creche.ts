@@ -172,6 +172,8 @@ export type ResumoDoMes = {
   esperados: number; vieram: number; extras: string[]; reposicoes: string[]; faltas: { dia: string; avisou: boolean }[];
   /** dias do plano que já passaram e ficaram sem chamada (nem presença nem falta) */
   semChamada: string[];
+  /** faltas avisadas com antecedência, de dias que ainda vão chegar (não contam como falta até o dia) */
+  vaiFaltar: string[];
 };
 const primeiroDoMes = (mes: Date) => new Date(mes.getFullYear(), mes.getMonth(), 1);
 const ultimoDoMes = (mes: Date) => new Date(mes.getFullYear(), mes.getMonth() + 1, 0);
@@ -180,16 +182,18 @@ export const isoMes = (mes: Date) => isoDia(primeiroDoMes(mes));
 /** Presenças, faltas e extras de um pet num mês (até hoje). */
 export function resumoDoMes(plano: Vigencia & { pet_id: string }, mes: Date, presencas: Presenca[], faltas: Pick<Falta, "pet_id" | "dia" | "avisou">[], horario: unknown, hoje: string): ResumoDoMes {
   const de = isoDia(primeiroDoMes(mes)), ate = isoDia(ultimoDoMes(mes));
-  // reserva de dia extra que ainda não virou presença não conta como vinda
-  const doPet = presencas.filter((e) => e.pet_id === plano.pet_id && e.status !== "reservada" && diaDaPresenca(e) >= de && diaDaPresenca(e) <= ate);
+  // reserva de dia extra que ainda não virou presença não conta como vinda; dia de antes do plano (o dia de experiência) também não
+  const doPet = presencas.filter((e) => e.pet_id === plano.pet_id && e.status !== "reservada" && diaDaPresenca(e) >= de && diaDaPresenca(e) <= ate
+    && planoVale(plano, diaDaPresenca(e)));
   const veio = new Set(doPet.map(diaDaPresenca));
-  // falta anotada num dia que depois foi marcado como fechado não conta
-  const faltou = faltas.filter((f) => f.pet_id === plano.pet_id && f.dia >= de && f.dia <= ate && !diaFechado(f.dia)).sort((a, b) => a.dia.localeCompare(b.dia));
+  // falta anotada num dia que depois foi marcado como fechado não conta; a avisada para um dia que ainda vai chegar fica à parte
+  const doMes = faltas.filter((f) => f.pet_id === plano.pet_id && f.dia >= de && f.dia <= ate && !diaFechado(f.dia)).sort((a, b) => a.dia.localeCompare(b.dia));
+  const faltou = doMes.filter((f) => f.dia <= hoje);
   const r: ResumoDoMes = {
     esperados: 0, vieram: doPet.filter((e) => e.mensalista !== "extra" && e.mensalista !== "reposicao").length,
     extras: doPet.filter((e) => e.mensalista === "extra").map(diaDaPresenca).sort(),
     reposicoes: doPet.filter((e) => e.mensalista === "reposicao").map(diaDaPresenca).sort(),
-    faltas: faltou.map((f) => ({ dia: f.dia, avisou: f.avisou })), semChamada: [],
+    faltas: faltou.map((f) => ({ dia: f.dia, avisou: f.avisou })), semChamada: [], vaiFaltar: doMes.filter((f) => f.dia > hoje).map((f) => f.dia),
   };
   for (let d = primeiroDoMes(mes); isoDia(d) <= ate && isoDia(d) <= hoje; d = somaDias(d, 1)) {
     const dia = isoDia(d);
@@ -301,7 +305,9 @@ export const textoDasDatas = (dias: string[]) => juntar(dias.map((d) => dataCurt
 function linhaDaMensagem(c: CobrancaCompleta, comMes = false) {
   const extras = extrasDaCobranca(c), taxas = taxasDaCobranca(c), valores = partesDosExtras(c);
   // acerto da saída (o plano já acabou): não tem mensalidade, só o que ficou sem cobrar
-  const partes = c.acerto_saida ? [] : [`mensalidade ${brl(c.valor_mensal)}`];
+  // mensalidade menor que a cheia (entrada ou saída no meio do mês, pausa): o tutor lê que é proporcional, para não estranhar o valor
+  const proporcional = Number(c.valor_mensal) < Number(c.valor_cheio) ? ` (proporcional aos dias do plano no mês; cheia ${brl(c.valor_cheio)})` : "";
+  const partes = c.acerto_saida ? [] : [`mensalidade ${brl(c.valor_mensal)}${proporcional}`];
   if (extras.length) partes.push(`${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((e) => e.dia))})${valores.dias > 0 ? ` ${brl(valores.dias)}` : ""}`);
   if (taxas.length) partes.push(`${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((e) => e.dia))}) ${brl(valores.taxas)}`);
   let texto = partes.join(" + ");
@@ -380,7 +386,9 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
   ]);
   if (!planos.length) return null;
   const mov = lido ?? await lerPresencas(sb, petshop.id, hoje, hoje);
-  const linhas = montarChamada(planos, hoje, mov.presencas, mov.faltas, petshop.horario).filter((l) => l.conta === "plano" || l.conta === "avulsa" || l.presenca?.status === "reservada");
+  // quem veio fora do dia (dia extra, reposição) não é "esperado", mas conta em "na casa" e "já saíram", como na Chamada
+  const todas = montarChamada(planos, hoje, mov.presencas, mov.faltas, petshop.horario);
+  const linhas = todas.filter((l) => l.conta === "plano" || l.conta === "avulsa" || l.presenca?.status === "reservada");
   let vencemHoje = 0, atrasadas = 0, reposicoes = 0;
   const semValor: string[] = [];
   if (vejoFinanceiro) {
@@ -405,8 +413,8 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
     faltaram: linhas.filter((l) => l.estado === "faltou").map((l) => l.plano.pets?.nome ?? "Pet"),
     // quem faltou sem o tutor avisar: só para esses vale mandar mensagem perguntando
     semAviso: linhas.filter((l) => l.estado === "faltou" && !l.falta?.avisou).map((l) => l.plano.pets?.nome ?? "Pet"), vencemHoje, atrasadas, reposicoes, semValor,
-    naCasa: linhas.filter((l) => l.estado === "na_casa").length,
-    sairam: linhas.filter((l) => l.estado === "saiu").length,
+    naCasa: todas.filter((l) => l.estado === "na_casa").length,
+    sairam: todas.filter((l) => l.estado === "saiu").length,
   };
 }
 
@@ -574,7 +582,8 @@ export async function lerExperiencias(sb: Banco, petshopId: string) {
   const comPlano = new Set((planos.data ?? []).map((p) => p.pet_id));
   const lista = (r.data ?? []) as unknown as Experiencia[];
   return {
-    hoje: lista.filter((e) => isoDia(new Date(e.entrada)) === hoje),
+    // depois que o cão foi para casa (ou virou mensalista), o dia de experiência sai do "hoje" e vai para "conversar"
+    hoje: lista.filter((e) => isoDia(new Date(e.entrada)) === hoje && e.status !== "encerrada" && !comPlano.has(e.pet_id)),
     conversar: lista.filter((e) => e.status === "encerrada" && !comPlano.has(e.pet_id) && !jaConversou(e)),
   };
 }
@@ -609,6 +618,8 @@ export const linkDoExtratoDoPet = (petId: string, mes?: Date) => `/gestao/app/cr
 /** O que o extrato do mês de um cão mostra. Dinheiro (`cobranca`, `taxas` com valor) só para quem vê o financeiro. */
 export type ExtratoDoPet = {
   mes: Date; pet: string; tutor: string | null;
+  /** "M" ou "F" (para "do Thor", "da Mel"); sem sexo na ficha, "de" */
+  sexo?: string | null;
   plano: Pick<Plano, "dias"> | null;
   /** dias do plano no mês até hoje (com a creche aberta) */
   esperados: number;
@@ -660,7 +671,7 @@ export function textoDoExtratoDoPet(x: ExtratoDoPet, petshop: string, comValores
     conta.push(`Total: ${brl(c.total)}${paga ? (Number(c.total) > 0 && c.lancamentos?.data ? `, pago em ${dataCurta(c.lancamentos.data)}` : "") : falta < Number(c.total) ? `. Já pago ${brl(centavos(Number(c.total) - falta))}, falta ${brl(falta)}` : `, vence em ${dataCurta(c.vencimento)}`}`);
   }
   return [
-    `${saudacaoZap(x.tutor, petshop)} Segue o extrato de ${mes} de ${x.pet} na creche:`,
+    `${saudacaoZap(x.tutor, petshop)} Segue o extrato de ${mes} ${x.sexo === "M" ? "do" : x.sexo === "F" ? "da" : "de"} ${x.pet} na creche:`,
     "",
     ...linhas,
     ...(conta.length ? ["", ...conta] : []),
@@ -668,3 +679,38 @@ export function textoDoExtratoDoPet(x: ExtratoDoPet, petshop: string, comValores
     "Qualquer dúvida, é só chamar.",
   ].join("\n");
 }
+
+/* ---------- saída do plano: o acerto que ficou para depois ---------- */
+
+/** Marca, na observação da cobrança, de que a saída já foi conferida (acertada, anotada ou deixada como está). */
+export const notaDaSaida = (fim: string) => `Saída em ${dataCurta(fim)}`;
+
+/** Cobrança de um plano que terminou e ainda pede conferência: a do mês da saída cheia, ou a de um mês em que ele já não vem. */
+export type SaidaParaAcertar = { plano: PlanoCompleto; cobranca: CobrancaCompleta; frase: string };
+
+/**
+ * O que ficou para acertar depois que um plano ganhou data de fim (a folha do acerto pode ter fechado sem escolha):
+ * a mensalidade do mês da saída maior que a conta pelos dias até a saída, ou uma cobrança de um mês depois da saída.
+ * Some quando a mensalidade é acertada, a cobrança cancelada, ou a observação diz que a saída foi conferida.
+ */
+export function saidasParaAcertar(planos: PlanoCompleto[], cobrancas: CobrancaCompleta[], horario: unknown): SaidaParaAcertar[] {
+  const lista: SaidaParaAcertar[] = [];
+  for (const p of planos) {
+    if (!p.fim) continue;
+    const mesFim = isoMes(deIsoDia(p.fim));
+    const nome = p.pets?.nome ?? "Pet";
+    const quando = `${p.fim < isoDia(new Date()) ? "terminou" : "termina"} em ${dataCurta(p.fim)}`;
+    for (const c of cobrancas) {
+      if (c.plano_id !== p.id || c.status !== "aberta" || c.acerto_saida || c.mes < mesFim || (c.obs ?? "").includes(notaDaSaida(p.fim))) continue;
+      if (c.mes === mesFim) {
+        const sug = sugestaoDoMes(p, deIsoDia(c.mes), Number(c.valor_cheio), horario);
+        if (!(centavos(sug.valor) < centavos(Number(c.valor_mensal)))) continue;
+        lista.push({ plano: p, cobranca: c, frase: `Plano de ${nome} ${quando}: a mensalidade de ${nomeMes(deIsoDia(c.mes))} ainda está em ${brl(c.valor_mensal)}. Pelos dias até a saída, ${brl(sug.valor)}.` });
+      } else if (Number(c.total) > 0) {
+        lista.push({ plano: p, cobranca: c, frase: `Plano de ${nome} ${quando}, mas a cobrança de ${nomeMes(deIsoDia(c.mes))} (${brl(c.total)}) continua aberta.` });
+      }
+    }
+  }
+  return lista;
+}
+

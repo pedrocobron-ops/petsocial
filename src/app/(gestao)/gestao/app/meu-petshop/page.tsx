@@ -404,7 +404,10 @@ function Servicos() {
         <button className="g-btn p pri" onClick={() => abrir("novo")}><Plus />Serviço novo</button>
       </div>
       {!ativos.length ? (
-        <Vazio titulo="Nenhum serviço na lista" texto={`Coloque o primeiro: ${exemplos ? `${exemplos}, ` : ""}o que vocês fazem.`} />
+        <Vazio titulo="Nenhum serviço na lista" texto={!usaModulo(petshop, "banho_tosa") && usaCasa(petshop)
+          // só creche e/ou hotel: a diária fica no cartão da casa e os planos em Mensalistas; aqui é só o que é cobrado à parte
+          ? `Não precisa colocar nada aqui para a ${nomeDaCasa(petshop).toLowerCase()} funcionar: a diária e as vagas ficam no cartão ${nomeDaCasa(petshop)} desta tela${usaModulo(petshop, "creche") ? " e os planos, em Mensalistas" : ""}. Use esta lista só para o que vocês cobram à parte (ex.: banho, transporte).`
+          : `Coloque o primeiro: ${exemplos ? `${exemplos}, ` : ""}o que vocês fazem.`} />
       ) : (
         <div className="g-mp-servicos">
           {ativos.map((s) => {

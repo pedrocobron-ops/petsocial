@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import { INSTRUCOES_AJUDA, MARCA_EQUIPE, MARCA_NOVO, procurarTopico } from "@/lib/gestao/ajuda";
 import { topicosPara } from "@/lib/gestao/manual";
+import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { comRegistro, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 
 export const runtime = "nodejs";
@@ -66,7 +67,9 @@ async function tratar(req: Request) {
     const bruto = r.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
     const equipe = bruto.includes(MARCA_EQUIPE);
     const novo = bruto.includes(MARCA_NOVO);
-    const texto = bruto.replace(MARCA_EQUIPE, "").replace(MARCA_NOVO, "").trim();
+    // o menu diz "Creche" (ou "Hotel") para quem usa só uma das duas: a resposta fala o nome que a pessoa vê
+    const { data: modulos } = bruto.includes("Creche e hotel") ? await sb.from("petshops").select("modulos, principal").eq("id", corpo.petshopId!).maybeSingle() : { data: null };
+    const texto = bruto.replace(MARCA_EQUIPE, "").replace(MARCA_NOVO, "").replaceAll("Creche e hotel", modulos ? nomeDaCasa(modulos) : "Creche e hotel").trim();
     // registro do que foi perguntado (o limite do dia já foi contado acima; se a conta estiver só para consulta, o registro é recusado e a resposta segue)
     await sb.from("assistente_eventos").insert({ petshop_id: corpo.petshopId, user_id: u.user.id, acao: "ajuda", pedido: ultima.texto.slice(0, 300) });
     if (!texto) return NextResponse.json(await local());

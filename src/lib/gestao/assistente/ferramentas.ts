@@ -1,6 +1,7 @@
 import { COLS_PACOTE, comCustos, comPrecosDeAgendamento, comPrecosDePacote, comPrecosDeProduto, comValoresDeEstadia, type PacoteLinha } from "../reservado";
 import { ferramentaLiberada } from "./permissao";
 import { consultarComissao, FERRAMENTAS_COMISSAO } from "./ferramenta-comissao";
+import { consultarPlanosDaCreche, FERRAMENTA_PLANOS_CRECHE } from "./creche-planos";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
@@ -95,6 +96,7 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ cliente_id: S }) },
   { grava: false, name: "ver_hospedes", description: "Creche e hotel: mostra quem está na casa agora (desde quando, saída prevista, diárias até aqui) e as reservas dos próximos dias.",
     input_schema: obj({ dias: { ...N, description: "Até quantos dias à frente olhar as reservas. Padrão: 7" } }) },
+  FERRAMENTA_PLANOS_CRECHE,
   { grava: false, name: "ver_pacotes", description: "Lista os modelos de pacote à venda (com pacote_id e preço) e os pacotes ativos, com usados e restantes. Com pet_id, só os pacotes daquele pet.",
     input_schema: obj({ pet_id: S }) },
   { grava: false, financeiro: true, name: "ver_caixa", description: "Diz se o caixa está aberto ou fechado, desde quando, o troco inicial, quanto entrou e saiu por forma de pagamento e o dinheiro esperado na gaveta. Com o caixa fechado, mostra o que foi lançado hoje e o último fechamento.",
@@ -661,6 +663,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
         onde_ver: "Caixa, Contas de clientes (e na ficha de cada tutor)",
       } };
     }
+    case "ver_planos_creche": return consultarPlanosDaCreche(c, e);
     case "ver_hospedes": {
       const dias = Math.max(0, Math.min(60, numero(e.dias) ?? 7));
       const abertas = await comValoresDeEstadia(sb, petshop.id, ok(await sb.from("estadias").select("id, tipo, entrada, saida_prevista, status, obs, pets(id, nome, alertas, clientes(nome))").eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500)), c.vejoFinanceiro);

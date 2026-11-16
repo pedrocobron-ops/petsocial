@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import {
+  notaDaSaida, saidasParaAcertar, type SaidaParaAcertar,
   faltaDaCobranca, isoMes, SELECT_COBRANCA, sugestaoDoMes, textoDasDatas, textoDasTaxas,
   type CobrancaCompleta, type PlanoCompleto,
   partesDoDesconto, regraIrmaoDe, valorDoDescontoIrmao,
@@ -73,6 +74,19 @@ export function AvisoSobras({ sobras, aoAcertar }: { sobras: SobrasDaSaida[]; ao
   );
 }
 
+export { notaDaSaida, saidasParaAcertar, type SaidaParaAcertar };
+
+/** Lê as cobranças dos planos que terminaram (do mês da saída em diante) e diz o que ainda pede acerto. */
+export async function lerSaidasParaAcertar(sb: ReturnType<typeof useGestao>["sb"], petshopId: string, planos: PlanoCompleto[], horario: unknown): Promise<SaidaParaAcertar[]> {
+  const comFim = planos.filter((p) => p.fim);
+  if (!comFim.length) return [];
+  const desde = comFim.map((p) => isoMes(deIsoDia(p.fim!))).sort()[0];
+  if (!calendarioGuardado(petshopId, false)) await lerCalendario(sb, petshopId, false).catch(() => null);
+  const r = await sb.from("creche_cobrancas").select(SELECT_COBRANCA).eq("petshop_id", petshopId).eq("status", "aberta").eq("acerto_saida", false)
+    .in("plano_id", comFim.map((p) => p.id)).gte("mes", desde).order("mes").order("id").limit(1000);
+  return saidasParaAcertar(comFim, ok(r) as unknown as CobrancaCompleta[], horario);
+}
+
 type Decisao = { texto: string; ok: boolean };
 type Item = {
   c: CobrancaCompleta; tipo: "mes" | "depois"; s: ReturnType<typeof sugestaoDoMes> | null;
@@ -108,7 +122,7 @@ export default function AcertoDaSaida({ plano, aoFechar }: { plano: PlanoComplet
     return { cobrancas: ok(cs) as unknown as CobrancaCompleta[], sobras: sobras[0] ?? null };
   }, [petshop.id, plano.id, fim]);
 
-  const atuais: Item[] = (dados?.cobrancas ?? []).filter((c) => c.status === "aberta" && !c.acerto_saida).flatMap((c): Item[] => {
+  const atuais: Item[] = (dados?.cobrancas ?? []).filter((c) => c.status === "aberta" && !c.acerto_saida && !(c.obs ?? "").includes(notaDaSaida(fim))).flatMap((c): Item[] => {
     const recebido = centavos(Number(c.total) - (c.lancamentos?.pago ? 0 : faltaDaCobranca(c)));
     if (c.mes === mesFim) {
       const s = sugestaoDoMes(plano, deIsoDia(c.mes), Number(c.valor_cheio), petshop.horario);
@@ -190,12 +204,12 @@ export default function AcertoDaSaida({ plano, aoFechar }: { plano: PlanoComplet
                       }, `Cobrança de ${mesDe(c)} de ${nome} cancelada. Saiu de A receber.`)}>Cancelar a cobrança de {mesDe(c)}</button>
                     )}
                     {it.pago && it.aMais > 0 && (
-                      <button type="button" className="g-btn verde p" disabled={ocupado} onClick={() => void fazer(chave, () => anotar(c, `Saída em ${dataCurta(fim)}: ${brl(it.aMais)} pagos a mais, para devolver ou abater`),
+                      <button type="button" className="g-btn verde p" disabled={ocupado} onClick={() => void fazer(chave, () => anotar(c, `${notaDaSaida(fim)}: ${brl(it.aMais)} pagos a mais, para devolver ou abater`),
                         `Anotado na cobrança de ${mesDe(c)}: ${brl(it.aMais)} para devolver ou abater.`)}>Anotar {brl(it.aMais)} para devolver</button>
                     )}
-                    <button type="button" className="g-btn fantasma p" disabled={ocupado} onClick={() => deixar(chave, it.pago
+                    <button type="button" className="g-btn fantasma p" disabled={ocupado} onClick={() => void fazer(chave, () => anotar(c, `${notaDaSaida(fim)}: ${it.pago ? "conferida, sem mudança" : "mensalidade mantida"}`), it.pago
                       ? `Fica como está: a cobrança de ${mesDe(c)} continua paga, sem anotação.`
-                      : `Fica como está: a cobrança de ${mesDe(c)} continua em ${brl(c.total)}.`)}>Deixar como está</button>
+                      : `Fica como está: a cobrança de ${mesDe(c)} continua em ${brl(c.total)}. O aviso de acerto não volta.`)}>Deixar como está</button>
                   </div>
                 )}
               </div>
