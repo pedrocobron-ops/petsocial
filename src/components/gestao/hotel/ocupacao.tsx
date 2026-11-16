@@ -144,7 +144,7 @@ function DiaDaOcupacao({ dia, hoje, abertas, encerradas, mens, tipos, aoFechar, 
   return (
     <Folha titulo={dataLonga(deIsoDia(dia))} aoFechar={aoFechar}
       rodape={<>
-        <Link className="g-btn sec" href={`/gestao/app/creche-hotel/folha?dia=${dia}`} target="_blank"><Printer />Folha do dia</Link>
+        <Link className="g-btn sec" href={`/gestao/app/creche-hotel/folha?dia=${dia}&de=ocupacao`}><Printer />Folha do dia</Link>
         {!passado && <button type="button" className="g-btn pri" onClick={() => aoNovaReserva(tipos[0] ?? "hotel")}><Plus />Nova reserva</button>}
       </>}>
       <div className="g-pilha">

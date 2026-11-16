@@ -30,7 +30,7 @@ export function ControlesDoPapel({ voltar, rotuloVoltar, children, dica, botao =
 }) {
   return (
     <div className="g-imp-controles">
-      <Link className="g-voltar" href={voltar}><ArrowLeft />{rotuloVoltar}</Link>
+      <Link className="g-btn sec g-imp-voltar" href={voltar}><ArrowLeft />{rotuloVoltar}</Link>
       {children}
       <div className="g-imp-linha">
         <button type="button" className="g-btn pri" onClick={() => window.print()}><Printer />{botao}</button>

@@ -20,8 +20,11 @@ import { CabecalhoDoPapel, ControlesDoPapel, Papel, useTituloDoPapel } from "@/c
 type Pet = { id: string; nome: string; foto: string | null; especie: string; sexo: string | null; alertas: string | null; porte: string | null; raca: string | null; nascimento: string | null; obs: string | null; clientes: { id: string; nome: string; telefone: string | null; email: string | null; endereco: string | null } | null };
 type Estadia = Omit<EstadiaCompleta, "pets"> & { pets: Pet | null };
 type Vacina = { pet_id: string; nome: string; aplicado_em: string | null; vence_em: string | null };
+// a estadia já traz os contatos (do pet e do tutor) e as vacinas: a ficha sai numa leva só (no celular, cada espera soma).
+// Quem não pode ler os contatos ou a saúde (área liberada pelo dono) recebe a ficha sem essa parte (o banco não entrega as linhas).
 const SELECT_FICHA = SELECT_ESTADIA.replace("pets(id, nome, foto, especie, sexo, alertas, porte, clientes(id, nome, telefone))",
-  "pets(id, nome, foto, especie, sexo, alertas, porte, raca, nascimento, obs, clientes(id, nome, telefone, email, endereco))");
+  "pets(id, nome, foto, especie, sexo, alertas, porte, raca, nascimento, obs, pets_contatos(*), pets_saude(pet_id, nome, aplicado_em, vence_em, tipo), clientes(id, nome, telefone, email, endereco, pets_contatos(*)))");
+type Embutido = { pets: (Pet & { pets_contatos?: Contato[]; pets_saude?: (Vacina & { tipo: string })[]; clientes: (NonNullable<Pet["clientes"]> & { pets_contatos?: Contato[] }) | null }) | null };
 
 function FichaNoPapel() {
   const { sb, petshop } = useGestao();
@@ -33,22 +36,16 @@ function FichaNoPapel() {
   const hoje = isoDia(new Date());
 
   const { dados, carregando, erro } = useDados(async () => {
-    const q = sb.from("estadias").select(SELECT_FICHA).eq("petshop_id", petshop.id);
-    const estadias = ok(await (estadiaId ? q.eq("id", estadiaId) : q.eq("status", "em_casa").order("entrada").order("id")).limit(300)) as unknown as Estadia[];
-    const pets = [...new Set(estadias.map((e) => e.pet_id))];
-    const tutores = [...new Set(estadias.map((e) => e.pets?.clientes?.id).filter(Boolean))] as string[];
-    const contatos: Contato[] = [], vacinas: Vacina[] = [];
-    // quem não pode ler os contatos ou a saúde (área liberada pelo dono) recebe a ficha sem essa parte
-    for (let i = 0; i < pets.length; i += 100) {
-      const lote = pets.slice(i, i + 100);
-      const [c, v] = await Promise.all([
-        sb.from("pets_contatos").select("*").eq("petshop_id", petshop.id).or(`pet_id.in.(${lote.join(",")}),cliente_id.in.(${(tutores.length ? tutores : ["00000000-0000-0000-0000-000000000000"]).join(",")})`).order("criado_em").limit(1000),
-        sb.from("pets_saude").select("pet_id, nome, aplicado_em, vence_em").eq("petshop_id", petshop.id).eq("tipo", "vacina").in("pet_id", lote).order("vence_em").limit(1000),
-      ]);
-      for (const x of c.data ?? []) if (!contatos.some((y) => y.id === x.id)) contatos.push(x);
-      vacinas.push(...((v.data ?? []) as Vacina[]));
+    const q = sb.from("estadias").select(SELECT_FICHA).eq("petshop_id", petshop.id).eq("pets.pets_saude.tipo", "vacina");
+    const lidas = ok(await (estadiaId ? q.eq("id", estadiaId) : q.eq("status", "em_casa").order("entrada").order("id")).limit(300)) as unknown as (Estadia & Embutido)[];
+    const contatos = new Map<string, Contato>(), vacinas: Vacina[] = [], vistos = new Set<string>();
+    for (const e of lidas) {
+      for (const c of [...(e.pets?.pets_contatos ?? []), ...(e.pets?.clientes?.pets_contatos ?? [])]) contatos.set(c.id, c);
+      if (e.pets && !vistos.has(e.pets.id)) { vistos.add(e.pets.id); vacinas.push(...(e.pets.pets_saude ?? []).filter((v) => v.tipo === "vacina").map(({ pet_id, nome, aplicado_em, vence_em }) => ({ pet_id, nome, aplicado_em, vence_em }))); }
     }
-    return { estadias, contatos, vacinas };
+    const porData = (a: { criado_em?: string | null }, b: { criado_em?: string | null }) => (a.criado_em ?? "").localeCompare(b.criado_em ?? "");
+    vacinas.sort((a, b) => (a.vence_em ?? "9999").localeCompare(b.vence_em ?? "9999"));
+    return { estadias: lidas as Estadia[], contatos: [...contatos.values()].sort(porData), vacinas };
   }, [petshop.id, estadiaId]);
 
   const todas = dados?.estadias ?? [];
@@ -58,7 +55,7 @@ function FichaNoPapel() {
 
   return (
     <div className="g-imp">
-      <ControlesDoPapel voltar="/gestao/app/creche-hotel" rotuloVoltar={`Voltar para ${nomeDaCasa(petshop)}`} dica="A ficha não mostra valores.">
+      <ControlesDoPapel voltar="/gestao/app/creche-hotel?ver=casa" rotuloVoltar={`Voltar para ${nomeDaCasa(petshop)}`} dica="A ficha não mostra valores.">
         {!estadiaId && (
           <div className="g-imp-linha">
             <div className="g-seg" role="group" aria-label="Como imprimir">

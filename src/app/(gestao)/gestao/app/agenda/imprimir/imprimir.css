@@ -77,3 +77,6 @@
 .g-imp-folha table.g-imp-tab col.c-quando { width: 17%; }
 .g-imp-folha table.g-imp-tab.cuidados col.c-cuidados { width: 20%; }
 .g-imp-folha table.g-imp-tab td.hora em { max-width: 100%; white-space: normal; font-size: .625rem; letter-spacing: .02em; }
+
+/* Voltar bem à vista (a folha abre na mesma aba) */
+.g-imp-controles .g-imp-voltar { justify-self: start; }
