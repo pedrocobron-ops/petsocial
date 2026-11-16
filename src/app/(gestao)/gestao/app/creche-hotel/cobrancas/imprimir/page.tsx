@@ -77,7 +77,8 @@ function CobrancasNoPapel() {
   const { dados, carregando, erro } = useDados(async () => {
     if (!cuidoDoFinanceiro) return null;
     const fimDoMes = isoDia(new Date(mes.getFullYear(), mes.getMonth() + 1, 0));
-    const [doMes, antigas, planos, pendentes] = await Promise.all([
+    // tudo numa leva só (no celular, cada espera soma)
+    const [doMes, antigas, planos, pendentes, m] = await Promise.all([
       sb.from("creche_cobrancas").select(SELECT_COBRANCA).eq("petshop_id", petshop.id).eq("mes", mesIso).eq("status", "aberta").order("vencimento").order("id").limit(1000),
       // o que ficou sem pagar de meses anteriores
       sb.from("creche_cobrancas").select(SELECT_COBRANCA.replace("lancamentos(", "lancamentos!inner(")).eq("petshop_id", petshop.id).eq("status", "aberta")
@@ -86,14 +87,11 @@ function CobrancasNoPapel() {
       // dias extras do mês que ainda não estão em cobrança nenhuma: vão para a mensalidade seguinte (a lista diz, para ninguém achar que sumiram)
       sb.from("estadias").select("plano_id, dia").eq("petshop_id", petshop.id).eq("mensalista", "extra").in("status", ["em_casa", "encerrada"])
         .is("cobranca_id", null).gte("dia", mesIso).lte("dia", fimDoMes).order("dia").limit(1000),
+      // nome do modelo de plano ("3x por semana"), quando o plano veio de um modelo (são poucos: lê todos junto)
+      sb.from("creche_modelos").select("id, nome").eq("petshop_id", petshop.id).limit(500),
     ]);
-    // nome do modelo de plano ("3x por semana"), quando o plano veio de um modelo
-    const idsModelo = [...new Set(planos.map((p) => p.modelo_id).filter(Boolean))] as string[];
     const modelos = new Map<string, string>();
-    if (idsModelo.length) {
-      const m = await sb.from("creche_modelos").select("id, nome").eq("petshop_id", petshop.id).in("id", idsModelo);
-      for (const x of m.data ?? []) modelos.set(x.id, x.nome);
-    }
+    for (const x of m.data ?? []) modelos.set(x.id, x.nome);
     const extrasDepois = new Map<string, string[]>();
     for (const e of pendentes.data ?? []) if (e.plano_id && e.dia) extrasDepois.set(e.plano_id, [...(extrasDepois.get(e.plano_id) ?? []), e.dia]);
     return { doMes: ok(doMes) as unknown as CobrancaCompleta[], antigas: ok(antigas) as unknown as CobrancaCompleta[], planos, modelos, extrasDepois };

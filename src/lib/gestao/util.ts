@@ -198,7 +198,14 @@ export function almocoNoDiaDaSemana(horario: unknown, diaDaSemana: number): { in
   return { inicio, fim, de: a.de.slice(0, 5), ate: a.ate.slice(0, 5) };
 }
 
-export const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+// palavras pequenas que não viram inicial ("Banho e Tosa" é BT, não BE; "Hotelzinho da Bia" é HB)
+const PALAVRAS_PEQUENAS = new Set(["e", "de", "da", "do", "das", "dos", "di", "du", "a", "o", "as", "os", "em", "na", "no", "com", "para", "pra", "&", "+", "-"]);
+/** Duas iniciais de um nome (pessoa ou pet shop), sem as palavras pequenas (e, de, da, do…) nem símbolos. */
+export const iniciais = (nome: string) => {
+  const partes = nome.trim().split(/\s+/).filter((p) => /[\p{L}\p{N}]/u.test(p));
+  const fortes = partes.filter((p) => !PALAVRAS_PEQUENAS.has(p.toLowerCase()));
+  return (fortes.length ? fortes : partes).slice(0, 2).map((p) => p.match(/[\p{L}\p{N}]/u)?.[0]?.toUpperCase() ?? "").join("");
+};
 
 /** Cor estável a partir de um texto (avatar sem foto). */
 export function corDoNome(nome: string) {

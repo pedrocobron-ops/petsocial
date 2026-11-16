@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Lock, Plus, Split, Trash2 } from "lucide-react";
 import { caixaAberto, formaPrincipal, ultimoContado, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
@@ -377,28 +377,31 @@ export function useCaixaAberto() {
 
 /**
  * Aviso ao receber com o caixa fechado. Quem tem a área Caixa abre o caixa ali mesmo, sem sair do que estava fazendo:
- * o troco inicial já vem com o último valor contado.
+ * o campo do troco já aparece aberto, com o último valor contado (ou vazio, que é zero). Linguagem simples: na primeira
+ * cobrança a pessoa ainda não sabe o que é "abrir o caixa".
  */
 export function AvisoCaixaFechado({ aberto }: { aberto: boolean | null }) {
   const { sb, petshop, user, posso, liberado } = useGestao();
   const { avisar, avisarErro } = useAvisos();
-  const [abrindo, setAbrindo] = useState(false);
   const [abriu, setAbriu] = useState(false);
   const [troco, setTroco] = useState<number | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const podeAbrir = posso("caixa") && liberado;
+  // o troco inicial começa com o que foi contado no último fechamento (a pessoa confere e muda se quiser)
+  useEffect(() => {
+    if (aberto !== false || !podeAbrir) return;
+    let vale = true;
+    void ultimoContado(sb, petshop.id).then((u) => { if (vale && u != null) setTroco((t) => t ?? u); }).catch(() => {});
+    return () => { vale = false; };
+  }, [aberto, podeAbrir, sb, petshop.id]);
   // abriu o caixa daqui: a confirmação fica na tela até a pessoa terminar o recebimento
   if (abriu) {
-    return <p className="g-cx-fora ok" role="status"><Lock aria-hidden /><span>Caixa aberto. Este valor entra no caixa de hoje; o que for pago em dinheiro entra também na contagem da gaveta.</span></p>;
+    return <p className="g-cx-fora ok" role="status"><Lock aria-hidden /><span>Caixa do dia aberto. Este valor já entra nele; o que for pago em dinheiro entra também na conta da gaveta.</span></p>;
   }
   if (aberto !== false) return null;
-  async function comecar() {
-    setAbrindo(true);
-    const ultimo = await ultimoContado(sb, petshop.id);
-    if (ultimo != null) setTroco((t) => t ?? ultimo);
-  }
   async function abrir() {
     if (salvando) return;
-    if (troco != null && (troco < 0 || troco >= 1e8)) { avisarErro("Confira o troco inicial."); return; }
+    if (troco != null && (troco < 0 || troco >= 1e8)) { avisarErro("Confira o troco."); return; }
     setSalvando(true);
     try {
       const r = await sb.from("caixas").insert({ petshop_id: petshop.id, valor_inicial: troco ?? 0, aberto_por: user.id });
@@ -406,7 +409,7 @@ export function AvisoCaixaFechado({ aberto }: { aberto: boolean | null }) {
       if (r.error && r.error.code !== "23505") throw new Error(r.error.message);
       await caixaAberto(sb, petshop.id);
       setAbriu(true);
-      avisar("Caixa aberto.");
+      avisar("Caixa do dia aberto.");
       avisarMudanca();
     } catch (e) { avisarErro(e); } finally { setSalvando(false); }
   }
@@ -414,16 +417,20 @@ export function AvisoCaixaFechado({ aberto }: { aberto: boolean | null }) {
     <div className="g-cx-fora" role="status">
       <Lock aria-hidden />
       <div>
-        <span>O caixa de hoje não está aberto. O valor fica anotado, mas não entra na contagem da gaveta.</span>
-        {posso("caixa") && liberado && !abrindo && <div><button type="button" className="g-btn sec p" onClick={() => void comecar()}>Abrir o caixa agora</button></div>}
-        {abrindo && (
-          <div className="g-cx-abrir">
-            <label>
-              <span>Troco inicial em dinheiro</span>
-              <CampoDinheiro valor={troco} aoMudar={setTroco} rotulo="Troco inicial em dinheiro" maximo={99999999} />
-            </label>
-            <button type="button" className="g-btn sec p" onClick={() => void abrir()} disabled={salvando}>{salvando ? "Abrindo…" : "Abrir o caixa"}</button>
-          </div>
+        {podeAbrir ? (
+          <>
+            <span><b>Falta abrir o caixa do dia.</b> É onde o sistema soma o que você recebe hoje e quanto dinheiro deve ter na gaveta. Abre uma vez por dia: diga quanto tem de troco na gaveta agora (se não tiver, deixe vazio).</span>
+            <div className="g-cx-abrir">
+              <label>
+                <span>Troco na gaveta agora</span>
+                <CampoDinheiro valor={troco} aoMudar={setTroco} rotulo="Troco na gaveta agora" placeholder="0,00" maximo={99999999} />
+              </label>
+              <button type="button" className="g-btn sec p" onClick={() => void abrir()} disabled={salvando}>{salvando ? "Abrindo…" : "Abrir o caixa"}</button>
+            </div>
+            <small className="g-muted">Prefere não abrir agora? Pode receber assim mesmo: o valor fica guardado nas contas de hoje. Só não entra na conta do dinheiro da gaveta.</small>
+          </>
+        ) : (
+          <span>O caixa do dia ainda não foi aberto. Pode receber assim mesmo: o valor fica guardado nas contas de hoje. Só não entra na conta do dinheiro da gaveta até alguém abrir o caixa.</span>
         )}
       </div>
     </div>

@@ -67,7 +67,7 @@ function Folha() {
   return (
     <div className="g-imp">
       <div className="g-imp-controles">
-        <Link className="g-voltar" href={`/gestao/app/agenda?dia=${dia}`}><ArrowLeft />Voltar para a agenda</Link>
+        <Link className="g-btn sec g-imp-voltar" href={`/gestao/app/agenda?dia=${dia}`}><ArrowLeft />Voltar para a agenda</Link>
         <div className="g-imp-linha">
           <div className="g-seg" role="group" aria-label="Período">
             <button aria-pressed={visao === "dia"} onClick={() => setVisao("dia")}>Dia</button>

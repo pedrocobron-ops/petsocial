@@ -406,6 +406,8 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   const [data, setData] = useState(inicial?.data ?? hoje);
   // na ficha do tutor, a dívida solta costuma ser paga no próximo atendimento: o vencimento começa daqui a 7 dias
   const [vencimento, setVencimento] = useState(inicial?.vencimento ?? (tutorFixo ? isoDia(new Date(Date.now() + 7 * 864e5)) : hoje));
+  // dívida trazida do caderno: desde quando o cliente deve (opcional). Só mostra "desde"; o dinheiro segue as regras de sempre
+  const [devidoDesde, setDevidoDesde] = useState(inicial?.devido_desde ?? "");
   const [repetir, setRepetir] = useState(false);
   const [meses, setMeses] = useState(6);
   const [erro, setErro] = useState<string | null>(null);
@@ -450,6 +452,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     const texto = descricao.trim() || null;
     if (conta && !texto) { setErro("Escreva do que é esta conta."); return; }
     if (conta && !vencimento) { setErro("Escolha o dia do vencimento."); return; }
+    if (conta && entrada && devidoDesde && devidoDesde > hoje) { setErro("O dia em que começou a dever não pode ser depois de hoje."); return; }
     if (!conta && escolheData && (!data || data > hoje)) { setErro("Escolha um dia até hoje."); return; }
     const pg = conta || travado || manterDividido ? null : fecharPagamento(pagamento, valor);
     if (pg && "erro" in pg) { setErro(pagamento.dividido ? pg.erro : entrada ? "Escolha como recebeu." : "Escolha como pagou."); return; }
@@ -467,7 +470,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     try {
       if (inicial) {
         const mudancas = conta
-          ? { valor, categoria, descricao: texto, vencimento, data: vencimento }
+          ? { valor, categoria, descricao: texto, vencimento, data: vencimento, ...(entrada && (devidoDesde || inicial.devido_desde) ? { devido_desde: devidoDesde || null } : {}) }
           : travado ? { descricao: texto }
           : manterDividido ? { categoria, descricao: texto, ...(escolheData ? { data } : {}) }
           : { valor, forma, pagamentos, categoria, descricao: texto, ...(escolheData ? { data } : {}) };
@@ -490,6 +493,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
             petshop_id: petshop.id, tipo, valor, categoria, pago: false, forma: null, vencimento: dia, data: dia,
             descricao: vezes > 1 ? `${texto} (${i + 1}/${vezes})` : texto, origem: "tela", criado_por: user.id,
             ...(entrada && tutorConta ? { cliente_id: tutorConta.id } : {}),
+            ...(entrada && devidoDesde ? { devido_desde: devidoDesde } : {}),
             chave: parteDaChave(chave, "conta", i + 1),
           };
         });
@@ -606,6 +610,11 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
             </Campo>
           )}
         </div>
+        {conta && entrada && (tutorFixo || tutorConta || inicial?.cliente_id) && (
+          <Campo rotulo="Deve desde (se quiser)" dica="Dívida trazida do caderno? Ponha o dia em que começou. Só muda o “desde” que aparece; o dinheiro entra no caixa no dia em que ele pagar.">
+            <input type="date" className="g-input" value={devidoDesde} max={hoje} onChange={(e) => { setDevidoDesde(e.target.value); setErro(null); }} aria-label="Deve desde" />
+          </Campo>
+        )}
         {!conta && (travado || manterDividido || soVer ? (
           <Grupo rotulo={entrada ? "Como recebeu" : "Como pagou"}>
             <p className="g-p g-tab">{inicial ? textoDoPagamento(inicial) : ""}</p>

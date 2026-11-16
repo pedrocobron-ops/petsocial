@@ -79,6 +79,8 @@ export function textoComprovanteDaParte(p: {
   petshop: string; tutor?: string | null; pet?: string | null; quando: Date | string;
   itens: { nome: string; qtd: number; valor: number }[]; total: number; desconto?: number;
   pago: number; formas: { forma: string; valor: number }[]; falta: number; pagaAte?: string | null; antigo?: number;
+  /** quanto o cliente devia de antes, no total (para dizer "pagou 40 do que devia (75); ainda deve 35") */
+  antigoDevia?: number;
 }) {
   const centavos = (n: number) => Math.round(n * 100) / 100;
   const nome = (f: string) => FORMAS.find((x) => x.id === f)?.rotulo ?? "Outro";
@@ -87,6 +89,16 @@ export function textoComprovanteDaParte(p: {
     return `${varios ? `${i.qtd.toLocaleString("pt-BR")} x ` : ""}${i.nome}${varios ? ` (${brl(i.valor)} cada)` : ""}: ${brl(centavos(i.qtd * i.valor))}`;
   });
   const pagamento = p.formas.length > 1 ? p.formas.map((x) => `${nome(x.forma)} ${brl(x.valor)}`).join(" + ") : p.formas.length ? nome(p.formas[0].forma) : "";
+  // o que devia de antes, dito por inteiro: quanto devia, quanto pagou disso e quanto ainda deve
+  const antigo = p.antigo && p.antigo > 0 ? centavos(p.antigo) : 0;
+  const devia = p.antigoDevia && p.antigoDevia > 0 ? centavos(Math.max(p.antigoDevia, antigo)) : 0;
+  const aindaDeve = devia ? centavos(devia - antigo) : 0;
+  const linhaDoAntigo = !antigo ? []
+    : !devia ? [`Pagou também ${brl(antigo)} do que devia de antes`]
+    : aindaDeve > 0.005 ? [`Pagou ${brl(antigo)} do que devia de antes (${brl(devia)}); ainda deve ${brl(aindaDeve)}`]
+    : [`Pagou também o que devia de antes: ${brl(antigo)} (quitado)`];
+  // o que fica para depois é só o resto da dívida antiga: já foi dito na linha de cima
+  const faltaJaDita = devia > 0 && Math.abs(centavos(p.falta) - aindaDeve) < 0.005;
   return [
     `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} Segue o comprovante do atendimento${p.pet ? ` de ${p.pet}` : ""}.`,
     "",
@@ -97,9 +109,9 @@ export function textoComprovanteDaParte(p: {
     ...linhas,
     ...(p.desconto && p.desconto > 0 ? [`Desconto: - ${brl(p.desconto)}`] : []),
     `Total da conta: ${brl(p.total)}`,
-    ...(p.antigo && p.antigo > 0 ? [`Do que estava em aberto antes: ${brl(p.antigo)}`] : []),
+    ...linhaDoAntigo,
     `Pago agora: ${brl(p.pago)}${pagamento ? ` (${pagamento})` : ""}`,
-    ...(p.falta > 0 ? [`Fica para pagar depois: ${brl(p.falta)}${p.pagaAte ? `, até ${dataCompleta(p.pagaAte)}` : ""}`] : []),
+    ...(p.falta > 0 && !faltaJaDita ? [`Fica para pagar depois: ${brl(p.falta)}${p.pagaAte ? `, até ${dataCompleta(p.pagaAte)}` : ""}`] : []),
     "",
     "Este comprovante não é nota fiscal.",
   ].join("\n");

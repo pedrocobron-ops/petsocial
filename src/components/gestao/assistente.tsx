@@ -43,6 +43,9 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   const [itens, setItens] = useState<Item[]>(memoria.itens);
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
+  // escrito enquanto o Mozart ainda respondia: espera na fila (visível) e vai sozinho quando ele terminar
+  const [fila, setFila] = useState<string | null>(null);
+  const [avisoFila, setAvisoFila] = useState<string | null>(null);
   const respondidos = useRef(new Set<string>());
   const [ouvindo, setOuvindo] = useState(false);
   const [temVoz, setTemVoz] = useState(false);
@@ -99,8 +102,11 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
 
   const enviar = useCallback((t: string) => {
     const limpo = t.trim();
-    if (!limpo || pensando) return;
+    if (!limpo) return;
     setTexto("");
+    setAvisoFila(null);
+    // o Mozart ainda está respondendo (por exemplo, fazendo um "Pode fazer"): a mensagem não se perde, entra na fila
+    if (pensando) { setFila((f) => (f ? `${f}\n${limpo}` : limpo)); return; }
     // um pedido novo com cartões em aberto descarta os cartões
     const abertos = memoria.itens.find((i) => i.tipo === "propostas" && !i.enviado);
     if (abertos && abertos.tipo === "propostas") {
@@ -115,6 +121,20 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     acrescentar({ tipo: "eu", texto: limpo, quando: hora(new Date()) });
     void chamar({ texto: limpo });
   }, [pensando, chamar]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // o Mozart terminou: manda o que ficou na fila. Se ele trouxe cartões novos para confirmar, não descarta os cartões
+  // sem a pessoa ver: a mensagem volta para a caixa, com o aviso
+  useEffect(() => {
+    if (pensando || !fila) return;
+    const t = fila;
+    setFila(null);
+    if (memoria.itens.some((i) => i.tipo === "propostas" && !i.enviado)) {
+      setTexto((atual) => (atual.trim() ? `${t}\n${atual}` : t));
+      setAvisoFila("O Mozart trouxe algo para confirmar. Sua mensagem voltou para a caixa: confirme acima ou toque em enviar.");
+      return;
+    }
+    enviar(t);
+  }, [pensando, fila, enviar]);
 
   useEffect(() => {
     if (pedidoInicial && !jaPediu.current) { jaPediu.current = true; enviar(pedidoInicial); }
@@ -219,15 +239,24 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
             </div>
           ))}
           {pensando && <div className="g-bolha ela rabo pensa" aria-label="Mozart está digitando"><i /><i /><i /></div>}
+          {fila && (
+            <div className="g-bolha eu rabo g-ass-fila" role="status">
+              {fila}
+              <span className="g-ass-fila-nota">Na fila: vai assim que o Mozart terminar.{" "}
+                <button type="button" className="g-link" onClick={() => { setTexto((atual) => (atual.trim() ? `${fila}\n${atual}` : fila)); setFila(null); }}>Editar</button>
+              </span>
+            </div>
+          )}
+          {avisoFila && <p className="g-ass-fila-aviso" role="status">{avisoFila}</p>}
           <div ref={fim} />
         </div>
 
         <form className="g-ass-entrada" onSubmit={(e) => { e.preventDefault(); enviar(texto); }}>
-          <textarea rows={1} value={texto} placeholder={ouvindo ? "Estou ouvindo…" : temPendente ? "Confirme acima ou peça um ajuste" : "Mensagem"} aria-label="Seu pedido"
+          <textarea rows={1} value={texto} placeholder={ouvindo ? "Estou ouvindo…" : pensando ? "Escreva: vai na fila" : temPendente ? "Confirme acima ou peça um ajuste" : "Mensagem"} aria-label="Seu pedido"
             onChange={(e) => setTexto(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(texto); } }} />
           {texto.trim() && !ouvindo ? (
-            <button className="g-mic enviar" disabled={pensando} aria-label="Enviar"><ArrowUp /></button>
+            <button className="g-mic enviar" aria-label={pensando ? "Enviar quando o Mozart terminar" : "Enviar"}><ArrowUp /></button>
           ) : temVoz ? (
             <button type="button" className={`g-mic${ouvindo ? " ouvindo" : ""}`} disabled={pensando} onClick={alternarVoz} aria-label={ouvindo ? "Parar de ouvir" : "Falar"}>{ouvindo ? <Square /> : <Mic />}</button>
           ) : (

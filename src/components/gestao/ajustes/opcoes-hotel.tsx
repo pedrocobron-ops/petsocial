@@ -17,6 +17,8 @@ import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { Campo, CampoValor, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "../ui";
+import { AvisoDeRascunho, useRascunho } from "../rascunho";
+import { useSalvarJunto } from "./salvar-junto";
 import "../hotel/hotel.css";
 
 /**
@@ -67,9 +69,25 @@ export default function OpcoesHotel() {
   }, [calendario, mexeuNosPrecos]);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  if (!souDono || !usaCasa(petshop)) return null;
   const temHotel = usaModulo(petshop, "hotel"), temCreche = usaModulo(petshop, "creche");
   const tituloOpcoes = temHotel && !temCreche ? "Opções do hotel" : temCreche && !temHotel ? "Opções da creche" : "Opções do hotel e da creche";
+  // o que foi mudado e não salvo fica no aparelho: recarregar a tela não perde
+  const valores = { sinal, pix, porte, temporadas, segundo, taxas, cuidados, semPreco, quartos, modelos, feriado, atraso, mexeuNosPrecos, mexeuNasTemporadas };
+  type Valores = typeof valores;
+  const aplicar = (v: Valores) => {
+    setSinal(v.sinal); setPix(v.pix); setPorte(v.porte); setTemporadas(v.temporadas); setSegundo(v.segundo); setTaxas(v.taxas); setCuidados(v.cuidados);
+    setSemPreco(v.semPreco); setQuartos(v.quartos); setModelos(v.modelos); setFeriado(v.feriado); setAtraso(v.atraso);
+    setMexeuNosPrecos(v.mexeuNosPrecos); setMexeuNasTemporadas(v.mexeuNasTemporadas);
+  };
+  const rascunho = useRascunho<Valores>("opcoes-hotel", valores, mexeu, (v) => { aplicar(v); setMexeu(true); });
+  const descartar = () => {
+    aplicar({ sinal: sinalDe(petshop), pix: pixDe(petshop), porte: porteDe(petshop), temporadas: temporadasDe(petshop), segundo: segundoPetDe(petshop), taxas: taxasDe(petshop),
+      cuidados: cuidadosLigados(petshop), semPreco: linkSemPreco(petshop), quartos: acomodacoesDe(petshop), modelos: modelosDe(petshop),
+      feriado: calendario?.feriado ?? FERIADO_VAZIO, atraso: calendario?.atraso ?? ATRASO_VAZIO, mexeuNosPrecos: false, mexeuNasTemporadas: false });
+    setMexeu(false); setErro(null);
+  };
+  const junto = useSalvarJunto("opcoes-hotel", { nome: tituloOpcoes, mexeu, salvar });
+  if (!souDono || !usaCasa(petshop)) return null;
   const m = <T,>(f: (v: T) => void) => (v: T) => { f(v); setMexeu(true); setErro(null); };
   const mp = <T,>(f: (v: T) => void) => (v: T) => { f(v); setMexeu(true); setMexeuNosPrecos(true); setErro(null); };
   const feriadoAtivo = feriado.ativo && feriado.valor != null;
@@ -102,25 +120,27 @@ export default function OpcoesHotel() {
   })();
   const diasDeFeriado = (calendario?.dias ?? []).filter((d) => d.feriado && d.dia >= isoDia(new Date())).length;
 
-  async function salvar() {
-    if (somenteLeitura() || salvando) return;
-    if (sinal.ativo && sinal.modo === "pct" && sinal.valor != null && sinal.valor > 100) return setErro("O sinal em porcentagem vai até 100%.");
-    if (segundo.ativo && (!segundo.pct || segundo.pct > 100)) return setErro("Escreva o desconto do segundo pet, de 1 a 100%.");
+  async function salvarAqui() { const r = await salvar(); if (r) avisar(r); }
+  async function salvar(): Promise<string | false> {
+    if (somenteLeitura() || salvando) return false;
+    const falha = (t: string) => { setErro(t); return false as const; };
+    if (sinal.ativo && sinal.modo === "pct" && sinal.valor != null && sinal.valor > 100) return falha("O sinal em porcentagem vai até 100%.");
+    if (segundo.ativo && (!segundo.pct || segundo.pct > 100)) return falha("Escreva o desconto do segundo pet, de 1 a 100%.");
     const temporadaRuim = temporadas.ativo ? temporadas.lista.find((t) => !t.nome.trim() || !t.de || !t.ate || t.ate < t.de) : null;
-    if (temporadaRuim) return setErro(`Confira a temporada ${temporadaRuim.nome.trim() ? `"${temporadaRuim.nome.trim()}"` : "sem nome"}: ela precisa de nome e de um período em que o fim vem depois do começo.`);
-    if (taxas.ativo && taxas.lista.some((t) => !t.nome.trim())) return setErro("Dê um nome para cada taxa, ou tire a que está em branco.");
-    if (quartos.ativo && quartos.lista.some((a) => !a.nome.trim())) return setErro("Dê um nome para cada acomodação, ou tire a que está em branco.");
-    if (feriado.ativo && (feriado.valor == null || (feriado.modo !== "valor" && !feriado.valor))) return setErro("Escreva o preço de feriado, ou desligue essa opção.");
+    if (temporadaRuim) return falha(`Confira a temporada ${temporadaRuim.nome.trim() ? `"${temporadaRuim.nome.trim()}"` : "sem nome"}: ela precisa de nome e de um período em que o fim vem depois do começo.`);
+    if (taxas.ativo && taxas.lista.some((t) => !t.nome.trim())) return falha("Dê um nome para cada taxa, ou tire a que está em branco.");
+    if (quartos.ativo && quartos.lista.some((a) => !a.nome.trim())) return falha("Dê um nome para cada acomodação, ou tire a que está em branco.");
+    if (feriado.ativo && (feriado.valor == null || (feriado.modo !== "valor" && !feriado.valor))) return falha("Escreva o preço de feriado, ou desligue essa opção.");
     if (atraso.ativo) {
       const usados = [temCreche ? atraso.creche : null, temHotel ? atraso.hotel : null].filter((t) => t && (t.hora || t.valor));
-      if (!usados.length) return setErro("Na taxa de busca fora do horário, escreva a hora e o valor, ou desligue essa opção.");
-      if (usados.some((t) => !t!.hora || !t!.valor)) return setErro("Na taxa de busca fora do horário, cada linha precisa da hora e do valor (ou fica toda em branco).");
+      if (!usados.length) return falha("Na taxa de busca fora do horário, escreva a hora e o valor, ou desligue essa opção.");
+      if (usados.some((t) => !t!.hora || !t!.valor)) return falha("Na taxa de busca fora do horário, cada linha precisa da hora e do valor (ou fica toda em branco).");
     }
     if (cruzadas.length && mexeuNasTemporadas && !(await confirmar({
       titulo: cruzadas.length === 1 ? "Duas temporadas pegam as mesmas noites" : "Há temporadas que pegam as mesmas noites",
       texto: `${cruzadas.slice(0, 3).map(fraseDoCruzamento).join(" ")}${cruzadas.length > 3 ? " E há outros casos na lista." : ""} Nas outras noites, cada uma vale sozinha. Se não é isso que você quer, volte e mude as datas.`,
       confirmar: "Está certo, salvar",
-    }))) return;
+    }))) return false;
     setErro(null); setSalvando(true);
     try {
       if (mexeuNosPrecos) {
@@ -143,8 +163,8 @@ export default function OpcoesHotel() {
       await recarregarBase();
       avisarMudanca();
       setMexeu(false); setMexeuNasTemporadas(false);
-      avisar(`${tituloOpcoes} salvas.`);
-    } catch (x) { avisarErro(x); } finally { setSalvando(false); }
+      return `${tituloOpcoes} salvas.`;
+    } catch (x) { avisarErro(x); return false; } finally { setSalvando(false); }
   }
 
   const mt = (v: typeof temporadas) => { m(setTemporadas)(v); setMexeuNasTemporadas(true); };
@@ -159,6 +179,7 @@ export default function OpcoesHotel() {
         <Tile icone={SlidersHorizontal} tom="ceu" />
         <div><h2>{tituloOpcoes}</h2><p className="g-muted g-p">Ligue só o que você usa. Desligado, nada muda nas telas nem na conta.</p></div>
       </div>
+      {rascunho.recuperado && mexeu && <AvisoDeRascunho aoDescartar={descartar} />}
       <div>
         <Opcao titulo="Sinal na reserva" frase="A reserva pode ter um sinal: recebido na hora ou a receber. No check-out ele é descontado da conta." ligada={sinal.ativo} aoMudar={(v) => m(setSinal)({ ...sinal, ativo: v })}>
           <div className="g-campo">
@@ -307,10 +328,12 @@ export default function OpcoesHotel() {
         </div>
       </div>
       {erro && <p className="g-erro" role="alert">{erro}</p>}
-      <div className="g-fila">
-        <button type="button" className="g-btn verde" onClick={() => void salvar()} disabled={salvando || !mexeu}>{salvando ? "Salvando…" : "Salvar opções"}</button>
-        {mexeu && <span className="g-muted g-pp">Você mudou as opções. Elas só valem depois de salvar.</span>}
-      </div>
+      {junto ? (mexeu && <p className="g-muted g-pp">Você mudou estas opções: salve no botão Salvar opções, no pé do grupo.</p>) : (
+        <div className="g-fila">
+          <button type="button" className="g-btn verde" onClick={() => void salvarAqui()} disabled={salvando || !mexeu}>{salvando ? "Salvando…" : "Salvar opções"}</button>
+          {mexeu && <span className="g-muted g-pp">Você mudou as opções. Elas só valem depois de salvar.</span>}
+        </div>
+      )}
     </section>
   );
 }

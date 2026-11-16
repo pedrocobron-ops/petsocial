@@ -665,6 +665,9 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-bolha.ela.rabo::before { left: -7px; background: #fffdf9; clip-path: polygon(100% 0, 0 0, 100% 100%); }
 .g-bolha.eu.rabo::before { right: -7px; background: #d6ecd2; clip-path: polygon(0 0, 100% 0, 0 100%); }
 .g-bolha.erro { background: var(--g-vermelho-tint); color: #7a281b; }
+.g-bolha.g-ass-fila { opacity: .78; border: 1px dashed rgba(30, 58, 47, .35); }
+.g-ass-fila-nota { display: block; margin-top: 4px; font-size: .75rem; color: rgba(31, 27, 23, .65); white-space: normal; }
+.g-ass-fila-aviso { justify-self: center; max-width: 92%; margin: 6px 0 0; padding: 6px 12px; border-radius: 12px; background: rgba(255, 251, 245, .95); font-size: .8125rem; color: var(--g-escuro-b); text-align: center; }
 .g-bolha.erro.rabo::before { background: var(--g-vermelho-tint); }
 .g-bolha .h { float: right; display: inline-flex; align-items: center; gap: 3px; margin: 7px -2px -3px 12px; font-size: .6875rem; color: rgba(31, 27, 23, .5); font-variant-numeric: tabular-nums; }
 .g-bolha.eu .h svg { color: #2f8fbf; }
@@ -1148,3 +1151,18 @@ small.erro.g-valor-erro { display: block; color: var(--g-vermelho); font-size: .
 .g-input.tremer { animation: g-tremer .35s ease; }
 @keyframes g-tremer { 0%, 100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 @media (prefers-reduced-motion: reduce) { .g-input.tremer { animation: none; } }
+
+/* Rascunho recuperado (o que foi digitado e não salvo voltou depois de recarregar) */
+.g-rascunho { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 8px 8px 12px; border-radius: var(--g-raio-p); background: var(--g-amarelo-tint); color: #5b4708; font-size: .875rem; }
+.g-rascunho > svg { width: 18px; height: 18px; flex: none; }
+.g-rascunho .g-btn { min-height: 36px; }
+
+/* Um botão só para os cartões de opções de um grupo (Meu pet shop): fica no pé da tela enquanto falta salvar */
+.g-salvar-junto {
+  grid-column: 1 / -1; position: sticky; z-index: 20; bottom: calc(var(--g-abas) + 10px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap;
+  padding: 10px 10px 10px 16px; border-radius: 16px; background: #1f1b17; color: #f6f1e8; box-shadow: var(--g-sombra-alta);
+}
+.g-salvar-junto p { margin: 0; font-size: .9375rem; min-width: 0; flex: 1 1 200px; }
+.g-salvar-junto .g-btn { flex: none; }
+@media (min-width: 960px) { .g-salvar-junto { bottom: 16px; margin-right: 210px; } }

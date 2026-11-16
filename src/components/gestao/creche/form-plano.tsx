@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import {
-  abreNoDia, DIAS_SEMANA, diasEmOrdem, isoMes, planoAtivo, podeMudarPlano, proporcionalDesde, vencimentoDoMes,
+  abreNoDia, DIAS_SEMANA, diasEmOrdem, isoMes, planoAtivo, podeMudarPlano, SELECT_PLANO, sugestaoDoMes, vencimentoDoMes,
+  type Plano,
   type PetDoPlano, type PlanoCompleto, type PrimeiraCobranca,
 } from "@/lib/gestao/creche";
 import type { PetComTutor } from "@/lib/gestao/tipos";
@@ -12,6 +13,7 @@ import { useTrava } from "@/lib/gestao/uma-vez";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Folha, ok, useAvisos, useDados } from "../ui";
+import { AvisoDeRascunho, useRascunho } from "../rascunho";
 import { lerModelos, type ModeloDePlano } from "./modelos";
 import AcertoDaSaida from "./saida";
 import "./creche.css";
@@ -37,7 +39,8 @@ const umDia = (dow: number) => isoDia(somaDias(new Date(2024, 0, 7), dow));
  * Quando o mês já começou, quem recebe escolhe como fica a primeira cobrança: nada vem marcado e nenhuma cobrança nasce vencida sozinha.
  */
 export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, aoSalvo }: {
-  plano?: PlanoCompleto; pet?: PetDoPlano | null; planos: PlanoCompleto[]; aoFechar: () => void; aoSalvo: () => void;
+  /** `aoSalvo` recebe o plano como ficou no banco: a lista mostra na hora, sem esperar a tela buscar tudo de novo */
+  plano?: PlanoCompleto; pet?: PetDoPlano | null; planos: PlanoCompleto[]; aoFechar: () => void; aoSalvo: (salvo?: PlanoCompleto) => void;
 }) {
   const { sb, petshop, cuidoDoFinanceiro: vejoFinanceiro, souDono } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
@@ -62,8 +65,10 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
   const [salvando, setSalvando] = useState(false);
   // o plano ganhou data de fim (o cão vai sair): quem cuida do financeiro confere as cobranças do mês da saída em diante
   const [saida, setSaida] = useState<PlanoCompleto | null>(null);
-  const conferirSaida = (novoFim: string | null, campos: Partial<PlanoCompleto>) => {
-    if (!plano || !vejoFinanceiro || !novoFim || novoFim === plano.fim) { aoSalvo(); return; }
+  const [salvo, setSalvo] = useState<PlanoCompleto | undefined>(undefined);
+  const conferirSaida = (novoFim: string | null, campos: Partial<PlanoCompleto>, gravado?: PlanoCompleto) => {
+    setSalvo(gravado);
+    if (!plano || !vejoFinanceiro || !novoFim || novoFim === plano.fim) { aoSalvo(gravado); return; }
     setSaida({ ...plano, ...campos, fim: novoFim, valor_mensal: mensal ?? plano.valor_mensal, valor_extra: extra });
   };
 
@@ -98,10 +103,25 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
   const proximoMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 1);
   const perguntaPrimeira = vejoFinanceiro && Boolean(apoio) && !apoio!.jaCobrou && !plano?.primeira_cobranca && Boolean(inicio) && inicio <= fimDoMes && (!fim || fim >= isoMes(mesAtual));
   const vigencia = { inicio, fim: fim || null, dias, pausa_de: comPausa ? pausaDe || null : null, pausa_ate: comPausa ? pausaAte || null : null };
-  const desde = inicio > hoje ? inicio : hoje;
-  const prop = mensal != null && dias.length ? proporcionalDesde(vigencia, mesAtual, mensal, petshop.horario, desde) : null;
+  // proporcional desde o começo do plano: os dias do plano no mês a partir do começo ÷ todos os dias do plano no mês × mensalidade
+  // (a mesma conta da cobrança do mês e do acerto da saída). Plano que vale o mês todo: o proporcional é o mês inteiro.
+  const prop = mensal != null && dias.length ? sugestaoDoMes(vigencia, mesAtual, mensal, petshop.horario) : null;
+  const comecoNoMes = inicio > isoMes(mesAtual) ? inicio : null;
   const vencPadrao = (() => { const v = inicio ? vencimentoDoMes({ inicio, vence_dia: venceDia }, mesAtual) : hoje; return v < hoje ? hoje : v; })();
   const vencDaPrimeira = vencPrimeira || vencPadrao;
+
+  // o que foi escrito e não salvo fica no aparelho (por plano, ou "novo"): recarregar a tela não perde. Salvou: some.
+  const valores = { pet: plano ? null : pet, dias, venceDia, inicio, fim, mensal, extra, modeloId, obs, pausaDe, pausaAte, comPausa, primeira, vencPrimeira };
+  type Valores = typeof valores;
+  const [inicial] = useState(() => JSON.stringify(valores));
+  const mexeu = JSON.stringify(valores) !== inicial;
+  const aplicar = (v: Valores) => {
+    if (!plano && v.pet) setPet(v.pet);
+    setDias(v.dias); setVenceDia(v.venceDia); setInicio(v.inicio); setFim(v.fim); setMensal(v.mensal); setExtra(v.extra); setModeloId(v.modeloId);
+    setObs(v.obs); setPausaDe(v.pausaDe); setPausaAte(v.pausaAte); setComPausa(v.comPausa); setPrimeira(v.primeira); setVencPrimeira(v.vencPrimeira);
+  };
+  const rascunho = useRascunho<Valores>(pode ? (plano ? `plano:${plano.id}` : `plano:novo${petInicial ? `:${petInicial.id}` : ""}`) : null, valores, mexeu, aplicar);
+  const descartar = () => { rascunho.limpar(); aplicar(JSON.parse(inicial) as Valores); if (!plano && !petInicial) setPet(null); setErro(null); };
 
   // trava na hora do primeiro toque: dois toques seguidos não criam o plano (nem a primeira cobrança) duas vezes
   const umaVez = useTrava();
@@ -129,8 +149,10 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
       let id = plano?.id;
       // modelo escolhido mas com outro preço: o plano fica com preço próprio (e a tela avisa)
       let saiuDoModelo = "";
-      if (plano) ok(await sb.from("creche_planos").update(campos).eq("id", plano.id).eq("petshop_id", petshop.id).select("id").single());
-      else id = ok(await sb.from("creche_planos").insert({ ...campos, petshop_id: petshop.id, pet_id: pet.id }).select("id").single()).id;
+      // a gravação já devolve o plano inteiro (com o pet), para a lista mostrar na hora
+      const linha = (plano ? ok(await sb.from("creche_planos").update(campos).eq("id", plano.id).eq("petshop_id", petshop.id).select(SELECT_PLANO).single())
+        : ok(await sb.from("creche_planos").insert({ ...campos, petshop_id: petshop.id, pet_id: pet.id }).select(SELECT_PLANO).single())) as unknown as Plano & { pets: PetDoPlano | null };
+      id = linha.id;
       if (vejoFinanceiro && mensal != null && id) {
         const modelo = modelos.find((m) => m.id === modeloId && Number(m.valor_mensal) === mensal) ? modeloId : null;
         const escolhido = modelos.find((m) => m.id === modeloId);
@@ -149,9 +171,14 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
           cobrou = ` A cobrança de ${nomeMes(mesAtual)} (${brl(irmao > 0 ? Number(g.data!.total) : valor)}${irmao > 0 ? `, com ${brl(irmao)} de desconto irmão` : ""}) vence em ${dataCurta(vencDaPrimeira)}.`;
         }
       } else if (perguntaPrimeira && primeira === "fora") cobrou = ` A primeira cobrança é a de ${nomeMes(proximoMes)}.`;
+      rascunho.limpar();
       avisar((plano ? "Plano salvo." : `${pet.nome} agora é mensalista da creche.`) + cobrou + saiuDoModelo);
       avisarMudanca();
-      conferirSaida(campos.fim, campos);
+      const comValor = vejoFinanceiro && mensal != null;
+      conferirSaida(campos.fim, campos, {
+        ...linha, valor_mensal: comValor ? mensal : plano?.valor_mensal ?? null, valor_extra: comValor ? extra : plano?.valor_extra ?? null,
+        temValor: comValor || Boolean(plano?.temValor), modelo_id: comValor ? (modelos.find((m) => m.id === modeloId && Number(m.valor_mensal) === mensal) ? modeloId : null) : plano?.modelo_id ?? null,
+      });
     } catch (e) { avisarErro(e); } finally { setSalvando(false); }
   }
 
@@ -167,13 +194,14 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
     try {
       if (naoComecou) ok(await sb.from("creche_planos").delete().eq("id", plano.id).eq("petshop_id", petshop.id).select("id"));
       else ok(await sb.from("creche_planos").update({ fim: hoje }).eq("id", plano.id).eq("petshop_id", petshop.id).select("id").single());
+      rascunho.limpar();
       avisar(naoComecou ? "Plano apagado." : `Plano de ${pet.nome} encerrado.`);
       avisarMudanca();
       if (naoComecou) aoSalvo(); else conferirSaida(hoje, {});
     } catch (e) { avisarErro(e); } finally { setSalvando(false); }
   }
 
-  if (saida) return <AcertoDaSaida plano={saida} aoFechar={aoSalvo} />;
+  if (saida) return <AcertoDaSaida plano={saida} aoFechar={() => aoSalvo(salvo)} />;
   if (!pode) {
     return (
       <Folha titulo="Plano do mensalista" aoFechar={aoFechar} rodape={<button className="g-btn sec" onClick={aoFechar}>Fechar</button>}>
@@ -201,6 +229,7 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
         <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : plano ? "Salvar plano" : "Cadastrar mensalista"}</button>
       </>}>
       <div className="g-form">
+        {rascunho.recuperado && <AvisoDeRascunho aoDescartar={descartar} />}
         <div className="g-fila" style={{ flexWrap: "nowrap" }}>
           <AvatarPet pet={pet} />
           <div className="g-cresce"><b style={{ display: "block" }}>{pet.nome}</b><span className="g-muted g-p">{pet.clientes?.nome ?? "Sem tutor"}</span></div>
@@ -262,8 +291,10 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
                 <p><b>Primeira cobrança.</b> {nomeMes(mesAtual)[0].toUpperCase() + nomeMes(mesAtual).slice(1)} já começou. Como fica a mensalidade deste mês?</p>
                 <label className="g-check"><input type="radio" name="primeira" checked={primeira === "fora"} onChange={() => { setPrimeira("fora"); limpar(); }} />
                   <span>Este mês já foi pago por fora: a primeira cobrança é a de {nomeMes(proximoMes)}</span></label>
-                <label className="g-check"><input type="radio" name="primeira" checked={primeira === "proporcional"} disabled={Boolean(prop && prop.restam === 0)} onChange={() => { setPrimeira("proporcional"); limpar(); }} />
-                  <span>Cobrar este mês, proporcional {desde === hoje ? "a partir de hoje" : `a partir de ${dataCurta(desde)}`}{prop ? (prop.restam > 0 ? `: ${brl(prop.valor)} (${prop.restam} de ${prop.todos} dias do plano no mês)` : " (não há mais dias do plano neste mês)") : ""}</span></label>
+                {!(prop && !prop.proporcional && prop.restam > 0) && (
+                  <label className="g-check"><input type="radio" name="primeira" checked={primeira === "proporcional"} disabled={Boolean(prop && prop.restam === 0)} onChange={() => { setPrimeira("proporcional"); limpar(); }} />
+                    <span>Cobrar este mês, proporcional {comecoNoMes ? `desde o começo do plano (${dataCurta(comecoNoMes)})` : "aos dias do plano"}{prop ? (prop.restam > 0 ? `: ${brl(prop.valor)} (${prop.restam} de ${prop.todos} dias do plano no mês)` : " (não há dias do plano neste mês)") : ""}</span></label>
+                )}
                 <label className="g-check"><input type="radio" name="primeira" checked={primeira === "inteiro"} onChange={() => { setPrimeira("inteiro"); limpar(); }} />
                   <span>Cobrar o mês inteiro{mensal != null ? `: ${brl(mensal)}` : ""}</span></label>
                 {(primeira === "proporcional" || primeira === "inteiro") && (

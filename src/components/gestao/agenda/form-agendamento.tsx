@@ -52,7 +52,7 @@ function anoFazSentido(dia: string) {
  * Ao criar, o horário pode se repetir: todos os da série dividem o mesmo `serie_id`.
  */
 /** O horário que acabou de ser marcado: a Agenda vai para o dia dele e oferece a confirmação no WhatsApp. */
-export type Marcado = { id: string; inicio: string; quantos: number };
+export type Marcado = { id: string; inicio: string; quantos: number; pet?: string };
 
 export default function FormAgendamento({ agendamento, petInicial, diaInicial, horaInicial, profissionalInicial, aoFechar, aoSalvar }: {
   agendamento?: AgendamentoCompleto; petInicial?: PetComTutor | null; diaInicial?: string; horaInicial?: string; profissionalInicial?: string | null;
@@ -343,7 +343,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
         const guardou = semFim && serie ? await sb.from("series_agenda").insert({ serie_id: serie, petshop_id: petshop.id, cada_semanas: repetir }).select("serie_id") : null;
         avisar(`${usar.length === 1 ? "1 horário marcado" : `${usar.length} horários marcados`}${!semFim ? "" : guardou?.error ? ". Não consegui guardar o Até eu cancelar: a repetição termina no último horário." : ". Perto do fim, a Agenda avisa para marcar os próximos."}`);
         avisarMudanca();
-        aoSalvar(marcados[0] ? { id: marcados[0].id, inicio: juntaDiaHora(usar[0], hhmm).toISOString(), quantos: usar.length } : undefined);
+        aoSalvar(marcados[0] ? { id: marcados[0].id, inicio: juntaDiaHora(usar[0], hhmm).toISOString(), quantos: usar.length, pet: pet?.nome } : undefined);
         setSalvando(false);
         return;
       }
@@ -393,7 +393,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
       if (!agendamento) {
         const novo = ok(await sb.from("agendamentos").insert({ ...campos, ...quando, petshop_id: petshop.id, criado_por: user.id }).select("id").single());
         if (aMais.length) await juntarAosMarcados([novo.id], aMais);
-        marcado = { id: novo.id, inicio: inicio.toISOString(), quantos: 1 };
+        marcado = { id: novo.id, inicio: inicio.toISOString(), quantos: 1, pet: pet?.nome };
       }
       avisar(agendamento ? "Horário alterado." : `${pet.nome} marcado para ${dataAmigavel(inicio)} às ${hhmm}.`);
       avisarMudanca();

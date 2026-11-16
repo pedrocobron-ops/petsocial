@@ -1,9 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Printer } from "lucide-react";
 import { esperadoNoDia, lerPlanos, lerPresencas } from "@/lib/gestao/creche";
 import { lerCuidados, nomeDaAcomodacao, quemOcupa, textoDoCuidado } from "@/lib/gestao/hotel";
 import { cuidadosLigados } from "@/lib/gestao/hotel-opcoes";
@@ -13,6 +11,7 @@ import { useCalendario } from "@/components/gestao/calendario";
 import { useGestao } from "@/components/gestao/contexto";
 import { Esqueleto, ok, useDados } from "@/components/gestao/ui";
 import LogoLoja from "@/components/gestao/logo-loja";
+import { ControlesDoPapel } from "@/components/gestao/papel";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta } from "@/components/gestao/hotel/tipos";
 import "../../agenda/imprimir/imprimir.css";
 
@@ -41,16 +40,17 @@ function FolhaDoDia() {
   const data = deIsoDia(dia);
 
   const { dados, carregando } = useDados(async () => {
-    const [abertas, encerradas] = await Promise.all([
+    // mensalistas esperados no dia (de hoje em diante), sem quem avisou que falta. Tudo numa leva só (no celular, cada espera soma).
+    const comMensalistas = usaCreche && dia >= hojeIso;
+    const [abertas, encerradas, planos, mov] = await Promise.all([
       sb.from("estadias").select(SELECT_DA_FOLHA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500),
       sb.from("estadias").select(SELECT_DA_FOLHA).eq("petshop_id", petshop.id).eq("status", "encerrada")
         .lte("entrada", somaDias(data, 1).toISOString()).gte("saida", data.toISOString()).order("entrada").limit(500),
+      comMensalistas ? lerPlanos(sb, petshop.id, false) : [],
+      comMensalistas ? lerPresencas(sb, petshop.id, dia, dia) : { presencas: [], faltas: [] },
     ]);
-    // mensalistas esperados no dia (de hoje em diante), sem quem avisou que falta
     let esperados: { id: string; petId: string; nome: string; tutor: string; telefone: string | null; alertas: string | null; obs?: string | null }[] = [];
-    if (usaCreche && dia >= hojeIso) {
-      const planos = await lerPlanos(sb, petshop.id, false);
-      const mov = planos.length ? await lerPresencas(sb, petshop.id, dia, dia) : { presencas: [], faltas: [] };
+    if (comMensalistas) {
       esperados = planos.filter((p) => p.pets?.ativo && esperadoNoDia(p, dia, petshop.horario) && !mov.faltas.some((f) => f.pet_id === p.pet_id && f.dia === dia))
         .map((p) => ({ id: p.id, petId: p.pet_id, nome: p.pets!.nome, tutor: p.pets!.clientes?.nome ?? "", telefone: p.pets!.clientes?.telefone ?? null, alertas: p.pets!.alertas, obs: (p.pets as { obs?: string | null }).obs ?? null }));
     }
@@ -111,14 +111,11 @@ function FolhaDoDia() {
 
   return (
     <div className="g-imp">
-      <div className="g-imp-controles">
-        <Link className="g-voltar" href="/gestao/app/creche-hotel"><ArrowLeft />Voltar para {nomeDaCasa(petshop)}</Link>
+      <ControlesDoPapel voltar={params.get("de") === "ocupacao" ? "/gestao/app/creche-hotel?ver=ocupacao" : "/gestao/app/creche-hotel?ver=casa"} rotuloVoltar={`Voltar para ${nomeDaCasa(petshop)}`} dica="A folha não mostra valores.">
         <div className="g-imp-linha">
           <input className="g-input" type="date" value={dia} aria-label="Dia" onChange={(e) => e.target.value && setDia(e.target.value)} />
-          <button className="g-btn pri" onClick={() => window.print()}><Printer />Imprimir ou salvar em PDF</button>
         </div>
-        <p className="g-muted g-pp">Para salvar em PDF, toque em Imprimir e escolha "Salvar como PDF" no lugar da impressora. A folha não mostra valores.</p>
-      </div>
+      </ControlesDoPapel>
 
       <article className="g-imp-folha semana">
         <header className="g-imp-cab">

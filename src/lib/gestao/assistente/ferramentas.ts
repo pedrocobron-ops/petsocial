@@ -163,14 +163,14 @@ async function petPorId(c: Contexto, id: unknown) {
 }
 /* ---------- o que os clientes devem (as mesmas contas do Caixa, Contas de clientes, e da ficha do tutor) ---------- */
 
-type ContaDeCliente = { id: string; valor: number; descricao: string | null; categoria: string; vencimento: string | null; data: string; criado_em: string; cliente_id: string | null };
+type ContaDeCliente = { id: string; valor: number; descricao: string | null; categoria: string; vencimento: string | null; data: string; criado_em: string; cliente_id: string | null; devido_desde: string | null };
 const real = (n: number) => Math.round(n * 100) / 100;
 /** Da mais antiga para a mais nova: vencimento (ou o dia da conta) e, no empate, quando foi anotada. */
 const maisAntigaPrimeiro = (a: ContaDeCliente, b: ContaDeCliente) =>
   (a.vencimento ?? a.data).localeCompare(b.vencimento ?? b.data) || a.criado_em.localeCompare(b.criado_em) || a.id.localeCompare(b.id);
 /** Contas a receber em aberto ligadas a um cliente (de um só, ou de todos). */
 async function contasDeClientes(c: Contexto, clienteId?: string): Promise<ContaDeCliente[]> {
-  let q = c.sb.from("lancamentos").select("id, valor, descricao, categoria, vencimento, data, criado_em, cliente_id").eq("petshop_id", c.petshop.id).eq("pago", false).eq("tipo", "entrada").not("cliente_id", "is", null);
+  let q = c.sb.from("lancamentos").select("id, valor, descricao, categoria, vencimento, data, criado_em, cliente_id, devido_desde").eq("petshop_id", c.petshop.id).eq("pago", false).eq("tipo", "entrada").not("cliente_id", "is", null);
   if (clienteId) q = q.eq("cliente_id", clienteId);
   const ls = ok(await q.order("id").limit(1000)) as ContaDeCliente[];
   return ls.map((l) => ({ ...l, valor: Number(l.valor) })).sort(maisAntigaPrimeiro);
@@ -182,11 +182,12 @@ function devedores(contas: ContaDeCliente[], nomes: Map<string, string>, hoje: s
   const m = new Map<string, { cliente_id: string; tutor: string; total: number; contas: ContaDeCliente[]; atrasado: number; desde: string }>();
   for (const l of contas) {
     const id = l.cliente_id!;
-    const d = m.get(id) ?? { cliente_id: id, tutor: nomes.get(id) ?? "Tutor", total: 0, contas: [], atrasado: 0, desde: l.criado_em };
+    const d = m.get(id) ?? { cliente_id: id, tutor: nomes.get(id) ?? "Tutor", total: 0, contas: [], atrasado: 0, desde: l.devido_desde ?? l.criado_em };
     d.total = real(d.total + l.valor);
     d.contas.push(l);
     if (l.vencimento && l.vencimento < hoje) d.atrasado = real(d.atrasado + l.valor);
-    if (l.criado_em < d.desde) d.desde = l.criado_em;
+    // dívida trazida do caderno: o dia anotado ("2026-03-10") vale; senão, quando foi anotada (os dois se comparam pelo dia)
+    if ((l.devido_desde ?? l.criado_em) < d.desde) d.desde = l.devido_desde ?? l.criado_em;
     m.set(id, d);
   }
   return [...m.values()].sort((a, b) => b.atrasado - a.atrasado || b.total - a.total);
@@ -657,7 +658,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       const total = real(lista.reduce((s, d) => s + d.total, 0));
       return { resultado: {
         hoje, total_a_receber: total, pessoas: lista.length,
-        devedores: lista.slice(0, 30).map((d) => ({ tutor: d.tutor, cliente_id: d.cliente_id, deve: d.total, contas: d.contas.length, atrasado: d.atrasado, desde: utcParaLocal(d.desde, c.fusoMin).slice(0, 10),
+        devedores: lista.slice(0, 30).map((d) => ({ tutor: d.tutor, cliente_id: d.cliente_id, deve: d.total, contas: d.contas.length, atrasado: d.atrasado, desde: d.desde.length === 10 ? d.desde : utcParaLocal(d.desde, c.fusoMin).slice(0, 10),
           ...(so || lista.length <= 5 ? { quais: d.contas.map((l) => ({ descricao: nomeDaConta(l), valor: l.valor, vencimento: l.vencimento })) } : {}) })),
         ...(lista.length > 30 ? { aviso: `Mostrando 30 de ${lista.length}. A lista inteira fica em Caixa, Contas de clientes.` } : {}),
         onde_ver: "Caixa, Contas de clientes (e na ficha de cada tutor)",

@@ -6,9 +6,10 @@ import { AlertTriangle, CalendarPlus, Check, DoorOpen, LogIn, MessageCircle, Sea
 import { lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { cuidadosVigentes, estadoSaude, tipoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import { portariaLigada, type Retirada } from "@/lib/gestao/casa-opcoes";
-import { abreNoDia, emPausa, erroDaChamada, esperadoNoDia, fraseDoSaldo, lerPresencas, lerSaldoDeReposicao, mensagemDeFalta, montarChamada, planoVale, podeMudarPlano, type LinhaChamada, type PlanoCompleto } from "@/lib/gestao/creche";
+import { abreNoDia, emPausa, erroDaChamada, esperadoNoDia, fraseDoSaldo, lerPresencas, lerSaldoDeReposicao, mensagemDeFalta, montarChamada, planoVale, podeMudarPlano, type LinhaChamada, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
 import { dataAmigavel, dataCurta, dataLonga, deIsoDia, isoDia, linkWhatsApp, semAcento, somaDias } from "@/lib/gestao/util";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { ocupadasNoDia } from "@/lib/gestao/hotel";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
@@ -53,7 +54,8 @@ async function saudeVencida(sb: ReturnType<typeof useGestao>["sb"], petshopId: s
  * "Cobrar / Não cobrar" na hora; quem não mexe com dinheiro só é avisado de que a saída ficou para quem recebe decidir.
  */
 export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, aoExperiencia }: {
-  planos: PlanoCompleto[]; vagasHoje: { ocupadas: number; total: number } | null; aoNovoMensalista: () => void;
+  /** `avulsas`: estadias de creche abertas fora da chamada (check-in avulso, reserva), para contar as vagas com a chamada que acabou de mudar */
+  planos: PlanoCompleto[]; vagasHoje: { ocupadas: number; total: number; avulsas?: Presenca[] } | null; aoNovoMensalista: () => void;
   /** com o dia de experiência ligado (Opções da creche): abre o check-in de um cão novo já marcado como dia de experiência */
   aoExperiencia?: () => void;
   /** faixa opcional acima da lista (abriu vaga para quem está na lista de espera) */
@@ -96,7 +98,11 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
   const naCasa = linhas.filter((l) => l.estado === "na_casa" && l.presenca?.mensalista);
   const abre = abreNoDia(petshop.horario, dia);
   const emPausaHoje = planos.filter((p) => p.pets?.ativo && planoVale(p, dia) && emPausa(p, dia) && p.dias.includes(deIsoDia(dia).getDay()));
-  const ocupadas = ehHoje && vagasHoje ? vagasHoje.ocupadas : null;
+  // a conta das vagas sai das mesmas presenças do placar: depois de marcar uma reposição ou uma chegada, os dois números mudam juntos
+  // (antes, o placar já mostrava quem chegou e a linha das vagas esperava a tela inteira buscar de novo)
+  const ocupadas = !ehHoje || !vagasHoje ? null : !dados || !vagasHoje.avulsas ? vagasHoje.ocupadas
+    : ocupadasNoDia("creche", [...vagasHoje.avulsas, ...dados.presencas.filter((e) => e.mensalista && (e.status === "reservada" || e.status === "em_casa"))], null, hoje, agora,
+      { planos, presencas: dados.presencas, faltas: dados.faltas }, petshop.horario);
   const vagas = vagasHoje?.total ?? null;
 
   async function marcar(plano: PlanoCompleto, acao: Acao, opcoes: { avisou?: boolean; forcar?: boolean } = {}): Promise<boolean> {
