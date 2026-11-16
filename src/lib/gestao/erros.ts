@@ -21,11 +21,11 @@ export function limparTexto(s: unknown, max: number = LIMITES.mensagem): string 
   // endereço com consulta ou âncora: fica só o caminho (mantém o :linha:coluna da pilha)
   v = v.replace(/(\S)[?#][^\s)'"]*?(?=:\d+:\d+|[\s)'"]|$)/g, "$1");
   v = v.replace(/eyJ[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*/g, ":token");
-  v = v.replace(/\b(?=[A-Za-z_-]*\d)[A-Za-z0-9_-]{24,}/g, ":token");
+  v = v.replace(/\b(?=[A-Za-z_-]*\d)[A-Za-z0-9_-]{32,}/g, ":token"); // nomes de arquivo do site (até ~30) ficam
   v = v.replace(/\b(Bearer)\s+\S+/g, "$1 :token").replace(/\b(apikey|token|senha|password|secret)\s*[:=]\s*\S+/gi, "$1=:token");
   v = v.replace(/R\$\s?-?\d[\d.,]*/g, "R$ :valor");
-  v = v.replace(/\+?\(?\d{2,3}\)?[\s.-]?9?\d{4}[\s.-]?\d{4}/g, ":n");
   v = v.replace(/\d{8,}/g, ":n");
+  v = v.replace(/\+?\(?\d{2,3}\)?[\s.-]?9?\d{4}[\s.-]?\d{4}/g, ":n");
   v = v.replace(/\s+/g, " ").trim();
   return v.length > max ? v.slice(0, max - 1) + "…" : v;
 }

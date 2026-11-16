@@ -78,7 +78,7 @@ begin
   v := regexp_replace(v, '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', ':id', 'g');
   v := regexp_replace(v, '(\S)[?#][^\s)''"]*?(?=:[0-9]+:[0-9]+|[\s)''"]|$)', '\1', 'g');
   v := regexp_replace(v, 'eyJ[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*', ':token', 'g');
-  v := regexp_replace(v, '(?=[A-Za-z_-]*[0-9])[A-Za-z0-9_-]{24,}', ':token', 'g');
+  v := regexp_replace(v, '(?=[A-Za-z_-]*[0-9])[A-Za-z0-9_-]{32,}', ':token', 'g');
   v := regexp_replace(v, 'R\$\s?-?[0-9][0-9.,]*', 'R$ :valor', 'g');
   v := regexp_replace(v, '[0-9]{8,}', ':n', 'g');
   v := regexp_replace(v, '\+?\(?[0-9]{2,3}\)?[\s.-]?9?[0-9]{4}[\s.-]?[0-9]{4}', ':n', 'g');

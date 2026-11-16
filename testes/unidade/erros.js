@@ -56,6 +56,7 @@ t('Chrome: só quadros com arquivo:linha, sem site, sem consulta, sem a mensagem
   assert.ok(!p.join('\n').includes('extension'));
   assert.equal(p.length, 6);
 });
+t('nome de arquivo do site (pedaço com número) fica', () => assert.equal(E.limparPilha('    at a (https://x.com/_next/static/chunks/4bd1b696-c023c6e3521b4ea0.js:1:2)'), 'a (/_next/static/chunks/4bd1b696-c023c6e3521b4ea0.js:1:2)'));
 t('Firefox/Safari: função@endereço:linha:coluna', () => assert.equal(E.limparPilha('Hoje@https://maestro.pet/_next/a.js?v=2:7:9\n@https://maestro.pet/b.js:1:1'), 'Hoje (/_next/a.js:7:9)\n/b.js:1:1'));
 t('pilha vazia ou estranha não quebra', () => { assert.equal(E.limparPilha(undefined), ''); assert.equal(E.limparPilha('qualquer coisa'), ''); });
 

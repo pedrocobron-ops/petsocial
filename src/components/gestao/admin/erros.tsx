@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bug, CheckCircle2, Monitor, RotateCcw, Server, WifiOff } from "lucide-react";
+import { Bug, CheckCircle2, Monitor, RotateCcw, Server } from "lucide-react";
 import { Esqueleto, Vazio, mensagemDeErro, ok, useAvisos } from "@/components/gestao/ui";
 import { banco } from "@/lib/gestao/supabase";
 import { haQuanto } from "@/lib/gestao/util";
@@ -73,7 +73,7 @@ export default function AbaErros() {
         <>
           <p className="g-pp g-muted g-tab" data-teste="erros-resumo">
             {grupos.length} {grupos.length === 1 ? "erro diferente" : "erros diferentes"} · {total} {total === 1 ? "vez" : "vezes"} no período
-            {dados.sem_internet > 0 && <> · <WifiOff style={{ width: 14, height: 14, verticalAlign: "-2px" }} aria-hidden /> {dados.sem_internet} falhas sem internet (só contadas)</>}
+            {dados.sem_internet > 0 && <> · {dados.sem_internet} {Number(dados.sem_internet) === 1 ? "falha" : "falhas"} sem internet (só contadas)</>}
             {dados.descartados > 0 && <> · {dados.descartados} envios descartados pelo limite</>}
           </p>
           {!grupos.length ? <Vazio titulo="Nenhum erro no período." texto="Quando alguém encontrar um erro no aplicativo, ele aparece aqui, sem dados de clientes." /> : (

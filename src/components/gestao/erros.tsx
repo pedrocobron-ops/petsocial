@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Selo } from "./marca";
 import { instalarVigia, registrarErro } from "@/lib/gestao/erros-navegador";
 
@@ -24,7 +23,8 @@ export function TelaDeErro({ erro, tentar, inteira }: { erro: Error & { digest?:
       <p>Nada do que você já salvou se perdeu. A equipe Maestro Pet já foi avisada. Tente de novo; se continuar, volte para Hoje.</p>
       <div className="g-fila" style={{ justifyContent: "center" }}>
         <button className="g-btn pri" onClick={() => tentar()}>Tentar de novo</button>
-        <Link className="g-btn sec" href="/gestao/app">Voltar para Hoje</Link>
+        {/* endereço inteiro (não Link): recarrega a página e sai de qualquer estado quebrado, mesmo quando a tela que quebrou é o Hoje */}
+        <a className="g-btn sec" href="/gestao/app">Voltar para Hoje</a>
       </div>
     </div>
   );
