@@ -1853,6 +1853,9 @@ isOneToOne: false
 "casa_quem_escreve":
 { Args: { "p_petshop": string }; Returns: string
                            },
+"cliente_receber_contas":
+{ Args: { "p_chave": string,"p_cliente": string,"p_passos": Json,"p_petshop": string }; Returns: Json
+                           },
 "clientes_juntar":
 { Args: { "p_de": string,"p_para": string }; Returns: Json
                            },
