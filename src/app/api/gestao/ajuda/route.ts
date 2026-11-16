@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import { INSTRUCOES_AJUDA, MARCA_EQUIPE, MARCA_NOVO, procurarTopico } from "@/lib/gestao/ajuda";
 import { topicosPara } from "@/lib/gestao/manual";
+import { comRegistro, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -20,7 +21,7 @@ const erro = (status: number, codigo: string, mensagem: string) => NextResponse.
  * `novo` (IA) ou `assunto` (busca no guia) dizem se a pessoa mudou de assunto, para a contagem de tentativas recomeçar.
  * Sem a chave da IA, responde pela busca de palavras no mesmo guia.
  */
-export async function POST(req: Request) {
+async function tratar(req: Request) {
   if (!configurado) return erro(503, "sem_banco", "O sistema ainda não está ligado neste endereço.");
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return erro(401, "sem_login", "Entre de novo para usar a ajuda.");
@@ -70,7 +71,10 @@ export async function POST(req: Request) {
     await sb.from("assistente_eventos").insert({ petshop_id: corpo.petshopId, user_id: u.user.id, acao: "ajuda", pedido: ultima.texto.slice(0, 300) });
     if (!texto) return NextResponse.json(await local());
     return NextResponse.json({ texto, equipe, novo });
-  } catch {
+  } catch (err) {
+    if (!(err instanceof Anthropic.APIError)) await registrarErroServidor("/api/gestao/ajuda", err, { petshop: corpo.petshopId });
     return NextResponse.json(await local());
   }
 }
+
+export const POST = comRegistro("/api/gestao/ajuda", tratar);

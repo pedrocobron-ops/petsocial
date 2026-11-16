@@ -121,6 +121,11 @@ O manual troca sozinho (`textoDaCasa` em `manual.ts`). Interruptor (`role="switc
   Contas (lista de `admin_painel`; a folha usa `admin/conta.tsx` com `admin_conta`: histórico e mensagens prontas), Conversas, Escola, Cakto.
 - Regra: o painel recebe só dados da conta e quantidades. Nada de nome/telefone de cliente, pets ou valores do pet shop. Função nova de admin
   é security definer, começa com `if not public.sou_admin() then raise exception`, e tira o `execute` de `public, anon`.
+- Aba Erros (`admin/erros.tsx`, `admin_erros` e `admin_erro_resolver`, migração 20261180): erros que as pessoas encontraram, agrupados.
+  Quem registra: `VigiaDeErros` (layout de /gestao: erro solto e promessa), `error.tsx` (tela que quebrou), `avisarErro`/`useDados`
+  quando o erro é técnico (`classificar` em `src/lib/gestao/erros.ts`) e as rotas do servidor (`comRegistro` e `registrarErroServidor`,
+  `src/lib/gestao/erros-servidor.ts`; o que escapa cai em `src/instrumentation.ts`). Tudo passa por `montarErro` (limpa) e o banco limpa
+  de novo. Rota nova do servidor: exporte `comRegistro("/api/gestao/<rota>", tratar)`. Nunca mande corpo de pedido, nome, telefone ou valor.
 - Trocas de status ficam em `petshop_status_hist` (gatilho em `petshops`, migração 20261175); sem regra de RLS, só as funções leem.
 
 ## Cakto (assinatura)

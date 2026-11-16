@@ -2421,6 +2421,7 @@ const BASE: TopicoBase[] = [
       "Vê também números de uso: quando alguém da equipe entrou, em quantos dias o sistema foi usado e quantos agendamentos, vendas, presenças na creche e hospedagens foram lançados.",
       "São só quantidades. O painel da Maestro Pet não mostra nomes, telefones ou endereços dos seus clientes, nem os pets, nem quanto o seu pet shop recebe ou gasta.",
       "As conversas com o Mozart e com a Ajuda ficam guardadas para a nossa equipe melhorar as respostas e ajudar quando você pede.",
+      "Quando uma tela dá erro, o sistema avisa a nossa equipe só com o necessário para consertar: a mensagem técnica, a tela, o aparelho (tamanho e navegador) e a versão do sistema. Sem nomes, telefones, e-mails nem valores.",
       "A Maestro Pet pode mandar mensagem pelo telefone do pet shop para dar boas-vindas, avisar do fim do teste ou de um pagamento que não passou. Nada é enviado sozinho.",
     ],
     palavras: ["o que voces veem", "maestro ve", "equipe maestro", "privacidade", "quem ve meus dados", "voces veem meus clientes", "espionar", "acesso da maestro", "lgpd"] },
@@ -2451,6 +2452,17 @@ const BASE: TopicoBase[] = [
     dicas: ["Os materiais não fazem parte da assinatura. Ninguém precisa comprar nada para usar o sistema.", "Comprou com um e-mail diferente do da conta? Fale com a nossa equipe para liberar."],
     palavras: ["escola", "aula", "aulas", "curso", "material", "comprei", "ler o material", "meus materiais", "aprender"] },
   /* ---------- O que o sistema não faz ---------- */
+  { id: "tela-travou", titulo: "Apareceu \"Opa, esta tela travou\": e agora?", secao: "limites", quem: "todos", rota: null,
+    passos: [
+      "Toque em Tentar de novo. Na maioria das vezes a tela volta na hora.",
+      "Se continuar, toque em Voltar para Hoje e abra a tela de novo pelo menu.",
+      "O que já estava salvo não se perde. Só o que estava sendo digitado naquela tela, e ainda não tinha sido salvo, pode precisar ser feito de novo.",
+    ],
+    dicas: [
+      "Você não precisa avisar: o sistema já manda para a equipe Maestro Pet o que deu errado, sem dados dos seus clientes. Se quiser contar o que estava fazendo, use a Ajuda.",
+      "Sem internet, as telas avisam e nada fica pela metade. Isso não conta como erro do sistema.",
+    ],
+    palavras: ["tela travou", "deu erro", "erro na tela", "travou", "tela branca", "parou de funcionar", "bug", "nao abre", "não abre", "opa"] },
   { id: "nota-fiscal", titulo: "Dá para emitir nota fiscal?", secao: "limites", quem: "todos", rota: null,
     passos: [
       "Não. O Maestro Pet Gestão não emite nota fiscal: nem NF-e, nem NFC-e, nem NFS-e.",

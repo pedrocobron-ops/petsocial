@@ -6,6 +6,7 @@ import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import { definicao, descrever, ehErroDeUso, ferramentasPara, gravar, rodarConsulta, type Contexto, type LinkZap, type Resumo } from "@/lib/gestao/assistente/ferramentas";
 import { INSTRUCOES, contextoDoPetshop } from "@/lib/gestao/assistente/instrucoes";
 import { ferramentaLiberada } from "@/lib/gestao/assistente/permissao";
+import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -85,7 +86,7 @@ function agoraNoFuso(fuso: string) {
   } catch { return null; }
 }
 
-export async function POST(req: Request) {
+async function tratar(req: Request) {
   if (!configurado) return erro(503, "sem_banco", "O sistema ainda não está ligado neste endereço.");
   if (!process.env.ANTHROPIC_API_KEY) { console.error("[assistente] sem ANTHROPIC_API_KEY"); return erro(503, "sem_chave", FORA_DO_AR); }
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -121,7 +122,7 @@ export async function POST(req: Request) {
   // toda chamada ao modelo conta no dia do pet shop (no banco; a conta só para consulta conta igual)
   const contar = async (tipo: "pedido" | "chamada") => {
     const r = await sb.rpc("assistente_contar", { p_petshop: c.petshop.id, p_canal: "mozart", p_tipo: tipo, p_limite: tipo === "pedido" ? LIMITE_DIA : LIMITE_CHAMADAS });
-    if (r.error) { console.error("[assistente] contagem falhou", r.error.code); return false; }
+    if (r.error) { console.error("[assistente] contagem falhou", r.error.code); await registrarErroServidor("/api/gestao/assistente", erroDoBanco(r.error, "assistente_contar"), { petshop: c.petshop.id }); return false; }
     return r.data === true;
   };
 
@@ -235,12 +236,15 @@ export async function POST(req: Request) {
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) return erro(429, "ocupado", "O Mozart está com muitos pedidos agora. Tente de novo em um minuto.");
     if (err instanceof Anthropic.AuthenticationError) { console.error("[assistente] chave recusada pela Anthropic"); return erro(503, "sem_chave", FORA_DO_AR); }
-    if (err instanceof Anthropic.APIError) return erro(502, "ia_fora", "O Mozart não respondeu agora. Tente de novo em instantes.");
+    if (err instanceof Anthropic.APIError) { await registrarErroServidor("/api/gestao/assistente", Object.assign(new Error(`Anthropic respondeu ${err.status ?? "sem status"}`), { name: "ErroDaIA" }), { petshop: c.petshop.id }); return erro(502, "ia_fora", "O Mozart não respondeu agora. Tente de novo em instantes."); }
     // o motivo vai para o registro do servidor; a pessoa vê só a frase
     console.error("[assistente] falha", err);
+    await registrarErroServidor("/api/gestao/assistente", err, { petshop: c.petshop.id });
     return NextResponse.json({ erro: "falha", mensagem: "Algo deu errado do nosso lado. Tente de novo em instantes.", tipo: err instanceof Error ? err.name : typeof err }, { status: 500 });
   }
 
   await guardarConversa(texto || "Pronto.");
   return NextResponse.json({ mensagens, texto: texto || "Pronto.", propostas: [], parciais: [], links, mudou });
 }
+
+export const POST = comRegistro("/api/gestao/assistente", tratar);

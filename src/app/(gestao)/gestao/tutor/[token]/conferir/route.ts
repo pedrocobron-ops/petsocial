@@ -1,4 +1,5 @@
 import { buscarFoto } from "@/lib/gestao/tutor-servidor";
+import { comRegistro } from "@/lib/gestao/erros-servidor";
 
 /**
  * Conferência para o dono (botão em Meu pet shop › Cuidado com o tutor › Página do tutor): com o link de um tutor e uma foto
@@ -7,7 +8,7 @@ import { buscarFoto } from "@/lib/gestao/tutor-servidor";
  */
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
+async function tratar(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const foto = new URL(req.url).searchParams.get("foto") ?? "";
   const ler = async (so: "principal" | "reserva") => {
@@ -19,3 +20,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   const reserva = principal === "nao" ? "nao" : await ler("reserva");
   return Response.json({ principal, reserva }, { headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
 }
+
+export const GET = comRegistro("/gestao/tutor/[token]/conferir", tratar);

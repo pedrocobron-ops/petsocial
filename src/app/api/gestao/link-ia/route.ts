@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/gestao/banco";
 import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "@/lib/gestao/supabase";
 import { segredoDoServidor } from "@/lib/gestao/servidor";
+import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 import {
   FERRAMENTA_HORARIOS, FERRAMENTA_HOTEL, INSTRUCOES_LINK_IA, MAX_PERGUNTAS_CONVERSA, contextoDoLink, entradaHorarios, entradaHotel,
   ferramentasDoLink, foraTexto, lerResposta, limiteConversaTexto, limiteTexto, limparFalas, perguntasNaConversa, respostaDeTeste, resumoDaEstimativa, type DadosDoLink,
@@ -40,7 +41,7 @@ const responder = (s: Saida, status = 200) => NextResponse.json(s, { status });
  * nada de clientes, pets ou caixa. O texto da pergunta não é guardado: só a contagem do dia.
  * Recebe { codigo, falas: [{ de: "eu" | "ia", texto }] } e devolve { texto, naoSei?, limite?, fora?, sugestao? }.
  */
-export async function POST(req: Request) {
+async function tratar(req: Request) {
   if (!configurado) return NextResponse.json({ erro: "sem_banco" }, { status: 503 });
   const corpo = (await req.json().catch(() => null)) as { codigo?: unknown; falas?: unknown } | null;
   const codigo = typeof corpo?.codigo === "string" ? corpo.codigo.trim() : "";
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
 
   const sb = createClient<Database>(SUPABASE_URL, SUPABASE_CHAVE, { auth: { persistSession: false, autoRefreshToken: false } });
   const ligada = await sb.rpc("link_ia_ligada", { p_codigo: codigo });
-  if (ligada.error) return NextResponse.json({ erro: "indisponivel" }, { status: 503 });
+  if (ligada.error) { await registrarErroServidor("/api/gestao/link-ia", erroDoBanco(ligada.error, "link_ia_ligada")); return NextResponse.json({ erro: "indisponivel" }, { status: 503 }); }
   if (ligada.data !== true) return NextResponse.json({ erro: "desligado" }, { status: 403 });
 
   // o que a página do link mostra, pelas mesmas funções públicas
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
   const segredo = segredoDoServidor() ?? undefined;
   const conta = await sb.rpc("link_ia_contar", { p_codigo: codigo, p_segredo: segredo });
   const contou = conta.data as { ok?: boolean; motivo?: string } | null;
-  if (conta.error) return responder({ texto: foraTexto(nome), fora: true });
+  if (conta.error) { await registrarErroServidor("/api/gestao/link-ia", erroDoBanco(conta.error, "link_ia_contar")); return responder({ texto: foraTexto(nome), fora: true }); }
   if (contou?.motivo === "recusado") { console.error("[link-ia] o banco recusou o segredo do servidor: grave de novo no painel (aba Cakto)"); return responder({ texto: foraTexto(nome), fora: true }); }
   if (!contou?.ok) return contou?.motivo === "desligado" ? NextResponse.json({ erro: "desligado" }, { status: 403 }) : responder({ texto: limiteTexto(nome), limite: true });
 
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
       bruto = await perguntarAoModelo(sb, codigo, d, contexto, falas);
     } catch (err) {
       if (err instanceof Anthropic.AuthenticationError) console.error("[link-ia] chave recusada pela Anthropic");
-      else if (!(err instanceof Anthropic.APIError)) console.error("[link-ia] falha", err instanceof Error ? err.name : typeof err);
+      else if (!(err instanceof Anthropic.APIError)) { console.error("[link-ia] falha", err instanceof Error ? err.name : typeof err); await registrarErroServidor("/api/gestao/link-ia", err); }
       await registrar(false);
       return responder({ texto: foraTexto(nome), fora: true });
     }
@@ -163,3 +164,5 @@ async function rodarFerramenta(sb: Banco, codigo: string, d: DadosDoLink, nome: 
   }
   return "Ferramenta indisponível.";
 }
+
+export const POST = comRegistro("/api/gestao/link-ia", tratar);
