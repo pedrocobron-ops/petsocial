@@ -24,11 +24,13 @@ export default function Feriados() {
   const somenteLeitura = useSomenteLeitura();
   const { calendario, recarregar } = useCalendario();
   const temHotel = usaModulo(petshop, "hotel");
+  // só hotel: feriado é dia de casa cheia, não dia fechado. A marcação já vem como feriado no preço, sem fechar.
+  const soHotel = temHotel && !usaModulo(petshop, "creche") && !usaModulo(petshop, "banho_tosa");
   const hoje = isoDia(new Date());
   const [dia, setDia] = useState("");
   const [nome, setNome] = useState("");
-  const [fechado, setFechado] = useState(true);
-  const [feriado, setFeriado] = useState(false);
+  const [fechado, setFechado] = useState(!soHotel);
+  const [feriado, setFeriado] = useState(soHotel);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [verPassados, setVerPassados] = useState(false);
@@ -69,7 +71,9 @@ export default function Feriados() {
     if (!fechado && !(temHotel && feriado)) return setErro("Marque acima se esses dias são fechados, se contam como feriado no preço, ou os dois.");
     if (!(await confirmar({
       titulo: `Colocar ${novos.length} feriados nacionais na lista?`,
-      texto: `De ${dataCompleta(novos[0].dia)} a ${dataCompleta(novos[novos.length - 1].dia)}. Eles entram ${fechado ? "como dia fechado" : "sem fechar o dia"}${temHotel && feriado ? " e contando como feriado no preço do hotel" : ""}, do jeito que está marcado acima. Depois dá para mudar ou tirar um por um. Feriado da cidade e do estado você acrescenta pela data.`,
+      texto: `De ${dataCompleta(novos[0].dia)} a ${dataCompleta(novos[novos.length - 1].dia)}. ${fechado
+        ? `Eles entram como dia FECHADO: o link não oferece ${soHotel ? "vaga com entrada ou saída nesses dias" : "horário nem vaga nesses dias"}${temHotel && feriado ? ", e a noite conta como feriado no preço do hotel" : ""}.`
+        : `Eles entram ${temHotel && feriado ? "contando como feriado no preço do hotel, " : ""}sem fechar: ${soHotel ? "o hotel recebe pets normalmente" : "vocês atendem normalmente"}.`} É o que está marcado acima. Depois dá para mudar ou tirar um por um. Feriado da cidade e do estado você acrescenta pela data.`,
       confirmar: "Colocar na lista",
     }))) return;
     setErro(null); setOcupado(true);
