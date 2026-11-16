@@ -80,8 +80,8 @@ begin
   v := regexp_replace(v, 'eyJ[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*', ':token', 'g');
   v := regexp_replace(v, '(?=[A-Za-z_-]*[0-9])[A-Za-z0-9_-]{24,}', ':token', 'g');
   v := regexp_replace(v, 'R\$\s?-?[0-9][0-9.,]*', 'R$ :valor', 'g');
-  v := regexp_replace(v, '\+?\(?[0-9]{2,3}\)?[\s.-]?9?[0-9]{4}[\s.-]?[0-9]{4}', ':n', 'g');
   v := regexp_replace(v, '[0-9]{8,}', ':n', 'g');
+  v := regexp_replace(v, '\+?\(?[0-9]{2,3}\)?[\s.-]?9?[0-9]{4}[\s.-]?[0-9]{4}', ':n', 'g');
   return nullif(btrim(left(v, greatest(p_max, 0))), '');
 end $$;
 revoke execute on function public.erro_limpar(text, integer) from public, anon, authenticated;
