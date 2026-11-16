@@ -18,6 +18,7 @@ import { FolhaOcorrencia, OcorrenciasDoCartao } from "@/components/gestao/casa/o
 import { FolhaQuemPodeBuscar, lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { decidirAtraso, FolhaTaxaDeAtraso, fraseDoAtraso, lerAtraso, lerAtrasosPendentes, type AtrasoPendente } from "@/components/gestao/creche/atraso";
 import Chamada from "@/components/gestao/creche/chamada";
+import { BotaoCorrigirHoras, FolhaCorrigirHoras, usePodeCorrigirHoras } from "@/components/gestao/creche/corrigir-horas";
 import Cobrancas from "@/components/gestao/creche/cobrancas";
 import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
 import Mensalistas from "@/components/gestao/creche/mensalistas";
@@ -203,6 +204,9 @@ export default function CrecheHotel() {
   const [gerando, setGerando] = useState(false);
   const [mesCobranca, setMesCobranca] = useState(() => new Date());
   const [acertando, setAcertando] = useState<EstadiaCompleta | null>(null);
+  // corrigir a hora de chegada ou de saída (dono e quem cuida do financeiro), com o motivo anotado
+  const [horasDe, setHorasDe] = useState<EstadiaCompleta | null>(null);
+  const corrigeHoras = usePodeCorrigirHoras();
   const [cobrando, setCobrando] = useState<EstadiaCompleta | null>(null);
   // mensalista que saiu depois do horário: a pergunta da taxa, só para quem recebe
   const [taxa, setTaxa] = useState<AtrasoPendente | null>(null);
@@ -660,6 +664,7 @@ export default function CrecheHotel() {
                         {!e.mensalista && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setEditando(e); }}><Pencil /> Editar</button>}
                         {comOcorrencias && pet && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setOcorrenciaDe(e); }}><ShieldAlert /> Ocorrência</button>}
                         {comPortaria && pet && <button className="g-btn fantasma p" onClick={() => setAutorizadosDe(e)}><ShieldCheck /> Quem busca</button>}
+                        {corrigeHoras && <BotaoCorrigirHoras nome={pet?.nome ?? "pet"} aoTocar={() => setHorasDe(e)} />}
                         {e.mensalista
                           ? <button className="g-btn verde p" style={{ marginLeft: "auto" }} disabled={ocupado === e.id} onClick={() => sair(e)}><LogOut /> Saiu</button>
                           : <button className="g-btn verde p" style={{ marginLeft: "auto" }} onClick={() => sair(e)}><LogOut /> Check-out</button>}
@@ -756,6 +761,7 @@ export default function CrecheHotel() {
                         {e.status === "cancelada"
                           ? <span className="g-tag vermelho">cancelada</span>
                           : <Cobrado e={e} />}
+                        {corrigeHoras && e.status === "encerrada" && <BotaoCorrigirHoras nome={e.pets?.nome ?? "pet"} aoTocar={() => setHorasDe(e)} />}
                         {vejoFinanceiro && e.status === "encerrada" && !e.mensalista && (
                           <button className={`g-btn p ${estadiaSemCobranca(e) ? "sec" : "fantasma"}`} onClick={(ev) => { ev.stopPropagation(); if (somenteLeitura()) return; if (estadiaSemCobranca(e)) setCobrando(e); else setAcertando(e); }}
                             aria-label={`${estadiaSemCobranca(e) ? "Receber" : "Corrigir"} a estadia de ${e.pets?.nome ?? "pet"}`}>{estadiaSemCobranca(e) ? <><HandCoins />Receber</> : <Pencil />}</button>
@@ -772,6 +778,7 @@ export default function CrecheHotel() {
 
       {ver === "casa" && dados && !tudoVazio && souDono && <div style={{ marginTop: 20 }}><LinkCrecheHotel titulo="Pedidos pelo link do cliente" /></div>}
       {(ver === "casa" || ver === "ocupacao") && dados && souDono && <p style={{ marginTop: 16 }}><Link className="g-btn fantasma p" href="/gestao/app/meu-petshop#opcoes-hotel"><Settings2 />{usaCreche && usaHotel ? "Opções do hotel e da creche" : usaHotel ? "Opções do hotel" : "Opções da creche"}</Link></p>}
+      {horasDe && <FolhaCorrigirHoras key={horasDe.id} estadia={horasDe} aoFechar={() => setHorasDe(null)} />}
       {acertando && <AcertarEstadia key={acertando.id} estadia={acertando} aoFechar={() => setAcertando(null)} aoGravar={() => { setAcertando(null); mudou(); }} />}
       {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} experienciaInicial={nova.experiencia} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} saidaInicial={nova.saida} horaInicial={nova.hora ?? undefined} saidaHoraInicial={nova.saidaHora ?? undefined} abertas={abertas} doTutor={doTutor}
         aoFechar={() => setNova(null)} aoGravar={(emCasa) => {

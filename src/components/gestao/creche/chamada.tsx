@@ -15,6 +15,7 @@ import { AvatarPet, avisarMudanca, Esqueleto, Folha, ok, useAvisos, useDados, us
 import { FolhaTaxaDeAtraso, lerAtraso, type AtrasoPendente } from "./atraso";
 import { DiasDoPlano } from "./resumo-mes";
 import { anotarFaltaAvisada } from "./falta-avisada";
+import { BotaoCorrigirHoras, FolhaCorrigirHoras, usePodeCorrigirHoras } from "./corrigir-horas";
 import "./creche.css";
 import "@/components/gestao/hotel/hotel.css";
 
@@ -69,6 +70,9 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
   // com "Quem pode buscar" ligado, o Saiu pergunta antes quem levou o pet
   const comPortaria = portariaLigada(petshop);
   const [buscando, setBuscando] = useState<LinhaChamada | null>(null);
+  // corrigir a hora de chegada ou de saída (dono e quem cuida do financeiro)
+  const corrigeHoras = usePodeCorrigirHoras();
+  const [horasDe, setHorasDe] = useState<LinhaChamada | null>(null);
   // saída fora do horário: a pergunta da taxa, só para quem recebe
   const [taxa, setTaxa] = useState<AtrasoPendente | null>(null);
   const valorDaTaxa = vejoFinanceiro && calendario?.atraso.ativo ? calendario.atraso.creche.valor : null;
@@ -254,6 +258,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
                           {l.presenca?.mensalista ? (
                             <>
                               <button className="g-btn sec" disabled={trava} onClick={() => { if (comPortaria && ehHoje && l.presenca) { if (!somenteLeitura()) setBuscando(l); } else fazer("saiu"); }}><DoorOpen />Saiu</button>
+                              {corrigeHoras && <BotaoCorrigirHoras nome={pet.nome} aoTocar={() => setHorasDe(l)} />}
                               <button className="g-btn fantasma p" disabled={trava} onClick={() => fazer("desfazer")} aria-label={`Desfazer a chegada de ${pet.nome}`}><Undo2 />Desfazer</button>
                             </>
                           ) : <span className="g-muted g-pp">saída pelo cartão, em Casa agora</span>}
@@ -262,6 +267,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
                       {l.estado === "saiu" && (
                         <>
                           <span className="g-tag">{ehHoje && l.presenca?.saida ? `saiu às ${horaCurta(l.presenca.saida)}` : "veio"}{l.presenca && dados.retiradas.get(l.presenca.id) ? ` ${textoDaRetirada(dados.retiradas.get(l.presenca.id)!)}` : ""}</span>
+                          {corrigeHoras && l.presenca && <BotaoCorrigirHoras nome={pet.nome} aoTocar={() => setHorasDe(l)} />}
                           {l.presenca?.mensalista && <button className="g-btn fantasma p" disabled={trava} onClick={() => fazer("desfazer")} aria-label={`Desfazer a ${ehHoje ? "saída" : "presença"} de ${pet.nome}`}><Undo2 />Desfazer</button>}
                         </>
                       )}
@@ -301,6 +307,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
         </>
       )}
 
+      {horasDe?.presenca && <FolhaCorrigirHoras key={horasDe.presenca.id} estadia={{ ...horasDe.presenca, pets: horasDe.plano.pets }} aoFechar={() => setHorasDe(null)} />}
       {buscando?.presenca && <QuemBuscou key={buscando.presenca.id} estadia={{ id: buscando.presenca.id, pets: buscando.plano.pets }} aoFechar={() => setBuscando(null)}
         aoSeguir={async () => { const l = buscando; setBuscando(null); await marcar(l.plano, "saiu"); }} />}
       {taxa && valorDaTaxa && <FolhaTaxaDeAtraso key={taxa.estadia_id} atraso={taxa} valor={valorDaTaxa} aoFechar={() => { setTaxa(null); avisarMudanca(); }} aoDecidir={() => { setTaxa(null); avisarMudanca(); }} />}
