@@ -532,6 +532,8 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "O pet passa a aparecer em Na casa agora.",
+      "Reserva para um dia que ainda não chegou: ao tocar em Check-in, o sistema pergunta antes (A reserva era para tal dia. Fazer o check-in hoje e recalcular as diárias?). Confirmando, a entrada passa a ser agora.",
+      "Fez o check-in sem querer? No mesmo dia, o cartão do pet em Na casa agora mostra Check-in feito hoje e o botão Desfazer check-in: a estadia volta para Reservas, com a data e a hora de antes. Nada de dinheiro muda (o sinal continua como estava). No outro dia, acerte a data em Editar.",
       "Reserva de um dia que já passou: ao tocar em Check-in, o sistema pergunta Quando ele chegou? Toque em Chegou em (o dia reservado) se o pet veio no dia combinado e só faltou anotar: a estadia fica com as datas da reserva. Toque em Chegou agora se ele está chegando só agora.",
       "Diária em R$ 0,00 vira cortesia: o sistema pede confirmação.",
       { so: ["creche"], texto: "Mensalista da creche não entra por aqui: a chegada é um toque em Chegou, na Chamada." },
@@ -544,6 +546,7 @@ const BASE: TopicoBase[] = [
       "Confira o número de Diárias.",
       "Se o pet tem pacote com saldo, aparece Como fica a conta: escolha Cobrar a diária ou Usar 1 do pacote.",
       "Em Tem mais alguma coisa na conta?, quem cuida do caixa toca em Outro extra para somar um valor a mais. Quem vende produtos também busca o produto: ele sai do estoque.",
+      "Espere a conta aparecer: enquanto o sistema busca o sinal, os descontos, o crédito e o que o tutor deve, a folha mostra Carregando a conta e o botão de receber fica apagado. Assim o valor nunca aparece cheio antes do desconto.",
       "Confira o Valor a receber. Dá para mudar o valor na mão.",
       "Se o tutor ainda deve alguma conta, ela aparece em ainda deve, com a pergunta receber junto? Marque para dar baixa nela neste mesmo pagamento.",
       "Escolha Paga agora e a forma de pagamento, ou Cliente paga depois.",
@@ -557,6 +560,8 @@ const BASE: TopicoBase[] = [
       { so: ["hotel"], texto: "Dois pets do mesmo tutor buscados juntos: a taxa de busca fora do horário entra na conta do primeiro. No segundo, a folha avisa que já foi cobrada e vem marcado Não cobrar de novo." },
       "Quem não cuida do caixa toca em Fazer check-out: a estadia encerra e a cobrança fica na lista Check-outs para cobrar, para quem cuida do caixa.",
       "Se a taxa de busca fora do horário está ligada e o pet saiu depois da hora, a folha pergunta se a taxa entra na conta: toque em Cobrar ou em Não cobrar a taxa. Sem escolher, a conta não fecha.",
+      "Se a internet falhar e a conta não carregar inteira, a folha avisa e mostra Tentar de novo. Nada é cobrado sem a conta completa.",
+      "O sistema confere o valor com o que já foi pago: se o valor a receber, somado ao sinal já pago e ao crédito usado, passar do total da estadia, nada é gravado e a folha mostra a conta certa.",
       "Reserva com sinal: o sinal aparece numa linha própria e sai da conta sozinho. O que foi pago a mais nunca vira acréscimo: o comprovante mostra o total da estadia, o que foi pago antes e o que foi devolvido ou ficou de crédito.",
       { so: ["hotel"], texto: "Com temporada, preço de feriado ou desconto do segundo pet ligados, toque em ver noite por noite para conferir a diária de cada noite." },
       "Depois, em Histórico, toque na estadia para ver a conta como foi cobrada e mandar o comprovante de novo.",
@@ -876,7 +881,8 @@ const BASE: TopicoBase[] = [
     passos: [
       "Abra Meu pet shop e vá até o cartão Feriados e dias fechados.",
       "Escolha a Data e, se quiser, escreva um Nome (Natal, folga da equipe).",
-      "Deixe marcado Fechado: não atendemos nesse dia. Quem tem hotel também pode marcar Conta como feriado no preço do hotel.",
+      "Marque Fechado: não atendemos nesse dia, se vocês não abrem. Quem tem hotel também pode marcar Conta como feriado no preço do hotel.",
+      { so: ["hotel"], texto: "Quem só tem hotel já encontra marcado Conta como feriado no preço do hotel, sem Fechado: o hotel recebe pets no feriado. Antes de colocar os feriados nacionais, a confirmação diz se eles entram como dia fechado ou não." },
       "Toque em Colocar na lista.",
       "Para não digitar um por um, toque em Colocar os feriados nacionais e confirme: entram os que ainda vão acontecer neste ano e no próximo.",
       "Para tirar uma data, toque na lixeira ao lado dela.",
@@ -986,6 +992,7 @@ const BASE: TopicoBase[] = [
     passos: [
       "O dono abre Meu pet shop e, no cartão Link de agendamento, liga a chave do link.",
       "Logo abaixo, em Pelo link, o cliente também pode pedir, o dono marca Vaga na creche e Vaga no hotel. As mesmas opções ficam no fim da tela Creche e hotel, em Casa agora.",
+      "Quem não tem serviço de banho e tosa ativo e liga o link pela primeira vez já sai com Vaga no hotel (e Vaga na creche, se faz creche) marcada, para o link não abrir sem opções. Dá para desmarcar ali.",
       "Mande o link para o cliente: em Meu pet shop, toque em Copiar link ou em Mandar no WhatsApp.",
       "Quando o pedido chegar, ele aparece em Pedidos pelo link, na tela Hoje e na Agenda.",
       "Toque em Aceitar ou em Recusar.",
