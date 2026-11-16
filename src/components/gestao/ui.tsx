@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { Cat, Dog, PawPrint, Search, X } from "lucide-react";
 import { fotoPet } from "@/lib/gestao/supabase";
 import type { PetComTutor } from "@/lib/gestao/tipos";
-import { corDoNome, iniciais, lerValor, semAcento, valor2 } from "@/lib/gestao/util";
+import { corDoNome, iniciais, lerValorEstrito, semAcento, valor2 } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { contaSoConsulta, useGestao } from "./contexto";
 import { registrarErroMostrado } from "@/lib/gestao/erros-navegador";
@@ -366,27 +366,74 @@ export function Campo({ rotulo, dica, erro, children }: { rotulo: string; dica?:
   );
 }
 
-/** Aviso de quando alguém digita o sinal de menos num campo de valor (o sinal é tirado). */
-export const AVISO_SEM_MENOS = "Valor não leva sinal de menos: tirei o sinal. Dinheiro que sai é lançado como saída.";
+/** Aviso antigo de quando alguém digitava o sinal de menos (hoje o campo mostra o erro e trava o salvar). */
+export const AVISO_SEM_MENOS = "Valor não leva sinal de menos. Dinheiro que sai é lançado como saída.";
 
-/** Campo de dinheiro: aceita "60", "60,50" ou "1.200,00" e devolve número (ou null). Não aceita sinal de menos. */
-export function CampoValor({ valor, aoMudar, placeholder = "0,00", autoFocus, id }: {
-  valor: number | null; aoMudar: (v: number | null) => void; placeholder?: string; autoFocus?: boolean; id?: string;
-}) {
-  const [texto, setTexto] = useState(valor == null ? "" : valor2(valor));
+/**
+ * Trava do salvar com dinheiro digitado errado, para o app inteiro: um toque num botão de gravar (laranja, verde ou
+ * `data-gravar`) dentro da mesma folha, formulário ou cartão de um campo de valor com erro não chega ao formulário;
+ * o campo ruim ganha o foco e o aviso continua embaixo dele. Assim nenhum formulário salva um valor que a pessoa não quis.
+ */
+let travaInstalada = false;
+function instalarTravaDeValor() {
+  if (travaInstalada || typeof document === "undefined") return;
+  travaInstalada = true;
+  const ruimPerto = (el: Element): HTMLElement | null => {
+    const lugar = el.closest(".g-folha") ?? el.closest("form") ?? el.closest(".g-card");
+    return (lugar?.querySelector('[data-valor-ruim="1"]') as HTMLElement | null) ?? null;
+  };
+  const segurar = (e: Event, ruim: HTMLElement) => {
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    ruim.focus(); ruim.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    ruim.classList.remove("tremer"); void ruim.offsetWidth; ruim.classList.add("tremer");
+  };
+  document.addEventListener("click", (e) => {
+    const bt = (e.target as Element | null)?.closest?.("button, [role=button]");
+    if (!bt || !bt.matches(".g-btn.pri, .g-btn.verde, [data-gravar]") || bt.closest(".g-folha-sair")) return;
+    const ruim = ruimPerto(bt);
+    if (ruim) segurar(e, ruim);
+  }, true);
+  document.addEventListener("submit", (e) => {
+    const f = e.target as HTMLFormElement | null;
+    const ruim = f?.querySelector?.('[data-valor-ruim="1"]') as HTMLElement | null;
+    if (ruim) segurar(e, ruim);
+  }, true);
+}
+
+/**
+ * O texto de um campo de dinheiro: guarda o que a pessoa digitou (sem tirar nada em silêncio), lê de forma estrita e diz o erro.
+ * Com erro, o valor passado adiante é null e a trava acima segura o salvar.
+ */
+export function useCampoDeValor(valor: number | null, aoMudar: (v: number | null) => void, formatar: (n: number) => string, negativo?: boolean) {
+  const [texto, setTexto] = useState(valor == null ? "" : formatar(valor));
+  const [erro, setErro] = useState<string | null>(null);
   const ultimo = useRef(valor);
-  const { avisar } = useAvisos();
+  useEffect(() => { instalarTravaDeValor(); }, []);
   useEffect(() => {
-    if (valor !== ultimo.current) { ultimo.current = valor; setTexto(valor == null ? "" : valor2(valor)); }
-  }, [valor]);
+    if (valor !== ultimo.current) { ultimo.current = valor; setTexto(valor == null ? "" : formatar(valor)); setErro(null); }
+  }, [valor, formatar]);
+  return {
+    texto, erro,
+    mudar: (t: string) => {
+      setTexto(t);
+      const r = lerValorEstrito(t, { negativo });
+      setErro(r.erro); ultimo.current = r.valor; aoMudar(r.valor);
+    },
+    sair: () => { if (!erro && ultimo.current != null) setTexto(formatar(ultimo.current)); },
+  };
+}
+
+export function CampoValor({ valor, aoMudar, placeholder = "0,00", autoFocus, id, negativo, rotulo }: {
+  valor: number | null; aoMudar: (v: number | null) => void; placeholder?: string; autoFocus?: boolean; id?: string; negativo?: boolean; rotulo?: string;
+}) {
+  const c = useCampoDeValor(valor, aoMudar, valor2, negativo);
   return (
-    <input id={id} className="g-input g-tab" inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={texto}
-      onChange={(e) => {
-        const limpo = e.target.value.replace(/-/g, "");
-        if (limpo !== e.target.value) avisar(AVISO_SEM_MENOS);
-        setTexto(limpo); const n = lerValor(limpo); ultimo.current = n; aoMudar(n);
-      }}
-      onBlur={() => { if (ultimo.current != null) setTexto(valor2(ultimo.current)); }} />
+    <>
+      <input id={id} className={`g-input g-tab${c.erro ? " ruim" : ""}`} inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={c.texto}
+        aria-label={rotulo} aria-invalid={c.erro ? true : undefined} data-valor-ruim={c.erro ? "1" : undefined}
+        onChange={(e) => c.mudar(e.target.value)} onBlur={c.sair} />
+      {c.erro && <small className="erro g-valor-erro" role="alert">{c.erro}</small>}
+    </>
   );
 }
 

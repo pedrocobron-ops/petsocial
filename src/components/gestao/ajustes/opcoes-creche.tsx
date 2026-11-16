@@ -6,6 +6,7 @@ import {
   experienciaDe, extratoDoPetLigado, OPCAO_DESCONTO_IRMAO, OPCAO_EXPERIENCIA, OPCAO_EXPERIENCIA_PRECO, OPCAO_EXTRATO_PET, precoDaExperiencia, regraIrmaoDe,
   type RegraIrmao,
 } from "@/lib/gestao/creche";
+import { AVISO_VALOR_RUIM, lerValor } from "@/lib/gestao/util";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
 import { useGestao } from "../contexto";
@@ -29,7 +30,7 @@ function Opcao({ titulo, frase, ligada, aoMudar, children }: { titulo: string; f
     </div>
   );
 }
-const lerNumero = (s: string) => { const n = Number(s.replace(",", ".")); return s.trim() && Number.isFinite(n) && n > 0 ? n : null; };
+const lerNumero = (s: string) => { const n = lerValor(s); return n != null && n > 0 ? n : null; };
 
 export default function OpcoesCreche() {
   const { sb, petshop, souDono, recarregarBase } = useGestao();
@@ -105,8 +106,8 @@ export default function OpcoesCreche() {
             <button type="button" aria-pressed={irmao.tipo === "reais"} onClick={() => m(setIrmao)({ ...irmao, tipo: "reais" })}>Em R$</button>
           </div>
           <div className="dupla">
-            <Campo rotulo={irmao.tipo === "pct" ? "Desconto (%)" : "Desconto (R$ por mês)"}>
-              <input className="g-input g-tab" inputMode="decimal" value={textoIrmao} placeholder={irmao.tipo === "pct" ? "%" : "0,00"} aria-label="Valor do desconto para irmãos"
+            <Campo rotulo={irmao.tipo === "pct" ? "Desconto (%)" : "Desconto (R$ por mês)"} erro={textoIrmao.trim() && lerValor(textoIrmao) == null ? (irmao.tipo === "pct" ? "Confira: use só números, ex.: 10" : AVISO_VALOR_RUIM) : null}>
+              <input className="g-input g-tab" inputMode="decimal" value={textoIrmao} data-valor-ruim={textoIrmao.trim() && lerValor(textoIrmao) == null ? "1" : undefined} placeholder={irmao.tipo === "pct" ? "%" : "0,00"} aria-label="Valor do desconto para irmãos"
                 onChange={(e) => { setTextoIrmao(e.target.value); m(setIrmao)({ ...irmao, valor: lerNumero(e.target.value) }); }} />
             </Campo>
             <label className="g-campo"><span>Quem paga a mensalidade cheia</span>

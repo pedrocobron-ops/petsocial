@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Lock, Plus, Split, Trash2 } from "lucide-react";
 import { caixaAberto, formaPrincipal, ultimoContado, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
-import { brl, isoDia, lerValor, somaDias } from "@/lib/gestao/util";
+import { brl, isoDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
-import { AVISO_SEM_MENOS, avisarMudanca, useAvisos, useDados } from "../ui";
+import { avisarMudanca, useAvisos, useCampoDeValor, useDados } from "../ui";
 import "./loja.css";
 import "../financeiro/recebimentos.css";
 
@@ -355,24 +355,14 @@ const duasCasas = (n: number) => brl(n).replace("R$", "").trim();
 export function CampoDinheiro({ valor, aoMudar, placeholder = "0,00", autoFocus, id, desligado, rotulo, maximo = VALOR_MAXIMO }: {
   valor: number | null; aoMudar: (v: number | null) => void; placeholder?: string; autoFocus?: boolean; id?: string; desligado?: boolean; rotulo?: string; maximo?: number;
 }) {
-  const [texto, setTexto] = useState(valor == null ? "" : duasCasas(valor));
-  const ultimo = useRef(valor);
-  const { avisar } = useAvisos();
-  useEffect(() => {
-    if (valor !== ultimo.current) { ultimo.current = valor; setTexto(valor == null ? "" : duasCasas(valor)); }
-  }, [valor]);
+  const c = useCampoDeValor(valor, aoMudar, duasCasas);
   return (
-    <input id={id} className="g-input g-tab" inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={texto} disabled={desligado} aria-label={rotulo}
-      aria-invalid={valor != null && valor > maximo ? true : undefined}
-      onChange={(e) => {
-        const limpo = e.target.value.replace(/-/g, "");
-        if (limpo !== e.target.value) avisar(AVISO_SEM_MENOS);
-        setTexto(limpo);
-        const n = lerValor(limpo);
-        ultimo.current = n;
-        aoMudar(n);
-      }}
-      onBlur={() => { if (ultimo.current != null) setTexto(duasCasas(ultimo.current)); }} />
+    <>
+      <input id={id} className={`g-input g-tab${c.erro ? " ruim" : ""}`} inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={c.texto} disabled={desligado} aria-label={rotulo}
+        aria-invalid={c.erro || (valor != null && valor > maximo) ? true : undefined} data-valor-ruim={c.erro ? "1" : undefined}
+        onChange={(e) => c.mudar(e.target.value)} onBlur={c.sair} />
+      {c.erro && <small className="erro g-valor-erro" role="alert">{c.erro}</small>}
+    </>
   );
 }
 
@@ -456,9 +446,9 @@ export function Chips<T extends string>({ opcoes, valor, aoMudar }: {
 /** Lê uma quantidade digitada ("10", "2,5"). Devolve null se não for número positivo ou zero. */
 export function lerQtd(s: string): number | null {
   const t = s.trim().replace(/\s/g, "").replace(",", ".");
-  if (!t) return null;
+  if (!t || !/^\d+(\.\d+)?$/.test(t)) return null;
   const n = Number(t);
-  return Number.isFinite(n) && n >= 0 ? Math.round(n * 1000) / 1000 : null;
+  return Number.isFinite(n) ? Math.round(n * 1000) / 1000 : null;
 }
 
 /** "10", "2,5", "0,125" */

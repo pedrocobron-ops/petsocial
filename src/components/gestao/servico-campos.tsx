@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Banco } from "@/lib/gestao/supabase";
 import { AREAS_DE_SERVICO, type AreaDoServico } from "@/lib/gestao/modulos";
-import { lerValor, valor2 } from "@/lib/gestao/util";
+import { lerValor, lerValorEstrito, valor2 } from "@/lib/gestao/util";
 import { CORES } from "./ajustes/grade-horario";
 import { ok } from "./ui";
 import "./ajustes/ajustes.css";
@@ -35,11 +35,10 @@ export function umPrecoSo(s: Precos): Precos {
 export function erroDoPreco(texto: string): string | null {
   const t = texto.trim();
   if (!t) return null;
-  if (!/^(R\$)?\s*-?[\d.,\s]+$/.test(t)) return "use só números";
-  const n = lerValor(t);
-  if (n == null) return "use só números";
-  if (n < 0) return "não pode ser negativo";
-  if (n > 99999) return "valor alto demais";
+  const r = lerValorEstrito(t, { negativo: true });
+  if (r.erro || r.valor == null) return "use só números, ex.: 50,00";
+  if (r.valor < 0) return "não pode ser negativo";
+  if (r.valor > 99999) return "valor alto demais";
   return null;
 }
 

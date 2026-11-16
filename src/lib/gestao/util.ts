@@ -133,12 +133,47 @@ export function precoMudaComPorte(s: Pick<Servico, "preco_p" | "preco_m" | "prec
 /** Anotação que acompanha o horário quando a pessoa marca sem saber o porte. */
 export const NOTA_PORTE = "Conferir o porte e o valor na hora.";
 
-/** Lê "1.234,56", "60", "60,5" ou "R$ 60" como número. */
-export function lerValor(s: string): number | null {
-  const limpo = s.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");
-  if (!limpo) return null;
-  const n = Number(limpo);
-  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+/** Aviso único para dinheiro digitado errado (embaixo do campo, e o salvar fica travado até arrumar). */
+export const AVISO_VALOR_RUIM = "Confira o valor: use só números, ex.: 520,00";
+export const AVISO_VALOR_NEGATIVO = "Confira o valor: não pode ser negativo.";
+
+/**
+ * Leitura estrita de dinheiro digitado: só números, uma vírgula (ou ponto) para os centavos com até 2 casas e, se quiser,
+ * pontos de milhar ("1.234,56"). Aceita "R$" na frente e espaços nas pontas. Letra no meio nunca é tirada em silêncio:
+ * "abc-5" e "52o,00" são recusados (devolve `erro`). Texto vazio é `valor: null` sem erro. Menos só com `negativo`.
+ */
+export function lerValorEstrito(s: string, opcoes?: { negativo?: boolean }): { valor: number | null; erro: string | null } {
+  let t = (s ?? "").trim().replace(/^R\$\s*/i, "");
+  if (!t) return { valor: null, erro: null };
+  let sinal = 1;
+  if (t.startsWith("-")) {
+    if (!opcoes?.negativo) return { valor: null, erro: /^-\s*(\d[\d.]*)(?:[,.]\d{0,2})?$/.test(t) ? AVISO_VALOR_NEGATIVO : AVISO_VALOR_RUIM };
+    sinal = -1; t = t.slice(1).trim();
+  }
+  let inteiro: string, centavos = "";
+  const comVirgula = /^(\d{1,3}(?:\.\d{3})+|\d+),(\d{0,2})$/.exec(t);
+  const milhar = /^\d{1,3}(?:\.\d{3})+$/.exec(t);
+  const comPonto = /^(\d+)(?:\.(\d{0,2}))?$/.exec(t);
+  if (comVirgula) { inteiro = comVirgula[1]; centavos = comVirgula[2]; }
+  else if (milhar) inteiro = t;
+  else if (comPonto) { inteiro = comPonto[1]; centavos = comPonto[2] ?? ""; }
+  else return { valor: null, erro: AVISO_VALOR_RUIM };
+  const n = Number(`${inteiro.replace(/\./g, "")}.${centavos || "0"}`);
+  if (!Number.isFinite(n)) return { valor: null, erro: AVISO_VALOR_RUIM };
+  return { valor: sinal * Math.round(n * 100) / 100, erro: null };
+}
+
+/** Lê "1.234,56", "60", "60,5" ou "R$ 60" como número. Texto com letra ou sinal fora do lugar dá null (nunca tira letra em silêncio). */
+export function lerValor(s: string, opcoes?: { negativo?: boolean }): number | null {
+  return lerValorEstrito(s, opcoes).valor;
+}
+
+/** Número simples digitado (porcentagem, quantidade): "10", "10,5", "0.25". Letra ou sobra dá null. */
+export function lerNumeroEstrito(s: string): number | null {
+  const t = (s ?? "").trim();
+  if (!/^\d+(?:[.,]\d+)?$/.test(t)) return null;
+  const n = Number(t.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
 }
 
 export function horarioDoDia(horario: unknown, d: Date) {
