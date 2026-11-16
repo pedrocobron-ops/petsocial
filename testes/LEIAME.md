@@ -73,6 +73,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `hotel.js`: **preço do hotel, banco × aplicativo**: ~740 noites comparadas (`hotel_noite` × `precoDasNoites`) com temporadas
   sobrepostas e empatadas, feriado nos três modos, segundo pet; estadia inteira (`hotel_previsto` × `contaDasDiarias`) com diária por porte;
   faixa de preço do link e "Esconder o preço".
+- `hotel-checkout.js`: check-out conferido com o que já foi pago (migração 20261181): receber na saída o total sem descontar o sinal
+  pago (ou o sinal a receber em parte) é recusado sem gravar nada (`maestro:passa_do_devido`); a conta certa, o acréscimo digitado, o
+  pago a mais virando crédito e a conta paga com o crédito passam; crédito + dinheiro acima do total é recusado. Desfazer check-in:
+  a data reservada fica guardada, a monitora desfaz no mesmo dia, tosador/estoque/anônimo não, de novo ou em outro dia não, o check-out apaga.
 - `link.js`: link do cliente anônimo: o que mostra, pedido de banho, chamada direta recusada, regras e aceite (texto e vacinas),
   hotel em dia fechado e fora do horário, dia de experiência, nada vira cliente antes de aceitar, link desligado, **freios de envio**
   (por WhatsApp, por rede, por loja; o teste põe os limites padrão em `config_interna` durante o teste e devolve os de antes).
@@ -106,6 +110,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `erros.js`: com `GESTAO_ERRO_TESTE=1`, a tela Hoje quebra de propósito (tela, erro solto, promessa) em 390 e 1366: tela
   "Opa, esta tela travou" com Tentar de novo e Voltar para Hoje e o menu, registro no banco (papel, tamanho da tela, versão, sem
   consulta) e a aba Erros do painel (agrupado, detalhes, filtros 24 h / 7 / 30 dias, marcar como resolvido e desfazer).
+- `checkout-lento.js`: check-out do hotel com a leitura do sinal atrasada 2,5 s (390 e 1366): enquanto carrega, a folha não mostra valor
+  e o botão fica apagado (clicar não grava); depois, "Receber R$ 2,75" (110 − sinal 107,25) e "Receber R$ 1,60" (80 − 20% do segundo
+  pet − sinal 62,40), uma entrada só cada.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 
