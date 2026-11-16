@@ -12,8 +12,9 @@ npx supabase start            # contêiner supabase_db_petsocial; o .env.local a
 
 # 2. Build e servidor (outra aba). GESTAO_LINK_IA_FALSO=1: o "Tirar dúvidas do link" responde sem chamar o modelo.
 #    GESTAO_ERRO_TESTE=1: liga o gatilho de erro de propósito (tela Hoje com ?__erro_teste=…, rota /api/gestao/erro-teste).
+#    GESTAO_CADERNO_FALSO=1: "Trazer do caderno" devolve uma leitura fixa (caderno-ia.ts, leituraDeTeste) sem chamar o modelo.
 npx next build
-ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 npx next start -p 3214
+ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_CADERNO_FALSO=1 npx next start -p 3214
 
 # 3. Testes
 npm run test:banco       # unidade + banco/API + rotas do servidor   (~1,5 min)
@@ -62,6 +63,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `textos.js`: textos que as testadoras acharam confusos: o comprovante com parte da dívida antiga ("Pagou R$ 40,00 do que devia de
   antes (R$ 75,00); ainda deve R$ 35,00", sem repetir o resto; quitado; chamada antiga sem o total) e as iniciais sem as palavras
   pequenas ("Banho e Tosa" = BT, "Hotelzinho da Bia" = HB).
+- `caderno.js`: leitura do caderno ou do outro sistema (`caderno.ts`, `caderno-ia.ts`): datas como estão escritas ("12/10" sem ano:
+  para quem deve, a mais recente até hoje; na agenda, a mais perto de hoje), horas ("14h", "9h30"), a limpeza do que a IA devolve
+  (valor ilegível fica em branco com "Verificar", preço único espalhado pelos portes, próxima dose da carteirinha só quando escrita),
+  a leitura de teste, o esquema estrito (todo objeto fecha e pede todos os campos), o tipo do arquivo pelos bytes e as páginas do PDF.
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
@@ -115,6 +120,15 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `divida-caderno.js`: dívida trazida do caderno (migração 20261186, `lancamentos.devido_desde`): dono e recepção anotam com o dia
   em que começou; o banco recusa dia depois de hoje, valor já recebido, saída, antes de 2000 e o tosador; anotar não vira dinheiro em
   dia nenhum; receber uma parte entra hoje, no caixa, e a conta segue "desde" o dia do caderno; a dona corrige o dia depois.
+- `caderno.js`: rota `/api/gestao/caderno` com a leitura de teste e o freio `caderno_contar` (migração 20261188). Papéis: sem login 401,
+  sem Clientes (estoque) 403, Quem me deve só com dinheiro, Agenda só com a área Agenda, Tabela de preços só o dono, carteirinha
+  com quem edita a saúde (monitora); "Não sei" tira o que a pessoa não pode trazer (com aviso) e nunca devolve carteirinha nem preços.
+  PDF do outro sistema lido e contando as páginas (o número do aparelho, menor, não vale). Recusados sem contar: planilha/texto (415),
+  ".jpg" que não é foto, PDF acima de 10 MB e de 25 páginas (413), 6 fotos ou 3 PDFs (400), sem arquivo. Limite do dia por pet shop
+  (`caderno_dia`, padrão 30; a contagem da loja sobe até faltar uma) com quanto resta, e o geral (`caderno_dia_geral`, posto logo
+  acima do lido hoje durante o teste e devolvido); ninguém lê a tabela de uso e ela não tem texto. Dívida com "desde" pelo mesmo
+  `lancarAReceber` da tela, duas vezes ao mesmo tempo com a mesma chave: uma conta só; o tosador não anota. Precisa do servidor com
+  `GESTAO_CADERNO_FALSO=1`.
 - `visitas.js`: última visita de cada pet: a função do banco (`visitas_dos_pets`) = a conta do navegador, para o dono e para o tosador.
 - `velocidade.js`: abrir o aplicativo numa ida só ao banco (migração 20261185): `lerBase` (`gestao_base`) = a leitura antiga parte por
   parte (`lerPetshop` + `lerEquipe` + `lerServicos`) para dono, recepção, monitora, tosador e estoque, com meta, diárias, opções com valor,
@@ -146,6 +160,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   nenhum botão de cobrar, concluir ou usar o pacote (só "Carregando a conta"; Cliente confirmou continua); depois, o pacote primeiro,
   o aviso do que o tutor deve de antes e "Cobrar à parte, sem usar o pacote · R$ 50,00". Com a leitura falhando: nada de cobrar,
   só "Tentar de novo", que traz a conta inteira.
+- `caderno.js`: Trazer do caderno pela tela, com a leitura de teste (`GESTAO_CADERNO_FALSO=1`). 390: Clientes → Foto do caderno →
+  "Não sei, descubra" → foto → a conferência (nada salvo ainda; Ana Souza "Já existe" com "Juntar com a ficha" marcado e o Thor "só
+  completa"; Marta "Verificar: sem telefone"; Beto devendo desde 12/10; total R$ 85,00; horário de dia que já passou fora) → dois
+  toques em "Salvar 5 itens": Ana uma ficha só (ganha a Pipoca), Marta e Joana novas, R$ 35 do Beto a receber com `devido_desde`,
+  R$ 50 da Joana sem data, nada no caixa, Thor marcado no dia +3 às 10:00 uma vez só. 1366: Tabela de preços ("Atualizar o preço de
+  Banho M de R$ 60,00 para R$ 55,00?", Hidratação "Igual ao que já está", Banho de ofurô novo: no banco, só o M muda e o novo entra
+  uma vez) e "Ler a carteirinha" do Thor (Antirrábica em branco com "Definir vencimento"; três cuidados uma vez só, com a
+  veterinária nas observações). Capturas em `testes/saida/caderno-*.png`.
 - `mozart-fila.js`: escrever enquanto o Mozart responde (o servidor do Mozart vira um roteiro lento com `page.route`): depois do
   "Pode fazer", o Enter põe a mensagem na conversa com "Na fila" e ela vai sozinha, uma vez, quando ele termina; se a resposta trouxer
   um cartão para confirmar, a mensagem volta para a caixa com o aviso e o cartão não é descartado.

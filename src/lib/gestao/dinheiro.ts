@@ -175,6 +175,8 @@ export async function gravarMovimentos(sb: Banco, petshopId: string, linhas: Lin
 export async function lancarAReceber(sb: Banco, petshopId: string, l: {
   valor: number; vencimento: string; categoria: string; descricao?: string | null; agendamentoId?: string | null; clienteId?: string | null;
   itens?: ItemLancamento[] | null;
+  /** Dívida trazida do caderno: o dia em que o cliente passou a dever (só mostra "desde"; não muda o dinheiro). */
+  devidoDesde?: string | null;
   /** Chave da operação: grava uma vez só (veja `lancarPago`). */
   chave?: string | null;
 }) {
@@ -184,6 +186,7 @@ export async function lancarAReceber(sb: Banco, petshopId: string, l: {
     data: l.vencimento, vencimento: l.vencimento, pago: false,
     agendamento_id: l.agendamentoId ?? null, cliente_id: l.clienteId ?? null, origem: "tela", criado_por: u.user?.id ?? null,
     ...(l.itens?.length ? { itens: l.itens } : {}),
+    ...(l.devidoDesde ? { devido_desde: l.devidoDesde } : {}),
   }, l.chave);
   if (error?.code === "23505") throw new Error("Este atendimento já tem recebimento lançado. Atualize a tela para ver.");
   if (error) throw new Error(error.message);

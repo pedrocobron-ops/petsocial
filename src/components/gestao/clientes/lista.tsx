@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Importar, { UltimaImportacao } from "@/components/gestao/importar";
-import { AlertTriangle, Cat, ChevronRight, Dog, Download, HandCoins, MessageCircle, PawPrint, Phone, PiggyBank, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
+import FotoCaderno from "@/components/gestao/caderno";
+import { AlertTriangle, Cat, ChevronRight, Dog, Camera, Download, HandCoins, MessageCircle, PawPrint, Phone, PiggyBank, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { brl, fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
 import { buscarVisitas, sumiu } from "@/lib/gestao/visitas";
@@ -81,6 +82,7 @@ export default function Lista({ aoAbrir, irPara }: {
   const [petNovo, setPetNovo] = useState(false);
   const [tutorNovo, setTutorNovo] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [caderno, setCaderno] = useState(false);
   const [versaoImportacao, setVersaoImportacao] = useState(0);
   // atalho "Cadastrar o primeiro pet" (guia, tela Hoje, primeiros passos): /gestao/app/clientes?novo=1 já abre o formulário
   useEffect(() => {
@@ -219,6 +221,7 @@ export default function Lista({ aoAbrir, irPara }: {
           {posso("clientes") && <button className="g-btn sec" onClick={() => setChamando(true)} disabled={!dados}><MessageCircle />Chamar de volta</button>}
           {listaInteira && <button className="g-btn sec" onClick={exportar} disabled={!dados}><Download />Exportar</button>}
           {listaInteira && <button className="g-btn sec" onClick={() => setImportando(true)}><Upload />Trazer de planilha</button>}
+          {posso("clientes") && <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setCaderno(true); }}><Camera />Foto do caderno</button>}
           <button className="g-btn pri" onClick={abrirPetNovo}><Plus />Pet novo</button>
         </div>
       </header>
@@ -389,6 +392,7 @@ export default function Lista({ aoAbrir, irPara }: {
       )}
 
       {chamando && <ChamarDeVolta aoFechar={() => setChamando(false)} />}
+      {caderno && <FotoCaderno tipoInicial="clientes" aoFechar={() => setCaderno(false)} aoTerminar={() => void recarregar()} />}
       {importando && listaInteira && <Importar tipo="clientes" aoFechar={() => { setImportando(false); setVersaoImportacao((v) => v + 1); }} aoTerminar={() => void recarregar()} />}
       {petNovo && (
         <FormPet nomeInicial={aba === "pets" && petsFiltrados.length === 0 ? q.trim() : undefined} aoFechar={() => setPetNovo(false)}

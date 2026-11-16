@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarDays, Check, Clock, FileSpreadsheet, ImagePlus, LayoutGrid, Link2, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Undo2, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BedDouble, BookOpen, Camera, CalendarDays, Check, Clock, FileSpreadsheet, ImagePlus, LayoutGrid, Link2, Minus, PawPrint, Plus, Scissors, Sparkles, Trash2, Undo2, Users, X } from "lucide-react";
 import type { Horario, Servico } from "@/lib/gestao/tipos";
 import { vagasDe } from "@/lib/gestao/agenda";
 import { areasDeServicoPara, artigoDe, categoriaDaArea, nomeDaCasa, usaModulo, type AreaDoServico } from "@/lib/gestao/modulos";
@@ -14,6 +14,7 @@ import { Tile } from "./painel";
 import { brl } from "@/lib/gestao/util";
 import { Campo, CampoValor, EVENTO_GUIA, abrirPersonalizarMenu, avisarMudanca, ok, useAvisos } from "./ui";
 import Importar from "./importar";
+import FotoCaderno from "./caderno";
 import { TEMAS, aplicarTema, enviarLogo, tirarLogo } from "@/lib/gestao/identidade";
 import { FalaMozart, PERGUNTAS, PreviaPainel, TrilhoBoasVindas, chaveBoasVindas, oQueDeixeiPronto } from "./boas-vindas";
 import { guardarLembrado, lerLembrado } from "./lembrado";
@@ -57,6 +58,7 @@ export default function GuiaInicial({ abrirAgora = false }: { /** a casca só ca
   const [aberto, setAberto] = useState(() => abrirAgora || !petshop.guia_feito_em);
   const [vez, setVez] = useState(0); // cada abertura começa do primeiro passo, com os dados de agora
   const [importando, setImportando] = useState(false);
+  const [caderno, setCaderno] = useState(false);
 
   useEffect(() => {
     const abrir = () => { setVez((v) => v + 1); setAberto(true); };
@@ -81,13 +83,14 @@ export default function GuiaInicial({ abrirAgora = false }: { /** a casca só ca
 
   return (
     <>
-      {visivel && <Guia key={vez} aoFechar={() => void fechar()} aoImportar={() => { void fechar(); setImportando(true); }} />}
+      {visivel && <Guia key={vez} aoFechar={() => void fechar()} aoImportar={() => { void fechar(); setImportando(true); }} aoCaderno={() => { void fechar(); setCaderno(true); }} />}
       {importando && <Importar tipo="clientes" aoFechar={() => setImportando(false)} aoTerminar={avisarMudanca} />}
+      {caderno && <FotoCaderno tipoInicial="clientes" aoFechar={() => setCaderno(false)} aoTerminar={avisarMudanca} />}
     </>
   );
 }
 
-function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () => void }) {
+function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImportar: () => void; aoCaderno: () => void }) {
   const { sb, petshop, eu, equipe, servicos, recarregarBase } = useGestao();
   const { avisarErro } = useAvisos();
   const banho = usaModulo(petshop, "banho_tosa"), creche = usaModulo(petshop, "creche"), hotel = usaModulo(petshop, "hotel");
@@ -138,6 +141,15 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
   // serviços que o dono acrescenta aqui: cartões em branco, gravados junto com os outros ao continuar
   const [servicosNovos, setServicosNovos] = useState<ServicoNovo[]>(() => rascunho?.servicosNovos ?? []);
   const [faltaNome, setFaltaNome] = useState(false);
+  // foto da tabela de preços: a leitura grava os serviços conferidos; depois, os cartões daqui mostram os preços novos
+  const [tabela, setTabela] = useState(false);
+  const [tabelaLida, setTabelaLida] = useState(false);
+  useEffect(() => {
+    if (!tabelaLida) return;
+    setTabelaLida(false);
+    setPrecos(servicosDaLista.map((s) => ({ ...s })));
+    setPorPorte((p) => ({ ...p, ...Object.fromEntries(servicosDaLista.map((s) => [s.id, comecaPorPorte(s)])) }));
+  }, [servicos, tabelaLida]); // eslint-disable-line react-hooks/exhaustive-deps
   const areasDoServico = areasDeServicoPara(petshop);
   const [diariaCreche, setDiariaCreche] = useState<number | null>(rascunho && "diariaCreche" in rascunho ? rascunho.diariaCreche ?? null : petshop.diaria_creche == null ? null : Number(petshop.diaria_creche));
   const [diariaHotel, setDiariaHotel] = useState<number | null>(rascunho && "diariaHotel" in rascunho ? rascunho.diariaHotel ?? null : petshop.diaria_hotel == null ? null : Number(petshop.diaria_hotel));
@@ -476,7 +488,11 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
           {atual === "servicos" && (
             <div className="g-pilha">
               {cabeca("O que vocês fazem e quanto custa?", "Já deixei os serviços mais comuns, sem preço: o valor é você quem coloca. Tire pela lixeira o que vocês não oferecem. Pode pôr só o preço do que mais sai (um banho, por exemplo) e deixar o resto em branco: você ajusta depois em Meu pet shop.")}
-              <div><button type="button" className="g-btn sec p" onClick={() => void pular()} disabled={salvando}>Pôr os preços depois</button></div>
+              <div className="g-fila">
+                <button type="button" className="g-btn sec p" onClick={() => setTabela(true)} disabled={salvando}><Camera />Tirar foto da tabela de preços</button>
+                <button type="button" className="g-btn sec p" onClick={() => void pular()} disabled={salvando}>Pôr os preços depois</button>
+              </div>
+              {tabela && <div className="g-cad-acima"><FotoCaderno tipoInicial="precos" aoFechar={() => setTabela(false)} aoTerminar={() => setTabelaLida(true)} /></div>}
               {!precos.length && <p className="g-guia-legenda">Nenhum serviço na lista ainda. Você cria os seus em Meu pet shop, em Serviços e preços.</p>}
               <div className="g-guia-servicos">
                 {naLista.map((s) => {
@@ -594,6 +610,7 @@ function Guia({ aoFechar, aoImportar }: { aoFechar: () => void; aoImportar: () =
               <div className="g-guia-proximos">
                 <Link className="g-btn pri" href="/gestao/app/clientes?novo=1" onClick={aoFechar}><PawPrint />Cadastrar o primeiro pet</Link>
                 <button type="button" className="g-btn sec" onClick={aoImportar}><FileSpreadsheet />Trazer meus clientes de uma planilha</button>
+                <button type="button" className="g-btn sec" onClick={aoCaderno}><Camera />Tirar foto do caderno</button>
                 <Link className="g-btn fantasma" href="/gestao/app/manual" onClick={aoFechar}><BookOpen />Ver o manual</Link>
                 <button type="button" className="g-btn fantasma" onClick={() => { aoFechar(); abrirPersonalizarMenu(); }}><LayoutGrid />Escolher o que aparece no menu</button>
               </div>

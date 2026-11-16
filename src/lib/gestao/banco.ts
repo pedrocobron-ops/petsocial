@@ -193,6 +193,26 @@ isOneToOne: false
       referencedColumns: ["id","petshop_id"]
     }
                   ]
+                },"caderno_uso": {
+                  Row: {
+                    "dia": string,"leituras": number,"paginas": number,"petshop_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "dia": string,"leituras"?: number,"paginas"?: number,"petshop_id": string
+                  }
+                  Update: {
+                    "dia"?: string,"leituras"?: number,"paginas"?: number,"petshop_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "caderno_uso_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"caixas": {
                   Row: {
                     "aberto_em": string,"aberto_por": string | null,"fechado_em": string | null,"fechado_por": string | null,"id": string,"obs": string | null,"petshop_id": string,"valor_contado": number | null,"valor_esperado": number | null,"valor_inicial": number
@@ -1891,6 +1911,9 @@ isOneToOne: false
                            },
 "avaliar_conversa":
 { Args: { "p_id": string,"p_pediu_equipe"?: boolean,"p_resolveu"?: boolean }; Returns: undefined
+                           },
+"caderno_contar":
+{ Args: { "p_paginas": number,"p_petshop": string }; Returns: Json
                            },
 "caixa_alteracoes":
 { Args: { "p_caixa": string }; Returns: number
