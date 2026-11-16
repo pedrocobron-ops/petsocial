@@ -50,6 +50,21 @@ const MSG = { tela: 'Erro de teste da tela (pode ignorar)', janela: 'Erro de tes
         T.ok(`${tipo}: registrado como ${tipo === 'janela' ? 'erro' : 'promessa'}`, q.length === 1 && q[0].tipo === (tipo === 'janela' ? 'erro' : 'promessa'), q);
         T.ok(`${tipo}: a tela segue funcionando`, !(await page.locator('[role=alert]', { hasText: 'esta tela travou' }).count()));
       }
+      T.secao('falha do banco mostrada na tela');
+      // a Agenda lê os horários; o banco "responde" um erro técnico: a tela avisa e o erro é registrado como do banco
+      await page.route('**/rest/v1/agendamentos*', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'XX000', message: 'falha de teste no banco zqx', details: null, hint: null }) }));
+      await N.ir(page, '/gestao/app/agenda', '.g-main');
+      const b = await esperar('[XX000] falha de teste no banco zqx');
+      T.ok('erro técnico do banco na tela: registrado como banco, com o código e a rota', b.length === 1 && b[0].tipo === 'banco' && b[0].rota === '/gestao/app/agenda', b);
+      await page.unroute('**/rest/v1/agendamentos*');
+      erros.splice(0, erros.length); // a falha de propósito acima aparece como HTTP 500 na lista de erros da página
+      await page.route('**/rest/v1/agendamentos*', (r) => r.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'P0001', message: 'Escolha um horário de teste zqx.', details: null, hint: null }) }));
+      await N.ir(page, '/gestao/app/agenda', '.g-main');
+      await page.waitForTimeout(1500);
+      T.ok('frase de regra do banco (feita para a pessoa) não é registrada', B.num(`select count(*) from erros_app where petshop_id='${L.P}' and mensagem like '%horário de teste zqx%'`) === 0);
+      await page.unroute('**/rest/v1/agendamentos*');
+      erros.splice(0, erros.length);
+
       T.secao('sem o gatilho, nada acontece');
       await N.ir(page, '/gestao/app', '.g-topo h1');
       T.ok('Hoje sem ?__erro_teste não registra nada', B.num(`select count(*) from erros_app where petshop_id='${L.P}' and mensagem like 'Erro de teste%' and tipo='tela'`) === 0);
