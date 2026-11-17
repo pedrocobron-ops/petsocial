@@ -562,8 +562,9 @@ const BASE: TopicoBase[] = [
       "O que não deu para ler aparece em O que não deu para ler com certeza. Nada é inventado: o que não foi lido fica em branco.",
     ],
     atencao: [
-      "As fotos e os arquivos servem só para a leitura: não ficam guardados em lugar nenhum.",
-      "Cada foto, print ou página de PDF conta uma leitura. Há um limite por dia (30 páginas); a tela mostra quantas ainda dá para ler hoje.",
+      "As fotos e os arquivos servem só para a leitura: não ficam guardados. PDF grande passa por uma pasta reservada e é apagado logo depois de ler.",
+      "Cada foto, print ou página de PDF conta uma leitura. Há um limite por dia (30 páginas); a tela mostra quantas ainda dá para ler hoje. Se a leitura não der certo, as páginas não contam.",
+      "Foto do iPhone (HEIC) que não abre: mande pelo Safari do iPhone ou tire um print da foto.",
       "Quem me deve aparece só para quem mexe com dinheiro, e Agenda só para quem marca horários.",
     ],
     palavras: ["caderno", "foto do caderno", "tirar foto", "foto da lista", "clientes do caderno", "agenda de papel", "fiado", "caderno de fiado", "quem me deve no caderno", "print", "pdf", "outro sistema", "simplesvet", "sistema antigo", "passar do caderno", "ler o caderno", "tabela de precos na foto", "foto da tabela"] },

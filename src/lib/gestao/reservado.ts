@@ -262,6 +262,12 @@ export async function comPrecosDeAgendamento<A extends ComServicosAMais>(sb: Ban
     })));
     for (const l of lidas.flat()) precos.set(String(l.id), num(l.preco));
   }
+  return comPrecosLidos(ags, precos);
+}
+
+/** O mesmo de `comPrecosDeAgendamento`, com os preços já lidos (id do horário ou do serviço a mais → preço). */
+export function comPrecosLidos<A extends ComServicosAMais>(ags: A[], lidos: Map<string, number | null> | { id: string; preco: number | null }[]): (Omit<ComPreco<A>, "agendamento_servicos"> & { agendamento_servicos: ComPreco<NonNullable<A["agendamento_servicos"]>[number]>[] | null })[] {
+  const precos = lidos instanceof Map ? lidos : new Map(lidos.map((l) => [String(l.id), num(l.preco)] as const));
   const preco = (id: string | undefined) => (id ? precos.get(id) ?? null : null);
   return ags.map((a) => ({
     ...a,
