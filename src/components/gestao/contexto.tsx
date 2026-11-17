@@ -10,6 +10,8 @@ import { banco, configurado, type Banco } from "@/lib/gestao/supabase";
 import type { Petshop, Profissional, Servico } from "@/lib/gestao/tipos";
 import { podeArea, type Area } from "@/lib/gestao/acessos";
 import { definirLoja } from "@/lib/gestao/erros-navegador";
+import { pendentes, type Documento } from "@/lib/gestao/documentos";
+import Reaceite from "./reaceite";
 
 export type Gestao = {
   sb: Banco;
@@ -67,6 +69,8 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   const [erro, setErro] = useState<string | null>(null);
   /** A assinatura abriu (o fim do teste vale)? null = não deu para ler do banco: segue a regra antiga, pelos links. */
   const [aberta, setAberta] = useState<boolean | null>(null);
+  /** Documentos com versão nova que esta pessoa ainda não aceitou: com algum, o aplicativo mostra a tela de aceite. */
+  const [faltam, setFaltam] = useState<Documento[]>([]);
 
   const buscarBase = useCallback(async (petshopId: string) => {
     // pet shop, equipe e serviços numa ida só ao banco (com o banco antes da atualização, um pedido por parte, como antes)
@@ -103,6 +107,10 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
         usarLinksDoBanco(a.links);
         if (vivo) setAberta(Boolean(a.aberta));
       }, () => undefined);
+      // aceites desta pessoa (versão dos Termos e da Política). Se a leitura falhar (banco sem a tabela, rede), não trava:
+      // a tela de aceite volta a ser conferida na próxima vez que o aplicativo abrir.
+      const aceites = sb.from("aceites").select("documento, versao").eq("user_id", u.id).then(
+        (r) => (r.error ? [] : pendentes(r.data ?? [])), () => [] as Documento[]);
       const { data: vinculos, error } = await sb.rpc("entrar");
       if (!vivo) return;
       if (error) { setErro("Não consegui carregar a sua conta. Tente de novo em instantes."); return; }
@@ -111,8 +119,9 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       try {
         const base = (meu.petshop_id === palpite ? await adiantado : null) ?? await buscarBase(meu.petshop_id);
         try { localStorage.setItem(CHAVE_ULTIMA, `${u.id}:${meu.petshop_id}`); } catch { /* sem armazenamento: segue */ }
-        const [todos] = await Promise.all([aplicarBase(base), assinatura]);
+        const [todos, , falta] = await Promise.all([aplicarBase(base), assinatura, aceites]);
         if (!vivo) return;
+        setFaltam(falta);
         setEu(todos.find((x) => x.id === meu.id) ?? meu);
         setUser(u);
       } catch {
@@ -172,6 +181,9 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
         <p>Abrindo o seu pet shop…</p>
       </div></div>
     );
+  }
+  if (faltam.length) {
+    return <Reaceite sb={sb} faltam={faltam} nome={valor.eu.nome} aoAceitar={() => setFaltam([])} aoSair={() => void valor.sair()} />;
   }
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }

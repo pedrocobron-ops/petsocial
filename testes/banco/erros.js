@@ -13,7 +13,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   const anon = B.cliente(), dono = L.sb.dono;
   const adm = B.cliente();
   const emailAdm = `t-${L.suf}.admin@teste-auto.local`;
-  B.must(await adm.auth.signUp({ email: emailAdm, password: SENHA }), 'cadastro do admin');
+  B.must(await adm.auth.signUp({ email: emailAdm, password: SENHA, options: B.dadosDoCadastro() }), 'cadastro do admin');
   const uid = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uid}') on conflict do nothing`); // só por SQL
   const ap = (x) => `t${L.suf.replace(/[^a-z0-9]/g, '')}${x}`; // aparelhos deste teste

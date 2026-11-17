@@ -23,7 +23,21 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "admins": {
+            "aceites": {
+                  Row: {
+                    "aceito_em": string,"documento": string,"email": string | null,"id": number,"ip": string | null,"navegador": string | null,"origem": string,"user_id": string | null,"versao": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "aceito_em"?: string,"documento": string,"email"?: string | null,"id"?: never,"ip"?: string | null,"navegador"?: string | null,"origem": string,"user_id"?: string | null,"versao": string
+                  }
+                  Update: {
+                    "aceito_em"?: string,"documento"?: string,"email"?: string | null,"id"?: never,"ip"?: string | null,"navegador"?: string | null,"origem"?: string,"user_id"?: string | null,"versao"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"admins": {
                   Row: {
                     "criado_em": string,"user_id": string
                   }
@@ -1931,8 +1945,14 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "acesso_liberado":
+            "aceitar_documentos":
+{ Args: { "p_privacidade": string,"p_termos": string }; Returns: Json
+                           },
+"acesso_liberado":
 { Args: { "p": string }; Returns: boolean
+                           },
+"admin_aceites":
+{ Args: { "p_busca"?: string,"p_limite"?: number }; Returns: Json
                            },
 "admin_atualizar":
 { Args: { "p_nota"?: string,"p_petshop": string,"p_plano"?: string,"p_status"?: Database["public"]['Enums']["status_assinatura"],"p_teste_ate"?: string }; Returns: undefined

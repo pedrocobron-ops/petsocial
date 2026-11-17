@@ -27,7 +27,7 @@ const PRECOS = { solo: [59, 159, 299], equipe: [89, 239, 449], petshop: [129, 34
   for (let i = 0; i < OFERTAS.length; i++) lojas.push(await criarLoja(T, { nome: `Cakto ${OFERTAS[i].plano}${OFERTAS[i].meses}`, equipe: false, dados: false }));
   const [cb, comum] = [await criarLoja(T, { nome: 'Cakto callback', equipe: false, dados: false }), await criarLoja(T, { nome: 'Cakto comum', equipe: false, dados: false })];
   const adm = B.cliente();
-  B.must(await adm.auth.signUp({ email: `t-${comum.suf}.admin@teste-auto.local`, password: comum.senha }), 'admin');
+  B.must(await adm.auth.signUp({ email: `t-${comum.suf}.admin@teste-auto.local`, password: comum.senha, options: B.dadosDoCadastro() }), 'admin');
   const uidAdm = (await adm.auth.getUser()).data.user.id;
   B.sql(`insert into admins (user_id) values ('${uidAdm}') on conflict do nothing`);
   T.depois(() => B.sql(`delete from admins where user_id='${uidAdm}'`));

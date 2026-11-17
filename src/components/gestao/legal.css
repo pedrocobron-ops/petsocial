@@ -20,7 +20,7 @@
 .g-raiz .g-leg-texto > * + * { margin-top: 14px; }
 .g-raiz .g-leg-texto > h2 { margin-top: 34px; scroll-margin-top: 16px; }
 .g-raiz .g-leg-texto > h3 { margin-top: 22px; }
-.g-leg-texto ul, .g-leg-texto ol { display: grid; gap: 8px; margin-bottom: 0; padding-left: 1.25rem; }
+.g-leg-texto ul, .g-leg-texto ol { display: grid; list-style: disc; gap: 8px; margin-bottom: 0; padding-left: 1.25rem; }
 .g-leg-texto li { padding-left: 2px; }
 .g-leg-texto li::marker { color: var(--g-cinza); }
 .g-leg-texto a { color: var(--g-verde); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
@@ -42,3 +42,25 @@
 .g-leg-pe a { color: var(--g-cinza); text-decoration: underline; text-underline-offset: 3px; }
 
 @media print { .g-leg-topo nav, .g-leg-pe { display: none; } .g-leg-folha { border: 0; box-shadow: none; padding: 0; } }
+
+/* cada parte com o resumo curto em destaque; índice dobrável */
+.g-raiz .g-leg-texto > .g-leg-parte { margin-top: 34px; }
+.g-raiz .g-leg-parte > * + * { margin-top: 12px; }
+.g-leg-parte h2 { scroll-margin-top: 16px; }
+.g-raiz .g-leg-parte > h3 { margin-top: 20px; }
+.g-leg-sintese { padding: 10px 14px; border-left: 3px solid var(--g-verde); border-radius: 0 12px 12px 0; background: var(--g-carta-2); }
+.g-leg-indice { padding: 10px 14px; border-radius: 14px; border: 1px solid var(--g-linha); }
+.g-leg-indice summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.g-leg-indice ol { margin: 8px 0 4px; padding-left: 1.4rem; display: grid; gap: 4px; }
+
+/* tela de aceite de versão nova (reaceite.tsx) */
+.g-reac { grid-template-rows: auto 1fr; }
+.g-reac-docs { display: grid; gap: 10px; }
+@media (min-width: 620px) { .g-reac-docs { grid-template-columns: 1fr 1fr; } }
+.g-raiz .g-leg-texto .g-reac-doc { display: grid; gap: 2px; padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); color: var(--g-tinta); text-decoration: none; font-weight: 400; }
+.g-reac-doc span { font-size: .875rem; color: var(--g-cinza); }
+.g-reac-doc .abrir { color: var(--g-verde); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.g-reac-acoes { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.g-reac-acoes .g-btn.pri { flex: 1 1 240px; }
+.g-reac-nao { font-size: .875rem; }
+.g-leg-texto ol { list-style: decimal; }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Porta from "@/components/gestao/porta";
 import { banco, configurado } from "@/lib/gestao/supabase";
+import { DOCUMENTOS, aceiteDoCadastro } from "@/lib/gestao/documentos";
 import CampoSenha from "../entrar/campo-senha";
 
 /** `?email=` vem no convite da equipe: o campo já chega preenchido com o e-mail que liga a pessoa ao pet shop. */
@@ -33,11 +34,13 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
     setErro(null);
     if (!configurado) { setErro("O sistema ainda não está ligado neste endereço."); return; }
     if (senha.length < 8) { setErro("A senha precisa de pelo menos 8 caracteres."); return; }
+    if (!aceito) { setErro("Para criar a conta, leia e aceite os Termos de uso e a Política de privacidade."); return; }
     setIndo(true);
     const { data, error } = await banco().auth.signUp({
       email: email.trim(), password: senha,
       // `app: "maestro"` deixa o modelo de e-mail do Supabase (projeto dividido com outro app) mostrar a marca certa.
-      options: { data: { app: "maestro", nome: nome.trim(), ...(convidado ? { convidado: true } : {}) }, emailRedirectTo: `${location.origin}/gestao/comecar` },
+      // `aceite`: as versões dos documentos aceitas aqui; o gatilho do banco grava o aceite quando o login é criado.
+      options: { data: { app: "maestro", nome: nome.trim(), aceite: aceiteDoCadastro(), ...(convidado ? { convidado: true } : {}) }, emailRedirectTo: `${location.origin}/gestao/comecar` },
     });
     setIndo(false);
     if (error) {
@@ -74,8 +77,11 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
           <small>Pelo menos 8 caracteres.</small>
         </label>
         <label className="g-check grande">
-          <input type="checkbox" checked={aceito} onChange={(e) => setAceito(e.target.checked)} required />
-          <span>Li e aceito os <Link className="g-link" href="/gestao/termos" target="_blank">Termos de Uso</Link> e a <Link className="g-link" href="/gestao/privacidade" target="_blank">Política de Privacidade</Link>.</span>
+          <input type="checkbox" name="aceite" checked={aceito} onChange={(e) => setAceito(e.target.checked)} required />
+          <span>
+            Li e aceito os <Link className="g-link" href="/gestao/termos" target="_blank">Termos de uso</Link> e a <Link className="g-link" href="/gestao/privacidade" target="_blank">Política de privacidade</Link>.
+            <small className="g-muted" style={{ display: "block", marginTop: 2 }}>Uso profissional, para o meu negócio. Versão {DOCUMENTOS.termos.versao} dos Termos e {DOCUMENTOS.privacidade.versao} da Política.</small>
+          </span>
         </label>
         {erro && <p className="g-erro" role="alert">{erro}</p>}
         <button className="g-btn pri cheio" disabled={indo}>{indo ? "Criando…" : "Criar minha conta"}</button>
