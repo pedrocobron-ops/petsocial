@@ -1,5 +1,6 @@
 import type { Horario } from "../tipos";
 import type { Contexto } from "./ferramentas";
+import { nomeDaCasa, usaCasa } from "../modulos";
 
 /** Parte fixa das instruções (igual para todos os pet shops: fica em cache). */
 export const INSTRUCOES = `Você é o Mozart, o assistente do Maestro Pet Gestão, um sistema para pet shops pequenos do Brasil. Você trabalha para a equipe do pet shop como um secretário que conhece o negócio: marca e remarca horários, cadastra pets, cuida da creche e do hotel, dos pacotes, do caixa e do estoque, anota a saúde dos pets, responde perguntas sobre a agenda e o dinheiro e avisa o que precisa de atenção. Quem fala com você é o dono ou alguém da equipe, muitas vezes por áudio transcrito, no meio do trabalho.
@@ -43,6 +44,13 @@ Jeito de falar
 
 const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 
+/** Pet shop que faz só creche ou só hotel: o Mozart chama a casa (tela e categoria do financeiro) pelo nome que ela tem no menu. */
+function casaSo(c: Contexto) {
+  const nome = nomeDaCasa(c.petshop);
+  if (nome === "Creche e hotel" || !usaCasa(c.petshop)) return "";
+  return `Este pet shop faz ${nome.toLowerCase()} e não faz ${nome === "Hotel" ? "creche" : "hotel"}: onde as ferramentas e estas instruções dizem "Creche e hotel" (tela ou categoria do financeiro), diga "${nome}".\n`;
+}
+
 /** O que muda de pet shop para pet shop: serviços, equipe, horário e quem está pedindo. */
 export function contextoDoPetshop(c: Contexto) {
   const h = c.petshop.horario as Horario | null;
@@ -59,6 +67,6 @@ Serviços:
 ${servicos || "(nenhum serviço ativo)"}
 Equipe:
 ${equipe}
-Quem está falando com você: ${c.eu.nome} (${c.eu.papel}). ${c.cuidoDoFinanceiro ? "Tem acesso ao financeiro." : c.vejoFinanceiro ? "Recebe e opera o caixa, mas não vê o financeiro (despesas, contas a pagar, resumo do mês)." : "Não tem acesso ao financeiro."}
+${casaSo(c)}Quem está falando com você: ${c.eu.nome} (${c.eu.papel}). ${c.cuidoDoFinanceiro ? "Tem acesso ao financeiro." : c.vejoFinanceiro ? "Recebe e opera o caixa, mas não vê o financeiro (despesas, contas a pagar, resumo do mês)." : "Não tem acesso ao financeiro."}
 ${c.equipe.filter((p) => p.ativo && p.atende).length <= 1 ? `Só uma pessoa atende: não precisa perguntar quem vai atender.${c.equipe.filter((p) => p.ativo).length <= 1 ? " Ela trabalha sozinha: não fale em \"equipe\"." : ""}` : "Mais de uma pessoa atende: se a pessoa não disser quem, marque sem profissional definido."}`;
 }

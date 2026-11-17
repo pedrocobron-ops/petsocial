@@ -7,7 +7,7 @@ import { conferirCaixa, conferirValorAlto, formaPrincipal, parteDaChave, type It
 import { casoDoErro, fazerTudoOuNada, partesOuNada, passoDoEstoque, ref, type Passo, type ResultadoDaOperacao } from "@/lib/gestao/tudo-ou-nada";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import {
-  contaDasDiarias, contarDiarias, fechoDaConta, noitesAntesDaEntrada, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDoPagamentoDaConta,
+  contaDasDiarias, contarDiarias, fechoDaConta, noitesAntesDaEntrada, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDaSobra, textoDoPagamentoDaConta,
   type ContaDaEstadia, type DestinoDaSobra, type EstadiaDoTutor, type Noite, type TaxaDaConta, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
 import { taxasDe } from "@/lib/gestao/hotel-opcoes";
@@ -604,10 +604,16 @@ function ContaFechada({ estadia, conta, saida, aoPronto, pendente }: { estadia: 
     <Folha titulo="Conta fechada" aoFechar={aoPronto} rodape={<button type="button" className="g-btn sec" onClick={aoPronto}>Pronto</button>}>
       <div className="g-vd-recibo">
         <Tile icone={Check} tom="menta" tamanho="g" />
-        {/* o número grande diz o que é: recebido agora, ou o que foi pago a mais (crédito, devolução), nunca parece dinheiro entrando */}
-        <p className="g-pp g-muted" style={{ margin: 0 }}>{fiado ? "Anotado em A receber" : agora > 0 ? "Recebido agora" : sobra?.destino === "credito" ? "Ficou de crédito para o tutor" : sobra?.destino === "devolvido" ? "Devolvido ao tutor" : sobra ? "Pago a mais, ficou com o hotel" : "Recebido agora"}</p>
-        <p className="g-num">{brl(agora > 0 || !sobra ? agora : sobra.valor)}</p>
-        <p><b>{fiado ? "Anotado em A receber." : agora > 0 ? "Recebido." : sobra?.destino === "devolvido" ? "Devolvido ao tutor." : sobra?.destino === "credito" ? "Ficou de crédito para o tutor." : sobra ? "Ficou com o hotel." : conta.credito_usado ? "Pago com o crédito do tutor." : "Check-out feito."}</b> {pendente ? `Estadia de ${estadia.pets?.nome ?? "pet"} acertada.` : `${estadia.pets?.nome ?? "O pet"} foi para casa.`}</p>
+        {/* o número grande é sempre o dinheiro desta saída (pode ser R$ 0,00); crédito, devolução e o pago a mais ficam numa linha à parte */}
+        <p className="g-pp g-muted" style={{ margin: 0 }}>{fiado ? "Anotado em A receber" : "Recebido agora"}</p>
+        <p className="g-num">{brl(agora)}</p>
+        <p><b>{fiado ? "Anotado em A receber." : agora > 0 ? "Recebido." : conta.sinal > 0 || conta.credito_usado ? "Nada a receber na saída." : "Check-out feito."}</b> {pendente ? `Estadia de ${estadia.pets?.nome ?? "pet"} acertada.` : `${estadia.pets?.nome ?? "O pet"} foi para casa.`}</p>
+        {(sobra || conta.credito_usado) && (
+          <div className="g-ht-conta-fora">
+            {sobra && <p><b>{sobra.destino === "credito" ? "Ficou de crédito para o tutor" : sobra.destino === "devolvido" ? textoDaSobra(sobra) : "Pago a mais, ficou com o hotel"}: {brl(sobra.valor)}</b></p>}
+            {conta.credito_usado ? <p><b>Pago com o crédito do tutor: {brl(conta.credito_usado)}</b></p> : null}
+          </div>
+        )}
         <div className="g-ht-conta" style={{ width: "100%", textAlign: "left" }}>
           <div className="l forte"><span>Total da estadia</span><span>{brl(conta.total)}</span></div>
           {fechoDaConta(conta).map((l, i) => <div key={i} className="l"><span>{l.texto}</span><span>{l.valor}</span></div>)}

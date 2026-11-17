@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { creditoDaEntrada, nomeDoMovimento, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { creditoDaEntrada, descricaoAtual, nomeDoMovimento, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import type { Caixa, Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCurta, dataLonga, hora } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
@@ -136,7 +136,7 @@ function FechamentoNoPapel() {
                       return (
                         <tr key={l.id}>
                           <td className="hora">{hora(quandoPagou(l))}</td>
-                          <td>{l.movimento ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [l.descricao, resumoDeItens(l)].filter(Boolean).join(" · ") || "Lançamento"}{!l.movimento && <small>{categoriaAtual(l.categoria, petshop)}{l.alterado_em ? ` · alterado em ${dataCurta(l.alterado_em)} às ${hora(l.alterado_em)}` : ""}</small>}</td>
+                          <td>{l.movimento ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [descricaoAtual(l.descricao), resumoDeItens(l)].filter(Boolean).join(" · ") || "Lançamento"}{!l.movimento && <small>{categoriaAtual(l.categoria, petshop, l.descricao)}{l.alterado_em ? ` · alterado em ${dataCurta(l.alterado_em)} às ${hora(l.alterado_em)}` : ""}</small>}</td>
                           <td>{l.movimento ? "Dinheiro" : textoDoPagamento(l)}</td>
                           <td className="pa-num">{entrada ? brl(valor) : ""}</td>
                           <td className="pa-num">{entrada ? "" : brl(valor)}</td>

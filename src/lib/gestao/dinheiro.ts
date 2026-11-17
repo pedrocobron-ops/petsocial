@@ -255,6 +255,16 @@ export const ehMovimentoDeGaveta = (l: { movimento?: string | null }) => Boolean
 export const nomeDoMovimento = (m: string | null | undefined) =>
   m === "sangria" ? "Tirou da gaveta (sangria)" : m === "suprimento" ? "Colocou na gaveta (suprimento)" : "";
 
+/**
+ * A descrição de um lançamento para mostrar. O sinal guarda o dia da chegada reservada ("Sinal da reserva: hotel de Thor, 19/11"),
+ * que fica velho quando o pet chega antes ou a reserva muda de dia: na tela, o sinal sai sem a data ("Sinal da reserva: hotel de Thor").
+ * O dia em que o dinheiro entrou continua ao lado, na linha.
+ */
+export function descricaoAtual(d: string | null | undefined): string {
+  const t = (d ?? "").trim();
+  return t.replace(/^((?:Sinal da reserva|Devolução do sinal): .+?), \d{2}\/\d{2}(?=\s*(?:\(|$))/, "$1");
+}
+
 /** Lê `lancamentos.itens` (jsonb) com cuidado: o que não tem cara de item fica de fora. */
 export function itensDoLancamento(l: { itens?: unknown } | null | undefined): ItemLancamento[] {
   const bruto = l?.itens;

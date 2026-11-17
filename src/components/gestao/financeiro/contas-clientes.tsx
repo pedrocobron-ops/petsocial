@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, HandCoins, MessageCircle, TriangleAlert } from "lucide-react";
 import { mensagemDeDivida, multaSugerida } from "@/lib/gestao/dinheiro-opcoes";
+import { descricaoAtual } from "@/lib/gestao/dinheiro";
 import type { Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, dataCurtaOuAno, hora, isoDia, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -68,7 +69,7 @@ function LinhaConta({ conta, hoje, aoReceber }: { conta: Lancamento; hoje: strin
   const { petshop } = useGestao();
   const v = conta.vencimento;
   const multa = multaSugerida(petshop, conta, hoje);
-  const nome = conta.descricao?.trim() || categoriaAtual(conta.categoria, petshop);
+  const nome = descricaoAtual(conta.descricao) || categoriaAtual(conta.categoria, petshop);
   return (
     <div className="gr-conta">
       <span className="t">

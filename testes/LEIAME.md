@@ -76,6 +76,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   para quem deve, a mais recente até hoje; na agenda, a mais perto de hoje), horas ("14h", "9h30"), a limpeza do que a IA devolve
   (valor ilegível fica em branco com "Verificar", preço único espalhado pelos portes, próxima dose da carteirinha só quando escrita),
   a leitura de teste, o esquema estrito (todo objeto fecha e pede todos os campos), o tipo do arquivo pelos bytes e as páginas do PDF.
+- `caixa-fichas.js`: textos e contas do caixa e das fichas (Bia, hotel só): o sinal sem a data velha (`descricaoAtual`: "Sinal da
+  reserva: hotel de Thor, 19/11" vira "Sinal da reserva: hotel de Thor", "(parte)" fica); "Creche e hotel" como "Hotel" ou "Creche"
+  pela entrada e pelo que o pet shop faz (`nomeDaCategoria`); o que é de cada pet (`lancamentoDoPet`: diária, sinal, devolução, sem
+  pegar "Melissa" pela "Mel"); o Mozart num hotel só diz "Hotel".
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
@@ -209,6 +213,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   imprimir** (lista e extrato das cobranças, extrato do cão, folha do dia, fichas de cuidados) na mesma aba, com Voltar, os dados
   numa leva só (ondas de pedidos com 600 ms de atraso), PDF A4 (`page.pdf`) e o título de cada parte da folha do dia na mesma
   folha que a primeira linha dela (cada parte empurrada para o pé da página em 21 pontos). 390 e 1366.
+- `caixa-fichas.js`: caixa e fichas num hotel só (migração 20261191), conta à mão em 390 e 1366. Check-out da Luna (1 diária de 95,
+  sinal 285) deixando de crédito: Conta fechada com "Recebido agora R$ 0,00" e, à parte, "Ficou de crédito para o tutor: R$ 190,00".
+  Caixa: gaveta R$ 102,75 (troco 100 + 2,75 em dinheiro), Entrou hoje 677,40 − Saiu hoje (devoluções e saídas) 110,00 = Saldo de
+  hoje 567,40, aviso dos 190,00 de crédito, sinal sem a data velha e categoria Hotel. Gasto aqui na ficha de cada pet (Mel 62,40 só
+  com o sinal, Thor 107,25, Luna 285 − 190 = 95,00, Bob 220 + 2,75 − 110 = 112,75) e na do tutor (Ana 169,65, "Hotel"). Relatórios:
+  4 noites reservadas de hoje em diante, a última em +4 (a estadia encerrada hoje não conta). Página do tutor: `ultima_vez` no banco,
+  "Luna veio hoje. Ainda não tem diário nem fotos." e, para quem nunca veio, o texto de antes. Capturas em `testes/saida/caixa-fichas-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 - `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente

@@ -41,6 +41,20 @@ export function nomeDaCasa(petshop: ComModulos): string {
 }
 
 /**
+ * O nome de uma categoria de lançamento na tela. "Creche e hotel" é o valor gravado (não muda); na tela vira o que a entrada é:
+ * pela descrição ("Hotel: 2 diárias · Thor", "Sinal da reserva: hotel de Mel", "Creche: 1 diária · Bob") e, sem ela,
+ * pelo que o pet shop faz ("Hotel" num hotel só, "Creche" numa creche só). Sem pet shop e sem descrição, o nome gravado.
+ */
+export function nomeDaCategoria(c: string, petshop?: ComModulos | null, descricao?: string | null): string {
+  if (c === "Produtos e insumos") return "Produtos e material";
+  if (c !== "Creche e hotel") return c;
+  const d = (descricao ?? "").toLowerCase();
+  const hotel = /(^|[^a-zà-ú])hotel([^a-zà-ú]|$)/.test(d), creche = /(^|[^a-zà-ú])creche([^a-zà-ú]|$)/.test(d);
+  if (hotel !== creche) return hotel ? "Hotel" : "Creche";
+  return petshop ? nomeDaCasa(petshop) : c;
+}
+
+/**
  * Área principal: a que aparece primeiro no menu e na tela inicial (`petshops.principal`).
  * Pacotes não entra: é um jeito de vender, não uma área. Vazio (null) = sem área principal, tudo na ordem de sempre.
  */

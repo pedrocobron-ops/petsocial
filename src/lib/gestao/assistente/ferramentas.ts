@@ -5,6 +5,7 @@ import { consultarPlanosDaCreche, FERRAMENTA_PLANOS_CRECHE } from "./creche-plan
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
+import { nomeDaCategoria } from "../modulos";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
@@ -630,7 +631,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       exigir(c.cuidoDoFinanceiro, "Esta pessoa opera o caixa, mas não tem a área Financeiro: não vê o resumo do período nem as contas. O dono pode liberar em Equipe.");
       exigir(RE_DIA.test(String(e.de)) && RE_DIA.test(String(e.ate)), "Datas no formato AAAA-MM-DD.");
       const [ls, caixa] = await Promise.all([
-        lerTudo<{ tipo: string; valor: number; forma: string | null; categoria: string; pagamentos: unknown }>((de, ate, contar) => sb.from("lancamentos").select("tipo, valor, forma, categoria, pagamentos", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).gte("data", String(e.de)).lte("data", String(e.ate)).order("data").order("id").range(de, ate)).then((data) => ({ data })),
+        lerTudo<{ tipo: string; valor: number; forma: string | null; categoria: string; descricao: string | null; pagamentos: unknown }>((de, ate, contar) => sb.from("lancamentos").select("tipo, valor, forma, categoria, descricao, pagamentos", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).gte("data", String(e.de)).lte("data", String(e.ate)).order("data").order("id").range(de, ate)).then((data) => ({ data })),
         sb.from("caixas").select("aberto_em, valor_inicial").eq("petshop_id", petshop.id).is("fechado_em", null).maybeSingle(),
       ]);
       // por forma, o pagamento dividido entra repartido (parte no Pix, parte em dinheiro)
@@ -640,7 +641,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
         for (const l of ls.data ?? []) {
           if (l.tipo !== tipo) continue;
           if (chave === "forma") for (const p of partesPorForma(l)) por(p.forma, p.valor);
-          else por(l.categoria ?? "outro", Number(l.valor));
+          // "Creche e hotel" com o nome da tela: "Hotel" ou "Creche" pela entrada e pelo que o pet shop faz
+          else por(l.categoria ? nomeDaCategoria(l.categoria, petshop, l.descricao) : "outro", Number(l.valor));
         }
         return m;
       };
