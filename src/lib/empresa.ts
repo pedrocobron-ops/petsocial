@@ -12,7 +12,7 @@ export const EMPRESA = {
   cpf: "412.538.738-95",
   razaoSocial: "",
   cnpj: "",
-  endereco: "",
+  endereco: "Rua Senador Paulo Egídio, 72, conjunto 1412, São Paulo/SP",
   email: "contato@maestropet.com",
   /** E-mail para privacidade (encarregado/LGPD) e assuntos jurídicos. Vazio = aparece [E-MAIL DE CONTATO] nos documentos do Gestão. */
   emailJuridico: "contato@maestropet.com",
