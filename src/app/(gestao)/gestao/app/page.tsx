@@ -1,9 +1,9 @@
 "use client";
 
-import { ajustesDoFaturamento, CATEGORIAS_DEVOLUCAO, SEM_AJUSTES } from "@/lib/gestao/faturamento";
+import { CATEGORIAS_DEVOLUCAO } from "@/lib/gestao/faturamento";
+import { lerDadosDoHoje } from "@/components/gestao/hoje-dados";
 import { BellRing, CalendarCheck2, UserX } from "lucide-react";
 import { CATEGORIA_MENSALIDADE, experienciaDe, juntar, lerExperiencias, resumoDaCrecheHoje } from "@/lib/gestao/creche";
-import { contarAtrasosPendentes } from "@/components/gestao/creche/atraso";
 import ChamadaDeHoje from "@/components/gestao/creche/chamada-hoje";
 import { OcorrenciasDeHoje } from "@/components/gestao/casa/ocorrencias";
 import { useVagaNaEsperaDoHotel } from "@/components/gestao/casa/espera";
@@ -18,8 +18,7 @@ import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import Link from "next/link";
 import { ShoppingBag, BedDouble, Camera, FileSpreadsheet, Cake, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, UserSearch, Wallet } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
-import { contando, lerTudo } from "@/lib/gestao/paginas";
-import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
+import { STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
 
 import { brl, dataAmigavel, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
@@ -29,16 +28,16 @@ import { useCalendario } from "@/components/gestao/calendario";
 import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
 import MinhaComissao from "@/components/gestao/minha-comissao";
+import MeuMes from "@/components/gestao/meu-mes";
 import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, useAdiantar, useDados } from "@/components/gestao/ui";
 import dynamic from "next/dynamic";
 import { ErroDeTeste } from "@/components/gestao/erros";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
-import { buscarSaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
 import MetaMes from "@/components/gestao/meta-mes";
 import DicasMozart from "@/components/gestao/dicas-mozart";
+import BomDia from "@/components/gestao/bom-dia";
 import ChamarDeVolta, { aniversariantes, buscarParaChamar, chamadoEm, lerChamados, quemSumiu, type AbaChamar, type GrupoChamar } from "@/components/gestao/clientes/chamar-de-volta";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
-import { comPrecosDeAgendamento, idsParaCobrar } from "@/lib/gestao/reservado";
 import { AtendimentosParaCobrar, MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import AlteracoesDeValores from "@/components/gestao/financeiro/alteracoes-de-valores";
 
@@ -82,131 +81,86 @@ export default function Hoje() {
   const rotuloCasa = nomeDaCasa(petshop);
 
   const vejoEstoque = posso("estoque"), vejoPacotes = posso("pacotes");
+  const cobrar = vejoFinanceiro && posso("creche_hotel");
   const { dados, carregando, recarregar } = useDados(async () => {
-    const amanha = somaDias(hoje, 1), depois = somaDias(hoje, 2);
-    const seg = inicioDaSemana(hoje), ha30 = somaDias(hoje, -30), ha6 = somaDias(hoje, -6);
-    // primeiros passos e aviso de fim de teste: seis contagens, sem trazer linha nenhuma, numa ida só ao banco
-    // (banco antes da atualização, sem `gestao_contagens`: uma contagem por pedido, como antes)
-    type Contagens = { pets: number; agendamentos: number; concluidos: number; lembrados: number; estadias: number; produtos: number };
-    const contagens: Promise<Contagens> = Promise.resolve(sb.rpc("gestao_contagens", { p: petshop.id })).then(async (r) => {
-      if (!r.error && r.data && typeof r.data === "object") return r.data as unknown as Contagens;
-      const n = (x: { count: number | null }) => x.count ?? 0;
-      const [pets, agendamentos, concluidos, lembrados, estadias, produtos] = await Promise.all([
-        sb.from("pets").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).then(n),
-        sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).then(n),
-        sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).eq("status", "concluido").then(n),
-        sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).not("lembrete_em", "is", null).then(n),
-        sb.from("estadias").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).then(n),
-        sb.from("produtos").select("id", { count: "exact", head: true }).eq("petshop_id", petshop.id).then(n),
-      ]);
-      return { pets, agendamentos, concluidos, lembrados, estadias, produtos };
-    });
-    const contagem = (k: keyof Contagens) => contagens.then((c) => ({ count: Number(c[k] ?? 0) }));
-    // tudo ao mesmo tempo: no celular com internet fraca, cada consulta esperando a outra soma uma ida e volta
-    const [lista, agsAmanha, emCasa, produtos, pets, totalAgs, entradas, contas, pacotes, daSemana, doMes, ultimos7, concluidos, lembrados, estadiasTotal, produtosTotal, proximosDias, semFechar, saude, aj, creche, experiencias] = await Promise.all([
-      // o preço de cada horário vem à parte; o banco só entrega a quem recebe (o formulário de editar regrava o que leu)
-      sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id).gte("inicio", hoje.toISOString()).lt("inicio", amanha.toISOString()).order("inicio")
-        .then(async (ags) => await comPrecosDeAgendamento(sb, petshop.id, (ags.data ?? []) as unknown as AgendamentoCompleto[]) as unknown as AgendamentoCompleto[]),
-      sb.from("agendamentos").select("id, lembrete_em, status, pets(clientes(id, telefone))").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).lt("inicio", depois.toISOString()),
-      sb.from("estadias").select("id, status, entrada, saida_prevista").eq("petshop_id", petshop.id).in("status", ["em_casa", "reservada"]).limit(1000),
-      // estoque e pacotes só entram no aviso de quem tem a área
-      vejoEstoque ? lerTudo<{ id: string; nome: string; estoque: number; estoque_minimo: number }>((de, ate, contar) => sb.from("produtos").select("id, nome, estoque, estoque_minimo", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).gt("estoque_minimo", 0).order("nome").order("id").range(de, ate)).then((data) => ({ data })) : Promise.resolve({ data: [] }),
-      contagem("pets"),
-      contagem("agendamentos"),
-      vejoFinanceiro ? sb.from("lancamentos").select("valor, tipo, categoria").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).eq("data", hojeIso) : Promise.resolve({ data: [] }),
-      cuidoDoFinanceiro ? sb.from("lancamentos").select("id, valor, vencimento, tipo, categoria").eq("petshop_id", petshop.id).eq("pago", false).lte("vencimento", hojeIso) : Promise.resolve({ data: [] }),
-      vejoPacotes ? sb.from("pacotes_clientes").select("id").eq("petshop_id", petshop.id).eq("ativo", true).gte("vence_em", hojeIso).lte("vence_em", isoDia(somaDias(hoje, 7))) : Promise.resolve({ data: [] }),
-      sb.from("agendamentos").select("inicio, status").eq("petshop_id", petshop.id).gte("inicio", seg.toISOString()).lt("inicio", somaDias(seg, 7).toISOString()),
-      lerTudo((de, ate, contar) => sb.from("agendamentos").select("status, servicos(nome, cor)", contando(contar)).eq("petshop_id", petshop.id).gte("inicio", ha30.toISOString()).lt("inicio", amanha.toISOString()).order("inicio").order("id").range(de, ate)).then((data) => ({ data })),
-      cuidoDoFinanceiro ? lerTudo((de, ate, contar) => sb.from("lancamentos").select("valor, data", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada").is("movimento", null).gte("data", isoDia(ha6)).lte("data", hojeIso).order("data").order("id").range(de, ate)).then((data) => ({ data })) : Promise.resolve({ data: [] }),
-      contagem("concluidos"),
-      contagem("lembrados"),
-      contagem("estadias"),
-      contagem("produtos"),
-      // os próximos horários depois de hoje: a tela não diz "nada por vir" quando há banho marcado para segunda
-      sb.from("agendamentos").select("id, inicio, pets(nome)").eq("petshop_id", petshop.id).gte("inicio", amanha.toISOString()).in("status", ["marcado", "confirmado"]).order("inicio").order("id").limit(2),
-      // horários de dias anteriores que ninguém fechou (nem concluído, nem falta, nem cancelado)
-      sb.from("agendamentos").select("id, inicio, pets(nome)", { count: "exact" }).eq("petshop_id", petshop.id).lt("inicio", hoje.toISOString()).in("status", ["marcado", "confirmado", "em_atendimento"]).order("inicio").order("id").limit(3),
-      buscarSaudeVencendo(sb, petshop.id).catch(() => null),
-      // devolução ao tutor e crédito deixado para ele saem do que entrou (a mesma regra do faturamento nos Relatórios)
-      cuidoDoFinanceiro ? ajustesDoFaturamento(sb, petshop.id, isoDia(ha6), hojeIso).catch(() => SEM_AJUSTES) : Promise.resolve(SEM_AJUSTES),
+    const seg = inicioDaSemana(hoje), ha6 = somaDias(hoje, -6);
+    // o primeiro olhar numa ida só ao banco (gestao_hoje; sem ela, uma consulta por parte, como antes), e a creche ao mesmo tempo:
+    // no celular com internet fraca, cada consulta esperando a outra soma uma ida e volta
+    const [h, creche, experiencias] = await Promise.all([
+      lerDadosDoHoje(sb, petshop.id, hoje, { vejoEstoque, vejoFinanceiro, cuidoDoFinanceiro, vejoPacotes, cobrar, cobrarHoje: posso("agenda") || vejoFinanceiro }),
       casa && usaModulo(petshop, "creche") ? resumoDaCrecheHoje(sb, petshop, cuidoDoFinanceiro, liberado).catch(() => null) : Promise.resolve(null),
       // dia de experiência (opção da creche): quem vem hoje e quem já fez e espera a conversa com o tutor
       casa && usaModulo(petshop, "creche") && experienciaDe(petshop).ativo ? lerExperiencias(sb, petshop.id).catch(() => null) : Promise.resolve(null),
     ]);
+    const { lista, saude, aj } = h;
     const ajusteDe = (iso: string) => aj.porDia.get(iso) ?? 0;
     const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
-    const porServico = new Map<string, { rotulo: string; valor: number; cor: string | null }>();
-    for (const a of (doMes.data ?? []) as unknown as { status: string; servicos: { nome: string; cor: string | null } | null }[]) {
-      if (!valeAg(a.status) || !a.servicos) continue;
-      const x = porServico.get(a.servicos.nome) ?? { rotulo: a.servicos.nome, valor: 0, cor: a.servicos.cor };
-      x.valor++; porServico.set(a.servicos.nome, x);
-    }
-    const amanhaAtivos = ((agsAmanha.data ?? []) as unknown as { id: string; lembrete_em: string | null; status: string; pets: { clientes: { id: string; telefone: string | null } | null } | null }[])
+    const amanhaAtivos = h.amanha
       .filter((a) => !["cancelado", "faltou"].includes(a.status));
     // um lembrete por tutor: quem tem dois pets amanhã recebe uma mensagem só
     const tutores = (lista: typeof amanhaAtivos) => new Set(lista.map((a) => a.pets?.clientes?.id ?? a.id)).size;
     // lembrete só dá para mandar a quem tem telefone: os outros não entram na conta do que falta
     const semTelefone = (a: (typeof amanhaAtivos)[number]) => soDigitos(a.pets?.clientes?.telefone).length < 8;
-    const estadias = emCasa.data ?? [];
+    const estadias = h.emCasa;
     const noDia = (iso: string | null) => Boolean(iso) && isoDia(new Date(iso!)) === hojeIso;
-    type Curto = { id: string; inicio: string; pets: { nome: string } | null };
     return {
       ags: lista,
-      proximosDias: (proximosDias.data ?? []) as unknown as Curto[],
-      semFechar: { total: semFechar.count ?? 0, primeiros: (semFechar.data ?? []) as unknown as Curto[] },
+      proximosDias: h.proximos,
+      semFechar: h.semFechar,
       amanha: amanhaAtivos.length,
       amanhaSemLembrete: tutores(amanhaAtivos.filter((a) => !a.lembrete_em && !semTelefone(a))),
       amanhaSemTelefone: tutores(amanhaAtivos.filter((a) => !a.lembrete_em && semTelefone(a))),
       emCasa: estadias.filter((e) => e.status === "em_casa").length,
       chegamHoje: estadias.filter((e) => e.status === "reservada" && noDia(e.entrada)).length,
       saemHoje: estadias.filter((e) => e.status === "em_casa" && noDia(e.saida_prevista)).length,
-      acabando: (produtos.data ?? []).filter((p) => Number(p.estoque) <= Number(p.estoque_minimo)),
-      pets: pets.count ?? 0,
-      totalAgs: totalAgs.count ?? 0,
-      concluidos: concluidos.count ?? 0,
-      lembrados: lembrados.count ?? 0,
-      estadiasTotal: estadiasTotal.count ?? 0,
-      produtosTotal: produtosTotal.count ?? 0,
-      entrou: Math.round(((entradas.data ?? []).filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0) + ajusteDe(hojeIso)) * 100) / 100,
+      acabando: h.acabando.filter((p) => Number(p.estoque) <= Number(p.estoque_minimo)),
+      pets: h.contagens.pets,
+      totalAgs: h.contagens.agendamentos,
+      concluidos: h.contagens.concluidos,
+      lembrados: h.contagens.lembrados,
+      estadiasTotal: h.contagens.estadias,
+      produtosTotal: h.contagens.produtos,
+      entrou: Math.round((h.entradas.filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0) + ajusteDe(hojeIso)) * 100) / 100,
       ajusteHoje: ajusteDe(hojeIso),
-      saiu: cuidoDoFinanceiro ? (entradas.data ?? []).filter((l) => l.tipo === "saida" && !CATEGORIAS_DEVOLUCAO.includes((l as { categoria?: string }).categoria ?? "")).reduce((s, l) => s + Number(l.valor), 0) : 0,
-      vendasHoje: ((entradas.data ?? []) as { valor: number; tipo: string; categoria?: string | null }[]).filter((l) => l.tipo === "entrada" && l.categoria === "Venda de produtos"),
-      contas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string }[]).filter((c) => c.tipo === "saida"),
+      saiu: cuidoDoFinanceiro ? h.entradas.filter((l) => l.tipo === "saida" && !CATEGORIAS_DEVOLUCAO.includes(l.categoria ?? "")).reduce((s, l) => s + Number(l.valor), 0) : 0,
+      vendasHoje: h.entradas.filter((l) => l.tipo === "entrada" && l.categoria === "Venda de produtos"),
+      contas: h.contas.filter((c) => c.tipo === "saida"),
       // as mensalidades da creche têm a linha delas (com o atalho para Cobranças)
-      aReceberVencidas: ((contas.data ?? []) as { id: string; valor: number; vencimento: string | null; tipo?: string; categoria?: string }[]).filter((c) => c.tipo === "entrada" && c.categoria !== CATEGORIA_MENSALIDADE),
-      pacotesVencendo: (pacotes.data ?? []).length,
+      aReceberVencidas: h.contas.filter((c) => c.tipo === "entrada" && c.categoria !== CATEGORIA_MENSALIDADE),
+      pacotesVencendo: h.pacotes,
       saude,
       creche,
       experiencias,
       semana: Array.from({ length: 7 }, (_, i) => {
         const d = somaDias(seg, i), iso = isoDia(d);
-        return { rotulo: nomeDiaCurto(d), valor: (daSemana.data ?? []).filter((a) => valeAg(a.status) && isoDia(new Date(a.inicio)) === iso).length };
+        return { rotulo: nomeDiaCurto(d), valor: h.semana.filter((a) => valeAg(a.status) && isoDia(new Date(a.inicio)) === iso).length };
       }),
-      servicosMes: [...porServico.values()].sort((a, b) => b.valor - a.valor).slice(0, 5),
+      servicosMes: [...h.servicosMes].sort((a, b) => b.valor - a.valor).slice(0, 5),
       // de segunda até hoje (a segunda desta semana está sempre dentro dos últimos 7 dias)
-      recebidoSemana: Math.round((((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data >= isoDia(seg)).reduce((t, l) => t + Number(l.valor), 0)
+      recebidoSemana: Math.round((h.ultimos7.filter((l) => l.data >= isoDia(seg)).reduce((t, l) => t + Number(l.valor), 0)
         + [...aj.porDia].filter(([d]) => d >= isoDia(seg)).reduce((t, [, v]) => t + v, 0)) * 100) / 100,
       entradas7: Array.from({ length: 7 }, (_, i) => {
         const iso = isoDia(somaDias(ha6, i));
-        return ((ultimos7.data ?? []) as { valor: number; data: string }[]).filter((l) => l.data === iso).reduce((t, l) => t + Number(l.valor), 0) + ajusteDe(iso);
+        return h.ultimos7.filter((l) => l.data === iso).reduce((t, l) => t + Number(l.valor), 0) + ajusteDe(iso);
       }),
+      paraCobrar: h.paraCobrar,
+      taxasPendentes: h.atrasos,
+      cobrarHoje: h.cobrarHoje,
     };
-  }, [petshop.id, hojeIso, vejoFinanceiro, cuidoDoFinanceiro, vejoEstoque, vejoPacotes, casa]);
+  }, [petshop.id, hojeIso, vejoFinanceiro, cuidoDoFinanceiro, vejoEstoque, vejoPacotes, casa, cobrar]);
 
   // quem chamar de volta e aniversariantes: consulta à parte, para não segurar o resto da tela
   const vejoClientes = posso("clientes");
   // check-outs de creche e hotel que saíram sem cobrança (feitos por quem não mexe com dinheiro): quem recebe vê aqui
-  const { dados: semCobrar } = useDados(async () => {
-    if (!vejoFinanceiro || !posso("creche_hotel")) return 0;
-    return (await idsParaCobrar(sb, petshop.id)).length;
-  }, [petshop.id, hojeIso, vejoFinanceiro]);
-  const paraCobrar = semCobrar ?? 0;
+  // (vêm na mesma leitura do primeiro olhar)
+  const paraCobrar = dados?.paraCobrar ?? 0;
   // lista de espera do hotel: abriu vaga para alguém (mesma conta da Ocupação)
   const vagaNaEspera = useVagaNaEsperaDoHotel(posso("creche_hotel"));
-  // mensalistas que saíram depois do horário e esperam a decisão da taxa (só quem recebe lê)
-  const { dados: taxasPendentes } = useDados(async () => (vejoFinanceiro && posso("creche_hotel") ? contarAtrasosPendentes(sb, petshop.id) : 0), [petshop.id, hojeIso, vejoFinanceiro]);
-  const { dados: paraChamar } = useDados(async () => (vejoClientes ? buscarParaChamar(sb, petshop.id) : null), [petshop.id, hojeIso, vejoClientes]);
+  // mensalistas que saíram depois do horário e esperam a decisão da taxa (só quem recebe lê; na mesma leitura)
+  const taxasPendentes = dados?.taxasPendentes ?? 0;
+  // abaixo da dobra: só depois que o primeiro olhar chegou (não disputa a rede com ele)
+  const primeiroOlhar = Boolean(dados);
+  const { dados: paraChamar } = useDados(async () => (vejoClientes && primeiroOlhar ? buscarParaChamar(sb, petshop.id) : null), [petshop.id, hojeIso, vejoClientes, primeiroOlhar]);
   const chamados = paraChamar ? lerChamados(petshop.id) : {};
   const comFone = (grupos: GrupoChamar[]) => grupos.filter((g) => g.telefone);
   const sumidos = paraChamar ? comFone(quemSumiu(paraChamar, 30, hoje)) : [];
@@ -223,7 +177,9 @@ export default function Hoje() {
   const ativos = (dados?.ags ?? []).filter((a) => !["cancelado", "faltou"].includes(a.status));
   const feitos = ativos.filter((a) => a.status === "concluido").length;
   // concluídos de hoje que ninguém cobrou (o banco diz quais, sem valor): não são "tudo certo"
-  const { ids: semConta } = useParaCobrar(hoje, hoje);
+  // vêm na leitura do primeiro olhar; sem ela (banco antes da atualização), à parte, como antes
+  const { ids: semContaAparte } = useParaCobrar(hoje, hoje, Boolean(dados && !dados.cobrarHoje));
+  const semConta = dados?.cobrarHoje ? new Set(dados.cobrarHoje) : semContaAparte;
   const faltaCobrarHoje = ativos.filter((a) => semConta.has(a.id)).length;
   const semConcluir = ativos.length - feitos;
   // marcados como "não cobrar" hoje: o dia fecha, mas o dono vê quantos foram e quem marcou
@@ -351,6 +307,9 @@ export default function Hoje() {
         {fechadoHoje && casa && !banho && <p className="g-aviso" role="status" style={{ margin: 0 }}><span className="g-cresce"><b>{fechadoHoje}.</b> {rotuloCasa === "Hotel" ? "O hotel não recebe chegadas hoje. Quem está hospedado continua hospedado." : rotuloCasa === "Creche" ? "A creche não abre hoje: ninguém é esperado na chamada e ninguém leva falta." : "A creche não abre hoje e ninguém leva falta. Quem está hospedado no hotel continua hospedado."}</span></p>}
         {cr && cartaoDaChamada && <ChamadaDeHoje esperados={cr.esperados} aindaNao={cr.aindaNao} naCasa={cr.naCasa} sairam={cr.sairam} faltaram={cr.faltaram.length} />}
 
+        {/* "Bom dia" do Mozart: primeira abertura do dia, até 3 linhas; lê sozinho (gestao_bom_dia), não depende dos dados desta tela */}
+        {!contaNova && <BomDia />}
+
         {/* pedidos que chegaram pelo link vêm no alto: no celular, abaixo dos primeiros passos e do Mozart ficavam longe da vista */}
         {posso("agenda") && <PedidosLink />}
 
@@ -476,6 +435,7 @@ export default function Hoje() {
 
         {!contaNova && cuidoDoFinanceiro && dados && <RecebidoNaSemana valor={dados.recebidoSemana} hoje={dados.entrou} />}
         <MinhaComissao />
+        {!cuidoDoFinanceiro && <MeuMes />}
 
         <div className={semAgenda ? "g-pilha g" : "g-duas"}>
           {!semAgenda && <section>
@@ -530,7 +490,7 @@ export default function Hoje() {
           </section>}
 
           <div className="g-pilha g">
-            {posso("clientes") && posso("agenda") && <DicasMozart semDicas={[...(sumidos.length ? ["sumidos"] : []), ...(niver.length ? ["niver"] : [])]} />}
+            {primeiroOlhar && posso("clientes") && posso("agenda") && <DicasMozart semDicas={[...(sumidos.length ? ["sumidos"] : []), ...(niver.length ? ["niver"] : [])]} />}
             {atencao.length > 0 && (
               <section>
                 <div className="g-card-t"><h2>Pede a sua atenção</h2><span className="g-tag amarelo">{atencao.length}</span></div>
@@ -552,7 +512,7 @@ export default function Hoje() {
               </section>
             )}
 
-            <MetaMes />
+            {primeiroOlhar && <MetaMes />}
 
             {!contaNova && !semAgenda && <section className="g-card">
               <div className="g-card-t"><h3>Movimento da semana</h3><span className="g-muted g-pp">horários por dia</span></div>

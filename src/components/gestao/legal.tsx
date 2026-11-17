@@ -2,22 +2,55 @@ import Link from "next/link";
 import { Selo } from "./marca";
 import { EMPRESA, identificacao } from "@/lib/empresa";
 import { WHATSAPP_SUPORTE_TEXTO, linkSuporte } from "@/lib/gestao/contato";
+import { textoVigencia, type Documento } from "@/lib/gestao/documentos";
 import "./legal.css";
 
-/** Data da última revisão dos Termos e da Política do Gestão (os dois mudam juntos). */
-export const LEGAL_ATUALIZADO_EM = "11 de novembro de 2026";
-/** Cada documento tem a própria data: mudou o texto, mude a data dele. */
-export const ATUALIZADO_EM: Record<"termos" | "privacidade", string> = { termos: LEGAL_ATUALIZADO_EM, privacidade: "15 de novembro de 2026" };
-
-/** Dado que ainda não existe no repositório: fica à vista até alguém preencher. */
+/** Dado que ainda não existe no repositório: fica à vista, entre colchetes, até alguém preencher (em `src/lib/empresa.ts`). */
 export function Preencher({ children }: { children: React.ReactNode }) {
-  return <mark className="g-leg-falta">[PREENCHER: {children}]</mark>;
+  return <mark className="g-leg-falta">[{children}]</mark>;
 }
 
-/** Razão social, CNPJ e endereço vêm de `src/lib/empresa.ts`. Enquanto estiverem vazios, aparece o marcador. */
+/** Razão social, CNPJ e endereço vêm de `src/lib/empresa.ts`. Cada um que estiver vazio aparece como marcador. */
 export function QuemResponde() {
-  const id = identificacao();
-  return id ? <b>{id}</b> : <Preencher>razão social, CNPJ e endereço da empresa dona da marca {EMPRESA.marca}, em src/lib/empresa.ts</Preencher>;
+  if (EMPRESA.razaoSocial && EMPRESA.cnpj && EMPRESA.endereco) return <b>{identificacao()}</b>;
+  return (
+    <b>
+      {EMPRESA.razaoSocial || <Preencher>RAZÃO SOCIAL</Preencher>}, inscrita no CNPJ sob o nº {EMPRESA.cnpj || <Preencher>CNPJ</Preencher>},
+      com sede em {EMPRESA.endereco || <Preencher>ENDEREÇO</Preencher>}
+    </b>
+  );
+}
+
+/** E-mail para assuntos de privacidade, do encarregado e jurídicos. */
+export function EmailJuridico() {
+  return EMPRESA.emailJuridico ? <a href={`mailto:${EMPRESA.emailJuridico}`}>{EMPRESA.emailJuridico}</a> : <Preencher>E-MAIL DE CONTATO</Preencher>;
+}
+export function Foro() {
+  return EMPRESA.foro ? <>{EMPRESA.foro}</> : <Preencher>FORO</Preencher>;
+}
+export function Encarregado() {
+  return EMPRESA.encarregado ? <>{EMPRESA.encarregado}</> : <Preencher>NOME DO ENCARREGADO</Preencher>;
+}
+
+/** Uma parte do documento: título, o resumo curto ("Em resumo") e o texto completo. */
+export function Parte({ id, n, titulo, resumo, children }: { id: string; n: number; titulo: string; resumo: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="g-leg-parte" aria-labelledby={`${id}-t`}>
+      <h2 id={`${id}-t`}>{n}. {titulo}</h2>
+      <p className="g-leg-sintese"><b>Em resumo:</b> {resumo}</p>
+      {children}
+    </section>
+  );
+}
+
+/** Índice das partes, com âncoras. */
+export function Indice({ partes }: { partes: [id: string, titulo: string][] }) {
+  return (
+    <details className="g-leg-indice">
+      <summary>Ver todas as partes ({partes.length})</summary>
+      <ol>{partes.map(([id, t]) => <li key={id}><a href={`#${id}`}>{t}</a></li>)}</ol>
+    </details>
+  );
 }
 
 export function Email() {
@@ -28,7 +61,7 @@ export function Zap() {
 }
 
 /** Moldura das páginas legais do Gestão (Termos de uso e Política de privacidade). A raiz `g g-raiz` vem do layout. */
-export default function Legal({ pagina, titulo, resumo, children }: { pagina: "termos" | "privacidade"; titulo: string; resumo: string; children: React.ReactNode }) {
+export default function Legal({ pagina, titulo, resumo, children }: { pagina: Documento; titulo: string; resumo: string; children: React.ReactNode }) {
   return (
     <div className="g-leg">
       <header className="g-leg-topo">
@@ -41,7 +74,7 @@ export default function Legal({ pagina, titulo, resumo, children }: { pagina: "t
       <main className="g-leg-folha">
         <div className="g-leg-abre">
           <h1>{titulo}</h1>
-          <p className="g-leg-data">Última atualização: {ATUALIZADO_EM[pagina]}</p>
+          <p className="g-leg-data">{textoVigencia(pagina)}</p>
           <p className="g-leg-resumo">{resumo}</p>
         </div>
         <div className="g-leg-texto">{children}</div>

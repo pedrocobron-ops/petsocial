@@ -21,9 +21,9 @@ const Comanda = dynamic(() => import("./comanda"), { ssr: false });
  * usa a mesma lista para a marca "Falta cobrar".
  * Pet shop que nunca fechou a conta de um atendimento pelo sistema recebe a lista vazia.
  */
-export function useParaCobrar(de?: Date, ate?: Date) {
+export function useParaCobrar(de?: Date, ate?: Date, ligado = true) {
   const { sb, petshop, posso, vejoFinanceiro } = useGestao();
-  const vale = posso("agenda") || vejoFinanceiro;
+  const vale = (posso("agenda") || vejoFinanceiro) && ligado;
   const deIso = de ? isoDia(de) : null, ateIso = ate ? isoDia(ate) : null;
   const { dados, recarregar } = useDados(async () => {
     if (!vale) return [] as { id: string; inicio: string }[];

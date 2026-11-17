@@ -86,9 +86,21 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   reserva: hotel de Thor, 19/11" vira "Sinal da reserva: hotel de Thor", "(parte)" fica); "Creche e hotel" como "Hotel" ou "Creche"
   pela entrada e pelo que o pet shop faz (`nomeDaCategoria`); o que é de cada pet (`lancamentoDoPet`: diária, sinal, devolução, sem
   pegar "Melissa" pela "Mel"); o Mozart num hotel só diz "Hotel".
+- `bom-dia.js`: o "Bom dia" do Mozart (`src/lib/gestao/bom-dia.ts`): no máximo 3 linhas na ordem dia (agenda, buraco livre, casa),
+  quem deve e vem hoje, vacina de quem vem, pacote no último uso, aniversário; sem `devem` (papel sem dinheiro) nada de R$; só
+  "agenda livre" não vira cartão; buraco na agenda com almoço e funcionamento. E a prévia da autorização das fotos
+  (`fotos-redes.ts`): o @ arrumado igual ao banco e a frase "Sem marcar o meu perfil." trocada.
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
+- `compra-etiquetas.js`: códigos de barras das etiquetas (`codigo-barras.ts`): EAN-13 só com 13 números e dígito certo, senão
+  Code 128; a tabela do Code 128 conferida (106 símbolos de 11 módulos, barras pares, todos diferentes); vetores conhecidos
+  (MP000001 = início B, M, P, troca C, 00 00 01, verificador 33; 7891234567890 com o verificador 43; os desenhos de
+  4006381333931 e MP000001 conferidos com um leitor de verdade, zxing-cpp, ao escrever) e o decodificador de `lib/barras.js`
+  (tabela do EAN em larguras, independente da do app) lendo de volta 16 códigos. Sugestão de compra (`compra.ts`) à mão:
+  21 em 6 semanas = 3,5 por semana, 7 + mínimo 3 = 10, tem 4: comprar 6 (com a explicação escrita); 8 semanas; caixa de 12;
+  venda desfeita desconta e uso no banho conta; perda à parte; sem vendas recentes sem sugestão; produto de 10 dias; parados,
+  acabando e valor em estoque (custo × quantidade).
 
 **banco/** (API do Supabase com o login de cada papel, como o navegador faz; SQL só para preparar e conferir)
 - `seguranca.js`: isolamento entre pet shops e anônimo; dono não mexe na própria assinatura nem vira admin; o que cada papel grava
@@ -143,8 +155,20 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   prazo de 60 dias (página e foto somem, as fotos ficam), freio de 60 aberturas por minuto (PT429); álbum (`album_criar`,
   `album_publico`, rota da foto, vencido some); foto apagada só pelo dono (sai do boletim e do álbum, vai para a fila), faxina dos
   arquivos (fila, órfãos de mais de um dia), faxina geral e pet apagado. Precisa do servidor com `GESTAO_BOLETIM_FALSO=1`.
+- `fotos-redes.js`: autorização para postar a foto do pet (migração 20261196): texto exato montado pelo banco (do/da, dia, @),
+  nada vem marcado (sem escolha é recusado), @ inválido recusado, mesma escolha devolve a mesma, quem lê (dono, recepção, tosador,
+  monitora; estoque, outra loja e anônimo não; ninguém lê o código do "Não quero mais"; ninguém grava direto), freio de 5 por minuto
+  por boletim (PT429), "todas" vale para o boletim e os seguintes (nunca os mais velhos), rotas do servidor (autorizar 200/400,
+  página do link 200/404, "Não quero mais" tira todas). `gestao_bom_dia` por papel: dono e recepção veem quem deve; tosador sem
+  dinheiro e sem pacote; monitora só a casa; estoque só o dia; outra loja nada; anônimo recusado. Precisa do servidor.
 - `admin.js`: funções do painel do administrador recusadas para anônimo e dono; o admin recebe só dados da conta e quantidades;
   troca de status vai para o histórico. (O admin de teste é criado por SQL: ninguém vira admin pela API.)
+- `aceites.js`: aceite dos Termos e da Política (migração 20261197): cadastro com `aceite` nos dados grava os dois documentos na versão
+  em vigor (`src/lib/gestao/documentos.ts`), sem `aceite` (ou com lixo) não grava e não derruba o cadastro; cada um lê só os seus;
+  gravar, mudar ou apagar direto recusado; `aceitar_documentos` (anônimo e versão estranha recusados, dois toques gravam uma vez,
+  com o navegador); `admin_aceites` só para o admin (com o pet shop e a contagem por versão); login apagado deixa o aceite com o e-mail.
+  **Contas de teste:** todo cadastro dos testes passa `B.dadosDoCadastro()` (o mesmo aceite da tela Criar conta); sem isso o login
+  pararia na tela de aceite de versão nova e `N.entrar` não acharia o aplicativo.
 - `cakto.js`: webhook da Cakto de ponta a ponta pela rota do servidor: 9 ofertas, ciclo da assinatura (renovada, atrasada, recuperada,
   cancelada), reembolso, contestação, MED, segredo errado, outro produto, e-mail diferente (callback e pagamento sem conta), Escola.
   A configuração da Cakto (`config_interna`) é guardada antes e devolvida igual no fim.
@@ -169,9 +193,43 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   ".jpg" que não é foto, PDF acima de 10 MB e de 25 páginas (413), 6 fotos ou 3 PDFs (400), sem arquivo. Limite do dia por pet shop
   (`caderno_dia`, padrão 30; a contagem da loja sobe até faltar uma) com quanto resta, e o geral (`caderno_dia_geral`, posto logo
   acima do lido hoje durante o teste e devolvido); ninguém lê a tabela de uso e ela não tem texto. Dívida com "desde" pelo mesmo
-  `lancarAReceber` da tela, duas vezes ao mesmo tempo com a mesma chave: uma conta só; o tosador não anota. Precisa do servidor com
+  `lancarAReceber` da tela, duas vezes ao mesmo tempo com a mesma chave: uma conta só; o tosador não anota. **Leitura que falha não
+  conta** (migração 20261195, `caderno_reservar`/`caderno_devolver`; o campo `teste_falha` só vale com `GESTAO_CADERNO_FALSO=1`):
+  erro do modelo 502 e recusa 422 devolvem as páginas; a reserva nunca volta para o aparelho; outro pet shop e anônimo não devolvem;
+  devolver duas vezes não tira mais nada; duas leituras ao mesmo tempo na última página: uma passa. **PDF grande pela pasta
+  temporária** (`caderno-tmp`): PDF de 6 MB sobe e vai só pelo caminho, lido e apagado logo depois; o que não é PDF 415 e apagado;
+  estoque, outro pet shop, anônimo, nome fora do padrão e outro tipo não sobem; pasta de outro pet shop 400. Precisa do servidor com
   `GESTAO_CADERNO_FALSO=1`.
+- `hoje.js`: tela Hoje numa ida só ao banco (migração 20261195, `gestao_hoje`): cada parte igual à leitura antiga pela API
+  (agenda de hoje com pet, tutor, serviços a mais e profissional; preços por `agendamentos_precos`; amanhã; estadias; semana;
+  serviços mais pedidos na mesma ordem; próximos; sem fechar; contagens; produtos acabando; o que entrou; contas; últimos 7 dias;
+  saúde vencendo; check-outs sem cobrança; concluídos de hoje sem cobrança) para dono, recepção, monitora, tosador e estoque,
+  com estoque, dinheiro e pacotes só para quem tem a área; anônimo recusado; dono de outra loja não lê nada.
+- `faxina.js`: faxina agendada (migração 20261195): rota `/api/gestao/faxina` recusada sem o segredo (401; 503 no servidor de teste,
+  que não tem `GESTAO_FAXINA_SEGREDO`), segredo pelo `Authorization: Bearer` (Vercel Cron) ou `x-gestao-faxina`; as funções só com a
+  chave de serviço; a tarefa `gestao-faxina-diaria` no pg_cron (quando o banco tem); `faxinaGeral` com a chave de serviço local
+  (`SUPABASE_SERVICE_ROLE_KEY` ou `npx supabase status -o env`), só na loja de teste: foto do boletim sem boletim há mais de um dia
+  sai, a de agora fica; PDF do caderno-tmp com mais de uma hora sai, o de agora fica; o de outro pet shop fica.
 - `visitas.js`: última visita de cada pet: a função do banco (`visitas_dos_pets`) = a conta do navegador, para o dono e para o tosador.
+- `lucro.js`: **Quanto sobrou** e **Por pessoa** (migração 20261193: `lucro_do_periodo`, `equipe_do_periodo`, `servicos.custo_material`,
+  `lancamentos.vendido_por`), lançando pelo mesmo código das telas e montando por `src/lib/gestao/lucro.ts`. Conta do Thor (Banho 60 +
+  Hidratação 30 + Corte 15 + shampoo 29,90 por R$ 120,00), parte de R$ 40 da conta do Bob, Luna sem conta, venda de balcão da recepção,
+  laço sem custo, pacote, entrada solta, aluguel, comissão paga e devolução: **linhas + outros lançamentos = Entrou do Financeiro**
+  (445,30), faturamento (435,30) e **resultado = Resultado do mês** (−98,03) pela mesma conta da tela; divisão da conta entre os
+  serviços igual à da comissão (53,37 / 26,69 / 13,34), a parte conta a receita e não a vez; material do Banho 8,50 × vezes; produto
+  pelo custo guardado na venda e, sem ele, pelo custo de hoje; Hidratação e laço com "custo não informado" (sem margem);
+  **comissão das linhas = `comissao_do_periodo`** (92,02, o centavo do arredondamento na maior linha) e "contar a comissão como custo".
+  Custo do material: só o dono grava e lê (`servicos_custos`; a coluna não tem select). Quem vendeu: `vendido_por` = quem lançou
+  (vendedor de outra loja é trocado). Por pessoa: atendimentos = os da comissão, conta do atendimento para quem atendeu, balcão para
+  quem lançou, **soma das pessoas = linhas de Quanto sobrou**; tosador e recepção só a própria linha. Recepção, tosador, estoque e
+  anônimo não leem Quanto sobrou; funções internas fechadas. Mozart `ver_lucro`: o de mais sobra primeiro, sem custo = null, mesmo
+  resultado do Financeiro, recusado para quem não cuida do financeiro.
+- `compra.js`: sugestão de compra e etiquetas (migração 20261194): "vem em caixa de" (`produtos.embalagem_qtd`) lido por todos
+  (permissão por coluna), gravado só por quem cuida do estoque, 0 recusado; código interno (`produtos_gerar_codigos`): MP + 6
+  números na ordem do nome, depois do maior já usado (também em produto fora da lista), produto com código fica igual, pedir de
+  novo não gera outro, dois pedidos ao mesmo tempo não repetem, outro pet shop não muda, tosador/recepção/anônimo/dona de outra
+  loja recusados; o Mozart `o_que_comprar` com os movimentos de verdade (grupo do fornecedor, 3,5 por semana, comprar 6 com a
+  explicação, 4 semanas = 13, caixa de 12), valor em estoque só para quem vê o financeiro, recusado para quem não tem Estoque.
 - `velocidade.js`: abrir o aplicativo numa ida só ao banco (migração 20261185): `lerBase` (`gestao_base`) = a leitura antiga parte por
   parte (`lerPetshop` + `lerEquipe` + `lerServicos`) para dono, recepção, monitora, tosador e estoque, com meta, diárias, opções com valor,
   comissão, convite e preços só para quem pode; as seis contagens da tela Hoje (`gestao_contagens`) = as contagens pela API; anônimo
@@ -195,6 +253,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   porte, Tempo total e Total, o banco com o principal e os 3 a mais, a agenda, a conta de R$ 145,00 e a comissão por serviço ao centavo);
   em 1366, tirar o primeiro (o seguinte assume), alterar um horário com três serviços, pet sem porte; tosador sem nenhum valor na tela
   (o banco põe o preço da lista) e preço travado para a recepção.
+- `primeiro-acesso.js`: dono novo do zero (criar conta, duas perguntas, "Começar já") até o primeiro resultado: no fim do guia
+  "Pronto em X minutos", "Marcar o primeiro horário" (botão principal) e "Copiar meu link de agendamento"; o link copiado em 7
+  toques e 4 campos; o primeiro horário (pet novo cadastrado na própria folha) em até 13 toques e 7 campos, com "Pronto em X
+  minutos" no aviso do marcado (antes da mudança: 19 toques e 9 campos). 390 até o horário, 1366 até o link.
+- `fotos-redes.js`: a página do boletim em 390 ("Pode postar a foto do Thor…", nada marcado, prévia com o @ = texto guardado,
+  "Pode postar desde", "Não quero mais" com confirmação); a ficha e o álbum em 1366 ("Pode postar ✓ (desde dd/mm)", depois
+  "Sem autorização"); o Bom dia do dono (quem deve) e do tosador (sem valor), "Perguntar ao Mozart", "Dispensar por hoje" que não volta.
 - `checkout-lento.js`: check-out do hotel com a leitura do sinal atrasada 2,5 s (390 e 1366): enquanto carrega, a folha não mostra valor
   e o botão fica apagado (clicar não grava); depois, "Receber R$ 2,75" (110 − sinal 107,25) e "Receber R$ 1,60" (80 − 20% do segundo
   pet − sinal 62,40), uma entrada só cada.
@@ -209,7 +274,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   R$ 50 da Joana sem data, nada no caixa, Thor marcado no dia +3 às 10:00 uma vez só. 1366: Tabela de preços ("Atualizar o preço de
   Banho M de R$ 60,00 para R$ 55,00?", Hidratação "Igual ao que já está", Banho de ofurô novo: no banco, só o M muda e o novo entra
   uma vez) e "Ler a carteirinha" do Thor (Antirrábica em branco com "Definir vencimento"; três cuidados uma vez só, com a
-  veterinária nas observações). Capturas em `testes/saida/caderno-*.png`.
+  veterinária nas observações). Foto HEIC que o Chromium não abre: o aviso diz para mandar pelo Safari ou tirar um print. PDF de 5 MB:
+  sobe antes para o `caderno-tmp`, o envio à rota fica pequeno, a leitura vem e nada fica na pasta. Capturas em `testes/saida/caderno-*.png`.
 - `mozart-fila.js`: escrever enquanto o Mozart responde (o servidor do Mozart vira um roteiro lento com `page.route`): depois do
   "Pode fazer", o Enter põe a mensagem na conversa com "Na fila" e ela vai sozinha, uma vez, quando ele termina; se a resposta trouxer
   um cartão para confirmar, a mensagem volta para a caixa com o aviso e o cartão não é descartado.
@@ -253,14 +319,42 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   "Recebeu adiantado?" R$ 50,00 no Pix, dois cliques: uma entrada e o cartão "Pago adiantado R$ 50,00"; lista de espera com
   "Prefere canil perto da janela": Marcar reserva abre com a observação e a reserva é salva com ela. Capturas em
   `testes/saida/hotel-bia-*.png`.
+- `lucro.js`: Quanto sobrou e Por pessoa pela tela, em 390 e 1366 (dono): Banho 2 vezes, R$ 113,33, material R$ 17,00, sobrou R$ 96,33;
+  Hidratação R$ 26,67 com "custo não informado" (nunca 100%); Produtos (390): shampoo de balcão R$ 59,80 − R$ 24,00; Como fecha com o
+  Financeiro (R$ 199,80 + outros R$ 200,00 = Entrou R$ 399,80; resultado −R$ 50,20) e o **mesmo Resultado do mês na tela Financeiro**;
+  Exportar baixa a planilha; Por pessoa com o tosador (2 atendimentos, R$ 140,00) e a recepção (venda R$ 59,80). 1366: Meu pet shop,
+  Custo do material por atendimento (grava R$ 4,20; o Banho abre com R$ 8,50). Tosador na tela Hoje: "Meu mês" com 2 atendimentos e sem
+  reais. Capturas em `testes/saida/lucro-*.png`.
+- `aceite.js`: Termos, Política e aceite pela tela, em 390 e 1366: Criar conta com a caixa desmarcada e os dois links (sem marcar, a conta
+  não nasce; marcada, em 390, nasce com os dois aceites "cadastro" no banco); as páginas com "Versão 2.0 — vigente desde 17/11/2026", o
+  resumo de cada parte e o índice; a dona sem aceite da versão em vigor entra e vê "Dona, atualizamos as nossas regras" (o resumo das
+  mudanças, os dois documentos, a caixa desmarcada; sem marcar não segue), aceita com dois cliques e o aplicativo abre com os dois
+  aceites "reaceite" gravados uma vez. Capturas em `testes/saida/aceite-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
+- `compra-etiquetas.js`: Estoque pela tela, 390 e 1366. O que comprar: "Vendeu em média 3,5 por semana nas últimas 6 semanas",
+  comprar 6 (13 com 4 semanas), parados e Valor em estoque R$ 640,00 para a dona; Montar pedido abre a mensagem do WhatsApp com
+  "- 6 unidades de Ração Golden 15 kg" e mudar para 8 muda a mensagem e o link. Etiquetas na mesma aba com Voltar: 5 etiquetas,
+  "Gerar código interno" (MP000001 no banco), os códigos da página lidos de volta (`lib/barras.js`), nome comprido com
+  reticências; PDF (`page.pdf` com o tamanho do `@page`): A4 3 × 10 e 4 × 16 numa folha A4, 40 × 25 e 50 × 30 mm com uma
+  etiqueta por página; Entrada com "Imprimir etiquetas do que entrou" abre com uma por unidade. Quem cuida do estoque (sem
+  dinheiro) vê a sugestão sem nenhum R$. Capturas em `testes/saida/compra-*.png`, `etiquetas-*.png` e PDFs `etiquetas-*.pdf`
+  (conferidos com zxing-cpp ao escrever: todos os códigos lidos).
 - `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente
   de verdade) reduzidas a 1600 px no aparelho, recados, atenção à saúde, texto pronto, "Escrever com o Mozart" (de teste), salvar,
   o WhatsApp com "Oi, Ana! O boletim do Thor de hoje: <link>" e o "Boletim enviado". 1366: a monitora, pelo cartão da creche em
   Casa agora ("Fez amizade com Mel"). A página pública em 390 e 1366 (fotos carregadas, atenção, serviços, Avaliar no Google, Marcar
   o próximo, sem telefone do tutor, sem rolagem para o lado) e o álbum na ficha do pet com o link para o tutor. Capturas em
   `testes/saida/boletim-*.png` e `album-390.png`.
+
+## Variáveis do servidor de produção (não precisa para os testes)
+
+A faxina diária (`/api/gestao/faxina`, `vercel.json` → crons, todo dia às 07:23 UTC) precisa, na Vercel:
+`SUPABASE_SERVICE_ROLE_KEY` (chave de serviço do Supabase; só esta rota usa, nunca vai para o navegador),
+`GESTAO_FAXINA_SEGREDO` (32+ caracteres aleatórios) e `CRON_SECRET` com **o mesmo valor** (a Vercel Cron manda
+`Authorization: Bearer <CRON_SECRET>`). Sem elas a rota responde 503 e não faz nada. A faxina do banco (álbuns vencidos,
+freios antigos, reservas do caderno) também roda pelo pg_cron (`gestao-faxina-diaria`, 06:17 UTC) quando o banco tem pg_cron.
+Para testar a rota à mão: `curl -H "x-gestao-faxina: <segredo>" https://…/api/gestao/faxina` (devolve só quantidades).
 
 ## Resultados que são assim de propósito
 
@@ -313,6 +407,11 @@ Nenhum no momento. (O freio de envios do link, que a 20261168 e a 20261173 tinha
 Medido em 15/11/2026 (servidor já no ar, banco local): `npm run test:tudo` levou 193 a 206 s em quatro rodadas seguidas, 588
 conferências em 15 arquivos. Por parte: unidade + banco ~60 s, migrações ~9 s, telas ~130 s (o passeio sozinho ~110 s).
 Duas rodadas seguidas passaram sem limpar nada entre elas (cada teste cria e apaga a sua loja).
+
+Tela Hoje (migração 20261195), medida em 17/11/2026 com o Playwright e 150 ms de latência em cada pedido (dono, loja com banho,
+creche, hotel e loja, 3 horários hoje; três aberturas em 390 e três em 1366): antes, 40 a 44 pedidos ao Supabase, a frase do Mozart
+em 1,56 a 1,71 s e a rede quieta em 1,78 a 2,72 s; depois, 24 a 26 pedidos, a frase em 0,73 a 0,83 s e a rede quieta em 1,58 a 2,08 s
+(o que fica: a abertura do aplicativo, a creche, os pedidos do link e o que vem abaixo da dobra depois do primeiro olhar).
 
 Cuidado com banco compartilhado: `link.js` e `cakto.js` mudam `config_interna` (global) durante alguns segundos e devolvem no fim.
 Outro processo testando o link ou a Cakto no mesmo banco ao mesmo tempo pode ver esses valores.

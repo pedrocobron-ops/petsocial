@@ -11,6 +11,8 @@ import { AvatarPessoa, AvatarPet, Esqueleto, useAvisos, useDados, Vazio } from "
 import { baixarPlanilha, brlMini, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, numeroCsv, PALETA, paginar, SemAcesso, somaPorForma, type Cel } from "@/components/gestao/financeiro/comum";
 import { Anel, Barras, Kpi, Rosca, Tile } from "@/components/gestao/painel";
 import RelatorioProdutos from "@/components/gestao/loja/relatorio-produtos";
+import QuantoSobrou from "@/components/gestao/relatorios/lucro";
+import PorPessoa from "@/components/gestao/relatorios/por-pessoa";
 import { percentuaisQueFecham } from "@/lib/gestao/dinheiro";
 import { cobradoPorServico, type ParteDoServico } from "@/lib/gestao/servicos-do-horario";
 import type { Banco } from "@/lib/gestao/supabase";
@@ -607,6 +609,8 @@ function Relatorios() {
             {!semBanho && <CrecheNoRelatorio de={de} ate={ate} />}
             <HotelNoRelatorio de={de} ate={ate} antes={antes} />
 
+            <QuantoSobrou de={deIso} ate={ateIso} />
+
             <RelatorioProdutos de={deIso} ate={ateIso} />
 
             <div className="g-duas" style={some}>
@@ -650,6 +654,8 @@ function Relatorios() {
                 ) : <p className="g-muted g-p">Nenhum atendimento concluído neste período.</p>}
               </section>
             </div>
+
+            {equipe.filter((x) => x.ativo).length > 1 && <PorPessoa de={deIso} ate={ateIso} />}
 
             <div className={semBanho ? "g-pilha" : "g-duas"}>
               {/* quem trabalha sozinha, sem comissão para ninguém, não precisa do bloco de comissão */}

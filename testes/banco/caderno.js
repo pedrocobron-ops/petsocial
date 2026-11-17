@@ -30,10 +30,12 @@ function pdf(n) {
     f.set('tipo', tipo);
     if (extra.paginas) f.set('paginas', extra.paginas);
     for (const [nome, buf, mime] of arquivos) f.append('arquivo', new Blob([buf], { type: mime }), nome);
+    for (const [k, v] of Object.entries(extra.campos ?? {})) for (const x of [].concat(v)) f.append(k, x);
     const r = await fetch(URL, { method: 'POST', headers: sb ? { authorization: `Bearer ${await token(sb)}` } : {}, body: f });
     return { status: r.status, j: await r.json().catch(() => null) };
   };
   const foto = (n = 1) => Array.from({ length: n }, (_, i) => [`f${i}.jpg`, JPEG, 'image/jpeg']);
+  const anon0 = () => B.cliente();
   const usoHoje = (p = P) => B.num(`select coalesce(sum(paginas), 0) from caderno_uso where petshop_id='${p}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
 
   T.secao('quem pode ler');
@@ -92,6 +94,69 @@ function pdf(n) {
   r = await ler(L.sb.dono, 'clientes', []);
   T.ok('sem arquivo: 400', r.status === 400 && r.j?.erro === 'sem_arquivo', r);
   T.ok('recusados não contam no limite', usoHoje() === antes, { antes, depois: usoHoje() });
+
+  T.secao('leitura que falha não conta (migração 20261195)');
+  const reservas = () => B.num(`select count(*) from caderno_reservas where petshop_id='${P}'`);
+  let antesF = usoHoje(), resAntes = reservas();
+  r = await ler(L.sb.dono, 'clientes', foto(2), { campos: { teste_falha: 'erro' } });
+  T.ok('erro do modelo (ou demora): 502, as 2 páginas voltam', r.status === 502 && r.j?.erro === 'ia_fora' && usoHoje() === antesF && reservas() === resAntes, { r, uso: usoHoje() - antesF });
+  r = await ler(L.sb.dono, 'clientes', foto(1), { campos: { teste_falha: 'recusa' } });
+  T.ok('recusa do modelo: 422, a página volta', r.status === 422 && r.j?.erro === 'recusa' && usoHoje() === antesF, { r, uso: usoHoje() - antesF });
+  r = await ler(L.sb.dono, 'clientes', foto(1));
+  T.ok('a que deu certo conta (e o número da reserva não volta para o aparelho)', r.status === 200 && usoHoje() === antesF + 1 && r.j.reserva === undefined && !JSON.stringify(r.j).includes('reserva'), r.j);
+  T.ok('ninguém lê as reservas direto', ((await L.sb.dono.from('caderno_reservas').select('*')).data ?? []).length === 0);
+  antesF = usoHoje();
+  const rv = B.must(await L.sb.dono.rpc('caderno_reservar', { p_petshop: P, p_paginas: 2 }), 'reservar');
+  T.ok('caderno_reservar conta como caderno_contar', rv.ok && rv.reserva && usoHoje() === antesF + 2, rv);
+  T.ok('outro pet shop não devolve a reserva de A', (await Bl.sb.dono.rpc('caderno_devolver', { p_reserva: rv.reserva })).data?.ok === false && usoHoje() === antesF + 2);
+  T.ok('anônimo não devolve', !!(await anon0().rpc('caderno_devolver', { p_reserva: rv.reserva })).error);
+  T.ok('devolver: as páginas voltam', (await L.sb.dono.rpc('caderno_devolver', { p_reserva: rv.reserva })).data?.ok === true && usoHoje() === antesF);
+  T.ok('devolver de novo não tira mais nada', (await L.sb.dono.rpc('caderno_devolver', { p_reserva: rv.reserva })).data?.ok === false && usoHoje() === antesF);
+  T.ok('reserva que não existe: nada', (await L.sb.dono.rpc('caderno_devolver', { p_reserva: B.uuid() })).data?.ok === false);
+  // duas leituras ao mesmo tempo com uma página sobrando: uma passa, a outra ouve o limite
+  const limC = B.num(`select public.link_limite('caderno_dia', 30)`);
+  B.sql(`update caderno_uso set paginas = ${limC - 1} where petshop_id='${P}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
+  const duas = await Promise.all([ler(L.sb.dono, 'clientes', foto(1)), ler(L.sb.caixa, 'clientes', foto(1))]);
+  T.ok('duas ao mesmo tempo na última página: uma lê, a outra ouve o limite', duas.filter((x) => x.status === 200).length === 1 && duas.filter((x) => x.status === 429).length === 1 && usoHoje() === limC, duas.map((x) => x.status));
+  B.sql(`update caderno_uso set paginas = ${limC - 1} where petshop_id='${P}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
+  const duasF = await Promise.all([ler(L.sb.dono, 'clientes', foto(1), { campos: { teste_falha: 'erro' } }), ler(L.sb.caixa, 'clientes', foto(1))]);
+  T.ok('a que falha devolve a página e nunca deixa a outra passar do limite', duasF[0].status === 502 && [200, 429].includes(duasF[1].status)
+    && usoHoje() === limC - 1 + (duasF[1].status === 200 ? 1 : 0), { status: duasF.map((x) => x.status), uso: usoHoje(), limC });
+  B.sql(`update caderno_uso set paginas = ${antesF} where petshop_id='${P}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
+
+  T.secao('PDF grande pela pasta temporária (caderno-tmp)');
+  const tmp = (sb, nome, buf, tipo = 'application/pdf') => sb.storage.from('caderno-tmp').upload(nome, new Blob([buf], { type: tipo }), { contentType: tipo });
+  const existe = (nome) => B.num(`select count(*) from storage.objects where bucket_id = 'caderno-tmp' and name = '${nome}'`) === 1;
+  const grande = Buffer.concat([pdf(2), Buffer.alloc(6 * 1024 * 1024, 32)]);
+  let nome = `${P}/${B.uuid()}.pdf`;
+  T.passa('o dono sobe o PDF de 6 MB (passa do limite de envio da Vercel)', await tmp(L.sb.dono, nome, grande));
+  antesF = usoHoje();
+  r = await ler(L.sb.dono, 'clientes', [], { campos: { caminho: nome, paginas_caminho: '1' } });
+  T.ok('a rota lê pelo caminho: 200, as 2 páginas do PDF contam', r.status === 200 && r.j.paginas === 2 && usoHoje() === antesF + 2 && r.j.leitura.clientes.length > 0, r);
+  T.ok('e o arquivo é apagado logo depois de ler', !existe(nome));
+  nome = `${P}/${B.uuid()}.pdf`;
+  T.passa('junto com uma foto: sobe o PDF', await tmp(L.sb.caixa, nome, pdf(1)));
+  r = await ler(L.sb.caixa, 'clientes', foto(1), { campos: { caminho: nome, paginas_caminho: '1' } });
+  T.ok('foto pelo envio + PDF pelo caminho: 200, 2 páginas, apagado', r.status === 200 && r.j.paginas === 2 && !existe(nome), r);
+  nome = `${P}/${B.uuid()}.pdf`;
+  await tmp(L.sb.dono, nome, JPEG);
+  r = await ler(L.sb.dono, 'clientes', [], { campos: { caminho: nome } });
+  T.ok('o que não é PDF pelo caminho: 415, apagado, não conta', r.status === 415 && !existe(nome), r);
+  T.recusa('o estoque (sem Clientes) não sobe', await tmp(L.sb.estoque, `${P}/${B.uuid()}.pdf`, pdf(1)));
+  T.recusa('o dono de outro pet shop não sobe na pasta de A', await tmp(Bl.sb.dono, `${P}/${B.uuid()}.pdf`, pdf(1)));
+  T.recusa('anônimo não sobe', await tmp(anon0(), `${P}/${B.uuid()}.pdf`, pdf(1)));
+  T.recusa('nome fora do padrão <petshop>/<aleatório>.pdf recusado', await tmp(L.sb.dono, `${P}/lista.pdf`, pdf(1)));
+  T.recusa('outro tipo de arquivo recusado pelo bucket', await tmp(L.sb.dono, `${P}/${B.uuid()}.pdf`, JPEG, 'image/jpeg'));
+  nome = `${Bl.P}/${B.uuid()}.pdf`;
+  T.passa('o outro pet shop sobe na pasta dele', await tmp(Bl.sb.dono, nome, pdf(1)));
+  T.ok('o dono de A não baixa nem apaga o arquivo de B', !!(await L.sb.dono.storage.from('caderno-tmp').download(nome)).error && ((await L.sb.dono.storage.from('caderno-tmp').remove([nome])).data ?? []).length === 0 && existe(nome));
+  r = await ler(L.sb.dono, 'clientes', [], { campos: { caminho: nome } });
+  T.ok('caminho da pasta de outro pet shop: 400, nada lido', r.status === 400 && existe(nome), r);
+  T.ok('anônimo não baixa', !!(await anon0().storage.from('caderno-tmp').download(nome)).error);
+  B.must(await Bl.sb.dono.storage.from('caderno-tmp').remove([nome]), 'apagar o de B');
+  r = await ler(L.sb.dono, 'clientes', [], { campos: { caminho: `${P}/${B.uuid()}.pdf` } });
+  T.ok('caminho que não existe: 400', r.status === 400 && r.j?.erro === 'sem_arquivo', r);
+  T.ok('nada disso contou a mais', usoHoje() === antesF + 4, usoHoje() - antesF);
 
   T.secao('limite do dia');
   const anon = B.cliente();

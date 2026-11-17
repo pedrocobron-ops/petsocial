@@ -24,7 +24,9 @@ import dynamic from "next/dynamic";
 import LembretesDoDia, { BotaoLembrete, lembretesQueFaltam } from "@/components/gestao/agenda/lembretes";
 import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "@/components/gestao/calendario";
+import { artigoDe } from "@/lib/gestao/modulos";
 import "./agenda.css";
+import { minutosDesde, textoProntoEm, useComecoDaConta } from "@/components/gestao/pronto-em";
 import { comPrecosDeAgendamento } from "@/lib/gestao/reservado";
 
 // folhas que só abrem com um toque: vêm à parte e baixam depois que a agenda abriu (useAdiantar)
@@ -57,6 +59,10 @@ function Agenda() {
   const [bloqueioAberto, setBloqueioAberto] = useState<Bloqueio | null>(null);
   // horário que acabou de ser marcado: a agenda fica no dia dele, com ele em destaque e a confirmação para o tutor à mão
   const [recem, setRecem] = useState<Marcado | null>(null);
+  // veio do fim do guia ("Marcar o primeiro horário"): o aviso do marcado diz em quanto tempo a conta ficou pronta
+  const [primeiraVez, setPrimeiraVez] = useState(false);
+  const comeco = useComecoDaConta();
+  const [prontoEm, setProntoEm] = useState<number | null>(null);
 
   const quemAtende = equipe.filter((p) => p.ativo && p.atende);
   // dia marcado como fechado em Meu pet shop (feriado, folga, médico): vale como o dia em que o pet shop não abre na semana
@@ -88,6 +94,7 @@ function Agenda() {
     // conta só para consulta: o atalho não abre o formulário (o banco recusaria a gravação)
     if (somenteLeitura()) { router.replace("/gestao/app/agenda"); return; }
     const petId = params.get("pet");
+    if (params.get("primeiro") === "1") setPrimeiraVez(true);
     void (async () => {
       let pet: PetComTutor | null = null;
       if (petId) pet = (await sb.from("pets").select("*, clientes(id, nome, telefone)").eq("id", petId).maybeSingle()).data as PetComTutor | null;
@@ -212,7 +219,7 @@ function Agenda() {
       </header>
 
       <div className="g-pilha">
-        {recem && <MarcadoAgora marcado={recem} lista={dados ?? []} aoAbrir={() => setAberto(recem.id)} aoFechar={() => setRecem(null)} />}
+        {recem && <MarcadoAgora marcado={recem} lista={dados ?? []} prontoEm={prontoEm} aoAbrir={() => setAberto(recem.id)} aoFechar={() => { setRecem(null); setProntoEm(null); }} />}
         <PedidosLink />
         <SeriesAcabando aoMudar={() => void recarregar()} />
         <div className="g-fila g-card g-ag-faixa">
@@ -460,7 +467,7 @@ function Agenda() {
       {novo && <FormAgendamento diaInicial={novo.dia} horaInicial={novo.hora} petInicial={novo.pet} profissionalInicial={novo.profissional}
         aoFechar={() => setNovo(null)} aoSalvar={(m) => {
           setNovo(null);
-          if (m) { setDia(isoDia(new Date(m.inicio))); setVisao("dia"); setRecem(m); }
+          if (m) { setDia(isoDia(new Date(m.inicio))); setVisao("dia"); setRecem(m); if (primeiraVez) { setProntoEm(minutosDesde(comeco)); setPrimeiraVez(false); } }
           void recarregar();
         }} />}
       {selecionado && !editando && <DetalheAgendamento agendamento={selecionado} aoFechar={() => setAberto(null)} aoMudar={() => void recarregar()} aoEditar={() => setEditando(selecionado)} />}
@@ -476,7 +483,7 @@ function Agenda() {
  * Depois de "Marcar": fica no alto da agenda até a pessoa fechar, com o dia e a hora por extenso e a confirmação pronta
  * para o tutor no WhatsApp (quem manda é a pessoa). Assim ninguém fica na dúvida se gravou e marca de novo.
  */
-function MarcadoAgora({ marcado, lista, aoAbrir, aoFechar }: { marcado: Marcado; lista: AgendamentoCompleto[]; aoAbrir: () => void; aoFechar: () => void }) {
+function MarcadoAgora({ marcado, lista, prontoEm, aoAbrir, aoFechar }: { marcado: Marcado; lista: AgendamentoCompleto[]; prontoEm?: number | null; aoAbrir: () => void; aoFechar: () => void }) {
   const { petshop } = useGestao();
   const a = lista.find((x) => x.id === marcado.id);
   const tutor = a?.pets?.clientes;
@@ -489,6 +496,7 @@ function MarcadoAgora({ marcado, lista, aoAbrir, aoFechar }: { marcado: Marcado;
         <CalendarCheck2 aria-hidden />
         <div className="g-cresce">
           <b>{a?.pets?.nome ?? marcado.pet ? `${a?.pets?.nome ?? marcado.pet} marcado` : "Horário marcado"}: {dataAmigavel(marcado.inicio)} às {hora(marcado.inicio)}.</b>
+          {prontoEm != null && <p className="g-pp" data-teste="pronto-em" style={{ margin: "2px 0 0", fontWeight: 600, color: "#24543b" }}>O primeiro horário {petshop.nome.length <= 40 ? `${artigoDe(petshop.nome).do} ${petshop.nome} ` : ""}está marcado. {textoProntoEm(prontoEm)}</p>}
           <p className="g-muted g-pp">{marcado.quantos > 1 ? `E mais ${marcado.quantos - 1 === 1 ? "1 data" : `${marcado.quantos - 1} datas`} da repetição. ` : ""}O horário está em destaque logo abaixo.</p>
         </div>
         <button className="g-ico" aria-label="Fechar o aviso" onClick={aoFechar}><X /></button>

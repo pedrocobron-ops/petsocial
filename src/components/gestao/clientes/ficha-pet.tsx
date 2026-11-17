@@ -13,6 +13,7 @@ import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, fmtTelefone, haQu
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { Anel, Tile, type Tom } from "../painel";
+import { FotosNasRedes } from "../boletim/autorizacao";
 import { AvatarPet, avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { linkTutor, nomePorte } from "./comum";
 import FormTutor from "./form-tutor";
@@ -212,6 +213,8 @@ export default function FichaPet({ id, voltar, aoAbrir }: { id: string; voltar: 
           </div>
         </div>
       )}
+
+      <FotosNasRedes petId={pet.id} />
 
       <div className="g-cli-nums">
         <div className="g-cli-num">
