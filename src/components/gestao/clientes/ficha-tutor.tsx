@@ -20,6 +20,7 @@ import { linkPet, nomePorte } from "./comum";
 import FormTutor from "./form-tutor";
 import { FolhaJuntarTutor } from "./juntar";
 import { EtiquetaEspecie } from "./lista";
+import DadosDoTutor from "../lgpd/dados-do-tutor";
 
 type Entrada = Pick<Lancamento, "id" | "valor" | "data" | "categoria" | "descricao" | "pago">;
 
@@ -241,10 +242,12 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
             </div>
           )}
 
+          {souDono && <DadosDoTutor cliente={cliente} pets={pets} aoApagar={() => void recarregar()} />}
+
           {souDono ? (
             <div className="g-pilha p">
               <div><button className="g-btn perigo" onClick={() => void excluir()}>Excluir cliente de vez</button></div>
-              <p className="g-pp g-muted">Se o cliente pedir para sair do seu cadastro, é por aqui. Apaga os pets, os horários, os pacotes e o histórico dele. Para só tirar da lista, desative o pet na ficha do pet.</p>
+              <p className="g-pp g-muted">Apaga os pets, os horários, os pacotes e o histórico dele, e os relatórios de meses passados mudam. Se o cliente pediu para sair do cadastro, prefira Apagar dados deste tutor: os dados pessoais somem e os relatórios ficam iguais. Para só tirar da lista, desative o pet na ficha do pet.</p>
             </div>
           ) : (
             <p className="g-pp g-muted">Só o dono pode excluir de vez. Para tirar um pet da lista sem apagar o histórico, abra a ficha do pet e toque em Desativar pet.</p>

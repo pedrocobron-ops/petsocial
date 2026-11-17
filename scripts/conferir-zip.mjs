@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { crc32, montarZip } from "../src/lib/gestao/zip.ts";
+import { crc32, montarZip, ZipEmPartes } from "../src/lib/gestao/zip.ts";
 
 const igual = (a, b, o) => { if (a !== b) throw new Error(`${o}: esperava ${b}, veio ${a}`); };
 igual(crc32(new TextEncoder().encode("123456789")), 0xcbf43926, "crc32");
@@ -40,4 +40,29 @@ print(json.dumps(z.read("cuidados-de-saúde.csv").decode("utf-8")))
     console.log("python zipfile: tudo certo");
   }
   if (u === null && py === null) process.exitCode = 1;
+
+  // o zip em partes (cópia completa do administrador): os mesmos arquivos, escritos aos poucos
+  const partes = [];
+  const z = new ZipEmPartes((b) => partes.push(b), new Date(2026, 10, 13, 9, 30, 0));
+  for (const a of arquivos) {
+    z.comecar(a.nome);
+    const c = typeof a.conteudo === "string" ? new TextEncoder().encode(a.conteudo) : a.conteudo;
+    for (let i = 0; i < c.length; i += 7000) z.escrever(c.slice(i, i + 7000));
+    z.terminar();
+  }
+  z.fechar();
+  const emPartes = join(pasta, "partes.zip");
+  writeFileSync(emPartes, Buffer.concat(partes.map((b) => Buffer.from(b))));
+  const u2 = rodar("unzip", ["-t", emPartes]);
+  console.log(u2 === null ? "unzip não instalado: pulei" : `em partes: ${u2.trim().split("\n").pop()}`);
+  const py2 = rodar("python3", ["-I", "-c", `
+import sys, zipfile, json
+z = zipfile.ZipFile(sys.argv[1])
+assert z.testzip() is None
+print(json.dumps([[i.filename, i.file_size] for i in z.infolist()], ensure_ascii=False))
+`, emPartes]);
+  if (py2 !== null) {
+    igual(JSON.stringify(JSON.parse(py2.trim()).map((x) => x[0])), JSON.stringify(arquivos.map((a) => a.nome)), "nomes em partes");
+    console.log("python zipfile (em partes): tudo certo");
+  }
 } finally { rmSync(pasta, { recursive: true, force: true }); }

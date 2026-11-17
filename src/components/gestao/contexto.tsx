@@ -28,8 +28,12 @@ export type Gestao = {
   cuidoDoFinanceiro: boolean;
   /** A pessoa abre esta área do aplicativo? (o dono libera área por área em Equipe) */
   posso: (area: Area) => boolean;
-  /** false = teste vencido ou assinatura cancelada: a conta fica só para consulta. */
+  /** false = teste vencido, assinatura cancelada ou conta marcada para ser apagada: a conta fica só para consulta. */
   liberado: boolean;
+  /** A conta está marcada para ser apagada ("Encerrar e apagar a conta", em Meu pet shop)? Até a data, fica só para consulta. */
+  exclusao: Exclusao | null;
+  /** Quem está logado é o titular da conta (o primeiro dono)? Só ele pede para apagar a conta e não sai da equipe. */
+  souTitular: boolean;
   /** Dias que faltam de teste (null quando não está em teste). */
   diasDeTeste: number | null;
   /**
@@ -41,6 +45,8 @@ export type Gestao = {
   recarregarBase: () => Promise<void>;
   sair: () => Promise<void>;
 };
+
+export type Exclusao = { pedido_em: string; apagar_em: string; pedido_nome: string | null };
 
 const Ctx = createContext<Gestao | null>(null);
 
@@ -71,6 +77,10 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   const [aberta, setAberta] = useState<boolean | null>(null);
   /** Documentos com versão nova que esta pessoa ainda não aceitou: com algum, o aplicativo mostra a tela de aceite. */
   const [faltam, setFaltam] = useState<Documento[]>([]);
+  const [exclusao, setExclusao] = useState<Exclusao | null>(null);
+  /** A conta está marcada para ser apagada? (banco antes da atualização ou falha na leitura: segue como não marcada) */
+  const lerExclusao = useCallback((petshopId: string) => sb.rpc("conta_exclusao_ver", { p_petshop: petshopId }).then(
+    (r) => (r.error || !r.data ? null : (r.data as unknown as Exclusao)), () => null), [sb]);
 
   const buscarBase = useCallback(async (petshopId: string) => {
     // pet shop, equipe e serviços numa ida só ao banco (com o banco antes da atualização, um pedido por parte, como antes)
@@ -119,9 +129,10 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       try {
         const base = (meu.petshop_id === palpite ? await adiantado : null) ?? await buscarBase(meu.petshop_id);
         try { localStorage.setItem(CHAVE_ULTIMA, `${u.id}:${meu.petshop_id}`); } catch { /* sem armazenamento: segue */ }
-        const [todos, , falta] = await Promise.all([aplicarBase(base), assinatura, aceites]);
+        const [todos, , falta, marcada] = await Promise.all([aplicarBase(base), assinatura, aceites, lerExclusao(meu.petshop_id)]);
         if (!vivo) return;
         setFaltam(falta);
+        setExclusao(marcada);
         setEu(todos.find((x) => x.id === meu.id) ?? meu);
         setUser(u);
       } catch {
@@ -132,7 +143,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       if (evento === "SIGNED_OUT") router.replace("/gestao/entrar");
     });
     return () => { vivo = false; sub.subscription.unsubscribe(); };
-  }, [sb, router, buscarBase, aplicarBase]);
+  }, [sb, router, buscarBase, aplicarBase, lerExclusao]);
 
   const valor = useMemo<Gestao | null>(() => {
     if (!user || !eu || !petshop) return null;
@@ -142,7 +153,9 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     const pagoAinda = petshop.status === "cancelada" && petshop.pago_ate != null && new Date(petshop.pago_ate).getTime() > Date.now();
     // enquanto a assinatura não abriu, o teste não bloqueia ninguém: a pessoa não teria como pagar (mesma regra do banco)
     const aberto = aberta ?? temCheckout();
-    const liberado = ["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && (resta > 0 || !aberto)) || pagoAinda;
+    // conta marcada para ser apagada: só para consulta até a data (mesma regra do banco, em acesso_liberado)
+    const liberado = !exclusao && (["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && (resta > 0 || !aberto)) || pagoAinda);
+    const titular = equipe.filter((x) => x.papel === "dono").sort((a, b) => a.criado_em.localeCompare(b.criado_em) || a.id.localeCompare(b.id))[0];
     // as mensagens de erro só falam em "conta só para consulta" quando a conta está mesmo assim
     soConsulta = !liberado;
     definirLoja(petshop.id, !liberado); // o registro de erros leva o pet shop aberto
@@ -153,16 +166,19 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       cuidoDoFinanceiro: podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
       posso: (area: Area) => podeArea(eu, area),
       liberado,
+      exclusao,
+      souTitular: titular?.id === eu.id,
       diasDeTeste: emTeste ? Math.max(0, Math.ceil(resta / 864e5)) : null,
       assinaturaAberta: aberto,
       recarregarBase: async () => {
-        const todos = await carregarBase(petshop.id);
+        const [todos, marcada] = await Promise.all([carregarBase(petshop.id), lerExclusao(petshop.id)]);
+        setExclusao(marcada);
         const novo = todos.find((x) => x.id === eu.id);
         if (novo) setEu(novo);
       },
       sair: async () => { await sb.auth.signOut(); router.replace("/gestao/entrar"); },
     };
-  }, [sb, user, eu, petshop, equipe, servicos, carregarBase, router, aberta]);
+  }, [sb, user, eu, petshop, equipe, servicos, carregarBase, router, aberta, exclusao, lerExclusao]);
 
   if (erro) {
     return (

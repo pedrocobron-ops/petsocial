@@ -10,7 +10,8 @@ import {
 import { useGestao } from "./contexto";
 import { planoPorId } from "@/lib/gestao/planos";
 import { DIAS_DE_AVISO, fimDoTeste } from "./fim-do-teste";
-import { dataLonga } from "@/lib/gestao/util";
+import { dataCompleta, dataLonga } from "@/lib/gestao/util";
+import SairDaEquipe from "./lgpd/sair-da-equipe";
 import { AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
 import BuscaGeral from "./busca-geral";
 import { areaDaRota } from "@/lib/gestao/acessos";
@@ -100,7 +101,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("pointerdown", tocou, true);
   }, []);
   const caminho = usePathname();
-  const { sb, user, petshop, eu, souDono, posso, liberado, diasDeTeste, assinaturaAberta, sair } = useGestao();
+  const { sb, user, petshop, eu, souDono, posso, liberado, exclusao, souTitular, diasDeTeste, assinaturaAberta, sair } = useGestao();
   const [pedidos, setPedidos] = useState(0);
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
   const [mais, setMais] = useState(false);
@@ -279,6 +280,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           )}
           <div className="g-nav" style={{ marginTop: 10 }}>
             <button onClick={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }}><LifeBuoy />Ajuda</button>
+            {!souTitular && <SairDaEquipe lateral />}
           </div>
           <div className="g-lado-eu">
             <AvatarPessoa nome={eu.nome} cor={eu.cor} tamanho="p" />
@@ -297,7 +299,14 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           <div className="g-barra-data"><CalendarClock />{dataLonga(new Date())}</div>
         </div>
         <AvisoDeFuso />
-        {!liberado && !cartaoNoHoje && !caminho.endsWith("/assinatura") && (
+        {exclusao && (
+          <div className="g-aviso vermelho" role="alert">
+            <TriangleAlert />
+            <span>Esta conta vai ser apagada em {dataCompleta(exclusao.apagar_em)}. Até lá, fica só para consulta: dá para ver e baixar os dados, mas não lançar.</span>
+            {souDono && !caminho.endsWith("/meu-petshop") && <Link className="g-btn p verde" href="/gestao/app/meu-petshop#encerrar-conta">Ver ou cancelar</Link>}
+          </div>
+        )}
+        {!liberado && !exclusao && !cartaoNoHoje && !caminho.endsWith("/assinatura") && (
           <div className="g-aviso vermelho" role="alert">
             <TriangleAlert />
             <span>{petshop.status === "teste" ? "Seu teste grátis terminou." : "Sua assinatura está inativa."} Seus dados estão guardados e a conta fica só para consulta até você assinar.</span>
@@ -378,6 +387,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
             )}
             <button className="g-btn verde" onClick={() => { setMais(false); setAjuda(true); }}><LifeBuoy />Ajuda</button>
             <button className="g-btn sec" onClick={() => void sair()}><LogOut />Sair</button>
+            {!souTitular && <SairDaEquipe />}
           </div>
         </Folha>
       )}
