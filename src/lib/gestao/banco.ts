@@ -903,6 +903,44 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"entradas": {
+                  Row: {
+                    "aceite": string | null,"aceite_assinatura": string | null,"aceite_ip": string | null,"aceite_navegador": string | null,"aceite_nome": string | null,"aceito_em": string | null,"agendamento_id": string | null,"assinaturas": (string)[],"atualizado_em": string,"criado_em": string,"criado_por": string | null,"cuidados": string | null,"devolvido_em": string | null,"devolvido_por": string | null,"estadia_id": string | null,"fotos": (string)[],"id": string,"idoso_doente": boolean,"lesoes": (string)[],"lesoes_obs": string | null,"link_criado_em": string | null,"obs": string | null,"pertences": (string)[],"pertences_outros": string | null,"pet_id": string,"petshop_id": string,"temperamento": (string)[],"termo": string,"token": string | null,"token_expira": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "aceite"?: string | null,"aceite_assinatura"?: string | null,"aceite_ip"?: string | null,"aceite_navegador"?: string | null,"aceite_nome"?: string | null,"aceito_em"?: string | null,"agendamento_id"?: string | null,"assinaturas"?: (string)[],"atualizado_em"?: string,"criado_em"?: string,"criado_por"?: string | null,"cuidados"?: string | null,"devolvido_em"?: string | null,"devolvido_por"?: string | null,"estadia_id"?: string | null,"fotos"?: (string)[],"id"?: string,"idoso_doente"?: boolean,"lesoes"?: (string)[],"lesoes_obs"?: string | null,"link_criado_em"?: string | null,"obs"?: string | null,"pertences"?: (string)[],"pertences_outros"?: string | null,"pet_id": string,"petshop_id": string,"temperamento"?: (string)[],"termo"?: string,"token"?: string | null,"token_expira"?: string | null
+                  }
+                  Update: {
+                    "aceite"?: string | null,"aceite_assinatura"?: string | null,"aceite_ip"?: string | null,"aceite_navegador"?: string | null,"aceite_nome"?: string | null,"aceito_em"?: string | null,"agendamento_id"?: string | null,"assinaturas"?: (string)[],"atualizado_em"?: string,"criado_em"?: string,"criado_por"?: string | null,"cuidados"?: string | null,"devolvido_em"?: string | null,"devolvido_por"?: string | null,"estadia_id"?: string | null,"fotos"?: (string)[],"id"?: string,"idoso_doente"?: boolean,"lesoes"?: (string)[],"lesoes_obs"?: string | null,"link_criado_em"?: string | null,"obs"?: string | null,"pertences"?: (string)[],"pertences_outros"?: string | null,"pet_id"?: string,"petshop_id"?: string,"temperamento"?: (string)[],"termo"?: string,"token"?: string | null,"token_expira"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "entradas_agendamento_id_fkey"
+      columns: ["agendamento_id"]
+isOneToOne: false
+      referencedRelation: "agendamentos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "entradas_estadia_id_fkey"
+      columns: ["estadia_id"]
+isOneToOne: false
+      referencedRelation: "estadias"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "entradas_pet_id_petshop_id_fkey"
+      columns: ["pet_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "pets"
+      referencedColumns: ["id","petshop_id"]
+    },{
+      foreignKeyName: "entradas_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"erros_app": {
                   Row: {
                     "aparelho": string,"areas": (string)[] | null,"assinatura": string,"contagem": number,"id": number,"mensagem": string,"navegador": string | null,"nome": string | null,"origem": string,"papel": string | null,"petshop_id": string | null,"pilha": string | null,"primeiro_em": string,"rota": string | null,"tela": string | null,"tipo": string,"ultimo_em": string,"versao": string | null
@@ -2561,6 +2599,36 @@ isOneToOne: false
                            },
 "estadia_checkout_conferir":
 { Args: { "p_estadia": string,"p_passos": Json,"p_petshop": string,"p_res": Json }; Returns: undefined
+                           },
+"entrada_aceitar":
+{ Args: { "p_ip": string,"p_navegador": string,"p_nome": string,"p_token": string }; Returns: Json
+                           },
+"entrada_arquivo_em_uso":
+{ Args: { "p_nome": string }; Returns: boolean
+                           },
+"entrada_assinar":
+{ Args: { "p_assinatura": string,"p_id": string,"p_nome": string }; Returns: Json
+                           },
+"entrada_devolver":
+{ Args: { "p_devolvido": boolean,"p_id": string }; Returns: string
+                           },
+"entrada_faxina":
+{ Args: { "p_petshop": string }; Returns: Json
+                           },
+"entrada_foto":
+{ Args: { "p_n": number,"p_token": string }; Returns: Json
+                           },
+"entrada_link":
+{ Args: { "p_fotos": Json,"p_id": string }; Returns: Json
+                           },
+"entrada_pode_limpar":
+{ Args: { "p_nome": string }; Returns: boolean
+                           },
+"entrada_publica":
+{ Args: { "p_token": string }; Returns: Json
+                           },
+"entrada_salvar":
+{ Args: { "p_agendamento": string,"p_dados": Json,"p_estadia": string,"p_fotos": Json,"p_id": string,"p_pet": string,"p_petshop": string }; Returns: Json
                            },
 "estadia_corrigir_horas":
 { Args: { "p_entrada"?: string,"p_estadia": string,"p_motivo"?: string,"p_saida"?: string }; Returns: Json
