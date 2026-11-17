@@ -11,10 +11,11 @@ import { conferirCaixa, parteDaChave, receberComCredito, receberConta, textoDoPa
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
-import { fazerTudoOuNada } from "@/lib/gestao/tudo-ou-nada";
+import { fazerTudoOuNada, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { calendarioGuardado, lerCalendario } from "@/lib/gestao/feriados";
-import { AvisoCaixaFechado, ChipsForma, useCaixaAberto } from "../loja/pecas";
+import { AvisoCaixaFechado, ChipsForma, PerguntaParcelas, useAnotarParcelas, useCaixaAberto } from "../loja/pecas";
+import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import { FORMAS, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, fmtTelefone, isoDia, linkWhatsApp, nomeMes } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -657,6 +658,9 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
   const hoje = isoDia(new Date());
   const caixaAgora = useCaixaAberto();
   const [forma, setForma] = useState<FormaPagamento | null>(null);
+  // crédito em quantas vezes (só quando a loja tem taxa de parcelado): vale para o pagamento inteiro
+  const [parcelas, setParcelas] = useState<number | null>(null);
+  const anotarParcelas = useAnotarParcelas();
   const [data, setData] = useState(hoje);
   const [comMulta, setComMulta] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -689,6 +693,8 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
     let feitas = 0, recebido = 0;
     const falhas: string[] = [];
     const itens: { pet: string; mes: string; valor: number; multa: number; acerto?: boolean }[] = [];
+    // os lançamentos pagos agora (para anotar em quantas vezes foi o crédito)
+    const pagos: string[] = [];
     let sobraCredito = credito;
     for (let i = 0; i < contas.length; i++) {
       const c = contas[i];
@@ -699,13 +705,14 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
       try {
         if (doCredito > 0 && resto > 0) {
           // crédito e o resto da mesma mensalidade entram juntos, ou nenhum (a nova tentativa não usa o crédito duas vezes)
-          await fazerTudoOuNada(sb, petshop.id, parteDaChave(chave, "junto", c.lancamento_id!)!, { funcao: "conta_receber_junto", conta: c.lancamento_id! }, [
+          const passos: Passo[] = [
             { t: "receber_credito", conta: c.lancamento_id!, valor: doCredito, chave: parteDaChave(chave, "credito", c.lancamento_id!) },
             { t: "receber", conta: c.lancamento_id!, valor: resto, forma: forma!, data, ...(m > 0 ? { multa: m, multa_forma: forma! } : {}), chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) },
-          ]);
+          ];
+          pagos.push(...idsDaOperacao(await fazerTudoOuNada(sb, petshop.id, parteDaChave(chave, "junto", c.lancamento_id!)!, { funcao: "conta_receber_junto", conta: c.lancamento_id! }, passos), passos));
           sobraCredito = centavos(sobraCredito - doCredito);
         } else if (doCredito > 0) { await receberComCredito(sb, c.lancamento_id!, doCredito, parteDaChave(chave, "credito", c.lancamento_id!)); sobraCredito = centavos(sobraCredito - doCredito); }
-        else if (resto > 0) await receberConta(sb, c.lancamento_id!, { valor: resto, forma: forma!, data, multa: m > 0 ? { valor: m, forma: forma! } : null, chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) });
+        else if (resto > 0) pagos.push(...((await receberConta(sb, c.lancamento_id!, { valor: resto, forma: forma!, data, multa: m > 0 ? { valor: m, forma: forma! } : null, chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) })).ids ?? []));
         feitas++; recebido = centavos(recebido + faltaDaCobranca(c) + m);
         itens.push({ pet: c.pets?.nome ?? "Pet", mes: c.mes, valor: faltaDaCobranca(c), multa: m, acerto: c.acerto_saida });
       } catch (e) { falhas.push(`${c.pets?.nome ?? "pet"} (${e instanceof Error ? e.message : "erro"})`); }
@@ -713,6 +720,7 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
     if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join("; ")}`);
     if (feitas) {
       avisar(`Recebido de ${grupo.tutor ?? "tutor"}: ${brl(recebido)} (${feitas === 1 ? "1 mensalidade" : `${feitas} mensalidades`}).`);
+      if (forma === "credito") await anotarParcelas(pagos, parcelas);
       const comoPagou = [credito > 0 ? `crédito do tutor (${brl(credito)})` : "", forma && total > 0 ? FORMAS.find((f) => f.id === forma)?.rotulo ?? "Outro" : ""].filter(Boolean).join(" e ");
       setRecibo({ total: recebido, n: feitas, texto: textoComprovanteMensalidades({ petshop: petshop.nome, tutor: grupo.tutor, dia: data, forma: comoPagou || "Outro", itens }) });
     }
@@ -762,6 +770,7 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
         {(saldoCredito ?? 0) > 0 && <UsarCredito saldo={saldoCredito!} usar={usarCredito} aoMudar={(v) => { setUsarCredito(v); setErro(null); }} usado={credito} resto={total} />}
         <p className="g-cm-total">{credito > 0 ? "A pagar agora" : "Total a receber"} <b className="g-num g-tab">{brl(total)}</b></p>
         {total > 0 && <ChipsForma valor={forma} aoMudar={(f) => { setForma(f); setErro(null); }} />}
+        {total > 0 && <PerguntaParcelas forma={forma} valor={parcelas} aoMudar={setParcelas} />}
         <Campo rotulo="Dia em que recebeu" erro={erro}>
           <input type="date" className="g-input" value={data} max={hoje} onChange={(e) => { setData(e.target.value); setErro(null); }} />
         </Campo>

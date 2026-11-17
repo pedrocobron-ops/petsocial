@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Lock, Plus, Split, Trash2 } from "lucide-react";
 import { caixaAberto, formaPrincipal, ultimoContado, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
-import { aoMudarTaxas, calcularTaxa, carregarTaxas, lojaPerguntaParcelas, perguntaParcelas, temTaxa, type TaxasMaquininha } from "@/lib/gestao/maquininha";
+import { anotarParcelasComRetry, aoMudarTaxas, avisoParcelasNaoAnotadas, calcularTaxa, carregarTaxas, lojaPerguntaParcelas, perguntaParcelas, temTaxa, type TaxasMaquininha } from "@/lib/gestao/maquininha";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, isoDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -58,10 +58,50 @@ export type EstadoPagamento = { forma: Forma | null; dividido: boolean; partes: 
 /* ---------- taxas da maquininha: "Você recebe" e em quantas vezes ---------- */
 
 /**
- * A tela anota em quantas vezes foi o crédito depois de gravar (`anotarParcelas`, maquininha.ts)? Só nelas a pergunta
- * "Em quantas vezes?" aparece. Fechar a conta, venda no balcão e check-out.
+ * A tela anota em quantas vezes foi o crédito depois de gravar (`useAnotarParcelas`)? Só nelas a pergunta "Crédito em quantas
+ * vezes?" aparece dentro de `EscolhaPagamento`. Hoje: todas as telas que recebem (Fechar a conta, venda no balcão e orçamento,
+ * check-out, Recebi, Cobrar a diferença, lançar entrada, vender pacote, sinal, saída de estoque vendida). As telas com
+ * `ChipsForma` (só a forma) põem `PerguntaParcelas` embaixo dos chips.
  */
 export const ParcelasNaTela = createContext(false);
+
+/** O seletor "Crédito em quantas vezes?" (À vista, 2 a 12 vezes). */
+export function SeletorParcelas({ valor, aoMudar }: { valor: number | null | undefined; aoMudar: (n: number) => void }) {
+  return (
+    <label className="g-tx-vezes">
+      <span>Crédito em quantas vezes?</span>
+      <select className="g-select" value={String(valor ?? 1)} aria-label="Crédito em quantas vezes" onChange={(ev) => aoMudar(Number(ev.target.value))}>
+        <option value="1">À vista</option>
+        {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => <option key={n} value={n}>{n} vezes</option>)}
+      </select>
+    </label>
+  );
+}
+
+/**
+ * "Crédito em quantas vezes?" para as telas que escolhem só a forma (`ChipsForma`): aparece com o crédito marcado, quando a loja
+ * tem taxa de parcelado (`maquininha_pergunta_parcelas`). Sem isso, nada aparece e a tela grava à vista, como antes.
+ */
+export function PerguntaParcelas({ forma, valor, aoMudar }: { forma: Forma | null; valor: number | null | undefined; aoMudar: (n: number) => void }) {
+  const { pergunta } = useMaquininha();
+  if (forma !== "credito" || !pergunta) return null;
+  return <SeletorParcelas valor={valor} aoMudar={aoMudar} />;
+}
+
+/**
+ * Anota em quantas vezes foi o crédito, logo depois de gravar (até 3 tentativas). Se não der, o pagamento continua gravado
+ * (a taxa fica a do crédito à vista) e aparece um aviso com "Tentar de novo". Devolve se deu certo (ou se não havia o que anotar).
+ */
+export function useAnotarParcelas() {
+  const { sb, petshop } = useGestao();
+  const { avisarErro } = useAvisos();
+  return useCallback(async function anotar(ids: (string | null | undefined)[], parcelas: number | null | undefined): Promise<boolean> {
+    if (!parcelas || parcelas < 2) return true;
+    const r = await anotarParcelasComRetry(sb, petshop.id, ids, parcelas);
+    if (!r.ok) avisarErro(avisoParcelasNaoAnotadas(parcelas), { rotulo: "Tentar de novo", fazer: () => void anotar(ids, parcelas) });
+    return r.ok;
+  }, [sb, petshop.id, avisarErro]);
+}
 
 const perguntaCache = new Map<string, boolean>();
 /**
@@ -103,15 +143,7 @@ function TaxaDoPagamento({ e, aoMudar, total }: { e: EstadoPagamento; aoMudar: (
   const conta = taxas && temTaxa(taxas) && (e.dividido ? partes?.length : e.forma) ? calcularTaxa(taxas, { valor, forma: e.dividido ? null : e.forma, pagamentos: partes && partes.length > 1 ? partes : null, parcelas: anota ? e.parcelas : 1 }) : null;
   return (
     <>
-      {anota && pergunta && temCredito && (
-        <label className="g-tx-vezes">
-          <span>Crédito em quantas vezes?</span>
-          <select className="g-select" value={String(e.parcelas ?? 1)} aria-label="Crédito em quantas vezes" onChange={(ev) => aoMudar({ ...e, parcelas: Number(ev.target.value) })}>
-            <option value="1">À vista</option>
-            {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => <option key={n} value={n}>{n} vezes</option>)}
-          </select>
-        </label>
-      )}
+      {anota && pergunta && temCredito && <SeletorParcelas valor={e.parcelas} aoMudar={(n) => aoMudar({ ...e, parcelas: n })} />}
       {conta && conta.taxa > 0 && (
         <p className="g-tx-recebe" role="status">
           <span>Taxa da maquininha: <b>{brl(conta.taxa)}</b> · Você recebe <b>{brl(conta.recebe)}</b></span>

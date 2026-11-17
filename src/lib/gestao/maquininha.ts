@@ -136,26 +136,72 @@ export async function lojaPerguntaParcelas(sb: Banco, petshopId: string): Promis
 /**
  * Crédito parcelado: anota em quantas vezes, logo depois de gravar o pagamento (a taxa do parcelado entra no lugar da do
  * crédito à vista). Só faz algo com 2 ou mais vezes; uma falha aqui não desfaz o pagamento (a taxa fica a do à vista).
+ * As telas usam `anotarParcelasComRetry` (tenta de novo e diz se não deu); esta devolve 0 em qualquer erro.
  */
 export async function anotarParcelas(sb: Banco, petshopId: string, ids: (string | null | undefined)[], parcelas: number | null | undefined): Promise<number> {
-  const lista = [...new Set(ids.filter((x): x is string => Boolean(x)))].slice(0, 20);
-  if (!parcelas || parcelas < 2 || !lista.length) return 0;
-  const r = await sb.rpc("maquininha_parcelas", { p: petshopId, p_ids: lista, p_parcelas: Math.min(12, Math.round(parcelas)) });
-  return r.error ? 0 : Number(r.data ?? 0);
+  const r = await anotarParcelasComRetry(sb, petshopId, ids, parcelas, []);
+  return r.anotados;
 }
 
-/** Os ids de lançamento que uma operação tudo-ou-nada gravou (para anotar as parcelas). */
-export function idsDaOperacao(r: { ids?: Record<string, string>; passos?: { t: string; id?: string; linha?: Record<string, unknown> | null }[] } | null | undefined): string[] {
+const dormir = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
+/**
+ * Anota as parcelas com até 3 tentativas (a internet pode falhar logo depois de gravar). O pagamento já está gravado: aqui só
+ * troca a taxa do crédito à vista pela do parcelado. `ok: false` quando não deu (a taxa ficou a do crédito à vista): a tela avisa.
+ * Recusa do banco (sem permissão, número de vezes errado) não é tentada de novo. 0 anotados não é erro (débito, Pix, nada a anotar).
+ */
+export async function anotarParcelasComRetry(sb: Banco, petshopId: string, ids: (string | null | undefined)[], parcelas: number | null | undefined,
+  esperas: number[] = [500, 1500]): Promise<{ ok: boolean; anotados: number; erro?: string }> {
+  const lista = [...new Set(ids.filter((x): x is string => Boolean(x)))].slice(0, 20);
+  if (!parcelas || parcelas < 2 || !lista.length) return { ok: true, anotados: 0 };
+  let erro = "";
+  for (let i = 0; i <= esperas.length; i++) {
+    if (i > 0) await dormir(esperas[i - 1]);
+    try {
+      const r = await sb.rpc("maquininha_parcelas", { p: petshopId, p_ids: lista, p_parcelas: Math.min(12, Math.round(parcelas)) });
+      if (!r.error) return { ok: true, anotados: Number(r.data ?? 0) };
+      erro = r.error.message;
+      // recusa do banco: tentar de novo não muda nada
+      if (r.error.code === "42501" || r.error.code === "P0001") break;
+    } catch (e) { erro = e instanceof Error ? e.message : String(e); }
+  }
+  return { ok: false, anotados: 0, erro };
+}
+
+/** O aviso quando as parcelas não foram anotadas (o pagamento está gravado; a taxa ficou a do crédito à vista). */
+export const avisoParcelasNaoAnotadas = (parcelas: number) =>
+  `O pagamento foi gravado, mas não consegui anotar o crédito em ${parcelas} vezes: a taxa da maquininha ficou a do crédito à vista. Toque em Tentar de novo.`;
+
+/** Um passo da operação tudo-ou-nada, só o que interessa aqui (o "receber" diz a conta que recebeu). */
+type PassoLido = { t: string; conta?: string };
+type ResultadoLido = { ids?: Record<string, string>; passos?: ({ t: string; id?: string; linha?: Record<string, unknown> | null } & Record<string, unknown>)[] };
+
+/**
+ * Os ids de lançamento que uma operação tudo-ou-nada gravou como pagos (para anotar as parcelas): os lançamentos novos, a parte
+ * recebida de uma conta (`parte_id`) e a multa (`multa_id`). Com `passos` (os que a tela mandou, na mesma ordem), também a
+ * conta recebida inteira (sem parte: a própria conta virou paga), inclusive a que foi criada na mesma operação ("$ref:nome").
+ */
+export function idsDaOperacao(r: ResultadoLido | null | undefined, passos?: PassoLido[] | null): string[] {
   if (!r) return [];
   const ids = new Set<string>(Object.values(r.ids ?? {}));
-  for (const p of r.passos ?? []) {
+  const texto = (v: unknown) => (typeof v === "string" && v ? v : null);
+  (r.passos ?? []).forEach((p, i) => {
     if (p.t === "lancamento" && p.id) ids.add(p.id);
     if (p.t === "receber" || p.t === "receber_credito") {
       if (p.id) ids.add(p.id);
       const l = p.linha as { id?: unknown } | null | undefined;
       if (l && typeof l.id === "string") ids.add(l.id);
+      const parte = texto(p.parte_id), multa = texto(p.multa_id);
+      if (parte) ids.add(parte);
+      if (multa) ids.add(multa);
+      const pedido = passos?.[i];
+      if (!parte && p.quitada === true && pedido?.t === p.t && pedido.conta) {
+        const ref = /^\$ref:(.+)$/.exec(pedido.conta);
+        const conta = ref ? r.ids?.[ref[1]] : pedido.conta;
+        if (conta) ids.add(conta);
+      }
     }
-  }
+  });
   return [...ids];
 }
 
@@ -165,8 +211,10 @@ export function idsDaOperacao(r: { ids?: Record<string, string>; passos?: { t: s
 export type TaxasDoPeriodo = {
   de: string; ate: string; hoje: string; configurada: boolean; taxa: number; cartao: number; lancamentos: number;
   por_forma: { forma: string; valor: number; taxa: number }[];
-  /** O que a maquininha ainda vai pagar, por dia (já sem a taxa). */
+  /** O que a maquininha ainda vai pagar, por dia (já sem a taxa). Crédito parcelado: uma parcela por mês (a cada 30 dias). */
   a_receber: { dia: string; valor: number }[];
+  /** Alguma parcela em aberto é de crédito parcelado (a tela explica a regra). */
+  parcelado?: boolean;
 };
 
 export async function taxasDoPeriodo(sb: Banco, petshopId: string, de: string, ate: string): Promise<TaxasDoPeriodo | null> {
@@ -176,7 +224,7 @@ export async function taxasDoPeriodo(sb: Banco, petshopId: string, de: string, a
   return {
     ...d, taxa: real(Number(d.taxa)), cartao: real(Number(d.cartao)), lancamentos: Number(d.lancamentos),
     por_forma: (d.por_forma ?? []).map((x) => ({ forma: x.forma, valor: real(Number(x.valor)), taxa: real(Number(x.taxa)) })),
-    a_receber: (d.a_receber ?? []).map((x) => ({ dia: x.dia, valor: real(Number(x.valor)) })),
+    a_receber: (d.a_receber ?? []).map((x) => ({ dia: x.dia, valor: real(Number(x.valor)) })), parcelado: d.parcelado === true,
   };
 }
 

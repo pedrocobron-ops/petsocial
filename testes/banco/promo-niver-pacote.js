@@ -143,7 +143,7 @@ const D = lib('dinheiro');
   const noLink = lp.find((x) => x.nome === 'Terça do banho');
   T.ok('o link mostra as promoções, com os serviços do link já abertos', lp.length === 2 && noLink && noLink.servicos.length === 1 && noLink.servicos[0] === L.S.Banho && noLink.hora_ate === '11:00' && Number(noLink.valor) === 10, lp);
   const chaves = [...new Set(lp.flatMap((x) => Object.keys(x)))].sort().join(',');
-  T.ok('… só o que o cliente precisa (sem id, loja, quem criou nem datas de criação)', chaves === 'comeca_em,dias,hora_ate,hora_de,nome,servicos,termina_em,tipo,valor', chaves);
+  T.ok('… só o que o cliente precisa (sem id, loja, quem criou nem datas de criação)', chaves === 'banho_tosa,casa,comeca_em,dias,hora_ate,hora_de,nome,servicos,termina_em,tipo,valor', chaves);
   T.ok('"Todos do banho e tosa" chega aberto (os serviços do link de banho e tosa)', lp.find((x) => x.nome === 'Dia de hoje').servicos.length >= 4);
   T.ok('código errado: lista vazia', (await anon.rpc('link_promocoes', { p_codigo: 'nao-existe' })).data?.length === 0);
   const horas = B.must(await anon.rpc('link_horarios', { p_codigo: L.codigo, p_servico: L.S.Banho, p_dia: DIA, p_pets: 1 }), 'horários');

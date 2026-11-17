@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { useGestao } from "@/components/gestao/contexto";
 import { abrirAssistente, avisarMudanca, Campo, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { Kpi, Tile } from "@/components/gestao/painel";
-import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, ErroTela, EscolhaPagamento, fecharPagamento, fmtQtd, lembrarForma, lerQtd, useCaixaAberto, usePagamento, type Forma } from "@/components/gestao/loja/pecas";
+import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, ErroTela, EscolhaPagamento, fecharPagamento, fmtQtd, lembrarForma, lerQtd, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, usePagamento, type Forma } from "@/components/gestao/loja/pecas";
 import VendaBalcao from "@/components/gestao/loja/venda";
 import nextDynamic from "next/dynamic";
 import { FileText } from "lucide-react";
@@ -631,6 +631,7 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
   const [valorEditado, setValorEditado] = useState<number | null | undefined>(undefined);
   // mesmo recebimento da venda no balcão: uma forma ou dividido em até três
   const [pagamento, setPagamento] = usePagamento();
+  const anotarParcelas = useAnotarParcelas();
   const [erroForma, setErroForma] = useState<string | null>(null);
   const [erroMotivo, setErroMotivo] = useState(false);
   const caixa = useCaixaAberto();
@@ -674,6 +675,8 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
           itens: [{ tipo: "produto", nome: produto.nome, qtd: n, valor: Math.round((valor / n) * 100) / 100, produto_id: produto.id }],
           chave,
         });
+        // crédito parcelado: em quantas vezes (tenta de novo e avisa se não der; a venda já entrou)
+        await anotarParcelas([lancado?.id], pagamento.parcelas);
         try {
           // a saída já nasce ligada à venda: é assim que o relatório de produtos acha o custo desta venda
           await gravarMovimentos(sb, petshop.id, [{
@@ -731,7 +734,9 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
                 : produto.preco_venda != null ? `${brl(produto.preco_venda)} por ${produto.unidade}. Vender por outro valor fica anotado.` : "Este produto ainda não tem preço de venda."}>
               <CampoDinheiro valor={valor} aoMudar={(v) => { setValorEditado(v); setErroForma(null); }} desligado={travado} />
             </Campo>
-            <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErroForma(null); }} total={valor ?? 0} erro={erroForma} />
+            <ParcelasNaTela.Provider value>
+              <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErroForma(null); }} total={valor ?? 0} erro={erroForma} />
+            </ParcelasNaTela.Provider>
             <AvisoCaixaFechado aberto={caixa} />
           </>
         ) : (

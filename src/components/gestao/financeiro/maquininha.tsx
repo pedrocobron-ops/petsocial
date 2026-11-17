@@ -56,6 +56,7 @@ export default function CartaoMaquininha({ de, ate, faturamento, rotuloPeriodo =
             {proximos.map((x) => <div key={x.dia}><span>{dataAmigavel(x.dia)}</span><b>{brl(x.valor)}</b></div>)}
           </div>
           {dados.a_receber.length > proximos.length && <small className="g-muted">E mais {dados.a_receber.length - proximos.length} dias depois.</small>}
+          {dados.parcelado && <small className="g-muted" style={{ display: "block" }}>Crédito parcelado: uma parcela por mês, a 1ª no prazo do parcelado e as outras a cada 30 dias.</small>}
         </div>
       )}
       <p className="g-muted g-pp">

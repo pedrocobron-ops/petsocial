@@ -3,12 +3,13 @@
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, CalendarOff, DoorOpen, Home, HandCoins, Hourglass, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, ShieldAlert, ShieldCheck, Sun, Sunset, Syringe } from "lucide-react";
+import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, CalendarOff, DoorOpen, Home, HandCoins, Hourglass, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, ShieldAlert, ShieldCheck, Sun, Sunset, Syringe, Tag, Truck } from "lucide-react";
 import { useCalendario } from "@/components/gestao/calendario";
 import { useGestao } from "@/components/gestao/contexto";
 import { Kpi } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, mensagemDeErro, ok, useAdiantar, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
-import { AvisoCaixaFechado, Chips, ChipsForma, erroDeValor, ErroTela, lembrarForma, useCaixaAberto, useFormaLembrada } from "@/components/gestao/loja/pecas";
+import { AvisoCaixaFechado, Chips, ChipsForma, erroDeValor, ErroTela, lembrarForma, PerguntaParcelas, useAnotarParcelas, useCaixaAberto, useFormaLembrada } from "@/components/gestao/loja/pecas";
+import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import { BotaoFotos, useFaxinaDasFotos } from "@/components/gestao/casa/fotos-do-dia";
 import { BotaoBoletim, useBoletinsDeHoje, useFaxinaDoBoletim } from "@/components/gestao/boletim/boletim";
@@ -24,6 +25,9 @@ import ReposicoesParaConferir from "@/components/gestao/creche/reposicoes";
 import ExperienciasDaCreche from "@/components/gestao/creche/experiencias";
 import CheckOut, { comNota, DetalheDaEstadia, estadiasDoTutor, NoitePorNoite, NOTA_PACOTE, pacoteServe, pacotesParaEstadia, venceu } from "@/components/gestao/hotel/checkout";
 import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/components/gestao/hotel/cuidados";
+import { LinhaPromoDaEstadia, usePromoDaEstadia } from "@/components/gestao/hotel/promo-da-estadia";
+import { COLS_PROMOCAO, descontoDaPromoNaEstadia, etiquetaDaCasa, lerPromoDaEstadia, lerPromocao, promoDaEstadia, type PromoDaEstadia } from "@/lib/gestao/promocoes";
+import { estadiaTemViagemNoDia, taxaDoLevaTraz, temTaxa } from "@/lib/gestao/quadro";
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
 import { DesfazerCheckin, useCheckinsDeHoje } from "@/components/gestao/hotel/desfazer-checkin";
 import { FolhaSinalJunto, LinhaSinalJunto } from "@/components/gestao/hotel/sinal-junto";
@@ -38,7 +42,7 @@ import { casoDoErro, fazerTudoOuNada, ref, type Passo, type ResultadoDaOperacao 
 import { useOperacao, useTrava } from "@/lib/gestao/uma-vez";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
 import {
-  aceitaSinal, contaDasDiarias, contarDiarias, diariaFixa, diariaSugerida, estadiaSemCobranca, fatosDoDia, lerConta, lerCuidados, nivelDeOcupacao, nomeDaAcomodacao, ocupadasNoDia, ocupaNoDia, precoPorNoite, sinalSugerido,
+  aceitaSinal, contaDasDiarias, contarDiarias, diariaFixa, diasDasNoites, diariaSugerida, estadiaSemCobranca, fatosDoDia, lerConta, lerCuidados, nivelDeOcupacao, nomeDaAcomodacao, ocupadasNoDia, ocupaNoDia, precoPorNoite, sinalSugerido,
   taxaNaConta, taxasGuardadas, temNoiteDiferente, textoDoCuidado, vagasDoTipo, type ContaDaEstadia, type Cuidado, type CuidadoFeito, type EstadiaDoTutor, type Mens, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
 import { acomodacoesDe, cuidadosLigados, porteDe, taxasDe } from "@/lib/gestao/hotel-opcoes";
@@ -520,14 +524,26 @@ export default function CrecheHotel() {
     const d = contaDasDiarias(petshop, e, n, Number(e.valor_diaria), [], new Date(e.saida ?? e.entrada), e.saida ?? e.entrada);
     const taxas = taxasGuardadas(v).reduce((t, x) => t + taxaNaConta(x, n).total, 0);
     const sinal = v?.sinal != null && (v.sinal_estado === "pago" || v.sinal_estado === "a_receber") ? Number(v.sinal) : 0;
-    return Math.max(0, centavos((d.total ?? 0) + taxas - sinal));
+    // a promoção da estadia (o check-out mostra a mesma linha)
+    const noites = d.noites ?? diasDasNoites(e.entrada, n, e.saida ?? e.entrada).map((dia) => ({ dia, valor: Number(e.valor_diaria) }));
+    const promo = e.mensalista ? 0 : Math.min(d.total ?? 0, descontoDaPromoNaEstadia(lerPromoDaEstadia(e.promo), noites).valor);
+    return Math.max(0, centavos((d.total ?? 0) - promo + taxas - sinal));
   };
   const vagasCrecheHoje = vagasHoje.find((v) => v.id === "creche");
   const previstoDe = (e: EstadiaCompleta) => { const p = previsto(petshop, { ...e, valor_diaria: e.valor_diaria == null ? null : Number(e.valor_diaria) }, doMesmoTutor(doTutor, e.pets?.clientes?.id), valoresDe(e)); return p && !p.aberto ? p.total : null; };
   const sugeridoPara = (e: EstadiaCompleta) => sinalSugerido(petshop, previstoDe(e));
 
-  /** Etiquetas do cartão que não são dinheiro: a acomodação. */
-  const quarto = (e: EstadiaCompleta) => { const n = nomeDaAcomodacao(petshop, e.acomodacao); return n ? <p className="g-ch-obs"><BedDouble aria-hidden /><span>{n}</span></p> : null; };
+  /** Etiquetas do cartão que não são dinheiro: a acomodação e o leva e traz. */
+  const quarto = (e: EstadiaCompleta) => {
+    const n = nomeDaAcomodacao(petshop, e.acomodacao);
+    const lt = e.leva_traz_buscar && e.leva_traz_levar ? "buscar e levar" : e.leva_traz_buscar ? "buscar em casa" : e.leva_traz_levar ? "levar de volta" : null;
+    const pr = e.mensalista ? null : lerPromoDaEstadia(e.promo);
+    if (!n && !lt && !(pr && !pr.tirada)) return null;
+    return <>{n && <p className="g-ch-obs"><BedDouble aria-hidden /><span>{n}</span></p>}{lt && <p className="g-ch-obs"><Truck aria-hidden /><span>Leva e traz: {lt}</span></p>}
+      {pr && !pr.tirada && <p className="g-ch-obs"><Tag aria-hidden /><span>Promoção {pr.nome} ({etiquetaDaCasa(pr, e.tipo)})</span></p>}</>;
+  };
+  // leva e traz de hoje (buscar quem entra hoje, levar quem sai hoje): o botão abre a lista do dia
+  const levaTrazHoje = abertas.filter((e) => estadiaTemViagemNoDia(e, hojeIso)).length;
   const botaoMensagens = (e: EstadiaCompleta) => e.pets ? <button className="g-btn zap p" onClick={() => setMensagens(e)}><MessageCircle /> Mensagens</button> : null;
 
   return (
@@ -543,6 +559,7 @@ export default function CrecheHotel() {
           {ver === "mensalistas" ? (podePlano && <button className="g-btn pri" onClick={() => { if (!somenteLeitura()) setNovoPlano(true); }}><Plus /> Novo mensalista</button>)
             : ver === "cobrancas" ? <button className="g-btn pri" onClick={() => { if (!somenteLeitura()) setGerando(true); }}><HandCoins /> Gerar cobranças de {nomeMes(mesCobranca)}</button>
             : <button className="g-btn pri" onClick={abrirNova}><Plus /> Nova reserva / Check-in</button>}
+          {levaTrazHoje > 0 && <Link className="g-btn sec" href={`/gestao/app/creche-hotel/leva-traz?dia=${hojeIso}`} title="Buscar e levar os pets de hoje, com endereço e rota"><Truck /> Leva e traz ({levaTrazHoje})</Link>}
         </div>
       </header>
 
@@ -928,6 +945,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
 }) {
   const { sb, petshop, vejoFinanceiro, souDono } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
+  const anotarParcelas = useAnotarParcelas();
   // só os tipos que o pet shop usa (na edição, o tipo da estadia aparece mesmo que tenha sido desligado depois)
   const tiposDaCasa = TIPOS.filter((t) => usaModulo(petshop, t.id) || editar?.tipo === t.id);
   const tipo0: Tipo = tiposDaCasa.some((t) => t.id === tipoInicial) ? tipoInicial : tiposDaCasa[0]?.id ?? tipoInicial;
@@ -964,6 +982,30 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const [erroSinal, setErroSinal] = useState<string | null>(null);
   // check-in de quem chegou agora: o tutor pode pagar adiantado (fica como o sinal da estadia, pago; o check-out desconta)
   const [adiantado, setAdiantado] = useState<EstadoSinal>(() => sinalInicial(null));
+  // leva e traz: buscar em casa na entrada e/ou levar de volta na saída, no endereço do tutor (ou outro escrito aqui)
+  const [levaBuscar, setLevaBuscar] = useState(Boolean(editar?.leva_traz_buscar));
+  const [levaLevar, setLevaLevar] = useState(Boolean(editar?.leva_traz_levar));
+  const [enderecoLT, setEnderecoLT] = useState(editar?.endereco_leva_traz ?? "");
+  const { dados: enderecoDoTutor } = useDados(async () => {
+    const id = pet?.clientes?.id;
+    if (!id) return null;
+    const r = await sb.from("clientes").select("endereco").eq("id", id).eq("petshop_id", petshop.id).maybeSingle();
+    return (r.data?.endereco ?? "").trim() || null;
+  }, [petshop.id, pet?.clientes?.id]);
+  function marcarLevaTraz(m: { buscar?: boolean; levar?: boolean }) {
+    if (m.buscar !== undefined) setLevaBuscar(m.buscar);
+    if (m.levar !== undefined) setLevaLevar(m.levar);
+    // o endereço vem do cadastro do tutor; a pessoa pode trocar
+    if ((m.buscar || m.levar) && !enderecoLT.trim() && enderecoDoTutor) setEnderecoLT(enderecoDoTutor);
+  }
+  // promoção em dias fracos (Meu pet shop): na reserva nova, a tela mostra a que o banco vai pôr; na edição, a da estadia
+  const { dados: promos } = useDados(async () => {
+    if (editar) return [];
+    const r = await sb.from("promocoes").select(COLS_PROMOCAO).eq("petshop_id", petshop.id).eq("ativa", true);
+    return r.error ? [] : (r.data ?? []).map((x) => lerPromocao(x as unknown as Record<string, unknown>));
+  }, [petshop.id, Boolean(editar)]);
+  const [semPromo, setSemPromo] = useState(false);
+  const promoDaEdicao = usePromoDaEstadia(editar?.id ?? "", editar?.promo ?? null);
 
   const emCasa = editar ? editar.status === "em_casa" : jaAqui;
   // na edição a entrada sempre aparece; no check-in novo a entrada é agora
@@ -1016,6 +1058,14 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const ofereceExp = tipo === "creche" && !temPlano && (regraExp.ativo || Boolean(editar?.experiencia)) && editar?.status !== "encerrada";
   const comExp = ofereceExp && experiencia;
   const precoExp = precoDaExperiencia(petshop) ?? 0;
+  // a promoção da estadia (mensalista e dia de experiência não têm)
+  const semPromoAqui = reservaExtra || diaDoPlano || comExp || Boolean(planoDoPet && jaAqui);
+  const promoNova = !editar && !semPromoAqui && entradaForm && !Number.isNaN(entradaForm.getTime())
+    ? promoDaEstadia(promos ?? [], { tipo, entrada: isoDia(entradaForm), saida: saidaDia || null, diaria }) : null;
+  const promoAqui: PromoDaEstadia | null = editar ? (!semPromoAqui ? promoDaEdicao.promo : null)
+    : promoNova ? { id: promoNova.id, nome: promoNova.nome, tipo: promoNova.tipo, valor: promoNova.valor, dias: promoNova.dias, comeca_em: promoNova.comeca_em, termina_em: promoNova.termina_em, casa: tipo, tirada: semPromo } : null;
+  const prevNoites = prev && !prev.aberto && diaria != null && entradaForm ? (prev.noites ?? diasDasNoites(entradaForm, prev.n).map((d) => ({ dia: d, valor: diaria }))) : null;
+  const descPromo = promoAqui && !promoAqui.tirada && prevNoites ? descontoDaPromoNaEstadia(promoAqui, prevNoites) : null;
 
   // sinal: só em reserva nova, para quem recebe. O valor acompanha a regra até a pessoa mexer.
   const ofereceSinal = !editar && !jaAqui && vejoFinanceiro && aceitaSinal(petshop, tipo) && !reservaExtra;
@@ -1113,6 +1163,11 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         ...(comExp || editar?.experiencia ? { experiencia: comExp } : {}),
         ...(opQuartos.ativo || editar?.acomodacao ? { acomodacao: tipo === "hotel" && quarto ? quarto.id : null } : {}),
         ...(comCuidados || editar?.cuidados ? { cuidados: cuidadosParaGravar(cuidados) as never } : {}),
+        // leva e traz (o banco guarda; a lista do dia mostra buscar na entrada e levar na saída)
+        ...(levaBuscar || levaLevar || editar?.leva_traz_buscar || editar?.leva_traz_levar
+          ? { leva_traz_buscar: levaBuscar, leva_traz_levar: levaLevar, endereco_leva_traz: levaBuscar || levaLevar ? enderecoLT.trim().slice(0, 300) || null : null } : {}),
+        // a promoção quem põe é o banco; a tela só pode pedir para marcar sem ela
+        ...(!editar && promoNova && semPromo ? { promo: { tirada: true } } : {}),
       };
       let id = editar?.id ?? null;
       if (editar) {
@@ -1137,8 +1192,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
       }
       if (id && sinalPronto.modo !== "sem") {
         try {
-          await lancarSinal(sb, petshop.id, { id, tipo, entrada: entrada.toISOString(), pet: pet.nome, clienteId: pet.clientes?.id ?? null }, sinalPronto, chave, !ofereceSinal);
+          const pagos = await lancarSinal(sb, petshop.id, { id, tipo, entrada: entrada.toISOString(), pet: pet.nome, clienteId: pet.clientes?.id ?? null }, sinalPronto, chave, !ofereceSinal);
           avisar(!ofereceSinal ? `${brl(sinalPronto.valor)} recebidos adiantado. O check-out desconta.` : sinalPronto.modo === "agora" ? `Sinal de ${brl(sinalPronto.valor)} recebido.` : `Sinal de ${brl(sinalPronto.valor)} em A receber, para ${dataCurta(sinalPronto.quando)}.`);
+          if (sinalPronto.modo === "agora") await anotarParcelas(pagos, sinalPronto.parcelas);
         } catch (e) {
           // o sinal e a ligação com a reserva vão juntos: nada dele ficou gravado. A mesma chave na nova tentativa encontra a
           // reserva já marcada e anota o sinal uma vez só
@@ -1248,6 +1304,27 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
             </select>
           </Campo>
         )}
+        {!reservaExtra && !diaDoPlano && (
+          <div className="g-campo g-ch-lt">
+            <span>Leva e traz</span>
+            <div className="g-ht-marcar">
+              <label className={levaBuscar ? "on" : ""}>
+                <input type="checkbox" checked={levaBuscar} onChange={(ev) => marcarLevaTraz({ buscar: ev.target.checked })} />
+                <span className="t"><b>Buscar em casa</b><small>{tipo === "hotel" ? "no dia da entrada" : "na chegada"}</small></span>
+              </label>
+              <label className={levaLevar ? "on" : ""}>
+                <input type="checkbox" checked={levaLevar} onChange={(ev) => marcarLevaTraz({ levar: ev.target.checked })} />
+                <span className="t"><b>Levar de volta</b><small>{tipo === "hotel" ? "no dia da saída" : "no fim do dia"}</small></span>
+              </label>
+            </div>
+            {(levaBuscar || levaLevar) && (
+              <Campo rotulo="Endereço" dica={enderecoDoTutor ? (enderecoLT.trim() === enderecoDoTutor ? "O endereço do cadastro do tutor. Dá para trocar." : "Em branco, vale o endereço do cadastro do tutor.") : "O tutor está sem endereço no cadastro: escreva aqui."}>
+                <input className="g-input" value={enderecoLT} maxLength={300} placeholder={enderecoDoTutor ?? "Rua, número, bairro"} onChange={(e) => setEnderecoLT(e.target.value)} />
+              </Campo>
+            )}
+            {(levaBuscar || levaLevar) && <small>Aparece na lista do Leva e traz do dia{tipo === "hotel" ? " (buscar na entrada, levar na saída)" : ""}. A taxa, se tiver, é só uma sugestão no check-out.</small>}
+          </div>
+        )}
         {diaDoPlano && (
           <div className="g-aviso vermelho" role="alert" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce"><b>{pet.nome} é mensalista e já vem nesse dia pelo plano.</b> Não precisa reservar: no dia, marque a chegada na Chamada.</span></div>
         )}
@@ -1303,6 +1380,16 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
           </p>
         )}
         {vejoFinanceiro && prev && !prev.aberto && prev.noites && temNoiteDiferente(prev.noites) && <NoitePorNoite noites={prev.noites} total={prev.diarias} />}
+        {promoAqui && (editar ? (
+          <LinhaPromoDaEstadia promo={promoAqui} tipo={tipo} valor={vejoFinanceiro && descPromo ? descPromo.valor : null} dias={descPromo?.dias ?? null}
+            ocupado={promoDaEdicao.ocupado} podeMudar={editar.status !== "encerrada"} aoTirar={() => void promoDaEdicao.tirar()} aoPorDeVolta={() => void promoDaEdicao.porDeVolta()} />
+        ) : (
+          <div className="g-campo">
+            <LinhaPromoDaEstadia promo={promoAqui} tipo={tipo} valor={vejoFinanceiro && descPromo ? descPromo.valor : null} dias={descPromo?.dias ?? null}
+              podeMudar aoTirar={() => setSemPromo(true)} aoPorDeVolta={() => setSemPromo(false)} />
+            {!promoAqui.tirada && <small>A diária continua a mesma: a promoção entra como desconto no check-out{tipo === "hotel" ? ", nas noites que caem nos dias dela" : ""}. Dá para tirar até lá.</small>}
+          </div>
+        ))}
         {ofereceSinal && <CamposSinal estado={sinal} aoMudar={(s) => { setMexeuNoSinal(true); setSinal(s); setErroSinal(null); }} sugerido={sugerido} erro={erroSinal} semTutor={!pet.clientes?.id} />}
         {ofereceAdiantado && <CamposAdiantado estado={adiantado} aoMudar={(s) => { setAdiantado(s); setErroSinal(null); }} erro={erroSinal} />}
         {comCuidados && <EditorDeCuidados valor={cuidados} aoMudar={setCuidados} />}
@@ -1338,8 +1425,10 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
   const [cobrar, setCobrar] = useState<Record<string, boolean>>({});
   const [semPacote, setSemPacote] = useState<Record<string, boolean>>({});
   const [semTaxa, setSemTaxa] = useState<Record<string, boolean>>({});
-  // no lote é uma forma só para todos (quem divide o pagamento sai pelo check-out do próprio pet)
+  // no lote é uma forma só para todos (quem divide o pagamento sai pelo check-out do próprio pet), e o crédito em quantas vezes
   const [forma, setForma] = useFormaLembrada();
+  const [parcelas, setParcelas] = useState<number | null>(null);
+  const anotarParcelas = useAnotarParcelas();
   const [erroForma, setErroForma] = useState<string | null>(null);
   const caixa = useCaixaAberto();
   const [salvando, setSalvando] = useState(false);
@@ -1355,7 +1444,11 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
     const mensal = Boolean(e.mensalista);
     // sinal ou taxas combinadas na reserva: a conta é maior do que a diária, então sai pelo check-out do pet
     const comSinal = e.sinal_estado === "pago" || e.sinal_estado === "a_receber";
-    const sozinho = vejoFinanceiro && !mensal && (comSinal || taxasGuardadas(valores.get(e.id)).length > 0) ? (comSinal ? "tem sinal na reserva" : "tem taxas combinadas") : null;
+    // promoção (desconto na conta) e leva e traz com taxa (sugestão na conta) também: a conta se fecha no check-out do pet
+    const comPromo = Boolean(e.promo && typeof e.promo === "object" && (e.promo as { tirada?: boolean }).tirada !== true);
+    const comTaxi = (e.leva_traz_buscar || e.leva_traz_levar) && temTaxa(taxaDoLevaTraz(petshop));
+    const sozinho = vejoFinanceiro && !mensal && (comSinal || taxasGuardadas(valores.get(e.id)).length > 0 || comPromo || comTaxi)
+      ? (comSinal ? "tem sinal na reserva" : comPromo ? "tem promoção" : comTaxi ? "tem leva e traz" : "tem taxas combinadas") : null;
     const n = mensal ? 1 : contarDiarias(e, agora);
     const valor = !mensal && e.valor_diaria != null ? centavos(n * Number(e.valor_diaria)) : 0;
     const pacote = mensal ? null : pacoteDe(e.pet_id, n);
@@ -1396,6 +1489,7 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
     setSalvando(true);
     let feitos = 0, recebido = 0, comPacote = 0, anotadas = 0;
     const falhas: string[] = [];
+    const pagos: string[] = [];
     for (const l of escolhidas) {
       const nome = l.e.pets?.nome ?? "Pet";
       try {
@@ -1440,7 +1534,7 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
         }
         feitos++;
         if (l.usaPacote && l.pacote) comPacote++;
-        if (lanca) recebido += l.recebe;
+        if (lanca) { recebido += l.recebe; pagos.push(...idsDaOperacao(feito, passos)); }
         // mensalista: o banco confere a hora e anota a saída fora do horário (sem valor); a decisão vem logo abaixo ou fica para quem recebe
         const anotada = l.mensal && (await sb.rpc("creche_atraso_anotar", { p_estadia: l.e.id })).data === true;
         if (l.mensal && l.podeTaxa && l.taxa === 0) await decidirAtraso(sb, l.e.id, "dispensada").catch(() => undefined);
@@ -1452,6 +1546,8 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
     }
     setSalvando(false);
     if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join(", ")}. Toque de novo para tentar: quem já saiu não é lançado outra vez.`);
+    // crédito parcelado: a mesma escolha para todos (até 20 de uma vez, o limite do banco)
+    if (forma === "credito") for (let i = 0; i < pagos.length; i += 20) await anotarParcelas(pagos.slice(i, i + 20), parcelas);
     if (feitos) avisar(`${feitos === 1 ? "1 pet foi" : `${feitos} pets foram`} para casa.${comPacote ? ` ${comPacote === 1 ? "1 usou" : `${comPacote} usaram`} o pacote.` : ""}${recebido ? ` ${brl(recebido)} no financeiro.` : ""}${anotadas ? ` ${anotadas === 1 ? "1 mensalista saiu" : `${anotadas} mensalistas saíram`} depois do horário: a taxa fica em Check-outs para cobrar, para ${vejoFinanceiro ? "você decidir" : "quem cuida do caixa decidir"}.` : ""}`);
     // algum não saiu: a folha fica aberta e a mesma chave vale para a nova tentativa
     if (falhas.length) return false;
@@ -1514,7 +1610,8 @@ function EncerrarCreche({ estadias, valores, aoFechar, aoGravar, aoCheckOut }: {
           <>
             {totalTaxas > 0 && <p className="g-p" role="status">Dos {brl(total)}, <b>{brl(totalTaxas)}</b> {comTaxa.length === 1 ? "é a taxa de busca fora do horário de 1 pet" : `são taxas de busca fora do horário de ${comTaxa.length} pets`}.</p>}
             <ChipsForma valor={forma} aoMudar={(f) => { setForma(f); setErroForma(null); }} erro={erroForma} />
-            <p className="g-pp g-muted">A mesma forma vale para todos. Se alguém dividir o pagamento ou for pagar depois, desmarque esse pet aqui e faça o check-out pelo cartão dele.</p>
+            <PerguntaParcelas forma={forma} valor={parcelas} aoMudar={setParcelas} />
+            <p className="g-pp g-muted">A mesma forma{forma === "credito" ? " e as mesmas vezes valem" : " vale"} para todos. Se alguém dividir o pagamento, pagar de outro jeito ou for pagar depois, desmarque esse pet aqui e faça o check-out pelo cartão dele.</p>
             <AvisoCaixaFechado aberto={caixa} />
           </>
         )}

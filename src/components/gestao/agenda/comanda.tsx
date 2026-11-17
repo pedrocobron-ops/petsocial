@@ -26,8 +26,8 @@ import {
   BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
   produtosDaConta, resumoDosItens, useProdutosDaLoja, valorDaLinha, type ItemConta, type PagaDepois,
 } from "../loja/conta";
-import { AvisoCaixaFechado, fecharPagamento, pagoAMenos, ParcelasNaTela, useCaixaAberto, usePagamento } from "../loja/pecas";
-import { anotarParcelas, idsDaOperacao } from "@/lib/gestao/maquininha";
+import { AvisoCaixaFechado, fecharPagamento, pagoAMenos, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, usePagamento } from "../loja/pecas";
+import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 import { LinhaPromoNaConta, usePromoDoHorario } from "./promo-do-horario";
 import { AvisoPacoteAcabando } from "../pacote-acabando";
@@ -59,6 +59,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   // quem não vende produtos não vê a busca do estoque: fica só o "Outro extra"
   const vendeProdutos = usaModulo(petshop, "loja");
   const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
+  const anotarParcelas = useAnotarParcelas();
   const somenteLeitura = useSomenteLeitura();
   const { produtos, carregando, erro } = useProdutosDaLoja();
   const pet = a.pets, tutor = pet?.clientes;
@@ -230,8 +231,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       if (a.status !== "concluido" || naoCobra) passos.push({ t: "agendamento", id: a.id, status: "concluido", ...(naoCobra ? { sem_cobranca: true } : {}) });
       const feito = await fecharNoBanco(chave, passos);
       if (!feito) return true;
-      // crédito parcelado: em quantas vezes (a taxa do parcelado); se falhar, fica a do crédito à vista
-      if (pg && !("erro" in pg)) await anotarParcelas(sb, petshop.id, idsDaOperacao(feito), pagamento.parcelas).catch(() => 0);
+      // crédito parcelado: em quantas vezes (a taxa do parcelado); se falhar, tenta de novo e avisa (fica a do crédito à vista)
+      if (pg && !("erro" in pg)) await anotarParcelas(idsDaOperacao(feito, passos), pagamento.parcelas);
       const usos = feito.passos.find((p) => p.t === "pacote");
       const lancado = lanca && !fiado ? (lancamentoDe(feito, "principal") as unknown as Lancamento | null) : null;
       if (vejoFinanceiro && pg && !("erro" in pg) && soDigitos(tutor?.telefone).length >= 8 && (lancado || pagouAntigas > 0)) {
@@ -330,8 +331,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       passos.push({ t: "receber", conta: ref("conta"), valor: entregue, forma: m.forma, pagamentos: partesOuNada(m.pagamentos), chave: parteDaChave(chave, "parte") });
       const feito = await fecharNoBanco(chave, passos);
       if (!feito) return true;
-      // crédito parcelado: em quantas vezes (a taxa do parcelado); se falhar, fica a do crédito à vista
-      await anotarParcelas(sb, petshop.id, idsDaOperacao(feito), pagamento.parcelas).catch(() => 0);
+      // crédito parcelado: em quantas vezes (a taxa do parcelado); se falhar, tenta de novo e avisa (fica a do crédito à vista)
+      await anotarParcelas(idsDaOperacao(feito, passos), pagamento.parcelas);
       const nota = `${credito > 0 ? `${brl(credito)} saíram do crédito de ${primeiroNome}. ` : ""}Ficou ${brl(falta)} para ${primeiroNome} pagar até ${dataCompleta(depois.quando)}, em A receber e na ficha.${junto > 0 ? ` O que ${primeiroNome} devia de antes (${brl(devido)}) continua anotado.` : ""}`;
       avisar(`Recebido ${brl(entregue)}. ${nota}`);
       avisarMudanca();

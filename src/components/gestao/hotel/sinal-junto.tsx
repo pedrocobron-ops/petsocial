@@ -9,7 +9,7 @@ import { useOperacao } from "@/lib/gestao/uma-vez";
 import { brl, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Folha, useAvisos } from "../ui";
-import { AvisoCaixaFechado, EscolhaPagamento, fecharPagamento, pagamentoInicial, useCaixaAberto, type EstadoPagamento } from "../loja/pecas";
+import { AvisoCaixaFechado, EscolhaPagamento, fecharPagamento, pagamentoInicial, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, type EstadoPagamento } from "../loja/pecas";
 
 /** A linha do grupo na aba Reservas: "Thor e Mel · sinal R$ 69,65" e o botão para receber junto. */
 export function LinhaSinalJunto({ grupo, aoReceber }: { grupo: GrupoDeSinal; aoReceber: () => void }) {
@@ -39,6 +39,7 @@ export function FolhaSinalJunto({ grupo, aoFechar, aoGravar }: { grupo: GrupoDeS
 
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
+  const anotarParcelas = useAnotarParcelas();
   async function gravar(chave: string): Promise<boolean | void> {
     if (salvando) return;
     setErro(null);
@@ -50,6 +51,8 @@ export function FolhaSinalJunto({ grupo, aoFechar, aoGravar }: { grupo: GrupoDeS
     try {
       await receberSinaisJuntos(sb, petshop.id, itens, pg, chave);
       avisar(`Sinal de ${nomes} recebido: ${brl(total)}.`);
+      // cada sinal é recebido inteiro: a conta de cada um virou paga (crédito parcelado: em quantas vezes)
+      await anotarParcelas(itens.map((x) => x.contaId), pagamento.parcelas);
       aoGravar();
     } catch (x) {
       setSalvando(false);
@@ -83,7 +86,9 @@ export function FolhaSinalJunto({ grupo, aoFechar, aoGravar }: { grupo: GrupoDeS
           </div>
         </div>
         <div className="g-card areia"><b className="g-tab">Total: {brl(total)}</b>{itens.length > 0 && itens.length < grupo.itens.length && <p className="g-muted g-p">Só {nomes}. O outro sinal continua em A receber.</p>}</div>
-        <EscolhaPagamento valor={pagamento} aoMudar={(p) => { setPagamento(p); setErro(null); }} total={total} rotulo="Como o tutor pagou" erro={erro} />
+        <ParcelasNaTela.Provider value>
+          <EscolhaPagamento valor={pagamento} aoMudar={(p) => { setPagamento(p); setErro(null); }} total={total} rotulo="Como o tutor pagou" erro={erro} />
+        </ParcelasNaTela.Provider>
         <AvisoCaixaFechado aberto={caixa} />
       </div>
     </Folha>

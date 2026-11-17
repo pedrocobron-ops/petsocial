@@ -14,6 +14,7 @@ import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
 import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres, vagasDe } from "../agenda";
 import { partesPorForma } from "../dinheiro";
+import { anotarParcelasComRetry, idsDaOperacao, lojaPerguntaParcelas } from "../maquininha";
 import { juntarServicosAMais, nomeDosServicos, valorDoHorario } from "../servicos-do-horario";
 import { parecidos } from "./parecido";
 import { almocoNoDiaDaSemana, brl, fmtTelefone, lerTelefone, linkWhatsApp, precoDoServico, semAcento, soDigitos } from "../util";
@@ -78,6 +79,8 @@ const uuid = (v: unknown) => (typeof v === "string" && RE_UUID.test(v) ? v : nul
 type Def = Anthropic.Tool & { grava: boolean; financeiro?: boolean };
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: "object" as const, properties, required, additionalProperties: false });
 const S = { type: "string" }, N = { type: "number" }, B = { type: "boolean" };
+/** Crédito em quantas vezes (a taxa do parcelado da maquininha). A ferramenta pede quando a loja tem taxa de parcelado. */
+const PARCELAS = { type: "integer", minimum: 1, maximum: 12, description: "Só no crédito: em quantas vezes o cliente passou (1 = à vista). Se a ferramenta pedir, pergunte." };
 const DIA = { type: "string", description: "Dia no formato AAAA-MM-DD" };
 const DIA_HORA = { type: "string", description: "Dia e hora locais no formato AAAA-MM-DDTHH:mm" };
 const HORA = { type: "string", description: "Hora local no formato HH:mm" };
@@ -127,9 +130,9 @@ export const FERRAMENTAS: Def[] = [
   { grava: true, name: "fazer_checkin", description: "Creche e hotel: registra que o pet chegou agora. Se o pet tem reserva do mesmo tipo para hoje (ou atrasada, ou para amanhã), a reserva vira check-in; senão, cria a estadia. Sem valor_diaria, usa a da reserva ou a diária de Meu pet shop.",
     input_schema: obj({ pet_id: S, tipo: { type: "string", enum: ["creche", "hotel"] }, saida_prevista: { ...S, description: "Opcional. AAAA-MM-DDTHH:mm (só o dia vale 18:00)" }, valor_diaria: N, obs: { ...S, description: "Ração, remédio, o que trouxe" } }, ["pet_id", "tipo"]) },
   { grava: true, name: "fazer_checkout", description: "Creche e hotel: encerra a estadia do pet que está na casa. Quem tem acesso ao financeiro recebe junto: o valor é diárias vezes o valor da diária, se você não passar, e precisa da forma de pagamento. Passe valor 0 para não cobrar agora.",
-    input_schema: obj({ pet_id: S, diarias: { ...N, description: "Opcional. Padrão: contadas da entrada até hoje (hotel por noite, creche por dia)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] } }, ["pet_id"]) },
+    input_schema: obj({ pet_id: S, diarias: { ...N, description: "Opcional. Padrão: contadas da entrada até hoje (hotel por noite, creche por dia)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS }, ["pet_id"]) },
   { grava: true, name: "vender_pacote", description: "Vende para um pet um modelo de pacote (pacote_id de ver_pacotes). Quem tem acesso ao financeiro lança o pagamento junto e precisa da forma; se o cliente ainda não pagou, passe ja_pagou: false e nada entra no financeiro.",
-    input_schema: obj({ pet_id: S, pacote_id: S, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, ja_pagou: { ...B, description: "Padrão: true" } }, ["pet_id", "pacote_id"]) },
+    input_schema: obj({ pet_id: S, pacote_id: S, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, ja_pagou: { ...B, description: "Padrão: true" } }, ["pet_id", "pacote_id"]) },
   { grava: true, name: "usar_pacote", description: "Dá baixa de 1 uso no pacote ativo do pet. Se o pet tem mais de um pacote ativo, passe pacote_cliente_id (de ver_pacotes).",
     input_schema: obj({ pet_id: S, pacote_cliente_id: S }, ["pet_id"]) },
   { grava: true, name: "registrar_saude", description: "Anota um cuidado de saúde do pet (vacina, vermífugo, antipulgas ou outro) com a data em que foi aplicado e, se a pessoa disse, quando vence. Só anota: não calcule nem sugira a data de vencimento.",
@@ -139,13 +142,13 @@ export const FERRAMENTAS: Def[] = [
   { grava: true, financeiro: true, name: "fechar_caixa", description: "Fecha o caixa aberto. Passe o dinheiro contado na gaveta (só dinheiro; Pix e cartão não entram). O cartão mostra o esperado, o contado e a diferença.",
     input_schema: obj({ valor_contado: N, obs: S }, ["valor_contado"]) },
   { grava: true, financeiro: true, name: "lancar_dinheiro", description: "Registra dinheiro NOVO que entrou ou saiu hoje (entra no caixa aberto): venda, serviço sem horário, despesa. Para receber um atendimento, passe agendamento_id: ele fica como concluído. Nunca use para um cliente pagando o que devia (fiado, conta anotada, taxa de falta): isso é receber_de_cliente, que dá baixa nas contas. Se o dinheiro veio de um cliente, passe cliente_id; se ele tem contas em aberto, a ferramenta recusa e manda usar receber_de_cliente, a não ser que a pessoa tenha dito que é outra coisa (aí passe nao_e_divida: true).",
-    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e material, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S, cliente_id: { ...S, description: "Tutor que pagou (de buscar_pets)" }, nao_e_divida: { ...B, description: "true só quando a pessoa disse que este dinheiro não é pagamento do que o cliente devia" } }, ["tipo", "valor", "forma", "categoria"]) },
+    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e material, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S, cliente_id: { ...S, description: "Tutor que pagou (de buscar_pets)" }, nao_e_divida: { ...B, description: "true só quando a pessoa disse que este dinheiro não é pagamento do que o cliente devia" } }, ["tipo", "valor", "forma", "categoria"]) },
   { grava: true, financeiro: true, name: "criar_conta", description: "Cria uma conta a pagar (saida) ou uma conta a receber (entrada) que não é de um cliente. O que um cliente ficou devendo é anotar_divida.",
     input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, vencimento: DIA, descricao: S, categoria: S }, ["tipo", "valor", "vencimento", "descricao"]) },
   { grava: true, financeiro: true, name: "anotar_divida", description: "Anota o que um cliente ficou devendo (fiado, taxa de falta, perfume que levou e vai pagar depois). Fica na ficha do tutor (\"Deve R$ X\"), em Caixa, Contas de clientes, em A receber e aparece como \"Deve de antes\" no próximo atendimento. Precisa do cliente_id (de buscar_pets). Sem vencimento, vence em 7 dias.",
     input_schema: obj({ cliente_id: S, valor: N, descricao: { ...S, description: "Do que é (ex.: Perfume, Taxa de falta de 18/11)" }, vencimento: DIA, categoria: { ...S, description: "Padrão: Outros" } }, ["cliente_id", "valor", "descricao"]) },
   { grava: true, financeiro: true, name: "receber_de_cliente", description: "Um cliente pagou o que devia (\"o dono do Bob me pagou os 35\", \"a Joana acertou o fiado\"): dá baixa nas contas em aberto dele, da mais antiga para a mais nova, e o dinheiro entra uma vez só. Pode ser só uma parte: o resto continua devido. Se pagou mais do que deve, pergunte se a diferença fica de crédito para ele (sobra: \"credito\"). O cartão mostra quanto ele deve, quais contas quita e o que fica faltando.",
-    input_schema: obj({ cliente_id: { ...S, description: "Tutor (de buscar_pets)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, sobra: { type: "string", enum: ["credito"], description: "Só quando pagou a mais e a pessoa disse que a diferença fica de crédito" } }, ["cliente_id", "valor", "forma"]) },
+    input_schema: obj({ cliente_id: { ...S, description: "Tutor (de buscar_pets)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, sobra: { type: "string", enum: ["credito"], description: "Só quando pagou a mais e a pessoa disse que a diferença fica de crédito" } }, ["cliente_id", "valor", "forma"]) },
   { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar. Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento.",
     input_schema: obj({ produto_id: S, produto_nome: S, unidade: { ...S, description: "un, kg, g, L, ml, pacote, saco" }, tipo: { type: "string", enum: ["entrada", "saida"] }, quantidade: N, custo_unitario: N, lancar_despesa: B, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, motivo: S }, ["tipo", "quantidade"]) },
   ...FERRAMENTAS_COMISSAO,
@@ -793,6 +796,35 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
 /* ---------- o que vai aparecer no cartão de confirmação ---------- */
 
 const FORMA: Record<string, string> = { pix: "Pix", dinheiro: "Dinheiro", debito: "Débito", credito: "Crédito", outro: "Outro" };
+
+/**
+ * Crédito em quantas vezes: no crédito, com a loja que tem taxa de parcelado (`maquininha_pergunta_parcelas`), o cartão só sai
+ * com o número de vezes (o modelo pergunta). Devolve o número (1 = à vista) ou null (não é crédito, ou a loja não pergunta).
+ */
+async function conferirParcelas(c: Contexto, e: Entrada): Promise<number | null> {
+  if (String(e.forma) !== "credito") return null;
+  const n = numero(e.parcelas);
+  if (n != null) {
+    exigir(Number.isInteger(n) && n >= 1 && n <= 12, "parcelas vai de 1 (à vista) a 12.");
+    return n;
+  }
+  exigir(!(await lojaPerguntaParcelas(c.sb, c.petshop.id)), "Falta saber em quantas vezes foi o crédito: pergunte (à vista ou de 2 a 12 vezes) e passe parcelas.");
+  return null;
+}
+const textoParcelas = (n: number | null) => (n == null ? null : n === 1 ? "à vista" : `em ${n} vezes`);
+
+/**
+ * Depois de gravar um pagamento no crédito: anota em quantas vezes (até 3 tentativas). Se não der, o pagamento continua gravado
+ * com a taxa do crédito à vista, e o resultado leva um aviso para o modelo contar.
+ */
+async function anotarVezes(c: Contexto, e: Entrada, ids: (string | null | undefined)[], r: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const n = String(e.forma) === "credito" ? numero(e.parcelas) : null;
+  if (!n || n < 2) return r;
+  const a = await anotarParcelasComRetry(c.sb, c.petshop.id, ids, n);
+  if (a.ok) return { ...r, credito_em_vezes: n };
+  const aviso = `O pagamento entrou, mas não consegui anotar o crédito em ${n} vezes: a taxa da maquininha ficou a do crédito à vista. Diga isso.`;
+  return { ...r, aviso: typeof r.aviso === "string" ? `${r.aviso} ${aviso}` : aviso };
+}
 const STATUS: Record<string, string> = { marcado: "Marcado", confirmado: "Confirmado", em_atendimento: "Em atendimento", concluido: "Concluído", faltou: "Faltou", cancelado: "Cancelado" };
 
 /** Confere a proposta (ids existem, datas válidas, permissão) e monta o resumo em português. Lança erro se algo não fecha. */
@@ -950,7 +982,7 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
         ["Chegou", quandoLocal(utcParaLocal(p.estadia.entrada, c.fusoMin))], ["Sai", `agora, ${quandoLocal(c.agora)}`],
         ["Diárias", `${p.n} ${palavra}${c.vejoFinanceiro && p.estadia.valor_diaria != null ? ` × ${brl(p.estadia.valor_diaria)}` : ""}`]];
       if (!c.vejoFinanceiro) linhas.push(["Pagamento", "fica para quem cuida do financeiro lançar"]);
-      else if (p.valor) linhas.push(["Recebe", `${brl(p.valor)} no ${FORMA[String(e.forma)]}`]);
+      else if (p.valor) { const vezes = textoParcelas(await conferirParcelas(c, e)); linhas.push(["Recebe", `${brl(p.valor)} no ${FORMA[String(e.forma)]}${vezes ? ` ${vezes}` : ""}`]); }
       else linhas.push(["Pagamento", numero(e.valor) === 0 ? "nada é cobrado agora" : "a diária não foi combinada: nada é cobrado agora"]);
       return { titulo: "Fazer check-out", linhas };
     }
@@ -958,7 +990,7 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       const p = await planoDaVenda(c, e);
       const linhas: [string, string][] = [["Pet", `${p.pet.nome}${p.pet.clientes?.nome ? ` (${p.pet.clientes.nome})` : ""}`], ["Pacote", p.modelo.nome], ["Quantidade", `${p.modelo.quantidade}x`],
         ["Vence", p.venceEm ? quandoLocal(p.venceEm) : "sem data para vencer"], ["Valor", brl(p.preco)]];
-      if (p.lanca) linhas.push(["Pagamento", `${brl(p.preco)} no ${FORMA[String(e.forma)]}`]);
+      if (p.lanca) { const vezes = textoParcelas(await conferirParcelas(c, e)); linhas.push(["Pagamento", `${brl(p.preco)} no ${FORMA[String(e.forma)]}${vezes ? ` ${vezes}` : ""}`]); }
       else if (p.preco > 0) linhas.push(["Pagamento", c.vejoFinanceiro ? "ainda não pagou: nada entra no financeiro agora" : "fica para quem cuida do financeiro lançar"]);
       const { data: jaTem } = await c.sb.from("pacotes_clientes").select("nome, total, usados").eq("petshop_id", c.petshop.id).eq("pet_id", p.pet.id).eq("ativo", true).limit(3);
       if (jaTem?.length) linhas.push(["Atenção", `já tem pacote ativo: ${jaTem.map((x) => `${x.nome} (${x.usados} de ${x.total} usados)`).join(", ")}`]);
@@ -1015,7 +1047,8 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       const valor = numero(e.valor);
       exigir(valor && valor > 0, "Falta o valor.");
       exigir(FORMA[String(e.forma)], "Falta a forma de pagamento: pergunte (Pix, dinheiro, débito ou crédito).");
-      const linhas: [string, string][] = [[e.tipo === "saida" ? "Saiu" : "Entrou", brl(valor)], ["Forma", FORMA[String(e.forma)]], ["Categoria", texto(e.categoria, 60) || "Outros"]];
+      const vezes = e.tipo === "saida" ? null : textoParcelas(await conferirParcelas(c, e));
+      const linhas: [string, string][] = [[e.tipo === "saida" ? "Saiu" : "Entrou", brl(valor)], ["Forma", `${FORMA[String(e.forma)]}${vezes ? ` ${vezes}` : ""}`], ["Categoria", texto(e.categoria, 60) || "Outros"]];
       if (texto(e.descricao)) linhas.push(["Descrição", texto(e.descricao)]);
       await conferirSeEDivida(c, e);
       if (uuid(e.cliente_id)) linhas.push(["Cliente", (await clientePorId(c, e.cliente_id)).nome]);
@@ -1038,7 +1071,8 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       const todas = p.partes.length === p.contas.length && p.partes.every((x) => x.quita);
       const n = p.partes.filter((x) => x.quita).length;
       const pedido = `${p.nome} deve ${brl(p.total)} (${umaOuMais(p.contas.length)}). Receber ${brl(p.pago)} ${FORMA_FRASE[String(e.forma)]} e ${todas ? `quitar ${p.contas.length <= 5 ? EXTENSO[p.contas.length] : `as ${p.contas.length}`}` : n ? `quitar ${n === 1 ? "1 conta" : `${n} contas`}, ficando ${brl(p.fica)}` : `abater, ficando ${brl(p.fica)}`}${p.sobra > 0 ? `, com ${brl(p.sobra)} de crédito` : ""}?`;
-      const linhas: [string, string][] = [["Resumo", pedido], ["Recebe", `${brl(p.pago)} ${FORMA_FRASE[String(e.forma)]}`]];
+      const vezes = textoParcelas(await conferirParcelas(c, e));
+      const linhas: [string, string][] = [["Resumo", pedido], ["Recebe", `${brl(p.pago)} ${FORMA_FRASE[String(e.forma)]}${vezes ? ` ${vezes}` : ""}`]];
       for (const x of p.partes) linhas.push([`· ${nomeDaConta(x.conta)}`, x.quita ? `${brl(x.valor)}: quitada` : `${brl(x.valor)} de ${brl(x.conta.valor)}: faltam ${brl(real(x.conta.valor - x.valor))}`]);
       const intocadas = p.contas.length - p.partes.length;
       if (intocadas > 0) linhas.push(["Continua em aberto", `${umaOuMais(intocadas)} mais nova${intocadas === 1 ? "" : "s"}`]);
@@ -1175,7 +1209,7 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
         descricao: `${TIPO_ESTADIA[p.estadia.tipo] ?? "Estadia"}: ${p.n} ${p.n === 1 ? "diária" : "diárias"} · ${p.pet.nome}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c),
         cliente_id: p.pet.clientes?.id ?? null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single();
       if (pago.error) return { feito: true, diarias: p.n, pagamento_lancado: false, aviso: "O check-out foi feito, mas o pagamento não foi lançado. Diga isso e peça para lançar pelo Financeiro." };
-      return { feito: true, diarias: p.n, pagamento_lancado: true, valor: p.valor };
+      return anotarVezes(c, e, [pago.data?.id], { feito: true, diarias: p.n, pagamento_lancado: true, valor: p.valor });
     }
     case "vender_pacote": {
       const p = await planoDaVenda(c, e);
@@ -1185,7 +1219,7 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
       const pago = await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "entrada", valor: p.preco, forma: String(e.forma), categoria: "Pacotes", descricao: `Pacote ${p.modelo.nome} · ${p.pet.nome}`,
         data: p.hoje, pago: true, caixa_id: await caixaAbertoId(c), cliente_id: p.pet.clientes?.id ?? null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single();
       if (pago.error) return { feito: true, pacote_cliente_id: vendido.id, pagamento_lancado: false, aviso: "O pacote foi criado, mas o pagamento não foi lançado. Diga isso e peça para lançar pelo Financeiro." };
-      return { feito: true, pacote_cliente_id: vendido.id, pagamento_lancado: true, valor: p.preco };
+      return anotarVezes(c, e, [pago.data?.id], { feito: true, pacote_cliente_id: vendido.id, pagamento_lancado: true, valor: p.preco });
     }
     case "usar_pacote": {
       const { pacote } = await pacoteParaUsar(c, e);
@@ -1239,10 +1273,10 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
       let clienteId: string | null = null;
       if (agId) clienteId = (await sb.from("agendamentos").select("pets(cliente_id)").eq("id", agId).maybeSingle()).data?.pets?.cliente_id ?? null;
       else if (uuid(e.cliente_id)) clienteId = (await clientePorId(c, e.cliente_id)).id;
-      ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: String(e.tipo), valor: numero(e.valor)!, forma: String(e.forma), categoria: texto(e.categoria, 60) || "Outros",
+      const novo = ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: String(e.tipo), valor: numero(e.valor)!, forma: String(e.forma), categoria: texto(e.categoria, 60) || "Outros",
         descricao: texto(e.descricao) || null, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), agendamento_id: agId, cliente_id: clienteId, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
       if (agId && e.tipo === "entrada") await sb.from("agendamentos").update({ status: "concluido" }).eq("petshop_id", petshop.id).eq("id", agId);
-      return { feito: true };
+      return e.tipo === "entrada" ? anotarVezes(c, e, [novo.id], { feito: true }) : { feito: true };
     }
     case "anotar_divida": {
       const p = await planoDaDivida(c, e);
@@ -1262,7 +1296,8 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
       }
       const r = await sb.rpc("cliente_receber_contas", { p_petshop: petshop.id, p_cliente: p.cliente.id, p_chave: chave, p_passos: passos as never });
       if (r.error) throw new ErroDeUso(`Nada foi recebido: ${r.error.message}`);
-      return { feito: true, recebido: p.pago, contas_quitadas: p.partes.filter((x) => x.quita).length, ainda_deve: p.fica, credito_deixado: p.sobra };
+      return anotarVezes(c, e, idsDaOperacao(r.data as Parameters<typeof idsDaOperacao>[0], passos as { t: string; conta?: string }[]),
+        { feito: true, recebido: p.pago, contas_quitadas: p.partes.filter((x) => x.quita).length, ainda_deve: p.fica, credito_deixado: p.sobra });
     }
     case "criar_conta": {
       ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: e.tipo === "entrada" ? "entrada" : "saida", valor: numero(e.valor)!, categoria: texto(e.categoria, 60) || "Outros",

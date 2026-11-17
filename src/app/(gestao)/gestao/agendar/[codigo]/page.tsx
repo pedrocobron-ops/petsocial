@@ -141,6 +141,8 @@ export default function AgendarPeloLink() {
   const [fechados, setFechados] = useState<Set<string>>(() => new Set());
   // o preço do hotel no link: undefined = ainda lendo (não mostra nada); null = banco antes da atualização (mostra a diária comum)
   const [precoHotel, setPrecoHotel] = useState<PrecoDoHotel | null | undefined>(undefined);
+  // promoções da creche e do hotel (só as que o link mostra: creche e hotel ligados no link)
+  const [promosCasa, setPromosCasa] = useState<PromoDoLink[]>([]);
   // "Tirar dúvida" (opção do dono; banco antes da atualização ou erro = sem o botão)
   const [comDuvida, setComDuvida] = useState(false);
   // link do Google para avaliar a loja (opção do dono; sem link, nada aparece)
@@ -161,7 +163,8 @@ export default function AgendarPeloLink() {
       const l = Array.isArray(r.data) ? (r.data as PromoDoLink[]) : [];
       // só as que têm serviço no link (a lista já vem aberta: vazia = nenhum serviço do link entra)
       setPromos(l.filter((x) => Array.isArray(x.servicos) && x.servicos.length).map((x, i) => ({ ...x, id: `promo-${i}`, ativa: true, valor: Number(x.valor), dias: (x.dias ?? []).map(Number) })));
-    }, () => setPromos([]));
+      setPromosCasa(l.filter((x) => Array.isArray(x.casa) && x.casa.length).map((x) => ({ ...x, valor: Number(x.valor), dias: (x.dias ?? []).map(Number) })));
+    }, () => { setPromos([]); setPromosCasa([]); });
     // se a função ainda não existe no banco, segue sem dias fechados (como sempre foi)
     const f = await banco().rpc("link_fechados", { p_codigo: codigo });
     setFechados(new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []));
@@ -431,7 +434,8 @@ export default function AgendarPeloLink() {
           aoPedir={() => setLembrados((n) => n + 1)}
           zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)} zapCom={(t) => linkWhatsApp(info.telefone, t)}
           preco={estadia === "hotel" ? precoHotel : undefined}
-          diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)} />
+          diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)}
+          promos={promosCasa.filter((x) => x.casa?.includes(estadia))} />
       )}
 
       {!estadia && passo !== "enviado" && (
@@ -453,7 +457,10 @@ export default function AgendarPeloLink() {
               {info.creche && (
                 <button type="button" className="g-lk-serv" style={{ "--cor": "#3b9bd9" } as React.CSSProperties} onClick={() => setEstadia("creche")}>
                   <i className="g-lk-serv-cor" aria-hidden><Sun /></i>
-                  <span className="g-lk-serv-t"><b>Creche</b><span>Passar o dia{info.creche.diaria != null && <em>{brlCurto(Number(info.creche.diaria))} a diária</em>}</span></span>
+                  <span className="g-lk-serv-t"><b>Creche</b><span>Passar o dia{info.creche.diaria != null && <em>{brlCurto(Number(info.creche.diaria))} a diária</em>}</span>
+                    {promosCasa.filter((x) => x.casa?.includes("creche")).slice(0, 2).map((x, i) => (
+                      <span key={i} className="g-lk-promo-serv">{etiquetaPromo(x)} na diária · {diasCurtos(x.dias)}{validadePorExtenso(x) ? ` · ${validadePorExtenso(x)}` : ""}</span>
+                    ))}</span>
                   <ArrowRight className="g-lk-serv-seta" aria-hidden />
                 </button>
               )}
@@ -462,7 +469,10 @@ export default function AgendarPeloLink() {
                   <i className="g-lk-serv-cor" aria-hidden><BedDouble /></i>
                   <span className="g-lk-serv-t"><b>Hotel</b><span>Dormir com a gente{precoHotel === undefined || precoHotel?.mostrar === false ? null
                     : precoHotel?.de != null ? <em>{precoHotel.ate != null && precoHotel.ate !== precoHotel.de ? "a partir de " : ""}{brlCurto(Number(precoHotel.de))} a diária</em>
-                    : precoHotel === null && info.hotel.diaria != null ? <em>{brlCurto(Number(info.hotel.diaria))} a diária</em> : null}</span></span>
+                    : precoHotel === null && info.hotel.diaria != null ? <em>{brlCurto(Number(info.hotel.diaria))} a diária</em> : null}</span>
+                    {promosCasa.filter((x) => x.casa?.includes("hotel")).slice(0, 2).map((x, i) => (
+                      <span key={i} className="g-lk-promo-serv">{etiquetaPromo(x)} nas noites de {diasCurtos(x.dias)}{validadePorExtenso(x) ? ` · ${validadePorExtenso(x)}` : ""}</span>
+                    ))}</span>
                   <ArrowRight className="g-lk-serv-seta" aria-hidden />
                 </button>
               )}

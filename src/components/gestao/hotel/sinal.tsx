@@ -10,7 +10,8 @@ import type { Banco } from "@/lib/gestao/supabase";
 import { brl, dataCompleta, dataCurta, isoDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Campo, Folha, ok, useAvisos } from "../ui";
-import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharPagamento, pagamentoInicial, useCaixaAberto, type EstadoPagamento, type Forma } from "../loja/pecas";
+import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharPagamento, pagamentoInicial, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, type EstadoPagamento, type Forma } from "../loja/pecas";
+import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import { nomeTipo, type EstadiaCompleta } from "./tipos";
 
 /**
@@ -29,7 +30,8 @@ export const sinalInicial = (valor: number | null, entrada?: string | Date): Est
   return { modo: valor ? "depois" : "sem", valor, quando: chegada > hoje && chegada < prazo ? chegada : prazo, pagamento: pagamentoInicial() };
 };
 
-type SinalPronto = { modo: "sem" } | { modo: "agora"; valor: number; forma: Forma; pagamentos: PartePagamento[] | null } | { modo: "depois"; valor: number; quando: string };
+/** `parcelas`: crédito em quantas vezes (anote depois de gravar, com os ids que `lancarSinal` devolve). */
+type SinalPronto = { modo: "sem" } | { modo: "agora"; valor: number; forma: Forma; pagamentos: PartePagamento[] | null; parcelas?: number | null } | { modo: "depois"; valor: number; quando: string };
 /** Confere o sinal antes de gravar a reserva. Devolve o erro em português ou o que lançar. */
 export function prepararSinal(s: EstadoSinal): { erro: string } | SinalPronto {
   if (s.modo === "sem") return { modo: "sem" };
@@ -42,7 +44,7 @@ export function prepararSinal(s: EstadoSinal): { erro: string } | SinalPronto {
   }
   const pg = fecharPagamento(s.pagamento, s.valor);
   if ("erro" in pg) return { erro: s.pagamento.dividido ? pg.erro : "Escolha como o tutor pagou o sinal." };
-  return { modo: "agora", valor: s.valor, ...pg };
+  return { modo: "agora", valor: s.valor, ...pg, parcelas: s.pagamento.parcelas ?? null };
 }
 
 /** Antes de receber: valor alto e caixa fechado, como nas outras telas que recebem. */
@@ -56,11 +58,12 @@ export async function conferirSinal(sb: Banco, petshopId: string, s: SinalPronto
 /**
  * Lança o sinal (recebido ou a receber) e liga à reserva, numa chamada só: ou os dois ficam gravados, ou nenhum.
  * Com a mesma chave de novo (a resposta não chegou, toque de novo), o banco devolve o que já foi feito, sem lançar outra vez.
+ * Devolve os ids dos lançamentos pagos agora (para anotar em quantas vezes foi o crédito).
  */
 export async function lancarSinal(sb: Banco, petshopId: string, e: { id: string; tipo: string; entrada: string; pet: string; clienteId: string | null }, s: SinalPronto, chave: string,
   /** pago adiantado no check-in de quem chegou agora (sem reserva): entra como o sinal, com outro nome */
-  adiantado?: boolean) {
-  if (s.modo === "sem") return;
+  adiantado?: boolean): Promise<string[]> {
+  if (s.modo === "sem") return [];
   const descricao = `${adiantado ? "Pago adiantado" : "Sinal da reserva"}: ${nomeTipo(e.tipo).toLowerCase()} de ${e.pet}, ${dataCurta(e.entrada)}`;
   const hoje = isoDia(new Date());
   const passos: Passo[] = s.modo === "agora" ? [
@@ -75,7 +78,8 @@ export async function lancarSinal(sb: Banco, petshopId: string, e: { id: string;
       sinal: s.valor, sinal_estado: "a_receber", sinal_lancamento_id: ref("sinal"), sinal_pago_em: null, sinal_pagamento: null, sinal_devolucao_id: null, sinal_devolvido_em: null,
     } },
   ];
-  await fazerTudoOuNada(sb, petshopId, parteDaChave(chave, "sinal")!, { funcao: "estadia_sinal", estadia: e.id }, passos);
+  const feito = await fazerTudoOuNada(sb, petshopId, parteDaChave(chave, "sinal")!, { funcao: "estadia_sinal", estadia: e.id }, passos);
+  return s.modo === "agora" ? idsDaOperacao(feito, passos) : [];
 }
 
 /** Os campos do sinal dentro de um formulário: sem sinal, recebi agora ou vai pagar depois. */
@@ -104,7 +108,9 @@ export function CamposSinal({ estado: s, aoMudar, sugerido, erro, semTutor }: {
             </Campo>
           ) : s.valor ? (
             <>
-              <EscolhaPagamento valor={s.pagamento} aoMudar={(pagamento) => aoMudar({ ...s, pagamento })} total={s.valor} rotulo="Como o tutor pagou o sinal" />
+              <ParcelasNaTela.Provider value>
+                <EscolhaPagamento valor={s.pagamento} aoMudar={(pagamento) => aoMudar({ ...s, pagamento })} total={s.valor} rotulo="Como o tutor pagou o sinal" />
+              </ParcelasNaTela.Provider>
               <AvisoCaixaFechado aberto={caixa} />
             </>
           ) : null}
@@ -140,7 +146,9 @@ export function CamposAdiantado({ estado: s, aoMudar, erro }: { estado: EstadoSi
           </Campo>
           {s.valor ? (
             <>
-              <EscolhaPagamento valor={s.pagamento} aoMudar={(pagamento) => aoMudar({ ...s, pagamento })} total={s.valor} rotulo="Forma de pagamento" />
+              <ParcelasNaTela.Provider value>
+                <EscolhaPagamento valor={s.pagamento} aoMudar={(pagamento) => aoMudar({ ...s, pagamento })} total={s.valor} rotulo="Forma de pagamento" />
+              </ParcelasNaTela.Provider>
               <AvisoCaixaFechado aberto={caixa} />
             </>
           ) : null}
@@ -193,6 +201,7 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
   const centavos = (n: number) => Math.round(n * 100) / 100;
   const recebeAgora = agora != null && agora > 0 && agora <= falta ? centavos(agora) : null;
   const emParte = recebeAgora != null && recebeAgora < falta;
+  const anotarParcelas = useAnotarParcelas();
 
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
@@ -212,11 +221,13 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
         setSalvando(true);
         if (emParte) {
           // só uma parte: entra no caixa de hoje e a conta do sinal fica com o que falta (a reserva segue com o sinal a receber)
-          await receberConta(sb, pendente.sinal_lancamento_id!, { valor: recebeAgora, forma: pg.forma, pagamentos: pg.pagamentos, chave });
+          const r = await receberConta(sb, pendente.sinal_lancamento_id!, { valor: recebeAgora, forma: pg.forma, pagamentos: pg.pagamentos, chave });
           avisar(`Sinal de ${nome}: ${brl(recebeAgora)} recebidos agora. Faltam ${brl(centavos(falta - recebeAgora))}, que continuam em A receber.`);
+          await anotarParcelas(r.ids ?? [], pagamento.parcelas);
         } else {
           await quitarConta(sb, petshop.id, pendente.sinal_lancamento_id!, pg, falta, chave);
           avisar(jaEntrou > 0 ? `Sinal de ${nome} completo: ${brl(falta)} recebidos agora, ${brl(pendente.sinal)} no total.` : `Sinal de ${nome} recebido: ${brl(pendente.sinal)}.`);
+          await anotarParcelas([pendente.sinal_lancamento_id], pagamento.parcelas);
         }
       } else {
         const pronto = prepararSinal(estado);
@@ -230,8 +241,9 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
         }))) return;
         if (!(await conferirSinal(sb, petshop.id, pronto, confirmar))) return;
         setSalvando(true);
-        await lancarSinal(sb, petshop.id, { id: e.id, tipo: e.tipo, entrada: e.entrada, pet: nome, clienteId: e.pets?.clientes?.id ?? null }, pronto, chave);
+        const pagos = await lancarSinal(sb, petshop.id, { id: e.id, tipo: e.tipo, entrada: e.entrada, pet: nome, clienteId: e.pets?.clientes?.id ?? null }, pronto, chave);
         avisar(pronto.modo === "agora" ? `Sinal de ${nome} recebido: ${brl(pronto.valor)}.` : `Sinal de ${brl(pronto.valor)} anotado em A receber, para ${dataCurta(pronto.quando)}.`);
+        if (pronto.modo === "agora") await anotarParcelas(pagos, pronto.parcelas);
       }
       aoGravar();
     } catch (x) {
@@ -255,7 +267,9 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
             <Campo rotulo="Quanto o tutor pagou agora" dica={emParte ? `Faltam ${brl(centavos(falta - recebeAgora!))}: continuam em A receber, e a reserva segue com o sinal a receber.` : `Até ${brl(falta)}. Se ele pagou só uma parte, escreva a parte: o resto continua em A receber.`}>
               <CampoDinheiro valor={agora} aoMudar={(v) => { setAgora(v); setErro(null); }} rotulo="Quanto o tutor pagou agora" maximo={falta} />
             </Campo>
-            <EscolhaPagamento valor={pagamento} aoMudar={(p) => { setPagamento(p); setErro(null); }} total={recebeAgora ?? falta} rotulo="Como o tutor pagou o sinal" erro={erro} />
+            <ParcelasNaTela.Provider value>
+              <EscolhaPagamento valor={pagamento} aoMudar={(p) => { setPagamento(p); setErro(null); }} total={recebeAgora ?? falta} rotulo="Como o tutor pagou o sinal" erro={erro} />
+            </ParcelasNaTela.Provider>
             <AvisoCaixaFechado aberto={caixa} />
           </>
         ) : <CamposSinal estado={estado} aoMudar={(s) => { setEstado(s); setErro(null); }} sugerido={sugerido} erro={erro} semTutor={!e.pets?.clientes?.id} />}

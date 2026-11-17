@@ -37,6 +37,20 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"admin_empresa_passos": {
+                  Row: {
+                    "feito_em": string,"feito_por": string | null,"passo": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "feito_em"?: string,"feito_por"?: string | null,"passo": string
+                  }
+                  Update: {
+                    "feito_em"?: string,"feito_por"?: string | null,"passo"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"admins": {
                   Row: {
                     "criado_em": string,"user_id": string
@@ -1189,14 +1203,14 @@ isOneToOne: false
                   ]
                 },"estadias": {
                   Row: {
-                    "acomodacao": string | null,"avisos": NonNullable<Json>,"chave": string | null,"cobranca_id": string | null,"criado_em": string,"cuidados": Json | null,"dia": string | null,"diarias_cobradas": number | null,"entrada": string,"experiencia": boolean,"id": string,"mensalista": string | null,"obs": string | null,"pet_id": string,"petshop_id": string,"plano_id": string | null,"saida": string | null,"saida_prevista": string | null,"sinal_estado": string | null,"status": string,"tipo": string,"valor_cobrado": number | null,"valor_diaria": number | null
+                    "acomodacao": string | null,"avisos": NonNullable<Json>,"chave": string | null,"cobranca_id": string | null,"criado_em": string,"cuidados": Json | null,"dia": string | null,"diarias_cobradas": number | null,"endereco_leva_traz": string | null,"entrada": string,"experiencia": boolean,"id": string,"leva_traz_buscar": boolean,"leva_traz_levar": boolean,"mensalista": string | null,"obs": string | null,"pet_id": string,"petshop_id": string,"plano_id": string | null,"promo": Json | null,"saida": string | null,"saida_prevista": string | null,"sinal_estado": string | null,"status": string,"tipo": string,"valor_cobrado": number | null,"valor_diaria": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "acomodacao"?: string | null,"avisos"?: NonNullable<Json>,"chave"?: string | null,"cobranca_id"?: string | null,"criado_em"?: string,"cuidados"?: Json | null,"dia"?: string | null,"diarias_cobradas"?: number | null,"entrada": string,"experiencia"?: boolean,"id"?: string,"mensalista"?: string | null,"obs"?: string | null,"pet_id": string,"petshop_id": string,"plano_id"?: string | null,"saida"?: string | null,"saida_prevista"?: string | null,"sinal_estado"?: string | null,"status"?: string,"tipo": string,"valor_cobrado"?: number | null,"valor_diaria"?: number | null
+                    "acomodacao"?: string | null,"avisos"?: NonNullable<Json>,"chave"?: string | null,"cobranca_id"?: string | null,"criado_em"?: string,"cuidados"?: Json | null,"dia"?: string | null,"diarias_cobradas"?: number | null,"endereco_leva_traz"?: string | null,"entrada": string,"experiencia"?: boolean,"id"?: string,"leva_traz_buscar"?: boolean,"leva_traz_levar"?: boolean,"mensalista"?: string | null,"obs"?: string | null,"pet_id": string,"petshop_id": string,"plano_id"?: string | null,"promo"?: Json | null,"saida"?: string | null,"saida_prevista"?: string | null,"sinal_estado"?: string | null,"status"?: string,"tipo": string,"valor_cobrado"?: number | null,"valor_diaria"?: number | null
                   }
                   Update: {
-                    "acomodacao"?: string | null,"avisos"?: NonNullable<Json>,"chave"?: string | null,"cobranca_id"?: string | null,"criado_em"?: string,"cuidados"?: Json | null,"dia"?: string | null,"diarias_cobradas"?: number | null,"entrada"?: string,"experiencia"?: boolean,"id"?: string,"mensalista"?: string | null,"obs"?: string | null,"pet_id"?: string,"petshop_id"?: string,"plano_id"?: string | null,"saida"?: string | null,"saida_prevista"?: string | null,"sinal_estado"?: string | null,"status"?: string,"tipo"?: string,"valor_cobrado"?: number | null,"valor_diaria"?: number | null
+                    "acomodacao"?: string | null,"avisos"?: NonNullable<Json>,"chave"?: string | null,"cobranca_id"?: string | null,"criado_em"?: string,"cuidados"?: Json | null,"dia"?: string | null,"diarias_cobradas"?: number | null,"endereco_leva_traz"?: string | null,"entrada"?: string,"experiencia"?: boolean,"id"?: string,"leva_traz_buscar"?: boolean,"leva_traz_levar"?: boolean,"mensalista"?: string | null,"obs"?: string | null,"pet_id"?: string,"petshop_id"?: string,"plano_id"?: string | null,"promo"?: Json | null,"saida"?: string | null,"saida_prevista"?: string | null,"sinal_estado"?: string | null,"status"?: string,"tipo"?: string,"valor_cobrado"?: number | null,"valor_diaria"?: number | null
                   }
                   Relationships: [
                     {
@@ -1647,6 +1661,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"lancamentos_recebidos": {
+                  Row: {
+                    "lancamento_id": string,"petshop_id": string,"recebido_em": string,"recebido_por": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "lancamento_id": string,"petshop_id": string,"recebido_em"?: string,"recebido_por"?: string | null
+                  }
+                  Update: {
+                    "lancamento_id"?: string,"petshop_id"?: string,"recebido_em"?: string,"recebido_por"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "lancamentos_recebidos_lancamento_id_fkey"
+      columns: ["lancamento_id"]
+isOneToOne: true
+      referencedRelation: "lancamentos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "lancamentos_recebidos_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"lancamentos_taxas": {
                   Row: {
                     "atualizado_em": string | null,"cartao": number,"criado_em": string,"lancamento_id": string,"parcelas": number | null,"partes": NonNullable<Json>,"petshop_id": string,"regra": NonNullable<Json>,"taxa": number
@@ -1667,6 +1707,32 @@ isOneToOne: true
       referencedColumns: ["id"]
     },{
       foreignKeyName: "lancamentos_taxas_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"leva_traz_estadias": {
+                  Row: {
+                    "estadia_id": string,"feito_em": string,"feito_por": string | null,"perna": string,"petshop_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "estadia_id": string,"feito_em"?: string,"feito_por"?: string | null,"perna": string,"petshop_id": string
+                  }
+                  Update: {
+                    "estadia_id"?: string,"feito_em"?: string,"feito_por"?: string | null,"perna"?: string,"petshop_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "leva_traz_estadias_estadia_id_fkey"
+      columns: ["estadia_id"]
+isOneToOne: false
+      referencedRelation: "estadias"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "leva_traz_estadias_petshop_id_fkey"
       columns: ["petshop_id"]
 isOneToOne: false
       referencedRelation: "petshops"
@@ -2359,14 +2425,14 @@ isOneToOne: false
                   ]
                 },"promo_usos": {
                   Row: {
-                    "agendamento_id": string | null,"criado_em": string,"desconto": number,"id": number,"lancamento_id": string | null,"petshop_id": string,"promo_id": string | null,"promo_nome": string
+                    "agendamento_id": string | null,"criado_em": string,"desconto": number,"estadia_id": string | null,"id": number,"lancamento_id": string | null,"petshop_id": string,"promo_id": string | null,"promo_nome": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendamento_id"?: string | null,"criado_em"?: string,"desconto": number,"id"?: never,"lancamento_id"?: string | null,"petshop_id": string,"promo_id"?: string | null,"promo_nome": string
+                    "agendamento_id"?: string | null,"criado_em"?: string,"desconto": number,"estadia_id"?: string | null,"id"?: never,"lancamento_id"?: string | null,"petshop_id": string,"promo_id"?: string | null,"promo_nome": string
                   }
                   Update: {
-                    "agendamento_id"?: string | null,"criado_em"?: string,"desconto"?: number,"id"?: never,"lancamento_id"?: string | null,"petshop_id"?: string,"promo_id"?: string | null,"promo_nome"?: string
+                    "agendamento_id"?: string | null,"criado_em"?: string,"desconto"?: number,"estadia_id"?: string | null,"id"?: never,"lancamento_id"?: string | null,"petshop_id"?: string,"promo_id"?: string | null,"promo_nome"?: string
                   }
                   Relationships: [
                     {
@@ -2374,6 +2440,12 @@ isOneToOne: false
       columns: ["agendamento_id"]
 isOneToOne: false
       referencedRelation: "agendamentos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "promo_usos_estadia_id_fkey"
+      columns: ["estadia_id"]
+isOneToOne: false
+      referencedRelation: "estadias"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "promo_usos_lancamento_id_fkey"
@@ -2391,14 +2463,14 @@ isOneToOne: false
                   ]
                 },"promocoes": {
                   Row: {
-                    "ativa": boolean,"atualizado_em": string,"comeca_em": string | null,"criado_em": string,"criado_por": string | null,"dias": (number)[],"hora_ate": string | null,"hora_de": string | null,"id": string,"nome": string,"petshop_id": string,"servicos": (string)[],"termina_em": string | null,"tipo": string,"valor": number
+                    "ativa": boolean,"atualizado_em": string,"banho_tosa": boolean,"casa": (string)[],"comeca_em": string | null,"criado_em": string,"criado_por": string | null,"dias": (number)[],"hora_ate": string | null,"hora_de": string | null,"id": string,"nome": string,"petshop_id": string,"servicos": (string)[],"termina_em": string | null,"tipo": string,"valor": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "ativa"?: boolean,"atualizado_em"?: string,"comeca_em"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"dias": (number)[],"hora_ate"?: string | null,"hora_de"?: string | null,"id"?: string,"nome": string,"petshop_id": string,"servicos"?: (string)[],"termina_em"?: string | null,"tipo": string,"valor": number
+                    "ativa"?: boolean,"atualizado_em"?: string,"banho_tosa"?: boolean,"casa"?: (string)[],"comeca_em"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"dias": (number)[],"hora_ate"?: string | null,"hora_de"?: string | null,"id"?: string,"nome": string,"petshop_id": string,"servicos"?: (string)[],"termina_em"?: string | null,"tipo": string,"valor": number
                   }
                   Update: {
-                    "ativa"?: boolean,"atualizado_em"?: string,"comeca_em"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"dias"?: (number)[],"hora_ate"?: string | null,"hora_de"?: string | null,"id"?: string,"nome"?: string,"petshop_id"?: string,"servicos"?: (string)[],"termina_em"?: string | null,"tipo"?: string,"valor"?: number
+                    "ativa"?: boolean,"atualizado_em"?: string,"banho_tosa"?: boolean,"casa"?: (string)[],"comeca_em"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"dias"?: (number)[],"hora_ate"?: string | null,"hora_de"?: string | null,"id"?: string,"nome"?: string,"petshop_id"?: string,"servicos"?: (string)[],"termina_em"?: string | null,"tipo"?: string,"valor"?: number
                   }
                   Relationships: [
                     {
@@ -2640,6 +2712,9 @@ isOneToOne: false
 "admin_copias":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"admin_empresa_marcar":
+{ Args: { "p_feito": boolean,"p_passo": string }; Returns: Json
+                           },
 "admin_erro_resolver":
 { Args: { "p_assinatura": string,"p_resolvido"?: boolean }; Returns: undefined
                            },
@@ -2670,6 +2745,9 @@ isOneToOne: false
 "admin_exclusoes":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"admin_pagantes":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "admin_painel":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
@@ -2678,6 +2756,9 @@ isOneToOne: false
                            },
 "admin_servidor_segredo":
 { Args: { "p_segredo": string }; Returns: undefined
+                           },
+"admin_status_em":
+{ Args: { "p_petshop": string,"p_quando": string }; Returns: Database["public"]['Enums']["status_assinatura"]
                            },
 "admin_uso":
 { Args: Record<PropertyKey, never>; Returns: Json
@@ -3282,6 +3363,9 @@ isOneToOne: false
 "estadia_ocupa":
 { Args: { "p_dia": string,"p_entrada": string,"p_hoje": string,"p_saida": string,"p_status": string,"p_tipo": string }; Returns: boolean
                            },
+"estadia_promo_usar":
+{ Args: { "p_id": string,"p_usar": boolean }; Returns: Json
+                           },
 "estadia_sinal":
 { Args: { "p_chave": string,"p_estadia": string,"p_passos": Json,"p_petshop": string }; Returns: Json
                            },
@@ -3418,6 +3502,9 @@ isOneToOne: false
                            },
 "kits_recalcular":
 { Args: { "p_kits": (string)[] }; Returns: undefined
+                           },
+"leva_traz_estadia_marcar":
+{ Args: { "p_estadia": string,"p_feito": boolean,"p_perna": string,"p_petshop": string }; Returns: Json
                            },
 "leva_traz_marcar":
 { Args: { "p_agendamento": string,"p_feito": boolean,"p_perna": string,"p_petshop": string }; Returns: Json
@@ -3729,6 +3816,9 @@ isOneToOne: false
 { Args: { "p": string }; Returns: {
               "custo": number,"id": string,"ultimo_custo": number
             }[]
+                           },
+"promo_da_estadia":
+{ Args: { "p_criado_ate": string,"p_diaria": number,"p_entrada": string,"p_petshop": string,"p_saida": string,"p_tipo": string }; Returns: Json
                            },
 "promo_desconto":
 { Args: { "p_itens": Json,"p_petshop": string,"p_principal": string,"p_promo": Json }; Returns: number

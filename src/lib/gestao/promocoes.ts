@@ -11,17 +11,30 @@ import { brl, brlCurto, dataCurta, deIsoDia, isoDia } from "./util";
 
 export type TipoPromo = "pct" | "reais";
 
-/** A promoção como o dono monta. `servicos` vazio = todos os serviços do banho e tosa. */
+/** Onde a promoção vale além do banho e tosa: a diária da creche e a do hotel. */
+export type CasaPromo = "creche" | "hotel";
+
+/**
+ * A promoção como o dono monta. `servicos` vazio = todos os serviços do banho e tosa.
+ * `banho_tosa` (padrão sim): vale nos horários da agenda. `casa`: vale também (ou só) na diária da creche e/ou do hotel
+ * (a faixa de hora não vale para estadias). Sem os dois campos (dados antigos): só banho e tosa, como sempre.
+ */
 export type Promocao = {
   id: string; nome: string; dias: number[]; hora_de: string | null; hora_ate: string | null; servicos: string[];
   tipo: TipoPromo; valor: number; comeca_em: string | null; termina_em: string | null; ativa: boolean; criado_em?: string;
+  banho_tosa?: boolean; casa?: CasaPromo[];
 };
 
 /** A cópia que fica no horário (e no pedido do link). `tirada`: a equipe tirou a promoção deste horário. */
 export type PromoDoHorario = { id: string; nome: string; tipo: TipoPromo; valor: number; servicos: string[]; tirada?: boolean };
 
 /** Colunas lidas da tabela. */
-export const COLS_PROMOCAO = "id, nome, dias, hora_de, hora_ate, servicos, tipo, valor, comeca_em, termina_em, ativa, criado_em";
+export const COLS_PROMOCAO = "id, nome, dias, hora_de, hora_ate, servicos, tipo, valor, comeca_em, termina_em, ativa, criado_em, banho_tosa, casa";
+
+/** Vale no banho e tosa? (sem o campo: sim, como sempre) */
+export const valeNoBanho = (p: Pick<Promocao, "banho_tosa">) => p.banho_tosa !== false;
+/** Vale na diária da creche ou do hotel? */
+export const valeNaCasa = (p: Pick<Promocao, "casa">, tipo: string) => Boolean(p.casa?.includes(tipo as CasaPromo));
 
 const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const DIAS_CURTOS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -76,7 +89,7 @@ export function promoDoHorario<P extends Promocao>(promos: P[], o: {
   servicoId: string | null; dia: string; hora: string; preco?: number | null; categoriaDe: (id: string) => string | null | undefined; criadoAte?: string;
 }): P | null {
   const base = o.preco ?? 100;
-  const lista = promos.filter((p) => p.ativa && (!o.criadoAte || !p.criado_em || p.criado_em <= o.criadoAte) && valeNoHorario(p, o.dia, o.hora) && servicoEntra(p.servicos, o.servicoId, o.categoriaDe));
+  const lista = promos.filter((p) => p.ativa && valeNoBanho(p) && (!o.criadoAte || !p.criado_em || p.criado_em <= o.criadoAte) && valeNoHorario(p, o.dia, o.hora) && servicoEntra(p.servicos, o.servicoId, o.categoriaDe));
   lista.sort((a, b) => descontoNoPreco(b, base) - descontoNoPreco(a, base) || String(a.criado_em ?? "").localeCompare(String(b.criado_em ?? "")));
   return lista[0] ?? null;
 }
@@ -131,11 +144,28 @@ export function servicosPorExtenso(p: Pick<Promocao, "servicos">, nomeDe: (id: s
   return n.length <= 1 ? n[0] ?? "serviços" : `${n.slice(0, -1).join(", ")} e ${n[n.length - 1]}`;
 }
 
+/** "em banho", "na diária da creche", "em banho e tosa e na diária do hotel". */
+export function ondePorExtenso(p: Pick<Promocao, "servicos" | "banho_tosa" | "casa">, nomeDe: (id: string) => string | null | undefined) {
+  const partes = [
+    ...(valeNoBanho(p) ? [`em ${servicosPorExtenso(p, nomeDe)}`] : []),
+    ...(valeNaCasa(p, "creche") ? ["na diária da creche"] : []),
+    ...(valeNaCasa(p, "hotel") ? ["na diária do hotel"] : []),
+  ];
+  return partes.length <= 1 ? partes[0] ?? "" : `${partes.slice(0, -1).join(", ")} e ${partes[partes.length - 1]}`;
+}
+
+/** As horas só valem no banho e tosa: com creche ou hotel junto, o texto diz isso. */
+function horasDoTexto(p: Promocao) {
+  const horas = valeNoBanho(p) ? horasPorExtenso(p) : null;
+  if (!horas) return null;
+  return p.casa?.length ? `${horas} no banho e tosa` : horas;
+}
+
 /** "Terça e quarta, antes das 11h: 10% de desconto no banho." O resumo da promoção na lista do dono. */
 export function resumoDaPromo(p: Promocao, nomeDe: (id: string) => string | null | undefined) {
   const dias = diasPorExtenso(p.dias);
-  const horas = horasPorExtenso(p);
-  return `${dias.charAt(0).toUpperCase()}${dias.slice(1)}${horas ? `, ${horas}` : ""}: ${valorPorExtenso(p)} em ${servicosPorExtenso(p, nomeDe)}.`;
+  const horas = horasDoTexto(p);
+  return `${dias.charAt(0).toUpperCase()}${dias.slice(1)}${horas ? `, ${horas}` : ""}: ${valorPorExtenso(p)} ${ondePorExtenso(p, nomeDe)}.`;
 }
 
 /** "de 01/12 a 20/12", "até 20/12", "a partir de 01/12" ou null. */
@@ -160,9 +190,10 @@ export function situacaoDaPromo(p: Promocao, hoje = isoDia(new Date())): "deslig
  */
 export function textoDaPromocao(p: Promocao, loja: string, nomeDe: (id: string) => string | null | undefined) {
   const dias = diasPorExtenso(p.dias);
-  const horas = horasPorExtenso(p);
+  const horas = horasDoTexto(p);
   const validade = validadePorExtenso(p);
-  return `${loja}: ${dias}${horas ? `, ${horas},` : ""} tem ${valorPorExtenso(p)} em ${servicosPorExtenso(p, nomeDe)}.${validade ? ` Vale ${validade}.` : ""} Quer marcar um horário? É só responder esta mensagem.`;
+  const pede = valeNoBanho(p) ? (p.casa?.length ? "Quer marcar um horário ou reservar uma vaga?" : "Quer marcar um horário?") : "Quer reservar uma vaga?";
+  return `${loja}: ${dias}${horas ? `, ${horas},` : ""} tem ${valorPorExtenso(p)} ${ondePorExtenso(p, nomeDe)}.${validade ? ` Vale ${validade}.` : ""} ${pede} É só responder esta mensagem.`;
 }
 
 /** O que vem do banco (numeric chega como texto em alguns caminhos): números de verdade. */
@@ -173,6 +204,8 @@ export function lerPromocao(x: Record<string, unknown>): Promocao {
     servicos: Array.isArray(x.servicos) ? (x.servicos as unknown[]).map(String) : [], tipo: x.tipo === "reais" ? "reais" : "pct", valor: Number(x.valor ?? 0),
     comeca_em: (x.comeca_em as string | null) ?? null, termina_em: (x.termina_em as string | null) ?? null, ativa: x.ativa !== false,
     criado_em: (x.criado_em as string | undefined) ?? undefined,
+    banho_tosa: x.banho_tosa !== false,
+    casa: Array.isArray(x.casa) ? (x.casa as unknown[]).map(String).filter((c): c is CasaPromo => c === "creche" || c === "hotel") : [],
   };
 }
 
@@ -184,3 +217,78 @@ export function lerPromoDoHorario(x: unknown): PromoDoHorario | null {
   return { id: String(o.id), nome: String(o.nome), tipo: o.tipo === "reais" ? "reais" : "pct", valor: Number(o.valor ?? 0),
     servicos: Array.isArray(o.servicos) ? (o.servicos as unknown[]).map(String) : [], tirada: o.tirada === true };
 }
+
+/* ---------- creche e hotel ---------- */
+
+/**
+ * A cópia que fica na estadia (`estadias.promo`, posta pelo banco ao marcar: `promo_da_estadia`). Guarda os dias da semana,
+ * o começo e o fim: no check-out a promoção vale nas noites (hotel) ou no dia (creche) que caem neles.
+ */
+export type PromoDaEstadia = {
+  id: string; nome: string; tipo: TipoPromo; valor: number; dias: number[]; comeca_em: string | null; termina_em: string | null;
+  casa: CasaPromo; tirada?: boolean;
+};
+
+/** A promoção da estadia, como veio do banco (ou null). */
+export function lerPromoDaEstadia(x: unknown): PromoDaEstadia | null {
+  if (!x || typeof x !== "object") return null;
+  const o = x as Record<string, unknown>;
+  if (!o.id || !o.nome) return null;
+  return {
+    id: String(o.id), nome: String(o.nome), tipo: o.tipo === "reais" ? "reais" : "pct", valor: Number(o.valor ?? 0),
+    dias: Array.isArray(o.dias) ? (o.dias as unknown[]).map(Number) : [], comeca_em: (o.comeca_em as string | null) ?? null,
+    termina_em: (o.termina_em as string | null) ?? null, casa: o.casa === "hotel" ? "hotel" : "creche", tirada: o.tirada === true,
+  };
+}
+
+/** O dia ("AAAA-MM-DD") é um dia da promoção (dia da semana, começo e fim)? */
+export function diaDaPromo(p: Pick<Promocao, "dias" | "comeca_em" | "termina_em">, dia: string) {
+  if (!p.dias.map(Number).includes(deIsoDia(dia).getDay())) return false;
+  if (p.comeca_em && dia < p.comeca_em) return false;
+  if (p.termina_em && dia > p.termina_em) return false;
+  return true;
+}
+
+const somaUmDia = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+/**
+ * Os dias que contam para achar a promoção de uma estadia (a mesma regra do banco, `promo_da_estadia`): as noites da entrada
+ * até a véspera da saída; sem saída, a noite da entrada e as 6 seguintes (hotel) ou só o dia da entrada (creche). Até 60.
+ */
+export function diasDaEstadiaParaPromo(tipo: string, entrada: string, saida: string | null) {
+  const fim = saida && saida > entrada ? isoDia(somaUmDia(deIsoDia(saida), -1)) : tipo === "hotel" && !saida ? isoDia(somaUmDia(deIsoDia(entrada), 6)) : entrada;
+  const out: string[] = [];
+  for (let d = deIsoDia(entrada); out.length < 60 && isoDia(d) <= fim; d = somaUmDia(d, 1)) out.push(isoDia(d));
+  return out;
+}
+
+/**
+ * A promoção que vale para uma estadia (a mesma escolha do banco): ligada, criada antes de `criadoAte`, para o tipo, com pelo
+ * menos um dia da estadia num dia dela. Mais de uma: a que dá mais desconto pela diária (empate: a mais antiga).
+ * `entrada` e `saida`: dias "AAAA-MM-DD" (saída opcional).
+ */
+export function promoDaEstadia<P extends Promocao>(promos: P[], o: { tipo: string; entrada: string; saida?: string | null; diaria?: number | null; criadoAte?: string }): P | null {
+  const dias = diasDaEstadiaParaPromo(o.tipo, o.entrada, o.saida ?? null);
+  const base = o.diaria ?? 100;
+  const conta = (p: P) => dias.filter((d) => diaDaPromo(p, d)).length * descontoNoPreco(p, base);
+  const lista = promos.filter((p) => p.ativa && valeNaCasa(p, o.tipo) && (!o.criadoAte || !p.criado_em || p.criado_em <= o.criadoAte) && dias.some((d) => diaDaPromo(p, d)));
+  lista.sort((a, b) => conta(b) - conta(a) || String(a.criado_em ?? "").localeCompare(String(b.criado_em ?? "")));
+  return lista[0] ?? null;
+}
+
+/**
+ * Quanto a promoção tira das diárias de uma estadia: só as noites (hotel) ou os dias (creche) que caem nos dias dela.
+ * % = soma dessas diárias × %, arredondado no centavo; R$ = o valor em cada uma delas (até a diária).
+ */
+export function descontoDaPromoNaEstadia(p: PromoDaEstadia | null | undefined, noites: { dia: string; valor: number }[]) {
+  if (!p || p.tirada) return { valor: 0, dias: [] as string[] };
+  const vale = noites.filter((n) => n.valor > 0 && diaDaPromo(p, n.dia));
+  const valor = p.tipo === "pct"
+    ? centavos((vale.reduce((t, n) => t + n.valor, 0) * Number(p.valor)) / 100)
+    : centavos(vale.reduce((t, n) => t + Math.min(Number(p.valor), n.valor), 0));
+  return { valor, dias: vale.map((n) => n.dia) };
+}
+
+/** "15% na diária da creche", "15% nas noites do hotel", "R$ 10 por noite no hotel". */
+export const etiquetaDaCasa = (p: Pick<PromoDaEstadia, "tipo" | "valor">, tipo: string) =>
+  p.tipo === "pct" ? `${Number(p.valor).toLocaleString("pt-BR")}% ${tipo === "hotel" ? "nas noites do hotel" : "na diária da creche"}`
+    : `${brlCurto(p.valor)} ${tipo === "hotel" ? "por noite no hotel" : "na diária da creche"}`;

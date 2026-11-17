@@ -267,6 +267,11 @@ export type ContaDaEstadia = {
   sobra?: SobraDaConta | null;
   /** crédito do tutor usado nesta conta (sai do "Valor na saída") */
   credito_usado?: number;
+  /**
+   * A promoção em dias fracos que ficou na conta (a cópia da estadia): o desconto já está fora de `soma`. `dias`: as noites
+   * (hotel) ou o dia (creche) em que ela valeu. O banco anota em promo_usos (para o relatório), limitado ao que ela pode dar.
+   */
+  promo?: { id: string; nome: string; tipo: "pct" | "reais"; valor: number; desconto: number; dias: string[] } | null;
 };
 export type DestinoDaSobra = "devolvido" | "credito" | "mantido";
 export type SobraDaConta = { valor: number; destino: DestinoDaSobra; forma?: string | null; nota?: string | null; lancamento_id?: string | null };
@@ -322,6 +327,11 @@ export function linhasDaConta(c: ContaDaEstadia): { texto: string; valor: string
       i = j + 1;
     }
   } else linhas.push({ texto: `${c.diarias} ${palavraDiarias(c.tipo, c.diarias)}${c.valor_diaria != null ? ` de ${brl(c.valor_diaria)}` : ""}`, valor: brl(c.total_diarias) });
+  if (c.promo && c.promo.desconto > 0) {
+    const quanto = c.promo.tipo === "pct" ? `${Number(c.promo.valor).toLocaleString("pt-BR")}%` : brl(c.promo.valor);
+    const onde = c.promo.dias.length ? ` (${c.promo.dias.length === 1 ? dataCurta(c.promo.dias[0]) : `${c.promo.dias.length} ${palavraDiarias(c.tipo, c.promo.dias.length)}`})` : "";
+    linhas.push({ texto: `Promoção ${c.promo.nome} -${quanto}${onde}`, valor: `- ${brl(c.promo.desconto)}` });
+  }
   for (const t of c.taxas) linhas.push({ texto: t.por === "noite" ? `${t.nome} (${t.qtd} x ${brl(t.valor)})` : t.nome, valor: brl(t.total) });
   for (const e of c.extras) linhas.push({ texto: e.nome, valor: brl(e.valor) });
   for (const p of c.produtos) linhas.push({ texto: p.qtd === 1 ? p.nome : `${p.qtd.toLocaleString("pt-BR")} x ${p.nome} (${brl(p.valor)} cada)`, valor: brl(p.total) });

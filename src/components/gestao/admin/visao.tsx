@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Esqueleto, mensagemDeErro, ok } from "@/components/gestao/ui";
+import CartaoPagantes from "@/components/gestao/admin/pagantes";
 import { banco } from "@/lib/gestao/supabase";
 import { PLANOS, PERIODOS, precoDe, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
 import { brl, dataCurta, deIsoDia, isoDia, somaDias } from "@/lib/gestao/util";
@@ -98,6 +99,7 @@ export default function AbaVisao() {
 
   return (
     <div className="g-pilha g">
+      <CartaoPagantes />
       <section className="g-grade c4" aria-label="Pet shops por situação">
         <Num rotulo="Pet shops cadastrados" valor={s.total} />
         <Num rotulo="Em teste" valor={s.teste} dica={s.teste_vencido ? `e ${s.teste_vencido} com o teste vencido, sem assinar` : "nenhum teste vencido sem assinar"} />

@@ -9,7 +9,7 @@ import { brl, dataCompleta } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { avisarMudanca, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { BuscaProduto, novaChave, useProdutosDaLoja, type ItemConta } from "./conta";
-import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, fmtQtd, lerQtd, useCaixaAberto, type Forma } from "./pecas";
+import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, fmtQtd, lerQtd, PerguntaParcelas, useAnotarParcelas, useCaixaAberto, type Forma } from "./pecas";
 import { EscolherTutor, type Tutor } from "./venda";
 import "./orcamento.css";
 
@@ -51,6 +51,9 @@ export default function FolhaDevolucao({ venda, aoFechar, aoPronto }: { venda: V
   const [avariados, setAvariados] = useState<Record<string, number>>({});
   const [modo, setModo] = useState<ModoDevolucao>("dinheiro");
   const [forma, setForma] = useState<Forma | null>(null);
+  // troca em que o cliente paga a diferença no crédito: em quantas vezes (a taxa do parcelado)
+  const [parcelas, setParcelas] = useState<number | null>(null);
+  const anotarParcelas = useAnotarParcelas();
   const [resto, setResto] = useState<"dinheiro" | "credito">("dinheiro");
   const [novos, setNovos] = useState<ItemConta[]>([]);
   const [tutor, setTutor] = useState<Tutor | null>(null);
@@ -78,9 +81,12 @@ export default function FolhaDevolucao({ venda, aoFechar, aoPronto }: { venda: V
         novos: modo === "troca" ? novos.filter((i) => i.qtd > 0 && i.produtoId).map((i) => ({ produto_id: i.produtoId!, qtd: i.qtd, ...(cuidoDoFinanceiro ? { valor: i.valor } : {}) })) : null,
       });
       const d = Number(r.diferenca ?? 0);
+      const parcelasDaTroca = modo === "troca" && d > 0 && forma === "credito" ? parcelas : null;
       avisar(modo === "dinheiro" ? `Devolução anotada: ${brl(r.valor)} voltaram para o cliente.`
         : modo === "credito" ? `Ficaram ${brl(r.valor)} de crédito para o tutor.`
         : d > 0 ? `Troca feita: o cliente pagou ${brl(d)} de diferença.` : d < 0 ? `Troca feita: ${brl(-d)} ${resto === "credito" ? "ficaram de crédito" : "voltaram para o cliente"}.` : "Troca feita, sem diferença.");
+      // a venda nova da troca leva a diferença no crédito: anota em quantas vezes (tenta de novo e avisa se não der)
+      if (parcelasDaTroca) await anotarParcelas([r.entrada_id], parcelasDaTroca);
       avisarMudanca();
       aoPronto?.();
       aoFechar();
@@ -168,6 +174,7 @@ export default function FolhaDevolucao({ venda, aoFechar, aoPronto }: { venda: V
           <div className="g-pilha p">
             <p className="g-pp"><b>{modo === "troca" && troca.cobrar > 0 ? "Como o cliente paga a diferença" : "Como o dinheiro volta"}</b></p>
             <ChipsForma valor={forma} aoMudar={(f) => { setForma(f); setErroForma(null); }} erro={erroForma} />
+            {modo === "troca" && troca.cobrar > 0 && <PerguntaParcelas forma={forma} valor={parcelas} aoMudar={setParcelas} />}
           </div>
         )}
         {mexeNoDinheiro && <AvisoCaixaFechado aberto={caixa} />}

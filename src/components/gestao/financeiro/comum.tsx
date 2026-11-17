@@ -17,7 +17,8 @@ import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
-import { AvisoCaixaFechado, CampoDinheiro, EscolhaPagamento, fecharPagamento, pagamentoInicial, useCaixaAberto, type EstadoPagamento } from "../loja/pecas";
+import { AvisoCaixaFechado, CampoDinheiro, EscolhaPagamento, fecharPagamento, pagamentoInicial, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, type EstadoPagamento } from "../loja/pecas";
+import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import { avisarMudanca, Campo, Folha, useAvisos, useDados, Vazio } from "../ui";
 import "./financeiro.css";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
@@ -429,6 +430,9 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   const conta = modo === "conta";
   const entrada = tipo === "entrada";
   const voltam = produtosDaVenda(inicial).length;
+  // entrada nova paga: no crédito, pergunta em quantas vezes (a taxa do parcelado)
+  const anotarParcelas = useAnotarParcelas();
+  const perguntaVezes = !inicial && !conta && entrada;
   // entrada recebida de um cliente corrigida para menos: a diferença pode continuar devida (não some calada)
   const baixou = inicial && inicial.pago && inicial.tipo === "entrada" && inicial.cliente_id && !inicial.conta_id && !inicial.movimento && !travado && !soVer && valor != null && valor > 0
     ? Math.max(0, Math.round((Number(inicial.valor) - valor) * 100) / 100) : 0;
@@ -515,8 +519,9 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         setSalvando(false);
         return;
       } else if (!escolheData || data === hoje) {
-        await lancarPago(sb, petshop.id, { tipo, valor, forma, pagamentos, categoria, descricao: texto, chave });
+        const lancado = await lancarPago(sb, petshop.id, { tipo, valor, forma, pagamentos, categoria, descricao: texto, chave });
         avisar(entrada ? `Entrada de ${brl(valor)} anotada.` : `Saída de ${brl(valor)} anotada.`);
+        if (perguntaVezes) await anotarParcelas([lancado.id], pagamento.parcelas);
       } else {
         // dia que já passou: não entra no caixa de hoje
         const r = await gravarLancamento(sb, petshop.id, {
@@ -525,6 +530,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         }, chave);
         if (r.error) throw new Error(r.error.message);
         avisar(`${entrada ? "Entrada" : "Saída"} de ${brl(valor)} anotada em ${dataCompleta(data)}.`);
+        if (perguntaVezes) await anotarParcelas([r.data.id], pagamento.parcelas);
       }
       await aoSalvo();
       avisarMudanca();
@@ -564,6 +570,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   }
 
   return (
+    <ParcelasNaTela.Provider value={perguntaVezes}>
     <Folha titulo={titulo} aoFechar={aoFechar}
       rodape={soVer ? <button type="button" className="g-btn sec" onClick={aoFechar}>Fechar</button> : <>
         {inicial && !travado && <button type="button" className="g-btn perigo" onClick={excluir} disabled={salvando}><Trash2 />Excluir</button>}
@@ -692,6 +699,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         <button type="submit" hidden />
       </form>
     </Folha>
+    </ParcelasNaTela.Provider>
   );
 }
 
@@ -784,6 +792,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
 
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
+  const anotarParcelas = useAnotarParcelas();
   // o crédito do tutor chega depois da folha abrir: até lá, nada de valor no botão
   const lendoCredito = saldoCredito == null;
   async function gravar(chave: string): Promise<boolean | void> {
@@ -818,7 +827,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
           }
           const feito = await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "conta_receber_junto", conta: conta.id }, passos);
           const ultimo = feito.passos[feito.passos.length - 1] ?? {};
-          r = { quitada: Boolean(ultimo.quitada), recebido: Number(ultimo.recebido ?? recebendo), falta: Number(ultimo.falta ?? 0), no_caixa: Boolean(ultimo.no_caixa) };
+          r = { quitada: Boolean(ultimo.quitada), recebido: Number(ultimo.recebido ?? recebendo), falta: Number(ultimo.falta ?? 0), no_caixa: Boolean(ultimo.no_caixa), ids: idsDaOperacao(feito, passos) };
         } else {
           const partes = separarMulta(pg.forma, pg.pagamentos, daMulta);
           r = await receberConta(sb, conta.id, {
@@ -830,6 +839,8 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
         }
         const comCredito = credito > 0 ? ` ${brl(credito)} saíram do crédito do tutor.` : "";
         avisar(r!.quitada ? `Recebido: ${brl(centavos(total + credito))}.${comCredito}` : `Recebido: ${brl(centavos(total + credito))}.${comCredito} Fica faltando ${brl(r!.falta)}.`);
+        // crédito parcelado: em quantas vezes (a parte recebida, a conta inteira e a multa; tenta de novo e avisa se não der)
+        if (total > 0) await anotarParcelas(r!.ids ?? [], pagamento.parcelas);
       } else {
         // só entra no caixa aberto quando o dinheiro andou hoje
         const caixa = data === hoje ? await caixaAberto(sb, petshop.id) : null;
@@ -852,6 +863,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
   }
 
   return (
+    <ParcelasNaTela.Provider value={entrada}>
     <Folha titulo={entrada ? "Recebi esta conta" : "Paguei esta conta"} aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
@@ -923,6 +935,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
         {data === hoje && <AvisoCaixaFechado aberto={caixaAgora} />}
       </div>
     </Folha>
+    </ParcelasNaTela.Provider>
   );
 }
 

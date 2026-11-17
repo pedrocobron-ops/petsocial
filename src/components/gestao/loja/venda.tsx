@@ -15,8 +15,8 @@ import {
   BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LinhaDaConta, produtosDaConta,
   resumoDosItens, useProdutosDaLoja, type ItemConta,
 } from "./conta";
-import { AvisoCaixaFechado, fecharRecebimento, pagaDepoisInicial, ParcelasNaTela, useCaixaAberto, usePagamento, type PagaDepois } from "./pecas";
-import { anotarParcelas, idsDaOperacao } from "@/lib/gestao/maquininha";
+import { AvisoCaixaFechado, fecharRecebimento, pagaDepoisInicial, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, usePagamento, type PagaDepois } from "./pecas";
+import { idsDaOperacao } from "@/lib/gestao/maquininha";
 
 export type Tutor = Pick<Cliente, "id" | "nome" | "telefone">;
 
@@ -31,6 +31,7 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
 }) {
   const { sb, petshop, user, vejoFinanceiro, souDono, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
+  const anotarParcelas = useAnotarParcelas();
   const somenteLeitura = useSomenteLeitura();
   const { produtos, carregando, erro } = useProdutosDaLoja();
   const [itens, setItens] = useState<ItemConta[]>(inicial?.itens ?? []);
@@ -102,7 +103,7 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
         try {
           const r = await fazerTudoOuNada(sb, petshop.id, chave, orcamento && lanca ? { funcao: "orcamento_vender", orcamento: orcamento.id } : { funcao: "venda_registrar" }, passos);
           vendaId = r.ids?.venda ?? null;
-          if (pg && !("erro" in pg) && !pg.fiado) await anotarParcelas(sb, petshop.id, idsDaOperacao(r), pagamento.parcelas).catch(() => 0);
+          if (pg && !("erro" in pg) && !pg.fiado) await anotarParcelas(idsDaOperacao(r, passos), pagamento.parcelas);
         } catch (e) { throw new Error(`A venda não foi anotada: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`); }
       }
       avisar(fiado ? `Anotado: ${brl(contas.total)} a receber de ${tutor?.nome ?? "cliente"} até ${dataCompleta(fiado.quando)}.` : vejoFinanceiro ? `Venda de ${brl(contas.total)} anotada.` : "Venda anotada no estoque.");
