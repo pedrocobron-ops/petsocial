@@ -85,3 +85,11 @@
 @media (min-width: 720px) { .g-guia-proximos .g-btn { flex: 0 1 auto; } }
 .g-guia-servico .cabeca .g-ico { flex: none; width: 40px; height: 40px; color: var(--g-cinza); }
 .g-guia-loja { text-align: left; width: 100%; max-width: 560px; margin: 4px auto; }
+
+/* primeiro resultado em minutos: "Começar já" na primeira pergunta e, no fim, marcar o primeiro horário ou copiar o link */
+.g-guia-ja { border-color: rgba(249, 115, 22, .45); background: #fff7ef; }
+.g-guia-ja > svg { color: var(--g-laranja); }
+.g-guia-ja:disabled { opacity: .6; }
+.g-guia-tempo { display: inline-flex; align-items: center; gap: 6px; margin: -4px 0 0; padding: 6px 12px; border-radius: 999px; background: var(--g-verde-tint); color: #24543b; font-weight: 600; font-size: .9375rem; }
+.g-guia-tempo svg { width: 16px; height: 16px; }
+.g-guia-primeiro { width: 100%; border-left-color: var(--g-laranja); }

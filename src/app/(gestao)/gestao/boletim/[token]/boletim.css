@@ -91,3 +91,27 @@
 .g-al-fotos img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
 .g-al-fotos.n1 img { aspect-ratio: 4 / 3; }
 @media (min-width: 560px) { .g-al-fotos.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* autorização para postar a foto nas redes da loja (nada vem marcado; "Não quero mais" a qualquer hora) */
+.g-bo-redes { display: grid; gap: 12px; }
+.g-bo-redes.aberto, .g-bo-redes.ok { padding: 18px; border-radius: 22px; background: var(--g-carta); box-shadow: var(--g-sombra); }
+.g-bo-redes .g-btn.cheio { white-space: normal; text-align: center; line-height: 1.25; min-height: 52px; }
+.g-bo-redes-t { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; }
+.g-bo-redes-t svg { width: 20px; height: 20px; flex: none; color: var(--g-verde); }
+.g-bo-redes-t b { font-size: 1.0625rem; overflow-wrap: anywhere; }
+.g-bo-redes.ok .g-bo-redes-t span { color: var(--g-cinza); font-size: .9375rem; }
+.g-bo-redes-ops { display: grid; gap: 8px; }
+.g-bo-redes-op { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 14px; border-radius: 16px; background: var(--g-papel, #fff); border: 2px solid var(--g-linha); color: inherit; text-align: left; }
+.g-bo-redes-op.on { border-color: var(--g-verde); background: var(--g-verde-tint); }
+.g-bo-redes-op > span:last-child { display: grid; gap: 2px; min-width: 0; }
+.g-bo-redes-op small { color: var(--g-cinza); font-size: .875rem; }
+.g-bo-redes-op .bolinha { flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; border: 2px solid var(--g-linha-forte); background: #fff; }
+.g-bo-redes-op.on .bolinha { border-color: var(--g-verde); background: var(--g-verde); color: #fff; }
+.g-bo-redes-op .bolinha svg { width: 14px; height: 14px; }
+.g-bo-redes-texto { margin: 0; font-size: .9375rem; line-height: 1.45; overflow-wrap: anywhere; }
+.g-bo-redes-texto.previa { display: grid; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); }
+.g-bo-redes-texto.previa small { color: var(--g-cinza); font-size: .8125rem; }
+.g-bo-redes-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.g-bo-redes-acoes .g-btn { flex: 1 1 auto; justify-content: center; }
+.g-bo-redes-nota { color: var(--g-cinza); font-size: .8125rem; }
+.g-bo-redes-sair { justify-self: start; color: var(--g-cinza); font-size: .9375rem; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; display: inline-flex; align-items: center; }

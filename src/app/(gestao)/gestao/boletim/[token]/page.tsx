@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { BedDouble, CalendarPlus, Check, HeartPulse, MessageCircle, PawPrint, Scissors, Sparkles, Star, Sun } from "lucide-react";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { corPropria, TEMAS } from "@/lib/gestao/identidade";
-import { lerBoletim, type BoletimPublico } from "@/lib/gestao/boletim-servidor";
+import { lerAutorizacaoDoBoletim, lerBoletim, type BoletimPublico } from "@/lib/gestao/boletim-servidor";
+import AutorizarFoto from "./autorizar";
 import { artigoDe } from "@/lib/gestao/modulos";
 import { brl, linkWhatsApp } from "@/lib/gestao/util";
 import "../../agendar/[codigo]/agendar.css";
@@ -53,7 +54,7 @@ function Devagar() {
 
 export default async function Boletim({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const b = await lerBoletim(token);
+  const [b, aut] = await Promise.all([lerBoletim(token), lerAutorizacaoDoBoletim(token)]);
   if (!b) notFound();
   if (b === "devagar") return <Devagar />;
 
@@ -143,6 +144,15 @@ export default async function Boletim({ params }: { params: Promise<{ token: str
               </dl>
             )}
           </section>
+        )}
+
+        {b.fotos > 0 && aut && (
+          <AutorizarFoto token={token} fuso={fuso} textos={aut.textos} atual={aut.atual}
+            rotulo={`Pode postar a foto ${doPet(b.pet)} nas redes ${artigoDe(b.petshop.nome).do} ${b.petshop.nome}`}
+            opcoes={{
+              boletim: { titulo: "Só as fotos deste boletim", apoio: b.fotos === 1 ? "A foto de hoje." : `As ${b.fotos} fotos de hoje.` },
+              todas: { titulo: "Também as das próximas visitas", apoio: `As de hoje e as que a gente tirar ${doPet(b.pet)} daqui para frente.` },
+            }} />
         )}
 
         <div className="g-bo-acoes">

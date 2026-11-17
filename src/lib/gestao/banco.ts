@@ -1245,6 +1245,52 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"fotos_autorizacao_freio": {
+                  Row: {
+                    "chave": string,"minuto": string,"n": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "chave": string,"minuto": string,"n"?: number
+                  }
+                  Update: {
+                    "chave"?: string,"minuto"?: string,"n"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"fotos_autorizacoes": {
+                  Row: {
+                    "autorizado_em": string,"boletim_id": string | null,"codigo": string,"escopo": string,"id": string,"marcar": string | null,"pet_id": string,"petshop_id": string,"retirado_em": string | null,"retirado_motivo": string | null,"texto": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "autorizado_em"?: string,"boletim_id"?: string | null,"codigo": string,"escopo": string,"id"?: string,"marcar"?: string | null,"pet_id": string,"petshop_id": string,"retirado_em"?: string | null,"retirado_motivo"?: string | null,"texto": string
+                  }
+                  Update: {
+                    "autorizado_em"?: string,"boletim_id"?: string | null,"codigo"?: string,"escopo"?: string,"id"?: string,"marcar"?: string | null,"pet_id"?: string,"petshop_id"?: string,"retirado_em"?: string | null,"retirado_motivo"?: string | null,"texto"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "fotos_autorizacoes_boletim_id_fkey"
+      columns: ["boletim_id"]
+isOneToOne: false
+      referencedRelation: "boletins"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "fotos_autorizacoes_pet_id_petshop_id_fkey"
+      columns: ["pet_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "pets"
+      referencedColumns: ["id","petshop_id"]
+    },{
+      foreignKeyName: "fotos_autorizacoes_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"hotel_precos": {
                   Row: {
                     "atraso": NonNullable<Json>,"atualizado_em": string,"feriado": NonNullable<Json>,"petshop_id": string
@@ -2105,6 +2151,12 @@ isOneToOne: false
 "boletim_apagar_foto":
 { Args: { "p_boletim": string,"p_caminho": string }; Returns: string
                            },
+"boletim_autorizacao":
+{ Args: { "p_token": string }; Returns: Json
+                           },
+"boletim_autorizar":
+{ Args: { "p_escopo": string,"p_marcar": string,"p_token": string }; Returns: Json
+                           },
 "boletim_do_codigo":
 { Args: { "p_token": string }; Returns: {
               "agendamento_id": string | null,
@@ -2515,6 +2567,41 @@ isOneToOne: false
 "forma_por_extenso":
 { Args: { "j": Json }; Returns: string
                            },
+"foto_autorizacao_do_boletim":
+{ Args: { "p_boletim": string,"p_pet": string,"p_petshop": string }; Returns: {
+              "autorizado_em": string,
+"boletim_id": string | null,
+"codigo": string,
+"escopo": string,
+"id": string,
+"marcar": string | null,
+"pet_id": string,
+"petshop_id": string,
+"retirado_em": string | null,
+"retirado_motivo": string | null,
+"texto": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "fotos_autorizacoes"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"foto_autorizacao_marcar":
+{ Args: { "p": string }; Returns: string
+                           },
+"foto_autorizacao_publica":
+{ Args: { "p_codigo": string }; Returns: Json
+                           },
+"foto_autorizacao_retirar":
+{ Args: { "p_codigo": string }; Returns: Json
+                           },
+"foto_autorizacao_texto":
+{ Args: { "p_dia": string,"p_escopo": string,"p_loja": string,"p_marcar": string,"p_pet": string,"p_sexo": string }; Returns: string
+                           },
+"fotos_autorizacao_frear":
+{ Args: { "p_chave": string,"p_limite": number }; Returns: undefined
+                           },
 "fuso_da_uf":
 { Args: { "p_uf": string }; Returns: string
                            },
@@ -2522,6 +2609,9 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
 "gestao_base":
+{ Args: { "p": string }; Returns: Json
+                           },
+"gestao_bom_dia":
 { Args: { "p": string }; Returns: Json
                            },
 "gestao_contagens":
