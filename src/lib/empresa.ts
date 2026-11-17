@@ -9,7 +9,7 @@ export const EMPRESA = {
   /** Nome de quem responde como pessoa física. */
   nome: "Pedro Amaral Martin",
   /** Só números ou com pontos: aparece nos termos e na política. Vazio = [CPF]. */
-  cpf: "",
+  cpf: "412.538.738-95",
   razaoSocial: "",
   cnpj: "",
   endereco: "",
