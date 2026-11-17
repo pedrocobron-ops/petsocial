@@ -25,7 +25,7 @@ export const SECOES = [
   { id: "estoque", titulo: "Estoque e pacotes", apoio: "Produtos, venda no balcão, pacotes e planos." },
   { id: "equipe", titulo: "Equipe", apoio: "Quem trabalha com você e o que cada um abre." },
   { id: "divulgacao", titulo: "Divulgação e relacionamento", apoio: "Link do cliente, lembretes e clientes de volta." },
-  { id: "ajustes", titulo: "Ajustes e conta", apoio: "Preços, horário, cópia de segurança e assinatura." },
+  { id: "ajustes", titulo: "Ajustes e conta", apoio: "Preços, horário, baixar os dados, apagar a conta e assinatura." },
   { id: "limites", titulo: "O que o sistema não faz", apoio: "Para você não procurar o que não existe." },
 ] as const;
 
@@ -81,6 +81,7 @@ const AGENDA = "/gestao/app/agenda";
 const CLIENTES = "/gestao/app/clientes";
 const CRECHE = "/gestao/app/creche-hotel";
 const PACOTES = "/gestao/app/pacotes";
+const MENSAGENS = "/gestao/app/mensagens";
 const CAIXA = "/gestao/app/caixa";
 const FINANCEIRO = "/gestao/app/financeiro";
 const RELATORIOS = "/gestao/app/relatorios";
@@ -599,8 +600,19 @@ const BASE: TopicoBase[] = [
       "Se precisar dele de volta, abra a ficha e toque em Reativar.",
       "Para apagar um cliente de vez, o dono abre a ficha do tutor e toca em Excluir cliente de vez.",
     ],
-    atencao: ["Excluir de vez apaga os pets, os horários, os pacotes e o histórico do cliente, e não dá para desfazer. Só o dono faz isso."],
+    atencao: ["Excluir de vez apaga os pets, os horários, os pacotes e o histórico do cliente, e não dá para desfazer. Só o dono faz isso.", "Se o cliente pediu para apagar os dados dele, prefira Apagar dados deste tutor: os relatórios ficam iguais."],
     palavras: ["desativar", "desativar pet", "excluir cliente", "apagar cliente", "remover pet", "pet morreu", "faleceu", "reativar", "tirar da lista", "morreu", "pet faleceu", "cachorro morreu", "nao e mais cliente", "tirar o pet"] },
+  { id: "dados-do-tutor", titulo: "O cliente pediu os dados dele ou para apagar (LGPD)", secao: "clientes", quem: "dono", rota: CLIENTES,
+    passos: [
+      "Abra Clientes e pets e toque no nome do tutor.",
+      "No cartão Dados deste tutor (LGPD), toque em Baixar os dados deste tutor.",
+      "Mande o arquivo ao cliente por um canal seguro, como o WhatsApp dele.",
+      "Se ele pediu para apagar, toque em Apagar dados deste tutor.",
+      "Leia o que acontece, digite o nome do tutor igual ao da ficha e toque em Apagar os dados.",
+    ],
+    dicas: ["O arquivo traz uma planilha para cada parte: cadastro, pets, saúde, contatos, agendamentos, estadias, pacotes, mensalidades, financeiro, crédito, boletins, autorizações de fotos e pedidos pelo link.", "Cada pedido fica no Registro de pedidos de dados, em Meu pet shop, para você mostrar que atendeu."],
+    atencao: ["Apagar não dá para desfazer. O nome vira Cliente removido, os pets viram Pet removido e somem telefone, e-mail, endereço, observações, fotos, saúde, boletins e autorizações. Os valores ficam no financeiro e nos relatórios, sem o nome."],
+    palavras: ["lgpd", "dados do cliente", "cliente pediu os dados", "apagar dados do cliente", "anonimizar", "anonimo", "direito de exclusao", "cliente quer sair", "esquecer cliente", "dados pessoais", "baixar dados do tutor", "apagar tutor"] },
 
   /* ---------- Creche e hotel ---------- */
   { id: "creche", titulo: "Como funciona a tela Creche e hotel", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
@@ -2504,10 +2516,43 @@ const BASE: TopicoBase[] = [
       "Para lembrar de um horário só, abra o horário e toque em Lembrete no WhatsApp.",
       "Tutor com mais de um horário recebe tudo em uma mensagem só.",
       "Horário que já começou fica de fora da lista.",
+      "Para mandar os lembretes junto com as outras mensagens do dia (pet pronto, vacina, aniversário, cobrança), use Mandar mensagens, no menu.",
       { so: ["casa"], texto: "A lista traz só os horários da Agenda. Para quem chega amanhã na creche ou no hotel, abra Creche e hotel e toque em Avisar quem chega amanhã, na faixa do alto." },
     ],
     atencao: ["O sistema não envia mensagem sozinho: quem aperta enviar é você.", "Tutor sem telefone na ficha não entra na lista."],
     palavras: ["lembrete", "lembretes", "confirmar", "confirmacao", "whatsapp do cliente", "mensagem", "avisar cliente", "lembrar o cliente", "zap", "um dia antes", "avisar um dia antes", "lembrete de amanha"] },
+  { id: "modo-envio", titulo: "Como mandar várias mensagens seguidas (Mandar mensagens)", secao: "divulgacao", quem: "todos", rota: MENSAGENS, tambem: [HOJE],
+    passos: [
+      "Na tela Hoje, toque no cartão Mandar N mensagens. Ou abra o menu e toque em Mandar mensagens.",
+      "A tela mostra quantas mensagens estão prontas de cada tipo: pet pronto para buscar, lembrete dos horários de amanhã, aviso de chegada da creche e do hotel, cobrança gentil, vacina e cuidados vencendo, renovar pacote, aniversário do pet e chamar de volta.",
+      "Desligue no interruptor o tipo que você não quer mandar agora.",
+      "Toque em Começar. Aparece uma mensagem por vez: para quem, por quê e o texto pronto.",
+      "Se quiser, mude o texto na caixa antes de abrir.",
+      "Toque em Abrir no WhatsApp. O WhatsApp deste aparelho abre com a mensagem pronta: aperte enviar e volte para o sistema.",
+      "Quando você volta, a tela pergunta Enviou?. Toque em Sim, próxima para anotar e ir para a próxima, em Pular para deixar para depois, ou em Não enviou para tentar de novo.",
+      "No fim, a tela mostra quantas foram e deixa passar de novo pelas que ficaram.",
+    ],
+    dicas: [
+      "O que você marca aqui vale nas outras telas: o lembrete aparece como mandado na Agenda, o aviso de pronto ganha o sininho, a chegada fica anotada na estadia e a cobrança fica anotada na conta.",
+      "Fica anotado quem mandou e a que horas. A mesma mensagem não volta para a fila no mesmo dia.",
+      "No computador dá para usar o teclado: Enter abre o WhatsApp; depois S é sim, P é pular e N é não enviou.",
+      "Cada pessoa vê só o que é da área dela: cobrança só para quem mexe com dinheiro, lembrete e pet pronto para quem tem a Agenda, chegada para quem tem Creche e hotel, pacote para quem tem Pacotes.",
+      "Pergunte ao Mozart: \"quantas mensagens tenho para mandar hoje?\"",
+    ],
+    atencao: [
+      "O sistema não envia nada sozinho: cada mensagem sai do WhatsApp do aparelho, quando você aperta enviar.",
+      "Tutor sem telefone, com telefone incompleto ou marcado como Não quer receber mensagens fica de fora. Toque em Ficaram de fora para ver quem e abrir a ficha.",
+    ],
+    palavras: ["mandar mensagens", "modo envio", "varias mensagens", "mensagens do dia", "fila de mensagens", "mandar tudo", "whatsapp", "zap", "lembretes", "cobranca", "cobrar no whatsapp", "aniversario", "vacina vencendo", "pet pronto", "enviou", "mensagem em massa", "disparo"] },
+  { id: "nao-quer-mensagens", titulo: "Como marcar que o tutor não quer receber mensagens", secao: "divulgacao", quem: "todos", rota: CLIENTES, tambem: [MENSAGENS],
+    passos: [
+      "Abra Clientes e pets e toque no tutor.",
+      "Toque em Editar.",
+      "Marque Não quer receber mensagens e toque em Salvar.",
+    ],
+    dicas: ["A ficha do tutor mostra a etiqueta Não quer receber mensagens.", "Para voltar a mandar, desmarque a caixa."],
+    atencao: ["Quem marcou fica de fora do Mandar mensagens (lembretes, avisos, aniversário e cobrança). Nas outras telas, o botão do WhatsApp continua lá para quando o próprio tutor pedir."],
+    palavras: ["nao quer receber", "nao mandar mensagem", "parar de mandar", "descadastrar", "sair da lista", "nao perturbe", "optout", "opt-out", "bloquear mensagens"] },
   { id: "sumidos", titulo: "Como chamar de volta quem não vem há um tempo", secao: "divulgacao", quem: "todos", rota: CLIENTES, tambem: [HOJE],
     passos: [
       "Abra Clientes e pets e toque em Chamar de volta.",
@@ -2587,7 +2632,7 @@ const BASE: TopicoBase[] = [
   { id: "meu-petshop-grupos", titulo: "Como achar um ajuste em Meu pet shop", secao: "ajustes", quem: "dono", rota: PETSHOP,
     passos: [
       "Abra Meu pet shop.",
-      "Os cartões ficam em grupos: Serviços e horário, Agenda e link do cliente, Creche e hotel, Loja, Cobrança e fidelidade, O negócio e Cópia de segurança. Só aparecem os grupos do que você usa.",
+      "Os cartões ficam em grupos: Serviços e horário, Agenda e link do cliente, Creche e hotel, Loja, Cobrança e fidelidade, O negócio e Seus dados e a conta. Só aparecem os grupos do que você usa.",
       "O primeiro grupo, Serviços e horário, já vem aberto: nele estão Serviços e preços, Horário de funcionamento e Feriados e dias fechados.",
       "Grupo fechado mostra o nome de cada cartão que tem dentro. Toque no nome do cartão para abrir o grupo e ir direto a ele.",
       "Para abrir ou fechar um grupo inteiro, toque no nome do grupo.",
@@ -2653,25 +2698,46 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["A logo e as cores aparecem no sistema, no link que o cliente recebe e na agenda impressa.", "Imagem quadrada fica melhor."],
     palavras: ["logo", "logotipo", "cor", "cores", "identidade", "marca", "personalizar", "tema"] },
-  { id: "copia", titulo: "Como baixar a cópia de segurança", secao: "ajustes", quem: "dono", rota: PETSHOP,
+  { id: "copia", titulo: "Como baixar todos os dados (cópia de segurança)", secao: "ajustes", quem: "dono", rota: PETSHOP,
     passos: [
-      "Abra Meu pet shop e desça até o fim da tela.",
-      "No cartão Cópia de segurança, toque em Baixar cópia.",
+      "Abra Meu pet shop e toque em Seus dados e a conta.",
+      "No cartão Baixar todos os dados, toque em Baixar todos os dados.",
       "Espere o sistema juntar os dados. Não feche a tela.",
       "Guarde o arquivo baixado em um lugar seguro.",
     ],
-    dicas: ["O arquivo traz planilhas de clientes, pets, agenda, financeiro, caixas, estoque, pacotes, creche e hotel (com os mensalistas, as mensalidades, o diário, as ocorrências e a lista de espera), pedidos pelo link, feriados e dias fechados, equipe, comissões pagas e serviços.", "As planilhas abrem no Excel e no Google Planilhas."],
+    dicas: ["O arquivo traz uma planilha para cada parte: clientes, pets, saúde, agenda, creche e hotel (com os mensalistas, as mensalidades, o diário, as ocorrências e a lista de espera), pacotes, vendas, financeiro, caixas, estoque, pedidos pelo link, boletins, autorizações de fotos, feriados, equipe, comissões pagas e serviços.", "O README.txt explica cada planilha. Elas abrem no Excel e no Google Planilhas, com os acentos certos.", "Serve também para levar os dados para outro sistema."],
     atencao: ["É uma cópia para guardar e consultar: não dá para restaurar, isto é, trazer esses arquivos de volta para o sistema. As fotos não entram."],
     palavras: ["copia de seguranca", "backup", "copia", "baixar dados", "guardar dados", "seguranca", "baixar tudo"] },
   { id: "dados", titulo: "Como baixar ou apagar os meus dados", secao: "ajustes", quem: "dono", rota: PETSHOP,
     passos: [
-      "Para baixar tudo de uma vez, abra Meu pet shop e toque em Baixar cópia, no cartão Cópia de segurança.",
+      "Para baixar tudo de uma vez, abra Meu pet shop e toque em Baixar todos os dados, em Seus dados e a conta.",
       "Para só a lista de clientes, abra Clientes e pets e toque em Exportar.",
       "Para os lançamentos de um mês, abra Financeiro e toque em Exportar.",
-      "Para apagar a conta inteira, fale com a nossa equipe pela Ajuda.",
+      "Para os dados de um cliente só, abra a ficha do tutor e toque em Baixar os dados deste tutor.",
+      "Para apagar a conta inteira, abra Meu pet shop e toque em Encerrar e apagar a conta.",
     ],
     dicas: ["Os dados que você lança são do seu pet shop."],
     palavras: ["dados", "exportar", "planilha", "lgpd", "apagar", "excluir conta", "privacidade", "meus dados"] },
+  { id: "encerrar-conta", titulo: "Como encerrar e apagar a conta", secao: "ajustes", quem: "dono", rota: PETSHOP,
+    passos: [
+      "Antes, baixe todos os dados: abra Meu pet shop, Seus dados e a conta, e toque em Baixar todos os dados.",
+      "No cartão Encerrar e apagar a conta, leia o que acontece e toque em Encerrar e apagar a conta.",
+      "Digite o nome do pet shop igual ao de Meu pet shop.",
+      "Toque em Apagar em 30 dias.",
+      "Se você paga a assinatura, cancele também na tela Assinatura.",
+    ],
+    dicas: ["Por 30 dias a conta fica só para consulta: dá para ver e baixar tudo, mas ninguém lança e o link não recebe pedidos.", "Mudou de ideia? Dentro dos 30 dias, toque em Cancelar a exclusão no mesmo cartão. Tudo volta como estava."],
+    atencao: ["Só o titular da conta (quem criou o pet shop) pede para apagar. Depois dos 30 dias, apagamos o pet shop, os dados, as fotos e os logins da equipe que não estão em outro pet shop. Não dá para desfazer."],
+    palavras: ["apagar conta", "excluir conta", "encerrar conta", "fechar conta", "cancelar conta", "deletar conta", "apagar tudo", "fechar o pet shop", "lgpd", "cancelar exclusao", "desistir de apagar"] },
+  { id: "sair-equipe", titulo: "Como sair da equipe de um pet shop", secao: "equipe", quem: "todos", rota: null,
+    passos: [
+      "No celular, toque em Mais. No computador, olhe no pé do menu, ao lado de Ajuda.",
+      "Toque em Sair desta equipe.",
+      "Confirme em Sair desta equipe.",
+    ],
+    dicas: ["O seu nome continua no histórico da agenda e do caixa. Para voltar, o dono convida de novo."],
+    atencao: ["O titular da conta não sai da equipe. Para fechar o pet shop, ele usa Encerrar e apagar a conta, em Meu pet shop."],
+    palavras: ["sair da equipe", "sair do pet shop", "deixar a equipe", "nao trabalho mais", "sai do emprego", "tirar meu acesso", "sair da conta do pet shop"] },
   { id: "o-que-a-maestro-ve", titulo: "O que a equipe Maestro Pet vê da minha conta", secao: "ajustes", quem: "dono", rota: null,
     passos: [
       "A equipe Maestro Pet vê os dados da conta: nome do pet shop, cidade, telefone, nome e e-mail do dono, nomes das pessoas da equipe, plano, situação da assinatura e datas do teste e do pagamento.",
@@ -2751,7 +2817,7 @@ const BASE: TopicoBase[] = [
   { id: "restaurar", titulo: "Dá para restaurar a cópia de segurança?", secao: "limites", quem: "todos", rota: null,
     passos: [
       "Não. A cópia de segurança serve para guardar e consultar: o sistema não traz esses arquivos de volta.",
-      "Os dados continuam guardados no sistema. A cópia é uma garantia a mais, que fica com você.",
+      "Os dados continuam guardados no sistema. A cópia (Baixar todos os dados, em Meu pet shop) é uma garantia a mais, que fica com você.",
       "Por planilha só entram clientes e pets (Trazer de planilha, em Clientes e pets) e produtos (Trazer de planilha, em Estoque). Agenda, financeiro e o resto não voltam por arquivo.",
       "Apagou alguma coisa por engano? Fale com a nossa equipe pela Ajuda.",
     ],
@@ -2888,7 +2954,7 @@ export const topicoPorId = (id: string | null | undefined, lista: Topico[] = TOP
 
 /** Nome de cada tela, como está no menu. */
 export const NOME_TELA: Record<string, string> = {
-  [HOJE]: "Hoje", [AGENDA]: "Agenda", [CLIENTES]: "Clientes e pets", [CRECHE]: "Creche e hotel", [PACOTES]: "Pacotes",
+  [HOJE]: "Hoje", [AGENDA]: "Agenda", [CLIENTES]: "Clientes e pets", [CRECHE]: "Creche e hotel", [PACOTES]: "Pacotes", [MENSAGENS]: "Mandar mensagens",
   [CAIXA]: "Caixa", [FINANCEIRO]: "Financeiro", [RELATORIOS]: "Relatórios", [ESTOQUE]: "Estoque", [EQUIPE]: "Equipe",
   [PETSHOP]: "Meu pet shop", [ASSINATURA]: "Assinatura", [ESCOLA]: "Escola de Gestão", [ROTA_MANUAL]: "Manual",
 };

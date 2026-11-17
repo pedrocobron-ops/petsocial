@@ -120,8 +120,12 @@ function pdf(n) {
   T.ok('duas ao mesmo tempo na última página: uma lê, a outra ouve o limite', duas.filter((x) => x.status === 200).length === 1 && duas.filter((x) => x.status === 429).length === 1 && usoHoje() === limC, duas.map((x) => x.status));
   B.sql(`update caderno_uso set paginas = ${limC - 1} where petshop_id='${P}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
   const duasF = await Promise.all([ler(L.sb.dono, 'clientes', foto(1), { campos: { teste_falha: 'erro' } }), ler(L.sb.caixa, 'clientes', foto(1))]);
-  T.ok('a que falha devolve a página e nunca deixa a outra passar do limite', duasF[0].status === 502 && [200, 429].includes(duasF[1].status)
-    && usoHoje() === limC - 1 + (duasF[1].status === 200 ? 1 : 0), { status: duasF.map((x) => x.status), uso: usoHoje(), limC });
+  // quem pega a última página primeiro depende da ordem de chegada: ou a que falha pega e devolve (a outra lê ou ouve o limite),
+  // ou a outra pega e a que falha ouve o limite antes de chamar o modelo. Nunca as duas contam, nunca passa do limite.
+  const [sf, so] = duasF.map((x) => x.status);
+  const certo = (sf === 502 && [200, 429].includes(so)) || (sf === 429 && so === 200);
+  T.ok('a que falha devolve a página e nunca deixa a outra passar do limite', certo
+    && usoHoje() === limC - 1 + (so === 200 ? 1 : 0), { status: [sf, so], uso: usoHoje(), limC });
   B.sql(`update caderno_uso set paginas = ${antesF} where petshop_id='${P}' and dia = (now() at time zone 'America/Sao_Paulo')::date`);
 
   T.secao('PDF grande pela pasta temporária (caderno-tmp)');

@@ -447,14 +447,14 @@ isOneToOne: false
                   ]
                 },"clientes": {
                   Row: {
-                    "criado_em": string,"email": string | null,"endereco": string | null,"id": string,"nome": string,"obs": string | null,"petshop_id": string,"telefone": string | null
+                    "criado_em": string,"email": string | null,"endereco": string | null,"id": string,"nao_quer_mensagens": boolean,"nome": string,"obs": string | null,"petshop_id": string,"telefone": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"nome": string,"obs"?: string | null,"petshop_id": string,"telefone"?: string | null
+                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"nao_quer_mensagens"?: boolean,"nome": string,"obs"?: string | null,"petshop_id": string,"telefone"?: string | null
                   }
                   Update: {
-                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"nome"?: string,"obs"?: string | null,"petshop_id"?: string,"telefone"?: string | null
+                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"nao_quer_mensagens"?: boolean,"nome"?: string,"obs"?: string | null,"petshop_id"?: string,"telefone"?: string | null
                   }
                   Relationships: [
                     {
@@ -1479,6 +1479,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"mensagens_enviadas": {
+                  Row: {
+                    "dia": string,"enviado_em": string,"enviado_por": string | null,"id": string,"petshop_id": string,"ref": string,"tipo": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "dia": string,"enviado_em"?: string,"enviado_por"?: string | null,"id"?: string,"petshop_id": string,"ref": string,"tipo": string
+                  }
+                  Update: {
+                    "dia"?: string,"enviado_em"?: string,"enviado_por"?: string | null,"id"?: string,"petshop_id"?: string,"ref"?: string,"tipo"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "mensagens_enviadas_enviado_por_fkey"
+      columns: ["enviado_por"]
+isOneToOne: false
+      referencedRelation: "profissionais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "mensagens_enviadas_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"modelos_mensagem": {
                   Row: {
                     "atualizado_em": string,"chave": string,"petshop_id": string,"texto": string
@@ -2053,6 +2079,9 @@ isOneToOne: false
 "admin_conversas":
 { Args: { "p_canal"?: string,"p_limite"?: number,"p_petshop"?: string }; Returns: Json
                            },
+"admin_copias":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "admin_erro_resolver":
 { Args: { "p_assinatura": string,"p_resolvido"?: boolean }; Returns: undefined
                            },
@@ -2080,6 +2109,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"admin_exclusoes":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "admin_painel":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
@@ -2263,6 +2295,12 @@ isOneToOne: false
 "casa_quem_escreve":
 { Args: { "p_petshop": string }; Returns: string
                            },
+"cliente_anonimizar":
+{ Args: { "p_cliente": string,"p_confirmacao": string }; Returns: Json
+                           },
+"cliente_dados":
+{ Args: { "p_cliente": string }; Returns: Json
+                           },
 "cliente_receber_contas":
 { Args: { "p_chave": string,"p_cliente": string,"p_passos": Json,"p_petshop": string }; Returns: Json
                            },
@@ -2336,6 +2374,15 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"conta_exclusao_cancelar":
+{ Args: { "p_petshop": string }; Returns: boolean
+                           },
+"conta_exclusao_pedir":
+{ Args: { "p_nome": string,"p_petshop": string }; Returns: Json
+                           },
+"conta_exclusao_ver":
+{ Args: { "p_petshop": string }; Returns: Json
+                           },
 "conta_receber_junto":
 { Args: { "p_chave": string,"p_conta": string,"p_passos": Json,"p_petshop": string }; Returns: Json
                            },
@@ -2544,6 +2591,9 @@ isOneToOne: false
               "comissao_pct": number,"email_convite": string,"id": string
             }[]
                            },
+"equipe_sair":
+{ Args: { "p_petshop": string }; Returns: boolean
+                           },
 "erro_limpar":
 { Args: { "p": string,"p_max": number }; Returns: string
                            },
@@ -2640,8 +2690,20 @@ isOneToOne: false
 "gestao_bom_dia":
 { Args: { "p": string }; Returns: Json
                            },
+"gestao_modo_envio":
+{ Args: { "p": string,"p_dias"?: number }; Returns: Json
+                           },
 "gestao_contagens":
 { Args: { "p": string }; Returns: Json
+                           },
+"gestao_copia_registrar":
+{ Args: { "p_linhas": number,"p_quem": string,"p_tabelas": number }; Returns: undefined
+                           },
+"gestao_copia_tabelas":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"gestao_exclusoes_processar":
+{ Args: { "p_limite"?: number,"p_petshop"?: string }; Returns: Json
                            },
 "gestao_faxina_arquivos":
 { Args: { "p_limite"?: number,"p_petshop"?: string }; Returns: Json
@@ -2651,6 +2713,9 @@ isOneToOne: false
                            },
 "gestao_hoje":
 { Args: { "a": Json,"p": string }; Returns: Json
+                           },
+"gestao_lgpd_arquivos":
+{ Args: { "p_limite"?: number,"p_petshop"?: string }; Returns: Json
                            },
 "google_link_valido":
 { Args: { "p": string }; Returns: string
@@ -2668,6 +2733,12 @@ isOneToOne: false
                            },
 "importacao_desfazer":
 { Args: { "p_clientes": (string)[],"p_pets": (string)[],"p_petshop": string }; Returns: Json
+                           },
+"lgpd_registrar_copia":
+{ Args: { "p_linhas"?: number,"p_petshop": string }; Returns: undefined
+                           },
+"lgpd_registros_ver":
+{ Args: { "p_petshop": string }; Returns: Json
                            },
 "limite_de_acessos":
 { Args: { "p_plano": string }; Returns: number
@@ -2805,6 +2876,9 @@ isOneToOne: false
                            },
 "marcar_uso":
 { Args: { "p_area": string,"p_petshop": string }; Returns: undefined
+                           },
+"modo_envio_marcar":
+{ Args: { "p": string,"p_refs": string[],"p_tipo": string }; Returns: Json
                            },
 "meu_email":
 { Args: Record<PropertyKey, never>; Returns: string

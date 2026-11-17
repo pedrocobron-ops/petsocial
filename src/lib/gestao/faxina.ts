@@ -9,6 +9,8 @@ import { SUPABASE_URL, type Banco } from "./supabase";
  * O banco (gestao_faxina_arquivos, migração 20261195) faz a faxina dele (álbuns vencidos, freios antigos, reservas velhas do
  * caderno), põe na fila as fotos do boletim que ficaram sem boletim em todos os pet shops e devolve o que apagar: as fotos da
  * fila e os PDFs do caderno-tmp com mais de uma hora. Aqui os arquivos saem pela API do Storage (o banco não apaga arquivo).
+ * LGPD (migração 20261199): apaga as contas com o prazo de "Encerrar e apagar a conta" vencido (gestao_exclusoes_processar; os
+ * logins do Maestro que ficaram sem pet shop saem pelo Auth) e os arquivos da fila `arquivos_lixo` (gestao_lgpd_arquivos).
  *
  * Variáveis (só no servidor, nunca no navegador):
  *   SUPABASE_SERVICE_ROLE_KEY  chave de serviço do Supabase (passa por cima das regras: só esta rota usa)
@@ -41,7 +43,9 @@ export function bancoDeServico(): Banco | null {
   return createClient<Database>(SUPABASE_URL, chave, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-export type ResultadoDaFaxina = { albuns: number; reservas: number; fotos: number; pdfs: number; falhas: number };
+/** `contas`: pet shops apagados (prazo de 30 dias do "Encerrar e apagar a conta" vencido); `logins`: logins apagados junto;
+ *  `arquivos`: arquivos da fila da LGPD (tutor apagado, conta apagada). */
+export type ResultadoDaFaxina = { albuns: number; reservas: number; fotos: number; pdfs: number; falhas: number; contas: number; logins: number; arquivos: number };
 
 async function apagar(sb: Banco, bucket: string, caminhos: string[]): Promise<{ ok: number; falhas: number }> {
   let ok = 0, falhas = 0;
@@ -55,7 +59,8 @@ async function apagar(sb: Banco, bucket: string, caminhos: string[]): Promise<{ 
 
 /** Uma faxina completa: algumas voltas de até 500 arquivos por bucket, até a fila esvaziar. `petshop`: só os arquivos dele (testes). */
 export async function faxinaGeral(sb: Banco, petshop?: string): Promise<ResultadoDaFaxina> {
-  const x: ResultadoDaFaxina = { albuns: 0, reservas: 0, fotos: 0, pdfs: 0, falhas: 0 };
+  const x: ResultadoDaFaxina = { albuns: 0, reservas: 0, fotos: 0, pdfs: 0, falhas: 0, contas: 0, logins: 0, arquivos: 0 };
+  await apagarContasVencidas(sb, x, petshop);
   for (let volta = 0; volta < VOLTAS; volta++) {
     const r = await sb.rpc("gestao_faxina_arquivos", { p_limite: LIMITE, ...(petshop ? { p_petshop: petshop } : {}) });
     if (r.error) throw Object.assign(new Error(r.error.message), { name: "ErroDaFaxina" });
@@ -66,5 +71,34 @@ export async function faxinaGeral(sb: Banco, petshop?: string): Promise<Resultad
     x.fotos += fotos.ok; x.pdfs += pdfs.ok; x.falhas += fotos.falhas + pdfs.falhas;
     if ((d.boletim?.length ?? 0) < LIMITE && (d.caderno_tmp?.length ?? 0) < LIMITE) break;
   }
+  for (let volta = 0; volta < VOLTAS; volta++) {
+    const r = await sb.rpc("gestao_lgpd_arquivos", { p_limite: LIMITE, ...(petshop ? { p_petshop: petshop } : {}) });
+    if (r.error) throw Object.assign(new Error(r.error.message), { name: "ErroDaFaxina" });
+    const porBucket = (r.data ?? {}) as Record<string, string[]>;
+    let n = 0;
+    for (const [bucket, caminhos] of Object.entries(porBucket)) {
+      const a = await apagar(sb, bucket, caminhos);
+      x.arquivos += a.ok; x.falhas += a.falhas; n += caminhos.length;
+    }
+    if (n < LIMITE) break;
+  }
   return x;
+}
+
+/**
+ * Contas com o prazo de "Encerrar e apagar a conta" vencido: o banco põe os arquivos do pet shop na fila, apaga o pet shop
+ * (e tudo dele) e devolve os logins do Maestro que ficaram sem nenhum pet shop; aqui eles saem do Auth.
+ */
+async function apagarContasVencidas(sb: Banco, x: ResultadoDaFaxina, petshop?: string) {
+  for (let volta = 0; volta < VOLTAS; volta++) {
+    const r = await sb.rpc("gestao_exclusoes_processar", { p_limite: 5, ...(petshop ? { p_petshop: petshop } : {}) });
+    if (r.error) throw Object.assign(new Error(r.error.message), { name: "ErroDaFaxina" });
+    const d = (r.data ?? {}) as { lojas?: number; usuarios?: string[] };
+    x.contas += Number(d.lojas ?? 0);
+    for (const id of d.usuarios ?? []) {
+      const u = await sb.auth.admin.deleteUser(id);
+      if (u.error) x.falhas += 1; else x.logins += 1;
+    }
+    if (Number(d.lojas ?? 0) < 5) break;
+  }
 }

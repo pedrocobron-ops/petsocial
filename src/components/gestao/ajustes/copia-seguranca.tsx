@@ -54,6 +54,8 @@ type EsperaLida = { tipo: string; entrada: string; saida: string; pet_nome: stri
 type PedidoLido = { tutor_nome: string; telefone: string; pet_nome: string; tipo: string; inicio: string; fim: string | null; obs: string | null; status: string; criado_em: string; termos_aceitos_em: string | null; termos_texto: string | null; termos_vacinas: boolean | null; cliente_cancelou_em: string | null; cliente_pediu: string | null; cliente_pediu_em: string | null; cliente_recado: string | null; servicos: { nome: string } | null };
 type DiaEspecialLido = { dia: string; nome: string; fechado: boolean; feriado: boolean };
 type ComissaoPagaLida = { profissional_id: string; de: string; ate: string; valor: number; pago_em: string };
+type BoletimLido = { criado_em: string; enviado_em: string | null; expira_em: string; fotos: string[] | null; agendamento_id: string | null; estadia_id: string | null; texto: string | null; pets: DoPet };
+type AutorizacaoLida = { autorizado_em: string; escopo: string; marcar: string | null; texto: string; retirado_em: string | null; retirado_motivo: string | null; pets: DoPet };
 
 /* ---------- células ---------- */
 
@@ -91,6 +93,7 @@ const ASSUNTOS = [
   { arquivo: "pets.csv", nome: "pets", explica: "Os pets, cada um com o nome do tutor, espécie, raça, porte, alertas e observações." },
   { arquivo: "cuidados-de-saude.csv", nome: "cuidados de saúde", explica: "Vacinas, vermífugos, antipulgas e outros cuidados anotados na ficha de cada pet." },
   { arquivo: "agendamentos.csv", nome: "agendamentos", explica: "Todos os horários da agenda, com pet, tutor, serviço (e os outros serviços do mesmo horário), profissional, situação e preço." },
+  { arquivo: "vendas.csv", nome: "vendas", explica: "Cada item vendido ou cobrado (produto, serviço, pacote): dia, cliente, quantidade, valor e quem vendeu. Vem dos lançamentos que têm itens." },
   { arquivo: "lancamentos.csv", nome: "lançamentos", explica: "O financeiro: tudo o que entrou e saiu, as contas a pagar e a receber. Saídas aparecem com valor negativo. Conta recebida em partes: cada parte é uma linha, e a linha da conta traz o valor cheio na última coluna." },
   { arquivo: "caixas.csv", nome: "caixas", explica: "Cada caixa aberto e fechado, com o troco, o que entrou e saiu, o dinheiro esperado e o contado." },
   { arquivo: "produtos.csv", nome: "produtos", explica: "Os produtos do estoque, com preço, custo, último custo, código de barras, último fornecedor, quantidade atual e mínima." },
@@ -109,12 +112,14 @@ const ASSUNTOS = [
   { arquivo: "comissoes-pagas.csv", nome: "comissões pagas", explica: "Cada comissão marcada como paga: a pessoa, o período, o valor e o dia." },
   { arquivo: "alteracoes-de-valores.csv", nome: "alterações em valores", explica: "O histórico de quem mexeu em dinheiro: valor recebido que foi alterado ou apagado (com o valor de antes) e venda com preço diferente da lista ou com desconto. O lançamento apagado só aparece aqui." },
   { arquivo: "servicos.csv", nome: "serviços", explica: "Os serviços e os preços por porte." },
+  { arquivo: "boletins.csv", nome: "boletins", explica: "Os boletins do pet mandados aos tutores: pet, tutor, quando foi feito e mandado, quantas fotos e até quando a página abre. As fotos não entram." },
+  { arquivo: "autorizacoes-de-fotos.csv", nome: "autorizações de fotos", explica: "As autorizações dos tutores para postar as fotos dos pets nas redes da loja: o texto exato aceito, quando, quais fotos, o perfil para marcar e quando foi tirada." },
 ] as const;
 type NomeArquivo = (typeof ASSUNTOS)[number]["arquivo"];
 
 function leiaMe(petshop: string, agora: Date, linhas: Map<NomeArquivo, number>) {
   const partes = [
-    `Cópia de segurança do Maestro Pet Gestão`,
+    `LEIA-ME · Todos os dados do pet shop no Maestro Pet Gestão`,
     `Pet shop: ${petshop}`,
     `Cópia feita em ${dataCompleta(agora)} às ${hora(agora)}.`,
     "",
@@ -128,8 +133,10 @@ function leiaMe(petshop: string, agora: Date, linhas: Map<NomeArquivo, number>) 
     "",
     "Para saber",
     "- Esta cópia mostra os dados como estavam na data e na hora acima. O que mudou depois não está aqui.",
+    "- Planilhas em UTF-8 com BOM e ponto e vírgula entre as colunas: abrem com acentos certos no Excel.",
+    "- A equipe vem sem senhas nem códigos de convite.",
     "- É uma cópia para você guardar e consultar. Ainda não dá para trazer estes arquivos de volta para o Maestro automaticamente.",
-    "- As fotos dos pets e o logotipo não entram na cópia.",
+    "- As fotos dos pets, do boletim e do diário e o logotipo não entram na cópia.",
     "- Valores em reais, com vírgula nos centavos e sem o R$, para a planilha conseguir somar.",
     "- Datas no formato dia/mês/ano.",
     "- Aqui tem dados dos seus clientes. Guarde em um lugar seguro.",
@@ -230,6 +237,15 @@ export default function CopiaSeguranca() {
           l.caixa_id ? quando(caixaPorId.get(l.caixa_id)?.aberto_em) : "", autor(l.criado_por, l.origem),
           l.valor_original != null ? dinheiroCsv(Number(l.valor_original)) : "", quando(l.alterado_em),
         ]),
+      ]);
+      const quemVendeu = new Map(equipe.map((x) => [x.id, x.nome]));
+      tabelas.set("vendas.csv", [
+        ["Data", "Item", "Quantidade", "Valor unitário", "Total do item", "Cliente", "Forma", "Pago", "Quem vendeu", "Descrição do lançamento"],
+        ...lancamentos.filter((l) => l.tipo === "entrada" && !l.movimento).flatMap((l) => itensDoLancamento(l).map((i): Cel[] => [
+          dataCompleta(l.data), i.nome, numero(i.qtd), dinheiro(i.valor), dinheiro(Math.round(i.qtd * i.valor * 100) / 100),
+          l.cliente_id ? nomeCliente.get(l.cliente_id) ?? "" : "", l.forma ? textoDoPagamento({ ...l, pagamentos: null }) : "", simNao(l.pago),
+          (l.vendido_por && quemVendeu.get(l.vendido_por)) || autor(l.criado_por, l.origem), l.descricao ?? "",
+        ])),
       ]);
       const doCaixa = new Map<string, Lancamento[]>();
       for (const l of lancamentos) if (l.caixa_id && l.pago) doCaixa.set(l.caixa_id, [...(doCaixa.get(l.caixa_id) ?? []), l]);
@@ -439,20 +455,40 @@ export default function CopiaSeguranca() {
         ...servicos.map((s): Cel[] => [s.nome, rotulo(TIPO_SERVICO, s.categoria), numero(s.duracao_min), dinheiro(s.preco_p), dinheiro(s.preco_m), dinheiro(s.preco_g), dinheiro(s.preco_gg), simNao(s.ativo)]),
       ]);
 
+      etapa("boletins");
+      const boletins = await seExistir(() => todas<BoletimLido>((a, b) => sb.from("boletins").select("criado_em, enviado_em, expira_em, fotos, agendamento_id, estadia_id, texto, pets(nome, clientes(nome))")
+        .eq("petshop_id", id).order("criado_em").order("id").range(a, b) as never));
+      tabelas.set("boletins.csv", [
+        ["Feito em", "Pet", "Tutor", "Visita", "Mandado ao tutor em", "Fotos", "Página abre até", "Texto"],
+        ...boletins.map((x): Cel[] => [quando(x.criado_em), x.pets?.nome ?? "", tutorDe(x.pets), x.agendamento_id ? "Banho e tosa" : "Creche ou hotel", quando(x.enviado_em),
+          numero(x.fotos?.length ?? 0), quando(x.expira_em), x.texto ?? ""]),
+      ]);
+
+      etapa("autorizações de fotos");
+      const autorizacoes = await seExistir(() => todas<AutorizacaoLida>((a, b) => sb.from("fotos_autorizacoes").select("autorizado_em, escopo, marcar, texto, retirado_em, retirado_motivo, pets(nome, clientes(nome))")
+        .eq("petshop_id", id).order("autorizado_em").order("id").range(a, b) as never));
+      tabelas.set("autorizacoes-de-fotos.csv", [
+        ["Pet", "Tutor", "Autorizado em", "Quais fotos", "Perfil para marcar", "Texto aceito", "Tirada em", "Por quê saiu"],
+        ...autorizacoes.map((x): Cel[] => [x.pets?.nome ?? "", tutorDe(x.pets), quando(x.autorizado_em), x.escopo === "boletim" ? "Só as daquele boletim" : "Daquele boletim e das próximas visitas",
+          x.marcar ?? "", x.texto, quando(x.retirado_em), x.retirado_motivo === "tutor" ? "O tutor tirou (Não quero mais)" : x.retirado_motivo === "trocada" ? "Trocada por uma nova" : ""]),
+      ]);
+
       fazendo = "o arquivo";
       setPasso({ n: total, texto: "Fechando o arquivo…" });
       const agora = new Date();
       const linhas = new Map<NomeArquivo, number>(ASSUNTOS.map((a) => [a.arquivo, (tabelas.get(a.arquivo)?.length ?? 1) - 1]));
       const arquivos: ArquivoZip[] = [
-        { nome: "LEIA-ME.txt", conteudo: leiaMe(petshop.nome, agora, linhas) },
+        { nome: "README.txt", conteudo: "\ufeff" + leiaMe(petshop.nome, agora, linhas) },
         ...ASSUNTOS.map((a) => ({ nome: a.arquivo, conteudo: textoCsv(tabelas.get(a.arquivo) ?? []) })),
       ];
       const zip = montarZip(arquivos, agora);
       const apelido = semAcento(petshop.nome).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "pet-shop";
       const nomeDoArquivo = `maestro-${apelido}-${isoDia(agora)}.zip`;
       baixarArquivo(new Blob([zip.buffer as ArrayBuffer], { type: "application/zip" }), nomeDoArquivo);
-      setFeita(`Cópia de ${dataCompleta(agora)} às ${hora(agora)} baixada: ${nomeDoArquivo}`);
-      avisar("Cópia baixada. Guarde em um lugar seguro.");
+      setFeita(`Dados de ${dataCompleta(agora)} às ${hora(agora)} baixados: ${nomeDoArquivo}`);
+      avisar("Dados baixados. Guarde em um lugar seguro.");
+      // fica no registro de pedidos de dados (sem o conteúdo, só quantas linhas)
+      void sb.rpc("lgpd_registrar_copia", { p_petshop: id, p_linhas: [...linhas.values()].reduce((t, n) => t + n, 0) }).then(() => undefined, () => undefined);
     } catch (e) {
       setErro(`Não deu para montar a cópia: parou ao juntar ${fazendo || "os dados"}. ${mensagemDeErro(e)} Nada foi baixado.`);
     } finally {
@@ -462,16 +498,16 @@ export default function CopiaSeguranca() {
 
   return (
     <section className="g-card gj-copia" aria-busy={Boolean(passo)}>
-      <div className="g-card-t"><h3><Tile icone={Archive} tom="ceu" tamanho="p" />Cópia de segurança</h3></div>
+      <div className="g-card-t"><h3><Tile icone={Archive} tom="ceu" tamanho="p" />Baixar todos os dados</h3></div>
       <p className="g-muted g-p">
-        Baixe um arquivo com os dados do seu pet shop para guardar com você: clientes, pets, agenda, financeiro, caixas, estoque, pacotes, creche e hotel (com os mensalistas, as mensalidades, o diário, as ocorrências e a lista de espera), pedidos pelo link, feriados e dias fechados, equipe, comissões pagas e serviços.
-        Vem tudo em planilhas, que abrem no Excel e no Google Planilhas.
+        Um arquivo .zip com tudo do seu pet shop, uma planilha para cada parte: clientes, pets, saúde, agenda, creche e hotel (com os mensalistas, as mensalidades, o diário, as ocorrências e a lista de espera), pacotes, vendas, financeiro, caixas, estoque, pedidos pelo link, boletins, autorizações de fotos, feriados, equipe, comissões pagas e serviços.
+        As planilhas abrem no Excel e no Google Planilhas, e o README.txt explica cada uma.
       </p>
       <p className="g-muted g-pp">
-        É uma cópia para guardar e consultar. Ainda não dá para trazer esses dados de volta para o Maestro automaticamente. As fotos não entram.
+        Serve como cópia de segurança e para levar os dados para outro sistema. Ainda não dá para trazer esses arquivos de volta para o Maestro automaticamente. As fotos não entram.
       </p>
       <div className="gj-copia-acao">
-        <button type="button" className="g-btn sec" onClick={() => void baixar()} disabled={Boolean(passo)}><Download />{passo ? "Montando a cópia…" : "Baixar cópia"}</button>
+        <button type="button" className="g-btn sec" onClick={() => void baixar()} disabled={Boolean(passo)}><Download />{passo ? "Montando o arquivo…" : "Baixar todos os dados"}</button>
         {passo && (
           <div className="gj-copia-anda" role="status" aria-live="polite">
             <span>{passo.texto}</span>

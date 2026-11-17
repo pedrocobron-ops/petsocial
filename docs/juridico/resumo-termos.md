@@ -1,6 +1,7 @@
 # Termos de uso e Política de privacidade do Gestão: resumo para o dono
 
-Versão 2.0 dos dois documentos, vigente desde 17/11/2026. Páginas: `/gestao/termos` e `/gestao/privacidade`
+Versão 2.1 dos dois documentos, vigente desde 17/11/2026 (a 2.0 é do mesmo dia; a 2.1 corrige a parte das fotos e descreve
+as funções de dados da LGPD; veja "O que mudou na 2.1"). Páginas: `/gestao/termos` e `/gestao/privacidade`
 (código em `src/app/(gestao)/gestao/termos/page.tsx` e `.../privacidade/page.tsx`). **Rascunho: precisa da revisão de um
 advogado brasileiro antes de valer.** Nada aqui é parecer jurídico.
 
@@ -10,8 +11,12 @@ advogado brasileiro antes de valer.** Nada aqui é parecer jurídico.
    é regida pelo Código Civil. Se o CDC se aplicar a alguém, os direitos dele ficam ressalvados (sem isso a cláusula cairia inteira).
 2. **Dados dos clientes: o pet shop é o controlador**, nós somos operadores (LGPD). Base legal, aviso aos tutores, autorização
    para fotos e mensagens e atendimento aos pedidos dos tutores são do pet shop; nós ajudamos.
-3. **Fotos e imagem.** Fotografar o pet, não pessoas; autorização do tutor antes de postar em redes sociais é do pet shop (o
-   sistema não pede nem guarda essa autorização). Boletim e álbum: link de 60 dias; fotos ficam no álbum enquanto o pet existir.
+3. **Fotos e imagem.** Fotografar o pet, não pessoas; autorização do tutor antes de postar em redes sociais. O sistema oferece a
+   autorização pelo boletim (migração 20261196, `fotos_autorizacoes`): nada vem marcado, o tutor escolhe "só as fotos deste boletim"
+   ou "também as das próximas visitas" e, se quiser, o @ para marcar; o banco guarda o texto exato, dia e hora; só o tutor autoriza
+   (a equipe não grava); "Não quero mais" tira todas as autorizações do pet a qualquer hora (o link vale para sempre). O sistema não
+   posta nada: quem posta e responde pela postagem é o pet shop, que deve parar de postar e avaliar retirar o que já postou quando
+   o tutor tira a autorização. Boletim e álbum: link de 60 dias; fotos ficam no álbum enquanto o pet existir.
 4. **Inteligência artificial pode errar.** Mozart (com cartão de confirmação), leitura do caderno/carteirinha/tabela de preço (arquivos
    não ficam guardados), textos do boletim e dúvidas do link: a conferência é do usuário, nada é orientação veterinária, jurídica ou
    contábil, e o que é confirmado vale como feito pelo pet shop.
@@ -29,6 +34,16 @@ advogado brasileiro antes de valer.** Nada aqui é parecer jurídico.
 12. **Sem pagamento.** Só consulta; depois de 180 dias só para consulta, a conta pode ser apagada com 30 dias de aviso por e-mail.
 13. **Propriedade intelectual, sugestões, cessão do contrato, prova eletrônica e aceite registrado** (versão, data, IP e navegador).
 14. **Mudanças.** Versão nova = aviso + tela de aceite obrigatória ao abrir o aplicativo (resumo do que mudou).
+15. **Dados e exclusão (LGPD).** Termos parte 22 e Política partes 3, 11 e 13:
+    - *Baixar todos os dados* (dono, Meu pet shop): .zip com uma planilha CSV por área (UTF-8 com BOM) e um README.txt; equipe sem senhas.
+    - *Dados de um tutor* (dono, ficha do tutor): baixar os dados daquele cliente; *Apagar dados deste tutor* com o nome digitado:
+      anonimiza (nome "Cliente removido", contato e observações apagados, pets sem nome/foto/saúde/boletins/autorizações), mantém
+      os valores no financeiro sem o nome. Irreversível.
+    - *Encerrar e apagar a conta* (só o titular, com o nome do pet shop digitado): 30 dias só para consulta, qualquer dono cancela;
+      depois a faxina diária apaga o pet shop, os arquivos e os logins da equipe que não estão em outro pet shop. Não cancela a
+      assinatura na Cakto. Fica o registro de que a conta foi apagada (nome, quem pediu, quando).
+    - *Sair desta equipe*: quem não é o titular tira o próprio acesso.
+    - Tudo isso fica no registro de pedidos de dados (`lgpd_registros`), sem dados de clientes.
 
 ## Como o aceite funciona
 
@@ -37,6 +52,15 @@ advogado brasileiro antes de valer.** Nada aqui é parecer jurídico.
   "atualizamos as nossas regras" e só segue depois de aceitar.
 - Painel do administrador, aba **Aceites**: contagem por versão, busca por e-mail e exportação em CSV.
 - Migração: `supabase/migrations/20261197000000_gestao_aceites.sql` (só acrescenta).
+
+## O que mudou na 2.1
+
+- A 2.0 dizia que o sistema não pede nem guarda a autorização para postar fotos. O produto já tem essa função (boletim,
+  "Pode postar a foto" e "Não quero mais"): os textos agora descrevem como ela funciona (Termos parte 11, Política partes 3, 7 e 11).
+- Novas funções de dados (item 15 acima), com os prazos: 30 dias só para consulta antes de apagar a conta; fotos de tutor apagado
+  saem na faxina diária; o registro de pedidos de dados fica depois de a conta ser apagada.
+- Na migração `20261199000000_gestao_lgpd.sql`: `cliente_dados`, `cliente_anonimizar`, `conta_exclusao_*`, `equipe_sair`,
+  `gestao_exclusoes_processar` (faxina), a cópia completa do administrador e o registro.
 
 ## O que falta preencher (aparece em amarelo nas páginas)
 
@@ -58,3 +82,9 @@ advogado brasileiro antes de valer.** Nada aqui é parecer jurídico.
   confirmar que os registros da hospedagem ficam guardados por esse prazo.
 - Contratos de tratamento de dados (DPA) e cláusulas de transferência internacional com Supabase, Vercel e Anthropic.
 - Conversas com o Mozart guardadas enquanto a conta existir: definir um prazo menor, se possível.
+- Anonimização do tutor: confirmar que manter os valores sem o nome (e os horários sem observação) atende o pedido de exclusão e a
+  guarda contábil; conversas com o Mozart que citam o tutor não são apagadas por ela.
+- Prazo de 30 dias para apagar a conta e o que fica depois (registro do pedido, aceites, pagamentos da assinatura); se o e-mail de
+  confirmação do pedido de exclusão é necessário (hoje a confirmação é só na tela).
+- Autorização de fotos: se o texto montado pelo banco basta como consentimento (art. 7º, I e art. 8º da LGPD; direito de imagem),
+  e o que o pet shop deve fazer com fotos já postadas quando o tutor tira a autorização.

@@ -9,16 +9,16 @@ const { criarLoja } = require('../lib/semente');
 const N = require('../lib/navegador');
 const T = require('../lib/teste')('passeio');
 
-const APP = ['', '/agenda', '/clientes', '/creche-hotel', '/pacotes', '/caixa', '/financeiro', '/relatorios', '/estoque', '/equipe', '/meu-petshop', '/assinatura', '/manual', '/escola'];
+const APP = ['', '/agenda', '/clientes', '/creche-hotel', '/pacotes', '/mensagens', '/caixa', '/financeiro', '/relatorios', '/estoque', '/equipe', '/meu-petshop', '/assinatura', '/manual', '/escola'];
 const PAPEIS = {
   dono: APP,
-  caixa: ['', '/agenda', '/clientes', '/creche-hotel', '/pacotes', '/caixa'],
-  monitor: ['', '/clientes', '/creche-hotel'],
-  tosador: ['', '/agenda', '/clientes'],
+  caixa: ['', '/agenda', '/clientes', '/creche-hotel', '/pacotes', '/mensagens', '/caixa'],
+  monitor: ['', '/clientes', '/creche-hotel', '/mensagens'],
+  tosador: ['', '/agenda', '/clientes', '/mensagens'],
   estoque: ['', '/estoque'],
 };
 // fora da área da pessoa: a tela tem de abrir sem erro (mostra o aviso ou volta para o início), nunca quebrar
-const FORA = { tosador: ['/financeiro', '/caixa'], monitor: ['/agenda', '/relatorios'], estoque: ['/clientes'] };
+const FORA = { tosador: ['/financeiro', '/caixa'], monitor: ['/agenda', '/relatorios'], estoque: ['/clientes', '/mensagens'] };
 const TAMANHOS = [[390, 844], [1366, 900]];
 const SAIDA = path.join(__dirname, '..', 'saida');
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
@@ -12,6 +11,7 @@ import { guardarLembrado, lerLembrado } from "../lembrado";
 import { AvatarPet, Esqueleto, Folha, Vazio, useAvisos, useDados } from "../ui";
 import { buscarTudo, linkTutor } from "./comum";
 import "./chamar-de-volta.css";
+import { CHAVE_NO_BANCO, juntarNomes, MODELOS_PADRAO, montarMensagem, type AbaChamar } from "@/lib/gestao/mensagens-prontas";
 
 /**
  * "Chamar de volta": quem já veio e parou de vir (sem horário marcado) e os aniversariantes da semana,
@@ -19,7 +19,8 @@ import "./chamar-de-volta.css";
  * (tabela `modelos_mensagem`: o mesmo em qualquer aparelho); quem já foi chamado fica guardado no aparelho.
  */
 
-export type AbaChamar = "volta" | "niver";
+export type { AbaChamar };
+export { juntarNomes, MODELOS_PADRAO, montarMensagem };
 
 type PetChamar = {
   id: string; nome: string; foto: string | null; especie: string; nascimento: string | null; cliente_id: string;
@@ -90,15 +91,8 @@ export function aniversariantes(lista: ParaChamar[], hoje = new Date()): GrupoCh
   return agrupar(itens);
 }
 
-/** "Thor", "Thor e Mel", "Thor, Mel e Luna". */
-export const juntarNomes = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(0, -1).join(", ")} e ${n[n.length - 1]}`);
-
 /* ---------- textos das mensagens (do pet shop; o aparelho guarda uma cópia para abrir sem esperar) ---------- */
 
-export const MODELOS_PADRAO: Record<AbaChamar, string> = {
-  volta: "Faz um tempinho desde a última visita de [pet]. Quer que eu veja um horário?",
-  niver: "A gente lembrou do aniversário de [pet] e passou para dar os parabéns! Muita saúde e muito carinho.",
-};
 const chaveModelos = (petshopId: string) => `maestro-gestao-chamar-modelos:${petshopId}`;
 const chaveChamados = (petshopId: string) => `maestro-gestao-chamados:${petshopId}`;
 
@@ -109,9 +103,6 @@ function lerModelos(petshopId: string): Record<AbaChamar, string> {
   const g = lerJson<Record<AbaChamar, string>>(chaveModelos(petshopId));
   return { volta: typeof g.volta === "string" ? g.volta : MODELOS_PADRAO.volta, niver: typeof g.niver === "string" ? g.niver : MODELOS_PADRAO.niver };
 }
-
-/** Como cada texto se chama na tabela `modelos_mensagem`. */
-const CHAVE_NO_BANCO: Record<AbaChamar, string> = { volta: "chamar.volta", niver: "chamar.niver" };
 
 /**
  * Os textos do pet shop. Se o pet shop ainda não tem um texto guardado e este aparelho tinha um texto próprio
@@ -131,12 +122,6 @@ async function lerModelosDoPetshop(sb: Banco, petshopId: string, doAparelho: Rec
     }
   }
   return final;
-}
-
-/** A mensagem inteira: a saudação entra sozinha e `[pet]` vira o nome do pet (ou dos pets) do tutor. Texto em branco usa o padrão. */
-export function montarMensagem(aba: AbaChamar, modelo: string, p: { tutor: string | null; pets: string[]; petshop: string }) {
-  const corpo = (modelo.trim() || MODELOS_PADRAO[aba]).replace(/\[pet\]/gi, juntarNomes(p.pets) || "seu pet");
-  return `${saudacaoZap(p.tutor, p.petshop)} ${corpo}`;
 }
 
 /* ---------- quem já foi chamado (fica marcado por alguns dias, neste aparelho) ---------- */

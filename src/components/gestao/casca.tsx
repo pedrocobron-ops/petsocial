@@ -5,12 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, Pencil, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
+  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, Pencil, ShieldCheck, Package, PawPrint, Send, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
 import { useGestao } from "./contexto";
 import { planoPorId } from "@/lib/gestao/planos";
 import { DIAS_DE_AVISO, fimDoTeste } from "./fim-do-teste";
-import { dataLonga } from "@/lib/gestao/util";
+import { dataCompleta, dataLonga } from "@/lib/gestao/util";
+import SairDaEquipe from "./lgpd/sair-da-equipe";
 import { AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
 import BuscaGeral from "./busca-geral";
 import { areaDaRota } from "@/lib/gestao/acessos";
@@ -40,6 +41,7 @@ const GRUPOS: { titulo: string; itens: Item[] }[] = [
     { href: "/gestao/app/clientes", rotulo: "Clientes e pets", icone: PawPrint, tom: "menta" },
     { href: "/gestao/app/creche-hotel", rotulo: "Creche e hotel", icone: BedDouble, tom: "ceu" },
     { href: "/gestao/app/pacotes", rotulo: "Pacotes", icone: Ticket, tom: "lilas" },
+    { href: "/gestao/app/mensagens", rotulo: "Mandar mensagens", icone: Send, tom: "menta" },
   ] },
   { titulo: "Dinheiro", itens: [
     { href: "/gestao/app/caixa", rotulo: "Caixa", icone: Wallet, tom: "manteiga", so: "financeiro" },
@@ -100,7 +102,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("pointerdown", tocou, true);
   }, []);
   const caminho = usePathname();
-  const { sb, user, petshop, eu, souDono, posso, liberado, diasDeTeste, assinaturaAberta, sair } = useGestao();
+  const { sb, user, petshop, eu, souDono, posso, liberado, exclusao, souTitular, diasDeTeste, assinaturaAberta, sair } = useGestao();
   const [pedidos, setPedidos] = useState(0);
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
   const [mais, setMais] = useState(false);
@@ -185,7 +187,10 @@ export default function Casca({ children }: { children: React.ReactNode }) {
 
   const podeRota = (href: string) => { const area = areaDaRota(href); return area ? posso(area) : true; };
   // as permissões de cada pessoa valem por cima da ordem do menu
-  const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href));
+  // Mandar mensagens (Modo envio) só para quem tem alguma área com mensagem para o tutor
+  const pode = (i: Item) => (i.so === "dono" ? souDono
+    : i.href === "/gestao/app/mensagens" ? (["agenda", "clientes", "creche_hotel", "pacotes", "caixa", "financeiro", "relatorios"] as const).some((a) => posso(a))
+    : podeRota(i.href));
   const menu = montarMenu(petshop, semAgenda);
   // tela aberta pelo endereço sem ter acesso: mostra o aviso no lugar da tela
   const soDeDono = ["/gestao/app/equipe", "/gestao/app/meu-petshop", "/gestao/app/assinatura", "/gestao/app/escola"].some((r) => caminho.startsWith(r));
@@ -279,6 +284,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           )}
           <div className="g-nav" style={{ marginTop: 10 }}>
             <button onClick={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }}><LifeBuoy />Ajuda</button>
+            {!souTitular && <SairDaEquipe lateral />}
           </div>
           <div className="g-lado-eu">
             <AvatarPessoa nome={eu.nome} cor={eu.cor} tamanho="p" />
@@ -297,7 +303,14 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           <div className="g-barra-data"><CalendarClock />{dataLonga(new Date())}</div>
         </div>
         <AvisoDeFuso />
-        {!liberado && !cartaoNoHoje && !caminho.endsWith("/assinatura") && (
+        {exclusao && (
+          <div className="g-aviso vermelho" role="alert">
+            <TriangleAlert />
+            <span>Esta conta vai ser apagada em {dataCompleta(exclusao.apagar_em)}. Até lá, fica só para consulta: dá para ver e baixar os dados, mas não lançar.</span>
+            {souDono && !caminho.endsWith("/meu-petshop") && <Link className="g-btn p verde" href="/gestao/app/meu-petshop#encerrar-conta">Ver ou cancelar</Link>}
+          </div>
+        )}
+        {!liberado && !exclusao && !cartaoNoHoje && !caminho.endsWith("/assinatura") && (
           <div className="g-aviso vermelho" role="alert">
             <TriangleAlert />
             <span>{petshop.status === "teste" ? "Seu teste grátis terminou." : "Sua assinatura está inativa."} Seus dados estão guardados e a conta fica só para consulta até você assinar.</span>
@@ -378,6 +391,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
             )}
             <button className="g-btn verde" onClick={() => { setMais(false); setAjuda(true); }}><LifeBuoy />Ajuda</button>
             <button className="g-btn sec" onClick={() => void sair()}><LogOut />Sair</button>
+            {!souTitular && <SairDaEquipe />}
           </div>
         </Folha>
       )}

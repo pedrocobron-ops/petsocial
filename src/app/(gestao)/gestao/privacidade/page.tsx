@@ -45,7 +45,7 @@ export default function PrivacidadeDoGestao() {
       <div className="g-leg-quadro">
         <b>O principal, em poucas linhas:</b> os dados que o pet shop lança são do pet shop, e nós só os usamos para o sistema funcionar.
         Não vendemos dados e não fazemos propaganda com eles. Alguns fornecedores ficam fora do Brasil, como a inteligência artificial e a hospedagem.
-        O aplicativo não tem pixel de anúncio. Dá para baixar os dados pela própria tela e pedir a exclusão da conta.
+        O aplicativo não tem pixel de anúncio. Dá para baixar todos os dados e apagar a conta pela própria tela.
         Tutor: quem responde pelos seus dados é o pet shop; fale com ele, e nós ajudamos.
       </div>
 
@@ -89,6 +89,7 @@ export default function PrivacidadeDoGestao() {
           <li><b>Pet shop:</b> nome, telefone, cidade e estado, logo, horário de funcionamento, serviços, preços e ajustes.</li>
           <li><b>Equipe:</b> nome, e-mail do convite, função, áreas que pode abrir, escala, comissão.</li>
           <li><b>Assinatura:</b> plano, situação, datas e o e-mail usado na compra. A Cakto nos avisa de cada pagamento, renovação, cancelamento, reembolso ou falha, e guardamos esses avisos. Não recebemos o número do cartão.</li>
+          <li><b>Pedidos de dados:</b> quem baixou todos os dados, baixou ou apagou os dados de um tutor, pediu ou cancelou a exclusão da conta ou saiu de uma equipe, e quando. Esse registro não guarda os dados dos clientes.</li>
           <li><b>Aceite dos termos:</b> qual versão dos Termos e desta política cada pessoa aceitou, quando e, quando disponíveis, o endereço de rede (IP) e o navegador.</li>
           <li><b>Assistente:</b> o texto dos pedidos feitos ao Mozart e à Ajuda, a resposta, a ação proposta, se foi confirmada, se a dúvida foi resolvida, quem pediu e quando.</li>
           <li><b>Escola de Gestão:</b> quais materiais foram comprados com o e-mail da conta.</li>
@@ -102,6 +103,7 @@ export default function PrivacidadeDoGestao() {
         <ul>
           <li><b>Tutores:</b> nome, telefone, e-mail, endereço, observações, quem pode buscar o pet, valores devidos e créditos.</li>
           <li><b>Pets:</b> nome, espécie, raça, porte, sexo, nascimento, alertas, observações, ficha de saúde (vacinas, vermífugo, antipulgas, remédios e vencimentos), fotos (perfil, antes e depois, boletim, fotos do dia da creche e do hotel), diário e ocorrências.</li>
+          <li><b>Autorizações para postar fotos:</b> as que o tutor deu pelo boletim (parte 7), com o texto aceito, o dia e a hora, e quando foram tiradas.</li>
           <li><b>Atendimento e dinheiro:</b> agenda, estadias, pacotes, caixa, entradas e saídas, comissões, estoque e fornecedores.</li>
         </ul>
         <p>
@@ -112,6 +114,7 @@ export default function PrivacidadeDoGestao() {
         <h3>Do tutor, nas páginas públicas</h3>
         <ul>
           <li><b>Pedido pelo link de agendamento:</b> nome, WhatsApp, nome, espécie e porte de cada pet, recado opcional, serviço, dia e hora, e o aceite das regras do pet shop, quando ele pede.</li>
+          <li><b>Autorização para postar fotos:</b> se o tutor tocar em &quot;Pode postar a foto&quot; no boletim, guardamos a escolha (só as fotos daquele boletim ou também as das próximas visitas), o perfil para marcar, se ele informar, o texto exato que aceitou, o dia e a hora e, se ele tirar, quando tirou.</li>
           <li><b>Dúvidas pelo link:</b> o texto da pergunta vai à inteligência artificial para ser respondido, mas <b>não fica guardado</b>; guardamos só a contagem. O link pede para o tutor não escrever dados pessoais ali.</li>
           <li><b>Proteção contra abuso:</b> para limitar pedidos e acessos repetidos, usamos o endereço de rede (IP) de quem acessa, só para contar e frear excessos.</li>
         </ul>
@@ -138,7 +141,7 @@ export default function PrivacidadeDoGestao() {
           <div><dt>Vercel</dt><dd>Hospedagem do aplicativo e das páginas públicas. Os pedidos passam pelos servidores dela, que podem ficar fora do Brasil.</dd></div>
           <div><dt>Anthropic</dt><dd>Fornece o modelo de inteligência artificial do Mozart, da Ajuda, da leitura do caderno, dos textos do boletim e das dúvidas do link (parte 8). Servidores fora do Brasil.</dd></div>
           <div><dt>Cakto</dt><dd>Pagamento da assinatura. Os dados de pagamento são digitados no ambiente dela e seguem a política dela.</dd></div>
-          <div><dt>Envio de e-mail</dt><dd>E-mails de confirmação de conta e de troca de senha: <Preencher>PROVEDOR DE E-MAIL</Preencher>.</dd></div>
+          <div><dt>Envio de e-mail</dt><dd>E-mails de confirmação de conta e de troca de senha, enviados pelo serviço de login do Supabase.</dd></div>
         </dl>
         <p>
           Também passam por serviços de terceiros, mas por escolha e no aparelho de quem usa: o <b>WhatsApp</b>, quando o pet shop abre uma mensagem pronta
@@ -162,7 +165,9 @@ export default function PrivacidadeDoGestao() {
           <li><b>Página do tutor:</b> link particular de cada tutor, sem senha, com os pets dele, o diário, as fotos do dia e o que está marcado. As fotos do dia passam pelo nosso servidor, que confere o link antes de entregar, e são apagadas no prazo que o pet shop escolhe (30, 60, 90 ou 180 dias; o normal é 90).</li>
           <li><b>Boletim e álbum:</b> página de cada visita ou do álbum do pet, com fotos, recados e, se o pet shop ligar, valores. O link abre por {DIAS_DO_BOLETIM} dias e depois para de abrir. As fotos continuam no álbum do pet, dentro do sistema, enquanto o pet estiver cadastrado ou até o pet shop apagá-las. A página não mostra telefone nem dados do tutor.</li>
           <li>Essas páginas pedem aos buscadores para não serem indexadas. Quem tiver o link consegue abrir; por isso o pet shop deve mandá-lo só ao tutor e pode trocar ou desligar o link da página do tutor.</li>
-          <li><b>Postagens em redes sociais</b> não são feitas pelo sistema. Se o pet shop postar fotos, a autorização do tutor é responsabilidade dele.</li>
+          <li><b>Autorização para postar fotos:</b> a página do boletim pode trazer &quot;Pode postar a foto&quot;. Nada vem marcado: o tutor escolhe se autoriza só as fotos daquele boletim ou também as das próximas visitas e, se quiser, o perfil dele para a loja marcar. O sistema monta o texto, guarda o que ele aceitou e mostra ao pet shop na ficha e no álbum do pet. Só o tutor autoriza; a equipe não consegue marcar por ele.</li>
+          <li><b>Tirar a autorização:</b> o tutor recebe junto um link &quot;Não quero mais&quot;, que funciona para sempre (mesmo depois que o boletim para de abrir) e tira na hora todas as autorizações daquele pet. Para o pet shop, a ficha passa a mostrar &quot;Sem autorização&quot;.</li>
+          <li><b>O sistema não posta nada</b> nas redes sociais. Quem escolhe e posta é o pet shop, que é o controlador desses dados e responde pela postagem e por respeitar quando o tutor tira a autorização.</li>
         </ul>
       </>)}
 
@@ -198,6 +203,10 @@ export default function PrivacidadeDoGestao() {
         <dl className="g-leg-pares">
           <div><dt>Conta e dados do pet shop</dt><dd>Enquanto a conta existir, inclusive só para consulta. Conta só para consulta por mais de 180 dias pode ser apagada, com aviso de 30 dias (Termos, parte 8).</dd></div>
           <div><dt>Cliente ou pet apagado</dt><dd>Sai na hora da tela. Os arquivos das fotos ligadas a ele são apagados logo depois, na faxina automática.</dd></div>
+          <div><dt>Dados de tutor apagados a pedido</dt><dd>Em &quot;Apagar dados deste tutor&quot;, nome, telefone, e-mail, endereço, observações, pets, saúde, boletins e autorizações saem na hora; as fotos, na faxina diária. Os valores ficam no financeiro, sem o nome, para a contabilidade do pet shop.</dd></div>
+          <div><dt>Autorizações para postar fotos</dt><dd>Enquanto o pet estiver cadastrado, inclusive as que o tutor tirou (com a data em que tirou), para mostrar quando valeram.</dd></div>
+          <div><dt>Conta apagada a pedido</dt><dd>Em &quot;Encerrar e apagar a conta&quot;, 30 dias só para consulta (dá para cancelar); depois apagamos o pet shop, os dados, os arquivos e os logins da equipe que não estão em outro pet shop. Fica só o registro de que a conta foi apagada (nome do pet shop, quem pediu e quando).</dd></div>
+          <div><dt>Registro de pedidos de dados</dt><dd>Enquanto a conta existir e, depois de apagada, pelo prazo em que puder ser necessário para provar que o pedido foi atendido.</dd></div>
           <div><dt>Fotos do álbum e do boletim</dt><dd>Enquanto o pet estiver cadastrado ou até o pet shop apagá-las. O link aberto ao tutor vale {DIAS_DO_BOLETIM} dias.</dd></div>
           <div><dt>Fotos da página do tutor</dt><dd>30, 60, 90 ou 180 dias, como o pet shop escolher (o normal é 90).</dd></div>
           <div><dt>Fotos e PDFs do caderno</dt><dd>Não ficam guardados: são lidos e descartados.</dd></div>
@@ -209,8 +218,8 @@ export default function PrivacidadeDoGestao() {
           <div><dt>Cópias de segurança</dt><dd>Substituídas com o tempo, no ciclo do fornecedor do banco de dados.</dd></div>
         </dl>
         <p>
-          <b>Baixar e apagar:</b> o dono baixa a cópia de segurança em Meu pet shop e as planilhas em Clientes e pets, Financeiro e Relatórios, inclusive com a conta só para consulta.
-          Clientes e pets são apagados pela própria tela. A exclusão da conta inteira é pedida pelo dono pelo nosso contato.
+          <b>Baixar e apagar:</b> o dono baixa todos os dados em Meu pet shop (um .zip com uma planilha por parte e um README) e as planilhas em Clientes e pets, Financeiro e Relatórios, inclusive com a conta só para consulta.
+          Na ficha do tutor, baixa os dados daquele cliente ou apaga os dados pessoais dele. A conta inteira é apagada pelo titular em Meu pet shop, Encerrar e apagar a conta.
         </p>
       </>)}
 
@@ -239,8 +248,8 @@ export default function PrivacidadeDoGestao() {
         </ul>
         <p><b>Como pedir:</b></p>
         <ul>
-          <li><b>Assinante ou pessoa da equipe:</b> boa parte se resolve na própria tela (corrigir, baixar, apagar clientes). Para o resto, inclusive a exclusão da conta, escreva para <EmailJuridico /> ou <Email /> com o assunto &quot;Privacidade&quot;. Podemos pedir uma confirmação de que o pedido é seu. Respondemos em até 15 dias.</li>
-          <li><b>Tutor:</b> fale com o pet shop onde o seu pet é atendido: ele é o controlador e consegue ver, corrigir e apagar os seus dados no sistema. Se preferir escrever para nós, diga qual é o pet shop: encaminhamos o pedido a ele e ajudamos a atender.</li>
+          <li><b>Assinante ou pessoa da equipe:</b> boa parte se resolve na própria tela: corrigir, baixar todos os dados, apagar clientes, apagar a conta (Meu pet shop, Encerrar e apagar a conta) e sair de uma equipe (&quot;Sair desta equipe&quot;). Para o resto, escreva para <EmailJuridico /> ou <Email /> com o assunto &quot;Privacidade&quot;. Podemos pedir uma confirmação de que o pedido é seu. Respondemos em até 15 dias.</li>
+          <li><b>Tutor:</b> fale com o pet shop onde o seu pet é atendido: ele é o controlador e, pela ficha do tutor, consegue baixar os seus dados em planilhas, corrigi-los e apagá-los. Para tirar a autorização de postar fotos, use o link &quot;Não quero mais&quot; do boletim. Se preferir escrever para nós, diga qual é o pet shop: encaminhamos o pedido a ele e ajudamos a atender.</li>
         </ul>
       </>)}
 

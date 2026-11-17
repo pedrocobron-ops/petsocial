@@ -1,15 +1,15 @@
 "use client";
 
-import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Bug, Camera, HeartPulse, MessageCircle, Pill, Plus, RotateCw, ShieldPlus, Syringe, Trash2 } from "lucide-react";
 import type { Database } from "@/lib/gestao/banco";
-import { dataCompleta, deIsoDia, inicioDoDia, isoDia, linkWhatsApp, semAcento } from "@/lib/gestao/util";
+import { dataCompleta, deIsoDia, isoDia, linkWhatsApp, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile, type Tom } from "../painel";
 import { avisarMudanca, Campo, Folha, ok, useAvisos, useSomenteLeitura } from "../ui";
 import { primeiroNome } from "./comum";
+import { diasParaVencer, mensagemSaude } from "@/lib/gestao/mensagens-prontas";
 
 /* ============================================================
    Ajudantes de estado e cor (a ficha, a lista e a tela Hoje usam os mesmos)
@@ -35,11 +35,8 @@ export type EstadoSaude = "em_dia" | "vencendo" | "vencido" | "sem";
 /** Classe de cor do estado, igual às do `g-tag`: verde, amarelo, vermelho ou nada (cinza). */
 export const COR_SAUDE: Record<EstadoSaude, "verde" | "amarelo" | "vermelho" | ""> = { em_dia: "verde", vencendo: "amarelo", vencido: "vermelho", sem: "" };
 
-/** Dias até o vencimento (negativo = já venceu). Sem data devolve null. */
-export function diasParaVencer(venceEm: string | null | undefined, hoje: Date = new Date()): number | null {
-  if (!venceEm) return null;
-  return Math.round((deIsoDia(venceEm).getTime() - inicioDoDia(hoje).getTime()) / 864e5);
-}
+// o texto da mensagem e a conta dos dias ficam na biblioteca (o Modo envio usa os mesmos)
+export { diasParaVencer, mensagemSaude };
 
 /** Em dia, vencendo (até `janela` dias), vencido ou sem vencimento. */
 export function estadoSaude(venceEm: string | null | undefined, hoje: Date = new Date(), janela = DIAS_AVISO_SAUDE): EstadoSaude {
@@ -116,25 +113,6 @@ export function EtiquetaSaude({ resumo }: { resumo: ResumoSaude | null | undefin
       <Syringe aria-hidden />{resumo.texto}{resumo.quantos > 1 ? ` +${resumo.quantos - 1}` : ""}
     </span>
   );
-}
-
-/** Mensagem pronta para o tutor: só lembra o cuidado e a data. Quem orienta é o veterinário dele. */
-export function mensagemSaude(tutorNome: string, petNome: string, petshopNome: string, alerta: Pick<CuidadoSaude, "tipo" | "nome" | "vence_em">[], hoje: Date = new Date()) {
-  const linhas = alerta.map((c) => {
-    const tipo = tipoSaude(c.tipo);
-    const dias = diasParaVencer(c.vence_em, hoje) ?? 0;
-    const nome = tipo.id === "outro" || semAcento(c.nome) === semAcento(tipo.rotulo) ? c.nome : `${tipo.rotulo} ${c.nome}`;
-    const quando = dias < 0 ? `venceu em ${dataCompleta(c.vence_em!)}` : dias === 0 ? "vence hoje" : `vence em ${dataCompleta(c.vence_em!)}`;
-    return `- ${nome}: ${quando}`;
-  });
-  return [
-    `${saudacaoZap(tutorNome, petshopNome)} Tudo bem?`,
-    "",
-    `Passando para lembrar ${alerta.length === 1 ? "de um cuidado" : "dos cuidados"} de ${petNome} que ${alerta.length === 1 ? "está" : "estão"} na nossa ficha:`,
-    ...linhas,
-    "",
-    "Quando puder, vale conversar com o veterinário de vocês para ver a próxima dose. Depois é só nos contar a data nova que a gente atualiza a ficha.",
-  ].join("\n");
 }
 
 /* ============================================================
