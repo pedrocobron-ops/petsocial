@@ -102,7 +102,7 @@ export default function PrivacidadeDoGestao() {
         <h3>Que o pet shop lança (nós como operadora)</h3>
         <ul>
           <li><b>Tutores:</b> nome, telefone, e-mail, endereço, observações, quem pode buscar o pet, valores devidos e créditos.</li>
-          <li><b>Pets:</b> nome, espécie, raça, porte, sexo, nascimento, alertas, observações, ficha de saúde (vacinas, vermífugo, antipulgas, remédios e vencimentos), fotos (perfil, antes e depois, boletim, fotos do dia da creche e do hotel), diário e ocorrências.</li>
+          <li><b>Pets:</b> nome, espécie, raça, porte, sexo, nascimento, alertas, observações, ficha de saúde (vacinas, vermífugo, antipulgas, remédios e vencimentos), fotos (perfil, antes e depois, boletim, fotos do dia da creche e do hotel), diário e ocorrências, e o checklist de entrada (temperamento, como o pet chegou, com fotos, e os pertences).</li>
           <li><b>Autorizações para postar fotos:</b> as que o tutor deu pelo boletim (parte 7), com o texto aceito, o dia e a hora, e quando foram tiradas.</li>
           <li><b>Atendimento e dinheiro:</b> agenda, estadias, pacotes, caixa, entradas e saídas, comissões, estoque e fornecedores.</li>
         </ul>
@@ -164,6 +164,7 @@ export default function PrivacidadeDoGestao() {
           <li><b>Link de agendamento:</b> mostra dados do pet shop (nome, cidade, telefone, horário, serviços, horários livres e, se ele quiser, preços). Não mostra a agenda nem dados de outros clientes. O pedido do tutor vai só para o pet shop escolhido.</li>
           <li><b>Página do tutor:</b> link particular de cada tutor, sem senha, com os pets dele, o diário, as fotos do dia e o que está marcado. As fotos do dia passam pelo nosso servidor, que confere o link antes de entregar, e são apagadas no prazo que o pet shop escolhe (30, 60, 90 ou 180 dias; o normal é 90).</li>
           <li><b>Boletim e álbum:</b> página de cada visita ou do álbum do pet, com fotos, recados e, se o pet shop ligar, valores. O link abre por {DIAS_DO_BOLETIM} dias e depois para de abrir. As fotos continuam no álbum do pet, dentro do sistema, enquanto o pet estiver cadastrado ou até o pet shop apagá-las. A página não mostra telefone nem dados do tutor.</li>
+          <li><b>Checklist de entrada:</b> quando o pet chega, o pet shop pode pedir que o tutor confira e aceite como o pet chegou, assinando no aparelho do pet shop ou por um link mandado no WhatsApp. Guardamos o nome digitado, a imagem da assinatura e a hora; pelo link, também o endereço de internet (IP) e o navegador. O link abre por 7 dias, mostra só o pet, o que foi anotado e as fotos, e não mostra telefone nem dados do tutor.</li>
           <li>Essas páginas pedem aos buscadores para não serem indexadas. Quem tiver o link consegue abrir; por isso o pet shop deve mandá-lo só ao tutor e pode trocar ou desligar o link da página do tutor.</li>
           <li><b>Autorização para postar fotos:</b> a página do boletim pode trazer &quot;Pode postar a foto&quot;. Nada vem marcado: o tutor escolhe se autoriza só as fotos daquele boletim ou também as das próximas visitas e, se quiser, o perfil dele para a loja marcar. O sistema monta o texto, guarda o que ele aceitou e mostra ao pet shop na ficha e no álbum do pet. Só o tutor autoriza; a equipe não consegue marcar por ele.</li>
           <li><b>Tirar a autorização:</b> o tutor recebe junto um link &quot;Não quero mais&quot;, que funciona para sempre (mesmo depois que o boletim para de abrir) e tira na hora todas as autorizações daquele pet. Para o pet shop, a ficha passa a mostrar &quot;Sem autorização&quot;.</li>
@@ -208,6 +209,7 @@ export default function PrivacidadeDoGestao() {
           <div><dt>Conta apagada a pedido</dt><dd>Em &quot;Encerrar e apagar a conta&quot;, 30 dias só para consulta (dá para cancelar); depois apagamos o pet shop, os dados, os arquivos e os logins da equipe que não estão em outro pet shop. Fica só o registro de que a conta foi apagada (nome do pet shop, quem pediu e quando).</dd></div>
           <div><dt>Registro de pedidos de dados</dt><dd>Enquanto a conta existir e, depois de apagada, pelo prazo em que puder ser necessário para provar que o pedido foi atendido.</dd></div>
           <div><dt>Fotos do álbum e do boletim</dt><dd>Enquanto o pet estiver cadastrado ou até o pet shop apagá-las. O link aberto ao tutor vale {DIAS_DO_BOLETIM} dias.</dd></div>
+          <div><dt>Checklist de entrada</dt><dd>Fica junto com o atendimento ou a estadia e é apagado com ele, com o pet ou com a conta. O link para o tutor aceitar vale 7 dias.</dd></div>
           <div><dt>Fotos da página do tutor</dt><dd>30, 60, 90 ou 180 dias, como o pet shop escolher (o normal é 90).</dd></div>
           <div><dt>Fotos e PDFs do caderno</dt><dd>Não ficam guardados: são lidos e descartados.</dd></div>
           <div><dt>Perguntas do link</dt><dd>Não ficam guardadas; só a contagem.</dd></div>
