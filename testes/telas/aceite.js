@@ -32,7 +32,8 @@ const foto = (page, nome, inteira = false) => page.screenshot({ path: `${FOTOS}a
     T.ok('e as versões', (await page.locator('form .g-check').innerText()).includes(`Versão ${Doc.DOCUMENTOS.termos.versao} dos Termos`));
     const email = `t-${L.suf}.tela${largura}@teste-auto.local`;
     await page.fill('input[autocomplete=name]', 'Pessoa da Tela');
-    await page.fill('input[type=email]', email);
+    await page.fill('input[autocomplete=email]', email);
+    await page.fill('input[type=email][autocomplete=off]', email);
     await page.fill('input[type=password]', L.senha);
     await foto(page, `criar-conta-${largura}`);
     await page.click('button.g-btn.pri');

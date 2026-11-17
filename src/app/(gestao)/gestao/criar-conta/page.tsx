@@ -23,6 +23,7 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
   const convidado = emailInicial !== "";
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState(emailInicial);
+  const [email2, setEmail2] = useState("");
   const [senha, setSenha] = useState("");
   const [aceito, setAceito] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -33,6 +34,9 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
     e.preventDefault();
     setErro(null);
     if (!configurado) { setErro("O sistema ainda não está ligado neste endereço."); return; }
+    if (!convidado && email.trim().toLowerCase() !== email2.trim().toLowerCase()) {
+      setErro("Os dois e-mails não estão iguais. Confira: é por esse e-mail que você recupera a senha."); return;
+    }
     if (senha.length < 8) { setErro("A senha precisa de pelo menos 8 caracteres."); return; }
     if (!aceito) { setErro("Para criar a conta, leia e aceite os Termos de uso e a Política de privacidade."); return; }
     setIndo(true);
@@ -72,6 +76,13 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
           <input className="g-input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           {convidado && <small>{email.trim().toLowerCase() === emailInicial ? "Use este e-mail: é ele que liga a sua conta ao pet shop." : `O convite foi feito para ${emailInicial}. Com outro e-mail, você não entra na equipe.`}</small>}
         </label>
+        {!convidado && (
+          <label className="g-campo"><span>Digite o e-mail de novo</span>
+            <input className="g-input" type="email" autoComplete="off" required value={email2} onChange={(e) => setEmail2(e.target.value)}
+              onPaste={(e) => e.preventDefault()} />
+            <small>{email2 && email.trim().toLowerCase() !== email2.trim().toLowerCase() ? "Ainda não está igual ao de cima." : "É por esse e-mail que você recupera a senha, se esquecer."}</small>
+          </label>
+        )}
         <label className="g-campo"><span>Crie uma senha</span>
           <CampoSenha valor={senha} aoMudar={setSenha} nova />
           <small>Pelo menos 8 caracteres.</small>

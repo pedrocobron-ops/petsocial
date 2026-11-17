@@ -28,7 +28,8 @@ async function percorrer(largura, { ateOHorario }) {
 
   await page.goto(B.BASE_URL + '/gestao/criar-conta');
   await digita(page.locator('input[autocomplete=name]'), 'Dona Teste');
-  await digita(page.locator('input[type=email]'), email);
+  await digita(page.locator('input[autocomplete=email]'), email);
+  await digita(page.locator('input[type=email][autocomplete=off]'), email);
   await digita(page.locator('input[type=password]').first(), SENHA);
   await toque(page.locator('input[type=checkbox]'));
   await toque(page.locator('button.g-btn.pri'));
@@ -68,7 +69,7 @@ async function percorrer(largura, { ateOHorario }) {
   T.ok(`${largura}: o link copiado é o link de agendamento da loja`, copiado.endsWith(`/gestao/agendar/${loja[2]}`) || (await copiar.textContent()).includes('Link copiado'), copiado);
   const linkEm = { toques, campos, s: (Date.now() - t0) / 1000 };
   console.log(`  ${largura}: link de agendamento copiado em ${linkEm.toques} toques e ${linkEm.campos} campos (${linkEm.s.toFixed(1)} s de máquina)`);
-  T.ok(`${largura}: link pronto em até 10 toques e 4 campos (antes: o guia inteiro e "Mandar link" na tela Hoje)`, linkEm.toques <= 10 && linkEm.campos <= 4, linkEm);
+  T.ok(`${largura}: link pronto em até 10 toques e 5 campos (o e-mail repetido no cadastro conta 1) (antes: o guia inteiro e "Mandar link" na tela Hoje)`, linkEm.toques <= 10 && linkEm.campos <= 5, linkEm);
   toques = antesDoLink.toques; campos = antesDoLink.campos; // o caminho do horário não conta o toque do link
 
   if (ateOHorario) {
@@ -102,7 +103,7 @@ async function percorrer(largura, { ateOHorario }) {
     T.ok(`${largura}: o primeiro horário ficou no banco, com o pet novo`, n === 1 && B.sql(`select count(*) from pets where petshop_id = '${L.P}' and nome = 'Thor'`) === '1', n);
     T.ok(`${largura}: o aviso do marcado diz "Pronto em X minutos"`, /O primeiro horário .* está marcado\. Pronto em \d+ minutos?\./.test((await aviso.textContent().catch(() => '')) || ''), await aviso.textContent().catch(() => ''));
     console.log(`  ${largura}: primeiro horário marcado em ${fim.toques} toques e ${fim.campos} campos (${fim.s.toFixed(1)} s de máquina)`);
-    T.ok(`${largura}: primeiro horário em até 13 toques e 7 campos (antes: 19 toques e 9 campos)`, fim.toques <= 13 && fim.campos <= 7, fim);
+    T.ok(`${largura}: primeiro horário em até 13 toques e 8 campos (com o e-mail repetido) (antes: 19 toques e 9 campos)`, fim.toques <= 13 && fim.campos <= 8, fim);
   }
   T.ok(`${largura}: nenhum erro de página`, erros.length === 0, erros);
   await ctx.close();
