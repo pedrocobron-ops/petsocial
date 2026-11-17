@@ -60,6 +60,19 @@ const T = require('../lib/teste')('link-ia');
   r = await pergunta(COD, 'Quanto custa o hotel?');
   T.ok('hotel com "Esconder o preço": sem valor', !/R\$/.test(r.j?.texto ?? 'R$') && /não informado/.test(r.j?.texto ?? ''), r.j);
   B.must(await a.rpc('petshop_salvar_opcoes', { p: P, p_mudancas: { 'hotel.link_sem_preco': false } }), 'mostra o preço');
+  // Bia, item 7: "Se eu levar dois cachorros juntos tem desconto?" com o desconto do segundo pet ligado. A resposta de teste lê o
+  // MESMO texto que iria ao modelo: o desconto tem de estar nos dados que o modelo recebe.
+  const DOIS = 'Se eu levar dois cachorros juntos tem desconto?';
+  r = await pergunta(COD, DOIS);
+  T.ok('sem desconto do segundo pet: não inventa ("Não sei")', r.j?.naoSei === true, r.j);
+  B.must(await a.rpc('petshop_salvar_opcoes', { p: P, p_mudancas: { 'hotel.desconto_segundo_pet': { ativo: true, pct: 20 } } }), 'liga o desconto do segundo pet');
+  T.ok('link_hotel_opcoes devolve segundo = 20', Number((await anon.rpc('link_hotel_opcoes', { p_codigo: COD })).data?.segundo) === 20);
+  r = await pergunta(COD, DOIS);
+  T.ok('com o desconto: os dados do modelo trazem "20% de desconto" para o pet a mais', r.status === 200 && !r.j?.naoSei && /20% de desconto na diária de cada pet a mais/.test(r.j?.texto ?? ''), r.j);
+  B.must(await a.rpc('petshop_salvar_opcoes', { p: P, p_mudancas: { 'hotel.link_sem_preco': true } }), 'esconde o preço de novo');
+  r = await pergunta(COD, DOIS);
+  T.ok('com "Esconder o preço": o desconto também some', !/20%/.test(r.j?.texto ?? '') && r.j?.naoSei === true, r.j);
+  B.must(await a.rpc('petshop_salvar_opcoes', { p: P, p_mudancas: { 'hotel.link_sem_preco': false, 'hotel.desconto_segundo_pet': { ativo: false, pct: 20 } } }), 'volta');
 
   T.secao('outro pet shop');
   B.sql(`update petshops set link_ativo = true where id='${Bl.P}'`);

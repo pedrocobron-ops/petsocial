@@ -51,6 +51,16 @@ t("hotel com Esconder o preço no link: sem diária, sem estimativa, sem ferrame
   assert.deepEqual(L.ferramentasDoLink(d).map((f) => f.name), ["horarios_livres"]);
   assert.equal(L.entradaHotel({ entrada: "2026-11-20", saida: "2026-11-22" }, d).ok, false);
 });
+t("desconto do segundo pet (Bia, item 7): entra no contexto e a resposta de teste o usa; sem desconto ou com preço escondido, não", () => {
+  const d = base(); d.hotel.segundo = 20;
+  const c = L.contextoDoLink(d);
+  assert.match(c, /- dois ou mais pets do mesmo tutor nas mesmas noites: 20% de desconto na diária de cada pet a mais/);
+  assert.match(L.respostaDeTeste("Se eu levar dois cachorros juntos tem desconto?", c, d), /20% de desconto/);
+  const sem = base();
+  assert.doesNotMatch(L.contextoDoLink(sem), /dois ou mais pets/);
+  const escondido = base(); escondido.hotel = { preco: { mostrar: false }, sinal: null, atraso: null, segundo: 20 };
+  assert.doesNotMatch(L.contextoDoLink(escondido), /20%/);
+});
 t("hotel sem resposta das opções (banco antigo): diária comum, como a página", () => {
   const d = base(); d.hotel = null;
   assert.match(L.contextoDoLink(d), /diária do hotel: R\$ 120/);

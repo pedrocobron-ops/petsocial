@@ -26,6 +26,7 @@ import { Tile } from "../painel";
 import { AvatarPet, Campo, Folha, mensagemDeErro, useAvisos, useDados } from "../ui";
 import { BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, LinhaDaConta, novaChave, produtosDaConta, useProdutosDaLoja, valorDaLinha, type ItemConta } from "../loja/conta";
 import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
+import { ehAdiantado } from "./sinal";
 import { horaCurta, nomeTipo, type EstadiaCompleta } from "./tipos";
 import "./hotel.css";
 
@@ -232,7 +233,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
     for (const e of conta.extras) linhas.push({ tipo: "extra", nome: e.nome, qtd: 1, valor: e.valor });
     for (const p of conta.produtos) linhas.push({ tipo: "produto", nome: p.nome, qtd: p.qtd, valor: p.valor, ...(p.produto_id ? { produto_id: p.produto_id } : {}) });
     if (conta.ajuste > 0) linhas.push({ tipo: "extra", nome: "Acréscimo", qtd: 1, valor: conta.ajuste });
-    if (conta.sinal > 0) linhas.push({ tipo: "extra", nome: conta.sinal_pago ? "Sinal já pago" : "Sinal (conta à parte)", qtd: 1, valor: -conta.sinal });
+    if (conta.sinal > 0) linhas.push({ tipo: "extra", nome: conta.sinal_pago ? (ehAdiantado(valores) ? "Pago adiantado" : "Sinal já pago") : "Sinal (conta à parte)", qtd: 1, valor: -conta.sinal });
     if (conta.credito_usado) linhas.push({ tipo: "extra", nome: "Crédito do tutor usado", qtd: 1, valor: -conta.credito_usado });
     return linhas;
   }
@@ -486,7 +487,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
                 <div className="l forte"><span>Total da estadia</span><span>{brl(soma)}</span></div>
                 {cortaSinal ? (
                   <div className="l"><span>{sinalRecebido > 0 ? `Sinal: ${brl(sinalRecebido)} já recebidos (a conta dos ${brl(centavos(sinal - sinalRecebido))} que faltavam sai de A receber)` : `Sinal de ${brl(sinal)} ainda a receber: a conta sai de A receber`}</span><span>- {brl(sinalRecebido)}</span></div>
-                ) : sinal > 0 && <div className="l"><span>{valores?.sinal_estado === "pago" ? `${sobraDoSinal > 0 ? "Pago antes" : "Sinal já pago"}${valores.sinal_pago_em ? ` em ${dataCurta(valores.sinal_pago_em)}` : ""}` : sinalRecebido > 0 ? `Sinal combinado (${brl(sinalRecebido)} já recebidos, ${brl(centavos(sinal - sinalRecebido))} ainda a receber)` : "Sinal combinado (ainda a receber)"}</span><span>- {brl(sinal)}</span></div>}
+                ) : sinal > 0 && <div className="l"><span>{valores?.sinal_estado === "pago" ? `${sobraDoSinal > 0 ? "Pago antes" : ehAdiantado(valores) ? "Pago adiantado" : "Sinal já pago"}${valores.sinal_pago_em ? ` em ${dataCurta(valores.sinal_pago_em)}` : ""}` : sinalRecebido > 0 ? `Sinal combinado (${brl(sinalRecebido)} já recebidos, ${brl(centavos(sinal - sinalRecebido))} ainda a receber)` : "Sinal combinado (ainda a receber)"}</span><span>- {brl(sinal)}</span></div>}
                 {sobraDoSinal > 0 && <div className="l forte"><span>Pago a mais</span><span>{brl(sobraDoSinal)}</span></div>}
                 {sinalNaConta > 0 && !sobraDoSinal && <div className="l forte"><span>Falta receber</span><span>{brl(Math.max(0, centavos(soma - sinalNaConta)))}</span></div>}
               </div>
