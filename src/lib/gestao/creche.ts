@@ -6,6 +6,7 @@ import { saudacaoZap } from "./agenda";
 import { calendarioGuardado, diaFechado, lerCalendarioUmaVez } from "./feriados";
 import { multaSugerida, opcoesDeCobranca } from "./dinheiro-opcoes";
 import { opcao } from "./opcoes";
+import { pixDe } from "./hotel-opcoes";
 import { brl, centavos, dataCompleta, dataCurta, deIsoDia, horarioDoDia, isoDia, nomeMes, somaDias } from "./util";
 
 /**
@@ -20,7 +21,19 @@ export type Falta = T["creche_faltas"]["Row"];
 export type Cobranca = T["creche_cobrancas"]["Row"];
 export type PetDoPlano = Pick<Pet, "id" | "nome" | "foto" | "especie" | "sexo" | "alertas" | "ativo"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
 /** Plano com o pet e, para quem vê o financeiro, os valores (senão ficam vazios). */
-export type PlanoCompleto = Plano & { pets: PetDoPlano | null; valor_mensal: number | null; valor_extra: number | null; temValor: boolean; modelo_id?: string | null };
+export type PlanoCompleto = Plano & {
+  pets: PetDoPlano | null; valor_mensal: number | null; valor_extra: number | null; temValor: boolean; modelo_id?: string | null;
+  /** preço do táxi do plano (só para quem vê o financeiro): por dia que veio, ou fixo por mês */
+  taxi_valor?: number | null; taxi_modo?: TaxiModo;
+};
+/** Táxi pet (leva e traz) do mensalista: só a ida, só a volta, ou ida e volta. */
+export type TaxiDoPlano = "ida" | "volta" | "ida_volta";
+export type TaxiModo = "dia" | "mes";
+export const TAXI_DO_PLANO: { id: TaxiDoPlano; rotulo: string }[] = [
+  { id: "ida", rotulo: "Só a ida (buscar em casa)" }, { id: "volta", rotulo: "Só a volta (levar para casa)" }, { id: "ida_volta", rotulo: "Ida e volta" },
+];
+export const textoDoTaxi = (t: string | null | undefined) => (t === "ida" ? "táxi só na ida" : t === "volta" ? "táxi só na volta" : t === "ida_volta" ? "táxi ida e volta" : "");
+export const taxiDe = (p: { taxi?: string | null }): TaxiDoPlano | null => (p.taxi === "ida" || p.taxi === "volta" || p.taxi === "ida_volta" ? p.taxi : null);
 export type Presenca = Pick<Estadia, "id" | "pet_id" | "tipo" | "status" | "entrada" | "saida" | "saida_prevista" | "plano_id" | "mensalista" | "dia" | "cobranca_id">;
 
 export const SELECT_PLANO = "*, pets(id, nome, foto, especie, sexo, alertas, ativo, clientes(id, nome, telefone))";
@@ -55,13 +68,18 @@ export async function lerPlanos(sb: Banco, petshopId: string, vejoFinanceiro: bo
     lerTudo<Plano & { pets: PetDoPlano | null }>((de, ate, contar) =>
       sb.from("creche_planos").select(SELECT_PLANO, contando(contar)).eq("petshop_id", petshopId).order("inicio").order("id").range(de, ate)),
     vejoFinanceiro
-      ? lerTudo<{ plano_id: string; valor_mensal: number; valor_extra: number | null; modelo_id: string | null }>((de, ate, contar) =>
-        sb.from("creche_planos_valores").select("plano_id, valor_mensal, valor_extra, modelo_id", contando(contar)).eq("petshop_id", petshopId).order("plano_id").range(de, ate)).catch(() => [])
+      ? lerTudo<{ plano_id: string; valor_mensal: number; valor_extra: number | null; modelo_id: string | null; taxi_valor?: number | null; taxi_modo?: string | null }>((de, ate, contar) =>
+        sb.from("creche_planos_valores").select("plano_id, valor_mensal, valor_extra, modelo_id, taxi_valor, taxi_modo", contando(contar)).eq("petshop_id", petshopId).order("plano_id").range(de, ate)).catch(() => [])
       : Promise.resolve([]),
   ]);
-  const valores = new Map<string, { valor_mensal: number; valor_extra: number | null; modelo_id: string | null }>();
-  for (const x of v) valores.set(x.plano_id, { valor_mensal: Number(x.valor_mensal), valor_extra: x.valor_extra == null ? null : Number(x.valor_extra), modelo_id: x.modelo_id });
-  return planos.map((p) => ({ ...p, valor_mensal: valores.get(p.id)?.valor_mensal ?? null, valor_extra: valores.get(p.id)?.valor_extra ?? null, temValor: valores.has(p.id), modelo_id: valores.get(p.id)?.modelo_id ?? null }));
+  type Valores = { valor_mensal: number; valor_extra: number | null; modelo_id: string | null; taxi_valor: number | null; taxi_modo: TaxiModo };
+  const valores = new Map<string, Valores>();
+  for (const x of v) valores.set(x.plano_id, { valor_mensal: Number(x.valor_mensal), valor_extra: x.valor_extra == null ? null : Number(x.valor_extra), modelo_id: x.modelo_id,
+    taxi_valor: x.taxi_valor == null ? null : Number(x.taxi_valor), taxi_modo: x.taxi_modo === "mes" ? "mes" : "dia" });
+  return planos.map((p) => {
+    const w = valores.get(p.id);
+    return { ...p, valor_mensal: w?.valor_mensal ?? null, valor_extra: w?.valor_extra ?? null, temValor: Boolean(w), modelo_id: w?.modelo_id ?? null, taxi_valor: w?.taxi_valor ?? null, taxi_modo: w?.taxi_modo ?? "dia" };
+  });
 }
 
 /** Presenças de creche (mensalistas e avulsas) e faltas entre dois dias, inclusive. */
@@ -260,21 +278,44 @@ export function extrasDaCobranca(c: Pick<Cobranca, "extras">): ExtraCobrado[] {
   });
 }
 
-/** As taxas de busca fora do horário que entraram na cobrança (quem recebe mandou para a mensalidade). */
-export function taxasDaCobranca(c: Pick<Cobranca, "taxas">): ExtraCobrado[] {
+type LinhaDeTaxa = { dia?: unknown; valor?: unknown; tipo?: unknown };
+function linhasDeTaxas(c: Pick<Cobranca, "taxas">): (ExtraCobrado & { tipo: string | null })[] {
   if (!Array.isArray(c.taxas)) return [];
   return (c.taxas as unknown[]).flatMap((x) => {
-    const e = x as { dia?: unknown; valor?: unknown };
-    return typeof e?.dia === "string" ? [{ dia: e.dia, valor: Number(e.valor ?? 0) || 0 }] : [];
+    const e = x as LinhaDeTaxa;
+    return typeof e?.dia === "string" ? [{ dia: e.dia, valor: Number(e.valor ?? 0) || 0, tipo: typeof e.tipo === "string" ? e.tipo : null }] : [];
   });
 }
-/** `valor_extras` soma os dias extras e as taxas de busca fora do horário: aqui, cada parte. */
+/** As taxas de busca fora do horário que entraram na cobrança (quem recebe mandou para a mensalidade). O táxi fica de fora. */
+export function taxasDaCobranca(c: Pick<Cobranca, "taxas">): ExtraCobrado[] {
+  return linhasDeTaxas(c).filter((x) => !x.tipo).map(({ dia, valor }) => ({ dia, valor }));
+}
+/**
+ * O táxi pet (leva e traz) que entrou na cobrança: os dias de táxi de meses anteriores ("taxi") e o valor fixo do mês ("taxi_mes").
+ * No banco, as linhas ficam em `taxas` com "tipo" (migração 20261218).
+ */
+export function taxiDaCobranca(c: Pick<Cobranca, "taxas">): { dias: ExtraCobrado[]; mes: number } {
+  const l = linhasDeTaxas(c);
+  return { dias: l.filter((x) => x.tipo === "taxi").map(({ dia, valor }) => ({ dia, valor })), mes: centavos(l.filter((x) => x.tipo === "taxi_mes").reduce((s, x) => s + x.valor, 0)) };
+}
+/** `valor_extras` soma os dias extras, as taxas de busca fora do horário e o táxi: aqui, cada parte. */
 export function partesDosExtras(c: Pick<Cobranca, "taxas" | "valor_extras">) {
-  const taxas = centavos(taxasDaCobranca(c).reduce((s, x) => s + x.valor, 0));
-  return { dias: centavos(Math.max(0, Number(c.valor_extras) - taxas)), taxas };
+  const todas = linhasDeTaxas(c);
+  const taxas = centavos(todas.filter((x) => !x.tipo).reduce((s, x) => s + x.valor, 0));
+  const taxi = centavos(todas.filter((x) => x.tipo === "taxi" || x.tipo === "taxi_mes").reduce((s, x) => s + x.valor, 0));
+  return { dias: centavos(Math.max(0, Number(c.valor_extras) - taxas - taxi)), taxas, taxi };
 }
 /** "1 taxa de busca fora do horário" */
 export const textoDasTaxas = (n: number) => (n === 1 ? "1 taxa de busca fora do horário" : `${n} taxas de busca fora do horário`);
+/** "táxi pet: 3 dias (03/11, 05/11 e 07/11)" / "táxi pet do mês" / os dois juntos. */
+export function textoDoTaxiDaCobranca(c: Pick<Cobranca, "taxas">): string {
+  const t = taxiDaCobranca(c);
+  const partes = [
+    t.dias.length ? `${t.dias.length === 1 ? "1 dia" : `${t.dias.length} dias`} (${textoDasDatas(t.dias.map((x) => x.dia))})` : "",
+    t.mes > 0 ? "do mês" : "",
+  ].filter(Boolean);
+  return partes.length ? `táxi pet ${partes.join(" e ")}` : "";
+}
 
 export type CobrancaCompleta = Cobranca & {
   pets: (Pick<Pet, "id" | "nome" | "foto" | "especie"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null }) | null;
@@ -310,6 +351,7 @@ function linhaDaMensagem(c: CobrancaCompleta, comMes = false) {
   const partes = c.acerto_saida ? [] : [`mensalidade ${brl(c.valor_mensal)}${proporcional}`];
   if (extras.length) partes.push(`${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((e) => e.dia))})${valores.dias > 0 ? ` ${brl(valores.dias)}` : ""}`);
   if (taxas.length) partes.push(`${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((e) => e.dia))}) ${brl(valores.taxas)}`);
+  if (valores.taxi > 0) partes.push(`${textoDoTaxiDaCobranca(c)} ${brl(valores.taxi)}`);
   let texto = partes.join(" + ");
   // desconto para irmãos (opção da creche) numa linha própria; o resto do desconto, como sempre
   const d = partesDoDesconto(c);
@@ -355,7 +397,9 @@ export function mensagemDeCobranca(p: { tutor: string | null | undefined; petsho
     return `${linhaDaMensagem(c, comMes)}${m ? ` + multa e juros por atraso ${brl(m.total)}` : ""}`;
   });
   const linhaTotal = multas > 0 ? [`Total: ${brl(total)} + multa e juros ${brl(multas)} = ${brl(centavos(total + multas))}`] : cs.length > 1 ? [`Total: ${brl(total)}`] : [];
-  return [abre, "", ...linhas, "", ...linhaTotal, vence, ...(o?.pix ? [`Chave Pix: ${o.pix}`] : []), "", "Qualquer dúvida, é só chamar. Obrigado!"].join("\n");
+  // a chave Pix das Opções de cobrança; sem ela, a do hotel e da creche (Meu pet shop, Opções da creche)
+  const pix = o?.pix || (p.opcoes ? pixDe(p.opcoes) : "");
+  return [abre, "", ...linhas, "", ...linhaTotal, vence, ...(pix ? [`Chave Pix: ${pix}`] : []), "", "Qualquer dúvida, é só chamar. Obrigado!"].join("\n");
 }
 
 /** Erros que as funções da chamada devolvem com um código na frente. */
@@ -612,6 +656,9 @@ export function mensagemDaExperiencia(p: { tutor: string | null | undefined; pet
 
 /** Extrato do mês de um cão (presenças, faltas, reposições, extras, taxas e, para quem vê o financeiro, a cobrança). */
 export const OPCAO_EXTRATO_PET = "creche.extrato_pet";
+/** Mostrar os planos mensais (Modelos de plano) no link do cliente, com o preço e a chave Pix. Começa desligado. */
+export const OPCAO_PLANOS_NO_LINK = "creche.planos_no_link";
+export const planosNoLink = (petshop: { opcoes?: unknown }) => opcao<boolean>(petshop, OPCAO_PLANOS_NO_LINK, false) === true;
 export const extratoDoPetLigado = (p: { opcoes?: unknown }) => opcao<boolean>(p, OPCAO_EXTRATO_PET, false) === true;
 /** Com o plano (`plano=`), a folha lê o saldo de reposição junto com o resto, numa leva só. */
 export const linkDoExtratoDoPet = (petId: string, mes?: Date, planoId?: string) =>
@@ -640,6 +687,7 @@ export function linhasDaCobrancaDoPet(c: CobrancaCompleta) {
     ...(c.acerto_saida ? [] : [{ nome: `Mensalidade de ${nomeMes(deIsoDia(c.mes))}${Number(c.valor_mensal) < Number(c.valor_cheio) ? " (proporcional)" : ""}`, valor: Number(c.valor_mensal) }]),
     ...(extras.length ? [{ nome: `${extras.length === 1 ? "Dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})`, valor: partes.dias }] : []),
     ...(taxas.length ? [{ nome: `${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((x) => x.dia))})`, valor: partes.taxas }] : []),
+    ...(partes.taxi > 0 ? [{ nome: textoDoTaxiDaCobranca(c).replace(/^t/, "T"), valor: partes.taxi }] : []),
     ...(d.irmao > 0 ? [{ nome: "Desconto irmão", valor: -d.irmao }] : []),
     ...(d.outro > 0 ? [{ nome: "Desconto", valor: -d.outro }] : []),
   ];

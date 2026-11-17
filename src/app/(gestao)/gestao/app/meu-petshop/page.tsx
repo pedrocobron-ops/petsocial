@@ -103,7 +103,7 @@ export default function MeuPetshop() {
         <Grupo id="servicos" titulo="Serviços e horário" icone={Scissors} tom="pessego" abertoDeInicio
           cartoes={[["Serviços e preços", <Servicos key="s" />], ["Horário de funcionamento", <HorarioDaLoja key="h" />], ["Feriados e dias fechados", <Feriados key="f" />]]} />
         <Grupo id="agenda" titulo="Agenda e link do cliente" icone={Link2} tom="ceu"
-          cartoes={[usaModulo(petshop, "banho_tosa") && ["Banho e tosa: pets ao mesmo tempo", <VagasBanho key="v" />], ["Link de agendamento", <LinkAgendamento key="l" />], ["Regras, cancelamento e dúvidas pelo link", <OpcoesDoLink key="o" />], usaModulo(petshop, "banho_tosa") && ["Taxa de leva e traz", <OpcoesDoLevaTraz key="t" />], usaModulo(petshop, "banho_tosa") && ["Promoções em dias fracos", <Promocoes key="p" />]]} />
+          cartoes={[usaModulo(petshop, "banho_tosa") && ["Banho e tosa: pets ao mesmo tempo", <VagasBanho key="v" />], ["Link de agendamento", <LinkAgendamento key="l" />], ["Regras, cancelamento e dúvidas pelo link", <OpcoesDoLink key="o" />], (usaModulo(petshop, "banho_tosa") || usaCasa(petshop)) && ["Taxa de leva e traz", <OpcoesDoLevaTraz key="t" />], usaModulo(petshop, "banho_tosa") && ["Promoções em dias fracos", <Promocoes key="p" />]]} />
         {usaCasa(petshop) && (
           <Grupo id="casa" titulo={nomeDaCasa(petshop)} icone={BedDouble} tom="lilas" salvarJunto
             cartoes={[[nomeDaCasa(petshop), <AjustesCrecheHotel key="a" />], [!usaModulo(petshop, "creche") ? "Opções do hotel" : !usaModulo(petshop, "hotel") ? "Opções da creche" : "Opções do hotel e da creche", <OpcoesHotel key="h" />], ["Cuidado com o tutor", <OpcoesCasa key="c" />], usaModulo(petshop, "creche") && ["Mais opções da creche", <OpcoesCreche key="cr" />]]} />
@@ -433,7 +433,7 @@ function Servicos() {
       {!ativos.length ? (
         <Vazio titulo="Nenhum serviço na lista" texto={!usaModulo(petshop, "banho_tosa") && usaCasa(petshop)
           // só creche e/ou hotel: a diária fica no cartão da casa e os planos em Mensalistas; aqui é só o que é cobrado à parte
-          ? `Não precisa colocar nada aqui para a ${nomeDaCasa(petshop).toLowerCase()} funcionar: a diária e as vagas ficam no cartão ${nomeDaCasa(petshop)} desta tela${usaModulo(petshop, "creche") ? " e os planos, em Mensalistas" : ""}. Use esta lista só para o que vocês cobram à parte (ex.: banho, transporte).`
+          ? `Não precisa colocar nada aqui para ${nomeDaCasa(petshop) === "Hotel" ? "o hotel" : nomeDaCasa(petshop) === "Creche" ? "a creche" : "a creche e o hotel funcionarem"}${nomeDaCasa(petshop) === "Creche e hotel" ? "" : " funcionar"}: a diária e as vagas ficam no cartão ${nomeDaCasa(petshop)} desta tela${usaModulo(petshop, "creche") ? " e os planos, em Mensalistas" : ""}. Use esta lista só para o que vocês cobram à parte (ex.: banho, transporte).`
           : `Coloque o primeiro: ${exemplos ? `${exemplos}, ` : ""}o que vocês fazem.`} />
       ) : (
         <div className="g-mp-servicos">

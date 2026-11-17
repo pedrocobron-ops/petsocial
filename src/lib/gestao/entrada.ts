@@ -48,11 +48,16 @@ export const IDADE_IDOSO = 8;
 export const TERMO_PADRAO = `Conferi com a equipe como {pet} chegou hoje: o temperamento, as alergias e os cuidados, as feridas, pulgas, carrapatos ou nós que já existiam antes do atendimento e os pertences que deixei.
 Contei tudo o que sei sobre a saúde de {pet}. Entendo que pets idosos, doentes, agitados ou com medo podem se cansar ou se estressar com o banho, a secagem, a tosa ou a estadia, mesmo com todo o cuidado. Se a equipe perceber que {pet} não está bem, ela pode parar o que estiver fazendo e vai me avisar.`;
 
+/** O texto padrão com as palavras do negócio: quem não tem banho e tosa não lê "banho, secagem e tosa" (só a estadia). */
+export function termoPadraoPara(petshop: { modulos?: string[] | null }): string {
+  const semBanho = Array.isArray(petshop.modulos) && petshop.modulos.length > 0 && !petshop.modulos.includes("banho_tosa");
+  return semBanho ? TERMO_PADRAO.replace("com o banho, a secagem, a tosa ou a estadia", "com a estadia").replace("parar o que estiver fazendo", "parar a atividade") : TERMO_PADRAO;
+}
 export function exigirDo(petshop: { opcoes?: unknown }): Exigir {
   const v = opcao<string>(petshop, CHAVE_EXIGIR, "idosos");
   return v === "todos" || v === "opcional" ? v : "idosos";
 }
-export const termoDoPetshop = (petshop: { opcoes?: unknown }) => opcao<string>(petshop, CHAVE_TERMO, "").trim() || TERMO_PADRAO;
+export const termoDoPetshop = (petshop: { opcoes?: unknown; modulos?: string[] | null }) => opcao<string>(petshop, CHAVE_TERMO, "").trim() || termoPadraoPara(petshop);
 /** O texto que o tutor lê, com o nome do pet. */
 export const termoComPet = (modelo: string, pet: string) => modelo.replace(/\{pet\}/g, pet.trim() || "o pet").trim();
 
@@ -86,12 +91,17 @@ export const COLS_ENTRADA = "id, petshop_id, pet_id, agendamento_id, estadia_id,
 
 /** Os pertences para devolver, por extenso: ["Coleira", "Caminha", "Casinha azul"]. */
 export function pertencesDe(e: Pick<Entrada, "pertences" | "pertences_outros">): string[] {
-  return [...rotulos(PERTENCES, e.pertences), ...(e.pertences_outros?.trim() ? [e.pertences_outros.trim()] : [])];
+  const outros = e.pertences_outros?.trim() ?? "";
+  const minus = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  // "Remédio" marcado e "remédio da artrose" escrito: fica só "remédio da artrose" (não "remédio e remédio da artrose")
+  const marcados = rotulos(PERTENCES, e.pertences).filter((r) => !outros || !minus(outros).includes(minus(r)));
+  return [...marcados, ...(outros ? [outros] : [])];
 }
 /** "Devolver: coleira, caminha e casinha azul" (vazio: nada a devolver). */
 export function textoDevolver(e: Pick<Entrada, "pertences" | "pertences_outros">): string {
   const l = pertencesDe(e);
-  return l.length ? `Devolver: ${emLista(l.map((x, i) => (i < e.pertences.length ? x.toLowerCase() : x)))}` : "";
+  const marcados = l.length - (e.pertences_outros?.trim() ? 1 : 0);
+  return l.length ? `Devolver: ${emLista(l.map((x, i) => (i < marcados ? x.toLowerCase() : x)))}` : "";
 }
 /** O link de aceite ainda vale? */
 export const linkValendo = (e: Pick<Entrada, "token" | "token_expira">, agora = new Date()) => Boolean(e.token && e.token_expira && new Date(e.token_expira) > agora);

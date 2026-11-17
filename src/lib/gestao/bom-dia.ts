@@ -85,7 +85,9 @@ export function linhasDoBomDia(d: DadosDoBomDia, o: { horario: unknown; agora?: 
   if (devem.length === 1) {
     const x = devem[0];
     const pets = x.pets?.length ? ` com ${juntar(x.pets)}` : "";
-    linhas.push({ id: "devem", texto: `${x.tutor} deve ${brl(Number(x.valor))} e vem hoje${pets}${x.quando ? ` às ${hhmm(x.quando)}` : ""}. Bom momento para acertar.` });
+    // a hora já passou (o pet já chegou, ou está na casa): "veio hoje", não "vem hoje"
+    const passou = Boolean(x.quando && new Date(x.quando).getTime() < agora.getTime());
+    linhas.push({ id: "devem", texto: `${x.tutor} deve ${brl(Number(x.valor))} e ${passou ? "veio" : "vem"} hoje${pets}${x.quando ? ` às ${hhmm(x.quando)}` : ""}. Bom momento para acertar.` });
   } else if (devem.length > 1) {
     linhas.push({ id: "devem", texto: `Vêm hoje e devem: ${ate3(devem.map((x) => `${primeiroNome(x.tutor)} (${brl(Number(x.valor))})`))}.` });
   }

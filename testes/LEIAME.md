@@ -58,6 +58,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 ## O que cada suíte confere
 
 **unidade/**
+- `creche-hotel-final.js`: rodada final (Rafael e Bia): regra de cancelamento do sinal (`destinoPelaRegra`: menos de 7 dias vira crédito, 7 ou mais devolve; sem regra, nada marcado), hora do hotel (`horasDoHotel`), táxi pet na cobrança (`taxiDaCobranca`, `partesDosExtras` com `taxi`, mensagem de cobrança com "táxi pet 2 dias" e a chave Pix do hotel), "Devolver: coleira, guia e remédio da artrose" sem repetir "remédio", texto do aceite sem banho num hotel só, "Saiu uma foto", exemplo das regras do link num hotel só, "veio hoje" no Bom dia, valor médio pelas contas contadas (895 ÷ 2 = 447,50) e cancelamentos com as reservas.
 - `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, desconto do segundo pet, regras), a leitura da resposta
   (não sei, sugestão de pedido só com serviço e dia válidos, sem links), limites de conversa. Sem banco.
 - `boletim.js`: textos do boletim do pet (`src/lib/gestao/boletim.ts`): "Oi, Ana! O boletim do Thor de hoje: <link>" (primeiro nome
@@ -138,6 +139,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   o que está só na tela comparado com o saldo de agora, e a planilha sem colunas de R$ para quem não vê o financeiro.
 
 **banco/** (API do Supabase com o login de cada papel, como o navegador faz; SQL só para preparar e conferir)
+- `creche-hotel-final.js`: migração 20261218. Táxi pet do mensalista: o Chegou da chamada anota o dia de táxi (só com táxi por dia e preço), Desfazer tira, a cobrança do mês seguinte leva os dias (`taxas` com "tipo": "taxi", somado em valor_extras e na conta a receber), cancelar a cobrança solta os dias, táxi fixo por mês entra no próprio mês ("taxi_mes"); o monitor lê ida/volta mas não o preço; viagens do Leva e traz (`creche_taxi_viagem_marcar`: levar só depois do Chegou, plano sem táxi recusado). Indicadores: 2 reservas canceladas de 3, o sinal não conta como conta (1 conta de R$ 300 = 222 + sinal de 78). Link: `link_hotel_opcoes.horas` e `.pix` (só com sinal), `link_creche_planos` (só com a opção; sem preço quando o link esconde preços), `link_fechados_nomes`.
 - `seguranca.js`: isolamento entre pet shops e anônimo; dono não mexe na própria assinatura nem vira admin; o que cada papel grava
   (recepção, monitora, tosador, estoque); caixa fechado travado; **matriz de leitura das colunas com dinheiro** por papel
   (dono, recepção, monitora, tosador, estoque, anônimo) e das funções de preço.
@@ -491,6 +493,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   `MIGRACOES=/outra/pasta` testa outra pasta.
 
 **telas/** (Playwright, Chromium)
+- `creche-hotel-final.js`: rodada final pela tela. Chegou da Chamada abre a folha Entrada (Todos os pets) e o cartão do mensalista tem Conferir a entrada; plano com táxi na Chamada e no Leva e traz (Buscado anotado); primeira foto de Fotos de hoje sobe e aparece (tempo medido); cancelar reserva com sinal pago traz Virar crédito do tutor já marcado pela regra e o cartão sai na hora (crédito de R$ 78 gravado); Aceitar todos tira o cartão do pedido na hora; link do hotel com 14:00/12:00 sem taxa e com a taxa às 18h sem "até as 15h"; Indicadores num hotel só sem mapa de horários, com ocupação e reservas canceladas.
 - `passeio.js`: todas as telas principais (Hoje, Agenda, Clientes, Creche e hotel, Pacotes, Caixa, Financeiro, Relatórios, Estoque,
   Equipe, Meu pet shop, Assinatura, Manual, Escola) em **390 e 1366**, com o dono e com cada papel da equipe (só as áreas dele, e
   algumas fora da área), as telas de impressão, `/gestao/admin` com dono comum e as páginas públicas (produto, entrar, link do

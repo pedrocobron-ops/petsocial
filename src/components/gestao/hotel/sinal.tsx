@@ -5,7 +5,7 @@ import { conferirCaixa, conferirValorAlto, parteDaChave, quitarConta, receberCon
 import { casoDoErro, fazerTudoOuNada, partesOuNada, ref, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { ValoresDaEstadia } from "@/lib/gestao/hotel";
-import { sinalDe } from "@/lib/gestao/hotel-opcoes";
+import { destinoPelaRegra, sinalDe, textoDaRegra } from "@/lib/gestao/hotel-opcoes";
 import type { Banco } from "@/lib/gestao/supabase";
 import { brl, dataCompleta, dataCurta, isoDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -283,6 +283,7 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
  * O sinal pode estar pago, a receber, ou a receber com uma parte já paga (recebida pelo Financeiro ou pelo Caixa):
  * nesse caso a decisão é sobre o que já entrou, e a conta do que falta sai de A receber (ou continua, se a pessoa quiser cobrar).
  */
+type Escolha = "ficar" | "devolver" | "cobrar" | "credito";
 export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { estadia: EstadiaCompleta; valores: ValoresDaEstadia; aoFechar: () => void; aoGravar: () => void }) {
   const { sb, petshop } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
@@ -290,7 +291,14 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
   const recebido = sinalRecebidoDe(valores), falta = faltaDoSinal(valores);
   const parcial = !pago && recebido > 0;
   const entrou = pago || parcial;
-  const [escolha, setEscolha] = useState<"ficar" | "devolver" | "cobrar" | null>(null);
+  const nomeTutor = e.pets?.clientes?.nome?.split(/\s+/)[0] ?? null;
+  const clienteId = e.pets?.clientes?.id ?? null;
+  // a regra de cancelamento de Meu pet shop (em campos): pelo tempo até a entrada, a escolha já vem marcada. Sem regra, nada vem marcado.
+  const regraCampos = sinalDe(petshop).cancela;
+  const faltam = Math.round((new Date(isoDia(new Date(e.entrada)) + "T12:00:00").getTime() - new Date(isoDia(new Date()) + "T12:00:00").getTime()) / 864e5);
+  const pelaRegra = entrou ? destinoPelaRegra(regraCampos, faltam) : null;
+  const sugerida: Escolha | null = pelaRegra === "credito" ? (clienteId ? "credito" : null) : pelaRegra;
+  const [escolha, setEscolha] = useState<Escolha | null>(sugerida);
   const [valor, setValor] = useState<number | null>(recebido > 0 ? recebido : Number(valores.sinal));
   const [forma, setForma] = useState<Forma | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -307,6 +315,8 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
     setErro(null);
     try {
       const devolve = entrou && escolha === "devolver";
+      const credito = entrou && escolha === "credito";
+      if (credito && !clienteId) return setErro("Este pet não tem tutor na ficha: não dá para deixar crédito.");
       if (devolve) {
         if (!valor || valor <= 0 || valor > recebido) return setErro(`O valor devolvido vai até ${brl(recebido)}.`);
         if (!forma) return setErro("Escolha como o sinal foi devolvido.");
@@ -322,6 +332,10 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
         // a devolução é uma saída de hoje; o recebimento do sinal fica como está, no dia em que entrou
         passos.push({ t: "lancamento", nome: "devolucao", chave: parteDaChave(chave, "devolucao"), linha: { tipo: "saida", valor: valor!, forma: forma!, categoria: CATEGORIA_DEVOLUCAO, descricao: `Devolução do sinal: ${nomeTipo(e.tipo).toLowerCase()} de ${nome}, ${dataCurta(e.entrada)}`, cliente_id: e.pets?.clientes?.id ?? null, pago: true, data: isoDia(new Date()) } });
         passos.push({ t: "estadia_valores", estadia: e.id, modo: "update", campos: { sinal_estado: "devolvido", sinal_devolucao_id: ref("devolucao"), sinal_devolvido_em: isoDia(new Date()) } });
+      } else if (credito) {
+        // o que entrou fica recebido e vira crédito do tutor (para a próxima conta); nada sai do caixa
+        passos.push({ t: "credito", cliente: clienteId!, valor: recebido, estadia: e.id, motivo: `Sinal da reserva cancelada: ${nomeTipo(e.tipo).toLowerCase()} de ${nome}, ${dataCurta(e.entrada)}`, chave: parteDaChave(chave, "credito") });
+        passos.push({ t: "estadia_valores", estadia: e.id, modo: "update", campos: { sinal_estado: "mantido" } });
       } else if (entrou || escolha === "ficar") {
         passos.push({ t: "estadia_valores", estadia: e.id, modo: "update", campos: { sinal_estado: "mantido" } });
       }
@@ -334,7 +348,8 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
         if (casoDoErro(x) === "maestro:apagar") { setErro(`Não consegui tirar essa conta: ela pode já ter sido paga, ou foi anotada por outra pessoa. Escolha ${parcial ? "continuar cobrando o que falta" : "deixar em A receber"}, ou peça para quem cuida do financeiro. Nada foi lançado.`); return false; }
         throw x;
       }
-      avisar(devolve ? `Reserva cancelada. ${brl(valor)} devolvidos, lançados como saída de hoje.${parcial ? " A conta do que faltava saiu de A receber." : ""}`
+      avisar(credito ? `Reserva cancelada. ${brl(recebido)} ficaram de crédito para ${nomeTutor ?? "o tutor"}: o próximo check-out oferece descontar.${parcial ? " A conta do que faltava saiu de A receber." : ""}`
+        : devolve ? `Reserva cancelada. ${brl(valor)} devolvidos, lançados como saída de hoje.${parcial ? " A conta do que faltava saiu de A receber." : ""}`
         : pago ? `Reserva cancelada. O sinal de ${brl(valores.sinal)} continua como recebido.`
         : parcial && escolha === "cobrar" ? `Reserva cancelada. Os ${brl(recebido)} recebidos ficam, e os ${brl(falta)} que faltam continuam em A receber.`
         : parcial ? `Reserva cancelada. Os ${brl(recebido)} recebidos ficam, e a conta do que faltava saiu de A receber.`
@@ -346,7 +361,7 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
     }
   }
 
-  const opcao = (id: "ficar" | "devolver" | "cobrar", titulo: string, apoio: string) => (
+  const opcao = (id: Escolha, titulo: string, apoio: string) => (
     <label className={escolha === id ? "on" : ""}>
       <input type="radio" name="sinal" checked={escolha === id} onChange={() => { setEscolha(id); setErro(null); }} />
       <span className="t"><b>{titulo}</b><small>{apoio}</small></span>
@@ -363,6 +378,7 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
         <div className="g-card areia">
           <b className="g-tab">{pago ? `Esta reserva tem sinal pago: ${brl(valores.sinal)}` : parcial ? `Esta reserva tem sinal de ${brl(valores.sinal)}: ${brl(recebido)} já recebidos, ${brl(falta)} a receber` : `Esta reserva tem sinal a receber: ${brl(valores.sinal)}`}</b>
           <p className="g-muted g-p">{nomeTipo(e.tipo)}, {dataCompleta(e.entrada)}{valores.sinal_pago_em ? ` · sinal recebido em ${dataCompleta(valores.sinal_pago_em)}` : ""}.{regra ? ` O que você combinou: ${regra}` : ""}</p>
+          {sugerida && <p className="g-p" role="status"><b>Pela sua regra</b> ({textoDaRegra(regraCampos)}), {faltam > 0 ? `faltam ${faltam === 1 ? "1 dia" : `${faltam} dias`} para a entrada` : faltam === 0 ? "a entrada é hoje" : "a entrada já passou"}: a escolha já vem marcada. Dá para mudar.</p>}
         </div>
         <div className="g-campo">
           <span>{entrou ? "O que fazer com o sinal?" : "O que fazer com a conta do sinal?"}</span>
@@ -370,9 +386,11 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
             {pago ? (<>
               {opcao("ficar", "Ficar com o sinal", "O valor continua como recebido. Nada muda no financeiro.")}
               {opcao("devolver", "Devolver o sinal", "Lança uma saída de hoje com o valor devolvido. O recebimento do sinal não é apagado.")}
+              {clienteId && opcao("credito", "Virar crédito do tutor", `${brl(recebido)} ficam de crédito para ${nomeTutor ?? "o tutor"} usar numa próxima reserva: o check-out oferece descontar. Nada sai do caixa.`)}
             </>) : parcial ? (<>
               {opcao("ficar", `Ficar com os ${brl(recebido)} recebidos`, `O que entrou continua como recebido. A conta dos ${brl(falta)} que faltavam sai de A receber.`)}
               {opcao("devolver", "Devolver o que foi recebido", `Lança uma saída de hoje com o valor devolvido. A conta dos ${brl(falta)} que faltavam sai de A receber.`)}
+              {clienteId && opcao("credito", `Os ${brl(recebido)} recebidos viram crédito do tutor`, `Ficam de crédito para ${nomeTutor ?? "o tutor"} usar numa próxima reserva. A conta dos ${brl(falta)} que faltavam sai de A receber.`)}
               {opcao("cobrar", "Continuar cobrando o que falta", `O que entrou continua como recebido e o tutor segue devendo ${brl(falta)}, em Financeiro, A receber.`)}
             </>) : (<>
               {opcao("ficar", "Deixar em A receber", "O tutor continua devendo o sinal. A conta segue em Financeiro, A receber.")}

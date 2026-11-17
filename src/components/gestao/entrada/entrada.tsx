@@ -348,7 +348,7 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
               {guardada.aceito_em && assinatura && /* eslint-disable-next-line @next/next/no-img-element */ <img className="g-ent-assinatura-mini" src={assinatura} alt={`Assinatura de ${guardada.aceite_nome ?? "tutor"}`} />}
             </div>
           )}
-          {automatica && !guardada && <p className="g-muted g-pp">Leva um minuto e protege a loja e o tutor. Se não der agora, toque em Pular agora: dá para fazer depois pelo horário.</p>}
+          {automatica && !guardada && <p className="g-muted g-pp">Leva um minuto e protege a loja e o tutor. Se não der agora, toque em Pular agora: dá para fazer depois {v.tipo === "banho" ? "pelo horário" : "pelo cartão do pet, em Conferir a entrada"}.</p>}
 
           <section className="g-bol-parte" aria-label="Temperamento">
             <div className="g-bol-t"><b>Temperamento</b><small>como chegou hoje</small></div>
@@ -391,7 +391,9 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
 
           <section className="g-bol-parte" aria-label="Idoso ou doente">
             <div className="g-chips"><button type="button" className="g-chip" aria-pressed={idoso} onClick={() => mexer(setIdoso)(!idoso)}>Pet idoso ou doente</button></div>
-            {idoso && <p className="g-ent-nota" role="note">Manuseio com mais calma: pausas, menos tempo de secador e atenção à respiração. Se ele não estiver bem, pare e avise o tutor.</p>}
+            {idoso && <p className="g-ent-nota" role="note">{v.tipo === "banho"
+              ? "Manuseio com mais calma: pausas, menos tempo de secador e atenção à respiração. Se ele não estiver bem, pare e avise o tutor."
+              : "Mais calma com ele: descanso, água por perto, menos correria com os outros cães e atenção à respiração. Se ele não estiver bem, avise o tutor."}</p>}
           </section>
 
           <section className="g-bol-parte" aria-label="Pertences deixados">

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Ban, CalendarClock, Check, ChevronLeft, ChevronRight, CircleCheck, HandCoins, MessageCircle, Pencil, Printer, RotateCcw, TriangleAlert, Undo2 } from "lucide-react";
 import {
-  regraIrmaoDe, cobraNoMes, descontoIrmao, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, textoComprovanteMensalidades, partesDoDesconto, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, vencimentoDoMes,
+  regraIrmaoDe, cobraNoMes, descontoIrmao, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, textoComprovanteMensalidades, partesDoDesconto, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, textoDoTaxiDaCobranca, vencimentoDoMes,
   type CobrancaCompleta, type EstadoCobranca, type PlanoCompleto, type PrimeiraCobranca,
 } from "@/lib/gestao/creche";
 import { conferirCaixa, parteDaChave, receberComCredito, receberConta, textoDoPagamento, type FormaPagamento } from "@/lib/gestao/dinheiro";
@@ -81,12 +81,13 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     // quem vê o financeiro abriu o mês corrente: as cobranças de mensalidade cheia que faltam são criadas (nunca duplica)
     // (junto: dia fechado não é dia do plano, e a conta do acerto da saída precisa do calendário)
-    await Promise.all([
+    // tudo ao mesmo tempo: gerar as que faltam, o calendário e as leituras (no celular, cada espera em fila soma uma ida e volta).
+    // Quase sempre não há nada para gerar; quando o banco cria alguma, só a lista do mês é lida de novo.
+    const doMesQ = () => sb.from("creche_cobrancas").select(SELECT_COBRANCA).eq("petshop_id", petshop.id).eq("mes", mesIso).order("vencimento").order("id").limit(1000);
+    const [gerou, , doMesAntes, antigas, todasAsCobrancas, acertos] = await Promise.all([
       mesIso === isoMes(new Date()) && liberado ? sb.rpc("creche_gerar_cobrancas", { p_petshop: petshop.id }) : null,
       calendarioGuardado(petshop.id, false) ? null : lerCalendario(sb, petshop.id, false).catch(() => null),
-    ]);
-    const [doMes, antigas, todasAsCobrancas, acertos] = await Promise.all([
-      sb.from("creche_cobrancas").select(SELECT_COBRANCA).eq("petshop_id", petshop.id).eq("mes", mesIso).order("vencimento").order("id").limit(1000),
+      doMesQ(),
       // o que ficou sem pagar de outros meses continua aparecendo em Atrasadas
       sb.from("creche_cobrancas").select(SELECT_COBRANCA.replace("lancamentos(", "lancamentos!inner(")).eq("petshop_id", petshop.id).eq("status", "aberta")
         .lt("mes", mesIso).eq("lancamentos.pago", false).order("vencimento").order("id").limit(1000),
@@ -97,7 +98,10 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
       sb.from("creche_cobrancas").select(SELECT_COBRANCA.replace("lancamentos(", "lancamentos!inner(")).eq("petshop_id", petshop.id).eq("status", "aberta")
         .eq("acerto_saida", true).gt("mes", mesIso).eq("lancamentos.pago", false).order("vencimento").order("id").limit(1000),
     ]);
-    const meses = (todasAsCobrancas.data ?? []) as { plano_id: string; mes: string }[];
+    const criadas = Number((gerou as { data?: unknown } | null)?.data ?? 0);
+    const doMes = criadas > 0 ? await doMesQ() : doMesAntes;
+    // as que acabaram de nascer também entram em "que planos já tiveram cobrança"
+    const meses = [...((todasAsCobrancas.data ?? []) as { plano_id: string; mes: string }[]), ...(criadas > 0 ? ((doMes.data ?? []) as { plano_id: string; mes: string }[]) : [])];
     return {
       doMes: ok(doMes) as unknown as CobrancaCompleta[],
       antigas: [...ok(antigas), ...(acertos.data ?? [])] as unknown as CobrancaCompleta[],
@@ -277,6 +281,7 @@ export default function Cobrancas({ planos, gerar, aoFecharGerar, aoMes }: {
                                     {c.acerto_saida ? "Acerto da saída: " : `${c.mes !== mesIso ? `${nomeMes(deIsoDia(c.mes))} · ` : ""}Mensalidade ${brl(c.valor_mensal)}${Number(c.valor_mensal) < Number(c.valor_cheio) ? " (proporcional)" : ""}`}
                                     {extras.length ? `${c.acerto_saida ? "" : " + "}${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})${partes.dias > 0 ? ` ${brl(partes.dias)}` : " sem valor"}` : ""}
                                     {taxas.length ? `${c.acerto_saida && !extras.length ? "" : " + "}${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((x) => x.dia))}) ${brl(partes.taxas)}` : ""}
+                                    {partes.taxi > 0 ? `${c.acerto_saida && !extras.length && !taxas.length ? "" : " + "}${textoDoTaxiDaCobranca(c)} ${brl(partes.taxi)}` : ""}
                                     {partesDoDesconto(c).irmao > 0 ? ` − desconto irmão ${brl(partesDoDesconto(c).irmao)}` : ""}
                                     {partesDoDesconto(c).outro > 0 ? ` − desconto ${brl(partesDoDesconto(c).outro)}` : ""}
                                   </span>
@@ -407,6 +412,8 @@ function MensagemDeCobranca({ grupo, texto: inicial, aoFechar, aoMandar }: { gru
 
 type LinhaGerar = {
   plano: PlanoCompleto; valor: number | null; sugestao: ReturnType<typeof sugestaoDoMes> | null; extras: string[]; unit: number; taxas: { dia: string; valor: number }[]; vencimento: string;
+  /** táxi pet: os dias de meses anteriores ainda sem cobrança e, com o táxi por mês, o valor fixo deste mês */
+  taxi: { dia: string; valor: number }[]; taxiMes: number;
   /** desconto para irmãos (opção da creche), sobre a mensalidade desta linha */
   irmao: number;
   /** primeira cobrança do plano e o vencimento já passou: quem recebe escolhe como fica (nada vem marcado) */
@@ -441,6 +448,15 @@ function GerarCobrancas({ sobras, mes, planos, todos, comCobranca, aoFechar, aoG
     return mapa;
   }, [petshop.id, mesIso, planos.length]);
 
+  // dias de táxi pet de meses anteriores que ainda não entraram em nenhuma cobrança (mesma regra das taxas)
+  const { dados: taxis } = useDados(async () => {
+    const mapa = new Map<string, { dia: string; valor: number }[]>();
+    if (!planos.some((p) => p.taxi)) return mapa;
+    const r = await sb.from("creche_taxi").select("pet_id, dia, valor").eq("petshop_id", petshop.id).is("cobranca_id", null).lt("dia", mesIso).order("dia").limit(2000);
+    for (const a of r.data ?? []) mapa.set(a.pet_id, [...(mapa.get(a.pet_id) ?? []), { dia: a.dia, valor: Number(a.valor ?? 0) }]);
+    return mapa;
+  }, [petshop.id, mesIso, planos.length]);
+
   const diaria = petshop.diaria_creche == null ? 0 : Number(petshop.diaria_creche);
   const linhas: LinhaGerar[] = planos.map((plano) => {
     const sugestao = plano.valor_mensal == null ? null : sugestaoDoMes(plano, mes, plano.valor_mensal, petshop.horario);
@@ -456,6 +472,7 @@ function GerarCobrancas({ sobras, mes, planos, todos, comCobranca, aoFechar, aoG
       plano, sugestao, primeira, escolha, daquiPraFrente, valor,
       irmao: valor == null ? 0 : descontoIrmao(petshop, todos, plano, mes, valor, petshop.horario),
       extras: extras?.get(plano.pet_id) ?? [], unit: plano.valor_extra ?? diaria, taxas: taxas?.get(plano.pet_id) ?? [], vencimento: primeira ? hoje : vencimento,
+      taxi: taxis?.get(plano.pet_id) ?? [], taxiMes: plano.taxi && plano.taxi_modo === "mes" && (plano.taxi_valor ?? 0) > 0 ? Number(plano.taxi_valor) : 0,
     };
   }).sort((a, b) => (a.plano.pets?.nome ?? "").localeCompare(b.plano.pets?.nome ?? "", "pt-BR"));
   const comValor = linhas.filter((l) => l.plano.temValor && l.valor != null);
@@ -464,7 +481,7 @@ function GerarCobrancas({ sobras, mes, planos, todos, comCobranca, aoFechar, aoG
   const porFora = comValor.filter((l) => l.primeira && l.escolha === "fora");
   const semEscolha = comValor.filter((l) => l.primeira && !l.escolha);
   const semValor = linhas.filter((l) => !l.plano.temValor);
-  const totalDe = (l: LinhaGerar) => centavos((l.valor ?? 0) + l.extras.length * l.unit + l.taxas.reduce((s, x) => s + x.valor, 0) - l.irmao);
+  const totalDe = (l: LinhaGerar) => centavos((l.valor ?? 0) + l.extras.length * l.unit + l.taxas.reduce((s, x) => s + x.valor, 0) + l.taxi.reduce((s, x) => s + x.valor, 0) + l.taxiMes - l.irmao);
   const total = centavos(prontas.reduce((s, l) => s + totalDe(l), 0));
 
   // trava na hora do primeiro toque: dois toques seguidos não geram (nem tentam gerar) as cobranças duas vezes.
@@ -512,7 +529,9 @@ function GerarCobrancas({ sobras, mes, planos, todos, comCobranca, aoFechar, aoG
         </div>
       ) : carregando && !extras ? <Esqueleto linhas={3} /> : (
         <div className="g-pilha">
-          <p className="g-muted g-p">Uma cobrança por mensalista: a mensalidade, mais os dias extras e as taxas de busca fora do horário de meses anteriores que ainda não foram cobrados. Quem já tem cobrança em {nomeMes(mes)} não entra de novo. A mensalidade cheia de quem vem o mês inteiro o sistema já cria sozinho. Aqui ficam só as que você precisa conferir antes: a primeira de cada mensalista, as proporcionais (entrada, saída ou pausa no mês) e as que você deixou para depois.</p>
+          <p className="g-muted g-p">Uma cobrança por mensalista: a mensalidade, mais os dias extras, as taxas de busca fora do horário e o táxi pet de meses anteriores que ainda não foram cobrados. Quem já tem cobrança em {nomeMes(mes)} não entra de novo.{mesIso > mesDeHoje
+            ? ` ${nomeMes(mes)[0].toUpperCase() + nomeMes(mes).slice(1)} ainda não começou: a lista mostra todos os mensalistas, também os de mensalidade cheia (essas o sistema criaria sozinho no dia 1º). Gerar agora já deixa todas prontas.`
+            : " A mensalidade cheia de quem vem o mês inteiro o sistema já cria sozinho. Aqui ficam só as que você precisa conferir antes: a primeira de cada mensalista, as proporcionais (entrada, saída ou pausa no mês) e as que você deixou para depois."}</p>
           <AvisoSobras sobras={sobras} />
           {mesIso > mesDeHoje && <p className="g-aviso" role="status" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce">{nomeMes(new Date())[0].toUpperCase() + nomeMes(new Date()).slice(1)} ainda não acabou. Dia extra ou taxa de busca marcados depois de gerar não entram nesta cobrança: vão para a do mês seguinte.</span></p>}
           <div className="g-cm-gerar">
@@ -539,6 +558,8 @@ function GerarCobrancas({ sobras, mes, planos, todos, comCobranca, aoFechar, aoG
                   )}
                   {l.extras.length > 0 && <span>{l.extras.length === 1 ? "1 dia extra" : `${l.extras.length} dias extras`} ({textoDasDatas(l.extras)}){l.unit > 0 ? `: ${brl(l.extras.length * l.unit)}` : ": sem preço de dia extra definido"}</span>}
                   {l.taxas.length > 0 && <span>{textoDasTaxas(l.taxas.length)} ({textoDasDatas(l.taxas.map((x) => x.dia))}): {brl(centavos(l.taxas.reduce((s, x) => s + x.valor, 0)))}</span>}
+                  {l.taxi.length > 0 && <span>Táxi pet: {l.taxi.length === 1 ? "1 dia" : `${l.taxi.length} dias`} ({textoDasDatas(l.taxi.map((x) => x.dia))}): {brl(centavos(l.taxi.reduce((s, x) => s + x.valor, 0)))}</span>}
+                  {l.taxiMes > 0 && <span>Táxi pet do mês: {brl(l.taxiMes)}</span>}
                   {l.irmao > 0 && l.escolha !== "fora" && <span>Desconto irmão: − {brl(l.irmao)}</span>}
                 </div>
                 <div className="valor">
@@ -631,6 +652,7 @@ function EditarCobranca({ cobranca: c, planos, aoFechar, aoSalvo }: { cobranca: 
         {taxas.length > 0 && (
           <p className="g-p"><b>{textoDasTaxas(taxas.length)}:</b> {textoDasDatas(taxas.map((x) => x.dia))} · {brl(partes.taxas)}</p>
         )}
+        {partes.taxi > 0 && <p className="g-p"><b>{textoDoTaxiDaCobranca(c).replace(/^t/, "T")}:</b> {brl(partes.taxi)}</p>}
         {irmao > 0 && <p className="g-p"><b>Desconto irmão:</b> − {brl(irmao)} <span className="g-muted g-pp">(regra de Meu pet shop, Opções da creche)</span></p>}
         <Campo rotulo="Vencimento"><input type="date" className="g-input" value={vencimento} onChange={(e) => { setVencimento(e.target.value); setErro(null); }} /></Campo>
         <Campo rotulo="Observação" dica="Só para vocês. Não vai na mensagem.">

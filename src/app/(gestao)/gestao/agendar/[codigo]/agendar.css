@@ -249,3 +249,9 @@
 .g-lk-promo-serv { font-size: .8125rem; font-weight: 600; color: #24543b; overflow-wrap: anywhere; }
 .g-lk-promo { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--t-menta, #dfeadf); color: #24543b; font-size: .9375rem; line-height: 1.4; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .g-lk-promo s { opacity: .75; }
+
+/* planos mensais da creche no link (opção da creche) */
+.g-lk-planos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.g-lk-planos li { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--g-linha); }
+.g-lk-planos li:last-child { border-bottom: 0; }
+.g-lk-planos b { white-space: nowrap; }
