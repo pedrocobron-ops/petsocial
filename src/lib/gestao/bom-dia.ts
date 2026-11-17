@@ -4,8 +4,8 @@ import { deMin, paraMin } from "./agenda";
 /**
  * "Bom dia" do Mozart na tela Hoje: no máximo 3 linhas, sempre do banco (função gestao_bom_dia, uma ida só) e sem chamar a IA.
  * O banco já tira o que a pessoa não pode ver (dinheiro só com área de dinheiro; agenda, casa, pacotes pela área). Aqui só se
- * escolhe e escreve: primeiro o dia (agenda e casa), depois, nesta ordem, quem deve e vem hoje, vacina vencendo de quem vem,
- * pacote no último uso e aniversário.
+ * escolhe e escreve: primeiro o dia (agenda e casa), depois, nesta ordem, quem deve e vem hoje, produto vencido ou vencendo
+ * (quem cuida do estoque), vacina vencendo de quem vem, pacote no último uso e aniversário.
  */
 export type Sexo = string | null;
 export type DadosDoBomDia = {
@@ -18,8 +18,10 @@ export type DadosDoBomDia = {
   vacinas?: { pet: string; sexo: Sexo; nome: string; tipo: string; vence_em: string }[];
   pacotes?: { pet: string; sexo: Sexo; nome: string; quando: string }[];
   niver?: { pet: string; sexo: Sexo; vem: boolean }[];
+  /** lotes com saldo vencidos ou vencendo em até 30 dias; só para quem cuida do estoque e só quando tem algum */
+  validade?: { vencidos: number; vencendo: number; primeiro: string | null };
 };
-export type LinhaDoBomDia = { id: "dia" | "devem" | "vacinas" | "pacotes" | "niver"; texto: string };
+export type LinhaDoBomDia = { id: "dia" | "devem" | "validade" | "vacinas" | "pacotes" | "niver"; texto: string };
 
 export const MAX_LINHAS_BOM_DIA = 3;
 
@@ -84,7 +86,18 @@ export function linhasDoBomDia(d: DadosDoBomDia, o: { horario: unknown; agora?: 
     linhas.push({ id: "devem", texto: `Vêm hoje e devem: ${ate3(devem.map((x) => `${primeiroNome(x.tutor)} (${brl(Number(x.valor))})`))}.` });
   }
 
-  // 3. vacina ou cuidado vencendo de quem vem hoje
+  // 3. validade dos produtos (lotes com saldo)
+  const val = d.validade;
+  if (val && val.vencidos + val.vencendo > 0) {
+    const partes = [
+      val.vencidos ? `${val.vencidos === 1 ? "1 produto vencido" : `${val.vencidos} produtos vencidos`} na prateleira` : "",
+      val.vencendo ? `${val.vencendo === 1 ? "1 vence" : `${val.vencendo} vencem`} em até 30 dias` : "",
+    ].filter(Boolean);
+    const um = val.vencidos + val.vencendo === 1 && val.primeiro ? ` (${val.primeiro})` : "";
+    linhas.push({ id: "validade", texto: `Validade: ${juntar(partes)}${um}. Veja em Estoque, Vencendo.` });
+  }
+
+  // 4. vacina ou cuidado vencendo de quem vem hoje
   const vac = d.vacinas ?? [];
   const hoje = d.dia;
   if (vac.length === 1) {
@@ -95,13 +108,13 @@ export function linhasDoBomDia(d: DadosDoBomDia, o: { horario: unknown; agora?: 
     linhas.push({ id: "vacinas", texto: `Vacina ou cuidado vencendo de quem vem hoje: ${ate3(pets)}.` });
   }
 
-  // 4. pacote no último uso
+  // 5. pacote no último uso
   const pac = d.pacotes ?? [];
   const semPacote = (n: string) => n.replace(/^pacote\s+(de\s+)?/i, "");
   if (pac.length === 1) linhas.push({ id: "pacotes", texto: `${pac[0].pet} usa hoje a última vez do pacote ${semPacote(pac[0].nome)}: boa hora para oferecer a renovação.` });
   else if (pac.length > 1) linhas.push({ id: "pacotes", texto: `${ate3(pac.map((p) => p.pet))} usam hoje a última vez do pacote: boa hora para oferecer a renovação.` });
 
-  // 5. aniversário
+  // 6. aniversário
   const niver = d.niver ?? [];
   if (niver.length === 1) linhas.push({ id: "niver", texto: `Hoje é aniversário ${doPet(niver[0].pet, niver[0].sexo)}${niver[0].vem ? `, e ${ele(niver[0].sexo)} vem hoje` : ""}.` });
   else if (niver.length > 1) linhas.push({ id: "niver", texto: `Fazem aniversário hoje: ${ate3(niver.map((n) => n.pet))}.` });

@@ -91,4 +91,33 @@ const ler = (d) => (d.tipo === 'ean13' ? lerEan13(modulos(d)) : lerCode128(modul
     a.valorEmEstoque === 465 && a.valorParado === 50 && a.semCusto === 1, { v: a.valorEmEstoque, p: a.valorParado, s: a.semCusto });
   T.ok('arredondar: 0,2 → 1; 13 com caixa de 12 → 24 (2 caixas); nada faltando → 0', K.arredondarCompra(0.2).quantidade === 1 && K.arredondarCompra(13, 12).quantidade === 24 && K.arredondarCompra(13, 12).caixas === 2 && K.arredondarCompra(-1, 6).quantidade === 0);
   T.ok('perda pelo motivo: "Perda ou vencido", "venceu", "embalagem rasgada"; "Venda" e "Uso no banho" não', K.ehPerda('Perda ou vencido') && K.ehPerda('venceu') && K.ehPerda('embalagem rasgada') && !K.ehPerda('Venda') && !K.ehPerda('Uso no banho'));
+
+  T.secao('kits e contagem (migração 20261201)');
+  {
+    const agora = new Date(2026, 10, 17, 12, 0);
+    const antes = new Date(2026, 6, 1).toISOString();
+    const P = [{ id: 's', nome: 'Shampoo', unidade: 'un', estoque: 8, estoque_minimo: 0, criado_em: antes, custo: 12.35 },
+      { id: 'k', nome: 'Kit banho', unidade: 'un', estoque: 4, estoque_minimo: 0, criado_em: antes, custo: 32.33, tipo: 'kit' }];
+    const M = [{ produto_id: 's', tipo: 'saida', quantidade: 2, motivo: 'Venda', criado_em: new Date(2026, 10, 10).toISOString() },
+      { produto_id: 'k', tipo: 'saida', quantidade: 2, motivo: 'Venda', criado_em: new Date(2026, 10, 10).toISOString() }];
+    const a = K.analisarCompra(P, M, { agora });
+    T.ok('O que comprar deixa o kit de fora (a venda dele já conta nos produtos do kit) e não soma o valor do kit (8 × 12,35 = 98,80)',
+      a.linhas.map((l) => l.produto.id).join() === 's' && a.linhas[0].vendido === 2 && a.valorEmEstoque === 98.8, a);
+  }
+  {
+    const CT = lib('contagem');
+    const item = (x) => ({ produto_id: x.id, nome: x.id, unidade: 'un', categoria: null, codigo_barras: null, saldo: x.saldo, contado: x.contado ?? null, esperado: x.esperado ?? null,
+      contado_em: null, contado_por_nome: null, diferenca: x.contado == null ? null : x.contado - x.esperado, custo: x.custo ?? null, valor: null, ajustado_de: null, ajustado_para: null });
+    const itens = [item({ id: 'a', saldo: 9, contado: 9, esperado: 10, custo: 12.35 }), item({ id: 'b', saldo: 7, contado: 8, esperado: 7, custo: 9.99 }), item({ id: 'c', saldo: 5, custo: 1.1 }), item({ id: 'd', saldo: 2 })];
+    const t1 = CT.totaisDaContagem(itens);
+    T.ok('contagem: diferença sobre o esperado (−1 e +1), valor ao centavo (−12,35 + 9,99 = −2,36)',
+      CT.diferencaDoItem(itens[0]) === -1 && [t1.contados, t1.comDiferenca, t1.sobra, t1.falta, t1.valor].join() === '2,2,1,1,-2.36', t1);
+    // na tela, ainda não mandado: c contado 2 (saldo de agora 5: −3 × 1,10 = −3,30), d contado 3 sem custo
+    const t2 = CT.totaisDaContagem(itens, new Map([['c', 2], ['d', 3]]));
+    T.ok('contagem: o que está só na tela compara com o saldo de agora (−2,36 − 3,30 = −5,66; 1 sem custo)',
+      [t2.contados, t2.comDiferenca, t2.valor, t2.semCusto, t2.faltamContar].join() === '4,4,-5.66,1,0', t2);
+    const csv = CT.linhasDaPlanilha({ status: 'aberta', com_valor: false, itens });
+    T.ok('contagem: planilha sem colunas de R$ para quem não vê o financeiro', csv[0].join('|') === 'Produto|Categoria|Unidade|Saldo no sistema|Contado|Diferença|Contado por'
+      && csv[1].join('|') === 'a||un|10|9|-1|', csv.slice(0, 2));
+  }
 }))();

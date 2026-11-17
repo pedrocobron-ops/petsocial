@@ -2,7 +2,7 @@
 
 import { CATEGORIAS_DEVOLUCAO } from "@/lib/gestao/faturamento";
 import { lerDadosDoHoje } from "@/components/gestao/hoje-dados";
-import { BellRing, CalendarCheck2, UserX } from "lucide-react";
+import { BellRing, CalendarCheck2, CalendarX, UserX } from "lucide-react";
 import { CATEGORIA_MENSALIDADE, experienciaDe, juntar, lerExperiencias, resumoDaCrecheHoje } from "@/lib/gestao/creche";
 import ChamadaDeHoje from "@/components/gestao/creche/chamada-hoje";
 import { OcorrenciasDeHoje } from "@/components/gestao/casa/ocorrencias";
@@ -40,6 +40,7 @@ import ChamarDeVolta, { aniversariantes, buscarParaChamar, chamadoEm, lerChamado
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
 import { AtendimentosParaCobrar, MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import AlteracoesDeValores from "@/components/gestao/financeiro/alteracoes-de-valores";
+import { resumoDaValidade, useVencimentos } from "@/components/gestao/loja/validade";
 
 // folhas que só abrem com um toque: vêm à parte e baixam depois que a tela abriu (useAdiantar)
 const carregarDetalhe = () => import("@/components/gestao/agenda/detalhe-agendamento");
@@ -160,6 +161,9 @@ export default function Hoje() {
   const taxasPendentes = dados?.taxasPendentes ?? 0;
   // abaixo da dobra: só depois que o primeiro olhar chegou (não disputa a rede com ele)
   const primeiroOlhar = Boolean(dados);
+  // validade dos produtos (lotes vencidos e vencendo em 30 dias): leitura à parte, só para quem cuida do estoque
+  const { dados: venc } = useVencimentos(vejoEstoque && primeiroOlhar);
+  const validade = resumoDaValidade(venc);
   const { dados: paraChamar } = useDados(async () => (vejoClientes && primeiroOlhar ? buscarParaChamar(sb, petshop.id) : null), [petshop.id, hojeIso, vejoClientes, primeiroOlhar]);
   const chamados = paraChamar ? lerChamados(petshop.id) : {};
   const comFone = (grupos: GrupoChamar[]) => grupos.filter((g) => g.telefone);
@@ -250,6 +254,10 @@ export default function Hoje() {
     posso("agenda") && dados.amanhaSemLembrete > 0 && { icone: MessageCircle, tom: "pessego" as Tom, texto: `Amanhã ${fechadoAmanha ? `é ${fechadoAmanha.replace(/^Dia /, "dia ")}, mas ` : ""}${dados.amanha === 1 ? "tem 1 horário" : `tem ${dados.amanha} horários`}. ${dados.amanhaSemLembrete === 1 ? "Falta 1 lembrete" : `Faltam ${dados.amanhaSemLembrete} lembretes`}: toque para mandar pelo WhatsApp.${dados.amanhaSemTelefone > 0 ? ` ${dados.amanhaSemTelefone} sem telefone (não ${dados.amanhaSemTelefone === 1 ? "entra" : "entram"} na conta).` : ""}`, aoTocar: () => setLembretes(true) },
     sumidosAChamar.length > 0 && { icone: UserSearch, tom: "menta" as Tom, texto: `${petsSumidos.texto} ${petsSumidos.q === 1 ? "não vem" : "não vêm"} há mais de 30 dias e não ${petsSumidos.q === 1 ? "tem" : "têm"} horário marcado. Toque para chamar de volta pelo WhatsApp.`, aoTocar: () => setChamando("volta") },
     niverAChamar.length > 0 && { icone: Cake, tom: "manteiga" as Tom, texto: `${petsNiver.texto} ${petsNiver.q === 1 ? "faz" : "fazem"} aniversário ${niverHoje ? "hoje" : "nos próximos dias"}. Toque para mandar os parabéns pelo WhatsApp.`, aoTocar: () => setChamando("niver") },
+    vejoEstoque && validade.vencidos.length + validade.em30.length > 0 && { icone: CalendarX, tom: "rosa" as Tom, texto: `${[
+      validade.vencidos.length ? (validade.vencidos.length === 1 ? "1 lote vencido" : `${validade.vencidos.length} lotes vencidos`) : "",
+      validade.em30.length ? `${validade.em30.length === 1 ? "1 lote vence" : `${validade.em30.length} lotes vencem`} em até 30 dias` : "",
+    ].filter(Boolean).join(" e ")} no estoque: ${[...new Set([...validade.vencidos, ...validade.em30].map((l) => l.nome))].slice(0, 3).join(", ")}. Toque para ver e dar baixa no que venceu.`, href: "/gestao/app/estoque?ver=vencendo" },
     loja && dados.acabando.length > 0 && { icone: Package, tom: "rosa" as Tom, texto: `${dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}: ${dados.acabando.slice(0, 3).map((p) => p.nome).join(", ")}.`, href: "/gestao/app/estoque" },
     dados.contas.length > 0 && { icone: Receipt, tom: "manteiga" as Tom, texto: `${dados.contas.length === 1 ? "1 conta vence" : `${dados.contas.length} contas vencem`} até hoje: ${brl(dados.contas.reduce((s, c) => s + Number(c.valor), 0))}.`, href: "/gestao/app/financeiro" },
     dados.aReceberVencidas.length > 0 && (() => {

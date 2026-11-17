@@ -91,3 +91,29 @@
 .g-lj-det li { overflow-wrap: anywhere; }
 .g-grade.kpis.g-lj-compra-kpis { grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); }
 @media (max-width: 560px) { .g-grade.kpis.g-lj-compra-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- validade e lote (Vencendo, lotes na ficha) ---------- */
+.g-val-faixa h3 { margin: 0; font-size: 1rem; }
+.g-val-faixa h3 small { font-weight: 400; font-size: .8125rem; }
+.g-val-faixa > .g-fila { gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.g-val-lista { list-style: none; margin: 0; padding: 0; }
+.g-val-lista li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--g-linha); min-width: 0; }
+.g-val-lista li:last-child { border-bottom: 0; }
+.g-val-lista .t { flex: 1; min-width: 0; }
+.g-val-lista .t b { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.g-val-lista .t span { display: block; font-size: .8125rem; color: var(--g-cinza); }
+.g-val-lista li.vencido .t span { color: var(--g-vermelho); }
+.g-val-lista li.perto .t span { color: #8a6208; }
+.g-val-ico { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--t-manteiga); color: #8a6208; }
+.g-val-lista li.vencido .g-val-ico { background: var(--t-rosa); color: var(--g-vermelho); }
+.g-val-ico svg { width: 17px; height: 17px; }
+.g-val-num { flex: none; text-align: right; display: grid; }
+.g-val-num small { font-size: .75rem; color: var(--g-cinza); }
+
+/* ---------- kits: produtos do kit ---------- */
+.g-kit-lista { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.g-kit-lista li { display: grid; grid-template-columns: minmax(0, 1fr) 72px auto auto; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--g-linha); border-radius: 12px; }
+.g-kit-lista .t { min-width: 0; }
+.g-kit-lista .t b { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.g-kit-lista .t small { color: var(--g-cinza); font-size: .75rem; }
+.g-kit-lista .g-input { padding-left: 8px; padding-right: 8px; text-align: right; }
