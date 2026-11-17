@@ -120,6 +120,19 @@ export function areasDeServicoPara(petshop: ComModulos, atual?: AreaDoServico | 
   return l.length ? l : ["banho_tosa"];
 }
 
+/**
+ * Onde cada opção de "O que o seu negócio faz?" aparece no menu, pela escolha da folha (`valor`): banho e tosa fica na
+ * Agenda; creche e hotel dividem um item só ("Creche e hotel" com as duas; "Creche" ou "Hotel" com uma);
+ * a venda de produtos fica em Estoque (e a venda, no Caixa).
+ */
+export function noMenu(m: Modulo, valor: readonly string[]): string {
+  if (m === "banho_tosa") return "Agenda";
+  if (m === "loja") return "Estoque e Caixa";
+  if (m === "pacotes") return "Pacotes";
+  const outra = m === "creche" ? "hotel" : "creche";
+  return valor.includes(outra) ? `Creche e hotel (um item só, junto com ${outra === "hotel" ? "o hotel" : "a creche"})` : m === "creche" ? "Creche" : "Hotel";
+}
+
 /** O que cada área põe no menu, para a frase "Pronto: o menu agora mostra …". */
 export function telasDoMenu(petshop: ComModulos): string[] {
   return [
@@ -128,4 +141,23 @@ export function telasDoMenu(petshop: ComModulos): string[] {
     usaModulo(petshop, "pacotes") ? "Pacotes" : null,
     usaModulo(petshop, "loja") ? "Estoque" : null,
   ].filter((x): x is string => x != null);
+}
+
+/** Creche e hotel: as duas áreas que o link do cliente pode receber pedido. */
+export type AreaDoLink = "creche" | "hotel";
+export const CAMPO_DO_LINK = { creche: "link_creche", hotel: "link_hotel" } as const;
+/** "Quer que os tutores também peçam reserva de hotel pelo link?" */
+export const PERGUNTA_DO_LINK: Record<AreaDoLink, string> = {
+  creche: "Quer que os tutores também peçam vaga na creche pelo link?",
+  hotel: "Quer que os tutores também peçam reserva de hotel pelo link?",
+};
+
+/**
+ * Creche ou hotel que a escolha liga agora e que o link do cliente (ligado) ainda não recebe: a folha pergunta antes de
+ * mudar o link. Nada muda no link sem a pessoa tocar em "Ligar no link".
+ */
+export function linkPergunta(petshop: { modulos?: string[] | null; link_ativo?: boolean | null; link_creche?: boolean | null; link_hotel?: boolean | null }, valor: readonly string[]): AreaDoLink[] {
+  if (!petshop.link_ativo) return [];
+  const salvo = modulosDe(petshop);
+  return (["creche", "hotel"] as const).filter((m) => valor.includes(m) && !salvo.includes(m) && !petshop[CAMPO_DO_LINK[m]]);
 }

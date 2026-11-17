@@ -262,13 +262,16 @@ export default function Hoje() {
   const vendas = dados && vejoFinanceiro ? { quantas: dados.vendasHoje.length, total: dados.vendasHoje.reduce((s, l) => s + Number(l.valor), 0) } : null;
   // sem banho e tosa e sem horário hoje: a agenda não ocupa lugar na tela de quem escolheu outra área principal
   const semAgenda = Boolean(principal && !banho && dados && !dados.ags.length);
-  const frase = !dados ? "" : contaNova && frente === "loja" ? "Tudo pronto para começar. O primeiro passo é cadastrar o que você vende."
+  // conta nova com primeiros passos na tela: o Mozart, o botão do topo e o cartão apontam o mesmo próximo passo
+  const passoNovo = contaNova && pp.estado === "ativo" ? pp.proximo : null;
+  const fraseDoPasso = passoNovo ? `Tudo pronto para começar. O próximo passo é ${passoNovo.texto.charAt(0).toLowerCase()}${passoNovo.texto.slice(1)}${passoNovo.id === "pet" && (souDono || eu.papel === "gerente") ? ", ou trazer os seus clientes de uma planilha" : ""}.` : null;
+  const frase = !dados ? "" : fraseDoPasso ?? (contaNova && frente === "loja" ? "Tudo pronto para começar. O primeiro passo é cadastrar o que você vende."
     : contaNova ? (posso("clientes") ? (souDono || eu.papel === "gerente" ? "Tudo pronto para começar. O primeiro passo é cadastrar um pet, ou trazer os seus clientes de uma planilha." : "Tudo pronto para começar. O primeiro passo é cadastrar um pet.") : "Tudo pronto para começar.")
     : frente === "loja" ? `${dados.acabando.length === 0 ? "Nenhum produto acabando" : dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}.${vendas ? (vendas.quantas ? ` Hoje ${vendas.quantas === 1 ? "saiu 1 venda" : `saíram ${vendas.quantas} vendas`} de produtos: ${brl(vendas.total)}.` : " Nenhuma venda de produtos hoje, por enquanto.") : ""}${ativos.length ? ` Na agenda, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : frente === "casa" ? `${temCasa ? linhaCasa : "Nenhum pet na casa agora"}.${ativos.length ? ` No banho e tosa, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : soCasa && !ativos.length ? (temCasa ? `${linhaCasa}.` : `Nenhum pet na casa agora.`)
     : !ativos.length ? `Nenhum horário marcado para hoje.${proximoDia ? ` O próximo é ${proximoDia.pets?.nome ?? "um pet"}, ${quandoFoi(proximoDia.inicio)}.` : ""}${linhaCasa ? ` ${linhaCasa}.` : ""}`
-    : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? (faltaCobrarHoje > 0 ? `, todos concluídos. ${faltaCobrarHoje === 1 ? "Falta cobrar 1" : `Falta cobrar ${faltaCobrarHoje}`}` : ", todos concluídos") : ""}.`;
+    : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? (faltaCobrarHoje > 0 ? `, todos concluídos. ${faltaCobrarHoje === 1 ? "Falta cobrar 1" : `Falta cobrar ${faltaCobrarHoje}`}` : ", todos concluídos") : ""}.`);
 
   const cr = dados?.creche ?? null;
   const cartaoDaChamada = Boolean(cr && cr.esperados > 0);
@@ -325,7 +328,10 @@ export default function Hoje() {
         </div>
         <div className="g-acoes">
           {posso("agenda") && banho && !contaNova && liberado && <LinkRapido rotulo="Mandar link de agendamento" />}
-          {contaNova && frente === "loja" ? <LinkDeGravar className="g-btn pri" href="/gestao/app/estoque"><Plus />Cadastrar o primeiro produto</LinkDeGravar>
+          {passoNovo ? (passoNovo.href
+              ? <Link className="g-btn pri" href={passoNovo.href} onClick={passoNovo.aoTocar}><ChevronRight />{passoNovo.texto}</Link>
+              : <button type="button" className="g-btn pri" onClick={passoNovo.aoTocar}><ChevronRight />{passoNovo.texto}</button>)
+            : contaNova && frente === "loja" ? <LinkDeGravar className="g-btn pri" href="/gestao/app/estoque"><Plus />Cadastrar o primeiro produto</LinkDeGravar>
             : contaNova && posso("clientes") ? <LinkDeGravar className="g-btn pri" href="/gestao/app/clientes?novo=1"><Plus />Cadastrar o primeiro pet</LinkDeGravar>
             : frente === "loja" ? <LinkDeGravar className="g-btn pri" href={ROTA_VENDER}><ShoppingBag />Vender</LinkDeGravar>
             : soCasa ? <LinkDeGravar className="g-btn pri" href="/gestao/app/creche-hotel"><Plus />{principal === "hotel" ? "Nova reserva" : "Fazer check-in"}</LinkDeGravar>
@@ -484,7 +490,8 @@ export default function Hoje() {
                   <Vazio mozart="acenando" titulo="Nenhum horário marcado para hoje" texto={casa ? `Serviços com hora marcada aparecem aqui. As estadias ficam em ${rotuloCasa}.` : "Serviços com hora marcada aparecem aqui."} />
                 ) : contaNova && posso("clientes") ? (
                   <Vazio mozart="acenando" titulo="A agenda começa pelo primeiro pet" texto="Cadastre um pet com o tutor. Depois é só marcar: o horário aparece aqui.">
-                    <LinkDeGravar className="g-btn verde" href="/gestao/app/clientes?novo=1">Cadastrar o primeiro pet</LinkDeGravar>
+                    {/* com outro passo antes (os preços, por exemplo), o botão fica só no alto da tela: um caminho só */}
+                    {(!passoNovo || passoNovo.id === "pet") && <LinkDeGravar className="g-btn verde" href="/gestao/app/clientes?novo=1">Cadastrar o primeiro pet</LinkDeGravar>}
                   </Vazio>
                 ) : (
                   <Vazio mozart="acenando" titulo="Nenhum banho marcado para hoje" texto="Que tal chamar quem está com o banho atrasado? O Mozart monta a lista para você.">

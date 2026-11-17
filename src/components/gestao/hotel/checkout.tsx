@@ -19,7 +19,7 @@ import { comValoresDeEstadia } from "@/lib/gestao/reservado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { imprimirComprovante } from "@/lib/gestao/comprovante";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, linkWhatsApp, soDigitos } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, linkWhatsApp, precoDoServico, soDigitos } from "@/lib/gestao/util";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -475,6 +475,11 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
               <span>Tem mais alguma coisa na conta?</span>
               {vendeProdutos && <BuscaProduto produtos={produtos} carregando={buscandoProdutos} erro={erroProdutos} itens={itens} aoEscolher={(p) => { setItens((l) => comProduto(l, p)); setValorEditado(undefined); }} />}
               <div className="g-chips g-vd-chips">
+                {/* serviços da área desta estadia (Meu pet shop, área Hotel ou Creche): um toque e entram como extra, com o preço do porte */}
+                {servicos.filter((s) => s.ativo && s.categoria === estadia.tipo).map((s) => {
+                  const v = precoDoServico(s, pet?.porte);
+                  return <button key={s.id} type="button" className="g-chip" onClick={() => { setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome: s.nome, qtd: 1, valor: v }]); setValorEditado(undefined); }}><Plus />{s.nome}{v != null ? ` · ${brl(v)}` : ""}</button>;
+                })}
                 <button type="button" className="g-chip" onClick={() => setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome: "", qtd: 1, valor: null }])}><Plus />Outro extra</button>
               </div>
             </div>
