@@ -19,7 +19,7 @@ export const EMPRESA = {
   /** Nome do encarregado pelo tratamento de dados (DPO). Vazio = [NOME DO ENCARREGADO]. */
   encarregado: "Pedro Amaral Martin",
   /** Comarca escolhida nos Termos do Gestão, ex. "Santos/SP". Vazio = [FORO]. */
-  foro: "",
+  foro: "São Paulo/SP",
   /** Só números, com DDI e DDD: ex. "5511999999999". */
   whatsapp: "5513991376169",
   instagram: "maestro_pet_",
