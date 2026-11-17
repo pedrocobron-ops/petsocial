@@ -59,7 +59,8 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
     const linha = (l: LinhaLucro): Cel[] => [
       l.tipo === "servico" ? "Serviço" : l.tipo === "produto" ? "Produto" : "Extra", l.nome, l.quantidade ? numeroCsv(l.quantidade) : "", l.receita ? dinheiroCsv(l.receita) : dinheiroCsv(0),
       l.material == null ? "não informado" : dinheiroCsv(l.material), dinheiroCsv(l.comissao), l.custo == null ? "custo não informado" : dinheiroCsv(l.custo),
-      l.margem == null ? "" : dinheiroCsv(l.margem), l.pct == null ? "" : numeroCsv(Math.round(l.pct * 10) / 10), l.falta ?? "",
+      l.margem == null ? "" : dinheiroCsv(l.margem), l.pct == null ? "" : numeroCsv(Math.round(l.pct * 10) / 10),
+      [l.devolvido > 0 ? `devolvido ${brl(l.devolvido)} (${fmtQtd(l.devolvidos)} ${l.unidade})` : "", l.falta ?? ""].filter(Boolean).join("; "),
     ];
     const p = x.ponte;
     const t: Cel[][] = [
@@ -152,7 +153,9 @@ function Linha({ l, comComissao }: { l: LinhaLucro; comComissao: boolean }) {
     : l.tipo === "produto"
       ? [l.material != null ? `produtos ${brl(l.material)}${l.custoDeHoje > 0 ? " (com custo de hoje)" : ""}` : null, l.comissao ? `comissão ${brl(l.comissao)}${comComissao ? "" : " (fora do custo)"}` : null]
       : [l.comissao ? `comissão ${brl(l.comissao)}` : null];
-  const sub = [...detalhe, l.falta].filter(Boolean).join(" · ");
+  // troca e devolução no período: o que voltou e quanto voltou para o cliente (a margem já desconta)
+  const voltou = l.devolvidos > 0 || l.devolvido > 0 ? `${l.devolvidos ? `${fmtQtd(l.devolvidos)} ${l.unidade} ${l.devolvidos === 1 ? "voltou" : "voltaram"}` : "devolução"} (− ${brl(l.devolvido)})` : null;
+  const sub = [...detalhe, voltou, l.falta].filter(Boolean).join(" · ");
   const ruim = l.margem != null && l.margem < 0;
   return (
     <div className="g-lu-l" role="row">

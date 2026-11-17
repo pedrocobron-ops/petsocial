@@ -5,6 +5,7 @@ import { Check, MessageCircle, Plus, Scissors, Ticket, Truck } from "lucide-reac
 import type { AgendamentoCompleto, Lancamento, PacoteCliente } from "@/lib/gestao/tipos";
 import { textoComprovante, textoComprovanteDaParte } from "@/lib/gestao/comprovante";
 import { conferirCaixa, conferirValorAlto, formaPrincipal, pagamentoComCredito, parteDaChave, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { conferirLimite } from "@/lib/gestao/fiado";
 import { casoDoErro, fazerTudoOuNada, lancamentoDe, partesOuNada, passoDoEstoque, ref, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { creditoDoTutor } from "@/lib/gestao/credito";
@@ -49,7 +50,7 @@ function alocarNasAntigas(antigas: Antiga[], sobra: number) {
 export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: {
   agendamento: AgendamentoCompleto; pacote?: PacoteCliente | null; aoFechar: () => void; aoPronto: () => void;
 }) {
-  const { sb, petshop, user, vejoFinanceiro, cuidoDoFinanceiro, servicos } = useGestao();
+  const { sb, petshop, user, vejoFinanceiro, cuidoDoFinanceiro, souDono, servicos } = useGestao();
   // quem não vende produtos não vê a busca do estoque: fica só o "Outro extra"
   const vendeProdutos = usaModulo(petshop, "loja");
   const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
@@ -163,6 +164,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     if (!(await conferirValorAlto(aPagar, perguntar))) return false;
     // o caixa fechou enquanto esta conta estava aberta: pergunta antes de receber fora dele
     if (pg && !("erro" in pg) && !(await conferirCaixa(sb, petshop.id, perguntar))) return false;
+    // fica a receber: passa do limite de fiado do tutor? quem pode libera (fica anotado)
+    if (fiado && !(await conferirLimite(sb, petshop.id, tutor?.id, contas.total, { perguntar, podeLiberar: souDono || cuidoDoFinanceiro, avisarErro }))) return false;
     // cada forma do pagamento vai primeiro para a conta de hoje (sem o crédito) e depois para as antigas
     const paraAntigas = junto > 0 ? alocarNasAntigas(antigas, centavos(recebendo - daConta)) : [];
     const repartido = pg && !("erro" in pg) && junto > 0
@@ -294,6 +297,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     if (naoTem.length && !(await perguntar({ titulo: naoTem.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${naoTem.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return false;
     if (!(await conferirValorAlto(contas.total, perguntar))) return false;
     if (!(await conferirCaixa(sb, petshop.id, perguntar))) return false;
+    if (!(await conferirLimite(sb, petshop.id, tutor.id, contas.total, { perguntar, podeLiberar: souDono || cuidoDoFinanceiro, avisarErro }))) return false;
     setSalvando(true);
     try {
       const passos = passosDoComeco();

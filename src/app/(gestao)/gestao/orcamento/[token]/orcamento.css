@@ -1,0 +1,40 @@
+/* Orçamento (página pública, sem login). Primeiro o celular. Prefixo g-op-. */
+.g-op { min-height: 100dvh; display: grid; grid-template-rows: 1fr auto; overflow-x: clip; }
+.g-op .g-lk-miolo { max-width: 600px; }
+
+.g-op-cab {
+  position: relative; overflow: hidden; display: grid; gap: 6px; padding: 18px 20px 22px; border-radius: 26px; color: #f6f1e8;
+  background: radial-gradient(380px 240px at 112% -14%, color-mix(in srgb, var(--destaque, var(--g-laranja)) 40%, transparent), transparent 62%),
+    radial-gradient(320px 240px at -14% 118%, rgba(255, 255, 255, .1), transparent 60%), linear-gradient(140deg, var(--g-escuro-a) 0%, var(--g-escuro-b) 100%);
+  box-shadow: 0 2px 4px rgba(31, 27, 23, .1), 0 30px 50px -30px rgba(23, 48, 42, .8);
+}
+.g-op-loja { display: flex; align-items: center; gap: 10px; min-width: 0; margin-bottom: 12px; }
+.g-op-loja > div { display: grid; min-width: 0; }
+.g-op-loja b { font-size: .9375rem; overflow-wrap: anywhere; }
+.g-op-loja span { font-size: .8125rem; opacity: .75; }
+.g-op-sobre { display: inline-flex; align-items: center; gap: 6px; font-size: .8125rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
+.g-op-sobre svg { width: 15px; height: 15px; }
+.g-raiz .g-op-cab h1 { font-family: var(--display); font-weight: 500; font-size: clamp(2rem, 1.6rem + 2.4vw, 3rem); line-height: 1.04; overflow-wrap: anywhere; }
+.g-op-quando { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; font-size: .9375rem; }
+.g-op-selo { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 9px; border-radius: 999px; background: rgba(246, 241, 232, .14); font-weight: 600; font-size: .8125rem; }
+.g-op-selo svg { width: 15px; height: 15px; }
+.g-op-selo.vencido { background: rgba(229, 115, 92, .3); }
+
+.g-op-bloco { display: grid; gap: 12px; padding: 14px 18px 18px; border-radius: 22px; background: var(--g-carta); box-shadow: var(--g-sombra); }
+.g-op-itens { list-style: none; margin: 0; padding: 0; display: grid; }
+.g-op-itens li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--g-linha); }
+.g-op-itens .ico { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: var(--t-pessego); color: var(--i-pessego); }
+.g-op-itens .ico svg { width: 18px; height: 18px; }
+.g-op-itens .t { display: grid; min-width: 0; }
+.g-op-itens .t b { font-weight: 600; overflow-wrap: anywhere; }
+.g-op-itens .t small { color: var(--g-cinza); font-size: .875rem; }
+.g-op-itens .v { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-op-conta { display: grid; gap: 4px; margin: 0; }
+.g-op-conta > div { display: flex; justify-content: space-between; gap: 12px; color: var(--g-cinza); }
+.g-op-conta dd { margin: 0; font-variant-numeric: tabular-nums; }
+.g-op-conta .total { margin-top: 4px; color: var(--g-tinta, inherit); align-items: baseline; }
+.g-op-conta .total dt { font-weight: 700; }
+.g-op-conta .total dd { font-family: var(--display); font-size: 1.75rem; font-weight: 500; }
+.g-op-obs { padding: 10px 12px; border-radius: 14px; background: var(--g-carta-2); font-size: .9375rem; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+.g-op-acoes { display: grid; gap: 10px; }
+.g-op-vazio { text-align: center; color: var(--g-cinza); padding: 24px 8px; }

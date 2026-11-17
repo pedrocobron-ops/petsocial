@@ -3,13 +3,17 @@
 import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, Merge, MessageCircle, NotebookPen, PawPrint, Pencil, Phone, Plus, Receipt, Users, Wallet } from "lucide-react";
+import dynamic from "next/dynamic";
+import { ArrowLeft, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, Merge, MessageCircle, NotebookPen, PawPrint, Pencil, Phone, Plus, Receipt, RotateCcw, Users, Wallet } from "lucide-react";
 import type { Cliente, Lancamento, Pet } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { CartaoFidelidade } from "../fidelidade";
 import CartaoPaginaDoTutor from "../casa/pagina-do-tutor";
 import { DividaDoTutor } from "../financeiro/contas-clientes";
+import { LimiteDoFiado } from "../financeiro/limite-fiado";
+import { vendaComProduto } from "@/lib/gestao/devolucao";
+import { OrcamentosDoCliente } from "../loja/orcamento";
 import { CreditoDoTutor } from "../hotel/credito";
 import { categoriaAtual, FolhaLancamento } from "../financeiro/comum";
 import { descricaoAtual } from "@/lib/gestao/dinheiro";
@@ -22,7 +26,10 @@ import { FolhaJuntarTutor } from "./juntar";
 import { EtiquetaEspecie } from "./lista";
 import DadosDoTutor from "../lgpd/dados-do-tutor";
 
-type Entrada = Pick<Lancamento, "id" | "valor" | "data" | "categoria" | "descricao" | "pago">;
+type Entrada = Pick<Lancamento, "id" | "valor" | "data" | "categoria" | "descricao" | "pago" | "tipo" | "itens" | "movimento" | "conta_id" | "diferenca_de" | "valor_original" | "cliente_id">;
+
+// troca e devolução de uma compra do cliente (abre só com um toque)
+const FolhaDevolucao = dynamic(() => import("../loja/devolucao"), { ssr: false });
 
 export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: string; voltar: () => void; aoExcluir: () => void; /** a ficha terminou de carregar */ aoAbrir?: () => void }) {
   // `vejoFinanceiro` (Caixa, Financeiro ou Relatórios): vê e recebe o que o tutor deve. `cuidoDoFinanceiro`: vê também quanto ele já gastou.
@@ -35,13 +42,14 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
   const [juntando, setJuntando] = useState(false);
   // "deve R$ 20" solto: taxa de falta, diferença esquecida (vira conta a receber deste tutor)
   const [anotando, setAnotando] = useState(false);
+  const [devolvendo, setDevolvendo] = useState<Entrada | null>(null);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [cliente, pets, entradas, devolucoes] = await Promise.all([
       sb.from("clientes").select("*").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
       sb.from("pets").select("*").eq("petshop_id", petshop.id).eq("cliente_id", id).order("ativo", { ascending: false }).order("nome"),
       cuidoDoFinanceiro
-        ? sb.from("lancamentos").select("id, valor, data, categoria, descricao, pago").eq("petshop_id", petshop.id).eq("cliente_id", id).eq("tipo", "entrada").is("movimento", null)
+        ? sb.from("lancamentos").select("id, valor, data, categoria, descricao, pago, tipo, itens, movimento, conta_id, diferenca_de, valor_original, cliente_id").eq("petshop_id", petshop.id).eq("cliente_id", id).eq("tipo", "entrada").is("movimento", null)
           .order("data", { ascending: false }).order("criado_em", { ascending: false }).limit(1000)
         : null,
       // o que foi devolvido ao tutor (pagou a mais, sinal devolvido) sai do que ele gastou
@@ -192,6 +200,12 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
             </div>
           )}
           {anotando && <FolhaLancamento modo="conta" tipo="entrada" tutor={{ id: cliente.id, nome: cliente.nome }} aoFechar={() => setAnotando(false)} aoSalvo={recarregar} />}
+          {vejoFinanceiro && <LimiteDoFiado cliente={cliente} aoMudar={() => void recarregar()} />}
+          {vejoFinanceiro && <OrcamentosDoCliente cliente={{ id: cliente.id, nome: cliente.nome, telefone: cliente.telefone }} />}
+          {devolvendo && (
+            <FolhaDevolucao venda={{ id: devolvendo.id, data: devolvendo.data, valor: Number(devolvendo.valor_original ?? devolvendo.valor), descricao: devolvendo.descricao, cliente_id: cliente.id }}
+              aoFechar={() => setDevolvendo(null)} aoPronto={() => void recarregar()} />
+          )}
 
           {cuidoDoFinanceiro && (
             <section className="g-card">
@@ -212,6 +226,7 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
                       <span className="d gc-linha-tags">
                         <b>{brl(l.valor)}</b>
                         {!l.pago && <span className="g-tag amarelo">A receber</span>}
+                        {vendaComProduto(l) && <button type="button" className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) setDevolvendo(l); }} aria-label={`Troca ou devolução: ${descricaoAtual(l.descricao) || l.categoria}`}><RotateCcw />Trocar</button>}
                       </span>
                     </div>
                   ))}

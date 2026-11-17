@@ -91,7 +91,7 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ dia: DIA, servico_id: S, profissional_id: S }, ["dia"]) },
   { grava: false, name: "clientes_sumidos", description: "Lista pets cujo último atendimento concluído foi há mais de N dias (ou que nunca vieram), com tutor e telefone.",
     input_schema: obj({ dias: { ...N, description: "Quantidade de dias sem vir, ex.: 30 ou 60" } }, ["dias"]) },
-  { grava: false, name: "ver_estoque", description: "Lista produtos do estoque com saldo, mínimo e preço. Sem termo, mostra os que estão acabando primeiro.",
+  { grava: false, name: "ver_estoque", description: "Lista produtos do estoque com saldo, mínimo e preço (kit: o saldo é quantos dá para montar). Sem termo, mostra os que estão acabando primeiro. Traz também os lotes vencidos e vencendo em 60 dias (vencendo), para \"o que está vencendo?\".",
     input_schema: obj({ termo: S }) },
   { grava: false, financeiro: true, name: "resumo_financeiro", description: "Soma o dinheiro que entrou e saiu entre dois dias (inclusive), por categoria e por forma de pagamento, e informa se há caixa aberto.",
     input_schema: obj({ de: DIA, ate: DIA }, ["de", "ate"]) },
@@ -626,12 +626,22 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     }
     case "ver_estoque": {
       const alvo = semAcento(texto(e.termo, 80));
-      const prods = await comCustos(sb, petshop.id, await comPrecosDeProduto(sb, petshop.id, await lerTudo<{ id: string; nome: string; categoria: string | null; unidade: string; estoque: number; estoque_minimo: number }>((de, ate, contar) =>
-        sb.from("produtos").select("id, nome, categoria, unidade, estoque, estoque_minimo", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate))));
+      const [prods, venc] = await Promise.all([
+        lerTudo<{ id: string; nome: string; categoria: string | null; unidade: string; estoque: number; estoque_minimo: number; tipo: string }>((de, ate, contar) =>
+          sb.from("produtos").select("id, nome, categoria, unidade, estoque, estoque_minimo, tipo", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate))
+          .then(async (l) => comCustos(sb, petshop.id, await comPrecosDeProduto(sb, petshop.id, l))),
+        // validade (lotes com saldo vencidos ou vencendo em 60 dias): só quem cuida do estoque ou do financeiro; sem permissão, fica de fora
+        sb.rpc("estoque_vencendo", { p: petshop.id, p_dias: 60 }).then((r) => (r.error ? null : (r.data as unknown as { lotes: { nome: string; unidade: string; lote: string | null; validade: string; quantidade: number; dias: number; valor: number | null }[] } | null))),
+      ]);
       const lista = prods.filter((p) => !alvo || semAcento(p.nome).includes(alvo))
-        .map((p) => ({ produto_id: p.id, nome: p.nome, unidade: p.unidade, saldo: Number(p.estoque), minimo: Number(p.estoque_minimo), acabando: Number(p.estoque_minimo) > 0 && Number(p.estoque) <= Number(p.estoque_minimo), preco_venda: p.preco_venda, ...(c.vejoFinanceiro ? { custo: p.custo } : {}) }))
+        .map((p) => ({ produto_id: p.id, nome: p.nome, unidade: p.unidade, ...(p.tipo === "kit" ? { kit: true } : {}), saldo: Number(p.estoque), minimo: Number(p.estoque_minimo), acabando: Number(p.estoque_minimo) > 0 && Number(p.estoque) <= Number(p.estoque_minimo), preco_venda: p.preco_venda, ...(c.vejoFinanceiro ? { custo: p.custo } : {}) }))
         .sort((a, b) => Number(b.acabando) - Number(a.acabando));
-      return { resultado: { total: lista.length, produtos: lista.slice(0, 40) } };
+      const lotes = (venc?.lotes ?? []).filter((l) => !alvo || semAcento(l.nome).includes(alvo));
+      return { resultado: { total: lista.length, produtos: lista.slice(0, 40),
+        ...(venc ? { vencendo: lotes.slice(0, 30).map((l) => ({ produto: l.nome, lote: l.lote, validade: l.validade, quantidade: Number(l.quantidade), unidade: l.unidade,
+          situacao: Number(l.dias) < 0 ? `vencido há ${-Number(l.dias)} dia(s)` : Number(l.dias) === 0 ? "vence hoje" : `vence em ${Number(l.dias)} dia(s)`,
+          ...(c.vejoFinanceiro && l.valor != null ? { valor_a_preco_de_custo: Number(l.valor) } : {}) })),
+          vencendo_onde_ver: "Estoque, Vencendo: lá dá para dar baixa como perda no que venceu." } : {}) } };
     }
     case "resumo_financeiro": {
       exigir(c.cuidoDoFinanceiro, "Esta pessoa opera o caixa, mas não tem a área Financeiro: não vê o resumo do período nem as contas. O dono pode liberar em Equipe.");

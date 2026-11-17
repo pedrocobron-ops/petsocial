@@ -32,8 +32,8 @@ export async function consultarCompra(c: Contexto, nome: string, e: Record<strin
   const periodo = (PERIODOS as readonly number[]).includes(Number(e.periodo_semanas)) ? Number(e.periodo_semanas) : 6;
   const { sb, petshop } = c;
   const [base, movs] = await Promise.all([
-    lerTudo<{ id: string; nome: string; unidade: string; estoque: number; estoque_minimo: number; criado_em: string; embalagem_qtd: number | null; fornecedor_id: string | null }>((de, ate, contar) =>
-      sb.from("produtos").select("id, nome, unidade, estoque, estoque_minimo, criado_em, embalagem_qtd, fornecedor_id", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)),
+    lerTudo<{ id: string; nome: string; unidade: string; estoque: number; estoque_minimo: number; criado_em: string; embalagem_qtd: number | null; fornecedor_id: string | null; tipo: string }>((de, ate, contar) =>
+      sb.from("produtos").select("id, nome, unidade, estoque, estoque_minimo, criado_em, embalagem_qtd, fornecedor_id, tipo", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)),
     lerMovimentosDaCompra(sb, petshop.id),
   ]);
   const produtos = c.vejoFinanceiro ? await comCustos(sb, petshop.id, base) : base.map((p) => ({ ...p, custo: null }));

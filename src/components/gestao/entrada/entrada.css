@@ -1,0 +1,63 @@
+/* Checklist de entrada com termo (lado da equipe). Prefixo g-ent-. Fotos e títulos reaproveitam o boletim (g-bol-). */
+.g-ent { gap: 18px; }
+.g-ent-curto { min-height: 72px; font-size: 1rem; line-height: 1.45; }
+.g-ent-atencao .g-chip[aria-pressed="true"] { background: var(--i-manteiga); border-color: var(--i-manteiga); }
+.g-ent-nota { margin: 0; padding: 10px 12px; border-radius: 14px; background: var(--t-lilas, var(--t-ceu)); color: var(--i-lilas, var(--i-ceu)); font-size: .9375rem; line-height: 1.45; }
+
+/* a linha no horário e no cartão da estadia */
+.g-ent-linha { display: grid; gap: 8px; min-width: 0; }
+.g-ent-linha > .g-btn { justify-self: start; }
+.g-ent-estado { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid var(--g-linha); border-radius: 14px;
+  background: var(--g-carta); color: inherit; font: inherit; font-size: .9375rem; text-align: left; cursor: pointer; }
+.g-ent-estado:hover { border-color: color-mix(in srgb, var(--g-verde) 40%, var(--g-linha)); }
+.g-ent-estado > svg { width: 18px; height: 18px; flex: none; color: var(--g-verde); }
+.g-ent-estado span { min-width: 0; }
+.g-ent-estado .ok { color: var(--i-menta); }
+.g-ent-estado .pend { color: var(--i-manteiga); font-weight: 600; }
+
+/* pertences para devolver */
+.g-ent-devolver { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--t-manteiga); color: var(--i-manteiga); cursor: pointer; font-size: .9375rem; }
+.g-ent-devolver.ok { background: var(--t-menta); color: var(--i-menta); }
+.g-ent-devolver input { width: 22px; height: 22px; flex: none; margin: 1px 0 0; accent-color: var(--g-verde); }
+.g-ent-devolver span { display: grid; gap: 2px; min-width: 0; }
+.g-ent-devolver small { font-size: .8125rem; opacity: .85; }
+.g-ent-devolver.destaque { border: 1.5px solid currentColor; }
+
+/* situação dentro da folha */
+.g-ent-situacao { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border-radius: 14px; background: var(--t-ceu); color: var(--i-ceu); font-size: .9375rem; }
+.g-ent-situacao.ok { background: var(--t-menta); color: var(--i-menta); }
+.g-ent-situacao > svg { width: 18px; height: 18px; flex: none; }
+.g-ent-situacao > span { flex: 1 1 220px; min-width: 0; }
+.g-ent-assinatura-mini { height: 44px; max-width: 160px; object-fit: contain; background: #fff; border-radius: 8px; padding: 2px 6px; }
+
+/* aceite: as duas escolhas */
+.g-ent-escolha { display: grid; gap: 10px; }
+@media (min-width: 620px) { .g-ent-escolha { grid-template-columns: 1fr 1fr; } }
+.g-ent-op { display: grid; justify-items: start; gap: 4px; padding: 14px; border: 1.5px solid var(--g-linha); border-radius: 16px; background: var(--g-carta); color: inherit; font: inherit; text-align: left; cursor: pointer; min-height: 96px; }
+.g-ent-op:hover { border-color: var(--g-verde); }
+.g-ent-op svg { width: 22px; height: 22px; color: var(--g-verde); }
+.g-ent-op small { color: var(--g-cinza); font-size: .875rem; line-height: 1.4; }
+.g-ent-termo { border: 1px solid var(--g-linha); border-radius: 14px; padding: 10px 14px; font-size: .9375rem; }
+.g-ent-termo summary { cursor: pointer; font-weight: 600; color: var(--g-verde); min-height: 28px; }
+.g-ent-termo p { margin: 8px 0 0; white-space: pre-line; line-height: 1.5; }
+
+/* o texto que o tutor lê e o resumo */
+.g-ent-texto { padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); font-size: 1rem; line-height: 1.55; display: grid; gap: 8px; }
+.g-ent-texto p { margin: 0; }
+.g-ent-resumo { margin: 0; display: grid; gap: 6px; font-size: .9375rem; }
+.g-ent-resumo > div { display: grid; grid-template-columns: minmax(0, 9.5em) minmax(0, 1fr); gap: 8px; }
+.g-ent-resumo dt { color: var(--g-cinza); }
+.g-ent-resumo dd { margin: 0; overflow-wrap: anywhere; }
+.g-ent-li { display: flex; align-items: center; gap: 10px; font-weight: 600; min-height: 44px; cursor: pointer; }
+.g-ent-li input { width: 22px; height: 22px; accent-color: var(--g-verde); }
+
+/* o quadro da assinatura */
+.g-ent-quadro { position: relative; border: 1.5px dashed color-mix(in srgb, var(--g-verde) 45%, var(--g-linha)); border-radius: 16px; background: #fff; overflow: hidden; }
+.g-ent-quadro canvas { display: block; width: 100%; height: 190px; touch-action: none; cursor: crosshair; }
+.g-ent-quadro-linha { position: absolute; left: 16px; right: 16px; bottom: 34px; border-top: 1px solid #c9c2b8; padding-top: 4px; color: #8a8178; font-size: .75rem; pointer-events: none; }
+.g-ent-limpar { position: absolute; top: 6px; right: 6px; background: rgba(255, 255, 255, .9); }
+.g-ent-url { margin: 0; overflow-wrap: anywhere; font-size: .875rem; }
+
+/* comprovante para imprimir */
+.g-ent-comp > div { padding-bottom: 6px; border-bottom: 1px solid #ece5d9; }
+.g-ent-comp dt { color: #4a433c; }

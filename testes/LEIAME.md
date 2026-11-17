@@ -88,7 +88,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   pegar "Melissa" pela "Mel"); o Mozart num hotel só diz "Hotel".
 - `bom-dia.js`: o "Bom dia" do Mozart (`src/lib/gestao/bom-dia.ts`): no máximo 3 linhas na ordem dia (agenda, buraco livre, casa),
   quem deve e vem hoje, vacina de quem vem, pacote no último uso, aniversário; sem `devem` (papel sem dinheiro) nada de R$; só
-  "agenda livre" não vira cartão; buraco na agenda com almoço e funcionamento. E a prévia da autorização das fotos
+  "agenda livre" não vira cartão; buraco na agenda com almoço e funcionamento; a linha da validade (quem cuida do estoque:
+  "Validade: 2 produtos vencidos na prateleira e 3 vencem em até 30 dias.") depois de quem deve e antes da vacina. E a prévia da autorização das fotos
   (`fotos-redes.ts`): o @ arrumado igual ao banco e a frase "Sem marcar o meu perfil." trocada.
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
@@ -104,7 +105,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   (tabela do EAN em larguras, independente da do app) lendo de volta 16 códigos. Sugestão de compra (`compra.ts`) à mão:
   21 em 6 semanas = 3,5 por semana, 7 + mínimo 3 = 10, tem 4: comprar 6 (com a explicação escrita); 8 semanas; caixa de 12;
   venda desfeita desconta e uso no banho conta; perda à parte; sem vendas recentes sem sugestão; produto de 10 dias; parados,
-  acabando e valor em estoque (custo × quantidade).
+  acabando e valor em estoque (custo × quantidade). Kits e contagem (migração 20261201): o kit fica de fora do O que comprar e do
+  valor em estoque (a venda dele conta nos produtos do kit); a diferença da contagem sobre o esperado (−1 e +1, −R$ 2,36 ao centavo),
+  o que está só na tela comparado com o saldo de agora, e a planilha sem colunas de R$ para quem não vê o financeiro.
 
 **banco/** (API do Supabase com o login de cada papel, como o navegador faz; SQL só para preparar e conferir)
 - `seguranca.js`: isolamento entre pet shops e anônimo; dono não mexe na própria assinatura nem vira admin; o que cada papel grava
@@ -173,6 +176,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   com o navegador); `admin_aceites` só para o admin (com o pet shop e a contagem por versão); login apagado deixa o aceite com o e-mail.
   **Contas de teste:** todo cadastro dos testes passa `B.dadosDoCadastro()` (o mesmo aceite da tela Criar conta); sem isso o login
   pararia na tela de aceite de versão nova e `N.entrar` não acharia o aplicativo.
+- `entrada.js`: checklist de entrada com termo (migração 20261202): quem grava e lê por área (agenda para o banho, creche e hotel para a
+  estadia; estoque, outro pet shop e anônimo não), conferências de `entrada_salvar` (visita, pet, chips fora da lista, foto fora da pasta
+  ou que não subiu, até 4, foto de outra entrada), dois toques no Salvar = uma entrada, gravar direto na tabela recusado; assinatura no
+  aparelho (`entrada_assinar`: nome, PNG na pasta, uma vez só); mudar depois do aceite apaga o aceite e põe a assinatura antiga e a foto
+  tirada na fila; link de 7 dias (`entrada_link`: precisa da assinatura de cada foto, o mesmo código de novo), página pública
+  (`entrada_publica`: nada do tutor nem caminho de arquivo; página com noindex), foto pela rota do servidor (bytes, 404), "Li e concordo"
+  pela rota `/gestao/entrada/<código>/aceite` duas vezes ao mesmo tempo = um aceite, com o navegador; vencido some; pertences devolvidos
+  (`entrada_devolver`); faxina (arquivo solto de mais de um dia, fila, nunca o que está em uso) e horário apagado. Precisa do servidor.
 - `cakto.js`: webhook da Cakto de ponta a ponta pela rota do servidor: 9 ofertas, ciclo da assinatura (renovada, atrasada, recuperada,
   cancelada), reembolso, contestação, MED, segredo errado, outro produto, e-mail diferente (callback e pagamento sem conta), Escola.
   A configuração da Cakto (`config_interna`) é guardada antes e devolvida igual no fim.
@@ -261,10 +272,42 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   marca das outras telas (`lembrete_em`, `pronto_avisado_em`, `avisos.chegada`, `cobrado_em`) e o registro com quem e quando, uma vez por
   (tipo, ref, dia), também com dois toques ao mesmo tempo; tipo de outra área, anônimo, tipo estranho e mais de 50 recusados; ref de outra
   loja ignorada; depois, a fila fica vazia. Ninguém grava nem apaga direto no registro; outra loja não lê.
+- `lotes-kits.js`: validade e lote, kits e contagem de estoque (migração 20261201). **Lotes**: entrada com lote e validade (o mesmo
+  lote, com espaço e outra caixa de letra, soma num lote só; custo do lote guardado e fora da leitura direta), venda de 6 sai do lote
+  que vence antes (B2: 5, depois A1: 1, anotado em `movimentos_lotes`), venda com o lote escolhido, lote de outro produto recusado,
+  saldo corrigido para menos do que está nos lotes (os lotes acompanham), produto sem lote igual a antes, ninguém grava nos lotes.
+  **Vencendo** (`estoque_vencendo`): dias e quantidades, valor só para quem vê o financeiro, 30 × 60 dias, tosador/anônimo/outra loja
+  recusados; `gestao_bom_dia` com `validade` só para quem cuida do estoque (e só com algo vencendo: o `fotos-redes.js` continua com
+  "estoque: só o dia"); **perda num toque** (`lotes_baixar_perda`, dois toques ao mesmo tempo: uma saída "Vencido" por lote, anotada
+  para o dono; a mesma chave de novo não tira outra vez; O que comprar põe à parte). **Kits**: nasce com saldo zero, monta só quem
+  cuida do estoque, kit não entra em kit, saldo = quantos dá para montar (min(10, 7/2) = 3), custo = soma (32,33) e refeito quando
+  o custo de um produto muda, não vira produto, sem ajuste nem entrada de compra; venda de 2 kits baixa cada produto (e os lotes, o
+  que vence antes), a saída do kit ligada à venda com o custo do kit e as dos produtos sem ligar; **Quanto sobrou** com o kit
+  (receita 110,00, custo 64,66 uma vez só) e sem linha dos produtos; `custos_das_vendas` sem as saídas dos produtos do kit; O que
+  comprar conta 2 shampoos e 4 condicionadores; venda desfeita devolve os produtos. **Contagem**: começar por categoria (sem o kit,
+  mesma chave = mesma contagem), tabelas fechadas, pausar e continuar, venda no meio (a diferença é sobre o esperado: 9 − 1 = 8),
+  revisão com valor só para quem vê o financeiro, **Ajustar estoque com dois toques ao mesmo tempo: ajusta uma vez** (dois
+  movimentos "Contagem"), histórico com quem começou e quem ajustou e −R$ 2,35, concluída não muda, papéis.
 - `velocidade.js`: abrir o aplicativo numa ida só ao banco (migração 20261185): `lerBase` (`gestao_base`) = a leitura antiga parte por
   parte (`lerPetshop` + `lerEquipe` + `lerServicos`) para dono, recepção, monitora, tosador e estoque, com meta, diárias, opções com valor,
   comissão, convite e preços só para quem pode; as seis contagens da tela Hoje (`gestao_contagens`) = as contagens pela API; anônimo
   recusado; dono de outra loja não lê nada e conta zero.
+- `orcamento-troca.js`: orçamento, troca e devolução e limite de fiado (migração 20261200), contas à mão. **Orçamento**: 2 × 29,90 +
+  Banho 60,00 − 9,80 = 110,00 (o total mandado pela tela é ignorado, `orcamento_conferir`); número em sequência; estoque não mexe;
+  tosador e estoque não leem nem criam; "convertido" direto recusado; página pública (`orcamento_publico`, anônimo) com loja, itens,
+  total, status e só o primeiro nome (sem telefone nem ids), vencido pela validade; texto do WhatsApp (`textoDoOrcamento`).
+  "Transformar em venda" (`orcamento_vender`) com **dois toques ao mesmo tempo**: uma venda, estoque −2 uma vez, convertido;
+  outra chave recusada; convertido não muda nem é apagado; o horário fica ligado (`orcamento_marcar`). **Devolução**
+  (`venda_devolver`): venda de 3 × 29,90 com 9,70 de desconto = 80,00; volta 1 = 26,67 em dinheiro (dois toques = uma saída
+  "Devolução" no caixa, estoque +1 uma vez); o resto (2, um avariado) = 53,33 de crédito (fecha ao centavo), estoque +2 e perda
+  de 1; mais que isso recusado; venda a receber e crédito sem tutor recusados. **Troca**: 29,90 por coleira de 45,00 = paga
+  15,10 no Pix (saída 29,90 "outro" + entrada 45,00 = 29,90 "outro" + 15,10 Pix; a recepção não muda o preço); por laço de 5,00
+  = volta 24,90 em dinheiro. **Relatórios**: comissão de 10% sobre o shampoo da conta do atendimento 2,99 → 0,00 depois da
+  devolução; `lucro_do_periodo` = `faturamento.ts` (devolvido 116,37, crédito 53,33), devoluções por produto (6 voltaram, 1
+  avariado, 169,70, custo de volta 60,00), `montarLucro` com a margem líquida e a ponte fechando. **Fiado**: a recepção não muda
+  o limite; Ana deve 180 de 200, mais 30 recusado com "Ana já deve R$ 180,00; com esta conta passa do limite de R$ 200,00."
+  (também pela venda de balcão); pagamento na hora passa; a recepção não libera; o dono libera (anotado, uma vez só); padrão da
+  loja (50) para quem não tem limite próprio, e a opção não vai para o tosador.
 
 **migracoes/**
 - `prova-ordem.sh`: cria um banco de rascunho no mesmo Postgres (chão copiado do banco local sem o `public`), aplica todas as
@@ -375,6 +418,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   próxima" grava o `lembrete_em`; "Pular" não grava; "Não enviou" fica na mesma; fim com 2 enviadas e 1 para depois. 1366: só a cobrança
   sobra; Enter abre o WhatsApp e S responde sim (`cobrado_em` e o registro com quem mandou); a ficha da Clara com "Não quer receber
   mensagens" e a caixa marcada no formulário. Capturas em `testes/saida/modo-envio-*.png`.
+- `entrada.js`: checklist de entrada pela tela. 390 (recepção): Thor com 10 anos chega pela Agenda e a folha abre sozinha (padrão: só pet
+  idoso), com os Cuidados e alertas da ficha e "Pet idoso ou doente" marcado; chips, foto feita num canvas, pertences, observação;
+  "Assinar aqui no aparelho" com o termo padrão, "Li e concordo", o nome do tutor e uma assinatura desenhada no quadro (PNG no bucket);
+  o horário mostra "Entrada conferida ✓ · aceite do tutor ✓" e "Devolver: coleira, caminha e Cobertor azul" com a caixa; o comprovante
+  com a assinatura. 1366: Meu pet shop "Todos os pets"; a monitora faz o check-in do hotel, a folha abre sozinha, "Mandar o link pelo
+  WhatsApp" ("Oi, Beto! …"); a página do tutor em 390 e 1366 (sem telefone, sem rolagem para o lado) e "Li e concordo"; o cartão mostra o
+  aceite e o check-out "Devolver: ração". Capturas em `testes/saida/entrada-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 - `compra-etiquetas.js`: Estoque pela tela, 390 e 1366. O que comprar: "Vendeu em média 3,5 por semana nas últimas 6 semanas",
@@ -385,12 +435,29 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   etiqueta por página; Entrada com "Imprimir etiquetas do que entrou" abre com uma por unidade. Quem cuida do estoque (sem
   dinheiro) vê a sugestão sem nenhum R$. Capturas em `testes/saida/compra-*.png`, `etiquetas-*.png` e PDFs `etiquetas-*.pdf`
   (conferidos com zxing-cpp ao escrever: todos os códigos lidos).
+- `estoque-lotes.js`: validade, kits e contagem pela tela (migração 20261201). 390, quem cuida do estoque (sem dinheiro): o aviso da
+  tela Hoje ("1 lote vencido e 1 lote vence em até 30 dias no estoque") abre Estoque, Vencendo sem nenhum R$; "Perda" dá baixa no
+  lote vencido (no banco: saída "Vencido" de 3, lote zerado); a contagem no celular: começar, + e −, vai ao banco sozinho (contado e
+  esperado), **sem internet** (`ctx.setOffline`: "Sem internet: 1 contagem guardada neste aparelho", nada no banco) e de volta (vai
+  sozinho), revisão (shampoo −1, condicionador +2, sem R$, sem rolagem para o lado), "Ajustar estoque" (saldos e dois movimentos
+  "Contagem", com uma saída no meio). 1366, o dono: Entrada com lote e validade; kit novo ("Dá para montar 7 kits", custo R$ 22,50;
+  no banco tipo kit, 2 produtos, saldo 7); Vencendo com R$; o histórico (+R$ 7,50, Edu Estoque) e a folha impressa. Capturas em
+  `testes/saida/lotes-*.png` e `contagem-*.png`.
 - `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente
   de verdade) reduzidas a 1600 px no aparelho, recados, atenção à saúde, texto pronto, "Escrever com o Mozart" (de teste), salvar,
   o WhatsApp com "Oi, Ana! O boletim do Thor de hoje: <link>" e o "Boletim enviado". 1366: a monitora, pelo cartão da creche em
   Casa agora ("Fez amizade com Mel"). A página pública em 390 e 1366 (fotos carregadas, atenção, serviços, Avaliar no Google, Marcar
   o próximo, sem telefone do tutor, sem rolagem para o lado) e o álbum na ficha do pet com o link para o tutor. Capturas em
   `testes/saida/boletim-*.png` e `album-390.png`.
+
+- `orcamento-troca.js`: orçamento, troca e limite de fiado pela tela. 390 (recepção): Caixa › Orçamentos › Orçamento novo com Ana,
+  2 shampoos e o Banho (entra a 50,00, o primeiro preço; ela põe 60,00), desconto 9,80 = R$ 110,00; Mandar no WhatsApp (número da
+  Ana, "Oi, Ana!", total e link); a página pública (Para Ana, itens, total, validade, "Quero fechar" para o WhatsApp da loja, 404
+  com código errado); Transformar em venda: venda de 54,91 (desconto repartido: 9,80 × 59,80 / 119,80 = 4,89) e depois o horário
+  com o Banho a 55,09; banco com a venda, estoque −2 e o orçamento convertido. Fiado acima do limite pela Venda no balcão: a
+  recepção vê a frase e nada é anotado. 1366 (dono): Caixa › a venda › Troca ou devolução: 1 shampoo volta = 27,46 em dinheiro,
+  **dois toques** = uma saída; o dono vê "Passa do limite de fiado", toca em "Liberar mesmo assim" e a conta entra (anotado quem
+  liberou); a ficha mostra "Limite R$ 200,00 · passou R$ 9,90 do limite" e Fazer orçamento. Capturas em `testes/saida/orc-*.png`.
 
 ## Variáveis do servidor de produção (não precisa para os testes)
 

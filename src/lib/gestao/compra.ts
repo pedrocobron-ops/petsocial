@@ -5,12 +5,15 @@ import { contando, lerTudo } from "./paginas";
  * Sugestão de compra e análise do estoque ("O que comprar", na tela Estoque, e o Mozart em "o que preciso comprar?").
  * Tudo sai dos movimentos de verdade: a média da semana é o que saiu (venda e uso) no período, dividido pelas semanas;
  * saldo corrigido (ajuste) não conta, perda ou vencido aparece à parte e não conta como venda, venda desfeita desconta.
+ * Kits ficam de fora: a venda de um kit vira saída "Venda" de cada produto do kit, e é essa que conta.
  * Sem saída no período: "sem vendas recentes", sem sugestão. Nada de número inventado: cada linha diz de onde veio a conta.
  */
 
 export type ProdutoDaCompra = {
   id: string; nome: string; unidade: string; estoque: number; estoque_minimo: number; criado_em: string;
   embalagem_qtd?: number | null; fornecedor_id?: string | null; custo?: number | null;
+  /** 'kit': fica de fora (não se compra kit; a venda do kit já conta nos produtos dele, e o valor não conta duas vezes). */
+  tipo?: string | null;
 };
 export type MovimentoDaCompra = { produto_id: string; tipo: string; quantidade: number; motivo: string | null; criado_em: string };
 
@@ -91,7 +94,9 @@ export function arredondarCompra(falta: number, embalagem: number | null | undef
   return { quantidade: Math.ceil(falta - 1e-9), caixas: null };
 }
 
-export function analisarCompra(produtos: ProdutoDaCompra[], movimentos: MovimentoDaCompra[], o: { agora?: Date; semanasPeriodo?: number; semanasCobrir?: number } = {}): AnaliseDaCompra {
+export function analisarCompra(todos: ProdutoDaCompra[], movimentos: MovimentoDaCompra[], o: { agora?: Date; semanasPeriodo?: number; semanasCobrir?: number } = {}): AnaliseDaCompra {
+  // kit não se compra: a venda do kit baixa (e conta) os produtos dele
+  const produtos = todos.filter((p) => p.tipo !== "kit");
   const agora = (o.agora ?? new Date()).getTime();
   const semanasPeriodo = Math.max(1, Math.min(12, Math.round(o.semanasPeriodo ?? 6)));
   const semanasCobrir = Math.max(0.5, Math.min(26, o.semanasCobrir ?? 2));

@@ -27,6 +27,7 @@ import { AvatarPet, Campo, Folha, mensagemDeErro, useAvisos, useDados } from "..
 import { BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, LinhaDaConta, novaChave, produtosDaConta, useProdutosDaLoja, valorDaLinha, type ItemConta } from "../loja/conta";
 import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
 import { ehAdiantado } from "./sinal";
+import { PertencesNaSaida } from "../entrada/entrada";
 import { horaCurta, nomeTipo, type EstadiaCompleta } from "./tipos";
 import "./hotel.css";
 
@@ -392,6 +393,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
             </div>
           </div>
         </div>
+        {!pendente && <PertencesNaSaida visita={{ tipo: estadia.tipo === "hotel" ? "hotel" : "creche", estadiaId: estadia.id }} />}
         <Campo rotulo="Diárias" dica={nValido ? `${n} ${palavra}${vejoFinanceiro && diaria != null && !dasDiarias.noites ? ` × ${brl(diaria)}` : ""}` : undefined}
           erro={nValido ? null : "Use um número inteiro, a partir de 1."}>
           <input className="g-input g-tab" inputMode="numeric" value={diarias} onChange={(e) => { setDiarias(e.target.value); setValorEditado(undefined); }} />

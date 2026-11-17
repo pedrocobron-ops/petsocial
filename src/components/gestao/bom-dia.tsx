@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, Cake, HandCoins, HeartPulse, MessageCircle, Ticket, X } from "lucide-react";
+import { CalendarDays, CalendarX, Cake, HandCoins, HeartPulse, MessageCircle, Ticket, X } from "lucide-react";
 import { linhasDoBomDia, type DadosDoBomDia, type LinhaDoBomDia } from "@/lib/gestao/bom-dia";
 import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { isoDia } from "@/lib/gestao/util";
@@ -21,7 +21,7 @@ import "./bom-dia.css";
  * numa abertura nova do aplicativo no mesmo dia, não volta.
  */
 const ICONES: Record<LinhaDoBomDia["id"], React.ComponentType<{ "aria-hidden"?: boolean }>> = {
-  dia: CalendarDays, devem: HandCoins, vacinas: HeartPulse, pacotes: Ticket, niver: Cake,
+  dia: CalendarDays, devem: HandCoins, validade: CalendarX, vacinas: HeartPulse, pacotes: Ticket, niver: Cake,
 };
 
 export const chaveBomDia = (petshop: string, pessoa: string) => `maestro-gestao-bomdia-${petshop}-${pessoa}`;

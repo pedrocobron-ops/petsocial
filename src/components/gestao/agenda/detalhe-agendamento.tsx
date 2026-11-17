@@ -24,6 +24,7 @@ import Comanda from "./comanda";
 import { MarcaSemCobranca, semCobranca } from "./para-cobrar";
 import AntesDepois from "./antes-depois";
 import { BotaoBoletim } from "../boletim/boletim";
+import { EntradaNaChegada, EntradaNaVisita, type VisitaDaEntrada } from "../entrada/entrada";
 import { continuarSerie, encerrarSerie, textoContinuou, VEZES_POR_VEZ } from "./series-acabando";
 import "@/components/gestao/hotel/hotel.css";
 
@@ -46,10 +47,13 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const [avisadoEm, setAvisadoEm] = useState(a.pronto_avisado_em);
   // "Cobrar a diferença" aberto (atendimento pago que ficou mais caro depois)
   const [cobrandoDiferenca, setCobrandoDiferenca] = useState(false);
+  // checklist de entrada: abre sozinha depois do "Chegou" quando o pet shop pede (todos ou pet idoso)
+  const [chegou, setChegou] = useState(false);
 
   const pet = a.pets;
   const tutor = pet?.clientes;
   const st = STATUS_AGENDAMENTO[a.status];
+  const visitaDaEntrada: VisitaDaEntrada | null = pet ? { tipo: "banho", agendamentoId: a.id, petId: pet.id, pet: pet.nome, tutor: tutor ? { nome: tutor.nome, telefone: tutor.telefone } : null } : null;
   const encerrado = ["concluido", "faltou", "cancelado"].includes(a.status);
   const deHoje = mesmoDia(new Date(a.inicio), new Date());
   // fotos: de hoje para trás, em horário que aconteceu (ou em qualquer um que já tenha foto)
@@ -510,6 +514,11 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           </div>
         )}
 
+        {visitaDaEntrada && a.status !== "cancelado" && a.status !== "faltou" && (
+          <EntradaNaVisita visita={visitaDaEntrada} saida={a.status === "em_atendimento" || a.status === "concluido"} mostrarSemEntrada={a.status === "em_atendimento"} />
+        )}
+        {chegou && visitaDaEntrada && <EntradaNaChegada visita={visitaDaEntrada} aoFechar={() => setChegou(false)} />}
+
         {comFotos && <AntesDepois agendamento={a} aoMudar={aoMudar} />}
         {(a.status === "em_atendimento" || a.status === "concluido") && pet && (
           <BotaoBoletim classe="g-btn sec cheio" visita={{ tipo: "banho", agendamentoId: a.id, petId: pet.id, pet: pet.nome, tutor: tutor ? { nome: tutor.nome, telefone: tutor.telefone } : null, servicos: servicosPorExtenso(a) }} />
@@ -518,7 +527,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         {!encerrado && (
           <div className="g-pilha p">
             {a.status === "marcado" && <button className="g-btn verde cheio" disabled={ocupado} onClick={() => void mudar({ status: "confirmado" }, "Horário confirmado.")}><Check />Cliente confirmou</button>}
-            {(a.status === "marcado" || a.status === "confirmado") && <button className="g-btn sec cheio" disabled={ocupado} onClick={() => void mudar({ status: "em_atendimento" }, `${pet?.nome ?? "Pet"} em atendimento.`)}><Play />Chegou: iniciar atendimento</button>}
+            {(a.status === "marcado" || a.status === "confirmado") && <button className="g-btn sec cheio" disabled={ocupado} onClick={() => void mudar({ status: "em_atendimento" }, `${pet?.nome ?? "Pet"} em atendimento.`).then((deu) => deu && setChegou(true))}><Play />Chegou: iniciar atendimento</button>}
             {!sabe && <ContaCarregando erro={erroExtra} aoTentar={() => void recarregar()} vejoFinanceiro={vejoFinanceiro} />}
             {/* pet com pacote que cobre este serviço: usar o pacote vem primeiro, para ninguém cobrar duas vezes */}
             {sabe && pacote && !pago && (
