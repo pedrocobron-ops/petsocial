@@ -202,8 +202,8 @@ export default function Pagina() {
             <a href="#funcoes" className="gp-link so-pc">Funções</a>
             <a href="#plano" className="gp-link gp-link-precos">Preços</a>
             <a href="#perguntas" className="gp-link so-pc">Perguntas</a>
-            <Link href="/gestao/entrar" className="gp-btn contorno">Entrar</Link>
-            <Link href={CRIAR} className="gp-btn verde">Teste grátis</Link>
+            <a href="/gestao/entrar" className="gp-btn contorno">Entrar</a>
+            <a href={CRIAR} className="gp-btn verde">Teste grátis</a>
           </nav>
         </header>
 
@@ -217,7 +217,7 @@ export default function Pagina() {
               <li><Check />Boletim do pet e link de agendamento, sem o tutor instalar nada</li>
             </ul>
             <div className="gp-acao">
-              <Link href={CRIAR} className="gp-btn pri grande">Teste grátis por 7 dias <ArrowRight /></Link>
+              <a href={CRIAR} className="gp-btn pri grande">Teste grátis por 7 dias <ArrowRight /></a>
               <span>Sem cartão. Sem fidelidade.</span>
             </div>
             <a href="#plano" className="gp-preco-curto">Planos desde <b>{DESDE} por mês</b>, com tudo incluído. Ver os preços</a>
@@ -321,7 +321,7 @@ export default function Pagina() {
         <div className="gp-c">
           <div className="gp-inclui-cab">
             <h2>É simples. <em>E é completo.</em></h2>
-            <Link href={CRIAR} className="gp-btn pri">Teste grátis por 7 dias</Link>
+            <a href={CRIAR} className="gp-btn pri">Teste grátis por 7 dias</a>
           </div>
           <ul className="gp-grade">
             {INCLUI.map(([t, d]) => <li key={t}><Marca tamanho={26} /><b>{t}</b><span>{d}</span></li>)}
@@ -366,10 +366,10 @@ export default function Pagina() {
           <div>
             <Marca tamanho={56} />
             <p className="gp-pe-frase">Comece a organizar o seu negócio <em>hoje.</em></p>
-            <Link href={CRIAR} className="gp-btn pri">Teste grátis por 7 dias <ArrowRight /></Link>
+            <a href={CRIAR} className="gp-btn pri">Teste grátis por 7 dias <ArrowRight /></a>
           </div>
           <nav aria-label="Rodapé">
-            <Link href="/gestao/entrar">Entrar</Link>
+            <a href="/gestao/entrar">Entrar</a>
             <Link href="/gestao/termos">Termos de uso</Link>
             <Link href="/gestao/privacidade">Política de privacidade</Link>
             <a href={linkSuporte()} target="_blank" rel="noopener noreferrer">WhatsApp</a>

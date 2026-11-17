@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Porta from "@/components/gestao/porta";
 import { banco, configurado } from "@/lib/gestao/supabase";
+import { registrarAcesso } from "@/lib/gestao/registro-acesso";
 import CampoSenha from "./campo-senha";
 
 export default function Entrar() {
@@ -19,13 +20,15 @@ export default function Entrar() {
     setErro(null);
     if (!configurado) { setErro("O sistema ainda não está ligado neste endereço."); return; }
     setIndo(true);
-    const { error } = await banco().auth.signInWithPassword({ email: email.trim(), password: senha });
+    const { data, error } = await banco().auth.signInWithPassword({ email: email.trim(), password: senha });
     setIndo(false);
     if (error) {
       setErro(/confirm/i.test(error.message) ? "Confirme o seu e-mail pelo link que enviamos antes de entrar."
         : /invalid/i.test(error.message) ? "E-mail ou senha não conferem." : "Não consegui entrar agora. Tente de novo em instantes.");
       return;
     }
+    // registro de acesso (Marco Civil): sai sem esperar, não atrasa a abertura
+    registrarAcesso(banco(), "login", data.user?.id);
     router.replace("/gestao/app");
   }
 

@@ -236,6 +236,18 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   chave de serviço; a tarefa `gestao-faxina-diaria` no pg_cron (quando o banco tem); `faxinaGeral` com a chave de serviço local
   (`SUPABASE_SERVICE_ROLE_KEY` ou `npx supabase status -o env`), só na loja de teste: foto do boletim sem boletim há mais de um dia
   sai, a de agora fica; PDF do caderno-tmp com mais de uma hora sai, o de agora fica; o de outro pet shop fica.
+- `lgpd-ajustes.js`: ajustes da revisão jurídica (migração 20261210). **Registro de acesso** (`registrar_acesso`): o login grava quem,
+  quando, o IP (x-forwarded-for) e o navegador (cortado em 300 letras); dois logins no mesmo minuto e a abertura no mesmo dia não gravam
+  de novo; anônimo recusado; ninguém (anônimo, dono, recepção) lê ou grava a tabela `registros_acesso` direto; `admin_registros_acesso`
+  recusado para o dono e lido pelo admin (por e-mail ou login). **Faxina** (`gestao_faxina_banco`): acesso com mais de 6 meses sai, com
+  menos fica; conversas (`conversas`) e histórico do Mozart (`assistente_eventos`) com mais de 12 meses saem, os de 11 meses ficam.
+  **Apagar o tutor** (`cliente_anonimizar`): orçamentos da Ana (pela ficha, só pelo telefone com +55, e um já convertido) ficam sem nome,
+  telefone e ficha, com o nome tirado da observação e o valor igual; o do Beto fica; conversas com o nome dela (maiúsculas e espaços
+  diferentes) ou o telefone formatado e o histórico com o nome ou o id do pet dela saem; as de outro tutor e de outra loja ficam.
+  **Autorização de foto**: o texto novo (sem cobrar, não vende, pessoas na foto, do/da/de, com e sem @), IP e navegador gravados (pela
+  API e pela rota da página do boletim, com os do tutor); autorização antiga fica com o texto da época. **Checklist de entrada**:
+  `aceite_hash` = SHA-256 de `termo + "\n" + fotos` na assinatura e no aceite pelo link, apagado quando a entrada muda, não muda em
+  outra gravação, a equipe lê e ninguém grava. Precisa do servidor só para a rota do boletim.
 - `lgpd.js`: LGPD (migração 20261199). **Dados de um tutor** (`cliente_dados`): o dono baixa só a Ana (cadastro, Thor e Mel, vacina,
   horário com preço, autorização de fotos, financeiro 60 + 45,50 + 33,30), nada do Beto, do Bob nem da outra loja, nenhum código do
   "Não quero mais"; recepção, tosador, dono de outra loja e anônimo recusados; fica no registro sem o nome. "Baixar todos os dados":
@@ -487,6 +499,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   Exportar baixa a planilha; Por pessoa com o tosador (2 atendimentos, R$ 140,00) e a recepção (venda R$ 59,80). 1366: Meu pet shop,
   Custo do material por atendimento (grava R$ 4,20; o Banho abre com R$ 8,50). Tosador na tela Hoje: "Meu mês" com 2 atendimentos e sem
   reais. Capturas em `testes/saida/lucro-*.png`.
+- `lgpd-ajustes.js`: revisão jurídica pela tela, em 390 e 1366. **Meta Pixel**: na capa `/gestao` a fila do fbq tem
+  `set autoConfig false` antes do `init`; "Teste grátis" e "Entrar" são links comuns (página inteira): em criar conta e entrar não há
+  fbq nem script do Pixel e nenhum pedido sai para o Facebook, nem digitando o e-mail (os pedidos para facebook.com/net são barrados e
+  anotados); capa → Termos pelo menu (1366) manda `consent revoke` ao fbq que ficou; no aplicativo, sem fbq. **Login** pela tela grava um
+  registro de acesso com o navegador (a abertura no mesmo dia não grava outro). **Opções de cobrança**: multa de 2% sem aviso, 10% com
+  "Para clientes pessoa física, a multa por atraso costuma ser limitada a 2%..." e salva assim mesmo; só juros também avisa. **Link de
+  agendamento**: o texto das dúvidas (inteligência artificial, podem errar) e "Seus dados vão só para <loja>, para responder ao seu
+  pedido." em "Com quem a gente fala?"; sem rolagem para o lado. Capturas em `testes/saida/lgpd-ajustes-*.png`.
 - `lgpd.js`: LGPD pela tela, em 390 e 1366. Meu pet shop, "Seus dados e a conta" com três cartões; "Baixar todos os dados" baixa um
   .zip (lido com o `zipfile` do Python) com README.txt e uma planilha por parte (clientes, pets, saúde, agenda, estadias, mensalistas,
   pacotes, lançamentos, vendas, caixas, produtos, movimentos, boletins, autorizações de fotos, equipe), todas com BOM, só os clientes

@@ -119,6 +119,9 @@ export default function OpcoesDeCobranca() {
                 <Campo rotulo="Multa em % (uma vez)"><input className="g-input g-tab" inputMode="decimal" placeholder="0" value={pct} aria-label="Multa em por cento" onChange={(e) => setPct(soPct(e.target.value))} /></Campo>
                 <Campo rotulo="Juros em % ao mês"><input className="g-input g-tab" inputMode="decimal" placeholder="0" value={juros} aria-label="Juros em por cento ao mês" onChange={(e) => setJuros(soPct(e.target.value))} /></Campo>
               </div>
+              {((lerPct(pct) ?? 0) > 2 || (lerPct(juros) ?? 0) > 0) && (
+                <p className="g-aviso" style={{ marginBottom: 0 }} role="status" data-teste="aviso-multa">Para clientes pessoa física, a multa por atraso costuma ser limitada a 2%. Confira com seu contador.</p>
+              )}
               <p className="g-muted g-pp">
                 {exemplo
                   ? `Exemplo: uma conta de ${brl(100)} vencida há 15 dias ficaria ${brl(100 + exemplo.total)} (${brl(exemplo.multa)} de multa e ${brl(exemplo.juros)} de juros). Os juros contam por dia de atraso.`

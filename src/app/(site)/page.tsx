@@ -129,7 +129,7 @@ export default function Home() {
               {GESTAO.map((t) => <li key={t}><Check size={18} aria-hidden />{t}</li>)}
             </ul>
             <div className="h2-gestao-ctas">
-              <Link className="btn" href="/gestao/criar-conta">Testar grátis por 7 dias<Seta /></Link>
+              <a className="btn" href="/gestao/criar-conta">Testar grátis por 7 dias<Seta /></a>
               <Link className="btn h2-btn-claro" href="/gestao">Conhecer o sistema</Link>
             </div>
             <p className="h2-gestao-nota">Sem cartão para testar. Planos a partir de R$ {menorPlano} por mês, sem fidelidade.</p>

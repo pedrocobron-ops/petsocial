@@ -531,6 +531,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
       </div>
       <div className="g-lk-bloco g-form">
         <h2>Com quem a gente fala?</h2>
+        <p className="g-muted" data-teste="aviso-dados">Seus dados vão só para {loja}, para responder ao seu pedido.</p>
         <label className="g-campo"><span>Seu nome</span>
           <input className="g-input" value={tutor} maxLength={120} autoComplete="name" onChange={(e) => setTutor(e.target.value)} />
         </label>

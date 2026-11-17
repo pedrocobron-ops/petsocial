@@ -31,10 +31,12 @@ function Comprovante() {
       const s = await sb.from("estadias").select("entrada, tipo").eq("id", e.estadia_id).maybeSingle();
       quando = s.data?.entrada ?? quando; tipo = s.data?.tipo === "hotel" ? "Hotel" : "Creche";
     }
+    // o código do aceite (SHA-256 do texto e das fotos, migração 20261210); banco antes da atualização: segue sem ele
+    const h = e.aceito_em ? await sb.from("entradas").select("aceite_hash").eq("id", e.id).maybeSingle().then((r) => (r.error ? null : r.data?.aceite_hash ?? null), () => null) : null;
     const urls = await enderecosDosArquivos(sb, [...e.fotos, ...(e.aceite_assinatura ? [e.aceite_assinatura] : [])]);
     const visita: Visita = { pet: pet?.nome ?? "Pet", especie: pet?.especie ?? null, tutor: pet?.clientes?.nome ?? null, telefone: pet?.clientes?.telefone ?? null, quando, tipo,
       voltar: e.agendamento_id ? "/gestao/app/agenda" : "/gestao/app/creche-hotel?ver=casa" };
-    return { e, visita, urls };
+    return { e, visita, urls, hash: h };
   }, [petshop.id, id]);
   useTituloDoPapel(dados ? `Entrada ${dados.visita.pet} ${dataCurta(new Date(dados.visita.quando)).replace(/\//g, "-")} · ${petshop.nome}` : `Entrada · ${petshop.nome}`);
   const e = dados?.e, v = dados?.visita;
@@ -78,6 +80,7 @@ function Comprovante() {
                     <img src={dados.urls.get(e.aceite_assinatura)} alt={`Assinatura de ${e.aceite_nome ?? "tutor"}`} data-teste="assinatura-impressa" style={{ display: "block", maxWidth: 360, width: "100%", height: "auto", borderBottom: "1px solid #999" }} />
                   )}
                   {(e.aceite_ip || e.aceite_navegador) && <p style={{ fontSize: ".75rem", color: "#666", overflowWrap: "anywhere" }}>{e.aceite_ip ? `IP ${e.aceite_ip}` : ""}{e.aceite_ip && e.aceite_navegador ? " · " : ""}{e.aceite_navegador ?? ""}</p>}
+                  {dados.hash && <p style={{ fontSize: ".75rem", color: "#666", overflowWrap: "anywhere" }} data-teste="aceite-hash">Código do aceite (SHA-256 do texto aceito e das fotos): {dados.hash}</p>}
                 </>
               )}
             </div>

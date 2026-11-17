@@ -16,7 +16,8 @@ async function tratar(req: Request, { params }: { params: Promise<{ token: strin
   if (!codigoDoBoletimValido(token) || !c || (escopo !== "boletim" && escopo !== "todas") || (c.marcar != null && typeof c.marcar !== "string")) {
     return Response.json({ erro: "pedido_invalido", mensagem: "Escolha quais fotos podemos postar." }, { status: 400, headers: base });
   }
-  const r = await autorizarFoto(token, escopo, typeof c.marcar === "string" ? c.marcar.slice(0, 80) : "");
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || req.headers.get("x-real-ip") || "";
+  const r = await autorizarFoto(token, escopo, typeof c.marcar === "string" ? c.marcar.slice(0, 80) : "", ip, req.headers.get("user-agent") ?? "");
   if (!r.ok) return Response.json({ erro: "recusado", mensagem: r.mensagem }, { status: r.status, headers: base });
   return Response.json(r.dados, { headers: base });
 }

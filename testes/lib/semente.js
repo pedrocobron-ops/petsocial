@@ -115,10 +115,16 @@ const APAGAR_LOJAS = (ids) => `
   end $$;
   set session_replication_role = origin;`;
 
+// registro de acesso (migração 20261210): sem chave estrangeira para o login (fica 6 meses), então sai aqui antes dos logins
+const APAGAR_ACESSOS = (padrao) => `
+  do $$ begin if to_regclass('public.registros_acesso') is not null then
+    delete from public.registros_acesso where user_id in (select id from auth.users where email like ${padrao});
+  end if; end $$;`;
+
 /** Apaga a loja, os logins e as fotos. */
 function limpar(L) {
   if (!L || !L.P) return;
-  B.sql(APAGAR_LOJAS(`'{${L.P}}'`) + `delete from auth.users where email like 't-${L.suf}.%@${DOMINIO}'; delete from aceites where email like 't-${L.suf}.%@${DOMINIO}';`);
+  B.sql(APAGAR_LOJAS(`'{${L.P}}'`) + APAGAR_ACESSOS(`'t-${L.suf}.%@${DOMINIO}'`) + `delete from auth.users where email like 't-${L.suf}.%@${DOMINIO}'; delete from aceites where email like 't-${L.suf}.%@${DOMINIO}';`);
   try { B.sql(`delete from storage.objects where name like '${L.P}/%'`); } catch { /* o storage pode proibir apagar direto; os arquivos ficam órfãos no disco de teste */ }
 }
 
@@ -127,6 +133,7 @@ function limparTudo() {
   const ids = B.sql(`select coalesce(array_agg(distinct p.petshop_id)::text, '{}') from profissionais p join auth.users u on u.id = p.user_id where u.email like '%@${DOMINIO}' and p.papel = 'dono'`);
   const lojas = ids === '{}' ? 0 : ids.split(',').length;
   if (lojas) B.sql(APAGAR_LOJAS(`'${ids}'`));
+  B.sql(APAGAR_ACESSOS(`'%@${DOMINIO}'`));
   const u = B.sql(`with a as (delete from auth.users where email like '%@${DOMINIO}' returning id) select count(*) from a;`);
   B.sql(`delete from aceites where email like '%@${DOMINIO}'`);
   return { lojas, logins: Number(u) };

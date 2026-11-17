@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Check } from "lucide-react";
 import { PERIODOS, PLANOS, ofertaDe, type PeriodoId } from "@/lib/gestao/planos";
 import { brlCurto } from "@/lib/gestao/util";
@@ -43,7 +42,7 @@ export default function PlanosVenda({ criar }: { criar: string }) {
                 <li><Check />Celular e computador</li>
                 <li><Check />Suporte por WhatsApp</li>
               </ul>
-              <Link href={criar} className={`gp-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`}>Teste grátis</Link>
+              <a href={criar} className={`gp-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`}>Teste grátis</a>
             </li>
           );
         })}
