@@ -279,8 +279,10 @@ export function LinhaDaConta({ item, produto, aoMudar, aoTirar, apoio }: {
 
 /* ---------- desconto, pagamento e total ---------- */
 
-export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, pagamento, aoPagamento, comPagamento = true, erroForma, depois, aoDepois, aceitaResto, receberAgora, junto, credito = 0 }: {
+export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, pagamento, aoPagamento, comPagamento = true, erroForma, depois, aoDepois, aceitaResto, receberAgora, junto, credito = 0, promo }: {
   subtotal: number; desconto: number; total: number; descontoDigitado: number | null; aoDesconto: (v: number | null) => void;
+  /** A promoção do horário (conta do atendimento): sai da soma antes do desconto do caixa. `desconto` vem sem ela. */
+  promo?: { nome: string; valor: number };
   pagamento: EstadoPagamento; aoPagamento: (e: EstadoPagamento) => void; comPagamento?: boolean; erroForma?: string | null;
   /** Só na conta do atendimento: deixa escolher "Cliente paga depois". */
   depois?: PagaDepois; aoDepois?: (d: PagaDepois) => void;
@@ -297,7 +299,7 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
   const aPagar = credito > 0 ? Math.max(0, receberAgora ?? total - credito) : receberAgora != null && receberAgora > total ? receberAgora : total;
   // o crédito paga tudo: não há forma de pagamento a escolher
   const nadaAPagar = credito > 0 && aPagar <= 0.005;
-  const passou = (descontoDigitado ?? 0) > subtotal && subtotal > 0;
+  const passou = (descontoDigitado ?? 0) > subtotal - (promo?.valor ?? 0) && subtotal > 0;
   // preço travado: o caixa dá desconto só até o máximo que o dono definiu (sem máximo, não dá desconto)
   const trava = travaDePreco(petshop);
   const limitado = trava.ligada && !cuidoDoFinanceiro;
@@ -329,9 +331,10 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
           <span className="g-rotulo">Total</span>
           <p className="g-num">{brl(total)}</p>
         </div>
-        {(desconto > 0 || aPagar > total || credito > 0) && (
+        {(desconto > 0 || (promo?.valor ?? 0) > 0 || aPagar > total || credito > 0) && (
           <div className="g-vd-contas g-tab">
-            {desconto > 0 && <span>Soma {brl(subtotal)}</span>}
+            {(desconto > 0 || (promo?.valor ?? 0) > 0) && <span>Soma {brl(subtotal)}</span>}
+            {(promo?.valor ?? 0) > 0 && <span>Promoção {promo!.nome} − {brl(promo!.valor)}</span>}
             {desconto > 0 && <span>Desconto − {brl(desconto)}</span>}
             {credito > 0 && <span>Crédito do tutor − {brl(credito)}</span>}
             {(junto ?? 0) > 0 && credito > 0 && !depois?.ativo && <span>Com o que devia ({brl(junto!)})</span>}

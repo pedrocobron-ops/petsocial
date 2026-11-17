@@ -1,5 +1,6 @@
 "use client";
 
+import { etiquetaPromo, lerPromoDoHorario } from "@/lib/gestao/promocoes";
 import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useEffect, useState } from "react";
 import { CalendarClock, Check, Clock, Link2, MessageCircle, UserX, X } from "lucide-react";
@@ -190,6 +191,8 @@ export default function PedidosLink() {
       : `${saudacaoZap(p.tutor_nome, petshop.nome)} Recebi o seu pedido para cancelar ${oQueFoi(lista)}.${escreveu} Vou conferir o que já foi pago e já te respondo.`;
   };
   /** Com as regras ligadas no link, o cartão do pedido diz se o tutor aceitou (e quando). */
+  // o pedido leva a promoção que valia no horário pedido (o cliente viu no link); aceito, o horário fica com ela
+  const promoDe = (p: Pedido) => { const x = lerPromoDoHorario(p.promo); return x ? <span className="g-tag verde" title="O cliente pediu com a promoção. Aceito, o horário fica com ela.">{`promoção ${x.nome} · ${etiquetaPromo(x)}`}</span> : null; };
   const aceiteDe = (p: Pedido) => p.termos_aceitos_em
     ? <span className="g-tag verde" title={p.termos_texto ?? undefined}>aceitou {p.termos_texto ? "as regras" : "a declaração de vacinas"}{p.termos_texto && p.termos_vacinas ? " e declarou vacinas em dia" : ""} em {diaHora(p.termos_aceitos_em)}</span>
     : doLink.pedeAceite ? <span className="g-tag amarelo">sem aceite das regras</span> : null;
@@ -575,6 +578,7 @@ export default function PedidosLink() {
                   {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
                   {p.experiencia && <span className="g-tag azul">pediu dia de experiência</span>}
                   {p.tipo === "creche" && fechadosDe(p, petshop.horario).length > 0 && <span className="g-tag amarelo">pelo seu horário, a creche não abre em {fechadosDe(p, petshop.horario).map((d) => dataCurta(d)).join(", ")}</span>}
+                  {promoDe(p)}
                   {aceiteDe(p)}
                 </div>
                 {p.obs && <p className="g-pl-obs">{p.obs}</p>}
@@ -604,6 +608,7 @@ export default function PedidosLink() {
                 <span className="g-tag azul">{ehEstadia(p) ? `${g.lista.length} pets do mesmo tutor` : `${g.lista.length} pets, um depois do outro`}</span>
                 {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
                 {p.experiencia && <span className="g-tag azul">pediram dia de experiência</span>}
+                {promoDe(p)}
                 {aceiteDe(p)}
               </div>
               <ul className="g-pl-pets">

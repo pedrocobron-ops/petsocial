@@ -13,7 +13,7 @@ type Def = Anthropic.Tool & { grava: boolean; financeiro?: boolean };
 
 export const FERRAMENTAS_ENVIO: Def[] = [
   { grava: false, name: "mensagens_para_mandar",
-    description: "Quantas mensagens de WhatsApp estão prontas para mandar hoje (\"quantas mensagens tenho para mandar?\", \"tem lembrete para mandar?\"), por tipo: pet pronto para buscar, lembrete dos horários de amanhã, aviso de chegada da creche e do hotel, cobrança gentil, vacina vencendo, renovação de pacote, aniversário e chamar de volta. Diz também quantos ficaram de fora (sem telefone, telefone incompleto, não quer receber). Só conta: quem manda é a pessoa, na tela Mandar mensagens.",
+    description: "Quantas mensagens de WhatsApp estão prontas para mandar hoje (\"quantas mensagens tenho para mandar?\", \"tem lembrete para mandar?\"), por tipo: pet pronto para buscar, lembrete dos horários de amanhã, aviso de chegada da creche e do hotel, cobrança gentil, vacina vencendo, renovação de pacote, aniversário do pet, aniversário do tutor e chamar de volta. Diz também quantos ficaram de fora (sem telefone, telefone incompleto, não quer receber). Só conta: quem manda é a pessoa, na tela Mandar mensagens.",
     input_schema: { type: "object", properties: {}, required: [], additionalProperties: false } },
 ];
 

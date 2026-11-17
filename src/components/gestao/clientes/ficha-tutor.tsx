@@ -4,7 +4,7 @@ import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ArrowLeft, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, Merge, MessageCircle, NotebookPen, PawPrint, Pencil, Phone, Plus, Receipt, RotateCcw, Users, Wallet } from "lucide-react";
+import { ArrowLeft, Cake, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, Merge, MessageCircle, NotebookPen, PawPrint, Pencil, Phone, Plus, Receipt, RotateCcw, Users, Wallet } from "lucide-react";
 import type { Cliente, Lancamento, Pet } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -25,6 +25,8 @@ import FormTutor from "./form-tutor";
 import { FolhaJuntarTutor } from "./juntar";
 import { EtiquetaEspecie } from "./lista";
 import DadosDoTutor from "../lgpd/dados-do-tutor";
+import { fazAniversario, nascimentoPorExtenso } from "@/lib/gestao/aniversario";
+import { AvisoPacoteAcabando } from "../pacote-acabando";
 
 type Entrada = Pick<Lancamento, "id" | "valor" | "data" | "categoria" | "descricao" | "pago" | "tipo" | "itens" | "movimento" | "conta_id" | "diferenca_de" | "valor_original" | "cliente_id">;
 
@@ -126,6 +128,7 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
                 <span className="g-cli-etq pessego"><PawPrint aria-hidden />{pets.length === 1 ? "1 pet" : `${pets.length} pets`}</span>
                 <span className="g-cli-etq">Cliente desde {dataCompleta(cliente.criado_em)}</span>
                 {cliente.nao_quer_mensagens && <span className="g-cli-etq rosa">Não quer receber mensagens</span>}
+                {fazAniversario(cliente.nascimento) && <span className="g-cli-etq pessego"><Cake aria-hidden />Aniversário hoje</span>}
               </div>
             </div>
           </div>
@@ -191,6 +194,7 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
             )}
           </section>
 
+          <AvisoPacoteAcabando petIds={pets.filter((p) => p.ativo).map((p) => p.id)} />
           {vejoFinanceiro && <DividaDoTutor tutor={cliente} aoMudar={recarregar} />}
           {vejoFinanceiro && <CreditoDoTutor clienteId={cliente.id} nome={cliente.nome} />}
           {vejoFinanceiro && (
@@ -243,6 +247,7 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
               <div><Tile icone={Phone} tom="ceu" tamanho="p" /><div><span>Telefone</span><p>{fmtTelefone(cliente.telefone) || <span className="g-muted">Não informado</span>}</p></div></div>
               <div><Tile icone={Mail} tom="lilas" tamanho="p" /><div><span>E-mail</span><p>{cliente.email ? <a className="g-link" href={`mailto:${cliente.email}`}>{cliente.email}</a> : <span className="g-muted">Não informado</span>}</p></div></div>
               <div><Tile icone={MapPin} tom="pessego" tamanho="p" /><div><span>Endereço</span><p>{cliente.endereco || <span className="g-muted">Não informado</span>}</p></div></div>
+              <div><Tile icone={Cake} tom="rosa" tamanho="p" /><div><span>Aniversário</span><p>{nascimentoPorExtenso(cliente.nascimento) ?? <span className="g-muted">Não informado</span>}</p></div></div>
               {cliente.obs?.trim() && <div><Tile icone={NotebookPen} tom="manteiga" tamanho="p" /><div><span>Observações</span><p className="gc-texto">{cliente.obs}</p></div></div>}
               <div><Tile icone={CalendarHeart} tom="menta" tamanho="p" /><div><span>Cliente desde</span><p>{dataCompleta(cliente.criado_em)}</p></div></div>
             </div>

@@ -1,0 +1,10 @@
+/* Aviso de pacote acabando (ficha do tutor, horário, Fechar a conta e Pacotes) */
+.g-pac-aviso { display: grid; gap: 8px; padding: 12px 14px; border-radius: var(--g-raio-p); background: color-mix(in srgb, #7c62c0 9%, var(--g-carta)); border: 1px solid color-mix(in srgb, #7c62c0 22%, transparent); min-width: 0; }
+.g-pac-aviso.compacto { padding: 10px 12px; }
+.g-pac-aviso-linha { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: start; min-width: 0; }
+.g-pac-aviso-linha + .g-pac-aviso-linha { border-top: 1px solid var(--g-linha); padding-top: 8px; }
+.g-pac-aviso-linha .t { display: grid; gap: 4px; min-width: 0; }
+.g-pac-aviso-linha .t b { font-size: .9375rem; overflow-wrap: anywhere; }
+.g-pac-aviso-linha .t > span { font-size: .8125rem; color: var(--g-cinza); overflow-wrap: anywhere; }
+.g-pac-aviso-acoes { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; }
+.g-pac-acabando .g-pac-aviso-linha { padding: 2px 0; }

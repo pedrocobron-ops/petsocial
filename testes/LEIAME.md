@@ -95,9 +95,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
 - `modo-envio.js`: a fila do Mandar mensagens (`src/lib/gestao/modo-envio.ts`, `montarFila`): uma mensagem por tutor e por tipo, na ordem
-  pronto, lembrete, chegada, cobrança, saúde, pacote, aniversário, chamar de volta; o texto igual ao das outras telas (`mensagemDoLembrete`,
+  pronto, lembrete, chegada, cobrança, saúde, pacote, aniversário, aniversário do tutor, chamar de volta; o texto igual ao das outras telas (`mensagemDoLembrete`,
   `textoPronto`, `mensagemSaude`, `montarMensagem` com o texto do pet shop, `mensagemDeDivida`, chegada do hotel) e a renovação do pacote;
   de fora com o motivo: sem telefone, telefone incompleto, "não quer receber mensagens"; o texto mudado vai no link wa.me.
+- `promo-niver-pacote.js`: as contas da promoção em dias fracos (`promocoes.ts`, as mesmas do banco): qual vale (dia, hora, serviço,
+  "todos do banho e tosa" sem creche, fim, desligada, criada depois do horário; mais de uma: a que dá mais desconto), quanto tira da conta
+  (só os serviços da promoção, % arredondado no centavo, R$ uma vez até a soma, tirada não tira), "de R$ 60 por R$ 54", o texto para
+  copiar sem "só hoje"; o aniversário do tutor (`aniversario.ts`: sem ano = 1904, 29/02 no dia 28 em ano não bissexto, datas que não
+  existem) e as frases e o texto de oferecer renovar do pacote acabando (`pacote-acabando.ts`, 1 uso / 7 dias / 30 dias).
 - `compra-etiquetas.js`: códigos de barras das etiquetas (`codigo-barras.ts`): EAN-13 só com 13 números e dígito certo, senão
   Code 128; a tabela do Code 128 conferida (106 símbolos de 11 módulos, barras pares, todos diferentes); vetores conhecidos
   (MP000001 = início B, M, P, troca C, 00 00 01, verificador 33; 7891234567890 com o verificador 43; os desenhos de
@@ -265,6 +270,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   loja recusados; o Mozart `o_que_comprar` com os movimentos de verdade (grupo do fornecedor, 3,5 por semana, comprar 6 com a
   explicação, 4 semanas = 13, caixa de 12), valor em estoque só para quem vê o financeiro, recusado para quem não tem Estoque.
 - `modo-envio.js`: Mandar mensagens (migração 20261198: `gestao_modo_envio`, `modo_envio_marcar`, `mensagens_enviadas`,
+  (Continua passando com a 20261205: o tipo novo 'niver_tutor' só aparece com o aniversário do tutor anotado.)
   `clientes.nao_quer_mensagens`). Lembrete de amanhã do Thor e da Mel numa mensagem só, pet pronto, cobrança (35, vencida), V10 em 5 dias,
   aniversário, pacote que acabou há 3 dias e o Bob sem vir há 70 dias: 7 mensagens para o dono (pela `montarFila` do app); Clara (não quer),
   Eva (sem telefone) e Davi (telefone incompleto) de fora. Por área: recepção tudo; tosador sem cobrança, pacote e chegada; monitora sem
@@ -272,6 +278,20 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   marca das outras telas (`lembrete_em`, `pronto_avisado_em`, `avisos.chegada`, `cobrado_em`) e o registro com quem e quando, uma vez por
   (tipo, ref, dia), também com dois toques ao mesmo tempo; tipo de outra área, anônimo, tipo estranho e mais de 50 recusados; ref de outra
   loja ignorada; depois, a fila fica vazia. Ninguém grava nem apaga direto no registro; outra loja não lê.
+- `promo-niver-pacote.js`: promoção, aniversário do tutor e pacote acabando (migração 20261205). Promoção: só o dono cria e muda
+  (`promocao_salvar`; recepção, tosador, anônimo e outra loja recusados; validações), a equipe lê, ninguém grava direto; ao marcar, o
+  banco põe a promoção pelo dia da semana, pela hora ("antes das 11h") e pelo serviço, com o preço da lista de sempre (R$ 60; o tosador
+  sem dinheiro marca e ganha R$ 70 do porte G); a API não escreve a promoção (nem ao marcar nem ao alterar); marcar pedindo sem ela;
+  remarcar tira e põe de volta; horário marcado antes de a promoção existir não ganha nem ao remarcar; mudar a promoção não mexe no que
+  foi marcado; tirar e pôr de volta (`agendamento_promo_usar`) por papel; a conta com a promoção (R$ 10) passa com o preço travado e o
+  caixa sem desconto, vai para `promo_usos` e não para Alterações em valores; R$ 1 a mais é recusado para a recepção e anotado de 40
+  para 39 para a dona; promoção tirada vira desconto do caixa; depois da conta, não muda mais; `relatorio_promocoes` (marcados, feitos,
+  contas, desconto; só quem vê o dinheiro); `link_promocoes` só com o que o cliente precisa, o horário com "10% off" e "de R$ 60 por R$ 54",
+  o pedido leva a promoção até o horário aceito mesmo depois de ela ser desligada; link desligado sem nada. Aniversário do tutor:
+  sem ano = 1904 (1900 recusado), 29/02 no dia 28, 'niver_tutor' no Mandar mensagens (texto padrão e do pet shop, a Clara que não quer
+  fica de fora, por área, marcar uma vez por ano, volta depois de um ano, tutor sem pet ativo não entra). Pacote acabando
+  (`pacotes_acabando`): último uso, acabou, vencendo, vencido, quem renovou fica de fora, só de um pet, outra loja e anônimo; `acabou_em`
+  ao usar o último e limpo ao desfazer. LGPD: `cliente_dados` leva o aniversário (dia e mês) e `cliente_anonimizar` o apaga.
 - `lotes-kits.js`: validade e lote, kits e contagem de estoque (migração 20261201). **Lotes**: entrada com lote e validade (o mesmo
   lote, com espaço e outra caixa de letra, soma num lote só; custo do lote guardado e fora da leitura direta), venda de 6 sai do lote
   que vence antes (B2: 5, depois A1: 1, anotado em `movimentos_lotes`), venda com o lote escolhido, lote de outro produto recusado,
@@ -441,6 +461,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   próxima" grava o `lembrete_em`; "Pular" não grava; "Não enviou" fica na mesma; fim com 2 enviadas e 1 para depois. 1366: só a cobrança
   sobra; Enter abre o WhatsApp e S responde sim (`cobrado_em` e o registro com quem mandou); a ficha da Clara com "Não quer receber
   mensagens" e a caixa marcada no formulário. Capturas em `testes/saida/modo-envio-*.png`.
+- `promo-niver-pacote.js`: promoção, aniversário do tutor e pacote acabando pela tela, 390 e 1366 (dona). 390: Meu pet shop (atalho
+  `#promocoes`) com a promoção, "Copiar o texto" e "Abrir no WhatsApp" (wa.me sem número), "Nova promoção" (terça, antes das 11h, R$ 10)
+  gravada; o horário do Thor com a linha da promoção (− R$ 6,00), o aviso do pacote (falta 1 uso, "Oferecer renovar") e o botão com
+  R$ 54; Fechar a conta com a linha da promoção, "Tirar" (volta a R$ 60) e "Pôr de volta"; a ficha da Ana com "Aniversário hoje" e o
+  pacote acabando; Aniversariantes do mês com "Dar parabéns". Link do cliente: "10% off" no Banho e nos horários, sem "de/por" enquanto o
+  porte não é escolhido, "De R$ 60 por R$ 54" no porte M. 1366: Pacotes acabando com "Vender de novo" (abre a renovação), Relatórios com o
+  bloco Promoções, Mandar mensagens com o aniversário do tutor, Editar o tutor com dia e mês e o ano gravado. Sem rolagem para o lado,
+  sem erro na página. Capturas em `testes/saida/promo-niver-pacote-*.png`.
 - `entrada.js`: checklist de entrada pela tela. 390 (recepção): Thor com 10 anos chega pela Agenda e a folha abre sozinha (padrão: só pet
   idoso), com os Cuidados e alertas da ficha e "Pet idoso ou doente" marcado; chips, foto feita num canvas, pertences, observação;
   "Assinar aqui no aparelho" com o termo padrão, "Li e concordo", o nome do tutor e uma assinatura desenhada no quadro (PNG no bucket);

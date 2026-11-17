@@ -29,6 +29,9 @@ import {
 import { AvisoCaixaFechado, fecharPagamento, pagoAMenos, ParcelasNaTela, useCaixaAberto, usePagamento } from "../loja/pecas";
 import { anotarParcelas, idsDaOperacao } from "@/lib/gestao/maquininha";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
+import { LinhaPromoNaConta, usePromoDoHorario } from "./promo-do-horario";
+import { AvisoPacoteAcabando } from "../pacote-acabando";
+import { descontoDaPromo } from "@/lib/gestao/promocoes";
 
 const centavos = (n: number) => Math.round(n * 100) / 100;
 /** Uma conta que o tutor ficou devendo de antes (fiado, taxa de falta, resto de um pagamento). */
@@ -85,7 +88,12 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   const caixa = useCaixaAberto();
   const op = useOperacao();
 
-  const contas = fecharContas(itens, desconto);
+  // a promoção do horário (o dono montou): uma linha de desconto, fora do "Desconto em reais" do caixa. O banco confere a mesma conta.
+  const promoDoHorario = usePromoDoHorario(a.id, a.promo);
+  const promoAtiva = promoDoHorario.promo && !promoDoHorario.promo.tirada ? promoDoHorario.promo : null;
+  const somaDaConta = fecharContas(itens, null).subtotal;
+  const promoValor = Math.min(somaDaConta, descontoDaPromo(promoAtiva, itens, a.servico_id, (id) => servicos.find((x) => x.id === id)?.categoria));
+  const contas = fecharContas(itens, (desconto ?? 0) + promoValor);
   // o que o tutor deve de antes (só para quem recebe): pode entrar nesta conta e ter baixa no mesmo pagamento
   const { dados: antigasLidas } = useDados(async () => {
     if (!vejoFinanceiro || !tutor?.id) return [] as Antiga[];
@@ -374,6 +382,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
             <span>{[tutor?.nome, `${hora(a.inicio)} às ${hora(a.fim)}`].filter(Boolean).join(" · ")}</span>
           </div>
         </div>
+        {pet && <AvisoPacoteAcabando petId={pet.id} compacto />}
 
         <div className="g-card liso g-vd-itens">
           {peloPacote && (
@@ -390,6 +399,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
             <LinhaDaConta key={i.chave} item={i} produto={produtos.find((p) => p.id === i.produtoId)} apoio={a.profissionais ? `com ${a.profissionais.nome}` : undefined}
               aoMudar={(m) => mudar(i.chave, m)} aoTirar={i.tipo === "servico" && (!i.servicoId || !mexeNosServicos || (naoTiraFeito && doHorario.has(i.servicoId))) ? undefined : () => setItens((l) => l.filter((x) => x.chave !== i.chave))} />
           ))}
+          {promoAtiva && <LinhaPromoNaConta promo={promoAtiva} valor={promoValor} ocupado={promoDoHorario.ocupado || salvando} aoTirar={() => void promoDoHorario.tirar()} />}
         </div>
 
         <div className="g-campo">
@@ -446,7 +456,11 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         {(saldoCredito ?? 0) > 0 && contas.total > 0 && (
           <UsarCredito saldo={saldoCredito!} usar={usarCredito} aoMudar={(v) => { setUsarCredito(v); setErroForma(null); }} usado={credito} resto={depois.ativo ? daConta : aPagar} />
         )}
-        <FechamentoDaConta subtotal={contas.subtotal} desconto={contas.desconto} total={contas.total} descontoDigitado={desconto} aoDesconto={setDesconto}
+        {promoDoHorario.promo?.tirada && (
+          <p className="g-pp g-muted" style={{ margin: 0 }}>Promoção {promoDoHorario.promo.nome} tirada deste horário. <button type="button" className="g-link" disabled={promoDoHorario.ocupado || salvando} onClick={() => void promoDoHorario.porDeVolta()}>Pôr de volta</button></p>
+        )}
+        <FechamentoDaConta subtotal={contas.subtotal} desconto={Math.max(0, Math.round((contas.desconto - promoValor) * 100) / 100)} total={contas.total}
+          promo={promoValor > 0 && promoAtiva ? { nome: promoAtiva.nome, valor: promoValor } : undefined} descontoDigitado={desconto} aoDesconto={setDesconto}
           pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErroForma(null); }} erroForma={erroForma}
           depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} aceitaResto receberAgora={aPagar} junto={junto} credito={credito} />
         {trocoQuePaga > 0 && (

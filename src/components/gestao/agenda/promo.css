@@ -1,0 +1,14 @@
+/* A promoção do horário (resumo do horário e Fechar a conta) */
+.g-promo-linha { flex-wrap: wrap; gap: 6px; min-width: 0; }
+.g-promo-linha > span:first-child { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.g-promo-linha.tirada > span:first-child { font-weight: 400; }
+.g-promo-linha .g-link { display: inline-flex; align-items: center; gap: 4px; }
+.g-promo-conta .t b, .g-promo-conta .t span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.g-promo-etq { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: var(--g-menta); color: #24543b; white-space: nowrap; }
+/* Meu pet shop: a lista de promoções */
+.g-promo-item { display: grid; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--g-linha); min-width: 0; }
+.g-promo-item:last-child { border-bottom: 0; }
+.g-promo-item .t { display: grid; gap: 4px; min-width: 0; }
+.g-promo-item .t b { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; overflow-wrap: anywhere; }
+.g-promo-item .t > span { color: var(--g-cinza); font-size: .875rem; overflow-wrap: anywhere; }
+.g-promo-acoes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

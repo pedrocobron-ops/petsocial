@@ -15,6 +15,8 @@ import { MUITOS_PEDIDOS, lembrarPedido } from "@/lib/gestao/link-opcoes";
 import { AceiteDosTermos, PedidosDesteAparelho, SEM_ACEITE, faltaAceitar, pedirPeloLink, useTermosDoLink } from "./termos";
 import DuvidaNoLink from "./duvida";
 import type { Sugestao } from "@/lib/gestao/link-ia-comum";
+import { diasCurtos, etiquetaPromo, horasPorExtenso, precoComPromo, promoDoHorario, validadePorExtenso, type Promocao } from "@/lib/gestao/promocoes";
+import { precoDoServico } from "@/lib/gestao/util";
 import "./agendar.css";
 
 type ServicoDoLink = {
@@ -28,9 +30,11 @@ type Info = {
   creche?: { diaria: number | null } | null; hotel?: { diaria: number | null } | null;
 };
 type Passo = "servico" | "quando" | "dados" | "enviado";
+/** Promoção do link (link_promocoes): os serviços já vêm abertos (os do link que entram nela). */
+type PromoDoLink = Omit<Promocao, "id" | "ativa" | "criado_em">;
 type Especie = "cao" | "gato" | "outro";
 type PetDoPedido = { id: number; nome: string; especie: Especie; porte: Porte | null };
-type Enviado = { id: string | null; servico: string; dia: string; pets: { nome: string; hora: string }[] };
+type Enviado = { id: string | null; servico: string; dia: string; pets: { nome: string; hora: string }[]; promo?: string | null };
 
 /** Quantos pets cabem num pedido só (o banco aceita até 4). */
 const MAX_PETS = 4;
@@ -141,6 +145,8 @@ export default function AgendarPeloLink() {
   const [comDuvida, setComDuvida] = useState(false);
   // link do Google para avaliar a loja (opção do dono; sem link, nada aparece)
   const [google, setGoogle] = useState<string | null>(null);
+  // promoções em dias fracos (opção do dono): "10% off" nos horários. Banco antes da atualização ou erro: sem promoção.
+  const [promos, setPromos] = useState<Promocao[]>([]);
   const carregar = useCallback(async () => {
     setSemRede(false);
     setInfo(undefined);
@@ -151,6 +157,11 @@ export default function AgendarPeloLink() {
     setInfo(lido && typeof lido === "object" && lido.nome ? { ...lido, servicos: Array.isArray(lido.servicos) ? lido.servicos : [] } : null);
     aplicarTema(lido && typeof lido === "object" ? lido.tema : null); // as cores do pet shop, não as da Maestro Pet
     void banco().rpc("link_google", { p_codigo: codigo }).then((g) => setGoogle(typeof g.data === "string" ? g.data : null), () => setGoogle(null));
+    void (banco() as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown }> }).rpc("link_promocoes", { p_codigo: codigo }).then((r) => {
+      const l = Array.isArray(r.data) ? (r.data as PromoDoLink[]) : [];
+      // só as que têm serviço no link (a lista já vem aberta: vazia = nenhum serviço do link entra)
+      setPromos(l.filter((x) => Array.isArray(x.servicos) && x.servicos.length).map((x, i) => ({ ...x, id: `promo-${i}`, ativa: true, valor: Number(x.valor), dias: (x.dias ?? []).map(Number) })));
+    }, () => setPromos([]));
     // se a função ainda não existe no banco, segue sem dias fechados (como sempre foi)
     const f = await banco().rpc("link_fechados", { p_codigo: codigo });
     setFechados(new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []));
@@ -179,6 +190,16 @@ export default function AgendarPeloLink() {
   }, [info, codigo]);
 
   const servico = info?.servicos.find((s) => s.id === servicoId) ?? null;
+  /** A promoção de um horário deste serviço (a mesma escolha do banco; o pedido leva a que vale). */
+  const promoEm = (s: ServicoDoLink | null, d: string | null, h: string | null, porte?: Porte | null) =>
+    s && d && h ? promoDoHorario(promos, { servicoId: s.id, dia: d, hora: h, preco: precoDoServico(s, porte ?? null), categoriaDe: () => "banho" }) : null;
+  /** "de R$ 60 por R$ 54": só com o preço da lista de verdade (um preço só, ou o do porte escolhido). */
+  const dePor = (s: ServicoDoLink, p: Promocao, porte?: Porte | null) => {
+    const valores = [s.preco_p, s.preco_m, s.preco_g, s.preco_gg].filter((v): v is number => v != null).map(Number);
+    const unico = valores.length && valores.every((v) => v === valores[0]) ? valores[0] : null;
+    const base = porte ? precoDoServico(s, porte) : unico;
+    return base != null && base > 0 ? { de: Number(base), por: precoComPromo(p, Number(base)) } : null;
+  };
   const dias = useMemo(() => {
     if (!info) return [];
     const base = deIsoDia(info.hoje);
@@ -285,7 +306,8 @@ export default function AgendarPeloLink() {
     if (error) return setErro("Não consegui enviar agora. Confira a internet e tente de novo.");
     const r = data as unknown as { ok: boolean; erro?: string; motivo?: string; id?: string } | null;
     if (r?.ok) {
-      setEnviado({ id: r.id ?? null, servico: servico.nome, dia, pets: lista.map((x, i) => ({ nome: x.nome, hora: somaMin(horaEscolhida, servico.duracao_min * i) })) });
+      const pr = promoEm(servico, dia, horaEscolhida, lista[0].porte);
+      setEnviado({ id: r.id ?? null, servico: servico.nome, dia, pets: lista.map((x, i) => ({ nome: x.nome, hora: somaMin(horaEscolhida, servico.duracao_min * i) })), promo: pr ? `${pr.nome} (${etiquetaPromo(pr)})` : null });
       // o endereço de acompanhar fica guardado neste aparelho: recarregar a página não perde o pedido
       if (r.id) { lembrarPedido(codigo, r.id, `${servico.nome} de ${listaDeNomes(lista.map((x) => x.nome))}`); setLembrados((n) => n + 1); }
       setAceite(SEM_ACEITE);
@@ -464,6 +486,9 @@ export default function AgendarPeloLink() {
                     <span className="g-lk-serv-t">
                       <b>{s.nome}</b>
                       <span><Clock aria-hidden />{duracao(s.duracao_min)}{preco && <em>{preco}</em>}</span>
+                      {promos.filter((x) => x.servicos.includes(s.id)).slice(0, 2).map((x) => (
+                        <span key={x.id} className="g-lk-promo-serv">{etiquetaPromo(x)} · {diasCurtos(x.dias)}{horasPorExtenso(x) ? `, ${horasPorExtenso(x)}` : ""}{validadePorExtenso(x) ? ` · ${validadePorExtenso(x)}` : ""}</span>
+                      ))}
                     </span>
                     <ArrowRight className="g-lk-serv-seta" aria-hidden />
                   </button>
@@ -531,12 +556,28 @@ export default function AgendarPeloLink() {
                     <div key={g.rotulo} className="g-lk-turno">
                       <span className="g-rotulo">{g.rotulo}</span>
                       <div className="g-lk-horas">
-                        {g.lista.map((h) => (
-                          <button key={h} type="button" className="g-lk-hora" aria-pressed={h === horaEscolhida} onClick={() => { setHoraEscolhida(h); setAvisoQuando(null); }}>{h}</button>
-                        ))}
+                        {g.lista.map((h) => {
+                          const pr = promoEm(servico, dia, h);
+                          return (
+                            <button key={h} type="button" className={`g-lk-hora${pr ? " com-promo" : ""}`} aria-pressed={h === horaEscolhida} aria-label={pr ? `${h}, ${etiquetaPromo(pr)}` : undefined} onClick={() => { setHoraEscolhida(h); setAvisoQuando(null); }}>
+                              {h}{pr && <small className="g-lk-hora-promo">{etiquetaPromo(pr)}</small>}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
+                  {(() => {
+                    const pr = promoEm(servico, dia, horaEscolhida);
+                    if (!pr) return null;
+                    const v = dePor(servico, pr);
+                    return (
+                      <p className="g-lk-promo" aria-live="polite">
+                        <b>Promoção {pr.nome}: {etiquetaPromo(pr)}.</b>{" "}
+                        {v ? <>De <s>{brlCurto(v.de)}</s> por <b>{brlCurto(v.por)}</b>{qtd > 1 ? " cada pet" : ""}.</> : "O desconto é no preço do porte do pet."}
+                      </p>
+                    );
+                  })()}
                   {horaEscolhida && fimEstimado && (
                     <p className="g-lk-termino" aria-live="polite">
                       <Clock aria-hidden />
@@ -563,6 +604,17 @@ export default function AgendarPeloLink() {
             <span><b>{servico.nome}</b> · {diaPorExtenso(dia, info.hoje)}, {qtd > 1 ? `das ${horaEscolhida} às ${fimEstimado}` : `às ${horaEscolhida}`}</span>
             <u>Trocar</u>
           </button>
+          {(() => {
+            const pr = promoEm(servico, dia, horaEscolhida, pets[0]?.porte);
+            if (!pr) return null;
+            const v = dePor(servico, pr, pets[0]?.porte);
+            return (
+              <p className="g-lk-promo">
+                <b>Promoção {pr.nome}: {etiquetaPromo(pr)}.</b>{" "}
+                {v ? <>De <s>{brlCurto(v.de)}</s> por <b>{brlCurto(v.por)}</b>{qtd > 1 ? " cada pet" : ""}{pets[0]?.porte ? ` (porte ${pets[0].porte})` : ""}.</> : "Escolha o porte para ver o preço com desconto."}{" "}O pedido vai com a promoção.
+              </p>
+            );
+          })()}
 
           <div className="g-lk-bloco g-form">
             <div className="g-lk-bloco-t"><h2>Quem vem?</h2>{qtd > 1 && <span className="g-muted g-pp">{qtd} pets</span>}</div>
@@ -653,6 +705,7 @@ export default function AgendarPeloLink() {
           <dl className="g-lk-resumo">
             <div><dt>Serviço</dt><dd>{enviado.servico}{enviado.pets.length > 1 && <small> para cada pet</small>}</dd></div>
             <div><dt>Dia</dt><dd>{diaPorExtenso(enviado.dia, info.hoje)}</dd></div>
+            {enviado.promo && <div><dt>Promoção</dt><dd>{enviado.promo}</dd></div>}
             {enviado.pets.length === 1 ? (
               <>
                 <div><dt>Pet</dt><dd>{enviado.pets[0].nome}</dd></div>

@@ -7,6 +7,8 @@ import { useGestao } from "../contexto";
 import { Campo, Folha, ok, useAvisos } from "../ui";
 import { FolhaMesmaPessoa, acharTutorIgual, useTutores, type TutorCurto } from "./juntar";
 import { CampoComVoz } from "../ditado";
+import { diasNoMes, lerNascimento, MESES, montarNascimento } from "@/lib/gestao/aniversario";
+import "./aniversario.css";
 
 /** Cadastro ou edição de um tutor (cliente). */
 export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: Cliente; aoFechar: () => void; aoSalvar: (c: Cliente) => void }) {
@@ -20,6 +22,12 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
   const [obs, setObs] = useState(cliente?.obs ?? "");
   // "Não quer receber mensagens": o Modo envio pula este tutor
   const [naoQuer, setNaoQuer] = useState(Boolean(cliente?.nao_quer_mensagens));
+  // aniversário do tutor: dia e mês; o ano é opcional
+  const nasc = lerNascimento(cliente?.nascimento);
+  const [nDia, setNDia] = useState<number | null>(nasc?.dia ?? null);
+  const [nMes, setNMes] = useState<number | null>(nasc?.mes ?? null);
+  const [nAno, setNAno] = useState(nasc?.ano ? String(nasc.ano) : "");
+  const nascimento = montarNascimento(nDia, nMes, nAno.trim() ? Number(nAno.replace(/\D/g, "")) || -1 : null);
   const [salvando, setSalvando] = useState(false);
   const { dados: tutores } = useTutores();
   const [igual, setIgual] = useState<{ tutor: TutorCurto; por: "telefone" | "nome" } | null>(null);
@@ -28,6 +36,7 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
     e.preventDefault();
     if (!nome.trim() || salvando) return;
     if (!telefoneValido(telefone)) { setErroFone(ERRO_TELEFONE); return; }
+    if (nascimento.erro) { avisarErro(nascimento.erro); return; }
     const achado = acharTutorIgual(tutores ?? [], nome, telefone, cliente?.id);
     // tutor novo com nome ou telefone de quem já existe: pergunta antes de criar outro
     if (!cliente && achado) { setIgual(achado); return; }
@@ -55,7 +64,7 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
           confirmar: "Salvar mesmo assim",
         }))) { setSalvando(false); return; }
       }
-      const campos = { nome: nome.trim(), telefone: telefoneLimpo(telefone) || null, email: email.trim() || null, endereco: endereco.trim() || null, obs: obs.trim() || null, nao_quer_mensagens: naoQuer };
+      const campos = { nome: nome.trim(), telefone: telefoneLimpo(telefone) || null, email: email.trim() || null, endereco: endereco.trim() || null, obs: obs.trim() || null, nao_quer_mensagens: naoQuer, nascimento: nascimento.valor };
       const salvo = cliente
         ? ok(await sb.from("clientes").update(campos).eq("id", cliente.id).eq("petshop_id", petshop.id).select().single())
         : ok(await sb.from("clientes").insert({ ...campos, petshop_id: petshop.id }).select().single());
@@ -92,6 +101,21 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
         </Campo>
         <Campo rotulo="E-mail"><input className="g-input" type="email" inputMode="email" autoComplete="off" maxLength={160} value={email} onChange={(e) => setEmail(e.target.value)} /></Campo>
         <Campo rotulo="Endereço" dica="Ajuda no leva e traz."><input className="g-input" autoComplete="off" maxLength={200} value={endereco} onChange={(e) => setEndereco(e.target.value)} /></Campo>
+        <div className="g-campo">
+          <span id="niver-tutor">Aniversário <small>(opcional)</small></span>
+          <div className="g-niver-campos" role="group" aria-labelledby="niver-tutor">
+            <select className="g-select" aria-label="Dia do aniversário" value={nDia ?? ""} onChange={(e) => setNDia(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">Dia</option>
+              {Array.from({ length: diasNoMes(nMes ?? 1, null) }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <select className="g-select" aria-label="Mês do aniversário" value={nMes ?? ""} onChange={(e) => setNMes(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">Mês</option>
+              {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+            <input className="g-input g-tab" inputMode="numeric" maxLength={4} placeholder="Ano" aria-label="Ano de nascimento (opcional)" value={nAno} onChange={(e) => setNAno(e.target.value.replace(/\D/g, ""))} />
+          </div>
+          {nascimento.erro && (nDia || nMes) ? <small className="erro">{nascimento.erro}</small> : <small>Para dar parabéns no dia (Mandar mensagens). O ano pode ficar em branco.</small>}
+        </div>
         <label className="g-check">
           <input type="checkbox" checked={naoQuer} onChange={(e) => setNaoQuer(e.target.checked)} />
           <span><b>Não quer receber mensagens</b><small> O Mandar mensagens pula este tutor (lembretes, avisos, aniversário, cobrança).</small></span>

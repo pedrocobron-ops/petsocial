@@ -14,6 +14,7 @@ import RelatorioProdutos from "@/components/gestao/loja/relatorio-produtos";
 import QuantoSobrou from "@/components/gestao/relatorios/lucro";
 import CartaoMaquininha from "@/components/gestao/financeiro/maquininha";
 import AbasDeRelatorios from "@/components/gestao/relatorios/abas";
+import PromocoesNoRelatorio from "@/components/gestao/relatorios/promocoes";
 import PorPessoa from "@/components/gestao/relatorios/por-pessoa";
 import { percentuaisQueFecham } from "@/lib/gestao/dinheiro";
 import { cobradoPorServico, type ParteDoServico } from "@/lib/gestao/servicos-do-horario";
@@ -615,6 +616,8 @@ function Relatorios() {
             <HotelNoRelatorio de={de} ate={ate} antes={antes} />
 
             <QuantoSobrou de={deIso} ate={ateIso} />
+
+            <PromocoesNoRelatorio de={deIso} ate={ateIso} />
 
             <RelatorioProdutos de={deIso} ate={ateIso} />
 
