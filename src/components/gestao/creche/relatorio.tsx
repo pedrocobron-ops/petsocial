@@ -96,11 +96,14 @@ export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) 
   const dosIrmaos = real(abertas.reduce((s, c) => s + partesDoDesconto(c).irmao, 0));
   const dosExtras = real(abertas.reduce((s, c) => s + partesDosExtras(c).dias, 0));
   const dasTaxas = real(abertas.reduce((s, c) => s + partesDosExtras(c).taxas, 0) + dados.taxasNaHora);
+  const doTaxi = real(abertas.reduce((s, c) => s + partesDosExtras(c).taxi, 0));
   const partes = [
     { nome: "Mensalidades", valor: mensalidades, apoio: `${um(abertas.length, "cobrança", "cobranças")}${dosIrmaos > 0 ? `, já com ${brl(dosIrmaos)} de desconto irmão` : ""}` },
     { nome: "Dias extras", valor: dosExtras, apoio: "na cobrança do mês seguinte" },
     { nome: "Taxa de busca fora do horário", valor: dasTaxas, apoio: "na mensalidade ou recebida na hora" },
-    { nome: "Diárias avulsas", valor: dados.avulsasCobrado, apoio: `${um(avulsas, "dia", "dias")} de pet sem plano` },
+    ...(doTaxi > 0 ? [{ nome: "Táxi pet dos mensalistas", valor: doTaxi, apoio: "na cobrança do mês" }] : []),
+    // a conta do dia avulso leva a diária e as taxas marcadas no check-out (táxi, banho…): o nome diz isso
+    { nome: "Dias avulsos", valor: dados.avulsasCobrado, apoio: `${um(avulsas, "dia", "dias")} de pet sem plano: a diária e as taxas da conta` },
   ];
   const totalCobrado = real(partes.reduce((s, x) => s + x.valor, 0));
 

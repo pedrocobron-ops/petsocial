@@ -72,14 +72,17 @@ function LinhaConta({ conta, hoje, aoReceber }: { conta: Lancamento; hoje: strin
   const v = conta.vencimento;
   const multa = multaSugerida(petshop, conta, hoje);
   const nome = descricaoAtual(conta.descricao) || categoriaAtual(conta.categoria, petshop);
+  // dívida de antes (do caderno), sem prazo combinado depois: o que importa é desde quando deve
+  const deAntes = Boolean(conta.devido_desde && (!v || v <= conta.devido_desde));
   return (
     <div className="gr-conta">
       <span className="t">
         <b>{nome}</b>
         <span>
-          {!v ? "sem data" : v < hoje ? <span className="g-vermelho-t">venceu em {dataCompleta(v)}</span> : v === hoje ? "vence hoje" : `vence em ${dataCompleta(v)}`}
+          {deAntes ? <span className={v && v < hoje ? "g-vermelho-t" : undefined}>deve desde {dataCurtaOuAno(conta.devido_desde!)}</span>
+            : !v ? "sem data" : v < hoje ? <span className="g-vermelho-t">venceu em {dataCompleta(v)}</span> : v === hoje ? "vence hoje" : `vence em ${dataCompleta(v)}`}
           {textoJaRecebido(conta) ? ` · ${textoJaRecebido(conta)}` : ""}
-          {conta.devido_desde ? ` · deve desde ${dataCurtaOuAno(conta.devido_desde)}` : ""}
+          {conta.devido_desde && !deAntes ? ` · deve desde ${dataCurtaOuAno(conta.devido_desde)}` : ""}
           {multa ? ` · com multa e juros: ${brl(centavos(Number(conta.valor) + multa.total))}` : ""}
         </span>
       </span>

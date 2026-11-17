@@ -36,7 +36,7 @@ import { AjusteDoSinal, CamposAdiantado, CamposSinal, CancelarComSinal, conferir
 import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
-import { abreNoDia, esperadoNoDia, experienciaDe, lerPlanos, lerPresencas, planoAtivo, planoVale, podeMudarPlano, precoDaExperiencia, type PlanoCompleto } from "@/lib/gestao/creche";
+import { abreNoDia, esperadoNoDia, experienciaDe, lerPlanos, lerPresencas, montarChamada, planoAtivo, planoVale, podeMudarPlano, precoDaExperiencia, type PlanoCompleto } from "@/lib/gestao/creche";
 import { conferirCaixa, conferirValorAlto, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import { casoDoErro, fazerTudoOuNada, ref, type Passo, type ResultadoDaOperacao } from "@/lib/gestao/tudo-ou-nada";
 import { useOperacao, useTrava } from "@/lib/gestao/uma-vez";
@@ -45,7 +45,7 @@ import {
   aceitaSinal, contaDasDiarias, contarDiarias, diariaFixa, diasDasNoites, diariaSugerida, estadiaSemCobranca, fatosDoDia, lerConta, lerCuidados, nivelDeOcupacao, nomeDaAcomodacao, ocupadasNoDia, ocupaNoDia, precoPorNoite, sinalSugerido,
   taxaNaConta, taxasGuardadas, temNoiteDiferente, textoDoCuidado, vagasDoTipo, type ContaDaEstadia, type Cuidado, type CuidadoFeito, type EstadiaDoTutor, type Mens, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
-import { acomodacoesDe, cuidadosLigados, porteDe, taxasDe } from "@/lib/gestao/hotel-opcoes";
+import { acomodacoesDe, cuidadosLigados, horasDoHotel, porteDe, taxasDe } from "@/lib/gestao/hotel-opcoes";
 import { principalDe, usaModulo } from "@/lib/gestao/modulos";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Estadia, Petshop } from "@/lib/gestao/tipos";
@@ -68,6 +68,7 @@ const Ocupacao = dynamic(carregarOcupacao, { ssr: false, loading: esperando });
 const Diario = dynamic(carregarDiario, { ssr: false, loading: esperando });
 const Mensalistas = dynamic(carregarMensalistas, { ssr: false, loading: esperando });
 const Cobrancas = dynamic(carregarCobrancas, { ssr: false, loading: esperando });
+const SEM_PLANOS: PlanoCompleto[] = [];
 // cadastrar um pet novo no meio da reserva: só abre com um toque
 const carregarFormPet = () => import("@/components/gestao/form-pet");
 const FormPet = dynamic(carregarFormPet, { ssr: false });
@@ -365,7 +366,13 @@ export default function CrecheHotel() {
   const planoDe = (e: EstadiaCompleta) => (e.plano_id ? mens?.planos.find((p) => p.id === e.plano_id) : undefined);
 
   const doTipo = (e: EstadiaCompleta) => tipo === "todos" || e.tipo === tipo;
-  const abertas = useMemo(() => dados?.abertas ?? [], [dados]);
+  // reservas canceladas aqui agora: o cartão sai na hora, sem esperar a lista buscar de novo (antes ele ficava uns segundos
+  // com Check-in e Cancelar na tela, e convidava a um segundo toque)
+  const [canceladasAgora, setCanceladasAgora] = useState<Set<string>>(() => new Set());
+  const tirarDaLista = (id: string) => setCanceladasAgora((s) => new Set([...s, id]));
+  // a lista nova (buscada depois do cancelamento) já vem certa: o filtro de agora não precisa mais ficar
+  useEffect(() => { setCanceladasAgora((s) => (s.size ? new Set() : s)); }, [dados]);
+  const abertas = useMemo(() => (dados?.abertas ?? []).filter((e) => !canceladasAgora.has(e.id)), [dados, canceladasAgora]);
   const naCasa = useMemo(() => abertas.filter((e) => e.status === "em_casa"), [abertas]);
   // check-in feito hoje pela reserva: dá para desfazer (um toque sem querer numa reserva de outro dia)
   const { checkins: checkinsDeHoje } = useCheckinsDeHoje(useMemo(() => naCasa.filter((e) => !e.mensalista).map((e) => e.id), [naCasa]));
@@ -408,7 +415,8 @@ export default function CrecheHotel() {
       if (e.dia !== isoDia(new Date())) { avisarErro(`A reserva de ${nome} é para ${dataAmigavel(deIsoDia(e.dia))}. Se o dia não vale mais, cancele a reserva e marque outra.`); return; }
       setOcupado(e.id);
       try {
-        ok(await sb.rpc("creche_chamada", { p_plano: e.plano_id, p_dia: e.dia, p_acao: "chegou" }));
+        const r = ok(await sb.rpc("creche_chamada", { p_plano: e.plano_id, p_dia: e.dia, p_acao: "chegou" })) as { repetido?: boolean } | null;
+        if (e.pets && !r?.repetido) setEntradaDe(visitaDaEntrada(e));
         avisar(`${nome} chegou. O dia extra entra na próxima mensalidade.`);
         mudou();
       } catch (x) {
@@ -455,6 +463,7 @@ export default function CrecheHotel() {
     if (!(await confirmar({ titulo: "Cancelar esta reserva?", texto: `${e.pets?.nome ?? "O pet"}, ${nomeTipo(e.tipo).toLowerCase()} ${dataAmigavel(new Date(e.entrada))}.`, confirmar: "Cancelar reserva", perigo: true }))) return;
     try {
       ok(await sb.from("estadias").update({ status: "cancelada" }).eq("id", e.id).eq("petshop_id", petshop.id).eq("status", "reservada").select("id"));
+      tirarDaLista(e.id);
       avisar("Reserva cancelada.");
       mudou();
     } catch (x) { avisarErro(x); }
@@ -543,7 +552,9 @@ export default function CrecheHotel() {
       {pr && !pr.tirada && <p className="g-ch-obs"><Tag aria-hidden /><span>Promoção {pr.nome} ({etiquetaDaCasa(pr, e.tipo)})</span></p>}</>;
   };
   // leva e traz de hoje (buscar quem entra hoje, levar quem sai hoje): o botão abre a lista do dia
-  const levaTrazHoje = abertas.filter((e) => estadiaTemViagemNoDia(e, hojeIso)).length;
+  // táxi dos mensalistas de hoje: quem tem táxi no plano e é esperado (ou já veio), sem falta
+  const taxiHoje = mens ? montarChamada(mens.planos.filter((p) => p.taxi), hojeIso, mens.presencas, mens.faltas, petshop.horario).filter((l) => l.estado !== "faltou").length : 0;
+  const levaTrazHoje = abertas.filter((e) => estadiaTemViagemNoDia(e, hojeIso)).length + taxiHoje;
   const botaoMensagens = (e: EstadiaCompleta) => e.pets ? <button className="g-btn zap p" onClick={() => setMensagens(e)}><MessageCircle /> Mensagens</button> : null;
 
   return (
@@ -578,7 +589,9 @@ export default function CrecheHotel() {
       {usaCreche && (ver === "chamada" || ver === "casa") && <div className="g-ht-acima"><ExperienciasDaCreche /></div>}
       {ver === "casa" && posso("agenda") && <div className="g-ht-acima"><PedidosLink /></div>}
 
-      {usaCreche && !mens ? <Esqueleto linhas={4} />
+      {/* Cobranças não espera os planos para começar a buscar as cobranças (os planos chegam junto e a tela completa) */}
+      {ver === "cobrancas" && usaCreche && cuidoDoFinanceiro ? <Cobrancas planos={mens?.planos ?? SEM_PLANOS} gerar={gerando && Boolean(mens)} aoFecharGerar={() => setGerando(false)} aoMes={setMesCobranca} />
+        : usaCreche && !mens ? <Esqueleto linhas={4} />
         : ver === "diario" && comDiario ? <Diario />
         : ver === "chamada" && mens ? <Chamada aviso={<AvisoDeVaga espera={espera} aoVer={verEspera} />} planos={mens.planos} vagasHoje={vagasCrecheHoje ? { ocupadas: vagasCrecheHoje.ocupadas, total: vagasCrecheHoje.total!, avulsas: abertas.filter((e) => e.tipo === "creche" && (!e.mensalista || e.dia !== hojeIso)) } : null}
             aoNovoMensalista={() => { if (!somenteLeitura()) { setVer("mensalistas"); setNovoPlano(true); } }}
@@ -720,7 +733,8 @@ export default function CrecheHotel() {
                             // creche é um dia só: o que vale dizer é como o dia conta (mensalista ou diária avulsa), não "1ª diária"
                             ? (e.mensalista === "extra" ? "mensalista · dia extra" : e.mensalista === "reposicao" ? "mensalista · reposição" : e.mensalista ? "mensalista · dia do plano" : e.experiencia ? "dia de experiência" : "diária avulsa")
                             : diarias === 1 ? "1ª diária" : `${diarias}ª diária`}</span>
-                          {atrasada ? <span className="g-tag vermelho">saída atrasada</span> : parte != null && <span className="g-muted g-tab">{Math.round(parte * 100)}% do período</span>}
+                          {/* "1ª diária de 2" diz mais que "1% do período" (o "%" não dizia nada para quem lia) */}
+                          {atrasada ? <span className="g-tag vermelho">saída atrasada</span> : e.tipo === "hotel" && e.saida_prevista ? <span className="g-muted g-tab">{contarDiarias(e, new Date(e.saida_prevista)) === 1 ? "1 diária prevista" : `${contarDiarias(e, new Date(e.saida_prevista))} diárias previstas`}</span> : null}
                         </div>
                         <div className="g-ch-barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={parte == null ? undefined : Math.round(parte * 100)} aria-label="Quanto do período já passou">
                           <i style={{ width: `${parte == null ? 100 : Math.max(4, parte * 100)}%` }} />
@@ -737,7 +751,7 @@ export default function CrecheHotel() {
                       {quarto(e)}
                       {e.obs && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{e.obs}</span></p>}
                       <AceiteDoLink estadiaId={e.id} />
-                      {pet && <EntradaNaVisita visita={visitaDaEntrada(e)} saida mostrarSemEntrada={!e.mensalista} />}
+                      {pet && <EntradaNaVisita visita={visitaDaEntrada(e)} saida />}
                       {comCuidados && <CuidadosDoDia estadia={e} feitos={dados.feitos} aoMudar={() => void recarregar()} />}
                       {comOcorrencias && <OcorrenciasDoCartao lista={dados.ocorrencias.filter((o) => o.estadia_id === e.id)} />}
                       <div className="g-fila g-ch-acoes">
@@ -891,7 +905,7 @@ export default function CrecheHotel() {
         fatos={comCuidados ? fatosDoDia(lerCuidados(mensagens), dados?.feitos.filter((f) => f.estadia_id === mensagens.id) ?? [], hojeIso) : undefined} />}
       {sinalJunto && <FolhaSinalJunto key={sinalJunto.chave} grupo={sinalJunto} aoFechar={() => setSinalJunto(null)} aoGravar={() => { setSinalJunto(null); mudou(); }} />}
       {sinalDe && <FolhaSinal estadia={sinalDe} valores={valoresDe(sinalDe)} sugerido={sugeridoPara(sinalDe)} totalPrevisto={previstoDe(sinalDe)} aoFechar={() => setSinalDe(null)} aoGravar={() => { setSinalDe(null); mudou(); }} />}
-      {cancelando && valoresDe(cancelando) && <CancelarComSinal estadia={cancelando} valores={valoresDe(cancelando)!} aoFechar={() => setCancelando(null)} aoGravar={() => { setCancelando(null); mudou(); }} />}
+      {cancelando && valoresDe(cancelando) && <CancelarComSinal estadia={cancelando} valores={valoresDe(cancelando)!} aoFechar={() => setCancelando(null)} aoGravar={() => { tirarDaLista(cancelando.id); setCancelando(null); mudou(); }} />}
       {detalhe && <DetalheDaEstadia estadia={detalhe} aoFechar={() => setDetalhe(null)}
         aoCorrigir={vejoFinanceiro && detalhe.status === "encerrada" && !detalhe.mensalista ? () => { const e = detalhe; setDetalhe(null); if (!somenteLeitura()) setAcertando(e); } : undefined} />}
       {entradaDe && <EntradaNaChegada key={entradaDe.estadiaId} visita={entradaDe} aoFechar={() => setEntradaDe(null)} />}
@@ -959,9 +973,12 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const [tipo, setTipo] = useState<Tipo>(tipo0);
   const [jaAqui, setJaAqui] = useState(jaAqui0);
   const [dia, setDia] = useState(editar ? isoDia(new Date(editar.entrada)) : diaInicial ?? hojeIso);
-  const [hhmm, setHhmm] = useState(editar ? horaDe(editar.entrada) : horaInicial ?? "08:00");
+  // hotel com hora de entrada e de saída combinadas (Meu pet shop, Opções do hotel): a reserva nova já vem com elas
+  const horasHotel = horasDoHotel(petshop);
+  const horaPadrao = (t: Tipo, qual: "entrada" | "saida") => (t === "hotel" ? (qual === "entrada" ? horasHotel.entrada : horasHotel.saida) : null) ?? (qual === "entrada" ? "08:00" : "18:00");
+  const [hhmm, setHhmm] = useState(editar ? horaDe(editar.entrada) : horaInicial ?? horaPadrao(tipo0, "entrada"));
   const [saidaDia, setSaidaDia] = useState(editar?.saida_prevista ? isoDia(new Date(editar.saida_prevista)) : saidaInicial && saidaInicial >= (diaInicial ?? "") ? saidaInicial : "");
-  const [saidaHora, setSaidaHora] = useState(editar?.saida_prevista ? horaDe(editar.saida_prevista) : saidaHoraInicial ?? "18:00");
+  const [saidaHora, setSaidaHora] = useState(editar?.saida_prevista ? horaDe(editar.saida_prevista) : saidaHoraInicial ?? horaPadrao(tipo0, "saida"));
   // a diária sugerida é sempre o preço de Meu pet shop (ou o do porte, se a opção estiver ligada), nunca a última digitada
   const [diaria, setDiaria] = useState<number | null>(editar ? (editar.valor_diaria == null ? null : Number(editar.valor_diaria)) : diariaSugerida(petshop, tipo0, petInicial?.porte ?? null));
   // na edição, a diária combinada fica como está até a pessoa trocar o tipo: aí vale o preço fixo do tipo novo
@@ -1022,6 +1039,11 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   function trocarTipo(t: Tipo) {
     if (t === tipo) return;
     setTipo(t);
+    // as horas sugeridas acompanham o tipo (quem já mudou a hora continua com a dela)
+    if (!editar) {
+      if (hhmm === horaPadrao(tipo, "entrada") && !horaInicial) setHhmm(horaPadrao(t, "entrada"));
+      if (saidaHora === horaPadrao(tipo, "saida") && !saidaHoraInicial) setSaidaHora(horaPadrao(t, "saida"));
+    }
     // trocou o tipo: a diária passa a ser o preço fixo do tipo novo, a não ser que a pessoa digite outro valor depois da troca
     if (!mexeuNaDiaria || editar) { setDiaria(diariaSugerida(petshop, t, pet?.porte)); setMexeuNaDiaria(false); }
   }

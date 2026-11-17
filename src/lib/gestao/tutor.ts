@@ -64,8 +64,9 @@ export function mensagemDaPagina(p: { tutor: string | null | undefined; petshop:
   return `${saudacaoZap(p.tutor, p.petshop)} Esta é a página de ${listaDeNomes(p.pets)} aqui com a gente: o diário do dia, as fotos e o que está marcado. É só sua, não precisa de senha. Guarde o link: ${p.url}`;
 }
 export function mensagemDasFotos(p: { tutor: string | null | undefined; petshop: string; pet: string; fotos: number; url: string }) {
-  const quantas = p.fotos === 1 ? "uma foto" : `${p.fotos} fotos`;
-  return `${saudacaoZap(p.tutor, p.petshop)} Saíram ${quantas} de ${p.pet} hoje. Veja aqui: ${p.url}`;
+  // "Saiu uma foto" / "Saíram 3 fotos" (antes: "Saíram uma foto")
+  const quantas = p.fotos === 1 ? "Saiu uma foto" : `Saíram ${p.fotos} fotos`;
+  return `${saudacaoZap(p.tutor, p.petshop)} ${quantas} de ${p.pet} hoje. Veja aqui: ${p.url}`;
 }
 
 export type FotoDoDia = { id: string; caminho: string; legenda: string | null; criado_em: string; criado_por: string | null; criado_nome: string | null; pet_id: string; url: string | null };
@@ -81,6 +82,17 @@ export async function fotosDoDia(sb: Banco, petshopId: string, petIds: string[],
   const s = await sb.storage.from(BUCKET_DIARIO).createSignedUrls(linhas.map((f) => f.caminho), 3600);
   const urls = new Map((s.data ?? []).map((x) => [x.path, x.signedUrl]));
   return linhas.map((f) => ({ ...f, url: urls.get(f.caminho) ?? null }));
+}
+
+/** Prazo de cada passo da foto (subir o arquivo, guardar no dia). */
+const PRAZO_DA_FOTO = 25_000;
+class Demorou extends Error {}
+/** A promessa, ou um erro `Demorou` depois de `ms` (a promessa continua correndo; o resultado tardio é ignorado). */
+export function comPrazo<T>(p: PromiseLike<T>, ms: number): Promise<T> {
+  return new Promise<T>((ok, falha) => {
+    const t = setTimeout(() => falha(new Demorou("demorou")), ms);
+    Promise.resolve(p).then((v) => { clearTimeout(t); ok(v); }, (e) => { clearTimeout(t); falha(e); });
+  });
 }
 
 /** Reduz a foto para no máximo 1600 px, JPEG leve (o celular manda fotos de vários MB). */
@@ -99,17 +111,35 @@ async function prepararFoto(f: File): Promise<Blob> {
  * Devolve quantas entraram e os erros (uma foto com problema não segura as outras).
  */
 export async function enviarFotos(sb: Banco, p: { petshopId: string; estadiaId: string; petId: string; dia: string; legenda?: string },
-  arquivos: File[], aoAvancar?: (feitas: number) => void): Promise<{ enviadas: number; erros: string[] }> {
+  arquivos: File[], aoAvancar?: (feitas: number) => void, aoDemorar?: (tentativa: number) => void): Promise<{ enviadas: number; erros: string[] }> {
   const erros: string[] = [];
   let enviadas = 0, feitas = 0, i = 0;
   const legenda = p.legenda?.trim().slice(0, 200) || null;
+  /**
+   * Sobe o arquivo com prazo: na primeira foto do dia o aparelho às vezes ficava 30 a 60 s parado em "Mandando 1 de 1…" (a sessão
+   * sendo renovada, ou a conexão com o armazenamento presa, sem erro nenhum). Passou do prazo: confere a sessão e tenta de novo,
+   * com outro nome de arquivo (o que ficou preso, se subir, vira sobra e a faxina apaga). Na segunda falha, diz o que aconteceu.
+   */
+  async function subir(blob: Blob): Promise<string> {
+    for (let tentativa = 1; ; tentativa++) {
+      const caminho = `${p.petshopId}/${p.petId}/${p.dia}/${crypto.randomUUID()}.jpg`;
+      try {
+        const up = await comPrazo(sb.storage.from(BUCKET_DIARIO).upload(caminho, blob, { contentType: "image/jpeg" }), PRAZO_DA_FOTO);
+        if (up.error) throw new Error(up.error.message.includes("size") ? "A foto ficou grande demais." : up.error.message);
+        return caminho;
+      } catch (e) {
+        if (!(e instanceof Demorou) || tentativa >= 2) throw e instanceof Demorou ? new Error("A foto não subiu: a internet está lenta. Toque em Escolher fotos para tentar de novo.") : e;
+        aoDemorar?.(tentativa + 1);
+        await comPrazo(sb.auth.getSession(), 10_000).catch(() => null);
+      }
+    }
+  }
   async function uma(f: File) {
     try {
       const blob = await prepararFoto(f);
-      const caminho = `${p.petshopId}/${p.petId}/${p.dia}/${crypto.randomUUID()}.jpg`;
-      const up = await sb.storage.from(BUCKET_DIARIO).upload(caminho, blob, { contentType: "image/jpeg" });
-      if (up.error) throw new Error(up.error.message.includes("size") ? "A foto ficou grande demais." : up.error.message);
-      const ins = await sb.from("diario_fotos").insert({ petshop_id: p.petshopId, estadia_id: p.estadiaId, pet_id: p.petId, dia: p.dia, caminho, legenda }).select("id");
+      const caminho = await subir(blob);
+      const ins = await comPrazo(sb.from("diario_fotos").insert({ petshop_id: p.petshopId, estadia_id: p.estadiaId, pet_id: p.petId, dia: p.dia, caminho, legenda }).select("id"), PRAZO_DA_FOTO)
+        .catch((e) => ({ data: null, error: { message: e instanceof Demorou ? "A foto subiu, mas não consegui guardar no dia: a internet está lenta. Tente de novo." : String(e) } }));
       if (ins.error) { void sb.storage.from(BUCKET_DIARIO).remove([caminho]); throw new Error(ins.error.message); }
       if (ins.data?.[0]?.id) novas.push({ id: ins.data[0].id, caminho });
       enviadas++;

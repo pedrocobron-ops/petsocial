@@ -5,10 +5,11 @@
  */
 export const MODULOS = [
   { id: "banho_tosa", rotulo: "Banho e tosa", apoio: "Agenda de horários, serviços e preços por porte." },
-  { id: "creche", rotulo: "Creche", apoio: "Pets que passam o dia: check-in, diária e vagas." },
+  { id: "creche", rotulo: "Creche", apoio: "Pets que passam o dia: check-in, diária, vagas e plano mensal." },
   { id: "hotel", rotulo: "Hotel", apoio: "Hospedagem: reservas, noites e vagas." },
   { id: "loja", rotulo: "Venda de produtos", apoio: "Estoque, entradas e venda no caixa." },
-  { id: "pacotes", rotulo: "Pacotes e planos", apoio: "Vender pacote e dar baixa a cada uso." },
+  // o plano mensal da creche (mensalistas) já vem com a Creche: "Pacotes" é outra coisa (testador achou que fosse o plano mensal)
+  { id: "pacotes", rotulo: "Pacotes e planos", apoio: "Vender um pacote de usos (ex.: 4 banhos, 10 diárias) e dar baixa a cada uso. O plano mensal da creche já vem com a Creche." },
 ] as const;
 
 export type Modulo = (typeof MODULOS)[number]["id"];

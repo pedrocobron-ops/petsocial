@@ -160,3 +160,60 @@ export async function lerSaidasDoPeriodo(sb: Banco, petshopId: string, de: strin
     meses: (x.meses ?? []).map((m) => ({ ...m, saiu: Number(m.saiu), contas_fixas: Number(m.contas_fixas) })),
   };
 }
+
+/* ---------- o que aconteceu com cada conta fixa no período (migração 20261214) ---------- */
+
+export type SituacaoContaFixa = {
+  conta_fixa_id: string | null; nome: string; mes: string; vencimento: string; valor: number; estimado: boolean;
+  /** paga · a_pagar (em A pagar) · vai_entrar (ainda não entrou em A pagar) · excluida · pausada · antes_do_inicio (a conta daquele mês não existe) */
+  situacao: "paga" | "a_pagar" | "vai_entrar" | "excluida" | "pausada" | "antes_do_inicio";
+  pago_em: string | null; entra_em: string | null; comeca_em: string | null;
+};
+
+/** `contas_fixas_situacao`: null se o banco ainda não tem a função (as telas ficam como antes). */
+export async function lerSituacaoContasFixas(sb: Banco, petshopId: string, de: string, ate: string): Promise<SituacaoContaFixa[] | null> {
+  const r = await sb.rpc("contas_fixas_situacao", { p: petshopId, p_de: de, p_ate: ate });
+  if (r.error || !Array.isArray(r.data)) return null;
+  return (r.data as unknown as SituacaoContaFixa[]).map((x) => ({ ...x, valor: Number(x.valor) }));
+}
+
+/** O que ainda falta pagar no período: as contas em A pagar e as que ainda vão entrar (pelo valor da conta fixa). */
+export function aindaAPagar(lista: SituacaoContaFixa[]) {
+  const itens = lista.filter((x) => x.situacao === "a_pagar" || x.situacao === "vai_entrar");
+  return { itens, total: Math.round(itens.reduce((t, x) => t + x.valor, 0) * 100) / 100 };
+}
+
+/**
+ * A frase do que aconteceu, sem deduzir nada (para a tela e para o Mozart):
+ * "paga em 10/11", "em A pagar, vence 20/11", "ainda não entrou em A pagar: entra em 15/11 e vence 25/11",
+ * "não existe conta de 11/2026: a conta fixa começou em 17/11/2026, depois do vencimento (05/11)".
+ */
+export function fraseDaSituacao(s: SituacaoContaFixa, hoje: string): string {
+  const v = s.vencimento;
+  switch (s.situacao) {
+    case "paga": return `paga${s.pago_em ? ` em ${ddmm(s.pago_em)}` : ""}`;
+    case "a_pagar": return `em A pagar, ${v < hoje ? `venceu em ${ddmm(v)} e ainda não foi paga` : v === hoje ? "vence hoje" : `vence ${ddmm(v)}`}${s.estimado ? " (valor estimado)" : ""}`;
+    case "vai_entrar": return s.entra_em && s.entra_em > hoje ? `ainda não entrou em A pagar: entra em ${ddmm(s.entra_em)} e vence ${ddmm(v)}` : `entra em A pagar ao abrir o Financeiro (vence ${ddmm(v)})`;
+    case "excluida": return "foi tirada de A pagar neste mês (não volta)";
+    case "pausada": return "conta fixa pausada: a conta deste mês não foi criada";
+    case "antes_do_inicio": return `não existe conta de ${s.mes.slice(5, 7)}/${s.mes.slice(0, 4)}: a conta fixa começou em ${s.comeca_em ? `${ddmm(s.comeca_em)}/${s.comeca_em.slice(0, 4)}` : "outro dia"}, depois do vencimento (${ddmm(v)}). Nada foi pago nem ficou para pagar`;
+  }
+}
+
+/* ---------- quanto precisa faturar, com a margem do que vende ---------- */
+
+/** Dias olhados para a margem média. */
+export const DIAS_DA_MARGEM = 90;
+
+/**
+ * Faturamento que paga as contas fixas, levando em conta que de cada venda só sobra a margem (preço − custo).
+ * Conta: contas fixas ÷ margem média (das linhas de serviço e produto com custo informado, nos últimos 90 dias).
+ * Só sai quando dá para confiar: margem entre 1% e 99% e pelo menos metade do que entrou com custo informado.
+ * Sem isso, null (a tela diz que a conta é só das contas fixas).
+ */
+export function faturamentoComMargem(totalMensal: number, l: { totais: { receitaComCusto: number; pct: number | null }; ponte: { entradas: number } }): { pct: number; faturamento: number } | null {
+  const pct = l.totais.pct;
+  if (!(totalMensal > 0) || pct == null || !(pct >= 1 && pct <= 99)) return null;
+  if (!(l.ponte.entradas > 0) || l.totais.receitaComCusto < l.ponte.entradas * 0.5) return null;
+  return { pct: Math.round(pct * 10) / 10, faturamento: Math.round((totalMensal / (pct / 100)) * 100) / 100 };
+}

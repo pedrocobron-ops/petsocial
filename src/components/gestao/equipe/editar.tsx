@@ -9,7 +9,7 @@ import { erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-hor
 import type { Database } from "@/lib/gestao/banco";
 import type { Horario, Profissional } from "@/lib/gestao/tipos";
 import { FRASE_TITULAR, acessoDe, camposDaEscolha, ehSocio, emailValido, erroDeLimite, erroDoTitular, escolhaDe, lerComissao, primeiroNome, titularDe, usoDoPlano, type Escolha } from "./modelo";
-import { Areas, Chave, Convite, DetalhesAgenda, EscolherPerfil, PlanoCheio, Vagas, fraseDoLink, useLinksDosConvites } from "./pecas";
+import { Areas, Chave, Convite, DetalhesAgenda, EscolherPerfil, PlanoCheio, Vagas, fraseDoLink, podeGerarLinkNovo, useLinksDosConvites } from "./pecas";
 
 /** O convite de quem ainda não criou a conta, para mandar de novo. */
 export function FolhaConvite({ pessoa, aoFechar }: { pessoa: Profissional; aoFechar: () => void }) {
@@ -245,7 +245,7 @@ export default function EditarPessoa({ pessoa, foco, aoFechar }: { pessoa: Profi
               {verConvite && <Convite pessoaId={pessoa.id} nome={pessoa.nome} email={pessoa.email_convite ?? ""} />}
               {dando ? campoEmail : (
                 <div className="g-fila">
-                  {!verConvite && <button type="button" className="g-btn p verde" onClick={() => setVerConvite(true)}><Send />Mandar o convite de novo</button>}
+                  {!verConvite && <button type="button" className="g-btn p verde" onClick={() => void podeGerarLinkNovo(confirmar, pessoa.nome, linkDe(pessoa.id)).then((sim) => { if (sim) setVerConvite(true); })}><Send />Mandar o convite de novo</button>}
                   <button type="button" className="g-btn p sec" onClick={() => { setDando(true); setVerConvite(false); }} disabled={mexendo}>Trocar o e-mail</button>
                   <button type="button" className="g-btn p perigo" onClick={() => void tirarAcesso()} disabled={mexendo}>Tirar o acesso</button>
                 </div>

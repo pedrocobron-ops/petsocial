@@ -8,7 +8,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { useTrava } from "@/lib/gestao/uma-vez";
 import { AvatarPessoa, AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import type { Database } from "@/lib/gestao/banco";
-import { abreNoDia } from "@/lib/gestao/creche";
+import { abreNoDia, precoDaExperiencia } from "@/lib/gestao/creche";
 import { pixDoSinal } from "@/lib/gestao/hotel";
 import { porteDe, sinalDe } from "@/lib/gestao/hotel-opcoes";
 import { nomeDaCasa } from "@/lib/gestao/modulos";
@@ -92,6 +92,10 @@ export default function PedidosLink() {
   const [tutores, setTutores] = useState<Record<string, string>>({});
   const [duvida, setDuvida] = useState<Duvida | null>(null);
   const [perguntaPorte, setPerguntaPorte] = useState<PerguntaPorte | null>(null);
+  // pedidos que acabaram de ser aceitos ou recusados aqui: saem da lista na hora, sem esperar a busca de novo
+  // (antes, o cartão com Aceitar e Recusar ficava na tela uns segundos e convidava a um segundo toque)
+  const [respondidosAgora, setRespondidosAgora] = useState<Set<string>>(() => new Set());
+  const marcarRespondidos = (ids: string[]) => setRespondidosAgora((s) => new Set([...s, ...ids]));
   const comOpcoes = usouOpcoesDoLink(petshop);
   const doLink = opcoesDoLink(petshop);
 
@@ -196,7 +200,7 @@ export default function PedidosLink() {
   const aceiteDe = (p: Pedido) => p.termos_aceitos_em
     ? <span className="g-tag verde" title={p.termos_texto ?? undefined}>aceitou {p.termos_texto ? "as regras" : "a declaração de vacinas"}{p.termos_texto && p.termos_vacinas ? " e declarou vacinas em dia" : ""} em {diaHora(p.termos_aceitos_em)}</span>
     : doLink.pedeAceite ? <span className="g-tag amarelo">sem aceite das regras</span> : null;
-  const pendentes = dados ?? [];
+  const pendentes = (dados ?? []).filter((p) => !respondidosAgora.has(p.id));
 
   /** O tutor foi avisado (ou a pessoa disse que já avisou): o pedido sai da lista, em todos os aparelhos. */
   async function avisado(lista: Respondido[]) {
@@ -287,7 +291,7 @@ export default function PedidosLink() {
     if (feitos.length) {
       const tutor = decisao.tutor;
       if (tutor) setTutores((t) => ({ ...t, ...Object.fromEntries(feitos.map((p) => [p.id, tutor])) }));
-      void recarregar();
+      marcarRespondidos(feitos.map((p) => p.id));
       const doSinal = comSinal ? ` ${comSinal === 1 ? "O sinal já ficou" : "Os sinais já ficaram"} em A receber, pela sua regra.` : "";
       avisar(feitos.length === 1 ? (ehEstadia(feitos[0]) ? `Reserva de ${feitos[0].pet_nome} feita. Ela está em ${casa}.${doSinal}` : `Horário de ${feitos[0].pet_nome} marcado.`)
         : feitos.every(ehEstadia) ? `Reservas de ${listaDe(feitos.map((p) => p.pet_nome))} feitas. Elas estão em ${casa}.${doSinal}` : `Horários de ${listaDe(feitos.map((p) => p.pet_nome))} marcados.`);
@@ -369,6 +373,7 @@ export default function PedidosLink() {
       const linhas = ok(await sb.from("pedidos_agendamento").update({ status: "recusado" }).in("id", lista.map((p) => p.id)).eq("petshop_id", petshop.id).eq("status", "pendente").select("id"));
       const feitos = lista.filter((p) => linhas.some((l) => l.id === p.id));
       if (!feitos.length) throw new Error(lista.length > 1 ? "Esses pedidos já foram respondidos." : "Esse pedido já foi respondido.");
+      marcarRespondidos(feitos.map((p) => p.id));
       avisar(feitos.length > 1 ? "Pedidos recusados." : "Pedido recusado.");
       void recarregar();
     } catch (e) {
@@ -422,10 +427,14 @@ export default function PedidosLink() {
     const noPrazo = new Date(p.inicio).getTime() - doLink.cancelarHoras * 36e5 > Date.now();
     const acompanhar = `\n\nVeja a confirmação aqui: ${base}/pedido/${p.id}${!doLink.cancelar ? "" : noPrazo ? `\nPor esse endereço você também cancela ou pede outra data, ${prazoPorExtenso(doLink.cancelarHoras)}.` : "\nSe precisar mudar ou cancelar, fale com a gente por aqui."}`;
     if (ehEstadia(p)) {
-      const oQue = `${p.tipo === "hotel" ? "o hotel" : "a creche"} de ${nomes}, ${periodoDe(p)}`;
+      // dia de experiência: a mensagem diz que é o dia de experiência e quanto custa (o preço só para quem vê o dinheiro)
+      const exp = p.tipo === "creche" && lista.every((r) => r.pedido.experiencia);
+      const precoExp = exp && vejoFinanceiro ? precoDaExperiencia(petshop) : null;
+      const oQue = exp ? `o dia de experiência de ${nomes} na creche, ${periodoDe(p)}` : `${p.tipo === "hotel" ? "o hotel" : "a creche"} de ${nomes}, ${periodoDe(p)}`;
+      const doPreco = !exp || lista[0].resposta === "recusado" ? "" : precoExp == null ? "" : precoExp > 0 ? ` O dia de experiência custa ${brl(precoExp)}${lista.length > 1 ? " por pet" : ""}, pago na saída.` : " O dia de experiência é por nossa conta.";
       return lista[0].resposta === "recusado"
         ? `${oi} Recebemos o seu pedido para ${oQue}, mas não temos vaga nessas datas. Você pode escolher outras datas aqui: ${base}\n\nSe preferir, me diga o período que fica bom para você.`
-        : `${oi} Está confirmado: ${oQue}, com chegada às ${hora(p.inicio)}${p.tipo === "hotel" ? ` e saída às ${hora(p.fim)}` : ""}.${fraseDoSinal(lista.map((r) => r.pedido))} Esperamos vocês!${acompanhar}`;
+        : `${oi} Está confirmado: ${oQue}, com chegada às ${hora(p.inicio)}${p.tipo === "hotel" ? ` e saída às ${hora(p.fim)}` : ""}.${doPreco}${fraseDoSinal(lista.map((r) => r.pedido))} Esperamos vocês!${acompanhar}`;
     }
     if (lista[0].resposta === "recusado") {
       return `${oi} Recebemos o seu pedido para ${nomes}, mas ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}, não vamos conseguir atender. Você pode escolher outro horário livre aqui: ${base}\n\nSe preferir, me diga os dias e períodos que ficam bons para você.`;

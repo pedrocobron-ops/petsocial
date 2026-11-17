@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Legal, { Email, EmailJuridico, Encarregado, Indice, Parte, Preencher, QuemResponde, Zap } from "@/components/gestao/legal";
+import Legal, { Email, EmailPrivacidade, Encarregado, Indice, Parte, Preencher, QuemResponde, Zap } from "@/components/gestao/legal";
 import { EMPRESA } from "@/lib/empresa";
 import { DIAS_DO_BOLETIM } from "@/lib/gestao/boletim";
 
@@ -53,7 +53,7 @@ export default function PrivacidadeDoGestao() {
 
       {p("quem-somos", "Esta política é do Gestão: aplicativo, cadastro, entrada e as páginas públicas dos pet shops.", <>
         <p>
-          O Maestro Pet Gestão é oferecido por <QuemResponde />, dona da marca {EMPRESA.marca} (&quot;nós&quot;).
+          O Maestro Pet Gestão é oferecido por <QuemResponde />, {EMPRESA.pessoaFisica ? "responsável pela" : "dona da"} marca {EMPRESA.marca} (&quot;nós&quot;).
           Esta política vale para o aplicativo do Gestão, as telas de cadastro e de entrada e as páginas públicas que os pet shops mandam aos tutores
           (link de agendamento, página do tutor, boletim e álbum). O restante do site maestropet.com, incluindo a página de apresentação do Gestão, segue a{" "}
           <Link href="/politica-de-privacidade">política de privacidade do site</Link>.
@@ -138,7 +138,7 @@ export default function PrivacidadeDoGestao() {
 
       {p("fornecedores", "Contamos com fornecedores para banco de dados, hospedagem, pagamentos, inteligência artificial e e-mail. Cada um recebe só o necessário.", <>
         <dl className="g-leg-pares">
-          <div><dt>Supabase</dt><dd>Banco de dados, login e guarda das fotos. O banco fica na região de São Paulo, Brasil; a empresa é dos Estados Unidos. O mesmo projeto do Supabase também atende outro produto do mesmo responsável (Escala CEO). Cada produto tem as suas tabelas e regras de acesso, e os dados de um não são usados no outro. Se você usar o mesmo e-mail nos dois, o login pode ser o mesmo.</dd></div>
+          <div><dt>Supabase</dt><dd>Banco de dados, login e guarda das fotos. O banco fica na região de São Paulo, Brasil; a empresa é dos Estados Unidos. O mesmo projeto do Supabase também atende outro produto do mesmo responsável (Escala CEO). Cada produto tem as suas tabelas e regras de acesso, e os dados de um não são usados no outro. Quem usa só o Escala CEO não enxerga nada do Gestão: as regras do próprio banco só deixam cada login ver o pet shop em que está na equipe. Se você usar o mesmo e-mail nos dois, o login pode ser o mesmo.</dd></div>
           <div><dt>Vercel</dt><dd>Hospedagem do aplicativo e das páginas públicas. Os pedidos passam pelos servidores dela, que podem ficar fora do Brasil.</dd></div>
           <div><dt>Anthropic</dt><dd>Fornece o modelo de inteligência artificial do Mozart, da Ajuda, da leitura do caderno, dos textos do boletim e das dúvidas do link (parte 8). Servidores fora do Brasil.</dd></div>
           <div><dt>Cakto</dt><dd>Pagamento da assinatura. Os dados de pagamento são digitados no ambiente dela e seguem a política dela.</dd></div>
@@ -196,9 +196,10 @@ export default function PrivacidadeDoGestao() {
 
       {p("aparelho", "Sem pixel de anúncio e sem cookie de medição no aplicativo. O navegador guarda só o login e algumas preferências.", <>
         <ul>
-          <li>O aplicativo, as telas de cadastro e de entrada e as páginas públicas dos pet shops <b>não usam pixel de anúncio nem cookies de medição</b>. Quem chega ao cadastro pela página de apresentação abre o cadastro numa página nova, sem o pixel.</li>
+          <li>O aplicativo, as telas de cadastro e de entrada e as páginas públicas dos pet shops <b>não usam pixel de anúncio nem cookies de medição</b>, e nelas não aparece o aviso de cookies.</li>
+          <li>Quem chega ao cadastro pela página de apresentação continua na mesma aba. Assim que o cadastro abre, o pixel daquela página para de mandar qualquer coisa. O cookie de medição que a página de apresentação já tenha deixado no navegador (o &quot;_fbp&quot;, da Meta) fica guardado nele até vencer ou ser apagado, mas o Gestão não o lê nem o usa.</li>
           <li>Para manter você conectado, o navegador guarda no próprio aparelho a sessão de login. Também guarda preferências e rascunhos, como o pet shop aberto por último, os ajustes da voz e um formulário ainda não salvo. Isso serve só para o sistema funcionar e fica no seu aparelho. Ao sair da conta, a sessão é apagada.</li>
-          <li>A página de apresentação do Gestão faz parte do site maestropet.com e pode usar o Pixel da Meta, como explica a <Link href="/politica-de-privacidade">política do site</Link>.</li>
+          <li>A página de apresentação do Gestão faz parte do site maestropet.com e usa o Pixel da Meta, como explica a <Link href="/politica-de-privacidade">política do site</Link>. Lá, o aviso de cookies tem &quot;Aceitar&quot; e &quot;Recusar&quot;: recusando, o pixel não manda nada daquele navegador. Dá para mudar a escolha na política do site, parte 5.</li>
         </ul>
       </>)}
 
@@ -219,7 +220,7 @@ export default function PrivacidadeDoGestao() {
           <div><dt>Registros de erro</dt><dd>30 dias.</dd></div>
           <div><dt>Registros de acesso</dt><dd>6 meses, em ambiente seguro, como pede o Marco Civil da Internet; depois são apagados. Só entregamos por ordem judicial.</dd></div>
           <div><dt>Pagamentos e aceites</dt><dd>Pelo prazo que a lei exigir e enquanto puderem ser necessários para defesa em processo, mesmo depois de a conta ser apagada.</dd></div>
-          <div><dt>Cópias de segurança</dt><dd>Substituídas com o tempo, no ciclo do fornecedor do banco de dados.</dd></div>
+          <div><dt>Cópias de segurança</dt><dd>As automáticas do fornecedor do banco (Supabase), pelo tempo do plano contratado com ele, e a cópia completa que a nossa equipe baixa de tempos em tempos (sem as fotos e sem senhas), guardada fora do fornecedor e trocada pelas mais novas. Servem só para recuperar o sistema; não há prazo de guarda garantido (Termos, parte 16).</dd></div>
         </dl>
         <p>
           <b>Baixar e apagar:</b> o dono baixa todos os dados em Meu pet shop (um .zip com uma planilha por parte e um README) e as planilhas em Clientes e pets, Financeiro e Relatórios, inclusive com a conta só para consulta.
@@ -252,7 +253,7 @@ export default function PrivacidadeDoGestao() {
         </ul>
         <p><b>Como pedir:</b></p>
         <ul>
-          <li><b>Assinante ou pessoa da equipe:</b> boa parte se resolve na própria tela: corrigir, baixar todos os dados, apagar clientes, apagar a conta (Meu pet shop, Encerrar e apagar a conta) e sair de uma equipe (&quot;Sair desta equipe&quot;). Para o resto, escreva para <EmailJuridico /> ou <Email /> com o assunto &quot;Privacidade&quot;. Podemos pedir uma confirmação de que o pedido é seu. Respondemos em até 15 dias.</li>
+          <li><b>Assinante ou pessoa da equipe:</b> boa parte se resolve na própria tela: corrigir, baixar todos os dados, apagar clientes, apagar a conta (Meu pet shop, Encerrar e apagar a conta) e sair de uma equipe (&quot;Sair desta equipe&quot;). Para o resto, escreva para <EmailPrivacidade /> com o assunto &quot;Privacidade&quot;. Podemos pedir uma confirmação de que o pedido é seu. Respondemos em até 15 dias.</li>
           <li><b>Tutor:</b> fale com o pet shop onde o seu pet é atendido: ele é o controlador e, pela ficha do tutor, consegue baixar os seus dados em planilhas, corrigi-los e apagá-los. Para tirar a autorização de postar fotos, use o link &quot;Não quero mais&quot; do boletim. Se preferir escrever para nós, diga qual é o pet shop: encaminhamos o pedido a ele e ajudamos a atender.</li>
         </ul>
       </>)}
@@ -280,7 +281,7 @@ export default function PrivacidadeDoGestao() {
       {p("contato", "Fale com o encarregado pelo e-mail de privacidade.", <>
         <p>
           Encarregado pelo tratamento de dados pessoais (DPO): <Encarregado />. Para falar com o encarregado ou tratar de qualquer assunto de privacidade,
-          escreva para <EmailJuridico />. Para outras dúvidas, também atendemos por <Email /> e pelo <Zap />.
+          escreva para <EmailPrivacidade />. Para outras dúvidas, também atendemos {EMPRESA.emailJuridico && EMPRESA.emailJuridico !== EMPRESA.email ? <>por <Email /> e </> : null}pelo <Zap />.
         </p>
         <p>Veja também os <Link href="/gestao/termos">Termos de uso</Link>.</p>
       </>)}

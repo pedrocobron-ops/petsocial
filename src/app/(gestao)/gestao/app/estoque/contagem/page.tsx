@@ -50,7 +50,7 @@ export default function Pagina() {
 /* ---------- lista e começar ---------- */
 
 function Lista() {
-  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { sb, petshop, vejoCusto } = useGestao();
   const router = useRouter();
   const [comecando, setComecando] = useState(false);
   const { dados, carregando, erro, recarregar } = useDados(async () =>
@@ -91,7 +91,7 @@ function Lista() {
                   <li key={c.id} className="g-card">
                     <span className="t">
                       <b>{c.nome}</b>
-                      <span>{c.status === "cancelada" ? "Cancelada" : `${c.ajustados === 1 ? "1 produto ajustado" : `${c.ajustados ?? 0} produtos ajustados`}${vejoFinanceiro && c.diferenca_valor != null ? ` · ${sinalBrl(Number(c.diferenca_valor))}` : ""}`}</span>
+                      <span>{c.status === "cancelada" ? "Cancelada" : `${c.ajustados === 1 ? "1 produto ajustado" : `${c.ajustados ?? 0} produtos ajustados`}${vejoCusto && c.diferenca_valor != null ? ` · ${sinalBrl(Number(c.diferenca_valor))}` : ""}`}</span>
                       <span>Começou {dataCurta(c.criado_em)}{c.criado_por_nome ? ` por ${c.criado_por_nome}` : ""}{c.concluida_em ? ` · ajustou ${dataCurta(c.concluida_em)} às ${hora(c.concluida_em)}${c.concluida_por_nome ? ` por ${c.concluida_por_nome}` : ""}` : ""}</span>
                     </span>
                     <span className="g-fila">

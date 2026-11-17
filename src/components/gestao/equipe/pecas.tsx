@@ -149,7 +149,7 @@ export function Areas({ areas, aoMudar, socio, curto }: { areas: Area[]; aoMudar
       </div>
       <div className="g-eq-areas-g dinheiro">
         <p className="g-eq-mini">Dinheiro</p>
-        {!curto && <p className="g-eq-areas-n">São as três áreas que mostram valores. Com elas desligadas, a pessoa não vê quanto entrou nem quanto saiu.</p>}
+        {!curto && <p className="g-eq-areas-n">Caixa, Financeiro e Relatórios mostram valores. Com as três desligadas, a pessoa não vê quanto entrou nem quanto saiu.{areasPara(petshop).some((a) => a.id === "custo") ? " O custo e a margem dos produtos ficam escondidos de quem cuida do estoque, a não ser que você ligue \"Ver custo e margem\"." : ""}</p>}
         <ul className="g-eq-poderes">{grupo(true)}</ul>
       </div>
       <div className="g-eq-areas-g fixas">
@@ -291,6 +291,23 @@ export function useLinksDosConvites() {
     if (new Date(x.expira_em).getTime() <= Date.now()) return { estado: "vencido" };
     return { estado: "valendo", ate: validadeDoConvite(x.expira_em) };
   };
+}
+
+/**
+ * Antes de gerar um link novo para quem já tem um valendo: o link que a pessoa já recebeu para de funcionar.
+ * Sem link valendo (vencido, sem link), não pergunta nada. Devolve se pode seguir.
+ */
+export async function podeGerarLinkNovo(
+  confirmar: (p: { titulo: string; texto?: string; confirmar?: string; voltar?: string }) => Promise<boolean>,
+  nome: string, link: LinkDoConvite | null,
+): Promise<boolean> {
+  if (link?.estado !== "valendo") return true;
+  const quem = primeiroNome(nome) || "a pessoa";
+  return confirmar({
+    titulo: "Gerar um link novo?",
+    texto: `O link que ${quem} já recebeu (vale até ${link.ate}) para de funcionar na hora. Só faça isso se ${quem} perdeu o link ou ainda não abriu: depois, mande o link novo.`,
+    confirmar: "Gerar link novo", voltar: "Manter o link atual",
+  });
 }
 
 /** Frase curta do link: "link vale até 24/11", "o link venceu: mande o convite de novo". */

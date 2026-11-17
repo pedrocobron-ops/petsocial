@@ -28,6 +28,11 @@ export default function DuvidaNoLink({ codigo, loja, telefone, aoPedir }: {
   const zap = linkWhatsApp(telefone, ultimaPergunta ? `Oi! Tenho uma dúvida: ${ultimaPergunta}` : "Oi! Tenho uma dúvida.");
 
   useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [falas, esperando]);
+  // no celular, as dúvidas sobem por cima do fim da página: a página ganha espaço embaixo para o "Enviar pedido" aparecer acima
+  useEffect(() => {
+    document.documentElement.classList.toggle("g-lk-duv-aberta", aberto);
+    return () => document.documentElement.classList.remove("g-lk-duv-aberta");
+  }, [aberto]);
   useEffect(() => {
     if (!aberto) return;
     campo.current?.focus();

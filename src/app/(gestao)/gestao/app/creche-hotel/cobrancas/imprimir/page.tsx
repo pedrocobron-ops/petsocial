@@ -3,10 +3,11 @@
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, lerPlanos, partesDoDesconto, partesDosExtras, SELECT_COBRANCA, taxasDaCobranca, textoDasDatas, textoDasTaxas, textoDosDias,
+  estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, lerPlanos, partesDoDesconto, partesDosExtras, SELECT_COBRANCA, taxasDaCobranca, taxiDaCobranca, textoDasDatas, textoDasTaxas, textoDoTaxiDaCobranca, textoDosDias,
   type CobrancaCompleta, type PlanoCompleto,
 } from "@/lib/gestao/creche";
 import { opcoesDeCobranca } from "@/lib/gestao/dinheiro-opcoes";
+import { pixDe } from "@/lib/gestao/hotel-opcoes";
 import { textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { brl, dataCurta, deIsoDia, fmtTelefone, isoDia, nomeMes } from "@/lib/gestao/util";
 import { nomeDaCasa } from "@/lib/gestao/modulos";
@@ -60,6 +61,7 @@ function textoDosExtras(c: CobrancaCompleta) {
   return [
     extras.length ? `${extras.length === 1 ? "1 dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})${partes.dias > 0 ? ` ${brl(partes.dias)}` : " sem valor"}` : null,
     taxas.length ? `${textoDasTaxas(taxas.length)} (${textoDasDatas(taxas.map((x) => x.dia))}) ${brl(partes.taxas)}` : null,
+    partes.taxi > 0 ? `${textoDoTaxiDaCobranca(c)} ${brl(partes.taxi)}` : null,
     partesDoDesconto(c).irmao > 0 ? `Desconto irmão − ${brl(partesDoDesconto(c).irmao)}` : null,
     partesDoDesconto(c).outro > 0 ? `Desconto − ${brl(partesDoDesconto(c).outro)}` : null,
   ].filter(Boolean) as string[];
@@ -187,7 +189,7 @@ function Extrato({ f, mes, mesTexto, hoje, planoDe, modeloDe }: {
   f: Familia; mes: Date; mesTexto: string; hoje: string; planoDe: (c: CobrancaCompleta) => PlanoCompleto | undefined; modeloDe: (c: CobrancaCompleta) => string | null;
 }) {
   const { petshop } = useGestao();
-  const pix = opcoesDeCobranca(petshop).pix;
+  const pix = opcoesDeCobranca(petshop).pix || pixDe(petshop);
   const todas = [...f.antigas, ...f.doMes];
   const aberto = todas.filter((c) => estadoDaCobranca(c, hoje).estado !== "paga");
   const deve = centavos(aberto.reduce((s, c) => s + faltaDaCobranca(c), 0));
@@ -201,6 +203,8 @@ function Extrato({ f, mes, mesTexto, hoje, planoDe, modeloDe }: {
       ...(extras.some((x) => x.valor > 0) ? extras.map((x) => ({ nome: `Dia extra em ${dataCurta(x.dia)}`, valor: brl(x.valor), recuo: true }))
         : extras.length ? [{ nome: `${extras.length === 1 ? "Dia extra" : `${extras.length} dias extras`} (${textoDasDatas(extras.map((x) => x.dia))})`, valor: partes.dias > 0 ? brl(partes.dias) : "sem valor", recuo: true }] : []),
       ...taxas.map((x) => ({ nome: `Busca fora do horário em ${dataCurta(x.dia)}`, valor: brl(x.valor), recuo: true })),
+      ...taxiDaCobranca(c).dias.map((x) => ({ nome: `Táxi pet em ${dataCurta(x.dia)}`, valor: brl(x.valor), recuo: true })),
+      taxiDaCobranca(c).mes > 0 && { nome: "Táxi pet do mês", valor: brl(taxiDaCobranca(c).mes), recuo: true },
       partesDoDesconto(c).irmao > 0 && { nome: "Desconto irmão", valor: `− ${brl(partesDoDesconto(c).irmao)}`, recuo: true },
       partesDoDesconto(c).outro > 0 && { nome: "Desconto", valor: `− ${brl(partesDoDesconto(c).outro)}`, recuo: true },
       { nome: "Total", valor: brl(c.total), forte: true },

@@ -23,6 +23,7 @@ import { EVENTO_GUIA, EVENTO_PERSONALIZAR_MENU, quandoATelaAbrir } from "./ui";
 import LogoLoja from "./logo-loja";
 import AvisoDeFuso from "./aviso-fuso";
 import { aplicarTema } from "@/lib/gestao/identidade";
+import { abrirDepoisDeRecarregar, chaveDaConversa } from "@/lib/gestao/assistente/guardada";
 
 // O que só abre com um toque (Mozart, Ajuda, guia inicial) e o "Como usar esta tela" (o manual inteiro) vêm à parte, depois
 // da tela: no celular com internet fraca, a tela não espera baixar o que a pessoa talvez nem abra.
@@ -105,6 +106,8 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   const { sb, user, petshop, eu, souDono, posso, liberado, exclusao, souTitular, diasDeTeste, assinaturaAberta, sair } = useGestao();
   const [pedidos, setPedidos] = useState(0);
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
+  // a página recarregou com a conversa do Mozart aberta (ou no meio de um "Pode fazer"): ela volta aberta, como estava
+  useEffect(() => { if (abrirDepoisDeRecarregar(chaveDaConversa(petshop.id, user.id))) setAssistente({ aberta: true, pedido: "" }); }, [petshop.id, user.id]);
   const [mais, setMais] = useState(false);
   const [ajuda, setAjuda] = useState(false);
   const [admin, setAdmin] = useState(false);

@@ -33,7 +33,7 @@ type Grupo = { id: string; fornecedor: Fornecedor | null; nome: string; linhas: 
 export default function OQueComprar({ produtos, fornecedores, comFornecedores, aoFechar }: {
   produtos: Produto[]; fornecedores: Fornecedor[]; comFornecedores: boolean; aoFechar: () => void;
 }) {
-  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { sb, petshop, vejoCusto } = useGestao();
   const [cobrir, setCobrir] = useState(() => lembradoNum("gestao:compra:cobrir", 2, COBRIR));
   const [periodo, setPeriodo] = useState(() => lembradoNum("gestao:compra:periodo", 6, PERIODOS));
   const [pedido, setPedido] = useState<Grupo | null>(null);
@@ -97,8 +97,8 @@ export default function OQueComprar({ produtos, fornecedores, comFornecedores, a
                 <Kpi icone={AlertTriangle} tom="manteiga" rotulo="Acabando" valor={analise.acabando.length}
                   apoio={analise.acabando.length ? "zerados, no mínimo ou para menos de 1 semana" : "nada acabando"} />
                 <Kpi icone={Hourglass} tom="lilas" rotulo="Parados há 60+ dias" valor={analise.parados.length}
-                  apoio={!analise.parados.length ? "tudo saiu nos últimos 60 dias" : vejoFinanceiro && analise.valorParado != null ? `${brl(analise.valorParado)} a preço de custo` : "com saldo e nada saiu"} />
-                {vejoFinanceiro && (
+                  apoio={!analise.parados.length ? "tudo saiu nos últimos 60 dias" : vejoCusto && analise.valorParado != null ? `${brl(analise.valorParado)} a preço de custo` : "com saldo e nada saiu"} />
+                {vejoCusto && (
                   <Kpi icone={Wallet} tom="menta" rotulo="Valor em estoque" valor={analise.valorEmEstoque != null ? brl(analise.valorEmEstoque) : "–"}
                     apoio={analise.semCusto ? `custo × quantidade · ${analise.semCusto} sem custo` : "custo × quantidade"} />
                 )}
@@ -112,7 +112,7 @@ export default function OQueComprar({ produtos, fornecedores, comFornecedores, a
               {analise.parados.length > 0 && (
                 <details className="g-lj-det">
                   <summary>Ver os parados há 60 dias ou mais</summary>
-                  <ul>{analise.parados.map((p) => <li key={p.id}><b>{p.nome}</b> · tem {fmtQtd(p.estoque)} {p.unidade}{vejoFinanceiro && p.custo != null ? ` · ${brl(Number(p.custo) * Number(p.estoque))} a preço de custo` : ""} · nada saiu nos últimos 60 dias</li>)}</ul>
+                  <ul>{analise.parados.map((p) => <li key={p.id}><b>{p.nome}</b> · tem {fmtQtd(p.estoque)} {p.unidade}{vejoCusto && p.custo != null ? ` · ${brl(Number(p.custo) * Number(p.estoque))} a preço de custo` : ""} · nada saiu nos últimos 60 dias</li>)}</ul>
                 </details>
               )}
               {analise.perdas.length > 0 && (

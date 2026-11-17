@@ -15,6 +15,7 @@ import { Tile } from "../painel";
 import { ok, useDados } from "../ui";
 import { LerComCamera } from "./leitor";
 import { CampoDinheiro, erroDeValor, EscolhaPagamento, fmtQtd, lerQtd, QuandoPaga, type EstadoPagamento, type PagaDepois } from "./pecas";
+import { CampoDesconto } from "./desconto";
 
 export type { PagaDepois } from "./pecas";
 import "./venda.css";
@@ -128,6 +129,9 @@ export function useProdutosDaLoja() {
 
 /* ---------- busca de produto ---------- */
 
+/** Parece um código de barras (e não um nome digitado)? Só letras e números, sem espaço, com algum número, de 4 a 64. */
+export const pareceCodigo = (s: string) => /^[A-Za-z0-9-]{4,64}$/.test(s) && /\d/.test(s);
+
 /** O produto com exatamente este código de barras (null quando não há, ou quando o código veio vazio). */
 export function produtoDoCodigo<P extends { codigo_barras?: string | null }>(produtos: P[], digitado: string): P | null {
   const codigo = limparCodigo(digitado);
@@ -145,6 +149,9 @@ export function BuscaProduto({ produtos, carregando, erro, itens, aoEscolher, au
   const comCodigo = opcoesDaLoja(petshop).codigoBarras;
   const [q, setQ] = useState("");
   const [aviso, setAviso] = useState<{ texto: string; ruim?: boolean } | null>(null);
+  // códigos lidos antes de a lista de produtos chegar (o leitor é rápido): esperam aqui e entram na conta, na ordem, quando ela chega
+  const fila = useRef<string[]>([]);
+  const [esperando, setEsperando] = useState(0);
   const alvo = semAcento(q);
   const codigo = comCodigo ? limparCodigo(q) : null;
   const achados = alvo ? produtos.filter((p) => semAcento(p.nome).includes(alvo) || semAcento(p.categoria ?? "").includes(alvo)
@@ -158,13 +165,36 @@ export function BuscaProduto({ produtos, carregando, erro, itens, aoEscolher, au
   }
   /** Código lido (leitor, câmera ou Enter no campo): código exato entra na conta; sem código, vale o único produto achado. */
   function lerCodigo(texto: string) {
+    // a lista ainda não chegou: guarda o código (nada se perde) e põe na conta assim que ela chegar
+    if (carregando) {
+      const limpo = limparCodigo(texto) ?? texto.trim();
+      if (!limpo) return;
+      fila.current.push(limpo);
+      setEsperando(fila.current.length);
+      setQ("");
+      setAviso({ texto: `${fila.current.length === 1 ? "1 código lido" : `${fila.current.length} códigos lidos`}. Entram na conta assim que a lista de produtos chegar.` });
+      return;
+    }
     const exato = produtoDoCodigo(produtos, texto);
     const unico = !exato && texto === q && achados.length === 1 ? achados[0] : null;
     if (exato ?? unico) return porNaConta((exato ?? unico)!);
-    if (carregando) return setAviso({ texto: "Ainda estou buscando os produtos. Tente de novo em um instante.", ruim: true });
     const limpo = limparCodigo(texto);
-    if (limpo && /^\d{6,}$/.test(limpo)) { setQ(""); setAviso({ texto: `Nenhum produto com o código ${limpo}. Confira o código na ficha do produto, em Estoque.`, ruim: true }); }
+    if (limpo && pareceCodigo(limpo) && !achados.length) { setQ(""); setAviso({ texto: `Código não encontrado: ${limpo}. Confira o código na ficha do produto, em Estoque.`, ruim: true }); }
   }
+  // a lista chegou: os códigos que esperavam entram na conta, na ordem em que foram lidos
+  useEffect(() => {
+    if (carregando || !fila.current.length) return;
+    const lidos = fila.current.splice(0);
+    setEsperando(0);
+    const entraram: string[] = [], faltaram: string[] = [];
+    for (const codigo of lidos) {
+      const p = produtoDoCodigo(produtos, codigo);
+      if (p) { aoEscolher(p); entraram.push(p.nome); } else faltaram.push(codigo);
+    }
+    const partes = [entraram.length ? `${entraram.length === 1 ? `${entraram[0]} entrou` : `${entraram.length} produtos entraram`} na conta.` : "",
+      faltaram.length ? `Código não encontrado: ${faltaram.join(", ")}.` : ""].filter(Boolean);
+    setAviso({ texto: partes.join(" "), ruim: faltaram.length > 0 });
+  }, [carregando, produtos, aoEscolher]);
 
   return (
     <div className="g-pilha p">
@@ -176,7 +206,7 @@ export function BuscaProduto({ produtos, carregando, erro, itens, aoEscolher, au
           onKeyDown={comCodigo ? (e) => { if (e.key === "Enter" && q.trim()) { e.preventDefault(); lerCodigo(q); } } : undefined} />
       </div>
       {comCodigo && <LerComCamera aoLer={lerCodigo} continuo />}
-      {aviso && !alvo && <p className={`g-pp ${aviso.ruim ? "g-vermelho-t" : "g-verde-t"}`} role="status">{aviso.texto}</p>}
+      {aviso && !alvo && <p className={`g-pp ${aviso.ruim ? "g-vermelho-t" : esperando ? "g-muted" : "g-verde-t"}`} role="status" data-teste="aviso-leitor">{aviso.texto}</p>}
       {erro ? <p className="g-pp g-vermelho-t">{erro}</p>
         : alvo && carregando ? <p className="g-pp g-muted">Buscando os produtos…</p>
         : alvo && !achados.length ? <p className="g-pp g-muted">{produtos.length ? (comCodigo ? "Nenhum produto com esse nome ou código." : "Nenhum produto com esse nome.") : "Ainda não tem produto no estoque."}</p>
@@ -313,13 +343,13 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
           {limitado && trava.descontoMax <= 0 ? (
             <p className="g-muted g-pp">Desconto e mudança de preço: só com o dono ou com quem vê o financeiro.</p>
           ) : (
-            <label className="g-campo g-vd-desconto">
-              <span>Desconto em reais (se tiver)</span>
-              <CampoDinheiro valor={descontoDigitado} aoMudar={aoDesconto} />
-              {passou ? <small>O desconto não passa do valor da conta.</small>
-                : passouDoMaximo ? <small className="erro" role="alert">O caixa pode dar até {trava.descontoMax.toLocaleString("pt-BR")}% de desconto ({brl(maximo!)} nesta conta). Mais que isso, só com o dono ou com quem vê o financeiro.</small>
-                : limitado ? <small>Até {trava.descontoMax.toLocaleString("pt-BR")}% ({brl(maximo!)} nesta conta).</small> : null}
-            </label>
+            <div className="g-pilha p">
+              {/* em reais ou em % (a % vira reais sobre a soma, já sem a promoção do horário) */}
+              <CampoDesconto base={Math.max(0, subtotal - (promo?.valor ?? 0))} valor={descontoDigitado} aoMudar={aoDesconto} maximo={maximo} maxPct={limitado ? trava.descontoMax : null} />
+              {passou ? <small className="g-pp">O desconto não passa do valor da conta.</small>
+                : passouDoMaximo ? <small className="erro g-pp" role="alert">O caixa pode dar até {trava.descontoMax.toLocaleString("pt-BR")}% de desconto ({brl(maximo!)} nesta conta). Mais que isso, só com o dono ou com quem vê o financeiro.</small>
+                : limitado ? <small className="g-pp g-muted">Até {trava.descontoMax.toLocaleString("pt-BR")}% ({brl(maximo!)} nesta conta).</small> : null}
+            </div>
           )}
           {nadaAPagar ? null : depois && aoDepois
             ? <QuandoPaga total={depois.ativo ? Math.max(0, Math.round((total - credito) * 100) / 100) : aPagar} pagamento={pagamento} aoPagamento={aoPagamento} depois={depois} aoDepois={aoDepois} erro={erroForma} aceitaResto={aceitaResto} />

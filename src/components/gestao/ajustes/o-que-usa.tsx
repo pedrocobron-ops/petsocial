@@ -63,7 +63,7 @@ export default function OQueUsa() {
           <EscolherPrincipal modulos={valor} valor={principal} aoMudar={(v) => { setEscolhida(v); setErro(null); }} />
         </div>
       )}
-      {areas.length > 0 && <p className="g-muted g-pp">A área principal aparece primeiro no menu e na tela inicial.{areas.length === 1 && principal && principal === principalSalva ? ` Hoje é ${MODULOS.find((m) => m.id === principal)?.rotulo.toLowerCase()}, a única área marcada.` : areas.length > 1 && !principal ? " Toque em uma para escolher." : ""}</p>}
+      {areas.length > 0 && <p className="g-muted g-pp">A área principal aparece primeiro no menu e na tela inicial.{areas.length === 1 && principal && principal === principalSalva ? ` Hoje é ${MODULOS.find((m) => m.id === principal)?.rotulo.toLowerCase()}, a única área de atendimento marcada${valor.some((m) => m === "pacotes" || m === "loja") ? " (pacotes e venda de produtos não contam como área principal)" : ""}.` : areas.length > 1 && !principal ? " Toque em uma para escolher." : ""}</p>}
       {mudou && saem.length > 0 && <p className="g-muted g-pp">Ao salvar, o que é de {saem.join(", ")} sai da frente do menu e dos avisos e passa para Outras áreas. O que já está lançado continua guardado.</p>}
       {erro && <p className="g-erro" role="alert">{erro}</p>}
       <div><button className="g-btn verde" onClick={() => void salvar()} disabled={salvando || !mudou}>{salvando ? "Salvando…" : "Salvar"}</button></div>

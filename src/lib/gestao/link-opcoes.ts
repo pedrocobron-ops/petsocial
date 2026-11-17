@@ -19,6 +19,11 @@ export const MAX_HORAS = 720;
 
 /** Só um exemplo de formato para o dono trocar pelo texto dele. Não é modelo de contrato. */
 export const EXEMPLO_DE_REGRAS = "Exemplo: Traga a carteira de vacinação no primeiro dia. Atrasos de mais de 15 minutos podem precisar de um novo horário.";
+/** O exemplo com as palavras do negócio: hotel e creche sem banho e tosa não têm "horário" para remarcar. */
+export function exemploDeRegras(petshop: { modulos?: string[] | null }): string {
+  const semBanho = Array.isArray(petshop.modulos) && petshop.modulos.length > 0 && !petshop.modulos.includes("banho_tosa");
+  return semBanho ? "Exemplo: Traga a carteira de vacinação na primeira estadia. Entrada a partir das 14h e saída até as 12h. Cancelamento com menos de 7 dias: o sinal vira crédito para outra data." : EXEMPLO_DE_REGRAS;
+}
 
 type ComOpcoes = { opcoes?: unknown };
 

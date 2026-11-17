@@ -8,10 +8,11 @@ import { BellRing, CalendarClock, CalendarX, Check, HandCoins, MessageCircle, Pl
 import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoCancelado, textoConfirmacao, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
-import { imprimirComprovante, textoComprovante } from "@/lib/gestao/comprovante";
+import { imprimirComprovante, textoComprovante, type AntigaNoComprovante } from "@/lib/gestao/comprovante";
 import { conferirCaixa, desfazerVenda, itensDoLancamento, lancarAReceber, lancarPago, produtosDaVenda, textoDoPagamento, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import { taxaDeFalta, travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useOperacao } from "@/lib/gestao/uma-vez";
+import { conferirDiaDoHorario } from "@/lib/gestao/dia-do-horario";
 import { fazerTudoOuNada } from "@/lib/gestao/tudo-ou-nada";
 import { nomeDosServicos, servicosAMais, servicosPorExtenso, valorDoHorario } from "@/lib/gestao/servicos-do-horario";
 import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
@@ -205,6 +206,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const opPacote = useOperacao();
   const usarPacote = (p: PacoteCliente) => opPacote.fazer(async (chave) => {
     if (somenteLeitura()) return false;
+    if (!(await conferirDiaDoHorario(a.inicio, confirmar))) return false;
     setOcupado(true);
     try {
       const feito = await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "agendamento_fechar_conta", agendamento: a.id },
@@ -354,12 +356,19 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
 
   const zapPronto = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", petshop: petshop.nome, servico: servicosPorExtenso(a) }));
 
-  // comprovante: só para quem vê o financeiro, com o atendimento concluído, a conta toda recebida e telefone na ficha
-  const zapComprovante = vejoFinanceiro && a.status === "concluido" && recebidos.length > 0 && !devidos.length && soDigitos(tutor?.telefone).length >= 8
-    ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico: nomeDosServicos(a), quando: a.inicio, recebidos }))
-    : null;
+  // comprovante: só para quem vê o financeiro, com o atendimento concluído, a conta toda recebida e telefone na ficha.
+  // Com o que entrou junto para o fiado (e o troco), pelo banco: sem isso, o comprovante diria só a conta do horário.
+  const comComprovante = vejoFinanceiro && a.status === "concluido" && recebidos.length > 0 && !devidos.length;
+  const { dados: doComprovante } = useDados(async () => {
+    if (!comComprovante) return null;
+    const r = await sb.rpc("comprovante_do_agendamento", { p_agendamento: a.id });
+    return r.error ? null : (r.data as { entregue: number | null; antigas: AntigaNoComprovante[] } | null);
+  }, [a.id, comComprovante, recebidos.length]);
+  const textoDoComprovante = () => textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico: nomeDosServicos(a), quando: a.inicio, recebidos,
+    antigas: doComprovante?.antigas ?? null, entregue: doComprovante?.entregue ?? null });
+  const zapComprovante = comComprovante && soDigitos(tutor?.telefone).length >= 8 ? linkWhatsApp(tutor?.telefone, textoDoComprovante()) : null;
   // o mesmo comprovante no papel (não precisa de telefone na ficha)
-  const comprovanteNoPapel = vejoFinanceiro && a.status === "concluido" && recebidos.length > 0 && !devidos.length;
+  const comprovanteNoPapel = comComprovante;
 
   if (comanda) {
     return <Comanda agendamento={a} pacote={comanda === "sim" ? null : comanda} aoFechar={() => setComanda(false)} aoPronto={() => { aoMudar(); aoFechar(); }} />;
@@ -561,7 +570,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
                 <Receipt />{pacote ? "Cobrar à parte, sem usar o pacote" : "Fechar a conta"}{aCobrar ? ` · ${brl(Math.max(0, Math.round((aCobrar - promoValor) * 100) / 100))}` : ""}
               </button>
             )}
-            {sabe && (!vejoFinanceiro || pago) && <button className={`g-btn ${pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void mudar({ status: "concluido" }, "Atendimento concluído.").then((deu) => deu && aoFechar())}><Check />{pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}
+            {sabe && (!vejoFinanceiro || pago) && <button className={`g-btn ${pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void conferirDiaDoHorario(a.inicio, confirmar).then((sim) => sim && mudar({ status: "concluido" }, "Atendimento concluído.")).then((deu) => deu && aoFechar())}><Check />{pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}
           </div>
         )}
         {faltaCobrar && (
@@ -594,7 +603,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           <a className="g-btn sec cheio" href={zapComprovante} target="_blank" rel="noopener noreferrer"><Receipt />Mandar comprovante</a>
         )}
         {comprovanteNoPapel && (
-          <button type="button" className="g-btn fantasma cheio" onClick={() => imprimirComprovante(textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico: nomeDosServicos(a), quando: a.inicio, recebidos }))}>
+          <button type="button" className="g-btn fantasma cheio" onClick={() => imprimirComprovante(textoDoComprovante())}>
             <Printer />Imprimir comprovante
           </button>
         )}

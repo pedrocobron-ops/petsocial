@@ -9,6 +9,7 @@ import { dataCurta, deIsoDia, fmtTelefone, isoDia, linkWhatsApp, soDigitos, soma
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { AvatarPet, Campo, EscolherPet, Folha, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
+import FormPet from "../form-pet";
 import type { EstadiaCompleta, PetDaEstadia, Tipo } from "../hotel/tipos";
 import "./casa.css";
 
@@ -149,6 +150,8 @@ export function FolhaEspera({ inicial, aoFechar, aoGravar }: {
   const tipos = (["creche", "hotel"] as const).filter((t) => usaModulo(petshop, t));
   const hoje = isoDia(new Date());
   const [pet, setPet] = useState<PetDaEstadia | null>(inicial?.pet ?? null);
+  const [criando, setCriando] = useState<string | null>(null);
+  const somenteLeitura = useSomenteLeitura();
   const [tipo, setTipo] = useState<Tipo>(inicial?.tipo && tipos.includes(inicial.tipo) ? inicial.tipo : tipos[0] ?? "creche");
   const [entrada, setEntrada] = useState(inicial?.entrada ?? hoje);
   const [saida, setSaida] = useState(inicial?.saida ?? "");
@@ -177,7 +180,9 @@ export function FolhaEspera({ inicial, aoFechar, aoGravar }: {
     } catch (e) { avisarErro(e); setSalvando(false); }
   }
 
-  if (!pet) return <Folha titulo="Quem entra na lista de espera?" aoFechar={aoFechar}><EscolherPet aoEscolher={(p) => setPet(p as unknown as PetDaEstadia)} autoFocus /></Folha>;
+  // quem liga pela primeira vez pode entrar na lista na hora: "Cadastrar pet novo" abre a ficha e volta para cá
+  if (criando !== null) return <FormPet nomeInicial={criando} aoFechar={() => setCriando(null)} aoSalvar={(p) => { setPet(p as unknown as PetDaEstadia); setCriando(null); }} />;
+  if (!pet) return <Folha titulo="Quem entra na lista de espera?" aoFechar={aoFechar}><EscolherPet aoEscolher={(p) => setPet(p as unknown as PetDaEstadia)} aoCriar={(nome) => { if (!somenteLeitura()) setCriando(nome); }} autoFocus /></Folha>;
   return (
     <Folha titulo="Lista de espera" aoFechar={aoFechar}
       rodape={<><button className="g-btn sec" onClick={aoFechar}>Voltar</button><button className="g-btn pri" onClick={() => void salvar()} disabled={salvando}>{salvando ? "Salvando…" : "Colocar na lista"}</button></>}>

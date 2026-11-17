@@ -1,8 +1,30 @@
 # Termos de uso e Política de privacidade do Gestão: resumo para o dono
 
-Versão 2.2 dos dois documentos, vigente desde 17/11/2026. Páginas: `/gestao/termos` e `/gestao/privacidade`
+Versão 2.3 dos dois documentos, vigente desde 18/11/2026. Páginas: `/gestao/termos` e `/gestao/privacidade`
 (código em `src/app/(gestao)/gestao/termos/page.tsx` e `.../privacidade/page.tsx`). O dono decidiu não passar por advogado
 por enquanto; a 2.2 incorpora uma revisão detalhada feita com o Claude (veja "O que mudou na 2.2"). Nada aqui é parecer jurídico.
+
+## O que mudou na 2.3
+
+Depois do teste com cinco donos de pet shop (17/11/2026). As decisões do dono (pessoa física com CPF, empresa no futuro,
+Supabase dividido com o Escala CEO, cláusula de operador) ficam como estavam; só o texto ficou mais claro e calmo.
+
+- **Cópias de segurança (Termos 16 e 22, Política 11):** descreve só o que existe e dá para conferir no código: as cópias
+  automáticas do Supabase "na frequência e pelo tempo do plano contratado" (o plano não foi conferido no painel do Supabase; ver
+  pendências) e a cópia completa do painel do administrador (aba Dados, lembrete a cada 7 dias, sem senhas e sem fotos, baixada
+  e guardada fora do fornecedor). Sem promessa de frequência, prazo de guarda ou restauração; "apagou por engano? fale com a gente,
+  podemos tentar recuperar, sem garantia". A Ajuda responde o mesmo (tópico `copias` em `manual.ts`).
+- **Mudar de plano ou de período (Termos 7):** cancelar na Cakto e assinar o novo; não deixar duas assinaturas ativas (o banco marca
+  a compra nova como "conflito" e as duas cobram). O plano novo conta do pagamento (`cakto_aplicar`: `pago_ate` = o maior entre o
+  que já havia e o pagamento + período); os meses que sobraram de um plano de 3 ou 6 meses não viram crédito nem são devolvidos,
+  fora dos 7 dias de arrependimento. Nenhuma regra nova de reembolso.
+- **Cookies (Política 10 e política do site, parte 5):** o aviso só aparece onde o Pixel carrega (fora de `/gestao/...`), com
+  Aceitar e Recusar; recusar faz `fbq('consent', 'revoke')` e apaga o cookie `_fbp`. A frase "o cadastro abre numa página nova"
+  (não era verdade) foi trocada pelo que acontece: mesma aba, pixel para de mandar, o cookie `_fbp` antigo não é usado.
+- Texto: parte 1 diz em uma frase o que acontece se o serviço parar (60 dias de aviso, devolução do não usado, parte 21) e que a
+  empresa futura assume com as mesmas condições; "Escola de Gestão" explicada na parte 19; parte 24 lembra que avisos que pedem ação
+  também aparecem na tela; Política 1 "responsável pela marca"; Política 5 diz que quem usa só o Escala CEO não enxerga o Gestão
+  (RLS por `meus_petshops()`); e-mail de privacidade aparece uma vez só (Política 13 e 17).
 
 ## O que mudou na 2.2
 
@@ -26,7 +48,8 @@ por enquanto; a 2.2 incorpora uma revisão detalhada feita com o Claude (veja "O
 - **Advogado (ao abrir o CNPJ ou crescer):** teto de responsabilidade e reclamações de terceiros em contrato de adesão; se MEIs e
   autônomos podem ser tratados como consumidores; DPAs e cláusulas-padrão com Supabase, Vercel e Anthropic; registro da marca no
   INPI; plano de resposta a incidentes (e uma planilha de registro de incidentes); separar Maestro Pet e Escala CEO.
-- Conferir o plano do Supabase (cópias de segurança) e a "garantia" de 7 dias configurada no produto da Cakto.
+- Conferir o plano do Supabase (cópias de segurança: frequência e por quantos dias ficam) e a "garantia" de 7 dias configurada no
+  produto da Cakto. Se o plano tiver cópia diária com prazo conhecido, dá para escrever o número na parte 16 (versão nova).
 
 ## As principais proteções
 

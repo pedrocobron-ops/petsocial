@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import {
-  experienciaDe, extratoDoPetLigado, OPCAO_DESCONTO_IRMAO, OPCAO_EXPERIENCIA, OPCAO_EXPERIENCIA_PRECO, OPCAO_EXTRATO_PET, precoDaExperiencia, regraIrmaoDe,
+  experienciaDe, extratoDoPetLigado, OPCAO_DESCONTO_IRMAO, OPCAO_EXPERIENCIA, OPCAO_EXPERIENCIA_PRECO, OPCAO_EXTRATO_PET, OPCAO_PLANOS_NO_LINK, planosNoLink, precoDaExperiencia, regraIrmaoDe,
   type RegraIrmao,
 } from "@/lib/gestao/creche";
 import { AVISO_VALOR_RUIM, lerValor } from "@/lib/gestao/util";
@@ -43,16 +43,17 @@ export default function OpcoesCreche() {
   const [irmao, setIrmao] = useState<RegraIrmao>(() => regraIrmaoDe(petshop));
   const [textoIrmao, setTextoIrmao] = useState(() => { const v = regraIrmaoDe(petshop).valor; return v == null ? "" : String(v).replace(".", ","); });
   const [extrato, setExtrato] = useState(() => extratoDoPetLigado(petshop));
+  const [planosLink, setPlanosLink] = useState(() => planosNoLink(petshop));
   const [mexeu, setMexeu] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   // o que foi mudado e não salvo fica no aparelho: recarregar a tela não perde
-  type Valores = { exp: typeof exp; preco: number | null; irmao: RegraIrmao; textoIrmao: string; extrato: boolean };
-  const aplicar = (v: Valores) => { setExp(v.exp); setPreco(v.preco); setIrmao(v.irmao); setTextoIrmao(v.textoIrmao); setExtrato(v.extrato); };
-  const rascunho = useRascunho<Valores>("opcoes-creche", { exp, preco, irmao, textoIrmao, extrato }, mexeu, (v) => { aplicar(v); setMexeu(true); });
+  type Valores = { exp: typeof exp; preco: number | null; irmao: RegraIrmao; textoIrmao: string; extrato: boolean; planosLink?: boolean };
+  const aplicar = (v: Valores) => { setExp(v.exp); setPreco(v.preco); setIrmao(v.irmao); setTextoIrmao(v.textoIrmao); setExtrato(v.extrato); setPlanosLink(Boolean(v.planosLink)); };
+  const rascunho = useRascunho<Valores>("opcoes-creche", { exp, preco, irmao, textoIrmao, extrato, planosLink }, mexeu, (v) => { aplicar(v); setMexeu(true); });
   const descartar = () => {
     const r = regraIrmaoDe(petshop);
-    aplicar({ exp: experienciaDe(petshop), preco: precoDaExperiencia(petshop), irmao: r, textoIrmao: r.valor == null ? "" : String(r.valor).replace(".", ","), extrato: extratoDoPetLigado(petshop) });
+    aplicar({ exp: experienciaDe(petshop), preco: precoDaExperiencia(petshop), irmao: r, textoIrmao: r.valor == null ? "" : String(r.valor).replace(".", ","), extrato: extratoDoPetLigado(petshop), planosLink: planosNoLink(petshop) });
     setMexeu(false); setErro(null);
   };
   const junto = useSalvarJunto("opcoes-creche", { nome: "Mais opções da creche", mexeu, salvar });
@@ -76,6 +77,7 @@ export default function OpcoesCreche() {
         [OPCAO_EXPERIENCIA_PRECO]: exp.ativo ? preco ?? 0 : precoDaExperiencia(petshop) ?? 0,
         [OPCAO_DESCONTO_IRMAO]: irmao,
         [OPCAO_EXTRATO_PET]: extrato,
+        [OPCAO_PLANOS_NO_LINK]: planosLink,
       });
       // a regra do irmão mudou: as mensalidades em aberto (sem nenhum recebimento) deste mês em diante acompanham
       let refeitas = 0;
@@ -134,6 +136,9 @@ export default function OpcoesCreche() {
           </div>
           <p className="g-muted g-pp">O desconto vale só sobre a mensalidade, não sobre dias extras nem taxas. Em mês proporcional (começo, saída ou pausa), o desconto em R$ acompanha a proporção. Conta como irmão o cão com plano em algum dia do mês. Mensalidade já paga, ou com parte recebida, não muda. Ao salvar, as mensalidades em aberto deste mês em diante acompanham a regra.</p>
         </Opcao>
+
+        <Opcao titulo="Mostrar os planos mensais no link" frase="No link do cliente, quem pede a creche vê os seus modelos de plano (2x, 3x por semana…) com o preço por mês e a chave Pix, se você preencheu. O tutor novo sabe o preço do plano antes do dia de experiência. Os modelos ficam em Creche, Mensalistas, Modelos de plano."
+          ligada={planosLink} aoMudar={m(setPlanosLink)} />
 
         <Opcao titulo="Extrato do mês por cachorro" frase="Na ficha do pet, o extrato do mês de cada cão: presenças, faltas, reposições, dias extras e taxas, para imprimir ou mandar pelo WhatsApp. Quem não vê o financeiro vê só as presenças, sem valores."
           ligada={extrato} aoMudar={m(setExtrato)} />

@@ -163,7 +163,7 @@ export default function Comecar() {
               <label className="g-campo"><span>E como eu chamo você?</span>
                 <input className="g-input" required maxLength={80} value={seuNome} onChange={(e) => setSeuNome(e.target.value)} enterKeyHint="next" />
               </label>
-              <details className="g-bv-mais" open={Boolean(telefone || cidade || uf) || undefined}>
+              <details className="g-bv-mais" open>
                 <summary>WhatsApp e cidade (se quiser)<ChevronDown /></summary>
                 <div className="dentro">
                   <label className="g-campo"><span>WhatsApp do pet shop</span>
@@ -198,7 +198,7 @@ export default function Comecar() {
                 <h1 className="g-guia-h">O que o seu negócio faz?</h1>
                 <p className="g-muted g-p">Marque tudo o que vale. Dá para mudar depois.</p>
               </div>
-              <EscolherModulos valor={modulos} aoMudar={(v) => { setModulos(v); setErro(null); }} />
+              <EscolherModulos valor={modulos} aoMudar={(v) => { setModulos(v); setErro(null); }} comApoio />
               {areas.length > 1 && (
                 <div className="g-bv-qual">
                   <h3>E o que vocês mais fazem?</h3>

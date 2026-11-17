@@ -9,7 +9,7 @@ import { AvatarPessoa, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } 
 import { NOME_DIAS, ORDEM_DIAS, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import AdicionarPessoa from "@/components/gestao/equipe/adicionar";
 import EditarPessoa, { FolhaConvite } from "@/components/gestao/equipe/editar";
-import { Areas, Vagas, fraseDoLink, useLinksDosConvites } from "@/components/gestao/equipe/pecas";
+import { Areas, Vagas, fraseDoLink, podeGerarLinkNovo, useLinksDosConvites } from "@/components/gestao/equipe/pecas";
 import { acessoDe, erroDeLimite, fraseDoLimite, funcaoDe, nAcessos, pilulasDe, primeiroNome, titularDe, usoDoPlano, type Uso } from "@/components/gestao/equipe/modelo";
 import { perfisPara } from "@/lib/gestao/acessos";
 import { usaModulo } from "@/lib/gestao/modulos";
@@ -29,7 +29,7 @@ type Aberto = { tipo: "novo" } | { tipo: "editar"; id: string; foco?: "acesso" }
 
 export default function Equipe() {
   const { souDono, equipe, eu, sb, petshop, recarregarBase } = useGestao();
-  const { avisar, avisarErro } = useAvisos();
+  const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [aberto, setAberto] = useState<Aberto>(null);
   const linkDe = useLinksDosConvites();
@@ -129,7 +129,7 @@ export default function Equipe() {
                         <b>{acesso === "login" ? "Com login" : acesso === "convite" ? "Convite criado: falta a pessoa entrar pelo link" : p.atende && usaModulo(petshop, "banho_tosa") ? "Sem login, só na agenda" : "Sem login"}</b>
                         {acesso === "convite" && <small>{p.email_convite}{fraseDoLink(linkDe(p.id)) ? ` · ${fraseDoLink(linkDe(p.id))}` : ""}</small>}
                       </p>
-                      {acesso === "convite" && <button type="button" className={`g-btn p ${linkDe(p.id)?.estado === "valendo" ? "sec" : "verde"} g-eq-acao`} onClick={() => abrir({ tipo: "convite", id: p.id })}><Send />{linkDe(p.id)?.estado === "valendo" ? "Reenviar" : "Mandar de novo"}</button>}
+                      {acesso === "convite" && <button type="button" className={`g-btn p ${linkDe(p.id)?.estado === "valendo" ? "sec" : "verde"} g-eq-acao`} onClick={() => { if (somenteLeitura()) return; void podeGerarLinkNovo(confirmar, p.nome, linkDe(p.id)).then((sim) => { if (sim) abrir({ tipo: "convite", id: p.id }); }); }}><Send />{linkDe(p.id)?.estado === "valendo" ? "Reenviar" : "Mandar de novo"}</button>}
                       {acesso === "sem" && <button type="button" className="g-btn p sec g-eq-acao" onClick={() => abrir({ tipo: "editar", id: p.id, foco: "acesso" })}><KeyRound />Dar login</button>}
                     </div>
 

@@ -719,7 +719,8 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo, aoMu
     return x.error ? 0 : Number(x.data ?? 0);
   }, [caixa.id]);
   const avisoCobrar = paraCobrar.n ? `${paraCobrar.n === 1 ? "1 atendimento concluído está" : `${paraCobrar.n} atendimentos concluídos estão`} sem conta fechada (${brl(paraCobrar.total)}).` : "";
-  const avisoAlteracoes = alteracoes ? `${alteracoes === 1 ? "1 alteração" : `${alteracoes} alterações`} em valores desde que este caixa abriu.` : "";
+  // conta as de todos (as suas e as da equipe): o link abre Alterações no período deste caixa, com "Todas" marcado, e a conta bate
+  const avisoAlteracoes = alteracoes ? `${alteracoes === 1 ? "1 alteração" : `${alteracoes} alterações`} em valores (suas e da equipe) desde que este caixa abriu.` : "";
   const dif = diferenca(contado, esperado);
 
   async function salvar() {

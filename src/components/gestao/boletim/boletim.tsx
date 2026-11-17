@@ -7,6 +7,8 @@ import {
   MAX_FOTOS_BOLETIM, mensagemDoBoletim, rotulosDosChips, textoModelo, type FotoDoBoletim, type TipoDoBoletim,
 } from "@/lib/gestao/boletim";
 import { hora, isoDia, linkWhatsApp } from "@/lib/gestao/util";
+import { diarioDe, itensMarcados } from "@/lib/gestao/casa-opcoes";
+import { fotosDoDia, paginaDoTutorLigada } from "@/lib/gestao/tutor";
 import { useGestao } from "../contexto";
 import { avisarMudanca, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { EtiquetaFoto, estadoDaFoto, useAutorizacoesDoPet } from "./autorizacao";
@@ -112,6 +114,21 @@ export function FolhaBoletim({ visita: v, aoFechar, aoEnviar }: { visita: Visita
     return { guardado: g, sexo: p.data?.sexo ?? null, fotos: g ? await fotosGuardadas(sb, g.fotos, g.assinaturas) : [] };
   }, [petshop.id, v.agendamentoId, v.estadiaId, v.petId]);
 
+  // creche e hotel: o diário de hoje e as Fotos de hoje do pet, para o boletim levar tudo num link só (Diário + Boletim + Fotos)
+  const comDiario = v.tipo !== "banho" && Boolean(v.estadiaId) && diarioDe(petshop).ativo;
+  const comFotosDoDia = v.tipo !== "banho" && Boolean(v.estadiaId) && paginaDoTutorLigada(petshop);
+  const { dados: doDia } = useDados(async () => {
+    if (!comDiario && !comFotosDoDia) return null;
+    const hoje = isoDia(new Date());
+    const [d, f] = await Promise.all([
+      comDiario ? sb.from("estadias_diario").select("itens, nota").eq("petshop_id", petshop.id).eq("estadia_id", v.estadiaId!).eq("dia", hoje).maybeSingle() : null,
+      comFotosDoDia ? fotosDoDia(sb, petshop.id, [v.petId], hoje).catch(() => []) : [],
+    ]);
+    return { itens: itensMarcados(d?.data ?? null), nota: (d?.data?.nota ?? "").trim(), fotos: (f ?? []).filter((x) => x.url) };
+  }, [petshop.id, v.estadiaId, v.petId, comDiario, comFotosDoDia]);
+  const [trouxe, setTrouxe] = useState(false);
+  const [trazendo, setTrazendo] = useState(false);
+
   const [pronto, setPronto] = useState(false);
   const [guardado, setGuardado] = useState<Guardado | null>(null);
   // o tutor autorizou postar as fotos? (ele autoriza na página do boletim; aqui só aparece)
@@ -185,6 +202,30 @@ export function FolhaBoletim({ visita: v, aoFechar, aoEnviar }: { visita: Visita
     }
     if (arquivos.length > vao.length) avisarErro(new Error(`Entraram ${vao.length}: o limite é de ${MAX_FOTOS_BOLETIM} fotos por boletim.`));
   }
+  /** Põe no boletim as Fotos de hoje (cópia no boletim, que vale 60 dias) e o que foi marcado no diário (no recado). */
+  async function trazerODia() {
+    if (!doDia || trazendo || somenteLeitura()) return;
+    setTrazendo(true);
+    const vagas = Math.max(0, MAX_FOTOS_BOLETIM - fotos.length - subindo);
+    let vieram = 0;
+    for (const f of doDia.fotos.slice(0, vagas)) {
+      try {
+        const r = await fetch(f.url!);
+        if (!r.ok) throw new Error("foto");
+        const arquivo = new File([await r.blob()], "foto-do-dia.jpg", { type: "image/jpeg" });
+        const x = await enviarFotoDoBoletim(sb, petshop.id, arquivo);
+        novas.current.add(x.caminho);
+        setFotos((l) => [...l, x]);
+        vieram++;
+      } catch { /* a foto que falhar fica de fora; as outras entram */ }
+    }
+    const doDiario = [doDia.itens.join(", "), doDia.nota].filter(Boolean).join(". ");
+    if (doDiario && !nota.includes(doDiario)) setNota((n) => [n.trim(), doDiario].filter(Boolean).join(". ").slice(0, 400));
+    setTrouxe(true); setMudou(true); setTrazendo(false);
+    if (doDia.fotos.length && vieram < Math.min(doDia.fotos.length, vagas)) avisarErro(new Error("Alguma foto de hoje não veio. Dá para escolher de novo pelo botão de fotos."));
+    else avisar(`${vieram ? `${vieram === 1 ? "1 foto" : `${vieram} fotos`} de hoje` : ""}${vieram && doDiario ? " e " : ""}${doDiario ? "o diário" : ""} no boletim. Confira e salve.`);
+  }
+
   function tirarFoto(f: FotoDoBoletim) {
     setFotos((l) => l.filter((x) => x.caminho !== f.caminho));
     if (novas.current.has(f.caminho)) { novas.current.delete(f.caminho); descartarFoto(sb, f.caminho); }
@@ -288,6 +329,16 @@ export function FolhaBoletim({ visita: v, aoFechar, aoEnviar }: { visita: Visita
               <EtiquetaFoto estado={estadoDaFoto(autorizacoes, guardado?.id, guardado?.criado_em ?? new Date().toISOString())} />
               {!estadoDaFoto(autorizacoes, guardado?.id, guardado?.criado_em ?? new Date().toISOString()).pode && <small className="g-muted">O tutor autoriza na página do boletim, se quiser.</small>}
             </p>
+          )}
+
+          {doDia && !trouxe && (doDia.fotos.length > 0 || doDia.itens.length > 0 || doDia.nota) && (
+            <div className="g-aviso" role="status" data-teste="boletim-do-dia" style={{ marginBottom: 0 }}>
+              <Sparkles aria-hidden />
+              <span className="g-cresce">
+                <b>Um link só para o tutor:</b> {[doDia.fotos.length ? `${doDia.fotos.length === 1 ? "1 foto" : `${doDia.fotos.length} fotos`} de Fotos de hoje` : "", doDia.itens.length || doDia.nota ? "o diário de hoje" : ""].filter(Boolean).join(" e ")} podem entrar neste boletim.
+                <br /><button type="button" className="g-btn sec p" style={{ marginTop: 6 }} disabled={trazendo} onClick={() => void trazerODia()}>{trazendo ? <><Loader2 className="g-gira" aria-hidden />Trazendo…</> : "Pôr no boletim"}</button>
+              </span>
+            </div>
           )}
 
           <section className="g-bol-parte" aria-label="Fotos">

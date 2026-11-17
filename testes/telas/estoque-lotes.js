@@ -111,7 +111,8 @@ const tx = (s) => String(s).replace(/[\u00a0\u202f]/g, " ");
     await ent.locator('input[inputmode=decimal]').first().fill('4');
     await ent.getByPlaceholder('Ex.: L2311A').fill('L-DEZ');
     await ent.getByLabel('Validade').fill(L.dia(45));
-    await ent.getByText(/Lançar a compra como despesa/).click();
+    // "Lançar a compra como despesa" começa desmarcado (antes vinha marcado e quem tocava desmarcava sem ver)
+    T.ok('Lançar a compra como despesa começa desmarcado', !(await ent.getByRole('checkbox', { name: /Lançar a compra como despesa/ }).isChecked()));
     await ent.getByRole('button', { name: 'Anotar entrada' }).click();
     await page.locator('.g-folha').waitFor({ state: 'detached', timeout: 15000 });
     T.ok('Entrada com lote e validade: o lote L-DEZ com 4 e a validade certa', B.num(`select quantidade from produtos_lotes where produto_id='${sh}' and lote='L-DEZ'`) === 4

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import { MARCAS_DAS_MENSAGENS, MENSAGENS, MODELOS_PADRAO } from "@/lib/gestao/hotel";
-import { temporadaDoDia } from "@/lib/gestao/hotel-opcoes";
+import { horasDoHotel, temporadaDoDia, textoDaRegra, type DestinoDoSinal, type HorasDoHotel } from "@/lib/gestao/hotel-opcoes";
 import {
   acomodacoesDe, CHAVES_HOTEL, cuidadosLigados, linkSemPreco, modelosDe, novoCodigo, pixDe, porteDe, segundoPetDe, sinalDe, taxasDe, temporadasDe, temporadasQueSeCruzam,
   type Acomodacao, type ModelosDeMensagem, type Taxa, type Temporada,
@@ -39,6 +39,14 @@ function Opcao({ titulo, frase, ligada, aoMudar, children }: { titulo: string; f
     </div>
   );
 }
+const DESTINOS: { id: DestinoDoSinal; rotulo: string }[] = [{ id: "ficar", rotulo: "Fica com o pet shop" }, { id: "devolver", rotulo: "É devolvido" }, { id: "credito", rotulo: "Vira crédito do tutor" }];
+function EscolhaDoDestino({ valor, rotulo, aoMudar }: { valor: DestinoDoSinal | null; rotulo: string; aoMudar: (v: DestinoDoSinal | null) => void }) {
+  return (
+    <div className="g-chips" role="group" aria-label={rotulo}>
+      {DESTINOS.map((d) => <button key={d.id} type="button" className="g-chip" aria-pressed={valor === d.id} onClick={() => aoMudar(valor === d.id ? null : d.id)}>{d.rotulo}</button>)}
+    </div>
+  );
+}
 const lerNumero = (s: string) => { const n = Number(s.replace(",", ".")); return s.trim() && Number.isFinite(n) && n >= 0 ? n : null; };
 
 export default function OpcoesHotel() {
@@ -47,6 +55,7 @@ export default function OpcoesHotel() {
   const somenteLeitura = useSomenteLeitura();
   const [sinal, setSinal] = useState(() => sinalDe(petshop));
   const [pix, setPix] = useState(() => pixDe(petshop));
+  const [horas, setHoras] = useState<HorasDoHotel>(() => horasDoHotel(petshop));
   const [porte, setPorte] = useState(() => porteDe(petshop));
   const [temporadas, setTemporadas] = useState(() => temporadasDe(petshop));
   const [segundo, setSegundo] = useState(() => segundoPetDe(petshop));
@@ -72,16 +81,16 @@ export default function OpcoesHotel() {
   const temHotel = usaModulo(petshop, "hotel"), temCreche = usaModulo(petshop, "creche");
   const tituloOpcoes = temHotel && !temCreche ? "Opções do hotel" : temCreche && !temHotel ? "Opções da creche" : "Opções do hotel e da creche";
   // o que foi mudado e não salvo fica no aparelho: recarregar a tela não perde
-  const valores = { sinal, pix, porte, temporadas, segundo, taxas, cuidados, semPreco, quartos, modelos, feriado, atraso, mexeuNosPrecos, mexeuNasTemporadas };
+  const valores = { sinal, pix, horas, porte, temporadas, segundo, taxas, cuidados, semPreco, quartos, modelos, feriado, atraso, mexeuNosPrecos, mexeuNasTemporadas };
   type Valores = typeof valores;
   const aplicar = (v: Valores) => {
-    setSinal(v.sinal); setPix(v.pix); setPorte(v.porte); setTemporadas(v.temporadas); setSegundo(v.segundo); setTaxas(v.taxas); setCuidados(v.cuidados);
+    setSinal({ ...v.sinal, cancela: v.sinal.cancela ?? { dias: null, perto: null, longe: null } }); setPix(v.pix); setHoras(v.horas ?? { entrada: null, saida: null }); setPorte(v.porte); setTemporadas(v.temporadas); setSegundo(v.segundo); setTaxas(v.taxas); setCuidados(v.cuidados);
     setSemPreco(v.semPreco); setQuartos(v.quartos); setModelos(v.modelos); setFeriado(v.feriado); setAtraso(v.atraso);
     setMexeuNosPrecos(v.mexeuNosPrecos); setMexeuNasTemporadas(v.mexeuNasTemporadas);
   };
   const rascunho = useRascunho<Valores>("opcoes-hotel", valores, mexeu, (v) => { aplicar(v); setMexeu(true); });
   const descartar = () => {
-    aplicar({ sinal: sinalDe(petshop), pix: pixDe(petshop), porte: porteDe(petshop), temporadas: temporadasDe(petshop), segundo: segundoPetDe(petshop), taxas: taxasDe(petshop),
+    aplicar({ sinal: sinalDe(petshop), pix: pixDe(petshop), horas: horasDoHotel(petshop), porte: porteDe(petshop), temporadas: temporadasDe(petshop), segundo: segundoPetDe(petshop), taxas: taxasDe(petshop),
       cuidados: cuidadosLigados(petshop), semPreco: linkSemPreco(petshop), quartos: acomodacoesDe(petshop), modelos: modelosDe(petshop),
       feriado: calendario?.feriado ?? FERIADO_VAZIO, atraso: calendario?.atraso ?? ATRASO_VAZIO, mexeuNosPrecos: false, mexeuNasTemporadas: false });
     setMexeu(false); setErro(null);
@@ -126,6 +135,7 @@ export default function OpcoesHotel() {
     const falha = (t: string) => { setErro(t); return false as const; };
     if (sinal.ativo && sinal.modo === "pct" && sinal.valor != null && sinal.valor > 100) return falha("O sinal em porcentagem vai até 100%.");
     if (segundo.ativo && (!segundo.pct || segundo.pct > 100)) return falha("Escreva o desconto do segundo pet, de 1 a 100%.");
+    if (sinal.ativo && (sinal.cancela.perto || sinal.cancela.longe) && sinal.cancela.dias == null) return falha("Na regra de cancelamento, escreva com quantos dias de antecedência a regra muda.");
     const temporadaRuim = temporadas.ativo ? temporadas.lista.find((t) => !t.nome.trim() || !t.de || !t.ate || t.ate < t.de) : null;
     if (temporadaRuim) return falha(`Confira a temporada ${temporadaRuim.nome.trim() ? `"${temporadaRuim.nome.trim()}"` : "sem nome"}: ela precisa de nome e de um período em que o fim vem depois do começo.`);
     if (taxas.ativo && taxas.lista.some((t) => !t.nome.trim())) return falha("Dê um nome para cada taxa, ou tire a que está em branco.");
@@ -151,6 +161,7 @@ export default function OpcoesHotel() {
       await salvarOpcoes(sb, petshop.id, {
         [CHAVES_HOTEL.sinal]: { ...sinal, politica: sinal.politica.trim() },
         [CHAVES_HOTEL.pix]: pix.trim(),
+        [CHAVES_HOTEL.horas]: { entrada: horas.entrada, saida: horas.saida },
         [CHAVES_HOTEL.porte]: porte,
         [CHAVES_HOTEL.temporadas]: { ativo: temporadas.ativo, lista: temporadas.lista.map((t) => ({ ...t, nome: t.nome.trim() })) },
         [CHAVES_HOTEL.segundoPet]: segundo,
@@ -195,11 +206,38 @@ export default function OpcoesHotel() {
           <Campo rotulo="O que você combina sobre o sinal" dica="Escreva com as suas palavras (por exemplo, o que acontece se o tutor cancelar). Este texto vai na mensagem que pede o sinal e no link do cliente. Em branco, não aparece nada.">
             <textarea className="g-textarea" value={sinal.politica} maxLength={400} onChange={(e) => m(setSinal)({ ...sinal, politica: e.target.value })} />
           </Campo>
-          <Campo rotulo="Chave Pix para o sinal" dica="Opcional. Se preencher, a chave vai junto na mensagem Pedir o sinal. O sistema não recebe pagamento: só mostra a chave.">
-            <input className="g-input" value={pix} maxLength={120} onChange={(e) => m(setPix)(e.target.value)} />
-          </Campo>
+          <div className="g-campo" role="group" aria-label="Se o tutor cancelar">
+            <span>Se o tutor cancelar (opcional)</span>
+            <div className="g-fila" style={{ alignItems: "center", gap: 8 }}>
+              <span className="g-p">Com menos de</span>
+              <input className="g-input g-tab" style={{ width: 70 }} inputMode="numeric" aria-label="Dias de antecedência" value={sinal.cancela.dias ?? ""} placeholder="7"
+                onChange={(e) => { const n = lerNumero(e.target.value); m(setSinal)({ ...sinal, cancela: { ...sinal.cancela, dias: n == null ? null : Math.min(365, Math.round(n)) } }); }} />
+              <span className="g-p">dias da entrada, o sinal:</span>
+            </div>
+            <EscolhaDoDestino valor={sinal.cancela.perto} rotulo="Com menos dias" aoMudar={(v) => m(setSinal)({ ...sinal, cancela: { ...sinal.cancela, perto: v } })} />
+            <span className="g-p">Com mais tempo, o sinal:</span>
+            <EscolhaDoDestino valor={sinal.cancela.longe} rotulo="Com mais tempo" aoMudar={(v) => m(setSinal)({ ...sinal, cancela: { ...sinal.cancela, longe: v } })} />
+            <small>{textoDaRegra(sinal.cancela) || "Em branco, nada vem marcado quando você cancela uma reserva com sinal."} Na hora de cancelar, a escolha da regra já vem marcada e dá para mudar.</small>
+          </div>
           {temCreche && <label className="g-check"><input type="checkbox" checked={sinal.creche} onChange={(e) => m(setSinal)({ ...sinal, creche: e.target.checked })} /><span>Oferecer o sinal também nas reservas da creche</span></label>}
         </Opcao>
+
+        <div className="g-ht-op">
+          <Campo rotulo="Chave Pix (se quiser)" dica="Vai na mensagem que pede o sinal, na mensagem de cobrança da mensalidade (se a de Opções de cobrança estiver em branco) e no link do cliente. O sistema não recebe pagamento: só mostra a chave.">
+            <input className="g-input" value={pix} maxLength={120} placeholder="Ex.: celular, CNPJ ou e-mail" onChange={(e) => m(setPix)(e.target.value)} />
+          </Campo>
+        </div>
+
+        {temHotel && (
+          <Opcao titulo="Hora de entrada e de saída do hotel" frase="A hora de check-in e de check-out que você combina. O link do cliente e a nova reserva já vêm com elas." ligada={Boolean(horas.entrada || horas.saida)}
+            aoMudar={(v) => m(setHoras)(v ? { entrada: horas.entrada ?? "14:00", saida: horas.saida ?? "12:00" } : { entrada: null, saida: null })}>
+            <div className="dupla">
+              <Campo rotulo="Entrada a partir de"><input type="time" className="g-input" value={horas.entrada ?? ""} onChange={(e) => m(setHoras)({ ...horas, entrada: e.target.value || null })} /></Campo>
+              <Campo rotulo="Saída até"><input type="time" className="g-input" value={horas.saida ?? ""} onChange={(e) => m(setHoras)({ ...horas, saida: e.target.value || null })} /></Campo>
+            </div>
+            {horas.saida && atraso.ativo && atraso.hotel.hora && atraso.hotel.hora !== horas.saida && <p className="g-pp g-muted">A taxa de busca fora do horário do hotel conta a partir das {atraso.hotel.hora} (mais abaixo). Se a saída combinada é {horas.saida}, use a mesma hora lá.</p>}
+          </Opcao>
+        )}
 
         {temHotel && (
           <Opcao titulo="Diária do hotel por porte" frase="Cada porte tem a sua diária. Porte em branco, ou pet sem porte na ficha, usa a diária do hotel de sempre." ligada={porte.ativo} aoMudar={(v) => m(setPorte)({ ...porte, ativo: v })}>

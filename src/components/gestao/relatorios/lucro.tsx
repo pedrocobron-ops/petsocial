@@ -5,9 +5,9 @@ import Link from "next/link";
 import { Coins, Download, PiggyBank, Receipt, Scale, TrendingUp } from "lucide-react";
 import { montarLucro, OPCAO_COMISSAO_CUSTO, porLucro, type LinhaLucro, type LucroDoBanco } from "@/lib/gestao/lucro";
 import { nomeDaCategoria } from "@/lib/gestao/modulos";
-import { lerSaidasDoPeriodo, type SaidasDoPeriodo } from "@/lib/gestao/contas-fixas";
+import { aindaAPagar, fraseDaSituacao, lerSaidasDoPeriodo, lerSituacaoContasFixas, type SaidasDoPeriodo, type SituacaoContaFixa } from "@/lib/gestao/contas-fixas";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
-import { brl, dataCompleta, deIsoDia } from "@/lib/gestao/util";
+import { brl, dataCompleta, deIsoDia, isoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { baixarPlanilha, Chips, dinheiroCsv, numeroCsv, type Cel } from "../financeiro/comum";
 import { Kpi, Tile } from "../painel";
@@ -37,12 +37,14 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
   const [salvando, setSalvando] = useState(false);
   const { dados, erro, recarregar } = useDados(async () => {
     // as saídas separadas em "Contas fixas" e o resto (o total é o mesmo; sem a função, as saídas aparecem como antes)
-    const [r, fixas] = await Promise.all([
+    // e as contas fixas do período que ainda não foram pagas (em A pagar ou ainda por entrar): ficam fora do resultado, à parte
+    const [r, fixas, situacao] = await Promise.all([
       sb.rpc("lucro_do_periodo", { p_petshop: petshop.id, p_de: de, p_ate: ate }),
       lerSaidasDoPeriodo(sb, petshop.id, de, ate).catch(() => null),
+      lerSituacaoContasFixas(sb, petshop.id, de, ate).catch(() => null),
     ]);
     if (r.error) throw new Error(r.error.message);
-    return { lucro: r.data as unknown as LucroDoBanco, fixas };
+    return { lucro: r.data as unknown as LucroDoBanco, fixas, situacao };
   }, [petshop.id, de, ate]);
   const x = useMemo(() => (dados ? montarLucro(dados.lucro) : null), [dados]);
   // a separação só vale se fecha com o "saiu" de Quanto sobrou (a mesma regra; conferido aqui também)
@@ -116,7 +118,7 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
             <Kpi icone={Coins} tom="rosa" rotulo="Custo informado" valor={brl(x.totais.custo)}
               apoio={x.totais.linhasSemCusto ? `${x.totais.linhasSemCusto === 1 ? "1 linha" : `${x.totais.linhasSemCusto} linhas`} sem custo` : "de todas as linhas"} />
             <Kpi icone={TrendingUp} tom={x.totais.margem < 0 ? "manteiga" : "menta"} rotulo="Sobrou" valor={x.totais.receitaComCusto > 0 ? brl(x.totais.margem) : "–"}
-              apoio={x.totais.pct != null ? `${pct(x.totais.pct)} do que tem custo` : "falta informar os custos"} />
+              apoio={x.totais.pct != null ? `${pct(x.totais.pct)} do que tem custo · antes das despesas` : "falta informar os custos"} />
             <Kpi icone={Scale} tom={x.ponte.resultado < 0 ? "rosa" : "lilas"} rotulo={inteiro ? "Resultado do mês" : "Resultado do período"} valor={brl(x.ponte.resultado)} apoio="entrou − saiu, como no Financeiro" />
           </div>
 
@@ -145,7 +147,7 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
             </p>
           )}
 
-          <Ponte x={x} categoria={categoria} inteiro={inteiro} fixas={fixas} />
+          <Ponte x={x} categoria={categoria} inteiro={inteiro} fixas={fixas} situacao={dados?.situacao ?? null} />
 
           <p className="g-muted g-pp">
             Entrou: o dinheiro recebido no período, já com o desconto, repartido entre os serviços de cada conta como na comissão (conta paga em partes conta cada parte no dia em que entrou; as vezes contam uma vez, quando a conta fecha).
@@ -181,8 +183,11 @@ function Linha({ l, comComissao }: { l: LinhaLucro; comComissao: boolean }) {
 }
 
 /** Como o total das linhas chega no Resultado do Financeiro (cada número é o mesmo da tela Financeiro). */
-function Ponte({ x, categoria, inteiro, fixas }: { x: ReturnType<typeof montarLucro>; categoria: (c: string) => string; inteiro: boolean; fixas: SaidasDoPeriodo | null }) {
+function Ponte({ x, categoria, inteiro, fixas, situacao }: { x: ReturnType<typeof montarLucro>; categoria: (c: string) => string; inteiro: boolean; fixas: SaidasDoPeriodo | null; situacao: SituacaoContaFixa[] | null }) {
   const p = x.ponte;
+  const falta = situacao ? aindaAPagar(situacao) : null;
+  const hoje = isoDia(new Date());
+  const base = p.taxas > 0 ? p.resultadoDepoisDasTaxas : p.resultado;
   return (
     <div className="g-lu-ponte" role="group" aria-label="Como fecha com o Financeiro">
       <p className="g-rotulo" style={{ marginBottom: 4 }}>Como fecha com o Financeiro</p>
@@ -205,6 +210,16 @@ function Ponte({ x, categoria, inteiro, fixas }: { x: ReturnType<typeof montarLu
         <div><span>Taxas da maquininha (cartão e Pix)</span><b>− {brl(p.taxas)}</b></div>
         <div className="igual fim"><span>Depois das taxas da maquininha</span><b className={p.resultadoDepoisDasTaxas < 0 ? "g-vermelho-t" : undefined}>{brl(p.resultadoDepoisDasTaxas)}</b></div>
       </>}
+      {falta && falta.itens.length > 0 && (
+        <>
+          <p className="g-rotulo" style={{ margin: "10px 0 4px" }} data-teste="contas-fixas-a-pagar">Contas fixas do período ainda não pagas (não entraram no resultado)</p>
+          {falta.itens.map((c) => (
+            <div key={`${c.conta_fixa_id ?? c.nome}${c.mes}`} className="sub fixa"><span>{c.nome} · {fraseDaSituacao(c, hoje)}</span><b>{brl(c.valor)}</b></div>
+          ))}
+          <div><span>Total a pagar</span><b>− {brl(falta.total)}</b></div>
+          <div className="igual fim"><span>Se pagar essas contas, o resultado fica</span><b className={base - falta.total < 0 ? "g-vermelho-t" : undefined}>{brl(Math.round((base - falta.total) * 100) / 100)}</b></div>
+        </>
+      )}
     </div>
   );
 }

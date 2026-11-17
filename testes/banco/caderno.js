@@ -196,7 +196,8 @@ function pdf(n) {
   const conta = (sb) => D.lancarAReceber(sb, P, { valor: 35, vencimento: venc, categoria: 'Outros', descricao: 'Banho', clienteId: L.tutores.Beto, devidoDesde: desde, chave: `${chave}:divida:x1` });
   const [a1, a2] = await Promise.all([conta(L.sb.caixa), conta(L.sb.caixa)]);
   T.ok('toque duplo em Salvar: a dívida entra uma vez só (mesma chave)', a1.id === a2.id && B.num(`select count(*) from lancamentos where petshop_id='${P}' and chave like '${chave}%'`) === 1);
-  T.ok('a dívida fica na ficha do cliente, a receber, com o dia em que começou', B.sql(`select cliente_id || '|' || pago || '|' || devido_desde || '|' || data from lancamentos where id='${a1.id}'`) === `${L.tutores.Beto}|false|${desde}|${venc}`);
+  // a dívida do caderno já está vencida desde o dia anotado (migração 20261216, achado da Neide): nada de "importação + 7 dias"
+  T.ok('a dívida fica na ficha do cliente, a receber, vencida desde o dia em que começou', B.sql(`select cliente_id || '|' || pago || '|' || devido_desde || '|' || data || '|' || vencimento from lancamentos where id='${a1.id}'`) === `${L.tutores.Beto}|false|${desde}|${desde}|${desde}`);
   let recusou = false;
   try { await D.lancarAReceber(L.sb.tosador, P, { valor: 10, vencimento: venc, categoria: 'Outros', descricao: 'x', clienteId: L.tutores.Beto, devidoDesde: desde, chave: B.uuid() }); } catch { recusou = true; }
   T.ok('o tosador não anota dívida (o banco recusa)', recusou);

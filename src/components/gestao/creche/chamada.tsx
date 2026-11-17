@@ -3,11 +3,11 @@
 import { useMemo, useState } from "react";
 import { BotaoFotos } from "../casa/fotos-do-dia";
 import { BotaoBoletim, useBoletinsDeHoje } from "../boletim/boletim";
-import { AlertTriangle, CalendarPlus, Check, DoorOpen, LogIn, MessageCircle, Search, Sparkles, Sunset, Syringe, Undo2, UserX } from "lucide-react";
+import { AlertTriangle, CalendarPlus, Check, DoorOpen, LogIn, MessageCircle, Search, Sparkles, Sunset, Syringe, Truck, Undo2, UserX } from "lucide-react";
 import { lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
 import { cuidadosVigentes, estadoSaude, tipoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import { portariaLigada, type Retirada } from "@/lib/gestao/casa-opcoes";
-import { abreNoDia, emPausa, erroDaChamada, esperadoNoDia, fraseDoSaldo, lerPresencas, lerSaldoDeReposicao, mensagemDeFalta, montarChamada, planoVale, podeMudarPlano, type LinhaChamada, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
+import { abreNoDia, emPausa, erroDaChamada, esperadoNoDia, fraseDoSaldo, lerPresencas, lerSaldoDeReposicao, mensagemDeFalta, montarChamada, planoVale, podeMudarPlano, textoDoTaxi, type LinhaChamada, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
 import { dataAmigavel, dataCurta, dataLonga, deIsoDia, isoDia, linkWhatsApp, semAcento, somaDias } from "@/lib/gestao/util";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { ocupadasNoDia } from "@/lib/gestao/hotel";
@@ -18,6 +18,7 @@ import { FolhaTaxaDeAtraso, lerAtraso, type AtrasoPendente } from "./atraso";
 import { DiasDoPlano } from "./resumo-mes";
 import { anotarFaltaAvisada } from "./falta-avisada";
 import { BotaoCorrigirHoras, FolhaCorrigirHoras, usePodeCorrigirHoras } from "./corrigir-horas";
+import { EntradaNaChegada, type VisitaDaEntrada } from "../entrada/entrada";
 import "./creche.css";
 import "@/components/gestao/hotel/hotel.css";
 
@@ -78,6 +79,8 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
   const [horasDe, setHorasDe] = useState<LinhaChamada | null>(null);
   // saída fora do horário: a pergunta da taxa, só para quem recebe
   const [taxa, setTaxa] = useState<AtrasoPendente | null>(null);
+  // checklist de entrada depois do Chegou de hoje (abre sozinho quando Meu pet shop pede: todos os pets ou só pet idoso)
+  const [entradaDe, setEntradaDe] = useState<VisitaDaEntrada | null>(null);
   const valorDaTaxa = vejoFinanceiro && calendario?.atraso.ativo ? calendario.atraso.creche.valor : null;
   const ehHoje = dia === hoje;
   // dia que ainda vai chegar: só dá para anotar a falta que o tutor já avisou (a chegada é marcada no dia)
@@ -122,6 +125,8 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
     }
     try {
       const r = ok(await sb.rpc("creche_chamada", { p_plano: plano.id, p_dia: dia, p_acao: acao, p_avisou: opcoes.avisou ?? false, p_forcar: opcoes.forcar ?? false })) as { repetido?: boolean; atraso?: boolean; estadia?: string; conferir?: boolean; reserva?: string; repoe?: string | null; sem_falta?: boolean };
+      // chegou hoje (pelo plano, dia extra ou reposição): o checklist de entrada abre se o pet shop pede, como no check-in avulso
+      if (!r.repetido && ehHoje && r.estadia && (acao === "chegou" || acao === "extra" || acao === "reposicao" || acao === "reposicao_livre")) setEntradaDe(visitaDoPlano(plano, r.estadia));
       if (r.repetido) avisar("Outra pessoa já tinha marcado. Atualizei a chamada.");
       else if (acao === "chegou") avisar(ehHoje ? `${nome} chegou.` : `${nome}: presença marcada em ${dataAmigavel(dia)}.`);
       else if (acao === "extra") avisar(`${nome}: dia extra anotado. Entra na cobrança do mês que vem.`);
@@ -245,6 +250,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
                         {l.conta === "extra" && <span className="g-tag amarelo">{l.presenca?.status === "reservada" ? "dia extra reservado" : "dia extra"}</span>}
                         {l.conta === "reposicao" && <span className="g-tag azul">reposição</span>}
                         {l.conta === "avulsa" && <span className="g-tag">check-in avulso</span>}
+                        {l.plano.taxi && <span className="g-tag azul"><Truck size={12} aria-hidden />{textoDoTaxi(l.plano.taxi)}</span>}
                         {s?.vacinas.length ? <span className="g-tag vermelho" title={s.vacinas.join(", ")}><Syringe size={12} aria-hidden />vacina vencida: {s.vacinas.join(", ")}{ehHoje && l.estado === "esperado" && petshop.creche_bloqueia_vacina ? (souDono ? " · entrada bloqueada (você pode liberar)" : " · entrada bloqueada: só o dono libera") : ""}</span> : null}
                         {s?.outros.length ? <span className="g-tag amarelo" title={s.outros.join(", ")}>vencido: {s.outros.join(", ")}</span> : null}
                         {pet.alertas && <span className="g-tag vermelho"><AlertTriangle size={12} aria-hidden />{pet.alertas}</span>}
@@ -317,6 +323,7 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
         </>
       )}
 
+      {entradaDe && <EntradaNaChegada key={entradaDe.estadiaId} visita={entradaDe} aoFechar={() => setEntradaDe(null)} />}
       {horasDe?.presenca && <FolhaCorrigirHoras key={horasDe.presenca.id} estadia={{ ...horasDe.presenca, pets: horasDe.plano.pets }} aoFechar={() => setHorasDe(null)} />}
       {buscando?.presenca && <QuemBuscou key={buscando.presenca.id} estadia={{ id: buscando.presenca.id, pets: buscando.plano.pets }} aoFechar={() => setBuscando(null)}
         aoSeguir={async () => { const l = buscando; setBuscando(null); await marcar(l.plano, "saiu"); }} />}
@@ -326,6 +333,12 @@ export default function Chamada({ planos, vagasHoje, aoNovoMensalista, aviso, ao
         aoFechar={() => setFora(false)} aoMarcar={async (p, como) => { if (await marcar(p, como)) setFora(false); }} />}
     </div>
   );
+}
+
+/** A visita do mensalista para o checklist de entrada (a presença do dia é uma estadia de creche). */
+function visitaDoPlano(plano: PlanoCompleto, estadiaId: string): VisitaDaEntrada {
+  const pet = plano.pets;
+  return { tipo: "creche", estadiaId, petId: plano.pet_id, pet: pet?.nome ?? "Pet", tutor: pet?.clientes ? { nome: pet.clientes.nome, telefone: pet.clientes.telefone } : null };
 }
 
 /** Mensalista que veio num dia que não é do plano: vira dia extra (entra na cobrança) ou reposição de falta (não cobra). */

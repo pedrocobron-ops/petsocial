@@ -230,8 +230,11 @@ export function pararDeFalar() {
   try { if (temLeitura()) window.speechSynthesis.cancel(); } catch { /* sem leitura */ }
 }
 
+/** O aviso de quando o aparelho não tem voz para ler (o navegador fica mudo, sem erro). */
+export const SEM_VOZ = "Este aparelho não tem voz instalada para ler em voz alta. Em Ajustes da voz (o botão no alto da conversa) tem o passo a passo para instalar uma voz em português.";
+
 /** Uma leitura: fala frases em fila (o navegador enfileira), avisa uma vez quando acabou ou foi interrompida. */
-function novaLeitura(aoAcabar?: () => void, voz?: string | null) {
+function novaLeitura(aoAcabar?: () => void, voz?: string | null, aoComecar?: () => void) {
   pararDeFalar();
   const minha = leitura;
   let faltam = 0, fechou = false, avisou = false;
@@ -247,6 +250,7 @@ function novaLeitura(aoAcabar?: () => void, voz?: string | null) {
           u.lang = escolhida?.lang?.replace(/_/g, "-") || "pt-BR";
           if (escolhida) { try { u.voice = escolhida; } catch { /* voz que sumiu: fica a do idioma */ } }
           u.rate = VELOCIDADE;
+          if (aoComecar) u.onstart = () => aoComecar();
           faltam++;
           const fim = () => { faltam--; conferir(); };
           u.onend = fim;
@@ -259,11 +263,14 @@ function novaLeitura(aoAcabar?: () => void, voz?: string | null) {
   };
 }
 
-/** Lê um texto em português, frase por frase. `aoAcabar` roda quando termina ou é interrompido. */
-export function falar(texto: string, aoAcabar?: () => void, voz?: string | null) {
+/**
+ * Lê um texto em português, frase por frase. `aoAcabar` roda quando termina ou é interrompido; `aoComecar`, quando a voz
+ * começa de verdade (sem ele chegar, o aparelho não tem voz: a tela avisa).
+ */
+export function falar(texto: string, aoAcabar?: () => void, voz?: string | null, aoComecar?: () => void) {
   const frases = dividirEmFrases(textoParaFalar(texto));
   if (!temLeitura() || !frases.length) { aoAcabar?.(); return; }
-  const l = novaLeitura(aoAcabar, voz);
+  const l = novaLeitura(aoAcabar, voz, aoComecar);
   l.falar(frases);
   l.terminar();
 }
@@ -289,7 +296,7 @@ export const EXEMPLO_DE_VOZ = "Oi! Eu sou o Mozart. Marquei o banho do Thor para
 export function EscolherVoz({ vozes }: { vozes: ReturnType<typeof useVozes> }) {
   const [id, setId] = useState(lerVozEscolhida);
   if (!vozes.pt.length) {
-    if (!vozes.total) return null;
+    if (!vozes.total) return <p className="g-ass-voz-dica" role="note">Não achei nenhuma voz neste aparelho para ler as respostas. No celular, instale os dados de voz em português (Android: Configurações, Idioma, Saída de texto em voz; iPhone: Ajustes, Acessibilidade, Conteúdo falado, Vozes). No computador, o Edge já vem com vozes.</p>;
     return (
       <p className="g-ass-voz-dica" role="note">
         Este aparelho não tem voz em português para ler as respostas. Para instalar: no Windows, Configurações, Hora e idioma, Fala,
