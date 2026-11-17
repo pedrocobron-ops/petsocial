@@ -81,6 +81,7 @@ const AGENDA = "/gestao/app/agenda";
 const CLIENTES = "/gestao/app/clientes";
 const CRECHE = "/gestao/app/creche-hotel";
 const PACOTES = "/gestao/app/pacotes";
+const MENSAGENS = "/gestao/app/mensagens";
 const CAIXA = "/gestao/app/caixa";
 const FINANCEIRO = "/gestao/app/financeiro";
 const RELATORIOS = "/gestao/app/relatorios";
@@ -2504,10 +2505,43 @@ const BASE: TopicoBase[] = [
       "Para lembrar de um horário só, abra o horário e toque em Lembrete no WhatsApp.",
       "Tutor com mais de um horário recebe tudo em uma mensagem só.",
       "Horário que já começou fica de fora da lista.",
+      "Para mandar os lembretes junto com as outras mensagens do dia (pet pronto, vacina, aniversário, cobrança), use Mandar mensagens, no menu.",
       { so: ["casa"], texto: "A lista traz só os horários da Agenda. Para quem chega amanhã na creche ou no hotel, abra Creche e hotel e toque em Avisar quem chega amanhã, na faixa do alto." },
     ],
     atencao: ["O sistema não envia mensagem sozinho: quem aperta enviar é você.", "Tutor sem telefone na ficha não entra na lista."],
     palavras: ["lembrete", "lembretes", "confirmar", "confirmacao", "whatsapp do cliente", "mensagem", "avisar cliente", "lembrar o cliente", "zap", "um dia antes", "avisar um dia antes", "lembrete de amanha"] },
+  { id: "modo-envio", titulo: "Como mandar várias mensagens seguidas (Mandar mensagens)", secao: "divulgacao", quem: "todos", rota: MENSAGENS, tambem: [HOJE],
+    passos: [
+      "Na tela Hoje, toque no cartão Mandar N mensagens. Ou abra o menu e toque em Mandar mensagens.",
+      "A tela mostra quantas mensagens estão prontas de cada tipo: pet pronto para buscar, lembrete dos horários de amanhã, aviso de chegada da creche e do hotel, cobrança gentil, vacina e cuidados vencendo, renovar pacote, aniversário do pet e chamar de volta.",
+      "Desligue no interruptor o tipo que você não quer mandar agora.",
+      "Toque em Começar. Aparece uma mensagem por vez: para quem, por quê e o texto pronto.",
+      "Se quiser, mude o texto na caixa antes de abrir.",
+      "Toque em Abrir no WhatsApp. O WhatsApp deste aparelho abre com a mensagem pronta: aperte enviar e volte para o sistema.",
+      "Quando você volta, a tela pergunta Enviou?. Toque em Sim, próxima para anotar e ir para a próxima, em Pular para deixar para depois, ou em Não enviou para tentar de novo.",
+      "No fim, a tela mostra quantas foram e deixa passar de novo pelas que ficaram.",
+    ],
+    dicas: [
+      "O que você marca aqui vale nas outras telas: o lembrete aparece como mandado na Agenda, o aviso de pronto ganha o sininho, a chegada fica anotada na estadia e a cobrança fica anotada na conta.",
+      "Fica anotado quem mandou e a que horas. A mesma mensagem não volta para a fila no mesmo dia.",
+      "No computador dá para usar o teclado: Enter abre o WhatsApp; depois S é sim, P é pular e N é não enviou.",
+      "Cada pessoa vê só o que é da área dela: cobrança só para quem mexe com dinheiro, lembrete e pet pronto para quem tem a Agenda, chegada para quem tem Creche e hotel, pacote para quem tem Pacotes.",
+      "Pergunte ao Mozart: \"quantas mensagens tenho para mandar hoje?\"",
+    ],
+    atencao: [
+      "O sistema não envia nada sozinho: cada mensagem sai do WhatsApp do aparelho, quando você aperta enviar.",
+      "Tutor sem telefone, com telefone incompleto ou marcado como Não quer receber mensagens fica de fora. Toque em Ficaram de fora para ver quem e abrir a ficha.",
+    ],
+    palavras: ["mandar mensagens", "modo envio", "varias mensagens", "mensagens do dia", "fila de mensagens", "mandar tudo", "whatsapp", "zap", "lembretes", "cobranca", "cobrar no whatsapp", "aniversario", "vacina vencendo", "pet pronto", "enviou", "mensagem em massa", "disparo"] },
+  { id: "nao-quer-mensagens", titulo: "Como marcar que o tutor não quer receber mensagens", secao: "divulgacao", quem: "todos", rota: CLIENTES, tambem: [MENSAGENS],
+    passos: [
+      "Abra Clientes e pets e toque no tutor.",
+      "Toque em Editar.",
+      "Marque Não quer receber mensagens e toque em Salvar.",
+    ],
+    dicas: ["A ficha do tutor mostra a etiqueta Não quer receber mensagens.", "Para voltar a mandar, desmarque a caixa."],
+    atencao: ["Quem marcou fica de fora do Mandar mensagens (lembretes, avisos, aniversário e cobrança). Nas outras telas, o botão do WhatsApp continua lá para quando o próprio tutor pedir."],
+    palavras: ["nao quer receber", "nao mandar mensagem", "parar de mandar", "descadastrar", "sair da lista", "nao perturbe", "optout", "opt-out", "bloquear mensagens"] },
   { id: "sumidos", titulo: "Como chamar de volta quem não vem há um tempo", secao: "divulgacao", quem: "todos", rota: CLIENTES, tambem: [HOJE],
     passos: [
       "Abra Clientes e pets e toque em Chamar de volta.",
@@ -2888,7 +2922,7 @@ export const topicoPorId = (id: string | null | undefined, lista: Topico[] = TOP
 
 /** Nome de cada tela, como está no menu. */
 export const NOME_TELA: Record<string, string> = {
-  [HOJE]: "Hoje", [AGENDA]: "Agenda", [CLIENTES]: "Clientes e pets", [CRECHE]: "Creche e hotel", [PACOTES]: "Pacotes",
+  [HOJE]: "Hoje", [AGENDA]: "Agenda", [CLIENTES]: "Clientes e pets", [CRECHE]: "Creche e hotel", [PACOTES]: "Pacotes", [MENSAGENS]: "Mandar mensagens",
   [CAIXA]: "Caixa", [FINANCEIRO]: "Financeiro", [RELATORIOS]: "Relatórios", [ESTOQUE]: "Estoque", [EQUIPE]: "Equipe",
   [PETSHOP]: "Meu pet shop", [ASSINATURA]: "Assinatura", [ESCOLA]: "Escola de Gestão", [ROTA_MANUAL]: "Manual",
 };

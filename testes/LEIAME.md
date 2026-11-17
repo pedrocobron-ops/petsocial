@@ -93,6 +93,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
+- `modo-envio.js`: a fila do Mandar mensagens (`src/lib/gestao/modo-envio.ts`, `montarFila`): uma mensagem por tutor e por tipo, na ordem
+  pronto, lembrete, chegada, cobrança, saúde, pacote, aniversário, chamar de volta; o texto igual ao das outras telas (`mensagemDoLembrete`,
+  `textoPronto`, `mensagemSaude`, `montarMensagem` com o texto do pet shop, `mensagemDeDivida`, chegada do hotel) e a renovação do pacote;
+  de fora com o motivo: sem telefone, telefone incompleto, "não quer receber mensagens"; o texto mudado vai no link wa.me.
 - `compra-etiquetas.js`: códigos de barras das etiquetas (`codigo-barras.ts`): EAN-13 só com 13 números e dígito certo, senão
   Code 128; a tabela do Code 128 conferida (106 símbolos de 11 módulos, barras pares, todos diferentes); vetores conhecidos
   (MP000001 = início B, M, P, troca C, 00 00 01, verificador 33; 7891234567890 com o verificador 43; os desenhos de
@@ -230,6 +234,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   novo não gera outro, dois pedidos ao mesmo tempo não repetem, outro pet shop não muda, tosador/recepção/anônimo/dona de outra
   loja recusados; o Mozart `o_que_comprar` com os movimentos de verdade (grupo do fornecedor, 3,5 por semana, comprar 6 com a
   explicação, 4 semanas = 13, caixa de 12), valor em estoque só para quem vê o financeiro, recusado para quem não tem Estoque.
+- `modo-envio.js`: Mandar mensagens (migração 20261198: `gestao_modo_envio`, `modo_envio_marcar`, `mensagens_enviadas`,
+  `clientes.nao_quer_mensagens`). Lembrete de amanhã do Thor e da Mel numa mensagem só, pet pronto, cobrança (35, vencida), V10 em 5 dias,
+  aniversário, pacote que acabou há 3 dias e o Bob sem vir há 70 dias: 7 mensagens para o dono (pela `montarFila` do app); Clara (não quer),
+  Eva (sem telefone) e Davi (telefone incompleto) de fora. Por área: recepção tudo; tosador sem cobrança, pacote e chegada; monitora sem
+  agenda nem dinheiro; estoque nada; anônimo recusado; outra loja nada. Mozart `mensagens_para_mandar` (7 e 5 para o tosador). Marcar grava a
+  marca das outras telas (`lembrete_em`, `pronto_avisado_em`, `avisos.chegada`, `cobrado_em`) e o registro com quem e quando, uma vez por
+  (tipo, ref, dia), também com dois toques ao mesmo tempo; tipo de outra área, anônimo, tipo estranho e mais de 50 recusados; ref de outra
+  loja ignorada; depois, a fila fica vazia. Ninguém grava nem apaga direto no registro; outra loja não lê.
 - `velocidade.js`: abrir o aplicativo numa ida só ao banco (migração 20261185): `lerBase` (`gestao_base`) = a leitura antiga parte por
   parte (`lerPetshop` + `lerEquipe` + `lerServicos`) para dono, recepção, monitora, tosador e estoque, com meta, diárias, opções com valor,
   comissão, convite e preços só para quem pode; as seis contagens da tela Hoje (`gestao_contagens`) = as contagens pela API; anônimo
@@ -330,6 +342,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   resumo de cada parte e o índice; a dona sem aceite da versão em vigor entra e vê "Dona, atualizamos as nossas regras" (o resumo das
   mudanças, os dois documentos, a caixa desmarcada; sem marcar não segue), aceita com dois cliques e o aplicativo abre com os dois
   aceites "reaceite" gravados uma vez. Capturas em `testes/saida/aceite-*.png`.
+- `modo-envio.js`: Mandar mensagens pela tela, 390 e 1366 (dona). 390: a tela Hoje mostra "Mandar 3 mensagens"; contagens com interruptores
+  (desligar o aniversário: "Começar: 2 mensagens"), "1 ficou de fora" com a Clara e o motivo; "1 de 3" com o lembrete do Thor e da Mel, texto
+  mudado no link wa.me; ao abrir, nada é perguntado nem marcado até a aba ser escondida e voltar (simulado com `visibilitychange`); "Sim,
+  próxima" grava o `lembrete_em`; "Pular" não grava; "Não enviou" fica na mesma; fim com 2 enviadas e 1 para depois. 1366: só a cobrança
+  sobra; Enter abre o WhatsApp e S responde sim (`cobrado_em` e o registro com quem mandou); a ficha da Clara com "Não quer receber
+  mensagens" e a caixa marcada no formulário. Capturas em `testes/saida/modo-envio-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 - `compra-etiquetas.js`: Estoque pela tela, 390 e 1366. O que comprar: "Vendeu em média 3,5 por semana nas últimas 6 semanas",

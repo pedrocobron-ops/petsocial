@@ -36,6 +36,7 @@ import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import MetaMes from "@/components/gestao/meta-mes";
 import DicasMozart from "@/components/gestao/dicas-mozart";
 import BomDia from "@/components/gestao/bom-dia";
+import EntradaModoEnvio from "@/components/gestao/modo-envio-entrada";
 import ChamarDeVolta, { aniversariantes, buscarParaChamar, chamadoEm, lerChamados, quemSumiu, type AbaChamar, type GrupoChamar } from "@/components/gestao/clientes/chamar-de-volta";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
 import { AtendimentosParaCobrar, MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
@@ -309,6 +310,9 @@ export default function Hoje() {
 
         {/* "Bom dia" do Mozart: primeira abertura do dia, até 3 linhas; lê sozinho (gestao_bom_dia), não depende dos dados desta tela */}
         {!contaNova && <BomDia />}
+
+        {/* Modo envio: "Mandar N mensagens" (lembretes, pet pronto, saúde, aniversário, pacote, cobrança, chamar de volta), depois do primeiro olhar */}
+        {!contaNova && <EntradaModoEnvio pronto={primeiroOlhar} />}
 
         {/* pedidos que chegaram pelo link vêm no alto: no celular, abaixo dos primeiros passos e do Mozart ficavam longe da vista */}
         {posso("agenda") && <PedidosLink />}
