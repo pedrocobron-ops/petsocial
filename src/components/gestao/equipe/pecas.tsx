@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, Check, ConciergeBell, Copy, Handshake, House, MessageCircle, PenLine, Plus, Scissors, Wallet, X } from "lucide-react";
 import { Tile, type Tom } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
-import { AvatarPessoa, useAvisos } from "@/components/gestao/ui";
+import { AvatarPessoa, avisarMudanca, useAvisos, useDados } from "@/components/gestao/ui";
 import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS } from "@/components/gestao/ajustes/grade-horario";
 import type { Horario } from "@/lib/gestao/tipos";
 import { areasPara, perfisPara, type Area } from "@/lib/gestao/acessos";
 import { artigoDe, usaModulo } from "@/lib/gestao/modulos";
-import { ROTULOS_ATENDE, SO_DONOS, TODAS_AREAS, comPerfil, fraseDoLimite, nAcessos, primeiroNome, textoDoConvite, type Escolha, type PerfilId, type Uso } from "./modelo";
+import { ROTULOS_ATENDE, SO_DONOS, TODAS_AREAS, comPerfil, fraseDoLimite, nAcessos, primeiroNome, textoDoConvite, validadeDoConvite, type Escolha, type PerfilId, type Uso } from "./modelo";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./equipe-form.css";
 
@@ -269,13 +269,69 @@ export function DetalhesAgenda({ nome, cor, aoCor, comissao, aoComissao, segueLo
 
 /* ---------- convite ---------- */
 
-/** O convite pronto para mandar: WhatsApp, copiar e o texto que a pessoa vai receber. */
-export function Convite({ nome, email }: { nome: string; email: string }) {
-  const { petshop } = useGestao();
+export type LinkDoConvite = { estado: "valendo"; ate: string } | { estado: "vencido" | "sem-link" };
+
+/**
+ * O link de cada convite pendente (só o dono vê): valendo até quando, vencido, ou sem link (convite de antes do código,
+ * que não entra mais só pelo e-mail). Sem link valendo, a tela pede para mandar o convite de novo.
+ */
+export function useLinksDosConvites() {
+  const { sb, petshop, equipe } = useGestao();
+  const chave = equipe.filter((p) => p.ativo && !p.user_id && p.email_convite?.trim()).map((p) => `${p.id}:${p.email_convite}`).join(",");
+  const { dados } = useDados(async () => {
+    if (!chave) return new Map<string, { expira_em: string; usado: boolean }>();
+    const r = await sb.rpc("convites_situacao", { p: petshop.id });
+    if (r.error) return null; // sem a informação, a tela fica como antes
+    return new Map((r.data ?? []).map((x) => [x.profissional_id, { expira_em: x.expira_em, usado: x.usado }]));
+  }, [petshop.id, chave]);
+  return (id: string): LinkDoConvite | null => {
+    if (!dados) return null;
+    const x = dados.get(id);
+    if (!x || x.usado) return { estado: "sem-link" };
+    if (new Date(x.expira_em).getTime() <= Date.now()) return { estado: "vencido" };
+    return { estado: "valendo", ate: validadeDoConvite(x.expira_em) };
+  };
+}
+
+/** Frase curta do link: "link vale até 24/11", "o link venceu: mande o convite de novo". */
+export function fraseDoLink(l: LinkDoConvite | null): string | null {
+  if (!l) return null;
+  if (l.estado === "valendo") return `link vale até ${l.ate}`;
+  return l.estado === "vencido" ? "o link venceu. Mande o convite de novo" : "Mande o convite de novo";
+}
+
+/**
+ * Convite de quem vai entrar com o próprio login. Ao abrir, o banco gera um código novo (só o hash fica guardado): o link
+ * leva esse código e vale por 7 dias, uma vez só. Gerar de novo faz o link anterior deixar de valer.
+ */
+export function Convite({ pessoaId, nome, email }: { pessoaId: string; nome: string; email: string }) {
+  const { sb, petshop } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const [copiado, setCopiado] = useState(false);
+  const [codigo, setCodigo] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [gerando, setGerando] = useState(false);
+  const pedido = useRef<string | null>(null);
   const origem = typeof window === "undefined" ? "" : window.location.origin;
-  const texto = textoDoConvite({ nome, petshop: petshop.nome, email, origem });
+  const texto = codigo ? textoDoConvite({ nome, petshop: petshop.nome, email, origem, codigo }) : "";
+  const validade = validadeDoConvite(Date.now() + 7 * 864e5);
+
+  async function gerar() {
+    setGerando(true); setErro(null); setCopiado(false);
+    const r = await sb.rpc("convite_gerar", { p_profissional: pessoaId });
+    setGerando(false);
+    if (r.error || !r.data) { setErro(r.error?.message && !/function|permission|schema/i.test(r.error.message) ? r.error.message : "Não consegui criar o link do convite. Tente de novo em instantes."); return; }
+    setCodigo(r.data);
+    avisarMudanca(); // a lista da equipe mostra a validade nova
+  }
+  // um link novo cada vez que o convite abre (o e-mail pode ter mudado); a mesma pessoa e o mesmo e-mail não geram dois
+  useEffect(() => {
+    const chave = `${pessoaId}:${email}`;
+    if (pedido.current === chave) return;
+    pedido.current = chave;
+    void gerar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pessoaId, email]);
 
   async function copiar() {
     try {
@@ -289,17 +345,27 @@ export function Convite({ nome, email }: { nome: string; email: string }) {
     <div className="g-eq-convite">
       <ol className="g-eq-convite-passos">
         <li><b>1</b><span className="g-eq-convite-p">{primeiroNome(nome) || "A pessoa"} abre o link que você mandar.</span></li>
-        <li><b>2</b><span className="g-eq-convite-p">Cria a conta com o e-mail <strong>{email}</strong>. É esse e-mail que liga a conta à sua equipe.</span></li>
-        <li><b>3</b><span className="g-eq-convite-p">Pronto: ao entrar, já cai {artigoDe(petshop.nome).no} {petshop.nome}.</span></li>
+        <li><b>2</b><span className="g-eq-convite-p">Cria a conta com o e-mail <strong>{email}</strong> (ou entra, se já tiver conta com esse e-mail).</span></li>
+        <li><b>3</b><span className="g-eq-convite-p">Pronto: já cai {artigoDe(petshop.nome).no} {petshop.nome}.</span></li>
       </ol>
-      <div className="g-eq-convite-acoes">
-        <a className="g-btn verde" href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar pelo WhatsApp</a>
-        <button type="button" className="g-btn sec" onClick={() => void copiar()}>{copiado ? <Check /> : <Copy />}{copiado ? "Copiado" : "Copiar convite"}</button>
-      </div>
-      <details className="g-eq-convite-ver">
-        <summary>Ver a mensagem que vai ser enviada</summary>
-        <p className="g-eq-convite-txt">{texto}</p>
-      </details>
+      <p className="g-eq-convite-p g-pp">O link é só de {primeiroNome(nome) || "da pessoa"}: vale até {validade} e funciona uma vez. Se mandar de novo, o link anterior deixa de valer.</p>
+      {erro && <p className="g-erro" role="alert">{erro}</p>}
+      {codigo ? (
+        <>
+          <div className="g-eq-convite-acoes">
+            <a className="g-btn verde" href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar pelo WhatsApp</a>
+            <button type="button" className="g-btn sec" onClick={() => void copiar()}>{copiado ? <Check /> : <Copy />}{copiado ? "Copiado" : "Copiar convite"}</button>
+          </div>
+          <details className="g-eq-convite-ver">
+            <summary>Ver a mensagem que vai ser enviada</summary>
+            <p className="g-eq-convite-txt">{texto}</p>
+          </details>
+        </>
+      ) : (
+        <div className="g-eq-convite-acoes">
+          <button type="button" className="g-btn verde" onClick={() => void gerar()} disabled={gerando}>{gerando ? "Criando o link…" : "Criar o link do convite"}</button>
+        </div>
+      )}
     </div>
   );
 }

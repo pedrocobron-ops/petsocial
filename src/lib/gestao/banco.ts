@@ -681,6 +681,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"convites_equipe": {
+                  Row: {
+                    "codigo_hash": string,"criado_em": string,"criado_por": string | null,"email": string,"expira_em": string,"petshop_id": string,"profissional_id": string,"usado_em": string | null,"usado_por": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "codigo_hash": string,"criado_em"?: string,"criado_por"?: string | null,"email": string,"expira_em": string,"petshop_id": string,"profissional_id": string,"usado_em"?: string | null,"usado_por"?: string | null
+                  }
+                  Update: {
+                    "codigo_hash"?: string,"criado_em"?: string,"criado_por"?: string | null,"email"?: string,"expira_em"?: string,"petshop_id"?: string,"profissional_id"?: string,"usado_em"?: string | null,"usado_por"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "convites_equipe_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "convites_equipe_profissional_id_fkey"
+      columns: ["profissional_id"]
+isOneToOne: true
+      referencedRelation: "profissionais"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"creche_atrasos": {
                   Row: {
                     "cobranca_id": string | null,"criado_em": string,"decidido_em": string | null,"decidido_por": string | null,"dia": string,"estadia_id": string,"estado": string,"lancamento_id": string | null,"limite": string,"pet_id": string,"petshop_id": string,"plano_id": string | null,"saiu_em": string,"valor": number | null
@@ -1039,6 +1065,34 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"emails_confirmados": {
+                  Row: {
+                    "confirmado_em": string,"email": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "confirmado_em"?: string,"email": string,"user_id": string
+                  }
+                  Update: {
+                    "confirmado_em"?: string,"email"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"emails_desde": {
+                  Row: {
+                    "desde": string,"email": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "desde"?: string,"email": string,"user_id": string
+                  }
+                  Update: {
+                    "desde"?: string,"email"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"entrada_acessos": {
                   Row: {
                     "entrada_id": string,"minuto": string,"n": number,"tipo": string
@@ -1075,14 +1129,14 @@ isOneToOne: false
                   ]
                 },"entradas": {
                   Row: {
-                    "aceite": string | null,"aceite_hash": string | null,"aceite_assinatura": string | null,"aceite_ip": string | null,"aceite_navegador": string | null,"aceite_nome": string | null,"aceito_em": string | null,"agendamento_id": string | null,"assinaturas": (string)[],"atualizado_em": string,"criado_em": string,"criado_por": string | null,"cuidados": string | null,"devolvido_em": string | null,"devolvido_por": string | null,"estadia_id": string | null,"fotos": (string)[],"id": string,"idoso_doente": boolean,"lesoes": (string)[],"lesoes_obs": string | null,"link_criado_em": string | null,"obs": string | null,"pertences": (string)[],"pertences_outros": string | null,"pet_id": string,"petshop_id": string,"temperamento": (string)[],"termo": string,"token": string | null,"token_expira": string | null
+                    "aceite": string | null,"aceite_assinatura": string | null,"aceite_hash": string | null,"aceite_ip": string | null,"aceite_navegador": string | null,"aceite_nome": string | null,"aceito_em": string | null,"agendamento_id": string | null,"assinaturas": (string)[],"atualizado_em": string,"criado_em": string,"criado_por": string | null,"cuidados": string | null,"devolvido_em": string | null,"devolvido_por": string | null,"estadia_id": string | null,"fotos": (string)[],"id": string,"idoso_doente": boolean,"lesoes": (string)[],"lesoes_obs": string | null,"link_criado_em": string | null,"obs": string | null,"pertences": (string)[],"pertences_outros": string | null,"pet_id": string,"petshop_id": string,"temperamento": (string)[],"termo": string,"token": string | null,"token_expira": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "aceite"?: string | null,"aceite_hash"?: string | null,"aceite_assinatura"?: string | null,"aceite_ip"?: string | null,"aceite_navegador"?: string | null,"aceite_nome"?: string | null,"aceito_em"?: string | null,"agendamento_id"?: string | null,"assinaturas"?: (string)[],"atualizado_em"?: string,"criado_em"?: string,"criado_por"?: string | null,"cuidados"?: string | null,"devolvido_em"?: string | null,"devolvido_por"?: string | null,"estadia_id"?: string | null,"fotos"?: (string)[],"id"?: string,"idoso_doente"?: boolean,"lesoes"?: (string)[],"lesoes_obs"?: string | null,"link_criado_em"?: string | null,"obs"?: string | null,"pertences"?: (string)[],"pertences_outros"?: string | null,"pet_id": string,"petshop_id": string,"temperamento"?: (string)[],"termo"?: string,"token"?: string | null,"token_expira"?: string | null
+                    "aceite"?: string | null,"aceite_assinatura"?: string | null,"aceite_hash"?: string | null,"aceite_ip"?: string | null,"aceite_navegador"?: string | null,"aceite_nome"?: string | null,"aceito_em"?: string | null,"agendamento_id"?: string | null,"assinaturas"?: (string)[],"atualizado_em"?: string,"criado_em"?: string,"criado_por"?: string | null,"cuidados"?: string | null,"devolvido_em"?: string | null,"devolvido_por"?: string | null,"estadia_id"?: string | null,"fotos"?: (string)[],"id"?: string,"idoso_doente"?: boolean,"lesoes"?: (string)[],"lesoes_obs"?: string | null,"link_criado_em"?: string | null,"obs"?: string | null,"pertences"?: (string)[],"pertences_outros"?: string | null,"pet_id": string,"petshop_id": string,"temperamento"?: (string)[],"termo"?: string,"token"?: string | null,"token_expira"?: string | null
                   }
                   Update: {
-                    "aceite"?: string | null,"aceite_hash"?: string | null,"aceite_assinatura"?: string | null,"aceite_ip"?: string | null,"aceite_navegador"?: string | null,"aceite_nome"?: string | null,"aceito_em"?: string | null,"agendamento_id"?: string | null,"assinaturas"?: (string)[],"atualizado_em"?: string,"criado_em"?: string,"criado_por"?: string | null,"cuidados"?: string | null,"devolvido_em"?: string | null,"devolvido_por"?: string | null,"estadia_id"?: string | null,"fotos"?: (string)[],"id"?: string,"idoso_doente"?: boolean,"lesoes"?: (string)[],"lesoes_obs"?: string | null,"link_criado_em"?: string | null,"obs"?: string | null,"pertences"?: (string)[],"pertences_outros"?: string | null,"pet_id"?: string,"petshop_id"?: string,"temperamento"?: (string)[],"termo"?: string,"token"?: string | null,"token_expira"?: string | null
+                    "aceite"?: string | null,"aceite_assinatura"?: string | null,"aceite_hash"?: string | null,"aceite_ip"?: string | null,"aceite_navegador"?: string | null,"aceite_nome"?: string | null,"aceito_em"?: string | null,"agendamento_id"?: string | null,"assinaturas"?: (string)[],"atualizado_em"?: string,"criado_em"?: string,"criado_por"?: string | null,"cuidados"?: string | null,"devolvido_em"?: string | null,"devolvido_por"?: string | null,"estadia_id"?: string | null,"fotos"?: (string)[],"id"?: string,"idoso_doente"?: boolean,"lesoes"?: (string)[],"lesoes_obs"?: string | null,"link_criado_em"?: string | null,"obs"?: string | null,"pertences"?: (string)[],"pertences_outros"?: string | null,"pet_id"?: string,"petshop_id"?: string,"temperamento"?: (string)[],"termo"?: string,"token"?: string | null,"token_expira"?: string | null
                   }
                   Relationships: [
                     {
@@ -2519,6 +2573,7 @@ isOneToOne: false
                     "em"?: string,"id"?: never,"ip"?: string | null,"navegador"?: string | null,"origem"?: string,"user_id"?: string
                   }
                   Relationships: [
+                    
                   ]
                 },"series_agenda": {
                   Row: {
@@ -2689,9 +2744,6 @@ isOneToOne: false
 "admin_aceites":
 { Args: { "p_busca"?: string,"p_limite"?: number }; Returns: Json
                            },
-"admin_registros_acesso":
-{ Args: { "p_email"?: string,"p_limite"?: number,"p_user"?: string }; Returns: Json
-                           },
 "admin_atualizar":
 { Args: { "p_nota"?: string,"p_petshop": string,"p_plano"?: string,"p_status"?: Database["public"]['Enums']["status_assinatura"],"p_teste_ate"?: string }; Returns: undefined
                            },
@@ -2766,6 +2818,9 @@ isOneToOne: false
                            },
 "admin_painel":
 { Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"admin_registros_acesso":
+{ Args: { "p_email"?: string,"p_limite"?: number,"p_user"?: string }; Returns: Json
                            },
 "admin_servidor_estado":
 { Args: Record<PropertyKey, never>; Returns: Json
@@ -3066,6 +3121,17 @@ isOneToOne: false
 "contagens_lista":
 { Args: { "p": string }; Returns: Json
                            },
+"convite_aceitar":
+{ Args: { "p_codigo": string }; Returns: string
+                           },
+"convite_gerar":
+{ Args: { "p_profissional": string }; Returns: string
+                           },
+"convites_situacao":
+{ Args: { "p": string }; Returns: {
+              "expira_em": string,"profissional_id": string,"usado": boolean
+            }[]
+                           },
 "copia_coluna_fora":
 { Args: { "p_coluna": string,"p_tabela": string }; Returns: boolean
                            },
@@ -3242,6 +3308,9 @@ isOneToOne: false
 "em_reais":
 { Args: { "v": number }; Returns: string
                            },
+"email_provar":
+{ Args: Record<PropertyKey, never>; Returns: boolean
+                           },
 "entrada_aceitar":
 { Args: { "p_ip": string,"p_navegador": string,"p_nome": string,"p_token": string }; Returns: Json
                            },
@@ -3261,6 +3330,7 @@ isOneToOne: false
 { Args: { "p_token": string }; Returns: {
               "aceite": string | null,
 "aceite_assinatura": string | null,
+"aceite_hash": string | null,
 "aceite_ip": string | null,
 "aceite_navegador": string | null,
 "aceite_nome": string | null,
@@ -3304,6 +3374,9 @@ isOneToOne: false
                            },
 "entrada_frear":
 { Args: { "p_entrada": string,"p_limite": number,"p_tipo": string }; Returns: undefined
+                           },
+"entrada_hash":
+{ Args: { "p_fotos": (string)[],"p_termo": string }; Returns: string
                            },
 "entrada_link":
 { Args: { "p_fotos": Json,"p_id": string }; Returns: Json
@@ -3426,7 +3499,9 @@ isOneToOne: false
 "codigo": string,
 "escopo": string,
 "id": string,
+"ip": string | null,
 "marcar": string | null,
+"navegador": string | null,
 "pet_id": string,
 "petshop_id": string,
 "retirado_em": string | null,

@@ -57,13 +57,14 @@ async function tratar(req: Request) {
     p_segredo: corpo.secret, p_evento: corpo.event, p_email: email as string,
     p_assinatura: idAssinatura as string,
     p_oferta: texto(oferta?.id) as string,
-    // o link de pagamento leva ?callback=<id do pet shop>: casa a compra com a conta mesmo com outro e-mail
+    // o link de pagamento leva ?callback=<id do pet shop>.<ficha> (assinado): casa a compra com a conta mesmo com outro e-mail
     p_callback: texto(dados.callback) as string,
     // com o produto da Gestão gravado no painel, avisos de outros produtos são ignorados no banco
     p_produto: texto(produto.id) as string,
     p_produto_curto: texto(produto.short_id) as string,
-    // guarda só o necessário para conferir depois (sem documento nem telefone do comprador)
-    p_payload: { oferta: oferta?.id ?? null, assinatura: idAssinatura, pedido: dados.id ?? null, status: dados.status ?? null, produto: produto.short_id ?? produto.id ?? null, valor: dados.amount ?? null, metodo: dados.paymentMethod ?? null } as never,
+    // guarda só o necessário para conferir depois (sem documento nem telefone do comprador). `pago_em`: quando a compra foi
+    // feita; o e-mail do dono só puxa o pagamento se já estava na conta antes disso (migração 20261209)
+    p_payload: { oferta: oferta?.id ?? null, assinatura: idAssinatura, pedido: dados.id ?? null, status: dados.status ?? null, produto: produto.short_id ?? produto.id ?? null, valor: dados.amount ?? null, metodo: dados.paymentMethod ?? null, pago_em: texto(dados.paidAt) ?? texto(dados.createdAt) } as never,
   });
   if (error) { await registrarErroServidor("/api/gestao/cakto", erroDoBanco(error, "cakto_evento")); return NextResponse.json({ ok: false }, { status: 500 }); }
   if (data === "recusado") return NextResponse.json({ ok: false }, { status: 401 });

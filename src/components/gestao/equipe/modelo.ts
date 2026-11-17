@@ -152,19 +152,25 @@ export const erroDeLimite = (e: unknown) => /plano atual permite/i.test(e instan
 export const emailValido = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 export const primeiroNome = (n: string) => n.trim().split(/\s+/)[0] ?? "";
 
-export function linkDoConvite(origem: string, email: string) {
-  return `${origem}/gestao/criar-conta?email=${encodeURIComponent(email.trim().toLowerCase())}`;
+/** Link do convite: o e-mail já vem preenchido e o código (`convite`) é o que liga a conta à equipe. Vale 7 dias, uma vez só. */
+export function linkDoConvite(origem: string, email: string, codigo: string) {
+  return `${origem}/gestao/criar-conta?email=${encodeURIComponent(email.trim().toLowerCase())}&convite=${encodeURIComponent(codigo)}`;
 }
 
-export function textoDoConvite({ nome, petshop, email, origem }: { nome: string; petshop: string; email: string; origem: string }) {
+/** Até quando vale um link de convite ("até 24/11"). */
+export const validadeDoConvite = (quando: string | number | Date) => new Date(quando).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+export function textoDoConvite({ nome, petshop, email, origem, codigo }: { nome: string; petshop: string; email: string; origem: string; codigo: string }) {
   const e = email.trim().toLowerCase();
   return [
     `Oi${primeiroNome(nome) ? `, ${primeiroNome(nome)}` : ""}! Aqui é ${petshop.trim()}. Você agora faz parte da nossa equipe no Maestro Pet Gestão.`,
     "",
     "Para entrar:",
-    `1. Abra este link: ${linkDoConvite(origem, e)}`,
+    `1. Abra este link: ${linkDoConvite(origem, e, codigo)}`,
     `2. Crie a sua conta com ESTE e-mail: ${e}`,
-    "3. Se chegar um e-mail de confirmação, abra o link dele. Pronto, você já entra na equipe.",
+    "3. Pronto, você já entra na equipe. Se você já tem conta no Maestro Pet, é só abrir o link e entrar com ela.",
+    "",
+    "O link vale por 7 dias e só funciona uma vez. Não passe para outra pessoa.",
   ].join("\n");
 }
 

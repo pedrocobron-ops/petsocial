@@ -67,7 +67,7 @@ export default function Comecar() {
       let antes: { user?: string; nome?: string } | null = null;
       try { antes = JSON.parse(localStorage.getItem("maestro-gestao-ultimo-acesso") ?? "null"); } catch { antes = null; }
       if (antes?.user === u.id) setMotivo({ tipo: "retirado", loja: antes.nome });
-      // criou a conta pelo link de um convite, mas nenhum convite bate com este e-mail
+      // criou a conta pelo link de um convite, mas o convite não entrou (link antigo sem código, vencido ou de outro e-mail)
       else if (u.user_metadata?.convidado) setMotivo({ tipo: "sem-convite", email: u.email });
       setPronto(true);
     })();
@@ -129,7 +129,7 @@ export default function Comecar() {
       <Porta titulo={retirado ? "Seu acesso a este pet shop foi retirado" : "Não achei o seu convite"}
         texto={retirado
           ? `Esta conta não está mais ligada ${motivo.loja ? `ao ${motivo.loja}` : "ao pet shop"}. Fale com o dono para ele liberar de novo, em Equipe.`
-          : `Nenhum pet shop convidou o e-mail ${motivo.email ?? "desta conta"}. Peça ao dono para conferir se o convite foi feito para este mesmo e-mail e se você já confirmou o e-mail pelo link que enviamos.`}>
+          : `A conta ${motivo.email ?? ""} foi criada, mas ainda não entrou em nenhuma equipe. Peça ao dono do pet shop para mandar o convite de novo, em Equipe, e abra o link novo: ele vale por 7 dias e é feito para o e-mail ${motivo.email ?? "desta conta"}.`}>
         <div className="g-pilha p">
           {erro && <p className="g-erro" role="alert">{erro}</p>}
           <button type="button" className="g-btn pri cheio" onClick={() => void conferirDeNovo()} disabled={conferindo}>{conferindo ? "Conferindo…" : "O dono já liberou: tentar de novo"}</button>
@@ -182,7 +182,7 @@ export default function Comecar() {
                   </div>
                 </div>
               </details>
-              <p className="g-bv-nota">Aqui você cria um pet shop novo, com 7 dias grátis. Foi convidado para a equipe de um pet shop que já existe? Então não crie outro: peça ao dono para conferir o e-mail do convite.</p>
+              <p className="g-bv-nota">Aqui você cria um pet shop novo, com 7 dias grátis. Foi convidado para a equipe de um pet shop que já existe? Então não crie outro: abra o link do convite que o dono mandou (ou peça para ele mandar de novo).</p>
             </div>
             {erro && <p className="g-erro g-guia-erro" role="alert">{erro}</p>}
             <footer className="g-guia-pe">

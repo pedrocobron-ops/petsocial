@@ -135,10 +135,22 @@ O manual troca sozinho (`textoDaCasa` em `manual.ts`). Interruptor (`role="switc
   de novo. Rota nova do servidor: exporte `comRegistro("/api/gestao/<rota>", tratar)`. Nunca mande corpo de pedido, nome, telefone ou valor.
 - Trocas de status ficam em `petshop_status_hist` (gatilho em `petshops`, migração 20261175); sem regra de RLS, só as funções leem.
 
+## E-mail da conta não prova nada (migração 20261209)
+
+"Confirm email" está desligado no Supabase: qualquer um cria conta com qualquer e-mail. Nada que dá acesso usa só o e-mail:
+- convite da equipe: código no link (`convite_gerar`, só o hash em `convites_equipe`, 7 dias, uso único) e `convite_aceitar`
+  com o e-mail da conta igual ao do convite; `entrar()` só lista os pet shops. Telas: `criar-conta?email=…&convite=…`,
+  `entrar?convite=…`, `equipe/pecas.tsx` (`Convite`, `useLinksDosConvites`);
+- Escola: `meu_email()` só devolve o e-mail provado (`emails_confirmados`, gravado por `email_provar` quando a sessão nasceu de
+  um código ou link mandado para o e-mail depois que ele foi posto na conta);
+- Cakto: ver abaixo.
+
 ## Cakto (assinatura)
 
 - Aviso de pagamento: `src/app/api/gestao/cakto/route.ts` → função `cakto_evento` (casa a loja pela assinatura, pelo `callback` do link
-  = `<id do pet shop>.<ficha>` assinado pelo banco em `assinatura_callback`, pelo e-mail da compra e pelo e-mail do dono) →
+  = `<id do pet shop>.<ficha>` assinado pelo banco em `assinatura_callback` e, por último, pelo e-mail do dono só se esse e-mail
+  já estava na conta antes da compra: `emails_desde`, `pago_em` = paidAt; o `cakto_email` de uma compra antiga não puxa mais
+  compras novas, migração 20261209) →
   `cakto_aplicar` (status, plano, período, `pago_ate`). Por callback ou e-mail, compra para uma conta com outra assinatura em dia
   vira "conflito" (fica em Pagamentos sem conta), e cancelamento/reembolso só vale para a assinatura gravada ou o mesmo pedido.
 - Contagens de uso de IA: Mozart e Ajuda contam no banco (`assistente_contar`, por dia no fuso do pet shop; toda chamada ao

@@ -6,21 +6,29 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Porta from "@/components/gestao/porta";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { DOCUMENTOS, aceiteDoCadastro } from "@/lib/gestao/documentos";
+import { aceitarConvite, lerCodigoDoConvite } from "@/lib/gestao/convite";
 import CampoSenha from "../entrar/campo-senha";
 
-/** `?email=` vem no convite da equipe: o campo já chega preenchido com o e-mail que liga a pessoa ao pet shop. */
+/**
+ * `?email=…&convite=<código>` vêm no link do convite da equipe: o campo já chega preenchido com o e-mail do convite, e o
+ * código (que só a pessoa convidada recebeu) é o que liga a conta ao pet shop depois do cadastro.
+ */
 export default function CriarConta() {
-  return <Suspense fallback={<Formulario emailInicial="" />}><ComConvite /></Suspense>;
+  return <Suspense fallback={<Formulario emailInicial="" codigo="" />}><ComConvite /></Suspense>;
 }
 
 function ComConvite() {
-  const email = (useSearchParams().get("email") ?? "").trim().toLowerCase().slice(0, 254);
-  return <Formulario key={email} emailInicial={email} />;
+  const busca = useSearchParams();
+  const email = (busca.get("email") ?? "").trim().toLowerCase().slice(0, 254);
+  const codigo = lerCodigoDoConvite(busca.get("convite"));
+  return <Formulario key={`${email}:${codigo}`} emailInicial={email} codigo={codigo} />;
 }
 
-function Formulario({ emailInicial }: { emailInicial: string }) {
+function Formulario({ emailInicial, codigo }: { emailInicial: string; codigo: string }) {
   const router = useRouter();
-  const convidado = emailInicial !== "";
+  const convidado = emailInicial !== "" || codigo !== "";
+  const entrarComConvite = codigo ? `/gestao/entrar?convite=${encodeURIComponent(codigo)}` : "/gestao/entrar";
+  const [erroConvite, setErroConvite] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState(emailInicial);
   const [email2, setEmail2] = useState("");
@@ -44,17 +52,37 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
       email: email.trim(), password: senha,
       // `app: "maestro"` deixa o modelo de e-mail do Supabase (projeto dividido com outro app) mostrar a marca certa.
       // `aceite`: as versões dos documentos aceitas aqui; o gatilho do banco grava o aceite quando o login é criado.
-      options: { data: { app: "maestro", nome: nome.trim(), aceite: aceiteDoCadastro(), ...(convidado ? { convidado: true } : {}) }, emailRedirectTo: `${location.origin}/gestao/comecar` },
+      // com confirmação de e-mail ligada, o link do e-mail volta para a tela de entrar com o código, que aceita o convite
+      options: { data: { app: "maestro", nome: nome.trim(), aceite: aceiteDoCadastro(), ...(convidado ? { convidado: true } : {}) }, emailRedirectTo: codigo ? `${location.origin}${entrarComConvite}` : `${location.origin}/gestao/comecar` },
     });
-    setIndo(false);
     if (error) {
-      setErro(/registered|already/i.test(error.message) ? "Este e-mail já tem conta. Entre ou recupere a senha."
+      setIndo(false);
+      setErro(/registered|already/i.test(error.message) ? (codigo ? "Este e-mail já tem conta. Toque em Entrar, logo abaixo, e entre com ela para aceitar o convite." : "Este e-mail já tem conta. Entre ou recupere a senha.")
         : /password/i.test(error.message) ? "Escolha uma senha mais forte, com pelo menos 8 caracteres."
         : "Não consegui criar a conta agora. Tente de novo em instantes.");
       return;
     }
+    if (data.session && codigo) {
+      const r = await aceitarConvite(banco(), codigo);
+      setIndo(false);
+      if ("erro" in r) { setErroConvite(r.erro); return; }
+      router.replace("/gestao/app");
+      return;
+    }
+    setIndo(false);
     if (data.session) router.replace("/gestao/comecar");
     else setConfirmar(true);
+  }
+
+  if (erroConvite) {
+    return (
+      <Porta titulo="A conta foi criada, mas o convite não entrou" texto={erroConvite}>
+        <div className="g-pilha p">
+          <p className="g-muted g-p">Peça ao dono do pet shop para mandar o convite de novo, em Equipe. Depois é só abrir o link novo: a sua conta já está pronta.</p>
+          <Link className="g-btn sec cheio" href="/gestao/comecar">Continuar sem o convite</Link>
+        </div>
+      </Porta>
+    );
   }
 
   if (confirmar) {
@@ -74,7 +102,7 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
         </label>
         <label className="g-campo"><span>E-mail</span>
           <input className="g-input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-          {convidado && <small>{email.trim().toLowerCase() === emailInicial ? "Use este e-mail: é ele que liga a sua conta ao pet shop." : `O convite foi feito para ${emailInicial}. Com outro e-mail, você não entra na equipe.`}</small>}
+          {convidado && emailInicial && <small>{email.trim().toLowerCase() === emailInicial ? "Use este e-mail: o convite foi feito para ele." : `O convite foi feito para ${emailInicial}. Com outro e-mail, você não entra na equipe.`}</small>}
         </label>
         {!convidado && (
           <label className="g-campo"><span>Digite o e-mail de novo</span>
@@ -97,7 +125,7 @@ function Formulario({ emailInicial }: { emailInicial: string }) {
         {erro && <p className="g-erro" role="alert">{erro}</p>}
         <button className="g-btn pri cheio" disabled={indo}>{indo ? "Criando…" : "Criar minha conta"}</button>
       </form>
-      <p className="g-muted g-p">Já tem conta? <Link className="g-link" href="/gestao/entrar">Entrar</Link></p>
+      <p className="g-muted g-p">Já tem conta? <Link className="g-link" href={entrarComConvite}>{codigo ? "Entrar e aceitar o convite" : "Entrar"}</Link></p>
     </Porta>
   );
 }

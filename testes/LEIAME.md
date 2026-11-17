@@ -37,6 +37,7 @@ Configuração por variável (todas opcionais):
 | `BASE_URL` | `http://localhost:3214` | servidor do Next |
 | `SUPABASE_URL`, `SUPABASE_KEY` | do `.env.local` (`NEXT_PUBLIC_SUPABASE_URL`, `..._PUBLISHABLE_KEY`) | API do Supabase |
 | `DB_CONTAINER` | `supabase_db_petsocial` | SQL de preparo e conferência (`docker exec … psql`) |
+| `AUTH_CONTAINER` | `DB_CONTAINER` com `_auth_` no lugar de `_db_` | segredo do Auth local para gerar o código do e-mail (`seguranca-email.js`) |
 | `DATABASE_URL` | — | se definida, o SQL vai por `psql $DATABASE_URL` em vez do docker |
 | `PLAYWRIGHT` | procura `playwright` no Node e em `/opt/node-tools` | caminho do pacote Playwright |
 | `TZ` | `America/Sao_Paulo` (o executor põe) | as funções do app usam o fuso da máquina |
@@ -198,6 +199,16 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `cakto.js`: webhook da Cakto de ponta a ponta pela rota do servidor: 9 ofertas, ciclo da assinatura (renovada, atrasada, recuperada,
   cancelada), reembolso, contestação, MED, segredo errado, outro produto, e-mail diferente (callback e pagamento sem conta), Escola.
   A configuração da Cakto (`config_interna`) é guardada antes e devolvida igual no fim.
+- `seguranca-email.js`: e-mail da conta não prova nada ("Confirm email" desligado; migração 20261209). Convite da equipe: só o dono
+  gera o código (`convite_gerar`; recepção, outro dono e anônimo recusados; só o hash no banco; 7 dias); quem cria conta com o e-mail
+  do convite **sem o código não entra** (`entrar()` não liga mais pelo e-mail); código inventado, de outro e-mail, antigo (gerou de
+  novo), vencido e já usado (outra conta) recusados; o certo entra uma vez (a mesma pessoa de novo só confirma); trocar o e-mail ou
+  tirar o acesso invalida o código; convite antigo sem código aparece sem link em `convites_situacao` e entra depois de mandar de
+  novo. Escola: conta nova com o e-mail da compra (só senha) não vê a compra (`meu_email()` vazio, `email_provar` falso); com o código
+  do e-mail (gerado pela API de administrador do Auth local, com a chave assinada pelo segredo do contêiner `AUTH_CONTAINER`, padrão
+  `supabase_auth_petsocial`) vê; quem prova o próprio e-mail e depois troca para o da compradora não vê. Cakto: compra de antes da conta
+  existir ou do e-mail ser posto na conta fica "sem_conta"; o `cakto_email` de uma compra antiga não puxa compra nova; o callback
+  assinado liga com outro e-mail; pela rota, o `paidAt` chega como `pago_em`. Mexe em `config_interna` e devolve no fim, como `cakto.js`.
 - `erros.js`: registro de erros (migração 20261180): ninguém lê as tabelas; funções do painel só para o admin; papel e áreas vêm do
   banco; limpeza e limites no banco; repetição junta (mesmo aparelho e versão, 10 min); freio por aparelho (30/min), por pet shop
   (60/min) e geral (1000/h, posto no limite durante o teste e devolvido); sem internet só conta; resolvido some e volta numa versão
@@ -427,6 +438,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   porte, Tempo total e Total, o banco com o principal e os 3 a mais, a agenda, a conta de R$ 145,00 e a comissão por serviço ao centavo);
   em 1366, tirar o primeiro (o seguinte assume), alterar um horário com três serviços, pet sem porte; tosador sem nenhum valor na tela
   (o banco põe o preço da lista) e preço travado para a recepção.
+- `convite.js`: convite da equipe pelo link com código (migração 20261209), em 390: na Equipe, convite antigo sem código aparece com
+  "Mande o convite de novo"; "Mandar de novo" mostra o texto com `criar-conta?email=…&convite=<código>` (7 dias, uma vez), o mesmo no
+  WhatsApp, o hash no banco, e o cartão passa a mostrar "link vale até dd/mm"; a pessoa abre o link, cria a conta e cai direto no
+  pet shop; quem já tem conta abre `entrar?convite=…`, entra e fica na equipe; o mesmo link com outra conta mostra "O convite não
+  entrou" e não liga nada.
 - `primeiro-acesso.js`: dono novo do zero (criar conta, duas perguntas, "Começar já") até o primeiro resultado: no fim do guia
   "Pronto em X minutos", "Marcar o primeiro horário" (botão principal) e "Copiar meu link de agendamento"; o link copiado em 7
   toques e 4 campos; o primeiro horário (pet novo cadastrado na própria folha) em até 13 toques e 7 campos, com "Pronto em X

@@ -74,12 +74,14 @@ async function criarLoja(T, o = {}) {
   }
   L.preco = (servico, porte) => PRECOS[servico][{ P: 0, M: 1, G: 2, GG: 3 }[porte] ?? 4];
 
-  // equipe: convite pelo e-mail e cadastro de cada um (o convite liga o login à loja)
+  // equipe: convite pelo e-mail com o código do link (convite_gerar), cadastro de cada um e convite_aceitar com o código
   if (o.equipe !== false) {
     for (const [papel, e] of Object.entries(EQUIPE)) {
       L.emails[papel] = mail(papel);
       L.ids[papel] = B.must(await L.sb.dono.from('profissionais').insert({ petshop_id: L.P, nome: e.nome, email_convite: L.emails[papel], acessos: e.acessos, ve_financeiro: e.ve, funcao: e.funcao, papel: 'funcionario', atende: !!e.atende }).select('id').single(), 'convite ' + papel).id;
+      const codigo = B.must(await L.sb.dono.rpc('convite_gerar', { p_profissional: L.ids[papel] }), 'código do convite ' + papel);
       L.sb[papel] = await cadastrar(L.emails[papel]);
+      B.must(await L.sb[papel].rpc('convite_aceitar', { p_codigo: codigo }), 'aceitar convite ' + papel);
       const v = B.must(await L.sb[papel].rpc('entrar'), 'entrar ' + papel);
       if (!v.some((x) => x.petshop_id === L.P)) throw new Error('o convite não ligou ' + papel);
     }
