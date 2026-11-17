@@ -211,6 +211,17 @@ const soma = (P) => B.sql(`select coalesce(sum(case when tipo='entrada' then val
   const nomeZ = B.sql(`select nome from petshops where id='${Z.P}'`);
   const foto = `${Z.P}/${B.uuid()}.jpg`;
   B.must(await Z.sb.dono.storage.from('pets').upload(foto, new Blob([Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])], { type: 'image/jpeg' }), { contentType: 'image/jpeg' }), 'foto');
+  // loja com movimento de verdade: horário com profissional e pacote, caixa fechado com lançamento (as ligações entre
+  // tabelas da mesma loja travavam a exclusão antes de 20261213)
+  B.sql(`with pr as (select id from profissionais where petshop_id='${Z.P}' order by criado_em limit 1),
+    pc as (insert into pacotes (petshop_id, nome, servico_id, quantidade, preco) values ('${Z.P}', 'Pacote 4 banhos', '${Z.S.Banho}', 4, 200) returning id),
+    pk as (insert into pacotes_clientes (petshop_id, pet_id, pacote_id, nome, servico_id, total) select '${Z.P}', '${Z.pets.Thor}', pc.id, 'Pacote 4 banhos', '${Z.S.Banho}', 4 from pc returning id),
+    cx as (insert into caixas (petshop_id, valor_inicial) values ('${Z.P}', 0) returning id)
+    insert into agendamentos (petshop_id, pet_id, servico_id, profissional_id, pacote_cliente_id, inicio, fim)
+    select '${Z.P}', '${Z.pets.Thor}', '${Z.S.Banho}', pr.id, pk.id, now() - interval '2 hours', now() - interval '1 hour' from pr, pk`);
+  B.sql(`insert into lancamentos (petshop_id, tipo, valor, categoria, descricao, data, pago, forma, caixa_id)
+    select '${Z.P}', 'entrada', 50, 'Banho e tosa', 'Banho', current_date, true, 'pix', id from caixas where petshop_id='${Z.P}' limit 1`);
+  B.sql(`update caixas set fechado_em = now() where petshop_id='${Z.P}'`);
   B.must(await Z.sb.dono.rpc('conta_exclusao_pedir', { p_petshop: Z.P, p_nome: nomeZ }), 'pedir');
   const x0 = await F.faxinaGeral(svc, Z.P);
   T.ok('antes do prazo a faxina não apaga', x0.contas === 0 && B.num(`select count(*) from petshops where id='${Z.P}'`) === 1, x0);
