@@ -7,7 +7,7 @@ import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { lancarAReceber, parteDaChave } from "@/lib/gestao/dinheiro";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import {
-  LADO_DA_FOTO, MAX_BYTES_PDF, MAX_IMAGENS, MAX_PAGINAS_PDF, MAX_PDFS, TIPOS_DA_PAGINA,
+  BUCKET_CADERNO_TMP, LADO_DA_FOTO, LIMITE_DO_ENVIO, MAX_BYTES_PDF, MAX_IMAGENS, MAX_PAGINAS_PDF, MAX_PDFS, TIPOS_DA_PAGINA,
   type AreaLida, type Leitura, type RespostaCaderno, type TipoCuidado, type TipoDaPagina,
 } from "@/lib/gestao/caderno";
 import { AREAS_DE_SERVICO, areaDoServico, areasDeServicoPara, categoriaDaArea } from "@/lib/gestao/modulos";
@@ -29,10 +29,15 @@ type ClienteJa = { id: string; nome: string; telefone: string | null; obs: strin
 type PetJa = { id: string; cliente_id: string; nome: string; raca: string | null; porte: string | null };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
+/** uuid v4 (o nome do arquivo na pasta temporária); randomUUID só existe em https */
+const uuid = () => (typeof crypto.randomUUID === "function" ? crypto.randomUUID()
+  : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b, i) => (i === 6 ? (b & 15) | 64 : i === 8 ? (b & 63) | 128 : b).toString(16).padStart(2, "0")).join("").replace(/^(.{8})(.{4})(.{4})(.{4})/, "$1-$2-$3-$4-"));
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 const PORTES = ["", "P", "M", "G", "GG"];
 const NOME_PORTE: Record<string, string> = { preco_p: "P", preco_m: "M", preco_g: "G", preco_gg: "GG" };
 
+/** Foto HEIC (o formato das fotos do iPhone): só abre onde o navegador sabe abrir (Safari). */
+const ehHeic = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
 /** Diminui a foto no aparelho (lado maior 1600 px, JPEG): a leitura fica igual e o envio fica leve. HEIC só abre onde o navegador sabe abrir. */
 async function paraJpeg(f: File): Promise<Blob> {
   const url = URL.createObjectURL(f);
@@ -69,7 +74,8 @@ async function paginasDoPdf(f: File): Promise<number> {
  * Trazer do caderno ou do outro sistema: foto do caderno, print de tela ou PDF exportado. A IA lê no servidor, a pessoa confere
  * cada linha aqui (corrige, desmarca, junta com quem já existe) e nada é salvo antes de "Salvar N itens".
  * O que é salvo vai pelos caminhos de sempre: clientes e pets como na planilha, "Anotar o que X deve" (com o dia em que
- * começou) e horários da agenda (só os de hoje em diante). Os arquivos não são guardados.
+ * começou) e horários da agenda (só os de hoje em diante). Os arquivos não são guardados (PDF grande passa pela pasta temporária
+ * caderno-tmp e é apagado logo depois de ler).
  */
 export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: {
   aoFechar: () => void; aoTerminar?: () => void; tipoInicial?: TipoDaPagina;
@@ -139,7 +145,11 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
           const b = await paraJpeg(f);
           nImg++;
           novos.push({ id: uid(), nome: f.name || "Foto", pdf: false, blob: b, previa: URL.createObjectURL(b), paginas: 1 });
-        } catch { problemas.push(`Não consegui abrir “${f.name || "a foto"}”. Tire a foto de novo pela câmera ou mande um print.`); }
+        } catch {
+          problemas.push(ehHeic(f)
+            ? `“${f.name || "A foto"}” está em HEIC, o formato das fotos do iPhone, e este navegador não abre esse formato. Abra o Maestro no Safari do iPhone e mande de lá, ou tire um print da foto e mande o print.`
+            : `Não consegui abrir “${f.name || "a foto"}”. Tire a foto de novo pela câmera ou mande um print.`);
+        }
       }
     }
     setArqs((a) => [...a, ...novos]);
@@ -156,13 +166,28 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
     if (!tipo || !arqs.length || somenteLeitura()) return;
     if (cota && paginas > cota.restam) { setErro(cota.restam ? `Hoje ainda dá para ler ${plural(cota.restam, "página", "páginas")}. Tire alguma foto ou página da lista, ou continue amanhã.` : `Hoje já foram lidas as ${cota.limite} páginas do dia. Amanhã dá para ler mais.`); return; }
     setErro(null); setEtapa("lendo");
+    const temporarios: string[] = [];
     try {
       const { data } = await sb.auth.getSession();
+      // envio grande demais para mandar de uma vez (a Vercel recusa acima de ~4,5 MB): os PDFs maiores sobem antes para a
+      // pasta temporária e vão só pelo caminho; o servidor lê e apaga logo depois de ler
+      const subir = new Set<string>();
+      let total = arqs.reduce((t, a) => t + a.blob.size, 0);
+      for (const a of [...arqs].filter((x) => x.pdf).sort((x, y) => y.blob.size - x.blob.size)) {
+        if (total <= LIMITE_DO_ENVIO) break;
+        const caminho = `${petshop.id}/${uuid()}.pdf`;
+        const up = await sb.storage.from(BUCKET_CADERNO_TMP).upload(caminho, a.blob, { contentType: "application/pdf", upsert: false });
+        if (up.error) break; // sem a pasta (banco antes da atualização): vai junto, como antes
+        temporarios.push(caminho); subir.add(a.id); total -= a.blob.size;
+      }
       const form = new FormData();
       form.set("petshopId", petshop.id);
       form.set("tipo", tipo);
-      form.set("paginas", arqs.filter((a) => a.pdf).map((a) => a.paginas).join(","));
-      arqs.forEach((a) => form.append("arquivo", a.blob, a.pdf ? a.nome : `${a.id}.jpg`));
+      form.set("paginas", arqs.filter((a) => a.pdf && !subir.has(a.id)).map((a) => a.paginas).join(","));
+      arqs.forEach((a) => { if (!subir.has(a.id)) form.append("arquivo", a.blob, a.pdf ? a.nome : `${a.id}.jpg`); });
+      const subidos = arqs.filter((a) => subir.has(a.id));
+      subidos.forEach((a, i) => form.append("caminho", temporarios[i]));
+      if (subidos.length) form.set("paginas_caminho", subidos.map((a) => a.paginas).join(","));
       const [r, existentes] = await Promise.all([
         fetch("/api/gestao/caderno", { method: "POST", headers: { authorization: `Bearer ${data.session?.access_token ?? ""}` }, body: form }),
         lerExistentes(),
@@ -183,6 +208,9 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
     } catch (e) {
       setErro(mensagemDeErro(e));
       setEtapa("escolher");
+    } finally {
+      // o servidor já apagou; se o pedido caiu antes, apaga daqui (o que sobrar sai na faxina, depois de uma hora)
+      if (temporarios.length) void sb.storage.from(BUCKET_CADERNO_TMP).remove(temporarios).then(() => null, () => null);
     }
   }
 
@@ -702,7 +730,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
               </ul>
             )}
           </div>
-          <p className="g-cad-privado"><Lock aria-hidden />As fotos e arquivos servem só para a leitura: não ficam guardados em lugar nenhum.</p>
+          <p className="g-cad-privado"><Lock aria-hidden />As fotos e arquivos servem só para a leitura: não ficam guardados. PDF grande passa por uma pasta reservada e é apagado logo depois de ler.</p>
           {cota && (
             <p className="g-muted g-pp" data-cota>
               {cota.restam > 0 ? `Hoje ainda dá para ler ${plural(cota.restam, "página", "páginas")} (cada foto, print ou página de PDF conta uma).` : `Hoje já foram lidas as ${cota.limite} páginas do dia. Amanhã dá para ler mais.`}

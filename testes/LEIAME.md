@@ -185,8 +185,23 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   ".jpg" que não é foto, PDF acima de 10 MB e de 25 páginas (413), 6 fotos ou 3 PDFs (400), sem arquivo. Limite do dia por pet shop
   (`caderno_dia`, padrão 30; a contagem da loja sobe até faltar uma) com quanto resta, e o geral (`caderno_dia_geral`, posto logo
   acima do lido hoje durante o teste e devolvido); ninguém lê a tabela de uso e ela não tem texto. Dívida com "desde" pelo mesmo
-  `lancarAReceber` da tela, duas vezes ao mesmo tempo com a mesma chave: uma conta só; o tosador não anota. Precisa do servidor com
+  `lancarAReceber` da tela, duas vezes ao mesmo tempo com a mesma chave: uma conta só; o tosador não anota. **Leitura que falha não
+  conta** (migração 20261195, `caderno_reservar`/`caderno_devolver`; o campo `teste_falha` só vale com `GESTAO_CADERNO_FALSO=1`):
+  erro do modelo 502 e recusa 422 devolvem as páginas; a reserva nunca volta para o aparelho; outro pet shop e anônimo não devolvem;
+  devolver duas vezes não tira mais nada; duas leituras ao mesmo tempo na última página: uma passa. **PDF grande pela pasta
+  temporária** (`caderno-tmp`): PDF de 6 MB sobe e vai só pelo caminho, lido e apagado logo depois; o que não é PDF 415 e apagado;
+  estoque, outro pet shop, anônimo, nome fora do padrão e outro tipo não sobem; pasta de outro pet shop 400. Precisa do servidor com
   `GESTAO_CADERNO_FALSO=1`.
+- `hoje.js`: tela Hoje numa ida só ao banco (migração 20261195, `gestao_hoje`): cada parte igual à leitura antiga pela API
+  (agenda de hoje com pet, tutor, serviços a mais e profissional; preços por `agendamentos_precos`; amanhã; estadias; semana;
+  serviços mais pedidos na mesma ordem; próximos; sem fechar; contagens; produtos acabando; o que entrou; contas; últimos 7 dias;
+  saúde vencendo; check-outs sem cobrança; concluídos de hoje sem cobrança) para dono, recepção, monitora, tosador e estoque,
+  com estoque, dinheiro e pacotes só para quem tem a área; anônimo recusado; dono de outra loja não lê nada.
+- `faxina.js`: faxina agendada (migração 20261195): rota `/api/gestao/faxina` recusada sem o segredo (401; 503 no servidor de teste,
+  que não tem `GESTAO_FAXINA_SEGREDO`), segredo pelo `Authorization: Bearer` (Vercel Cron) ou `x-gestao-faxina`; as funções só com a
+  chave de serviço; a tarefa `gestao-faxina-diaria` no pg_cron (quando o banco tem); `faxinaGeral` com a chave de serviço local
+  (`SUPABASE_SERVICE_ROLE_KEY` ou `npx supabase status -o env`), só na loja de teste: foto do boletim sem boletim há mais de um dia
+  sai, a de agora fica; PDF do caderno-tmp com mais de uma hora sai, o de agora fica; o de outro pet shop fica.
 - `visitas.js`: última visita de cada pet: a função do banco (`visitas_dos_pets`) = a conta do navegador, para o dono e para o tosador.
 - `lucro.js`: **Quanto sobrou** e **Por pessoa** (migração 20261193: `lucro_do_periodo`, `equipe_do_periodo`, `servicos.custo_material`,
   `lancamentos.vendido_por`), lançando pelo mesmo código das telas e montando por `src/lib/gestao/lucro.ts`. Conta do Thor (Banho 60 +
@@ -245,7 +260,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   R$ 50 da Joana sem data, nada no caixa, Thor marcado no dia +3 às 10:00 uma vez só. 1366: Tabela de preços ("Atualizar o preço de
   Banho M de R$ 60,00 para R$ 55,00?", Hidratação "Igual ao que já está", Banho de ofurô novo: no banco, só o M muda e o novo entra
   uma vez) e "Ler a carteirinha" do Thor (Antirrábica em branco com "Definir vencimento"; três cuidados uma vez só, com a
-  veterinária nas observações). Capturas em `testes/saida/caderno-*.png`.
+  veterinária nas observações). Foto HEIC que o Chromium não abre: o aviso diz para mandar pelo Safari ou tirar um print. PDF de 5 MB:
+  sobe antes para o `caderno-tmp`, o envio à rota fica pequeno, a leitura vem e nada fica na pasta. Capturas em `testes/saida/caderno-*.png`.
 - `mozart-fila.js`: escrever enquanto o Mozart responde (o servidor do Mozart vira um roteiro lento com `page.route`): depois do
   "Pode fazer", o Enter põe a mensagem na conversa com "Na fila" e ela vai sozinha, uma vez, quando ele termina; se a resposta trouxer
   um cartão para confirmar, a mensagem volta para a caixa com o aviso e o cartão não é descartado.
@@ -309,6 +325,15 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   o próximo, sem telefone do tutor, sem rolagem para o lado) e o álbum na ficha do pet com o link para o tutor. Capturas em
   `testes/saida/boletim-*.png` e `album-390.png`.
 
+## Variáveis do servidor de produção (não precisa para os testes)
+
+A faxina diária (`/api/gestao/faxina`, `vercel.json` → crons, todo dia às 07:23 UTC) precisa, na Vercel:
+`SUPABASE_SERVICE_ROLE_KEY` (chave de serviço do Supabase; só esta rota usa, nunca vai para o navegador),
+`GESTAO_FAXINA_SEGREDO` (32+ caracteres aleatórios) e `CRON_SECRET` com **o mesmo valor** (a Vercel Cron manda
+`Authorization: Bearer <CRON_SECRET>`). Sem elas a rota responde 503 e não faz nada. A faxina do banco (álbuns vencidos,
+freios antigos, reservas do caderno) também roda pelo pg_cron (`gestao-faxina-diaria`, 06:17 UTC) quando o banco tem pg_cron.
+Para testar a rota à mão: `curl -H "x-gestao-faxina: <segredo>" https://…/api/gestao/faxina` (devolve só quantidades).
+
 ## Resultados que são assim de propósito
 
 - **Ninguém lê preço direto das tabelas** (`agendamentos.preco`, `servicos.preco_*`, `produtos.preco_venda/custo`, diárias, `opcoes`…):
@@ -360,6 +385,11 @@ Nenhum no momento. (O freio de envios do link, que a 20261168 e a 20261173 tinha
 Medido em 15/11/2026 (servidor já no ar, banco local): `npm run test:tudo` levou 193 a 206 s em quatro rodadas seguidas, 588
 conferências em 15 arquivos. Por parte: unidade + banco ~60 s, migrações ~9 s, telas ~130 s (o passeio sozinho ~110 s).
 Duas rodadas seguidas passaram sem limpar nada entre elas (cada teste cria e apaga a sua loja).
+
+Tela Hoje (migração 20261195), medida em 17/11/2026 com o Playwright e 150 ms de latência em cada pedido (dono, loja com banho,
+creche, hotel e loja, 3 horários hoje; três aberturas em 390 e três em 1366): antes, 40 a 44 pedidos ao Supabase, a frase do Mozart
+em 1,56 a 1,71 s e a rede quieta em 1,78 a 2,72 s; depois, 24 a 26 pedidos, a frase em 0,73 a 0,83 s e a rede quieta em 1,58 a 2,08 s
+(o que fica: a abertura do aplicativo, a creche, os pedidos do link e o que vem abaixo da dobra depois do primeiro olhar).
 
 Cuidado com banco compartilhado: `link.js` e `cakto.js` mudam `config_interna` (global) durante alguns segundos e devolvem no fim.
 Outro processo testando o link ou a Cakto no mesmo banco ao mesmo tempo pode ver esses valores.

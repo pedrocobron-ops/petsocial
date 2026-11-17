@@ -66,6 +66,7 @@ Sistema por assinatura para pet shops, dentro deste site. Fica fora do Google (`
 | `/gestao/agendar/<código>` | Link público de agendamento: o tutor pede um horário e a equipe aceita ou recusa (liga em Meu pet shop) |
 | `/api/gestao/assistente` | O Mozart (assistente): entende o pedido, consulta e propõe ações; só grava depois do "Confirmar" |
 | `/api/gestao/cakto` | Aviso de pagamento da Cakto (webhook): libera ou bloqueia a assinatura |
+| `/api/gestao/faxina` | Faxina diária (Vercel Cron, `vercel.json`): fotos do boletim sem boletim, PDFs esquecidos do caderno-tmp e a faxina do banco. Só com o segredo |
 
 Como as telas são feitas: `src/components/gestao/LEIAME.md`. Banco (tabelas e regras de acesso): `supabase/migrations/`.
 
@@ -81,6 +82,9 @@ Como as telas são feitas: `src/components/gestao/LEIAME.md`. Banco (tabelas e r
 | `GESTAO_ASSISTENTE_LIMITE_DIA` | Pedidos ao Mozart por pet shop por dia (padrão 150) |
 | `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO`, `_EQUIPE`, `_PETSHOP` | Link do checkout mensal de cada plano na Cakto. Com `_3` ou `_6` no fim (ex.: `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO_6`), o link do plano de 3 ou 6 meses. Os planos e preços ficam em `src/lib/gestao/planos.ts` |
 | `GESTAO_CAKTO_PRODUTO` | Id do produto na Cakto: eventos de outros produtos são ignorados |
+| `SUPABASE_SERVICE_ROLE_KEY` | Chave de serviço do Supabase (Project Settings → API). Segredo, só no servidor: só a rota `/api/gestao/faxina` usa. Sem ela, a faxina dos arquivos não roda (a do banco segue pelo pg_cron) |
+| `GESTAO_FAXINA_SEGREDO` | Segredo da rota da faxina (32 caracteres ou mais, aleatório). Ponha **o mesmo valor** em `CRON_SECRET`: a Vercel Cron manda `Authorization: Bearer <CRON_SECRET>`. Também vale o cabeçalho `x-gestao-faxina` |
+| `CRON_SECRET` | O mesmo valor de `GESTAO_FAXINA_SEGREDO` (a Vercel manda nos pedidos da Cron) |
 
 ### Para colocar no ar
 

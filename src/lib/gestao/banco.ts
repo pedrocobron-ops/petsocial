@@ -345,6 +345,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"caderno_reservas": {
+                  Row: {
+                    "criado_em": string,"dia": string,"id": string,"paginas": number,"petshop_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "criado_em"?: string,"dia": string,"id"?: string,"paginas": number,"petshop_id": string
+                  }
+                  Update: {
+                    "criado_em"?: string,"dia"?: string,"id"?: string,"paginas"?: number,"petshop_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "caderno_reservas_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"caderno_uso": {
                   Row: {
                     "dia": string,"leituras": number,"paginas": number,"petshop_id": string
@@ -2219,6 +2239,12 @@ isOneToOne: false
 "caderno_contar":
 { Args: { "p_paginas": number,"p_petshop": string }; Returns: Json
                            },
+"caderno_devolver":
+{ Args: { "p_reserva": string }; Returns: Json
+                           },
+"caderno_reservar":
+{ Args: { "p_paginas": number,"p_petshop": string }; Returns: Json
+                           },
 "caixa_alteracoes":
 { Args: { "p_caixa": string }; Returns: number
                            },
@@ -2616,6 +2642,15 @@ isOneToOne: false
                            },
 "gestao_contagens":
 { Args: { "p": string }; Returns: Json
+                           },
+"gestao_faxina_arquivos":
+{ Args: { "p_limite"?: number,"p_petshop"?: string }; Returns: Json
+                           },
+"gestao_faxina_banco":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"gestao_hoje":
+{ Args: { "a": Json,"p": string }; Returns: Json
                            },
 "google_link_valido":
 { Args: { "p": string }; Returns: string

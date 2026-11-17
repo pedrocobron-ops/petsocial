@@ -50,6 +50,11 @@ export async function ajustesDoFaturamento(sb: Banco, petshopId: string, de: str
     lerTudo<{ id: string; valor: number; criado_em: string; lancamento_id: string | null; cliente_id: string }>((a, b, contar) => sb.from("clientes_creditos").select("id, valor, criado_em, lancamento_id, cliente_id", contando(contar)).eq("petshop_id", petshopId)
       .gte("criado_em", deIsoDia(de).toISOString()).lt("criado_em", somaDias(deIsoDia(ate), 1).toISOString()).order("criado_em").order("id").range(a, b)).catch(() => []),
   ]);
+  return montarAjustes(devolucoes, creditos);
+}
+
+/** A conta dos ajustes com as linhas já lidas (devoluções pagas e movimento de crédito do período). */
+export function montarAjustes(devolucoes: { valor: number; data: string; cliente_id: string | null }[], creditos: { valor: number; criado_em: string; lancamento_id: string | null; cliente_id: string }[]): AjustesDoFaturamento {
   const x: AjustesDoFaturamento = { devolvido: 0, devolucoes: devolucoes.length, creditoDeixado: 0, creditoUsadoFora: 0, porDia: new Map(), porCliente: new Map() };
   const somar = (dia: string, cliente: string | null, v: number) => {
     x.porDia.set(dia, real((x.porDia.get(dia) ?? 0) + v));

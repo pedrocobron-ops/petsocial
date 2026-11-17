@@ -120,6 +120,34 @@ const nb = (s) => (s ?? '').replace(/ /g, ' ');
     T.ok('Banho de ofurô novo uma vez só: R$ 35 em todos os portes, 40 min', B.num(`select count(*) from servicos where petshop_id='${P}' and nome='Banho de ofurô'`) === 1 && precos('Banho de ofurô') === '35.00|35.00|35.00|35.00|40', precos('Banho de ofurô'));
     await folha.locator('button', { hasText: 'Pronto' }).click();
 
+    T.secao('1366: foto HEIC e PDF grande (migração 20261195)');
+    await page.waitForTimeout(400);
+    await page.locator('button', { hasText: 'Foto do caderno' }).click();
+    const f3 = page.locator('.g-folha');
+    await f3.locator('.g-cad-tipo', { hasText: 'Clientes e pets' }).click();
+    // uma "foto do iPhone" que o Chromium não abre
+    await f3.locator('input[type=file][multiple]').setInputFiles({ name: 'IMG_0001.HEIC', mimeType: 'image/heic', buffer: Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypheic'), Buffer.alloc(400, 1)]) });
+    await f3.locator('.g-aviso.vermelho').waitFor({ timeout: 10000 });
+    T.ok('HEIC que o navegador não abre: diz o que fazer (Safari ou print)', /HEIC.*iPhone.*Safari.*print/s.test(nb(await f3.locator('.g-aviso.vermelho').innerText())), await f3.locator('.g-aviso.vermelho').innerText());
+    // PDF de 5 MB: passa do limite de envio da Vercel (~4,5 MB), sobe antes para a pasta temporária
+    const pdf = Buffer.concat([Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n', 'latin1'), Buffer.alloc(5 * 1024 * 1024, 32)]);
+    await f3.locator('input[type=file][multiple]').setInputFiles({ name: 'lista-do-sistema.pdf', mimeType: 'application/pdf', buffer: pdf });
+    await f3.locator('.g-cad-arqs li').first().waitFor({ timeout: 15000 });
+    const subidas = [], envios = [];
+    const ouvir = (rq) => {
+      if (/\/storage\/v1\/object\/caderno-tmp\//.test(rq.url()) && rq.method() === 'POST') subidas.push(rq.url());
+      if (/\/api\/gestao\/caderno$/.test(rq.url())) envios.push(rq.postDataBuffer()?.length ?? 0);
+    };
+    page.on('request', ouvir);
+    await lerEEsperar(page);
+    page.off('request', ouvir);
+    T.ok('o PDF subiu antes para a pasta temporária e o envio foi pequeno', subidas.length === 1 && envios.length === 1 && envios[0] < 1024 * 1024, { subidas: subidas.length, envio: envios[0] });
+    T.ok('a leitura veio (a conferência aparece)', (await f3.locator('.g-cad-secao').count()) > 0);
+    await page.waitForTimeout(500);
+    T.ok('nada ficou na pasta temporária (apagado logo depois de ler)', B.num(`select count(*) from storage.objects where bucket_id = 'caderno-tmp' and name like '${P}/%'`) === 0);
+    await f3.locator('.g-folha-x, button[aria-label="Fechar"]').first().click().catch(() => {});
+    await page.waitForTimeout(400);
+
     T.secao('1366: carteirinha do Thor');
     await N.ir(page, `/gestao/app/clientes?pet=${L.pets.Thor}`);
     await page.locator('button', { hasText: 'Ler a carteirinha' }).click();

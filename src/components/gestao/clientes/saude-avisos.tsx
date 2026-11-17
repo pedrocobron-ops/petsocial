@@ -54,10 +54,34 @@ export function fraseSaude(vencidos: string[], vencendo: string[], dias: number)
  * vencendo nos próximos 15 dias. O pet com as duas coisas conta só em `vencidos`.
  * `nomes` vem com os vencidos primeiro.
  */
-export async function buscarSaudeVencendo(sb: Banco, petshopId: string): Promise<{ vencidos: number; vencendo: number; nomes: string[]; nomesVencidos: string[]; nomesVencendo: string[]; frase: string }> {
-  const DIAS = 15;
+export async function buscarSaudeVencendo(sb: Banco, petshopId: string): Promise<SaudeVencendo> {
+  const cuidados = await buscarCuidados(sb, petshopId, DIAS_SAUDE_HOJE);
+  return resumirSaudeVencendo(cuidados, async (ids) => {
+    // só os pets ativos entram na conta
+    const nomeDe = new Map<string, string>();
+    for (let i = 0; i < ids.length; i += LOTE) {
+      const r = await sb.from("pets").select("id, nome").eq("petshop_id", petshopId).eq("ativo", true).in("id", ids.slice(i, i + LOTE));
+      if (r.error) throw new Error(r.error.message);
+      for (const p of r.data ?? []) nomeDe.set(p.id, p.nome);
+    }
+    return nomeDe;
+  });
+}
+
+export type SaudeVencendo = { vencidos: number; vencendo: number; nomes: string[]; nomesVencidos: string[]; nomesVencendo: string[]; frase: string };
+/** A janela do aviso da tela Hoje (dias). */
+export const DIAS_SAUDE_HOJE = 15;
+/** O dia-limite dos cuidados que a tela Hoje lê (hoje + 15 dias), o mesmo de `buscarCuidados`. */
+export const limiteSaudeHoje = () => isoDia(somaDias(new Date(), DIAS_SAUDE_HOJE));
+
+/**
+ * A conta de `buscarSaudeVencendo` com os cuidados já lidos (os que vencem até o limite e depois os outros dos mesmos pets).
+ * `nomes`: o nome dos pets ativos entre os ids pedidos (quem não volta não entra na conta).
+ */
+export async function resumirSaudeVencendo(cuidados: CuidadoResumido[], nomes: (ids: string[]) => Promise<Map<string, string>>): Promise<SaudeVencendo> {
+  const DIAS = DIAS_SAUDE_HOJE;
   const hoje = new Date();
-  const alerta = cuidadosEmAlerta(await buscarCuidados(sb, petshopId, DIAS), hoje, DIAS);
+  const alerta = cuidadosEmAlerta(cuidados, hoje, DIAS);
   const estadoDoPet = new Map<string, "vencido" | "vencendo">();
   for (const c of alerta) {
     if (estadoSaude(c.vence_em, hoje, DIAS) === "vencido") estadoDoPet.set(c.pet_id, "vencido");
@@ -65,14 +89,8 @@ export async function buscarSaudeVencendo(sb: Banco, petshopId: string): Promise
   }
   if (!estadoDoPet.size) return { vencidos: 0, vencendo: 0, nomes: [], nomesVencidos: [], nomesVencendo: [], frase: "" };
 
-  // só os pets ativos entram na conta
   const ids = [...estadoDoPet.keys()];
-  const nomeDe = new Map<string, string>();
-  for (let i = 0; i < ids.length; i += LOTE) {
-    const r = await sb.from("pets").select("id, nome").eq("petshop_id", petshopId).eq("ativo", true).in("id", ids.slice(i, i + LOTE));
-    if (r.error) throw new Error(r.error.message);
-    for (const p of r.data ?? []) nomeDe.set(p.id, p.nome);
-  }
+  const nomeDe = await nomes(ids);
   const ativos = ids.filter((id) => nomeDe.has(id));
   const vencidos = ativos.filter((id) => estadoDoPet.get(id) === "vencido");
   const vencendo = ativos.filter((id) => estadoDoPet.get(id) === "vencendo");

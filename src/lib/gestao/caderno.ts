@@ -4,7 +4,7 @@
  *
  * Caminho: a pessoa tira foto do caderno (ou manda um print ou um PDF do sistema que usava) → a rota /api/gestao/caderno
  * lê e devolve a lista → a pessoa confere, corrige e escolhe → só então a tela salva, pelos caminhos de sempre.
- * Os arquivos não são guardados em lugar nenhum.
+ * Os arquivos não são guardados: PDF grande passa pela pasta temporária (caderno-tmp) e é apagado logo depois de ler.
  */
 
 export type TipoDaPagina = "clientes" | "dividas" | "agenda" | "precos" | "vacinas" | "auto";
@@ -22,6 +22,15 @@ export const MAX_PDFS = 2;
 export const MAX_PAGINAS_PDF = 20;
 export const MAX_BYTES_PDF = 10 * 1024 * 1024;
 export const MAX_BYTES_IMAGEM = 5 * 1024 * 1024;
+/**
+ * A Vercel recusa pedidos acima de ~4,5 MB. Acima de 4 MB no envio, os PDFs (do maior para o menor) sobem antes para o bucket
+ * privado caderno-tmp, e a rota recebe só o caminho: lê e apaga logo depois de ler (o que sobrar sai na faxina, depois de 1 hora).
+ */
+export const LIMITE_DO_ENVIO = 4 * 1024 * 1024;
+export const BUCKET_CADERNO_TMP = "caderno-tmp";
+/** <petshop>/<aleatório>.pdf, sempre na pasta do pet shop do pedido. */
+export const caminhoTemporarioValido = (c: string, petshopId: string) =>
+  /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.pdf$/.test(c) && c.startsWith(`${petshopId.toLowerCase()}/`);
 /** Lado maior da foto depois de diminuída no aparelho (a leitura não ganha nada acima disso). */
 export const LADO_DA_FOTO = 1600;
 /** Padrão do limite do dia por pet shop (o banco usa config_interna 'caderno_dia'). */
