@@ -42,22 +42,43 @@ function FolhaDoDia() {
   const { dados, carregando } = useDados(async () => {
     // mensalistas esperados no dia (de hoje em diante), sem quem avisou que falta. Tudo numa leva só (no celular, cada espera soma).
     const comMensalistas = usaCreche && dia >= hojeIso;
-    const [abertas, encerradas, planos, mov] = await Promise.all([
+    // reservas que vieram do mesmo pedido do link (dois pets do mesmo tutor): o recado do pedido vale para o grupo, não para cada pet.
+    // Na mesma leva das estadias (chegada até o dia; estadia de mais de 90 dias não entra no grupo, só mostra o recado em cada pet)
+    const [abertas, encerradas, planos, mov, pedidosR] = await Promise.all([
       sb.from("estadias").select(SELECT_DA_FOLHA).eq("petshop_id", petshop.id).in("status", ["reservada", "em_casa"]).order("entrada").limit(500),
       sb.from("estadias").select(SELECT_DA_FOLHA).eq("petshop_id", petshop.id).eq("status", "encerrada")
         .lte("entrada", somaDias(data, 1).toISOString()).gte("saida", data.toISOString()).order("entrada").limit(500),
       comMensalistas ? lerPlanos(sb, petshop.id, false) : [],
       comMensalistas ? lerPresencas(sb, petshop.id, dia, dia) : { presencas: [], faltas: [] },
+      sb.from("pedidos_agendamento").select("estadia_id, grupo_id, obs, criado_em").eq("petshop_id", petshop.id).eq("status", "aceito").not("grupo_id", "is", null)
+        .not("estadia_id", "is", null).lte("inicio", somaDias(data, 1).toISOString()).gte("inicio", somaDias(data, -90).toISOString()).order("criado_em").order("id").limit(500),
     ]);
+    const pedidos = pedidosR.data ?? [];
     let esperados: { id: string; petId: string; nome: string; tutor: string; telefone: string | null; alertas: string | null; obs?: string | null }[] = [];
     if (comMensalistas) {
       esperados = planos.filter((p) => p.pets?.ativo && esperadoNoDia(p, dia, petshop.horario) && !mov.faltas.some((f) => f.pet_id === p.pet_id && f.dia === dia))
         .map((p) => ({ id: p.id, petId: p.pet_id, nome: p.pets!.nome, tutor: p.pets!.clientes?.nome ?? "", telefone: p.pets!.clientes?.telefone ?? null, alertas: p.pets!.alertas, obs: (p.pets as { obs?: string | null }).obs ?? null }));
     }
-    return { abertas: ok(abertas) as unknown as EstadiaCompleta[], encerradas: ok(encerradas) as unknown as EstadiaCompleta[], esperados };
+    return { abertas: ok(abertas) as unknown as EstadiaCompleta[], encerradas: ok(encerradas) as unknown as EstadiaCompleta[], esperados, pedidos };
   }, [petshop.id, dia, usaCreche, calendarioPronto]);
 
   const abertas = dados?.abertas ?? [], encerradas = dados?.encerradas ?? [];
+  // o recado do pedido para dois pets ("Thor é agitado; Mel come ração light") aparece uma vez, como "Do pedido de Thor e Mel"
+  const doPedido = new Map<string, { grupo: string; obs: string; nomes: string }>();
+  {
+    const porGrupo = new Map<string, string[]>();
+    const lidas = new Set([...abertas, ...encerradas].map((e) => e.id));
+    for (const p of dados?.pedidos ?? []) if (p.grupo_id && p.estadia_id && lidas.has(p.estadia_id)) porGrupo.set(p.grupo_id, [...(porGrupo.get(p.grupo_id) ?? []), p.estadia_id]);
+    const nomeDe = (id: string) => [...abertas, ...encerradas].find((e) => e.id === id)?.pets?.nome ?? "pet";
+    for (const p of dados?.pedidos ?? []) {
+      const ids = p.grupo_id ? porGrupo.get(p.grupo_id) ?? [] : [];
+      const e = [...abertas, ...encerradas].find((x) => x.id === p.estadia_id);
+      // só quando a estadia guarda o recado do pedido como veio (se alguém mudou, é o cuidado daquele pet)
+      if (!e || ids.length < 2 || !p.obs?.trim() || e.obs?.trim() !== p.obs.trim()) continue;
+      const nomes = ids.map(nomeDe);
+      doPedido.set(e.id, { grupo: p.grupo_id!, obs: p.obs.trim(), nomes: nomes.length <= 1 ? nomes.join("") : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}` });
+    }
+  }
   const noDia = (d: string | null) => Boolean(d) && isoDia(new Date(d!)) === dia;
   const ocupam = (["hotel", "creche"] as const).flatMap((t) => quemOcupa(t, dia, hoje, abertas, encerradas));
   // quem já chegou hoje e está na casa fica em "Na casa" (não em "Chegam")
@@ -75,7 +96,16 @@ function FolhaDoDia() {
   const esperados = (dados?.esperados ?? []).filter((p) => !jaTem.has(p.petId));
 
   type Coluna = "chega" | "sai" | "fica" | "naoveio";
-  const tabela = (lista: EstadiaCompleta[], coluna: Coluna) => (
+  const tabela = (lista: EstadiaCompleta[], coluna: Coluna) => {
+    const jaMostrado = new Set<string>();
+    const recado = (e: EstadiaCompleta) => {
+      const p = doPedido.get(e.id);
+      if (!p) return e.obs ? <span>{e.obs}</span> : null;
+      if (jaMostrado.has(p.grupo)) return null;
+      jaMostrado.add(p.grupo);
+      return <span className="pedido"><span><b>Do pedido de {p.nomes}:</b> {p.obs}</span></span>;
+    };
+    return (
     <table className={comCuidados ? "g-imp-tab cuidados" : "g-imp-tab"}>
       <colgroup><col className="c-pet" /><col className="c-quando" /><col className="c-tutor" />{comCuidados && <col className="c-cuidados" />}<col className="c-atencao" /><col className="c-feito" /></colgroup>
       <thead><tr><th>Pet</th><th>{coluna === "chega" ? "Chega" : coluna === "sai" ? "Sai" : coluna === "naoveio" ? "Era para chegar" : "Até"}</th><th>Tutor</th>{comCuidados && <th>Comida e remédio</th>}<th>Atenção</th><th className="feito">Feito</th></tr></thead>
@@ -92,16 +122,17 @@ function FolhaDoDia() {
                   <small>{coluna === "chega" ? (fim ? `até ${dataCurta(fim)}` : "sem saída prevista") : coluna === "sai" ? `desde ${dataCurta(e.entrada)}` : fim ? `às ${horaCurta(fim)}` : "sem saída prevista"}</small>
                   {coluna !== "chega" && atrasada(e) && <em>saída atrasada</em>}</td>
               )}
-              <td>{e.pets?.clientes?.nome ?? "—"}<small className="tel">{fmtTelefone(e.pets?.clientes?.telefone)}</small></td>
+              <td className="tutor"><span className="nome">{e.pets?.clientes?.nome ?? "—"}</span>{e.pets?.clientes?.telefone && <small className="tel">{fmtTelefone(e.pets.clientes.telefone)}</small>}</td>
               {comCuidados && <td className="atencao">{lerCuidados(e).map((c) => <span key={c.id}>{c.tipo === "remedio" ? "Remédio: " : ""}{textoDoCuidado(c)}</span>)}</td>}
-              <td className="atencao">{e.pets?.alertas && <span><b>{e.pets.alertas}</b></span>}{obsDoPet(e) && <span>{obsDoPet(e)}</span>}{e.obs && <span>{e.obs}</span>}</td>
+              <td className="atencao">{e.pets?.alertas && <span><b>{e.pets.alertas}</b></span>}{obsDoPet(e) && <span>{obsDoPet(e)}</span>}{recado(e)}</td>
               <td className="feito"><i /></td>
             </tr>
           );
         })}
       </tbody>
     </table>
-  );
+    );
+  };
   const secao = (titulo: string, lista: EstadiaCompleta[], coluna: Coluna, vazio: string) => (
     <section className={`g-imp-dia${lista.length ? "" : " vazio"}`}>
       <h2>{titulo}<small>{!lista.length ? vazio : lista.length === 1 ? "1 pet" : `${lista.length} pets`}</small></h2>
@@ -133,7 +164,7 @@ function FolhaDoDia() {
                 <h2>Mensalistas esperados na creche<small>{esperados.length === 1 ? "1 pet" : `${esperados.length} pets`}</small></h2>
                 <table>
                   <thead><tr><th>Pet</th><th>Tutor</th><th>Atenção</th><th className="feito">Veio</th></tr></thead>
-                  <tbody>{esperados.map((p) => <tr key={p.id}><td><b>{p.nome}</b></td><td>{p.tutor || "—"}<small className="tel">{fmtTelefone(p.telefone)}</small></td><td className="atencao">{p.alertas && <span><b>{p.alertas}</b></span>}{p.obs && <span>{p.obs}</span>}</td><td className="feito"><i /></td></tr>)}</tbody>
+                  <tbody>{esperados.map((p) => <tr key={p.id}><td><b>{p.nome}</b></td><td className="tutor"><span className="nome">{p.tutor || "—"}</span>{p.telefone && <small className="tel">{fmtTelefone(p.telefone)}</small>}</td><td className="atencao">{p.alertas && <span><b>{p.alertas}</b></span>}{p.obs && <span>{p.obs}</span>}</td><td className="feito"><i /></td></tr>)}</tbody>
                 </table>
               </section>
             )}

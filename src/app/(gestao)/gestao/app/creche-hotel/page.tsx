@@ -25,7 +25,9 @@ import CheckOut, { comNota, DetalheDaEstadia, estadiasDoTutor, NoitePorNoite, NO
 import { CuidadosDoDia, cuidadosParaGravar, EditorDeCuidados } from "@/components/gestao/hotel/cuidados";
 import { AvisarChegadas, MensagensDaEstadia } from "@/components/gestao/hotel/mensagens";
 import { DesfazerCheckin, useCheckinsDeHoje } from "@/components/gestao/hotel/desfazer-checkin";
-import { AjusteDoSinal, CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
+import { FolhaSinalJunto, LinhaSinalJunto } from "@/components/gestao/hotel/sinal-junto";
+import { gruposDeSinal, type GrupoDeSinal } from "@/lib/gestao/sinal-junto";
+import { AjusteDoSinal, CamposAdiantado, CamposSinal, CancelarComSinal, conferirSinal, EtiquetaSinal, faltaDoSinal, FolhaSinal, lancarSinal, prepararSinal, sinalInicial, type EstadoSinal } from "@/components/gestao/hotel/sinal";
 import { comValoresDeEstadia, idsParaCobrar } from "@/lib/gestao/reservado";
 import { horaCurta, nomeTipo, SELECT_ESTADIA, type EstadiaCompleta, type PetDaEstadia, type Tipo } from "@/components/gestao/hotel/tipos";
 import { diarioDe, esperaDe, ocorrenciasLigadas, portariaLigada, type Ocorrencia, type Retirada } from "@/lib/gestao/casa-opcoes";
@@ -233,7 +235,7 @@ export default function CrecheHotel() {
   const valorDaTaxa = vejoFinanceiro && calendario?.atraso.ativo ? calendario.atraso.creche.valor : null;
   const [aba, setAba] = useState<Aba>("casa");
   const [tipo, setTipo] = useState<"todos" | Tipo>("todos");
-  const [nova, setNova] = useState<{ dia?: string; saida?: string; hora?: string | null; saidaHora?: string | null; tipo?: Tipo; pet?: PetDaEstadia | null; espera?: string; experiencia?: boolean } | null>(null);
+  const [nova, setNova] = useState<{ dia?: string; saida?: string; hora?: string | null; saidaHora?: string | null; tipo?: Tipo; pet?: PetDaEstadia | null; espera?: string; experiencia?: boolean; obs?: string } | null>(null);
   // check-in de reserva com a data já passada: a pessoa diz se o pet chegou agora ou no dia reservado
   const [chegando, setChegando] = useState<EstadiaCompleta | null>(null);
   const [editando, setEditando] = useState<EstadiaCompleta | null>(null);
@@ -242,6 +244,8 @@ export default function CrecheHotel() {
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [mensagens, setMensagens] = useState<EstadiaCompleta | null>(null);
   const [sinalDe, setSinalDe] = useState<EstadiaCompleta | null>(null);
+  // sinal das reservas do mesmo tutor que chegam no mesmo dia (o pedido do link com dois pets), recebido com um pagamento só
+  const [sinalJunto, setSinalJunto] = useState<GrupoDeSinal | null>(null);
   const [cancelando, setCancelando] = useState<EstadiaCompleta | null>(null);
   const [detalhe, setDetalhe] = useState<EstadiaCompleta | null>(null);
   const [avisando, setAvisando] = useState(false);
@@ -557,7 +561,7 @@ export default function CrecheHotel() {
           <div className="g-pilha">
             <Ocupacao abertas={abertas} mens={mens ?? null} aoNovaReserva={(dia, t) => { if (!somenteLeitura()) setNova({ dia, tipo: t }); }} />
             <ListaDeEspera espera={espera} aoNova={() => setEsperaNova({})}
-              aoReservar={(x) => setNova({ dia: x.entrada, saida: x.saida, hora: x.hora_entrada, saidaHora: x.hora_saida, tipo: x.tipo === "hotel" ? "hotel" : "creche", pet: x.pets, espera: x.id })} />
+              aoReservar={(x) => setNova({ dia: x.entrada, saida: x.saida, hora: x.hora_entrada, saidaHora: x.hora_saida, tipo: x.tipo === "hotel" ? "hotel" : "creche", pet: x.pets, espera: x.id, obs: x.obs ?? undefined })} />
           </div>
         )
         : tudoVazio ? (
@@ -730,8 +734,14 @@ export default function CrecheHotel() {
             const fimDoMes = isoDia(new Date(agora.getFullYear(), agora.getMonth() + 1, 0));
             const [pDe, pAte] = periodo === "7" ? [hojeIso, isoDia(somaDias(agora, 7))] : periodo === "mes" ? [hojeIso.slice(0, 8) + "01", fimDoMes] : periodo === "outro" ? [de, ate] : ["", "9999-12-31"];
             const lista = reservas.filter(doTipo).filter((e) => { const d = isoDia(new Date(e.entrada)); return d >= pDe && d <= pAte; });
+            const juntos = vejoFinanceiro ? gruposDeSinal(lista.map((e) => {
+              const v = valoresDe(e);
+              return { id: e.id, entrada: e.entrada, status: e.status, criado: e.criado_em, pet: e.pets?.nome ?? "Pet", tutorId: e.pets?.clientes?.id ?? null, tutor: e.pets?.clientes?.nome ?? null,
+                sinal: v?.sinal ?? null, sinalEstado: v?.sinal_estado ?? null, contaId: v?.sinal_lancamento_id ?? null, sinalRecebido: v?.sinal_recebido ?? null };
+            })) : [];
             return (
               <>
+                {juntos.length > 0 && <div className="g-pilha p" style={{ marginBottom: 12 }}>{juntos.map((g) => <LinhaSinalJunto key={g.chave} grupo={g} aoReceber={() => { if (!somenteLeitura()) setSinalJunto(g); }} />)}</div>}
                 {reservas.length > 0 && (
                   <div className="g-ht-filtro" role="group" aria-label="Período das reservas">
                     <Chips opcoes={PERIODOS} valor={periodo} aoMudar={setPeriodo} />
@@ -831,7 +841,7 @@ export default function CrecheHotel() {
       {(ver === "casa" || ver === "ocupacao") && dados && souDono && <p style={{ marginTop: 16 }}><Link className="g-btn fantasma p" href="/gestao/app/meu-petshop#opcoes-hotel"><Settings2 />{usaCreche && usaHotel ? "Opções do hotel e da creche" : usaHotel ? "Opções do hotel" : "Opções da creche"}</Link></p>}
       {horasDe && <FolhaCorrigirHoras key={horasDe.id} estadia={horasDe} aoFechar={() => setHorasDe(null)} />}
       {acertando && <AcertarEstadia key={acertando.id} estadia={acertando} aoFechar={() => setAcertando(null)} aoGravar={() => { setAcertando(null); mudou(); }} />}
-      {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} experienciaInicial={nova.experiencia} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} saidaInicial={nova.saida} horaInicial={nova.hora ?? undefined} saidaHoraInicial={nova.saidaHora ?? undefined} abertas={abertas} doTutor={doTutor}
+      {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} experienciaInicial={nova.experiencia} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} saidaInicial={nova.saida} horaInicial={nova.hora ?? undefined} saidaHoraInicial={nova.saidaHora ?? undefined} obsInicial={nova.obs} abertas={abertas} doTutor={doTutor}
         aoFechar={() => setNova(null)} aoGravar={(emCasa) => {
           // a reserva veio da lista de espera: o pedido sai da fila
           const daEspera = nova.espera;
@@ -848,6 +858,7 @@ export default function CrecheHotel() {
       {mensagens && <MensagensDaEstadia estadia={mensagens} aoFechar={() => setMensagens(null)} aoMudar={() => void recarregar()}
         sinal={(() => { const v = valoresDe(mensagens); return v?.sinal != null && (v.sinal_estado === "a_receber" || v.sinal_estado === "pago") ? { valor: Number(v.sinal), pago: v.sinal_estado === "pago", recebido: v.sinal_estado === "a_receber" ? Math.max(0, centavos(Number(v.sinal) - faltaDoSinal(v))) : 0 } : null; })()}
         fatos={comCuidados ? fatosDoDia(lerCuidados(mensagens), dados?.feitos.filter((f) => f.estadia_id === mensagens.id) ?? [], hojeIso) : undefined} />}
+      {sinalJunto && <FolhaSinalJunto key={sinalJunto.chave} grupo={sinalJunto} aoFechar={() => setSinalJunto(null)} aoGravar={() => { setSinalJunto(null); mudou(); }} />}
       {sinalDe && <FolhaSinal estadia={sinalDe} valores={valoresDe(sinalDe)} sugerido={sugeridoPara(sinalDe)} totalPrevisto={previstoDe(sinalDe)} aoFechar={() => setSinalDe(null)} aoGravar={() => { setSinalDe(null); mudou(); }} />}
       {cancelando && valoresDe(cancelando) && <CancelarComSinal estadia={cancelando} valores={valoresDe(cancelando)!} aoFechar={() => setCancelando(null)} aoGravar={() => { setCancelando(null); mudou(); }} />}
       {detalhe && <DetalheDaEstadia estadia={detalhe} aoFechar={() => setDetalhe(null)}
@@ -882,7 +893,9 @@ export default function CrecheHotel() {
 
 const horaDe = (d: string | Date) => { const x = new Date(d); return `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
 
-function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, horaInicial, saidaHoraInicial, abertas, doTutor, editar, valores, mens, petInicial, experienciaInicial, aoEspera, aoFechar, aoGravar }: {
+function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, horaInicial, saidaHoraInicial, obsInicial, abertas, doTutor, editar, valores, mens, petInicial, experienciaInicial, aoEspera, aoFechar, aoGravar }: {
+  /** vindo da lista de espera: a observação anotada na fila ("Prefere canil perto da janela") */
+  obsInicial?: string;
   /** vindo da Chamada (Dia de experiência): já marcado como dia de experiência */
   experienciaInicial?: boolean;
   /** vindo da lista de espera: as horas que o tutor pediu */
@@ -920,7 +933,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const [diaria, setDiaria] = useState<number | null>(editar ? (editar.valor_diaria == null ? null : Number(editar.valor_diaria)) : diariaSugerida(petshop, tipo0, petInicial?.porte ?? null));
   // na edição, a diária combinada fica como está até a pessoa trocar o tipo: aí vale o preço fixo do tipo novo
   const [mexeuNaDiaria, setMexeuNaDiaria] = useState(Boolean(editar));
-  const [obs, setObs] = useState(editar?.obs ?? "");
+  const [obs, setObs] = useState(editar?.obs ?? obsInicial ?? "");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   // dia de experiência (opção da creche): só para cão sem plano, num dia de creche que ainda não terminou
@@ -934,6 +947,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const [sinal, setSinal] = useState<EstadoSinal>(() => sinalInicial(null));
   const [mexeuNoSinal, setMexeuNoSinal] = useState(false);
   const [erroSinal, setErroSinal] = useState<string | null>(null);
+  // check-in de quem chegou agora: o tutor pode pagar adiantado (fica como o sinal da estadia, pago; o check-out desconta)
+  const [adiantado, setAdiantado] = useState<EstadoSinal>(() => sinalInicial(null));
 
   const emCasa = editar ? editar.status === "em_casa" : jaAqui;
   // na edição a entrada sempre aparece; no check-in novo a entrada é agora
@@ -989,6 +1004,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
 
   // sinal: só em reserva nova, para quem recebe. O valor acompanha a regra até a pessoa mexer.
   const ofereceSinal = !editar && !jaAqui && vejoFinanceiro && aceitaSinal(petshop, tipo) && !reservaExtra;
+  const ofereceAdiantado = !editar && jaAqui && vejoFinanceiro && !reservaExtra && !comExp;
   const sugerido = ofereceSinal ? sinalSugerido(petshop, prev && !prev.aberto ? prev.total : null) : null;
   useEffect(() => {
     if (!ofereceSinal || mexeuNoSinal) return;
@@ -1014,8 +1030,11 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
     if (saida && (Number.isNaN(saida.getTime()) || saida <= entrada)) return falha("A saída prevista precisa ser depois da entrada.");
     if (diaria != null && diaria < 0) return falha("A diária não pode ser negativa.");
     if (diaria != null && diaria > 99999) return falha("Confira o valor da diária.");
-    const sinalPronto = ofereceSinal ? prepararSinal(sinal) : { modo: "sem" as const };
-    if ("erro" in sinalPronto) { setErroSinal(sinalPronto.erro); avisarErro(sinalPronto.erro); return; }
+    const sinalPronto = ofereceSinal ? prepararSinal(sinal) : ofereceAdiantado && adiantado.modo === "agora" ? prepararSinal(adiantado) : { modo: "sem" as const };
+    if ("erro" in sinalPronto) {
+      const m = !ofereceSinal && !(adiantado.valor && adiantado.valor > 0) ? "Escreva o valor recebido adiantado, ou escolha Não." : !ofereceSinal ? sinalPronto.erro.replace("o sinal", "o valor adiantado") : sinalPronto.erro;
+      setErroSinal(m); avisarErro(m); return;
+    }
     if (sinalPronto.modo === "depois" && !pet.clientes?.id) { setErroSinal("Este pet está sem tutor na ficha. Coloque o tutor, ou escolha outra forma para o sinal."); return; }
 
     if (!editar && emCasa && tipo === "creche" && petshop.creche_bloqueia_vacina && vencidas?.length && !souDono) {
@@ -1103,13 +1122,13 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
       }
       if (id && sinalPronto.modo !== "sem") {
         try {
-          await lancarSinal(sb, petshop.id, { id, tipo, entrada: entrada.toISOString(), pet: pet.nome, clienteId: pet.clientes?.id ?? null }, sinalPronto, chave);
-          avisar(sinalPronto.modo === "agora" ? `Sinal de ${brl(sinalPronto.valor)} recebido.` : `Sinal de ${brl(sinalPronto.valor)} em A receber, para ${dataCurta(sinalPronto.quando)}.`);
+          await lancarSinal(sb, petshop.id, { id, tipo, entrada: entrada.toISOString(), pet: pet.nome, clienteId: pet.clientes?.id ?? null }, sinalPronto, chave, !ofereceSinal);
+          avisar(!ofereceSinal ? `${brl(sinalPronto.valor)} recebidos adiantado. O check-out desconta.` : sinalPronto.modo === "agora" ? `Sinal de ${brl(sinalPronto.valor)} recebido.` : `Sinal de ${brl(sinalPronto.valor)} em A receber, para ${dataCurta(sinalPronto.quando)}.`);
         } catch (e) {
           // o sinal e a ligação com a reserva vão juntos: nada dele ficou gravado. A mesma chave na nova tentativa encontra a
           // reserva já marcada e anota o sinal uma vez só
-          setErroSinal("O sinal não foi anotado. Toque de novo para anotar.");
-          avisarErro(`A reserva foi marcada, mas o sinal não foi anotado (nada dele foi lançado). Toque de novo para anotar o sinal. (${e instanceof Error ? e.message : "erro"})`);
+          setErroSinal(ofereceSinal ? "O sinal não foi anotado. Toque de novo para anotar." : "O valor adiantado não foi anotado. Toque de novo para anotar.");
+          avisarErro(!ofereceSinal ? `O check-in foi feito, mas o valor adiantado não foi anotado (nada dele foi lançado). Toque de novo para anotar. (${e instanceof Error ? e.message : "erro"})` : `A reserva foi marcada, mas o sinal não foi anotado (nada dele foi lançado). Toque de novo para anotar o sinal. (${e instanceof Error ? e.message : "erro"})`);
           return false;
         }
       }
@@ -1270,6 +1289,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         )}
         {vejoFinanceiro && prev && !prev.aberto && prev.noites && temNoiteDiferente(prev.noites) && <NoitePorNoite noites={prev.noites} total={prev.diarias} />}
         {ofereceSinal && <CamposSinal estado={sinal} aoMudar={(s) => { setMexeuNoSinal(true); setSinal(s); setErroSinal(null); }} sugerido={sugerido} erro={erroSinal} semTutor={!pet.clientes?.id} />}
+        {ofereceAdiantado && <CamposAdiantado estado={adiantado} aoMudar={(s) => { setAdiantado(s); setErroSinal(null); }} erro={erroSinal} />}
         {comCuidados && <EditorDeCuidados valor={cuidados} aoMudar={setCuidados} />}
         <Campo rotulo="Observações">
           <CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações da estadia"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder="Ração, remédio, horário de passeio, o que trouxe na mochila…" /></CampoComVoz>

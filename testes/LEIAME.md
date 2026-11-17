@@ -54,7 +54,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 ## O que cada suíte confere
 
 **unidade/**
-- `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, regras), a leitura da resposta
+- `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, desconto do segundo pet, regras), a leitura da resposta
   (não sei, sugestão de pedido só com serviço e dia válidos, sem links), limites de conversa. Sem banco.
 - `boletim.js`: textos do boletim do pet (`src/lib/gestao/boletim.ts`): "Oi, Ana! O boletim do Thor de hoje: <link>" (primeiro nome
   do tutor, do/da/de pelo sexo do pet), texto pronto só com os recados marcados, recados guardados e lidos de volta, dados do
@@ -114,11 +114,21 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   pago (ou o sinal a receber em parte) é recusado sem gravar nada (`maestro:passa_do_devido`); a conta certa, o acréscimo digitado, o
   pago a mais virando crédito e a conta paga com o crédito passam; crédito + dinheiro acima do total é recusado. Desfazer check-in:
   a data reservada fica guardada, a monitora desfaz no mesmo dia, tosador/estoque/anônimo não, de novo ou em outro dia não, o check-out apaga.
+- `hotel-bia.js`: achados da Bia no hotel. **Sinal recebido junto** (`receberSinaisJuntos`, `src/lib/gestao/sinal-junto.ts`):
+  Thor (sinal 107,25, já pagou 100,00) e Mel (62,40) da Ana, chegada no mesmo dia, viram o grupo "Thor e Mel · sinal R$ 69,65"
+  (o Bob, de outro tutor, fica fora); dois toques com a mesma chave ao mesmo tempo: R$ 69,65 entram uma vez, nenhum lançamento
+  novo, os dois sinais pagos; a mesma chave depois devolve "repetido"; outra chave com os sinais já pagos é recusada
+  (`maestro:conta_mudou`). Pagamento dividido (Pix 60 + dinheiro 20 para sinais de 50 e 30) repartido ao centavo entre as contas.
+  Um dos sinais recebido em outra tela: recusado e nada entra; o tosador não recebe. **Pago adiantado** no check-in de quem chegou
+  agora (mesmos passos de `lancarSinal`, `sinal_pagamento.adiantado`): dois toques entram uma vez; o check-out que recebe o total
+  sem descontar é recusado (`maestro:passa_do_devido`) e o certo (110 − 100 = 10) passa.
 - `link.js`: link do cliente anônimo: o que mostra, pedido de banho, chamada direta recusada, regras e aceite (texto e vacinas),
   hotel em dia fechado e fora do horário, dia de experiência, nada vira cliente antes de aceitar, link desligado, **freios de envio**
   (por WhatsApp, por rede, por loja; o teste põe os limites padrão em `config_interna` durante o teste e devolve os de antes).
 - `link-ia.js`: rota `/api/gestao/link-ia` e funções: ligar/desligar (só o dono), respostas pelo contexto, dados de outro pet shop
-  nunca entram, contagens sem texto, limites por conversa, por rede e por dia (o do dia sem mexer na configuração global: a contagem
+  nunca entram, **desconto do segundo pet** ("Se eu levar dois cachorros juntos tem desconto?": sem desconto, "Não sei"; com 20%
+  ligado, `link_hotel_opcoes.segundo` = 20 e a resposta de teste, que lê o mesmo texto que iria ao modelo, traz "20% de desconto";
+  com "Esconder o preço", some), contagens sem texto, limites por conversa, por rede e por dia (o do dia sem mexer na configuração global: a contagem
   da loja de teste sobe até faltar uma). Precisa do servidor com `GESTAO_LINK_IA_FALSO=1`.
 - `tutor.js`: página do tutor: só os pets do tutor, fotos pela rota do servidor (assinatura e caminho reserva, bytes certos, cache privado),
   prazo das fotos, faxina dos arquivos (fila, órfãos), quem lê e grava, freio de 30 acessos por minuto. Precisa do servidor.
@@ -236,6 +246,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   em uso, roxo avisa "Essa cor já é de Tosa higiênica"; salvo repetido (390), Serviços e preços avisa e "Dar uma cor para cada" deixa
   todas diferentes (a Tosa higiênica fica roxa). Check-out do hotel (1366): "Banho de saída do hotel · R$ 40,00" num toque e o total
   R$ 160,00. Capturas em `testes/saida/juliana-*.png`.
+- `hotel-bia.js`: achados da Bia pela tela. 390 (recepção): Reservas mostra "Thor e Mel · sinal R$ 69,65" e "Receber junto"
+  com dois cliques no Pix recebe R$ 69,65 uma vez, os dois sinais pagos; Folha do dia da chegada com o recado do pedido do link
+  uma vez só ("Do pedido de Thor e Mel") e o nome do tutor numa linha e o telefone na de baixo, na tela e no papel
+  (`emulateMedia('print')`, PDF em `testes/saida/hotel-bia-folha.pdf`). 1366 (dono): check-in de quem chegou agora com
+  "Recebeu adiantado?" R$ 50,00 no Pix, dois cliques: uma entrada e o cartão "Pago adiantado R$ 50,00"; lista de espera com
+  "Prefere canil perto da janela": Marcar reserva abre com a observação e a reserva é salva com ela. Capturas em
+  `testes/saida/hotel-bia-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 - `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente

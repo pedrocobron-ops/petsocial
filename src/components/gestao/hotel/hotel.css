@@ -174,3 +174,9 @@
 /* Conta fechada: o que foi pago a mais (crédito, devolução) ou o crédito usado, separado do dinheiro recebido */
 .g-ht-conta-fora { width: 100%; display: grid; gap: 4px; padding: 10px 12px; border-radius: var(--g-raio-p); background: var(--g-azul-tint); color: var(--g-tinta); text-align: center; }
 .g-ht-conta-fora p { margin: 0; font-size: .9375rem; }
+
+/* sinal das reservas do mesmo tutor recebido junto ("Thor e Mel · sinal R$ 69,65") */
+.g-ht-junto { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--g-linha); background: var(--g-carta); }
+.g-ht-junto .t { flex: 1 1 200px; min-width: 0; }
+.g-ht-junto .t b { display: block; font-variant-numeric: tabular-nums; }
+.g-ht-junto .t small { display: block; color: var(--g-cinza); font-size: .8125rem; }
