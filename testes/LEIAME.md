@@ -176,6 +176,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   com o navegador); `admin_aceites` só para o admin (com o pet shop e a contagem por versão); login apagado deixa o aceite com o e-mail.
   **Contas de teste:** todo cadastro dos testes passa `B.dadosDoCadastro()` (o mesmo aceite da tela Criar conta); sem isso o login
   pararia na tela de aceite de versão nova e `N.entrar` não acharia o aplicativo.
+- `entrada.js`: checklist de entrada com termo (migração 20261202): quem grava e lê por área (agenda para o banho, creche e hotel para a
+  estadia; estoque, outro pet shop e anônimo não), conferências de `entrada_salvar` (visita, pet, chips fora da lista, foto fora da pasta
+  ou que não subiu, até 4, foto de outra entrada), dois toques no Salvar = uma entrada, gravar direto na tabela recusado; assinatura no
+  aparelho (`entrada_assinar`: nome, PNG na pasta, uma vez só); mudar depois do aceite apaga o aceite e põe a assinatura antiga e a foto
+  tirada na fila; link de 7 dias (`entrada_link`: precisa da assinatura de cada foto, o mesmo código de novo), página pública
+  (`entrada_publica`: nada do tutor nem caminho de arquivo; página com noindex), foto pela rota do servidor (bytes, 404), "Li e concordo"
+  pela rota `/gestao/entrada/<código>/aceite` duas vezes ao mesmo tempo = um aceite, com o navegador; vencido some; pertences devolvidos
+  (`entrada_devolver`); faxina (arquivo solto de mais de um dia, fila, nunca o que está em uso) e horário apagado. Precisa do servidor.
 - `cakto.js`: webhook da Cakto de ponta a ponta pela rota do servidor: 9 ofertas, ciclo da assinatura (renovada, atrasada, recuperada,
   cancelada), reembolso, contestação, MED, segredo errado, outro produto, e-mail diferente (callback e pagamento sem conta), Escola.
   A configuração da Cakto (`config_interna`) é guardada antes e devolvida igual no fim.
@@ -394,6 +402,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   próxima" grava o `lembrete_em`; "Pular" não grava; "Não enviou" fica na mesma; fim com 2 enviadas e 1 para depois. 1366: só a cobrança
   sobra; Enter abre o WhatsApp e S responde sim (`cobrado_em` e o registro com quem mandou); a ficha da Clara com "Não quer receber
   mensagens" e a caixa marcada no formulário. Capturas em `testes/saida/modo-envio-*.png`.
+- `entrada.js`: checklist de entrada pela tela. 390 (recepção): Thor com 10 anos chega pela Agenda e a folha abre sozinha (padrão: só pet
+  idoso), com os Cuidados e alertas da ficha e "Pet idoso ou doente" marcado; chips, foto feita num canvas, pertences, observação;
+  "Assinar aqui no aparelho" com o termo padrão, "Li e concordo", o nome do tutor e uma assinatura desenhada no quadro (PNG no bucket);
+  o horário mostra "Entrada conferida ✓ · aceite do tutor ✓" e "Devolver: coleira, caminha e Cobertor azul" com a caixa; o comprovante
+  com a assinatura. 1366: Meu pet shop "Todos os pets"; a monitora faz o check-in do hotel, a folha abre sozinha, "Mandar o link pelo
+  WhatsApp" ("Oi, Beto! …"); a página do tutor em 390 e 1366 (sem telefone, sem rolagem para o lado) e "Li e concordo"; o cartão mostra o
+  aceite e o check-out "Devolver: ração". Capturas em `testes/saida/entrada-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 - `compra-etiquetas.js`: Estoque pela tela, 390 e 1366. O que comprar: "Vendeu em média 3,5 por semana nas últimas 6 semanas",

@@ -18,6 +18,7 @@ import Feriados from "@/components/gestao/ajustes/feriados";
 import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
 import OpcoesDaLoja from "@/components/gestao/ajustes/opcoes-loja";
 import { LojaNoGoogle, OpcoesDoBoletim } from "@/components/gestao/ajustes/opcoes-boletim";
+import { OpcoesDaEntrada } from "@/components/gestao/ajustes/opcoes-entrada";
 import { AREAS_DE_SERVICO, areaDoServico, areasDeServicoPara, categoriaDaArea, nomeDaCasa, usaCasa, usaModulo, type AreaDoServico } from "@/lib/gestao/modulos";
 import { CAMPOS_PRECO, EscolherArea, PrecosDoServico, comecaPorPorte, corLivre, erroDoPreco, inserirServico, mudarServico, umPrecoSo, type Precos } from "@/components/gestao/servico-campos";
 import { textoDoLink } from "@/lib/gestao/agenda";
@@ -108,7 +109,7 @@ export default function MeuPetshop() {
         <Grupo id="dinheiro" titulo="Cobrança e fidelidade" icone={HandCoins} tom="menta"
           cartoes={[["Opções de cobrança", <OpcoesDeCobranca key="c" />], ["Fidelidade", <AjusteFidelidade key="f" />]]} />
         <Grupo id="negocio" titulo="O negócio" icone={Store} tom="rosa"
-          cartoes={[["Dados", <Dados key="d" />], ["O que você usa", <OQueUsa key="o" />], ["Identidade do pet shop", <Identidade key="i" />], ["Sua loja aparece no Google?", <LojaNoGoogle key="g" />], ["Boletim do pet", <OpcoesDoBoletim key="b" />]]} />
+          cartoes={[["Dados", <Dados key="d" />], ["O que você usa", <OQueUsa key="o" />], ["Identidade do pet shop", <Identidade key="i" />], ["Sua loja aparece no Google?", <LojaNoGoogle key="g" />], ["Boletim do pet", <OpcoesDoBoletim key="b" />], (usaModulo(petshop, "banho_tosa") || usaCasa(petshop)) && ["Checklist de entrada", <OpcoesDaEntrada key="e" />]]} />
         <Grupo id="copia" titulo="Seus dados e a conta" icone={Archive} tom="ceu" largo
           cartoes={[["Baixar todos os dados", <CopiaSeguranca key="c" />], ["Encerrar e apagar a conta", <EncerrarConta key="e" />], ["Registro de pedidos de dados", <RegistroDeDados key="r" />]]} />
       </div>

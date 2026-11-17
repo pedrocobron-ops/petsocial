@@ -12,6 +12,7 @@ import { AvisoCaixaFechado, Chips, ChipsForma, erroDeValor, ErroTela, lembrarFor
 import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/components/gestao/clientes/saude";
 import { BotaoFotos, useFaxinaDasFotos } from "@/components/gestao/casa/fotos-do-dia";
 import { BotaoBoletim, useBoletinsDeHoje, useFaxinaDoBoletim } from "@/components/gestao/boletim/boletim";
+import { EntradaNaChegada, EntradaNaVisita, type VisitaDaEntrada } from "@/components/gestao/entrada/entrada";
 import { AvisoDeVaga, FolhaEspera, ListaDeEspera, useListaDeEspera } from "@/components/gestao/casa/espera";
 import dynamic from "next/dynamic";
 import { FolhaOcorrencia, OcorrenciasDoCartao } from "@/components/gestao/casa/ocorrencias";
@@ -183,6 +184,12 @@ function Cobrado({ e }: { e: EstadiaCompleta }) {
 }
 
 /** Etiqueta colorida do tipo: creche é dia (manteiga), hotel é noite (céu). */
+/** A visita para o checklist de entrada (o pet, o tutor e a estadia). */
+function visitaDaEntrada(e: { id: string; tipo: string; pets: PetDaEstadia | null }): VisitaDaEntrada {
+  return { tipo: e.tipo === "hotel" ? "hotel" : "creche", estadiaId: e.id, petId: e.pets?.id ?? "", pet: e.pets?.nome ?? "Pet",
+    tutor: e.pets?.clientes ? { nome: e.pets.clientes.nome, telefone: e.pets.clientes.telefone } : null };
+}
+
 function EtiquetaTipo({ tipo, curta }: { tipo: string; curta?: boolean }) {
   const Icone = tipo === "hotel" ? Moon : Sun;
   return <span className={`g-ch-tipo ${tipo === "hotel" ? "hotel" : "creche"}${curta ? " curta" : ""}`} title={nomeTipo(tipo)}><Icone aria-hidden /><em>{nomeTipo(tipo)}</em></span>;
@@ -238,6 +245,8 @@ export default function CrecheHotel() {
   const [nova, setNova] = useState<{ dia?: string; saida?: string; hora?: string | null; saidaHora?: string | null; tipo?: Tipo; pet?: PetDaEstadia | null; espera?: string; experiencia?: boolean; obs?: string } | null>(null);
   // check-in de reserva com a data já passada: a pessoa diz se o pet chegou agora ou no dia reservado
   const [chegando, setChegando] = useState<EstadiaCompleta | null>(null);
+  // checklist de entrada depois do check-in (abre sozinha quando o pet shop pede)
+  const [entradaDe, setEntradaDe] = useState<VisitaDaEntrada | null>(null);
   const [editando, setEditando] = useState<EstadiaCompleta | null>(null);
   const [lote, setLote] = useState(false);
   const [saindo, setSaindo] = useState<EstadiaCompleta | null>(null);
@@ -419,7 +428,10 @@ export default function CrecheHotel() {
       const r = ok(await sb.from("estadias").update(quando === "reservado" ? { status: "em_casa" } : { status: "em_casa", entrada: new Date().toISOString() })
         .eq("id", e.id).eq("petshop_id", petshop.id).eq("status", "reservada").select("id"));
       if (!r.length) avisar("Essa reserva já tinha sido alterada. Atualizei a lista.");
-      else avisar(quando === "reservado" ? `${nome} está na casa desde ${dataCurta(e.entrada)}, como estava reservado.` : `${nome} chegou.${isoDia(new Date(e.entrada)) !== isoDia(new Date()) ? " Foi engano? No cartão dele, Desfazer check-in volta para a reserva." : ""}`);
+      else {
+        if (e.pets) setEntradaDe(visitaDaEntrada(e));
+        avisar(quando === "reservado" ? `${nome} está na casa desde ${dataCurta(e.entrada)}, como estava reservado.` : `${nome} chegou.${isoDia(new Date(e.entrada)) !== isoDia(new Date()) ? " Foi engano? No cartão dele, Desfazer check-in volta para a reserva." : ""}`);
+      }
       mudou();
     } catch (x) {
       if (ehRepetido(x)) { avisarErro(`${nome} já está na casa. Atualizei a lista.`); mudou(); }
@@ -708,6 +720,7 @@ export default function CrecheHotel() {
                       {quarto(e)}
                       {e.obs && <p className="g-ch-obs"><NotebookPen aria-hidden /><span>{e.obs}</span></p>}
                       <AceiteDoLink estadiaId={e.id} />
+                      {pet && <EntradaNaVisita visita={visitaDaEntrada(e)} saida mostrarSemEntrada={!e.mensalista} />}
                       {comCuidados && <CuidadosDoDia estadia={e} feitos={dados.feitos} aoMudar={() => void recarregar()} />}
                       {comOcorrencias && <OcorrenciasDoCartao lista={dados.ocorrencias.filter((o) => o.estadia_id === e.id)} />}
                       <div className="g-fila g-ch-acoes">
@@ -842,7 +855,8 @@ export default function CrecheHotel() {
       {horasDe && <FolhaCorrigirHoras key={horasDe.id} estadia={horasDe} aoFechar={() => setHorasDe(null)} />}
       {acertando && <AcertarEstadia key={acertando.id} estadia={acertando} aoFechar={() => setAcertando(null)} aoGravar={() => { setAcertando(null); mudou(); }} />}
       {nova && <NovaEstadia mens={mens ?? null} petInicial={nova.pet ?? undefined} experienciaInicial={nova.experiencia} aoEspera={comEspera ? (x) => { setNova(null); setEsperaNova(x); } : undefined} jaAquiInicial={aba !== "reservas"} tipoInicial={nova.tipo ?? (tipo !== "todos" ? tipo : principalDe(petshop) === "hotel" ? "hotel" : "creche")} diaInicial={nova.dia} saidaInicial={nova.saida} horaInicial={nova.hora ?? undefined} saidaHoraInicial={nova.saidaHora ?? undefined} obsInicial={nova.obs} abertas={abertas} doTutor={doTutor}
-        aoFechar={() => setNova(null)} aoGravar={(emCasa) => {
+        aoFechar={() => setNova(null)} aoGravar={(emCasa, chegou) => {
+          if (chegou) setEntradaDe(chegou);
           // a reserva veio da lista de espera: o pedido sai da fila
           const daEspera = nova.espera;
           if (daEspera) void sb.from("lista_espera").update({ status: "atendido" }).eq("id", daEspera).eq("petshop_id", petshop.id).select("id").then(() => espera.recarregar());
@@ -863,6 +877,7 @@ export default function CrecheHotel() {
       {cancelando && valoresDe(cancelando) && <CancelarComSinal estadia={cancelando} valores={valoresDe(cancelando)!} aoFechar={() => setCancelando(null)} aoGravar={() => { setCancelando(null); mudou(); }} />}
       {detalhe && <DetalheDaEstadia estadia={detalhe} aoFechar={() => setDetalhe(null)}
         aoCorrigir={vejoFinanceiro && detalhe.status === "encerrada" && !detalhe.mensalista ? () => { const e = detalhe; setDetalhe(null); if (!somenteLeitura()) setAcertando(e); } : undefined} />}
+      {entradaDe && <EntradaNaChegada key={entradaDe.estadiaId} visita={entradaDe} aoFechar={() => setEntradaDe(null)} />}
       {chegando && (
         <Folha titulo={`Quando ${chegando.pets?.nome ?? "o pet"} chegou?`} aoFechar={() => setChegando(null)}
           rodape={<>
@@ -909,7 +924,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   petInicial?: PetDaEstadia;
   /** com a lista de espera ligada: em dia cheio, a pessoa pode pôr o pet na lista em vez de passar do limite */
   aoEspera?: (x: { pet: PetDaEstadia; tipo: Tipo; entrada: string; saida?: string; horaEntrada?: string; horaSaida?: string }) => void;
-  aoFechar: () => void; aoGravar: (emCasa: boolean) => void;
+  aoFechar: () => void; aoGravar: (emCasa: boolean, chegou?: VisitaDaEntrada) => void;
 }) {
   const { sb, petshop, vejoFinanceiro, souDono } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
@@ -1132,7 +1147,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
           return false;
         }
       }
-      aoGravar(emCasa);
+      aoGravar(emCasa, !editar && emCasa && id ? visitaDaEntrada({ id, tipo, pets: pet }) : undefined);
     } catch (e) {
       if (ehRepetido(e)) {
         // outra pessoa fez o check-in deste pet no meio do caminho
