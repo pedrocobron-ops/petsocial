@@ -4,14 +4,20 @@
  */
 export const EMPRESA = {
   marca: "Maestro Pet",
+  /** Enquanto não houver empresa, quem responde é o fundador como pessoa física (CPF). Ao abrir a empresa: false e preencha razão social e CNPJ. */
+  pessoaFisica: true,
+  /** Nome de quem responde como pessoa física. */
+  nome: "Pedro Amaral Martin",
+  /** Só números ou com pontos: aparece nos termos e na política. Vazio = [CPF]. */
+  cpf: "",
   razaoSocial: "",
   cnpj: "",
   endereco: "",
   email: "contato@maestropet.com",
   /** E-mail para privacidade (encarregado/LGPD) e assuntos jurídicos. Vazio = aparece [E-MAIL DE CONTATO] nos documentos do Gestão. */
-  emailJuridico: "",
+  emailJuridico: "contato@maestropet.com",
   /** Nome do encarregado pelo tratamento de dados (DPO). Vazio = [NOME DO ENCARREGADO]. */
-  encarregado: "",
+  encarregado: "Pedro Amaral Martin",
   /** Comarca escolhida nos Termos do Gestão, ex. "Santos/SP". Vazio = [FORO]. */
   foro: "",
   /** Só números, com DDI e DDD: ex. "5511999999999". */
@@ -39,4 +45,6 @@ export const linkInstagram = () => (EMPRESA.instagram ? `https://www.instagram.c
 
 /** "Razão social · CNPJ … · Endereço", só com o que estiver preenchido. */
 export const identificacao = () =>
-  [EMPRESA.razaoSocial, EMPRESA.cnpj && `CNPJ ${EMPRESA.cnpj}`, EMPRESA.endereco].filter(Boolean).join(" · ");
+  EMPRESA.pessoaFisica
+    ? [EMPRESA.nome, EMPRESA.cpf && `CPF ${EMPRESA.cpf}`, EMPRESA.endereco].filter(Boolean).join(" · ")
+    : [EMPRESA.razaoSocial, EMPRESA.cnpj && `CNPJ ${EMPRESA.cnpj}`, EMPRESA.endereco].filter(Boolean).join(" · ");

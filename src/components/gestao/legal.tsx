@@ -12,6 +12,14 @@ export function Preencher({ children }: { children: React.ReactNode }) {
 
 /** Razão social, CNPJ e endereço vêm de `src/lib/empresa.ts`. Cada um que estiver vazio aparece como marcador. */
 export function QuemResponde() {
+  if (EMPRESA.pessoaFisica) {
+    return (
+      <b>
+        {EMPRESA.nome || <Preencher>NOME COMPLETO</Preencher>}, pessoa física, inscrito no CPF sob o nº {EMPRESA.cpf || <Preencher>CPF</Preencher>},
+        com endereço em {EMPRESA.endereco || <Preencher>ENDEREÇO</Preencher>}
+      </b>
+    );
+  }
   if (EMPRESA.razaoSocial && EMPRESA.cnpj && EMPRESA.endereco) return <b>{identificacao()}</b>;
   return (
     <b>

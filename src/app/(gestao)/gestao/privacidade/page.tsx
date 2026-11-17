@@ -141,7 +141,7 @@ export default function PrivacidadeDoGestao() {
           <div><dt>Vercel</dt><dd>Hospedagem do aplicativo e das páginas públicas. Os pedidos passam pelos servidores dela, que podem ficar fora do Brasil.</dd></div>
           <div><dt>Anthropic</dt><dd>Fornece o modelo de inteligência artificial do Mozart, da Ajuda, da leitura do caderno, dos textos do boletim e das dúvidas do link (parte 8). Servidores fora do Brasil.</dd></div>
           <div><dt>Cakto</dt><dd>Pagamento da assinatura. Os dados de pagamento são digitados no ambiente dela e seguem a política dela.</dd></div>
-          <div><dt>Envio de e-mail</dt><dd>E-mails de confirmação de conta e de troca de senha: <Preencher>PROVEDOR DE E-MAIL</Preencher>.</dd></div>
+          <div><dt>Envio de e-mail</dt><dd>E-mails de confirmação de conta e de troca de senha, enviados pelo serviço de login do Supabase.</dd></div>
         </dl>
         <p>
           Também passam por serviços de terceiros, mas por escolha e no aparelho de quem usa: o <b>WhatsApp</b>, quando o pet shop abre uma mensagem pronta
