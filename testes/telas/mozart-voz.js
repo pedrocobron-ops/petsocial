@@ -49,6 +49,8 @@ const SAIDA = `${B.RAIZ}/testes/saida`;
 
     T.secao(`${largura}: microfone e texto ao vivo`);
     T.ok('o microfone aparece, grande, com nome para o leitor de tela', (await mic.count()) === 1 && /Falar/.test(await mic.getAttribute('aria-label')));
+    // espera a animação de abrir o painel terminar (no meio dela o botão ainda está menor)
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect && a.effect.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {}))));
     const tam = await mic.boundingBox();
     T.ok('botão de pelo menos 56 px', tam && tam.width >= 55 && tam.height >= 55, tam);
     await mic.click();

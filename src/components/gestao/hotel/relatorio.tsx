@@ -70,7 +70,7 @@ export default function HotelNoRelatorio({ de, ate, antes }: { de: Date; ate: Da
     // sinal que ficou sem a conta (ela foi apagada depois de recebida): vale o dia em que foi dado como pago
     for (const x of sinais) if (!x.sinal_lancamento_id && x.sinal_pago_em && x.sinal_pago_em >= deIso && x.sinal_pago_em <= ateIso) entrou.set(x.estadia_id, real(Number(x.sinal)));
     const sinalRecebido = real([...entrou.values()].reduce((t, n) => t + n, 0));
-    return { estadias: [...abertas, ...encerradas], contas, sinalRecebido, sinaisRecebidos: [...entrou.values()].filter((n) => n > 0).length, devolvido: real(dev.reduce((t, l) => t + Number(l.valor), 0)), devolucoes: dev.length };
+    return { estadias: [...abertas, ...encerradas], abertas, contas, sinalRecebido, sinaisRecebidos: [...entrou.values()].filter((n) => n > 0).length, devolvido: real(dev.reduce((t, l) => t + Number(l.valor), 0)), devolucoes: dev.length };
   }, [petshop.id, temHotel, deIso, ateIso, antesDe, antesAte]);
 
   if (!temHotel || !dados) return null;
@@ -82,7 +82,8 @@ export default function HotelNoRelatorio({ de, ate, antes }: { de: Date; ate: Da
   const disponiveis = vagas ? vagas * dias(de, ate) : null, disponiveisAntes = vagas ? vagas * dias(antes.de, antes.ate) : null;
   const taxa = disponiveis ? Math.round((vendidas / disponiveis) * 100) : null;
   const taxaAntes = disponiveisAntes ? Math.round((vendidasAntes / disponiveisAntes) * 100) : null;
-  const futuras = noites.filter((d) => d >= hoje);
+  // de hoje em diante: só as reservas e quem está na casa (a estadia já encerrada hoje não é noite reservada)
+  const futuras = dados.abertas.flatMap((e) => noitesDe(e, hoje)).filter((d) => d >= hoje);
   const ultima = futuras.length ? futuras.reduce((m, d) => (d > m ? d : m)) : null;
 
   const somar = (a: string, b: string) => {
@@ -125,7 +126,7 @@ export default function HotelNoRelatorio({ de, ate, antes }: { de: Date; ate: Da
             {ateIso >= hoje ? " Conta também as noites já reservadas até o fim do período." : ""}
             {" "}Período anterior: {taxaAntes == null ? `${vendidasAntes} noites` : `${taxaAntes}% (${vendidasAntes} de ${disponiveisAntes} noites)`}.
           </p>
-          <p className="g-p"><b>{futuras.length}</b> {futuras.length === 1 ? "noite já reservada" : "noites já reservadas"} de hoje em diante{ultima ? `, a última em ${dataCurta(ultima)}` : ""}.</p>
+          <p className="g-p">{futuras.length ? <><b>{futuras.length}</b> {futuras.length === 1 ? "noite reservada" : "noites reservadas"} de hoje em diante (reservas e pets na casa){ultima ? `, a última em ${dataCurta(ultima)}` : ""}.</> : "Nenhuma noite reservada de hoje em diante."}</p>
         </div>
         <div className="g-rel-ch-tipo">
           <p className="g-rel-ch-nome"><b>De onde veio o valor das contas</b></p>

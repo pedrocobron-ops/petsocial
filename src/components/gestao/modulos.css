@@ -8,6 +8,9 @@
 .g-mod-op .t { flex: 1; min-width: 0; display: grid; gap: 1px; line-height: 1.2; }
 .g-mod-op .t b { font-weight: 600; font-size: .9375rem; }
 .g-mod-op .t small { font-size: .8125rem; color: var(--g-cinza); }
+/* onde a opção fica no menu (Personalizar e Meu pet shop) */
+.g-mod-op .t small.g-mod-menu { margin-top: 3px; font-size: .75rem; color: var(--g-verde); }
+.g-mod-op .t small.g-mod-menu b { font-weight: 600; font-size: inherit; }
 .g-mod-op .ok { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid var(--g-linha-forte); color: #fff; }
 .g-mod-op .ok svg { width: 14px; height: 14px; stroke-width: 3; }
 .g-mod-op[aria-pressed="true"] { border-color: var(--g-verde); background: var(--g-verde-tint); }
@@ -18,3 +21,8 @@
 /* folha Personalizar do menu: o recado de que desligar não apaga nada */
 .g-mod-nota { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); font-size: .9375rem; line-height: 1.4; }
 .g-mod-nota svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--g-verde); }
+/* creche ou hotel ligados agora: perguntar se o link do cliente também passa a receber pedido (nada muda sozinho) */
+.g-mod-link { display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--g-linha); background: var(--g-carta); }
+.g-mod-link p { margin: 0; font-size: .9375rem; line-height: 1.4; }
+.g-mod-link small { font-size: .8125rem; color: var(--g-cinza); line-height: 1.35; }
+.g-mod-link .g-chips { flex-wrap: wrap; }

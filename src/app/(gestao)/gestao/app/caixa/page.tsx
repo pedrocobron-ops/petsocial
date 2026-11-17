@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, Download, History, Lock, Minus, Plus, Printer, Scale, ShoppingBag, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
-import { caixaAberto, CATEGORIA_GAVETA, conferirValorAlto, creditoDaEntrada, desfazerVenda, lancarPago, lembrarCaixa, nomeDoMovimento, partesPorForma, percentuaisQueFecham, textoDoPagamento, ultimoContado } from "@/lib/gestao/dinheiro";
+import { ajustesDoFaturamento, SEM_AJUSTES } from "@/lib/gestao/faturamento";
+import { caixaAberto, CATEGORIA_GAVETA, conferirValorAlto, creditoDaEntrada, descricaoAtual, desfazerVenda, lancarPago, lembrarCaixa, nomeDoMovimento, partesPorForma, percentuaisQueFecham, textoDoPagamento, ultimoContado } from "@/lib/gestao/dinheiro";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import "@/components/gestao/financeiro/recebimentos.css";
 import {
@@ -52,7 +53,7 @@ function exportarCaixa(caixa: Caixa, lancamentos: Lancamento[]) {
   const movimentos = emOrdem.flatMap((l): Cel[][] => {
     const gaveta = Boolean(l.movimento), entrada = l.tipo === "entrada";
     const tipo = l.movimento === "sangria" ? "Sangria" : l.movimento === "suprimento" ? "Suprimento" : entrada ? "Entrada" : "Saída";
-    const descricao = gaveta ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [l.descricao, resumoDeItens(l)].filter(Boolean).join(" · ");
+    const descricao = gaveta ? [nomeDoMovimento(l.movimento), l.descricao].filter(Boolean).join(": ") : [descricaoAtual(l.descricao), resumoDeItens(l)].filter(Boolean).join(" · ");
     return partesPorForma(l).map((p): Cel[] => [
       dataCompleta(quandoPagou(l)), hora(quandoPagou(l)), descricao, categoriaAtual(l.categoria), tipo, rotuloForma(p.forma), dinheiroCsv(entrada ? p.valor : -p.valor),
     ]);
@@ -110,13 +111,15 @@ function CaixaDoDia() {
     // quem só opera o caixa não lê os lançamentos de caixas fechados: o resumo deles vem do que o banco anotou ao fechar
     const ids = [...(aberto ? [aberto.id] : []), ...(fin ? fechados.map((c) => c.id) : [])];
     const desde = aberto ? aberto.aberto_em : new Date(`${hoje}T00:00:00`).toISOString();
-    const [dosCaixas, ap] = await Promise.all([
+    const [dosCaixas, ap, ajustes] = await Promise.all([
       ids.length
         ? paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true)
           .in("caixa_id", ids).order("criado_em", { ascending: false }).order("id").range(de, ate))
         : Promise.resolve([] as Lancamento[]),
       // valores recebidos que alguém apagou: deste caixa (ou de hoje, com o caixa fechado). Só chega para quem cuida do financeiro.
       fin ? sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", petshop.id).eq("acao", "apagou").gte("quando", desde).order("quando", { ascending: false }).limit(200) : null,
+      // o que ficou de crédito para os tutores hoje: entrou, não saiu da gaveta, mas ainda é deles (a mesma conta dos Relatórios)
+      fin ? ajustesDoFaturamento(sb, petshop.id, hoje, hoje).catch(() => SEM_AJUSTES) : Promise.resolve(SEM_AJUSTES),
     ]);
     // o que foi lançado hoje com o caixa fechado fica solto (sem caixa) e não entra na conferência da gaveta
     const soltos = doDia.filter((l) => !l.caixa_id);
@@ -125,7 +128,7 @@ function CaixaDoDia() {
       return aberto ? l.caixa_id === aberto.id || (!l.caixa_id && l.data === hoje) : l.data === hoje;
     });
     dosCaixas.sort(porPagamento); doDia.sort(porPagamento); soltos.sort(porPagamento);
-    return { aberto, fechados, dosCaixas, soltos, doDia, apagados };
+    return { aberto, fechados, dosCaixas, soltos, doDia, apagados, creditoDeixado: ajustes.creditoDeixado };
   }, [petshop.id, hoje, fin]);
 
   async function abrir(f: FolhaAberta) {
@@ -162,7 +165,7 @@ function CaixaDoDia() {
     return <>{topo}{erro ? <ErroDeCarga erro={erro} tentar={recarregar} /> : carregando ? <Esqueleto linhas={4} /> : null}</>;
   }
 
-  const { aberto, fechados, soltos, doDia, apagados } = dados;
+  const { aberto, fechados, soltos, doDia, apagados, creditoDeixado } = dados;
   const lancamentos = aberto ? doCaixa(aberto.id) : soltos;
   // o dia inteiro (bate com a tela Hoje) e o que ficou fora do caixa
   // sangria e suprimento só mexem na gaveta: não são entrada nem saída do dia
@@ -185,6 +188,9 @@ function CaixaDoDia() {
   const editar = (l: Lancamento) => void abrir((l.movimento === "sangria" || l.movimento === "suprimento") && podeMexer(l) ? { tipo: "gaveta", de: l.movimento, lancamento: l } : { tipo: "editar", lancamento: l });
   const saiuEmDinheiro = resumo?.porForma.find((f) => f.id === "dinheiro")?.saiu ?? 0;
   const saldo = resumo ? Math.round((resumo.entrou - resumo.saiu) * 100) / 100 : 0;
+  // o dia: entrou menos o que saiu (devoluções e despesas pagas hoje); sangria e suprimento não entram, só mexem na gaveta
+  const saldoDoDia = Math.round((entrouNoDia - saiuNoDia) * 100) / 100;
+  const dinheiroDoCaixa = resumo?.porForma.find((f) => f.id === "dinheiro");
   const resumoUltimo = ultimo ? resumoDoCaixa(ultimo.valor_inicial, doCaixa(ultimo.id)) : null;
   // do mais antigo para o mais novo, para ler da esquerda para a direita
   const ultimosCaixas = fin ? fechados.slice(0, 7).reverse().map((c) => ({ rotulo: dataCurta(c.fechado_em!), valor: resumoDoCaixa(c.valor_inicial, doCaixa(c.id)).entrou })) : [];
@@ -216,12 +222,26 @@ function CaixaDoDia() {
                   <p className="g-cx-gaveta">{brl(resumo.esperado)}</p>
                 </div>
                 <div>
-                  <p className="g-cx-leg">Recebido hoje</p>
-                  <p className="g-cx-gaveta">{brl(entrouNoDia)}</p>
+                  <p className="g-cx-leg">{fin ? "Saldo de hoje" : "Entrou hoje"}</p>
+                  <p className={`g-cx-gaveta${fin && saldoDoDia < 0 ? " g-cx-neg" : ""}`}>{brl(fin ? saldoDoDia : entrouNoDia)}</p>
                 </div>
               </div>
+              {/* o dia em três números que fecham: entrou − saiu = saldo (quem só opera o caixa vê o que saiu da gaveta) */}
+              <dl className="g-cx-dia" aria-label="Hoje">
+                <div><dt>Entrou hoje</dt><dd>+ {brl(entrouNoDia)}</dd></div>
+                {fin
+                  ? <div><dt>Saiu hoje (devoluções e saídas)</dt><dd>− {brl(saiuNoDia)}</dd></div>
+                  : <div><dt>Saiu em dinheiro (da gaveta)</dt><dd>− {brl(saiuEmDinheiro)}</dd></div>}
+                {fin && <div className="forte"><dt>Saldo de hoje</dt><dd>{brl(saldoDoDia)}</dd></div>}
+              </dl>
               <p className="g-cx-leg">
-                Na gaveta: o troco de {brl(aberto.valor_inicial)} mais o que entrou e saiu em dinheiro. Recebido hoje: tudo o que entrou hoje, em dinheiro, Pix ou cartão.
+                Na gaveta: o troco de {brl(aberto.valor_inicial)}
+                {dinheiroDoCaixa && dinheiroDoCaixa.entrou > 0 ? ` + ${brl(dinheiroDoCaixa.entrou)} que entrou em dinheiro` : ""}
+                {dinheiroDoCaixa && dinheiroDoCaixa.saiu > 0 ? ` − ${brl(dinheiroDoCaixa.saiu)} que saiu em dinheiro` : ""}
+                {resumo.suprimentos > 0 ? ` + ${brl(resumo.suprimentos)} colocado` : ""}
+                {resumo.sangrias > 0 ? ` − ${brl(resumo.sangrias)} tirado` : ""}.
+                {" "}Entrou e saiu hoje: tudo, em dinheiro, Pix ou cartão.
+                {fin && creditoDeixado > 0 ? ` ${brl(creditoDeixado)} do que entrou ficou de crédito para tutores: não saiu dinheiro, mas é deles até usarem.` : ""}
               </p>
               <details className="g-cx-detalhes">
                 <summary>Ver detalhes</summary>
@@ -469,12 +489,12 @@ function LinhaLancamento({ l, aoTocar }: { l: Lancamento; aoTocar?: () => void }
   const forma = textoDoPagamento(l);
   const apoio = gaveta
     ? `${hora(quandoPagou(l))} · ${l.descricao || "não é venda nem despesa"}`
-    : `${hora(quandoPagou(l))}${l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria, petshop)}` : ""}${resumoDeItens(l) ? ` · ${resumoDeItens(l)}` : ""}`;
+    : `${hora(quandoPagou(l))}${l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria, petshop, l.descricao)}` : ""}${resumoDeItens(l) ? ` · ${resumoDeItens(l)}` : ""}`;
   const dentro = (
     <>
       <Tile icone={gaveta ? (entrada ? ArrowDownToLine : ArrowUpFromLine) : entrada ? ArrowDownLeft : ArrowUpRight} tom={gaveta ? "manteiga" : entrada ? "menta" : "rosa"} />
       <span className="t">
-        <b className="g-cx-desc">{gaveta ? nomeDoMovimento(l.movimento) : l.descricao || categoriaAtual(l.categoria, petshop)} <TagAlterado lancamento={l} /></b>
+        <b className="g-cx-desc">{gaveta ? nomeDoMovimento(l.movimento) : descricaoAtual(l.descricao) || categoriaAtual(l.categoria, petshop)} <TagAlterado lancamento={l} /></b>
         <span>{apoio}{!gaveta && <i className="g-cx-so-cel"> · {forma}</i>}</span>
       </span>
       {gaveta ? <span className="g-tag amarelo g-cx-so-largo">Gaveta</span> : <span className="g-tag g-cx-so-largo">{forma}</span>}

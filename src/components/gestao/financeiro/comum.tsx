@@ -7,7 +7,7 @@ import { fazerTudoOuNada, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { diaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
-import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { nomeDaCategoria, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Caixa, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
@@ -365,10 +365,11 @@ const categoriasDe = (tipo: Tipo) => (tipo === "entrada" ? CATEGORIAS_ENTRADA : 
 /** Nome de hoje para uma categoria gravada com o nome antigo. */
 /**
  * O nome da categoria na tela. Com o pet shop, "Creche e hotel" (o valor gravado, que não muda) aparece como o menu chama
- * a casa: "Hotel" num hotel só, "Creche" numa creche só. Sem o pet shop (estado do formulário, planilha), o nome gravado.
+ * a entrada: "Hotel" ou "Creche" pela descrição, quando ela diz; senão como o menu chama a casa ("Hotel" num hotel só, "Creche"
+ * numa creche só). Sem o pet shop (estado do formulário, planilha), o nome gravado.
  */
-export const categoriaAtual = (c: string, petshop?: { modulos?: string[] | null }) =>
-  c === "Produtos e insumos" ? "Produtos e material" : c === "Creche e hotel" && petshop ? nomeDaCasa(petshop) : c;
+export const categoriaAtual = (c: string, petshop?: { modulos?: string[] | null }, descricao?: string | null) =>
+  petshop ? nomeDaCategoria(c, petshop, descricao) : c === "Produtos e insumos" ? "Produtos e material" : c;
 
 /**
  * Cria ou edita um lançamento.

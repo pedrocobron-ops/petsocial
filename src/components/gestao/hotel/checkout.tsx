@@ -7,7 +7,7 @@ import { conferirCaixa, conferirValorAlto, formaPrincipal, parteDaChave, type It
 import { casoDoErro, fazerTudoOuNada, partesOuNada, passoDoEstoque, ref, type Passo, type ResultadoDaOperacao } from "@/lib/gestao/tudo-ou-nada";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import {
-  contaDasDiarias, contarDiarias, fechoDaConta, noitesAntesDaEntrada, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDoPagamentoDaConta,
+  contaDasDiarias, contarDiarias, fechoDaConta, noitesAntesDaEntrada, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDaSobra, textoDoPagamentoDaConta,
   type ContaDaEstadia, type DestinoDaSobra, type EstadiaDoTutor, type Noite, type TaxaDaConta, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
 import { taxasDe } from "@/lib/gestao/hotel-opcoes";
@@ -19,13 +19,14 @@ import { comValoresDeEstadia } from "@/lib/gestao/reservado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { imprimirComprovante } from "@/lib/gestao/comprovante";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, linkWhatsApp, soDigitos } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, linkWhatsApp, precoDoServico, soDigitos } from "@/lib/gestao/util";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { AvatarPet, Campo, Folha, mensagemDeErro, useAvisos, useDados } from "../ui";
 import { BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, LinhaDaConta, novaChave, produtosDaConta, useProdutosDaLoja, valorDaLinha, type ItemConta } from "../loja/conta";
 import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
+import { ehAdiantado } from "./sinal";
 import { horaCurta, nomeTipo, type EstadiaCompleta } from "./tipos";
 import "./hotel.css";
 
@@ -232,7 +233,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
     for (const e of conta.extras) linhas.push({ tipo: "extra", nome: e.nome, qtd: 1, valor: e.valor });
     for (const p of conta.produtos) linhas.push({ tipo: "produto", nome: p.nome, qtd: p.qtd, valor: p.valor, ...(p.produto_id ? { produto_id: p.produto_id } : {}) });
     if (conta.ajuste > 0) linhas.push({ tipo: "extra", nome: "Acréscimo", qtd: 1, valor: conta.ajuste });
-    if (conta.sinal > 0) linhas.push({ tipo: "extra", nome: conta.sinal_pago ? "Sinal já pago" : "Sinal (conta à parte)", qtd: 1, valor: -conta.sinal });
+    if (conta.sinal > 0) linhas.push({ tipo: "extra", nome: conta.sinal_pago ? (ehAdiantado(valores) ? "Pago adiantado" : "Sinal já pago") : "Sinal (conta à parte)", qtd: 1, valor: -conta.sinal });
     if (conta.credito_usado) linhas.push({ tipo: "extra", nome: "Crédito do tutor usado", qtd: 1, valor: -conta.credito_usado });
     return linhas;
   }
@@ -475,6 +476,11 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
               <span>Tem mais alguma coisa na conta?</span>
               {vendeProdutos && <BuscaProduto produtos={produtos} carregando={buscandoProdutos} erro={erroProdutos} itens={itens} aoEscolher={(p) => { setItens((l) => comProduto(l, p)); setValorEditado(undefined); }} />}
               <div className="g-chips g-vd-chips">
+                {/* serviços da área desta estadia (Meu pet shop, área Hotel ou Creche): um toque e entram como extra, com o preço do porte */}
+                {servicos.filter((s) => s.ativo && s.categoria === estadia.tipo).map((s) => {
+                  const v = precoDoServico(s, pet?.porte);
+                  return <button key={s.id} type="button" className="g-chip" onClick={() => { setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome: s.nome, qtd: 1, valor: v }]); setValorEditado(undefined); }}><Plus />{s.nome}{v != null ? ` · ${brl(v)}` : ""}</button>;
+                })}
                 <button type="button" className="g-chip" onClick={() => setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome: "", qtd: 1, valor: null }])}><Plus />Outro extra</button>
               </div>
             </div>
@@ -486,7 +492,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
                 <div className="l forte"><span>Total da estadia</span><span>{brl(soma)}</span></div>
                 {cortaSinal ? (
                   <div className="l"><span>{sinalRecebido > 0 ? `Sinal: ${brl(sinalRecebido)} já recebidos (a conta dos ${brl(centavos(sinal - sinalRecebido))} que faltavam sai de A receber)` : `Sinal de ${brl(sinal)} ainda a receber: a conta sai de A receber`}</span><span>- {brl(sinalRecebido)}</span></div>
-                ) : sinal > 0 && <div className="l"><span>{valores?.sinal_estado === "pago" ? `${sobraDoSinal > 0 ? "Pago antes" : "Sinal já pago"}${valores.sinal_pago_em ? ` em ${dataCurta(valores.sinal_pago_em)}` : ""}` : sinalRecebido > 0 ? `Sinal combinado (${brl(sinalRecebido)} já recebidos, ${brl(centavos(sinal - sinalRecebido))} ainda a receber)` : "Sinal combinado (ainda a receber)"}</span><span>- {brl(sinal)}</span></div>}
+                ) : sinal > 0 && <div className="l"><span>{valores?.sinal_estado === "pago" ? `${sobraDoSinal > 0 ? "Pago antes" : ehAdiantado(valores) ? "Pago adiantado" : "Sinal já pago"}${valores.sinal_pago_em ? ` em ${dataCurta(valores.sinal_pago_em)}` : ""}` : sinalRecebido > 0 ? `Sinal combinado (${brl(sinalRecebido)} já recebidos, ${brl(centavos(sinal - sinalRecebido))} ainda a receber)` : "Sinal combinado (ainda a receber)"}</span><span>- {brl(sinal)}</span></div>}
                 {sobraDoSinal > 0 && <div className="l forte"><span>Pago a mais</span><span>{brl(sobraDoSinal)}</span></div>}
                 {sinalNaConta > 0 && !sobraDoSinal && <div className="l forte"><span>Falta receber</span><span>{brl(Math.max(0, centavos(soma - sinalNaConta)))}</span></div>}
               </div>
@@ -604,10 +610,16 @@ function ContaFechada({ estadia, conta, saida, aoPronto, pendente }: { estadia: 
     <Folha titulo="Conta fechada" aoFechar={aoPronto} rodape={<button type="button" className="g-btn sec" onClick={aoPronto}>Pronto</button>}>
       <div className="g-vd-recibo">
         <Tile icone={Check} tom="menta" tamanho="g" />
-        {/* o número grande diz o que é: recebido agora, ou o que foi pago a mais (crédito, devolução), nunca parece dinheiro entrando */}
-        <p className="g-pp g-muted" style={{ margin: 0 }}>{fiado ? "Anotado em A receber" : agora > 0 ? "Recebido agora" : sobra?.destino === "credito" ? "Ficou de crédito para o tutor" : sobra?.destino === "devolvido" ? "Devolvido ao tutor" : sobra ? "Pago a mais, ficou com o hotel" : "Recebido agora"}</p>
-        <p className="g-num">{brl(agora > 0 || !sobra ? agora : sobra.valor)}</p>
-        <p><b>{fiado ? "Anotado em A receber." : agora > 0 ? "Recebido." : sobra?.destino === "devolvido" ? "Devolvido ao tutor." : sobra?.destino === "credito" ? "Ficou de crédito para o tutor." : sobra ? "Ficou com o hotel." : conta.credito_usado ? "Pago com o crédito do tutor." : "Check-out feito."}</b> {pendente ? `Estadia de ${estadia.pets?.nome ?? "pet"} acertada.` : `${estadia.pets?.nome ?? "O pet"} foi para casa.`}</p>
+        {/* o número grande é sempre o dinheiro desta saída (pode ser R$ 0,00); crédito, devolução e o pago a mais ficam numa linha à parte */}
+        <p className="g-pp g-muted" style={{ margin: 0 }}>{fiado ? "Anotado em A receber" : "Recebido agora"}</p>
+        <p className="g-num">{brl(agora)}</p>
+        <p><b>{fiado ? "Anotado em A receber." : agora > 0 ? "Recebido." : conta.sinal > 0 || conta.credito_usado ? "Nada a receber na saída." : "Check-out feito."}</b> {pendente ? `Estadia de ${estadia.pets?.nome ?? "pet"} acertada.` : `${estadia.pets?.nome ?? "O pet"} foi para casa.`}</p>
+        {(sobra || conta.credito_usado) && (
+          <div className="g-ht-conta-fora">
+            {sobra && <p><b>{sobra.destino === "credito" ? "Ficou de crédito para o tutor" : sobra.destino === "devolvido" ? textoDaSobra(sobra) : "Pago a mais, ficou com o hotel"}: {brl(sobra.valor)}</b></p>}
+            {conta.credito_usado ? <p><b>Pago com o crédito do tutor: {brl(conta.credito_usado)}</b></p> : null}
+          </div>
+        )}
         <div className="g-ht-conta" style={{ width: "100%", textAlign: "left" }}>
           <div className="l forte"><span>Total da estadia</span><span>{brl(conta.total)}</span></div>
           {fechoDaConta(conta).map((l, i) => <div key={i} className="l"><span>{l.texto}</span><span>{l.valor}</span></div>)}

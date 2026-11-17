@@ -54,7 +54,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 ## O que cada suíte confere
 
 **unidade/**
-- `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, regras), a leitura da resposta
+- `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, desconto do segundo pet, regras), a leitura da resposta
   (não sei, sugestão de pedido só com serviço e dia válidos, sem links), limites de conversa. Sem banco.
 - `boletim.js`: textos do boletim do pet (`src/lib/gestao/boletim.ts`): "Oi, Ana! O boletim do Thor de hoje: <link>" (primeiro nome
   do tutor, do/da/de pelo sexo do pet), texto pronto só com os recados marcados, recados guardados e lidos de volta, dados do
@@ -69,6 +69,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `parecido.js`: nomes parecidos para pedidos falados (`assistente/parecido.ts`, usado por `buscar_pets` quando o nome não bate):
   "tor" acha o Thor, "luna" a Lunna, "mau" a Mel (e a Bel: mais de um, o Mozart pergunta), pelo tutor e pelo começo do nome; nada
   inventado para nomes longe.
+- `juliana.js`: o que a testadora Juliana achou: o nome do cadastro na resposta do Mozart (`parecido.ts`, `manterNomes`: "Tutora Teste 1"
+  volta a ser "Tutor Teste 1"; Bruno Silva e Bruna Silva no cadastro, nome de uma palavra e palavra dentro de outra ficam como estão;
+  `nomesDosResultados` tira os nomes de `buscar_pets` e do cartão confirmado), as cores da agenda (`cores.ts`: `corLivre`, `trocasDeCor`
+  com o primeiro de cada cor ficando e os outros ganhando cor livre, desativado fora, mais serviços que cores), onde cada opção de
+  Personalizar fica no menu (`noMenu`: Agenda, Estoque e Caixa, Pacotes, "Creche e hotel" com as duas e "Creche"/"Hotel" com uma, igual
+  a `nomeDaCasa`) e quando ligar creche ou hotel pergunta do link (`linkPergunta`: só com o link ligado e a área nova fora do link).
 - `textos.js`: textos que as testadoras acharam confusos: o comprovante com parte da dívida antiga ("Pagou R$ 40,00 do que devia de
   antes (R$ 75,00); ainda deve R$ 35,00", sem repetir o resto; quitado; chamada antiga sem o total) e as iniciais sem as palavras
   pequenas ("Banho e Tosa" = BT, "Hotelzinho da Bia" = HB).
@@ -76,6 +82,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   para quem deve, a mais recente até hoje; na agenda, a mais perto de hoje), horas ("14h", "9h30"), a limpeza do que a IA devolve
   (valor ilegível fica em branco com "Verificar", preço único espalhado pelos portes, próxima dose da carteirinha só quando escrita),
   a leitura de teste, o esquema estrito (todo objeto fecha e pede todos os campos), o tipo do arquivo pelos bytes e as páginas do PDF.
+- `caixa-fichas.js`: textos e contas do caixa e das fichas (Bia, hotel só): o sinal sem a data velha (`descricaoAtual`: "Sinal da
+  reserva: hotel de Thor, 19/11" vira "Sinal da reserva: hotel de Thor", "(parte)" fica); "Creche e hotel" como "Hotel" ou "Creche"
+  pela entrada e pelo que o pet shop faz (`nomeDaCategoria`); o que é de cada pet (`lancamentoDoPet`: diária, sinal, devolução, sem
+  pegar "Melissa" pela "Mel"); o Mozart num hotel só diz "Hotel".
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
@@ -104,11 +114,21 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   pago (ou o sinal a receber em parte) é recusado sem gravar nada (`maestro:passa_do_devido`); a conta certa, o acréscimo digitado, o
   pago a mais virando crédito e a conta paga com o crédito passam; crédito + dinheiro acima do total é recusado. Desfazer check-in:
   a data reservada fica guardada, a monitora desfaz no mesmo dia, tosador/estoque/anônimo não, de novo ou em outro dia não, o check-out apaga.
+- `hotel-bia.js`: achados da Bia no hotel. **Sinal recebido junto** (`receberSinaisJuntos`, `src/lib/gestao/sinal-junto.ts`):
+  Thor (sinal 107,25, já pagou 100,00) e Mel (62,40) da Ana, chegada no mesmo dia, viram o grupo "Thor e Mel · sinal R$ 69,65"
+  (o Bob, de outro tutor, fica fora); dois toques com a mesma chave ao mesmo tempo: R$ 69,65 entram uma vez, nenhum lançamento
+  novo, os dois sinais pagos; a mesma chave depois devolve "repetido"; outra chave com os sinais já pagos é recusada
+  (`maestro:conta_mudou`). Pagamento dividido (Pix 60 + dinheiro 20 para sinais de 50 e 30) repartido ao centavo entre as contas.
+  Um dos sinais recebido em outra tela: recusado e nada entra; o tosador não recebe. **Pago adiantado** no check-in de quem chegou
+  agora (mesmos passos de `lancarSinal`, `sinal_pagamento.adiantado`): dois toques entram uma vez; o check-out que recebe o total
+  sem descontar é recusado (`maestro:passa_do_devido`) e o certo (110 − 100 = 10) passa.
 - `link.js`: link do cliente anônimo: o que mostra, pedido de banho, chamada direta recusada, regras e aceite (texto e vacinas),
   hotel em dia fechado e fora do horário, dia de experiência, nada vira cliente antes de aceitar, link desligado, **freios de envio**
   (por WhatsApp, por rede, por loja; o teste põe os limites padrão em `config_interna` durante o teste e devolve os de antes).
 - `link-ia.js`: rota `/api/gestao/link-ia` e funções: ligar/desligar (só o dono), respostas pelo contexto, dados de outro pet shop
-  nunca entram, contagens sem texto, limites por conversa, por rede e por dia (o do dia sem mexer na configuração global: a contagem
+  nunca entram, **desconto do segundo pet** ("Se eu levar dois cachorros juntos tem desconto?": sem desconto, "Não sei"; com 20%
+  ligado, `link_hotel_opcoes.segundo` = 20 e a resposta de teste, que lê o mesmo texto que iria ao modelo, traz "20% de desconto";
+  com "Esconder o preço", some), contagens sem texto, limites por conversa, por rede e por dia (o do dia sem mexer na configuração global: a contagem
   da loja de teste sobe até faltar uma). Precisa do servidor com `GESTAO_LINK_IA_FALSO=1`.
 - `tutor.js`: página do tutor: só os pets do tutor, fotos pela rota do servidor (assinatura e caminho reserva, bytes certos, cache privado),
   prazo das fotos, faxina dos arquivos (fila, órfãos), quem lê e grava, freio de 30 acessos por minuto. Precisa do servidor.
@@ -136,7 +156,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   ferramentas rodam de verdade, com o login de cada papel): "o dono do Bob me pagou os 35" com duas contas abertas (5 + 30) quita as duas
   e o mês ganha 35 uma vez só (a entrada solta é recusada; o toque duplo não recebe de novo), pagamento em parte, pagou a mais (pergunta;
   com `sobra: "credito"` vira crédito), `anotar_divida` ligada ao tutor, `quem_me_deve` por pessoa, papéis (`cliente_receber_contas`
-  recusado para quem não mexe com dinheiro, conta e crédito de outro cliente recusados) e o teto de voltas e de tempo.
+  recusado para quem não mexe com dinheiro, conta e crédito de outro cliente recusados) e o teto de voltas e de tempo. **Nome do tutor**
+  (Juliana): "pipokinha" acha a Pipoquinha pelo nome parecido, o cartão mostra "Pipoquinha (Tutor Teste 1)", o resultado gravado leva o
+  `cartao_confirmado`, e o "Ela é da Tutora Teste 1." do modelo de mentira sai como "Tutor Teste 1"; as instruções pedem os nomes exatos.
 - `divida-caderno.js`: dívida trazida do caderno (migração 20261186, `lancamentos.devido_desde`): dono e recepção anotam com o dia
   em que começou; o banco recusa dia depois de hoje, valor já recebido, saída, antes de 2000 e o tosador; anotar não vira dinheiro em
   dia nenhum; receber uma parte entra hoje, no caixa, e a conta segue "desde" o dia do caderno; a dona corrige o dia depois.
@@ -209,6 +231,28 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   imprimir** (lista e extrato das cobranças, extrato do cão, folha do dia, fichas de cuidados) na mesma aba, com Voltar, os dados
   numa leva só (ondas de pedidos com 600 ms de atraso), PDF A4 (`page.pdf`) e o título de cada parte da folha do dia na mesma
   folha que a primeira linha dela (cada parte empurrada para o pé da página em 21 pontos). 390 e 1366.
+- `caixa-fichas.js`: caixa e fichas num hotel só (migração 20261191), conta à mão em 390 e 1366. Check-out da Luna (1 diária de 95,
+  sinal 285) deixando de crédito: Conta fechada com "Recebido agora R$ 0,00" e, à parte, "Ficou de crédito para o tutor: R$ 190,00".
+  Caixa: gaveta R$ 102,75 (troco 100 + 2,75 em dinheiro), Entrou hoje 677,40 − Saiu hoje (devoluções e saídas) 110,00 = Saldo de
+  hoje 567,40, aviso dos 190,00 de crédito, sinal sem a data velha e categoria Hotel. Gasto aqui na ficha de cada pet (Mel 62,40 só
+  com o sinal, Thor 107,25, Luna 285 − 190 = 95,00, Bob 220 + 2,75 − 110 = 112,75) e na do tutor (Ana 169,65, "Hotel"). Relatórios:
+  4 noites reservadas de hoje em diante, a última em +4 (a estadia encerrada hoje não conta). Página do tutor: `ultima_vez` no banco,
+  "Luna veio hoje. Ainda não tem diário nem fotos." e, para quem nunca veio, o texto de antes. Capturas em `testes/saida/caixa-fichas-*.png`.
+- `juliana.js`: o que a Juliana achou, em 390 e 1366, numa loja só de banho e tosa com o link ligado e os serviços sem preço. Conta nova:
+  o botão do alto, o Mozart e o passo em destaque de Primeiros passos são o mesmo ("Colocar os preços dos serviços") e a agenda vazia não
+  oferece outro caminho. 1366: Personalizar mostra "No menu: Agenda / Estoque e Caixa / Pacotes / Hotel" e, com creche e hotel, "Creche e
+  hotel" nos dois cartões; ligar os dois pergunta do link sem nada marcado; "Ligar no link" só na creche grava creche no link e o hotel
+  fora, com o recado "continua sem hotel". Serviço novo: a linha da área (Hotel: extra na saída, entra na conta), um ponto em cada cor
+  em uso, roxo avisa "Essa cor já é de Tosa higiênica"; salvo repetido (390), Serviços e preços avisa e "Dar uma cor para cada" deixa
+  todas diferentes (a Tosa higiênica fica roxa). Check-out do hotel (1366): "Banho de saída do hotel · R$ 40,00" num toque e o total
+  R$ 160,00. Capturas em `testes/saida/juliana-*.png`.
+- `hotel-bia.js`: achados da Bia pela tela. 390 (recepção): Reservas mostra "Thor e Mel · sinal R$ 69,65" e "Receber junto"
+  com dois cliques no Pix recebe R$ 69,65 uma vez, os dois sinais pagos; Folha do dia da chegada com o recado do pedido do link
+  uma vez só ("Do pedido de Thor e Mel") e o nome do tutor numa linha e o telefone na de baixo, na tela e no papel
+  (`emulateMedia('print')`, PDF em `testes/saida/hotel-bia-folha.pdf`). 1366 (dono): check-in de quem chegou agora com
+  "Recebeu adiantado?" R$ 50,00 no Pix, dois cliques: uma entrada e o cartão "Pago adiantado R$ 50,00"; lista de espera com
+  "Prefere canil perto da janela": Marcar reserva abre com a observação e a reserva é salva com ela. Capturas em
+  `testes/saida/hotel-bia-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 - `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente

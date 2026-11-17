@@ -20,6 +20,8 @@ import { LojaNoGoogle, OpcoesDoBoletim } from "@/components/gestao/ajustes/opcoe
 import { AREAS_DE_SERVICO, areaDoServico, areasDeServicoPara, categoriaDaArea, nomeDaCasa, usaCasa, usaModulo, type AreaDoServico } from "@/lib/gestao/modulos";
 import { CAMPOS_PRECO, EscolherArea, PrecosDoServico, comecaPorPorte, corLivre, inserirServico, mudarServico, umPrecoSo, type Precos } from "@/components/gestao/servico-campos";
 import { textoDoLink } from "@/lib/gestao/agenda";
+import { trocasDeCor } from "@/lib/gestao/cores";
+import { emLista } from "@/components/gestao/personalizar-menu";
 import { useEffect, useRef, useState } from "react";
 import { Archive, BedDouble, CalendarDays, Check, ChevronDown, Clock, Copy, ExternalLink, HandCoins, Link2, MessageCircle, Plus, Scissors, Store, Tag } from "lucide-react";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
@@ -391,6 +393,20 @@ function Servicos() {
   const variasAreas = areasDeServicoPara(petshop).length > 1;
   const abrir = (s: Servico | "novo") => { if (!somenteLeitura()) setEditando(s); };
 
+  // serviços com a mesma cor na agenda: o primeiro de cada cor fica, os outros ganham uma cor livre (com um toque)
+  const trocas = trocasDeCor(ativos);
+  const [trocando, setTrocando] = useState(false);
+  async function trocarCores() {
+    if (somenteLeitura() || trocando) return;
+    setTrocando(true);
+    try {
+      for (const t of trocas) await mudarServico(sb, petshop.id, t.id, { cor: t.para });
+      await recarregarBase();
+      avisarMudanca();
+      avisar(trocas.length === 1 ? `Pronto: ${trocas[0].nome} ganhou uma cor só dela.` : `Pronto: ${emLista(trocas.map((t) => t.nome))} ganharam cores só deles.`);
+    } catch (x) { avisarErro(x); } finally { setTrocando(false); }
+  }
+
   async function reativar(s: Servico) {
     if (somenteLeitura()) return;
     try {
@@ -431,6 +447,15 @@ function Servicos() {
               </button>
             );
           })}
+        </div>
+      )}
+      {trocas.length > 0 && (
+        <div className="g-aviso g-mp-cores" role="status" style={{ marginTop: 14 }}>
+          <span className="g-cresce">
+            <b>{trocas.length === 1 ? "Dois serviços estão com a mesma cor na agenda" : "Alguns serviços estão com a mesma cor na agenda"}:</b>{" "}
+            {trocas.map((t) => `${t.igualA} e ${t.nome}`).join("; ")}. Na agenda eles ficam iguais.
+          </span>
+          <button type="button" className="g-btn p sec" onClick={() => void trocarCores()} disabled={trocando}>{trocando ? "Trocando…" : "Dar uma cor para cada"}</button>
         </div>
       )}
       {inativos.length > 0 && (
@@ -525,7 +550,7 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
             aoMudar={(c, chave, ruim) => { setValores((a) => ({ ...a, ...c })); setErrosPreco((m) => { const x = { ...m }; if (ruim) x[chave] = ruim; else delete x[chave]; return x; }); }} />
           <small>{porPorte ? "P = pequeno, M = médio, G = grande, GG = gigante. Pode deixar em branco o porte que vocês não atendem." : "Pode deixar em branco e pôr o preço depois."}</small>
         </div>
-        <div className="g-campo"><span>Cor na agenda</span><EscolherCor valor={cor} aoMudar={setCor} /></div>
+        <div className="g-campo"><span>Cor na agenda</span><EscolherCor valor={cor} aoMudar={setCor} usadas={servicos.filter((s) => s.ativo && s.id !== servico?.id).map((s) => ({ nome: s.nome, cor: s.cor }))} /></div>
         {servico && (
           <label className="g-check">
             <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />

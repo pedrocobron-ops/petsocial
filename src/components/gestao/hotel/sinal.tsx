@@ -57,15 +57,17 @@ export async function conferirSinal(sb: Banco, petshopId: string, s: SinalPronto
  * Lança o sinal (recebido ou a receber) e liga à reserva, numa chamada só: ou os dois ficam gravados, ou nenhum.
  * Com a mesma chave de novo (a resposta não chegou, toque de novo), o banco devolve o que já foi feito, sem lançar outra vez.
  */
-export async function lancarSinal(sb: Banco, petshopId: string, e: { id: string; tipo: string; entrada: string; pet: string; clienteId: string | null }, s: SinalPronto, chave: string) {
+export async function lancarSinal(sb: Banco, petshopId: string, e: { id: string; tipo: string; entrada: string; pet: string; clienteId: string | null }, s: SinalPronto, chave: string,
+  /** pago adiantado no check-in de quem chegou agora (sem reserva): entra como o sinal, com outro nome */
+  adiantado?: boolean) {
   if (s.modo === "sem") return;
-  const descricao = `Sinal da reserva: ${nomeTipo(e.tipo).toLowerCase()} de ${e.pet}, ${dataCurta(e.entrada)}`;
+  const descricao = `${adiantado ? "Pago adiantado" : "Sinal da reserva"}: ${nomeTipo(e.tipo).toLowerCase()} de ${e.pet}, ${dataCurta(e.entrada)}`;
   const hoje = isoDia(new Date());
   const passos: Passo[] = s.modo === "agora" ? [
     { t: "lancamento", nome: "sinal", chave: parteDaChave(chave, "sinal"), linha: { tipo: "entrada", valor: s.valor, forma: s.forma, pagamentos: partesOuNada(s.pagamentos), categoria: CATEGORIA_SINAL, descricao, cliente_id: e.clienteId, pago: true, data: hoje } },
     { t: "estadia_valores", estadia: e.id, modo: "upsert", campos: {
       sinal: s.valor, sinal_estado: "pago", sinal_lancamento_id: ref("sinal"), sinal_pago_em: hoje,
-      sinal_pagamento: { forma: s.forma, pagamentos: s.pagamentos }, sinal_devolucao_id: null, sinal_devolvido_em: null,
+      sinal_pagamento: { forma: s.forma, pagamentos: s.pagamentos, ...(adiantado ? { adiantado: true } : {}) }, sinal_devolucao_id: null, sinal_devolvido_em: null,
     } },
   ] : [
     { t: "lancamento", nome: "sinal", chave: parteDaChave(chave, "sinal"), linha: { tipo: "entrada", valor: s.valor, forma: null, categoria: CATEGORIA_SINAL, descricao, cliente_id: e.clienteId, pago: false, data: s.quando, vencimento: s.quando } },
@@ -114,6 +116,41 @@ export function CamposSinal({ estado: s, aoMudar, sugerido, erro, semTutor }: {
   );
 }
 
+/** O "sinal" é o que o tutor pagou adiantado no check-in de quem chegou agora (não uma reserva com sinal)? */
+export const ehAdiantado = (v: Pick<ValoresDaEstadia, "sinal_pagamento"> | null | undefined) =>
+  Boolean(v?.sinal_pagamento && typeof v.sinal_pagamento === "object" && !Array.isArray(v.sinal_pagamento) && (v.sinal_pagamento as { adiantado?: unknown }).adiantado === true);
+
+/**
+ * "Recebeu adiantado?" no check-in de quem chegou agora (Bia, item 8): o tutor paga uma parte (ou tudo) na entrada.
+ * Fica guardado como o sinal da estadia, pago: entra no caixa de hoje e o check-out desconta, como o sinal de uma reserva.
+ */
+export function CamposAdiantado({ estado: s, aoMudar, erro }: { estado: EstadoSinal; aoMudar: (s: EstadoSinal) => void; erro?: string | null }) {
+  const caixa = useCaixaAberto();
+  return (
+    <div className="g-campo">
+      <span>Recebeu adiantado?</span>
+      <div className="g-seg g-ht-seg" role="group" aria-label="Recebeu adiantado?">
+        <button type="button" aria-pressed={s.modo !== "agora"} onClick={() => aoMudar({ ...s, modo: "sem" })}>Não</button>
+        <button type="button" aria-pressed={s.modo === "agora"} onClick={() => aoMudar({ ...s, modo: "agora" })}>Sim, recebi agora</button>
+      </div>
+      {s.modo === "agora" && (
+        <div className="g-pilha p" style={{ marginTop: 8 }}>
+          <Campo rotulo="Valor recebido" dica="Entra no caixa de hoje. No check-out, é descontado da conta, como um sinal.">
+            <CampoDinheiro valor={s.valor} aoMudar={(valor) => aoMudar({ ...s, valor })} rotulo="Valor recebido adiantado" />
+          </Campo>
+          {s.valor ? (
+            <>
+              <EscolhaPagamento valor={s.pagamento} aoMudar={(pagamento) => aoMudar({ ...s, pagamento })} total={s.valor} rotulo="Forma de pagamento" />
+              <AvisoCaixaFechado aberto={caixa} />
+            </>
+          ) : null}
+        </div>
+      )}
+      {erro && <small className="erro" role="alert">{erro}</small>}
+    </div>
+  );
+}
+
 /** Quanto do sinal já entrou de verdade (o sinal pago inteiro, ou as partes já recebidas da conta dele). */
 export const sinalRecebidoDe = (v: Pick<ValoresDaEstadia, "sinal" | "sinal_estado" | "sinal_recebido">) =>
   v.sinal_estado === "pago" ? Number(v.sinal ?? 0) : Math.min(Number(v.sinal ?? 0), Number(v.sinal_recebido ?? 0));
@@ -127,7 +164,7 @@ export function EtiquetaSinal({ e, valores }: { e: Pick<EstadiaCompleta, "sinal_
   const estado = (vejoFinanceiro ? valores?.sinal_estado : null) ?? e.sinal_estado;
   if (!estado) return null;
   const valor = vejoFinanceiro && valores?.sinal != null ? ` ${brl(valores.sinal)}` : "";
-  if (estado === "pago") return <span className="g-tag verde g-tab">Sinal{valor} pago</span>;
+  if (estado === "pago") return <span className="g-tag verde g-tab">{vejoFinanceiro && ehAdiantado(valores) ? `Pago adiantado${valor}` : `Sinal${valor} pago`}</span>;
   const falta = vejoFinanceiro && valores ? faltaDoSinal(valores) : 0;
   if (estado === "a_receber") return <span className="g-tag amarelo g-tab">{falta > 0 && falta < Number(valores?.sinal) ? `Sinal${valor} · falta ${brl(falta)}` : `Sinal${valor} a receber`}</span>;
   if (estado === "devolvido") return <span className="g-tag g-tab">Sinal{valor} devolvido</span>;

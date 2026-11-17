@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { Banco } from "@/lib/gestao/supabase";
 import { AREAS_DE_SERVICO, type AreaDoServico } from "@/lib/gestao/modulos";
 import { lerValor, lerValorEstrito, valor2 } from "@/lib/gestao/util";
-import { CORES } from "./ajustes/grade-horario";
 import { ok } from "./ui";
 import "./ajustes/ajustes.css";
 import "./servico-campos.css";
@@ -90,6 +89,14 @@ export function PrecosDoServico({ servico, valores, porPorte, aoTrocarModo, aoMu
   );
 }
 
+/** O que acontece com um serviço de cada área: uma linha embaixo da escolha, para ninguém precisar adivinhar. */
+export const DICA_DA_AREA: Record<AreaDoServico, string> = {
+  banho_tosa: "Vira horário na Agenda, com o tempo e a cor daqui, e aparece no link do cliente.",
+  creche: "Aparece como extra na saída da creche (check-out) e entra na conta, com o preço do porte do pet. Não aparece no link do cliente.",
+  hotel: "Aparece como extra da estadia na saída do hotel (check-out) e entra na conta, com o preço do porte do pet. Não aparece no link do cliente.",
+  loja: "Vira horário na Agenda e aparece no link do cliente, como os do banho e tosa.",
+};
+
 /** Banho e tosa, Creche, Hotel ou Loja: só as áreas que o pet shop usa. Com uma área só, não aparece (quem usa decide). */
 export function EscolherArea({ areas, valor, aoMudar, servico }: { areas: AreaDoServico[]; valor: AreaDoServico; aoMudar: (a: AreaDoServico) => void; servico: string }) {
   if (areas.length < 2) return null;
@@ -101,15 +108,12 @@ export function EscolherArea({ areas, valor, aoMudar, servico }: { areas: AreaDo
           <button key={a.id} type="button" className="g-chip" aria-pressed={valor === a.id} onClick={() => aoMudar(a.id)}>{a.rotulo}</button>
         ))}
       </div>
+      <small className="g-sv-area-dica" aria-live="polite">{DICA_DA_AREA[valor]}</small>
     </div>
   );
 }
 
-/** Uma cor da agenda que nenhum serviço ativo usa ainda (a primeira da lista); com todas usadas, roda a lista. */
-export function corLivre(usadas: (string | null | undefined)[]): string {
-  const em = new Set(usadas.filter(Boolean).map((c) => c!.toLowerCase()));
-  return CORES.find((c) => !em.has(c)) ?? CORES[em.size % CORES.length];
-}
+export { corLivre } from "@/lib/gestao/cores";
 
 type LinhaServico = {
   nome: string; categoria: string; duracao_min: number; cor: string; ordem?: number; ativo?: boolean;

@@ -80,3 +80,10 @@
 
 /* Voltar bem à vista (a folha abre na mesma aba) */
 .g-imp-controles .g-imp-voltar { justify-self: start; }
+
+/* Folha do dia: o nome do tutor numa linha e o telefone na outra, também no papel (antes o fim do nome ia para a linha do telefone) */
+.g-imp-folha td.tutor .nome { display: block; }
+.g-imp-folha td.tutor small.tel { display: block; margin-left: 0; white-space: nowrap; }
+@media print { .g-imp .g-imp-folha.semana td.tutor small.tel { display: block; margin-left: 0; } }
+/* o recado do pedido feito para mais de um pet aparece uma vez, com o nome dos pets */
+.g-imp-folha td.atencao span.pedido > span { display: block; }

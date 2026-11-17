@@ -8,7 +8,7 @@ import { useGestao } from "../contexto";
 import EscolherModulos from "../modulos";
 import { Tile } from "../painel";
 import { useAvisos, useSomenteLeitura } from "../ui";
-import { useSalvarModulos } from "../personalizar-menu";
+import { PerguntaDoLink, linkPergunta, useSalvarModulos, type AreaDoLink } from "../personalizar-menu";
 
 /** O que o negócio faz: mostra ou esconde telas do menu, passos e avisos. Não apaga nada. */
 export default function OQueUsa() {
@@ -29,6 +29,8 @@ export default function OQueUsa() {
   const areas = areasParaPrincipal(valor);
   const principal = areas.length > 1 ? (areas.find((a) => a === escolhida) ?? null) : principalPara(valor, escolhida);
   const mudou = valor.length !== salvo.length || valor.some((m) => !salvo.includes(m)) || (areas.length > 1 && principal !== principalSalva);
+  const perguntaLink = linkPergunta(petshop, valor);
+  const [noLink, setNoLink] = useState<AreaDoLink[]>([]);
   const saem = MODULOS.filter((m) => salvo.includes(m.id) && !valor.includes(m.id)).map((m) => m.rotulo.toLowerCase());
 
   async function salvar() {
@@ -37,10 +39,12 @@ export default function OQueUsa() {
     setErro(null);
     setSalvando(true);
     try {
-      const { novas, linkJunto } = await salvarModulos(valor, principal);
-      const nomeNovas = novas.map((m) => (m === "creche" ? "creche" : "hotel")).join(" e ");
+      const { novas, noLink: entraram } = await salvarModulos(valor, principal, noLink.filter((a) => perguntaLink.includes(a)));
+      setNoLink([]);
+      const nomes = (l: readonly string[]) => l.map((m) => (m === "creche" ? "creche" : "hotel")).join(" e ");
+      const fora = perguntaLink.filter((a) => !entraram.includes(a));
       avisar(`${principal ? "Salvo. O menu e a tela inicial já estão na nova ordem." : "Salvo. O menu já mostra na frente só o que você usa."}${novas.length
-        ? ` Coloque a diária e as vagas ${novas.length > 1 ? "da creche e do hotel" : novas[0] === "creche" ? "da creche" : "do hotel"} no grupo ${novas.length > 1 || (valor.includes("creche") && valor.includes("hotel")) ? "Creche e hotel" : novas[0] === "creche" ? "Creche" : "Hotel"}, aqui em Meu pet shop.${linkJunto ? ` O link do cliente também passa a receber pedido de ${nomeNovas}.` : ""}`
+        ? ` Coloque a diária e as vagas ${novas.length > 1 ? "da creche e do hotel" : novas[0] === "creche" ? "da creche" : "do hotel"} no grupo ${novas.length > 1 || (valor.includes("creche") && valor.includes("hotel")) ? "Creche e hotel" : novas[0] === "creche" ? "Creche" : "Hotel"}, aqui em Meu pet shop.${entraram.length ? ` O link do cliente também passa a receber pedido de ${nomes(entraram)}.` : ""}${fora.length ? ` O link do cliente continua sem ${nomes(fora)}.` : ""}`
         : ""}`);
     } catch (x) { avisarErro(x); } finally { setSalvando(false); }
   }
@@ -51,7 +55,8 @@ export default function OQueUsa() {
         <Tile icone={LayoutGrid} tom="menta" />
         <div><h2>O que você usa</h2><p className="g-muted g-p">Marque o que o seu negócio faz. O que você não marcar sai da frente e fica em Outras áreas, no fim do menu: nada é apagado, e dá para ligar de novo quando quiser. Também muda pelo botão Personalizar, ao lado de Dia a dia, no menu.</p></div>
       </div>
-      <EscolherModulos valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} comApoio />
+      <EscolherModulos valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} comApoio comMenu />
+      <PerguntaDoLink areas={perguntaLink} marcadas={noLink} aoMudar={setNoLink} />
       {areas.length > 1 && (
         <div className="g-pilha p">
           <p className="g-rotulo">Área principal</p>

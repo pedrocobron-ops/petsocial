@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { definicao, descrever, ehErroDeUso, gravar, rodarConsulta, type Contexto, type LinkZap, type Resumo } from "./ferramentas";
+import { manterNomes, nomesDosResultados } from "./parecido";
 import { ferramentaLiberada } from "./permissao";
 
 /**
@@ -28,6 +29,16 @@ type Saida =
   | { tipo: "recusa"; mensagens: Msg[] }
   | { tipo: "ok"; mensagens: Msg[]; texto: string; propostas: Proposta[]; parciais: Resultado[]; links: LinkZap[]; cortou: boolean };
 
+/** Os nomes de pets e tutores que as ferramentas já devolveram nesta conversa. */
+function nomesDaConversa(mensagens: Msg[]): string[] {
+  const conteudos: string[] = [];
+  for (const m of mensagens) {
+    if (m.role !== "user" || !Array.isArray(m.content)) continue;
+    for (const b of m.content) if (b.type === "tool_result" && typeof b.content === "string") conteudos.push(b.content);
+  }
+  return nomesDosResultados(conteudos);
+}
+
 export async function voltas(o: {
   c: Contexto; mensagens: Msg[]; liberado: boolean;
   chamar: (mensagens: Msg[]) => Promise<RespostaDoModelo>;
@@ -50,7 +61,8 @@ export async function voltas(o: {
     }
     const resposta = await o.chamar(mensagens);
     mensagens.push({ role: "assistant", content: resposta.content as Extract<Msg, { role: "assistant" }>["content"] });
-    const fala = resposta.content.filter((b) => b.type === "text").map((b) => (b.type === "text" ? b.text : "")).join("\n").trim();
+    // nomes de pets e tutores como estão no cadastro (o modelo às vezes troca o fim: "Tutora" por "Tutor")
+    const fala = manterNomes(resposta.content.filter((b) => b.type === "text").map((b) => (b.type === "text" ? b.text : "")).join("\n").trim(), nomesDaConversa(mensagens));
     if (fala) texto = texto ? `${texto}\n\n${fala}` : fala;
 
     if (resposta.stop_reason === "refusal") return { tipo: "recusa", mensagens: mensagens.slice(0, -1) };
