@@ -88,7 +88,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   pegar "Melissa" pela "Mel"); o Mozart num hotel só diz "Hotel".
 - `bom-dia.js`: o "Bom dia" do Mozart (`src/lib/gestao/bom-dia.ts`): no máximo 3 linhas na ordem dia (agenda, buraco livre, casa),
   quem deve e vem hoje, vacina de quem vem, pacote no último uso, aniversário; sem `devem` (papel sem dinheiro) nada de R$; só
-  "agenda livre" não vira cartão; buraco na agenda com almoço e funcionamento. E a prévia da autorização das fotos
+  "agenda livre" não vira cartão; buraco na agenda com almoço e funcionamento; a linha da validade (quem cuida do estoque:
+  "Validade: 2 produtos vencidos na prateleira e 3 vencem em até 30 dias.") depois de quem deve e antes da vacina. E a prévia da autorização das fotos
   (`fotos-redes.ts`): o @ arrumado igual ao banco e a frase "Sem marcar o meu perfil." trocada.
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
@@ -104,7 +105,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   (tabela do EAN em larguras, independente da do app) lendo de volta 16 códigos. Sugestão de compra (`compra.ts`) à mão:
   21 em 6 semanas = 3,5 por semana, 7 + mínimo 3 = 10, tem 4: comprar 6 (com a explicação escrita); 8 semanas; caixa de 12;
   venda desfeita desconta e uso no banho conta; perda à parte; sem vendas recentes sem sugestão; produto de 10 dias; parados,
-  acabando e valor em estoque (custo × quantidade).
+  acabando e valor em estoque (custo × quantidade). Kits e contagem (migração 20261201): o kit fica de fora do O que comprar e do
+  valor em estoque (a venda dele conta nos produtos do kit); a diferença da contagem sobre o esperado (−1 e +1, −R$ 2,36 ao centavo),
+  o que está só na tela comparado com o saldo de agora, e a planilha sem colunas de R$ para quem não vê o financeiro.
 
 **banco/** (API do Supabase com o login de cada papel, como o navegador faz; SQL só para preparar e conferir)
 - `seguranca.js`: isolamento entre pet shops e anônimo; dono não mexe na própria assinatura nem vira admin; o que cada papel grava
@@ -261,6 +264,22 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   marca das outras telas (`lembrete_em`, `pronto_avisado_em`, `avisos.chegada`, `cobrado_em`) e o registro com quem e quando, uma vez por
   (tipo, ref, dia), também com dois toques ao mesmo tempo; tipo de outra área, anônimo, tipo estranho e mais de 50 recusados; ref de outra
   loja ignorada; depois, a fila fica vazia. Ninguém grava nem apaga direto no registro; outra loja não lê.
+- `lotes-kits.js`: validade e lote, kits e contagem de estoque (migração 20261201). **Lotes**: entrada com lote e validade (o mesmo
+  lote, com espaço e outra caixa de letra, soma num lote só; custo do lote guardado e fora da leitura direta), venda de 6 sai do lote
+  que vence antes (B2: 5, depois A1: 1, anotado em `movimentos_lotes`), venda com o lote escolhido, lote de outro produto recusado,
+  saldo corrigido para menos do que está nos lotes (os lotes acompanham), produto sem lote igual a antes, ninguém grava nos lotes.
+  **Vencendo** (`estoque_vencendo`): dias e quantidades, valor só para quem vê o financeiro, 30 × 60 dias, tosador/anônimo/outra loja
+  recusados; `gestao_bom_dia` com `validade` só para quem cuida do estoque (e só com algo vencendo: o `fotos-redes.js` continua com
+  "estoque: só o dia"); **perda num toque** (`lotes_baixar_perda`, dois toques ao mesmo tempo: uma saída "Vencido" por lote, anotada
+  para o dono; a mesma chave de novo não tira outra vez; O que comprar põe à parte). **Kits**: nasce com saldo zero, monta só quem
+  cuida do estoque, kit não entra em kit, saldo = quantos dá para montar (min(10, 7/2) = 3), custo = soma (32,33) e refeito quando
+  o custo de um produto muda, não vira produto, sem ajuste nem entrada de compra; venda de 2 kits baixa cada produto (e os lotes, o
+  que vence antes), a saída do kit ligada à venda com o custo do kit e as dos produtos sem ligar; **Quanto sobrou** com o kit
+  (receita 110,00, custo 64,66 uma vez só) e sem linha dos produtos; `custos_das_vendas` sem as saídas dos produtos do kit; O que
+  comprar conta 2 shampoos e 4 condicionadores; venda desfeita devolve os produtos. **Contagem**: começar por categoria (sem o kit,
+  mesma chave = mesma contagem), tabelas fechadas, pausar e continuar, venda no meio (a diferença é sobre o esperado: 9 − 1 = 8),
+  revisão com valor só para quem vê o financeiro, **Ajustar estoque com dois toques ao mesmo tempo: ajusta uma vez** (dois
+  movimentos "Contagem"), histórico com quem começou e quem ajustou e −R$ 2,35, concluída não muda, papéis.
 - `velocidade.js`: abrir o aplicativo numa ida só ao banco (migração 20261185): `lerBase` (`gestao_base`) = a leitura antiga parte por
   parte (`lerPetshop` + `lerEquipe` + `lerServicos`) para dono, recepção, monitora, tosador e estoque, com meta, diárias, opções com valor,
   comissão, convite e preços só para quem pode; as seis contagens da tela Hoje (`gestao_contagens`) = as contagens pela API; anônimo
@@ -385,6 +404,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   etiqueta por página; Entrada com "Imprimir etiquetas do que entrou" abre com uma por unidade. Quem cuida do estoque (sem
   dinheiro) vê a sugestão sem nenhum R$. Capturas em `testes/saida/compra-*.png`, `etiquetas-*.png` e PDFs `etiquetas-*.pdf`
   (conferidos com zxing-cpp ao escrever: todos os códigos lidos).
+- `estoque-lotes.js`: validade, kits e contagem pela tela (migração 20261201). 390, quem cuida do estoque (sem dinheiro): o aviso da
+  tela Hoje ("1 lote vencido e 1 lote vence em até 30 dias no estoque") abre Estoque, Vencendo sem nenhum R$; "Perda" dá baixa no
+  lote vencido (no banco: saída "Vencido" de 3, lote zerado); a contagem no celular: começar, + e −, vai ao banco sozinho (contado e
+  esperado), **sem internet** (`ctx.setOffline`: "Sem internet: 1 contagem guardada neste aparelho", nada no banco) e de volta (vai
+  sozinho), revisão (shampoo −1, condicionador +2, sem R$, sem rolagem para o lado), "Ajustar estoque" (saldos e dois movimentos
+  "Contagem", com uma saída no meio). 1366, o dono: Entrada com lote e validade; kit novo ("Dá para montar 7 kits", custo R$ 22,50;
+  no banco tipo kit, 2 produtos, saldo 7); Vencendo com R$; o histórico (+R$ 7,50, Edu Estoque) e a folha impressa. Capturas em
+  `testes/saida/lotes-*.png` e `contagem-*.png`.
 - `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente
   de verdade) reduzidas a 1600 px no aparelho, recados, atenção à saúde, texto pronto, "Escrever com o Mozart" (de teste), salvar,
   o WhatsApp com "Oi, Ana! O boletim do Thor de hoje: <link>" e o "Boletim enviado". 1366: a monitora, pelo cartão da creche em

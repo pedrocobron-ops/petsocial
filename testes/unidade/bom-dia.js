@@ -73,6 +73,18 @@ t('vários que devem: primeiro nome e valor, até 3 e "e mais 1"', () =>
     { tutor: 'Clara Dias', valor: 20, quando: null, pets: null }, { tutor: 'Davi Reis', valor: 10, quando: null, pets: null }] }, { horario: HORARIO, agora })[0].texto),
   'Vêm hoje e devem: Ana (R$ 75,00), Beto (R$ 30,00), Clara (R$ 20,00) e mais 1.'));
 
+T.secao('validade dos produtos (quem cuida do estoque)');
+t('vencidos e vencendo numa linha, depois de quem deve e antes da vacina', () => {
+  const l = BD.linhasDoBomDia({ dia: '2026-11-17', devem: [{ tutor: 'Ana Souza', valor: 75, quando: null, pets: null }],
+    vacinas: [{ pet: 'Thor', sexo: 'M', nome: 'V10', tipo: 'vacina', vence_em: '2026-11-20' }], validade: { vencidos: 2, vencendo: 3, primeiro: 'Shampoo' } }, { horario: HORARIO, agora });
+  assert.deepEqual(l.map((x) => x.id), ['devem', 'validade', 'vacinas']);
+  assert.equal(l[1].texto, 'Validade: 2 produtos vencidos na prateleira e 3 vencem em até 30 dias. Veja em Estoque, Vencendo.');
+});
+t('um só: diz qual produto', () => assert.equal(
+  BD.linhasDoBomDia({ dia: '2026-11-17', validade: { vencidos: 0, vencendo: 1, primeiro: 'Ração Golden' } }, { horario: HORARIO, agora })[0].texto,
+  'Validade: 1 vence em até 30 dias (Ração Golden). Veja em Estoque, Vencendo.'));
+t('sem nada vencendo: nenhuma linha', () => assert.equal(BD.linhasDoBomDia({ dia: '2026-11-17', validade: { vencidos: 0, vencendo: 0, primeiro: null } }, { horario: HORARIO, agora }).length, 0));
+
 T.secao('autorização das fotos: a prévia igual ao banco');
 t('o @ arrumado: "ana.pets", "@ana.pets", "instagram.com/ana.pets/" viram "@ana.pets"', () => {
   for (const v of ['ana.pets', '@ana.pets', ' @@ana.pets ', 'https://www.instagram.com/ana.pets/', 'instagram.com/ana.pets?igsh=1']) assert.equal(FR.arrumarArroba(v), '@ana.pets', v);

@@ -67,7 +67,8 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
     const unidade = new Map(dados.produtos.map((p) => [p.id, p.unidade]));
     const x = vendasPorProduto(dados.vendas, dados.saidas, nomes);
     const vendidos = new Set(x.linhas.map((l) => l.produtoId).filter(Boolean));
-    const parados = dados.produtos.filter((p) => p.ativo && Number(p.estoque) > 0 && !vendidos.has(p.id))
+    // kit não conta: o saldo dele é o dos produtos do kit (não entra duas vezes no valor parado)
+    const parados = dados.produtos.filter((p) => p.ativo && p.tipo !== "kit" && Number(p.estoque) > 0 && !vendidos.has(p.id))
       .map((p) => ({ p, valor: p.custo != null ? Math.round(Number(p.estoque) * Number(p.custo) * 100) / 100 : null }))
       .sort((a, b) => (b.valor ?? -1) - (a.valor ?? -1) || a.p.nome.localeCompare(b.p.nome, "pt-BR"));
     return { ...x, unidade, parados, valorParado: Math.round(parados.reduce((t, i) => t + (i.valor ?? 0), 0) * 100) / 100 };

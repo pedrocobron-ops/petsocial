@@ -5,7 +5,7 @@ import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Importar from "@/components/gestao/importar";
-import { AlertTriangle, ArrowUpFromLine, BarChart3, Barcode, ClipboardList, Minus, Package, PackageX, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Tag, Truck, Wallet, Upload } from "lucide-react";
+import { AlertTriangle, ArrowUpFromLine, BarChart3, Barcode, Boxes, CalendarX, ClipboardCheck, ClipboardList, Minus, Package, PackageX, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Tag, Truck, Wallet, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useGestao } from "@/components/gestao/contexto";
 import { abrirAssistente, avisarMudanca, Campo, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
@@ -15,6 +15,7 @@ import VendaBalcao from "@/components/gestao/loja/venda";
 import Fornecedores, { EscolherFornecedor, pedeReposicao, useFornecedores, type Fornecedor } from "@/components/gestao/loja/fornecedores";
 import { LerComCamera } from "@/components/gestao/loja/leitor";
 import OQueComprar from "@/components/gestao/loja/o-que-comprar";
+import { lerItensDoKit, LotesDoProduto, nomeDoLote, ProdutosDoKit, quandoVence, resumoDaValidade, useItensDoKit, useLotesDoProduto, useVencimentos, Vencendo, type ItemDoKit } from "@/components/gestao/loja/validade";
 import OpcoesDaLoja from "@/components/gestao/ajustes/opcoes-loja";
 import { limparCodigo, margemDe, opcoesDaLoja, pct } from "@/lib/gestao/loja-opcoes";
 import { conferirCaixa, conferirValorAlto, gravarMovimentos, lancarPago, parteDaChave } from "@/lib/gestao/dinheiro";
@@ -53,7 +54,7 @@ function nivel(p: Produto): { tom: "ok" | "perto" | "baixo"; parte: number | nul
   return { tom: tem < min ? "baixo" : tem <= min * 1.5 ? "perto" : "ok", parte: Math.min(1, tem / (min * 2)) };
 }
 
-type Aberta = { tipo: "novo" | "venda" | "fornecedores" | "opcoes" | "comprar" } | { tipo: "entrada" | "saida" | "ficha"; produto: Produto };
+type Aberta = { tipo: "novo" | "venda" | "fornecedores" | "opcoes" | "comprar" | "vencendo" } | { tipo: "entrada" | "saida" | "ficha"; produto: Produto };
 
 /** O que as folhas de produto precisam saber das opções da loja. */
 type Loja = { margem: boolean; codigoBarras: boolean; fornecedores: boolean; lista: Fornecedor[]; recarregarFornecedores: () => Promise<unknown>; produtos: Produto[] };
@@ -81,7 +82,8 @@ export default function Estoque() {
   // saídas dos últimos 30 dias: só para o resumo do topo (se a busca falhar, o cartão fica de fora)
   const { dados: saidas, recarregar: recarregarSaidas } = useDados(async () => {
     const desde = new Date(Date.now() - 30 * 864e5).toISOString();
-    return lerTudo<{ motivo: string | null }>((de, ate, contar) => sb.from("movimentos_estoque").select("motivo", contando(contar)).eq("petshop_id", petshop.id).eq("tipo", "saida").gte("criado_em", desde).order("criado_em").order("id").range(de, ate));
+    // as saídas dos produtos de um kit vendido não contam de novo (a do kit já conta)
+    return lerTudo<{ motivo: string | null }>((de, ate, contar) => sb.from("movimentos_estoque").select("motivo", contando(contar)).eq("petshop_id", petshop.id).eq("tipo", "saida").is("kit_movimento_id", null).gte("criado_em", desde).order("criado_em").order("id").range(de, ate));
   }, [petshop.id]);
 
   const produtos = useMemo(() => dados ?? [], [dados]);
@@ -102,21 +104,31 @@ export default function Estoque() {
   const [mostrar, setMostrar] = useState(PASSO);
   useEffect(() => { setMostrar(PASSO); }, [q, filtro]);
 
-  const abrir = (a: Aberta) => { if (a.tipo !== "ficha" && a.tipo !== "fornecedores" && a.tipo !== "opcoes" && a.tipo !== "comprar" && somenteLeitura()) return; setAberta(a); };
+  // validade: lotes vencidos e vencendo (quem cuida do estoque ou do financeiro)
+  const vejoValidade = posso("estoque") || cuidoDoFinanceiro;
+  const { dados: venc, carregando: carregandoVenc, recarregar: recarregarVenc } = useVencimentos(vejoValidade);
+  const validade = resumoDaValidade(venc);
+  const comValidade = produtos.some((p) => p.controla_validade) || (venc?.lotes.length ?? 0) > 0;
+
+  const abrir = (a: Aberta) => { if (a.tipo !== "ficha" && a.tipo !== "fornecedores" && a.tipo !== "opcoes" && a.tipo !== "comprar" && a.tipo !== "vencendo" && somenteLeitura()) return; setAberta(a); };
   const fechar = () => setAberta(null);
   // atalho "Vender" da tela inicial (/gestao/app/estoque?vender=1): já abre a venda, uma vez só
   const temProdutos = produtos.length > 0;
   useEffect(() => {
-    if (!temProdutos || !new URLSearchParams(window.location.search).has("vender")) return;
+    const busca = new URLSearchParams(window.location.search);
+    // atalho do aviso de validade da tela Hoje (/gestao/app/estoque?ver=vencendo)
+    if (busca.get("ver") === "vencendo") { window.history.replaceState(null, "", window.location.pathname); setAberta({ tipo: "vencendo" }); return; }
+    if (!temProdutos || !busca.has("vender")) return;
     window.history.replaceState(null, "", window.location.pathname);
     if (!somenteLeitura()) setAberta({ tipo: "venda" });
   }, [temProdutos, somenteLeitura]);
-  const gravou = () => { fechar(); void recarregar(); void recarregarSaidas(); avisarMudanca(); };
+  const gravou = () => { fechar(); void recarregar(); void recarregarSaidas(); void recarregarVenc(); avisarMudanca(); };
 
   const categorias = new Set(produtos.map((p) => p.categoria?.trim()).filter(Boolean)).size;
-  const comCusto = produtos.filter((p) => p.custo != null && Number(p.estoque) > 0);
+  // kit fica de fora do valor: o saldo dele é o dos produtos do kit (não conta duas vezes)
+  const comCusto = produtos.filter((p) => p.tipo !== "kit" && p.custo != null && Number(p.estoque) > 0);
   const valorParado = comCusto.reduce((t, p) => t + Number(p.estoque) * Number(p.custo), 0);
-  const semCusto = produtos.filter((p) => p.custo == null && Number(p.estoque) > 0).length;
+  const semCusto = produtos.filter((p) => p.tipo !== "kit" && p.custo == null && Number(p.estoque) > 0).length;
   const vendas = (saidas ?? []).filter((m) => m.motivo === "Venda").length;
 
   return (
@@ -131,6 +143,8 @@ export default function Estoque() {
           <button className="g-btn sec" onClick={() => setImportando(true)}><Upload /> Trazer de planilha</button>
           {produtos.length > 0 && posso("estoque") && <button className="g-btn sec" onClick={() => abrir({ tipo: "comprar" })}><ClipboardList /> O que comprar</button>}
           {produtos.length > 0 && posso("estoque") && <Link className="g-btn sec" href="/gestao/app/estoque/etiquetas"><Tag /> Etiquetas</Link>}
+          {vejoValidade && comValidade && <button className="g-btn sec" onClick={() => abrir({ tipo: "vencendo" })}><CalendarX /> Vencendo</button>}
+          {produtos.length > 0 && posso("estoque") && <Link className="g-btn sec" href="/gestao/app/estoque/contagem"><ClipboardCheck /> Contagem</Link>}
           {op.fornecedores && <button className="g-btn sec" onClick={() => abrir({ tipo: "fornecedores" })}><Truck /> Fornecedores</button>}
           {souDono && <button className="g-btn sec" onClick={() => abrir({ tipo: "opcoes" })}><SlidersHorizontal /> Opções</button>}
           <button className="g-btn pri" onClick={() => abrir({ tipo: "novo" })}><Plus /> Produto novo</button>
@@ -165,6 +179,18 @@ export default function Estoque() {
             {": "}{baixos.slice(0, 5).map((p) => p.nome).join(", ")}{baixos.length > 5 ? ` e mais ${baixos.length - 5}` : ""}
           </span>
           {filtro !== "acabando" && <button className="g-btn sec p" onClick={() => setFiltro("acabando")}>Ver</button>}
+        </div>
+      )}
+
+      {validade.vencidos.length + validade.em30.length > 0 && (
+        <div className={`g-aviso${validade.vencidos.length ? " vermelho" : ""}`} data-teste="aviso-validade">
+          <CalendarX />
+          <span className="g-cresce">
+            <b>{[validade.vencidos.length ? (validade.vencidos.length === 1 ? "1 lote vencido" : `${validade.vencidos.length} lotes vencidos`) : "",
+              validade.em30.length ? `${validade.em30.length === 1 ? "1 lote vence" : `${validade.em30.length} lotes vencem`} em até 30 dias` : ""].filter(Boolean).join(" e ")}</b>
+            {": "}{[...new Set([...validade.vencidos, ...validade.em30].map((l) => l.nome))].slice(0, 4).join(", ")}
+          </span>
+          <button className="g-btn sec p" onClick={() => abrir({ tipo: "vencendo" })}>Ver</button>
         </div>
       )}
 
@@ -206,13 +232,14 @@ export default function Estoque() {
               {lista.slice(0, mostrar).map((p) => {
                 const n = nivel(p), min = Number(p.estoque_minimo);
                 const mg = op.margem && vejoCusto ? margemDe(p.preco_venda, p.custo) : null;
+                const kit = p.tipo === "kit", perto = validade.perto.get(p.id);
                 return (
                   <div key={p.id} className={`g-card g-est-prod ${n.tom}`}>
                     <button type="button" className="g-est-cab" onClick={() => abrir({ tipo: "ficha", produto: p })} aria-label={`Abrir ${p.nome}`}>
-                      <Tile icone={zerado(p) ? PackageX : Package} tom="rosa" />
+                      <Tile icone={kit ? Boxes : zerado(p) ? PackageX : Package} tom={kit ? "lilas" : "rosa"} />
                       <span className="t">
                         <b>{p.nome}</b>
-                        <span>{[p.categoria, p.preco_venda != null ? `vende a ${brl(p.preco_venda)}` : null].filter(Boolean).join(" · ") || "Sem categoria"}</span>
+                        <span>{[kit ? "Kit" : null, p.categoria, p.preco_venda != null ? `vende a ${brl(p.preco_venda)}` : null].filter(Boolean).join(" · ") || "Sem categoria"}</span>
                       </span>
                       <span className="g-est-saldo">
                         <span className="g-num m">{fmtQtd(p.estoque)}</span>
@@ -228,12 +255,15 @@ export default function Estoque() {
                       ) : <div className="g-est-barra sem" aria-hidden />}
                       <div className="g-est-leg">
                         {mg?.prejuizo && <span className="g-tag vermelho">vende abaixo do custo</span>}
+                        {perto && <span className={`g-tag ${perto.dias < 0 ? "vermelho" : perto.dias <= 30 ? "laranja" : "amarelo"}`}>{quandoVence(perto.dias)}</span>}
                         {zerado(p) ? <span className="g-tag vermelho">zerado</span> : acabando(p) ? <span className="g-tag laranja">acabando</span> : n.tom === "perto" ? <span className="g-tag amarelo">perto do mínimo</span> : null}
-                        <span className="g-muted g-pp g-tab">{min > 0 ? `mínimo ${fmtQtd(min)} ${p.unidade}` : "sem mínimo definido"}{mg && !mg.prejuizo && mg.pct != null ? ` · margem ${pct(mg.pct)}` : ""}</span>
+                        <span className="g-muted g-pp g-tab">{kit ? "dá para montar" : min > 0 ? `mínimo ${fmtQtd(min)} ${p.unidade}` : "sem mínimo definido"}{mg && !mg.prejuizo && mg.pct != null ? ` · margem ${pct(mg.pct)}` : ""}</span>
                       </div>
                     </div>
                     <div className="g-est-pe">
-                      <button className="g-btn sec p" onClick={() => abrir({ tipo: "entrada", produto: p })}><Plus /> Entrada</button>
+                      {kit
+                        ? <button className="g-btn sec p" onClick={() => abrir({ tipo: "ficha", produto: p })}><Boxes /> Produtos do kit</button>
+                        : <button className="g-btn sec p" onClick={() => abrir({ tipo: "entrada", produto: p })}><Plus /> Entrada</button>}
                       <button className="g-btn sec p" onClick={() => abrir({ tipo: "saida", produto: p })} disabled={zerado(p)}><Minus /> Saída</button>
                     </div>
                   </div>
@@ -252,6 +282,7 @@ export default function Estoque() {
       {aberta?.tipo === "venda" && <VendaBalcao aoFechar={fechar} aoPronto={gravou} />}
       {aberta?.tipo === "novo" && <ProdutoNovo loja={loja} aoFechar={fechar} aoGravar={gravou} />}
       {aberta?.tipo === "entrada" && <Entrada produto={aberta.produto} loja={loja} aoFechar={fechar} aoGravar={gravou} />}
+      {aberta?.tipo === "vencendo" && <Vencendo dados={venc} carregando={carregandoVenc} aoFechar={fechar} aoMudar={() => { void recarregar(); void recarregarVenc(); void recarregarSaidas(); avisarMudanca(); }} />}
       {aberta?.tipo === "comprar" && <OQueComprar produtos={produtos} fornecedores={fornecedores} comFornecedores={op.fornecedores} aoFechar={fechar} />}
       {aberta?.tipo === "fornecedores" && <Fornecedores produtos={produtos} fornecedores={fornecedores} aoFechar={fechar} aoMudar={recarregarFornecedores} />}
       {aberta?.tipo === "opcoes" && (
@@ -270,10 +301,12 @@ export default function Estoque() {
 
 /* ---------- campos do produto (novo e ficha) ---------- */
 
-type CamposProduto = { nome: string; categoria: string; unidade: string; preco: number | null; custo: number | null; minimo: string; caixa: string; codigo: string; fornecedorId: string | null };
+type CamposProduto = { nome: string; categoria: string; unidade: string; preco: number | null; custo: number | null; minimo: string; caixa: string; codigo: string; fornecedorId: string | null; controla: boolean };
 
-function CamposDoProduto({ v, mudar, categorias, loja, produto, precoFixo, aoGerarCodigo, gerandoCodigo }: {
+function CamposDoProduto({ v, mudar, categorias, loja, produto, precoFixo, aoGerarCodigo, gerandoCodigo, kit }: {
   v: CamposProduto; mudar: (p: Partial<CamposProduto>) => void; categorias?: string[]; loja: Loja; /** Na ficha: o produto como está gravado. */ produto?: Produto;
+  /** Kit: sem unidade, custo, caixa e fornecedor próprios (vêm dos produtos do kit). */
+  kit?: boolean;
   /** Preço travado e a pessoa não é o dono nem cuida do financeiro: o preço de venda não muda por aqui. */
   precoFixo?: boolean;
   /** Na ficha, produto sem código: gera o código interno (Code 128) e guarda. */
@@ -302,18 +335,22 @@ function CamposDoProduto({ v, mudar, categorias, loja, produto, precoFixo, aoGer
         <Campo rotulo="Categoria">
           <input className="g-input" value={v.categoria} onChange={(e) => mudar({ categoria: e.target.value })} placeholder="Ex.: Ração" list="ge-categorias" />
         </Campo>
-        <Campo rotulo="Unidade">
-          <select className="g-select" value={v.unidade} onChange={(e) => mudar({ unidade: e.target.value })}>
-            {(UNIDADES.includes(v.unidade) ? UNIDADES : [v.unidade, ...UNIDADES]).map((u) => <option key={u} value={u}>{u}</option>)}
-          </select>
-        </Campo>
+        {!kit && (
+          <Campo rotulo="Unidade">
+            <select className="g-select" value={v.unidade} onChange={(e) => mudar({ unidade: e.target.value })}>
+              {(UNIDADES.includes(v.unidade) ? UNIDADES : [v.unidade, ...UNIDADES]).map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </Campo>
+        )}
       </div>
       {categorias && <datalist id="ge-categorias">{categorias.map((c) => <option key={c} value={c} />)}</datalist>}
       <div className="dupla">
         <Campo rotulo="Preço de venda" dica={precoFixo ? "Com o preço travado, só o dono ou quem vê o financeiro muda o preço de venda." : produto ? "Mudar o preço fica anotado, com o seu nome, para o dono ver." : undefined}>
           <CampoDinheiro valor={v.preco} aoMudar={(n) => mudar({ preco: n })} desligado={precoFixo} />
         </Campo>
-        <Campo rotulo={loja.margem && produto ? "Custo médio" : "Custo"}><CampoDinheiro valor={v.custo} aoMudar={(n) => mudar({ custo: n })} /></Campo>
+        {kit
+          ? <Campo rotulo="Custo do kit" dica="A soma do custo dos produtos do kit."><input className="g-input g-tab" readOnly value={produto?.custo != null ? brl(produto.custo) : "–"} aria-label="Custo do kit" /></Campo>
+          : <Campo rotulo={loja.margem && produto ? "Custo médio" : "Custo"}><CampoDinheiro valor={v.custo} aoMudar={(n) => mudar({ custo: n })} /></Campo>}
       </div>
       {loja.margem && (
         <div className="g-lj-margem">
@@ -327,7 +364,7 @@ function CamposDoProduto({ v, mudar, categorias, loja, produto, precoFixo, aoGer
           )}
         </div>
       )}
-      {loja.fornecedores && (
+      {loja.fornecedores && !kit && (
         <Campo rotulo="Último fornecedor" dica="Muda sozinho quando você escolhe o fornecedor numa entrada.">
           <select className="g-select" value={v.fornecedorId ?? ""} onChange={(e) => mudar({ fornecedorId: e.target.value || null })}>
             <option value="">Nenhum</option>
@@ -339,10 +376,18 @@ function CamposDoProduto({ v, mudar, categorias, loja, produto, precoFixo, aoGer
         <Campo rotulo="Estoque mínimo" dica="Abaixo disso, o produto aparece como acabando. Deixe 0 para não avisar.">
           <input className="g-input g-tab" inputMode="decimal" value={v.minimo} onChange={(e) => mudar({ minimo: e.target.value })} placeholder="0" />
         </Campo>
-        <Campo rotulo="Vem em caixa de" dica={`Opcional. Quantos ${v.unidade} vêm na caixa do fornecedor: O que comprar sugere caixas inteiras.`}>
-          <input className="g-input g-tab" inputMode="decimal" value={v.caixa} onChange={(e) => mudar({ caixa: e.target.value })} placeholder="Ex.: 12" aria-label="Vem em caixa de" />
-        </Campo>
+        {!kit && (
+          <Campo rotulo="Vem em caixa de" dica={`Opcional. Quantos ${v.unidade} vêm na caixa do fornecedor: O que comprar sugere caixas inteiras.`}>
+            <input className="g-input g-tab" inputMode="decimal" value={v.caixa} onChange={(e) => mudar({ caixa: e.target.value })} placeholder="Ex.: 12" aria-label="Vem em caixa de" />
+          </Campo>
+        )}
       </div>
+      {!kit && (
+        <label className="g-check">
+          <input type="checkbox" checked={v.controla} onChange={(e) => mudar({ controla: e.target.checked })} />
+          <span>Controlar validade <small className="g-muted">(cada entrada pede o lote e a validade; a venda tira primeiro o que vence antes)</small></span>
+        </label>
+      )}
     </>
   );
 }
@@ -365,8 +410,12 @@ function camposDaLoja(loja: Loja, v: CamposProduto) {
 function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () => void; aoGravar: () => void }) {
   const { sb, petshop, user } = useGestao();
   const { avisar, avisarErro } = useAvisos();
-  const [v, setV] = useState<CamposProduto>({ nome: "", categoria: "", unidade: "un", preco: null, custo: null, minimo: "", caixa: "", codigo: "", fornecedorId: null });
+  const { posso, cuidoDoFinanceiro } = useGestao();
+  const [v, setV] = useState<CamposProduto>({ nome: "", categoria: "", unidade: "un", preco: null, custo: null, minimo: "", caixa: "", codigo: "", fornecedorId: null, controla: false });
   const [inicial, setInicial] = useState("");
+  const [tipo, setTipo] = useState<"produto" | "kit">("produto");
+  const [itensKit, setItensKit] = useState<ItemDoKit[]>([]);
+  const kit = tipo === "kit";
   const [salvando, setSalvando] = useState(false);
 
   const op = useOperacao();
@@ -381,14 +430,23 @@ function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () =>
     if (minimo == null || qtd == null || caixa === undefined) { avisarErro("Confira as quantidades: use só números."); return; }
     const repetido = loja.codigoBarras ? donoDoCodigo(loja.produtos, limparCodigo(v.codigo)) : null;
     if (repetido) { avisarErro(`Este código de barras já está em ${repetido.nome}. Cada produto tem o seu.`); return; }
+    const itens = kit ? lerItensDoKit(itensKit) : [];
+    if (typeof itens === "string") { avisarErro(itens); return; }
     setSalvando(true);
     try {
-      // o produto já foi criado nesta operação e só o estoque inicial falhou: a nova tentativa não cria outro
+      // o produto já foi criado nesta operação e só o estoque inicial (ou a lista do kit) falhou: a nova tentativa não cria outro
       const novo = criado.current?.chave === chave ? { id: criado.current.id } : ok(await sb.from("produtos").insert({
-        petshop_id: petshop.id, nome, categoria: v.categoria.trim() || null, unidade: v.unidade,
-        preco_venda: v.preco, custo: v.custo, estoque_minimo: minimo, embalagem_qtd: caixa, ...camposDaLoja(loja, v),
+        petshop_id: petshop.id, nome, categoria: v.categoria.trim() || null, unidade: kit ? "un" : v.unidade,
+        preco_venda: v.preco, custo: kit ? null : v.custo, estoque_minimo: minimo, embalagem_qtd: kit ? null : caixa,
+        ...camposDaLoja(loja, kit ? { ...v, fornecedorId: null } : v), tipo, controla_validade: !kit && v.controla,
       }).select("id").single());
       criado.current = { chave, id: novo.id };
+      if (kit) {
+        ok(await sb.rpc("kit_definir_itens", { p_kit: novo.id, p_itens: itens }));
+        avisar(`${nome} está no estoque.`);
+        aoGravar();
+        return;
+      }
       if (qtd > 0) {
         await gravarMovimentos(sb, petshop.id, [{
           petshop_id: petshop.id, produto_id: novo.id, tipo: "entrada", quantidade: qtd, custo_unitario: v.custo,
@@ -408,10 +466,22 @@ function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () =>
         <button className="g-btn pri" onClick={salvar} disabled={salvando}>{salvando ? "Salvando…" : "Salvar produto"}</button>
       </>}>
       <div className="g-form">
-        <CamposDoProduto v={v} mudar={(p) => setV((a) => ({ ...a, ...p }))} loja={loja} />
-        <Campo rotulo={`Quanto tem hoje (${v.unidade})`} dica="O que já está na prateleira. Pode deixar em branco.">
-          <input className="g-input g-tab" inputMode="decimal" value={inicial} onChange={(e) => setInicial(e.target.value)} placeholder="0" />
-        </Campo>
+        <div className="g-campo">
+          <span>Tipo</span>
+          <div className="g-chips" role="group" aria-label="Tipo do produto">
+            <button type="button" className="g-chip" aria-pressed={!kit} onClick={() => setTipo("produto")}>Produto</button>
+            <button type="button" className="g-chip" aria-pressed={kit} onClick={() => setTipo("kit")}><Boxes style={{ width: 15, height: 15 }} /> Kit ou combo</button>
+          </div>
+          {kit && <small className="g-muted">Um kit junta outros produtos (ex.: shampoo + condicionador). Vender o kit tira cada produto do estoque.</small>}
+        </div>
+        <CamposDoProduto v={v} mudar={(p) => setV((a) => ({ ...a, ...p }))} loja={loja} kit={kit} />
+        {kit ? (
+          <ProdutosDoKit itens={itensKit} mudar={setItensKit} produtos={loja.produtos} vejoCusto={posso("estoque") || cuidoDoFinanceiro} />
+        ) : (
+          <Campo rotulo={`Quanto tem hoje (${v.unidade})`} dica="O que já está na prateleira. Pode deixar em branco.">
+            <input className="g-input g-tab" inputMode="decimal" value={inicial} onChange={(e) => setInicial(e.target.value)} placeholder="0" />
+          </Campo>
+        )}
       </div>
     </Folha>
   );
@@ -435,6 +505,9 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
   const [fornecedorId, setFornecedorId] = useState<string | null>(loja.fornecedores && loja.lista.some((f) => f.id === produto.fornecedor_id && f.ativo) ? produto.fornecedor_id : null);
   const [despesa, setDespesa] = useState(true);
   const [etiquetas, setEtiquetas] = useState(false);
+  // validade e lote: só com "Controlar validade" no produto (os dois opcionais)
+  const [loteTxt, setLoteTxt] = useState("");
+  const [validade, setValidade] = useState("");
   const router = useRouter();
   // despesa é uma forma só, e nada vem marcado: a pessoa diz como pagou o fornecedor
   const [forma, setForma] = useState<Forma | null>(null);
@@ -453,6 +526,7 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
     const custoRuim = erroDeValor(custo, "O custo") ?? (lanca ? erroDeValor(total, "O total da compra") : null);
     if (custoRuim) { avisarErro(custoRuim); return; }
     if (lanca && !forma) { setErroForma("Escolha como você pagou a compra."); avisarErro("Escolha a forma de pagamento."); return; }
+    if (validade && !/^(20\d\d|2100)-\d\d-\d\d$/.test(validade)) { avisarErro("Confira a validade."); return; }
     if (lanca && !(await conferirValorAlto(total, confirmar))) return;
     if (lanca && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     setSalvando(true);
@@ -460,6 +534,7 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
       await gravarMovimentos(sb, petshop.id, [{
         petshop_id: petshop.id, produto_id: produto.id, tipo: "entrada", quantidade: n, custo_unitario: custo || null,
         motivo: "Compra", criado_por: user.id, ...(loja.fornecedores && fornecedorId ? { fornecedor_id: fornecedorId } : {}),
+        ...(produto.controla_validade && (loteTxt.trim() || validade) ? { lote: loteTxt.trim().slice(0, 60) || null, validade: validade || null } : {}),
         chave: parteDaChave(chave, "entrada"),
       }]);
       if (lanca && forma) {
@@ -496,6 +571,16 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
           </Campo>
           <Campo rotulo={`Custo por ${produto.unidade}`} dica="Opcional" erro={erroDeValor(custo, "O custo")}><CampoDinheiro valor={custo} aoMudar={setCusto} /></Campo>
         </div>
+        {produto.controla_validade && (
+          <div className="dupla">
+            <Campo rotulo="Lote" dica="Opcional. O código do lote na embalagem.">
+              <input className="g-input" value={loteTxt} maxLength={60} onChange={(e) => setLoteTxt(e.target.value)} placeholder="Ex.: L2311A" />
+            </Campo>
+            <Campo rotulo="Validade" dica="Opcional. A venda tira primeiro o que vence antes.">
+              <input className="g-input g-tab" type="date" value={validade} min="2000-01-01" max="2100-12-31" onChange={(e) => setValidade(e.target.value)} aria-label="Validade" />
+            </Campo>
+          </div>
+        )}
         {loja.margem && (
           <p className="g-muted g-pp" role="status">
             {n && custo
@@ -542,6 +627,9 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
   const [erroMotivo, setErroMotivo] = useState(false);
   const caixa = useCaixaAberto();
   const [salvando, setSalvando] = useState(false);
+  // lotes com saldo: a saída tira do que vence antes, ou do lote escolhido
+  const { dados: lotes } = useLotesDoProduto(produto.id, produto.tipo !== "kit");
+  const [loteId, setLoteId] = useState("");
 
   const n = lerQtd(qtd);
   const saldo = Number(produto.estoque);
@@ -582,7 +670,7 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
           // a saída já nasce ligada à venda: é assim que o relatório de produtos acha o custo desta venda
           await gravarMovimentos(sb, petshop.id, [{
             petshop_id: petshop.id, produto_id: produto.id, tipo: "saida", quantidade: n, motivo, criado_por: user.id, chave: parteDaChave(chave, "saida"),
-            ...(lancado?.id ? { lancamento_id: lancado.id } : {}),
+            ...(lancado?.id ? { lancamento_id: lancado.id } : {}), ...(loteId ? { lote_id: loteId } : {}),
           }]);
           avisar(`Venda de ${brl(valor)} anotada.`);
         } catch (e) {
@@ -592,6 +680,7 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
       } else {
         await gravarMovimentos(sb, petshop.id, [{
           petshop_id: petshop.id, produto_id: produto.id, tipo: "saida", quantidade: n, motivo, criado_por: user.id, chave: parteDaChave(chave, "saida"),
+          ...(loteId ? { lote_id: loteId } : {}),
         }]);
         avisar(`Saíram ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}.`);
       }
@@ -618,6 +707,15 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
           </div>
           {erroMotivo && <small className="erro" role="alert">Escolha o motivo da saída.</small>}
         </div>
+        {(lotes?.length ?? 0) > 0 && (
+          <Campo rotulo="De qual lote?" dica="Sem escolher, sai primeiro o que vence antes.">
+            <select className="g-select" value={loteId} onChange={(e) => setLoteId(e.target.value)} aria-label="De qual lote">
+              <option value="">O que vence antes (automático)</option>
+              {lotes!.map((l) => <option key={l.id} value={l.id}>{nomeDoLote(l)} · tem {fmtQtd(l.quantidade)} {produto.unidade}</option>)}
+            </select>
+          </Campo>
+        )}
+        {produto.tipo === "kit" && <p className="g-muted g-pp">Kit: cada produto do kit sai do estoque.</p>}
         {venda && (vejoFinanceiro ? (
           <>
             <Campo rotulo="Valor da venda" erro={erroDeValor(valor, "O valor da venda")}
@@ -653,8 +751,16 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
   const [v, setV] = useState<CamposProduto>({
     nome: produto.nome, categoria: produto.categoria ?? "", unidade: produto.unidade, preco: produto.preco_venda, custo: produto.custo,
     minimo: Number(produto.estoque_minimo) ? fmtQtd(produto.estoque_minimo) : "", caixa: produto.embalagem_qtd ? fmtQtd(produto.embalagem_qtd) : "",
-    codigo: produto.codigo_barras ?? "", fornecedorId: produto.fornecedor_id,
+    codigo: produto.codigo_barras ?? "", fornecedorId: produto.fornecedor_id, controla: Boolean(produto.controla_validade),
   });
+  const kit = produto.tipo === "kit";
+  // kit: a lista de produtos (só grava quando muda); produto com validade: os lotes
+  const { dados: itensGravados } = useItensDoKit(kit ? produto.id : null);
+  const [itensKit, setItensKit] = useState<ItemDoKit[] | null>(null);
+  useEffect(() => { if (itensGravados && itensKit === null) setItensKit(itensGravados.map((i) => ({ componente_id: i.componente_id, qtd: fmtQtd(i.quantidade) }))); }, [itensGravados, itensKit]);
+  const mudouKit = kit && itensKit != null && itensGravados != null
+    && JSON.stringify(itensKit.map((i) => [i.componente_id, lerQtd(i.qtd)])) !== JSON.stringify(itensGravados.map((i) => [i.componente_id, i.quantidade]));
+  const { dados: lotes } = useLotesDoProduto(produto.id, !kit && (Boolean(produto.controla_validade) || v.controla));
   const [gerandoCodigo, setGerandoCodigo] = useState(false);
   async function gerarCodigo() {
     if (somenteLeitura()) return;
@@ -685,12 +791,18 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
     if (caixa === undefined) { avisarErro("Confira o Vem em caixa de: use só números, maior que zero."); return; }
     const repetido = loja.codigoBarras ? donoDoCodigo(loja.produtos, limparCodigo(v.codigo), produto.id) : null;
     if (repetido) { avisarErro(`Este código de barras já está em ${repetido.nome}. Cada produto tem o seu.`); return; }
+    const itens = mudouKit && itensKit ? lerItensDoKit(itensKit) : null;
+    if (typeof itens === "string") { avisarErro(itens); return; }
     setSalvando(true);
     try {
+      if (itens) ok(await sb.rpc("kit_definir_itens", { p_kit: produto.id, p_itens: itens }));
       // o preço só vai quando mudou: mudar o preço fica anotado (e, com a trava, só o dono ou quem vê o financeiro muda)
       const mudouPreco = (v.preco ?? null) !== (produto.preco_venda == null ? null : Number(produto.preco_venda));
       ok(await sb.from("produtos").update({
-        nome, categoria: v.categoria.trim() || null, unidade: v.unidade, ...(mudouPreco && !precoFixo ? { preco_venda: v.preco } : {}), custo: v.custo, estoque_minimo: minimo, embalagem_qtd: caixa, ...camposDaLoja(loja, v),
+        nome, categoria: v.categoria.trim() || null, ...(mudouPreco && !precoFixo ? { preco_venda: v.preco } : {}), estoque_minimo: minimo,
+        // kit: unidade, custo, caixa e fornecedor vêm dos produtos do kit
+        ...(kit ? {} : { unidade: v.unidade, custo: v.custo, embalagem_qtd: caixa, controla_validade: v.controla, ...camposDaLoja(loja, v) }),
+        ...(kit && loja.codigoBarras ? { codigo_barras: limparCodigo(v.codigo) } : {}),
       }).eq("id", produto.id).eq("petshop_id", petshop.id).select("id").single());
       avisar("Produto atualizado.");
       aoGravar();
@@ -736,10 +848,10 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
         <div className={`g-card g-est-ficha ${nivel(produto).tom}`}>
           <div className="g-fila entre">
             <div>
-              <span className="g-rotulo">Saldo</span>
-              <div><span className="g-num">{fmtQtd(produto.estoque)}</span> <span className="g-muted">{produto.unidade}</span></div>
+              <span className="g-rotulo">{kit ? "Dá para montar" : "Saldo"}</span>
+              <div><span className="g-num">{fmtQtd(produto.estoque)}</span> <span className="g-muted">{kit ? (Number(produto.estoque) === 1 ? "kit" : "kits") : produto.unidade}</span></div>
             </div>
-            {contado === null && <button className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setContado(""); }}>Corrigir saldo</button>}
+            {contado === null && !kit && <button className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setContado(""); }}>Corrigir saldo</button>}
           </div>
           {contado !== null && (
             <div className="g-form" style={{ marginTop: 14 }}>
@@ -758,9 +870,18 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
         </div>
 
         <div className="g-form">
-          <CamposDoProduto v={v} mudar={(p) => setV((a) => ({ ...a, ...p }))} loja={loja} produto={produto} precoFixo={precoFixo}
+          <CamposDoProduto v={v} mudar={(p) => setV((a) => ({ ...a, ...p }))} loja={loja} produto={produto} precoFixo={precoFixo} kit={kit}
             aoGerarCodigo={loja.codigoBarras && posso("estoque") ? () => void gerarCodigo() : undefined} gerandoCodigo={gerandoCodigo} />
+          {kit && (itensKit == null ? <Esqueleto linhas={2} /> : (
+            <ProdutosDoKit itens={itensKit} mudar={setItensKit} produtos={loja.produtos} vejoCusto={posso("estoque") || cuidoDoFinanceiro} kitId={produto.id} />
+          ))}
         </div>
+        {!kit && (Boolean(produto.controla_validade) || (lotes?.length ?? 0) > 0) && (
+          <section>
+            <h3 style={{ marginBottom: 6 }}>Lotes e validade</h3>
+            <LotesDoProduto produto={produto} lotes={lotes ?? []} />
+          </section>
+        )}
         {posso("estoque") && (
           <div><Link className="g-btn sec p" href={`/gestao/app/estoque/etiquetas?p=${produto.id}:1`}><Tag /> Imprimir etiquetas</Link></div>
         )}
