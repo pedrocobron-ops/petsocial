@@ -68,10 +68,10 @@ export default function TermosDoGestao() {
 
       <Indice partes={PARTES} />
 
-      {p("quem-somos", `O Gestão é oferecido pela empresa dona da marca ${EMPRESA.marca}. Ao criar a conta, você faz um contrato com ela.`, <>
+      {p("quem-somos", EMPRESA.pessoaFisica ? `O Gestão é oferecido por ${EMPRESA.nome}, pessoa física responsável pela marca ${EMPRESA.marca}. Ao criar a conta, você faz um contrato com ele.` : `O Gestão é oferecido pela empresa responsável pela marca ${EMPRESA.marca}. Ao criar a conta, você faz um contrato com ela.`, <>
         <p>
-          O Maestro Pet Gestão (o &quot;Gestão&quot; ou o &quot;sistema&quot;) é oferecido por <QuemResponde />, dona da marca {EMPRESA.marca}.
-          Neste texto, &quot;nós&quot; é essa empresa. &quot;Você&quot; ou &quot;assinante&quot; é a pessoa ou a empresa que cria a conta do pet shop.
+          O Maestro Pet Gestão (o &quot;Gestão&quot; ou o &quot;sistema&quot;) é oferecido por <QuemResponde />, {EMPRESA.pessoaFisica ? "responsável" : "dona"} pela marca {EMPRESA.marca}.
+          Neste texto, &quot;nós&quot; é quem oferece o Gestão: hoje, {EMPRESA.pessoaFisica ? "a pessoa física indicada acima" : "a empresa indicada acima"}; depois, a empresa que assumir o serviço (parte 26). &quot;Você&quot; ou &quot;assinante&quot; é a pessoa ou a empresa que cria a conta do pet shop.
           &quot;Equipe&quot; são as pessoas que você convida para entrar na conta. &quot;Clientes&quot; ou &quot;tutores&quot; são os clientes do seu pet shop.
         </p>
         <p>
@@ -106,8 +106,8 @@ export default function TermosDoGestao() {
 
       {p("conta", "Cada pessoa entra com o próprio login. Você cuida das senhas, decide o que cada pessoa da equipe pode abrir e responde pelo que fazem na conta.", <>
         <ul>
-          <li>Para criar a conta você informa nome, e-mail e senha. Use um e-mail seu e que funcione: é por ele que confirmamos a conta, trocamos a senha e mandamos avisos.</li>
-          <li>Quem cria o pet shop é o <b>dono</b> da conta no sistema. O dono convida a equipe, escolhe as áreas que cada pessoa abre (agenda, caixa, financeiro, estoque e outras) e muda os ajustes. O número de logins depende do plano.</li>
+          <li>Para criar a conta você informa nome, e-mail e senha. Digite com cuidado um e-mail que é seu e que você usa: hoje o sistema não manda link para confirmar o e-mail no cadastro. É por esse e-mail que você troca a senha, recebe os avisos da conta e da cobrança e é reconhecido no pagamento. Se ele estiver errado, os avisos podem não chegar ou chegar a outra pessoa. Podemos pedir a confirmação do e-mail a qualquer momento e limitar a conta até ela ser feita.</li>
+          <li>Quem cria o pet shop é o <b>dono</b> da conta no sistema. O dono convida a equipe por um link com código, que vale só para o e-mail convidado, escolhe as áreas que cada pessoa abre (agenda, caixa, financeiro, estoque e outras) e muda os ajustes. O número de logins depende do plano.</li>
           <li>Cada pessoa entra com o <b>próprio e-mail e senha</b>. Não divida o mesmo login entre pessoas e não passe a senha a ninguém.</li>
           <li>O que for feito com um login da sua conta é considerado feito pelo seu pet shop. Você responde pelos atos das pessoas que convidou, como responde pelos atos da sua equipe no balcão.</li>
           <li>Quando alguém sair da equipe, tire o acesso dessa pessoa em Equipe no mesmo dia.</li>
@@ -135,7 +135,7 @@ export default function TermosDoGestao() {
           ))}
         </ul>
         <ul>
-          <li>O preço que vale para você é o mostrado na tela Assinatura e no checkout no momento em que você assina, com os impostos já incluídos.</li>
+          <li>O preço que vale para você é o mostrado na tela Assinatura e no checkout no momento em que você assina. É o valor final, sem acréscimos. O comprovante do pagamento é enviado pela Cakto.</li>
           <li>O pagamento é feito na <b>Cakto</b>, a plataforma de pagamentos que usamos. Os dados do cartão ou do Pix são digitados no ambiente dela, sob as regras dela. Nós não recebemos nem guardamos o número do seu cartão.</li>
           <li>A cobrança é <b>recorrente</b>: conforme o período escolhido, todo mês, a cada 3 ou a cada 6 meses, e a assinatura se renova sozinha pelo mesmo período até você cancelar.</li>
           <li>Use no checkout o mesmo e-mail da sua conta: é por ele que o sistema reconhece o pagamento e libera o acesso. Pagamento com outro e-mail pode demorar a ser reconhecido.</li>
@@ -150,7 +150,7 @@ export default function TermosDoGestao() {
           <li>O cancelamento encerra as renovações seguintes. Você continua usando até o fim do período que já pagou; depois a conta fica só para consulta.</li>
           <li><b>Arrependimento em 7 dias:</b> se pedir o cancelamento em até 7 dias depois do primeiro pagamento de uma assinatura, devolvemos o valor integral desse pagamento, mesmo nos planos de 3 e 6 meses.</li>
           <li>Fora desse prazo, não devolvemos o valor de períodos já começados, inclusive se você deixar de usar o sistema, salvo quando a lei mandar ou quando o serviço não puder ser usado por falha nossa.</li>
-          <li>A devolução é feita pela Cakto, pelo mesmo meio de pagamento, nos prazos dela e da operadora do cartão. Também valem as regras de reembolso publicadas pela Cakto no momento da compra.</li>
+          <li>A devolução é feita pela Cakto, pelo mesmo meio de pagamento, nos prazos dela e da operadora do cartão. Se as regras da Cakto derem a você mais prazo ou mais direitos, valem as dela.</li>
           <li>Para mudar de plano, cancele o atual e assine o novo: os dados do pet shop continuam os mesmos.</li>
         </ul>
       </>)}
@@ -159,7 +159,7 @@ export default function TermosDoGestao() {
         <ul>
           <li>Se uma cobrança não passar, o acesso continua por um tempo enquanto a Cakto tenta de novo. Sem acerto, a assinatura é encerrada e a conta fica só para consulta.</li>
           <li>Com a conta só para consulta, os dados continuam guardados e você ainda consegue baixar as planilhas e todos os dados (Meu pet shop, Baixar todos os dados).</li>
-          <li>Se a conta ficar só para consulta por mais de <b>{DIAS_ATE_APAGAR} dias</b> seguidos (depois do teste ou por falta de pagamento), podemos apagar a conta e os dados do pet shop. Antes, avisamos o dono por e-mail com pelo menos <b>{DIAS_DE_AVISO} dias</b> de antecedência, para dar tempo de assinar ou baixar os dados.</li>
+          <li>Se a conta ficar só para consulta por mais de <b>{DIAS_ATE_APAGAR} dias</b> seguidos (depois do teste ou por falta de pagamento), podemos apagar a conta e os dados do pet shop. Antes, avisamos o dono por e-mail e na tela do aplicativo com pelo menos <b>{DIAS_DE_AVISO} dias</b> de antecedência, para dar tempo de assinar ou baixar os dados.</li>
           <li>Contestação de pagamento já feito (chargeback) sem motivo pode levar à suspensão da conta até o acerto.</li>
         </ul>
       </>)}
@@ -170,6 +170,7 @@ export default function TermosDoGestao() {
           <li>lançar, guardar ou divulgar conteúdo ilegal, ofensivo, discriminatório, que viole direitos de outras pessoas ou que exponha alguém sem autorização;</li>
           <li>usar o sistema ou os textos que ele prepara para mandar mensagens em massa, propaganda não pedida (spam) ou golpes;</li>
           <li>se passar por outra pessoa ou empresa, criar contas com dados falsos ou usar a conta de outro pet shop;</li>
+          <li>criar conta ou aceitar convite com um e-mail que não é seu;</li>
           <li>copiar, revender, alugar ou sublicenciar o sistema, ou oferecer o acesso a terceiros fora da sua equipe;</li>
           <li>tentar descobrir o código, desmontar o sistema (engenharia reversa), contornar a segurança, ler dados de outro pet shop ou testar falhas sem a nossa autorização por escrito;</li>
           <li>usar robôs, raspadores (scraping) ou outros meios automáticos para tirar dados do sistema ou das páginas públicas, fora das exportações que o próprio sistema oferece;</li>
@@ -194,7 +195,7 @@ export default function TermosDoGestao() {
           <li>lançar só os dados necessários e ter uma base legal para tratá-los (por exemplo, a prestação do serviço ao tutor);</li>
           <li>informar os seus clientes de como usa os dados deles, inclusive que usa um sistema como o nosso;</li>
           <li>obter a autorização do tutor quando a lei pedir, como para fotos usadas em divulgação e mensagens que não sejam do atendimento. Para as fotos, o sistema oferece a autorização pelo boletim (parte 11);</li>
-          <li>não usar os campos de observação para dados sensíveis de pessoas (saúde, religião, origem racial e outros), nem para dados de crianças;</li>
+          <li>não usar os campos de observação para dados sensíveis de pessoas (saúde, religião, origem racial e outros). Se o tutor tiver menos de 18 anos, cadastre como tutor o pai, a mãe ou o responsável;</li>
           <li>atender os pedidos dos seus clientes sobre os dados deles (ver, corrigir, receber uma cópia, apagar). Na ficha do tutor, o dono tem &quot;Baixar os dados deste tutor&quot; e &quot;Apagar dados deste tutor&quot; (parte 22). Nós ajudamos no que estiver ao nosso alcance (Política de privacidade, parte 13);</li>
           <li>manter a sua equipe informada sobre o cuidado com esses dados.</li>
         </ul>
@@ -202,6 +203,17 @@ export default function TermosDoGestao() {
           Nós usamos esses dados só para prestar o serviço, dar suporte, manter a segurança e cumprir a lei. Não vendemos os dados dos seus clientes,
           não os usamos em propaganda e não os passamos a terceiros fora dos fornecedores listados na Política de privacidade.
         </p>
+        <p><b>O que nós, como operador, nos comprometemos a fazer:</b></p>
+        <ul>
+          <li>tratar os dados dos seus clientes e da sua equipe só para prestar o serviço. Estes termos e o que você faz no sistema (lançar, apagar, baixar, ligar ou desligar funções) são as suas instruções para nós;</li>
+          <li>limitar o acesso da nossa equipe ao necessário para suporte que você pediu, manutenção, segurança ou obrigação legal, sempre com sigilo;</li>
+          <li>usar só os fornecedores listados na Política de privacidade (parte 5), inclusive os que ficam fora do Brasil (parte 6). Ao aceitar estes termos, você autoriza esse uso. Se incluirmos um fornecedor novo que receba dados dos seus clientes, avisamos com pelo menos 15 dias de antecedência; se não concordar, você pode cancelar e receber de volta a parte não usada do período pago;</li>
+          <li>avisar você sem demora, em até 2 dias úteis depois de confirmarmos, de qualquer incidente de segurança que atinja dados do seu pet shop, com o que soubermos, para você decidir sobre a comunicação à ANPD e aos tutores;</li>
+          <li>ajudar você a atender os pedidos dos tutores e da ANPD;</li>
+          <li>não usar os dados dos seus clientes para fins nossos (propaganda, venda, treino de inteligência artificial). Para melhorar o sistema, usamos só números gerais, que não identificam tutor nem pet;</li>
+          <li>apagar os dados quando a conta acabar, como explica a parte 22, salvo o que a lei mandar guardar;</li>
+          <li>dar, quando você pedir por escrito, as informações de que precisar para mostrar que cumpre a LGPD.</li>
+        </ul>
       </>)}
 
       {p("fotos", "As fotos que você guarda e envia são responsabilidade sua. Foque no pet e evite pessoas. Para postar nas redes, use a autorização do tutor pelo boletim: ele escolhe, você vê na ficha e ele pode tirar quando quiser.", <>
@@ -209,10 +221,10 @@ export default function TermosDoGestao() {
           <li>Você só deve enviar ao sistema fotos que tem o direito de usar. <b>Fotografe o pet, não as pessoas.</b> Evite rostos de tutores, funcionários e principalmente crianças; se alguém aparecer, a autorização dessa pessoa é sua responsabilidade.</li>
           <li>As fotos do boletim e do antes e depois ficam no <b>álbum do pet</b> enquanto o pet estiver cadastrado. O dono pode apagar uma foto a qualquer momento: ela sai do álbum, do boletim e dos links já enviados.</li>
           <li>Antes de postar foto ou vídeo de um pet de cliente nas redes sociais do pet shop ou em qualquer divulgação, tenha a <b>autorização do tutor</b>.</li>
-          <li><b>Autorização pelo boletim:</b> na página do boletim, o tutor pode tocar em &quot;Pode postar a foto&quot; e escolher, sem nada marcado de início, se autoriza só as fotos daquele boletim ou também as das próximas visitas e, se quiser, o perfil dele para a loja marcar. O sistema guarda o texto exato que ele aceitou, o dia e a hora, e mostra na ficha e no álbum do pet (&quot;Pode postar&quot;, com a data). Só o tutor dá a autorização: ninguém da equipe consegue marcar por ele.</li>
+          <li><b>Autorização pelo boletim:</b> na página do boletim, o tutor pode tocar em &quot;Pode postar a foto&quot; e escolher, sem nada marcado de início, se autoriza só as fotos daquele boletim ou também as das próximas visitas e, se quiser, o perfil dele para a loja marcar. O sistema guarda o texto exato que ele aceitou, o dia e a hora, e mostra na ficha e no álbum do pet (&quot;Pode postar&quot;, com a data). A autorização só pode ser dada pela página do boletim, não pelas telas do sistema. Quem abre o link é tratado como o tutor: mande o boletim só a ele, e ninguém da equipe deve autorizar no lugar dele. O sistema guarda também o endereço de internet e o navegador de quem autorizou.</li>
           <li><b>O tutor tira quando quiser,</b> pelo link &quot;Não quero mais&quot;, que continua funcionando mesmo depois que a página do boletim para de abrir. A partir daí a ficha mostra &quot;Sem autorização&quot;. Não poste fotos novas desse pet e avalie retirar das suas redes o que já foi postado.</li>
           <li>O sistema <b>não posta nada</b> nas redes sociais. Quem escolhe a foto, posta e responde pela postagem é o pet shop. Para autorizações pedidas fora do sistema (papel, mensagem), guardá-las é com você.</li>
-          <li><b>Checklist de entrada:</b> as fotos de como o pet chegou (ferida, pulgas, nós) e a assinatura ou o aceite do tutor ficam guardados com o atendimento ou a estadia. O texto do termo é seu: o sistema traz um modelo, que você pode mudar, e você responde pelo que ele diz. O Maestro Pet só guarda o registro do aceite (nome, hora e, pelo link, o endereço de internet e o navegador); ele não garante que o termo tenha valor em uma disputa.</li>
+          <li><b>Checklist de entrada:</b> as fotos de como o pet chegou (ferida, pulgas, nós) e a assinatura ou o aceite do tutor ficam guardados com o atendimento ou a estadia. O texto do termo é seu: o sistema traz um modelo, que você pode mudar, e você responde pelo que ele diz. O Maestro Pet só guarda o registro do aceite (nome, hora, endereço de internet, navegador e um código de conferência do texto e das fotos aceitos); ele não garante que o termo tenha valor em uma disputa.</li>
           <li>O texto do boletim (escrito por você ou pelo Mozart) deve ser conferido antes de mandar. O que for mandado ao tutor é mensagem do seu pet shop.</li>
           <li>Você nos dá permissão para guardar, reduzir e mostrar essas fotos só para o sistema funcionar (no aplicativo e nas páginas que você manda ao tutor). Não usamos as fotos dos seus clientes em propaganda nossa sem a sua autorização por escrito.</li>
         </ul>
@@ -224,6 +236,8 @@ export default function TermosDoGestao() {
           <li><b>Regras do link:</b> as regras, as condições de cancelamento e os avisos que você escreve no link são suas, e você responde por elas perante o tutor.</li>
           <li><b>Página do tutor:</b> opcional. Cada tutor recebe um link particular, sem senha, que mostra os pets dele, o diário, as fotos do dia e o que está marcado. Quem tiver o link consegue abrir. Se um link for parar com quem não devia, troque-o na ficha do tutor.</li>
           <li><b>Boletim e álbum:</b> o link do boletim e o do álbum abrem por {DIAS_DO_BOLETIM} dias para quem os tiver e depois param de abrir. As fotos continuam no álbum do pet, dentro do sistema. As páginas não aparecem em buscadores.</li>
+          <li><b>Orçamento:</b> o link do orçamento mostra os itens, o total, a validade e o primeiro nome de quem recebeu. Os preços e as promoções que você mostra no link, no orçamento e nas mensagens são ofertas do seu pet shop e podem obrigá-lo perante o cliente: mantenha-os corretos.</li>
+          <li><b>Modo TV do quadro:</b> mostra nomes dos pets, serviços e alertas. Deixe a tela onde clientes não leiam alertas de outros pets.</li>
           <li>Você decide para quem manda cada link. Mande só ao tutor do pet.</li>
           <li>Podemos limitar a quantidade de pedidos, aberturas e perguntas que as páginas públicas recebem, para evitar abuso. Com a conta só para consulta, o link de agendamento para de receber pedidos.</li>
         </ul>
@@ -255,7 +269,7 @@ export default function TermosDoGestao() {
       {p("whatsapp", "O sistema não manda mensagens sozinho: ele abre o WhatsApp do seu aparelho com o texto pronto. Quem envia, e responde pelo envio, é você.", <>
         <ul>
           <li>Lembretes, avisos, cobranças, boletins e parabéns são preparados pelo sistema e abertos no <b>WhatsApp do seu aparelho</b>, com o seu número. Quem revisa e aperta enviar é você.</li>
-          <li>Você responde por quem recebe as suas mensagens: mande só para clientes que deram o número para isso, respeite quem pedir para não receber e não use os textos para spam.</li>
+          <li>Você responde por quem recebe as suas mensagens: mande só para clientes que deram o número para isso, respeite quem pedir para não receber (marque &quot;Não quer receber mensagens&quot; na ficha: ele sai dos parabéns e do Mandar mensagens) e não use os textos para spam.</li>
           <li>O WhatsApp é um serviço de outra empresa, com regras próprias. Bloqueio ou limitação do seu número pelo WhatsApp não é responsabilidade nossa.</li>
         </ul>
       </>)}
@@ -265,13 +279,15 @@ export default function TermosDoGestao() {
           <li>Os valores, comissões, saldos e relatórios são calculados a partir do que a sua equipe lançou. Confira antes de pagar alguém, cobrar um cliente ou tomar decisões.</li>
           <li>Eles <b>não são escrituração contábil</b> nem substituem o seu contador. Emitir notas fiscais, pagar impostos e cumprir obrigações fiscais e trabalhistas do seu negócio é responsabilidade do pet shop.</li>
           <li>Comissões e regras de pagamento da equipe são combinadas entre você e cada pessoa. O sistema só faz a conta com as regras que você colocou.</li>
+          <li>Multa, juros, taxa de falta e limite de fiado que você liga no sistema são regras suas com os seus clientes. Eles são consumidores: a lei limita a multa por atraso e pede que taxas e regras sejam informadas antes (por exemplo, nas regras do link). O sistema só faz a conta com o que você colocou.</li>
+          <li>Taxas da maquininha, lucro, &quot;quanto sobrou&quot; e indicadores são estimativas feitas com as taxas e os custos que você digitou. Confira com o extrato da maquininha e com o seu contador.</li>
         </ul>
       </>)}
 
       {p("disponivel", "Trabalhamos para o sistema ficar no ar, mas não garantimos funcionamento sem parada. Baixe as suas cópias de tempos em tempos.", <>
         <ul>
           <li>Fazemos o possível para o Gestão funcionar bem e sem interrupção, mas <b>não garantimos um tempo mínimo no ar</b> nem ausência de erros. Pode haver paradas para manutenção (de preferência fora do horário comercial), falhas nossas ou dos fornecedores (hospedagem, banco de dados, pagamentos, IA) e problemas de internet ou do seu aparelho.</li>
-          <li>O banco de dados tem cópias de segurança feitas pelo fornecedor, mas elas servem para recuperar o sistema em caso de problema grave, não para desfazer o que alguém apagou ou mudou na sua conta.</li>
+          <li>O banco de dados pode ter cópias de segurança feitas pelo fornecedor, conforme o plano contratado com ele, mas elas servem para recuperar o sistema em caso de problema grave, não para desfazer o que alguém apagou ou mudou na sua conta.</li>
           <li><b>A sua cópia é sua:</b> baixe de tempos em tempos todos os dados (Meu pet shop, Baixar todos os dados) e as planilhas (Clientes, Financeiro, Relatórios) e guarde os registros que a lei exige de você (fiscais, trabalhistas, sanitários) fora do sistema.</li>
           <li>Podemos incluir, mudar ou retirar funções. Quando uma mudança tirar algo importante do seu uso, avisamos antes.</li>
         </ul>
@@ -284,7 +300,7 @@ export default function TermosDoGestao() {
           <li>não respondemos por erros nos dados lançados por você ou pela sua equipe, por ações confirmadas sem conferência (inclusive as sugeridas pela IA), nem por decisões tomadas com base nos números do sistema;</li>
           <li>não respondemos por falhas de serviços que não controlamos, como o WhatsApp, a Cakto, a sua internet, o seu aparelho ou o navegador;</li>
           <li>não respondemos pela relação entre o pet shop e os seus clientes, nem pelo atendimento, a saúde e a segurança dos animais;</li>
-          <li>não respondemos por acesso feito com o login e a senha da sua conta;</li>
+          <li>não respondemos por acesso feito com o login e a senha da sua conta, salvo quando ele acontecer por falha de segurança nossa;</li>
           <li>o total que podemos dever a você, somando todos os pedidos, fica <b>limitado ao valor que você nos pagou pela assinatura nos 12 meses anteriores ao fato</b>.</li>
         </ul>
         <p>
@@ -330,7 +346,7 @@ export default function TermosDoGestao() {
       {p("fim", `Você baixa todos os dados quando quiser. Para apagar a conta, o titular pede no próprio sistema: ela fica ${DIAS_ATE_APAGAR_A_PEDIDO} dias só para consulta (dá para cancelar) e depois é apagada. Alguns registros ficam pelo prazo da lei.`, <>
         <ul>
           <li><b>Baixar todos os dados:</b> a qualquer momento, inclusive com a conta só para consulta, o dono baixa em Meu pet shop um arquivo .zip com uma planilha para cada parte (clientes, pets, saúde, agenda, creche e hotel, pacotes, vendas, financeiro, caixa, estoque, boletins, autorizações de fotos, equipe e outras) e um README que explica cada uma. As planilhas abrem no Excel e servem para levar os dados a outro sistema. As fotos não entram, e a equipe vem sem senhas.</li>
-          <li><b>Dados de um tutor:</b> na ficha do tutor, o dono baixa num toque os dados daquele cliente, para responder a um pedido dele. Em &quot;Apagar dados deste tutor&quot;, depois de digitar o nome dele, o nome vira &quot;Cliente removido&quot;, telefone, e-mail, endereço e observações são apagados, os pets ficam sem nome, foto, saúde, boletins e autorizações, e os valores continuam no financeiro sem o nome, para a contabilidade. Não dá para desfazer.</li>
+          <li><b>Dados de um tutor:</b> na ficha do tutor, o dono baixa num toque os dados daquele cliente, para responder a um pedido dele. Em &quot;Apagar dados deste tutor&quot;, depois de digitar o nome dele, o nome vira &quot;Cliente removido&quot;, telefone, e-mail, endereço e observações são apagados, os pets ficam sem nome, foto, saúde, boletins e autorizações, os orçamentos ficam sem nome e telefone, as conversas com o Mozart que citam o tutor são apagadas, e os valores continuam no financeiro sem o nome, para a contabilidade. Não dá para desfazer.</li>
           <li><b>Encerrar e apagar a conta:</b> o titular da conta pede em Meu pet shop, digitando o nome do pet shop. A conta fica <b>{DIAS_ATE_APAGAR_A_PEDIDO} dias só para consulta</b> (ninguém lança e o link para de receber pedidos), com o aviso na tela, e qualquer dono pode cancelar nesse prazo. Passados os {DIAS_ATE_APAGAR_A_PEDIDO} dias, apagamos o pet shop, todos os dados lançados, os arquivos (fotos e documentos) e os logins da equipe que não estão em outro pet shop. Isso não cancela a assinatura: cancele também pela tela Assinatura (parte 7).</li>
           <li><b>Sair de uma equipe:</b> quem trabalha num pet shop e não é o titular pode tocar em &quot;Sair desta equipe&quot;. O login deixa de abrir aquele pet shop; o nome continua no histórico dele.</li>
           <li>Os pedidos de dados (baixar todos os dados, baixar ou apagar os dados de um tutor, pedir ou cancelar a exclusão, sair da equipe) ficam registrados com quem pediu e quando, sem os dados dos clientes, para o pet shop mostrar que atendeu o pedido.</li>
@@ -367,7 +383,7 @@ export default function TermosDoGestao() {
         <ul>
           <li>Se uma parte destes termos for considerada inválida, as demais continuam valendo.</li>
           <li>Se deixarmos de exigir uma regra em algum momento, isso não quer dizer que abrimos mão dela.</li>
-          <li>Você não pode passar este contrato a outra pessoa sem a nossa concordância. Podemos passá-lo a uma empresa do mesmo grupo ou a quem adquirir o negócio, mantidas estas condições.</li>
+          <li>Você não pode passar este contrato a outra pessoa sem a nossa concordância. Nós podemos passá-lo, com os dados e o histórico da conta, a uma empresa (com CNPJ) aberta para oferecer o Maestro Pet, a uma empresa do mesmo grupo ou a quem adquirir o negócio. As condições destes termos continuam as mesmas, e avisamos antes pelo e-mail da conta e no aplicativo. Se não concordar, você pode cancelar e receber de volta a parte não usada do período pago.</li>
           <li>Os registros eletrônicos do sistema (aceites, lançamentos, avisos da Cakto) servem como prova do que foi feito na conta.</li>
         </ul>
       </>)}
