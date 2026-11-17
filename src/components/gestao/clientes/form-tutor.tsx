@@ -18,6 +18,8 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
   const [email, setEmail] = useState(cliente?.email ?? "");
   const [endereco, setEndereco] = useState(cliente?.endereco ?? "");
   const [obs, setObs] = useState(cliente?.obs ?? "");
+  // "Não quer receber mensagens": o Modo envio pula este tutor
+  const [naoQuer, setNaoQuer] = useState(Boolean(cliente?.nao_quer_mensagens));
   const [salvando, setSalvando] = useState(false);
   const { dados: tutores } = useTutores();
   const [igual, setIgual] = useState<{ tutor: TutorCurto; por: "telefone" | "nome" } | null>(null);
@@ -53,7 +55,7 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
           confirmar: "Salvar mesmo assim",
         }))) { setSalvando(false); return; }
       }
-      const campos = { nome: nome.trim(), telefone: telefoneLimpo(telefone) || null, email: email.trim() || null, endereco: endereco.trim() || null, obs: obs.trim() || null };
+      const campos = { nome: nome.trim(), telefone: telefoneLimpo(telefone) || null, email: email.trim() || null, endereco: endereco.trim() || null, obs: obs.trim() || null, nao_quer_mensagens: naoQuer };
       const salvo = cliente
         ? ok(await sb.from("clientes").update(campos).eq("id", cliente.id).eq("petshop_id", petshop.id).select().single())
         : ok(await sb.from("clientes").insert({ ...campos, petshop_id: petshop.id }).select().single());
@@ -90,6 +92,10 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
         </Campo>
         <Campo rotulo="E-mail"><input className="g-input" type="email" inputMode="email" autoComplete="off" maxLength={160} value={email} onChange={(e) => setEmail(e.target.value)} /></Campo>
         <Campo rotulo="Endereço" dica="Ajuda no leva e traz."><input className="g-input" autoComplete="off" maxLength={200} value={endereco} onChange={(e) => setEndereco(e.target.value)} /></Campo>
+        <label className="g-check">
+          <input type="checkbox" checked={naoQuer} onChange={(e) => setNaoQuer(e.target.checked)} />
+          <span><b>Não quer receber mensagens</b><small> O Mandar mensagens pula este tutor (lembretes, avisos, aniversário, cobrança).</small></span>
+        </label>
         <Campo rotulo="Observações"><CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações"><textarea className="g-textarea" maxLength={600} value={obs} onChange={(e) => setObs(e.target.value)} /></CampoComVoz></Campo>
       </form>
     </Folha>

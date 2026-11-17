@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, Pencil, ShieldCheck, Package, PawPrint, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
+  BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, Pencil, ShieldCheck, Package, PawPrint, Send, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
 } from "lucide-react";
 import { useGestao } from "./contexto";
 import { planoPorId } from "@/lib/gestao/planos";
@@ -40,6 +40,7 @@ const GRUPOS: { titulo: string; itens: Item[] }[] = [
     { href: "/gestao/app/clientes", rotulo: "Clientes e pets", icone: PawPrint, tom: "menta" },
     { href: "/gestao/app/creche-hotel", rotulo: "Creche e hotel", icone: BedDouble, tom: "ceu" },
     { href: "/gestao/app/pacotes", rotulo: "Pacotes", icone: Ticket, tom: "lilas" },
+    { href: "/gestao/app/mensagens", rotulo: "Mandar mensagens", icone: Send, tom: "menta" },
   ] },
   { titulo: "Dinheiro", itens: [
     { href: "/gestao/app/caixa", rotulo: "Caixa", icone: Wallet, tom: "manteiga", so: "financeiro" },
@@ -185,7 +186,10 @@ export default function Casca({ children }: { children: React.ReactNode }) {
 
   const podeRota = (href: string) => { const area = areaDaRota(href); return area ? posso(area) : true; };
   // as permissões de cada pessoa valem por cima da ordem do menu
-  const pode = (i: Item) => (i.so === "dono" ? souDono : podeRota(i.href));
+  // Mandar mensagens (Modo envio) só para quem tem alguma área com mensagem para o tutor
+  const pode = (i: Item) => (i.so === "dono" ? souDono
+    : i.href === "/gestao/app/mensagens" ? (["agenda", "clientes", "creche_hotel", "pacotes", "caixa", "financeiro", "relatorios"] as const).some((a) => posso(a))
+    : podeRota(i.href));
   const menu = montarMenu(petshop, semAgenda);
   // tela aberta pelo endereço sem ter acesso: mostra o aviso no lugar da tela
   const soDeDono = ["/gestao/app/equipe", "/gestao/app/meu-petshop", "/gestao/app/assinatura", "/gestao/app/escola"].some((r) => caminho.startsWith(r));

@@ -447,14 +447,14 @@ isOneToOne: false
                   ]
                 },"clientes": {
                   Row: {
-                    "criado_em": string,"email": string | null,"endereco": string | null,"id": string,"nome": string,"obs": string | null,"petshop_id": string,"telefone": string | null
+                    "criado_em": string,"email": string | null,"endereco": string | null,"id": string,"nao_quer_mensagens": boolean,"nome": string,"obs": string | null,"petshop_id": string,"telefone": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"nome": string,"obs"?: string | null,"petshop_id": string,"telefone"?: string | null
+                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"nao_quer_mensagens"?: boolean,"nome": string,"obs"?: string | null,"petshop_id": string,"telefone"?: string | null
                   }
                   Update: {
-                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"nome"?: string,"obs"?: string | null,"petshop_id"?: string,"telefone"?: string | null
+                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"nao_quer_mensagens"?: boolean,"nome"?: string,"obs"?: string | null,"petshop_id"?: string,"telefone"?: string | null
                   }
                   Relationships: [
                     {
@@ -1473,6 +1473,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     },{
       foreignKeyName: "lista_espera_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"mensagens_enviadas": {
+                  Row: {
+                    "dia": string,"enviado_em": string,"enviado_por": string | null,"id": string,"petshop_id": string,"ref": string,"tipo": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "dia": string,"enviado_em"?: string,"enviado_por"?: string | null,"id"?: string,"petshop_id": string,"ref": string,"tipo": string
+                  }
+                  Update: {
+                    "dia"?: string,"enviado_em"?: string,"enviado_por"?: string | null,"id"?: string,"petshop_id"?: string,"ref"?: string,"tipo"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "mensagens_enviadas_enviado_por_fkey"
+      columns: ["enviado_por"]
+isOneToOne: false
+      referencedRelation: "profissionais"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "mensagens_enviadas_petshop_id_fkey"
       columns: ["petshop_id"]
 isOneToOne: false
       referencedRelation: "petshops"
@@ -2640,6 +2666,9 @@ isOneToOne: false
 "gestao_bom_dia":
 { Args: { "p": string }; Returns: Json
                            },
+"gestao_modo_envio":
+{ Args: { "p": string,"p_dias"?: number }; Returns: Json
+                           },
 "gestao_contagens":
 { Args: { "p": string }; Returns: Json
                            },
@@ -2805,6 +2834,9 @@ isOneToOne: false
                            },
 "marcar_uso":
 { Args: { "p_area": string,"p_petshop": string }; Returns: undefined
+                           },
+"modo_envio_marcar":
+{ Args: { "p": string,"p_refs": string[],"p_tipo": string }; Returns: Json
                            },
 "meu_email":
 { Args: Record<PropertyKey, never>; Returns: string

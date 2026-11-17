@@ -1,0 +1,55 @@
+/* Modo envio: escolher os tipos, uma mensagem por vez, fim */
+.g-me-tipos ul, .g-me-pulados ul, .g-me-feitas { list-style: none; margin: 0; padding: 0; }
+.g-me-tipos li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--g-linha); }
+.g-me-tipos li:first-child { border-top: 0; }
+.g-me-tipos li.desligado .t { opacity: .5; }
+.g-me-tipos .t, .g-me-pulados .t { display: grid; min-width: 0; flex: 1; }
+.g-me-tipos .t b, .g-me-pulados .t b { font-weight: 600; overflow-wrap: anywhere; }
+.g-me-tipos .t span, .g-me-pulados .t span { color: var(--g-cinza); font-size: .875rem; overflow-wrap: anywhere; }
+.g-me-comecar { margin: 14px 0 8px; min-height: 54px; font-size: 1.0625rem; }
+
+.g-me-chave { position: relative; flex: none; width: 54px; height: 32px; padding: 0; border: 0; border-radius: 999px; background: #cfc6b8; cursor: pointer; transition: background .18s; }
+.g-me-chave i { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fffdf9; box-shadow: 0 1px 3px rgba(31, 27, 23, .3); transition: transform .18s cubic-bezier(.2, .7, .2, 1); }
+.g-me-chave[aria-checked="true"] { background: var(--g-verde); }
+.g-me-chave[aria-checked="true"] i { transform: translateX(22px); }
+.g-me-chave:focus-visible { outline: 3px solid var(--g-laranja); outline-offset: 2px; }
+
+.g-me-pulados summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.g-me-pulados summary::-webkit-details-marker { display: none; }
+.g-me-pulados summary > svg { width: 18px; height: 18px; flex: none; color: var(--g-cinza); }
+.g-me-pulados summary span { flex: 1; min-width: 0; }
+.g-me-pulados summary .seta { transition: transform .15s; }
+.g-me-pulados[open] summary .seta { transform: rotate(90deg); }
+.g-me-pulados li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--g-linha); }
+.g-me-pulados ul { margin-top: 10px; }
+.g-me-pulados li .t { flex: 1 1 200px; }
+
+.g-me-vez { max-width: 640px; margin-inline: auto; width: 100%; }
+.g-me-progresso { display: flex; align-items: center; gap: 12px; }
+.g-me-progresso .trilha { flex: 1; height: 8px; border-radius: 999px; background: rgba(31, 27, 23, .12); overflow: hidden; }
+.g-me-progresso .trilha i { display: block; height: 100%; background: var(--g-verde); border-radius: inherit; transition: width .25s; }
+.g-me-msg { display: grid; gap: 14px; }
+.g-me-msg .quem { display: flex; align-items: center; gap: 12px; }
+.g-me-msg h2 { margin: 2px 0 0; font: 500 1.375rem/1.15 var(--display); overflow-wrap: anywhere; }
+.g-me-msg .porque { margin: 0; padding: 10px 14px; border-radius: var(--g-raio-p); background: var(--g-carta-2); font-size: .9375rem; overflow-wrap: anywhere; }
+.g-me-msg textarea { min-height: 150px; font-size: .9375rem; line-height: 1.45; }
+.g-me-acoes, .g-me-pergunta { display: grid; gap: 10px; }
+.g-me-abrir, .g-me-pergunta .g-btn.pri { min-height: 58px; font-size: 1.0625rem; }
+.g-me-pergunta { padding: 14px; border-radius: var(--g-raio-p); background: var(--g-verde-tint); }
+.g-me-pergunta p { margin: 0; font-size: 1.0625rem; }
+.g-me-teclas { display: none; margin: 0; }
+@media (min-width: 900px) and (hover: hover) { .g-me-teclas { display: block; } }
+
+.g-me-fim { display: grid; gap: 12px; justify-items: start; max-width: 640px; margin-inline: auto; width: 100%; }
+.g-me-fim h2 { margin: 0; font: 500 1.5rem/1.15 var(--display); }
+.g-me-fim p { margin: 0; }
+.g-me-feitas { display: grid; gap: 6px; width: 100%; }
+.g-me-feitas li { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: .9375rem; }
+.g-me-feitas li svg { color: var(--g-verde); align-self: center; }
+.g-me-feitas li span { color: var(--g-cinza); font-size: .8125rem; }
+
+/* entrada na tela Hoje */
+.g-me-entrada { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+.g-me-entrada .t { display: grid; flex: 1; min-width: 0; }
+.g-me-entrada .t span { color: var(--g-cinza); font-size: .875rem; overflow-wrap: anywhere; }
+.g-me-entrada > svg { width: 20px; height: 20px; flex: none; color: var(--g-cinza); }

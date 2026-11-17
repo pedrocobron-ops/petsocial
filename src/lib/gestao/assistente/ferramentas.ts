@@ -3,6 +3,7 @@ import { ferramentaLiberada } from "./permissao";
 import { consultarComissao, FERRAMENTAS_COMISSAO } from "./ferramenta-comissao";
 import { consultarLucro, FERRAMENTAS_LUCRO } from "./ferramenta-lucro";
 import { consultarCompra, FERRAMENTAS_COMPRA } from "./ferramenta-compra";
+import { consultarEnvio, FERRAMENTAS_ENVIO } from "./ferramenta-envio";
 import { consultarPlanosDaCreche, FERRAMENTA_PLANOS_CRECHE } from "./creche-planos";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
@@ -150,6 +151,7 @@ export const FERRAMENTAS: Def[] = [
   ...FERRAMENTAS_COMISSAO,
   ...FERRAMENTAS_LUCRO,
   ...FERRAMENTAS_COMPRA,
+  ...FERRAMENTAS_ENVIO,
 ];
 
 export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro">): Anthropic.Tool[] =>
@@ -773,6 +775,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
   if (lucro) return lucro;
   const compra = await consultarCompra(c, nome, e, (m) => new ErroDeUso(m));
   if (compra) return compra;
+  const envio = await consultarEnvio(c, nome);
+  if (envio) return envio;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 

@@ -116,6 +116,7 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
               <div className="g-cli-etqs">
                 <span className="g-cli-etq pessego"><PawPrint aria-hidden />{pets.length === 1 ? "1 pet" : `${pets.length} pets`}</span>
                 <span className="g-cli-etq">Cliente desde {dataCompleta(cliente.criado_em)}</span>
+                {cliente.nao_quer_mensagens && <span className="g-cli-etq rosa">Não quer receber mensagens</span>}
               </div>
             </div>
           </div>
