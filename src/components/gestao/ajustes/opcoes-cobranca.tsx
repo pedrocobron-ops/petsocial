@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { HandCoins } from "lucide-react";
 import { MARCAS_DO_MODELO, mensagemDeDivida, MODELO_COBRANCA, multaSugerida, OPCOES_DINHEIRO as K, opcoesDeCobranca, opcoesDeComissao, taxaDeFalta, travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
+import { limitePadrao, OPCAO_LIMITE_FIADO } from "@/lib/gestao/fiado";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { brl, isoDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -49,6 +50,7 @@ export default function OpcoesDeCobranca() {
   const trava = travaDePreco(petshop);
   const [descMax, setDescMax] = useState(pctTexto(trava.descontoMax));
   const [taxa, setTaxa] = useState<number | null>(taxaDeFalta(petshop) || null);
+  const [limite, setLimite] = useState<number | null>(limitePadrao(petshop) || null);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [porServico, setPorServico] = useState(false);
@@ -76,13 +78,14 @@ export default function OpcoesDeCobranca() {
     if (dm === null) { setErro("O desconto máximo do caixa fica entre 0 e 100%."); return; }
     if (fixa != null && (fixa < 0 || fixa > 99999.99)) { setErro("Confira a multa em reais."); return; }
     if (taxa != null && (taxa < 0 || taxa > 99999.99)) { setErro("Confira a taxa de falta."); return; }
+    if (limite != null && (limite < 0 || limite > 99999.99)) { setErro("Confira o limite de fiado."); return; }
     const texto = modelo.trim();
     if (texto && !texto.includes("{contas}")) { setErro("A mensagem precisa ter {contas}: é onde entra a lista do que o cliente deve."); return; }
     setErro(null);
     await gravar({
       [K.multaFixa]: fixa ?? 0, [K.multaPct]: p, [K.jurosMesPct]: j, [K.pix]: pix.trim().slice(0, 120),
       [K.modelo]: !texto || texto === MODELO_COBRANCA ? "" : texto.slice(0, 1200), [K.comissaoProdutosPct]: pp, [K.descontoMaxCaixa]: dm,
-      [K.taxaFalta]: taxa ?? 0,
+      [K.taxaFalta]: taxa ?? 0, [OPCAO_LIMITE_FIADO]: limite ?? 0,
     }, "Opções salvas.");
   }
 
@@ -159,6 +162,13 @@ export default function OpcoesDeCobranca() {
           <div><b>Taxa de falta</b><p className="g-muted g-pp">Com um valor aqui, quando você marca Faltou na agenda o sistema pergunta se quer anotar a taxa para o tutor. Ela fica na ficha e em A receber, e aparece em Fechar a conta do próximo atendimento como &quot;Deve de antes&quot;. Em branco, o Faltou não pergunta nada.</p></div>
           <Campo rotulo="Taxa de falta (se cobrar)">
             <div style={{ maxWidth: 160 }}><CampoDinheiro valor={taxa} aoMudar={setTaxa} rotulo="Taxa de falta" /></div>
+          </Campo>
+        </div>
+
+        <div className="gr-op-bloco">
+          <div><b>Limite de fiado</b><p className="g-muted g-pp">Até quanto um cliente pode ficar devendo. Passou do limite, o sistema avisa (&quot;Ana já deve R$ 180; com esta conta passa do limite de R$ 200&quot;) e só você ou quem cuida do financeiro libera, com o nome anotado. Cada cliente pode ter um limite próprio na ficha. Pagamento na hora nunca é barrado. Em branco, sem limite.</p></div>
+          <Campo rotulo="Limite padrão por cliente (se quiser)">
+            <div style={{ maxWidth: 160 }}><CampoDinheiro valor={limite} aoMudar={setLimite} rotulo="Limite de fiado padrão" /></div>
           </Campo>
         </div>
 

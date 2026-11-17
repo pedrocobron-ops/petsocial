@@ -1,0 +1,26 @@
+/* Orçamentos e troca/devolução (prefixo g-orc-) */
+.g-orc-d { display: grid; justify-items: end; gap: 4px; }
+.g-orc-cab { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.g-orc-cab > div { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.g-orc-cab b { font: 480 1.375rem/1.15 var(--display); overflow-wrap: anywhere; }
+.g-orc-itens { padding: 2px 16px; }
+.g-orc-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--g-linha); }
+.g-orc-item:last-child { border-bottom: 0; }
+.g-orc-item .t { display: grid; min-width: 0; }
+.g-orc-item .t b { font-weight: 600; overflow-wrap: anywhere; }
+.g-orc-item .t span { font-size: .875rem; color: var(--g-cinza); }
+.g-orc-item.menos { color: var(--g-cinza); }
+.g-orc-mandar { display: flex; flex-wrap: wrap; gap: 8px; }
+.g-orc-mandar .g-btn { flex: 1 1 180px; justify-content: center; }
+
+/* devolução: o que volta */
+.g-orc-volta { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; padding: 12px 0; border-bottom: 1px solid var(--g-linha); }
+.g-orc-volta:last-child { border-bottom: 0; }
+.g-orc-volta .t { display: grid; min-width: 0; }
+.g-orc-volta .t b { font-weight: 600; overflow-wrap: anywhere; }
+.g-orc-volta .t span { font-size: .875rem; color: var(--g-cinza); }
+.g-orc-volta .ctrl { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.g-orc-limite { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .875rem; color: var(--g-cinza); }
+.g-orc-barra { position: relative; flex: 1 1 120px; min-width: 100px; height: 8px; border-radius: 999px; background: var(--g-carta-2); overflow: hidden; box-shadow: inset 0 0 0 1px var(--g-linha); }
+.g-orc-barra i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--g-verde); }
+.g-orc-barra.passou i { background: var(--g-vermelho); }

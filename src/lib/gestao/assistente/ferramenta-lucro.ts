@@ -24,6 +24,7 @@ const linha = (l: LinhaLucro) => ({
   nome: l.nome, tipo: l.tipo, quantidade: l.quantidade, entrou: l.receita,
   custo: l.custo, comissao_da_linha: l.comissao, sobrou: l.margem, sobrou_pct: l.pct == null ? null : Math.round(l.pct * 10) / 10,
   ...(l.custo == null ? { custo_nao_informado: l.falta ?? "custo não informado" } : {}),
+  ...(l.devolvido > 0 ? { devolvido_ao_cliente: l.devolvido, unidades_que_voltaram: l.devolvidos } : {}),
 });
 
 /** Roda a ferramenta; devolve null quando o nome não é desta lista. Erro de uso: lança Error com a frase para o modelo. */

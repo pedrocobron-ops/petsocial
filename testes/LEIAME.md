@@ -292,6 +292,22 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   parte (`lerPetshop` + `lerEquipe` + `lerServicos`) para dono, recepção, monitora, tosador e estoque, com meta, diárias, opções com valor,
   comissão, convite e preços só para quem pode; as seis contagens da tela Hoje (`gestao_contagens`) = as contagens pela API; anônimo
   recusado; dono de outra loja não lê nada e conta zero.
+- `orcamento-troca.js`: orçamento, troca e devolução e limite de fiado (migração 20261200), contas à mão. **Orçamento**: 2 × 29,90 +
+  Banho 60,00 − 9,80 = 110,00 (o total mandado pela tela é ignorado, `orcamento_conferir`); número em sequência; estoque não mexe;
+  tosador e estoque não leem nem criam; "convertido" direto recusado; página pública (`orcamento_publico`, anônimo) com loja, itens,
+  total, status e só o primeiro nome (sem telefone nem ids), vencido pela validade; texto do WhatsApp (`textoDoOrcamento`).
+  "Transformar em venda" (`orcamento_vender`) com **dois toques ao mesmo tempo**: uma venda, estoque −2 uma vez, convertido;
+  outra chave recusada; convertido não muda nem é apagado; o horário fica ligado (`orcamento_marcar`). **Devolução**
+  (`venda_devolver`): venda de 3 × 29,90 com 9,70 de desconto = 80,00; volta 1 = 26,67 em dinheiro (dois toques = uma saída
+  "Devolução" no caixa, estoque +1 uma vez); o resto (2, um avariado) = 53,33 de crédito (fecha ao centavo), estoque +2 e perda
+  de 1; mais que isso recusado; venda a receber e crédito sem tutor recusados. **Troca**: 29,90 por coleira de 45,00 = paga
+  15,10 no Pix (saída 29,90 "outro" + entrada 45,00 = 29,90 "outro" + 15,10 Pix; a recepção não muda o preço); por laço de 5,00
+  = volta 24,90 em dinheiro. **Relatórios**: comissão de 10% sobre o shampoo da conta do atendimento 2,99 → 0,00 depois da
+  devolução; `lucro_do_periodo` = `faturamento.ts` (devolvido 116,37, crédito 53,33), devoluções por produto (6 voltaram, 1
+  avariado, 169,70, custo de volta 60,00), `montarLucro` com a margem líquida e a ponte fechando. **Fiado**: a recepção não muda
+  o limite; Ana deve 180 de 200, mais 30 recusado com "Ana já deve R$ 180,00; com esta conta passa do limite de R$ 200,00."
+  (também pela venda de balcão); pagamento na hora passa; a recepção não libera; o dono libera (anotado, uma vez só); padrão da
+  loja (50) para quem não tem limite próprio, e a opção não vai para o tosador.
 
 **migracoes/**
 - `prova-ordem.sh`: cria um banco de rascunho no mesmo Postgres (chão copiado do banco local sem o `public`), aplica todas as
@@ -433,6 +449,15 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   Casa agora ("Fez amizade com Mel"). A página pública em 390 e 1366 (fotos carregadas, atenção, serviços, Avaliar no Google, Marcar
   o próximo, sem telefone do tutor, sem rolagem para o lado) e o álbum na ficha do pet com o link para o tutor. Capturas em
   `testes/saida/boletim-*.png` e `album-390.png`.
+
+- `orcamento-troca.js`: orçamento, troca e limite de fiado pela tela. 390 (recepção): Caixa › Orçamentos › Orçamento novo com Ana,
+  2 shampoos e o Banho (entra a 50,00, o primeiro preço; ela põe 60,00), desconto 9,80 = R$ 110,00; Mandar no WhatsApp (número da
+  Ana, "Oi, Ana!", total e link); a página pública (Para Ana, itens, total, validade, "Quero fechar" para o WhatsApp da loja, 404
+  com código errado); Transformar em venda: venda de 54,91 (desconto repartido: 9,80 × 59,80 / 119,80 = 4,89) e depois o horário
+  com o Banho a 55,09; banco com a venda, estoque −2 e o orçamento convertido. Fiado acima do limite pela Venda no balcão: a
+  recepção vê a frase e nada é anotado. 1366 (dono): Caixa › a venda › Troca ou devolução: 1 shampoo volta = 27,46 em dinheiro,
+  **dois toques** = uma saída; o dono vê "Passa do limite de fiado", toca em "Liberar mesmo assim" e a conta entra (anotado quem
+  liberou); a ficha mostra "Limite R$ 200,00 · passou R$ 9,90 do limite" e Fazer orçamento. Capturas em `testes/saida/orc-*.png`.
 
 ## Variáveis do servidor de produção (não precisa para os testes)
 

@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { History, Lock, Package, Scissors, Sparkles, Trash2 } from "lucide-react";
+import dynamic from "next/dynamic";
+import { History, Lock, Package, RotateCcw, Scissors, Sparkles, Trash2 } from "lucide-react";
 import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, creditoDaEntrada, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento, type ContaRecebida } from "@/lib/gestao/dinheiro";
 import { fazerTudoOuNada, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { creditoDoTutor } from "@/lib/gestao/credito";
+import { vendaComProduto } from "@/lib/gestao/devolucao";
+import { conferirLimite } from "@/lib/gestao/fiado";
 import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
 import { diaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
 import { nomeDaCategoria, usaCasa, usaModulo } from "@/lib/gestao/modulos";
@@ -18,6 +21,9 @@ import { AvisoCaixaFechado, CampoDinheiro, EscolhaPagamento, fecharPagamento, pa
 import { avisarMudanca, Campo, Folha, useAvisos, useDados, Vazio } from "../ui";
 import "./financeiro.css";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
+
+// troca e devolução de uma venda (abre só com um toque)
+const FolhaDevolucao = dynamic(() => import("../loja/devolucao"), { ssr: false });
 
 /* ---------- contas ---------- */
 
@@ -381,10 +387,11 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   /** Conta a receber anotada na ficha de um tutor (taxa de falta, diferença esquecida): já vem com ele. */
   tutor?: { id: string; nome: string } | null;
 }) {
-  const { sb, petshop, user, cuidoDoFinanceiro } = useGestao();
+  const { sb, petshop, user, cuidoDoFinanceiro, souDono, vejoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const hoje = hojeIso();
   const [tipo, setTipo] = useState<Tipo>(inicial ? (inicial.tipo as Tipo) : tipoInicial);
+  const [devolvendo, setDevolvendo] = useState(false);
   const [valor, setValor] = useState<number | null>(inicial ? Number(inicial.valor) : null);
   // forma: a do lançamento; num novo, nenhuma vem marcada: a pessoa escolhe
   const [pagamento, setPagamento] = useState<EstadoPagamento>(() => pagamentoInicial(inicial ? (inicial.forma as FormaId | null) ?? "pix" : null));
@@ -467,6 +474,8 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     if ((!inicial || Number(inicial.valor) !== valor) && !(await conferirValorAlto(valor, confirmar))) return;
     // dinheiro de hoje: se o caixa fechou enquanto esta folha estava aberta, pergunta antes de lançar fora dele
     if (!inicial && !conta && (!escolheData || data === hoje) && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
+    // conta nova a receber de um cliente: passa do limite de fiado? quem pode libera (fica anotado)
+    if (!inicial && conta && entrada && tutorConta && !(await conferirLimite(sb, petshop.id, tutorConta.id, Math.round(valor * vezes * 100) / 100, { perguntar: confirmar, podeLiberar: souDono || cuidoDoFinanceiro, avisarErro }))) return false;
     setSalvando(true);
     try {
       if (inicial) {
@@ -574,6 +583,16 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
           </p>
         )}
         {inicial && <ItensDoLancamento lancamento={inicial} />}
+        {inicial && vejoFinanceiro && vendaComProduto(inicial) && (
+          <div className="g-fila">
+            <button type="button" className="g-btn sec p" onClick={() => setDevolvendo(true)}><RotateCcw />Troca ou devolução</button>
+            <span className="g-pp g-muted">O cliente trouxe um produto de volta? Devolva o dinheiro, deixe de crédito ou troque.</span>
+          </div>
+        )}
+        {devolvendo && inicial && (
+          <FolhaDevolucao venda={{ id: inicial.id, data: inicial.data, valor: Number(inicial.valor_original ?? inicial.valor), descricao: inicial.descricao, cliente_id: inicial.cliente_id }}
+            aoFechar={() => setDevolvendo(false)} aoPronto={() => { void aoSalvo(); aoFechar(); }} />
+        )}
         {inicial && <HistoricoDeAlteracoes lancamento={inicial} />}
         {inicial && <PrecosMudados lancamento={inicial} />}
         {inicial && <PartesRecebidas conta={inicial} />}

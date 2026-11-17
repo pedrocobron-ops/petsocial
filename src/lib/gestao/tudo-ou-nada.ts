@@ -54,7 +54,9 @@ type Alvo =
   | { funcao: "estadia_checkout" | "estadia_sinal"; estadia: string }
   | { funcao: "agendamento_fechar_conta"; agendamento: string }
   | { funcao: "conta_receber_junto"; conta: string }
-  | { funcao: "venda_registrar" };
+  | { funcao: "venda_registrar" }
+  /** A venda de um orçamento: os mesmos passos de venda_registrar e o orçamento marcado como convertido, junto. */
+  | { funcao: "orcamento_vender"; orcamento: string };
 
 /** Manda os passos numa chamada só. Lança `ErroDaOperacao` (nada foi gravado, ou a resposta não chegou: tente com a mesma chave). */
 export async function fazerTudoOuNada(sb: Banco, petshopId: string, chave: string, alvo: Alvo, passos: Passo[]): Promise<ResultadoDaOperacao> {
@@ -62,6 +64,7 @@ export async function fazerTudoOuNada(sb: Banco, petshopId: string, chave: strin
   const r = alvo.funcao === "agendamento_fechar_conta" ? await sb.rpc(alvo.funcao, { ...args, p_agendamento: alvo.agendamento })
     : alvo.funcao === "conta_receber_junto" ? await sb.rpc(alvo.funcao, { ...args, p_conta: alvo.conta })
     : alvo.funcao === "venda_registrar" ? await sb.rpc(alvo.funcao, args)
+    : alvo.funcao === "orcamento_vender" ? await sb.rpc(alvo.funcao, { ...args, p_orcamento: alvo.orcamento })
     : await sb.rpc(alvo.funcao, { ...args, p_estadia: alvo.estadia });
   if (r.error) throw new ErroDaOperacao(r.error.message, (r.error as { hint?: string | null }).hint ?? null);
   return r.data as unknown as ResultadoDaOperacao;

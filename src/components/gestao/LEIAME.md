@@ -72,6 +72,13 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   parte em qualquer forma por `pagoAMenos` (`EstadoPagamento.parte`/`resto`, só com `aceitaResto`).
 - "Recebeu quanto?" fica em `EstadoPagamento.entregue`: `fecharPagamento` recusa dinheiro a menos; a conta do atendimento usa `dinheiroAMenos`
   (recebe a parte e anota o resto para o tutor).
+- Orçamento, troca e devolução, limite de fiado (migração 20261200):
+  orçamento em `orcamentos` (`loja/orcamento.tsx`, regras em `src/lib/gestao/orcamento.ts`): o banco refaz subtotal e total
+  (`orcamento_conferir`); "Transformar em venda" usa `VendaBalcao` com `orcamento` (`fazerTudoOuNada` com `orcamento_vender`) e o
+  horário com `FormAgendamento servicosIniciais` + `orcamento_marcar`; página pública `/gestao/orcamento/<código>` (`orcamento_publico`).
+  Troca e devolução só por `devolver` (`src/lib/gestao/devolucao.ts`, função `venda_devolver`, folha `loja/devolucao.tsx`): nunca
+  apague a venda para devolver um produto. Limite de fiado: toda conta a receber nova de um cliente passa antes por `conferirLimite`
+  (`src/lib/gestao/fiado.ts`); o banco recusa sem liberação (`maestro:limite_fiado`), e só dono ou financeiro libera (`fiado_liberar`).
 - Datas: `agendamentos.inicio/fim` são `timestamptz`; campos `date` são texto `AAAA-MM-DD` (use `isoDia`, `deIsoDia`).
   Formatação em `src/lib/gestao/util.ts` (`brl`, `hora`, `dataAmigavel`, `dataCurta`, `fmtTelefone`, `linkWhatsApp`…).
 

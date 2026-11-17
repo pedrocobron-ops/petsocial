@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Search, UserPlus, X } from "lucide-react";
 import { conferirCaixa, conferirValorAlto } from "@/lib/gestao/dinheiro";
+import { conferirLimite } from "@/lib/gestao/fiado";
 import { fazerTudoOuNada, partesOuNada, passoDoEstoque, ref, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useOperacao } from "@/lib/gestao/uma-vez";
@@ -16,17 +17,24 @@ import {
 } from "./conta";
 import { AvisoCaixaFechado, fecharRecebimento, pagaDepoisInicial, useCaixaAberto, usePagamento, type PagaDepois } from "./pecas";
 
-type Tutor = Pick<Cliente, "id" | "nome" | "telefone">;
+export type Tutor = Pick<Cliente, "id" | "nome" | "telefone">;
 
-/** Venda de produtos sem agendamento: escolhe os produtos, recebe e dá baixa no estoque. */
-export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => void; aoPronto?: () => void }) {
-  const { sb, petshop, user, vejoFinanceiro } = useGestao();
+/**
+ * Venda de produtos sem agendamento: escolhe os produtos, recebe e dá baixa no estoque.
+ * Com `orcamento`, a venda já vem com os produtos, o tutor e o desconto do orçamento, e o orçamento fica marcado como
+ * convertido na mesma gravação (`orcamento_vender`).
+ */
+export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: {
+  aoFechar: () => void; aoPronto?: (vendaId?: string | null) => void;
+  inicial?: { itens: ItemConta[]; tutor: Tutor | null; desconto: number | null }; orcamento?: { id: string; numero: number } | null;
+}) {
+  const { sb, petshop, user, vejoFinanceiro, souDono, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const { produtos, carregando, erro } = useProdutosDaLoja();
-  const [itens, setItens] = useState<ItemConta[]>([]);
-  const [tutor, setTutor] = useState<Tutor | null>(null);
-  const [desconto, setDesconto] = useState<number | null>(null);
+  const [itens, setItens] = useState<ItemConta[]>(inicial?.itens ?? []);
+  const [tutor, setTutor] = useState<Tutor | null>(inicial?.tutor ?? null);
+  const [desconto, setDesconto] = useState<number | null>(inicial?.desconto ?? null);
   const [pagamento, setPagamento] = usePagamento();
   // "Cliente paga depois": a venda fica em A receber, no nome do tutor, com o dia combinado
   const [depois, setDepois] = useState<PagaDepois>(pagaDepoisInicial);
@@ -63,6 +71,8 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
     const falta = faltaNoEstoque(itens, produtos);
     if (falta.length && !(await perguntar({ titulo: falta.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${falta.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" })))  return false;
     if (vejoFinanceiro && !(await conferirValorAlto(contas.total, perguntar)))  return false;
+    // fiado: passa do limite do cliente? quem pode libera (fica anotado); quem não pode, recebe agora
+    if (fiado && !(await conferirLimite(sb, petshop.id, tutor?.id, contas.total, { perguntar, podeLiberar: souDono || cuidoDoFinanceiro, avisarErro })))  return false;
     // o caixa fechou enquanto esta venda estava aberta: pergunta antes de receber fora dele
     if (pg && !("erro" in pg) && !pg.fiado && !(await conferirCaixa(sb, petshop.id, perguntar)))  return false;
     setSalvando(true);
@@ -86,20 +96,23 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
       }
       const estoque = passoDoEstoque(produtosDaConta(vendidos), chave, lanca ? ref("venda") : null);
       if (estoque) passos.push(estoque);
+      let vendaId: string | null = null;
       if (passos.length) {
-        try { await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "venda_registrar" }, passos); }
-        catch (e) { throw new Error(`A venda não foi anotada: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`); }
+        try {
+          const r = await fazerTudoOuNada(sb, petshop.id, chave, orcamento && lanca ? { funcao: "orcamento_vender", orcamento: orcamento.id } : { funcao: "venda_registrar" }, passos);
+          vendaId = r.ids?.venda ?? null;
+        } catch (e) { throw new Error(`A venda não foi anotada: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`); }
       }
       avisar(fiado ? `Anotado: ${brl(contas.total)} a receber de ${tutor?.nome ?? "cliente"} até ${dataCompleta(fiado.quando)}.` : vejoFinanceiro ? `Venda de ${brl(contas.total)} anotada.` : "Venda anotada no estoque.");
       avisarMudanca();
-      aoPronto?.();
+      aoPronto?.(vendaId);
       aoFechar();
       return true;
     } catch (e) { avisarErro(e); setSalvando(false); return false; }
   }
 
   return (
-    <Folha larga titulo="Venda no balcão" aoFechar={aoFechar}
+    <Folha larga titulo={orcamento ? `Venda do orçamento nº ${orcamento.numero}` : "Venda no balcão"} aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
         <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || !vendidos.length}>
@@ -131,7 +144,7 @@ export default function VendaBalcao({ aoFechar, aoPronto }: { aoFechar: () => vo
 }
 
 /** Tutor da venda (opcional): busca pelo nome em clientes. */
-function EscolherTutor({ valor, aoMudar }: { valor: Tutor | null; aoMudar: (t: Tutor | null) => void }) {
+export function EscolherTutor({ valor, aoMudar }: { valor: Tutor | null; aoMudar: (t: Tutor | null) => void }) {
   const [aberto, setAberto] = useState(false);
   if (valor) {
     return (

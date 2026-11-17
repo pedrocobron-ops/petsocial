@@ -6,7 +6,10 @@
  *  - custo: produto pelo custo guardado na venda (sem ele, o custo de hoje do cadastro); serviço pelo "custo do material"
  *    do serviço × vezes; com "Contar comissão como custo", a comissão da linha também. Sem custo informado, a linha não
  *    ganha margem inventada: fica "custo não informado";
- *  - a ponte com o Financeiro: linhas + outros lançamentos = Entrou; − devoluções e crédito = faturamento; − saídas = resultado.
+ *  - a ponte com o Financeiro: linhas + outros lançamentos = Entrou; − devoluções e crédito = faturamento; − saídas = resultado;
+ *  - troca e devolução de produto (migração 20261200): a linha do produto mostra o que voltou (`devolvido`, `devolvidos`) e a
+ *    margem desconta o que voltou ao cliente e devolve o custo das unidades que voltaram ao estoque (o avariado é perda).
+ *    A receita continua a de antes (a ponte não muda: a devolução já está em "devolvido" ou no crédito deixado).
  * Sem importações de tela: usada pela tela de Relatórios, pela planilha, pelo Mozart e pelos testes.
  */
 
@@ -20,6 +23,8 @@ export type LucroDoBanco = {
   de: string; ate: string; comissao_como_custo: boolean;
   servicos: { servico_id: string | null; nome: string; quantidade: number; receita: number; custo_material_unitario: number | null; comissao: number }[];
   produtos: { produto_id: string | null; nome: string; unidade: string; quantidade: number; receita: number; custo_salvo: number; custo_cadastro: number; sem_custo: number; comissao: number }[];
+  /** Troca e devolução no período, por produto (migração 20261200; banco antigo: ausente). */
+  devolucoes?: { produto_id: string | null; nome: string; unidade: string; quantidade: number; avariados: number; valor: number; custo_volta: number; sem_custo: number }[];
   extras: { receita: number; comissao: number };
   outros: { categoria: string; valor: number; lancamentos: number }[];
   entradas: number; devolvido: number; credito_deixado: number; credito_usado_fora: number; faturamento: number;
@@ -42,6 +47,9 @@ export type LinhaLucro = {
   falta: string | null;
   /** Parte do custo do produto que veio do cadastro de hoje (venda sem custo guardado). */
   custoDeHoje: number;
+  /** Troca e devolução no período: o que voltou ao cliente (R$) e quantas unidades voltaram (só produto). */
+  devolvido: number;
+  devolvidos: number;
 };
 
 export type Lucro = {
@@ -50,6 +58,8 @@ export type Lucro = {
   totais: {
     receita: number; receitaComCusto: number; receitaSemCusto: number; linhasSemCusto: number;
     custo: number; margem: number; pct: number | null; comissao: number;
+    /** Troca e devolução de produto no período (já dentro de "devolvido" e do crédito deixado da ponte). */
+    devolvido: number;
   };
   ponte: {
     linhas: number; outros: { categoria: string; valor: number; lancamentos: number }[]; somaOutros: number; entradas: number;
@@ -60,9 +70,11 @@ export type Lucro = {
   };
 };
 
-function fechar(l: Omit<LinhaLucro, "margem" | "pct">): LinhaLucro {
-  const margem = l.custo == null ? null : real(l.receita - l.custo);
-  return { ...l, margem, pct: margem == null || !(l.receita > 0) ? null : (margem / l.receita) * 100 };
+function fechar(x: Omit<LinhaLucro, "margem" | "pct" | "devolvido" | "devolvidos"> & { devolvido?: number; devolvidos?: number }): LinhaLucro {
+  const l = { ...x, devolvido: x.devolvido ?? 0, devolvidos: x.devolvidos ?? 0 };
+  const liquida = real(l.receita - l.devolvido);
+  const margem = l.custo == null ? null : real(liquida - l.custo);
+  return { ...l, margem, pct: margem == null || !(liquida > 0) ? null : (margem / liquida) * 100 };
 }
 
 /** Monta as linhas e os totais do relatório a partir da resposta do banco. */
@@ -77,14 +89,23 @@ export function montarLucro(b: LucroDoBanco): Lucro {
       receita: real(s.receita), material, comissao, custo, falta: material == null ? "custo do material não informado" : null, custoDeHoje: 0,
     });
   });
-  const produtos = (b.produtos ?? []).map((p): LinhaLucro => {
-    const comissao = real(p.comissao), semCusto = qtd(p.sem_custo);
-    const material = semCusto > 0 ? null : real(Number(p.custo_salvo) + Number(p.custo_cadastro));
+  // produto que só voltou no período (vendido antes): entra como linha sem receita, com o que voltou
+  const devs = b.devolucoes ?? [];
+  const chaveP = (p: { produto_id: string | null; nome: string }) => p.produto_id ?? `nome:${p.nome.toLowerCase()}`;
+  const vendidos = new Set((b.produtos ?? []).map(chaveP));
+  const linhasP = [...(b.produtos ?? []), ...devs.filter((d) => !vendidos.has(chaveP(d))).map((d) => ({
+    produto_id: d.produto_id, nome: d.nome, unidade: d.unidade, quantidade: 0, receita: 0, custo_salvo: 0, custo_cadastro: 0, sem_custo: 0, comissao: 0,
+  }))];
+  const produtos = linhasP.map((p): LinhaLucro => {
+    const dv = devs.find((d) => chaveP(d) === chaveP(p));
+    const comissao = real(p.comissao), semCusto = qtd(Number(p.sem_custo) + Number(dv?.sem_custo ?? 0));
+    const material = semCusto > 0 ? null : real(Number(p.custo_salvo) + Number(p.custo_cadastro) - Number(dv?.custo_volta ?? 0));
     const custo = material == null ? null : real(material + (comComissao ? comissao : 0));
     return fechar({
       chave: `p:${p.produto_id ?? p.nome}`, tipo: "produto", id: p.produto_id, nome: p.nome, quantidade: qtd(p.quantidade), unidade: p.unidade || "un",
       receita: real(p.receita), material, comissao, custo, custoDeHoje: real(p.custo_cadastro),
       falta: semCusto > 0 ? `${semCusto.toLocaleString("pt-BR")} ${p.unidade || "un"} sem custo no cadastro` : null,
+      devolvido: real(dv?.valor ?? 0), devolvidos: qtd(dv?.quantidade ?? 0),
     });
   });
   const ex = b.extras ?? { receita: 0, comissao: 0 };
@@ -96,8 +117,9 @@ export function montarLucro(b: LucroDoBanco): Lucro {
   const comCusto = todas.filter((l) => l.custo != null);
   const receita = real(todas.reduce((t, l) => t + l.receita, 0));
   const receitaComCusto = real(comCusto.reduce((t, l) => t + l.receita, 0));
+  const devolvidoComCusto = real(comCusto.reduce((t, l) => t + l.devolvido, 0));
   const custo = real(comCusto.reduce((t, l) => t + (l.custo ?? 0), 0));
-  const margem = real(receitaComCusto - custo);
+  const margem = real(receitaComCusto - devolvidoComCusto - custo);
   const outros = (b.outros ?? []).map((o) => ({ categoria: o.categoria, valor: real(o.valor), lancamentos: Number(o.lancamentos) }));
   const somaOutros = real(outros.reduce((t, o) => t + o.valor, 0));
   const entradas = real(b.entradas);
@@ -105,7 +127,8 @@ export function montarLucro(b: LucroDoBanco): Lucro {
     servicos, produtos, extras, comissaoComoCusto: comComissao,
     totais: {
       receita, receitaComCusto, receitaSemCusto: real(receita - receitaComCusto), linhasSemCusto: todas.length - comCusto.length,
-      custo, margem, pct: receitaComCusto > 0 ? (margem / receitaComCusto) * 100 : null, comissao: real(b.comissao_total),
+      custo, margem, pct: receitaComCusto - devolvidoComCusto > 0 ? (margem / (receitaComCusto - devolvidoComCusto)) * 100 : null, comissao: real(b.comissao_total),
+      devolvido: real(todas.reduce((t, l) => t + l.devolvido, 0)),
     },
     ponte: {
       linhas: receita, outros, somaOutros, entradas,
