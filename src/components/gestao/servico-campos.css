@@ -14,6 +14,10 @@
 .g-sv-precos .precos.um > small { font-size: .8125rem; color: var(--g-cinza); padding-bottom: 12px; }
 .g-sv-area, .g-sv-cor { display: grid; gap: 6px; }
 .g-sv-area .g-chips { flex-wrap: wrap; }
+.g-sv-area-dica { font-size: .8125rem; line-height: 1.35; color: var(--g-cinza); }
+/* cor da agenda: as que outro serviço já usa ganham um ponto; escolher uma delas mostra de quem é */
+.g-sv-cor-aviso { font-size: .8125rem; line-height: 1.35; color: var(--g-cinza); }
+.g-sv-cor-aviso b { color: inherit; font-weight: 600; }
 /* serviço novo no guia: o nome é um campo; o botão de pôr mais um fica no fim da lista */
 .g-guia-servico .cabeca .g-input.nome { flex: 1; min-width: 0; min-height: 40px; font: 480 1rem/1.2 var(--display); }
 .g-guia-mais { justify-self: start; }

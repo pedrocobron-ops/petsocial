@@ -68,3 +68,6 @@ section.g-card.g-pilha > .g-mp-t { margin-bottom: 0; }
 .g-mp-cartao { min-width: 0; scroll-margin-top: 76px; }
 .g-mp-grupo-corpo[hidden] { display: none; }
 @media (min-width: 960px) { .g-mp-grupo-corpo:not(.largo) { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g-mp-grupo-corpo:not(.largo) > :only-child { grid-column: 1 / -1; } }
+/* serviços com a mesma cor: o texto ocupa a linha e o botão desce no celular */
+.g-aviso.g-mp-cores .g-cresce { flex: 1 1 260px; }
+.g-aviso.g-mp-cores .g-btn { margin-left: 0; }

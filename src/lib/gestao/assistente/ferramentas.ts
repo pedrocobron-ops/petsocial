@@ -1071,7 +1071,24 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
     const ja = await sb.rpc("lote_ja_feito", { p_petshop: petshop.id, p_chave: c.chave });
     if (ja.data) return { feito: true, repetido: true, aviso: "Isso já tinha sido recebido. Nada foi recebido de novo." };
   }
-  await descrever(c, nome, e); // confere de novo na hora de gravar
+  const resumo = await descrever(c, nome, e); // confere de novo na hora de gravar
+  return comOCartao(await gravarConferido(c, nome, e), resumo);
+}
+
+/**
+ * O resultado do que foi gravado vai para o modelo junto com o cartão que a pessoa confirmou: a frase de "pronto" sai
+ * dos nomes do cadastro, como estão no cartão ("Mel (Tutor Teste 1)"), e não da memória da conversa (o modelo chegou a
+ * escrever "Tutora Teste 1" para a dona de uma cadela).
+ */
+export function comOCartao(r: unknown, resumo: Resumo): unknown {
+  if (!r || typeof r !== "object" || Array.isArray(r)) return r;
+  return { ...r, cartao_confirmado: { titulo: resumo.titulo, linhas: resumo.linhas.map(([k, v]) => (k ? `${k}: ${v}` : v)) },
+    nomes: "Na resposta, escreva os nomes de pets e tutores exatamente como no cartão, sem mudar nenhuma letra." };
+}
+
+async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<unknown> {
+  const { sb, petshop } = c;
+  const hoje = c.agora.slice(0, 10);
   switch (nome) {
     case "cadastrar_pet": {
       let clienteId = uuid(e.cliente_id);

@@ -154,6 +154,36 @@ const ultimoResultado = (msgs) => {
   const rc = await F.gravar(cCaixa, 'receber_de_cliente', { cliente_id: clara, valor: 40, forma: 'dinheiro' });
   T.ok('a recepção recebe pelo Mozart', rc.feito && deve(clara) === 0, rc);
 
+  T.secao('Juliana: o nome do tutor sai como no cadastro ("Tutor Teste 1", nunca "Tutora Teste 1")');
+  {
+    const tutorJ = B.must(await dono.from('clientes').insert({ petshop_id: P, nome: 'Tutor Teste 1', telefone: '11900000001' }).select('id').single(), 'tutor').id;
+    const pipoca = B.must(await dono.from('pets').insert({ petshop_id: P, cliente_id: tutorJ, nome: 'Pipoquinha', especie: 'cao', sexo: 'F', porte: 'M' }).select('id').single(), 'pet').id;
+    const quando = `${L.dia(2)}T10:00`;
+    const vistosJ = [];
+    // o modelo de mentira faz o que o de verdade fez: acha a cadela, marca e, depois do "Pode fazer", flexiona o nome do tutor
+    const roteiroJ = async (m) => {
+      vistosJ.push(ultimoResultado(m));
+      if (vistosJ.length === 1) return usar('buscar_pets', { termo: 'pipokinha' });
+      if (vistosJ.length === 2) return usar('marcar_horario', { pet_id: pipoca, servico_id: L.S.Banho, inicio: quando });
+      return falar('Prontinho, marquei o banho da Pipoquinha. Ela é da Tutora Teste 1.');
+    };
+    const mJ = pergunta('marca banho da pipokinha depois de amanha as 10');
+    const sJ = await C.voltas({ c: cDono, mensagens: mJ, liberado: true, chamar: roteiroJ, contar: semContar });
+    const buscaJ = JSON.parse(vistosJ[1].content);
+    T.ok('buscar_pets pelo nome parecido acha a Pipoquinha com o tutor dela', buscaJ.pets.length === 1 && buscaJ.pets[0].pet_id === pipoca && buscaJ.pets[0].tutor === 'Tutor Teste 1' && /parecido/.test(buscaJ.aviso || ''), buscaJ);
+    T.ok('o cartão mostra "Pipoquinha (Tutor Teste 1)"', sJ.propostas[0]?.resumo.linhas[0][1] === 'Pipoquinha (Tutor Teste 1)', sJ.propostas[0]);
+    const pJ = sJ.mensagens[sJ.mensagens.length - 1].content.filter((b) => b.type === 'tool_use');
+    const gJ = await C.responderCartoes({ c: cDono, pendentes: pJ, liberado: true, decisoes: [{ id: pJ[0].id, ok: true }] });
+    const feitoJ = JSON.parse(gJ.resultados[0].content);
+    T.ok('o resultado do que foi gravado leva o cartão confirmado, com o nome do cadastro', feitoJ.feito && feitoJ.cartao_confirmado.linhas.includes('Pet: Pipoquinha (Tutor Teste 1)') && /exatamente/.test(feitoJ.nomes), feitoJ);
+    sJ.mensagens.push({ role: 'user', content: gJ.resultados });
+    const fimJ = await C.voltas({ c: cDono, mensagens: sJ.mensagens, liberado: true, chamar: roteiroJ, contar: semContar });
+    T.ok('a resposta final diz "Tutor Teste 1" (o "Tutora" do modelo é corrigido)', fimJ.tipo === 'ok' && /da Tutor Teste 1\./.test(fimJ.texto) && !/Tutora/.test(fimJ.texto), fimJ.texto);
+    T.ok('marcou um horário só, para a Pipoquinha', B.num(`select count(*) from agendamentos where petshop_id='${P}' and pet_id='${pipoca}'`) === 1);
+    const { INSTRUCOES } = lib('assistente/instrucoes');
+    T.ok('as instruções pedem os nomes exatamente como vêm das ferramentas', /exatamente como vêm das ferramentas/.test(INSTRUCOES));
+  }
+
   T.secao('teto de voltas e de tempo');
   let chamadas = 0;
   const semFim = async () => { chamadas++; return usar('buscar_pets', { termo: 'thor' }); };

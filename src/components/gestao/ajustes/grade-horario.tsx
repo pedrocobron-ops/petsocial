@@ -1,6 +1,7 @@
 "use client";
 
 import type { Horario } from "@/lib/gestao/tipos";
+import { CORES, NOME_COR, donoDaCor } from "@/lib/gestao/cores";
 import "./ajustes.css";
 
 /** Ordem em que a semana aparece: segunda primeiro, domingo por último. */
@@ -206,18 +207,32 @@ export function GradeHorario({ valor, aoMudar, aberto = "Aberto", fechado = "Fec
   );
 }
 
-export const CORES = ["#f97316", "#3b82a0", "#4d8f6b", "#7c6fb0", "#b0763f", "#b0563f", "#a05a82", "#1e3a2f"];
-const NOME_COR: Record<string, string> = {
-  "#f97316": "laranja", "#3b82a0": "azul", "#4d8f6b": "verde", "#7c6fb0": "roxo", "#b0763f": "caramelo", "#b0563f": "telha", "#a05a82": "rosa", "#1e3a2f": "verde-garrafa",
-};
+export { CORES };
 
-export function EscolherCor({ valor, aoMudar, rotulo = "Cor" }: { valor: string; aoMudar: (c: string) => void; rotulo?: string }) {
+/**
+ * Bolinhas de cor. `usadas`: as cores que outro serviço já usa, com o nome dele. Elas ganham um ponto, e escolher uma
+ * delas mostra embaixo de quem é (na agenda os dois ficariam iguais).
+ */
+export function EscolherCor({ valor, aoMudar, rotulo = "Cor", usadas }: { valor: string; aoMudar: (c: string) => void; rotulo?: string; usadas?: { nome: string; cor: string | null }[] }) {
   const cores = CORES.includes(valor) ? CORES : [valor, ...CORES];
+  const de = (c: string) => (usadas ? donoDaCor(c, usadas) : null);
+  const repetida = de(valor);
   return (
-    <div className="gj-cores" role="group" aria-label={rotulo}>
-      {cores.map((c) => (
-        <button key={c} type="button" className="gj-cor" style={{ background: c }} aria-pressed={c === valor} aria-label={NOME_COR[c] ?? "cor atual"} onClick={() => aoMudar(c)} />
-      ))}
-    </div>
+    <>
+      <div className="gj-cores" role="group" aria-label={rotulo}>
+        {cores.map((c) => {
+          const quem = de(c);
+          return (
+            <button key={c} type="button" className={`gj-cor${quem ? " usada" : ""}`} style={{ background: c }} aria-pressed={c === valor}
+              aria-label={`${NOME_COR[c] ?? "cor atual"}${quem ? `, já é de ${quem}` : ""}`} title={quem ? `Já é de ${quem}` : undefined} onClick={() => aoMudar(c)} />
+          );
+        })}
+      </div>
+      {usadas && usadas.length > 0 && (
+        <small className="gj-cor-aviso" role="status">
+          {repetida ? <>Essa cor já é de <b>{repetida}</b>: na agenda os dois ficam iguais. Escolha uma sem ponto.</> : "As cores com um ponto já são de outro serviço."}
+        </small>
+      )}
+    </>
   );
 }

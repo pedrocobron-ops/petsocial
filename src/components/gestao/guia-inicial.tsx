@@ -530,7 +530,8 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
                       <PrecosDoServico servico={nomeDele} valores={s} porPorte={s.porPorte}
                         aoTrocarModo={(v) => { semErros(s.chave); setErro(null); mudarNovo(s.chave, v ? { porPorte: true } : { porPorte: false, ...umPrecoSo(s) }); }}
                         aoMudar={(campos, c, ruim) => { mudarNovo(s.chave, campos); setErro(null); anotarErro(`${s.chave}:${c}`, ruim); }} />
-                      <div className="g-sv-cor"><span className="g-rotulo">Cor na agenda</span><EscolherCor valor={s.cor} aoMudar={(cor) => mudarNovo(s.chave, { cor })} rotulo={`Cor de ${nomeDele}`} /></div>
+                      <div className="g-sv-cor"><span className="g-rotulo">Cor na agenda</span><EscolherCor valor={s.cor} aoMudar={(cor) => mudarNovo(s.chave, { cor })} rotulo={`Cor de ${nomeDele}`}
+                        usadas={[...naLista.map((x) => ({ nome: x.nome, cor: x.cor })), ...servicosNovos.filter((x) => x.chave !== s.chave).map((x) => ({ nome: x.nome.trim() || "outro serviço novo", cor: x.cor }))]} /></div>
                     </section>
                   );
                 })}

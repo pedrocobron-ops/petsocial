@@ -69,6 +69,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `parecido.js`: nomes parecidos para pedidos falados (`assistente/parecido.ts`, usado por `buscar_pets` quando o nome não bate):
   "tor" acha o Thor, "luna" a Lunna, "mau" a Mel (e a Bel: mais de um, o Mozart pergunta), pelo tutor e pelo começo do nome; nada
   inventado para nomes longe.
+- `juliana.js`: o que a testadora Juliana achou: o nome do cadastro na resposta do Mozart (`parecido.ts`, `manterNomes`: "Tutora Teste 1"
+  volta a ser "Tutor Teste 1"; Bruno Silva e Bruna Silva no cadastro, nome de uma palavra e palavra dentro de outra ficam como estão;
+  `nomesDosResultados` tira os nomes de `buscar_pets` e do cartão confirmado), as cores da agenda (`cores.ts`: `corLivre`, `trocasDeCor`
+  com o primeiro de cada cor ficando e os outros ganhando cor livre, desativado fora, mais serviços que cores), onde cada opção de
+  Personalizar fica no menu (`noMenu`: Agenda, Estoque e Caixa, Pacotes, "Creche e hotel" com as duas e "Creche"/"Hotel" com uma, igual
+  a `nomeDaCasa`) e quando ligar creche ou hotel pergunta do link (`linkPergunta`: só com o link ligado e a área nova fora do link).
 - `textos.js`: textos que as testadoras acharam confusos: o comprovante com parte da dívida antiga ("Pagou R$ 40,00 do que devia de
   antes (R$ 75,00); ainda deve R$ 35,00", sem repetir o resto; quitado; chamada antiga sem o total) e as iniciais sem as palavras
   pequenas ("Banho e Tosa" = BT, "Hotelzinho da Bia" = HB).
@@ -140,7 +146,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   ferramentas rodam de verdade, com o login de cada papel): "o dono do Bob me pagou os 35" com duas contas abertas (5 + 30) quita as duas
   e o mês ganha 35 uma vez só (a entrada solta é recusada; o toque duplo não recebe de novo), pagamento em parte, pagou a mais (pergunta;
   com `sobra: "credito"` vira crédito), `anotar_divida` ligada ao tutor, `quem_me_deve` por pessoa, papéis (`cliente_receber_contas`
-  recusado para quem não mexe com dinheiro, conta e crédito de outro cliente recusados) e o teto de voltas e de tempo.
+  recusado para quem não mexe com dinheiro, conta e crédito de outro cliente recusados) e o teto de voltas e de tempo. **Nome do tutor**
+  (Juliana): "pipokinha" acha a Pipoquinha pelo nome parecido, o cartão mostra "Pipoquinha (Tutor Teste 1)", o resultado gravado leva o
+  `cartao_confirmado`, e o "Ela é da Tutora Teste 1." do modelo de mentira sai como "Tutor Teste 1"; as instruções pedem os nomes exatos.
 - `divida-caderno.js`: dívida trazida do caderno (migração 20261186, `lancamentos.devido_desde`): dono e recepção anotam com o dia
   em que começou; o banco recusa dia depois de hoje, valor já recebido, saída, antes de 2000 e o tosador; anotar não vira dinheiro em
   dia nenhum; receber uma parte entra hoje, no caixa, e a conta segue "desde" o dia do caderno; a dona corrige o dia depois.
@@ -220,6 +228,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   com o sinal, Thor 107,25, Luna 285 − 190 = 95,00, Bob 220 + 2,75 − 110 = 112,75) e na do tutor (Ana 169,65, "Hotel"). Relatórios:
   4 noites reservadas de hoje em diante, a última em +4 (a estadia encerrada hoje não conta). Página do tutor: `ultima_vez` no banco,
   "Luna veio hoje. Ainda não tem diário nem fotos." e, para quem nunca veio, o texto de antes. Capturas em `testes/saida/caixa-fichas-*.png`.
+- `juliana.js`: o que a Juliana achou, em 390 e 1366, numa loja só de banho e tosa com o link ligado e os serviços sem preço. Conta nova:
+  o botão do alto, o Mozart e o passo em destaque de Primeiros passos são o mesmo ("Colocar os preços dos serviços") e a agenda vazia não
+  oferece outro caminho. 1366: Personalizar mostra "No menu: Agenda / Estoque e Caixa / Pacotes / Hotel" e, com creche e hotel, "Creche e
+  hotel" nos dois cartões; ligar os dois pergunta do link sem nada marcado; "Ligar no link" só na creche grava creche no link e o hotel
+  fora, com o recado "continua sem hotel". Serviço novo: a linha da área (Hotel: extra na saída, entra na conta), um ponto em cada cor
+  em uso, roxo avisa "Essa cor já é de Tosa higiênica"; salvo repetido (390), Serviços e preços avisa e "Dar uma cor para cada" deixa
+  todas diferentes (a Tosa higiênica fica roxa). Check-out do hotel (1366): "Banho de saída do hotel · R$ 40,00" num toque e o total
+  R$ 160,00. Capturas em `testes/saida/juliana-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 - `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente
