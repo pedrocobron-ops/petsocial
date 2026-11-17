@@ -2816,6 +2816,9 @@ isOneToOne: false
 "admin_pagantes":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
+"admin_mozart_tempos":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "admin_painel":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
@@ -3789,6 +3792,9 @@ isOneToOne: false
                            },
 "modo_envio_marcar":
 { Args: { "p": string,"p_refs": (string)[],"p_tipo": string }; Returns: Json
+                           },
+"mozart_tempo_registrar":
+{ Args: { "p_cache_gravados": number,"p_cache_lidos": number,"p_entrada": number,"p_ferramentas": number,"p_fim": string,"p_modo": string,"p_petshop": string,"p_primeiro_ms": number | null,"p_saida": number,"p_sinal_ms": number | null,"p_total_ms": number,"p_voltas": number }; Returns: undefined
                            },
 "niver_no_dia":
 { Args: { "p_dia": string,"p_nascimento": string }; Returns: boolean

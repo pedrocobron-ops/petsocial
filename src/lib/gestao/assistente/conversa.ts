@@ -2,6 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { definicao, descrever, ehErroDeUso, gravar, rodarConsulta, type Contexto, type LinkZap, type Resumo } from "./ferramentas";
 import { manterNomes, nomesDosResultados } from "./parecido";
 import { ferramentaLiberada } from "./permissao";
+import { fraseDaFerramenta } from "./progresso";
 
 /**
  * As voltas de uma conversa com o Mozart, separadas da rota para dar para testar com um modelo de mentira:
@@ -12,8 +13,20 @@ import { ferramentaLiberada } from "./permissao";
 export type Msg = Anthropic.Beta.BetaMessageParam;
 export type Resultado = Anthropic.Beta.BetaToolResultBlockParam;
 export type Proposta = { id: string; ferramenta: string; resumo: Resumo };
+/** Tokens de uma chamada (o que a API devolve em `usage`). */
+export type Gasto = { input_tokens?: number | null; output_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null };
 /** O que interessa da resposta do modelo. */
-export type RespostaDoModelo = { content: Anthropic.Beta.BetaContentBlock[]; stop_reason: string | null };
+export type RespostaDoModelo = { content: Anthropic.Beta.BetaContentBlock[]; stop_reason: string | null; usage?: Gasto | null };
+/**
+ * Avisos que a chamada ao modelo dá enquanto ele escreve (só quando a resposta vai aos poucos para a tela):
+ * `texto` recebe cada pedaço do que ele fala; `ferramenta` diz que ele começou a pedir uma consulta.
+ */
+export type AvisosDaChamada = { texto: (pedaco: string) => void; ferramenta: (nome: string) => void };
+/** O que a rota mostra enquanto a pessoa espera: o texto aos poucos e a frase do que o Mozart está fazendo. */
+export type Avisos = { texto?: (pedaco: string) => void; progresso?: (frase: string) => void };
+/** Números do pedido, para o "Tempo do Mozart" (a rota guarda). */
+export type Medidas = { voltas: number; ferramentas: number; entrada: number; saida: number; cacheLidos: number; cacheGravados: number };
+export const medidasZeradas = (): Medidas => ({ voltas: 0, ferramentas: 0, entrada: 0, saida: 0, cacheLidos: 0, cacheGravados: 0 });
 
 /** Voltas no máximo por pedido (cada volta é uma chamada ao modelo). */
 export const MAX_VOLTAS = 6;
@@ -41,12 +54,18 @@ function nomesDaConversa(mensagens: Msg[]): string[] {
 
 export async function voltas(o: {
   c: Contexto; mensagens: Msg[]; liberado: boolean;
-  chamar: (mensagens: Msg[]) => Promise<RespostaDoModelo>;
+  chamar: (mensagens: Msg[], avisos: AvisosDaChamada) => Promise<RespostaDoModelo>;
   /** Conta uma chamada no dia do pet shop; false: passou do limite. */
   contar: () => Promise<boolean>;
   maxVoltas?: number; prazoMs?: number; relogio?: () => number;
+  avisos?: Avisos;
+  /** Preenchido durante as voltas (voltas, consultas e tokens). */
+  medidas?: Medidas;
 }): Promise<Saida> {
   const { c, mensagens, liberado } = o;
+  const m = o.medidas ?? medidasZeradas();
+  // o texto que já foi para a tela: a fala de uma volta nova começa num parágrafo novo (igual ao texto final)
+  let mostrou = false;
   const relogio = o.relogio ?? Date.now;
   const inicio = relogio();
   const links: LinkZap[] = [];
@@ -59,7 +78,21 @@ export async function voltas(o: {
       if (!texto) return { tipo: "limite" };
       break;
     }
-    const resposta = await o.chamar(mensagens);
+    let comecouVolta = false;
+    const resposta = await o.chamar(mensagens, {
+      texto: (pedaco) => {
+        if (!pedaco || !o.avisos?.texto) return;
+        if (!comecouVolta) { comecouVolta = true; if (mostrou) o.avisos.texto("\n\n"); }
+        mostrou = true;
+        o.avisos.texto(pedaco);
+      },
+      ferramenta: (nome) => o.avisos?.progresso?.(fraseDaFerramenta(nome, undefined, c.agora, definicao(nome)?.grava)),
+    });
+    m.voltas++;
+    m.entrada += resposta.usage?.input_tokens ?? 0;
+    m.saida += resposta.usage?.output_tokens ?? 0;
+    m.cacheLidos += resposta.usage?.cache_read_input_tokens ?? 0;
+    m.cacheGravados += resposta.usage?.cache_creation_input_tokens ?? 0;
     mensagens.push({ role: "assistant", content: resposta.content as Extract<Msg, { role: "assistant" }>["content"] });
     // nomes de pets e tutores como estão no cadastro (o modelo às vezes troca o fim: "Tutora" por "Tutor")
     const fala = manterNomes(resposta.content.filter((b) => b.type === "text").map((b) => (b.type === "text" ? b.text : "")).join("\n").trim(), nomesDaConversa(mensagens));
@@ -69,25 +102,35 @@ export async function voltas(o: {
     if (resposta.stop_reason !== "tool_use") break;
     if (volta === max - 1) cortou = true;
 
-    const parciais: Resultado[] = [];
+    const usos = resposta.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
+    m.ferramentas += usos.length;
+    // um resultado por pedido do modelo, na ordem em que ele pediu (os cartões ficam de fora)
+    const porPedido: (Resultado | null)[] = usos.map(() => null);
+    const linksPorPedido: LinkZap[][] = usos.map(() => []);
+    // as consultas (só leem) rodam todas ao mesmo tempo
+    const consultas = usos.map((uso, i) => ({ uso, i, def: definicao(uso.name) })).filter((x) => x.def && ferramentaLiberada(x.def, c) && !x.def.grava);
+    for (const { uso } of consultas) o.avisos?.progresso?.(fraseDaFerramenta(uso.name, uso.input, c.agora));
+    await Promise.all(consultas.map(async ({ uso, i }) => {
+      const r = await rodarConsulta(c, uso.name, uso.input);
+      if (r.links) linksPorPedido[i] = r.links;
+      porPedido[i] = { type: "tool_result", tool_use_id: uso.id, content: r.conteudo, is_error: r.erro };
+    }));
+    for (const l of linksPorPedido) links.push(...l);
+    // o resto, em ordem: ferramenta fora do alcance, conta só para consulta e os cartões (que só descrevem, nada é gravado)
     const propostas: Proposta[] = [];
-    for (const uso of resposta.content) {
-      if (uso.type !== "tool_use") continue;
+    for (let i = 0; i < usos.length; i++) {
+      const uso = usos[i];
+      if (porPedido[i]) continue;
       const def = definicao(uso.name);
-      if (!def || !ferramentaLiberada(def, c)) { parciais.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: "Ferramenta indisponível para esta pessoa." }); continue; }
-      if (!def.grava) {
-        const r = await rodarConsulta(c, uso.name, uso.input);
-        if (r.links) links.push(...r.links);
-        parciais.push({ type: "tool_result", tool_use_id: uso.id, content: r.conteudo, is_error: r.erro });
-        continue;
-      }
-      if (!liberado) { parciais.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Diga isso à pessoa e indique a tela Assinatura." }); continue; }
+      if (!def || !ferramentaLiberada(def, c)) { porPedido[i] = { type: "tool_result", tool_use_id: uso.id, is_error: true, content: "Ferramenta indisponível para esta pessoa." }; continue; }
+      if (!liberado) { porPedido[i] = { type: "tool_result", tool_use_id: uso.id, is_error: true, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Diga isso à pessoa e indique a tela Assinatura." }; continue; }
       try {
         propostas.push({ id: uso.id, ferramenta: uso.name, resumo: await descrever(c, uso.name, uso.input as Record<string, unknown>) });
       } catch (err) {
-        parciais.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: ehErroDeUso(err) ? err.message : "Não consegui preparar essa ação." });
+        porPedido[i] = { type: "tool_result", tool_use_id: uso.id, is_error: true, content: ehErroDeUso(err) ? err.message : "Não consegui preparar essa ação." };
       }
     }
+    const parciais = porPedido.filter((r): r is Resultado => r !== null);
     // há algo para a pessoa confirmar: para aqui e espera os botões
     if (propostas.length) return { tipo: "ok", mensagens, texto, propostas, parciais, links, cortou: false };
     mensagens.push({ role: "user", content: parciais });

@@ -128,7 +128,8 @@ const SAIDA = `${B.RAIZ}/testes/saida`;
     await esperarResposta();
     await page.waitForTimeout(200);
     const falas = await voz(() => window.__voz.falas);
-    T.ok('ligado: a resposta nova é lida em pt-BR', falas.length === 1 && /Entendi: quanto entrou hoje/.test(falas[0].texto) && falas[0].lang === 'pt-BR', falas);
+    // lida frase por frase (cada frase é uma fala): "Entendi: quanto entrou hoje." e "Confere?"
+    T.ok('ligado: a resposta nova é lida em pt-BR, frase por frase', falas.length === 2 && /Entendi: quanto entrou hoje\./.test(falas[0].texto) && falas[1].texto === 'Confere?' && falas.every((f) => f.lang === 'pt-BR'), falas);
     await ler.uncheck();
     T.ok('o ajuste fica guardado', (await page.evaluate(() => localStorage.getItem('gestao:voz:ler-respostas'))) === '0');
     await painel.locator('button[aria-label="Ajustes da voz"]').click();
@@ -136,7 +137,7 @@ const SAIDA = `${B.RAIZ}/testes/saida`;
     T.ok('cada resposta tem o alto-falante', (await painel.locator('.g-bolha.ela button.g-ass-ouvir').count()) >= 2 && (await alto.getAttribute('aria-label')) === 'Ouvir esta resposta');
     await alto.click();
     await page.waitForTimeout(100);
-    T.ok('tocar no alto-falante lê aquela resposta', (await voz(() => window.__voz.falas.length)) === 2 && (await alto.getAttribute('aria-pressed')) === 'true');
+    T.ok('tocar no alto-falante lê aquela resposta', (await voz(() => window.__voz.falas.length)) > falas.length && (await alto.getAttribute('aria-pressed')) === 'true');
     await tela('lendo');
     await page.waitForTimeout(500);
 

@@ -67,6 +67,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   plano de 01/11, que agora é o mês inteiro); seg a sex 9 de 21 × 1.100 = 471,43; dia fechado fora da conta; pausa no mês.
 - `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
   outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
+- `mozart-rapido.js`: a voz (`src/lib/gestao/fala.ts`: a melhor voz em português do aparelho, natural do Edge > Google > aprimorada
+  da Apple > outras do Brasil > Portugal; texto limpo para falar, "R$ 60,00" = "60 reais", "10h30" = "10 e 30"; frases que fecham
+  enquanto o texto chega), as frases de progresso (`assistente/progresso.ts`, toda consulta tem a sua), as voltas com modelo e banco de
+  mentira (texto aos poucos, consultas da mesma volta ao mesmo tempo e na ordem pedida, tokens somados, cartão continua parando), os
+  próximos dias no contexto e as marcas de cache da rota. Sem banco.
 - `parecido.js`: nomes parecidos para pedidos falados (`assistente/parecido.ts`, usado por `buscar_pets` quando o nome não bate):
   "tor" acha o Thor, "luna" a Lunna, "mau" a Mel (e a Bel: mais de um, o Mozart pergunta), pelo tutor e pelo começo do nome; nada
   inventado para nomes longe.
@@ -476,6 +481,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   e o alto-falante de cada resposta; segurar para falar (toque de dedo no 390, mouse no 1366) e tocar para parar; "Não ouvi nada";
   microfone bloqueado ("Libere o microfone nas configurações do navegador"); microfone na Ajuda (não manda sozinho); para sozinho em
   8 s de silêncio e em 30 s (`page.clock`); navegador sem ditado: sem botão, escrever continua igual. Capturas em `testes/saida/mozart-voz-*`.
+- `mozart-stream.js`: o Mozart respondendo aos poucos (o fetch da página vira um roteiro em pedaços, no formato da rota: uma linha JSON
+  por evento). 390 e 1366: o pedido vai com `Accept: application/x-ndjson`; "Procurando Thor…" embaixo dos três pontinhos; o texto cresce
+  na mesma bolha; o cartão continua pedindo "Pode fazer" (nenhuma decisão vai antes do toque); a resposta do "Pode fazer" também chega
+  aos poucos; ler em voz alta fala frase por frase enquanto chega. 390: "Voz" com as vozes do Edge (só português, a natural primeiro,
+  "Ouvir exemplo", a escolha guardada) e aparelho sem voz em português (dica de como instalar, sem alto-falante). No servidor de
+  verdade: sem o Accept a rota responde JSON como antes. Capturas em `testes/saida/mozart-stream-*`.
 - `ditado.js`: microfone nos campos de texto livre (`CampoComVoz`, `src/components/gestao/ditado.tsx`): na ficha do pet nova (cuidados e
   alertas, observações) e em Marcar horário (observação), o falado entra depois do que estava escrito, com espaço, ao vivo; respeita o
   tamanho do campo; nada é salvo sozinho; bloqueado mostra a ajuda; navegador sem ditado não mostra botão. 390 e 1366.

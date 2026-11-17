@@ -702,6 +702,13 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-ass-fila-nota { display: block; margin-top: 4px; font-size: .75rem; color: rgba(31, 27, 23, .65); white-space: normal; }
 .g-ass-fila-aviso { justify-self: center; max-width: 92%; margin: 6px 0 0; padding: 6px 12px; border-radius: 12px; background: rgba(255, 251, 245, .95); font-size: .8125rem; color: var(--g-escuro-b); text-align: center; }
 .g-bolha.erro.rabo::before { background: var(--g-vermelho-tint); }
+/* resposta chegando aos poucos: a bolha cresce; a final entra no lugar sem a animação de chegada */
+.g-bolha.g-ass-aovivo, .g-bolha.ja { animation: none; }
+.g-ass-progresso { margin: -2px 0 0 4px; font-size: .8125rem; color: var(--g-cinza); font-style: italic; overflow-wrap: anywhere; }
+.g-ass-voz { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; padding-top: 4px; }
+.g-ass-voz label { display: grid; gap: 2px; flex: 1 1 200px; min-width: 0; font-size: .875rem; }
+.g-ass-voz select { width: 100%; min-width: 0; }
+.g-ass-voz-dica { margin: 4px 0 0; font-size: .8125rem; color: var(--g-cinza); overflow-wrap: anywhere; }
 .g-bolha .h { float: right; display: inline-flex; align-items: center; gap: 3px; margin: 7px -2px -3px 12px; font-size: .6875rem; color: rgba(31, 27, 23, .5); font-variant-numeric: tabular-nums; }
 .g-bolha.eu .h svg { color: #2f8fbf; }
 .g-bolha.pensa { display: inline-flex; gap: 5px; padding: 13px 14px; font-style: normal; }

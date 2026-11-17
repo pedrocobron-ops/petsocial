@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, Square } from "lucide-react";
+import { Mic, Square, Volume2 } from "lucide-react";
+import { criarJuntaFrases, dividirEmFrases, melhorVoz, nomeDaVoz, textoParaFalar, vozesEmPortugues } from "@/lib/gestao/fala";
 import { guardarLembrado, lerLembrado } from "./lembrado";
 
 /**
@@ -191,24 +192,124 @@ export function FaixaVoz({ ditado, children }: { ditado: Ditado; children?: Reac
 
 export const temLeitura = () => typeof window !== "undefined" && "speechSynthesis" in window && typeof window.SpeechSynthesisUtterance === "function";
 
+/** Um pouco mais rápido que o normal: a voz padrão soa arrastada lendo frases curtas. */
+const VELOCIDADE = 1.05;
+const CHAVE_VOZ = "gestao:voz:voz";
+/** A voz escolhida em "Voz" (voiceURI); vazio: a melhor do aparelho. */
+export const lerVozEscolhida = () => lerLembrado(CHAVE_VOZ) || "";
+export const guardarVozEscolhida = (id: string) => guardarLembrado(CHAVE_VOZ, id);
+
+function vozesDoAparelho(): SpeechSynthesisVoice[] {
+  try { return temLeitura() ? window.speechSynthesis.getVoices() ?? [] : []; } catch { return []; }
+}
+
+/**
+ * As vozes em português do aparelho (melhor primeiro). Elas carregam depois da página em muitos navegadores (evento
+ * voiceschanged; o Safari às vezes nem avisa, então confere de novo algumas vezes). `total`: quantas vozes o aparelho
+ * tem em qualquer idioma (0 pode ser só que ainda não carregou).
+ */
+export function useVozes() {
+  const [vozes, setVozes] = useState<{ pt: SpeechSynthesisVoice[]; total: number }>({ pt: [], total: 0 });
+  useEffect(() => {
+    if (!temLeitura()) return;
+    const ler = () => { const todas = vozesDoAparelho(); setVozes({ pt: vozesEmPortugues(todas), total: todas.length }); };
+    ler();
+    const s = window.speechSynthesis;
+    try { s.addEventListener?.("voiceschanged", ler); } catch { /* navegador antigo */ }
+    const relogios = [250, 1000, 3000].map((ms) => window.setTimeout(ler, ms));
+    return () => { relogios.forEach((t) => window.clearTimeout(t)); try { s.removeEventListener?.("voiceschanged", ler); } catch { /* segue */ } };
+  }, []);
+  return vozes;
+}
+
+/** Cada leitura tem um número: parar (ou começar outra) faz a de antes não falar mais nada. */
+let leitura = 0;
+
 export function pararDeFalar() {
+  leitura++;
   try { if (temLeitura()) window.speechSynthesis.cancel(); } catch { /* sem leitura */ }
 }
 
-/** Lê um texto em português. `aoAcabar` roda quando termina ou é interrompido. */
-export function falar(texto: string, aoAcabar?: () => void) {
-  if (!temLeitura() || !texto.trim()) { aoAcabar?.(); return; }
-  try {
-    const s = window.speechSynthesis;
-    s.cancel();
-    const u = new SpeechSynthesisUtterance(texto.replace(/R\$\s?/g, "R$ "));
-    u.lang = "pt-BR";
-    const voz = s.getVoices().find((v) => v.lang === "pt-BR") ?? s.getVoices().find((v) => v.lang?.toLowerCase().startsWith("pt"));
-    if (voz) u.voice = voz;
-    u.onend = () => aoAcabar?.();
-    u.onerror = () => aoAcabar?.();
-    s.speak(u);
-  } catch { aoAcabar?.(); }
+/** Uma leitura: fala frases em fila (o navegador enfileira), avisa uma vez quando acabou ou foi interrompida. */
+function novaLeitura(aoAcabar?: () => void, voz?: string | null) {
+  pararDeFalar();
+  const minha = leitura;
+  let faltam = 0, fechou = false, avisou = false;
+  const escolhida = melhorVoz(vozesDoAparelho(), voz ?? lerVozEscolhida());
+  const avisar = () => { if (!avisou) { avisou = true; aoAcabar?.(); } };
+  const conferir = () => { if (leitura !== minha || (fechou && faltam === 0)) avisar(); };
+  return {
+    falar(frases: string[]) {
+      if (leitura !== minha || !temLeitura()) return;
+      for (const f of frases) {
+        try {
+          const u = new SpeechSynthesisUtterance(f);
+          u.lang = escolhida?.lang?.replace(/_/g, "-") || "pt-BR";
+          if (escolhida) { try { u.voice = escolhida; } catch { /* voz que sumiu: fica a do idioma */ } }
+          u.rate = VELOCIDADE;
+          faltam++;
+          const fim = () => { faltam--; conferir(); };
+          u.onend = fim;
+          u.onerror = fim;
+          window.speechSynthesis.speak(u);
+        } catch { /* segue com a próxima */ }
+      }
+    },
+    terminar() { fechou = true; conferir(); },
+  };
+}
+
+/** Lê um texto em português, frase por frase. `aoAcabar` roda quando termina ou é interrompido. */
+export function falar(texto: string, aoAcabar?: () => void, voz?: string | null) {
+  const frases = dividirEmFrases(textoParaFalar(texto));
+  if (!temLeitura() || !frases.length) { aoAcabar?.(); return; }
+  const l = novaLeitura(aoAcabar, voz);
+  l.falar(frases);
+  l.terminar();
+}
+
+/**
+ * Lê enquanto o texto chega: cada frase começa a ser falada assim que fecha, sem esperar a resposta inteira.
+ * `acrescentar(pedaço)` a cada pedaço; `terminar()` no fim (fala o que sobrou).
+ */
+export function falarAosPoucos(aoAcabar?: () => void) {
+  if (!temLeitura()) return { acrescentar: () => {}, terminar: () => aoAcabar?.() };
+  const l = novaLeitura(aoAcabar);
+  const junta = criarJuntaFrases();
+  return {
+    acrescentar(pedaco: string) { l.falar(junta.acrescentar(pedaco)); },
+    terminar() { l.falar(junta.terminar()); l.terminar(); },
+  };
+}
+
+/** Frase de exemplo de "Ouvir exemplo" (com valor, hora e data, que é o que mais aparece). */
+export const EXEMPLO_DE_VOZ = "Oi! Eu sou o Mozart. Marquei o banho do Thor para sexta, 20/11, às 10h30, por R$ 60,00.";
+
+/** "Voz": as vozes em português do aparelho, com "Ouvir exemplo". Sem nenhuma, a dica de como instalar. */
+export function EscolherVoz({ vozes }: { vozes: ReturnType<typeof useVozes> }) {
+  const [id, setId] = useState(lerVozEscolhida);
+  if (!vozes.pt.length) {
+    if (!vozes.total) return null;
+    return (
+      <p className="g-ass-voz-dica" role="note">
+        Este aparelho não tem voz em português para ler as respostas. Para instalar: no Windows, Configurações, Hora e idioma, Fala,
+        Adicionar vozes, Português (Brasil); no Android, Configurações, Idioma, Saída de texto em voz (instale os dados de voz em português);
+        no iPhone, Ajustes, Acessibilidade, Conteúdo falado, Vozes, Português (Brasil). Ou use o Edge, que já vem com vozes naturais.
+      </p>
+    );
+  }
+  return (
+    <div className="g-ass-voz">
+      <label>
+        <span>Voz</span>
+        <select className="g-input" value={id} onChange={(e) => { setId(e.target.value); guardarVozEscolhida(e.target.value); }} aria-label="Voz do Mozart">
+          <option value="">Automática (a melhor deste aparelho)</option>
+          {vozes.pt.map((v) => <option key={v.voiceURI || v.name} value={v.voiceURI || v.name}>{nomeDaVoz(v)}</option>)}
+        </select>
+      </label>
+      <button type="button" className="g-btn sec p" onClick={() => falar(EXEMPLO_DE_VOZ, undefined, id)}><Volume2 />Ouvir exemplo</button>
+    </div>
+  );
 }
 
 /* ---------- preferências (no aparelho) ---------- */
