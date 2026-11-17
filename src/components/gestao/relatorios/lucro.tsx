@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Coins, Download, PiggyBank, Receipt, Scale, TrendingUp } from "lucide-react";
 import { montarLucro, OPCAO_COMISSAO_CUSTO, porLucro, type LinhaLucro, type LucroDoBanco } from "@/lib/gestao/lucro";
 import { nomeDaCategoria } from "@/lib/gestao/modulos";
+import { lerSaidasDoPeriodo, type SaidasDoPeriodo } from "@/lib/gestao/contas-fixas";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
 import { brl, dataCompleta, deIsoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -35,11 +36,17 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
   const [vista, setVista] = useState<Vista>("servicos");
   const [salvando, setSalvando] = useState(false);
   const { dados, erro, recarregar } = useDados(async () => {
-    const r = await sb.rpc("lucro_do_periodo", { p_petshop: petshop.id, p_de: de, p_ate: ate });
+    // as saídas separadas em "Contas fixas" e o resto (o total é o mesmo; sem a função, as saídas aparecem como antes)
+    const [r, fixas] = await Promise.all([
+      sb.rpc("lucro_do_periodo", { p_petshop: petshop.id, p_de: de, p_ate: ate }),
+      lerSaidasDoPeriodo(sb, petshop.id, de, ate).catch(() => null),
+    ]);
     if (r.error) throw new Error(r.error.message);
-    return r.data as unknown as LucroDoBanco;
+    return { lucro: r.data as unknown as LucroDoBanco, fixas };
   }, [petshop.id, de, ate]);
-  const x = useMemo(() => (dados ? montarLucro(dados) : null), [dados]);
+  const x = useMemo(() => (dados ? montarLucro(dados.lucro) : null), [dados]);
+  // a separação só vale se fecha com o "saiu" de Quanto sobrou (a mesma regra; conferido aqui também)
+  const fixas = dados?.fixas && x && dados.fixas.total > 0 && Math.round(dados.fixas.saiu * 100) === Math.round(x.ponte.saiu * 100) ? dados.fixas : null;
   const categoria = (c: string) => nomeDaCategoria(c, petshop);
 
   async function trocarComissao(v: boolean) {
@@ -80,7 +87,10 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
       ["Ficou de crédito para o tutor", dinheiroCsv(-p.creditoDeixado)],
       ["Crédito usado no check-out", dinheiroCsv(p.creditoUsadoFora)],
       ["Faturamento", dinheiroCsv(p.faturamento)],
-      ...p.saidas.map((s): Cel[] => [`Saída: ${categoria(s.categoria)}`, dinheiroCsv(-s.valor)]),
+      ...(fixas
+        ? [["Saída: Contas fixas", dinheiroCsv(-fixas.total)] as Cel[], ...fixas.contas.map((c): Cel[] => [`Conta fixa: ${c.nome}`, dinheiroCsv(-c.valor)]),
+          ...fixas.outras.map((s): Cel[] => [`Saída: ${categoria(s.categoria)}`, dinheiroCsv(-s.valor)])]
+        : p.saidas.map((s): Cel[] => [`Saída: ${categoria(s.categoria)}`, dinheiroCsv(-s.valor)])),
       ["Resultado do período (entrou − saiu)", dinheiroCsv(p.resultado)],
       ...(p.taxas > 0 ? [["Taxas da maquininha", dinheiroCsv(-p.taxas)], ["Resultado depois das taxas da maquininha", dinheiroCsv(p.resultadoDepoisDasTaxas)]] satisfies Cel[][] : []),
     ];
@@ -135,7 +145,7 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
             </p>
           )}
 
-          <Ponte x={x} categoria={categoria} inteiro={inteiro} />
+          <Ponte x={x} categoria={categoria} inteiro={inteiro} fixas={fixas} />
 
           <p className="g-muted g-pp">
             Entrou: o dinheiro recebido no período, já com o desconto, repartido entre os serviços de cada conta como na comissão (conta paga em partes conta cada parte no dia em que entrou; as vezes contam uma vez, quando a conta fecha).
@@ -171,7 +181,7 @@ function Linha({ l, comComissao }: { l: LinhaLucro; comComissao: boolean }) {
 }
 
 /** Como o total das linhas chega no Resultado do Financeiro (cada número é o mesmo da tela Financeiro). */
-function Ponte({ x, categoria, inteiro }: { x: ReturnType<typeof montarLucro>; categoria: (c: string) => string; inteiro: boolean }) {
+function Ponte({ x, categoria, inteiro, fixas }: { x: ReturnType<typeof montarLucro>; categoria: (c: string) => string; inteiro: boolean; fixas: SaidasDoPeriodo | null }) {
   const p = x.ponte;
   return (
     <div className="g-lu-ponte" role="group" aria-label="Como fecha com o Financeiro">
@@ -185,7 +195,11 @@ function Ponte({ x, categoria, inteiro }: { x: ReturnType<typeof montarLucro>; c
       {p.creditoUsadoFora > 0 && <div><span>Crédito usado no check-out</span><b>+ {brl(p.creditoUsadoFora)}</b></div>}
       {(p.devolvido > 0 || p.creditoDeixado > 0 || p.creditoUsadoFora > 0) && <div className="igual"><span>Faturamento</span><b>{brl(p.faturamento)}</b></div>}
       <div><span>Saídas (despesas gerais, compras, comissão paga…)</span><b>− {brl(p.saiu)}</b></div>
-      {p.saidas.map((s) => <div key={s.categoria} className="sub"><span>{categoria(s.categoria)}</span><b>{brl(s.valor)}</b></div>)}
+      {fixas ? <>
+        <div className="sub" data-teste="saidas-contas-fixas"><span><b>Contas fixas</b></span><b>{brl(fixas.total)}</b></div>
+        {fixas.contas.map((c) => <div key={`${c.conta_fixa_id ?? ""}${c.nome}`} className="sub fixa"><span>{c.nome}</span><b>{brl(c.valor)}</b></div>)}
+        {fixas.outras.map((s) => <div key={s.categoria} className="sub"><span>{categoria(s.categoria)}</span><b>{brl(s.valor)}</b></div>)}
+      </> : p.saidas.map((s) => <div key={s.categoria} className="sub"><span>{categoria(s.categoria)}</span><b>{brl(s.valor)}</b></div>)}
       <div className="igual fim"><span>{inteiro ? "Resultado do mês (o mesmo do Financeiro)" : "Resultado do período"}</span><b className={p.resultado < 0 ? "g-vermelho-t" : undefined}>{brl(p.resultado)}</b></div>
       {p.taxas > 0 && <>
         <div><span>Taxas da maquininha (cartão e Pix)</span><b>− {brl(p.taxas)}</b></div>

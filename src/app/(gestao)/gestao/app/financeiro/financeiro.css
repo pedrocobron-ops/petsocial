@@ -90,3 +90,6 @@
   .g-fin-meta.vazia { grid-template-columns: auto minmax(0, 1fr) auto; }
   .g-fin-meta.vazia .g-btn { grid-column: auto; }
 }
+
+/* conta fixa com valor que muda todo mês: entra em A pagar com o valor aproximado até alguém escrever o certo */
+.g-linha .t .g-fin-estimado { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: var(--g-amarelo-tint); color: #6e5510; font-size: .75rem; font-weight: 600; white-space: normal; }

@@ -1,10 +1,12 @@
 import { brl, almocoDoDia, horarioDoDia } from "./util";
 import { deMin, paraMin } from "./agenda";
+import { linhaDoBomDiaContas } from "./contas-fixas";
 
 /**
  * "Bom dia" do Mozart na tela Hoje: no máximo 3 linhas, sempre do banco (função gestao_bom_dia, uma ida só) e sem chamar a IA.
  * O banco já tira o que a pessoa não pode ver (dinheiro só com área de dinheiro; agenda, casa, pacotes pela área). Aqui só se
- * escolhe e escreve: primeiro o dia (agenda e casa), depois, nesta ordem, quem deve e vem hoje, produto vencido ou vencendo
+ * escolhe e escreve: primeiro o dia (agenda e casa), depois, nesta ordem, quem deve e vem hoje, conta fixa vencida, de hoje ou
+ * de amanhã (só quem cuida do financeiro e vê o dinheiro: "Aluguel vence amanhã (R$ 2.500,00)"), produto vencido ou vencendo
  * (quem cuida do estoque), vacina vencendo de quem vem, pacote no último uso e aniversário.
  */
 export type Sexo = string | null;
@@ -20,8 +22,10 @@ export type DadosDoBomDia = {
   niver?: { pet: string; sexo: Sexo; vem: boolean }[];
   /** lotes com saldo vencidos ou vencendo em até 30 dias; só para quem cuida do estoque e só quando tem algum */
   validade?: { vencidos: number; vencendo: number; primeiro: string | null };
+  /** contas fixas em A pagar vencidas, de hoje e de amanhã; só para quem cuida do financeiro e vê o dinheiro */
+  contas_fixas?: { nome: string; valor: number; vencimento: string; estimado: boolean }[];
 };
-export type LinhaDoBomDia = { id: "dia" | "devem" | "validade" | "vacinas" | "pacotes" | "niver"; texto: string };
+export type LinhaDoBomDia = { id: "dia" | "devem" | "contas" | "validade" | "vacinas" | "pacotes" | "niver"; texto: string };
 
 export const MAX_LINHAS_BOM_DIA = 3;
 
@@ -85,6 +89,10 @@ export function linhasDoBomDia(d: DadosDoBomDia, o: { horario: unknown; agora?: 
   } else if (devem.length > 1) {
     linhas.push({ id: "devem", texto: `Vêm hoje e devem: ${ate3(devem.map((x) => `${primeiroNome(x.tutor)} (${brl(Number(x.valor))})`))}.` });
   }
+
+  // 2b. contas fixas vencidas, de hoje e de amanhã
+  const contas = linhaDoBomDiaContas((d.contas_fixas ?? []).map((c) => ({ ...c, valor: Number(c.valor), estimado: Boolean(c.estimado) })), d.dia);
+  if (contas) linhas.push({ id: "contas", texto: contas });
 
   // 3. validade dos produtos (lotes com saldo)
   const val = d.validade;

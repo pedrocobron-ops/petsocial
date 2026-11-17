@@ -603,6 +603,14 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         {inicial && <HistoricoDeAlteracoes lancamento={inicial} />}
         {inicial && <PrecosMudados lancamento={inicial} />}
         {inicial && <PartesRecebidas conta={inicial} />}
+        {conta && inicial?.competencia && (
+          <p className={inicial.valor_estimado ? "g-aviso" : "g-muted g-pp"} role="note" style={{ margin: 0 }}>
+            <span className="g-cresce">
+              {inicial.valor_estimado && <><b>Valor estimado: confira a conta.</b> Quando ela chegar, escreva o valor certo aqui. </>}
+              Esta conta veio de uma conta fixa: mudar aqui muda só este mês (os próximos, em Financeiro, Contas fixas). Se excluir, a conta deste mês não volta a ser criada.
+            </span>
+          </p>
+        )}
         {inicial?.conta_id && !soVer && !travado && (
           <p className="g-muted g-pp">Este valor é uma parte recebida de uma conta. Se você excluir ou diminuir, a diferença volta a ficar em aberto na conta do cliente.</p>
         )}

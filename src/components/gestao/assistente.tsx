@@ -7,16 +7,41 @@ import { hora, isoDia } from "@/lib/gestao/util";
 import Link from "next/link";
 import { useGestao } from "./contexto";
 import { avisarMudanca } from "./ui";
-import { BotaoMic, FaixaVoz, falar, guardarEnviarSozinho, guardarLerRespostas, lerEnviarSozinho, lerLerRespostas, pararDeFalar, temLeitura, useDitado } from "./voz";
+import { BotaoMic, EscolherVoz, FaixaVoz, falar, falarAosPoucos, guardarEnviarSozinho, guardarLerRespostas, lerEnviarSozinho, lerLerRespostas, pararDeFalar, temLeitura, useDitado, useVozes } from "./voz";
 
 type Resumo = { titulo: string; linhas: [string, string][] };
 type Proposta = { id: string; ferramenta: string; resumo: Resumo; estado: "pendente" | "sim" | "nao" };
 type LinkZap = { nome: string; texto: string; url: string };
 type Item =
-  | { tipo: "eu" | "ele" | "erro"; texto: string; quando?: string; saidas?: boolean }
+  | { tipo: "eu" | "ele" | "erro"; texto: string; quando?: string; saidas?: boolean; jaVisto?: boolean }
   | { tipo: "propostas"; lista: Proposta[]; enviado: boolean }
   | { tipo: "links"; lista: LinkZap[] };
 type Resposta = { mensagens: unknown[]; texto: string; propostas: Omit<Proposta, "estado">[]; parciais: unknown[]; links: LinkZap[]; mudou: boolean; erro?: string; mensagem?: string };
+/** Um evento da resposta que chega aos poucos (uma linha JSON cada): texto, o que ele está fazendo, e o fim com tudo. */
+type Evento = { t: "texto"; d: string } | { t: "progresso"; frase: string } | ({ t: "fim"; status: number } & Partial<Resposta>);
+
+/** Lê a resposta aos poucos: chama `aoEvento` a cada linha e devolve o evento "fim" (null se a conexão caiu antes). */
+async function lerAosPoucos(r: Response, aoEvento: (e: Evento) => void): Promise<Extract<Evento, { t: "fim" }> | null> {
+  const leitor = r.body!.getReader();
+  const dec = new TextDecoder();
+  let resto = "";
+  let fim: Extract<Evento, { t: "fim" }> | null = null;
+  const linha = (l: string) => {
+    if (!l.trim()) return;
+    let e: Evento;
+    try { e = JSON.parse(l) as Evento; } catch { return; }
+    if (e.t === "fim") fim = e; else aoEvento(e);
+  };
+  for (;;) {
+    const { value, done } = await leitor.read();
+    if (done) break;
+    resto += dec.decode(value, { stream: true });
+    let i = resto.indexOf("\n");
+    while (i >= 0) { linha(resto.slice(0, i)); resto = resto.slice(i + 1); i = resto.indexOf("\n"); }
+  }
+  linha(resto + dec.decode());
+  return fim;
+}
 
 /** A conversa continua enquanto o aplicativo está aberto, mesmo fechando e abrindo o painel. */
 const memoria: { petshop: string | null; itens: Item[]; mensagens: unknown[]; parciais: unknown[] } = { petshop: null, itens: [], mensagens: [], parciais: [] };
@@ -31,6 +56,16 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   const [itens, setItens] = useState<Item[]>(memoria.itens);
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
+  // a resposta que está chegando: o texto até aqui e a frase do que o Mozart está fazendo ("Procurando Thor…")
+  const [aoVivo, setAoVivo] = useState<{ texto: string; frase: string | null } | null>(null);
+  // os pedaços chegam muito rápido: a tela junta e desenha uma vez por quadro
+  const vivo = useRef({ texto: "", frase: null as string | null, ativo: false, marcado: false });
+  const mostrarVivo = () => {
+    if (vivo.current.marcado) return;
+    vivo.current.marcado = true;
+    const desenhar = () => { vivo.current.marcado = false; if (vivo.current.ativo) setAoVivo({ texto: vivo.current.texto, frase: vivo.current.frase }); };
+    if (typeof requestAnimationFrame === "function" && document.visibilityState === "visible") requestAnimationFrame(desenhar); else window.setTimeout(desenhar, 50);
+  };
   // escrito enquanto o Mozart ainda respondia: espera na fila (visível) e vai sozinho quando ele terminar
   const [fila, setFila] = useState<string | null>(null);
   const [avisoFila, setAvisoFila] = useState<string | null>(null);
@@ -45,7 +80,11 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   lerAgora.current = lerRespostas;
   const [ajustesVoz, setAjustesVoz] = useState(false);
   const [lendo, setLendo] = useState<number | null>(null);
-  const [podeLer, setPodeLer] = useState(false);
+  const [temLeituraAqui, setTemLeituraAqui] = useState(false);
+  const vozes = useVozes();
+  // o aparelho tem vozes, mas nenhuma em português: o alto-falante some e "Voz" mostra como instalar
+  const semVozPt = vozes.total > 0 && vozes.pt.length === 0;
+  const podeLer = temLeituraAqui && !semVozPt;
   const fim = useRef<HTMLDivElement>(null);
   const jaPediu = useRef(false);
 
@@ -53,10 +92,10 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
   const acrescentar = (...novos: Item[]) => guardar([...memoria.itens, ...novos]);
 
   useEffect(() => {
-    setPodeLer(temLeitura());
+    setTemLeituraAqui(temLeitura());
     return () => { window.clearInterval(relogioEnvio.current); pararDeFalar(); };
   }, []);
-  useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [itens, pensando]);
+  useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [itens, pensando, aoVivo]);
   useEffect(() => {
     // no celular a conversa cobre a tela e trava a rolagem de trás; no computador é uma janelinha e a tela segue livre
     const antes = document.documentElement.style.overflow;
@@ -68,27 +107,60 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
 
   const chamar = useCallback(async (corpo: Record<string, unknown>) => {
     setPensando(true);
+    vivo.current = { texto: "", frase: null, ativo: false, marcado: false };
+    // lendo em voz alta: cada frase começa assim que chega (o número é a posição da bolha que a resposta vai ocupar)
+    const voz: { atual: ReturnType<typeof falarAosPoucos> | null } = { atual: null };
+    const n = memoria.itens.length;
     try {
       const { data } = await sb.auth.getSession();
       const agora = new Date();
+      // pede a resposta aos poucos (pelo Accept); o servidor pode responder de uma vez (JSON), e as duas formas funcionam
+      const aosPoucos = typeof ReadableStream === "function" && typeof TextDecoder === "function";
       const r = await fetch("/api/gestao/assistente", {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${data.session?.access_token ?? ""}` },
+        headers: { "content-type": "application/json", accept: aosPoucos ? "application/x-ndjson, application/json" : "application/json", authorization: `Bearer ${data.session?.access_token ?? ""}` },
         body: JSON.stringify({
           petshopId: petshop.id, mensagens: memoria.mensagens,
           agora: `${isoDia(agora)}T${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`,
           fusoMin: -agora.getTimezoneOffset(), ...corpo,
         }),
       });
-      const j = (await r.json().catch(() => null)) as Resposta | null;
+      let j: Resposta | null;
+      let status = r.status;
+      if (r.ok && r.body && /ndjson/.test(r.headers.get("content-type") ?? "")) {
+        vivo.current.ativo = true;
+        const fim = await lerAosPoucos(r, (e) => {
+          if (e.t === "progresso") { vivo.current.frase = e.frase; mostrarVivo(); }
+          else if (e.t === "texto") {
+            vivo.current.texto += e.d;
+            vivo.current.frase = null;
+            mostrarVivo();
+            if (lerAgora.current) {
+              if (!voz.atual) { setLendo(n); voz.atual = falarAosPoucos(() => setLendo((x) => (x === n ? null : x))); }
+              voz.atual.acrescentar(e.d);
+            }
+          }
+        });
+        status = fim?.status ?? 500;
+        j = fim ? (fim as unknown as Resposta) : null;
+        if (!fim) j = { erro: "falha", mensagem: "A conexão caiu no meio da resposta. Tente de novo." } as Resposta;
+      } else {
+        j = (await r.json().catch(() => null)) as Resposta | null;
+      }
       // o Mozart não respondeu: a frase do servidor (sem detalhe técnico) e o caminho para seguir sem ele
-      if (!r.ok || !j || j.erro) { acrescentar({ tipo: "erro", texto: j?.mensagem ?? "Não consegui falar com o Mozart agora. Tente de novo em instantes.", saidas: r.status >= 500 }); return; }
+      if (status >= 400 || !j || j.erro) {
+        if (status === 499) return;
+        acrescentar({ tipo: "erro", texto: j?.mensagem || "Não consegui falar com o Mozart agora. Tente de novo em instantes.", saidas: status >= 500 });
+        return;
+      }
       memoria.mensagens = j.mensagens;
       memoria.parciais = j.parciais ?? [];
       const novos: Item[] = [];
       if (j.texto && !(j.propostas.length && j.texto === "Pronto.")) {
-        novos.push({ tipo: "ele", texto: j.texto, quando: hora(new Date()) });
-        if (lerAgora.current) { const n = memoria.itens.length; setLendo(n); falar(j.texto, () => setLendo((x) => (x === n ? null : x))); }
+        novos.push({ tipo: "ele", texto: j.texto, quando: hora(new Date()), jaVisto: Boolean(vivo.current.texto) });
+        // leu aos poucos: fala o que sobrou; respondeu de uma vez: lê agora, frase por frase
+        if (voz.atual) { voz.atual.terminar(); voz.atual = null; }
+        else if (lerAgora.current) { setLendo(n); falar(j.texto, () => setLendo((x) => (x === n ? null : x))); }
       }
       if (j.links?.length) novos.push({ tipo: "links", lista: j.links });
       if (j.propostas.length) novos.push({ tipo: "propostas", enviado: false, lista: j.propostas.map((p) => ({ ...p, estado: "pendente" as const })) });
@@ -96,7 +168,13 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
       if (j.mudou) avisarMudanca();
     } catch {
       acrescentar({ tipo: "erro", texto: "Sem conexão. Confira a internet e tente de novo." });
-    } finally { setPensando(false); }
+    } finally {
+      // o texto falado até aqui termina (resposta com erro ou só cartão)
+      if (voz.atual) voz.atual.terminar();
+      vivo.current.ativo = false;
+      setAoVivo(null);
+      setPensando(false);
+    }
   }, [sb, petshop.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const temPendente = itens.some((i) => i.tipo === "propostas" && !i.enviado);
@@ -206,9 +284,9 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
         <header className="g-ass-topo">
           <span className={`foto${foraDoAr ? " fora" : ""}`}><Selo tamanho={42} /><i aria-hidden /></span>
           <div><b>Mozart</b><span>{ditado.ouvindo ? "ouvindo você…" : pensando ? "digitando…" : foraDoAr ? `fora do ar agora · ${petshop.nome}` : `online · ${petshop.nome}`}</span></div>
-          {(ditado.suportado || podeLer) && <button className="g-ico" onClick={() => setAjustesVoz((a) => !a)} aria-label="Ajustes da voz" aria-expanded={ajustesVoz} title="Ajustes da voz"><SlidersHorizontal /></button>}
-          {itens.length > 0 && <button className="g-ico" style={ditado.suportado || podeLer ? { marginLeft: 0 } : undefined} onClick={novaConversa} aria-label="Começar conversa nova" title="Conversa nova"><RotateCcw /></button>}
-          <button className="g-ico" style={itens.length || ditado.suportado || podeLer ? { marginLeft: 0 } : undefined} onClick={aoFechar} aria-label="Fechar a conversa" title="Fechar"><ChevronDown /></button>
+          {(ditado.suportado || temLeituraAqui) && <button className="g-ico" onClick={() => setAjustesVoz((a) => !a)} aria-label="Ajustes da voz" aria-expanded={ajustesVoz} title="Ajustes da voz"><SlidersHorizontal /></button>}
+          {itens.length > 0 && <button className="g-ico" style={ditado.suportado || temLeituraAqui ? { marginLeft: 0 } : undefined} onClick={novaConversa} aria-label="Começar conversa nova" title="Conversa nova"><RotateCcw /></button>}
+          <button className="g-ico" style={itens.length || ditado.suportado || temLeituraAqui ? { marginLeft: 0 } : undefined} onClick={aoFechar} aria-label="Fechar a conversa" title="Fechar"><ChevronDown /></button>
         </header>
         {ajustesVoz && (
           <div className="g-ass-ajustes">
@@ -224,6 +302,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
                 <span>Ler as respostas do Mozart em voz alta<small>Fica guardado neste aparelho.</small></span>
               </label>
             )}
+            {temLeituraAqui && <EscolherVoz vozes={vozes} />}
           </div>
         )}
 
@@ -259,7 +338,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
               </div>
             </div>
           ) : (
-            <div key={i} className={`g-bolha ${item.tipo === "eu" ? "eu" : "ela"}${item.tipo === "erro" ? " erro" : ""}${itens[i - 1]?.tipo !== item.tipo ? " rabo" : ""}`}>
+            <div key={i} className={`g-bolha ${item.tipo === "eu" ? "eu" : "ela"}${item.tipo === "erro" ? " erro" : ""}${item.jaVisto ? " ja" : ""}${itens[i - 1]?.tipo !== item.tipo ? " rabo" : ""}`}>
               {item.texto}
               {item.tipo === "erro" && item.saidas && (
                 <span className="g-ass-saidas">
@@ -277,7 +356,9 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
                 {item.quando}{item.tipo === "eu" && <CheckCheck size={14} />}</span>}
             </div>
           ))}
-          {pensando && <div className="g-bolha ela rabo pensa" aria-label="Mozart está digitando"><i /><i /><i /></div>}
+          {aoVivo?.texto && <div className="g-bolha ela rabo g-ass-aovivo">{aoVivo.texto}</div>}
+          {pensando && <div className={`g-bolha ela pensa${aoVivo?.texto ? "" : " rabo"}`} aria-label="Mozart está digitando"><i /><i /><i /></div>}
+          {pensando && aoVivo?.frase && <p className="g-ass-progresso" role="status">{aoVivo.frase}</p>}
           {fila && (
             <div className="g-bolha eu rabo g-ass-fila" role="status">
               {fila}

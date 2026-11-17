@@ -702,6 +702,13 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-ass-fila-nota { display: block; margin-top: 4px; font-size: .75rem; color: rgba(31, 27, 23, .65); white-space: normal; }
 .g-ass-fila-aviso { justify-self: center; max-width: 92%; margin: 6px 0 0; padding: 6px 12px; border-radius: 12px; background: rgba(255, 251, 245, .95); font-size: .8125rem; color: var(--g-escuro-b); text-align: center; }
 .g-bolha.erro.rabo::before { background: var(--g-vermelho-tint); }
+/* resposta chegando aos poucos: a bolha cresce; a final entra no lugar sem a animação de chegada */
+.g-bolha.g-ass-aovivo, .g-bolha.ja { animation: none; }
+.g-ass-progresso { margin: -2px 0 0 4px; font-size: .8125rem; color: var(--g-cinza); font-style: italic; overflow-wrap: anywhere; }
+.g-ass-voz { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; padding-top: 4px; }
+.g-ass-voz label { display: grid; gap: 2px; flex: 1 1 200px; min-width: 0; font-size: .875rem; }
+.g-ass-voz select { width: 100%; min-width: 0; }
+.g-ass-voz-dica { margin: 4px 0 0; font-size: .8125rem; color: var(--g-cinza); overflow-wrap: anywhere; }
 .g-bolha .h { float: right; display: inline-flex; align-items: center; gap: 3px; margin: 7px -2px -3px 12px; font-size: .6875rem; color: rgba(31, 27, 23, .5); font-variant-numeric: tabular-nums; }
 .g-bolha.eu .h svg { color: #2f8fbf; }
 .g-bolha.pensa { display: inline-flex; gap: 5px; padding: 13px 14px; font-style: normal; }
@@ -875,10 +882,10 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-lista > .g-linha { min-width: 0; }
 .g-lista > .g-linha .d { white-space: nowrap; }
 
-/* financeiro no celular: as quatro abas cabem na tela, sem rolar de lado nem cortar */
+/* financeiro no celular: as seis abas cabem na tela em duas fileiras de três, sem rolar de lado nem cortar */
 @media (max-width: 520px) {
-  .gf-rola .g-seg[aria-label="Parte do financeiro"] { display: flex; }
-  .gf-rola .g-seg[aria-label="Parte do financeiro"] button { flex: 1 1 auto; min-width: 0; padding: 0 6px; font-size: .8125rem; }
+  .gf-rola .g-seg[aria-label="Parte do financeiro"] { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 20px; }
+  .gf-rola .g-seg[aria-label="Parte do financeiro"] button { min-width: 0; padding: 0 4px; font-size: .8125rem; overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* avisos flutuantes sobem para o alto quando há uma janela aberta: não cobrem o total nem os botões */

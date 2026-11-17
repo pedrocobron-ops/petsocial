@@ -4,6 +4,7 @@ import { consultarComissao, FERRAMENTAS_COMISSAO } from "./ferramenta-comissao";
 import { consultarLucro, FERRAMENTAS_LUCRO } from "./ferramenta-lucro";
 import { consultarCompra, FERRAMENTAS_COMPRA } from "./ferramenta-compra";
 import { consultarEnvio, FERRAMENTAS_ENVIO } from "./ferramenta-envio";
+import { consultarContasFixas, descreverContaFixa, FERRAMENTAS_CONTAS_FIXAS, gravarContaFixa } from "./ferramenta-contas-fixas";
 import { consultarPlanosDaCreche, FERRAMENTA_PLANOS_CRECHE } from "./creche-planos";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
@@ -155,6 +156,7 @@ export const FERRAMENTAS: Def[] = [
   ...FERRAMENTAS_LUCRO,
   ...FERRAMENTAS_COMPRA,
   ...FERRAMENTAS_ENVIO,
+  ...FERRAMENTAS_CONTAS_FIXAS,
 ];
 
 export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro">): Anthropic.Tool[] =>
@@ -790,6 +792,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
   if (compra) return compra;
   const envio = await consultarEnvio(c, nome);
   if (envio) return envio;
+  const fixas = await consultarContasFixas(c, nome, (m) => new ErroDeUso(m));
+  if (fixas) return fixas;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 
@@ -1109,6 +1113,8 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       return { titulo: e.tipo === "saida" ? "Saída de estoque" : "Entrada de estoque", linhas };
     }
   }
+  const fixa = await descreverContaFixa(c, nome, e, (m) => new ErroDeUso(m));
+  if (fixa) return fixa;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 
@@ -1326,6 +1332,8 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
       return { feito: true, produto_id: produtoId, despesa_lancada: despesa };
     }
   }
+  const fixa = await gravarContaFixa(c, nome, e, (m) => new ErroDeUso(m));
+  if (fixa) return fixa;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 

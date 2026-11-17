@@ -11,6 +11,26 @@ type Conversa = {
   resolveu: boolean | null; pediu_equipe: boolean; criado_em: string; pessoa: string | null;
 };
 type Filtro = "tudo" | "mozart" | "ajuda" | "problema";
+type Tempos = { pedidos: number; mediana_ms: number | null; p90_ms: number | null; primeiro_mediana_ms: number | null; primeiro_p90_ms: number | null; voltas_media: number | null };
+
+const seg = (ms: number | null) => (ms == null ? "–" : `${(ms / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`);
+
+/** "Tempo do Mozart": quanto os pedidos levaram nos últimos 7 dias (mediana e p90), e até a primeira palavra aparecer. */
+function TempoDoMozart() {
+  const [t, setT] = useState<Tempos | null>(null);
+  useEffect(() => {
+    let vale = true;
+    (async () => { try { const r = ok(await banco().rpc("admin_mozart_tempos")) as unknown as Tempos; if (vale) setT(r); } catch { /* sem a migração: a linha não aparece */ } })();
+    return () => { vale = false; };
+  }, []);
+  if (!t) return null;
+  return (
+    <p className="g-pp g-muted g-tab" style={{ overflowWrap: "anywhere" }}>
+      <b style={{ color: "var(--g-tinta)" }}>Tempo do Mozart</b> (7 dias, {t.pedidos} {t.pedidos === 1 ? "pedido" : "pedidos"}):{" "}
+      {t.pedidos ? <>resposta completa em {seg(t.mediana_ms)} (mediana), {seg(t.p90_ms)} (p90) · primeira palavra ou aviso em {seg(t.primeiro_mediana_ms)} (mediana), {seg(t.primeiro_p90_ms)} (p90) · {String(t.voltas_media ?? 0).replace(".", ",")} voltas em média</> : "nenhum pedido ainda."}
+    </p>
+  );
+}
 
 /** O que as pessoas pedem ao Mozart e perguntam na Ajuda, para a equipe Maestro Pet ver onde o sistema precisa melhorar. */
 export default function AbaConversas({ petshopId, enxuto }: { petshopId?: string; enxuto?: boolean }) {
@@ -43,6 +63,7 @@ export default function AbaConversas({ petshopId, enxuto }: { petshopId?: string
 
   return (
     <div className="g-pilha">
+      {!enxuto && !petshopId && <TempoDoMozart />}
       {!enxuto && (
         <div className="g-busca">
           <Search />

@@ -3,8 +3,8 @@ import { lerEquipe, lerPetshop, lerServicos } from "@/lib/gestao/reservado";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
-import { ferramentasPara, type Contexto, type LinkZap } from "@/lib/gestao/assistente/ferramentas";
-import { responderCartoes, voltas, type Msg, type Resultado } from "@/lib/gestao/assistente/conversa";
+import { ferramentasPara, type Contexto } from "@/lib/gestao/assistente/ferramentas";
+import { medidasZeradas, responderCartoes, voltas, type Msg, type Resultado } from "@/lib/gestao/assistente/conversa";
 import { INSTRUCOES, contextoDoPetshop } from "@/lib/gestao/assistente/instrucoes";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 
@@ -82,7 +82,22 @@ function agoraNoFuso(fuso: string) {
   } catch { return null; }
 }
 
+/**
+ * A resposta vai aos poucos (uma linha JSON por evento) quando o aplicativo pede com `?stream=1` ou `Accept: application/x-ndjson`:
+ *   {"t":"texto","d":"Achei"}          pedaço do que o Mozart está escrevendo
+ *   {"t":"progresso","frase":"Procurando Thor…"}   o que ele está fazendo enquanto a pessoa espera
+ *   {"t":"fim","status":200,...}       o mesmo corpo da resposta de uma vez (mensagens, texto, propostas, parciais, links, mudou)
+ *                                     ou, se deu errado, {"t":"fim","status":429|502|503|500,"erro":…,"mensagem":…}
+ * Sem isso (ou com GESTAO_MOZART_STREAM=0 no servidor), responde de uma vez em JSON, como sempre.
+ * Erros antes de chamar o modelo (login, pedido vazio, limite do dia) vêm sempre em JSON com o status de antes.
+ */
+type Evento = { t: "texto"; d: string } | { t: "progresso"; frase: string };
+const querAosPoucos = (req: Request) => process.env.GESTAO_MOZART_STREAM !== "0"
+  && (new URL(req.url).searchParams.get("stream") === "1" || (req.headers.get("accept") ?? "").includes("application/x-ndjson"));
+
 async function tratar(req: Request) {
+  const inicio = Date.now();
+  const aosPoucos = querAosPoucos(req);
   if (!configurado) return erro(503, "sem_banco", "O sistema ainda não está ligado neste endereço.");
   if (!process.env.ANTHROPIC_API_KEY) { console.error("[assistente] sem ANTHROPIC_API_KEY"); return erro(503, "sem_chave", FORA_DO_AR); }
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -156,45 +171,92 @@ async function tratar(req: Request) {
   // cada chamada tem prazo: o pedido inteiro precisa caber no tempo da rota (e a pessoa não fica 50 s olhando "digitando…")
   const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, ""), timeout: 25_000, maxRetries: 1 });
   const comFallback = /^claude-(opus-5-5|fable-5-2)/.test(MODELO);
-  let texto = "";
-  let links: LinkZap[] = [];
+  // a pessoa fechou a conversa no meio: para de gastar com o modelo (nada é gravado sem o "Pode fazer")
+  const parar = new AbortController();
 
-  try {
-    const r = await voltas({
-      c, mensagens, liberado, contar: () => contar("chamada"),
-      chamar: (msgs) => cliente.beta.messages.create({
-        model: MODELO,
-        max_tokens: 4000,
-        output_config: { effort: "low" },
-        ...(comFallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
-        system: [
-          { type: "text", text: INSTRUCOES, cache_control: { type: "ephemeral" } },
-          { type: "text", text: contextoDoPetshop(c) },
-        ],
-        tools: ferramentasPara(c),
-        messages: msgs,
-      }),
-    });
-    if (r.tipo === "limite") return erro(429, "limite", LIMITE_TEXTO);
-    if (r.tipo === "recusa") return NextResponse.json({ mensagens: r.mensagens, texto: "Com isso eu não consigo ajudar. Posso cuidar da agenda, dos clientes, do caixa e do estoque.", propostas: [], parciais: [], links: [], mudou });
-    texto = r.texto;
-    links = r.links;
-    if (r.propostas.length) {
-      await guardarConversa([texto, ...r.propostas.map((p) => `[cartão] ${p.resumo.titulo}`)].filter(Boolean).join("\n"));
-      return NextResponse.json({ mensagens, texto, propostas: r.propostas, parciais: r.parciais, links, mudou });
+  /** Chama o modelo, roda as voltas e devolve o status e o corpo da resposta (o mesmo nos dois jeitos de responder). */
+  const rodar = async (emitir?: (e: Evento) => void): Promise<{ status: number; corpo: Record<string, unknown> }> => {
+    const medidas = medidasZeradas();
+    let primeiro: number | null = null, sinal: number | null = null;
+    const avisos = emitir && {
+      texto: (d: string) => { primeiro ??= Date.now() - inicio; sinal ??= primeiro; emitir({ t: "texto", d }); },
+      progresso: (frase: string) => { sinal ??= Date.now() - inicio; emitir({ t: "progresso", frase }); },
+    };
+    const medir = (fim: "ok" | "cartao" | "recusa" | "limite" | "erro" | "demorou") => {
+      const total = Date.now() - inicio;
+      console.info(`[assistente] ${aosPoucos ? "stream" : "json"} ${fim} ${total} ms, 1ª palavra ${primeiro ?? "-"} ms, ${medidas.voltas} voltas, ${medidas.ferramentas} consultas, tokens ${medidas.entrada}+${medidas.cacheLidos} lidos do cache+${medidas.cacheGravados} gravados / ${medidas.saida} de saída`);
+      // não trava a resposta se falhar
+      return Promise.resolve(sb.rpc("mozart_tempo_registrar", {
+        p_petshop: c.petshop.id, p_modo: aosPoucos ? "stream" : "json", p_fim: fim, p_total_ms: total, p_primeiro_ms: primeiro as number, p_sinal_ms: sinal as number, // null vai como null no banco
+        p_voltas: medidas.voltas, p_ferramentas: medidas.ferramentas, p_entrada: medidas.entrada, p_saida: medidas.saida,
+        p_cache_lidos: medidas.cacheLidos, p_cache_gravados: medidas.cacheGravados,
+      })).then(() => undefined, () => undefined);
+    };
+    const falha = async (status: number, codigo: string, mensagem: string, extra?: Record<string, unknown>) => { await medir(status === 429 && codigo === "limite" ? "limite" : "erro"); return { status, corpo: { erro: codigo, mensagem, ...extra } }; };
+    try {
+      const r = await voltas({
+        c, mensagens, liberado, contar: () => contar("chamada"), avisos, medidas,
+        chamar: async (msgs, ao) => {
+          const pedido = {
+            model: MODELO,
+            max_tokens: 4000,
+            output_config: { effort: "low" as const },
+            ...(comFallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+            // marcas de cache (3 de 4): ferramentas + instruções fixas; o contexto do pet shop; e a conversa até a última
+            // mensagem (automática, anda junto com as voltas: a volta seguinte e o pedido seguinte leem do cache)
+            cache_control: { type: "ephemeral" as const },
+            system: [
+              { type: "text" as const, text: INSTRUCOES, cache_control: { type: "ephemeral" as const } },
+              { type: "text" as const, text: contextoDoPetshop(c), cache_control: { type: "ephemeral" as const } },
+            ],
+            tools: ferramentasPara(c),
+            messages: msgs,
+          };
+          if (!emitir) return cliente.beta.messages.create(pedido, { signal: parar.signal });
+          const fluxo = cliente.beta.messages.stream(pedido, { signal: parar.signal });
+          fluxo.on("text", (d) => ao.texto(d));
+          fluxo.on("streamEvent", (e) => { if (e.type === "content_block_start" && e.content_block.type === "tool_use") ao.ferramenta(e.content_block.name); });
+          return fluxo.finalMessage();
+        },
+      });
+      if (r.tipo === "limite") return falha(429, "limite", LIMITE_TEXTO);
+      if (r.tipo === "recusa") { await medir("recusa"); return { status: 200, corpo: { mensagens: r.mensagens, texto: "Com isso eu não consigo ajudar. Posso cuidar da agenda, dos clientes, do caixa e do estoque.", propostas: [], parciais: [], links: [], mudou } }; }
+      if (r.propostas.length) {
+        await Promise.all([guardarConversa([r.texto, ...r.propostas.map((p) => `[cartão] ${p.resumo.titulo}`)].filter(Boolean).join("\n")), medir("cartao")]);
+        return { status: 200, corpo: { mensagens, texto: r.texto, propostas: r.propostas, parciais: r.parciais, links: r.links, mudou } };
+      }
+      await Promise.all([guardarConversa(r.texto || "Pronto."), medir(r.cortou ? "demorou" : "ok")]);
+      return { status: 200, corpo: { mensagens, texto: r.texto || "Pronto.", propostas: [], parciais: [], links: r.links, mudou } };
+    } catch (err) {
+      if (parar.signal.aborted) return { status: 499, corpo: { erro: "cancelado", mensagem: "" } };
+      if (err instanceof Anthropic.RateLimitError) return falha(429, "ocupado", "O Mozart está com muitos pedidos agora. Tente de novo em um minuto.");
+      if (err instanceof Anthropic.AuthenticationError) { console.error("[assistente] chave recusada pela Anthropic"); return falha(503, "sem_chave", FORA_DO_AR); }
+      if (err instanceof Anthropic.APIError) { await registrarErroServidor("/api/gestao/assistente", Object.assign(new Error(`Anthropic respondeu ${err.status ?? "sem status"}`), { name: "ErroDaIA" }), { petshop: c.petshop.id }); return falha(502, "ia_fora", "O Mozart não respondeu agora. Tente de novo em instantes."); }
+      // o motivo vai para o registro do servidor; a pessoa vê só a frase
+      console.error("[assistente] falha", err);
+      await registrarErroServidor("/api/gestao/assistente", err, { petshop: c.petshop.id });
+      return falha(500, "falha", "Algo deu errado do nosso lado. Tente de novo em instantes.", { tipo: err instanceof Error ? err.name : typeof err });
     }
-  } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) return erro(429, "ocupado", "O Mozart está com muitos pedidos agora. Tente de novo em um minuto.");
-    if (err instanceof Anthropic.AuthenticationError) { console.error("[assistente] chave recusada pela Anthropic"); return erro(503, "sem_chave", FORA_DO_AR); }
-    if (err instanceof Anthropic.APIError) { await registrarErroServidor("/api/gestao/assistente", Object.assign(new Error(`Anthropic respondeu ${err.status ?? "sem status"}`), { name: "ErroDaIA" }), { petshop: c.petshop.id }); return erro(502, "ia_fora", "O Mozart não respondeu agora. Tente de novo em instantes."); }
-    // o motivo vai para o registro do servidor; a pessoa vê só a frase
-    console.error("[assistente] falha", err);
-    await registrarErroServidor("/api/gestao/assistente", err, { petshop: c.petshop.id });
-    return NextResponse.json({ erro: "falha", mensagem: "Algo deu errado do nosso lado. Tente de novo em instantes.", tipo: err instanceof Error ? err.name : typeof err }, { status: 500 });
+  };
+
+  if (!aosPoucos) {
+    const r = await rodar();
+    return NextResponse.json(r.corpo, { status: r.status });
   }
 
-  await guardarConversa(texto || "Pronto.");
-  return NextResponse.json({ mensagens, texto: texto || "Pronto.", propostas: [], parciais: [], links, mudou });
+  // aos poucos: uma linha JSON por evento; o último ("fim") traz o corpo completo e o status
+  const cod = new TextEncoder();
+  let aberto = true;
+  const corrente = new ReadableStream<Uint8Array>({
+    async start(ctl) {
+      const enviar = (e: Record<string, unknown>) => { if (!aberto) return; try { ctl.enqueue(cod.encode(`${JSON.stringify(e)}\n`)); } catch { aberto = false; } };
+      const r = await rodar(enviar);
+      enviar({ t: "fim", status: r.status, ...r.corpo });
+      if (aberto) { aberto = false; try { ctl.close(); } catch { /* já fechou */ } }
+    },
+    cancel() { aberto = false; parar.abort(); },
+  });
+  return new Response(corrente, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-cache, no-transform", "x-accel-buffering": "no" } });
 }
 
 export const POST = comRegistro("/api/gestao/assistente", tratar);

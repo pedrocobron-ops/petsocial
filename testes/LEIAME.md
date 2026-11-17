@@ -67,6 +67,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   plano de 01/11, que agora é o mês inteiro); seg a sex 9 de 21 × 1.100 = 471,43; dia fechado fora da conta; pausa no mês.
 - `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
   outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
+- `mozart-rapido.js`: a voz (`src/lib/gestao/fala.ts`: a melhor voz em português do aparelho, natural do Edge > Google > aprimorada
+  da Apple > outras do Brasil > Portugal; texto limpo para falar, "R$ 60,00" = "60 reais", "10h30" = "10 e 30"; frases que fecham
+  enquanto o texto chega), as frases de progresso (`assistente/progresso.ts`, toda consulta tem a sua), as voltas com modelo e banco de
+  mentira (texto aos poucos, consultas da mesma volta ao mesmo tempo e na ordem pedida, tokens somados, cartão continua parando), os
+  próximos dias no contexto e as marcas de cache da rota. Sem banco.
 - `parecido.js`: nomes parecidos para pedidos falados (`assistente/parecido.ts`, usado por `buscar_pets` quando o nome não bate):
   "tor" acha o Thor, "luna" a Lunna, "mau" a Mel (e a Bel: mais de um, o Mozart pergunta), pelo tutor e pelo começo do nome; nada
   inventado para nomes longe.
@@ -414,6 +419,23 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   promo_usos direto; depois da conta, a promoção não muda. `relatorio_promocoes` com estadias e encerradas (monitora e outro pet shop
   recusados). `link_promocoes` com `casa` (sem id), e sem a creche quando ela sai do link. Pedido do link de creche leva a promoção e,
   aceito, a estadia fica com ela.
+- `contas-fixas.js`: **contas fixas** (migração 20261212), com as datas de 2030 em diante pela geração interna
+  (`contas_fixas_gerar_interno(p, dia)`, sem depender de hoje). A conta do mês entra 10 dias antes do vencimento (nada 16 dias
+  antes), uma vez só (chamar de novo e duas telas ao mesmo tempo não repetem); dia 31 em fevereiro vence em 28/02 (29/02 em ano
+  bissexto, 30/04 em abril, banco e app); trimestral desde fevereiro (fev, mai, ago, nov), semestral (abr, out), anual (março, e o
+  de 2031 10 dias antes); começo 15/03 e fim 30/06 só abril a junho; nada antes do mês do cadastro; no máximo 12 meses para trás;
+  pausada não gera e ligada de novo usa o valor novo; a conta excluída de A pagar não volta (e "veio R$ 2.600" é recusado);
+  apagar a conta fixa deixa as contas já criadas. Valor que varia: entra com a marca de estimado, que sai ao escrever o valor ou ao
+  pagar; mudar depois de paga fica em `lancamentos_alteracoes`; `contas_fixas_valor` cria a do mês já com o valor certo, sem
+  repetir, e recusa conta paga e mês fora do trimestre. Quem pode: dono e quem cuida do financeiro; recepção (caixa, sem
+  financeiro), tosador, outra loja e anônimo não leem nem gravam; ninguém grava direto na tabela nem liga ou desliga um lançamento
+  de uma conta fixa. Bom dia e Hoje: "Luz da loja venceu em dd/mm (R$ 380,00, valor estimado); Aluguel da loja vence amanhã
+  (R$ 2.500,00)", só para quem cuida do financeiro. **Quanto custa manter**, à mão: 2.500 + 380 + 1.200 ÷ 12 + 600 ÷ 3 = 3.180
+  (sem a pausada e a que terminou), faturou 795 = 25%, faltam 2.385, o faturamento igual ao de `lucro_do_periodo`. Relatórios:
+  saiu 480 (luz 380 + produtos 100, devolução fora), resultado 275 em Quanto sobrou e Indicadores; `contas_fixas_do_periodo`
+  separa 380 + 100 = o mesmo saiu, por mês também; sem a ligação com a conta fixa, os totais são idênticos; `lucro_do_periodo` e
+  `indicadores_do_periodo` não foram trocados. Mozart: `ver_contas_fixas` (3.180, 23% depois da devolução) e `valor_conta_fixa`
+  (cartão com o valor de antes; grava 2.610; conta paga recusada). A faxina diária chama a geração.
 
 **migracoes/**
 - `prova-ordem.sh`: cria um banco de rascunho no mesmo Postgres (chão copiado do banco local sem o `public`), aplica todas as
@@ -426,6 +448,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   Equipe, Meu pet shop, Assinatura, Manual, Escola) em **390 e 1366**, com o dono e com cada papel da equipe (só as áreas dele, e
   algumas fora da área), as telas de impressão, `/gestao/admin` com dono comum e as páginas públicas (produto, entrar, link do
   cliente, página do tutor). Em cada uma: nenhum erro de página ou console, nenhum pedido recusado, sem rolagem para o lado e com conteúdo.
+- `contas-fixas.js`: Financeiro, Contas fixas, em 390 e 1366: cadastrar pelo modelo (Aluguel; Luz com "Muda todo mês"),
+  "Quanto custa manter o pet shop" com quanto precisa faturar (2.500, depois 2.880), a conta do mês em A pagar como "conta fixa"
+  (a luz com "valor estimado: confira a conta"), Paguei (Pix, hoje) tira de A pagar; Relatórios, Quanto sobrou com "Contas fixas
+  R$ 2.880,00" e cada conta embaixo; Hoje abre sem erro. Sem rolagem lateral e sem erro na página; capturas em
+  `testes/saida/contas-fixas-*.png`.
 - `admin-pagantes.js`: cartão "Clientes pagantes" na Visão geral do painel do administrador, em 390 e 1366: número e barra "X de 15",
   a loja ativa na lista ("pagante desde", "pago até"); com a resposta de `admin_pagantes` trocada no navegador, abaixo de 15 os passos
   ficam fechados em "Quando chegar em 15" (6 passos, MEI e "confirme com o contador") e sem histórico confiável aparece "vale só o
@@ -476,6 +503,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   e o alto-falante de cada resposta; segurar para falar (toque de dedo no 390, mouse no 1366) e tocar para parar; "Não ouvi nada";
   microfone bloqueado ("Libere o microfone nas configurações do navegador"); microfone na Ajuda (não manda sozinho); para sozinho em
   8 s de silêncio e em 30 s (`page.clock`); navegador sem ditado: sem botão, escrever continua igual. Capturas em `testes/saida/mozart-voz-*`.
+- `mozart-stream.js`: o Mozart respondendo aos poucos (o fetch da página vira um roteiro em pedaços, no formato da rota: uma linha JSON
+  por evento). 390 e 1366: o pedido vai com `Accept: application/x-ndjson`; "Procurando Thor…" embaixo dos três pontinhos; o texto cresce
+  na mesma bolha; o cartão continua pedindo "Pode fazer" (nenhuma decisão vai antes do toque); a resposta do "Pode fazer" também chega
+  aos poucos; ler em voz alta fala frase por frase enquanto chega. 390: "Voz" com as vozes do Edge (só português, a natural primeiro,
+  "Ouvir exemplo", a escolha guardada) e aparelho sem voz em português (dica de como instalar, sem alto-falante). No servidor de
+  verdade: sem o Accept a rota responde JSON como antes. Capturas em `testes/saida/mozart-stream-*`.
 - `ditado.js`: microfone nos campos de texto livre (`CampoComVoz`, `src/components/gestao/ditado.tsx`): na ficha do pet nova (cuidados e
   alertas, observações) e em Marcar horário (observação), o falado entra depois do que estava escrito, com espaço, ao vivo; respeita o
   tamanho do campo; nada é salvo sozinho; bloqueado mostra a ajuda; navegador sem ditado não mostra botão. 390 e 1366.

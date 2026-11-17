@@ -1,7 +1,8 @@
 // Ditado (SpeechRecognition) e leitura (speechSynthesis) de mentira para os testes de tela: ctx.addInitScript(falsos).
 // O teste faz o ditado "ouvir": window.__voz.ultimo._ouvir([[texto, final], …]); silêncio: window.__voz.ultimo._fim().
 // Contagens em window.__voz (comecou, parou, falas…).
-/** Ditado e leitura de mentira. localStorage "teste:voz" = "sem": navegador sem ditado. window.__vozModo = "negado": recusa. */
+/** Ditado e leitura de mentira. localStorage "teste:voz" = "sem": navegador sem ditado. window.__vozModo = "negado": recusa.
+ *  window.__vozesFalsas = [{ name, lang, voiceURI }]: as vozes do aparelho (sem isso, nenhuma, como antes). */
 function falsos() {
   let sem = false;
   try { sem = localStorage.getItem('teste:voz') === 'sem'; } catch { /* sem armazenamento */ }
@@ -32,9 +33,9 @@ function falsos() {
   }
   try {
     Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
-      speaking: false, pending: false, paused: false, getVoices: () => [], pause() {}, resume() {}, addEventListener() {}, removeEventListener() {},
+      speaking: false, pending: false, paused: false, getVoices: () => window.__vozesFalsas || [], pause() {}, resume() {}, addEventListener() {}, removeEventListener() {},
       cancel() { reg.cancelou++; },
-      speak(u) { reg.falas.push({ texto: u.text, lang: u.lang }); setTimeout(() => u.onend && u.onend(), 300); },
+      speak(u) { reg.falas.push({ texto: u.text, lang: u.lang, voz: u.voice ? u.voice.name : null, rate: u.rate }); setTimeout(() => u.onend && u.onend(), 300); },
     } });
   } catch { /* segue */ }
 }
