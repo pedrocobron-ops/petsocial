@@ -59,6 +59,7 @@ const FRASES: Record<string, (e: Entrada | null, agora?: string) => string> = {
   o_que_comprar: () => "Vendo o que precisa comprar…",
   mensagens_para_mandar: () => "Contando as mensagens para mandar…",
   ver_lucro: () => "Calculando quanto sobrou…",
+  ver_contas_fixas: () => "Somando as contas fixas…",
 };
 
 /** Frase de uma ferramenta que grava (o cartão): o Mozart prepara para a pessoa conferir. */
