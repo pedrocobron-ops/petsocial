@@ -2,6 +2,7 @@ import { COLS_PACOTE, comCustos, comPrecosDeAgendamento, comPrecosDePacote, comP
 import { ferramentaLiberada } from "./permissao";
 import { consultarComissao, FERRAMENTAS_COMISSAO } from "./ferramenta-comissao";
 import { consultarLucro, FERRAMENTAS_LUCRO } from "./ferramenta-lucro";
+import { consultarCompra, FERRAMENTAS_COMPRA } from "./ferramenta-compra";
 import { consultarPlanosDaCreche, FERRAMENTA_PLANOS_CRECHE } from "./creche-planos";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
@@ -148,6 +149,7 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ produto_id: S, produto_nome: S, unidade: { ...S, description: "un, kg, g, L, ml, pacote, saco" }, tipo: { type: "string", enum: ["entrada", "saida"] }, quantidade: N, custo_unitario: N, lancar_despesa: B, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, motivo: S }, ["tipo", "quantidade"]) },
   ...FERRAMENTAS_COMISSAO,
   ...FERRAMENTAS_LUCRO,
+  ...FERRAMENTAS_COMPRA,
 ];
 
 export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro">): Anthropic.Tool[] =>
@@ -769,6 +771,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
   if (extra) return extra;
   const lucro = await consultarLucro(c, nome, e, (m) => new ErroDeUso(m));
   if (lucro) return lucro;
+  const compra = await consultarCompra(c, nome, e, (m) => new ErroDeUso(m));
+  if (compra) return compra;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 

@@ -1827,14 +1827,14 @@ isOneToOne: false
                   ]
                 },"produtos": {
                   Row: {
-                    "ativo": boolean,"categoria": string | null,"codigo_barras": string | null,"criado_em": string,"custo": number | null,"estoque": number,"estoque_minimo": number,"fornecedor_id": string | null,"id": string,"nome": string,"petshop_id": string,"preco_venda": number | null,"ultimo_custo": number | null,"unidade": string
+                    "ativo": boolean,"categoria": string | null,"codigo_barras": string | null,"criado_em": string,"custo": number | null,"embalagem_qtd": number | null,"estoque": number,"estoque_minimo": number,"fornecedor_id": string | null,"id": string,"nome": string,"petshop_id": string,"preco_venda": number | null,"ultimo_custo": number | null,"unidade": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "ativo"?: boolean,"categoria"?: string | null,"codigo_barras"?: string | null,"criado_em"?: string,"custo"?: number | null,"estoque"?: number,"estoque_minimo"?: number,"fornecedor_id"?: string | null,"id"?: string,"nome": string,"petshop_id": string,"preco_venda"?: number | null,"ultimo_custo"?: number | null,"unidade"?: string
+                    "ativo"?: boolean,"categoria"?: string | null,"codigo_barras"?: string | null,"criado_em"?: string,"custo"?: number | null,"embalagem_qtd"?: number | null,"estoque"?: number,"estoque_minimo"?: number,"fornecedor_id"?: string | null,"id"?: string,"nome": string,"petshop_id": string,"preco_venda"?: number | null,"ultimo_custo"?: number | null,"unidade"?: string
                   }
                   Update: {
-                    "ativo"?: boolean,"categoria"?: string | null,"codigo_barras"?: string | null,"criado_em"?: string,"custo"?: number | null,"estoque"?: number,"estoque_minimo"?: number,"fornecedor_id"?: string | null,"id"?: string,"nome"?: string,"petshop_id"?: string,"preco_venda"?: number | null,"ultimo_custo"?: number | null,"unidade"?: string
+                    "ativo"?: boolean,"categoria"?: string | null,"codigo_barras"?: string | null,"criado_em"?: string,"custo"?: number | null,"embalagem_qtd"?: number | null,"estoque"?: number,"estoque_minimo"?: number,"fornecedor_id"?: string | null,"id"?: string,"nome"?: string,"petshop_id"?: string,"preco_venda"?: number | null,"ultimo_custo"?: number | null,"unidade"?: string
                   }
                   Relationships: [
                     {
@@ -2903,6 +2903,11 @@ isOneToOne: false
 "precos_dos_pacotes":
 { Args: { "p": string }; Returns: {
               "id": string,"preco": number,"vendido": boolean
+            }[]
+                           },
+"produtos_gerar_codigos":
+{ Args: { "p_petshop": string,"p_produtos": (string)[] }; Returns: {
+              "codigo_barras": string,"id": string
             }[]
                            },
 "produtos_precos":

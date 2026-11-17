@@ -16,7 +16,7 @@ export type ProfissionalLinha = T["profissionais"]["Row"];
 export type PetshopLinha = T["petshops"]["Row"];
 
 /** O produto sem o preço de venda (`comPrecosDeProduto`) e sem o custo (`comCustos`). */
-export const COLS_PRODUTO = "id, petshop_id, nome, categoria, unidade, estoque, estoque_minimo, ativo, criado_em, codigo_barras, fornecedor_id";
+export const COLS_PRODUTO = "id, petshop_id, nome, categoria, unidade, estoque, estoque_minimo, ativo, criado_em, codigo_barras, fornecedor_id, embalagem_qtd";
 export const COLS_MOVIMENTO = "id, petshop_id, produto_id, tipo, quantidade, motivo, origem, criado_por, criado_em, fornecedor_id, lancamento_id";
 export const COLS_PACOTE = "id, petshop_id, nome, servico_id, quantidade, validade_dias, ativo, criado_em";
 export const COLS_PACOTE_CLIENTE = "id, petshop_id, pet_id, pacote_id, nome, servico_id, total, usados, comprado_em, vence_em, ativo, criado_em";
