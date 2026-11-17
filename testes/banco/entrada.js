@@ -130,4 +130,11 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   T.ok('apaga o que está na fila, nunca a foto em uso', !rm.error && !existe(solta.c) && !existe(f2.c) && !existe(sig.c) && existe(f1.c));
   B.sql(`delete from agendamentos where id='${ag}'`);
   T.ok('horário apagado: a entrada sai e a foto vai para a fila', B.num(`select count(*) from entradas where id='${id}'`) === 0 && naFila(f1.c));
+
+  T.secao('dados do tutor apagados (LGPD)');
+  const fb = await subir(mon);
+  B.must(await mon.rpc('entrada_salvar', { p_petshop: P, p_id: re.data.id, p_pet: L.pets.Bob, p_agendamento: null, p_estadia: est, p_dados: { pertences: ['racao'] }, p_fotos: [fb.c] }), 'foto na entrada do Bob');
+  const apag = await dono.rpc('cliente_anonimizar', { p_cliente: L.tutores.Beto, p_confirmacao: 'Beto Lima' });
+  T.ok('apagar os dados do tutor apaga a entrada do pet', !apag.error && B.num(`select count(*) from entradas where id='${re.data.id}'`) === 0, apag.error?.message);
+  T.ok('a foto da entrada vai para a fila da faxina (bucket entrada)', B.num(`select count(*) from arquivos_lixo where bucket='entrada' and caminho='${fb.c}'`) === 1);
 }))();
