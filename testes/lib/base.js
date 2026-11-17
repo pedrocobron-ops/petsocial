@@ -70,4 +70,10 @@ async function servidorNoAr() {
   try { const r = await fetch(BASE_URL + '/gestao', { redirect: 'manual' }); return r.status < 500; } catch { return false; }
 }
 
-module.exports = { RAIZ, ENV, SUPABASE_URL, SUPABASE_KEY, BASE_URL, DB_CONTAINER, cliente, sql, num, q, must, uuid, sufixo, ipAleatorio, centavos, hojeNo, somaDias, diaDaSemana, proximoDia, instante, servidorNoAr };
+/**
+ * Dados do cadastro de um login de teste: o mesmo aceite dos Termos e da Política que a tela Criar conta manda
+ * (src/lib/gestao/documentos.ts). Sem isso, a conta de teste pararia na tela de aceite de versão nova ao abrir o aplicativo.
+ */
+const dadosDoCadastro = () => ({ data: { app: 'maestro', aceite: require('./app').lib('documentos').aceiteDoCadastro() } });
+
+module.exports = { RAIZ, dadosDoCadastro, ENV, SUPABASE_URL, SUPABASE_KEY, BASE_URL, DB_CONTAINER, cliente, sql, num, q, must, uuid, sufixo, ipAleatorio, centavos, hojeNo, somaDias, diaDaSemana, proximoDia, instante, servidorNoAr };

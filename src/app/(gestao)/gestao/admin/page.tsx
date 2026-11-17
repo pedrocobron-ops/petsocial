@@ -11,6 +11,7 @@ import AbaConversas from "@/components/gestao/admin/conversas";
 import AbaEscola from "@/components/gestao/admin/escola";
 import AbaCakto from "@/components/gestao/admin/cakto";
 import AbaErros from "@/components/gestao/admin/erros";
+import AbaAceites from "@/components/gestao/admin/aceites";
 import { AvisosProvider, Campo, Esqueleto, Folha, Vazio, mensagemDeErro, ok, useAvisos } from "@/components/gestao/ui";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { dataCompleta, fmtTelefone, haQuanto, hora, isoDia, semAcento } from "@/lib/gestao/util";
@@ -94,7 +95,7 @@ function Admin() {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [abertaId, setAbertaId] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
-  const [aba, setAba] = useState<"visao" | "geral" | "uso" | "conversas" | "escola" | "cakto" | "erros">("visao");
+  const [aba, setAba] = useState<"visao" | "geral" | "uso" | "conversas" | "escola" | "cakto" | "erros" | "aceites">("visao");
   const [uso, setUso] = useState<Uso[]>([]);
   const [contas, setContas] = useState<UsoConta[]>([]);
   const [vez, setVez] = useState(0);
@@ -192,12 +193,12 @@ function Admin() {
 
       {erro && <p className="g-aviso vermelho" role="alert">{erro}</p>}
       <div className="g-seg g-adm-abas" role="group" aria-label="Partes do painel" style={{ marginBottom: 18 }}>
-        {([["visao", "Visão geral"], ["uso", "Uso"], ["geral", "Contas"], ["conversas", "Conversas"], ["escola", "Escola"], ["cakto", "Cakto"], ["erros", "Erros"]] as const).map(([id, r]) => (
+        {([["visao", "Visão geral"], ["uso", "Uso"], ["geral", "Contas"], ["conversas", "Conversas"], ["escola", "Escola"], ["cakto", "Cakto"], ["erros", "Erros"], ["aceites", "Aceites"]] as const).map(([id, r]) => (
           <button key={id} aria-pressed={aba === id} onClick={() => setAba(id)}>{r}</button>
         ))}
       </div>
       {!lojas ? (!erro && <Esqueleto linhas={6} />) : aba === "visao" ? <AbaVisao key={vez} /> : aba === "uso" ? <AbaUso lojas={lojas} uso={uso} contas={contas} aoAbrir={setAbertaId} />
-        : aba === "conversas" ? <AbaConversas key={vez} /> : aba === "escola" ? <AbaEscola /> : aba === "cakto" ? <AbaCakto lojas={lojas} aoMudar={carregar} /> : aba === "erros" ? <AbaErros key={vez} /> : (
+        : aba === "conversas" ? <AbaConversas key={vez} /> : aba === "escola" ? <AbaEscola /> : aba === "cakto" ? <AbaCakto lojas={lojas} aoMudar={carregar} /> : aba === "erros" ? <AbaErros key={vez} /> : aba === "aceites" ? <AbaAceites key={vez} /> : (
         <div className="g-pilha g">
           <section className="g-pilha">
             <div className="g-fila entre">

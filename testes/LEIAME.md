@@ -145,6 +145,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   arquivos (fila, órfãos de mais de um dia), faxina geral e pet apagado. Precisa do servidor com `GESTAO_BOLETIM_FALSO=1`.
 - `admin.js`: funções do painel do administrador recusadas para anônimo e dono; o admin recebe só dados da conta e quantidades;
   troca de status vai para o histórico. (O admin de teste é criado por SQL: ninguém vira admin pela API.)
+- `aceites.js`: aceite dos Termos e da Política (migração 20261197): cadastro com `aceite` nos dados grava os dois documentos na versão
+  em vigor (`src/lib/gestao/documentos.ts`), sem `aceite` (ou com lixo) não grava e não derruba o cadastro; cada um lê só os seus;
+  gravar, mudar ou apagar direto recusado; `aceitar_documentos` (anônimo e versão estranha recusados, dois toques gravam uma vez,
+  com o navegador); `admin_aceites` só para o admin (com o pet shop e a contagem por versão); login apagado deixa o aceite com o e-mail.
+  **Contas de teste:** todo cadastro dos testes passa `B.dadosDoCadastro()` (o mesmo aceite da tela Criar conta); sem isso o login
+  pararia na tela de aceite de versão nova e `N.entrar` não acharia o aplicativo.
 - `cakto.js`: webhook da Cakto de ponta a ponta pela rota do servidor: 9 ofertas, ciclo da assinatura (renovada, atrasada, recuperada,
   cancelada), reembolso, contestação, MED, segredo errado, outro produto, e-mail diferente (callback e pagamento sem conta), Escola.
   A configuração da Cakto (`config_interna`) é guardada antes e devolvida igual no fim.
@@ -253,6 +259,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   "Recebeu adiantado?" R$ 50,00 no Pix, dois cliques: uma entrada e o cartão "Pago adiantado R$ 50,00"; lista de espera com
   "Prefere canil perto da janela": Marcar reserva abre com a observação e a reserva é salva com ela. Capturas em
   `testes/saida/hotel-bia-*.png`.
+- `aceite.js`: Termos, Política e aceite pela tela, em 390 e 1366: Criar conta com a caixa desmarcada e os dois links (sem marcar, a conta
+  não nasce; marcada, em 390, nasce com os dois aceites "cadastro" no banco); as páginas com "Versão 2.0 — vigente desde 17/11/2026", o
+  resumo de cada parte e o índice; a dona sem aceite da versão em vigor entra e vê "Dona, atualizamos as nossas regras" (o resumo das
+  mudanças, os dois documentos, a caixa desmarcada; sem marcar não segue), aceita com dois cliques e o aplicativo abre com os dois
+  aceites "reaceite" gravados uma vez. Capturas em `testes/saida/aceite-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 - `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente

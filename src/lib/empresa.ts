@@ -8,6 +8,12 @@ export const EMPRESA = {
   cnpj: "",
   endereco: "",
   email: "contato@maestropet.com",
+  /** E-mail para privacidade (encarregado/LGPD) e assuntos jurídicos. Vazio = aparece [E-MAIL DE CONTATO] nos documentos do Gestão. */
+  emailJuridico: "",
+  /** Nome do encarregado pelo tratamento de dados (DPO). Vazio = [NOME DO ENCARREGADO]. */
+  encarregado: "",
+  /** Comarca escolhida nos Termos do Gestão, ex. "Santos/SP". Vazio = [FORO]. */
+  foro: "",
   /** Só números, com DDI e DDD: ex. "5511999999999". */
   whatsapp: "5513991376169",
   instagram: "maestro_pet_",

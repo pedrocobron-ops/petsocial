@@ -32,7 +32,7 @@ const TUTORES = [
 
 async function cadastrar(email) {
   const sb = B.cliente();
-  const r = await sb.auth.signUp({ email, password: SENHA });
+  const r = await sb.auth.signUp({ email, password: SENHA, options: B.dadosDoCadastro() });
   if (r.error) throw new Error(`cadastro ${email}: ${r.error.message}`);
   if (!r.data.session) B.must(await sb.auth.signInWithPassword({ email, password: SENHA }), 'login ' + email);
   return sb;
@@ -118,7 +118,7 @@ const APAGAR_LOJAS = (ids) => `
 /** Apaga a loja, os logins e as fotos. */
 function limpar(L) {
   if (!L || !L.P) return;
-  B.sql(APAGAR_LOJAS(`'{${L.P}}'`) + `delete from auth.users where email like 't-${L.suf}.%@${DOMINIO}';`);
+  B.sql(APAGAR_LOJAS(`'{${L.P}}'`) + `delete from auth.users where email like 't-${L.suf}.%@${DOMINIO}'; delete from aceites where email like 't-${L.suf}.%@${DOMINIO}';`);
   try { B.sql(`delete from storage.objects where name like '${L.P}/%'`); } catch { /* o storage pode proibir apagar direto; os arquivos ficam órfãos no disco de teste */ }
 }
 
@@ -128,6 +128,7 @@ function limparTudo() {
   const lojas = ids === '{}' ? 0 : ids.split(',').length;
   if (lojas) B.sql(APAGAR_LOJAS(`'${ids}'`));
   const u = B.sql(`with a as (delete from auth.users where email like '%@${DOMINIO}' returning id) select count(*) from a;`);
+  B.sql(`delete from aceites where email like '%@${DOMINIO}'`);
   return { lojas, logins: Number(u) };
 }
 
