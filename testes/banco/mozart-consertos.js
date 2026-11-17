@@ -164,9 +164,9 @@ const n = (x) => JSON.parse(JSON.stringify(x).replace(/ /g, ' '));
     if (Number(L.hoje.slice(8, 10)) > 1) {
       B.must(await dono.rpc('contas_fixas_salvar', { p: P, p_conta: { id: B.uuid(), nome: 'Aluguel', categoria: 'Aluguel', dia, valor: 3500, frequencia: 'mensal', comeca_em: comeca } }), 'conta fixa');
       const r = n(JSON.parse((await F.rodarConsulta(cDono, 'ver_contas_fixas', {})).conteudo));
-      const al = r.contas.find((x) => x.nome === 'Aluguel');
-      T.ok('o aluguel diz "não entrou este mês" e que o sistema não sabe se foi paga', al && /não entrou este mês/.test(al.este_mes) && /não sabe se a deste mês foi paga/.test(al.este_mes), al);
-      T.ok('a regra manda nunca deduzir que foi paga', /Nunca deduza que uma conta foi paga/.test(r.regra));
+      const al = (r.este_mes ?? []).find((x) => x.conta === 'Aluguel');
+      T.ok('o aluguel diz que não existe conta deste mês (começou depois do vencimento) e que nada foi pago', al && al.situacao === 'antes_do_inicio' && /não existe conta de/.test(al.o_que_aconteceu) && /Nada foi pago/.test(al.o_que_aconteceu), al);
+      T.ok('a regra manda nunca deduzir que foi paga', /nunca deduza que está paga/i.test(r.regra));
     } else T.ok('(dia 1: sem dia anterior no mês para testar)', true);
   }
 
