@@ -172,6 +172,19 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   `lancarAReceber` da tela, duas vezes ao mesmo tempo com a mesma chave: uma conta só; o tosador não anota. Precisa do servidor com
   `GESTAO_CADERNO_FALSO=1`.
 - `visitas.js`: última visita de cada pet: a função do banco (`visitas_dos_pets`) = a conta do navegador, para o dono e para o tosador.
+- `lucro.js`: **Quanto sobrou** e **Por pessoa** (migração 20261193: `lucro_do_periodo`, `equipe_do_periodo`, `servicos.custo_material`,
+  `lancamentos.vendido_por`), lançando pelo mesmo código das telas e montando por `src/lib/gestao/lucro.ts`. Conta do Thor (Banho 60 +
+  Hidratação 30 + Corte 15 + shampoo 29,90 por R$ 120,00), parte de R$ 40 da conta do Bob, Luna sem conta, venda de balcão da recepção,
+  laço sem custo, pacote, entrada solta, aluguel, comissão paga e devolução: **linhas + outros lançamentos = Entrou do Financeiro**
+  (445,30), faturamento (435,30) e **resultado = Resultado do mês** (−98,03) pela mesma conta da tela; divisão da conta entre os
+  serviços igual à da comissão (53,37 / 26,69 / 13,34), a parte conta a receita e não a vez; material do Banho 8,50 × vezes; produto
+  pelo custo guardado na venda e, sem ele, pelo custo de hoje; Hidratação e laço com "custo não informado" (sem margem);
+  **comissão das linhas = `comissao_do_periodo`** (92,02, o centavo do arredondamento na maior linha) e "contar a comissão como custo".
+  Custo do material: só o dono grava e lê (`servicos_custos`; a coluna não tem select). Quem vendeu: `vendido_por` = quem lançou
+  (vendedor de outra loja é trocado). Por pessoa: atendimentos = os da comissão, conta do atendimento para quem atendeu, balcão para
+  quem lançou, **soma das pessoas = linhas de Quanto sobrou**; tosador e recepção só a própria linha. Recepção, tosador, estoque e
+  anônimo não leem Quanto sobrou; funções internas fechadas. Mozart `ver_lucro`: o de mais sobra primeiro, sem custo = null, mesmo
+  resultado do Financeiro, recusado para quem não cuida do financeiro.
 - `velocidade.js`: abrir o aplicativo numa ida só ao banco (migração 20261185): `lerBase` (`gestao_base`) = a leitura antiga parte por
   parte (`lerPetshop` + `lerEquipe` + `lerServicos`) para dono, recepção, monitora, tosador e estoque, com meta, diárias, opções com valor,
   comissão, convite e preços só para quem pode; as seis contagens da tela Hoje (`gestao_contagens`) = as contagens pela API; anônimo
@@ -253,6 +266,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   "Recebeu adiantado?" R$ 50,00 no Pix, dois cliques: uma entrada e o cartão "Pago adiantado R$ 50,00"; lista de espera com
   "Prefere canil perto da janela": Marcar reserva abre com a observação e a reserva é salva com ela. Capturas em
   `testes/saida/hotel-bia-*.png`.
+- `lucro.js`: Quanto sobrou e Por pessoa pela tela, em 390 e 1366 (dono): Banho 2 vezes, R$ 113,33, material R$ 17,00, sobrou R$ 96,33;
+  Hidratação R$ 26,67 com "custo não informado" (nunca 100%); Produtos (390): shampoo de balcão R$ 59,80 − R$ 24,00; Como fecha com o
+  Financeiro (R$ 199,80 + outros R$ 200,00 = Entrou R$ 399,80; resultado −R$ 50,20) e o **mesmo Resultado do mês na tela Financeiro**;
+  Exportar baixa a planilha; Por pessoa com o tosador (2 atendimentos, R$ 140,00) e a recepção (venda R$ 59,80). 1366: Meu pet shop,
+  Custo do material por atendimento (grava R$ 4,20; o Banho abre com R$ 8,50). Tosador na tela Hoje: "Meu mês" com 2 atendimentos e sem
+  reais. Capturas em `testes/saida/lucro-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
 - `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente

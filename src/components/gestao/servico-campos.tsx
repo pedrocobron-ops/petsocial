@@ -117,6 +117,8 @@ export { corLivre } from "@/lib/gestao/cores";
 
 type LinhaServico = {
   nome: string; categoria: string; duracao_min: number; cor: string; ordem?: number; ativo?: boolean;
+  /** Custo do material por atendimento (só o dono; em branco = não informado). Só vai quando a tela mexeu nele. */
+  custo_material?: number | null;
 } & Precos;
 /** Antes da migração 20261179, o banco não conhece a categoria 'loja': o serviço da loja entra como 'outro'. */
 const semLoja = (e: { message?: string } | null) => !!e && /servicos_categoria_check/.test(e.message ?? "");

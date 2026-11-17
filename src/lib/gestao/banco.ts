@@ -1253,14 +1253,14 @@ isOneToOne: true
                   ]
                 },"lancamentos": {
                   Row: {
-                    "agendamento_id": string | null,"alterado_em": string | null,"caixa_id": string | null,"categoria": string,"chave": string | null,"cliente_id": string | null,"cobrado_em": string | null,"conta_id": string | null,"credito_usado": number | null,"criado_em": string,"criado_por": string | null,"data": string,"descricao": string | null,"devido_desde": string | null,"diferenca_de": string | null,"forma": string | null,"id": string,"itens": Json | null,"movimento": string | null,"multa_de": string | null,"multa_recebida": number | null,"multa_recebida_em": string | null,"origem": string,"pagamentos": Json | null,"pago": boolean,"pago_em": string | null,"petshop_id": string,"tipo": string,"valor": number,"valor_original": number | null,"vencimento": string | null
+                    "agendamento_id": string | null,"alterado_em": string | null,"caixa_id": string | null,"categoria": string,"chave": string | null,"cliente_id": string | null,"cobrado_em": string | null,"conta_id": string | null,"credito_usado": number | null,"criado_em": string,"criado_por": string | null,"data": string,"descricao": string | null,"devido_desde": string | null,"diferenca_de": string | null,"forma": string | null,"id": string,"itens": Json | null,"movimento": string | null,"multa_de": string | null,"multa_recebida": number | null,"multa_recebida_em": string | null,"origem": string,"pagamentos": Json | null,"pago": boolean,"pago_em": string | null,"petshop_id": string,"tipo": string,"valor": number,"valor_original": number | null,"vencimento": string | null,"vendido_por": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendamento_id"?: string | null,"alterado_em"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"chave"?: string | null,"cliente_id"?: string | null,"cobrado_em"?: string | null,"conta_id"?: string | null,"credito_usado"?: number | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"devido_desde"?: string | null,"diferenca_de"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"movimento"?: string | null,"multa_de"?: string | null,"multa_recebida"?: number | null,"multa_recebida_em"?: string | null,"origem"?: string,"pagamentos"?: Json | null,"pago"?: boolean,"pago_em"?: string | null,"petshop_id": string,"tipo": string,"valor": number,"valor_original"?: number | null,"vencimento"?: string | null
+                    "agendamento_id"?: string | null,"alterado_em"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"chave"?: string | null,"cliente_id"?: string | null,"cobrado_em"?: string | null,"conta_id"?: string | null,"credito_usado"?: number | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"devido_desde"?: string | null,"diferenca_de"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"movimento"?: string | null,"multa_de"?: string | null,"multa_recebida"?: number | null,"multa_recebida_em"?: string | null,"origem"?: string,"pagamentos"?: Json | null,"pago"?: boolean,"pago_em"?: string | null,"petshop_id": string,"tipo": string,"valor": number,"valor_original"?: number | null,"vencimento"?: string | null,"vendido_por"?: string | null
                   }
                   Update: {
-                    "agendamento_id"?: string | null,"alterado_em"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"chave"?: string | null,"cliente_id"?: string | null,"cobrado_em"?: string | null,"conta_id"?: string | null,"credito_usado"?: number | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"devido_desde"?: string | null,"diferenca_de"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"movimento"?: string | null,"multa_de"?: string | null,"multa_recebida"?: number | null,"multa_recebida_em"?: string | null,"origem"?: string,"pagamentos"?: Json | null,"pago"?: boolean,"pago_em"?: string | null,"petshop_id"?: string,"tipo"?: string,"valor"?: number,"valor_original"?: number | null,"vencimento"?: string | null
+                    "agendamento_id"?: string | null,"alterado_em"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"chave"?: string | null,"cliente_id"?: string | null,"cobrado_em"?: string | null,"conta_id"?: string | null,"credito_usado"?: number | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"devido_desde"?: string | null,"diferenca_de"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"movimento"?: string | null,"multa_de"?: string | null,"multa_recebida"?: number | null,"multa_recebida_em"?: string | null,"origem"?: string,"pagamentos"?: Json | null,"pago"?: boolean,"pago_em"?: string | null,"petshop_id"?: string,"tipo"?: string,"valor"?: number,"valor_original"?: number | null,"vencimento"?: string | null,"vendido_por"?: string | null
                   }
                   Relationships: [
                     {
@@ -1304,6 +1304,12 @@ isOneToOne: false
       columns: ["petshop_id"]
 isOneToOne: false
       referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "lancamentos_vendido_por_fkey"
+      columns: ["vendido_por"]
+isOneToOne: false
+      referencedRelation: "profissionais"
       referencedColumns: ["id"]
     }
                   ]
@@ -1807,14 +1813,14 @@ isOneToOne: false
                   ]
                 },"servicos": {
                   Row: {
-                    "ativo": boolean,"categoria": string,"cor": string,"criado_em": string,"duracao_min": number,"id": string,"nome": string,"ordem": number,"petshop_id": string,"preco_g": number | null,"preco_gg": number | null,"preco_m": number | null,"preco_p": number | null
+                    "ativo": boolean,"categoria": string,"cor": string,"criado_em": string,"custo_material": number | null,"duracao_min": number,"id": string,"nome": string,"ordem": number,"petshop_id": string,"preco_g": number | null,"preco_gg": number | null,"preco_m": number | null,"preco_p": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "ativo"?: boolean,"categoria"?: string,"cor"?: string,"criado_em"?: string,"duracao_min"?: number,"id"?: string,"nome": string,"ordem"?: number,"petshop_id": string,"preco_g"?: number | null,"preco_gg"?: number | null,"preco_m"?: number | null,"preco_p"?: number | null
+                    "ativo"?: boolean,"categoria"?: string,"cor"?: string,"criado_em"?: string,"custo_material"?: number | null,"duracao_min"?: number,"id"?: string,"nome": string,"ordem"?: number,"petshop_id": string,"preco_g"?: number | null,"preco_gg"?: number | null,"preco_m"?: number | null,"preco_p"?: number | null
                   }
                   Update: {
-                    "ativo"?: boolean,"categoria"?: string,"cor"?: string,"criado_em"?: string,"duracao_min"?: number,"id"?: string,"nome"?: string,"ordem"?: number,"petshop_id"?: string,"preco_g"?: number | null,"preco_gg"?: number | null,"preco_m"?: number | null,"preco_p"?: number | null
+                    "ativo"?: boolean,"categoria"?: string,"cor"?: string,"criado_em"?: string,"custo_material"?: number | null,"duracao_min"?: number,"id"?: string,"nome"?: string,"ordem"?: number,"petshop_id"?: string,"preco_g"?: number | null,"preco_gg"?: number | null,"preco_m"?: number | null,"preco_p"?: number | null
                   }
                   Relationships: [
                     {
@@ -2432,6 +2438,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"equipe_do_periodo":
+{ Args: { "p_ate": string,"p_de": string,"p_petshop": string }; Returns: Json
+                           },
 "equipe_reservado":
 { Args: { "p": string }; Returns: {
               "comissao_pct": number,"email_convite": string,"id": string
@@ -2631,6 +2640,24 @@ isOneToOne: false
 "lote_ja_feito":
 { Args: { "p_chave": string,"p_petshop": string }; Returns: Json
                            },
+"lucro_comissoes":
+{ Args: { "p": string,"p_ate": string,"p_de": string }; Returns: {
+              "comissao": number,"nome": string,"produto_id": string,"servico_id": string,"tipo": string
+            }[]
+                           },
+"lucro_do_periodo":
+{ Args: { "p_ate": string,"p_de": string,"p_petshop": string }; Returns: Json
+                           },
+"lucro_pecas":
+{ Args: { "p": string,"p_ate": string,"p_de": string }; Returns: {
+              "agendamento_id": string,"categoria": string,"conta": string,"lancamento_id": string,"nome": string,"principal": boolean,"produto_id": string,"profissional_id": string,"qtd": number,"servico_id": string,"tipo": string,"valor": number,"vendido_por": string
+            }[]
+                           },
+"lucro_repartir":
+{ Args: { "p_itens": Json,"p_tipo": string,"p_total": number }; Returns: {
+              "nome": string,"produto_id": string,"qtd": number,"servico_id": string,"valor": number
+            }[]
+                           },
 "marcar_uso":
 { Args: { "p_area": string,"p_petshop": string }; Returns: undefined
                            },
@@ -2784,7 +2811,8 @@ isOneToOne: false
 "tipo": string,
 "valor": number,
 "valor_original": number | null,
-"vencimento": string | null
+"vencimento": string | null,
+"vendido_por": string | null
             }[]
                           SetofOptions: {
         from: "*"
@@ -2801,6 +2829,11 @@ isOneToOne: false
 "series_acabando":
 { Args: { "p": string }; Returns: {
               "cada_semanas": number,"pet_id": string,"pet_nome": string,"restantes": number,"serie_id": string,"servico_nome": string,"tutor_nome": string,"ultimo": string
+            }[]
+                           },
+"servicos_custos":
+{ Args: { "p": string }; Returns: {
+              "custo_material": number,"id": string
             }[]
                            },
 "servicos_do_horario_texto":

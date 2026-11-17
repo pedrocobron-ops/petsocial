@@ -1,0 +1,38 @@
+/* Relatórios: "Quanto sobrou" e "Por pessoa" (tabelas que viram cartões no celular) */
+.g-lu-tab { display: grid; }
+.g-lu-l { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 14px; padding: 11px 0; border-bottom: 1px solid var(--g-linha); font-variant-numeric: tabular-nums; }
+.g-lu-l:last-child { border-bottom: 0; }
+.g-lu-l > .n { grid-column: 1 / -1; min-width: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 1px; }
+.g-lu-l > .n > b { font-weight: 600; }
+.g-lu-l > .n > small { color: var(--g-cinza); font-size: .8125rem; }
+.g-lu-l > span { font-size: .875rem; color: var(--g-cinza); min-width: 0; }
+.g-lu-l > span.n { color: var(--g-tinta); font-size: .9375rem; }
+.g-lu-l > span > i { font-style: normal; }
+.g-lu-l > span > em { font-style: normal; font-weight: 600; color: var(--g-tinta); }
+.g-lu-l > span > em.ruim { color: var(--g-vermelho); }
+.g-lu-l > span > em.sem { font-weight: 400; color: var(--g-cinza); font-size: .8125rem; }
+.g-lu-l.total { border-top: 2px solid var(--g-linha-forte); }
+.g-lu-l.cab { display: none; }
+.g-lu-l.cab > span { font-size: .8125rem; }
+@media (min-width: 900px), print {
+  .g-lu-l { grid-template-columns: minmax(0, 2.4fr) .8fr 1fr 1.15fr 1fr .7fr; align-items: baseline; }
+  .g-lu-l > span.n { grid-column: auto; text-align: left; white-space: normal; font-size: .9375rem; color: var(--g-tinta); }
+  .g-lu-l > span { text-align: right; font-size: .9375rem; white-space: nowrap; }
+  .g-lu-l > span > i { display: none; }
+  .g-lu-l.cab { display: grid; padding: 4px 0 6px; }
+  .g-lu-l.cab > span:first-child { text-align: left; }
+}
+
+.g-lu-ponte { display: grid; gap: 2px; font-variant-numeric: tabular-nums; }
+.g-lu-ponte > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: .9375rem; }
+.g-lu-ponte > div > span { min-width: 0; color: var(--g-cinza); }
+.g-lu-ponte > div > b { white-space: nowrap; font-weight: 600; }
+.g-lu-ponte > div.sub { padding: 1px 0 1px 14px; font-size: .8125rem; }
+.g-lu-ponte > div.sub > b { font-weight: 400; color: var(--g-cinza); }
+.g-lu-ponte > div.igual { border-top: 1px solid var(--g-linha); margin-top: 2px; padding-top: 7px; }
+.g-lu-ponte > div.igual > span { color: var(--g-tinta); font-weight: 600; }
+.g-lu-ponte > div.fim { border-top: 2px solid var(--g-linha-forte); }
+.g-lu-ponte details summary { cursor: pointer; }
+
+.g-lu-op { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+.g-lu-op .g-check { margin: 0; }

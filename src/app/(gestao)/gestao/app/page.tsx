@@ -29,6 +29,7 @@ import { useCalendario } from "@/components/gestao/calendario";
 import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
 import MinhaComissao from "@/components/gestao/minha-comissao";
+import MeuMes from "@/components/gestao/meu-mes";
 import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, useAdiantar, useDados } from "@/components/gestao/ui";
 import dynamic from "next/dynamic";
 import { ErroDeTeste } from "@/components/gestao/erros";
@@ -476,6 +477,7 @@ export default function Hoje() {
 
         {!contaNova && cuidoDoFinanceiro && dados && <RecebidoNaSemana valor={dados.recebidoSemana} hoje={dados.entrou} />}
         <MinhaComissao />
+        {!cuidoDoFinanceiro && <MeuMes />}
 
         <div className={semAgenda ? "g-pilha g" : "g-duas"}>
           {!semAgenda && <section>

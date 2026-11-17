@@ -18,7 +18,7 @@ import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
 import OpcoesDaLoja from "@/components/gestao/ajustes/opcoes-loja";
 import { LojaNoGoogle, OpcoesDoBoletim } from "@/components/gestao/ajustes/opcoes-boletim";
 import { AREAS_DE_SERVICO, areaDoServico, areasDeServicoPara, categoriaDaArea, nomeDaCasa, usaCasa, usaModulo, type AreaDoServico } from "@/lib/gestao/modulos";
-import { CAMPOS_PRECO, EscolherArea, PrecosDoServico, comecaPorPorte, corLivre, inserirServico, mudarServico, umPrecoSo, type Precos } from "@/components/gestao/servico-campos";
+import { CAMPOS_PRECO, EscolherArea, PrecosDoServico, comecaPorPorte, corLivre, erroDoPreco, inserirServico, mudarServico, umPrecoSo, type Precos } from "@/components/gestao/servico-campos";
 import { textoDoLink } from "@/lib/gestao/agenda";
 import { trocasDeCor } from "@/lib/gestao/cores";
 import { emLista } from "@/components/gestao/personalizar-menu";
@@ -30,7 +30,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { Campo, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
 import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import { PORTES, type Horario, type Servico } from "@/lib/gestao/tipos";
-import { brl, brlCurto, fmtTelefone, soDigitos, mascaraTelefone } from "@/lib/gestao/util";
+import { brl, brlCurto, fmtTelefone, lerValor, soDigitos, mascaraTelefone, valor2 } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./meu-petshop.css";
 
@@ -495,6 +495,20 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
   const [ativo, setAtivo] = useState(servico?.ativo ?? true);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // custo do material (só o dono lê e grava; em branco = não informado): vem do banco quando a folha abre
+  const [custo, setCusto] = useState<{ texto: string; lido: string | null; mexeu: boolean }>({ texto: "", lido: servico ? null : "", mexeu: false });
+  useEffect(() => {
+    if (!servico) return;
+    let vivo = true;
+    void Promise.resolve(sb.rpc("servicos_custos", { p: petshop.id })).then((r) => {
+      if (!vivo || r.error) return;
+      const v = (r.data ?? []).find((x) => x.id === servico.id)?.custo_material;
+      const t = v == null ? "" : valor2(Number(v));
+      setCusto((c) => (c.mexeu ? { ...c, lido: t } : { texto: t, lido: t, mexeu: false }));
+    });
+    return () => { vivo = false; };
+  }, [sb, petshop.id, servico]);
+  const erroCusto = erroDoPreco(custo.texto);
 
   async function salvar() {
     const n = nome.trim();
@@ -505,9 +519,11 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
     const precosDele = porPorte ? valores : umPrecoSo(valores);
     if (CAMPOS_PRECO.some((c) => (precosDele[c] ?? 0) < 0)) return setErro("O preço não pode ser negativo.");
     if (CAMPOS_PRECO.some((c) => (precosDele[c] ?? 0) > 99999)) return setErro("Confira os preços.");
+    if (erroCusto) return setErro(`Confira o custo do material: ${erroCusto}.`);
     setErro(null);
     setSalvando(true);
-    const campos = { nome: n.slice(0, 80), categoria: categoriaDaArea(area, servico?.categoria), duracao_min: min, cor, ativo, ...precosDele };
+    const custoMaterial = custo.mexeu && custo.texto.trim() !== (custo.lido ?? "") ? { custo_material: custo.texto.trim() ? lerValor(custo.texto) : null } : {};
+    const campos = { nome: n.slice(0, 80), categoria: categoriaDaArea(area, servico?.categoria), duracao_min: min, cor, ativo, ...precosDele, ...custoMaterial };
     try {
       if (servico) {
         await mudarServico(sb, petshop.id, servico.id, campos);
@@ -550,6 +566,14 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
             aoMudar={(c, chave, ruim) => { setValores((a) => ({ ...a, ...c })); setErrosPreco((m) => { const x = { ...m }; if (ruim) x[chave] = ruim; else delete x[chave]; return x; }); }} />
           <small>{porPorte ? "P = pequeno, M = médio, G = grande, GG = gigante. Pode deixar em branco o porte que vocês não atendem." : "Pode deixar em branco e pôr o preço depois."}</small>
         </div>
+        <label className="g-campo">
+          <span>Custo do material por atendimento <span className="g-muted">(opcional)</span></span>
+          <input className={`g-input g-tab${erroCusto ? " ruim" : ""}`} style={{ maxWidth: 160 }} inputMode="decimal" placeholder="R$" value={custo.texto} aria-invalid={!!erroCusto}
+            disabled={custo.lido === null} aria-label={`Custo do material de ${nome.trim() || "serviço"}`}
+            onChange={(e) => setCusto((c) => ({ ...c, texto: e.target.value, mexeu: true }))}
+            onBlur={() => { if (!erroCusto && custo.texto.trim()) { const v = lerValor(custo.texto); if (v != null) setCusto((c) => ({ ...c, texto: valor2(v) })); } }} />
+          <small>{erroCusto ? <span className="erro" role="alert">{erroCusto}</span> : "Shampoo, condicionador, perfume e o que mais gasta em cada atendimento. Entra em Relatórios, Quanto sobrou. Em branco, aparece “custo não informado”. Só você vê."}</small>
+        </label>
         <div className="g-campo"><span>Cor na agenda</span><EscolherCor valor={cor} aoMudar={setCor} usadas={servicos.filter((s) => s.ativo && s.id !== servico?.id).map((s) => ({ nome: s.nome, cor: s.cor }))} /></div>
         {servico && (
           <label className="g-check">
