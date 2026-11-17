@@ -12,18 +12,17 @@
 export type Documento = "termos" | "privacidade";
 
 export const DOCUMENTOS: Record<Documento, { nome: string; caminho: string; versao: string; vigenteDesde: string }> = {
-  termos: { nome: "Termos de uso", caminho: "/gestao/termos", versao: "2.1", vigenteDesde: "2026-11-17" },
-  privacidade: { nome: "Política de privacidade", caminho: "/gestao/privacidade", versao: "2.1", vigenteDesde: "2026-11-17" },
+  termos: { nome: "Termos de uso", caminho: "/gestao/termos", versao: "2.2", vigenteDesde: "2026-11-17" },
+  privacidade: { nome: "Política de privacidade", caminho: "/gestao/privacidade", versao: "2.2", vigenteDesde: "2026-11-17" },
 };
 
 /** O que mudou nesta versão, em poucas linhas, para a tela de aceite de quem já tinha conta. */
 export const MUDANCAS: string[] = [
-  "Autorização para postar fotos: explicamos como funciona. O tutor autoriza pelo boletim (só aquelas fotos ou também as próximas), o sistema guarda o texto aceito e ele tira quando quiser pelo link \"Não quero mais\".",
-  "Baixar todos os dados: em Meu pet shop, um arquivo com uma planilha para cada parte e um README que explica cada uma.",
-  "Dados de um tutor: na ficha do tutor, o dono baixa os dados daquele cliente ou apaga os dados pessoais dele. Os valores ficam no financeiro, sem o nome.",
-  "Checklist de entrada: o pet shop pode registrar como o pet chegou (com fotos) e pedir o aceite do tutor, por assinatura no aparelho ou por link. O texto do termo é do pet shop; o sistema guarda o aceite.",
-  "Aniversário do tutor (opcional) e horários das etapas do atendimento e do leva e traz: explicamos o que guardamos e para quê.",
-  "Encerrar e apagar a conta: o titular pede em Meu pet shop. A conta fica 30 dias só para consulta, dá para cancelar nesse prazo e depois apagamos tudo. Quem é da equipe pode sair por \"Sair desta equipe\".",
+  "Quem oferece o Gestão hoje é uma pessoa física; explicamos como fica quando o serviço passar para uma empresa (CNPJ), com aviso antes.",
+  "Cadastro sem e-mail de confirmação: use um e-mail seu e correto, porque é por ele que se troca a senha. Convites da equipe agora usam um link com código.",
+  "Nossos compromissos como operador dos dados dos seus clientes, incluindo aviso de incidente em até 2 dias úteis e a lista de fornecedores.",
+  "Novos prazos de guarda: registros de acesso por 6 meses e conversas com o assistente por 12 meses. Apagar os dados de um tutor também limpa orçamentos e conversas.",
+  "Multa, juros, fiado, taxas da maquininha, lucro, orçamento, promoções, checklist de entrada, aniversário do tutor e Modo TV: o que é responsabilidade do pet shop.",
 ];
 
 /** "17/11/2026" a partir de "2026-11-17" (sem fuso: é uma data de calendário). */

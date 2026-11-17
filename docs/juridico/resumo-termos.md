@@ -1,9 +1,32 @@
 # Termos de uso e Política de privacidade do Gestão: resumo para o dono
 
-Versão 2.1 dos dois documentos, vigente desde 17/11/2026 (a 2.0 é do mesmo dia; a 2.1 corrige a parte das fotos e descreve
-as funções de dados da LGPD; veja "O que mudou na 2.1"). Páginas: `/gestao/termos` e `/gestao/privacidade`
-(código em `src/app/(gestao)/gestao/termos/page.tsx` e `.../privacidade/page.tsx`). **Rascunho: precisa da revisão de um
-advogado brasileiro antes de valer.** Nada aqui é parecer jurídico.
+Versão 2.2 dos dois documentos, vigente desde 17/11/2026. Páginas: `/gestao/termos` e `/gestao/privacidade`
+(código em `src/app/(gestao)/gestao/termos/page.tsx` e `.../privacidade/page.tsx`). O dono decidiu não passar por advogado
+por enquanto; a 2.2 incorpora uma revisão detalhada feita com o Claude (veja "O que mudou na 2.2"). Nada aqui é parecer jurídico.
+
+## O que mudou na 2.2
+
+- Quem oferece é pessoa física (CPF); a parte 26 prevê a passagem do contrato para uma empresa (CNPJ), com aviso e direito de
+  cancelar com devolução proporcional. O texto troca "dona da marca" por "responsável pela marca" enquanto não houver registro no INPI.
+- Cadastro sem e-mail de confirmação: o usuário declara que o e-mail é dele; convites da equipe passam a usar link com código.
+- Cláusula de operador (LGPD art. 39) na parte 10: instruções, sigilo, sub-operadores autorizados (lista na Política, aviso de 15 dias
+  para fornecedor novo), aviso de incidente ao pet shop em até 2 dias úteis, ajuda com pedidos, eliminação no fim.
+- Incidentes (Política, parte 14): dados da conta, nós avisamos ANPD e assinantes; dados do pet shop, avisamos o pet shop, que comunica.
+- Prazos: registros de acesso 6 meses (Marco Civil) e conversas com o assistente 12 meses; "Apagar dados deste tutor" limpa também
+  orçamentos e conversas.
+- Parte 15: multa, juros, taxa de falta e fiado são regras do pet shop com consumidores; taxas da maquininha, lucro e indicadores são estimativas.
+- Responsabilidade (parte 17): acesso com login e senha só não é nosso se não houver falha de segurança nossa.
+- Política: Escala CEO no mesmo Supabase, Google Maps e link de avaliação, orçamento e acompanhamento de pedido, IP na autorização
+  de fotos e no checklist, pixel fora do cadastro, transferência internacional com DPA e cláusulas-padrão da ANPD.
+
+## Pendências para profissionais (quando der)
+
+- **Contador:** imposto sobre o que recebe como pessoa física (carnê-leão/IRPF, ISS como autônomo, NFS-e), o que responder a
+  clientes PJ que pedirem nota, quando abrir a empresa (CNAE, regime) e como passar a Cakto do CPF para o CNPJ.
+- **Advogado (ao abrir o CNPJ ou crescer):** teto de responsabilidade e reclamações de terceiros em contrato de adesão; se MEIs e
+  autônomos podem ser tratados como consumidores; DPAs e cláusulas-padrão com Supabase, Vercel e Anthropic; registro da marca no
+  INPI; plano de resposta a incidentes (e uma planilha de registro de incidentes); separar Maestro Pet e Escala CEO.
+- Conferir o plano do Supabase (cópias de segurança) e a "garantia" de 7 dias configurada no produto da Cakto.
 
 ## As principais proteções
 
@@ -70,9 +93,8 @@ advogado brasileiro antes de valer.** Nada aqui é parecer jurídico.
 | [E-MAIL DE CONTATO] (privacidade e jurídico) | `src/lib/empresa.ts` (`emailJuridico`) |
 | [NOME DO ENCARREGADO] (DPO) | `src/lib/empresa.ts` (`encarregado`) |
 | [FORO] (comarca, ex. "Santos/SP") | `src/lib/empresa.ts` (`foro`) |
-| [PROVEDOR DE E-MAIL] (quem envia os e-mails de login) | texto em `privacidade/page.tsx`, parte 5 |
 
-## Decisões de negócio para confirmar com o advogado
+## Decisões de negócio (antigas; ver também as pendências acima)
 
 - Reembolso de 7 dias para todos (inclusive planos de 3 e 6 meses) e nenhum reembolso depois; regras de reembolso da Cakto.
 - 180 dias até apagar conta sem pagamento e 30 dias de aviso; 30 dias de aviso para reajuste; 60 dias para encerrar o serviço.
