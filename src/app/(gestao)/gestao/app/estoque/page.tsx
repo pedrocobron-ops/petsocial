@@ -12,6 +12,8 @@ import { abrirAssistente, avisarMudanca, Campo, Esqueleto, Folha, ok, useAvisos,
 import { Kpi, Tile } from "@/components/gestao/painel";
 import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, ErroTela, EscolhaPagamento, fecharPagamento, fmtQtd, lembrarForma, lerQtd, useCaixaAberto, usePagamento, type Forma } from "@/components/gestao/loja/pecas";
 import VendaBalcao from "@/components/gestao/loja/venda";
+import nextDynamic from "next/dynamic";
+import { FileText } from "lucide-react";
 import Fornecedores, { EscolherFornecedor, pedeReposicao, useFornecedores, type Fornecedor } from "@/components/gestao/loja/fornecedores";
 import { LerComCamera } from "@/components/gestao/loja/leitor";
 import OQueComprar from "@/components/gestao/loja/o-que-comprar";
@@ -23,6 +25,9 @@ import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import type { MovimentoEstoque, Produto } from "@/lib/gestao/tipos";
 import { brl, brlCurto, dataCurta, semAcento } from "@/lib/gestao/util";
 import "./estoque.css";
+
+// orçamentos: abre só com um toque
+const Orcamentos = nextDynamic(() => import("@/components/gestao/loja/orcamento"), { ssr: false });
 
 const UNIDADES = ["un", "kg", "g", "L", "ml", "pacote", "saco"];
 const FILTROS = [
@@ -73,6 +78,7 @@ export default function Estoque() {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [aberta, setAberta] = useState<Aberta | null>(null);
   const [importando, setImportando] = useState(false);
+  const [orcamentos, setOrcamentos] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () =>
     (await comCustos(sb, petshop.id, await comPrecosDeProduto(sb, petshop.id, await lerTudo<{ id: string }>((de, ate, contar) => sb.from("produtos").select(COLS_PRODUTO, contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate))))) as unknown as Produto[],
@@ -128,6 +134,7 @@ export default function Estoque() {
         </div>
         <div className="g-acoes">
           {produtos.length > 0 && <button className="g-btn sec" onClick={() => abrir({ tipo: "venda" })}><ShoppingBag /> Vender</button>}
+          {vejoFinanceiro && <button className="g-btn sec" onClick={() => setOrcamentos(true)}><FileText /> Orçamentos</button>}
           <button className="g-btn sec" onClick={() => setImportando(true)}><Upload /> Trazer de planilha</button>
           {produtos.length > 0 && posso("estoque") && <button className="g-btn sec" onClick={() => abrir({ tipo: "comprar" })}><ClipboardList /> O que comprar</button>}
           {produtos.length > 0 && posso("estoque") && <Link className="g-btn sec" href="/gestao/app/estoque/etiquetas"><Tag /> Etiquetas</Link>}
@@ -250,6 +257,7 @@ export default function Estoque() {
       )}
 
       {aberta?.tipo === "venda" && <VendaBalcao aoFechar={fechar} aoPronto={gravou} />}
+      {orcamentos && <Orcamentos aoFechar={() => { setOrcamentos(false); void recarregar(); }} />}
       {aberta?.tipo === "novo" && <ProdutoNovo loja={loja} aoFechar={fechar} aoGravar={gravou} />}
       {aberta?.tipo === "entrada" && <Entrada produto={aberta.produto} loja={loja} aoFechar={fechar} aoGravar={gravou} />}
       {aberta?.tipo === "comprar" && <OQueComprar produtos={produtos} fornecedores={fornecedores} comFornecedores={op.fornecedores} aoFechar={fechar} />}

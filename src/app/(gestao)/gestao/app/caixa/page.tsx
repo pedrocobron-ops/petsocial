@@ -15,12 +15,17 @@ import {
 } from "@/components/gestao/financeiro/comum";
 import { ContasDeClientes } from "@/components/gestao/financeiro/contas-clientes";
 import VendaBalcao from "@/components/gestao/loja/venda";
+import nextDynamic from "next/dynamic";
+import { FileText } from "lucide-react";
 import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
 import type { AlteracaoLancamento, Caixa, Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, hora, isoDia } from "@/lib/gestao/util";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { AtendimentosParaCobrar, useParaCobrarComValor } from "@/components/gestao/agenda/para-cobrar";
 import "./caixa.css";
+
+// orçamentos: abre só com um toque
+const Orcamentos = nextDynamic(() => import("@/components/gestao/loja/orcamento"), { ssr: false });
 
 export default function PaginaCaixa() {
   const { vejoFinanceiro } = useGestao();
@@ -91,6 +96,7 @@ function CaixaDoDia() {
   const { avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [folha, setFolha] = useState<FolhaAberta | null>(null);
+  const [orcamentos, setOrcamentos] = useState(false);
   const hoje = hojeIso();
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
@@ -152,12 +158,11 @@ function CaixaDoDia() {
         <h1>Caixa</h1>
         <p className="g-muted">{dataLonga(new Date())}</p>
       </div>
-      {dados?.aberto && (
-        <div className="g-acoes">
-          {fin && <button className="g-btn fantasma" onClick={() => exportarCaixa(dados.aberto!, doCaixa(dados.aberto!.id))}><Download />Exportar</button>}
-          <button className="g-btn sec" onClick={() => void abrir({ tipo: "fechar" })}><Lock />Fechar o caixa</button>
-        </div>
-      )}
+      <div className="g-acoes">
+        <button className="g-btn sec" onClick={() => setOrcamentos(true)}><FileText />Orçamentos</button>
+        {dados?.aberto && fin && <button className="g-btn fantasma" onClick={() => exportarCaixa(dados.aberto!, doCaixa(dados.aberto!.id))}><Download />Exportar</button>}
+        {dados?.aberto && <button className="g-btn sec" onClick={() => void abrir({ tipo: "fechar" })}><Lock />Fechar o caixa</button>}
+      </div>
     </header>
   );
 
@@ -445,6 +450,7 @@ function CaixaDoDia() {
         <FolhaGaveta tipo={folha.de} inicial={folha.lancamento} naGaveta={resumo.esperado} aoFechar={() => setFolha(null)} aoSalvo={recarregar} />
       )}
       {folha?.tipo === "venda" && <VendaBalcao aoFechar={() => setFolha(null)} aoPronto={() => void recarregar()} />}
+      {orcamentos && <Orcamentos aoFechar={() => { setOrcamentos(false); void recarregar(); }} />}
       {folha?.tipo === "fechar" && aberto && (
         <FolhaFechar caixa={aberto} lancamentos={lancamentos} dinheiroFora={dinheiroFora} aoFechar={() => setFolha(null)} aoMudou={recarregar}
           aoSalvo={async () => { await recarregar(); setFolha({ tipo: "resumo", caixaId: aberto.id }); }} />

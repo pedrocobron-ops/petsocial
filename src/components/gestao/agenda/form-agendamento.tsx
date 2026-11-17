@@ -55,8 +55,10 @@ function anoFazSentido(dia: string) {
 /** O horário que acabou de ser marcado: a Agenda vai para o dia dele e oferece a confirmação no WhatsApp. */
 export type Marcado = { id: string; inicio: string; quantos: number; pet?: string };
 
-export default function FormAgendamento({ agendamento, petInicial, diaInicial, horaInicial, profissionalInicial, aoFechar, aoSalvar }: {
+export default function FormAgendamento({ agendamento, petInicial, diaInicial, horaInicial, profissionalInicial, servicosIniciais, obsInicial, aoFechar, aoSalvar }: {
   agendamento?: AgendamentoCompleto; petInicial?: PetComTutor | null; diaInicial?: string; horaInicial?: string; profissionalInicial?: string | null;
+  /** Horário novo já com os serviços e os valores (o orçamento que virou horário). */
+  servicosIniciais?: { servicoId: string; preco: number | null }[]; obsInicial?: string;
   /** `marcado`: horário novo que acabou de ser marcado (o primeiro, numa série), para a Agenda abrir o dia dele. */
   aoFechar: () => void; aoSalvar: (marcado?: Marcado) => void;
 }) {
@@ -77,17 +79,23 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const [hhmm, setHhmm] = useState(agendamento ? hora(agendamento.inicio) : horaInicial ?? "");
   // os serviços do horário, na ordem em que a pessoa tocou: o primeiro é o principal. Ao marcar, com um serviço só ele já vem escolhido.
   const [escolhidos, setEscolhidos] = useState<Escolhido[]>(() => {
+    if (!agendamento && servicosIniciais?.length) {
+      return servicosIniciais.filter((x, i, l) => servicos.some((s) => s.id === x.servicoId) && l.findIndex((y) => y.servicoId === x.servicoId) === i)
+        .map((x) => ({ servicoId: x.servicoId, preco: x.preco, mexido: x.preco != null }));
+    }
     if (!agendamento) return ativos.length === 1 ? [{ servicoId: ativos[0].id, preco: null, mexido: false }] : [];
     const l: Escolhido[] = agendamento.servico_id ? [{ servicoId: agendamento.servico_id, preco: agendamento.preco ?? null, mexido: true }] : [];
     for (const o of outrosDoHorario) if (!l.some((x) => x.servicoId === o.servico_id)) l.push({ servicoId: o.servico_id, preco: o.preco == null ? null : Number(o.preco), mexido: true });
     return l;
   });
-  const [duracao, setDuracao] = useState<number>(agendamento ? Math.round((new Date(agendamento.fim).getTime() - new Date(agendamento.inicio).getTime()) / 60000) : ativos.length === 1 ? ativos[0].duracao_min : 60);
+  const [duracao, setDuracao] = useState<number>(agendamento ? Math.round((new Date(agendamento.fim).getTime() - new Date(agendamento.inicio).getTime()) / 60000)
+    : servicosIniciais?.length ? servicosIniciais.reduce((t, x) => t + (servicos.find((s) => s.id === x.servicoId)?.duracao_min ?? 0), 0) || 60
+    : ativos.length === 1 ? ativos[0].duracao_min : 60);
   // horário sem serviço nenhum (pet shop sem serviço cadastrado): o valor é escrito à mão
   const [precoSolto, setPrecoSolto] = useState<number | null>(agendamento && !agendamento.servico_id ? agendamento.preco ?? null : null);
   const [levaTraz, setLevaTraz] = useState(agendamento?.leva_traz ?? false);
   const [endereco, setEndereco] = useState(agendamento?.endereco_leva_traz ?? "");
-  const [obs, setObs] = useState(agendamento?.obs ?? "");
+  const [obs, setObs] = useState(agendamento?.obs ?? obsInicial ?? "");
   const [salvando, setSalvando] = useState(false);
   // remarcou (mudou o dia ou a hora): antes de fechar, oferece o aviso pronto para o tutor, com a data nova
   const [remarcado, setRemarcado] = useState<{ quando: string; hora: string; zap: string | null } | null>(null);

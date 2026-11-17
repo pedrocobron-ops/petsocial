@@ -447,14 +447,14 @@ isOneToOne: false
                   ]
                 },"clientes": {
                   Row: {
-                    "criado_em": string,"email": string | null,"endereco": string | null,"id": string,"nome": string,"obs": string | null,"petshop_id": string,"telefone": string | null
+                    "criado_em": string,"email": string | null,"endereco": string | null,"id": string,"limite_fiado": number | null,"nome": string,"obs": string | null,"petshop_id": string,"telefone": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"nome": string,"obs"?: string | null,"petshop_id": string,"telefone"?: string | null
+                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"limite_fiado"?: number | null,"nome": string,"obs"?: string | null,"petshop_id": string,"telefone"?: string | null
                   }
                   Update: {
-                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"nome"?: string,"obs"?: string | null,"petshop_id"?: string,"telefone"?: string | null
+                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"limite_fiado"?: number | null,"nome"?: string,"obs"?: string | null,"petshop_id"?: string,"telefone"?: string | null
                   }
                   Relationships: [
                     {
@@ -1245,6 +1245,34 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"devolucoes": {
+                  Row: {
+                    "chave": string,"cliente_id": string | null,"credito_id": string | null,"criado_em": string,"criado_por": string | null,"diferenca": number | null,"entrada_id": string | null,"forma": string | null,"id": string,"itens": Json,"modo": string,"novos": Json | null,"petshop_id": string,"resultado": Json | null,"saida_id": string | null,"valor": number,"valor_novos": number | null,"venda_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "chave": string,"cliente_id"?: string | null,"credito_id"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"diferenca"?: number | null,"entrada_id"?: string | null,"forma"?: string | null,"id"?: string,"itens": Json,"modo": string,"novos"?: Json | null,"petshop_id": string,"resultado"?: Json | null,"saida_id"?: string | null,"valor": number,"valor_novos"?: number | null,"venda_id"?: string | null
+                  }
+                  Update: {
+                    "chave"?: string,"cliente_id"?: string | null,"credito_id"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"diferenca"?: number | null,"entrada_id"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json,"modo"?: string,"novos"?: Json | null,"petshop_id"?: string,"resultado"?: Json | null,"saida_id"?: string | null,"valor"?: number,"valor_novos"?: number | null,"venda_id"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"fiado_liberacoes": {
+                  Row: {
+                    "cliente_id": string,"criado_em": string,"devia": number,"id": string,"lancamento_id": string | null,"liberado_nome": string | null,"liberado_por": string | null,"limite": number,"petshop_id": string,"usado_em": string | null,"valor": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "cliente_id": string,"criado_em"?: string,"devia": number,"id"?: string,"lancamento_id"?: string | null,"liberado_nome"?: string | null,"liberado_por"?: string | null,"limite": number,"petshop_id": string,"usado_em"?: string | null,"valor": number
+                  }
+                  Update: {
+                    "cliente_id"?: string,"criado_em"?: string,"devia"?: number,"id"?: string,"lancamento_id"?: string | null,"liberado_nome"?: string | null,"liberado_por"?: string | null,"limite"?: number,"petshop_id"?: string,"usado_em"?: string | null,"valor"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"fornecedores": {
                   Row: {
                     "ativo": boolean,"criado_em": string,"id": string,"nome": string,"observacoes": string | null,"petshop_id": string,"telefone": string | null
@@ -1570,6 +1598,20 @@ isOneToOne: false
       referencedRelation: "petshops"
       referencedColumns: ["id"]
     }
+                  ]
+                },"orcamentos": {
+                  Row: {
+                    "agendamento_id": string | null,"aceito_em": string | null,"chave": string | null,"cliente_id": string | null,"convertido_em": string | null,"convertido_por": string | null,"criado_em": string,"criado_por": string | null,"desconto": number,"id": string,"itens": Json,"lancamento_id": string | null,"alterado_em": string | null,"nome": string | null,"numero": number,"obs": string | null,"petshop_id": string,"status": string,"subtotal": number,"telefone": string | null,"token": string,"total": number,"validade": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agendamento_id"?: string | null,"aceito_em"?: string | null,"chave"?: string | null,"cliente_id"?: string | null,"convertido_em"?: string | null,"convertido_por"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"desconto"?: number,"id"?: string,"itens": Json,"lancamento_id"?: string | null,"alterado_em"?: string | null,"nome"?: string | null,"numero"?: number,"obs"?: string | null,"petshop_id": string,"status"?: string,"subtotal"?: number,"telefone"?: string | null,"token"?: string,"total"?: number,"validade": string
+                  }
+                  Update: {
+                    "agendamento_id"?: string | null,"aceito_em"?: string | null,"chave"?: string | null,"cliente_id"?: string | null,"convertido_em"?: string | null,"convertido_por"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"desconto"?: number,"id"?: string,"itens"?: Json,"lancamento_id"?: string | null,"alterado_em"?: string | null,"nome"?: string | null,"numero"?: number,"obs"?: string | null,"petshop_id"?: string,"status"?: string,"subtotal"?: number,"telefone"?: string | null,"token"?: string,"total"?: number,"validade"?: string
+                  }
+                  Relationships: [
+                    
                   ]
                 },"pacotes": {
                   Row: {
@@ -3070,6 +3112,27 @@ isOneToOne: false
                            },
 "vejo_financeiro":
 { Args: { "p": string }; Returns: boolean
+                           },
+"fiado_liberar":
+{ Args: { "p_cliente": string,"p_petshop": string,"p_valor": number }; Returns: Json
+                           },
+"fiado_situacao":
+{ Args: { "p_cliente": string,"p_petshop": string }; Returns: Json
+                           },
+"orcamento_marcar":
+{ Args: { "p_agendamento"?: string,"p_lancamento"?: string,"p_orcamento": string }; Returns: Json
+                           },
+"orcamento_publico":
+{ Args: { "p_token": string }; Returns: Json
+                           },
+"orcamento_vender":
+{ Args: { "p_chave": string,"p_orcamento": string,"p_passos": Json,"p_petshop": string }; Returns: Json
+                           },
+"venda_devolver":
+{ Args: { "p_chave": string,"p_cliente"?: string,"p_forma"?: string,"p_itens": Json,"p_modo": string,"p_novos"?: Json,"p_petshop": string,"p_resto"?: string,"p_venda": string }; Returns: Json
+                           },
+"venda_devolvivel":
+{ Args: { "p_petshop": string,"p_venda": string }; Returns: { "devolvido": number,"devolvido_valor": number,"nome": string,"pago": number,"produto_id": string,"vendido": number }[]
                            },
 "venda_registrar":
 { Args: { "p_chave": string,"p_passos": Json,"p_petshop": string }; Returns: Json

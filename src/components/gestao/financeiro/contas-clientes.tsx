@@ -3,11 +3,13 @@
 import { useMemo, useState } from "react";
 import { Check, HandCoins, MessageCircle, TriangleAlert } from "lucide-react";
 import { mensagemDeDivida, multaSugerida } from "@/lib/gestao/dinheiro-opcoes";
+import { fraseDoDisponivel, limiteDoCliente } from "@/lib/gestao/fiado";
 import { descricaoAtual } from "@/lib/gestao/dinheiro";
 import type { Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, dataCurtaOuAno, hora, isoDia, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
+import { BarraDoLimite } from "./limite-fiado";
 import { AvatarPessoa, avisarMudanca, Campo, Folha, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { categoriaAtual, FolhaBaixa, textoJaRecebido } from "./comum";
 import "./recebimentos.css";
@@ -18,7 +20,7 @@ import "./recebimentos.css";
  * ler só as contas em aberto de clientes (não despesas, nem o histórico).
  */
 
-type Tutor = { id: string; nome: string; telefone: string | null };
+type Tutor = { id: string; nome: string; telefone: string | null; limite_fiado?: number | null };
 export type Devedor = { chave: string; tutor: Tutor | null; contas: Lancamento[]; total: number; atrasado: number; desde: string; cobradoEm: string | null };
 
 const centavos = (n: number) => Math.round(n * 100) / 100;
@@ -37,7 +39,7 @@ export function useContasDeClientes(clienteId?: string) {
     const ids = [...new Set(contas.map((c) => c.cliente_id).filter((x): x is string => Boolean(x)))];
     const tutores = new Map<string, Tutor>();
     for (let i = 0; i < ids.length; i += 150) {
-      const t = await sb.from("clientes").select("id, nome, telefone").eq("petshop_id", petshop.id).in("id", ids.slice(i, i + 150));
+      const t = await sb.from("clientes").select("id, nome, telefone, limite_fiado").eq("petshop_id", petshop.id).in("id", ids.slice(i, i + 150));
       for (const c of t.data ?? []) tutores.set(c.id, c);
     }
     return { contas, tutores };
@@ -89,7 +91,10 @@ function LinhaConta({ conta, hoje, aoReceber }: { conta: Lancamento; hoje: strin
 
 /** O que um tutor deve: total, contas e os dois botões (Recebi em cada conta, Cobrar no WhatsApp no total). */
 function BlocoDevedor({ d, hoje, aoReceber, aoCobrar, semNome }: { d: Devedor; hoje: string; aoReceber: (c: Lancamento) => void; aoCobrar: () => void; semNome?: boolean }) {
+  const { petshop } = useGestao();
   const temZap = telefoneValido(d.tutor?.telefone);
+  // limite de fiado (o do cliente ou o padrão da loja): quanto ainda cabe
+  const limite = !semNome && d.tutor ? limiteDoCliente(d.tutor, petshop) : null;
   return (
     <div className="gr-devedor">
       <div className="gr-devedor-t">
@@ -103,6 +108,7 @@ function BlocoDevedor({ d, hoje, aoReceber, aoCobrar, semNome }: { d: Devedor; h
         </span>
         {d.atrasado > 0 && <span className="g-tag vermelho"><TriangleAlert size={12} aria-hidden />{brl(d.atrasado)} em atraso</span>}
       </div>
+      {limite != null && <div className="g-orc-limite"><span>{fraseDoDisponivel(d.total, limite)}</span><BarraDoLimite deve={d.total} limite={limite} /></div>}
       <div className="gr-contas">
         {d.contas.map((c) => <LinhaConta key={c.id} conta={c} hoje={hoje} aoReceber={() => aoReceber(c)} />)}
       </div>
