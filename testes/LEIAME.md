@@ -308,6 +308,19 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   o limite; Ana deve 180 de 200, mais 30 recusado com "Ana já deve R$ 180,00; com esta conta passa do limite de R$ 200,00."
   (também pela venda de balcão); pagamento na hora passa; a recepção não libera; o dono libera (anotado, uma vez só); padrão da
   loja (50) para quem não tem limite próprio, e a opção não vai para o tosador.
+- `taxas-indicadores.js`: **taxas da maquininha** e **Indicadores** (migração 20261204), contas à mão. Sem taxas cadastradas, nada é
+  guardado; só o dono grava (`taxas_maquininha`: recepção e tosador recusados, % acima de 30 e parcela 13 recusadas), recepção e
+  tosador não leem. Taxa guardada no pagamento (`lancamentos_taxas`): débito 100 × 2% = 2,00; crédito 150 × 4% + 0,50 = 6,50;
+  **dividido** 200 (Pix 50 × 0,99% = 0,495 → 0,50, crédito 100 → 4,50, dinheiro 50 sem taxa) = 5,00; dinheiro sem linha; crédito
+  300 à vista 12,50 e, anotado 3x pela recepção (`maquininha_parcelas`), 7,5% + 0,50 = 23,00; 2x pela % do parcelado = 6,50; a
+  recepção não anota na venda do dono, o tosador é recusado. `calcularTaxa` (maquininha.ts) = banco nos 5 casos. **Mudar as
+  taxas não muda o que já foi pago** (débito 2,00 e crédito 6,50 ficam; débito novo 3,00); valor corrigido 150 → 200 refaz com a
+  regra do dia (8,50, não a nova). Ninguém grava nem muda a tabela das taxas guardadas; caixa fechado não deixa anotar parcelas.
+  `taxas_do_periodo`: 48,00 em 6 pagamentos, por forma, a receber 195,00 amanhã e 657,50 em 30 dias; `lucro_do_periodo`: resultado
+  igual ao Financeiro (1.140,00) e a taxa à parte (depois das taxas 1.092,00). Outra loja e anônimo não leem nem chamam nada.
+  **Indicadores** (`indicadores_do_periodo`, 3 meses): cada mês com faturamento, resultado e taxas iguais a `lucro_do_periodo` do
+  mesmo mês e ao `faturamento.ts`; 3 atendimentos, faltas 25%, cancelados 1 de 6, retorno em 60 dias 1 de 2, mapa = marcados sem
+  cancelados, Banho o mais feito; recepção, tosador, outra loja e período de mais de um ano recusados; loja sem movimento: sem dados.
 
 - `quadro-taxi.js`: quadro de atendimento e leva e traz (migração 20261203). `quadro_mover`: só quem tem Agenda (monitora, estoque,
   outro pet shop e anônimo recusados), etapa fora da lista, horário de amanhã e desmarcado recusados; a chegada pelo quadro (ou pelo
@@ -468,6 +481,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   recepção vê a frase e nada é anotado. 1366 (dono): Caixa › a venda › Troca ou devolução: 1 shampoo volta = 27,46 em dinheiro,
   **dois toques** = uma saída; o dono vê "Passa do limite de fiado", toca em "Liberar mesmo assim" e a conta entra (anotado quem
   liberou); a ficha mostra "Limite R$ 200,00 · passou R$ 9,90 do limite" e Fazer orçamento. Capturas em `testes/saida/orc-*.png`.
+- `indicadores.js`: taxas da maquininha e Indicadores pela tela, em 390 e 1366 (dono). Relatórios › **Indicadores** (a primeira aba):
+  faturamento do período, 3 atendimentos, voltaram em 60 dias 50% (1 de 2), faltas 25%, mapa de dias e horários, serviços mais
+  vendidos, Quanto sobrou por mês com "depois das taxas", Ver os números; Mês passado compara só com número de verdade. **Venda
+  no balcão**: Débito de 29,90 mostra "Taxa da maquininha R$ 0,60 · Você recebe R$ 29,30"; Crédito em 3 vezes, 2,74 / 27,16, e a
+  venda fica no banco com 2,74 e 3 parcelas. Financeiro e Relatórios com o cartão Taxas da maquininha; Quanto sobrou com a linha
+  das taxas depois do resultado. Meu pet shop: o dono muda o débito (o exemplo de R$ 100,00 muda na hora) e o débito de antes
+  continua com 2,00. Loja nova: "Ainda não tem dados neste período." sem nenhum R$. Capturas em `testes/saida/indicadores-*.png`.
 
 - `quadro-taxi.js`: quadro do dia e leva e traz pela tela (servidor no ar). 390 (tosador): Agenda › Quadro, abas com a contagem, o cartão
   do Thor (Banho e tosa, com Tito, Morde, alergia, Leva e traz), "Chegou: começar o banho", secagem, tosa e "Está pronto" com

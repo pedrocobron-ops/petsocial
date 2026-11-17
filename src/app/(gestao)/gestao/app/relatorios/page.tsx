@@ -12,6 +12,8 @@ import { baixarPlanilha, brlMini, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, nu
 import { Anel, Barras, Kpi, Rosca, Tile } from "@/components/gestao/painel";
 import RelatorioProdutos from "@/components/gestao/loja/relatorio-produtos";
 import QuantoSobrou from "@/components/gestao/relatorios/lucro";
+import CartaoMaquininha from "@/components/gestao/financeiro/maquininha";
+import AbasDeRelatorios from "@/components/gestao/relatorios/abas";
 import PorPessoa from "@/components/gestao/relatorios/por-pessoa";
 import { percentuaisQueFecham } from "@/lib/gestao/dinheiro";
 import { cobradoPorServico, type ParteDoServico } from "@/lib/gestao/servicos-do-horario";
@@ -466,6 +468,7 @@ function Relatorios() {
       </header>
 
       <div className="g-pilha">
+        <AbasDeRelatorios atual="periodo" />
         <div className="gf-rola gf-nao-imprime">
           <Chips opcoes={PERIODOS} valor={periodo} aoMudar={setPeriodo} rotulo="Período" />
         </div>
@@ -566,6 +569,8 @@ function Relatorios() {
                 ) : <p className="g-muted g-p">Nenhum horário marcado neste período.</p>}
               </section>
             </div>
+
+            <CartaoMaquininha de={deIso} ate={ateIso} faturamento={r.faturamento} />
 
             {r.totalEstadias > 0 && (
               <section className="g-card">

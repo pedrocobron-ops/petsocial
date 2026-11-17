@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { Lock, Plus, Split, Trash2 } from "lucide-react";
 import { caixaAberto, formaPrincipal, ultimoContado, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
+import { aoMudarTaxas, calcularTaxa, carregarTaxas, lojaPerguntaParcelas, perguntaParcelas, temTaxa, type TaxasMaquininha } from "@/lib/gestao/maquininha";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, isoDia, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { avisarMudanca, useAvisos, useCampoDeValor, useDados } from "../ui";
 import "./loja.css";
 import "../financeiro/recebimentos.css";
+import "../ajustes/taxas-maquininha.css";
 
 export type Forma = (typeof FORMAS)[number]["id"];
 
@@ -50,7 +52,75 @@ export type ParteDigitada = { forma: Forma | null; valor: number | null };
 /** O que a pessoa escolheu para receber: uma forma só, ou o pagamento dividido em partes. */
 /** `entregue`: o que a pessoa escreveu em "Recebeu quanto?" (dinheiro entregue pelo cliente), para o troco e para não lançar mais do que entrou. */
 /** `parte`: com Pix, cartão ou outro, o cliente pagou só uma parte (o valor vai em `entregue`); `resto`: no dividido, o que falta fica para depois. */
-export type EstadoPagamento = { forma: Forma | null; dividido: boolean; partes: ParteDigitada[]; ultimaManual: boolean; entregue?: number | null; parte?: boolean; resto?: boolean };
+/** `parcelas`: crédito em quantas vezes (só nas telas que anotam, `ParcelasNaTela`; a taxa do parcelado vem daí). */
+export type EstadoPagamento = { forma: Forma | null; dividido: boolean; partes: ParteDigitada[]; ultimaManual: boolean; entregue?: number | null; parte?: boolean; resto?: boolean; parcelas?: number | null };
+
+/* ---------- taxas da maquininha: "Você recebe" e em quantas vezes ---------- */
+
+/**
+ * A tela anota em quantas vezes foi o crédito depois de gravar (`anotarParcelas`, maquininha.ts)? Só nelas a pergunta
+ * "Em quantas vezes?" aparece. Fechar a conta, venda no balcão e check-out.
+ */
+export const ParcelasNaTela = createContext(false);
+
+const perguntaCache = new Map<string, boolean>();
+/**
+ * As taxas da loja para mostrar no pagamento: só para quem cuida do financeiro (os outros não veem valor de taxa).
+ * `pergunta`: a loja quer saber em quantas vezes foi o crédito (vale para todo mundo que recebe).
+ */
+export function useMaquininha(): { taxas: TaxasMaquininha | null; pergunta: boolean } {
+  const { sb, petshop, cuidoDoFinanceiro } = useGestao();
+  const [x, setX] = useState<{ taxas: TaxasMaquininha | null; pergunta: boolean }>({ taxas: null, pergunta: perguntaCache.get(petshop.id) ?? false });
+  const [vez, setVez] = useState(0);
+  useEffect(() => aoMudarTaxas(() => setVez((n) => n + 1)), []);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        if (cuidoDoFinanceiro) {
+          const taxas = await carregarTaxas(sb, petshop.id, vez > 0);
+          if (vivo) setX({ taxas, pergunta: perguntaParcelas(taxas) });
+        } else {
+          const pergunta = await lojaPerguntaParcelas(sb, petshop.id);
+          perguntaCache.set(petshop.id, pergunta);
+          if (vivo) setX({ taxas: null, pergunta });
+        }
+      } catch { /* sem taxas: o pagamento continua igual */ }
+    })();
+    return () => { vivo = false; };
+  }, [sb, petshop.id, cuidoDoFinanceiro, vez]);
+  return x;
+}
+
+/** "Em quantas vezes?" (crédito) e "Taxa da maquininha · Você recebe" (cartão e Pix), embaixo da forma de pagamento. */
+function TaxaDoPagamento({ e, aoMudar, total }: { e: EstadoPagamento; aoMudar: (e: EstadoPagamento) => void; total: number }) {
+  const { taxas, pergunta } = useMaquininha();
+  const anota = useContext(ParcelasNaTela);
+  if (!(total > 0)) return null;
+  const partes = e.dividido ? contasDoPagamento(e, total).partes.filter((p) => p.forma && Number(p.valor) > 0).map((p) => ({ forma: p.forma!, valor: centavos(Number(p.valor)) })) : null;
+  const temCredito = e.dividido ? Boolean(partes?.some((p) => p.forma === "credito")) : e.forma === "credito";
+  const valor = !e.dividido && e.parte && e.entregue ? e.entregue : e.dividido && partes ? centavos(partes.reduce((t, p) => t + p.valor, 0)) : total;
+  const conta = taxas && temTaxa(taxas) && (e.dividido ? partes?.length : e.forma) ? calcularTaxa(taxas, { valor, forma: e.dividido ? null : e.forma, pagamentos: partes && partes.length > 1 ? partes : null, parcelas: anota ? e.parcelas : 1 }) : null;
+  return (
+    <>
+      {anota && pergunta && temCredito && (
+        <label className="g-tx-vezes">
+          <span>Crédito em quantas vezes?</span>
+          <select className="g-select" value={String(e.parcelas ?? 1)} aria-label="Crédito em quantas vezes" onChange={(ev) => aoMudar({ ...e, parcelas: Number(ev.target.value) })}>
+            <option value="1">À vista</option>
+            {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => <option key={n} value={n}>{n} vezes</option>)}
+          </select>
+        </label>
+      )}
+      {conta && conta.taxa > 0 && (
+        <p className="g-tx-recebe" role="status">
+          <span>Taxa da maquininha: <b>{brl(conta.taxa)}</b> · Você recebe <b>{brl(conta.recebe)}</b></span>
+          <small>O cliente paga o mesmo valor. Só você e quem cuida do financeiro veem isso.</small>
+        </p>
+      )}
+    </>
+  );
+}
 
 export const pagamentoInicial = (forma: Forma | null = null): EstadoPagamento => ({ forma, dividido: false, partes: [], ultimaManual: false, entregue: null });
 
@@ -156,6 +226,7 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
         </div>
         {erro && <small className="erro" role="alert">{erro}</small>}
         {e.forma === "dinheiro" && total > 0 && <Troco devido={total} {...entregue} aceitaResto={aceitaResto} />}
+        <TaxaDoPagamento e={e} aoMudar={aoMudar} total={total} />
         {/* Pix, cartão ou outro: o cliente pagou só uma parte (só onde o resto fica anotado para depois) */}
         {aceitaResto && e.forma && e.forma !== "dinheiro" && total > 0.01 && (e.parte ? (
           <div className="g-pg-troco">
@@ -240,6 +311,7 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
       {aceitaResto && e.resto && <small>O que faltar fica anotado para o cliente pagar depois. <button type="button" className="g-pg-link" onClick={() => aoMudar({ ...e, resto: false, ultimaManual: false })}>Pagou tudo</button></small>}
       {emDinheiro && <Troco devido={Number(emDinheiro.valor)} parte {...entregue} />}
       {!e.ultimaManual && c.passou === 0 && <small>A última parte se completa sozinha com o que falta.</small>}
+      <TaxaDoPagamento e={e} aoMudar={aoMudar} total={total} />
       {erro && <small className="erro" role="alert">{erro}</small>}
       <div className="g-pg-acoes">
         {e.partes.length < MAX_PARTES && (

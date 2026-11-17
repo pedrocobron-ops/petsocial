@@ -1,0 +1,52 @@
+/* Relatórios: as duas partes (Indicadores e Relatório do período) e os gráficos de Indicadores (prefixo g-ind-). */
+.g-rel-abas { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 4px; border-radius: 999px; background: var(--g-carta-2); max-width: 100%; }
+.g-rel-abas a { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px; font-weight: 600; font-size: .875rem; color: var(--g-cinza); text-decoration: none; }
+.g-rel-abas a svg { width: 16px; height: 16px; }
+.g-rel-abas a[aria-current="page"] { background: var(--g-carta); color: var(--g-tinta); box-shadow: 0 1px 3px rgba(31, 27, 23, .14); }
+
+.g-ind-comp { display: inline-flex; align-items: center; gap: 2px; font-size: .75rem; color: var(--g-cinza); }
+.g-ind-comp svg { width: 14px; height: 14px; }
+.g-ind-comp.sobe { color: var(--g-verde); font-weight: 600; }
+.g-ind-comp.desce { color: var(--g-vermelho); font-weight: 600; }
+.g-ind-apoio { display: grid; gap: 2px; }
+
+.g-ind-tab { margin-top: 10px; font-size: .8125rem; }
+.g-ind-tab summary { cursor: pointer; color: var(--g-cinza); font-weight: 600; }
+.g-ind-tab table { width: 100%; border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.g-ind-tab th, .g-ind-tab td { padding: 4px 6px; border-bottom: 1px solid var(--g-linha); text-align: right; white-space: nowrap; }
+.g-ind-tab th:first-child { text-align: left; }
+
+.g-ind-leg { display: flex; gap: 14px; font-size: .8125rem; margin-bottom: 8px; }
+.g-ind-leg span { display: inline-flex; align-items: center; gap: 6px; }
+.g-ind-leg i { width: 10px; height: 10px; border-radius: 4px; }
+.g-ind-leg i.novo, .g-ind-emp i.novo { background: var(--g-laranja); }
+.g-ind-leg i.voltou, .g-ind-emp i.voltou { background: var(--g-verde); }
+.g-ind-emp { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; align-items: end; height: 160px; }
+.g-ind-emp > div { display: grid; grid-template-rows: auto 1fr auto; justify-items: center; gap: 6px; height: 100%; min-width: 0; }
+.g-ind-emp .pilha { align-self: end; display: flex; flex-direction: column; gap: 2px; width: 100%; max-width: 44px; }
+.g-ind-emp .pilha i { display: block; min-height: 3px; border-radius: 4px; }
+.g-ind-emp .v { font-size: .75rem; font-weight: 600; min-height: 1em; font-variant-numeric: tabular-nums; }
+.g-ind-emp .r { font-size: .6875rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--g-cinza); white-space: nowrap; }
+
+.g-ind-dois { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.g-ind-dois > div { display: grid; gap: 3px; padding: 12px; border-radius: 14px; background: var(--g-carta-2); min-width: 0; }
+.g-ind-dois small { font-size: .75rem; color: var(--g-cinza); }
+.g-ind-dois b { font: 480 1.5rem/1.1 var(--display); font-variant-numeric: tabular-nums; }
+@media (max-width: 380px) { .g-ind-dois { grid-template-columns: 1fr; } }
+
+.g-ind-mapa-rola { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+.g-ind-mapa { border-collapse: separate; border-spacing: 2px; font-size: .6875rem; font-variant-numeric: tabular-nums; }
+.g-ind-mapa th { font-weight: 600; color: var(--g-cinza); padding: 0 4px; white-space: nowrap; }
+.g-ind-mapa tbody th { text-align: left; text-transform: uppercase; letter-spacing: .04em; }
+.g-ind-mapa td { width: 28px; min-width: 26px; height: 26px; border-radius: 4px; text-align: center; color: var(--g-tinta); }
+.g-ind-mapa td.zero { background: var(--g-carta-2); }
+.g-ind-mapa td.forte { color: #fff; font-weight: 600; }
+
+.g-ind-sobras { display: grid; gap: 10px; }
+.g-ind-sobras > div { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; }
+.g-ind-sobras .r { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--g-cinza); }
+.g-ind-sobras .g-ind-trilho { height: 12px; border-radius: 4px; background: var(--g-carta-2); overflow: hidden; }
+.g-ind-sobras .g-ind-trilho i { display: block; height: 100%; border-radius: 4px; background: var(--g-verde); }
+.g-ind-sobras .g-ind-trilho i.neg { background: var(--g-vermelho); }
+.g-ind-sobras b { font-variant-numeric: tabular-nums; font-size: .875rem; white-space: nowrap; }
+.g-ind-sobras small { grid-column: 2 / -1; font-size: .75rem; color: var(--g-cinza); }

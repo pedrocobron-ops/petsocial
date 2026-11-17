@@ -9,6 +9,7 @@ import EncerrarConta, { RegistroDeDados } from "@/components/gestao/lgpd/encerra
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
 import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
 import OpcoesDeCobranca from "@/components/gestao/ajustes/opcoes-cobranca";
+import TaxasDaMaquininha from "@/components/gestao/ajustes/taxas-maquininha";
 import OpcoesCasa from "@/components/gestao/ajustes/opcoes-casa";
 import OpcoesCreche from "@/components/gestao/ajustes/opcoes-creche";
 import OpcoesHotel from "@/components/gestao/ajustes/opcoes-hotel";
@@ -108,7 +109,7 @@ export default function MeuPetshop() {
         )}
         {usaModulo(petshop, "loja") && <Grupo id="loja" titulo="Loja" icone={Store} tom="manteiga" cartoes={[["Opções da loja", <OpcoesDaLoja key="l" />]]} />}
         <Grupo id="dinheiro" titulo="Cobrança e fidelidade" icone={HandCoins} tom="menta"
-          cartoes={[["Opções de cobrança", <OpcoesDeCobranca key="c" />], ["Fidelidade", <AjusteFidelidade key="f" />]]} />
+          cartoes={[["Opções de cobrança", <OpcoesDeCobranca key="c" />], ["Taxas da maquininha", <TaxasDaMaquininha key="t" />], ["Fidelidade", <AjusteFidelidade key="f" />]]} />
         <Grupo id="negocio" titulo="O negócio" icone={Store} tom="rosa"
           cartoes={[["Dados", <Dados key="d" />], ["O que você usa", <OQueUsa key="o" />], ["Identidade do pet shop", <Identidade key="i" />], ["Sua loja aparece no Google?", <LojaNoGoogle key="g" />], ["Boletim do pet", <OpcoesDoBoletim key="b" />], (usaModulo(petshop, "banho_tosa") || usaCasa(petshop)) && ["Checklist de entrada", <OpcoesDaEntrada key="e" />]]} />
         <Grupo id="copia" titulo="Seus dados e a conta" icone={Archive} tom="ceu" largo

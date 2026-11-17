@@ -16,7 +16,7 @@ const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
 
 export const FERRAMENTAS_LUCRO: Def[] = [
   { grava: false, financeiro: true, name: "ver_lucro",
-    description: "Quanto sobrou por serviço e por produto entre dois dias (inclusive): vezes, quanto entrou (com desconto), custo (material do serviço, custo do produto e, se o dono ligou, a comissão), quanto sobrou em reais e em %. Linha sem custo cadastrado vem com margem null e 'custo não informado': nunca diga que ela dá 100% de lucro. Traz também o resultado do período (entrou − saiu, o mesmo do Financeiro). Use para \"qual serviço dá mais lucro?\". Sem datas, o mês atual.",
+    description: "Quanto sobrou por serviço e por produto entre dois dias (inclusive): vezes, quanto entrou (com desconto), custo (material do serviço, custo do produto e, se o dono ligou, a comissão), quanto sobrou em reais e em %. Linha sem custo cadastrado vem com margem null e 'custo não informado': nunca diga que ela dá 100% de lucro. Traz também o resultado do período (entrou − saiu, o mesmo do Financeiro) e, se a loja cadastrou as taxas da maquininha, quanto a maquininha ficou e o resultado depois das taxas. Use para \"qual serviço dá mais lucro?\". Sem datas, o mês atual.",
     input_schema: { type: "object", properties: { de: DIA, ate: DIA }, required: [], additionalProperties: false } },
 ];
 
@@ -55,8 +55,9 @@ export async function consultarLucro(c: Contexto, nome: string, e: Record<string
       financeiro: {
         outros_lancamentos: x.ponte.outros.map((o) => ({ categoria: o.categoria, valor: o.valor })), entrou: x.ponte.entradas,
         devolvido: x.ponte.devolvido, credito_deixado: x.ponte.creditoDeixado, faturamento: x.ponte.faturamento, saiu: x.ponte.saiu, resultado: x.ponte.resultado,
+        ...(x.ponte.taxas > 0 ? { taxas_da_maquininha: x.ponte.taxas, resultado_depois_das_taxas: x.ponte.resultadoDepoisDasTaxas } : {}),
       },
-      obs: "Linha com sobrou null não tem custo cadastrado: diga 'custo não informado' e sugira pôr o custo do material em Meu pet shop, Serviços e preços (ou o custo no produto, em Estoque). Compra de mercadoria e comissão paga estão nas saídas do resultado: não some com o custo das linhas.",
+      obs: "Taxas da maquininha (quando vierem) são a soma das taxas guardadas em cada pagamento com cartão ou Pix: diga o resultado e, à parte, o resultado depois das taxas. Linha com sobrou null não tem custo cadastrado: diga 'custo não informado' e sugira pôr o custo do material em Meu pet shop, Serviços e preços (ou o custo no produto, em Estoque). Compra de mercadoria e comissão paga estão nas saídas do resultado: não some com o custo das linhas.",
       onde_ver: "Relatórios, bloco Quanto sobrou (com Exportar).",
     },
   };

@@ -14,6 +14,7 @@ import {
   TagAlterado, textoJaRecebido, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import CustoDasVendas from "@/components/gestao/financeiro/custo-vendas";
+import CartaoMaquininha from "@/components/gestao/financeiro/maquininha";
 import AlteracoesDoPeriodo from "@/components/gestao/financeiro/alteracoes-periodo";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
 import { contasDaMeta, descricaoAtual, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
@@ -332,6 +333,7 @@ function Financeiro() {
                     <Categorias titulo="Para onde foi" icone={ArrowUpRight} tom="rosa" total={contas.saiu} linhas={contas.saidasPorCategoria} vazio="Nenhuma saída neste mês." quente />
                     <CustoDasVendas inicio={inicio} fim={fim} doMes={dados.doMes} resultado={resultado} mesAtual={mesAtual}
                       entrouDeProdutos={contas.entradasPorCategoria.find((c) => c.nome === "Venda de produtos")?.valor ?? 0} />
+                    <CartaoMaquininha de={inicio} ate={fim} faturamento={faturamento} rotuloPeriodo="no mês" />
                   </div>
                 </div>
               ) : (

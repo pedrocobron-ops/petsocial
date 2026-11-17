@@ -29,6 +29,8 @@ export type LucroDoBanco = {
   outros: { categoria: string; valor: number; lancamentos: number }[];
   entradas: number; devolvido: number; credito_deixado: number; credito_usado_fora: number; faturamento: number;
   saidas: { categoria: string; valor: number }[]; saiu: number; resultado: number; comissao_total: number;
+  /** Taxa da maquininha das entradas do período e o resultado depois dela (migração 20261204; banco antigo: ausente). */
+  taxas_maquininha?: number; resultado_depois_taxas?: number;
 };
 
 export type LinhaLucro = {
@@ -67,6 +69,9 @@ export type Lucro = {
     saidas: { categoria: string; valor: number }[]; saiu: number; resultado: number;
     /** Linhas + outros − Entrou: sempre zero (o banco reparte cada entrada ao centavo). Fica aqui para os testes e a tela. */
     diferenca: number;
+    /** Taxa da maquininha guardada nos pagamentos do período (linha à parte: o resultado continua o do Financeiro). */
+    taxas: number;
+    resultadoDepoisDasTaxas: number;
   };
 };
 
@@ -135,6 +140,8 @@ export function montarLucro(b: LucroDoBanco): Lucro {
       devolvido: real(b.devolvido), creditoDeixado: real(b.credito_deixado), creditoUsadoFora: real(b.credito_usado_fora), faturamento: real(b.faturamento),
       saidas: (b.saidas ?? []).map((s) => ({ categoria: s.categoria, valor: real(s.valor) })), saiu: real(b.saiu), resultado: real(b.resultado),
       diferenca: real(receita + somaOutros - entradas),
+      taxas: real(b.taxas_maquininha ?? 0),
+      resultadoDepoisDasTaxas: real(b.resultado_depois_taxas ?? Number(b.resultado) - Number(b.taxas_maquininha ?? 0)),
     },
   };
 }
