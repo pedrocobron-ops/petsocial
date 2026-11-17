@@ -8,7 +8,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import FormPet from "@/components/gestao/form-pet";
 import { Anel, Kpi, Tile } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, EscolherPet, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
-import { AvisoCaixaFechado, CampoDinheiro, erroDeValor, ErroTela, fecharRecebimento, lembrarForma, pagaDepoisInicial, pagoAMenos, QuandoPaga, useCaixaAberto, usePagamento, type PagaDepois } from "@/components/gestao/loja/pecas";
+import { AvisoCaixaFechado, CampoDinheiro, erroDeValor, ErroTela, fecharRecebimento, lembrarForma, pagaDepoisInicial, pagoAMenos, ParcelasNaTela, QuandoPaga, useAnotarParcelas, useCaixaAberto, usePagamento, type PagaDepois } from "@/components/gestao/loja/pecas";
 import { conferirCaixa, conferirValorAlto, lancarAReceber, lancarPago, parteDaChave, receberConta } from "@/lib/gestao/dinheiro";
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useOperacao } from "@/lib/gestao/uma-vez";
@@ -432,6 +432,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
 
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
+  const anotarParcelas = useAnotarParcelas();
   async function gravar(chave: string): Promise<boolean | void> {
     if (!pet) return;
     const t = Number(total);
@@ -472,7 +473,8 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
           const contaDoPacote = await lancarAReceber(sb, petshop.id, {
             valor: preco, vencimento: depois.quando, categoria: "Pacotes", descricao: `Pacote ${nome.trim()} · ${pet.nome}`, clienteId: tutorId, chave,
           });
-          await receberConta(sb, contaDoPacote.id, { valor: aMenos.entregue, forma: aMenos.forma, pagamentos: aMenos.pagamentos, data: compra === hoje ? null : compra, chave: parteDaChave(chave, "parte") });
+          const parte = await receberConta(sb, contaDoPacote.id, { valor: aMenos.entregue, forma: aMenos.forma, pagamentos: aMenos.pagamentos, data: compra === hoje ? null : compra, chave: parteDaChave(chave, "parte") });
+          await anotarParcelas(parte.ids ?? [], pagamento.parcelas);
           avisar(`Pacote vendido para ${pet.nome}. Recebido ${brl(aMenos.entregue)}; ${brl(aMenos.falta)} ficam para ${pet.clientes?.nome?.split(" ")[0] ?? "o tutor"} pagar até ${dataCurta(depois.quando)}, em A receber e na ficha.`);
         } catch (e) {
           avisarErro(`O pacote foi criado, mas o pagamento não terminou. Toque de novo para terminar. (${e instanceof Error ? e.message : "erro"})`);
@@ -481,11 +483,12 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
       } else if (rec && !("erro" in rec) && preco && !rec.fiado) {
         try {
           lembrarForma(rec.forma);
-          await lancarPago(sb, petshop.id, {
+          const lancado = await lancarPago(sb, petshop.id, {
             tipo: "entrada", valor: preco, forma: rec.forma, pagamentos: rec.pagamentos, categoria: "Pacotes", descricao: `Pacote ${nome.trim()} · ${pet.nome}`,
             clienteId: pet.clientes?.id ?? null, data: compra, chave,
           });
           avisar(`Pacote vendido para ${pet.nome}. ${brl(preco)} no financeiro.`);
+          await anotarParcelas([lancado.id], pagamento.parcelas);
         } catch (e) {
           // o pacote não é vendido de novo (mesma chave): tocar de novo só lança o pagamento
           avisarErro(`O pacote foi criado, mas o pagamento não foi lançado. Toque de novo para lançar. (${e instanceof Error ? e.message : "erro"})`);
@@ -550,6 +553,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
   }
 
   return (
+    <ParcelasNaTela.Provider value>
     <Folha titulo={inicio.base ? "Renovar pacote" : "Confirmar a venda"} aoFechar={aoFechar}
       rodape={<>
         <button className="g-btn sec" onClick={inicio.base ? aoFechar : () => setEscolhido(false)}>Voltar</button>
@@ -601,5 +605,6 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
         ) : vejoFinanceiro ? <p className="g-pp g-muted">Sem preço, o pacote é anotado sem lançar dinheiro.</p> : null}
       </div>
     </Folha>
+    </ParcelasNaTela.Provider>
   );
 }

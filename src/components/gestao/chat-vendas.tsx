@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ArrowUp, MessageCircle, X } from "lucide-react";
 import { linkSuporte } from "@/lib/gestao/contato";
@@ -82,7 +81,7 @@ export default function ChatVendas() {
         {soOla && <div className="gp-chat-rapidas">{RAPIDAS.map((r) => <button key={r} type="button" onClick={() => enviar(r)}>{r}</button>)}</div>}
         <div ref={fim} />
       </div>
-      <Link className="gp-chat-teste" href="/gestao/criar-conta">Testar grátis por 7 dias, sem cartão<ArrowRight /></Link>
+      <a className="gp-chat-teste" href="/gestao/criar-conta">Testar grátis por 7 dias, sem cartão<ArrowRight /></a>
       <form onSubmit={(e) => { e.preventDefault(); enviar(texto); }}>
         <input ref={campo} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escreva a sua dúvida" maxLength={600} aria-label="Sua mensagem" enterKeyHint="send" />
         <button type="submit" disabled={!texto.trim() || pensando} aria-label="Enviar"><ArrowUp /></button>

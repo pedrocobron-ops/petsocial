@@ -2,12 +2,12 @@
 
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { useEffect, useState } from "react";
-import { Check, Clock, MessageCircle, Plus, Printer } from "lucide-react";
+import { Check, Clock, MessageCircle, Plus, Printer, Truck } from "lucide-react";
 import { conferirCaixa, conferirValorAlto, formaPrincipal, parteDaChave, type ItemLancamento, type PartePagamento } from "@/lib/gestao/dinheiro";
 import { casoDoErro, fazerTudoOuNada, partesOuNada, passoDoEstoque, ref, type Passo, type ResultadoDaOperacao } from "@/lib/gestao/tudo-ou-nada";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import {
-  contaDasDiarias, contarDiarias, fechoDaConta, noitesAntesDaEntrada, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDaSobra, textoDoPagamentoDaConta,
+  contaDasDiarias, contarDiarias, diasDasNoites, fechoDaConta, noitesAntesDaEntrada, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDaSobra, textoDoPagamentoDaConta,
   type ContaDaEstadia, type DestinoDaSobra, type EstadiaDoTutor, type Noite, type TaxaDaConta, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
 import { taxasDe } from "@/lib/gestao/hotel-opcoes";
@@ -24,11 +24,14 @@ import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { AvatarPet, Campo, Folha, mensagemDeErro, useAvisos, useDados } from "../ui";
-import { BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, LinhaDaConta, novaChave, produtosDaConta, useProdutosDaLoja, valorDaLinha, type ItemConta } from "../loja/conta";
-import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, ParcelasNaTela, QuandoPaga, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
-import { anotarParcelas, idsDaOperacao } from "@/lib/gestao/maquininha";
+import { BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, LEVA_E_TRAZ, LinhaDaConta, novaChave, produtosDaConta, useProdutosDaLoja, valorDaLinha, type ItemConta } from "../loja/conta";
+import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, ParcelasNaTela, QuandoPaga, useAnotarParcelas, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
+import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import { ehAdiantado } from "./sinal";
 import { PertencesNaSaida } from "../entrada/entrada";
+import { descontoDaPromoNaEstadia } from "@/lib/gestao/promocoes";
+import { taxaDoLevaTraz, taxaSugerida, temTaxa } from "@/lib/gestao/quadro";
+import { LinhaPromoDaEstadia, usePromoDaEstadia } from "./promo-da-estadia";
 import { horaCurta, nomeTipo, type EstadiaCompleta } from "./tipos";
 import "./hotel.css";
 
@@ -98,6 +101,7 @@ export function NoitePorNoite({ noites, total }: { noites: Noite[]; total: numbe
 export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false }: { estadia: EstadiaCompleta; aoFechar: () => void; aoGravar: () => void; pendente?: boolean }) {
   const { sb, petshop, servicos, vejoFinanceiro, user } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
+  const anotarParcelas = useAnotarParcelas();
   const [agora] = useState(() => (pendente && estadia.saida ? new Date(estadia.saida) : new Date()));
   const contadas = pendente && estadia.diarias_cobradas ? estadia.diarias_cobradas : contarDiarias(estadia, agora);
   // feriados (preço da noite) e a taxa de busca fora do horário: só chegam para quem recebe
@@ -173,10 +177,23 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
   // mais noites do que as datas mostram (check-in anotado depois da chegada): as noites a mais contam antes da entrada, nunca em dia que ainda não chegou
   const noitesAntes = estadia.tipo === "hotel" && dasDiarias.noites ? noitesAntesDaEntrada(estadia.entrada, dasDiarias.noites.map((x) => x.dia)) : [];
   const passaDasDatas = estadia.tipo === "hotel" && !pendente && nValido && n > contadas;
+  // promoção em dias fracos (a cópia que o banco pôs na reserva): desconto só nas noites (hotel) ou no dia (creche) que caem
+  // nos dias dela. Uma linha à parte na conta, que a pessoa pode tirar antes de receber. Pacote: nada a descontar.
+  const promoDaEstadia = usePromoDaEstadia(estadia.id, estadia.promo);
+  const promoAtiva = vejoFinanceiro && !estadia.mensalista && !pacote && promoDaEstadia.promo && !promoDaEstadia.promo.tirada ? promoDaEstadia.promo : null;
+  const noitesDaConta = dasDiarias.noites ? dasDiarias.noites.map((x) => ({ dia: x.dia, valor: x.valor }))
+    : nValido && diaria != null ? diasDasNoites(estadia.entrada, n, agora).map((d) => ({ dia: d, valor: diaria })) : [];
+  const daPromo = promoAtiva && dasDiarias.total != null ? descontoDaPromoNaEstadia(promoAtiva, noitesDaConta) : { valor: 0, dias: [] as string[] };
+  const descontoPromo = Math.min(daPromo.valor, dasDiarias.total ?? 0);
+  // leva e traz: a taxa de Meu pet shop é só uma sugestão (entra na conta com um toque)
+  const comLevaTraz = estadia.leva_traz_buscar || estadia.leva_traz_levar;
+  const taxaTaxi = taxaDoLevaTraz(petshop);
+  const sugeridaTaxi = comLevaTraz && temTaxa(taxaTaxi) ? taxaSugerida(taxaTaxi, estadia.endereco_leva_traz) : null;
+  const temLevaTrazNaConta = itens.some((i) => i.tipo === "extra" && i.nome === LEVA_E_TRAZ);
   const somaTaxas = centavos(taxas.reduce((t, x) => t + x.total, 0));
   const somaItens = centavos(itens.reduce((t, i) => t + valorDaLinha(i), 0));
-  const temMais = taxas.length > 0 || itens.length > 0;
-  const soma = centavos((dasDiarias.total ?? 0) + somaTaxas + somaItens);
+  const temMais = taxas.length > 0 || itens.length > 0 || descontoPromo > 0;
+  const soma = centavos((dasDiarias.total ?? 0) - descontoPromo + somaTaxas + somaItens);
   const sinalVale = valores?.sinal != null && (valores.sinal_estado === "pago" || valores.sinal_estado === "a_receber");
   const sinal = sinalVale ? Number(valores!.sinal) : 0;
   // sinal a receber que já teve uma parte paga: o desconto é o sinal cheio; o que falta dele segue na conta à parte (ou é recebido junto)
@@ -223,6 +240,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
       pagamento: pg, lancamento_id: lancamentoId,
       ...(sobraDoSinal > 0 ? { sobra: sobra ?? { valor: sobraDoSinal, destino: destino ?? "mantido" } } : {}),
       ...(creditoUsado > 0 ? { credito_usado: creditoUsado } : {}),
+      ...(descontoPromo > 0 && promoAtiva ? { promo: { id: promoAtiva.id, nome: promoAtiva.nome, tipo: promoAtiva.tipo, valor: promoAtiva.valor, desconto: descontoPromo, dias: daPromo.dias } } : {}),
     };
   }
 
@@ -231,6 +249,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
     if (!temMais && !conta.sinal && !conta.credito_usado) return null;
     const linhas: ItemLancamento[] = [];
     if (conta.total_diarias > 0) linhas.push({ tipo: "servico", nome: `${nomeTipo(estadia.tipo)}: ${n} ${n === 1 ? "diária" : "diárias"}`, qtd: 1, valor: conta.total_diarias });
+    if (conta.promo && conta.promo.desconto > 0) linhas.push({ tipo: "extra", nome: `Promoção ${conta.promo.nome}`, qtd: 1, valor: -conta.promo.desconto });
     for (const t of conta.taxas) linhas.push({ tipo: "extra", nome: t.nome, qtd: t.qtd, valor: t.valor });
     for (const e of conta.extras) linhas.push({ tipo: "extra", nome: e.nome, qtd: 1, valor: e.valor });
     for (const p of conta.produtos) linhas.push({ tipo: "produto", nome: p.nome, qtd: p.qtd, valor: p.valor, ...(p.produto_id ? { produto_id: p.produto_id } : {}) });
@@ -352,7 +371,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
       let feito: ResultadoDaOperacao;
       try {
         feito = await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "estadia_checkout", estadia: estadia.id }, passos);
-        if (rec && !("erro" in rec) && !rec.fiado) await anotarParcelas(sb, petshop.id, idsDaOperacao(feito), pagamento.parcelas).catch(() => 0);
+        if (rec && !("erro" in rec) && !rec.fiado) await anotarParcelas(idsDaOperacao(feito, passos), pagamento.parcelas);
       } catch (e) {
         if (casoDoErro(e) === "maestro:estadia_ja") { avisar(pendente ? "Essa estadia já tinha sido acertada. Atualizei a lista." : "Esse check-out já tinha sido feito. Atualizei a lista."); aoGravar(); return; }
         // o banco conferiu com o que já foi pago (sinal, crédito) e o valor passava do que falta: lê tudo de novo e mostra a conta certa
@@ -469,6 +488,27 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
                 <small>Só entra na conta a taxa que você marcar.</small>
               </div>
             )}
+            {promoDaEstadia.promo && !estadia.mensalista && (
+              <LinhaPromoDaEstadia promo={promoDaEstadia.promo} tipo={estadia.tipo} valor={pacote ? null : descontoPromo} dias={pacote ? null : daPromo.dias}
+                ocupado={promoDaEstadia.ocupado || salvando} podeMudar aoTirar={() => { setValorEditado(undefined); void promoDaEstadia.tirar(); }} aoPorDeVolta={() => { setValorEditado(undefined); void promoDaEstadia.porDeVolta(); }} />
+            )}
+            {comLevaTraz && !temLevaTrazNaConta && (
+              <div className="g-card liso g-pilha p g-vd-taxi" role="group" aria-label="Taxa de leva e traz">
+                <p className="g-pp" style={{ margin: 0 }}>
+                  <Truck size={15} aria-hidden style={{ verticalAlign: "-3px", marginRight: 4 }} />
+                  {`Esta estadia tem leva e traz (${estadia.leva_traz_buscar && estadia.leva_traz_levar ? "buscar e levar" : estadia.leva_traz_buscar ? "só buscar" : "só levar"})`}
+                  {sugeridaTaxi ? <>{sugeridaTaxi.bairro ? <> para <b>{sugeridaTaxi.bairro}</b></> : null}: taxa de <b className="g-tab">{brl(sugeridaTaxi.valor)}</b>.</> : temTaxa(taxaTaxi) ? ". De qual bairro?" : "."}
+                </p>
+                <div className="g-chips">
+                  {sugeridaTaxi && <button type="button" className="g-chip" onClick={() => { setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome: LEVA_E_TRAZ, qtd: 1, valor: sugeridaTaxi.valor }]); setValorEditado(undefined); }}><Plus />Pôr na conta · {brl(sugeridaTaxi.valor)}</button>}
+                  {taxaTaxi.modo === "bairro" && taxaTaxi.bairros.filter((b) => b.nome !== sugeridaTaxi?.bairro).slice(0, 24).map((b) => (
+                    <button key={b.nome} type="button" className="g-chip" onClick={() => { setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome: LEVA_E_TRAZ, qtd: 1, valor: b.valor }]); setValorEditado(undefined); }}>{b.nome} · {brl(b.valor)}</button>
+                  ))}
+                  {!temTaxa(taxaTaxi) && <button type="button" className="g-chip" onClick={() => setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome: LEVA_E_TRAZ, qtd: 1, valor: null }])}><Plus />{LEVA_E_TRAZ}</button>}
+                </div>
+                {estadia.leva_traz_buscar !== estadia.leva_traz_levar && sugeridaTaxi && <small className="g-muted">Foi só uma viagem: dá para mudar o valor na linha, depois de pôr na conta.</small>}
+              </div>
+            )}
             {itens.length > 0 && (
               <div className="g-card liso g-vd-itens">
                 {itens.map((i) => (
@@ -492,6 +532,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
             {(temMais || sinal > 0 || Boolean(dasDiarias.noites)) && (
               <div className="g-card areia g-ht-conta" role="status">
                 <div className="l"><span>{pacote ? `Diárias pelo pacote (${n})` : `Diárias (${n})`}</span><span>{brl(dasDiarias.total ?? 0)}</span></div>
+                {descontoPromo > 0 && promoAtiva && <div className="l"><span>Promoção {promoAtiva.nome}</span><span>- {brl(descontoPromo)}</span></div>}
                 {taxas.map((t) => <div key={t.id} className="l"><span>{t.nome}{t.por === "noite" ? ` (${t.qtd} × ${brl(t.valor)})` : ""}</span><span>{brl(t.total)}</span></div>)}
                 {itens.filter((i) => valorDaLinha(i) > 0 || i.nome.trim()).map((i) => <div key={i.chave} className="l"><span>{i.tipo === "produto" ? `${i.qtd.toLocaleString("pt-BR")} × ${i.nome}` : i.nome.trim() || "Extra"}</span><span>{brl(valorDaLinha(i))}</span></div>)}
                 <div className="l forte"><span>Total da estadia</span><span>{brl(soma)}</span></div>

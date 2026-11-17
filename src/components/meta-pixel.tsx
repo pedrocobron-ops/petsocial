@@ -25,25 +25,41 @@ export function rastrearProprio(evento: string, dados?: Record<string, unknown>,
 }
 
 /**
+ * Onde o Pixel pode estar: só nas páginas públicas de venda. Tudo em /gestao/... fica de fora (aplicativo, criar conta,
+ * entrar, senha, links de tutor, termos): são dados de trabalho do pet shop ou formulários com e-mail.
+ * A capa /gestao (sem barra no fim) é pública e tem o Pixel.
+ */
+export function pixelNaRota(pathname: string | null | undefined): boolean {
+  const p = pathname ?? "";
+  return !(p.startsWith("/gestao/") || p.startsWith("/api/"));
+}
+
+/**
  * Meta Pixel: PageView na carga e a cada troca de página feita pelo Next.
+ * `autoConfig` desligado antes do `init`: o fbevents.js não lê botões nem campos da página sozinho (nada de "advanced matching"
+ * automático com o e-mail de um formulário). Se a pessoa sair da capa para uma rota privada sem recarregar a página, o
+ * consentimento é retirado (`consent revoke`): o fbevents que ficou na memória não manda mais nada.
  * A fila do fbq é criada logo; o fbevents.js (≈ 200 KB) só baixa em `lazyOnload`, sem disputar banda com a capa (LCP),
  * e processa a fila quando chega. Nenhum evento se perde.
  */
 export default function MetaPixel() {
   const pathname = usePathname();
   const primeira = useRef(true);
+  const aqui = pixelNaRota(pathname);
   useEffect(() => {
+    // rota privada: o fbq (se a página veio da capa) para de mandar qualquer coisa; de volta numa página pública, volta
+    if (window.fbq) window.fbq("consent", aqui ? "grant" : "revoke");
     if (primeira.current) { primeira.current = false; return; }
-    if (pathname.startsWith("/gestao/")) return;
+    if (!aqui) return;
     rastrear("PageView");
-  }, [pathname]);
+  }, [pathname, aqui]);
   // dentro do aplicativo de gestão não há rastreamento de anúncio: são dados de trabalho do pet shop
-  if (!PIXEL_ID || pathname.startsWith("/gestao/")) return null;
+  if (!PIXEL_ID || !aqui) return null;
   return (
     <>
       {/* A fila do fbq nasce já (poucos bytes): init, PageView e qualquer evento entram nela na hora. */}
       <Script id="meta-pixel" strategy="afterInteractive">
-        {`!function(f){if(f.fbq)return;var n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[]}(window);fbq.disablePushState=true;fbq('init',${JSON.stringify(PIXEL_ID)});fbq('track','PageView');`}
+        {`!function(f){if(f.fbq)return;var n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[]}(window);fbq.disablePushState=true;fbq('set','autoConfig',false,${JSON.stringify(PIXEL_ID)});fbq('init',${JSON.stringify(PIXEL_ID)});fbq('track','PageView');`}
       </Script>
       {/* O fbevents.js (≈ 200 KB) só baixa depois da carga e processa a fila; não disputa banda com a capa (LCP). */}
       <Script id="meta-pixel-js" src="https://connect.facebook.net/en_US/fbevents.js" strategy="lazyOnload" />

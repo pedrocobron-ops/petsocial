@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Clock } from "lucide-react";
-import { AvisoCaixaFechado, ChipsForma, useCaixaAberto, useFormaLembrada } from "@/components/gestao/loja/pecas";
+import { AvisoCaixaFechado, ChipsForma, PerguntaParcelas, useAnotarParcelas, useCaixaAberto, useFormaLembrada } from "@/components/gestao/loja/pecas";
 import { conferirCaixa, lancarPago } from "@/lib/gestao/dinheiro";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
@@ -73,6 +73,8 @@ export function FolhaTaxaDeAtraso({ atraso, valor, aoFechar, aoDecidir }: {
   const [cobra, setCobra] = useState<boolean | null>(null);
   const [como, setComo] = useState<"mensalidade" | "agora">("mensalidade");
   const [forma, setForma] = useFormaLembrada();
+  const [parcelas, setParcelas] = useState<number | null>(null);
+  const anotarParcelas = useAnotarParcelas();
   const [erroForma, setErroForma] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const caixa = useCaixaAberto();
@@ -107,6 +109,7 @@ export function FolhaTaxaDeAtraso({ atraso, valor, aoFechar, aoDecidir }: {
         }
         await decidirAtraso(sb, atraso.estadia_id, "recebida", valor, lanc.id);
         avisar(`${nome}: ${brl(valor)} de taxa no financeiro.`);
+        if (forma === "credito") await anotarParcelas([lanc.id], parcelas);
       }
       aoDecidir();
     } catch (e) {
@@ -148,6 +151,7 @@ export function FolhaTaxaDeAtraso({ atraso, valor, aoFechar, aoDecidir }: {
               ? <p className="g-muted g-p">A taxa entra na cobrança do mês que vem, junto com os dias extras, e aparece na mensagem de cobrança com a data.</p>
               : <>
                 <ChipsForma valor={forma} aoMudar={(f) => { setForma(f); setErroForma(null); }} erro={erroForma} />
+                <PerguntaParcelas forma={forma} valor={parcelas} aoMudar={setParcelas} />
                 <AvisoCaixaFechado aberto={caixa} />
               </>}
           </>

@@ -37,6 +37,7 @@ Configuração por variável (todas opcionais):
 | `BASE_URL` | `http://localhost:3214` | servidor do Next |
 | `SUPABASE_URL`, `SUPABASE_KEY` | do `.env.local` (`NEXT_PUBLIC_SUPABASE_URL`, `..._PUBLISHABLE_KEY`) | API do Supabase |
 | `DB_CONTAINER` | `supabase_db_petsocial` | SQL de preparo e conferência (`docker exec … psql`) |
+| `AUTH_CONTAINER` | `DB_CONTAINER` com `_auth_` no lugar de `_db_` | segredo do Auth local para gerar o código do e-mail (`seguranca-email.js`) |
 | `DATABASE_URL` | — | se definida, o SQL vai por `psql $DATABASE_URL` em vez do docker |
 | `PLAYWRIGHT` | procura `playwright` no Node e em `/opt/node-tools` | caminho do pacote Playwright |
 | `TZ` | `America/Sao_Paulo` (o executor põe) | as funções do app usam o fuso da máquina |
@@ -175,6 +176,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   dinheiro e sem pacote; monitora só a casa; estoque só o dia; outra loja nada; anônimo recusado. Precisa do servidor.
 - `admin.js`: funções do painel do administrador recusadas para anônimo e dono; o admin recebe só dados da conta e quantidades;
   troca de status vai para o histórico. (O admin de teste é criado por SQL: ninguém vira admin pela API.)
+- `admin-pagantes.js`: clientes pagantes rumo aos 15 (migração 20261206): `admin_pagantes` e `admin_empresa_marcar` recusados para
+  anônimo, dono e recepção; ninguém (nem o admin) lê ou grava `admin_empresa_passos` direto; `admin_status_em` fora da API. Pagante =
+  ativa ou atrasada (teste, cortesia e cancelada com período pago ficam de fora); `hoje` = tamanho da lista; cada loja com desde e pago
+  até. Passos: marcar (sem duplicar, com quem marcou), desmarcar, passo desconhecido recusado. Evolução: 6 meses fechados; histórico
+  montado (teste → ativa → cancelada) dá o status certo no fim de cada mês; mês antes do primeiro registro volta como não confiável;
+  a contagem do mês bate com o banco. Os passos são globais: o teste guarda e devolve como estavam.
 - `aceites.js`: aceite dos Termos e da Política (migração 20261197): cadastro com `aceite` nos dados grava os dois documentos na versão
   em vigor (`src/lib/gestao/documentos.ts`), sem `aceite` (ou com lixo) não grava e não derruba o cadastro; cada um lê só os seus;
   gravar, mudar ou apagar direto recusado; `aceitar_documentos` (anônimo e versão estranha recusados, dois toques gravam uma vez,
@@ -192,6 +199,16 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `cakto.js`: webhook da Cakto de ponta a ponta pela rota do servidor: 9 ofertas, ciclo da assinatura (renovada, atrasada, recuperada,
   cancelada), reembolso, contestação, MED, segredo errado, outro produto, e-mail diferente (callback e pagamento sem conta), Escola.
   A configuração da Cakto (`config_interna`) é guardada antes e devolvida igual no fim.
+- `seguranca-email.js`: e-mail da conta não prova nada ("Confirm email" desligado; migração 20261209). Convite da equipe: só o dono
+  gera o código (`convite_gerar`; recepção, outro dono e anônimo recusados; só o hash no banco; 7 dias); quem cria conta com o e-mail
+  do convite **sem o código não entra** (`entrar()` não liga mais pelo e-mail); código inventado, de outro e-mail, antigo (gerou de
+  novo), vencido e já usado (outra conta) recusados; o certo entra uma vez (a mesma pessoa de novo só confirma); trocar o e-mail ou
+  tirar o acesso invalida o código; convite antigo sem código aparece sem link em `convites_situacao` e entra depois de mandar de
+  novo. Escola: conta nova com o e-mail da compra (só senha) não vê a compra (`meu_email()` vazio, `email_provar` falso); com o código
+  do e-mail (gerado pela API de administrador do Auth local, com a chave assinada pelo segredo do contêiner `AUTH_CONTAINER`, padrão
+  `supabase_auth_petsocial`) vê; quem prova o próprio e-mail e depois troca para o da compradora não vê. Cakto: compra de antes da conta
+  existir ou do e-mail ser posto na conta fica "sem_conta"; o `cakto_email` de uma compra antiga não puxa compra nova; o callback
+  assinado liga com outro e-mail; pela rota, o `paidAt` chega como `pago_em`. Mexe em `config_interna` e devolve no fim, como `cakto.js`.
 - `erros.js`: registro de erros (migração 20261180): ninguém lê as tabelas; funções do painel só para o admin; papel e áreas vêm do
   banco; limpeza e limites no banco; repetição junta (mesmo aparelho e versão, 10 min); freio por aparelho (30/min), por pet shop
   (60/min) e geral (1000/h, posto no limite durante o teste e devolvido); sem internet só conta; resolvido some e volta numa versão
@@ -230,6 +247,18 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   chave de serviço; a tarefa `gestao-faxina-diaria` no pg_cron (quando o banco tem); `faxinaGeral` com a chave de serviço local
   (`SUPABASE_SERVICE_ROLE_KEY` ou `npx supabase status -o env`), só na loja de teste: foto do boletim sem boletim há mais de um dia
   sai, a de agora fica; PDF do caderno-tmp com mais de uma hora sai, o de agora fica; o de outro pet shop fica.
+- `lgpd-ajustes.js`: ajustes da revisão jurídica (migração 20261210). **Registro de acesso** (`registrar_acesso`): o login grava quem,
+  quando, o IP (x-forwarded-for) e o navegador (cortado em 300 letras); dois logins no mesmo minuto e a abertura no mesmo dia não gravam
+  de novo; anônimo recusado; ninguém (anônimo, dono, recepção) lê ou grava a tabela `registros_acesso` direto; `admin_registros_acesso`
+  recusado para o dono e lido pelo admin (por e-mail ou login). **Faxina** (`gestao_faxina_banco`): acesso com mais de 6 meses sai, com
+  menos fica; conversas (`conversas`) e histórico do Mozart (`assistente_eventos`) com mais de 12 meses saem, os de 11 meses ficam.
+  **Apagar o tutor** (`cliente_anonimizar`): orçamentos da Ana (pela ficha, só pelo telefone com +55, e um já convertido) ficam sem nome,
+  telefone e ficha, com o nome tirado da observação e o valor igual; o do Beto fica; conversas com o nome dela (maiúsculas e espaços
+  diferentes) ou o telefone formatado e o histórico com o nome ou o id do pet dela saem; as de outro tutor e de outra loja ficam.
+  **Autorização de foto**: o texto novo (sem cobrar, não vende, pessoas na foto, do/da/de, com e sem @), IP e navegador gravados (pela
+  API e pela rota da página do boletim, com os do tutor); autorização antiga fica com o texto da época. **Checklist de entrada**:
+  `aceite_hash` = SHA-256 de `termo + "\n" + fotos` na assinatura e no aceite pelo link, apagado quando a entrada muda, não muda em
+  outra gravação, a equipe lê e ninguém grava. Precisa do servidor só para a rota do boletim.
 - `lgpd.js`: LGPD (migração 20261199). **Dados de um tutor** (`cliente_dados`): o dono baixa só a Ana (cadastro, Thor e Mel, vacina,
   horário com preço, autorização de fotos, financeiro 60 + 45,50 + 33,30), nada do Beto, do Bob nem da outra loja, nenhum código do
   "Não quero mais"; recepção, tosador, dono de outra loja e anônimo recusados; fica no registro sem o nome. "Baixar todos os dados":
@@ -336,11 +365,26 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   recepção não anota na venda do dono, o tosador é recusado. `calcularTaxa` (maquininha.ts) = banco nos 5 casos. **Mudar as
   taxas não muda o que já foi pago** (débito 2,00 e crédito 6,50 ficam; débito novo 3,00); valor corrigido 150 → 200 refaz com a
   regra do dia (8,50, não a nova). Ninguém grava nem muda a tabela das taxas guardadas; caixa fechado não deixa anotar parcelas.
-  `taxas_do_periodo`: 48,00 em 6 pagamentos, por forma, a receber 195,00 amanhã e 657,50 em 30 dias; `lucro_do_periodo`: resultado
+  `taxas_do_periodo`: 48,00 em 6 pagamentos, por forma, a receber 195,00 amanhã e o crédito em parcelas por mês (20261208): 426,09
+  em 30 dias, 139,08 em 60 e 92,33 em 90; `lucro_do_periodo`: resultado
   igual ao Financeiro (1.140,00) e a taxa à parte (depois das taxas 1.092,00). Outra loja e anônimo não leem nem chamam nada.
   **Indicadores** (`indicadores_do_periodo`, 3 meses): cada mês com faturamento, resultado e taxas iguais a `lucro_do_periodo` do
   mesmo mês e ao `faturamento.ts`; 3 atendimentos, faltas 25%, cancelados 1 de 6, retorno em 60 dias 1 de 2, mapa = marcados sem
   cancelados, Banho o mais feito; recepção, tosador, outra loja e período de mais de um ano recusados; loja sem movimento: sem dados.
+
+- `parcelas-todas.js`: **crédito em quantas vezes** em todas as telas que recebem (migração 20261208), pelo código das telas e
+  conferido à mão (crédito 4% + 0,50; parcelado 6%; 3x 7,5%). **Recebi** (`receber_conta`): a conta inteira devolve o id da própria
+  conta e a recepção anota 3x na conta que o dono anotou (200 → 15,50), fica anotado quem recebeu (`lancamentos_recebidos`); a
+  recepção não anota numa conta que o dono recebeu, nem numa que ela recebeu há mais de 30 minutos; parte com multa = dois ids (parte
+  6,50 e multa 1,10 em 2x). `conta_receber_junto` (idsDaOperacao acha a conta quitada pelo passo da tela) 4x 3,50; `venda_registrar`
+  3x 9,50; `orcamento_vender` 2x 4,10; `estadia_sinal` 2x 6,50; `estadia_checkout` (creche) 3x 5,75; **troca** com diferença no
+  crédito (`venda_devolver`, só a diferença de 100 paga taxa) 4,50 → 3x 8,00. Débito e Pix: as vezes não mudam nada.
+  `anotarParcelasComRetry`: duas falhas de internet e a terceira anota; recusa do banco não insiste; à vista nem chama o banco.
+  **Mozart**: `lancar_dinheiro` no crédito sem as vezes não sai (pede para perguntar), com 3x 15,50; `receber_de_cliente` 2x 5,90;
+  1x à vista; loja sem taxa de parcelado não pergunta. **A receber da maquininha** (`taxas_do_periodo`): débito 98,00 amanhã; 3x de
+  277,00 = 92,34 + 92,33 + 92,33 em +30, +60, +90; 2x 46,75 + 46,75; à vista 143,50 em +30; um 12x de 1.200,00 pago há 200 dias
+  (líquido 1.127,50: 93,95 por parcela) com as parcelas 7 a 12 em +10, +40, …, +160; Pix já caiu; total 1.175,70; "parcelado" na
+  resposta. Loja sem parcelado: débito 176,40 amanhã e crédito à vista 143,50 em 30 dias, como antes.
 
 - `quadro-taxi.js`: quadro de atendimento e leva e traz (migração 20261203). `quadro_mover`: só quem tem Agenda (monitora, estoque,
   outro pet shop e anônimo recusados), etapa fora da lista, horário de amanhã e desmarcado recusados; a chegada pelo quadro (ou pelo
@@ -351,6 +395,25 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   toques em Buscado = uma viagem, levar = entregue no quadro, desfazer. Taxa (`taxi.taxa`): só o dono grava, a recepção (caixa) lê e o
   tosador não (`opcoes_sem_valores`). Contas do app (`quadro.ts`): bairro achado no endereço (o nome mais comprido), valor fixo, bairro
   repetido recusado, próxima etapa (pula a tosa sem tosa), viagens na ordem do relógio, rota com no máximo 10 endereços e "Estou chegando".
+- `casa-taxi-promo.js`: leva e traz e promoção em dias fracos na creche e no hotel (migração 20261207). Leva e traz: a monitora grava
+  `leva_traz_buscar`, `leva_traz_levar` e `endereco_leva_traz` pela API e a equipe lê (leitura coluna por coluna); endereço com mais de
+  300 letras recusado. `leva_traz_estadia_marcar`: só quem tem Creche e hotel (tosador, estoque, outro pet shop, pelo id dele também,
+  e anônimo recusados), estadia sem leva e traz, viagem fora da lista, levar antes do check-in e estadia cancelada recusados; **dois
+  toques** (monitora e recepção) = uma viagem e a mesma hora; buscar não faz check-in, levar não faz check-out; desfazer (duas vezes sem
+  erro). Ninguém grava direto em `leva_traz_estadias` (nem o dono); só quem tem Creche e hotel lê. Contas do app (`quadro.ts`): hotel
+  busca no dia da entrada e leva no dia da saída prevista (ou da de verdade, se saiu antes), creche no mesmo dia, mensalista e cancelada
+  fora, horários e estadias juntos na ordem do relógio. Promoção: `promocao_salvar` com `banho_tosa` e `casa` (só o dono; sem lugar ou
+  lugar fora da lista recusados; só creche apaga serviços e faixa de hora); a creche no dia ganha a cópia (nome, %, dias, casa) e a
+  diária fica a da lista; outro dia, hotel no mesmo dia e dia de experiência não; a API não escreve a promoção (ao marcar, ao editar, nem
+  para apagar, nem o dono); `{"tirada": true}`; estadia marcada antes da promoção não ganha (nem ao remarcar); remarcar para outro dia
+  tira e de volta põe; mudar a promoção não mexe na cópia; a promoção só da creche não entra no banho e tosa (nem ao pôr de volta no
+  horário). Hotel: R$ 25 só na noite que cai no dia (3 noites, 1 no dia), 15% nas noites do dia, tirada não desconta, a escolha do app
+  igual à do banco. `estadia_promo_usar`: tosador, outro pet shop e anônimo recusados, dois toques em Tirar, pôr de volta a mesma cópia,
+  estadia sem cópia e dia de experiência. promo_usos pela conta guardada (`estadias_valores.conta.promo`): quem não recebe não grava a
+  conta, o desconto forjado é limitado ao que a promoção pode dar, gravar de novo não anota duas vezes, tirada não anota, ninguém lê
+  promo_usos direto; depois da conta, a promoção não muda. `relatorio_promocoes` com estadias e encerradas (monitora e outro pet shop
+  recusados). `link_promocoes` com `casa` (sem id), e sem a creche quando ela sai do link. Pedido do link de creche leva a promoção e,
+  aceito, a estadia fica com ela.
 
 **migracoes/**
 - `prova-ordem.sh`: cria um banco de rascunho no mesmo Postgres (chão copiado do banco local sem o `public`), aplica todas as
@@ -363,6 +426,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   Equipe, Meu pet shop, Assinatura, Manual, Escola) em **390 e 1366**, com o dono e com cada papel da equipe (só as áreas dele, e
   algumas fora da área), as telas de impressão, `/gestao/admin` com dono comum e as páginas públicas (produto, entrar, link do
   cliente, página do tutor). Em cada uma: nenhum erro de página ou console, nenhum pedido recusado, sem rolagem para o lado e com conteúdo.
+- `admin-pagantes.js`: cartão "Clientes pagantes" na Visão geral do painel do administrador, em 390 e 1366: número e barra "X de 15",
+  a loja ativa na lista ("pagante desde", "pago até"); com a resposta de `admin_pagantes` trocada no navegador, abaixo de 15 os passos
+  ficam fechados em "Quando chegar em 15" (6 passos, MEI e "confirme com o contador") e sem histórico confiável aparece "vale só o
+  número de hoje"; com 15, o aviso "Chegou a hora de abrir a empresa" com os passos abertos; em 1366 marcar "Abrir o CNPJ" grava,
+  continua marcado ao abrir de novo e desmarcar tira. Sem rolagem para o lado e sem erro na página.
 - `erros.js`: com `GESTAO_ERRO_TESTE=1`, a tela Hoje quebra de propósito (tela, erro solto, promessa) em 390 e 1366: tela
   "Opa, esta tela travou" com Tentar de novo e Voltar para Hoje e o menu, registro no banco (papel, tamanho da tela, versão, sem
   consulta) e a aba Erros do painel (agrupado, detalhes, filtros 24 h / 7 / 30 dias, marcar como resolvido e desfazer).
@@ -370,6 +438,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   porte, Tempo total e Total, o banco com o principal e os 3 a mais, a agenda, a conta de R$ 145,00 e a comissão por serviço ao centavo);
   em 1366, tirar o primeiro (o seguinte assume), alterar um horário com três serviços, pet sem porte; tosador sem nenhum valor na tela
   (o banco põe o preço da lista) e preço travado para a recepção.
+- `convite.js`: convite da equipe pelo link com código (migração 20261209), em 390: na Equipe, convite antigo sem código aparece com
+  "Mande o convite de novo"; "Mandar de novo" mostra o texto com `criar-conta?email=…&convite=<código>` (7 dias, uma vez), o mesmo no
+  WhatsApp, o hash no banco, e o cartão passa a mostrar "link vale até dd/mm"; a pessoa abre o link, cria a conta e cai direto no
+  pet shop; quem já tem conta abre `entrar?convite=…`, entra e fica na equipe; o mesmo link com outra conta mostra "O convite não
+  entrou" e não liga nada.
 - `primeiro-acesso.js`: dono novo do zero (criar conta, duas perguntas, "Começar já") até o primeiro resultado: no fim do guia
   "Pronto em X minutos", "Marcar o primeiro horário" (botão principal) e "Copiar meu link de agendamento"; o link copiado em 7
   toques e 4 campos; o primeiro horário (pet novo cadastrado na própria folha) em até 13 toques e 7 campos, com "Pronto em X
@@ -442,6 +515,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   Exportar baixa a planilha; Por pessoa com o tosador (2 atendimentos, R$ 140,00) e a recepção (venda R$ 59,80). 1366: Meu pet shop,
   Custo do material por atendimento (grava R$ 4,20; o Banho abre com R$ 8,50). Tosador na tela Hoje: "Meu mês" com 2 atendimentos e sem
   reais. Capturas em `testes/saida/lucro-*.png`.
+- `lgpd-ajustes.js`: revisão jurídica pela tela, em 390 e 1366. **Meta Pixel**: na capa `/gestao` a fila do fbq tem
+  `set autoConfig false` antes do `init`; "Teste grátis" e "Entrar" são links comuns (página inteira): em criar conta e entrar não há
+  fbq nem script do Pixel e nenhum pedido sai para o Facebook, nem digitando o e-mail (os pedidos para facebook.com/net são barrados e
+  anotados); capa → Termos pelo menu (1366) manda `consent revoke` ao fbq que ficou; no aplicativo, sem fbq. **Login** pela tela grava um
+  registro de acesso com o navegador (a abertura no mesmo dia não grava outro). **Opções de cobrança**: multa de 2% sem aviso, 10% com
+  "Para clientes pessoa física, a multa por atraso costuma ser limitada a 2%..." e salva assim mesmo; só juros também avisa. **Link de
+  agendamento**: o texto das dúvidas (inteligência artificial, podem errar) e "Seus dados vão só para <loja>, para responder ao seu
+  pedido." em "Com quem a gente fala?"; sem rolagem para o lado. Capturas em `testes/saida/lgpd-ajustes-*.png`.
 - `lgpd.js`: LGPD pela tela, em 390 e 1366. Meu pet shop, "Seus dados e a conta" com três cartões; "Baixar todos os dados" baixa um
   .zip (lido com o `zipfile` do Python) com README.txt e uma planilha por parte (clientes, pets, saúde, agenda, estadias, mensalistas,
   pacotes, lançamentos, vendas, caixas, produtos, movimentos, boletins, autorizações de fotos, equipe), todas com BOM, só os clientes
@@ -517,6 +598,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   das taxas depois do resultado. Meu pet shop: o dono muda o débito (o exemplo de R$ 100,00 muda na hora) e o débito de antes
   continua com 2,00. Loja nova: "Ainda não tem dados neste período." sem nenhum R$. Capturas em `testes/saida/indicadores-*.png`.
 
+- `parcelas-todas.js`: crédito em quantas vezes nas telas que antes gravavam à vista, em 390 e 1366. A recepção: Caixa › **Entrada**
+  (no Pix não pergunta; no crédito, "Crédito em quantas vezes?", 3x de 200,00 = 15,50 no banco) e Caixa › Contas de clientes ›
+  **Recebi** a conta que o dono anotou, em 2x (6,50 e 2 vezes no banco). O dono: Pacotes › **Vender pacote** em 4x (vê "R$ 14,90 ·
+  Você recebe R$ 225,10"; 14,90 e 4 vezes no banco) e vê no Financeiro "Crédito parcelado: uma parcela por mês…" no a
+  receber da maquininha. Sem rolagem lateral e sem erro. Capturas em `testes/saida/parcelas-*.png`.
+
 - `quadro-taxi.js`: quadro do dia e leva e traz pela tela (servidor no ar). 390 (tosador): Agenda › Quadro, abas com a contagem, o cartão
   do Thor (Banho e tosa, com Tito, Morde, alergia, Leva e traz), "Chegou: começar o banho", secagem, tosa e "Está pronto" com
   "Avisar que está pronto" (wa.me da Ana com "Já pode vir buscar"; grava `pronto_avisado_em`); Leva e traz: buscar e levar de volta
@@ -524,6 +611,17 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   viagem, Entregue em casa (entregue no quadro); Modo TV sem botões. 1366 (dona): 5 colunas, arrastar a Mel para No banho, Fechar a conta
   do Thor com "Pôr na conta · R$ 15,00" (Receber R$ 105,00, nada cobrado antes de receber), Meu pet shop › Taxa de leva e traz por bairro,
   Modo TV cobrindo o menu e atualizando sozinho (o Bob aparece em Pronto em até 35 s). Capturas em `testes/saida/quadro-*.png`.
+- `casa-taxi-promo.js`: leva e traz e promoção na creche e no hotel pela tela (servidor no ar). 390 (monitora, só Creche e hotel): o botão
+  "Leva e traz (2)" na Creche e hotel, o cartão do Thor com "Leva e traz: levar de volta" e "Promoção Dia da creche (15% na diária da
+  creche)", a lista do dia em Creche e hotel › Leva e traz (Thor levar de volta com o endereço da ficha, Rex buscar no hotel com o
+  endereço da reserva, voltar para a Creche e hotel), **dois toques** em Buscado = uma viagem, Entregue em casa sem check-out, Todas com
+  quem fez; nova reserva de hotel da Luna com Buscar em casa e o endereço da Clara já preenchido (grava buscar, não levar, e o endereço).
+  1366 (dona): check-out do Thor com a linha "Promoção Dia da creche −15%" (− R$ 10,50) e a taxa sugerida que não entra sozinha
+  (Receber R$ 59,50; Pôr na conta → R$ 74,50), Tirar (R$ 85,00, anotado na estadia) e Pôr de volta, o resumo com diárias, promoção e
+  leva e traz, **dois cliques** em Receber = uma entrada de R$ 74,50 com a linha da promoção, R$ 10,50 em promo_usos, o comprovante do
+  WhatsApp com as duas linhas; Meu pet shop › Nova promoção com "Onde vale" (sem banho e tosa somem o horário e os serviços) salva só
+  do hotel. 390 (cliente): o link mostra "15% off na diária" na Creche e na página da creche, sem preço riscado nem "últimas vagas".
+  Em cada tela: sem erro e sem rolagem para o lado. Capturas em `testes/saida/casa-taxi-*.png`.
 
 ## Variáveis do servidor de produção (não precisa para os testes)
 

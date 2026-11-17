@@ -18,7 +18,7 @@ import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, fmtTelefone, hor
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { FolhaBaixa, FolhaLancamento } from "../financeiro/comum";
-import { AvisoCaixaFechado, EscolhaPagamento, fecharPagamento, useCaixaAberto, usePagamento } from "../loja/pecas";
+import { AvisoCaixaFechado, EscolhaPagamento, fecharPagamento, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, usePagamento } from "../loja/pecas";
 import { FidelidadeNoHorario } from "../fidelidade";
 import Comanda from "./comanda";
 import { MarcaSemCobranca, semCobranca } from "./para-cobrar";
@@ -687,6 +687,7 @@ function CobrarDiferenca({ agendamento: a, valor, aoFechar, aoPronto }: { agenda
   const [erro, setErro] = useState<string | null>(null);
   const caixa = useCaixaAberto();
   const op = useOperacao();
+  const anotarParcelas = useAnotarParcelas();
   const servicos = nomeDosServicos(a) ?? "Atendimento";
   const receber = () => op.fazer(async (chave) => {
     const pg = fecharPagamento(pagamento, valor);
@@ -694,10 +695,12 @@ function CobrarDiferenca({ agendamento: a, valor, aoFechar, aoPronto }: { agenda
     if (!(await conferirCaixa(sb, petshop.id, confirmar))) return false;
     try {
       const item = { tipo: "extra", nome: `Diferença de ${servicos}`, qtd: 1, valor, diferenca_de: a.id } as ItemLancamento;
-      await lancarPago(sb, petshop.id, {
+      const lancado = await lancarPago(sb, petshop.id, {
         tipo: "entrada", valor, forma: pg.forma, pagamentos: pg.pagamentos, categoria: a.servicos?.categoria === "creche" || a.servicos?.categoria === "hotel" ? "Creche e hotel" : "Banho e tosa",
         clienteId: a.pets?.clientes?.id ?? null, descricao: `Diferença: ${servicos} · ${a.pets?.nome ?? "pet"} (${dataCurta(new Date(a.inicio))})`.slice(0, 200), itens: [item], chave,
       });
+      // crédito parcelado: em quantas vezes (tenta de novo e avisa se não der; a diferença já entrou)
+      await anotarParcelas([lancado.id], pagamento.parcelas);
       avisar(`Diferença de ${brl(valor)} recebida.`);
       avisarMudanca();
       await aoPronto();
@@ -705,6 +708,7 @@ function CobrarDiferenca({ agendamento: a, valor, aoFechar, aoPronto }: { agenda
     } catch (e) { avisarErro(e); return false; }
   });
   return (
+    <ParcelasNaTela.Provider value>
     <Folha titulo="Cobrar a diferença" aoFechar={aoFechar}
       rodape={<><button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button><button type="button" className="g-btn pri" disabled={op.ocupado} onClick={() => void receber()}>Receber {brl(valor)}</button></>}>
       <div className="g-form">
@@ -714,5 +718,6 @@ function CobrarDiferenca({ agendamento: a, valor, aoFechar, aoPronto }: { agenda
         <p className="g-pp g-muted">Entra no caixa de hoje como uma entrada à parte, com o nome do pet, ligada a este atendimento: a comissão e os relatórios passam a contar a conta fechada mais a diferença.</p>
       </div>
     </Folha>
+    </ParcelasNaTela.Provider>
   );
 }

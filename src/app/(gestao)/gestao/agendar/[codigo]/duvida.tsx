@@ -71,7 +71,7 @@ export default function DuvidaNoLink({ codigo, loja, telefone, aoPedir }: {
       <div className="g-lk-duv-cab">
         <div>
           <h2 id="g-lk-duv-t">Tirar dúvida</h2>
-          <p>Respostas automáticas, só com o que {loja} mostra nesta página.</p>
+          <p>Respostas automáticas, feitas por inteligência artificial com o que {loja} mostra nesta página. Podem errar: o que vale é o que {loja} confirmar.</p>
         </div>
         <button type="button" className="g-lk-duv-x" onClick={() => setAberto(false)} aria-label="Fechar as dúvidas"><X aria-hidden /></button>
       </div>

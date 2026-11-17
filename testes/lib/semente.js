@@ -74,12 +74,14 @@ async function criarLoja(T, o = {}) {
   }
   L.preco = (servico, porte) => PRECOS[servico][{ P: 0, M: 1, G: 2, GG: 3 }[porte] ?? 4];
 
-  // equipe: convite pelo e-mail e cadastro de cada um (o convite liga o login à loja)
+  // equipe: convite pelo e-mail com o código do link (convite_gerar), cadastro de cada um e convite_aceitar com o código
   if (o.equipe !== false) {
     for (const [papel, e] of Object.entries(EQUIPE)) {
       L.emails[papel] = mail(papel);
       L.ids[papel] = B.must(await L.sb.dono.from('profissionais').insert({ petshop_id: L.P, nome: e.nome, email_convite: L.emails[papel], acessos: e.acessos, ve_financeiro: e.ve, funcao: e.funcao, papel: 'funcionario', atende: !!e.atende }).select('id').single(), 'convite ' + papel).id;
+      const codigo = B.must(await L.sb.dono.rpc('convite_gerar', { p_profissional: L.ids[papel] }), 'código do convite ' + papel);
       L.sb[papel] = await cadastrar(L.emails[papel]);
+      B.must(await L.sb[papel].rpc('convite_aceitar', { p_codigo: codigo }), 'aceitar convite ' + papel);
       const v = B.must(await L.sb[papel].rpc('entrar'), 'entrar ' + papel);
       if (!v.some((x) => x.petshop_id === L.P)) throw new Error('o convite não ligou ' + papel);
     }
@@ -115,10 +117,16 @@ const APAGAR_LOJAS = (ids) => `
   end $$;
   set session_replication_role = origin;`;
 
+// registro de acesso (migração 20261210): sem chave estrangeira para o login (fica 6 meses), então sai aqui antes dos logins
+const APAGAR_ACESSOS = (padrao) => `
+  do $$ begin if to_regclass('public.registros_acesso') is not null then
+    delete from public.registros_acesso where user_id in (select id from auth.users where email like ${padrao});
+  end if; end $$;`;
+
 /** Apaga a loja, os logins e as fotos. */
 function limpar(L) {
   if (!L || !L.P) return;
-  B.sql(APAGAR_LOJAS(`'{${L.P}}'`) + `delete from auth.users where email like 't-${L.suf}.%@${DOMINIO}'; delete from aceites where email like 't-${L.suf}.%@${DOMINIO}';`);
+  B.sql(APAGAR_LOJAS(`'{${L.P}}'`) + APAGAR_ACESSOS(`'t-${L.suf}.%@${DOMINIO}'`) + `delete from auth.users where email like 't-${L.suf}.%@${DOMINIO}'; delete from aceites where email like 't-${L.suf}.%@${DOMINIO}';`);
   try { B.sql(`delete from storage.objects where name like '${L.P}/%'`); } catch { /* o storage pode proibir apagar direto; os arquivos ficam órfãos no disco de teste */ }
 }
 
@@ -127,6 +135,7 @@ function limparTudo() {
   const ids = B.sql(`select coalesce(array_agg(distinct p.petshop_id)::text, '{}') from profissionais p join auth.users u on u.id = p.user_id where u.email like '%@${DOMINIO}' and p.papel = 'dono'`);
   const lojas = ids === '{}' ? 0 : ids.split(',').length;
   if (lojas) B.sql(APAGAR_LOJAS(`'${ids}'`));
+  B.sql(APAGAR_ACESSOS(`'%@${DOMINIO}'`));
   const u = B.sql(`with a as (delete from auth.users where email like '%@${DOMINIO}' returning id) select count(*) from a;`);
   B.sql(`delete from aceites where email like '%@${DOMINIO}'`);
   return { lojas, logins: Number(u) };

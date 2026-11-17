@@ -92,9 +92,19 @@ function recusa(e: { code?: string; message: string }): { ok: false; status: num
   return { ok: false, status: 502, mensagem: "Não consegui guardar agora. Tente de novo em instantes." };
 }
 
-/** O tutor autoriza pela página do boletim. O banco monta e guarda o texto exato. */
-export async function autorizarFoto(token: string, escopo: EscopoDaFoto, marcar: string): Promise<RespostaDoBanco<AutorizacaoAtual>> {
-  const r = await banco().rpc("boletim_autorizar", { p_token: token, p_escopo: escopo, p_marcar: marcar });
+/**
+ * O tutor autoriza pela página do boletim. O banco monta e guarda o texto exato e, junto, o IP e o navegador de quem tocou
+ * (migração 20261210: boletim_autorizar lê x-maestro-ip e x-maestro-navegador do pedido; sem eles, os do servidor).
+ */
+export async function autorizarFoto(token: string, escopo: EscopoDaFoto, marcar: string, ip = "", navegador = ""): Promise<RespostaDoBanco<AutorizacaoAtual>> {
+  const quem: Record<string, string> = {};
+  if (ip) quem["x-maestro-ip"] = ip.slice(0, 64);
+  if (navegador) quem["x-maestro-navegador"] = navegador.replace(/[^\x20-\x7e]/g, "").slice(0, 300);
+  const sb = createClient<Database>(SUPABASE_URL, SUPABASE_CHAVE, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: quem, fetch: (u, i) => fetch(u, { ...i, cache: "no-store" }) },
+  });
+  const r = await sb.rpc("boletim_autorizar", { p_token: token, p_escopo: escopo, p_marcar: marcar });
   if (r.error) return recusa(r.error);
   return { ok: true, dados: r.data as unknown as AutorizacaoAtual };
 }

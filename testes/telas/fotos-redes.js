@@ -43,7 +43,7 @@ const SAIDA = path.join(__dirname, '..', 'saida');
   await page.locator('.g-bo-redes-op', { hasText: 'Também as das próximas visitas' }).click();
   await page.locator('.g-bo-redes input').fill('instagram.com/ana.pets');
   const previa = (await page.locator('[data-teste=texto-da-autorizacao] p').textContent()).trim();
-  T.ok('a prévia é o texto que vai ser guardado, com o @', /^Autorizo .* as fotos do Thor deste boletim e das próximas visitas\. Pode marcar o meu perfil @ana\.pets\. Posso tirar/.test(previa), previa);
+  T.ok('a prévia é o texto que vai ser guardado, com o @', /^Autorizo .* as fotos do Thor deste boletim e das próximas visitas, para mostrar o trabalho da loja\. .* Pode marcar o meu perfil @ana\.pets\. Posso tirar/.test(previa), previa);
   T.ok('sem rolagem para o lado (390)', (await N.rolagemLateral(page)) <= 0);
   await foto(page, '390-escolha');
   await autorizar.click();

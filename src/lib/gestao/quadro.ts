@@ -100,9 +100,11 @@ export function alertasDoPet(alertas: string | null | undefined, entrada?: { tem
 export type Perna = "buscar" | "levar";
 export type ViagemFeita = { perna: Perna; feito_em: string; feito_por: string | null };
 
-/** Uma viagem do motorista: buscar o pet na casa do tutor ou levar de volta. */
+/** Uma viagem do motorista: buscar o pet na casa do tutor ou levar de volta. De um horário (banho e tosa) ou de uma estadia. */
 export type Viagem = {
-  chave: string; agendamentoId: string; perna: Perna;
+  chave: string; agendamentoId: string | null; perna: Perna;
+  /** A estadia (creche ou hotel) da viagem; null nas viagens dos horários. */
+  estadiaId?: string | null;
   /** Hora de referência da viagem (para a ordem): buscar = início do horário; levar = quando ficou pronto, ou o fim previsto. */
   quando: string;
   /** O pet já está pronto para levar (etapa pronto, entregue no quadro, conta fechada ou tutor avisado). */
@@ -129,11 +131,52 @@ export function montarViagens(horarios: HorarioLevaTraz[], quadro: Map<string, L
     const col = colunaDe(a, q);
     const pronto = col === "pronto" || col === "entregue" || a.status === "concluido" || Boolean(a.pronto_avisado_em);
     const prontoEm = q?.etapa === "pronto" ? q.etapa_em : a.pronto_avisado_em;
-    out.push({ chave: `${a.id}:buscar`, agendamentoId: a.id, perna: "buscar", quando: a.inicio, pronto: true, prontoEm: null, feitoEm: b?.feito_em ?? null, feitoPor: b?.feito_por ?? null, endereco });
-    out.push({ chave: `${a.id}:levar`, agendamentoId: a.id, perna: "levar", quando: pronto && prontoEm ? prontoEm : a.fim, pronto, prontoEm: pronto ? prontoEm ?? null : null, feitoEm: l?.feito_em ?? null, feitoPor: l?.feito_por ?? null, endereco });
+    out.push({ chave: `${a.id}:buscar`, agendamentoId: a.id, estadiaId: null, perna: "buscar", quando: a.inicio, pronto: true, prontoEm: null, feitoEm: b?.feito_em ?? null, feitoPor: b?.feito_por ?? null, endereco });
+    out.push({ chave: `${a.id}:levar`, agendamentoId: a.id, estadiaId: null, perna: "levar", quando: pronto && prontoEm ? prontoEm : a.fim, pronto, prontoEm: pronto ? prontoEm ?? null : null, feitoEm: l?.feito_em ?? null, feitoPor: l?.feito_por ?? null, endereco });
   }
   return out.sort((x, y) => new Date(x.quando).getTime() - new Date(y.quando).getTime() || (x.perna === "buscar" ? -1 : 1));
 }
+
+/** A estadia como a lista do leva e traz lê (creche e hotel). */
+export type EstadiaLevaTraz = {
+  id: string; tipo: string; entrada: string; saida_prevista: string | null; saida: string | null; status: string;
+  mensalista?: string | null; leva_traz_buscar: boolean; leva_traz_levar: boolean; endereco_leva_traz: string | null;
+  pets?: { clientes?: { endereco?: string | null } | null } | null;
+};
+
+const diaLocal = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const naHora = (dia: string, hhmm: string) => { const [a, m, d] = dia.split("-").map(Number); const [h, mi] = hhmm.split(":").map(Number); return new Date(a, m - 1, d, h, mi).toISOString(); };
+
+/**
+ * As viagens de uma estadia que caem no dia ("AAAA-MM-DD"):
+ *  - buscar (se marcado na estadia) no dia da entrada;
+ *  - levar de volta (se marcado) no dia da saída: a de verdade, ou a prevista; creche sem saída prevista volta no mesmo dia.
+ * Cancelada e mensalista (o dia do plano só vira estadia quando o pet chega) ficam de fora. Levar só fica "pronto" com o pet na casa.
+ */
+export function viagensDaEstadia(e: EstadiaLevaTraz, dia: string, feitas: Map<string, ViagemFeita>): Viagem[] {
+  if (e.status === "cancelada" || e.mensalista) return [];
+  const endereco = (e.endereco_leva_traz ?? "").trim() || (e.pets?.clientes?.endereco ?? "").trim() || null;
+  const out: Viagem[] = [];
+  if (e.leva_traz_buscar && diaLocal(e.entrada) === dia) {
+    const b = feitas.get(`${e.id}:buscar`);
+    out.push({ chave: `e${e.id}:buscar`, agendamentoId: null, estadiaId: e.id, perna: "buscar", quando: e.entrada, pronto: true, prontoEm: null, feitoEm: b?.feito_em ?? null, feitoPor: b?.feito_por ?? null, endereco });
+  }
+  const fim = e.saida ?? e.saida_prevista ?? (e.tipo === "creche" ? naHora(diaLocal(e.entrada), "18:00") : null);
+  if (e.leva_traz_levar && fim && diaLocal(fim) === dia) {
+    const l = feitas.get(`${e.id}:levar`);
+    const naCasa = e.status === "em_casa" || e.status === "encerrada";
+    out.push({ chave: `e${e.id}:levar`, agendamentoId: null, estadiaId: e.id, perna: "levar", quando: fim, pronto: naCasa, prontoEm: null, feitoEm: l?.feito_em ?? null, feitoPor: l?.feito_por ?? null, endereco });
+  }
+  return out;
+}
+
+/** Todas as viagens do dia (horários e estadias), na ordem do relógio. */
+export function juntarViagens(...listas: Viagem[][]): Viagem[] {
+  return listas.flat().sort((x, y) => new Date(x.quando).getTime() - new Date(y.quando).getTime() || (x.perna === "buscar" ? -1 : 1));
+}
+
+/** A estadia tem alguma viagem neste dia? (botão Leva e traz na Creche e hotel) */
+export const estadiaTemViagemNoDia = (e: Omit<EstadiaLevaTraz, "pets">, dia: string) => viagensDaEstadia(e, dia, new Map()).length > 0;
 
 const BUSCA = "https://www.google.com/maps/search/?api=1&query=";
 /** Abre o endereço no Google Maps (celular abre o aplicativo). */

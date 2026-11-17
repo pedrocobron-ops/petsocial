@@ -9,15 +9,15 @@ import { erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-hor
 import type { Database } from "@/lib/gestao/banco";
 import type { Horario, Profissional } from "@/lib/gestao/tipos";
 import { FRASE_TITULAR, acessoDe, camposDaEscolha, ehSocio, emailValido, erroDeLimite, erroDoTitular, escolhaDe, lerComissao, primeiroNome, titularDe, usoDoPlano, type Escolha } from "./modelo";
-import { Areas, Chave, Convite, DetalhesAgenda, EscolherPerfil, PlanoCheio, Vagas } from "./pecas";
+import { Areas, Chave, Convite, DetalhesAgenda, EscolherPerfil, PlanoCheio, Vagas, fraseDoLink, useLinksDosConvites } from "./pecas";
 
 /** O convite de quem ainda não criou a conta, para mandar de novo. */
 export function FolhaConvite({ pessoa, aoFechar }: { pessoa: Profissional; aoFechar: () => void }) {
   return (
     <Folha titulo={`Convite de ${primeiroNome(pessoa.nome)}`} aoFechar={aoFechar} rodape={<button className="g-btn sec" onClick={aoFechar}>Fechar</button>}>
       <div className="g-pilha">
-        <p className="g-muted g-p">{primeiroNome(pessoa.nome)} ainda não criou a conta. Mande o convite de novo: ele continua valendo.</p>
-        <Convite nome={pessoa.nome} email={pessoa.email_convite ?? ""} />
+        <p className="g-muted g-p">{primeiroNome(pessoa.nome)} ainda não entrou. Aqui vai um link novo: mande de novo pelo WhatsApp. O link que você mandou antes deixa de valer.</p>
+        <Convite pessoaId={pessoa.id} nome={pessoa.nome} email={pessoa.email_convite ?? ""} />
       </div>
     </Folha>
   );
@@ -53,6 +53,7 @@ export default function EditarPessoa({ pessoa, foco, aoFechar }: { pessoa: Profi
   const [email, setEmail] = useState(pessoa.email_convite ?? "");
   const [erroAcesso, setErroAcesso] = useState<string | null>(null);
   const [verConvite, setVerConvite] = useState(false);
+  const linkDe = useLinksDosConvites();
   const [mexendo, setMexendo] = useState(false);
   const secaoAcesso = useRef<HTMLElement>(null);
   useEffect(() => { if (foco === "acesso") secaoAcesso.current?.scrollIntoView({ block: "start" }); }, [foco]);
@@ -237,14 +238,14 @@ export default function EditarPessoa({ pessoa, foco, aoFechar }: { pessoa: Profi
               <div className="g-eq-estado espera">
                 <i className="g-eq-estado-i" aria-hidden><Hourglass /></i>
                 <p className="g-eq-estado-t">
-                  <b>Convite criado: falta a pessoa criar a conta</b>
-                  <small>{pessoa.email_convite} · já ocupa 1 acesso do plano</small>
+                  <b>Convite criado: falta a pessoa entrar pelo link</b>
+                  <small>{pessoa.email_convite} · já ocupa 1 acesso do plano{!verConvite && fraseDoLink(linkDe(pessoa.id)) ? ` · ${fraseDoLink(linkDe(pessoa.id))}` : ""}</small>
                 </p>
               </div>
-              {verConvite && <Convite nome={pessoa.nome} email={pessoa.email_convite ?? ""} />}
+              {verConvite && <Convite pessoaId={pessoa.id} nome={pessoa.nome} email={pessoa.email_convite ?? ""} />}
               {dando ? campoEmail : (
                 <div className="g-fila">
-                  {!verConvite && <button type="button" className="g-btn p verde" onClick={() => setVerConvite(true)}><Send />Reenviar convite</button>}
+                  {!verConvite && <button type="button" className="g-btn p verde" onClick={() => setVerConvite(true)}><Send />Mandar o convite de novo</button>}
                   <button type="button" className="g-btn p sec" onClick={() => { setDando(true); setVerConvite(false); }} disabled={mexendo}>Trocar o e-mail</button>
                   <button type="button" className="g-btn p perigo" onClick={() => void tirarAcesso()} disabled={mexendo}>Tirar o acesso</button>
                 </div>

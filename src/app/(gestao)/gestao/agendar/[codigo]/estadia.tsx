@@ -7,6 +7,10 @@ import { PORTES, type Porte } from "@/lib/gestao/tipos";
 import { brl, brlCurto, dataCurta, deIsoDia, fmtTelefone, horarioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
 import { MUITOS_PEDIDOS, lembrarPedido } from "@/lib/gestao/link-opcoes";
 import { AceiteDosTermos, SEM_ACEITE, faltaAceitar, pedirPeloLink, type TermosDoLink } from "./termos";
+import { diaDaPromo, diasPorExtenso, etiquetaPromo, validadePorExtenso, type Promocao } from "@/lib/gestao/promocoes";
+
+/** Promoção da creche ou do hotel que o link mostra (link_promocoes). */
+type PromoDaCasa = Pick<Promocao, "nome" | "dias" | "tipo" | "valor" | "comeca_em" | "termina_em">;
 
 type Tipo = "creche" | "hotel";
 type Especie = "cao" | "gato" | "outro";
@@ -61,7 +65,9 @@ const listaE = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(0, -1).
  * Pedido de creche (um ou mais dias) ou de hotel (entrada e saída) pelo link do cliente.
  * O cliente só fica sabendo se um dia está cheio; não vê quem está na casa nem quantas vagas existem.
  */
-export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, preco, zapLoja, zapCom, aoVoltar, termos = null, recarregarTermos, aoPedir, fechados, horario }: {
+export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, preco, zapLoja, zapCom, aoVoltar, termos = null, recarregarTermos, aoPedir, fechados, horario, promos = [] }: {
+  /** promoções em dias fracos deste tipo (o pedido leva a que vale; quem confirma é o pet shop) */
+  promos?: PromoDaCasa[];
   codigo: string; tipo: Tipo; hoje: string; loja: string; diaria: number | null; zapLoja: string | null; aoVoltar: () => void;
   /** WhatsApp da loja com outro texto (depois do pedido, a conversa já começa falando dele) */ zapCom?: (texto: string) => string | null;
   /** hotel: o preço que o link pode mostrar. undefined = ainda lendo; null = banco antes da atualização (fica a diária comum, como era). */
@@ -432,6 +438,16 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
                 : !semPreco && diaria != null && <> · diária de {brlCurto(diaria)}{total != null && dias > 1 ? `, cerca de ${brlCurto(total)} no total` : ""}</>}
             </p>
           )}
+          {promos.map((x, i) => {
+            // os dias do pedido que caem na promoção: noites (hotel, da entrada até a véspera da saída) ou dias (creche)
+            const dosDias = datasOk ? Array.from({ length: Math.max(1, hotel ? dias : entre(entrada, saida) + 1) }, (_, k) => soma(entrada, k)).filter((d) => diaDaPromo(x, d)).length : null;
+            return (
+              <p key={i} className="g-lk-promo-serv" style={{ display: "block", whiteSpace: "normal" }}>
+                Promoção {x.nome}: {etiquetaPromo(x)} {hotel ? `nas noites (${diasPorExtenso(x.dias)})` : `na diária (${diasPorExtenso(x.dias)})`}{validadePorExtenso(x) ? `, ${validadePorExtenso(x)}` : ""}.
+                {dosDias != null ? (dosDias > 0 ? ` Nas datas escolhidas, vale em ${dosDias} ${hotel ? (dosDias === 1 ? "noite" : "noites") : (dosDias === 1 ? "dia" : "dias")}.` : " As datas escolhidas não caem nesses dias.") : ""}
+              </p>
+            );
+          })}
           {fraseDoSinal && <p className="g-muted g-pp">{fraseDoSinal}{sinal?.politica ? ` ${sinal.politica}` : ""} Nada é pago por aqui.</p>}
           {datasOk && fraseDaTaxa && <p className="g-muted g-pp">{fraseDaTaxa}</p>}
           {erroDatas && <p className="g-lk-alerta" role="alert"><span>{erroDatas}</span></p>}
@@ -515,6 +531,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
       </div>
       <div className="g-lk-bloco g-form">
         <h2>Com quem a gente fala?</h2>
+        <p className="g-muted" data-teste="aviso-dados">Seus dados vão só para {loja}, para responder ao seu pedido.</p>
         <label className="g-campo"><span>Seu nome</span>
           <input className="g-input" value={tutor} maxLength={120} autoComplete="name" onChange={(e) => setTutor(e.target.value)} />
         </label>

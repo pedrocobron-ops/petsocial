@@ -9,7 +9,7 @@ import { AvatarPessoa, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } 
 import { NOME_DIAS, ORDEM_DIAS, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import AdicionarPessoa from "@/components/gestao/equipe/adicionar";
 import EditarPessoa, { FolhaConvite } from "@/components/gestao/equipe/editar";
-import { Areas, Vagas } from "@/components/gestao/equipe/pecas";
+import { Areas, Vagas, fraseDoLink, useLinksDosConvites } from "@/components/gestao/equipe/pecas";
 import { acessoDe, erroDeLimite, fraseDoLimite, funcaoDe, nAcessos, pilulasDe, primeiroNome, titularDe, usoDoPlano, type Uso } from "@/components/gestao/equipe/modelo";
 import { perfisPara } from "@/lib/gestao/acessos";
 import { usaModulo } from "@/lib/gestao/modulos";
@@ -32,6 +32,7 @@ export default function Equipe() {
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [aberto, setAberto] = useState<Aberto>(null);
+  const linkDe = useLinksDosConvites();
   if (!souDono) return <Vazio titulo="Só o dono do pet shop mexe aqui." />;
 
   const ativos = equipe.filter((p) => p.ativo);
@@ -79,7 +80,7 @@ export default function Equipe() {
             <Kpi icone={Users} tom="ceu" rotulo="Na equipe" valor={ativos.length} apoio={ativos.length === 1 ? "pessoa ativa" : "pessoas ativas"} />
             <Kpi icone={Scissors} tom="pessego" rotulo="Atendem" valor={atendem} apoio={usaModulo(petshop, "banho_tosa") ? "aparecem na agenda" : "cuidam dos pets"} />
             <Kpi icone={CalendarCheck} tom="menta" rotulo="Trabalham hoje" valor={trabalhamHoje} apoio={loja[hoje] ? `${NOME_DIAS[hoje]}, pela escala` : "pet shop fechado hoje"} />
-            <Kpi icone={Mail} tom="manteiga" rotulo="Convites" valor={convites} apoio={convites ? "esperando criar a conta" : "nenhum pendente"} />
+            <Kpi icone={Mail} tom="manteiga" rotulo="Convites" valor={convites} apoio={convites ? "esperando entrar pelo link" : "nenhum pendente"} />
           </div>
         </div>}
 
@@ -125,10 +126,10 @@ export default function Equipe() {
                     <div className={`g-eq-acesso ${acesso}`}>
                       <i className="g-eq-acesso-i" aria-hidden>{acesso === "login" ? <KeyRound /> : acesso === "convite" ? <Hourglass /> : p.atende ? <CalendarDays /> : <Lock />}</i>
                       <p className="g-eq-acesso-t">
-                        <b>{acesso === "login" ? "Com login" : acesso === "convite" ? "Convite criado: falta a pessoa criar a conta" : p.atende && usaModulo(petshop, "banho_tosa") ? "Sem login, só na agenda" : "Sem login"}</b>
-                        {acesso === "convite" && <small>{p.email_convite}</small>}
+                        <b>{acesso === "login" ? "Com login" : acesso === "convite" ? "Convite criado: falta a pessoa entrar pelo link" : p.atende && usaModulo(petshop, "banho_tosa") ? "Sem login, só na agenda" : "Sem login"}</b>
+                        {acesso === "convite" && <small>{p.email_convite}{fraseDoLink(linkDe(p.id)) ? ` · ${fraseDoLink(linkDe(p.id))}` : ""}</small>}
                       </p>
-                      {acesso === "convite" && <button type="button" className="g-btn p sec g-eq-acao" onClick={() => abrir({ tipo: "convite", id: p.id })}><Send />Reenviar</button>}
+                      {acesso === "convite" && <button type="button" className={`g-btn p ${linkDe(p.id)?.estado === "valendo" ? "sec" : "verde"} g-eq-acao`} onClick={() => abrir({ tipo: "convite", id: p.id })}><Send />{linkDe(p.id)?.estado === "valendo" ? "Reenviar" : "Mandar de novo"}</button>}
                       {acesso === "sem" && <button type="button" className="g-btn p sec g-eq-acao" onClick={() => abrir({ tipo: "editar", id: p.id, foco: "acesso" })}><KeyRound />Dar login</button>}
                     </div>
 

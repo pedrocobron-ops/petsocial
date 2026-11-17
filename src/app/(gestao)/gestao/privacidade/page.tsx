@@ -66,12 +66,12 @@ export default function PrivacidadeDoGestao() {
         <dl className="g-leg-pares">
           <div>
             <dt>Dados da conta</dt>
-            <dd>Nome, e-mail e login do assinante e da equipe, dados do pet shop, da assinatura e do uso do sistema. Aqui a <b>{EMPRESA.marca} é a controladora</b>.</dd>
+            <dd>Nome, e-mail e login do assinante e da equipe, dados do pet shop, da assinatura e do uso do sistema (não os dados de trabalho da equipe, como escala, comissão e vendas, que são do pet shop). Aqui a <b>{EMPRESA.marca} é a controladora</b>.</dd>
           </div>
           <div>
             <dt>Dados que o pet shop lança</dt>
             <dd>
-              Tutores, pets, fotos, agenda, creche e hotel, financeiro, estoque e os pedidos que chegam pelo link. Aqui o <b>pet shop é o controlador</b> e a
+              Tutores, pets, fotos, agenda, creche e hotel, financeiro, estoque, os pedidos que chegam pelo link e os dados de trabalho da equipe (escala, comissão, vendas). Aqui o <b>pet shop é o controlador</b> e a
               {" "}<b>{EMPRESA.marca} é a operadora</b>: guardamos e processamos esses dados só para o sistema funcionar, seguindo as instruções do pet shop e os Termos de uso.
             </dd>
           </div>
@@ -87,12 +87,13 @@ export default function PrivacidadeDoGestao() {
         <ul>
           <li><b>Cadastro:</b> nome, e-mail e senha. A senha fica cifrada pelo serviço de login; nós não conseguimos lê-la.</li>
           <li><b>Pet shop:</b> nome, telefone, cidade e estado, logo, horário de funcionamento, serviços, preços e ajustes.</li>
-          <li><b>Equipe:</b> nome, e-mail do convite, função, áreas que pode abrir, escala, comissão.</li>
+          <li><b>Equipe:</b> nome, e-mail do convite, função e áreas que pode abrir. Escala, comissão e vendas de cada pessoa são dados que o pet shop lança.</li>
           <li><b>Assinatura:</b> plano, situação, datas e o e-mail usado na compra. A Cakto nos avisa de cada pagamento, renovação, cancelamento, reembolso ou falha, e guardamos esses avisos. Não recebemos o número do cartão.</li>
           <li><b>Pedidos de dados:</b> quem baixou todos os dados, baixou ou apagou os dados de um tutor, pediu ou cancelou a exclusão da conta ou saiu de uma equipe, e quando. Esse registro não guarda os dados dos clientes.</li>
           <li><b>Aceite dos termos:</b> qual versão dos Termos e desta política cada pessoa aceitou, quando e, quando disponíveis, o endereço de rede (IP) e o navegador.</li>
           <li><b>Assistente:</b> o texto dos pedidos feitos ao Mozart e à Ajuda, a resposta, a ação proposta, se foi confirmada, se a dúvida foi resolvida, quem pediu e quando.</li>
           <li><b>Escola de Gestão:</b> quais materiais foram comprados com o e-mail da conta.</li>
+          <li><b>Registros de acesso:</b> data, hora, endereço de internet (IP) e navegador de cada entrada no sistema.</li>
           <li><b>Uso do sistema:</b> quando cada pessoa esteve com o sistema aberto, por quanto tempo e em quais áreas, e contagens de uso (quantos agendamentos, leituras de foto, perguntas no link).</li>
           <li><b>Erros:</b> quando uma tela dá erro, a mensagem técnica limpa, a tela, o tamanho da tela, o navegador e a versão do sistema (parte 9).</li>
           <li><b>Atendimento:</b> o que você escrever para nós por e-mail ou WhatsApp.</li>
@@ -122,11 +123,11 @@ export default function PrivacidadeDoGestao() {
 
       {p("para-que", "Usamos os dados para prestar o serviço, cobrar, dar suporte, manter a segurança, melhorar o sistema e cumprir a lei. Não vendemos dados.", <>
         <dl className="g-leg-pares">
-          <div><dt>Criar e manter a conta</dt><dd>Login, confirmação de e-mail, troca de senha, teste, equipe e liberação do acesso. Base: execução do contrato (art. 7º, V).</dd></div>
+          <div><dt>Criar e manter a conta</dt><dd>Login, troca de senha, teste, equipe e liberação do acesso. Base: execução do contrato (art. 7º, V).</dd></div>
           <div><dt>Cobrança</dt><dd>Reconhecer o pagamento, liberar ou bloquear a conta, reembolsar e guardar os comprovantes. Base: execução do contrato e cumprimento de obrigação legal (art. 7º, II e V).</dd></div>
           <div><dt>Prova do aceite</dt><dd>Guardar quem aceitou cada versão dos documentos. Base: exercício regular de direitos e legítimo interesse (art. 7º, VI e IX).</dd></div>
           <div><dt>Suporte e avisos</dt><dd>Responder dúvidas, ajudar quando você pede e avisar sobre o serviço, a cobrança e mudanças nos documentos. Base: execução do contrato e legítimo interesse.</dd></div>
-          <div><dt>Segurança e melhoria</dt><dd>Evitar abuso (limites do assistente, das leituras e das páginas públicas), investigar erros, ler as conversas com o assistente para melhorar as respostas e entender, em números gerais, como o sistema é usado. Base: legítimo interesse (art. 7º, IX).</dd></div>
+          <div><dt>Segurança e melhoria</dt><dd>Evitar abuso (limites do assistente, das leituras e das páginas públicas), investigar erros, ler, quando preciso e com acesso restrito, trechos das conversas com o assistente para corrigir erros e melhorar as respostas (não usamos essas conversas para propaganda nem para treinar inteligência artificial) e entender, em números gerais, como o sistema é usado. Base: legítimo interesse (art. 7º, IX).</dd></div>
           <div><dt>Dados lançados pelo pet shop</dt><dd>Guardar, mostrar e processar para o sistema funcionar, a mando do pet shop. A base legal é definida pelo pet shop, que é o controlador.</dd></div>
           <div><dt>Obrigações legais</dt><dd>Guardar registros de acesso pelo prazo do Marco Civil da Internet e atender ordens de autoridades. Base: obrigação legal.</dd></div>
         </dl>
@@ -137,25 +138,24 @@ export default function PrivacidadeDoGestao() {
 
       {p("fornecedores", "Contamos com fornecedores para banco de dados, hospedagem, pagamentos, inteligência artificial e e-mail. Cada um recebe só o necessário.", <>
         <dl className="g-leg-pares">
-          <div><dt>Supabase</dt><dd>Banco de dados, login e guarda das fotos. O banco fica na região de São Paulo, Brasil; a empresa é dos Estados Unidos.</dd></div>
+          <div><dt>Supabase</dt><dd>Banco de dados, login e guarda das fotos. O banco fica na região de São Paulo, Brasil; a empresa é dos Estados Unidos. O mesmo projeto do Supabase também atende outro produto do mesmo responsável (Escala CEO). Cada produto tem as suas tabelas e regras de acesso, e os dados de um não são usados no outro. Se você usar o mesmo e-mail nos dois, o login pode ser o mesmo.</dd></div>
           <div><dt>Vercel</dt><dd>Hospedagem do aplicativo e das páginas públicas. Os pedidos passam pelos servidores dela, que podem ficar fora do Brasil.</dd></div>
           <div><dt>Anthropic</dt><dd>Fornece o modelo de inteligência artificial do Mozart, da Ajuda, da leitura do caderno, dos textos do boletim e das dúvidas do link (parte 8). Servidores fora do Brasil.</dd></div>
           <div><dt>Cakto</dt><dd>Pagamento da assinatura. Os dados de pagamento são digitados no ambiente dela e seguem a política dela.</dd></div>
-          <div><dt>Envio de e-mail</dt><dd>E-mails de confirmação de conta e de troca de senha, enviados pelo serviço de login do Supabase.</dd></div>
+          <div><dt>Envio de e-mail</dt><dd>E-mails de troca de senha e avisos de login, enviados pelo serviço de login do Supabase.</dd></div>
         </dl>
         <p>
           Também passam por serviços de terceiros, mas por escolha e no aparelho de quem usa: o <b>WhatsApp</b>, quando o pet shop abre uma mensagem pronta
-          (nós não enviamos nada ao WhatsApp), e o <b>reconhecimento de voz do navegador</b>, quando alguém usa o microfone (parte 8).
+          (nós não enviamos nada ao WhatsApp), o <b>reconhecimento de voz do navegador</b>, quando alguém usa o microfone (parte 8), o <b>Google Maps</b>, quando alguém da equipe abre o endereço do leva e traz (o endereço vai ao Google), e o <b>Google</b>, se o pet shop puser nas páginas o link para ser avaliado.
         </p>
-        <p>Podemos entregar dados a autoridades só quando a lei ou uma ordem judicial exigir. Se o negócio for vendido ou reorganizado, os dados seguem com ele, sob esta política.</p>
+        <p>Podemos entregar dados a autoridades só quando a lei ou uma ordem judicial exigir. Se o negócio for vendido ou reorganizado, os dados seguem com ele, sob esta política. Quando o Maestro Pet passar a ser oferecido por uma empresa (CNPJ), ela assume o nosso lugar nesta política, com os mesmos compromissos, e avisamos antes.</p>
       </>)}
 
       {p("exterior", "Hospedagem e inteligência artificial ficam, em parte, fora do Brasil, principalmente nos Estados Unidos. Essa transferência é feita para prestar o serviço, com as garantias que a LGPD pede.", <>
         <p>
           Parte do tratamento acontece fora do Brasil, principalmente nos Estados Unidos: a hospedagem da Vercel e o processamento da inteligência artificial
           da Anthropic, e eventualmente o suporte técnico dos fornecedores. Essa transferência internacional é necessária para prestar o serviço que você contratou
-          e é feita com fornecedores que se comprometem por contrato com padrões de proteção de dados e segurança, conforme o artigo 33 da LGPD e as regras da ANPD
-          sobre o tema. Usar o assistente e as funções de inteligência artificial é opcional.
+          e segue o artigo 33 da LGPD: pedimos a cada fornecedor o acordo de proteção de dados e, quando houver, as cláusulas-padrão aprovadas pela ANPD. Usar o assistente e as funções de inteligência artificial é opcional.
         </p>
       </>)}
 
@@ -164,9 +164,11 @@ export default function PrivacidadeDoGestao() {
           <li><b>Link de agendamento:</b> mostra dados do pet shop (nome, cidade, telefone, horário, serviços, horários livres e, se ele quiser, preços). Não mostra a agenda nem dados de outros clientes. O pedido do tutor vai só para o pet shop escolhido.</li>
           <li><b>Página do tutor:</b> link particular de cada tutor, sem senha, com os pets dele, o diário, as fotos do dia e o que está marcado. As fotos do dia passam pelo nosso servidor, que confere o link antes de entregar, e são apagadas no prazo que o pet shop escolhe (30, 60, 90 ou 180 dias; o normal é 90).</li>
           <li><b>Boletim e álbum:</b> página de cada visita ou do álbum do pet, com fotos, recados e, se o pet shop ligar, valores. O link abre por {DIAS_DO_BOLETIM} dias e depois para de abrir. As fotos continuam no álbum do pet, dentro do sistema, enquanto o pet estiver cadastrado ou até o pet shop apagá-las. A página não mostra telefone nem dados do tutor.</li>
-          <li><b>Checklist de entrada:</b> quando o pet chega, o pet shop pode pedir que o tutor confira e aceite como o pet chegou, assinando no aparelho do pet shop ou por um link mandado no WhatsApp. Guardamos o nome digitado, a imagem da assinatura e a hora; pelo link, também o endereço de internet (IP) e o navegador. O link abre por 7 dias, mostra só o pet, o que foi anotado e as fotos, e não mostra telefone nem dados do tutor.</li>
+          <li><b>Checklist de entrada:</b> quando o pet chega, o pet shop pode pedir que o tutor confira e aceite como o pet chegou, assinando no aparelho do pet shop ou por um link mandado no WhatsApp. Guardamos o nome digitado, a imagem da assinatura, a hora, o endereço de internet (IP) e o navegador (na assinatura no aparelho do pet shop, os do aparelho da loja) e um código de conferência do texto e das fotos aceitos. O link abre por 7 dias, mostra só o pet, o que foi anotado e as fotos, e não mostra telefone nem dados do tutor.</li>
           <li>Essas páginas pedem aos buscadores para não serem indexadas. Quem tiver o link consegue abrir; por isso o pet shop deve mandá-lo só ao tutor e pode trocar ou desligar o link da página do tutor.</li>
-          <li><b>Autorização para postar fotos:</b> a página do boletim pode trazer &quot;Pode postar a foto&quot;. Nada vem marcado: o tutor escolhe se autoriza só as fotos daquele boletim ou também as das próximas visitas e, se quiser, o perfil dele para a loja marcar. O sistema monta o texto, guarda o que ele aceitou e mostra ao pet shop na ficha e no álbum do pet. Só o tutor autoriza; a equipe não consegue marcar por ele.</li>
+          <li><b>Orçamento:</b> página de cada orçamento, com o nome do pet shop, os itens, o total, a validade e o primeiro nome para quem foi feito. Abre para quem tiver o link, não aparece em buscadores, e &quot;Quero fechar&quot; abre o WhatsApp do pet shop.</li>
+          <li><b>Acompanhar o pedido:</b> depois de pedir pelo link, o tutor acompanha o pedido por uma página própria. O navegador dele guarda só a lista dos pedidos feitos naquele aparelho; dá para tirar da lista.</li>
+          <li><b>Autorização para postar fotos:</b> a página do boletim pode trazer &quot;Pode postar a foto&quot;. Nada vem marcado: o tutor escolhe se autoriza só as fotos daquele boletim ou também as das próximas visitas e, se quiser, o perfil dele para a loja marcar. O sistema monta o texto, guarda o que foi aceito, com a hora, o endereço de internet e o navegador, e mostra ao pet shop na ficha e no álbum do pet. A autorização só é dada pela página do boletim, não pelas telas do sistema; quem abre o link é tratado como o tutor, por isso o pet shop deve mandá-lo só a ele.</li>
           <li><b>Tirar a autorização:</b> o tutor recebe junto um link &quot;Não quero mais&quot;, que funciona para sempre (mesmo depois que o boletim para de abrir) e tira na hora todas as autorizações daquele pet. Para o pet shop, a ficha passa a mostrar &quot;Sem autorização&quot;.</li>
           <li><b>O sistema não posta nada</b> nas redes sociais. Quem escolhe e posta é o pet shop, que é o controlador desses dados e responde pela postagem e por respeitar quando o tutor tira a autorização.</li>
         </ul>
@@ -194,7 +196,7 @@ export default function PrivacidadeDoGestao() {
 
       {p("aparelho", "Sem pixel de anúncio e sem cookie de medição no aplicativo. O navegador guarda só o login e algumas preferências.", <>
         <ul>
-          <li>O aplicativo, as telas de cadastro e de entrada e as páginas públicas dos pet shops <b>não usam pixel de anúncio nem cookies de medição</b>.</li>
+          <li>O aplicativo, as telas de cadastro e de entrada e as páginas públicas dos pet shops <b>não usam pixel de anúncio nem cookies de medição</b>. Quem chega ao cadastro pela página de apresentação abre o cadastro numa página nova, sem o pixel.</li>
           <li>Para manter você conectado, o navegador guarda no próprio aparelho a sessão de login. Também guarda preferências e rascunhos, como o pet shop aberto por último, os ajustes da voz e um formulário ainda não salvo. Isso serve só para o sistema funcionar e fica no seu aparelho. Ao sair da conta, a sessão é apagada.</li>
           <li>A página de apresentação do Gestão faz parte do site maestropet.com e pode usar o Pixel da Meta, como explica a <Link href="/politica-de-privacidade">política do site</Link>.</li>
         </ul>
@@ -204,7 +206,7 @@ export default function PrivacidadeDoGestao() {
         <dl className="g-leg-pares">
           <div><dt>Conta e dados do pet shop</dt><dd>Enquanto a conta existir, inclusive só para consulta. Conta só para consulta por mais de 180 dias pode ser apagada, com aviso de 30 dias (Termos, parte 8).</dd></div>
           <div><dt>Cliente ou pet apagado</dt><dd>Sai na hora da tela. Os arquivos das fotos ligadas a ele são apagados logo depois, na faxina automática.</dd></div>
-          <div><dt>Dados de tutor apagados a pedido</dt><dd>Em &quot;Apagar dados deste tutor&quot;, nome, telefone, e-mail, endereço, observações, pets, saúde, boletins e autorizações saem na hora; as fotos, na faxina diária. Os valores ficam no financeiro, sem o nome, para a contabilidade do pet shop.</dd></div>
+          <div><dt>Dados de tutor apagados a pedido</dt><dd>Em &quot;Apagar dados deste tutor&quot;, nome, telefone, e-mail, endereço, observações, pets, saúde, boletins e autorizações saem na hora, assim como o nome e o telefone nos orçamentos e as conversas com o assistente que citam o tutor; as fotos, na faxina diária. Os valores ficam no financeiro, sem o nome, para a contabilidade do pet shop.</dd></div>
           <div><dt>Autorizações para postar fotos</dt><dd>Enquanto o pet estiver cadastrado, inclusive as que o tutor tirou (com a data em que tirou), para mostrar quando valeram.</dd></div>
           <div><dt>Conta apagada a pedido</dt><dd>Em &quot;Encerrar e apagar a conta&quot;, 30 dias só para consulta (dá para cancelar); depois apagamos o pet shop, os dados, os arquivos e os logins da equipe que não estão em outro pet shop. Fica só o registro de que a conta foi apagada (nome do pet shop, quem pediu e quando).</dd></div>
           <div><dt>Registro de pedidos de dados</dt><dd>Enquanto a conta existir e, depois de apagada, pelo prazo em que puder ser necessário para provar que o pedido foi atendido.</dd></div>
@@ -213,9 +215,9 @@ export default function PrivacidadeDoGestao() {
           <div><dt>Fotos da página do tutor</dt><dd>30, 60, 90 ou 180 dias, como o pet shop escolher (o normal é 90).</dd></div>
           <div><dt>Fotos e PDFs do caderno</dt><dd>Não ficam guardados: são lidos e descartados.</dd></div>
           <div><dt>Perguntas do link</dt><dd>Não ficam guardadas; só a contagem.</dd></div>
-          <div><dt>Conversas com o assistente</dt><dd>Enquanto a conta existir.</dd></div>
+          <div><dt>Conversas com o assistente</dt><dd>12 meses; depois são apagadas.</dd></div>
           <div><dt>Registros de erro</dt><dd>30 dias.</dd></div>
-          <div><dt>Registros de acesso</dt><dd>Pelo prazo que a lei exigir (o Marco Civil da Internet pede 6 meses).</dd></div>
+          <div><dt>Registros de acesso</dt><dd>6 meses, em ambiente seguro, como pede o Marco Civil da Internet; depois são apagados. Só entregamos por ordem judicial.</dd></div>
           <div><dt>Pagamentos e aceites</dt><dd>Pelo prazo que a lei exigir e enquanto puderem ser necessários para defesa em processo, mesmo depois de a conta ser apagada.</dd></div>
           <div><dt>Cópias de segurança</dt><dd>Substituídas com o tempo, no ciclo do fornecedor do banco de dados.</dd></div>
         </dl>
@@ -255,11 +257,12 @@ export default function PrivacidadeDoGestao() {
         </ul>
       </>)}
 
-      {p("incidentes", "Se acontecer um incidente com risco relevante, avisamos os pet shops afetados e a ANPD, como manda a lei.", <>
+      {p("incidentes", "Se acontecer um incidente com risco relevante, avisamos os pet shops afetados em até 2 dias úteis e, nos dados da conta, também a ANPD.", <>
         <p>
-          Se acontecer um incidente de segurança que possa trazer risco ou dano relevante, avisamos os assinantes afetados e a ANPD no prazo e da forma que a lei
-          e a ANPD determinam, dizendo o que aconteceu, quais dados foram afetados, o que fizemos e o que você pode fazer. Quando o incidente envolver dados que o
-          pet shop lança, avisamos o pet shop, que é o controlador, e ajudamos na comunicação aos tutores.
+          Se acontecer um incidente de segurança que possa trazer risco ou dano relevante: nos dados da conta, em que somos controladores, avisamos os assinantes
+          afetados e a ANPD no prazo e na forma que a ANPD determina. Nos dados que o pet shop lança, avisamos o pet shop, que é o controlador, em até 2 dias úteis
+          depois de confirmar o incidente, dizendo o que aconteceu, quais dados foram atingidos, o que fizemos e o que ele pode fazer. A comunicação à ANPD e aos
+          tutores é do pet shop, e nós ajudamos.
         </p>
       </>)}
 

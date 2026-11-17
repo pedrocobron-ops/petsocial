@@ -113,10 +113,12 @@ const c = (n) => B.centavos(n);
   T.ok('taxas do mês = R$ 48,00 (6 pagamentos com taxa)', tp && c(tp.taxa) === 4800 && tp.lancamentos === 6, tp);
   const debF = tp.por_forma.find((x) => x.forma === 'debito'), pixF = tp.por_forma.find((x) => x.forma === 'pix');
   T.ok('por forma: débito R$ 200,00 com R$ 5,00 de taxa; Pix R$ 50,00 com R$ 0,50', debF && c(debF.valor) === 20000 && c(debF.taxa) === 500 && pixF && c(pixF.taxa) === 50, tp.por_forma);
-  // a receber: crédito à vista 200 − 8,50 = 191,50; parte crédito do dividido 100 − 4,50 = 95,50; 3x 300 − 23 = 277; 2x 100 − 6,50 = 93,50 → dia +30 = 657,50;
-  // débito 100 − 2 + 100 − 3 = 195,00 no dia +1; o Pix (0 dias) já caiu
-  const ar30 = tp.a_receber.find((x) => x.dia === L.dia(30)), ar1 = tp.a_receber.find((x) => x.dia === L.dia(1));
-  T.ok('a receber da maquininha: R$ 195,00 amanhã (débito) e R$ 657,50 em 30 dias (crédito, já sem a taxa)', ar1 && c(ar1.valor) === 19500 && ar30 && c(ar30.valor) === 65750 && tp.a_receber.length === 2, tp.a_receber);
+  // a receber: crédito à vista 200 − 8,50 = 191,50; parte crédito do dividido 100 − 4,50 = 95,50; 3x 300 − 23 = 277 em três parcelas
+  // (92,34 + 92,33 + 92,33, a cada 30 dias); 2x 100 − 6,50 = 93,50 em duas (46,75 + 46,75) → dia +30 = 426,09, +60 = 139,08, +90 = 92,33
+  // (migração 20261208: o parcelado sai uma parcela por mês); débito 100 − 2 + 100 − 3 = 195,00 no dia +1; o Pix (0 dias) já caiu
+  const ar = (n) => tp.a_receber.find((x) => x.dia === L.dia(n));
+  T.ok('a receber da maquininha: R$ 195,00 amanhã (débito); crédito R$ 426,09 em 30 dias, R$ 139,08 em 60 e R$ 92,33 em 90 (parcelado por mês, já sem a taxa)',
+    c(ar(1)?.valor) === 19500 && c(ar(30)?.valor) === 42609 && c(ar(60)?.valor) === 13908 && c(ar(90)?.valor) === 9233 && tp.a_receber.length === 4 && tp.parcelado === true, tp.a_receber);
   B.must(await dono.from('lancamentos').insert({ petshop_id: P, tipo: 'saida', valor: 40, forma: 'pix', categoria: 'Aluguel', data: L.hoje, pago: true, origem: 'tela' }).select('id'), 'uma saída');
   const lu = B.must(await dono.rpc('lucro_do_periodo', { p_petshop: P, p_de: L.mes1, p_ate: fim }), 'lucro_do_periodo');
   const entrou = B.num(`select coalesce(sum(valor), 0) from lancamentos where petshop_id='${P}' and tipo='entrada' and pago and movimento is null and data between '${L.mes1}' and '${fim}'`);

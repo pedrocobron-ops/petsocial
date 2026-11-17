@@ -112,7 +112,7 @@ const EVENTO_AVISOU = "gestao:avisou";
 export type AcaoDoAviso = { rotulo: string; fazer: () => void };
 type Toast = { id: number; texto: string; erro?: boolean; acao?: AcaoDoAviso };
 type Pergunta = { titulo: string; texto?: string; confirmar?: string; perigo?: boolean; /** nome do botão que responde não (padrão: Voltar) */ voltar?: string; resolver: (v: boolean) => void };
-const AvisosCtx = createContext<{ avisar: (t: string, acao?: AcaoDoAviso) => void; avisarErro: (e: unknown) => void; confirmar: (p: Omit<Pergunta, "resolver">) => Promise<boolean> } | null>(null);
+const AvisosCtx = createContext<{ avisar: (t: string, acao?: AcaoDoAviso) => void; avisarErro: (e: unknown, acao?: AcaoDoAviso) => void; confirmar: (p: Omit<Pergunta, "resolver">) => Promise<boolean> } | null>(null);
 
 export function useAvisos() {
   const v = useContext(AvisosCtx);
@@ -131,7 +131,7 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
     if (!erro) window.dispatchEvent(new Event(EVENTO_AVISOU));
   }, []);
   const avisar = useCallback((t: string, acao?: AcaoDoAviso) => por(t, false, acao), [por]);
-  const avisarErro = useCallback((e: unknown) => { por(mensagemDeErro(e), true); registrarErroMostrado(e); }, [por]);
+  const avisarErro = useCallback((e: unknown, acao?: AcaoDoAviso) => { por(mensagemDeErro(e), true, acao); registrarErroMostrado(e); }, [por]);
   const confirmar = useCallback((p: Omit<Pergunta, "resolver">) => new Promise<boolean>((resolver) => setPergunta({ ...p, resolver })), []);
   const responder = (v: boolean) => { pergunta?.resolver(v); setPergunta(null); };
   return (

@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BookOpen, Check, Clock, ExternalLink, GraduationCap, Library, Mail, Store } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Clock, ExternalLink, GraduationCap, Library, Mail, MailCheck, Store } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import Leitor from "@/components/gestao/escola/leitor";
 import { Tile } from "@/components/gestao/painel";
-import { Folha, Vazio, ok, useDados } from "@/components/gestao/ui";
+import { Folha, Vazio, ok, useAvisos, useDados } from "@/components/gestao/ui";
+import type { Banco } from "@/lib/gestao/supabase";
 import { AULAS, MATERIAIS, linkDeCompra, type Aula, type Material } from "@/lib/gestao/escola";
 import { brlCurto } from "@/lib/gestao/util";
 
@@ -23,12 +24,15 @@ export default function Escola() {
   const [lendo, setLendo] = useState<Material | null>(null);
   const [tema, setTema] = useState<Aula["tema"] | "Todas">("Todas");
 
-  const { dados } = useDados(async () => {
+  // as compras vêm pelo e-mail da compra, mas só aparecem com o e-mail da conta provado (código ou link mandado para ele):
+  // com "Confirm email" desligado, qualquer um cria conta com o e-mail de outra pessoa (migração 20261209)
+  const { dados, recarregar } = useDados(async () => {
+    const provado = await sb.rpc("email_provar");
     const [compras, arquivos] = await Promise.all([
       sb.from("escola_compras").select("slug").eq("email", (user.email ?? "").toLowerCase()),
       sb.from("escola_materiais").select("slug"),
     ]);
-    return { meus: new Set(ok(compras).map((c) => c.slug)), comArquivo: new Set(ok(arquivos).map((a) => a.slug)) };
+    return { provado: provado.data === true, meus: new Set(ok(compras).map((c) => c.slug)), comArquivo: new Set(ok(arquivos).map((a) => a.slug)) };
   }, [user.email]);
 
   const meus = useMemo(() => MATERIAIS.filter((m) => dados?.meus.has(m.slug)), [dados]);
@@ -49,6 +53,8 @@ export default function Escola() {
           <h2>Cuidar bem dos pets você já sabe. Aqui é a parte do negócio.</h2>
           <p>Aulas curtas e gratuitas sobre preço, agenda, caixa e equipe, sempre mostrando onde fazer no sistema. E materiais completos da Maestro Pet para quem quer oferecer um serviço novo.</p>
         </section>
+
+        {dados && !dados.provado && user.email && <ConfirmarEmail sb={sb} email={user.email} aoConfirmar={() => void recarregar()} />}
 
         {meus.length > 0 && (
           <section className="g-pilha">
@@ -150,7 +156,7 @@ export default function Escola() {
               <p><b style={{ font: "500 1.5rem/1 var(--display)" }}>{brlCurto(materialAberto.preco)}</b> <span className="g-muted g-p">pagamento único, pela Cakto</span></p>
               <ul className="g-esc-lista">
                 <li><Mail aria-hidden />Você recebe o material no e-mail logo depois do pagamento.</li>
-                <li><BookOpen aria-hidden />Comprando com o e-mail desta conta{user.email ? ` (${user.email})` : ""}, ele também aparece aqui em Meus materiais para ler no celular ou no computador.</li>
+                <li><BookOpen aria-hidden />Comprando com o e-mail desta conta{user.email ? ` (${user.email})` : ""}, ele também aparece aqui em Meus materiais para ler no celular ou no computador{dados?.provado ? "" : ", depois que você confirmar o e-mail com o código que mandamos para ele"}.</li>
               </ul>
               <div className="g-fila">
                 <a className="g-btn pri" href={linkDeCompra(materialAberto, user.email)} target="_blank" rel="noopener noreferrer">Comprar por {brlCurto(materialAberto.preco)}<ExternalLink aria-hidden /></a>
@@ -164,5 +170,61 @@ export default function Escola() {
 
       {lendo && <Leitor slug={lendo.slug} titulo={lendo.nome} aoFechar={() => setLendo(null)} />}
     </div>
+  );
+}
+
+/**
+ * Confirmar que o e-mail da conta é mesmo da pessoa: o Supabase manda um código (e um link) para o e-mail; com ele, a sessão
+ * nova prova o e-mail (`email_provar`) e as compras feitas com esse e-mail aparecem. Uma vez só por conta e e-mail.
+ */
+function ConfirmarEmail({ sb, email, aoConfirmar }: { sb: Banco; email: string; aoConfirmar: () => void }) {
+  const { avisar } = useAvisos();
+  const [enviado, setEnviado] = useState(false);
+  const [codigo, setCodigo] = useState("");
+  const [indo, setIndo] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function mandar() {
+    setIndo(true); setErro(null);
+    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: `${location.origin}/gestao/app/escola` } });
+    setIndo(false);
+    if (error) { setErro(/rate|seconds|segundos|limit/i.test(error.message) ? "Já mandamos um código há pouco. Espere um minuto e tente de novo." : "Não consegui mandar o código agora. Tente de novo em instantes."); return; }
+    setEnviado(true);
+  }
+
+  async function confirmar(e: React.FormEvent) {
+    e.preventDefault();
+    const c = codigo.replace(/\D/g, "");
+    if (c.length < 6) { setErro("Digite os números do código que chegou no e-mail."); return; }
+    setIndo(true); setErro(null);
+    const v = await sb.auth.verifyOtp({ email, token: c, type: "email" });
+    if (v.error) { setIndo(false); setErro("Esse código não confere ou já venceu. Peça um código novo."); return; }
+    const r = await sb.rpc("email_provar");
+    setIndo(false);
+    if (r.error || r.data !== true) { setErro("Não consegui confirmar o e-mail agora. Tente de novo em instantes."); return; }
+    avisar("E-mail confirmado. Os materiais comprados com ele já aparecem aqui.");
+    aoConfirmar();
+  }
+
+  return (
+    <section className="g-card g-pilha p">
+      <h2 className="g-esc-tit"><MailCheck aria-hidden />Comprou um material com o e-mail {email}?</h2>
+      <p className="g-muted g-p">Para liberar a leitura aqui, confirme que esse e-mail é seu. Mandamos um código para ele; é uma vez só.</p>
+      {!enviado ? (
+        <div className="g-fila"><button type="button" className="g-btn pri p" onClick={() => void mandar()} disabled={indo}>{indo ? "Mandando…" : "Mandar o código para o meu e-mail"}</button></div>
+      ) : (
+        <form className="g-form" onSubmit={confirmar}>
+          <label className="g-campo"><span>Código que chegou em {email}</span>
+            <input className="g-input" inputMode="numeric" autoComplete="one-time-code" maxLength={10} value={codigo} onChange={(ev) => setCodigo(ev.target.value)} />
+            <small>Se chegou um link em vez do código, é só abrir o link neste aparelho. Não achou? Olhe a caixa de spam.</small>
+          </label>
+          <div className="g-fila">
+            <button className="g-btn pri p" disabled={indo}>{indo ? "Conferindo…" : "Confirmar"}</button>
+            <button type="button" className="g-btn sec p" onClick={() => void mandar()} disabled={indo}>Mandar outro código</button>
+          </div>
+        </form>
+      )}
+      {erro && <p className="g-erro" role="alert">{erro}</p>}
+    </section>
   );
 }

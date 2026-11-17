@@ -9,6 +9,7 @@ import type { User } from "@supabase/supabase-js";
 import { banco, configurado, type Banco } from "@/lib/gestao/supabase";
 import type { Petshop, Profissional, Servico } from "@/lib/gestao/tipos";
 import { podeArea, type Area } from "@/lib/gestao/acessos";
+import { registrarAcesso } from "@/lib/gestao/registro-acesso";
 import { definirLoja } from "@/lib/gestao/erros-navegador";
 import { pendentes, type Documento } from "@/lib/gestao/documentos";
 import Reaceite from "./reaceite";
@@ -104,6 +105,8 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       if (!vivo) return;
       if (!data.session) { router.replace("/gestao/entrar"); return; }
       const u = data.session.user;
+      // registro de acesso (Marco Civil): uma vez por dia, sem esperar (não atrasa a abertura)
+      registrarAcesso(sb, "abertura", u.id);
       let preferido: string | null = null, ultimo: string | null = null;
       try { preferido = localStorage.getItem(CHAVE_LOJA); ultimo = localStorage.getItem(CHAVE_ULTIMA); } catch { /* sem armazenamento: segue */ }
       // o pet shop aberto da última vez neste aparelho já começa a carregar junto com a conta (uma ida ao banco a menos no

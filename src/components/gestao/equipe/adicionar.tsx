@@ -34,7 +34,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
   const [escala, setEscala] = useState<Horario>(loja);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [feito, setFeito] = useState<{ nome: string; email: string | null; atende: boolean } | null>(null);
+  const [feito, setFeito] = useState<{ id: string; nome: string; email: string | null; atende: boolean } | null>(null);
 
   const topo = useRef<HTMLDivElement>(null);
   useEffect(() => { topo.current?.scrollIntoView({ block: "start" }); }, [passo, feito]);
@@ -95,13 +95,13 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
 
     setSalvando(true);
     try {
-      ok(await sb.from("profissionais").insert({
+      const [novo] = ok(await sb.from("profissionais").insert({
         petshop_id: petshop.id, nome: n.slice(0, 80), ...camposDaEscolha(escolha, !!comLogin, petshop), atende: escolha.atende, cor,
         comissao_pct: lerComissao(comissao) ?? 0, escala: segueLoja ? null : escala, email_convite: comLogin ? e : null,
       }).select("id"));
       await recarregarBase();
       avisarMudanca();
-      setFeito({ nome: n, email: comLogin ? e : null, atende: escolha.atende });
+      setFeito({ id: novo.id, nome: n, email: comLogin ? e : null, atende: escolha.atende });
     } catch (x) {
       if (erroDeLimite(x)) {
         // alguém ocupou a vaga enquanto o formulário estava aberto: volta ao passo do login com a conta atualizada
@@ -185,7 +185,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
                 <label className="g-campo"><span>E-mail de {primeiro}</span>
                   <input className="g-input" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="nome@email.com" value={email}
                     onChange={(ev) => { setEmail(ev.target.value); setErro(null); }} />
-                  <small>É com esse e-mail que a pessoa vai criar a conta. Precisa ser exatamente o mesmo: é assim que o sistema sabe que ela é da sua equipe. A senha é a própria pessoa quem escolhe.</small>
+                  <small>É com esse e-mail que a pessoa vai criar a conta. Depois você manda um link de convite só dela: é o link, junto com esse e-mail, que liga a conta à sua equipe. A senha é a própria pessoa quem escolhe.</small>
                 </label>
               </Opcao>
             </div>
@@ -238,7 +238,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
             {feito.email ? (
               <>
                 <p className="g-muted">Falta só mandar o convite. O acesso já está guardado para {primeiroNome(feito.nome)}: {uso.usados} de {nAcessos(uso.limite)} em uso.</p>
-                <Convite nome={feito.nome} email={feito.email} />
+                <Convite pessoaId={feito.id} nome={feito.nome} email={feito.email} />
               </>
             ) : (
               <p className="g-muted">

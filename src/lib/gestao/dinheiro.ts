@@ -404,8 +404,18 @@ export async function ultimoContado(sb: Banco, petshopId: string): Promise<numbe
   return data?.valor_contado == null ? null : Number(data.valor_contado);
 }
 
-/** O que o banco responde ao receber uma conta. */
-export type ContaRecebida = { quitada: boolean; recebido: number; falta: number; no_caixa: boolean };
+/**
+ * O que o banco responde ao receber uma conta. `ids`: os lançamentos pagos agora (a parte recebida, ou a própria conta quando
+ * foi recebida inteira, e a multa), para anotar em quantas vezes foi o crédito (`anotarParcelas`, maquininha.ts).
+ */
+export type ContaRecebida = { quitada: boolean; recebido: number; falta: number; no_caixa: boolean; ids?: string[] };
+
+/** Os lançamentos pagos por um recebimento de conta (a resposta de receber_conta). */
+export function idsDoRecebimento(contaId: string, x: Record<string, unknown>): string[] {
+  const parte = typeof x.parte_id === "string" ? x.parte_id : null;
+  const multa = typeof x.multa_id === "string" ? x.multa_id : null;
+  return [parte ?? (x.quitada ? contaId : null), multa].filter((v): v is string => Boolean(v));
+}
 
 /**
  * Recebe uma conta que um cliente ficou de pagar: inteira ou só uma parte. O banco faz tudo numa operação só:
@@ -431,7 +441,7 @@ export async function receberConta(sb: Banco, contaId: string, r: {
   });
   if (error) throw new Error(error.message);
   const x = (data ?? {}) as Record<string, unknown>;
-  return { quitada: Boolean(x.quitada), recebido: Number(x.recebido ?? r.valor), falta: Number(x.falta ?? 0), no_caixa: Boolean(x.no_caixa) };
+  return { quitada: Boolean(x.quitada), recebido: Number(x.recebido ?? r.valor), falta: Number(x.falta ?? 0), no_caixa: Boolean(x.no_caixa), ids: idsDoRecebimento(contaId, x) };
 }
 
 /**

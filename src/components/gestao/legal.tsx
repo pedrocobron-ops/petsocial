@@ -91,7 +91,7 @@ export default function Legal({ pagina, titulo, resumo, children }: { pagina: Do
         <Link href="/gestao/termos">Termos de uso</Link>
         <Link href="/gestao/privacidade">Política de privacidade</Link>
         <Link href="/gestao">Conhecer o Gestão</Link>
-        <Link href="/gestao/entrar">Entrar</Link>
+        <a href="/gestao/entrar">Entrar</a>
       </footer>
     </div>
   );
