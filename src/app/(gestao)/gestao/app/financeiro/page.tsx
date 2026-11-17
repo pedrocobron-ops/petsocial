@@ -16,7 +16,7 @@ import {
 import CustoDasVendas from "@/components/gestao/financeiro/custo-vendas";
 import AlteracoesDoPeriodo from "@/components/gestao/financeiro/alteracoes-periodo";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
-import { contasDaMeta, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { contasDaMeta, descricaoAtual, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
 import type { AlteracaoLancamento, Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
@@ -376,8 +376,8 @@ function Financeiro() {
                         <button key={l.id} className="g-linha" onClick={() => abrir({ tipo: "editar", lancamento: l })}>
                           <Tile icone={entrada ? ArrowDownLeft : ArrowUpRight} tom={entrada ? "menta" : "rosa"} />
                           <span className="t">
-                            <b>{l.descricao || categoriaAtual(l.categoria, petshop)} <TagAlterado lancamento={l} /></b>
-                            <span>{dataCurta(l.data)}{l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria, petshop)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {textoDoPagamento(l)}</i></span>
+                            <b>{descricaoAtual(l.descricao) || categoriaAtual(l.categoria, petshop)} <TagAlterado lancamento={l} /></b>
+                            <span>{dataCurta(l.data)}{l.descricao && !ehDeServico(l) ? ` · ${categoriaAtual(l.categoria, petshop, l.descricao)}` : ""}{resumoDeItens(l) && ` · ${resumoDeItens(l)}`}<i className="g-fin-so-cel"> · {textoDoPagamento(l)}</i></span>
                           </span>
                           <span className="g-tag g-fin-so-largo">{textoDoPagamento(l)}</span>
                           <span className={`d ${entrada ? "g-verde-t" : "g-vermelho-t"}`}><b>{entrada ? "+" : "−"} {brl(l.valor)}</b></span>
@@ -633,7 +633,7 @@ function Contas({ lista, receber, hoje, tutores, aoEditar, aoBaixar, aoCriar }: 
               <button className="gf-toque" onClick={() => aoEditar(c)} aria-label={`Editar ${c.descricao || c.categoria}`}>
                 <span className="g-fin-so-largo"><Tile icone={v && v < hoje ? TriangleAlert : receber ? HandCoins : Receipt} tom={v && v < hoje ? "rosa" : receber ? "menta" : "manteiga"} /></span>
                 <span className="t">
-                  <b>{c.descricao || c.categoria}</b>
+                  <b>{descricaoAtual(c.descricao) || categoriaAtual(c.categoria, petshop)}</b>
                   <span>{tutor ? `${tutor} · ` : ""}{categoriaAtual(c.categoria, petshop)}{textoJaRecebido(c) ? ` · ${textoJaRecebido(c)}` : ""}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
                 </span>
                 <span className="d">

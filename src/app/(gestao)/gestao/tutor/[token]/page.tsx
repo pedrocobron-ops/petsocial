@@ -24,6 +24,8 @@ type Dia = { dia: string; tipo: string | null; itens: string[]; nota: string | n
 type PetDaPagina = {
   id: string; nome: string; especie: string | null; sexo: string | null; foto: string | null;
   na_casa: { tipo: string; entrada: string; saida_prevista: string | null } | null;
+  /** O último dia em que o pet esteve aqui (AAAA-MM-DD), sem diário nem foto necessariamente. Banco antes da 20261191: não vem. */
+  ultima_vez?: string | null;
   dias: Dia[]; agenda: { inicio: string; servico: string | null }[]; reservas: { tipo: string; entrada: string; saida_prevista: string | null }[];
   saude: { tipo: string; nome: string; vence_em: string }[];
 };
@@ -67,6 +69,15 @@ export default async function PaginaDoTutor({ params }: { params: Promise<{ toke
   const diaCurto = (iso: string) => fmt({ day: "2-digit", month: "2-digit" }, "UTC").format(diaDe(iso));
   const hora = (iso: string) => { const [h, m] = fmt({ hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso)).split(":"); return m === "00" ? `${Number(h)}h` : `${Number(h)}h${m}`; };
   const semana = (iso: string) => fmt({ weekday: "short" }).format(new Date(iso)).replace(".", "");
+
+  // sem diário, fotos nem nada marcado: o texto depende de o pet já ter vindo (hoje, ontem, outro dia) ou não
+  const semDiario = (pet: PetDaPagina) => {
+    const u = pet.ultima_vez, ele = pet.sexo === "F" ? "ela" : pet.sexo === "M" ? "ele" : "o pet";
+    if (!u) return `Ainda não tem diário nem fotos de ${pet.nome}. Quando ${ele} vier, o dia aparece aqui.`;
+    if (u === p.hoje) return `${pet.nome} veio hoje. Ainda não tem diário nem fotos.`;
+    if (u === ontem) return `${pet.nome} veio ontem. Não ficou diário nem fotos desse dia.`;
+    return `A última visita de ${pet.nome} foi em ${diaCurto(u)}. Quando ${ele} vier de novo, o dia aparece aqui.`;
+  };
 
   const propria = corPropria(p.petshop.tema);
   const tema = !propria && p.petshop.tema && p.petshop.tema !== "floresta" && TEMAS.some((t) => t.id === p.petshop.tema) ? p.petshop.tema : undefined;
@@ -154,7 +165,7 @@ export default async function PaginaDoTutor({ params }: { params: Promise<{ toke
               ))}
 
               {pet.na_casa && !pet.dias.some((d) => d.dia === p.hoje) && <p className="g-tt-vazio">O diário e as fotos de hoje aparecem aqui assim que a equipe puser.</p>}
-              {!temAlgo && <p className="g-tt-vazio">Ainda não tem diário nem fotos de {pet.nome}. Quando {pet.sexo === "F" ? "ela" : pet.sexo === "M" ? "ele" : "o pet"} vier, o dia aparece aqui.</p>}
+              {!temAlgo && <p className="g-tt-vazio">{semDiario(pet)}</p>}
             </section>
           );
         })}

@@ -47,3 +47,12 @@
 
 /* resumo do caixa fechado no celular: Imprimir, Exportar e Fechar cabem na mesma linha */
 @media (max-width: 520px) { .g-folha-pe:has(.g-cx-imp) { gap: 6px; padding-inline: 14px; } .g-folha-pe:has(.g-cx-imp) .g-btn { min-width: 0; padding-inline: 8px; gap: 6px; } }
+
+/* o dia no bloco do caixa aberto: entrou, saiu e o saldo, um embaixo do outro, os valores alinhados à direita */
+.g-cx-dia { display: grid; gap: 2px; margin: 0; padding: 10px 0 0; border-top: 1px solid rgba(246, 241, 232, .16); }
+.g-cx-dia > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 3px 0; }
+.g-cx-dia dt { font-size: .875rem; color: rgba(246, 241, 232, .8); min-width: 0; }
+.g-cx-dia dd { margin: 0; font-size: .9375rem; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.g-cx-dia > .forte { border-top: 1px dashed rgba(246, 241, 232, .22); margin-top: 3px; padding-top: 7px; }
+.g-cx-dia > .forte dt { color: #f6f1e8; font-weight: 600; }
+.g-cx-neg { color: #ffb4a6; }

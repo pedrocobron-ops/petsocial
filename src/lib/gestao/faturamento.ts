@@ -16,6 +16,20 @@ import { isoDia, deIsoDia, somaDias } from "./util";
  */
 export const CATEGORIAS_DEVOLUCAO = ["Devolução", "Devolução de sinal"];
 
+/**
+ * O lançamento é deste pet? Pela descrição, como a estadia e o sinal gravam: "Hotel: 2 diárias · Thor" (às vezes seguido de
+ * "(parte)" ou "+ taxa"), "Sinal da reserva: hotel de Thor, 19/11", "Devolução: hotel de Thor, 16/11 a 18/11 (…)",
+ * "Devolução do sinal: hotel de Thor, 19/11". Sem diferença de maiúsculas.
+ */
+export function lancamentoDoPet(descricao: string | null | undefined, pet: string): boolean {
+  const d = (descricao ?? "").trim().toLowerCase(), nome = pet.trim().toLowerCase();
+  if (!d || !nome) return false;
+  const ponto = `· ${nome}`, i = d.indexOf(ponto);
+  if (i >= 0 && /^($|\s|\(|\+)/.test(d.slice(i + ponto.length))) return true;
+  const m = /^(?:sinal da reserva|devolução do sinal|devolução): (?:hotel|creche) de (.+?)(?:,|\s\(|$)/.exec(d);
+  return Boolean(m && m[1].trim() === nome);
+}
+
 export type AjustesDoFaturamento = {
   devolvido: number; devolucoes: number;
   creditoDeixado: number; creditoUsadoFora: number;

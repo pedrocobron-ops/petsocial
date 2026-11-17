@@ -11,7 +11,8 @@ import { CartaoFidelidade } from "../fidelidade";
 import CartaoPaginaDoTutor from "../casa/pagina-do-tutor";
 import { DividaDoTutor } from "../financeiro/contas-clientes";
 import { CreditoDoTutor } from "../hotel/credito";
-import { FolhaLancamento } from "../financeiro/comum";
+import { categoriaAtual, FolhaLancamento } from "../financeiro/comum";
+import { descricaoAtual } from "@/lib/gestao/dinheiro";
 import FormPet from "../form-pet";
 import { Tile } from "../painel";
 import { AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
@@ -203,8 +204,8 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
                     <div key={l.id} className="g-linha">
                       <Tile icone={Receipt} tom={l.pago ? "menta" : "manteiga"} tamanho="p" />
                       <span className="t">
-                        <b>{l.descricao?.trim() || l.categoria}</b>
-                        <span>{dataCompleta(l.data)}{l.descricao?.trim() ? ` · ${l.categoria}` : ""}</span>
+                        <b>{descricaoAtual(l.descricao) || categoriaAtual(l.categoria, petshop)}</b>
+                        <span>{dataCompleta(l.data)}{l.descricao?.trim() ? ` · ${categoriaAtual(l.categoria, petshop, l.descricao)}` : ""}</span>
                       </span>
                       <span className="d gc-linha-tags">
                         <b>{brl(l.valor)}</b>

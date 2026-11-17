@@ -24,6 +24,7 @@ import { OcorrenciasDoPet } from "../casa/ocorrencias";
 import { QuemPodeBuscar } from "../casa/portaria";
 import { portariaLigada } from "@/lib/gestao/casa-opcoes";
 import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
+import { CATEGORIAS_DEVOLUCAO, lancamentoDoPet } from "@/lib/gestao/faturamento";
 
 type PetDaFicha = Pet & { clientes: Cliente | null };
 type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id"> & { agendamento_servicos?: { id: string; servico_id: string; preco: number | null; ordem: number }[] | null };
@@ -76,13 +77,24 @@ export default function FichaPet({ id, voltar, aoAbrir }: { id: string; voltar: 
       comPrecosDeAgendamento(sb, petshop.id, (concluidos.data ?? []) as { id: string; inicio: string; agendamento_servicos?: { id: string }[] | null }[], vejoFinanceiro) as Promise<Feito[]>,
       comPrecosDeAgendamento(sb, petshop.id, (atendimentos.data ?? []) as unknown as Atendimento[], vejoFinanceiro),
       (async () => {
-        if (!(vejoFinanceiro && petLido?.cliente_id && (nEstadias > 0 || usaModulo(petshop, "creche")))) return 0;
-        // diárias e mensalidades da creche: a descrição traz "· Nome do pet" (às vezes seguido de "(parte)" ou "+ taxa")
-        const l = await sb.from("lancamentos").select("valor, descricao").eq("petshop_id", petshop.id).eq("cliente_id", petLido.cliente_id)
-          .eq("tipo", "entrada").eq("pago", true).in("categoria", ["Creche e hotel", "Creche: mensalidade"]).limit(1000);
-        const nome = `· ${petLido.nome}`.toLowerCase();
-        const doPet = (d: string) => { const i = d.indexOf(nome); return i >= 0 && /^($|\s|\(|\+)/.test(d.slice(i + nome.length)); };
-        return (l.data ?? []).filter((x) => doPet((x.descricao ?? "").trim().toLowerCase())).reduce((t, x) => t + Number(x.valor), 0);
+        // num pet shop com creche ou hotel, sempre: o sinal pago entra antes da primeira estadia (e a reserva pode ter sido apagada)
+        if (!(vejoFinanceiro && petLido?.cliente_id && (nEstadias > 0 || (estadias.data ?? []).length > 0 || usaCasa(petshop)))) return 0;
+        // a mesma conta da ficha do tutor, só com o que é deste pet: o que entrou (diárias, mensalidades e o sinal da reserva),
+        // menos o que foi devolvido e o que ficou de crédito; o crédito usado num check-out deste pet (fora de uma entrada) conta
+        const [entradas, devolucoes, creditos] = await Promise.all([
+          sb.from("lancamentos").select("valor, descricao").eq("petshop_id", petshop.id).eq("cliente_id", petLido.cliente_id)
+            .eq("tipo", "entrada").eq("pago", true).in("categoria", ["Creche e hotel", "Creche: mensalidade"]).limit(1000),
+          sb.from("lancamentos").select("valor, descricao").eq("petshop_id", petshop.id).eq("cliente_id", petLido.cliente_id)
+            .eq("tipo", "saida").eq("pago", true).in("categoria", CATEGORIAS_DEVOLUCAO).limit(1000),
+          sb.from("clientes_creditos").select("valor, lancamento_id, estadias!inner(pet_id)").eq("petshop_id", petshop.id).eq("cliente_id", petLido.cliente_id)
+            .eq("estadias.pet_id", id).limit(1000),
+        ]);
+        const doPet = (d: string | null) => lancamentoDoPet(d, petLido.nome);
+        const entrou = (entradas.data ?? []).filter((x) => doPet(x.descricao)).reduce((t, x) => t + Number(x.valor), 0);
+        const devolvido = (devolucoes.data ?? []).filter((x) => doPet(x.descricao)).reduce((t, x) => t + Number(x.valor), 0);
+        const credito = ((creditos.data ?? []) as { valor: number; lancamento_id: string | null }[])
+          .reduce((t, c) => t + (Number(c.valor) > 0 ? -Number(c.valor) : c.lancamento_id ? 0 : -Number(c.valor)), 0);
+        return Math.max(0, Math.round((entrou - devolvido + credito) * 100) / 100);
       })(),
     ]);
     // quem está na casa agora veio hoje; estadia encerrada conta pelo dia em que saiu
@@ -219,7 +231,7 @@ export default function FichaPet({ id, voltar, aoAbrir }: { id: string; voltar: 
         {vejoFinanceiro ? (
           <div className="g-cli-num">
             <Tile icone={Wallet} tom="menta" />
-            <div><span className="g-rotulo">{gastoEstadias > 0 || !comBanho ? "Gasto aqui" : "Gasto em atendimentos"}</span><b className="g-tab">{brl(gasto)}</b><small>{gastoParcial ? "nos 1.000 mais recentes" : gastoEstadias > 0 ? (comBanho ? `${brl(gastoEstadias)} de ${nomeDaCasa(petshop).toLowerCase()}` : "diárias e mensalidades pagas") : comBanho ? "soma dos concluídos" : "nada pago ainda"}</small></div>
+            <div><span className="g-rotulo">{gastoEstadias > 0 || !comBanho ? "Gasto aqui" : "Gasto em atendimentos"}</span><b className="g-tab">{brl(gasto)}</b><small>{gastoParcial ? "nos 1.000 mais recentes" : gastoEstadias > 0 ? (comBanho ? `${brl(gastoEstadias)} de ${nomeDaCasa(petshop).toLowerCase()}` : usaModulo(petshop, "creche") ? "diárias, sinais e mensalidades" : "diárias e sinais pagos") : comBanho ? "soma dos concluídos" : "nada pago ainda"}</small></div>
           </div>
         ) : !usaModulo(petshop, "pacotes") && casa ? (
           <div className="g-cli-num">
