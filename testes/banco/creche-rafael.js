@@ -81,7 +81,8 @@ const U = lib('util');
   T.recusa('a monitora não corrige', await corrigir(monitor, { p_saida: as(ontem, '19:30') }), /Só o dono ou quem cuida do financeiro/);
   T.recusa('a recepção (caixa, sem financeiro) não corrige', await corrigir(caixa, { p_saida: as(ontem, '19:30') }), /Só o dono ou quem cuida do financeiro/);
   T.recusa('sem motivo: recusado', await dono.rpc('estadia_corrigir_horas', { p_estadia: est, p_saida: as(ontem, '19:30'), p_motivo: '' }), /motivo/);
-  T.recusa('saída noutro dia: recusado', await corrigir(dono, { p_saida: as(L.hoje, '07:30') }), /mesmo dia/);
+  // hoje 00:01: sempre no passado (ou dentro da folga de 5 min) e noutro dia que a chegada de ontem
+  T.recusa('saída noutro dia: recusado', await corrigir(dono, { p_saida: as(L.hoje, '00:01') }), /mesmo dia/);
   T.recusa('saída antes da chegada: recusado', await corrigir(dono, { p_saida: as(ontem, '07:00') }), /depois da chegada/);
   let r = await corrigir(dono, { p_saida: as(ontem, '19:30') });
   T.passa('o dono põe a saída às 19h30', r, r.data && r.data.taxa === 'anotada');

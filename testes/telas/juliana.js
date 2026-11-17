@@ -106,7 +106,8 @@ const sqlLoja = (L, campos) => B.sql(`select ${campos} from petshops where id='$
       T.secao('1366: check-out do hotel com o serviço da área Hotel num toque');
       const tutor = B.must(await L.sb.dono.from('clientes').insert({ petshop_id: L.P, nome: 'Tutor Teste 1', telefone: '11900000001' }).select('id').single(), 'tutor').id;
       const mel = B.must(await L.sb.dono.from('pets').insert({ petshop_id: L.P, cliente_id: tutor, nome: 'Mel', especie: 'cao', porte: 'M' }).select('id').single(), 'pet').id;
-      const ontem = new Date(Date.now() - 26 * 3600e3).toISOString();
+      // ontem às 10:00 no horário do pet shop: uma diária a qualquer hora do dia (26 h antes passava de duas perto da meia-noite)
+      const ontem = B.sql(`select to_char((((now() at time zone 'America/Sao_Paulo')::date - 1) + time '10:00') at time zone 'America/Sao_Paulo' at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`);
       B.must(await L.sb.dono.from('estadias').insert({ petshop_id: L.P, pet_id: mel, tipo: 'hotel', status: 'em_casa', entrada: ontem, valor_diaria: 120 }).select('id'), 'estadia');
       await N.ir(page, '/gestao/app/creche-hotel?ver=casa');
       await page.locator('.g-ch-cartao', { hasText: 'Mel' }).first().locator('button', { hasText: 'Check-out' }).click();
