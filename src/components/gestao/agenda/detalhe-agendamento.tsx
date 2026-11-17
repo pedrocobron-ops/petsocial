@@ -26,15 +26,20 @@ import AntesDepois from "./antes-depois";
 import { BotaoBoletim } from "../boletim/boletim";
 import { EntradaNaChegada, EntradaNaVisita, type VisitaDaEntrada } from "../entrada/entrada";
 import { continuarSerie, encerrarSerie, textoContinuou, VEZES_POR_VEZ } from "./series-acabando";
+import { LinhaPromo, usePromoDoHorario } from "./promo-do-horario";
+import { AvisoPacoteAcabando } from "../pacote-acabando";
+import { descontoDaPromo } from "@/lib/gestao/promocoes";
 import "@/components/gestao/hotel/hotel.css";
 
 /** Tudo sobre um horário: quem é o pet, o que fazer agora (confirmar, iniciar, concluir e fechar a conta) e o lembrete no WhatsApp. */
 export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, aoEditar }: {
   agendamento: AgendamentoCompleto; aoFechar: () => void; aoMudar: () => void; aoEditar: () => void;
 }) {
-  const { sb, petshop, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso } = useGestao();
+  const { sb, petshop, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso, servicos } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
+  // a promoção do horário (o banco pôs ao marcar): a equipe tira ou põe de volta até a conta ser lançada
+  const promoDoHorario = usePromoDoHorario(a.id, a.promo);
   // conta aberta: "sim", ou com o pacote que vai cobrir o serviço principal
   const [comanda, setComanda] = useState<false | "sim" | PacoteCliente>(false);
   const [cancelando, setCancelando] = useState(false);
@@ -113,6 +118,12 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const pacote = a.pacote_cliente_id ? null : extra?.pacote ?? null;
   // o que falta cobrar na conta: tudo, ou só os outros serviços quando o principal foi pelo pacote
   const aCobrar = a.pacote_cliente_id ? valorOutros : total;
+  // a promoção tira da conta (a mesma conta de Fechar a conta): o principal só quando não vai pelo pacote
+  const categoriaDe = (id: string) => servicos.find((x) => x.id === id)?.categoria;
+  const promoValor = descontoDaPromo(promoDoHorario.promo, [
+    ...(a.pacote_cliente_id || a.preco == null ? [] : [{ tipo: "servico", valor: Number(a.preco), qtd: 1 }]),
+    ...outros.map((o) => ({ tipo: "servico", valor: o.preco == null ? null : Number(o.preco), qtd: 1, servicoId: o.servico_id })),
+  ], a.servico_id, categoriaDe);
   // conta fechada: já recebida, ou anotada para o cliente pagar depois (a receber)
   const recebidos = (extra?.pago ?? []).filter((l) => l.pago), devidos = (extra?.pago ?? []).filter((l) => !l.pago);
   const recebido = recebidos.reduce((t, l) => t + Number(l.valor), 0);
@@ -434,6 +445,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         </div>
 
         {pet?.alertas && <p className="g-aviso" style={{ margin: 0 }}>{pet.alertas}</p>}
+        {pet && a.status !== "cancelado" && <AvisoPacoteAcabando petId={pet.id} />}
         {vejoFinanceiro && deveAntes > 0.005 && a.status !== "cancelado" && (
           <p className="g-aviso g-agd-deve" style={{ margin: 0 }} role="status">
             <span>
@@ -460,6 +472,10 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           {a.profissionais && <div className="g-fila entre"><span className="g-muted">Com</span><b>{a.profissionais.nome}</b></div>}
           {/* valores só para quem recebe: quem só atende vê o serviço, o horário e quem atende */}
           {vejoFinanceiro && <div className="g-fila entre"><span className="g-muted">{outros.length ? "Valor total" : "Valor"}</span><b className="g-tab">{total != null ? brl(total) : "A definir"}{pago && !lancado ? " · pago" : ""}</b></div>}
+          {promoDoHorario.promo && (
+            <LinhaPromo promo={promoDoHorario.promo} valor={vejoFinanceiro ? promoValor : null} ocupado={promoDoHorario.ocupado}
+              podeMudar={!encerrado && !lancado && (posso("agenda") || vejoFinanceiro)} aoTirar={() => void promoDoHorario.tirar()} aoPorDeVolta={() => void promoDoHorario.porDeVolta()} />
+          )}
           {vejoFinanceiro && outros.length > 0 && (
             <ul className="g-agd-servicos" aria-label="Valor de cada serviço">
               <li><span>{a.servicos?.nome ?? "Serviço"}</span><b className="g-tab">{a.pacote_cliente_id ? "pelo pacote" : a.preco != null ? brl(a.preco) : "a definir"}</b></li>
@@ -542,7 +558,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
             )}
             {sabe && vejoFinanceiro && !pago && (
               <button className={`g-btn ${pacote ? "sec" : "pri"} cheio`} disabled={ocupado || !sabe} onClick={() => { if (!somenteLeitura()) setComanda("sim"); }}>
-                <Receipt />{pacote ? "Cobrar à parte, sem usar o pacote" : "Fechar a conta"}{aCobrar ? ` · ${brl(aCobrar)}` : ""}
+                <Receipt />{pacote ? "Cobrar à parte, sem usar o pacote" : "Fechar a conta"}{aCobrar ? ` · ${brl(Math.max(0, Math.round((aCobrar - promoValor) * 100) / 100))}` : ""}
               </button>
             )}
             {sabe && (!vejoFinanceiro || pago) && <button className={`g-btn ${pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void mudar({ status: "concluido" }, "Atendimento concluído.").then((deu) => deu && aoFechar())}><Check />{pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}

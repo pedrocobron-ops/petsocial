@@ -62,20 +62,23 @@ export function mensagemSaude(tutorNome: string, petNome: string, petshopNome: s
 /* ---------- chamar de volta e aniversário (Clientes, tela Hoje, Modo envio) ---------- */
 
 export type AbaChamar = "volta" | "niver";
+/** Os textos que o pet shop pode mudar: os do Chamar de volta e o do aniversário do tutor. */
+export type ModeloChave = AbaChamar | "niver_tutor";
 
 /** "Thor", "Thor e Mel", "Thor, Mel e Luna". */
 export const juntarNomes = (n: string[]) => (n.length <= 1 ? n[0] ?? "" : `${n.slice(0, -1).join(", ")} e ${n[n.length - 1]}`);
 
 /** Os textos padrão (o pet shop muda os dele em Chamar de volta; ficam em `modelos_mensagem`). */
-export const MODELOS_PADRAO: Record<AbaChamar, string> = {
+export const MODELOS_PADRAO: Record<ModeloChave, string> = {
   volta: "Faz um tempinho desde a última visita de [pet]. Quer que eu veja um horário?",
   niver: "A gente lembrou do aniversário de [pet] e passou para dar os parabéns! Muita saúde e muito carinho.",
+  niver_tutor: "Hoje é o seu aniversário! Toda a equipe deseja um dia muito feliz para você. Um abraço também para [pet].",
 };
 /** Como cada texto se chama na tabela `modelos_mensagem`. */
-export const CHAVE_NO_BANCO: Record<AbaChamar, string> = { volta: "chamar.volta", niver: "chamar.niver" };
+export const CHAVE_NO_BANCO: Record<ModeloChave, string> = { volta: "chamar.volta", niver: "chamar.niver", niver_tutor: "chamar.niver_tutor" };
 
 /** A mensagem inteira: a saudação entra sozinha e `[pet]` vira o nome do pet (ou dos pets) do tutor. Texto em branco usa o padrão. */
-export function montarMensagem(aba: AbaChamar, modelo: string, p: { tutor: string | null; pets: string[]; petshop: string }) {
+export function montarMensagem(aba: ModeloChave, modelo: string, p: { tutor: string | null; pets: string[]; petshop: string }) {
   const corpo = (modelo.trim() || MODELOS_PADRAO[aba]).replace(/\[pet\]/gi, juntarNomes(p.pets) || "seu pet");
   return `${saudacaoZap(p.tutor, p.petshop)} ${corpo}`;
 }

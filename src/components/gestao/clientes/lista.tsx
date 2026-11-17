@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Importar, { UltimaImportacao } from "@/components/gestao/importar";
 import FotoCaderno from "@/components/gestao/caderno";
-import { AlertTriangle, Cat, ChevronRight, Dog, Camera, Download, HandCoins, MessageCircle, PawPrint, Phone, PiggyBank, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
+import { AlertTriangle, Cake, Cat, ChevronRight, Dog, Camera, Download, HandCoins, MessageCircle, PawPrint, Phone, PiggyBank, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { brl, fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
 import { buscarVisitas, sumiu } from "@/lib/gestao/visitas";
@@ -14,6 +14,7 @@ import { Anel, Kpi } from "../painel";
 import { abrirAssistente, AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { baixarCsv, buscarTudo, ESPECIES, linkPet, linkTutor, nomePorte, type PetDaLista } from "./comum";
 import ChamarDeVolta from "./chamar-de-volta";
+import Aniversariantes from "./aniversariantes";
 import FormTutor from "./form-tutor";
 import { EtiquetaSaude } from "./saude";
 import { buscarAlertasSaude } from "./saude-avisos";
@@ -94,6 +95,7 @@ export default function Lista({ aoAbrir, irPara }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [chamando, setChamando] = useState(false);
+  const [niverDoMes, setNiverDoMes] = useState(false);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [pets, clientes] = await Promise.all([
@@ -219,6 +221,7 @@ export default function Lista({ aoAbrir, irPara }: {
         </div>
         <div className="g-acoes">
           {posso("clientes") && <button className="g-btn sec" onClick={() => setChamando(true)} disabled={!dados}><MessageCircle />Chamar de volta</button>}
+          {posso("clientes") && <button className="g-btn sec" onClick={() => setNiverDoMes(true)}><Cake />Aniversariantes do mês</button>}
           {listaInteira && <button className="g-btn sec" onClick={exportar} disabled={!dados}><Download />Exportar</button>}
           {listaInteira && <button className="g-btn sec" onClick={() => setImportando(true)}><Upload />Trazer de planilha</button>}
           {posso("clientes") && <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setCaderno(true); }}><Camera />Foto do caderno</button>}
@@ -392,6 +395,7 @@ export default function Lista({ aoAbrir, irPara }: {
       )}
 
       {chamando && <ChamarDeVolta aoFechar={() => setChamando(false)} />}
+      {niverDoMes && <Aniversariantes aoFechar={() => setNiverDoMes(false)} />}
       {caderno && <FotoCaderno tipoInicial="clientes" aoFechar={() => setCaderno(false)} aoTerminar={() => void recarregar()} />}
       {importando && listaInteira && <Importar tipo="clientes" aoFechar={() => { setImportando(false); setVersaoImportacao((v) => v + 1); }} aoTerminar={() => void recarregar()} />}
       {petNovo && (

@@ -101,10 +101,10 @@ export default function PrivacidadeDoGestao() {
 
         <h3>Que o pet shop lança (nós como operadora)</h3>
         <ul>
-          <li><b>Tutores:</b> nome, telefone, e-mail, endereço, observações, quem pode buscar o pet, valores devidos e créditos.</li>
+          <li><b>Tutores:</b> nome, telefone, e-mail, endereço, data de aniversário (opcional: dia e mês, e o ano se o tutor quiser, só para o pet shop mandar os parabéns), observações, quem pode buscar o pet, valores devidos e créditos.</li>
           <li><b>Pets:</b> nome, espécie, raça, porte, sexo, nascimento, alertas, observações, ficha de saúde (vacinas, vermífugo, antipulgas, remédios e vencimentos), fotos (perfil, antes e depois, boletim, fotos do dia da creche e do hotel), diário e ocorrências, e o checklist de entrada (temperamento, como o pet chegou, com fotos, e os pertences).</li>
           <li><b>Autorizações para postar fotos:</b> as que o tutor deu pelo boletim (parte 7), com o texto aceito, o dia e a hora, e quando foram tiradas.</li>
-          <li><b>Atendimento e dinheiro:</b> agenda, estadias, pacotes, caixa, entradas e saídas, comissões, estoque e fornecedores.</li>
+          <li><b>Atendimento e dinheiro:</b> agenda (com a hora de cada etapa do atendimento e das viagens de leva e traz, e quem da equipe marcou), estadias, pacotes, caixa, entradas e saídas, comissões, estoque e fornecedores.</li>
         </ul>
         <p>
           O conteúdo desses campos é escolha do pet shop. O sistema não pede CPF nem dados de cartão dos tutores. Os Termos pedem que o pet shop não use

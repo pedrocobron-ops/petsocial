@@ -14,6 +14,7 @@ import { multaSugerida } from "@/lib/gestao/dinheiro-opcoes";
 import { repartirPagamento } from "@/lib/gestao/hotel";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { servicosAMais } from "@/lib/gestao/servicos-do-horario";
+import { taxaDoLevaTraz, taxaSugerida, temTaxa } from "@/lib/gestao/quadro";
 import { brl, dataCompleta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useGestao } from "../contexto";
@@ -25,8 +26,12 @@ import {
   BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
   produtosDaConta, resumoDosItens, useProdutosDaLoja, valorDaLinha, type ItemConta, type PagaDepois,
 } from "../loja/conta";
-import { AvisoCaixaFechado, fecharPagamento, pagoAMenos, useCaixaAberto, usePagamento } from "../loja/pecas";
+import { AvisoCaixaFechado, fecharPagamento, pagoAMenos, ParcelasNaTela, useCaixaAberto, usePagamento } from "../loja/pecas";
+import { anotarParcelas, idsDaOperacao } from "@/lib/gestao/maquininha";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
+import { LinhaPromoNaConta, usePromoDoHorario } from "./promo-do-horario";
+import { AvisoPacoteAcabando } from "../pacote-acabando";
+import { descontoDaPromo } from "@/lib/gestao/promocoes";
 
 const centavos = (n: number) => Math.round(n * 100) / 100;
 /** Uma conta que o tutor ficou devendo de antes (fiado, taxa de falta, resto de um pagamento). */
@@ -83,7 +88,12 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   const caixa = useCaixaAberto();
   const op = useOperacao();
 
-  const contas = fecharContas(itens, desconto);
+  // a promoção do horário (o dono montou): uma linha de desconto, fora do "Desconto em reais" do caixa. O banco confere a mesma conta.
+  const promoDoHorario = usePromoDoHorario(a.id, a.promo);
+  const promoAtiva = promoDoHorario.promo && !promoDoHorario.promo.tirada ? promoDoHorario.promo : null;
+  const somaDaConta = fecharContas(itens, null).subtotal;
+  const promoValor = Math.min(somaDaConta, descontoDaPromo(promoAtiva, itens, a.servico_id, (id) => servicos.find((x) => x.id === id)?.categoria));
+  const contas = fecharContas(itens, (desconto ?? 0) + promoValor);
   // o que o tutor deve de antes (só para quem recebe): pode entrar nesta conta e ter baixa no mesmo pagamento
   const { dados: antigasLidas } = useDados(async () => {
     if (!vejoFinanceiro || !tutor?.id) return [] as Antiga[];
@@ -134,7 +144,11 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     setEscolhendoServico(false);
   };
   const mudar = (chave: string, m: Partial<ItemConta>) => setItens((l) => l.map((i) => (i.chave === chave ? { ...i, ...m } : i)));
-  const extra = (nome: string) => setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome, qtd: 1, valor: null }]);
+  const extra = (nome: string, valor: number | null = null) => setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome, qtd: 1, valor }]);
+  // taxa de leva e traz de Meu pet shop: só uma sugestão; entra na conta com um toque (nada muda sozinho)
+  const taxa = taxaDoLevaTraz(petshop);
+  const comTaxa = a.leva_traz && temTaxa(taxa);
+  const sugerida = comTaxa ? taxaSugerida(taxa, a.endereco_leva_traz) : null;
 
   /** Mesma categoria do recebimento simples; creche e hotel vão para a deles; conta só de produto vira venda. */
   function categoria() {
@@ -216,6 +230,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       if (a.status !== "concluido" || naoCobra) passos.push({ t: "agendamento", id: a.id, status: "concluido", ...(naoCobra ? { sem_cobranca: true } : {}) });
       const feito = await fecharNoBanco(chave, passos);
       if (!feito) return true;
+      // crédito parcelado: em quantas vezes (a taxa do parcelado); se falhar, fica a do crédito à vista
+      if (pg && !("erro" in pg)) await anotarParcelas(sb, petshop.id, idsDaOperacao(feito), pagamento.parcelas).catch(() => 0);
       const usos = feito.passos.find((p) => p.t === "pacote");
       const lancado = lanca && !fiado ? (lancamentoDe(feito, "principal") as unknown as Lancamento | null) : null;
       if (vejoFinanceiro && pg && !("erro" in pg) && soDigitos(tutor?.telefone).length >= 8 && (lancado || pagouAntigas > 0)) {
@@ -314,6 +330,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       passos.push({ t: "receber", conta: ref("conta"), valor: entregue, forma: m.forma, pagamentos: partesOuNada(m.pagamentos), chave: parteDaChave(chave, "parte") });
       const feito = await fecharNoBanco(chave, passos);
       if (!feito) return true;
+      // crédito parcelado: em quantas vezes (a taxa do parcelado); se falhar, fica a do crédito à vista
+      await anotarParcelas(sb, petshop.id, idsDaOperacao(feito), pagamento.parcelas).catch(() => 0);
       const nota = `${credito > 0 ? `${brl(credito)} saíram do crédito de ${primeiroNome}. ` : ""}Ficou ${brl(falta)} para ${primeiroNome} pagar até ${dataCompleta(depois.quando)}, em A receber e na ficha.${junto > 0 ? ` O que ${primeiroNome} devia de antes (${brl(devido)}) continua anotado.` : ""}`;
       avisar(`Recebido ${brl(entregue)}. ${nota}`);
       avisarMudanca();
@@ -348,6 +366,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   }
 
   return (
+    <ParcelasNaTela.Provider value>
     <Folha larga titulo="Fechar a conta" aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
@@ -363,6 +382,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
             <span>{[tutor?.nome, `${hora(a.inicio)} às ${hora(a.fim)}`].filter(Boolean).join(" · ")}</span>
           </div>
         </div>
+        {pet && <AvisoPacoteAcabando petId={pet.id} compacto />}
 
         <div className="g-card liso g-vd-itens">
           {peloPacote && (
@@ -379,16 +399,31 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
             <LinhaDaConta key={i.chave} item={i} produto={produtos.find((p) => p.id === i.produtoId)} apoio={a.profissionais ? `com ${a.profissionais.nome}` : undefined}
               aoMudar={(m) => mudar(i.chave, m)} aoTirar={i.tipo === "servico" && (!i.servicoId || !mexeNosServicos || (naoTiraFeito && doHorario.has(i.servicoId))) ? undefined : () => setItens((l) => l.filter((x) => x.chave !== i.chave))} />
           ))}
+          {promoAtiva && <LinhaPromoNaConta promo={promoAtiva} valor={promoValor} ocupado={promoDoHorario.ocupado || salvando} aoTirar={() => void promoDoHorario.tirar()} />}
         </div>
 
         <div className="g-campo">
           <span>{vendeProdutos ? "Levou mais alguma coisa?" : "Tem mais alguma coisa na conta?"}</span>
           {vendeProdutos && <BuscaProduto produtos={produtos} carregando={carregando} erro={erro} itens={itens} aoEscolher={(p) => setItens((l) => comProduto(l, p))} />}
           <div className="g-chips g-vd-chips">
-            {a.leva_traz && !temLevaTraz && <button type="button" className="g-chip" onClick={() => extra(LEVA_E_TRAZ)}><Truck />{LEVA_E_TRAZ}</button>}
+            {a.leva_traz && !temLevaTraz && !comTaxa && <button type="button" className="g-chip" onClick={() => extra(LEVA_E_TRAZ)}><Truck />{LEVA_E_TRAZ}</button>}
             {mexeNosServicos && servicosParaJuntar.length > 0 && <button type="button" className="g-chip" aria-expanded={escolhendoServico} onClick={() => setEscolhendoServico((v) => !v)}><Scissors />Outro serviço</button>}
             <button type="button" className="g-chip" onClick={() => extra("")}><Plus />Outro extra</button>
           </div>
+          {comTaxa && !temLevaTraz && (
+            <div className="g-card liso g-pilha p g-vd-taxi" role="group" aria-label="Taxa de leva e traz">
+              <p className="g-pp" style={{ margin: 0 }}>
+                <Truck size={15} aria-hidden style={{ verticalAlign: "-3px", marginRight: 4 }} />
+                {sugerida ? <>Este horário tem leva e traz{sugerida.bairro ? <> para <b>{sugerida.bairro}</b></> : null}: taxa de <b className="g-tab">{brl(sugerida.valor)}</b>.</> : "Este horário tem leva e traz. De qual bairro?"}
+              </p>
+              <div className="g-chips">
+                {sugerida && <button type="button" className="g-chip" aria-pressed="false" onClick={() => extra(LEVA_E_TRAZ, sugerida.valor)}><Plus />Pôr na conta · {brl(sugerida.valor)}</button>}
+                {taxa.modo === "bairro" && taxa.bairros.filter((b) => b.nome !== sugerida?.bairro).slice(0, 24).map((b) => (
+                  <button key={b.nome} type="button" className="g-chip" onClick={() => extra(LEVA_E_TRAZ, b.valor)}>{b.nome} · {brl(b.valor)}</button>
+                ))}
+              </div>
+            </div>
+          )}
           {escolhendoServico && servicosParaJuntar.length > 0 && (
             <div className="g-vd-servicos" role="group" aria-label="Qual serviço juntar na conta">
               <small className="g-muted">Qual serviço o pet fez a mais? Ele entra na conta com o valor dele{a.profissionais ? " e conta para a comissão" : ""}.</small>
@@ -421,7 +456,11 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         {(saldoCredito ?? 0) > 0 && contas.total > 0 && (
           <UsarCredito saldo={saldoCredito!} usar={usarCredito} aoMudar={(v) => { setUsarCredito(v); setErroForma(null); }} usado={credito} resto={depois.ativo ? daConta : aPagar} />
         )}
-        <FechamentoDaConta subtotal={contas.subtotal} desconto={contas.desconto} total={contas.total} descontoDigitado={desconto} aoDesconto={setDesconto}
+        {promoDoHorario.promo?.tirada && (
+          <p className="g-pp g-muted" style={{ margin: 0 }}>Promoção {promoDoHorario.promo.nome} tirada deste horário. <button type="button" className="g-link" disabled={promoDoHorario.ocupado || salvando} onClick={() => void promoDoHorario.porDeVolta()}>Pôr de volta</button></p>
+        )}
+        <FechamentoDaConta subtotal={contas.subtotal} desconto={Math.max(0, Math.round((contas.desconto - promoValor) * 100) / 100)} total={contas.total}
+          promo={promoValor > 0 && promoAtiva ? { nome: promoAtiva.nome, valor: promoValor } : undefined} descontoDigitado={desconto} aoDesconto={setDesconto}
           pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErroForma(null); }} erroForma={erroForma}
           depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} aceitaResto receberAgora={aPagar} junto={junto} credito={credito} />
         {trocoQuePaga > 0 && (
@@ -460,5 +499,6 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         </p>
       </div>
     </Folha>
+    </ParcelasNaTela.Provider>
   );
 }

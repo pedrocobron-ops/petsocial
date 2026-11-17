@@ -22,6 +22,7 @@ export const MUDANCAS: string[] = [
   "Baixar todos os dados: em Meu pet shop, um arquivo com uma planilha para cada parte e um README que explica cada uma.",
   "Dados de um tutor: na ficha do tutor, o dono baixa os dados daquele cliente ou apaga os dados pessoais dele. Os valores ficam no financeiro, sem o nome.",
   "Checklist de entrada: o pet shop pode registrar como o pet chegou (com fotos) e pedir o aceite do tutor, por assinatura no aparelho ou por link. O texto do termo é do pet shop; o sistema guarda o aceite.",
+  "Aniversário do tutor (opcional) e horários das etapas do atendimento e do leva e traz: explicamos o que guardamos e para quê.",
   "Encerrar e apagar a conta: o titular pede em Meu pet shop. A conta fica 30 dias só para consulta, dá para cancelar nesse prazo e depois apagamos tudo. Quem é da equipe pode sair por \"Sair desta equipe\".",
 ];
 

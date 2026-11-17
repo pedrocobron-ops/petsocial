@@ -85,14 +85,14 @@ isOneToOne: false
                   ]
                 },"agendamentos": {
                   Row: {
-                    "checklist": NonNullable<Json>,"concluido_servicos": string | null,"criado_em": string,"criado_por": string | null,"endereco_leva_traz": string | null,"fim": string,"foto_antes": string | null,"foto_depois": string | null,"id": string,"inicio": string,"lembrete_em": string | null,"leva_traz": boolean,"obs": string | null,"origem": string,"pacote_cliente_id": string | null,"pet_id": string,"petshop_id": string,"preco": number | null,"profissional_id": string | null,"pronto_avisado_em": string | null,"remarcado_em": string | null,"sem_cobranca": boolean,"sem_cobranca_em": string | null,"sem_cobranca_nome": string | null,"sem_cobranca_por": string | null,"serie_id": string | null,"servico_id": string | null,"status": Database["public"]['Enums']["status_agendamento"],"valor_concluido": number | null
+                    "checklist": NonNullable<Json>,"concluido_servicos": string | null,"criado_em": string,"criado_por": string | null,"endereco_leva_traz": string | null,"fim": string,"foto_antes": string | null,"foto_depois": string | null,"id": string,"inicio": string,"lembrete_em": string | null,"leva_traz": boolean,"obs": string | null,"origem": string,"pacote_cliente_id": string | null,"pet_id": string,"petshop_id": string,"preco": number | null,"profissional_id": string | null,"promo": Json | null,"pronto_avisado_em": string | null,"remarcado_em": string | null,"sem_cobranca": boolean,"sem_cobranca_em": string | null,"sem_cobranca_nome": string | null,"sem_cobranca_por": string | null,"serie_id": string | null,"servico_id": string | null,"status": Database["public"]['Enums']["status_agendamento"],"valor_concluido": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "checklist"?: NonNullable<Json>,"concluido_servicos"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"endereco_leva_traz"?: string | null,"fim": string,"foto_antes"?: string | null,"foto_depois"?: string | null,"id"?: string,"inicio": string,"lembrete_em"?: string | null,"leva_traz"?: boolean,"obs"?: string | null,"origem"?: string,"pacote_cliente_id"?: string | null,"pet_id": string,"petshop_id": string,"preco"?: number | null,"profissional_id"?: string | null,"pronto_avisado_em"?: string | null,"remarcado_em"?: string | null,"sem_cobranca"?: boolean,"sem_cobranca_em"?: string | null,"sem_cobranca_nome"?: string | null,"sem_cobranca_por"?: string | null,"serie_id"?: string | null,"servico_id"?: string | null,"status"?: Database["public"]['Enums']["status_agendamento"],"valor_concluido"?: number | null
+                    "checklist"?: NonNullable<Json>,"concluido_servicos"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"endereco_leva_traz"?: string | null,"fim": string,"foto_antes"?: string | null,"foto_depois"?: string | null,"id"?: string,"inicio": string,"lembrete_em"?: string | null,"leva_traz"?: boolean,"obs"?: string | null,"origem"?: string,"pacote_cliente_id"?: string | null,"pet_id": string,"petshop_id": string,"preco"?: number | null,"profissional_id"?: string | null,"promo"?: Json | null,"pronto_avisado_em"?: string | null,"remarcado_em"?: string | null,"sem_cobranca"?: boolean,"sem_cobranca_em"?: string | null,"sem_cobranca_nome"?: string | null,"sem_cobranca_por"?: string | null,"serie_id"?: string | null,"servico_id"?: string | null,"status"?: Database["public"]['Enums']["status_agendamento"],"valor_concluido"?: number | null
                   }
                   Update: {
-                    "checklist"?: NonNullable<Json>,"concluido_servicos"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"endereco_leva_traz"?: string | null,"fim"?: string,"foto_antes"?: string | null,"foto_depois"?: string | null,"id"?: string,"inicio"?: string,"lembrete_em"?: string | null,"leva_traz"?: boolean,"obs"?: string | null,"origem"?: string,"pacote_cliente_id"?: string | null,"pet_id"?: string,"petshop_id"?: string,"preco"?: number | null,"profissional_id"?: string | null,"pronto_avisado_em"?: string | null,"remarcado_em"?: string | null,"sem_cobranca"?: boolean,"sem_cobranca_em"?: string | null,"sem_cobranca_nome"?: string | null,"sem_cobranca_por"?: string | null,"serie_id"?: string | null,"servico_id"?: string | null,"status"?: Database["public"]['Enums']["status_agendamento"],"valor_concluido"?: number | null
+                    "checklist"?: NonNullable<Json>,"concluido_servicos"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"endereco_leva_traz"?: string | null,"fim"?: string,"foto_antes"?: string | null,"foto_depois"?: string | null,"id"?: string,"inicio"?: string,"lembrete_em"?: string | null,"leva_traz"?: boolean,"obs"?: string | null,"origem"?: string,"pacote_cliente_id"?: string | null,"pet_id"?: string,"petshop_id"?: string,"preco"?: number | null,"profissional_id"?: string | null,"promo"?: Json | null,"pronto_avisado_em"?: string | null,"remarcado_em"?: string | null,"sem_cobranca"?: boolean,"sem_cobranca_em"?: string | null,"sem_cobranca_nome"?: string | null,"sem_cobranca_por"?: string | null,"serie_id"?: string | null,"servico_id"?: string | null,"status"?: Database["public"]['Enums']["status_agendamento"],"valor_concluido"?: number | null
                   }
                   Relationships: [
                     {
@@ -461,14 +461,14 @@ isOneToOne: false
                   ]
                 },"clientes": {
                   Row: {
-                    "criado_em": string,"email": string | null,"endereco": string | null,"id": string,"limite_fiado": number | null,"nao_quer_mensagens": boolean,"nome": string,"obs": string | null,"petshop_id": string,"telefone": string | null
+                    "criado_em": string,"email": string | null,"endereco": string | null,"id": string,"limite_fiado": number | null,"nao_quer_mensagens": boolean,"nascimento": string | null,"nome": string,"obs": string | null,"petshop_id": string,"telefone": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"limite_fiado"?: number | null,"nao_quer_mensagens"?: boolean,"nome": string,"obs"?: string | null,"petshop_id": string,"telefone"?: string | null
+                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"limite_fiado"?: number | null,"nao_quer_mensagens"?: boolean,"nascimento"?: string | null,"nome": string,"obs"?: string | null,"petshop_id": string,"telefone"?: string | null
                   }
                   Update: {
-                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"limite_fiado"?: number | null,"nao_quer_mensagens"?: boolean,"nome"?: string,"obs"?: string | null,"petshop_id"?: string,"telefone"?: string | null
+                    "criado_em"?: string,"email"?: string | null,"endereco"?: string | null,"id"?: string,"limite_fiado"?: number | null,"nao_quer_mensagens"?: boolean,"nascimento"?: string | null,"nome"?: string,"obs"?: string | null,"petshop_id"?: string,"telefone"?: string | null
                   }
                   Relationships: [
                     {
@@ -1647,6 +1647,58 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"lancamentos_taxas": {
+                  Row: {
+                    "atualizado_em": string | null,"cartao": number,"criado_em": string,"lancamento_id": string,"parcelas": number | null,"partes": NonNullable<Json>,"petshop_id": string,"regra": NonNullable<Json>,"taxa": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "atualizado_em"?: string | null,"cartao"?: number,"criado_em"?: string,"lancamento_id": string,"parcelas"?: number | null,"partes"?: NonNullable<Json>,"petshop_id": string,"regra": NonNullable<Json>,"taxa"?: number
+                  }
+                  Update: {
+                    "atualizado_em"?: string | null,"cartao"?: number,"criado_em"?: string,"lancamento_id"?: string,"parcelas"?: number | null,"partes"?: NonNullable<Json>,"petshop_id"?: string,"regra"?: NonNullable<Json>,"taxa"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "lancamentos_taxas_lancamento_id_fkey"
+      columns: ["lancamento_id"]
+isOneToOne: true
+      referencedRelation: "lancamentos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "lancamentos_taxas_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"leva_traz_viagens": {
+                  Row: {
+                    "agendamento_id": string,"feito_em": string,"feito_por": string | null,"perna": string,"petshop_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agendamento_id": string,"feito_em"?: string,"feito_por"?: string | null,"perna": string,"petshop_id": string
+                  }
+                  Update: {
+                    "agendamento_id"?: string,"feito_em"?: string,"feito_por"?: string | null,"perna"?: string,"petshop_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "leva_traz_viagens_agendamento_id_petshop_id_fkey"
+      columns: ["agendamento_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "agendamentos"
+      referencedColumns: ["id","petshop_id"]
+    },{
+      foreignKeyName: "leva_traz_viagens_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"lgpd_registros": {
                   Row: {
                     "acao": string,"detalhe": NonNullable<Json>,"id": number,"petshop_id": string | null,"quando": string,"quem": string | null,"quem_nome": string | null
@@ -1975,14 +2027,14 @@ isOneToOne: false
                   ]
                 },"pacotes_clientes": {
                   Row: {
-                    "ativo": boolean,"chave": string | null,"comprado_em": string,"criado_em": string,"id": string,"nome": string,"pacote_id": string | null,"pet_id": string,"petshop_id": string,"preco": number,"servico_id": string | null,"total": number,"usados": number,"vence_em": string | null
+                    "acabou_em": string | null,"ativo": boolean,"chave": string | null,"comprado_em": string,"criado_em": string,"id": string,"nome": string,"pacote_id": string | null,"pet_id": string,"petshop_id": string,"preco": number,"servico_id": string | null,"total": number,"usados": number,"vence_em": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "ativo"?: boolean,"chave"?: string | null,"comprado_em"?: string,"criado_em"?: string,"id"?: string,"nome": string,"pacote_id"?: string | null,"pet_id": string,"petshop_id": string,"preco"?: number,"servico_id"?: string | null,"total": number,"usados"?: number,"vence_em"?: string | null
+                    "acabou_em"?: string | null,"ativo"?: boolean,"chave"?: string | null,"comprado_em"?: string,"criado_em"?: string,"id"?: string,"nome": string,"pacote_id"?: string | null,"pet_id": string,"petshop_id": string,"preco"?: number,"servico_id"?: string | null,"total": number,"usados"?: number,"vence_em"?: string | null
                   }
                   Update: {
-                    "ativo"?: boolean,"chave"?: string | null,"comprado_em"?: string,"criado_em"?: string,"id"?: string,"nome"?: string,"pacote_id"?: string | null,"pet_id"?: string,"petshop_id"?: string,"preco"?: number,"servico_id"?: string | null,"total"?: number,"usados"?: number,"vence_em"?: string | null
+                    "acabou_em"?: string | null,"ativo"?: boolean,"chave"?: string | null,"comprado_em"?: string,"criado_em"?: string,"id"?: string,"nome"?: string,"pacote_id"?: string | null,"pet_id"?: string,"petshop_id"?: string,"preco"?: number,"servico_id"?: string | null,"total"?: number,"usados"?: number,"vence_em"?: string | null
                   }
                   Relationships: [
                     {
@@ -2007,14 +2059,14 @@ isOneToOne: false
                   ]
                 },"pedidos_agendamento": {
                   Row: {
-                    "agendamento_id": string | null,"avisado_em": string | null,"cliente_cancelou_em": string | null,"cliente_pedido_visto_em": string | null,"cliente_pediu": string | null,"cliente_pediu_em": string | null,"cliente_recado": string | null,"criado_em": string,"especie": string,"estadia_id": string | null,"experiencia": boolean,"fim": string,"grupo_id": string | null,"id": string,"inicio": string,"obs": string | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"servico_id": string | null,"status": string,"telefone": string,"termos_aceitos_em": string | null,"termos_texto": string | null,"termos_vacinas": boolean | null,"tipo": string,"tutor_nome": string
+                    "agendamento_id": string | null,"avisado_em": string | null,"cliente_cancelou_em": string | null,"cliente_pedido_visto_em": string | null,"cliente_pediu": string | null,"cliente_pediu_em": string | null,"cliente_recado": string | null,"criado_em": string,"especie": string,"estadia_id": string | null,"experiencia": boolean,"fim": string,"grupo_id": string | null,"id": string,"inicio": string,"obs": string | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"promo": Json | null,"servico_id": string | null,"status": string,"telefone": string,"termos_aceitos_em": string | null,"termos_texto": string | null,"termos_vacinas": boolean | null,"tipo": string,"tutor_nome": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim": string,"grupo_id"?: string | null,"id"?: string,"inicio": string,"obs"?: string | null,"pet_nome": string,"petshop_id": string,"porte"?: string | null,"servico_id"?: string | null,"status"?: string,"telefone": string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome": string
+                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim": string,"grupo_id"?: string | null,"id"?: string,"inicio": string,"obs"?: string | null,"pet_nome": string,"petshop_id": string,"porte"?: string | null,"promo"?: Json | null,"servico_id"?: string | null,"status"?: string,"telefone": string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome": string
                   }
                   Update: {
-                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim"?: string,"grupo_id"?: string | null,"id"?: string,"inicio"?: string,"obs"?: string | null,"pet_nome"?: string,"petshop_id"?: string,"porte"?: string | null,"servico_id"?: string | null,"status"?: string,"telefone"?: string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome"?: string
+                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim"?: string,"grupo_id"?: string | null,"id"?: string,"inicio"?: string,"obs"?: string | null,"pet_nome"?: string,"petshop_id"?: string,"porte"?: string | null,"promo"?: Json | null,"servico_id"?: string | null,"status"?: string,"telefone"?: string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome"?: string
                   }
                   Relationships: [
                     {
@@ -2305,6 +2357,84 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"promo_usos": {
+                  Row: {
+                    "agendamento_id": string | null,"criado_em": string,"desconto": number,"id": number,"lancamento_id": string | null,"petshop_id": string,"promo_id": string | null,"promo_nome": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agendamento_id"?: string | null,"criado_em"?: string,"desconto": number,"id"?: never,"lancamento_id"?: string | null,"petshop_id": string,"promo_id"?: string | null,"promo_nome": string
+                  }
+                  Update: {
+                    "agendamento_id"?: string | null,"criado_em"?: string,"desconto"?: number,"id"?: never,"lancamento_id"?: string | null,"petshop_id"?: string,"promo_id"?: string | null,"promo_nome"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "promo_usos_agendamento_id_fkey"
+      columns: ["agendamento_id"]
+isOneToOne: false
+      referencedRelation: "agendamentos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "promo_usos_lancamento_id_fkey"
+      columns: ["lancamento_id"]
+isOneToOne: false
+      referencedRelation: "lancamentos"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "promo_usos_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"promocoes": {
+                  Row: {
+                    "ativa": boolean,"atualizado_em": string,"comeca_em": string | null,"criado_em": string,"criado_por": string | null,"dias": (number)[],"hora_ate": string | null,"hora_de": string | null,"id": string,"nome": string,"petshop_id": string,"servicos": (string)[],"termina_em": string | null,"tipo": string,"valor": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "ativa"?: boolean,"atualizado_em"?: string,"comeca_em"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"dias": (number)[],"hora_ate"?: string | null,"hora_de"?: string | null,"id"?: string,"nome": string,"petshop_id": string,"servicos"?: (string)[],"termina_em"?: string | null,"tipo": string,"valor": number
+                  }
+                  Update: {
+                    "ativa"?: boolean,"atualizado_em"?: string,"comeca_em"?: string | null,"criado_em"?: string,"criado_por"?: string | null,"dias"?: (number)[],"hora_ate"?: string | null,"hora_de"?: string | null,"id"?: string,"nome"?: string,"petshop_id"?: string,"servicos"?: (string)[],"termina_em"?: string | null,"tipo"?: string,"valor"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "promocoes_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"quadro_atendimento": {
+                  Row: {
+                    "agendamento_id": string,"atualizado_em": string,"atualizado_por": string | null,"chegou_em": string | null,"entregue_em": string | null,"etapa": string | null,"etapa_em": string | null,"petshop_id": string,"status_antes": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agendamento_id": string,"atualizado_em"?: string,"atualizado_por"?: string | null,"chegou_em"?: string | null,"entregue_em"?: string | null,"etapa"?: string | null,"etapa_em"?: string | null,"petshop_id": string,"status_antes"?: string | null
+                  }
+                  Update: {
+                    "agendamento_id"?: string,"atualizado_em"?: string,"atualizado_por"?: string | null,"chegou_em"?: string | null,"entregue_em"?: string | null,"etapa"?: string | null,"etapa_em"?: string | null,"petshop_id"?: string,"status_antes"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "quadro_atendimento_agendamento_id_petshop_id_fkey"
+      columns: ["agendamento_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "agendamentos"
+      referencedColumns: ["id","petshop_id"]
+    },{
+      foreignKeyName: "quadro_atendimento_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"series_agenda": {
                   Row: {
                     "cada_semanas": number,"criado_em": string,"encerrada_em": string | null,"petshop_id": string,"serie_id": string
@@ -2341,6 +2471,26 @@ isOneToOne: false
       foreignKeyName: "servicos_petshop_id_fkey"
       columns: ["petshop_id"]
 isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"taxas_maquininha": {
+                  Row: {
+                    "atualizado_em": string,"atualizado_por": string | null,"credito_dias": number,"credito_fixo": number,"credito_pct": number,"debito_dias": number,"debito_fixo": number,"debito_pct": number,"parcelado_dias": number | null,"parcelado_pct": number | null,"parcelas_pct": NonNullable<Json>,"petshop_id": string,"pix_dias": number,"pix_fixo": number,"pix_pct": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "atualizado_em"?: string,"atualizado_por"?: string | null,"credito_dias"?: number,"credito_fixo"?: number,"credito_pct"?: number,"debito_dias"?: number,"debito_fixo"?: number,"debito_pct"?: number,"parcelado_dias"?: number | null,"parcelado_pct"?: number | null,"parcelas_pct"?: NonNullable<Json>,"petshop_id": string,"pix_dias"?: number,"pix_fixo"?: number,"pix_pct"?: number
+                  }
+                  Update: {
+                    "atualizado_em"?: string,"atualizado_por"?: string | null,"credito_dias"?: number,"credito_fixo"?: number,"credito_pct"?: number,"debito_dias"?: number,"debito_fixo"?: number,"debito_pct"?: number,"parcelado_dias"?: number | null,"parcelado_pct"?: number | null,"parcelas_pct"?: NonNullable<Json>,"petshop_id"?: string,"pix_dias"?: number,"pix_fixo"?: number,"pix_pct"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "taxas_maquininha_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: true
       referencedRelation: "petshops"
       referencedColumns: ["id"]
     }
@@ -2543,6 +2693,9 @@ isOneToOne: false
                            },
 "agendamento_preco_da_tabela":
 { Args: { "p_id": string }; Returns: boolean
+                           },
+"agendamento_promo_usar":
+{ Args: { "p_id": string,"p_usar": boolean }; Returns: Json
                            },
 "agendamento_remarcado_em":
 { Args: { "p_id": string }; Returns: string
@@ -2765,6 +2918,7 @@ isOneToOne: false
 "petshop_id": string,
 "preco": number | null,
 "profissional_id": string | null,
+"promo": Json | null,
 "pronto_avisado_em": string | null,
 "remarcado_em": string | null,
 "sem_cobranca": boolean,
@@ -3256,11 +3410,17 @@ isOneToOne: false
 "importacao_desfazer":
 { Args: { "p_clientes": (string)[],"p_pets": (string)[],"p_petshop": string }; Returns: Json
                            },
+"indicadores_do_periodo":
+{ Args: { "p": string,"p_ate": string,"p_de": string }; Returns: Json
+                           },
 "kit_definir_itens":
 { Args: { "p_itens": Json,"p_kit": string }; Returns: Json
                            },
 "kits_recalcular":
 { Args: { "p_kits": (string)[] }; Returns: undefined
+                           },
+"leva_traz_marcar":
+{ Args: { "p_agendamento": string,"p_feito": boolean,"p_perna": string,"p_petshop": string }; Returns: Json
                            },
 "lgpd_anotar":
 { Args: { "p_acao": string,"p_detalhe"?: Json,"p_petshop": string }; Returns: undefined
@@ -3381,6 +3541,9 @@ isOneToOne: false
 "link_pedir_estadia":
 { Args: { "p_codigo": string,"p_entrada": string,"p_especie"?: string,"p_hora_entrada"?: string,"p_hora_saida"?: string,"p_mais_pets"?: Json,"p_obs"?: string,"p_pet": string,"p_porte"?: string,"p_saida": string,"p_telefone": string,"p_tipo": string,"p_tutor": string }; Returns: Json
                            },
+"link_promocoes":
+{ Args: { "p_codigo": string }; Returns: Json
+                           },
 "link_rede":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
@@ -3423,6 +3586,12 @@ isOneToOne: false
               "nome": string,"produto_id": string,"qtd": number,"servico_id": string,"valor": number
             }[]
                            },
+"maquininha_parcelas":
+{ Args: { "p": string,"p_ids": (string)[],"p_parcelas": number }; Returns: number
+                           },
+"maquininha_pergunta_parcelas":
+{ Args: { "p": string }; Returns: boolean
+                           },
 "marcar_uso":
 { Args: { "p_area": string,"p_petshop": string }; Returns: undefined
                            },
@@ -3443,6 +3612,9 @@ isOneToOne: false
 "modo_envio_marcar":
 { Args: { "p": string,"p_refs": (string)[],"p_tipo": string }; Returns: Json
                            },
+"niver_no_dia":
+{ Args: { "p_dia": string,"p_nascimento": string }; Returns: boolean
+                           },
 "nome_na_equipe":
 { Args: { "p": string }; Returns: string
                            },
@@ -3460,6 +3632,9 @@ isOneToOne: false
                            },
 "orcamento_vender":
 { Args: { "p_chave": string,"p_orcamento": string,"p_passos": Json,"p_petshop": string }; Returns: Json
+                           },
+"pacotes_acabando":
+{ Args: { "p": string,"p_pet"?: string }; Returns: Json
                            },
 "pagamentos_conferidos":
 { Args: { "p_pagamentos": Json,"p_total": number }; Returns: Json
@@ -3555,6 +3730,24 @@ isOneToOne: false
               "custo": number,"id": string,"ultimo_custo": number
             }[]
                            },
+"promo_desconto":
+{ Args: { "p_itens": Json,"p_petshop": string,"p_principal": string,"p_promo": Json }; Returns: number
+                           },
+"promo_do_horario":
+{ Args: { "p_criado_ate": string,"p_inicio": string,"p_petshop": string,"p_porte": string,"p_servico": string }; Returns: Json
+                           },
+"promo_servico_entra":
+{ Args: { "p_petshop": string,"p_servico": string,"p_servicos": Json }; Returns: boolean
+                           },
+"promocao_apagar":
+{ Args: { "p": string,"p_id": string }; Returns: boolean
+                           },
+"promocao_salvar":
+{ Args: { "p": string,"p_dados": Json,"p_id": string }; Returns: string
+                           },
+"quadro_mover":
+{ Args: { "p_agendamento": string,"p_para": string,"p_petshop": string }; Returns: Json
+                           },
 "receber_conta":
 { Args: { "p_chave"?: string,"p_conta": string,"p_data"?: string,"p_forma": string,"p_multa"?: number,"p_multa_forma"?: string,"p_multa_pagamentos"?: Json,"p_novo_vencimento"?: string,"p_pagamentos"?: Json,"p_valor": number }; Returns: Json
                            },
@@ -3608,6 +3801,9 @@ isOneToOne: false
 "registrar_conversa":
 { Args: { "p_canal": string,"p_pediu_equipe"?: boolean,"p_pergunta": string,"p_petshop": string,"p_resposta": string }; Returns: string
                            },
+"relatorio_promocoes":
+{ Args: { "p": string,"p_ate": string,"p_de": string }; Returns: Json
+                           },
 "serie_continuar":
 { Args: { "p_depois_de": string,"p_serie": string,"p_vezes"?: number }; Returns: number
                            },
@@ -3637,6 +3833,18 @@ isOneToOne: false
                            },
 "sou_dono":
 { Args: { "p": string }; Returns: boolean
+                           },
+"taxa_calcular":
+{ Args: { "p_data": string,"p_forma": string,"p_pagamentos": Json,"p_parcelas": number,"p_regra": Json,"p_valor": number }; Returns: Json
+                           },
+"taxa_do_lancamento":
+{ Args: { "p_id": string,"p_parcelas"?: number }; Returns: undefined
+                           },
+"taxa_parcelas_ok":
+{ Args: { "j": Json }; Returns: boolean
+                           },
+"taxas_do_periodo":
+{ Args: { "p": string,"p_ate": string,"p_de": string }; Returns: Json
                            },
 "telefone_limpo":
 { Args: { "p": string }; Returns: string

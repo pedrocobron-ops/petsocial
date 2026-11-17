@@ -18,7 +18,7 @@ import { brl, centavos, dataAmigavel, dataCompleta, deIsoDia, fmtTelefone, hora,
  * avisos da estadia, cobrado_em) e o registro em `mensagens_enviadas`.
  */
 
-export type TipoEnvio = "pronto" | "lembrete" | "chegada" | "cobranca" | "saude" | "pacote" | "niver" | "volta";
+export type TipoEnvio = "pronto" | "lembrete" | "chegada" | "cobranca" | "saude" | "pacote" | "niver" | "niver_tutor" | "volta";
 
 /** Ordem da fila: o que é do dia (pet pronto, amanhã) primeiro; depois o resto. */
 export const TIPOS_ENVIO: { id: TipoEnvio; rotulo: string; curto: string }[] = [
@@ -29,6 +29,7 @@ export const TIPOS_ENVIO: { id: TipoEnvio; rotulo: string; curto: string }[] = [
   { id: "saude", rotulo: "Vacina e cuidados vencendo", curto: "Saúde" },
   { id: "pacote", rotulo: "Renovar pacote (última vez)", curto: "Pacote" },
   { id: "niver", rotulo: "Aniversário do pet hoje", curto: "Aniversário" },
+  { id: "niver_tutor", rotulo: "Aniversário do tutor hoje", curto: "Aniversário do tutor" },
   { id: "volta", rotulo: "Chamar de volta (60 dias ou mais sem vir)", curto: "Chamar de volta" },
 ];
 export const rotuloDoTipo = (t: TipoEnvio) => TIPOS_ENVIO.find((x) => x.id === t)!.rotulo;
@@ -43,6 +44,7 @@ type ItemHorario = Servicos & { id: string; inicio: string; pet: Pet; tutor: Tut
 type ItemChegada = { id: string; tipo: string; entrada: string; saida_prevista: string | null; pet: Pet; tutor: Tutor };
 type ItemSaude = { id: string; pet_id: string; tipo: string; nome: string; vence_em: string; pet: Pet; tutor: Tutor };
 type ItemNiver = { id: string; nome: string; nascimento: string; pet: Pet; tutor: Tutor };
+type ItemNiverTutor = { id: string; nome: string; nascimento: string; pets: Pet[] | null; tutor: Tutor };
 type ItemPacote = { id: string; nome: string; total: number; usados: number; pet: Pet; tutor: Tutor };
 type Conta = { id: string; valor: number; valor_original: number | null; descricao: string | null; categoria: string; vencimento: string | null; multa_recebida: number | null; multa_recebida_em: string | null };
 type ItemCobranca = { cliente_id: string; total: number; tutor: Tutor; contas: Conta[] };
@@ -52,7 +54,7 @@ type ItemVolta = { id: string; ultima: string; servico: string | null; pet: Pet;
 export type DadosDoEnvio = {
   dia: string;
   modelos: Record<string, string>;
-  itens: Partial<{ lembrete: ItemHorario[]; pronto: ItemHorario[]; chegada: ItemChegada[]; saude: ItemSaude[]; niver: ItemNiver[]; pacote: ItemPacote[]; cobranca: ItemCobranca[]; volta: ItemVolta[] }>;
+  itens: Partial<{ lembrete: ItemHorario[]; pronto: ItemHorario[]; chegada: ItemChegada[]; saude: ItemSaude[]; niver: ItemNiver[]; niver_tutor: ItemNiverTutor[]; pacote: ItemPacote[]; cobranca: ItemCobranca[]; volta: ItemVolta[] }>;
 };
 
 /** Uma mensagem da fila. `refs` vão para `modo_envio_marcar` quando a pessoa diz que mandou. */
@@ -163,6 +165,13 @@ export function montarFila(d: DadosDoEnvio, petshop: Petshop, agora = new Date()
   for (const g of porTutor(d.itens.niver ?? [])) {
     entrar("niver", g.map((p) => p.id), g[0].tutor, g[0].pet.id, `Aniversário ${g.length === 1 ? doPet(g[0].pet) : `de ${nomes(g)}`} hoje`,
       (t) => montarMensagem("niver", modeloNiver, { tutor: t, pets: [...new Set(g.map((p) => p.pet.nome))], petshop: loja }));
+  }
+  // aniversário do tutor: a ref é o tutor (uma vez por ano); [pet] vira o nome dos pets dele
+  const modeloNiverTutor = d.modelos?.[CHAVE_NO_BANCO.niver_tutor] ?? "";
+  for (const c of d.itens.niver_tutor ?? []) {
+    const pets = (c.pets ?? []).map((p) => p.nome);
+    entrar("niver_tutor", c.tutor?.id ? [c.tutor.id] : [c.id], c.tutor, c.pets?.[0]?.id ?? null, `Aniversário de ${c.tutor?.nome?.trim() || c.nome} hoje`,
+      (t) => montarMensagem("niver_tutor", modeloNiverTutor, { tutor: t, pets, petshop: loja }));
   }
   for (const g of porTutor(d.itens.volta ?? [])) {
     const dias = Math.round((deIsoDia(hoje).getTime() - deIsoDia(isoDoDia(g[0].ultima)).getTime()) / 864e5);

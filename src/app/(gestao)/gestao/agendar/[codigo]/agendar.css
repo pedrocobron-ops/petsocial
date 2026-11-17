@@ -236,3 +236,11 @@
 .g-lk-duv-form .g-btn { min-width: 46px; height: 46px; padding: 0 12px; }
 .g-lk-rodape .g-lk-google { flex-basis: 100%; justify-content: center; gap: 6px; font-weight: 600; color: var(--g-verde); text-decoration: none; }
 .g-lk-rodape .g-lk-google svg { width: 15px; height: 15px; color: #e3a008; fill: currentColor; }
+
+/* promoção em dias fracos: etiqueta no horário, no serviço e o preço com desconto */
+.g-lk-hora.com-promo { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border-radius: 16px; line-height: 1.1; padding: 4px 2px; }
+.g-lk-hora-promo { font-size: .6875rem; font-weight: 700; color: #24543b; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-lk-hora[aria-pressed="true"] .g-lk-hora-promo { color: #1f1b17; }
+.g-lk-promo-serv { font-size: .8125rem; font-weight: 600; color: #24543b; overflow-wrap: anywhere; }
+.g-lk-promo { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--t-menta, #dfeadf); color: #24543b; font-size: .9375rem; line-height: 1.4; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.g-lk-promo s { opacity: .75; }

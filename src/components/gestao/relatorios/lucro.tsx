@@ -82,6 +82,7 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
       ["Faturamento", dinheiroCsv(p.faturamento)],
       ...p.saidas.map((s): Cel[] => [`Saída: ${categoria(s.categoria)}`, dinheiroCsv(-s.valor)]),
       ["Resultado do período (entrou − saiu)", dinheiroCsv(p.resultado)],
+      ...(p.taxas > 0 ? [["Taxas da maquininha", dinheiroCsv(-p.taxas)], ["Resultado depois das taxas da maquininha", dinheiroCsv(p.resultadoDepoisDasTaxas)]] satisfies Cel[][] : []),
     ];
     baixarPlanilha(t, `quanto-sobrou-${de}-a-${ate}.csv`);
     avisar("Planilha baixada.");
@@ -186,6 +187,10 @@ function Ponte({ x, categoria, inteiro }: { x: ReturnType<typeof montarLucro>; c
       <div><span>Saídas (despesas gerais, compras, comissão paga…)</span><b>− {brl(p.saiu)}</b></div>
       {p.saidas.map((s) => <div key={s.categoria} className="sub"><span>{categoria(s.categoria)}</span><b>{brl(s.valor)}</b></div>)}
       <div className="igual fim"><span>{inteiro ? "Resultado do mês (o mesmo do Financeiro)" : "Resultado do período"}</span><b className={p.resultado < 0 ? "g-vermelho-t" : undefined}>{brl(p.resultado)}</b></div>
+      {p.taxas > 0 && <>
+        <div><span>Taxas da maquininha (cartão e Pix)</span><b>− {brl(p.taxas)}</b></div>
+        <div className="igual fim"><span>Depois das taxas da maquininha</span><b className={p.resultadoDepoisDasTaxas < 0 ? "g-vermelho-t" : undefined}>{brl(p.resultadoDepoisDasTaxas)}</b></div>
+      </>}
     </div>
   );
 }

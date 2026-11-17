@@ -25,7 +25,8 @@ import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { AvatarPet, Campo, Folha, mensagemDeErro, useAvisos, useDados } from "../ui";
 import { BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, LinhaDaConta, novaChave, produtosDaConta, useProdutosDaLoja, valorDaLinha, type ItemConta } from "../loja/conta";
-import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, QuandoPaga, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
+import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, ParcelasNaTela, QuandoPaga, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
+import { anotarParcelas, idsDaOperacao } from "@/lib/gestao/maquininha";
 import { ehAdiantado } from "./sinal";
 import { PertencesNaSaida } from "../entrada/entrada";
 import { horaCurta, nomeTipo, type EstadiaCompleta } from "./tipos";
@@ -351,6 +352,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
       let feito: ResultadoDaOperacao;
       try {
         feito = await fazerTudoOuNada(sb, petshop.id, chave, { funcao: "estadia_checkout", estadia: estadia.id }, passos);
+        if (rec && !("erro" in rec) && !rec.fiado) await anotarParcelas(sb, petshop.id, idsDaOperacao(feito), pagamento.parcelas).catch(() => 0);
       } catch (e) {
         if (casoDoErro(e) === "maestro:estadia_ja") { avisar(pendente ? "Essa estadia já tinha sido acertada. Atualizei a lista." : "Esse check-out já tinha sido feito. Atualizei a lista."); aoGravar(); return; }
         // o banco conferiu com o que já foi pago (sinal, crédito) e o valor passava do que falta: lê tudo de novo e mostra a conta certa
@@ -378,6 +380,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
   const rotuloDoBotao = salvando ? "Salvando…" : !contaPronta ? (erroDaLeitura ? "Conta não carregou" : "Carregando a conta…") : fiado ? `Anotar ${brl(daEstadia)} a receber` : recebido > 0 ? `Receber ${brl(recebido)}` : pacote ? (pendente ? "Usar o pacote" : "Usar o pacote e encerrar") : pendente ? "Fechar sem cobrar" : "Fazer check-out";
 
   return (
+    <ParcelasNaTela.Provider value>
     <Folha titulo={pendente ? `Receber a estadia${pet ? ` de ${pet.nome}` : ""}` : `Check-out${pet ? ` de ${pet.nome}` : ""}`} aoFechar={aoFechar} larga={vejoFinanceiro && temMais}
       rodape={<>
         <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
@@ -564,6 +567,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
         </>}
       </div>
     </Folha>
+    </ParcelasNaTela.Provider>
   );
 }
 

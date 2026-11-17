@@ -1,0 +1,25 @@
+/* Taxas da maquininha (Meu pet shop) e a linha "Você recebe" no pagamento */
+.g-tx-formas { display: grid; gap: 12px; }
+@media (min-width: 900px) { .g-tx-formas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.g-tx-forma { border: 1px solid var(--g-linha); border-radius: var(--g-raio-p); padding: 10px 12px 12px; margin: 0; min-width: 0; display: grid; gap: 6px; }
+.g-tx-forma legend { font-weight: 700; padding: 0 4px; }
+.g-tx-campos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.g-tx-campos label, .g-tx-grade label { display: grid; gap: 4px; min-width: 0; }
+.g-tx-campos label span, .g-tx-grade label span { font-size: .75rem; color: var(--g-cinza); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-tx-campos .g-input, .g-tx-grade .g-input { width: 100%; min-width: 0; }
+.g-tx-parcelas summary { cursor: pointer; font-size: .875rem; font-weight: 600; }
+.g-tx-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0 6px; }
+@media (min-width: 700px) { .g-tx-grade { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.g-tx-exemplo { margin: 0; padding: 10px 12px; border-radius: var(--g-raio-p); background: var(--g-verde-tint); font-size: .875rem; line-height: 1.45; }
+
+.g-tx-recebe { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--g-raio-p); background: var(--g-azul-tint); font-size: .8125rem; line-height: 1.4; }
+.g-tx-recebe b { font-variant-numeric: tabular-nums; }
+.g-tx-recebe small { color: var(--g-cinza); }
+.g-tx-vezes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .875rem; }
+.g-tx-vezes .g-select { width: auto; min-width: 120px; }
+.g-tx-nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.g-tx-nums > div { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--g-raio-p); background: var(--g-carta-2); min-width: 0; }
+.g-tx-nums small { color: var(--g-cinza); font-size: .75rem; line-height: 1.3; }
+.g-tx-nums b { font-size: 1.125rem; }
+@media (max-width: 420px) { .g-tx-nums { grid-template-columns: 1fr; } }
+.g-tx-convite { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; margin: 0; }

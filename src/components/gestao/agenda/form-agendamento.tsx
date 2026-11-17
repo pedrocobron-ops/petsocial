@@ -19,6 +19,9 @@ import { AvatarPet, Campo, EscolherPet, Folha, avisarMudanca, ok, useAvisos, use
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 import { VEZES_POR_VEZ } from "./series-acabando";
 import { CampoComVoz } from "../ditado";
+import { COLS_PROMOCAO, descontoDaPromo, descontoCurto, lerPromocao, promoDoHorario } from "@/lib/gestao/promocoes";
+import { Tag } from "lucide-react";
+import "./promo.css";
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
 type Problema = { tipo: "fechado" | "bloqueio" | "conflito" | "vagas" | "fora" | "almoco"; texto: string };
@@ -168,6 +171,20 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const mudarValor = (id: string, v: number | null) => setEscolhidos((l) => l.map((x) => (x.servicoId === id ? { ...x, preco: v, mexido: true } : x)));
   const mudarTexto = (id: string, t: string) => setEscolhidos((l) => l.map((x) => (x.servicoId === id ? { ...x, texto: t } : x)));
   const totalDoHorario = Math.round(escolhidos.reduce((t, o) => t + (o.preco ?? 0), 0) * 100) / 100;
+  // promoção em dias fracos: ao marcar, o banco põe a promoção que vale no dia, na hora e no serviço. Aqui a tela mostra antes
+  // (com a mesma conta) e deixa tirar. Alterando um horário, a promoção fica no detalhe do horário.
+  const { dados: promos } = useDados(async () => {
+    if (agendamento) return [];
+    const r = await sb.from("promocoes").select(COLS_PROMOCAO).eq("petshop_id", petshop.id).eq("ativa", true);
+    return r.error ? [] : (r.data ?? []).map((x) => lerPromocao(x as unknown as Record<string, unknown>));
+  }, [petshop.id, Boolean(agendamento)]);
+  const [semPromo, setSemPromo] = useState(false);
+  const categoriaDe = (id: string) => servicoDe(id)?.categoria;
+  const promoAqui = !agendamento && servicoId && RE_DIA.test(dia) && /^\d{2}:\d{2}/.test(hhmm)
+    ? promoDoHorario(promos ?? [], { servicoId, dia, hora: hhmm.slice(0, 5), preco: precoDoServico(servico, porte), categoriaDe }) : null;
+  const promoValor = promoAqui ? descontoDaPromo({ ...promoAqui, tirada: false }, escolhidos.map((o) => ({ tipo: "servico", valor: o.preco, qtd: 1, servicoId: o.servicoId })), servicoId, categoriaDe) : 0;
+  /** No horário novo: pede ao banco para marcar sem a promoção (a pessoa tirou). */
+  const semAPromo = promoAqui && semPromo ? { promo: { tirada: true } } : {};
   const tempoDosServicos = escolhidos.reduce((t, o) => t + duracaoDe(o.servicoId), 0);
   /** O valor deste serviço fica no preço da lista (trava ligada e o serviço tem preço). */
   const valorFixo = (id: string) => travado && precoDoServico(servicoDe(id), porte) != null;
@@ -345,7 +362,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
         const serie = usar.length > 1 || semFim ? crypto.randomUUID() : null;
         const marcados = ok(await sb.from("agendamentos").insert(usar.map((d) => {
           const ini = juntaDiaHora(d, hhmm);
-          return { ...campos, inicio: ini.toISOString(), fim: new Date(ini.getTime() + duracao * 60000).toISOString(), serie_id: serie, petshop_id: petshop.id, criado_por: user.id };
+          return { ...campos, ...semAPromo, inicio: ini.toISOString(), fim: new Date(ini.getTime() + duracao * 60000).toISOString(), serie_id: serie, petshop_id: petshop.id, criado_por: user.id };
         })).select("id"));
         if (aMais.length) await juntarAosMarcados(marcados.map((m) => m.id), aMais);
         // "até eu cancelar": a série fica marcada para a Agenda avisar quando estiver acabando
@@ -400,7 +417,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
       }
       let marcado: Marcado | undefined;
       if (!agendamento) {
-        const novo = ok(await sb.from("agendamentos").insert({ ...campos, ...quando, petshop_id: petshop.id, criado_por: user.id }).select("id").single());
+        const novo = ok(await sb.from("agendamentos").insert({ ...campos, ...semAPromo, ...quando, petshop_id: petshop.id, criado_por: user.id }).select("id").single());
         if (aMais.length) await juntarAosMarcados([novo.id], aMais);
         marcado = { id: novo.id, inicio: inicio.toISOString(), quantos: 1, pet: pet?.nome };
       }
@@ -518,6 +535,18 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
                 </ul>
                 {valorRuim && <p className="g-erro g-pp" role="alert" style={{ margin: 0 }}>Algum valor não é número. Escreva só números, como 45,00.</p>}
                 {vejoFinanceiro && travado && escolhidos.some((o) => valorFixo(o.servicoId)) && <p className="g-pp g-muted" style={{ margin: 0 }}>Preço da lista. Só o dono ou quem cuida do financeiro marca com outro valor.</p>}
+                {promoAqui && (
+                  <div className={`g-fila entre g-promo-linha${semPromo ? " tirada" : ""}`} role="status">
+                    {semPromo
+                      ? <><span className="g-muted">Promoção {promoAqui.nome} tirada</span><button type="button" className="g-link" onClick={() => setSemPromo(false)}>Pôr de volta</button></>
+                      : <><span><Tag size={14} aria-hidden /> Promoção {promoAqui.nome}</span>
+                        <span className="g-fila" style={{ gap: 8 }}>
+                          <b className="g-tab g-verde-t">{vejoFinanceiro && promoValor > 0 ? `− ${brl(promoValor)}` : descontoCurto(promoAqui)}</b>
+                          <button type="button" className="g-btn fantasma p" onClick={() => setSemPromo(true)} aria-label={`Tirar a promoção ${promoAqui.nome}`}><X />Tirar</button>
+                        </span></>}
+                  </div>
+                )}
+                {promoAqui && !semPromo && <p className="g-pp g-muted" style={{ margin: 0 }}>O preço do horário fica o da lista. A promoção entra como desconto na hora de fechar a conta.</p>}
                 {escolhidos.length > 1 && (
                   <div className="g-agd-total" role="status">
                     <span>Tempo total</span><b className="g-tab">{tempo(tempoDosServicos)}</b>

@@ -15,7 +15,8 @@ import {
   BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LinhaDaConta, produtosDaConta,
   resumoDosItens, useProdutosDaLoja, type ItemConta,
 } from "./conta";
-import { AvisoCaixaFechado, fecharRecebimento, pagaDepoisInicial, useCaixaAberto, usePagamento, type PagaDepois } from "./pecas";
+import { AvisoCaixaFechado, fecharRecebimento, pagaDepoisInicial, ParcelasNaTela, useCaixaAberto, usePagamento, type PagaDepois } from "./pecas";
+import { anotarParcelas, idsDaOperacao } from "@/lib/gestao/maquininha";
 
 export type Tutor = Pick<Cliente, "id" | "nome" | "telefone">;
 
@@ -101,6 +102,7 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
         try {
           const r = await fazerTudoOuNada(sb, petshop.id, chave, orcamento && lanca ? { funcao: "orcamento_vender", orcamento: orcamento.id } : { funcao: "venda_registrar" }, passos);
           vendaId = r.ids?.venda ?? null;
+          if (pg && !("erro" in pg) && !pg.fiado) await anotarParcelas(sb, petshop.id, idsDaOperacao(r), pagamento.parcelas).catch(() => 0);
         } catch (e) { throw new Error(`A venda não foi anotada: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`); }
       }
       avisar(fiado ? `Anotado: ${brl(contas.total)} a receber de ${tutor?.nome ?? "cliente"} até ${dataCompleta(fiado.quando)}.` : vejoFinanceiro ? `Venda de ${brl(contas.total)} anotada.` : "Venda anotada no estoque.");
@@ -112,6 +114,7 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
   }
 
   return (
+    <ParcelasNaTela.Provider value>
     <Folha larga titulo={orcamento ? `Venda do orçamento nº ${orcamento.numero}` : "Venda no balcão"} aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
@@ -140,6 +143,7 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
         {!vejoFinanceiro && <p className="g-muted g-pp">A venda sai do estoque. O dinheiro fica para quem cuida do financeiro lançar.</p>}
       </div>
     </Folha>
+    </ParcelasNaTela.Provider>
   );
 }
 

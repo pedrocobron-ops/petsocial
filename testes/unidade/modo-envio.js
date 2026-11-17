@@ -1,6 +1,6 @@
 // Unidade: a fila do Modo envio (src/lib/gestao/modo-envio.ts) montada a partir do que gestao_modo_envio devolve.
 // Uma mensagem por tutor e por tipo, o texto igual ao das outras telas (lembrete, pronto, saúde, chamar de volta, aniversário,
-// cobrança, chegada), a renovação do pacote, e quem fica de fora: sem telefone, telefone incompleto, "não quer receber mensagens".
+// cobrança, chegada), a renovação do pacote, o aniversário do tutor (texto padrão), e quem fica de fora: sem telefone, telefone incompleto, "não quer receber mensagens".
 const assert = require('node:assert/strict');
 const { lib } = require('../lib/app');
 const T = require('../lib/teste')('unidade-modo-envio');
@@ -42,6 +42,10 @@ const dados = {
       { id: 's2', pet_id: thor.id, tipo: 'vermifugo', nome: 'Drontal', vence_em: mais(8), pet: thor, tutor: ana },
     ],
     niver: [{ id: mel.id, nome: 'Mel', nascimento: '2020-11-17', pet: mel, tutor: ana }],
+    niver_tutor: [
+      { id: ana.id, nome: 'Ana Souza', nascimento: '1904-11-17', pets: [thor, mel], tutor: ana },
+      { id: clara.id, nome: 'Clara Dias', nascimento: '1980-11-17', pets: [luna], tutor: clara },
+    ],
     pacote: [{ id: 'pc1', nome: 'Pacote de 4 banhos', total: 4, usados: 4, pet: thor, tutor: ana }],
     cobranca: [{ cliente_id: ana.id, total: 75, tutor: ana, contas: [
       { id: 'l1', valor: 35, valor_original: null, descricao: 'Banho', categoria: 'Banho e tosa', vencimento: mais(-7), multa_recebida: null, multa_recebida_em: null },
@@ -60,9 +64,11 @@ t('sem telefone (Beto), não quer receber (Clara), telefone incompleto (Davi): d
   const m = Object.fromEntries(fila.pulados.filter((p) => p.tipo === 'lembrete').map((p) => [p.quem, p.motivo]));
   assert.deepEqual(m, { 'Beto Lima': 'sem telefone', 'Clara Dias': 'não quer receber mensagens', 'Davi Reis': 'telefone incompleto' });
 });
-t('ordem da fila: pronto, lembrete, chegada, cobrança, saúde, pacote, aniversário, chamar de volta', () =>
-  assert.deepEqual([...new Set(fila.mensagens.map((m) => m.tipo))], ['pronto', 'lembrete', 'chegada', 'cobranca', 'saude', 'pacote', 'niver', 'volta']));
-t('contagem por tipo', () => assert.deepEqual(ME.contarPorTipo(fila), { pronto: 1, lembrete: 1, chegada: 1, cobranca: 1, saude: 1, pacote: 1, niver: 1, volta: 1 }));
+t('ordem da fila: pronto, lembrete, chegada, cobrança, saúde, pacote, aniversário, aniversário do tutor, chamar de volta', () =>
+  assert.deepEqual([...new Set(fila.mensagens.map((m) => m.tipo))], ['pronto', 'lembrete', 'chegada', 'cobranca', 'saude', 'pacote', 'niver', 'niver_tutor', 'volta']));
+t('contagem por tipo', () => assert.deepEqual(ME.contarPorTipo(fila), { pronto: 1, lembrete: 1, chegada: 1, cobranca: 1, saude: 1, pacote: 1, niver: 1, niver_tutor: 1, volta: 1 }));
+t('aniversário do tutor: a Clara (não quer receber) fica de fora', () =>
+  assert.deepEqual(fila.pulados.filter((p) => p.tipo === 'niver_tutor').map((p) => [p.quem, p.motivo]), [['Clara Dias', 'não quer receber mensagens']]));
 
 T.secao('o texto é o mesmo das outras telas');
 t('lembrete = mensagemDoLembrete (Agenda, "Mandar os lembretes")', () => {
@@ -83,6 +89,16 @@ t('saúde: uma mensagem com os dois cuidados do Thor (mensagemSaude)', () => {
   assert.match(s.texto, new RegExp(`- Vacina V10: vence em ${ddmmaaaa(mais(3))}\\n- Vermífugo Drontal: vence em ${ddmmaaaa(mais(8))}`));
 });
 t('aniversário com o texto do pet shop (modelos_mensagem)', () => assert.equal(de('niver')[0].texto, 'Oi, Ana! Aqui é Banho da Neide. Parabéns para Mel!'));
+t('aniversário do tutor: a ref é o tutor e vai o texto padrão, com os pets dele', () => {
+  const n = de('niver_tutor')[0];
+  assert.deepEqual(n.refs, ['c-ana']);
+  assert.equal(n.texto, 'Oi, Ana! Aqui é Banho da Neide. Hoje é o seu aniversário! Toda a equipe deseja um dia muito feliz para você. Um abraço também para Thor e Mel.');
+  assert.match(n.porque, /^Aniversário de Ana Souza hoje$/);
+});
+t('aniversário do tutor com o texto do pet shop', () => {
+  const f2 = ME.montarFila({ dia: HOJE, modelos: { 'chamar.niver_tutor': 'Feliz aniversário! Beijo do [pet].' }, itens: { niver_tutor: dados.itens.niver_tutor } }, petshop);
+  assert.equal(f2.mensagens[0].texto, 'Oi, Ana! Aqui é Banho da Neide. Feliz aniversário! Beijo do Thor e Mel.');
+});
 t('chamar de volta: uma mensagem para os dois pets, a ref é o tutor, texto padrão', () => {
   const v = de('volta')[0];
   assert.deepEqual(v.refs, ['c-ana']);

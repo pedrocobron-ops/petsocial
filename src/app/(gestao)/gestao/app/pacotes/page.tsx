@@ -15,6 +15,8 @@ import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { Cliente, Pacote, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, dataCurtaOuAno, deIsoDia, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
 import { usaModulo } from "@/lib/gestao/modulos";
+import { LinhaAcabando } from "@/components/gestao/pacote-acabando";
+import { lerPacotesAcabando, PACOTE_ACABOU_DIAS, PACOTE_VENCENDO_DIAS } from "@/lib/gestao/pacote-acabando";
 import "./pacotes.css";
 
 /** Exemplo de nome de pacote, no assunto do pet shop: quem não faz banho e tosa não lê "4 banhos no mês". */
@@ -101,7 +103,20 @@ export default function Pacotes() {
   const modelosAVenda = modelos.filter((m) => m.ativo).length;
   const verClientes = (f: Filtro) => { setAba("clientes"); setFiltro(f); };
 
-  const mudou = () => { void recarregar(); avisarMudanca(); };
+  // pacotes acabando: 1 uso sobrando, acabou há pouco, vencendo ou vencido há pouco (sem outro pacote valendo para o pet)
+  const { dados: acabando, recarregar: recarregarAcabando } = useDados(() => lerPacotesAcabando(sb, petshop.id), [petshop.id]);
+  const [todosAcabando, setTodosAcabando] = useState(false);
+  const mudou = () => { void recarregar(); void recarregarAcabando(); avisarMudanca(); };
+  // "Vender de novo" de outra tela (ficha, horário, conta): /gestao/app/pacotes?renovar=<id> abre a venda já preenchida
+  const renovarPedido = useMemo(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("renovar")), []);
+  const [renovou, setRenovou] = useState(false);
+  useEffect(() => {
+    if (!renovarPedido || renovou || !dados) return;
+    const p = vendidos.find((x) => x.id === renovarPedido);
+    setRenovou(true);
+    window.history.replaceState(null, "", window.location.pathname);
+    if (p) renovar(p);
+  }, [renovarPedido, renovou, dados, vendidos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function mudarUso(p: PacoteDoPet, passo: 1 | -1) {
     if (somenteLeitura()) return;
@@ -197,6 +212,16 @@ export default function Pacotes() {
             </Vazio>
           ) : (
             <>
+              {(acabando?.length ?? 0) > 0 && (
+                <section className="g-card g-pac-aviso g-pac-acabando" aria-label="Pacotes acabando">
+                  <div className="g-fila entre" style={{ flexWrap: "wrap", gap: 6 }}>
+                    <b>Pacotes acabando ({acabando!.length})</b>
+                    <span className="g-muted g-pp">falta 1 uso, acabou ou venceu há até {PACOTE_ACABOU_DIAS} dias, ou vence em até {PACOTE_VENCENDO_DIAS} dias</span>
+                  </div>
+                  {(todosAcabando ? acabando! : acabando!.slice(0, 5)).map((p) => <LinhaAcabando key={p.id} p={p} vende comPet aoRenovar={() => { const x = vendidos.find((v) => v.id === p.id); if (x) renovar(x); }} />)}
+                  {acabando!.length > 5 && <button type="button" className="g-btn fantasma p" style={{ justifySelf: "start" }} onClick={() => setTodosAcabando(!todosAcabando)}>{todosAcabando ? "Mostrar menos" : `Mostrar todos (${acabando!.length})`}</button>}
+                </section>
+              )}
               <div className="g-chips">
                 {FILTROS.map((f) => (
                   <button key={f.id} className="g-chip" aria-pressed={filtro === f.id} onClick={() => setFiltro(f.id)}>
