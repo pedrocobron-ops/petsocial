@@ -309,6 +309,16 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   (também pela venda de balcão); pagamento na hora passa; a recepção não libera; o dono libera (anotado, uma vez só); padrão da
   loja (50) para quem não tem limite próprio, e a opção não vai para o tosador.
 
+- `quadro-taxi.js`: quadro de atendimento e leva e traz (migração 20261203). `quadro_mover`: só quem tem Agenda (monitora, estoque,
+  outro pet shop e anônimo recusados), etapa fora da lista, horário de amanhã e desmarcado recusados; a chegada pelo quadro (ou pelo
+  "Chegou" da Agenda, pelo gatilho) anota a hora e o status de antes; voltar para Esperando devolve o confirmado; dois toques (tosador e
+  recepção ao mesmo tempo) = uma linha e a mesma hora; Entregue nunca conclui nem lança dinheiro, e voltar de Entregue tira a marca;
+  concluído não volta para Esperando; voltar para marcado ou falta apaga o quadro. Ninguém grava direto em `quadro_atendimento` nem em
+  `leva_traz_viagens`, e só quem tem Agenda lê. `leva_traz_marcar`: horário sem leva e traz e levar antes de chegar recusados, dois
+  toques em Buscado = uma viagem, levar = entregue no quadro, desfazer. Taxa (`taxi.taxa`): só o dono grava, a recepção (caixa) lê e o
+  tosador não (`opcoes_sem_valores`). Contas do app (`quadro.ts`): bairro achado no endereço (o nome mais comprido), valor fixo, bairro
+  repetido recusado, próxima etapa (pula a tosa sem tosa), viagens na ordem do relógio, rota com no máximo 10 endereços e "Estou chegando".
+
 **migracoes/**
 - `prova-ordem.sh`: cria um banco de rascunho no mesmo Postgres (chão copiado do banco local sem o `public`), aplica todas as
   migrações em ordem **menos as adiadas** (`ADIAR`, padrão `20261149 20261157`, as que entram depois de publicar o app) e depois as
@@ -458,6 +468,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   recepção vê a frase e nada é anotado. 1366 (dono): Caixa › a venda › Troca ou devolução: 1 shampoo volta = 27,46 em dinheiro,
   **dois toques** = uma saída; o dono vê "Passa do limite de fiado", toca em "Liberar mesmo assim" e a conta entra (anotado quem
   liberou); a ficha mostra "Limite R$ 200,00 · passou R$ 9,90 do limite" e Fazer orçamento. Capturas em `testes/saida/orc-*.png`.
+
+- `quadro-taxi.js`: quadro do dia e leva e traz pela tela (servidor no ar). 390 (tosador): Agenda › Quadro, abas com a contagem, o cartão
+  do Thor (Banho e tosa, com Tito, Morde, alergia, Leva e traz), "Chegou: começar o banho", secagem, tosa e "Está pronto" com
+  "Avisar que está pronto" (wa.me da Ana com "Já pode vir buscar"; grava `pronto_avisado_em`); Leva e traz: buscar e levar de volta
+  (pronto), rota no Google Maps com a cidade, Mapa com o endereço do horário, Ligar, "Estou chegando", **dois toques** em Buscado = uma
+  viagem, Entregue em casa (entregue no quadro); Modo TV sem botões. 1366 (dona): 5 colunas, arrastar a Mel para No banho, Fechar a conta
+  do Thor com "Pôr na conta · R$ 15,00" (Receber R$ 105,00, nada cobrado antes de receber), Meu pet shop › Taxa de leva e traz por bairro,
+  Modo TV cobrindo o menu e atualizando sozinho (o Bob aparece em Pronto em até 35 s). Capturas em `testes/saida/quadro-*.png`.
 
 ## Variáveis do servidor de produção (não precisa para os testes)
 

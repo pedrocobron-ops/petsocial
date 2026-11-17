@@ -14,6 +14,7 @@ import { multaSugerida } from "@/lib/gestao/dinheiro-opcoes";
 import { repartirPagamento } from "@/lib/gestao/hotel";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { servicosAMais } from "@/lib/gestao/servicos-do-horario";
+import { taxaDoLevaTraz, taxaSugerida, temTaxa } from "@/lib/gestao/quadro";
 import { brl, dataCompleta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useGestao } from "../contexto";
@@ -134,7 +135,11 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     setEscolhendoServico(false);
   };
   const mudar = (chave: string, m: Partial<ItemConta>) => setItens((l) => l.map((i) => (i.chave === chave ? { ...i, ...m } : i)));
-  const extra = (nome: string) => setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome, qtd: 1, valor: null }]);
+  const extra = (nome: string, valor: number | null = null) => setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome, qtd: 1, valor }]);
+  // taxa de leva e traz de Meu pet shop: só uma sugestão; entra na conta com um toque (nada muda sozinho)
+  const taxa = taxaDoLevaTraz(petshop);
+  const comTaxa = a.leva_traz && temTaxa(taxa);
+  const sugerida = comTaxa ? taxaSugerida(taxa, a.endereco_leva_traz) : null;
 
   /** Mesma categoria do recebimento simples; creche e hotel vão para a deles; conta só de produto vira venda. */
   function categoria() {
@@ -385,10 +390,24 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
           <span>{vendeProdutos ? "Levou mais alguma coisa?" : "Tem mais alguma coisa na conta?"}</span>
           {vendeProdutos && <BuscaProduto produtos={produtos} carregando={carregando} erro={erro} itens={itens} aoEscolher={(p) => setItens((l) => comProduto(l, p))} />}
           <div className="g-chips g-vd-chips">
-            {a.leva_traz && !temLevaTraz && <button type="button" className="g-chip" onClick={() => extra(LEVA_E_TRAZ)}><Truck />{LEVA_E_TRAZ}</button>}
+            {a.leva_traz && !temLevaTraz && !comTaxa && <button type="button" className="g-chip" onClick={() => extra(LEVA_E_TRAZ)}><Truck />{LEVA_E_TRAZ}</button>}
             {mexeNosServicos && servicosParaJuntar.length > 0 && <button type="button" className="g-chip" aria-expanded={escolhendoServico} onClick={() => setEscolhendoServico((v) => !v)}><Scissors />Outro serviço</button>}
             <button type="button" className="g-chip" onClick={() => extra("")}><Plus />Outro extra</button>
           </div>
+          {comTaxa && !temLevaTraz && (
+            <div className="g-card liso g-pilha p g-vd-taxi" role="group" aria-label="Taxa de leva e traz">
+              <p className="g-pp" style={{ margin: 0 }}>
+                <Truck size={15} aria-hidden style={{ verticalAlign: "-3px", marginRight: 4 }} />
+                {sugerida ? <>Este horário tem leva e traz{sugerida.bairro ? <> para <b>{sugerida.bairro}</b></> : null}: taxa de <b className="g-tab">{brl(sugerida.valor)}</b>.</> : "Este horário tem leva e traz. De qual bairro?"}
+              </p>
+              <div className="g-chips">
+                {sugerida && <button type="button" className="g-chip" aria-pressed="false" onClick={() => extra(LEVA_E_TRAZ, sugerida.valor)}><Plus />Pôr na conta · {brl(sugerida.valor)}</button>}
+                {taxa.modo === "bairro" && taxa.bairros.filter((b) => b.nome !== sugerida?.bairro).slice(0, 24).map((b) => (
+                  <button key={b.nome} type="button" className="g-chip" onClick={() => extra(LEVA_E_TRAZ, b.valor)}>{b.nome} · {brl(b.valor)}</button>
+                ))}
+              </div>
+            </div>
+          )}
           {escolhendoServico && servicosParaJuntar.length > 0 && (
             <div className="g-vd-servicos" role="group" aria-label="Qual serviço juntar na conta">
               <small className="g-muted">Qual serviço o pet fez a mais? Ele entra na conta com o valor dele{a.profissionais ? " e conta para a comissão" : ""}.</small>

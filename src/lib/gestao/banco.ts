@@ -1647,6 +1647,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"leva_traz_viagens": {
+                  Row: {
+                    "agendamento_id": string,"feito_em": string,"feito_por": string | null,"perna": string,"petshop_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agendamento_id": string,"feito_em"?: string,"feito_por"?: string | null,"perna": string,"petshop_id": string
+                  }
+                  Update: {
+                    "agendamento_id"?: string,"feito_em"?: string,"feito_por"?: string | null,"perna"?: string,"petshop_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "leva_traz_viagens_agendamento_id_petshop_id_fkey"
+      columns: ["agendamento_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "agendamentos"
+      referencedColumns: ["id","petshop_id"]
+    },{
+      foreignKeyName: "leva_traz_viagens_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"lgpd_registros": {
                   Row: {
                     "acao": string,"detalhe": NonNullable<Json>,"id": number,"petshop_id": string | null,"quando": string,"quem": string | null,"quem_nome": string | null
@@ -2299,6 +2325,32 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "profissionais_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"quadro_atendimento": {
+                  Row: {
+                    "agendamento_id": string,"atualizado_em": string,"atualizado_por": string | null,"chegou_em": string | null,"entregue_em": string | null,"etapa": string | null,"etapa_em": string | null,"petshop_id": string,"status_antes": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agendamento_id": string,"atualizado_em"?: string,"atualizado_por"?: string | null,"chegou_em"?: string | null,"entregue_em"?: string | null,"etapa"?: string | null,"etapa_em"?: string | null,"petshop_id": string,"status_antes"?: string | null
+                  }
+                  Update: {
+                    "agendamento_id"?: string,"atualizado_em"?: string,"atualizado_por"?: string | null,"chegou_em"?: string | null,"entregue_em"?: string | null,"etapa"?: string | null,"etapa_em"?: string | null,"petshop_id"?: string,"status_antes"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "quadro_atendimento_agendamento_id_petshop_id_fkey"
+      columns: ["agendamento_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "agendamentos"
+      referencedColumns: ["id","petshop_id"]
+    },{
+      foreignKeyName: "quadro_atendimento_petshop_id_fkey"
       columns: ["petshop_id"]
 isOneToOne: false
       referencedRelation: "petshops"
@@ -3262,6 +3314,9 @@ isOneToOne: false
 "kits_recalcular":
 { Args: { "p_kits": (string)[] }; Returns: undefined
                            },
+"leva_traz_marcar":
+{ Args: { "p_agendamento": string,"p_feito": boolean,"p_perna": string,"p_petshop": string }; Returns: Json
+                           },
 "lgpd_anotar":
 { Args: { "p_acao": string,"p_detalhe"?: Json,"p_petshop": string }; Returns: undefined
                            },
@@ -3554,6 +3609,9 @@ isOneToOne: false
 { Args: { "p": string }; Returns: {
               "custo": number,"id": string,"ultimo_custo": number
             }[]
+                           },
+"quadro_mover":
+{ Args: { "p_agendamento": string,"p_para": string,"p_petshop": string }; Returns: Json
                            },
 "receber_conta":
 { Args: { "p_chave"?: string,"p_conta": string,"p_data"?: string,"p_forma": string,"p_multa"?: number,"p_multa_forma"?: string,"p_multa_pagamentos"?: Json,"p_novo_vencimento"?: string,"p_pagamentos"?: Json,"p_valor": number }; Returns: Json

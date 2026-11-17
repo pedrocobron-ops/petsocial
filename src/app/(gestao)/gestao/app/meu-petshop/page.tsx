@@ -19,6 +19,7 @@ import OQueUsa from "@/components/gestao/ajustes/o-que-usa";
 import OpcoesDaLoja from "@/components/gestao/ajustes/opcoes-loja";
 import { LojaNoGoogle, OpcoesDoBoletim } from "@/components/gestao/ajustes/opcoes-boletim";
 import { OpcoesDaEntrada } from "@/components/gestao/ajustes/opcoes-entrada";
+import OpcoesDoLevaTraz from "@/components/gestao/ajustes/opcoes-taxi";
 import { AREAS_DE_SERVICO, areaDoServico, areasDeServicoPara, categoriaDaArea, nomeDaCasa, usaCasa, usaModulo, type AreaDoServico } from "@/lib/gestao/modulos";
 import { CAMPOS_PRECO, EscolherArea, PrecosDoServico, comecaPorPorte, corLivre, erroDoPreco, inserirServico, mudarServico, umPrecoSo, type Precos } from "@/components/gestao/servico-campos";
 import { textoDoLink } from "@/lib/gestao/agenda";
@@ -100,7 +101,7 @@ export default function MeuPetshop() {
         <Grupo id="servicos" titulo="Serviços e horário" icone={Scissors} tom="pessego" abertoDeInicio
           cartoes={[["Serviços e preços", <Servicos key="s" />], ["Horário de funcionamento", <HorarioDaLoja key="h" />], ["Feriados e dias fechados", <Feriados key="f" />]]} />
         <Grupo id="agenda" titulo="Agenda e link do cliente" icone={Link2} tom="ceu"
-          cartoes={[usaModulo(petshop, "banho_tosa") && ["Banho e tosa: pets ao mesmo tempo", <VagasBanho key="v" />], ["Link de agendamento", <LinkAgendamento key="l" />], ["Regras, cancelamento e dúvidas pelo link", <OpcoesDoLink key="o" />]]} />
+          cartoes={[usaModulo(petshop, "banho_tosa") && ["Banho e tosa: pets ao mesmo tempo", <VagasBanho key="v" />], ["Link de agendamento", <LinkAgendamento key="l" />], ["Regras, cancelamento e dúvidas pelo link", <OpcoesDoLink key="o" />], usaModulo(petshop, "banho_tosa") && ["Taxa de leva e traz", <OpcoesDoLevaTraz key="t" />]]} />
         {usaCasa(petshop) && (
           <Grupo id="casa" titulo={nomeDaCasa(petshop)} icone={BedDouble} tom="lilas" salvarJunto
             cartoes={[[nomeDaCasa(petshop), <AjustesCrecheHotel key="a" />], [!usaModulo(petshop, "creche") ? "Opções do hotel" : !usaModulo(petshop, "hotel") ? "Opções da creche" : "Opções do hotel e da creche", <OpcoesHotel key="h" />], ["Cuidado com o tutor", <OpcoesCasa key="c" />], usaModulo(petshop, "creche") && ["Mais opções da creche", <OpcoesCreche key="cr" />]]} />
