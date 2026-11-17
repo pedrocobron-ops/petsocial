@@ -15,6 +15,8 @@ export const metadata: Metadata = {
 /** Dias depois de a conta ficar só para consulta por falta de pagamento em que os dados podem ser apagados (sempre com aviso antes). */
 const DIAS_ATE_APAGAR = 180;
 const DIAS_DE_AVISO = 30;
+/** "Encerrar e apagar a conta": dias só para consulta antes de apagar (o mesmo do banco, conta_exclusao_pedir). */
+const DIAS_ATE_APAGAR_A_PEDIDO = 30;
 
 const PARTES: [string, string][] = [
   ["quem-somos", "Quem somos e o que é este documento"],
@@ -156,7 +158,7 @@ export default function TermosDoGestao() {
       {p("sem-pagamento", `Pagamento que não passa: tentamos de novo por um tempo. Sem acerto, a conta fica só para consulta e, depois de ${DIAS_ATE_APAGAR} dias, pode ser apagada, sempre com aviso antes.`, <>
         <ul>
           <li>Se uma cobrança não passar, o acesso continua por um tempo enquanto a Cakto tenta de novo. Sem acerto, a assinatura é encerrada e a conta fica só para consulta.</li>
-          <li>Com a conta só para consulta, os dados continuam guardados e você ainda consegue baixar as planilhas e a cópia de segurança.</li>
+          <li>Com a conta só para consulta, os dados continuam guardados e você ainda consegue baixar as planilhas e todos os dados (Meu pet shop, Baixar todos os dados).</li>
           <li>Se a conta ficar só para consulta por mais de <b>{DIAS_ATE_APAGAR} dias</b> seguidos (depois do teste ou por falta de pagamento), podemos apagar a conta e os dados do pet shop. Antes, avisamos o dono por e-mail com pelo menos <b>{DIAS_DE_AVISO} dias</b> de antecedência, para dar tempo de assinar ou baixar os dados.</li>
           <li>Contestação de pagamento já feito (chargeback) sem motivo pode levar à suspensão da conta até o acerto.</li>
         </ul>
@@ -191,9 +193,9 @@ export default function TermosDoGestao() {
         <ul>
           <li>lançar só os dados necessários e ter uma base legal para tratá-los (por exemplo, a prestação do serviço ao tutor);</li>
           <li>informar os seus clientes de como usa os dados deles, inclusive que usa um sistema como o nosso;</li>
-          <li>obter a autorização do tutor quando a lei pedir, como para fotos usadas em divulgação e mensagens que não sejam do atendimento;</li>
+          <li>obter a autorização do tutor quando a lei pedir, como para fotos usadas em divulgação e mensagens que não sejam do atendimento. Para as fotos, o sistema oferece a autorização pelo boletim (parte 11);</li>
           <li>não usar os campos de observação para dados sensíveis de pessoas (saúde, religião, origem racial e outros), nem para dados de crianças;</li>
-          <li>atender os pedidos dos seus clientes sobre os dados deles (ver, corrigir, apagar). Nós ajudamos no que estiver ao nosso alcance (Política de privacidade, parte 13);</li>
+          <li>atender os pedidos dos seus clientes sobre os dados deles (ver, corrigir, receber uma cópia, apagar). Na ficha do tutor, o dono tem &quot;Baixar os dados deste tutor&quot; e &quot;Apagar dados deste tutor&quot; (parte 22). Nós ajudamos no que estiver ao nosso alcance (Política de privacidade, parte 13);</li>
           <li>manter a sua equipe informada sobre o cuidado com esses dados.</li>
         </ul>
         <p>
@@ -202,11 +204,14 @@ export default function TermosDoGestao() {
         </p>
       </>)}
 
-      {p("fotos", "As fotos que você guarda e envia são responsabilidade sua. Foque no pet, evite pessoas nas fotos e peça autorização ao tutor antes de postar.", <>
+      {p("fotos", "As fotos que você guarda e envia são responsabilidade sua. Foque no pet e evite pessoas. Para postar nas redes, use a autorização do tutor pelo boletim: ele escolhe, você vê na ficha e ele pode tirar quando quiser.", <>
         <ul>
           <li>Você só deve enviar ao sistema fotos que tem o direito de usar. <b>Fotografe o pet, não as pessoas.</b> Evite rostos de tutores, funcionários e principalmente crianças; se alguém aparecer, a autorização dessa pessoa é sua responsabilidade.</li>
           <li>As fotos do boletim e do antes e depois ficam no <b>álbum do pet</b> enquanto o pet estiver cadastrado. O dono pode apagar uma foto a qualquer momento: ela sai do álbum, do boletim e dos links já enviados.</li>
-          <li>Antes de postar foto ou vídeo de um pet de cliente nas redes sociais do pet shop ou em qualquer divulgação, peça a <b>autorização do tutor</b> e guarde essa autorização. O sistema não pede nem guarda essa autorização por você.</li>
+          <li>Antes de postar foto ou vídeo de um pet de cliente nas redes sociais do pet shop ou em qualquer divulgação, tenha a <b>autorização do tutor</b>.</li>
+          <li><b>Autorização pelo boletim:</b> na página do boletim, o tutor pode tocar em &quot;Pode postar a foto&quot; e escolher, sem nada marcado de início, se autoriza só as fotos daquele boletim ou também as das próximas visitas e, se quiser, o perfil dele para a loja marcar. O sistema guarda o texto exato que ele aceitou, o dia e a hora, e mostra na ficha e no álbum do pet (&quot;Pode postar&quot;, com a data). Só o tutor dá a autorização: ninguém da equipe consegue marcar por ele.</li>
+          <li><b>O tutor tira quando quiser,</b> pelo link &quot;Não quero mais&quot;, que continua funcionando mesmo depois que a página do boletim para de abrir. A partir daí a ficha mostra &quot;Sem autorização&quot;. Não poste fotos novas desse pet e avalie retirar das suas redes o que já foi postado.</li>
+          <li>O sistema <b>não posta nada</b> nas redes sociais. Quem escolhe a foto, posta e responde pela postagem é o pet shop. Para autorizações pedidas fora do sistema (papel, mensagem), guardá-las é com você.</li>
           <li>O texto do boletim (escrito por você ou pelo Mozart) deve ser conferido antes de mandar. O que for mandado ao tutor é mensagem do seu pet shop.</li>
           <li>Você nos dá permissão para guardar, reduzir e mostrar essas fotos só para o sistema funcionar (no aplicativo e nas páginas que você manda ao tutor). Não usamos as fotos dos seus clientes em propaganda nossa sem a sua autorização por escrito.</li>
         </ul>
@@ -266,7 +271,7 @@ export default function TermosDoGestao() {
         <ul>
           <li>Fazemos o possível para o Gestão funcionar bem e sem interrupção, mas <b>não garantimos um tempo mínimo no ar</b> nem ausência de erros. Pode haver paradas para manutenção (de preferência fora do horário comercial), falhas nossas ou dos fornecedores (hospedagem, banco de dados, pagamentos, IA) e problemas de internet ou do seu aparelho.</li>
           <li>O banco de dados tem cópias de segurança feitas pelo fornecedor, mas elas servem para recuperar o sistema em caso de problema grave, não para desfazer o que alguém apagou ou mudou na sua conta.</li>
-          <li><b>A sua cópia é sua:</b> baixe de tempos em tempos a cópia de segurança (Meu pet shop) e as planilhas (Clientes, Financeiro, Relatórios) e guarde os registros que a lei exige de você (fiscais, trabalhistas, sanitários) fora do sistema.</li>
+          <li><b>A sua cópia é sua:</b> baixe de tempos em tempos todos os dados (Meu pet shop, Baixar todos os dados) e as planilhas (Clientes, Financeiro, Relatórios) e guarde os registros que a lei exige de você (fiscais, trabalhistas, sanitários) fora do sistema.</li>
           <li>Podemos incluir, mudar ou retirar funções. Quando uma mudança tirar algo importante do seu uso, avisamos antes.</li>
         </ul>
       </>)}
@@ -316,15 +321,19 @@ export default function TermosDoGestao() {
           <li>Podemos <b>suspender</b> o acesso, todo ou em parte, se houver uso ilegal, fraude, abuso das funções ou dos limites, risco à segurança do sistema ou de outros assinantes, pedido de autoridade ou descumprimento destes termos.</li>
           <li>Sempre que possível e seguro, avisamos antes e damos um prazo para corrigir. Em caso grave ou urgente, a suspensão pode ser imediata.</li>
           <li>Se o problema não for resolvido, podemos <b>encerrar</b> a conta. Nesse caso, devolvemos a parte proporcional do período já pago que não poderá ser usada, salvo em caso de fraude ou uso ilegal.</li>
-          <li>Você pode encerrar a relação a qualquer momento, cancelando a assinatura (parte 7) e, se quiser, pedindo a exclusão da conta.</li>
+          <li>Você pode encerrar a relação a qualquer momento, cancelando a assinatura (parte 7) e, se quiser, apagando a conta em Meu pet shop, Encerrar e apagar a conta (parte 22).</li>
           <li>Podemos também deixar de oferecer o Gestão. Nesse caso, avisamos com pelo menos 60 dias de antecedência e devolvemos o valor de períodos pagos e não usados.</li>
         </ul>
       </>)}
 
-      {p("fim", "Ao fim da conta, você pode baixar os dados. A exclusão é um direito seu, feito pelo próprio sistema ou pelo nosso contato. Alguns registros ficam pelo prazo da lei.", <>
+      {p("fim", `Você baixa todos os dados quando quiser. Para apagar a conta, o titular pede no próprio sistema: ela fica ${DIAS_ATE_APAGAR_A_PEDIDO} dias só para consulta (dá para cancelar) e depois é apagada. Alguns registros ficam pelo prazo da lei.`, <>
         <ul>
-          <li><b>Baixar os dados:</b> a qualquer momento, inclusive com a conta só para consulta, o dono baixa a cópia de segurança em Meu pet shop e as planilhas em Clientes e pets, Financeiro e Relatórios. As fotos não entram na cópia.</li>
-          <li><b>Apagar:</b> a exclusão de clientes e pets é feita na própria tela, pelo dono. A exclusão da conta inteira é pedida pelo dono pelo nosso contato; confirmamos que o pedido é dele e apagamos a conta e os dados do pet shop.</li>
+          <li><b>Baixar todos os dados:</b> a qualquer momento, inclusive com a conta só para consulta, o dono baixa em Meu pet shop um arquivo .zip com uma planilha para cada parte (clientes, pets, saúde, agenda, creche e hotel, pacotes, vendas, financeiro, caixa, estoque, boletins, autorizações de fotos, equipe e outras) e um README que explica cada uma. As planilhas abrem no Excel e servem para levar os dados a outro sistema. As fotos não entram, e a equipe vem sem senhas.</li>
+          <li><b>Dados de um tutor:</b> na ficha do tutor, o dono baixa num toque os dados daquele cliente, para responder a um pedido dele. Em &quot;Apagar dados deste tutor&quot;, depois de digitar o nome dele, o nome vira &quot;Cliente removido&quot;, telefone, e-mail, endereço e observações são apagados, os pets ficam sem nome, foto, saúde, boletins e autorizações, e os valores continuam no financeiro sem o nome, para a contabilidade. Não dá para desfazer.</li>
+          <li><b>Encerrar e apagar a conta:</b> o titular da conta pede em Meu pet shop, digitando o nome do pet shop. A conta fica <b>{DIAS_ATE_APAGAR_A_PEDIDO} dias só para consulta</b> (ninguém lança e o link para de receber pedidos), com o aviso na tela, e qualquer dono pode cancelar nesse prazo. Passados os {DIAS_ATE_APAGAR_A_PEDIDO} dias, apagamos o pet shop, todos os dados lançados, os arquivos (fotos e documentos) e os logins da equipe que não estão em outro pet shop. Isso não cancela a assinatura: cancele também pela tela Assinatura (parte 7).</li>
+          <li><b>Sair de uma equipe:</b> quem trabalha num pet shop e não é o titular pode tocar em &quot;Sair desta equipe&quot;. O login deixa de abrir aquele pet shop; o nome continua no histórico dele.</li>
+          <li>Os pedidos de dados (baixar todos os dados, baixar ou apagar os dados de um tutor, pedir ou cancelar a exclusão, sair da equipe) ficam registrados com quem pediu e quando, sem os dados dos clientes, para o pet shop mostrar que atendeu o pedido.</li>
+          <li>Também atendemos esses pedidos pelo nosso contato; confirmamos que o pedido é de quem pode fazê-lo.</li>
           <li>Conta encerrada por falta de pagamento segue a parte 8.</li>
           <li>Cópias de segurança do fornecedor são substituídas com o tempo, no ciclo dele. Registros de pagamento, de aceite destes termos e outros que a lei nos obrigue a guardar, ou que sejam necessários para nos defendermos, ficam pelo prazo legal.</li>
         </ul>

@@ -209,11 +209,30 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   serviços mais pedidos na mesma ordem; próximos; sem fechar; contagens; produtos acabando; o que entrou; contas; últimos 7 dias;
   saúde vencendo; check-outs sem cobrança; concluídos de hoje sem cobrança) para dono, recepção, monitora, tosador e estoque,
   com estoque, dinheiro e pacotes só para quem tem a área; anônimo recusado; dono de outra loja não lê nada.
-- `faxina.js`: faxina agendada (migração 20261195): rota `/api/gestao/faxina` recusada sem o segredo (401; 503 no servidor de teste,
+- `faxina.js`: faxina agendada (migração 20261195; a 20261199 junta as contas com o prazo de exclusão vencido e a fila `arquivos_lixo`, ver `lgpd.js`): rota `/api/gestao/faxina` recusada sem o segredo (401; 503 no servidor de teste,
   que não tem `GESTAO_FAXINA_SEGREDO`), segredo pelo `Authorization: Bearer` (Vercel Cron) ou `x-gestao-faxina`; as funções só com a
   chave de serviço; a tarefa `gestao-faxina-diaria` no pg_cron (quando o banco tem); `faxinaGeral` com a chave de serviço local
   (`SUPABASE_SERVICE_ROLE_KEY` ou `npx supabase status -o env`), só na loja de teste: foto do boletim sem boletim há mais de um dia
   sai, a de agora fica; PDF do caderno-tmp com mais de uma hora sai, o de agora fica; o de outro pet shop fica.
+- `lgpd.js`: LGPD (migração 20261199). **Dados de um tutor** (`cliente_dados`): o dono baixa só a Ana (cadastro, Thor e Mel, vacina,
+  horário com preço, autorização de fotos, financeiro 60 + 45,50 + 33,30), nada do Beto, do Bob nem da outra loja, nenhum código do
+  "Não quero mais"; recepção, tosador, dono de outra loja e anônimo recusados; fica no registro sem o nome. "Baixar todos os dados":
+  `lgpd_registrar_copia` e `lgpd_registros_ver` só do dono (recepção e outra loja recusadas); ninguém lê as tabelas novas direto.
+  **Apagar dados do tutor** (`cliente_anonimizar`): nome errado, recepção, outra loja e anônimo recusados sem mudar nada; com o nome
+  ("  ana   SOUZA ") vira "Cliente removido" sem telefone/e-mail/endereço/obs, Thor e Mel "Pet removido" desativados sem foto (a foto vai
+  para `arquivos_lixo`), saúde e autorização apagadas, horário sem obs/endereço; **soma e quantidade dos lançamentos iguais** e o
+  recebido de hoje igual; nenhum lançamento aponta para a Ana (nem o de caixa fechado, que não ganha "alterado depois"); nomes fora
+  das descrições; Beto e Bob intactos; registro com quantidades e sem nome; de novo = "já". **Sair da equipe** (`equipe_sair`): o
+  titular, anônimo e quem é de fora recusados; o tosador sai, não entra mais, o nome fica sem login, registro, não lê clientes.
+  **Encerrar a conta**: recepção, outra loja, anônimo, nome errado e sócio que não é titular recusados; o titular pede (nome em
+  maiúsculas), +30 dias, de novo devolve o mesmo; a equipe vê, a outra loja não; `acesso_liberado` falso: dono e recepção não
+  cadastram, mas leem e baixam; a outra loja segue; recepção e outra loja não cancelam; o dono cancela e volta a lançar; registro.
+  **Admin**: `admin_copias`/`admin_exclusoes` recusados para anônimo e dono; funções da chave de serviço recusadas para dono e admin
+  logado; rota `/api/gestao/admin/copia`: sem login 401, dono e recepção 403, admin 200 (zip) ou 503 sem a chave no servidor. Com a
+  chave de serviço local: **cópia completa** (`copia-completa.ts`) com o manifesto, uma tabela por arquivo, sem o token do tutor, sem
+  segredos da configuração e sem nada do auth; abre no `zipfile` do Python; "última cópia" no `admin_copias`. **Conta apagada**: antes
+  do prazo a faxina não apaga; o painel lista; com `apagar_em` no passado, `faxinaGeral` apaga o pet shop, clientes, pets, equipe,
+  arquivos do Storage e os 5 logins, marca `apagado_em` e o registro; as outras lojas ficam; de novo não apaga nada.
 - `visitas.js`: última visita de cada pet: a função do banco (`visitas_dos_pets`) = a conta do navegador, para o dono e para o tosador.
 - `lucro.js`: **Quanto sobrou** e **Por pessoa** (migração 20261193: `lucro_do_periodo`, `equipe_do_periodo`, `servicos.custo_material`,
   `lancamentos.vendido_por`), lançando pelo mesmo código das telas e montando por `src/lib/gestao/lucro.ts`. Conta do Thor (Banho 60 +
@@ -337,8 +356,16 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   Exportar baixa a planilha; Por pessoa com o tosador (2 atendimentos, R$ 140,00) e a recepção (venda R$ 59,80). 1366: Meu pet shop,
   Custo do material por atendimento (grava R$ 4,20; o Banho abre com R$ 8,50). Tosador na tela Hoje: "Meu mês" com 2 atendimentos e sem
   reais. Capturas em `testes/saida/lucro-*.png`.
+- `lgpd.js`: LGPD pela tela, em 390 e 1366. Meu pet shop, "Seus dados e a conta" com três cartões; "Baixar todos os dados" baixa um
+  .zip (lido com o `zipfile` do Python) com README.txt e uma planilha por parte (clientes, pets, saúde, agenda, estadias, mensalistas,
+  pacotes, lançamentos, vendas, caixas, produtos, movimentos, boletins, autorizações de fotos, equipe), todas com BOM, só os clientes
+  desta loja (a "Zuleica" da vizinha nunca aparece), equipe sem senha. 390: ficha da Ana, "Baixar os dados deste tutor" (zip só dela)
+  e "Apagar dados deste tutor" (o botão só acende com o nome certo; a ficha vira "Cliente removido"; a soma do dinheiro fica igual);
+  "Sair desta equipe" no Mais da recepção e não do titular. 1366: "Encerrar e apagar a conta" com o nome digitado, "Pedido registrado"
+  com a data, aviso vermelho para o dono e para a recepção (o banco não deixa lançar), "Ver ou cancelar" e "Cancelar a exclusão";
+  painel do administrador, aba Dados (cópia completa e contas para apagar). Capturas em `testes/saida/lgpd-*.png`.
 - `aceite.js`: Termos, Política e aceite pela tela, em 390 e 1366: Criar conta com a caixa desmarcada e os dois links (sem marcar, a conta
-  não nasce; marcada, em 390, nasce com os dois aceites "cadastro" no banco); as páginas com "Versão 2.0 — vigente desde 17/11/2026", o
+  não nasce; marcada, em 390, nasce com os dois aceites "cadastro" no banco); as páginas com "Versão 2.1 — vigente desde 17/11/2026", o
   resumo de cada parte e o índice; a dona sem aceite da versão em vigor entra e vê "Dona, atualizamos as nossas regras" (o resumo das
   mudanças, os dois documentos, a caixa desmarcada; sem marcar não segue), aceita com dois cliques e o aplicativo abre com os dois
   aceites "reaceite" gravados uma vez. Capturas em `testes/saida/aceite-*.png`.
@@ -373,6 +400,9 @@ A faxina diária (`/api/gestao/faxina`, `vercel.json` → crons, todo dia às 07
 `Authorization: Bearer <CRON_SECRET>`). Sem elas a rota responde 503 e não faz nada. A faxina do banco (álbuns vencidos,
 freios antigos, reservas do caderno) também roda pelo pg_cron (`gestao-faxina-diaria`, 06:17 UTC) quando o banco tem pg_cron.
 Para testar a rota à mão: `curl -H "x-gestao-faxina: <segredo>" https://…/api/gestao/faxina` (devolve só quantidades).
+A mesma faxina apaga as contas com o prazo de "Encerrar e apagar a conta" vencido (pet shop, arquivos e os logins do Maestro que
+ficaram sem pet shop) e os arquivos da fila da LGPD. A **cópia completa** do painel do administrador (`/api/gestao/admin/copia`)
+também usa `SUPABASE_SERVICE_ROLE_KEY` (sem ela, 503); só passa quem `sou_admin` diz que é admin.
 
 ## Resultados que são assim de propósito
 

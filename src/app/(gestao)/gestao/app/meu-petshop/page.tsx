@@ -5,6 +5,7 @@ import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
 import { abrirGuia } from "@/components/gestao/ui";
 import Identidade from "@/components/gestao/ajustes/identidade";
 import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
+import EncerrarConta, { RegistroDeDados } from "@/components/gestao/lgpd/encerrar-conta";
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
 import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
 import OpcoesDeCobranca from "@/components/gestao/ajustes/opcoes-cobranca";
@@ -68,7 +69,7 @@ export default function MeuPetshop() {
     ...(usaModulo(petshop, "loja") ? [{ id: "loja", titulo: "Loja" }] : []),
     { id: "dinheiro", titulo: "Cobrança e fidelidade" },
     { id: "negocio", titulo: "O negócio" },
-    { id: "copia", titulo: "Cópia de segurança" },
+    { id: "copia", titulo: "Seus dados e a conta" },
   ];
   return (
     <>
@@ -108,7 +109,8 @@ export default function MeuPetshop() {
           cartoes={[["Opções de cobrança", <OpcoesDeCobranca key="c" />], ["Fidelidade", <AjusteFidelidade key="f" />]]} />
         <Grupo id="negocio" titulo="O negócio" icone={Store} tom="rosa"
           cartoes={[["Dados", <Dados key="d" />], ["O que você usa", <OQueUsa key="o" />], ["Identidade do pet shop", <Identidade key="i" />], ["Sua loja aparece no Google?", <LojaNoGoogle key="g" />], ["Boletim do pet", <OpcoesDoBoletim key="b" />]]} />
-        <Grupo id="copia" titulo="Cópia de segurança" icone={Archive} tom="ceu" largo cartoes={[["Cópia de segurança", <CopiaSeguranca key="c" />]]} />
+        <Grupo id="copia" titulo="Seus dados e a conta" icone={Archive} tom="ceu" largo
+          cartoes={[["Baixar todos os dados", <CopiaSeguranca key="c" />], ["Encerrar e apagar a conta", <EncerrarConta key="e" />], ["Registro de pedidos de dados", <RegistroDeDados key="r" />]]} />
       </div>
     </>
   );

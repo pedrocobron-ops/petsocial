@@ -1,0 +1,20 @@
+/* Dados e LGPD: encerrar a conta, registro, dados do tutor. Prefixo gl-. */
+.gl-cartao { display: grid; gap: 10px; }
+.gl-cartao > .g-card-t { margin-bottom: 0; }
+.gl-passos { margin: 0; padding-left: 1.25rem; list-style: decimal; display: grid; gap: 6px; font-size: .9375rem; line-height: 1.45; }
+.gl-passos li { overflow-wrap: anywhere; }
+.gl-marcada { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--g-raio-p); background: var(--g-vermelho-tint); }
+.gl-marcada > svg { flex: none; width: 22px; height: 22px; color: var(--g-vermelho); margin-top: 1px; }
+.gl-marcada b { display: block; }
+.gl-marcada p { margin: 4px 0 0; }
+.gl-registro { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.gl-registro li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 8px 0; border-bottom: 1px solid var(--g-linha); font-size: .9375rem; }
+.gl-registro li:last-child { border-bottom: 0; }
+.gl-registro li span { color: var(--g-cinza); }
+.gl-tutor { display: grid; gap: 8px; }
+.gl-tutor-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.gl-confere { padding: 12px 14px; border-radius: var(--g-raio-p); background: var(--g-amarelo-tint); font-size: .9375rem; line-height: 1.45; }
+.gl-confere ul { margin: 6px 0 0; padding-left: 1.2rem; display: grid; gap: 4px; }
+@media (max-width: 559px) {
+  .gl-cartao .g-btn, .gl-tutor-acoes > .g-btn { width: 100%; }
+}

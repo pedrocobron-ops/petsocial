@@ -483,13 +483,14 @@ export function LinkDeGravar({ href, className, style, children }: { href: strin
 
 /** Aviso de conta só para consulta. Use antes de abrir formulários de gravação. */
 export function useSomenteLeitura() {
-  const { liberado } = useGestao();
+  const { liberado, exclusao } = useGestao();
   const { avisar } = useAvisos();
   return useCallback(() => {
     if (liberado) return false;
-    avisar("Sua conta está só para consulta. Assine para voltar a lançar.");
+    avisar(exclusao ? "A conta está marcada para ser apagada e fica só para consulta. Para voltar a lançar, o dono cancela em Meu pet shop."
+      : "Sua conta está só para consulta. Assine para voltar a lançar.");
     return true;
-  }, [liberado, avisar]);
+  }, [liberado, exclusao, avisar]);
 }
 
 /* ---------- escolher um pet ---------- */

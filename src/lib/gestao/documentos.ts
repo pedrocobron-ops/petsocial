@@ -12,17 +12,16 @@
 export type Documento = "termos" | "privacidade";
 
 export const DOCUMENTOS: Record<Documento, { nome: string; caminho: string; versao: string; vigenteDesde: string }> = {
-  termos: { nome: "Termos de uso", caminho: "/gestao/termos", versao: "2.0", vigenteDesde: "2026-11-17" },
-  privacidade: { nome: "Política de privacidade", caminho: "/gestao/privacidade", versao: "2.0", vigenteDesde: "2026-11-17" },
+  termos: { nome: "Termos de uso", caminho: "/gestao/termos", versao: "2.1", vigenteDesde: "2026-11-17" },
+  privacidade: { nome: "Política de privacidade", caminho: "/gestao/privacidade", versao: "2.1", vigenteDesde: "2026-11-17" },
 };
 
 /** O que mudou nesta versão, em poucas linhas, para a tela de aceite de quem já tinha conta. */
 export const MUDANCAS: string[] = [
-  "Os textos foram reescritos em linguagem simples, com um resumo no começo de cada parte.",
-  "Explicamos melhor o que é responsabilidade do pet shop: os dados dos clientes, as fotos, o boletim, as mensagens de WhatsApp e a autorização para postar fotos.",
-  "Deixamos claro que as funções de inteligência artificial (Mozart, leitura do caderno, textos do boletim e dúvidas do link) podem errar e que tudo deve ser conferido antes de usar.",
-  "Detalhamos planos, teste grátis, cobrança pela Cakto, reembolso em 7 dias e o que acontece com a conta e os dados quando a assinatura acaba.",
-  "A Política de privacidade agora lista cada fornecedor, a transferência de dados para fora do Brasil, os prazos de guarda e como o tutor pede os dados dele.",
+  "Autorização para postar fotos: explicamos como funciona. O tutor autoriza pelo boletim (só aquelas fotos ou também as próximas), o sistema guarda o texto aceito e ele tira quando quiser pelo link \"Não quero mais\".",
+  "Baixar todos os dados: em Meu pet shop, um arquivo com uma planilha para cada parte e um README que explica cada uma.",
+  "Dados de um tutor: na ficha do tutor, o dono baixa os dados daquele cliente ou apaga os dados pessoais dele. Os valores ficam no financeiro, sem o nome.",
+  "Encerrar e apagar a conta: o titular pede em Meu pet shop. A conta fica 30 dias só para consulta, dá para cancelar nesse prazo e depois apagamos tudo. Quem é da equipe pode sair por \"Sair desta equipe\".",
 ];
 
 /** "17/11/2026" a partir de "2026-11-17" (sem fuso: é uma data de calendário). */

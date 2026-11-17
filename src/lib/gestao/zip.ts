@@ -82,3 +82,84 @@ export function montarZip(arquivos: ArquivoZip[], quando: Date = new Date()): Ui
   u16(0);
   return saida;
 }
+
+/** CRC-32 em partes: comece com 0xffffffff, siga passando o resultado e termine com `(crc ^ 0xffffffff) >>> 0`. */
+export function crc32Parte(crc: number, bytes: Uint8Array): number {
+  if (!tabela) crc32(new Uint8Array(0));
+  const t = tabela!;
+  for (let i = 0; i < bytes.length; i++) crc = t[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+  return crc >>> 0;
+}
+
+type Feito = { nome: Uint8Array; onde: number; crc: number; tam: number };
+
+/**
+ * ZIP montado aos poucos (sem compressão), para mandar por partes sem guardar tudo na memória: cada arquivo começa com o
+ * cabeçalho local sem CRC nem tamanho (bit 3 das flags) e termina com o "descritor de dados", que traz os dois.
+ * Uso: `const z = new ZipEmPartes(enviar)`; `z.comecar("a.json")`; `z.escrever(...)` quantas vezes quiser; `z.terminar()`;
+ * no fim, `z.fechar()` manda o diretório central. Sem ZIP64: até 4 GB no total.
+ */
+export class ZipEmPartes {
+  private p = 0;
+  private atual: Feito | null = null;
+  private feitos: Feito[] = [];
+  private readonly hora: number;
+  private readonly data: number;
+  private readonly enviar: (b: Uint8Array) => void;
+  constructor(enviar: (b: Uint8Array) => void, quando: Date = new Date()) {
+    this.enviar = enviar;
+    this.hora = (quando.getHours() << 11) | (quando.getMinutes() << 5) | (quando.getSeconds() >> 1);
+    this.data = ((Math.max(1980, quando.getFullYear()) - 1980) << 9) | ((quando.getMonth() + 1) << 5) | quando.getDate();
+  }
+  private mandar(b: Uint8Array) {
+    if (this.p + b.length > 0xfffffff0) throw new Error("A cópia ficou grande demais para um zip só.");
+    this.p += b.length;
+    this.enviar(b);
+  }
+  comecar(nome: string) {
+    if (this.atual) this.terminar();
+    const n = new TextEncoder().encode(nome);
+    const b = new Uint8Array(30 + n.length), v = new DataView(b.buffer);
+    v.setUint32(0, 0x04034b50, true); v.setUint16(4, 20, true); v.setUint16(6, 0x0808, true); v.setUint16(8, 0, true);
+    v.setUint16(10, this.hora, true); v.setUint16(12, this.data, true); // CRC e tamanhos (14 a 25) ficam zerados
+    v.setUint16(26, n.length, true); v.setUint16(28, 0, true); b.set(n, 30);
+    this.atual = { nome: n, onde: this.p, crc: 0xffffffff, tam: 0 };
+    this.mandar(b);
+  }
+  escrever(conteudo: string | Uint8Array) {
+    if (!this.atual) throw new Error("Comece um arquivo antes de escrever.");
+    const b = typeof conteudo === "string" ? new TextEncoder().encode(conteudo) : conteudo;
+    if (!b.length) return;
+    this.atual.crc = crc32Parte(this.atual.crc, b);
+    this.atual.tam += b.length;
+    this.mandar(b);
+  }
+  terminar() {
+    const a = this.atual;
+    if (!a) return;
+    a.crc = (a.crc ^ 0xffffffff) >>> 0;
+    const b = new Uint8Array(16), v = new DataView(b.buffer);
+    v.setUint32(0, 0x08074b50, true); v.setUint32(4, a.crc, true); v.setUint32(8, a.tam, true); v.setUint32(12, a.tam, true);
+    this.mandar(b);
+    this.feitos.push(a);
+    this.atual = null;
+  }
+  /** Um arquivo inteiro de uma vez. */
+  arquivo(nome: string, conteudo: string | Uint8Array) { this.comecar(nome); this.escrever(conteudo); this.terminar(); }
+  fechar() {
+    this.terminar();
+    if (this.feitos.length > 0xffff) throw new Error("Arquivos demais para um zip só.");
+    const inicio = this.p;
+    for (const a of this.feitos) {
+      const b = new Uint8Array(46 + a.nome.length), v = new DataView(b.buffer);
+      v.setUint32(0, 0x02014b50, true); v.setUint16(4, 20, true); v.setUint16(6, 20, true); v.setUint16(8, 0x0808, true); v.setUint16(10, 0, true);
+      v.setUint16(12, this.hora, true); v.setUint16(14, this.data, true); v.setUint32(16, a.crc, true); v.setUint32(20, a.tam, true); v.setUint32(24, a.tam, true);
+      v.setUint16(28, a.nome.length, true); v.setUint32(42, a.onde, true); b.set(a.nome, 46);
+      this.mandar(b);
+    }
+    const fim = new Uint8Array(22), v = new DataView(fim.buffer);
+    v.setUint32(0, 0x06054b50, true); v.setUint16(8, this.feitos.length, true); v.setUint16(10, this.feitos.length, true);
+    v.setUint32(12, this.p - inicio, true); v.setUint32(16, inicio, true);
+    this.mandar(fim);
+  }
+}
