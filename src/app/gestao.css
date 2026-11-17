@@ -882,10 +882,10 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-lista > .g-linha { min-width: 0; }
 .g-lista > .g-linha .d { white-space: nowrap; }
 
-/* financeiro no celular: as quatro abas cabem na tela, sem rolar de lado nem cortar */
+/* financeiro no celular: as seis abas cabem na tela em duas fileiras de três, sem rolar de lado nem cortar */
 @media (max-width: 520px) {
-  .gf-rola .g-seg[aria-label="Parte do financeiro"] { display: flex; }
-  .gf-rola .g-seg[aria-label="Parte do financeiro"] button { flex: 1 1 auto; min-width: 0; padding: 0 6px; font-size: .8125rem; }
+  .gf-rola .g-seg[aria-label="Parte do financeiro"] { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 20px; }
+  .gf-rola .g-seg[aria-label="Parte do financeiro"] button { min-width: 0; padding: 0 4px; font-size: .8125rem; overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* avisos flutuantes sobem para o alto quando há uma janela aberta: não cobrem o total nem os botões */

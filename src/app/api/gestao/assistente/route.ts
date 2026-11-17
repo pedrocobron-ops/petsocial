@@ -187,7 +187,7 @@ async function tratar(req: Request) {
       console.info(`[assistente] ${aosPoucos ? "stream" : "json"} ${fim} ${total} ms, 1ª palavra ${primeiro ?? "-"} ms, ${medidas.voltas} voltas, ${medidas.ferramentas} consultas, tokens ${medidas.entrada}+${medidas.cacheLidos} lidos do cache+${medidas.cacheGravados} gravados / ${medidas.saida} de saída`);
       // não trava a resposta se falhar
       return Promise.resolve(sb.rpc("mozart_tempo_registrar", {
-        p_petshop: c.petshop.id, p_modo: aosPoucos ? "stream" : "json", p_fim: fim, p_total_ms: total, p_primeiro_ms: primeiro, p_sinal_ms: sinal,
+        p_petshop: c.petshop.id, p_modo: aosPoucos ? "stream" : "json", p_fim: fim, p_total_ms: total, p_primeiro_ms: primeiro as number, p_sinal_ms: sinal as number, // null vai como null no banco
         p_voltas: medidas.voltas, p_ferramentas: medidas.ferramentas, p_entrada: medidas.entrada, p_saida: medidas.saida,
         p_cache_lidos: medidas.cacheLidos, p_cache_gravados: medidas.cacheGravados,
       })).then(() => undefined, () => undefined);

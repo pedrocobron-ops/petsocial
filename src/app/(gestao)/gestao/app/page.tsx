@@ -36,6 +36,7 @@ import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import MetaMes from "@/components/gestao/meta-mes";
 import DicasMozart from "@/components/gestao/dicas-mozart";
 import BomDia from "@/components/gestao/bom-dia";
+import { fraseDaContaFixa, lerAvisosContasFixas } from "@/lib/gestao/contas-fixas";
 import EntradaModoEnvio from "@/components/gestao/modo-envio-entrada";
 import ChamarDeVolta, { aniversariantes, buscarParaChamar, chamadoEm, lerChamados, quemSumiu, type AbaChamar, type GrupoChamar } from "@/components/gestao/clientes/chamar-de-volta";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
@@ -88,12 +89,15 @@ export default function Hoje() {
     const seg = inicioDaSemana(hoje), ha6 = somaDias(hoje, -6);
     // o primeiro olhar numa ida só ao banco (gestao_hoje; sem ela, uma consulta por parte, como antes), e a creche ao mesmo tempo:
     // no celular com internet fraca, cada consulta esperando a outra soma uma ida e volta
-    const [h, creche, experiencias] = await Promise.all([
+    const [h, creche, experiencias, contasFixas] = await Promise.all([
       lerDadosDoHoje(sb, petshop.id, hoje, { vejoEstoque, vejoFinanceiro, cuidoDoFinanceiro, vejoPacotes, cobrar, cobrarHoje: posso("agenda") || vejoFinanceiro }),
       casa && usaModulo(petshop, "creche") ? resumoDaCrecheHoje(sb, petshop, cuidoDoFinanceiro, liberado).catch(() => null) : Promise.resolve(null),
       // dia de experiência (opção da creche): quem vem hoje e quem já fez e espera a conversa com o tutor
       casa && usaModulo(petshop, "creche") && experienciaDe(petshop).ativo ? lerExperiencias(sb, petshop.id).catch(() => null) : Promise.resolve(null),
+      // contas fixas vencidas, de hoje e de amanhã (gera antes a conta do mês, se já é hora): só quem cuida do financeiro
+      cuidoDoFinanceiro && vejoFinanceiro ? lerAvisosContasFixas(sb, petshop.id, hojeIso).catch(() => []) : Promise.resolve([]),
     ]);
+    const idsFixas = new Set(contasFixas.map((c) => c.id));
     const { lista, saude, aj } = h;
     const ajusteDe = (iso: string) => aj.porDia.get(iso) ?? 0;
     const valeAg = (st: string) => !["cancelado", "faltou"].includes(st);
@@ -126,7 +130,9 @@ export default function Hoje() {
       ajusteHoje: ajusteDe(hojeIso),
       saiu: cuidoDoFinanceiro ? h.entradas.filter((l) => l.tipo === "saida" && !CATEGORIAS_DEVOLUCAO.includes(l.categoria ?? "")).reduce((s, l) => s + Number(l.valor), 0) : 0,
       vendasHoje: h.entradas.filter((l) => l.tipo === "entrada" && l.categoria === "Venda de produtos"),
-      contas: h.contas.filter((c) => c.tipo === "saida"),
+      // as contas fixas têm a linha delas ("Aluguel vence amanhã (R$ 2.500,00)")
+      contas: h.contas.filter((c) => c.tipo === "saida" && !idsFixas.has(c.id)),
+      contasFixas,
       // as mensalidades da creche têm a linha delas (com o atalho para Cobranças)
       aReceberVencidas: h.contas.filter((c) => c.tipo === "entrada" && c.categoria !== CATEGORIA_MENSALIDADE),
       pacotesVencendo: h.pacotes,
@@ -260,6 +266,9 @@ export default function Hoje() {
       validade.em30.length ? `${validade.em30.length === 1 ? "1 lote vence" : `${validade.em30.length} lotes vencem`} em até 30 dias` : "",
     ].filter(Boolean).join(" e ")} no estoque: ${[...new Set([...validade.vencidos, ...validade.em30].map((l) => l.nome))].slice(0, 3).join(", ")}. Toque para ver e dar baixa no que venceu.`, href: "/gestao/app/estoque?ver=vencendo" },
     loja && dados.acabando.length > 0 && { icone: Package, tom: "rosa" as Tom, texto: `${dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}: ${dados.acabando.slice(0, 3).map((p) => p.nome).join(", ")}.`, href: "/gestao/app/estoque" },
+    ...dados.contasFixas.slice(0, 3).map((c) => ({ icone: Receipt, tom: (c.vencimento < hojeIso ? "rosa" : "manteiga") as Tom,
+      texto: `${fraseDaContaFixa(c, hojeIso)}.${c.vencimento < hojeIso ? " Ainda está em A pagar." : ""}${c.estimado ? " Confira a conta e escreva o valor certo." : ""}`, href: "/gestao/app/financeiro?aba=pagar" })),
+    dados.contasFixas.length > 3 && { icone: Receipt, tom: "manteiga" as Tom, texto: `E mais ${dados.contasFixas.length - 3 === 1 ? "1 conta fixa" : `${dados.contasFixas.length - 3} contas fixas`} vencendo até amanhã.`, href: "/gestao/app/financeiro?aba=pagar" },
     dados.contas.length > 0 && { icone: Receipt, tom: "manteiga" as Tom, texto: `${dados.contas.length === 1 ? "1 conta vence" : `${dados.contas.length} contas vencem`} até hoje: ${brl(dados.contas.reduce((s, c) => s + Number(c.valor), 0))}.`, href: "/gestao/app/financeiro" },
     dados.aReceberVencidas.length > 0 && (() => {
       // a conta que vence hoje ainda não venceu: a frase separa as duas

@@ -29,6 +29,7 @@
 .g-lu-ponte > div > b { white-space: nowrap; font-weight: 600; }
 .g-lu-ponte > div.sub { padding: 1px 0 1px 14px; font-size: .8125rem; }
 .g-lu-ponte > div.sub > b { font-weight: 400; color: var(--g-cinza); }
+.g-lu-ponte > div.sub.fixa { padding-left: 28px; }
 .g-lu-ponte > div.igual { border-top: 1px solid var(--g-linha); margin-top: 2px; padding-top: 7px; }
 .g-lu-ponte > div.igual > span { color: var(--g-tinta); font-weight: 600; }
 .g-lu-ponte > div.fim { border-top: 2px solid var(--g-linha-forte); }

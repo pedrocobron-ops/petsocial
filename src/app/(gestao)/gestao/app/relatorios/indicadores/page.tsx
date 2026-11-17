@@ -12,6 +12,7 @@ import {
   type IndicadoresDoBanco, type PeriodoIndicadores,
 } from "@/lib/gestao/indicadores";
 import { brl, dataCompleta } from "@/lib/gestao/util";
+import { lerSaidasDoPeriodo, type SaidasDoPeriodo } from "@/lib/gestao/contas-fixas";
 import "@/components/gestao/relatorios/indicadores.css";
 
 export default function PaginaIndicadores() {
@@ -32,11 +33,13 @@ function Indicadores() {
   const { de, ate } = intervaloIndicadores(periodo, hoje);
   const antes = intervaloAnterior(periodo, hoje);
   const { dados, carregando, erro, recarregar } = useDados(async () => {
-    const [atual, anterior] = await Promise.all([
+    const [atual, anterior, fixas] = await Promise.all([
       carregarIndicadores(sb, petshop.id, de, ate),
       carregarIndicadores(sb, petshop.id, antes.de, antes.ate).catch(() => null),
+      // as saídas em "Contas fixas" e o resto (o total é o mesmo "saiu"; sem a função, nada muda na tela)
+      lerSaidasDoPeriodo(sb, petshop.id, de, ate).catch(() => null),
     ]);
-    return { atual, anterior };
+    return { atual, anterior, fixas };
   }, [petshop.id, de, ate, antes.de, antes.ate]);
 
   return (
@@ -55,7 +58,7 @@ function Indicadores() {
         {erro && <ErroDeCarga erro={erro} tentar={recarregar} />}
         {carregando || !dados ? (erro ? null : <Esqueleto linhas={5} />)
           : !temDados(dados.atual) ? <Vazio titulo="Ainda não tem dados neste período." texto="Quando houver atendimentos, estadias e pagamentos, os gráficos aparecem aqui." />
-          : <Graficos d={dados.atual} antes={dados.anterior} periodoAnterior={`de ${dataCompleta(antes.de)} a ${dataCompleta(antes.ate)}`} />}
+          : <Graficos d={dados.atual} antes={dados.anterior} fixas={dados.fixas} periodoAnterior={`de ${dataCompleta(antes.de)} a ${dataCompleta(antes.ate)}`} />}
       </div>
     </>
   );
@@ -69,7 +72,7 @@ function Comparar({ atual, anterior }: { atual: number | null; anterior: number 
   return <span className={`g-ind-comp ${c.pct === 0 ? "" : c.sobe ? "sobe" : "desce"}`}>{c.pct !== 0 && <Seta aria-hidden />}{c.texto}</span>;
 }
 
-function Graficos({ d, antes, periodoAnterior }: { d: IndicadoresDoBanco; antes: IndicadoresDoBanco | null; periodoAnterior: string }) {
+function Graficos({ d, antes, fixas, periodoAnterior }: { d: IndicadoresDoBanco; antes: IndicadoresDoBanco | null; fixas: SaidasDoPeriodo | null; periodoAnterior: string }) {
   const t = totaisIndicadores(d), ta = antes ? totaisIndicadores(antes) : null;
   const comAno = new Set(d.meses.map((m) => m.mes.slice(0, 4))).size > 1;
   const rot = (mes: string) => rotuloMes(mes, comAno);
@@ -157,6 +160,16 @@ function Graficos({ d, antes, periodoAnterior }: { d: IndicadoresDoBanco; antes:
           <p className="g-muted g-pp" style={{ marginTop: 0 }}>Entrou − saiu, como no Resultado do Financeiro.</p>
           <Sobras meses={d.meses.map((m) => ({ rotulo: rot(m.mes), valor: m.resultado ?? 0, taxas: m.taxas ?? 0, depois: m.resultado_depois_taxas ?? 0 }))} />
           {(t.taxas ?? 0) > 0 && <p className="g-muted g-pp">Taxas da maquininha no período: {brl(t.taxas)}. Depois delas, sobrou {brl(t.resultadoDepoisTaxas)}.</p>}
+          {fixas && fixas.total > 0 && (
+            <div data-teste="indicadores-contas-fixas">
+              <p className="g-muted g-pp">Das saídas do período ({brl(fixas.saiu)}), {brl(fixas.total)} foram contas fixas (aluguel, luz, salários…) e {brl(Math.round((fixas.saiu - fixas.total) * 100) / 100)} as outras.</p>
+              <TabelaMeses cab={["Mês", "Saiu", "Contas fixas", "Outras saídas"]} linhas={d.meses.map((m) => {
+                const f = fixas.meses.find((x) => x.mes === m.mes);
+                const saiu = m.saiu ?? 0, fx = f?.contas_fixas ?? 0;
+                return [rot(m.mes), brl(saiu), brl(fx), brl(Math.round((saiu - fx) * 100) / 100)];
+              })} />
+            </div>
+          )}
         </section>
       )}
     </>

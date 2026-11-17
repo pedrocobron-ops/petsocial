@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, CalendarX, Cake, HandCoins, HeartPulse, MessageCircle, Ticket, X } from "lucide-react";
+import { CalendarDays, CalendarX, Cake, HandCoins, HeartPulse, MessageCircle, Receipt, Ticket, X } from "lucide-react";
 import { linhasDoBomDia, type DadosDoBomDia, type LinhaDoBomDia } from "@/lib/gestao/bom-dia";
+import { gerarContasFixas } from "@/lib/gestao/contas-fixas";
 import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { isoDia } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";
@@ -21,7 +22,7 @@ import "./bom-dia.css";
  * numa abertura nova do aplicativo no mesmo dia, não volta.
  */
 const ICONES: Record<LinhaDoBomDia["id"], React.ComponentType<{ "aria-hidden"?: boolean }>> = {
-  dia: CalendarDays, devem: HandCoins, validade: CalendarX, vacinas: HeartPulse, pacotes: Ticket, niver: Cake,
+  dia: CalendarDays, devem: HandCoins, contas: Receipt, validade: CalendarX, vacinas: HeartPulse, pacotes: Ticket, niver: Cake,
 };
 
 export const chaveBomDia = (petshop: string, pessoa: string) => `maestro-gestao-bomdia-${petshop}-${pessoa}`;
@@ -30,7 +31,7 @@ function lerSessao(chave: string) { try { return sessionStorage.getItem(chave); 
 function guardarSessao(chave: string, v: string) { try { sessionStorage.setItem(chave, v); } catch { /* sem armazenamento: só não lembra */ } }
 
 export default function BomDia() {
-  const { sb, petshop, eu } = useGestao();
+  const { sb, petshop, eu, cuidoDoFinanceiro } = useGestao();
   const [linhas, setLinhas] = useState<LinhaDoBomDia[] | null>(null);
   const [fechado, setFechado] = useState(false);
   const chave = chaveBomDia(petshop.id, eu.id);
@@ -42,6 +43,8 @@ export default function BomDia() {
     if (marca === `${hoje}:fechado` || (marca === `${hoje}:visto` && lerSessao(chave) !== hoje)) { setFechado(true); return; }
     let vivo = true;
     void (async () => {
+      // contas fixas: a conta do mês entra em A pagar antes do resumo ler (só quem cuida do financeiro; os outros não veem)
+      if (cuidoDoFinanceiro) await gerarContasFixas(sb, petshop.id);
       const r = await sb.rpc("gestao_bom_dia", { p: petshop.id });
       if (!vivo || r.error || !r.data) return; // sem o resumo, a tela segue igual
       const l = linhasDoBomDia(r.data as unknown as DadosDoBomDia, { horario: petshop.horario, nomeDaCasa: nomeDaCasa(petshop) });

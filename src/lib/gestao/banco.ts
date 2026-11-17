@@ -661,6 +661,46 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"contas_fixas": {
+                  Row: {
+                    "ativa": boolean,"atualizado_em": string,"categoria": string,"comeca_em": string,"criado_em": string,"criado_por": string | null,"dia": number,"forma": string | null,"frequencia": string,"id": string,"mes_inicial": number,"nome": string,"petshop_id": string,"termina_em": string | null,"valor": number,"valor_varia": boolean
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "ativa"?: boolean,"atualizado_em"?: string,"categoria"?: string,"comeca_em"?: string,"criado_em"?: string,"criado_por"?: string | null,"dia": number,"forma"?: string | null,"frequencia"?: string,"id"?: string,"mes_inicial"?: number,"nome": string,"petshop_id": string,"termina_em"?: string | null,"valor": number,"valor_varia"?: boolean
+                  }
+                  Update: {
+                    "ativa"?: boolean,"atualizado_em"?: string,"categoria"?: string,"comeca_em"?: string,"criado_em"?: string,"criado_por"?: string | null,"dia"?: number,"forma"?: string | null,"frequencia"?: string,"id"?: string,"mes_inicial"?: number,"nome"?: string,"petshop_id"?: string,"termina_em"?: string | null,"valor"?: number,"valor_varia"?: boolean
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "contas_fixas_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"contas_fixas_puladas": {
+                  Row: {
+                    "competencia": string,"conta_fixa_id": string,"criado_em": string,"petshop_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "competencia": string,"conta_fixa_id": string,"criado_em"?: string,"petshop_id": string
+                  }
+                  Update: {
+                    "competencia"?: string,"conta_fixa_id"?: string,"criado_em"?: string,"petshop_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "contas_fixas_puladas_conta_fixa_id_petshop_id_fkey"
+      columns: ["conta_fixa_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "contas_fixas"
+      referencedColumns: ["id","petshop_id"]
+    }
+                  ]
                 },"conversas": {
                   Row: {
                     "canal": string,"criado_em": string,"id": string,"pediu_equipe": boolean,"pergunta": string,"petshop_id": string,"resolveu": boolean | null,"resposta": string | null,"user_id": string | null
@@ -1635,14 +1675,14 @@ isOneToOne: true
                   ]
                 },"lancamentos": {
                   Row: {
-                    "agendamento_id": string | null,"alterado_em": string | null,"caixa_id": string | null,"categoria": string,"chave": string | null,"cliente_id": string | null,"cobrado_em": string | null,"conta_id": string | null,"credito_usado": number | null,"criado_em": string,"criado_por": string | null,"data": string,"descricao": string | null,"devido_desde": string | null,"diferenca_de": string | null,"forma": string | null,"id": string,"itens": Json | null,"movimento": string | null,"multa_de": string | null,"multa_recebida": number | null,"multa_recebida_em": string | null,"origem": string,"pagamentos": Json | null,"pago": boolean,"pago_em": string | null,"petshop_id": string,"tipo": string,"valor": number,"valor_original": number | null,"vencimento": string | null,"vendido_por": string | null
+                    "agendamento_id": string | null,"alterado_em": string | null,"caixa_id": string | null,"categoria": string,"chave": string | null,"cliente_id": string | null,"cobrado_em": string | null,"competencia": string | null,"conta_fixa_id": string | null,"conta_id": string | null,"credito_usado": number | null,"criado_em": string,"criado_por": string | null,"data": string,"descricao": string | null,"devido_desde": string | null,"diferenca_de": string | null,"forma": string | null,"id": string,"itens": Json | null,"movimento": string | null,"multa_de": string | null,"multa_recebida": number | null,"multa_recebida_em": string | null,"origem": string,"pagamentos": Json | null,"pago": boolean,"pago_em": string | null,"petshop_id": string,"tipo": string,"valor": number,"valor_estimado": boolean,"valor_original": number | null,"vencimento": string | null,"vendido_por": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendamento_id"?: string | null,"alterado_em"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"chave"?: string | null,"cliente_id"?: string | null,"cobrado_em"?: string | null,"conta_id"?: string | null,"credito_usado"?: number | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"devido_desde"?: string | null,"diferenca_de"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"movimento"?: string | null,"multa_de"?: string | null,"multa_recebida"?: number | null,"multa_recebida_em"?: string | null,"origem"?: string,"pagamentos"?: Json | null,"pago"?: boolean,"pago_em"?: string | null,"petshop_id": string,"tipo": string,"valor": number,"valor_original"?: number | null,"vencimento"?: string | null,"vendido_por"?: string | null
+                    "agendamento_id"?: string | null,"alterado_em"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"chave"?: string | null,"cliente_id"?: string | null,"cobrado_em"?: string | null,"competencia"?: string | null,"conta_fixa_id"?: string | null,"conta_id"?: string | null,"credito_usado"?: number | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"devido_desde"?: string | null,"diferenca_de"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"movimento"?: string | null,"multa_de"?: string | null,"multa_recebida"?: number | null,"multa_recebida_em"?: string | null,"origem"?: string,"pagamentos"?: Json | null,"pago"?: boolean,"pago_em"?: string | null,"petshop_id": string,"tipo": string,"valor": number,"valor_estimado"?: boolean,"valor_original"?: number | null,"vencimento"?: string | null,"vendido_por"?: string | null
                   }
                   Update: {
-                    "agendamento_id"?: string | null,"alterado_em"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"chave"?: string | null,"cliente_id"?: string | null,"cobrado_em"?: string | null,"conta_id"?: string | null,"credito_usado"?: number | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"devido_desde"?: string | null,"diferenca_de"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"movimento"?: string | null,"multa_de"?: string | null,"multa_recebida"?: number | null,"multa_recebida_em"?: string | null,"origem"?: string,"pagamentos"?: Json | null,"pago"?: boolean,"pago_em"?: string | null,"petshop_id"?: string,"tipo"?: string,"valor"?: number,"valor_original"?: number | null,"vencimento"?: string | null,"vendido_por"?: string | null
+                    "agendamento_id"?: string | null,"alterado_em"?: string | null,"caixa_id"?: string | null,"categoria"?: string,"chave"?: string | null,"cliente_id"?: string | null,"cobrado_em"?: string | null,"competencia"?: string | null,"conta_fixa_id"?: string | null,"conta_id"?: string | null,"credito_usado"?: number | null,"criado_em"?: string,"criado_por"?: string | null,"data"?: string,"descricao"?: string | null,"devido_desde"?: string | null,"diferenca_de"?: string | null,"forma"?: string | null,"id"?: string,"itens"?: Json | null,"movimento"?: string | null,"multa_de"?: string | null,"multa_recebida"?: number | null,"multa_recebida_em"?: string | null,"origem"?: string,"pagamentos"?: Json | null,"pago"?: boolean,"pago_em"?: string | null,"petshop_id"?: string,"tipo"?: string,"valor"?: number,"valor_estimado"?: boolean,"valor_original"?: number | null,"vencimento"?: string | null,"vendido_por"?: string | null
                   }
                   Relationships: [
                     {
@@ -1662,6 +1702,12 @@ isOneToOne: false
       columns: ["cliente_id","petshop_id"]
 isOneToOne: false
       referencedRelation: "clientes"
+      referencedColumns: ["id","petshop_id"]
+    },{
+      foreignKeyName: "lancamentos_conta_fixa_fkey"
+      columns: ["conta_fixa_id","petshop_id"]
+isOneToOne: false
+      referencedRelation: "contas_fixas"
       referencedColumns: ["id","petshop_id"]
     },{
       foreignKeyName: "lancamentos_conta_id_fkey"
@@ -2015,6 +2061,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     },{
       foreignKeyName: "movimentos_lotes_petshop_id_fkey"
+      columns: ["petshop_id"]
+isOneToOne: false
+      referencedRelation: "petshops"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"mozart_tempos": {
+                  Row: {
+                    "em": string,"ferramentas": number,"fim": string,"id": number,"modo": string,"petshop_id": string,"primeiro_ms": number | null,"sinal_ms": number | null,"tokens_cache_gravados": number,"tokens_cache_lidos": number,"tokens_entrada": number,"tokens_saida": number,"total_ms": number,"voltas": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "em"?: string,"ferramentas"?: number,"fim": string,"id"?: never,"modo": string,"petshop_id": string,"primeiro_ms"?: number | null,"sinal_ms"?: number | null,"tokens_cache_gravados"?: number,"tokens_cache_lidos"?: number,"tokens_entrada"?: number,"tokens_saida"?: number,"total_ms": number,"voltas"?: number
+                  }
+                  Update: {
+                    "em"?: string,"ferramentas"?: number,"fim"?: string,"id"?: never,"modo"?: string,"petshop_id"?: string,"primeiro_ms"?: number | null,"sinal_ms"?: number | null,"tokens_cache_gravados"?: number,"tokens_cache_lidos"?: number,"tokens_entrada"?: number,"tokens_saida"?: number,"total_ms"?: number,"voltas"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "mozart_tempos_petshop_id_fkey"
       columns: ["petshop_id"]
 isOneToOne: false
       referencedRelation: "petshops"
@@ -2813,10 +2879,10 @@ isOneToOne: false
 "admin_exclusoes":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
-"admin_pagantes":
+"admin_mozart_tempos":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
-"admin_mozart_tempos":
+"admin_pagantes":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
 "admin_painel":
@@ -3123,6 +3189,39 @@ isOneToOne: false
                            },
 "contagens_lista":
 { Args: { "p": string }; Returns: Json
+                           },
+"contas_fixas_antecedencia":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
+"contas_fixas_apagar":
+{ Args: { "p": string,"p_id": string }; Returns: boolean
+                           },
+"contas_fixas_do_periodo":
+{ Args: { "p": string,"p_ate": string,"p_de": string }; Returns: Json
+                           },
+"contas_fixas_gerar":
+{ Args: { "p": string }; Returns: number
+                           },
+"contas_fixas_gerar_interno":
+{ Args: { "p": string,"p_hoje"?: string }; Returns: number
+                           },
+"contas_fixas_gerar_todas":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
+"contas_fixas_passo":
+{ Args: { "p_frequencia": string }; Returns: number
+                           },
+"contas_fixas_resumo":
+{ Args: { "p": string }; Returns: Json
+                           },
+"contas_fixas_salvar":
+{ Args: { "p": string,"p_conta": Json }; Returns: Json
+                           },
+"contas_fixas_valor":
+{ Args: { "p": string,"p_conta": string,"p_mes": string,"p_valor": number }; Returns: Json
+                           },
+"contas_fixas_vencimento":
+{ Args: { "p_dia": number,"p_mes": string }; Returns: string
                            },
 "convite_aceitar":
 { Args: { "p_codigo": string }; Returns: string
@@ -3794,7 +3893,7 @@ isOneToOne: false
 { Args: { "p": string,"p_refs": (string)[],"p_tipo": string }; Returns: Json
                            },
 "mozart_tempo_registrar":
-{ Args: { "p_cache_gravados": number,"p_cache_lidos": number,"p_entrada": number,"p_ferramentas": number,"p_fim": string,"p_modo": string,"p_petshop": string,"p_primeiro_ms": number | null,"p_saida": number,"p_sinal_ms": number | null,"p_total_ms": number,"p_voltas": number }; Returns: undefined
+{ Args: { "p_cache_gravados": number,"p_cache_lidos": number,"p_entrada": number,"p_ferramentas": number,"p_fim": string,"p_modo": string,"p_petshop": string,"p_primeiro_ms": number,"p_saida": number,"p_sinal_ms": number,"p_total_ms": number,"p_voltas": number }; Returns: undefined
                            },
 "niver_no_dia":
 { Args: { "p_dia": string,"p_nascimento": string }; Returns: boolean
@@ -3953,6 +4052,8 @@ isOneToOne: false
 "chave": string | null,
 "cliente_id": string | null,
 "cobrado_em": string | null,
+"competencia": string | null,
+"conta_fixa_id": string | null,
 "conta_id": string | null,
 "credito_usado": number | null,
 "criado_em": string,
@@ -3975,6 +4076,7 @@ isOneToOne: false
 "petshop_id": string,
 "tipo": string,
 "valor": number,
+"valor_estimado": boolean,
 "valor_original": number | null,
 "vencimento": string | null,
 "vendido_por": string | null

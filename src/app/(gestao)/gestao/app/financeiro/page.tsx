@@ -16,6 +16,8 @@ import {
 import CustoDasVendas from "@/components/gestao/financeiro/custo-vendas";
 import CartaoMaquininha from "@/components/gestao/financeiro/maquininha";
 import AlteracoesDoPeriodo from "@/components/gestao/financeiro/alteracoes-periodo";
+import ContasFixas, { FolhaContaFixa } from "@/components/gestao/financeiro/contas-fixas";
+import { gerarContasFixas, type ContaFixa } from "@/lib/gestao/contas-fixas";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
 import { contasDaMeta, descricaoAtual, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
@@ -31,10 +33,11 @@ export default function PaginaFinanceiro() {
   return cuidoDoFinanceiro ? <Financeiro /> : <SemAcesso />;
 }
 
-type Aba = "resumo" | "pagar" | "receber" | "lancamentos" | "alteracoes";
+type Aba = "resumo" | "pagar" | "fixas" | "receber" | "lancamentos" | "alteracoes";
 const ABAS: { id: Aba; rotulo: string }[] = [
   { id: "resumo", rotulo: "Resumo" },
   { id: "pagar", rotulo: "A pagar" },
+  { id: "fixas", rotulo: "Contas fixas" },
   { id: "receber", rotulo: "A receber" },
   { id: "lancamentos", rotulo: "Lançamentos" },
   { id: "alteracoes", rotulo: "Alterações" },
@@ -47,7 +50,8 @@ type FolhaAberta =
   | { tipo: "editar"; lancamento: Lancamento }
   | { tipo: "conta"; de: Tipo; conta?: Lancamento }
   | { tipo: "baixa"; conta: Lancamento }
-  | { tipo: "meta" };
+  | { tipo: "meta" }
+  | { tipo: "fixa"; conta?: ContaFixa };
 
 type Movimento = Pick<Lancamento, "tipo" | "valor" | "categoria">;
 /** Saída que devolveu dinheiro ao tutor: não é despesa, é dinheiro que entrou e voltou (sai do que entrou). */
@@ -77,8 +81,10 @@ function Financeiro() {
   const agora = new Date();
   const [mes, setMes] = useState(() => new Date(agora.getFullYear(), agora.getMonth(), 1));
   const [aba, setAba] = useState<Aba>("resumo");
-  // atalhos: /gestao/app/financeiro?aba=receber (tela Hoje) e ?aba=alteracoes (fechamento do caixa)
-  useEffect(() => { const a = new URLSearchParams(window.location.search).get("aba"); if (a === "receber" || a === "alteracoes") setAba(a); }, []);
+  // atalhos: /gestao/app/financeiro?aba=receber (tela Hoje), ?aba=alteracoes (fechamento do caixa), ?aba=pagar e ?aba=fixas (contas fixas)
+  useEffect(() => { const a = new URLSearchParams(window.location.search).get("aba"); if (a === "receber" || a === "alteracoes" || a === "pagar" || a === "fixas") setAba(a); }, []);
+  // a lista de contas fixas relê depois de salvar
+  const [versaoFixas, setVersaoFixas] = useState(0);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("tudo");
   const [folha, setFolha] = useState<FolhaAberta | null>(null);
@@ -90,6 +96,8 @@ function Financeiro() {
   const hoje = hojeIso();
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
+    // contas fixas: a conta do mês entra em A pagar 10 dias antes do vencimento (o banco não repete nem refaz a excluída)
+    await gerarContasFixas(sb, petshop.id);
     // sangria e suprimento (movimento de gaveta) não são receita nem despesa: ficam fora de tudo aqui
     // os apagados do mês e os ajustes do faturamento não dependem do resto: saem na mesma leva (no celular, cada espera soma)
     const apP = Promise.resolve(sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", petshop.id).eq("acao", "apagou")
@@ -228,6 +236,7 @@ function Financeiro() {
 
   const tituloMes = `${nomeMes(mes)} de ${mes.getFullYear()}`;
   const acao = aba === "pagar" ? { rotulo: "Nova conta", abre: (): FolhaAberta => ({ tipo: "conta", de: "saida" }) }
+    : aba === "fixas" ? { rotulo: "Nova conta fixa", abre: (): FolhaAberta => ({ tipo: "fixa" }) }
     : aba === "receber" ? { rotulo: "Nova conta", abre: (): FolhaAberta => ({ tipo: "conta", de: "entrada" }) }
     : { rotulo: "Novo lançamento", abre: (): FolhaAberta => ({ tipo: "novo" }) };
 
@@ -347,6 +356,10 @@ function Financeiro() {
                 aoBaixar={(c) => abrir({ tipo: "baixa", conta: c })}
                 aoCriar={() => abrir({ tipo: "conta", de: aba === "pagar" ? "saida" : "entrada" })} />
             )}
+            {aba === "pagar" && (
+              <p className="g-muted g-pp">Aluguel, luz, salários e outras contas que se repetem: cadastre uma vez em <button type="button" className="g-link" onClick={() => setAba("fixas")}>Contas fixas</button> e a conta de cada mês entra aqui sozinha, 10 dias antes de vencer.</p>
+            )}
+            {aba === "fixas" && <ContasFixas versao={versaoFixas} aoEditar={(c) => abrir({ tipo: "fixa", conta: c })} aoCriar={() => abrir({ tipo: "fixa" })} />}
             {aba === "receber" && contas.aReceber.length > 0 && posso("clientes") && (
               <p className="g-muted g-pp">Por pessoa, como no caderno: <Link className="g-link" href="/gestao/app/clientes?filtro=deve">Quem me deve</Link>, em Clientes (também no Caixa, em Contas de clientes).</p>
             )}
@@ -407,6 +420,7 @@ function Financeiro() {
       {folha?.tipo === "conta" && <FolhaLancamento modo="conta" tipo={folha.de} inicial={folha.conta} aoFechar={() => setFolha(null)} aoSalvo={recarregar} />}
       {folha?.tipo === "baixa" && <FolhaBaixa conta={folha.conta} aoFechar={() => setFolha(null)} aoSalvo={recarregar} />}
       {folha?.tipo === "meta" && <FolhaMeta aoFechar={() => setFolha(null)} />}
+      {folha?.tipo === "fixa" && <FolhaContaFixa conta={folha.conta} aoFechar={() => setFolha(null)} aoSalvo={async () => { setVersaoFixas((v) => v + 1); await recarregar(); }} />}
     </>
   );
 }
@@ -636,7 +650,8 @@ function Contas({ lista, receber, hoje, tutores, aoEditar, aoBaixar, aoCriar }: 
                 <span className="g-fin-so-largo"><Tile icone={v && v < hoje ? TriangleAlert : receber ? HandCoins : Receipt} tom={v && v < hoje ? "rosa" : receber ? "menta" : "manteiga"} /></span>
                 <span className="t">
                   <b>{descricaoAtual(c.descricao) || categoriaAtual(c.categoria, petshop)}</b>
-                  <span>{tutor ? `${tutor} · ` : ""}{categoriaAtual(c.categoria, petshop)}{textoJaRecebido(c) ? ` · ${textoJaRecebido(c)}` : ""}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
+                  <span>{tutor ? `${tutor} · ` : ""}{c.competencia ? "conta fixa · " : ""}{categoriaAtual(c.categoria, petshop)}{textoJaRecebido(c) ? ` · ${textoJaRecebido(c)}` : ""}{v && v !== hoje ? ` · ${v < hoje ? "venceu" : "vence"} ${outroAno(v) ? `em ${dataCompleta(v)}` : dataAmigavel(v)}` : ""}</span>
+                  {c.valor_estimado && <span className="g-fin-estimado">valor estimado: confira a conta</span>}
                 </span>
                 <span className="d">
                   <b>{brl(c.valor)}</b>
