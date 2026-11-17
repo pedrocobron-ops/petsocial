@@ -27,11 +27,14 @@ export function useFornecedores(ligado: boolean) {
 export const pedeReposicao = (p: Pick<Produto, "estoque" | "estoque_minimo">) =>
   Number(p.estoque) <= 0 || (Number(p.estoque_minimo) > 0 && Number(p.estoque) <= Number(p.estoque_minimo));
 
-/** Texto do pedido de reposição. Só entra a quantidade que a pessoa digitou; sem quantidade, vai só o nome do produto. */
-export function textoDoPedido(fornecedor: string, petshop: string, linhas: { nome: string; unidade: string; qtd: number | null }[]) {
+/**
+ * Texto do pedido de reposição. Só entra a quantidade que a pessoa digitou; sem quantidade, vai só o nome do produto;
+ * com 0, o produto sai do pedido. Sem fornecedor (lista de compras para copiar), a saudação fica sem nome.
+ */
+export function textoDoPedido(fornecedor: string | null, petshop: string, linhas: { nome: string; unidade: string; qtd: number | null }[]) {
   const medida = (l: { unidade: string; qtd: number | null }) => (l.unidade === "un" ? (l.qtd === 1 ? "unidade" : "unidades") : l.unidade);
-  const itens = linhas.map((l) => (l.qtd ? `- ${fmtQtd(l.qtd)} ${medida(l)} de ${l.nome}` : `- ${l.nome}`)).join("\n");
-  return `Olá, ${fornecedor}! Aqui é do ${petshop}.\nQuero fazer um pedido de reposição:\n${itens}\nPode me confirmar o valor e o prazo de entrega? Obrigado!`;
+  const itens = linhas.filter((l) => l.qtd !== 0).map((l) => (l.qtd ? `- ${fmtQtd(l.qtd)} ${medida(l)} de ${l.nome}` : `- ${l.nome}`)).join("\n");
+  return `Olá${fornecedor ? `, ${fornecedor}` : ""}! Aqui é do ${petshop}.\nQuero fazer um pedido de reposição:\n${itens}\nPode me confirmar o valor e o prazo de entrega? Obrigado!`;
 }
 
 /** Escolha do fornecedor numa entrada de estoque, com atalho para cadastrar um novo sem sair da entrada. */
@@ -249,23 +252,30 @@ function FichaFornecedor({ fornecedor, produtos, aoFechar, aoMudar }: { forneced
   );
 }
 
-/** Pedido de reposição: o sistema monta a mensagem, a pessoa confere, muda o que quiser e manda pelo WhatsApp dela. */
-function PedidoDeReposicao({ fornecedor, produtos, aoFechar }: { fornecedor: Fornecedor; produtos: Produto[]; aoFechar: () => void }) {
+/**
+ * Pedido de reposição: o sistema monta a mensagem, a pessoa confere, muda o que quiser e manda pelo WhatsApp dela.
+ * Vindo de "O que comprar", as quantidades já chegam preenchidas com a sugestão (`iniciais`) e continuam editáveis.
+ * Sem fornecedor, é a lista de compras para copiar.
+ */
+export function PedidoDeReposicao({ fornecedor, produtos, aoFechar, iniciais, explicacao }: {
+  fornecedor: Fornecedor | null; produtos: Pick<Produto, "id" | "nome" | "unidade" | "estoque" | "estoque_minimo">[]; aoFechar: () => void;
+  iniciais?: Record<string, number>; explicacao?: string;
+}) {
   const { petshop } = useGestao();
   const { avisar, avisarErro } = useAvisos();
-  const [qtds, setQtds] = useState<Record<string, string>>({});
+  const [qtds, setQtds] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(iniciais ?? {}).map(([id, n]) => [id, fmtQtd(n)])));
   // enquanto a pessoa não mexe no texto, ele acompanha as quantidades; depois de mexer, vale o que ela escreveu
   const [escrito, setEscrito] = useState<string | null>(null);
-  const montado = textoDoPedido(fornecedor.nome, petshop.nome, produtos.map((p) => ({ nome: p.nome, unidade: p.unidade, qtd: lerQtd(qtds[p.id] ?? "") || null })));
+  const montado = textoDoPedido(fornecedor?.nome ?? null, petshop.nome, produtos.map((p) => { const q = lerQtd(qtds[p.id] ?? ""); return { nome: p.nome, unidade: p.unidade, qtd: q === 0 ? 0 : q || null }; }));
   const texto = escrito ?? montado;
-  const zap = linkWhatsApp(fornecedor.telefone, texto);
+  const zap = fornecedor ? linkWhatsApp(fornecedor.telefone, texto) : null;
 
   async function copiar() {
     try { await navigator.clipboard.writeText(texto); avisar("Mensagem copiada."); } catch { avisarErro("Não consegui copiar. Selecione o texto e copie."); }
   }
 
   return (
-    <Folha larga titulo={`Pedido para ${fornecedor.nome}`} aoFechar={aoFechar}
+    <Folha larga titulo={fornecedor ? `Pedido para ${fornecedor.nome}` : "Lista de compras"} aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
         {zap
@@ -273,7 +283,7 @@ function PedidoDeReposicao({ fornecedor, produtos, aoFechar }: { fornecedor: For
           : <button type="button" className="g-btn pri" onClick={() => void copiar()}><Copy /> Copiar mensagem</button>}
       </>}>
       <div className="g-pilha">
-        <p className="g-muted g-p">Produtos deste fornecedor que estão no mínimo ou abaixo. Diga quanto quer de cada um, confira a mensagem e mande: nada é enviado sozinho.</p>
+        <p className="g-muted g-p">{explicacao ?? "Produtos deste fornecedor que estão no mínimo ou abaixo. Diga quanto quer de cada um, confira a mensagem e mande: nada é enviado sozinho."}</p>
         <div>
           {produtos.map((p) => (
             <label key={p.id} className="g-lj-pedido">
@@ -290,7 +300,7 @@ function PedidoDeReposicao({ fornecedor, produtos, aoFechar }: { fornecedor: For
           <textarea className="g-textarea" rows={Math.min(14, 5 + produtos.length)} value={texto} onChange={(e) => setEscrito(e.target.value)} aria-label="Mensagem do pedido" />
         </Campo>
         {escrito !== null && <div><button type="button" className="g-btn fantasma p" onClick={() => setEscrito(null)}>Montar a mensagem de novo</button></div>}
-        {!zap && <p className="g-muted g-pp">Este fornecedor está sem WhatsApp. Copie a mensagem, ou coloque o número em Editar para abrir a conversa direto.</p>}
+        {!zap && <p className="g-muted g-pp">{fornecedor ? "Este fornecedor está sem WhatsApp. Copie a mensagem, ou coloque o número em Editar para abrir a conversa direto." : "Estes produtos estão sem fornecedor. Copie a mensagem e mande para quem você compra."}</p>}
         {zap && <div><button type="button" className="g-btn sec p" onClick={() => void copiar()}><Copy /> Copiar mensagem</button></div>}
       </div>
     </Folha>

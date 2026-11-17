@@ -89,6 +89,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
+- `compra-etiquetas.js`: códigos de barras das etiquetas (`codigo-barras.ts`): EAN-13 só com 13 números e dígito certo, senão
+  Code 128; a tabela do Code 128 conferida (106 símbolos de 11 módulos, barras pares, todos diferentes); vetores conhecidos
+  (MP000001 = início B, M, P, troca C, 00 00 01, verificador 33; 7891234567890 com o verificador 43; os desenhos de
+  4006381333931 e MP000001 conferidos com um leitor de verdade, zxing-cpp, ao escrever) e o decodificador de `lib/barras.js`
+  (tabela do EAN em larguras, independente da do app) lendo de volta 16 códigos. Sugestão de compra (`compra.ts`) à mão:
+  21 em 6 semanas = 3,5 por semana, 7 + mínimo 3 = 10, tem 4: comprar 6 (com a explicação escrita); 8 semanas; caixa de 12;
+  venda desfeita desconta e uso no banho conta; perda à parte; sem vendas recentes sem sugestão; produto de 10 dias; parados,
+  acabando e valor em estoque (custo × quantidade).
 
 **banco/** (API do Supabase com o login de cada papel, como o navegador faz; SQL só para preparar e conferir)
 - `seguranca.js`: isolamento entre pet shops e anônimo; dono não mexe na própria assinatura nem vira admin; o que cada papel grava
@@ -172,6 +180,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   `lancarAReceber` da tela, duas vezes ao mesmo tempo com a mesma chave: uma conta só; o tosador não anota. Precisa do servidor com
   `GESTAO_CADERNO_FALSO=1`.
 - `visitas.js`: última visita de cada pet: a função do banco (`visitas_dos_pets`) = a conta do navegador, para o dono e para o tosador.
+- `compra.js`: sugestão de compra e etiquetas (migração 20261194): "vem em caixa de" (`produtos.embalagem_qtd`) lido por todos
+  (permissão por coluna), gravado só por quem cuida do estoque, 0 recusado; código interno (`produtos_gerar_codigos`): MP + 6
+  números na ordem do nome, depois do maior já usado (também em produto fora da lista), produto com código fica igual, pedir de
+  novo não gera outro, dois pedidos ao mesmo tempo não repetem, outro pet shop não muda, tosador/recepção/anônimo/dona de outra
+  loja recusados; o Mozart `o_que_comprar` com os movimentos de verdade (grupo do fornecedor, 3,5 por semana, comprar 6 com a
+  explicação, 4 semanas = 13, caixa de 12), valor em estoque só para quem vê o financeiro, recusado para quem não tem Estoque.
 - `velocidade.js`: abrir o aplicativo numa ida só ao banco (migração 20261185): `lerBase` (`gestao_base`) = a leitura antiga parte por
   parte (`lerPetshop` + `lerEquipe` + `lerServicos`) para dono, recepção, monitora, tosador e estoque, com meta, diárias, opções com valor,
   comissão, convite e preços só para quem pode; as seis contagens da tela Hoje (`gestao_contagens`) = as contagens pela API; anônimo
@@ -255,6 +269,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   `testes/saida/hotel-bia-*.png`.
 - `caixa.js`: a recepção fecha a conta pela tela (celular pela Agenda, computador pela lista "para cobrar" do Caixa) com **dois
   cliques seguidos no Receber**: uma entrada só, com o valor e os itens certos.
+- `compra-etiquetas.js`: Estoque pela tela, 390 e 1366. O que comprar: "Vendeu em média 3,5 por semana nas últimas 6 semanas",
+  comprar 6 (13 com 4 semanas), parados e Valor em estoque R$ 640,00 para a dona; Montar pedido abre a mensagem do WhatsApp com
+  "- 6 unidades de Ração Golden 15 kg" e mudar para 8 muda a mensagem e o link. Etiquetas na mesma aba com Voltar: 5 etiquetas,
+  "Gerar código interno" (MP000001 no banco), os códigos da página lidos de volta (`lib/barras.js`), nome comprido com
+  reticências; PDF (`page.pdf` com o tamanho do `@page`): A4 3 × 10 e 4 × 16 numa folha A4, 40 × 25 e 50 × 30 mm com uma
+  etiqueta por página; Entrada com "Imprimir etiquetas do que entrou" abre com uma por unidade. Quem cuida do estoque (sem
+  dinheiro) vê a sugestão sem nenhum R$. Capturas em `testes/saida/compra-*.png`, `etiquetas-*.png` e PDFs `etiquetas-*.pdf`
+  (conferidos com zxing-cpp ao escrever: todos os códigos lidos).
 - `boletim.js`: boletim do pet pela tela. 390: o tosador, pela Agenda, no fim do banho: duas fotos feitas num canvas (nada de gente
   de verdade) reduzidas a 1600 px no aparelho, recados, atenção à saúde, texto pronto, "Escrever com o Mozart" (de teste), salvar,
   o WhatsApp com "Oi, Ana! O boletim do Thor de hoje: <link>" e o "Boletim enviado". 1366: a monitora, pelo cartão da creche em

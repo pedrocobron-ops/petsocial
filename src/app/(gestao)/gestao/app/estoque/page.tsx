@@ -5,7 +5,8 @@ import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Importar from "@/components/gestao/importar";
-import { AlertTriangle, ArrowUpFromLine, BarChart3, Minus, Package, PackageX, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Truck, Wallet, Upload } from "lucide-react";
+import { AlertTriangle, ArrowUpFromLine, BarChart3, Barcode, ClipboardList, Minus, Package, PackageX, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Tag, Truck, Wallet, Upload } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useGestao } from "@/components/gestao/contexto";
 import { abrirAssistente, avisarMudanca, Campo, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { Kpi, Tile } from "@/components/gestao/painel";
@@ -13,6 +14,7 @@ import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, ErroTela, Es
 import VendaBalcao from "@/components/gestao/loja/venda";
 import Fornecedores, { EscolherFornecedor, pedeReposicao, useFornecedores, type Fornecedor } from "@/components/gestao/loja/fornecedores";
 import { LerComCamera } from "@/components/gestao/loja/leitor";
+import OQueComprar from "@/components/gestao/loja/o-que-comprar";
 import OpcoesDaLoja from "@/components/gestao/ajustes/opcoes-loja";
 import { limparCodigo, margemDe, opcoesDaLoja, pct } from "@/lib/gestao/loja-opcoes";
 import { conferirCaixa, conferirValorAlto, gravarMovimentos, lancarPago, parteDaChave } from "@/lib/gestao/dinheiro";
@@ -51,7 +53,7 @@ function nivel(p: Produto): { tom: "ok" | "perto" | "baixo"; parte: number | nul
   return { tom: tem < min ? "baixo" : tem <= min * 1.5 ? "perto" : "ok", parte: Math.min(1, tem / (min * 2)) };
 }
 
-type Aberta = { tipo: "novo" | "venda" | "fornecedores" | "opcoes" } | { tipo: "entrada" | "saida" | "ficha"; produto: Produto };
+type Aberta = { tipo: "novo" | "venda" | "fornecedores" | "opcoes" | "comprar" } | { tipo: "entrada" | "saida" | "ficha"; produto: Produto };
 
 /** O que as folhas de produto precisam saber das opções da loja. */
 type Loja = { margem: boolean; codigoBarras: boolean; fornecedores: boolean; lista: Fornecedor[]; recarregarFornecedores: () => Promise<unknown>; produtos: Produto[] };
@@ -100,7 +102,7 @@ export default function Estoque() {
   const [mostrar, setMostrar] = useState(PASSO);
   useEffect(() => { setMostrar(PASSO); }, [q, filtro]);
 
-  const abrir = (a: Aberta) => { if (a.tipo !== "ficha" && a.tipo !== "fornecedores" && a.tipo !== "opcoes" && somenteLeitura()) return; setAberta(a); };
+  const abrir = (a: Aberta) => { if (a.tipo !== "ficha" && a.tipo !== "fornecedores" && a.tipo !== "opcoes" && a.tipo !== "comprar" && somenteLeitura()) return; setAberta(a); };
   const fechar = () => setAberta(null);
   // atalho "Vender" da tela inicial (/gestao/app/estoque?vender=1): já abre a venda, uma vez só
   const temProdutos = produtos.length > 0;
@@ -127,6 +129,8 @@ export default function Estoque() {
         <div className="g-acoes">
           {produtos.length > 0 && <button className="g-btn sec" onClick={() => abrir({ tipo: "venda" })}><ShoppingBag /> Vender</button>}
           <button className="g-btn sec" onClick={() => setImportando(true)}><Upload /> Trazer de planilha</button>
+          {produtos.length > 0 && posso("estoque") && <button className="g-btn sec" onClick={() => abrir({ tipo: "comprar" })}><ClipboardList /> O que comprar</button>}
+          {produtos.length > 0 && posso("estoque") && <Link className="g-btn sec" href="/gestao/app/estoque/etiquetas"><Tag /> Etiquetas</Link>}
           {op.fornecedores && <button className="g-btn sec" onClick={() => abrir({ tipo: "fornecedores" })}><Truck /> Fornecedores</button>}
           {souDono && <button className="g-btn sec" onClick={() => abrir({ tipo: "opcoes" })}><SlidersHorizontal /> Opções</button>}
           <button className="g-btn pri" onClick={() => abrir({ tipo: "novo" })}><Plus /> Produto novo</button>
@@ -248,6 +252,7 @@ export default function Estoque() {
       {aberta?.tipo === "venda" && <VendaBalcao aoFechar={fechar} aoPronto={gravou} />}
       {aberta?.tipo === "novo" && <ProdutoNovo loja={loja} aoFechar={fechar} aoGravar={gravou} />}
       {aberta?.tipo === "entrada" && <Entrada produto={aberta.produto} loja={loja} aoFechar={fechar} aoGravar={gravou} />}
+      {aberta?.tipo === "comprar" && <OQueComprar produtos={produtos} fornecedores={fornecedores} comFornecedores={op.fornecedores} aoFechar={fechar} />}
       {aberta?.tipo === "fornecedores" && <Fornecedores produtos={produtos} fornecedores={fornecedores} aoFechar={fechar} aoMudar={recarregarFornecedores} />}
       {aberta?.tipo === "opcoes" && (
         <Folha titulo="Opções da loja" aoFechar={fechar} rodape={<button className="g-btn sec" onClick={fechar}>Voltar</button>}>
@@ -265,12 +270,14 @@ export default function Estoque() {
 
 /* ---------- campos do produto (novo e ficha) ---------- */
 
-type CamposProduto = { nome: string; categoria: string; unidade: string; preco: number | null; custo: number | null; minimo: string; codigo: string; fornecedorId: string | null };
+type CamposProduto = { nome: string; categoria: string; unidade: string; preco: number | null; custo: number | null; minimo: string; caixa: string; codigo: string; fornecedorId: string | null };
 
-function CamposDoProduto({ v, mudar, categorias, loja, produto, precoFixo }: {
+function CamposDoProduto({ v, mudar, categorias, loja, produto, precoFixo, aoGerarCodigo, gerandoCodigo }: {
   v: CamposProduto; mudar: (p: Partial<CamposProduto>) => void; categorias?: string[]; loja: Loja; /** Na ficha: o produto como está gravado. */ produto?: Produto;
   /** Preço travado e a pessoa não é o dono nem cuida do financeiro: o preço de venda não muda por aqui. */
   precoFixo?: boolean;
+  /** Na ficha, produto sem código: gera o código interno (Code 128) e guarda. */
+  aoGerarCodigo?: () => void; gerandoCodigo?: boolean;
 }) {
   const mg = loja.margem ? margemDe(v.preco, v.custo) : null;
   const repetido = loja.codigoBarras ? donoDoCodigo(loja.produtos, limparCodigo(v.codigo), produto?.id) : null;
@@ -280,11 +287,14 @@ function CamposDoProduto({ v, mudar, categorias, loja, produto, precoFixo }: {
         <input className="g-input" value={v.nome} onChange={(e) => mudar({ nome: e.target.value })} placeholder="Ex.: Ração Golden 15 kg" maxLength={120} />
       </Campo>
       {loja.codigoBarras && (
-        <Campo rotulo="Código de barras" dica="Opcional. Clique no campo e passe o leitor, ou digite os números da embalagem." erro={repetido ? `Este código já está em ${repetido.nome}.` : null}>
+        <Campo rotulo="Código de barras" dica={aoGerarCodigo ? "Opcional. Passe o leitor, digite os números da embalagem ou, sem código na embalagem, gere um código interno para a etiqueta." : "Opcional. Clique no campo e passe o leitor, ou digite os números da embalagem."} erro={repetido ? `Este código já está em ${repetido.nome}.` : null}>
           <div className="g-lj-codigo">
             <input className="g-input g-tab" inputMode="numeric" value={v.codigo} maxLength={64} onChange={(e) => mudar({ codigo: e.target.value })} placeholder="Ex.: 7891234567895"
               onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} />
             <LerComCamera aoLer={(codigo) => mudar({ codigo })} />
+            {aoGerarCodigo && !v.codigo.trim() && !produto?.codigo_barras && (
+              <button type="button" className="g-btn sec p" onClick={aoGerarCodigo} disabled={gerandoCodigo}><Barcode /> {gerandoCodigo ? "Gerando…" : "Gerar código interno"}</button>
+            )}
           </div>
         </Campo>
       )}
@@ -325,11 +335,23 @@ function CamposDoProduto({ v, mudar, categorias, loja, produto, precoFixo }: {
           </select>
         </Campo>
       )}
-      <Campo rotulo="Estoque mínimo" dica="Abaixo disso, o produto aparece como acabando. Deixe 0 para não avisar.">
-        <input className="g-input g-tab" inputMode="decimal" value={v.minimo} onChange={(e) => mudar({ minimo: e.target.value })} placeholder="0" />
-      </Campo>
+      <div className="dupla">
+        <Campo rotulo="Estoque mínimo" dica="Abaixo disso, o produto aparece como acabando. Deixe 0 para não avisar.">
+          <input className="g-input g-tab" inputMode="decimal" value={v.minimo} onChange={(e) => mudar({ minimo: e.target.value })} placeholder="0" />
+        </Campo>
+        <Campo rotulo="Vem em caixa de" dica={`Opcional. Quantos ${v.unidade} vêm na caixa do fornecedor: O que comprar sugere caixas inteiras.`}>
+          <input className="g-input g-tab" inputMode="decimal" value={v.caixa} onChange={(e) => mudar({ caixa: e.target.value })} placeholder="Ex.: 12" aria-label="Vem em caixa de" />
+        </Campo>
+      </div>
     </>
   );
+}
+
+/** "Vem em caixa de": vazio = null; número maior que zero; undefined = digitado errado. */
+function lerCaixa(s: string): number | null | undefined {
+  if (!s.trim()) return null;
+  const n = lerQtd(s);
+  return n != null && n > 0 && n <= 100000 ? n : undefined;
 }
 
 /** Campos das opções ligadas, prontos para gravar no produto (opção desligada não toca na coluna). */
@@ -343,7 +365,7 @@ function camposDaLoja(loja: Loja, v: CamposProduto) {
 function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () => void; aoGravar: () => void }) {
   const { sb, petshop, user } = useGestao();
   const { avisar, avisarErro } = useAvisos();
-  const [v, setV] = useState<CamposProduto>({ nome: "", categoria: "", unidade: "un", preco: null, custo: null, minimo: "", codigo: "", fornecedorId: null });
+  const [v, setV] = useState<CamposProduto>({ nome: "", categoria: "", unidade: "un", preco: null, custo: null, minimo: "", caixa: "", codigo: "", fornecedorId: null });
   const [inicial, setInicial] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -355,7 +377,8 @@ function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () =>
     if (!nome) { avisarErro("Escreva o nome do produto."); return; }
     const minimo = v.minimo.trim() ? lerQtd(v.minimo) : 0;
     const qtd = inicial.trim() ? lerQtd(inicial) : 0;
-    if (minimo == null || qtd == null) { avisarErro("Confira as quantidades: use só números."); return; }
+    const caixa = lerCaixa(v.caixa);
+    if (minimo == null || qtd == null || caixa === undefined) { avisarErro("Confira as quantidades: use só números."); return; }
     const repetido = loja.codigoBarras ? donoDoCodigo(loja.produtos, limparCodigo(v.codigo)) : null;
     if (repetido) { avisarErro(`Este código de barras já está em ${repetido.nome}. Cada produto tem o seu.`); return; }
     setSalvando(true);
@@ -363,7 +386,7 @@ function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () =>
       // o produto já foi criado nesta operação e só o estoque inicial falhou: a nova tentativa não cria outro
       const novo = criado.current?.chave === chave ? { id: criado.current.id } : ok(await sb.from("produtos").insert({
         petshop_id: petshop.id, nome, categoria: v.categoria.trim() || null, unidade: v.unidade,
-        preco_venda: v.preco, custo: v.custo, estoque_minimo: minimo, ...camposDaLoja(loja, v),
+        preco_venda: v.preco, custo: v.custo, estoque_minimo: minimo, embalagem_qtd: caixa, ...camposDaLoja(loja, v),
       }).select("id").single());
       criado.current = { chave, id: novo.id };
       if (qtd > 0) {
@@ -411,6 +434,8 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
   const [custo, setCusto] = useState<number | null>(loja.margem ? produto.ultimo_custo ?? produto.custo : produto.custo);
   const [fornecedorId, setFornecedorId] = useState<string | null>(loja.fornecedores && loja.lista.some((f) => f.id === produto.fornecedor_id && f.ativo) ? produto.fornecedor_id : null);
   const [despesa, setDespesa] = useState(true);
+  const [etiquetas, setEtiquetas] = useState(false);
+  const router = useRouter();
   // despesa é uma forma só, e nada vem marcado: a pessoa diz como pagou o fornecedor
   const [forma, setForma] = useState<Forma | null>(null);
   const [erroForma, setErroForma] = useState<string | null>(null);
@@ -452,6 +477,8 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
         }
       } else avisar(`Entraram ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}.`);
       aoGravar();
+      // etiquetas do que entrou: uma por unidade (kg, litro e afins: uma só), na folha de etiquetas
+      if (etiquetas) router.push(`/gestao/app/estoque/etiquetas?p=${produto.id}:${["un", "pacote", "saco"].includes(produto.unidade) ? Math.max(1, Math.min(500, Math.ceil(n))) : 1}`);
     } catch (e) { avisarErro(e); return false; } finally { setSalvando(false); }
   }
 
@@ -478,6 +505,10 @@ function Entrada({ produto, loja, aoFechar, aoGravar }: { produto: Produto; loja
               : "Com o custo preenchido, o custo médio do produto é recalculado nesta entrada."}
           </p>
         )}
+        <label className="g-check">
+          <input type="checkbox" checked={etiquetas} onChange={(e) => setEtiquetas(e.target.checked)} />
+          <span>Imprimir etiquetas do que entrou</span>
+        </label>
         {loja.fornecedores && <EscolherFornecedor valor={fornecedorId} aoMudar={setFornecedorId} fornecedores={loja.lista} aoCriar={loja.recarregarFornecedores} />}
         {vejoFinanceiro && (
           <>
@@ -613,7 +644,7 @@ function Saida({ produto, aoFechar, aoGravar }: { produto: Produto; aoFechar: ()
 const TIPO_MOV: Record<string, string> = { entrada: "Entrada", saida: "Saída", ajuste: "Saldo corrigido" };
 
 function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produto; loja: Loja; aoFechar: () => void; aoMudar: () => void; aoGravar: () => void }) {
-  const { sb, petshop, user, equipe, cuidoDoFinanceiro } = useGestao();
+  const { sb, petshop, user, equipe, cuidoDoFinanceiro, posso } = useGestao();
   const precoFixo = travaDePreco(petshop).ligada && !cuidoDoFinanceiro;
   // quem deu cada saída ou corrigiu o saldo (nome de quem está na equipe)
   const nomeDe = (id: string | null | undefined) => (id ? equipe.find((x) => x.user_id === id)?.nome?.split(" ")[0] ?? null : null);
@@ -621,8 +652,20 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
   const somenteLeitura = useSomenteLeitura();
   const [v, setV] = useState<CamposProduto>({
     nome: produto.nome, categoria: produto.categoria ?? "", unidade: produto.unidade, preco: produto.preco_venda, custo: produto.custo,
-    minimo: Number(produto.estoque_minimo) ? fmtQtd(produto.estoque_minimo) : "", codigo: produto.codigo_barras ?? "", fornecedorId: produto.fornecedor_id,
+    minimo: Number(produto.estoque_minimo) ? fmtQtd(produto.estoque_minimo) : "", caixa: produto.embalagem_qtd ? fmtQtd(produto.embalagem_qtd) : "",
+    codigo: produto.codigo_barras ?? "", fornecedorId: produto.fornecedor_id,
   });
+  const [gerandoCodigo, setGerandoCodigo] = useState(false);
+  async function gerarCodigo() {
+    if (somenteLeitura()) return;
+    setGerandoCodigo(true);
+    try {
+      const r = ok(await sb.rpc("produtos_gerar_codigos", { p_petshop: petshop.id, p_produtos: [produto.id] }));
+      const codigo = r[0]?.codigo_barras ?? null;
+      if (codigo) { setV((a) => ({ ...a, codigo })); avisar(`Código interno ${codigo} guardado. Ele sai na etiqueta e o leitor acha o produto na venda.`); }
+      aoMudar();
+    } catch (e) { avisarErro(e); } finally { setGerandoCodigo(false); }
+  }
   const [contado, setContado] = useState<string | null>(null);
   const [razao, setRazao] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -638,6 +681,8 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
     if (!nome) { avisarErro("Escreva o nome do produto."); return; }
     const minimo = v.minimo.trim() ? lerQtd(v.minimo) : 0;
     if (minimo == null) { avisarErro("Confira o estoque mínimo: use só números."); return; }
+    const caixa = lerCaixa(v.caixa);
+    if (caixa === undefined) { avisarErro("Confira o Vem em caixa de: use só números, maior que zero."); return; }
     const repetido = loja.codigoBarras ? donoDoCodigo(loja.produtos, limparCodigo(v.codigo), produto.id) : null;
     if (repetido) { avisarErro(`Este código de barras já está em ${repetido.nome}. Cada produto tem o seu.`); return; }
     setSalvando(true);
@@ -645,7 +690,7 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
       // o preço só vai quando mudou: mudar o preço fica anotado (e, com a trava, só o dono ou quem vê o financeiro muda)
       const mudouPreco = (v.preco ?? null) !== (produto.preco_venda == null ? null : Number(produto.preco_venda));
       ok(await sb.from("produtos").update({
-        nome, categoria: v.categoria.trim() || null, unidade: v.unidade, ...(mudouPreco && !precoFixo ? { preco_venda: v.preco } : {}), custo: v.custo, estoque_minimo: minimo, ...camposDaLoja(loja, v),
+        nome, categoria: v.categoria.trim() || null, unidade: v.unidade, ...(mudouPreco && !precoFixo ? { preco_venda: v.preco } : {}), custo: v.custo, estoque_minimo: minimo, embalagem_qtd: caixa, ...camposDaLoja(loja, v),
       }).eq("id", produto.id).eq("petshop_id", petshop.id).select("id").single());
       avisar("Produto atualizado.");
       aoGravar();
@@ -713,8 +758,12 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
         </div>
 
         <div className="g-form">
-          <CamposDoProduto v={v} mudar={(p) => setV((a) => ({ ...a, ...p }))} loja={loja} produto={produto} precoFixo={precoFixo} />
+          <CamposDoProduto v={v} mudar={(p) => setV((a) => ({ ...a, ...p }))} loja={loja} produto={produto} precoFixo={precoFixo}
+            aoGerarCodigo={loja.codigoBarras && posso("estoque") ? () => void gerarCodigo() : undefined} gerandoCodigo={gerandoCodigo} />
         </div>
+        {posso("estoque") && (
+          <div><Link className="g-btn sec p" href={`/gestao/app/estoque/etiquetas?p=${produto.id}:1`}><Tag /> Imprimir etiquetas</Link></div>
+        )}
 
         <section>
           <h3 style={{ marginBottom: 6 }}>Últimos movimentos</h3>
