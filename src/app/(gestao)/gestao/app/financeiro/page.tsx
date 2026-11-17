@@ -59,7 +59,8 @@ const ehDevolucao = (l: Pick<Lancamento, "tipo" | "categoria">) => l.tipo === "s
 
 /**
  * Soma por categoria. Uma conta com serviço, produto e extra é repartida: o serviço fica na categoria do lançamento,
- * o produto em "Venda de produtos" e o extra em "Extras", com o desconto rateado na proporção de cada parte.
+ * o produto em "Venda de produtos" e o extra (taxas, leva e traz, outros) em "Taxas e extras", com o desconto rateado na proporção
+ * de cada parte. Sinal já pago e crédito usado (linhas negativas) abatem primeiro o serviço: a taxa de R$ 40 aparece como R$ 40.
  */
 function porCategoria(lista: Lancamento[], petshop: { modulos?: string[] | null }) {
   const mapa = new Map<string, number>();
@@ -69,7 +70,7 @@ function porCategoria(lista: Lancamento[], petshop: { modulos?: string[] | null 
     if (!partes) { por(categoriaAtual(l.categoria, petshop), Number(l.valor)); continue; }
     por(categoriaAtual(l.categoria, petshop), partes.servico);
     por("Venda de produtos", partes.produto);
-    por("Extras", partes.extra);
+    por("Taxas e extras", partes.extra);
   }
   return [...mapa].map(([nome, valor]) => ({ nome, valor: Math.round(valor * 100) / 100 })).sort((a, b) => b.valor - a.valor);
 }

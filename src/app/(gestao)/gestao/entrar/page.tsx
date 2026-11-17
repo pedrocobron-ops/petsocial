@@ -6,10 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Porta from "@/components/gestao/porta";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { registrarAcesso } from "@/lib/gestao/registro-acesso";
-import { aceitarConvite, lerCodigoDoConvite } from "@/lib/gestao/convite";
+import { aceitarConvite, avisoDoConvite, conferirConvite, lerCodigoDoConvite, type SituacaoDoConvite } from "@/lib/gestao/convite";
 import CampoSenha from "./campo-senha";
 
-/** `?convite=<código>`: link do convite da equipe para quem já tem conta. Logado, aceita na hora; senão, depois de entrar. */
+/**
+ * `?convite=<código>`: link do convite da equipe para quem já tem conta. Logado, aceita na hora; senão, depois de entrar.
+ * Sem login, o link é conferido ao abrir (`convite_conferir`): vencido, trocado ou cancelado aparece antes de pedir a senha.
+ */
 export default function Entrar() {
   return <Suspense fallback={<Formulario codigo="" />}><ComConvite /></Suspense>;
 }
@@ -28,11 +31,18 @@ function Formulario({ codigo }: { codigo: string }) {
   // convite que não entrou, com a pessoa já logada: mostra o motivo e o que fazer
   const [erroConvite, setErroConvite] = useState<string | null>(null);
   const [conferindo, setConferindo] = useState(codigo !== "");
+  const [convite, setConvite] = useState<{ situacao: SituacaoDoConvite; petshop: string | null } | null>(null);
   const feito = useRef(false);
 
   async function usarConvite() {
     const r = await aceitarConvite(banco(), codigo);
-    if ("erro" in r) { setErroConvite(r.erro); return; }
+    if ("erro" in r) {
+      // o banco só diz "não vale mais": a conferência explica se venceu, foi trocado por um mais novo ou cancelado
+      const c = /outro e-mail|já está na equipe/i.test(r.erro) ? null : await conferirConvite(banco(), codigo);
+      const a = c && c.situacao !== "muitos" ? avisoDoConvite(c.situacao, c.petshop) : null;
+      setErroConvite(a ? `${a.titulo}. ${a.texto}` : r.erro);
+      return;
+    }
     router.replace("/gestao/app");
   }
 
@@ -43,6 +53,7 @@ function Formulario({ codigo }: { codigo: string }) {
     void (async () => {
       const { data } = await banco().auth.getSession();
       if (data.session) await usarConvite();
+      else setConvite(await conferirConvite(banco(), codigo));
       setConferindo(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,6 +85,18 @@ function Formulario({ codigo }: { codigo: string }) {
 
   if (conferindo) return <Porta titulo="Abrindo o convite…"><span /></Porta>;
 
+  // link que não serve mais: diz logo, antes de pedir a senha ("usado" segue para o formulário: pode ser a própria pessoa)
+  const aviso = convite && !["valido", "usado", "muitos", "outro_email"].includes(convite.situacao) ? avisoDoConvite(convite.situacao, convite.petshop) : null;
+  if (aviso) {
+    return (
+      <Porta titulo={aviso.titulo} texto={aviso.texto}>
+        <div className="g-pilha p">
+          <Link className="g-btn sec cheio" href="/gestao/entrar">Entrar sem o convite</Link>
+        </div>
+      </Porta>
+    );
+  }
+
   if (erroConvite) {
     return (
       <Porta titulo="O convite não entrou" texto={erroConvite}>
@@ -88,7 +111,8 @@ function Formulario({ codigo }: { codigo: string }) {
 
   return (
     <Porta titulo={codigo ? "Entre para aceitar o convite" : "Que bom te ver"}
-      texto={codigo ? "Use a conta do e-mail que recebeu o convite. Ao entrar, você já cai na equipe." : "Entre para abrir o seu pet shop."}>
+      texto={codigo ? `Use a conta do e-mail que recebeu o convite${convite?.petshop ? ` de ${convite.petshop}` : ""}. Ao entrar, você já cai na equipe.` : "Entre para abrir o seu pet shop."}>
+      {convite?.situacao === "usado" && <p className="g-aviso" role="status">Este convite já foi usado. Se foi você, entre normalmente com o seu e-mail e a sua senha.</p>}
       <form className="g-form" onSubmit={enviar}>
         <label className="g-campo"><span>E-mail</span>
           <input className="g-input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />

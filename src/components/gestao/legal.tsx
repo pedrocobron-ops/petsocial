@@ -33,6 +33,11 @@ export function QuemResponde() {
 export function EmailJuridico() {
   return EMPRESA.emailJuridico ? <a href={`mailto:${EMPRESA.emailJuridico}`}>{EMPRESA.emailJuridico}</a> : <Preencher>E-MAIL DE CONTATO</Preencher>;
 }
+/** O e-mail de privacidade uma vez só: o jurídico, se houver; senão o de contato (não repete o mesmo endereço duas vezes). */
+export function EmailPrivacidade() {
+  const e = EMPRESA.emailJuridico || EMPRESA.email;
+  return <a href={`mailto:${e}`}>{e}</a>;
+}
 export function Foro() {
   return EMPRESA.foro ? <>{EMPRESA.foro}</> : <Preencher>FORO</Preencher>;
 }

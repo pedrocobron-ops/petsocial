@@ -23,6 +23,10 @@
 
 .g-cad-duvidas { align-items: flex-start; flex-wrap: nowrap; margin-bottom: 0; }
 .g-cad-duvidas ul { margin: 4px 0 0; padding-left: 18px; }
+.g-cad-pendente { align-items: flex-start; flex-wrap: nowrap; margin-bottom: 0; }
+.g-cad-pendente > svg { flex: none; margin-top: 2px; }
+.g-cad-pendente .g-fila { flex-wrap: wrap; }
+.g-cad-pendente .g-btn { margin-left: 0; }
 .g-cad-secao { display: grid; gap: 10px; }
 .g-cad-secao > h3 { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 1.0625rem; }
 .g-cad-secao > h3 svg { width: 20px; height: 20px; }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { EMPRESA, identificacao } from "@/lib/empresa";
+import EscolhaDeCookies from "@/components/escolha-cookies";
 
 export const metadata: Metadata = {
   title: "Política de privacidade",
@@ -76,10 +77,16 @@ export default function PrivacidadePage() {
         segurança reconhecidos, como prevê o artigo 33 da LGPD.
       </p>
 
-      <h2>5. Cookies</h2>
+      <h2 id="cookies">5. Cookies</h2>
       <p>
-        Usamos cookies necessários para o site funcionar e cookies de medição do Pixel da Meta. Na primeira visita, um aviso explica isso.
-        Você pode apagar ou bloquear os cookies nas configurações do seu navegador a qualquer momento, e ajustar os anúncios que vê em{" "}
+        Usamos cookies necessários para o site funcionar e cookies de medição do Pixel da Meta. Na primeira visita, um aviso pergunta se
+        você aceita ou recusa os cookies de medição. Recusando, o Pixel não manda nada do seu navegador e o cookie dele é apagado; a escolha
+        fica guardada no próprio navegador. O aviso e o Pixel aparecem só nas páginas do site: o aplicativo Maestro Pet Gestão, as telas de
+        cadastro e de entrada e as páginas que os pet shops mandam aos tutores não usam cookies de medição.
+      </p>
+      <EscolhaDeCookies />
+      <p>
+        Você também pode apagar ou bloquear os cookies nas configurações do seu navegador a qualquer momento, e ajustar os anúncios que vê em{" "}
         <a href="https://www.facebook.com/adpreferences" rel="noopener noreferrer">facebook.com/adpreferences</a>. Bloquear os cookies
         de medição não impede a compra nem o acesso aos produtos.
       </p>

@@ -100,7 +100,7 @@ export default function Assinatura() {
             </div>
             <div className="g-card g-pilha">
               <div><a className={`g-btn ${status === "atrasada" ? "verde" : "sec"}`} href={PORTAL} target="_blank" rel="noopener noreferrer">Trocar cartão ou cancelar<ExternalLink aria-hidden /></a></div>
-              <p className="g-muted g-pp">Abre a página da Cakto, que cuida da cobrança. Lá você entra com o e-mail usado na compra{petshop.cakto_email ? ` (${petshop.cakto_email})` : ""}. Para mudar de plano, cancele por lá e assine o plano novo aqui: os seus dados continuam.</p>
+              <p className="g-muted g-pp">Abre a página da Cakto, que cuida da cobrança. Lá você entra com o e-mail usado na compra{petshop.cakto_email ? ` (${petshop.cakto_email})` : ""}. Para mudar de plano ou de período, cancele por lá e depois assine o novo aqui: os seus dados continuam. O plano novo começa a contar do dia em que você pagar, e os meses que sobraram do atual não viram crédito nem desconto (<Link className="g-link" href="/gestao/termos#cancelar" target="_blank">Termos, parte 7</Link>).</p>
             </div>
           </section>
         )}
@@ -145,7 +145,8 @@ export default function Assinatura() {
         <section className="g-card areia g-pilha p">
           <h2 className="g-as-dados-t"><Tile icone={Database} tom="ceu" tamanho="p" />Seus dados</h2>
           <p className="g-p">
-            Tudo o que você lança aqui é do seu pet shop. Dá para levar quando quiser: em{" "}
+            Tudo o que você lança aqui é do seu pet shop. Dá para levar quando quiser: tudo de uma vez em{" "}
+            <Link className="g-link alvo" href="/gestao/app/meu-petshop#baixar-todos-os-dados">Meu pet shop → Baixar todos os dados</Link>, ou só uma parte em{" "}
             <Link className="g-link alvo" href="/gestao/app/clientes">Clientes → Exportar</Link> e em{" "}
             <Link className="g-link alvo" href="/gestao/app/financeiro">Financeiro → Exportar</Link>.
           </p>

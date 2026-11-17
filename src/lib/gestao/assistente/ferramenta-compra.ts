@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { podeArea } from "../acessos";
+import { podeArea, veCusto } from "../acessos";
 import { analisarCompra, lerMovimentosDaCompra, PERIODOS, textoDasSemanas } from "../compra";
 import { contando, lerTudo } from "../paginas";
 import { comCustos } from "../reservado";
@@ -36,7 +36,9 @@ export async function consultarCompra(c: Contexto, nome: string, e: Record<strin
       sb.from("produtos").select("id, nome, unidade, estoque, estoque_minimo, criado_em, embalagem_qtd, fornecedor_id, tipo", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)),
     lerMovimentosDaCompra(sb, petshop.id),
   ]);
-  const produtos = c.vejoFinanceiro ? await comCustos(sb, petshop.id, base) : base.map((p) => ({ ...p, custo: null }));
+  // custo e valor a preço de custo: só para quem vê o custo (dono, financeiro ou "Ver custo e margem"; o banco confere de novo)
+  const vejoCusto = veCusto(c.eu);
+  const produtos = vejoCusto ? await comCustos(sb, petshop.id, base) : base.map((p) => ({ ...p, custo: null }));
   const fornecedores = new Map<string, string>();
   const ids = [...new Set(produtos.map((p) => p.fornecedor_id).filter((x): x is string => Boolean(x)))];
   if (ids.length) {
@@ -69,7 +71,7 @@ export async function consultarCompra(c: Contexto, nome: string, e: Record<strin
       sem_vendas_recentes: sem.slice(0, 30).map((l) => ({ produto: l.produto.nome, saldo: Number(l.produto.estoque), unidade: l.produto.unidade })),
       acabando: a.acabando.slice(0, 30).map((l) => ({ produto: l.produto.nome, saldo: Number(l.produto.estoque), minimo: Number(l.produto.estoque_minimo), da_para: l.semanasRestam != null ? textoDasSemanas(l.semanasRestam) : "sem vendas recentes" })),
       parados_60_dias: a.parados.slice(0, 30).map((p) => ({ produto: p.nome, saldo: Number(p.estoque), unidade: p.unidade })),
-      ...(c.vejoFinanceiro ? { valor_em_estoque: a.valorEmEstoque != null ? real(a.valorEmEstoque) : null, valor_parado: a.valorParado != null ? real(a.valorParado) : null, produtos_sem_custo: a.semCusto } : {}),
+      ...(vejoCusto ? { valor_em_estoque: a.valorEmEstoque != null ? real(a.valorEmEstoque) : null, valor_parado: a.valorParado != null ? real(a.valorParado) : null, produtos_sem_custo: a.semCusto } : {}),
       onde_ver: "Estoque, O que comprar: um toque no fornecedor monta o pedido pelo WhatsApp com essas quantidades (dá para mudar antes de mandar).",
     },
   };

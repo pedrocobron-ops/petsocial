@@ -12,17 +12,16 @@
 export type Documento = "termos" | "privacidade";
 
 export const DOCUMENTOS: Record<Documento, { nome: string; caminho: string; versao: string; vigenteDesde: string }> = {
-  termos: { nome: "Termos de uso", caminho: "/gestao/termos", versao: "2.2", vigenteDesde: "2026-11-17" },
-  privacidade: { nome: "Política de privacidade", caminho: "/gestao/privacidade", versao: "2.2", vigenteDesde: "2026-11-17" },
+  termos: { nome: "Termos de uso", caminho: "/gestao/termos", versao: "2.3", vigenteDesde: "2026-11-18" },
+  privacidade: { nome: "Política de privacidade", caminho: "/gestao/privacidade", versao: "2.3", vigenteDesde: "2026-11-18" },
 };
 
 /** O que mudou nesta versão, em poucas linhas, para a tela de aceite de quem já tinha conta. */
 export const MUDANCAS: string[] = [
-  "Quem oferece o Gestão hoje é uma pessoa física; explicamos como fica quando o serviço passar para uma empresa (CNPJ), com aviso antes.",
-  "Cadastro sem e-mail de confirmação: use um e-mail seu e correto, porque é por ele que se troca a senha. Convites da equipe agora usam um link com código.",
-  "Nossos compromissos como operador dos dados dos seus clientes, incluindo aviso de incidente em até 2 dias úteis e a lista de fornecedores.",
-  "Novos prazos de guarda: registros de acesso por 6 meses e conversas com o assistente por 12 meses. Apagar os dados de um tutor também limpa orçamentos e conversas.",
-  "Multa, juros, fiado, taxas da maquininha, lucro, orçamento, promoções, checklist de entrada, aniversário do tutor e Modo TV: o que é responsabilidade do pet shop.",
+  "Cópias de segurança: explicamos quais existem hoje (as do fornecedor do banco e uma cópia completa feita pela nossa equipe), para que servem e o que fazer se algo for apagado por engano. Não há prazo de guarda garantido.",
+  "Mudar de plano ou de período: como fazer, quando o plano novo começa e o que acontece com os meses que sobraram de um plano de 3 ou 6 meses.",
+  "Cookies: o aviso aparece só nas páginas do site que medem visitas, com Aceitar e Recusar. O aplicativo e o cadastro continuam sem pixel.",
+  "Textos mais claros sobre quem oferece o serviço hoje, o banco de dados dividido com o Escala CEO e os avisos que aparecem na tela.",
 ];
 
 /** "17/11/2026" a partir de "2026-11-17" (sem fuso: é uma data de calendário). */

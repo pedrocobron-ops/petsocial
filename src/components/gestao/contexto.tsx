@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { banco, configurado, type Banco } from "@/lib/gestao/supabase";
 import type { Petshop, Profissional, Servico } from "@/lib/gestao/tipos";
-import { podeArea, type Area } from "@/lib/gestao/acessos";
+import { podeArea, veCusto, type Area } from "@/lib/gestao/acessos";
 import { registrarAcesso } from "@/lib/gestao/registro-acesso";
 import { definirLoja } from "@/lib/gestao/erros-navegador";
 import { pendentes, type Documento } from "@/lib/gestao/documentos";
@@ -27,6 +27,8 @@ export type Gestao = {
   vejoFinanceiro: boolean;
   /** Dono, ou quem tem Financeiro ou Relatórios: vê todo o dinheiro (despesas, contas, histórico, meta) e corrige valor já recebido. */
   cuidoDoFinanceiro: boolean;
+  /** Vê o custo e a margem dos produtos: dono, quem cuida do financeiro ou quem tem "Ver custo e margem" (o banco confere de novo). */
+  vejoCusto: boolean;
   /** A pessoa abre esta área do aplicativo? (o dono libera área por área em Equipe) */
   posso: (area: Area) => boolean;
   /** false = teste vencido, assinatura cancelada ou conta marcada para ser apagada: a conta fica só para consulta. */
@@ -167,6 +169,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       souDono: eu.papel === "dono",
       vejoFinanceiro: podeArea(eu, "caixa") || podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
       cuidoDoFinanceiro: podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
+      vejoCusto: veCusto(eu),
       posso: (area: Area) => podeArea(eu, area),
       liberado,
       exclusao,

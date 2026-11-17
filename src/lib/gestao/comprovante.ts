@@ -4,15 +4,46 @@ import { brl, chamar, dataCompleta } from "./util";
 
 type Recebido = { valor: number; forma?: string | null; pagamentos?: unknown; itens?: unknown };
 
+/** O que entrou na mesma conta para o que o tutor devia de antes (fiado, resto de outra conta): quanto e como. */
+export type AntigaNoComprovante = { recebido: number; falta: number; forma?: string | null; pagamentos?: unknown };
+
+const centavos = (n: number) => Math.round(n * 100) / 100;
+const nomeDaForma = (f: string) => FORMAS.find((x) => x.id === f)?.rotulo ?? "Outro";
+
+/** "Dinheiro R$ 100,00 + Pix R$ 20,00": as partes somadas por forma, sempre com o valor de cada uma. */
+export function formasComValor(partes: { forma: string; valor: number }[]) {
+  const porForma = new Map<string, number>();
+  for (const x of partes) if (x.valor > 0) porForma.set(x.forma, centavos((porForma.get(x.forma) ?? 0) + x.valor));
+  return [...porForma].map(([f, v]) => `${nomeDaForma(f)} ${brl(v)}`).join(" + ");
+}
+
+/** "Recebido em dinheiro: R$ 100,00 · Troco: R$ 5,00", quando o cliente entregou mais do que a parte em dinheiro. */
+function linhaDoTroco(entregue: number | null | undefined, emDinheiro: number) {
+  if (!entregue || !(emDinheiro > 0)) return [];
+  const troco = centavos(entregue - emDinheiro);
+  return troco > 0.005 ? [`Recebido em dinheiro: ${brl(entregue)} · Troco: ${brl(troco)}`] : [];
+}
+
+/** O que devia de antes, numa linha só: quanto pagou agora disso e quanto ainda deve (ou que ficou quitado). */
+function linhaDoQueDevia(pagou: number, devia: number) {
+  if (!(pagou > 0)) return [];
+  const aindaDeve = devia > 0 ? centavos(Math.max(devia, pagou) - pagou) : 0;
+  if (!(devia > 0)) return [`Pagou também ${brl(pagou)} do que devia de antes`];
+  return aindaDeve > 0.005
+    ? [`Pagou ${brl(pagou)} do que devia de antes (${brl(Math.max(devia, pagou))}); ainda deve ${brl(aindaDeve)}`]
+    : [`Pagou também o que devia de antes: ${brl(pagou)} (quitado)`];
+}
+
 /**
  * Comprovante do atendimento em texto simples, para mandar ao tutor pelo WhatsApp:
- * pet shop, data, pet, o que foi cobrado (serviço, produtos e extras), total e como foi pago.
- * Não é documento fiscal, e o texto diz isso no fim.
+ * pet shop, data, pet, o que foi cobrado (serviço, produtos e extras), total e como foi pago (cada forma com o valor).
+ * `antigas`: o que entrou junto, no mesmo pagamento, para o que o tutor devia de antes (fica dito quanto pagou disso e quanto
+ * ainda deve). `entregue`: quanto o cliente entregou em dinheiro (para o troco). Não é documento fiscal, e o texto diz isso no fim.
  */
 export function textoComprovante(p: {
   petshop: string; tutor?: string | null; pet?: string | null; servico?: string | null; quando: Date | string; recebidos: Recebido[];
+  antigas?: AntigaNoComprovante[] | null; entregue?: number | null;
 }) {
-  const centavos = (n: number) => Math.round(n * 100) / 100;
   const total = centavos(p.recebidos.reduce((t, l) => t + Number(l.valor), 0));
   const linhas: string[] = [];
   let desconto = 0;
@@ -25,12 +56,15 @@ export function textoComprovante(p: {
     }
     desconto = centavos(desconto + contaDosItens(itens, Number(l.valor)).desconto);
   }
-  // como foi pago: as partes de todos os recebimentos, somadas por forma
-  const porForma = new Map<FormaPagamento, number>();
-  for (const l of p.recebidos) for (const parte of partesPorForma(l)) porForma.set(parte.forma, centavos((porForma.get(parte.forma) ?? 0) + parte.valor));
-  const nome = (f: FormaPagamento) => FORMAS.find((x) => x.id === f)?.rotulo ?? "Outro";
-  const formas = [...porForma];
-  const pagamento = formas.length > 1 ? formas.map(([f, v]) => `${nome(f)} ${brl(v)}`).join(" + ") : formas.length ? nome(formas[0][0]) : "";
+  // como foi pago: as partes de todos os recebimentos (a conta e o que devia de antes), somadas por forma
+  const antigas = (p.antigas ?? []).filter((x) => Number(x.recebido) > 0);
+  const partes: { forma: FormaPagamento; valor: number }[] = [];
+  for (const l of p.recebidos) partes.push(...partesPorForma(l));
+  for (const x of antigas) partes.push(...partesPorForma({ valor: Number(x.recebido), forma: x.forma, pagamentos: x.pagamentos }));
+  const pagamento = formasComValor(partes);
+  const pagouAntigas = centavos(antigas.reduce((t, x) => t + Number(x.recebido), 0));
+  const deviaAntes = centavos(antigas.reduce((t, x) => t + Number(x.recebido) + Math.max(0, Number(x.falta)), 0));
+  const emDinheiro = centavos(partes.filter((x) => x.forma === "dinheiro").reduce((t, x) => t + x.valor, 0));
 
   return [
     `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} Segue o comprovante do atendimento${p.pet ? ` de ${p.pet}` : ""}.`,
@@ -42,7 +76,10 @@ export function textoComprovante(p: {
     ...linhas,
     ...(desconto > 0 ? [`Desconto: - ${brl(desconto)}`] : []),
     `Total: ${brl(total)}`,
+    ...linhaDoQueDevia(pagouAntigas, deviaAntes),
+    ...(pagouAntigas > 0 ? [`Total pago agora: ${brl(centavos(total + pagouAntigas))}`] : []),
     ...(pagamento ? [`Pagamento: ${pagamento}`] : []),
+    ...linhaDoTroco(p.entregue, emDinheiro),
     "",
     "Este comprovante não é nota fiscal.",
   ].join("\n");
@@ -81,22 +118,20 @@ export function textoComprovanteDaParte(p: {
   pago: number; formas: { forma: string; valor: number }[]; falta: number; pagaAte?: string | null; antigo?: number;
   /** quanto o cliente devia de antes, no total (para dizer "pagou 40 do que devia (75); ainda deve 35") */
   antigoDevia?: number;
+  /** Quanto o cliente entregou em dinheiro (para o troco). */
+  entregue?: number | null;
 }) {
-  const centavos = (n: number) => Math.round(n * 100) / 100;
-  const nome = (f: string) => FORMAS.find((x) => x.id === f)?.rotulo ?? "Outro";
   const linhas = p.itens.map((i) => {
     const varios = i.qtd !== 1;
     return `${varios ? `${i.qtd.toLocaleString("pt-BR")} x ` : ""}${i.nome}${varios ? ` (${brl(i.valor)} cada)` : ""}: ${brl(centavos(i.qtd * i.valor))}`;
   });
-  const pagamento = p.formas.length > 1 ? p.formas.map((x) => `${nome(x.forma)} ${brl(x.valor)}`).join(" + ") : p.formas.length ? nome(p.formas[0].forma) : "";
+  const pagamento = formasComValor(p.formas);
   // o que devia de antes, dito por inteiro: quanto devia, quanto pagou disso e quanto ainda deve
   const antigo = p.antigo && p.antigo > 0 ? centavos(p.antigo) : 0;
   const devia = p.antigoDevia && p.antigoDevia > 0 ? centavos(Math.max(p.antigoDevia, antigo)) : 0;
   const aindaDeve = devia ? centavos(devia - antigo) : 0;
-  const linhaDoAntigo = !antigo ? []
-    : !devia ? [`Pagou também ${brl(antigo)} do que devia de antes`]
-    : aindaDeve > 0.005 ? [`Pagou ${brl(antigo)} do que devia de antes (${brl(devia)}); ainda deve ${brl(aindaDeve)}`]
-    : [`Pagou também o que devia de antes: ${brl(antigo)} (quitado)`];
+  const linhaDoAntigo = linhaDoQueDevia(antigo, devia);
+  const emDinheiro = centavos(p.formas.filter((x) => x.forma === "dinheiro").reduce((t, x) => t + x.valor, 0));
   // o que fica para depois é só o resto da dívida antiga: já foi dito na linha de cima
   const faltaJaDita = devia > 0 && Math.abs(centavos(p.falta) - aindaDeve) < 0.005;
   return [
@@ -111,6 +146,7 @@ export function textoComprovanteDaParte(p: {
     `Total da conta: ${brl(p.total)}`,
     ...linhaDoAntigo,
     `Pago agora: ${brl(p.pago)}${pagamento ? ` (${pagamento})` : ""}`,
+    ...linhaDoTroco(p.entregue, emDinheiro),
     ...(p.falta > 0 && !faltaJaDita ? [`Fica para pagar depois: ${brl(p.falta)}${p.pagaAte ? `, até ${dataCompleta(p.pagaAte)}` : ""}`] : []),
     "",
     "Este comprovante não é nota fiscal.",

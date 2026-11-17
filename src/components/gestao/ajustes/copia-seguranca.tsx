@@ -497,7 +497,7 @@ export default function CopiaSeguranca() {
   }
 
   return (
-    <section className="g-card gj-copia" aria-busy={Boolean(passo)}>
+    <section className="g-card gj-copia" id="baixar-todos-os-dados" aria-busy={Boolean(passo)}>
       <div className="g-card-t"><h3><Tile icone={Archive} tom="ceu" tamanho="p" />Baixar todos os dados</h3></div>
       <p className="g-muted g-p">
         Um arquivo .zip com tudo do seu pet shop, uma planilha para cada parte: clientes, pets, saúde, agenda, creche e hotel (com os mensalistas, as mensalidades, o diário, as ocorrências e a lista de espera), pacotes, vendas, financeiro, caixas, estoque, pedidos pelo link, boletins, autorizações de fotos, feriados, equipe, comissões pagas e serviços.

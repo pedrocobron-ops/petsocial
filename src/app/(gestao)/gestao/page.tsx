@@ -173,8 +173,8 @@ const PERGUNTAS: [string, React.ReactNode][] = [
   ["Serve para clínica veterinária?", "O sistema é feito para banho e tosa, creche, hotel e loja de pet shop. Ele não tem prontuário, receituário nem internação. Uma clínica que também faz banho e tosa pode usá-lo para essa parte."],
   ["Posso colocar a minha equipe?", "Sim. Cada pessoa entra com o próprio acesso, e você escolhe o que ela abre: agenda, clientes, creche e hotel, pacotes, estoque, caixa, financeiro, relatórios. Quem não cuida do dinheiro não vê valores. Dá para ter mais de um dono. O número de pessoas com login depende do plano: 1, 3 ou 6. Banhista ou tosador que só aparece na agenda, sem entrar no sistema, não conta."],
   ["Tem contrato de fidelidade?", "Não. A cobrança da assinatura é feita pela Cakto, a empresa que cuida dos pagamentos para nós. No plano mensal a cobrança é todo mês. Nos planos de 3 e 6 meses você paga o período de uma vez, por um valor menor. Em qualquer um, você cancela quando quiser e usa até o fim do período já pago."],
-  ["Posso trocar de plano depois?", "Pode. Hoje a troca é feita cancelando o plano atual e assinando o novo; os dados continuam os mesmos."],
-  ["O que acontece quando os 7 dias acabam?", "A conta fica só para consulta e os dados continuam guardados. Para voltar a usar, é só escolher um plano. Nada é cobrado sozinho, porque o teste não pede cartão."],
+  ["Posso trocar de plano depois?", "Pode. Hoje a troca é feita cancelando o plano atual e assinando o novo; os dados continuam os mesmos. O plano novo conta a partir do pagamento dele, e os meses que sobraram de um plano de 3 ou 6 meses não viram crédito: se puder, troque perto do fim do período pago."],
+  ["O que acontece quando os 7 dias acabam?", "A conta fica só para consulta e os dados continuam guardados: dá para ver e baixar tudo. Para voltar a usar, é só escolher um plano. Nada é cobrado sozinho, porque o teste não pede cartão. Se a conta ficar mais de 180 dias só para consulta, ela pode ser apagada, sempre com aviso por e-mail e na tela pelo menos 30 dias antes."],
 ];
 
 function Tela({ arquivo, alt, celular, prioridade }: TelaVenda & { prioridade?: boolean }) {

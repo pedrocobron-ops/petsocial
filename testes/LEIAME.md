@@ -16,6 +16,9 @@ npx supabase start            # contêiner supabase_db_petsocial; o .env.local a
 npx next build
 ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_CADERNO_FALSO=1 npx next start -p 3214
 #    GESTAO_BOLETIM_FALSO=1: "Escrever com o Mozart" no boletim do pet responde sem chamar o modelo.
+#    GESTAO_MOZART_FALSO=1: o Mozart responde por um roteiro fixo (assistente/modelo-de-teste.ts), sem chamar o modelo:
+#    "bloqueia…" traz o cartão de bloquear o almoço de amanhã; "markdown" responde com negrito e lista; o resto, uma frase
+#    escrita palavra por palavra. Precisa dele: banco/mozart-rota.js e telas/mozart-consertos.js.
 npx next build
 ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_BOLETIM_FALSO=1 npx next start -p 3214
 
@@ -67,6 +70,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   plano de 01/11, que agora é o mês inteiro); seg a sex 9 de 21 × 1.100 = 471,43; dia fechado fora da conta; pausa no mês.
 - `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
   outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
+- `mozart-consertos.js`: os consertos depois dos cinco testadores, com modelo de mentira e sem banco: creche e hotel nunca viram
+  horário da agenda (`ferramenta-estadia.ts`: o serviço "Creche diária" é recusado em marcar_horario), quem não vê dinheiro nunca
+  ouve "não deve nada", ver_sinais, frase de espera com o nome da casa, o texto do cartão sem "Pode fazer" (`semPedidoDeConfirmar`),
+  negrito e lista na bolha (`assistente/markdown.ts`), a tabela de preços que manda creche e hotel para a diária e o modelo de plano
+  (`tabela-precos.ts`, `destinoDaLinha`), o "Tirar dúvida" com dois pets, o preço de cada porte e a creche calculada no código
+  (`estimarCreche`), a conversa guardada na aba (`assistente/guardada.ts`) e o cartão que grava uma vez só (`reservar`/`liberar`).
 - `mozart-rapido.js`: a voz (`src/lib/gestao/fala.ts`: a melhor voz em português do aparelho, natural do Edge > Google > aprimorada
   da Apple > outras do Brasil > Portugal; texto limpo para falar, "R$ 60,00" = "60 reais", "10h30" = "10 e 30"; frases que fecham
   enquanto o texto chega), as frases de progresso (`assistente/progresso.ts`, toda consulta tem a sua), as voltas com modelo e banco de
@@ -81,9 +90,17 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   com o primeiro de cada cor ficando e os outros ganhando cor livre, desativado fora, mais serviços que cores), onde cada opção de
   Personalizar fica no menu (`noMenu`: Agenda, Estoque e Caixa, Pacotes, "Creche e hotel" com as duas e "Creche"/"Hotel" com uma, igual
   a `nomeDaCasa`) e quando ligar creche ou hotel pergunta do link (`linkPergunta`: só com o link ligado e a área nova fora do link).
+- `convite-termos.js`: depois do teste de 17/11: os textos do link de convite que não vale (`convite.ts`, `avisoDoConvite`: vencido,
+  usado, trocado por um mais novo, cancelado, inválido, outro e-mail, muitas tentativas; com o nome do pet shop, sem repetir "Peça ao
+  dono…"), Termos e Política 2.3 (`documentos.ts`: quem aceitou a 2.2 vê o aceite de novo, resumo com cópias, troca de plano e cookies) e
+  a Ajuda achando "vocês fazem cópia dos meus dados?" (tópico `copias`, sem prometer prazo) e "como mudar de plano".
 - `textos.js`: textos que as testadoras acharam confusos: o comprovante com parte da dívida antiga ("Pagou R$ 40,00 do que devia de
   antes (R$ 75,00); ainda deve R$ 35,00", sem repetir o resto; quitado; chamada antiga sem o total) e as iniciais sem as palavras
   pequenas ("Banho e Tosa" = BT, "Hotelzinho da Bia" = HB).
+- `planilha.js`: trazer clientes de uma planilha (`planilha.ts`, `xlsx.ts`): .xlsx de verdade (montado por `lib/xlsx.js`, compactado ou
+  não, a primeira aba pela ordem das abas, telefone salvo como número "1.1912345678E10"), o texto separado por tabulação que volta
+  igual pela leitura da tela, "Luna, Bob" / "Mel e Bob" em dois pets ("Thor filhote" não), observação de alergia/medo/bravo que vira
+  alerta, as linhas para o banco (um pet por linha, telefone limpo, listas de telefone incompleto e de dois telefones) e as frases do resumo.
 - `caderno.js`: leitura do caderno ou do outro sistema (`caderno.ts`, `caderno-ia.ts`): datas como estão escritas ("12/10" sem ano:
   para quem deve, a mais recente até hoje; na agenda, a mais perto de hoje), horas ("14h", "9h30"), a limpeza do que a IA devolve
   (valor ilegível fica em branco com "Verificar", preço único espalhado pelos portes, próxima dose da carteirinha só quando escrita),
@@ -204,6 +221,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `cakto.js`: webhook da Cakto de ponta a ponta pela rota do servidor: 9 ofertas, ciclo da assinatura (renovada, atrasada, recuperada,
   cancelada), reembolso, contestação, MED, segredo errado, outro produto, e-mail diferente (callback e pagamento sem conta), Escola.
   A configuração da Cakto (`config_interna`) é guardada antes e devolvida igual no fim.
+- `convite-conferir.js`: conferir o link do convite antes de criar a conta (migração 20261219, `convite_conferir`, sem login): link que
+  vale responde só a situação e o nome do pet shop (nunca o e-mail do convite); outro e-mail = "outro_email" sem criar nada; link de
+  antes do "Reenviar" = "substituido"; vencido, e-mail trocado ("cancelado"), usado (e continua "usado" depois que a pessoa sai);
+  limites de 10 tentativas de e-mail por código e 30 conferências por rede por hora; apagar a loja com convites não trava.
 - `seguranca-email.js`: e-mail da conta não prova nada ("Confirm email" desligado; migração 20261209). Convite da equipe: só o dono
   gera o código (`convite_gerar`; recepção, outro dono e anônimo recusados; só o hash no banco; 7 dias); quem cria conta com o e-mail
   do convite **sem o código não entra** (`entrar()` não liga mais pelo e-mail); código inventado, de outro e-mail, antigo (gerou de
@@ -218,6 +239,14 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   banco; limpeza e limites no banco; repetição junta (mesmo aparelho e versão, 10 min); freio por aparelho (30/min), por pet shop
   (60/min) e geral (1000/h, posto no limite durante o teste e devolvido); sem internet só conta; resolvido some e volta numa versão
   nova; rota do servidor que quebra vira registro com origem "servidor". Precisa do servidor com `GESTAO_ERRO_TESTE=1`.
+- `mozart-consertos.js`: com o banco de verdade e modelo de mentira: "coloca a Mel na creche amanhã" vira reserva da creche (e a
+  confirmação repetida grava uma vez só, pela função `assistente_acao_reservar`, migração 20261215), mensalista no dia do plano não
+  reserva e em outro dia vira dia extra, hotel com entrada e saída, `ver_hospedes` com a creche dia a dia (mensalista de todo dia),
+  a busca do tosador sem valor, `ver_sinais` igual a `lerSinaisDoPeriodo` (Relatórios), conta fixa que "não entrou este mês",
+  criar_conta_fixa, e a tabela de preços gravando a diária da creche, o modelo de plano e a diária do hotel por porte.
+- `mozart-rota.js` (servidor com GESTAO_MOZART_FALSO=1 e GESTAO_LINK_IA_FALSO=1): a resposta do Mozart chega palavra por palavra
+  pela rota de verdade mesmo pedindo gzip (content-encoding identity), o texto do cartão sem "Pode fazer", a mesma confirmação
+  mandada duas vezes grava um bloqueio só, e o "Tirar dúvida" responde o total dos dois pets igual a `link_hotel_estimativa`.
 - `mozart.js`: o Mozart e o dinheiro dos clientes com um **modelo de mentira** (roteiro fixo; as voltas de `assistente/conversa.ts` e as
   ferramentas rodam de verdade, com o login de cada papel): "o dono do Bob me pagou os 35" com duas contas abertas (5 + 30) quita as duas
   e o mês ganha 35 uma vez só (a entrada solta é recusada; o toque duplo não recebe de novo), pagamento em parte, pagou a mais (pergunta;
@@ -225,6 +254,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   recusado para quem não mexe com dinheiro, conta e crédito de outro cliente recusados) e o teto de voltas e de tempo. **Nome do tutor**
   (Juliana): "pipokinha" acha a Pipoquinha pelo nome parecido, o cartão mostra "Pipoquinha (Tutor Teste 1)", o resultado gravado leva o
   `cartao_confirmado`, e o "Ela é da Tutora Teste 1." do modelo de mentira sai como "Tutor Teste 1"; as instruções pedem os nomes exatos.
+- `importar.js`: planilha de clientes numa operação só (migração 20261217, `importar_clientes`; achado da Juliana: parou em 7 de 10 e o
+  resumo errou): 10 linhas com "Luna, Bob", alergia, telefone incompleto, a Ana pelo telefone, linha repetida e homônimo; o resumo bate
+  com o que entrou no banco (7 tutores e 9 pets); a mesma chave devolve o que já entrou; outra chave: "Nada novo"; linha estranha é
+  pulada; erro no meio (gatilho de teste) recusa tudo e não gasta a chave; recepção importa, estoque e outro pet shop não; ninguém grava
+  na tabela direto; a última importação é lida de outro login; `importacao_desfazer_registro` desfaz uma vez só; 2.000 linhas dentro do
+  limite de 8 s do banco. Rascunhos (`rascunhos`): guardar e regravar, cada pessoa só vê os seus, tipo estranho recusado, faxina de 7 dias.
 - `divida-caderno.js`: dívida trazida do caderno (migração 20261186, `lancamentos.devido_desde`): dono e recepção anotam com o dia
   em que começou; o banco recusa dia depois de hoje, valor já recebido, saída, antes de 2000 e o tosador; anotar não vira dinheiro em
   dia nenhum; receber uma parte entra hoje, no caixa, e a conta segue "desde" o dia do caderno; a dona corrige o dia depois.
@@ -437,6 +472,18 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   `indicadores_do_periodo` não foram trocados. Mozart: `ver_contas_fixas` (3.180, 23% depois da devolução) e `valor_conta_fixa`
   (cartão com o valor de antes; grava 2.610; conta paga recusada). A faxina diária chama a geração.
 
+- `loja-camila.js`: o que a testadora Camila achou na loja (migração 20261214). **Ver custo e margem**: pela API, quem tem Estoque
+  sem dinheiro não recebe custo nenhum (produtos_reservado, custos_dos_produtos, compras, movimentos, lotes, Vencendo e contagem sem
+  valor, `produtos.custo` direto recusado, devoluções vazias), a recepção (Caixa) e o tosador também não; o dono recebe tudo; com a
+  chave "custo" o Estoque passa a receber, sem ganhar o dinheiro (ve_financeiro falso, lançamentos e devoluções vazios); `veCusto`
+  da tela igual; o Mozart (ver_estoque, o_que_comprar) só manda custo para quem vê. **Entrada com despesa** (`estoque_entrada`):
+  4 × 150 com R$ 600,00 no Pix (estoque +4, despesa paga hoje), mesma chave não repete, sem forma / Estoque sem dinheiro / recepção
+  "a pagar" são recusados e nada entra (nem a entrada), "Vou pagar depois" vira conta a pagar, lote e validade da entrada. Estoque
+  inicial no lote. **Orçamento** 364,70 (produtos 320,90 + banho 43,80): virou venda sem horário = "falta marcar", valor_vendido
+  320,90, o horário marcado depois completa; a observação vai no texto do WhatsApp. **Contas fixas**: o aluguel do dia 1 cadastrado
+  hoje "não existe" neste mês (antes_do_inicio), o DAS em A pagar, o Mozart diz isso e a regra de não deduzir; faturamento com a
+  margem (4.759 ÷ 37% = 12.862,16; sem custo suficiente, nenhuma estimativa).
+
 **migracoes/**
 - `prova-ordem.sh`: cria um banco de rascunho no mesmo Postgres (chão copiado do banco local sem o `public`), aplica todas as
   migrações em ordem **menos as adiadas** (`ADIAR`, padrão `20261149 20261157`, as que entram depois de publicar o app) e depois as
@@ -448,8 +495,15 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   Equipe, Meu pet shop, Assinatura, Manual, Escola) em **390 e 1366**, com o dono e com cada papel da equipe (só as áreas dele, e
   algumas fora da área), as telas de impressão, `/gestao/admin` com dono comum e as páginas públicas (produto, entrar, link do
   cliente, página do tutor). Em cada uma: nenhum erro de página ou console, nenhum pedido recusado, sem rolagem para o lado e com conteúdo.
+- `loja-camila.js`: a loja da Camila pela tela, em 390 e 1366. Quem cuida do estoque sem "Ver custo e margem": a lista e a ficha
+  sem margem, custo médio, último custo nem valor em estoque; Produto novo com "Controlar validade" pede o lote ou a validade do que já
+  está na prateleira e guarda no lote. O dono: vê a margem; Entrada com "Lançar a compra como despesa" desmarcado, que marcado pede a
+  forma antes de anotar (nada grava sem ela) e com o Pix grava as duas, a próxima entrada desmarcada; Venda no balcão com a lista
+  demorando 2,5 s: três códigos lidos antes entram na conta (R$ 198,90) e "Código não encontrado: …"; orçamento que virou venda com
+  o horário fechado sem marcar: "Falta marcar", R$ 320,90 e Marcar o horário; crédito à vista virando 3x na edição (taxa do 3x);
+  Quanto sobrou com as contas fixas ainda não pagas. Capturas em testes/saida/camila-*.png.
 - `contas-fixas.js`: Financeiro, Contas fixas, em 390 e 1366: cadastrar pelo modelo (Aluguel; Luz com "Muda todo mês"),
-  "Quanto custa manter o pet shop" com quanto precisa faturar (2.500, depois 2.880), a conta do mês em A pagar como "conta fixa"
+  "Quanto custa manter o pet shop" com a soma das contas (2.500, depois 2.880; sem custo do que vende, o mínimo a faturar), a conta do mês em A pagar como "conta fixa"
   (a luz com "valor estimado: confira a conta"), Paguei (Pix, hoje) tira de A pagar; Relatórios, Quanto sobrou com "Contas fixas
   R$ 2.880,00" e cada conta embaixo; Hoje abre sem erro. Sem rolagem lateral e sem erro na página; capturas em
   `testes/saida/contas-fixas-*.png`.
@@ -465,11 +519,22 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   porte, Tempo total e Total, o banco com o principal e os 3 a mais, a agenda, a conta de R$ 145,00 e a comissão por serviço ao centavo);
   em 1366, tirar o primeiro (o seguinte assume), alterar um horário com três serviços, pet sem porte; tosador sem nenhum valor na tela
   (o banco põe o preço da lista) e preço travado para a recepção.
+- `convite-conferir.js`: convite depois do teste de 17/11, em 390 e 1366: "Reenviar" com o link valendo pergunta antes ("Manter o
+  link atual" não troca nada); o link de antes mostra "Este link foi trocado por um mais novo" (criar conta e entrar, sem formulário);
+  o link que vale mostra o nome do pet shop; outro e-mail avisa e não cria a conta; o dono conectado vê "Você está conectado como".
+- `cookies-termos.js`: aviso de cookies só onde o Pixel carrega (não em cadastro, entrada, Termos e Política do Gestão), com Aceitar e
+  Recusar; recusar guarda a escolha, apaga o `_fbp`, não baixa o fbevents.js e não mostra o aviso de novo; a política do site (parte 5)
+  mostra e muda a escolha; Política e Termos 2.3 (e-mail de privacidade uma vez, "responsável pela marca", cópias, troca de plano).
 - `convite.js`: convite da equipe pelo link com código (migração 20261209), em 390: na Equipe, convite antigo sem código aparece com
   "Mande o convite de novo"; "Mandar de novo" mostra o texto com `criar-conta?email=…&convite=<código>` (7 dias, uma vez), o mesmo no
   WhatsApp, o hash no banco, e o cartão passa a mostrar "link vale até dd/mm"; a pessoa abre o link, cria a conta e cai direto no
   pet shop; quem já tem conta abre `entrar?convite=…`, entra e fica na equipe; o mesmo link com outra conta mostra "O convite não
   entrou" e não liga nada.
+- `guia-recarregar.js`: começo guiado com a página recarregando (Neide, Bia, Juliana). 390: pergunta 1 com nome e WhatsApp, recarrega,
+  continua; pergunta 2 explica "Pacotes e planos" e o marcado continua. 390 e 1366: horário Ter a sáb 8h às 18h com almoço, recarrega:
+  "Continuei de onde você parou", almoço marcado, frase simples do sábado, Continuar grava o almoço; Kátia + "Mais", recarrega: Kátia
+  uma vez, "Kátia já está na lista", e com ela já gravada antes, Continuar não grava outra (3 pets por horário, como marcado). 390: foto
+  da tabela de preços muda o Banho M de 60,00 para 55,00 no campo na hora. Creche só: sábado inteiro e "Ligar o meu link" no fim.
 - `primeiro-acesso.js`: dono novo do zero (criar conta, duas perguntas, "Começar já") até o primeiro resultado: no fim do guia
   "Pronto em X minutos", "Marcar o primeiro horário" (botão principal) e "Copiar meu link de agendamento"; o link copiado em 7
   toques e 4 campos; o primeiro horário (pet novo cadastrado na própria folha) em até 13 toques e 7 campos, com "Pronto em X
@@ -484,6 +549,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   nenhum botão de cobrar, concluir ou usar o pacote (só "Carregando a conta"; Cliente confirmou continua); depois, o pacote primeiro,
   o aviso do que o tutor deve de antes e "Cobrar à parte, sem usar o pacote · R$ 50,00". Com a leitura falhando: nada de cobrar,
   só "Tentar de novo", que traz a conta inteira.
+- `importar-rascunho.js`: 390: .xlsx de 10 linhas pela tela (9 para trazer), Trazer e sair da tela na hora: entram 8 tutores e 9 pets;
+  1366 (outro aparelho): a última importação diz "8 tutores novos e 9 pets novos" com separados e alertas, e desfaz. Caderno: a leitura
+  fica no banco assim que chega; corrige a Marta, recarrega, "Você tem uma leitura que ainda não foi salva" → Continuar a revisão (com a
+  correção, sem contar outra página) → Salvar apaga o rascunho; dívida de tutor novo da mesma leitura diz "Cliente novo, desta leitura";
+  Descartar apaga. 1366: o aviso com Continuar e Descartar, sem rolagem para o lado.
 - `caderno.js`: Trazer do caderno pela tela, com a leitura de teste (`GESTAO_CADERNO_FALSO=1`). 390: Clientes → Foto do caderno →
   "Não sei, descubra" → foto → a conferência (nada salvo ainda; Ana Souza "Já existe" com "Juntar com a ficha" marcado e o Thor "só
   completa"; Marta "Verificar: sem telefone"; Beto devendo desde 12/10; total R$ 85,00; horário de dia que já passou fora) → dois
@@ -503,6 +573,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   e o alto-falante de cada resposta; segurar para falar (toque de dedo no 390, mouse no 1366) e tocar para parar; "Não ouvi nada";
   microfone bloqueado ("Libere o microfone nas configurações do navegador"); microfone na Ajuda (não manda sozinho); para sozinho em
   8 s de silêncio e em 30 s (`page.clock`); navegador sem ditado: sem botão, escrever continua igual. Capturas em `testes/saida/mozart-voz-*`.
+- `mozart-consertos.js` (servidor com GESTAO_MOZART_FALSO=1): negrito e lista na bolha; recarregar traz a conversa e o cartão
+  pendente (o painel abre sozinho) e confirmar grava uma vez; recarregar no meio do "Pode fazer" termina sozinho, sem gravar duas
+  vezes; "Ouvir esta resposta" sem voz no aparelho mostra o aviso; com o Tirar dúvida aberto no celular, o fim da página sobe acima
+  da folha; loja só de creche não sugere banho. 390 e 1366.
 - `mozart-stream.js`: o Mozart respondendo aos poucos (o fetch da página vira um roteiro em pedaços, no formato da rota: uma linha JSON
   por evento). 390 e 1366: o pedido vai com `Accept: application/x-ndjson`; "Procurando Thor…" embaixo dos três pontinhos; o texto cresce
   na mesma bolha; o cartão continua pedindo "Pode fazer" (nenhuma decisão vai antes do toque); a resposta do "Pode fazer" também chega

@@ -57,6 +57,8 @@ export const linkDoOrcamento = (origem: string, token: string) => `${origem.repl
  */
 export function textoDoOrcamento(o: {
   loja: string; numero: number; para?: string | null; itens: ItemOrcamento[]; desconto: number; validade: string; link?: string | null;
+  /** A observação para o cliente (a mesma da página do orçamento). */
+  obs?: string | null;
 }) {
   const c = contaDoOrcamento(o.itens, o.desconto);
   const nome = (o.para ?? "").trim().split(/\s+/)[0];
@@ -68,6 +70,7 @@ export function textoDoOrcamento(o: {
     ...(c.desconto > 0 ? [`Soma: ${brl(c.subtotal)}`, `Desconto: − ${brl(c.desconto)}`] : []),
     `*Total: ${brl(c.total)}*`,
     `Vale até ${dataCompleta(o.validade)}.`,
+    ...(o.obs?.trim() ? ["", o.obs.trim()] : []),
     ...(o.link ? ["", `Ver e responder: ${o.link}`] : []),
   ];
   return linhas.join("\n");
@@ -108,6 +111,28 @@ export function repartirDesconto(itens: ItemOrcamento[], desconto: number) {
     return { servicoId: s.servico_id ?? null, nome: s.nome, preco: Math.max(0, centavos(linha - parte)) };
   });
   return { descontoProdutos: descProdutos, servicos: out };
+}
+
+type Convertido = { status: string; itens: ItemOrcamento[]; desconto: number; total: number; lancamento_id: string | null; agendamento_id: string | null; valor_vendido?: number | null };
+
+/**
+ * Virou venda dos produtos, mas o horário dos serviços não foi marcado (a pessoa fechou "Marcar horário" porque o tutor ainda
+ * não escolheu o dia). O serviço não se perde: o orçamento continua oferecendo "Marcar o horário" com o preço repartido.
+ */
+export const faltaMarcar = (o: Convertido) => o.status === "convertido" && Boolean(o.lancamento_id) && !o.agendamento_id && temServico(o.itens);
+
+/** Os serviços que ainda faltam marcar, com o preço já com a parte do desconto (o mesmo que o horário recebe). */
+export const servicosAMarcar = (o: Convertido) => (faltaMarcar(o) ? repartirDesconto(o.itens, Number(o.desconto)).servicos : []);
+
+/**
+ * Quanto entrou na venda do orçamento: o valor do lançamento (guardado pelo banco em `valor_vendido`); sem ele, o total menos os
+ * serviços que viraram horário (a mesma conta de "Transformar em venda"). null quando não virou venda.
+ */
+export function valorDaVenda(o: Convertido): number | null {
+  if (o.status !== "convertido" || !o.lancamento_id) return null;
+  if (o.valor_vendido != null) return Number(o.valor_vendido);
+  const servicos = temServico(o.itens) ? repartirDesconto(o.itens, Number(o.desconto)).servicos.reduce((t, s) => t + s.preco, 0) : 0;
+  return centavos(Number(o.total) - servicos);
 }
 
 /** Dias até a validade (negativo: já venceu). */

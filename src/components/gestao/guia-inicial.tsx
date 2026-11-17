@@ -7,11 +7,11 @@ import type { Horario, Servico } from "@/lib/gestao/tipos";
 import { vagasDe } from "@/lib/gestao/agenda";
 import { areasDeServicoPara, artigoDe, categoriaDaArea, nomeDaCasa, usaModulo, type AreaDoServico } from "@/lib/gestao/modulos";
 import { EscolherCor, GradeHorario, erroDoHorario, lerHorario } from "./ajustes/grade-horario";
-import { CAMPOS_PRECO, EscolherArea, PrecosDoServico, comecaPorPorte, corLivre, inserirServico, umPrecoSo, type Precos } from "./servico-campos";
+import { CAMPOS_PRECO, EscolherArea, PrecosDoServico, comecaPorPorte, corLivre, inserirServico, mudarServico, umPrecoSo, type Precos } from "./servico-campos";
 import { useGestao } from "./contexto";
 import { Selo } from "./marca";
 import { Tile } from "./painel";
-import { brl } from "@/lib/gestao/util";
+import { brl, semAcento } from "@/lib/gestao/util";
 import { textoDoLink } from "@/lib/gestao/agenda";
 import { minutosDesde, textoProntoEm, useComecoDaConta } from "./pronto-em";
 import { Campo, CampoValor, EVENTO_GUIA, abrirPersonalizarMenu, avisarMudanca, ok, useAvisos } from "./ui";
@@ -132,7 +132,18 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
     try { return JSON.parse(lerLembrado(chaveRascunho) ?? "null") as RascunhoGuia | null; } catch { return null; }
   });
   const servicosDaLista = servicos.filter((s) => !["creche", "hotel"].includes(s.categoria));
-  const [horario, setHorario] = useState<Horario>(() => (rascunho?.horario ? lerHorario(rascunho.horario) : lerHorario(petshop.horario)));
+  const [horario, setHorario] = useState<Horario>(() => {
+    if (rascunho?.horario) return lerHorario(rascunho.horario);
+    const h = lerHorario(petshop.horario);
+    // o horário que o pet shop novo ganha tem o sábado até as 13h (comum no banho e tosa). Creche e hotel não fecham
+    // no sábado à tarde: começam com o sábado inteiro (quem fecha mais cedo marca "Sábado meio período")
+    const sab = h["6"], seg = h["1"];
+    if (!petshop.guia_feito_em && !banho && sab && seg && sab.fecha === "13:00" && sab.abre === seg.abre) h["6"] = { ...sab, fecha: seg.fecha };
+    return h;
+  });
+  // recarregou a página no meio do guia: avisa que o que aparece marcado é o que a pessoa já tinha marcado (nada se perde
+  // nem entra duas vezes) até ela mexer de novo
+  const [retomado, setRetomado] = useState(() => Boolean(rascunho) && !petshop.guia_feito_em);
   const [euAtendo, setEuAtendo] = useState(rascunho?.euAtendo ?? eu.atende);
   const [novos, setNovos] = useState<string[]>(rascunho?.novos ?? []);
   const [nome, setNome] = useState("");
@@ -160,6 +171,9 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
   const areasDoServico = areasDeServicoPara(petshop);
   const [diariaCreche, setDiariaCreche] = useState<number | null>(rascunho && "diariaCreche" in rascunho ? rascunho.diariaCreche ?? null : petshop.diaria_creche == null ? null : Number(petshop.diaria_creche));
   const [diariaHotel, setDiariaHotel] = useState<number | null>(rascunho && "diariaHotel" in rascunho ? rascunho.diariaHotel ?? null : petshop.diaria_hotel == null ? null : Number(petshop.diaria_hotel));
+  // a foto da tabela de preços pode ter gravado a diária da creche ou do hotel: o passo da casa já vem com ela
+  useEffect(() => { if (diariaCreche == null && petshop.diaria_creche != null) setDiariaCreche(Number(petshop.diaria_creche)); }, [petshop.diaria_creche]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (diariaHotel == null && petshop.diaria_hotel != null) setDiariaHotel(Number(petshop.diaria_hotel)); }, [petshop.diaria_hotel]); // eslint-disable-line react-hooks/exhaustive-deps
   const [vagasCreche, setVagasCreche] = useState(rascunho?.vagasCreche ?? (petshop.vagas_creche == null ? "" : String(petshop.vagas_creche)));
   const [vagasHotel, setVagasHotel] = useState(rascunho?.vagasHotel ?? (petshop.vagas_hotel == null ? "" : String(petshop.vagas_hotel)));
   const [linkLigado, setLinkLigado] = useState(rascunho?.linkLigado ?? petshop.link_ativo);
@@ -191,6 +205,8 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
   }, [erro]);
   // cada passo abre do começo
   useEffect(() => { corpo.current?.scrollTo(0, 0); }, [passo]);
+  const passoInicial = useRef(passo);
+  useEffect(() => { if (passo !== passoInicial.current) { setRetomado(false); setRepetido(null); } }, [passo]);
 
   const outros = equipe.filter((p) => p.ativo && p.atende && p.id !== eu.id);
   const atendem = (euAtendo ? 1 : 0) + outros.length + novos.length;
@@ -204,9 +220,16 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
   const pergunta = atual === "cor" || atual === "logo";
   const nPergunta = PERGUNTAS - perguntas + passo + 1;
 
+  /** Quem já está na lista (da equipe ou acrescentado aqui), pelo nome sem acento: o mesmo nome não entra duas vezes. */
+  const nomeNaLista = (t: string) => [eu.nome, ...outros.map((p) => p.nome), ...novos].find((x) => semAcento(x) === semAcento(t));
+  const jaNaLista = (t: string) => Boolean(nomeNaLista(t));
+  const [repetido, setRepetido] = useState<string | null>(null);
   function juntarNome() {
-    const t = nome.trim();
+    const t = nome.trim().replace(/\s+/g, " ");
     if (t.length < 2) return;
+    const igual = nomeNaLista(t);
+    if (igual) { setRepetido(igual); setNome(""); return; }
+    setRepetido(null);
     setNovos((l) => [...l, t.slice(0, 60)]);
     setNome("");
   }
@@ -299,11 +322,16 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
         ok(await sb.from("petshops").update({ horario }).eq("id", petshop.id).select("id"));
       }
       if (atual === "equipe") {
-        const pendente = nome.trim().length >= 2 ? [...novos, nome.trim().slice(0, 60)] : novos;
+        const digitado = nome.trim().replace(/\s+/g, " ").slice(0, 60);
+        const pendente = digitado.length >= 2 && !jaNaLista(digitado) ? [...novos, digitado] : novos;
         if (!euAtendo && !outros.length && !pendente.length) { setErro("Diga quem atende os pets: você, alguém da equipe ou os dois."); return; }
         if (euAtendo !== eu.atende) ok(await sb.from("profissionais").update({ atende: euAtendo }).eq("id", eu.id).eq("petshop_id", petshop.id).select("id"));
         if (pendente.length) {
-          ok(await sb.from("profissionais").insert(pendente.map((t, i) => ({ petshop_id: petshop.id, nome: t, papel: "funcionario" as const, funcao: "Banhista e tosador(a)", atende: true, cor: CORES[(outros.length + i) % CORES.length] }))).select("id"));
+          // quem já está gravado na equipe (continuar de novo depois de recarregar, toque duplo) não entra outra vez
+          const naEquipe = ok(await sb.from("profissionais").select("nome").eq("petshop_id", petshop.id).eq("ativo", true));
+          const ja = new Set(naEquipe.map((p) => semAcento(p.nome)));
+          const entram = [...new Map(pendente.filter((t) => !ja.has(semAcento(t))).map((t) => [semAcento(t), t])).values()];
+          if (entram.length) ok(await sb.from("profissionais").insert(entram.map((t, i) => ({ petshop_id: petshop.id, nome: t, papel: "funcionario" as const, funcao: "Banhista e tosador(a)", atende: true, cor: CORES[(outros.length + i) % CORES.length] }))).select("id"));
           setNovos([]); setNome("");
         }
         ok(await sb.from("petshops").update({ vagas: vagasAgora }).eq("id", petshop.id).select("id"));
@@ -360,10 +388,15 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
   /** Grava os serviços acrescentados aqui e passa cada um para a lista de cima (voltar a este passo mostra como os outros). */
   async function gravarServicosNovos(lista: ServicoNovo[]) {
     let ordem = servicos.reduce((m, s) => Math.max(m, s.ordem), 0);
+    // o que já está gravado com o mesmo nome (o guia recarregou depois de gravar, ou o toque foi repetido): atualiza, não duplica
+    const gravados = lista.length ? ok(await sb.from("servicos").select("id, nome").eq("petshop_id", petshop.id)) : [];
     for (const s of lista) {
       const precosDele = s.porPorte ? { preco_p: s.preco_p, preco_m: s.preco_m, preco_g: s.preco_g, preco_gg: s.preco_gg } : umPrecoSo(s);
       const linha = { nome: s.nome.trim().slice(0, 80), categoria: categoriaDaArea(s.area), duracao_min: s.duracao_min, cor: s.cor, ordem: ++ordem, ...precosDele };
-      const id = await inserirServico(sb, petshop.id, linha);
+      const igual = gravados.find((g) => semAcento(g.nome) === semAcento(linha.nome));
+      if (igual) await mudarServico(sb, petshop.id, igual.id, { ativo: true, duracao_min: linha.duracao_min, ...precosDele });
+      const id = igual ? igual.id : await inserirServico(sb, petshop.id, linha);
+      if (igual && precos.some((x) => x.id === id)) { setServicosNovos((l) => l.filter((x) => x.chave !== s.chave)); semErros(s.chave); continue; }
       setServicosNovos((l) => l.filter((x) => x.chave !== s.chave));
       setPrecos((l) => [...l, { id, ativo: true, ...linha }]);
       setPorPorte((m) => ({ ...m, [id]: s.porPorte }));
@@ -403,6 +436,16 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
   }, [passo, comeco]); // eslint-disable-line react-hooks/exhaustive-deps
   const enderecoDoLink = typeof window === "undefined" || !petshop.link_codigo ? "" : `${window.location.origin}/gestao/agendar/${petshop.link_codigo}`;
   const zapDoLink = enderecoDoLink ? `https://wa.me/?text=${encodeURIComponent(textoDoLink(petshop, enderecoDoLink))}` : null;
+  /** Creche ou hotel sem banho e tosa: o guia não tem o passo do link; no fim, um toque liga o link para pedir vaga. */
+  async function ligarLink() {
+    if (salvando) return;
+    setSalvando(true); setErro(null);
+    try {
+      ok(await sb.from("petshops").update({ link_ativo: true, ...(creche ? { link_creche: true } : {}), ...(hotel ? { link_hotel: true } : {}) }).eq("id", petshop.id).select("id"));
+      await recarregarBase();
+      avisarMudanca();
+    } catch (e) { avisarErro(e); } finally { setSalvando(false); }
+  }
   async function copiarLink() {
     if (!enderecoDoLink) return;
     try { await navigator.clipboard.writeText(enderecoDoLink); setCopiado(true); }
@@ -487,11 +530,16 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
 
           {!pergunta && !fim && n === 1 && (
             <p className="g-guia-intro">{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? <>{oQueDeixeiPronto(petshop)}{" "}</> : null}
-              <b>{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? "Agora" : `${primeiro},`} {total === 1 ? "é um passo só" : `são ${total} passos curtos`} para deixar {artigoDe(petshop.nome).o} {petshop.nome} {artigoDe(petshop.nome).o === "a" ? "pronta" : "pronto"}.</b>{" "}
+              <b>{veioDasBoasVindas ? "As perguntas acabaram. Agora" : `${primeiro},`} {total === 1 ? "falta um passo só" : `faltam ${total} passos curtos`} para deixar {artigoDe(petshop.nome).o} {petshop.nome} {artigoDe(petshop.nome).o === "a" ? "pronta" : "pronto"}.</b>{" "}
               O que não souber agora, toque em Faço depois: dá para mudar tudo em Meu pet shop.
             </p>
           )}
 
+          {retomado && !pergunta && !fim && (
+            <p className="g-aviso g-guia-retomado" style={{ marginBottom: 0 }} role="status" data-teste="guia-retomado">
+              <span>Continuei de onde você parou. O que aparece marcado é o que você já tinha marcado. Confira e toque em {passo === passos.length - 1 ? "Concluir" : "Continuar"} para gravar.</span>
+            </p>
+          )}
           {atual === "horario" && (
             <div className="g-pilha">
               {cabeca("Quando vocês abrem?", banho ? "A agenda só oferece horário dentro desses dias e horas. Já deixei o mais comum marcado: confira e siga." : "Já deixei o mais comum marcado: confira e siga.")}
@@ -502,6 +550,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
           {atual === "equipe" && (
             <div className="g-pilha">
               {cabeca("Quem atende os pets?", "Quem aparece na agenda para receber os horários. Só o nome basta. Se você trabalha sozinho, é só continuar.")}
+              {repetido && <p className="g-aviso" style={{ marginBottom: 0 }} role="status">{repetido} já está na lista: não precisa adicionar de novo.</p>}
               <div className="g-guia-gente">
                 <label className={`g-guia-pessoa${euAtendo ? " on" : ""}`}>
                   <input type="checkbox" checked={euAtendo} onChange={(e) => setEuAtendo(e.target.checked)} />
@@ -629,7 +678,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
             <div className="g-pilha">
               {cabeca(banho ? "Quer que o cliente peça horário pelo celular?" : "Quer que o cliente peça vaga pelo celular?", banho ? "Você manda um link. O cliente vê só os horários livres, conforme o que você acabou de configurar, e envia o pedido. Nada é marcado sem você aceitar." : "Você manda um link. O cliente escolhe o dia e envia o pedido. Nada é marcado sem você aceitar.")}
               <button type="button" className={`g-guia-opcao${linkLigado ? " on" : ""}`} onClick={() => setLinkLigado(true)}>
-                <Tile icone={Link2} tom="pessego" /><span><b>Sim, ligar o link</b><small>{banho ? 'Fica em "Mandar link de agendamento", na tela inicial.' : "Fica em Meu pet shop, em Link de agendamento."}</small></span>{linkLigado && <Check />}
+                <Tile icone={Link2} tom="pessego" /><span><b>Sim, ligar o link</b><small>{banho ? 'Depois, ele fica na Agenda, no botão "Link do cliente", e em Meu pet shop.' : "Fica em Meu pet shop, em Link de agendamento."}</small></span>{linkLigado && <Check />}
               </button>
               <button type="button" className={`g-guia-opcao${!linkLigado ? " on" : ""}`} onClick={() => setLinkLigado(false)}>
                 <Tile icone={CalendarDays} tom="menta" /><span><b>Agora não</b><small>Só a equipe marca. Dá para ligar depois.</small></span>{!linkLigado && <Check />}
@@ -656,13 +705,30 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
                   {copiado && <p className="g-muted g-pp" role="status">Pronto: cole numa conversa do WhatsApp ou na bio do Instagram. O pedido chega na tela inicial e só vira horário quando você aceitar.</p>}
                 </section>
               )}
+              {!banho && (creche || hotel) && (
+                <section className="g-guia-bloco g-guia-primeiro" aria-label="Link do cliente">
+                  <h3>Quer que o cliente peça vaga pelo celular?</h3>
+                  <p className="g-muted g-pp">{petshop.link_ativo
+                    ? "O seu link está ligado: o cliente escolhe o dia e manda o pedido, e nada entra sem você aceitar."
+                    : "Você manda um link, o cliente escolhe o dia e manda o pedido. Nada entra sem você aceitar. Dá para desligar em Meu pet shop."}</p>
+                  <div className="g-guia-proximos">
+                    {!petshop.link_ativo && (
+                      <button type="button" className="g-btn sec" data-teste="ligar-link" disabled={salvando} onClick={() => void ligarLink()}><Link2 />{salvando ? "Ligando…" : "Ligar o meu link"}</button>
+                    )}
+                    {petshop.link_ativo && petshop.link_codigo && (
+                      <button type="button" className="g-btn sec" data-teste="copiar-link" onClick={() => void copiarLink()}>{copiado ? <Check /> : <Copy />}{copiado ? "Link copiado" : "Copiar meu link"}</button>
+                    )}
+                    {copiado && zapDoLink && <a className="g-btn zap" href={zapDoLink} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar no WhatsApp</a>}
+                  </div>
+                </section>
+              )}
               <ul className="g-guia-resumo">
                 <li><Clock /><span>Aberto em {Object.values(salvoH).filter(Boolean).length} dias da semana</span></li>
                 {banho && <li><Users /><span>{vagasDe(petshop, equipe) === 1 ? "1 pet por horário" : `Até ${vagasDe(petshop, equipe)} pets no mesmo horário`}</span></li>}
                 {banho && <li><Scissors /><span>{servicosAtivos === 1 ? "1 serviço na agenda" : `${servicosAtivos} serviços na agenda`}</span></li>}
                 {creche && <li><BedDouble /><span>{resumoCasa("Creche", petshop.diaria_creche, petshop.vagas_creche)}</span></li>}
                 {hotel && <li><BedDouble /><span>{resumoCasa("Hotel", petshop.diaria_hotel, petshop.vagas_hotel)}</span></li>}
-                {banho && <li><Link2 /><span>Link do cliente {petshop.link_ativo ? "ligado" : "desligado"}</span></li>}
+                <li><Link2 /><span>Link do cliente {petshop.link_ativo ? "ligado" : "desligado"}</span></li>
               </ul>
               {usaModulo(petshop, "loja") && (
                 <section className="g-guia-bloco g-guia-loja" aria-label="Opções da loja">

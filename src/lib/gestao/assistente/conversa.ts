@@ -3,6 +3,7 @@ import { definicao, descrever, ehErroDeUso, gravar, rodarConsulta, type Contexto
 import { manterNomes, nomesDosResultados } from "./parecido";
 import { ferramentaLiberada } from "./permissao";
 import { fraseDaFerramenta } from "./progresso";
+import { nomeDaCasa } from "../modulos";
 
 /**
  * As voltas de uma conversa com o Mozart, separadas da rota para dar para testar com um modelo de mentira:
@@ -86,7 +87,7 @@ export async function voltas(o: {
         mostrou = true;
         o.avisos.texto(pedaco);
       },
-      ferramenta: (nome) => o.avisos?.progresso?.(fraseDaFerramenta(nome, undefined, c.agora, definicao(nome)?.grava)),
+      ferramenta: (nome) => o.avisos?.progresso?.(fraseDaFerramenta(nome, undefined, c.agora, definicao(nome)?.grava, nomeDaCasa(c.petshop))),
     });
     m.voltas++;
     m.entrada += resposta.usage?.input_tokens ?? 0;
@@ -109,7 +110,7 @@ export async function voltas(o: {
     const linksPorPedido: LinkZap[][] = usos.map(() => []);
     // as consultas (só leem) rodam todas ao mesmo tempo
     const consultas = usos.map((uso, i) => ({ uso, i, def: definicao(uso.name) })).filter((x) => x.def && ferramentaLiberada(x.def, c) && !x.def.grava);
-    for (const { uso } of consultas) o.avisos?.progresso?.(fraseDaFerramenta(uso.name, uso.input, c.agora));
+    for (const { uso } of consultas) o.avisos?.progresso?.(fraseDaFerramenta(uso.name, uso.input, c.agora, false, nomeDaCasa(c.petshop)));
     await Promise.all(consultas.map(async ({ uso, i }) => {
       const r = await rodarConsulta(c, uso.name, uso.input);
       if (r.links) linksPorPedido[i] = r.links;
@@ -132,11 +133,30 @@ export async function voltas(o: {
     }
     const parciais = porPedido.filter((r): r is Resultado => r !== null);
     // há algo para a pessoa confirmar: para aqui e espera os botões
-    if (propostas.length) return { tipo: "ok", mensagens, texto, propostas, parciais, links, cortou: false };
+    if (propostas.length) return { tipo: "ok", mensagens, texto: semPedidoDeConfirmar(texto, true), propostas, parciais, links, cortou: false };
     mensagens.push({ role: "user", content: parciais });
   }
   if (cortou && !texto) texto = DEMOROU;
-  return { tipo: "ok", mensagens, texto, propostas: [], parciais: [], links, cortou };
+  return { tipo: "ok", mensagens, texto: semPedidoDeConfirmar(texto, false), propostas: [], parciais: [], links, cortou };
+}
+
+const JA_GRAVADA = "Esta ação já tinha sido gravada (o pedido chegou repetido). Nada foi gravado de novo.";
+
+/**
+ * O texto que acompanha os cartões não pede confirmação: o cartão já tem os botões, e depois do "Pode fazer" a frase
+ * "Confere no cartão e clica em Pode fazer" fica errada embaixo de um cartão confirmado. Tira as frases que mandam conferir
+ * ou confirmar no cartão. Se não sobrar nada: com cartão, vazio (o cartão fala por si); sem cartão, o texto como veio.
+ */
+export function semPedidoDeConfirmar(texto: string, temCartao: boolean): string {
+  if (!texto) return texto;
+  const pede = /pode fazer|(confere|confira|conferir|confirma|confirme|confirmar|confirmação)[^.!?\n]*(cart[ãa]o|bot[ãa]o|abaixo|acima)|(no|o) cart[ãa]o[^.!?\n]*(confirm|confer)|está aí para (você )?confirmar/i;
+  const linhas = texto.split("\n").map((linha) => {
+    const frases = linha.match(/[^.!?]+[.!?]*\s*/g) ?? [linha];
+    return frases.filter((f) => !pede.test(f)).join("").trim();
+  });
+  const limpo = linhas.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (limpo) return limpo;
+  return temCartao ? "" : texto;
 }
 
 /** Grava o que a pessoa confirmou nos cartões e devolve o resultado de cada ferramenta (na ordem dos pedidos do modelo). */
@@ -145,6 +165,13 @@ export async function responderCartoes(o: {
   decisoes?: { id: string; ok: boolean }[]; parciais?: Resultado[];
   /** Anota no histórico do pet shop o que foi feito (a rota grava em assistente_eventos). */
   anotar?: (acao: string, detalhes: unknown) => Promise<void>;
+  /**
+   * Cada cartão grava uma vez só (a conversa volta depois de recarregar a página e a confirmação pode chegar de novo):
+   * `reservar` marca a ação antes de gravar (false: já foi gravada); `liberar` solta a marca quando a gravação falha.
+   * A rota usa as funções do banco `assistente_acao_reservar` e `assistente_acao_liberar`.
+   */
+  reservar?: (usoId: string) => Promise<boolean>;
+  liberar?: (usoId: string) => Promise<void>;
 }): Promise<{ resultados: Resultado[]; mudou: boolean }> {
   const { c, liberado } = o;
   const resultados: Resultado[] = [];
@@ -159,15 +186,20 @@ export async function responderCartoes(o: {
     // a conversa vem do navegador: confere de novo se esta pessoa pode usar a ferramenta (igual à volta do modelo)
     if (!ferramentaLiberada(def, c)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: "Ferramenta indisponível para esta pessoa. Nada foi gravado." }); continue; }
     if (!liberado) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Nada foi gravado.", is_error: true }); continue; }
+    if (o.reservar && !(await o.reservar(uso.id))) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JA_GRAVADA }); continue; }
+    let gravou = false;
     try {
       // a chave desta ação: se o mesmo pedido chegar duas vezes (toque duplo, internet que repetiu), o banco grava uma vez só
       c.chave = `mozart:${uso.id}`;
       const r = await gravar(c, uso.name, uso.input as Record<string, unknown>);
+      gravou = true;
       mudou = true;
       await o.anotar?.(uso.name, uso.input);
       resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JSON.stringify(r) });
     } catch (err) {
-      if (err instanceof Error && /_chave_uniq/.test(err.message)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "Esta ação já tinha sido gravada (o pedido chegou repetido). Nada foi gravado de novo." }); continue; }
+      if (err instanceof Error && /_chave_uniq/.test(err.message)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JA_GRAVADA }); continue; }
+      // não gravou: a pessoa pode tentar de novo
+      if (!gravou && o.liberar) await o.liberar(uso.id).catch(() => undefined);
       const semPermissao = err instanceof Error && /row-level security|permission denied/i.test(err.message);
       resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: ehErroDeUso(err) ? err.message : semPermissao ? "Sem permissão para gravar isso." : "Não consegui gravar agora." });
     } finally {

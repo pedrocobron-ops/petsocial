@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { podeArea } from "@/lib/gestao/acessos";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
+import type { Json } from "@/lib/gestao/banco";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 import { BUCKET_CADERNO_TMP, MAX_BYTES_IMAGEM, MAX_BYTES_PDF, MAX_IMAGENS, MAX_PAGINAS_PDF, MAX_PDFS, caminhoTemporarioValido, limparLeitura, type Leitura, type TipoDaPagina } from "@/lib/gestao/caderno";
 import { ESQUEMA_CADERNO, INSTRUCOES_CADERNO, leituraDeTeste, paginasDoPdf, pedidoDaLeitura, tipoDoArquivo, type TipoArquivo } from "@/lib/gestao/caderno-ia";
@@ -14,6 +15,8 @@ const MODELO = process.env.GESTAO_CADERNO_MODELO ?? "claude-opus-5-5";
 /** Só para testes automáticos: devolve uma leitura fixa sem chamar o modelo. Nunca vale na Vercel. */
 const DE_TESTE = process.env.GESTAO_CADERNO_FALSO === "1" && !process.env.VERCEL;
 const TIPOS: TipoDaPagina[] = ["clientes", "dividas", "agenda", "precos", "vacinas", "auto"];
+/** Onde a leitura fica guardada até salvar: "caderno" ou a carteirinha de um pet ("caderno_pet:<id>"). */
+const RASCUNHO = /^(caderno|caderno_pet:[0-9a-f-]{36})$/;
 
 const erro = (status: number, codigo: string, mensagem: string, extra?: Record<string, unknown>) => NextResponse.json({ erro: codigo, mensagem, ...extra }, { status });
 const FORA = "A leitura não está funcionando agora. Tente de novo mais tarde; enquanto isso, dá para cadastrar pela tela ou trazer de uma planilha.";
@@ -130,6 +133,13 @@ async function tratar(req: Request) {
     const r = await lerAsPaginas(arquivos, tipo, hoje, petshopId, pdfs > 0, { dinheiro, agenda, dono }, DE_TESTE ? String(form.get("teste_falha") ?? "") : "");
     if (r instanceof Response) return r;
     leu = true;
+    // a leitura foi paga: fica guardada no banco (rascunho desta pessoa) até salvar ou descartar. Se a página recarregar
+    // ou a pessoa sair no meio, a conferência volta sem ler de novo. Banco antes da atualização: segue sem guardar.
+    const rascunho = String(form.get("rascunho") ?? "");
+    if (RASCUNHO.test(rascunho)) {
+      await sb.from("rascunhos").upsert({ petshop_id: petshopId, tipo: rascunho, dados: { versao: 1, tipo, leitura: r, lido_em: new Date().toISOString(), paginas } as unknown as NonNullable<Json> },
+        { onConflict: "petshop_id,user_id,tipo" }).then(() => null, () => null);
+    }
     return NextResponse.json({ leitura: r, restam: c.restam ?? 0, limite: c.limite ?? 0, paginas });
   } finally {
     // não leu (erro do modelo, demora, recusa, ou quebrou no meio): as páginas voltam para o limite do dia

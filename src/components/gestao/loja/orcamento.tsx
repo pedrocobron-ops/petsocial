@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { Check, Copy, ExternalLink, FileText, MessageCircle, Pencil, Plus, Search, Trash2, Wand2 } from "lucide-react";
 import {
-  contaDoOrcamento, fraseDaValidade, linkDoOrcamento, repartirDesconto, STATUS_ORCAMENTO, statusDoOrcamento, temProduto, temServico,
-  textoDoOrcamento, validadePadrao, zapDoOrcamento, type ItemOrcamento, type StatusOrcamento,
+  contaDoOrcamento, faltaMarcar, fraseDaValidade, linkDoOrcamento, repartirDesconto, servicosAMarcar, STATUS_ORCAMENTO, statusDoOrcamento, temProduto, temServico,
+  textoDoOrcamento, validadePadrao, valorDaVenda, zapDoOrcamento, type ItemOrcamento, type StatusOrcamento,
 } from "@/lib/gestao/orcamento";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { PetComTutor } from "@/lib/gestao/tipos";
@@ -28,8 +28,10 @@ export type Orcamento = {
   id: string; numero: number; cliente_id: string | null; nome: string | null; telefone: string | null; itens: ItemOrcamento[];
   subtotal: number; desconto: number; total: number; validade: string; obs: string | null; status: string; token: string;
   lancamento_id: string | null; agendamento_id: string | null; convertido_em: string | null; criado_em: string;
+  /** Quanto entrou na venda (o valor do lançamento). */
+  valor_vendido?: number | null;
 };
-const COLS = "id, numero, cliente_id, nome, telefone, itens, subtotal, desconto, total, validade, obs, status, token, lancamento_id, agendamento_id, convertido_em, criado_em";
+const COLS = "id, numero, cliente_id, nome, telefone, itens, subtotal, desconto, total, validade, obs, status, token, lancamento_id, agendamento_id, convertido_em, criado_em, valor_vendido";
 
 type Tela =
   | { t: "lista" }
@@ -91,9 +93,10 @@ export default function Orcamentos({ cliente, aoFechar, comecarNovo }: { cliente
     return (
       <VendaBalcao orcamento={{ id: o.id, numero: o.numero }} inicial={{ itens, tutor: tela.tutor, desconto: rep.descontoProdutos > 0 ? rep.descontoProdutos : null }}
         aoFechar={() => { if (tela.t === "venda") voltar(); }}
-        aoPronto={() => {
+        aoPronto={(vendaId) => {
           avisarMudanca();
-          if (temServico(o.itens)) { avisar("Venda anotada. Agora marque o horário dos serviços do orçamento."); void abrirHorario(o); }
+          // o orçamento agora tem a venda: se a pessoa fechar o horário sem marcar, o serviço fica para marcar depois
+          if (temServico(o.itens)) { avisar("Venda anotada. Agora marque o horário dos serviços do orçamento."); void abrirHorario({ ...o, status: "convertido", lancamento_id: vendaId ?? o.lancamento_id ?? null }); }
           else { avisar(`O orçamento nº ${o.numero} virou venda.`); voltar(); }
         }} />
     );
@@ -104,7 +107,11 @@ export default function Orcamentos({ cliente, aoFechar, comecarNovo }: { cliente
     const servicos = rep.servicos.filter((s) => s.servicoId).map((s) => ({ servicoId: s.servicoId!, preco: s.preco }));
     return (
       <FormAgendamento petInicial={tela.pet} servicosIniciais={servicos} obsInicial={`Orçamento nº ${o.numero}`}
-        aoFechar={voltar}
+        aoFechar={() => {
+          // a venda já foi feita e o horário ficou para depois: o serviço continua no orçamento, com o botão para marcar
+          if (o.lancamento_id) avisar(`O ${servicos.length === 1 ? "serviço ficou" : "serviços ficaram"} para marcar depois: está no orçamento nº ${o.numero}, em "Falta marcar".`);
+          voltar();
+        }}
         aoSalvar={async (marcado) => {
           if (marcado?.id) {
             try { ok(await sb.rpc("orcamento_marcar", { p_orcamento: o.id, p_agendamento: marcado.id })); avisar(`Horário marcado. O orçamento nº ${o.numero} virou ${temProduto(o.itens) ? "venda e horário" : "horário"}.`); }
@@ -123,7 +130,8 @@ export default function Orcamentos({ cliente, aoFechar, comecarNovo }: { cliente
   if (tela.t === "ver") {
     const o = lista.dados?.linhas.find((x) => x.id === tela.id);
     if (!o) return <Folha titulo="Orçamento" aoFechar={voltar}><Esqueleto linhas={4} /></Folha>;
-    return <VerOrcamento o={o} tutor={tutorDe(o)} aoFechar={voltar} aoEditar={() => setTela({ t: "editar", o })} aoConverter={() => void converter(o)} aoMudou={() => void lista.recarregar()} />;
+    return <VerOrcamento o={o} tutor={tutorDe(o)} aoFechar={voltar} aoEditar={() => setTela({ t: "editar", o })} aoConverter={() => void converter(o)}
+      aoMarcar={() => void abrirHorario(o)} aoMudou={() => void lista.recarregar()} />;
   }
   return <ListaDeOrcamentos titulo={cliente ? `Orçamentos de ${cliente.nome.split(" ")[0]}` : "Orçamentos"} linhas={lista.dados?.linhas ?? null} erro={lista.erro}
     tutorDe={tutorDe} aoFechar={aoFechar} aoNovo={() => setTela({ t: "editar" })} aoAbrir={(o) => setTela({ t: "ver", id: o.id })} />;
@@ -172,9 +180,11 @@ function ListaDeOrcamentos({ titulo, linhas, erro, tutorDe, aoFechar, aoNovo, ao
                   <Tile icone={FileText} tom="manteiga" tamanho="p" />
                   <span className="t">
                     <b>Nº {o.numero}{nomeDe(o) ? ` · ${nomeDe(o)}` : ""}</b>
-                    <span>{o.itens.length === 1 ? o.itens[0].nome : `${o.itens.length} itens`} · {s === "convertido" ? `virou venda${o.convertido_em ? ` em ${dataCompleta(o.convertido_em)}` : ""}` : fraseDaValidade(o.validade, hoje)}</span>
+                    <span>{o.itens.length === 1 ? o.itens[0].nome : `${o.itens.length} itens`} · {s === "convertido" ? fraseDoConvertido(o) : fraseDaValidade(o.validade, hoje)}</span>
                   </span>
-                  <span className="d g-orc-d"><b>{brl(o.total)}</b><span className={`g-tag ${STATUS_ORCAMENTO[s].tom}`}>{STATUS_ORCAMENTO[s].rotulo}</span></span>
+                  <span className="d g-orc-d"><b>{brl(valorNaLista(o))}</b>{faltaMarcar(o)
+                    ? <span className="g-tag laranja">Falta marcar</span>
+                    : <span className={`g-tag ${STATUS_ORCAMENTO[s].tom}`}>{STATUS_ORCAMENTO[s].rotulo}</span>}</span>
                 </button>
               ))}
             </div>
@@ -185,10 +195,23 @@ function ListaDeOrcamentos({ titulo, linhas, erro, tutorDe, aoFechar, aoNovo, ao
   );
 }
 
+/** O valor ao lado do orçamento na lista: o que entrou na venda (com o serviço ainda a marcar, só a venda); senão, o total. */
+const valorNaLista = (o: Orcamento) => (faltaMarcar(o) ? valorDaVenda(o) ?? o.total : o.total);
+
+/** "virou venda de R$ 320,90 em 17/11/2026 · falta marcar: Banho", "virou venda e horário", "virou horário". */
+function fraseDoConvertido(o: Orcamento) {
+  const quando = o.convertido_em ? ` em ${dataCompleta(o.convertido_em)}` : "";
+  const venda = valorDaVenda(o);
+  if (!o.lancamento_id) return `virou horário${quando}`;
+  const base = `virou venda${venda != null ? ` de ${brl(venda)}` : ""}${o.agendamento_id ? " e horário" : ""}${quando}`;
+  const falta = servicosAMarcar(o);
+  return falta.length ? `${base} · falta marcar: ${falta.map((s) => s.nome).join(", ")}` : base;
+}
+
 /* ---------- ver, mandar, converter ---------- */
 
-function VerOrcamento({ o, tutor, aoFechar, aoEditar, aoConverter, aoMudou }: {
-  o: Orcamento; tutor: Tutor | null; aoFechar: () => void; aoEditar: () => void; aoConverter: () => void; aoMudou: () => void;
+function VerOrcamento({ o, tutor, aoFechar, aoEditar, aoConverter, aoMarcar, aoMudou }: {
+  o: Orcamento; tutor: Tutor | null; aoFechar: () => void; aoEditar: () => void; aoConverter: () => void; aoMarcar: () => void; aoMudou: () => void;
 }) {
   const { sb, petshop } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
@@ -197,9 +220,10 @@ function VerOrcamento({ o, tutor, aoFechar, aoEditar, aoConverter, aoMudou }: {
   const s = statusDoOrcamento(o);
   const link = linkDoOrcamento(origem(), o.token);
   const para = tutor?.nome ?? o.nome;
-  const texto = textoDoOrcamento({ loja: petshop.nome, numero: o.numero, para, itens: o.itens, desconto: Number(o.desconto), validade: o.validade, link });
+  const texto = textoDoOrcamento({ loja: petshop.nome, numero: o.numero, para, itens: o.itens, desconto: Number(o.desconto), validade: o.validade, link, obs: o.obs });
   const zap = zapDoOrcamento(tutor?.telefone ?? o.telefone, texto);
   const convertido = s === "convertido";
+  const aMarcar = servicosAMarcar(o);
 
   async function mudarStatus(status: "aberto" | "aceito") {
     if (somenteLeitura() || ocupado) return;
@@ -223,16 +247,19 @@ function VerOrcamento({ o, tutor, aoFechar, aoEditar, aoConverter, aoMudou }: {
 
   return (
     <Folha titulo={`Orçamento nº ${o.numero}`} aoFechar={aoFechar}
-      rodape={convertido ? <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button> : <>
+      rodape={convertido ? <>
+        <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
+        {aMarcar.length > 0 && <button type="button" className="g-btn pri" onClick={() => { if (!somenteLeitura()) aoMarcar(); }}><Wand2 />Marcar o horário</button>}
+      </> : <>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
         <button type="button" className="g-btn pri" disabled={ocupado} onClick={() => { if (!somenteLeitura()) aoConverter(); }}><Wand2 />Transformar em {temProduto(o.itens) ? "venda" : "horário"}</button>
       </>}>
       <div className="g-pilha">
         <div className="g-orc-cab">
           <div>
-            <span className={`g-tag ${STATUS_ORCAMENTO[s].tom}`}>{STATUS_ORCAMENTO[s].rotulo}</span>
+            {aMarcar.length ? <span className="g-tag laranja">Falta marcar</span> : <span className={`g-tag ${STATUS_ORCAMENTO[s].tom}`}>{STATUS_ORCAMENTO[s].rotulo}</span>}
             <b>{para ?? "Sem cliente"}</b>
-            <span className="g-muted g-pp">{convertido ? `Virou ${o.lancamento_id ? "venda" : "horário"}${o.convertido_em ? ` em ${dataCompleta(o.convertido_em)}` : ""}` : fraseDaValidade(o.validade)}{(tutor?.telefone ?? o.telefone) ? ` · ${fmtTelefone(tutor?.telefone ?? o.telefone)}` : ""}</span>
+            <span className="g-muted g-pp">{convertido ? (() => { const f = fraseDoConvertido(o).split(" · ")[0]; return f.charAt(0).toUpperCase() + f.slice(1); })() : fraseDaValidade(o.validade)}{(tutor?.telefone ?? o.telefone) ? ` · ${fmtTelefone(tutor?.telefone ?? o.telefone)}` : ""}</span>
           </div>
           <p className="g-num">{brl(o.total)}</p>
         </div>
@@ -246,6 +273,14 @@ function VerOrcamento({ o, tutor, aoFechar, aoEditar, aoConverter, aoMudou }: {
           {Number(o.desconto) > 0 && <div className="g-orc-item menos"><span className="t"><span>Soma {brl(o.subtotal)} · desconto</span></span><b className="g-tab">− {brl(o.desconto)}</b></div>}
         </div>
         {o.obs && <p className="g-pp g-muted" style={{ whiteSpace: "pre-line" }}>{o.obs}</p>}
+        {aMarcar.length > 0 && (
+          <div className="g-aviso" role="status" data-teste="falta-marcar">
+            <span className="g-cresce">
+              <b>Falta marcar: {aMarcar.map((x) => `${x.nome} ${brl(x.preco)}`).join(", ")}</b>
+              {" "}Os produtos já viraram venda ({brl(valorDaVenda(o) ?? 0)}). O serviço não foi cobrado: marque o horário quando o tutor escolher o dia, e ele é cobrado na conta do atendimento.
+            </span>
+          </div>
+        )}
         {!convertido && (
           <>
             <div className="g-orc-mandar">

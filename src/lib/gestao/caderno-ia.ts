@@ -49,9 +49,10 @@ export const ESQUEMA_CADERNO = {
       type: "array",
       items: {
         type: "object", additionalProperties: false,
-        required: ["nome", "area", "duracao_min", "preco_unico", "preco_p", "preco_m", "preco_g", "preco_gg", "certeza"],
+        required: ["nome", "area", "cobranca", "vezes_semana", "duracao_min", "preco_unico", "preco_p", "preco_m", "preco_g", "preco_gg", "certeza"],
         properties: {
-          nome: txt, area: { type: "string", enum: ["banho_tosa", "creche", "hotel", "loja"] }, duracao_min: NUM,
+          nome: txt, area: { type: "string", enum: ["banho_tosa", "creche", "hotel", "loja"] },
+          cobranca: { type: "string", enum: ["servico", "diaria", "mensal", "pacote"] }, vezes_semana: NUM, duracao_min: NUM,
           preco_unico: NUM, preco_p: NUM, preco_m: NUM, preco_g: NUM, preco_gg: NUM, certeza: CERTEZA,
         },
       },
@@ -107,6 +108,11 @@ Regras:
 12. Tabela de preços: preço por porte vai em preco_p, preco_m, preco_g, preco_gg (só os que estiverem escritos; "pequeno",
     "médio", "grande", "gigante" ou faixas de peso equivalentes); um preço só para todos vai em preco_unico. "A partir de"
     ou faixa ("R$ 50 a 80"): use o menor valor e ponha a linha em "duvidas". Tempo em minutos (1h30 → 90), null se não tiver.
+    "cobranca": "servico" para o que se faz com hora marcada (banho, tosa, unha, hidratação, consulta...); "diaria" para o
+    dia de creche (day care, diária, avulso) ou a diária/pernoite do hotel; "mensal" para plano ou mensalidade da creche
+    ("mensal 3x semana", "plano 5 dias", "mensalista"), com "vezes_semana" = quantos dias por semana (3x → 3; "todos os dias"
+    ou "seg a sex" → 5; null se não estiver escrito); "pacote" para pacote de vários banhos ("4 banhos"). Creche e hotel
+    nunca são "servico": nunca têm tempo (duracao_min null).
 13. Carteirinha: a próxima dose só se estiver ESCRITA na carteirinha. Nunca calcule a próxima dose a partir da aplicação
     (nada de "um ano depois"): sem data escrita, "proxima" fica vazio. O selo/etiqueta do produto é o nome; o carimbo é
     o veterinário.

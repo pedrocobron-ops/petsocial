@@ -16,12 +16,17 @@ export const AREAS = [
   { id: "caixa", rotulo: "Caixa", apoio: "Abrir, receber e fechar o caixa do dia.", rota: "/gestao/app/caixa", dinheiro: true },
   { id: "financeiro", rotulo: "Financeiro", apoio: "Contas a pagar e a receber, resultado do mês.", rota: "/gestao/app/financeiro", dinheiro: true },
   { id: "relatorios", rotulo: "Relatórios", apoio: "Faturamento, comissão e desempenho.", rota: "/gestao/app/relatorios", dinheiro: true },
+  // não é uma tela: mostra o custo e a margem dos produtos (Estoque, etiquetas, contagem, Mozart). Não liga ve_financeiro.
+  // A rota é só para o menu esconder a chave de quem não vende produtos (nenhuma tela mora nela).
+  { id: "custo", rotulo: "Ver custo e margem", apoio: "Quanto a loja paga em cada produto, a margem e o valor do estoque a preço de custo. Quem tem Financeiro ou Relatórios já vê.", rota: "/gestao/app/estoque/custo-e-margem", dinheiro: true },
 ] as const;
 
 export type Area = (typeof AREAS)[number]["id"];
 const TODAS = AREAS.map((a) => a.id) as Area[];
 const DIA_A_DIA: Area[] = ["agenda", "clientes", "creche_hotel", "pacotes", "estoque"];
 const DINHEIRO: Area[] = ["caixa", "financeiro", "relatorios"];
+/** Áreas que são telas do menu (a chave "custo" não é uma tela). */
+const TELAS = AREAS.filter((a) => a.id !== "custo");
 
 /** Combinações prontas para o dono escolher com um toque. "socio" vira papel dono. */
 export const PERFIS = [
@@ -77,4 +82,6 @@ export const podeArea = (p: Pick<Profissional, "papel" | "ve_financeiro" | "aces
 /** O que gravar em `ve_financeiro` para um conjunto de áreas. */
 export const veDinheiro = (areas: Area[]) => areas.some((a) => DINHEIRO.includes(a));
 /** Área de uma rota do aplicativo (null = tela inicial ou tela só do dono). */
-export const areaDaRota = (caminho: string): Area | null => AREAS.find((a) => caminho.startsWith(a.rota))?.id ?? null;
+export const areaDaRota = (caminho: string): Area | null => TELAS.find((a) => caminho.startsWith(a.rota))?.id ?? null;
+/** Vê o custo e a margem dos produtos: dono, quem cuida do financeiro (Financeiro ou Relatórios) ou quem tem a chave "custo". */
+export const veCusto = (p: Pick<Profissional, "papel" | "ve_financeiro" | "acessos">) => ["custo", "financeiro", "relatorios"].some((a) => podeArea(p, a as Area));

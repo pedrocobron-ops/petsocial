@@ -5,7 +5,7 @@ import { CalendarDays, CalendarX, Cake, HandCoins, HeartPulse, MessageCircle, Re
 import { linhasDoBomDia, type DadosDoBomDia, type LinhaDoBomDia } from "@/lib/gestao/bom-dia";
 import { gerarContasFixas } from "@/lib/gestao/contas-fixas";
 import { nomeDaCasa } from "@/lib/gestao/modulos";
-import { isoDia } from "@/lib/gestao/util";
+import { isoDia, saudacao } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";
 import { Selo } from "./marca";
 import { guardarLembrado, lerLembrado } from "./lembrado";
@@ -63,7 +63,7 @@ export default function BomDia() {
     <section className="g-bomdia" aria-label="Bom dia do Mozart" data-teste="bom-dia">
       <div className="g-bomdia-cab">
         <Selo tamanho={30} tom="verde" />
-        <h2>Bom dia! O que importa hoje</h2>
+        <h2>{saudacao()}! O que importa hoje</h2>
         <button type="button" className="g-ico fechar" aria-label="Dispensar o resumo por hoje" title="Dispensar por hoje" onClick={dispensar}><X /></button>
       </div>
       <ul>
@@ -72,7 +72,7 @@ export default function BomDia() {
           return <li key={l.id} data-linha={l.id}><Icone aria-hidden />{l.texto}</li>;
         })}
       </ul>
-      <button type="button" className="g-btn p fantasma" onClick={() => abrirAssistente("Bom dia, Mozart! O que tenho de mais importante hoje?")}><MessageCircle />Perguntar ao Mozart</button>
+      <button type="button" className="g-btn p fantasma" onClick={() => abrirAssistente(`${saudacao()}, Mozart! O que tenho de mais importante hoje?`)}><MessageCircle />Perguntar ao Mozart</button>
     </section>
   );
 }

@@ -181,7 +181,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const [semPromo, setSemPromo] = useState(false);
   const categoriaDe = (id: string) => servicoDe(id)?.categoria;
   const promoAqui = !agendamento && servicoId && RE_DIA.test(dia) && /^\d{2}:\d{2}/.test(hhmm)
-    ? promoDoHorario(promos ?? [], { servicoId, dia, hora: hhmm.slice(0, 5), preco: precoDoServico(servico, porte), categoriaDe }) : null;
+    ? promoDoHorario(promos ?? [], { servicoId, dia, hora: hhmm.slice(0, 5), preco: precoDoServico(servico, porte), categoriaDe, nascimento: pet?.nascimento ?? null }) : null;
   const promoValor = promoAqui ? descontoDaPromo({ ...promoAqui, tirada: false }, escolhidos.map((o) => ({ tipo: "servico", valor: o.preco, qtd: 1, servicoId: o.servicoId })), servicoId, categoriaDe) : 0;
   /** No horário novo: pede ao banco para marcar sem a promoção (a pessoa tirou). */
   const semAPromo = promoAqui && semPromo ? { promo: { tirada: true } } : {};

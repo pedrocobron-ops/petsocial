@@ -6,10 +6,13 @@ import { consultarCompra, FERRAMENTAS_COMPRA } from "./ferramenta-compra";
 import { consultarEnvio, FERRAMENTAS_ENVIO } from "./ferramenta-envio";
 import { consultarContasFixas, descreverContaFixa, FERRAMENTAS_CONTAS_FIXAS, gravarContaFixa } from "./ferramenta-contas-fixas";
 import { consultarPlanosDaCreche, FERRAMENTA_PLANOS_CRECHE } from "./creche-planos";
+import { agendaNaoEhCasa, descreverEstadia, FERRAMENTA_RESERVAR_ESTADIA, gravarEstadia } from "./ferramenta-estadia";
+import { consultarSinais, FERRAMENTA_SINAIS } from "./ferramenta-sinais";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
-import { nomeDaCategoria } from "../modulos";
+import { nomeDaCasa, nomeDaCategoria, usaModulo } from "../modulos";
+import { veCusto } from "../acessos";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
@@ -103,9 +106,10 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({}) },
   { grava: false, financeiro: true, name: "quem_me_deve", description: "Quem está devendo: os clientes que ficaram de pagar depois, um por pessoa, com o total, quantas contas, o que está atrasado e desde quando (igual ao Caixa, Contas de clientes). Use para \"quem me deve?\", \"quanto a Joana deve?\" (com cliente_id, só aquele tutor e as contas dele).",
     input_schema: obj({ cliente_id: S }) },
-  { grava: false, name: "ver_hospedes", description: "Creche e hotel: mostra quem está na casa agora (desde quando, saída prevista, diárias até aqui) e as reservas dos próximos dias.",
+  { grava: false, name: "ver_hospedes", description: "Creche e hotel: mostra quem está na casa agora (desde quando, saída prevista, diárias até aqui), as reservas dos próximos dias e, na creche, quem vem em cada dia (creche_por_dia: os mensalistas esperados pelo plano, que não têm reserva, e as reservas). Para \"quem vem amanhã/quem está na creche\", responda por creche_por_dia, com todos os nomes de cada dia.",
     input_schema: obj({ dias: { ...N, description: "Até quantos dias à frente olhar as reservas. Padrão: 7" } }) },
   FERRAMENTA_PLANOS_CRECHE,
+  FERRAMENTA_SINAIS,
   { grava: false, name: "ver_pacotes", description: "Lista os modelos de pacote à venda (com pacote_id e preço) e os pacotes ativos, com usados e restantes. Com pet_id, só os pacotes daquele pet.",
     input_schema: obj({ pet_id: S }) },
   { grava: false, financeiro: true, name: "ver_caixa", description: "Diz se o caixa está aberto ou fechado, desde quando, o troco inicial, quanto entrou e saiu por forma de pagamento e o dinheiro esperado na gaveta. Com o caixa fechado, mostra o que foi lançado hoje e o último fechamento.",
@@ -117,7 +121,7 @@ export const FERRAMENTAS: Def[] = [
 
   { grava: true, name: "cadastrar_pet", description: "Cadastra um pet novo. Se o tutor já é cliente, passe cliente_id; senão, passe tutor_nome (e telefone, se a pessoa disse) e o tutor é criado junto.",
     input_schema: obj({ nome: S, cliente_id: S, tutor_nome: S, tutor_telefone: S, especie: { type: "string", enum: ["cao", "gato", "outro"] }, raca: S, porte: { type: "string", enum: ["P", "M", "G", "GG"] }, alertas: { ...S, description: "Cuidados: alergia, medo, comportamento" } }, ["nome"]) },
-  { grava: true, name: "marcar_horario", description: "Marca um horário na agenda para um pet já cadastrado. O valor é sugerido pelo serviço e porte se você não passar. Se o pet vai fazer mais de um serviço no mesmo horário (ex.: banho e hidratação), passe os outros em outros_servicos_ids: cada um entra com o valor dele e o tempo soma. Para horário que se repete (toda semana, de 15 em 15 dias, uma vez por mês), passe repetir_a_cada_semanas e repetir_vezes: cria todos de uma vez, no mesmo dia da semana e hora. Dá erro se cair em bloqueio do pet shop inteiro ou do profissional escolhido.",
+  { grava: true, name: "marcar_horario", description: "Marca um horário na agenda (banho, tosa e outros serviços com hora) para um pet já cadastrado. Nunca para creche nem hotel: isso é reservar_estadia ou fazer_checkin, mesmo que exista um serviço com esse nome na lista. O valor é sugerido pelo serviço e porte se você não passar. Se o pet vai fazer mais de um serviço no mesmo horário (ex.: banho e hidratação), passe os outros em outros_servicos_ids: cada um entra com o valor dele e o tempo soma. Para horário que se repete (toda semana, de 15 em 15 dias, uma vez por mês), passe repetir_a_cada_semanas e repetir_vezes: cria todos de uma vez, no mesmo dia da semana e hora. Dá erro se cair em bloqueio do pet shop inteiro ou do profissional escolhido.",
     input_schema: obj({ pet_id: S, servico_id: S, inicio: DIA_HORA, profissional_id: S, preco: N, obs: S, leva_traz: B,
       outros_servicos_ids: { type: "array", items: S, description: "Opcional: ids de outros serviços do pet shop feitos no mesmo horário, além de servico_id" },
       repetir_a_cada_semanas: { type: "number", enum: [1, 2, 4], description: "Intervalo da repetição, em semanas: 1, 2 ou 4" },
@@ -130,6 +134,7 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ bloqueio_id: S, dia: DIA, hora: { ...HORA, description: "Uma hora que cai dentro do bloqueio, HH:mm" }, motivo: S, profissional_id: S, e_os_proximos: { ...B, description: "Remove este e os próximos da mesma série" } }) },
   { grava: true, name: "fazer_checkin", description: "Creche e hotel: registra que o pet chegou agora. Se o pet tem reserva do mesmo tipo para hoje (ou atrasada, ou para amanhã), a reserva vira check-in; senão, cria a estadia. Sem valor_diaria, usa a da reserva ou a diária de Meu pet shop.",
     input_schema: obj({ pet_id: S, tipo: { type: "string", enum: ["creche", "hotel"] }, saida_prevista: { ...S, description: "Opcional. AAAA-MM-DDTHH:mm (só o dia vale 18:00)" }, valor_diaria: N, obs: { ...S, description: "Ração, remédio, o que trouxe" } }, ["pet_id", "tipo"]) },
+  FERRAMENTA_RESERVAR_ESTADIA,
   { grava: true, name: "fazer_checkout", description: "Creche e hotel: encerra a estadia do pet que está na casa. Quem tem acesso ao financeiro recebe junto: o valor é diárias vezes o valor da diária, se você não passar, e precisa da forma de pagamento. Passe valor 0 para não cobrar agora.",
     input_schema: obj({ pet_id: S, diarias: { ...N, description: "Opcional. Padrão: contadas da entrada até hoje (hotel por noite, creche por dia)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS }, ["pet_id"]) },
   { grava: true, name: "vender_pacote", description: "Vende para um pet um modelo de pacote (pacote_id de ver_pacotes). Quem tem acesso ao financeiro lança o pagamento junto e precisa da forma; se o cliente ainda não pagou, passe ja_pagou: false e nada entra no financeiro.",
@@ -527,6 +532,38 @@ async function conferirSeEDivida(c: Contexto, e: Entrada) {
   throw new ErroDeUso(`Nada foi lançado: ${quem}. Se este dinheiro é pagamento do que o cliente devia, use receber_de_cliente com esse cliente_id: ele dá baixa nas contas e o dinheiro entra uma vez só. Lançar como entrada solta deixaria a dívida aberta e contaria o dinheiro duas vezes. Só use lancar_dinheiro de novo, com nao_e_divida: true, se a pessoa disser que é outra coisa (um serviço ou venda nova).`);
 }
 
+/** Frase que vai para o modelo no lugar de um valor que esta pessoa não pode ver. */
+export const SEM_VALORES = "sem acesso: esta pessoa não vê valores nem quem deve. Se perguntarem de dívida ou dinheiro, diga que com o acesso dela você não consegue ver esses valores e que isso é com quem cuida do financeiro. Nunca diga que não deve nada.";
+
+type NaCasa = { pet?: string; tutor?: string | null; tipo: string };
+type Reserva = NaCasa & { chega: string };
+/**
+ * A creche dia a dia (de hoje até `dias` à frente): os mensalistas esperados pelo plano (sem os que avisaram falta),
+ * quem está na casa hoje e as reservas avulsas. Os planos vêm de `ver_planos_creche` (a mesma conta da tela Mensalistas).
+ */
+async function crecheDiaADia(c: Contexto, dias: number, naCasa: NaCasa[], reservas: Reserva[]) {
+  const hoje = c.agora.slice(0, 10);
+  const n = Math.max(1, Math.min(14, dias || 7));
+  const r = (await consultarPlanosDaCreche(c, { dias: n })).resultado as { planos?: { pet: string; tutor: string | null; hoje: string; esperado_hoje: boolean; proximos_dias: { dia: string; estado: string }[] }[] };
+  const nome = (pet: string, tutor: string | null | undefined) => `${pet}${tutor ? ` (${tutor})` : ""}`;
+  const lista: { dia: string; mensalistas: string[]; reservas: string[]; na_casa_agora?: string[]; total: number }[] = [];
+  for (let i = 0; i <= n; i++) {
+    const dia = somaDiasLocal(hoje, i);
+    const rotulo = `${i === 0 ? "hoje, " : i === 1 ? "amanhã, " : ""}${quandoLocal(dia)}`;
+    const ms: string[] = [];
+    for (const p of r.planos ?? []) {
+      if (i === 0) { if (p.esperado_hoje) ms.push(`${nome(p.pet, p.tutor)}: ${p.hoje}`); continue; }
+      const x = p.proximos_dias.find((d) => d.dia === quandoLocal(dia).replace(" às", ""));
+      if (x && !/faltar/.test(x.estado)) ms.push(`${nome(p.pet, p.tutor)}${x.estado === "esperado" ? "" : `: ${x.estado}`}`);
+    }
+    const rs = reservas.filter((x) => x.tipo === "creche" && x.chega.slice(0, 10) === dia).map((x) => nome(x.pet ?? "pet", x.tutor));
+    const casa = i === 0 ? naCasa.filter((x) => x.tipo === "creche").map((x) => nome(x.pet ?? "pet", x.tutor)) : undefined;
+    const todos = new Set([...ms.map((m) => m.split(":")[0]), ...rs, ...(casa ?? [])]);
+    lista.push({ dia: rotulo, mensalistas: ms, reservas: rs, ...(casa ? { na_casa_agora: casa } : {}), total: todos.size });
+  }
+  return lista;
+}
+
 async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resultado: unknown; links?: LinkZap[] }> {
   const { sb, petshop } = c;
   const hoje = c.agora.slice(0, 10);
@@ -568,7 +605,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
           ultimo_atendimento: ultimo ? `${utcParaLocal(ultimo.inicio, c.fusoMin).slice(0, 10)} (${ultimo.servicos?.nome ?? "atendimento"})` : "nunca",
           proximo_horario: proximo ? utcParaLocal(proximo.inicio, c.fusoMin) : null,
           pacotes: (pacotes.data ?? []).filter((x) => x.pet_id === p.id).map((x) => `${x.nome}: ${x.usados}/${x.total}`),
-          ...(c.vejoFinanceiro ? { tutor_deve: deve(p.clientes?.id) ?? "nada" } : {}),
+          // sem acesso ao dinheiro: o Mozart não sabe se o tutor deve (e não pode dizer "não deve nada")
+          tutor_deve: c.vejoFinanceiro ? deve(p.clientes?.id) ?? "nada" : SEM_VALORES,
         };
       }) } };
     }
@@ -639,13 +677,13 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
         sb.rpc("estoque_vencendo", { p: petshop.id, p_dias: 60 }).then((r) => (r.error ? null : (r.data as unknown as { lotes: { nome: string; unidade: string; lote: string | null; validade: string; quantidade: number; dias: number; valor: number | null }[] } | null))),
       ]);
       const lista = prods.filter((p) => !alvo || semAcento(p.nome).includes(alvo))
-        .map((p) => ({ produto_id: p.id, nome: p.nome, unidade: p.unidade, ...(p.tipo === "kit" ? { kit: true } : {}), saldo: Number(p.estoque), minimo: Number(p.estoque_minimo), acabando: Number(p.estoque_minimo) > 0 && Number(p.estoque) <= Number(p.estoque_minimo), preco_venda: p.preco_venda, ...(c.vejoFinanceiro ? { custo: p.custo } : {}) }))
+        .map((p) => ({ produto_id: p.id, nome: p.nome, unidade: p.unidade, ...(p.tipo === "kit" ? { kit: true } : {}), saldo: Number(p.estoque), minimo: Number(p.estoque_minimo), acabando: Number(p.estoque_minimo) > 0 && Number(p.estoque) <= Number(p.estoque_minimo), preco_venda: p.preco_venda, ...(veCusto(c.eu) && p.custo != null ? { custo: p.custo } : {}) }))
         .sort((a, b) => Number(b.acabando) - Number(a.acabando));
       const lotes = (venc?.lotes ?? []).filter((l) => !alvo || semAcento(l.nome).includes(alvo));
       return { resultado: { total: lista.length, produtos: lista.slice(0, 40),
         ...(venc ? { vencendo: lotes.slice(0, 30).map((l) => ({ produto: l.nome, lote: l.lote, validade: l.validade, quantidade: Number(l.quantidade), unidade: l.unidade,
           situacao: Number(l.dias) < 0 ? `vencido há ${-Number(l.dias)} dia(s)` : Number(l.dias) === 0 ? "vence hoje" : `vence em ${Number(l.dias)} dia(s)`,
-          ...(c.vejoFinanceiro && l.valor != null ? { valor_a_preco_de_custo: Number(l.valor) } : {}) })),
+          ...(veCusto(c.eu) && l.valor != null ? { valor_a_preco_de_custo: Number(l.valor) } : {}) })),
           vencendo_onde_ver: "Estoque, Vencendo: lá dá para dar baixa como perda no que venceu." } : {}) } };
     }
     case "resumo_financeiro": {
@@ -710,7 +748,10 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
         const chega = utcParaLocal(x.entrada, c.fusoMin), d = diasEntre(hoje, chega);
         return { ...comum(x), chega, sai: x.saida_prevista ? utcParaLocal(x.saida_prevista, c.fusoMin) : null, situacao: d < 0 ? "não veio (data já passou)" : d === 0 ? "chega hoje" : d === 1 ? "chega amanhã" : `em ${d} dias` };
       });
-      return { resultado: { agora: c.agora, na_casa: naCasa, total_na_casa: naCasa.length, reservas, reservas_ate: ate, reservas_mais_para_frente: reservadas.length - reservas.length } };
+      // creche: quem vem em cada dia, com os mensalistas esperados pelo plano (eles não têm reserva: vêm pelos dias da semana)
+      const porDia = usaModulo(petshop, "creche") ? await crecheDiaADia(c, dias, naCasa, reservas) : null;
+      return { resultado: { agora: c.agora, na_casa: naCasa, total_na_casa: naCasa.length, reservas, reservas_ate: ate, reservas_mais_para_frente: reservadas.length - reservas.length,
+        ...(porDia ? { creche_por_dia: porDia, como_responder: "Quem vem em um dia: todos os nomes de creche_por_dia daquele dia (mensalistas e reservas). Mensalista que vem todo dia aparece em todos os dias." } : {}) } };
     }
     case "ver_pacotes": {
       const pet = e.pet_id ? await petPorId(c, e.pet_id) : null;
@@ -794,6 +835,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
   if (envio) return envio;
   const fixas = await consultarContasFixas(c, nome, (m) => new ErroDeUso(m));
   if (fixas) return fixas;
+  const sinais = await consultarSinais(c, nome, e, (m) => new ErroDeUso(m));
+  if (sinais) return sinais;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 
@@ -854,6 +897,9 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       const pet = await petPorId(c, e.pet_id);
       const servico = servicoPorId(c, e.servico_id);
       exigir(servico, "servico_id inválido: use um dos serviços do pet shop.");
+      // creche e hotel vão para Creche e hotel, nunca para a agenda (mesmo com um serviço "Creche diária" na lista)
+      const casa = [servico, ...outrosServicosDoPedido(c, e, servico.id)].map((x) => agendaNaoEhCasa(c, x)).find(Boolean);
+      exigir(!casa, casa ?? "");
       const { inicios, aCada } = iniciosDoPedido(e);
       const inicio = inicios[0];
       const prof = e.profissional_id ? profPorId(c, e.profissional_id) : null;
@@ -1115,6 +1161,8 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
   }
   const fixa = await descreverContaFixa(c, nome, e, (m) => new ErroDeUso(m));
   if (fixa) return fixa;
+  const estadia = await descreverEstadia(c, nome, e, (m) => new ErroDeUso(m));
+  if (estadia) return estadia;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 
@@ -1332,6 +1380,8 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
       return { feito: true, produto_id: produtoId, despesa_lancada: despesa };
     }
   }
+  const estadia = await gravarEstadia(c, nome, e, (m) => new ErroDeUso(m));
+  if (estadia) return estadia;
   const fixa = await gravarContaFixa(c, nome, e, (m) => new ErroDeUso(m));
   if (fixa) return fixa;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);

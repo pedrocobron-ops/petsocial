@@ -211,6 +211,11 @@
   background: var(--g-carta); border-radius: 22px 22px 0 0; border: 1px solid var(--g-linha); box-shadow: 0 -20px 50px -20px rgba(23, 48, 42, .45);
   padding-bottom: env(safe-area-inset-bottom);
 }
+/* celular com as dúvidas abertas: a folha fica mais baixa e a página rola até o "Enviar pedido" aparecer acima dela */
+@media (max-width: 719px) {
+  html.g-lk-duv-aberta .g-lk-duv { max-height: min(62dvh, 560px); }
+  html.g-lk-duv-aberta .g-lk.com-duvida .g-lk-rodape { padding-bottom: calc(64dvh + env(safe-area-inset-bottom)); }
+}
 @media (min-width: 720px) {
   .g-lk-duv { inset: auto 24px 24px auto; width: 380px; border-radius: 22px; box-shadow: 0 30px 60px -24px rgba(23, 48, 42, .55); }
   .g-lk-duv-abrir { right: 24px; bottom: 24px; }

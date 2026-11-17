@@ -85,12 +85,18 @@ function horasDaSemana(h: Horario): { abre: string; fecha: string } | null {
  * segue com horário até fechar; quem também para nesse dia muda a hora de fechar.
  */
 function fraseSemAlmoco(h: Horario, a: Almoco, dias: string[]): string {
-  const nomes = (l: string[]) => l.map((d) => NOME_DIAS[d]).join(" e ");
+  // "no sábado", "na sexta", "na sexta e no sábado"
+  const comArtigo = (d: string) => `${d === "0" || d === "6" ? "no" : "na"} ${NOME_DIAS[d]}`;
+  const nomes = (l: string[]) => l.map(comArtigo).join(" e ");
+  const maiuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
   const dentro = dias.filter((d) => h[d]!.fecha > a.de && h[d]!.abre < a.de);
   const fora = dias.filter((d) => !dentro.includes(d));
   const partes: string[] = [];
-  if (dentro.length) partes.push(`Em ${nomes(dentro)}, que ${dentro.length === 1 ? "fecha" : "fecham"} durante o almoço, o almoço não vale: a agenda e o link oferecem horário até a hora de fechar. Se nesse dia vocês param às ${a.de}, mude a hora de fechar para ${a.de}.`);
-  if (fora.length) partes.push(`Em ${nomes(fora)} não muda nada, porque o dia termina antes ou começa depois do almoço.`);
+  for (const d of dentro) {
+    const fecha = h[d]!.fecha;
+    partes.push(`${maiuscula(comArtigo(d))} vocês fecham às ${fecha}, antes de o almoço acabar: nesse dia não tem pausa, e a agenda oferece horário até as ${fecha}. Se ${comArtigo(d)} vocês param às ${a.de}, mude a hora de fechar desse dia para ${a.de}.`);
+  }
+  if (fora.length) partes.push(`${maiuscula(nomes(fora))} não muda nada: o dia termina antes do almoço ou começa depois.`);
   return partes.join(" ");
 }
 

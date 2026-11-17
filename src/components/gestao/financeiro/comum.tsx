@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { History, Lock, Package, RotateCcw, Scissors, Sparkles, Trash2 } from "lucide-react";
 import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, creditoDaEntrada, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento, type ContaRecebida } from "@/lib/gestao/dinheiro";
@@ -430,9 +430,20 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   const conta = modo === "conta";
   const entrada = tipo === "entrada";
   const voltam = produtosDaVenda(inicial).length;
-  // entrada nova paga: no crédito, pergunta em quantas vezes (a taxa do parcelado)
+  // entrada paga: no crédito, pergunta em quantas vezes (a taxa do parcelado). Na edição também, enquanto o caixa dela está aberto
+  // (as mesmas regras de maquininha_parcelas no banco): um crédito anotado à vista por engano vira parcelado sem excluir e refazer.
   const anotarParcelas = useAnotarParcelas();
-  const perguntaVezes = !inicial && !conta && entrada;
+  const editaVezes = Boolean(inicial && inicial.pago && inicial.tipo === "entrada" && !inicial.movimento && !travado && !soVer && !conta);
+  const perguntaVezes = (!inicial && !conta && entrada) || editaVezes;
+  // as parcelas anotadas hoje (quem cuida do financeiro lê; para os outros começa em "À vista")
+  const { dados: vezesAntes } = useDados(async () => {
+    if (!editaVezes || !inicial) return 1;
+    const r = await sb.from("lancamentos_taxas").select("parcelas").eq("lancamento_id", inicial.id).maybeSingle();
+    return Number(r.data?.parcelas ?? 1) || 1;
+  }, [editaVezes, inicial?.id]);
+  useEffect(() => {
+    if (vezesAntes && vezesAntes > 1) setPagamento((p) => (p.parcelas == null ? { ...p, parcelas: vezesAntes } : p));
+  }, [vezesAntes]);
   // entrada recebida de um cliente corrigida para menos: a diferença pode continuar devida (não some calada)
   const baixou = inicial && inicial.pago && inicial.tipo === "entrada" && inicial.cliente_id && !inicial.conta_id && !inicial.movimento && !travado && !soVer && valor != null && valor > 0
     ? Math.max(0, Math.round((Number(inicial.valor) - valor) * 100) / 100) : 0;
@@ -491,6 +502,17 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         const r = await sb.from("lancamentos").update(mudancas).eq("id", inicial.id).eq("petshop_id", petshop.id).select("id");
         if (r.error) throw new Error(r.error.message);
         if (!r.data?.length) throw new Error("Não deu para salvar. Este lançamento pode ter sido apagado, ou só o dono e quem cuida do financeiro podem alterar.");
+        // crédito: em quantas vezes mudou? (refaz a taxa e as datas do a receber da maquininha)
+        const credito = forma === "credito" || (pagamentos ?? []).some((x) => x.forma === "credito");
+        const vezesAgora = pagamento.parcelas ?? 1;
+        if (editaVezes && credito && !manterDividido && vezesAgora !== (vezesAntes ?? 1)) {
+          const v = await sb.rpc("maquininha_parcelas", { p: petshop.id, p_ids: [inicial.id], p_parcelas: vezesAgora });
+          if (v.error || !Number(v.data)) {
+            avisarErro(`A alteração foi salva, mas o número de parcelas não mudou${v.error ? ` (${v.error.message})` : ": só dá para mudar com o caixa desta venda aberto, e quem só opera o caixa muda só o que lançou há pouco"}.`);
+            await aoSalvo(); avisarMudanca(); aoFechar();
+            return;
+          }
+        }
         if (baixou && restoDevido && inicial.cliente_id) {
           // a diferença vira uma conta a receber do mesmo cliente: não some do que ele deve
           const resto = await gravarLancamento(sb, petshop.id, {
@@ -689,7 +711,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
         {recebido && !soVer && !travado && (
           <p className="g-muted g-pp">Este valor já foi recebido. Se você alterar ou excluir, fica anotado quem mudou, quando e o valor de antes.</p>
         )}
-        {!inicial && !conta && (!escolheData || data === hoje) && <AvisoCaixaFechado aberto={caixa} />}
+        {!inicial && !conta && (!escolheData || data === hoje) && <AvisoCaixaFechado aberto={caixa} saida={tipo === "saida"} />}
         {conta && !inicial && !tutorFixo && (
           <>
             <label className="g-check">
@@ -940,7 +962,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
             <input type="date" className="g-input" value={data} max={hoje} onChange={(e) => { setData(e.target.value); setErro(null); }} />
           </Campo>
         ) : <p className="g-muted g-pp">{erro ? <span className="erro" role="alert">{erro} </span> : null}Entra com a data de hoje.</p>}
-        {data === hoje && <AvisoCaixaFechado aberto={caixaAgora} />}
+        {data === hoje && <AvisoCaixaFechado aberto={caixaAgora} saida={!entrada} />}
       </div>
     </Folha>
     </ParcelasNaTela.Provider>

@@ -35,7 +35,7 @@ function falsos() {
     Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
       speaking: false, pending: false, paused: false, getVoices: () => window.__vozesFalsas || [], pause() {}, resume() {}, addEventListener() {}, removeEventListener() {},
       cancel() { reg.cancelou++; },
-      speak(u) { reg.falas.push({ texto: u.text, lang: u.lang, voz: u.voice ? u.voice.name : null, rate: u.rate }); setTimeout(() => u.onend && u.onend(), 300); },
+      speak(u) { reg.falas.push({ texto: u.text, lang: u.lang, voz: u.voice ? u.voice.name : null, rate: u.rate }); setTimeout(() => u.onstart && u.onstart(), 10); setTimeout(() => u.onend && u.onend(), 300); },
     } });
   } catch { /* segue */ }
 }
