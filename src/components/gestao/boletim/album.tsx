@@ -8,6 +8,7 @@ import { chamar, dataLonga, linkWhatsApp } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { avisarMudanca, Esqueleto, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
+import { EtiquetaFoto, estadoDaFoto, useAutorizacoesDoPet } from "./autorizacao";
 import "./boletim.css";
 
 /**
@@ -16,7 +17,7 @@ import "./boletim.css";
  * uma foto. "Mandar o álbum" cria um link novo (60 dias) com as fotos de agora, para o tutor ver sem instalar nada.
  */
 type Foto = { url: string; rotulo?: string; caminho?: string; boletim?: string };
-type VisitaDoAlbum = { chave: string; quando: string; tipo: "banho" | "creche" | "hotel"; fotos: Foto[] };
+type VisitaDoAlbum = { chave: string; quando: string; tipo: "banho" | "creche" | "hotel"; fotos: Foto[]; /** o boletim da visita e quando ele nasceu (para a autorização das redes) */ boletim?: string; boletimEm?: string };
 const ICONE = { banho: Scissors, creche: Sun, hotel: BedDouble } as const;
 const ROTULO = { banho: "Banho e tosa", creche: "Creche", hotel: "Hotel" } as const;
 const SEGUNDOS = 61 * 86400;
@@ -30,6 +31,7 @@ export default function AlbumDoPet({ pet, tutor }: { pet: { id: string; nome: st
   const [link, setLink] = useState<string | null>(null);
   const [criando, setCriando] = useState(false);
   const pode = posso("agenda") || posso("creche_hotel");
+  const autorizacoes = useAutorizacoesDoPet(pode ? pet.id : null);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     if (!pode) return { visitas: [] as VisitaDoAlbum[], caminhos: [] as string[] };
@@ -61,6 +63,7 @@ export default function AlbumDoPet({ pet, tutor }: { pet: { id: string; nome: st
       const tipo = x.agendamento_id ? "banho" : x.estadias?.tipo === "hotel" ? "hotel" : "creche";
       const chave = x.agendamento_id ? `a:${x.agendamento_id}` : `e:${x.estadia_id}:${x.criado_em.slice(0, 10)}`;
       const v = mapa.get(chave) ?? { chave, quando: x.agendamentos?.inicio ?? x.criado_em, tipo, fotos: [] };
+      if (!v.boletim) { v.boletim = x.id; v.boletimEm = x.criado_em; }
       for (const c of x.fotos) if (urls.get(c)) v.fotos.push({ url: urls.get(c)!, caminho: c, boletim: x.id });
       mapa.set(chave, v);
     }
@@ -119,7 +122,8 @@ export default function AlbumDoPet({ pet, tutor }: { pet: { id: string; nome: st
             const Icone = ICONE[v.tipo];
             return (
               <div key={v.chave} className="g-bol-album-visita">
-                <p><b>{dataLonga(v.quando)}</b><span className="g-tag"><Icone size={12} aria-hidden />{ROTULO[v.tipo]}</span></p>
+                <p><b>{dataLonga(v.quando)}</b><span className="g-tag"><Icone size={12} aria-hidden />{ROTULO[v.tipo]}</span>
+                  {autorizacoes && <EtiquetaFoto estado={estadoDaFoto(autorizacoes, v.boletim, v.boletimEm ?? v.quando)} />}</p>
                 <ul>
                   {v.fotos.map((f, i) => (
                     <li key={f.caminho ?? `${v.chave}${i}`}>

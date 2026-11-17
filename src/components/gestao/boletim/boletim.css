@@ -53,3 +53,9 @@
 .g-bol-album-visita img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
 .g-bol-album-visita small { position: absolute; left: 6px; bottom: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(31, 27, 23, .62); color: #fff; font-size: .75rem; font-weight: 600; }
 .g-bol-album-visita .g-bol-foto-x { width: 30px; height: 30px; top: 4px; right: 4px; }
+
+/* autorização do tutor para postar as fotos nas redes (ficha do pet, álbum, boletim) */
+.g-bol-redes-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; padding: 10px 12px; border-radius: 14px; background: var(--g-carta); border: 1px solid var(--g-linha); font-size: .9375rem; }
+.g-bol-redes-linha > svg { width: 18px; height: 18px; flex: none; color: var(--g-verde); }
+.g-bol-redes-linha small { flex-basis: 100%; }
+.g-bol-redes { white-space: nowrap; }

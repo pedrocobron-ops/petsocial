@@ -36,6 +36,7 @@ import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import { buscarSaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
 import MetaMes from "@/components/gestao/meta-mes";
 import DicasMozart from "@/components/gestao/dicas-mozart";
+import BomDia from "@/components/gestao/bom-dia";
 import ChamarDeVolta, { aniversariantes, buscarParaChamar, chamadoEm, lerChamados, quemSumiu, type AbaChamar, type GrupoChamar } from "@/components/gestao/clientes/chamar-de-volta";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
 import { comPrecosDeAgendamento, idsParaCobrar } from "@/lib/gestao/reservado";
@@ -350,6 +351,9 @@ export default function Hoje() {
         {/* dia fechado sem a agenda na tela (creche ou hotel): o aviso vem no alto, antes do botão de check-in */}
         {fechadoHoje && casa && !banho && <p className="g-aviso" role="status" style={{ margin: 0 }}><span className="g-cresce"><b>{fechadoHoje}.</b> {rotuloCasa === "Hotel" ? "O hotel não recebe chegadas hoje. Quem está hospedado continua hospedado." : rotuloCasa === "Creche" ? "A creche não abre hoje: ninguém é esperado na chamada e ninguém leva falta." : "A creche não abre hoje e ninguém leva falta. Quem está hospedado no hotel continua hospedado."}</span></p>}
         {cr && cartaoDaChamada && <ChamadaDeHoje esperados={cr.esperados} aindaNao={cr.aindaNao} naCasa={cr.naCasa} sairam={cr.sairam} faltaram={cr.faltaram.length} />}
+
+        {/* "Bom dia" do Mozart: primeira abertura do dia, até 3 linhas; lê sozinho (gestao_bom_dia), não depende dos dados desta tela */}
+        {!contaNova && <BomDia />}
 
         {/* pedidos que chegaram pelo link vêm no alto: no celular, abaixo dos primeiros passos e do Mozart ficavam longe da vista */}
         {posso("agenda") && <PedidosLink />}

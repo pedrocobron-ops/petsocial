@@ -9,6 +9,7 @@ import {
 import { hora, isoDia, linkWhatsApp } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { avisarMudanca, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
+import { EtiquetaFoto, estadoDaFoto, useAutorizacoesDoPet } from "./autorizacao";
 import "./boletim.css";
 
 /**
@@ -80,7 +81,7 @@ export function BotaoBoletim({ visita, estado, classe = "g-btn sec p" }: { visit
   );
 }
 
-type Guardado = { id: string; token: string; texto: string; chips: unknown; nota: string | null; atencao: string | null; fotos: string[]; assinaturas: string[]; enviado_em: string | null; expira_em: string };
+type Guardado = { id: string; token: string; texto: string; chips: unknown; nota: string | null; atencao: string | null; fotos: string[]; assinaturas: string[]; enviado_em: string | null; expira_em: string; criado_em?: string };
 
 /** Separa o texto de atenção guardado nos toques rápidos e no resto escrito à mão. */
 function lerAtencao(t: string | null) {
@@ -100,7 +101,7 @@ export function FolhaBoletim({ visita: v, aoFechar, aoEnviar }: { visita: Visita
 
   // o boletim que já existe desta visita (o do banho, ou o de hoje da estadia) e o sexo do pet, para o "do/da"
   const { dados, carregando, erro } = useDados(async () => {
-    let q = sb.from("boletins").select("id, token, texto, chips, nota, atencao, fotos, assinaturas, enviado_em, expira_em").eq("petshop_id", petshop.id);
+    let q = sb.from("boletins").select("id, token, texto, chips, nota, atencao, fotos, assinaturas, enviado_em, expira_em, criado_em").eq("petshop_id", petshop.id);
     if (v.agendamentoId) q = q.eq("agendamento_id", v.agendamentoId);
     else { const desde = new Date(); desde.setHours(0, 0, 0, 0); q = q.eq("estadia_id", v.estadiaId!).gte("criado_em", desde.toISOString()); }
     const [b, p] = await Promise.all([
@@ -113,6 +114,8 @@ export function FolhaBoletim({ visita: v, aoFechar, aoEnviar }: { visita: Visita
 
   const [pronto, setPronto] = useState(false);
   const [guardado, setGuardado] = useState<Guardado | null>(null);
+  // o tutor autorizou postar as fotos? (ele autoriza na página do boletim; aqui só aparece)
+  const autorizacoes = useAutorizacoesDoPet(v.petId);
   const [fotos, setFotos] = useState<FotoDoBoletim[]>([]);
   const [subindo, setSubindo] = useState(0);
   const [chips, setChips] = useState<string[]>([]);
@@ -278,6 +281,13 @@ export function FolhaBoletim({ visita: v, aoFechar, aoEnviar }: { visita: Visita
               <span>{guardado.enviado_em ? <><b>Boletim enviado</b> às {hora(guardado.enviado_em)}{isoDia(new Date(guardado.enviado_em)) !== isoDia(new Date()) ? ` de ${new Date(guardado.enviado_em).toLocaleDateString("pt-BR")}` : ""}.</> : <><b>Boletim salvo</b>, ainda não mandado.</>} {mudou ? "Salve as mudanças para mandar." : "O link vale 60 dias."}</span>
               {url && !mudou && <a className="g-link" href={url} target="_blank" rel="noopener noreferrer">Ver como o tutor vê<ExternalLink aria-hidden /></a>}
             </div>
+          )}
+          {autorizacoes && (guardado || autorizacoes.length > 0) && (
+            <p className="g-bol-redes-linha" data-teste="redes-do-boletim">
+              <span className="g-cresce">Fotos nas redes</span>
+              <EtiquetaFoto estado={estadoDaFoto(autorizacoes, guardado?.id, guardado?.criado_em ?? new Date().toISOString())} />
+              {!estadoDaFoto(autorizacoes, guardado?.id, guardado?.criado_em ?? new Date().toISOString()).pode && <small className="g-muted">O tutor autoriza na página do boletim, se quiser.</small>}
+            </p>
           )}
 
           <section className="g-bol-parte" aria-label="Fotos">

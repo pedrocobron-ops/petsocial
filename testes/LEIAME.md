@@ -86,6 +86,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   reserva: hotel de Thor, 19/11" vira "Sinal da reserva: hotel de Thor", "(parte)" fica); "Creche e hotel" como "Hotel" ou "Creche"
   pela entrada e pelo que o pet shop faz (`nomeDaCategoria`); o que é de cada pet (`lancamentoDoPet`: diária, sinal, devolução, sem
   pegar "Melissa" pela "Mel"); o Mozart num hotel só diz "Hotel".
+- `bom-dia.js`: o "Bom dia" do Mozart (`src/lib/gestao/bom-dia.ts`): no máximo 3 linhas na ordem dia (agenda, buraco livre, casa),
+  quem deve e vem hoje, vacina de quem vem, pacote no último uso, aniversário; sem `devem` (papel sem dinheiro) nada de R$; só
+  "agenda livre" não vira cartão; buraco na agenda com almoço e funcionamento. E a prévia da autorização das fotos
+  (`fotos-redes.ts`): o @ arrumado igual ao banco e a frase "Sem marcar o meu perfil." trocada.
 - `erros.js`: limpeza dos erros antes de irem para o banco (`src/lib/gestao/erros.ts`): e-mail, telefone, valor, uuid, ficha (JWT e
   códigos longos), consulta e âncora do endereço saem; rota com `:id`; pilha só com arquivo:linha; navegador; o que entra e o que é
   ignorado (frases para a pessoa, regra do banco, Mozart fora do ar, sem internet só conta).
@@ -143,6 +147,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   prazo de 60 dias (página e foto somem, as fotos ficam), freio de 60 aberturas por minuto (PT429); álbum (`album_criar`,
   `album_publico`, rota da foto, vencido some); foto apagada só pelo dono (sai do boletim e do álbum, vai para a fila), faxina dos
   arquivos (fila, órfãos de mais de um dia), faxina geral e pet apagado. Precisa do servidor com `GESTAO_BOLETIM_FALSO=1`.
+- `fotos-redes.js`: autorização para postar a foto do pet (migração 20261196): texto exato montado pelo banco (do/da, dia, @),
+  nada vem marcado (sem escolha é recusado), @ inválido recusado, mesma escolha devolve a mesma, quem lê (dono, recepção, tosador,
+  monitora; estoque, outra loja e anônimo não; ninguém lê o código do "Não quero mais"; ninguém grava direto), freio de 5 por minuto
+  por boletim (PT429), "todas" vale para o boletim e os seguintes (nunca os mais velhos), rotas do servidor (autorizar 200/400,
+  página do link 200/404, "Não quero mais" tira todas). `gestao_bom_dia` por papel: dono e recepção veem quem deve; tosador sem
+  dinheiro e sem pacote; monitora só a casa; estoque só o dia; outra loja nada; anônimo recusado. Precisa do servidor.
 - `admin.js`: funções do painel do administrador recusadas para anônimo e dono; o admin recebe só dados da conta e quantidades;
   troca de status vai para o histórico. (O admin de teste é criado por SQL: ninguém vira admin pela API.)
 - `cakto.js`: webhook da Cakto de ponta a ponta pela rota do servidor: 9 ofertas, ciclo da assinatura (renovada, atrasada, recuperada,
@@ -195,6 +205,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   porte, Tempo total e Total, o banco com o principal e os 3 a mais, a agenda, a conta de R$ 145,00 e a comissão por serviço ao centavo);
   em 1366, tirar o primeiro (o seguinte assume), alterar um horário com três serviços, pet sem porte; tosador sem nenhum valor na tela
   (o banco põe o preço da lista) e preço travado para a recepção.
+- `primeiro-acesso.js`: dono novo do zero (criar conta, duas perguntas, "Começar já") até o primeiro resultado: no fim do guia
+  "Pronto em X minutos", "Marcar o primeiro horário" (botão principal) e "Copiar meu link de agendamento"; o link copiado em 7
+  toques e 4 campos; o primeiro horário (pet novo cadastrado na própria folha) em até 13 toques e 7 campos, com "Pronto em X
+  minutos" no aviso do marcado (antes da mudança: 19 toques e 9 campos). 390 até o horário, 1366 até o link.
+- `fotos-redes.js`: a página do boletim em 390 ("Pode postar a foto do Thor…", nada marcado, prévia com o @ = texto guardado,
+  "Pode postar desde", "Não quero mais" com confirmação); a ficha e o álbum em 1366 ("Pode postar ✓ (desde dd/mm)", depois
+  "Sem autorização"); o Bom dia do dono (quem deve) e do tosador (sem valor), "Perguntar ao Mozart", "Dispensar por hoje" que não volta.
 - `checkout-lento.js`: check-out do hotel com a leitura do sinal atrasada 2,5 s (390 e 1366): enquanto carrega, a folha não mostra valor
   e o botão fica apagado (clicar não grava); depois, "Receber R$ 2,75" (110 − sinal 107,25) e "Receber R$ 1,60" (80 − 20% do segundo
   pet − sinal 62,40), uma entrada só cada.
