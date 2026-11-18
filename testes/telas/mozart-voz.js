@@ -185,8 +185,9 @@ const SAIDA = `${B.RAIZ}/testes/saida`;
     await painel.locator('button[aria-label="Fechar a conversa"]').click();
     await painel.waitFor({ state: 'detached', timeout: 5000 });
     await page.waitForTimeout(700); // a barra de baixo ignora o toque logo depois de fechar uma janela (toque duplo)
-    if (celular) { await page.locator('.g-abas button', { hasText: 'Mais' }).click(); await page.locator('.g-btn.verde', { hasText: 'Ajuda' }).click(); }
-    else await page.locator('.g-lado .g-nav button', { hasText: 'Ajuda' }).click();
+    // a Ajuda fica num lugar só: o botão Ajuda do alto abre a folha, e Tirar uma dúvida abre a conversa
+    await page.locator('[data-teste=botao-ajuda]').click();
+    await page.locator('.g-folha').last().locator('[data-teste=ajuda-duvida]').click();
     const ajuda = page.locator('.g-ass-painel[aria-label="Ajuda"]');
     await ajuda.waitFor({ timeout: 10000 });
     const micAjuda = ajuda.locator('button.g-mic.voz');

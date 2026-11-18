@@ -1250,7 +1250,7 @@ small.erro.g-valor-erro { display: block; color: var(--g-vermelho); font-size: .
   /* a chave do Mandar mensagens: o toque vale a altura da linha, não só a bolinha */
   .g-me-chave::after { content: ""; position: absolute; inset: -6px -4px; }
   /* botão de texto longo quebra a linha em vez de passar da tela */
-  .g-btn { white-space: normal; text-align: center; max-width: 100%; }
+  .g-btn { white-space: normal; text-align: center; max-width: 100%; min-width: fit-content; }
 }
 /* faixa dos dias da agenda: os 7 dias ocupam a largura toda (44 px cada) e as setas da semana descem para baixo deles */
 @media (max-width: 520px) {
