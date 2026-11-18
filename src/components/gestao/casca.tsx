@@ -13,7 +13,7 @@ import { DIAS_DE_AVISO, fimDoTeste } from "./fim-do-teste";
 import { dataCompleta, dataLonga } from "@/lib/gestao/util";
 import SairDaEquipe from "./lgpd/sair-da-equipe";
 import { BaixarMeusDados } from "./lgpd/meus-dados";
-import { AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
+import { LeiturasComErro, AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
 import BuscaGeral from "./busca-geral";
 import { areaDaRota } from "@/lib/gestao/acessos";
 import { TELA_DA_AREA, nomeDaCasa, principalDe, rotaForaDoMenu, usaModulo, type Principal } from "@/lib/gestao/modulos";
@@ -152,7 +152,20 @@ export default function Casca({ children }: { children: React.ReactNode }) {
 
   // só a equipe Maestro Pet vê o item "Administrador" no menu
   // (pergunta depois que a tela abriu: não disputa a rede com o que a tela precisa para aparecer)
-  useEffect(() => { let vale = true; const parar = quandoATelaAbrir(() => void sb.rpc("sou_admin").then((r) => { if (vale) setAdmin(r.data === true); })); return () => { vale = false; parar(); }; }, [sb]);
+  // a resposta fica guardada nesta aba (por login): não pergunta de novo a cada recarga da página
+  useEffect(() => {
+    const chave = `maestro-gestao-admin:${eu.user_id ?? ""}`;
+    let guardado: string | null = null;
+    try { guardado = sessionStorage.getItem(chave); } catch { /* sem armazenamento: pergunta */ }
+    if (guardado === "0" || guardado === "1") { setAdmin(guardado === "1"); return; }
+    let vale = true;
+    const parar = quandoATelaAbrir(() => void sb.rpc("sou_admin").then((r) => {
+      if (!vale) return;
+      setAdmin(r.data === true);
+      if (!r.error) { try { sessionStorage.setItem(chave, r.data === true ? "1" : "0"); } catch { /* segue */ } }
+    }));
+    return () => { vale = false; parar(); };
+  }, [sb, eu.user_id]);
 
   // marca de uso: a cada minuto com a tela aberta, diz em que parte do sistema a pessoa está
   useEffect(() => {
@@ -307,6 +320,8 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
+      {/* leitura que falhou e a tela não tratou: nunca fica parecendo "nada cadastrado" */}
+      <LeiturasComErro />
       <main className="g-main" id="conteudo" tabIndex={-1}>
         <div className="g-barra">
           <div className="g-barra-marca"><LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={34} padrao="selo" tomSelo="verde" /><span>{petshop.nome}</span></div>

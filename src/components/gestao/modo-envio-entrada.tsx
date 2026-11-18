@@ -12,16 +12,20 @@ import "./modo-envio.css";
  * Entrada do Modo envio na tela Hoje: "Mandar N mensagens" com o que é cada uma. Só aparece quando há mensagem pronta.
  * Lê depois do primeiro olhar da tela (`pronto`), para não disputar a rede com ele.
  */
-export default function EntradaModoEnvio({ pronto }: { pronto: boolean }) {
+export default function EntradaModoEnvio({ pronto, contagem }: {
+  pronto: boolean;
+  /** Quantas mensagens por tipo, já contadas no banco (tela Hoje, `gestao_hoje_extras`): com ela, este cartão não baixa a fila. */
+  contagem?: { rotulo: string; quantas: number }[] | null;
+}) {
   const { sb, petshop } = useGestao();
   const { dados } = useDados(async () => {
-    if (!pronto) return null;
+    if (!pronto || contagem !== undefined) return null;
     const d = await lerModoEnvio(sb, petshop.id);
     return d ? montarFila(d, petshop) : null;
-  }, [petshop.id, pronto]);
-  const n = dados?.mensagens.length ?? 0;
+  }, [petshop.id, pronto, contagem === undefined]);
+  const partes = contagem ?? (dados ? resumoDaFila(dados) : []);
+  const n = contagem ? contagem.reduce((t, x) => t + x.quantas, 0) : dados?.mensagens.length ?? 0;
   if (!n) return null;
-  const partes = resumoDaFila(dados!);
   return (
     <Link href="/gestao/app/mensagens" className="g-card g-me-entrada">
       <Tile icone={Send} tom="menta" />

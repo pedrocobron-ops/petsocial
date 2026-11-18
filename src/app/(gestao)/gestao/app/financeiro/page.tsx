@@ -135,7 +135,8 @@ function Financeiro() {
     for (const r of nomes) for (const c of r.data ?? []) tutores.set(c.id, c.nome);
     const apagados: AlteracaoLancamento[] = ap.data ?? [];
     return { doMes, anterior, contas, tutores, apagados, ajustes, cadeia, cadeiaAntes };
-  }, [petshop.id, inicio]);
+  // memória curta: voltar ao Financeiro pelo menu não baixa o mês de novo (qualquer gravação faz buscar outra vez)
+  }, [petshop.id, inicio], { guardar: "financeiro" });
 
   const contas = useMemo(() => {
     const doMes = dados?.doMes ?? [];
@@ -154,7 +155,8 @@ function Financeiro() {
       aPagar: (dados?.contas ?? []).filter((l) => l.tipo === "saida"),
       aReceber: (dados?.contas ?? []).filter((l) => l.tipo === "entrada"),
     };
-  }, [dados]);
+  // o nome das categorias vem do pet shop (o que o negócio faz): mudou, refaz a conta
+  }, [dados, petshop]);
   // o resultado conta o faturamento: o crédito que ficou com o tutor ainda é dele (só conta quando ele usar)
   const ajustes = dados?.ajustes ?? SEM_AJUSTES;
   const faturamento = faturamentoLiquido(contas.bruto, ajustes);

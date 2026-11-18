@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 import { execSync } from "node:child_process";
+import { bancoDoBuild } from "./src/lib/gestao/banco-do-build";
+
+// De qual banco este build fala: as variáveis; sem elas, produção só no build de produção da Vercel (nunca em silêncio em outro lugar).
+const BANCO = bancoDoBuild(process.env);
+if (BANCO.aviso) console.warn(`\n\n********\n${BANCO.aviso}\n********\n`);
 
 /** Versão do aplicativo para o registro de erros da Gestão: o commit da Vercel ou, no build local, o do git. */
 function versao(): string {
@@ -19,7 +24,7 @@ function versao(): string {
  * script de oferta da Cakto. Links para o WhatsApp (wa.me), Cakto e Google Maps são navegação, que a lista não segura.
  */
 function cabecalhosDeSeguranca() {
-  const supabase = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://pifuiczrytmizqxzygbi.supabase.co").replace(/\/+$/, "");
+  const supabase = (BANCO.url || "https://banco-nao-configurado.invalid").replace(/\/+$/, "");
   const supabaseWs = supabase.replace(/^http/, "ws");
   const dev = process.env.NODE_ENV !== "production";
   const csp = [
@@ -53,7 +58,9 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
   },
   poweredByHeader: false,
-  env: { NEXT_PUBLIC_GESTAO_VERSAO: versao() },
+  // o ESLint roda no CI (npm run lint), não no build
+  eslint: { ignoreDuringBuilds: true },
+  env: { NEXT_PUBLIC_GESTAO_VERSAO: versao(), NEXT_PUBLIC_SUPABASE_URL: BANCO.url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: BANCO.chave },
 
   async headers() {
     // Páginas abertas por um código no endereço (tutor, entrada, álbum, boletim, orçamento, autorização de fotos) e as fotos

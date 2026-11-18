@@ -30,6 +30,9 @@ import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFren
 import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, useAdiantar, useDados } from "@/components/gestao/ui";
 import dynamic from "next/dynamic";
 import { ErroDeTeste } from "@/components/gestao/erros";
+import { registrarErro } from "@/lib/gestao/erros-navegador";
+import { lerSinal } from "@/lib/gestao/sinal";
+import { lerExtrasDoHoje, nomesEMais } from "@/lib/gestao/hoje-extras";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
 import BomDia from "@/components/gestao/bom-dia";
 import { fraseDaContaFixa, lerAvisosContasFixas } from "@/lib/gestao/contas-fixas";
@@ -65,6 +68,8 @@ const SensorDaEspera = dynamic(() => import("@/components/gestao/hoje-sensores")
 const SensorDaValidade = dynamic(() => import("@/components/gestao/hoje-sensores").then((m) => m.SensorDaValidade), { ssr: false });
 const SEM_VAGA: VagaNaEspera = { n: 0, nomes: [] };
 const SEM_VALIDADE: ResumoDaValidade = { vencidos: [], em30: [], perto: new Map() };
+
+const falhasVistas = new Set<string>();
 
 const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa semana?", "Quem não vem há mais de um mês?"];
 
@@ -173,7 +178,10 @@ export default function Hoje() {
       taxasPendentes: h.atrasos,
       cobrarHoje: h.cobrarHoje,
     };
-  }, [petshop.id, hojeIso, vejoFinanceiro, cuidoDoFinanceiro, vejoEstoque, vejoPacotes, casa, cobrar, vejoAgenda]);
+  // memória curta (voltar para a Hoje pelo menu não baixa tudo de novo) e, a cada minuto, a pergunta leve "mudou algo?":
+  // o tablet do banho vê o que a recepção marcou sem ninguém recarregar a página, e só baixa de novo quando mudou
+  }, [petshop.id, hojeIso, vejoFinanceiro, cuidoDoFinanceiro, vejoEstoque, vejoPacotes, casa, cobrar, vejoAgenda, liberado],
+  { guardar: "hoje", aCada: 60_000, sinal: () => lerSinal(sb, petshop.id, hoje, somaDias(hoje, 2)) });
 
   // quem chamar de volta e aniversariantes: consulta à parte, para não segurar o resto da tela
   const vejoClientes = posso("clientes");
@@ -188,19 +196,40 @@ export default function Hoje() {
   const primeiroOlhar = Boolean(dados);
   // validade dos produtos (lotes vencidos e vencendo em 30 dias): leitura à parte, só para quem cuida do estoque
   const [validade, setValidade] = useState<ResumoDaValidade>(SEM_VALIDADE);
-  const { dados: paraChamar } = useDados(async () => (vejoClientes && primeiroOlhar ? buscarParaChamar(sb, petshop.id) : null), [petshop.id, hojeIso, vejoClientes, primeiroOlhar]);
+  // Os cartões de baixo (quem chamar, aniversariantes, "O Mozart reparou", "Mandar N mensagens") vêm contados do banco numa
+  // resposta pequena (gestao_hoje_extras): a tela não baixa mais todos os pets nem o histórico para mostrar três frases.
+  // Quem já foi chamado fica guardado neste aparelho: a lista vai junto para o banco tirar da conta.
+  const vejoDicas = posso("clientes") && posso("agenda");
+  const { dados: extras, recarregar: recarregarExtras } = useDados(async () => {
+    if (!primeiroOlhar) return null;
+    const chamados = lerChamados(petshop.id);
+    const ids = (aba: AbaChamar) => Object.keys(chamados).filter((k) => k.startsWith(`${aba}:`)).map((k) => k.slice(aba.length + 1))
+      .filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) && chamadoEm(chamados, aba, id));
+    const x = await lerExtrasDoHoje(sb, petshop.id, hoje, { chamar: vejoClientes, dicas: vejoDicas, pacotes: vejoPacotes, envio: true, chamadosVolta: ids("volta"), chamadosNiver: ids("niver") });
+    // parte que o banco não conseguiu montar: o cartão fica de fora e o erro fica registrado (uma vez por parte)
+    for (const f of x?.falhas ?? []) if (!falhasVistas.has(f.parte)) { falhasVistas.add(f.parte); registrarErro(Object.assign(new Error(`gestao_hoje_extras, parte ${f.parte}: ${f.erro}`), { name: "ParteDoHojeFalhou" }), "banco"); }
+    return { tem: x !== null, x };
+  }, [petshop.id, hojeIso, vejoClientes, vejoDicas, vejoPacotes, primeiroOlhar], { guardar: "hoje-extras" });
+  // banco antes da atualização (sem a função): lê do jeito de antes, aqui e nos cartões
+  const semExtras = Boolean(extras && !extras.tem);
+  const { dados: paraChamar } = useDados(async () => (vejoClientes && primeiroOlhar && semExtras ? buscarParaChamar(sb, petshop.id) : null), [petshop.id, hojeIso, vejoClientes, primeiroOlhar, semExtras]);
   const chamados = paraChamar ? lerChamados(petshop.id) : {};
   const comFone = (grupos: GrupoChamar[]) => grupos.filter((g) => g.telefone);
-  const sumidos = paraChamar ? comFone(quemSumiu(paraChamar, 30, hoje)) : [];
-  const niver = paraChamar ? comFone(aniversariantes(paraChamar, hoje)) : [];
-  const sumidosAChamar = sumidos.filter((g) => !chamadoEm(chamados, "volta", g.chave));
-  const niverAChamar = niver.filter((g) => !chamadoEm(chamados, "niver", g.chave));
+  const sumidosAntigo = paraChamar ? comFone(quemSumiu(paraChamar, 30, hoje)) : [];
+  const niverAntigo = paraChamar ? comFone(aniversariantes(paraChamar, hoje)) : [];
+  const sumidosAChamarAntigo = sumidosAntigo.filter((g) => !chamadoEm(chamados, "volta", g.chave));
+  const niverAChamarAntigo = niverAntigo.filter((g) => !chamadoEm(chamados, "niver", g.chave));
   const nomesDosPets = (grupos: GrupoChamar[]) => {
     const nomes = grupos.flatMap((g) => g.pets.map((p) => p.pet.nome));
-    return { q: nomes.length, texto: nomes.length <= 2 ? nomes.join(" e ") : `${nomes.slice(0, 2).join(", ")} e mais ${nomes.length - 2}` };
+    return { q: nomes.length, texto: nomesEMais(nomes, nomes.length) };
   };
-  const petsSumidos = nomesDosPets(sumidosAChamar), petsNiver = nomesDosPets(niverAChamar);
-  const niverHoje = niverAChamar.length > 0 && niverAChamar.every((g) => g.pets.every((p) => p.ordem === 0));
+  const doBanco = extras?.x?.chamar ?? null;
+  // o que a tela usa: quantos tutores faltam chamar, os pets deles ("Thor, Mel e mais 3") e se há alguém na lista inteira
+  const sumidos = { length: doBanco ? doBanco.sumidos.todos : sumidosAntigo.length }, niver = { length: doBanco ? doBanco.niver.todos : niverAntigo.length };
+  const sumidosAChamar = { length: doBanco ? doBanco.sumidos.tutores : sumidosAChamarAntigo.length }, niverAChamar = { length: doBanco ? doBanco.niver.tutores : niverAChamarAntigo.length };
+  const petsSumidos = doBanco ? { q: doBanco.sumidos.pets, texto: nomesEMais(doBanco.sumidos.nomes, doBanco.sumidos.pets) } : nomesDosPets(sumidosAChamarAntigo);
+  const petsNiver = doBanco ? { q: doBanco.niver.pets, texto: nomesEMais(doBanco.niver.nomes, doBanco.niver.pets) } : nomesDosPets(niverAChamarAntigo);
+  const niverHoje = doBanco ? Boolean(doBanco.niver.hoje) : niverAChamarAntigo.length > 0 && niverAChamarAntigo.every((g) => g.pets.every((p) => p.ordem === 0));
 
   const ativos = (dados?.ags ?? []).filter((a) => !["cancelado", "faltou"].includes(a.status));
   const feitos = ativos.filter((a) => a.status === "concluido").length;
@@ -366,7 +395,7 @@ export default function Hoje() {
         {!contaNova && <BomDia />}
 
         {/* Modo envio: "Mandar N mensagens" (lembretes, pet pronto, saúde, aniversário, pacote, cobrança, chamar de volta), depois do primeiro olhar */}
-        {!contaNova && <EntradaModoEnvio pronto={primeiroOlhar} />}
+        {!contaNova && extras && <EntradaModoEnvio pronto={primeiroOlhar} contagem={extras.tem ? extras.x?.envio ?? null : undefined} />}
 
         {/* pedidos que chegaram pelo link vêm no alto: no celular, abaixo dos primeiros passos e do Mozart ficavam longe da vista */}
         {posso("agenda") && <PedidosLink />}
@@ -550,7 +579,7 @@ export default function Hoje() {
           </section>}
 
           <div className="g-pilha g">
-            {primeiroOlhar && posso("clientes") && posso("agenda") && <DicasMozart semDicas={[...(sumidos.length ? ["sumidos"] : []), ...(niver.length ? ["niver"] : [])]} />}
+            {primeiroOlhar && extras && vejoDicas && <DicasMozart doBanco={extras.tem ? extras.x?.dicas ?? null : undefined} semDicas={[...(sumidos.length ? ["sumidos"] : []), ...(niver.length ? ["niver"] : [])]} />}
             {atencao.length > 0 && (
               <section>
                 <div className="g-card-t"><h2>Pede a sua atenção</h2><span className="g-tag amarelo">{atencao.length}</span></div>
@@ -594,7 +623,7 @@ export default function Hoje() {
       {selecionado && !editando && <DetalheAgendamento agendamento={selecionado} aoFechar={() => setAberto(null)} aoMudar={() => void recarregar()} aoEditar={() => setEditando(selecionado)} />}
       {importando && <Importar tipo="clientes" aoFechar={() => setImportando(false)} aoTerminar={() => void recarregar()} />}
       {caderno && <FotoCaderno tipoInicial="clientes" aoFechar={() => setCaderno(false)} aoTerminar={() => void recarregar()} />}
-      {chamando && <ChamarDeVolta aba={chamando} aoFechar={() => setChamando(null)} />}
+      {chamando && <ChamarDeVolta aba={chamando} aoFechar={() => { setChamando(null); void recarregarExtras(); }} />}
       {lembretes && <LembretesDoDia dia={isoDia(somaDias(hoje, 1))} aoFechar={() => setLembretes(false)} aoMudar={() => void recarregar()} />}
       {editando && <FormAgendamento agendamento={editando} aoFechar={() => setEditando(null)} aoSalvar={() => { setEditando(null); setAberto(null); void recarregar(); }} />}
     </>

@@ -13,6 +13,7 @@ import { podeArea, veCusto, type Area } from "@/lib/gestao/acessos";
 import { registrarAcesso } from "@/lib/gestao/registro-acesso";
 import { definirLoja } from "@/lib/gestao/erros-navegador";
 import { fmtTelefone } from "@/lib/gestao/util";
+import { comPrazo, definirDonoDaMemoria, esquecerTudo } from "@/lib/gestao/dados-memoria";
 import { definirImpressaoDoComprovante, papelDoComprovante } from "@/lib/gestao/comprovante-papel";
 import { pendentes, type Documento } from "@/lib/gestao/documentos";
 import Reaceite from "./reaceite";
@@ -74,6 +75,25 @@ const CHAVE_ULTIMA = "maestro-gestao-ultima-loja";
  */
 const CHAVE_NOME = "maestro-gestao-nome-loja";
 const SCRIPT_DO_NOME = `try{var n=localStorage.getItem(${JSON.stringify(CHAVE_NOME)}),e=document.getElementById("g-abrindo");if(n&&e)e.textContent="Abrindo "+n.slice(0,80)+"\u2026"}catch(x){}`;
+/** Depois de quanto tempo a tela de abertura explica a demora e oferece "Tentar de novo". */
+export const DEMORA_DA_ABERTURA_MS = 8000;
+/** Depois de quanto tempo sem conseguir abrir a tela desiste de esperar e mostra o erro (com "Tentar de novo"). */
+const LIMITE_DA_ABERTURA_MS = 45_000;
+/** Prazo para o aparelho dizer se há login guardado (se outra aba travou essa conferência, não fica esperando para sempre). */
+const PRAZO_DO_LOGIN_MS = 15_000;
+/**
+ * A saída da tela de abertura também vale antes de o aplicativo baixar (internet fraca): um script pequeno mostra o aviso
+ * depois de 8 segundos e liga o botão, que recarrega a página.
+ */
+const SCRIPT_DA_DEMORA = `setTimeout(function(){try{var d=document.getElementById("g-abrindo-demora");if(d){d.style.display="";var b=d.querySelector("button");if(b&&!b.onclick)b.onclick=function(){location.reload()}}}catch(x){}},${DEMORA_DA_ABERTURA_MS});`;
+const ETAPAS = {
+  baixando: "O aplicativo ainda está baixando. A internet parece fraca.",
+  login: "Ainda conferindo o seu login. A internet parece fraca ou o servidor demorou para responder.",
+  conta: "Ainda buscando a sua conta. O servidor está demorando para responder.",
+  loja: "Ainda buscando os dados do pet shop. O servidor está demorando para responder.",
+} as const;
+
+const SEM_BANCO = "O banco de dados ainda não foi configurado neste endereço.";
 
 let soConsulta = false;
 /** A conta está só para consulta (teste vencido ou assinatura cancelada)? Para as mensagens de erro, fora dos componentes. */
@@ -95,6 +115,10 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   /** Documentos com versão nova que esta pessoa ainda não aceitou: com algum, o aplicativo mostra a tela de aceite. */
   const [faltam, setFaltam] = useState<Documento[]>([]);
   const [exclusao, setExclusao] = useState<Exclusao | null>(null);
+  /** Em que passo a abertura está (para dizer o que está acontecendo quando demora) e quantas vezes a pessoa pediu de novo. */
+  const [etapa, setEtapa] = useState<keyof typeof ETAPAS>("baixando");
+  const [tentativa, setTentativa] = useState(0);
+  const [demorou, setDemorou] = useState(false);
   /** A conta está marcada para ser apagada? (banco antes da atualização ou falha na leitura: segue como não marcada) */
   const lerExclusao = useCallback((petshopId: string) => sb.rpc("conta_exclusao_ver", { p_petshop: petshopId }).then(
     (r) => (r.error || !r.data ? null : (r.data as unknown as Exclusao)), () => null), [sb]);
@@ -116,10 +140,20 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let vivo = true;
+    // abertura que não termina: aos 8 s a tela explica e oferece "Tentar de novo"; aos 45 s desiste de esperar e mostra o erro
+    setDemorou(false);
+    const desde = tentativa === 0 && typeof performance !== "undefined" ? performance.now() : 0;
+    const tDemora = setTimeout(() => { if (vivo) setDemorou(true); }, Math.max(0, DEMORA_DA_ABERTURA_MS - desde));
+    const tLimite = setTimeout(() => { if (vivo) setErro("A abertura demorou demais. A internet pode estar fraca, ou o servidor não respondeu. Tente de novo."); }, LIMITE_DA_ABERTURA_MS);
+    const terminou = () => { clearTimeout(tDemora); clearTimeout(tLimite); };
     (async () => {
-      if (!configurado) { setErro("O banco de dados ainda não foi configurado neste endereço."); return; }
-      const { data } = await sb.auth.getSession();
+      if (!configurado) { terminou(); setErro(SEM_BANCO); return; }
+      setEtapa("login");
+      let data: Awaited<ReturnType<typeof sb.auth.getSession>>["data"];
+      try { data = (await comPrazo(sb.auth.getSession(), PRAZO_DO_LOGIN_MS)).data; }
+      catch { if (vivo) { terminou(); setErro("Não consegui conferir o seu login neste aparelho. Tente de novo; se continuar, feche as outras abas do aplicativo e abra outra vez."); } return; }
       if (!vivo) return;
+      setEtapa("conta");
       if (!data.session) { router.replace("/gestao/entrar"); return; }
       const u = data.session.user;
       // registro de acesso (Marco Civil): uma vez por dia, sem esperar (não atrasa a abertura)
@@ -145,27 +179,32 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
         (r) => (r.error ? [] : pendentes(r.data ?? [])), () => [] as Documento[]);
       const { data: vinculos, error } = await sb.rpc("entrar");
       if (!vivo) return;
-      if (error) { setErro("Não consegui carregar a sua conta. Tente de novo em instantes."); return; }
+      if (error) { terminou(); setErro("Não consegui carregar a sua conta. Tente de novo em instantes."); return; }
       if (!vinculos?.length) { router.replace("/gestao/comecar"); return; }
       const meu = vinculos.find((v) => v.petshop_id === preferido) ?? vinculos[0];
+      setEtapa("loja");
       try {
         const base = (meu.petshop_id === palpite ? await adiantado : null) ?? await buscarBase(meu.petshop_id);
         try { localStorage.setItem(CHAVE_ULTIMA, `${u.id}:${meu.petshop_id}`); } catch { /* sem armazenamento: segue */ }
         const [todos, , falta, marcada] = await Promise.all([aplicarBase(base), assinatura, aceites, (meu.petshop_id === palpite && exclusaoAdiantada) || lerExclusao(meu.petshop_id)]);
         if (!vivo) return;
+        terminou();
+        // a memória curta das telas é desta conta neste pet shop (trocou: esquece)
+        definirDonoDaMemoria(`${u.id}:${meu.petshop_id}`);
         setFaltam(falta);
         setExclusao(marcada);
         setEu(todos.find((x) => x.id === meu.id) ?? meu);
         setUser(u);
+        setErro(null); // chegou depois do limite: abre assim mesmo
       } catch {
-        setErro("Não consegui carregar o pet shop. Tente de novo em instantes.");
+        if (vivo) { terminou(); setErro("Não consegui carregar o pet shop. Tente de novo em instantes."); }
       }
     })();
     const { data: sub } = sb.auth.onAuthStateChange((evento) => {
-      if (evento === "SIGNED_OUT") router.replace("/gestao/entrar");
+      if (evento === "SIGNED_OUT") { esquecerTudo(); router.replace("/gestao/entrar"); }
     });
-    return () => { vivo = false; sub.subscription.unsubscribe(); };
-  }, [sb, router, buscarBase, aplicarBase, lerExclusao]);
+    return () => { vivo = false; terminou(); sub.subscription.unsubscribe(); };
+  }, [sb, router, buscarBase, aplicarBase, lerExclusao, tentativa]);
 
   // assinatura atrasada: pergunta ao banco quando a conta trava (banco de antes da migração 20261237: segue liberada)
   const lojaAtrasada = petshop?.status === "atrasada" ? petshop.id : null;
@@ -217,17 +256,19 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
         const novo = todos.find((x) => x.id === eu.id);
         if (novo) setEu(novo);
       },
-      sair: async () => { try { localStorage.removeItem(CHAVE_NOME); } catch { /* sem armazenamento */ } await sb.auth.signOut(); router.replace("/gestao/entrar"); },
+      sair: async () => { try { localStorage.removeItem(CHAVE_NOME); } catch { /* sem armazenamento */ } esquecerTudo(); await sb.auth.signOut(); router.replace("/gestao/entrar"); },
     };
   }, [sb, user, eu, petshop, equipe, servicos, carregarBase, router, aberta, atraso, exclusao, lerExclusao]);
 
+  /** "Tentar de novo" na abertura: refaz a abertura aqui mesmo (sem baixar o aplicativo outra vez). */
+  const tentarDeNovo = () => { setErro(null); setEtapa("login"); setTentativa((n) => n + 1); };
   if (erro) {
     return (
       <div className="g g-raiz"><div className="g-vazio" style={{ minHeight: "100dvh", alignContent: "center" }}>
         <Selo tamanho={72} tom="suave" />
         <b>Opa, algo não carregou</b>
         <p>{erro}</p>
-        <button className="g-btn verde" onClick={() => location.reload()}>Tentar de novo</button>
+        <button className="g-btn verde" onClick={() => { if (erro === SEM_BANCO) location.reload(); else tentarDeNovo(); }}>Tentar de novo</button>
       </div></div>
     );
   }
@@ -237,6 +278,12 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
         <Selo tamanho={72} tom="suave" />
         <p id="g-abrindo" suppressHydrationWarning>Abrindo o seu pet shop…</p>
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_NOME }} />
+        {/* abertura que demora: diz o que está acontecendo e dá uma saída (nunca fica só "Abrindo…" sem botão) */}
+        <div id="g-abrindo-demora" className="g-pilha p" style={{ justifyItems: "center", maxWidth: 420, display: demorou ? undefined : "none" }} suppressHydrationWarning role="status">
+          <p className="g-muted" suppressHydrationWarning>{ETAPAS[etapa]} Nada do que você salvou se perdeu.</p>
+          <button type="button" className="g-btn verde" onClick={tentarDeNovo}>Tentar de novo</button>
+        </div>
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DA_DEMORA }} />
       </div></div>
     );
   }

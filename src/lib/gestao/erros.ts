@@ -93,7 +93,7 @@ export function navegadorDe(ua: unknown): string {
 
 /** O banco ou o servidor desistiu por demora (tempo esgotado da consulta, do gateway ou da função). */
 export const ehDemora = (m: string) =>
-  /statement timeout|canceling statement|\b57014\b|lock timeout|timed? ?out|Gateway Time-?out|\b50[4]\b|\b544\b|FUNCTION_INVOCATION_TIMEOUT/i.test(m);
+  /tempo esgotado|statement timeout|canceling statement|\b57014\b|lock timeout|timed? ?out|Gateway Time-?out|\b50[4]\b|\b544\b|FUNCTION_INVOCATION_TIMEOUT/i.test(m);
 
 /**
  * Erro técnico (do banco ou do servidor) trocado por uma frase que a pessoa entende; null quando o texto já é para a pessoa ler

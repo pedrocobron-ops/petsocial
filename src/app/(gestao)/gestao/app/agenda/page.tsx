@@ -19,6 +19,7 @@ import { deMin, marcadoPara, paraMin, textoConfirmacao, vagasDe } from "@/lib/ge
 import { almocoDoDia, dataAmigavel, nomeNaEquipe, dataLonga, linkWhatsApp, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
+import { lerSinal } from "@/lib/gestao/sinal";
 import { AvatarPet, DICA_SO_CONSULTA, Esqueleto, Vazio, abrirAssistente, ok, useAdiantar, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import PedidosLink from "@/components/gestao/agenda/pedidos-link";
 import SeriesAcabando from "@/components/gestao/agenda/series-acabando";
@@ -91,10 +92,12 @@ function Agenda() {
 
   // o preço de cada horário vem à parte; o banco só entrega a quem recebe (sempre pergunta: o formulário de editar
   // regrava o preço que leu, e com o banco antes da atualização quem não recebe ainda lê o preço direto)
+  const sinalDaSemana = () => lerSinal(sb, petshop.id, segunda, somaDias(segunda, 7));
   const { dados, carregando, erro, recarregar } = useDados(async () =>
     await comPrecosDeAgendamento(sb, petshop.id, ok(await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id)
       .gte("inicio", segunda.toISOString()).lt("inicio", somaDias(segunda, 7).toISOString()).order("inicio")) as unknown as AgendamentoCompleto[]) as unknown as AgendamentoCompleto[],
-  [petshop.id, segunda.getTime()]);
+  // memória curta (voltar pelo menu não baixa a semana de novo) e a pergunta leve a cada minuto: o que outro aparelho marcou aparece sozinho
+  [petshop.id, segunda.getTime()], { guardar: "agenda-semana", aCada: 60_000, sinal: sinalDaSemana });
 
   // concluídos da semana que ninguém cobrou (o banco diz quais, sem valor): a marca "Falta cobrar" no lugar de "Concluído"
   const { ids: semConta } = useParaCobrar(segunda, somaDias(segunda, 6));
@@ -102,7 +105,7 @@ function Agenda() {
   const { dados: bloqueios, recarregar: recarregarBloqueios } = useDados(async () =>
     ok(await sb.from("bloqueios").select("*").eq("petshop_id", petshop.id)
       .lt("inicio", somaDias(segunda, 7).toISOString()).gt("fim", segunda.toISOString()).order("inicio")),
-  [petshop.id, segunda.getTime()]);
+  [petshop.id, segunda.getTime()], { guardar: "agenda-bloqueios", aCada: 60_000, sinal: sinalDaSemana });
 
   // link "Agendar" vindo da ficha do pet: /gestao/app/agenda?novo=1&pet=<id>
   useEffect(() => {

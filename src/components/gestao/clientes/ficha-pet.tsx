@@ -9,6 +9,8 @@ import Link from "@/components/gestao/link-depois";
 import { AlertTriangle, ArrowLeft, ArrowLeftRight, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
 import type { Agendamento, Cliente, Estadia, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
+import { colsDoTutor, tutorLido } from "@/lib/gestao/reservado";
+type PetComTutorInteiro = Pet & { clientes: Cliente | null };
 import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, fmtTelefone, haQuanto, hora, idade, inicioDoDia, linkWhatsApp, nomeDiaCurto, telefoneValido, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
@@ -56,7 +58,9 @@ export default function FichaPet({ id, voltar, aoAbrir }: { id: string; voltar: 
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [pet, atendimentos, pacotes, estadias, concluidos, saude, hospedagens] = await Promise.all([
-      sb.from("pets").select("*, clientes(*)").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
+      // do tutor, e-mail e endereço só para quem tem a área Clientes
+      sb.from("pets").select(`*, clientes(${colsDoTutor(posso("clientes"))})`).eq("petshop_id", petshop.id).eq("id", id).maybeSingle()
+        .then((r) => ({ ...r, data: r.data ? { ...(r.data as unknown as PetComTutorInteiro), clientes: (r.data as unknown as PetComTutorInteiro).clientes ? tutorLido((r.data as unknown as PetComTutorInteiro).clientes!) : null } : null })),
       sb.from("agendamentos").select("id, inicio, status, servico_id, obs, agendamento_servicos(id, servico_id, ordem)").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
       sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", id).eq("ativo", true).order("comprado_em", { ascending: false }),
       sb.from("estadias").select(COLS_ESTADIA).eq("petshop_id", petshop.id).eq("pet_id", id).order("entrada", { ascending: false }).limit(8),

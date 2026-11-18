@@ -2,6 +2,7 @@
 // Executor da suíte: roda cada arquivo de teste num processo próprio (um depois do outro), junta os resultados e
 // termina com código 1 se algo falhou.
 //
+//   node testes/rodar.js unidade      só os testes de unidade (sem banco e sem servidor: é o que o CI roda)
 //   node testes/rodar.js banco        unidade + banco (API do Supabase e rotas do servidor)
 //   node testes/rodar.js telas        telas no navegador (Playwright)
 //   node testes/rodar.js migracoes    prova de ordem das migrações (banco de rascunho)
@@ -19,6 +20,8 @@ const DIR = __dirname;
 const SAIDA = path.join(DIR, 'saida');
 const lista = (pasta) => fs.readdirSync(path.join(DIR, pasta)).filter((f) => f.endsWith('.js') || f.endsWith('.sh')).sort().map((f) => `${pasta}/${f}`);
 const GRUPOS = {
+  // só os testes de unidade: não precisam de banco nem de servidor (é o que o CI roda a cada pull request)
+  unidade: () => lista('unidade'),
   banco: () => [...lista('unidade'), ...lista('banco')],
   telas: () => lista('telas'),
   migracoes: () => lista('migracoes'),
@@ -65,8 +68,10 @@ async function principal() {
   arqs = [...new Set(arqs)];
 
   // antes de começar: o banco responde? o servidor está no ar (se algum teste precisa)?
-  try { B.sql('select 1'); } catch (e) { console.error(`Sem acesso ao Postgres local (contêiner ${B.DB_CONTAINER}): ${e.message.split('\n')[0]}\nSuba o Supabase local (npx supabase start) ou defina DB_CONTAINER / DATABASE_URL.`); return 2; }
-  try { const r = await fetch(`${B.SUPABASE_URL}/rest/v1/`, { headers: { apikey: B.SUPABASE_KEY } }); if (r.status >= 500) throw new Error('HTTP ' + r.status); } catch (e) { console.error(`A API do Supabase não responde em ${B.SUPABASE_URL}: ${e.message}`); return 2; }
+  // (só testes de unidade: não precisam de banco nem de servidor; é assim que o CI roda)
+  const soUnidade = arqs.length > 0 && arqs.every((x) => x.startsWith('unidade/'));
+  if (!soUnidade) try { B.sql('select 1'); } catch (e) { console.error(`Sem acesso ao Postgres local (contêiner ${B.DB_CONTAINER}): ${e.message.split('\n')[0]}\nSuba o Supabase local (npx supabase start) ou defina DB_CONTAINER / DATABASE_URL.`); return 2; }
+  if (!soUnidade) try { const r = await fetch(`${B.SUPABASE_URL}/rest/v1/`, { headers: { apikey: B.SUPABASE_KEY } }); if (r.status >= 500) throw new Error('HTTP ' + r.status); } catch (e) { console.error(`A API do Supabase não responde em ${B.SUPABASE_URL}: ${e.message}`); return 2; }
   if (arqs.some((a) => PRECISA_SERVIDOR.test(a)) && !(await B.servidorNoAr())) {
     console.error(`O servidor do aplicativo não responde em ${B.BASE_URL}.\nRode: npx next build && ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 npx next start -p 3214\n(ou defina BASE_URL).`);
     return 2;

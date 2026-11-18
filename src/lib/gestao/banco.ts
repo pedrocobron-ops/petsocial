@@ -4172,6 +4172,12 @@ isOneToOne: false
 "gestao_modo_envio":
 { Args: { "p": string,"p_dias"?: number }; Returns: Json
                            },
+"gestao_sinal":
+{ Args: { "p": string,"p_ate": string,"p_de": string }; Returns: string
+                           },
+"gestao_tabelas":
+{ Args: Record<PropertyKey, never>; Returns: (unknown)[]
+                           },
 "gestao_vendedor":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
@@ -4881,9 +4887,6 @@ isOneToOne: false
                            },
 "vendas_contar":
 { Args: { "p_segredo": string,"p_visitante": string }; Returns: boolean
-                           },
-"vendedor_publico":
-{ Args: Record<PropertyKey, never>; Returns: Json
                            },
 "visitas_dos_pets":
 { Args: { "p": string,"p_agora"?: string,"p_hoje": string }; Returns: Json

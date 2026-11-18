@@ -111,7 +111,6 @@ function duracao(min: number) {
   return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
 }
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 /** "R$ 42,41": preço de promoção sempre com os centavos (é o valor da conta). */
 const reaisCheio = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 /** O preço com a promoção (% arredonda no centavo; R$ vai até o preço): a mesma conta da página e do banco. */

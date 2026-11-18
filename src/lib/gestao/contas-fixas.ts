@@ -93,11 +93,22 @@ export async function lerResumoContasFixas(sb: Banco, petshopId: string): Promis
 
 /** Pede ao banco as contas do mês que já entram em A pagar. Sem acesso, ou num banco antes da migração: não faz nada. */
 export async function gerarContasFixas(sb: Banco, petshopId: string): Promise<number> {
-  try {
-    const r = await sb.rpc("contas_fixas_gerar", { p: petshopId });
-    return r.error ? 0 : Number(r.data ?? 0);
-  } catch { return 0; }
+  // no navegador, a tela Hoje e o Bom dia pedem ao mesmo tempo, e o Financeiro logo depois: um pedido só por minuto e por
+  // pet shop (a função não repete conta, então pedir de novo não mudava nada; só gastava uma ida ao banco)
+  if (typeof window !== "undefined") {
+    const ja = pedidosDeGerar.get(petshopId);
+    if (ja && Date.now() - ja.em < 60_000) return ja.pedido;
+  }
+  const pedido = (async () => {
+    try {
+      const r = await sb.rpc("contas_fixas_gerar", { p: petshopId });
+      return r.error ? 0 : Number(r.data ?? 0);
+    } catch { return 0; }
+  })();
+  if (typeof window !== "undefined") pedidosDeGerar.set(petshopId, { em: Date.now(), pedido });
+  return pedido;
 }
+const pedidosDeGerar = new Map<string, { em: number; pedido: Promise<number> }>();
 
 /* ---------- os avisos: vence amanhã, vence hoje, venceu ---------- */
 

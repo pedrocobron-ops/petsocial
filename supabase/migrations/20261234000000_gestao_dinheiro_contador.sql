@@ -238,9 +238,13 @@ $$;
 revoke execute on function public.contas_do_valor_medio(uuid, date, date) from public, anon, authenticated;
 
 -- indicadores_do_periodo: a definição da 20261224 com o valor médio único e "pagos" por serviço
-create or replace function public.indicadores_do_periodo(p uuid, p_de date, p_ate date)
-returns jsonb
-language plpgsql stable security definer set search_path = '' as $$
+-- (rodada 9, junção) base: a versão rápida da 20261229 (tabela por mês com group by), mais o valor médio, os pacotes e os pagos desta rodada
+CREATE OR REPLACE FUNCTION public.indicadores_do_periodo(p uuid, p_de date, p_ate date)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare
   v_fuso text;
   v_din boolean;
@@ -303,11 +307,19 @@ begin
     from public.estadias_valores v
     where v.petshop_id = p and (v.sinal_lancamento_id is not null or v.conta is not null)
   ),
+  sinais_id as materialized (select distinct x.id from sinais x where x.id is not null),
+  sinais_pagos as materialized (
+    select x.conta ->> 'lancamento_id' as lancamento, sum(x.sinal) as sinal
+    from sinais x where x.sinal_estado = 'pago' and x.conta ->> 'lancamento_id' is not null group by 1
+  ),
   ent as materialized (
     select l.id, l.data, l.valor, (l.conta_id is null and l.diferenca_de is null) as principal,
-      exists (select 1 from sinais x where x.id is not null and (x.id = l.id or x.id = l.conta_id)) as do_sinal,
-      coalesce((select sum(x.sinal) from sinais x where x.sinal_estado = 'pago' and x.conta ->> 'lancamento_id' = l.id::text), 0) as sinal_descontado
+      (s1.id is not null or s2.id is not null) as do_sinal,
+      coalesce(sp.sinal, 0) as sinal_descontado
     from public.lancamentos l
+    left join sinais_id s1 on s1.id = l.id
+    left join sinais_id s2 on s2.id = l.conta_id
+    left join sinais_pagos sp on sp.lancamento = l.id::text
     where l.petshop_id = p and l.tipo = 'entrada' and l.pago and l.movimento is null and l.data between p_de and p_ate
   ),
   sai as (
@@ -344,29 +356,63 @@ begin
     from (select distinct n.cliente_id from noper n) c
   ),
   pc as materialized (select * from public.lucro_pecas(p, p_de, p_ate)),
+  -- a tabela dos meses: cada parte é agrupada uma vez por mês (antes, cada mês relia cada parte inteira)
+  ent_m as (
+    select to_char(e.data, 'YYYY-MM') as mes, sum(e.valor) as entradas,
+      count(*) filter (where e.principal and not e.do_sinal) as contas,
+      sum(e.valor + e.sinal_descontado) filter (where e.principal and not e.do_sinal) as valor_contas
+    from ent e group by 1
+  ),
+  sai_m as (
+    select to_char(s.data, 'YYYY-MM') as mes, sum(s.valor) filter (where s.devolucao) as devolvido, sum(s.valor) filter (where not s.devolucao) as saiu
+    from sai s group by 1
+  ),
+  cred_m as (
+    select to_char(c.dia, 'YYYY-MM') as mes, sum(c.valor) filter (where c.valor > 0) as deixado,
+      -sum(c.valor) filter (where c.valor < 0 and c.lancamento_id is null) as usado_fora
+    from cred c group by 1
+  ),
+  tx_m as (select to_char(t.data, 'YYYY-MM') as mes, sum(t.taxa) as taxas from tx t group by 1),
+  ag_m as (
+    select to_char(a.local, 'YYYY-MM') as mes, count(*) filter (where a.status = 'concluido') as atendimentos,
+      count(*) filter (where a.status = 'faltou') as faltas, count(*) filter (where a.status = 'cancelado') as cancelados, count(*) as marcados
+    from ag a group by 1
+  ),
+  er_m as (
+    select to_char(x.dia, 'YYYY-MM') as mes, count(*) as estadias_marcadas, count(*) filter (where x.status = 'cancelada') as estadias_canceladas
+    from er x group by 1
+  ),
+  ec_m as (select to_char(x.dia, 'YYYY-MM') as mes, count(*) as canceladas_no_periodo from ec x group by 1),
+  nh_m as (select to_char(x.dia, 'YYYY-MM') as mes, count(*) as noites_hotel from nh x where x.dia between p_de and p_ate group by 1),
+  es_m as (
+    select to_char(e.dia, 'YYYY-MM') as mes, count(*) filter (where e.tipo = 'creche') as creche, count(*) filter (where e.tipo = 'hotel') as hotel
+    from es e group by 1
+  ),
+  cli_m as (select to_char(n.dia, 'YYYY-MM') as mes, count(distinct n.cliente_id) as clientes from noper n group by 1),
+  prim_m as (select to_char(x.dia, 'YYYY-MM') as mes, count(*) as primeira_vez from prim x where x.dia between p_de and p_ate group by 1),
   mm as (
     select m.mes, m.de, m.ate,
-      (select coalesce(sum(e.valor), 0) from ent e where e.data between m.de and m.ate) as entradas,
-      vm.contas as contas,
-      vm.valor as valor_contas, vm.pacotes as pacotes, vm.valor_pacotes as valor_pacotes,
-      (select coalesce(sum(s.valor), 0) from sai s where s.devolucao and s.data between m.de and m.ate) as devolvido,
-      (select coalesce(sum(s.valor), 0) from sai s where not s.devolucao and s.data between m.de and m.ate) as saiu,
-      (select coalesce(sum(c.valor) filter (where c.valor > 0), 0) from cred c where c.dia between m.de and m.ate) as deixado,
-      (select coalesce(-sum(c.valor) filter (where c.valor < 0 and c.lancamento_id is null), 0) from cred c where c.dia between m.de and m.ate) as usado_fora,
-      (select coalesce(sum(t.taxa), 0) from tx t where t.data between m.de and m.ate) as taxas,
-      (select count(*) from ag a where a.status = 'concluido' and a.local::date between m.de and m.ate) as atendimentos,
-      (select count(*) from ag a where a.status = 'faltou' and a.local::date between m.de and m.ate) as faltas,
-      (select count(*) from ag a where a.status = 'cancelado' and a.local::date between m.de and m.ate) as cancelados,
-      (select count(*) from ag a where a.local::date between m.de and m.ate) as marcados,
-      (select count(*) from er x where x.dia between m.de and m.ate) as estadias_marcadas,
-      (select count(*) from er x where x.status = 'cancelada' and x.dia between m.de and m.ate) as estadias_canceladas,
-      (select count(*) from ec x where x.dia between m.de and m.ate) as canceladas_no_periodo,
-      (select count(*) from nh x where x.dia between m.de and m.ate) as noites_hotel,
-      (select count(*) from es e where e.tipo = 'creche' and e.dia between m.de and m.ate) as creche,
-      (select count(*) from es e where e.tipo = 'hotel' and e.dia between m.de and m.ate) as hotel,
-      (select count(distinct n.cliente_id) from noper n where n.dia between m.de and m.ate) as clientes,
-      (select count(*) from prim x where x.dia between m.de and m.ate) as primeira_vez
+      coalesce(e.entradas, 0) as entradas, vm.contas as contas, vm.valor as valor_contas, vm.pacotes as pacotes, vm.valor_pacotes as valor_pacotes,
+      coalesce(s.devolvido, 0) as devolvido, coalesce(s.saiu, 0) as saiu,
+      coalesce(c.deixado, 0) as deixado, coalesce(c.usado_fora, 0) as usado_fora,
+      coalesce(t.taxas, 0) as taxas,
+      coalesce(a.atendimentos, 0) as atendimentos, coalesce(a.faltas, 0) as faltas, coalesce(a.cancelados, 0) as cancelados, coalesce(a.marcados, 0) as marcados,
+      coalesce(r.estadias_marcadas, 0) as estadias_marcadas, coalesce(r.estadias_canceladas, 0) as estadias_canceladas,
+      coalesce(k.canceladas_no_periodo, 0) as canceladas_no_periodo, coalesce(h.noites_hotel, 0) as noites_hotel,
+      coalesce(o.creche, 0) as creche, coalesce(o.hotel, 0) as hotel,
+      coalesce(l.clientes, 0) as clientes, coalesce(v.primeira_vez, 0) as primeira_vez
     from meses m cross join lateral public.contas_do_valor_medio(p, m.de, m.ate) vm
+    left join ent_m e on e.mes = m.mes
+    left join sai_m s on s.mes = m.mes
+    left join cred_m c on c.mes = m.mes
+    left join tx_m t on t.mes = m.mes
+    left join ag_m a on a.mes = m.mes
+    left join er_m r on r.mes = m.mes
+    left join ec_m k on k.mes = m.mes
+    left join nh_m h on h.mes = m.mes
+    left join es_m o on o.mes = m.mes
+    left join cli_m l on l.mes = m.mes
+    left join prim_m v on v.mes = m.mes
   ),
   sv as (
     select coalesce(x.servico_id::text, '-') as k, x.servico_id, count(*) as vezes
@@ -435,7 +481,7 @@ begin
     'mapa', coalesce((select jsonb_agg(jsonb_build_object('d', m.d, 'h', m.h, 'n', m.n) order by m.d, m.h) from mapa m), '[]'::jsonb)
   ) into v_res;
   return v_res;
-end $$;
+end $function$;
 revoke execute on function public.indicadores_do_periodo(uuid, date, date) from public, anon;
 grant execute on function public.indicadores_do_periodo(uuid, date, date) to authenticated;
 

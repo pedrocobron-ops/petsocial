@@ -139,7 +139,8 @@ function CaixaDoDia() {
     await comTrocas(sb, petshop.id, [...dosCaixas, ...doDia] as (Lancamento & { trocado?: number | null })[]);
     dosCaixas.sort(porPagamento); doDia.sort(porPagamento); soltos.sort(porPagamento);
     return { aberto, fechados, dosCaixas, soltos, doDia, apagados, creditoDeixado: ajustes.creditoDeixado };
-  }, [petshop.id, hoje, fin]);
+  // memória curta: voltar ao Caixa pelo menu não baixa tudo de novo (qualquer gravação faz buscar outra vez)
+  }, [petshop.id, hoje, fin], { guardar: "caixa" });
 
   async function abrir(f: FolhaAberta) {
     if (f.tipo !== "resumo" && somenteLeitura()) return;

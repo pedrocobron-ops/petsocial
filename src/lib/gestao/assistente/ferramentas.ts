@@ -190,8 +190,9 @@ export const FERRAMENTAS: Def[] = ([
     input_schema: obj({ cliente_id: S, valor: N, descricao: { ...S, description: "Do que é (ex.: Perfume, Taxa de falta de 18/11)" }, vencimento: DIA, categoria: { ...S, description: "Padrão: Outros" } }, ["cliente_id", "valor", "descricao"]) },
   { grava: true, financeiro: true, name: "receber_de_cliente", description: "Um cliente pagou o que devia (\"o dono do Bob me pagou os 35\", \"a Joana acertou o fiado\"): dá baixa nas contas em aberto dele, da mais antiga para a mais nova, e o dinheiro entra uma vez só. Pode ser só uma parte: o resto continua devido. Se pagou mais do que deve, pergunte se a diferença fica de crédito para ele (sobra: \"credito\"). O cartão mostra quanto ele deve, quais contas quita e o que fica faltando.",
     input_schema: obj({ cliente_id: { ...S, description: "Tutor (de buscar_pets)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, sobra: { type: "string", enum: ["credito"], description: "Só quando pagou a mais e a pessoa disse que a diferença fica de crédito" } }, ["cliente_id", "valor", "forma"]) },
-  { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar. Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento.",
-    input_schema: obj({ produto_id: S, produto_nome: S, unidade: { ...S, description: "un, kg, g, L, ml, pacote, saco" }, tipo: { type: "string", enum: ["entrada", "saida"] }, quantidade: N, custo_unitario: N, lancar_despesa: B, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, motivo: S }, ["tipo", "quantidade"]) },
+  { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar. Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento. Produto que controla validade (ver_estoque diz): a entrada precisa da validade; pergunte à pessoa, nunca invente.",
+    input_schema: obj({ produto_id: S, produto_nome: S, unidade: { ...S, description: "un, kg, g, L, ml, pacote, saco" }, tipo: { type: "string", enum: ["entrada", "saida"] }, quantidade: N, custo_unitario: N, lancar_despesa: B, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, motivo: S,
+      validade: { ...DIA, description: "Só na entrada: validade do que está entrando (AAAA-MM-DD). Obrigatória quando o produto controla validade." }, lote: { ...S, description: "Só na entrada: número do lote, se a pessoa disser" } }, ["tipo", "quantidade"]) },
   ...FERRAMENTAS_CHAO,
   ...FERRAMENTAS_COMISSAO,
   ...FERRAMENTAS_LUCRO,
@@ -1248,10 +1249,14 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       exigir(qtd && qtd > 0, "Falta a quantidade.");
       let nomeProd = texto(e.produto_nome, 120), unidade = texto(e.unidade, 12) || "un", novo = true, saldo = 0;
       if (uuid(e.produto_id)) {
-        const { data: p } = await c.sb.from("produtos").select("nome, unidade, estoque").eq("petshop_id", c.petshop.id).eq("id", String(e.produto_id)).maybeSingle();
+        const { data: p } = await c.sb.from("produtos").select("nome, unidade, estoque, controla_validade, tipo").eq("petshop_id", c.petshop.id).eq("id", String(e.produto_id)).maybeSingle();
         exigir(p, "produto_id inválido: use ver_estoque.");
         nomeProd = p.nome; unidade = p.unidade; novo = false; saldo = Number(p.estoque);
+        // a mesma regra das telas (e do banco, em estoque_entrada): produto com Controlar validade entra com a validade
+        exigir(!(e.tipo === "entrada" && p.controla_validade && p.tipo === "produto" && !RE_DIA.test(String(e.validade ?? ""))),
+          "Esse produto controla validade: pergunte a validade do que está entrando (dia, mês e ano) e passe em validade (AAAA-MM-DD). Não invente a data.");
       }
+      exigir(e.validade == null || e.validade === "" || RE_DIA.test(String(e.validade)), "validade no formato AAAA-MM-DD.");
       exigir(nomeProd, "Diga qual é o produto.");
       exigir(!(novo && e.tipo === "saida"), "Esse produto não está no estoque: use ver_estoque para achar o nome certo.");
       const custo = numero(e.custo_unitario);
@@ -1261,6 +1266,7 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
         exigir(FORMA[String(e.forma)], "Para lançar a despesa, pergunte como foi pago (Pix, dinheiro, débito ou crédito).");
         linhas.push(["Despesa", `${brl(custo * qtd)} no ${FORMA[String(e.forma)]}`]);
       }
+      if (e.tipo === "entrada" && RE_DIA.test(String(e.validade ?? ""))) linhas.push(["Validade", `${quandoLocal(String(e.validade))}${texto(e.lote, 60) ? ` · lote ${texto(e.lote, 60)}` : ""}`]);
       if (texto(e.motivo)) linhas.push(["Motivo", texto(e.motivo, 80)]);
       return { titulo: e.tipo === "saida" ? "Saída de estoque" : "Entrada de estoque", linhas };
     }
@@ -1488,17 +1494,28 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
       }
       const qtd = numero(e.quantidade)!, custo = numero(e.custo_unitario);
       let nomeProd = texto(e.produto_nome, 120), unidade = texto(e.unidade, 12) || "un";
-      if (!produtoId) produtoId = ok(await sb.from("produtos").insert({ petshop_id: petshop.id, nome: nomeProd, unidade, custo }).select("id").single()).id;
-      else { const p = ok(await sb.from("produtos").select("nome, unidade").eq("id", produtoId).single()); nomeProd = p.nome; unidade = p.unidade; }
-      ok(await sb.from("movimentos_estoque").insert({ petshop_id: petshop.id, produto_id: produtoId, tipo: e.tipo === "saida" ? "saida" : "entrada", quantidade: qtd,
-        custo_unitario: e.tipo === "entrada" ? custo : null, motivo: texto(e.motivo, 80) || null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
-      let despesa = false;
-      if (e.lancar_despesa && custo != null && e.tipo === "entrada" && c.vejoFinanceiro) {
-        ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "saida", valor: centavos(custo * qtd), forma: String(e.forma), categoria: "Produtos e material",
-          descricao: `Compra: ${qtd} ${unidade} de ${nomeProd}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
-        despesa = true;
+      if (!produtoId) {
+        // produto novo: se a tentativa anterior já criou (o pedido chegou de novo), aproveita o que está lá em vez de criar outro
+        const igual = await sb.from("produtos").select("id").eq("petshop_id", petshop.id).eq("nome", nomeProd).eq("ativo", true).limit(1);
+        produtoId = igual.data?.[0]?.id ?? ok(await sb.from("produtos").insert({ petshop_id: petshop.id, nome: nomeProd, unidade, custo }).select("id").single()).id;
+      } else { const p = ok(await sb.from("produtos").select("nome, unidade").eq("id", produtoId).single()); nomeProd = p.nome; unidade = p.unidade; }
+      if (e.tipo !== "entrada") {
+        ok(await sb.from("movimentos_estoque").insert({ petshop_id: petshop.id, produto_id: produtoId, tipo: "saida", quantidade: qtd,
+          custo_unitario: null, motivo: texto(e.motivo, 80) || null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
+        return { feito: true, produto_id: produtoId, despesa_lancada: false };
       }
-      return { feito: true, produto_id: produtoId, despesa_lancada: despesa };
+      // Entrada: pela mesma função das telas (estoque_entrada). O movimento e a despesa da compra entram juntos ou nenhum
+      // entra (antes eram duas gravações: se a despesa falhasse, a nova tentativa dava "já feito" e a despesa nunca entrava),
+      // o produto com Controlar validade só entra com a validade, e o pedido repetido devolve o que já foi gravado.
+      const comDespesa = Boolean(e.lancar_despesa && custo != null && c.vejoFinanceiro);
+      const r = await sb.rpc("estoque_entrada", {
+        p_petshop: petshop.id, p_chave: c.chave && c.chave.length >= 8 ? c.chave : `mozart:${crypto.randomUUID()}`,
+        p_movimento: { produto_id: produtoId, quantidade: qtd, custo_unitario: custo, motivo: texto(e.motivo, 80) || "Compra", validade: RE_DIA.test(String(e.validade ?? "")) ? String(e.validade) : null, lote: texto(e.lote, 60) || null },
+        p_despesa: comDespesa ? { valor: centavos(custo! * qtd), forma: String(e.forma), pago: true, descricao: `Compra: ${qtd} ${unidade} de ${nomeProd}` } : null,
+      } as never);
+      if (r.error) throw new ErroDeUso(`Nada entrou no estoque: ${r.error.message}`);
+      const feito = (r.data ?? {}) as { lancamento_id?: string | null; repetido?: boolean };
+      return { feito: true, produto_id: produtoId, despesa_lancada: Boolean(feito.lancamento_id), ...(feito.repetido ? { repetido: true } : {}) };
     }
   }
   const estadia = await gravarEstadia(c, nome, e, (m) => new ErroDeUso(m));

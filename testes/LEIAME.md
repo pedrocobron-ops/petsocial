@@ -23,6 +23,7 @@ npx next build
 ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_BOLETIM_FALSO=1 npx next start -p 3214
 
 # 3. Testes
+npm run test:unidade     # só os testes de unidade: sem banco e sem servidor (é o que o CI roda a cada pull request)
 npm run test:banco       # unidade + banco/API + rotas do servidor   (~1,5 min)
 npm run test:telas       # navegador: passeio pelas telas e conta pelo caixa   (~2,5 min)
 npm run test:migracoes   # prova de ordem das migrações num banco de rascunho   (~10 s)

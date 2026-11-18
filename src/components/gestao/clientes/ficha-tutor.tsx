@@ -1,6 +1,7 @@
 "use client";
 
 import { saudacaoZap } from "@/lib/gestao/agenda";
+import { colsDoTutor, tutorLido } from "@/lib/gestao/reservado";
 import { useEffect, useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import dynamic from "next/dynamic";
@@ -46,9 +47,11 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
   const [anotando, setAnotando] = useState(false);
   const [devolvendo, setDevolvendo] = useState<Entrada | null>(null);
 
+  const vejoContato = posso("clientes");
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [cliente, pets, entradas, devolucoes] = await Promise.all([
-      sb.from("clientes").select("*").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
+      // e-mail e endereço só para quem tem a área Clientes (quem só atende lê nome, telefone e observações)
+      sb.from("clientes").select(colsDoTutor(vejoContato)).eq("petshop_id", petshop.id).eq("id", id).maybeSingle().then((r) => ({ ...r, data: r.data ? tutorLido(r.data) : null })),
       sb.from("pets").select("*").eq("petshop_id", petshop.id).eq("cliente_id", id).order("ativo", { ascending: false }).order("nome"),
       cuidoDoFinanceiro
         ? sb.from("lancamentos").select("id, valor, data, categoria, descricao, pago, tipo, itens, movimento, conta_id, diferenca_de, valor_original, cliente_id").eq("petshop_id", petshop.id).eq("cliente_id", id).eq("tipo", "entrada").is("movimento", null)
@@ -247,8 +250,8 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
             <div className="g-card-t"><h3><Tile icone={Phone} tom="ceu" tamanho="p" />Contato</h3></div>
             <div className="g-cli-contato">
               <div><Tile icone={Phone} tom="ceu" tamanho="p" /><div><span>Telefone</span><p>{fmtTelefone(cliente.telefone) || <span className="g-muted">Não informado</span>}</p></div></div>
-              <div><Tile icone={Mail} tom="lilas" tamanho="p" /><div><span>E-mail</span><p>{cliente.email ? <a className="g-link" href={`mailto:${cliente.email}`}>{cliente.email}</a> : <span className="g-muted">Não informado</span>}</p></div></div>
-              <div><Tile icone={MapPin} tom="pessego" tamanho="p" /><div><span>Endereço</span><p>{cliente.endereco || <span className="g-muted">Não informado</span>}</p></div></div>
+              {vejoContato && <div><Tile icone={Mail} tom="lilas" tamanho="p" /><div><span>E-mail</span><p>{cliente.email ? <a className="g-link" href={`mailto:${cliente.email}`}>{cliente.email}</a> : <span className="g-muted">Não informado</span>}</p></div></div>}
+              {vejoContato && <div><Tile icone={MapPin} tom="pessego" tamanho="p" /><div><span>Endereço</span><p>{cliente.endereco || <span className="g-muted">Não informado</span>}</p></div></div>}
               <div><Tile icone={Cake} tom="rosa" tamanho="p" /><div><span>Aniversário</span><p>{nascimentoPorExtenso(cliente.nascimento) ?? <span className="g-muted">Não informado</span>}</p></div></div>
               {cliente.obs?.trim() && <div><Tile icone={NotebookPen} tom="manteiga" tamanho="p" /><div><span>Observações</span><p className="gc-texto">{cliente.obs}</p></div></div>}
               <div><Tile icone={CalendarHeart} tom="menta" tamanho="p" /><div><span>Cliente desde</span><p>{dataCompleta(cliente.criado_em)}</p></div></div>

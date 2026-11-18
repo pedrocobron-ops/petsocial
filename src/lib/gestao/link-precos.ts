@@ -5,8 +5,9 @@
  *   `pedidos_valores.visto`, migração 20261235, feito pela mesma regra).
  * Regra: o preço da lista no porte do pet; com promoção no horário, "de X por Y" (% arredonda no centavo, R$ vai até o preço).
  * Sem porte (ou sem preço para o porte): um preço só vale para todos; preços diferentes viram "de X a Y, conforme o porte".
- * Sem importações: dá para testar sozinho.
+ * O arredondamento é o mesmo do resto do sistema (`centavos` de util.ts, igual ao do banco).
  */
+import { centavos } from "./util";
 export type PrecosDaLista = { preco_p: number | null; preco_m: number | null; preco_g: number | null; preco_gg: number | null };
 export type PromoDoPreco = { nome: string; tipo: "pct" | "reais"; valor: number };
 
@@ -22,7 +23,6 @@ export type ValorDoPet = {
 };
 export type LinhaDeValor = { nome: string; v: ValorDoPet };
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 const num = (x: unknown): number | null => (x == null || x === "" || !Number.isFinite(Number(x)) ? null : Number(x));
 
 /** "R$ 42,41" (sempre com centavos: é valor de conta). */

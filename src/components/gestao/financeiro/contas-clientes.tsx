@@ -44,7 +44,8 @@ export function useContasDeClientes(clienteId?: string) {
       for (const c of t.data ?? []) tutores.set(c.id, c);
     }
     return { contas, tutores };
-  }, [petshop.id, vejoFinanceiro, clienteId ?? ""]);
+  // memória curta: o Caixa, o Financeiro e a ficha do tutor pedem a mesma lista; voltar pelo menu não baixa de novo
+  }, [petshop.id, vejoFinanceiro, clienteId ?? ""], { guardar: "contas-de-clientes" });
 }
 
 /** Desde quando o cliente deve esta conta: o dia anotado (dívida trazida do caderno) ou o dia em que foi anotada. */

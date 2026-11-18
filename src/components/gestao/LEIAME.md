@@ -10,6 +10,24 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
 - Toda consulta filtra por `petshop_id = petshop.id`. Toda inserção envia `petshop_id`.
 - Buscar: `useDados(async () => ok(await sb.from(...)...), [deps])`. Depois de gravar: `recarregar()` e, se outra tela
   pode ser afetada, `avisarMudanca()`.
+- `useDados` (rodada 9; `ui.tsx` + `src/lib/gestao/dados-memoria.ts`):
+  - Erro: leia `erro` e mostre o aviso com "Tentar de novo" quando `erro && !dados`. Se a tela não ler `erro`, o aviso comum da
+    casca (`<LeiturasComErro />`, "Uma parte desta tela não carregou") aparece sozinho: leitura que falhou nunca vira lista vazia.
+  - Relê sozinha ao voltar para a aba ou a janela (no máximo a cada 30 s), quando o dia vira e, com `{ aCada, sinal }`, quando o
+    banco diz que algo mudou (`lerSinal`, função `gestao_sinal`: Hoje, Agenda e Quadro). Não relê com folha aberta nem com a
+    pessoa digitando. Releitura que traz o mesmo resultado não mexe na tela; a que falha não troca dados por erro.
+  - Memória curta: `{ guardar: "nome" }` guarda o resultado por nome + dependências. Voltar pelo menu mostra na hora; em menos de
+    30 s e sem gravação no meio, nem busca. Só use em leitura que depende APENAS das dependências e do pet shop. Qualquer
+    `recarregar()`, `avisarMudanca()`, gravação direta em tabela ou função que grava (`pedidoGrava`, em `supabase.ts`) faz buscar de novo.
+  - Prazo: pedido ao banco sem resposta em 30 s é cortado (`buscarComPrazo`) e a leitura inteira tem 60 s (a biblioteca do banco tenta de novo
+    sozinha uma leitura cortada); passou disso, vira "Demorou demais", com "Tentar de novo". Se a resposta ainda chegar, ela vale.
+- Tutor (`clientes`): nunca `select("*")`. Use `colsDoTutor(posso("clientes"))` + `tutorLido` (`reservado.ts`): e-mail e endereço só
+  para quem tem a área Clientes. Quem não lê o contato não manda `email` nem `endereco` na edição.
+- Tela Hoje: os cartões de baixo (quem chamar, aniversariantes, dicas do Mozart, "Mandar N mensagens") vêm contados do banco por
+  `lerExtrasDoHoje` (`hoje-extras.ts`, função `gestao_hoje_extras`). Cartão novo na Hoje não baixa lista inteira: conta no banco.
+- Banco do build: `supabase-config.ts` não tem padrão. Sem as variáveis, só o build de produção da Vercel usa o projeto de produção
+  (`banco-do-build.ts`, aplicado no `next.config.ts`); em qualquer outro lugar o aplicativo abre dizendo que o banco não foi configurado.
+- Antes de abrir um pull request: `npm run typecheck`, `npm run lint` e `npm run test:unidade` (é o que o CI roda, `.github/workflows/ci.yml`).
 - Lista que pode passar de mil linhas (clientes, pets, agendamentos, lançamentos, produtos, movimentos, estadias): o banco
   entrega no máximo 1000 por consulta e `.limit(5000)` não muda isso. Leia em páginas com `lerTudo` + `contando`
   (`src/lib/gestao/paginas.ts`), sempre com ordem fixa terminando em `.order("id")`.

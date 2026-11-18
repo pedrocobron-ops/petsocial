@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import { ferramentasPara, type Contexto } from "@/lib/gestao/assistente/ferramentas";
-import { medidasZeradas, responderCartoes, voltas, type Msg, type Resultado } from "@/lib/gestao/assistente/conversa";
+import { contaLiberada, limitesDaChamada, medidasZeradas, responderCartoes, voltas, type Msg, type Resultado } from "@/lib/gestao/assistente/conversa";
 import { INSTRUCOES, contextoDoPetshop } from "@/lib/gestao/assistente/instrucoes";
 import { modeloDeTeste } from "@/lib/gestao/assistente/modelo-de-teste";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
@@ -123,15 +123,17 @@ async function tratar(req: Request) {
   // dias fechados e feriados (Meu pet shop) dos próximos 14 dias, com um dia de folga dos dois lados (o relógio é conferido abaixo)
   const diaDoAparelho = corpo.agora!.slice(0, 10);
   const somaDia = (n: number) => new Date(Date.parse(`${diaDoAparelho}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
-  const [p, e, s, especiais] = await Promise.all([
+  const [p, e, s, especiais, acesso] = await Promise.all([
     lerPetshop(sb, corpo.petshopId),
     lerEquipe(sb, corpo.petshopId),
     lerServicos(sb, corpo.petshopId),
     sb.from("dias_especiais").select("dia, nome, fechado, feriado").eq("petshop_id", corpo.petshopId).gte("dia", somaDia(-1)).lte("dia", somaDia(15)).order("dia").limit(40),
+    // a conta pode gravar? Quem diz é o banco (acesso_liberado), a mesma regra das telas e das tabelas
+    sb.rpc("acesso_liberado", { p: corpo.petshopId }).then((r) => r, () => ({ data: null, error: { message: "sem resposta" } })),
   ]);
   const eu = (e.data ?? []).find((x) => x.user_id === u.user!.id && x.ativo);
   if (!p.data || !eu) return erro(403, "sem_acesso", "Você não faz parte deste pet shop.");
-  const liberado = ["ativa", "atrasada", "cortesia"].includes(p.data.status) || (p.data.status === "teste" && new Date(p.data.teste_ate) > new Date());
+  const liberado = contaLiberada(acesso.error ? null : acesso.data, p.data);
   const c: Contexto = {
     sb, userId: u.user.id, petshop: p.data, eu, equipe: e.data ?? [], servicos: s.data ?? [],
     vejoFinanceiro: podeArea(eu, "caixa") || podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
@@ -210,6 +212,8 @@ async function tratar(req: Request) {
   };
 
   // cada chamada tem prazo: o pedido inteiro precisa caber no tempo da rota (e a pessoa não fica 50 s olhando "digitando…")
+  // O pedido inteiro tem prazo (PRAZO_TOTAL_MS, contado desde que a rota começou): cada chamada recebe só o tempo que sobra e,
+  // depois da primeira volta, não repete. Assim a soma das voltas nunca passa do limite de 60 s da rota.
   const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, ""), timeout: 25_000, maxRetries: 1 });
   const comFallback = /^claude-(opus-5-5|fable-5-2)/.test(MODELO);
   // a pessoa fechou a conversa no meio: para de gastar com o modelo (nada é gravado sem o "Pode fazer")
@@ -236,8 +240,9 @@ async function tratar(req: Request) {
     const falha = async (status: number, codigo: string, mensagem: string, extra?: Record<string, unknown>) => { await medir(status === 429 && codigo === "limite" ? "limite" : "erro"); return { status, corpo: { erro: codigo, mensagem, ...extra } }; };
     try {
       const r = await voltas({
-        c, mensagens, liberado, contar: () => contar("chamada"), avisos, medidas,
-        chamar: async (msgs, ao) => {
+        c, mensagens, liberado, contar: () => contar("chamada"), avisos, medidas, inicioDoPedido: inicio,
+        chamar: async (msgs, ao, tempo) => {
+          const limites = limitesDaChamada(tempo);
           const pedido = {
             model: MODELO,
             max_tokens: 4000,
@@ -254,8 +259,8 @@ async function tratar(req: Request) {
             messages: msgs,
           };
           if (DE_TESTE) return modeloDeTeste(msgs, ao);
-          if (!emitir) return cliente.beta.messages.create(pedido, { signal: parar.signal });
-          const fluxo = cliente.beta.messages.stream(pedido, { signal: parar.signal });
+          if (!emitir) return cliente.beta.messages.create(pedido, { signal: parar.signal, ...limites });
+          const fluxo = cliente.beta.messages.stream(pedido, { signal: parar.signal, ...limites });
           fluxo.on("text", (d) => ao.texto(d));
           fluxo.on("streamEvent", (e) => { if (e.type === "content_block_start" && e.content_block.type === "tool_use") ao.ferramenta(e.content_block.name); });
           return fluxo.finalMessage();

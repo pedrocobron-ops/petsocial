@@ -274,7 +274,8 @@ function Relatorios() {
       lerCadeia(sb, petshop.id, deIso, ateIso).catch(() => null),
     ]);
     return { ags, entradas, recebimentos, diferencas, ajustes, cadeia, clientesNovos: novos.count ?? 0, estadias, anterior };
-  }, [petshop.id, deIso, ateIso, antesDeIso, antesAteIso]);
+  // memória curta: voltar aos Relatórios (ou ao mesmo período) não refaz as contas (qualquer gravação faz buscar outra vez)
+  }, [petshop.id, deIso, ateIso, antesDeIso, antesAteIso], { guardar: "relatorios" });
 
   const r = useMemo(() => {
     if (!dados) return null;
