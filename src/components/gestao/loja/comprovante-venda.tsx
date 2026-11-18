@@ -18,29 +18,34 @@ type Recebido = { valor: number; forma?: string | null; pagamentos?: unknown; it
 export const assuntoDoLancamento = (l: { categoria?: string | null }) => (l.categoria === "Pacotes" ? "do pacote" : "da compra");
 
 /** O texto do comprovante de um lançamento de venda (sem pet: é uma compra). */
-export function textoDaVenda(petshop: string, tutor: string | null | undefined, l: Recebido, entregue?: number | null) {
+export function textoDaVenda(petshop: string, tutor: string | null | undefined, l: Recebido, entregue?: number | null,
+  /** crédito em quantas vezes, a hora do recebimento e quem atendeu (na venda feita agora) */
+  mais?: { parcelas?: number | null; hora?: string | Date | null; quem?: string | null }) {
   // pacote sem itens: o nome do pacote vira a linha (a descrição é "Pacote 4 banhos · Thor")
   return textoComprovante({
     petshop, tutor, servico: l.descricao?.trim() || l.categoria || "Venda", quando: l.criado_em ?? new Date(), pagoEm: l.data ?? null,
-    recebidos: [l], entregue, assunto: assuntoDoLancamento(l),
+    recebidos: [l], entregue, assunto: assuntoDoLancamento(l), ...(mais ?? {}),
   });
 }
 
 /** A folha que aparece logo depois de vender: valor, Mandar comprovante (WhatsApp do tutor) e Imprimir. */
-export function FolhaVendaFeita({ titulo, valor, frase, texto, telefone, tutor, aoFechar }: {
+export function FolhaVendaFeita({ titulo, valor, frase, texto, telefone, tutor, aoFechar, rotulo, tituloImpresso = "Comprovante de venda" }: {
   titulo: string; valor: number; frase: string; texto: string; telefone?: string | null; tutor?: string | null; aoFechar: () => void;
+  /** o que é o número grande ("Anotado em A receber", "Devolvido ao cliente"); sem ele, só o valor */
+  rotulo?: string; tituloImpresso?: string;
 }) {
   const zap = soDigitos(telefone).length >= 8 ? linkWhatsApp(telefone, texto) : null;
   return (
     <Folha titulo={titulo} aoFechar={aoFechar} rodape={<button type="button" className="g-btn sec" onClick={aoFechar}>Pronto</button>}>
       <div className="g-vd-recibo">
         <Tile icone={Check} tom="menta" tamanho="g" />
+        {rotulo && <p className="g-pp g-muted" style={{ margin: 0 }}>{rotulo}</p>}
         <p className="g-num">{brl(valor)}</p>
         <p className="g-p">{frase}</p>
         {zap
           ? <a className="g-btn zap cheio" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar comprovante</a>
           : <p className="g-pp g-muted">{tutor ? `${tutor} está sem WhatsApp na ficha: dá para imprimir o comprovante.` : "Sem o tutor na venda, não dá para mandar pelo WhatsApp: dá para imprimir o comprovante."}</p>}
-        <button type="button" className="g-btn fantasma cheio" onClick={() => imprimirComprovante(texto, "Comprovante de venda")}><Printer />Imprimir comprovante</button>
+        <button type="button" className="g-btn fantasma cheio" onClick={() => imprimirComprovante(texto, tituloImpresso)}><Printer />Imprimir comprovante</button>
         <p className="g-pp g-muted">{zap ? `O WhatsApp de ${tutor ?? "quem comprou"} abre com o comprovante pronto e você só aperta enviar. ` : ""}Não é nota fiscal.</p>
       </div>
     </Folha>

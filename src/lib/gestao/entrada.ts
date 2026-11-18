@@ -27,6 +27,16 @@ export const PERTENCES: Opcao[] = [
   { id: "coleira", rotulo: "Coleira" }, { id: "guia", rotulo: "Guia" }, { id: "caminha", rotulo: "Caminha" },
   { id: "brinquedo", rotulo: "Brinquedo" }, { id: "remedio", rotulo: "Remédio" }, { id: "racao", rotulo: "Ração" },
 ];
+/**
+ * Os atalhos "Como o pet chegou" do horário (pulgas, nós, pele, ouvido, unhas, agitado) viram o começo do Conferir a entrada:
+ * uma lista só. O que o tosador tocou no atalho já vem marcado na conferência que o tutor assina.
+ */
+export function entradaPelosAtalhos(atalhos: Record<string, boolean> | null | undefined): { temperamento: string[]; lesoes: string[]; lesoesObs: string } {
+  const a = atalhos ?? {};
+  const lesoes = [a.pulgas ? "pulgas" : null, a.nos ? "nos" : null, a.pele ? "ferida" : null].filter((x): x is string => Boolean(x));
+  const obs = [a.pele ? "Ferida ou irritação na pele" : null, a.ouvido ? "Ouvido sujo ou com cheiro" : null, a.unhas ? "Unhas compridas" : null].filter(Boolean).join(". ");
+  return { temperamento: a.agitado ? ["agitado"] : [], lesoes, lesoesObs: obs ? `${obs}.` : "" };
+}
 const rotuloDe = (lista: Opcao[], id: string) => lista.find((o) => o.id === id)?.rotulo ?? id;
 export const rotulos = (lista: Opcao[], ids: readonly string[]) => lista.filter((o) => ids.includes(o.id)).map((o) => o.rotulo);
 

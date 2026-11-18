@@ -53,16 +53,44 @@ export function proximaEtapa(a: ComStatus, q: LinhaQuadro | null | undefined, co
   return null;
 }
 
-/** Texto do botão "Próxima etapa". */
-export function rotuloDoProximo(d: Destino | null): string {
+/** Texto do botão "Próxima etapa". `semBanho`: o horário não tem banho (só tosa, unhas…): a chegada não fala em banho. */
+export function rotuloDoProximo(d: Destino | null, semBanho = false): string {
   switch (d) {
-    case "banho": return "Chegou: começar o banho";
+    case "banho": return semBanho ? "Chegou: começar o atendimento" : "Chegou: começar o banho";
     case "secagem": return "Foi para a secagem";
     case "tosa": return "Foi para a tosa";
     case "pronto": return "Está pronto";
     case "entregue": return "Entregue ao tutor";
     default: return "";
   }
+}
+
+/** O horário tem banho em algum serviço? Sem serviço nenhum na lista, vale como banho (o texto de sempre). */
+export const temBanho = (nomes: (string | null | undefined)[]) => { const l = nomes.filter(Boolean); return !l.length || l.some((n) => /banho/i.test(n ?? "")); };
+
+/** "pronto" ou "pronta", pelo sexo do pet (sem sexo na ficha, "pronto"). */
+export const prontoOuPronta = (sexo: string | null | undefined) => (sexo === "F" ? "pronta" : "pronto");
+
+/**
+ * A ordem do "Meus pets de hoje": primeiro quem está na casa (pronto para buscar, depois secando, depois no banho; quem está há mais
+ * tempo na etapa vem antes), depois quem ainda vai chegar (pela hora marcada) e, por último, os entregues.
+ */
+export function ordemDoMeuDia<A extends ComStatus & { id: string; inicio: string }>(ags: A[], quadro: Map<string, LinhaQuadro>): A[] {
+  const peso: Record<Coluna, number> = { pronto: 0, secando: 1, banho: 2, esperando: 3, entregue: 4 };
+  const col = (a: A) => colunaDe(a, quadro.get(a.id)) ?? "entregue";
+  const desde = (a: A) => { const q = quadro.get(a.id); return new Date(q?.etapa_em ?? q?.chegou_em ?? a.inicio).getTime(); };
+  return [...ags].sort((x, y) => peso[col(x)] - peso[col(y)]
+    || (col(x) === "esperando" || col(x) === "entregue" ? new Date(x.inicio).getTime() - new Date(y.inicio).getTime() : desde(x) - desde(y)));
+}
+
+/** O alerta do pet em poucas palavras, para caber na linha da agenda: "BRAVO: morde na hora de cortar unha. Usar…". */
+export function alertaCurto(alertas: string | null | undefined, max = 60): string | null {
+  const t = (alertas ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  if (t.length <= max) return t;
+  const corte = t.slice(0, max);
+  const fim = corte.lastIndexOf(" ");
+  return `${(fim > max * 0.6 ? corte.slice(0, fim) : corte).replace(/[\s.,;:]+$/, "")}…`;
 }
 
 /** Algum serviço do horário é tosa? (decide se a etapa Na tosa entra no "Próxima etapa") */

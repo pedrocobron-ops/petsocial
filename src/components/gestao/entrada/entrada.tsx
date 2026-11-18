@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Camera, Check, ClipboardCheck, Copy, Eraser, ImagePlus, Loader2, MessageCircle, PenLine, Printer, RotateCcw, X } from "lucide-react";
 import {
-  abreSozinha, assinarParaOLink, COLS_ENTRADA, descartarArquivo, ehIdoso, enderecoDaEntrada, enderecosDosArquivos, enviarAssinatura,
+  abreSozinha, assinarParaOLink, COLS_ENTRADA, entradaPelosAtalhos, descartarArquivo, ehIdoso, enderecoDaEntrada, enderecosDosArquivos, enviarAssinatura,
   faxinaDaEntrada, prepararFotoDaEntrada, subirFotoDaEntrada, LESOES, linkValendo, MAX_FOTOS_ENTRADA, mensagemDaEntrada, PERTENCES, pertencesDe, resumoDaEntrada as resumo, TEMPERAMENTOS,
   termoComPet, termoDoPetshop, textoDevolver, type Entrada, type FotoDaEntrada,
 } from "@/lib/gestao/entrada";
@@ -26,6 +26,8 @@ export type VisitaDaEntrada = {
   agendamentoId?: string; estadiaId?: string;
   petId: string; pet: string;
   tutor: { nome: string | null; telefone: string | null } | null;
+  /** os atalhos "Como o pet chegou" do horário: entram marcados na conferência que ainda não foi salva */
+  atalhos?: Record<string, boolean> | null;
 };
 const areaDe = (v: Pick<VisitaDaEntrada, "tipo">) => (v.tipo === "banho" ? "agenda" : "creche_hotel");
 
@@ -228,6 +230,11 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
       // pré-preenchido pela ficha do pet: os Cuidados e alertas e a idade
       setCuidados((dados.alertas ?? "").slice(0, 600));
       setIdoso(ehIdoso(dados.nascimento));
+      // o que o tosador já tocou em "Como o pet chegou" entra marcado aqui (uma lista só)
+      const dosAtalhos = entradaPelosAtalhos(v.atalhos);
+      if (dosAtalhos.temperamento.length || dosAtalhos.lesoes.length || dosAtalhos.lesoesObs) {
+        setTemperamento(dosAtalhos.temperamento); setLesoes(dosAtalhos.lesoes); setLesoesObs(dosAtalhos.lesoesObs); setMudou(true);
+      }
     }
     setPronto(true);
   }, [dados, pronto]);
@@ -440,7 +447,7 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
                       <RotateCcw aria-hidden /><span>Não subiu. Tentar de novo</span>
                     </button>
                   )}
-                  <button type="button" className="g-bol-foto-x" aria-label={`Tirar a foto ${i + 1}`} onClick={() => tirarFoto(f)}><X aria-hidden /></button>
+                  <button type="button" className="g-bol-foto-x" aria-label={`Remover a foto ${i + 1}`} title="Remover esta foto" onClick={() => tirarFoto(f)}><X aria-hidden /></button>
                 </li>
               ))}
               {fotos.length < MAX_FOTOS_ENTRADA && (

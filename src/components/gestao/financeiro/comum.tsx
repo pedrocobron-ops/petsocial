@@ -8,7 +8,8 @@ import { fazerTudoOuNada, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { vendaComProduto } from "@/lib/gestao/devolucao";
 import { conferirLimite } from "@/lib/gestao/fiado";
-import { multaSugerida, regraDaMulta } from "@/lib/gestao/dinheiro-opcoes";
+import { multaSugerida, regraDaMulta, travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
+import { nomeDeQuemAtende, textoReciboDeConta } from "@/lib/gestao/comprovante";
 import { diaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
 import { nomeDaCategoria, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
@@ -20,12 +21,14 @@ import { Tile } from "../painel";
 import { AvisoCaixaFechado, CampoDinheiro, EscolhaPagamento, fecharPagamento, pagamentoInicial, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, type EstadoPagamento } from "../loja/pecas";
 import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import { avisarMudanca, Campo, Folha, useAvisos, useDados, Vazio } from "../ui";
-import { ComprovanteDoLancamento } from "../loja/comprovante-venda";
+import { ComprovanteDoLancamento, FolhaVendaFeita } from "../loja/comprovante-venda";
 import "./financeiro.css";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 
 // troca e devolução de uma venda (abre só com um toque)
 const FolhaDevolucao = dynamic(() => import("../loja/devolucao"), { ssr: false });
+// devolver ao cliente um valor recebido sem produto (serviço, estadia): a saída fica ligada à entrada
+const FolhaDevolverValor = dynamic(() => import("./devolver-valor"), { ssr: false });
 
 /* ---------- contas ---------- */
 
@@ -43,19 +46,30 @@ export const COR_FORMA: Record<string, string> = { pix: "#2f6b4c", dinheiro: "#c
 /** Cores para fatias e barras quando o item não tem cor própria. */
 export const PALETA = ["#2f6b4c", "#ea670c", "#2f6f8a", "#5b4590", "#c99a2e", "#b3402e", "#6a625a", "#a39a90"];
 
-type Movimento = Pick<Lancamento, "tipo" | "valor" | "forma"> & { pagamentos?: unknown; movimento?: string | null; credito_usado?: number | null };
+type Movimento = Pick<Lancamento, "tipo" | "valor" | "forma"> & { pagamentos?: unknown; movimento?: string | null; credito_usado?: number | null; trocado?: number | null };
+
+/**
+ * Troca de produto: a entrada nova leva, na forma "outro", o valor do produto que voltou, e a devolução sai pelo mesmo valor.
+ * Essa parte não é dinheiro: o Caixa tira dos totais (`trocado`, que a tela junta pela função `trocas_do_caixa`), e só a
+ * diferença paga (ou devolvida) conta como dinheiro que andou.
+ */
+export const trocadoDe = (l: object) => Math.max(0, Number((l as { trocado?: number | null }).trocado ?? 0));
+/** O que saiu de verdade: as saídas sem a parte que é só produto trocado. */
+export const saiuDe = (saidas: { valor: number }[]) => centavos(soma(saidas) - saidas.reduce((t, l) => t + trocadoDe(l), 0));
 
 /** Tira sangrias e suprimentos: dinheiro que só entrou ou saiu da gaveta não é receita nem despesa. */
 export const semMovimentos = <T extends { movimento?: string | null }>(lista: T[]) => lista.filter((l) => !l.movimento);
 
 /** Soma por forma de pagamento, repartindo o pagamento dividido entre as formas dele. */
-export function somaPorForma(lista: { valor: number; forma?: string | null; pagamentos?: unknown; credito_usado?: number | null }[]) {
+export function somaPorForma(lista: { valor: number; forma?: string | null; pagamentos?: unknown; credito_usado?: number | null; trocado?: number | null }[]) {
   const mapa = new Map<string, number>();
   const somar = (k: string, v: number) => mapa.set(k, centavos((mapa.get(k) ?? 0) + v));
   for (const l of lista) {
     // a parte paga com o crédito do tutor fica à parte (FORMA_CREDITO): não é dinheiro que entrou no dia
     const credito = creditoDaEntrada(l);
-    for (const p of partesPorForma(l)) somar(p.forma, p.forma === "outro" && credito > 0 ? p.valor - credito : p.valor);
+    // o produto trocado (na forma "outro") também não é dinheiro: sai da soma
+    const fora = credito + trocadoDe(l);
+    for (const p of partesPorForma(l)) somar(p.forma, p.forma === "outro" && fora > 0 ? p.valor - fora : p.valor);
     if (credito > 0) somar(FORMA_CREDITO, credito);
   }
   for (const [k, v] of mapa) if (Math.abs(v) < 0.005) mapa.delete(k);
@@ -81,7 +95,7 @@ export function resumoDoCaixa(valorInicial: number, lancamentos: Movimento[]) {
   // o que foi pago com o crédito do tutor não entrou no caixa (é dinheiro de antes)
   const credito = centavos(entradas.reduce((t, l) => t + creditoDaEntrada(l), 0));
   return {
-    entrou: centavos(soma(entradas) - credito), saiu: soma(saidas), porForma, suprimentos, sangrias, credito,
+    entrou: centavos(soma(entradas) - credito - entradas.reduce((t, l) => t + trocadoDe(l), 0)), saiu: saiuDe(saidas), porForma, suprimentos, sangrias, credito,
     nEntradas: entradas.length, nSaidas: saidas.length,
     esperado: centavos(Number(valorInicial) + dinheiro.entrou + suprimentos - dinheiro.saiu - sangrias),
   };
@@ -394,6 +408,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   const hoje = hojeIso();
   const [tipo, setTipo] = useState<Tipo>(inicial ? (inicial.tipo as Tipo) : tipoInicial);
   const [devolvendo, setDevolvendo] = useState(false);
+  const [devolvendoValor, setDevolvendoValor] = useState(false);
   const [valor, setValor] = useState<number | null>(inicial ? Number(inicial.valor) : null);
   // forma: a do lançamento; num novo, nenhuma vem marcada: a pessoa escolhe
   const [pagamento, setPagamento] = useState<EstadoPagamento>(() => pagamentoInicial(inicial ? (inicial.forma as FormaId | null) ?? "pix" : null));
@@ -411,6 +426,16 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   // valor já recebido: o dono e quem cuida do financeiro alteram; quem só opera o caixa corrige o que ela mesma lançou no caixa aberto
   const soVer = Boolean(inicial?.pago && !cuidoDoFinanceiro && !(inicial.criado_por === user.id && inicial.caixa_id && !travado));
   const recebido = Boolean(inicial?.pago);
+  // preço travado: apagar um valor recebido é como baixar o preço. Quem só opera o caixa não apaga (o banco recusa); devolve.
+  const apagarTravado = Boolean(inicial && inicial.pago && inicial.tipo === "entrada" && !inicial.movimento && !inicial.conta_id && travaDePreco(petshop).ligada && !cuidoDoFinanceiro);
+  // entrada recebida sem produto (serviço, estadia, pacote): dá para devolver o valor ao cliente, ligado a ela
+  const podeDevolverValor = Boolean(inicial && inicial.pago && inicial.tipo === "entrada" && !inicial.movimento && !inicial.conta_id && vejoFinanceiro && !vendaComProduto(inicial));
+  // quanto desta entrada já voltou para o cliente (devolução, troca): a folha diz, para ninguém devolver duas vezes
+  const { dados: jaDevolvido } = useDados(async () => {
+    if (!inicial || !inicial.pago || inicial.tipo !== "entrada" || inicial.movimento || !vejoFinanceiro) return 0;
+    const r = await sb.rpc("entradas_devolvidas", { p_petshop: petshop.id, p_ids: [inicial.id] });
+    return Number((r.data ?? [])[0]?.devolvido ?? 0);
+  }, [inicial?.id, vejoFinanceiro]);
   const caixa = useCaixaAberto();
   const [descricao, setDescricao] = useState(inicial?.descricao ?? "");
   const [data, setData] = useState(inicial?.data ?? hoje);
@@ -596,7 +621,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     <ParcelasNaTela.Provider value={perguntaVezes}>
     <Folha titulo={titulo} aoFechar={aoFechar}
       rodape={soVer ? <button type="button" className="g-btn sec" onClick={aoFechar}>Fechar</button> : <>
-        {inicial && !travado && <button type="button" className="g-btn perigo" onClick={excluir} disabled={salvando}><Trash2 />Excluir</button>}
+        {inicial && !travado && !apagarTravado && <button type="button" className="g-btn perigo" onClick={excluir} disabled={salvando}><Trash2 />Excluir</button>}
         <button type="button" className="g-btn pri" onClick={() => void salvar()} disabled={salvando || op.ocupado}>{salvando ? "Salvando…" : inicial ? "Salvar" : conta ? "Anotar conta" : "Lançar"}</button>
       </>}>
       <form className="g-form" onSubmit={(e) => { e.preventDefault(); void salvar(); }}>
@@ -612,7 +637,23 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
             <span>Este lançamento é de um caixa já fechado ({dataCompleta(caixaFechadoEm!)}). O valor, a forma de pagamento, a categoria e o dia não mudam mais, e ele não pode ser excluído. Só a descrição pode ser corrigida. Se precisar corrigir, lance um ajuste: uma entrada ou uma saída com a diferença.</span>
           </p>
         )}
+        {apagarTravado && !soVer && !travado && (
+          <p className="g-cx-fora" role="status">
+            <Lock aria-hidden />
+            <span>Com o preço travado, só o dono ou quem vê o financeiro apaga ou baixa um valor já recebido. Se o cliente desistiu, use {vendaComProduto(inicial!) ? "Troca ou devolução" : "Devolver ao cliente"}: fica anotado, com o seu nome.</span>
+          </p>
+        )}
         {inicial && <ItensDoLancamento lancamento={inicial} />}
+        {inicial && (jaDevolvido ?? 0) > 0 && (
+          <p className="g-aviso" role="note" style={{ margin: 0 }}><span className="g-cresce"><b>Desta entrada, {brl(jaDevolvido!)} já voltaram para o cliente</b> (devolução ou troca). O recebimento continua aqui, no histórico.</span></p>
+        )}
+        {podeDevolverValor && (
+          <div className="g-fila">
+            <button type="button" className="g-btn sec p" onClick={() => setDevolvendoValor(true)}><RotateCcw />Devolver ao cliente</button>
+            <span className="g-pp g-muted">O cliente desistiu ou pagou a mais? Devolva o valor: a saída fica ligada a este recebimento.</span>
+          </div>
+        )}
+        {devolvendoValor && inicial && <FolhaDevolverValor entrada={inicial} aoFechar={() => setDevolvendoValor(false)} aoPronto={() => { void aoSalvo(); aoFechar(); }} />}
         {inicial && vejoFinanceiro && vendaComProduto(inicial) && (
           <div className="g-fila">
             <button type="button" className="g-btn sec p" onClick={() => setDevolvendo(true)}><RotateCcw />Troca ou devolução</button>
@@ -791,8 +832,23 @@ export function UsarCredito({ saldo, usar, aoMudar, usado, resto }: { saldo: num
   );
 }
 
+/**
+ * Uma saída já paga no mesmo mês, da mesma categoria e de valor perto (até 10% de diferença): pode ser a mesma conta lançada
+ * à mão (ou pelo Mozart) antes de dar baixa na conta a pagar. Só avisa; quem decide é a pessoa.
+ */
+export async function saidaParecida(sb: ReturnType<typeof useGestao>["sb"], petshopId: string, conta: Pick<Lancamento, "id" | "valor" | "categoria">, dia: string) {
+  const de = `${dia.slice(0, 7)}-01`, ate = isoDia(new Date(Number(dia.slice(0, 4)), Number(dia.slice(5, 7)), 0));
+  const valor = Number(conta.valor), folga = Math.max(1, valor * 0.1);
+  const r = await sb.from("lancamentos").select("id, valor, descricao, categoria, data").eq("petshop_id", petshopId).eq("tipo", "saida").eq("pago", true).is("movimento", null)
+    .eq("categoria", conta.categoria).neq("id", conta.id).gte("data", de).lte("data", ate).gte("valor", valor - folga).lte("valor", valor + folga).order("data", { ascending: false }).limit(1);
+  if (r.error || !r.data?.length) return null;
+  return { ...r.data[0], valor: Number(r.data[0].valor) };
+}
+
 export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; aoFechar: () => void; aoSalvo: () => void | Promise<void> }) {
-  const { sb, petshop, cuidoDoFinanceiro } = useGestao();
+  const { sb, petshop, cuidoDoFinanceiro, eu } = useGestao();
+  // conta recebida: antes de fechar, o recibo (WhatsApp do tutor ou impresso)
+  const [recibo, setRecibo] = useState<{ valor: number; texto: string; frase: string; tutor: { nome: string; telefone: string | null } | null } | null>(null);
   const { avisar, avisarErro, confirmar } = useAvisos();
   useCalendario(); // dia fechado: o resto não vence nele
   const hoje = hojeIso();
@@ -840,6 +896,15 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
     // o resto não vence num dia em que o negócio está fechado (feriado, folga marcada em Meu pet shop)
     if (parcial && novoVencimento && diaFechado(novoVencimento)) { setErro(fechadoNoResto(novoVencimento)); return; }
     if (data === hoje && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
+    // conta a pagar: já existe uma saída paga parecida neste mês (mesma categoria, valor perto)? Pode ser a mesma conta lançada duas vezes.
+    if (!entrada) {
+      const parecida = await saidaParecida(sb, petshop.id, conta, data);
+      if (parecida && !(await confirmar({
+        titulo: "Já existe uma saída parecida neste mês",
+        texto: `"${parecida.descricao || categoriaAtual(parecida.categoria, petshop)}", ${brl(parecida.valor)}, paga em ${dataCompleta(parecida.data)}. Se for esta mesma conta, não dê baixa de novo: a despesa contaria duas vezes. Nesse caso, volte e apague uma das duas.`,
+        confirmar: "É outra conta, dar baixa", voltar: "Voltar",
+      }))) return;
+    }
     setSalvando(true);
     try {
       if (entrada) {
@@ -874,6 +939,25 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
         avisar(r!.quitada ? `Recebido: ${brl(centavos(total + credito))}.${comCredito}` : `Recebido: ${brl(centavos(total + credito))}.${comCredito} Fica faltando ${brl(r!.falta)}.`);
         // crédito parcelado: em quantas vezes (a parte recebida, a conta inteira e a multa; tenta de novo e avisa se não der)
         if (total > 0) await anotarParcelas(r!.ids ?? [], pagamento.parcelas);
+        // o recibo de quem pagou: a conta, quanto entrou e como, a multa e o que ainda falta
+        const t = conta.cliente_id ? (await sb.from("clientes").select("nome, telefone").eq("petshop_id", petshop.id).eq("id", conta.cliente_id).maybeSingle()).data : null;
+        const partes = total > 0 ? (pg.pagamentos && pg.pagamentos.length > 1 ? pg.pagamentos : [{ forma: pg.forma, valor: total }]) : [];
+        const emDinheiro = partes.filter((x) => x.forma === "dinheiro").reduce((s, x) => s + Number(x.valor), 0);
+        setRecibo({
+          valor: centavos(total + credito), tutor: t ?? null,
+          frase: r!.quitada ? "Conta quitada." : `Fica faltando ${brl(r!.falta)}${novoVencimento ? `, até ${dataCompleta(novoVencimento)}` : ""}.`,
+          texto: textoReciboDeConta({
+            petshop: petshop.nome, tutor: t?.nome, conta: conta.descricao?.trim() || categoriaAtual(conta.categoria, petshop), pagoEm: data, valor: recebendo, multa: daMulta,
+            formas: [...(credito > 0 ? [{ forma: "credito_tutor", valor: credito }] : []), ...partes.map((x) => ({ forma: x.forma as string, valor: Number(x.valor) }))],
+            falta: r!.quitada ? 0 : r!.falta, pagaAte: novoVencimento || null, parcelas: pagamento.parcelas,
+            entregue: pagamento.entregue != null && emDinheiro > 0 && pagamento.entregue > emDinheiro + 0.005 ? pagamento.entregue : null,
+            hora: data === hoje ? new Date() : null, quem: nomeDeQuemAtende(eu),
+          }),
+        });
+        await aoSalvo();
+        avisarMudanca();
+        setSalvando(false);
+        return true;
       } else {
         // só entra no caixa aberto quando o dinheiro andou hoje
         const caixa = data === hoje ? await caixaAberto(sb, petshop.id) : null;
@@ -893,6 +977,11 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
       // a mesma chave na nova tentativa: se algo já entrou (a resposta não chegou), o banco não recebe de novo
       return false;
     }
+  }
+
+  if (recibo) {
+    return <FolhaVendaFeita titulo="Conta recebida" rotulo="Recebido agora" valor={recibo.valor} frase={recibo.frase} texto={recibo.texto}
+      telefone={recibo.tutor?.telefone} tutor={recibo.tutor?.nome} tituloImpresso="Recibo de pagamento" aoFechar={aoFechar} />;
   }
 
   return (

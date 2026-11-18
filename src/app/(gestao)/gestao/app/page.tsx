@@ -18,6 +18,8 @@ import { ShoppingBag, BedDouble, Camera, FileSpreadsheet, Cake, CalendarDays, Ch
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
+import { alertaCurto } from "@/lib/gestao/quadro";
+import { nomeNaEquipe } from "@/lib/gestao/util";
 
 import { brl, dataAmigavel, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
@@ -52,6 +54,9 @@ const EntradaModoEnvio = dynamic(() => import("@/components/gestao/modo-envio-en
 const MetaMes = dynamic(() => import("@/components/gestao/meta-mes"), { ssr: false });
 const MeuMes = dynamic(() => import("@/components/gestao/meu-mes"), { ssr: false });
 const MinhaComissao = dynamic(() => import("@/components/gestao/minha-comissao"), { ssr: false });
+// o dia de quem atende (tosador, banhista) e as doses de agora de quem cuida da creche e do hotel
+const MeuDia = dynamic(() => import("@/components/gestao/agenda/meu-dia"), { ssr: false });
+const CuidadosDeAgora = dynamic(() => import("@/components/gestao/hotel/cuidados-de-agora"), { ssr: false });
 const DicasMozart = dynamic(() => import("@/components/gestao/dicas-mozart"), { ssr: false });
 const AlteracoesDeValores = dynamic(() => import("@/components/gestao/financeiro/alteracoes-de-valores"), { ssr: false });
 const OcorrenciasDeHoje = dynamic(() => import("@/components/gestao/casa/ocorrencias").then((m) => m.OcorrenciasDeHoje), { ssr: false });
@@ -66,7 +71,11 @@ const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa sema
 export default function Hoje() {
   // vejoFinanceiro: recebe (Caixa, Financeiro ou Relatórios) e vê o que entrou hoje.
   // cuidoDoFinanceiro: vê também o que saiu, as contas, a meta e o caminho para o Financeiro.
-  const { sb, petshop, eu, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso, liberado } = useGestao();
+  const { sb, petshop, eu, equipe, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso, liberado } = useGestao();
+  // a agenda de banho e tosa é de quem tem a área Agenda ou recebe (caixa): quem só cuida da creche e do hotel não vê os horários
+  const vejoAgenda = posso("agenda") || vejoFinanceiro;
+  // "Meu dia": quem atende e não mexe com dinheiro abre a tela pelos pets dela, não pelo dia do pet shop
+  const meuDia = Boolean(eu.atende) && posso("agenda") && !vejoFinanceiro && !souDono && usaModulo(petshop, "banho_tosa");
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
   useAdiantar(carregarDetalhe, carregarForm);
@@ -86,12 +95,12 @@ export default function Hoje() {
   // Sem ela, vale a ordem de sempre.
   const principal = principalDe(petshop), frenteDoNegocio = frenteDe(petshop);
   const frente = frenteDoNegocio === "casa" ? (casa ? "casa" : null) : frenteDoNegocio === "loja" ? (posso("estoque") ? "loja" : null) : frenteDoNegocio === "banho" && posso("agenda") ? "banho" : null;
-  const soCasa = frente ? frente === "casa" : casa && !banho;
+  const soCasa = frente ? frente === "casa" : casa && (!banho || !vejoAgenda);
   const rotuloCasa = nomeDaCasa(petshop);
 
   const vejoEstoque = posso("estoque"), vejoPacotes = posso("pacotes");
   const cobrar = vejoFinanceiro && posso("creche_hotel");
-  const { dados, carregando, recarregar } = useDados(async () => {
+  const { dados, carregando, erro, recarregar } = useDados(async () => {
     const seg = inicioDaSemana(hoje), ha6 = somaDias(hoje, -6);
     // o primeiro olhar numa ida só ao banco (gestao_hoje; sem ela, uma consulta por parte, como antes), e a creche ao mesmo tempo:
     // no celular com internet fraca, cada consulta esperando a outra soma uma ida e volta
@@ -116,8 +125,8 @@ export default function Hoje() {
     const estadias = h.emCasa;
     const noDia = (iso: string | null) => Boolean(iso) && isoDia(new Date(iso!)) === hojeIso;
     return {
-      ags: lista,
-      proximosDias: h.proximos,
+      ags: vejoAgenda ? lista : [],
+      proximosDias: vejoAgenda ? h.proximos : [],
       semFechar: h.semFechar,
       amanha: amanhaAtivos.length,
       amanhaSemLembrete: tutores(amanhaAtivos.filter((a) => !a.lembrete_em && !semTelefone(a))),
@@ -149,9 +158,9 @@ export default function Hoje() {
       experiencias,
       semana: Array.from({ length: 7 }, (_, i) => {
         const d = somaDias(seg, i), iso = isoDia(d);
-        return { rotulo: nomeDiaCurto(d), valor: h.semana.filter((a) => valeAg(a.status) && isoDia(new Date(a.inicio)) === iso).length };
+        return { rotulo: nomeDiaCurto(d), valor: vejoAgenda ? h.semana.filter((a) => valeAg(a.status) && isoDia(new Date(a.inicio)) === iso).length : 0 };
       }),
-      servicosMes: [...h.servicosMes].sort((a, b) => b.valor - a.valor).slice(0, 5),
+      servicosMes: vejoAgenda ? [...h.servicosMes].sort((a, b) => b.valor - a.valor).slice(0, 5) : [],
       // de segunda até hoje (a segunda desta semana está sempre dentro dos últimos 7 dias)
       recebidoSemana: Math.round((h.ultimos7.filter((l) => l.data >= isoDia(seg)).reduce((t, l) => t + Number(l.valor), 0)
         + [...aj.porDia].filter(([d]) => d >= isoDia(seg)).reduce((t, [, v]) => t + v, 0)) * 100) / 100,
@@ -163,7 +172,7 @@ export default function Hoje() {
       taxasPendentes: h.atrasos,
       cobrarHoje: h.cobrarHoje,
     };
-  }, [petshop.id, hojeIso, vejoFinanceiro, cuidoDoFinanceiro, vejoEstoque, vejoPacotes, casa, cobrar]);
+  }, [petshop.id, hojeIso, vejoFinanceiro, cuidoDoFinanceiro, vejoEstoque, vejoPacotes, casa, cobrar, vejoAgenda]);
 
   // quem chamar de volta e aniversariantes: consulta à parte, para não segurar o resto da tela
   const vejoClientes = posso("clientes");
@@ -202,8 +211,11 @@ export default function Hoje() {
   const semConcluir = ativos.length - feitos;
   // marcados como "não cobrar" hoje: o dia fecha, mas o dono vê quantos foram e quem marcou
   const naoCobradosHoje = ativos.filter((a) => semCobranca(a));
-  const proximo = ativos.find((a) => a.status !== "concluido" && new Date(a.fim) > new Date());
+  // no "Meu dia", o próximo e o que está na mesa são os da pessoa (e os sem profissional), não os do pet shop
+  const meusAtivos = meuDia ? ativos.filter((a) => a.profissional_id === eu.id || !a.profissional_id) : ativos;
+  const proximo = meusAtivos.find((a) => a.status !== "concluido" && new Date(a.fim) > new Date());
   const selecionado = aberto ? dados?.ags.find((a) => a.id === aberto) ?? null : null;
+  const quemAtende = equipe.filter((p) => p.ativo && p.atende);
 
   // retenção: no máximo um cartão em destaque, nesta ordem: fim de teste > primeiros passos > resumo da semana
   const teste = fimDoTeste(petshop);
@@ -235,13 +247,15 @@ export default function Hoje() {
   const contaNova = Boolean(dados && dados.pets === 0 && dados.totalAgs === 0 && dados.estadiasTotal === 0 && (frente !== "loja" || dados.produtosTotal === 0));
   const vendas = dados && vejoFinanceiro ? { quantas: dados.vendasHoje.length, total: dados.vendasHoje.reduce((s, l) => s + Number(l.valor), 0) } : null;
   // sem banho e tosa e sem horário hoje: a agenda não ocupa lugar na tela de quem escolheu outra área principal
-  const semAgenda = Boolean(principal && !banho && dados && !dados.ags.length);
+  const semAgenda = !vejoAgenda || Boolean(principal && !banho && dados && !dados.ags.length);
   // conta nova com primeiros passos na tela: o Mozart, o botão do topo e o cartão apontam o mesmo próximo passo
   const passoNovo = contaNova && pp.estado === "ativo" ? pp.proximo : null;
   const fraseDoPasso = passoNovo ? `Tudo pronto para começar. O próximo passo é ${passoNovo.texto.charAt(0).toLowerCase()}${passoNovo.texto.slice(1)}${passoNovo.id === "pet" && (souDono || eu.papel === "gerente") ? ", ou trazer os seus clientes de uma planilha" : ""}.` : null;
   const frase = !dados ? "" : fraseDoPasso ?? (contaNova && frente === "loja" ? "Tudo pronto para começar. O primeiro passo é cadastrar o que você vende."
     : contaNova ? (posso("clientes") ? (souDono || eu.papel === "gerente" ? "Tudo pronto para começar. O primeiro passo é cadastrar um pet, ou trazer os seus clientes de uma planilha." : "Tudo pronto para começar. O primeiro passo é cadastrar um pet.") : "Tudo pronto para começar.")
     : frente === "loja" ? `${dados.acabando.length === 0 ? "Nenhum produto acabando" : dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}.${vendas ? (vendas.quantas ? ` Hoje ${vendas.quantas === 1 ? "saiu 1 venda" : `saíram ${vendas.quantas} vendas`} no balcão: ${brl(vendas.total)} (produtos vendidos na conta do atendimento entram em Relatórios).` : " Nenhuma venda no balcão hoje, por enquanto.") : ""}${ativos.length ? ` Na agenda, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
+    : meuDia ? (meusAtivos.length ? `Hoje você tem ${n(meusAtivos.length, "pet", "pets")}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}${proximo.pets?.alertas ? ` (atenção: ${alertaCurto(proximo.pets.alertas, 80)})` : ""}` : ", todos já atendidos"}.` : "Nenhum pet marcado com você hoje.")
+    : !vejoAgenda ? (temCasa ? `${linhaCasa}.` : casa ? "Nenhum pet na casa agora." : "Bom trabalho hoje.")
     : frente === "casa" ? `${temCasa ? linhaCasa : "Nenhum pet na casa agora"}.${ativos.length ? ` No banho e tosa, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : soCasa && !ativos.length ? (temCasa ? `${linhaCasa}.` : `Nenhum pet na casa agora.`)
     : !ativos.length ? `Nenhum horário marcado para hoje.${proximoDia ? ` O próximo é ${proximoDia.pets?.nome ?? "um pet"}, ${quandoFoi(proximoDia.inicio)}.` : ""}${linhaCasa ? ` ${linhaCasa}.` : ""}`
@@ -291,7 +305,7 @@ export default function Hoje() {
   ].filter(Boolean) as { icone: React.ComponentType<{ size?: number }>; tom: Tom; texto: string; href?: string; aoTocar?: () => void }[] : [];
 
   const agora = new Date();
-  const emAndamento = ativos.find((a) => a.status !== "concluido" && new Date(a.inicio) <= agora && new Date(a.fim) > agora);
+  const emAndamento = meusAtivos.find((a) => a.status !== "concluido" && new Date(a.inicio) <= agora && new Date(a.fim) > agora);
   const destaque = emAndamento ?? proximo;
   const faltam = destaque ? Math.round((new Date(destaque.inicio).getTime() - agora.getTime()) / 60000) : 0;
   const quando = !destaque ? "" : faltam <= 0 ? "acontecendo agora" : faltam < 60 ? `em ${faltam} min` : `em ${Math.floor(faltam / 60)} h${faltam % 60 ? ` ${faltam % 60} min` : ""}`;
@@ -310,7 +324,7 @@ export default function Hoje() {
           <h1>{saudacao()}, <em className="it">{eu.nome.split(" ")[0]}</em></h1>
         </div>
         <div className="g-acoes">
-          {posso("agenda") && banho && !contaNova && liberado && <LinkRapido rotulo="Mandar o link do cliente" />}
+          {posso("agenda") && banho && !contaNova && liberado && !meuDia && <LinkRapido rotulo="Mandar o link do cliente" />}
           {passoNovo ? (passoNovo.href
               ? <Link className="g-btn pri" href={passoNovo.href} onClick={passoNovo.aoTocar}><ChevronRight />{passoNovo.texto}</Link>
               : <button type="button" className="g-btn pri" onClick={passoNovo.aoTocar}><ChevronRight />{passoNovo.texto}</button>)
@@ -323,6 +337,13 @@ export default function Hoje() {
       </header>
 
       <div className="g-pilha g">
+        {/* a leitura do dia falhou (banco demorou, internet caiu): diz e deixa tentar de novo, sem fingir que a agenda está livre */}
+        {erro && !dados && (
+          <div className="g-aviso" role="alert" data-teste="hoje-erro">
+            <span>{erro}</span>
+            <button className="g-btn p sec" onClick={() => void recarregar()}>Tentar de novo</button>
+          </div>
+        )}
         {testePerto && souDono && (
           <FimDoTeste modo={cartaoTeste ? "cartao" : "linha"} numeros={dados ? { pets: dados.pets, horarios: dados.totalAgs, concluidos: dados.concluidos } : null}
             aoDispensar={() => { guardarLembrado(chaveAgoraNao(petshop.id), hojeIso); setAgoraNao(true); }} />
@@ -332,6 +353,10 @@ export default function Hoje() {
 
         {/* dia fechado sem a agenda na tela (creche ou hotel): o aviso vem no alto, antes do botão de check-in */}
         {fechadoHoje && casa && !banho && <p className="g-aviso" role="status" style={{ margin: 0 }}><span className="g-cresce"><b>{fechadoHoje}.</b> {rotuloCasa === "Hotel" ? "O hotel não recebe chegadas hoje. Quem está hospedado continua hospedado." : rotuloCasa === "Creche" ? "A creche não abre hoje: ninguém é esperado na chamada e ninguém leva falta." : "A creche não abre hoje e ninguém leva falta. Quem está hospedado no hotel continua hospedado."}</span></p>}
+        {/* quem atende: os pets dela primeiro, com o alerta, o próximo passo e as fotos */}
+        {meuDia && dados && <MeuDia ags={dados.ags} semConta={semConta} aoAbrir={setAberto} aoMudar={() => void recarregar()} />}
+        {/* creche e hotel: comida e remédio que estão na hora ou atrasados, um toque para marcar */}
+        {casa && primeiroOlhar && <CuidadosDeAgora />}
         {cr && cartaoDaChamada && <ChamadaDeHoje esperados={cr.esperados} aindaNao={cr.aindaNao} naCasa={cr.naCasa} sairam={cr.sairam} faltaram={cr.faltaram.length} />}
 
         {/* "Bom dia" do Mozart: primeira abertura do dia, até 3 linhas; lê sozinho (gestao_bom_dia), não depende dos dados desta tela */}
@@ -343,7 +368,7 @@ export default function Hoje() {
         {/* pedidos que chegaram pelo link vêm no alto: no celular, abaixo dos primeiros passos e do Mozart ficavam longe da vista */}
         {posso("agenda") && <PedidosLink />}
 
-        {contaNova && cartaoPassos && <PrimeirosPassos pp={pp} modo="cartao" curto />}
+        {contaNova && cartaoPassos && !meuDia && <PrimeirosPassos pp={pp} modo="cartao" curto />}
 
         <div className="g-heroi">
           <section className="g-mozart">
@@ -363,7 +388,7 @@ export default function Hoje() {
             </div>
           </section>
 
-          {destaque?.pets && frente !== "casa" && frente !== "loja" ? (
+          {meuDia ? null : destaque?.pets && frente !== "casa" && frente !== "loja" ? (
             <button className="g-proximo" style={{ textAlign: "left", color: "inherit", "--cor": destaque.servicos?.cor ?? "#f97316" } as React.CSSProperties} onClick={() => setAberto(destaque.id)}>
               <div className="g-fila entre" style={{ flexWrap: "nowrap" }}>
                 <span className="g-rotulo" style={{ color: "#8a4a17" }}>{emAndamento ? "Na mesa agora" : "Próximo atendimento"}</span>
@@ -413,11 +438,11 @@ export default function Hoje() {
             </div>
             ) : (
             <div className="g-proximo vazio">
-              <span className="g-rotulo" style={{ color: "#24543b" }}>{dados && ativos.length ? (semConcluir > 0 ? "Fim dos horários de hoje" : faltaCobrarHoje > 0 ? "Atendimentos concluídos" : "Dia concluído") : temCasa ? "Banho e tosa sem horários hoje" : "Agenda livre hoje"}</span>
+              <span className="g-rotulo" style={{ color: "#24543b" }}>{erro && !dados ? "Agenda de hoje" : dados && ativos.length ? (semConcluir > 0 ? "Fim dos horários de hoje" : faltaCobrarHoje > 0 ? "Atendimentos concluídos" : "Dia concluído") : temCasa ? "Banho e tosa sem horários hoje" : "Agenda livre hoje"}</span>
               <div className="quem">
                 <Tile icone={dados && ativos.length ? (semConcluir > 0 || faltaCobrarHoje > 0 ? HandCoins : Check) : Sparkles} tom={dados && ativos.length && (semConcluir > 0 || faltaCobrarHoje > 0) ? "manteiga" : "menta"} tamanho="g" />
                 <div style={{ minWidth: 0 }}>
-                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{!(dados && ativos.length) ? (proximoDia ? `Próximo: ${proximoDia.pets?.nome ?? "um pet"}, ${quandoFoi(proximoDia.inicio)}` : "Nenhum horário marcado por vir")
+                  <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>{erro && !dados ? "Não deu para ler a agenda agora" : !(dados && ativos.length) ? (proximoDia ? `Próximo: ${proximoDia.pets?.nome ?? "um pet"}, ${quandoFoi(proximoDia.inicio)}` : "Nenhum horário marcado por vir")
                     : semConcluir > 0 ? `${semConcluir === 1 ? "1 horário ficou" : `${semConcluir} horários ficaram`} sem concluir`
                     : faltaCobrarHoje > 0 ? `${faltaCobrarHoje === 1 ? "Falta cobrar 1 atendimento" : `Falta cobrar ${faltaCobrarHoje} atendimentos`}`
                     : "Tudo atendido por hoje"}</b>
@@ -443,7 +468,7 @@ export default function Hoje() {
         {cuidoDoFinanceiro && <AlteracoesDeValores />}
         {casa && <OcorrenciasDeHoje />}
 
-        {!(contaNova && cartaoPassos) && <PrimeirosPassos pp={pp} modo={cartaoPassos ? "cartao" : "linha"} />}
+        {!(contaNova && cartaoPassos) && !meuDia && <PrimeirosPassos pp={pp} modo={cartaoPassos ? "cartao" : "linha"} />}
         {temResumo && <ResumoSemana modo={cartaoResumo ? "cartao" : "linha"} />}
 
         {!contaNova && <div className="g-grade kpis">
@@ -470,11 +495,11 @@ export default function Hoje() {
         <div className={semAgenda ? "g-pilha g" : "g-duas"}>
           {!semAgenda && <section>
             <div className="g-card-t">
-              <h2>Agenda de hoje</h2>
+              <h2>{meuDia ? "Agenda de hoje do pet shop" : "Agenda de hoje"}</h2>
               {posso("agenda") && <Link className="g-btn fantasma p" href="/gestao/app/agenda?visao=semana">Ver a semana<ChevronRight /></Link>}
             </div>
             {fechadoHoje && !(casa && !banho) && <p className="g-aviso" role="status" style={{ marginBottom: 12 }}><span className="g-cresce"><b>{fechadoHoje}.</b> O pet shop não abre hoje.{ativos.some((a) => a.status !== "concluido") ? " Os horários abaixo continuam marcados: confira com o tutor ou remarque." : ""}</span></p>}
-            {carregando && !dados ? <Esqueleto /> : !dados?.ags.length ? (
+            {(carregando || erro) && !dados ? <Esqueleto /> : !dados?.ags.length ? (
               <div className="g-card">
                 {!banho ? (
                   <Vazio mozart="acenando" titulo="Nenhum horário marcado para hoje" texto={casa ? `Serviços com hora marcada aparecem aqui. As estadias ficam em ${rotuloCasa}.` : "Serviços com hora marcada aparecem aqui."} />
@@ -502,7 +527,9 @@ export default function Hoje() {
                           {a.pets && <AvatarPet pet={a.pets} />}
                           <span className="t">
                             <b>{a.pets?.nome}</b>
-                            <span className="serv"><i />{nomeDosServicos(a) ?? "Atendimento"}</span>
+                            <span className="serv"><i />{[nomeDosServicos(a), quemAtende.length > 1 && a.profissionais ? `com ${nomeNaEquipe(a.profissionais.nome, quemAtende.map((p) => p.nome))}` : null].filter(Boolean).join(" · ") || "Atendimento"}</span>
+                            {/* o alerta vem antes de tudo: quem vai pegar o pet precisa ler antes de tocar */}
+                            {a.pets?.alertas && !fora && <span className="g-agd-alerta">{alertaCurto(a.pets.alertas)}</span>}
                             {a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {a.pets.clientes.nome}</span>}
                           </span>
                           {semConta.has(a.id) ? <span className="g-tag laranja">Falta cobrar</span>

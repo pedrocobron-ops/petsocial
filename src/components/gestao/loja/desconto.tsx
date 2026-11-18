@@ -40,7 +40,8 @@ export function CampoDesconto({ base, valor, aoMudar, maximo, maxPct }: {
         </span>
       </span>
       {modo === "reais" ? (
-        <CampoDinheiro valor={valor} aoMudar={aoMudar} rotulo="Desconto em reais" />
+        // acima do que o caixa pode dar: o campo fica marcado (a frase e o total ficam com quem chama)
+        <CampoDinheiro valor={valor} aoMudar={aoMudar} rotulo="Desconto em reais" maximo={maximo != null ? maximo + 0.005 : undefined} />
       ) : (
         <>
           <input className={`g-input g-tab${ruim ? " ruim" : ""}`} inputMode="decimal" placeholder="Ex.: 10" value={texto} aria-label="Desconto em porcentagem"

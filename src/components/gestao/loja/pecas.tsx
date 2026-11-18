@@ -1,6 +1,7 @@
 "use client";
 
-import { foraNoModoSimples } from "@/lib/gestao/modo-simples";
+import { modoSimples } from "@/lib/gestao/modo-simples";
+import { usaModulo } from "@/lib/gestao/modulos";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Lock, Plus, Split, Trash2 } from "lucide-react";
 import { caixaAberto, formaPrincipal, ultimoFechamento, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
@@ -472,6 +473,9 @@ export function CampoDinheiro({ valor, aoMudar, placeholder = "0,00", autoFocus,
   );
 }
 
+/** O pagamento escolhido tem dinheiro em espécie? (Uma forma só, ou uma das partes do pagamento dividido.) */
+export const temDinheiro = (e: EstadoPagamento) => (e.dividido ? e.partes.some((p) => p.forma === "dinheiro") : e.forma === "dinheiro");
+
 /* ---------- caixa fechado ---------- */
 
 /** O caixa está aberto agora? `null` enquanto não sabe (ou para quem não vê o financeiro). */
@@ -486,7 +490,11 @@ export function useCaixaAberto() {
  * o campo do troco já aparece aberto, com o último valor contado (ou vazio, que é zero). Linguagem simples: na primeira
  * cobrança a pessoa ainda não sabe o que é "abrir o caixa".
  */
-export function AvisoCaixaFechado({ aberto, saida }: { aberto: boolean | null; /** Pagar uma conta ou lançar uma saída (e não receber). */ saida?: boolean }) {
+export function AvisoCaixaFechado({ aberto, saida, emDinheiro }: {
+  aberto: boolean | null; /** Pagar uma conta ou lançar uma saída (e não receber). */ saida?: boolean;
+  /** A forma escolhida tem dinheiro em espécie (`temDinheiro`). No modo simples sem loja, o aviso só aparece com ela: é o dinheiro que precisa da gaveta. */
+  emDinheiro?: boolean;
+}) {
   const { sb, petshop, user, posso, liberado } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const [abriu, setAbriu] = useState(false);
@@ -495,7 +503,8 @@ export function AvisoCaixaFechado({ aberto, saida }: { aberto: boolean | null; /
   const [fechouHoje, setFechouHoje] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const podeAbrir = posso("caixa") && liberado;
-  const simplesSemCaixa = foraNoModoSimples(petshop, "/gestao/app/caixa");
+  // modo simples sem loja: o caixa do dia só é oferecido quando entra dinheiro em espécie (Pix e cartão não mexem na gaveta)
+  const simplesSemCaixa = modoSimples(petshop) && !usaModulo(petshop, "loja") && !emDinheiro;
   // o troco inicial começa com o que foi contado no último fechamento (a pessoa confere e muda se quiser)
   useEffect(() => {
     if (aberto !== false || !podeAbrir) return;
@@ -512,7 +521,8 @@ export function AvisoCaixaFechado({ aberto, saida }: { aberto: boolean | null; /
     return <p className="g-cx-fora ok" role="status"><Lock aria-hidden /><span>Caixa do dia aberto. Este valor já entra nele; o que for {saida ? "pago" : "recebido"} em dinheiro entra também na conta da gaveta.</span></p>;
   }
   if (aberto !== false) return null;
-  // modo simples sem loja: o caixa do dia não aparece no recebimento (é avançado para quem está começando). O valor entra igual.
+  // modo simples sem loja, recebendo sem dinheiro em espécie: o aviso não aparece (o valor entra igual). Com dinheiro, oferece
+  // abrir o caixa ali mesmo: sem isso, o primeiro fechamento de quem está começando dava diferença na gaveta.
   if (simplesSemCaixa) return null;
   async function abrir() {
     if (salvando) return;

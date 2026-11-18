@@ -58,10 +58,17 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 ## O que cada suíte confere
 
 **unidade/**
+- `seguranca-rodada9.js`: célula de planilha segura (`celulaCsv` em `csv.ts`: fórmula vira texto) e o uso dela na exportação dos aceites; `next.config.ts` com os cabeçalhos de segurança em todas as páginas; **`npm audit --omit=dev --audit-level=high`** sem alerta alto ou crítico (sem internet vira problema conhecido, não derruba).
+- `caixa-trava-recibos.js`: rodada 9 (N5): comprovante do hotel com o sinal recebido na saída (110,40 + 282,60 = 393,00 = Crédito 2x 200,00 + Pix 193,00; `totalPagoAgora`, `fechoDaConta`), parcelas, troco, hora e quem atendeu nos comprovantes (`formasComValor`, `linhaDeQuem`), comprovante da conta para depois (`textoComprovanteAReceber`), recibo da conta paga (`textoReciboDeConta`: 15,00 + 0,34 = 15,34), troca e devolução (`textoComprovanteDevolucao`: 29,99 por 34,90, diferença 4,91), frases do fiado (`fraseDoLimite`, `fraseDoQueDeve`), Caixa no menu no modo simples e "Conta anterior" na cobrança.
+- `equipe-chao.js`: rodada 9 (N6), a equipe do chão e os cuidados do hotel: dose na hora, atrasada ou depois (`situacaoDaDose`, `dosesDeAgora`), ficha de cuidados e ocorrências ligadas por padrão (`hotel.sem_cuidados`, `casa.sem_ocorrencias`), texto livre que fala de remédio (`falaDeRemedio`), atalhos de chegada que entram no Conferir a entrada (`entradaPelosAtalhos`), ordem do Meus pets de hoje, alerta curto, "Cannot coerce…" em português e as áreas das ferramentas do Mozart do chão.
 - `dinheiro-j.js`: rodada 8 (J): nascimento e sexo do pet na planilha (`nascimentoDe`, `sexoDe`, `linhasParaOBanco`, resumo), o total do hotel com o nome da temporada, do feriado e do segundo pet (`oQueMudouNasNoites`), comprovante da compra com o pagamento dividido e a linha da promoção, e `dividaPorVencimento`.
 - `robustez.js`: rodada 8 (defeitos e robustez): nome sem HTML (`limparNome`), saída prevista longe demais com o ano (`saidaLongeDemais`, `dataAmigavel`), balão do navegador em português (`mensagemDeValidacao`), sem internet nunca vira "caixa fechado" (`conferirCaixa`), Ajuda sem "[EQUIPE] não é necessário…" (`lerRespostaDaAjuda`) e o Mozart pelas áreas da pessoa (quem só tem o Caixa não recebe marcar_horario; cartão forjado recusado no servidor).
 - `rodada2-h.js`: segunda rodada (Rafael, Bia, Juliana, Neide): tempo esgotado do banco vira "Demorou demais, tente de novo" (`textoAmigavel`); a foto da entrada tenta de novo e desiste com aviso (`subirFotoDaEntrada`); Termos e Política 2.3 vigentes desde 17/11/2026; mapa sem "Campinas, Campinas" (`comCidade`); comprovante com a data do pagamento (`linhasDaData`); "2 noites (15/11 a 17/11)" no comprovante do hotel; linhas da creche em Quanto sobrou (`linhasDaCasa`); cancelamentos pelo dia do cancelamento e a tela abrindo em Este mês.
 - `creche-hotel-final.js`: rodada final (Rafael e Bia): regra de cancelamento do sinal (`destinoPelaRegra`: menos de 7 dias vira crédito, 7 ou mais devolve; sem regra, nada marcado), hora do hotel (`horasDoHotel`), táxi pet na cobrança (`taxiDaCobranca`, `partesDosExtras` com `taxi`, mensagem de cobrança com "táxi pet 2 dias" e a chave Pix do hotel), "Devolver: coleira, guia e remédio da artrose" sem repetir "remédio", texto do aceite sem banho num hotel só, "Saiu uma foto", exemplo das regras do link num hotel só, "veio hoje" no Bom dia, valor médio pelas contas contadas (895 ÷ 2 = 447,50) e cancelamentos com as reservas.
+- `operacao.js`: rodada 9 (operação): a rota da faxina aceita `CRON_SECRET` ou `GESTAO_FAXINA_SEGREDO` (`segredosDaFaxina`,
+  `pedidoAutorizado`, `pareceAgendada`); a tela Hoje só lê do jeito antigo quando a função não existe ou quebrou, nunca quando o banco
+  demorou (`leituraAntigaVale`); a abertura do link do cliente numa ida só, com as oito de antes só em banco sem `link_inicial`, e o
+  resultado guardado por alguns segundos (`lerLinkCom`, `segundosDoLinkGuardado`). Sem banco.
 - `rede-lenta.js`: o que a página pública põe no HTML (`link-servidor.ts`): cores do pet shop só conferidas (Vinho, cor própria;
   texto com CSS ou HTML nunca entra) e pedido com código inválido sem ir ao banco. Sem rede.
 - `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, desconto do segundo pet, regras), a leitura da resposta
@@ -154,6 +161,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   o que está só na tela comparado com o saldo de agora, e a planilha sem colunas de R$ para quem não vê o financeiro.
 
 **banco/** (API do Supabase com o login de cada papel, como o navegador faz; SQL só para preparar e conferir)
+- `caixa-trava-recibos.js`: migração 20261231 (rodada 9, N5): trava de preço em creche e hotel (diária da lista, noites pelas datas, valor da saída com o desconto máximo, pela função do check-out e pela API direta, pacote só do próprio pet, check-out pendente), Alterações (`diaria`, `diarias`, `checkout`, `devolucao`), apagar e baixar valor recebido com a trava, limite de fiado pelo que fica (`fiado_limite_no_fim`: 175,50 com 100,00 pagos fica 75,50), falta com a taxa numa gravação (`agendamento_faltou`), devolução ligada à entrada (`entrada_devolver`, `entradas_devolvidas`), troca fora do dinheiro do caixa (`trocas_do_caixa`) e o Mozart dando baixa em conta de A pagar (`ferramenta-pagar-conta.ts`: a luz de 268,40 sai uma vez só).
+- `equipe-chao.js`: rodada 9 (N6, migração 20261232): comissão de quem não mexe com dinheiro só com o total (minha_comissao, comissao_extrato por mês inteiro, ver_comissao do Mozart) e a opção `comissao.mostrar_valores`; VARREDURA: todas as tabelas e todas as funções de leitura chamadas com a sessão do tosador e a da monitora, sem nenhum preço semeado (67,31; 123,47; 58,13; 96,29…); "Entregue ao tutor" conclui (entra em Atendimentos para cobrar e na comissão); mensalista numa gravação só (`creche_plano_salvar`: falhou uma parte, nada fica); Mozart do chão (`ver_cuidados`, `marcar_cuidado`, `mover_no_quadro`, `registrar_ocorrencia`) com o cartão, as áreas e a recusa do banco.
 - `dinheiro-relatorios-j.js`: migração 20261224 (rodada 8, Sandra): a devolução sai de Relatórios > Produtos, dos Indicadores e do Mozart (`devolucoes_por_produto`, `vendasPorProduto` com as devoluções) e bate com Quanto sobrou; mensalidade e sinal que ainda não venceram não contam no limite de fiado (`fiado_deve`, `fiado_situacao` com vencido / vence hoje / a vencer); a promoção do horário como linha negativa sai só do serviço (partes, comissão 40% de 72,00, `promo_usos`, sem "desconto do caixa"); crédito do tutor na venda no balcão; `resumo_financeiro` do Mozart igual ao Financeiro; `cobradoPorItem` da cópia; planilha de clientes com nascimento e sexo do pet.
 - `robustez.js`: migração 20261226: nomes limpos pelo banco (pet shop, tutor, pet, equipe), nome só de marcação recusado, saída prevista a mais de 366 dias recusada (estadia antiga com outra mudança passa) e duas abas fechando o mesmo caixa (a segunda recebe `ja_fechado` com a hora e o valor contado).
 - `estreante-m.js`: rodada 8 (estreante): o Mozart anota na ficha do pet ("a Mel é brava, morde"): cartão "Anotar na ficha do pet", nada gravado antes do Pode fazer, o texto entra no fim de Cuidados e alertas sem apagar nada, a mesma confirmação não grava duas vezes, o que outra pessoa escreveu no meio fica; o tosador também anota; outro pet shop não acha o pet. Modo simples: o dono liga pelas opções, a equipe recebe e não muda.
@@ -161,7 +170,23 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `creche-hotel-final.js`: migração 20261218. Táxi pet do mensalista: o Chegou da chamada anota o dia de táxi (só com táxi por dia e preço), Desfazer tira, a cobrança do mês seguinte leva os dias (`taxas` com "tipo": "taxi", somado em valor_extras e na conta a receber), cancelar a cobrança solta os dias, táxi fixo por mês entra no próprio mês ("taxi_mes"); o monitor lê ida/volta mas não o preço; viagens do Leva e traz (`creche_taxi_viagem_marcar`: levar só depois do Chegou, plano sem táxi recusado). Indicadores: 2 reservas canceladas de 3, o sinal não conta como conta (1 conta de R$ 300 = 222 + sinal de 78). Link: `link_hotel_opcoes.horas` e `.pix` (só com sinal), `link_creche_planos` (só com a opção; sem preço quando o link esconde preços), `link_fechados_nomes`.
 - `seguranca.js`: isolamento entre pet shops e anônimo; dono não mexe na própria assinatura nem vira admin; o que cada papel grava
   (recepção, monitora, tosador, estoque); caixa fechado travado; **matriz de leitura das colunas com dinheiro** por papel
-  (dono, recepção, monitora, tosador, estoque, anônimo) e das funções de preço.
+  (dono, recepção, monitora, tosador, estoque, anônimo) e das funções de preço. No fim, a **varredura** (rodada 9): a lista de
+  TODAS as tabelas/visões e de TODAS as funções que a API alcança sai do próprio banco na hora do teste (tabela ou função nova
+  entra sozinha). O dono de outro pet shop e o anônimo tentam ler, mudar e apagar em cada tabela e chamam cada função com os ids
+  de A; nada pode trazer a marca posta nos dados de A (nome, e-mail, endereço, R$ 7.777,77) e o retrato dos dados de A tem de
+  ficar igual. Anônimo que lê qualquer linha de qualquer tabela derruba o teste (catálogo público de propósito entra em `PUBLICAS`).
+  Ficam fora da chamada (lista `PULA`): funções que apagam a conta de quem chama, criam loja, do painel e as que só contam uso.
+- `seguranca-rodada9.js` (migração 20261228; a parte dos cabeçalhos e da rota do Mozart precisa do servidor, de preferência com
+  `GESTAO_MOZART_FALSO=1`): teto geral da IA por dia (Mozart, Ajuda, boletim, Tirar dúvida: o que passa do teto volta "geral"),
+  conta só para consulta sem IA ("fechado"; a rota responde 403 `so_consulta` com frase simples), teto menor no teste grátis;
+  trava do servidor (carência → fechada; com a trava, segredo errado é recusado e não gasta a cota de ninguém; só `service_role`
+  grava); Cakto por e-mail só com o e-mail provado (sem prova: "sem conta" com `payload.sem_prova`; ao provar, liga sozinho;
+  callback assinado continua direto); clientes, pets e saúde por área (só Estoque não lê; sem Clientes não edita o tutor; Caixa e
+  Financeiro só o limite do fiado); aceite só de versão conhecida (`documentos_versoes`; **subiu a versão em documentos.ts? ponha
+  a linha na tabela numa migração**, senão este teste falha); IP do aceite da entrada; freio de lojas novas por rede; nome de
+  arquivo nos buckets `pets` e `diario`; cabeçalhos de segurança em todas as páginas e a rota `/api/gestao/csp`.
+  O que mexe em `config_interna` roda numa transação desfeita no fim (`ensaio`, com `set local role` e `request.jwt.claims`):
+  não atrapalha outro teste rodando ao mesmo tempo. O executor (`rodar.js`) renova a carência da trava num banco LOCAL sem trava.
 - `dinheiro.js`: um dia de banho e tosa pelo **mesmo código das telas** (`lancarPago`, `receberConta`, `receberComCredito`,
   `moverCredito`, `ajustesDoFaturamento`): conta com 3 serviços + produto (baixa o estoque), toque duplo e segundo recebimento
   recusados, pagamento em parte e dívida, crédito do tutor, devolução, "não cobrar", preço travado (o que a recepção não consegue),
@@ -304,6 +329,16 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   serviços mais pedidos na mesma ordem; próximos; sem fechar; contagens; produtos acabando; o que entrou; contas; últimos 7 dias;
   saúde vencendo; check-outs sem cobrança; concluídos de hoje sem cobrança) para dono, recepção, monitora, tosador e estoque,
   com estoque, dinheiro e pacotes só para quem tem a área; anônimo recusado; dono de outra loja não lê nada.
+- `desempenho-operacao.js`: rodada 9, desempenho do banco e operação (migração 20261229), numa loja de teste com história
+  (`testes/lib/semente-volume.js`: 420 horários em 14 meses, contas com serviço e produto, partes de conta, "cobrar a diferença",
+  devoluções, créditos, taxas, estadias com sinal, pacotes, bloqueios, pedidos do link, caixas fechados). As funções trocadas devolvem
+  **exatamente** o mesmo que as de antes (`testes/lib/antes-20261229.sql`, num esquema só da rodada): `indicadores_do_periodo` (um dia,
+  30 dias, 3 meses e 12 meses), `pacotes_acabando`, `link_vaga` (65 dias de horários), `conflitos_agenda`, `partes_do_lancamento`,
+  `partes_por_servico`, `lucro_repartir` e `comissao_linhas_calc`. `gestao_hoje` diz as partes que falharam (`falhas`); `erro_do_banco`
+  grava em `erros_app`; `link_inicial` igual às oito funções públicas; rotinas (`rotina_anotar`, `admin_rotinas`, atraso de 36 h); índices
+  e o plano de exclusão (toda tabela da cascata coberta, com índice por pet shop). **Apagar a conta**: um lote e para (andamento gravado,
+  nada solto, cancelar recusado), a faxina retoma e termina (todas as linhas, tabelas sem `petshop_id`, logins, registro), loja com erro
+  fica anotada sem travar as outras, e a fila `logins_lixo` tenta de novo o login que o Auth não apagou. Precisa da chave de serviço local.
 - `faxina.js`: faxina agendada (migração 20261195; a 20261199 junta as contas com o prazo de exclusão vencido e a fila `arquivos_lixo`, ver `lgpd.js`): rota `/api/gestao/faxina` recusada sem o segredo (401; 503 no servidor de teste,
   que não tem `GESTAO_FAXINA_SEGREDO`), segredo pelo `Authorization: Bearer` (Vercel Cron) ou `x-gestao-faxina`; as funções só com a
   chave de serviço; a tarefa `gestao-faxina-diaria` no pg_cron (quando o banco tem); `faxinaGeral` com a chave de serviço local
@@ -519,6 +554,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   registro e "Cliente removido" depois de apagar.
 
 **telas/** (Playwright, Chromium)
+- `seguranca-rodada9.js` (390 e 1366): com os cabeçalhos novos, o site de vendas, a entrada, o cadastro, o link do cliente e as telas do aplicativo abrem sem erro, sem rolagem lateral e **sem nenhum aviso "[Report Only]"** da lista de carregamento (Supabase, fotos, fontes); o Manual tem "O Mozart tem limite de uso?"; no painel do administrador (aba Cakto), o cartão Trava do servidor e o Teto de uso da inteligência artificial hoje.
+- `caixa-trava-recibos.js`: rodada 9 (N5) com a recepção e o preço travado (10%): check-out da creche abaixo da conta com o botão apagado e o menor valor na folha (R$ 63,00), comprovante com "Dinheiro R$ 63,00" e quem recebeu; desconto acima do máximo ("Desconto acima do permitido", total de R$ 63,00); Faltou com a taxa num aviso só e gravada mesmo recarregando; venda no balcão com "Ana deve R$ 119,80 · … cabe mais R$ 30,20" e a recusa do limite escrita na venda; entrada recebida sem Excluir e com Devolver ao cliente (comprovante da devolução); 1366: Caixa depois de uma troca conta só o dinheiro (Entrou hoje R$ 147,90) e Alterações mostra o check-out abaixo da conta e as devoluções. Capturas em `testes/saida/caixa-trava-*.png`.
+- `equipe-chao.js`: rodada 9 (N6) em 360 px: o tosador abre o Hoje por Meus pets de hoje (alerta em vermelho, um toque por etapa até Entregue, que conclui), Agenda em Só os meus (lembra a escolha, alerta na linha, serviço sem corte), atalho de chegada que entra no Conferir a entrada, Minha comissão só com o total, e nenhuma resposta da sessão com preço; a monitora sem Agenda não vê o banho, marca o remédio atrasado em Cuidados de agora, botões de dose com 48 px e a ficha impressa sem "Nenhum remédio anotado"; a dona (1366) vê o Thor em Atendimentos para cobrar. Capturas `testes/saida/chao-*.png`.
 - `robustez.js`: check-in que troca pet e tipo limpa a saída prevista e recusa a data a dois anos (390 e 1366), cartão com o ano, aba velha do caixa avisa "Este caixa já foi fechado", foco visível, "Preencha este campo.", rascunho do Pet novo depois de recarregar e a faixa "Sem internet agora".
 - `estreante-m.js` (360 px): conta nova com "Agora, o primeiro cliente" e "Faltam 2 coisas para começar", sem "Cadastrar o primeiro pet"; o botão Ajuda do alto (44 px) abre Tirar uma dúvida, Pedir para o Mozart fazer, Manual e o passo a passo da tela, e o Ajuda do Mais abre a mesma folha; sem rolagem para o lado, nome do pet shop inteiro, dias da agenda com 44 px; valor do porte no pedido pelo link; álbum com "Banho e corte de unhas"; modo simples (Outras áreas, Agenda sem Quadro, Mais opções no horário, recebimento sem pedir para abrir o caixa).
 - `rodada2-h.js`: segunda rodada no site real (Rafael): check-out com o banco respondendo "statement timeout" (a tela diz que demorou, sem o texto do banco, e a nova tentativa fecha a conta uma vez só); entrada com a foto que não sobe (salva sem ela, avisa na folha, a foto fica com Tentar de novo e entra depois); Quanto sobrou numa creche só com as mensalidades (390 e 1366).
@@ -675,6 +713,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   "Para clientes pessoa física, a multa por atraso costuma ser limitada a 2%..." e salva assim mesmo; só juros também avisa. **Link de
   agendamento**: o texto das dúvidas (inteligência artificial, podem errar) e "Seus dados vão só para <loja>, para responder ao seu
   pedido." em "Com quem a gente fala?"; sem rolagem para o lado. Capturas em `testes/saida/lgpd-ajustes-*.png`.
+- `operacao.js`: rodada 9 (operação), em 390 e 1366. Hoje com o banco demorando (resposta de tempo esgotado em `gestao_hoje`): aparece
+  "Demorou demais, tente de novo" com Tentar de novo, a leitura antiga de ~25 consultas não é disparada e a tela não diz "agenda livre";
+  com a função inexistente, lê do jeito antigo. Painel do administrador: aviso no alto e, na aba Dados, "Rotinas automáticas" (faxina
+  atrasada com o motivo; "em dia" depois de rodar bem) e a conta com a exclusão vencida há 4 dias marcada como atrasada.
 - `lgpd.js`: LGPD pela tela, em 390 e 1366. Meu pet shop, "Seus dados e a conta" com três cartões; "Baixar todos os dados" baixa um
   .zip (lido com o `zipfile` do Python) com README.txt e uma planilha por parte (clientes, pets, saúde, agenda, estadias, mensalistas,
   pacotes, lançamentos, vendas, caixas, produtos, movimentos, boletins, autorizações de fotos, equipe), todas com BOM, só os clientes
@@ -787,6 +829,34 @@ Para testar a rota à mão: `curl -H "x-gestao-faxina: <segredo>" https://…/ap
 A mesma faxina apaga as contas com o prazo de "Encerrar e apagar a conta" vencido (pet shop, arquivos e os logins do Maestro que
 ficaram sem pet shop) e os arquivos da fila da LGPD. A **cópia completa** do painel do administrador (`/api/gestao/admin/copia`)
 também usa `SUPABASE_SERVICE_ROLE_KEY` (sem ela, 503); só passa quem `sou_admin` diz que é admin.
+
+**Trava do servidor (migração 20261228).** O Tirar dúvida do link, o chat da página de vendas e o IP do aceite da entrada
+dependem de o banco conhecer o segredo do servidor (`GESTAO_SEGREDO_SERVIDOR`, 32+ caracteres; sem ela, o segredo é derivado
+da `ANTHROPIC_API_KEY`). Como fica em produção:
+1. com `SUPABASE_SERVICE_ROLE_KEY` na Vercel, o servidor grava a trava sozinho no primeiro pedido depois de publicar
+   (`garantirTrava` em `src/lib/gestao/servidor.ts`) e regrava se a chave for trocada; ninguém precisa tocar em nada;
+2. sem essa chave, vale o botão **Ligar a trava** do painel do administrador (aba Cakto);
+3. enquanto nenhuma das duas coisas acontece, o banco aceita a contagem só até a data de carência (7 dias depois da migração,
+   `config_interna.servidor_trava_carencia_ate`, mostrada no painel). Passou a data sem trava: o Tirar dúvida responde "fora do
+   ar" e o chat de vendas responde o texto fixo com o WhatsApp, até a trava ser ligada. Com a trava ligada, segredo errado ou
+   ausente é sempre recusado (quem chama a função direto com a chave pública não gasta a cota de ninguém).
+
+**Tetos de gasto com IA por dia, somando todos os pet shops** (`config_interna`, número de até 6 dígitos; sem a linha vale o padrão):
+`mozart_dia_geral` 8000 chamadas ao modelo · `ajuda_dia_geral` 3000 perguntas · `boletim_dia_geral` 1500 textos ·
+`link_ia_dia_geral` 3000 perguntas · `vendas_limite_dia` 2000 mensagens · `caderno_dia_geral` 3000 páginas ·
+`mozart_teste_dia` 60 e `ajuda_teste_dia` 40 pedidos por dia de um pet shop em teste grátis · `lojas_por_rede_dia` 10 pet shops
+novos por rede por dia. Para mudar: `insert into config_interna (chave, valor) values ('mozart_dia_geral', '12000') on conflict
+(chave) do update set valor = excluded.valor;`. O painel do administrador (aba Cakto) mostra o usado e o teto de cada canal no dia.
+Além disso, ponha um limite mensal de gasto na chave da Anthropic (console da Anthropic): é a última barreira.
+
+**Senha mínima.** As telas pedem 8 caracteres e `supabase/config.toml` (banco local) também. Em produção quem recusa a senha curta
+é o Supabase Auth: mude no painel do Supabase, Authentication → Policies (ou Providers → Email) → Minimum password length = 8,
+e ligue "Prevent use of leaked passwords" se o plano tiver. O projeto é dividido com o Escala CEO: vale para os dois.
+
+**Cabeçalhos de segurança** (`next.config.ts`, `cabecalhosDeSeguranca`): valem em todas as páginas. A lista do que a página pode
+carregar está em modo "só avisando" (`Content-Security-Policy-Report-Only`); os avisos caem em `/api/gestao/csp` e aparecem nos
+logs da Vercel como `[csp] …`. Depois de alguns dias sem aviso legítimo, troque o nome do cabeçalho para `Content-Security-Policy`.
+Script, imagem ou serviço novo de fora? Ponha o endereço na lista (o teste `telas/seguranca-rodada9.js` acusa aviso nas telas).
 
 ## Resultados que são assim de propósito
 

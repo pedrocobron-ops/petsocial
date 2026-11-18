@@ -415,7 +415,8 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
         if (criados.current.has(`d:${d.id}:conta`)) continue;
         await lancarAReceber(sb, petshop.id, {
           valor: d.valor!, vencimento: hoje, categoria: "Outros",
-          descricao: (d.descricao.trim() || "Trazido do caderno").slice(0, 120), clienteId: id,
+          // sem descrição: "Conta anterior" (este nome aparece na cobrança que vai para o tutor; "desde" já diz que veio do caderno)
+          descricao: (d.descricao.trim() || "Conta anterior").slice(0, 120), clienteId: id,
           devidoDesde: d.desde && d.desde <= hoje ? d.desde : null, chave: parteDaChave(chave, "divida", d.id),
         });
         criados.current.set(`d:${d.id}:conta`, id);

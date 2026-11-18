@@ -8,7 +8,7 @@
 //  - o cartão do pedido pelo link mostra o valor do porte (Banho M = R$ 60,00).
 //  - o álbum chama a visita pelos serviços feitos ("Banho e corte de unhas"), não "Banho e tosa".
 //  - modo simples: Relatórios vai para Outras áreas, a Agenda fica sem Quadro e Imprimir, o horário guarda o resto em Mais opções
-//    (Cliente cancelou, Apagar) e o recebimento não pede para abrir o caixa. Desligado (pet shop de antes): tudo como era.
+//    (Cliente cancelou, Apagar) e o recebimento só oferece abrir o caixa quando a forma é Dinheiro (rodada 9). Desligado (pet shop de antes): tudo como era.
 const B = require('../lib/base');
 const N = require('../lib/navegador');
 const { criarLoja } = require('../lib/semente');
@@ -116,7 +116,14 @@ const txt = async (l) => (await l.innerText()).replace(/ /g, ' ');
   await foto(page, 'horario-simples');
   await det.locator('button', { hasText: 'Fechar a conta' }).first().click(); await page.waitForTimeout(1500);
   const conta = await txt(page.locator('.g-folha').last());
-  T.ok('o recebimento não pede para abrir o caixa (Banho 50 + Corte de unhas 15)', !/Falta abrir o caixa/.test(conta) && /Receber R\$\s65,00/.test(conta), conta.slice(-300));
+  T.ok('sem forma escolhida, o recebimento não fala do caixa (Banho 50 + Corte de unhas 15)', !/Falta abrir o caixa/.test(conta) && /Receber R\$\s65,00/.test(conta), conta.slice(-300));
+  // rodada 9: escolhendo Dinheiro, o caixa do dia é oferecido ali mesmo (sem isso, o primeiro fechamento dava diferença na gaveta)
+  const folhaConta = page.locator('.g-folha').last();
+  await folhaConta.locator('.g-chips button, button.g-chip', { hasText: 'Pix' }).first().click(); await page.waitForTimeout(300);
+  T.ok('com Pix, continua sem falar do caixa', !/Falta abrir o caixa/.test(await txt(folhaConta)));
+  await folhaConta.locator('.g-chips button, button.g-chip', { hasText: 'Dinheiro' }).first().click(); await page.waitForTimeout(600);
+  const comDinheiro = await txt(folhaConta);
+  T.ok('com Dinheiro: "Falta abrir o caixa do dia", com Troco na gaveta agora e o botão Abrir o caixa', /Falta abrir o caixa do dia/.test(comDinheiro) && /Troco na gaveta agora/.test(comDinheiro) && (await folhaConta.getByRole('button', { name: 'Abrir o caixa' }).isVisible()), comDinheiro.slice(-500));
   await foto(page, 'conta-simples');
 
   T.ok('nenhum erro de página', erros.length === 0, erros.slice(0, 4));

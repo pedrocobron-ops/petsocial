@@ -84,6 +84,22 @@
 .g-ht-cuid .horas { display: flex; flex-wrap: wrap; gap: 6px; }
 .g-ht-feito { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--g-linha-forte); background: #fffdf9; font: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; color: var(--g-tinta); }
 .g-ht-feito svg { width: 14px; height: 14px; }
+/* dedo molhado, luva: o botão de cada dose tem pelo menos 48 px nos dois sentidos */
+.g-ht-feito { min-height: 48px; min-width: 56px; justify-content: center; padding: 8px 14px; font-size: .9375rem; }
+.g-ht-cuid .horas { gap: 8px; }
+.g-ht-feito.atrasada { background: #fde8e4; border: 2px solid #b3402e; color: #8a2a1c; }
+.g-ht-feito.agora { border: 2px solid #b26a00; background: #fff4dc; color: #6e4300; }
+/* doses de agora, na tela Hoje e no alto de Creche e hotel */
+.g-ht-agora { display: grid; gap: 10px; }
+.g-ht-agora ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.g-ht-agora li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--g-linha); background: var(--g-carta); }
+.g-ht-agora li.atrasada { border: 2px solid #b3402e; background: #fdf0ed; }
+.g-ht-agora li .t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.g-ht-agora li .t b { font-size: 1rem; overflow-wrap: anywhere; }
+.g-ht-agora li .t span { font-size: .875rem; color: var(--g-tinta); overflow-wrap: anywhere; }
+.g-ht-agora li .t .quando { font-weight: 700; color: #8a2a1c; }
+.g-ht-agora li:not(.atrasada) .t .quando { color: #6e4300; }
+.g-ht-agora li .g-btn { flex: none; min-height: 48px; }
 .g-ht-feito[aria-pressed="true"] { background: #e3efe3; border-color: rgba(36, 84, 59, .4); color: #24543b; }
 .g-ht-feito small { font-weight: 500; color: inherit; opacity: .85; }
 .g-ht-cuid-linha { display: grid; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--g-linha); background: var(--g-carta); }

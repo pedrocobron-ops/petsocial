@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./banco";
 import { SUPABASE_CHAVE, SUPABASE_URL } from "./supabase";
 import { BUCKET_ENTRADA } from "./entrada";
+import { garantirTrava, segredoDoServidor } from "./servidor";
 
 /**
  * O lado do servidor da página do aceite da entrada (/gestao/entrada/<código>), só com a chave pública. Só importar em código de
@@ -58,7 +59,11 @@ export type RespostaDoAceite = { ok: true; aceito_em: string; nome: string } | {
 
 /** "Li e concordo": grava uma vez (o segundo toque devolve o que já estava). */
 export async function aceitarEntrada(token: string, nome: string, ip: string, navegador: string): Promise<RespostaDoAceite> {
-  const r = await banco().rpc("entrada_aceitar", { p_token: token, p_nome: nome, p_ip: ip, p_navegador: navegador });
+  // o IP que o servidor viu só vale no banco com o segredo do servidor (senão o banco usa o endereço que ele mesmo vê)
+  await garantirTrava();
+  let r = await banco().rpc("entrada_aceitar", { p_token: token, p_nome: nome, p_ip: ip, p_navegador: navegador, p_segredo: segredoDoServidor() ?? undefined });
+  // banco ainda sem o parâmetro novo (antes da migração 20261228): como antes
+  if (r.error && (r.error.code === "PGRST202" || r.error.code === "42883")) r = await banco().rpc("entrada_aceitar", { p_token: token, p_nome: nome, p_ip: ip, p_navegador: navegador });
   if (r.error) {
     if (r.error.code === "PT429") return { ok: false, status: 429, mensagem: "Muitos toques agora. Espere um minuto e tente de novo." };
     if (r.error.code === "P0001") return { ok: false, status: 400, mensagem: r.error.message };

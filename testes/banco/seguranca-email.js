@@ -204,8 +204,16 @@ function chaveDeServico() {
   const C1 = await criarLoja(T, { nome: 'Email cakto 1', equipe: false, dados: false });
   let r = await evento(C1.emails.dono, { pago_em: new Date(Date.now() - 3600e3).toISOString() });
   T.ok('compra de antes da conta existir: não cai na loja (sem_conta)', r.data === 'sem_conta' && status(C1.P) === 'teste', r.error?.message ?? r.data);
+  // (migração 20261228) o e-mail já estava na conta, mas a dona nunca PROVOU que a caixa de entrada é dela: não libera
+  r = await evento(C1.emails.dono);
+  T.ok('e-mail da conta sem prova (cadastro não confirma e-mail): não cai na loja (sem_conta)', r.data === 'sem_conta' && status(C1.P) === 'teste', r.error?.message ?? r.data);
+  T.ok('… e o aviso guarda o pet shop provável para o painel', B.num(`select count(*) from cakto_eventos where petshop_id is null and payload->>'sem_prova' = '${C1.P}'`) === 1);
+  // a dona prova o e-mail (entrou por um link mandado para ele): o pagamento que esperava (feito com a conta já criada) liga sozinho
+  B.sql(`insert into emails_confirmados (user_id, email) select id, lower(email) from auth.users where email = '${C1.emails.dono}' on conflict (user_id) do update set email = excluded.email`);
+  T.ok('provou o e-mail: o pagamento que esperava liga sozinho', status(C1.P) === 'ativa' && B.num(`select count(*) from cakto_eventos where petshop_id = '${C1.P}' and payload ? 'ligado_por_prova'`) >= 1, status(C1.P));
+  B.sql(`update petshops set status = 'teste', pago_ate = null, cakto_assinatura = null where id = '${C1.P}'`);
   r = await evento(C1.emails.dono, { pago_em: 'não é data' });
-  T.ok('data da compra ilegível: vale agora (a conta já existia) → cai na loja', r.data === 'ok' && status(C1.P) === 'ativa', r.error?.message ?? r.data);
+  T.ok('data da compra ilegível: vale agora (a conta já existia, e-mail provado) → cai na loja', r.data === 'ok' && status(C1.P) === 'ativa', r.error?.message ?? r.data);
 
   // a dona troca o e-mail da conta para o do comprador DEPOIS da compra
   const C2 = await criarLoja(T, { nome: 'Email cakto 2', equipe: false, dados: false });

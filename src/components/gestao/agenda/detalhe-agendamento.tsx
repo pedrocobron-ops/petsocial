@@ -5,13 +5,14 @@ import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { foraDoLimite } from "@/lib/gestao/fiado";
 import { useState } from "react";
 import Link from "@/components/gestao/link-depois";
-import { BellRing, CalendarClock, CalendarX, Check, ChevronDown, HandCoins, MessageCircle, Play, Printer, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
+import { BellRing, CalendarClock, CalendarX, Check, ChevronDown, HandCoins, MessageCircle, Play, Printer, Receipt, Repeat, Trash2, Truck, UserX, NotebookPen } from "lucide-react";
 import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoCancelado, textoConfirmacao, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
 import { imprimirComprovante, textoComprovante, type AntigaNoComprovante } from "@/lib/gestao/comprovante";
 import { conferirCaixa, desfazerVenda, itensDoLancamento, lancarAReceber, lancarPago, produtosDaVenda, textoDoPagamento, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import { taxaDeFalta, travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
+import { ehErroDoLimite } from "@/lib/gestao/fiado";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { conferirDiaDoHorario } from "@/lib/gestao/dia-do-horario";
 import { fazerTudoOuNada } from "@/lib/gestao/tudo-ou-nada";
@@ -27,7 +28,8 @@ import { MarcaSemCobranca, semCobranca } from "./para-cobrar";
 import AntesDepois from "./antes-depois";
 import { modoSimples } from "@/lib/gestao/modo-simples";
 import { BotaoBoletim } from "../boletim/boletim";
-import { EntradaNaChegada, EntradaNaVisita, type VisitaDaEntrada } from "../entrada/entrada";
+import { EntradaNaChegada, EntradaNaVisita, useEntrada, type VisitaDaEntrada } from "../entrada/entrada";
+import { CampoComVoz } from "../ditado";
 import { continuarSerie, encerrarSerie, textoContinuou, VEZES_POR_VEZ } from "./series-acabando";
 import { LinhaPromo, usePromoDoHorario } from "./promo-do-horario";
 import { AvisoPacoteAcabando } from "../pacote-acabando";
@@ -62,7 +64,9 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const pet = a.pets;
   const tutor = pet?.clientes;
   const st = STATUS_AGENDAMENTO[a.status];
-  const visitaDaEntrada: VisitaDaEntrada | null = pet ? { tipo: "banho", agendamentoId: a.id, petId: pet.id, pet: pet.nome, tutor: tutor ? { nome: tutor.nome, telefone: tutor.telefone } : null } : null;
+  // os atalhos "Como o pet chegou" e o Conferir a entrada são uma lista só: o que foi tocado no atalho entra marcado na conferência
+  const visitaDaEntrada: VisitaDaEntrada | null = pet ? { tipo: "banho", agendamentoId: a.id, petId: pet.id, pet: pet.nome, tutor: tutor ? { nome: tutor.nome, telefone: tutor.telefone } : null, atalhos: checklist } : null;
+  const { entrada: entradaSalva } = useEntrada({ tipo: "banho", agendamentoId: a.id });
   const encerrado = ["concluido", "faltou", "cancelado"].includes(a.status);
   const deHoje = mesmoDia(new Date(a.inicio), new Date());
   // fotos: de hoje para trás, em horário que aconteceu (ou em qualquer um que já tenha foto)
@@ -113,6 +117,27 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
       antigas, diferencaCobrada: Number(diferencas.error ? 0 : diferencas.data ?? 0),
     };
   }, [a.id, a.status, a.sem_cobranca]);
+  // "Da última vez": a anotação do último atendimento concluído deste pet (lâmina, shampoo, comportamento), para quem atende agora
+  const { dados: ultimaNota } = useDados(async () => {
+    const r = await sb.from("agendamentos").select("id, inicio, obs").eq("petshop_id", petshop.id).eq("pet_id", a.pet_id).eq("status", "concluido")
+      .lt("inicio", a.inicio).not("obs", "is", null).order("inicio", { ascending: false }).limit(1);
+    const u = r.data?.[0];
+    return u?.obs?.trim() ? { inicio: u.inicio, obs: u.obs.trim() } : null;
+  }, [a.id, a.pet_id, a.inicio]);
+  // anotação de como foi o atendimento: fica no horário e aparece no histórico do pet e no próximo atendimento
+  const [anotando, setAnotando] = useState(false);
+  const [nota, setNota] = useState(a.obs ?? "");
+  async function salvarNota() {
+    if (somenteLeitura()) return;
+    setOcupado(true);
+    try {
+      ok(await sb.from("agendamentos").update({ obs: nota.trim().slice(0, 400) || null }).eq("id", a.id).select("id").single());
+      avisar("Anotação salva. Ela aparece no histórico do pet e no próximo atendimento.");
+      setAnotando(false);
+      avisarMudanca();
+      aoMudar();
+    } catch (e) { avisarErro(e); } finally { setOcupado(false); }
+  }
   // mais de um serviço no mesmo horário: o pacote cobre só o principal; os outros entram na conta
   const outros = servicosAMais(a);
   const valorOutros = Math.round(outros.reduce((t, o) => t + Number(o.preco ?? 0), 0) * 100) / 100;
@@ -162,7 +187,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const porQueNao = extra?.emCaixaFechado ? "O pagamento deste atendimento está em um caixa já fechado: só o dono do pet shop pode reabrir, alterar ou apagar."
     : temConta ? "Atendimento com pagamento lançado: só o dono ou quem cuida do financeiro pode reabrir, alterar ou apagar."
     : concluidoTravado ? "Com o preço travado, só o dono ou quem vê o financeiro volta para marcado ou apaga um atendimento concluído. Falta cobrar? Feche a conta pelo valor do horário."
-    : a.status !== "concluido" ? "Para tirar este horário, use Desmarcar horário: ele fica no histórico. Apagar da agenda é com o dono ou quem vê o financeiro."
+    : a.status !== "concluido" ? "Para tirar este horário, toque em Cliente cancelou (ou Faltou): ele fica no histórico. Apagar da agenda é com o dono ou quem vê o financeiro."
     : "Atendimento concluído: só quem cuida do caixa ou do financeiro pode reabrir, alterar ou apagar.";
 
   async function mudar(campos: Partial<{ status: StatusAgendamento; checklist: Record<string, boolean>; lembrete_em: string; pronto_avisado_em: string; pacote_cliente_id: string }>, aviso?: string) {
@@ -249,7 +274,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   async function pedirApagar() {
     if (somenteLeitura()) return;
     if (lancado > 0) { setApagando(true); return; }
-    if (!(await confirmar({ titulo: "Apagar este horário?", texto: `Ele some da agenda. Se o cliente só desmarcou, prefira Desmarcar horário, que fica no histórico.${avisoPacote}`, confirmar: "Apagar", perigo: true }))) return;
+    if (!(await confirmar({ titulo: "Apagar este horário?", texto: `Ele some da agenda. Se o cliente só desmarcou, prefira Cliente cancelou, que fica no histórico.${avisoPacote}`, confirmar: "Apagar", perigo: true }))) return;
     void apagar(false);
   }
 
@@ -272,7 +297,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
       }
       const foi = ok(await sb.from("agendamentos").delete().eq("id", a.id).select("id")) as { id: string }[];
       // o banco não apagou (regra de quem pode): nada some da tela sem ter saído do banco
-      if (!foi.length) throw new Error("Este horário não foi apagado: apagar da agenda é com o dono ou quem vê o financeiro. Use Desmarcar horário.");
+      if (!foi.length) throw new Error("Este horário não foi apagado: apagar da agenda é com o dono ou quem vê o financeiro. Use Cliente cancelou.");
       const fotos = [a.foto_antes, a.foto_depois].filter((c): c is string => Boolean(c));
       if (fotos.length) void sb.storage.from("pets").remove(fotos);
       avisar(`Horário apagado.${extraAviso}${!comRecebimento && lancado > 0 ? ` ${oLancado.replace(/^./, (c) => c.toUpperCase())} de ${brl(lancado)} ${recebido > 0 && aReceber > 0 ? "continuam" : "continua"} no financeiro.` : ""}`);
@@ -292,26 +317,50 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   async function pedirFalta() {
     if (somenteLeitura()) return;
     if (new Date(a.inicio).getTime() > Date.now()
-      && !(await confirmar({ titulo: "Marcar como falta?", texto: `O horário de ${pet?.nome ?? "este pet"} é ${dataAmigavel(a.inicio)} às ${hora(a.inicio)} e ainda não chegou. Se o cliente avisou que não vem, prefira Desmarcar horário.`, confirmar: "Marcar falta" }))) return;
+      && !(await confirmar({ titulo: "Marcar como falta?", texto: `O horário de ${pet?.nome ?? "este pet"} é ${dataAmigavel(a.inicio)} às ${hora(a.inicio)} e ainda não chegou. Se o cliente avisou que não vem, prefira Cliente cancelou.`, confirmar: "Marcar falta" }))) return;
     const antes = a.status;
-    if (!(await mudar({ status: "faltou" }))) return;
-    // taxa de falta ligada em Opções de cobrança: oferece anotar (quem decide é a pessoa)
-    if (taxa > 0 && vejoFinanceiro && tutor?.id && (await confirmar({
+    // taxa de falta ligada em Opções de cobrança: pergunta ANTES de gravar, e a falta e a taxa vão juntas numa gravação só
+    // (antes a taxa ia em segundo plano, depois da falta, e se perdia quando a pessoa recarregava a tela em seguida)
+    const comTaxa = taxa > 0 && vejoFinanceiro && Boolean(tutor?.id) && (await confirmar({
       titulo: `Anotar a taxa de falta de ${brl(taxa)}?`,
-      texto: `Fica na ficha de ${tutor.nome ?? "o tutor"} e em A receber. No próximo atendimento, aparece em Fechar a conta como "Deve de antes", para receber junto.`,
+      texto: `Fica na ficha de ${tutor?.nome ?? "o tutor"} e em A receber. No próximo atendimento, aparece em Fechar a conta como "Deve de antes", para receber junto. O horário fica como falta nos dois casos.`,
       confirmar: "Anotar a taxa", voltar: "Não cobrar",
-    }))) void anotarTaxa();
-    avisar(`${pet?.nome ?? "O pet"} ficou como falta.`, {
-      rotulo: "Desfazer",
-      fazer: () => {
-        // só volta se ainda estiver como falta (ninguém mexeu de novo nesse meio-tempo)
-        void sb.from("agendamentos").update({ status: antes }).eq("id", a.id).eq("petshop_id", petshop.id).eq("status", "faltou").select("id").then(({ data, error }) => {
-          if (error || !data?.length) { avisarErro(error ?? new Error("Não deu para desfazer: o horário já mudou de novo.")); return; }
-          avisar(`Desfeito: ${pet?.nome ?? "o pet"} voltou para ${STATUS_AGENDAMENTO[antes].rotulo.toLowerCase()}.`);
-          avisarMudanca();
-          aoMudar();
+    }));
+    await opTaxa.fazer(async (chave) => {
+      setOcupado(true);
+      try {
+        let r = await sb.rpc("agendamento_faltou", { p_agendamento: a.id, p_taxa: comTaxa, p_chave: chave });
+        // a taxa passa do limite de fiado do tutor: a falta fica marcada e a pessoa fica sabendo que a taxa não entrou
+        let semTaxaPorLimite: string | null = null;
+        if (r.error && comTaxa && ehErroDoLimite(r.error)) {
+          semTaxaPorLimite = r.error.message;
+          r = await sb.rpc("agendamento_faltou", { p_agendamento: a.id, p_taxa: false });
+        }
+        if (r.error) { avisarErro(r.error); return false; }
+        const feito = r.data as { taxa?: number; lancamento_id?: string | null } | null;
+        const anotada = Number(feito?.taxa ?? 0) > 0 ? feito!.lancamento_id ?? null : null;
+        avisarMudanca();
+        aoMudar();
+        if (semTaxaPorLimite) avisarErro(`A taxa de falta não foi anotada: ${semTaxaPorLimite} Só o dono ou quem cuida do financeiro pode liberar.`);
+        avisar(`${pet?.nome ?? "O pet"} ficou como falta.${anotada ? ` Taxa de ${brl(taxa)} anotada para ${tutor?.nome?.split(" ")[0] ?? "o tutor"}.` : ""}`, {
+          rotulo: "Desfazer",
+          fazer: () => {
+            // só volta se ainda estiver como falta (ninguém mexeu de novo nesse meio-tempo); a taxa anotada agora sai junto
+            void sb.from("agendamentos").update({ status: antes }).eq("id", a.id).eq("petshop_id", petshop.id).eq("status", "faltou").select("id").then(async ({ data, error }) => {
+              if (error || !data?.length) { avisarErro(error ?? new Error("Não deu para desfazer: o horário já mudou de novo.")); return; }
+              let comATaxa = "";
+              if (anotada) {
+                const t = await sb.from("lancamentos").delete().eq("id", anotada).eq("petshop_id", petshop.id).eq("pago", false).select("id");
+                comATaxa = t.error || !t.data?.length ? " A taxa de falta continua anotada: tire em Financeiro, A receber." : " A taxa de falta saiu junto.";
+              }
+              avisar(`Desfeito: ${pet?.nome ?? "o pet"} voltou para ${STATUS_AGENDAMENTO[antes].rotulo.toLowerCase()}.${comATaxa}`);
+              avisarMudanca();
+              aoMudar();
+            });
+          },
         });
-      },
+        return true;
+      } finally { setOcupado(false); }
     });
   }
 
@@ -325,21 +374,6 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
 
   const taxa = taxaDeFalta(petshop);
   const opTaxa = useOperacao();
-  /** Anota a taxa de falta para o tutor (uma vez só, mesmo com toque duplo). */
-  const anotarTaxa = () => opTaxa.fazer(async (chave) => {
-    if (!tutor?.id) return false;
-    try {
-      const vence = isoDia(somaDias(new Date(), 7));
-      await lancarAReceber(sb, petshop.id, {
-        valor: taxa, vencimento: vence, categoria: "Outros", clienteId: tutor.id, chave,
-        descricao: `Taxa de falta ${dataCurta(new Date(a.inicio))}${pet?.nome ? ` (${pet.nome})` : ""}`,
-      });
-      avisar(`Taxa de falta de ${brl(taxa)} anotada para ${tutor.nome?.split(" ")[0] ?? "o tutor"}.`);
-      avisarMudanca();
-      return true;
-    } catch (e) { avisarErro(e); return false; }
-  });
-
   // horário que já começou (ou foi marcado depois, para anotar): lembrete e confirmação para o tutor não fazem sentido (achado da Neide)
   const jaPassou = new Date(a.inicio).getTime() < Date.now();
   const zap = linkWhatsApp(tutor?.telefone, textoLembrete({
@@ -365,6 +399,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const zapCancelado = linkWhatsApp(tutor?.telefone, textoCancelado({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", sexo: pet?.sexo, quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome }));
 
   const zapPronto = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", sexo: pet?.sexo, petshop: petshop.nome, servico: servicosPorExtenso(a) }));
+  // concluiu hoje e o tutor ainda não foi avisado: a folha continua aberta, com o "Avisar que terminou" à mão
+  const ofereceAvisar = deHoje && Boolean(zapPronto) && !avisadoEm;
 
   // comprovante: só para quem vê o financeiro, com o atendimento concluído, a conta toda recebida e telefone na ficha.
   // Com o que entrou junto para o fiado (e o troco), pelo banco: sem isso, o comprovante diria só a conta do horário.
@@ -526,7 +562,19 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           {a.pacote_cliente_id && <div className="g-fila entre"><span className="g-muted">Pagamento</span><b>{outros.length ? `${a.servicos?.nome ?? "Serviço"} pelo pacote` : "Pelo pacote"}</b></div>}
           {a.leva_traz && <div className="g-fila"><Truck size={18} /><span>Leva e traz{a.endereco_leva_traz ? `: ${a.endereco_leva_traz}` : ""}</span></div>}
           {tutor && <FidelidadeNoHorario clienteId={tutor.id} />}
-          {a.obs && <p className="g-p">{a.obs}</p>}
+          {a.obs && !anotando && <p className="g-p">{a.obs}</p>}
+          {ultimaNota && <p className="g-pp g-agd-ultima"><b>Da última vez ({dataCurta(ultimaNota.inicio)}):</b> {ultimaNota.obs}</p>}
+          {(a.status === "em_atendimento" || a.status === "concluido") && (anotando ? (
+            <div className="g-campo">
+              <span>Como foi o atendimento</span>
+              <CampoComVoz valor={nota} aoMudar={setNota} maxLength={400} rotulo="Ditar como foi o atendimento"><textarea className="g-textarea" value={nota} maxLength={400} onChange={(e) => setNota(e.target.value)} placeholder="Lâmina, shampoo, como o pet se comportou, o que o tutor pediu…" /></CampoComVoz>
+              <small>Fica no histórico do pet e aparece no próximo atendimento como &quot;Da última vez&quot;.</small>
+              <div className="g-fila">
+                <button type="button" className="g-btn sec p" disabled={ocupado} onClick={() => void salvarNota()}>Salvar anotação</button>
+                <button type="button" className="g-btn fantasma p" onClick={() => { setAnotando(false); setNota(a.obs ?? ""); }}>Voltar</button>
+              </div>
+            </div>
+          ) : <div><button type="button" className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) { setNota(a.obs ?? ""); setAnotando(true); } }}><NotebookPen />{a.obs ? "Mudar a anotação" : "Anotar como foi (lâmina, shampoo…)"}</button></div>)}
           <AceiteDoLink agendamentoId={a.id} />
         </div>
         {a.serie_id && extra?.fimDaSerie && !encerrado && (
@@ -538,7 +586,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           </p>
         )}
 
-        {(a.status === "em_atendimento" || Object.values(checklist).some(Boolean)) && (
+        {/* com a entrada já conferida, vale a conferência (a que o tutor assina): os atalhos saem da frente */}
+        {!entradaSalva && (a.status === "em_atendimento" || Object.values(checklist).some(Boolean)) && (
           <div className="g-campo"><span>Como o pet chegou</span>
             <div className="g-chips">
               {CHECKLIST_BANHO.map((c) => (
@@ -546,6 +595,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
                   onClick={() => { const novo = { ...checklist, [c.id]: !checklist[c.id] }; setChecklist(novo); void mudar({ checklist: novo }); }}>{c.rotulo}</button>
               ))}
             </div>
+            {a.status === "em_atendimento" && <small>O que você marcar aqui já entra marcado em Conferir a entrada, que é o que o tutor assina.</small>}
           </div>
         )}
 
@@ -581,7 +631,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
                 <Receipt />{pacote ? "Cobrar à parte, sem usar o pacote" : "Fechar a conta"}{aCobrar ? ` · ${brl(Math.max(0, Math.round((aCobrar - promoValor) * 100) / 100))}` : ""}
               </button>
             )}
-            {sabe && (!vejoFinanceiro || pago) && <button className={`g-btn ${pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void conferirDiaDoHorario(a.inicio, confirmar).then((sim) => sim && mudar({ status: "concluido" }, "Atendimento concluído.")).then((deu) => deu && aoFechar())}><Check />{pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}
+            {sabe && (!vejoFinanceiro || pago) && <button className={`g-btn ${pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void conferirDiaDoHorario(a.inicio, confirmar).then((sim) => sim && mudar({ status: "concluido" }, ofereceAvisar ? "Atendimento concluído. Quer avisar o tutor? O botão está logo abaixo." : "Atendimento concluído.")).then((deu) => deu && !ofereceAvisar && aoFechar())}><Check />{pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}
           </div>
         )}
         {faltaCobrar && (

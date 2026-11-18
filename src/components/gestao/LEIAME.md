@@ -97,6 +97,14 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   por pet shop, pessoa e `tipo`, só a própria pessoa lê; sai ao salvar ou descartar e sozinha depois de 7 dias. Rascunho de digitação
   barata (guia inicial, formulários) continua no aparelho (`lembrado.ts`). Planilha de clientes: só por `importar_clientes` (tudo ou nada,
   resumo contado no banco, guardado em `importacoes`), com as linhas montadas por `linhasParaOBanco` (`src/lib/gestao/planilha.ts`).
+- Equipe do chão (migração 20261232): quem não tem Caixa, Financeiro nem Relatórios recebe da comissão só o total do mês e a quantidade
+  (`minha_comissao`, `comissao_extrato` e `ver_comissao` vêm com `so_total`; base, percentual e valor por linha vazios; o dono libera em
+  `comissao.mostrar_valores`). Nunca mostre a essa pessoa um valor por atendimento: dividido pelo percentual, ele dá o preço.
+  "Entregue ao tutor" (`quadro_mover`) conclui o atendimento. A agenda do banho na tela Hoje é de quem tem `posso("agenda")` ou recebe
+  (`vejoAgenda`); quem atende e não mexe com dinheiro abre por `<MeuDia>` (`agenda/meu-dia.tsx`). Ficha de cuidados e ocorrências vêm
+  LIGADAS (`cuidadosLigados`, `ocorrenciasLigadas`: só desligam por `hotel.sem_cuidados` / `casa.sem_ocorrencias`); dose atrasada por
+  `situacaoDaDose` / `dosesDeAgora` (`hotel.ts`), cartão `<CuidadosDeAgora>`. A ficha impressa nunca afirma "nenhum remédio" (`falaDeRemedio`).
+  Mensalista: plano + valor + primeira cobrança por `creche_plano_salvar` (tudo ou nada). Mozart do chão: `assistente/ferramenta-chao.ts`.
 - Datas: `agendamentos.inicio/fim` são `timestamptz`; campos `date` são texto `AAAA-MM-DD` (use `isoDia`, `deIsoDia`).
   Formatação em `src/lib/gestao/util.ts` (`brl`, `hora`, `dataAmigavel`, `dataCurta`, `fmtTelefone`, `linkWhatsApp`…).
 
@@ -170,6 +178,30 @@ O manual troca sozinho (`textoDaCasa` em `manual.ts`). Interruptor (`role="switc
 - Escola: `meu_email()` só devolve o e-mail provado (`emails_confirmados`, gravado por `email_provar` quando a sessão nasceu de
   um código ou link mandado para o e-mail depois que ele foi posto na conta);
 - Cakto: ver abaixo.
+
+## Segurança, rodada 9 (migração 20261228)
+
+- **Teto de IA**: toda rota que chama o modelo conta antes no banco. Mozart e Ajuda: `assistente_contar_v2` (devolve o motivo:
+  `limite` do pet shop, `geral` de todos juntos, `fechado` = conta só para consulta, que não usa IA); boletim, Tirar dúvida do
+  link, caderno e chat de venda têm as suas funções, todas com teto geral do dia em `config_interna` (lista em testes/LEIAME.md).
+  Rota nova com IA? Crie a contagem com teto geral e recuse quando `acesso_liberado` é falso. O aviso para a pessoa é simples e
+  diz que as telas seguem funcionando.
+- **Trava do servidor** (`src/lib/gestao/servidor.ts`): função aberta ao anônimo que gasta cota ou grava prova recebe
+  `p_segredo` e confere com `servidor_segredo_ok` (contagem; tem carência) ou `servidor_segredo_confere` (prova; sem carência).
+  A rota chama `garantirTrava()` antes: o servidor grava a própria impressão sozinho quando tem a chave de serviço.
+- **Clientes, pets e saúde por área** (regras do banco, não só o menu): leem `clientes` e `pets` as áreas Clientes, Agenda,
+  Creche e hotel, Pacotes, Caixa, Financeiro e Relatórios; criam as cinco primeiras; **editar o tutor é só da área Clientes**
+  (Caixa, Financeiro e Relatórios mudam apenas `limite_fiado`: gatilho `clientes_so_da_area`, que deixa passar as funções do
+  sistema). `pets_saude`: Clientes, Agenda e Creche e hotel. Tela nova que edita o tutor fora de Clientes precisa de uma função
+  própria no banco. Limite conhecido: quem atende (Agenda, Creche, Caixa) ainda lê a linha inteira do tutor (e-mail, endereço);
+  esconder essas colunas pede trocar as leituras das telas por funções (não dá para fazer por coluna sem quebrar `select *`).
+- **Cakto pelo e-mail** só liga para dono com o e-mail provado (`emails_confirmados`). Sem prova fica em Pagamentos sem conta com
+  o pet shop provável; `nova-senha` chama `email_provar` (quem abriu o link do e-mail provou) e o gatilho
+  `gestao_cakto_ligar_ao_provar` liga o pagamento que esperava.
+- **Versões dos documentos**: subiu `versao` em `documentos.ts`? Ponha a linha em `documentos_versoes` numa migração
+  (`aceitar_documentos` só aceita versão da tabela ou a seguinte à maior).
+- **Planilha (CSV)** com texto vindo de fora: `celulaCsv` (`src/lib/gestao/csv.ts`). **Cabeçalhos de segurança**: `next.config.ts`
+  (script ou serviço de fora novo entra na lista de lá).
 
 ## Cakto (assinatura)
 

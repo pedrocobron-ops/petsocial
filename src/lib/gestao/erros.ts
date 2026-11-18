@@ -102,6 +102,11 @@ export const ehDemora = (m: string) =>
 export function textoAmigavel(m: string): string | null {
   if (ehDemora(m)) return "Demorou demais, tente de novo.";
   if (/\b50[0-3]\b|Internal Server Error|Bad Gateway|Service Unavailable|upstream/i.test(m)) return "O servidor falhou agora. Tente de novo em instantes.";
+  // a gravação não achou a linha: quase sempre a pessoa não tem a área para mudar aquilo (o banco esconde a linha), ou alguém apagou
+  if (/Cannot coerce the result to a single JSON object|JSON object requested, multiple \(or no\) rows returned|PGRST116/i.test(m)) {
+    return "Não deu para mudar: o seu acesso não permite isso, ou o item já não existe. Atualize a tela; se precisar, fale com o dono.";
+  }
+  if (/row-level security|permission denied for/i.test(m)) return "O seu acesso não permite fazer isso. Fale com o dono do pet shop.";
   if (/does not exist|schema cache|Could not find the|syntax error|invalid input syntax|operator does not exist|is ambiguous|PGRST\d|null value in column|could not serialize|deadlock detected|too many connections|remaining connection slots/i.test(m)) {
     return "Algo deu errado do nosso lado. Tente de novo; se continuar, fale com o suporte.";
   }

@@ -70,6 +70,7 @@ async function pdf(page, nome) {
     const botoes = () => grupo.locator('button', { hasText: /^Salvar opções$/ }).count();
     T.ok('sem mudança, nenhum botão Salvar opções nos três cartões', (await botoes()) === 0, await botoes());
     await grupo.locator('#opcoes-creche [role=switch][aria-label="Extrato do mês por cachorro"]').click();
+    // Ocorrências vem ligada (rodada 9): o toque desliga
     await grupo.locator('#opcoes-casa [role=switch][aria-label="Ocorrências"]').click();
     const barra = page.locator('.g-salvar-junto');
     await barra.waitFor({ timeout: 5000 });
@@ -96,14 +97,14 @@ async function pdf(page, nome) {
     const avisos = await page.locator('#grupo-casa .g-rascunho', { hasText: 'Rascunho recuperado' }).count();
     const extratoLigado = await page.locator('#opcoes-creche [role=switch][aria-label="Extrato do mês por cachorro"]').getAttribute('aria-checked');
     const ocorrLigado = await page.locator('#opcoes-casa [role=switch][aria-label="Ocorrências"]').getAttribute('aria-checked');
-    T.ok('depois de recarregar: "Rascunho recuperado" nos dois cartões, chaves como estavam, faixa de volta', avisos === 2 && extratoLigado === 'true' && ocorrLigado === 'true' && await barra.isVisible(), { avisos, extratoLigado, ocorrLigado });
+    T.ok('depois de recarregar: "Rascunho recuperado" nos dois cartões, chaves como estavam, faixa de volta', avisos === 2 && extratoLigado === 'true' && ocorrLigado === 'false' && await barra.isVisible(), { avisos, extratoLigado, ocorrLigado });
     T.ok('nada foi gravado antes de salvar', JSON.stringify(opcoes()) === JSON.stringify({ extrato: null, ocorrencias: null }), opcoes());
     await page.screenshot({ path: `${SAIDA}/creche-sobras-rascunho-opcoes-390.png` }).catch(() => {});
 
     await barra.locator('button', { hasText: 'Salvar opções' }).click();
     await barra.waitFor({ state: 'detached', timeout: 10000 });
     const o = opcoes();
-    T.ok('um toque salvou os dois cartões', o.extrato === true && o.ocorrencias === true, o);
+    T.ok('um toque salvou os dois cartões', o.extrato === true && o.ocorrencias === false && B.sql(`select opcoes->>'casa.sem_ocorrencias' from petshops where id='${P}'`) === 'true', o);
     const sobra = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('maestro:rascunho:') && /opcoes-/.test(k)));
     T.ok('salvou: o rascunho some do aparelho', sobra.length === 0, sobra);
 

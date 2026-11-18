@@ -2,7 +2,8 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { horaFalada, lerCuidados, nomeDaAcomodacao } from "@/lib/gestao/hotel";
+import { falaDeRemedio, horaFalada, lerCuidados, nomeDaAcomodacao } from "@/lib/gestao/hotel";
+import { cuidadosLigados } from "@/lib/gestao/hotel-opcoes";
 import { contatosDoPet, nomeComRelacao, type Contato } from "@/lib/gestao/casa-opcoes";
 import { nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { dataCurta, deIsoDia, fmtTelefone, idade, isoDia } from "@/lib/gestao/util";
@@ -97,6 +98,11 @@ function Ficha({ e, compacta, pagina, hoje, contatos, vacinas }: { e: Estadia; c
   const cuidados = lerCuidados(e);
   const comida = cuidados.filter((c) => c.tipo === "comida"), remedio = cuidados.filter((c) => c.tipo === "remedio");
   const busca = contatos.filter((c) => c.tipo === "busca"), vets = contatos.filter((c) => c.tipo === "veterinario");
+  // o que está escrito à mão (alerta, observação do pet e da estadia): a ficha nunca diz "nenhum remédio" com texto livre na ficha,
+  // porque o remédio pode estar lá ("toma Gardenal 8h e 20h"). Nesse caso manda ler as observações, em destaque.
+  const livre = [pet?.alertas, pet?.obs, e.obs].filter((x): x is string => Boolean(x && x.trim()));
+  const remedioNoTexto = !remedio.length && falaDeRemedio(...livre);
+  const comLista = cuidadosLigados(petshop) || cuidados.length > 0;
   const fim = e.status === "encerrada" ? e.saida : e.saida_prevista;
   const atrasada = e.status === "em_casa" && Boolean(e.saida_prevista) && new Date(e.saida_prevista!).getTime() < Date.now();
   const sobre = [pet?.raca, pet?.porte ? `porte ${pet.porte}` : null, pet?.sexo === "M" ? "macho" : pet?.sexo === "F" ? "fêmea" : null, pet?.nascimento ? idade(pet.nascimento) : null].filter(Boolean).join(" · ");
@@ -121,22 +127,32 @@ function Ficha({ e, compacta, pagina, hoje, contatos, vacinas }: { e: Estadia; c
         </div>
       </div>
       {(pet?.alertas || pet?.obs || e.obs) && (
-        <div className={`g-pa-caixa larga${pet?.alertas ? " alerta" : ""}`}>
+        <div className={`g-pa-caixa larga${pet?.alertas || remedioNoTexto ? " alerta" : ""}`}>
           <h3>Atenção e observações</h3>
+          {remedioNoTexto && <p className="g-pa-remedio"><b>ATENÇÃO: as observações abaixo falam de remédio. Leia antes de cuidar do pet.</b></p>}
           {pet?.alertas && <p><b>{pet.alertas}</b></p>}
           {pet?.obs && <p>{pet.obs}</p>}
           {e.obs && <p>{e.obs}</p>}
         </div>
       )}
       <div className="g-pa-caixas">
-        <div className="g-pa-caixa">
-          <h3>Comida</h3>
-          {comida.length ? <ul>{comida.map(cuidado)}</ul> : <p className="vazio">Nada anotado na reserva.</p>}
-        </div>
-        <div className="g-pa-caixa">
-          <h3>Remédio</h3>
-          {remedio.length ? <ul>{remedio.map(cuidado)}</ul> : <p className="vazio">Nenhum remédio anotado.</p>}
-        </div>
+        {/* sem a lista de cuidados (o dono desligou) e sem nada combinado: os blocos não aparecem, para não afirmar o que ninguém perguntou */}
+        {(comLista || comida.length > 0) && (
+          <div className="g-pa-caixa">
+            <h3>Comida</h3>
+            {comida.length ? <ul>{comida.map(cuidado)}</ul>
+              : <p className="vazio">{livre.length ? "Sem horários em lista. Veja as observações acima." : "Sem horários em lista. Pergunte ao tutor."}</p>}
+          </div>
+        )}
+        {(comLista || remedio.length > 0 || remedioNoTexto) && (
+          <div className={`g-pa-caixa${remedioNoTexto ? " alerta" : ""}`}>
+            <h3>Remédio</h3>
+            {remedio.length ? <ul>{remedio.map(cuidado)}</ul>
+              : remedioNoTexto ? <p><b>Há remédio escrito nas observações acima.</b> As doses não estão em lista: confira os horários com o tutor.</p>
+              : livre.length ? <p className="vazio">Sem doses em lista. Leia as observações acima antes de dizer que não há remédio.</p>
+              : <p className="vazio">Sem doses em lista e sem observações. Confirme com o tutor se o pet toma algum remédio.</p>}
+          </div>
+        )}
         {!compacta && (
           <div className="g-pa-caixa">
             <h3>Tutor</h3>

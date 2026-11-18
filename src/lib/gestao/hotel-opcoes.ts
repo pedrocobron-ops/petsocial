@@ -12,6 +12,8 @@ export const CHAVES_HOTEL = {
   sinal: "hotel.sinal", pix: "hotel.pix", porte: "hotel.diaria_por_porte", temporadas: "hotel.temporadas",
   segundoPet: "hotel.desconto_segundo_pet", taxas: "hotel.taxas", cuidados: "hotel.cuidados", acomodacoes: "hotel.acomodacoes",
   mensagens: "hotel.mensagens", linkSemPreco: "hotel.link_sem_preco", horas: "hotel.horas",
+  /** O dono desligou a ficha de cuidados de propósito (a ficha vem ligada: veja `cuidadosLigados`). */
+  semCuidados: "hotel.sem_cuidados",
 } as const;
 
 /**
@@ -140,7 +142,12 @@ export function taxasDe(p: ComOpcoes): OpcaoTaxas {
   });
   return { ativo: o.ativo === true, lista: itens };
 }
-export const cuidadosLigados = (p: ComOpcoes) => opcao<boolean>(p, CHAVES_HOTEL.cuidados, false) === true;
+/**
+ * Ficha de cuidados (comida e remédio com dose e horários, e a lista do dia): vem LIGADA em todo hotel e creche, novo ou antigo,
+ * e só sai quando o dono desliga de propósito (`hotel.sem_cuidados`). A chave antiga `hotel.cuidados` gravava "desligado" em quem só
+ * salvou as outras opções sem mexer nela, e um hotel assim imprimia "nenhum remédio" para um cão medicado: por isso não vale mais.
+ */
+export const cuidadosLigados = (p: ComOpcoes) => opcao<boolean>(p, CHAVES_HOTEL.semCuidados, false) !== true;
 export function acomodacoesDe(p: ComOpcoes): OpcaoAcomodacoes {
   const o = obj(opcao<unknown>(p, CHAVES_HOTEL.acomodacoes, {}));
   const itens = lista(o.lista).flatMap((a): Acomodacao[] => {

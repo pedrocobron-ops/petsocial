@@ -131,7 +131,9 @@ const D = lib('dinheiro'), C = lib('credito'), F = lib('faturamento');
   const c1 = await doBanco();
   T.ok('comissão do tosador = R$ 127,49 (serviços 124,50 + produto 2,99)', linha(c1) === esperado, linha(c1));
   const minha = B.must(await tos.rpc('minha_comissao', { p_petshop: P }), 'minha comissão');
-  T.ok('"Minha comissão" do tosador mostra o mesmo', linha(minha.meses?.[0]) === esperado, linha(minha.meses?.[0]));
+  // rodada 9: quem não mexe com dinheiro recebe o mesmo total e a quantidade, sem a base nem a divisão (dariam o preço do serviço)
+  const m0 = minha.meses?.[0];
+  T.ok('"Minha comissão" do tosador mostra o mesmo total e os 4 atendimentos, sem a base', m0?.atendimentos === 4 && B.centavos(m0.comissao) === 12749 && m0.base === null && m0.comissao_servicos === null && minha.pct === null, m0);
   T.passa('dono paga a comissão do período', await dono.rpc('comissao_pagar', { p_profissional: L.ids.tosador, p_de: L.mes1, p_ate: L.hoje, p_forma: 'pix', p_valor: 127.49, p_chave: B.uuid() }));
   T.ok('sem pendência depois de pagar', (B.must(await dono.rpc('comissao_pendencias', { p_petshop: P }), 'pendências') ?? []).length === 0);
   T.recusa('pagar de novo sem nada devido é recusado', await dono.rpc('comissao_pagar', { p_profissional: L.ids.tosador, p_de: L.mes1, p_ate: L.hoje, p_forma: 'pix', p_valor: 10, p_chave: B.uuid() }));

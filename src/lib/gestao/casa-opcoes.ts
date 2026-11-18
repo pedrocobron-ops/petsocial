@@ -4,7 +4,7 @@ import { opcao } from "./opcoes";
 import { dataCurta, deIsoDia, isoDia, somaDias } from "./util";
 
 /**
- * O cuidado com o tutor na creche e no hotel (`petshops.opcoes`, chaves "casa.*"). Tudo começa desligado:
+ * O cuidado com o tutor na creche e no hotel (`petshops.opcoes`, chaves "casa.*"). Começa desligado, menos as ocorrências:
  * - diário do dia: o que o pet fez, marcado em um toque, com a mensagem pronta para o tutor;
  * - quem pode buscar: as pessoas autorizadas e o veterinário de emergência, conferidos na saída;
  * - lista de espera: quem quer vaga num dia cheio, e o aviso quando abre lugar;
@@ -19,7 +19,9 @@ export type Ocorrencia = T["estadias_ocorrencias"]["Row"];
 export type Espera = T["lista_espera"]["Row"];
 type ComOpcoes = { opcoes?: unknown };
 
-export const CHAVES_CASA = { diario: "casa.diario", portaria: "casa.portaria", espera: "casa.espera", ocorrencias: "casa.ocorrencias" } as const;
+export const CHAVES_CASA = { diario: "casa.diario", portaria: "casa.portaria", espera: "casa.espera", ocorrencias: "casa.ocorrencias",
+  /** O dono desligou as ocorrências de propósito (elas vêm ligadas: veja `ocorrenciasLigadas`). */
+  semOcorrencias: "casa.sem_ocorrencias" } as const;
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
@@ -49,7 +51,8 @@ export const nomeComRelacao = (c: { nome: string; relacao?: string | null }) => 
 
 /* ---------- ocorrências ---------- */
 
-export const ocorrenciasLigadas = (p: ComOpcoes) => opcao<boolean>(p, CHAVES_CASA.ocorrencias, false) === true;
+/** Ocorrências: vêm LIGADAS em toda creche e hotel; só saem quando o dono desliga de propósito (`casa.sem_ocorrencias`). */
+export const ocorrenciasLigadas = (p: ComOpcoes) => opcao<boolean>(p, CHAVES_CASA.semOcorrencias, false) !== true;
 export const TIPOS_DE_OCORRENCIA = [
   { id: "briga", rotulo: "Briga", frase: "se envolveu numa briga" },
   { id: "machucado", rotulo: "Machucado", frase: "se machucou" },

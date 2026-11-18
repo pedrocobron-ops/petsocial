@@ -1,5 +1,7 @@
 "use client";
 
+import { alertaCurto } from "@/lib/gestao/quadro";
+import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import { modoSimples } from "@/lib/gestao/modo-simples";
 import { useFaxinaDoBoletim } from "@/components/gestao/boletim/boletim";
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -43,7 +45,7 @@ const H_HORA = 64; // altura de uma hora na visão de semana, em px
 type Trecho = { b: Bloqueio; de: number; ate: number; inteiro: boolean };
 
 function Agenda() {
-  const { sb, petshop, equipe, liberado, souDono } = useGestao();
+  const { sb, petshop, equipe, liberado, souDono, eu, vejoFinanceiro } = useGestao();
   const simples = modoSimples(petshop);
   useFaxinaDoBoletim(); // boletim do pet: apaga os arquivos da fila (nada aparece na tela)
   const router = useRouter();
@@ -52,7 +54,18 @@ function Agenda() {
   useAdiantar(carregarForm, carregarDetalhe);
   const [dia, setDia] = useState(() => params.get("dia") ?? isoDia(new Date()));
   const [visao, setVisao] = useState<"dia" | "semana">(() => (params.get("visao") === "semana" ? "semana" : "dia"));
-  const [prof, setProf] = useState<string | null>(null);
+  // de quem é a agenda na tela: o aparelho lembra a última escolha de cada pessoa. Quem atende e não mexe com dinheiro
+  // (tosador, banhista) começa vendo só os horários dela; o dono e a recepção começam em Todos.
+  const chaveProf = `gestao:agenda:prof:${petshop.id}:${eu.id}`;
+  const [prof, setProfSolto] = useState<string | null>(() => {
+    const atendem = equipe.filter((p) => p.ativo && p.atende);
+    if (atendem.length < 2) return null;
+    const guardado = lerLembrado(chaveProf);
+    if (guardado === "todos") return null;
+    if (guardado && atendem.some((p) => p.id === guardado)) return guardado;
+    return eu.atende && !vejoFinanceiro && !souDono && atendem.some((p) => p.id === eu.id) ? eu.id : null;
+  });
+  const setProf = (id: string | null) => { setProfSolto(id); guardarLembrado(chaveProf, id ?? "todos"); };
   const [novo, setNovo] = useState<Novo | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
   const [editando, setEditando] = useState<AgendamentoCompleto | null>(null);
@@ -253,7 +266,7 @@ function Agenda() {
         {quemAtende.length > 1 && (
           <div className="g-chips">
             <button className="g-chip" aria-pressed={prof === null} onClick={() => setProf(null)}>Todos</button>
-            {quemAtende.map((p) => <button key={p.id} className="g-chip" aria-pressed={prof === p.id} onClick={() => setProf(p.id)}><i style={{ background: p.cor }} />{nomeNaEquipe(p.nome, nomesDaEquipe)}</button>)}
+            {quemAtende.map((p) => <button key={p.id} className="g-chip" aria-pressed={prof === p.id} onClick={() => setProf(p.id)}><i style={{ background: p.cor }} />{p.id === eu.id ? "Só os meus" : nomeNaEquipe(p.nome, nomesDaEquipe)}</button>)}
           </div>
         )}
 
@@ -433,8 +446,10 @@ function Agenda() {
                     <span className="t">
                       <b>{l.a.pets?.nome}</b>
                       <span className="serv"><i />{[nomeDosServicos(l.a), quemAtende.length > 1 && l.a.profissionais ? nomeNaEquipe(l.a.profissionais.nome, nomesDaEquipe) : null].filter(Boolean).join(" · ") || "Atendimento"}</span>
+                      {/* o alerta do pet vem antes de qualquer outra marca: quem vai pegar o pet lê antes de tocar */}
+                      {l.a.pets?.alertas && !["cancelado", "faltou"].includes(l.a.status) && <span className="g-agd-alerta">{alertaCurto(l.a.pets.alertas)}</span>}
                       {l.a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {l.a.pets.clientes.nome}</span>}
-                      {lotados.has(l.a.id) && !["cancelado", "faltou"].includes(l.a.status) && <span className="g-agd-lotado"><Users size={13} aria-hidden />Passa das vagas: {lotados.get(l.a.id)} ao mesmo tempo</span>}
+                      {lotados.has(l.a.id) && !["cancelado", "faltou"].includes(l.a.status) && <span className="g-agd-lotado"><Users size={13} aria-hidden /><span>Passa das vagas<span className="g-agd-lotado-n">: {lotados.get(l.a.id)} ao mesmo tempo</span></span></span>}
                     </span>
                     {l.a.leva_traz && <Truck size={18} aria-label="Leva e traz" />}
                     {l.a.pronto_avisado_em && <span className="g-agd-avisado" role="img" aria-label={`Tutor avisado às ${hora(l.a.pronto_avisado_em)}`} title={`Tutor avisado às ${hora(l.a.pronto_avisado_em)}`}><BellRing aria-hidden /></span>}

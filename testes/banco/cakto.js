@@ -26,6 +26,11 @@ const PRECOS = { solo: [79, 215, 399], equipe: [129, 349, 659], petshop: [179, 4
   const lojas = [];
   for (let i = 0; i < OFERTAS.length; i++) lojas.push(await criarLoja(T, { nome: `Cakto ${OFERTAS[i].plano}${OFERTAS[i].meses}`, equipe: false, dados: false }));
   const [cb, comum] = [await criarLoja(T, { nome: 'Cakto callback', equipe: false, dados: false }), await criarLoja(T, { nome: 'Cakto comum', equipe: false, dados: false })];
+  // Pagamento ligado só pelo e-mail vale apenas para dono que PROVOU o e-mail (migração 20261228): as lojas dos planos e a
+  // "comum" fazem de conta que o dono já entrou por um link mandado ao e-mail. A do callback fica sem a prova de propósito.
+  const provar = (...ls) => B.sql(`insert into emails_confirmados (user_id, email) select u.id, lower(u.email) from auth.users u join profissionais p on p.user_id = u.id
+    where p.papel = 'dono' and p.petshop_id in (${ls.map((l) => `'${l.P}'`).join(', ')}) on conflict (user_id) do update set email = excluded.email`);
+  provar(...lojas, comum);
   const adm = B.cliente();
   B.must(await adm.auth.signUp({ email: `t-${comum.suf}.admin@teste-auto.local`, password: comum.senha, options: B.dadosDoCadastro() }), 'admin');
   const uidAdm = (await adm.auth.getUser()).data.user.id;

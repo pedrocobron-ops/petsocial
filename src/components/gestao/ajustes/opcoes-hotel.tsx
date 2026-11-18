@@ -167,6 +167,7 @@ export default function OpcoesHotel() {
         [CHAVES_HOTEL.segundoPet]: segundo,
         [CHAVES_HOTEL.taxas]: { ativo: taxas.ativo, lista: taxas.lista.map((t) => ({ ...t, nome: t.nome.trim() })) },
         [CHAVES_HOTEL.cuidados]: cuidados,
+        [CHAVES_HOTEL.semCuidados]: !cuidados,
         [CHAVES_HOTEL.linkSemPreco]: semPreco,
         [CHAVES_HOTEL.acomodacoes]: { ativo: quartos.ativo, lista: quartos.lista.map((a) => ({ ...a, nome: a.nome.trim() })) },
         [CHAVES_HOTEL.mensagens]: Object.fromEntries(Object.entries(modelos).filter(([k, v]) => v && v.trim() && v.trim() !== MODELOS_PADRAO[k as keyof typeof MODELOS_PADRAO])),
@@ -332,7 +333,7 @@ export default function OpcoesHotel() {
           <div><button type="button" className="g-btn sec p" onClick={() => m(setTaxas)({ ...taxas, lista: [...taxas.lista, { id: novoCodigo(), nome: "", valor: 0, por: "fixa" }] })}><Plus />Nova taxa</button></div>
         </Opcao>
 
-        <Opcao titulo="Ficha de cuidados" frase="Comida e remédio de cada estadia, com horários, e uma lista do dia para a equipe marcar o que já foi feito." ligada={cuidados} aoMudar={m(setCuidados)} />
+        <Opcao titulo="Ficha de cuidados" frase="Comida e remédio de cada estadia, com dose e horários, e uma lista do dia para a equipe marcar o que já foi feito. Vem ligada: desligue só se o seu hotel não anota comida nem remédio no sistema." ligada={cuidados} aoMudar={m(setCuidados)} />
 
         {temHotel && (
           <Opcao titulo="Acomodações" frase="Liste os canis, baias ou quartos. A reserva pode ficar com uma acomodação, e o sistema avisa quando ela já está cheia nas datas." ligada={quartos.ativo} aoMudar={(v) => m(setQuartos)({ ...quartos, ativo: v })}>

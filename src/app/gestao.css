@@ -858,6 +858,27 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-ag .t .g-agd-tutor { white-space: normal; overflow: visible; overflow-wrap: anywhere; color: var(--g-tinta); font-size: .8125rem; margin-top: 1px; }
 .g-ag .t .g-agd-lotado { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; margin-top: 4px; padding: 3px 9px; border-radius: 10px; background: var(--g-amarelo-tint); color: #6e5510; font-size: .75rem; font-weight: 600; white-space: normal; }
 .g-ag .t .g-agd-lotado svg { flex: none; }
+/* Rodada 9 (equipe do chão): o alerta do pet aparece na linha da agenda e do Hoje, antes das outras marcas; o serviço quebra em
+   até duas linhas no celular em vez de ser cortado; "Passa das vagas" fica curto no celular (o número está no título). */
+.g-ag .t .g-agd-alerta { display: block; white-space: normal; overflow: visible; overflow-wrap: anywhere; margin-top: 3px; padding: 3px 8px; border-radius: 8px; background: #fde8e4; color: #8a2a1c; font-size: .8125rem; font-weight: 700; line-height: 1.3; }
+.g-ag .t .g-agd-lotado span { display: inline; font-size: inherit; color: inherit; overflow: visible; white-space: normal; }
+.g-ag .t .serv { display: flex; align-items: flex-start; white-space: normal; overflow: visible; overflow-wrap: anywhere; line-height: 1.3; }
+.g-ag .t .serv i { margin-top: .32em; }
+@media (max-width: 520px) { .g-ag .t .g-agd-lotado .g-agd-lotado-n { display: none; } }
+/* no celular, a etiqueta do status desce para a linha de baixo: o nome, o serviço e o alerta ficam com a largura toda */
+@media (max-width: 520px) {
+  .g-tempo .g-ag { flex-wrap: wrap; row-gap: 6px; }
+  .g-tempo .g-ag .t { flex: 1 1 62%; }
+  .g-tempo .g-ag > .g-tag { margin-left: auto; }
+}
+.g-agd-ultima { margin: 0; padding: 6px 10px; border-radius: 10px; background: var(--g-amarelo-tint); color: #5b4708; overflow-wrap: anywhere; }
+/* Meus pets de hoje (tela Hoje de quem atende) */
+.g-meu-dia-lista { display: grid; gap: 10px; }
+@media (min-width: 900px) { .g-meu-dia-lista { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); } }
+.g-meu-dia-bts { grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; }
+.g-meu-dia-bts .g-btn { min-height: 52px; }
+.g-meu-dia-bts .g-btn.sec { width: auto; padding-inline: 14px; }
+.g-meu-dia-bts .g-btn:only-child { grid-column: 1 / -1; }
 
 /* semana: horário acima das vagas e o botão "+N" quando há mais de dois ao mesmo tempo */
 .g-semana-col .g-bloco.lotado { outline: 2px dashed #b3402e; outline-offset: -2px; }

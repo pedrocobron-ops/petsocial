@@ -26,6 +26,7 @@ const NOMES: Record<string, [string, string]> = {
   mensagens_para_mandar: ["as", "mensagens para mandar"],
   ver_lucro: ["a", "conta de quanto sobrou"],
   ver_contas_fixas: ["as", "contas fixas"],
+  ver_contas_a_pagar: ["as", "contas a pagar"],
   ver_maquininha: ["a", "conta da maquininha"],
   ver_descontos: ["a", "soma dos descontos"],
   cadastrar_pet: ["o", "cadastro do pet"],
@@ -34,6 +35,10 @@ const NOMES: Record<string, [string, string]> = {
   bloquear_horario: ["o", "bloqueio da agenda"],
   remover_bloqueio: ["a", "retirada do bloqueio"],
   reservar_estadia: ["a", "reserva"],
+  ver_cuidados: ["a", "lista de comida e remédio"],
+  marcar_cuidado: ["a", "marcação da dose"],
+  mover_no_quadro: ["a", "troca de etapa no quadro"],
+  registrar_ocorrencia: ["o", "registro da ocorrência"],
   fazer_checkin: ["o", "check-in"],
   fazer_checkout: ["o", "check-out"],
   vender_pacote: ["a", "venda do pacote"],
@@ -49,6 +54,7 @@ const NOMES: Record<string, [string, string]> = {
   movimentar_estoque: ["o", "movimento do estoque"],
   criar_conta_fixa: ["o", "cadastro da conta fixa"],
   valor_conta_fixa: ["o", "valor da conta fixa"],
+  pagar_conta: ["a", "baixa da conta a pagar"],
 };
 
 const ARTIGO = /(?:^|\s)(o|a|os|as|do|da|dos|das|no|na|nos|nas|pelo|pela|pelos|pelas|ao|à|aos|às|um|uma)\s*$/i;

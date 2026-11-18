@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, Pill, Plus, Trash2, Utensils } from "lucide-react";
-import { horaFalada, lerCuidados, type Cuidado, type CuidadoFeito } from "@/lib/gestao/hotel";
+import { horaFalada, lerCuidados, situacaoDaDose, type Cuidado, type CuidadoFeito } from "@/lib/gestao/hotel";
 import { novoCodigo } from "@/lib/gestao/hotel-opcoes";
 import { hora, isoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -72,8 +72,13 @@ export function CuidadosDoDia({ estadia: e, feitos, aoMudar }: { estadia: Estadi
   const [ocupado, setOcupado] = useState<string | null>(null);
   const cuidados = lerCuidados(e);
   if (!cuidados.length) return null;
-  const hoje = isoDia(new Date());
+  const agora = new Date();
+  const hoje = isoDia(agora);
   const doDia = feitos.filter((f) => f.estadia_id === e.id && f.dia === hoje);
+  // dose que passou da hora (mais de meia hora) e ninguém marcou: fica em vermelho, com "atrasado" escrito (não só a cor)
+  const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+  const entrada = new Date(e.entrada);
+  const entrouMin = isoDia(entrada) === hoje ? entrada.getHours() * 60 + entrada.getMinutes() : null;
 
   async function alternar(c: Cuidado, h: string) {
     if (somenteLeitura() || ocupado) return;
@@ -100,10 +105,12 @@ export function CuidadosDoDia({ estadia: e, feitos, aoMudar }: { estadia: Estadi
           <div className="horas">
             {(c.horas.length ? c.horas : [""]).map((h) => {
               const feito = doDia.find((f) => f.item === c.id && f.hora === h);
+              const sit = h ? situacaoDaDose(h, agoraMin, Boolean(feito), entrouMin) : feito ? "feito" : "depois";
               return (
-                <button key={h} type="button" className="g-ht-feito" aria-pressed={Boolean(feito)} disabled={ocupado === `${c.id}-${h}`} onClick={() => void alternar(c, h)}
-                  aria-label={`${c.oque}${h ? ` das ${horaFalada(h)}` : ""}: ${feito ? "feito, toque para desfazer" : "marcar como feito"}`}>
+                <button key={h} type="button" className={`g-ht-feito${sit === "atrasada" ? " atrasada" : sit === "agora" ? " agora" : ""}`} aria-pressed={Boolean(feito)} disabled={ocupado === `${c.id}-${h}`} onClick={() => void alternar(c, h)}
+                  aria-label={`${c.oque}${h ? ` das ${horaFalada(h)}` : ""}: ${feito ? "feito, toque para desfazer" : sit === "atrasada" ? "atrasado, marcar como feito" : "marcar como feito"}`}>
                   {feito && <Check aria-hidden />}{h ? horaFalada(h) : feito ? "feito" : "Marcar feito"}
+                  {sit === "atrasada" && <small>atrasado</small>}{sit === "agora" && <small>agora</small>}
                   {feito && <small>feito{feito.feito_nome ? ` por ${feito.feito_nome.split(/\s+/)[0]}` : ""} {hora(feito.feito_em)}</small>}
                 </button>
               );

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, CalendarOff, DoorOpen, Home, HandCoins, Hourglass, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, ShieldAlert, ShieldCheck, Sun, Sunset, Syringe, Tag, Truck } from "lucide-react";
 import { useCalendario } from "@/components/gestao/calendario";
+import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useGestao } from "@/components/gestao/contexto";
 import { Kpi } from "@/components/gestao/painel";
 import { AvatarPet, avisarMudanca, Campo, CampoValor, EscolherPet, Esqueleto, Folha, mensagemDeErro, ok, useAdiantar, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
@@ -46,7 +47,9 @@ import {
   aceitaSinal, contaDasDiarias, contarDiarias, diariaFixa, diasDasNoites, diariaSugerida, estadiaSemCobranca, fatosDoDia, lerConta, lerCuidados, nivelDeOcupacao, nomeDaAcomodacao, ocupadasNoDia, ocupaNoDia, precoPorNoite, sinalSugerido,
   taxaNaConta, taxasGuardadas, temNoiteDiferente, oQueMudouNasNoites, textoDoCuidado, vagasDoTipo, type ContaDaEstadia, type Cuidado, type CuidadoFeito, type EstadiaDoTutor, type Mens, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
-import { acomodacoesDe, cuidadosLigados, horasDoHotel, porteDe, taxasDe } from "@/lib/gestao/hotel-opcoes";
+import { falaDeRemedio } from "@/lib/gestao/hotel";
+import { acomodacoesDe, cuidadosLigados, horasDoHotel, novoCodigo, porteDe, taxasDe } from "@/lib/gestao/hotel-opcoes";
+import CuidadosDeAgora from "@/components/gestao/hotel/cuidados-de-agora";
 import { principalDe, usaModulo } from "@/lib/gestao/modulos";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Estadia, Petshop } from "@/lib/gestao/tipos";
@@ -591,6 +594,8 @@ export default function CrecheHotel() {
 
       {usaCreche && (souDono || cuidoDoFinanceiro) && (ver === "chamada" || ver === "casa" || ver === "cobrancas") && <ReposicoesParaConferir />}
       {usaCreche && (ver === "chamada" || ver === "casa") && <div className="g-ht-acima"><ExperienciasDaCreche /></div>}
+      {/* comida e remédio na hora ou atrasados, de todos os hóspedes: um toque para marcar, sem rolar cartão por cartão */}
+      {ver === "casa" && comCuidados && <div className="g-ht-acima"><CuidadosDeAgora semLink aoMudar={() => void recarregar()} /></div>}
       {ver === "casa" && posso("agenda") && <div className="g-ht-acima"><PedidosLink /></div>}
 
       {/* Cobranças não espera os planos para começar a buscar as cobranças (os planos chegam junto e a tela completa) */}
@@ -961,7 +966,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   aoEspera?: (x: { pet: PetDaEstadia; tipo: Tipo; entrada: string; saida?: string; horaEntrada?: string; horaSaida?: string }) => void;
   aoFechar: () => void; aoGravar: (emCasa: boolean, chegou?: VisitaDaEntrada) => void;
 }) {
-  const { sb, petshop, vejoFinanceiro, souDono } = useGestao();
+  const { sb, petshop, vejoFinanceiro, souDono, cuidoDoFinanceiro } = useGestao();
+  // preço travado: quem só opera o caixa reserva e faz check-in pela diária da lista (o banco recusa uma diária menor)
+  const precoTravado = travaDePreco(petshop).ligada && vejoFinanceiro && !cuidoDoFinanceiro;
   const { avisar, avisarErro, confirmar } = useAvisos();
   const anotarParcelas = useAnotarParcelas();
   // só os tipos que o pet shop usa (na edição, o tipo da estadia aparece mesmo que tenha sido desligado depois)
@@ -1386,7 +1393,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
             : doPorte ? (diaria === fixa ? `Diária do hotel para o porte ${pet.porte}, das opções do hotel.` : `A diária do hotel para o porte ${pet.porte} é ${brl(fixa)}.`)
             : diaria === fixa ? `Preço fixo ${tipo === "hotel" ? "do hotel" : "da creche"}, definido em Meu pet shop.`
             : `O preço fixo ${tipo === "hotel" ? "do hotel" : "da creche"} é ${brl(fixa)}.`}>
-          <CampoValor valor={diaria} aoMudar={(n) => { setMexeuNaDiaria(true); setDiaria(n); }} placeholder={fixa == null ? "Sem preço fixo" : "0,00"} />
+          {precoTravado && fixa != null && diaria != null
+            ? <><input className="g-input g-tab" value={brl(diaria)} disabled aria-label="Valor da diária" /><small>Preço travado: a diária é a da lista. Só o dono ou quem vê o financeiro combina outro valor.</small></>
+            : <CampoValor valor={diaria} aoMudar={(n) => { setMexeuNaDiaria(true); setDiaria(n); }} placeholder={fixa == null ? "Sem preço fixo" : "0,00"} />}
         </Campo>}
         {vejoFinanceiro && trocouTipo && (
           <p className="g-pp g-muted" role="status">
@@ -1434,8 +1443,12 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         {ofereceAdiantado && <CamposAdiantado estado={adiantado} aoMudar={(s) => { setAdiantado(s); setErroSinal(null); }} erro={erroSinal} />}
         {comCuidados && <EditorDeCuidados valor={cuidados} aoMudar={setCuidados} />}
         <Campo rotulo="Observações">
-          <CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações da estadia"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder="Ração, remédio, horário de passeio, o que trouxe na mochila…" /></CampoComVoz>
+          <CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações da estadia"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder={comCuidados ? "Horário de passeio, o que trouxe na mochila, recados do tutor…" : "Ração, remédio, horário de passeio, o que trouxe na mochila…"} /></CampoComVoz>
         </Campo>
+        {comCuidados && !cuidados.some((c) => c.tipo === "remedio" && c.oque.trim()) && falaDeRemedio(obs, pet.alertas) && (
+          <p className="g-aviso vermelho" role="status" style={{ margin: 0 }}><span className="g-cresce"><b>Parece que {pet.nome} toma remédio.</b> Anote o remédio, a dose e os horários em Comida e remédio, logo acima: a equipe marca cada dose e a ficha impressa mostra os horários.</span>
+            <button type="button" className="g-btn sec p" onClick={() => setCuidados((l) => [...l, { id: novoCodigo(), tipo: "remedio", oque: "", quanto: "", horas: [] }])}>Anotar o remédio</button></p>
+        )}
         {erro && <p className="g-erro" role="alert">{erro}</p>}
       </div>
     </Folha>

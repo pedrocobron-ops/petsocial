@@ -65,6 +65,11 @@ const FRASES: Record<string, (e: Entrada | null, agora?: string, casa?: string) 
   mensagens_para_mandar: () => "Contando as mensagens para mandar…",
   ver_lucro: () => "Calculando quanto sobrou…",
   ver_contas_fixas: () => "Somando as contas fixas…",
+  ver_contas_a_pagar: () => "Vendo as contas a pagar…",
+  ver_cuidados: () => "Olhando a comida e o remédio de cada hóspede…",
+  marcar_cuidado: () => "Preparando a dose para você conferir…",
+  mover_no_quadro: () => "Preparando a troca de etapa para você conferir…",
+  registrar_ocorrencia: () => "Preparando a ocorrência para você conferir…",
 };
 
 /** A primeira frase de cada pedido, antes de o modelo responder: "Pensando…" ou, depois do "Pode fazer", "Conferindo o que ficou feito…". */

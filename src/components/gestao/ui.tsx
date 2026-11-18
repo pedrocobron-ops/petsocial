@@ -95,7 +95,7 @@ export function ok<T>(r: { data: T; error: { message: string } | null }): NonNul
 /** Recusa do banco que o aplicativo não sabe explicar: só fala em "só para consulta" quando a conta está mesmo assim. */
 const semPermissao = () => (contaSoConsulta()
   ? "Sua conta está só para consulta. Para voltar a gravar, veja a tela Assinatura."
-  : "Não consegui salvar agora. Tente de novo ou fale com o suporte.");
+  : "Não deu para salvar: o seu acesso não permite isso, ou o item já não existe. Atualize a tela; se precisar, fale com o dono do pet shop.");
 
 /** Texto de erro que uma pessoa entende. */
 export function mensagemDeErro(e: unknown): string {
@@ -104,7 +104,7 @@ export function mensagemDeErro(e: unknown): string {
   // sem internet: o aparelho sabe (navigator.onLine) e diz; com internet, o pedido não chegou ao servidor
   if (ehFalhaDeRede(m) || /network/i.test(m)) return textoDeRede(!semInternet());
   if (/duplicate key/i.test(m)) return "Isso já está cadastrado.";
-  if (/JSON object requested|0 rows|PGRST116/i.test(m)) return semPermissao();
+  if (/JSON object requested|Cannot coerce the result to a single JSON object|0 rows|PGRST116/i.test(m)) return semPermissao();
   if (/caixas_um_aberto/i.test(m)) return "Já existe um caixa aberto.";
   if (/numeric field overflow|out of range/i.test(m)) return "Esse valor é grande demais. Confira os números.";
   if (/violates check constraint/i.test(m)) return "Confira os valores: algum número está negativo ou fora do permitido.";

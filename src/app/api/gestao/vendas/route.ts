@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/gestao/banco";
 import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "@/lib/gestao/supabase";
-import { segredoDoServidor, visitante } from "@/lib/gestao/servidor";
+import { garantirTrava, segredoDoServidor, visitante } from "@/lib/gestao/servidor";
 import { INSTRUCOES_VENDAS, MARCA_PESSOA, RESPOSTA_SEM_IA } from "@/lib/gestao/vendas";
 import { comRegistro, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 
@@ -47,7 +47,11 @@ async function tratar(req: Request) {
   // teto no banco: sem conseguir contar, não chama o modelo
   try {
     const sb = createClient<Database>(SUPABASE_URL, SUPABASE_CHAVE, { auth: { persistSession: false, autoRefreshToken: false } });
-    const conta = await sb.rpc("vendas_contar", { p_segredo: segredoDoServidor() as string, p_visitante: quem });
+    await garantirTrava();
+    let conta = await sb.rpc("vendas_contar", { p_segredo: segredoDoServidor() as string, p_visitante: quem });
+    // recusou: pode ser o teto do dia ou o banco não conhecer mais o segredo deste servidor. Se a trava precisou ser gravada
+    // agora, conta de novo; senão é o teto mesmo.
+    if (!conta.error && conta.data !== true && (await garantirTrava(true)) === "gravou") conta = await sb.rpc("vendas_contar", { p_segredo: segredoDoServidor() as string, p_visitante: quem });
     if (conta.error || conta.data !== true) return semIa();
   } catch { return semIa(); }
 

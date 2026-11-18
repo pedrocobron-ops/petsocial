@@ -28,6 +28,11 @@ export default function NovaSenha() {
     const { error } = await banco().auth.updateUser({ password: senha });
     setIndo(false);
     if (error) { setErro("Não consegui salvar a senha. Peça um link novo e tente de novo."); return; }
+    // quem chegou aqui abriu o link mandado para o e-mail: fica provado que a caixa de entrada é da pessoa (liga pagamento
+    // que esperava essa prova) e os outros aparelhos saem da conta (se alguém mais sabia a senha antiga, perde o acesso).
+    // Nada disso segura a entrada se falhar.
+    try { await banco().rpc("email_provar"); } catch { /* segue */ }
+    try { await banco().auth.signOut({ scope: "others" }); } catch { /* segue */ }
     router.replace("/gestao/app");
   }
 
