@@ -2,7 +2,7 @@
 
 import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Cake, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, Merge, MessageCircle, NotebookPen, PawPrint, Pencil, Phone, Plus, Receipt, RotateCcw, Users, Wallet } from "lucide-react";
 import type { Cliente, Lancamento, Pet } from "@/lib/gestao/tipos";

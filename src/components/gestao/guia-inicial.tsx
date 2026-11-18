@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarPlus, Camera, CalendarDays, Check, Clock, Copy, FileSpreadsheet, ImagePlus, LayoutGrid, Link2, MessageCircle, Minus, PawPrint, Plus, Scissors, Sparkles, Timer, Trash2, Undo2, Users, X, Zap } from "lucide-react";
 import type { Horario, Servico } from "@/lib/gestao/tipos";
 import { vagasDe } from "@/lib/gestao/agenda";

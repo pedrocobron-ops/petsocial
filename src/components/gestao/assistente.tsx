@@ -4,7 +4,7 @@ import { Selo } from "./marca";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Check, CheckCheck, ChevronDown, MessageCircle, RotateCcw, SlidersHorizontal, Volume2, VolumeX } from "lucide-react";
 import { hora, isoDia } from "@/lib/gestao/util";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { useGestao } from "./contexto";
 import { avisarMudanca, semInternet } from "./ui";
 import { textoDeRede } from "@/lib/gestao/validacao";

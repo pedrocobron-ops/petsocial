@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { CalendarRange, Check, ChevronRight, Copy, Lightbulb } from "lucide-react";
 import type { Banco } from "@/lib/gestao/supabase";
 import { brl, dataCurta, inicioDaSemana, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";

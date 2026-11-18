@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ChevronRight, Send } from "lucide-react";
 import { lerModoEnvio, montarFila, resumoDaFila } from "@/lib/gestao/modo-envio";
 import { useGestao } from "./contexto";

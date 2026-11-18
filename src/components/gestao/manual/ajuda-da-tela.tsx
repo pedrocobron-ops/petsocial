@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { usePathname } from "next/navigation";
 import { BookOpen, ChevronRight, MessageCircleQuestion, Mic } from "lucide-react";
 import { ROTA_MANUAL, nomeDaTela, telaDoCaminho, topicosDaRota } from "@/lib/gestao/manual";

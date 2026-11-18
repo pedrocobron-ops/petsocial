@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useMemo, useState, useEffect } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Lock, MessageCircle, Printer, Truck } from "lucide-react";
 import type { AgendamentoCompleto, Bloqueio } from "@/lib/gestao/tipos";

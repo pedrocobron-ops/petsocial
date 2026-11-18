@@ -62,6 +62,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `robustez.js`: rodada 8 (defeitos e robustez): nome sem HTML (`limparNome`), saída prevista longe demais com o ano (`saidaLongeDemais`, `dataAmigavel`), balão do navegador em português (`mensagemDeValidacao`), sem internet nunca vira "caixa fechado" (`conferirCaixa`), Ajuda sem "[EQUIPE] não é necessário…" (`lerRespostaDaAjuda`) e o Mozart pelas áreas da pessoa (quem só tem o Caixa não recebe marcar_horario; cartão forjado recusado no servidor).
 - `rodada2-h.js`: segunda rodada (Rafael, Bia, Juliana, Neide): tempo esgotado do banco vira "Demorou demais, tente de novo" (`textoAmigavel`); a foto da entrada tenta de novo e desiste com aviso (`subirFotoDaEntrada`); Termos e Política 2.3 vigentes desde 17/11/2026; mapa sem "Campinas, Campinas" (`comCidade`); comprovante com a data do pagamento (`linhasDaData`); "2 noites (15/11 a 17/11)" no comprovante do hotel; linhas da creche em Quanto sobrou (`linhasDaCasa`); cancelamentos pelo dia do cancelamento e a tela abrindo em Este mês.
 - `creche-hotel-final.js`: rodada final (Rafael e Bia): regra de cancelamento do sinal (`destinoPelaRegra`: menos de 7 dias vira crédito, 7 ou mais devolve; sem regra, nada marcado), hora do hotel (`horasDoHotel`), táxi pet na cobrança (`taxiDaCobranca`, `partesDosExtras` com `taxi`, mensagem de cobrança com "táxi pet 2 dias" e a chave Pix do hotel), "Devolver: coleira, guia e remédio da artrose" sem repetir "remédio", texto do aceite sem banho num hotel só, "Saiu uma foto", exemplo das regras do link num hotel só, "veio hoje" no Bom dia, valor médio pelas contas contadas (895 ÷ 2 = 447,50) e cancelamentos com as reservas.
+- `rede-lenta.js`: o que a página pública põe no HTML (`link-servidor.ts`): cores do pet shop só conferidas (Vinho, cor própria;
+  texto com CSS ou HTML nunca entra) e pedido com código inválido sem ir ao banco. Sem rede.
 - `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, desconto do segundo pet, regras), a leitura da resposta
   (não sei, sugestão de pedido só com serviço e dia válidos, sem links), limites de conversa. Sem banco.
 - `boletim.js`: textos do boletim do pet (`src/lib/gestao/boletim.ts`): "Oi, Ana! O boletim do Thor de hoje: <link>" (primeiro nome
@@ -581,6 +583,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `checkout-lento.js`: check-out do hotel com a leitura do sinal atrasada 2,5 s (390 e 1366): enquanto carrega, a folha não mostra valor
   e o botão fica apagado (clicar não grava); depois, "Receber R$ 2,75" (110 − sinal 107,25) e "Receber R$ 1,60" (80 − 20% do segundo
   pet − sinal 62,40), uma entrada só cada.
+- `rede-lenta.js`: internet fraca (estreante, 3ª rodada). Com o JavaScript desligado em 360, o link do cliente já mostra o nome do pet
+  shop, o recado, os serviços com preço, as cores (Vinho) e o título "Agendar: …"; a página do pedido mostra "Tutora, seu pedido chegou."
+  com o pet e a situação; pedido que não existe e link errado com a mensagem de sempre. O HTML do link não traz a biblioteca do Supabase
+  nem dado do tutor. 390 e 1366: o pedido vai até "Pedido enviado" e o Atualizar da página do pedido funciona, sem erro de hidratação.
+  A abertura do aplicativo diz "Abrindo <pet shop>…" com os pacotes de JavaScript bloqueados. A Hoje (390 e 1366) não baixa outra tela
+  antes de aparecer com os dados, e depois volta a adiantar. No fim, uma medida informativa com 400 kbps, 400 ms e CPU 4x.
 - `agenda-lenta.js`: ficha do horário com a leitura dos pacotes e do que já foi pago atrasada 2,5 s (390 e 1366): enquanto carrega,
   nenhum botão de cobrar, concluir ou usar o pacote (só "Carregando a conta"; Cliente confirmou continua); depois, o pacote primeiro,
   o aviso do que o tutor deve de antes e "Cobrar à parte, sem usar o pacote · R$ 50,00". Com a leitura falhando: nada de cobrar,

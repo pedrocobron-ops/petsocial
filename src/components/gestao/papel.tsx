@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ArrowLeft, Printer } from "lucide-react";
 import { dataCurta, hora } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";

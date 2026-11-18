@@ -3,7 +3,7 @@
 import { COLS_MOVIMENTO, COLS_PRODUTO, comCustos, comCustosDeMovimento, comPrecosDeProduto } from "@/lib/gestao/reservado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import Importar from "@/components/gestao/importar";
 import { AlertTriangle, ArrowUpFromLine, BarChart3, Barcode, Boxes, CalendarX, ClipboardCheck, ClipboardList, Minus, Package, PackageX, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Tag, Truck, Wallet, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { useMemo, useState } from "react";
 import { Check, Lock, Repeat, Store, Trash2 } from "lucide-react";
 import type { Bloqueio } from "@/lib/gestao/tipos";

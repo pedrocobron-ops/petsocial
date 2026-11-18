@@ -1,8 +1,6 @@
 "use client";
 
 import { nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
-import HotelNoRelatorio from "@/components/gestao/hotel/relatorio";
-import CrecheNoRelatorio from "@/components/gestao/creche/relatorio";
 import { useMemo, useState } from "react";
 import BlocoComissao, { type LinhaComissao } from "@/components/gestao/relatorios/comissao";
 import { ArrowDownRight, ArrowUpRight, CalendarDays, CircleCheck, Clock, CreditCard, Download, HandCoins, Home, Moon, PawPrint, Printer, Receipt, Scissors, Sun, TrendingUp, UserPlus, Users, UserX } from "lucide-react";
@@ -10,11 +8,8 @@ import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPessoa, AvatarPet, Esqueleto, useAvisos, useDados, Vazio } from "@/components/gestao/ui";
 import { baixarPlanilha, brlMini, Chips, COR_FORMA, dinheiroCsv, ErroDeCarga, numeroCsv, PALETA, paginar, SemAcesso, somaPorForma, type Cel } from "@/components/gestao/financeiro/comum";
 import { Anel, Barras, Kpi, Rosca, Tile } from "@/components/gestao/painel";
-import RelatorioProdutos from "@/components/gestao/loja/relatorio-produtos";
-import QuantoSobrou from "@/components/gestao/relatorios/lucro";
 import CartaoMaquininha from "@/components/gestao/financeiro/maquininha";
 import AbasDeRelatorios from "@/components/gestao/relatorios/abas";
-import PromocoesNoRelatorio from "@/components/gestao/relatorios/promocoes";
 import PorPessoa from "@/components/gestao/relatorios/por-pessoa";
 import { percentuaisQueFecham } from "@/lib/gestao/dinheiro";
 import { cobradoPorServico, type ParteDoServico } from "@/lib/gestao/servicos-do-horario";
@@ -22,6 +17,15 @@ import type { Banco } from "@/lib/gestao/supabase";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, deIsoDia, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
 import "./relatorios.css";
+import dynamic from "next/dynamic";
+
+// partes de baixo da tela e de quem tem creche, hotel ou loja vêm à parte: no celular com internet fraca, o resumo do
+// período aparece antes; cada parte entra quando chega (o que mostram não muda)
+const HotelNoRelatorio = dynamic(() => import("@/components/gestao/hotel/relatorio"), { ssr: false });
+const CrecheNoRelatorio = dynamic(() => import("@/components/gestao/creche/relatorio"), { ssr: false });
+const RelatorioProdutos = dynamic(() => import("@/components/gestao/loja/relatorio-produtos"), { ssr: false });
+const QuantoSobrou = dynamic(() => import("@/components/gestao/relatorios/lucro"), { ssr: false });
+const PromocoesNoRelatorio = dynamic(() => import("@/components/gestao/relatorios/promocoes"), { ssr: false });
 import { comPrecosDeAgendamento, comValoresDeEstadia } from "@/lib/gestao/reservado";
 import { ajustesDoFaturamento, faturamentoLiquido, temAjuste, type AjustesDoFaturamento } from "@/lib/gestao/faturamento";
 import { FORMA_CREDITO } from "@/components/gestao/financeiro/comum";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Check, Copy, Link2, MessageCircle, Settings2 } from "lucide-react";
 import type { PetComTutor } from "@/lib/gestao/tipos";
 import { linkWhatsApp } from "@/lib/gestao/util";

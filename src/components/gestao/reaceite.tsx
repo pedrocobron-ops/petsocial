@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Selo } from "./marca";
 import { DOCUMENTOS, MUDANCAS, aceiteDoCadastro, textoVigencia, type Documento } from "@/lib/gestao/documentos";
 import { EMPRESA } from "@/lib/empresa";

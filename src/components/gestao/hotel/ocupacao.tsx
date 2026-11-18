@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ChevronLeft, ChevronRight, Moon, Plus, Printer, Sun } from "lucide-react";
 import { abreNoDia, esperadoNoDia, lerPresencas } from "@/lib/gestao/creche";
 import { nivelDeOcupacao, nomeDaAcomodacao, ocupacaoDoDia, quemOcupa, vagasDoTipo, type Mens } from "@/lib/gestao/hotel";

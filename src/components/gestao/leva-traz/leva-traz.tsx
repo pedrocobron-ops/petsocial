@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, MapPin, MessageCircle, Navigation, Phone, Printer, Truck, Undo2 } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";

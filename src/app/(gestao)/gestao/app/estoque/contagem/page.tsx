@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Check, ClipboardCheck, CloudOff, Download, Minus, Pause, Play, Plus, Printer, Search, X } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";

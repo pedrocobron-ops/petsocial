@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { AlertTriangle, Ban, CalendarClock, Check, ChevronLeft, ChevronRight, CircleCheck, HandCoins, MessageCircle, Pencil, Printer, RotateCcw, TriangleAlert, Undo2 } from "lucide-react";
 import {
   regraIrmaoDe, cobraNoMes, descontoIrmao, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, textoComprovanteMensalidades, partesDoDesconto, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, textoDoTaxiDaCobranca, vencimentoDoMes,

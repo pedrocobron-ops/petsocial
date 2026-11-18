@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ChartColumn, FileText } from "lucide-react";
 import "./indicadores.css";
 

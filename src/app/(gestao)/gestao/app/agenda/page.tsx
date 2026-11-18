@@ -3,7 +3,7 @@
 import { modoSimples } from "@/lib/gestao/modo-simples";
 import { useFaxinaDoBoletim } from "@/components/gestao/boletim/boletim";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BellRing, CalendarCheck2, CalendarOff, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, SquareKanban, Truck, Printer, Users, Utensils, X } from "lucide-react";

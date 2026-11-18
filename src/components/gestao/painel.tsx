@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 
 /**
  * Peças de painel: indicadores com ícone colorido, anel de progresso, linha de tendência e barras.

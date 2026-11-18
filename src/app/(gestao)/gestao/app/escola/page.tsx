@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ArrowRight, BookOpen, Check, Clock, ExternalLink, GraduationCap, Library, Mail, MailCheck, Store } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import Leitor from "@/components/gestao/escola/leitor";

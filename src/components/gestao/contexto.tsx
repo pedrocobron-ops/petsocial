@@ -62,6 +62,13 @@ export function useGestao(): Gestao {
 const CHAVE_LOJA = "maestro-gestao-petshop";
 /** Último pet shop aberto neste aparelho (conta:pet shop): só para adiantar a leitura, não decide qual abre. */
 const CHAVE_ULTIMA = "maestro-gestao-ultima-loja";
+/**
+ * Nome do último pet shop aberto neste aparelho: só para a tela de abertura dizer "Abrindo o Banho e Tosa da Cida…" já no
+ * HTML, antes do JavaScript baixar (no celular com internet fraca, são vários segundos). Um script pequeno lê e escreve o
+ * texto (textContent, nunca HTML); sem o nome guardado, fica "Abrindo o seu pet shop…".
+ */
+const CHAVE_NOME = "maestro-gestao-nome-loja";
+const SCRIPT_DO_NOME = `try{var n=localStorage.getItem(${JSON.stringify(CHAVE_NOME)}),e=document.getElementById("g-abrindo");if(n&&e)e.textContent="Abrindo "+n.slice(0,80)+"\u2026"}catch(x){}`;
 
 let soConsulta = false;
 /** A conta está só para consulta (teste vencido ou assinatura cancelada)? Para as mensagens de erro, fora dos componentes. */
@@ -93,6 +100,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   }, [sb]);
   const aplicarBase = useCallback((b: Awaited<ReturnType<typeof buscarBase>>) => {
     setPetshop(b.petshop);
+    try { localStorage.setItem(CHAVE_NOME, b.petshop.nome); } catch { /* sem armazenamento: a abertura fica com o texto geral */ }
     setEquipe(b.equipe);
     setServicos(b.servicos);
     return b.equipe;
@@ -184,7 +192,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
         const novo = todos.find((x) => x.id === eu.id);
         if (novo) setEu(novo);
       },
-      sair: async () => { await sb.auth.signOut(); router.replace("/gestao/entrar"); },
+      sair: async () => { try { localStorage.removeItem(CHAVE_NOME); } catch { /* sem armazenamento */ } await sb.auth.signOut(); router.replace("/gestao/entrar"); },
     };
   }, [sb, user, eu, petshop, equipe, servicos, carregarBase, router, aberta, exclusao, lerExclusao]);
 
@@ -202,7 +210,8 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     return (
       <div className="g g-raiz"><div className="g-vazio" style={{ minHeight: "100dvh", alignContent: "center" }}>
         <Selo tamanho={72} tom="suave" />
-        <p>Abrindo o seu pet shop…</p>
+        <p id="g-abrindo" suppressHydrationWarning>Abrindo o seu pet shop…</p>
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DO_NOME }} />
       </div></div>
     );
   }

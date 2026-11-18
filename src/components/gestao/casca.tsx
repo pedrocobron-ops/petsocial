@@ -2,7 +2,7 @@
 
 import { Selo } from "./marca";
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, Pencil, ShieldCheck, Package, PawPrint, Send, Store, Sun, Ticket, TriangleAlert, Users, Wallet,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ShieldAlert, Trash2 } from "lucide-react";
 import { diarioDe, ocorrenciasLigadas, portariaLigada, tipoDaOcorrencia, TIPOS_DE_OCORRENCIA, type Ocorrencia, type TipoDeOcorrencia } from "@/lib/gestao/casa-opcoes";
 import { usaCasa } from "@/lib/gestao/modulos";

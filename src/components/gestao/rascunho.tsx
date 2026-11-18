@@ -87,3 +87,6 @@ export function AvisoDeRascunho({ aoDescartar, texto = "Rascunho recuperado: o q
     </div>
   );
 }
+
+/** Chave do rascunho do formulário de pet novo (fica aqui, fora do formulário, para a lista de Clientes não precisar baixá-lo). */
+export const RASCUNHO_PET_NOVO = "pet-novo";

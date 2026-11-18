@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Gift, MessageCircle, PawPrint } from "lucide-react";
 import { anosQueFaz, diaNoMes, MESES } from "@/lib/gestao/aniversario";
 import { CHAVE_NO_BANCO, MODELOS_PADRAO, montarMensagem } from "@/lib/gestao/mensagens-prontas";

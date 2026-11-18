@@ -1,12 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./banco";
 
-/** Endereço e chave pública do Supabase (variáveis na Vercel). A chave pública só funciona junto com as regras do banco (RLS). */
-// Padrão: o projeto do Supabase em uso hoje. Os dois valores são públicos por natureza (vão para o navegador de qualquer forma);
-// as variáveis da Vercel trocam o projeto sem mexer no código, quando o Gestão ganhar um banco só dele.
-export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://pifuiczrytmizqxzygbi.supabase.co";
-export const SUPABASE_CHAVE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "sb_publishable_0WFj3aYhEER7N0yrDQ6Q1Q_Lk1I4XwY";
-export const configurado = Boolean(SUPABASE_URL && SUPABASE_CHAVE);
+import { SUPABASE_CHAVE, SUPABASE_URL } from "./supabase-config";
+
+// endereço, chave pública e foto do pet moram em supabase-config.ts (sem a biblioteca do Supabase, para as páginas públicas)
+export { SUPABASE_CHAVE, SUPABASE_URL, configurado, fotoPet } from "./supabase-config";
 
 export type Banco = SupabaseClient<Database>;
 
@@ -28,9 +26,4 @@ export function bancoDoUsuario(token: string): Banco {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
-}
-
-/** Endereço público da foto de um pet (o nome do arquivo é aleatório). */
-export function fotoPet(caminho: string | null | undefined): string | null {
-  return caminho ? `${SUPABASE_URL}/storage/v1/object/public/pets/${caminho}` : null;
 }

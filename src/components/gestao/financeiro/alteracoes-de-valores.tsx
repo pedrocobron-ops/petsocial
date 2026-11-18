@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ChevronRight, History } from "lucide-react";
 import { brl, dataAmigavel, hora } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";

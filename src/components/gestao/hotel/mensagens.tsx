@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
 import { corpoDaMensagem, MENSAGENS, textoDaMensagem } from "@/lib/gestao/hotel";
 import type { TipoDeMensagem } from "@/lib/gestao/hotel-opcoes";

@@ -19,6 +19,12 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
 - Celular com internet fraca: consultas que não dependem uma da outra vão juntas (`Promise.all`), nunca uma esperando a outra.
   Folha que só abre com um toque (formulário, detalhe, conta) entra por `next/dynamic` e baixa em segundo plano com `useAdiantar`;
   o que é de fundo espera a tela abrir (`quandoATelaAbrir`, em `ui.tsx`). Nada disso muda o que a tela mostra.
+  Link entre telas do aplicativo: `import Link from "@/components/gestao/link-depois"` (não `next/link`): a tela de destino só
+  baixa depois que a tela aberta apareceu. Cartão de baixo da tela ou de quem tem a área: `next/dynamic` com `ssr: false`; leitura de
+  fundo que mora em módulo grande vira um "sensor" à parte (`hoje-sensores.tsx`).
+  Páginas públicas (link do cliente, pedido do tutor): o servidor lê pelas mesmas funções públicas (`link-servidor.ts`) e a página
+  chega pronta no HTML; no navegador, o banco é `bancoDepois()` (`supabase-depois.ts`), que baixa a biblioteca à parte. Endereço,
+  chave e `fotoPet` sem a biblioteca: `supabase-config.ts`.
 - Gravar: `try { ok(await sb.from(...).insert(...)) ; avisar("…") } catch (e) { avisarErro(e) }`.
 - Antes de abrir um formulário de gravação: `if (somenteLeitura()) return;` (`useSomenteLeitura()`), porque a conta
   com teste vencido fica só para consulta. Atalho que leva a gravar (Marcar horário, Cadastrar pet) é `<LinkDeGravar>`: com a conta

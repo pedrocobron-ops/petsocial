@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Selo } from "./marca";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Cat, Dog, PawPrint, Search, X } from "lucide-react";

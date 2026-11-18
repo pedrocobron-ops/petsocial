@@ -17,7 +17,8 @@ import { limparNome } from "@/lib/gestao/validacao";
 import { AvisoDeRascunho, useRascunho } from "./rascunho";
 
 /** Nome do rascunho do "Pet novo" (a lista de Clientes reabre o formulário quando ele existe). */
-export const RASCUNHO_PET_NOVO = "pet-novo";
+export { RASCUNHO_PET_NOVO } from "./rascunho";
+import { RASCUNHO_PET_NOVO } from "./rascunho";
 
 /**
  * Cadastro ou edição de um pet. Em cadastro novo, escolhe um tutor existente ou cria o tutor junto.

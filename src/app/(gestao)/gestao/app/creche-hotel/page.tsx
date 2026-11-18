@@ -2,7 +2,7 @@
 
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, CalendarOff, DoorOpen, Home, HandCoins, Hourglass, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, ShieldAlert, ShieldCheck, Sun, Sunset, Syringe, Tag, Truck } from "lucide-react";
 import { useCalendario } from "@/components/gestao/calendario";
 import { useGestao } from "@/components/gestao/contexto";

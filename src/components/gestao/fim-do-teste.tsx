@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ChevronRight, Clock, Lock } from "lucide-react";
 import type { Petshop } from "@/lib/gestao/tipos";
 import { brl, dataCurta, hora, inicioDoDia, nomeDia } from "@/lib/gestao/util";

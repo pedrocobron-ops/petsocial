@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ChevronRight, Package, ShoppingBag, Wallet } from "lucide-react";
 import { Tile } from "./painel";
 import { brl } from "@/lib/gestao/util";
