@@ -20,6 +20,8 @@ import type { Banco } from "../supabase";
 import type { Horario, Petshop, Profissional, Servico } from "../tipos";
 import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres, vagasDe } from "../agenda";
 import { partesPorForma } from "../dinheiro";
+import { CATEGORIAS_DEVOLUCAO, faturamentoLiquido, montarAjustes } from "../faturamento";
+import { foraDoLimite } from "../fiado";
 import { anotarParcelasComRetry, idsDaOperacao, lojaPerguntaParcelas } from "../maquininha";
 import { juntarServicosAMais, nomeDosServicos, valorDoHorario } from "../servicos-do-horario";
 import { parecidos } from "./parecido";
@@ -43,6 +45,8 @@ export type Contexto = {
   vejoFinanceiro: boolean;
   /** Dono, ou quem tem Financeiro ou Relatórios: vê despesas, contas e o histórico. */
   cuidoDoFinanceiro: boolean;
+  /** As áreas que a pessoa abre (`areasDe`): ferramenta de uma área que ela não tem não é oferecida nem roda. */
+  areas?: string[];
   /** Minutos a leste de UTC no aparelho de quem pediu (Brasília = -180). */
   fusoMin: number;
   /** Agora, no horário local: "AAAA-MM-DDTHH:mm". */
@@ -84,7 +88,7 @@ const uuid = (v: unknown) => (typeof v === "string" && RE_UUID.test(v) ? v : nul
 
 /* ---------- definição das ferramentas (o que o modelo enxerga) ---------- */
 
-type Def = Anthropic.Tool & { grava: boolean; financeiro?: boolean };
+type Def = Anthropic.Tool & { grava: boolean; financeiro?: boolean; areas?: readonly string[] };
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: "object" as const, properties, required, additionalProperties: false });
 const S = { type: "string" }, N = { type: "number" }, B = { type: "boolean" };
 /** Crédito em quantas vezes (a taxa do parcelado da maquininha). A ferramenta pede quando a loja tem taxa de parcelado. */
@@ -93,7 +97,21 @@ const DIA = { type: "string", description: "Dia no formato AAAA-MM-DD" };
 const DIA_HORA = { type: "string", description: "Dia e hora locais no formato AAAA-MM-DDTHH:mm" };
 const HORA = { type: "string", description: "Hora local no formato HH:mm" };
 
-export const FERRAMENTAS: Def[] = [
+/**
+ * Áreas de cada ferramenta (as chaves de Equipe; basta ter uma). Quem não tem nenhuma não recebe a ferramenta: o Mozart nem
+ * monta o cartão, e explica que isso é com quem tem a área. As mesmas áreas que o banco confere ao gravar.
+ */
+const AREAS_DA_FERRAMENTA: Record<string, readonly string[]> = {
+  marcar_horario: ["agenda"], bloquear_horario: ["agenda"], remover_bloqueio: ["agenda"], horarios_livres: ["agenda"],
+  // concluir e receber um horário também é de quem opera o caixa (a mesma regra do banco em agendamentos)
+  alterar_horario: ["agenda", "caixa", "financeiro"],
+  cadastrar_pet: ["clientes", "agenda", "creche_hotel"], registrar_saude: ["clientes", "agenda", "creche_hotel"], anotar_no_pet: ["clientes", "creche_hotel"], clientes_sumidos: ["clientes"],
+  fazer_checkin: ["creche_hotel"], fazer_checkout: ["creche_hotel"], reservar_estadia: ["creche_hotel"], ver_hospedes: ["creche_hotel"], ver_planos_creche: ["creche_hotel"],
+  vender_pacote: ["pacotes"], usar_pacote: ["pacotes", "agenda", "creche_hotel"],
+  movimentar_estoque: ["estoque"], ver_estoque: ["estoque"], o_que_comprar: ["estoque"],
+};
+
+export const FERRAMENTAS: Def[] = ([
   { grava: false, name: "buscar_pets", description: "Procura pets e tutores pelo nome do pet, nome do tutor ou telefone. Use sempre antes de marcar horário ou lançar algo para um pet, para pegar o id certo. Devolve também o último atendimento e os pacotes ativos. Sem o nome exato (erro do ditado), devolve os nomes parecidos com um aviso.",
     input_schema: obj({ termo: { ...S, description: "Nome do pet, do tutor ou parte do telefone" } }, ["termo"]) },
   { grava: false, name: "ver_agenda", description: "Lista os horários marcados entre dois dias (inclusive), com pet, tutor, serviço, profissional, status e valor, e os bloqueios de horário do período (almoço, folga, feriado), cada um com bloqueio_id e se faz parte de uma série.",
@@ -104,11 +122,11 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ dias: { ...N, description: "Quantidade de dias sem vir, ex.: 30 ou 60" } }, ["dias"]) },
   { grava: false, name: "ver_estoque", description: "Lista produtos do estoque com saldo, mínimo e preço (kit: o saldo é quantos dá para montar). Sem termo, mostra os que estão acabando primeiro. Traz também os lotes vencidos e vencendo em 60 dias (vencendo), para \"o que está vencendo?\".",
     input_schema: obj({ termo: S }) },
-  { grava: false, financeiro: true, name: "resumo_financeiro", description: "Soma o dinheiro que entrou e saiu entre dois dias (inclusive), por categoria e por forma de pagamento, e informa se há caixa aberto.",
+  { grava: false, financeiro: true, name: "resumo_financeiro", description: "Soma o dinheiro que entrou e saiu entre dois dias (inclusive), por categoria e por forma de pagamento, e informa se há caixa aberto. Traz o faturamento e o resultado prontos, com a mesma conta do Financeiro (devolução e crédito deixado para o tutor já tirados) e, se houver, o resultado depois das taxas da maquininha: use para \"quanto eu ganhei\".",
     input_schema: obj({ de: DIA, ate: DIA }, ["de", "ate"]) },
   { grava: false, financeiro: true, name: "contas_em_aberto", description: "Lista contas a pagar e a receber ainda não pagas, com vencimento (as a receber dizem de qual tutor são). Para \"quem me deve\", use quem_me_deve.",
     input_schema: obj({}) },
-  { grava: false, financeiro: true, name: "quem_me_deve", description: "Quem está devendo: os clientes que ficaram de pagar depois, um por pessoa, com o total, quantas contas, o que está atrasado e desde quando (igual ao Caixa, Contas de clientes). Use para \"quem me deve?\", \"quanto a Joana deve?\" (com cliente_id, só aquele tutor e as contas dele).",
+  { grava: false, financeiro: true, name: "quem_me_deve", description: "Quem está devendo: os clientes que ficaram de pagar depois, um por pessoa, com o total separado em vencido, vence hoje e a vencer, quantas contas e desde quando (igual ao Caixa, Contas de clientes). Use para \"quem me deve?\", \"quanto a Joana deve?\" (com cliente_id, só aquele tutor e as contas dele).",
     input_schema: obj({ cliente_id: S }) },
   { grava: false, name: "ver_hospedes", description: "Creche e hotel: mostra quem está na casa agora (desde quando, saída prevista, diárias até aqui), as reservas dos próximos dias e, na creche, quem vem em cada dia (creche_por_dia: os mensalistas esperados pelo plano, que não têm reserva, e as reservas). Para \"quem vem amanhã/quem está na creche\", responda por creche_por_dia, com todos os nomes de cada dia.",
     input_schema: obj({ dias: { ...N, description: "Até quantos dias à frente olhar as reservas. Padrão: 7" } }) },
@@ -149,6 +167,8 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ pet_id: S, pacote_cliente_id: S }, ["pet_id"]) },
   { grava: true, name: "registrar_saude", description: "Anota um cuidado de saúde do pet (vacina, vermífugo, antipulgas ou outro) com a data em que foi aplicado e, se a pessoa disse, quando vence. Só anota: não calcule nem sugira a data de vencimento.",
     input_schema: obj({ pet_id: S, tipo: { type: "string", enum: ["vacina", "vermifugo", "antipulgas", "outro"] }, nome: { ...S, description: "Ex.: V10, Antirrábica, Bravecto" }, aplicado_em: { ...DIA, description: "AAAA-MM-DD. Padrão: hoje" }, vence_em: DIA, obs: S }, ["pet_id", "tipo", "nome"]) },
+  { grava: true, name: "anotar_no_pet", description: "Anota na ficha de um pet já cadastrado (\"a Bolinha é brava, morde, anota isso\"). onde: \"alertas\" para cuidados que a equipe precisa ver antes de pegar o pet (morde, alergia, medo de secador, cardíaco), que aparecem em destaque na agenda; \"observacoes\" para o resto (preferências, recados). O texto entra no fim do que já estava escrito, sem apagar nada. Escreva a anotação curta, com as palavras da pessoa. Para vacina e remédio com data, use registrar_saude.",
+    input_schema: obj({ pet_id: S, onde: { type: "string", enum: ["alertas", "observacoes"] }, texto: { ...S, description: "O que anotar, curto. Ex.: Morde. Cuidado ao secar." } }, ["pet_id", "onde", "texto"]) },
   { grava: true, financeiro: true, name: "abrir_caixa", description: "Abre o caixa do dia com o troco inicial em dinheiro (0 se a gaveta está vazia).",
     input_schema: obj({ troco_inicial: N }) },
   { grava: true, financeiro: true, name: "fechar_caixa", description: "Fecha o caixa aberto. Passe o dinheiro contado na gaveta (só dinheiro; Pix e cartão não entram). O cartão mostra o esperado, o contado e a diferença.",
@@ -168,10 +188,10 @@ export const FERRAMENTAS: Def[] = [
   ...FERRAMENTAS_COMPRA,
   ...FERRAMENTAS_ENVIO,
   ...FERRAMENTAS_CONTAS_FIXAS,
-];
+] as Def[]).map((f) => (AREAS_DA_FERRAMENTA[f.name] ? { ...f, areas: AREAS_DA_FERRAMENTA[f.name] } : f));
 
-export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro">): Anthropic.Tool[] =>
-  FERRAMENTAS.filter((f) => ferramentaLiberada(f, c)).map(({ grava: _g, financeiro: _f, ...t }) => t);
+export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro" | "areas">): Anthropic.Tool[] =>
+  FERRAMENTAS.filter((f) => ferramentaLiberada(f, c)).map(({ grava: _g, financeiro: _f, areas: _a, ...t }) => t);
 export const definicao = (nome: string) => FERRAMENTAS.find((f) => f.name === nome);
 
 /* ---------- consultas ---------- */
@@ -184,6 +204,21 @@ async function petPorId(c: Contexto, id: unknown) {
   const { data } = await c.sb.from("pets").select("*, clientes(id, nome, telefone)").eq("petshop_id", c.petshop.id).eq("id", pid).maybeSingle();
   exigir(data, "Pet não encontrado: use buscar_pets.");
   return data;
+}
+/** Onde a anotação do Mozart entra na ficha do pet (os nomes dos campos como a ficha mostra). */
+const ROTULO_ANOTACAO = { alertas: "Cuidados e alertas", obs: "Observações" } as const;
+const LIMITE_ANOTACAO = { alertas: 400, obs: 600 } as const;
+/** O texto novo vai no fim do que já estava escrito no campo; nada some. Recusa se não couber. */
+export function anotacaoDoPet(pet: { alertas?: string | null; obs?: string | null }, e: Record<string, unknown>) {
+  const onde = e.onde === "observacoes" || e.onde === "obs" ? "obs" as const : "alertas" as const;
+  exigir(e.onde === "alertas" || e.onde === "observacoes" || e.onde === "obs", "onde deve ser alertas ou observacoes.");
+  const novo = texto(e.texto, 400).replace(/\s+/g, " ");
+  exigir(novo.length >= 2, "Falta o que anotar. Pergunte.");
+  const antes = (pet[onde] ?? "").trim();
+  exigir(!semAcento(antes).includes(semAcento(novo)), `Isso já está anotado em ${ROTULO_ANOTACAO[onde]}. Nada para fazer.`);
+  const fica = antes ? `${antes}${/[.!?]$/.test(antes) ? "" : "."} ${novo}` : novo;
+  exigir(fica.length <= LIMITE_ANOTACAO[onde], `Não cabe em ${ROTULO_ANOTACAO[onde]} (limite de ${LIMITE_ANOTACAO[onde]} letras). Diga para a pessoa resumir o que já está na ficha, em Clientes e pets.`);
+  return { onde, novo, fica };
 }
 /* ---------- o que os clientes devem (as mesmas contas do Caixa, Contas de clientes, e da ficha do tutor) ---------- */
 
@@ -201,20 +236,23 @@ async function contasDeClientes(c: Contexto, clienteId?: string): Promise<ContaD
 }
 const nomeDaConta = (l: { descricao: string | null; categoria: string }) => l.descricao?.trim() || l.categoria;
 const umaOuMais = (n: number) => (n === 1 ? "1 conta" : `${n} contas`);
-/** Por pessoa: total, contas, atrasado e desde quando. */
+/** Por pessoa: total, contas, atrasado (vencido), vence hoje, a vencer e desde quando (a mesma conta do Caixa, Contas de clientes). */
 function devedores(contas: ContaDeCliente[], nomes: Map<string, string>, hoje: string) {
-  const m = new Map<string, { cliente_id: string; tutor: string; total: number; contas: ContaDeCliente[]; atrasado: number; desde: string }>();
+  const m = new Map<string, { cliente_id: string; tutor: string; total: number; contas: ContaDeCliente[]; atrasado: number; hoje: number; aVencer: number; foraDoLimite: number; desde: string }>();
   for (const l of contas) {
     const id = l.cliente_id!;
-    const d = m.get(id) ?? { cliente_id: id, tutor: nomes.get(id) ?? "Tutor", total: 0, contas: [], atrasado: 0, desde: l.devido_desde ?? l.criado_em };
+    const d = m.get(id) ?? { cliente_id: id, tutor: nomes.get(id) ?? "Tutor", total: 0, contas: [], atrasado: 0, hoje: 0, aVencer: 0, foraDoLimite: 0, desde: l.devido_desde ?? l.criado_em };
     d.total = real(d.total + l.valor);
     d.contas.push(l);
     if (l.vencimento && l.vencimento < hoje) d.atrasado = real(d.atrasado + l.valor);
+    else if (!l.vencimento || l.vencimento === hoje) d.hoje = real(d.hoje + l.valor);
+    else d.aVencer = real(d.aVencer + l.valor);
+    if (foraDoLimite(l, hoje)) d.foraDoLimite = real(d.foraDoLimite + l.valor);
     // dívida trazida do caderno: o dia anotado ("2026-03-10") vale; senão, quando foi anotada (os dois se comparam pelo dia)
     if ((l.devido_desde ?? l.criado_em) < d.desde) d.desde = l.devido_desde ?? l.criado_em;
     m.set(id, d);
   }
-  return [...m.values()].sort((a, b) => b.atrasado - a.atrasado || b.total - a.total);
+  return [...m.values()].sort((a, b) => b.atrasado - a.atrasado || b.hoje - a.hoje || b.total - a.total);
 }
 async function nomesDosClientes(c: Contexto, ids: string[]) {
   const m = new Map<string, string>();
@@ -698,26 +736,49 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     case "resumo_financeiro": {
       exigir(c.cuidoDoFinanceiro, "Esta pessoa opera o caixa, mas não tem a área Financeiro: não vê o resumo do período nem as contas. O dono pode liberar em Equipe.");
       exigir(RE_DIA.test(String(e.de)) && RE_DIA.test(String(e.ate)), "Datas no formato AAAA-MM-DD.");
-      const [ls, caixa] = await Promise.all([
-        lerTudo<{ tipo: string; valor: number; forma: string | null; categoria: string; descricao: string | null; pagamentos: unknown }>((de, ate, contar) => sb.from("lancamentos").select("tipo, valor, forma, categoria, descricao, pagamentos", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).gte("data", String(e.de)).lte("data", String(e.ate)).order("data").order("id").range(de, ate)).then((data) => ({ data })),
+      const de = String(e.de), ate = String(e.ate);
+      // o crédito do tutor conta pelo instante em que foi deixado ou usado, no fuso da loja (a mesma regra do Financeiro)
+      const desde = localParaUtc(`${de}T00:00`, c.fusoMin).toISOString(), antes = localParaUtc(`${somaDiasLocal(ate, 1)}T00:00`, c.fusoMin).toISOString();
+      const [ls, caixa, creditos] = await Promise.all([
+        lerTudo<{ id: string; tipo: string; valor: number; forma: string | null; categoria: string; descricao: string | null; pagamentos: unknown }>((a, b, contar) => sb.from("lancamentos").select("id, tipo, valor, forma, categoria, descricao, pagamentos", contando(contar)).eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null).gte("data", de).lte("data", ate).order("data").order("id").range(a, b)).then((data) => ({ data })),
         sb.from("caixas").select("aberto_em, valor_inicial").eq("petshop_id", petshop.id).is("fechado_em", null).maybeSingle(),
+        lerTudo<{ id: string; valor: number; criado_em: string; lancamento_id: string | null; cliente_id: string }>((a, b, contar) => sb.from("clientes_creditos").select("id, valor, criado_em, lancamento_id, cliente_id", contando(contar)).eq("petshop_id", petshop.id)
+          .gte("criado_em", desde).lt("criado_em", antes).order("criado_em").order("id").range(a, b)).catch(() => []),
       ]);
+      const todos = ls.data ?? [];
+      const ehDevolucao = (l: { tipo: string; categoria: string }) => l.tipo === "saida" && CATEGORIAS_DEVOLUCAO.includes(l.categoria);
       // por forma, o pagamento dividido entra repartido (parte no Pix, parte em dinheiro)
-      const soma = (tipo: string, chave: "categoria" | "forma") => {
+      const soma = (filtro: (l: (typeof todos)[number]) => boolean, chave: "categoria" | "forma") => {
         const m: Record<string, number> = {};
         const por = (k: string, v: number) => { m[k] = Math.round(((m[k] ?? 0) + v) * 100) / 100; };
-        for (const l of ls.data ?? []) {
-          if (l.tipo !== tipo) continue;
+        for (const l of todos) {
+          if (!filtro(l)) continue;
           if (chave === "forma") for (const p of partesPorForma(l)) por(p.forma, p.valor);
           // "Creche e hotel" com o nome da tela: "Hotel" ou "Creche" pela entrada e pelo que o pet shop faz
           else por(l.categoria ? nomeDaCategoria(l.categoria, petshop, l.descricao) : "outro", Number(l.valor));
         }
         return m;
       };
-      const total = (tipo: string) => Math.round((ls.data ?? []).filter((l) => l.tipo === tipo).reduce((s, l) => s + Number(l.valor), 0) * 100) / 100;
-      return { resultado: { de: e.de, ate: e.ate, entrou: total("entrada"), saiu: total("saida"), resultado: Math.round((total("entrada") - total("saida")) * 100) / 100,
-        entradas_por_categoria: soma("entrada", "categoria"), entradas_por_forma: soma("entrada", "forma"), saidas_por_categoria: soma("saida", "categoria"),
-        lancamentos: (ls.data ?? []).length, caixa_aberto: caixa.data ? { desde: utcParaLocal(caixa.data.aberto_em, c.fusoMin), troco_inicial: caixa.data.valor_inicial } : null } };
+      const total = (filtro: (l: (typeof todos)[number]) => boolean) => real(todos.filter(filtro).reduce((t, l) => t + Number(l.valor), 0));
+      // a mesma conta do Financeiro (faturamento.ts): entrou − devolvido − crédito deixado + crédito usado fora de uma conta − saiu
+      const ajustes = montarAjustes(todos.filter(ehDevolucao).map((l) => ({ valor: Number(l.valor), data: de, cliente_id: null })), creditos);
+      const entrou = total((l) => l.tipo === "entrada");
+      const saiu = total((l) => l.tipo === "saida" && !ehDevolucao(l));
+      const faturamento = faturamentoLiquido(entrou, ajustes);
+      const resultado = real(faturamento - saiu);
+      // taxas da maquininha guardadas em cada pagamento do período (as mesmas de Relatórios, Quanto sobrou)
+      const idsEntrada = todos.filter((l) => l.tipo === "entrada").map((l) => l.id);
+      let taxas = 0;
+      for (let i = 0; i < idsEntrada.length; i += 150) {
+        const t = await sb.from("lancamentos_taxas").select("taxa").eq("petshop_id", petshop.id).in("lancamento_id", idsEntrada.slice(i, i + 150));
+        for (const x of t.data ?? []) taxas = real(taxas + Number(x.taxa));
+      }
+      return { resultado: { de, ate, entrou, devolvido_ao_cliente: ajustes.devolvido, credito_deixado_para_tutores: ajustes.creditoDeixado, credito_usado_fora_de_conta: ajustes.creditoUsadoFora,
+        faturamento, saiu, resultado,
+        ...(taxas > 0 ? { taxas_da_maquininha: taxas, resultado_depois_das_taxas: real(resultado - taxas) } : {}),
+        como_e_a_conta: "Igual ao Financeiro, Resultado do mês: faturamento = entrou − devolvido ao cliente − crédito deixado para tutores (ainda é deles) + crédito usado fora de uma conta; resultado = faturamento − saiu. Devolução não está em saiu. Diga esses números como estão: não refaça a conta. Taxas da maquininha já estão em resultado_depois_das_taxas (não tire de novo).",
+        entradas_por_categoria: soma((l) => l.tipo === "entrada", "categoria"), entradas_por_forma: soma((l) => l.tipo === "entrada", "forma"), saidas_por_categoria: soma((l) => l.tipo === "saida" && !ehDevolucao(l), "categoria"),
+        lancamentos: todos.length, caixa_aberto: caixa.data ? { desde: utcParaLocal(caixa.data.aberto_em, c.fusoMin), troco_inicial: caixa.data.valor_inicial } : null } };
     }
     case "contas_em_aberto": {
       exigir(c.cuidoDoFinanceiro, "Esta pessoa opera o caixa, mas não tem a área Financeiro: não vê o resumo do período nem as contas. O dono pode liberar em Equipe.");
@@ -733,9 +794,14 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       const nomes = await nomesDosClientes(c, [...new Set(contas.map((l) => l.cliente_id!))]);
       const lista = devedores(contas, nomes, hoje);
       const total = real(lista.reduce((s, d) => s + d.total, 0));
+      const somar = (k: "atrasado" | "hoje" | "aVencer") => real(lista.reduce((s, d) => s + d[k], 0));
       return { resultado: {
         hoje, total_a_receber: total, pessoas: lista.length,
-        devedores: lista.slice(0, 30).map((d) => ({ tutor: d.tutor, cliente_id: d.cliente_id, deve: d.total, contas: d.contas.length, atrasado: d.atrasado, desde: d.desde.length === 10 ? d.desde : utcParaLocal(d.desde, c.fusoMin).slice(0, 10),
+        vencido: somar("atrasado"), vence_hoje: somar("hoje"), a_vencer: somar("aVencer"),
+        devendo_agora: real(somar("atrasado") + somar("hoje")),
+        como_ler: "vencido = o vencimento já passou; vence_hoje = vence hoje (ou sem data); a_vencer = vence depois de hoje (mensalidade do mês que vem, sinal de reserva, fiado com prazo). Para \"quem me deve agora\", use vencido + vence_hoje.",
+        devedores: lista.slice(0, 30).map((d) => ({ tutor: d.tutor, cliente_id: d.cliente_id, deve: d.total, contas: d.contas.length, atrasado: d.atrasado, vence_hoje: d.hoje, a_vencer: d.aVencer,
+          ...(d.foraDoLimite > 0 ? { fora_do_limite_de_fiado: d.foraDoLimite } : {}), desde: d.desde.length === 10 ? d.desde : utcParaLocal(d.desde, c.fusoMin).slice(0, 10),
           ...(so || lista.length <= 5 ? { quais: d.contas.map((l) => ({ descricao: nomeDaConta(l), valor: l.valor, vencimento: l.vencimento })) } : {}) })),
         ...(lista.length > 30 ? { aviso: `Mostrando 30 de ${lista.length}. A lista inteira fica em Caixa, Contas de clientes.` } : {}),
         onde_ver: "Caixa, Contas de clientes (e na ficha de cada tutor)",
@@ -1082,6 +1148,12 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       if (texto(e.obs)) linhas.push(["Obs.", texto(e.obs, 300)]);
       return { titulo: "Anotar na saúde do pet", linhas };
     }
+    case "anotar_no_pet": {
+      const pet = await petPorId(c, e.pet_id);
+      const { onde, novo, fica } = anotacaoDoPet(pet, e);
+      return { titulo: "Anotar na ficha do pet", linhas: [["Pet", `${pet.nome}${pet.clientes?.nome ? ` (${pet.clientes.nome})` : ""}`], ["Onde", ROTULO_ANOTACAO[onde]], ["Anotar", novo],
+        ...(fica !== novo ? [["Fica assim", fica] as [string, string]] : [])] };
+    }
     case "abrir_caixa": {
       exigir(c.vejoFinanceiro, "Esta pessoa não tem acesso ao financeiro.");
       const aberto = await caixaAbertoAgora(c);
@@ -1301,6 +1373,17 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
       const novo = ok(await sb.from("pets_saude").insert({ petshop_id: petshop.id, pet_id: pet.id, tipo: String(e.tipo), nome: texto(e.nome, 80), aplicado_em: e.aplicado_em ? String(e.aplicado_em) : hoje,
         vence_em: e.vence_em ? String(e.vence_em) : null, obs: texto(e.obs, 300) || null, criado_por: c.userId }).select("id").single());
       return { feito: true, saude_id: novo.id };
+    }
+    case "anotar_no_pet": {
+      const pet = await petPorId(c, e.pet_id);
+      const { onde, fica } = anotacaoDoPet(pet, e);
+      // grava só se ninguém mexeu no campo desde o cartão (senão, o texto de outra pessoa se perderia)
+      const antes = (pet as Record<string, unknown>)[onde] as string | null;
+      let q = sb.from("pets").update(onde === "obs" ? { obs: fica } : { alertas: fica }).eq("id", pet.id).eq("petshop_id", petshop.id);
+      q = antes == null ? q.is(onde, null) : q.eq(onde, antes);
+      const r = ok(await q.select("id"));
+      exigir(r.length, "A ficha desse pet mudou agora há pouco (ou o seu acesso não deixa editar). Nada foi feito. Busque o pet de novo e confira.");
+      return { feito: true, pet_id: pet.id, onde: ROTULO_ANOTACAO[onde] };
     }
     case "abrir_caixa": {
       const r = await sb.from("caixas").insert({ petshop_id: petshop.id, valor_inicial: Math.max(0, numero(e.troco_inicial) ?? 0), aberto_por: c.userId }).select("id").single();

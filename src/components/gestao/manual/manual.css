@@ -1,16 +1,5 @@
 /* Manual (/gestao/app/manual) e o botão "Como usar esta tela" da barra de cima. */
 
-/* ---------- botão na barra de cima ---------- */
-.g-man-botao {
-  display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 40px; padding: 0 12px; border-radius: 999px;
-  border: 1px solid var(--g-linha-forte); background: transparent; color: var(--g-tinta); font: 600 .8125rem/1 var(--sans); white-space: nowrap;
-}
-.g-man-botao:hover { background: rgba(31, 27, 23, .05); }
-.g-man-botao svg { width: 18px; height: 18px; color: var(--g-verde); }
-.g-man-botao i { font-style: normal; display: none; }
-@media (min-width: 1180px) { .g-man-botao i { display: inline; } }
-@media (max-width: 359px) { .g-man-botao { padding: 0 10px; } .g-man-botao span { display: none; } }
-
 /* ---------- um tópico: título que abre o passo a passo ---------- */
 .g-man-lista { display: grid; }
 .g-man-item { border-bottom: 1px solid var(--g-linha); scroll-margin-top: 16px; }
@@ -166,3 +155,19 @@
   .g-man.so-um .g-man-passos li::before { width: 20px; height: 20px; font-size: 9pt; }
 }
 @media print { .g-man.so-um .g-man-nota, .g-man.so-um .g-man-nota.atencao { font-size: 10pt; padding: 6px 8px; } }
+
+/* ---------- a Ajuda: um lugar só (botão no alto e Ajuda do menu) ---------- */
+.g-ajc { gap: 16px; }
+.g-ajc-saidas { display: grid; gap: 8px; }
+@media (min-width: 720px) { .g-ajc-saidas { grid-template-columns: repeat(3, 1fr); } }
+.g-ajc-saida {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px; border-radius: 16px; border: 1px solid var(--g-linha);
+  background: #fffdf9; color: inherit; font: inherit; text-align: left; text-decoration: none; cursor: pointer;
+}
+.g-ajc-saida:hover { border-color: var(--g-linha-forte); }
+.g-ajc-saida .ic { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 12px; background: var(--g-verde-tint, #e6efe9); color: var(--g-verde); }
+.g-ajc-saida .ic svg { width: 20px; height: 20px; }
+.g-ajc-saida .t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.g-ajc-saida .t b { font-weight: 600; }
+.g-ajc-saida .t small { font-size: .8125rem; line-height: 1.35; color: var(--g-cinza); }
+.g-ajc-saida > svg { width: 18px; height: 18px; flex: none; color: var(--g-cinza); }

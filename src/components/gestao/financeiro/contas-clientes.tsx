@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, HandCoins, MessageCircle, TriangleAlert } from "lucide-react";
 import { mensagemDeDivida, multaSugerida } from "@/lib/gestao/dinheiro-opcoes";
-import { fraseDoDisponivel, limiteDoCliente } from "@/lib/gestao/fiado";
+import { dividaPorVencimento, fraseDoDisponivel, fraseDoVencimento, limiteDoCliente, type DividaPorVencimento } from "@/lib/gestao/fiado";
 import { descricaoAtual } from "@/lib/gestao/dinheiro";
 import type { Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, dataCurta, dataCurtaOuAno, hora, isoDia, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
@@ -21,7 +21,9 @@ import "./recebimentos.css";
  */
 
 type Tutor = { id: string; nome: string; telefone: string | null; limite_fiado?: number | null };
-export type Devedor = { chave: string; tutor: Tutor | null; contas: Lancamento[]; total: number; atrasado: number; desde: string; cobradoEm: string | null };
+export type Devedor = { chave: string; tutor: Tutor | null; contas: Lancamento[]; total: number; atrasado: number; desde: string; cobradoEm: string | null;
+  /** O total separado por vencimento e o que conta no limite de fiado (sem a mensalidade e o sinal que ainda não venceram). */
+  partes: DividaPorVencimento };
 
 const centavos = (n: number) => Math.round(n * 100) / 100;
 const quandoFoi = (iso: string) => `${dataCurta(iso)} às ${hora(iso)}`;
@@ -48,13 +50,15 @@ export function useContasDeClientes(clienteId?: string) {
 
 /** Desde quando o cliente deve esta conta: o dia anotado (dívida trazida do caderno) ou o dia em que foi anotada. */
 export const desdeDaConta = (c: Pick<Lancamento, "devido_desde" | "criado_em">) => c.devido_desde ?? c.criado_em;
+/** O dia (AAAA-MM-DD) de "desde": o dia anotado ou o dia em que foi anotada, no fuso do aparelho. */
+const diaDe = (s: string) => (s.length === 10 ? s : isoDia(new Date(s)));
 
 /** Junta as contas por tutor: quanto deve, quanto está atrasado, desde quando e quando foi cobrado. */
 export function porDevedor(contas: Lancamento[], tutores: Map<string, Tutor>, hoje: string): Devedor[] {
   const mapa = new Map<string, Devedor>();
   for (const c of contas) {
     const chave = c.cliente_id ?? "sem";
-    const d = mapa.get(chave) ?? { chave, tutor: c.cliente_id ? tutores.get(c.cliente_id) ?? null : null, contas: [], total: 0, atrasado: 0, desde: desdeDaConta(c), cobradoEm: null };
+    const d = mapa.get(chave) ?? { chave, tutor: c.cliente_id ? tutores.get(c.cliente_id) ?? null : null, contas: [], total: 0, atrasado: 0, desde: desdeDaConta(c), cobradoEm: null, partes: dividaPorVencimento([], hoje) };
     d.contas.push(c);
     d.total = centavos(d.total + Number(c.valor));
     if (c.vencimento && c.vencimento < hoje) d.atrasado = centavos(d.atrasado + Number(c.valor));
@@ -63,7 +67,23 @@ export function porDevedor(contas: Lancamento[], tutores: Map<string, Tutor>, ho
     if (c.cobrado_em && (!d.cobradoEm || c.cobrado_em > d.cobradoEm)) d.cobradoEm = c.cobrado_em;
     mapa.set(chave, d);
   }
-  return [...mapa.values()].sort((a, b) => b.atrasado - a.atrasado || b.total - a.total);
+  for (const d of mapa.values()) d.partes = dividaPorVencimento(d.contas, hoje);
+  // quem deve agora (vencido ou vence hoje) primeiro; o que só tem conta a vencer vai para o fim
+  return [...mapa.values()].sort((a, b) => b.atrasado - a.atrasado || (b.partes.venceHoje - a.partes.venceHoje) || b.total - a.total);
+}
+
+/**
+ * Pelo vencimento (Sandra: "desde 18/11" numa conta que vence 05/12 parecia dívida velha): dívida do caderno, "deve desde 10/03";
+ * conta vencida, "venceu em 15/11" (a mais antiga); "vence hoje"; senão "vence 05/12" (o vencimento mais perto).
+ */
+export function textoDoDesde(d: Pick<Devedor, "contas" | "desde" | "partes">, hoje: string) {
+  const caderno = d.contas.map((c) => c.devido_desde).filter((v): v is string => Boolean(v)).sort()[0];
+  const venceu = d.contas.map((c) => c.vencimento).filter((v): v is string => Boolean(v && v < hoje)).sort()[0];
+  if (caderno && (!venceu || caderno <= venceu)) return `deve desde ${dataCurtaOuAno(caderno)}`;
+  if (venceu) return `venceu em ${dataCurtaOuAno(venceu)}`;
+  if (d.partes.venceHoje > 0) return "vence hoje";
+  const proximo = d.contas.map((c) => c.vencimento).filter((v): v is string => Boolean(v && v > hoje)).sort()[0];
+  return proximo ? `vence ${dataCurtaOuAno(proximo)}` : `desde ${dataCurtaOuAno(diaDe(d.desde))}`;
 }
 
 /** Uma conta em aberto, com o botão Recebi. */
@@ -105,13 +125,20 @@ function BlocoDevedor({ d, hoje, aoReceber, aoCobrar, semNome }: { d: Devedor; h
         <span className="t">
           <b>{semNome ? `Deve ${brl(d.total)}` : d.tutor?.nome ?? "Sem tutor na conta"}</b>
           <span>
-            {semNome ? "" : `Deve ${brl(d.total)} · `}{d.contas.length === 1 ? "1 conta" : `${d.contas.length} contas`} · desde {dataCurtaOuAno(d.desde.length === 10 ? d.desde : isoDia(new Date(d.desde)))}
+            {semNome ? "" : `Deve ${brl(d.total)} · `}{d.contas.length === 1 ? "1 conta" : `${d.contas.length} contas`} · {textoDoDesde(d, hoje)}
             {d.cobradoEm ? ` · cobrado em ${quandoFoi(d.cobradoEm)}` : ""}
           </span>
+          {/* separado pelo vencimento: o que já venceu, o que vence hoje e o que ainda vai vencer */}
+          {(d.partes.aVencer > 0 || d.partes.vencido > 0) && d.partes.total > 0 && <span className="g-pp g-muted">{fraseDoVencimento(d.partes)}</span>}
         </span>
         {d.atrasado > 0 && <span className="g-tag vermelho"><TriangleAlert size={12} aria-hidden />{brl(d.atrasado)} em atraso</span>}
       </div>
-      {limite != null && <div className="g-orc-limite"><span>{fraseDoDisponivel(d.total, limite)}</span><BarraDoLimite deve={d.total} limite={limite} /></div>}
+      {limite != null && (
+        <div className="g-orc-limite">
+          <span>{fraseDoDisponivel(d.partes.noLimite, limite)}{d.partes.foraDoLimite > 0 ? ` (sem ${brl(d.partes.foraDoLimite)} de mensalidade ou sinal que ainda não venceram)` : ""}</span>
+          <BarraDoLimite deve={d.partes.noLimite} limite={limite} />
+        </div>
+      )}
       <div className="gr-contas">
         {d.contas.map((c) => <LinhaConta key={c.id} conta={c} hoje={hoje} aoReceber={() => aoReceber(c)} />)}
       </div>
@@ -136,6 +163,7 @@ export function ContasDeClientes({ aoMudar, largo }: { aoMudar?: () => void | Pr
   const [todos, setTodos] = useState(false);
   const devedores = useMemo(() => porDevedor(dados?.contas ?? [], dados?.tutores ?? new Map(), hoje), [dados, hoje]);
   const total = centavos(devedores.reduce((s, d) => s + d.total, 0));
+  const partesDoTotal = useMemo(() => dividaPorVencimento(dados?.contas.filter((c) => c.cliente_id || c.agendamento_id) ?? [], hoje), [dados, hoje]);
   const visiveis = todos ? devedores : devedores.slice(0, 5);
   const alvo = cobrando ? devedores.find((d) => d.chave === cobrando) : null;
   const mudou = async () => { await recarregar(); await aoMudar?.(); };
@@ -154,6 +182,7 @@ export function ContasDeClientes({ aoMudar, largo }: { aoMudar?: () => void | Pr
             <p className="g-muted g-pp" style={{ marginBottom: 4 }}>
               {devedores.length === 1 ? "1 cliente ficou de pagar depois." : `${devedores.length} clientes ficaram de pagar depois.`} Quando pagar, toque em Recebi: pode ser o valor todo ou só uma parte.
             </p>
+            {partesDoTotal.aVencer > 0 && <p className="g-pp" style={{ margin: 0 }}><b>{fraseDoVencimento(partesDoTotal)}</b>. O que ainda vai vencer (mensalidade do mês que vem, sinal de reserva) não conta no limite de fiado até vencer.</p>}
             {visiveis.map((d) => (
               <BlocoDevedor key={d.chave} d={d} hoje={hoje} aoReceber={(c) => { if (!somenteLeitura()) setBaixando(c); }} aoCobrar={() => setCobrando(d.chave)} />
             ))}

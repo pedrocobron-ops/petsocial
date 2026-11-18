@@ -2,7 +2,7 @@ import { contaDosItens, itensDoLancamento, partesPorForma, type FormaPagamento }
 import { FORMAS } from "./tipos";
 import { brl, chamar, dataCompleta, isoDia } from "./util";
 
-type Recebido = { valor: number; forma?: string | null; pagamentos?: unknown; itens?: unknown; data?: string | null };
+type Recebido = { valor: number; forma?: string | null; pagamentos?: unknown; itens?: unknown; data?: string | null; credito_usado?: number | null };
 
 /**
  * A data do comprovante é a do pagamento (o dia em que o dinheiro entrou, no fuso da loja), não a do horário: o horário de amanhã
@@ -19,7 +19,14 @@ export function linhasDaData(quando: Date | string, pagoEm?: string | null): str
 export type AntigaNoComprovante = { recebido: number; falta: number; forma?: string | null; pagamentos?: unknown };
 
 const centavos = (n: number) => Math.round(n * 100) / 100;
-const nomeDaForma = (f: string) => FORMAS.find((x) => x.id === f)?.rotulo ?? "Outro";
+const nomeDaForma = (f: string) => (f === "credito_tutor" ? "Crédito do tutor" : FORMAS.find((x) => x.id === f)?.rotulo ?? "Outro");
+/** As partes do pagamento, com a parte paga com o crédito do tutor pelo nome (no pagamento ela é "outro"). */
+function partesComCredito(l: Recebido): { forma: string; valor: number }[] {
+  const partes = partesPorForma(l);
+  const credito = centavos(Math.max(0, Number(l.credito_usado ?? 0)));
+  if (!(credito > 0)) return partes;
+  return [{ forma: "credito_tutor", valor: credito }, ...partes.map((p) => (p.forma === "outro" ? { ...p, valor: centavos(p.valor - credito) } : p))];
+}
 
 /** "Dinheiro R$ 100,00 + Pix R$ 20,00": as partes somadas por forma, sempre com o valor de cada uma. */
 export function formasComValor(partes: { forma: string; valor: number }[]) {
@@ -56,6 +63,8 @@ export function textoComprovante(p: {
   antigas?: AntigaNoComprovante[] | null; entregue?: number | null;
   /** o dia em que o dinheiro entrou (AAAA-MM-DD); sem ele, o dia do lançamento mais novo */
   pagoEm?: string | null;
+  /** do que é o comprovante: "do atendimento" (padrão), "da compra" (venda no balcão), "do pacote" */
+  assunto?: string;
 }) {
   const pagoEm = p.pagoEm ?? p.recebidos.map((l) => l.data ?? "").filter(Boolean).sort().pop() ?? null;
   const total = centavos(p.recebidos.reduce((t, l) => t + Number(l.valor), 0));
@@ -72,8 +81,8 @@ export function textoComprovante(p: {
   }
   // como foi pago: as partes de todos os recebimentos (a conta e o que devia de antes), somadas por forma
   const antigas = (p.antigas ?? []).filter((x) => Number(x.recebido) > 0);
-  const partes: { forma: FormaPagamento; valor: number }[] = [];
-  for (const l of p.recebidos) partes.push(...partesPorForma(l));
+  const partes: { forma: FormaPagamento | "credito_tutor"; valor: number }[] = [];
+  for (const l of p.recebidos) partes.push(...(partesComCredito(l) as { forma: FormaPagamento | "credito_tutor"; valor: number }[]));
   for (const x of antigas) partes.push(...partesPorForma({ valor: Number(x.recebido), forma: x.forma, pagamentos: x.pagamentos }));
   const pagamento = formasComValor(partes);
   const pagouAntigas = centavos(antigas.reduce((t, x) => t + Number(x.recebido), 0));
@@ -81,7 +90,7 @@ export function textoComprovante(p: {
   const emDinheiro = centavos(partes.filter((x) => x.forma === "dinheiro").reduce((t, x) => t + x.valor, 0));
 
   return [
-    `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} Segue o comprovante do atendimento${p.pet ? ` de ${p.pet}` : ""}.`,
+    `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} Segue o comprovante ${p.assunto ?? "do atendimento"}${p.pet ? ` de ${p.pet}` : ""}.`,
     "",
     p.petshop,
     ...linhasDaData(p.quando, pagoEm),

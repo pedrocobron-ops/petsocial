@@ -303,7 +303,7 @@ export default function Hoje() {
           <h1>{saudacao()}, <em className="it">{eu.nome.split(" ")[0]}</em></h1>
         </div>
         <div className="g-acoes">
-          {posso("agenda") && banho && !contaNova && liberado && <LinkRapido rotulo="Mandar link de agendamento" />}
+          {posso("agenda") && banho && !contaNova && liberado && <LinkRapido rotulo="Mandar o link do cliente" />}
           {passoNovo ? (passoNovo.href
               ? <Link className="g-btn pri" href={passoNovo.href} onClick={passoNovo.aoTocar}><ChevronRight />{passoNovo.texto}</Link>
               : <button type="button" className="g-btn pri" onClick={passoNovo.aoTocar}><ChevronRight />{passoNovo.texto}</button>)
@@ -351,7 +351,7 @@ export default function Hoje() {
             <div className="g-pilha p">
               <div className="g-fila"><button className="g-btn pri" onClick={() => abrirAssistente()}><Mic />Falar com o Mozart</button></div>
               <div className="g-sugestoes">
-                {pedidosDaFrente(frente, PEDIDOS).filter((p) => cuidoDoFinanceiro || !p.startsWith("Quanto")).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
+                {pedidosDaFrente(frente, PEDIDOS).filter((p) => (cuidoDoFinanceiro || !p.startsWith("Quanto")) && (posso("agenda") || !p.includes("horários")) && (posso("clientes") || !p.startsWith("Quem não vem"))).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
               </div>
             </div>
           </section>
@@ -472,9 +472,9 @@ export default function Hoje() {
                 {!banho ? (
                   <Vazio mozart="acenando" titulo="Nenhum horário marcado para hoje" texto={casa ? `Serviços com hora marcada aparecem aqui. As estadias ficam em ${rotuloCasa}.` : "Serviços com hora marcada aparecem aqui."} />
                 ) : contaNova && posso("clientes") ? (
-                  <Vazio mozart="acenando" titulo="A agenda começa pelo primeiro pet" texto="Cadastre um pet com o tutor. Depois é só marcar: o horário aparece aqui.">
-                    {/* com outro passo antes (os preços, por exemplo), o botão fica só no alto da tela: um caminho só */}
-                    {(!passoNovo || passoNovo.id === "pet") && <LinkDeGravar className="g-btn verde" href="/gestao/app/clientes?novo=1">Cadastrar o primeiro pet</LinkDeGravar>}
+                  <Vazio mozart="acenando" titulo="Nenhum horário ainda" texto={posso("agenda") ? "Marque o primeiro: o pet entra na hora, só com o nome e o tutor. O horário aparece aqui." : "Os horários marcados aparecem aqui."}>
+                    {/* o próximo passo já está no alto da tela (e nos primeiros passos): aqui só sem passo na tela, para não repetir */}
+                    {!passoNovo && posso("agenda") && <LinkDeGravar className="g-btn verde" href="/gestao/app/agenda?novo=1">Marcar o primeiro horário</LinkDeGravar>}
                   </Vazio>
                 ) : (
                   <Vazio mozart="acenando" titulo="Nenhum banho marcado para hoje" texto="Que tal chamar quem está com o banho atrasado? O Mozart monta a lista para você.">

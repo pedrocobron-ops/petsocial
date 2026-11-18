@@ -18,7 +18,7 @@ const ABAS: { id: string; rotulo: string; frase: string; alt: string }[] = [
   { id: "equipe", rotulo: "Equipe", frase: "Acesso por área, quem atende na agenda, a comissão de cada um e a escala da semana.", alt: "Equipe, com a função, o acesso e a escala de cada pessoa" },
   { id: "sem-valores", rotulo: "O que a equipe vê", frase: "Quem não cuida do dinheiro trabalha normalmente e não vê valores. O menu dela mostra só as áreas que você liberou.", alt: "A tela de creche e hotel vista por um monitor sem acesso ao dinheiro: menu reduzido e nenhum valor à mostra" },
   { id: "opcoes", rotulo: "Ajustes", frase: "Sinal, preço por porte, temporada, taxas: cada opção começa desligada. Você liga só o que usa.", alt: "Meu pet shop: diária e vagas da creche e do hotel e as opções que o dono liga, como o sinal na reserva" },
-  { id: "manual", rotulo: "Manual", frase: "O passo a passo de cada tarefa, com busca e para imprimir. E o botão “Como usar esta tela” no alto das telas.", alt: "Manual dentro do sistema, com busca e os primeiros passos" },
+  { id: "manual", rotulo: "Manual", frase: "O passo a passo de cada tarefa, com busca e para imprimir. E o botão “Ajuda” no alto das telas.", alt: "Manual dentro do sistema, com busca e os primeiros passos" },
 ];
 
 /** Para cada tipo de negócio: o que o sistema faz, com a tela real ao lado. */

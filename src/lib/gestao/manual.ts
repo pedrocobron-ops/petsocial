@@ -3,7 +3,7 @@ import { nomeDaCasa, principalDe, usaCasa, usaModulo } from "./modulos";
 /**
  * Manual do Maestro Pet Gestão, em dados. É a única fonte:
  * - da tela Manual (/gestao/app/manual),
- * - do botão "Como usar esta tela" (os tópicos da rota aberta),
+ * - do botão "Ajuda" do alto de cada tela (os tópicos da rota aberta),
  * - das respostas da Ajuda (`resposta` sai dos passos; veja ajuda.ts).
  * Mudou uma tela ou o nome de um botão? Atualize o tópico aqui.
  *
@@ -61,7 +61,7 @@ type TopicoBase = {
   quem: Quem;
   /** Tela onde se faz (o botão "Abrir esta tela" leva para cá). null = fora do menu (tela de entrada, navegador). */
   rota: string | null;
-  /** Outras telas em que o tópico também aparece no botão "Como usar esta tela". */
+  /** Outras telas em que o tópico também aparece no botão "Ajuda" do alto. */
   tambem?: string[];
   /** Só aparece para o pet shop que usa alguma destas partes. Sem isso, aparece para todos. */
   usa?: Uso[];
@@ -99,18 +99,18 @@ const BASE: TopicoBase[] = [
   { id: "guia", titulo: "Como é o primeiro acesso", secao: "primeiros", quem: "dono", rota: HOJE,
     passos: [
       "O Mozart faz quatro perguntas, uma por tela. Na primeira, escreva o nome do seu negócio e como você quer ser chamado, e toque em Continuar. WhatsApp e cidade ficam logo embaixo e podem ficar em branco.",
-      "Na segunda, marque o que o seu negócio faz: banho e tosa, creche, hotel, venda de produtos, pacotes. Se marcar mais de uma área, toque em qual é a atividade principal. Depois toque em Criar meu pet shop.",
+      "Na segunda, marque o que o seu negócio faz: banho e tosa, creche, hotel, venda de produtos, pacotes. Se marcar mais de uma área, toque em qual é a atividade principal. Começar no modo simples já vem marcado (menos menus no começo; desmarque se quiser ver tudo). Depois toque em Continuar: o pet shop é criado aí.",
       "Na terceira, toque em uma cor para ver o painel mudar e em Continuar para ficar com ela.",
       "Na quarta, toque em Escolher a imagem para colocar a sua logo e em Continuar.",
       "Cor e logo podem ficar para depois: toque em Faço depois em cada uma, ou em Com pressa? Pular a cor e a logo.",
       { so: ["banho"], texto: "Quer começar a atender já? Na pergunta da cor, toque em Começar já: marcar o primeiro horário. Fica o horário padrão, você atende, os serviços entram sem preço e o link do cliente liga. O guia vai direto para o fim; o resto você ajusta depois em Meu pet shop." },
-      "Em seguida abre um guia curto, com um assunto por passo: horário, equipe e vagas, serviços e preços, diária e vagas da creche e do hotel, link do cliente. Só aparecem os passos do que você marcou.",
+      "Em seguida vêm alguns ajustes rápidos, um assunto por tela: horário, equipe e vagas, serviços e preços, diária e vagas da creche e do hotel, link do cliente. Só aparece o que você marcou.",
       "No horário, toque nos dias prontos (Seg a sex, Seg a sáb, Ter a sáb ou Todos os dias), depois nas horas prontas (8h às 18h ou 9h às 19h) e, se for o caso, em Sábado meio período. O botão que bate com a grade fica marcado. Se vocês fecham para almoçar, marque Fecha para o almoço?.",
-      "Em cada passo, toque em Continuar para gravar ou em Faço depois para pular.",
+      "Em cada ajuste, toque em Continuar para gravar ou em Faço depois para pular.",
       "A página recarregou no meio (o celular trocou de aplicativo, por exemplo)? O guia volta no passo em que você estava, com o que já tinha marcado, e avisa Continuei de onde você parou. Confira e toque em Continuar: nada entra duas vezes, nem a mesma pessoa na equipe.",
       "Nos preços, escolha Um preço só para usar o mesmo valor em todos os portes, ou Por porte para separar.",
       "Faz um serviço que não está na lista? No fim dos serviços, toque em Adicionar outro serviço: escreva o nome, escolha quanto tempo leva, o preço, a cor na agenda e, se o pet shop tem mais de uma área, de qual área ele é. Tire pela lixeira se mudar de ideia.",
-      { so: ["banho"], texto: "No fim, a tela mostra em quantos minutos o pet shop ficou pronto. Toque em Marcar o primeiro horário (o pet entra na hora: escreva o nome, toque em Cadastrar pet novo e ponha o tutor) ou em Copiar meu link de agendamento para mandar a um cliente pelo WhatsApp." },
+      { so: ["banho"], texto: "No fim, a tela mostra em quantos minutos o pet shop ficou pronto e o que falta para começar (Faltam 2 coisas para começar: Marcar o primeiro horário e Fechar a conta do primeiro atendimento). É a mesma lista do cartão da tela Hoje, que fica lá até você fazer. Toque em Marcar o primeiro horário (o pet entra na hora: escreva o nome, toque em Cadastrar pet novo e ponha o tutor) ou em Copiar o link do cliente para mandar a um cliente pelo WhatsApp." },
       "No fim, também dá para Cadastrar o primeiro pet (já abre a ficha para preencher), Trazer meus clientes de uma planilha ou Escolher o que aparece no menu.",
     ],
     dicas: ["A área principal aparece primeiro no menu e na tela inicial. O que você não marcou fica em Outras áreas, no fim do menu.", "Tudo o que você respondeu pode ser mudado depois em Meu pet shop: o cartão O que você usa troca as áreas e a área principal, e o cartão Identidade do pet shop troca a logo e as cores.", "Para passar pelo guia de novo, abra Meu pet shop e toque em Refazer o guia de configuração.", "Na tela Hoje, o cartão Primeiros passos mostra o que falta fazer. Um toque leva direto ao lugar. Enquanto a conta é nova, o botão do alto da tela e o Mozart apontam o mesmo próximo passo do cartão."],
@@ -127,7 +127,7 @@ const BASE: TopicoBase[] = [
       { so: ["banho"], texto: "Em Agenda de hoje, toque em um horário para abrir, concluir ou remarcar." },
       "Em Pede a sua atenção, toque em cada linha para resolver: lembretes de amanhã, clientes sumidos, aniversários, produto acabando, contas vencendo e, na creche, a chamada e as mensalidades.",
     ],
-    dicas: ["Só aparece o que o pet shop usa e o que o dono liberou para você.", "Valores em dinheiro só aparecem para quem cuida do caixa ou do financeiro. No Bom dia, quem não mexe com dinheiro não vê quem deve.", "Pedidos que chegaram pelo link de agendamento aparecem em destaque, com Aceitar e Recusar."],
+    dicas: ["Só aparece o que o pet shop usa e o que o dono liberou para você.", "Valores em dinheiro só aparecem para quem cuida do caixa ou do financeiro. No Bom dia, quem não mexe com dinheiro não vê quem deve.", "Pedidos que chegaram pelo link do cliente aparecem em destaque, com Aceitar e Recusar."],
     palavras: ["hoje", "tela inicial", "inicio", "resumo do dia", "pede a sua atencao", "painel", "bom dia", "resumo da manha", "o que importa hoje"] },
   { id: "menu", titulo: "Como achar as telas no menu", secao: "primeiros", quem: "todos", rota: HOJE,
     passos: [
@@ -137,7 +137,7 @@ const BASE: TopicoBase[] = [
       "No computador, o menu fica na lateral esquerda, sempre aberto.",
       "Para achar um pet ou tutor de qualquer tela, toque na lupa no alto e escreva o nome ou o telefone.",
     ],
-    dicas: ["A área principal do pet shop vem logo depois de Hoje. O dono troca em Meu pet shop, no cartão O que você usa.", "O dono escolhe quais áreas aparecem no Dia a dia pelo botão Personalizar, ao lado do título Dia a dia.", "O menu mostra só as telas que o dono liberou para você.", "Em cada tela, o botão Como usar esta tela, no alto, mostra o passo a passo daquela tela."],
+    dicas: ["A área principal do pet shop vem logo depois de Hoje. O dono troca em Meu pet shop, no cartão O que você usa.", "O dono escolhe quais áreas aparecem no Dia a dia pelo botão Personalizar, ao lado do título Dia a dia.", "O menu mostra só as telas que o dono liberou para você.", "Em cada tela, o botão Ajuda, no alto, mostra o passo a passo daquela tela e leva ao manual, às dúvidas e ao Mozart."],
     palavras: ["menu", "onde fica", "nao acho", "mais", "telas", "navegar", "lupa", "buscar", "busca", "outras areas", "sumiu do menu"] },
   { id: "mozart", titulo: "Como usar o Mozart, o assistente", secao: "primeiros", quem: "todos", rota: HOJE,
     passos: [
@@ -159,7 +159,9 @@ const BASE: TopicoBase[] = [
       "Ele também cadastra pet, bloqueia horário, faz check-in e check-out, vende e usa pacote, anota vacina, abre e fecha o caixa e prepara mensagens de WhatsApp.",
       { so: ["loja"], texto: "Quem cuida do estoque pergunta \"o que preciso comprar?\": ele diz quanto comprar de cada produto e de onde veio a conta." },
       "Perguntas sobre dinheiro só funcionam para quem vê o financeiro (dono, ou quem tem Financeiro ou Relatórios). Para quem não vê, ele responde que não consegue ver os valores (nunca que o cliente não deve nada).",
+      "O Mozart só faz o que a pessoa pode fazer nas telas: quem não tem a Agenda liberada em Equipe pede para marcar um horário e ele responde na hora que, com esse acesso, não consegue (sem montar cartão). O mesmo vale para Clientes e pets, Creche e hotel, Pacotes e Estoque.",
       "Cliente que pagou o que devia? Diga \"o dono do Bob me pagou os 35 em dinheiro\": o cartão mostra quanto ele deve e quais contas quita, e o dinheiro entra uma vez só. Para anotar uma dívida, diga \"anota que a Joana me deve 20 do perfume\": fica na ficha dela. \"Quem me deve?\" responde por pessoa.",
+      "Peça para ele anotar na ficha do pet: \"a Bolinha é brava, morde, anota isso na ficha dela\". O cartão mostra onde entra (Cuidados e alertas, que aparece em destaque na agenda, ou Observações) e como fica: o texto novo vai no fim do que já estava escrito, nada é apagado. Nome, porte e tutor se mudam na ficha, em Clientes e pets.",
       "Dá para falar em vez de escrever: veja Falar com o Mozart.",
     ],
     palavras: ["mozart", "assistente", "ia", "inteligencia artificial", "o que posso pedir", "mozart receber divida", "mozart fiado", "me pagou o que devia"] },
@@ -184,14 +186,15 @@ const BASE: TopicoBase[] = [
     palavras: ["voz", "falar", "microfone", "ditado", "audio", "maos ocupadas", "segurar para falar", "ler em voz alta", "ouvir resposta", "microfone bloqueado", "nao ouve", "enviando editar", "falar com o mozart"] },
   { id: "ajuda", titulo: "Como achar ajuda e este manual", secao: "primeiros", quem: "todos", rota: ROTA_MANUAL,
     passos: [
-      "Em qualquer tela, toque em Como usar esta tela, no alto: abre o passo a passo daquela tela.",
-      "Para ver tudo, abra o menu e toque em Manual, na parte Aprender.",
-      "No Manual, escreva na busca o que você quer fazer, como \"receber\" ou \"vacina\".",
-      "Não achou? Toque em Ajuda, no menu, e escreva a sua dúvida.",
+      "Em qualquer tela, toque em Ajuda, no alto (no menu também tem Ajuda). Abre um lugar só, com tudo:",
+      "Tirar uma dúvida: escreva ou fale a pergunta e a resposta vem na hora.",
+      "Pedir para o Mozart fazer: ele marca, recebe e anota por você, e mostra um cartão para você conferir antes de gravar.",
+      "Manual: todo o passo a passo. Escreva na busca o que você quer fazer, como \"receber\" ou \"vacina\".",
+      "Embaixo vem o passo a passo da tela em que você está: toque no que quer fazer.",
       "Se a Ajuda não resolver, ela mostra o botão Abrir o WhatsApp para falar com a nossa equipe.",
     ],
     dicas: ["No Manual, o botão Imprimir coloca todos os tópicos no papel ou em PDF, em duas colunas. Para um tópico só, abra o tópico e toque em Imprimir este tópico."],
-    palavras: ["ajuda", "manual", "duvida", "suporte", "tutorial", "passo a passo", "falar com alguem", "atendimento"] },
+    palavras: ["ajuda", "manual", "duvida", "suporte", "tutorial", "passo a passo", "falar com alguem", "atendimento", "como usar esta tela", "onde pedir ajuda"] },
   { id: "instalar", titulo: "Como instalar no celular ou no computador", secao: "primeiros", quem: "todos", rota: null,
     passos: [
       "No Android, abra o sistema no Chrome, toque nos três pontinhos e em Instalar aplicativo.",
@@ -307,7 +310,7 @@ const BASE: TopicoBase[] = [
       "Toque no horário, na Agenda ou na tela Hoje.",
       "Para mudar dia, hora, serviço ou valor, toque em Remarcar ou alterar, mude o que precisa e toque em Salvar.",
       { so: ["banho"], texto: "Mudou o dia ou a hora? Logo depois de salvar aparece Horário remarcado, com o botão Avisar no WhatsApp: a mensagem sai pronta com o dia e a hora novos. Você só aperta enviar." },
-      "Se o cliente avisou que não vem, toque em Desmarcar horário.",
+      "Se o cliente avisou que não vem, toque em Cliente cancelou.",
       "Se o cliente não apareceu, toque em Faltou.",
     ],
     dicas: [
@@ -328,19 +331,19 @@ const BASE: TopicoBase[] = [
     dicas: ["O horário volta ao normal, com o mesmo pet, serviço e hora.", "Ao reabrir um atendimento pago, o pagamento continua registrado no caixa e no financeiro."],
     atencao: [
       "Reabrir atendimento com pagamento é só para o dono ou quem vê o financeiro. Se o pagamento está em um caixa já fechado, só o dono. Para os outros, o botão não aparece e a tela diz por quê.",
-      "Horário apagado pelo botão Apagar da agenda não volta: precisa ser marcado de novo.",
+      "Horário apagado pelo botão Apagar (marquei errado) não volta: precisa ser marcado de novo.",
     ],
     palavras: ["desfazer", "apertei errado", "cliquei errado", "toquei errado", "sem querer", "cancelei errado", "cancelei sem querer", "como volta", "voltar para marcado", "voltar o horario", "recuperar horario", "descancelar", "reabrir", "desfazer cancelamento", "desfazer falta", "conclui errado", "marquei falta", "marquei falta errado", "dei falta mas veio", "falta mas o cliente veio", "tirar a falta", "conclui sem querer"] },
   { id: "apagar-horario", titulo: "Como apagar um horário da agenda", secao: "agenda", usa: ["banho"], quem: "financeiro", rota: AGENDA,
     passos: [
       "Toque no horário.",
-      "Toque em Apagar da agenda, no fim da janela.",
+      "Toque em Apagar (marquei errado), no fim da janela.",
       "Confirme em Apagar.",
     ],
-    dicas: ["Se o cliente só desmarcou, prefira Desmarcar horário: assim fica no histórico."],
+    dicas: ["Se o cliente só desmarcou, prefira Cliente cancelou: assim fica no histórico."],
     atencao: [
       "Se o horário já foi pago ou tem conta a receber, o sistema pergunta o que fazer com o dinheiro antes de apagar. Leia com calma.",
-      "Apagar da agenda é com o dono ou quem vê o financeiro. Quem da equipe usa só a agenda toca em Desmarcar horário: o horário fica no histórico como desmarcado.",
+      "Apagar (marquei errado) é com o dono ou quem vê o financeiro. Quem da equipe usa só a agenda toca em Cliente cancelou: o horário fica no histórico como desmarcado.",
     ],
     palavras: ["apagar horario", "apagar um horario", "apagar o horario", "apagar da agenda", "excluir horario", "lixeira", "remover horario", "marquei errado", "horario duplicado"] },
   { id: "bloquear", titulo: "Como bloquear um horário (folga, feriado, compromisso)", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA,
@@ -388,7 +391,7 @@ const BASE: TopicoBase[] = [
       "Toque em Salvar boletim e depois em Mandar no WhatsApp. O WhatsApp abre com a mensagem e o link: toque em enviar.",
     ],
     dicas: [
-      "O tutor abre o link no celular, sem instalar nada: vê as fotos, o texto, os serviços e o botão Marcar o próximo (com o link de agendamento ligado).",
+      "O tutor abre o link no celular, sem instalar nada: vê as fotos, o texto, os serviços e o botão Marcar o próximo (com o link do cliente ligado).",
       "Depois de mandar, o botão mostra Boletim enviado com a hora. Tocar nele abre de novo para corrigir ou mandar outra vez: o link é o mesmo.",
       { so: ["casa"], texto: "Na creche e no hotel, o botão Mandar boletim fica na Chamada (em quem já saiu) e no cartão do pet em Casa agora. No hotel dá para mandar um por dia." },
       "Sem internet para o Mozart, ou passou do limite do dia, o texto pronto continua valendo.",
@@ -434,7 +437,7 @@ const BASE: TopicoBase[] = [
       "Cole o link e toque em Salvar.",
     ],
     dicas: [
-      "O botão Avaliar no Google aparece no fim do boletim do pet, do álbum e do link de agendamento, para todos os clientes.",
+      "O botão Avaliar no Google aparece no fim do boletim do pet, do álbum e do link do cliente, para todos os clientes.",
       "Sem o Perfil da Empresa, cole o link da loja no Google Maps.",
       "O Google não deixa escolher quem avalia nem dar brinde em troca: por isso o botão aparece para todos, sem pergunta antes.",
     ],
@@ -570,9 +573,10 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "Só a coluna Tutor é obrigatória. Um tutor com dois pets ocupa duas linhas, repetindo o nome e o telefone.",
-      "Nada do que já está no sistema é apagado. Tutor ou pet que já existe só ganha o que estava em branco: telefone, raça, porte, observações.",
+      "Nada do que já está no sistema é apagado. Tutor ou pet que já existe só ganha o que estava em branco: telefone, raça, porte, nascimento, sexo, observações.",
       "A coluna Alertas vai para os alertas do pet (aparecem na agenda). Observação que fala de alergia, medo, bravo, doença ou remédio também vira alerta; o resto fica nas observações do pet.",
       "Dois pets na mesma célula (Luna, Bob ou Mel e Bob) entram como dois pets do mesmo tutor.",
+      "As colunas Nascimento do pet (20/11/2021, ou só 20/11 sem o ano) e Sexo do pet (Macho ou Fêmea) entram na ficha: o aniversário e a promoção de aniversário já valem para esses pets. Data que não dá para ler aparece no resumo, e o pet entra sem ela.",
       "A planilha entra de uma vez: ou tudo, ou nada. Se der erro, nada entra e dá para tocar em Trazer de novo. Sair da tela depois de tocar em Trazer não para a importação.",
       "O resumo fica guardado: abra Trazer de planilha de novo, de qualquer aparelho, e veja Última importação. Os números são os que entraram de verdade.",
       "Trouxe a planilha errada? Em Última importação, toque em Desfazer esta importação: saem os tutores e os pets que ela criou.",
@@ -673,6 +677,8 @@ const BASE: TopicoBase[] = [
       "Sinal, taxas, acomodação e ficha de cuidados só aparecem na reserva de quem ligou cada opção em Meu pet shop, em Opções do hotel e da creche.",
       "Leva e traz: marque Buscar em casa (na entrada) e/ou Levar de volta (na saída). O endereço vem do cadastro do tutor; dá para trocar. A estadia entra na lista do Leva e traz do dia.",
       "Se a reserva cai numa promoção em dias fracos (Meu pet shop), aparece a linha Promoção com o desconto. A diária não muda: o desconto entra no check-out. Toque em Tirar para marcar sem a promoção.",
+      "Trocou o pet, o tipo ou tocou em Chegou agora? A Saída prevista volta para o branco: escolha de novo. Uma data de outra reserva nunca passa para esta.",
+      "A Saída prevista vai até 31 dias depois da entrada na creche e até 180 no hotel. Com uma data mais longe (um ano trocado, por exemplo), aparece Confira o dia e o ano e nada é salvo. Saída prevista com mais de 6 meses mostra o ano no cartão.",
     ],
     palavras: ["reserva", "reservar", "marcar uma reserva", "reserva de creche", "reserva de hotel", "marcar hotel", "marcar creche", "hospedar", "diaria", "nova reserva", "vai ficar no hotel", "ficar no hotel", "dias no hotel", "deixar no hotel", "vai ficar hospedado", "vai ficar", "deixar na creche"] },
   { id: "creche-checkin", titulo: "Como fazer o check-in", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE,
@@ -712,7 +718,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "Usando o pacote, o botão vira Usar o pacote e encerrar, e nenhum dinheiro é lançado.",
-      { so: ["hotel"], texto: "Pet que sai antes e já tinha pago mais do que a estadia: a conta mostra Pago a mais e pergunta o que fazer. Devolver lança uma saída de hoje na categoria Devolução, ligada ao tutor. Deixar como crédito do tutor guarda o valor na ficha dele, e a próxima conta (check-out, Fechar a conta do atendimento ou creche) oferece usar. Não devolver (multa ou combinado) deixa o valor com o hotel, com o motivo que você escrever. Sem escolher, a conta não fecha." },
+      { so: ["hotel"], texto: "Pet que sai antes e já tinha pago mais do que a estadia: a conta mostra Pago a mais e pergunta o que fazer. Devolver lança uma saída de hoje na categoria Devolução, ligada ao tutor. Deixar como crédito do tutor guarda o valor na ficha dele, e a próxima conta (venda no balcão, Fechar a conta do atendimento, mensalidade da creche ou check-out) oferece usar. Não devolver (multa ou combinado) deixa o valor com o hotel, com o motivo que você escrever. Sem escolher, a conta não fecha." },
       { so: ["hotel"], texto: "Na janela Conta fechada, o número grande é sempre o dinheiro recebido na saída (pode ser R$ 0,00, quando o sinal já pagou tudo). O que ficou de crédito, o que foi devolvido ou o crédito usado aparecem numa faixa à parte, por exemplo Ficou de crédito para o tutor: R$ 190,00." },
       { so: ["hotel"], texto: "Tutor com crédito: no check-out aparece Usar o crédito, já marcado. Desmarque se não for usar agora." },
       { so: ["hotel"], texto: "Dois pets do mesmo tutor buscados juntos: a taxa de busca fora do horário entra na conta do primeiro. No segundo, a folha avisa que já foi cobrada e vem marcado Não cobrar de novo." },
@@ -755,7 +761,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "Devolver o sinal lança uma saída de hoje com o valor devolvido. O recebimento do sinal não é apagado.",
-      "Virar crédito do tutor: o valor fica de crédito para a próxima conta dele (o check-out oferece descontar). Nada sai do caixa, e a ficha do tutor mostra o crédito.",
+      "Virar crédito do tutor: o valor fica de crédito para a próxima conta dele: a venda no balcão, Fechar a conta, a mensalidade da creche e o check-out do hotel oferecem usar. Nada sai do caixa, e a ficha do tutor mostra o crédito.",
       "Com a regra de cancelamento preenchida em Meu pet shop (Opções do hotel, Sinal na reserva, Se o tutor cancelar), a escolha da regra já vem marcada pelo tempo até a entrada. Dá para mudar.",
       "Se o tutor pagou só uma parte do sinal, a escolha é sobre o que entrou: Ficar com o que foi recebido, Devolver o que foi recebido ou Continuar cobrando o que falta. Nas duas primeiras, a conta do que faltava sai de A receber.",
     ],
@@ -1164,7 +1170,7 @@ const BASE: TopicoBase[] = [
     palavras: ["preco da diaria", "valor da diaria", "diaria da creche", "diaria do hotel", "preco da creche", "preco do hotel", "vagas da creche", "vagas do hotel", "casa cheia", "lotado", "lotada", "lotacao", "lotou", "cheio", "cheia", "quantas vagas", "ocupacao", "quantos cachorros cabem", "cabem", "quantos cabem", "limite de cachorros", "quanto cobro a diaria", "mudar a diaria", "mudo a diaria", "onde mudo a diaria"] },
   { id: "creche-link", titulo: "Como receber pedidos de creche e hotel pelo link", secao: "creche", usa: ["casa"], quem: "todos", rota: CRECHE, tambem: [AGENDA, PETSHOP],
     passos: [
-      "O dono abre Meu pet shop e, no cartão Link de agendamento, liga a chave do link.",
+      "O dono abre Meu pet shop e, no cartão Link do cliente, liga a chave do link.",
       "Logo abaixo, em Pelo link, o cliente também pode pedir, o dono marca Vaga na creche e Vaga no hotel. As mesmas opções ficam no fim da tela Creche e hotel, em Casa agora.",
       "Quem não tem serviço de banho e tosa ativo e liga o link pela primeira vez já sai com Vaga no hotel (e Vaga na creche, se faz creche) marcada, para o link não abrir sem opções. Dá para desmarcar ali.",
       "Mande o link para o cliente: em Meu pet shop, toque em Copiar link ou em Mandar no WhatsApp.",
@@ -1187,7 +1193,7 @@ const BASE: TopicoBase[] = [
       "Quem não cuida do caixa não vê o valor: a mensagem dessa pessoa fala da regra do sinal e avisa que o valor chega em seguida.",
       { so: ["hotel"], texto: "No link, o tutor vê uma estimativa do hotel para as datas e o porte que escolheu, feita pelas regras da sua conta (porte, temporada, feriado e segundo pet). É estimativa: a conta de verdade é a da reserva." },
       "Se o telefone do pedido já for de um tutor, o sistema pergunta É a mesma pessoa? antes de criar a ficha. A pergunta vem uma vez por pedido, mesmo aceitando os pets um por um.",
-      { so: ["banho"], texto: "Quem tem banho e tosa também acha o link na tela Hoje, em Mandar link de agendamento, e na Agenda, em Link do cliente." },
+      { so: ["banho"], texto: "Quem tem banho e tosa também acha o link na tela Hoje, em Mandar o link do cliente, e na Agenda, em Link do cliente." },
     ],
     palavras: ["pedido de creche", "pedido de hotel", "pedidos de creche", "creche e hotel pelo link", "reserva pelo link", "cliente reservar", "reserva online", "hospedagem pelo link", "pedir vaga", "vaga pelo link"] },
   { id: "mensalista", titulo: "Como cadastrar um mensalista da creche", secao: "creche", usa: ["creche"], quem: "financeiro", rota: CRECHE, tambem: [CLIENTES],
@@ -1759,7 +1765,7 @@ const BASE: TopicoBase[] = [
     ],
     dicas: [
       "O banco guarda o valor do atendimento na hora em que ele foi concluído. Mudar depois, por qualquer caminho (Voltar para marcado, Remarcar ou alterar, trocar o porte do pet, apagar), é comparado com esse valor.",
-      "Com a trava de preço ligada (Meu pet shop, Opções de cobrança), quem tem só o Caixa não faz nada disso: os botões Voltar para marcado e Apagar da agenda nem aparecem para essa pessoa, e o horário explica o porquê. Falta cobrar? É só fechar a conta pelo valor do horário.",
+      "Com a trava de preço ligada (Meu pet shop, Opções de cobrança), quem tem só o Caixa não faz nada disso: os botões Voltar para marcado e Apagar (marquei errado) nem aparecem para essa pessoa, e o horário explica o porquê. Falta cobrar? É só fechar a conta pelo valor do horário.",
       "Com a trava desligada, pode, e fica anotado com o nome de quem fez.",
       "Quem atende (sem Caixa) já não muda nem apaga um atendimento concluído.",
     ],
@@ -1854,9 +1860,11 @@ const BASE: TopicoBase[] = [
       "O botão aparece quando o tutor tem telefone na ficha.",
       "O comprovante mostra o que foi cobrado, cada forma de pagamento com o valor (Dinheiro R$ 100,00 + Pix R$ 20,00) e o troco, quando o cliente entregou mais dinheiro.",
       "Se o cliente pagou junto o que devia de antes (fiado), o comprovante diz quanto foi para a dívida, o total pago agora e quanto ele ainda deve. Vale também quando você manda o comprovante mais tarde, pelo horário.",
+      "Venda no balcão e venda de pacote também têm comprovante: depois de receber, aparecem Mandar comprovante (com o tutor na venda e telefone na ficha) e Imprimir comprovante. Para mandar depois, abra o lançamento no Caixa ou no Financeiro.",
+      "A promoção do horário (aniversário, dia fraco) aparece no comprovante como uma linha com o nome dela.",
     ],
     atencao: ["O comprovante não é nota fiscal. O sistema não emite nota fiscal."],
-    palavras: ["comprovante", "recibo", "mandar comprovante", "comprovante de pagamento", "comprovante com fiado", "comprovante dividido", "troco no comprovante", "papel do fiado"] },
+    palavras: ["comprovante", "recibo", "mandar comprovante", "comprovante de pagamento", "comprovante da venda", "comprovante do pacote", "imprimir comprovante", "cupom", "comprovante com fiado", "comprovante dividido", "troco no comprovante", "papel do fiado"] },
   { id: "caixa", titulo: "Como abrir o caixa", secao: "dinheiro", quem: "caixa", rota: CAIXA,
     passos: [
       "Abra Caixa.",
@@ -1919,6 +1927,7 @@ const BASE: TopicoBase[] = [
       "O sistema mostra se bateu certinho, se sobrou ou se faltou.",
       "Se alguém receber enquanto você conta, o sistema avisa quanto entrou, mostra o novo valor esperado e pede para você conferir e tocar em Fechar o caixa de novo.",
       "Se quiser, escreva uma observação, como \"faltou troco\".",
+      "O caixa já foi fechado em outra aba ou em outro aparelho? Ao tocar em Fechar o caixa, aparece Este caixa já foi fechado, com a hora e quanto foi contado. Vale o primeiro fechamento; toque em Ver o fechamento para conferir.",
       "Antes de fechar, o sistema avisa se ainda tem atendimento concluído sem conta fechada (e quanto soma) e quantas alterações em valores houve desde que o caixa abriu.",
     ],
     atencao: ["Depois de fechado, os lançamentos daquele caixa não mudam mais de valor nem podem ser excluídos. Para corrigir, lance um ajuste no caixa de hoje."],
@@ -2074,11 +2083,12 @@ const BASE: TopicoBase[] = [
   { id: "credito-tutor", titulo: "Como usar o crédito do tutor", secao: "dinheiro", quem: "caixa", rota: AGENDA, tambem: [CLIENTES, CRECHE, CAIXA],
     passos: [
       "O crédito nasce quando o tutor paga a mais (por exemplo, o pet sai do hotel antes e ele tinha pago adiantado) e você escolhe deixar como crédito.",
-      "Na próxima conta dele, aparece Crédito do tutor, com o saldo, e Usar o crédito, já marcado. Vale em Fechar a conta do atendimento, no check-out, no Recebi da ficha ou de A receber e no Receber e Receber tudo da creche.",
+      "Na próxima conta dele, aparece Crédito do tutor, com o saldo, e Usar o crédito, já marcado. Vale na Venda no balcão (depois de Dizer quem comprou), em Fechar a conta do atendimento, no check-out, no Recebi da ficha ou de A receber e no Receber e Receber tudo da creche.",
       "Se o crédito paga tudo, o botão vira Pagar com o crédito. Se paga uma parte, escolha a forma do resto e toque em Receber.",
       "Para não usar agora, desmarque Usar o crédito.",
     ],
     dicas: [
+      "Na Venda no balcão com Cliente paga depois, o crédito não entra: ele fica para quando o tutor vier pagar a conta (no Recebi).",
       "Em Clientes, na aba Tutores, quem tem crédito aparece com Crédito e o valor. O filtro Com crédito mostra só esses. Na ficha do tutor, o cartão Crédito mostra de onde veio e onde foi usado.",
       "A parte paga com crédito aparece no recebimento como Crédito do tutor. Ela não entra no caixa de hoje: o dinheiro já tinha entrado antes.",
       "Apagar o recebimento (ou desfazer a baixa) devolve o crédito ao tutor.",
@@ -2093,6 +2103,7 @@ const BASE: TopicoBase[] = [
     dicas: [
       "Check-out do hotel e da creche, Encerrar o dia da creche, sinal da reserva, cancelar com sinal, Fechar a conta do atendimento (inteira, em parte ou para pagar depois), Recebi com o crédito do tutor e a Venda no balcão gravam tudo junto: a estadia, o pacote, o dinheiro, o crédito, o estoque e o atendimento concluído entram juntos, ou nada entra.",
       "Se a internet caiu na volta, depois de gravar, a nova tentativa só mostra o que já tinha sido feito.",
+      "Sem internet, aparece no alto da tela Sem internet agora, e ao tocar em Receber a folha diz Sem internet agora (nunca que o caixa foi fechado). Toque em Tentar de novo quando a conexão voltar: nada foi gravado antes disso.",
       "Pacote: o uso é somado na hora de gravar. Duas telas usando o mesmo pacote não fazem um uso sumir, e o pacote nunca passa do total.",
     ],
     palavras: ["internet caiu", "sem internet", "caiu a internet", "deu erro", "erro ao receber", "lancou duas vezes", "lançou duas vezes", "duplicou", "ficou pela metade", "nao gravou", "não gravou", "toque de novo", "sem conexao"] },
@@ -2143,7 +2154,7 @@ const BASE: TopicoBase[] = [
       "Se a taxa muda com o número de parcelas, toque em Uma taxa para cada número de parcelas e escreva a de cada uma.",
       "Confira o exemplo (numa venda de R$ 100,00, quanto você recebe) e toque em Salvar taxas.",
       "Na hora de receber no cartão, aparece a taxa e Você recebe. No crédito, escolha em quantas vezes: a pergunta aparece em todo lugar que recebe (Fechar a conta, venda no balcão e orçamento, check-out, Recebi, Cobrar a diferença, lançar entrada, vender pacote, sinal, creche e troca com diferença), quando você colocou a taxa do parcelado.",
-      "Em Financeiro e em Relatórios, o cartão Taxas da maquininha mostra quanto a maquininha ficou no período, o faturamento líquido (depois das taxas) e o que ela ainda vai pagar, por dia. O crédito parcelado aparece em parcelas: uma por mês, a 1ª no prazo do parcelado e as outras a cada 30 dias.",
+      "Em Financeiro e em Relatórios, o cartão Taxas da maquininha mostra quanto a maquininha ficou no período, o faturamento líquido (depois das taxas) e o que ela ainda vai pagar, por dia. O crédito parcelado aparece em parcelas: uma por mês, a 1ª no prazo do parcelado e as outras a cada 30 dias. Dia que cai no sábado ou no domingo passa para a segunda-feira (feriado não entra na conta).",
     ],
     dicas: [
       "O preço do cliente não muda: a taxa é só para você ver quanto recebe de verdade.",
@@ -2283,7 +2294,7 @@ const BASE: TopicoBase[] = [
       "Com Controlar validade marcado e alguma coisa em Quanto tem hoje, escreva o Lote do que já tem e a Validade do que já tem.",
       "Toque em Salvar produto.",
     ],
-    dicas: ["Quando o saldo chega ao mínimo, o produto aparece como acabando e a tela Hoje avisa.", "Para muitos produtos de uma vez, use Trazer de planilha. Além de nome, preço, custo e quantidade, a planilha pode ter Validade, Lote e Fornecedor (com Fornecedores ligado nas Opções da loja): com validade ou lote, o produto já entra com Controlar validade e o saldo vira um lote.", "Código de barras, Último fornecedor e Margem aparecem no produto quando o dono liga cada um em Opções da loja. Desligados, o cadastro fica só com estes campos.",
+    dicas: ["Quando o saldo chega ao mínimo, o produto aparece como acabando e a tela Hoje avisa.", "Para muitos produtos de uma vez, use Trazer de planilha. Além de nome, preço, custo e quantidade, a planilha pode ter Validade, Lote e Fornecedor (com Fornecedores ligado nas Opções da loja): com validade ou lote, o produto já entra com Controlar validade e o saldo vira um lote. O mesmo produto em duas linhas da planilha (dois lotes, como vem na nota do distribuidor) entra uma vez, com os dois lotes e o saldo somado.", "Código de barras, Último fornecedor e Margem aparecem no produto quando o dono liga cada um em Opções da loja. Desligados, o cadastro fica só com estes campos.",
       "O custo, a margem e o valor do estoque a preço de custo só aparecem para o dono, para quem tem Financeiro ou Relatórios e para quem tem a chave Ver custo e margem, em Equipe."],
     palavras: ["estoque", "produto novo", "cadastrar produto", "minimo", "acabando", "inventario", "racao", "shampoo", "trazer produtos", "planilha de produtos"] },
   { id: "estoque-entrada", titulo: "Como dar entrada e saída de produto", secao: "estoque", usa: ["loja"], quem: "todos", rota: ESTOQUE,
@@ -2357,7 +2368,7 @@ const BASE: TopicoBase[] = [
       "O valor que volta é o que o cliente pagou pelo produto, com o desconto da venda. Devolveu tudo, volta o valor exato da compra, até o centavo.",
       "O que volta entra no estoque na hora. O avariado não volta para a prateleira: fica anotado como perda.",
       "Na troca, se o produto novo custa mais, o cliente paga só a diferença; se custa menos, você devolve a diferença ou deixa de crédito.",
-      "Nos relatórios, a devolução sai do faturamento, o Quanto sobrou mostra o que voltou em cada produto e a comissão sobre o produto devolvido sai da conta.",
+      "Nos relatórios, a devolução sai do faturamento, o Quanto sobrou mostra o que voltou em cada produto e a comissão sobre o produto devolvido sai da conta. Relatórios, Produtos, os Indicadores (Produtos mais vendidos), o cartão Produtos vendidos no mês do Financeiro e o Mozart contam a venda já sem o que voltou, no dia em que voltou.",
       "Só dá para devolver venda já paga. Conta ainda a receber: mude a conta.",
     ],
     palavras: ["troca", "trocar", "devolucao", "devolver", "devolver produto", "cliente devolveu", "trocar produto", "produto com defeito", "avariado", "estragado", "reembolso", "estorno", "devolver dinheiro", "deixar de credito", "trocar racao", "tamanho errado"] },
@@ -2372,7 +2383,8 @@ const BASE: TopicoBase[] = [
       "Passou do limite, o sistema avisa antes de anotar: Ana já deve R$ 180; com esta conta passa do limite de R$ 200.",
       "Só o dono ou quem cuida do financeiro toca em Liberar mesmo assim. Fica anotado quem liberou.",
       "Pagamento na hora nunca é barrado: o limite vale só para o que fica para depois.",
-      "A ficha e Contas de clientes mostram o limite e quanto ainda cabe.",
+      "A ficha e Contas de clientes mostram o limite e quanto ainda cabe, e o que o cliente deve separado em vencido, vence hoje e a vencer.",
+      "O limite conta o que o cliente já deve: o atrasado, o que vence hoje e o fiado (mesmo com prazo). Mensalidade da creche e sinal de reserva que ainda não venceram ficam de fora até vencer: gerar as cobranças do mês que vem não deixa ninguém passando do limite.",
     ],
     palavras: ["limite", "limite de fiado", "limite de credito", "fiado demais", "deve muito", "passou do limite", "liberar fiado", "liberar mesmo assim", "teto", "maximo que pode dever", "nao deixar dever"] },
   { id: "loja-opcoes", titulo: "Como ligar as opções da loja: margem, código de barras e fornecedores", secao: "estoque", usa: ["loja"], quem: "dono", rota: PETSHOP, tambem: [ESTOQUE],
@@ -2685,8 +2697,8 @@ const BASE: TopicoBase[] = [
   /* ---------- Divulgação e relacionamento ---------- */
   { id: "link", titulo: "Como mandar o link para o cliente agendar sozinho", secao: "divulgacao", quem: "todos", rota: PETSHOP, tambem: [HOJE, AGENDA],
     passos: [
-      { so: ["banho"], texto: "Na tela Hoje, toque em Mandar link de agendamento. Na Agenda, o botão se chama Link do cliente." },
-      "O dono também acha o link em Meu pet shop, no cartão Link de agendamento.",
+      { so: ["banho"], texto: "Na tela Hoje, toque em Mandar o link do cliente. Na Agenda, o botão se chama Link do cliente." },
+      "O dono também acha o link em Meu pet shop, no cartão Link do cliente.",
       "Se o link estiver desligado, o dono liga: na janela do link, em Ligar o link; em Meu pet shop, na chave do cartão.",
       "Toque em Copiar link para colar onde quiser.",
       { so: ["banho"], texto: "Ou, na janela do link, toque em Mandar para um cliente e escolha o pet: o WhatsApp do tutor abre com o convite." },
@@ -2695,14 +2707,14 @@ const BASE: TopicoBase[] = [
     dicas: [
       "O cliente vê só os horários livres. Nada é marcado sem você aceitar.",
       "Ver como o cliente vê abre a página do link.",
-      "O recado que aparece no topo da página fica em Meu pet shop, no cartão Link de agendamento, em Recado na página.",
+      "O recado que aparece no topo da página fica em Meu pet shop, no cartão Link do cliente, em Recado na página.",
       "Pelo link o cliente só pede: não paga nada, nem sinal.",
     ],
-    palavras: ["link", "agendamento online", "cliente agendar", "tutor agendar", "link de agendamento", "link do cliente", "agendar sozinho", "bio do instagram", "marque sozinho", "marcar sozinho", "cliente marcar sozinho", "marcar pelo celular", "agendar pelo celular", "cliente marcar", "marcar pela internet"] },
+    palavras: ["link", "agendamento online", "cliente agendar", "tutor agendar", "link do cliente", "link do cliente", "agendar sozinho", "bio do instagram", "marque sozinho", "marcar sozinho", "cliente marcar sozinho", "marcar pelo celular", "agendar pelo celular", "cliente marcar", "marcar pela internet"] },
   { id: "pedidos-link", titulo: "Como aceitar ou recusar um pedido que veio pelo link", secao: "divulgacao", quem: "todos", rota: AGENDA, tambem: [HOJE],
     passos: [
       "Quando chega um pedido, aparece o bloco Pedidos pelo link, na tela Hoje e na Agenda.",
-      "Confira o pet, o serviço, o dia e a hora.",
+      "Confira o pet, o serviço, o dia e a hora. Quem vê o dinheiro vê também o valor, o mesmo que o link mostrou ao tutor: o preço do porte do pedido (sem porte, de quanto a quanto, conforme o porte) ou a diária da creche e do hotel.",
       "Se aparecer Quem atende?, escolha a pessoa ou deixe para decidir depois.",
       "Toque em Aceitar ou em Recusar.",
       "Se o pedido veio sem o porte e o valor do serviço muda com ele, abre a pergunta Qual é o porte. Toque no porte, ou em Não sei ainda — conferir o valor na hora, e depois em Aceitar.",
@@ -2868,6 +2880,7 @@ const BASE: TopicoBase[] = [
       { so: ["banho"], texto: "Desconto de aniversário do pet: fica no cartão próprio Promoção de aniversário do pet, logo abaixo das promoções em dias fracos. Toque em Criar a promoção de aniversário. Ela entra sozinha no horário marcado de 7 dias antes a 7 dias depois do aniversário, em % ou em reais, e a equipe pode tirar. O pet precisa ter o aniversário na ficha (o ano pode ficar em branco). Essa promoção não aparece no link do cliente." },
       "O link do cliente mostra o desconto nos horários da promoção, com o preço de antes e o preço com desconto.",
       "Ao marcar um horário que bate com a promoção, ela já entra no horário. Na hora de fechar a conta, ela aparece como uma linha de desconto.",
+      "O desconto da promoção sai só do serviço da promoção: o produto vendido na mesma conta continua com o preço dele, na comissão e nos relatórios. O comprovante mostra a linha da promoção com o nome.",
       "Para divulgar, toque em Copiar o texto ou em Abrir no WhatsApp: o texto só diz o que está na promoção (dias, horas e até quando vale).",
       "Em Relatórios, o bloco Promoções mostra quantos horários e estadias usaram cada promoção e quanto de desconto foi dado.",
       { so: ["hotel"], texto: "No hotel, o desconto vale em cada noite que cai nos dias escolhidos: uma reserva de sexta a segunda com promoção no domingo tem desconto só na noite de domingo." },
@@ -3097,6 +3110,17 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["A área principal aparece primeiro no menu e na tela inicial.", "O que você não marcar sai da frente e fica em Outras áreas, no fim do menu. Nada é apagado, e dá para marcar de novo quando quiser.", "Pacotes e planos não pode ser a área principal: é um jeito de vender, não uma área."],
     palavras: ["o que voce usa", "area principal", "atividade principal", "outras areas", "esconder menu", "tirar do menu", "mostrar menu", "creche primeiro", "ordem do menu", "modulos"] },
+  { id: "modo-simples", titulo: "Modo simples: menos botões para começar", secao: "ajustes", quem: "dono", rota: PETSHOP, tambem: [HOJE],
+    passos: [
+      "Abra Meu pet shop e, em O negócio, ache o cartão Modo simples.",
+      "Toque na chave para ligar ou desligar. Quem cria o pet shop agora já começa com ele ligado (dá para desmarcar na segunda pergunta do primeiro acesso).",
+      "Ligado: Relatórios e Escola de Gestão saem da frente do menu e ficam em Outras áreas, no fim do menu. Quem não vende produtos também vê o Caixa em Outras áreas.",
+      { so: ["banho"], texto: "Na Agenda somem Quadro do dia e Imprimir. No horário fica o botão do momento (Chegou, Fechar a conta); Cliente confirmou, Mandar confirmação, Remarcar, Faltou, Cliente cancelou e Apagar ficam em Mais opções. As fotos de antes e depois aparecem depois do Chegou." },
+      "Ao receber, o sistema não pede para abrir o caixa: o valor entra no Financeiro do dia do mesmo jeito.",
+      "No Financeiro, a parte Alterações sai das abas.",
+    ],
+    dicas: ["Nada é apagado nem desligado: o que saiu do menu continua abrindo por Outras áreas, e tudo volta ao desligar.", "Pet shops de antes continuam com o modo simples desligado."],
+    palavras: ["modo simples", "simples", "menos botoes", "menos menus", "iniciante", "comecando", "muito botao", "esconder relatorios", "modo facil"] },
   { id: "menu-personalizar", titulo: "Escolher o que aparece no menu", secao: "ajustes", quem: "dono", rota: HOJE,
     passos: [
       "No menu, ao lado do título Dia a dia, toque em Personalizar. No celular, toque em Mais: o Personalizar fica ao lado de Dia a dia.",
@@ -3122,7 +3146,7 @@ const BASE: TopicoBase[] = [
       "Espere o sistema juntar os dados. Não feche a tela.",
       "Guarde o arquivo baixado em um lugar seguro.",
     ],
-    dicas: ["O arquivo traz uma planilha para cada parte: clientes, pets, saúde, agenda, creche e hotel (com os mensalistas, as mensalidades, o diário, as ocorrências e a lista de espera), pacotes, vendas, financeiro, caixas, estoque, pedidos pelo link, boletins, autorizações de fotos, feriados, equipe, comissões pagas e serviços.", "O README.txt explica cada planilha. Elas abrem no Excel e no Google Planilhas, com os acentos certos.", "Serve também para levar os dados para outro sistema."],
+    dicas: ["O arquivo traz uma planilha para cada parte: clientes, pets, saúde, agenda, creche e hotel (com os mensalistas, as mensalidades, o diário, as ocorrências e a lista de espera), pacotes, vendas, financeiro, caixas, estoque (com lotes e validade), crédito dos tutores, pedidos pelo link, boletins, autorizações de fotos, feriados, equipe, comissões pagas e serviços.", "Para o contador: em vendas.csv, Total cobrado é o que entrou de cada item, já com o desconto (a soma bate com o Financeiro), a forma mostra cada parte do pagamento dividido e as colunas Devolvido dizem o que voltou. Em lancamentos.csv, sangria e suprimento vêm com o tipo Gaveta e a coluna Entra no resultado diz o que conta no resultado do mês.", "O README.txt explica cada planilha. Elas abrem no Excel e no Google Planilhas, com os acentos certos.", "Serve também para levar os dados para outro sistema."],
     atencao: ["É uma cópia para guardar e consultar: não dá para restaurar, isto é, trazer esses arquivos de volta para o sistema. As fotos não entram."],
     palavras: ["copia de seguranca", "backup", "copia", "baixar dados", "guardar dados", "seguranca", "baixar tudo"] },
   { id: "dados", titulo: "Como baixar ou apagar os meus dados", secao: "ajustes", quem: "dono", rota: PETSHOP,

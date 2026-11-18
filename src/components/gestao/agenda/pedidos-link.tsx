@@ -16,6 +16,7 @@ import { opcoesDoLink, prazoPorExtenso, usouOpcoesDoLink } from "@/lib/gestao/li
 import { brl, NOTA_PORTE, precoMudaComPorte } from "@/lib/gestao/util";
 import { PORTES } from "@/lib/gestao/tipos";
 import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar, semAcento } from "@/lib/gestao/util";
+import { precoDoPedido } from "@/lib/gestao/preco-do-pedido";
 import "./pedidos-link.css";
 
 type Pedido = Database["public"]["Tables"]["pedidos_agendamento"]["Row"];
@@ -160,6 +161,14 @@ export default function PedidosLink() {
   const atendem = equipe.filter((p) => p.ativo && p.atende);
   const nomeServico = (id: string | null) => servicos.find((s) => s.id === id)?.nome ?? null;
   const rotulo = (p: Pedido) => (p.tipo === "creche" ? "Creche" : p.tipo === "hotel" ? "Hotel" : nomeServico(p.servico_id));
+  // o valor do pedido, como o link mostrou ao tutor (só para quem vê o dinheiro)
+  const valorDe = (p: Pedido) => {
+    if (!vejoFinanceiro) return null;
+    const porte = porteDe(petshop);
+    const v = precoDoPedido(p, servicos.find((s) => s.id === p.servico_id), { diaria_creche: petshop.diaria_creche, diaria_hotel: petshop.diaria_hotel,
+      diariaHotelDoPorte: porte.ativo && p.porte ? porte[p.porte as "P" | "M" | "G" | "GG"] ?? null : null });
+    return v && <span className="g-pl-valor">{v}</span>;
+  };
   const corServico = (id: string | null) => servicos.find((s) => s.id === id)?.cor ?? "#f97316";
   const respondidos: Respondido[] = (tudo?.semAviso ?? []).map((p) => ({ pedido: p, servico: rotulo(p), resposta: p.cliente_cancelou_em ? "cancelou" : p.status === "aceito" ? "aceito" : "recusado", tutor: tutores[p.id] }));
   // recados do tutor (outra data ou cancelamento que depende de você), um cartão por tutor
@@ -584,6 +593,7 @@ export default function PedidosLink() {
                 <div className="g-pl-quando">
                   <span className="g-pl-serv"><i aria-hidden />{servico ?? "Serviço"}</span>
                   <span className="g-pl-hora"><Clock aria-hidden />{ehEstadia(p) ? periodoDe(p) : `${quandoNaTela(p.inicio)}, ${hora(p.inicio)}`}</span>
+                  {valorDe(p)}
                   {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
                   {p.experiencia && <span className="g-tag azul">pediu dia de experiência</span>}
                   {p.tipo === "creche" && fechadosDe(p, petshop.horario).length > 0 && <span className="g-tag amarelo">pelo seu horário, a creche não abre em {fechadosDe(p, petshop.horario).map((d) => dataCurta(d)).join(", ")}</span>}
@@ -626,7 +636,7 @@ export default function PedidosLink() {
                   return (
                     <li key={x.id}>
                       {!ehEstadia(x) && <span className="g-pl-pet-h">{hora(x.inicio)}</span>}
-                      <span className="g-pl-pet-n"><b>{x.pet_nome}</b>{detalhes && <small>{detalhes}</small>}</span>
+                      <span className="g-pl-pet-n"><b>{x.pet_nome}</b>{detalhes && <small>{detalhes}</small>}{valorDe(x) && <small className="g-pl-valor-p">{valorDe(x)}</small>}</span>
                       <span className="g-pl-pet-b">
                         <button type="button" className="g-btn sec p" disabled={ocupado !== null} aria-label={`Aceitar só ${x.pet_nome}`} onClick={() => void aceitar([x], g.id)}>{ocupado === x.id ? "…" : "Aceitar"}</button>
                         <button type="button" className="g-btn fantasma p" disabled={ocupado !== null} aria-label={`Recusar só ${x.pet_nome}`} onClick={() => void recusar([x], g.id)}>Recusar</button>

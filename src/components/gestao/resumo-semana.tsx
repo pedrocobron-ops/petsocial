@@ -108,7 +108,7 @@ function Conteudo({ aoIr }: { aoIr?: () => void }) {
   const vazia = semMovimento(r);
   const s = r.semana, a = r.antes;
   const total = s.concluidos + s.faltas;
-  const dicaLink: Dica | null = posso("agenda") ? { texto: "Mande o link de agendamento: o cliente escolhe um horário livre pelo celular e você só aceita.", botao: "Abrir o link de agendamento", aoTocar: abrirLinkDeAgendamento } : null;
+  const dicaLink: Dica | null = posso("agenda") ? { texto: "Mande o link do cliente: ele escolhe um horário livre pelo celular e você só aceita.", botao: "Abrir o link do cliente", aoTocar: abrirLinkDeAgendamento } : null;
   // uma sugestão só, ligada ao número que mais pede atenção
   const dica: Dica | null =
     vazia ? dicaLink

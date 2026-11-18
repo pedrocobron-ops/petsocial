@@ -468,7 +468,8 @@ export async function resumoDaCrecheHoje(sb: Banco, petshop: { id: string; horar
  */
 export function textoComprovanteMensalidades(p: {
   petshop: string; tutor?: string | null; dia: string; forma: string;
-  itens: { pet: string; mes: string; valor: number; multa: number; acerto?: boolean }[];
+  /** `descontos`: "desconto irmão R$ 60,00" (o comprovante diz que o valor já vem com ele) */
+  itens: { pet: string; mes: string; valor: number; multa: number; acerto?: boolean; descontos?: string | null }[];
 }) {
   const total = Math.round(p.itens.reduce((t, i) => t + i.valor + i.multa, 0) * 100) / 100;
   return [
@@ -477,7 +478,7 @@ export function textoComprovanteMensalidades(p: {
     p.petshop,
     `Data: ${dataCompleta(p.dia)}`,
     "",
-    ...p.itens.map((i) => `${i.pet}: ${i.acerto ? "acerto da saída" : `mensalidade de ${nomeMes(deIsoDia(i.mes))}`} ${brl(i.valor)}${i.multa > 0 ? ` + multa e juros por atraso ${brl(i.multa)}` : ""}`),
+    ...p.itens.map((i) => `${i.pet}: ${i.acerto ? "acerto da saída" : `mensalidade de ${nomeMes(deIsoDia(i.mes))}`} ${brl(i.valor)}${i.descontos ? ` (já com ${i.descontos})` : ""}${i.multa > 0 ? ` + multa e juros por atraso ${brl(i.multa)}` : ""}`),
     `Total: ${brl(total)}`,
     `Pagamento: ${p.forma}`,
     "",

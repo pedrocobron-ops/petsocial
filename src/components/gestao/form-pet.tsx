@@ -13,6 +13,11 @@ import { usaModulo } from "@/lib/gestao/modulos";
 import { AvatarPet, Campo, Folha, ok, useAvisos } from "./ui";
 import { FolhaMesmaPessoa, acharTutorIgual, useTutores, type TutorCurto } from "./clientes/juntar";
 import { CampoComVoz } from "./ditado";
+import { limparNome } from "@/lib/gestao/validacao";
+import { AvisoDeRascunho, useRascunho } from "./rascunho";
+
+/** Nome do rascunho do "Pet novo" (a lista de Clientes reabre o formulário quando ele existe). */
+export const RASCUNHO_PET_NOVO = "pet-novo";
 
 /**
  * Cadastro ou edição de um pet. Em cadastro novo, escolhe um tutor existente ou cria o tutor junto.
@@ -58,6 +63,22 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
   const arquivo = useRef<HTMLInputElement>(null);
 
   const precisaTutor = !pet && !clienteFixo;
+
+  // pet novo aberto pelo botão (sem nome nem tutor vindos de outra tela): o que foi digitado volta depois de recarregar
+  const comRascunho = !pet && !clienteFixo && !nomeInicial;
+  type Rascunho = { nome: string; especie: string; raca: string; porte: string; sexo: string; nDia: number | null; nMes: number | null; nAno: string; alertas: string; obs: string; tutorNome: string; tutorFone: string; tutorId: string | null };
+  const doRascunho: Rascunho = { nome, especie, raca, porte, sexo, nDia, nMes, nAno, alertas, obs, tutorNome, tutorFone, tutorId };
+  const mexeu = comRascunho && Boolean(nome.trim() || raca.trim() || alertas.trim() || obs.trim() || tutorNome.trim() || tutorFone.trim() || nDia || nMes);
+  const rascunho = useRascunho<Rascunho>(comRascunho ? RASCUNHO_PET_NOVO : null, doRascunho, mexeu, (r) => {
+    setNome(r.nome ?? ""); setEspecie(r.especie || "cao"); setRaca(r.raca ?? ""); setPorte(r.porte ?? ""); setSexo(r.sexo ?? "");
+    setNDia(r.nDia ?? null); setNMes(r.nMes ?? null); setNAno(r.nAno ?? ""); setAlertas(r.alertas ?? ""); setObs(r.obs ?? "");
+    setTutorNome(r.tutorNome ?? ""); setTutorFone(r.tutorFone ?? ""); setTutorId(r.tutorId ?? null);
+  });
+  const descartar = () => {
+    rascunho.limpar();
+    setNome(""); setEspecie("cao"); setRaca(""); setPorte(""); setSexo(""); setNDia(null); setNMes(null); setNAno(""); setAlertas(""); setObs("");
+    setTutorNome(""); setTutorFone(""); setTutorId(null);
+  };
   const { dados: clientes } = useTutores(precisaTutor);
   const alvo = semAcento(tutorNome);
   const sugestoes = precisaTutor && !tutorId && alvo.length >= 2 ? (clientes ?? []).filter((c) => semAcento(c.nome).includes(alvo)).slice(0, 4) : [];
@@ -107,16 +128,17 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
       let clienteId = tutorCerto;
       if (!clienteId) {
         if (!tutorNome.trim()) throw new Error("Diga o nome do tutor.");
-        const novo = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome: tutorNome.trim(), telefone: telefoneLimpo(tutorFone) || null }).select("id").single());
+        const novo = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome: limparNome(tutorNome), telefone: telefoneLimpo(tutorFone) || null }).select("id").single());
         clienteId = novo.id;
       }
       const campos = {
-        nome: nome.trim(), especie, raca: raca.trim() || null, porte: porte || null, sexo: sexo || null,
+        nome: limparNome(nome), especie, raca: raca.trim() || null, porte: porte || null, sexo: sexo || null,
         nascimento: nascimento || null, alertas: alertas.trim() || null, obs: obs.trim() || null, foto,
       };
       const salvo = pet
         ? ok(await sb.from("pets").update(campos).eq("id", pet.id).select("*, clientes(id, nome, telefone)").single())
         : ok(await sb.from("pets").insert({ ...campos, petshop_id: petshop.id, cliente_id: clienteId }).select("*, clientes(id, nome, telefone)").single());
+      rascunho.limpar();
       avisar(pet ? "Ficha atualizada." : `${campos.nome} entrou no cadastro.`);
       aoSalvar(salvo as PetComTutor);
     } catch (err) { avisarErro(err); }
@@ -133,8 +155,9 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
 
   return (
     <Folha titulo={pet ? `Ficha de ${pet.nome}` : "Pet novo"} aoFechar={aoFechar}
-      rodape={<><button type="button" className="g-btn sec" onClick={aoFechar}>Cancelar</button><button className="g-btn pri" form="form-pet" disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button></>}>
+      rodape={<><button type="button" className="g-btn sec" onClick={() => { rascunho.limpar(); aoFechar(); }}>Cancelar</button><button className="g-btn pri" form="form-pet" disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button></>}>
       <form id="form-pet" className="g-form" onSubmit={salvar}>
+        {rascunho.recuperado && <AvisoDeRascunho aoDescartar={descartar} />}
         <div className="g-fila">
           <AvatarPet pet={{ nome: nome || "Pet", foto, especie }} tamanho="g" />
           <button type="button" className="g-btn sec p" onClick={() => arquivo.current?.click()} disabled={enviandoFoto}><Camera />{enviandoFoto ? "Enviando…" : foto ? "Trocar foto" : "Colocar foto"}</button>
@@ -205,7 +228,7 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
           </div>
           {erroNasc ? <small className="erro" role="alert">{erroNasc}</small>
             : montado.erro && (nDia || nMes) && nAno.length !== 1 && nAno.length !== 2 && nAno.length !== 3 ? <small className="erro">{montado.erro}</small>
-            : <small>Para a promoção de aniversário e o parabéns no dia. Sem o ano, a idade não aparece.</small>}
+            : <small>Para a promoção de aniversário e os parabéns no dia. Sem o ano, a idade não aparece.</small>}
         </div>
         <Campo rotulo="Cuidados e alertas" dica={comBanho ? "Aparece em destaque na agenda. Ex.: alergia a shampoo, medo de secador, morde." : "Aparece em destaque junto do nome do pet. Ex.: alergia, briga com outros cães, foge no portão."}>
           <CampoComVoz valor={alertas} aoMudar={setAlertas} maxLength={400} rotulo="Ditar os cuidados e alertas"><textarea className="g-textarea" value={alertas} maxLength={400} onChange={(e) => setAlertas(e.target.value)} /></CampoComVoz>

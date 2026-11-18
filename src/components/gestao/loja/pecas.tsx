@@ -1,5 +1,6 @@
 "use client";
 
+import { foraNoModoSimples } from "@/lib/gestao/modo-simples";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Lock, Plus, Split, Trash2 } from "lucide-react";
 import { caixaAberto, formaPrincipal, ultimoFechamento, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
@@ -264,7 +265,8 @@ export function EscolhaPagamento({ valor: e, aoMudar, total, erro, rotulo = "For
           <div className="g-pg-troco">
             <label>
               <span>Pagou quanto no {FORMAS.find((f) => f.id === e.forma)?.rotulo ?? "pagamento"}?</span>
-              <CampoDinheiro valor={e.entregue ?? null} aoMudar={(v) => aoMudar({ ...e, entregue: v })} rotulo="Quanto pagou agora" />
+              {/* o nome do campo é a mesma pergunta que aparece (leitor de tela, voz e preenchimento automático acham pelo texto) */}
+              <CampoDinheiro valor={e.entregue ?? null} aoMudar={(v) => aoMudar({ ...e, entregue: v })} rotulo={`Pagou quanto no ${FORMAS.find((f) => f.id === e.forma)?.rotulo ?? "pagamento"}?`} />
             </label>
             <p role="status" className={e.entregue != null && e.entregue < total - 0.005 ? "falta" : undefined}>
               {e.entregue == null ? <span className="g-muted">Escreva quanto entrou agora.</span>
@@ -493,6 +495,7 @@ export function AvisoCaixaFechado({ aberto, saida }: { aberto: boolean | null; /
   const [fechouHoje, setFechouHoje] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const podeAbrir = posso("caixa") && liberado;
+  const simplesSemCaixa = foraNoModoSimples(petshop, "/gestao/app/caixa");
   // o troco inicial começa com o que foi contado no último fechamento (a pessoa confere e muda se quiser)
   useEffect(() => {
     if (aberto !== false || !podeAbrir) return;
@@ -509,6 +512,8 @@ export function AvisoCaixaFechado({ aberto, saida }: { aberto: boolean | null; /
     return <p className="g-cx-fora ok" role="status"><Lock aria-hidden /><span>Caixa do dia aberto. Este valor já entra nele; o que for {saida ? "pago" : "recebido"} em dinheiro entra também na conta da gaveta.</span></p>;
   }
   if (aberto !== false) return null;
+  // modo simples sem loja: o caixa do dia não aparece no recebimento (é avançado para quem está começando). O valor entra igual.
+  if (simplesSemCaixa) return null;
   async function abrir() {
     if (salvando) return;
     if (troco != null && (troco < 0 || troco >= 1e8)) { avisarErro("Confira o troco."); return; }

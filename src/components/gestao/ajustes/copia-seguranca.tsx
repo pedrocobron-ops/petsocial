@@ -19,6 +19,8 @@ import { FORMAS, STATUS_AGENDAMENTO, type AlteracaoLancamento, type Caixa, type 
 import { brl, dataCompleta, fmtTelefone, hora, isoDia, semAcento } from "@/lib/gestao/util";
 import { montarZip, type ArquivoZip } from "@/lib/gestao/zip";
 import { acomodacoesDe } from "@/lib/gestao/hotel-opcoes";
+import { cobradoPorItem } from "@/lib/gestao/loja-vendas";
+import { CATEGORIAS_DEVOLUCAO } from "@/lib/gestao/faturamento";
 import "./copia-seguranca.css";
 
 /* ---------- o que vem do banco ---------- */
@@ -93,11 +95,12 @@ const ASSUNTOS = [
   { arquivo: "pets.csv", nome: "pets", explica: "Os pets, cada um com o nome do tutor, espécie, raça, porte, alertas e observações." },
   { arquivo: "cuidados-de-saude.csv", nome: "cuidados de saúde", explica: "Vacinas, vermífugos, antipulgas e outros cuidados anotados na ficha de cada pet." },
   { arquivo: "agendamentos.csv", nome: "agendamentos", explica: "Todos os horários da agenda, com pet, tutor, serviço (e os outros serviços do mesmo horário), profissional, situação e preço." },
-  { arquivo: "vendas.csv", nome: "vendas", explica: "Cada item vendido ou cobrado (produto, serviço, pacote): dia, cliente, quantidade, valor e quem vendeu. Vem dos lançamentos que têm itens." },
-  { arquivo: "lancamentos.csv", nome: "lançamentos", explica: "O financeiro: tudo o que entrou e saiu, as contas a pagar e a receber. Saídas aparecem com valor negativo. Conta recebida em partes: cada parte é uma linha, e a linha da conta traz o valor cheio na última coluna." },
+  { arquivo: "vendas.csv", nome: "vendas", explica: "Cada item vendido ou cobrado (produto, serviço, pacote): dia da venda, cliente, quantidade, preço da lista e, nas últimas colunas, o desconto do item e o que foi cobrado de verdade (a soma de Total cobrado é o que entrou), o vencimento de quem ficou de pagar e o que voltou em troca ou devolução. A forma mostra cada parte do pagamento dividido. Linha negativa (promoção, sinal, crédito) já está repartida nas outras: o cobrado dela é zero. Vem dos lançamentos que têm itens." },
+  { arquivo: "lancamentos.csv", nome: "lançamentos", explica: "O financeiro: tudo o que entrou e saiu, as contas a pagar e a receber. Saídas aparecem com valor negativo. Sangria e suprimento aparecem com o tipo Gaveta: mexem só no dinheiro da gaveta e não entram no resultado (veja a coluna Entra no resultado). Conta recebida em partes: cada parte é uma linha, e a linha da conta traz o valor cheio na coluna Valor cheio." },
   { arquivo: "caixas.csv", nome: "caixas", explica: "Cada caixa aberto e fechado, com o troco, o que entrou e saiu, o dinheiro esperado e o contado." },
-  { arquivo: "produtos.csv", nome: "produtos", explica: "Os produtos do estoque, com preço, custo, último custo, código de barras, último fornecedor, quantidade atual e mínima." },
-  { arquivo: "movimentos-de-estoque.csv", nome: "movimentos de estoque", explica: "Cada entrada, saída e correção de saldo dos produtos. Nas saídas, o custo é o do produto naquele momento." },
+  { arquivo: "produtos.csv", nome: "produtos", explica: "Os produtos do estoque, com preço, custo, último custo, código de barras, último fornecedor, quantidade atual e mínima, e os lotes com saldo (lote, validade e quantidade)." },
+  { arquivo: "movimentos-de-estoque.csv", nome: "movimentos de estoque", explica: "Cada entrada, saída e correção de saldo dos produtos, com o lote e a validade. Nas saídas, o custo é o do produto naquele momento." },
+  { arquivo: "creditos-dos-tutores.csv", nome: "crédito dos tutores", explica: "Cada vez que um tutor ficou com crédito (pagou a mais, sinal de reserva cancelada, devolução de produto) ou usou o crédito, com o saldo depois." },
   { arquivo: "fornecedores.csv", nome: "fornecedores", explica: "Os fornecedores cadastrados, com WhatsApp e observações." },
   { arquivo: "pacotes.csv", nome: "pacotes", explica: "Os pacotes que o pet shop oferece." },
   { arquivo: "pacotes-vendidos.csv", nome: "pacotes vendidos", explica: "Os pacotes comprados por cada pet, com quanto já foi usado e a validade." },
@@ -224,10 +227,13 @@ export default function CopiaSeguranca() {
       const caixas = await todas<Caixa>((a, b) => sb.from("caixas").select("*").eq("petshop_id", id).order("aberto_em").order("id").range(a, b));
       const caixaPorId = new Map(caixas.map((c) => [c.id, c]));
       const qtd = (x: number) => x.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
+      // o que entra no resultado do mês (Financeiro): sangria e suprimento só mexem na gaveta; conta em aberto ainda não entrou
+      const noResultado = (l: Lancamento) => (l.movimento ? "Não (só mexe na gaveta)" : !l.pago ? "Não (ainda não foi pago)"
+        : l.tipo === "saida" && CATEGORIAS_DEVOLUCAO.includes(l.categoria) ? "Sim (devolução: tira do faturamento)" : "Sim");
       tabelas.set("lancamentos.csv", [
-        ["Data", "Hora do lançamento", "Tipo", "Categoria", "Descrição", "Cliente", "Itens", "Forma", "Partes do pagamento", "Valor", "Pago", "Vencimento", "Movimento de gaveta", "Caixa aberto em", "Quem lançou", "Valor cheio da conta (recebida em partes)", "Alterado depois de recebido em"],
+        ["Data", "Hora do lançamento", "Tipo", "Categoria", "Descrição", "Cliente", "Itens", "Forma", "Partes do pagamento", "Valor", "Pago", "Vencimento", "Movimento de gaveta", "Caixa aberto em", "Quem lançou", "Valor cheio da conta (recebida em partes)", "Alterado depois de recebido em", "Entra no resultado", "Crédito do tutor usado"],
         ...lancamentos.map((l): Cel[] => [
-          dataCompleta(l.data), hora(l.criado_em), l.tipo === "entrada" ? "Entrada" : "Saída", categoriaAtual(l.categoria), l.descricao ?? "",
+          dataCompleta(l.data), hora(l.criado_em), l.movimento ? "Gaveta" : l.tipo === "entrada" ? "Entrada" : "Saída", categoriaAtual(l.categoria), l.descricao ?? "",
           l.cliente_id ? nomeCliente.get(l.cliente_id) ?? "" : "",
           itensDoLancamento(l).map((i) => `${qtd(i.qtd)} x ${i.nome} (${brl(i.valor)} cada)`).join(" | "),
           l.forma ? textoDoPagamento({ ...l, pagamentos: null }) : "",
@@ -236,16 +242,39 @@ export default function CopiaSeguranca() {
           simNao(l.pago), quando(l.vencimento), nomeDoMovimento(l.movimento),
           l.caixa_id ? quando(caixaPorId.get(l.caixa_id)?.aberto_em) : "", autor(l.criado_por, l.origem),
           l.valor_original != null ? dinheiroCsv(Number(l.valor_original)) : "", quando(l.alterado_em),
+          noResultado(l), l.credito_usado ? dinheiroCsv(Number(l.credito_usado)) : "",
         ]),
       ]);
       const quemVendeu = new Map(equipe.map((x) => [x.id, x.nome]));
+      // troca e devolução de cada venda, por produto: o que voltou e como (dinheiro, crédito, troca)
+      type DevolucaoLida = { venda_id: string | null; modo: string; itens: unknown; criado_em: string; saida_id: string | null; credito_id: string | null };
+      const devolucoes = await seExistir(() => todas<DevolucaoLida & { id: string }>((a, b) => sb.from("devolucoes").select("id, venda_id, modo, itens, criado_em, saida_id, credito_id").eq("petshop_id", id).order("criado_em").order("id").range(a, b)));
+      const voltou = new Map<string, { qtd: number; valor: number; textos: string[] }>();
+      const MODO: Record<string, string> = { dinheiro: "dinheiro devolvido", credito: "virou crédito", troca: "trocado" };
+      for (const d of devolucoes) {
+        if (!d.venda_id || !(d.saida_id || d.credito_id || d.modo === "troca")) continue;
+        for (const i of (Array.isArray(d.itens) ? d.itens : []) as { produto_id?: string; qtd?: number; valor?: number }[]) {
+          const k = `${d.venda_id}|${i.produto_id ?? ""}`, x = voltou.get(k) ?? { qtd: 0, valor: 0, textos: [] };
+          x.qtd += Number(i.qtd ?? 0); x.valor = Math.round((x.valor + Number(i.valor ?? 0)) * 100) / 100;
+          x.textos.push(`${Number(i.qtd ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} em ${dataCompleta(isoDia(new Date(d.criado_em)))} (${MODO[d.modo] ?? d.modo})`);
+          voltou.set(k, x);
+        }
+      }
       tabelas.set("vendas.csv", [
-        ["Data", "Item", "Quantidade", "Valor unitário", "Total do item", "Cliente", "Forma", "Pago", "Quem vendeu", "Descrição do lançamento"],
-        ...lancamentos.filter((l) => l.tipo === "entrada" && !l.movimento).flatMap((l) => itensDoLancamento(l).map((i): Cel[] => [
-          dataCompleta(l.data), i.nome, numero(i.qtd), dinheiro(i.valor), dinheiro(Math.round(i.qtd * i.valor * 100) / 100),
-          l.cliente_id ? nomeCliente.get(l.cliente_id) ?? "" : "", l.forma ? textoDoPagamento({ ...l, pagamentos: null }) : "", simNao(l.pago),
-          (l.vendido_por && quemVendeu.get(l.vendido_por)) || autor(l.criado_por, l.origem), l.descricao ?? "",
-        ])),
+        ["Data", "Item", "Quantidade", "Valor unitário", "Total do item", "Cliente", "Forma", "Pago", "Quem vendeu", "Descrição do lançamento",
+          "Desconto no item", "Total cobrado", "Vencimento", "Devolvido (quantidade)", "Devolvido (valor)", "Devolução"],
+        // conta recebida em partes: a parte não repete os itens (a conta, com o valor cheio, já traz)
+        ...lancamentos.filter((l) => l.tipo === "entrada" && !l.movimento && !l.conta_id).flatMap((l) => cobradoPorItem(l).map((i): Cel[] => {
+          const d = i.produto_id ? voltou.get(`${l.id}|${i.produto_id}`) : undefined;
+          return [
+            // o dia da venda: conta em aberto guarda o vencimento em "data"; vale o dia em que foi anotada
+            dataCompleta(l.pago ? l.data : l.devido_desde ?? isoDia(new Date(l.criado_em))), i.nome, numero(i.qtd), dinheiro(i.valor), dinheiro(i.bruto),
+            l.cliente_id ? nomeCliente.get(l.cliente_id) ?? "" : "", l.forma ? textoDoPagamento(l) : "", simNao(l.pago),
+            (l.vendido_por && quemVendeu.get(l.vendido_por)) || autor(l.criado_por, l.origem), l.descricao ?? "",
+            dinheiro(i.desconto), dinheiro(i.cobrado), l.pago ? "" : quando(l.vencimento),
+            d ? numero(d.qtd) : "", d ? dinheiro(d.valor) : "", d ? d.textos.join(" | ") : "",
+          ];
+        })),
       ]);
       const doCaixa = new Map<string, Lancamento[]>();
       for (const l of lancamentos) if (l.caixa_id && l.pago) doCaixa.set(l.caixa_id, [...(doCaixa.get(l.caixa_id) ?? []), l]);
@@ -270,22 +299,51 @@ export default function CopiaSeguranca() {
       const fornecedores = await todas<FornecedorLido>((a, b) => sb.from("fornecedores").select("id, nome, telefone, observacoes, ativo, criado_em").eq("petshop_id", id).order("nome").order("id").range(a, b));
       const nomeFornecedor = new Map(fornecedores.map((f) => [f.id, f.nome]));
       // colunas novas sempre no fim, para quem já usa a planilha antiga
+      // lotes e validade (estoque com Controlar validade, ou lote anotado na entrada)
+      type LoteLido = { id: string; produto_id: string; lote: string | null; validade: string | null; quantidade: number };
+      const lotes = await seExistir(() => todas<LoteLido>((a, b) => sb.from("produtos_lotes").select("id, produto_id, lote, validade, quantidade").eq("petshop_id", id).order("validade", { nullsFirst: false }).order("id").range(a, b)));
+      const loteDe = new Map(lotes.map((l) => [l.id, l]));
+      const nomeDoLote = (l: Pick<LoteLido, "lote" | "validade">) => [l.lote ? `lote ${l.lote}` : "", l.validade ? `validade ${dataCompleta(l.validade)}` : ""].filter(Boolean).join(", ");
+      const lotesDoProduto = new Map<string, string[]>();
+      for (const l of lotes) if (Number(l.quantidade) > 0) lotesDoProduto.set(l.produto_id, [...(lotesDoProduto.get(l.produto_id) ?? []), `${nomeDoLote(l)}: ${Number(l.quantidade).toLocaleString("pt-BR", { maximumFractionDigits: 3 })}`]);
       tabelas.set("produtos.csv", [
-        ["Produto", "Categoria", "Unidade", "Preço de venda", "Custo", "Em estoque", "Estoque mínimo", "Ativo", "Criado em", "Código de barras", "Último custo", "Último fornecedor"],
+        ["Produto", "Categoria", "Unidade", "Preço de venda", "Custo", "Em estoque", "Estoque mínimo", "Ativo", "Criado em", "Código de barras", "Último custo", "Último fornecedor", "Lotes com saldo"],
         ...produtos.map((p): Cel[] => [p.nome, p.categoria ?? "", p.unidade, dinheiro(p.preco_venda), dinheiro(p.custo), numero(p.estoque), numero(p.estoque_minimo), simNao(p.ativo), quando(p.criado_em),
-          p.codigo_barras ?? "", dinheiro(p.ultimo_custo), (p.fornecedor_id && nomeFornecedor.get(p.fornecedor_id)) || ""]),
+          p.codigo_barras ?? "", dinheiro(p.ultimo_custo), (p.fornecedor_id && nomeFornecedor.get(p.fornecedor_id)) || "", (lotesDoProduto.get(p.id) ?? []).join(" | ")]),
       ]);
 
       etapa("movimentos de estoque");
       const movimentosSemCusto = await todas<MovimentoLido>((a, b) => sb.from("movimentos_estoque").select(COLS_MOVIMENTO).eq("petshop_id", id).order("criado_em").order("id").range(a, b));
       const custoDoMovimento = await custosDeTodosOsMovimentos(sb, id, movimentosSemCusto);
+      // em quais lotes cada movimento mexeu (a saída pode tirar de mais de um lote)
+      const movLotes = await seExistir(() => todas<{ id: string; movimento_id: string; lote_id: string; quantidade: number }>((a, b) => sb.from("movimentos_lotes").select("id, movimento_id, lote_id, quantidade").eq("petshop_id", id).order("criado_em").order("id").range(a, b)));
+      const lotesDoMov = new Map<string, string[]>();
+      for (const x of movLotes) {
+        const l = loteDe.get(x.lote_id);
+        if (l) lotesDoMov.set(x.movimento_id, [...(lotesDoMov.get(x.movimento_id) ?? []), `${nomeDoLote(l)}: ${Math.abs(Number(x.quantidade)).toLocaleString("pt-BR", { maximumFractionDigits: 3 })}`]);
+      }
       tabelas.set("movimentos-de-estoque.csv", [
-        ["Quando", "Produto", "Tipo", "Quantidade", "Unidade", "Custo por unidade", "Motivo", "Quem fez", "Fornecedor"],
+        ["Quando", "Produto", "Tipo", "Quantidade", "Unidade", "Custo por unidade", "Motivo", "Quem fez", "Fornecedor", "Lote e validade"],
         ...movimentosSemCusto.map((m): Cel[] => [
           quando(m.criado_em), nomeProduto.get(m.produto_id)?.nome ?? "", rotulo(TIPO_MOVIMENTO, m.tipo), numero(m.quantidade), nomeProduto.get(m.produto_id)?.unidade ?? "",
           dinheiro(custoDoMovimento.get(m.id)), m.motivo ?? "", autor(m.criado_por, m.origem), (m.fornecedor_id && nomeFornecedor.get(m.fornecedor_id)) || "",
+          (lotesDoMov.get(m.id) ?? []).join(" | "),
         ]),
       ]);
+
+      etapa("crédito dos tutores");
+      type CreditoLido = { id: string; cliente_id: string; valor: number; motivo: string | null; criado_em: string; estadia_id: string | null; lancamento_id: string | null };
+      const creditos = await seExistir(() => todas<CreditoLido>((a, b) => sb.from("clientes_creditos").select("id, cliente_id, valor, motivo, criado_em, estadia_id, lancamento_id").eq("petshop_id", id).order("criado_em").order("id").range(a, b)));
+      const saldo = new Map<string, number>();
+      tabelas.set("creditos-dos-tutores.csv", [
+        ["Quando", "Tutor", "Movimento", "Valor", "Saldo do tutor depois", "Motivo"],
+        ...creditos.map((c): Cel[] => {
+          const s = Math.round(((saldo.get(c.cliente_id) ?? 0) + Number(c.valor)) * 100) / 100;
+          saldo.set(c.cliente_id, s);
+          return [quando(c.criado_em), nomeCliente.get(c.cliente_id) ?? "", Number(c.valor) >= 0 ? "Ficou de crédito" : "Usou o crédito", dinheiroCsv(Number(c.valor)), dinheiroCsv(s), c.motivo ?? ""];
+        }),
+      ]);
+      const sinalVirouCredito = new Set(creditos.filter((c) => c.estadia_id && Number(c.valor) > 0).map((c) => c.estadia_id!));
 
       etapa("fornecedores");
       tabelas.set("fornecedores.csv", [
@@ -329,7 +387,9 @@ export default function CopiaSeguranca() {
             rotulo(TIPO_ESTADIA, e.tipo), e.pets?.nome ?? "", tutorDe(e.pets), fmtTelefone(e.pets?.clientes?.telefone), quando(e.entrada), quando(e.saida_prevista), quando(e.saida),
             rotulo(STATUS_ESTADIA, e.status), dinheiro(e.valor_diaria), numero(e.diarias_cobradas), dinheiro(e.valor_cobrado), e.obs ?? "",
             rotulo(MENSALISTA, e.mensalista), e.acomodacao ? acomodacoes.get(e.acomodacao) ?? e.acomodacao : "",
-            v?.sinal_estado ? dinheiro(v.sinal) : "", rotulo(SINAL, v?.sinal_estado ?? e.sinal_estado), v?.sinal_estado ? dinheiro(v.sinal_recebido) : "", buscou.get(e.id) ?? "",
+            v?.sinal_estado ? dinheiro(v.sinal) : "",
+            // sinal de reserva cancelada que ficou de crédito para o tutor
+            (v?.sinal_estado ?? e.sinal_estado) === "mantido" && e.status === "cancelada" && sinalVirouCredito.has(e.id) ? "Virou crédito do tutor" : rotulo(SINAL, v?.sinal_estado ?? e.sinal_estado), v?.sinal_estado ? dinheiro(v.sinal_recebido) : "", buscou.get(e.id) ?? "",
           ];
         }),
       ]);

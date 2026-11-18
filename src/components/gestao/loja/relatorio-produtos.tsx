@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Coins, Download, Package, ShoppingBag, TrendingUp } from "lucide-react";
 import { opcoesDaLoja, pct } from "@/lib/gestao/loja-opcoes";
-import { margemDaLinha, vendasPorProduto, type LinhaProduto, type SaidaLida, type VendaLida } from "@/lib/gestao/loja-vendas";
+import { lerDevolucoesPorProduto, margemDaLinha, vendasPorProduto, type LinhaProduto, type SaidaLida, type VendaLida } from "@/lib/gestao/loja-vendas";
 import { itensDoLancamento } from "@/lib/gestao/dinheiro";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
@@ -46,7 +46,7 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
   const [todosParados, setTodosParados] = useState(false);
 
   const { dados, carregando, erro } = useDados(async () => {
-    const [vendas, fiado, saidas, produtos] = await Promise.all([
+    const [vendas, fiado, saidas, produtos, devolucoes] = await Promise.all([
       // conta recebida em partes: depois de quitada, `valor` guarda só a última parte e `valor_original` o valor cheio.
       // A venda entra uma vez, no dia em que a conta foi quitada, pelo valor cheio (senão a receita do produto sairia menor).
       paginar<VendaLida & { valor_original: number | null }>((a, b) => sb.from("lancamentos").select("id, valor, valor_original, itens").eq("petshop_id", petshop.id).eq("pago", true).eq("tipo", "entrada")
@@ -57,15 +57,16 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
       paginar<SaidaLida & { id: string }>((a, b) => sb.rpc("custos_das_vendas", { p: petshop.id, p_de: de, p_ate: ate }).order("id").range(a, b)),
       lerTudo<{ id: string }>((a, b, contar) => sb.from("produtos").select(COLS_PRODUTO, contando(contar)).eq("petshop_id", petshop.id).order("nome").order("id").range(a, b))
         .then(async (l) => comCustos(sb, petshop.id, await comPrecosDeProduto(sb, petshop.id, l))) as Promise<unknown> as Promise<Produto[]>,
+      lerDevolucoesPorProduto(sb, petshop.id, de, ate),
     ]);
-    return { vendas: vendas.filter(temProduto), aReceber: fiado.filter(temProduto).length, saidas, produtos };
+    return { vendas: vendas.filter(temProduto), aReceber: fiado.filter(temProduto).length, saidas, produtos, devolucoes };
   }, [petshop.id, de, ate]);
 
   const r = useMemo(() => {
     if (!dados) return null;
     const nomes = new Map(dados.produtos.map((p) => [p.id, p.nome]));
     const unidade = new Map(dados.produtos.map((p) => [p.id, p.unidade]));
-    const x = vendasPorProduto(dados.vendas, dados.saidas, nomes);
+    const x = vendasPorProduto(dados.vendas, dados.saidas, nomes, dados.devolucoes);
     const vendidos = new Set(x.linhas.map((l) => l.produtoId).filter(Boolean));
     // kit não conta: o saldo dele é o dos produtos do kit (não entra duas vezes no valor parado)
     const parados = dados.produtos.filter((p) => p.ativo && p.tipo !== "kit" && Number(p.estoque) > 0 && !vendidos.has(p.id))
@@ -96,14 +97,14 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
     const t: Cel[][] = [
       ["Vendas por produto", petshop.nome],
       ["Período", `${dataCompleta(deIsoDia(de))} a ${dataCompleta(deIsoDia(ate))}`],
-      ["Como é a conta", "Receita: vendas já recebidas, com o desconto rateado. Custo: o custo do produto guardado na hora de cada venda. Venda sem custo registrado não entra no custo nem na margem."],
+      ["Como é a conta", "Receita: vendas já recebidas, com o desconto rateado, menos o que voltou em troca ou devolução no período. Custo: o custo do produto guardado na hora de cada venda (o que voltou ao estoque sai do custo). Venda sem custo registrado não entra no custo nem na margem."],
       [],
-      ["Produto", "Unidades vendidas", "Receita", "Receita com custo registrado", "Custo dos produtos vendidos", "Margem bruta", "Margem %", "Vendas sem custo registrado"],
+      ["Produto", "Unidades vendidas", "Receita", "Receita com custo registrado", "Custo dos produtos vendidos", "Margem bruta", "Margem %", "Vendas sem custo registrado", "Unidades devolvidas", "Valor devolvido"],
       ...linhas.map((l): Cel[] => {
         const m = margemDaLinha(l);
-        return [l.nome, numeroCsv(l.unidades), dinheiroCsv(l.receita), dinheiroCsv(l.receitaComCusto), m ? dinheiroCsv(l.custo) : "sem custo registrado", m ? dinheiroCsv(m.reais) : "", m?.pct != null ? numeroCsv(Math.round(m.pct * 10) / 10) : "", numeroCsv(l.semCusto)];
+        return [l.nome, numeroCsv(l.unidades), dinheiroCsv(l.receita), dinheiroCsv(l.receitaComCusto), m ? dinheiroCsv(l.custo) : "sem custo registrado", m ? dinheiroCsv(m.reais) : "", m?.pct != null ? numeroCsv(Math.round(m.pct * 10) / 10) : "", numeroCsv(l.semCusto), numeroCsv(l.devolvidos), dinheiroCsv(l.devolvido)];
       }),
-      ["Total", numeroCsv(total.unidades), dinheiroCsv(total.receita), dinheiroCsv(total.receitaComCusto), dinheiroCsv(total.custo), margemTotal ? dinheiroCsv(margemTotal.reais) : "", margemTotal?.pct != null ? numeroCsv(Math.round(margemTotal.pct * 10) / 10) : "", numeroCsv(total.semCusto)],
+      ["Total", numeroCsv(total.unidades), dinheiroCsv(total.receita), dinheiroCsv(total.receitaComCusto), dinheiroCsv(total.custo), margemTotal ? dinheiroCsv(margemTotal.reais) : "", margemTotal?.pct != null ? numeroCsv(Math.round(margemTotal.pct * 10) / 10) : "", numeroCsv(total.semCusto), numeroCsv(total.devolvidos), dinheiroCsv(total.devolvido)],
       [],
       ["Parados: com saldo e sem venda no período"],
       ["Produto", "Saldo", "Unidade", "Valor a preço de custo"],
@@ -126,7 +127,7 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
           {r.linhas.length ? (
             <>
               <div className="g-grade kpis">
-                <Kpi icone={ShoppingBag} tom="menta" rotulo="Receita de produtos" valor={brl(total.receita)} apoio="vendas já recebidas" />
+                <Kpi icone={ShoppingBag} tom="menta" rotulo="Receita de produtos" valor={brl(total.receita)} apoio={total.devolvido > 0 ? `já sem ${brl(total.devolvido)} devolvidos` : "vendas já recebidas"} />
                 <Kpi icone={Coins} tom="rosa" rotulo="Custo dos produtos vendidos" valor={margemTotal ? brl(total.custo) : "–"} apoio={total.semCusto ? `${total.semCusto} sem custo registrado` : "custo de cada venda"} />
                 <Kpi icone={TrendingUp} tom={margemTotal && margemTotal.reais < 0 ? "manteiga" : "menta"} rotulo="Margem bruta" valor={margemTotal ? brl(margemTotal.reais) : "–"}
                   apoio={margemTotal?.pct != null ? `${pct(margemTotal.pct)} da receita com custo` : "sem custo registrado"} />
@@ -150,7 +151,8 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
                   const m = margemDaLinha(l);
                   return (
                     <div key={l.chave} className="g-lj-rel-l" role="row">
-                      <b>{l.nome}{l.semCusto > 0 && m ? <small className="g-muted" style={{ fontWeight: 400 }}> · {l.semCusto} sem custo registrado</small> : null}</b>
+                      <b>{l.nome}{l.semCusto > 0 && m ? <small className="g-muted" style={{ fontWeight: 400 }}> · {l.semCusto} sem custo registrado</small> : null}
+                        {l.devolvidos > 0 ? <small className="g-muted" style={{ fontWeight: 400 }}> · {fmtQtd(l.devolvidos)} {l.devolvidos === 1 ? "voltou" : "voltaram"} ({brl(l.devolvido)})</small> : null}</b>
                       {cel("Vendidos", qtdDe(l))}
                       {cel("Receita", brl(l.receita))}
                       {cel("Custo", m ? brl(l.custo) : "sem custo registrado")}
@@ -173,7 +175,7 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
               {r.linhas.length > 1 && (
                 <div>
                   <p className="g-rotulo" style={{ marginBottom: 8 }}>Mais vendidos</p>
-                  <Ranking itens={[...r.linhas].sort((a, b) => b.unidades - a.unidades || b.receita - a.receita).slice(0, 5).map((l) => ({ rotulo: l.nome, valor: l.unidades }))} formato={(n) => fmtQtd(n)} />
+                  <Ranking itens={r.linhas.filter((l) => l.unidades > 0).sort((a, b) => b.unidades - a.unidades || b.receita - a.receita).slice(0, 5).map((l) => ({ rotulo: l.nome, valor: l.unidades }))} formato={(n) => fmtQtd(n)} />
                 </div>
               )}
             </>
@@ -199,7 +201,7 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
           </div>
 
           <p className="g-muted g-pp">
-            Receita: vendas de produto já recebidas no período, com o desconto da conta rateado. Custo: o custo do produto guardado na hora de cada venda, então mudar o custo depois não muda a margem de venda antiga.
+            Receita: vendas de produto já recebidas no período, com o desconto da conta rateado, menos o que voltou em troca ou devolução (no dia em que voltou, como em Quanto sobrou). Custo: o custo do produto guardado na hora de cada venda, então mudar o custo depois não muda a margem de venda antiga.
             {total.semCusto > 0 ? ` ${total.semCusto === 1 ? "1 venda está" : `${total.semCusto} vendas estão`} sem custo registrado (venda de antes desta função, ou produto que ainda não tinha custo): ${total.semCusto === 1 ? "ela entra" : "elas entram"} na receita e ${total.semCusto === 1 ? "fica" : "ficam"} de fora do custo e da margem.` : ""}
             {dados!.aReceber > 0 ? ` ${dados!.aReceber === 1 ? "1 conta a receber com produtos fica" : `${dados!.aReceber} contas a receber com produtos ficam`} de fora até o cliente pagar.` : ""}
             {r.soltas > 0 ? ` ${r.soltas === 1 ? "1 saída marcada como venda não está ligada" : `${r.soltas} saídas marcadas como venda não estão ligadas`} a um recebimento (baixa sem dinheiro lançado, ou venda de antes desta função).` : ""}

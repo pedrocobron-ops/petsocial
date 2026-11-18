@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { modoSimples } from "@/lib/gestao/modo-simples";
 import {
   ArrowDownLeft, ArrowUpRight, CalendarClock, CalendarDays, ChartColumn, Check, ChevronLeft, ChevronRight, CreditCard, Download, HandCoins, Plus, Receipt, Scale,
   Search, Target, TrendingUp, TriangleAlert,
@@ -282,7 +283,8 @@ function Financeiro() {
 
             <div className="gf-rola">
               <div className="g-seg" role="group" aria-label="Parte do financeiro">
-                {ABAS.map((a) => (
+                {/* modo simples: Alterações (descontos e valores mudados) sai das abas; aberta pelo endereço, continua */}
+                {ABAS.filter((a) => a.id !== "alteracoes" || aba === "alteracoes" || !modoSimples(petshop)).map((a) => (
                   <button key={a.id} aria-pressed={aba === a.id} onClick={() => setAba(a.id)}>
                     {a.rotulo}
                     {a.id === "pagar" && contas.aPagar.length > 0 ? ` (${contas.aPagar.length})` : ""}

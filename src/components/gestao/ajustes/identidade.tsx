@@ -123,7 +123,7 @@ export default function Identidade() {
           <div><b>{petshop.nome}</b><span>Peça um horário por aqui.</span></div>
         </div>
         <div className="passos"><span className="on"><i>1</i>Serviço</span><span><i>2</i>Dia e hora</span><span><i>3</i>Seus dados</span></div>
-        <p className="legenda"><Link2 />Assim o cliente vê o seu link de agendamento.</p>
+        <p className="legenda"><Link2 />Assim o cliente vê o link do cliente.</p>
       </div>
     </section>
   );

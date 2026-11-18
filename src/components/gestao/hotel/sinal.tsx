@@ -348,7 +348,7 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
         if (casoDoErro(x) === "maestro:apagar") { setErro(`Não consegui tirar essa conta: ela pode já ter sido paga, ou foi anotada por outra pessoa. Escolha ${parcial ? "continuar cobrando o que falta" : "deixar em A receber"}, ou peça para quem cuida do financeiro. Nada foi lançado.`); return false; }
         throw x;
       }
-      avisar(credito ? `Reserva cancelada. ${brl(recebido)} ficaram de crédito para ${nomeTutor ?? "o tutor"}: o próximo check-out oferece descontar.${parcial ? " A conta do que faltava saiu de A receber." : ""}`
+      avisar(credito ? `Reserva cancelada. ${brl(recebido)} ficaram de crédito para ${nomeTutor ?? "o tutor"}: a próxima conta dele (balcão, atendimento, mensalidade ou check-out) oferece usar.${parcial ? " A conta do que faltava saiu de A receber." : ""}`
         : devolve ? `Reserva cancelada. ${brl(valor)} devolvidos, lançados como saída de hoje.${parcial ? " A conta do que faltava saiu de A receber." : ""}`
         : pago ? `Reserva cancelada. O sinal de ${brl(valores.sinal)} continua como recebido.`
         : parcial && escolha === "cobrar" ? `Reserva cancelada. Os ${brl(recebido)} recebidos ficam, e os ${brl(falta)} que faltam continuam em A receber.`
@@ -386,7 +386,7 @@ export function CancelarComSinal({ estadia: e, valores, aoFechar, aoGravar }: { 
             {pago ? (<>
               {opcao("ficar", "Ficar com o sinal", "O valor continua como recebido. Nada muda no financeiro.")}
               {opcao("devolver", "Devolver o sinal", "Lança uma saída de hoje com o valor devolvido. O recebimento do sinal não é apagado.")}
-              {clienteId && opcao("credito", "Virar crédito do tutor", `${brl(recebido)} ficam de crédito para ${nomeTutor ?? "o tutor"} usar numa próxima reserva: o check-out oferece descontar. Nada sai do caixa.`)}
+              {clienteId && opcao("credito", "Virar crédito do tutor", `${brl(recebido)} ficam de crédito para ${nomeTutor ?? "o tutor"} usar na próxima conta (balcão, atendimento, mensalidade ou check-out). Nada sai do caixa.`)}
             </>) : parcial ? (<>
               {opcao("ficar", `Ficar com os ${brl(recebido)} recebidos`, `O que entrou continua como recebido. A conta dos ${brl(falta)} que faltavam sai de A receber.`)}
               {opcao("devolver", "Devolver o que foi recebido", `Lança uma saída de hoje com o valor devolvido. A conta dos ${brl(falta)} que faltavam sai de A receber.`)}

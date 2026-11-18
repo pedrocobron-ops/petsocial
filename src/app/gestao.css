@@ -1214,3 +1214,55 @@ small.erro.g-valor-erro { display: block; color: var(--g-vermelho); font-size: .
 .g-salvar-junto p { margin: 0; font-size: .9375rem; min-width: 0; flex: 1 1 200px; }
 .g-salvar-junto .g-btn { flex: none; }
 @media (min-width: 960px) { .g-salvar-junto { bottom: 16px; margin-right: 210px; } }
+
+/* foco do teclado visível em todo campo (WCAG 2.4.7): contorno forte, além da borda colorida */
+.g-raiz :is(.g-input, .g-select, .g-textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea):focus-visible {
+  outline: 2px solid var(--g-verde); outline-offset: 2px; box-shadow: 0 0 0 4px rgba(30, 58, 47, .16);
+}
+.g-raiz [aria-invalid="true"]:not(:focus-visible) { border-color: var(--g-vermelho); }
+
+/* faixa de sem internet (some sozinha quando a conexão volta) */
+.g-sem-internet {
+  position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 50%; translate: -50% 0; z-index: 95; width: min(94vw, 460px);
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; background: #7a2a1e; color: #fff;
+  font-size: .9375rem; line-height: 1.35; box-shadow: var(--g-sombra-alta);
+}
+.g-sem-internet svg { width: 20px; height: 20px; flex: none; }
+/* botão "Ajuda" da barra de cima (vem com a tela; a folha da Ajuda baixa à parte) */
+.g-man-botao {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 44px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--g-linha-forte); background: transparent; color: var(--g-tinta); font: 600 .8125rem/1 var(--sans); white-space: nowrap;
+}
+.g-man-botao:hover { background: rgba(31, 27, 23, .05); }
+.g-man-botao svg { width: 18px; height: 18px; color: var(--g-verde); }
+.g-man-botao i { font-style: normal; display: none; }
+@media (min-width: 1180px) { .g-man-botao i { display: inline; } }
+@media (max-width: 359px) { .g-man-botao { padding: 0 10px; } .g-man-botao span { display: none; } }
+
+/* ---------- celular pequeno (360 px) e alvos de toque de 44 px (rodada 8, estreante) ---------- */
+/* nome do pet shop no alto do celular: até duas linhas, em vez de "Banho e Tosa da C…" */
+.g-barra-marca > span:last-child { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.12; font-size: clamp(.875rem, 4vw, 1.0625rem); overflow-wrap: anywhere; }
+@media (max-width: 719px) {
+  .g-ico { min-width: 44px; min-height: 44px; }
+  .g-chip, .g-seg button, .g-btn.p { min-height: 44px; }
+  .g-link.alvo { min-height: 44px; display: inline-flex; align-items: center; }
+  .g-sugestoes button, .g-meta-convite, .g-livre, .g-rel-abas a, .g-eq-plano-l, .g-est-cab { min-height: 44px; }
+  /* a chave do Mandar mensagens: o toque vale a altura da linha, não só a bolinha */
+  .g-me-chave::after { content: ""; position: absolute; inset: -6px -4px; }
+  /* botão de texto longo quebra a linha em vez de passar da tela */
+  .g-btn { white-space: normal; text-align: center; max-width: 100%; }
+}
+/* faixa dos dias da agenda: os 7 dias ocupam a largura toda (44 px cada) e as setas da semana descem para baixo deles */
+@media (max-width: 520px) {
+  .g-fila.g-ag-faixa { display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "dias dias dias" "ant . prox"; gap: 0; padding: 4px 2px; }
+  .g-ag-faixa .g-dias { grid-area: dias; grid-auto-columns: minmax(44px, 1fr); }
+  .g-ag-faixa > .g-ico:first-child { grid-area: ant; }
+  .g-ag-faixa > .g-ico:last-child { grid-area: prox; }
+  .g-ag-faixa .g-ico { width: 44px; height: 44px; }
+}
+/* modo simples: "Mais opções" do horário */
+.g-agd-mais { border-top: 1px solid var(--g-linha); padding-top: 4px; }
+.g-agd-mais > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; font-weight: 600; color: var(--g-verde); cursor: pointer; list-style: none; }
+.g-agd-mais > summary::-webkit-details-marker { display: none; }
+.g-agd-mais > summary svg { width: 18px; height: 18px; transition: rotate .2s; }
+.g-agd-mais[open] > summary svg { rotate: 180deg; }

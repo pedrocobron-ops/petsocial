@@ -49,8 +49,8 @@ const ESPECIES: { id: Especie; rotulo: string; icone: React.ComponentType<{ size
 ];
 const PASSOS: { id: Passo; rotulo: string }[] = [
   { id: "servico", rotulo: "Serviço" },
-  { id: "quando", rotulo: "Dia e hora" },
-  { id: "dados", rotulo: "Seus dados" },
+  { id: "quando", rotulo: "Quando" },
+  { id: "dados", rotulo: "Você" },
 ];
 
 function duracao(min: number) {

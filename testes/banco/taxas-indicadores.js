@@ -116,7 +116,8 @@ const c = (n) => B.centavos(n);
   // a receber: crédito à vista 200 − 8,50 = 191,50; parte crédito do dividido 100 − 4,50 = 95,50; 3x 300 − 23 = 277 em três parcelas
   // (92,34 + 92,33 + 92,33, a cada 30 dias); 2x 100 − 6,50 = 93,50 em duas (46,75 + 46,75) → dia +30 = 426,09, +60 = 139,08, +90 = 92,33
   // (migração 20261208: o parcelado sai uma parcela por mês); débito 100 − 2 + 100 − 3 = 195,00 no dia +1; o Pix (0 dias) já caiu
-  const ar = (n) => tp.a_receber.find((x) => x.dia === L.dia(n));
+  // o dia que cai no sábado ou no domingo passa para a segunda (emDiaUtil, rodada 8)
+  const ar = (n) => tp.a_receber.find((x) => x.dia === MQ.emDiaUtil([{ dia: L.dia(n), valor: 0 }])[0].dia);
   T.ok('a receber da maquininha: R$ 195,00 amanhã (débito); crédito R$ 426,09 em 30 dias, R$ 139,08 em 60 e R$ 92,33 em 90 (parcelado por mês, já sem a taxa)',
     c(ar(1)?.valor) === 19500 && c(ar(30)?.valor) === 42609 && c(ar(60)?.valor) === 13908 && c(ar(90)?.valor) === 9233 && tp.a_receber.length === 4 && tp.parcelado === true, tp.a_receber);
   B.must(await dono.from('lancamentos').insert({ petshop_id: P, tipo: 'saida', valor: 40, forma: 'pix', categoria: 'Aluguel', data: L.hoje, pago: true, origem: 'tela' }).select('id'), 'uma saída');

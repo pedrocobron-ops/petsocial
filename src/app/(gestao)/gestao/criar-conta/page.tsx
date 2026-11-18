@@ -35,6 +35,7 @@ function Formulario({ emailInicial, codigo }: { emailInicial: string; codigo: st
   const [email, setEmail] = useState(emailInicial);
   const [email2, setEmail2] = useState("");
   const [senha, setSenha] = useState("");
+  const emailsDiferentes = Boolean(email2) && email.trim().toLowerCase() !== email2.trim().toLowerCase();
   const [aceito, setAceito] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [indo, setIndo] = useState(false);
@@ -163,8 +164,9 @@ function Formulario({ emailInicial, codigo }: { emailInicial: string; codigo: st
         {!convidado && (
           <label className="g-campo"><span>Digite o e-mail de novo</span>
             <input className="g-input" type="email" autoComplete="off" required value={email2} onChange={(e) => setEmail2(e.target.value)}
-              onPaste={(e) => e.preventDefault()} />
-            <small>{email2 && email.trim().toLowerCase() !== email2.trim().toLowerCase() ? "Ainda não está igual ao de cima." : "É por esse e-mail que você recupera a senha, se esquecer."}</small>
+              aria-invalid={emailsDiferentes ? true : undefined} onPaste={(e) => e.preventDefault()} />
+            {/* diferente do de cima: na cor de erro (não na cor da dica) */}
+            {emailsDiferentes ? <small className="erro">Ainda não está igual ao de cima.</small> : <small>É por esse e-mail que você recupera a senha, se esquecer.</small>}
           </label>
         )}
         <label className="g-campo"><span>Crie uma senha</span>

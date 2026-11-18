@@ -84,7 +84,9 @@ const continuar = async (page) => { await page.locator('.g-guia-pe .g-btn.pri').
     T.ok('recarregou: volta no passo do horário, com o aviso', /Quando vocês abrem\?/.test(await page.locator('.g-guia').innerText()) && (await page.locator('[data-teste=guia-retomado]').count()) === 1);
     T.ok('o almoço continua marcado (12:00 às 13:00)', await page.getByLabel('Fecha para o almoço?').isChecked() && (await page.getByLabel('Almoço: começa').inputValue()) === '12:00');
     const frase = nb(await page.locator('.gj-almoco').innerText());
-    T.ok('a frase do sábado ficou simples ("No sábado vocês fecham às 13:00…")', /No sábado vocês fecham às 13:00/.test(frase) && !/Em sábado/.test(frase), frase);
+    T.ok('a frase do sábado ficou simples ("No sábado, fecha às 13:00: sem pausa.")', /No sábado, fecha às 13:00: sem pausa\./.test(frase) && !/Em sábado/.test(frase), frase);
+    // rodada 8 (estreante): o parágrafo do almoço tinha 70 palavras
+    T.ok('o texto do almoço é curto (até 30 palavras)', frase.split(/\s+/).filter(Boolean).length <= 30, frase);
     await page.screenshot({ path: `${pasta}/guia-horario-recarregado-${largura}.png` }).catch(() => {});
     await continuar(page);
     const h = JSON.parse(B.sql(`select horario::text from petshops where id='${P}'`));

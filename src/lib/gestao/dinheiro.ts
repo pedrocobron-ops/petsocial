@@ -2,6 +2,7 @@ import type { Database } from "./banco";
 import type { Banco } from "./supabase";
 import { FORMAS } from "./tipos";
 import { brl, horarioDoDia, isoDia } from "./util";
+import { ehFalhaDeRede, textoDeRede } from "./validacao";
 
 /** Forma de pagamento aceita num lançamento. */
 export type FormaPagamento = (typeof FORMAS)[number]["id"];
@@ -17,7 +18,9 @@ export const CATEGORIA_GAVETA = "Movimento de gaveta";
 const caixaVisto = new Map<string, string | null>();
 
 async function lerCaixaAberto(sb: Banco, petshopId: string) {
-  const { data } = await sb.from("caixas").select("*").eq("petshop_id", petshopId).is("fechado_em", null).maybeSingle();
+  const { data, error } = await sb.from("caixas").select("*").eq("petshop_id", petshopId).is("fechado_em", null).maybeSingle();
+  // sem internet (ou sem resposta) não é "sem caixa": a falha sobe e a tela diz que a conexão caiu, sem gravar nada
+  if (error && (ehFalhaDeRede(error.message) || (typeof navigator !== "undefined" && navigator.onLine === false))) throw new Error(error.message || "Failed to fetch");
   return data;
 }
 
@@ -40,7 +43,19 @@ type Perguntar = (p: { titulo: string; texto?: string; confirmar?: string; perig
  */
 export async function conferirCaixa(sb: Banco, petshopId: string, perguntar: Perguntar) {
   const antes = caixaVisto.get(petshopId);
-  const agora = await lerCaixaAberto(sb, petshopId);
+  // sem internet: diz isso (nunca "o caixa foi fechado") e deixa tentar de novo; nada foi gravado
+  let agora: Awaited<ReturnType<typeof lerCaixaAberto>> = null;
+  for (;;) {
+    try { agora = await lerCaixaAberto(sb, petshopId); break; } catch {
+      const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+      const deNovo = await perguntar({
+        titulo: offline ? "Sem internet agora" : "Sem resposta do servidor",
+        texto: `${textoDeRede(!offline)} Nada foi gravado ainda.`,
+        confirmar: "Tentar de novo",
+      });
+      if (!deNovo) return false;
+    }
+  }
   if (antes && !agora) {
     const sim = await perguntar({
       titulo: "O caixa foi fechado há pouco",
@@ -63,7 +78,8 @@ export async function conferirValorAlto(valor: number | null | undefined, pergun
 
 /** Uma linha de uma venda ou comanda, como fica guardada em `lancamentos.itens`. `valor` é o preço de uma unidade. */
 /** `servico_id`: qual serviço da lista é esta linha (horário com mais de um serviço; sem ele, é o serviço principal do horário). */
-export type ItemLancamento = { tipo: "servico" | "produto" | "extra"; nome: string; qtd: number; valor: number; produto_id?: string; servico_id?: string };
+/** `promo`: a linha negativa da promoção do horário (aniversário, dia fraco): sai só do serviço, não é desconto do caixa. */
+export type ItemLancamento = { tipo: "servico" | "produto" | "extra"; nome: string; qtd: number; valor: number; produto_id?: string; servico_id?: string; promo?: boolean };
 
 /**
  * Registra dinheiro que já entrou ou saiu hoje. Se houver caixa aberto, o lançamento entra nele.

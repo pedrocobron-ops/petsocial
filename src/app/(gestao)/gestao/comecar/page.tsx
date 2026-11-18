@@ -10,7 +10,10 @@ import { MODULOS, areasParaPrincipal, principalPara, type Modulo, type Principal
 import { ArrowLeft, ArrowRight, ChevronDown, X } from "lucide-react";
 import { EscolherPrincipal, FalaMozart, TrilhoBoasVindas, chaveBoasVindas } from "@/components/gestao/boas-vindas";
 import { guardarLembrado } from "@/components/gestao/lembrado";
+import { salvarOpcoes } from "@/lib/gestao/opcoes";
+import { CHAVE_MODO_SIMPLES } from "@/lib/gestao/modo-simples";
 import "@/components/gestao/guia-inicial.css";
+import { limparNome } from "@/lib/gestao/validacao";
 
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 
@@ -18,7 +21,7 @@ const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","P
 const RASCUNHO = "maestro-gestao-comecar";
 /** Uma chave por conta: duas pessoas no mesmo aparelho não misturam as respostas. A chave antiga (uma só) ainda é lida. */
 const rascunhoDe = (user: string) => `${RASCUNHO}-${user}`;
-type Rascunho = { user: string; passo: 0 | 1; nome: string; seuNome: string; telefone: string; cidade: string; uf: string; modulos: Modulo[]; principal: Principal | null };
+type Rascunho = { user: string; passo: 0 | 1; nome: string; seuNome: string; telefone: string; cidade: string; uf: string; modulos: Modulo[]; principal: Principal | null; simples?: boolean };
 
 /**
  * Primeiro acesso: o Mozart pergunta o nome do negócio e o que ele faz, cria o pet shop e começa o teste de 7 dias.
@@ -39,6 +42,8 @@ export default function Comecar() {
   // nada vem marcado: cada negócio marca o que faz (uma creche não começa com banho e tosa ligado)
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [principal, setPrincipal] = useState<Principal | null>(null);
+  // modo simples já vem marcado para quem cria o pet shop agora (dá para desmarcar aqui ou desligar em Meu pet shop)
+  const [simples, setSimples] = useState(true);
   const [passo, setPasso] = useState<0 | 1>(0);
   const [userId, setUserId] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -61,6 +66,7 @@ export default function Comecar() {
         if (r && r.user === u.id) {
           setNome(r.nome); setSeuNome(r.seuNome); setTelefone(r.telefone); setCidade(r.cidade); setUf(r.uf);
           setModulos(r.modulos.filter((m) => MODULOS.some((x) => x.id === m))); setPrincipal(r.principal); setPasso(r.passo === 1 ? 1 : 0);
+          if (typeof r.simples === "boolean") setSimples(r.simples);
         }
       } catch { /* sem rascunho: começa do zero */ }
       // esta conta já entrou num pet shop neste aparelho e agora não tem nenhum: o acesso foi retirado
@@ -75,9 +81,9 @@ export default function Comecar() {
 
   useEffect(() => {
     if (!pronto || !userId) return;
-    const r: Rascunho = { user: userId, passo, nome, seuNome, telefone, cidade, uf, modulos, principal };
+    const r: Rascunho = { user: userId, passo, nome, seuNome, telefone, cidade, uf, modulos, principal, simples };
     try { localStorage.setItem(rascunhoDe(userId), JSON.stringify(r)); localStorage.removeItem(RASCUNHO); } catch { /* sem armazenamento: só não lembra */ }
-  }, [pronto, userId, passo, nome, seuNome, telefone, cidade, uf, modulos, principal]);
+  }, [pronto, userId, passo, nome, seuNome, telefone, cidade, uf, modulos, principal, simples]);
 
   const areas = areasParaPrincipal(modulos);
   const primeiro = seuNome.trim().split(/\s+/)[0] ?? "";
@@ -85,23 +91,25 @@ export default function Comecar() {
   function seguir(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
-    if (nome.trim().length < 2) { setErro("Me diga o nome do seu negócio para eu continuar."); return; }
+    if (limparNome(nome).length < 2) { setErro("Me diga o nome do seu negócio para eu continuar."); return; }
     if (telefone.trim() && !telefoneValido(telefone)) { setErro(ERRO_TELEFONE); return; }
     setPasso(1);
   }
 
-  /** Cria o pet shop. `depois`: a pessoa deixou a pergunta para depois; o sistema abre com tudo, na ordem de sempre. */
-  async function criar(depois: boolean) {
+  /** Cria o pet shop (com o modo simples, se a pessoa deixou marcado) e segue para a cor, já dentro do aplicativo. */
+  async function criar() {
     setErro(null);
-    if (!depois && !modulos.length) { setErro("Marque pelo menos uma coisa que o seu negócio faz."); return; }
-    const escolhida = depois ? null : principalPara(modulos, principal);
-    if (!depois && areas.length > 1 && !escolhida) { setErro("Toque no que vocês mais fazem."); return; }
+    if (!modulos.length) { setErro("Marque pelo menos uma coisa que o seu negócio faz."); return; }
+    const escolhida = principalPara(modulos, principal);
+    if (areas.length > 1 && !escolhida) { setErro("Toque no que vocês mais fazem."); return; }
     setIndo(true);
     const { data: id, error } = await banco().rpc("criar_petshop", {
-      p_nome: nome, p_seu_nome: seuNome, p_telefone: telefone.replace(/\D/g, ""), p_cidade: cidade, p_uf: uf,
-      ...(depois ? {} : { p_modulos: modulos, ...(escolhida ? { p_principal: escolhida } : {}) }),
+      p_nome: limparNome(nome), p_seu_nome: limparNome(seuNome), p_telefone: telefone.replace(/\D/g, ""), p_cidade: cidade, p_uf: uf,
+      p_modulos: modulos, ...(escolhida ? { p_principal: escolhida } : {}),
     });
     if (error || !id) { setIndo(false); setErro("Não consegui criar o pet shop. Confira os dados e tente de novo."); return; }
+    // modo simples: menos menus para começar (muda em Meu pet shop). Se não gravar agora, o pet shop abre completo, como sempre.
+    if (simples) await salvarOpcoes(banco(), id, { [CHAVE_MODO_SIMPLES]: true }).catch(() => undefined);
     // a conversa continua dentro do aplicativo, pela cor
     guardarLembrado(chaveBoasVindas(id), "cor");
     guardarLembrado("maestro-gestao-petshop", id);
@@ -206,12 +214,16 @@ export default function Comecar() {
                   <p>Isso aparece primeiro no menu e na tela inicial. O resto continua à mão.</p>
                 </div>
               )}
+              <label className="g-bv-simples">
+                <input type="checkbox" checked={simples} onChange={(e) => setSimples(e.target.checked)} />
+                <span><b>Começar no modo simples</b><small>Menos botões e menus no começo. Nada fica de fora: o resto vai para Outras áreas, e dá para desligar em Meu pet shop.</small></span>
+              </label>
             </div>
             {erro && <p className="g-erro g-guia-erro" role="alert">{erro}</p>}
-            <footer className="g-guia-pe g-bv-pe3">
+            {/* esta pergunta não fica para depois: sem marcar o que o negócio faz, o pet shop não nasce (era "Faço depois" que dava erro) */}
+            <footer className="g-guia-pe">
               <button type="button" className="g-btn fantasma g-guia-volta" onClick={() => { setErro(null); setPasso(0); }} disabled={indo} aria-label="Voltar à pergunta anterior"><ArrowLeft /></button>
-              <button type="button" className="g-btn fantasma g-guia-depois" onClick={() => void criar(true)} disabled={indo}>Faço depois</button>
-              <button type="button" className="g-btn pri" onClick={() => void criar(false)} disabled={indo}>{indo ? "Criando…" : "Criar meu pet shop"}<ArrowRight /></button>
+              <button type="button" className="g-btn pri" onClick={() => void criar()} disabled={indo}>{indo ? "Um instante…" : "Continuar"}<ArrowRight /></button>
             </footer>
           </>
         )}

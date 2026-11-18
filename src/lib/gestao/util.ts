@@ -37,7 +37,7 @@ export const dataCurtaOuAno = (d: Date | string) => {
   const longe = Math.abs(x.getTime() - Date.now()) > 300 * 864e5;
   return x.getFullYear() !== new Date().getFullYear() || longe ? dataCompleta(x) : dataCurta(x);
 };
-/** "hoje", "amanhã", "ontem" ou "sexta, 14/11" */
+/** "hoje", "amanhã", "ontem" ou "sexta, 14/11" ("sexta, 14/11/2027" quando está a mais de 6 meses de hoje) */
 export function dataAmigavel(d: Date | string) {
   const x = typeof d === "string" && d.length === 10 ? deIsoDia(d) : new Date(d);
   const hoje = inicioDoDia(new Date());
@@ -45,7 +45,8 @@ export function dataAmigavel(d: Date | string) {
   if (dif === 0) return "hoje";
   if (dif === 1) return "amanhã";
   if (dif === -1) return "ontem";
-  return `${DIAS[x.getDay()]}, ${dataCurta(x)}`;
+  // longe de hoje (mais de 6 meses), com o ano: "sábado, 18/11/2028" nunca passa por um dia desta semana
+  return `${DIAS[x.getDay()]}, ${Math.abs(dif) > 183 ? dataCompleta(x) : dataCurta(x)}`;
 }
 export function haQuanto(d: Date | string | null | undefined) {
   if (!d) return "nunca";

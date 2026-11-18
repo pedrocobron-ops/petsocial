@@ -135,6 +135,10 @@ cada cartão confirmado é marcado no banco antes de gravar (`assistente_acao_re
 confirmação de novo não grava duas vezes. Creche e hotel nunca viram horário da agenda: reserva é `reservar_estadia`
 (`assistente/ferramenta-estadia.ts`). A bolha mostra negrito e lista por `TextoMozart` (`assistente/markdown.ts`); nada vira HTML.
 
+Modo simples (`src/lib/gestao/modo-simples.ts`, opção `geral.modo_simples`, desligado em quem nunca mexeu): tela nova com coisa avançada
+pergunta `modoSimples(petshop)` e esconde (nunca apaga); tela inteira avançada entra em `foraNoModoSimples` e vai para Outras áreas.
+Ajuda: um lugar só, o botão "Ajuda" da barra de cima (casca) e o Ajuda do menu abrem a mesma folha (`manual/ajuda-da-tela.tsx`).
+Nomes: "Link do cliente" (não "link de agendamento"), "Fechar a conta", "Faço depois"; a mesma conta dos primeiros passos (`textoFaltam`).
 Nome da casa: quem usa só hotel lê "Hotel", só creche lê "Creche" (`nomeDaCasa`). A categoria gravada continua "Creche e hotel"; na tela,
 use `categoriaAtual(categoria, petshop)` (Financeiro, Caixa, contas). Áreas da equipe com `areasPara(petshop)` / `pilulasDe(p, petshop)`.
 O manual troca sozinho (`textoDaCasa` em `manual.ts`). Interruptor (`role="switch"`) sempre com `aria-label` ou texto dentro.

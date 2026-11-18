@@ -22,7 +22,7 @@ export function CreditoDoTutor({ clienteId, nome }: { clienteId: string; nome: s
         <h3><Tile icone={PiggyBank} tom="menta" tamanho="p" />Crédito de {primeiro}</h3>
         <b className="g-tab">{brl(dados.saldo)}</b>
       </div>
-      <p className="g-muted g-pp">{dados.saldo > 0 ? `${primeiro} tem ${brl(dados.saldo)} para usar. O próximo check-out do hotel oferece descontar da conta.` : "Nada para usar agora."}</p>
+      <p className="g-muted g-pp">{dados.saldo > 0 ? `${primeiro} tem ${brl(dados.saldo)} para usar. A próxima conta dele oferece usar: venda no balcão, Fechar a conta, mensalidade da creche e check-out do hotel.` : "Nada para usar agora."}</p>
       <div className="g-ht-conta">
         {dados.movimentos.slice(0, 8).map((m) => (
           <div key={m.id} className="l"><span>{dataCurta(m.criado_em)} · {m.motivo ?? (Number(m.valor) > 0 ? "Crédito deixado" : "Crédito usado")}</span><span>{Number(m.valor) > 0 ? brl(Number(m.valor)) : `- ${brl(-Number(m.valor))}`}</span></div>

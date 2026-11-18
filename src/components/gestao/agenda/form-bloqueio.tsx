@@ -215,7 +215,7 @@ export default function FormBloqueio({ bloqueio, diaInicial, profissionalInicial
             <small>Feriado? {souDono ? <>Em <Link className="g-link" href="/gestao/app/meu-petshop#feriados">Feriados e dias fechados</Link></> : "Em Meu pet shop, Feriados e dias fechados,"} o botão Colocar os feriados nacionais põe todos os do ano de uma vez: a agenda e o link do cliente já sabem que o dia é fechado.</small>
           )}
           {!bloqueio && !profId && /^almo[cç]o$/i.test(motivo.trim()) && (
-            <small>O pet shop fecha para o almoço todo dia? Em Meu pet shop, no horário de funcionamento, dá para marcar o almoço uma vez só, sem prazo para acabar. O bloqueio daqui serve para um dia ou para algumas semanas.</small>
+            <small>Almoço todo dia? Marque uma vez só em Meu pet shop, no horário de funcionamento. Este bloqueio é para um dia ou algumas semanas.</small>
           )}
         </div>
 

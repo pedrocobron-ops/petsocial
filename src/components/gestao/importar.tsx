@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Camera, Download, FileSpreadsheet, History, TriangleAlert, Undo2, Upload } from "lucide-react";
-import { dataCurta, hora, semAcento } from "@/lib/gestao/util";
+import { dataCurta, hora, isoDia, semAcento } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { fraseDesfeita, frasesDoResumo, lerTabela, linhasParaOBanco, tabelaComoTexto, type ResumoDaImportacao } from "@/lib/gestao/planilha";
 import { ehXlsx, inflarNoNavegador, lerXlsx, temInflarNoNavegador } from "@/lib/gestao/xlsx";
@@ -35,6 +35,9 @@ const COLUNAS: Record<Tipo, Coluna[]> = {
     // alergia, medo, doença: vai para os alertas do pet (aparecem na agenda). Observação que fala disso também vira alerta.
     { id: "alertas", rotulo: "Alertas", nomes: ["alerta", "alertas", "cuidados", "cuidado", "atencao", "saude", "alergia", "alergias"], parece: /alerta|cuidado|atencao|alergi/, exemplo: "Alergia a shampoo comum" },
     { id: "obs", rotulo: "Observações", nomes: ["observacao", "observacoes", "obs", "anotacao", "anotacoes", "notas"], parece: /observa|\bobs\b|anota|\bnotas?\b/, exemplo: "Gosta de laço" },
+    // antes de tutor e pet: "Nascimento do pet" e "Sexo do animal" são destas (o aniversário do pet e a promoção dependem delas)
+    { id: "nascimento", rotulo: "Nascimento do pet", nomes: ["nascimento", "data de nascimento", "nascimento do pet", "aniversario", "aniversario do pet", "data nasc", "nasc"], parece: /nasc|aniversari/, exemplo: "20/11/2021" },
+    { id: "sexo", rotulo: "Sexo do pet", nomes: ["sexo", "sexo do pet", "genero"], parece: /\bsexo\b|genero/, exemplo: "Fêmea" },
     { id: "tutor", rotulo: "Tutor", nomes: ["tutor", "cliente", "nome do tutor", "nome do cliente", "dono", "dona", "responsavel", "proprietario", "nome"], parece: /tutor|cliente|\bdon[oa]\b|responsavel|proprietari/, obrigatoria: true, exemplo: "Roberta Dias" },
     { id: "pet", rotulo: "Pet", nomes: ["pet", "nome do pet", "animal", "nome do animal", "bichinho", "cachorro", "mascote", "paciente"], parece: /\bpet\b|bichinho|animal|cachorro|mascote/, exemplo: "Mel" },
   ],
@@ -57,7 +60,7 @@ const COLUNAS: Record<Tipo, Coluna[]> = {
 };
 /** Ordem em que as colunas aparecem para a pessoa (na lista do seletor e na planilha modelo). */
 const ORDEM: Record<Tipo, string[]> = {
-  clientes: ["tutor", "telefone", "pet", "especie", "raca", "porte", "alertas", "obs", "email", "endereco"],
+  clientes: ["tutor", "telefone", "pet", "especie", "raca", "porte", "nascimento", "sexo", "alertas", "obs", "email", "endereco"],
   produtos: ["nome", "codigo", "categoria", "unidade", "preco", "custo", "estoque", "minimo", "validade", "lote", "fornecedor"],
 };
 /** Colunas que dependem de uma opção da loja: código de barras e fornecedor. */
@@ -243,7 +246,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
    * gravação, e fica guardado. Sair da tela no meio não deixa metade: ao voltar, a última importação mostra o que entrou.
    */
   async function importarClientes(linhas: Record<string, string>[], chave: string): Promise<Ultima> {
-    const { linhas: paraOBanco, extra } = linhasParaOBanco(linhas, Boolean(lido && "pet" in lido.onde));
+    const { linhas: paraOBanco, extra } = linhasParaOBanco(linhas, Boolean(lido && "pet" in lido.onde), isoDia(new Date()));
     const r = ok(await sb.rpc("importar_clientes", { p_petshop: petshop.id, p_chave: chave, p_linhas: paraOBanco as unknown as Json, p_extra: extra as unknown as Json })) as unknown as {
       id: string; em: string; resumo: ResumoDaImportacao; clientes: string[]; pets: string[];
     };
@@ -258,7 +261,9 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     const codigos = new Set((existentes.data ?? []).filter((p) => p.ativo && p.codigo_barras).map((p) => p.codigo_barras!));
     let repetidos = 0;
     const { data: u } = await sb.auth.getUser();
-    let novos = 0, pulados = 0, ignorados = 0, semValidade = 0, comLote = 0;
+    let novos = 0, pulados = 0, ignorados = 0, semValidade = 0, comLote = 0, outroLote = 0, repetidoSemLote = 0;
+    // produto criado por esta planilha: uma segunda linha com o mesmo nome (outro lote, outra validade) entra como mais um lote dele
+    const criados = new Map<string, { id: string; controla: boolean }>();
     // fornecedores pelo nome (sem acento); o que a planilha traz e não existe é cadastrado uma vez
     const fornecedores = new Map<string, string>();
     if (comFornecedor && linhas.some((l) => l.fornecedor?.trim())) {
@@ -277,6 +282,19 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     const ruim = (v: string | undefined) => Boolean((v ?? "").trim()) && numero(v) == null;
     for (const [i, l] of linhas.entries()) {
       const nome = l.nome.trim().slice(0, 120);
+      const desta = criados.get(semAcento(nome));
+      if (desta) {
+        // a mesma planilha repete o produto (é assim que a nota do distribuidor vem): a quantidade entra como outro lote
+        const q = numero(l.estoque), c = numero(l.custo), val = validadeDaPlanilha(l.validade), lt = (l.lote ?? "").trim().slice(0, 60) || null;
+        if (!(q && q > 0)) { pulados++; continue; }
+        if (desta.controla && !val && !lt) { repetidoSemLote++; continue; }
+        await gravarMovimentos(sb, petshop.id, [{
+          petshop_id: petshop.id, produto_id: desta.id, tipo: "entrada", quantidade: q, motivo: "Saldo trazido da planilha", criado_por: u.user?.id ?? null,
+          custo_unitario: c != null ? Math.round(c * 100) / 100 : null, ...(desta.controla ? { lote: lt, validade: val || null } : {}), chave: parteDaChave(chave, "saldo", i),
+        }]);
+        outroLote++;
+        continue;
+      }
       if (tem.has(semAcento(nome))) { pulados++; continue; }
       const preco = numero(l.preco), custo = numero(l.custo), qtd = numero(l.estoque), minimo = numero(l.minimo);
       if (ruim(l.preco) || ruim(l.custo) || ruim(l.estoque) || ruim(l.minimo)) ignorados++;
@@ -296,6 +314,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
       }).select("id").single();
       if (r.error) throw new Error(r.error.message);
       tem.add(semAcento(nome));
+      criados.set(semAcento(nome), { id: r.data.id, controla });
       if (codigo) codigos.add(codigo);
       novos++;
       if (qtd && qtd > 0) {
@@ -314,6 +333,8 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     return [
       `${novos} ${novos === 1 ? "produto novo" : "produtos novos"} no estoque.`,
       ...(ignorados ? [`${ignorados} ${ignorados === 1 ? "produto tinha" : "produtos tinham"} preço, custo ou quantidade que não era número (ou era negativo) e ficou em branco. Confira no Estoque.`] : []),
+      ...(outroLote ? [`${outroLote} ${outroLote === 1 ? "linha repetia" : "linhas repetiam"} um produto desta planilha e ${outroLote === 1 ? "entrou" : "entraram"} como mais um lote dele (a quantidade somou no saldo).`] : []),
+      ...(repetidoSemLote ? [`${repetidoSemLote} ${repetidoSemLote === 1 ? "linha repetia" : "linhas repetiam"} um produto com validade, mas sem validade nem lote: ${repetidoSemLote === 1 ? "ficou" : "ficaram"} de fora. Dê entrada em Estoque, Entrada.`] : []),
       ...(pulados ? [`${pulados} já ${pulados === 1 ? "existia" : "existiam"} com o mesmo nome e ${pulados === 1 ? "foi pulado" : "foram pulados"}.`] : []),
       ...(repetidos ? [`${repetidos} ${repetidos === 1 ? "produto veio" : "produtos vieram"} com um código de barras que já estava em outro produto e ${repetidos === 1 ? "entrou" : "entraram"} sem código. Confira no Estoque.`] : []),
       ...(comLote ? [`${comLote} ${comLote === 1 ? "produto entrou" : "produtos entraram"} com a validade ou o lote: ${comLote === 1 ? "já aparece" : "já aparecem"} no Vencendo.`] : []),
@@ -410,7 +431,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
             </div>
           )}
           <p className="g-muted g-p">
-            Serve para quem vem de outro sistema ou de uma planilha. Nada do que já está aqui é apagado: {tipo === "clientes" ? "tutor ou pet que já existe só ganha o que estava em branco (telefone, raça, porte, observações)" : "produto com o mesmo nome é pulado"}.
+            Serve para quem vem de outro sistema ou de uma planilha. Nada do que já está aqui é apagado: {tipo === "clientes" ? "tutor ou pet que já existe só ganha o que estava em branco (telefone, raça, porte, observações)" : "produto que já estava no estoque com o mesmo nome é pulado; o mesmo produto em duas linhas da planilha (dois lotes) entra uma vez, com os dois lotes"}.
           </p>
           <div className="g-card liso g-pilha p">
             <b className="g-p">1. A planilha precisa de uma linha de títulos</b>

@@ -1,4 +1,4 @@
-import { podeArea } from "@/lib/gestao/acessos";
+import { areasDe, podeArea } from "@/lib/gestao/acessos";
 import { lerEquipe, lerPetshop, lerServicos } from "@/lib/gestao/reservado";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
@@ -130,6 +130,7 @@ async function tratar(req: Request) {
     sb, userId: u.user.id, petshop: p.data, eu, equipe: e.data ?? [], servicos: s.data ?? [],
     vejoFinanceiro: podeArea(eu, "caixa") || podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
     cuidoDoFinanceiro: podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
+    areas: areasDe(eu),
     fusoMin: corpo.fusoMin, agora: corpo.agora!.slice(0, 16),
     diasEspeciais: especiais.error ? undefined : (especiais.data ?? []),
   };

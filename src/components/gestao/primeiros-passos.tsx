@@ -7,6 +7,7 @@ import { useGestao } from "./contexto";
 import { Tile } from "./painel";
 import { Folha, abrirPersonalizarMenu } from "./ui";
 import { abrirLinkDeAgendamento, guardarLembrado, lerLembrado } from "./lembrado";
+import { textoFaltam } from "@/lib/gestao/primeiros-passos";
 import { frenteDe, nomeDaCasa, usaCasa, usaModulo, type Frente } from "@/lib/gestao/modulos";
 
 /** Com área principal, os passos dela vêm primeiro; das outras áreas marcadas entra só o primeiro passo de cada uma. */
@@ -49,16 +50,17 @@ export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: ()
   const todos: (Passo & { so: boolean })[] = dados ? [
     { id: "precos", so: souDono && banho && banhoInteiro && ativos.length > 0, feito: temPreco, texto: "Colocar os preços dos serviços", dica: "Em Meu pet shop, na parte Serviços e preços.", href: "/gestao/app/meu-petshop" },
     { id: "diaria", so: souDono && soCasa, feito: temDiaria, texto: "Colocar o preço da diária", dica: `Em Meu pet shop, na parte ${nomeDaCasa(petshop)}.`, href: "/gestao/app/meu-petshop" },
-    { id: "pet", so: posso("clientes"), feito: dados.pets > 0, texto: "Cadastrar o primeiro pet", dica: "Já abre a ficha para preencher.", href: "/gestao/app/clientes?novo=1" },
+    // com a agenda, o pet entra junto ao marcar o primeiro horário: não é um passo à parte (era o mesmo pedido três vezes na tela)
+    { id: "pet", so: posso("clientes") && !(agenda && banhoInteiro), feito: dados.pets > 0, texto: "Cadastrar o primeiro pet", dica: "Já abre a ficha para preencher.", href: "/gestao/app/clientes?novo=1" },
     { id: "checkin", so: comCasa && posso("creche_hotel"), feito: dados.estadias > 0, texto: banho ? `Anotar a primeira chegada ${usaModulo(petshop, "hotel") && !usaModulo(petshop, "creche") ? "no hotel" : usaModulo(petshop, "creche") && !usaModulo(petshop, "hotel") ? "na creche" : "na creche ou no hotel"}` : "Fazer o primeiro check-in",
       dica: banho ? `Em ${nomeDaCasa(petshop)}, no botão Nova reserva / Check-in: é onde fica anotado que o pet chegou.` : `Em ${nomeDaCasa(petshop)}, no botão Nova reserva / Check-in.`, href: "/gestao/app/creche-hotel" },
     { id: "produto", so: comLoja && posso("estoque"), feito: dados.produtos > 0, texto: "Cadastrar o primeiro produto", dica: "Em Estoque, no botão de produto novo.", href: "/gestao/app/estoque" },
-    { id: "horario", so: agenda, feito: dados.horarios > 0, texto: "Marcar o primeiro horário", dica: "Já abre a janela para marcar.", href: "/gestao/app/agenda?novo=1" },
-    { id: "concluir", so: agenda && banhoInteiro, feito: dados.concluidos > 0, texto: vejoFinanceiro ? "Concluir e receber um atendimento" : "Concluir um atendimento", dica: vejoFinanceiro ? "Na Agenda, toque no horário e em Fechar a conta." : "Na Agenda, toque no horário e em Concluir atendimento.", href: "/gestao/app/agenda" },
-    { id: "link", so: souDono && agenda && banhoInteiro, feito: petshop.link_ativo, texto: "Ligar o link de agendamento", dica: "O cliente pede o horário pelo celular e você aceita.", aoTocar: abrirLinkDeAgendamento },
+    { id: "horario", so: agenda, feito: dados.horarios > 0, texto: "Marcar o primeiro horário", dica: "O pet entra na hora, só com o nome e o tutor.", href: "/gestao/app/agenda?novo=1" },
+    { id: "concluir", so: agenda && banhoInteiro, feito: dados.concluidos > 0, texto: vejoFinanceiro ? "Fechar a conta do primeiro atendimento" : "Concluir o primeiro atendimento", dica: vejoFinanceiro ? "Na Agenda, toque no horário e em Fechar a conta." : "Na Agenda, toque no horário e em Concluir atendimento.", href: "/gestao/app/agenda" },
+    { id: "link", so: souDono && agenda && banhoInteiro, feito: petshop.link_ativo, texto: "Ligar o link do cliente", dica: "O cliente pede o horário pelo celular e você aceita.", aoTocar: abrirLinkDeAgendamento },
     dados.amanha > 0
-      ? { id: "lembrete", so: agenda && banhoInteiro, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Abre os lembretes dos horários de amanhã.", aoTocar: aoLembretes }
-      : { id: "lembrete", so: agenda && banhoInteiro, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Na Agenda, pelo botão do WhatsApp ao lado do horário.", href: "/gestao/app/agenda" },
+      ? { id: "lembrete", so: agenda && banhoInteiro, opcional: true, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Abre os lembretes dos horários de amanhã.", aoTocar: aoLembretes }
+      : { id: "lembrete", so: agenda && banhoInteiro, opcional: true, feito: dados.lembretes > 0, texto: "Mandar um lembrete de WhatsApp", dica: "Quando marcar o próximo horário, abra o horário e toque em Lembrete no WhatsApp.", href: "/gestao/app/agenda" },
     { id: "marca", so: souDono, opcional: true, feito: Boolean(petshop.logo) || petshop.tema !== "floresta", texto: "Colocar a sua logo e as suas cores", dica: "Em Meu pet shop.", href: "/gestao/app/meu-petshop" },
     { id: "menu", so: souDono, opcional: true, feito: menu, texto: "Escolher o que aparece no menu", dica: "Banho e tosa, creche, hotel, loja: o menu Dia a dia mostra só o que você liga.", aoTocar: () => { guardarLembrado(chaveMenu, "1"); setMenu(true); abrirPersonalizarMenu(); } },
     { id: "escola", so: souDono, opcional: true, feito: escola, texto: "Ver as aulas grátis sobre o dia a dia do pet shop", dica: "Na Escola de Gestão: aulas curtas, já incluídas, nada para comprar.", href: "/gestao/app/escola", aoTocar: () => { guardarLembrado(chaveEscola, "1"); setEscola(true); } },
@@ -90,6 +92,46 @@ export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: ()
 }
 type Passos = ReturnType<typeof usePrimeirosPassos>;
 
+
+/**
+ * As contagens dos primeiros passos lidas do banco, para quem não está na tela Hoje (o fim do guia).
+ * Só quantidades (sem nomes nem valores).
+ */
+export function useDadosDosPassos(ligado: boolean): DadosDosPassos | null {
+  const { sb, petshop } = useGestao();
+  const [dados, setDados] = useState<DadosDosPassos | null>(null);
+  useEffect(() => {
+    if (!ligado) return;
+    let vale = true;
+    const contar = (q: PromiseLike<{ count: number | null }>) => Promise.resolve(q).then((r) => r.count ?? 0, () => 0);
+    const P = petshop.id;
+    void Promise.all([
+      contar(sb.from("pets").select("id", { count: "exact", head: true }).eq("petshop_id", P)),
+      contar(sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", P)),
+      contar(sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", P).eq("status", "concluido")),
+      contar(sb.from("agendamentos").select("id", { count: "exact", head: true }).eq("petshop_id", P).not("lembrete_em", "is", null)),
+      contar(sb.from("estadias").select("id", { count: "exact", head: true }).eq("petshop_id", P)),
+      contar(sb.from("produtos").select("id", { count: "exact", head: true }).eq("petshop_id", P)),
+    ]).then(([pets, horarios, concluidos, lembretes, estadias, produtos]) => {
+      if (vale) setDados({ pets, horarios, concluidos, lembretes, amanha: 0, estadias, produtos });
+    });
+    return () => { vale = false; };
+  }, [ligado, sb, petshop.id, petshop.link_ativo]);
+  return dados;
+}
+
+/** Os passos que faltam, numerados, para o fim do guia: a mesma lista e a mesma conta do cartão da tela Hoje. */
+export function OQueFalta({ pp, aoIr }: { pp: Passos; aoIr?: () => void }) {
+  const faltam = pp.principais.filter((p) => !p.feito);
+  if (!pp.total) return null;
+  return (
+    <div className="g-pps na-guia" data-teste="o-que-falta">
+      <p className="g-pp"><b>{textoFaltam(faltam.length)}{faltam.length ? ":" : "."}</b></p>
+      {faltam.length > 0 && <div className="g-pps-lista">{faltam.map((p, i) => <Linha key={p.id} p={p} n={i + 1} destaque={i === 0} aoIr={aoIr} />)}</div>}
+    </div>
+  );
+}
+
 function Linha({ p, n, destaque, aoIr }: { p: Passo; n: number | null; destaque: boolean; aoIr?: () => void }) {
   const dentro = (
     <>
@@ -113,11 +155,11 @@ function Lista({ pp, aoIr, curto = false }: { pp: Passos; aoIr?: () => void; cur
   const opcionais = resumido ? [] : pp.passos.filter((p) => p.opcional);
   return (
     <>
-      <div className="g-prog" role="img" aria-label={`${pp.feitos} de ${pp.total} passos feitos`}><i style={{ width: `${(pp.feitos / pp.total) * 100}%` }} /></div>
+      <div className="g-prog" role="img" aria-label={textoFaltam(pp.total - pp.feitos)}><i style={{ width: `${(pp.feitos / pp.total) * 100}%` }} /></div>
       <div className="g-pps-lista">
-        {visiveis.map((p) => <Linha key={p.id} p={p} n={pp.principais.indexOf(p) + 1} destaque={p.id === pp.proximo?.id} aoIr={aoIr} />)}
+        {visiveis.map((p) => <Linha key={p.id} p={p} n={faltam.indexOf(p) + 1} destaque={p.id === pp.proximo?.id} aoIr={aoIr} />)}
       </div>
-      {resumido && <div><button type="button" className="g-link g-p" onClick={() => setTudo(true)}>Ver os {pp.total} passos</button></div>}
+      {resumido && <div><button type="button" className="g-link g-p alvo" onClick={() => setTudo(true)}>Ver tudo o que falta</button></div>}
       {opcionais.length > 0 && (
         <div className="g-pilha p">
           <p className="g-rotulo">Se quiser, depois</p>
@@ -141,7 +183,7 @@ export default function PrimeirosPassos({ pp, modo, curto = false }: { pp: Passo
         <Tile icone={PartyPopper} tom="menta" tamanho="g" />
         <div className="g-cresce">
           <h2>Primeiros passos concluídos</h2>
-          <p className="g-p">Você já passou por cada parte do dia a dia do sistema. Se quiser rever alguma coisa, a Ajuda fica no menu.</p>
+          <p className="g-p">Você já passou por cada parte do dia a dia do sistema. Se quiser rever alguma coisa, toque em Ajuda, no alto de cada tela.</p>
         </div>
         <button className="g-btn sec" onClick={pp.fechar}>Fechar</button>
       </section>
@@ -153,11 +195,11 @@ export default function PrimeirosPassos({ pp, modo, curto = false }: { pp: Passo
       <>
         <button type="button" className="g-ret-linha" onClick={() => setAberto(true)}>
           <ListChecks aria-hidden />
-          <span><b>Primeiros passos: {pp.feitos} de {pp.total}.</b>{pp.proximo ? ` Falta: ${pp.proximo.texto.toLowerCase()}.` : ""}</span>
+          <span><b>Primeiros passos: {textoFaltam(pp.total - pp.feitos).toLowerCase()}.</b>{pp.proximo ? ` Próximo: ${pp.proximo.texto.toLowerCase()}.` : ""}</span>
           <ChevronRight aria-hidden />
         </button>
         {aberto && (
-          <Folha titulo={`Primeiros passos: ${pp.feitos} de ${pp.total}`} aoFechar={() => setAberto(false)}>
+          <Folha titulo={`Primeiros passos: ${textoFaltam(pp.total - pp.feitos).toLowerCase()}`} aoFechar={() => setAberto(false)}>
             <div className="g-pilha g-pps na-folha"><Lista pp={pp} aoIr={() => setAberto(false)} /></div>
           </Folha>
         )}
@@ -170,10 +212,10 @@ export default function PrimeirosPassos({ pp, modo, curto = false }: { pp: Passo
       <div className="g-ret-cab">
         <Tile icone={ListChecks} tom="menta" tamanho="g" />
         <div className="g-cresce">
-          <h2>Primeiros passos</h2>
-          <p className="g-muted g-p">Um toque leva direto ao lugar. Cada passo se marca sozinho quando você faz.</p>
+          <h2>{pp.proximo?.id === "horario" ? "Agora, o primeiro cliente" : "Primeiros passos"}</h2>
+          <p className="g-pp" data-teste="faltam"><b>{textoFaltam(pp.total - pp.feitos)}.</b></p>
+          <p className="g-muted g-p">Um toque leva direto ao lugar, e cada um se marca sozinho quando você faz.</p>
         </div>
-        <p className="g-pps-conta" aria-hidden><b>{pp.feitos}</b> de {pp.total}</p>
       </div>
       <Lista pp={pp} curto={curto} />
       <div><button type="button" className="g-btn fantasma g-pps-sei" onClick={pp.dispensar}>Já sei usar</button></div>

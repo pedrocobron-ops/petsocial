@@ -11,6 +11,10 @@ import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { contaSoConsulta, useGestao } from "./contexto";
 import { registrarErroMostrado } from "@/lib/gestao/erros-navegador";
 import { textoAmigavel } from "@/lib/gestao/erros";
+import { ehFalhaDeRede, textoDeRede } from "@/lib/gestao/validacao";
+
+/** O aparelho diz que está sem internet agora. */
+export const semInternet = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
 /* ---------- carregar dados ---------- */
 
@@ -97,7 +101,8 @@ const semPermissao = () => (contaSoConsulta()
 export function mensagemDeErro(e: unknown): string {
   const m = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e);
   if (/row-level security|permission denied/i.test(m)) return semPermissao();
-  if (/Failed to fetch|NetworkError|network/i.test(m)) return "Sem conexão. Confira a internet e tente de novo.";
+  // sem internet: o aparelho sabe (navigator.onLine) e diz; com internet, o pedido não chegou ao servidor
+  if (ehFalhaDeRede(m) || /network/i.test(m)) return textoDeRede(!semInternet());
   if (/duplicate key/i.test(m)) return "Isso já está cadastrado.";
   if (/JSON object requested|0 rows|PGRST116/i.test(m)) return semPermissao();
   if (/caixas_um_aberto/i.test(m)) return "Já existe um caixa aberto.";

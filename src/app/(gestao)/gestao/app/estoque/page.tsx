@@ -27,6 +27,7 @@ import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { FORMAS, type MovimentoEstoque, type Produto } from "@/lib/gestao/tipos";
 import { brl, brlCurto, dataCompleta, dataCurta, isoDia, semAcento } from "@/lib/gestao/util";
 import "./estoque.css";
+import { limparNome } from "@/lib/gestao/validacao";
 
 // orçamentos: abre só com um toque
 const Orcamentos = nextDynamic(() => import("@/components/gestao/loja/orcamento"), { ssr: false });
@@ -455,7 +456,7 @@ function ProdutoNovo({ loja, aoFechar, aoGravar }: { loja: Loja; aoFechar: () =>
   const criado = useRef<{ chave: string; id: string } | null>(null);
   const salvar = () => op.fazer(gravar);
   async function gravar(chave: string): Promise<boolean | void> {
-    const nome = v.nome.trim();
+    const nome = limparNome(v.nome);
     if (!nome) { avisarErro("Escreva o nome do produto."); return; }
     const minimo = v.minimo.trim() ? lerQtd(v.minimo) : 0;
     const qtd = inicial.trim() ? lerQtd(inicial) : 0;
@@ -870,7 +871,7 @@ function Ficha({ produto, loja, aoFechar, aoMudar, aoGravar }: { produto: Produt
 
   async function salvar() {
     if (somenteLeitura()) return;
-    const nome = v.nome.trim();
+    const nome = limparNome(v.nome);
     if (!nome) { avisarErro("Escreva o nome do produto."); return; }
     const minimo = v.minimo.trim() ? lerQtd(v.minimo) : 0;
     if (minimo == null) { avisarErro("Confira o estoque mínimo: use só números."); return; }

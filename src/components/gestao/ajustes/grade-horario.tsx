@@ -94,9 +94,9 @@ function fraseSemAlmoco(h: Horario, a: Almoco, dias: string[]): string {
   const partes: string[] = [];
   for (const d of dentro) {
     const fecha = h[d]!.fecha;
-    partes.push(`${maiuscula(comArtigo(d))} vocês fecham às ${fecha}, antes de o almoço acabar: nesse dia não tem pausa, e a agenda oferece horário até as ${fecha}. Se ${comArtigo(d)} vocês param às ${a.de}, mude a hora de fechar desse dia para ${a.de}.`);
+    partes.push(`${maiuscula(comArtigo(d))}, fecha às ${fecha}: sem pausa. Para às ${a.de}? Feche às ${a.de}.`);
   }
-  if (fora.length) partes.push(`${maiuscula(nomes(fora))} não muda nada: o dia termina antes do almoço ou começa depois.`);
+  if (fora.length) partes.push(`${maiuscula(nomes(fora))}, sem pausa.`);
   return partes.join(" ");
 }
 
@@ -202,11 +202,11 @@ export function GradeHorario({ valor, aoMudar, aberto = "Aberto", fechado = "Fec
                 <input type="time" className={`g-input${almocoRuim ? " ruim" : ""}`} aria-label="Almoço: termina" value={almoco.ate} onChange={(e) => porAlmoco({ ...almoco, ate: e.target.value })} />
               </span>
               <small className="g-muted">
-                Nesse intervalo a agenda e o link do cliente não oferecem horário. Vale toda semana, sem prazo para acabar.
+                Ninguém marca nesse intervalo. Vale toda semana.
                 {semAlmocoNoDia.length > 0 && ` ${fraseSemAlmoco(valor, almoco, semAlmocoNoDia)}`}
               </small>
             </>
-          ) : <small className="g-muted">Se fecha, marque aqui: não precisa bloquear a agenda toda semana.</small>}
+          ) : <small className="g-muted">Marque aqui em vez de bloquear a agenda toda semana.</small>}
         </div>
       )}
     </div>

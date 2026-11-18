@@ -86,7 +86,11 @@ export default function Aniversariantes({ aoFechar }: { aoFechar: () => void }) 
       };
     }),
   ].sort((a, b) => a.dia - b.dia || Number(a.pet) - Number(b.pet) || a.nome.localeCompare(b.nome));
-  const exemplo = montarMensagem("niver_tutor", modelo, { tutor: "Ana", pets: ["Thor"], petshop: petshop.nome });
+  // o exemplo usa o primeiro tutor do mês (com os pets dele), e não nomes que não existem na loja (estreante L6)
+  const primeiroTutor = (dados ?? []).find((c) => diaNoMes(c.nascimento, mes, ano) != null);
+  const primeiroPet = (petsDoMes ?? []).find((p) => diaNoMes(p.nascimento, mes, ano) != null);
+  const exemplo = montarMensagem("niver_tutor", modelo, primeiroTutor ? { tutor: primeiroTutor.nome, pets: pets(primeiroTutor), petshop: petshop.nome }
+    : { tutor: primeiroPet?.clientes?.nome ?? "Tutor", pets: primeiroPet ? [primeiroPet.nome] : [], petshop: petshop.nome });
 
   return (
     <Folha larga titulo="Aniversariantes do mês" aoFechar={aoFechar} rodape={<button type="button" className="g-btn sec" onClick={aoFechar}>Fechar</button>}>

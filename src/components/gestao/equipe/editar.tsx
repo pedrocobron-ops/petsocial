@@ -10,6 +10,7 @@ import type { Database } from "@/lib/gestao/banco";
 import type { Horario, Profissional } from "@/lib/gestao/tipos";
 import { FRASE_TITULAR, acessoDe, camposDaEscolha, ehSocio, emailValido, erroDeLimite, erroDoTitular, escolhaDe, lerComissao, nomeCurtoDe, titularDe, usoDoPlano, type Escolha } from "./modelo";
 import { Areas, Chave, Convite, DetalhesAgenda, EscolherPerfil, PlanoCheio, Vagas, fraseDoLink, podeGerarLinkNovo, useLinksDosConvites } from "./pecas";
+import { limparNome } from "@/lib/gestao/validacao";
 
 /** O convite de quem ainda não criou a conta, para mandar de novo. */
 export function FolhaConvite({ pessoa, aoFechar }: { pessoa: Profissional; aoFechar: () => void }) {
@@ -75,7 +76,7 @@ export default function EditarPessoa({ pessoa, foco, aoFechar }: { pessoa: Profi
   const tratar = (x: unknown) => avisarErro(erroDoTitular(x) ? new Error(FRASE_TITULAR) : x);
 
   async function salvar() {
-    const n = nome.trim();
+    const n = limparNome(nome);
     const c = lerComissao(comissao);
     const mudaFuncao = mexeu && !travada;
     if (!n) return setErro("Escreva o nome da pessoa.");

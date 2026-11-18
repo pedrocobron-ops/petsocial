@@ -9,7 +9,8 @@ import type { Cliente } from "@/lib/gestao/tipos";
 import { brl, fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
 import { buscarVisitas, sumiu } from "@/lib/gestao/visitas";
 import { useGestao } from "../contexto";
-import FormPet from "../form-pet";
+import FormPet, { RASCUNHO_PET_NOVO } from "../form-pet";
+import { chaveDoRascunho, lerRascunho } from "../rascunho";
 import { Anel, Kpi } from "../painel";
 import { abrirAssistente, AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { baixarCsv, buscarTudo, ESPECIES, linkPet, linkTutor, nomePorte, type PetDaLista } from "./comum";
@@ -94,6 +95,11 @@ export default function Lista({ aoAbrir, irPara }: {
     if (!somenteLeitura()) setPetNovo(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // "Pet novo" que ficou pela metade (a página recarregou): reabre com o que estava escrito
+  useEffect(() => {
+    if (lerRascunho(chaveDoRascunho(petshop.id, eu.id, RASCUNHO_PET_NOVO)) && !somenteLeitura()) setPetNovo(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [petshop.id, eu.id]);
   const [chamando, setChamando] = useState(false);
   const [niverDoMes, setNiverDoMes] = useState(false);
 

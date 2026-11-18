@@ -37,13 +37,51 @@ export function fraseDoDisponivel(deve: number, limite: number) {
   return sobra >= 0 ? `Limite ${brl(limite)} · cabe mais ${brl(sobra)}` : `Limite ${brl(limite)} · passou ${brl(-sobra)} do limite`;
 }
 
-export type SituacaoFiado = { nome: string; limite: number | null; do_cliente: boolean; deve: number; disponivel: number | null };
+/**
+ * Conta a receber que ainda não conta no limite (a mesma regra do banco, `conta_fora_do_limite`, migração 20261224): vence
+ * depois de hoje e é de um serviço que ainda vai acontecer (mensalidade da creche gerada para o mês, sinal de reserva).
+ * Fiado de venda ou de atendimento já feito sempre conta, mesmo com prazo.
+ */
+export function foraDoLimite(l: { categoria?: string | null; descricao?: string | null; vencimento?: string | null }, hoje: string): boolean {
+  return Boolean(l.vencimento && l.vencimento > hoje && (l.categoria === "Creche: mensalidade" || /^\s*(sinal da reserva|pago adiantado):/i.test(l.descricao ?? "")));
+}
+
+/** O que o tutor deve, separado pelo vencimento: vencido, vence hoje (ou sem data) e a vencer; e o que conta no limite. */
+export type DividaPorVencimento = { total: number; vencido: number; venceHoje: number; aVencer: number; noLimite: number; foraDoLimite: number };
+export function dividaPorVencimento(contas: { valor: number | string; vencimento?: string | null; categoria?: string | null; descricao?: string | null }[], hoje: string): DividaPorVencimento {
+  const d: DividaPorVencimento = { total: 0, vencido: 0, venceHoje: 0, aVencer: 0, noLimite: 0, foraDoLimite: 0 };
+  for (const c of contas) {
+    const v = Number(c.valor);
+    d.total = centavos(d.total + v);
+    if (c.vencimento && c.vencimento < hoje) d.vencido = centavos(d.vencido + v);
+    else if (!c.vencimento || c.vencimento === hoje) d.venceHoje = centavos(d.venceHoje + v);
+    else d.aVencer = centavos(d.aVencer + v);
+    if (foraDoLimite(c, hoje)) d.foraDoLimite = centavos(d.foraDoLimite + v);
+    else d.noLimite = centavos(d.noLimite + v);
+  }
+  return d;
+}
+
+/** "R$ 120,00 vencido · R$ 30,00 vence hoje · R$ 900,00 a vencer" (só as partes com valor). */
+export function fraseDoVencimento(d: Pick<DividaPorVencimento, "vencido" | "venceHoje" | "aVencer">) {
+  return [d.vencido > 0 && `${brl(d.vencido)} vencido`, d.venceHoje > 0 && `${brl(d.venceHoje)} vence hoje`, d.aVencer > 0 && `${brl(d.aVencer)} a vencer`].filter(Boolean).join(" · ");
+}
+
+/** `deve`: o que conta no limite (sem a mensalidade e o sinal que ainda não venceram). As partes vêm do banco novo (20261224). */
+export type SituacaoFiado = {
+  nome: string; limite: number | null; do_cliente: boolean; deve: number; disponivel: number | null;
+  vencido?: number; vence_hoje?: number; a_vencer?: number; total?: number; fora_do_limite?: number;
+};
 
 export async function situacaoDoFiado(sb: Banco, petshopId: string, clienteId: string): Promise<SituacaoFiado | null> {
   const r = await sb.rpc("fiado_situacao", { p_petshop: petshopId, p_cliente: clienteId });
   if (r.error) throw new Error(r.error.message);
   const d = r.data as unknown as SituacaoFiado | null;
-  return d ? { ...d, limite: d.limite == null ? null : Number(d.limite), deve: Number(d.deve), disponivel: d.disponivel == null ? null : Number(d.disponivel) } : null;
+  const n = (x: unknown) => (x == null ? undefined : Number(x));
+  return d ? {
+    ...d, limite: d.limite == null ? null : Number(d.limite), deve: Number(d.deve), disponivel: d.disponivel == null ? null : Number(d.disponivel),
+    vencido: n(d.vencido), vence_hoje: n(d.vence_hoje), a_vencer: n(d.a_vencer), total: n(d.total), fora_do_limite: n(d.fora_do_limite),
+  } : null;
 }
 
 /** O erro do banco é o do limite? */
