@@ -58,7 +58,7 @@ const D = lib('dinheiro'), O = lib('orcamento'), DV = lib('devolucao'), FI = lib
   T.ok('… sem telefone nem id do cliente, sem ids de produto', !JSON.stringify(pub).includes(L.tutores.Ana) && !JSON.stringify(pub).includes(prod) && !JSON.stringify(pub).includes('988880001'));
   T.ok('código errado não devolve nada', (await anon.rpc('orcamento_publico', { p_token: 'a'.repeat(48) })).data == null);
   T.recusa('anônimo não lê a tabela', await anon.from('orcamentos').select('id').eq('id', orc.id).then((r) => (r.data?.length ? r : { error: { message: 'vazio' } })));
-  B.sql(`update orcamentos set validade = current_date - 1 where id='${orc2.id}'`);
+  B.sql(`update orcamentos set validade = '${L.dia(-1)}' where id='${orc2.id}'`);
   const tok2 = B.sql(`select token from orcamentos where id='${orc2.id}'`);
   T.ok('com a validade no passado, aparece vencido', (await anon.rpc('orcamento_publico', { p_token: tok2 })).data?.status === 'vencido');
   T.ok('statusDoOrcamento da tela diz o mesmo', O.statusDoOrcamento({ status: 'aberto', validade: L.dia(-1) }, L.hoje) === 'vencido' && O.statusDoOrcamento({ status: 'aceito', validade: L.hoje }, L.hoje) === 'aceito');
