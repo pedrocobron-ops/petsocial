@@ -1,11 +1,12 @@
 "use client";
 
+import { foraNoModoSimples } from "@/lib/gestao/modo-simples";
 import { useState } from "react";
 import { Check, MessageCircle, Plus, Scissors, Ticket, Truck } from "lucide-react";
 import type { AgendamentoCompleto, Lancamento, PacoteCliente } from "@/lib/gestao/tipos";
 import { textoComprovante, textoComprovanteDaParte } from "@/lib/gestao/comprovante";
 import { conferirCaixa, conferirValorAlto, formaPrincipal, pagamentoComCredito, parteDaChave, type PartePagamento } from "@/lib/gestao/dinheiro";
-import { conferirLimite } from "@/lib/gestao/fiado";
+import { conferirLimite, foraDoLimite } from "@/lib/gestao/fiado";
 import { casoDoErro, fazerTudoOuNada, lancamentoDe, partesOuNada, passoDoEstoque, ref, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { creditoDoTutor } from "@/lib/gestao/credito";
@@ -109,7 +110,9 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     const lidas = await lerTudo<Antiga>((de, ate, contar) => sb.from("lancamentos").select("id, valor, descricao, categoria, data, vencimento, agendamento_id, multa_recebida, multa_recebida_em", contando(contar))
       .eq("petshop_id", petshop.id).eq("cliente_id", tutor.id).eq("tipo", "entrada").eq("pago", false).order("data").order("id").range(de, ate)).catch(() => null);
     if (!lidas) return [] as Antiga[];
-    return lidas.filter((l) => l.agendamento_id !== a.id).map((l) => ({ ...l, valor: Number(l.valor) }));
+    // mensalidade e sinal de reserva que ainda não venceram não são "deve de antes": são de um serviço que ainda vai acontecer
+    const hoje = isoDia(new Date());
+    return lidas.filter((l) => l.agendamento_id !== a.id && !foraDoLimite(l, hoje)).map((l) => ({ ...l, valor: Number(l.valor) }));
   }, [petshop.id, tutor?.id ?? "", vejoFinanceiro, a.id]);
   const antigas = antigasLidas ?? [];
   const devido = centavos(antigas.reduce((t, l) => t + l.valor, 0));
@@ -202,7 +205,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       // tudo numa chamada só (o banco grava tudo ou nada): serviços do horário, pacote, a conta, o crédito, as contas antigas,
       // o estoque e o atendimento concluído. Se a internet cair no meio, nada fica pela metade; tocar de novo não repete.
       const passos = passosDoComeco();
-      const gravar = itensParaGravar(itens);
+      const gravar = comLinhaDaPromo(itensParaGravar(itens));
       const descricao = descricaoDaConta(gravar);
       let lanca = false;
       if (fiado) {
@@ -251,7 +254,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       if (vejoFinanceiro && pg && !("erro" in pg) && soDigitos(tutor?.telefone).length >= 8 && (lancado || pagouAntigas > 0)) {
         zapComprovante = junto > 0
           ? linkWhatsApp(tutor?.telefone, textoComprovanteDaParte({
-              petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, pagoEm: isoDia(new Date()), itens: gravar, total: contas.total, desconto: contas.desconto,
+              petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, pagoEm: isoDia(new Date()), itens: gravar, total: contas.total, desconto: centavos(contas.desconto - (promoAtiva && promoValor > 0 ? promoValor : 0)),
               pago: centavos(contas.total + pagouAntigas), formas: formasPagas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas, antigoDevia: devido, entregue,
             }))
           : lancado ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, pagoEm: isoDia(new Date()), recebidos: [lancado], entregue })) : null;
@@ -288,8 +291,16 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     return passos;
   }
 
+  /**
+   * A promoção do horário entra como uma linha negativa da conta (marcada "promo"): o desconto sai só do serviço, e não se espalha
+   * pelos produtos da mesma conta (comissão, Quanto sobrou e a planilha ficam certos). O comprovante mostra a linha com o nome.
+   */
+  function comLinhaDaPromo(linhas: ReturnType<typeof itensParaGravar>): ReturnType<typeof itensParaGravar> {
+    if (!(promoValor > 0) || !promoAtiva) return linhas;
+    return [...linhas, { tipo: "extra", nome: `Promoção ${promoAtiva.nome}`, qtd: 1, valor: -promoValor, promo: true }];
+  }
   function descricaoDaConta(gravar: ReturnType<typeof itensParaGravar>) {
-    const mais = resumoDosItens(gravar);
+    const mais = resumoDosItens(gravar.filter((i) => !i.promo));
     const nomes = gravar.filter((i) => i.tipo === "servico").map((i) => i.nome).join(" + ") || (peloPacote ? `${servico} (pacote)` : servico);
     return encurtar(`${nomes} · ${pet?.nome ?? ""}`.trim().replace(/ ·$/, "") + (mais ? ` + ${mais}` : ""));
   }
@@ -330,7 +341,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     setSalvando(true);
     try {
       const passos = passosDoComeco();
-      const gravar = itensParaGravar(itens);
+      const gravar = comLinhaDaPromo(itensParaGravar(itens));
       passos.push({ t: "lancamento", nome: "conta", chave: parteDaChave(chave, "conta"), linha: {
         tipo: "entrada", valor: contas.total, forma: null, categoria: categoria(), descricao: descricaoDaConta(gravar), data: depois.quando, vencimento: depois.quando, pago: false,
         agendamento_id: a.id, cliente_id: tutor.id, itens: gravar,
@@ -350,7 +361,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       avisarMudanca();
       // quem fica devendo é quem mais precisa do comprovante do que já pagou
       const zap = vejoFinanceiro ? linkWhatsApp(tutor.telefone, textoComprovanteDaParte({
-        petshop: petshop.nome, tutor: tutor.nome, pet: pet?.nome, quando: a.inicio, pagoEm: isoDia(new Date()), itens: gravar, total: contas.total, desconto: contas.desconto,
+        petshop: petshop.nome, tutor: tutor.nome, pet: pet?.nome, quando: a.inicio, pagoEm: isoDia(new Date()), itens: gravar, total: contas.total, desconto: centavos(contas.desconto - (promoAtiva && promoValor > 0 ? promoValor : 0)),
         pago: entregue, formas: m.pagamentos ?? [{ forma: m.forma, valor: entregue }], falta, pagaAte: depois.quando,
       })) : null;
       if (zap && soDigitos(tutor.telefone).length >= 8) setRecebida({ valor: entregue, nota, zap });
@@ -505,7 +516,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         )}
         {aPagar > 0 && !depois.ativo && <AvisoCaixaFechado aberto={caixa} />}
         <p className="g-pp g-muted">
-          {contas.total > 0 && depois.ativo ? "Nada entra no caixa agora: a conta fica em A receber" : contas.total > 0 && credito > 0 && aPagar <= 0 ? "O crédito do tutor paga a conta: nada entra no caixa agora" : contas.total > 0 ? (caixa === false ? "O valor entra no financeiro de hoje, fora do caixa" : "O valor entra no caixa de hoje") : "Nada entra no caixa"}
+          {contas.total > 0 && depois.ativo ? "Nada entra no caixa agora: a conta fica em A receber" : contas.total > 0 && credito > 0 && aPagar <= 0 ? "O crédito do tutor paga a conta: nada entra no caixa agora" : contas.total > 0 ? (caixa === false ? (foraNoModoSimples(petshop, "/gestao/app/caixa") ? "O valor entra no financeiro de hoje" : "O valor entra no financeiro de hoje, fora do caixa") : "O valor entra no caixa de hoje") : "Nada entra no caixa"}
           {pacote ? `, ${servico} sai do pacote` : ""}
           {vendidos.length ? ", os produtos saem do estoque" : ""}
           {a.status !== "concluido" ? " e o atendimento fica como concluído." : "."}

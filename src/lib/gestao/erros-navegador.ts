@@ -4,7 +4,8 @@
  * Quem chama: `VigiaDeErros` (erros soltos e promessas recusadas), `error.tsx` (tela que quebrou) e os avisos de erro
  * (`avisarErro` e `useDados`, em ui.tsx) quando o erro é técnico (ver `classificar`).
  */
-import { banco, configurado } from "./supabase";
+import { configurado } from "./supabase-config";
+import { bancoDepois as banco } from "./supabase-depois";
 import { VERSAO_APP, classificar, ehDeRede, ignorar, mensagemDe, montarErro, type TipoErro } from "./erros";
 
 let loja: string | null = null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ArrowDownLeft, ArrowDownToLine, ArrowUpFromLine, ArrowUpRight, Banknote, ChartColumn, Check, Coins, CreditCard, Download, History, Lock, Minus, Plus, Printer, Scale, ShoppingBag, Wallet } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
@@ -726,10 +726,27 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo, aoMu
   const avisoAlteracoes = alteracoes ? `${alteracoes === 1 ? "1 alteração" : `${alteracoes} alterações`} em valores (suas e da equipe) desde que este caixa abriu.` : "";
   const dif = diferenca(contado, esperado);
 
+  /**
+   * Outra aba (ou outro aparelho) fechou este caixa primeiro: vale aquele fechamento. Avisa com quando e quanto foi contado,
+   * atualiza a tela e mostra o fechamento, em vez de aceitar o toque em silêncio.
+   */
+  async function jaFechado(quando?: string | null, contadoLa?: number | null) {
+    setSalvando(false);
+    const sim = await confirmar({
+      titulo: "Este caixa já foi fechado",
+      texto: `Ele foi fechado ${quando ? `às ${hora(quando)}, ` : ""}em outra aba ou outro aparelho${contadoLa != null ? `, com ${brl(Number(contadoLa))} contados` : ""}. Vale esse fechamento: a contagem desta tela não foi gravada.`,
+      confirmar: "Ver o fechamento", voltar: "Entendi",
+    });
+    if (sim) await aoSalvo(); else { await aoMudou(); aoFechar(); }
+  }
+
   async function salvar() {
     if (salvando) return;
     if (contado == null || contado < 0) { setErro("Conte o dinheiro da gaveta e escreva aqui. Se está vazia, escreva 0."); return; }
     if (contado >= 1e8) { setErro("Esse valor é grande demais. Confira os números."); return; }
+    // a tela pode estar velha (outra aba fechou o caixa): confere antes de perguntar
+    const agora = await sb.from("caixas").select("fechado_em, valor_contado").eq("id", caixa.id).maybeSingle();
+    if (agora.data?.fechado_em) { await jaFechado(agora.data.fechado_em, agora.data.valor_contado); return; }
     // fechar não tem volta: confirma mostrando se bateu, sobrou ou faltou
     const sim = await confirmar({
       titulo: "Fechar o caixa de hoje?",
@@ -742,9 +759,9 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo, aoMu
       // o banco refaz a conta na hora de fechar: se o esperado não é mais o que a pessoa viu, não fecha e devolve o de agora
       const u = await sb.rpc("fechar_caixa", { p_caixa: caixa.id, p_contado: contado, p_obs: obs.trim(), p_esperado: esperado });
       if (u.error) throw new Error(u.error.message);
-      const resposta = (u.data ?? {}) as { fechado?: boolean; motivo?: string; esperado?: number };
+      const resposta = (u.data ?? {}) as { fechado?: boolean; motivo?: string; esperado?: number; fechado_em?: string | null; contado?: number | null };
       if (!resposta.fechado) {
-        if (resposta.motivo !== "mudou") throw new Error("Este caixa já tinha sido fechado.");
+        if (resposta.motivo !== "mudou") { await jaFechado(resposta.fechado_em, resposta.contado); return; }
         const agora = Number(resposta.esperado), d = Math.round((agora - esperado) * 100) / 100;
         setMudou({
           esperado: agora,

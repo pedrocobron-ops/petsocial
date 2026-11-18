@@ -51,6 +51,36 @@ export function porteDe(v: string | undefined) {
   return null;
 }
 
+/** "Macho", "M", "masc." → "M"; "Fêmea", "F", "fem" → "F"; o resto fica em branco. */
+export function sexoDe(v: string | undefined): "M" | "F" | null {
+  const s = semAcento(v ?? "").replace(/[^a-z]/g, "");
+  if (["m", "macho", "masc", "masculino"].includes(s)) return "M";
+  if (["f", "femea", "fem", "feminino"].includes(s)) return "F";
+  return null;
+}
+
+/**
+ * Nascimento do pet escrito na planilha → "AAAA-MM-DD". Aceita 20/11/2020, 20-11-20, 2020-11-20, o número de data do Excel e
+ * só dia e mês (20/11): sem o ano, guarda 1904 (o mesmo da ficha: a tela mostra só dia e mês). Data que não existe, ou
+ * depois de hoje: null (o pet entra sem a data). `hoje`: AAAA-MM-DD.
+ */
+export function nascimentoDe(v: string | undefined, hoje: string): string | null {
+  const s = (v ?? "").trim();
+  if (!s) return null;
+  let a: number, m: number, d: number;
+  let x: RegExpMatchArray | null;
+  if ((x = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) { a = +x[1]; m = +x[2]; d = +x[3]; }
+  else if ((x = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/))) { d = +x[1]; m = +x[2]; a = x[3].length === 2 ? (+x[3] > +hoje.slice(2, 4) ? 1900 : 2000) + +x[3] : +x[3]; }
+  else if ((x = s.match(/^(\d{1,2})[/.-](\d{1,2})$/))) { d = +x[1]; m = +x[2]; a = 1904; }
+  else if (/^\d{5}$/.test(s)) { const dt = new Date(Date.UTC(1899, 11, 30) + Number(s) * 864e5); a = dt.getUTCFullYear(); m = dt.getUTCMonth() + 1; d = dt.getUTCDate(); }
+  else return null;
+  const dt = new Date(Date.UTC(a, m - 1, d));
+  if (m < 1 || m > 12 || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  const iso = `${a}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  if (a !== 1904 && (a < 1980 || iso > hoje)) return null;
+  return iso;
+}
+
 /**
  * "Luna, Bob", "Luna / Bob", "Luna e Bob" numa célula de pet: dois pets. Só separa quando cada parte parece um nome
  * (até duas palavras); "Thor filhote" ou uma frase ficam como estão.
@@ -75,14 +105,16 @@ export const ehAlerta = (texto: string | undefined) => ALERTA.test(semAcento(tex
 export type LinhaParaOBanco = {
   tutor: string; fone: string | null; email: string; endereco: string;
   pet: string; especie: string; especie_dada: boolean; raca: string; porte: string | null; obs: string; alertas: string;
+  /** Nascimento (AAAA-MM-DD; ano 1904 = sem ano) e sexo do pet (M ou F), quando a planilha traz. */
+  nascimento?: string | null; sexo?: "M" | "F" | null;
 };
-export type ExtraDaImportacao = { fone_ruim: string[]; dois_fones: string[]; sem_pet: boolean; separados: number };
+export type ExtraDaImportacao = { fone_ruim: string[]; dois_fones: string[]; sem_pet: boolean; separados: number; nascimento_ruim?: string[] };
 
 /**
  * As linhas da planilha (já com a coluna escolhida para cada campo) → o que vai para o banco. Telefone lido e limpo aqui
  * (o primeiro válido; incompleto fica em branco e entra na lista para conferir). Pet com dois nomes vira duas linhas.
  */
-export function linhasParaOBanco(linhas: Record<string, string>[], temColunaDePet: boolean): { linhas: LinhaParaOBanco[]; extra: ExtraDaImportacao } {
+export function linhasParaOBanco(linhas: Record<string, string>[], temColunaDePet: boolean, hoje = new Date().toISOString().slice(0, 10)): { linhas: LinhaParaOBanco[]; extra: ExtraDaImportacao } {
   const extra: ExtraDaImportacao = { fone_ruim: [], dois_fones: [], sem_pet: !temColunaDePet, separados: 0 };
   const saida: LinhaParaOBanco[] = [];
   for (const l of linhas) {
@@ -98,7 +130,9 @@ export function linhasParaOBanco(linhas: Record<string, string>[], temColunaDePe
       tutor, fone: lida.fone, email: (l.email ?? "").trim().slice(0, 160), endereco: (l.endereco ?? "").trim().slice(0, 200),
       especie: especieDe(l.especie), especie_dada: Boolean(l.especie?.trim()), raca: (l.raca ?? "").trim().slice(0, 60), porte: porteDe(l.porte),
       obs: ehAlerta(nota) ? "" : nota, alertas,
+      nascimento: nascimentoDe(l.nascimento, hoje), sexo: sexoDe(l.sexo),
     };
+    if ((l.nascimento ?? "").trim() && !base.nascimento) (extra.nascimento_ruim ??= []).push(`${(l.pet ?? "").trim() || tutor}: ${(l.nascimento ?? "").trim().slice(0, 20)}`);
     const pets = separarPets(l.pet);
     if (pets.length > 1) extra.separados++;
     if (!pets.length) saida.push({ ...base, pet: "", obs: "", alertas: "" });
@@ -112,6 +146,8 @@ export type ResumoDaImportacao = {
   tutores_novos: number; pets_novos: number; tutores_completados: number; pets_completados: number; ja_estavam: number;
   linhas_repetidas: number; mesmo_nome: string[]; homonimos: number; com_alerta: number;
   fone_ruim?: string[]; dois_fones?: string[]; sem_pet?: boolean; separados?: number;
+  /** Pets que entraram com a data de nascimento; datas que não deu para ler (migração 20261224). */
+  com_nascimento?: number; nascimento_ruim?: string[];
 };
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
@@ -138,7 +174,9 @@ export function frasesDoResumo(r: ResumoDaImportacao): string[] {
     ...(n(r.separados) ? [`${plural(n(r.separados), "linha tinha", "linhas tinham")} mais de um pet na mesma célula (como “Luna, Bob”): cada pet entrou separado.`] : []),
     ...(n(r.com_alerta) ? [`${plural(n(r.com_alerta), "pet ficou", "pets ficaram")} com alerta (alergia, medo, doença ou cuidado), tirado das observações da planilha.`] : []),
     ...(tc ? [`${plural(tc, "tutor que já estava aqui ganhou", "tutores que já estavam aqui ganharam")} o que faltava (telefone, e-mail ou endereço).`] : []),
-    ...(pc ? [`${plural(pc, "pet que já estava aqui ganhou", "pets que já estavam aqui ganharam")} o que faltava (raça, porte, observações ou alertas).`] : []),
+    ...(n(r.com_nascimento) ? [`${plural(n(r.com_nascimento), "pet entrou", "pets entraram")} com a data de nascimento: o aniversário e a promoção de aniversário já valem para ${n(r.com_nascimento) === 1 ? "ele" : "eles"}.`] : []),
+    ...(Array.isArray(r.nascimento_ruim) && r.nascimento_ruim.length ? [`${plural(r.nascimento_ruim.length, "data de nascimento não deu para ler", "datas de nascimento não deu para ler")} (use 20/11/2021 ou 20/11): ${alguns(r.nascimento_ruim)}. ${r.nascimento_ruim.length === 1 ? "O pet entrou" : "Os pets entraram"} sem a data.`] : []),
+    ...(pc ? [`${plural(pc, "pet que já estava aqui ganhou", "pets que já estavam aqui ganharam")} o que faltava (raça, porte, nascimento, sexo, observações ou alertas).`] : []),
     ...(n(r.ja_estavam) ? [`${plural(n(r.ja_estavam), "pet já estava no cadastro e ficou como estava", "pets já estavam no cadastro e ficaram como estavam")}.`] : []),
     ...(n(r.linhas_repetidas) ? [`${plural(n(r.linhas_repetidas), "linha repetia", "linhas repetiam")} um pet que já tinha aparecido na planilha e ${n(r.linhas_repetidas) === 1 ? "foi pulada" : "foram puladas"}.`] : []),
     ...(mesmoNome.length ? [`${plural(mesmoNome.length, "pet ficou de fora porque o tutor já tem outro pet com o mesmo nome nesta planilha", "pets ficaram de fora porque o tutor já tem outro pet com o mesmo nome nesta planilha")}: ${alguns(mesmoNome, 12)}. Se forem pets diferentes, cadastre na ficha do tutor com um nome que diferencie (Thor filhote, Thor 2).`] : []),

@@ -39,6 +39,7 @@ const NOMES: Record<string, [string, string]> = {
   vender_pacote: ["a", "venda do pacote"],
   usar_pacote: ["o", "uso do pacote"],
   registrar_saude: ["a", "anotação de saúde"],
+  anotar_no_pet: ["a", "anotação na ficha do pet"],
   abrir_caixa: ["a", "abertura do caixa"],
   fechar_caixa: ["o", "fechamento do caixa"],
   lancar_dinheiro: ["o", "lançamento"],

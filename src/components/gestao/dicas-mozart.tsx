@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Cake, CalendarPlus, MessageCircle, Ticket, UserX, X } from "lucide-react";
 import { deIsoDia, horarioDoDia, inicioDoDia, isoDia, nomeDia, somaDias } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";

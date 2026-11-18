@@ -115,6 +115,15 @@
 .gp-grade span { color: var(--cinza); font-size: 1rem; line-height: 1.45; }
 
 /* ---------- planos ---------- */
+/* Novidades: o que chegou por último, em cartões curtos */
+.gp-recentes { background: var(--creme2); padding-block: clamp(4rem, 3rem + 6vw, 7rem); scroll-margin-top: 1rem; }
+.gp-recentes h2 { color: var(--v); }
+.gp-recentes-lista { list-style: none; padding: 0; margin: 2.5rem 0 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.gp-recentes-lista li { background: #fffdf9; border-radius: 16px; padding: 1.25rem 1.3rem 1.4rem; display: grid; gap: .4rem; align-content: start; border: 1px solid rgba(31, 27, 23, .08); }
+.gp-recentes-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #dcebe2; color: #24543b; margin-bottom: .35rem; }
+.gp-recentes-ico svg { width: 20px; height: 20px; }
+.gp-recentes-lista b { font: 600 1.125rem/1.25 var(--sans); }
+.gp-recentes-lista li > span:last-child { color: var(--cinza); font-size: 1rem; line-height: 1.45; }
 .gp-planos { padding-block: clamp(4rem, 3rem + 6vw, 7rem); scroll-margin-top: 1rem; }
 .gp-planos h2, .gp-planos .gp-lead { text-align: center; margin-inline: auto; }
 .gp-planos h2 { color: var(--v); }
@@ -357,8 +366,10 @@
 .gp-bm-nome { font: 460 1.875rem/1 var(--display); color: var(--v); margin-top: -.35rem !important; }
 .gp-bm-quando { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: .8125rem; color: var(--cinza); }
 .gp-bm-quando span { padding: 2px 9px; border-radius: 999px; background: #dcebe2; color: var(--v); font-weight: 600; }
-.gp-nv-tela .gp-bm-fotos svg { width: 100%; height: auto; display: block; }
+.gp-nv-tela .gp-bm-fotos img { width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; display: block; border-radius: 14px; background: #f3ece2; }
 .gp-bm-fotos { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+.gp-bm-fotos figure { position: relative; margin: 0; }
+.gp-bm-fotos figcaption { position: absolute; left: .4rem; bottom: .4rem; padding: .15rem .5rem; border-radius: 999px; background: rgba(31, 27, 23, .72); color: #fff; font-size: .6875rem; font-weight: 700; }
 .gp-bm-carta { position: relative; padding: .75rem .8rem .7rem 2.2rem; border-radius: 14px; background: #fff; border: 1px solid rgba(31, 27, 23, .08); }
 .gp-bm-carta > svg { position: absolute; left: .75rem; top: .8rem; color: var(--laranja2); }
 .gp-bm-carta small { display: block; margin-top: .3rem; font-size: .75rem; color: var(--cinza); }

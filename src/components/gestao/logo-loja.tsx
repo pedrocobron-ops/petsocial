@@ -1,4 +1,4 @@
-import { fotoPet } from "@/lib/gestao/supabase";
+import { fotoPet } from "@/lib/gestao/supabase-config";
 import { iniciais } from "@/lib/gestao/util";
 import { Selo } from "./marca";
 

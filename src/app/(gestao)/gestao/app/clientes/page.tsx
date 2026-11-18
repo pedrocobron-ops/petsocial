@@ -2,11 +2,17 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Esqueleto } from "@/components/gestao/ui";
+import dynamic from "next/dynamic";
+import { Esqueleto, useAdiantar } from "@/components/gestao/ui";
 import { BASE } from "@/components/gestao/clientes/comum";
-import FichaPet from "@/components/gestao/clientes/ficha-pet";
-import FichaTutor from "@/components/gestao/clientes/ficha-tutor";
 import Lista from "@/components/gestao/clientes/lista";
+
+// as fichas (com saúde, álbum, contas, pacotes, orçamento…) vêm à parte: quem abre a lista não espera baixar a ficha, e ela
+// baixa em segundo plano depois que a lista apareceu (useAdiantar); abrindo direto numa ficha, ela baixa logo depois da tela
+const carregarFichaPet = () => import("@/components/gestao/clientes/ficha-pet");
+const carregarFichaTutor = () => import("@/components/gestao/clientes/ficha-tutor");
+const FichaPet = dynamic(carregarFichaPet, { ssr: false, loading: () => <Esqueleto linhas={6} /> });
+const FichaTutor = dynamic(carregarFichaTutor, { ssr: false, loading: () => <Esqueleto linhas={6} /> });
 import "./clientes.css";
 
 /** Caminho percorrido dentro desta tela, para o "Voltar" saber se pode usar o voltar do navegador. */
@@ -19,6 +25,7 @@ function Tela() {
   const cliente = params.get("cliente");
   const chave = pet ? `pet:${pet}` : cliente ? `cliente:${cliente}` : "lista";
   const rolagem = useRef(0);
+  useAdiantar(carregarFichaPet, carregarFichaTutor);
   // abriu direto numa ficha: a lista (que pode ter milhares de pets) começa a carregar depois que a ficha chegou,
   // para não disputar a internet com ela; abrindo pela lista, ela vem na hora
   const [comLista, setComLista] = useState(chave === "lista");

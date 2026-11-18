@@ -224,8 +224,24 @@ export async function taxasDoPeriodo(sb: Banco, petshopId: string, de: string, a
   return {
     ...d, taxa: real(Number(d.taxa)), cartao: real(Number(d.cartao)), lancamentos: Number(d.lancamentos),
     por_forma: (d.por_forma ?? []).map((x) => ({ forma: x.forma, valor: real(Number(x.valor)), taxa: real(Number(x.taxa)) })),
-    a_receber: (d.a_receber ?? []).map((x) => ({ dia: x.dia, valor: real(Number(x.valor)) })), parcelado: d.parcelado === true,
+    a_receber: emDiaUtil((d.a_receber ?? []).map((x) => ({ dia: x.dia, valor: real(Number(x.valor)) }))), parcelado: d.parcelado === true,
   };
+}
+
+/**
+ * A maquininha não paga no sábado nem no domingo (Sandra, L10: "domingo, 17/01"): o dia que cai no fim de semana passa para a
+ * segunda-feira, somado ao que já caía nela. Feriado não entra (cada maquininha trata de um jeito).
+ */
+export function emDiaUtil(lista: { dia: string; valor: number }[]): { dia: string; valor: number }[] {
+  const m = new Map<string, number>();
+  for (const x of lista) {
+    const d = new Date(`${x.dia.slice(0, 10)}T12:00:00Z`);
+    const semana = d.getUTCDay();
+    if (semana === 6 || semana === 0) d.setUTCDate(d.getUTCDate() + (semana === 6 ? 2 : 1));
+    const dia = d.toISOString().slice(0, 10);
+    m.set(dia, real((m.get(dia) ?? 0) + x.valor));
+  }
+  return [...m].sort(([a], [b]) => a.localeCompare(b)).map(([dia, valor]) => ({ dia, valor }));
 }
 
 /** "2,5%" (sem zeros à toa). */

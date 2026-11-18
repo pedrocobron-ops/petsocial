@@ -216,6 +216,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const nomeDe = (id: string | null) => (id ? nomeNaEquipe(quemAtende.find((p) => p.id === id)?.nome, nomesDaEquipe) || "profissional" : "pet shop inteiro");
 
   const funcionamento = horarioDoDia(petshop.horario, deIsoDia(dia));
+  // a folha aberta por muito tempo: a cada minuto a lista de hoje tira o horário que já passou (09:30 some às 09:31)
+  const [minuto, setMinuto] = useState(0);
+  useEffect(() => { const id = setInterval(() => setMinuto((m) => m + 1), 60000); return () => clearInterval(id); }, []);
   const livres = useMemo(() => {
     if (!funcionamento) return [];
     const base = deIsoDia(dia).getTime();
@@ -231,7 +234,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     const agora = new Date();
     const aPartirDe = dia === isoDia(agora) ? agora.getHours() * 60 + agora.getMinutes() : undefined;
     return horariosLivres({ abre: funcionamento.abre, fecha: funcionamento.fecha, duracaoMin: duracao, ocupados, bloqueados, vagas: profId ? 1 : vagasDe(petshop, equipe), aPartirDe });
-  }, [funcionamento, dia, doDia, bloqueios, profId, duracao, agendamento, petshop, equipe]);
+  }, [funcionamento, dia, doDia, bloqueios, profId, duracao, agendamento, petshop, equipe, minuto]);
 
   const bloqueioEm = (d: string) => {
     const ini = juntaDiaHora(d, hhmm).getTime();

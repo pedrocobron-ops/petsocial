@@ -1,5 +1,6 @@
 "use client";
 
+import ModoSimples from "@/components/gestao/ajustes/modo-simples";
 import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
 
 import { abrirGuia } from "@/components/gestao/ui";
@@ -38,6 +39,7 @@ import { PORTES, type Horario, type Servico } from "@/lib/gestao/tipos";
 import { brl, brlCurto, fmtTelefone, lerValor, soDigitos, mascaraTelefone, valor2 } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./meu-petshop.css";
+import { limparNome } from "@/lib/gestao/validacao";
 
 const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
 const DURACOES = [15, 30, 45, 60, 90, 120];
@@ -103,7 +105,7 @@ export default function MeuPetshop() {
         <Grupo id="servicos" titulo="Serviços e horário" icone={Scissors} tom="pessego" abertoDeInicio
           cartoes={[["Serviços e preços", <Servicos key="s" />], ["Horário de funcionamento", <HorarioDaLoja key="h" />], ["Feriados e dias fechados", <Feriados key="f" />]]} />
         <Grupo id="agenda" titulo="Agenda e link do cliente" icone={Link2} tom="ceu"
-          cartoes={[usaModulo(petshop, "banho_tosa") && ["Banho e tosa: pets ao mesmo tempo", <VagasBanho key="v" />], ["Link de agendamento", <LinkAgendamento key="l" />], ["Regras, cancelamento e dúvidas pelo link", <OpcoesDoLink key="o" />], (usaModulo(petshop, "banho_tosa") || usaCasa(petshop)) && ["Taxa de leva e traz", <OpcoesDoLevaTraz key="t" />], usaModulo(petshop, "banho_tosa") && ["Promoções em dias fracos", <Promocoes key="p" so="dias" />], usaModulo(petshop, "banho_tosa") && ["Promoção de aniversário do pet", <Promocoes key="pa" so="aniversario" />]]} />
+          cartoes={[usaModulo(petshop, "banho_tosa") && ["Banho e tosa: pets ao mesmo tempo", <VagasBanho key="v" />], ["Link do cliente", <LinkAgendamento key="l" />], ["Regras, cancelamento e dúvidas pelo link", <OpcoesDoLink key="o" />], (usaModulo(petshop, "banho_tosa") || usaCasa(petshop)) && ["Taxa de leva e traz", <OpcoesDoLevaTraz key="t" />], usaModulo(petshop, "banho_tosa") && ["Promoções em dias fracos", <Promocoes key="p" so="dias" />], usaModulo(petshop, "banho_tosa") && ["Promoção de aniversário do pet", <Promocoes key="pa" so="aniversario" />]]} />
         {usaCasa(petshop) && (
           <Grupo id="casa" titulo={nomeDaCasa(petshop)} icone={BedDouble} tom="lilas" salvarJunto
             cartoes={[[nomeDaCasa(petshop), <AjustesCrecheHotel key="a" />], [!usaModulo(petshop, "creche") ? "Opções do hotel" : !usaModulo(petshop, "hotel") ? "Opções da creche" : "Opções do hotel e da creche", <OpcoesHotel key="h" />], ["Cuidado com o tutor", <OpcoesCasa key="c" />], usaModulo(petshop, "creche") && ["Mais opções da creche", <OpcoesCreche key="cr" />]]} />
@@ -112,7 +114,7 @@ export default function MeuPetshop() {
         <Grupo id="dinheiro" titulo="Cobrança e fidelidade" icone={HandCoins} tom="menta"
           cartoes={[["Opções de cobrança", <OpcoesDeCobranca key="c" />], ["Taxas da maquininha", <TaxasDaMaquininha key="t" />], ["Fidelidade", <AjusteFidelidade key="f" />]]} />
         <Grupo id="negocio" titulo="O negócio" icone={Store} tom="rosa"
-          cartoes={[["Dados", <Dados key="d" />], ["O que você usa", <OQueUsa key="o" />], ["Identidade do pet shop", <Identidade key="i" />], ["Sua loja aparece no Google?", <LojaNoGoogle key="g" />], ["Boletim do pet", <OpcoesDoBoletim key="b" />], (usaModulo(petshop, "banho_tosa") || usaCasa(petshop)) && ["Checklist de entrada", <OpcoesDaEntrada key="e" />]]} />
+          cartoes={[["Dados", <Dados key="d" />], ["O que você usa", <OQueUsa key="o" />], ["Modo simples", <ModoSimples key="ms" />], ["Identidade do pet shop", <Identidade key="i" />], ["Sua loja aparece no Google?", <LojaNoGoogle key="g" />], ["Boletim do pet", <OpcoesDoBoletim key="b" />], (usaModulo(petshop, "banho_tosa") || usaCasa(petshop)) && ["Checklist de entrada", <OpcoesDaEntrada key="e" />]]} />
         <Grupo id="copia" titulo="Seus dados e a conta" icone={Archive} tom="ceu" largo
           cartoes={[["Baixar todos os dados", <CopiaSeguranca key="c" />], ["Encerrar e apagar a conta", <EncerrarConta key="e" />], ["Registro de pedidos de dados", <RegistroDeDados key="r" />]]} />
       </div>
@@ -209,7 +211,7 @@ function Dados() {
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (somenteLeitura()) return;
-    const n = nome.trim();
+    const n = limparNome(nome);
     const tel = soDigitos(telefone);
     if (n.length < 2) return setErro("Escreva o nome do pet shop.");
     if (tel && tel.length !== 10 && tel.length !== 11) return setErro("Confira o WhatsApp: DDD e número.");
@@ -302,8 +304,8 @@ function LinkAgendamento() {
     <section className={`g-card g-pilha g-mp-link${ativo ? " on" : ""}`}>
       <div className="g-mp-t">
         <Tile icone={Link2} tom="pessego" />
-        <div><h2>Link de agendamento</h2><p className="g-muted g-p">{usaCasa(petshop) ? "O cliente pede horário ou vaga pelo celular. Você aceita ou recusa." : "O cliente pede o horário pelo celular. Você aceita ou recusa."}</p></div>
-        <button type="button" role="switch" aria-checked={ativo} aria-label="Link de agendamento" className="g-mp-chave" disabled={ligando} onClick={() => void ligar(!ativo)}><i /></button>
+        <div><h2>Link do cliente</h2><p className="g-muted g-p">{usaCasa(petshop) ? "O cliente pede horário ou vaga pelo celular. Você aceita ou recusa." : "O cliente pede o horário pelo celular. Você aceita ou recusa."}</p></div>
+        <button type="button" role="switch" aria-checked={ativo} aria-label="Link do cliente" className="g-mp-chave" disabled={ligando} onClick={() => void ligar(!ativo)}><i /></button>
       </div>
 
       {ativo ? (
@@ -517,7 +519,7 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
   const erroCusto = erroDoPreco(custo.texto);
 
   async function salvar() {
-    const n = nome.trim();
+    const n = limparNome(nome);
     const min = Number(minutos);
     if (!n) return setErro("Dê um nome ao serviço.");
     if (!Number.isInteger(min) || min < 5 || min > 1440) return setErro("A duração fica entre 5 minutos e 24 horas.");

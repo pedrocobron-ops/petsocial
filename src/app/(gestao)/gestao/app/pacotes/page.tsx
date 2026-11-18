@@ -18,6 +18,7 @@ import { usaModulo } from "@/lib/gestao/modulos";
 import { LinhaAcabando } from "@/components/gestao/pacote-acabando";
 import { lerPacotesAcabando, PACOTE_ACABOU_DIAS, PACOTE_VENCENDO_DIAS } from "@/lib/gestao/pacote-acabando";
 import { comPrecosPorte, PORTES_DO_PACOTE, precoDoPacote, resumoPorPorte, sugestaoPorPorte, type PortePacote, type PrecosPorte } from "@/lib/gestao/pacote-porte";
+import { FolhaVendaFeita, textoDaVenda } from "@/components/gestao/loja/comprovante-venda";
 import "./pacotes.css";
 
 /** Exemplo de nome de pacote, no assunto do pet shop: quem não faz banho e tosa não lê "4 banhos no mês". */
@@ -71,6 +72,7 @@ export default function Pacotes() {
   const [aba, setAba] = useState<"clientes" | "modelos">("clientes");
   const [filtro, setFiltro] = useState<Filtro>("ativos");
   const [venda, setVenda] = useState<Venda | null>(null);
+  const [recibo, setRecibo] = useState<ReciboDoPacote | null>(null);
   const [modelo, setModelo] = useState<ModeloPacote | "novo" | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
 
@@ -320,7 +322,9 @@ export default function Pacotes() {
       </div>
 
       {venda && <VenderPacote inicio={venda} modelos={modelos.filter((m) => m.ativo)} aoFechar={() => setVenda(null)}
-        aoGravar={(novo) => { setVenda(null); setAba("clientes"); setFiltro("ativos"); if (novo) setRecentes((l) => [novo, ...l.filter((x) => x.id !== novo.id)]); mudou(); }} />}
+        aoGravar={(novo, comprovante) => { setVenda(null); setAba("clientes"); setFiltro("ativos"); if (novo) setRecentes((l) => [novo, ...l.filter((x) => x.id !== novo.id)]); if (comprovante) setRecibo(comprovante); mudou(); }} />}
+      {/* pacote pago: o comprovante (WhatsApp do tutor ou impresso), como no atendimento; a lista já mostra o pacote atrás */}
+      {recibo && <FolhaVendaFeita titulo="Pacote vendido" valor={recibo.valor} frase={recibo.frase} texto={recibo.texto} telefone={recibo.telefone} tutor={recibo.tutor} aoFechar={() => setRecibo(null)} />}
       {modelo && <FormModelo modelo={modelo === "novo" ? null : modelo} aoFechar={() => setModelo(null)} aoGravar={() => { setModelo(null); mudou(); }} />}
     </>
   );
@@ -409,7 +413,8 @@ function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: ModeloPacote | nul
 
 /* ---------- vender pacote ---------- */
 
-function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; modelos: ModeloPacote[]; aoFechar: () => void; aoGravar: (vendido: PacoteDoPet | null) => void }) {
+type ReciboDoPacote = { valor: number; texto: string; frase: string; telefone: string | null; tutor: string | null };
+function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; modelos: ModeloPacote[]; aoFechar: () => void; aoGravar: (vendido: PacoteDoPet | null, comprovante?: ReciboDoPacote) => void }) {
   const { sb, petshop, servicos, vejoFinanceiro, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   // preço travado (opção do dono): quem só opera o caixa vende o pacote da lista, pelo preço da lista
@@ -529,6 +534,9 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
           });
           avisar(`Pacote vendido para ${pet.nome}. ${brl(preco)} no financeiro.`);
           await anotarParcelas([lancado.id], pagamento.parcelas);
+          const texto = textoDaVenda(petshop.nome, pet.clientes?.nome, { ...lancado, valor: Number(lancado.valor), descricao: `Pacote ${nome.trim()} (${t} ${t === 1 ? "uso" : "usos"}${venceEm ? `, vale até ${dataCompleta(venceEm)}` : ""}) · ${pet.nome}` });
+          aoGravar(novo, { valor: preco, texto, frase: `Pacote vendido para ${pet.nome}.`, telefone: pet.clientes?.telefone ?? null, tutor: pet.clientes?.nome ?? null });
+          return true;
         } catch (e) {
           // o pacote não é vendido de novo (mesma chave): tocar de novo só lança o pagamento
           avisarErro(`O pacote foi criado, mas o pagamento não foi lançado. Toque de novo para lançar. (${e instanceof Error ? e.message : "erro"})`);

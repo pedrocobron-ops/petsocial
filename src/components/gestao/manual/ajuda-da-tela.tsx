@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import Link from "@/components/gestao/link-depois";
 import { usePathname } from "next/navigation";
-import { BookOpen, CircleHelp, LifeBuoy } from "lucide-react";
+import { BookOpen, ChevronRight, MessageCircleQuestion, Mic } from "lucide-react";
 import { ROTA_MANUAL, nomeDaTela, telaDoCaminho, topicosDaRota } from "@/lib/gestao/manual";
+import { modoSimples } from "@/lib/gestao/modo-simples";
 import { useGestao } from "../contexto";
-import { Folha } from "../ui";
+import { Folha, abrirAssistente } from "../ui";
 import { ItemTopico, useUmLoginSo } from "./topico";
 import "./manual.css";
 
@@ -15,50 +16,71 @@ export const EVENTO_AJUDA = "gestao:ajuda";
 export const abrirAjuda = () => window.dispatchEvent(new Event(EVENTO_AJUDA));
 
 /**
- * Botão "Como usar esta tela", na barra de cima de todas as telas: abre o passo a passo dos tópicos do manual
- * que pertencem à tela aberta. Fica na casca, uma vez só, e se orienta pelo endereço.
+ * A Ajuda: um lugar só para pedir ajuda, no botão "Ajuda" da barra de cima de todas as telas (e no Ajuda do menu).
+ * Abre uma folha com o passo a passo da tela aberta (os tópicos do manual dela) e as três saídas: tirar uma dúvida
+ * (a conversa da Ajuda), pedir para o Mozart fazer e o manual completo. Fica na casca, uma vez só, e se orienta pelo endereço.
  */
-export default function AjudaDaTela({ aoPerguntar }: { /** abre a conversa da Ajuda */ aoPerguntar: () => void }) {
-  const { petshop } = useGestao();
+export default function AjudaDaTela({ aberta, aoFechar, aoPerguntar }: {
+  /** O botão "Ajuda" fica na casca (aparece já com a tela, antes deste arquivo baixar); aqui, a folha. */
+  aberta: boolean; aoFechar: () => void;
+  /** abre a conversa da Ajuda */
+  aoPerguntar: () => void;
+}) {
+  const { petshop, souDono } = useGestao();
   const umLogin = useUmLoginSo();
   const caminho = usePathname();
   const tela = telaDoCaminho(caminho);
-  const [aberta, setAberta] = useState(false);
   const [topico, setTopico] = useState<string | null>(null);
   // só os tópicos do que o pet shop usa: quem não tem creche não lê sobre a chamada
-  const topicos = topicosDaRota(caminho, petshop);
+  const topicos = tela && tela !== ROTA_MANUAL ? topicosDaRota(caminho, petshop) : [];
 
-  useEffect(() => { setAberta(false); }, [caminho]);
+  // mudou de tela: a folha fecha (só quando muda: este arquivo pode montar já com a folha aberta pelo toque no botão)
+  const caminhoAntes = useRef(caminho);
+  useEffect(() => { if (caminhoAntes.current !== caminho) { caminhoAntes.current = caminho; aoFechar(); } }, [caminho]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const ouvir = () => { setAberta(false); aoPerguntar(); };
+    const ouvir = () => { aoFechar(); aoPerguntar(); };
     window.addEventListener(EVENTO_AJUDA, ouvir);
     return () => window.removeEventListener(EVENTO_AJUDA, ouvir);
-  }, [aoPerguntar]);
+  }, [aoPerguntar, aoFechar]);
+  useEffect(() => { if (aberta) setTopico(topicos.length > 0 && topicos.length <= 2 ? topicos[0].id : null); }, [aberta]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // no próprio Manual o botão seria repetição
-  if (!tela || tela === ROTA_MANUAL || !topicos.length) return null;
-  const nome = nomeDaTela(tela, petshop);
-  const abrir = () => { setTopico(topicos.length <= 2 ? topicos[0].id : null); setAberta(true); };
+  const nome = tela ? nomeDaTela(tela, petshop) : "";
+  const saida = (icone: React.ReactNode, titulo: string, texto: string, aoTocar: () => void, teste: string) => (
+    <button type="button" className="g-ajc-saida" onClick={aoTocar} data-teste={teste}>
+      <span className="ic" aria-hidden>{icone}</span>
+      <span className="t"><b>{titulo}</b><small>{texto}</small></span>
+      <ChevronRight aria-hidden />
+    </button>
+  );
 
   return (
     <>
-      <button type="button" className="g-man-botao" onClick={abrir} aria-label="Como usar esta tela" title="Como usar esta tela">
-        <CircleHelp aria-hidden /><span>Como usar<i> esta tela</i></span>
-      </button>
       {aberta && (
-        <Folha larga titulo={tela === "/gestao/app" ? "Como usar a tela Hoje" : `Como usar: ${nome}`} aoFechar={() => setAberta(false)}>
-          <div className="g-man-folha">
-            <p className="g-muted g-p">Toque no que você quer fazer para ver o passo a passo.</p>
-            <div className="g-man-lista">
-              {topicos.map((t) => (
-                <ItemTopico key={t.id} prefixo="f" topico={t} aberto={topico === t.id} aoAlternar={() => setTopico((a) => (a === t.id ? null : t.id))}
-                  semTela={tela} aoIr={() => setAberta(false)} semQuem={umLogin} />
-              ))}
+        <Folha larga titulo="Ajuda" aoFechar={aoFechar}>
+          <div className="g-man-folha g-ajc">
+            <div className="g-ajc-saidas">
+              {saida(<MessageCircleQuestion />, "Tirar uma dúvida", "Escreva ou fale a pergunta: a resposta vem na hora.", () => { aoFechar(); aoPerguntar(); }, "ajuda-duvida")}
+              {saida(<Mic />, "Pedir para o Mozart fazer", "Ele marca, recebe e anota por você. Você confere antes de gravar.", () => { aoFechar(); abrirAssistente(); }, "ajuda-mozart")}
+              <Link className="g-ajc-saida" href={ROTA_MANUAL} onClick={aoFechar} data-teste="ajuda-manual">
+                <span className="ic" aria-hidden><BookOpen /></span>
+                <span className="t"><b>Manual</b><small>Todo o passo a passo, com busca.</small></span>
+                <ChevronRight aria-hidden />
+              </Link>
             </div>
-            <div className="g-man-saidas">
-              <Link className="g-btn sec" href={ROTA_MANUAL} onClick={() => setAberta(false)}><BookOpen />Ver o manual completo</Link>
-              <button type="button" className="g-btn verde" onClick={() => { setAberta(false); aoPerguntar(); }}><LifeBuoy />Perguntar para a Ajuda</button>
-            </div>
+            {topicos.length > 0 && (
+              <div className="g-pilha p">
+                <p className="g-rotulo">{tela === "/gestao/app" ? "Como usar a tela Hoje" : `Como usar: ${nome}`}</p>
+                <div className="g-man-lista">
+                  {topicos.map((t) => (
+                    <ItemTopico key={t.id} prefixo="f" topico={t} aberto={topico === t.id} aoAlternar={() => setTopico((a) => (a === t.id ? null : t.id))}
+                      semTela={tela ?? undefined} aoIr={aoFechar} semQuem={umLogin} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {souDono && modoSimples(petshop) && (
+              <p className="g-muted g-pp">Modo simples ligado: Relatórios, Escola e outras telas ficam em Outras áreas, no fim do menu. <Link className="g-link" href="/gestao/app/meu-petshop#modo-simples" onClick={aoFechar}>Mudar em Meu pet shop</Link>.</p>
+            )}
           </div>
         </Folha>
       )}

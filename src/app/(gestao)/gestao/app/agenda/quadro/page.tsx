@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, BellRing, ChevronRight, Maximize2, MessageCircle, MonitorPlay, MoveRight, Receipt, Truck, X } from "lucide-react";

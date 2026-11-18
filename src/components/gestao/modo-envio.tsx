@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ArrowLeft, Cake, Check, Gift, ChevronRight, HandCoins, HeartPulse, MessageCircle, PhoneOff, RotateCcw, Send, SkipForward, Sparkles, Ticket, BedDouble, CalendarClock, UserSearch, X } from "lucide-react";
 import { lerModoEnvio, linkDaMensagem, marcarEnviada, montarFila, TIPOS_ENVIO, type Fila, type MensagemDaFila, type TipoEnvio } from "@/lib/gestao/modo-envio";
 import { fmtTelefone, hora } from "@/lib/gestao/util";

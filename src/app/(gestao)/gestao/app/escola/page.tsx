@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ArrowRight, BookOpen, Check, Clock, ExternalLink, GraduationCap, Library, Mail, MailCheck, Store } from "lucide-react";
 import { useGestao } from "@/components/gestao/contexto";
 import Leitor from "@/components/gestao/escola/leitor";
@@ -53,8 +53,6 @@ export default function Escola() {
           <h2>Cuidar bem dos pets você já sabe. Aqui é a parte do negócio.</h2>
           <p>Aulas curtas e gratuitas sobre preço, agenda, caixa e equipe, sempre mostrando onde fazer no sistema. E materiais completos da Maestro Pet para quem quer oferecer um serviço novo.</p>
         </section>
-
-        {dados && !dados.provado && user.email && <ConfirmarEmail sb={sb} email={user.email} aoConfirmar={() => void recarregar()} />}
 
         {meus.length > 0 && (
           <section className="g-pilha">
@@ -121,6 +119,9 @@ export default function Escola() {
             <p className="g-muted g-pp">Os materiais são vendidos à parte, pela Cakto, e não fazem parte da assinatura do sistema. Ninguém é obrigado a comprar nada para usar o Maestro Pet Gestão.</p>
           </section>
         )}
+
+        {/* no fim, e fechado: quem nunca comprou nada não precisa achar que tem de confirmar o e-mail (estreante, L12) */}
+        {dados && !dados.provado && user.email && <ConfirmarEmail sb={sb} email={user.email} aoConfirmar={() => void recarregar()} />}
       </div>
 
       {aulaAberta && (
@@ -208,10 +209,10 @@ function ConfirmarEmail({ sb, email, aoConfirmar }: { sb: Banco; email: string; 
 
   return (
     <section className="g-card g-pilha p">
-      <h2 className="g-esc-tit"><MailCheck aria-hidden />Comprou um material com o e-mail {email}?</h2>
-      <p className="g-muted g-p">Para liberar a leitura aqui, confirme que esse e-mail é seu. Mandamos um código para ele; é uma vez só.</p>
+      <h2 className="g-esc-tit"><MailCheck aria-hidden />Já comprou um material da Maestro Pet?</h2>
+      <p className="g-muted g-p">Só para quem comprou com o e-mail {email}: mandamos um código para ele e a leitura é liberada aqui. Não comprou? Pode ignorar.</p>
       {!enviado ? (
-        <div className="g-fila"><button type="button" className="g-btn pri p" onClick={() => void mandar()} disabled={indo}>{indo ? "Mandando…" : "Mandar o código para o meu e-mail"}</button></div>
+        <div className="g-fila"><button type="button" className="g-btn sec p" onClick={() => void mandar()} disabled={indo}>{indo ? "Mandando…" : "Liberar aqui"}</button></div>
       ) : (
         <form className="g-form" onSubmit={confirmar}>
           <label className="g-campo"><span>Código que chegou em {email}</span>

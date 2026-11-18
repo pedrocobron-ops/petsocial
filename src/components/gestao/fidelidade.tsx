@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Gift } from "lucide-react";
 import { AREAS_FIDELIDADE, lerFidelidade, programaDe } from "@/lib/gestao/fidelidade";
 import { chamar, dataCompleta } from "@/lib/gestao/util";

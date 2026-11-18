@@ -66,7 +66,7 @@ function Manual() {
           <div className="g-busca">
             <Search aria-hidden />
             <input className="g-input" type="search" value={busca} onChange={(e) => setBusca(e.target.value)}
-              placeholder="O que você quer fazer? Ex.: receber, vacina, senha" aria-label="Buscar no manual" />
+              placeholder="Ex.: receber, vacina, senha" aria-label="Buscar no manual" />
             {busca && <button type="button" className="g-ico g-man-limpar" onClick={() => setBusca("")} aria-label="Limpar a busca"><X /></button>}
           </div>
           {!umLogin && (

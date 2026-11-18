@@ -58,8 +58,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 ## O que cada suíte confere
 
 **unidade/**
+- `dinheiro-j.js`: rodada 8 (J): nascimento e sexo do pet na planilha (`nascimentoDe`, `sexoDe`, `linhasParaOBanco`, resumo), o total do hotel com o nome da temporada, do feriado e do segundo pet (`oQueMudouNasNoites`), comprovante da compra com o pagamento dividido e a linha da promoção, e `dividaPorVencimento`.
+- `robustez.js`: rodada 8 (defeitos e robustez): nome sem HTML (`limparNome`), saída prevista longe demais com o ano (`saidaLongeDemais`, `dataAmigavel`), balão do navegador em português (`mensagemDeValidacao`), sem internet nunca vira "caixa fechado" (`conferirCaixa`), Ajuda sem "[EQUIPE] não é necessário…" (`lerRespostaDaAjuda`) e o Mozart pelas áreas da pessoa (quem só tem o Caixa não recebe marcar_horario; cartão forjado recusado no servidor).
 - `rodada2-h.js`: segunda rodada (Rafael, Bia, Juliana, Neide): tempo esgotado do banco vira "Demorou demais, tente de novo" (`textoAmigavel`); a foto da entrada tenta de novo e desiste com aviso (`subirFotoDaEntrada`); Termos e Política 2.3 vigentes desde 17/11/2026; mapa sem "Campinas, Campinas" (`comCidade`); comprovante com a data do pagamento (`linhasDaData`); "2 noites (15/11 a 17/11)" no comprovante do hotel; linhas da creche em Quanto sobrou (`linhasDaCasa`); cancelamentos pelo dia do cancelamento e a tela abrindo em Este mês.
 - `creche-hotel-final.js`: rodada final (Rafael e Bia): regra de cancelamento do sinal (`destinoPelaRegra`: menos de 7 dias vira crédito, 7 ou mais devolve; sem regra, nada marcado), hora do hotel (`horasDoHotel`), táxi pet na cobrança (`taxiDaCobranca`, `partesDosExtras` com `taxi`, mensagem de cobrança com "táxi pet 2 dias" e a chave Pix do hotel), "Devolver: coleira, guia e remédio da artrose" sem repetir "remédio", texto do aceite sem banho num hotel só, "Saiu uma foto", exemplo das regras do link num hotel só, "veio hoje" no Bom dia, valor médio pelas contas contadas (895 ÷ 2 = 447,50) e cancelamentos com as reservas.
+- `rede-lenta.js`: o que a página pública põe no HTML (`link-servidor.ts`): cores do pet shop só conferidas (Vinho, cor própria;
+  texto com CSS ou HTML nunca entra) e pedido com código inválido sem ir ao banco. Sem rede.
 - `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, desconto do segundo pet, regras), a leitura da resposta
   (não sei, sugestão de pedido só com serviço e dia válidos, sem links), limites de conversa. Sem banco.
 - `boletim.js`: textos do boletim do pet (`src/lib/gestao/boletim.ts`): "Oi, Ana! O boletim do Thor de hoje: <link>" (primeiro nome
@@ -72,6 +76,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   plano de 01/11, que agora é o mês inteiro); seg a sex 9 de 21 × 1.100 = 471,43; dia fechado fora da conta; pausa no mês.
 - `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
   outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
+- `estreante-m.js`: rodada 8 (estreante): valor no cartão do pedido pelo link (`precoDoPedido`), a anotação do Mozart na ficha do pet (`anotacaoDoPet`), o modo simples (`foraNoModoSimples`) e "Faltam N coisas para começar".
 - `mozart-consertos.js`: os consertos depois dos cinco testadores, com modelo de mentira e sem banco: creche e hotel nunca viram
   horário da agenda (`ferramenta-estadia.ts`: o serviço "Creche diária" é recusado em marcar_horario), quem não vê dinheiro nunca
   ouve "não deve nada", ver_sinais, frase de espera com o nome da casa, o texto do cartão sem "Pode fazer" (`semPedidoDeConfirmar`),
@@ -149,6 +154,9 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   o que está só na tela comparado com o saldo de agora, e a planilha sem colunas de R$ para quem não vê o financeiro.
 
 **banco/** (API do Supabase com o login de cada papel, como o navegador faz; SQL só para preparar e conferir)
+- `dinheiro-relatorios-j.js`: migração 20261224 (rodada 8, Sandra): a devolução sai de Relatórios > Produtos, dos Indicadores e do Mozart (`devolucoes_por_produto`, `vendasPorProduto` com as devoluções) e bate com Quanto sobrou; mensalidade e sinal que ainda não venceram não contam no limite de fiado (`fiado_deve`, `fiado_situacao` com vencido / vence hoje / a vencer); a promoção do horário como linha negativa sai só do serviço (partes, comissão 40% de 72,00, `promo_usos`, sem "desconto do caixa"); crédito do tutor na venda no balcão; `resumo_financeiro` do Mozart igual ao Financeiro; `cobradoPorItem` da cópia; planilha de clientes com nascimento e sexo do pet.
+- `robustez.js`: migração 20261226: nomes limpos pelo banco (pet shop, tutor, pet, equipe), nome só de marcação recusado, saída prevista a mais de 366 dias recusada (estadia antiga com outra mudança passa) e duas abas fechando o mesmo caixa (a segunda recebe `ja_fechado` com a hora e o valor contado).
+- `estreante-m.js`: rodada 8 (estreante): o Mozart anota na ficha do pet ("a Mel é brava, morde"): cartão "Anotar na ficha do pet", nada gravado antes do Pode fazer, o texto entra no fim de Cuidados e alertas sem apagar nada, a mesma confirmação não grava duas vezes, o que outra pessoa escreveu no meio fica; o tosador também anota; outro pet shop não acha o pet. Modo simples: o dono liga pelas opções, a equipe recebe e não muda.
 - `rodada2-h.js`: migração 20261221: "Táxi pet do mês" e "Táxi pet (datas)" na conta da mensalidade (a busca fora do horário com o nome dela); reserva cancelada hoje para o mês que vem nos indicadores (`estadias_canceladas_no_periodo`); `lista_espera.cheio_ao_entrar`; quem só usa a agenda não apaga horário marcado (o caixa e o dono apagam).
 - `creche-hotel-final.js`: migração 20261218. Táxi pet do mensalista: o Chegou da chamada anota o dia de táxi (só com táxi por dia e preço), Desfazer tira, a cobrança do mês seguinte leva os dias (`taxas` com "tipo": "taxi", somado em valor_extras e na conta a receber), cancelar a cobrança solta os dias, táxi fixo por mês entra no próprio mês ("taxi_mes"); o monitor lê ida/volta mas não o preço; viagens do Leva e traz (`creche_taxi_viagem_marcar`: levar só depois do Chegou, plano sem táxi recusado). Indicadores: 2 reservas canceladas de 3, o sinal não conta como conta (1 conta de R$ 300 = 222 + sinal de 78). Link: `link_hotel_opcoes.horas` e `.pix` (só com sinal), `link_creche_planos` (só com a opção; sem preço quando o link esconde preços), `link_fechados_nomes`.
 - `seguranca.js`: isolamento entre pet shops e anônimo; dono não mexe na própria assinatura nem vira admin; o que cada papel grava
@@ -511,6 +519,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   registro e "Cliente removido" depois de apagar.
 
 **telas/** (Playwright, Chromium)
+- `robustez.js`: check-in que troca pet e tipo limpa a saída prevista e recusa a data a dois anos (390 e 1366), cartão com o ano, aba velha do caixa avisa "Este caixa já foi fechado", foco visível, "Preencha este campo.", rascunho do Pet novo depois de recarregar e a faixa "Sem internet agora".
+- `estreante-m.js` (360 px): conta nova com "Agora, o primeiro cliente" e "Faltam 2 coisas para começar", sem "Cadastrar o primeiro pet"; o botão Ajuda do alto (44 px) abre Tirar uma dúvida, Pedir para o Mozart fazer, Manual e o passo a passo da tela, e o Ajuda do Mais abre a mesma folha; sem rolagem para o lado, nome do pet shop inteiro, dias da agenda com 44 px; valor do porte no pedido pelo link; álbum com "Banho e corte de unhas"; modo simples (Outras áreas, Agenda sem Quadro, Mais opções no horário, recebimento sem pedir para abrir o caixa).
 - `rodada2-h.js`: segunda rodada no site real (Rafael): check-out com o banco respondendo "statement timeout" (a tela diz que demorou, sem o texto do banco, e a nova tentativa fecha a conta uma vez só); entrada com a foto que não sobe (salva sem ela, avisa na folha, a foto fica com Tentar de novo e entra depois); Quanto sobrou numa creche só com as mensalidades (390 e 1366).
 - `creche-hotel-final.js`: rodada final pela tela. Chegou da Chamada abre a folha Entrada (Todos os pets) e o cartão do mensalista tem Conferir a entrada; plano com táxi na Chamada e no Leva e traz (Buscado anotado); primeira foto de Fotos de hoje sobe e aparece (tempo medido); cancelar reserva com sinal pago traz Virar crédito do tutor já marcado pela regra e o cartão sai na hora (crédito de R$ 78 gravado); Aceitar todos tira o cartão do pedido na hora; link do hotel com 14:00/12:00 sem taxa e com a taxa às 18h sem "até as 15h"; Indicadores num hotel só sem mapa de horários, com ocupação e reservas canceladas.
 - `passeio.js`: todas as telas principais (Hoje, Agenda, Clientes, Creche e hotel, Pacotes, Caixa, Financeiro, Relatórios, Estoque,
@@ -564,7 +574,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   uma vez, "Kátia já está na lista", e com ela já gravada antes, Continuar não grava outra (3 pets por horário, como marcado). 390: foto
   da tabela de preços muda o Banho M de 60,00 para 55,00 no campo na hora. Creche só: sábado inteiro e "Ligar o meu link" no fim.
 - `primeiro-acesso.js`: dono novo do zero (criar conta, duas perguntas, "Começar já") até o primeiro resultado: no fim do guia
-  "Pronto em X minutos", "Marcar o primeiro horário" (botão principal) e "Copiar meu link de agendamento"; o link copiado em 7
+  "Pronto em X minutos", "Marcar o primeiro horário" (botão principal) e "Copiar o link do cliente"; o link copiado em 7
   toques e 4 campos; o primeiro horário (pet novo cadastrado na própria folha) em até 13 toques e 7 campos, com "Pronto em X
   minutos" no aviso do marcado (antes da mudança: 19 toques e 9 campos). 390 até o horário, 1366 até o link.
 - `fotos-redes.js`: a página do boletim em 390 ("Pode postar a foto do Thor…", nada marcado, prévia com o @ = texto guardado,
@@ -573,6 +583,12 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `checkout-lento.js`: check-out do hotel com a leitura do sinal atrasada 2,5 s (390 e 1366): enquanto carrega, a folha não mostra valor
   e o botão fica apagado (clicar não grava); depois, "Receber R$ 2,75" (110 − sinal 107,25) e "Receber R$ 1,60" (80 − 20% do segundo
   pet − sinal 62,40), uma entrada só cada.
+- `rede-lenta.js`: internet fraca (estreante, 3ª rodada). Com o JavaScript desligado em 360, o link do cliente já mostra o nome do pet
+  shop, o recado, os serviços com preço, as cores (Vinho) e o título "Agendar: …"; a página do pedido mostra "Tutora, seu pedido chegou."
+  com o pet e a situação; pedido que não existe e link errado com a mensagem de sempre. O HTML do link não traz a biblioteca do Supabase
+  nem dado do tutor. 390 e 1366: o pedido vai até "Pedido enviado" e o Atualizar da página do pedido funciona, sem erro de hidratação.
+  A abertura do aplicativo diz "Abrindo <pet shop>…" com os pacotes de JavaScript bloqueados. A Hoje (390 e 1366) não baixa outra tela
+  antes de aparecer com os dados, e depois volta a adiantar. No fim, uma medida informativa com 400 kbps, 400 ms e CPU 4x.
 - `agenda-lenta.js`: ficha do horário com a leitura dos pacotes e do que já foi pago atrasada 2,5 s (390 e 1366): enquanto carrega,
   nenhum botão de cobrar, concluir ou usar o pacote (só "Carregando a conta"; Cliente confirmou continua); depois, o pacote primeiro,
   o aviso do que o tutor deve de antes e "Cobrar à parte, sem usar o pacote · R$ 50,00". Com a leitura falhando: nada de cobrar,
@@ -718,6 +734,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   o próximo, sem telefone do tutor, sem rolagem para o lado) e o álbum na ficha do pet com o link para o tutor. Capturas em
   `testes/saida/boletim-*.png` e `album-390.png`.
 
+- `dinheiro-j.js`: rodada 8 (J) pela tela: venda no balcão paga com o crédito do tutor e o comprovante (WhatsApp e Imprimir); Contas de clientes com vencido / a vencer e o limite sem a mensalidade futura ("venceu em"); Relatórios › Produtos sem o que voltou (1366); a cópia completa com total cobrado, devolução, crédito dos tutores, lotes e "Entra no resultado".
 - `orcamento-troca.js`: orçamento, troca e limite de fiado pela tela. 390 (recepção): Caixa › Orçamentos › Orçamento novo com Ana,
   2 shampoos e o Banho (entra a 50,00, o primeiro preço; ela põe 60,00), desconto 9,80 = R$ 110,00; Mandar no WhatsApp (número da
   Ana, "Oi, Ana!", total e link); a página pública (Para Ana, itens, total, validade, "Quero fechar" para o WhatsApp da loja, 404

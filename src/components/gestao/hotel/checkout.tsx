@@ -67,7 +67,17 @@ export async function estadiasDoTutor(sb: Banco, petshopId: string, clienteId: s
   return comValoresDeEstadia(sb, petshopId, (r.data ?? []) as unknown as (EstadiaDoTutor & { id: string })[]);
 }
 
-type Pendencia = Pick<Lancamento, "id" | "valor" | "descricao" | "categoria" | "data" | "vencimento">;
+/**
+ * "anotada em 18/11 · vence 25/11": o dia em que a conta nasceu (o dia anotado, para dívida trazida do caderno) e o vencimento.
+ * Antes só "de 25/11", que era o vencimento e parecia o dia do serviço.
+ */
+function textoDaPendencia(p: { data: string; vencimento: string | null; criado_em?: string | null; devido_desde?: string | null }) {
+  const nasceu = p.devido_desde ?? (p.criado_em ? isoDia(new Date(p.criado_em)) : p.data);
+  const hoje = isoDia(new Date());
+  const venc = p.vencimento && p.vencimento !== nasceu ? (p.vencimento < hoje ? `venceu ${dataCurta(p.vencimento)}` : p.vencimento === hoje ? "vence hoje" : `vence ${dataCurta(p.vencimento)}`) : null;
+  return [`anotada em ${dataCurta(nasceu)}`, venc].filter(Boolean).join(" · ");
+}
+type Pendencia = Pick<Lancamento, "id" | "valor" | "descricao" | "categoria" | "data" | "vencimento" | "criado_em" | "devido_desde">;
 /** Categoria da saída quando o hotel devolve ao tutor o que ele pagou a mais (o pet saiu antes). */
 export const CATEGORIA_DEVOLUCAO_SAIDA = "Devolução";
 /** Outro pet do mesmo tutor que saiu há pouco (mesma busca) e já pagou a taxa de busca fora do horário. */
@@ -144,7 +154,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
       sb.from("estadias_valores").select("*").eq("estadia_id", estadia.id).maybeSingle().then((r) => { if (r.error) throw new Error(r.error.message); return r.data; }),
       estadia.tipo === "hotel" ? estadiasDoTutor(sb, petshop.id, tutor?.id, true) : Promise.resolve([]),
       // todas as contas abertas do tutor (em páginas: o banco entrega no máximo mil por vez)
-      tutor?.id ? lerTudo<Pendencia>((de, ate, contar) => sb.from("lancamentos").select("id, valor, descricao, categoria, data, vencimento", contando(contar)).eq("petshop_id", petshop.id).eq("cliente_id", tutor.id).eq("tipo", "entrada").eq("pago", false).order("data").order("id").range(de, ate)) : Promise.resolve([] as Pendencia[]),
+      tutor?.id ? lerTudo<Pendencia>((de, ate, contar) => sb.from("lancamentos").select("id, valor, descricao, categoria, data, vencimento, criado_em, devido_desde", contando(contar)).eq("petshop_id", petshop.id).eq("cliente_id", tutor.id).eq("tipo", "entrada").eq("pago", false).order("data").order("id").range(de, ate)) : Promise.resolve([] as Pendencia[]),
       creditoDoTutor(sb, petshop.id, tutor?.id).then((c) => c.saldo),
       atrasoJaCobrado(sb, petshop.id, tutor?.id, estadia, agora),
     ]);
@@ -588,7 +598,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
                   {pendencias.map((p) => (
                     <label key={p.id} className={marcada(p) && !fiado ? "on" : ""}>
                       <input type="checkbox" checked={marcada(p) && !fiado} disabled={Boolean(fiado)} onChange={(ev) => { setJunto((j) => ({ ...j, [p.id]: ev.target.checked })); setErroForma(null); }} />
-                      <span className="t"><b>{p.ehSinal ? "Sinal desta reserva" : p.descricao || p.categoria}</b><small>{p.ehSinal ? (sinalRecebido > 0 ? "o que falta do sinal" : "ficou para pagar depois") : `de ${dataCurta(p.data)}`} · receber junto?</small></span>
+                      <span className="t"><b>{p.ehSinal ? "Sinal desta reserva" : p.descricao || p.categoria}</b><small>{p.ehSinal ? (sinalRecebido > 0 ? "o que falta do sinal" : "ficou para pagar depois") : textoDaPendencia(p)} · receber junto?</small></span>
                       <b className="v">{brl(p.valor)}</b>
                     </label>
                   ))}

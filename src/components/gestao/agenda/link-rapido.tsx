@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Check, Copy, Link2, MessageCircle, Settings2 } from "lucide-react";
 import type { PetComTutor } from "@/lib/gestao/tipos";
 import { linkWhatsApp } from "@/lib/gestao/util";
@@ -69,7 +69,7 @@ export default function LinkRapido({ rotulo = "Link do cliente" }: { rotulo?: st
     <>
       <button className="g-btn sec" onClick={() => setAberto(true)}><Link2 /><span className="g-lr-rot">{rotulo}</span></button>
       {aberto && (
-        <Folha titulo="Link de agendamento" aoFechar={() => { setAberto(false); setEscolhendo(false); }}>
+        <Folha titulo="Link do cliente" aoFechar={() => { setAberto(false); setEscolhendo(false); }}>
           {!petshop.link_ativo ? (
             <div className="g-pilha">
               <p className="g-muted">O link está desligado. Com ele ligado, o cliente escolhe o serviço e um horário livre pelo celular e manda o pedido. Nada é marcado sem você aceitar.</p>

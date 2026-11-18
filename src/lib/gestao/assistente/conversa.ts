@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { definicao, descrever, ehErroDeUso, gravar, rodarConsulta, type Contexto, type LinkZap, type Resumo } from "./ferramentas";
 import { manterNomes, nomesDosResultados } from "./parecido";
-import { ferramentaLiberada } from "./permissao";
+import { ferramentaLiberada, motivoDaRecusa } from "./permissao";
 import { FRASE_JUNTANDO, fraseDaFerramenta, fraseInicial } from "./progresso";
 import { semNomesDeFerramenta } from "./sem-nomes";
 import { nomeDaCasa } from "../modulos";
@@ -127,7 +127,7 @@ export async function voltas(o: {
       const uso = usos[i];
       if (porPedido[i]) continue;
       const def = definicao(uso.name);
-      if (!def || !ferramentaLiberada(def, c)) { porPedido[i] = { type: "tool_result", tool_use_id: uso.id, is_error: true, content: "Ferramenta indisponível para esta pessoa." }; continue; }
+      if (!def || !ferramentaLiberada(def, c)) { porPedido[i] = { type: "tool_result", tool_use_id: uso.id, is_error: true, content: motivoDaRecusa(def, c) }; continue; }
       if (!liberado) { porPedido[i] = { type: "tool_result", tool_use_id: uso.id, is_error: true, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Diga isso à pessoa e indique a tela Assinatura." }; continue; }
       try {
         propostas.push({ id: uso.id, ferramenta: uso.name, resumo: await descrever(c, uso.name, uso.input as Record<string, unknown>) });
@@ -188,7 +188,7 @@ export async function responderCartoes(o: {
     const decisao = o.decisoes?.find((d) => d.id === uso.id);
     if (!def?.grava || !decisao?.ok) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A pessoa descartou esta ação. Nada foi gravado." }); continue; }
     // a conversa vem do navegador: confere de novo se esta pessoa pode usar a ferramenta (igual à volta do modelo)
-    if (!ferramentaLiberada(def, c)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: "Ferramenta indisponível para esta pessoa. Nada foi gravado." }); continue; }
+    if (!ferramentaLiberada(def, c)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: motivoDaRecusa(def, c) }); continue; }
     if (!liberado) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Nada foi gravado.", is_error: true }); continue; }
     if (o.reservar && !(await o.reservar(uso.id))) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JA_GRAVADA }); continue; }
     let gravou = false;

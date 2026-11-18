@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";

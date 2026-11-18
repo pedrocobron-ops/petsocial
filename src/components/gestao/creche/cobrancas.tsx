@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { AlertTriangle, Ban, CalendarClock, Check, ChevronLeft, ChevronRight, CircleCheck, HandCoins, MessageCircle, Pencil, Printer, RotateCcw, TriangleAlert, Undo2 } from "lucide-react";
 import {
   regraIrmaoDe, cobraNoMes, descontoIrmao, estadoDaCobranca, extrasDaCobranca, faltaDaCobranca, isoMes, mensagemDeCobranca, textoComprovanteMensalidades, partesDoDesconto, partesDosExtras, proporcionalDesde, SELECT_COBRANCA, sugestaoDoMes, taxasDaCobranca, textoDasDatas, textoDasTaxas, textoDoTaxiDaCobranca, vencimentoDoMes,
@@ -714,7 +714,7 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
     setErro(null); setSalvando(true);
     let feitas = 0, recebido = 0;
     const falhas: string[] = [];
-    const itens: { pet: string; mes: string; valor: number; multa: number; acerto?: boolean }[] = [];
+    const itens: { pet: string; mes: string; valor: number; multa: number; acerto?: boolean; descontos?: string | null }[] = [];
     // os lançamentos pagos agora (para anotar em quantas vezes foi o crédito)
     const pagos: string[] = [];
     let sobraCredito = credito;
@@ -736,7 +736,10 @@ function ReceberFamilia({ grupo, contas, aoFechar, aoFeito }: { grupo: Grupo; co
         } else if (doCredito > 0) { await receberComCredito(sb, c.lancamento_id!, doCredito, parteDaChave(chave, "credito", c.lancamento_id!)); sobraCredito = centavos(sobraCredito - doCredito); }
         else if (resto > 0) pagos.push(...((await receberConta(sb, c.lancamento_id!, { valor: resto, forma: forma!, data, multa: m > 0 ? { valor: m, forma: forma! } : null, chave: parteDaChave(chave, "mensalidade", c.lancamento_id!) })).ids ?? []));
         feitas++; recebido = centavos(recebido + faltaDaCobranca(c) + m);
-        itens.push({ pet: c.pets?.nome ?? "Pet", mes: c.mes, valor: faltaDaCobranca(c), multa: m, acerto: c.acerto_saida });
+        // o desconto irmão (e o outro desconto) no comprovante, como na Cobrança: "R$ 540,00 (já com desconto irmão R$ 60,00)"
+        const dd = partesDoDesconto(c);
+        const descontos = [dd.irmao > 0 && `desconto irmão ${brl(dd.irmao)}`, dd.outro > 0 && `desconto ${brl(dd.outro)}`].filter(Boolean).join(" e ") || null;
+        itens.push({ pet: c.pets?.nome ?? "Pet", mes: c.mes, valor: faltaDaCobranca(c), multa: m, acerto: c.acerto_saida, descontos });
       } catch (e) { falhas.push(`${c.pets?.nome ?? "pet"} (${e instanceof Error ? e.message : "erro"})`); }
     }
     if (falhas.length) avisarErro(`Não deu certo com: ${falhas.join("; ")}`);

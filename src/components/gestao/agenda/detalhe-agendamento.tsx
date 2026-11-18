@@ -2,9 +2,10 @@
 
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
+import { foraDoLimite } from "@/lib/gestao/fiado";
 import { useState } from "react";
-import Link from "next/link";
-import { BellRing, CalendarClock, CalendarX, Check, HandCoins, MessageCircle, Play, Printer, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
+import Link from "@/components/gestao/link-depois";
+import { BellRing, CalendarClock, CalendarX, Check, ChevronDown, HandCoins, MessageCircle, Play, Printer, Receipt, Repeat, Trash2, Truck, UserX } from "lucide-react";
 import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { textoCancelado, textoConfirmacao, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
@@ -24,6 +25,7 @@ import { FidelidadeNoHorario } from "../fidelidade";
 import Comanda from "./comanda";
 import { MarcaSemCobranca, semCobranca } from "./para-cobrar";
 import AntesDepois from "./antes-depois";
+import { modoSimples } from "@/lib/gestao/modo-simples";
 import { BotaoBoletim } from "../boletim/boletim";
 import { EntradaNaChegada, EntradaNaVisita, type VisitaDaEntrada } from "../entrada/entrada";
 import { continuarSerie, encerrarSerie, textoContinuou, VEZES_POR_VEZ } from "./series-acabando";
@@ -37,6 +39,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   agendamento: AgendamentoCompleto; aoFechar: () => void; aoMudar: () => void; aoEditar: () => void;
 }) {
   const { sb, petshop, vejoFinanceiro, cuidoDoFinanceiro, souDono, posso, servicos } = useGestao();
+  const simples = modoSimples(petshop);
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   // a promoção do horário (o banco pôs ao marcar): a equipe tira ou põe de volta até a conta ser lançada
@@ -104,7 +107,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     // o pagamento já está num caixa fechado? (aí só o dono reabre ou apaga)
     const caixas = [...new Set(lancados.filter((l) => l.pago && l.caixa_id).map((l) => l.caixa_id!))];
     const fechados = caixas.length ? await sb.from("caixas").select("id").in("id", caixas).not("fechado_em", "is", null) : { data: [] };
-    const antigas = ((deve.data ?? []) as { id: string; valor: number; descricao: string | null; categoria: string; vencimento: string | null; agendamento_id: string | null }[]).filter((l) => l.agendamento_id !== a.id);
+    const antigas = ((deve.data ?? []) as { id: string; valor: number; descricao: string | null; categoria: string; vencimento: string | null; agendamento_id: string | null }[]).filter((l) => l.agendamento_id !== a.id && !foraDoLimite(l, isoDia(new Date())));
     return {
       pago: lancados, pacote: validos[0] ?? null, fimDaSerie, semFim, emCaixaFechado: (fechados.data ?? []).length > 0, faltaCobrar: (semConta.data ?? []).some((x) => x.id === a.id), mexidas: mexidas.data ?? [],
       antigas, diferencaCobrada: Number(diferencas.error ? 0 : diferencas.data ?? 0),
@@ -551,14 +554,15 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         )}
         {chegou && visitaDaEntrada && <EntradaNaChegada visita={visitaDaEntrada} aoFechar={() => setChegou(false)} />}
 
-        {comFotos && <AntesDepois agendamento={a} aoMudar={aoMudar} />}
+        {/* modo simples: as fotos aparecem depois do Chegou (é quando se tira o antes); antes disso, o botão do momento fica no alto */}
+        {comFotos && (!simples || a.status === "em_atendimento" || a.status === "concluido") && <AntesDepois agendamento={a} aoMudar={aoMudar} />}
         {(a.status === "em_atendimento" || a.status === "concluido") && pet && (
           <BotaoBoletim classe="g-btn sec cheio" visita={{ tipo: "banho", agendamentoId: a.id, petId: pet.id, pet: pet.nome, tutor: tutor ? { nome: tutor.nome, telefone: tutor.telefone } : null, servicos: servicosPorExtenso(a) }} />
         )}
 
         {!encerrado && (
           <div className="g-pilha p">
-            {a.status === "marcado" && <button className="g-btn verde cheio" disabled={ocupado} onClick={() => void mudar({ status: "confirmado" }, "Horário confirmado.")}><Check />Cliente confirmou</button>}
+            {a.status === "marcado" && !simples && <button className="g-btn verde cheio" disabled={ocupado} onClick={() => void mudar({ status: "confirmado" }, "Horário confirmado.")}><Check />Cliente confirmou</button>}
             {(a.status === "marcado" || a.status === "confirmado") && <button className="g-btn sec cheio" disabled={ocupado} onClick={() => void mudar({ status: "em_atendimento" }, `${pet?.nome ?? "Pet"} em atendimento.`).then((deu) => deu && setChegou(true))}><Play />Chegou: iniciar atendimento</button>}
             {!sabe && <ContaCarregando erro={erroExtra} aoTentar={() => void recarregar()} vejoFinanceiro={vejoFinanceiro} />}
             {/* pet com pacote que cobre este serviço: usar o pacote vem primeiro, para ninguém cobrar duas vezes */}
@@ -633,16 +637,6 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           {pet && posso("clientes") && <Link className="g-btn sec" href={`/gestao/app/clientes?pet=${pet.id}`}>Ver ficha</Link>}
         </div>
         {a.lembrete_em && <p className="g-pp g-muted">Lembrete aberto {dataAmigavel(a.lembrete_em)} às {hora(a.lembrete_em)}.</p>}
-        {(a.status === "marcado" || a.status === "confirmado") && !jaPassou && foiRemarcado && zapRemarcado && (
-          <div className="g-fila">
-            <a className="g-btn sec g-cresce" href={zapRemarcado} target="_blank" rel="noopener noreferrer"><MessageCircle />Avisar remarcação</a>
-          </div>
-        )}
-        {(a.status === "marcado" || a.status === "confirmado") && !jaPassou && zapConfirmacao && (
-          <div className="g-fila">
-            <a className="g-btn sec g-cresce" href={zapConfirmacao} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar confirmação</a>
-          </div>
-        )}
         {/* faltou e não há taxa de falta definida: diz onde definir, e dá para anotar agora */}
         {a.status === "faltou" && vejoFinanceiro && !(taxa > 0) && (
           <div className="g-card liso g-pilha p" role="note">
@@ -656,22 +650,45 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         {a.status === "cancelado" && (zapCancelado
           ? <a className="g-btn zap cheio" href={zapCancelado} target="_blank" rel="noopener noreferrer"><MessageCircle />Avisar cancelamento</a>
           : <p className="g-pp g-muted">Sem telefone do tutor para avisar do cancelamento.</p>)}
-
+        <MaisOpcoes simples={simples}>
+          {simples && a.status === "marcado" && <button className="g-btn sec cheio" disabled={ocupado} onClick={() => void mudar({ status: "confirmado" }, "Horário confirmado.")}><Check />Cliente confirmou</button>}
+        {(a.status === "marcado" || a.status === "confirmado") && !jaPassou && foiRemarcado && zapRemarcado && (
+          <div className="g-fila">
+            <a className="g-btn sec g-cresce" href={zapRemarcado} target="_blank" rel="noopener noreferrer"><MessageCircle />Avisar remarcação</a>
+          </div>
+        )}
+        {(a.status === "marcado" || a.status === "confirmado") && !jaPassou && zapConfirmacao && (
+          <div className="g-fila">
+            <a className="g-btn sec g-cresce" href={zapConfirmacao} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar confirmação</a>
+          </div>
+        )}
         <hr className="g-sep" />
         <div className="g-fila">
           {!encerrado && <button className="g-btn fantasma p" onClick={() => { if (!somenteLeitura()) aoEditar(); }}><CalendarClock />Remarcar ou alterar</button>}
           {!encerrado && <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirFalta()}><UserX />Faltou</button>}
-          {!encerrado && <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirDesmarcar()}><CalendarX />Desmarcar horário</button>}
+          {!encerrado && <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirDesmarcar()}><CalendarX />Cliente cancelou</button>}
           {encerrado && podeReabrir && <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void reabrir()}>Voltar para marcado</button>}
         </div>
         {/* a lixeira fica sozinha, longe de Desmarcar, para não apagar por engano */}
         <div className="g-agd-apagar">
           {!sabe ? null : !podeApagar
             ? <p className="g-pp g-muted">{porQueNao}</p>
-            : <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirApagar()}><Trash2 />Apagar da agenda</button>}
+            : <button className="g-btn fantasma p" disabled={ocupado} onClick={() => void pedirApagar()}><Trash2 />Apagar (marquei errado)</button>}
         </div>
+        </MaisOpcoes>
       </div>
     </Folha>
+  );
+}
+
+/** Modo simples: o que não é a ação do momento (confirmar, remarcar, faltou, cancelou, apagar) fica fechado em "Mais opções". */
+function MaisOpcoes({ simples, children }: { simples: boolean; children: React.ReactNode }) {
+  if (!simples) return <>{children}</>;
+  return (
+    <details className="g-agd-mais">
+      <summary>Mais opções<ChevronDown aria-hidden /></summary>
+      <div className="g-pilha p">{children}</div>
+    </details>
   );
 }
 

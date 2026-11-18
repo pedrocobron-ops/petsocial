@@ -6,7 +6,6 @@ import { comPrecosDeAgendamento, comPrecosLidos, idsParaCobrar } from "@/lib/ges
 import { ajustesDoFaturamento, CATEGORIAS_DEVOLUCAO, montarAjustes, SEM_AJUSTES, type AjustesDoFaturamento } from "@/lib/gestao/faturamento";
 import { deIsoDia, inicioDaSemana, isoDia, somaDias } from "@/lib/gestao/util";
 import { buscarSaudeVencendo, limiteSaudeHoje, resumirSaudeVencendo, type SaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
-import { contarAtrasosPendentes } from "@/components/gestao/creche/atraso";
 import type { CuidadoResumido } from "@/components/gestao/clientes/saude";
 
 /**
@@ -143,7 +142,8 @@ async function lerDoJeitoAntigo(sb: Banco, petshopId: string, d: ReturnType<type
     // devolução ao tutor e crédito deixado para ele saem do que entrou (a mesma regra do faturamento nos Relatórios)
     cuidoDoFinanceiro ? ajustesDoFaturamento(sb, petshopId, isoDia(ha6), hojeIso).catch(() => SEM_AJUSTES) : Promise.resolve(SEM_AJUSTES),
     cobrar ? idsParaCobrar(sb, petshopId).then((ids) => ids.length) : Promise.resolve(0),
-    cobrar ? contarAtrasosPendentes(sb, petshopId) : Promise.resolve(0),
+    // (só no banco antes da gestao_hoje; o módulo da taxa de atraso é grande e vem à parte)
+    cobrar ? import("@/components/gestao/creche/atraso").then((m) => m.contarAtrasosPendentes(sb, petshopId)) : Promise.resolve(0),
   ]);
   // serviços mais pedidos: na ordem em que cada um apareceu primeiro (a tela ordena pelo total)
   const porServico = new Map<string, { rotulo: string; valor: number; cor: string | null }>();

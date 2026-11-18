@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { CalendarCheck2, Pencil, Plus, Printer } from "lucide-react";
 import { DIAS_SEMANA, diasEmOrdem, extratoDoPetLigado, fraseDoSaldo, linkDoExtratoDoPet, lerPlanos, lerSaldoDeReposicao, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, textoDasDatas, type Falta, type PetDoPlano, type PlanoCompleto, type Presenca } from "@/lib/gestao/creche";
 import { calendarioGuardado, lerCalendario } from "@/lib/gestao/feriados";

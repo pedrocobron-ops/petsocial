@@ -1,8 +1,8 @@
 "use client";
 
 import { Selo } from "./marca";
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "@/components/gestao/link-depois";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3, BedDouble, BookOpen, CalendarDays, CalendarClock, ChevronDown, CreditCard, GraduationCap, Landmark, LifeBuoy, LogOut, Menu, Mic, Pencil, ShieldCheck, Package, PawPrint, Send, Store, Sun, Ticket, TriangleAlert, Users, Wallet,
@@ -23,9 +23,10 @@ import { EVENTO_GUIA, EVENTO_PERSONALIZAR_MENU, quandoATelaAbrir } from "./ui";
 import LogoLoja from "./logo-loja";
 import AvisoDeFuso from "./aviso-fuso";
 import { aplicarTema } from "@/lib/gestao/identidade";
+import { foraNoModoSimples } from "@/lib/gestao/modo-simples";
 import { abrirDepoisDeRecarregar, chaveDaConversa } from "@/lib/gestao/assistente/guardada";
 
-// O que só abre com um toque (Mozart, Ajuda, guia inicial) e o "Como usar esta tela" (o manual inteiro) vêm à parte, depois
+// O que só abre com um toque (Mozart, Ajuda, guia inicial) e o botão Ajuda do alto (o manual inteiro) vêm à parte, depois
 // da tela: no celular com internet fraca, a tela não espera baixar o que a pessoa talvez nem abra.
 const carregarAssistente = () => import("./assistente");
 const Assistente = dynamic(carregarAssistente, { ssr: false });
@@ -65,7 +66,7 @@ const AGENDA = "/gestao/app/agenda", CASA = "/gestao/app/creche-hotel", ESTOQUE 
 /** As telas de cada área principal, na ordem em que sobem para logo depois de Hoje. */
 const TELAS_DA_PRINCIPAL: Record<Principal, string[]> = { banho_tosa: [AGENDA], creche: [CASA], hotel: [CASA], loja: [ESTOQUE, CAIXA] };
 const CHAVE_OUTRAS = "maestro-gestao-outras-areas";
-type ComMenu = Parameters<typeof rotaForaDoMenu>[0];
+type ComMenu = Parameters<typeof rotaForaDoMenu>[0] & { opcoes?: unknown };
 
 /**
  * O menu do pet shop. A área principal vem primeiro no dia a dia, logo depois de Hoje; as outras áreas marcadas seguem.
@@ -75,7 +76,8 @@ type ComMenu = Parameters<typeof rotaForaDoMenu>[0];
 function montarMenu(petshop: ComMenu, semAgenda: boolean) {
   const principal = principalDe(petshop);
   // quem não faz banho e tosa não precisa da Agenda na frente: com área principal escolhida, ou sem nenhum horário marcado até hoje
-  const fora = (i: Item) => rotaForaDoMenu(petshop, i.href) || (i.href === AGENDA && !usaModulo(petshop, "banho_tosa") && (principal != null || semAgenda));
+  // no modo simples, o que é avançado (Relatórios, Escola, Caixa sem loja) também vai para "Outras áreas"
+  const fora = (i: Item) => rotaForaDoMenu(petshop, i.href) || foraNoModoSimples(petshop, i.href) || (i.href === AGENDA && !usaModulo(petshop, "banho_tosa") && (principal != null || semAgenda));
   const rotulo = (i: Item): Item => (i.href === CASA && !fora(i) ? { ...i, rotulo: nomeDaCasa(petshop) } : i);
   const todos = GRUPOS.flatMap((g) => g.itens);
   const sobem = principal ? TELAS_DA_PRINCIPAL[principal].map((h) => todos.find((i) => i.href === h)!).filter((i) => !fora(i)) : [];
@@ -110,6 +112,10 @@ export default function Casca({ children }: { children: React.ReactNode }) {
   useEffect(() => { if (abrirDepoisDeRecarregar(chaveDaConversa(petshop.id, user.id))) setAssistente({ aberta: true, pedido: "" }); }, [petshop.id, user.id]);
   const [mais, setMais] = useState(false);
   const [ajuda, setAjuda] = useState(false);
+  // a Ajuda: um lugar só (botão no alto de cada tela e Ajuda no menu) que leva ao passo a passo da tela, à conversa, ao Mozart e ao manual
+  const [central, setCentral] = useState(false);
+  const fecharCentral = useCallback(() => setCentral(false), []);
+  const perguntarNaAjuda = useCallback(() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }, []);
   const [admin, setAdmin] = useState(false);
   // o guia inicial só carrega quando vai abrir: na primeira entrada (guia ainda não feito) ou pelo botão em Meu pet shop
   const [guia, setGuia] = useState<"fechado" | "inicio" | "botao">(() => (petshop.guia_feito_em ? "fechado" : "inicio"));
@@ -286,7 +292,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
             </div>
           )}
           <div className="g-nav" style={{ marginTop: 10 }}>
-            <button onClick={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }}><LifeBuoy />Ajuda</button>
+            <button onClick={() => { setAssistente({ aberta: false, pedido: "" }); setCentral(true); }}><LifeBuoy />Ajuda</button>
             {!souTitular && <SairDaEquipe lateral />}
           </div>
           <div className="g-lado-eu">
@@ -301,8 +307,12 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         <div className="g-barra">
           <div className="g-barra-marca"><LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={34} padrao="selo" tomSelo="verde" /><span>{petshop.nome}</span></div>
           {aqui && <div className="g-barra-onde"><span className={`g-tile p ${aqui.item.tom}`} aria-hidden><aqui.item.icone /></span><span>{aqui.grupo} / <b>{aqui.item.rotulo}</b></span></div>}
-          {posso("clientes") ? <BuscaGeral /> : <span style={{ flex: 1 }} />}
-          {depois && <AjudaDaTela aoPerguntar={() => { setAssistente({ aberta: false, pedido: "" }); setAjuda(true); }} />}
+          {/* no Manual, a busca é a do manual: duas caixas de busca na mesma tela confundiam */}
+          {posso("clientes") && !caminho.startsWith("/gestao/app/manual") ? <BuscaGeral /> : <span style={{ flex: 1 }} />}
+          <button type="button" className="g-man-botao" onClick={() => setCentral(true)} aria-label="Ajuda" title="Ajuda: como usar esta tela, dúvidas, Mozart e manual" data-teste="botao-ajuda">
+            <LifeBuoy aria-hidden /><span>Ajuda</span>
+          </button>
+          {(depois || central) && <AjudaDaTela aberta={central} aoFechar={fecharCentral} aoPerguntar={perguntarNaAjuda} />}
           <div className="g-barra-data"><CalendarClock />{dataLonga(new Date())}</div>
         </div>
         <AvisoDeFuso />
@@ -392,7 +402,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
                 <div className="g-lista"><Link href="/gestao/admin" className="g-linha"><span className="g-ico" aria-hidden><ShieldCheck /></span><span className="t"><b>Administrador</b></span></Link></div>
               </div>
             )}
-            <button className="g-btn verde" onClick={() => { setMais(false); setAjuda(true); }}><LifeBuoy />Ajuda</button>
+            <button className="g-btn verde" onClick={() => { setMais(false); setCentral(true); }}><LifeBuoy />Ajuda</button>
             <button className="g-btn sec" onClick={() => void sair()}><LogOut />Sair</button>
             {!souTitular && <SairDaEquipe />}
           </div>

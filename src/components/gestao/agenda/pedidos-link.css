@@ -20,6 +20,8 @@
 .g-pl-serv i { width: 8px; height: 8px; flex: none; border-radius: 3px; background: var(--cor); }
 .g-pl-hora { background: var(--g-carta-2); font-variant-numeric: tabular-nums; }
 .g-pl-hora svg { width: 14px; height: 14px; flex: none; }
+.g-pl-valor { display: inline-flex; align-items: center; padding: 4px 11px; border-radius: 999px; font-size: .875rem; font-weight: 700; background: color-mix(in srgb, var(--g-verde, #2f7d5b) 12%, #fffbf5); font-variant-numeric: tabular-nums; }
+.g-pl-valor-p .g-pl-valor { padding: 0 0 0 6px; background: none; font-size: .8125rem; }
 /* etiqueta comprida ("aceitou as regras e declarou vacinas em dia em…") quebra de linha em vez de passar do cartão */
 .g-pl-quando { min-width: 0; }
 .g-pl-quando .g-tag { white-space: normal; text-align: left; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }

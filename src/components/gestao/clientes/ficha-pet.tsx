@@ -5,7 +5,7 @@ import CartaoPaginaDoTutor from "../casa/pagina-do-tutor";
 import { saudacaoZap } from "@/lib/gestao/agenda";
 import { COLS_ESTADIA, COLS_PACOTE_CLIENTE, comPrecosDeAgendamento } from "@/lib/gestao/reservado";
 import { Fragment, useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { AlertTriangle, ArrowLeft, ArrowLeftRight, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
 import type { Agendamento, Cliente, Estadia, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";

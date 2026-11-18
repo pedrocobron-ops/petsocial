@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ArrowRight, ChevronDown, Lightbulb, Printer, TriangleAlert } from "lucide-react";
 import { QUEM, nomeDaTela, type Topico } from "@/lib/gestao/manual";
 import { nomeDaCasa } from "@/lib/gestao/modulos";

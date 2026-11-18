@@ -64,6 +64,10 @@ const D = lib('dinheiro');
     const depois = (await page.locator('.g-main').innerText()).split(/Clientes com pacote/i)[1] ?? '';
     T.ok(`depois que a lista do banco volta, ${pet} aparece uma vez só`, (depois.match(new RegExp(`\\n${pet}\\n`, 'g')) ?? []).length === 1, depois.slice(0, 300));
     T.ok('o banco tem a venda uma vez', B.num(`select count(*) from pacotes_clientes pc join pets p on p.id = pc.pet_id where pc.petshop_id='${P}' and p.nome='${pet}'`) === 1);
+    // rodada 8 (J): a venda paga mostra o comprovante por cima da lista (Mandar comprovante e Imprimir)
+    const recibo = page.locator('.g-folha', { hasText: 'Pacote vendido' }).last();
+    T.ok('o pacote pago mostra o comprovante (Imprimir comprovante)', await recibo.getByRole('button', { name: 'Imprimir comprovante' }).isVisible().catch(() => false));
+    if (await recibo.count()) await recibo.getByRole('button', { name: 'Pronto' }).click();
     await page.unroute(/\/rest\/v1\/pacotes_clientes\?select=/);
 
     // Caixa → Financeiro › Alterações (este caixa, todas)

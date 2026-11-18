@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Check, MessageCircle, PhoneOff } from "lucide-react";
 import type { Banco } from "@/lib/gestao/supabase";
 import { chamar, dataAmigavel, deIsoDia, fmtTelefone, haQuanto, inicioDoDia, linkWhatsApp, soDigitos } from "@/lib/gestao/util";

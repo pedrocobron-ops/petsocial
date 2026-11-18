@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { BedDouble, Copy, Images, Link2, MessageCircle, Scissors, Sun, Trash2 } from "lucide-react";
-import { BUCKET_BOLETIM, doPet, type Sexo } from "@/lib/gestao/boletim";
+import { BUCKET_BOLETIM, doPet, seloDoBanho, type Sexo } from "@/lib/gestao/boletim";
+import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
 import { fotoPet } from "@/lib/gestao/supabase";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { BUCKET_DIARIO } from "@/lib/gestao/tutor";
@@ -21,9 +22,13 @@ import "./boletim.css";
  * uma foto. "Mandar o álbum" cria um link novo (60 dias) com as fotos de agora, para o tutor ver sem instalar nada.
  */
 type Foto = { url: string; rotulo?: string; caminho?: string; boletim?: string };
-type VisitaDoAlbum = { chave: string; quando: string; tipo: "banho" | "creche" | "hotel"; fotos: Foto[]; /** o boletim da visita e quando ele nasceu (para a autorização das redes) */ boletim?: string; boletimEm?: string };
+type VisitaDoAlbum = { chave: string; quando: string; tipo: "banho" | "creche" | "hotel"; fotos: Foto[]; /** os serviços do horário (banho) */ servicos?: string[]; /** o boletim da visita e quando ele nasceu (para a autorização das redes) */ boletim?: string; boletimEm?: string };
 const ICONE = { banho: Scissors, creche: Sun, hotel: BedDouble } as const;
 const ROTULO = { banho: "Banho e tosa", creche: "Creche", hotel: "Hotel" } as const;
+/** Os serviços do horário, como vêm junto da leitura (o principal e os a mais). */
+type ComServicosDoAlbum = { servicos?: { nome: string } | null; agendamento_servicos?: { servico_id: string; ordem: number; servicos: { nome: string } | null }[] | null };
+/** A visita de banho mostra os serviços feitos ("Banho e corte de unhas"), como o boletim: nunca "Banho e tosa" para um banho. */
+const nomesDoHorario = (a: ComServicosDoAlbum) => (nomeDosServicos(a, "|") ?? "").split("|").filter(Boolean);
 const SEGUNDOS = 61 * 86400;
 const POR_VEZ = 8;
 
@@ -41,12 +46,12 @@ export default function AlbumDoPet({ pet, tutor }: { pet: { id: string; nome: st
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     if (!pode) return { visitas: [] as VisitaDoAlbum[], caminhos: [] as string[] };
     const [b, a, d] = await Promise.all([
-      sb.from("boletins").select("id, fotos, criado_em, agendamento_id, estadia_id, estadias(tipo), agendamentos(inicio)")
+      sb.from("boletins").select("id, fotos, criado_em, agendamento_id, estadia_id, estadias(tipo), agendamentos(inicio, servicos(nome), agendamento_servicos(servico_id, ordem, servicos(nome)))")
         .eq("petshop_id", petshop.id).eq("pet_id", pet.id).order("criado_em", { ascending: false }).limit(300),
       posso("agenda")
-        ? sb.from("agendamentos").select("id, inicio, foto_antes, foto_depois").eq("petshop_id", petshop.id).eq("pet_id", pet.id)
+        ? sb.from("agendamentos").select("id, inicio, foto_antes, foto_depois, servicos(nome), agendamento_servicos(servico_id, ordem, servicos(nome))").eq("petshop_id", petshop.id).eq("pet_id", pet.id)
           .or("foto_antes.not.is.null,foto_depois.not.is.null").order("inicio", { ascending: false }).limit(100)
-        : Promise.resolve({ data: [] as { id: string; inicio: string; foto_antes: string | null; foto_depois: string | null }[], error: null }),
+        : Promise.resolve({ data: [] as { id: string; inicio: string; foto_antes: string | null; foto_depois: string | null }[], error: null as { message: string } | null }) as unknown as Promise<{ data: { id: string }[] | null; error: { message: string } | null }>,
       // Fotos de hoje (diário da creche e do hotel)
       posso("creche_hotel")
         ? sb.from("diario_fotos").select("id, caminho, dia, criado_em, estadia_id, estadias(tipo)").eq("petshop_id", petshop.id).eq("pet_id", pet.id)
@@ -54,7 +59,7 @@ export default function AlbumDoPet({ pet, tutor }: { pet: { id: string; nome: st
         : Promise.resolve({ data: [] as { id: string; caminho: string; dia: string; criado_em: string; estadia_id: string | null; estadias: { tipo: string } | null }[], error: null }),
     ]);
     const doDiario = (d.error ? [] : d.data ?? []) as unknown as { id: string; caminho: string; dia: string; criado_em: string; estadia_id: string | null; estadias: { tipo: string } | null }[];
-    const boletins = ok(b) as unknown as { id: string; fotos: string[]; criado_em: string; agendamento_id: string | null; estadia_id: string | null; estadias: { tipo: string } | null; agendamentos: { inicio: string } | null }[];
+    const boletins = ok(b) as unknown as { id: string; fotos: string[]; criado_em: string; agendamento_id: string | null; estadia_id: string | null; estadias: { tipo: string } | null; agendamentos: ({ inicio: string } & ComServicosDoAlbum) | null }[];
     const caminhos = boletins.flatMap((x) => x.fotos);
     const urls = new Map<string, string>();
     for (let i = 0; i < caminhos.length; i += 100) {
@@ -68,8 +73,8 @@ export default function AlbumDoPet({ pet, tutor }: { pet: { id: string; nome: st
     }
     const mapa = new Map<string, VisitaDoAlbum>();
     // antes e depois do banho (bucket de fotos do pet)
-    for (const x of ok(a) ?? []) {
-      const v: VisitaDoAlbum = { chave: `a:${x.id}`, quando: x.inicio, tipo: "banho", fotos: [] };
+    for (const x of (ok(a) ?? []) as unknown as ({ id: string; inicio: string; foto_antes: string | null; foto_depois: string | null } & ComServicosDoAlbum)[]) {
+      const v: VisitaDoAlbum = { chave: `a:${x.id}`, quando: x.inicio, tipo: "banho", fotos: [], servicos: nomesDoHorario(x) };
       if (x.foto_antes) v.fotos.push({ url: fotoPet(x.foto_antes)!, rotulo: "Antes" });
       if (x.foto_depois) v.fotos.push({ url: fotoPet(x.foto_depois)!, rotulo: "Depois" });
       mapa.set(v.chave, v);
@@ -78,7 +83,7 @@ export default function AlbumDoPet({ pet, tutor }: { pet: { id: string; nome: st
       if (!x.fotos.length) continue;
       const tipo = x.agendamento_id ? "banho" : x.estadias?.tipo === "hotel" ? "hotel" : "creche";
       const chave = x.agendamento_id ? `a:${x.agendamento_id}` : `e:${x.estadia_id}:${isoDia(new Date(x.criado_em))}`;
-      const v = mapa.get(chave) ?? { chave, quando: x.agendamentos?.inicio ?? x.criado_em, tipo, fotos: [] };
+      const v = mapa.get(chave) ?? { chave, quando: x.agendamentos?.inicio ?? x.criado_em, tipo, fotos: [], servicos: x.agendamentos ? nomesDoHorario(x.agendamentos) : undefined };
       if (!v.boletim) { v.boletim = x.id; v.boletimEm = x.criado_em; }
       for (const c of x.fotos) if (urls.get(c)) v.fotos.push({ url: urls.get(c)!, caminho: c, boletim: x.id });
       mapa.set(chave, v);
@@ -147,7 +152,7 @@ export default function AlbumDoPet({ pet, tutor }: { pet: { id: string; nome: st
             const Icone = ICONE[v.tipo];
             return (
               <div key={v.chave} className="g-bol-album-visita">
-                <p><b>{dataLonga(v.quando)}</b><span className="g-tag"><Icone size={12} aria-hidden />{ROTULO[v.tipo]}</span>
+                <p><b>{dataLonga(v.quando)}</b><span className="g-tag"><Icone size={12} aria-hidden />{v.tipo === "banho" ? seloDoBanho(v.servicos) : ROTULO[v.tipo]}</span>
                   {autorizacoes && <EtiquetaFoto estado={estadoDaFoto(autorizacoes, v.boletim, v.boletimEm ?? v.quando)} />}</p>
                 <ul>
                   {v.fotos.map((f, i) => (

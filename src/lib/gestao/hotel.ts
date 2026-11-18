@@ -208,6 +208,18 @@ export function contaDasDiarias(petshop: Petshop, e: EstadiaDaConta, n: number, 
 /** A conta noite a noite mudou alguma noite em relação à diária combinada? (Para a tela dizer "com temporada, feriado ou desconto".) */
 export const temNoiteDiferente = (noites: Noite[] | null) => Boolean(noites?.some((x) => x.temporada != null || x.desconto > 0));
 
+/**
+ * O que mudou o total, dito pelo nome (Sandra, Bia): "com Férias e desconto do segundo pet", "com Feriado: Consciência Negra".
+ * Antes a tela dizia só "com temporada, feriado ou desconto". Sem noite diferente, vazio.
+ */
+export function oQueMudouNasNoites(noites: Noite[] | null): string {
+  if (!noites?.length) return "";
+  const nomes = [...new Set(noites.map((x) => x.temporada).filter((x): x is string => Boolean(x)))];
+  const partes = [...(nomes.length > 3 ? [...nomes.slice(0, 3), `mais ${nomes.length - 3}`] : nomes), ...(noites.some((x) => x.desconto > 0) ? ["desconto do segundo pet"] : [])];
+  if (!partes.length) return "";
+  return `com ${partes.length === 1 ? partes[0] : `${partes.slice(0, -1).join(", ")} e ${partes[partes.length - 1]}`}`;
+}
+
 /** Taxa marcada numa estadia, com a quantidade (1, ou o número de noites) e o total. */
 export type TaxaDaConta = { id: string; nome: string; por: "fixa" | "noite"; valor: number; qtd: number; total: number };
 export const taxaNaConta = (t: Taxa, n: number): TaxaDaConta => { const qtd = t.por === "noite" ? Math.max(1, n) : 1; return { id: t.id, nome: t.nome, por: t.por, valor: t.valor, qtd, total: centavos(qtd * t.valor) }; };

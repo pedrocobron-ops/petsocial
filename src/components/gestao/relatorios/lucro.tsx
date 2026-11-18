@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { Coins, Download, PiggyBank, Receipt, Scale, TrendingUp } from "lucide-react";
 import { linhasDaCasa, montarLucro, OPCAO_COMISSAO_CUSTO, porLucro, type LinhaLucro, type LucroDoBanco } from "@/lib/gestao/lucro";
 import { nomeDaCategoria, usaCasa, usaModulo } from "@/lib/gestao/modulos";

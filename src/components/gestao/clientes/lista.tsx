@@ -1,21 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import Importar, { UltimaImportacao } from "@/components/gestao/importar";
-import FotoCaderno from "@/components/gestao/caderno";
+import Link from "@/components/gestao/link-depois";
+import dynamic from "next/dynamic";
 import { AlertTriangle, Cake, Cat, ChevronRight, Dog, Camera, Download, HandCoins, MessageCircle, PawPrint, Phone, PiggyBank, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { brl, fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
 import { buscarVisitas, sumiu } from "@/lib/gestao/visitas";
 import { useGestao } from "../contexto";
-import FormPet from "../form-pet";
+import { chaveDoRascunho, lerRascunho, RASCUNHO_PET_NOVO } from "../rascunho";
 import { Anel, Kpi } from "../painel";
-import { abrirAssistente, AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
+import { abrirAssistente, AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, useAdiantar, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { baixarCsv, buscarTudo, ESPECIES, linkPet, linkTutor, nomePorte, type PetDaLista } from "./comum";
-import ChamarDeVolta from "./chamar-de-volta";
-import Aniversariantes from "./aniversariantes";
-import FormTutor from "./form-tutor";
+
+// folhas que só abrem com um toque (caderno, planilha, pet novo, tutor novo, chamar de volta, aniversariantes) vêm à parte e baixam
+// depois que a lista apareceu (useAdiantar): no celular com internet fraca, a lista não espera por elas
+const carregarFormPet = () => import("../form-pet");
+const carregarFormTutor = () => import("./form-tutor");
+const carregarImportar = () => import("@/components/gestao/importar");
+const FormPet = dynamic(carregarFormPet, { ssr: false });
+const FormTutor = dynamic(carregarFormTutor, { ssr: false });
+const Importar = dynamic(carregarImportar, { ssr: false });
+const UltimaImportacao = dynamic(() => carregarImportar().then((m) => m.UltimaImportacao), { ssr: false });
+const FotoCaderno = dynamic(() => import("@/components/gestao/caderno"), { ssr: false });
+const ChamarDeVolta = dynamic(() => import("./chamar-de-volta"), { ssr: false });
+const Aniversariantes = dynamic(() => import("./aniversariantes"), { ssr: false });
 import { EtiquetaSaude } from "./saude";
 import { buscarAlertasSaude } from "./saude-avisos";
 
@@ -64,6 +73,7 @@ export default function Lista({ aoAbrir, irPara }: {
   irPara: (url: string) => void;
 }) {
   const { sb, petshop, posso, eu, vejoFinanceiro } = useGestao();
+  useAdiantar(carregarFormPet, carregarFormTutor);
   // a lista inteira de clientes (baixar a planilha, trazer de planilha) é com o dono e o gerente; quem atende consulta um por um
   const listaInteira = eu.papel === "dono" || eu.papel === "gerente";
   const { avisar, avisarErro } = useAvisos();
@@ -94,6 +104,11 @@ export default function Lista({ aoAbrir, irPara }: {
     if (!somenteLeitura()) setPetNovo(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // "Pet novo" que ficou pela metade (a página recarregou): reabre com o que estava escrito
+  useEffect(() => {
+    if (lerRascunho(chaveDoRascunho(petshop.id, eu.id, RASCUNHO_PET_NOVO)) && !somenteLeitura()) setPetNovo(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [petshop.id, eu.id]);
   const [chamando, setChamando] = useState(false);
   const [niverDoMes, setNiverDoMes] = useState(false);
 

@@ -4,9 +4,10 @@ import { Selo } from "./marca";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Check, CheckCheck, ChevronDown, MessageCircle, RotateCcw, SlidersHorizontal, Volume2, VolumeX } from "lucide-react";
 import { hora, isoDia } from "@/lib/gestao/util";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { useGestao } from "./contexto";
-import { avisarMudanca } from "./ui";
+import { avisarMudanca, semInternet } from "./ui";
+import { textoDeRede } from "@/lib/gestao/validacao";
 import { BotaoMic, EscolherVoz, FaixaVoz, falar, falarAosPoucos, guardarEnviarSozinho, guardarLerRespostas, lerEnviarSozinho, lerLerRespostas, pararDeFalar, SEM_VOZ, temLeitura, useDitado, useVozes } from "./voz";
 import { TextoMozart } from "./texto-mozart";
 import { chaveDaConversa, guardarConversa, lerConversa } from "@/lib/gestao/assistente/guardada";
@@ -75,15 +76,16 @@ if (typeof window !== "undefined") {
 }
 
 /** Sugestões do começo da conversa, pelo que o pet shop faz (loja só de creche ou de hotel não lê "Marca banho"). */
-function sugestoesPara(p: { modulos?: string[] | null }, dinheiro: boolean) {
-  const banho = usaModulo(p, "banho_tosa"), creche = usaModulo(p, "creche"), hotel = usaModulo(p, "hotel");
+function sugestoesPara(p: { modulos?: string[] | null }, dinheiro: boolean, posso: (a: "agenda" | "creche_hotel" | "clientes") => boolean = () => true) {
+  // só o que a pessoa pode fazer: quem não tem a Agenda não lê "Marca banho" (o Mozart recusaria)
+  const banho = usaModulo(p, "banho_tosa") && posso("agenda"), creche = usaModulo(p, "creche") && posso("creche_hotel"), hotel = usaModulo(p, "hotel") && posso("creche_hotel");
   const l: string[] = [];
-  if (banho || (!creche && !hotel)) l.push("Marca banho da Mel sexta às 10h", "Que horários tenho livres amanhã?");
+  if (banho || (!creche && !hotel && posso("agenda"))) l.push("Marca banho da Mel sexta às 10h", "Que horários tenho livres amanhã?");
   if (creche) l.push(banho ? "Quem vem na creche amanhã?" : "Coloca a Mel na creche sexta", "Quem vem na creche amanhã?");
   if (hotel) l.push(creche || banho ? "Quem está no hotel hoje?" : "Reserva o hotel do Thor de sexta a domingo", "Quem está no hotel hoje?");
   const unicas = [...new Set(l)].slice(0, 2);
   if (dinheiro) unicas.push(hotel ? "Quanto recebi de sinal este mês?" : "Quanto entrou essa semana?");
-  unicas.push("Quem não vem há mais de um mês?");
+  if (posso("clientes")) unicas.push("Quem não vem há mais de um mês?");
   return unicas;
 }
 
@@ -259,7 +261,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
       // a página está recarregando: o pedido fica anotado para terminar depois
       if (saindo) return;
       memoria.decidindo = null; memoria.esperando = false;
-      acrescentar({ tipo: "erro", texto: "Sem conexão. Confira a internet e tente de novo." });
+      acrescentar({ tipo: "erro", texto: textoDeRede(!semInternet()) });
     } finally {
       // o texto falado até aqui termina (resposta com erro ou só cartão)
       if (voz.atual) voz.atual.terminar();
@@ -383,7 +385,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     persistir();
   }
 
-  const sugestoes = sugestoesPara(petshop, vejoFinanceiro);
+  const sugestoes = sugestoesPara(petshop, vejoFinanceiro, posso);
 
   const primeiro = eu.nome.split(" ")[0];
   // a última resposta foi o servidor dizendo que o Mozart está fora do ar: o topo não diz "online"
@@ -500,7 +502,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
           )}
         </FaixaVoz>
         <form className="g-ass-entrada" onSubmit={(e) => { e.preventDefault(); enviar(texto); }}>
-          <textarea ref={caixa} rows={1} value={texto} placeholder={ditado.ouvindo ? "Estou ouvindo…" : pensando ? "Escreva: vai na fila" : temPendente ? "Confirme acima ou peça um ajuste" : "Mensagem"} aria-label="Seu pedido"
+          <textarea ref={caixa} rows={1} value={texto} placeholder={ditado.ouvindo ? "Estou ouvindo…" : pensando ? "Escreva: vai na fila" : temPendente ? "Confirme ou peça ajuste" : "Mensagem"} aria-label="Seu pedido"
             readOnly={ditado.ouvindo}
             onPointerDown={() => { if (contagem !== null) cancelarEnvio(); }}
             onFocus={() => { if (contagem !== null) cancelarEnvio(); }}

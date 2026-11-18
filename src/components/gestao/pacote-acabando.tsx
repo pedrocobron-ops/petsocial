@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { MessageCircle, RotateCcw, Ticket } from "lucide-react";
 import { ETIQUETA_MOTIVO, fraseDoPacote, lerPacotesAcabando, linkRenovar, textoOferecerRenovar, type PacoteAcabando } from "@/lib/gestao/pacote-acabando";
 import { linkWhatsApp } from "@/lib/gestao/util";

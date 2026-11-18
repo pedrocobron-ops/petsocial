@@ -2,26 +2,34 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ClipboardCheck, ScrollText, X } from "lucide-react";
-import { banco } from "@/lib/gestao/supabase";
+import { bancoDepois as banco } from "@/lib/gestao/supabase-depois";
 import { esquecerPedido, pedidosLembrados, type OpcoesNoLink, type PedidoLembrado } from "@/lib/gestao/link-opcoes";
 
 export type TermosDoLink = NonNullable<OpcoesNoLink["termos"]>;
 export type Aceite = { regras: boolean; vacinas: boolean };
 export const SEM_ACEITE: Aceite = { regras: false, vacinas: false };
 
-/** As regras que quem recebe o pedido escreveu (null = não pede aceite). Vêm do banco; a página não guarda nada. */
-export function useTermosDoLink(codigo: string) {
-  const [termos, setTermos] = useState<TermosDoLink | null>(null);
+const lerTermos = (t: unknown): TermosDoLink | null => {
+  const x = t as OpcoesNoLink["termos"] | null;
+  return x && typeof x === "object" ? { texto: String(x.texto ?? ""), vacinas: !!x.vacinas } : null;
+};
+
+/**
+ * As regras que quem recebe o pedido escreveu (null = não pede aceite). Vêm do banco; a página não guarda nada.
+ * `inicial`: o que o servidor já leu (undefined = não leu, a página lê pelo navegador).
+ */
+export function useTermosDoLink(codigo: string, inicial?: unknown) {
+  const [termos, setTermos] = useState<TermosDoLink | null>(() => (inicial === undefined ? null : lerTermos(inicial)));
   const buscar = useCallback(async () => {
     if (!codigo) return null;
     const { data, error } = await banco().rpc("link_opcoes", { p_codigo: codigo });
     if (error) return null;
-    const t = (data as unknown as OpcoesNoLink | null)?.termos ?? null;
-    const lido = t && typeof t === "object" ? { texto: String(t.texto ?? ""), vacinas: !!t.vacinas } : null;
+    const lido = lerTermos((data as unknown as OpcoesNoLink | null)?.termos ?? null);
     setTermos(lido);
     return lido;
   }, [codigo]);
-  useEffect(() => { void buscar(); }, [buscar]);
+  const jaVeio = inicial !== undefined;
+  useEffect(() => { if (!jaVeio) void buscar(); }, [buscar, jaVeio]);
   return { termos, recarregarTermos: buscar };
 }
 

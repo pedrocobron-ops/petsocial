@@ -1,6 +1,6 @@
 // Primeiro acesso de um dono novo até o primeiro resultado útil, contando toques e campos (Playwright).
 // Celular (390): criar a conta, as duas perguntas do Mozart, "Começar já", o fim do guia ("Pronto em X minutos", "Marcar o
-// primeiro horário", "Copiar meu link de agendamento") e o primeiro horário marcado com o pet novo cadastrado ali mesmo
+// primeiro horário", "Copiar o link do cliente") e o primeiro horário marcado com o pet novo cadastrado ali mesmo
 // ("O primeiro horário … está marcado. Pronto em X minutos."). Computador (1366): o mesmo começo, até o link copiado.
 // Teto de toques e campos: o caminho não pode voltar a crescer sem ninguém ver (antes desta mudança: 19 toques e 9 campos
 // até o primeiro horário). A conta e a loja são apagadas no fim.
@@ -38,7 +38,7 @@ async function percorrer(largura, { ateOHorario }) {
   await digita(page.locator('input[minlength="2"]'), `Banho Teste ${suf}`);
   await toque(page.locator('button.g-btn.pri', { hasText: 'Continuar' }));
   await toque(page.locator('.g-mod-op').first());
-  await toque(page.locator('button.g-btn.pri', { hasText: 'Criar meu pet shop' }));
+  await toque(page.locator('button.g-btn.pri', { hasText: 'Continuar' }));
   await page.waitForURL('**/gestao/app**', { timeout: 30000 });
   L.P = B.sql(`select p.petshop_id from profissionais p join auth.users u on u.id = p.user_id where u.email = '${email}'`);
 
@@ -57,8 +57,15 @@ async function percorrer(largura, { ateOHorario }) {
   T.ok(`${largura}: o fim do guia diz em quanto tempo ficou pronto`, /^Pronto em \d+ minutos?\.$/.test((pronto || '').trim()), pronto);
   const cta = page.locator('[data-teste=primeiro-horario]');
   T.ok(`${largura}: "Marcar o primeiro horário" é o botão principal do fim`, (await cta.isVisible()) && /\bpri\b/.test(await cta.getAttribute('class')));
+  // rodada 8 (estreante M4): o fim do guia diz o que falta com a mesma conta e a mesma lista do cartão da tela Hoje
+  const falta = page.locator('[data-teste=o-que-falta]');
+  await falta.waitFor({ timeout: 15000 }).catch(() => {});
+  const tFalta = ((await falta.textContent().catch(() => '')) || '').replace(/ /g, ' ');
+  const nFalta = Number((tFalta.match(/Faltam (\d+) coisas para começar/) || [])[1]);
+  T.ok(`${largura}: o fim do guia diz "Faltam N coisas para começar" e lista as N`, nFalta > 0 && (await falta.locator('.g-pps-passo').count()) === nFalta && /Marcar o primeiro horário/.test(tFalta), tFalta);
+  T.ok(`${largura}: o pet shop nasce no modo simples (já marcado na segunda pergunta)`, B.sql(`select coalesce(opcoes->>'geral.modo_simples', '') from petshops where id = '${L.P}'`) === 'true');
   const copiar = page.locator('[data-teste=copiar-link]');
-  T.ok(`${largura}: "Copiar meu link de agendamento" aparece com o link ligado`, await copiar.isVisible());
+  T.ok(`${largura}: "Copiar o link do cliente" aparece com o link ligado`, await copiar.isVisible());
   T.ok(`${largura}: sem rolagem para o lado no fim do guia`, (await N.rolagemLateral(page)) <= 0);
 
   // primeiro resultado útil pelo link: um toque

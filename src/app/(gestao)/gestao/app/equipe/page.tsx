@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ArrowRight, CalendarCheck, CalendarDays, ChevronRight, Hourglass, KeyRound, Lock, Mail, Percent, Scissors, Send, Smartphone, UserPlus, Users } from "lucide-react";
 import { Kpi, Tile } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";

@@ -2,7 +2,7 @@
 
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { AlertTriangle, ArrowRight, BedDouble, CalendarCheck, CalendarOff, DoorOpen, Home, HandCoins, Hourglass, LogIn, LogOut, MessageCircle, Moon, NotebookPen, Pencil, Plus, Printer, Settings2, ShieldAlert, ShieldCheck, Sun, Sunset, Syringe, Tag, Truck } from "lucide-react";
 import { useCalendario } from "@/components/gestao/calendario";
 import { useGestao } from "@/components/gestao/contexto";
@@ -40,10 +40,11 @@ import { abreNoDia, esperadoNoDia, experienciaDe, lerPlanos, lerPresencas, monta
 import { conferirCaixa, conferirValorAlto, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import { casoDoErro, fazerTudoOuNada, ref, type Passo, type ResultadoDaOperacao } from "@/lib/gestao/tudo-ou-nada";
 import { useOperacao, useTrava } from "@/lib/gestao/uma-vez";
+import { DIAS_MAXIMOS_ESTADIA, saidaLongeDemais } from "@/lib/gestao/validacao";
 import { atrasoSugerido, diaFechado, fraseDoDiaFechado, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
 import {
   aceitaSinal, contaDasDiarias, contarDiarias, diariaFixa, diasDasNoites, diariaSugerida, estadiaSemCobranca, fatosDoDia, lerConta, lerCuidados, nivelDeOcupacao, nomeDaAcomodacao, ocupadasNoDia, ocupaNoDia, precoPorNoite, sinalSugerido,
-  taxaNaConta, taxasGuardadas, temNoiteDiferente, textoDoCuidado, vagasDoTipo, type ContaDaEstadia, type Cuidado, type CuidadoFeito, type EstadiaDoTutor, type Mens, type ValoresDaEstadia,
+  taxaNaConta, taxasGuardadas, temNoiteDiferente, oQueMudouNasNoites, textoDoCuidado, vagasDoTipo, type ContaDaEstadia, type Cuidado, type CuidadoFeito, type EstadiaDoTutor, type Mens, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
 import { acomodacoesDe, cuidadosLigados, horasDoHotel, porteDe, taxasDe } from "@/lib/gestao/hotel-opcoes";
 import { principalDe, usaModulo } from "@/lib/gestao/modulos";
@@ -163,7 +164,7 @@ function LinhaValor({ e, plano, abertas, valores }: { e: EstadiaCompleta; plano?
       <span>Diária <b className="g-tab">{brl(e.valor_diaria)}</b></span>
       {Number(e.valor_diaria) === 0 && !p.total ? <span className="g-tag">cortesia</span>
         : p.aberto ? <span className="g-muted">sem saída prevista</span>
-        : <span>Total previsto <b className="g-tab">{brl(p.total)}</b> <span className="g-muted">({p.n} {p.n === 1 ? "diária" : "diárias"}{p.comRegra ? ", com temporada, feriado ou desconto" : ""}{p.taxas ? " e taxas" : ""})</span></span>}
+        : <span>Total previsto <b className="g-tab">{brl(p.total)}</b> <span className="g-muted">({p.n} {p.n === 1 ? "diária" : "diárias"}{p.comRegra ? `, ${oQueMudouNasNoites(p.noites) || "com temporada, feriado ou desconto"}` : ""}{p.taxas ? " e taxas" : ""})</span></span>}
       {sinal}
       {e.status === "reservada" && !p.aberto && <AjusteDoSinal estadiaId={e.id} valores={valores} total={p.total} aoGravar={avisarMudanca} />}
     </p>
@@ -1035,6 +1036,12 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   const doPorte = tipo === "hotel" && opPorte.ativo && fixa != null && (pet?.porte === "P" || pet?.porte === "M" || pet?.porte === "G" || pet?.porte === "GG") && opPorte[pet.porte] != null;
   const { dados: vencidas } = useDados(async () => (pet ? vacinasVencidas(sb, petshop.id, pet.id).catch(() => []) : []), [petshop.id, pet?.id]);
 
+  /** Saída prevista em branco de novo (trocou o pet, o tipo ou o "chegou agora"): uma data velha nunca passa para outra estadia. */
+  function limparSaida(t: Tipo = tipo) {
+    if (editar) return;
+    setSaidaDia("");
+    setSaidaHora(saidaHoraInicial ?? horaPadrao(t, "saida"));
+  }
   function escolherPet(p: PetDaEstadia) {
     setPet(p);
     if (!mexeuNaDiaria) setDiaria(diariaSugerida(petshop, tipo, p.porte));
@@ -1045,7 +1052,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
     // as horas sugeridas acompanham o tipo (quem já mudou a hora continua com a dela)
     if (!editar) {
       if (hhmm === horaPadrao(tipo, "entrada") && !horaInicial) setHhmm(horaPadrao(t, "entrada"));
-      if (saidaHora === horaPadrao(tipo, "saida") && !saidaHoraInicial) setSaidaHora(horaPadrao(t, "saida"));
+      limparSaida(t);
     }
     // trocou o tipo: a diária passa a ser o preço fixo do tipo novo, a não ser que a pessoa digite outro valor depois da troca
     if (!mexeuNaDiaria || editar) { setDiaria(diariaSugerida(petshop, t, pet?.porte)); setMexeuNaDiaria(false); }
@@ -1054,7 +1061,9 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
   // o que está no formulário agora (muda na hora quando troca o tipo, as datas ou a diária)
   const entradaForm = escolheEntrada ? (dia && hhmm ? juntaDiaHora(dia, hhmm) : null) : new Date();
   const saidaForm = saidaDia ? juntaDiaHora(saidaDia, saidaHora || "18:00") : null;
-  const datasBoas = Boolean(entradaForm && !Number.isNaN(entradaForm.getTime()) && (!saidaForm || (!Number.isNaN(saidaForm.getTime()) && saidaForm > entradaForm)));
+  // saída a meses (ou anos) da entrada: quase sempre data velha ou ano trocado. Não calcula o total e não deixa salvar.
+  const longeDemais = entradaForm && !Number.isNaN(entradaForm.getTime()) ? saidaLongeDemais(tipo, entradaForm, saidaForm) : null;
+  const datasBoas = !longeDemais && Boolean(entradaForm && !Number.isNaN(entradaForm.getTime()) && (!saidaForm || (!Number.isNaN(saidaForm.getTime()) && saidaForm > entradaForm)));
   const periodoForm: Periodo | null = datasBoas ? { tipo, entrada: entradaForm!.toISOString(), saida_prevista: saidaForm?.toISOString() ?? null, status: emCasa ? "em_casa" : "reservada" } : null;
   const taxasDaReserva = opTaxas.ativo ? opTaxas.lista.filter((t) => taxasMarcadas.includes(t.id)) : taxasGuardadas(valores).filter((t) => taxasMarcadas.includes(t.id));
   const prev = pet && periodoForm && diaria != null
@@ -1118,6 +1127,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
     if (emCasa && entrada.getTime() > agora.getTime() + 60000) return falha("O pet já está na casa: a entrada não pode ser no futuro.");
     const saida = saidaDia ? juntaDiaHora(saidaDia, saidaHora || "18:00") : null;
     if (saida && (Number.isNaN(saida.getTime()) || saida <= entrada)) return falha("A saída prevista precisa ser depois da entrada.");
+    const longe = saidaLongeDemais(tipo, entrada, saida);
+    if (longe) return falha(longe);
     if (diaria != null && diaria < 0) return falha("A diária não pode ser negativa.");
     if (diaria != null && diaria > 99999) return falha("Confira o valor da diária.");
     const sinalPronto = ofereceSinal ? prepararSinal(sinal) : ofereceAdiantado && adiantado.modo === "agora" ? prepararSinal(adiantado) : { modo: "sem" as const };
@@ -1271,7 +1282,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         <div className="g-fila" style={{ flexWrap: "nowrap" }}>
           <AvatarPet pet={pet} />
           <div className="g-cresce"><b style={{ display: "block" }}>{pet.nome}</b><span className="g-muted g-p">{pet.clientes?.nome ?? "Sem tutor"}</span></div>
-          {!editar && <button type="button" className="g-btn fantasma p" onClick={() => { setPet(null); setErro(null); }}>Trocar</button>}
+          {!editar && <button type="button" className="g-btn fantasma p" onClick={() => { setPet(null); setErro(null); limparSaida(); }}>Trocar</button>}
         </div>
         {jaNaCasa && <div className="g-aviso vermelho" role="alert" style={{ marginBottom: 0 }}><AlertTriangle /><span className="g-cresce"><b>{fraseConflito(pet.nome, jaNaCasa)}</b> Não dá para fazer outro check-in; uma reserva para depois, sim.</span></div>}
         {Boolean(vencidas?.length) && (
@@ -1289,8 +1300,8 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         )}
         {!editar && (
           <div className="g-seg g-ht-seg" role="group" aria-label="Quando o pet vem">
-            <button type="button" aria-pressed={!jaAqui} onClick={() => setJaAqui(false)}>Reservar para outro dia</button>
-            <button type="button" aria-pressed={jaAqui} onClick={() => setJaAqui(true)}>Chegou agora</button>
+            <button type="button" aria-pressed={!jaAqui} onClick={() => { if (jaAqui) { setJaAqui(false); limparSaida(); } }}>Reservar para outro dia</button>
+            <button type="button" aria-pressed={jaAqui} onClick={() => { if (!jaAqui) { setJaAqui(true); limparSaida(); } }}>Chegou agora</button>
           </div>
         )}
         {escolheEntrada && (
@@ -1300,9 +1311,13 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
           </div>
         )}
         <div className="dupla">
-          <Campo rotulo="Saída prevista" dica="Opcional"><input type="date" className="g-input" value={saidaDia} min={escolheEntrada ? dia : isoDia(new Date())} onChange={(e) => setSaidaDia(e.target.value)} /></Campo>
+          <Campo rotulo="Saída prevista" dica={longeDemais ? undefined : "Opcional"}><input type="date" className="g-input" value={saidaDia} min={escolheEntrada ? dia : isoDia(new Date())}
+            max={entradaForm && !Number.isNaN(entradaForm.getTime()) ? isoDia(somaDias(entradaForm, tipo === "creche" ? DIAS_MAXIMOS_ESTADIA.creche : DIAS_MAXIMOS_ESTADIA.hotel)) : undefined}
+            aria-invalid={longeDemais ? true : undefined} onChange={(e) => setSaidaDia(e.target.value)} /></Campo>
           <Campo rotulo="Hora"><input type="time" className="g-input" value={saidaHora} onChange={(e) => setSaidaHora(e.target.value)} disabled={!saidaDia} /></Campo>
         </div>
+        {/* a frase ocupa a largura toda (embaixo do dia e da hora), para a hora não descer sozinha */}
+        {longeDemais && <p className="g-erro g-p" role="alert" style={{ margin: 0 }}>{longeDemais}</p>}
         {diasFechados.length > 0 && (
           <p className="g-ht-fechado" role="status">
             <CalendarOff aria-hidden />
@@ -1401,7 +1416,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
           <p className="g-ch-valor g-ch-previsto" aria-live="polite">
             {prev.total === 0 ? <span className="g-tag">cortesia</span>
               : prev.aberto ? <span className="g-muted">Sem saída prevista: o total sai no check-out.</span>
-              : <span>Total previsto <b className="g-tab">{brl(prev.total)}</b> <span className="g-muted">({prev.n} {prev.n === 1 ? "diária" : "diárias"}{prev.comRegra ? ", com temporada, feriado ou desconto" : ` de ${brl(diaria)}`}{prev.taxas ? ` e ${brl(prev.taxas)} de taxas` : ""})</span></span>}
+              : <span>Total previsto <b className="g-tab">{brl(prev.total)}</b> <span className="g-muted">({prev.n} {prev.n === 1 ? "diária" : "diárias"}{prev.comRegra ? `, ${oQueMudouNasNoites(prev.noites) || "com temporada, feriado ou desconto"}` : ` de ${brl(diaria)}`}{prev.taxas ? ` e ${brl(prev.taxas)} de taxas` : ""})</span></span>}
           </p>
         )}
         {vejoFinanceiro && prev && !prev.aberto && prev.noites && temNoiteDiferente(prev.noites) && <NoitePorNoite noites={prev.noites} total={prev.diarias} />}

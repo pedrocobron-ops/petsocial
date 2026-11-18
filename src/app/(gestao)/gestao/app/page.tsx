@@ -5,8 +5,6 @@ import { lerDadosDoHoje } from "@/components/gestao/hoje-dados";
 import { BellRing, CalendarCheck2, CalendarX, UserX } from "lucide-react";
 import { CATEGORIA_MENSALIDADE, experienciaDe, juntar, lerExperiencias, resumoDaCrecheHoje } from "@/lib/gestao/creche";
 import ChamadaDeHoje from "@/components/gestao/creche/chamada-hoje";
-import { OcorrenciasDeHoje } from "@/components/gestao/casa/ocorrencias";
-import { useVagaNaEsperaDoHotel } from "@/components/gestao/casa/espera";
 
 import { Marca, Selo } from "@/components/gestao/marca";
 import { Anel, Barras, Kpi, Ranking, Tendencia, Tile, type Tom } from "@/components/gestao/painel";
@@ -15,7 +13,7 @@ import FimDoTeste, { DIAS_DE_AVISO, ProgressoDoTeste, chaveAgoraNao, fimDoTeste 
 import PrimeirosPassos, { usePrimeirosPassos } from "@/components/gestao/primeiros-passos";
 import ResumoSemana, { temSemanaPassada } from "@/components/gestao/resumo-semana";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ShoppingBag, BedDouble, Camera, FileSpreadsheet, Cake, CalendarDays, Check, HandCoins, HeartPulse, ChevronRight, MessageCircle, Mic, Package, PawPrint, Plus, Receipt, Scissors, Sparkles, Ticket, UserSearch, Wallet } from "lucide-react";
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
@@ -27,22 +25,16 @@ import { fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "@/components/gestao/calendario";
 import { frenteDe, nomeDaCasa, principalDe, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ChegamESaem, FrenteDaLoja, RecebidoNaSemana, ROTA_VENDER, pedidosDaFrente } from "@/components/gestao/hoje-frente";
-import MinhaComissao from "@/components/gestao/minha-comissao";
-import MeuMes from "@/components/gestao/meu-mes";
 import { AvatarPet, Esqueleto, LinkDeGravar, Vazio, abrirAssistente, useAdiantar, useDados } from "@/components/gestao/ui";
 import dynamic from "next/dynamic";
 import { ErroDeTeste } from "@/components/gestao/erros";
 import LinkRapido from "@/components/gestao/agenda/link-rapido";
-import MetaMes from "@/components/gestao/meta-mes";
-import DicasMozart from "@/components/gestao/dicas-mozart";
 import BomDia from "@/components/gestao/bom-dia";
 import { fraseDaContaFixa, lerAvisosContasFixas } from "@/lib/gestao/contas-fixas";
-import EntradaModoEnvio from "@/components/gestao/modo-envio-entrada";
 import ChamarDeVolta, { aniversariantes, buscarParaChamar, chamadoEm, lerChamados, quemSumiu, type AbaChamar, type GrupoChamar } from "@/components/gestao/clientes/chamar-de-volta";
 import LembretesDoDia, { BotaoLembrete } from "@/components/gestao/agenda/lembretes";
 import { AtendimentosParaCobrar, MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
-import AlteracoesDeValores from "@/components/gestao/financeiro/alteracoes-de-valores";
-import { resumoDaValidade, useVencimentos } from "@/components/gestao/loja/validade";
+import type { ResumoDaValidade, VagaNaEspera } from "@/components/gestao/hoje-sensores";
 
 // folhas que só abrem com um toque: vêm à parte e baixam depois que a tela abriu (useAdiantar)
 const carregarDetalhe = () => import("@/components/gestao/agenda/detalhe-agendamento");
@@ -53,6 +45,20 @@ const Importar = dynamic(() => import("@/components/gestao/importar"), { ssr: fa
 const FotoCaderno = dynamic(() => import("@/components/gestao/caderno"), { ssr: false });
 // pedidos pelo link: o cartão só aparece quando há pedido (até lá, nada na tela); vem à parte e não segura a tela
 const PedidosLink = dynamic(() => import("@/components/gestao/agenda/pedidos-link"), { ssr: false });
+// cartões de baixo da tela e de quem tem a área (meta, meu mês, comissão, alterações, ocorrências, dicas) e as leituras de
+// fundo que moram em módulos grandes (lista de espera do hotel, validade): vêm à parte, para o primeiro pacote da Hoje ser
+// menor no celular com internet fraca. Os cartões aparecem quando chegam; o que mostram não muda.
+const EntradaModoEnvio = dynamic(() => import("@/components/gestao/modo-envio-entrada"), { ssr: false });
+const MetaMes = dynamic(() => import("@/components/gestao/meta-mes"), { ssr: false });
+const MeuMes = dynamic(() => import("@/components/gestao/meu-mes"), { ssr: false });
+const MinhaComissao = dynamic(() => import("@/components/gestao/minha-comissao"), { ssr: false });
+const DicasMozart = dynamic(() => import("@/components/gestao/dicas-mozart"), { ssr: false });
+const AlteracoesDeValores = dynamic(() => import("@/components/gestao/financeiro/alteracoes-de-valores"), { ssr: false });
+const OcorrenciasDeHoje = dynamic(() => import("@/components/gestao/casa/ocorrencias").then((m) => m.OcorrenciasDeHoje), { ssr: false });
+const SensorDaEspera = dynamic(() => import("@/components/gestao/hoje-sensores").then((m) => m.SensorDaEspera), { ssr: false });
+const SensorDaValidade = dynamic(() => import("@/components/gestao/hoje-sensores").then((m) => m.SensorDaValidade), { ssr: false });
+const SEM_VAGA: VagaNaEspera = { n: 0, nomes: [] };
+const SEM_VALIDADE: ResumoDaValidade = { vencidos: [], em30: [], perto: new Map() };
 
 const PEDIDOS = ["Que horários tenho livres amanhã?", "Quanto entrou essa semana?", "Quem não vem há mais de um mês?"];
 
@@ -165,14 +171,13 @@ export default function Hoje() {
   // (vêm na mesma leitura do primeiro olhar)
   const paraCobrar = dados?.paraCobrar ?? 0;
   // lista de espera do hotel: abriu vaga para alguém (mesma conta da Ocupação)
-  const vagaNaEspera = useVagaNaEsperaDoHotel(posso("creche_hotel"));
+  const [vagaNaEspera, setVagaNaEspera] = useState<VagaNaEspera>(SEM_VAGA);
   // mensalistas que saíram depois do horário e esperam a decisão da taxa (só quem recebe lê; na mesma leitura)
   const taxasPendentes = dados?.taxasPendentes ?? 0;
   // abaixo da dobra: só depois que o primeiro olhar chegou (não disputa a rede com ele)
   const primeiroOlhar = Boolean(dados);
   // validade dos produtos (lotes vencidos e vencendo em 30 dias): leitura à parte, só para quem cuida do estoque
-  const { dados: venc } = useVencimentos(vejoEstoque && primeiroOlhar);
-  const validade = resumoDaValidade(venc);
+  const [validade, setValidade] = useState<ResumoDaValidade>(SEM_VALIDADE);
   const { dados: paraChamar } = useDados(async () => (vejoClientes && primeiroOlhar ? buscarParaChamar(sb, petshop.id) : null), [petshop.id, hojeIso, vejoClientes, primeiroOlhar]);
   const chamados = paraChamar ? lerChamados(petshop.id) : {};
   const comFone = (grupos: GrupoChamar[]) => grupos.filter((g) => g.telefone);
@@ -297,13 +302,15 @@ export default function Hoje() {
   return (
     <>
       <ErroDeTeste />
+      <SensorDaEspera ligado={posso("creche_hotel")} aoMudar={setVagaNaEspera} />
+      {vejoEstoque && primeiroOlhar && <SensorDaValidade ativo aoMudar={setValidade} />}
       <header className="g-topo">
         <div>
           <p className="g-rotulo" style={{ marginBottom: 6 }}>{dataLonga(hoje)}</p>
           <h1>{saudacao()}, <em className="it">{eu.nome.split(" ")[0]}</em></h1>
         </div>
         <div className="g-acoes">
-          {posso("agenda") && banho && !contaNova && liberado && <LinkRapido rotulo="Mandar link de agendamento" />}
+          {posso("agenda") && banho && !contaNova && liberado && <LinkRapido rotulo="Mandar o link do cliente" />}
           {passoNovo ? (passoNovo.href
               ? <Link className="g-btn pri" href={passoNovo.href} onClick={passoNovo.aoTocar}><ChevronRight />{passoNovo.texto}</Link>
               : <button type="button" className="g-btn pri" onClick={passoNovo.aoTocar}><ChevronRight />{passoNovo.texto}</button>)
@@ -351,7 +358,7 @@ export default function Hoje() {
             <div className="g-pilha p">
               <div className="g-fila"><button className="g-btn pri" onClick={() => abrirAssistente()}><Mic />Falar com o Mozart</button></div>
               <div className="g-sugestoes">
-                {pedidosDaFrente(frente, PEDIDOS).filter((p) => cuidoDoFinanceiro || !p.startsWith("Quanto")).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
+                {pedidosDaFrente(frente, PEDIDOS).filter((p) => (cuidoDoFinanceiro || !p.startsWith("Quanto")) && (posso("agenda") || !p.includes("horários")) && (posso("clientes") || !p.startsWith("Quem não vem"))).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
               </div>
             </div>
           </section>
@@ -472,9 +479,9 @@ export default function Hoje() {
                 {!banho ? (
                   <Vazio mozart="acenando" titulo="Nenhum horário marcado para hoje" texto={casa ? `Serviços com hora marcada aparecem aqui. As estadias ficam em ${rotuloCasa}.` : "Serviços com hora marcada aparecem aqui."} />
                 ) : contaNova && posso("clientes") ? (
-                  <Vazio mozart="acenando" titulo="A agenda começa pelo primeiro pet" texto="Cadastre um pet com o tutor. Depois é só marcar: o horário aparece aqui.">
-                    {/* com outro passo antes (os preços, por exemplo), o botão fica só no alto da tela: um caminho só */}
-                    {(!passoNovo || passoNovo.id === "pet") && <LinkDeGravar className="g-btn verde" href="/gestao/app/clientes?novo=1">Cadastrar o primeiro pet</LinkDeGravar>}
+                  <Vazio mozart="acenando" titulo="Nenhum horário ainda" texto={posso("agenda") ? "Marque o primeiro: o pet entra na hora, só com o nome e o tutor. O horário aparece aqui." : "Os horários marcados aparecem aqui."}>
+                    {/* o próximo passo já está no alto da tela (e nos primeiros passos): aqui só sem passo na tela, para não repetir */}
+                    {!passoNovo && posso("agenda") && <LinkDeGravar className="g-btn verde" href="/gestao/app/agenda?novo=1">Marcar o primeiro horário</LinkDeGravar>}
                   </Vazio>
                 ) : (
                   <Vazio mozart="acenando" titulo="Nenhum banho marcado para hoje" texto="Que tal chamar quem está com o banho atrasado? O Mozart monta a lista para você.">

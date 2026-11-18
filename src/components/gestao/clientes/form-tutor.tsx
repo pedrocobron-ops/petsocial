@@ -9,6 +9,7 @@ import { FolhaMesmaPessoa, acharTutorIgual, useTutores, type TutorCurto } from "
 import { CampoComVoz } from "../ditado";
 import { diasNoMes, lerNascimento, MESES, montarNascimento } from "@/lib/gestao/aniversario";
 import "./aniversario.css";
+import { limparNome } from "@/lib/gestao/validacao";
 
 /** Cadastro ou edição de um tutor (cliente). */
 export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: Cliente; aoFechar: () => void; aoSalvar: (c: Cliente) => void }) {
@@ -64,7 +65,7 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
           confirmar: "Salvar mesmo assim",
         }))) { setSalvando(false); return; }
       }
-      const campos = { nome: nome.trim(), telefone: telefoneLimpo(telefone) || null, email: email.trim() || null, endereco: endereco.trim() || null, obs: obs.trim() || null, nao_quer_mensagens: naoQuer, nascimento: nascimento.valor };
+      const campos = { nome: limparNome(nome), telefone: telefoneLimpo(telefone) || null, email: email.trim() || null, endereco: endereco.trim() || null, obs: obs.trim() || null, nao_quer_mensagens: naoQuer, nascimento: nascimento.valor };
       const salvo = cliente
         ? ok(await sb.from("clientes").update(campos).eq("id", cliente.id).eq("petshop_id", petshop.id).select().single())
         : ok(await sb.from("clientes").insert({ ...campos, petshop_id: petshop.id }).select().single());

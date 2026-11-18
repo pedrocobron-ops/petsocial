@@ -10,6 +10,7 @@ import { perfilParaOPetshop } from "@/lib/gestao/acessos";
 import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ESCOLHA_VAZIA, camposDaEscolha, ehSocio, emailValido, erroDeLimite, lerComissao, nAcessos, nomeCurtoDe, perfilPorId, sugereLogin, usoDoPlano, type Escolha } from "./modelo";
 import { Areas, Chave, Convite, DetalhesAgenda, EscolherPerfil, ModelosProntos, Opcao, PlanoCheio, Trilho, Vagas } from "./pecas";
+import { limparNome } from "@/lib/gestao/validacao";
 
 type Passo = "quem" | "login" | "areas" | "detalhes";
 
@@ -39,7 +40,7 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
   const topo = useRef<HTMLDivElement>(null);
   useEffect(() => { topo.current?.scrollIntoView({ block: "start" }); }, [passo, feito]);
 
-  const n = nome.trim();
+  const n = limparNome(nome);
   // nome de duas palavras fica inteiro ("Recepção Teste", "Ana Souza"): só a primeira pode ser um cargo (achado da Juliana)
   const primeiro = nomeCurtoDe(n);
   const socio = ehSocio(escolha);

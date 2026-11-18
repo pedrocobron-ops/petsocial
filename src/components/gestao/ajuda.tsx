@@ -6,7 +6,8 @@ import { rapidasPara } from "@/lib/gestao/manual";
 import { linkSuporte } from "@/lib/gestao/contato";
 import { hora } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";
-import { abrirAssistente } from "./ui";
+import { abrirAssistente, semInternet } from "./ui";
+import { textoDeRede } from "@/lib/gestao/validacao";
 import { BotaoMic, FaixaVoz, useDitado } from "./voz";
 
 type Item = { de: "eu" | "ajuda"; texto: string; quando: string; avaliar?: boolean; avaliado?: "sim" | "nao"; registro?: string | null; /** a Ajuda não soube responder, ou o caso é da equipe */ semSaida?: boolean };
@@ -82,7 +83,7 @@ export default function Ajuda({ aoFechar }: { aoFechar: () => void }) {
       if (j.semResposta) falhou();
       if (j.equipe) chamarEquipe();
     } catch {
-      guardar([...comPergunta, { de: "ajuda", texto: "Sem conexão. Confira a internet e tente de novo.", quando: hora(new Date()) }]);
+      guardar([...comPergunta, { de: "ajuda", texto: textoDeRede(!semInternet()), quando: hora(new Date()) }]);
     } finally { setPensando(false); }
   }, [pensando, sb, petshop.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { CreditCard } from "lucide-react";
 import { NOME_FORMA_TAXA, taxasDoPeriodo } from "@/lib/gestao/maquininha";
 import { brl, dataAmigavel } from "@/lib/gestao/util";

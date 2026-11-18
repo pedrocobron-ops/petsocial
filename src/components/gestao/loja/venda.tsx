@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { Search, UserPlus, X } from "lucide-react";
-import { conferirCaixa, conferirValorAlto } from "@/lib/gestao/dinheiro";
+import { conferirCaixa, conferirValorAlto, pagamentoComCredito } from "@/lib/gestao/dinheiro";
+import { creditoDoTutor } from "@/lib/gestao/credito";
 import { conferirLimite } from "@/lib/gestao/fiado";
-import { fazerTudoOuNada, partesOuNada, passoDoEstoque, ref, type Passo } from "@/lib/gestao/tudo-ou-nada";
+import { fazerTudoOuNada, lancamentoDe, partesOuNada, passoDoEstoque, ref, type Passo } from "@/lib/gestao/tudo-ou-nada";
+import { FolhaVendaFeita, textoDaVenda } from "./comprovante-venda";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { Cliente } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, fmtTelefone, isoDia, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPessoa, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
+import { UsarCredito } from "../financeiro/comum";
 import {
   BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LinhaDaConta, produtosDaConta,
   resumoDosItens, useProdutosDaLoja, type ItemConta,
@@ -43,11 +46,20 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
   const [erroForma, setErroForma] = useState<string | null>(null);
   const [erroTutor, setErroTutor] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // venda paga: antes de fechar, oferece o comprovante (WhatsApp do tutor ou impresso), como na conta do atendimento
+  const [feita, setFeita] = useState<{ valor: number; texto: string; frase: string; vendaId: string | null } | null>(null);
   const caixa = useCaixaAberto();
   const op = useOperacao();
 
   const contas = fecharContas(itens, vejoFinanceiro ? desconto : null);
   const vendidos = produtosDaConta(itens);
+  // crédito do tutor (pagou a mais antes, sinal que virou crédito): pode pagar a venda, como em Fechar a conta e na mensalidade.
+  // Na venda "paga depois" o crédito não entra: fica para quando ele vier pagar.
+  const { dados: saldoCredito } = useDados(async () => (vejoFinanceiro && tutor?.id ? (await creditoDoTutor(sb, petshop.id, tutor.id)).saldo : 0), [petshop.id, tutor?.id ?? "", vejoFinanceiro]);
+  const [usarCredito, setUsarCredito] = useState(true);
+  const credito = usarCredito && !depois.ativo && (saldoCredito ?? 0) > 0 && contas.total > 0 ? Math.round(Math.min(saldoCredito ?? 0, contas.total) * 100) / 100 : 0;
+  const aPagar = Math.round((contas.total - credito) * 100) / 100;
+  const soCredito = credito > 0 && aPagar <= 0.005;
   // venda começada: recarregar ou fechar a aba pede confirmação antes de perder o que já está na conta
   const temItens = itens.length > 0;
   useEffect(() => {
@@ -65,7 +77,7 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
     const problema = erroDaConta(itens, vejoFinanceiro ? desconto : null, contas.total);
     if (problema) { avisarErro(problema); return false; }
     if (vejoFinanceiro && contas.total <= 0) { avisarErro("A venda está sem valor. Confira os preços e o desconto."); return false; }
-    const pg = vejoFinanceiro ? fecharRecebimento(pagamento, depois, contas.total) : null;
+    const pg = vejoFinanceiro ? (soCredito ? { fiado: false as const, forma: "outro" as const, pagamentos: null } : fecharRecebimento(pagamento, depois, credito > 0 ? aPagar : contas.total)) : null;
     if (pg && "erro" in pg) { setErroForma(pg.noCampo); avisarErro(pg.erro); return false; }
     const fiado = pg && !("erro" in pg) && pg.fiado ? pg : null;
     // fiado precisa de nome: sem o tutor a conta ficaria solta, sem ninguém para cobrar
@@ -90,28 +102,46 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
         } });
         lanca = true;
       } else if (pg && !("erro" in pg) && !pg.fiado) {
+        // com o crédito: a venda vai pelo valor cheio e a parte do crédito entra na forma "outro" (o banco tira do saldo junto)
+        const comCredito = credito > 0 ? pagamentoComCredito(credito, soCredito ? null : { forma: pg.forma, pagamentos: pg.pagamentos }, aPagar) : { forma: pg.forma, pagamentos: pg.pagamentos };
         passos.push({ t: "lancamento", nome: "venda", chave, linha: {
-          tipo: "entrada", valor: contas.total, forma: pg.forma, pagamentos: partesOuNada(pg.pagamentos), categoria: "Venda de produtos", cliente_id: tutor?.id ?? null, pago: true, data: isoDia(new Date()),
-          descricao: encurtar(`Venda: ${resumoDosItens(linhas)}`), itens: linhas,
+          tipo: "entrada", valor: contas.total, forma: comCredito.forma, pagamentos: partesOuNada(comCredito.pagamentos), categoria: "Venda de produtos", cliente_id: tutor?.id ?? null, pago: true, data: isoDia(new Date()),
+          descricao: encurtar(`Venda: ${resumoDosItens(linhas)}`), itens: linhas, credito_usado: credito > 0 ? credito : null,
         } });
         lanca = true;
       }
       const estoque = passoDoEstoque(produtosDaConta(vendidos), chave, lanca ? ref("venda") : null);
       if (estoque) passos.push(estoque);
       let vendaId: string | null = null;
+      let lancada: Record<string, unknown> | null = null;
       if (passos.length) {
         try {
           const r = await fazerTudoOuNada(sb, petshop.id, chave, orcamento && lanca ? { funcao: "orcamento_vender", orcamento: orcamento.id } : { funcao: "venda_registrar" }, passos);
           vendaId = r.ids?.venda ?? null;
-          if (pg && !("erro" in pg) && !pg.fiado) await anotarParcelas(idsDaOperacao(r, passos), pagamento.parcelas);
+          lancada = lanca && !fiado ? lancamentoDe(r, "venda") : null;
+          if (pg && !("erro" in pg) && !pg.fiado && !soCredito) await anotarParcelas(idsDaOperacao(r, passos), pagamento.parcelas);
         } catch (e) { throw new Error(`A venda não foi anotada: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`); }
       }
-      avisar(fiado ? `Anotado: ${brl(contas.total)} a receber de ${tutor?.nome ?? "cliente"} até ${dataCompleta(fiado.quando)}.` : vejoFinanceiro ? `Venda de ${brl(contas.total)} anotada.` : "Venda anotada no estoque.");
+      avisar(fiado ? `Anotado: ${brl(contas.total)} a receber de ${tutor?.nome ?? "cliente"} até ${dataCompleta(fiado.quando)}.` : vejoFinanceiro ? `Venda de ${brl(contas.total)} anotada.${credito > 0 ? ` ${brl(credito)} saíram do crédito de ${tutor?.nome?.split(" ")[0] ?? "o tutor"}.` : ""}` : "Venda anotada no estoque.");
       avisarMudanca();
+      // venda paga (sem orçamento, que segue para o horário): mostra o comprovante antes de fechar
+      if (lancada && !orcamento && vejoFinanceiro) {
+        const l = { valor: contas.total, forma: (lancada.forma as string | null) ?? null, pagamentos: lancada.pagamentos ?? null, itens: linhas, credito_usado: credito > 0 ? credito : null, data: isoDia(new Date()), criado_em: new Date().toISOString(), categoria: "Venda de produtos" };
+        setItens([]); // a venda já foi gravada: recarregar a aba não precisa mais perguntar
+        setFeita({ valor: contas.total, vendaId, texto: textoDaVenda(petshop.nome, tutor?.nome, l),
+          frase: `Venda anotada.${credito > 0 ? ` ${brl(credito)} saíram do crédito de ${tutor?.nome?.split(" ")[0] ?? "o tutor"}.` : ""} Os produtos saíram do estoque.` });
+        setSalvando(false);
+        return true;
+      }
       aoPronto?.(vendaId);
       aoFechar();
       return true;
     } catch (e) { avisarErro(e); setSalvando(false); return false; }
+  }
+
+  if (feita) {
+    const fim = () => { aoPronto?.(feita.vendaId); aoFechar(); };
+    return <FolhaVendaFeita titulo="Venda anotada" valor={feita.valor} frase={feita.frase} texto={feita.texto} telefone={tutor?.telefone} tutor={tutor?.nome} aoFechar={fim} />;
   }
 
   return (
@@ -120,7 +150,7 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
         <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || !vendidos.length}>
-          {salvando ? "Anotando…" : vejoFinanceiro ? (depois.ativo && contas.total > 0 ? `Anotar ${brl(contas.total)} a receber` : `Receber ${contas.total > 0 ? brl(contas.total) : ""}`.trim()) : "Dar baixa no estoque"}
+          {salvando ? "Anotando…" : vejoFinanceiro ? (depois.ativo && contas.total > 0 ? `Anotar ${brl(contas.total)} a receber` : soCredito ? "Pagar com o crédito" : `Receber ${contas.total > 0 ? brl(credito > 0 ? aPagar : contas.total) : ""}`.trim()) : "Dar baixa no estoque"}
         </button>
       </>}>
       <div className="g-form">
@@ -136,9 +166,12 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
         <EscolherTutor valor={tutor} aoMudar={(t) => { setTutor(t); setErroTutor(null); }} />
         {erroTutor && <small className="erro" role="alert">{erroTutor}</small>}
 
+        {vejoFinanceiro && !depois.ativo && (saldoCredito ?? 0) > 0 && contas.total > 0 && (
+          <UsarCredito saldo={saldoCredito!} usar={usarCredito} aoMudar={(v) => { setUsarCredito(v); setErroForma(null); }} usado={credito} resto={aPagar} />
+        )}
         <FechamentoDaConta subtotal={contas.subtotal} desconto={contas.desconto} total={contas.total} descontoDigitado={desconto} aoDesconto={setDesconto}
           pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErroForma(null); }} comPagamento={vejoFinanceiro} erroForma={erroForma}
-          depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); setErroTutor(null); }} />
+          depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); setErroTutor(null); }} credito={credito} receberAgora={credito > 0 ? aPagar : undefined} />
         {vejoFinanceiro && !(depois.ativo && contas.total > 0) && <AvisoCaixaFechado aberto={caixa} />}
         {vejoFinanceiro && depois.ativo && contas.total > 0 && <p className="g-muted g-pp">Nada entra no caixa agora. Os produtos saem do estoque e a conta fica no nome de {tutor?.nome ?? "quem comprou"}.</p>}
         {!vejoFinanceiro && <p className="g-muted g-pp">A venda sai do estoque. O dinheiro fica para quem cuida do financeiro lançar.</p>}

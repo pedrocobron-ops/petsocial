@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { CalendarCheck2, CalendarDays, HandCoins, Sparkles, Sun, UserX } from "lucide-react";
 import {
   abreNoDia, DIAS_SEMANA, estadoDaCobranca, experienciaDe, faltaDaCobranca, juntar, lerPlanos, lerPresencas, partesDoDesconto, partesDosExtras, SELECT_COBRANCA, type CobrancaCompleta,

@@ -3382,6 +3382,9 @@ isOneToOne: false
 "conta_exclusao_ver":
 { Args: { "p_petshop": string }; Returns: Json
                            },
+"conta_fora_do_limite":
+{ Args: { "p_categoria": string,"p_descricao": string,"p_hoje": string,"p_vencimento": string }; Returns: boolean
+                           },
 "conta_receber_junto":
 { Args: { "p_chave": string,"p_conta": string,"p_passos": Json,"p_petshop": string }; Returns: Json
                            },
@@ -3601,6 +3604,11 @@ isOneToOne: false
 "custos_dos_produtos":
 { Args: { "p": string }; Returns: {
               "custo": number,"id": string
+            }[]
+                           },
+"devolucoes_por_produto":
+{ Args: { "p": string,"p_ate": string,"p_de": string }; Returns: {
+              "avariados": number,"custo_volta": number,"nome": string,"produto_id": string,"quantidade": number,"sem_custo": number,"valor": number
             }[]
                            },
 "dia_fechado":
@@ -3904,6 +3912,9 @@ isOneToOne: false
 "google_link_valido":
 { Args: { "p": string }; Returns: string
                            },
+"hoje_do_petshop":
+{ Args: { "p": string }; Returns: string
+                           },
 "hotel_busca_ate":
 { Args: { "p_petshop": string }; Returns: string
                            },
@@ -3983,6 +3994,9 @@ isOneToOne: false
                            },
 "limite_de_acessos":
 { Args: { "p_plano": string }; Returns: number
+                           },
+"limpar_nome":
+{ Args: { "p": string }; Returns: string
                            },
 "link_creche_experiencia":
 { Args: { "p_codigo": string }; Returns: Json

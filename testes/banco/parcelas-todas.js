@@ -183,9 +183,13 @@ const c = (n) => B.centavos(n);
     [30, 9234 + 4675 + 14350],
     [40, 9395], [60, 9233 + 4675], [70, 9395], [90, 9233], [100, 9395], [130, 9395], [160, 9395],
   ];
-  const confere = esperado.map(([n, v]) => [n, v, dia(n) ? c(dia(n).valor) : null]);
-  T.ok('cada dia, conferido à mão (débito amanhã, parcelas de 30 em 30 dias, a 1ª com o centavo que sobra)',
-    confere.every(([, v, achou]) => v === achou) && tp.a_receber.length === esperado.length, { confere, a_receber: tp.a_receber });
+  // a maquininha não paga no sábado nem no domingo: o que cairia neles passa para a segunda (somado ao que já caía nela)
+  const diaUtil = (iso) => { const d = new Date(`${iso}T12:00:00Z`); const s = d.getUTCDay(); if (s === 6 || s === 0) d.setUTCDate(d.getUTCDate() + (s === 6 ? 2 : 1)); return d.toISOString().slice(0, 10); };
+  const porDia = new Map();
+  for (const [n, v] of esperado) { const k = diaUtil(L2.dia(n)); porDia.set(k, (porDia.get(k) ?? 0) + v); }
+  const confere = [...porDia].map(([k, v]) => { const achou = tp.a_receber.find((x) => x.dia === k); return [k, v, achou ? c(achou.valor) : null]; });
+  T.ok('cada dia, conferido à mão (débito amanhã, parcelas de 30 em 30 dias, a 1ª com o centavo que sobra, fim de semana na segunda)',
+    confere.every(([, v, achou]) => v === achou) && tp.a_receber.length === porDia.size, { confere, a_receber: tp.a_receber });
   T.ok('o Pix (0 dias) já caiu: não aparece', !dia(0));
   const totalAR = c(tp.a_receber.reduce((t, x) => t + x.valor, 0));
   // 98 + 277 + 93,50 + 143,50 + 6 × 93,95 = 1.175,70
@@ -200,7 +204,7 @@ const c = (n) => B.centavos(n);
   await MQ.salvarTaxas(d3, P3, { ...MQ.TAXAS_ZERADAS, ...REGRA });
   for (const [v, f] of [[100, 'debito'], [50, 'pix'], [150, 'credito'], [80, 'debito']]) await D.lancarPago(d3, P3, { tipo: 'entrada', valor: v, forma: f, categoria: 'Outros', chave: chave() });
   const t3 = await MQ.taxasDoPeriodo(d3, P3, L3.mes1, fim);
-  const um = t3.a_receber.find((x) => x.dia === L3.dia(1)), trinta = t3.a_receber.find((x) => x.dia === L3.dia(30));
+  const um = t3.a_receber.find((x) => x.dia === diaUtil(L3.dia(1))), trinta = t3.a_receber.find((x) => x.dia === diaUtil(L3.dia(30)));
   // débito 98 + 78,40 = 176,40 amanhã; crédito à vista 143,50 em 30 dias; Pix já caiu
   T.ok('débito R$ 176,40 amanhã e crédito à vista R$ 143,50 em 30 dias, nada mais', t3.a_receber.length === 2 && um && c(um.valor) === 17640 && trinta && c(trinta.valor) === 14350, t3.a_receber);
   T.ok('sem parcelado: a tela não mostra a linha da regra', t3.parcelado === false);

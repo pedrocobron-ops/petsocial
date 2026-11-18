@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ChevronRight, Target } from "lucide-react";
 import { contasDaMeta } from "@/lib/gestao/dinheiro";
 import { brl, isoDia, nomeMes } from "@/lib/gestao/util";

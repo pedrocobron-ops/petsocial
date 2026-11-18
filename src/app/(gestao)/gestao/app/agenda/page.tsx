@@ -1,8 +1,9 @@
 "use client";
 
+import { modoSimples } from "@/lib/gestao/modo-simples";
 import { useFaxinaDoBoletim } from "@/components/gestao/boletim/boletim";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { MarcaSemCobranca, semCobranca, useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BellRing, CalendarCheck2, CalendarOff, ChevronLeft, ChevronRight, Lock, MessageCircle, Plus, SquareKanban, Truck, Printer, Users, Utensils, X } from "lucide-react";
@@ -43,6 +44,7 @@ type Trecho = { b: Bloqueio; de: number; ate: number; inteiro: boolean };
 
 function Agenda() {
   const { sb, petshop, equipe, liberado, souDono } = useGestao();
+  const simples = modoSimples(petshop);
   useFaxinaDoBoletim(); // boletim do pet: apaga os arquivos da fila (nada aparece na tela)
   const router = useRouter();
   const params = useSearchParams();
@@ -212,9 +214,9 @@ function Agenda() {
             <button aria-pressed={visao === "dia"} onClick={() => setVisao("dia")}>Dia</button>
             <button aria-pressed={visao === "semana"} onClick={() => setVisao("semana")}>Semana</button>
           </div>
-          <Link className="g-btn sec" href="/gestao/app/agenda/quadro" title="Quadro do dia: quem está esperando, no banho, secando, pronto e entregue"><SquareKanban />Quadro</Link>
+          {!simples && <Link className="g-btn sec" href="/gestao/app/agenda/quadro" title="Quadro do dia: quem está esperando, no banho, secando, pronto e entregue"><SquareKanban />Quadro do dia</Link>}
           {resumo.levaTraz > 0 && <Link className="g-btn sec" href={`/gestao/app/agenda/leva-traz?dia=${dia}`} title="Buscar e levar os pets do dia, com endereço e rota"><Truck />Leva e traz</Link>}
-          <Link className="g-btn sec" href={`/gestao/app/agenda/imprimir?dia=${dia}&visao=${visao}${prof ? `&prof=${prof}` : ""}`} title="Imprimir ou salvar a agenda em PDF"><Printer />Imprimir</Link>
+          {!simples && <Link className="g-btn sec" href={`/gestao/app/agenda/imprimir?dia=${dia}&visao=${visao}${prof ? `&prof=${prof}` : ""}`} title="Imprimir ou salvar a agenda em PDF"><Printer />Imprimir</Link>}
           {liberado && <LinkRapido />}
           <button className="g-btn sec" disabled={!liberado} title={liberado ? undefined : DICA_SO_CONSULTA} onClick={() => { if (!somenteLeitura()) setBloqueando(true); }}><Lock />Bloquear horário</button>
           <button className="g-btn pri" disabled={!liberado} title={liberado ? undefined : DICA_SO_CONSULTA} onClick={() => abrirNovo({ dia })}><Plus />Marcar horário</button>

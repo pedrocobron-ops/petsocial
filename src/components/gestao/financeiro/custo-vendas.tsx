@@ -2,7 +2,7 @@
 
 import { Package } from "lucide-react";
 import { opcoesDaLoja, pct } from "@/lib/gestao/loja-opcoes";
-import { vendasPorProduto, type SaidaLida, type VendaLida } from "@/lib/gestao/loja-vendas";
+import { lerDevolucoesPorProduto, vendasPorProduto, type DevolucaoLida, type SaidaLida, type VendaLida } from "@/lib/gestao/loja-vendas";
 import { usaModulo } from "@/lib/gestao/modulos";
 import type { Lancamento } from "@/lib/gestao/tipos";
 import { brl } from "@/lib/gestao/util";
@@ -30,12 +30,17 @@ function Cartao({ inicio, fim, doMes, resultado, mesAtual, entrouDeProdutos }: {
   // conta recebida em partes: depois de quitada, `valor` guarda só a última parte e `valor_original` o valor cheio
   const vendas: VendaLida[] = doMes.filter((l) => l.tipo === "entrada" && l.itens != null).map((l) => ({ id: l.id, itens: l.itens, valor: Number(l.valor_original ?? l.valor) }));
   const chave = vendas.map((v) => v.id).join(",");
-  const { dados: saidas } = useDados(async () => {
-    if (!chave) return [] as SaidaLida[];
-    return paginar<SaidaLida & { id: string }>((a, b) => sb.rpc("custos_das_vendas", { p: petshop.id, p_de: inicio, p_ate: fim }).order("id").range(a, b));
+  const { dados } = useDados(async () => {
+    if (!chave) return { saidas: [] as SaidaLida[], devolucoes: [] as DevolucaoLida[] };
+    const [saidas, devolucoes] = await Promise.all([
+      paginar<SaidaLida & { id: string }>((a, b) => sb.rpc("custos_das_vendas", { p: petshop.id, p_de: inicio, p_ate: fim }).order("id").range(a, b)),
+      lerDevolucoesPorProduto(sb, petshop.id, inicio, fim),
+    ]);
+    return { saidas, devolucoes };
   }, [petshop.id, inicio, fim, chave]);
-  if (!saidas) return null;
-  const { total } = vendasPorProduto(vendas, saidas, new Map());
+  if (!dados) return null;
+  // troca e devolução do mês saem da venda e da sobra (a mesma conta de Relatórios > Produtos e de Quanto sobrou)
+  const { total } = vendasPorProduto(vendas, dados.saidas, new Map(), dados.devolucoes);
   if (!total.vendas) return null;
   const temCusto = total.unidadesComCusto > 0;
   const sobra = centavos(total.receitaComCusto - total.custo);
@@ -43,7 +48,7 @@ function Cartao({ inicio, fim, doMes, resultado, mesAtual, entrouDeProdutos }: {
   // "De onde veio" soma o dinheiro que ENTROU no mês na categoria Venda de produtos; este cartão soma as vendas com conta
   // fechada (é delas que o estoque guardou o custo). A diferença é o que entrou em parte de venda ainda em aberto, ou venda
   // lançada sem os produtos: aparece numa linha própria, para os dois números fecharem na mesma tela.
-  const foraDaqui = entrouDeProdutos == null ? 0 : centavos(entrouDeProdutos - total.receita);
+  const foraDaqui = entrouDeProdutos == null ? 0 : centavos(entrouDeProdutos - total.receita - total.devolvido);
   const linha = (rotulo: string, valor: string, classe = "") => <div className="g-fila entre"><span className="g-muted">{rotulo}</span><b className={`g-tab ${classe}`}>{valor}</b></div>;
 
   return (
@@ -51,6 +56,7 @@ function Cartao({ inicio, fim, doMes, resultado, mesAtual, entrouDeProdutos }: {
       <div className="g-card-t"><h3><Tile icone={Package} tom="rosa" tamanho="p" />Produtos vendidos no mês</h3><span className="g-muted g-pp">quanto custou o que saiu</span></div>
       <div className="g-pilha p">
         {linha(Math.abs(foraDaqui) > 0.005 ? "Vendas de produtos com a conta fechada" : "Venda de produtos", brl(total.receita))}
+        {total.devolvido > 0 && <p className="g-muted g-pp" style={{ margin: 0 }}>Já sem {brl(total.devolvido)} de produto devolvido.</p>}
         {linha("Custo dos produtos vendidos", temCusto ? `− ${brl(total.custo)}` : "sem custo registrado")}
         {temCusto && linha("Sobra dos produtos", `${brl(sobra)}${total.receitaComCusto > 0 ? ` · ${pct((sobra / total.receitaComCusto) * 100)}` : ""}`, sobra < 0 ? "g-vermelho-t" : "")}
       </div>

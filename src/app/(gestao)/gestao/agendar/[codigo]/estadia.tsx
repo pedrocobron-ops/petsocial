@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Cat, Check, Dog, MessageCircle, PawPrint, Plus, Trash2 } from "lucide-react";
-import { banco } from "@/lib/gestao/supabase";
+import { bancoDepois as banco } from "@/lib/gestao/supabase-depois";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
 import { brl, brlCurto, dataCurta, deIsoDia, fmtTelefone, horarioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
 import { MUITOS_PEDIDOS, lembrarPedido } from "@/lib/gestao/link-opcoes";

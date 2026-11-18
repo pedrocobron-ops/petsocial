@@ -490,6 +490,7 @@ export function QuadroDeAssinatura({ aoMudar }: { aoMudar: (temAlgo: boolean, te
   const desenhando = useRef(false);
   const ultimo = useRef<{ x: number; y: number } | null>(null);
   const [vazio, setVazio] = useState(true);
+  const temDesenho = useRef(false);
   const avisarRef = useRef(aoMudar);
   avisarRef.current = aoMudar;
 
@@ -500,11 +501,19 @@ export function QuadroDeAssinatura({ aoMudar }: { aoMudar: (temAlgo: boolean, te
       const r = c.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       if (c.width === Math.round(r.width * dpr) && c.height === Math.round(r.height * dpr)) return;
+      // virar o celular (ou a tela mudar de tamanho) não apaga o que o tutor já assinou: o desenho é copiado para o quadro novo
+      let copia: HTMLCanvasElement | null = null;
+      if (c.width > 0 && c.height > 0 && temDesenho.current) {
+        copia = document.createElement("canvas");
+        copia.width = c.width; copia.height = c.height;
+        copia.getContext("2d")!.drawImage(c, 0, 0);
+      }
       c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
       const x = c.getContext("2d")!;
+      if (copia) { x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(copia, 0, 0); }
       x.setTransform(dpr, 0, 0, dpr, 0, 0);
       x.lineCap = "round"; x.lineJoin = "round"; x.lineWidth = 2.6; x.strokeStyle = "#1f1b17";
-      setVazio(true); avisarRef.current(false, c);
+      if (!copia) { setVazio(true); avisarRef.current(false, c); }
     };
     ajustar();
     const ro = new ResizeObserver(ajustar);
@@ -527,6 +536,7 @@ export function QuadroDeAssinatura({ aoMudar }: { aoMudar: (temAlgo: boolean, te
     const x = e.currentTarget.getContext("2d")!;
     x.beginPath(); x.moveTo(ultimo.current.x, ultimo.current.y); x.lineTo(p.x, p.y); x.stroke();
     ultimo.current = p;
+    temDesenho.current = true;
     if (vazio) { setVazio(false); avisarRef.current(true, e.currentTarget); }
   }
   function parar(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -538,6 +548,7 @@ export function QuadroDeAssinatura({ aoMudar }: { aoMudar: (temAlgo: boolean, te
     const c = tela.current;
     if (!c) return;
     c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
+    temDesenho.current = false;
     setVazio(true); avisarRef.current(false, c);
   }
   return (

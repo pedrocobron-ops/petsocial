@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/gestao/link-depois";
 import { ArrowLeft, ArrowRight, BedDouble, BookOpen, CalendarPlus, Camera, CalendarDays, Check, Clock, Copy, FileSpreadsheet, ImagePlus, LayoutGrid, Link2, MessageCircle, Minus, PawPrint, Plus, Scissors, Sparkles, Timer, Trash2, Undo2, Users, X, Zap } from "lucide-react";
 import type { Horario, Servico } from "@/lib/gestao/tipos";
 import { vagasDe } from "@/lib/gestao/agenda";
@@ -18,6 +18,7 @@ import { Campo, CampoValor, EVENTO_GUIA, abrirPersonalizarMenu, avisarMudanca, o
 import Importar from "./importar";
 import FotoCaderno from "./caderno";
 import { TEMAS, aplicarTema, enviarLogo, tirarLogo } from "@/lib/gestao/identidade";
+import { OQueFalta, useDadosDosPassos, usePrimeirosPassos } from "./primeiros-passos";
 import { FalaMozart, PERGUNTAS, PreviaPainel, TrilhoBoasVindas, chaveBoasVindas, oQueDeixeiPronto } from "./boas-vindas";
 import { guardarLembrado, lerLembrado } from "./lembrado";
 import LogoLoja from "./logo-loja";
@@ -25,6 +26,7 @@ import { LojaNoGoogle } from "./ajustes/opcoes-boletim";
 import OpcoesDaLoja from "./ajustes/opcoes-loja";
 import "./ajustes/identidade.css";
 import "./guia-inicial.css";
+import { limparNome } from "@/lib/gestao/validacao";
 
 export { EVENTO_GUIA, abrirGuia } from "./ui";
 
@@ -219,13 +221,16 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
   const n = passo + 1 - perguntas;
   const pergunta = atual === "cor" || atual === "logo";
   const nPergunta = PERGUNTAS - perguntas + passo + 1;
+  // no fim do guia, o que falta para começar: a mesma lista e a mesma conta do cartão da tela Hoje
+  const dadosDosPassos = useDadosDosPassos(fim);
+  const pp = usePrimeirosPassos(dadosDosPassos, () => undefined);
 
   /** Quem já está na lista (da equipe ou acrescentado aqui), pelo nome sem acento: o mesmo nome não entra duas vezes. */
   const nomeNaLista = (t: string) => [eu.nome, ...outros.map((p) => p.nome), ...novos].find((x) => semAcento(x) === semAcento(t));
   const jaNaLista = (t: string) => Boolean(nomeNaLista(t));
   const [repetido, setRepetido] = useState<string | null>(null);
   function juntarNome() {
-    const t = nome.trim().replace(/\s+/g, " ");
+    const t = limparNome(nome);
     if (t.length < 2) return;
     const igual = nomeNaLista(t);
     if (igual) { setRepetido(igual); setNome(""); return; }
@@ -261,7 +266,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
 
   /**
    * "Começar já" (conta nova com banho e tosa): fica o horário padrão, quem atende é você, os serviços entram sem preço e o link do
-   * cliente liga. Um toque e o guia vai direto para o fim, com "Marcar o primeiro horário" e "Copiar meu link de agendamento".
+   * cliente liga. Um toque e o guia vai direto para o fim, com "Marcar o primeiro horário" e "Copiar o link do cliente".
    * Tudo muda depois em Meu pet shop.
    */
   async function comecarJa() {
@@ -322,7 +327,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
         ok(await sb.from("petshops").update({ horario }).eq("id", petshop.id).select("id"));
       }
       if (atual === "equipe") {
-        const digitado = nome.trim().replace(/\s+/g, " ").slice(0, 60);
+        const digitado = limparNome(nome).slice(0, 60);
         const pendente = digitado.length >= 2 && !jaNaLista(digitado) ? [...novos, digitado] : novos;
         if (!euAtendo && !outros.length && !pendente.length) { setErro("Diga quem atende os pets: você, alguém da equipe ou os dois."); return; }
         if (euAtendo !== eu.atende) ok(await sb.from("profissionais").update({ atende: euAtendo }).eq("id", eu.id).eq("petshop_id", petshop.id).select("id"));
@@ -392,7 +397,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
     const gravados = lista.length ? ok(await sb.from("servicos").select("id, nome").eq("petshop_id", petshop.id)) : [];
     for (const s of lista) {
       const precosDele = s.porPorte ? { preco_p: s.preco_p, preco_m: s.preco_m, preco_g: s.preco_g, preco_gg: s.preco_gg } : umPrecoSo(s);
-      const linha = { nome: s.nome.trim().slice(0, 80), categoria: categoriaDaArea(s.area), duracao_min: s.duracao_min, cor: s.cor, ordem: ++ordem, ...precosDele };
+      const linha = { nome: limparNome(s.nome).slice(0, 80), categoria: categoriaDaArea(s.area), duracao_min: s.duracao_min, cor: s.cor, ordem: ++ordem, ...precosDele };
       const igual = gravados.find((g) => semAcento(g.nome) === semAcento(linha.nome));
       if (igual) await mudarServico(sb, petshop.id, igual.id, { ativo: true, duracao_min: linha.duracao_min, ...precosDele });
       const id = igual ? igual.id : await inserirServico(sb, petshop.id, linha);
@@ -463,7 +468,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
         <header className="g-guia-topo">
           {!pergunta && <Selo tamanho={36} tom="verde" />}
           {pergunta ? <TrilhoBoasVindas agora={nPergunta} /> : (
-            <div className="g-guia-trilho" role="img" aria-label={fim ? "Guia concluído" : `Passo ${n} de ${total}`}>
+            <div className="g-guia-trilho" role="img" aria-label={fim ? "Guia concluído" : `Ajuste ${n} de ${total}`}>
               {passos.slice(perguntas).map((p, i) => <span key={p.id} className={i < n - 1 ? "feito" : i === n - 1 ? "agora" : ""}><i /></span>)}
             </div>
           )}
@@ -482,7 +487,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
               {banho && !petshop.guia_feito_em && (
                 <button type="button" className="g-guia-opcao g-guia-ja" data-teste="comecar-ja" onClick={() => void comecarJa()} disabled={salvando}>
                   <Tile icone={Zap} tom="pessego" />
-                  <span><b>Começar já: marcar o primeiro horário</b><small>Fica o horário padrão, você atende e o link do cliente liga. Cor, preços e o resto você ajusta depois, em Meu pet shop.</small></span>
+                  <span><b>Começar já: marcar o primeiro horário</b><small>Fica o horário padrão, você atende e o link do cliente fica ligado. O resto, depois, em Meu pet shop.</small></span>
                   <ArrowRight aria-hidden />
                 </button>
               )}
@@ -530,8 +535,8 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
 
           {!pergunta && !fim && n === 1 && (
             <p className="g-guia-intro">{veioDasBoasVindas && oQueDeixeiPronto(petshop) ? <>{oQueDeixeiPronto(petshop)}{" "}</> : null}
-              <b>{veioDasBoasVindas ? "As perguntas acabaram. Agora" : `${primeiro},`} {total === 1 ? "falta um passo só" : `faltam ${total} passos curtos`} para deixar {artigoDe(petshop.nome).o} {petshop.nome} {artigoDe(petshop.nome).o === "a" ? "pronta" : "pronto"}.</b>{" "}
-              O que não souber agora, toque em Faço depois: dá para mudar tudo em Meu pet shop.
+              <b>{veioDasBoasVindas ? "As perguntas acabaram. Agora," : `${primeiro},`} {total === 1 ? "um ajuste rápido" : `${total} ajustes rápidos`} para deixar {artigoDe(petshop.nome).o} {petshop.nome} {artigoDe(petshop.nome).o === "a" ? "pronta" : "pronto"}.</b>{" "}
+              Não sabe agora? Toque em Faço depois.
             </p>
           )}
 
@@ -549,7 +554,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
 
           {atual === "equipe" && (
             <div className="g-pilha">
-              {cabeca("Quem atende os pets?", "Quem aparece na agenda para receber os horários. Só o nome basta. Se você trabalha sozinho, é só continuar.")}
+              {cabeca("Quem atende os pets?", "Só o nome basta. Trabalha sozinho? É só continuar.")}
               {repetido && <p className="g-aviso" style={{ marginBottom: 0 }} role="status">{repetido} já está na lista: não precisa adicionar de novo.</p>}
               <div className="g-guia-gente">
                 <label className={`g-guia-pessoa${euAtendo ? " on" : ""}`}>
@@ -585,10 +590,9 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
 
           {atual === "servicos" && (
             <div className="g-pilha">
-              {cabeca("O que vocês fazem e quanto custa?", "Já deixei os serviços mais comuns, sem preço: o valor é você quem coloca. Tire pela lixeira o que vocês não oferecem. Pode pôr só o preço do que mais sai (um banho, por exemplo) e deixar o resto em branco: você ajusta depois em Meu pet shop.")}
+              {cabeca("O que vocês fazem e quanto custa?", "Os serviços mais comuns já estão aqui, sem preço. Ponha o preço do que mais sai e tire pela lixeira o que não fazem. O resto pode ficar em branco.")}
               <div className="g-fila">
                 <button type="button" className="g-btn sec p" onClick={() => setTabela(true)} disabled={salvando}><Camera />Tirar foto da tabela de preços</button>
-                <button type="button" className="g-btn sec p" onClick={() => void pular()} disabled={salvando}>Pôr os preços depois</button>
               </div>
               {tabela && <div className="g-cad-acima"><FotoCaderno tipoInicial="precos" aoFechar={() => setTabela(false)} aoTerminar={() => setTabelaLida(true)} /></div>}
               {!precos.length && <p className="g-guia-legenda">Nenhum serviço na lista ainda. Você cria os seus em Meu pet shop, em Serviços e preços.</p>}
@@ -648,7 +652,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
 
           {atual === "casa" && (
             <div className="g-pilha">
-              {cabeca(`${casa}: quanto custa e quantos pets cabem?`, "A diária já vem preenchida no check-in e na reserva. As vagas avisam quando a casa enche. Em branco, você digita o valor a cada estadia e a casa fica sem limite.")}
+              {cabeca(`${casa}: quanto custa e quantos pets cabem?`, "A diária já vem no check-in e na reserva; as vagas avisam quando enche. Pode deixar em branco.")}
               {creche && (
                 <div className="g-guia-bloco">
                   <h3>Creche</h3>
@@ -678,7 +682,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
             <div className="g-pilha">
               {cabeca(banho ? "Quer que o cliente peça horário pelo celular?" : "Quer que o cliente peça vaga pelo celular?", banho ? "Você manda um link. O cliente vê só os horários livres, conforme o que você acabou de configurar, e envia o pedido. Nada é marcado sem você aceitar." : "Você manda um link. O cliente escolhe o dia e envia o pedido. Nada é marcado sem você aceitar.")}
               <button type="button" className={`g-guia-opcao${linkLigado ? " on" : ""}`} onClick={() => setLinkLigado(true)}>
-                <Tile icone={Link2} tom="pessego" /><span><b>Sim, ligar o link</b><small>{banho ? 'Depois, ele fica na Agenda, no botão "Link do cliente", e em Meu pet shop.' : "Fica em Meu pet shop, em Link de agendamento."}</small></span>{linkLigado && <Check />}
+                <Tile icone={Link2} tom="pessego" /><span><b>Sim, ligar o link</b><small>{banho ? 'Depois, ele fica na Agenda, no botão "Link do cliente", e em Meu pet shop.' : "Fica em Meu pet shop, em Link do cliente."}</small></span>{linkLigado && <Check />}
               </button>
               <button type="button" className={`g-guia-opcao${!linkLigado ? " on" : ""}`} onClick={() => setLinkLigado(false)}>
                 <Tile icone={CalendarDays} tom="menta" /><span><b>Agora não</b><small>Só a equipe marca. Dá para ligar depois.</small></span>{!linkLigado && <Check />}
@@ -694,11 +698,12 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
               {banho && (
                 <section className="g-guia-bloco g-guia-primeiro" aria-label="O primeiro resultado">
                   <h3>Agora, o primeiro cliente</h3>
-                  <p className="g-muted g-pp">{petshop.link_ativo ? "Marque o primeiro horário (o pet entra na hora, só com o nome e o tutor) ou mande o seu link para um cliente pedir pelo celular." : "Marque o primeiro horário: o pet entra na hora, só com o nome e o tutor."}</p>
+                  <OQueFalta pp={pp} aoIr={aoFechar} />
+                  {petshop.link_ativo && <p className="g-muted g-pp">Ou mande o seu link para um cliente pedir pelo celular.</p>}
                   <div className="g-guia-proximos">
                     <Link className="g-btn pri" data-teste="primeiro-horario" href="/gestao/app/agenda?novo=1&primeiro=1" onClick={aoFechar}><CalendarPlus />Marcar o primeiro horário</Link>
                     {petshop.link_ativo && petshop.link_codigo && (
-                      <button type="button" className="g-btn sec" data-teste="copiar-link" onClick={() => void copiarLink()}>{copiado ? <Check /> : <Copy />}{copiado ? "Link copiado" : "Copiar meu link de agendamento"}</button>
+                      <button type="button" className="g-btn sec" data-teste="copiar-link" onClick={() => void copiarLink()}>{copiado ? <Check /> : <Copy />}{copiado ? "Link copiado" : "Copiar o link do cliente"}</button>
                     )}
                     {copiado && zapDoLink && <a className="g-btn zap" href={zapDoLink} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar no WhatsApp</a>}
                   </div>
@@ -716,7 +721,7 @@ function Guia({ aoFechar, aoImportar, aoCaderno }: { aoFechar: () => void; aoImp
                       <button type="button" className="g-btn sec" data-teste="ligar-link" disabled={salvando} onClick={() => void ligarLink()}><Link2 />{salvando ? "Ligando…" : "Ligar o meu link"}</button>
                     )}
                     {petshop.link_ativo && petshop.link_codigo && (
-                      <button type="button" className="g-btn sec" data-teste="copiar-link" onClick={() => void copiarLink()}>{copiado ? <Check /> : <Copy />}{copiado ? "Link copiado" : "Copiar meu link"}</button>
+                      <button type="button" className="g-btn sec" data-teste="copiar-link" onClick={() => void copiarLink()}>{copiado ? <Check /> : <Copy />}{copiado ? "Link copiado" : "Copiar o link do cliente"}</button>
                     )}
                     {copiado && zapDoLink && <a className="g-btn zap" href={zapDoLink} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar no WhatsApp</a>}
                   </div>

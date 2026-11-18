@@ -8,7 +8,7 @@ const B = require('../lib/base');
 const { criarLoja } = require('../lib/semente');
 const T = require('../lib/teste')('cakto');
 
-const PRECOS = { solo: [59, 159, 299], equipe: [89, 239, 449], petshop: [129, 349, 659] };
+const PRECOS = { solo: [79, 215, 399], equipe: [129, 349, 659], petshop: [179, 479, 909] };
 
 (async () => T.rodar(async () => {
   if (!(await B.servidorNoAr())) throw new Error(`servidor fora do ar em ${B.BASE_URL} (veja testes/LEIAME.md)`);
@@ -92,10 +92,10 @@ const PRECOS = { solo: [59, 159, 299], equipe: [89, 239, 449], petshop: [129, 34
 
   T.secao('ciclo da assinatura');
   const a1 = lojas[0];
-  const ev = (e, extra = {}) => post(e, pedido({ email: a1.emails.dono, oferta: OFERTAS[0].oferta, preco: 59, assinatura: `sub-${suf}-1`, ...extra }));
+  const ev = (e, extra = {}) => post(e, pedido({ email: a1.emails.dono, oferta: OFERTAS[0].oferta, preco: 79, assinatura: `sub-${suf}-1`, ...extra }));
   let r = await ev('subscription_renewed'); let l = loja(a1.P);
   T.ok('renovada → ativa, pago até +1 mês +1 dia', r.corpo?.resultado === 'ok' && l.status === 'ativa' && Math.abs(l.pago - esperado(1)) < 120, l);
-  r = await post('subscription_renewed', pedido({ email: pagou('trocado'), oferta: OFERTAS[0].oferta, preco: 59, assinatura: `sub-${suf}-1` }));
+  r = await post('subscription_renewed', pedido({ email: pagou('trocado'), oferta: OFERTAS[0].oferta, preco: 79, assinatura: `sub-${suf}-1` }));
   T.ok('renovação com outro e-mail casa pela assinatura', r.corpo?.resultado === 'ok', r);
   await ev('subscription_late', { status: 'waiting_payment' });
   T.ok('atrasada → atrasada, e continua com acesso', loja(a1.P).status === 'atrasada' && B.sql(`select acesso_liberado('${a1.P}')`) === 't');
@@ -105,7 +105,7 @@ const PRECOS = { solo: [59, 159, 299], equipe: [89, 239, 449], petshop: [129, 34
   T.ok('cancelada → cancelada, usa até o fim do que pagou', l.status === 'cancelada' && l.pago > Date.now() / 1000 && B.sql(`select acesso_liberado('${a1.P}')`) === 't', l);
 
   T.secao('reembolso e contestação');
-  await post('refund', pedido({ email: lojas[1].emails.dono, oferta: OFERTAS[1].oferta, preco: 159, assinatura: `sub-${suf}-2`, status: 'refunded' }));
+  await post('refund', pedido({ email: lojas[1].emails.dono, oferta: OFERTAS[1].oferta, preco: 215, assinatura: `sub-${suf}-2`, status: 'refunded' }));
   l = loja(lojas[1].P);
   T.ok('reembolso → cancelada, pago_ate zerado e sem acesso', l.status === 'cancelada' && l.pago === null && B.sql(`select acesso_liberado('${lojas[1].P}')`) === 'f', l);
   await post('chargeback', pedido({ email: lojas[2].emails.dono, oferta: OFERTAS[2].oferta, preco: 299, assinatura: `sub-${suf}-3`, status: 'chargedback' }));
@@ -114,13 +114,13 @@ const PRECOS = { solo: [59, 159, 299], equipe: [89, 239, 449], petshop: [129, 34
   T.ok('MED do Pix também cancela', loja(lojas[5].P).status === 'cancelada');
   r = await post('refund_requested', pedido({ email: lojas[6].emails.dono, oferta: OFERTAS[6].oferta, preco: 129, assinatura: `sub-${suf}-7`, status: 'refund_requested' }));
   T.ok('reembolso só pedido não muda nada', r.corpo?.resultado === 'ignorado' && loja(lojas[6].P).status === 'ativa', r);
-  r = await post('purchase_refused', pedido({ email: comum.emails.dono, oferta: OFERTAS[0].oferta, preco: 59, assinatura: `sub-${suf}-z`, status: 'refused' }));
+  r = await post('purchase_refused', pedido({ email: comum.emails.dono, oferta: OFERTAS[0].oferta, preco: 79, assinatura: `sub-${suf}-z`, status: 'refused' }));
   T.ok('compra recusada não ativa ninguém', r.corpo?.resultado === 'ignorado' && loja(comum.P).status === 'teste', r);
 
   T.secao('segredo errado e outro produto');
-  r = await post('purchase_approved', pedido({ email: comum.emails.dono, oferta: OFERTAS[0].oferta, preco: 59, assinatura: `sub-${suf}-w` }), 'segredo-errado-123');
+  r = await post('purchase_approved', pedido({ email: comum.emails.dono, oferta: OFERTAS[0].oferta, preco: 79, assinatura: `sub-${suf}-w` }), 'segredo-errado-123');
   T.ok('segredo errado → 401 e nada muda', r.status === 401 && loja(comum.P).status === 'teste', r);
-  r = await post('purchase_approved', pedido({ email: comum.emails.dono, oferta: OFERTAS[0].oferta, preco: 59, assinatura: `sub-${suf}-w` }), '');
+  r = await post('purchase_approved', pedido({ email: comum.emails.dono, oferta: OFERTAS[0].oferta, preco: 79, assinatura: `sub-${suf}-w` }), '');
   T.ok('sem segredo → 400 ou 401', r.status === 400 || r.status === 401, r);
   const outroProd = { ...PRODUTO, id: B.uuid(), short_id: 'guia' + suf.slice(-4), name: 'Guia', type: 'unique' };
   r = await post('purchase_approved', pedido({ email: comum.emails.dono, oferta: 'guia' + suf, preco: 37, assinatura: null, produto: outroProd }));

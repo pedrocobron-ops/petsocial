@@ -20,6 +20,7 @@ import { Tile } from "../painel";
 import { AvisoCaixaFechado, CampoDinheiro, EscolhaPagamento, fecharPagamento, pagamentoInicial, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, type EstadoPagamento } from "../loja/pecas";
 import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import { avisarMudanca, Campo, Folha, useAvisos, useDados, Vazio } from "../ui";
+import { ComprovanteDoLancamento } from "../loja/comprovante-venda";
 import "./financeiro.css";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 
@@ -618,6 +619,8 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
             <span className="g-pp g-muted">O cliente trouxe um produto de volta? Devolva o dinheiro, deixe de crédito ou troque.</span>
           </div>
         )}
+        {/* venda no balcão e pacote pagos: o comprovante (WhatsApp do tutor ou impresso), como no atendimento e no check-out */}
+        {inicial && inicial.pago && !inicial.movimento && !inicial.conta_id && (inicial.categoria === "Venda de produtos" || inicial.categoria === "Pacotes") && <ComprovanteDoLancamento lancamento={inicial} />}
         {devolvendo && inicial && (
           <FolhaDevolucao venda={{ id: inicial.id, data: inicial.data, valor: Number(inicial.valor_original ?? inicial.valor), descricao: inicial.descricao, cliente_id: inicial.cliente_id }}
             aoFechar={() => setDevolvendo(false)} aoPronto={() => { void aoSalvo(); aoFechar(); }} />
