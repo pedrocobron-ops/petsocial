@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Coins, Download, PiggyBank, Receipt, Scale, TrendingUp } from "lucide-react";
-import { montarLucro, OPCAO_COMISSAO_CUSTO, porLucro, type LinhaLucro, type LucroDoBanco } from "@/lib/gestao/lucro";
-import { nomeDaCategoria } from "@/lib/gestao/modulos";
+import { linhasDaCasa, montarLucro, OPCAO_COMISSAO_CUSTO, porLucro, type LinhaLucro, type LucroDoBanco } from "@/lib/gestao/lucro";
+import { nomeDaCategoria, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { aindaAPagar, fraseDaSituacao, lerSaidasDoPeriodo, lerSituacaoContasFixas, type SaidasDoPeriodo, type SituacaoContaFixa } from "@/lib/gestao/contas-fixas";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
 import { brl, dataCompleta, deIsoDia, isoDia } from "@/lib/gestao/util";
@@ -100,7 +100,13 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
     avisar("Planilha baixada.");
   }
 
-  const linhas = x ? porLucro(vista === "servicos" ? [...x.servicos, ...(x.extras ? [x.extras] : [])] : x.produtos) : [];
+  // creche e hotel: o que entrou deles aparece como linhas (sem custo por serviço), não só em "Outros lançamentos"
+  const casa = x && usaCasa(petshop) ? linhasDaCasa(x.ponte.outros, categoria) : [];
+  const daCasa = casa.reduce((t, l) => t + l.receita, 0);
+  const banho = usaModulo(petshop, "banho_tosa");
+  const nomeCasa = categoria("Creche e hotel");
+  const aCasa = nomeCasa === "Hotel" ? "o hotel não tem" : nomeCasa === "Creche" ? "a creche não tem" : "a creche e o hotel não têm";
+  const linhas = x ? porLucro(vista === "servicos" ? [...x.servicos, ...(x.extras ? [x.extras] : []), ...casa] : x.produtos) : [];
   const temProdutos = Boolean(x?.produtos.length);
   const semMaterial = x?.servicos.filter((s) => s.material == null && s.id) ?? [];
   const inteiro = mesInteiro(de, ate);
@@ -114,32 +120,36 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
       {erro ? <p className="g-erro" role="alert">{erro}</p> : !x ? <Esqueleto linhas={3} /> : (
         <>
           <div className="g-grade kpis">
-            <Kpi icone={Receipt} tom="ceu" rotulo="Entrou de serviços e produtos" valor={brl(x.totais.receita)} apoio="com o desconto, já recebido" />
+            <Kpi icone={Receipt} tom="ceu" rotulo={daCasa > 0 ? (banho ? "Entrou de serviços, casa e produtos" : `Entrou ${categoria("Creche e hotel") === "Hotel" ? "do hotel" : "da creche"} e de produtos`) : "Entrou de serviços e produtos"}
+              valor={brl(x.totais.receita + daCasa)} apoio="com o desconto, já recebido" />
             <Kpi icone={Coins} tom="rosa" rotulo="Custo informado" valor={brl(x.totais.custo)}
-              apoio={x.totais.linhasSemCusto ? `${x.totais.linhasSemCusto === 1 ? "1 linha" : `${x.totais.linhasSemCusto} linhas`} sem custo` : "de todas as linhas"} />
-            <Kpi icone={TrendingUp} tom={x.totais.margem < 0 ? "manteiga" : "menta"} rotulo="Sobrou" valor={x.totais.receitaComCusto > 0 ? brl(x.totais.margem) : "–"}
-              apoio={x.totais.pct != null ? `${pct(x.totais.pct)} do que tem custo · antes das despesas` : "falta informar os custos"} />
+              apoio={!banho && !temProdutos && daCasa > 0 ? `${aCasa} custo por serviço` : x.totais.linhasSemCusto ? `${x.totais.linhasSemCusto === 1 ? "1 linha" : `${x.totais.linhasSemCusto} linhas`} sem custo` : "de todas as linhas"} />
+            {x.totais.receitaComCusto <= 0 && daCasa > 0
+              // creche e hotel não têm custo por serviço: o que sobra é o resultado do período (o mesmo do Financeiro)
+              ? <Kpi icone={TrendingUp} tom={x.ponte.resultado < 0 ? "manteiga" : "menta"} rotulo="Sobrou" valor={brl(x.ponte.resultado)} apoio={`entrou − saiu: ${aCasa} custo por serviço`} />
+              : <Kpi icone={TrendingUp} tom={x.totais.margem < 0 ? "manteiga" : "menta"} rotulo="Sobrou" valor={x.totais.receitaComCusto > 0 ? brl(x.totais.margem) : "–"}
+                  apoio={x.totais.pct != null ? `${pct(x.totais.pct)} do que tem custo · antes das despesas` : "falta informar os custos"} />}
             <Kpi icone={Scale} tom={x.ponte.resultado < 0 ? "rosa" : "lilas"} rotulo={inteiro ? "Resultado do mês" : "Resultado do período"} valor={brl(x.ponte.resultado)} apoio="entrou − saiu, como no Financeiro" />
           </div>
 
-          <div className="g-lu-op">
+          {(banho || temProdutos) && <div className="g-lu-op">
             {souDono ? (
               <label className="g-check">
                 <input type="checkbox" checked={x.comissaoComoCusto} disabled={salvando} onChange={(e) => void trocarComissao(e.target.checked)} />
                 <span>Contar a comissão como custo <span className="g-muted">(o que cada serviço e produto rendeu de comissão sai do que sobrou)</span></span>
               </label>
             ) : <p className="g-muted g-pp">{x.comissaoComoCusto ? "A comissão conta como custo (o dono escolhe)." : "A comissão não conta como custo (o dono escolhe)."}</p>}
-          </div>
+          </div>}
 
           {temProdutos && <Chips opcoes={VISTAS} valor={vista} aoMudar={setVista} rotulo="Mostrar" />}
           {linhas.length ? (
             <div className="g-lu-tab" role="table" aria-label={vista === "servicos" ? "Quanto sobrou por serviço" : "Quanto sobrou por produto"}>
               <div className="g-lu-l cab" role="row">
-                <span>{vista === "servicos" ? "Serviço" : "Produto"}</span><span>{vista === "servicos" ? "Vezes" : "Vendidos"}</span><span>Entrou</span><span>Custo</span><span>Sobrou</span><span>%</span>
+                <span>{vista === "servicos" ? (banho ? "Serviço" : "O que entrou") : "Produto"}</span><span>{vista === "servicos" ? "Vezes" : "Vendidos"}</span><span>Entrou</span><span>Custo</span><span>Sobrou</span><span>%</span>
               </div>
               {linhas.map((l) => <Linha key={l.chave} l={l} comComissao={x.comissaoComoCusto} />)}
             </div>
-          ) : <p className="g-muted g-p">{vista === "servicos" ? "Nenhum serviço recebido neste período." : "Nenhum produto vendido neste período."}</p>}
+          ) : <p className="g-muted g-p">{vista === "servicos" ? (banho ? "Nenhum serviço recebido neste período." : `Nada recebido ${categoria("Creche e hotel") === "Hotel" ? "do hotel" : "da creche"} neste período.`) : "Nenhum produto vendido neste período."}</p>}
           {vista === "servicos" && semMaterial.length > 0 && (
             <p className="g-muted g-pp">
               {semMaterial.length === 1 ? `${semMaterial[0].nome} está` : `${semMaterial.length} serviços estão`} sem custo do material: aparece “custo não informado” em vez de uma margem de 100%.
@@ -173,9 +183,9 @@ function Linha({ l, comComissao }: { l: LinhaLucro; comComissao: boolean }) {
   return (
     <div className="g-lu-l" role="row">
       <span className="n"><b>{l.nome}</b>{sub && <small>{sub}</small>}</span>
-      <span><i>{l.tipo === "produto" ? "Vendidos " : "Vezes "}</i><em>{l.tipo === "extra" ? "–" : `${fmtQtd(l.quantidade)}${l.tipo === "produto" ? ` ${l.unidade}` : ""}`}</em></span>
+      <span><i>{l.tipo === "produto" ? "Vendidos " : "Vezes "}</i><em>{l.chave.startsWith("casa:") ? `${fmtQtd(l.quantidade)} ${l.unidade}` : l.tipo === "extra" ? "–" : `${fmtQtd(l.quantidade)}${l.tipo === "produto" ? ` ${l.unidade}` : ""}`}</em></span>
       <span><i>Entrou </i><em>{brl(l.receita)}</em></span>
-      <span>{l.custo == null ? <em className="sem">custo não informado</em> : <><i>Custo </i><em>{brl(l.custo)}</em></>}</span>
+      <span>{l.custo == null ? <em className="sem">{l.chave.startsWith("casa:") ? "sem custo por serviço" : "custo não informado"}</em> : <><i>Custo </i><em>{brl(l.custo)}</em></>}</span>
       <span><i>Sobrou </i><em className={ruim ? "ruim" : undefined}>{l.margem == null ? "–" : brl(l.margem)}</em></span>
       <span><i>Margem </i><em className={ruim ? "ruim" : undefined}>{pct(l.pct)}</em></span>
     </div>

@@ -153,10 +153,13 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const concluidoTravado = travado && a.status === "concluido" && !temConta && !a.sem_cobranca && (total ?? 0) > 0;
   const podeMexerNoPago = extra?.emCaixaFechado ? souDono : temConta ? cuidoDoFinanceiro : vejoFinanceiro && !concluidoTravado;
   const podeReabrir = a.status !== "concluido" || (sabe && podeMexerNoPago);
-  const podeApagar = sabe && (a.status === "concluido" || temConta ? podeMexerNoPago : true);
+  // horário marcado: quem só usa a agenda (sem ver valores) desmarca, e o horário fica no histórico; apagar é com quem vê o
+  // financeiro (o banco confere a mesma regra, migração 20261221)
+  const podeApagar = sabe && (a.status === "concluido" || temConta ? podeMexerNoPago : vejoFinanceiro);
   const porQueNao = extra?.emCaixaFechado ? "O pagamento deste atendimento está em um caixa já fechado: só o dono do pet shop pode reabrir, alterar ou apagar."
     : temConta ? "Atendimento com pagamento lançado: só o dono ou quem cuida do financeiro pode reabrir, alterar ou apagar."
     : concluidoTravado ? "Com o preço travado, só o dono ou quem vê o financeiro volta para marcado ou apaga um atendimento concluído. Falta cobrar? Feche a conta pelo valor do horário."
+    : a.status !== "concluido" ? "Para tirar este horário, use Desmarcar horário: ele fica no histórico. Apagar da agenda é com o dono ou quem vê o financeiro."
     : "Atendimento concluído: só quem cuida do caixa ou do financeiro pode reabrir, alterar ou apagar.";
 
   async function mudar(campos: Partial<{ status: StatusAgendamento; checklist: Record<string, boolean>; lembrete_em: string; pronto_avisado_em: string; pacote_cliente_id: string }>, aviso?: string) {
@@ -264,7 +267,9 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         extraAviso = ` ${oLancado.replace(/^./, (c) => c.toUpperCase())} de ${brl(lancado)} também ${recebido > 0 && aReceber > 0 ? "foram apagados" : aReceber > 0 ? "foi apagada" : "foi apagado"}${voltaram ? ` e ${voltaram === 1 ? "1 produto voltou" : `${voltaram} produtos voltaram`} para o estoque` : ""}.`;
         if (erroEstoque) avisarErro(`O recebimento foi apagado, mas os produtos não voltaram para o estoque. Acerte o saldo na tela de Estoque. (${erroEstoque})`);
       }
-      ok(await sb.from("agendamentos").delete().eq("id", a.id).select("id"));
+      const foi = ok(await sb.from("agendamentos").delete().eq("id", a.id).select("id")) as { id: string }[];
+      // o banco não apagou (regra de quem pode): nada some da tela sem ter saído do banco
+      if (!foi.length) throw new Error("Este horário não foi apagado: apagar da agenda é com o dono ou quem vê o financeiro. Use Desmarcar horário.");
       const fotos = [a.foto_antes, a.foto_depois].filter((c): c is string => Boolean(c));
       if (fotos.length) void sb.storage.from("pets").remove(fotos);
       avisar(`Horário apagado.${extraAviso}${!comRecebimento && lancado > 0 ? ` ${oLancado.replace(/^./, (c) => c.toUpperCase())} de ${brl(lancado)} ${recebido > 0 && aReceber > 0 ? "continuam" : "continua"} no financeiro.` : ""}`);

@@ -10,7 +10,7 @@ import { brlMini, Chips, ErroDeCarga, SemAcesso } from "@/components/gestao/fina
 import { Barras, Kpi, Ranking, Tile } from "@/components/gestao/painel";
 import AbasDeRelatorios from "@/components/gestao/relatorios/abas";
 import {
-  carregarIndicadores, comparacao, DIAS_SEMANA_CURTOS, intervaloAnterior, intervaloIndicadores, pct1, PERIODOS_INDICADORES, rotuloMes, temDados, totaisIndicadores,
+  carregarIndicadores, comparacao, DIAS_SEMANA_CURTOS, intervaloAnterior, intervaloIndicadores, pct1, PERIODO_INICIAL, PERIODOS_INDICADORES, rotuloMes, temDados, totaisIndicadores,
   type IndicadoresDoBanco, type PeriodoIndicadores,
 } from "@/lib/gestao/indicadores";
 import { brl, dataCompleta } from "@/lib/gestao/util";
@@ -30,7 +30,7 @@ const n = (v: number, um: string, varios: string) => `${v.toLocaleString("pt-BR"
  */
 function Indicadores() {
   const { sb, petshop } = useGestao();
-  const [periodo, setPeriodo] = useState<PeriodoIndicadores>("6");
+  const [periodo, setPeriodo] = useState<PeriodoIndicadores>(PERIODO_INICIAL);
   const hoje = useMemo(() => new Date(), []);
   const { de, ate } = intervaloIndicadores(periodo, hoje);
   const antes = intervaloAnterior(periodo, hoje);
@@ -141,7 +141,8 @@ function Graficos({ d, antes, fixas, periodoAnterior }: { d: IndicadoresDoBanco;
           <div className="g-card-t"><h3><Tile icone={UserX} tom="rosa" tamanho="p" />Faltas e cancelamentos</h3></div>
           <div className="g-ind-dois">
             <div><small>Faltas</small><b>{pct1(t.pctFaltas)}</b><small>{n(t.faltas, "falta", "faltas")} de {t.atendimentos + t.faltas} que deviam vir</small><Comparar atual={t.pctFaltas} anterior={ta?.pctFaltas ?? null} /></div>
-            <div><small>Cancelamentos</small><b>{pct1(t.pctCancelados)}</b><small>{n(t.cancelados, "cancelado", "cancelados")} de {n(t.marcados, "marcado", "marcados")}{t.reservasMarcadas > 0 ? ` (${n(t.reservasCanceladas, "reserva cancelada", "reservas canceladas")} de ${n(t.reservasMarcadas, "reserva", "reservas")} da creche e do hotel)` : ""}</small><Comparar atual={t.pctCancelados} anterior={ta?.pctCancelados ?? null} /></div>
+            <div><small>Cancelamentos</small><b>{pct1(t.pctCancelados)}</b><small>{n(t.cancelados, "cancelado", "cancelados")} de {n(t.marcados, "marcado", "marcados")}{t.reservasMarcadas > 0 ? ` (${n(t.reservasCanceladas, "reserva cancelada", "reservas canceladas")} de ${n(t.reservasMarcadas, "reserva", "reservas")} da creche e do hotel, pela data de entrada)` : ""}</small>
+              {t.canceladasNoPeriodo > 0 && <small>{t.canceladasNoPeriodo === 1 ? "1 reserva da creche ou do hotel foi cancelada" : `${t.canceladasNoPeriodo.toLocaleString("pt-BR")} reservas da creche e do hotel foram canceladas`} neste período (pela data do cancelamento)</small>}<Comparar atual={t.pctCancelados} anterior={ta?.pctCancelados ?? null} /></div>
           </div>
           {t.reservasMarcadas > 0 && <p className="g-muted g-pp">Reservas pelo dia da entrada, sem os dias dos mensalistas. Faltas são só dos horários da agenda.</p>}
         </section>

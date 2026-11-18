@@ -91,6 +91,23 @@ export function navegadorDe(ua: unknown): string {
   return so ? `${nav} · ${so}` : nav;
 }
 
+/** O banco ou o servidor desistiu por demora (tempo esgotado da consulta, do gateway ou da função). */
+export const ehDemora = (m: string) =>
+  /statement timeout|canceling statement|\b57014\b|lock timeout|timed? ?out|Gateway Time-?out|\b50[4]\b|\b544\b|FUNCTION_INVOCATION_TIMEOUT/i.test(m);
+
+/**
+ * Erro técnico (do banco ou do servidor) trocado por uma frase que a pessoa entende; null quando o texto já é para a pessoa ler
+ * (as recusas das regras do banco). Nunca mostra o texto em inglês do banco.
+ */
+export function textoAmigavel(m: string): string | null {
+  if (ehDemora(m)) return "Demorou demais, tente de novo.";
+  if (/\b50[0-3]\b|Internal Server Error|Bad Gateway|Service Unavailable|upstream/i.test(m)) return "O servidor falhou agora. Tente de novo em instantes.";
+  if (/does not exist|schema cache|Could not find the|syntax error|invalid input syntax|operator does not exist|is ambiguous|PGRST\d|null value in column|could not serialize|deadlock detected|too many connections|remaining connection slots/i.test(m)) {
+    return "Algo deu errado do nosso lado. Tente de novo; se continuar, fale com o suporte.";
+  }
+  return null;
+}
+
 /** Texto de erro de rede: sem internet ou servidor que não respondeu. */
 export const ehDeRede = (m: string) => /Failed to fetch|NetworkError|Load failed|network ?error|ERR_INTERNET_DISCONNECTED|fetch failed/i.test(m);
 

@@ -14,7 +14,7 @@ import { cuidadosVigentes, estadoSaude, type CuidadoResumido } from "@/component
 import { BotaoFotos, useFaxinaDasFotos } from "@/components/gestao/casa/fotos-do-dia";
 import { BotaoBoletim, useBoletinsDeHoje, useFaxinaDoBoletim } from "@/components/gestao/boletim/boletim";
 import { EntradaNaChegada, EntradaNaVisita, type VisitaDaEntrada } from "@/components/gestao/entrada/entrada";
-import { AvisoDeVaga, FolhaEspera, ListaDeEspera, useListaDeEspera } from "@/components/gestao/casa/espera";
+import { AvisoDeVaga, FolhaEspera, ListaDeEspera, temVagaNosDias, useListaDeEspera } from "@/components/gestao/casa/espera";
 import dynamic from "next/dynamic";
 import { FolhaOcorrencia, OcorrenciasDoCartao } from "@/components/gestao/casa/ocorrencias";
 import { FolhaQuemPodeBuscar, lerRetiradas, QuemBuscou, textoDaRetirada } from "@/components/gestao/casa/portaria";
@@ -497,10 +497,13 @@ export default function CrecheHotel() {
     try { await decidirAtraso(sb, a.estadia_id, "dispensada"); avisar("Sem taxa desta vez."); mudou(); } catch (x) { avisarErro(x); }
   }
 
-  /** A saída de um hóspede: com "Quem pode buscar" ligado, primeiro a equipe marca quem levou. */
+  /**
+   * A saída de um hóspede: com "Quem pode buscar" ligado, primeiro a equipe marca quem levou. Com "levar de volta" (leva e traz),
+   * quem leva é a própria casa: não pergunta "Quem veio buscar?".
+   */
   const sair = (e: EstadiaCompleta) => {
     if (somenteLeitura()) return;
-    if (comPortaria) setBuscando(e);
+    if (comPortaria && !e.leva_traz_levar) setBuscando(e);
     else if (e.mensalista) void saidaDoMensalista(e);
     else setSaindo(e);
   };
@@ -929,7 +932,7 @@ export default function CrecheHotel() {
         aoSeguir={async () => { const e = buscando; setBuscando(null); if (e.mensalista) await saidaDoMensalista(e); else setSaindo(e); }} />}
       {ocorrenciaDe && <FolhaOcorrencia estadia={ocorrenciaDe} aoFechar={() => setOcorrenciaDe(null)} aoGravar={() => { setOcorrenciaDe(null); void recarregar(); }} />}
       {autorizadosDe?.pets && <FolhaQuemPodeBuscar pet={autorizadosDe.pets} aoFechar={() => setAutorizadosDe(null)} />}
-      {esperaNova && <FolhaEspera inicial={esperaNova} aoFechar={() => setEsperaNova(null)} aoGravar={() => { setEsperaNova(null); void espera.recarregar(); verEspera(); }} />}
+      {esperaNova && <FolhaEspera inicial={esperaNova} temVaga={(t, de, ate) => temVagaNosDias(petshop, t, de, ate, abertas, mens ?? null)} aoFechar={() => setEsperaNova(null)} aoGravar={() => { setEsperaNova(null); void espera.recarregar(); verEspera(); }} />}
       {avisando && <AvisarChegadas reservas={reservas} aoFechar={() => setAvisando(false)} aoMudar={() => void recarregar()} />}
     </>
   );

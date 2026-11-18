@@ -125,6 +125,8 @@ export default function Hoje() {
       concluidos: h.contagens.concluidos,
       lembrados: h.contagens.lembrados,
       estadiasTotal: h.contagens.estadias,
+      // o passo "primeiro check-in" só conta o pet que entrou (reserva aceita pelo link não é check-in)
+      checkinsTotal: h.contagens.checkins ?? h.contagens.estadias,
       produtosTotal: h.contagens.produtos,
       entrou: Math.round((h.entradas.filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0) + ajusteDe(hojeIso)) * 100) / 100,
       ajusteHoje: ajusteDe(hojeIso),
@@ -204,7 +206,7 @@ export default function Hoje() {
   const [agoraNao, setAgoraNao] = useState(() => lerLembrado(chaveAgoraNao(petshop.id)) === hojeIso);
   const cartaoTeste = testePerto && souDono && (!liberado || !agoraNao);
   const pp = usePrimeirosPassos(
-    dados ? { pets: dados.pets, horarios: dados.totalAgs, concluidos: dados.concluidos, lembretes: dados.lembrados, amanha: dados.amanha, estadias: dados.estadiasTotal, produtos: dados.produtosTotal } : null,
+    dados ? { pets: dados.pets, horarios: dados.totalAgs, concluidos: dados.concluidos, lembretes: dados.lembrados, amanha: dados.amanha, estadias: dados.checkinsTotal, produtos: dados.produtosTotal } : null,
     () => setLembretes(true),
   );
   const cartaoPassos = !cartaoTeste && pp.estado !== "some";

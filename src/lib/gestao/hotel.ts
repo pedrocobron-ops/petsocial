@@ -322,7 +322,10 @@ export function linhasDaConta(c: ContaDaEstadia): { texto: string; valor: string
       while (j + 1 < c.noites.length && c.noites[j + 1].valor === c.noites[i].valor && c.noites[j + 1].temporada === c.noites[i].temporada && c.noites[j + 1].desconto === c.noites[i].desconto) j++;
       const n = j - i + 1, x = c.noites[i];
       const marcas = [x.temporada, x.desconto > 0 ? "desconto do segundo pet" : null].filter(Boolean).join(", ");
-      const dias = n === 1 ? dataCurta(x.dia) : `${dataCurta(x.dia)} a ${dataCurta(c.noites[j].dia)}`;
+      // hotel: do dia da entrada ao dia da saída da última noite ("2 noites (15/11 a 17/11)" para quem sai no dia 17);
+      // creche: os dias em que o pet veio
+      const dias = c.tipo === "hotel" ? `${dataCurta(x.dia)} a ${dataCurta(isoDia(somaDias(new Date(`${c.noites[j].dia}T12:00:00`), 1)))}`
+        : n === 1 ? dataCurta(x.dia) : `${dataCurta(x.dia)} a ${dataCurta(c.noites[j].dia)}`;
       linhas.push({ texto: `${n} ${palavraDiarias(c.tipo, n)} de ${brl(x.valor)} (${dias}${marcas ? `, ${marcas}` : ""})`, valor: brl(centavos(n * x.valor)) });
       i = j + 1;
     }

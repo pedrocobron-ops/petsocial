@@ -150,7 +150,43 @@ async function prepararFoto(f: File): Promise<Blob> {
   } catch { throw new Error(`Não consegui ler "${f.name}". Escolha uma foto JPG ou PNG.`); }
 }
 
-export type FotoDaEntrada = { caminho: string; url: string };
+/**
+ * Uma foto da folha de entrada. `pendente`: escolhida, mas ainda não subiu (ou não conseguiu subir). Ela continua na folha
+ * (com a prévia do aparelho) para tentar de novo, e a entrada pode ser salva sem ela: a foto nunca some sem aviso.
+ */
+export type FotoDaEntrada = { caminho: string; url: string; pendente?: { arquivo: Blob; estado: "subindo" | "falhou"; erro?: string } };
+
+/** Reduz a foto no aparelho (o erro aqui é da foto, não da internet: não adianta tentar de novo). */
+export const prepararFotoDaEntrada = prepararFoto;
+
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Desiste de uma tentativa que passa disto (internet fraca): a próxima tentativa começa do zero. */
+export const TEMPO_DA_FOTO_MS = 20000;
+
+/**
+ * Sobe a foto já reduzida, tentando de novo quando a internet ou o servidor falham (até 3 vezes, com uma pausa entre elas).
+ * Cada tentativa vai para um arquivo novo: uma tentativa que demorou e chegou depois fica sem uso e sai na faxina.
+ */
+export async function subirFotoDaEntrada(sb: Banco, petshopId: string, blob: Blob, tentativas = 3, tempo = TEMPO_DA_FOTO_MS): Promise<string> {
+  let ultimo: unknown = null;
+  for (let i = 0; i < tentativas; i++) {
+    if (i > 0) await esperar(1000 * i);
+    const caminho = `${petshopId}/${crypto.randomUUID()}.jpg`;
+    try {
+      const up = await Promise.race([
+        sb.storage.from(BUCKET_ENTRADA).upload(caminho, blob, { contentType: "image/jpeg" }),
+        esperar(tempo).then(() => ({ error: { message: "tempo esgotado" } })),
+      ]);
+      if (!up.error) return caminho;
+      if (up.error.message.includes("size")) throw Object.assign(new Error("A foto ficou grande demais."), { final: true });
+      ultimo = up.error;
+    } catch (e) {
+      if ((e as { final?: boolean }).final) throw e;
+      ultimo = e;
+    }
+  }
+  throw new Error(`A foto não subiu${ultimo ? " (a internet ou o servidor demoraram)" : ""}. Ela continua na folha: toque em Tentar de novo.`);
+}
 
 /** Reduz a foto no aparelho (até 1600 px, JPEG) e sobe para o bucket privado. */
 export async function enviarFotoDaEntrada(sb: Banco, petshopId: string, f: File): Promise<FotoDaEntrada> {

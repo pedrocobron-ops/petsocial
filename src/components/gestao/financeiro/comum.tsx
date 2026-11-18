@@ -902,7 +902,7 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
       <div className="g-form">
         <div className="g-card areia">
           <LinhaResumo nome={conta.descricao || conta.categoria} valor={brl(conta.valor)} forte />
-          <p className="g-muted g-pp">{categoriaAtual(conta.categoria, petshop)}{conta.vencimento ? ` · vencimento em ${dataCompleta(conta.vencimento)}` : ""}{textoJaRecebido(conta) ? ` · ${textoJaRecebido(conta)}` : ""}</p>
+          <p className="g-muted g-pp">{categoriaAtual(conta.categoria, petshop)}{conta.devido_desde ? ` · deve desde ${dataCompleta(conta.devido_desde)}` : conta.vencimento ? ` · vencimento em ${dataCompleta(conta.vencimento)}` : ""}{textoJaRecebido(conta) ? ` · ${textoJaRecebido(conta)}` : ""}</p>
         </div>
         {entrada && <PartesRecebidas conta={conta} />}
         {entrada && (

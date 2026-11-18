@@ -58,6 +58,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 ## O que cada suíte confere
 
 **unidade/**
+- `rodada2-h.js`: segunda rodada (Rafael, Bia, Juliana, Neide): tempo esgotado do banco vira "Demorou demais, tente de novo" (`textoAmigavel`); a foto da entrada tenta de novo e desiste com aviso (`subirFotoDaEntrada`); Termos e Política 2.3 vigentes desde 17/11/2026; mapa sem "Campinas, Campinas" (`comCidade`); comprovante com a data do pagamento (`linhasDaData`); "2 noites (15/11 a 17/11)" no comprovante do hotel; linhas da creche em Quanto sobrou (`linhasDaCasa`); cancelamentos pelo dia do cancelamento e a tela abrindo em Este mês.
 - `creche-hotel-final.js`: rodada final (Rafael e Bia): regra de cancelamento do sinal (`destinoPelaRegra`: menos de 7 dias vira crédito, 7 ou mais devolve; sem regra, nada marcado), hora do hotel (`horasDoHotel`), táxi pet na cobrança (`taxiDaCobranca`, `partesDosExtras` com `taxi`, mensagem de cobrança com "táxi pet 2 dias" e a chave Pix do hotel), "Devolver: coleira, guia e remédio da artrose" sem repetir "remédio", texto do aceite sem banho num hotel só, "Saiu uma foto", exemplo das regras do link num hotel só, "veio hoje" no Bom dia, valor médio pelas contas contadas (895 ÷ 2 = 447,50) e cancelamentos com as reservas.
 - `link-ia.js`: o contexto que o assistente do link recebe (horário, preços, hotel com ou sem preço, desconto do segundo pet, regras), a leitura da resposta
   (não sei, sugestão de pedido só com serviço e dia válidos, sem links), limites de conversa. Sem banco.
@@ -148,6 +149,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   o que está só na tela comparado com o saldo de agora, e a planilha sem colunas de R$ para quem não vê o financeiro.
 
 **banco/** (API do Supabase com o login de cada papel, como o navegador faz; SQL só para preparar e conferir)
+- `rodada2-h.js`: migração 20261221: "Táxi pet do mês" e "Táxi pet (datas)" na conta da mensalidade (a busca fora do horário com o nome dela); reserva cancelada hoje para o mês que vem nos indicadores (`estadias_canceladas_no_periodo`); `lista_espera.cheio_ao_entrar`; quem só usa a agenda não apaga horário marcado (o caixa e o dono apagam).
 - `creche-hotel-final.js`: migração 20261218. Táxi pet do mensalista: o Chegou da chamada anota o dia de táxi (só com táxi por dia e preço), Desfazer tira, a cobrança do mês seguinte leva os dias (`taxas` com "tipo": "taxi", somado em valor_extras e na conta a receber), cancelar a cobrança solta os dias, táxi fixo por mês entra no próprio mês ("taxi_mes"); o monitor lê ida/volta mas não o preço; viagens do Leva e traz (`creche_taxi_viagem_marcar`: levar só depois do Chegou, plano sem táxi recusado). Indicadores: 2 reservas canceladas de 3, o sinal não conta como conta (1 conta de R$ 300 = 222 + sinal de 78). Link: `link_hotel_opcoes.horas` e `.pix` (só com sinal), `link_creche_planos` (só com a opção; sem preço quando o link esconde preços), `link_fechados_nomes`.
 - `seguranca.js`: isolamento entre pet shops e anônimo; dono não mexe na própria assinatura nem vira admin; o que cada papel grava
   (recepção, monitora, tosador, estoque); caixa fechado travado; **matriz de leitura das colunas com dinheiro** por papel
@@ -509,6 +511,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   registro e "Cliente removido" depois de apagar.
 
 **telas/** (Playwright, Chromium)
+- `rodada2-h.js`: segunda rodada no site real (Rafael): check-out com o banco respondendo "statement timeout" (a tela diz que demorou, sem o texto do banco, e a nova tentativa fecha a conta uma vez só); entrada com a foto que não sobe (salva sem ela, avisa na folha, a foto fica com Tentar de novo e entra depois); Quanto sobrou numa creche só com as mensalidades (390 e 1366).
 - `creche-hotel-final.js`: rodada final pela tela. Chegou da Chamada abre a folha Entrada (Todos os pets) e o cartão do mensalista tem Conferir a entrada; plano com táxi na Chamada e no Leva e traz (Buscado anotado); primeira foto de Fotos de hoje sobe e aparece (tempo medido); cancelar reserva com sinal pago traz Virar crédito do tutor já marcado pela regra e o cartão sai na hora (crédito de R$ 78 gravado); Aceitar todos tira o cartão do pedido na hora; link do hotel com 14:00/12:00 sem taxa e com a taxa às 18h sem "até as 15h"; Indicadores num hotel só sem mapa de horários, com ocupação e reservas canceladas.
 - `passeio.js`: todas as telas principais (Hoje, Agenda, Clientes, Creche e hotel, Pacotes, Caixa, Financeiro, Relatórios, Estoque,
   Equipe, Meu pet shop, Assinatura, Manual, Escola) em **390 e 1366**, com o dono e com cada papel da equipe (só as áreas dele, e

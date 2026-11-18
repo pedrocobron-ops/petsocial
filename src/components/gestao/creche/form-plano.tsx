@@ -8,7 +8,7 @@ import {
   type PetDoPlano, type PlanoCompleto, type PrimeiraCobranca,
 } from "@/lib/gestao/creche";
 import type { PetComTutor } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, dataCurta, isoDia, nomeMes, somaDias } from "@/lib/gestao/util";
+import { brl, centavos, dataCompleta, dataCurta, isoDia, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useTrava } from "@/lib/gestao/uma-vez";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
@@ -117,6 +117,9 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
   const comecoNoMes = inicio > isoMes(mesAtual) ? inicio : null;
   const vencPadrao = (() => { const v = inicio ? vencimentoDoMes({ inicio, vence_dia: venceDia }, mesAtual) : hoje; return v < hoje ? hoje : v; })();
   const vencDaPrimeira = vencPrimeira || vencPadrao;
+  // táxi com valor fixo no mês: entra na primeira cobrança junto da mensalidade (o banco soma); a opção mostra o total que vai ser criado
+  const taxiDoMes = taxi && taxiModo === "mes" && taxiValor != null && taxiValor > 0 ? taxiValor : 0;
+  const comTaxi = (v: number) => (taxiDoMes > 0 ? `${brl(v)} + táxi pet do mês ${brl(taxiDoMes)} = ${brl(centavos(v + taxiDoMes))}` : brl(v));
 
   // o que foi escrito e não salvo fica no aparelho (por plano, ou "novo"): recarregar a tela não perde. Salvou: some.
   const valores = { pet: plano ? null : pet, dias, venceDia, inicio, fim, mensal, extra, modeloId, obs, pausaDe, pausaAte, comPausa, primeira, vencPrimeira, taxi, taxiValor, taxiModo };
@@ -176,9 +179,12 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
         if (r.error) avisarErro(`O plano foi salvo, mas a primeira cobrança não foi criada (${r.error.message}). Gere em Cobranças.`);
         else {
           // o banco já aplica o desconto para irmãos (opção da creche): o aviso diz o total que ficou
+          // (e o táxi do mês): o aviso diz o total que ficou na cobrança
           const g = await sb.from("creche_cobrancas").select("total, desconto_irmao").eq("id", r.data as string).maybeSingle();
           const irmao = Number(g.data?.desconto_irmao ?? 0);
-          cobrou = ` A cobrança de ${nomeMes(mesAtual)} (${brl(irmao > 0 ? Number(g.data!.total) : valor)}${irmao > 0 ? `, com ${brl(irmao)} de desconto irmão` : ""}) vence em ${dataCurta(vencDaPrimeira)}.`;
+          const total = g.data ? Number(g.data.total) : centavos(valor + taxiDoMes);
+          const partes = [taxiDoMes > 0 ? `com ${brl(taxiDoMes)} de táxi pet do mês` : "", irmao > 0 ? `com ${brl(irmao)} de desconto irmão` : ""].filter(Boolean).join(" e ");
+          cobrou = ` A cobrança de ${nomeMes(mesAtual)} (${brl(total)}${partes ? `, ${partes}` : ""}) vence em ${dataCurta(vencDaPrimeira)}.`;
         }
       } else if (perguntaPrimeira && primeira === "fora") cobrou = ` A primeira cobrança é a de ${nomeMes(proximoMes)}.`;
       rascunho.limpar();
@@ -304,10 +310,10 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
                   <span>Este mês já foi pago por fora: a primeira cobrança é a de {nomeMes(proximoMes)}</span></label>
                 {!(formaDoMes && !formaDoMes.proporcional && formaDoMes.restam > 0) && (
                   <label className="g-check"><input type="radio" name="primeira" checked={primeira === "proporcional"} disabled={Boolean(formaDoMes && formaDoMes.restam === 0)} onChange={() => { setPrimeira("proporcional"); limpar(); }} />
-                    <span>Cobrar este mês, proporcional {comecoNoMes ? `desde o começo do plano (${dataCurta(comecoNoMes)})` : "aos dias do plano"}{prop ? (prop.restam > 0 ? `: ${brl(prop.valor)} (${prop.restam} de ${prop.todos} dias do plano no mês)` : " (não há dias do plano neste mês)") : ""}</span></label>
+                    <span>Cobrar este mês, proporcional {comecoNoMes ? `desde o começo do plano (${dataCurta(comecoNoMes)})` : "aos dias do plano"}{prop ? (prop.restam > 0 ? `: ${comTaxi(prop.valor)} (${prop.restam} de ${prop.todos} dias do plano no mês)` : " (não há dias do plano neste mês)") : ""}</span></label>
                 )}
                 <label className="g-check"><input type="radio" name="primeira" checked={primeira === "inteiro"} onChange={() => { setPrimeira("inteiro"); limpar(); }} />
-                  <span>Cobrar o mês inteiro{mensal != null ? `: ${brl(mensal)}` : ""}</span></label>
+                  <span>Cobrar o mês inteiro{mensal != null ? `: ${comTaxi(mensal)}` : ""}</span></label>
                 {(primeira === "proporcional" || primeira === "inteiro") && (
                   <Campo rotulo="Vencimento desta primeira cobrança" dica="As próximas vencem no dia combinado acima.">
                     <input type="date" className="g-input" value={vencDaPrimeira} min={hoje} onChange={(e) => { setVencPrimeira(e.target.value); limpar(); }} />

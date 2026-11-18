@@ -56,6 +56,8 @@ type TopicoBase = {
   /** Escrito como tarefa: "Como marcar um horário". */
   titulo: string;
   secao: SecaoId;
+  /** A seção para quem não faz banho e tosa (o tópico da agenda que também vale na creche e no hotel fica em Creche/Hotel). */
+  secaoSemBanho?: SecaoId;
   quem: Quem;
   /** Tela onde se faz (o botão "Abrir esta tela" leva para cá). null = fora do menu (tela de entrada, navegador). */
   rota: string | null;
@@ -329,14 +331,17 @@ const BASE: TopicoBase[] = [
       "Horário apagado pelo botão Apagar da agenda não volta: precisa ser marcado de novo.",
     ],
     palavras: ["desfazer", "apertei errado", "cliquei errado", "toquei errado", "sem querer", "cancelei errado", "cancelei sem querer", "como volta", "voltar para marcado", "voltar o horario", "recuperar horario", "descancelar", "reabrir", "desfazer cancelamento", "desfazer falta", "conclui errado", "marquei falta", "marquei falta errado", "dei falta mas veio", "falta mas o cliente veio", "tirar a falta", "conclui sem querer"] },
-  { id: "apagar-horario", titulo: "Como apagar um horário da agenda", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA,
+  { id: "apagar-horario", titulo: "Como apagar um horário da agenda", secao: "agenda", usa: ["banho"], quem: "financeiro", rota: AGENDA,
     passos: [
       "Toque no horário.",
       "Toque em Apagar da agenda, no fim da janela.",
       "Confirme em Apagar.",
     ],
     dicas: ["Se o cliente só desmarcou, prefira Desmarcar horário: assim fica no histórico."],
-    atencao: ["Se o horário já foi pago ou tem conta a receber, o sistema pergunta o que fazer com o dinheiro antes de apagar. Leia com calma."],
+    atencao: [
+      "Se o horário já foi pago ou tem conta a receber, o sistema pergunta o que fazer com o dinheiro antes de apagar. Leia com calma.",
+      "Apagar da agenda é com o dono ou quem vê o financeiro. Quem da equipe usa só a agenda toca em Desmarcar horário: o horário fica no histórico como desmarcado.",
+    ],
     palavras: ["apagar horario", "apagar um horario", "apagar o horario", "apagar da agenda", "excluir horario", "lixeira", "remover horario", "marquei errado", "horario duplicado"] },
   { id: "bloquear", titulo: "Como bloquear um horário (folga, feriado, compromisso)", secao: "agenda", usa: ["banho"], quem: "todos", rota: AGENDA,
     passos: [
@@ -973,6 +978,7 @@ const BASE: TopicoBase[] = [
       "O tutor quis? Toque em Marcar reserva: o formulário abre com a entrada, a saída e a observação que estavam na lista (Prefere canil perto da janela). Confira e salve. O pet sai da lista sozinho.",
     ],
     dicas: [
+      "Colocou na lista com os dias ainda livres? O pet aparece com Tem vaga nesses dias e não vira o aviso Abriu vaga: dá para marcar a reserva direto.",
       { so: ["creche"], texto: "A vaga abre quando uma reserva é cancelada, quando um hóspede sai antes ou quando um mensalista leva falta no dia." },
       { sem: ["creche"], texto: "A vaga abre quando uma reserva é cancelada ou quando um hóspede sai antes." },
       "A ordem da lista é a de chegada, e cada um mostra o lugar na fila (1º da fila, 2º da fila). Se abriu uma vaga só, só o primeiro que cabe nos dias dele fica com Abriu vaga; os outros mostram que a vaga é de quem chegou antes. Se o primeiro não quiser, toque em Tirar: a vaga passa para o próximo.",
@@ -1138,7 +1144,7 @@ const BASE: TopicoBase[] = [
       "Salve. O nome da acomodação aparece no cartão do pet, na Ocupação e na Folha do dia.",
     ],
     dicas: ["Se a acomodação já estiver cheia nas datas, o sistema avisa e pergunta se é para colocar mesmo assim."],
-    palavras: ["canil", "baia", "box", "quarto", "suite", "acomodacao", "gaiola", "onde o pet fica", "gatil"] },
+    palavras: ["canil", "baia", "box", "quarto", "suite", "acomodacao", "gaiola", "onde o pet fica", "gatil", "escolher o canil", "escolher o quarto"] },
   { id: "creche-preco", titulo: "Como definir a diária e as vagas da creche e do hotel", secao: "creche", usa: ["casa"], quem: "dono", rota: PETSHOP, tambem: [CRECHE],
     passos: [
       "Abra Meu pet shop.",
@@ -2119,6 +2125,7 @@ const BASE: TopicoBase[] = [
       "Toque em Exportar para baixar a planilha.",
     ],
     dicas: [
+      "Na creche e no hotel, o que entrou aparece em linhas próprias (Creche: mensalidades, diárias e taxas). Eles não têm custo por serviço: numa creche ou num hotel só, Sobrou mostra o resultado do período (entrou menos saiu).",
       "Serviço sem custo do material, ou produto sem custo, mostra custo não informado: o sistema não inventa uma margem de 100%.",
       "Quer que a comissão conte como custo? Marque Contar a comissão como custo, logo abaixo dos números (só o dono muda).",
       "Embaixo, Como fecha com o Financeiro mostra a conta até o resultado: serviços e produtos, outros lançamentos (pacotes, creche, hotel, outras entradas), devoluções e crédito, e as saídas. No mês inteiro, o resultado é o mesmo do Financeiro.",
@@ -2158,6 +2165,7 @@ const BASE: TopicoBase[] = [
       "Em cada número aparece a comparação com o período anterior (por exemplo, +12% que o período anterior), quando ele teve movimento.",
     ],
     dicas: [
+      "Em Cancelamentos, a reserva da creche ou do hotel cancelada no período aparece pelo dia em que foi cancelada, mesmo que a entrada fosse para depois.",
       "Os números são os mesmos de Relatórios e de Quanto sobrou, separados por mês.",
       "Retorno em 60 dias: dos clientes atendidos no período, quantos vieram de novo em até 60 dias depois de uma visita.",
       "Primeira vez: o cliente veio pela primeira vez naquele mês. Voltaram: já tinha vindo antes.",
@@ -2937,7 +2945,7 @@ const BASE: TopicoBase[] = [
       "Se aparecer o aviso O relógio deste aparelho está na frente (ou atrás) do horário do pet shop, acerte o fuso do aparelho ou confira o estado em Dados. Com o relógio fora, a agenda aparece deslocada.",
     ],
     palavras: ["horario de funcionamento", "abre", "fecha", "meu pet shop", "nome do pet shop", "dados do pet shop", "endereco", "whatsapp do pet shop", "sabado", "domingo", "almoco", "hora do almoco", "terca a sabado", "horario de almoco", "horario do almoco", "fechar para o almoco", "fecha para almoco", "intervalo de almoco", "colocar almoco", "pausa para almoco", "hora que eu abro", "hora que abro", "hora de abrir", "hora de fechar", "que horas abre", "abrir mais cedo", "fechar mais tarde", "horario do pet shop"] },
-  { id: "checklist-entrada", titulo: "Como fazer o checklist de entrada e pegar o aceite do tutor", secao: "agenda", quem: "todos", rota: AGENDA, tambem: [CRECHE],
+  { id: "checklist-entrada", titulo: "Como fazer o checklist de entrada e pegar o aceite do tutor", secao: "agenda", secaoSemBanho: "creche", quem: "todos", rota: AGENDA, tambem: [CRECHE],
     passos: [
       "Ao tocar em Chegou: iniciar atendimento na Agenda, em Chegou na Chamada da creche (mensalista) ou ao fazer o check-in na creche ou no hotel, a folha Entrada pode abrir sozinha. Quando ela abre, o dono escolhe em Meu pet shop, Checklist de entrada.",
       "Marque o temperamento (calmo, agitado, morde, com medo) e confira Alergias e cuidados.",
@@ -2946,6 +2954,7 @@ const BASE: TopicoBase[] = [
       "Para o tutor aceitar: toque em Assinar aqui no aparelho (ele lê, marca Li e concordo, escreve o nome e assina com o dedo) ou em Mandar o link pelo WhatsApp (ele abre, lê e toca em Li e concordo).",
     ],
     dicas: [
+      "Internet fraca? A foto aparece na hora e sobe em seguida. Se não subir, a entrada é salva sem ela, a folha avisa e a foto fica lá com Tentar de novo: nada some sem aviso.",
       "Sem tempo agora? Toque em Pular agora. Depois, o horário ou o cartão do pet (também o do mensalista, em Casa agora) mostra Conferir a entrada.",
       "O horário e o cartão em Na casa agora mostram Entrada conferida e se o aceite do tutor está feito ou pendente.",
       "Na saída aparece Devolver: e a lista dos pertences, com a caixa para marcar.",
@@ -3254,14 +3263,6 @@ const BASE: TopicoBase[] = [
     ],
     dicas: ["Para mandar os lembretes do dia em sequência, veja Como mandar lembretes pelo WhatsApp."],
     palavras: ["envio automatico", "automatico", "automatica", "sozinho", "manda sozinho", "envia sozinho", "disparo", "disparar", "robo", "mensagem automatica", "lembrete automatico", "whatsapp automatico", "em massa"] },
-  { id: "canil", titulo: "Dá para escolher o canil ou o quarto de cada hóspede?", secao: "limites", usa: ["hotel"], quem: "todos", rota: null,
-    passos: [
-      "Dá, mas é uma opção que começa desligada. O dono liga em Meu pet shop, no cartão Opções do hotel e da creche, na chave Acomodações, cria a lista (nome e quantos pets cabem) e toca em Salvar opções.",
-      "Ligada, a reserva, o check-in e o Editar mostram o campo Acomodação.",
-      "O nome da acomodação aparece no cartão do pet, na Ocupação e na Folha do dia.",
-    ],
-    dicas: ["Sem a opção ligada, dá para escrever onde o pet está em Observações."],
-    palavras: ["canil", "baia", "box", "quarto", "suite", "acomodacao", "gaiola", "onde o pet fica"] },
 ];
 
 const usaParte = (petshop: ComModulos, u: Uso) => (u === "banho" ? usaModulo(petshop, "banho_tosa") : u === "casa" ? usaCasa(petshop) : usaModulo(petshop, u));
@@ -3322,7 +3323,8 @@ function textoDaCasa(texto: string, petshop: ComModulos | null): string {
 function pronto(t: TopicoBase, petshop: ComModulos | null): Topico {
   const linhas = (l?: Passo[]) => (l ?? []).filter((x) => typeof x === "string" || valePasso(petshop, x)).map((x) => textoDaCasa(typeof x === "string" ? x : x.texto, petshop));
   const passos = linhas(t.passos), dicas = linhas(t.dicas), atencao = linhas(t.atencao);
-  const limpo = { ...t, titulo: tituloPara(t.titulo, petshop), passos, dicas: dicas.length ? dicas : undefined, atencao: atencao.length ? atencao : undefined };
+  const secao = petshop && t.secaoSemBanho && !usaParte(petshop, "banho") ? t.secaoSemBanho : t.secao;
+  const limpo = { ...t, secao, titulo: tituloPara(t.titulo, petshop), passos, dicas: dicas.length ? dicas : undefined, atencao: atencao.length ? atencao : undefined };
   return { ...limpo, resposta: respostaDe(limpo) };
 }
 

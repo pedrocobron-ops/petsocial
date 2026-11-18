@@ -335,7 +335,7 @@ export function FolhaBoletim({ visita: v, aoFechar, aoEnviar }: { visita: Visita
             <div className="g-aviso" role="status" data-teste="boletim-do-dia" style={{ marginBottom: 0 }}>
               <Sparkles aria-hidden />
               <span className="g-cresce">
-                <b>Um link só para o tutor:</b> {[doDia.fotos.length ? `${doDia.fotos.length === 1 ? "1 foto" : `${doDia.fotos.length} fotos`} de Fotos de hoje` : "", doDia.itens.length || doDia.nota ? "o diário de hoje" : ""].filter(Boolean).join(" e ")} {doDia.fotos.length === 1 && !(doDia.itens.length || doDia.nota) ? "pode" : "podem"} entrar neste boletim.
+                <b>Um link só para o tutor:</b> {[doDia.fotos.length ? `${doDia.fotos.length === 1 ? "1 foto" : `${doDia.fotos.length} fotos`} de Fotos de hoje` : "", doDia.itens.length || doDia.nota ? "o diário de hoje" : ""].filter(Boolean).join(" e ")} {doDia.fotos.length > 1 || (doDia.fotos.length > 0 && (doDia.itens.length > 0 || Boolean(doDia.nota))) ? "podem" : "pode"} entrar neste boletim.
                 <br /><button type="button" className="g-btn sec p" style={{ marginTop: 6 }} disabled={trazendo} onClick={() => void trazerODia()}>{trazendo ? <><Loader2 className="g-gira" aria-hidden />Trazendo…</> : "Pôr no boletim"}</button>
               </span>
             </div>

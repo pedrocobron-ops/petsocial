@@ -61,3 +61,12 @@
 /* comprovante para imprimir */
 .g-ent-comp > div { padding-bottom: 6px; border-bottom: 1px solid #ece5d9; }
 .g-ent-comp dt { color: #4a433c; }
+
+/* foto que ainda não subiu: prévia do aparelho com o estado por cima (subindo, ou "Tentar de novo") */
+.g-bol-fotos li.pendente img { opacity: .55; }
+.g-ent-foto-estado { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 4px; color: var(--g-tinta); background: transparent; border: 0; font: inherit; font-size: .8125rem; font-weight: 600; text-align: center; padding: 8px; }
+.g-ent-foto-estado svg { width: 24px; height: 24px; }
+.g-ent-foto-estado.falhou { cursor: pointer; color: var(--g-vermelho, #b42318); background: color-mix(in srgb, var(--g-carta) 55%, transparent); }
+
+/* rodapé com três botões (Salvar e pedir o aceite, Só salvar, Fechar): no celular, quebra a linha em vez de passar da tela */
+.g-folha-pe:has([data-teste=salvar-entrada]) { flex-wrap: wrap; }

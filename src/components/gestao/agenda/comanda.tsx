@@ -251,12 +251,12 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       if (vejoFinanceiro && pg && !("erro" in pg) && soDigitos(tutor?.telefone).length >= 8 && (lancado || pagouAntigas > 0)) {
         zapComprovante = junto > 0
           ? linkWhatsApp(tutor?.telefone, textoComprovanteDaParte({
-              petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, itens: gravar, total: contas.total, desconto: contas.desconto,
+              petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, pagoEm: isoDia(new Date()), itens: gravar, total: contas.total, desconto: contas.desconto,
               pago: centavos(contas.total + pagouAntigas), formas: formasPagas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas, antigoDevia: devido, entregue,
             }))
-          : lancado ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado], entregue })) : null;
+          : lancado ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, pagoEm: isoDia(new Date()), recebidos: [lancado], entregue })) : null;
       } else if (vejoFinanceiro && lancado && soDigitos(tutor?.telefone).length >= 8) {
-        zapComprovante = linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado], entregue }));
+        zapComprovante = linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, pagoEm: isoDia(new Date()), recebidos: [lancado], entregue }));
       }
       const recebeu = lanca;
       const notaAntigas = pagouAntigas > 0
@@ -350,7 +350,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       avisarMudanca();
       // quem fica devendo é quem mais precisa do comprovante do que já pagou
       const zap = vejoFinanceiro ? linkWhatsApp(tutor.telefone, textoComprovanteDaParte({
-        petshop: petshop.nome, tutor: tutor.nome, pet: pet?.nome, quando: a.inicio, itens: gravar, total: contas.total, desconto: contas.desconto,
+        petshop: petshop.nome, tutor: tutor.nome, pet: pet?.nome, quando: a.inicio, pagoEm: isoDia(new Date()), itens: gravar, total: contas.total, desconto: contas.desconto,
         pago: entregue, formas: m.pagamentos ?? [{ forma: m.forma, valor: entregue }], falta, pagaAte: depois.quando,
       })) : null;
       if (zap && soDigitos(tutor.telefone).length >= 8) setRecebida({ valor: entregue, nota, zap });
