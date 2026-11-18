@@ -33,9 +33,13 @@ const normal = (x) => JSON.stringify(x, (k, v) => (v && typeof v === 'object' &&
     const api = {
       pets: await n('pets'), agendamentos: await n('agendamentos'), concluidos: await n('agendamentos', (q) => q.eq('status', 'concluido')),
       lembrados: await n('agendamentos', (q) => q.not('lembrete_em', 'is', null)), estadias: await n('estadias'), produtos: await n('produtos'),
+      // só as que entraram na casa: a reserva aceita (do link) não é check-in (migração 20261221)
+      checkins: await n('estadias', (q) => q.in('status', ['em_casa', 'encerrada'])),
     };
     T.ok('contagens da tela Hoje = contagens pela API', !c.error && normal(c.data) === normal(api), { banco: c.data, api, erro: c.error && c.error.message });
   }
+  const cd = (await dono.rpc('gestao_contagens', { p: L.P })).data;
+  T.ok('a reserva (ainda não chegou) conta como estadia, mas não como check-in (Primeiros passos)', cd && cd.estadias === 1 && cd.checkins === 0, cd);
   T.ok('o dono recebe a meta e as diárias; o tosador não', (await R.lerBase(dono, L.P)).petshop.meta_mes === 5000 && (await R.lerBase(L.sb.tosador, L.P)).petshop.meta_mes == null);
 
   T.secao('quem não é da loja');

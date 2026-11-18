@@ -2,7 +2,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { definicao, descrever, ehErroDeUso, gravar, rodarConsulta, type Contexto, type LinkZap, type Resumo } from "./ferramentas";
 import { manterNomes, nomesDosResultados } from "./parecido";
 import { ferramentaLiberada } from "./permissao";
-import { fraseDaFerramenta } from "./progresso";
+import { FRASE_JUNTANDO, fraseDaFerramenta, fraseInicial } from "./progresso";
+import { semNomesDeFerramenta } from "./sem-nomes";
 import { nomeDaCasa } from "../modulos";
 
 /**
@@ -80,6 +81,8 @@ export async function voltas(o: {
       break;
     }
     let comecouVolta = false;
+    // a pessoa sempre lê o que está acontecendo, mesmo quando o modelo demora para escrever ou pedir uma consulta
+    o.avisos?.progresso?.(volta === 0 ? fraseInicial(mensagens) : FRASE_JUNTANDO);
     const resposta = await o.chamar(mensagens, {
       texto: (pedaco) => {
         if (!pedaco || !o.avisos?.texto) return;
@@ -96,7 +99,8 @@ export async function voltas(o: {
     m.cacheGravados += resposta.usage?.cache_creation_input_tokens ?? 0;
     mensagens.push({ role: "assistant", content: resposta.content as Extract<Msg, { role: "assistant" }>["content"] });
     // nomes de pets e tutores como estão no cadastro (o modelo às vezes troca o fim: "Tutora" por "Tutor")
-    const fala = manterNomes(resposta.content.filter((b) => b.type === "text").map((b) => (b.type === "text" ? b.text : "")).join("\n").trim(), nomesDaConversa(mensagens));
+    // e nunca o nome interno de uma consulta ("resumo_financeiro")
+    const fala = semNomesDeFerramenta(manterNomes(resposta.content.filter((b) => b.type === "text").map((b) => (b.type === "text" ? b.text : "")).join("\n").trim(), nomesDaConversa(mensagens)));
     if (fala) texto = texto ? `${texto}\n\n${fala}` : fala;
 
     if (resposta.stop_reason === "refusal") return { tipo: "recusa", mensagens: mensagens.slice(0, -1) };

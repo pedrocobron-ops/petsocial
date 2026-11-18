@@ -26,7 +26,7 @@ export const EMPRESA = {
   /** Quem está por trás da marca (aparece em "Quem somos"). Foto em /public, ex. "/equipe/fundador.webp". */
   fundador: { nome: "", papel: "fundador do Maestro Pet e tutor do Mozart", foto: "", texto: "" },
   /** Data da última revisão dos termos e da política. */
-  atualizadoEm: "25 de outubro de 2026",
+  atualizadoEm: "18 de novembro de 2026",
 };
 
 export const linkWhatsapp = (texto = "Olá! Tenho uma dúvida sobre o Maestro Pet.") =>

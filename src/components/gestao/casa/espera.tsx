@@ -23,7 +23,22 @@ export type EsperaComPet = Espera & { pets: PetDaEstadia | null };
  * `posicao`: lugar na fila (1 = chegou primeiro na lista), contado dentro do tipo. `vez`: abriu vaga, mas a vaga já é de quem
  * chegou antes (o nome dele), então esta linha espera a vez.
  */
-export type LinhaDaEspera = { e: EsperaComPet; temVaga: boolean; cheioEm: string | null; posicao: number; vez: string | null };
+export type LinhaDaEspera = { e: EsperaComPet; temVaga: boolean; cheioEm: string | null; posicao: number; vez: string | null; /** tem vaga, mas o pet entrou na lista com os dias ainda livres: não "abriu" vaga (não vira aviso) */ semFila?: boolean };
+
+/**
+ * O pet entrou na lista com os dias ainda livres? (`cheio_ao_entrar` = false; migração 20261221). Esse não "abriu vaga": a
+ * vaga já existia, então não vira aviso de "Abriu vaga" (antes o aviso aparecia na hora, num dia que nem estava cheio).
+ * Pedido antigo (sem a anotação) e pedido do link (só entra com o dia cheio) seguem como antes.
+ */
+export const entrouComVaga = (e: Pick<Espera, "origem"> & { cheio_ao_entrar?: boolean | null }) => e.origem !== "link" && e.cheio_ao_entrar === false;
+
+/** Todos os dias do pedido têm vaga agora? (a mesma conta da lista e do aviso de casa cheia) */
+export function temVagaNosDias(petshop: Parameters<typeof vagasDoTipo>[0] & { horario?: unknown }, tipo: Tipo, entrada: string, saida: string, abertas: EstadiaCompleta[], mens: Mens | null): boolean {
+  const vagas = vagasDoTipo(petshop, tipo);
+  if (vagas == null) return true;
+  const hoje = isoDia(new Date()), agora = new Date();
+  return diasDaEspera({ tipo, entrada, saida }, hoje).every((d) => vagas - ocupadasNoDia(tipo, abertas, null, d, agora, mens, petshop.horario as never) > 0);
+}
 export type ListaEspera = { ligada: boolean; linhas: LinhaDaEspera[]; comVaga: LinhaDaEspera[]; recarregar: () => Promise<void> };
 
 /** A lista de espera que ainda vale (de hoje em diante), na ordem de chegada, com a conta de quem já tem vaga. */
@@ -53,6 +68,8 @@ export function useListaDeEspera(abertas: EstadiaCompleta[], mens: Mens | null):
     const livres = (d: string) => vagas - ocupadasNoDia(e.tipo, abertas, null, d, agora, mens, petshop.horario) - (usadas.get(`${e.tipo}:${d}`) ?? 0);
     const cheioEm = dias.find((d) => livres(d) <= 0) ?? null;
     if (cheioEm == null) {
+      // entrou na lista com vaga: não ocupa a vaga de quem estava esperando um dia cheio, nem vira aviso
+      if (entrouComVaga(e)) return { e, temVaga: true, cheioEm: null, posicao, vez: null, semFila: true };
       for (const d of dias) { usadas.set(`${e.tipo}:${d}`, (usadas.get(`${e.tipo}:${d}`) ?? 0) + 1); if (!dono.has(`${e.tipo}:${d}`)) dono.set(`${e.tipo}:${d}`, nomeDoPet(e)); }
       return { e, temVaga: true, cheioEm: null, posicao, vez: null };
     }
@@ -60,7 +77,7 @@ export function useListaDeEspera(abertas: EstadiaCompleta[], mens: Mens | null):
     const vez = (usadas.get(`${e.tipo}:${cheioEm}`) ?? 0) > 0 && livres(cheioEm) + (usadas.get(`${e.tipo}:${cheioEm}`) ?? 0) > 0 ? dono.get(`${e.tipo}:${cheioEm}`) ?? null : null;
     return { e, temVaga: false, cheioEm, posicao, vez };
   });
-  return { ligada, linhas, comVaga: linhas.filter((l) => l.temVaga), recarregar: async () => { await recarregar(); } };
+  return { ligada, linhas, comVaga: linhas.filter((l) => l.temVaga && !l.semFila), recarregar: async () => { await recarregar(); } };
 }
 
 const nomeDoPet = (e: EsperaComPet) => e.pets?.nome ?? e.pet_nome;
@@ -98,7 +115,7 @@ export function ListaDeEspera({ espera, aoReservar, aoNova }: { espera: ListaEsp
     if (!(await confirmar({ titulo: `Tirar ${nomeDoPet(e)} da lista de espera?`, texto: `${e.tipo === "hotel" ? "Hotel" : "Creche"}, ${periodoDaEspera(e)}.`, confirmar: "Tirar da lista", perigo: true }))) return;
     await mudar(e, { status: "desistiu" }, `${nomeDoPet(e)} saiu da lista de espera.`);
   }
-  const linha = ({ e, temVaga, cheioEm, posicao, vez }: LinhaDaEspera) => {
+  const linha = ({ e, temVaga, cheioEm, posicao, vez, semFila }: LinhaDaEspera) => {
     const zap = temVaga ? linkWhatsApp(foneDe(e), mensagemDeVaga({ tutor: tutorDe(e), petshop: petshop.nome, pet: nomeDoPet(e), tipo: e.tipo, entrada: e.entrada, saida: e.saida })) : null;
     return (
       <div key={e.id} className={`g-cs-espera${temVaga ? " vaga" : ""}`}>
@@ -108,7 +125,8 @@ export function ListaDeEspera({ espera, aoReservar, aoNova }: { espera: ListaEsp
           <span>{[tutorDe(e) ?? "Sem tutor", foneDe(e) ? fmtTelefone(foneDe(e)) : null].filter(Boolean).join(" · ")}</span>
           <span>{e.tipo === "hotel" ? "Hotel" : "Creche"} · {periodoDaEspera(e)}{` · na lista desde ${dataCurta(new Date(e.criado_em))}`}{e.origem === "link" ? ` · pediu pelo link${e.termos_aceitos_em ? " e aceitou as regras" : ""}` : ""}{e.obs ? ` · ${e.obs}` : ""}</span>
           <div className="selos">
-            {temVaga ? <span className="g-tag verde"><Check size={12} aria-hidden />abriu vaga</span>
+            {temVaga && semFila ? <span className="g-tag verde"><Check size={12} aria-hidden />tem vaga nesses dias: dá para marcar a reserva</span>
+              : temVaga ? <span className="g-tag verde"><Check size={12} aria-hidden />abriu vaga</span>
               : vez ? <span className="g-tag"><Hourglass size={12} aria-hidden />a vaga de {dataCurta(deIsoDia(cheioEm!))} é de {vez}, que chegou antes</span>
               : <span className="g-tag"><Hourglass size={12} aria-hidden />cheio em {dataCurta(deIsoDia(cheioEm!))}</span>}
             {e.status === "chamado" && e.chamado_em && <span className="g-tag azul">avisado {dataCurta(new Date(e.chamado_em))}</span>}
@@ -116,7 +134,7 @@ export function ListaDeEspera({ espera, aoReservar, aoNova }: { espera: ListaEsp
         </div>
         <div className="a">
           {zap && <a className={`g-btn p ${e.status === "chamado" ? "sec" : "zap"}`} href={zap} target="_blank" rel="noopener noreferrer"
-            onClick={() => { if (!somenteLeitura()) void mudar(e, { status: "chamado", chamado_em: new Date().toISOString() }); }}><MessageCircle />{e.status === "chamado" ? "Avisar de novo" : "Avisar que abriu vaga"}</a>}
+            onClick={() => { if (!somenteLeitura()) void mudar(e, { status: "chamado", chamado_em: new Date().toISOString() }); }}><MessageCircle />{e.status === "chamado" ? "Avisar de novo" : semFila ? "Avisar que tem vaga" : "Avisar que abriu vaga"}</a>}
           {temVaga && !zap && <span className="g-muted g-pp">Sem telefone para avisar.</span>}
           <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) aoReservar(e); }}><CalendarPlus />Marcar reserva</button>
           <button type="button" className="g-btn fantasma p" onClick={() => void tirar(e)} aria-label={`Tirar ${nomeDoPet(e)} da lista de espera`}><X />Tirar</button>
@@ -142,8 +160,10 @@ export function ListaDeEspera({ espera, aoReservar, aoNova }: { espera: ListaEsp
 }
 
 /** Folha para colocar um pet na lista de espera. Vem preenchida quando a pessoa tentou reservar um dia cheio. */
-export function FolhaEspera({ inicial, aoFechar, aoGravar }: {
+export function FolhaEspera({ inicial, aoFechar, aoGravar, temVaga }: {
   inicial?: { pet?: PetDaEstadia | null; tipo?: Tipo; entrada?: string; saida?: string; horaEntrada?: string; horaSaida?: string }; aoFechar: () => void; aoGravar: () => void;
+  /** a conta de vagas da tela (sem ela, o pedido fica como antes: sem a anotação) */
+  temVaga?: (tipo: Tipo, entrada: string, saida: string) => boolean;
 }) {
   const { sb, petshop } = useGestao();
   const { avisar, avisarErro } = useAvisos();
@@ -168,14 +188,17 @@ export function FolhaEspera({ inicial, aoFechar, aoGravar }: {
     const fim = saida || (hotel ? isoDia(somaDias(deIsoDia(entrada), 1)) : entrada);
     if (fim < entrada || (hotel && fim === entrada)) return setErro(hotel ? "No hotel, a saída é pelo menos um dia depois da entrada." : "O último dia vem depois do primeiro.");
     if (fim > isoDia(somaDias(deIsoDia(entrada), 60))) return setErro("O período passa de 60 dias.");
+    // os dias ainda têm vaga: fica anotado (não vira "Abriu vaga" depois) e a pessoa é avisada de que dá para reservar direto
+    const livre = temVaga ? temVaga(tipo, entrada, fim) : null;
     setErro(null); setSalvando(true);
     try {
       ok(await sb.from("lista_espera").insert({
+        ...(livre == null ? {} : { cheio_ao_entrar: !livre }),
         petshop_id: petshop.id, tipo, entrada, saida: fim, pet_id: pet.id, pet_nome: pet.nome, tutor_nome: pet.clientes?.nome ?? null,
         telefone: soDigitos(pet.clientes?.telefone) || null, especie: ["cao", "gato", "outro"].includes(pet.especie ?? "") ? pet.especie : null, obs: obs.trim() || null,
         ...(hotel && /^\d{2}:\d{2}$/.test(horaEntrada) ? { hora_entrada: horaEntrada } : {}), ...(hotel && /^\d{2}:\d{2}$/.test(horaSaida) ? { hora_saida: horaSaida } : {}),
       }).select("id"));
-      avisar(`${pet.nome} está na lista de espera ${hotel ? "do hotel" : "da creche"}.`);
+      avisar(`${pet.nome} está na lista de espera ${hotel ? "do hotel" : "da creche"}.${livre ? " Esses dias ainda têm vaga: dá para marcar a reserva direto." : ""}`);
       aoGravar();
     } catch (e) { avisarErro(e); setSalvando(false); }
   }

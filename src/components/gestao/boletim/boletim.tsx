@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Check, Copy, ExternalLink, ImagePlus, Loader2, MessageCircle, Newspaper, RotateCcw, Sparkles, X } from "lucide-react";
 import {
   AMIZADE, CHIPS_ATENCAO, chipsDo, chipsDosRotulos, descartarFoto, enderecoDoBoletim, enviarFotoDoBoletim, faxinaDoBoletim, fotosGuardadas,
-  MAX_FOTOS_BOLETIM, mensagemDoBoletim, rotulosDosChips, textoModelo, type FotoDoBoletim, type TipoDoBoletim,
+  MAX_FOTOS_BOLETIM, mensagemDoBoletim, recadoNoSexo, rotulosDosChips, textoModelo, type FotoDoBoletim, type TipoDoBoletim,
 } from "@/lib/gestao/boletim";
 import { hora, isoDia, linkWhatsApp } from "@/lib/gestao/util";
 import { diarioDe, itensMarcados } from "@/lib/gestao/casa-opcoes";
@@ -335,7 +335,7 @@ export function FolhaBoletim({ visita: v, aoFechar, aoEnviar }: { visita: Visita
             <div className="g-aviso" role="status" data-teste="boletim-do-dia" style={{ marginBottom: 0 }}>
               <Sparkles aria-hidden />
               <span className="g-cresce">
-                <b>Um link só para o tutor:</b> {[doDia.fotos.length ? `${doDia.fotos.length === 1 ? "1 foto" : `${doDia.fotos.length} fotos`} de Fotos de hoje` : "", doDia.itens.length || doDia.nota ? "o diário de hoje" : ""].filter(Boolean).join(" e ")} podem entrar neste boletim.
+                <b>Um link só para o tutor:</b> {[doDia.fotos.length ? `${doDia.fotos.length === 1 ? "1 foto" : `${doDia.fotos.length} fotos`} de Fotos de hoje` : "", doDia.itens.length || doDia.nota ? "o diário de hoje" : ""].filter(Boolean).join(" e ")} {doDia.fotos.length > 1 || (doDia.fotos.length > 0 && (doDia.itens.length > 0 || Boolean(doDia.nota))) ? "podem" : "pode"} entrar neste boletim.
                 <br /><button type="button" className="g-btn sec p" style={{ marginTop: 6 }} disabled={trazendo} onClick={() => void trazerODia()}>{trazendo ? <><Loader2 className="g-gira" aria-hidden />Trazendo…</> : "Pôr no boletim"}</button>
               </span>
             </div>
@@ -366,7 +366,7 @@ export function FolhaBoletim({ visita: v, aoFechar, aoEnviar }: { visita: Visita
           <section className="g-bol-parte" aria-label="Como foi">
             <div className="g-bol-t"><b>{v.tipo === "banho" ? "Como foi" : "Como foi o dia"}</b><small>toque no que aconteceu</small></div>
             <div className="g-chips">
-              {lista.map((c) => <button key={c.id} type="button" className="g-chip" aria-pressed={chips.includes(c.id)} onClick={() => tocar(c.id)}>{c.rotulo}</button>)}
+              {lista.map((c) => <button key={c.id} type="button" className="g-chip" aria-pressed={chips.includes(c.id)} onClick={() => tocar(c.id)}>{recadoNoSexo(c.rotulo, sexo)}</button>)}
             </div>
             {v.tipo !== "banho" && (
               <label className="g-campo g-bol-amigo">

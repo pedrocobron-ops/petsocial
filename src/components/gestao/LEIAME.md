@@ -71,6 +71,10 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   Somas por forma: `somaPorForma` separa a parte do crédito em `FORMA_CREDITO`; `textoDoPagamento` mostra "Crédito do tutor".
 - "Cobrar a diferença": a entrada fica em `lancamentos.diferenca_de` (o banco liga pela marca do item e recusa a segunda); comissão, relatórios
   (`cobradoPorServico(..., diferenca)`) e o horário somam a conta fechada e a diferença.
+- Valor em estoque: sempre `valorEmEstoque` (`compra.ts`), que usa o custo médio sem arredondar (`custo_exato`, que `comCustos` traz
+  pela função `produtos_custo_exato`, migração 20261222). Entrada de produto com Controlar validade pede a validade (`estoque_entrada` recusa sem ela).
+- Texto para o tutor que fala do pet: passe o `sexo` do pet (`textoConfirmacao`, `textoLembrete`, `textoPronto`… em `agenda.ts`; `marcadoPara`
+  para "Mel marcada"). Nome de alguém da equipe em chip ou lista: `nomeNaEquipe(nome, todos)` (não o primeiro nome solto).
 - Saída de estoque de uma conta: `baixarEstoque(..., lancamentoId, chave, estadiaId)`; sem lançamento (check-out pago pelo sinal ou pelo crédito), a estadia.
 - Conta do atendimento: o que o tutor deve de antes entra com "Incluir nesta conta?" (baixa por `receberConta` com `parteDaChave`); pagamento em
   parte em qualquer forma por `pagoAMenos` (`EstadoPagamento.parte`/`resto`, só com `aceitaResto`).

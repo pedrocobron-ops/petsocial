@@ -12,8 +12,8 @@
 export type Documento = "termos" | "privacidade";
 
 export const DOCUMENTOS: Record<Documento, { nome: string; caminho: string; versao: string; vigenteDesde: string }> = {
-  termos: { nome: "Termos de uso", caminho: "/gestao/termos", versao: "2.3", vigenteDesde: "2026-11-18" },
-  privacidade: { nome: "Política de privacidade", caminho: "/gestao/privacidade", versao: "2.3", vigenteDesde: "2026-11-18" },
+  termos: { nome: "Termos de uso", caminho: "/gestao/termos", versao: "2.3", vigenteDesde: "2026-11-17" },
+  privacidade: { nome: "Política de privacidade", caminho: "/gestao/privacidade", versao: "2.3", vigenteDesde: "2026-11-17" },
 };
 
 /** O que mudou nesta versão, em poucas linhas, para a tela de aceite de quem já tinha conta. */

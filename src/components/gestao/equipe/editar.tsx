@@ -8,15 +8,15 @@ import { AvatarPessoa, Folha, avisarMudanca, ok, useAvisos } from "@/components/
 import { erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import type { Database } from "@/lib/gestao/banco";
 import type { Horario, Profissional } from "@/lib/gestao/tipos";
-import { FRASE_TITULAR, acessoDe, camposDaEscolha, ehSocio, emailValido, erroDeLimite, erroDoTitular, escolhaDe, lerComissao, primeiroNome, titularDe, usoDoPlano, type Escolha } from "./modelo";
+import { FRASE_TITULAR, acessoDe, camposDaEscolha, ehSocio, emailValido, erroDeLimite, erroDoTitular, escolhaDe, lerComissao, nomeCurtoDe, titularDe, usoDoPlano, type Escolha } from "./modelo";
 import { Areas, Chave, Convite, DetalhesAgenda, EscolherPerfil, PlanoCheio, Vagas, fraseDoLink, podeGerarLinkNovo, useLinksDosConvites } from "./pecas";
 
 /** O convite de quem ainda não criou a conta, para mandar de novo. */
 export function FolhaConvite({ pessoa, aoFechar }: { pessoa: Profissional; aoFechar: () => void }) {
   return (
-    <Folha titulo={`Convite de ${primeiroNome(pessoa.nome)}`} aoFechar={aoFechar} rodape={<button className="g-btn sec" onClick={aoFechar}>Fechar</button>}>
+    <Folha titulo={`Convite de ${nomeCurtoDe(pessoa.nome)}`} aoFechar={aoFechar} rodape={<button className="g-btn sec" onClick={aoFechar}>Fechar</button>}>
       <div className="g-pilha">
-        <p className="g-muted g-p">{primeiroNome(pessoa.nome)} ainda não entrou. Aqui vai um link novo: mande de novo pelo WhatsApp. O link que você mandou antes deixa de valer.</p>
+        <p className="g-muted g-p">{nomeCurtoDe(pessoa.nome)} ainda não entrou. Aqui vai um link novo: mande de novo pelo WhatsApp. O link que você mandou antes deixa de valer.</p>
         <Convite pessoaId={pessoa.id} nome={pessoa.nome} email={pessoa.email_convite ?? ""} />
       </div>
     </Folha>
@@ -30,7 +30,7 @@ export default function EditarPessoa({ pessoa, foco, aoFechar }: { pessoa: Profi
   const loja = lerHorario(petshop.horario);
   const uso = usoDoPlano(petshop, equipe);
   const acesso = acessoDe(pessoa);
-  const primeiro = primeiroNome(pessoa.nome);
+  const primeiro = nomeCurtoDe(pessoa.nome);
   const titular = pessoa.id === titularDe(equipe);
   const souEu = pessoa.id === eu.id;
   // o titular continua dono, e ninguém rebaixa nem desativa a si mesmo

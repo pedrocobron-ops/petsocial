@@ -10,13 +10,14 @@ import { avisarMudanca } from "./ui";
 import { BotaoMic, EscolherVoz, FaixaVoz, falar, falarAosPoucos, guardarEnviarSozinho, guardarLerRespostas, lerEnviarSozinho, lerLerRespostas, pararDeFalar, SEM_VOZ, temLeitura, useDitado, useVozes } from "./voz";
 import { TextoMozart } from "./texto-mozart";
 import { chaveDaConversa, guardarConversa, lerConversa } from "@/lib/gestao/assistente/guardada";
+import { semNomesDeFerramenta } from "@/lib/gestao/assistente/sem-nomes";
 import { usaModulo } from "@/lib/gestao/modulos";
 
 type Resumo = { titulo: string; linhas: [string, string][] };
 type Proposta = { id: string; ferramenta: string; resumo: Resumo; estado: "pendente" | "sim" | "nao" };
 type LinkZap = { nome: string; texto: string; url: string };
 type Item =
-  | { tipo: "eu" | "ele" | "erro"; texto: string; quando?: string; saidas?: boolean; jaVisto?: boolean }
+  | { tipo: "eu" | "ele" | "erro"; texto: string; quando?: string; saidas?: boolean; jaVisto?: boolean; interrompida?: boolean; repetir?: string }
   | { tipo: "propostas"; lista: Proposta[]; enviado: boolean }
   | { tipo: "links"; lista: LinkZap[] };
 type Resposta = { mensagens: unknown[]; texto: string; propostas: Omit<Proposta, "estado">[]; parciais: unknown[]; links: LinkZap[]; mudou: boolean; erro?: string; mensagem?: string };
@@ -57,10 +58,20 @@ const memoria: { chave: string | null; itens: Item[]; mensagens: unknown[]; parc
 let saindo = false;
 /** O painel está aberto agora (volta aberto depois de recarregar). */
 let painelAberto = false;
-if (typeof window !== "undefined") { window.addEventListener("pagehide", () => { saindo = true; }); window.addEventListener("beforeunload", () => { saindo = true; }); }
+/** O texto da resposta que está chegando agora (vai junto quando a página sai no meio: volta marcada como interrompida). */
+let textoAoVivo = "";
 function persistir(aberta = painelAberto) {
   if (!memoria.chave || saindo) return;
-  guardarConversa(memoria.chave, { itens: memoria.itens, mensagens: memoria.mensagens, parciais: memoria.parciais, decidindo: memoria.decidindo, esperando: memoria.esperando, aberta });
+  const noMeio = memoria.esperando || Boolean(memoria.decidindo);
+  guardarConversa(memoria.chave, { itens: memoria.itens, mensagens: memoria.mensagens, parciais: memoria.parciais, decidindo: memoria.decidindo, esperando: memoria.esperando, aberta, interrompida: noMeio && textoAoVivo.trim() ? textoAoVivo : null });
+}
+if (typeof window !== "undefined") {
+  // guarda uma última vez (com o texto que já tinha chegado) e para de guardar: o que estava no meio fica como estava
+  const sair = () => { if (saindo) return; if (textoAoVivo) persistir(); saindo = true; };
+  window.addEventListener("pagehide", sair); window.addEventListener("beforeunload", sair);
+  // no celular, trocar de aplicativo dispara "pagehide" e a página pode voltar sem recarregar (cache do navegador): volta a
+  // guardar, senão a conversa seguinte não ficava guardada e sumia no próximo recarregar
+  window.addEventListener("pageshow", (e) => { if (e.persisted) saindo = false; });
 }
 
 /** Sugestões do começo da conversa, pelo que o pet shop faz (loja só de creche ou de hotel não lê "Marca banho"). */
@@ -84,8 +95,16 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     // outro pet shop ou outra pessoa: a conversa desta aba (a de antes de recarregar, se houver)
     const g = lerConversa<Item>(chaveGuardada);
     Object.assign(memoria, { chave: chaveGuardada, itens: g?.itens ?? [], mensagens: g?.mensagens ?? [], parciais: g?.parciais ?? [], decidindo: g?.decidindo ?? null, esperando: false });
-    // o pedido tinha ido e a página recarregou antes da resposta: avisa (não manda de novo sozinho: cada pedido conta)
-    if (g?.esperando && !g.decidindo) memoria.itens = [...memoria.itens, { tipo: "erro", texto: "A página recarregou antes da resposta do Mozart. Se ainda precisar, mande o pedido de novo." }];
+    // o pedido tinha ido e a página recarregou antes da resposta: mostra o que já tinha chegado, marcado como interrompido,
+    // e oferece perguntar de novo (não manda sozinho: cada pedido conta). Um "Pode fazer" no meio termina sozinho (abaixo).
+    if (g?.esperando && !g.decidindo) {
+      const pedido = [...memoria.itens].reverse().find((i) => i.tipo === "eu");
+      const repetir = pedido && pedido.tipo === "eu" ? pedido.texto : undefined;
+      if (g.interrompida) memoria.itens = [...memoria.itens, { tipo: "ele", texto: g.interrompida, interrompida: true }];
+      memoria.itens = [...memoria.itens, { tipo: "erro", texto: g.interrompida
+        ? "A página recarregou antes de o Mozart terminar: a resposta acima ficou pela metade."
+        : "A página recarregou antes da resposta do Mozart.", repetir }];
+    }
   }
   const [itens, setItens] = useState<Item[]>(memoria.itens);
   const [texto, setTexto] = useState("");
@@ -163,7 +182,12 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
 
   const chamar = useCallback(async (corpo: Record<string, unknown>) => {
     setPensando(true);
-    vivo.current = { texto: "", mostrado: 0, frase: null, ativo: false, marcado: false };
+    // a linha do que ele está fazendo aparece na hora, antes de qualquer resposta do servidor
+    const primeiraFrase = corpo.decisoes ? (corpo.retomando ? "Terminando a resposta que foi interrompida…" : "Fazendo o que você confirmou…") : "Pensando…";
+    vivo.current = { texto: "", mostrado: 0, frase: primeiraFrase, ativo: false, marcado: false };
+    textoAoVivo = "";
+    setAoVivo({ texto: "", frase: primeiraFrase });
+    delete corpo.retomando;
     // fica anotado (na aba) o que foi mandado e ainda não teve resposta: se a página recarregar, dá para terminar
     if (corpo.decisoes) memoria.decidindo = { decisoes: corpo.decisoes as Decidindo["decisoes"], parciais: (corpo.parciais as unknown[]) ?? [] };
     else memoria.esperando = true;
@@ -193,6 +217,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
           if (e.t === "progresso") { vivo.current.frase = e.frase; mostrarVivo(); }
           else if (e.t === "texto") {
             vivo.current.texto += e.d;
+            textoAoVivo = vivo.current.texto;
             vivo.current.frase = null;
             mostrarVivo();
             if (lerAgora.current) {
@@ -238,6 +263,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     } finally {
       // o texto falado até aqui termina (resposta com erro ou só cartão)
       if (voz.atual) voz.atual.terminar();
+      if (!saindo) textoAoVivo = "";
       vivo.current.ativo = false;
       setAoVivo(null);
       setPensando(false);
@@ -336,7 +362,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     terminou.current = true;
     const ids = new Set(d.decisoes.map((x) => x.id));
     memoria.itens.forEach((i) => { if (i.tipo === "propostas" && i.lista.some((p) => ids.has(p.id))) respondidos.current.add(i.lista.map((p) => p.id).join(",")); });
-    void chamar({ decisoes: d.decisoes, parciais: d.parciais });
+    void chamar({ decisoes: d.decisoes, parciais: d.parciais, retomando: true });
   }, [chamar]);
 
   function decidir(grupo: Extract<Item, { tipo: "propostas" }>, id: string, sim: boolean) {
@@ -426,6 +452,12 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
           ) : (
             <div key={i} className={`g-bolha ${item.tipo === "eu" ? "eu" : "ela"}${item.tipo === "erro" ? " erro" : ""}${item.jaVisto ? " ja" : ""}${itens[i - 1]?.tipo !== item.tipo ? " rabo" : ""}`}>
               {item.tipo === "ele" ? <TextoMozart texto={item.texto} /> : item.texto}
+              {item.tipo === "ele" && item.interrompida && <span className="g-ass-sem-voz">Resposta interrompida</span>}
+              {item.tipo === "erro" && item.repetir && i === itens.length - 1 && !pensando && (
+                <span className="g-ass-saidas">
+                  <button type="button" className="g-link alvo" onClick={() => { const t = item.repetir!; guardar(memoria.itens.map((x) => (x === item ? { ...item, repetir: undefined } : x))); enviar(t); }}>Perguntar de novo</button>
+                </span>
+              )}
               {semVoz === i && <span className="g-ass-sem-voz" role="status">{SEM_VOZ}</span>}
               {item.tipo === "erro" && item.saidas && (
                 <span className="g-ass-saidas">
@@ -443,7 +475,7 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
                 {item.quando}{item.tipo === "eu" && <CheckCheck size={14} />}</span>}
             </div>
           ))}
-          {aoVivo?.texto && <div className="g-bolha ela rabo g-ass-aovivo"><TextoMozart texto={aoVivo.texto} /></div>}
+          {aoVivo?.texto && <div className="g-bolha ela rabo g-ass-aovivo"><TextoMozart texto={semNomesDeFerramenta(aoVivo.texto)} /></div>}
           {pensando && <div className={`g-bolha ela pensa${aoVivo?.texto ? "" : " rabo"}`} aria-label="Mozart está digitando"><i /><i /><i /></div>}
           {pensando && aoVivo?.frase && <p className="g-ass-progresso" role="status">{aoVivo.frase}</p>}
           {fila && (

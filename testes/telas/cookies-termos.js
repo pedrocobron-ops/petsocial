@@ -1,6 +1,7 @@
 // Aviso de cookies e Termos/Política 2.3 no navegador (Juliana, 17/11):
 //   - o aviso só aparece onde o Pixel carrega: na capa /gestao sim; no cadastro, na entrada, nos Termos e na Política do Gestão não;
 //   - o aviso tem Aceitar e Recusar; recusando, a escolha fica guardada, o cookie _fbp some, o fbevents.js não baixa e o aviso não volta;
+//   - consentimento primeiro (Juliana, 2ª rodada): antes de escolher, o fbevents.js não baixa; só depois do Aceitar;
 //   - a política do site (parte 5) mostra a escolha e deixa mudar;
 //   - Política do Gestão: e-mail de privacidade uma vez só na parte 13, "responsável pela marca", sem "página nova, sem o pixel";
 //   - Termos: cópias de segurança como são (parte 16) e troca de plano (parte 7).
@@ -32,6 +33,10 @@ const { EMPRESA } = require('../lib/app').lib('../empresa');
     await aviso.waitFor({ timeout: 15000 });
     T.ok('capa /gestao (com Pixel): o aviso aparece com Recusar e Aceitar',
       (await aviso.locator('button', { hasText: 'Recusar' }).count()) === 1 && (await aviso.locator('button', { hasText: 'Aceitar' }).count()) === 1);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+    T.ok('antes de escolher: o fbevents.js não baixa (consentimento primeiro)', pedidosPixel.length === 0, pedidosPixel);
+    T.ok('… e o fbq não tem o script de verdade (só a fila, sem rede e sem cookie)', await page.evaluate(() => !document.querySelector('script[src*="fbevents"]') && !document.cookie.includes('_fbp')));
     // a pílula sai do caminho enquanto cobre um link da página: rola um pouco (menos de 160 px) até ela ficar livre
     for (let y = 0; y <= 140 && (await page.locator('.cookies.desvia, .cookies.fora').count()); y += 35) {
       await page.evaluate((v) => window.scrollTo(0, v), y); await page.waitForTimeout(350);
@@ -59,8 +64,14 @@ const { EMPRESA } = require('../lib/app').lib('../empresa');
     const escolha = page.locator('.escolha-cookies');
     await escolha.waitFor({ timeout: 15000 });
     T.ok('a parte 5 mostra que este navegador recusou', /recusou/.test(await escolha.textContent()));
+    pedidosPixel.length = 0;
     await escolha.locator('button').click();
     T.ok('… e dá para aceitar de novo', (await page.evaluate(() => localStorage.getItem('mp-cookies'))) === 'aceito' && /aceitou/.test(await escolha.textContent()));
+    await page.waitForFunction(() => !!document.querySelector('script[src*="fbevents"]'), null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    T.ok('… e só depois do Aceitar o fbevents.js baixa', pedidosPixel.some((u) => /fbevents/.test(u)), pedidosPixel);
+    T.ok('a política diz que o Pixel só funciona depois do Aceitar (e a base legal é o consentimento)', /só começa a funcionar depois que você toca em Aceitar/.test(await page.locator('body').textContent())
+      && /Consentimento \(I\), dado no aviso de cookies/.test(await page.locator('body').textContent()));
     T.ok('… sem rolagem para o lado', (await N.rolagemLateral(page)) <= 0);
     await page.screenshot({ path: path.join(SAIDA, `cookies-politica-${w}.png`) });
     await ctx.close();
@@ -90,6 +101,8 @@ const { EMPRESA } = require('../lib/app').lib('../empresa');
   T.ok('parte 16: as duas cópias, sem prometer prazo, e o que fazer se apagar por engano', /Supabase/.test(disp) && /cópia completa/.test(disp) && /não prometemos/.test(disp) && /Apagou algo por engano/.test(disp));
   const cancelar = await page.locator('#cancelar').textContent();
   T.ok('parte 7: troca de plano e os meses que sobraram', /Mudar de plano ou de período/.test(cancelar) && /não viram crédito nem desconto/.test(cancelar));
+  T.ok('Termos 2.3: "vigente desde 17/11/2026" (o dia em que entrou no ar; Neide e Rafael aceitaram em 17/11)', /vigente desde 17\/11\/2026/.test(await page.locator('body').textContent()));
+  T.ok('sem palavras grudadas: "desconto no plano" e "controlador (decide"', /desconto no plano novo/.test(cancelar) && /controlador \(decide/.test(await page.locator('body').textContent()));
   T.ok('parte 19: "Escola de Gestão" explicada', /Escola de Gestão \(a área do sistema/.test(await page.locator('#marca').textContent()));
   await page.locator('#disponivel').scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(SAIDA, 'termos-copias-390.png') });

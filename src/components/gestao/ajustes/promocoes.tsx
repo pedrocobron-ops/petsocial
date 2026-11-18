@@ -32,7 +32,11 @@ const SITUACAO: Record<ReturnType<typeof situacaoDaPromo>, { texto: string; tom:
   desligada: { texto: "desligada", tom: "" },
 };
 
-export default function Promocoes() {
+/**
+ * `so="dias"`: só as promoções de dias fracos (o cartão de sempre). `so="aniversario"`: só a promoção de aniversário do pet, num
+ * cartão próprio (achado da Neide: aniversário não é "dia fraco" e ela não achava a promoção). Sem `so`, todas, como antes.
+ */
+export default function Promocoes({ so }: { so?: "dias" | "aniversario" } = {}) {
   const { sb, petshop, souDono, servicos } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
@@ -44,7 +48,9 @@ export default function Promocoes() {
     return (r.data ?? []).map((x) => lerPromocao(x as unknown as Record<string, unknown>));
   }, [petshop.id]);
   if (!souDono || dados === null) return null;
-  const lista = dados ?? [];
+  const todas = dados ?? [];
+  const lista = so === "dias" ? todas.filter((p) => !p.aniversario) : so === "aniversario" ? todas.filter((p) => p.aniversario) : todas;
+  const soNiver = so === "aniversario";
   const nomeDe = (id: string) => servicos.find((s) => s.id === id)?.nome;
   const hoje = isoDia(new Date());
 
@@ -79,16 +85,23 @@ export default function Promocoes() {
   const nova = (): Rascunho => ({ id: null, nome: "", dias: [2], hora_de: null, hora_ate: null, faixa: false, servicos: [], tipo: "pct", valor: 10, comeca_em: null, termina_em: null, ativa: true,
     banho_tosa: comBanho, casa: comBanho ? [] : [usaModulo(petshop, "creche") ? "creche" : "hotel"] });
 
+  const criarNiver = () => { if (!somenteLeitura()) setEditando({ ...nova(), nome: "Aniversário do pet", dias: [0, 1, 2, 3, 4, 5, 6], banho_tosa: true, casa: [], aniversario: true }); };
+
   return (
-    <section className="g-card g-pilha" id="promocoes">
+    <section className="g-card g-pilha" id={soNiver ? "promocao-aniversario" : "promocoes"}>
       <div className="g-mp-t">
-        <Tile icone={Percent} tom="menta" />
+        <Tile icone={soNiver ? Cake : Percent} tom={soNiver ? "rosa" : "menta"} />
         <div>
-          <h2>Promoções em dias fracos</h2>
-          <p className="g-muted g-p">Um desconto nos dias e horários com menos movimento, no banho e tosa{usaModulo(petshop, "creche") || usaModulo(petshop, "hotel") ? ", na creche ou no hotel" : ""}. O link do cliente mostra o desconto, e o que for marcado já vem com a promoção.</p>
+          {soNiver ? <>
+            <h2>Promoção de aniversário do pet</h2>
+            <p className="g-muted g-p">Um desconto no banho e tosa marcado perto do aniversário do pet ({JANELA_NIVER} dias antes a {JANELA_NIVER} dias depois). Entra sozinho no horário, e a equipe pode tirar. Não aparece no link do cliente. O pet precisa ter o aniversário na ficha (o ano pode ficar em branco).</p>
+          </> : <>
+            <h2>Promoções em dias fracos</h2>
+            <p className="g-muted g-p">Um desconto nos dias e horários com menos movimento, no banho e tosa{usaModulo(petshop, "creche") || usaModulo(petshop, "hotel") ? ", na creche ou no hotel" : ""}. O link do cliente mostra o desconto, e o que for marcado já vem com a promoção.</p>
+          </>}
         </div>
       </div>
-      {!lista.length ? <p className="g-muted g-p">Nenhuma promoção ainda. Exemplo: terça e quarta, 10% no banho.</p> : (
+      {!lista.length ? <p className="g-muted g-p">{soNiver ? "Nenhuma promoção de aniversário ainda. Exemplo: 10% no banho da semana do aniversário." : "Nenhuma promoção ainda. Exemplo: terça e quarta, 10% no banho."}</p> : (
         <div className="g-lista">
           {lista.map((p) => {
             const sit = SITUACAO[situacaoDaPromo(p, hoje)];
@@ -112,11 +125,12 @@ export default function Promocoes() {
         </div>
       )}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" className="g-btn verde p" onClick={() => { if (!somenteLeitura()) setEditando(nova()); }}><Plus />Nova promoção</button>
-        {usaModulo(petshop, "banho_tosa") && !lista.some((p) => p.aniversario) && (
-          <button type="button" className="g-btn sec p" onClick={() => { if (!somenteLeitura()) setEditando({ ...nova(), nome: "Aniversário do pet", dias: [0, 1, 2, 3, 4, 5, 6], banho_tosa: true, casa: [], aniversario: true }); }}><Cake />Promoção de aniversário</button>
+        {!soNiver && <button type="button" className="g-btn verde p" onClick={() => { if (!somenteLeitura()) setEditando(nova()); }}><Plus />Nova promoção</button>}
+        {usaModulo(petshop, "banho_tosa") && so !== "dias" && !todas.some((p) => p.aniversario) && (
+          <button type="button" className={`g-btn ${soNiver ? "verde" : "sec"} p`} onClick={criarNiver}><Cake />{soNiver ? "Criar a promoção de aniversário" : "Promoção de aniversário"}</button>
         )}
       </div>
+      {so === "dias" && usaModulo(petshop, "banho_tosa") && <p className="g-pp g-muted">A promoção de aniversário do pet tem um cartão próprio, logo abaixo.</p>}
       <p className="g-pp g-muted">Mudar ou apagar uma promoção não mexe nos horários já marcados. O texto pronto só diz o que está aqui (dias, horas e até quando vale).</p>
       {editando && <FormPromocao inicial={editando} aoFechar={() => setEditando(null)} aoSalvar={async (r) => {
         const banho = valeNoBanho(r);
@@ -180,7 +194,7 @@ function FormPromocao({ inicial, aoFechar, aoSalvar }: { inicial: Rascunho; aoFe
             <input type="checkbox" checked={niver} onChange={(e) => mudar(e.target.checked ? { aniversario: true, banho_tosa: true, casa: [] } : { aniversario: false })} />
             <span>Só perto do aniversário do pet</span>
           </label>
-          {niver && <small className="g-muted">Vale no horário de banho e tosa marcado de {JANELA_NIVER} dias antes a {JANELA_NIVER} dias depois do aniversário do pet (o ano não importa). O pet precisa ter a data de nascimento na ficha. Não aparece no link do cliente: entra sozinha no horário, e a equipe pode tirar.</small>}
+          {niver && <small className="g-muted">Vale no horário de banho e tosa marcado de {JANELA_NIVER} dias antes a {JANELA_NIVER} dias depois do aniversário do pet (o ano não importa). O pet precisa ter o aniversário na ficha (o ano pode ficar em branco). Não aparece no link do cliente: entra sozinha no horário, e a equipe pode tirar.</small>}
         </div>
         {onde.length > 1 && !niver && (
           <div className="g-campo">

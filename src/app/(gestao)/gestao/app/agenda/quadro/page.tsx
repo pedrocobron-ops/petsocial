@@ -295,7 +295,7 @@ function AvisarPronto({ a, aoFechar, aoAvisar }: { a: AgendamentoCompleto; aoFec
   const { sb, petshop } = useGestao();
   const { avisarErro } = useAvisos();
   const tutor = a.pets?.clientes;
-  const zap = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: a.pets?.nome ?? "seu pet", petshop: petshop.nome, servico: servicosPorExtenso(a) }));
+  const zap = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: a.pets?.nome ?? "seu pet", sexo: a.pets?.sexo, petshop: petshop.nome, servico: servicosPorExtenso(a) }));
   const marcar = () => {
     void sb.from("agendamentos").update({ pronto_avisado_em: new Date().toISOString() }).eq("id", a.id).select("id").single()
       .then(({ error }) => { if (error) avisarErro(error); else { avisarMudanca(); aoAvisar(); } });

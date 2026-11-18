@@ -77,6 +77,10 @@ function roteiroAosPoucos() {
 
     const progresso = painel.locator('.g-ass-progresso');
     await progresso.waitFor({ timeout: 5000 });
+    // Juliana N1: a linha aparece na hora ("Pensando…"), antes de o servidor dizer o que está fazendo
+    const primeira = await progresso.innerText().catch(() => '');
+    T.ok('a primeira linha aparece na hora: "Pensando…" (ou já a frase da consulta)', /Pensando…|Procurando Thor…/.test(primeira), primeira);
+    await painel.locator('.g-ass-progresso', { hasText: 'Procurando Thor…' }).waitFor({ timeout: 5000 }).catch(() => {});
     T.ok('a frase aparece embaixo dos três pontinhos', /Procurando Thor…/.test(await progresso.innerText()) && (await painel.locator('.g-bolha.pensa + .g-ass-progresso').count()) === 1);
     await page.screenshot({ path: `${B.RAIZ}/testes/saida/mozart-stream-progresso-${largura}.png` }).catch(() => {});
     await page.waitForFunction(() => /horários livres de amanhã/.test(document.querySelector('.g-ass-progresso')?.textContent || ''), null, { timeout: 5000 });

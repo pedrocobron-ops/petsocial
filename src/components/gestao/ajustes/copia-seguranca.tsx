@@ -180,7 +180,7 @@ export default function CopiaSeguranca() {
         ["Pet", "Tutor", "Telefone do tutor", "Espécie", "Raça", "Porte", "Sexo", "Nascimento", "Alertas", "Observações", "Ativo", "Adicionado em"],
         ...pets.map((p): Cel[] => [
           p.nome, p.clientes?.nome ?? "", fmtTelefone(p.clientes?.telefone), ESPECIES[p.especie] ?? p.especie, p.raca ?? "", nomePorte(p.porte), rotulo(SEXO, p.sexo),
-          quando(p.nascimento), p.alertas ?? "", p.obs ?? "", simNao(p.ativo), quando(isoDia(new Date(p.criado_em))),
+          p.nascimento?.startsWith("1904-") ? `${p.nascimento.slice(8, 10)}/${p.nascimento.slice(5, 7)}` : quando(p.nascimento), p.alertas ?? "", p.obs ?? "", simNao(p.ativo), quando(isoDia(new Date(p.criado_em))),
         ]),
       ]);
 

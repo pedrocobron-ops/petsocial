@@ -52,7 +52,7 @@ export default function PrivacidadePage() {
             <td>Na navegação</td>
             <td>Páginas vistas, aparelho, navegador, endereço IP e cookies do Pixel da Meta</td>
             <td>Medir visitas, entender o que funciona e mostrar anúncios do {EMPRESA.marca} a quem já visitou o site</td>
-            <td>Legítimo interesse (IX), com a opção de recusar (item 5)</td>
+            <td>Consentimento (I), dado no aviso de cookies e que você pode retirar (item 5)</td>
           </tr>
         </tbody>
       </table>
@@ -80,8 +80,9 @@ export default function PrivacidadePage() {
       <h2 id="cookies">5. Cookies</h2>
       <p>
         Usamos cookies necessários para o site funcionar e cookies de medição do Pixel da Meta. Na primeira visita, um aviso pergunta se
-        você aceita ou recusa os cookies de medição. Recusando, o Pixel não manda nada do seu navegador e o cookie dele é apagado; a escolha
-        fica guardada no próprio navegador. O aviso e o Pixel aparecem só nas páginas do site: o aplicativo Maestro Pet Gestão, as telas de
+        você aceita ou recusa os cookies de medição. O Pixel só começa a funcionar depois que você toca em Aceitar: antes disso, ou se você
+        recusar, ele não carrega, não grava o cookie dele e não manda nada do seu navegador (se já tinha gravado, o cookie é apagado ao
+        recusar). A escolha fica guardada no próprio navegador. O aviso e o Pixel aparecem só nas páginas do site: o aplicativo Maestro Pet Gestão, as telas de
         cadastro e de entrada e as páginas que os pet shops mandam aos tutores não usam cookies de medição.
       </p>
       <EscolhaDeCookies />

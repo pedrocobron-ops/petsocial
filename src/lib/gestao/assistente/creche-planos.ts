@@ -11,7 +11,7 @@ import type { Contexto } from "./ferramentas";
 export const FERRAMENTA_PLANOS_CRECHE: Anthropic.Tool & { grava: false } = {
   grava: false,
   name: "ver_planos_creche",
-  description: "Creche: planos de mensalista (cães que vêm em dias fixos da semana e pagam por mês). Mostra os dias da semana de cada plano, se o pet é esperado hoje e o que aconteceu na chamada, os próximos dias do plano (com as faltas já avisadas), presenças, faltas, reposições e dias extras do mês e o saldo de reposição. Use para perguntas sobre mensalistas (\"a Luna vem quinta?\", \"quem vem hoje na creche?\") e sempre que falarem de falta ou dia de um mensalista: a creche não usa a agenda de horários. Com pet_id, só os planos daquele pet.",
+  description: "Creche: planos de mensalista (cães que vêm em dias fixos da semana e pagam por mês). Mostra os dias da semana de cada plano, se o pet é esperado hoje e o que aconteceu na chamada, os próximos dias do plano (com as faltas já avisadas), presenças, faltas, reposições e dias extras do mês, o saldo de reposição e o táxi pet (leva e traz) do plano: taxi diz se o plano tem táxi (ida, volta ou ida e volta); para quem recebe, o preço do táxi (por dia que veio ou fixo por mês) e os dias de táxi já anotados que ainda vão entrar na cobrança. Use para perguntas sobre mensalistas (\"a Luna vem quinta?\", \"quem vem hoje na creche?\") e sempre que falarem de falta ou dia de um mensalista: a creche não usa a agenda de horários. Com pet_id, só os planos daquele pet.",
   input_schema: {
     type: "object", additionalProperties: false, required: [],
     properties: {
@@ -29,7 +29,7 @@ const dataCurta = (dia: string) => `${DIAS[dow(dia)]}, ${dia.slice(8, 10)}/${dia
 const localDia = (iso: string, fusoMin: number) => new Date(new Date(iso).getTime() + fusoMin * 60000).toISOString().slice(0, 10);
 const localHora = (iso: string, fusoMin: number) => new Date(new Date(iso).getTime() + fusoMin * 60000).toISOString().slice(11, 16);
 
-type Plano = { id: string; pet_id: string; dias: number[]; inicio: string; fim: string | null; pausa_de: string | null; pausa_ate: string | null; vence_dia: number;
+type Plano = { id: string; pet_id: string; dias: number[]; taxi?: string | null; inicio: string; fim: string | null; pausa_de: string | null; pausa_ate: string | null; vence_dia: number;
   pets: { id: string; nome: string; ativo: boolean; clientes: { nome: string } | null } | null };
 
 export async function consultarPlanosDaCreche(c: Contexto, e: Record<string, unknown>): Promise<{ resultado: unknown }> {
@@ -38,7 +38,7 @@ export async function consultarPlanosDaCreche(c: Contexto, e: Record<string, unk
   const n = Math.max(1, Math.min(60, typeof e.dias === "number" && Number.isFinite(e.dias) ? Math.round(e.dias) : 14));
   const petId = typeof e.pet_id === "string" && RE_UUID.test(e.pet_id) ? e.pet_id : null;
   const mesDe = `${hoje.slice(0, 8)}01`, ate = somaDias(hoje, n);
-  let q = sb.from("creche_planos").select("id, pet_id, dias, inicio, fim, pausa_de, pausa_ate, vence_dia, pets(id, nome, ativo, clientes(nome))").eq("petshop_id", petshop.id).order("inicio").limit(500);
+  let q = sb.from("creche_planos").select("id, pet_id, dias, taxi, inicio, fim, pausa_de, pausa_ate, vence_dia, pets(id, nome, ativo, clientes(nome))").eq("petshop_id", petshop.id).order("inicio").limit(500);
   if (petId) q = q.eq("pet_id", petId);
   const r = await q;
   if (r.error) throw new Error(r.error.message);
@@ -46,12 +46,15 @@ export async function consultarPlanosDaCreche(c: Contexto, e: Record<string, unk
   const planos = ((r.data ?? []) as unknown as Plano[]).filter((p) => p.pets?.ativo !== false && (petId || !p.fim || p.fim >= hoje));
   if (!planos.length) return { resultado: { planos: [], aviso: petId ? "Esse pet não tem plano de mensalista na creche." : "A creche não tem mensalistas com plano ativo." } };
   const pets = [...new Set(planos.map((p) => p.pet_id))];
-  const [faltas, presencas, fechados, valores] = await Promise.all([
+  const comTaxi = planos.filter((p) => p.taxi).map((p) => p.id);
+  const [faltas, presencas, fechados, valores, taxis] = await Promise.all([
     sb.from("creche_faltas").select("pet_id, dia, avisou").eq("petshop_id", petshop.id).in("pet_id", pets).gte("dia", mesDe).lte("dia", ate).limit(2000),
     sb.from("estadias").select("pet_id, status, entrada, saida, mensalista, dia").eq("petshop_id", petshop.id).eq("tipo", "creche").neq("status", "cancelada")
       .in("pet_id", pets).gte("dia", mesDe).lte("dia", ate).limit(2000),
     sb.from("dias_especiais").select("dia").eq("petshop_id", petshop.id).eq("fechado", true).gte("dia", mesDe).lte("dia", ate).limit(500),
-    c.vejoFinanceiro ? sb.from("creche_planos_valores").select("plano_id, valor_mensal, valor_extra").eq("petshop_id", petshop.id).in("plano_id", planos.map((p) => p.id)).limit(500) : null,
+    c.vejoFinanceiro ? sb.from("creche_planos_valores").select("plano_id, valor_mensal, valor_extra, taxi_valor, taxi_modo").eq("petshop_id", petshop.id).in("plano_id", planos.map((p) => p.id)).limit(500) : null,
+    // dias de táxi anotados (o pet chegou pela Chamada) que ainda não entraram numa cobrança
+    c.vejoFinanceiro && comTaxi.length ? sb.from("creche_taxi").select("plano_id, valor").eq("petshop_id", petshop.id).in("plano_id", comTaxi).is("cobranca_id", null).limit(2000) : null,
   ]);
   const fechado = new Set((fechados.data ?? []).map((d) => d.dia));
   const horario = petshop.horario as Horario | null;
@@ -61,6 +64,13 @@ export async function consultarPlanosDaCreche(c: Contexto, e: Record<string, unk
   const faltasDe = (pet: string) => (faltas.data ?? []).filter((f) => f.pet_id === pet);
   const vindasDe = (pet: string) => (presencas.data ?? []).filter((x) => x.pet_id === pet);
   const valor = new Map((valores?.data ?? []).map((v) => [v.plano_id, v]));
+  const taxiAnotado = new Map<string, { dias: number; valor: number }>();
+  for (const t of taxis?.data ?? []) {
+    if (!t.plano_id) continue;
+    const x = taxiAnotado.get(t.plano_id) ?? { dias: 0, valor: 0 };
+    taxiAnotado.set(t.plano_id, { dias: x.dias + 1, valor: Math.round((x.valor + Number(t.valor)) * 100) / 100 });
+  }
+  const NOME_TAXI: Record<string, string> = { ida: "só a ida (buscar em casa)", volta: "só a volta (levar para casa)", ida_volta: "ida e volta (buscar e levar)" };
 
   const lista = planos.map((p) => {
     const fs = faltasDe(p.pet_id), vs = vindasDe(p.pet_id);
@@ -93,11 +103,17 @@ export async function consultarPlanosDaCreche(c: Contexto, e: Record<string, unk
         dias_extras: doMes.filter((x) => x.mensalista === "extra").map((x) => dataCurta(x.dia!)),
       },
       ...(c.vejoFinanceiro && v ? { mensalidade: Number(v.valor_mensal), vence_dia: p.vence_dia, ...(v.valor_extra != null ? { preco_dia_extra: Number(v.valor_extra) } : {}) } : {}),
+      taxi: p.taxi ? NOME_TAXI[p.taxi] ?? p.taxi : "sem táxi",
+      ...(p.taxi && c.vejoFinanceiro && v ? {
+        taxi_preco: v.taxi_valor != null && Number(v.taxi_valor) > 0 ? (v.taxi_modo === "mes" ? `${Number(v.taxi_valor)} fixo por mês (entra na cobrança do próprio mês)` : `${Number(v.taxi_valor)} por dia que veio (os dias de um mês entram na cobrança do mês seguinte)`) : "sem preço (só aparece no Leva e traz)",
+        ...(taxiAnotado.get(p.id) ? { taxi_dias_anotados_sem_cobranca: taxiAnotado.get(p.id)!.dias, taxi_valor_anotado_sem_cobranca: taxiAnotado.get(p.id)!.valor } : {}),
+      } : {}),
     };
   });
   return {
     resultado: {
       hoje: dataCurta(hoje), planos: lista,
+      taxi: "Táxi pet do mensalista fica no plano (Creche, Mensalistas). Nos dias do plano o pet entra sozinho na tela Leva e traz da Creche; o valor do mês aparece em Cobranças, Gerar cobranças (linha Táxi pet).",
       como_anotar_falta_avisada: "Falta de um dia que ainda vai chegar: em Creche, Mensalistas, toque no pet e em Vai faltar (ou na Chamada, escolha o dia). Falta de hoje: na Chamada, Faltou e Avisou. Você não grava falta: diga isso à pessoa.",
     },
   };

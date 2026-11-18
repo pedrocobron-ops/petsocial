@@ -1,8 +1,19 @@
 import { contaDosItens, itensDoLancamento, partesPorForma, type FormaPagamento } from "./dinheiro";
 import { FORMAS } from "./tipos";
-import { brl, chamar, dataCompleta } from "./util";
+import { brl, chamar, dataCompleta, isoDia } from "./util";
 
-type Recebido = { valor: number; forma?: string | null; pagamentos?: unknown; itens?: unknown };
+type Recebido = { valor: number; forma?: string | null; pagamentos?: unknown; itens?: unknown; data?: string | null };
+
+/**
+ * A data do comprovante é a do pagamento (o dia em que o dinheiro entrou, no fuso da loja), não a do horário: o horário de amanhã
+ * recebido hoje sai com "Data do pagamento: hoje" e "Atendimento: amanhã". No mesmo dia, uma linha só, como sempre.
+ * `pagoEm`: AAAA-MM-DD; sem ele, a data do horário.
+ */
+export function linhasDaData(quando: Date | string, pagoEm?: string | null): string[] {
+  const doHorario = isoDia(new Date(quando));
+  if (!pagoEm || !/^\d{4}-\d{2}-\d{2}$/.test(pagoEm) || pagoEm === doHorario) return [`Data: ${dataCompleta(new Date(quando))}`];
+  return [`Data do pagamento: ${dataCompleta(pagoEm)}`, `Atendimento: ${dataCompleta(new Date(quando))}`];
+}
 
 /** O que entrou na mesma conta para o que o tutor devia de antes (fiado, resto de outra conta): quanto e como. */
 export type AntigaNoComprovante = { recebido: number; falta: number; forma?: string | null; pagamentos?: unknown };
@@ -43,7 +54,10 @@ function linhaDoQueDevia(pagou: number, devia: number) {
 export function textoComprovante(p: {
   petshop: string; tutor?: string | null; pet?: string | null; servico?: string | null; quando: Date | string; recebidos: Recebido[];
   antigas?: AntigaNoComprovante[] | null; entregue?: number | null;
+  /** o dia em que o dinheiro entrou (AAAA-MM-DD); sem ele, o dia do lançamento mais novo */
+  pagoEm?: string | null;
 }) {
+  const pagoEm = p.pagoEm ?? p.recebidos.map((l) => l.data ?? "").filter(Boolean).sort().pop() ?? null;
   const total = centavos(p.recebidos.reduce((t, l) => t + Number(l.valor), 0));
   const linhas: string[] = [];
   let desconto = 0;
@@ -70,7 +84,7 @@ export function textoComprovante(p: {
     `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} Segue o comprovante do atendimento${p.pet ? ` de ${p.pet}` : ""}.`,
     "",
     p.petshop,
-    `Data: ${dataCompleta(new Date(p.quando))}`,
+    ...linhasDaData(p.quando, pagoEm),
     ...(p.pet ? [`Pet: ${p.pet}`] : []),
     "",
     ...linhas,
@@ -114,6 +128,8 @@ export function imprimirComprovante(texto: string, titulo = "Comprovante de aten
  */
 export function textoComprovanteDaParte(p: {
   petshop: string; tutor?: string | null; pet?: string | null; quando: Date | string;
+  /** o dia em que o dinheiro entrou (AAAA-MM-DD) */
+  pagoEm?: string | null;
   itens: { nome: string; qtd: number; valor: number }[]; total: number; desconto?: number;
   pago: number; formas: { forma: string; valor: number }[]; falta: number; pagaAte?: string | null; antigo?: number;
   /** quanto o cliente devia de antes, no total (para dizer "pagou 40 do que devia (75); ainda deve 35") */
@@ -138,7 +154,7 @@ export function textoComprovanteDaParte(p: {
     `${p.tutor ? `Oi, ${chamar(p.tutor)}!` : "Oi!"} Segue o comprovante do atendimento${p.pet ? ` de ${p.pet}` : ""}.`,
     "",
     p.petshop,
-    `Data: ${dataCompleta(new Date(p.quando))}`,
+    ...linhasDaData(p.quando, p.pagoEm),
     ...(p.pet ? [`Pet: ${p.pet}`] : []),
     "",
     ...linhas,

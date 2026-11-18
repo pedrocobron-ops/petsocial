@@ -109,6 +109,12 @@
 .g-val-ico svg { width: 17px; height: 17px; }
 .g-val-num { flex: none; text-align: right; display: grid; }
 .g-val-num small { font-size: .75rem; color: var(--g-cinza); }
+/* ações do lote (Ver produto, Dar baixa, Perda): no celular descem para a linha de baixo */
+.g-val-acoes { flex: none; display: flex; gap: 6px; }
+@media (max-width: 560px) {
+  .g-val-lista li { flex-wrap: wrap; }
+  .g-val-acoes { flex-basis: 100%; justify-content: flex-end; }
+}
 
 /* ---------- kits: produtos do kit ---------- */
 .g-kit-lista { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }

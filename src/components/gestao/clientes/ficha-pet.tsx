@@ -132,7 +132,9 @@ export default function FichaPet({ id, voltar, aoAbrir }: { id: string; voltar: 
   const { pet, atendimentos, pacotes, estadias, visitas, nEstadias, ultimaVisita, gasto, gastoEstadias, gastoParcial, saude, erroSaude } = dados;
   const tutor = pet.clientes;
   const zap = tutor ? linkWhatsApp(tutor.telefone, `${saudacaoZap(tutor.nome, petshop.nome)} `) : null;
-  const etiquetas = [pet.raca, pet.porte ? `Porte ${nomePorte(pet.porte).toLowerCase()}` : null, pet.sexo === "M" ? "Macho" : pet.sexo === "F" ? "Fêmea" : null, idade(pet.nascimento)]
+  const etiquetas = [pet.raca, pet.porte ? `Porte ${nomePorte(pet.porte).toLowerCase()}` : null, pet.sexo === "M" ? "Macho" : pet.sexo === "F" ? "Fêmea" : null, idade(pet.nascimento),
+    // aniversário sem o ano: só o dia ("Aniversário 20/11")
+    pet.nascimento?.startsWith("1904-") ? `Aniversário ${pet.nascimento.slice(8, 10)}/${pet.nascimento.slice(5, 7)}` : null]
     .filter((x): x is string => !!x);
   const agora = new Date();
   const hoje = inicioDoDia(agora);

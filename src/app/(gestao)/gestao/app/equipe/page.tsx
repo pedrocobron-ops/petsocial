@@ -14,6 +14,7 @@ import { acessoDe, erroDeLimite, fraseDoLimite, funcaoDe, nAcessos, pilulasDe, p
 import { perfisPara } from "@/lib/gestao/acessos";
 import { usaModulo } from "@/lib/gestao/modulos";
 import type { Profissional } from "@/lib/gestao/tipos";
+import { nomeNaEquipe } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
 import "./equipe.css";
 
@@ -246,7 +247,7 @@ function EscalaDaSemana() {
         ))}
         {quem.map((p) => (
           <Fragment key={p.id}>
-            <span className="g-eq-esc-nome"><i style={{ background: p.cor }} aria-hidden />{p.nome.split(" ")[0]}</span>
+            <span className="g-eq-esc-nome"><i style={{ background: p.cor }} aria-hidden />{nomeNaEquipe(p.nome, quem.map((x) => x.nome))}</span>
             {ORDEM_DIAS.map((d) => {
               const h = p.escala ? lerHorario(p.escala)[d] : loja[d];
               return h ? (

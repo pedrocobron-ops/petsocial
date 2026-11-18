@@ -5,9 +5,9 @@ import { CalendarCheck2, CalendarOff, Check, Clock, Lock, MessageCircle, Repeat,
 import type { AgendamentoCompleto, PetComTutor, StatusAgendamento } from "@/lib/gestao/tipos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { PORTES } from "@/lib/gestao/tipos";
-import { REPETICOES, bloqueioPega, datasDaSerie, horariosLivres, paraMin, textoRemarcado, vagasDe } from "@/lib/gestao/agenda";
+import { REPETICOES, bloqueioPega, datasDaSerie, deMin, horariosLivres, marcadoPara, paraMin, textoRemarcado, vagasDe } from "@/lib/gestao/agenda";
 import { definirServicosAMais, juntarServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-horario";
-import { almocoDoDia, brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, linkWhatsApp, nomeDiaCurto, NOTA_PORTE, precoDoServico, precoMudaComPorte, somaDias } from "@/lib/gestao/util";
+import { almocoDoDia, brl, nomeNaEquipe, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, linkWhatsApp, nomeDiaCurto, NOTA_PORTE, precoDoServico, precoMudaComPorte, somaDias } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
@@ -55,8 +55,11 @@ function anoFazSentido(dia: string) {
  * Marca um horário novo ou altera um existente. Avisa (sem impedir) quando bate com outro atendimento ou com um bloqueio.
  * Ao criar, o horário pode se repetir: todos os da série dividem o mesmo `serie_id`.
  */
+/** "1h30", "2h" (a duração do atendimento no aviso de fora do horário). */
+const textoDuracao = (min: number) => `${Math.floor(min / 60)}h${min % 60 ? String(min % 60).padStart(2, "0") : ""}`;
+
 /** O horário que acabou de ser marcado: a Agenda vai para o dia dele e oferece a confirmação no WhatsApp. */
-export type Marcado = { id: string; inicio: string; quantos: number; pet?: string };
+export type Marcado = { id: string; inicio: string; quantos: number; pet?: string; sexo?: string | null };
 
 export default function FormAgendamento({ agendamento, petInicial, diaInicial, horaInicial, profissionalInicial, servicosIniciais, obsInicial, aoFechar, aoSalvar }: {
   agendamento?: AgendamentoCompleto; petInicial?: PetComTutor | null; diaInicial?: string; horaInicial?: string; profissionalInicial?: string | null;
@@ -209,7 +212,8 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     return ok(await sb.from("bloqueios").select("id, inicio, fim, motivo, profissional_id").eq("petshop_id", petshop.id)
       .lt("inicio", somaDias(deIsoDia(ultimoDia), 1).toISOString()).gt("fim", deIsoDia(dia).toISOString()));
   }, [dia, ultimoDia, diaOk, petshop.id]);
-  const nomeDe = (id: string | null) => (id ? quemAtende.find((p) => p.id === id)?.nome.split(" ")[0] ?? "profissional" : "pet shop inteiro");
+  const nomesDaEquipe = quemAtende.map((p) => p.nome);
+  const nomeDe = (id: string | null) => (id ? nomeNaEquipe(quemAtende.find((p) => p.id === id)?.nome, nomesDaEquipe) || "profissional" : "pet shop inteiro");
 
   const funcionamento = horarioDoDia(petshop.horario, deIsoDia(dia));
   const livres = useMemo(() => {
@@ -369,7 +373,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
         const guardou = semFim && serie ? await sb.from("series_agenda").insert({ serie_id: serie, petshop_id: petshop.id, cada_semanas: repetir }).select("serie_id") : null;
         avisar(`${usar.length === 1 ? "1 horário marcado" : `${usar.length} horários marcados`}${!semFim ? "" : guardou?.error ? ". Não consegui guardar o Até eu cancelar: a repetição termina no último horário." : ". Perto do fim, a Agenda avisa para marcar os próximos."}`);
         avisarMudanca();
-        aoSalvar(marcados[0] ? { id: marcados[0].id, inicio: juntaDiaHora(usar[0], hhmm).toISOString(), quantos: usar.length, pet: pet?.nome } : undefined);
+        aoSalvar(marcados[0] ? { id: marcados[0].id, inicio: juntaDiaHora(usar[0], hhmm).toISOString(), quantos: usar.length, pet: pet?.nome, sexo: pet?.sexo } : undefined);
         setSalvando(false);
         return;
       }
@@ -419,9 +423,9 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
       if (!agendamento) {
         const novo = ok(await sb.from("agendamentos").insert({ ...campos, ...semAPromo, ...quando, petshop_id: petshop.id, criado_por: user.id }).select("id").single());
         if (aMais.length) await juntarAosMarcados([novo.id], aMais);
-        marcado = { id: novo.id, inicio: inicio.toISOString(), quantos: 1, pet: pet?.nome };
+        marcado = { id: novo.id, inicio: inicio.toISOString(), quantos: 1, pet: pet?.nome, sexo: pet?.sexo };
       }
-      avisar(agendamento ? "Horário alterado." : `${pet.nome} marcado para ${dataAmigavel(inicio)} às ${hhmm}.`);
+      avisar(agendamento ? "Horário alterado." : `${marcadoPara(pet.nome, pet.sexo)} para ${dataAmigavel(inicio)} às ${hhmm}.`);
       avisarMudanca();
       if (agendamento && new Date(agendamento.inicio).getTime() !== inicio.getTime()) {
         const nomes = [servicos.find((x) => x.id === servicoId)?.nome, ...aMais.map((o) => servicos.find((x) => x.id === o.servico_id)?.nome)].filter((n): n is string => Boolean(n));
@@ -429,7 +433,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
         const quandoTexto = dataAmigavel(inicio);
         setRemarcado({
           quando: quandoTexto, hora: hhmm,
-          zap: linkWhatsApp(pet.clientes?.telefone, textoRemarcado({ tutor: pet.clientes?.nome, pet: pet.nome, servico: oQue, quando: quandoTexto, hora: hhmm, petshop: petshop.nome })),
+          zap: linkWhatsApp(pet.clientes?.telefone, textoRemarcado({ tutor: pet.clientes?.nome, pet: pet.nome, sexo: pet.sexo, servico: oQue, quando: quandoTexto, hora: hhmm, petshop: petshop.nome })),
         });
         setSalvando(false);
         return;
@@ -561,7 +565,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
             <div className="g-campo"><span>Quem atende</span>
               <div className="g-chips">
                 <button type="button" className="g-chip" aria-pressed={profId === null} onClick={() => setProfId(null)}>A definir</button>
-                {quemAtende.map((p) => <button key={p.id} type="button" className="g-chip" aria-pressed={profId === p.id} onClick={() => setProfId(p.id)}><i style={{ background: p.cor }} />{p.nome.split(" ")[0]}</button>)}
+                {quemAtende.map((p) => <button key={p.id} type="button" className="g-chip" aria-pressed={profId === p.id} onClick={() => setProfId(p.id)}><i style={{ background: p.cor }} />{nomeNaEquipe(p.nome, nomesDaEquipe)}</button>)}
               </div>
             </div>
           )}
@@ -599,7 +603,10 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
           )}
           {foraAqui && !repetindo && (
             <p className="g-agd-alerta" role="status"><Clock />
-              <span><b>Fora do horário de funcionamento.</b> {dataAmigavel(dia).replace(/^./, (c) => c.toUpperCase())} o pet shop abre das {foraAqui.abre} às {foraAqui.fecha}. Você pode marcar mesmo assim.</span>
+              <span><b>Fora do horário de funcionamento.</b> {dataAmigavel(dia).replace(/^./, (c) => c.toUpperCase())} o pet shop abre das {foraAqui.abre} às {foraAqui.fecha}.{" "}
+                {paraMin(hhmm) >= paraMin(foraAqui.abre) && paraMin(hhmm) < paraMin(foraAqui.fecha)
+                  ? `O atendimento leva ${duracao >= 60 ? textoDuracao(duracao) : `${duracao} min`}: começando às ${hhmm}, termina às ${deMin(paraMin(hhmm) + duracao)}, depois do horário de fechar. `
+                  : ""}Você pode marcar mesmo assim.</span>
             </p>
           )}
           {lotadoAqui && !repetindo && (

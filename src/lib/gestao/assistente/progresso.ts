@@ -53,6 +53,8 @@ const FRASES: Record<string, (e: Entrada | null, agora?: string, casa?: string) 
   ver_hospedes: (_e, _a, casa) => (casa === "Hotel" ? "Olhando quem está no hotel…" : casa === "Creche" ? "Olhando quem está na creche…" : "Olhando quem está na creche e no hotel…"),
   reservar_estadia: () => "Preparando a reserva para você conferir…",
   ver_sinais: () => "Somando os sinais…",
+  ver_maquininha: () => "Olhando o que a maquininha vai pagar…",
+  ver_descontos: () => "Somando os descontos…",
   ver_pacotes: () => "Conferindo os pacotes…",
   ver_caixa: () => "Conferindo o caixa…",
   ver_saude: () => "Olhando as vacinas e os cuidados…",
@@ -64,6 +66,15 @@ const FRASES: Record<string, (e: Entrada | null, agora?: string, casa?: string) 
   ver_lucro: () => "Calculando quanto sobrou…",
   ver_contas_fixas: () => "Somando as contas fixas…",
 };
+
+/** A primeira frase de cada pedido, antes de o modelo responder: "Pensando…" ou, depois do "Pode fazer", "Conferindo o que ficou feito…". */
+export function fraseInicial(mensagens: { role: string; content?: unknown }[]): string {
+  const ultima = mensagens[mensagens.length - 1];
+  const respondeuCartao = ultima?.role === "user" && Array.isArray(ultima.content) && ultima.content.some((b) => (b as { type?: string })?.type === "tool_result");
+  return respondeuCartao ? "Conferindo o que ficou feito…" : "Pensando…";
+}
+/** Depois das consultas, enquanto o modelo escreve a resposta com o que elas trouxeram. */
+export const FRASE_JUNTANDO = "Juntando a resposta…";
 
 /** Frase de uma ferramenta que grava (o cartão): o Mozart prepara para a pessoa conferir. */
 const PREPARANDO = "Preparando para você conferir…";

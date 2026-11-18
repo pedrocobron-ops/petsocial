@@ -8,7 +8,7 @@ import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { desenhoDoCodigo } from "@/lib/gestao/codigo-barras";
 import { opcoesDaLoja } from "@/lib/gestao/loja-opcoes";
 import type { Produto } from "@/lib/gestao/tipos";
-import { brl, semAcento } from "@/lib/gestao/util";
+import { brl, dataCurta, semAcento } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Esqueleto, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import { ControlesDoPapel, useTituloDoPapel } from "@/components/gestao/papel";
@@ -20,6 +20,8 @@ import "./etiquetas.css";
  * Etiquetas dos produtos para imprimir na mesma aba (com Voltar, como as outras folhas): nome, preço e código de barras.
  * Folha A4 de etiquetas adesivas (3 × 10 e 4 × 16) ou impressora de etiqueta (uma etiqueta por página, no tamanho dela).
  * `?p=<id>:<quantidade>,…` já vem com os produtos escolhidos (da ficha do produto ou de uma entrada no estoque).
+ * Produto com "Controlar validade": a etiqueta pode mostrar a validade e o lote ("Mostrar validade e lote"). Vindo de uma entrada,
+ * `&val=<id>:<AAAA-MM-DD>:<lote>` traz o que acabou de entrar; senão, vale o lote com saldo que vence antes (produto_lotes).
  */
 type Modelo = {
   id: string; nome: string; apoio: string; w: number; h: number; termica?: boolean; compacta?: boolean;
@@ -49,6 +51,21 @@ function lerEscolha(p: string | null): Record<string, number> {
 }
 
 /** Quantas etiquetas para "uma por unidade": un, pacote e saco contam; kg, g, L e ml levam uma só. */
+/** "id:2027-02-10:L123" da URL (a entrada que acabou de ser anotada). */
+function lerValidades(v: string | null): Record<string, { validade: string | null; lote: string | null }> {
+  const r: Record<string, { validade: string | null; lote: string | null }> = {};
+  for (const parte of (v ?? "").split(",")) {
+    const [id, dia, ...lote] = parte.split(":");
+    if (!/^[0-9a-f-]{36}$/i.test(id ?? "")) continue;
+    r[id] = { validade: /^\d{4}-\d{2}-\d{2}$/.test(dia ?? "") ? dia : null, lote: lote.join(":").trim().slice(0, 60) || null };
+  }
+  return r;
+}
+
+/** "Val. 10/02/2027 · Lote GLD2601" (o que couber na etiqueta). */
+const textoDaValidade = (l: { validade: string | null; lote: string | null } | undefined) =>
+  !l ? "" : [l.validade ? `Val. ${dataCurta(l.validade)}/${l.validade.slice(0, 4)}` : null, l.lote ? `Lote ${l.lote}` : null].filter(Boolean).join(" · ");
+
 const etiquetasDoSaldo = (p: Pick<Produto, "estoque" | "unidade">) =>
   ["un", "pacote", "saco"].includes(p.unidade) ? Math.max(0, Math.min(500, Math.floor(Number(p.estoque)))) : Number(p.estoque) > 0 ? 1 : 0;
 
@@ -69,6 +86,8 @@ function Etiquetas() {
   const modelo = MODELOS.find((m) => m.id === modeloId)!;
   const [escolha, setEscolha] = useState<Record<string, number>>(() => lerEscolha(params.get("p")));
   const [comPreco, setComPreco] = useState(true);
+  const [comValidade, setComValidade] = useState(true);
+  const daEntrada = useMemo(() => lerValidades(params.get("val")), [params]);
   const [pular, setPular] = useState("");
   const [q, setQ] = useState("");
   const [mostrar, setMostrar] = useState(PASSO);
@@ -86,6 +105,19 @@ function Etiquetas() {
   const escolhidos = produtos.filter((p) => escolha[p.id]);
   const semCodigo = escolhidos.filter((p) => !p.codigo_barras);
   const naoDesenha = escolhidos.filter((p) => p.codigo_barras && !desenhoDoCodigo(p.codigo_barras));
+  // validade e lote de cada produto escolhido com "Controlar validade": o da entrada, ou o lote com saldo que vence antes
+  const comLote = escolhidos.filter((p) => p.controla_validade).map((p) => p.id).sort().join(",");
+  const { dados: validades } = useDados(async () => {
+    const r: Record<string, { validade: string | null; lote: string | null }> = {};
+    await Promise.all(comLote.split(",").filter(Boolean).map(async (id) => {
+      if (daEntrada[id]) { r[id] = daEntrada[id]; return; }
+      const x = await sb.rpc("produto_lotes", { p: petshop.id, p_produto: id });
+      const l = ((x.data ?? []) as { lote: string | null; validade: string | null; quantidade: number }[]).find((y) => Number(y.quantidade) > 0);
+      if (l) r[id] = { validade: l.validade, lote: l.lote };
+    }));
+    return r;
+  }, [petshop.id, comLote, daEntrada]);
+  const temValidade = Object.keys(validades ?? {}).length > 0;
 
   // as etiquetas na ordem da lista; as primeiras posições da folha podem ficar em branco (folha já usada)
   const etiquetas = useMemo(() => {
@@ -133,6 +165,7 @@ function Etiquetas() {
           <div className="g-et-topo">
             <b className="nome" title={p.nome}>{nomeCurto(p.nome, modelo.nomeMax)}</b>
             {comPreco && p.preco_venda != null && <span className="preco">{brl(p.preco_venda)}</span>}
+            {comValidade && validades?.[p.id] && <span className="val">{textoDaValidade(validades[p.id])}</span>}
           </div>
           {p.codigo_barras ? <CodigoDeBarras codigo={p.codigo_barras} /> : <span className="sem">sem código</span>}
         </>
@@ -158,6 +191,7 @@ function Etiquetas() {
         </div>
         <div className="g-imp-linha">
           <label className="g-check"><input type="checkbox" checked={comPreco} onChange={(e) => setComPreco(e.target.checked)} /><span>Mostrar o preço</span></label>
+          {temValidade && <label className="g-check"><input type="checkbox" checked={comValidade} onChange={(e) => setComValidade(e.target.checked)} /><span>Mostrar validade e lote</span></label>}
           {!modelo.termica && (
             <label className="g-et-pular">
               <span>Começar na etiqueta nº</span>

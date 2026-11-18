@@ -8,6 +8,7 @@ import { fraseDesfeita, frasesDoResumo, lerTabela, linhasParaOBanco, tabelaComoT
 import { ehXlsx, inflarNoNavegador, lerXlsx, temInflarNoNavegador } from "@/lib/gestao/xlsx";
 import { limparCodigo, opcoesDaLoja } from "@/lib/gestao/loja-opcoes";
 import { gravarMovimentos, parteDaChave } from "@/lib/gestao/dinheiro";
+import { unidadeDaPlanilha, validadeDaPlanilha } from "@/lib/gestao/planilha-produtos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { Json } from "@/lib/gestao/banco";
 import { useGestao } from "./contexto";
@@ -47,16 +48,24 @@ const COLUNAS: Record<Tipo, Coluna[]> = {
     { id: "custo", rotulo: "Custo", nomes: ["custo", "preco de custo", "valor de custo", "compra"], exemplo: "140,00" },
     { id: "estoque", rotulo: "Quantidade em estoque", nomes: ["estoque", "quantidade", "qtd", "saldo", "quantidade em estoque"], exemplo: "10" },
     { id: "minimo", rotulo: "Estoque mínimo", nomes: ["minimo", "estoque minimo", "alerta"], exemplo: "3" },
+    // com a validade, o produto passa a "Controlar validade" e a quantidade entra como um lote (com o código do lote, se tiver)
+    { id: "validade", rotulo: "Validade", nomes: ["validade", "data de validade", "vencimento", "vence", "vence em", "val"], parece: /validade|vencimento/, exemplo: "10/02/2027" },
+    { id: "lote", rotulo: "Lote", nomes: ["lote", "numero do lote", "cod lote", "codigo do lote"], parece: /\blote\b/, exemplo: "L2311A" },
+    // só entra quando o pet shop ligou os fornecedores nas opções da loja (o que não existe é cadastrado)
+    { id: "fornecedor", rotulo: "Fornecedor", nomes: ["fornecedor", "distribuidor", "marca do fornecedor"], parece: /fornecedor|distribuidor/, exemplo: "Distribuidora Pet Sul" },
   ],
 };
 /** Ordem em que as colunas aparecem para a pessoa (na lista do seletor e na planilha modelo). */
 const ORDEM: Record<Tipo, string[]> = {
   clientes: ["tutor", "telefone", "pet", "especie", "raca", "porte", "alertas", "obs", "email", "endereco"],
-  produtos: ["nome", "codigo", "categoria", "unidade", "preco", "custo", "estoque", "minimo"],
+  produtos: ["nome", "codigo", "categoria", "unidade", "preco", "custo", "estoque", "minimo", "validade", "lote", "fornecedor"],
 };
-/** As colunas aceitas; a de código de barras só para quem ligou a opção. */
-const colunasDe = (tipo: Tipo, comCodigo: boolean) => COLUNAS[tipo].filter((c) => c.id !== "codigo" || comCodigo);
-const emOrdem = (tipo: Tipo, comCodigo: boolean) => ORDEM[tipo].filter((id) => id !== "codigo" || comCodigo).map((id) => COLUNAS[tipo].find((c) => c.id === id)!);
+/** Colunas que dependem de uma opção da loja: código de barras e fornecedor. */
+type Extras = { codigo: boolean; fornecedor: boolean };
+const vale = (id: string, x: Extras) => (id !== "codigo" || x.codigo) && (id !== "fornecedor" || x.fornecedor);
+/** As colunas aceitas; a de código de barras e a de fornecedor só para quem ligou a opção. */
+const colunasDe = (tipo: Tipo, x: Extras) => COLUNAS[tipo].filter((c) => vale(c.id, x));
+const emOrdem = (tipo: Tipo, x: Extras) => ORDEM[tipo].filter((id) => vale(id, x)).map((id) => COLUNAS[tipo].find((c) => c.id === id)!);
 const MAXIMO = 2000;
 
 /** Palpite de qual coluna da planilha é o quê: primeiro os títulos exatos, depois os parecidos. Cada campo fica com uma coluna só. */
@@ -86,8 +95,8 @@ function numero(v: string | undefined) {
 }
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
-function baixarModelo(tipo: Tipo, comCodigo: boolean) {
-  const cols = emOrdem(tipo, comCodigo);
+function baixarModelo(tipo: Tipo, extras: Extras) {
+  const cols = emOrdem(tipo, extras);
   const csv = "﻿" + [cols.map((c) => c.rotulo), cols.map((c) => c.exemplo)].map((l) => l.map((x) => `"${x.replace(/"/g, '""')}"`).join(";")).join("\r\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
@@ -158,8 +167,9 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
   const [mesmoAssim, setMesmoAssim] = useState(false);
   // a lista está no caderno ou noutro sistema (print, PDF): a mesma folha vira a leitura por foto
   const [caderno, setCaderno] = useState(false);
-  const comCodigo = opcoesDaLoja(petshop).codigoBarras;
-  const cols = useMemo(() => colunasDe(tipo, comCodigo), [tipo, comCodigo]);
+  const { codigoBarras: comCodigo, fornecedores: comFornecedor } = opcoesDaLoja(petshop);
+  const extras = useMemo(() => ({ codigo: comCodigo, fornecedor: comFornecedor }), [comCodigo, comFornecedor]);
+  const cols = useMemo(() => colunasDe(tipo, extras), [tipo, extras]);
   const principal = cols.find((c) => c.obrigatoria)!;
 
   useEffect(() => {
@@ -248,7 +258,22 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     const codigos = new Set((existentes.data ?? []).filter((p) => p.ativo && p.codigo_barras).map((p) => p.codigo_barras!));
     let repetidos = 0;
     const { data: u } = await sb.auth.getUser();
-    let novos = 0, pulados = 0, ignorados = 0;
+    let novos = 0, pulados = 0, ignorados = 0, semValidade = 0, comLote = 0;
+    // fornecedores pelo nome (sem acento); o que a planilha traz e não existe é cadastrado uma vez
+    const fornecedores = new Map<string, string>();
+    if (comFornecedor && linhas.some((l) => l.fornecedor?.trim())) {
+      const fs = ok(await sb.from("fornecedores").select("id, nome").eq("petshop_id", petshop.id).order("id").limit(1000));
+      for (const f of fs) fornecedores.set(semAcento(f.nome), f.id);
+    }
+    const fornecedorDe = async (nome: string | undefined) => {
+      const n = (nome ?? "").trim().slice(0, 120);
+      if (!comFornecedor || !n) return null;
+      const ja = fornecedores.get(semAcento(n));
+      if (ja) return ja;
+      const f = ok(await sb.from("fornecedores").insert({ petshop_id: petshop.id, nome: n }).select("id").single());
+      fornecedores.set(semAcento(n), f.id);
+      return f.id;
+    };
     const ruim = (v: string | undefined) => Boolean((v ?? "").trim()) && numero(v) == null;
     for (const [i, l] of linhas.entries()) {
       const nome = l.nome.trim().slice(0, 120);
@@ -257,21 +282,33 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
       if (ruim(l.preco) || ruim(l.custo) || ruim(l.estoque) || ruim(l.minimo)) ignorados++;
       let codigo = comCodigo ? limparCodigo(l.codigo) : null;
       if (codigo && codigos.has(codigo)) { codigo = null; repetidos++; }
+      const validade = validadeDaPlanilha(l.validade);
+      if (validade === undefined) semValidade++;
+      const lote = (l.lote ?? "").trim().slice(0, 60) || null;
+      // com validade (ou lote) na planilha, o produto controla a validade e o saldo entra como um lote
+      const controla = Boolean(validade || lote);
+      const fornecedorId = await fornecedorDe(l.fornecedor);
       const r = await sb.from("produtos").insert({
-        petshop_id: petshop.id, nome, categoria: l.categoria?.trim() || null, unidade: l.unidade?.trim().slice(0, 12) || "un",
+        petshop_id: petshop.id, nome, categoria: l.categoria?.trim() || null, unidade: unidadeDaPlanilha(l.unidade),
         preco_venda: preco != null ? Math.round(preco * 100) / 100 : null, custo: custo != null ? Math.round(custo * 100) / 100 : null,
-        estoque_minimo: minimo ?? 0, ...(codigo ? { codigo_barras: codigo } : {}),
+        estoque_minimo: minimo ?? 0, ...(codigo ? { codigo_barras: codigo } : {}), ...(controla ? { controla_validade: true } : {}),
+        ...(fornecedorId ? { fornecedor_id: fornecedorId } : {}),
       }).select("id").single();
       if (r.error) throw new Error(r.error.message);
       tem.add(semAcento(nome));
       if (codigo) codigos.add(codigo);
       novos++;
       if (qtd && qtd > 0) {
-        // o saldo de cada linha da planilha entra uma vez só por importação (a chave é da folha + o número da linha)
-        await gravarMovimentos(sb, petshop.id, [{
+        // o saldo de cada linha da planilha entra uma vez só por importação (a chave é da folha + o número da linha);
+        // com validade ou lote, entra como o lote do que já está na prateleira (no Vencendo e no "vence antes sai antes")
+        await gravarMovimentos(sb, petshop.id, [controla ? {
+          petshop_id: petshop.id, produto_id: r.data.id, tipo: "entrada", quantidade: qtd, motivo: "Saldo trazido da planilha", criado_por: u.user?.id ?? null,
+          custo_unitario: custo != null ? Math.round(custo * 100) / 100 : null, lote, validade: validade || null, chave: parteDaChave(chave, "saldo", i),
+        } : {
           petshop_id: petshop.id, produto_id: r.data.id, tipo: "ajuste", quantidade: qtd, motivo: "Saldo trazido da planilha", criado_por: u.user?.id ?? null,
           chave: parteDaChave(chave, "saldo", i),
         }]);
+        if (controla) comLote++;
       }
     }
     return [
@@ -279,6 +316,8 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
       ...(ignorados ? [`${ignorados} ${ignorados === 1 ? "produto tinha" : "produtos tinham"} preço, custo ou quantidade que não era número (ou era negativo) e ficou em branco. Confira no Estoque.`] : []),
       ...(pulados ? [`${pulados} já ${pulados === 1 ? "existia" : "existiam"} com o mesmo nome e ${pulados === 1 ? "foi pulado" : "foram pulados"}.`] : []),
       ...(repetidos ? [`${repetidos} ${repetidos === 1 ? "produto veio" : "produtos vieram"} com um código de barras que já estava em outro produto e ${repetidos === 1 ? "entrou" : "entraram"} sem código. Confira no Estoque.`] : []),
+      ...(comLote ? [`${comLote} ${comLote === 1 ? "produto entrou" : "produtos entraram"} com a validade ou o lote: ${comLote === 1 ? "já aparece" : "já aparecem"} no Vencendo.`] : []),
+      ...(semValidade ? [`${semValidade} ${semValidade === 1 ? "produto tinha" : "produtos tinham"} uma validade que não deu para ler (use 10/02/2027) e ${semValidade === 1 ? "entrou" : "entraram"} sem ela. Confira no Estoque.`] : []),
     ];
   }
 
@@ -376,10 +415,10 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
           <div className="g-card liso g-pilha p">
             <b className="g-p">1. A planilha precisa de uma linha de títulos</b>
             <p className="g-muted g-pp">
-              Colunas aceitas: {emOrdem(tipo, comCodigo).map((c) => c.rotulo).join(", ")}. Só <b>{principal.rotulo}</b> é obrigatória.
+              Colunas aceitas: {emOrdem(tipo, extras).map((c) => c.rotulo).join(", ")}. Só <b>{principal.rotulo}</b> é obrigatória.
               {tipo === "clientes" && " Um tutor com dois pets ocupa duas linhas, repetindo o nome e o telefone. Se os títulos da sua planilha forem outros (Responsável, Zap, Bichinho), você escolhe o que é cada coluna antes de trazer."}
             </p>
-            <div><button className="g-btn sec p" onClick={() => baixarModelo(tipo, comCodigo)}><Download />Baixar planilha modelo</button></div>
+            <div><button className="g-btn sec p" onClick={() => baixarModelo(tipo, extras)}><Download />Baixar planilha modelo</button></div>
           </div>
           <div className="g-card liso g-pilha p">
             <b className="g-p">2. Escolha o arquivo ou cole as células</b>
@@ -406,7 +445,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
                         <td key={i}>
                           <select className={`g-select g-imp-sel${lido.mapa[i] ? " usa" : ""}`} value={lido.mapa[i]} aria-label={`A coluna “${t || i + 1}” é`} onChange={(e) => escolher(i, e.target.value)}>
                             <option value="">Não usar</option>
-                            {emOrdem(tipo, comCodigo).map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
+                            {emOrdem(tipo, extras).map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
                           </select>
                         </td>
                       ))}

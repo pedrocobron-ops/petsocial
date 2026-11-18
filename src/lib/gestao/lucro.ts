@@ -146,6 +146,24 @@ export function montarLucro(b: LucroDoBanco): Lucro {
   };
 }
 
+/** Categorias das entradas da creche e do hotel (mensalidade, diárias e taxas da estadia). */
+export const CATEGORIAS_DA_CASA = ["Creche: mensalidade", "Creche e hotel"] as const;
+
+/**
+ * O que entrou da creche e do hotel, como linhas de Quanto sobrou (antes ficava só em "Outros lançamentos", e uma loja só de creche
+ * via "Nenhum serviço recebido" e "Sobrou –"). Não têm custo por serviço: aparecem sem margem, com o que entrou. A ponte com o
+ * Financeiro não muda (o valor continua nos outros lançamentos).
+ * `nome`: o nome que a tela mostra para a categoria (Creche, Hotel ou Creche e hotel, conforme a loja).
+ */
+export function linhasDaCasa(outros: { categoria: string; valor: number; lancamentos: number }[], nome: (categoria: string) => string): LinhaLucro[] {
+  return outros.filter((o) => (CATEGORIAS_DA_CASA as readonly string[]).includes(o.categoria) && o.valor !== 0).map((o) => ({
+    chave: `casa:${o.categoria}`, tipo: "extra", id: null,
+    nome: o.categoria === "Creche: mensalidade" ? "Creche: mensalidades" : `${nome(o.categoria)}: diárias e taxas`,
+    quantidade: o.lancamentos, unidade: o.lancamentos === 1 ? "conta" : "contas", receita: real(o.valor), material: null, comissao: 0, custo: null, margem: null, pct: null,
+    falta: "sem custo por serviço: o que sobra é o resultado (entrou − saiu)", custoDeHoje: 0, devolvido: 0, devolvidos: 0,
+  }));
+}
+
 /** As linhas que dão mais lucro primeiro (margem em reais); sem custo informado, vão para o fim, pela receita. */
 export function porLucro(linhas: LinhaLucro[]): LinhaLucro[] {
   return [...linhas].sort((a, b) => (a.margem == null) !== (b.margem == null) ? (a.margem == null ? 1 : -1)

@@ -8,6 +8,8 @@ import { consultarContasFixas, descreverContaFixa, FERRAMENTAS_CONTAS_FIXAS, gra
 import { consultarPlanosDaCreche, FERRAMENTA_PLANOS_CRECHE } from "./creche-planos";
 import { agendaNaoEhCasa, descreverEstadia, FERRAMENTA_RESERVAR_ESTADIA, gravarEstadia } from "./ferramenta-estadia";
 import { consultarSinais, FERRAMENTA_SINAIS } from "./ferramenta-sinais";
+import { consultarMaquininha, FERRAMENTA_MAQUININHA } from "./ferramenta-maquininha";
+import { consultarDescontos, FERRAMENTA_DESCONTOS } from "./ferramenta-descontos";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
@@ -47,6 +49,8 @@ export type Contexto = {
   agora: string;
   /** Chave da ação que está sendo gravada: dinheiro e estoque entram com ela, e o banco recusa a mesma chave duas vezes. */
   chave?: string;
+  /** Dias fechados e feriados dos próximos 14 dias (a rota lê de `dias_especiais`; vai no contexto do modelo). */
+  diasEspeciais?: { dia: string; nome: string | null; fechado: boolean; feriado: boolean }[];
 };
 
 export type Resumo = { titulo: string; linhas: [string, string][] };
@@ -110,6 +114,8 @@ export const FERRAMENTAS: Def[] = [
     input_schema: obj({ dias: { ...N, description: "Até quantos dias à frente olhar as reservas. Padrão: 7" } }) },
   FERRAMENTA_PLANOS_CRECHE,
   FERRAMENTA_SINAIS,
+  FERRAMENTA_MAQUININHA,
+  FERRAMENTA_DESCONTOS,
   { grava: false, name: "ver_pacotes", description: "Lista os modelos de pacote à venda (com pacote_id e preço) e os pacotes ativos, com usados e restantes. Com pet_id, só os pacotes daquele pet.",
     input_schema: obj({ pet_id: S }) },
   { grava: false, financeiro: true, name: "ver_caixa", description: "Diz se o caixa está aberto ou fechado, desde quando, o troco inicial, quanto entrou e saiu por forma de pagamento e o dinheiro esperado na gaveta. Com o caixa fechado, mostra o que foi lançado hoje e o último fechamento.",
@@ -544,22 +550,25 @@ type Reserva = NaCasa & { chega: string };
 async function crecheDiaADia(c: Contexto, dias: number, naCasa: NaCasa[], reservas: Reserva[]) {
   const hoje = c.agora.slice(0, 10);
   const n = Math.max(1, Math.min(14, dias || 7));
-  const r = (await consultarPlanosDaCreche(c, { dias: n })).resultado as { planos?: { pet: string; tutor: string | null; hoje: string; esperado_hoje: boolean; proximos_dias: { dia: string; estado: string }[] }[] };
+  const r = (await consultarPlanosDaCreche(c, { dias: n })).resultado as { planos?: { pet: string; tutor: string | null; hoje: string; esperado_hoje: boolean; taxi?: string; proximos_dias: { dia: string; estado: string }[] }[] };
+  const fechado = new Map((c.diasEspeciais ?? []).filter((d) => d.fechado).map((d) => [d.dia, d.nome?.trim() || null]));
+  const comTaxi = (p: { taxi?: string }) => (p.taxi && p.taxi !== "sem táxi" ? ` · táxi: ${p.taxi}` : "");
   const nome = (pet: string, tutor: string | null | undefined) => `${pet}${tutor ? ` (${tutor})` : ""}`;
-  const lista: { dia: string; mensalistas: string[]; reservas: string[]; na_casa_agora?: string[]; total: number }[] = [];
+  const lista: { dia: string; fechado?: string; mensalistas: string[]; reservas: string[]; na_casa_agora?: string[]; total: number }[] = [];
   for (let i = 0; i <= n; i++) {
     const dia = somaDiasLocal(hoje, i);
     const rotulo = `${i === 0 ? "hoje, " : i === 1 ? "amanhã, " : ""}${quandoLocal(dia)}`;
     const ms: string[] = [];
     for (const p of r.planos ?? []) {
-      if (i === 0) { if (p.esperado_hoje) ms.push(`${nome(p.pet, p.tutor)}: ${p.hoje}`); continue; }
+      if (i === 0) { if (p.esperado_hoje) ms.push(`${nome(p.pet, p.tutor)}: ${p.hoje}${comTaxi(p)}`); continue; }
       const x = p.proximos_dias.find((d) => d.dia === quandoLocal(dia).replace(" às", ""));
-      if (x && !/faltar/.test(x.estado)) ms.push(`${nome(p.pet, p.tutor)}${x.estado === "esperado" ? "" : `: ${x.estado}`}`);
+      if (x && !/faltar/.test(x.estado)) ms.push(`${nome(p.pet, p.tutor)}${x.estado === "esperado" ? "" : `: ${x.estado}`}${comTaxi(p)}`);
     }
     const rs = reservas.filter((x) => x.tipo === "creche" && x.chega.slice(0, 10) === dia).map((x) => nome(x.pet ?? "pet", x.tutor));
     const casa = i === 0 ? naCasa.filter((x) => x.tipo === "creche").map((x) => nome(x.pet ?? "pet", x.tutor)) : undefined;
-    const todos = new Set([...ms.map((m) => m.split(":")[0]), ...rs, ...(casa ?? [])]);
-    lista.push({ dia: rotulo, mensalistas: ms, reservas: rs, ...(casa ? { na_casa_agora: casa } : {}), total: todos.size });
+    const todos = new Set([...ms.map((m) => m.split(/:| · /)[0]), ...rs, ...(casa ?? [])]);
+    const f = fechado.has(dia) ? `o pet shop não abre${fechado.get(dia) ? ` (${fechado.get(dia)})` : ""}: nenhum mensalista é esperado` : undefined;
+    lista.push({ dia: rotulo, ...(f ? { fechado: f } : {}), mensalistas: ms, reservas: rs, ...(casa ? { na_casa_agora: casa } : {}), total: todos.size });
   }
   return lista;
 }
@@ -837,6 +846,10 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
   if (fixas) return fixas;
   const sinais = await consultarSinais(c, nome, e, (m) => new ErroDeUso(m));
   if (sinais) return sinais;
+  const maquininha = await consultarMaquininha(c, nome, e, (m) => new ErroDeUso(m));
+  if (maquininha) return maquininha;
+  const descontos = await consultarDescontos(c, nome, e, (m) => new ErroDeUso(m));
+  if (descontos) return descontos;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 

@@ -18,6 +18,9 @@ export const PERIODOS_INDICADORES = [
 export type PeriodoIndicadores = (typeof PERIODOS_INDICADORES)[number]["id"];
 
 /** Primeiro e último dia (AAAA-MM-DD). "Últimos N meses" conta o mês atual (até hoje) e os N − 1 anteriores inteiros. */
+/** O período que a tela abre: este mês (o primeiro botão). */
+export const PERIODO_INICIAL: PeriodoIndicadores = "mes";
+
 export function intervaloIndicadores(p: PeriodoIndicadores, hoje: Date): { de: string; ate: string } {
   const a = hoje.getFullYear(), m = hoje.getMonth();
   if (p === "mes") return { de: isoDia(new Date(a, m, 1)), ate: isoDia(hoje) };
@@ -51,6 +54,8 @@ export type MesIndicador = {
   valor_contas?: number | null;
   /** reservas e estadias da creche e do hotel (sem as presenças de mensalista), pelo dia da entrada; noites de hotel ocupadas */
   estadias_marcadas?: number; estadias_canceladas?: number; noites_hotel?: number;
+  /** reservas canceladas no mês pelo dia do cancelamento (cancelar hoje uma reserva do mês que vem conta hoje); banco antigo: não vem */
+  estadias_canceladas_no_periodo?: number;
   estadias_creche: number; estadias_hotel: number; clientes: number; primeira_vez: number; voltaram: number;
 };
 
@@ -77,7 +82,8 @@ export function lerIndicadores(d: IndicadoresDoBanco): IndicadoresDoBanco {
       ...m, faturamento: ouNulo(m.faturamento), entradas: ouNulo(m.entradas), saiu: ouNulo(m.saiu), resultado: ouNulo(m.resultado),
       taxas: ouNulo(m.taxas), resultado_depois_taxas: ouNulo(m.resultado_depois_taxas), valor_medio: ouNulo(m.valor_medio),
       contas: Number(m.contas), atendimentos: Number(m.atendimentos), faltas: Number(m.faltas), cancelados: Number(m.cancelados), marcados: Number(m.marcados),
-      valor_contas: ouNulo(m.valor_contas), estadias_marcadas: Number(m.estadias_marcadas ?? 0), estadias_canceladas: Number(m.estadias_canceladas ?? 0), noites_hotel: Number(m.noites_hotel ?? 0),
+      valor_contas: ouNulo(m.valor_contas), estadias_marcadas: Number(m.estadias_marcadas ?? 0), estadias_canceladas: Number(m.estadias_canceladas ?? 0),
+      estadias_canceladas_no_periodo: m.estadias_canceladas_no_periodo == null ? undefined : Number(m.estadias_canceladas_no_periodo), noites_hotel: Number(m.noites_hotel ?? 0),
       estadias_creche: Number(m.estadias_creche), estadias_hotel: Number(m.estadias_hotel), clientes: Number(m.clientes),
       primeira_vez: Number(m.primeira_vez), voltaram: Number(m.voltaram),
     })),
@@ -103,6 +109,8 @@ export function totaisIndicadores(d: IndicadoresDoBanco) {
   const atendimentos = soma((m) => m.atendimentos), faltas = soma((m) => m.faltas);
   // cancelamentos: horários da agenda e reservas da creche e do hotel (as reservas canceladas não apareciam: "0 de 0")
   const reservasCanceladas = soma((m) => m.estadias_canceladas ?? 0), reservasMarcadas = soma((m) => m.estadias_marcadas ?? 0);
+  // reservas canceladas no período pelo dia do cancelamento (o que a pessoa fez no período); banco antigo: as de antes
+  const canceladasNoPeriodo = d.meses.some((m) => m.estadias_canceladas_no_periodo != null) ? soma((m) => m.estadias_canceladas_no_periodo ?? 0) : reservasCanceladas;
   const cancelados = soma((m) => m.cancelados) + reservasCanceladas, marcados = soma((m) => m.marcados) + reservasMarcadas;
   const estadias = soma((m) => m.estadias_creche + m.estadias_hotel);
   // o valor médio soma só as contas contadas (o sinal entra junto da conta do check-out, não como outra conta; o que foi recebido
@@ -110,7 +118,7 @@ export function totaisIndicadores(d: IndicadoresDoBanco) {
   const comValorDasContas = d.dinheiro && d.meses.some((m) => m.valor_contas != null);
   const valorDasContas = comValorDasContas ? real(soma((m) => m.valor_contas ?? 0)) : faturamento;
   return {
-    faturamento, contas, reservasCanceladas, reservasMarcadas, noitesHotel: soma((m) => m.noites_hotel ?? 0),
+    faturamento, contas, reservasCanceladas, reservasMarcadas, canceladasNoPeriodo, noitesHotel: soma((m) => m.noites_hotel ?? 0),
     valorMedio: valorDasContas != null && contas > 0 ? real(valorDasContas / contas) : null,
     taxas: d.dinheiro ? real(soma((m) => m.taxas)) : null,
     resultado: d.dinheiro ? real(soma((m) => m.resultado)) : null,
@@ -127,7 +135,7 @@ export function totaisIndicadores(d: IndicadoresDoBanco) {
 /** Tem algum movimento no período? */
 export function temDados(d: IndicadoresDoBanco) {
   const t = totaisIndicadores(d);
-  return Boolean(t.marcados || t.estadias || t.contas || (t.faturamento ?? 0) !== 0 || d.produtos.length || (t.resultado ?? 0) !== 0);
+  return Boolean(t.marcados || t.estadias || t.contas || t.canceladasNoPeriodo || (t.faturamento ?? 0) !== 0 || d.produtos.length || (t.resultado ?? 0) !== 0);
 }
 
 /**

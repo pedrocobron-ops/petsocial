@@ -11,7 +11,7 @@ import { montarZip } from "@/lib/gestao/zip";
 import "./lgpd.css";
 
 /** O que o banco devolve em `cliente_dados`: cada planilha já com as colunas e as linhas. */
-type DadosDoTutor = { cliente: string; petshop: string; gerado_em: string; arquivos: { arquivo: string; explica: string; colunas: string[]; linhas: unknown[][] }[] };
+type DadosDoTutor = { cliente: string; petshop: string; gerado_em: string; /** Código do pedido no Registro de pedidos de dados (banco novo). */ protocolo?: string | null; arquivos: { arquivo: string; explica: string; colunas: string[]; linhas: unknown[][] }[] };
 
 const celula = (v: unknown): Cel => (v == null ? "" : typeof v === "number" ? { bruto: String(v).replace(".", ",") } : String(v));
 const igual = (a: string, b: string) => semAcento(a.replace(/\s+/g, " ").trim()) === semAcento(b.replace(/\s+/g, " ").trim());
@@ -23,13 +23,14 @@ export function zipDoTutor(d: DadosDoTutor, agora = new Date()) {
     `Cliente: ${d.cliente}`,
     `Pet shop: ${d.petshop}`,
     `Gerado em ${dataCompleta(agora)} às ${hora(agora)}.`,
+    ...(d.protocolo ? [`Protocolo do pedido: ${d.protocolo} (o mesmo do Registro de pedidos de dados, em Meu pet shop).`] : []),
     "",
     "Para responder ao pedido do cliente (LGPD, art. 18): tudo o que o pet shop guarda sobre ele e os pets dele no sistema.",
     "Cada arquivo .csv é uma planilha (UTF-8, ponto e vírgula entre as colunas). Abre no Excel e no Google Planilhas.",
     "",
     ...d.arquivos.map((a) => `${a.arquivo} (${a.linhas.length === 1 ? "1 linha" : `${a.linhas.length} linhas`})\r\n  ${a.explica}`),
     "",
-    "As fotos não entram no arquivo. Valores em reais, sem o R$.",
+    "As fotos não entram no arquivo. Valores em reais (R$).",
     "",
   ].join("\r\n");
   return montarZip([
@@ -58,7 +59,7 @@ export default function DadosDoTutor({ cliente, pets, aoApagar }: { cliente: { i
       const zip = zipDoTutor(d, agora);
       const apelido = semAcento(cliente.nome).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "cliente";
       baixarArquivo(new Blob([zip.buffer as ArrayBuffer], { type: "application/zip" }), `dados-${apelido}-${isoDia(agora)}.zip`);
-      avisar("Dados do tutor baixados. Mande ao cliente por um canal seguro.");
+      avisar(d.protocolo ? `Dados do tutor baixados (protocolo ${d.protocolo}). Mande ao cliente por um canal seguro.` : "Dados do tutor baixados. Mande ao cliente por um canal seguro.");
     } catch (e) { avisarErro(e); } finally { setBaixando(false); }
   }
 
@@ -76,7 +77,7 @@ export default function DadosDoTutor({ cliente, pets, aoApagar }: { cliente: { i
 }
 
 function FolhaApagar({ cliente, pets, aoFechar, aoApagar }: { cliente: { id: string; nome: string }; pets: { nome: string }[]; aoFechar: () => void; aoApagar: () => void }) {
-  const { sb } = useGestao();
+  const { sb, petshop } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const [nome, setNome] = useState("");
   const [indo, setIndo] = useState(false);
@@ -87,7 +88,11 @@ function FolhaApagar({ cliente, pets, aoFechar, aoApagar }: { cliente: { id: str
     setIndo(true);
     try {
       ok(await sb.rpc("cliente_anonimizar", { p_cliente: cliente.id, p_confirmacao: nome }));
-      avisar("Dados do tutor apagados. Os valores continuam no financeiro, sem o nome.");
+      // o protocolo do pedido, para o dono dar ao cliente (fica no Registro de pedidos de dados)
+      const reg = await sb.rpc("lgpd_registros_ver", { p_petshop: petshop.id });
+      const prot = ((reg.data ?? []) as unknown as { acao: string; cliente_id?: string | null; protocolo?: string | null }[])
+        .find((r) => r.acao === "apagou_tutor" && r.cliente_id === cliente.id)?.protocolo;
+      avisar(`Dados do tutor apagados${prot ? ` (protocolo ${prot})` : ""}. Os valores continuam no financeiro, sem o nome.`);
       aoApagar();
     } catch (e) { avisarErro(e); setIndo(false); }
   }

@@ -284,7 +284,10 @@ function CaixaDoDia() {
                 <Tile icone={Lock} tom="menta" tamanho="g" />
                 <div style={{ minWidth: 0 }}>
                   <h2>O caixa está fechado</h2>
-                  <p>Abra o caixa para começar o dia. Você conta o troco da gaveta e o resto a gente soma.</p>
+                  {/* fechou hoje: não manda "começar o dia" de novo; só se precisar receber em dinheiro */}
+                  {ultimo?.fechado_em && isoDia(new Date(ultimo.fechado_em)) === isoDia(new Date())
+                    ? <p>O caixa de hoje já foi fechado, às {hora(ultimo.fechado_em)}. Se ainda for receber em dinheiro hoje, dá para abrir de novo.</p>
+                    : <p>Abra o caixa para começar o dia. Você conta o troco da gaveta e o resto a gente soma.</p>}
                 </div>
               </div>
               <div><button className="g-btn pri" onClick={() => void abrir({ tipo: "abrir" })}><Wallet />Abrir o caixa</button></div>
