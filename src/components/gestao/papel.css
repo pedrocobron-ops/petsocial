@@ -75,6 +75,7 @@
 .g-pa-caixa { border: 1px solid #bdb3a4; border-radius: 8px; padding: 8px 10px; break-inside: avoid; display: grid; gap: 4px; align-content: start; }
 .g-pa-caixa.larga { grid-column: 1 / -1; }
 .g-pa-caixa.alerta { border: 2px solid #b3402e; }
+.g-pa-caixa .g-pa-remedio { font-size: 1rem; color: #8a2a1c; }
 .g-pa-caixa h3 { font: 700 .6875rem/1.2 var(--sans); text-transform: uppercase; letter-spacing: .06em; color: #4a433c; }
 .g-pa-caixa p, .g-pa-caixa li { font-size: .875rem; line-height: 1.4; }
 .g-pa-caixa ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }

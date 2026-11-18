@@ -32,6 +32,10 @@ export function fraseDaAlteracao(x: AlteracaoDeValor): string {
   if (x.tipo === "estoque_venda") return `${quem} deu saída de ${x.descricao}${de ? ` (${de} pelo preço da lista)` : ""}`;
   if (x.tipo === "estoque_saida") return `${quem} deu baixa no estoque: ${x.descricao}${de ? `, ${de} no custo` : ""}`;
   if (x.tipo === "porte") return `${quem} trocou o porte para menor: ${x.descricao}. O preço da lista do porte menor é mais baixo`;
+  if (x.tipo === "diaria") return `${quem} combinou uma diária abaixo da lista: ${x.descricao}, ${para} no lugar de ${de}`;
+  if (x.tipo === "diarias") return `${quem} cobrou menos diárias do que as datas mostram: ${x.descricao}${de ? ` (${para} no lugar de ${de})` : ""}`;
+  if (x.tipo === "checkout") return `${quem} cobrou abaixo da conta: ${x.descricao}, ${para} no lugar de ${de}`;
+  if (x.tipo === "devolucao") return `${quem} fez uma devolução: ${x.descricao}${de ? ` (${de}${x.para ? `; no lugar, ${para}` : ""})` : ""}`;
   if (x.tipo === "alterou_forma") return `${quem} trocou a forma de pagamento de um valor recebido: ${x.descricao}${para ? `, ${para}` : ""}`;
   return x.de != null && x.para != null && Number(x.de) !== Number(x.para)
     ? `${quem} alterou um valor recebido: ${x.descricao}, de ${de} para ${para}`

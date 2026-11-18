@@ -2,7 +2,8 @@
 
 import Link from "@/components/gestao/link-depois";
 import { Selo } from "./marca";
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
+import { SELETOR_FOCAVEL, proximoNoTab, tempoDoAviso } from "@/lib/gestao/desenho";
 import { Cat, Dog, PawPrint, Search, X } from "lucide-react";
 import { fotoPet } from "@/lib/gestao/supabase";
 import type { PetComTutor } from "@/lib/gestao/tipos";
@@ -95,7 +96,7 @@ export function ok<T>(r: { data: T; error: { message: string } | null }): NonNul
 /** Recusa do banco que o aplicativo não sabe explicar: só fala em "só para consulta" quando a conta está mesmo assim. */
 const semPermissao = () => (contaSoConsulta()
   ? "Sua conta está só para consulta. Para voltar a gravar, veja a tela Assinatura."
-  : "Não consegui salvar agora. Tente de novo ou fale com o suporte.");
+  : "Não deu para salvar: o seu acesso não permite isso, ou o item já não existe. Atualize a tela; se precisar, fale com o dono do pet shop.");
 
 /** Texto de erro que uma pessoa entende. */
 export function mensagemDeErro(e: unknown): string {
@@ -104,7 +105,7 @@ export function mensagemDeErro(e: unknown): string {
   // sem internet: o aparelho sabe (navigator.onLine) e diz; com internet, o pedido não chegou ao servidor
   if (ehFalhaDeRede(m) || /network/i.test(m)) return textoDeRede(!semInternet());
   if (/duplicate key/i.test(m)) return "Isso já está cadastrado.";
-  if (/JSON object requested|0 rows|PGRST116/i.test(m)) return semPermissao();
+  if (/JSON object requested|Cannot coerce the result to a single JSON object|0 rows|PGRST116/i.test(m)) return semPermissao();
   if (/caixas_um_aberto/i.test(m)) return "Já existe um caixa aberto.";
   if (/numeric field overflow|out of range/i.test(m)) return "Esse valor é grande demais. Confira os números.";
   if (/violates check constraint/i.test(m)) return "Confira os valores: algum número está negativo ou fora do permitido.";
@@ -135,7 +136,8 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
   const por = useCallback((texto: string, erro?: boolean, acao?: AcaoDoAviso) => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t.slice(-2), { id, texto, erro, acao }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), acao ? 8000 : erro ? 5000 : 2600);
+    // o tempo na tela acompanha o tamanho do texto (frase comprida não some antes de ser lida)
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tempoDoAviso(texto, { erro, acao: Boolean(acao) }));
     // aviso de que deu certo = algo foi gravado: a folha aberta deixa de contar como "mexida"
     if (!erro) window.dispatchEvent(new Event(EVENTO_AVISOU));
   }, []);
@@ -146,19 +148,25 @@ export function AvisosProvider({ children }: { children: React.ReactNode }) {
   return (
     <AvisosCtx.Provider value={{ avisar, avisarErro, confirmar }}>
       {children}
-      <div className="g-toasts" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`g-toast${t.erro ? " erro" : ""}${t.acao ? " com-acao" : ""}`}>
-            <span>{t.texto}</span>
-            {t.acao && <button type="button" onClick={() => { setToasts((l) => l.filter((x) => x.id !== t.id)); t.acao!.fazer(); }}>{t.acao.rotulo}</button>}
+      {/* dois cantos de leitura: o que deu certo espera a vez (status); o erro é dito na hora (alert) */}
+      <div className="g-toasts">
+        {[false, true].map((erros) => (
+          <div key={String(erros)} className="g-toasts-grupo" role={erros ? "alert" : "status"} aria-live={erros ? "assertive" : "polite"}>
+            {toasts.filter((t) => Boolean(t.erro) === erros).map((t) => (
+              <div key={t.id} className={`g-toast${t.erro ? " erro" : ""}${t.acao ? " com-acao" : ""}`}>
+                <span>{t.texto}</span>
+                {t.acao && <button type="button" onClick={() => { setToasts((l) => l.filter((x) => x.id !== t.id)); t.acao!.fazer(); }}>{t.acao.rotulo}</button>}
+              </div>
+            ))}
           </div>
         ))}
       </div>
       {pergunta && (
         <Folha titulo={pergunta.titulo} aoFechar={() => responder(false)}
           rodape={<>
-            <button className="g-btn sec" onClick={() => responder(false)}>{pergunta.voltar ?? "Voltar"}</button>
-            <button className={`g-btn ${pergunta.perigo ? "perigo" : "pri"}`} onClick={() => responder(true)} autoFocus>{pergunta.confirmar ?? "Confirmar"}</button>
+            {/* apagar ou desfazer algo: o foco começa no botão que não faz nada (Enter sem querer não apaga) */}
+            <button className="g-btn sec" onClick={() => responder(false)} autoFocus={Boolean(pergunta.perigo)}>{pergunta.voltar ?? "Voltar"}</button>
+            <button className={`g-btn ${pergunta.perigo ? "perigo" : "pri"}`} onClick={() => responder(true)} autoFocus={!pergunta.perigo}>{pergunta.confirmar ?? "Confirmar"}</button>
           </>}>
           {pergunta.texto && <p className="g-muted">{pergunta.texto}</p>}
         </Folha>
@@ -278,12 +286,55 @@ function segurarSegundoToque() {
   window.setTimeout(() => capa.remove(), 350);
 }
 
+/**
+ * Tab não sai da folha de cima: do último botão volta para o primeiro (e o contrário com Shift). Com "Sair sem salvar?"
+ * na frente, a volta é só entre os dois botões da pergunta. O foco que está em algo por cima da folha (a conversa do
+ * Mozart, o botão de um aviso rápido) segue livre.
+ */
+function prenderTab(e: KeyboardEvent, folha: HTMLElement | null) {
+  if (!folha) return;
+  const ativo = document.activeElement as HTMLElement | null;
+  if (ativo?.closest(".g-ass, .g-toasts")) return;
+  const area = (folha.querySelector(":scope > .g-folha-sair") as HTMLElement | null) ?? folha;
+  const lista = [...area.querySelectorAll<HTMLElement>(SELETOR_FOCAVEL)].filter((el) => {
+    // fora os escondidos e os de uma pergunta que não é desta área
+    if (!el.getClientRects().length || getComputedStyle(el).visibility === "hidden") return false;
+    return area !== folha || !el.closest(".g-folha-sair");
+  });
+  const destino = proximoNoTab(lista.length, ativo ? lista.indexOf(ativo) : -1, e.shiftKey);
+  // folha sem nada para focar (só texto): o foco fica nela
+  if (!lista.length) { e.preventDefault(); folha.focus({ preventScroll: true }); return; }
+  // no meio da lista o navegador segue sozinho; nas pontas (ou com o foco fora da lista, como logo depois de abrir) dá a volta
+  if (destino === null) return;
+  e.preventDefault();
+  lista[destino].focus();
+}
+
+/** A folha fechou: o foco volta para o botão que a abriu (se ele ainda está na tela e nada mais pegou o foco). */
+function devolverFoco(gatilho: HTMLElement | null) {
+  if (!gatilho) return;
+  window.setTimeout(() => {
+    if (!gatilho.isConnected || !gatilho.getClientRects().length) return;
+    const ativo = document.activeElement;
+    if (ativo && ativo !== document.body && ativo.isConnected) return;
+    // no celular, voltar o foco para um campo de texto abriria o teclado sem a pessoa pedir
+    if (gatilho.matches("input, textarea, select") && window.matchMedia?.("(pointer: coarse)").matches) return;
+    gatilho.focus({ preventScroll: true });
+  }, 0);
+}
+
 export function Folha({ titulo, aoFechar, children, rodape, larga }: {
   titulo: React.ReactNode; aoFechar: () => void; children: React.ReactNode; rodape?: React.ReactNode; larga?: boolean;
 }) {
   const fechar = useRef(aoFechar);
   fechar.current = aoFechar;
   const caixa = useRef<HTMLDivElement>(null);
+  const idTitulo = useId();
+  // quem tinha o foco quando a folha foi pedida (lido antes de ela entrar na tela, porque um campo com autoFocus pega o foco logo)
+  const [quemAbriu] = useState<HTMLElement | null>(() => {
+    const a = typeof document !== "undefined" ? document.activeElement : null;
+    return a instanceof HTMLElement && a !== document.body ? a : null;
+  });
   // a pessoa digitou algo nesta folha? (só vale para fechar por fora, Esc ou X; o próprio formulário fecha direto ao salvar)
   const mexeu = useRef(false);
   const [perguntando, setPerguntando] = useState(false);
@@ -308,14 +359,20 @@ export function Folha({ titulo, aoFechar, children, rodape, larga }: {
     if (!guarda) porGuarda();
     const relogio = window.setInterval(conferirGuarda, 700);
     // Esc fecha só a folha que está por cima
+    const no = caixa.current;
     const tecla = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || pilhaDeFolhas[pilhaDeFolhas.length - 1] !== eu) return;
+      if (pilhaDeFolhas[pilhaDeFolhas.length - 1] !== eu) return;
+      if (e.key === "Tab") { prenderTab(e, no); return; }
+      if (e.key !== "Escape") return;
       e.stopImmediatePropagation();
       if (perguntandoAgora.current) setPerguntando(false); else tentar.current();
     };
     document.addEventListener("keydown", tecla);
+    // teclado e leitor de tela: o foco entra na folha ao abrir (no campo com autoFocus, se houver; senão na própria folha)
+    // e volta para o botão que a abriu quando ela fecha
+    const gatilho = quemAbriu;
+    if (no && !no.contains(document.activeElement)) no.focus({ preventScroll: true });
     // digitar ou marcar algo dentro desta folha (e não de outra aberta por cima) conta como formulário mexido; busca não conta
-    const no = caixa.current;
     const digitou = (e: Event) => {
       const alvo = e.target as HTMLElement | null;
       if (!alvo || alvo.closest(".g-folha") !== no) return;
@@ -335,13 +392,18 @@ export function Folha({ titulo, aoFechar, children, rodape, larga }: {
       no?.removeEventListener("input", digitou); no?.removeEventListener("change", digitou); window.removeEventListener(EVENTO_AVISOU, gravou);
       document.documentElement.style.overflow = antes;
       segurarSegundoToque();
+      devolverFoco(gatilho);
     };
   }, []);
+  // "Sair sem salvar?" fechou com "Continuar preenchendo": o foco volta para a folha (o botão que o tinha sumiu)
+  useEffect(() => {
+    if (!perguntando && caixa.current && (document.activeElement === document.body || !document.activeElement)) caixa.current.focus({ preventScroll: true });
+  }, [perguntando]);
   return (
     <div className="g-fundo" onMouseDown={(e) => { if (e.target === e.currentTarget) tentar.current(); }}>
-      <div ref={caixa} className={`g-folha${larga ? " larga" : ""}`} role="dialog" aria-modal="true">
+      <div ref={caixa} className={`g-folha${larga ? " larga" : ""}`} role="dialog" aria-modal="true" aria-labelledby={idTitulo} tabIndex={-1}>
         <div className="g-folha-topo">
-          <h2>{titulo}</h2>
+          <h2 id={idTitulo}>{titulo}</h2>
           <button className="g-ico" onClick={() => tentar.current()} aria-label="Fechar"><X /></button>
         </div>
         <div className="g-folha-corpo">{children}</div>
@@ -370,7 +432,7 @@ export function Campo({ rotulo, dica, erro, children }: { rotulo: string; dica?:
     <label className="g-campo">
       <span>{rotulo}</span>
       {children}
-      {erro ? <small className="erro">{erro}</small> : dica ? <small>{dica}</small> : null}
+      {erro ? <small className="erro" role="alert">{erro}</small> : dica ? <small>{dica}</small> : null}
     </label>
   );
 }
@@ -510,7 +572,7 @@ export function EscolherPet({ aoEscolher, aoCriar, autoFocus }: {
 }) {
   const { sb, petshop } = useGestao();
   const [q, setQ] = useState("");
-  const { dados } = useDados(async () =>
+  const { dados, erro, carregando, recarregar } = useDados(async () =>
     lerTudo<PetComTutor>((de, ate, contar) => sb.from("pets").select("*, clientes(id, nome, telefone)", contando(contar)).eq("petshop_id", petshop.id).eq("ativo", true).order("nome").order("id").range(de, ate)),
   [petshop.id]);
   const alvo = semAcento(q);
@@ -530,6 +592,14 @@ export function EscolherPet({ aoEscolher, aoCriar, autoFocus }: {
         ))}
         {dados && !lista.length && <p className="g-muted g-p" style={{ padding: "12px 4px" }}>Nenhum pet encontrado.</p>}
       </div>
+      {/* a lista não veio (sem internet, por exemplo): diz isso, em vez de parecer que o pet shop não tem pets */}
+      {!dados && carregando && <Esqueleto linhas={3} />}
+      {!dados && !carregando && erro && (
+        <div className="g-aviso vermelho" role="alert" style={{ marginBottom: 0 }}>
+          <span>Não consegui trazer a lista de pets. {erro}</span>
+          <button type="button" className="g-btn sec p" onClick={() => void recarregar()}>Tentar de novo</button>
+        </div>
+      )}
       {aoCriar && <button type="button" className="g-btn sec" onClick={() => aoCriar(q.trim())}>Cadastrar pet novo{q.trim() ? `: ${q.trim()}` : ""}</button>}
     </div>
   );

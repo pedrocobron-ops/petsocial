@@ -56,8 +56,9 @@ t('ligado: Relatórios e Escola saem; Agenda, Financeiro e Hoje ficam', () => {
   assert.equal(M.foraNoModoSimples(p, '/gestao/app/escola'), true);
   for (const h of ['/gestao/app', '/gestao/app/agenda', '/gestao/app/financeiro', '/gestao/app/clientes']) assert.equal(M.foraNoModoSimples(p, h), false);
 });
-t('ligado: o Caixa sai só de quem não vende produtos', () => {
-  assert.equal(M.foraNoModoSimples({ ...so, opcoes: { 'geral.modo_simples': true } }, '/gestao/app/caixa'), true);
+// rodada 9: o Caixa fica no menu para todos (quem recebe em dinheiro precisa dele no primeiro dia, para a gaveta bater)
+t('ligado: o Caixa continua no menu, com ou sem venda de produtos', () => {
+  assert.equal(M.foraNoModoSimples({ ...so, opcoes: { 'geral.modo_simples': true } }, '/gestao/app/caixa'), false);
   assert.equal(M.foraNoModoSimples({ ...loja, opcoes: { 'geral.modo_simples': true } }, '/gestao/app/caixa'), false);
 });
 t('valor estranho na chave: desligado', () => assert.equal(M.modoSimples({ opcoes: { 'geral.modo_simples': 'sim' } }), false));

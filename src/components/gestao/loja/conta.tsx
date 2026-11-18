@@ -309,6 +309,18 @@ export function LinhaDaConta({ item, produto, aoMudar, aoTirar, apoio }: {
 
 /* ---------- desconto, pagamento e total ---------- */
 
+/**
+ * Preço travado: até quanto quem só opera o caixa pode dar de desconto nesta conta (null = sem limite: trava desligada, ou é o
+ * dono ou quem vê o financeiro). O limite arredonda para baixo, como no banco (5% de R$ 127,50 = R$ 6,37).
+ */
+export function maximoDoCaixa(petshop: { opcoes?: unknown }, cuidoDoFinanceiro: boolean, subtotal: number): number | null {
+  const trava = travaDePreco(petshop);
+  return trava.ligada && !cuidoDoFinanceiro ? Math.floor((subtotal * trava.descontoMax) + 1e-6) / 100 : null;
+}
+/** O desconto digitado passa do que o caixa pode dar? (O banco recusaria: a tela não deixa receber esse valor.) */
+export const descontoPassaDoCaixa = (maximo: number | null, descontoDigitado: number | null | undefined) => maximo != null && (descontoDigitado ?? 0) > maximo + 0.005;
+export const AVISO_DESCONTO_ACIMA = "Desconto acima do permitido";
+
 export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado, aoDesconto, pagamento, aoPagamento, comPagamento = true, erroForma, depois, aoDepois, aceitaResto, receberAgora, junto, credito = 0, promo }: {
   subtotal: number; desconto: number; total: number; descontoDigitado: number | null; aoDesconto: (v: number | null) => void;
   /** A promoção do horário (conta do atendimento): sai da soma antes do desconto do caixa. `desconto` vem sem ela. */
@@ -334,8 +346,10 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
   const trava = travaDePreco(petshop);
   const limitado = trava.ligada && !cuidoDoFinanceiro;
   // o limite arredonda para baixo (5% de R$ 127,50 = R$ 6,37): nunca passa do percentual
-  const maximo = limitado ? Math.floor((subtotal * trava.descontoMax) + 1e-6) / 100 : null;
-  const passouDoMaximo = maximo != null && (descontoDigitado ?? 0) > maximo + 0.005;
+  const maximo = maximoDoCaixa(petshop, cuidoDoFinanceiro, subtotal);
+  const passouDoMaximo = descontoPassaDoCaixa(maximo, descontoDigitado);
+  // desconto acima do que o caixa pode dar: o total mostrado é o que dá para cobrar (com o desconto máximo), nunca o que o banco recusa
+  const aMais = passouDoMaximo ? Math.round(((descontoDigitado ?? 0) - maximo!) * 100) / 100 : 0;
   return (
     <>
       {comPagamento && (
@@ -358,14 +372,14 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
       )}
       <div className="g-vd-total" role="status">
         <div>
-          <span className="g-rotulo">Total</span>
-          <p className="g-num">{brl(total)}</p>
+          <span className="g-rotulo">{passouDoMaximo ? "Total com o desconto que você pode dar" : "Total"}</span>
+          <p className="g-num">{brl(passouDoMaximo ? total + aMais : total)}</p>
         </div>
         {(desconto > 0 || (promo?.valor ?? 0) > 0 || aPagar > total || credito > 0) && (
           <div className="g-vd-contas g-tab">
             {(desconto > 0 || (promo?.valor ?? 0) > 0) && <span>Soma {brl(subtotal)}</span>}
             {(promo?.valor ?? 0) > 0 && <span>Promoção {promo!.nome} − {brl(promo!.valor)}</span>}
-            {desconto > 0 && <span>Desconto − {brl(desconto)}</span>}
+            {desconto > 0 && <span>Desconto − {brl(passouDoMaximo ? Math.max(0, desconto - aMais) : desconto)}</span>}
             {credito > 0 && <span>Crédito do tutor − {brl(credito)}</span>}
             {(junto ?? 0) > 0 && credito > 0 && !depois?.ativo && <span>Com o que devia ({brl(junto!)})</span>}
             {credito > 0 && <span>{depois?.ativo ? "Fica a receber" : "A pagar agora"}: <b>{brl(depois?.ativo ? Math.max(0, Math.round((total - credito) * 100) / 100) : aPagar)}</b></span>}

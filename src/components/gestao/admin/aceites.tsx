@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { Esqueleto, mensagemDeErro, ok } from "@/components/gestao/ui";
+import { celulaCsv } from "@/lib/gestao/csv";
 import { DOCUMENTOS, type Documento } from "@/lib/gestao/documentos";
 import { banco } from "@/lib/gestao/supabase";
 import { dataCompleta, hora } from "@/lib/gestao/util";
@@ -34,7 +35,8 @@ export default function AbaAceites() {
   function exportar() {
     const linhas = [["e-mail", "pet shop", "documento", "versão", "aceito em", "origem", "ip", "navegador"],
       ...aceites.map((a) => [a.email ?? "", a.petshops ?? "", nomeDoc(a.documento), a.versao, a.aceito_em, a.origem, a.ip ?? "", a.navegador ?? ""])];
-    const csv = linhas.map((l) => l.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\n");
+    // o navegador e o nome do pet shop vêm de fora: célula que começa com = + - @ ganha um apóstrofo para a planilha não ler como fórmula
+    const csv = linhas.map((l) => l.map(celulaCsv).join(";")).join("\r\n");
     const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a"); a.href = url; a.download = "aceites.csv"; a.click(); URL.revokeObjectURL(url);
   }

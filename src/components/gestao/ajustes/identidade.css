@@ -14,14 +14,14 @@
 .g-idt-tema .amostra i { position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid var(--g-carta); }
 .g-idt-tema .amostra svg { width: 20px; height: 20px; }
 .g-idt-previa { display: grid; gap: 10px; padding: 12px; border-radius: 18px; border: 1px dashed var(--g-linha-forte); }
-.g-idt-previa .cabeca { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; color: #f6f1e8;
+.g-idt-previa .cabeca { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; color: var(--g-creme);
   background: radial-gradient(260px 160px at 110% -10%, color-mix(in srgb, var(--g-laranja) 34%, transparent), transparent 62%), linear-gradient(135deg, var(--g-escuro-a), var(--g-escuro-b)); }
 .g-idt-previa .cabeca b { display: block; font: 500 1.125rem/1.15 var(--display); }
 .g-idt-previa .cabeca div span { font-size: .8125rem; opacity: .8; }
 .g-idt-previa .passos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .g-idt-previa .passos > span { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; background: var(--g-carta-2); font-size: .75rem; font-weight: 600; color: var(--g-cinza); white-space: nowrap; overflow: hidden; }
 .g-idt-previa .passos > span i { display: grid; place-items: center; width: 20px; height: 20px; flex: none; border-radius: 50%; background: #fffbf5; font-style: normal; font-size: .6875rem; }
-.g-idt-previa .passos > span.on { background: var(--g-verde); color: #f6f1e8; }
-.g-idt-previa .passos > span.on i { background: var(--g-laranja); color: #1f1b17; }
+.g-idt-previa .passos > span.on { background: var(--g-verde); color: var(--g-creme); }
+.g-idt-previa .passos > span.on i { background: var(--g-laranja); color: var(--g-tinta); }
 .g-idt-previa .legenda { display: flex; align-items: center; gap: 6px; font-size: .8125rem; color: var(--g-cinza); }
 .g-idt-previa .legenda svg { width: 14px; height: 14px; }

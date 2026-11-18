@@ -211,7 +211,8 @@ export const iniciais = (nome: string) => {
 
 /** Cor estável a partir de um texto (avatar sem foto). */
 export function corDoNome(nome: string) {
-  const cores = ["#c9773f", "#4d8f6b", "#3b82a0", "#7c6fb0", "#b0563f", "#8a7a3a", "#a05a82"];
+  // as iniciais são claras em cima da cor: todas com contraste de pelo menos 4,5:1 (WCAG AA)
+  const cores = ["#a85f2c", "#3f7a5a", "#33728d", "#6f61a6", "#b0563f", "#776a3a", "#a05a82"];
   let h = 0;
   for (const c of nome) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return cores[h % cores.length];

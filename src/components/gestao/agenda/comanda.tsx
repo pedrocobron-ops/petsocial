@@ -1,10 +1,10 @@
 "use client";
 
-import { foraNoModoSimples } from "@/lib/gestao/modo-simples";
+import { modoSimples } from "@/lib/gestao/modo-simples";
 import { useState } from "react";
-import { Check, MessageCircle, Plus, Scissors, Ticket, Truck } from "lucide-react";
+import { Check, MessageCircle, Plus, Printer, Scissors, Ticket, Truck } from "lucide-react";
 import type { AgendamentoCompleto, Lancamento, PacoteCliente } from "@/lib/gestao/tipos";
-import { textoComprovante, textoComprovanteDaParte } from "@/lib/gestao/comprovante";
+import { imprimirComprovante, nomeDeQuemAtende, textoComprovante, textoComprovanteAReceber, textoComprovanteDaParte } from "@/lib/gestao/comprovante";
 import { conferirCaixa, conferirValorAlto, formaPrincipal, pagamentoComCredito, parteDaChave, type PartePagamento } from "@/lib/gestao/dinheiro";
 import { conferirLimite, foraDoLimite } from "@/lib/gestao/fiado";
 import { casoDoErro, fazerTudoOuNada, lancamentoDe, partesOuNada, passoDoEstoque, ref, type Passo } from "@/lib/gestao/tudo-ou-nada";
@@ -16,7 +16,7 @@ import { repartirPagamento } from "@/lib/gestao/hotel";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { servicosAMais } from "@/lib/gestao/servicos-do-horario";
 import { taxaDoLevaTraz, taxaSugerida, temTaxa } from "@/lib/gestao/quadro";
-import { brl, dataCompleta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { conferirDiaDoHorario } from "@/lib/gestao/dia-do-horario";
 import { useGestao } from "../contexto";
@@ -25,10 +25,10 @@ import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { Tile } from "../painel";
 import { AvatarPet, Folha, avisarMudanca, mensagemDeErro, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import {
-  BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
+  AVISO_DESCONTO_ACIMA, BuscaProduto, comProduto, descontoPassaDoCaixa, encurtar, erroDaConta, maximoDoCaixa, faltaNoEstoque, fecharContas, FechamentoDaConta, itensParaGravar, LEVA_E_TRAZ, LinhaDaConta, novaChave,
   produtosDaConta, resumoDosItens, useProdutosDaLoja, valorDaLinha, type ItemConta, type PagaDepois,
 } from "../loja/conta";
-import { AvisoCaixaFechado, fecharPagamento, pagoAMenos, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, usePagamento } from "../loja/pecas";
+import { AvisoCaixaFechado, fecharPagamento, pagoAMenos, ParcelasNaTela, temDinheiro, useAnotarParcelas, useCaixaAberto, usePagamento } from "../loja/pecas";
 import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
 import { LinhaPromoNaConta, usePromoDoHorario } from "./promo-do-horario";
@@ -63,7 +63,7 @@ function dinheiroEntregue(e: { entregue?: number | null; parte?: boolean }, form
 export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: {
   agendamento: AgendamentoCompleto; pacote?: PacoteCliente | null; aoFechar: () => void; aoPronto: () => void;
 }) {
-  const { sb, petshop, user, vejoFinanceiro, cuidoDoFinanceiro, souDono, servicos } = useGestao();
+  const { sb, petshop, user, eu, vejoFinanceiro, cuidoDoFinanceiro, souDono, servicos } = useGestao();
   // quem não vende produtos não vê a busca do estoque: fica só o "Outro extra"
   const vendeProdutos = usaModulo(petshop, "loja");
   const { avisar, avisarErro, confirmar: perguntar } = useAvisos();
@@ -93,7 +93,17 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   const [erroForma, setErroForma] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   // conta recebida: antes de fechar, oferece o comprovante no WhatsApp do tutor
-  const [recebida, setRecebida] = useState<{ valor: number; zap: string; nota?: string } | null>(null);
+  // (sem telefone na ficha, dá para imprimir; conta que ficou para depois também tem comprovante)
+  const [recebida, setRecebida] = useState<{ valor: number; texto: string; nota?: string; fiado?: boolean } | null>(null);
+  // a recusa do limite de fiado fica escrita na conta (o aviso que some em segundos não basta)
+  const [erroFiado, setErroFiado] = useState<string | null>(null);
+  const recusaDoFiado = (e: unknown) => { setErroFiado(e instanceof Error ? e.message : String(e)); avisarErro(e); };
+  // atendimento de um dia que já passou (lançando o caderno): quem cuida do financeiro escolhe o dia em que o cliente pagou
+  const hojeIso = isoDia(new Date());
+  const diaDoHorario = isoDia(new Date(a.inicio));
+  const podeOutroDia = cuidoDoFinanceiro && diaDoHorario < hojeIso;
+  const [diaPago, setDiaPago] = useState<string>(hojeIso);
+  const pagoEm = podeOutroDia ? diaPago : hojeIso;
   const caixa = useCaixaAberto();
   const op = useOperacao();
 
@@ -116,7 +126,6 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   }, [petshop.id, tutor?.id ?? "", vejoFinanceiro, a.id]);
   const antigas = antigasLidas ?? [];
   const devido = centavos(antigas.reduce((t, l) => t + l.valor, 0));
-  const hojeIso = isoDia(new Date());
   const comMulta = antigas.reduce((t, l) => t + (multaSugerida(petshop, l, hojeIso)?.total ?? 0), 0);
   const [comDivida, setComDivida] = useState(false);
   // o que entra junto do que ele devia (nada quando a conta toda fica para depois)
@@ -139,6 +148,9 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
   const vendidos = produtosDaConta(itens);
   const temLevaTraz = itens.some((i) => i.tipo === "extra" && i.nome === LEVA_E_TRAZ);
   // atendimento já concluído e conta zerada: quem recebe ainda pode dizer "não vou cobrar" (uma vez)
+  // preço travado: desconto acima do que o caixa pode dar não vira "Receber R$ x" (o banco recusaria)
+  const maximoDesconto = vejoFinanceiro ? maximoDoCaixa(petshop, cuidoDoFinanceiro, contas.subtotal) : null;
+  const descontoAcima = descontoPassaDoCaixa(maximoDesconto, desconto);
   const nadaAFazer = contas.total <= 0 && junto <= 0 && a.status === "concluido" && !vendidos.length && !pacote && (a.sem_cobranca || !vejoFinanceiro);
   // serviços da lista do pet shop que ainda não estão nesta conta (para juntar mais um na hora de fechar)
   const servicosNaConta = itens.filter((i) => i.tipo === "servico" && i.servicoId).map((i) => i.servicoId!);
@@ -175,6 +187,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     if (nadaAFazer || somenteLeitura()) return false;
     const problema = erroDaConta(itens, desconto, contas.total);
     if (problema) { avisarErro(problema); return false; }
+    if (descontoAcima) { avisarErro(`O caixa pode dar até ${brl(maximoDesconto!)} de desconto nesta conta. Mais que isso, só com o dono ou com quem vê o financeiro.`); return false; }
     // horário de amanhã (ou depois) concluído hoje: confirma antes (achado da Neide: concluiu os de amanhã sem perceber)
     if (a.status !== "concluido" && !(await conferirDiaDoHorario(a.inicio, perguntar, contas.total > 0 || junto > 0))) return false;
     const fiado = depois.ativo && contas.total > 0;
@@ -192,7 +205,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     // o caixa fechou enquanto esta conta estava aberta: pergunta antes de receber fora dele
     if (pg && !("erro" in pg) && !(await conferirCaixa(sb, petshop.id, perguntar))) return false;
     // fica a receber: passa do limite de fiado do tutor? quem pode libera (fica anotado)
-    if (fiado && !(await conferirLimite(sb, petshop.id, tutor?.id, contas.total, { perguntar, podeLiberar: souDono || cuidoDoFinanceiro, avisarErro }))) return false;
+    setErroFiado(null);
+    if (fiado && !(await conferirLimite(sb, petshop.id, tutor?.id, daConta, { perguntar, podeLiberar: souDono || cuidoDoFinanceiro, avisarErro: recusaDoFiado }))) return false;
     // cada forma do pagamento vai primeiro para a conta de hoje (sem o crédito) e depois para as antigas
     const paraAntigas = junto > 0 ? alocarNasAntigas(antigas, centavos(recebendo - daConta)) : [];
     const repartido = pg && !("erro" in pg) && junto > 0
@@ -200,7 +214,6 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       : null;
     let pagouAntigas = 0;
     setSalvando(true);
-    let zapComprovante: string | null = null;
     try {
       // tudo numa chamada só (o banco grava tudo ou nada): serviços do horário, pacote, a conta, o crédito, as contas antigas,
       // o estoque e o atendimento concluído. Se a internet cair no meio, nada fica pela metade; tocar de novo não repete.
@@ -223,7 +236,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         const comCredito = credito > 0 ? pagamentoComCredito(credito, pgDaConta && daConta > 0 ? pgDaConta : null, daConta) : { forma: pgDaConta!.forma, pagamentos: pgDaConta!.pagamentos ?? null };
         if (contas.total > 0) {
           passos.push({ t: "lancamento", nome: "principal", chave, linha: {
-            tipo: "entrada", valor: contas.total, forma: comCredito.forma, pagamentos: partesOuNada(comCredito.pagamentos), pago: true, data: isoDia(new Date()),
+            tipo: "entrada", valor: contas.total, forma: comCredito.forma, pagamentos: partesOuNada(comCredito.pagamentos), pago: true, data: pagoEm,
             categoria: categoria(), agendamento_id: a.id, cliente_id: tutor?.id ?? null, descricao, itens: gravar, credito_usado: credito > 0 ? credito : null,
           } });
           lanca = true;
@@ -251,15 +264,21 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       const formasPagas = pg && !("erro" in pg) ? pg.pagamentos ?? [{ forma: pg.forma, valor: recebendo }] : [];
       const entregue = dinheiroEntregue(pagamento, formasPagas);
       if (entregue && lancado?.id) void Promise.resolve(sb.rpc("comprovante_guardar_entregue", { p_lancamento: lancado.id, p_entregue: entregue })).catch(() => {});
-      if (vejoFinanceiro && pg && !("erro" in pg) && soDigitos(tutor?.telefone).length >= 8 && (lancado || pagouAntigas > 0)) {
-        zapComprovante = junto > 0
-          ? linkWhatsApp(tutor?.telefone, textoComprovanteDaParte({
-              petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, pagoEm: isoDia(new Date()), itens: gravar, total: contas.total, desconto: centavos(contas.desconto - (promoAtiva && promoValor > 0 ? promoValor : 0)),
-              pago: centavos(contas.total + pagouAntigas), formas: formasPagas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas, antigoDevia: devido, entregue,
-            }))
-          : lancado ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, pagoEm: isoDia(new Date()), recebidos: [lancado], entregue })) : null;
-      } else if (vejoFinanceiro && lancado && soDigitos(tutor?.telefone).length >= 8) {
-        zapComprovante = linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, pagoEm: isoDia(new Date()), recebidos: [lancado], entregue }));
+      // o comprovante: a hora, quem atendeu, as parcelas do crédito e o troco; a conta que ficou para depois também tem o dela
+      const rodape = { hora: new Date(), quem: nomeDeQuemAtende(eu), parcelas: pagamento.parcelas };
+      let textoDoComprovante: string | null = null;
+      if (vejoFinanceiro && pg && !("erro" in pg) && junto > 0 && (lancado || pagouAntigas > 0)) {
+        textoDoComprovante = textoComprovanteDaParte({
+          petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, pagoEm, itens: gravar, total: contas.total, desconto: centavos(contas.desconto - (promoAtiva && promoValor > 0 ? promoValor : 0)),
+          pago: centavos(contas.total + pagouAntigas), formas: formasPagas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas, antigoDevia: devido, entregue, ...rodape,
+        });
+      } else if (vejoFinanceiro && lancado) {
+        textoDoComprovante = textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, pagoEm, recebidos: [lancado], entregue, ...rodape });
+      } else if (vejoFinanceiro && fiado) {
+        textoDoComprovante = textoComprovanteAReceber({
+          petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, itens: gravar.filter((i) => !i.promo), total: contas.total, desconto: contas.desconto,
+          pagaAte: depois.quando, assunto: "do atendimento", hora: rodape.hora, quem: rodape.quem,
+        });
       }
       const recebeu = lanca;
       const notaAntigas = pagouAntigas > 0
@@ -269,7 +288,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       const usados = usos?.usados ?? (pacote ? pacote.usados + 1 : 0), total = usos?.total ?? pacote?.total ?? 0;
       avisar(fiado ? `Anotado: ${brl(daConta)} a receber até ${dataCompleta(depois.quando)}.${notaCredito}` : recebeu ? `Recebido ${brl(contas.total)}.${notaCredito}${pacote ? ` ${servico} saiu do pacote.` : ""}${notaAntigas}` : pagouAntigas > 0 ? `Atendimento concluído.${notaAntigas}` : pacote ? `Usado ${usados} de ${total} do pacote.` : "Atendimento concluído sem cobrança.");
       avisarMudanca();
-      if (zapComprovante) setRecebida({ valor: centavos(contas.total + pagouAntigas), zap: zapComprovante, nota: `${notaCredito}${notaAntigas}`.trim() || undefined });
+      if (textoDoComprovante) setRecebida({ valor: fiado ? daConta : centavos(contas.total + pagouAntigas), texto: textoDoComprovante, nota: `${fiado ? `Fica para pagar até ${dataCompleta(depois.quando)}.` : ""}${notaCredito}${notaAntigas}`.trim() || undefined, fiado });
       else aoPronto();
       return true;
     } catch (e) { avisarErro(e); setSalvando(false); return false; }
@@ -317,7 +336,13 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         aoPronto();
         return null;
       }
-      throw new Error(`A conta não foi fechada: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`);
+      // recusa por regra (preço travado, desconto, limite de fiado): tocar de novo não muda nada; a frase do banco diz o que fazer
+      const msg = mensagemDeErro(e);
+      if (casoDoErro(e) === "maestro:limite_fiado") setErroFiado(msg);
+      if (casoDoErro(e) === "maestro:limite_fiado" || casoDoErro(e) === "maestro:preco_travado" || /só o dono ou|Só o dono ou|desconto passa do máximo/.test(msg)) {
+        throw new Error(`A conta não foi fechada e nada foi cobrado. ${msg}`);
+      }
+      throw new Error(`A conta não foi fechada: nada ficou pela metade. Toque de novo para tentar. (${msg})`);
     }
   }
 
@@ -337,7 +362,9 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     if (naoTem.length && !(await perguntar({ titulo: naoTem.length === 1 ? "Esse produto passa do estoque" : "Esses produtos passam do estoque", texto: `${naoTem.join(" ")} Vender mesmo assim? O saldo fica negativo até você dar entrada no estoque.`, confirmar: "Vender mesmo assim" }))) return false;
     if (!(await conferirValorAlto(contas.total, perguntar))) return false;
     if (!(await conferirCaixa(sb, petshop.id, perguntar))) return false;
-    if (!(await conferirLimite(sb, petshop.id, tutor.id, contas.total, { perguntar, podeLiberar: souDono || cuidoDoFinanceiro, avisarErro }))) return false;
+    // o limite de fiado olha o que FICA devendo (a conta menos o crédito e a parte paga agora), não a conta inteira
+    setErroFiado(null);
+    if (!(await conferirLimite(sb, petshop.id, tutor.id, falta, { perguntar, podeLiberar: souDono || cuidoDoFinanceiro, avisarErro: recusaDoFiado }))) return false;
     setSalvando(true);
     try {
       const passos = passosDoComeco();
@@ -351,7 +378,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       if (a.status !== "concluido") passos.push({ t: "agendamento", id: a.id, status: "concluido" });
       // o crédito do tutor entra primeiro, depois a parte que ele deu
       if (credito > 0) passos.push({ t: "receber_credito", conta: ref("conta"), valor: credito, chave: parteDaChave(chave, "credito") });
-      passos.push({ t: "receber", conta: ref("conta"), valor: entregue, forma: m.forma, pagamentos: partesOuNada(m.pagamentos), chave: parteDaChave(chave, "parte") });
+      passos.push({ t: "receber", conta: ref("conta"), valor: entregue, forma: m.forma, pagamentos: partesOuNada(m.pagamentos), chave: parteDaChave(chave, "parte"), ...(pagoEm !== hojeIso ? { data: pagoEm } : {}) });
       const feito = await fecharNoBanco(chave, passos);
       if (!feito) return true;
       // crédito parcelado: em quantas vezes (a taxa do parcelado); se falhar, tenta de novo e avisa (fica a do crédito à vista)
@@ -360,11 +387,12 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       avisar(`Recebido ${brl(entregue)}. ${nota}`);
       avisarMudanca();
       // quem fica devendo é quem mais precisa do comprovante do que já pagou
-      const zap = vejoFinanceiro ? linkWhatsApp(tutor.telefone, textoComprovanteDaParte({
-        petshop: petshop.nome, tutor: tutor.nome, pet: pet?.nome, quando: a.inicio, pagoEm: isoDia(new Date()), itens: gravar, total: contas.total, desconto: centavos(contas.desconto - (promoAtiva && promoValor > 0 ? promoValor : 0)),
+      const texto = vejoFinanceiro ? textoComprovanteDaParte({
+        petshop: petshop.nome, tutor: tutor.nome, pet: pet?.nome, quando: a.inicio, pagoEm, itens: gravar, total: contas.total, desconto: centavos(contas.desconto - (promoAtiva && promoValor > 0 ? promoValor : 0)),
         pago: entregue, formas: m.pagamentos ?? [{ forma: m.forma, valor: entregue }], falta, pagaAte: depois.quando,
-      })) : null;
-      if (zap && soDigitos(tutor.telefone).length >= 8) setRecebida({ valor: entregue, nota, zap });
+        hora: new Date(), quem: nomeDeQuemAtende(eu), parcelas: pagamento.parcelas,
+      }) : null;
+      if (texto) setRecebida({ valor: entregue, nota, texto });
       else aoPronto();
       return true;
     } catch (e) {
@@ -375,15 +403,19 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     }
   }
   if (recebida) {
+    const zap = soDigitos(tutor?.telefone).length >= 8 ? linkWhatsApp(tutor?.telefone, recebida.texto) : null;
     return (
       <Folha titulo="Conta fechada" aoFechar={aoPronto} rodape={<button type="button" className="g-btn sec" onClick={aoPronto}>Pronto</button>}>
         <div className="g-vd-recibo">
           <Tile icone={Check} tom="menta" tamanho="g" />
+          <p className="g-pp g-muted" style={{ margin: 0 }}>{recebida.fiado ? "Anotado em A receber" : "Recebido agora"}</p>
           <p className="g-num">{brl(recebida.valor)}</p>
-          <p><b>Recebido.</b> O atendimento{pet?.nome ? ` de ${pet.nome}` : ""} ficou como concluído.</p>
+          <p><b>{recebida.fiado ? "Anotado." : "Recebido."}</b> O atendimento{pet?.nome ? ` de ${pet.nome}` : ""} ficou como concluído.</p>
           {recebida.nota && <p className="g-p">{recebida.nota}</p>}
-          <a className="g-btn zap cheio" href={recebida.zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar comprovante</a>
-          <p className="g-pp g-muted">O WhatsApp de {tutor?.nome ?? "quem trouxe o pet"} abre com o comprovante pronto e você só aperta enviar. Não é nota fiscal.</p>
+          {zap ? <a className="g-btn zap cheio" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar comprovante</a>
+            : <p className="g-pp g-muted">{tutor?.nome ?? "O tutor"} está sem WhatsApp na ficha: dá para imprimir o comprovante.</p>}
+          <button type="button" className="g-btn fantasma cheio" onClick={() => imprimirComprovante(recebida.texto)}><Printer />Imprimir comprovante</button>
+          <p className="g-pp g-muted">{zap ? `O WhatsApp de ${tutor?.nome ?? "quem trouxe o pet"} abre com o comprovante pronto e você só aperta enviar. ` : ""}Imprimir abre a folha para imprimir ou salvar em PDF. Não é nota fiscal.</p>
         </div>
       </Folha>
     );
@@ -394,8 +426,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     <Folha larga titulo="Fechar a conta" aoFechar={aoFechar}
       rodape={<>
         <button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || nadaAFazer || lendoConta} aria-busy={lendoConta}>
-          {salvando ? "Anotando…" : lendoConta ? "Carregando a conta…" : aPagar <= 0 && credito > 0 ? "Pagar com o crédito" : aPagar <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(daConta)} a receber` : aMenos ? `Receber ${brl(aMenos.entregue)}` : `Receber ${brl(aPagar)}`}
+        <button type="button" className="g-btn pri" onClick={() => void confirmar()} disabled={salvando || op.ocupado || nadaAFazer || lendoConta || descontoAcima} aria-busy={lendoConta}>
+          {salvando ? "Anotando…" : lendoConta ? "Carregando a conta…" : descontoAcima ? AVISO_DESCONTO_ACIMA : aPagar <= 0 && credito > 0 ? "Pagar com o crédito" : aPagar <= 0 ? (pacote ? "Concluir usando o pacote" : a.status === "concluido" ? "Não cobrar este atendimento" : "Concluir sem cobrar") : depois.ativo ? `Anotar ${brl(daConta)} a receber` : aMenos ? `Receber ${brl(aMenos.entregue)}` : `Receber ${brl(aPagar)}`}
         </button>
       </>}>
       <div className="g-form">
@@ -514,9 +546,22 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
             ) : <p className="g-pp g-erro">Este pet está sem tutor na ficha: não dá para deixar o resto anotado. Corrija o valor recebido.</p>}
           </div>
         )}
-        {aPagar > 0 && !depois.ativo && <AvisoCaixaFechado aberto={caixa} />}
+        {erroFiado && (
+          <p className="g-erro g-p" role="alert" id="g-vd-erro-fiado">{erroFiado}{/Só o dono/.test(erroFiado) ? "" : " Só o dono ou quem cuida do financeiro pode liberar. Receba agora, ou peça para eles."}</p>
+        )}
+        {podeOutroDia && contas.total > 0 && !depois.ativo && aPagar > 0 && (
+          <div className="g-campo" role="group" aria-label="Dia em que o cliente pagou">
+            <span>Dia em que o cliente pagou</span>
+            <div className="g-seg">
+              <button type="button" aria-pressed={diaPago === hojeIso} onClick={() => setDiaPago(hojeIso)}>Hoje</button>
+              <button type="button" aria-pressed={diaPago === diaDoHorario} onClick={() => setDiaPago(diaDoHorario)}>No dia do atendimento ({dataCurta(diaDoHorario)})</button>
+            </div>
+            <small>{diaPago === hojeIso ? "Este atendimento é de um dia que já passou. Se o cliente pagou naquele dia, escolha o dia do atendimento." : `O valor entra no financeiro de ${dataCompleta(diaDoHorario)} e não entra no caixa de hoje.`}</small>
+          </div>
+        )}
+        {aPagar > 0 && !depois.ativo && pagoEm === hojeIso && <AvisoCaixaFechado aberto={caixa} emDinheiro={temDinheiro(pagamento)} />}
         <p className="g-pp g-muted">
-          {contas.total > 0 && depois.ativo ? "Nada entra no caixa agora: a conta fica em A receber" : contas.total > 0 && credito > 0 && aPagar <= 0 ? "O crédito do tutor paga a conta: nada entra no caixa agora" : contas.total > 0 ? (caixa === false ? (foraNoModoSimples(petshop, "/gestao/app/caixa") ? "O valor entra no financeiro de hoje" : "O valor entra no financeiro de hoje, fora do caixa") : "O valor entra no caixa de hoje") : "Nada entra no caixa"}
+          {contas.total > 0 && depois.ativo ? "Nada entra no caixa agora: a conta fica em A receber" : contas.total > 0 && credito > 0 && aPagar <= 0 ? "O crédito do tutor paga a conta: nada entra no caixa agora" : contas.total > 0 && pagoEm !== hojeIso ? `O valor entra no financeiro de ${dataCurta(pagoEm)}, fora do caixa de hoje` : contas.total > 0 ? (caixa === false ? (modoSimples(petshop) && !temDinheiro(pagamento) ? "O valor entra no financeiro de hoje" : "O valor entra no financeiro de hoje, fora do caixa") : "O valor entra no caixa de hoje") : "Nada entra no caixa"}
           {pacote ? `, ${servico} sai do pacote` : ""}
           {vendidos.length ? ", os produtos saem do estoque" : ""}
           {a.status !== "concluido" ? " e o atendimento fica como concluído." : "."}

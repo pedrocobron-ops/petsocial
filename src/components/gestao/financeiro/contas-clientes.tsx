@@ -182,7 +182,7 @@ export function ContasDeClientes({ aoMudar, largo }: { aoMudar?: () => void | Pr
             <p className="g-muted g-pp" style={{ marginBottom: 4 }}>
               {devedores.length === 1 ? "1 cliente ficou de pagar depois." : `${devedores.length} clientes ficaram de pagar depois.`} Quando pagar, toque em Recebi: pode ser o valor todo ou só uma parte.
             </p>
-            {partesDoTotal.aVencer > 0 && <p className="g-pp" style={{ margin: 0 }}><b>{fraseDoVencimento(partesDoTotal)}</b>. O que ainda vai vencer (mensalidade do mês que vem, sinal de reserva) não conta no limite de fiado até vencer.</p>}
+            {partesDoTotal.aVencer > 0 && <p className="g-pp" style={{ margin: 0 }}><b>{fraseDoVencimento(partesDoTotal)}</b>. Mensalidade da creche e sinal de reserva que ainda vão vencer não contam no limite de fiado até vencer; fiado e taxa de falta contam, mesmo com prazo.</p>}
             {visiveis.map((d) => (
               <BlocoDevedor key={d.chave} d={d} hoje={hoje} aoReceber={(c) => { if (!somenteLeitura()) setBaixando(c); }} aoCobrar={() => setCobrando(d.chave)} />
             ))}

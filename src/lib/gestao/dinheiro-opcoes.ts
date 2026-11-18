@@ -33,6 +33,8 @@ export const OPCOES_DINHEIRO = {
   comissaoProdutos: "comissao.em_produtos",
   /** Percentual da comissão sobre produtos. */
   comissaoProdutosPct: "comissao.produtos_pct",
+  /** Quem não mexe com dinheiro vê o valor de cada atendimento na própria comissão (desligado: só o total do mês). O banco lê esta chave. */
+  comissaoMostrarValores: "comissao.mostrar_valores",
   /** Taxa de falta em reais: com valor, o "Faltou" da agenda oferece anotar a taxa para o tutor (zero ou vazio = não oferece). */
   taxaFalta: "dinheiro.taxa_falta",
 } as const;
@@ -63,12 +65,13 @@ export function taxaDeFalta(petshop: ComOpcoes): number {
   return Number.isFinite(v) && v > 0 ? centavos(Math.min(v, 99999.99)) : 0;
 }
 
-export type OpcoesDeComissao = { extras: boolean; porServico: boolean; produtos: boolean; produtosPct: number };
+export type OpcoesDeComissao = { extras: boolean; porServico: boolean; produtos: boolean; produtosPct: number; mostrarValores: boolean };
 export function opcoesDeComissao(petshop: ComOpcoes): OpcoesDeComissao {
   const K = OPCOES_DINHEIRO;
   return {
     extras: opcao(petshop, K.comissaoExtras, false), porServico: opcao(petshop, K.comissaoPorServico, false),
     produtos: opcao(petshop, K.comissaoProdutos, false), produtosPct: Math.min(100, Math.max(0, opcao(petshop, K.comissaoProdutosPct, 0))),
+    mostrarValores: opcao(petshop, K.comissaoMostrarValores, false),
   };
 }
 
@@ -118,6 +121,9 @@ export const MARCAS_DO_MODELO = [
 
 export type ContaDaMensagem = { valor: number; valor_original?: number | null; descricao?: string | null; categoria: string; vencimento?: string | null };
 
+/** O nome de uma conta num texto que vai para o tutor: sem as palavras de dentro do sistema. */
+export const nomeParaOTutor = (nome: string) => (/^trazido do caderno$/i.test(nome.trim()) ? "Conta anterior" : nome);
+
 /**
  * Mensagem de cobrança de um tutor: o que está em aberto, com as datas, e o total.
  * Tom educado, sem ameaça. Multa e juros só aparecem se o dono ligou a opção e marcou "mostrar na mensagem".
@@ -133,7 +139,8 @@ export function mensagemDeDivida(petshop: ComOpcoes & { nome: string }, tutor: s
     const cheio = c.valor_original != null && Number(c.valor_original) > Number(c.valor) ? Number(c.valor_original) : null;
     const m = o.multaNaMensagem ? multaSugerida(petshop, c, hoje) : null;
     if (m) multas = centavos(multas + m.total);
-    const nome = (c.descricao?.trim() || c.categoria).replace(/ \(parte\)$/, "");
+    // para o tutor, "Trazido do caderno" (como a dívida antiga fica anotada aqui dentro) não diz nada: vira "Conta anterior"
+    const nome = nomeParaOTutor((c.descricao?.trim() || c.categoria).replace(/ \(parte\)$/, ""));
     return `- ${nome}: ${cheio ? `falta ${brl(c.valor)} de ${brl(cheio)}` : brl(c.valor)}${quando ? ` (${quando})` : ""}${m ? ` + multa e juros ${brl(m.total)}` : ""}`;
   });
   const soma = centavos(contas.reduce((s, c) => s + Number(c.valor), 0));

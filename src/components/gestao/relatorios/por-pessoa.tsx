@@ -53,10 +53,10 @@ export default function PorPessoa({ de, ate }: { de: string; ate: string }) {
       {erro ? <p className="g-erro" role="alert">{erro}</p> : !x ? <Esqueleto linhas={3} /> : x.pessoas.length ? (
         <>
           <div className="g-lu-tab" role="table" aria-label="Produtividade por pessoa">
-            <div className="g-lu-l cab" role="row"><span>Pessoa</span><span>Atendimentos</span><span>Vendas</span><span>Entrou por ela</span><span>Valor médio</span><span>Comissão</span></div>
+            <div className="g-lu-l cab" role="row"><span role="columnheader">Pessoa</span><span role="columnheader">Atendimentos</span><span role="columnheader">Vendas</span><span role="columnheader">Entrou por ela</span><span role="columnheader">Valor médio</span><span role="columnheader">Comissão</span></div>
             {[...x.pessoas, ...(x.semPessoa ? [x.semPessoa] : [])].map((p) => (
               <div key={p.id ?? "sem"} className="g-lu-l" role="row">
-                <span className="n">
+                <span role="cell" className="n">
                   <span className="g-fila" style={{ gap: 8, flexWrap: "nowrap" }}>
                     {p.id && <AvatarPessoa nome={p.nome} cor={p.cor ?? undefined} />}
                     <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -67,21 +67,21 @@ export default function PorPessoa({ de, ate }: { de: string; ate: string }) {
                     </span>
                   </span>
                 </span>
-                <span><i>Atendimentos </i><em>{p.id ? p.atendimentos : "–"}</em></span>
-                <span><i>Vendas </i><em>{p.vendas ? `${p.vendas} · ${brl(p.vendasValor)}` : "–"}</em></span>
-                <span><i>Entrou por ela </i><em>{brl(p.receita)}</em></span>
-                <span><i>Valor médio </i><em>{p.medio == null ? "–" : brl(p.medio)}</em></span>
-                <span><i>Comissão </i><em>{p.id ? brl(p.comissao) : "–"}</em></span>
+                <span role="cell"><i>Atendimentos </i><em>{p.id ? p.atendimentos : "–"}</em></span>
+                <span role="cell"><i>Vendas </i><em>{p.vendas ? `${p.vendas} · ${brl(p.vendasValor)}` : "–"}</em></span>
+                <span role="cell"><i>Entrou por ela </i><em>{brl(p.receita)}</em></span>
+                <span role="cell"><i>Valor médio </i><em>{p.medio == null ? "–" : brl(p.medio)}</em></span>
+                <span role="cell"><i>Comissão </i><em>{p.id ? brl(p.comissao) : "–"}</em></span>
               </div>
             ))}
             {!x.soEu && (
               <div className="g-lu-l total" role="row">
-                <span className="n"><b>Total</b></span>
-                <span><i>Atendimentos </i><em>{x.total.atendimentos}</em></span>
-                <span />
-                <span><i>Entrou </i><em>{brl(x.total.receita)}</em></span>
-                <span />
-                <span><i>Comissão </i><em>{brl(x.total.comissao)}</em></span>
+                <span role="cell" className="n"><b>Total</b></span>
+                <span role="cell"><i>Atendimentos </i><em>{x.total.atendimentos}</em></span>
+                <span role="cell" />
+                <span role="cell"><i>Entrou </i><em>{brl(x.total.receita)}</em></span>
+                <span role="cell" />
+                <span role="cell"><i>Comissão </i><em>{brl(x.total.comissao)}</em></span>
               </div>
             )}
           </div>

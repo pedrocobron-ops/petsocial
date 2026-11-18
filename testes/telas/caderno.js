@@ -35,10 +35,11 @@ const nb = (s) => (s ?? '').replace(/ /g, ' ');
     await N.entrar(page, L.emails.dono, L.senha);
     await N.ir(page, '/gestao/app/clientes');
     T.secao('390: abrir e ler');
-    await page.locator('button', { hasText: 'Foto do caderno' }).click();
+    await N.doAlto(page, 'Foto do caderno');
     const folha = page.locator('.g-folha');
     await folha.waitFor();
     T.ok('título e aviso de que a foto não fica guardada', /Trazer do caderno ou do outro sistema/.test(await folha.innerText()) && /não ficam guardados/.test(await folha.innerText()));
+    await folha.getByText(/Hoje ainda dá para ler/).first().waitFor({ timeout: 8000 }).catch(() => {}); // a contagem chega um instante depois da folha
     T.ok('mostra quantas páginas ainda dá para ler hoje', /Hoje ainda dá para ler 30 páginas/.test(await folha.innerText()));
     T.ok('os quatro tipos e o "Não sei" (dono)', (await folha.locator('.g-cad-tipo').count()) === 5);
     await folha.locator('.g-cad-tipo', { hasText: 'Não sei, descubra' }).click();
@@ -99,7 +100,7 @@ const nb = (s) => (s ?? '').replace(/ /g, ' ');
     await N.entrar(page, L.emails.dono, L.senha);
     await N.ir(page, '/gestao/app/clientes');
     T.secao('1366: tabela de preços');
-    await page.locator('button', { hasText: 'Foto do caderno' }).click();
+    await N.doAlto(page, 'Foto do caderno');
     const folha = page.locator('.g-folha');
     await folha.locator('.g-cad-tipo', { hasText: 'Tabela de preços' }).click();
     T.ok('o botão da câmera fala da tabela', (await folha.locator('label.g-btn', { hasText: 'Tirar foto da tabela' }).count()) === 1);
@@ -122,7 +123,7 @@ const nb = (s) => (s ?? '').replace(/ /g, ' ');
 
     T.secao('1366: foto HEIC e PDF grande (migração 20261195)');
     await page.waitForTimeout(400);
-    await page.locator('button', { hasText: 'Foto do caderno' }).click();
+    await N.doAlto(page, 'Foto do caderno');
     const f3 = page.locator('.g-folha');
     await f3.locator('.g-cad-tipo', { hasText: 'Clientes e pets' }).click();
     // uma "foto do iPhone" que o Chromium não abre

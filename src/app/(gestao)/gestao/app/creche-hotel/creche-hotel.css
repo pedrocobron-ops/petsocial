@@ -60,10 +60,10 @@
 
 /* correções do teste de uso: saída atrasada e vagas à parte dos indicadores, valor no cartão, check-out em lote */
 .g-ch-faixa { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.g-ch-atraso { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border-radius: 14px; border: 1px solid rgba(179, 64, 46, .3); background: var(--g-vermelho-tint); color: #7a281b; font-size: .9375rem; text-align: left; }
+.g-ch-atraso { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border-radius: 14px; border: 1px solid rgba(179, 64, 46, .3); background: var(--g-vermelho-tint); color: var(--txt-vermelho); font-size: .9375rem; text-align: left; }
 .g-ch-atraso svg, .g-ch-vagas svg { width: 18px; height: 18px; flex: none; }
 .g-ch-vagas { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border-radius: 14px; background: var(--g-carta); border: 1px solid var(--g-linha); font-size: .9375rem; }
-.g-ch-vagas.cheia { background: var(--g-amarelo-tint); border-color: rgba(194, 148, 26, .4); color: #5b4708; }
+.g-ch-vagas.cheia { background: var(--g-amarelo-tint); border-color: rgba(194, 148, 26, .4); color: var(--txt-amarelo); }
 .g-ch-lote { margin-left: auto; min-height: 44px; }
 @media (max-width: 719px) { .g-ch-lote { margin-left: 0; width: 100%; } .g-ch-atraso, .g-ch-vagas { flex: 1 1 100%; } }
 .g-ch-valor { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 14px; font-size: .9375rem; }

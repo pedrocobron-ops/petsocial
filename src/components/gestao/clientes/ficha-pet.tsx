@@ -28,7 +28,7 @@ import { nomeDaCasa, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { CATEGORIAS_DEVOLUCAO, lancamentoDoPet } from "@/lib/gestao/faturamento";
 
 type PetDaFicha = Pet & { clientes: Cliente | null };
-type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id"> & { agendamento_servicos?: { id: string; servico_id: string; preco: number | null; ordem: number }[] | null };
+type Atendimento = Pick<Agendamento, "id" | "inicio" | "status" | "preco" | "servico_id"> & { obs?: string | null } & { agendamento_servicos?: { id: string; servico_id: string; preco: number | null; ordem: number }[] | null };
 
 const mesDoAno = (d: string) => new Date(d).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 const TOM_VISITA: Record<string, Tom> = { verde: "menta", amarelo: "manteiga", vermelho: "rosa" };
@@ -57,7 +57,7 @@ export default function FichaPet({ id, voltar, aoAbrir }: { id: string; voltar: 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [pet, atendimentos, pacotes, estadias, concluidos, saude, hospedagens] = await Promise.all([
       sb.from("pets").select("*, clientes(*)").eq("petshop_id", petshop.id).eq("id", id).maybeSingle(),
-      sb.from("agendamentos").select("id, inicio, status, servico_id, agendamento_servicos(id, servico_id, ordem)").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
+      sb.from("agendamentos").select("id, inicio, status, servico_id, obs, agendamento_servicos(id, servico_id, ordem)").eq("petshop_id", petshop.id).eq("pet_id", id).order("inicio", { ascending: false }).limit(60),
       sb.from("pacotes_clientes").select(COLS_PACOTE_CLIENTE).eq("petshop_id", petshop.id).eq("pet_id", id).eq("ativo", true).order("comprado_em", { ascending: false }),
       sb.from("estadias").select(COLS_ESTADIA).eq("petshop_id", petshop.id).eq("pet_id", id).order("entrada", { ascending: false }).limit(8),
       // visitas concluídas: a conta exata, a mais recente e os valores para somar
@@ -280,6 +280,8 @@ export default function FichaPet({ id, voltar, aoAbrir }: { id: string; voltar: 
                             {nomeDiaCurto(new Date(a.inicio))}, {dataCurta(a.inicio)} às {hora(a.inicio)}
                             {vejoFinanceiro && valorDe(a) != null && <> · <b className="g-tab">{brl(valorDe(a)!)}</b></>}
                           </span>
+                          {/* a anotação do atendimento (lâmina, shampoo, comportamento): o próximo tosador vê como foi */}
+                          {a.obs?.trim() && !fora && <span className="q" style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>Anotação: {a.obs.trim()}</span>}
                         </div>
                       </li>
                     </Fragment>

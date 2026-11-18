@@ -6,11 +6,11 @@
 .g-pg-troco p { margin: 0; min-height: 44px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: .9375rem; font-weight: 600; }
 .g-pg-troco p b { font-family: var(--display); font-size: 1.125rem; }
 .g-pg-troco p .g-muted { font-weight: 400; font-size: .8125rem; }
-.g-pg-troco p.falta { color: #7a281b; }
+.g-pg-troco p.falta { color: var(--txt-vermelho); }
 
 /* abrir o caixa sem sair do recebimento */
 .g-cx-fora > div { display: grid; gap: 8px; min-width: 0; flex: 1; }
-.g-cx-fora.ok { background: var(--g-menta); border-color: transparent; color: #24543b; }
+.g-cx-fora.ok { background: var(--g-menta); border-color: transparent; color: var(--txt-verde); }
 .g-cx-abrir { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: flex-end; }
 .g-cx-abrir label { display: grid; gap: 4px; font-size: .8125rem; color: var(--g-cinza); flex: 1 1 140px; max-width: 200px; }
 

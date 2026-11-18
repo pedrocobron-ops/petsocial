@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/gestao/banco";
 import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "@/lib/gestao/supabase";
-import { segredoDoServidor } from "@/lib/gestao/servidor";
+import { garantirTrava, segredoDoServidor } from "@/lib/gestao/servidor";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 import {
   FERRAMENTA_CRECHE, FERRAMENTA_HORARIOS, FERRAMENTA_HOTEL, INSTRUCOES_LINK_IA, estimarCreche, pedidoDeTeste, MAX_PERGUNTAS_CONVERSA, contextoDoLink, entradaHorarios, entradaHotel,
@@ -95,7 +95,10 @@ async function tratar(req: Request) {
   if (!DE_TESTE && !process.env.ANTHROPIC_API_KEY) { console.error("[link-ia] sem ANTHROPIC_API_KEY"); return responder({ texto: foraTexto(nome), fora: true }); }
   // a contagem leva o segredo do servidor: quem chama a função direto com a chave pública não gasta a cota do pet shop
   const segredo = segredoDoServidor() ?? undefined;
-  const conta = await sb.rpc("link_ia_contar", { p_codigo: codigo, p_segredo: segredo });
+  await garantirTrava();
+  let conta = await sb.rpc("link_ia_contar", { p_codigo: codigo, p_segredo: segredo });
+  // o banco não conhece o segredo deste servidor (chave trocada, trava nunca ligada): grava a trava e tenta mais uma vez
+  if ((conta.data as { motivo?: string } | null)?.motivo === "recusado" && ["ok", "gravou"].includes(await garantirTrava(true))) conta = await sb.rpc("link_ia_contar", { p_codigo: codigo, p_segredo: segredo });
   const contou = conta.data as { ok?: boolean; motivo?: string } | null;
   if (conta.error) { await registrarErroServidor("/api/gestao/link-ia", erroDoBanco(conta.error, "link_ia_contar")); return responder({ texto: foraTexto(nome), fora: true }); }
   if (contou?.motivo === "recusado") { console.error("[link-ia] o banco recusou o segredo do servidor: grave de novo no painel (aba Cakto)"); return responder({ texto: foraTexto(nome), fora: true }); }

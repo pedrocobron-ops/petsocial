@@ -7,12 +7,65 @@ function versao(): string {
   try { return execSync("git rev-parse --short=12 HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim() || "local"; } catch { return "local"; }
 }
 
+/**
+ * Cabeçalhos de segurança de todas as páginas.
+ * - Valendo já: o site não abre dentro de página de outro site (X-Frame-Options + frame-ancestors), o navegador não
+ *   adivinha tipo de arquivo (nosniff), o endereço completo não vaza para outros sites (Referrer-Policy; as páginas
+ *   públicas levam código no endereço) e só o próprio site usa câmera e microfone (fotos e o Mozart por voz).
+ * - Só avisando (Content-Security-Policy-Report-Only): a lista do que cada página pode carregar. Nada é bloqueado ainda;
+ *   o navegador manda um aviso para /api/gestao/csp quando algo sai da lista. Depois de alguns dias sem aviso legítimo,
+ *   troque `Content-Security-Policy-Report-Only` por `Content-Security-Policy` (e junte o frame-ancestors na mesma linha).
+ * De fora que o site usa: Supabase (dados, fotos e tempo real), o pixel da Meta (só depois do aceite dos cookies) e o
+ * script de oferta da Cakto. Links para o WhatsApp (wa.me), Cakto e Google Maps são navegação, que a lista não segura.
+ */
+function cabecalhosDeSeguranca() {
+  const supabase = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://pifuiczrytmizqxzygbi.supabase.co").replace(/\/+$/, "");
+  const supabaseWs = supabase.replace(/^http/, "ws");
+  const dev = process.env.NODE_ENV !== "production";
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""} https://connect.facebook.net https://caktoscripts.nyc3.cdn.digitaloceanspaces.com`,
+    "style-src 'self' 'unsafe-inline'",
+    `img-src 'self' data: blob: ${supabase} https://www.facebook.com`,
+    `media-src 'self' data: blob: ${supabase}`,
+    "font-src 'self' data:",
+    `connect-src 'self' ${supabase} ${supabaseWs} https://www.facebook.com https://connect.facebook.net${dev ? " ws://localhost:* ws://127.0.0.1:*" : ""}`,
+    "worker-src 'self' blob:",
+    "frame-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "report-uri /api/gestao/csp",
+  ].join("; ");
+  return [
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    { key: "X-Frame-Options", value: "SAMEORIGIN" },
+    { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), browsing-topics=()" },
+    // frame-ancestors não funciona no modo "só avisando": vai numa regra que já vale
+    { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+    { key: "Content-Security-Policy-Report-Only", value: csp },
+  ];
+}
+
 const nextConfig: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
   },
   poweredByHeader: false,
   env: { NEXT_PUBLIC_GESTAO_VERSAO: versao() },
+
+  async headers() {
+    // Páginas abertas por um código no endereço (tutor, entrada, álbum, boletim, orçamento, autorização de fotos) e as fotos
+    // delas: nenhum endereço vai para fora (no-referrer). As outras mandam só o domínio. Duas regras que não se cruzam.
+    const COM_CODIGO = "tutor|entrada|album|boletim|orcamento|autorizacao";
+    const todos = cabecalhosDeSeguranca();
+    return [
+      { source: "/:path*", headers: todos.filter((h) => h.key !== "Referrer-Policy") },
+      { source: `/((?!${COM_CODIGO.split("|").map((a) => `gestao/${a}/`).join("|")}).*)`, headers: todos.filter((h) => h.key === "Referrer-Policy") },
+      { source: `/gestao/:area(${COM_CODIGO})/:resto*`, headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+    ];
+  },
 
   /**
    * Redirecionamentos permanentes (301) das versões antigas do domínio

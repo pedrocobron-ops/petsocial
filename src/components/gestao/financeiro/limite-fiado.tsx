@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Gauge, Pencil } from "lucide-react";
-import { fraseDoDisponivel, fraseDoVencimento, limitePadrao, situacaoDoFiado } from "@/lib/gestao/fiado";
+import { fraseDoDisponivel, fraseDoQueDeve, fraseDoVencimento, limitePadrao, situacaoDoFiado } from "@/lib/gestao/fiado";
 import { brl } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { CampoDinheiro } from "../loja/pecas";
@@ -46,6 +46,18 @@ export function LimiteDoFiado({ cliente, aoMudar }: { cliente: { id: string; nom
       {editando && <FolhaLimite cliente={cliente} atual={s.do_cliente ? s.limite : null} aoFechar={() => setEditando(false)} aoSalvo={() => { setEditando(false); void recarregar(); aoMudar?.(); }} />}
     </div>
   );
+}
+
+/**
+ * Na venda e na conta, assim que o tutor é escolhido: quanto ele já deve e quanto ainda cabe no limite de fiado
+ * ("Ana deve R$ 119,80 · limite de fiado R$ 150,00, cabe mais R$ 30,20"). Só para quem mexe com dinheiro; sem dívida e sem limite, nada aparece.
+ */
+export function FiadoDoTutor({ clienteId, nome }: { clienteId: string; nome: string }) {
+  const { sb, petshop, vejoFinanceiro } = useGestao();
+  const { dados: s } = useDados(async () => (vejoFinanceiro ? situacaoDoFiado(sb, petshop.id, clienteId).catch(() => null) : null), [petshop.id, clienteId, vejoFinanceiro]);
+  const frase = s ? fraseDoQueDeve(nome, s) : null;
+  if (!frase) return null;
+  return <p className="g-pp g-muted g-vd-fiado" role="status" style={{ margin: 0 }}><Gauge size={14} aria-hidden style={{ verticalAlign: "-2px", marginRight: 4 }} />{frase}</p>;
 }
 
 function FolhaLimite({ cliente, atual, aoFechar, aoSalvo }: { cliente: { id: string; nome: string }; atual: number | null; aoFechar: () => void; aoSalvo: () => void }) {

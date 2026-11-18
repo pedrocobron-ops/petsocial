@@ -53,7 +53,7 @@ const tx = (s) => String(s).replace(/[\u00a0\u202f]/g, " ");
 
     T.secao('contagem no celular · 390 px');
     await N.ir(page, '/gestao/app/estoque');
-    await page.getByRole('link', { name: 'Contagem' }).click();
+    await N.doAlto(page, 'Contagem', 'link');
     await page.getByRole('button', { name: 'Começar contagem' }).click();
     const comecar = page.locator('.g-folha', { hasText: 'O que contar?' }).last();
     await comecar.getByRole('button', { name: 'Começar', exact: true }).click();
@@ -137,7 +137,7 @@ const tx = (s) => String(s).replace(/[\u00a0\u202f]/g, " ");
       && saldo(kit) === 7 && B.num(`select custo from produtos where id='${kit}'`) === 22.5);
     T.ok('o cartão do kit: "Kit", 7 e "Produtos do kit"', /Kit/.test(await page.locator('.g-est-prod', { hasText: 'Kit banho em casa' }).innerText())
       && (await page.locator('.g-est-prod', { hasText: 'Kit banho em casa' }).getByRole('button', { name: 'Produtos do kit' }).count()) === 1);
-    await page.getByRole('button', { name: 'Vencendo' }).click();
+    await N.doAlto(page, 'Vencendo');
     const vf = page.locator('.g-folha', { hasText: 'Vencem em' }).last();
     await vf.locator('.g-val-lista li').first().waitFor({ timeout: 15000 });
     const tv = tx(await vf.innerText());

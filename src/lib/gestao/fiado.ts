@@ -25,10 +25,23 @@ export function limiteDoCliente(cliente: { limite_fiado?: number | null } | null
   return p > 0 ? p : null;
 }
 
-/** "Ana já deve R$ 180,00; com esta conta passa do limite de R$ 200,00." */
-export function fraseDoLimite(nome: string, deve: number, limite: number) {
+/**
+ * "Ana já deve R$ 180,00; com esta conta passa do limite de R$ 200,00." Quem não deve nada (com `valor`, o que ficaria
+ * devendo): "Ana ficaria devendo R$ 175,50: passa do limite de R$ 150,00." As mesmas frases do banco (`fiado_limite_no_fim`).
+ */
+export function fraseDoLimite(nome: string, deve: number, limite: number, valor?: number) {
   const primeiro = nome.trim().split(/\s+/)[0] || "O cliente";
+  if (!(deve > 0.005) && valor != null) return `${primeiro} ficaria devendo ${brl(valor)}: passa do limite de ${brl(limite)}.`;
   return `${primeiro} já deve ${brl(deve)}; com esta conta passa do limite de ${brl(limite)}.`;
+}
+
+/** "Ana deve R$ 119,80 · limite R$ 150,00, cabe mais R$ 30,20" (para a venda mostrar assim que o tutor é escolhido). */
+export function fraseDoQueDeve(nome: string, s: Pick<SituacaoFiado, "deve" | "limite" | "total">): string | null {
+  const primeiro = nome.trim().split(/\s+/)[0] || "O cliente";
+  const deve = centavos(Math.max(Number(s.total ?? s.deve), s.deve));
+  const limite = s.limite == null ? null : (() => { const sobra = centavos(s.limite! - s.deve); return sobra >= 0 ? `limite de fiado ${brl(s.limite!)}, cabe mais ${brl(sobra)}` : `passou ${brl(-sobra)} do limite de fiado de ${brl(s.limite!)}`; })();
+  if (!(deve > 0.005)) return limite ? `${primeiro} não deve nada · ${limite}` : null;
+  return `${primeiro} deve ${brl(deve)}${limite ? ` · ${limite}` : ""}`;
 }
 
 /** "Limite R$ 200,00 · cabe mais R$ 20,00" (ou "passou R$ 15,00 do limite"). */
@@ -90,7 +103,7 @@ export const ehErroDoLimite = (e: unknown) => /passa do limite de R\$/.test(e in
 type Perguntar = (p: { titulo: string; texto?: string; confirmar?: string; perigo?: boolean; voltar?: string }) => Promise<boolean>;
 
 /**
- * Antes de anotar `valor` a receber de um cliente: cabe no limite? Se passa, quem pode liberar (dono ou quem cuida do
+ * Antes de anotar `valor` a receber de um cliente (o que FICA devendo: numa conta paga em parte, só o resto): cabe no limite? Se passa, quem pode liberar (dono ou quem cuida do
  * financeiro) confirma "Liberar mesmo assim" e o banco anota quem liberou; quem não pode recebe a frase e não grava.
  * Devolve true para seguir. Lança erro só quando a liberação falha.
  */
@@ -101,7 +114,7 @@ export async function conferirLimite(sb: Banco, petshopId: string, clienteId: st
   let s: SituacaoFiado | null = null;
   try { s = await situacaoDoFiado(sb, petshopId, clienteId); } catch { return true; } // sem ler, o banco confere na gravação
   if (!s || s.limite == null || centavos(s.deve + valor) <= s.limite + 0.005) return true;
-  const frase = fraseDoLimite(s.nome, s.deve, s.limite);
+  const frase = fraseDoLimite(s.nome, s.deve, s.limite, centavos(valor));
   if (!o.podeLiberar) {
     o.avisarErro(`${frase} Só o dono ou quem cuida do financeiro pode liberar. Receba agora, ou peça para eles.`);
     return false;

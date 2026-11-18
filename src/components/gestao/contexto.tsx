@@ -11,6 +11,8 @@ import type { Petshop, Profissional, Servico } from "@/lib/gestao/tipos";
 import { podeArea, veCusto, type Area } from "@/lib/gestao/acessos";
 import { registrarAcesso } from "@/lib/gestao/registro-acesso";
 import { definirLoja } from "@/lib/gestao/erros-navegador";
+import { fmtTelefone } from "@/lib/gestao/util";
+import { definirImpressaoDoComprovante, papelDoComprovante } from "@/lib/gestao/comprovante-papel";
 import { pendentes, type Documento } from "@/lib/gestao/documentos";
 import Reaceite from "./reaceite";
 
@@ -174,6 +176,8 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     // as mensagens de erro só falam em "conta só para consulta" quando a conta está mesmo assim
     soConsulta = !liberado;
     definirLoja(petshop.id, !liberado); // o registro de erros leva o pet shop aberto
+    // o comprovante impresso sai no papel escolhido em Meu pet shop, com o telefone e a cidade embaixo do nome
+    definirImpressaoDoComprovante({ papel: papelDoComprovante(petshop), contato: [petshop.telefone ? fmtTelefone(petshop.telefone) : "", [petshop.cidade, petshop.uf].filter(Boolean).join("/")].filter(Boolean).join(" · ") });
     return {
       sb, user, petshop, eu, equipe, servicos,
       souDono: eu.papel === "dono",

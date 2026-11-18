@@ -83,8 +83,8 @@ Como as telas são feitas: `src/components/gestao/LEIAME.md`. Banco (tabelas e r
 | `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO`, `_EQUIPE`, `_PETSHOP` | Link do checkout mensal de cada plano na Cakto. Com `_3` ou `_6` no fim (ex.: `NEXT_PUBLIC_GESTAO_CHECKOUT_SOLO_6`), o link do plano de 3 ou 6 meses. Os planos e preços ficam em `src/lib/gestao/planos.ts` |
 | `GESTAO_CAKTO_PRODUTO` | Id do produto na Cakto: eventos de outros produtos são ignorados |
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave de serviço do Supabase (Project Settings → API). Segredo, só no servidor: só a rota `/api/gestao/faxina` usa. Sem ela, a faxina dos arquivos não roda (a do banco segue pelo pg_cron) |
-| `GESTAO_FAXINA_SEGREDO` | Segredo da rota da faxina (32 caracteres ou mais, aleatório). Ponha **o mesmo valor** em `CRON_SECRET`: a Vercel Cron manda `Authorization: Bearer <CRON_SECRET>`. Também vale o cabeçalho `x-gestao-faxina` |
-| `CRON_SECRET` | O mesmo valor de `GESTAO_FAXINA_SEGREDO` (a Vercel manda nos pedidos da Cron) |
+| `GESTAO_FAXINA_SEGREDO` | Opcional. Segredo próprio da rota da faxina (32 caracteres ou mais, aleatório), para chamar à mão com `Authorization: Bearer` ou `x-gestao-faxina`. A rota aceita este **ou** o `CRON_SECRET`: basta um dos dois. |
+| `CRON_SECRET` | Obrigatório na Vercel (16 caracteres ou mais, aleatório): a Vercel Cron manda `Authorization: Bearer <CRON_SECRET>` na faxina diária. Sem ele (e sem `GESTAO_FAXINA_SEGREDO`) ou sem `SUPABASE_SERVICE_ROLE_KEY`, a faxina não roda, o motivo aparece no painel do administrador (aba Erros) e a aba Dados mostra a rotina como atrasada. |
 
 ### Para colocar no ar
 

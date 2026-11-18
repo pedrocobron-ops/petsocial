@@ -79,6 +79,7 @@ export default function OpcoesCasa() {
         [CHAVES_CASA.portaria]: portaria,
         [CHAVES_CASA.espera]: { ativo: espera.ativo, link: espera.ativo && espera.link },
         [CHAVES_CASA.ocorrencias]: ocorrencias,
+        [CHAVES_CASA.semOcorrencias]: !ocorrencias,
         [CHAVE_TUTOR]: { ativo: tutor, dias_fotos: diasFotos },
         ...(usaModulo(petshop, "creche") ? { [OPCAO_EQUIPE_MUDA_PLANO]: equipePlano, [OPCAO_REPOSICAO_PRAZO]: prazo, [OPCAO_REPOSICAO_SO_AVISOU]: soAvisou } : {}),
       });
@@ -121,7 +122,7 @@ export default function OpcoesCasa() {
           <p className="g-muted g-pp">Entrar na lista não reserva nada: o pedido só vira reserva quando você marcar.</p>
         </Opcao>
 
-        <Opcao titulo="Ocorrências" frase="Briga, machucado, fuga ou vômito: a equipe anota na estadia com a hora e o nome de quem escreveu. Você vê no Hoje e na ficha do pet." ligada={ocorrencias} aoMudar={m(setOcorrencias)} />
+        <Opcao titulo="Ocorrências" frase="Briga, machucado, fuga ou vômito: a equipe anota na estadia com a hora e o nome de quem escreveu. Você vê no Hoje e na ficha do pet. Vem ligada." ligada={ocorrencias} aoMudar={m(setOcorrencias)} />
 
         <Opcao titulo="Página do tutor" frase="A equipe põe fotos no dia de cada pet. Cada tutor ganha um link só dele, sem senha, com o diário, as fotos, o que está marcado e os avisos de vacina, sem preços." ligada={tutor} aoMudar={m(setTutor)}>
           <p className="g-muted g-pp">As fotos ficam guardadas só para a equipe e para o tutor do pet (até 10 por pet por dia). O link do tutor sai pelo botão Mandar a página do tutor, na ficha do tutor e nos cartões da creche e do hotel. Desligando esta opção, todos os links param de abrir na hora.</p>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { garantirTrava, segredoDoServidor } from "@/lib/gestao/servidor";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import { INSTRUCOES_AJUDA, lerRespostaDaAjuda, procurarTopico } from "@/lib/gestao/ajuda";
@@ -50,9 +51,15 @@ async function tratar(req: Request) {
 
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json(await local());
 
-  // a contagem do dia fica no banco (vale também para a conta só para consulta); se não der para contar, responde pelo manual
-  const conta = await sb.rpc("assistente_contar", { p_petshop: corpo.petshopId, p_canal: "ajuda", p_tipo: "pedido", p_limite: LIMITE_DIA });
-  if (conta.error || conta.data !== true) return NextResponse.json(await local());
+  // a contagem do dia fica no banco (por pet shop e somando todos; a conta só para consulta não usa a IA); se o banco
+  // recusar ou não der para contar, responde pelo manual
+  await garantirTrava();
+  const args = { p_petshop: corpo.petshopId, p_canal: "ajuda", p_tipo: "pedido", p_limite: LIMITE_DIA };
+  const v2 = await sb.rpc("assistente_contar_v2", { ...args, p_segredo: segredoDoServidor() ?? undefined });
+  // banco sem a função nova (antes da migração 20261228): a contagem de antes
+  const contou = !v2.error ? (v2.data as { ok?: boolean } | null)?.ok === true
+    : (v2.error.code === "PGRST202" || v2.error.code === "42883") && (await sb.rpc("assistente_contar", args)).data === true;
+  if (!contou) return NextResponse.json(await local());
 
   try {
     const cliente = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, "") });

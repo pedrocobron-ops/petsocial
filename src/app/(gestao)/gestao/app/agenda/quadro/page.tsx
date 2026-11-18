@@ -12,11 +12,13 @@ import { textoPronto } from "@/lib/gestao/agenda";
 import { comPrecosDeAgendamento } from "@/lib/gestao/reservado";
 import { dataLonga, hora, inicioDoDia, linkWhatsApp, somaDias } from "@/lib/gestao/util";
 import {
-  COLUNAS, NOME_DESTINO, alertasDoPet, colunaDe, proximaEtapa, rotuloDoProximo, temTosa, tempoDesde,
+  COLUNAS, NOME_DESTINO, alertasDoPet, colunaDe, prontoOuPronta, proximaEtapa, rotuloDoProximo, temBanho, temTosa, tempoDesde,
   type Coluna, type Destino, type Etapa, type LinhaQuadro,
 } from "@/lib/gestao/quadro";
 import { useGestao } from "@/components/gestao/contexto";
 import { AvatarPet, DICA_SO_CONSULTA, Esqueleto, Folha, Vazio, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
+import { useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
+import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import "../agenda.css";
 import "./quadro.css";
 
@@ -35,9 +37,14 @@ const DESTINOS: Destino[] = ["esperando", "banho", "secagem", "tosa", "pronto", 
  * Com ?tv=1, o Modo TV: tela cheia, só para olhar, letras grandes, atualiza sozinho a cada 30 segundos.
  */
 function Quadro() {
-  const { sb, petshop, liberado, vejoFinanceiro } = useGestao();
+  const { sb, petshop, liberado, vejoFinanceiro, eu, equipe } = useGestao();
   const params = useSearchParams();
   const tv = params.get("tv") === "1";
+  // "Só os meus": quem atende vê só os pets marcados com ela (e os sem profissional). O aparelho lembra a escolha.
+  const atendo = Boolean(eu.atende) && equipe.filter((p) => p.ativo && p.atende).length > 1;
+  const chaveMeus = `gestao:quadro:meus:${petshop.id}:${eu.id}`;
+  const [soMeus, setSoMeus] = useState(() => atendo && lerLembrado(chaveMeus) === "1");
+  const mudarSoMeus = (v: boolean) => { setSoMeus(v); guardarLembrado(chaveMeus, v ? "1" : "0"); };
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const [agora, setAgora] = useState(() => Date.now());
@@ -83,9 +90,13 @@ function Quadro() {
     return () => { clearInterval(relogio); clearInterval(busca); document.removeEventListener("visibilitychange", voltou); };
   }, [tv]);
 
+  // concluídos de hoje sem conta fechada (o banco diz quais, sem valor): o pet entregue sem pagar mostra Falta cobrar
+  const { ids: semConta, recarregar: recarregarSemConta } = useParaCobrar(hoje, hoje, !tv);
+  const filtrar = soMeus && !tv;
   const porColuna = useMemo(() => {
     const m = new Map<Coluna, AgendamentoCompleto[]>(COLUNAS.map((c) => [c.id, []]));
     for (const a of dados?.ags ?? []) {
+      if (filtrar && a.profissional_id && a.profissional_id !== eu.id) continue;
       const c = colunaDe(a, dados?.quadro.get(a.id));
       if (c) m.get(c)!.push(a);
     }
@@ -94,7 +105,7 @@ function Quadro() {
     for (const [c, l] of m) l.sort((x, y) => c === "entregue" ? new Date(dados?.quadro.get(y.id)?.entregue_em ?? y.fim).getTime() - new Date(dados?.quadro.get(x.id)?.entregue_em ?? x.fim).getTime()
       : c === "esperando" ? new Date(x.inicio).getTime() - new Date(y.inicio).getTime() : quando(x) - quando(y));
     return m;
-  }, [dados]);
+  }, [dados, filtrar, eu.id]);
   const total = (dados?.ags ?? []).filter((a) => colunaDe(a, null) != null).length;
   // no celular, uma coluna por vez: começa na primeira em andamento que tem alguém
   const abaAtual: Coluna = aba ?? (["banho", "secando", "pronto", "esperando", "entregue"] as Coluna[]).find((c) => (porColuna.get(c)?.length ?? 0) > 0) ?? "esperando";
@@ -109,6 +120,7 @@ function Quadro() {
       avisar(`${a.pets?.nome ?? "Pet"}: ${NOME_DESTINO[para].toLowerCase()}.`);
       avisarMudanca();
       await recarregar();
+      if (para === "entregue") void recarregarSemConta();
       if (para === "pronto" && !a.pronto_avisado_em) setPronto(a);
     } catch (e) { avisarErro(e); void recarregar(); } finally { setMexendo(null); setEntregar(null); }
   }
@@ -150,7 +162,7 @@ function Quadro() {
                 {!lista.length && <p className="g-qd-nada">{c.id === "esperando" ? "Ninguém esperando." : c.id === "entregue" ? "Ninguém entregue ainda." : "Nenhum pet aqui."}</p>}
                 {mostrar.map((a) => (
                   <Cartao key={a.id} a={a} q={dados?.quadro.get(a.id) ?? null} entrada={dados?.entradas.get(a.id) ?? null} agora={agora} tv={tv}
-                    ocupado={mexendo === a.id} liberado={liberado} vejoFinanceiro={vejoFinanceiro}
+                    ocupado={mexendo === a.id} liberado={liberado} vejoFinanceiro={vejoFinanceiro} faltaCobrar={semConta.has(a.id)}
                     aoProximo={(d) => void mover(a, d)} aoEscolher={() => { if (!somenteLeitura()) setEscolhendo(a); }} aoAbrir={() => setAberto(a.id)}
                     aoArrastar={(sim) => setArrastando(sim ? a.id : null)} />
                 ))}
@@ -198,6 +210,12 @@ function Quadro() {
       <div className="g-pilha">
         <p className="g-muted g-pp g-qd-dica">Toque no botão de baixo do cartão para passar o pet para a próxima etapa. Toque no pet para abrir o horário (conta, boletim, fotos).{" "}
           <span className="g-so-pc">No computador, dá para arrastar o cartão para outra coluna.</span></p>
+        {atendo && total > 0 && (
+          <div className="g-chips" role="group" aria-label="De quem">
+            <button type="button" className="g-chip" aria-pressed={!soMeus} onClick={() => mudarSoMeus(false)}>Todos</button>
+            <button type="button" className="g-chip" aria-pressed={soMeus} onClick={() => mudarSoMeus(true)}>Só os meus</button>
+          </div>
+        )}
         {erro && <p className="g-erro">{erro}</p>}
         {corpo}
       </div>
@@ -217,7 +235,7 @@ function Quadro() {
                 </button>
               );
             })}
-            {escolhendo.status === "concluido" && <p className="g-pp g-muted">A conta deste atendimento já foi fechada: ele não volta para Esperando.</p>}
+            {escolhendo.status === "concluido" && <p className="g-pp g-muted">Este atendimento já foi concluído: ele não volta para Esperando.</p>}
           </div>
         </Folha>
       )}
@@ -226,7 +244,7 @@ function Quadro() {
         <Folha titulo={`Entregar ${entregar.pets?.nome ?? "o pet"}?`} aoFechar={() => setEntregar(null)}
           rodape={<button type="button" className="g-btn sec" onClick={() => setEntregar(null)}>Voltar</button>}>
           <div className="g-pilha">
-            <p className="g-aviso" style={{ margin: 0 }}><span><b>A conta ainda não foi fechada.</b> {vejoFinanceiro ? "Se o tutor vai pagar agora, feche a conta primeiro." : "Quem cuida do caixa fecha a conta depois: o horário mostra Falta cobrar."}</span></p>
+            <p className="g-aviso" style={{ margin: 0 }}><span><b>A conta ainda não foi fechada.</b> {vejoFinanceiro ? "Se o tutor vai pagar agora, feche a conta primeiro. Entregando assim mesmo, o atendimento fica concluído e entra em Atendimentos para cobrar." : "Entregando, o atendimento fica concluído e aparece como Falta cobrar para quem cuida do caixa."}</span></p>
             {vejoFinanceiro && <button type="button" className="g-btn pri cheio" onClick={() => { const a = entregar; setEntregar(null); setAberto(a.id); }}><Receipt />Abrir o horário para fechar a conta</button>}
             <button type="button" className={`g-btn ${vejoFinanceiro ? "sec" : "pri"} cheio`} disabled={Boolean(mexendo)} onClick={() => void mover(entregar, "entregue")}>Entregar mesmo assim</button>
           </div>
@@ -242,18 +260,23 @@ function Quadro() {
 }
 
 /** Um pet no quadro: foto, nome, serviços, quem faz, há quanto tempo, alertas e os botões. */
-function Cartao({ a, q, entrada, agora, tv, ocupado, liberado, vejoFinanceiro, aoProximo, aoEscolher, aoAbrir, aoArrastar }: {
+function Cartao({ a, q, entrada, agora, tv, ocupado, liberado, vejoFinanceiro, faltaCobrar, aoProximo, aoEscolher, aoAbrir, aoArrastar }: {
   a: AgendamentoCompleto; q: LinhaQuadro | null; entrada: Entrada | null; agora: number; tv: boolean; ocupado: boolean; liberado: boolean; vejoFinanceiro: boolean;
+  /** concluído (entregue) sem conta fechada: o banco disse que falta cobrar */
+  faltaCobrar: boolean;
   aoProximo: (d: Destino) => void; aoEscolher: () => void; aoAbrir: () => void; aoArrastar: (sim: boolean) => void;
 }) {
   const col = colunaDe(a, q);
   const servicos = nomeDosServicos(a) ?? "Atendimento";
-  const proximo = proximaEtapa(a, q, temTosa([a.servicos?.nome, ...servicosAMais(a).map((s) => s.servicos?.nome)]));
+  const nomes = [a.servicos?.nome, ...servicosAMais(a).map((s) => s.servicos?.nome)];
+  const proximo = proximaEtapa(a, q, temTosa(nomes));
+  // entregue sem pagar: antes da atualização do banco ficava "em atendimento"; agora fica concluído e o banco diz que falta cobrar
+  const semPagar = (col === "entregue" && a.status === "em_atendimento") || (a.status === "concluido" && faltaCobrar);
   const alertas = alertasDoPet(a.pets?.alertas, entrada);
   const quem = a.profissionais?.nome.split(" ")[0];
   const tempo = col === "esperando"
     ? `Marcado às ${hora(a.inicio)}`
-    : col === "entregue" ? (q?.entregue_em ? `Entregue às ${hora(q.entregue_em)}` : "Conta fechada")
+    : col === "entregue" ? (q?.entregue_em ? `Entregue às ${hora(q.entregue_em)}` : "Concluído")
     : [q?.chegou_em ? `Chegou ${tempoDesde(q.chegou_em, agora)}` : `Desde as ${hora(a.inicio)}`, q?.etapa_em && q.etapa && col !== "banho" ? `${col === "pronto" ? "pronto" : "nesta etapa"} ${tempoDesde(q.etapa_em, agora)}` : null].filter(Boolean).join(" · ");
   return (
     <article className={`g-qd-card${ocupado ? " ocupado" : ""}`} style={{ "--cor": a.servicos?.cor ?? "#f97316" } as React.CSSProperties}
@@ -271,18 +294,18 @@ function Cartao({ a, q, entrada, agora, tv, ocupado, liberado, vejoFinanceiro, a
         </button>
       )}
       <p className="g-qd-info">{[quem ? `com ${quem}` : null, tempo].filter(Boolean).join(" · ")}</p>
-      {(alertas.length > 0 || a.leva_traz || a.pronto_avisado_em || (a.status === "concluido" && col === "pronto") || (col === "entregue" && a.status === "em_atendimento")) && (
+      {(alertas.length > 0 || a.leva_traz || a.pronto_avisado_em || (a.status === "concluido" && col === "pronto") || semPagar) && (
         <div className="g-qd-tags">
           {alertas.map((x) => <span key={x} className="g-tag vermelho">{x}</span>)}
           {a.leva_traz && <span className="g-tag azul"><Truck size={13} aria-hidden />Leva e traz</span>}
           {a.pronto_avisado_em && <span className="g-tag verde"><BellRing size={13} aria-hidden />Avisado às {hora(a.pronto_avisado_em)}</span>}
-          {a.status === "concluido" && col === "pronto" && <span className="g-tag verde">Conta fechada</span>}
-          {col === "entregue" && a.status === "em_atendimento" && <span className="g-tag laranja">{vejoFinanceiro ? "Falta fechar a conta" : "Falta cobrar"}</span>}
+          {a.status === "concluido" && col === "pronto" && !semPagar && <span className="g-tag verde">Concluído</span>}
+          {semPagar && <span className="g-tag laranja">{vejoFinanceiro ? "Falta fechar a conta" : "Falta cobrar"}</span>}
         </div>
       )}
       {!tv && (
         <div className="g-qd-bts">
-          {proximo && <button type="button" className="g-btn pri" disabled={ocupado || !liberado} title={liberado ? undefined : DICA_SO_CONSULTA} onClick={() => aoProximo(proximo)}><MoveRight />{rotuloDoProximo(proximo)}</button>}
+          {proximo && <button type="button" className="g-btn pri" disabled={ocupado || !liberado} title={liberado ? undefined : DICA_SO_CONSULTA} onClick={() => aoProximo(proximo)}><MoveRight />{rotuloDoProximo(proximo, !temBanho(nomes))}</button>}
           <button type="button" className="g-btn fantasma p" disabled={ocupado || !liberado} onClick={aoEscolher}>Mudar etapa</button>
         </div>
       )}
@@ -302,7 +325,7 @@ function AvisarPronto({ a, aoFechar, aoAvisar }: { a: AgendamentoCompleto; aoFec
     aoFechar();
   };
   return (
-    <Folha titulo={`${a.pets?.nome ?? "O pet"} está pronto`} aoFechar={aoFechar}
+    <Folha titulo={`${a.pets?.nome ?? "O pet"} está ${prontoOuPronta(a.pets?.sexo)}`} aoFechar={aoFechar}
       rodape={<button type="button" className="g-btn sec" onClick={aoFechar}>Agora não</button>}>
       <div className="g-pilha">
         {zap ? (

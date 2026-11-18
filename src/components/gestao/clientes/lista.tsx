@@ -1,5 +1,6 @@
 "use client";
 
+import { MaisAcoes } from "@/components/gestao/mais-acoes";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import dynamic from "next/dynamic";
@@ -236,10 +237,13 @@ export default function Lista({ aoAbrir, irPara }: {
         </div>
         <div className="g-acoes">
           {posso("clientes") && <button className="g-btn sec" onClick={() => setChamando(true)} disabled={!dados}><MessageCircle />Chamar de volta</button>}
-          {posso("clientes") && <button className="g-btn sec" onClick={() => setNiverDoMes(true)}><Cake />Aniversariantes do mês</button>}
-          {listaInteira && <button className="g-btn sec" onClick={exportar} disabled={!dados}><Download />Exportar</button>}
-          {listaInteira && <button className="g-btn sec" onClick={() => setImportando(true)}><Upload />Trazer de planilha</button>}
-          {posso("clientes") && <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setCaderno(true); }}><Camera />Foto do caderno</button>}
+          {/* no celular: Chamar de volta, Pet novo e o resto dentro de "Mais" */}
+          <MaisAcoes>
+            {posso("clientes") && <button className="g-btn sec" onClick={() => setNiverDoMes(true)}><Cake />Aniversariantes do mês</button>}
+            {listaInteira && <button className="g-btn sec" onClick={exportar} disabled={!dados}><Download />Exportar</button>}
+            {listaInteira && <button className="g-btn sec" onClick={() => setImportando(true)}><Upload />Trazer de planilha</button>}
+            {posso("clientes") && <button className="g-btn sec" onClick={() => { if (!somenteLeitura()) setCaderno(true); }}><Camera />Foto do caderno</button>}
+          </MaisAcoes>
           <button className="g-btn pri" onClick={abrirPetNovo}><Plus />Pet novo</button>
         </div>
       </header>

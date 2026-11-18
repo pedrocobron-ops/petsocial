@@ -5,9 +5,11 @@ import { consultarLucro, FERRAMENTAS_LUCRO } from "./ferramenta-lucro";
 import { consultarCompra, FERRAMENTAS_COMPRA } from "./ferramenta-compra";
 import { consultarEnvio, FERRAMENTAS_ENVIO } from "./ferramenta-envio";
 import { consultarContasFixas, descreverContaFixa, FERRAMENTAS_CONTAS_FIXAS, gravarContaFixa } from "./ferramenta-contas-fixas";
+import { conferirSeEContaAPagar, consultarContasAPagar, descreverPagarConta, FERRAMENTAS_PAGAR_CONTA, gravarPagarConta } from "./ferramenta-pagar-conta";
 import { consultarPlanosDaCreche, FERRAMENTA_PLANOS_CRECHE } from "./creche-planos";
 import { agendaNaoEhCasa, descreverEstadia, FERRAMENTA_RESERVAR_ESTADIA, gravarEstadia } from "./ferramenta-estadia";
 import { consultarSinais, FERRAMENTA_SINAIS } from "./ferramenta-sinais";
+import { consultarChao, descreverChao, FERRAMENTAS_CHAO, gravarChao } from "./ferramenta-chao";
 import { consultarMaquininha, FERRAMENTA_MAQUININHA } from "./ferramenta-maquininha";
 import { consultarDescontos, FERRAMENTA_DESCONTOS } from "./ferramenta-descontos";
 import { diariaSugerida } from "../hotel";
@@ -109,6 +111,10 @@ const AREAS_DA_FERRAMENTA: Record<string, readonly string[]> = {
   fazer_checkin: ["creche_hotel"], fazer_checkout: ["creche_hotel"], reservar_estadia: ["creche_hotel"], ver_hospedes: ["creche_hotel"], ver_planos_creche: ["creche_hotel"],
   vender_pacote: ["pacotes"], usar_pacote: ["pacotes", "agenda", "creche_hotel"],
   movimentar_estoque: ["estoque"], ver_estoque: ["estoque"], o_que_comprar: ["estoque"],
+  // a agenda de banho e tosa é de quem tem a Agenda ou recebe: quem só cuida da creche e do hotel não lê os horários pelo Mozart
+  ver_agenda: ["agenda", "caixa", "financeiro", "relatorios"],
+  // equipe do chão (ferramenta-chao.ts): doses e ocorrências são da creche e do hotel; o quadro é da agenda
+  ver_cuidados: ["creche_hotel"], marcar_cuidado: ["creche_hotel"], registrar_ocorrencia: ["creche_hotel"], mover_no_quadro: ["agenda"],
 };
 
 export const FERRAMENTAS: Def[] = ([
@@ -173,8 +179,8 @@ export const FERRAMENTAS: Def[] = ([
     input_schema: obj({ troco_inicial: N }) },
   { grava: true, financeiro: true, name: "fechar_caixa", description: "Fecha o caixa aberto. Passe o dinheiro contado na gaveta (só dinheiro; Pix e cartão não entram). O cartão mostra o esperado, o contado e a diferença.",
     input_schema: obj({ valor_contado: N, obs: S }, ["valor_contado"]) },
-  { grava: true, financeiro: true, name: "lancar_dinheiro", description: "Registra dinheiro NOVO que entrou ou saiu hoje (entra no caixa aberto): venda, serviço sem horário, despesa. Para receber um atendimento, passe agendamento_id: ele fica como concluído. Nunca use para um cliente pagando o que devia (fiado, conta anotada, taxa de falta): isso é receber_de_cliente, que dá baixa nas contas. Se o dinheiro veio de um cliente, passe cliente_id; se ele tem contas em aberto, a ferramenta recusa e manda usar receber_de_cliente, a não ser que a pessoa tenha dito que é outra coisa (aí passe nao_e_divida: true).",
-    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e material, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S, cliente_id: { ...S, description: "Tutor que pagou (de buscar_pets)" }, nao_e_divida: { ...B, description: "true só quando a pessoa disse que este dinheiro não é pagamento do que o cliente devia" } }, ["tipo", "valor", "forma", "categoria"]) },
+  { grava: true, financeiro: true, name: "lancar_dinheiro", description: "Registra dinheiro NOVO que entrou ou saiu hoje (entra no caixa aberto): venda, serviço sem horário, despesa. Para receber um atendimento, passe agendamento_id: ele fica como concluído. Nunca use para um cliente pagando o que devia (fiado, conta anotada, taxa de falta): isso é receber_de_cliente, que dá baixa nas contas. Se o dinheiro veio de um cliente, passe cliente_id; se ele tem contas em aberto, a ferramenta recusa e manda usar receber_de_cliente, a não ser que a pessoa tenha dito que é outra coisa (aí passe nao_e_divida: true). Nunca use para pagar uma conta que está em A pagar ou que é conta fixa (luz, aluguel, internet, salário, fornecedor anotado): isso é pagar_conta, que dá baixa na conta; a ferramenta recusa a saída que parece uma conta de A pagar, a não ser que a pessoa tenha dito que é outra despesa (aí passe nao_e_conta_a_pagar: true).",
+    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e material, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S, cliente_id: { ...S, description: "Tutor que pagou (de buscar_pets)" }, nao_e_divida: { ...B, description: "true só quando a pessoa disse que este dinheiro não é pagamento do que o cliente devia" }, nao_e_conta_a_pagar: { ...B, description: "true só quando a pessoa disse que esta saída não é o pagamento de uma conta que está em A pagar nem de uma conta fixa" } }, ["tipo", "valor", "forma", "categoria"]) },
   { grava: true, financeiro: true, name: "criar_conta", description: "Cria uma conta a pagar (saida) ou uma conta a receber (entrada) que não é de um cliente. O que um cliente ficou devendo é anotar_divida.",
     input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, vencimento: DIA, descricao: S, categoria: S }, ["tipo", "valor", "vencimento", "descricao"]) },
   { grava: true, financeiro: true, name: "anotar_divida", description: "Anota o que um cliente ficou devendo (fiado, taxa de falta, perfume que levou e vai pagar depois). Fica na ficha do tutor (\"Deve R$ X\"), em Caixa, Contas de clientes, em A receber e aparece como \"Deve de antes\" no próximo atendimento. Precisa do cliente_id (de buscar_pets). Sem vencimento, vence em 7 dias.",
@@ -183,11 +189,13 @@ export const FERRAMENTAS: Def[] = ([
     input_schema: obj({ cliente_id: { ...S, description: "Tutor (de buscar_pets)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, sobra: { type: "string", enum: ["credito"], description: "Só quando pagou a mais e a pessoa disse que a diferença fica de crédito" } }, ["cliente_id", "valor", "forma"]) },
   { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar. Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento.",
     input_schema: obj({ produto_id: S, produto_nome: S, unidade: { ...S, description: "un, kg, g, L, ml, pacote, saco" }, tipo: { type: "string", enum: ["entrada", "saida"] }, quantidade: N, custo_unitario: N, lancar_despesa: B, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, motivo: S }, ["tipo", "quantidade"]) },
+  ...FERRAMENTAS_CHAO,
   ...FERRAMENTAS_COMISSAO,
   ...FERRAMENTAS_LUCRO,
   ...FERRAMENTAS_COMPRA,
   ...FERRAMENTAS_ENVIO,
   ...FERRAMENTAS_CONTAS_FIXAS,
+  ...FERRAMENTAS_PAGAR_CONTA,
 ] as Def[]).map((f) => (AREAS_DA_FERRAMENTA[f.name] ? { ...f, areas: AREAS_DA_FERRAMENTA[f.name] } : f));
 
 export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro" | "areas">): Anthropic.Tool[] =>
@@ -900,6 +908,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       return { resultado: { preparadas: links.length, sem_telefone: semTelefone, aviso: "As mensagens aparecem como botões na tela. Nada foi enviado: a pessoa toca para abrir o WhatsApp." }, links };
     }
   }
+  const chao = await consultarChao(c, nome, e, (m) => new ErroDeUso(m));
+  if (chao) return chao;
   const extra = await consultarComissao(c, nome, e, (m) => new ErroDeUso(m));
   if (extra) return extra;
   const lucro = await consultarLucro(c, nome, e, (m) => new ErroDeUso(m));
@@ -910,6 +920,8 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
   if (envio) return envio;
   const fixas = await consultarContasFixas(c, nome, (m) => new ErroDeUso(m));
   if (fixas) return fixas;
+  const aPagar = await consultarContasAPagar(c, nome, (m) => new ErroDeUso(m));
+  if (aPagar) return aPagar;
   const sinais = await consultarSinais(c, nome, e, (m) => new ErroDeUso(m));
   if (sinais) return sinais;
   const maquininha = await consultarMaquininha(c, nome, e, (m) => new ErroDeUso(m));
@@ -1186,6 +1198,8 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       const linhas: [string, string][] = [[e.tipo === "saida" ? "Saiu" : "Entrou", brl(valor)], ["Forma", `${FORMA[String(e.forma)]}${vezes ? ` ${vezes}` : ""}`], ["Categoria", texto(e.categoria, 60) || "Outros"]];
       if (texto(e.descricao)) linhas.push(["Descrição", texto(e.descricao)]);
       await conferirSeEDivida(c, e);
+      // saída que parece ser uma conta de A pagar (ou uma conta fixa): é pagar_conta, para a despesa não contar duas vezes
+      await conferirSeEContaAPagar(c, e, (m) => new ErroDeUso(m));
       if (uuid(e.cliente_id)) linhas.push(["Cliente", (await clientePorId(c, e.cliente_id)).nome]);
       if (e.agendamento_id) {
         const { data: a } = await c.sb.from("agendamentos").select("pets(nome), servicos(nome)").eq("petshop_id", c.petshop.id).eq("id", uuid(e.agendamento_id) ?? "00000000-0000-0000-0000-000000000000").maybeSingle();
@@ -1246,8 +1260,12 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
   }
   const fixa = await descreverContaFixa(c, nome, e, (m) => new ErroDeUso(m));
   if (fixa) return fixa;
+  const baixa = await descreverPagarConta(c, nome, e, (m) => new ErroDeUso(m));
+  if (baixa) return baixa;
   const estadia = await descreverEstadia(c, nome, e, (m) => new ErroDeUso(m));
   if (estadia) return estadia;
+  const chao = await descreverChao(c, nome, e, (m) => new ErroDeUso(m));
+  if (chao) return chao;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 
@@ -1478,8 +1496,12 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
   }
   const estadia = await gravarEstadia(c, nome, e, (m) => new ErroDeUso(m));
   if (estadia) return estadia;
+  const chao = await gravarChao(c, nome, e, (m) => new ErroDeUso(m));
+  if (chao) return chao;
   const fixa = await gravarContaFixa(c, nome, e, (m) => new ErroDeUso(m));
   if (fixa) return fixa;
+  const baixa = await gravarPagarConta(c, nome, e, (m) => new ErroDeUso(m));
+  if (baixa) return baixa;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 

@@ -12,7 +12,7 @@ import AbaEscola from "@/components/gestao/admin/escola";
 import AbaCakto from "@/components/gestao/admin/cakto";
 import AbaErros from "@/components/gestao/admin/erros";
 import AbaAceites from "@/components/gestao/admin/aceites";
-import AbaDados, { LembreteDaCopia } from "@/components/gestao/admin/dados";
+import AbaDados, { LembreteDaCopia, LembreteDasRotinas } from "@/components/gestao/admin/dados";
 import { AvisosProvider, Campo, Esqueleto, Folha, Vazio, mensagemDeErro, ok, useAvisos } from "@/components/gestao/ui";
 import { banco, configurado } from "@/lib/gestao/supabase";
 import { dataCompleta, fmtTelefone, haQuanto, hora, isoDia, semAcento } from "@/lib/gestao/util";
@@ -194,6 +194,7 @@ function Admin() {
 
       {erro && <p className="g-aviso vermelho" role="alert">{erro}</p>}
       {aba !== "dados" && <LembreteDaCopia aoAbrir={() => setAba("dados")} />}
+      {aba !== "dados" && <LembreteDasRotinas aoAbrir={() => setAba("dados")} />}
       <div className="g-seg g-adm-abas" role="group" aria-label="Partes do painel" style={{ marginBottom: 18 }}>
         {([["visao", "Visão geral"], ["uso", "Uso"], ["geral", "Contas"], ["conversas", "Conversas"], ["escola", "Escola"], ["cakto", "Cakto"], ["erros", "Erros"], ["aceites", "Aceites"], ["dados", "Dados"]] as const).map(([id, r]) => (
           <button key={id} aria-pressed={aba === id} onClick={() => setAba(id)}>{r}</button>

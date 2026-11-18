@@ -7,12 +7,24 @@ import { ajustesDoFaturamento, CATEGORIAS_DEVOLUCAO, montarAjustes, SEM_AJUSTES,
 import { deIsoDia, inicioDaSemana, isoDia, somaDias } from "@/lib/gestao/util";
 import { buscarSaudeVencendo, limiteSaudeHoje, resumirSaudeVencendo, type SaudeVencendo } from "@/components/gestao/clientes/saude-avisos";
 import type { CuidadoResumido } from "@/components/gestao/clientes/saude";
+import { leituraAntigaVale } from "@/lib/gestao/hoje-reserva";
+import { registrarErro } from "@/lib/gestao/erros-navegador";
 
 /**
  * O que a tela Hoje lê no primeiro olhar. Vem numa ida só ao banco (`gestao_hoje`, migração 20261195), com o login de quem pede:
  * as mesmas regras de cada tabela e as mesmas funções de preço. Se a função ainda não existe (banco antes da atualização) ou
- * falhar, lê do jeito de antes, uma consulta por parte, ao mesmo tempo. As duas leituras entregam a mesma coisa.
+ * devolver algo que não dá para ler, lê do jeito de antes, uma consulta por parte, ao mesmo tempo. As duas leituras entregam a
+ * mesma coisa. Quando o banco demorou, está sobrecarregado ou a internet caiu, NÃO lê do jeito antigo (seriam umas 25 consultas
+ * de uma vez bem na hora em que o banco está cheio): o erro sobe e a tela mostra "Tentar de novo" (`leituraAntigaVale`).
+ * Parte que o banco não conseguiu montar (chave `falhas`, migração 20261229) vale vazia, como antes, e fica registrada.
  */
+const jaRegistradas = new Set<string>();
+function registrarUmaVez(chave: string, erro: Error) {
+  if (jaRegistradas.has(chave)) return;
+  jaRegistradas.add(chave);
+  registrarErro(erro, "banco");
+}
+
 /** `checkins`: estadias que entraram na casa (em casa ou encerradas); banco antigo não manda, e vale `estadias`. */
 export type Contagens = { pets: number; agendamentos: number; concluidos: number; lembrados: number; estadias: number; produtos: number; checkins?: number };
 type Curto = { id: string; inicio: string; pets: { nome: string } | null };
@@ -65,7 +77,15 @@ export async function lerDadosDoHoje(sb: Banco, petshopId: string, hoje: Date, q
     },
   });
   const h = (!r.error && r.data && typeof r.data === "object" && !Array.isArray(r.data) ? r.data : null) as Record<string, unknown> | null;
-  if (!h || !Array.isArray(h.lista) || !h.contagens) return lerDoJeitoAntigo(sb, petshopId, d, q);
+  if (!h || !Array.isArray(h.lista) || !h.contagens) {
+    if (r.error && !leituraAntigaVale(r.error)) throw Object.assign(new Error(r.error.message), { code: r.error.code ?? "" });
+    // a função existe mas falhou por outro motivo: lê do jeito antigo e deixa registrado (função que não existe não é erro)
+    if (r.error && !/PGRST202|42883/.test(r.error.code ?? "")) registrarUmaVez("gestao_hoje", Object.assign(new Error(`gestao_hoje: ${r.error.message}`), { code: r.error.code ?? "" }));
+    return lerDoJeitoAntigo(sb, petshopId, d, q);
+  }
+  for (const f of (Array.isArray(h.falhas) ? h.falhas : []) as { parte?: string; erro?: string }[]) {
+    registrarUmaVez(`parte:${f.parte}`, Object.assign(new Error(`gestao_hoje, parte ${f.parte ?? "?"}: ${f.erro ?? "falhou"}`), { name: "ParteDoHojeFalhou" }));
+  }
 
   const lista = h.lista as AgendamentoCompleto[];
   const precos = h.precos as { id: string; preco: number | null }[] | null;

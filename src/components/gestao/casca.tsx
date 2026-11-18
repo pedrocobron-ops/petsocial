@@ -276,7 +276,9 @@ export default function Casca({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="g-app">
-      <aside className="g-lado">
+      {/* teclado: o primeiro Tab da página oferece pular o menu e ir direto ao conteúdo */}
+      <a className="g-pular" href="#conteudo" onClick={(e) => { e.preventDefault(); document.getElementById("conteudo")?.focus(); }}>Pular para o conteúdo</a>
+      <aside className="g-lado" aria-label="Menu do aplicativo">
         <div className="g-marca">
           <LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={38} padrao="selo" />
           <div><b title={petshop.nome}>{petshop.nome}</b><span>Maestro Pet Gestão</span></div>
@@ -303,7 +305,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="g-main">
+      <main className="g-main" id="conteudo" tabIndex={-1}>
         <div className="g-barra">
           <div className="g-barra-marca"><LogoLoja nome={petshop.nome} logo={petshop.logo} tamanho={34} padrao="selo" tomSelo="verde" /><span>{petshop.nome}</span></div>
           {aqui && <div className="g-barra-onde"><span className={`g-tile p ${aqui.item.tom}`} aria-hidden><aqui.item.icone /></span><span>{aqui.grupo} / <b>{aqui.item.rotulo}</b></span></div>}
@@ -354,7 +356,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* toque duplo no botão de uma folha: ela fecha no primeiro toque e o segundo cairia na aba que fica embaixo */}
-      <nav className="g-abas" aria-label="Menu" onClickCapture={(e) => { if (Date.now() - toqueNaFolha.current < 500) { e.preventDefault(); e.stopPropagation(); } }}>
+      <nav className="g-abas" aria-label="Atalhos" onClickCapture={(e) => { if (Date.now() - toqueNaFolha.current < 500) { e.preventDefault(); e.stopPropagation(); } }}>
         <Link prefetch={false} href="/gestao/app" aria-current={atual("/gestao/app") ? "page" : undefined}><Sun />Hoje</Link>
         <Link prefetch={false} href={podeAba ? aba.href : "/gestao/app"} aria-current={atual(aba.href) ? "page" : undefined} style={{ position: "relative", opacity: podeAba ? 1 : .35 }}><aba.icone />{aba.rotulo}{aba.href === AGENDA && pedidos > 0 && <span className="g-nav-n aba">{pedidos}</span>}</Link>
         <button className="g-aba-mic" onClick={() => setAssistente({ aberta: true, pedido: "" })} aria-label="Falar com o Mozart, o assistente">
@@ -364,9 +366,11 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         <button onClick={() => setMais(true)}><Menu />Mais</button>
       </nav>
 
-      <button className={`g-fab${assistente.aberta ? " aberta" : ""}`} onClick={() => { setAjuda(false); setAssistente((a) => ({ aberta: !a.aberta, pedido: "" })); }} aria-expanded={assistente.aberta}>
+      <button className={`g-fab${assistente.aberta ? " aberta" : ""}`} onClick={() => { setAjuda(false); setAssistente((a) => ({ aberta: !a.aberta, pedido: "" })); }} aria-expanded={assistente.aberta}
+        title={assistente.aberta ? "Fechar a conversa com o Mozart" : "Falar com o Mozart, o assistente"}>
         <span className="foto"><Selo tamanho={40} /><i aria-hidden /></span>
-        <span className="txt"><b>Mozart</b><span>{assistente.aberta ? "fechar a conversa" : "fala comigo"}</span></span>
+        {/* em tela mais estreita o texto some da vista, mas continua sendo o nome do botão para o leitor de tela (gestao.css) */}
+        <span className="txt"><b>Mozart</b> <span>{assistente.aberta ? "fechar a conversa" : "fala comigo"}</span></span>
       </button>
 
       {mais && (

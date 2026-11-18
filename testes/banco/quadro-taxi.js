@@ -1,6 +1,7 @@
 // Quadro de atendimento e leva e traz (migração 20261203): quem move o pet no quadro (área Agenda; monitora, estoque, outro pet shop e
 // anônimo não), as colunas pelo status + etapa (o status continua com o mesmo sentido), a chegada anotada por qualquer tela (gatilho),
-// voltar para Esperando devolve o status de antes, o quadro nunca conclui, dois toques = uma mudança (a hora fica a do primeiro),
+// voltar para Esperando devolve o status de antes, Entregue conclui o atendimento sem cobrar (rodada 9: antes ficava em atendimento
+// e ninguém cobrava), dois toques = uma mudança (a hora fica a do primeiro),
 // as viagens do leva e traz (buscar/levar, desfazer, levar = entregue no quadro), ninguém grava direto nas tabelas, a taxa de leva e
 // traz fora das opções de quem não recebe e as contas do app (quadro.ts): colunas, próxima etapa, viagens, rota e taxa por bairro.
 const B = require('../lib/base');
@@ -63,18 +64,17 @@ const T = require('../lib/teste')('quadro-taxi');
   T.passa('Esperando de novo não muda nada', await mover(tosador, mel, 'esperando'));
   T.ok('a Mel continua confirmada', status(mel) === 'confirmado');
 
-  T.secao('pronto e entregue: o quadro não conclui nem cobra');
+  T.secao('pronto e entregue: entregar conclui o atendimento, sem cobrar');
   T.recusa('entregue sem ter chegado é recusado', await mover(tosador, mel, 'entregue'), /não chegou/);
   T.passa('Thor pronto', await mover(tosador, thor, 'pronto'));
   const [e1, e2] = await Promise.all([mover(tosador, thor, 'entregue'), mover(tosador, thor, 'entregue')]);
   T.ok('dois toques em Entregue: uma hora só', !e1.error && !e2.error && e1.data?.entregue_em === e2.data?.entregue_em, e1.error?.message || e2.error?.message);
-  T.ok('entregue, mas o status continua em atendimento (falta cobrar)', status(thor) === 'em_atendimento' && linha(thor) === 'pronto|true|marcado|true', linha(thor));
+  T.ok('entregue: o atendimento fica concluído (falta cobrar)', status(thor) === 'concluido' && linha(thor) === 'pronto|true|marcado|true', linha(thor));
   T.ok('nenhum dinheiro lançado pelo quadro', B.num(`select count(*) from lancamentos where agendamento_id='${thor}'`) === 0);
   T.passa('de Entregue de volta para a tosa (toque errado)', await mover(tosador, thor, 'tosa'));
   T.ok('a volta tira o entregue', linha(thor) === 'tosa|true|marcado|false', linha(thor));
-  B.must(await caixa.from('agendamentos').update({ status: 'concluido' }).eq('id', thor).select('id'), 'concluiu (conta fechada)');
-  T.ok('concluir mantém a etapa (pago, esperando o tutor)', linha(thor) === 'tosa|true|marcado|false');
-  T.recusa('concluído não volta para Esperando pelo quadro', await mover(tosador, thor, 'esperando'), /fechada/);
+  T.ok('a volta de etapa mantém o atendimento concluído', status(thor) === 'concluido' && linha(thor) === 'tosa|true|marcado|false');
+  T.recusa('concluído não volta para Esperando pelo quadro', await mover(tosador, thor, 'esperando'), /concluído/);
   T.passa('concluído vai para Pronto', await mover(tosador, thor, 'pronto'));
   T.ok('colunas do app: concluído + pronto = Pronto para buscar; concluído sem quadro = Entregue',
     Q.colunaDe({ status: 'concluido' }, { etapa: 'pronto', etapa_em: 'x', chegou_em: 'x', entregue_em: null }) === 'pronto' && Q.colunaDe({ status: 'concluido' }, null) === 'entregue');

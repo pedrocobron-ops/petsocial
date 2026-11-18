@@ -8,6 +8,7 @@ import { medidasZeradas, responderCartoes, voltas, type Msg, type Resultado } fr
 import { INSTRUCOES, contextoDoPetshop } from "@/lib/gestao/assistente/instrucoes";
 import { modeloDeTeste } from "@/lib/gestao/assistente/modelo-de-teste";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
+import { garantirTrava, segredoDoServidor } from "@/lib/gestao/servidor";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,8 +22,8 @@ const LIMITE_DIA = Number(process.env.GESTAO_ASSISTENTE_LIMITE_DIA ?? 150);
 /** Chamadas ao modelo por pet shop por dia (cada pedido usa uma ou mais; os cartões confirmados também contam). */
 const LIMITE_CHAMADAS = Number(process.env.GESTAO_ASSISTENTE_LIMITE_CHAMADAS ?? LIMITE_DIA * 4);
 /** Teto do histórico que o navegador devolve: mensagens e tamanho total (em caracteres do JSON). */
-const MAX_MENSAGENS = 60;
-const MAX_HISTORICO = 300_000;
+const MAX_MENSAGENS = 40;
+const MAX_HISTORICO = 120_000;
 
 type Corpo = {
   petshopId?: string; mensagens?: Msg[]; texto?: string; agora?: string; fusoMin?: number;
@@ -33,7 +34,12 @@ type Corpo = {
 const FORA_DO_AR = "O Mozart está fora do ar agora. Enquanto isso, tudo funciona pelos botões das telas, e o Manual, no menu, explica cada passo. Tente de novo mais tarde.";
 
 const erro = (status: number, codigo: string, mensagem: string) => NextResponse.json({ erro: codigo, mensagem }, { status });
-const LIMITE_TEXTO = "O Mozart atingiu o limite de pedidos de hoje. Amanhã ele volta; enquanto isso, as telas funcionam normalmente.";
+const LIMITE_TEXTO = "Por hoje o Mozart já atendeu todos os pedidos que cabem num dia. Amanhã cedo ele volta. Enquanto isso, tudo funciona pelos botões das telas, e o Manual, no menu, explica cada passo.";
+/** O teto do dia somando todos os pet shops (config_interna mozart_dia_geral): não é culpa de quem está pedindo. */
+const LIMITE_GERAL_TEXTO = "O Mozart recebeu pedidos demais hoje, de todos os pet shops juntos, e precisou parar para descansar. Amanhã cedo ele volta. Enquanto isso, tudo funciona pelos botões das telas, e o Manual, no menu, explica cada passo.";
+/** Conta só para consulta (teste vencido, assinatura cancelada ou conta em exclusão): a IA custa a cada pergunta. */
+const FECHADO_TEXTO = "O Mozart atende quem está no teste grátis ou com a assinatura em dia. A sua conta está só para consulta: os dados continuam aqui, nas telas. Para voltar a usar o Mozart, veja a tela Assinatura.";
+const textoDoLimite = (motivo: string | null) => (motivo === "fechado" ? FECHADO_TEXTO : motivo === "geral" ? LIMITE_GERAL_TEXTO : LIMITE_TEXTO);
 
 type Bloco = Record<string, unknown>;
 const ehTexto = (v: unknown, max = 8000) => typeof v === "string" && v.length <= max;
@@ -139,13 +145,31 @@ async function tratar(req: Request) {
   const noAparelho = new Date(Date.now() + c.fusoMin * 60000).toISOString().slice(0, 16);
   if (doServidor && Math.abs(Date.parse(`${c.agora}:00Z`) - Date.parse(`${noAparelho}:00Z`)) > 15 * 60000) { c.agora = doServidor.agora; c.fusoMin = doServidor.fusoMin; }
 
-  // toda chamada ao modelo conta no dia do pet shop (no banco; a conta só para consulta conta igual)
+  // toda chamada ao modelo conta no dia do pet shop e no teto geral do dia (no banco). A conta só para consulta não usa o
+  // Mozart: o banco recusa a contagem ("fechado") e nenhuma chamada ao modelo é feita.
+  // por que a última contagem foi recusada: "limite" (do pet shop), "geral" (todos juntos) ou "fechado" (conta só para consulta)
+  let motivoDaRecusa: string | null = null;
   const contar = async (tipo: "pedido" | "chamada") => {
-    const r = await sb.rpc("assistente_contar", { p_petshop: c.petshop.id, p_canal: "mozart", p_tipo: tipo, p_limite: tipo === "pedido" ? LIMITE_DIA : LIMITE_CHAMADAS });
+    const args = { p_petshop: c.petshop.id, p_canal: "mozart", p_tipo: tipo, p_limite: tipo === "pedido" ? LIMITE_DIA : LIMITE_CHAMADAS };
+    // a contagem leva o segredo do servidor: com a trava ligada, quem chama a função direto não enche o teto de todos
+    const comSegredo = { ...args, p_segredo: segredoDoServidor() ?? undefined };
+    let v2 = await sb.rpc("assistente_contar_v2", comSegredo);
+    // o banco não conhece o segredo deste servidor (chave trocada): grava a trava e tenta mais uma vez
+    if (!v2.error && (v2.data as { motivo?: string } | null)?.motivo === "recusado" && ["ok", "gravou"].includes(await garantirTrava(true))) v2 = await sb.rpc("assistente_contar_v2", comSegredo);
+    if (!v2.error) {
+      const d = v2.data as { ok?: boolean; motivo?: string } | null;
+      if (d?.motivo === "recusado") { console.error("[assistente] o banco recusou o segredo do servidor: ligue a trava no painel (aba Cakto)"); await registrarErroServidor("/api/gestao/assistente", Object.assign(new Error("O banco recusou o segredo do servidor (trava do servidor): grave de novo no painel, aba Cakto"), { name: "TravaDoServidor" }), { petshop: c.petshop.id }); }
+      if (!d?.ok) motivoDaRecusa = d?.motivo ?? "limite";
+      return d?.ok === true;
+    }
+    // banco sem a função nova (antes da migração 20261228): a contagem de antes
+    const r = v2.error.code === "PGRST202" || v2.error.code === "42883" ? await sb.rpc("assistente_contar", args) : v2;
     if (r.error) { console.error("[assistente] contagem falhou", r.error.code); await registrarErroServidor("/api/gestao/assistente", erroDoBanco(r.error, "assistente_contar"), { petshop: c.petshop.id }); return false; }
+    if (r.data !== true) motivoDaRecusa = "limite";
     return r.data === true;
   };
 
+  await garantirTrava();
   const mensagens: Msg[] = historico(corpo.mensagens);
   let mudou = false;
 
@@ -171,7 +195,7 @@ async function tratar(req: Request) {
   } else {
     const texto = (corpo.texto ?? "").trim().slice(0, 2000);
     if (!texto) return erro(400, "pedido_vazio", "Diga ou escreva o que você precisa.");
-    if (!(await contar("pedido"))) return erro(429, "limite", LIMITE_TEXTO);
+    if (!(await contar("pedido"))) return motivoDaRecusa === "fechado" ? erro(403, "so_consulta", FECHADO_TEXTO) : motivoDaRecusa === "recusado" ? erro(503, "fora", FORA_DO_AR) : erro(429, "limite", textoDoLimite(motivoDaRecusa));
     await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao: "pedido", pedido: texto });
     const dia = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"][new Date(`${c.agora.slice(0, 10)}T00:00:00Z`).getUTCDay()];
     mensagens.push({ role: "user", content: [{ type: "text", text: texto }, { type: "text", text: `(Agora: ${dia}, ${c.agora.replace("T", " ")}, horário local do pet shop.)` }] });
@@ -237,7 +261,7 @@ async function tratar(req: Request) {
           return fluxo.finalMessage();
         },
       });
-      if (r.tipo === "limite") return falha(429, "limite", LIMITE_TEXTO);
+      if (r.tipo === "limite") return motivoDaRecusa === "fechado" ? falha(403, "so_consulta", FECHADO_TEXTO) : motivoDaRecusa === "recusado" ? falha(503, "fora", FORA_DO_AR) : falha(429, "limite", textoDoLimite(motivoDaRecusa));
       if (r.tipo === "recusa") { await medir("recusa"); return { status: 200, corpo: { mensagens: r.mensagens, texto: "Com isso eu não consigo ajudar. Posso cuidar da agenda, dos clientes, do caixa e do estoque.", propostas: [], parciais: [], links: [], mudou } }; }
       if (r.propostas.length) {
         await Promise.all([guardarConversa([r.texto, ...r.propostas.map((p) => `[cartão] ${p.resumo.titulo}`)].filter(Boolean).join("\n")), medir("cartao")]);

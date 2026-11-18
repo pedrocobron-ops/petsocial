@@ -1,5 +1,6 @@
 "use client";
 
+import { MaisAcoes } from "@/components/gestao/mais-acoes";
 import { COLS_MOVIMENTO, COLS_PRODUTO, comCustos, comCustosDeMovimento, comPrecosDeProduto } from "@/lib/gestao/reservado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -151,6 +152,8 @@ export default function Estoque() {
         </div>
         <div className="g-acoes">
           {produtos.length > 0 && <button className="g-btn sec" onClick={() => abrir({ tipo: "venda" })}><ShoppingBag /> Vender</button>}
+          {/* no celular: Vender, Produto novo e o resto dentro de "Mais" */}
+          <MaisAcoes>
           {vejoFinanceiro && <button className="g-btn sec" onClick={() => setOrcamentos(true)}><FileText /> Orçamentos</button>}
           <button className="g-btn sec" onClick={() => setImportando(true)}><Upload /> Trazer de planilha</button>
           {produtos.length > 0 && posso("estoque") && <button className="g-btn sec" onClick={() => abrir({ tipo: "comprar" })}><ClipboardList /> O que comprar</button>}
@@ -159,6 +162,7 @@ export default function Estoque() {
           {produtos.length > 0 && posso("estoque") && <Link className="g-btn sec" href="/gestao/app/estoque/contagem"><ClipboardCheck /> Contagem</Link>}
           {op.fornecedores && <button className="g-btn sec" onClick={() => abrir({ tipo: "fornecedores" })}><Truck /> Fornecedores</button>}
           {souDono && <button className="g-btn sec" onClick={() => abrir({ tipo: "opcoes" })}><SlidersHorizontal /> Opções</button>}
+          </MaisAcoes>
           <button className="g-btn pri" onClick={() => abrir({ tipo: "novo" })}><Plus /> Produto novo</button>
         </div>
       </header>
@@ -247,7 +251,7 @@ export default function Estoque() {
                 const kit = p.tipo === "kit", perto = validade.perto.get(p.id);
                 return (
                   <div key={p.id} className={`g-card g-est-prod ${n.tom}`}>
-                    <button type="button" className="g-est-cab" onClick={() => abrir({ tipo: "ficha", produto: p })} aria-label={`Abrir ${p.nome}`}>
+                    <button type="button" className="g-est-cab" onClick={() => abrir({ tipo: "ficha", produto: p })} title={`Abrir ${p.nome}`}>
                       <Tile icone={kit ? Boxes : zerado(p) ? PackageX : Package} tom={kit ? "lilas" : "rosa"} />
                       <span className="t">
                         <b>{p.nome}</b>

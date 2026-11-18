@@ -348,7 +348,7 @@ export function FolhaBoletim({ visita: v, aoFechar, aoEnviar }: { visita: Visita
                 <li key={f.caminho}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {f.url ? <img src={f.url} alt={`Foto ${i + 1} de ${v.pet}`} /> : <span className="sem">foto</span>}
-                  <button type="button" className="g-bol-foto-x" aria-label={`Tirar a foto ${i + 1}`} onClick={() => tirarFoto(f)}><X aria-hidden /></button>
+                  <button type="button" className="g-bol-foto-x" aria-label={`Remover a foto ${i + 1}`} title="Remover esta foto" onClick={() => tirarFoto(f)}><X aria-hidden /></button>
                 </li>
               ))}
               {Array.from({ length: subindo }, (_, i) => <li key={`s${i}`} className="subindo" aria-label="Foto subindo"><Loader2 className="g-gira" aria-hidden /></li>)}

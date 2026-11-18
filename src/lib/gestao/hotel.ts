@@ -4,6 +4,7 @@ import { FORMAS } from "./tipos";
 import { saudacaoZap } from "./agenda";
 import { estadiaOcupa, mensalistasNoDia, type Falta, type PlanoCompleto, type Presenca } from "./creche";
 import type { PartePagamento } from "./dinheiro";
+import { linhaDeQuem } from "./comprovante";
 import { feriadoDoDia, regraDeFeriado, type RegraFeriado } from "./feriados";
 import { opcoesDeCobranca } from "./dinheiro-opcoes";
 import { acomodacoesDe, modelosDe, pixDe, porteDe, segundoPetDe, sinalDe, temporadaDoDia, temporadasDe, type Taxa, type Temporada, type TipoDeMensagem } from "./hotel-opcoes";
@@ -270,7 +271,8 @@ export type ContaDaEstadia = {
   a_pagar: number;
   /** contas antigas do tutor recebidas junto */
   pendencias: { descricao: string; valor: number }[];
-  pagamento: { fiado: true; quando: string } | { fiado: false; forma: string; pagamentos: PartePagamento[] | null } | null;
+  /** `valor`: quanto entrou neste pagamento (a estadia, o sinal e as contas antigas recebidas junto); `parcelas`: crédito em quantas vezes */
+  pagamento: { fiado: true; quando: string } | { fiado: false; forma: string; pagamentos: PartePagamento[] | null; valor?: number; parcelas?: number } | null;
   lancamento_id: string | null;
   /**
    * O que foi pago antes (sinal) passou do total da estadia (o pet saiu antes): o que foi feito com a diferença.
@@ -284,6 +286,11 @@ export type ContaDaEstadia = {
    * (hotel) ou o dia (creche) em que ela valeu. O banco anota em promo_usos (para o relatório), limitado ao que ela pode dar.
    */
   promo?: { id: string; nome: string; tipo: "pct" | "reais"; valor: number; desconto: number; dias: string[] } | null;
+  /** o sinal (ou o que faltava dele) recebido no mesmo pagamento da saída: no comprovante é "recebido agora", não "já pago" */
+  sinal_junto?: number;
+  /** quem fechou a conta e quando (para o comprovante) */
+  quem?: string | null;
+  hora?: string | null;
 };
 export type DestinoDaSobra = "devolvido" | "credito" | "mantido";
 export type SobraDaConta = { valor: number; destino: DestinoDaSobra; forma?: string | null; nota?: string | null; lancamento_id?: string | null };
@@ -317,7 +324,10 @@ const nomeDaForma = (f: string) => FORMAS.find((x) => x.id === f)?.rotulo ?? "Ou
 export function textoDoPagamentoDaConta(p: ContaDaEstadia["pagamento"]) {
   if (!p) return "";
   if (p.fiado) return `a receber até ${dataCompleta(p.quando)}`;
-  return p.pagamentos && p.pagamentos.length > 1 ? p.pagamentos.map((x) => `${nomeDaForma(x.forma)} ${brl(x.valor)}`).join(" + ") : nomeDaForma(p.forma);
+  // crédito parcelado: "Crédito 2x"; uma forma só também leva o valor ("Dinheiro R$ 70,00")
+  const nome = (f: string) => `${nomeDaForma(f)}${f === "credito" && p.parcelas && p.parcelas > 1 ? ` ${p.parcelas}x` : ""}`;
+  return p.pagamentos && p.pagamentos.length > 1 ? p.pagamentos.map((x) => `${nome(x.forma)} ${brl(x.valor)}`).join(" + ")
+    : `${nome(p.forma)}${p.valor != null && p.valor > 0 ? ` ${brl(p.valor)}` : ""}`;
 }
 
 const palavraDiarias = (tipo: string, n: number) => (tipo === "hotel" ? (n === 1 ? "noite" : "noites") : n === 1 ? "diária" : "diárias");
@@ -365,11 +375,22 @@ export function textoDaSobra(x: SobraDaConta) {
 /** O fim da conta, depois do total: o que foi pago antes, o que foi feito com a sobra, o crédito usado e o valor na saída. */
 export function fechoDaConta(c: ContaDaEstadia): { texto: string; valor: string }[] {
   const l: { texto: string; valor: string }[] = [];
-  if (c.sinal > 0) l.push(c.sobra ? { texto: "Pago antes (sinal)", valor: brl(c.sinal) } : { texto: `Sinal ${c.sinal_pago ? "já pago" : "combinado"}`, valor: `- ${brl(c.sinal)}` });
+  // o sinal recebido no mesmo pagamento da saída não é "já pago": entra como recebido agora (e as linhas somam o que foi pago)
+  const junto = !c.sobra && c.sinal_junto && c.sinal_junto > 0 ? centavos(Math.min(c.sinal_junto, c.sinal)) : 0;
+  if (c.sinal > 0 && junto > 0) {
+    if (c.sinal - junto > 0.005) l.push({ texto: "Sinal já pago antes", valor: `- ${brl(centavos(c.sinal - junto))}` });
+    l.push({ texto: "Sinal recebido agora", valor: brl(junto) });
+  } else if (c.sinal > 0) l.push(c.sobra ? { texto: "Pago antes (sinal)", valor: brl(c.sinal) } : { texto: `Sinal ${c.sinal_pago ? "já pago" : "combinado"}`, valor: `- ${brl(c.sinal)}` });
   if (c.sobra) l.push({ texto: textoDaSobra(c.sobra), valor: brl(c.sobra.valor) });
   if (c.credito_usado) l.push({ texto: "Crédito usado", valor: `- ${brl(c.credito_usado)}` });
-  if (c.sinal > 0 || c.credito_usado) l.push({ texto: "Valor na saída", valor: brl(c.a_pagar) });
+  if (c.sinal > 0 || c.credito_usado) l.push({ texto: junto > 0 ? "Resto da estadia, na saída" : "Valor na saída", valor: brl(c.a_pagar) });
   return l;
+}
+
+/** Quanto entrou no pagamento da saída: o resto da estadia, o sinal recebido junto e as contas antigas recebidas junto. */
+export function totalPagoAgora(c: ContaDaEstadia) {
+  const sinalAgora = !c.sobra && c.sinal_junto && c.sinal_junto > 0 ? Math.min(c.sinal_junto, c.sinal) : 0;
+  return centavos(c.a_pagar + sinalAgora + c.pendencias.reduce((t, x) => t + x.valor, 0));
 }
 
 /**
@@ -380,6 +401,8 @@ export function textoComprovanteEstadia(p: { petshop: string; telefone?: string 
   const c = p.conta;
   const lugar = c.tipo === "hotel" ? "Hotel" : "Creche";
   const junto = centavos(c.pendencias.reduce((t, x) => t + x.valor, 0));
+  const pagoAgora = totalPagoAgora(c);
+  const sinalAgora = !c.sobra && c.sinal_junto && c.sinal_junto > 0;
   return [
     `${saudacaoZap(p.tutor, p.petshop).replace(/ Aqui é .*$/, "")} Segue o comprovante da estadia${p.pet ? ` de ${p.pet}` : ""}.`,
     "",
@@ -394,8 +417,10 @@ export function textoComprovanteEstadia(p: { petshop: string; telefone?: string 
     ...linhasDaConta(c).map((l) => `${l.texto}: ${l.valor}`),
     `Total da estadia: ${brl(c.total)}`,
     ...fechoDaConta(c).map((l) => `${l.texto}: ${l.valor}`),
-    ...(junto > 0 ? ["", ...c.pendencias.map((x) => `Conta anterior (${x.descricao}): ${brl(x.valor)}`), `Total pago agora: ${brl(centavos(c.a_pagar + junto))}`] : []),
-    ...(c.pagamento ? [`Pagamento: ${textoDoPagamentoDaConta(c.pagamento)}`] : []),
+    ...(junto > 0 ? ["", ...c.pendencias.map((x) => `Conta anterior (${x.descricao}): ${brl(x.valor)}`)] : []),
+    ...(junto > 0 || sinalAgora ? [`Total pago agora: ${brl(pagoAgora)}`] : []),
+    ...(c.pagamento ? [`Pagamento: ${textoDoPagamentoDaConta(c.pagamento.fiado || c.pagamento.valor != null ? c.pagamento : { ...c.pagamento, valor: pagoAgora })}`] : []),
+    ...linhaDeQuem(c.hora, c.quem, c.pagamento?.fiado ? "Anotado" : c.pagamento ? "Recebido" : "Fechado"),
     "",
     "Este comprovante não é nota fiscal.",
   ].join("\n");
@@ -430,6 +455,59 @@ export function fatosDoDia(cuidados: Cuidado[], feitos: Pick<CuidadoFeito, "item
     partes.push(`${c.tipo === "remedio" ? `tomou ${c.oque}` : c.oque.toLowerCase() === "ração" || c.oque.toLowerCase() === "comida" ? "comeu" : `comeu ${c.oque.toLowerCase()}`} ${juntarE(horas.map((h) => `às ${h}`))}`);
   }
   return partes.join("; ");
+}
+
+/** Uma dose combinada, vista agora: feita, atrasada (passou mais de meia hora), na hora (meia hora antes até meia hora depois) ou depois. */
+export type SituacaoDaDose = "feito" | "atrasada" | "agora" | "depois";
+/** Tolerância da dose, em minutos: antes disso ainda está "na hora"; depois, está atrasada. */
+export const TOLERANCIA_DA_DOSE = 30;
+const emMinutos = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); };
+/**
+ * Como está a dose das `hora` ("08:00") agora (`agoraMin`: minutos desde a meia-noite, no relógio do pet shop).
+ * `entrouMin`: se o pet chegou hoje, a que horas (minutos): dose de antes da chegada não é cobrada da equipe ("depois" = nada a fazer).
+ */
+export function situacaoDaDose(hora: string, agoraMin: number, feito: boolean, entrouMin?: number | null): SituacaoDaDose {
+  if (feito) return "feito";
+  if (!/^\d{2}:\d{2}$/.test(hora)) return "depois";
+  const h = emMinutos(hora);
+  if (entrouMin != null && h < entrouMin - TOLERANCIA_DA_DOSE) return "depois";
+  if (agoraMin > h + TOLERANCIA_DA_DOSE) return "atrasada";
+  if (agoraMin >= h - TOLERANCIA_DA_DOSE) return "agora";
+  return "depois";
+}
+
+/** Uma dose para dar agora ou já atrasada, de um pet que está na casa. */
+export type DoseDeAgora = { estadiaId: string; pet: string; cuidado: Cuidado; hora: string; situacao: "atrasada" | "agora"; atrasoMin: number };
+/**
+ * As doses de agora e as atrasadas de quem está na casa: remédio antes de comida, a mais atrasada primeiro.
+ * `feitos`: as marcas de hoje (estadias_cuidados). `entrada` da estadia em ISO; `hoje` em AAAA-MM-DD e `agoraMin` no relógio local.
+ */
+export function dosesDeAgora(
+  estadias: { id: string; entrada: string; cuidados?: unknown; pets?: { nome: string } | null }[],
+  feitos: Pick<CuidadoFeito, "estadia_id" | "item" | "dia" | "hora">[], hoje: string, agoraMin: number,
+  diaLocal: (iso: string) => string = (iso) => isoDiaLocal(new Date(iso)), minutoLocal: (iso: string) => number = (iso) => { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); },
+): DoseDeAgora[] {
+  const out: DoseDeAgora[] = [];
+  for (const e of estadias) {
+    const entrouMin = diaLocal(e.entrada) === hoje ? minutoLocal(e.entrada) : null;
+    for (const c of lerCuidados(e)) for (const h of c.horas) {
+      const feito = feitos.some((f) => f.estadia_id === e.id && f.item === c.id && f.dia === hoje && f.hora === h);
+      const sit = situacaoDaDose(h, agoraMin, feito, entrouMin);
+      if (sit === "atrasada" || sit === "agora") out.push({ estadiaId: e.id, pet: e.pets?.nome ?? "Pet", cuidado: c, hora: h, situacao: sit, atrasoMin: Math.max(0, agoraMin - emMinutos(h)) });
+    }
+  }
+  const peso = (d: DoseDeAgora) => (d.situacao === "atrasada" ? 0 : 2) + (d.cuidado.tipo === "remedio" ? 0 : 1);
+  return out.sort((a, b) => peso(a) - peso(b) || b.atrasoMin - a.atrasoMin || a.pet.localeCompare(b.pet, "pt-BR"));
+}
+const isoDiaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/**
+ * O texto livre (observações da estadia, do pet, alertas) fala de remédio? Serve para a ficha impressa nunca dizer "nenhum remédio"
+ * com um remédio escrito nas observações, e para o check-in sugerir anotar a dose em Comida e remédio.
+ */
+export function falaDeRemedio(...textos: (string | null | undefined)[]): boolean {
+  const t = textos.filter(Boolean).join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return /\b(remedio|remedios|medicac|medicamento|comprimido|capsula|gotas?|dose|doses|insulina|antibiotico|anti-?inflamatorio|colirio|pomada|xarope|injec|gardenal|apoquel|prednis|\d+\s?mg|\d+\s?ml|de \d+ em \d+ ?h|a cada \d+ ?h)/.test(t);
 }
 
 /* ---------- mensagens para o tutor ---------- */

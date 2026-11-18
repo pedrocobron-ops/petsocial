@@ -14,7 +14,7 @@
 .g-mod-op .ok { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid var(--g-linha-forte); color: #fff; }
 .g-mod-op .ok svg { width: 14px; height: 14px; stroke-width: 3; }
 .g-mod-op[aria-pressed="true"] { border-color: var(--g-verde); background: var(--g-verde-tint); }
-.g-mod-op[aria-pressed="true"] .ic { background: var(--g-verde); color: #f6f1e8; }
+.g-mod-op[aria-pressed="true"] .ic { background: var(--g-verde); color: var(--g-creme); }
 .g-mod-op[aria-pressed="true"] .ok { background: var(--g-verde); border-color: var(--g-verde); }
 /* a última opção, sozinha na linha, ocupa a largura toda */
 .g-mod:not(.apoio) .g-mod-op:last-child:nth-child(odd) { grid-column: 1 / -1; }

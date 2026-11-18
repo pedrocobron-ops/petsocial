@@ -145,7 +145,7 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
           {linhas.length ? (
             <div className="g-lu-tab" role="table" aria-label={vista === "servicos" ? "Quanto sobrou por serviço" : "Quanto sobrou por produto"}>
               <div className="g-lu-l cab" role="row">
-                <span>{vista === "servicos" ? (banho ? "Serviço" : "O que entrou") : "Produto"}</span><span>{vista === "servicos" ? "Vezes" : "Vendidos"}</span><span>Entrou</span><span>Custo</span><span>Sobrou</span><span>%</span>
+                <span role="columnheader">{vista === "servicos" ? (banho ? "Serviço" : "O que entrou") : "Produto"}</span><span role="columnheader">{vista === "servicos" ? "Vezes" : "Vendidos"}</span><span role="columnheader">Entrou</span><span role="columnheader">Custo</span><span role="columnheader">Sobrou</span><span role="columnheader">%</span>
               </div>
               {linhas.map((l) => <Linha key={l.chave} l={l} comComissao={x.comissaoComoCusto} />)}
             </div>
@@ -182,12 +182,12 @@ function Linha({ l, comComissao }: { l: LinhaLucro; comComissao: boolean }) {
   const ruim = l.margem != null && l.margem < 0;
   return (
     <div className="g-lu-l" role="row">
-      <span className="n"><b>{l.nome}</b>{sub && <small>{sub}</small>}</span>
-      <span><i>{l.tipo === "produto" ? "Vendidos " : "Vezes "}</i><em>{l.chave.startsWith("casa:") ? `${fmtQtd(l.quantidade)} ${l.unidade}` : l.tipo === "extra" ? "–" : `${fmtQtd(l.quantidade)}${l.tipo === "produto" ? ` ${l.unidade}` : ""}`}</em></span>
-      <span><i>Entrou </i><em>{brl(l.receita)}</em></span>
-      <span>{l.custo == null ? <em className="sem">{l.chave.startsWith("casa:") ? "sem custo por serviço" : "custo não informado"}</em> : <><i>Custo </i><em>{brl(l.custo)}</em></>}</span>
-      <span><i>Sobrou </i><em className={ruim ? "ruim" : undefined}>{l.margem == null ? "–" : brl(l.margem)}</em></span>
-      <span><i>Margem </i><em className={ruim ? "ruim" : undefined}>{pct(l.pct)}</em></span>
+      <span role="cell" className="n"><b>{l.nome}</b>{sub && <small>{sub}</small>}</span>
+      <span role="cell"><i>{l.tipo === "produto" ? "Vendidos " : "Vezes "}</i><em>{l.chave.startsWith("casa:") ? `${fmtQtd(l.quantidade)} ${l.unidade}` : l.tipo === "extra" ? "–" : `${fmtQtd(l.quantidade)}${l.tipo === "produto" ? ` ${l.unidade}` : ""}`}</em></span>
+      <span role="cell"><i>Entrou </i><em>{brl(l.receita)}</em></span>
+      <span role="cell">{l.custo == null ? <em className="sem">{l.chave.startsWith("casa:") ? "sem custo por serviço" : "custo não informado"}</em> : <><i>Custo </i><em>{brl(l.custo)}</em></>}</span>
+      <span role="cell"><i>Sobrou </i><em className={ruim ? "ruim" : undefined}>{l.margem == null ? "–" : brl(l.margem)}</em></span>
+      <span role="cell"><i>Margem </i><em className={ruim ? "ruim" : undefined}>{pct(l.pct)}</em></span>
     </div>
   );
 }

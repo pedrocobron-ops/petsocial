@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { garantirTrava, segredoDoServidor } from "@/lib/gestao/servidor";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
@@ -47,7 +48,11 @@ async function tratar(req: Request) {
   const modelo = (motivo?: Saida["motivo"]) => NextResponse.json({ texto: textoModelo(d), ia: false, motivo } satisfies Saida);
 
   if (!DE_TESTE && !process.env.ANTHROPIC_API_KEY) { console.error("[boletim] sem ANTHROPIC_API_KEY"); return modelo("fora"); }
-  const conta = await sb.rpc("boletim_ia_contar", { p_petshop: c.petshopId });
+  await garantirTrava();
+  let conta = await sb.rpc("boletim_ia_contar", { p_petshop: c.petshopId, p_segredo: segredoDoServidor() ?? undefined });
+  // banco ainda sem o parâmetro novo (antes da migração 20261228): como antes
+  if (conta.error && (conta.error.code === "PGRST202" || conta.error.code === "42883")) conta = await sb.rpc("boletim_ia_contar", { p_petshop: c.petshopId });
+  if (!conta.error && (conta.data as { motivo?: string } | null)?.motivo === "recusado" && ["ok", "gravou"].includes(await garantirTrava(true))) conta = await sb.rpc("boletim_ia_contar", { p_petshop: c.petshopId, p_segredo: segredoDoServidor() ?? undefined });
   if (conta.error) { await registrarErroServidor("/api/gestao/boletim", erroDoBanco(conta.error, "boletim_ia_contar"), { petshop: c.petshopId }); return modelo("fora"); }
   const r = conta.data as { ok?: boolean; motivo?: string } | null;
   if (!r?.ok) return r?.motivo === "sem_acesso" ? NextResponse.json({ erro: "sem_acesso", mensagem: "Sem acesso." }, { status: 403 }) : modelo("limite");

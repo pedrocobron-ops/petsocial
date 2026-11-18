@@ -33,10 +33,10 @@
 .g-ht-dia .n small { font-size: .6875rem; font-weight: 600; color: var(--g-cinza); text-transform: uppercase; }
 .g-ht-oc { display: flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 8px; font-size: .75rem; font-weight: 600; white-space: nowrap; background: var(--g-carta-2); color: var(--g-cinza); }
 .g-ht-oc svg { width: 12px; height: 12px; flex: none; }
-.g-ht-oc.livre { background: #e3efe3; color: #24543b; }
-.g-ht-oc.meio { background: var(--g-amarelo-tint); color: #5b4708; }
+.g-ht-oc.livre { background: #e3efe3; color: var(--txt-verde); }
+.g-ht-oc.meio { background: var(--g-amarelo-tint); color: var(--txt-amarelo); }
 .g-ht-oc.quase { background: #f6d9b8; color: #7a4310; }
-.g-ht-oc.cheio { background: var(--g-vermelho-tint); color: #7a281b; }
+.g-ht-oc.cheio { background: var(--g-vermelho-tint); color: var(--txt-vermelho); }
 .g-ht-legenda { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: .8125rem; color: var(--g-cinza); }
 .g-ht-legenda span { display: inline-flex; align-items: center; gap: 6px; }
 .g-ht-legenda i { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
@@ -51,8 +51,8 @@
 
 /* vagas das datas escolhidas, no formulário de reserva */
 .g-ht-vagas { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--g-carta-2); font-size: .9375rem; }
-.g-ht-vagas.cheio { background: var(--g-vermelho-tint); color: #7a281b; }
-.g-ht-vagas.quase { background: var(--g-amarelo-tint); color: #5b4708; }
+.g-ht-vagas.cheio { background: var(--g-vermelho-tint); color: var(--txt-vermelho); }
+.g-ht-vagas.quase { background: var(--g-amarelo-tint); color: var(--txt-amarelo); }
 .g-ht-vagas svg { width: 18px; height: 18px; flex: none; }
 
 /* conta */
@@ -82,8 +82,24 @@
 .g-ht-cuid .item { display: grid; gap: 6px; }
 .g-ht-cuid .item > span { font-size: .9375rem; }
 .g-ht-cuid .horas { display: flex; flex-wrap: wrap; gap: 6px; }
-.g-ht-feito { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--g-linha-forte); background: #fffdf9; font: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; color: var(--g-tinta); }
+.g-ht-feito { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--g-linha-forte); background: var(--g-campo); font: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; color: var(--g-tinta); }
 .g-ht-feito svg { width: 14px; height: 14px; }
+/* dedo molhado, luva: o botão de cada dose tem pelo menos 48 px nos dois sentidos */
+.g-ht-feito { min-height: 48px; min-width: 56px; justify-content: center; padding: 8px 14px; font-size: .9375rem; }
+.g-ht-cuid .horas { gap: 8px; }
+.g-ht-feito.atrasada { background: #fde8e4; border: 2px solid #b3402e; color: #8a2a1c; }
+.g-ht-feito.agora { border: 2px solid #b26a00; background: #fff4dc; color: #6e4300; }
+/* doses de agora, na tela Hoje e no alto de Creche e hotel */
+.g-ht-agora { display: grid; gap: 10px; }
+.g-ht-agora ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.g-ht-agora li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--g-linha); background: var(--g-carta); }
+.g-ht-agora li.atrasada { border: 2px solid #b3402e; background: #fdf0ed; }
+.g-ht-agora li .t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.g-ht-agora li .t b { font-size: 1rem; overflow-wrap: anywhere; }
+.g-ht-agora li .t span { font-size: .875rem; color: var(--g-tinta); overflow-wrap: anywhere; }
+.g-ht-agora li .t .quando { font-weight: 700; color: #8a2a1c; }
+.g-ht-agora li:not(.atrasada) .t .quando { color: #6e4300; }
+.g-ht-agora li .g-btn { flex: none; min-height: 48px; }
 .g-ht-feito[aria-pressed="true"] { background: #e3efe3; border-color: rgba(36, 84, 59, .4); color: #24543b; }
 .g-ht-feito small { font-weight: 500; color: inherit; opacity: .85; }
 .g-ht-cuid-linha { display: grid; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--g-linha); background: var(--g-carta); }
@@ -97,8 +113,8 @@
 
 /* opções (Meu pet shop) */
 .g-ht-chave { position: relative; flex: none; width: 54px; height: 32px; padding: 0; border: 0; border-radius: 999px; background: #cfc6b8; cursor: pointer; transition: background .18s; }
-.g-ht-chave i { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fffdf9; box-shadow: 0 1px 3px rgba(31, 27, 23, .3); transition: transform .18s cubic-bezier(.2, .7, .2, 1); }
-.g-ht-chave[aria-checked="true"] { background: #2f6b4c; }
+.g-ht-chave i { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: var(--g-campo); box-shadow: 0 1px 3px rgba(31, 27, 23, .3); transition: transform .18s cubic-bezier(.2, .7, .2, 1); }
+.g-ht-chave[aria-checked="true"] { background: var(--txt-verde-2); }
 .g-ht-chave[aria-checked="true"] i { transform: translateX(22px); }
 .g-ht-op { display: grid; gap: 10px; padding: 14px 0; border-top: 1px solid var(--g-linha); }
 .g-ht-op-t { display: flex; align-items: flex-start; gap: 12px; }
@@ -128,7 +144,7 @@
 .g-ht-fer .g-check { min-height: 44px; }
 .g-ht-fer .g-ico { margin-left: auto; }
 /* dia fechado: aviso na reserva, na agenda e no calendário de ocupação */
-.g-ht-fechado { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--g-amarelo-tint); color: #5b4708; font-size: .9375rem; }
+.g-ht-fechado { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--g-amarelo-tint); color: var(--txt-amarelo); font-size: .9375rem; }
 .g-ht-fechado svg { width: 18px; height: 18px; flex: none; }
 .g-ht-dia .fer { font-size: .6875rem; font-weight: 600; color: #7a4310; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; line-height: 1.2; }
 /* taxa de busca fora do horário: a pessoa decide antes de fechar a conta */
@@ -149,16 +165,16 @@
   .g-ht-papel { font-size: .8125rem; color: #4a433c; margin: 0 0 2px; }
   .g-ht-ocup .g-ht-cal-topo h2 { font-size: 1.25rem; margin-bottom: 4px; }
   .g-ht-ocup .g-ht-mes { display: grid !important; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-  .g-ht-ocup .g-ht-sem { padding: 0 0 2px; color: #1f1b17; }
+  .g-ht-ocup .g-ht-sem { padding: 0 0 2px; color: var(--g-tinta); }
   .g-ht-ocup .g-ht-dia { min-height: 0; padding: 3px 6px; gap: 2px; border-radius: 6px; border-color: #9c9184; background: #fff; opacity: 1; break-inside: avoid; }
-  .g-ht-ocup .g-ht-dia.passado { color: #6a625a; }
+  .g-ht-ocup .g-ht-dia.passado { color: var(--g-cinza); }
   .g-ht-ocup .g-ht-dia.passado .g-ht-oc { opacity: .75; }
-  .g-ht-ocup .g-ht-dia.hoje { box-shadow: none; border: 2px solid #1f1b17; }
+  .g-ht-ocup .g-ht-dia.hoje { box-shadow: none; border: 2px solid var(--g-tinta); }
   .g-ht-ocup .g-ht-dia .n { font-size: .9375rem; line-height: 1.15; }
-  .g-ht-ocup .g-ht-oc { font-size: .8125rem; padding: 0 5px; border-radius: 4px; color: #1f1b17; }
-  .g-ht-ocup .g-ht-oc.cheio { font-weight: 800; outline: 1.5px solid #7a281b; outline-offset: -1.5px; }
+  .g-ht-ocup .g-ht-oc { font-size: .8125rem; padding: 0 5px; border-radius: 4px; color: var(--g-tinta); }
+  .g-ht-ocup .g-ht-oc.cheio { font-weight: 800; outline: 1.5px solid var(--txt-vermelho); outline-offset: -1.5px; }
   .g-ht-ocup .g-ht-dia .fer { -webkit-line-clamp: 1; line-clamp: 1; font-size: .625rem; }
-  .g-ht-ocup .g-ht-legenda { margin-top: 6px; font-size: .75rem; color: #1f1b17; }
+  .g-ht-ocup .g-ht-legenda { margin-top: 6px; font-size: .75rem; color: var(--g-tinta); }
 }
 
 /* conta do check-out ainda carregando: nada de valor na tela até tudo chegar */

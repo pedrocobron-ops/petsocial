@@ -9,11 +9,14 @@ import { useDados } from "./ui";
 import "./financeiro/recebimentos.css";
 
 type Pago = { de: string; ate: string; valor: number; pago_em: string };
-type Mes = { de: string; ate: string; atendimentos: number; com_pacote: number; base: number; base_produtos: number; comissao_servicos: number; comissao_produtos: number; comissao: number; pagos: Pago[] };
+// base, base_produtos e a divisão serviços/produtos vêm vazias para quem recebe só o total (sem Caixa, Financeiro nem Relatórios)
+type Mes = { de: string; ate: string; atendimentos: number; com_pacote: number; base: number | null; base_produtos: number | null; comissao_servicos: number | null; comissao_produtos: number | null; comissao: number; pagos: Pago[] };
 
 /**
  * "Minha comissão": a comissão de quem está logado, do mês atual e do anterior.
  * O banco entrega só a linha da própria pessoa: nada do financeiro do pet shop nem da comissão dos colegas.
+ * Quem não mexe com dinheiro recebe só o total do mês e quantos atendimentos foram: nem a base, nem o percentual, nem o valor
+ * de cada atendimento (o valor dividido pelo percentual daria o preço do serviço). O dono libera os valores em Meu pet shop.
  * Não aparece para quem não tem comissão.
  */
 export default function MinhaComissao() {
@@ -25,10 +28,11 @@ export default function MinhaComissao() {
     if (!pode) return null;
     const r = await sb.rpc("minha_comissao", { p_petshop: petshop.id });
     if (r.error) return null;
-    return r.data as { pct: number; meses: Mes[] } | null;
+    return r.data as { pct: number | null; meses: Mes[]; so_total?: boolean; tem_comissao?: boolean } | null;
   }, [petshop.id, pode]);
   const meses = dados?.meses ?? [];
-  if (!meses.length || !(Number(dados?.pct) > 0 || meses.some((m) => Number(m.comissao) > 0))) return null;
+  if (!meses.length || !(dados?.tem_comissao || Number(dados?.pct) > 0 || meses.some((m) => Number(m.comissao) > 0))) return null;
+  const soTotal = Boolean(dados?.so_total);
   const n = (q: number) => (q === 1 ? "1 atendimento" : `${q} atendimentos`);
   return (
     <section className="g-card gr-minha" aria-label="Minha comissão">
@@ -43,7 +47,7 @@ export default function MinhaComissao() {
             <div key={m.de}>
               <small>{i === 0 ? `${nomeMes(deIsoDia(m.de))}, até agora` : nomeMes(deIsoDia(m.de))}</small>
               <b className="g-tab">{brl(m.comissao)}</b>
-              <small>{n(m.atendimentos)}{vejoFinanceiro ? ` · base ${brl(m.base)}` : ""}{Number(m.comissao_produtos) > 0 ? ` · produtos ${brl(m.comissao_produtos)}` : ""}</small>
+              <small>{n(m.atendimentos)}{vejoFinanceiro && m.base != null ? ` · base ${brl(m.base)}` : ""}{Number(m.comissao_produtos) > 0 ? ` · produtos ${brl(m.comissao_produtos)}` : ""}</small>
               {m.pagos.length > 0
                 ? <small><span className="g-tag verde">{brl(pago)} pago</span> {[...new Set(m.pagos.map((p) => `${dataCurta(p.de)} a ${dataCurta(p.ate)}`))].join(", ")}</small>
                 : Number(m.comissao) > 0 ? <small><span className="g-tag">ainda não marcada como paga</span></small> : null}
@@ -53,6 +57,7 @@ export default function MinhaComissao() {
       </div>
       <p className="g-muted g-pp">
         Conta sobre o valor cobrado pelo serviço nos atendimentos que você concluiu{op.extras ? ", com os extras" : ""}{op.produtos ? ", mais os produtos vendidos na conta" : ""}. Quem fecha o valor e paga é o dono.
+        {soTotal ? " Aqui aparece o total do mês; o valor de cada atendimento fica com quem cuida do financeiro." : ""}
       </p>
     </section>
   );

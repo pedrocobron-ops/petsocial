@@ -42,7 +42,7 @@
 .g-cont-tab th.n { white-space: normal; }
 .g-cont-tab td small { display: block; font-size: .75rem; color: var(--g-cinza); }
 .g-cont-tab tr.falta td b { color: var(--g-vermelho); }
-.g-cont-tab tr.sobra td b { color: #2f6b4c; }
+.g-cont-tab tr.sobra td b { color: var(--txt-verde-2); }
 .g-cont-tab tfoot td { border-bottom: 0; font-size: .875rem; }
 @media (max-width: 520px) {
   .g-cont-tab { font-size: .875rem; }

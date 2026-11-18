@@ -6,6 +6,8 @@ import { conferirCaixa } from "@/lib/gestao/dinheiro";
 import { contaDaTroca, devolver, lerDevolvivel, resta, valorQueVolta, type LinhaDevolvivel, type ModoDevolucao } from "@/lib/gestao/devolucao";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { brl, dataCompleta } from "@/lib/gestao/util";
+import { nomeDeQuemAtende, textoComprovanteDevolucao } from "@/lib/gestao/comprovante";
+import { FolhaVendaFeita } from "./comprovante-venda";
 import { useGestao } from "../contexto";
 import { avisarMudanca, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { BuscaProduto, novaChave, useProdutosDaLoja, type ItemConta } from "./conta";
@@ -40,7 +42,9 @@ function CampoNumero({ valor, aoMudar, max, rotulo }: { valor: number; aoMudar: 
 }
 
 export default function FolhaDevolucao({ venda, aoFechar, aoPronto }: { venda: VendaParaDevolver; aoFechar: () => void; aoPronto?: () => void }) {
-  const { sb, petshop, cuidoDoFinanceiro } = useGestao();
+  const { sb, petshop, cuidoDoFinanceiro, eu } = useGestao();
+  // depois de gravar: o comprovante (o que voltou, o que levou, a diferença e para onde foi o dinheiro)
+  const [feita, setFeita] = useState<{ valor: number; rotulo: string; frase: string; texto: string; tutor: { nome: string; telefone?: string | null } | null } | null>(null);
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const op = useOperacao();
@@ -88,11 +92,30 @@ export default function FolhaDevolucao({ venda, aoFechar, aoPronto }: { venda: V
       // a venda nova da troca leva a diferença no crédito: anota em quantas vezes (tenta de novo e avisa se não der)
       if (parcelasDaTroca) await anotarParcelas([r.entrada_id], parcelasDaTroca);
       avisarMudanca();
-      aoPronto?.();
-      aoFechar();
+      // o comprovante: de quem é a compra (o tutor da venda, ou o escolhido aqui)
+      let quem: { nome: string; telefone?: string | null } | null = tutor;
+      if (!quem && venda.cliente_id) quem = (await sb.from("clientes").select("nome, telefone").eq("petshop_id", petshop.id).eq("id", venda.cliente_id).maybeSingle()).data ?? null;
+      const levou = modo === "troca" ? novos.filter((i) => i.qtd > 0 && i.produtoId).map((i) => ({ nome: i.nome, qtd: i.qtd, valor: i.valor ?? 0 })) : null;
+      const texto = textoComprovanteDevolucao({
+        petshop: petshop.nome, tutor: quem?.nome, modo, valor: Number(r.valor),
+        itens: voltam.map((l) => ({ nome: l.nome, qtd: qtd[l.produto_id], valor: valorQueVolta(l, qtd[l.produto_id]) })),
+        novos: levou, valorNovos: modo === "troca" ? Number(r.novos ?? leva) : null, forma: mexeNoDinheiro ? forma : null, resto: modo === "troca" ? resto : null,
+        hora: new Date(), quem: nomeDeQuemAtende(eu),
+      });
+      setFeita({
+        texto, tutor: quem,
+        valor: modo === "troca" ? Math.abs(d) : Number(r.valor),
+        rotulo: modo === "dinheiro" ? "Devolvido ao cliente" : modo === "credito" ? "Ficou de crédito" : d > 0 ? "Diferença recebida" : d < 0 ? (resto === "credito" ? "Diferença que ficou de crédito" : "Diferença devolvida") : "Troca sem diferença",
+        frase: modo === "troca" ? "Troca feita. O que voltou entrou no estoque e o que o cliente levou saiu." : "Devolução anotada. O que voltou em bom estado entrou no estoque.",
+      });
       return true;
     } catch (e) { avisarErro(e); return false; }
   });
+
+  if (feita) {
+    return <FolhaVendaFeita titulo={modo === "troca" ? "Troca feita" : "Devolução feita"} rotulo={feita.rotulo} valor={feita.valor} frase={feita.frase} texto={feita.texto}
+      telefone={feita.tutor?.telefone} tutor={feita.tutor?.nome} tituloImpresso={modo === "troca" ? "Comprovante de troca" : "Comprovante de devolução"} aoFechar={() => { aoPronto?.(); aoFechar(); }} />;
+  }
 
   const rotuloBotao = modo === "dinheiro" ? `Devolver ${brl(volta)}` : modo === "credito" ? `Deixar ${brl(volta)} de crédito`
     : troca.cobrar > 0 ? `Trocar e receber ${brl(troca.cobrar)}` : troca.devolver > 0 ? `Trocar e ${resto === "credito" ? "deixar" : "devolver"} ${brl(troca.devolver)}` : "Fazer a troca";

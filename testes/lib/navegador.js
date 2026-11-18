@@ -55,6 +55,19 @@ async function ir(page, rota, seletor = '.g-main') {
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(400);
 }
+/**
+ * Toca num botão ou link do cabeçalho da tela pelo nome. No celular, as ações a mais (Exportar, Trazer de planilha, Foto do
+ * caderno, Etiquetas…) ficam dentro do "Mais" (mais-acoes.tsx): se o botão não está à vista, abre o "Mais" antes.
+ */
+async function doAlto(page, nome, papel = 'button') {
+  const alvo = () => page.locator('.g-topo .g-acoes').getByRole(papel, { name: nome }).first();
+  await page.locator('.g-topo .g-acoes').first().waitFor({ timeout: 20000 });
+  if (!(await alvo().isVisible().catch(() => false))) {
+    const mais = page.locator('.g-topo .g-mais-botao').first();
+    if (await mais.isVisible().catch(() => false)) await mais.click();
+  }
+  await alvo().click();
+}
 const rolagemLateral = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
-module.exports = { playwright, abrirNavegador, fecharNavegador, contexto, entrar, fecharAvisos, ir, rolagemLateral, IGNORAR };
+module.exports = { playwright, abrirNavegador, fecharNavegador, contexto, entrar, fecharAvisos, ir, doAlto, rolagemLateral, IGNORAR };

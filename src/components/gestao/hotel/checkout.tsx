@@ -7,10 +7,12 @@ import { conferirCaixa, conferirValorAlto, formaPrincipal, parteDaChave, type It
 import { casoDoErro, fazerTudoOuNada, partesOuNada, passoDoEstoque, ref, type Passo, type ResultadoDaOperacao } from "@/lib/gestao/tudo-ou-nada";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import {
-  contaDasDiarias, contarDiarias, diasDasNoites, fechoDaConta, noitesAntesDaEntrada, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDaSobra, textoDoPagamentoDaConta,
+  contaDasDiarias, contarDiarias, diasDasNoites, fechoDaConta, noitesAntesDaEntrada, NOTA_PACOTE, lerConta, linhasDaConta, repartirPagamento, taxaNaConta, taxasGuardadas, textoComprovanteEstadia, textoDaSobra, textoDoPagamentoDaConta, totalPagoAgora,
   type ContaDaEstadia, type DestinoDaSobra, type EstadiaDoTutor, type Noite, type TaxaDaConta, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
 import { taxasDe } from "@/lib/gestao/hotel-opcoes";
+import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
+import { nomeDeQuemAtende } from "@/lib/gestao/comprovante";
 import { atrasoSugerido, ID_TAXA_ATRASO, NOME_TAXA_ATRASO } from "@/lib/gestao/feriados";
 import { usaModulo } from "@/lib/gestao/modulos";
 import type { Banco } from "@/lib/gestao/supabase";
@@ -25,7 +27,7 @@ import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { AvatarPet, Campo, Folha, mensagemDeErro, useAvisos, useDados } from "../ui";
 import { BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, LEVA_E_TRAZ, LinhaDaConta, novaChave, produtosDaConta, useProdutosDaLoja, valorDaLinha, type ItemConta } from "../loja/conta";
-import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, ParcelasNaTela, QuandoPaga, useAnotarParcelas, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
+import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, ParcelasNaTela, QuandoPaga, temDinheiro, useAnotarParcelas, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
 import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import { ehDemora, mensagemDe } from "@/lib/gestao/erros";
 import { ehAdiantado } from "./sinal";
@@ -110,8 +112,11 @@ export function NoitePorNoite({ noites, total }: { noites: Noite[]; total: numbe
  * sem mexer na hora da saída.
  */
 export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false }: { estadia: EstadiaCompleta; aoFechar: () => void; aoGravar: () => void; pendente?: boolean }) {
-  const { sb, petshop, servicos, vejoFinanceiro, user } = useGestao();
+  const { sb, petshop, servicos, vejoFinanceiro, cuidoDoFinanceiro, eu } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
+  // preço travado (Meu pet shop): quem só opera o caixa cobra as diárias pelas datas e a conta como ela dá (o banco confere igual)
+  const trava = travaDePreco(petshop);
+  const travado = trava.ligada && vejoFinanceiro && !cuidoDoFinanceiro && !estadia.mensalista;
   const anotarParcelas = useAnotarParcelas();
   const [agora] = useState(() => (pendente && estadia.saida ? new Date(estadia.saida) : new Date()));
   const contadas = pendente && estadia.diarias_cobradas ? estadia.diarias_cobradas : contarDiarias(estadia, agora);
@@ -220,6 +225,18 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
   const [formaDevolucao, setFormaDevolucao] = useState<Forma | null>(null);
   const [notaSobra, setNotaSobra] = useState("");
   const [erroSobra, setErroSobra] = useState<string | null>(null);
+  // com o preço travado: menos diárias do que as datas e valor abaixo da conta (menos o desconto que o caixa pode dar) não passam
+  const pelasDatas = contarDiarias(estadia, agora);
+  const diariasAMenos = travado && nValido && n < pelasDatas;
+  const descontoDoCaixa = travado ? Math.floor(soma * trava.descontoMax + 0.000001) / 100 : 0;
+  const minimoAReceber = travado && calculado != null ? Math.max(0, centavos(calculado - descontoDoCaixa)) : null;
+  // em branco (fica para cobrar depois) só vale no check-out sem sinal; no acerto de um check-out pendente, em branco é não cobrar
+  const emBrancoPode = valor == null && !pendente && !sinalNaConta;
+  const valorAbaixo = minimoAReceber != null && valorEditado !== undefined && !emBrancoPode && (valor ?? 0) < minimoAReceber - 0.005;
+  const erroDaTrava = diariasAMenos
+    ? `Pelas datas ${pelasDatas === 1 ? `é 1 ${estadia.tipo === "hotel" ? "noite" : "dia"}` : `são ${pelasDatas} ${estadia.tipo === "hotel" ? "noites" : "dias"}`}. Com o preço travado, só o dono ou quem vê o financeiro cobra menos.`
+    : valorAbaixo ? `Com o preço travado, o menor valor que o caixa recebe nesta conta é ${brl(minimoAReceber)}${trava.descontoMax > 0 ? ` (desconto de até ${trava.descontoMax.toLocaleString("pt-BR")}%)` : ""}. Para cobrar menos, chame o dono ou quem vê o financeiro.`
+    : null;
   const cobra = vejoFinanceiro && Boolean(valor);
   // crédito do tutor (de uma estadia anterior): entra na conta, se a pessoa quiser
   const saldoCredito = mais?.credito ?? 0;
@@ -249,6 +266,9 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
       soma, ajuste: centavos(total - soma), total, sinal: sinalNaConta, sinal_pago: valores?.sinal_estado === "pago" || cortaSinal || recebeJunto.some((p) => p.ehSinal),
       a_pagar: centavos((valor ?? 0) - creditoUsado), pendencias: recebeJunto.filter((p) => !p.ehSinal).map((p) => ({ descricao: p.descricao || p.categoria, valor: p.valor })),
       pagamento: pg, lancamento_id: lancamentoId,
+      // o sinal (ou o que faltava dele) recebido neste mesmo pagamento: o comprovante diz "recebido agora", e não "já pago"
+      ...(recebeJunto.some((p) => p.ehSinal) ? { sinal_junto: centavos(recebeJunto.filter((p) => p.ehSinal).reduce((t, p) => t + p.valor, 0)) } : {}),
+      quem: nomeDeQuemAtende(eu), hora: new Date().toISOString(),
       ...(sobraDoSinal > 0 ? { sobra: sobra ?? { valor: sobraDoSinal, destino: destino ?? "mantido" } } : {}),
       ...(creditoUsado > 0 ? { credito_usado: creditoUsado } : {}),
       ...(descontoPromo > 0 && promoAtiva ? { promo: { id: promoAtiva.id, nome: promoAtiva.nome, tipo: promoAtiva.tipo, valor: promoAtiva.valor, desconto: descontoPromo, dias: daPromo.dias } } : {}),
@@ -277,6 +297,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
     if (salvando) return;
     if (!contaPronta) { avisarErro("Espere a conta terminar de carregar."); return; }
     if (!nValido) { avisarErro("Confira o número de diárias."); return; }
+    if (erroDaTrava) { avisarErro(erroDaTrava); return; }
     if (atraso && comAtraso === null) { setErroAtraso(true); document.getElementById("g-ht-atraso")?.scrollIntoView({ block: "center", behavior: "smooth" }); avisarErro("Diga se a taxa de busca fora do horário entra na conta ou não."); return; }
     const valorRuim = erroDeValor(valor) ?? (vejoFinanceiro ? erroDaConta(itens, null, soma) : null);
     if (valorRuim) { avisarErro(valorRuim); return; }
@@ -369,7 +390,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
           for (const [i, p] of recebeJunto.entries()) {
             passos.push({ t: "receber", conta: p.id, valor: p.valor, forma: formaPrincipal(dasOutras[i]), pagamentos: partesOuNada(dasOutras[i]), esperado: p.valor, chave: parteDaChave(chave, "conta", p.id) });
           }
-          pg = { fiado: false, forma: rec.forma, pagamentos: rec.pagamentos };
+          pg = { fiado: false, forma: rec.forma, pagamentos: rec.pagamentos, valor: recebido, ...(pagamento.parcelas && pagamento.parcelas > 1 ? { parcelas: pagamento.parcelas } : {}) };
           recado = `${foi} ${brl(recebido)} no financeiro.`;
         }
       }
@@ -387,6 +408,8 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
         if (casoDoErro(e) === "maestro:estadia_ja") { avisar(pendente ? "Essa estadia já tinha sido acertada. Atualizei a lista." : "Esse check-out já tinha sido feito. Atualizei a lista."); aoGravar(); return; }
         // o banco conferiu com o que já foi pago (sinal, crédito) e o valor passava do que falta: lê tudo de novo e mostra a conta certa
         if (casoDoErro(e) === "maestro:passa_do_devido") { avisarErro(`Nada foi cobrado. ${mensagemDeErro(e)}`); setValorEditado(undefined); void lerMais(); return; }
+        // preço travado: o banco recusou (a conta dele é a que vale). Tocar de novo não adianta: a frase diz o que fazer.
+        if (casoDoErro(e) === "maestro:preco_travado") { avisarErro(`${pendente ? "A estadia não foi acertada" : "O check-out não foi feito"} e nada foi cobrado. ${mensagemDeErro(e)}`); return false; }
         // nada ficou gravado (ou a resposta não chegou): a mesma chave na nova tentativa não lança nada duas vezes
         // demorou demais: sem o texto técnico; a nova tentativa usa a mesma chave, então não cobra duas vezes
         if (ehDemora(mensagemDe(e))) avisarErro(`${pendente ? "A estadia não foi acertada" : "O check-out não foi feito"}: demorou demais e nada ficou pela metade. Toque de novo para tentar (não cobra duas vezes).`);
@@ -409,14 +432,14 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
   if (fechada) return <ContaFechada estadia={estadia} conta={fechada.conta} saida={fechada.saida} aoPronto={aoGravar} pendente={pendente} />;
 
   const mudar = (chave: string, m: Partial<ItemConta>) => setItens((l) => l.map((i) => (i.chave === chave ? { ...i, ...m } : i)));
-  const rotuloDoBotao = salvando ? "Salvando…" : !contaPronta ? (erroDaLeitura ? "Conta não carregou" : "Carregando a conta…") : fiado ? `Anotar ${brl(daEstadia)} a receber` : recebido > 0 ? `Receber ${brl(recebido)}` : pacote ? (pendente ? "Usar o pacote" : "Usar o pacote e encerrar") : pendente ? "Fechar sem cobrar" : "Fazer check-out";
+  const rotuloDoBotao = salvando ? "Salvando…" : !contaPronta ? (erroDaLeitura ? "Conta não carregou" : "Carregando a conta…") : erroDaTrava ? (diariasAMenos ? "Confira as diárias" : "Valor abaixo do permitido") : fiado ? `Anotar ${brl(daEstadia)} a receber` : recebido > 0 ? `Receber ${brl(recebido)}` : pacote ? (pendente ? "Usar o pacote" : "Usar o pacote e encerrar") : pendente ? "Fechar sem cobrar" : "Fazer check-out";
 
   return (
     <ParcelasNaTela.Provider value>
     <Folha titulo={pendente ? `Receber a estadia${pet ? ` de ${pet.nome}` : ""}` : `Check-out${pet ? ` de ${pet.nome}` : ""}`} aoFechar={aoFechar} larga={vejoFinanceiro && temMais}
       rodape={<>
         <button className="g-btn sec" onClick={aoFechar}>Voltar</button>
-        <button className="g-btn pri" onClick={salvar} disabled={salvando || !contaPronta} aria-busy={!contaPronta && !erroDaLeitura}>{rotuloDoBotao}</button>
+        <button className="g-btn pri" onClick={salvar} disabled={salvando || !contaPronta || Boolean(erroDaTrava)} aria-busy={!contaPronta && !erroDaLeitura}>{rotuloDoBotao}</button>
       </>}>
       <div className="g-form">
         <div className="g-card areia">
@@ -430,7 +453,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
         </div>
         {!pendente && <PertencesNaSaida visita={{ tipo: estadia.tipo === "hotel" ? "hotel" : "creche", estadiaId: estadia.id }} />}
         <Campo rotulo="Diárias" dica={nValido ? `${n} ${palavra}${vejoFinanceiro && diaria != null && !dasDiarias.noites ? ` × ${brl(diaria)}` : ""}` : undefined}
-          erro={nValido ? null : "Use um número inteiro, a partir de 1."}>
+          erro={!nValido ? "Use um número inteiro, a partir de 1." : diariasAMenos ? erroDaTrava : null}>
           <input className="g-input g-tab" inputMode="numeric" value={diarias} onChange={(e) => { setDiarias(e.target.value); setValorEditado(undefined); }} />
         </Campo>
         {!contaPronta ? (
@@ -491,14 +514,15 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
                     const on = idsMarcados.includes(t.id), x = taxaNaConta(daReserva.find((y) => y.id === t.id) ?? t, nValido ? n : 1);
                     return (
                       <label key={t.id} className={on ? "on" : ""}>
-                        <input type="checkbox" checked={on} onChange={(ev) => { setMarcadas(ev.target.checked ? [...idsMarcados, t.id] : idsMarcados.filter((i) => i !== t.id)); setValorEditado(undefined); }} />
+                        {/* preço travado: a taxa combinada na reserva só sai da conta com o dono ou quem vê o financeiro */}
+                        <input type="checkbox" checked={on} disabled={travado && on && daReserva.some((y) => y.id === t.id)} onChange={(ev) => { setMarcadas(ev.target.checked ? [...idsMarcados, t.id] : idsMarcados.filter((i) => i !== t.id)); setValorEditado(undefined); }} />
                         <span className="t"><b>{t.nome}</b><small>{t.por === "noite" ? `${brl(x.valor)} por ${estadia.tipo === "hotel" ? "noite" : "dia"} × ${x.qtd}` : "uma vez na conta"}</small></span>
                         <b className="v">{brl(x.total)}</b>
                       </label>
                     );
                   })}
                 </div>
-                <small>Só entra na conta a taxa que você marcar.</small>
+                <small>Só entra na conta a taxa que você marcar.{travado && daReserva.length > 0 ? " Com o preço travado, a taxa combinada na reserva fica na conta." : ""}</small>
               </div>
             )}
             {promoDaEstadia.promo && !estadia.mensalista && (
@@ -579,7 +603,9 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
                 {erroSobra && <p className="g-erro" role="alert">{erroSobra}</p>}
               </div>
             )}
-            {(!pacote || temMais || sinal > 0) && <Campo rotulo="Valor a receber" erro={erroDeValor(valor)} dica={diaria == null && !temMais ? "A diária não foi combinada no check-in. Deixe em branco se não for cobrar." : valorEditado !== undefined && calculado != null && valor !== calculado ? `Pela conta seria ${brl(calculado)}. Você mudou o valor.` : "Deixe em branco se não for cobrar."}>
+            {(!pacote || temMais || sinal > 0) && <Campo rotulo="Valor a receber" erro={erroDeValor(valor) ?? (valorAbaixo ? erroDaTrava : null)} dica={travado && !valorAbaixo && calculado != null && (valorEditado === undefined || valor === calculado)
+              ? (trava.descontoMax > 0 && descontoDoCaixa > 0 ? `Preço travado: você pode dar até ${trava.descontoMax.toLocaleString("pt-BR")}% de desconto (${brl(descontoDoCaixa)} nesta conta).` : "Preço travado: o valor é o da conta. Para mudar, chame o dono ou quem vê o financeiro.")
+              : diaria == null && !temMais ? "A diária não foi combinada no check-in. Deixe em branco se não for cobrar." : valorEditado !== undefined && calculado != null && valor !== calculado ? `Pela conta seria ${brl(calculado)}. Você mudou o valor.` : "Deixe em branco se não for cobrar."}>
               <CampoDinheiro valor={valor} aoMudar={(v) => { setValorEditado(v); setErroForma(null); }} />
             </Campo>}
             {saldoCredito > 0 && cobra && (
@@ -613,7 +639,7 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
                       depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} erro={erroForma} />
                   : <EscolhaPagamento valor={pagamento} aoMudar={(e) => { setPagamento(e); setErroForma(null); }} total={recebido} erro={erroForma} />}
                 {somaJunto > 0 && !fiado && <p className="g-pp g-muted">Recebendo {brl(recebido)}: {brl(daEstadia)} desta estadia e {brl(somaJunto)} de {recebeJunto.length === 1 ? "uma conta anterior" : "contas anteriores"}.</p>}
-                {!fiado && <AvisoCaixaFechado aberto={caixa} />}
+                {!fiado && <AvisoCaixaFechado aberto={caixa} emDinheiro={temDinheiro(pagamento)} />}
               </>
             ) : null}
           </>
@@ -666,7 +692,8 @@ function ContaFechada({ estadia, conta, saida, aoPronto, pendente }: { estadia: 
   const zap = zapDoComprovante(petshop, estadia, conta, saida);
   const junto = centavos(conta.pendencias.reduce((t, p) => t + p.valor, 0));
   const fiado = conta.pagamento?.fiado;
-  const agora = centavos(conta.a_pagar + junto);
+  // o que entrou neste pagamento: o resto da estadia, o sinal recebido junto e as contas antigas (as mesmas linhas do comprovante)
+  const agora = totalPagoAgora(conta);
   const sobra = conta.sobra;
   return (
     <Folha titulo="Conta fechada" aoFechar={aoPronto} rodape={<button type="button" className="g-btn sec" onClick={aoPronto}>Pronto</button>}>
@@ -733,7 +760,7 @@ export function DetalheDaEstadia({ estadia: e, aoFechar, aoCorrigir }: { estadia
             <div className="l forte"><span>Total da estadia</span><span>{brl(conta.total)}</span></div>
             {fechoDaConta(conta).map((l, i) => <div key={i} className="l"><span>{l.texto}</span><span>{l.valor}</span></div>)}
             {conta.pendencias.map((p, i) => <div key={i} className="l fraca"><span>Recebido junto: {p.descricao}</span><span>{brl(p.valor)}</span></div>)}
-            {conta.pagamento && <div className="l fraca"><span>Pagamento{junto > 0 ? ` (${brl(centavos(conta.a_pagar + junto))})` : ""}</span><span>{textoDoPagamentoDaConta(conta.pagamento)}</span></div>}
+            {conta.pagamento && <div className="l fraca"><span>Pagamento{junto > 0 || conta.sinal_junto ? ` (${brl(totalPagoAgora(conta))})` : ""}</span><span>{textoDoPagamentoDaConta(conta.pagamento)}</span></div>}
           </div>
         ) : e.status === "cancelada" ? (
           dados?.sinal_estado ? <p className="g-p">Sinal de {brl(dados.sinal)}: {dados.sinal_estado === "devolvido" ? `devolvido${dados.sinal_devolvido_em ? ` em ${dataCompleta(dados.sinal_devolvido_em)}` : ""}` : dados.sinal_estado === "mantido" ? "não foi devolvido" : dados.sinal_estado === "pago" ? "pago" : "a receber"}.</p> : null

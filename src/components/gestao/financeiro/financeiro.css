@@ -30,7 +30,7 @@
 
 /* diferença na gaveta */
 .gf-dif { padding: 12px 14px; border-radius: var(--g-raio-p); background: var(--g-carta-2); font-weight: 600; font-variant-numeric: tabular-nums; }
-.gf-dif.certo { background: var(--g-menta); color: #24543b; }
+.gf-dif.certo { background: var(--g-menta); color: var(--txt-verde); }
 .gf-dif.sobra { background: var(--g-azul-tint); color: #1f5268; }
 .gf-dif.falta { background: var(--g-vermelho-tint); color: #8b2f20; }
 

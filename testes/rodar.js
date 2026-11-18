@@ -24,7 +24,7 @@ const GRUPOS = {
   migracoes: () => lista('migracoes'),
   tudo: () => [...lista('unidade'), ...lista('banco'), ...lista('migracoes'), ...lista('telas')],
 };
-const PRECISA_SERVIDOR = /^(telas\/|banco\/(tutor|link-ia|cakto|erros|caderno|boletim|fotos-redes|entrada)\.js)/;
+const PRECISA_SERVIDOR = /^(telas\/|banco\/(tutor|link-ia|cakto|erros|caderno|boletim|fotos-redes|entrada|seguranca-rodada9)\.js)/;
 
 function rodar(arq) {
   return new Promise((fim) => {
@@ -70,6 +70,16 @@ async function principal() {
   if (arqs.some((a) => PRECISA_SERVIDOR.test(a)) && !(await B.servidorNoAr())) {
     console.error(`O servidor do aplicativo não responde em ${B.BASE_URL}.\nRode: npx next build && ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 npx next start -p 3214\n(ou defina BASE_URL).`);
     return 2;
+  }
+
+  // Banco LOCAL sem a trava do servidor gravada: renova a carência (migração 20261228) para os testes do Tirar dúvida do
+  // link, do chat de venda e da entrada não dependerem de quando o banco foi criado. Nunca mexe num banco que não é local.
+  if (/\/\/(127\.0\.0\.1|localhost)[:/]/.test(B.SUPABASE_URL)) {
+    try {
+      B.sql(`insert into public.config_interna (chave, valor) select 'servidor_trava_carencia_ate', (now() + interval '30 days')::text
+               where not exists (select 1 from public.config_interna where chave = 'servidor_segredo_sha256')
+             on conflict (chave) do update set valor = excluded.valor`);
+    } catch { /* banco sem a migração: segue */ }
   }
 
   console.log(`Suíte: ${arqs.length} arquivo(s) · Supabase ${B.SUPABASE_URL} · servidor ${B.BASE_URL} · TZ ${process.env.TZ}\n`);

@@ -159,30 +159,49 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
         dias: diasEmOrdem(dias), vence_dia: venceDia, inicio, fim: fim || null, obs: obs.trim() || null, pausa_de: comPausa ? pausaDe : null, pausa_ate: comPausa ? pausaAte : null, taxi,
         ...(perguntaPrimeira && primeira ? { primeira_cobranca: isoMes(primeira === "fora" ? proximoMes : mesAtual) } : {}),
       };
-      let id = plano?.id;
       // modelo escolhido mas com outro preço: o plano fica com preço próprio (e a tela avisa)
       let saiuDoModelo = "";
-      // a gravação já devolve o plano inteiro (com o pet), para a lista mostrar na hora
-      const linha = (plano ? ok(await sb.from("creche_planos").update(campos).eq("id", plano.id).eq("petshop_id", petshop.id).select(SELECT_PLANO).single())
-        : ok(await sb.from("creche_planos").insert({ ...campos, petshop_id: petshop.id, pet_id: pet.id }).select(SELECT_PLANO).single())) as unknown as Plano & { pets: PetDoPlano | null };
-      id = linha.id;
-      if (vejoFinanceiro && mensal != null && id) {
-        const modelo = modelos.find((m) => m.id === modeloId && Number(m.valor_mensal) === mensal) ? modeloId : null;
-        const escolhido = modelos.find((m) => m.id === modeloId);
-        if (escolhido && !modelo) saiuDoModelo = ` Com ${brl(mensal)}, o plano fica com preço próprio, fora do modelo ${escolhido.nome}: o reajuste do modelo não muda este plano.`;
-        ok(await sb.from("creche_planos_valores").upsert({ plano_id: id, petshop_id: petshop.id, valor_mensal: mensal, valor_extra: extra, modelo_id: modelo, taxi_valor: taxi ? taxiValor : null, taxi_modo: taxiModo, atualizado_em: new Date().toISOString() }).select("plano_id"));
+      const comValores = vejoFinanceiro && mensal != null;
+      const modeloGravado = comValores && modelos.find((m) => m.id === modeloId && Number(m.valor_mensal) === mensal) ? modeloId : null;
+      const escolhido = comValores ? modelos.find((m) => m.id === modeloId) : undefined;
+      if (escolhido && !modeloGravado) saiuDoModelo = ` Com ${brl(mensal!)}, o plano fica com preço próprio, fora do modelo ${escolhido.nome}: o reajuste do modelo não muda este plano.`;
+      const precos = comValores ? { valor_mensal: mensal, valor_extra: extra, modelo_id: modeloGravado, taxi_valor: taxi ? taxiValor : null, taxi_modo: taxiModo } : null;
+      const comCobranca = perguntaPrimeira && mensal != null && (primeira === "proporcional" || primeira === "inteiro");
+      const valorDaPrimeira = comCobranca ? (primeira === "proporcional" ? prop!.valor : mensal!) : 0;
+      // plano, valor e primeira cobrança numa gravação só (função creche_plano_salvar): ou entra tudo, ou não entra nada.
+      // Antes eram três gravações: se a internet caía no meio, o plano ficava salvo "sem valor".
+      let id = plano?.id;
+      let cobrancaId: string | null = null;
+      let erroDaCobranca = "";
+      const junto = await sb.rpc("creche_plano_salvar", {
+        p_petshop: petshop.id, p_pet: pet.id, p_plano: plano?.id ?? null, p_campos: campos as never, p_valores: precos as never,
+        p_cobranca: (comCobranca ? { mes: isoMes(mesAtual), valor: valorDaPrimeira, vencimento: vencDaPrimeira } : null) as never,
+      } as never);
+      if (junto.error && (junto.error.code === "PGRST202" || junto.error.code === "42883")) {
+        // banco antes da atualização: grava em partes, como antes
+        const gravada = (plano ? ok(await sb.from("creche_planos").update(campos).eq("id", plano.id).eq("petshop_id", petshop.id).select("id").single())
+          : ok(await sb.from("creche_planos").insert({ ...campos, petshop_id: petshop.id, pet_id: pet.id }).select("id").single())) as { id: string };
+        id = gravada.id;
+        if (precos) ok(await sb.from("creche_planos_valores").upsert({ plano_id: id, petshop_id: petshop.id, ...precos, atualizado_em: new Date().toISOString() }).select("plano_id"));
+        if (comCobranca) {
+          const r = await sb.rpc("creche_cobranca_criar", { p_plano: id, p_mes: isoMes(mesAtual), p_valor: valorDaPrimeira, p_vencimento: vencDaPrimeira });
+          if (r.error) erroDaCobranca = r.error.message; else cobrancaId = r.data as string;
+        }
+      } else {
+        if (junto.error) throw new Error(junto.error.message);
+        const feito = junto.data as unknown as { id: string; cobranca_id: string | null };
+        id = feito.id; cobrancaId = feito.cobranca_id;
       }
+      // o plano inteiro (com o pet), para a lista mostrar na hora
+      const linha = ok(await sb.from("creche_planos").select(SELECT_PLANO).eq("id", id!).eq("petshop_id", petshop.id).single()) as unknown as Plano & { pets: PetDoPlano | null };
       let cobrou = "";
-      if (perguntaPrimeira && id && mensal != null && (primeira === "proporcional" || primeira === "inteiro")) {
-        const valor = primeira === "proporcional" ? prop!.valor : mensal;
-        const r = await sb.rpc("creche_cobranca_criar", { p_plano: id, p_mes: isoMes(mesAtual), p_valor: valor, p_vencimento: vencDaPrimeira });
-        if (r.error) avisarErro(`O plano foi salvo, mas a primeira cobrança não foi criada (${r.error.message}). Gere em Cobranças.`);
+      if (comCobranca) {
+        if (erroDaCobranca || !cobrancaId) avisarErro(`O plano foi salvo, mas a primeira cobrança não foi criada (${erroDaCobranca || "sem resposta"}). Gere em Cobranças.`);
         else {
-          // o banco já aplica o desconto para irmãos (opção da creche): o aviso diz o total que ficou
-          // (e o táxi do mês): o aviso diz o total que ficou na cobrança
-          const g = await sb.from("creche_cobrancas").select("total, desconto_irmao").eq("id", r.data as string).maybeSingle();
+          // o banco já aplica o desconto para irmãos (opção da creche) e o táxi do mês: o aviso diz o total que ficou na cobrança
+          const g = await sb.from("creche_cobrancas").select("total, desconto_irmao").eq("id", cobrancaId).maybeSingle();
           const irmao = Number(g.data?.desconto_irmao ?? 0);
-          const total = g.data ? Number(g.data.total) : centavos(valor + taxiDoMes);
+          const total = g.data ? Number(g.data.total) : centavos(valorDaPrimeira + taxiDoMes);
           const partes = [taxiDoMes > 0 ? `com ${brl(taxiDoMes)} de táxi pet do mês` : "", irmao > 0 ? `com ${brl(irmao)} de desconto irmão` : ""].filter(Boolean).join(" e ");
           cobrou = ` A cobrança de ${nomeMes(mesAtual)} (${brl(total)}${partes ? `, ${partes}` : ""}) vence em ${dataCurta(vencDaPrimeira)}.`;
         }

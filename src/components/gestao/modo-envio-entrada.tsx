@@ -23,7 +23,7 @@ export default function EntradaModoEnvio({ pronto }: { pronto: boolean }) {
   if (!n) return null;
   const partes = resumoDaFila(dados!);
   return (
-    <Link href="/gestao/app/mensagens" className="g-card g-me-entrada" aria-label={n === 1 ? "Mandar 1 mensagem pelo WhatsApp" : `Mandar ${n} mensagens pelo WhatsApp`}>
+    <Link href="/gestao/app/mensagens" className="g-card g-me-entrada">
       <Tile icone={Send} tom="menta" />
       <span className="t">
         <b>{n === 1 ? "Mandar 1 mensagem" : `Mandar ${n} mensagens`}</b>

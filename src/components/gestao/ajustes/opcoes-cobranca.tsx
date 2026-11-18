@@ -152,7 +152,7 @@ export default function OpcoesDeCobranca() {
         <div className="gr-op-bloco">
           <div><b>Preço e desconto na venda</b><p className="g-muted g-pp">Toda venda com preço diferente da lista ou com desconto fica anotada (quem vendeu, de quanto para quanto) e aparece para você na tela Hoje. Isso vale sempre, sem ligar nada.</p></div>
           <Chave nome="Só o dono e quem vê o financeiro mudam preço ou dão desconto" titulo="Só o dono e quem vê o financeiro mudam preço ou dão desconto" ligado={trava.ligada} desligado={ocupado}
-            apoio="Quem só opera o caixa vende pelo preço da lista (produto, serviço do horário e pacote) e não diminui o valor de um atendimento já concluído: não volta para marcado, não apaga da agenda, não troca o serviço nem o porte para baixar a conta. Também não muda o preço dos produtos no Estoque, nem dá saída como venda sem o dinheiro entrar. Desligado, tudo isso pode, e fica anotado com o nome de quem fez."
+            apoio="Quem só opera o caixa vende pelo preço da lista (produto, serviço do horário, pacote e diária da creche e do hotel) e não diminui o valor de um atendimento já concluído: não volta para marcado, não apaga da agenda, não troca o serviço nem o porte para baixar a conta. No check-out da creche e do hotel, cobra as diárias pelas datas e o valor que a conta dá. Também não apaga nem baixa um valor já recebido, não muda o preço dos produtos no Estoque, nem dá saída como venda sem o dinheiro entrar. Desligado, tudo isso pode, e fica anotado com o nome de quem fez."
             aoMudar={() => void gravar({ [K.precoTravado]: !trava.ligada }, trava.ligada ? "Preço liberado para quem recebe. As mudanças continuam anotadas." : "Preço travado para quem só opera o caixa.")} />
           {trava.ligada && (
             <Campo rotulo="Desconto máximo que o caixa pode dar (%)" dica="Em branco ou zero, o caixa não dá desconto nenhum. O dono e quem vê o financeiro não têm limite.">
@@ -184,6 +184,9 @@ export default function OpcoesDeCobranca() {
           <Chave nome="Extras contam para a comissão" titulo="Extras contam para a comissão" ligado={c.extras} desligado={ocupado}
             apoio="Hidratação, leva e traz e outros extras da conta entram na base, junto com o serviço."
             aoMudar={() => void gravar({ [K.comissaoExtras]: !c.extras }, c.extras ? "Extras fora da comissão." : "Extras passam a contar para a comissão.")} />
+          <Chave nome="Mostrar o valor de cada atendimento na comissão" titulo="A pessoa vê o valor de cada atendimento" ligado={c.mostrarValores} desligado={ocupado}
+            apoio="Desligado, quem não mexe com dinheiro vê só o total da própria comissão no mês e quantos atendimentos fez. Ligado, vê também a base, o percentual e o valor de cada atendimento (com isso dá para saber o preço de cada serviço)."
+            aoMudar={() => void gravar({ [K.comissaoMostrarValores]: !c.mostrarValores }, c.mostrarValores ? "A equipe volta a ver só o total da comissão." : "A equipe passa a ver o valor de cada atendimento na própria comissão.")} />
           {usaModulo(petshop, "loja") && (
             <>
               <Chave nome="Comissão sobre produtos" titulo="Comissão sobre produtos" ligado={c.produtos} desligado={ocupado}

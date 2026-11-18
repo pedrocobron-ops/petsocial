@@ -141,4 +141,96 @@ const COLUNAS = {
   const op = (await mon.rpc('petshop_opcoes', { p: A.P })).data ?? {};
   T.ok('opções do negócio para a equipe sem dinheiro: sem os valores', !JSON.stringify(op).match(/experiencia_preco|"valor":\s*\d/), op);
   T.ok('anônimo não executa preco_de_tabela', !!(await anon.rpc('preco_de_tabela', { p_petshop: A.P, p_servico: A.S.Banho, p_pet: A.pets.Thor })).error);
+  // ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  // Varredura (ideia da revisão de segurança, rodada 9): TODAS as tabelas e TODAS as funções que a API alcança, lidas do
+  // próprio banco na hora do teste. Tabela ou função nova entra sozinha, sem ninguém lembrar de pôr o nome aqui.
+  // Quem tenta: o dono de OUTRO pet shop (B) e o anônimo, contra os dados de A. Dados de A levam uma marca única.
+  // ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  const MARCA = `MARCA${A.suf.toUpperCase()}`;
+  const cliM = B.must(await a.from('clientes').insert({ petshop_id: A.P, nome: `Tutor ${MARCA}`, telefone: '11977776666', email: `${MARCA.toLowerCase()}@teste-auto.local`, endereco: `Rua ${MARCA}, 7`, obs: `obs ${MARCA}` }).select('id').single(), 'tutor marcado').id;
+  const petM = B.must(await a.from('pets').insert({ petshop_id: A.P, cliente_id: cliM, nome: `Pet ${MARCA}`, especie: 'cao', obs: `obs ${MARCA}` }).select('id').single(), 'pet marcado').id;
+  const lanM = B.must(await a.from('lancamentos').insert({ petshop_id: A.P, tipo: 'entrada', valor: 7777.77, forma: 'pix', categoria: 'Serviços', descricao: `lanc ${MARCA}`, data: A.hoje, pago: true, cliente_id: cliM }).select('id').single(), 'lançamento marcado').id;
+  const contaM = B.must(await a.from('lancamentos').insert({ petshop_id: A.P, tipo: 'entrada', valor: 7777.77, categoria: 'Serviços', descricao: `conta ${MARCA}`, data: A.hoje, vencimento: A.hoje, pago: false, cliente_id: cliM }).select('id').single(), 'conta marcada').id;
+  const vazou = (d) => { const t = JSON.stringify(d ?? null); return t.includes(MARCA) || t.includes(MARCA.toLowerCase()) || t.includes('7777.77'); };
+  // retrato dos dados de A, para conferir no fim que ninguém de fora mudou nada
+  const parte = (t) => `(select md5(coalesce(string_agg(c::text, ',' order by c.id), '')) from ${t} c where petshop_id = '${A.P}')`;
+  const retrato = () => B.sql(`select concat_ws('|', ${['clientes', 'pets', 'agendamentos', 'lancamentos', 'estadias', 'produtos', 'servicos', 'profissionais', 'pacotes_clientes'].map(parte).join(', ')},
+    (select md5(concat_ws(',', nome, status, plano, teste_ate, pago_ate, opcoes, horario, link_ativo, link_codigo, diaria_creche, diaria_hotel, modulos)) from petshops where id = '${A.P}'))`);
+  const antes = retrato();
+  // a varredura enxerga: o dono de A acha a marca pela tabela e por uma função (senão o "nada vazou" não provaria nada)
+  T.ok('a marca aparece para o dono de A (tabela e função)', vazou((await a.from('clientes').select('*').eq('id', cliM)).data) && vazou((await a.from('lancamentos').select('valor').eq('id', lanM)).data));
+
+  T.secao('varredura: todas as tabelas (outro pet shop e anônimo)');
+  const tabelas = B.sql(`select c.relname || ':' || (exists (select 1 from pg_attribute t where t.attrelid = c.oid and t.attname = 'petshop_id' and not t.attisdropped))::int
+    from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'v', 'm', 'p') order by 1`).split('\n').filter(Boolean);
+  // tabelas sem dono (catálogo igual para todos) que o anônimo pode ler de propósito; qualquer outra precisa vir vazia
+  const PUBLICAS = new Set([]);
+  const furos = [];
+  for (const l of tabelas) {
+    const [t, temLoja] = l.split(':');
+    for (const [quem, c] of [['outro pet shop', b], ['anônimo', anon]]) {
+      const livre = await c.from(t).select('*').limit(1000);
+      if (livre.error) continue; // sem permissão: fechado
+      if (vazou(livre.data)) furos.push(`${quem} leu a marca de A em ${t}`);
+      if (livre.data.some((x) => JSON.stringify(x).includes(A.P))) furos.push(`${quem} leu linha com o id de A em ${t}`);
+      if (quem === 'anônimo' && livre.data.length && !PUBLICAS.has(t)) furos.push(`anônimo leu ${livre.data.length} linha(s) de ${t}`);
+      if (temLoja === '1') {
+        const dele = await c.from(t).select('*', { count: 'exact', head: true }).eq('petshop_id', A.P);
+        if (!dele.error && dele.count) furos.push(`${quem} contou ${dele.count} linha(s) de A em ${t}`);
+        const mudou = await c.from(t).update({ petshop_id: A.P }).eq('petshop_id', A.P).select('petshop_id');
+        if (!mudou.error && mudou.data.length) furos.push(`${quem} alterou ${mudou.data.length} linha(s) de A em ${t}`);
+        const apagou = await c.from(t).delete().eq('petshop_id', A.P).select('petshop_id');
+        if (!apagou.error && apagou.data.length) furos.push(`${quem} apagou ${apagou.data.length} linha(s) de A em ${t}`);
+      }
+    }
+  }
+  T.ok(`${tabelas.length} tabelas e visões: ninguém de fora lê, muda ou apaga dado de A`, furos.length === 0, furos.slice(0, 12));
+  T.ok('a varredura achou as tabelas (o banco respondeu a lista)', tabelas.length > 100, tabelas.length);
+
+  T.secao('varredura: todas as funções que a API alcança (outro pet shop e anônimo, com os ids de A)');
+  const funcoes = B.sql(`select p.proname || '#' || has_function_privilege('anon', p.oid, 'execute')::int || '#' || coalesce((
+      select string_agg(coalesce(nullif(x.n, ''), 'a' || x.i) || '~' || x.t::regtype::text, ';' order by x.i)
+      from unnest(p.proargnames[1:p.pronargs], string_to_array(p.proargtypes::text, ' ')::oid[]) with ordinality x(n, t, i)), '')
+    from pg_proc p
+    where p.pronamespace = 'public'::regnamespace and p.prokind = 'f' and p.prorettype <> 'trigger'::regtype
+      and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute'))
+    order by 1`).split('\n').filter(Boolean);
+  const idsDeA = { pet: A.pets.Thor, cliente: cliM, tutor: cliM, agendamento: ag, servico: A.S.Banho, produto: A.prod, profissional: A.ids.tosador, estadia: est, conta: contaM, lancamento: lanM, plano, pacote: pac, caixa, id: lanM, petshop: A.P, p: A.P };
+  const valor = (nome, tipo) => {
+    const k = nome.replace(/^p_/, '');
+    if (tipo === 'uuid') return idsDeA[k] ?? A.P;
+    if (tipo === 'uuid[]') return [idsDeA[k.replace(/s$/, '')] ?? lanM, ag, est, contaM, cliM, petM];
+    if (tipo === 'date') return A.hoje;
+    if (/timestamp/.test(tipo)) return new Date().toISOString();
+    if (tipo === 'text') return /codigo|token/.test(k) ? A.codigo : /tipo/.test(k) ? 'hotel' : /mes/.test(k) ? A.hoje.slice(0, 7) : /busca|texto|nome/.test(k) ? MARCA : 'x';
+    if (tipo === 'text[]') return ['x'];
+    if (/int|numeric|double|real/.test(tipo)) return /\[\]/.test(tipo) ? [1] : 1;
+    if (tipo === 'boolean') return false;
+    if (tipo === 'jsonb' || tipo === 'json') return {};
+    if (tipo === 'time without time zone') return '10:00';
+    return null;
+  };
+  // fora da varredura: o que apagaria ou mudaria a conta de B (quem chama), cria loja, ou só conta uso/erro (freios de todos)
+  const PULA = /^(apagar_|excluir_|conta_|encerrar|admin_|criar_petshop|entrar$|cakto_|escola_evento|erro_registrar|registrar_|vendas_contar|aceitar_documentos|email_provar|servidor_segredo_)/;
+  const vazamentos = [];
+  let chamadas = 0;
+  for (const l of funcoes) {
+    const [nome, paraAnon, args] = l.split('#');
+    if (PULA.test(nome)) continue;
+    const corpo = {};
+    for (const x of (args || '').split(';').filter(Boolean)) { const [n2, t2] = x.split('~'); corpo[n2] = valor(n2, t2); }
+    // as funções do link público (link_*) recebem o código de A de propósito: é o que o cliente de A vê. Só o outro pet shop
+    // (com login) e o anônimo SEM o código entram aqui; o que o link mostra é conferido em link.js e tutor.js.
+    if (/^(link_|tutor_|entrada_|quadro_|boletim_|orcamento_|convite_)/.test(nome)) for (const k of Object.keys(corpo)) if (corpo[k] === A.codigo) corpo[k] = 'x';
+    for (const [quem, c] of [['outro pet shop', b], ...(paraAnon === '1' ? [['anônimo', anon]] : [])]) {
+      let r2; try { r2 = await c.rpc(nome, corpo); } catch (e) { r2 = { error: { message: String(e) } }; }
+      chamadas++;
+      if (!r2.error && vazou(r2.data)) vazamentos.push(`${quem} recebeu dado de A por ${nome}: ${JSON.stringify(r2.data).slice(0, 160)}`);
+    }
+  }
+  T.ok(`${funcoes.length} funções (${chamadas} chamadas): nenhuma devolve dado de A a quem é de fora`, vazamentos.length === 0, vazamentos.slice(0, 8));
+  T.ok('a varredura achou as funções (o banco respondeu a lista)', funcoes.length > 200, funcoes.length);
+  T.ok('depois da varredura, os dados de A estão iguais (ninguém de fora mudou nem apagou nada)', retrato() === antes, 'o retrato dos dados de A mudou');
+  console.log(`  (funções abertas ao anônimo: ${funcoes.filter((l) => l.split('#')[1] === '1').map((l) => l.split('#')[0]).join(', ')})`);
 }))();
+

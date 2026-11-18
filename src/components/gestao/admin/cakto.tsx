@@ -16,7 +16,7 @@ type Config = {
   produto: string | null; aberta: boolean;
   ofertas: Record<string, string>; links: Record<string, string>; antigas: Record<string, string>;
 };
-type SemConta = { id: number; evento: string; email: string | null; recebido_em: string; oferta: string | null; assinatura: string | null; valor: number | null; plano: string | null };
+type SemConta = { id: number; evento: string; email: string | null; recebido_em: string; oferta: string | null; assinatura: string | null; valor: number | null; plano: string | null; sem_prova?: string | null; sem_prova_nome?: string | null };
 
 const MESES: Record<PeriodoId, number> = { mensal: 1, trimestral: 3, semestral: 6 };
 const NOME_EVENTO: Record<string, string> = {
@@ -137,6 +137,7 @@ export default function AbaCakto({ lojas, aoMudar }: { lojas: LojaCakto[]; aoMud
                   <b style={{ overflowWrap: "anywhere" }}>{s.email ?? "sem e-mail"}</b>
                   <span>{NOME_EVENTO[s.evento] ?? s.evento}{nomePlanoMeses(s.plano) ? ` · ${nomePlanoMeses(s.plano)}` : s.oferta ? ` · oferta ${s.oferta}` : ""}{typeof s.valor === "number" ? ` · ${brl(s.valor)}` : ""}</span>
                   <span className="g-tab">{quando(s.recebido_em)}</span>
+                  {s.sem_prova && <span className="g-pp">Este é o e-mail do dono de <b>{s.sem_prova_nome ?? "um pet shop"}</b>, mas ele ainda não provou que a caixa de entrada é dele (o cadastro não confirma e-mail). Confirme com o cliente antes de ligar. Se ele entrar pelo link do “Esqueci minha senha”, o pagamento liga sozinho.</span>}
                 </span>
                 <span className="g-fila" style={{ gap: 6 }}>
                   <button className="g-btn p verde" onClick={() => setLigando(s)}><Link2 />Ligar a um pet shop</button>
@@ -300,13 +301,16 @@ function Ligar({ pagamento, lojas, aoFechar, aoLigar }: { pagamento: SemConta; l
  * alcança com a chave pública. Com a trava ligada, o banco só aceita a contagem que vem do servidor (que manda um
  * segredo que só ele conhece). O botão pede ao servidor para gravar o segredo dele; o banco guarda só uma impressão.
  */
+type EstadoDoServidor = { ligada: boolean; em: string | null; origem?: string | null; carencia_ate?: string | null; ia?: { canal: string; usado: number; teto: number }[] };
+const NOME_CANAL: Record<string, string> = { mozart: "Mozart (chamadas à IA)", ajuda: "Ajuda (perguntas)", boletim: "Texto do boletim", link_ia: "Tirar dúvida do link", vendas: "Chat da página de vendas (24 h)", caderno: "Trazer do caderno (páginas)" };
+
 function TravaDoServidor() {
   const { avisar, avisarErro } = useAvisos();
-  const [estado, setEstado] = useState<{ ligada: boolean; em: string | null } | null>(null);
+  const [estado, setEstado] = useState<EstadoDoServidor | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const carregar = useCallback(async () => {
     const r = await banco().rpc("admin_servidor_estado");
-    setEstado(r.error ? null : (r.data as unknown as { ligada: boolean; em: string | null }));
+    setEstado(r.error ? null : (r.data as unknown as EstadoDoServidor));
   }, []);
   useEffect(() => { void carregar(); }, [carregar]);
   async function ligar() {
@@ -321,19 +325,44 @@ function TravaDoServidor() {
     } catch (e) { avisarErro(e); } finally { setOcupado(false); }
   }
   if (!estado) return null;
+  const carenciaVale = !!estado.carencia_ate && new Date(estado.carencia_ate) > new Date();
   return (
+    <>
     <section className="g-card g-pilha">
       <div className="g-fila entre">
         <div>
           <h2>Trava do servidor</h2>
           <p className="g-muted g-p">{estado.ligada
             ? `Ligada${estado.em ? ` em ${quando(estado.em)}` : ""}. Só o sistema conta as perguntas do Tirar dúvida do link e as mensagens do chat de venda: ninguém gasta a cota de fora.`
-            : "Desligada: alguém de fora pode gastar a cota do dia do Tirar dúvida do link de um pet shop ou do chat de venda. Ligue uma vez neste endereço."}</p>
-          <p className="g-pp g-muted">Se a chave da inteligência artificial for trocada no servidor, toque de novo para gravar a nova trava.</p>
+            : carenciaVale
+              ? `Desligada. Até ${quando(estado.carencia_ate as string)} o Tirar dúvida do link e o chat de venda seguem funcionando sem ela; depois dessa data eles param de responder com a inteligência artificial até a trava ser ligada. Ligue agora neste endereço.`
+              : "Desligada, e o prazo acabou: o Tirar dúvida do link e o chat de venda não estão respondendo com a inteligência artificial. Ligue agora neste endereço."}</p>
+          <p className="g-pp g-muted">{estado.ligada && estado.origem === "servidor" ? "O próprio sistema ligou a trava sozinho. " : ""}Se a chave da inteligência artificial for trocada no servidor, o sistema grava a trava nova sozinho quando tem a chave de serviço; se o Tirar dúvida parar de responder, toque aqui para gravar de novo.</p>
         </div>
         <span className={`g-tag ${estado.ligada ? "verde" : "amarelo"}`}>{estado.ligada ? "ligada" : "desligada"}</span>
       </div>
       <div><button className={`g-btn ${estado.ligada ? "sec" : "verde"}`} disabled={ocupado} onClick={() => void ligar()}>{ocupado ? "Um instante…" : estado.ligada ? "Gravar de novo" : "Ligar a trava"}</button></div>
     </section>
+    {estado.ia && estado.ia.length > 0 && (
+      <section className="g-card g-pilha" data-teste="teto-ia">
+        <div>
+          <h2>Teto de uso da inteligência artificial hoje</h2>
+          <p className="g-muted g-p">Soma de todos os pet shops. Quando um canal chega ao teto, ele para até o dia seguinte e as pessoas leem um aviso simples; as telas seguem funcionando.</p>
+        </div>
+        <div className="g-pilha" style={{ gap: 6 }}>
+          {estado.ia.map((c) => {
+            const pct = c.teto > 0 ? Math.round((c.usado / c.teto) * 100) : 100;
+            return (
+              <div key={c.canal} className="g-linha" style={{ flexWrap: "wrap" }}>
+                <span className="t" style={{ minWidth: 0 }}><b>{NOME_CANAL[c.canal] ?? c.canal}</b><span className="g-tab">{c.usado} de {c.teto}</span></span>
+                <span className={`g-tag ${pct >= 100 ? "vermelho" : pct >= 50 ? "amarelo" : "verde"}`}>{pct >= 100 ? "no teto" : pct >= 50 ? `${pct}%: passou da metade` : `${pct}%`}</span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="g-pp g-muted">Os tetos ficam na configuração interna do banco (mozart_dia_geral, ajuda_dia_geral, boletim_dia_geral, link_ia_dia_geral, vendas_limite_dia, caderno_dia_geral). Peça à equipe técnica para mudar.</p>
+      </section>
+    )}
+    </>
   );
 }

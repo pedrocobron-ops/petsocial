@@ -1,5 +1,5 @@
 /* "Bom dia" do Mozart na tela Hoje: cartão curto, no máximo 3 linhas */
-.g-bomdia { position: relative; display: grid; gap: 10px; padding: 14px 14px 12px; border-radius: 18px; background: linear-gradient(135deg, #fffdf9, #f3f6ee); border: 1px solid rgba(36, 84, 59, .16); box-shadow: var(--g-sombra); }
+.g-bomdia { position: relative; display: grid; gap: 10px; padding: 14px 14px 12px; border-radius: 18px; background: linear-gradient(135deg, var(--g-campo), #f3f6ee); border: 1px solid rgba(36, 84, 59, .16); box-shadow: var(--g-sombra); }
 .g-bomdia-cab { display: flex; align-items: center; gap: 10px; padding-right: 34px; }
 .g-bomdia-cab h2 { font: 480 1.125rem/1.2 var(--display); margin: 0; min-width: 0; }
 .g-bomdia .fechar { position: absolute; top: 6px; right: 6px; width: 40px; height: 40px; color: var(--g-cinza); }
