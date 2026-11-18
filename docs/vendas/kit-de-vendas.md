@@ -22,7 +22,7 @@ Tudo aqui foi conferido com o manual do sistema (`src/lib/gestao/manual.ts`) e c
 
 O Maestro Pet Gestão é o sistema para o pet shop pequeno que faz banho e tosa, creche, hotel ou loja — uma coisa só ou
 todas — e quer organizar o dia pelo celular, sem pagar à parte por cada função. Todas as funções estão em todos os planos,
-desde R$ 59 por mês; o plano muda só pelo número de pessoas que entram. O tutor não precisa instalar nada: recebe o boletim
+desde R$ 79 por mês; o plano muda só pelo número de pessoas que entram. O tutor não precisa instalar nada: recebe o boletim
 do pet com fotos, o link de agendamento e as mensagens pelo WhatsApp do próprio pet shop, sem custo por mensagem cobrado por
 nós. Quem está saindo do caderno ou de outro sistema traz os clientes por foto, print ou PDF e confere tudo antes de salvar.
 E quem está com a mão no banho fala com o Mozart, o assistente de dentro do sistema, que prepara e espera a confirmação.
@@ -169,9 +169,17 @@ já conhece, e não tem custo por mensagem da nossa parte."
 fiscal. Se você precisa emitir nota, continua usando o emissor que usa hoje."
 
 **"É caro?"**
-"O Solo, para quem trabalha sozinho, é R$ 59 por mês. Para até 3 pessoas, R$ 89; para até 6, R$ 129. Todos têm as mesmas
+"O Solo, para quem trabalha sozinho, é R$ 79 por mês. Para até 3 pessoas, R$ 129; para até 6, R$ 179. Todos têm as mesmas
 funções, inclusive o Mozart, creche e hotel. Pagando 3 ou 6 meses de uma vez sai mais barato. Não tem fidelidade, e você
-testa 7 dias sem cartão antes de decidir." (Não ofereça desconto nem cupom.)
+testa 7 dias sem cartão antes de decidir."
+
+**Cupom de desconto (só o vendedor oferece, na conversa).** O vendedor pode dar um cupom da Cakto para fechar a venda. Regras:
+- Use só os cupons criados pela dona na Cakto, com o valor e a validade que ela definiu. Não invente cupom nem porcentagem.
+- Diga o que o cupom é de verdade: "Consigo um cupom de X% para você assinar até [data]". A data tem que ser a validade real do
+  cupom na Cakto.
+- Não diga que o preço "vai subir", que "é a última vaga" ou que "é só hoje" se não for verdade. Não fale em "primeiros
+  clientes".
+- O cupom é digitado pelo cliente na tela de pagamento da Cakto, no campo de cupom.
 
 **"Minha equipe não sabe usar."**
 "Foi feito primeiro para o celular. Cada pessoa vê só as áreas que você libera, então a tela dela é menor. Quem não gosta de
@@ -218,7 +226,7 @@ Use o desenho do boletim (seção Novidades da página) ou prints da conta de de
 
 **Post 5 — Tudo num plano**
 > Banho e tosa, creche, hotel e loja no mesmo sistema.
-> Todas as funções em todos os planos, desde R$ 59 por mês. Você escolhe o plano só pelo número de pessoas que entram.
+> Todas as funções em todos os planos, desde R$ 79 por mês. Você escolhe o plano só pelo número de pessoas que entram.
 > Sem fidelidade. 7 dias grátis, sem cartão.
 
 **Post 6 — WhatsApp do seu número**
@@ -254,9 +262,9 @@ Mande só para quem você já conhece ou que deu o contato. Uma mensagem, sem in
 ## f) Checklist do que ainda depende da dona do Maestro Pet
 
 - [ ] **Preços confirmados.** O código (`src/lib/gestao/planos.ts`) tem hoje:
-      Solo (1 pessoa) R$ 59/mês, R$ 159 a cada 3 meses, R$ 299 a cada 6 meses;
-      Equipe (até 3) R$ 89/mês, R$ 239 a cada 3 meses, R$ 449 a cada 6 meses;
-      Pet shop (até 6) R$ 129/mês, R$ 349 a cada 3 meses, R$ 659 a cada 6 meses.
+      Solo (1 pessoa) R$ 79/mês, R$ 215 a cada 3 meses, R$ 399 a cada 6 meses;
+      Equipe (até 3) R$ 129/mês, R$ 349 a cada 3 meses, R$ 659 a cada 6 meses;
+      Pet shop (até 6) R$ 179/mês, R$ 479 a cada 3 meses, R$ 909 a cada 6 meses.
       Se algum valor mudar, mudar no código (a página e a Nina leem dali) e neste kit.
 - [ ] **Checkout da Cakto pendente.** Criar o produto de assinatura e as ofertas (mensal, 3 e 6 meses de cada plano), colar os
       links no painel do administrador (aba Cakto) ou nas variáveis `NEXT_PUBLIC_GESTAO_CHECKOUT_*`, ligar cada oferta ao plano

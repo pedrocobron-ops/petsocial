@@ -16,9 +16,9 @@ export const PERIODOS: { id: PeriodoId; nome: string; meses: number; cada: strin
 
 /** Valor de cada cobrança. O de 3 meses sai cerca de 10% mais barato que pagar mês a mês; o de 6, cerca de 15%. */
 const PRECOS: Record<PlanoId, Record<PeriodoId, number>> = {
-  solo: { mensal: 59, trimestral: 159, semestral: 299 },
-  equipe: { mensal: 89, trimestral: 239, semestral: 449 },
-  petshop: { mensal: 129, trimestral: 349, semestral: 659 },
+  solo: { mensal: 79, trimestral: 215, semestral: 399 },
+  equipe: { mensal: 129, trimestral: 349, semestral: 659 },
+  petshop: { mensal: 179, trimestral: 479, semestral: 909 },
 };
 
 // cada variável precisa aparecer por extenso para entrar na página
