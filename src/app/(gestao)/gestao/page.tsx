@@ -12,7 +12,7 @@ import { PLANOS } from "@/lib/gestao/planos";
 import { brlCurto } from "@/lib/gestao/util";
 import "./produto.css";
 
-// espaço que não quebra: "R$ 59" fica sempre na mesma linha
+// espaço que não quebra: "R$ 79" fica sempre na mesma linha
 const DESDE = brlCurto(PLANOS[0].preco).replace(" ", "\u00a0");
 const TITULO = `Maestro Pet Gestão: sistema para pet shop, banho e tosa, creche, hotel e loja, desde ${DESDE}`;
 
