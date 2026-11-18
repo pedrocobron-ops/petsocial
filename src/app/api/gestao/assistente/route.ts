@@ -114,10 +114,14 @@ async function tratar(req: Request) {
   const sb = bancoDoUsuario(token);
   const { data: u } = await sb.auth.getUser(token);
   if (!u.user) return erro(401, "sem_login", "Entre de novo para falar com o Mozart.");
-  const [p, e, s] = await Promise.all([
+  // dias fechados e feriados (Meu pet shop) dos próximos 14 dias, com um dia de folga dos dois lados (o relógio é conferido abaixo)
+  const diaDoAparelho = corpo.agora!.slice(0, 10);
+  const somaDia = (n: number) => new Date(Date.parse(`${diaDoAparelho}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
+  const [p, e, s, especiais] = await Promise.all([
     lerPetshop(sb, corpo.petshopId),
     lerEquipe(sb, corpo.petshopId),
     lerServicos(sb, corpo.petshopId),
+    sb.from("dias_especiais").select("dia, nome, fechado, feriado").eq("petshop_id", corpo.petshopId).gte("dia", somaDia(-1)).lte("dia", somaDia(15)).order("dia").limit(40),
   ]);
   const eu = (e.data ?? []).find((x) => x.user_id === u.user!.id && x.ativo);
   if (!p.data || !eu) return erro(403, "sem_acesso", "Você não faz parte deste pet shop.");
@@ -127,6 +131,7 @@ async function tratar(req: Request) {
     vejoFinanceiro: podeArea(eu, "caixa") || podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
     cuidoDoFinanceiro: podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
     fusoMin: corpo.fusoMin, agora: corpo.agora!.slice(0, 16),
+    diasEspeciais: especiais.error ? undefined : (especiais.data ?? []),
   };
   // o relógio que vale é o do servidor: o do aparelho só é usado se bate com ele (aparelho em outro fuso de propósito)
   const doServidor = agoraNoFuso(p.data.fuso || "America/Sao_Paulo");

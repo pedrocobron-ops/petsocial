@@ -45,6 +45,19 @@ export const CHIPS_ATENCAO = ["Vimos uma pulga", "Orelha vermelha", "Pele irrita
 
 export const chipsDo = (tipo: TipoDoBoletim) => (tipo === "banho" ? CHIPS_BANHO : CHIPS_CASA);
 
+/** O recado como a página mostra, no feminino quando a ficha diz Fêmea ("Comportada"). */
+export function recadoNoSexo(rotulo: string, sexo: Sexo) {
+  return sexo === "F" && rotulo === "Comportado" ? "Comportada" : rotulo;
+}
+
+/** O selo do boletim de banho e tosa: os serviços feitos ("Banho e hidratação"); sem serviço, "Banho e tosa". */
+export function seloDoBanho(servicos: string[] | null | undefined) {
+  const l = (servicos ?? []).map((s) => s.trim()).filter(Boolean);
+  if (!l.length) return "Banho e tosa";
+  const texto = l.length === 1 ? l[0] : l.length === 2 ? `${l[0]} e ${l[1].toLowerCase()}` : `${l[0]} e mais ${l.length - 1}`;
+  return texto.length > 34 ? `${texto.slice(0, 32).trimEnd()}…` : texto;
+}
+
 /** Os recados como ficam guardados (e como a página mostra): os rótulos, mais o "Fez amizade com X". */
 export function rotulosDosChips(tipo: TipoDoBoletim, ids: string[], amigo: string): string[] {
   const lista = chipsDo(tipo).filter((c) => ids.includes(c.id)).map((c) => c.rotulo);

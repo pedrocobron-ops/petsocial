@@ -6,6 +6,8 @@ import type { Cliente, Pet, PetComTutor } from "@/lib/gestao/tipos";
 import { PORTES } from "@/lib/gestao/tipos";
 import { ERRO_TELEFONE, isoDia, mascaraTelefone, semAcento, telefoneLimpo, telefoneValido } from "@/lib/gestao/util";
 import { reduzirFoto } from "@/lib/gestao/foto";
+import { diasNoMes, lerNascimento, MESES, montarNascimento } from "@/lib/gestao/aniversario";
+import "./clientes/aniversario.css";
 import { useGestao } from "./contexto";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { AvatarPet, Campo, Folha, ok, useAvisos } from "./ui";
@@ -34,7 +36,14 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
   // tutor digitado que já existe: pergunta antes de criar outro
   const [igual, setIgual] = useState<{ tutor: TutorCurto; por: "telefone" | "nome" } | null>(null);
   const [sexo, setSexo] = useState(pet?.sexo ?? "");
-  const [nascimento, setNascimento] = useState(pet?.nascimento ?? "");
+  // aniversário do pet: dia e mês; o ano é opcional (sem ele, o banco guarda 1904, como o do tutor). Achado da Neide: muita
+  // gente sabe o dia ("niver 20/11") e não o ano.
+  const nasc0 = lerNascimento(pet?.nascimento);
+  const [nDia, setNDia] = useState<number | null>(nasc0?.dia ?? null);
+  const [nMes, setNMes] = useState<number | null>(nasc0?.mes ?? null);
+  const [nAno, setNAno] = useState(nasc0?.ano ? String(nasc0.ano) : "");
+  const montado = montarNascimento(nDia, nMes, nAno.trim() ? Number(nAno.replace(/\D/g, "")) || -1 : null);
+  const nascimento = montado.valor ?? "";
   const [alertas, setAlertas] = useState(pet?.alertas ?? "");
   const [obs, setObs] = useState(pet?.obs ?? "");
   const [foto, setFoto] = useState<string | null>(pet?.foto ?? null);
@@ -76,6 +85,7 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
     e.preventDefault();
     if (!nome.trim() || salvando) return;
     if (!tutorId && precisaTutor && !telefoneValido(tutorFone)) { setErroFone(ERRO_TELEFONE); return; }
+    if (montado.erro) { setErroNasc(montado.erro); return; }
     if (nascimento && nascimento > hoje) { setErroNasc("O nascimento não pode ser depois de hoje."); return; }
     if (especie === "cao" && !porte && !naoSeiPorte) {
       setErroPorte("Escolha o porte. Se ainda não sabe, toque em Não sei ainda.");
@@ -179,10 +189,24 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
             <select className="g-select" value={sexo} onChange={(e) => setSexo(e.target.value)}><option value="">—</option><option value="M">Macho</option><option value="F">Fêmea</option></select>
           </Campo>
         </div>
-        <Campo rotulo="Nascimento" erro={erroNasc}>
-          <input className="g-input" type="date" max={hoje} value={nascimento} aria-invalid={!!erroNasc}
-            onChange={(e) => { setNascimento(e.target.value); setErroNasc(e.target.value && e.target.value > hoje ? "O nascimento não pode ser depois de hoje." : null); }} />
-        </Campo>
+        <div className="g-campo">
+          <span id="niver-pet">Aniversário <small>(opcional)</small></span>
+          <div className="g-niver-campos" role="group" aria-labelledby="niver-pet">
+            <select className="g-select" aria-label="Dia do aniversário do pet" value={nDia ?? ""} aria-invalid={!!erroNasc} onChange={(e) => { setNDia(e.target.value ? Number(e.target.value) : null); setErroNasc(null); }}>
+              <option value="">Dia</option>
+              {Array.from({ length: diasNoMes(nMes ?? 1, null) }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <select className="g-select" aria-label="Mês do aniversário do pet" value={nMes ?? ""} aria-invalid={!!erroNasc} onChange={(e) => { setNMes(e.target.value ? Number(e.target.value) : null); setErroNasc(null); }}>
+              <option value="">Mês</option>
+              {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+            <input className="g-input g-tab" inputMode="numeric" maxLength={4} placeholder="Ano" aria-label="Ano de nascimento do pet (opcional)" value={nAno}
+              onChange={(e) => { setNAno(e.target.value.replace(/\D/g, "")); setErroNasc(null); }} />
+          </div>
+          {erroNasc ? <small className="erro" role="alert">{erroNasc}</small>
+            : montado.erro && (nDia || nMes) && nAno.length !== 1 && nAno.length !== 2 && nAno.length !== 3 ? <small className="erro">{montado.erro}</small>
+            : <small>Para a promoção de aniversário e o parabéns no dia. Sem o ano, a idade não aparece.</small>}
+        </div>
         <Campo rotulo="Cuidados e alertas" dica={comBanho ? "Aparece em destaque na agenda. Ex.: alergia a shampoo, medo de secador, morde." : "Aparece em destaque junto do nome do pet. Ex.: alergia, briga com outros cães, foge no portão."}>
           <CampoComVoz valor={alertas} aoMudar={setAlertas} maxLength={400} rotulo="Ditar os cuidados e alertas"><textarea className="g-textarea" value={alertas} maxLength={400} onChange={(e) => setAlertas(e.target.value)} /></CampoComVoz>
         </Campo>

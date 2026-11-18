@@ -161,7 +161,7 @@ export default function TermosDoGestao() {
           </li>
           <li>
             O plano novo vale a partir do pagamento dele, pelo período escolhido, com o preço e o número de logins dele. O período que você já tinha pago
-            não se perde: o acesso continua, no mínimo, até o fim dele. Mas os meses que sobraram de um plano de 3 ou 6 meses <b>não viram crédito nem desconto</b>
+            não se perde: o acesso continua, no mínimo, até o fim dele. Mas os meses que sobraram de um plano de 3 ou 6 meses <b>não viram crédito nem desconto</b>{" "}
             no plano novo e não são devolvidos, salvo dentro dos 7 dias do arrependimento ou nos casos do item acima. Por isso, se puder esperar, troque perto do fim do período pago.
           </li>
         </ul>
@@ -198,7 +198,7 @@ export default function TermosDoGestao() {
       {p("dados", "Pela LGPD, o seu pet shop é o controlador dos dados dos seus clientes e nós somos o operador. Cabe a você ter motivo legal para usar esses dados e informar os seus clientes.", <>
         <p>
           O que você e a sua equipe lançam (clientes, pets, agenda, financeiro, estoque, fotos) <b>pertence ao seu pet shop</b>.
-          Pela Lei Geral de Proteção de Dados (LGPD), quanto aos dados dos seus clientes e da sua equipe, o seu pet shop é o <b>controlador</b>
+          Pela Lei Geral de Proteção de Dados (LGPD), quanto aos dados dos seus clientes e da sua equipe, o seu pet shop é o <b>controlador</b>{" "}
           (decide o que lançar e para quê) e nós somos o <b>operador</b> (guardamos e processamos esses dados para o sistema funcionar, seguindo as suas instruções
           e a <Link href="/gestao/privacidade">Política de privacidade</Link>).
         </p>

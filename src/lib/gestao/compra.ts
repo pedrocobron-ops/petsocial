@@ -12,6 +12,8 @@ import { contando, lerTudo } from "./paginas";
 export type ProdutoDaCompra = {
   id: string; nome: string; unidade: string; estoque: number; estoque_minimo: number; criado_em: string;
   embalagem_qtd?: number | null; fornecedor_id?: string | null; custo?: number | null;
+  /** Custo médio sem arredondar (só para o valor em estoque; `comCustos`). */
+  custo_exato?: number | null;
   /** 'kit': fica de fora (não se compra kit; a venda do kit já conta nos produtos dele, e o valor não conta duas vezes). */
   tipo?: string | null;
 };
@@ -164,7 +166,7 @@ export function analisarCompra(todos: ProdutoDaCompra[], movimentos: MovimentoDa
     return saldo <= 0 || (min > 0 && saldo <= min) || (l.semanasRestam != null && l.semanasRestam < 1);
   });
   const comCusto = produtos.filter((p) => Number(p.estoque) > 0 && p.custo != null);
-  const valor = (lista: ProdutoDaCompra[]) => centavos(lista.filter((p) => p.custo != null).reduce((t, p) => t + Number(p.estoque) * Number(p.custo), 0));
+  const valor = (lista: ProdutoDaCompra[]) => valorEmEstoque(lista);
   return {
     semanasPeriodo, semanasCobrir, linhas, parados, acabando,
     valorEmEstoque: comCusto.length ? valor(comCusto) : null,
@@ -179,4 +181,12 @@ export async function lerMovimentosDaCompra(sb: Banco, petshopId: string, agora 
   const desde = new Date(agora.getTime() - PARADO_DIAS * DIA).toISOString();
   return lerTudo<MovimentoDaCompra>((de, ate, contar) => sb.from("movimentos_estoque").select("produto_id, tipo, quantidade, motivo, criado_em", contando(contar))
     .eq("petshop_id", petshopId).in("tipo", ["saida", "entrada"]).gte("criado_em", desde).order("criado_em").order("id").range(de, ate));
+}
+
+/**
+ * Valor em estoque a preço de custo: saldo × custo médio de cada produto com custo, somado e arredondado só no fim.
+ * Usa o custo médio sem arredondar quando o banco entrega (`custo_exato`): 5 × 142 + 4 × 150 = R$ 1.310,00, não 1.310,04.
+ */
+export function valorEmEstoque(lista: Pick<ProdutoDaCompra, "estoque" | "custo" | "custo_exato" | "tipo">[]) {
+  return centavos(lista.filter((p) => p.custo != null && p.tipo !== "kit").reduce((t, p) => t + Number(p.estoque) * Number(p.custo_exato ?? p.custo), 0));
 }

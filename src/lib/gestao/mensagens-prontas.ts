@@ -1,4 +1,4 @@
-import { saudacaoZap, textoLembrete } from "./agenda";
+import { doPet, saudacaoZap, servicoComArtigo, textoLembrete } from "./agenda";
 import { servicosPorExtenso } from "./servicos-do-horario";
 import { dataAmigavel, dataCompleta, deIsoDia, hora, inicioDoDia, semAcento } from "./util";
 
@@ -13,7 +13,7 @@ type NaOrdem = { ordem: number };
 /** O mínimo de um horário para o lembrete. */
 export type HorarioDoLembrete = {
   inicio: string;
-  pets?: { nome: string; clientes?: { nome: string } | null } | null;
+  pets?: { nome: string; sexo?: string | null; clientes?: { nome: string } | null } | null;
   servicos?: { nome: string } | null;
   agendamento_servicos?: (NaOrdem & { servicos: { nome: string } | null })[] | null;
 };
@@ -23,9 +23,12 @@ export function mensagemDoLembrete(ags: HorarioDoLembrete[], petshop: string) {
   const tutor = ags[0]?.pets?.clientes?.nome;
   if (ags.length === 1) {
     const a = ags[0];
-    return textoLembrete({ tutor, pet: a.pets?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop });
+    return textoLembrete({ tutor, pet: a.pets?.nome ?? "seu pet", sexo: a.pets?.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop });
   }
-  const partes = ags.map((a) => `${servicosPorExtenso(a)?.toLowerCase() ?? "horário"} de ${a.pets?.nome ?? "seu pet"} às ${hora(a.inicio)}`);
+  const partes = ags.map((a) => {
+    const x = servicoComArtigo(servicosPorExtenso(a));
+    return `${x ? x.texto.toLowerCase() : "o horário"} ${doPet(a.pets?.nome ?? "seu pet", a.pets?.sexo)} às ${hora(a.inicio)}`;
+  });
   const lista = `${partes.slice(0, -1).join(", ")} e ${partes[partes.length - 1]}`;
   return `${saudacaoZap(tutor, petshop)} Passando para lembrar dos horários de ${dataAmigavel(ags[0].inicio)}: ${lista}. Posso confirmar?`;
 }

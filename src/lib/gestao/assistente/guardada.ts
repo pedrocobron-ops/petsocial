@@ -14,6 +14,8 @@ export type ConversaGuardada<I = unknown> = {
   esperando: boolean;
   /** O painel estava aberto: volta aberto depois de recarregar. */
   aberta: boolean;
+  /** O texto que já tinha chegado quando a página saiu no meio da resposta (volta marcado como interrompido). */
+  interrompida?: string | null;
 };
 
 const VALIDADE_MS = 12 * 3600_000;
@@ -29,7 +31,7 @@ export function lerConversa<I = unknown>(chave: string, agora = Date.now()): Con
     if (!s) return null;
     const c = JSON.parse(s) as ConversaGuardada<I>;
     if (!c || c.v !== 1 || !Array.isArray(c.itens) || !Array.isArray(c.mensagens) || agora - Number(c.em) > VALIDADE_MS) { apagarConversa(chave); return null; }
-    return { ...c, parciais: Array.isArray(c.parciais) ? c.parciais : [], decidindo: c.decidindo ?? null, esperando: Boolean(c.esperando), aberta: Boolean(c.aberta) };
+    return { ...c, parciais: Array.isArray(c.parciais) ? c.parciais : [], decidindo: c.decidindo ?? null, esperando: Boolean(c.esperando), aberta: Boolean(c.aberta), interrompida: typeof c.interrompida === "string" ? c.interrompida.slice(0, 8000) : null };
   } catch { return null; }
 }
 

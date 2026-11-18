@@ -63,7 +63,7 @@ export const termoComPet = (modelo: string, pet: string) => modelo.replace(/\{pe
 
 /** Anos completos pela data de nascimento (null sem data). */
 export function anosDe(nascimento: string | null | undefined, hoje = new Date()): number | null {
-  if (!nascimento || !/^\d{4}-\d{2}-\d{2}/.test(nascimento)) return null;
+  if (!nascimento || !/^\d{4}-\d{2}-\d{2}/.test(nascimento) || nascimento.startsWith("1904-")) return null;
   const n = deIsoDia(nascimento.slice(0, 10));
   let a = hoje.getFullYear() - n.getFullYear();
   if (hoje.getMonth() < n.getMonth() || (hoje.getMonth() === n.getMonth() && hoje.getDate() < n.getDate())) a--;

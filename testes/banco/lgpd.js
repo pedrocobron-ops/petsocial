@@ -49,7 +49,18 @@ const soma = (P) => B.sql(`select coalesce(sum(case when tipo='entrada' then val
   T.ok('vem o cadastro da Ana com e-mail e endereço', arq('cadastro.csv').linhas[0]?.[0] === 'Ana Souza' && texto.includes('ana@exemplo.com'), arq('cadastro.csv').linhas);
   T.ok('vêm só os pets dela (Thor e Mel)', arq('pets.csv').linhas.map((l) => l[0]).sort().join() === 'Mel,Thor', arq('pets.csv').linhas);
   T.ok('a vacina, o horário com o preço e a autorização das fotos', arq('saude.csv').linhas.length === 1 && arq('agendamentos.csv').linhas.length === 1 && arq('autorizacoes-de-fotos.csv').linhas.length === 1);
-  T.ok('o financeiro dela: 60 + 45,50 + 33,30', arq('financeiro.csv').linhas.map((l) => l[4]).sort((a, b) => a - b).join() === '33.3,45.5,60', arq('financeiro.csv').linhas);
+  // 2ª rodada (Juliana): valores como "R$ 60,00" e palavras no lugar dos códigos ("concluido", "cao", "G", 150)
+  T.ok('o financeiro dela: R$ 60,00 + R$ 45,50 + R$ 33,30, com "Entrada"', arq('financeiro.csv').linhas.map((l) => l[4]).sort().join() === 'R$ 33,30,R$ 45,50,R$ 60,00'
+    && arq('financeiro.csv').linhas.every((l) => l[1] === 'Entrada'), arq('financeiro.csv').linhas);
+  T.ok('o horário com a situação e o preço por extenso (sem "marcado"/"concluido" e sem 150 solto)', (() => {
+    const l = arq('agendamentos.csv').linhas[0] ?? [];
+    return ['Marcado', 'Confirmado', 'Em atendimento', 'Concluído', 'Faltou', 'Cancelado'].includes(l[4]) && (l[5] == null || /^R\$ \d+,\d\d$/.test(String(l[5])));
+  })(), arq('agendamentos.csv').linhas);
+  T.ok('pets com "Cão"/"Gato", porte e sexo por extenso', arq('pets.csv').linhas.every((l) => ['Cão', 'Gato', 'Outro'].includes(l[1]) && (l[3] == null || ['Pequeno', 'Médio', 'Grande', 'Gigante'].includes(l[3])) && (l[4] == null || ['Macho', 'Fêmea'].includes(l[4]))), arq('pets.csv').linhas);
+  T.ok('saúde com o tipo por extenso', arq('saude.csv').linhas.every((l) => ['Vacina', 'Vermífugo', 'Antipulgas', 'Outro'].includes(l[1])), arq('saude.csv').linhas);
+  T.ok('nenhum código solto nas planilhas', !/"(concluido|marcado|cao|em_casa|encerrada|saida|entrada)"/.test(JSON.stringify(d.arquivos.map((a) => a.linhas))));
+  T.ok('devolve o protocolo do pedido (o mesmo do registro)', /^LGPD-[2-9A-Z]{4}-[2-9A-Z]{4}$/.test(d.protocolo ?? '')
+    && B.num(`select count(*) from lgpd_registros where petshop_id='${P}' and acao='baixou_tutor' and protocolo='${d.protocolo}'`) === 1, d.protocolo);
   T.ok('nada do Beto, do Bob nem da outra loja', !/Beto|Bob|Clara|Luna|11988880002/.test(texto) && !texto.includes(O.P));
   T.ok('nenhum código do "Não quero mais" sai', !/[0-9a-f]{64}/.test(texto));
   T.ok('cada planilha com o mesmo número de colunas em cada linha', d.arquivos.every((a) => a.linhas.every((l) => l.length === a.colunas.length)));
@@ -67,6 +78,8 @@ const soma = (P) => B.sql(`select coalesce(sum(case when tipo='entrada' then val
   T.recusa('o dono de outra loja não anota', await O.sb.dono.rpc('lgpd_registrar_copia', { p_petshop: P }));
   const reg = await dono.rpc('lgpd_registros_ver', { p_petshop: P });
   T.ok('o dono vê o registro (baixou os dados, baixou um tutor)', !reg.error && reg.data.some((x) => x.acao === 'baixou_dados') && reg.data.some((x) => x.acao === 'baixou_tutor'), reg.error?.message);
+  T.ok('… com o protocolo e o nome do tutor (lido do cadastro na hora)', !reg.error && reg.data.find((x) => x.acao === 'baixou_tutor')?.cliente === 'Ana Souza'
+    && reg.data.every((x) => /^LGPD-/.test(x.protocolo ?? '')), reg.data);
   T.recusa('a recepção não vê o registro', await L.sb.caixa.rpc('lgpd_registros_ver', { p_petshop: P }));
   T.recusa('o dono de outra loja não vê o registro', await O.sb.dono.rpc('lgpd_registros_ver', { p_petshop: P }));
   T.ok('ninguém lê as tabelas novas direto', ((await dono.from('lgpd_registros').select('id')).data ?? []).length === 0
@@ -100,6 +113,10 @@ const soma = (P) => B.sql(`select coalesce(sum(case when tipo='entrada' then val
   T.ok('o Beto e o Bob ficam como estavam', B.sql(`select nome from clientes where id='${L.tutores.Beto}'`) === 'Beto Lima' && B.sql(`select nome from pets where id='${L.pets.Bob}'`) === 'Bob'
     && B.num(`select count(*) from lancamentos where cliente_id='${L.tutores.Beto}'`) === 1);
   T.ok('fica no registro, com quantidades e sem nome', B.num(`select count(*) from lgpd_registros where petshop_id='${P}' and acao='apagou_tutor' and (detalhe->>'pets')::int = 2 and detalhe::text !~* 'ana|thor'`) === 1);
+  const reg2 = (await dono.rpc('lgpd_registros_ver', { p_petshop: P })).data ?? [];
+  T.ok('depois de apagar, o registro diz "Cliente removido" (o nome não fica guardado em lugar nenhum do registro)', reg2.filter((x) => x.cliente_id === L.tutores.Ana).length === 2
+    && reg2.filter((x) => x.cliente_id === L.tutores.Ana).every((x) => x.cliente === 'Cliente removido' && /^LGPD-/.test(x.protocolo))
+    && B.num(`select count(*) from lgpd_registros where petshop_id='${P}' and (detalhe::text ~* 'ana souza' or quem_nome ~* 'ana souza')`) === 0, reg2);
   const de2 = await dono.rpc('cliente_anonimizar', { p_cliente: L.tutores.Ana, p_confirmacao: 'qualquer' });
   T.ok('pedir de novo não faz nada (já apagado)', !de2.error && de2.data?.ja === true && B.num(`select count(*) from lgpd_registros where petshop_id='${P}' and acao='apagou_tutor'`) === 1, de2.error?.message);
 

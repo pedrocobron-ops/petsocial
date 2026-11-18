@@ -11,6 +11,8 @@
 .gl-registro li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 8px 0; border-bottom: 1px solid var(--g-linha); font-size: .9375rem; }
 .gl-registro li:last-child { border-bottom: 0; }
 .gl-registro li span { color: var(--g-cinza); }
+.gl-registro li .gl-protocolo { flex-basis: 100%; font-size: .8125rem; }
+.gl-registro li .gl-protocolo b { color: var(--g-tinta); font-weight: 600; letter-spacing: .03em; }
 .gl-tutor { display: grid; gap: 8px; }
 .gl-tutor-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
 .gl-confere { padding: 12px 14px; border-radius: var(--g-raio-p); background: var(--g-amarelo-tint); font-size: .9375rem; line-height: 1.45; }

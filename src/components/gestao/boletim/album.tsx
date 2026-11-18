@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BedDouble, Copy, Images, Link2, MessageCircle, Scissors, Sun, Trash2 } from "lucide-react";
 import { BUCKET_BOLETIM, doPet, type Sexo } from "@/lib/gestao/boletim";
 import { fotoPet } from "@/lib/gestao/supabase";
+import { usaModulo } from "@/lib/gestao/modulos";
 import { chamar, dataLonga, linkWhatsApp } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -115,7 +116,7 @@ export default function AlbumDoPet({ pet, tutor }: { pet: { id: string; nome: st
       <div className="g-card-t"><h3><Tile icone={Images} tom="pessego" tamanho="p" />Álbum</h3>{total > 0 && <span className="g-muted g-pp" style={{ whiteSpace: "nowrap" }}>{total === 1 ? "1 foto" : `${total} fotos`}</span>}</div>
       {erro && <p className="g-erro" role="alert">{erro}</p>}
       {carregando && !dados ? <Esqueleto linhas={2} /> : !visitas.length ? (
-        <p className="g-muted g-p">Ainda sem fotos. As fotos dos boletins e do antes e depois do banho aparecem aqui, por visita.</p>
+        <p className="g-muted g-p">Ainda sem fotos. {usaModulo(petshop, "banho_tosa") ? "As fotos dos boletins e do antes e depois do banho aparecem aqui, por visita." : "As fotos dos boletins aparecem aqui, por visita."}</p>
       ) : (
         <>
           {visitas.slice(0, mostrar).map((v) => {

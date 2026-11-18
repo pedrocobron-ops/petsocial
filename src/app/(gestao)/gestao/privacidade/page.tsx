@@ -199,7 +199,7 @@ export default function PrivacidadeDoGestao() {
           <li>O aplicativo, as telas de cadastro e de entrada e as páginas públicas dos pet shops <b>não usam pixel de anúncio nem cookies de medição</b>, e nelas não aparece o aviso de cookies.</li>
           <li>Quem chega ao cadastro pela página de apresentação continua na mesma aba. Assim que o cadastro abre, o pixel daquela página para de mandar qualquer coisa. O cookie de medição que a página de apresentação já tenha deixado no navegador (o &quot;_fbp&quot;, da Meta) fica guardado nele até vencer ou ser apagado, mas o Gestão não o lê nem o usa.</li>
           <li>Para manter você conectado, o navegador guarda no próprio aparelho a sessão de login. Também guarda preferências e rascunhos, como o pet shop aberto por último, os ajustes da voz e um formulário ainda não salvo. Isso serve só para o sistema funcionar e fica no seu aparelho. Ao sair da conta, a sessão é apagada.</li>
-          <li>A página de apresentação do Gestão faz parte do site maestropet.com e usa o Pixel da Meta, como explica a <Link href="/politica-de-privacidade">política do site</Link>. Lá, o aviso de cookies tem &quot;Aceitar&quot; e &quot;Recusar&quot;: recusando, o pixel não manda nada daquele navegador. Dá para mudar a escolha na política do site, parte 5.</li>
+          <li>A página de apresentação do Gestão faz parte do site maestropet.com e usa o Pixel da Meta, como explica a <Link href="/politica-de-privacidade">política do site</Link>. Lá, o aviso de cookies tem &quot;Aceitar&quot; e &quot;Recusar&quot;: o pixel só carrega depois do &quot;Aceitar&quot;; antes da escolha, ou recusando, ele não manda nada daquele navegador. Dá para mudar a escolha na política do site, parte 5.</li>
         </ul>
       </>)}
 

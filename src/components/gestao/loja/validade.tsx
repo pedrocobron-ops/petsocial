@@ -63,8 +63,12 @@ const FAIXAS = [
 ] as const;
 
 /** A folha "Vencendo": vencidos e vencendo em 30 e 60 dias, com a baixa como perda. */
-export function Vencendo({ dados, carregando, aoFechar, aoMudar }: {
+export function Vencendo({ dados, carregando, aoFechar, aoMudar, aoVerProduto, aoDarSaida }: {
   dados: Vencimentos | null | undefined; carregando: boolean; aoFechar: () => void; aoMudar: () => void;
+  /** "Ver produto": abre a ficha do produto (a tela troca a folha). */
+  aoVerProduto?: (produtoId: string) => void;
+  /** "Dar baixa" num lote que ainda não venceu: abre a Saída do produto com o lote escolhido (venda, uso ou perda). */
+  aoDarSaida?: (produtoId: string, loteId: string) => void;
 }) {
   const { sb, petshop, posso } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
@@ -100,7 +104,7 @@ export function Vencendo({ dados, carregando, aoFechar, aoMudar }: {
   return (
     <Folha larga titulo="Vencendo" aoFechar={aoFechar} rodape={<button type="button" className="g-btn sec" onClick={aoFechar}>Voltar</button>}>
       <div className="g-pilha g">
-        <p className="g-muted g-p">Produtos com &quot;Controlar validade&quot;: cada entrada guarda o lote e a validade, e a venda tira primeiro do que vence antes.</p>
+        <p className="g-muted g-p">Produtos com &quot;Controlar validade&quot;: cada entrada guarda a validade (e o lote, se tiver), e a venda tira primeiro do que vence antes.</p>
         {carregando && !dados ? <Esqueleto linhas={4} /> : !lotes.length ? (
           <p className="g-muted g-centro" style={{ padding: "24px 8px" }}>Nada vencido nem vencendo nos próximos 60 dias.</p>
         ) : FAIXAS.map((f) => {
@@ -127,10 +131,19 @@ export function Vencendo({ dados, carregando, aoFechar, aoMudar }: {
                       <b className="g-tab">{fmtQtd(l.quantidade)} {l.unidade}</b>
                       {comValor && l.valor != null && <small>{brl(l.valor)}</small>}
                     </span>
-                    {podeBaixar && l.dias < 0 && (
-                      <button type="button" className="g-btn sec p" disabled={baixando != null} onClick={() => void baixar([l], l.lote_id)}
-                        aria-label={`Dar baixa como perda: ${l.nome}, ${nomeDoLote(l)}`}>{baixando === l.lote_id ? "…" : "Perda"}</button>
-                    )}
+                    <span className="g-val-acoes">
+                      {aoVerProduto && (
+                        <button type="button" className="g-btn fantasma p" onClick={() => aoVerProduto(l.produto_id)} aria-label={`Ver produto: ${l.nome}`}>Ver produto</button>
+                      )}
+                      {podeBaixar && l.dias < 0 && (
+                        <button type="button" className="g-btn sec p" disabled={baixando != null} onClick={() => void baixar([l], l.lote_id)}
+                          aria-label={`Dar baixa como perda: ${l.nome}, ${nomeDoLote(l)}`}>{baixando === l.lote_id ? "…" : "Perda"}</button>
+                      )}
+                      {podeBaixar && l.dias >= 0 && aoDarSaida && (
+                        <button type="button" className="g-btn sec p" onClick={() => aoDarSaida(l.produto_id, l.lote_id)}
+                          aria-label={`Dar baixa: ${l.nome}, ${nomeDoLote(l)}`}>Dar baixa</button>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -138,6 +151,7 @@ export function Vencendo({ dados, carregando, aoFechar, aoMudar }: {
           );
         })}
         {podeBaixar && lotes.some((l) => l.dias < 0) && <p className="g-muted g-pp">&quot;Perda&quot; tira o lote inteiro do estoque, com o motivo &quot;Vencido&quot;. O dono vê em Alterações em valores.</p>}
+        {podeBaixar && aoDarSaida && lotes.some((l) => l.dias >= 0) && <p className="g-muted g-pp">&quot;Dar baixa&quot; abre a saída do produto já com o lote escolhido: venda (numa promoção, por exemplo), uso no banho ou perda.</p>}
       </div>
     </Folha>
   );

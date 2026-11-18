@@ -8,6 +8,7 @@ import { lerAutorizacaoDoBoletim, lerBoletim, type BoletimPublico } from "@/lib/
 import AutorizarFoto from "./autorizar";
 import { artigoDe } from "@/lib/gestao/modulos";
 import { brl, linkWhatsApp } from "@/lib/gestao/util";
+import { recadoNoSexo, seloDoBanho } from "@/lib/gestao/boletim";
 import "../../agendar/[codigo]/agendar.css";
 import "./boletim.css";
 
@@ -62,7 +63,9 @@ export default async function Boletim({ params }: { params: Promise<{ token: str
   const fmt = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("pt-BR", { ...o, timeZone: fuso });
   const dia = fmt({ weekday: "long", day: "numeric", month: "long" }).format(new Date(b.tipo === "banho" ? b.quando : b.criado_em));
   const ate = fmt({ day: "numeric", month: "long" }).format(new Date(b.expira_em));
-  const tipo = b.tipo === "banho" ? { icone: Scissors, rotulo: "Banho e tosa" }
+  const servicos = b.tipo === "banho" ? b.servicos : [];
+  // o selo diz o que foi feito ("Banho e hidratação"), não sempre "Banho e tosa" (achado da Neide)
+  const tipo = b.tipo === "banho" ? { icone: Scissors, rotulo: seloDoBanho(servicos) }
     : b.tipo === "creche" ? { icone: Sun, rotulo: "Dia de creche" }
     : { icone: BedDouble, rotulo: b.dia_hotel && b.dia_hotel > 0 ? `Hotel · ${b.dia_hotel}º dia` : "Hotel" };
   const Icone = tipo.icone;
@@ -73,7 +76,6 @@ export default async function Boletim({ params }: { params: Promise<{ token: str
   const zap = linkWhatsApp(b.petshop.telefone, `Oi! Vi o boletim ${doPet(b.pet)} de hoje.`);
   const onde = [b.petshop.cidade, b.petshop.uf].filter(Boolean).join(" · ");
   const foto = (n: number) => `/gestao/boletim/${token}/foto/${n}`;
-  const servicos = b.tipo === "banho" ? b.servicos : [];
 
   return (
     <div className="g-raiz g-bo" data-tema={tema} style={estilo}>
@@ -133,7 +135,7 @@ export default async function Boletim({ params }: { params: Promise<{ token: str
             {b.chips.length > 0 && (
               <>
                 <h2>{b.tipo === "banho" ? "Como foi" : "Como foi o dia"}</h2>
-                <ul className="g-bo-chips">{b.chips.map((c) => <li key={c}>{c}</li>)}</ul>
+                <ul className="g-bo-chips">{b.chips.map((c) => <li key={c}>{recadoNoSexo(c, b.pet.sexo)}</li>)}</ul>
               </>
             )}
             {b.valores && (

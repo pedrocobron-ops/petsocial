@@ -147,10 +147,24 @@ function montarEquipe(base: ProfissionalLinha[], reservadas: Linhas): Profission
  * Junta o custo e o último custo aos produtos (null para quem não cuida do estoque nem vê o financeiro).
  * Com a margem ligada, `custo` é o custo médio; desligada, é o da última entrada.
  */
-export async function comCustos<P extends { id: string }>(sb: Banco, petshopId: string, produtos: P[]): Promise<(P & { custo: number | null; ultimo_custo: number | null })[]> {
-  const extra = produtos.length ? porId(await reservado(sb, "produtos_reservado", { p: petshopId },
-    () => sb.rpc("custos_dos_produtos", { p: petshopId }))) : new Map<string, Record<string, unknown>>();
-  return produtos.map((p) => ({ ...p, custo: num(extra.get(p.id)?.custo), ultimo_custo: num(extra.get(p.id)?.ultimo_custo) }));
+export async function comCustos<P extends { id: string }>(sb: Banco, petshopId: string, produtos: P[]): Promise<(P & { custo: number | null; ultimo_custo: number | null; custo_exato: number | null })[]> {
+  const [extra, exatos] = produtos.length ? await Promise.all([
+    reservado(sb, "produtos_reservado", { p: petshopId }, () => sb.rpc("custos_dos_produtos", { p: petshopId })).then(porId),
+    custosExatos(sb, petshopId),
+  ]) : [new Map<string, Record<string, unknown>>(), new Map<string, number>()];
+  return produtos.map((p) => ({ ...p, custo: num(extra.get(p.id)?.custo), ultimo_custo: num(extra.get(p.id)?.ultimo_custo), custo_exato: exatos.get(p.id) ?? null }));
+}
+
+/**
+ * Custo médio sem arredondar (migração 20261222, `produtos_custo_exato`), só para o valor em estoque: 5 × 142 + 4 × 150 dá
+ * R$ 1.310,00 (com o custo médio arredondado, 9 × 145,56 = 1.310,04). Banco de antes ou quem não vê o custo: vazio.
+ */
+async function custosExatos(sb: Banco, petshopId: string): Promise<Map<string, number>> {
+  const r = await sb.rpc("produtos_custo_exato" as never, { p: petshopId } as never) as unknown as { data: { id: string; custo: number | string | null }[] | null; error: unknown };
+  const m = new Map<string, number>();
+  if (r.error || !Array.isArray(r.data)) return m;
+  for (const l of r.data) if (l.custo != null && Number.isFinite(Number(l.custo))) m.set(String(l.id), Number(l.custo));
+  return m;
 }
 
 /** Custo unitário de cada compra feita de um fornecedor, por id do movimento. */

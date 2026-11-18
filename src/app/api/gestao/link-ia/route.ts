@@ -58,12 +58,15 @@ async function tratar(req: Request) {
   const info = infoR.data as unknown as DadosDoLink["info"] | null;
   if (infoR.error || !info || typeof info !== "object" || !info.nome) return NextResponse.json({ erro: "desligado" }, { status: 403 });
   info.servicos = Array.isArray(info.servicos) ? info.servicos : [];
-  const [fechados, hotel, opcoes, experiencia, espera] = await Promise.all([
+  const [fechados, hotel, opcoes, experiencia, espera, planos, taxi] = await Promise.all([
     sb.rpc("link_fechados", { p_codigo: codigo }),
     info.hotel ? sb.rpc("link_hotel_opcoes", { p_codigo: codigo }) : Promise.resolve({ data: null }),
     sb.rpc("link_opcoes", { p_codigo: codigo }),
     info.creche ? sb.rpc("link_creche_experiencia", { p_codigo: codigo }) : Promise.resolve({ data: null }),
     info.creche || info.hotel ? sb.rpc("link_espera_ativa", { p_codigo: codigo }) : Promise.resolve({ data: false }),
+    // os planos mensais que a página mostra e o táxi pet (banco sem a função nova: segue sem)
+    info.creche ? sb.rpc("link_creche_planos", { p_codigo: codigo }) : Promise.resolve({ data: null }),
+    sb.rpc("link_taxi", { p_codigo: codigo }).then((r) => r, () => ({ data: null })),
   ]);
   const d: DadosDoLink = {
     info,
@@ -73,6 +76,8 @@ async function tratar(req: Request) {
     opcoes: (opcoes.data as DadosDoLink["opcoes"]) ?? null,
     experiencia: (experiencia.data as DadosDoLink["experiencia"]) ?? null,
     espera: espera.data === true,
+    planos: (planos.data as DadosDoLink["planos"]) ?? null,
+    taxi: (taxi.data as DadosDoLink["taxi"]) ?? null,
   };
   const nome = info.nome;
   // a diária comum de cada porte, pela estimativa do próprio link (uma noite de cada porte, sem desconto): o assistente

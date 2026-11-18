@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Check, Lock, Repeat, Store, Trash2 } from "lucide-react";
 import type { Bloqueio } from "@/lib/gestao/tipos";
 import { MOTIVOS_BLOQUEIO, bloqueioPega, diasUteis } from "@/lib/gestao/agenda";
-import { dataCurta, deIsoDia, hora, horarioDoDia, inicioDoDia, isoDia, juntaDiaHora, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
+import { dataCurta, deIsoDia, hora, nomeNaEquipe, horarioDoDia, inicioDoDia, isoDia, juntaDiaHora, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Campo, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import "@/app/(gestao)/gestao/app/agenda/agenda.css";
@@ -201,7 +201,7 @@ export default function FormBloqueio({ bloqueio, diaInicial, profissionalInicial
           <div className="g-campo"><span>Para quem</span>
             <div className="g-chips">
               <button type="button" className="g-chip" aria-pressed={profId === null} onClick={() => setProfId(null)}><Store size={15} />Pet shop inteiro</button>
-              {quemAtende.map((p) => <button key={p.id} type="button" className="g-chip" aria-pressed={profId === p.id} onClick={() => setProfId(p.id)}><i style={{ background: p.cor }} />{p.nome.split(" ")[0]}</button>)}
+              {quemAtende.map((p) => <button key={p.id} type="button" className="g-chip" aria-pressed={profId === p.id} onClick={() => setProfId(p.id)}><i style={{ background: p.cor }} />{nomeNaEquipe(p.nome, quemAtende.map((x) => x.nome))}</button>)}
             </div>
           </div>
         )}

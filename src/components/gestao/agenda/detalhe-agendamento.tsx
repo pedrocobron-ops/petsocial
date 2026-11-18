@@ -332,8 +332,10 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     } catch (e) { avisarErro(e); return false; }
   });
 
+  // horário que já começou (ou foi marcado depois, para anotar): lembrete e confirmação para o tutor não fazem sentido (achado da Neide)
+  const jaPassou = new Date(a.inicio).getTime() < Date.now();
   const zap = linkWhatsApp(tutor?.telefone, textoLembrete({
-    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", sexo: pet?.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
   }));
 
   // remarcado de verdade? o banco anota quando o início muda (migração 20261166). Sem a função no banco, vale o de antes.
@@ -345,16 +347,16 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   // marcado há pouco e ainda sem lembrete: a mensagem certa é a confirmação, não a remarcação
   const recemMarcado = !foiRemarcado && remarcadoEm !== undefined && !a.lembrete_em && Date.now() - new Date(a.criado_em).getTime() < 864e5;
   const zapConfirmacao = recemMarcado ? linkWhatsApp(tutor?.telefone, textoConfirmacao({
-    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", sexo: pet?.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
   })) : null;
 
   // remarcou ou cancelou: a mensagem para o tutor já vem pronta (quem manda é a pessoa, pelo WhatsApp)
   const zapRemarcado = linkWhatsApp(tutor?.telefone, textoRemarcado({
-    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", sexo: pet?.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
   }));
-  const zapCancelado = linkWhatsApp(tutor?.telefone, textoCancelado({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome }));
+  const zapCancelado = linkWhatsApp(tutor?.telefone, textoCancelado({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", sexo: pet?.sexo, quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome }));
 
-  const zapPronto = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", petshop: petshop.nome, servico: servicosPorExtenso(a) }));
+  const zapPronto = linkWhatsApp(tutor?.telefone, textoPronto({ tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", sexo: pet?.sexo, petshop: petshop.nome, servico: servicosPorExtenso(a) }));
 
   // comprovante: só para quem vê o financeiro, com o atendimento concluído, a conta toda recebida e telefone na ficha.
   // Com o que entrou junto para o fiado (e o troco), pelo banco: sem isso, o comprovante diria só a conta do horário.
@@ -616,7 +618,9 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
         ) : <p className="g-pp g-muted">Sem telefone do tutor para avisar que o atendimento de {pet?.nome ?? "o pet"} terminou.</p>)}
 
         <div className="g-fila">
-          {a.status === "cancelado" || a.status === "faltou" || a.status === "concluido" ? null : zap ? (
+          {a.status === "cancelado" || a.status === "faltou" || a.status === "concluido" ? null : jaPassou ? (
+            a.status !== "em_atendimento" && <p className="g-pp g-muted g-cresce" data-teste="ja-passou">Este horário já passou: não precisa de lembrete nem de confirmação.</p>
+          ) : zap ? (
             <a className={`g-btn ${podeAvisarPronto && zapPronto ? "sec" : "zap"} g-cresce`} href={zap} target="_blank" rel="noopener noreferrer" onClick={() => { void mudar({ lembrete_em: new Date().toISOString() }).then(recarregar); }}>
               <MessageCircle />{a.lembrete_em ? "Lembrar de novo" : "Lembrete no WhatsApp"}
             </a>
@@ -624,12 +628,12 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           {pet && posso("clientes") && <Link className="g-btn sec" href={`/gestao/app/clientes?pet=${pet.id}`}>Ver ficha</Link>}
         </div>
         {a.lembrete_em && <p className="g-pp g-muted">Lembrete aberto {dataAmigavel(a.lembrete_em)} às {hora(a.lembrete_em)}.</p>}
-        {(a.status === "marcado" || a.status === "confirmado") && foiRemarcado && zapRemarcado && (
+        {(a.status === "marcado" || a.status === "confirmado") && !jaPassou && foiRemarcado && zapRemarcado && (
           <div className="g-fila">
             <a className="g-btn sec g-cresce" href={zapRemarcado} target="_blank" rel="noopener noreferrer"><MessageCircle />Avisar remarcação</a>
           </div>
         )}
-        {(a.status === "marcado" || a.status === "confirmado") && zapConfirmacao && (
+        {(a.status === "marcado" || a.status === "confirmado") && !jaPassou && zapConfirmacao && (
           <div className="g-fila">
             <a className="g-btn sec g-cresce" href={zapConfirmacao} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar confirmação</a>
           </div>

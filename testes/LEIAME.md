@@ -77,6 +77,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   negrito e lista na bolha (`assistente/markdown.ts`), a tabela de preços que manda creche e hotel para a diária e o modelo de plano
   (`tabela-precos.ts`, `destinoDaLinha`), o "Tirar dúvida" com dois pets, o preço de cada porte e a creche calculada no código
   (`estimarCreche`), a conversa guardada na aba (`assistente/guardada.ts`) e o cartão que grava uma vez só (`reservar`/`liberar`).
+- `mozart-link-v2.js`: 2ª rodada dos testadores, sem banco: o "Tirar dúvida" não desmente um total da estimativa (`semDesmentir`),
+  sabe os planos mensais da creche e o táxi pet (sem valor com o preço escondido); a linha "Pensando…" antes de cada volta do modelo;
+  nome interno de ferramenta vira palavras (`assistente/sem-nomes.ts`); feriado dos próximos 14 dias no contexto; táxi do mensalista e
+  `ver_maquininha` nas instruções; a resposta cortada por um recarregar guardada como interrompida.
 - `mozart-rapido.js`: a voz (`src/lib/gestao/fala.ts`: a melhor voz em português do aparelho, natural do Edge > Google > aprimorada
   da Apple > outras do Brasil > Portugal; texto limpo para falar, "R$ 60,00" = "60 reais", "10h30" = "10 e 30"; frases que fecham
   enquanto o texto chega), as frases de progresso (`assistente/progresso.ts`, toda consulta tem a sua), as voltas com modelo e banco de
@@ -95,6 +99,11 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   usado, trocado por um mais novo, cancelado, inválido, outro e-mail, muitas tentativas; com o nome do pet shop, sem repetir "Peça ao
   dono…"), Termos e Política 2.3 (`documentos.ts`: quem aceitou a 2.2 vê o aceite de novo, resumo com cópias, troca de plano e cookies) e
   a Ajuda achando "vocês fazem cópia dos meus dados?" (tópico `copias`, sem prometer prazo) e "como mudar de plano".
+- `loja-textos-lgpd.js`: 2ª rodada (Camila, Neide, Juliana): mensagens com do/da pelo sexo do pet e o verbo concordando ("Pipoca
+  marcada", "O banho e a hidratação da Luna ficaram marcados", "lembrar do banho e da hidratação da Luna"; sem sexo, como antes;
+  serviço desconhecido diz "O horário"); nome curto da equipe que diferencia ("Banhista Ana"/"Banhista Beto", `nomeNaEquipe`);
+  valor em estoque com o custo médio sem arredondar (5 × 142 + 4 × 150 = 1.310,00, não 1.310,04); unidade e validade da planilha de
+  produtos (`planilha-produtos.ts`); selo do boletim com os serviços e "Comportada"; aniversário do pet sem o ano (1904: sem idade, sem idoso).
 - `textos.js`: textos que as testadoras acharam confusos: o comprovante com parte da dívida antiga ("Pagou R$ 40,00 do que devia de
   antes (R$ 75,00); ainda deve R$ 35,00", sem repetir o resto; quitado; chamada antiga sem o total) e as iniciais sem as palavras
   pequenas ("Banho e Tosa" = BT, "Hotelzinho da Bia" = HB).
@@ -241,6 +250,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   banco; limpeza e limites no banco; repetição junta (mesmo aparelho e versão, 10 min); freio por aparelho (30/min), por pet shop
   (60/min) e geral (1000/h, posto no limite durante o teste e devolvido); sem internet só conta; resolvido some e volta numa versão
   nova; rota do servidor que quebra vira registro com origem "servidor". Precisa do servidor com `GESTAO_ERRO_TESTE=1`.
+- `mozart-link-v2.js` (servidor com GESTAO_LINK_IA_FALSO=1 e GESTAO_MOZART_FALSO=1): `link_taxi` (táxi pet do link, sem valor com o preço escondido) e o "Tirar dúvida" respondendo o plano de 3x e o táxi; `ver_sinais` com o sinal que virou crédito (219,60 − 54 − 89,70 = 75,90 com o pet shop); táxi do mensalista em `ver_planos_creche` e `ver_hospedes` (preço só para quem recebe); dia fechado em creche_por_dia; `ver_maquininha` igual a `taxas_do_periodo`; `ver_descontos`; "Pensando…" como primeiro evento da rota.
 - `mozart-consertos.js`: com o banco de verdade e modelo de mentira: "coloca a Mel na creche amanhã" vira reserva da creche (e a
   confirmação repetida grava uma vez só, pela função `assistente_acao_reservar`, migração 20261215), mensalista no dia do plano não
   reserva e em outro dia vira dia extra, hotel com entrada e saída, `ver_hospedes` com a creche dia a dia (mensalista de todo dia),
@@ -492,12 +502,24 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   adiadas por cima, cada uma numa transação. Apaga o rascunho no fim (mesmo se falhar). `ADIAR=""` aplica tudo em ordem;
   `MIGRACOES=/outra/pasta` testa outra pasta.
 
+- `loja-textos-lgpd.js`: migração 20261222. `estoque_entrada` recusa produto com Controlar validade sem a validade (só lote também);
+  com a validade e sem lote vira um lote; produto sem o controle e volta de venda desfeita continuam; `produtos_custo_exato`
+  (1.310 ÷ 9, só para quem vê o custo, custo da ficha esquece a média exata, a média seguinte parte dele); aniversário sem o ano
+  sai "20/11" na planilha do tutor. `lgpd.js` ganhou: planilhas com palavras e "R$ 60,00", protocolo do pedido, o nome do tutor no
+  registro e "Cliente removido" depois de apagar.
+
 **telas/** (Playwright, Chromium)
 - `creche-hotel-final.js`: rodada final pela tela. Chegou da Chamada abre a folha Entrada (Todos os pets) e o cartão do mensalista tem Conferir a entrada; plano com táxi na Chamada e no Leva e traz (Buscado anotado); primeira foto de Fotos de hoje sobe e aparece (tempo medido); cancelar reserva com sinal pago traz Virar crédito do tutor já marcado pela regra e o cartão sai na hora (crédito de R$ 78 gravado); Aceitar todos tira o cartão do pedido na hora; link do hotel com 14:00/12:00 sem taxa e com a taxa às 18h sem "até as 15h"; Indicadores num hotel só sem mapa de horários, com ocupação e reservas canceladas.
 - `passeio.js`: todas as telas principais (Hoje, Agenda, Clientes, Creche e hotel, Pacotes, Caixa, Financeiro, Relatórios, Estoque,
   Equipe, Meu pet shop, Assinatura, Manual, Escola) em **390 e 1366**, com o dono e com cada papel da equipe (só as áreas dele, e
   algumas fora da área), as telas de impressão, `/gestao/admin` com dono comum e as páginas públicas (produto, entrar, link do
   cliente, página do tutor). Em cada uma: nenhum erro de página ou console, nenhum pedido recusado, sem rolagem para o lado e com conteúdo.
+- `loja-textos-lgpd.js`: 2ª rodada pela tela (390, captura 1366): planilha de produtos com validade e lote aparece sem recarregar;
+  Entrada sem validade não anota; "Pode pagar assim mesmo"; Vencendo com Ver produto e Dar baixa (abre a Saída com o lote);
+  horário num dia que já passou: "Mel marcada", sem confirmação nem lembrete; "Banhista Ana" e "Banhista Beto" nos chips;
+  aniversário do pet só com dia e mês e na lista Aniversariantes do mês; cartão "Promoção de aniversário do pet"; Registro de pedidos
+  de dados com o nome e o protocolo. `cookies-termos.js` ganhou: sem escolha o fbevents.js não baixa, só depois do Aceitar; Termos
+  "vigente desde 17/11/2026" e sem palavras grudadas.
 - `loja-camila.js`: a loja da Camila pela tela, em 390 e 1366. Quem cuida do estoque sem "Ver custo e margem": a lista e a ficha
   sem margem, custo médio, último custo nem valor em estoque; Produto novo com "Controlar validade" pede o lote ou a validade do que já
   está na prateleira e guarda no lote. O dono: vê a margem; Entrada com "Lançar a compra como despesa" desmarcado, que marcado pede a
@@ -576,6 +598,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   e o alto-falante de cada resposta; segurar para falar (toque de dedo no 390, mouse no 1366) e tocar para parar; "Não ouvi nada";
   microfone bloqueado ("Libere o microfone nas configurações do navegador"); microfone na Ajuda (não manda sozinho); para sozinho em
   8 s de silêncio e em 30 s (`page.clock`); navegador sem ditado: sem botão, escrever continua igual. Capturas em `testes/saida/mozart-voz-*`.
+- `mozart-v2.js` (servidor com GESTAO_MOZART_FALSO=1): "Pensando…" logo depois de mandar; recarregar no meio da resposta traz a parte que chegou marcada "Resposta interrompida" e "Perguntar de novo" traz a resposta inteira (390 e 1366).
 - `mozart-consertos.js` (servidor com GESTAO_MOZART_FALSO=1): negrito e lista na bolha; recarregar traz a conversa e o cartão
   pendente (o painel abre sozinho) e confirmar grava uma vez; recarregar no meio do "Pode fazer" termina sozinho, sem gravar duas
   vezes; "Ouvir esta resposta" sem voz no aparelho mostra o aviso; com o Tirar dúvida aberto no celular, o fim da página sobe acima
