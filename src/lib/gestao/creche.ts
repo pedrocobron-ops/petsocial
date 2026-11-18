@@ -471,7 +471,7 @@ export function textoComprovanteMensalidades(p: {
   /** `descontos`: "desconto irmão R$ 60,00" (o comprovante diz que o valor já vem com ele) */
   itens: { pet: string; mes: string; valor: number; multa: number; acerto?: boolean; descontos?: string | null }[];
 }) {
-  const total = Math.round(p.itens.reduce((t, i) => t + i.valor + i.multa, 0) * 100) / 100;
+  const total = centavos(p.itens.reduce((t, i) => t + i.valor + i.multa, 0));
   return [
     `${saudacaoZap(p.tutor, p.petshop).replace(/ Aqui é .*$/, "")} Segue o comprovante ${p.itens.length === 1 ? "da mensalidade" : "das mensalidades"} da creche.`,
     "",

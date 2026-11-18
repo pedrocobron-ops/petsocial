@@ -6,7 +6,7 @@ import type { AutorizacaoAtual, EscopoDaFoto } from "@/lib/gestao/boletim-servid
 import { arrumarArroba, textoComArroba } from "@/lib/gestao/fotos-redes";
 
 /**
- * "Pode postar a foto do Thor nas redes da Loja": o tutor autoriza na página do boletim. Nada vem marcado: ele escolhe QUAIS
+ * "Pode postar a foto do Thor nas redes da Loja?" + o botão "Quero autorizar": o tutor autoriza na página do boletim. Nada vem marcado: ele escolhe QUAIS
  * fotos e, se quiser, o @ para a loja marcar. O texto mostrado é o mesmo que o banco guarda (o banco monta; aqui só troca a frase
  * "Sem marcar o meu perfil." pelo @, do mesmo jeito que o banco). Tirar é a qualquer hora, pelo link "Não quero mais".
  */
@@ -50,7 +50,10 @@ export default function AutorizarFoto({ token, rotulo, textos, atual, fuso, opco
   if (!aberto) {
     return (
       <section className="g-bo-redes" aria-label="Fotos nas redes">
-        <button type="button" className="g-btn sec cheio" data-teste="pode-postar" onClick={() => setAberto(true)}><Share2 />{rotulo}</button>
+        {/* uma pergunta e uma escolha: antes era um botão com a frase "Pode postar a foto…", que parecia um aviso, não uma pergunta */}
+        <p className="g-bo-redes-t" data-teste="pergunta-das-fotos"><Share2 aria-hidden /><b>{rotulo}?</b></p>
+        <p className="g-bo-redes-nota">Você escolhe. Sem a sua autorização, nenhuma foto é postada.</p>
+        <button type="button" className="g-btn sec cheio" data-teste="pode-postar" onClick={() => setAberto(true)}>Quero autorizar</button>
       </section>
     );
   }

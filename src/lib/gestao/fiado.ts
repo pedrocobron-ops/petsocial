@@ -1,6 +1,6 @@
 import type { Banco } from "./supabase";
 import { opcao } from "./opcoes";
-import { brl } from "./util";
+import { brl, centavos } from "./util";
 
 /**
  * Limite de fiado (migração 20261200): limite do cliente (`clientes.limite_fiado`) ou o padrão da loja (opção
@@ -10,7 +10,6 @@ import { brl } from "./util";
  */
 export const OPCAO_LIMITE_FIADO = "dinheiro.limite_fiado";
 
-const centavos = (n: number) => Math.round(Number((n * 100).toPrecision(12))) / 100;
 
 /** O limite padrão da loja (0 = sem limite). Quem não vê o dinheiro recebe 0 (o banco não entrega a opção). */
 export function limitePadrao(petshop: { opcoes?: unknown }): number {

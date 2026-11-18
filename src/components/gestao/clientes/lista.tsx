@@ -6,7 +6,7 @@ import Link from "@/components/gestao/link-depois";
 import dynamic from "next/dynamic";
 import { AlertTriangle, Cake, Cat, ChevronRight, Dog, Camera, Download, HandCoins, MessageCircle, PawPrint, Phone, PiggyBank, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
-import { brl, fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
+import { brl, fmtTelefone, haQuanto, isoDia, semAcento, soDigitos, centavos } from "@/lib/gestao/util";
 import { buscarVisitas, sumiu } from "@/lib/gestao/visitas";
 import { useGestao } from "../contexto";
 import { chaveDoRascunho, lerRascunho, RASCUNHO_PET_NOVO } from "../rascunho";
@@ -146,7 +146,7 @@ export default function Lista({ aoAbrir, irPara }: {
   const totalDevido = useMemo(() => {
     let v = 0, n = 0, cred = 0, nc = 0;
     for (const x of dinheiro?.values() ?? []) { if (x.deve > 0) { v += x.deve; n++; } if (x.credito > 0) { cred += x.credito; nc++; } }
-    return { valor: Math.round(v * 100) / 100, tutores: n, credito: Math.round(cred * 100) / 100, comCredito: nc };
+    return { valor: centavos(v), tutores: n, credito: centavos(cred), comCredito: nc };
   }, [dinheiro]);
 
   // Saúde: pets com cuidado vencido ou vencendo em 30 dias (consulta leve, só de leitura)
@@ -220,6 +220,8 @@ export default function Lista({ aoAbrir, irPara }: {
     try {
       baixarCsv(clientes, pets, `clientes-e-pets-${isoDia(new Date())}.csv`);
       avisar("Lista baixada.");
+      // fica no Registro de pedidos de dados (quem exportou e quantas linhas, sem o conteúdo); banco antigo sem a função: segue
+      void (sb.rpc as unknown as (f: string, a: Record<string, unknown>) => PromiseLike<unknown>)("lgpd_registrar_exportacao", { p_petshop: petshop.id, p_linhas: clientes.length }).then(() => undefined, () => undefined);
     } catch (e) { avisarErro(e); }
   }
 

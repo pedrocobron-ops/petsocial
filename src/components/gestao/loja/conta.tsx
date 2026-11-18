@@ -7,7 +7,7 @@ import { Minus, Package, Plus, Scissors, Search, Sparkles, Trash2, Truck } from 
 import { gravarMovimentos, parteDaChave, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Produto } from "@/lib/gestao/tipos";
-import { brl, semAcento } from "@/lib/gestao/util";
+import { brl, semAcento, centavos } from "@/lib/gestao/util";
 import { limparCodigo, opcoesDaLoja } from "@/lib/gestao/loja-opcoes";
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useGestao } from "../contexto";
@@ -33,7 +33,6 @@ export type ItemConta = {
 };
 
 export const LEVA_E_TRAZ = "Leva e traz";
-const centavos = (n: number) => Math.round(n * 100) / 100;
 let contador = 0;
 export const novaChave = () => `item-${++contador}`;
 
@@ -349,7 +348,7 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
   const maximo = maximoDoCaixa(petshop, cuidoDoFinanceiro, subtotal);
   const passouDoMaximo = descontoPassaDoCaixa(maximo, descontoDigitado);
   // desconto acima do que o caixa pode dar: o total mostrado é o que dá para cobrar (com o desconto máximo), nunca o que o banco recusa
-  const aMais = passouDoMaximo ? Math.round(((descontoDigitado ?? 0) - maximo!) * 100) / 100 : 0;
+  const aMais = passouDoMaximo ? centavos(((descontoDigitado ?? 0) - maximo!)) : 0;
   return (
     <>
       {comPagamento && (
@@ -366,7 +365,7 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
             </div>
           )}
           {nadaAPagar ? null : depois && aoDepois
-            ? <QuandoPaga total={depois.ativo ? Math.max(0, Math.round((total - credito) * 100) / 100) : aPagar} pagamento={pagamento} aoPagamento={aoPagamento} depois={depois} aoDepois={aoDepois} erro={erroForma} aceitaResto={aceitaResto} />
+            ? <QuandoPaga total={depois.ativo ? Math.max(0, centavos((total - credito))) : aPagar} pagamento={pagamento} aoPagamento={aoPagamento} depois={depois} aoDepois={aoDepois} erro={erroForma} aceitaResto={aceitaResto} />
             : <EscolhaPagamento valor={pagamento} aoMudar={aoPagamento} total={aPagar} erro={erroForma} />}
         </>
       )}
@@ -382,7 +381,7 @@ export function FechamentoDaConta({ subtotal, desconto, total, descontoDigitado,
             {desconto > 0 && <span>Desconto − {brl(passouDoMaximo ? Math.max(0, desconto - aMais) : desconto)}</span>}
             {credito > 0 && <span>Crédito do tutor − {brl(credito)}</span>}
             {(junto ?? 0) > 0 && credito > 0 && !depois?.ativo && <span>Com o que devia ({brl(junto!)})</span>}
-            {credito > 0 && <span>{depois?.ativo ? "Fica a receber" : "A pagar agora"}: <b>{brl(depois?.ativo ? Math.max(0, Math.round((total - credito) * 100) / 100) : aPagar)}</b></span>}
+            {credito > 0 && <span>{depois?.ativo ? "Fica a receber" : "A pagar agora"}: <b>{brl(depois?.ativo ? Math.max(0, centavos((total - credito))) : aPagar)}</b></span>}
             {credito <= 0 && aPagar > total && !depois?.ativo && <span>Com o que devia ({brl(junto ?? aPagar - total)}): <b>{brl(aPagar)}</b></span>}
           </div>
         )}

@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import Link from "@/components/gestao/link-depois";
-import { AlertTriangle, BadgeCheck, Check, Clock, Database, ExternalLink, Gift, Lock, Sparkles, Store, User, Users } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Check, Clock, Database, ExternalLink, Gift, Lock, MessageCircle, Sparkles, Store, Ticket, User, Users } from "lucide-react";
 import { Tile, type Tom } from "@/components/gestao/painel";
 import { useGestao } from "@/components/gestao/contexto";
 import { Vazio, useDados } from "@/components/gestao/ui";
 import { linkSuporte } from "@/lib/gestao/contato";
 import { artigoDe } from "@/lib/gestao/modulos";
-import { PERIODOS, PLANOS, ofertaDe, planoPorId, textoPessoas, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
+import { DIAS_DE_ATRASO_PADRAO, PERIODOS, PLANOS, TEXTOS_ASSINAR, conselhoDoPlano, limparCupom, linkDoCheckout, ofertaDe, planoPorId, textoParaAssinar, textoPessoas, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
+import { linhaDoVendedor, temVendedor, vendedorDe } from "@/lib/gestao/vendedor";
+import { ocupaAcesso } from "@/components/gestao/equipe/modelo";
 import { TEXTO_TESTE } from "@/components/gestao/fim-do-teste";
 import { brlCurto, dataCompleta, dataCurta } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
@@ -39,29 +41,19 @@ function Acessos({ n }: { n: number }) {
   return <span className="g-as-acessos" aria-hidden>{Array.from({ length: MAIOR }, (_, i) => <i key={i} className={i < n ? "on" : undefined}><User /></i>)}</span>;
 }
 
-/**
- * Link de pagamento com o e-mail da conta já preenchido (parâmetros `email` e `confirmEmail` do checkout da Cakto)
- * e a marca do pet shop em `callback`, que a Cakto devolve no aviso de pagamento: assim a compra cai na conta certa
- * mesmo se a pessoa trocar o e-mail na hora de pagar. A marca é assinada pelo banco (`assinatura_callback`:
- * id do pet shop e uma ficha secreta dele), para ninguém mandar uma compra para a conta de outra pessoa.
- */
-function linkDoCheckout(checkout: string, email: string | undefined, callback?: string | null) {
-  const extras: [string, string][] = [];
-  if (email) extras.push(["email", email], ["confirmEmail", email]);
-  if (callback) extras.push(["callback", callback]);
-  try {
-    const u = new URL(checkout);
-    for (const [k, v] of extras) u.searchParams.set(k, v);
-    return u.toString();
-  } catch {
-    const q = extras.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
-    return q ? `${checkout}${checkout.includes("?") ? "&" : "?"}${q}` : checkout;
-  }
-}
-
 export default function Assinatura() {
-  const { sb, souDono, petshop, user, liberado, diasDeTeste, assinaturaAberta } = useGestao();
+  const { sb, souDono, petshop, user, equipe, liberado, diasDeTeste, assinaturaAberta, atraso } = useGestao();
   const [periodo, setPeriodo] = useState<PeriodoId>("mensal");
+  // "Tenho um cupom": o código vai junto no link de pagamento (ou na mensagem do WhatsApp); quem confere é a Cakto
+  const [comCupom, setComCupom] = useState(false);
+  const [cupomDigitado, setCupomDigitado] = useState("");
+  const cupom = comCupom ? limparCupom(cupomDigitado) : "";
+  // quem vende (nome e documento gravados no painel do administrador): só aparece quando está preenchido
+  const { dados: vendedor } = useDados(async () => {
+    const r = await sb.rpc("gestao_vendedor");
+    const v = vendedorDe(r.error ? null : r.data);
+    return temVendedor(v) ? v : null;
+  }, []);
   // sem a marca assinada (banco antes da atualização ou sem internet), o link segue só com o e-mail
   const { dados: callback } = useDados(async () => {
     if (!souDono) return null;
@@ -73,6 +65,8 @@ export default function Assinatura() {
   const podeAssinar = status === "teste" || status === "cancelada";
   const temAssinatura = status === "ativa" || status === "atrasada";
   const atual = planoPorId(petshop.plano);
+  // quantas pessoas entram no sistema hoje (login ou convite): o plano que serve sai daqui
+  const conselho = conselhoDoPlano(equipe.filter(ocupaAcesso).length);
 
   return (
     <div>
@@ -111,6 +105,7 @@ export default function Assinatura() {
               <h2>Escolha o plano</h2>
               <p className="g-muted g-p">Todos têm as mesmas funções e o Mozart. Muda quantas pessoas entram no sistema, cada uma com o seu login. Pagando por 3 ou 6 meses, sai mais barato.</p>
             </div>
+            <p className="g-aviso g-as-conselho" data-teste="conselho-do-plano"><Users aria-hidden /><span>{conselho.texto}</span></p>
             <div className="g-seg" role="group" aria-label="De quanto em quanto tempo pagar" style={{ justifySelf: "start" }}>
               {PERIODOS.map((pe) => <button key={pe.id} aria-pressed={periodo === pe.id} onClick={() => setPeriodo(pe.id)}>{pe.nome}</button>)}
             </div>
@@ -118,15 +113,16 @@ export default function Assinatura() {
               {PLANOS.map((p) => {
                 const v = VISUAL[p.id], o = ofertaDe(p.id, periodo);
                 return (
-                  <div key={p.id} className={`g-card g-as-plano tom-${v.tom}${p.id === "equipe" ? " realce" : ""}`}>
+                  <div key={p.id} className={`g-card g-as-plano tom-${v.tom}${conselho.cabe && p.id === conselho.plano.id ? " realce" : ""}`}>
+                    {conselho.cabe && p.id === conselho.plano.id && <span className="g-as-marca"><Check aria-hidden />Serve para a sua equipe de hoje</span>}
                     <div className="g-as-plano-t"><Tile icone={v.icone} tom={v.tom} tamanho="g" /><div><h2>{p.nome}</h2><p className="g-muted g-pp">{p.para}</p></div></div>
                     <p className="g-as-preco"><span className="g-num">{brlCurto(o.preco)}</span><span className="g-muted g-p"> {o.periodo.cada}</span></p>
                     <p className="g-muted g-pp" style={{ minHeight: "2.6em" }}>{o.periodo.meses > 1 ? `Equivale a ${brlCurto(Math.round(o.porMes * 100) / 100)} por mês: ${brlCurto(o.economia)} a menos do que no mensal.` : "Cobrado todo mês."}</p>
                     <div className="g-as-quantos"><Acessos n={p.acessos} /><p className="g-p"><b>{textoPessoas(p.acessos)}</b> com login próprio</p></div>
-                    {/* enquanto a assinatura não abriu, ninguém paga: o botão espera, mesmo com o link já cadastrado */}
+                    {/* com o link de pagamento cadastrado e ligado, vai para a Cakto; sem ele, a pessoa assina com a equipe, pelo WhatsApp */}
                     {o.checkout && assinaturaAberta
-                      ? <a className={`g-btn cheio ${p.id === "equipe" ? "pri" : "verde"}`} href={linkDoCheckout(o.checkout, user.email, callback)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
-                      : <button className="g-btn cheio" disabled>Disponível em breve</button>}
+                      ? <a className={`g-btn cheio ${conselho.cabe && p.id === conselho.plano.id ? "pri" : "verde"}`} data-teste={`assinar-${p.id}`} href={linkDoCheckout(o.checkout, user.email, callback, cupom)} target="_blank" rel="noopener noreferrer">Assinar<ExternalLink aria-hidden /></a>
+                      : <a className="g-btn cheio verde" data-teste={`assinar-${p.id}`} href={linkSuporte(textoParaAssinar(p.id, periodo, petshop.nome, user.email, cupom))} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden />Assinar pelo WhatsApp</a>}
                   </div>
                 );
               })}
@@ -137,8 +133,34 @@ export default function Assinatura() {
                 {INCLUI.map((i) => <li key={i}><Check aria-hidden />{i}</li>)}
               </ul>
             </div>
-            {!assinaturaAberta && <p className="g-muted g-p">A assinatura ainda não abriu. Enquanto isso, você continua usando tudo normalmente, sem pagar nada.</p>}
-            <p className="g-muted g-pp">O pagamento é feito na Cakto, a empresa que cuida da cobrança da Maestro Pet. A assinatura se renova sozinha ao fim de cada período até você cancelar. Você cancela quando quiser e usa até o fim do período já pago. Use na página de pagamento o mesmo e-mail da sua conta{user.email ? ` (${user.email})` : ""} para o acesso ser liberado sozinho.</p>
+            <div className="g-card g-pilha p g-as-cupom">
+              {comCupom ? (
+                <>
+                  <label className="g-campo"><span>Código do cupom</span>
+                    <input className="g-input" name="cupom" autoCapitalize="characters" autoComplete="off" spellCheck={false} maxLength={40} placeholder="Ex.: ANA10" value={cupomDigitado} onChange={(e) => setCupomDigitado(e.target.value.toUpperCase())} autoFocus />
+                  </label>
+                  <p className="g-muted g-pp" role="status">{cupom
+                    ? `O cupom ${cupom} vai junto quando você tocar em Assinar. O desconto aparece na página de pagamento, antes de você pagar. Se o código estiver errado ou vencido, a página segue com o preço normal: confira o valor antes de concluir.`
+                    : "Escreva o código do jeito que a nossa equipe passou. Ele vai junto quando você tocar em Assinar."}</p>
+                  <div><button type="button" className="g-btn fantasma p" onClick={() => { setComCupom(false); setCupomDigitado(""); }}>Não tenho cupom</button></div>
+                </>
+              ) : (
+                <div className="g-fila">
+                  <button type="button" className="g-btn sec p" onClick={() => setComCupom(true)}><Ticket aria-hidden />Tenho um cupom</button>
+                  <span className="g-muted g-pp">Cupom é dado pela nossa equipe de atendimento, com data de validade.</span>
+                </div>
+              )}
+            </div>
+            <ul className="g-as-regras" data-teste="regras-da-assinatura">
+              <li><Check aria-hidden />{TEXTOS_ASSINAR.nadaCobrado}</li>
+              <li><Check aria-hidden /><span>{TEXTOS_ASSINAR.arrependimento} (<Link className="g-link" href="/gestao/termos#cancelar" target="_blank">Termos, parte 7</Link>)</span></li>
+              <li><Check aria-hidden />{TEXTOS_ASSINAR.semFidelidade}</li>
+              <li><Check aria-hidden />{TEXTOS_ASSINAR.pagamento}</li>
+            </ul>
+            <p className="g-muted g-pp">{assinaturaAberta
+              ? <>A assinatura se renova sozinha ao fim de cada período até você cancelar. Use na página de pagamento o mesmo e-mail da sua conta{user.email ? ` (${user.email})` : ""} para o acesso ser liberado sozinho.</>
+              : <>Ao tocar em Assinar pelo WhatsApp, a mensagem já sai escrita com o plano escolhido. A nossa equipe manda o link de pagamento e libera a sua conta. A assinatura se renova sozinha ao fim de cada período até você cancelar.</>}</p>
+            {vendedor && <p className="g-muted g-pp" data-teste="vendedor">{linhaDoVendedor(vendedor)}</p>}
           </section>
         )}
 
@@ -172,15 +194,6 @@ export default function Assinatura() {
           </section>
         );
       }
-      if (dias === 0) {
-        // o prazo passou, mas a assinatura ainda não abriu: ninguém fica bloqueado sem ter como pagar
-        return (
-          <section className="g-as-estado teste">
-            <div className="g-as-estado-t"><Tile icone={Clock} tom="pessego" tamanho="g" /><div><p className="g-rotulo">Teste grátis</p><h2>Teste grátis: terminou em {dataCurta(fim)}</h2></div></div>
-            <p className="g-p">{TEXTO_TESTE.vencidoSemAbrir}</p>
-          </section>
-        );
-      }
       const restam = Math.min(dias, DIAS_DE_TESTE);
       return (
         <section className="g-as-estado teste">
@@ -192,7 +205,7 @@ export default function Assinatura() {
           <div className="g-as-barra" role="img" aria-label={`${restam} de ${DIAS_DE_TESTE} dias restantes`}>
             {Array.from({ length: DIAS_DE_TESTE }, (_, i) => <i key={i} className={i < restam ? "on" : undefined} />)}
           </div>
-          <p className="g-p">Vai até {dataCurta(fim)}. Durante o teste, tudo funciona e até 6 pessoas podem entrar.{assinaturaAberta ? "" : " Se o teste acabar antes de a assinatura abrir, você continua usando normalmente até ela abrir."}</p>
+          <p className="g-p">Vai até {dataCurta(fim)}. Durante o teste, tudo funciona e até 6 pessoas podem entrar. {TEXTO_TESTE.nadaCobrado} {TEXTO_TESTE.seNaoAssinar}</p>
         </section>
       );
     }
@@ -209,8 +222,12 @@ export default function Assinatura() {
     if (status === "atrasada") {
       return (
         <section className="g-as-estado alerta">
-          <div className="g-as-estado-t"><Tile icone={AlertTriangle} tom="rosa" tamanho="g" /><div><p className="g-rotulo">Pagamento pendente</p><h2>O último pagamento não foi aprovado</h2></div></div>
-          <p className="g-p">Seu acesso continua por enquanto. Para não perder, confira o cartão na página da Cakto, no botão logo abaixo.</p>
+          <div className="g-as-estado-t"><Tile icone={liberado ? AlertTriangle : Lock} tom="rosa" tamanho="g" /><div><p className="g-rotulo">Pagamento pendente</p><h2>{liberado ? "O último pagamento não foi aprovado" : "Assinatura atrasada: a conta está só para consulta"}</h2></div></div>
+          <p className="g-p" data-teste="aviso-de-atraso">{!liberado
+            ? "O pagamento não foi aprovado e o prazo para acertar passou. Você continua vendo o que lançou, mas não consegue marcar, lançar nem alterar. Os dados continuam guardados: assim que o pagamento entrar, tudo volta a funcionar. Confira o cartão na página da Cakto, no botão logo abaixo."
+            : atraso
+              ? `Seu acesso continua até ${dataCompleta(atraso.travaEm)} (${atraso.dias} dias depois da cobrança que não passou). Se o pagamento não entrar até lá, a conta fica só para consulta. Os dados continuam guardados. Confira o cartão na página da Cakto, no botão logo abaixo.`
+              : `Seu acesso continua por enquanto: são ${DIAS_DE_ATRASO_PADRAO} dias para acertar, a contar da cobrança que não passou. Depois disso a conta fica só para consulta. Confira o cartão na página da Cakto, no botão logo abaixo.`}</p>
         </section>
       );
     }

@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./banco";
 import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "./supabase";
 import { TEMAS, corPropria } from "./identidade";
+import { lerLinkJunto, type LeitorDoLink, type LinkInicial } from "./link-inicial";
+export type { LinkInicial };
 
 /**
  * O lado do servidor do link do cliente e da página do pedido: o servidor lê pelas mesmas funções públicas que o navegador
@@ -20,42 +22,9 @@ type Rpc = { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data:
 const ler = (f: string, a: Record<string, unknown>) =>
   Promise.resolve((banco() as unknown as Rpc).rpc(f, a)).catch((e: unknown) => ({ data: null, error: e ?? "falhou" }));
 
-/** O que a página do link lê ao abrir, cru como o banco devolve (a página faz as mesmas contas de antes). */
-export type LinkInicial = {
-  /** resposta de link_info (null = link desligado ou inexistente) */
-  info: unknown;
-  /** link_nome, para a página do link desligado dizer com quem falar */
-  nome: string | null;
-  google: string | null;
-  promocoes: unknown[];
-  fechados: string[];
-  ia: boolean;
-  /** link_hotel_opcoes.preco: undefined quando o link não oferece hotel */
-  precoHotel?: unknown;
-  /** link_opcoes.termos (regras que o tutor aceita) */
-  termos: unknown;
-};
-
-type Resposta = { data: unknown; error: unknown };
-type Leitor = (f: string, a: Record<string, unknown>) => Promise<Resposta>;
-
-/** Monta o que a página recebe a partir das oito partes (as mesmas contas de sempre). `opcoesFalhou`: termos fica indefinido. */
-function montar(x: { info: unknown; nome: unknown; google: unknown; promocoes: unknown; fechados: unknown; ia: unknown; hotel: unknown; opcoes: unknown }, opcoesFalhou = false): LinkInicial {
-  const lido = x.info as { nome?: unknown; hotel?: unknown } | null;
-  const valido = !!lido && typeof lido === "object" && !!lido.nome;
-  const preco = (x.hotel as { preco?: unknown } | null)?.preco;
-  const termos = opcoesFalhou ? undefined : ((x.opcoes as { termos?: unknown } | null)?.termos ?? null);
-  return {
-    info: x.info ?? null,
-    nome: typeof x.nome === "string" && x.nome.trim() ? x.nome.trim() : null,
-    google: typeof x.google === "string" ? x.google : null,
-    promocoes: Array.isArray(x.promocoes) ? x.promocoes : [],
-    fechados: Array.isArray(x.fechados) ? (x.fechados as string[]) : [],
-    ia: valido && x.ia === true,
-    ...(valido && lido.hotel ? { precoHotel: preco && typeof preco === "object" ? preco : null } : {}),
-    termos,
-  };
-}
+// O que a página lê ao abrir e como as partes viram uma resposta só: `link-inicial.ts` (o navegador usa o mesmo, quando
+// o servidor não conseguiu ler).
+type Leitor = LeitorDoLink;
 
 /**
  * Por quantos segundos o servidor reaproveita a abertura de um link (o mesmo link aberto por vários tutores em seguida não
@@ -72,11 +41,6 @@ const guardados = new Map<string, { ate: number; valor: LinkInicial }>();
 /** Só para os testes: esquece o que está guardado. */
 export const esquecerLinksGuardados = () => guardados.clear();
 
-/** A função não existe neste banco (antes da migração 20261229): aí, e só aí, vale ler as oito partes uma a uma. */
-const funcaoNaoExiste = (e: unknown) => {
-  const x = (e ?? {}) as { code?: unknown; message?: unknown };
-  return /^(PGRST202|42883)$/.test(String(x.code ?? "")) || /Could not find the function/i.test(String(x.message ?? ""));
-};
 
 /**
  * A abertura do link: uma ida só ao banco (`link_inicial`, migração 20261229, que junta as oito funções públicas de sempre),
@@ -87,21 +51,8 @@ export async function lerLinkCom(ler: Leitor, codigo: string, agora: number = Da
   const segundos = segundosDoLinkGuardado();
   const g = segundos > 0 ? guardados.get(codigo) : undefined;
   if (g && g.ate > agora) return g.valor;
-  const p = { p_codigo: codigo };
-  let valor: LinkInicial;
-  const junto = await ler("link_inicial", p);
-  if (!junto.error && junto.data && typeof junto.data === "object" && !Array.isArray(junto.data)) {
-    valor = montar(junto.data as Parameters<typeof montar>[0]);
-  } else if (junto.error && !funcaoNaoExiste(junto.error)) {
-    return undefined;
-  } else {
-    const [info, nome, google, promocoes, fechados, ia, hotel, opcoes] = await Promise.all([
-      ler("link_info", p), ler("link_nome", p), ler("link_google", p), ler("link_promocoes", p),
-      ler("link_fechados", p), ler("link_ia_ligada", p), ler("link_hotel_opcoes", p), ler("link_opcoes", p),
-    ]);
-    if (info.error) return undefined;
-    valor = montar({ info: info.data, nome: nome.data, google: google.data, promocoes: promocoes.data, fechados: fechados.data, ia: ia.data, hotel: hotel.data, opcoes: opcoes.data }, !!opcoes.error);
-  }
+  const valor = await lerLinkJunto(ler, codigo);
+  if (!valor) return undefined;
   // só guarda link que existe e está ligado (código inventado não enche a memória; link desligado volta a valer na hora)
   if (segundos > 0 && (valor.info as { nome?: unknown } | null)?.nome) {
     if (guardados.size >= MAX_GUARDADOS) { const primeiro = guardados.keys().next().value; if (primeiro !== undefined) guardados.delete(primeiro); }

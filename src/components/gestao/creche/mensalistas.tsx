@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarX2, ChevronDown, History, ListChecks, Pencil, Plus, Search } from "lucide-react";
 import { abreNoDia, DIAS_SEMANA, lerPresencas, planoAtivo, podeMudarPlano, resumoDoMes, taxiDe, type PlanoCompleto } from "@/lib/gestao/creche";
-import { brl, dataCompleta, dataCurta, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, isoDia, nomeMes, semAcento, somaDias, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Esqueleto, useDados, useSomenteLeitura, Vazio } from "../ui";
 import { Chips } from "../loja/pecas";
@@ -147,7 +147,7 @@ export default function Mensalistas({ planos: lidos, novo, aoAbrirNovo, aoFechar
                       {vejoFinanceiro && (p.temValor ? <span className="g-tag verde g-tab">{brl(p.valor_mensal)}</span> : <span className="g-tag amarelo">sem valor</span>)}
                       {/* o táxi pet entra na cobrança do mês: a lista mostra junto, para bater com Gerar cobranças */}
                       {vejoFinanceiro && p.temValor && taxiDe(p) && Number(p.taxi_valor ?? 0) > 0 && (
-                        <span className="g-tag g-tab">{p.taxi_modo === "mes" ? `+ táxi ${brl(Number(p.taxi_valor))} por mês = ${brl(Math.round((Number(p.valor_mensal) + Number(p.taxi_valor)) * 100) / 100)}` : `+ táxi ${brl(Number(p.taxi_valor))} por dia que veio`}</span>
+                        <span className="g-tag g-tab">{p.taxi_modo === "mes" ? `+ táxi ${brl(Number(p.taxi_valor))} por mês = ${brl(centavos((Number(p.valor_mensal) + Number(p.taxi_valor))))}` : `+ táxi ${brl(Number(p.taxi_valor))} por dia que veio`}</span>
                       )}
                     </div>
                     {r && (r.esperados > 0 || r.vieram > 0 || r.extras.length > 0 || r.reposicoes.length > 0) && (

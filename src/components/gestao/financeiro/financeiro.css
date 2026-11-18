@@ -115,3 +115,18 @@ button.gf-alt-aviso svg { color: #8a6412; }
 /* Financeiro › Alterações: filtros de período e de quem */
 .gf-alt-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .gf-alt-filtros .g-seg { max-width: 100%; overflow-x: auto; }
+
+/* a cadeia do dinheiro: sinal · nome (e o que quer dizer) · valor; os totais em destaque */
+.gf-cadeia { display: grid; }
+.gf-cadeia > div { display: grid; grid-template-columns: 1.1em minmax(0, 1fr) auto; align-items: baseline; gap: 8px; padding: 8px 2px; font-size: .9375rem; }
+.gf-cadeia > div + div { border-top: 1px solid var(--g-linha); }
+.gf-cadeia i { font-style: normal; font-weight: 600; color: var(--g-texto-2, inherit); text-align: center; }
+.gf-cadeia span { min-width: 0; overflow-wrap: anywhere; }
+.gf-cadeia small { display: block; font-size: .78rem; line-height: 1.35; opacity: .72; font-weight: 400; }
+.gf-cadeia b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gf-cadeia > div.t { font-weight: 700; background: var(--g-carta-2); border-radius: 10px; padding-inline: 8px; border-top-color: transparent; }
+.gf-cadeia > div.t + div { border-top-color: transparent; }
+.gf-cadeia > div.t b { font-weight: 700; }
+
+/* Para o contador: a explicação de cada planilha aparece inteira */
+.gf-contador .g-linha .t span { white-space: normal; overflow: visible; text-overflow: clip; }

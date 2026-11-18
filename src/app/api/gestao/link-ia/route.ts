@@ -32,14 +32,14 @@ function liberado(chave: string) {
   return true;
 }
 
-type Saida = { texto: string; naoSei?: boolean; limite?: boolean; fora?: boolean; sugestao?: unknown };
+type Saida = { texto: string; naoSei?: boolean; limite?: boolean; fora?: boolean; sugestao?: unknown; resto?: boolean };
 const responder = (s: Saida, status = 200) => NextResponse.json(s, { status });
 
 /**
  * Dúvidas do cliente no link público (sem login). Só funciona quando o dono ligou "Tirar dúvidas do cliente no link".
  * O servidor monta o que o assistente sabe pelas funções públicas do link (chave pública, sem chave de serviço):
  * nada de clientes, pets ou caixa. O texto da pergunta não é guardado: só a contagem do dia.
- * Recebe { codigo, falas: [{ de: "eu" | "ia", texto }] } e devolve { texto, naoSei?, limite?, fora?, sugestao? }.
+ * Recebe { codigo, falas: [{ de: "eu" | "ia", texto }] } e devolve { texto, naoSei?, limite?, fora?, sugestao?, resto? } (resto: respondeu uma parte e o que faltou é com o pet shop).
  */
 async function tratar(req: Request) {
   if (!configurado) return NextResponse.json({ erro: "sem_banco" }, { status: 503 });
@@ -58,7 +58,7 @@ async function tratar(req: Request) {
   const info = infoR.data as unknown as DadosDoLink["info"] | null;
   if (infoR.error || !info || typeof info !== "object" || !info.nome) return NextResponse.json({ erro: "desligado" }, { status: 403 });
   info.servicos = Array.isArray(info.servicos) ? info.servicos : [];
-  const [fechados, hotel, opcoes, experiencia, espera, planos, taxi] = await Promise.all([
+  const [fechados, hotel, opcoes, experiencia, espera, planos, taxi, promocoes] = await Promise.all([
     sb.rpc("link_fechados", { p_codigo: codigo }),
     info.hotel ? sb.rpc("link_hotel_opcoes", { p_codigo: codigo }) : Promise.resolve({ data: null }),
     sb.rpc("link_opcoes", { p_codigo: codigo }),
@@ -67,6 +67,8 @@ async function tratar(req: Request) {
     // os planos mensais que a página mostra e o táxi pet (banco sem a função nova: segue sem)
     info.creche ? sb.rpc("link_creche_planos", { p_codigo: codigo }) : Promise.resolve({ data: null }),
     sb.rpc("link_taxi", { p_codigo: codigo }).then((r) => r, () => ({ data: null })),
+    // as promoções que a página mostra (sem elas, o assistente dizia o preço cheio num dia de promoção)
+    sb.rpc("link_promocoes", { p_codigo: codigo }).then((r) => r, () => ({ data: null })),
   ]);
   const d: DadosDoLink = {
     info,
@@ -78,6 +80,7 @@ async function tratar(req: Request) {
     espera: espera.data === true,
     planos: (planos.data as DadosDoLink["planos"]) ?? null,
     taxi: (taxi.data as DadosDoLink["taxi"]) ?? null,
+    promocoes: Array.isArray(promocoes.data) ? (promocoes.data as DadosDoLink["promocoes"]) : [],
   };
   const nome = info.nome;
   // a diária comum de cada porte, pela estimativa do próprio link (uma noite de cada porte, sem desconto): o assistente
@@ -124,7 +127,7 @@ async function tratar(req: Request) {
   }
   const r = lerResposta(bruto, d);
   await registrar(!r.naoSei);
-  return responder({ texto: r.texto, naoSei: r.naoSei, sugestao: r.sugestao });
+  return responder({ texto: r.texto, naoSei: r.naoSei, sugestao: r.sugestao, ...(r.resto ? { resto: true } : {}) });
 }
 
 type Banco = ReturnType<typeof createClient<Database>>;

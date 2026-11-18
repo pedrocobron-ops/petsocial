@@ -7,7 +7,7 @@ import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { ValoresDaEstadia } from "@/lib/gestao/hotel";
 import { destinoPelaRegra, sinalDe, textoDaRegra } from "@/lib/gestao/hotel-opcoes";
 import type { Banco } from "@/lib/gestao/supabase";
-import { brl, dataCompleta, dataCurta, isoDia, somaDias } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, isoDia, somaDias, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Campo, Folha, ok, useAvisos } from "../ui";
 import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharPagamento, pagamentoInicial, ParcelasNaTela, useAnotarParcelas, useCaixaAberto, type EstadoPagamento, type Forma } from "../loja/pecas";
@@ -164,7 +164,7 @@ export const sinalRecebidoDe = (v: Pick<ValoresDaEstadia, "sinal" | "sinal_estad
   v.sinal_estado === "pago" ? Number(v.sinal ?? 0) : Math.min(Number(v.sinal ?? 0), Number(v.sinal_recebido ?? 0));
 /** Quanto do sinal ainda falta receber (só o sinal "a receber" tem falta). */
 export const faltaDoSinal = (v: Pick<ValoresDaEstadia, "sinal" | "sinal_estado" | "sinal_recebido">) =>
-  v.sinal_estado === "a_receber" ? Math.max(0, Math.round((Number(v.sinal ?? 0) - sinalRecebidoDe(v)) * 100) / 100) : 0;
+  v.sinal_estado === "a_receber" ? Math.max(0, centavos((Number(v.sinal ?? 0) - sinalRecebidoDe(v)))) : 0;
 
 /** Etiqueta do sinal no cartão: com valor para quem recebe, só a situação para os outros. */
 export function EtiquetaSinal({ e, valores }: { e: Pick<EstadiaCompleta, "sinal_estado">; valores?: ValoresDaEstadia | null }) {
@@ -198,7 +198,6 @@ export function FolhaSinal({ estadia: e, valores, sugerido, totalPrevisto, aoFec
   const falta = pendente ? faltaDoSinal(pendente) : 0, jaEntrou = pendente ? sinalRecebidoDe(pendente) : 0;
   // o tutor pode pagar só uma parte do que falta: o resto continua em A receber
   const [agora, setAgora] = useState<number | null>(falta > 0 ? falta : null);
-  const centavos = (n: number) => Math.round(n * 100) / 100;
   const recebeAgora = agora != null && agora > 0 && agora <= falta ? centavos(agora) : null;
   const emParte = recebeAgora != null && recebeAgora < falta;
   const anotarParcelas = useAnotarParcelas();
@@ -425,7 +424,7 @@ export function AjusteDoSinal({ estadiaId, valores, total, aoGravar }: { estadia
   const [deixou, setDeixou] = useState(() => { try { return typeof window !== "undefined" && localStorage.getItem(chave) === "1"; } catch { return false; } });
   if (!vejoFinanceiro || !valores || deixou || !regra.ativo || regra.modo !== "pct" || !regra.valor || !total) return null;
   if (valores.sinal_estado !== "a_receber" || !valores.sinal_lancamento_id || valores.sinal == null || Number(valores.sinal_recebido ?? 0) > 0) return null;
-  const pela = Math.round(Number((total * regra.valor).toPrecision(12))) / 100;
+  const pela = centavos(total * regra.valor / 100);
   if (Math.abs(pela - Number(valores.sinal)) < 0.005 || pela <= 0) return null;
   async function acertar() {
     if (salvando) return;

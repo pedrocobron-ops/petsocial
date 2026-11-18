@@ -1,5 +1,7 @@
 import type { Banco } from "./supabase";
 import { partesPorForma, type PartePagamento } from "./dinheiro";
+import { centavos as real } from "./util";
+import { opcao } from "./opcoes";
 
 /**
  * Taxas da maquininha (migração 20261204): o que a maquininha cobra em cada forma de pagamento e quanto a loja recebe de
@@ -33,7 +35,6 @@ export const TAXAS_ZERADAS: TaxasMaquininha = {
 export const MAX_PCT = 30, MAX_FIXO = 50, MAX_DIAS = 120;
 
 /** Ao centavo, meio centavo para cima (como o round do banco): 0,495 vira 0,50, sem o erro do ponto flutuante. */
-const real = (n: number) => Math.round(Number((n * 100).toPrecision(12))) / 100;
 const num = (v: unknown, padrao = 0) => (v == null || v === "" || !Number.isFinite(Number(v)) ? padrao : Number(v));
 
 /** Lê a linha do banco (números que chegam como texto viram número). */
@@ -217,27 +218,42 @@ export type TaxasDoPeriodo = {
   parcelado?: boolean;
 };
 
-export async function taxasDoPeriodo(sb: Banco, petshopId: string, de: string, ate: string): Promise<TaxasDoPeriodo | null> {
+/** Opção (Meu pet shop, Taxas da maquininha): o repasse que cai num feriado da lista do pet shop passa para o próximo dia útil. Desligada por padrão. */
+export const OPCAO_REPASSE_FERIADO = "dinheiro.repasse_pula_feriado";
+export const repassePulaFeriado = (petshop: { opcoes?: unknown }) => opcao(petshop, OPCAO_REPASSE_FERIADO, false);
+
+/** Os feriados marcados em Meu pet shop (Feriados e dias fechados), para o repasse pular. Com a opção desligada, nenhum. */
+export async function feriadosDoRepasse(sb: Banco, petshop: { id: string; opcoes?: unknown }): Promise<Set<string> | null> {
+  if (!repassePulaFeriado(petshop)) return null;
+  const r = await sb.from("dias_especiais").select("dia").eq("petshop_id", petshop.id).eq("feriado", true).limit(1000);
+  return new Set((r.data ?? []).map((d) => d.dia));
+}
+
+export async function taxasDoPeriodo(sb: Banco, petshopId: string, de: string, ate: string, feriados?: Set<string> | null): Promise<TaxasDoPeriodo | null> {
   const r = await sb.rpc("taxas_do_periodo", { p: petshopId, p_de: de, p_ate: ate });
   if (r.error || !r.data) return null;
   const d = r.data as unknown as TaxasDoPeriodo;
   return {
     ...d, taxa: real(Number(d.taxa)), cartao: real(Number(d.cartao)), lancamentos: Number(d.lancamentos),
     por_forma: (d.por_forma ?? []).map((x) => ({ forma: x.forma, valor: real(Number(x.valor)), taxa: real(Number(x.taxa)) })),
-    a_receber: emDiaUtil((d.a_receber ?? []).map((x) => ({ dia: x.dia, valor: real(Number(x.valor)) }))), parcelado: d.parcelado === true,
+    a_receber: emDiaUtil((d.a_receber ?? []).map((x) => ({ dia: x.dia, valor: real(Number(x.valor)) })), feriados), parcelado: d.parcelado === true,
   };
 }
 
 /**
  * A maquininha não paga no sábado nem no domingo (Sandra, L10: "domingo, 17/01"): o dia que cai no fim de semana passa para a
- * segunda-feira, somado ao que já caía nela. Feriado não entra (cada maquininha trata de um jeito).
+ * segunda-feira, somado ao que já caía nela. Os dias são corridos (30 dias = 30 dias de calendário). Feriado só entra quando a
+ * loja liga a opção (`OPCAO_REPASSE_FERIADO`) e pela lista de feriados que ela mesma marcou: cada maquininha trata de um jeito.
  */
-export function emDiaUtil(lista: { dia: string; valor: number }[]): { dia: string; valor: number }[] {
+export function emDiaUtil(lista: { dia: string; valor: number }[], feriados?: Set<string> | null): { dia: string; valor: number }[] {
   const m = new Map<string, number>();
   for (const x of lista) {
     const d = new Date(`${x.dia.slice(0, 10)}T12:00:00Z`);
-    const semana = d.getUTCDay();
-    if (semana === 6 || semana === 0) d.setUTCDate(d.getUTCDate() + (semana === 6 ? 2 : 1));
+    for (let i = 0; i < 15; i++) {
+      const semana = d.getUTCDay();
+      if (semana !== 6 && semana !== 0 && !feriados?.has(d.toISOString().slice(0, 10))) break;
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
     const dia = d.toISOString().slice(0, 10);
     m.set(dia, real((m.get(dia) ?? 0) + x.valor));
   }

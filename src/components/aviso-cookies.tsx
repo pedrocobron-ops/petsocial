@@ -80,7 +80,7 @@ export default function AvisoCookies() {
   const escondida = fora || desvia;
   return (
     <div ref={ref} className={`cookies${fora ? " fora" : ""}${desvia && !fora ? " desvia" : ""}`} role="region" aria-label="Aviso de cookies" aria-hidden={escondida || undefined}>
-      <Link href="/politica-de-privacidade#cookies" tabIndex={escondida ? -1 : undefined}>Usamos cookies de medição</Link>
+      <Link href="/politica-de-privacidade#cookies" tabIndex={escondida ? -1 : undefined}>Usamos cookies da Meta para medir anúncios. <u>Saiba mais</u></Link>
       <span className="cookies-botoes">
         <button type="button" className="recusar" onClick={() => escolher("recusado")} tabIndex={escondida ? -1 : undefined}>Recusar</button>
         <button type="button" onClick={() => escolher("aceito")} tabIndex={escondida ? -1 : undefined}>Aceitar</button>

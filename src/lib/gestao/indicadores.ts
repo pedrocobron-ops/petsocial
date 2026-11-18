@@ -1,5 +1,5 @@
 import type { Banco } from "./supabase";
-import { isoDia } from "./util";
+import { isoDia, centavos } from "./util";
 
 /**
  * Indicadores (Relatórios, Indicadores): os números dos gráficos, por mês, de `indicadores_do_periodo` (migração 20261204).
@@ -64,13 +64,14 @@ export type IndicadoresDoBanco = {
   meses: MesIndicador[];
   clientes: number; primeira_vez: number;
   retorno_60: { clientes: number; voltaram: number };
-  servicos: { servico_id: string | null; nome: string; vezes: number; receita: number | null }[];
+  /** `vezes`: feitos no período (pelo dia do atendimento). `pagos` e `receita`: o par do dinheiro (pelo dia do pagamento), o mesmo de Quanto sobrou. */
+  servicos: { servico_id: string | null; nome: string; vezes: number; pagos: number; receita: number | null }[];
   produtos: { produto_id: string | null; nome: string; unidade: string; quantidade: number; receita: number | null }[];
   /** d: 0 = segunda … 6 = domingo; h: hora (0–23); n: horários marcados (sem os cancelados). */
   mapa: { d: number; h: number; n: number }[];
 };
 
-const real = (n: unknown) => Math.round(Number(n ?? 0) * 100) / 100;
+const real = (n: unknown) => centavos(Number(n ?? 0));
 const ouNulo = (n: unknown) => (n == null ? null : real(n));
 
 /** Lê a resposta do banco (números que chegam como texto viram número). */
@@ -89,7 +90,7 @@ export function lerIndicadores(d: IndicadoresDoBanco): IndicadoresDoBanco {
     })),
     clientes: Number(d.clientes), primeira_vez: Number(d.primeira_vez),
     retorno_60: { clientes: Number(d.retorno_60?.clientes ?? 0), voltaram: Number(d.retorno_60?.voltaram ?? 0) },
-    servicos: (d.servicos ?? []).map((s) => ({ ...s, vezes: Number(s.vezes), receita: ouNulo(s.receita) })),
+    servicos: (d.servicos ?? []).map((s) => ({ ...s, vezes: Number(s.vezes), pagos: Number((s as { pagos?: number }).pagos ?? 0), receita: ouNulo(s.receita) })),
     produtos: (d.produtos ?? []).map((p) => ({ ...p, quantidade: Number(p.quantidade), receita: ouNulo(p.receita) })),
     mapa: (d.mapa ?? []).map((x) => ({ d: Number(x.d), h: Number(x.h), n: Number(x.n) })),
   };

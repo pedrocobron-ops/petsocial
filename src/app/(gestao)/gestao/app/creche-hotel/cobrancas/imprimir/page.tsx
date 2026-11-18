@@ -9,7 +9,7 @@ import {
 import { opcoesDeCobranca } from "@/lib/gestao/dinheiro-opcoes";
 import { pixDe } from "@/lib/gestao/hotel-opcoes";
 import { textoDoPagamento } from "@/lib/gestao/dinheiro";
-import { brl, dataCurta, deIsoDia, fmtTelefone, isoDia, nomeMes } from "@/lib/gestao/util";
+import { brl, dataCurta, deIsoDia, fmtTelefone, isoDia, nomeMes, centavos } from "@/lib/gestao/util";
 import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { useGestao } from "@/components/gestao/contexto";
 import { SemAcesso } from "@/components/gestao/financeiro/comum";
@@ -22,7 +22,6 @@ import { CabecalhoDoPapel, ControlesDoPapel, Pares, Papel, useTituloDoPapel } fr
  * - com `tutor=<id>`, o extrato do mês de um tutor, para imprimir ou salvar em PDF e mandar para ele.
  * Só lê; não gera cobrança nem mexe em nada.
  */
-const centavos = (n: number) => Math.round(n * 100) / 100;
 type Familia = { chave: string; tutor: string; telefone: string | null; doMes: CobrancaCompleta[]; antigas: CobrancaCompleta[] };
 
 function familias(doMes: CobrancaCompleta[], antigas: CobrancaCompleta[]): Familia[] {

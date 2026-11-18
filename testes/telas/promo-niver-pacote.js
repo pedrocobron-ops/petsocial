@@ -130,7 +130,9 @@ const SAIDA = path.join(__dirname, '..', 'saida');
   await semRolagem(page, 'link');
   await page.locator('button', { hasText: 'Continuar' }).click();
   await page.locator('.g-lk-opcao.porte', { hasText: 'M' }).first().click();
-  T.ok('porte M: "De R$ 60 por R$ 54" (60 é o preço da lista do porte M)', /De\s*R\$\s?60\s*por\s*R\$\s?54/.test(await page.locator('.g-lk-promo').innerText()), await page.locator('.g-lk-promo').innerText());
+  // rodada 9 (N7): no passo dos dados, o valor vem numa linha por pet ("porte M · 10% off: R$ 60,00 riscado, R$ 54,00"), não mais na frase "De X por Y"
+  const valorNoLink = await page.locator('[data-teste=valor-do-pedido]').innerText();
+  T.ok('porte M: de R$ 60,00 por R$ 54,00 (60 é o preço da lista do porte M)', /porte M/.test(valorNoLink) && /R\$\s?60,00/.test(valorNoLink) && /R\$\s?54,00/.test(valorNoLink) && /Semana do banho/.test(valorNoLink), valorNoLink);
   await foto(page, '390-link-dados');
   await semRolagem(page, 'link, seus dados');
   T.ok('link: sem erro na página', !erros.length, erros);

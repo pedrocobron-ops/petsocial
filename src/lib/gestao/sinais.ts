@@ -1,6 +1,7 @@
 import { lerConta, type ValoresDaEstadia } from "./hotel";
 import { contando, lerTudo } from "./paginas";
 import type { Banco } from "./supabase";
+import { centavos as real } from "./util";
 
 /**
  * Sinais da creche e do hotel num período (a mesma conta de Relatórios, cartão do hotel, e do Mozart, "quanto recebi de sinal?"):
@@ -25,7 +26,6 @@ export type SinaisDoPeriodo = {
 };
 
 type Sinal = Pick<ValoresDaEstadia, "estadia_id" | "sinal" | "sinal_estado" | "sinal_pago_em" | "sinal_devolvido_em" | "sinal_devolucao_id" | "sinal_lancamento_id">;
-const real = (n: number) => Math.round(n * 100) / 100;
 const diaLocal = (iso: string, fusoMin: number) => new Date(new Date(iso).getTime() + fusoMin * 60000).toISOString().slice(0, 10);
 const mais1 = (dia: string) => new Date(Date.parse(`${dia}T00:00:00Z`) + 864e5).toISOString().slice(0, 10);
 

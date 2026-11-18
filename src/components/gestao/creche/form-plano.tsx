@@ -19,6 +19,7 @@ import AcertoDaSaida from "./saida";
 import "./creche.css";
 import "@/components/gestao/hotel/hotel.css";
 import { CampoComVoz } from "../ditado";
+import { DICA_OBS } from "@/lib/gestao/privacidade-textos";
 
 /** Quantos mensalistas (com plano que ainda vale) vêm em cada dia da semana. Índice = dia do banco (0 = domingo). */
 export function mensalistasPorDia(planos: PlanoCompleto[], hoje: string, semPlano?: string): number[] {
@@ -384,7 +385,7 @@ export default function FormPlano({ plano, pet: petInicial, planos, aoFechar, ao
             <small>{comPausa ? "Na pausa o pet não entra na chamada, não leva falta e não ocupa vaga. A cobrança do mês sugere a mensalidade proporcional. Cobrança que já foi gerada não muda sozinha: se combinou desconto, altere em Cobranças." : "Sem pausa marcada."}</small>
           </div>
         )}
-        <Campo rotulo="Observações">
+        <Campo rotulo="Observações" dica={DICA_OBS}>
           <CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações do plano"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder="Horário que costuma chegar, quem busca, combinados com o tutor…" /></CampoComVoz>
         </Campo>
         {erro && <p className="g-erro" role="alert">{erro}</p>}

@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Horario } from "../tipos";
 import type { Contexto } from "./ferramentas";
+import { centavos } from "../util";
 
 /**
  * Mozart: os planos de mensalista da creche (só consulta). "A Luna vem quinta?", "O tutor da Luna avisou que ela não vem
@@ -68,7 +69,7 @@ export async function consultarPlanosDaCreche(c: Contexto, e: Record<string, unk
   for (const t of taxis?.data ?? []) {
     if (!t.plano_id) continue;
     const x = taxiAnotado.get(t.plano_id) ?? { dias: 0, valor: 0 };
-    taxiAnotado.set(t.plano_id, { dias: x.dias + 1, valor: Math.round((x.valor + Number(t.valor)) * 100) / 100 });
+    taxiAnotado.set(t.plano_id, { dias: x.dias + 1, valor: centavos((x.valor + Number(t.valor))) });
   }
   const NOME_TAXI: Record<string, string> = { ida: "só a ida (buscar em casa)", volta: "só a volta (levar para casa)", ida_volta: "ida e volta (buscar e levar)" };
 

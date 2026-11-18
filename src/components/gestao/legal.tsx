@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Selo } from "./marca";
-import { EMPRESA, identificacao } from "@/lib/empresa";
+import { EMPRESA } from "@/lib/empresa";
 import { WHATSAPP_SUPORTE_TEXTO, linkSuporte } from "@/lib/gestao/contato";
 import { textoVigencia, type Documento } from "@/lib/gestao/documentos";
+import { quemOfereceDoSite, type QuemOferece } from "@/lib/gestao/vendedor-documentos";
 import "./legal.css";
 
 /** Dado que ainda não existe no repositório: fica à vista, entre colchetes, até alguém preencher (em `src/lib/empresa.ts`). */
@@ -10,21 +11,23 @@ export function Preencher({ children }: { children: React.ReactNode }) {
   return <mark className="g-leg-falta">[{children}]</mark>;
 }
 
-/** Razão social, CNPJ e endereço vêm de `src/lib/empresa.ts`. Cada um que estiver vazio aparece como marcador. */
-export function QuemResponde() {
-  if (EMPRESA.pessoaFisica) {
+/**
+ * Quem oferece o Gestão: nome, CPF ou CNPJ e endereço. O nome e o documento vêm do painel do administrador
+ * (`quemOferece()` em `src/lib/gestao/vendedor-documentos.ts`); sem `v`, da identificação geral do site. O que faltar aparece como marcador.
+ */
+export function QuemResponde({ v = quemOfereceDoSite() }: { v?: QuemOferece }) {
+  if (v.pessoaFisica) {
     return (
       <b>
-        {EMPRESA.nome || <Preencher>NOME COMPLETO</Preencher>}, pessoa física, inscrito no CPF sob o nº {EMPRESA.cpf || <Preencher>CPF</Preencher>},
-        com endereço em {EMPRESA.endereco || <Preencher>ENDEREÇO</Preencher>}
+        {v.nome || <Preencher>NOME COMPLETO</Preencher>}, pessoa física, inscrito no CPF sob o nº {v.documento || <Preencher>CPF</Preencher>},
+        com endereço em {v.endereco || <Preencher>ENDEREÇO</Preencher>}
       </b>
     );
   }
-  if (EMPRESA.razaoSocial && EMPRESA.cnpj && EMPRESA.endereco) return <b>{identificacao()}</b>;
   return (
     <b>
-      {EMPRESA.razaoSocial || <Preencher>RAZÃO SOCIAL</Preencher>}, inscrita no CNPJ sob o nº {EMPRESA.cnpj || <Preencher>CNPJ</Preencher>},
-      com sede em {EMPRESA.endereco || <Preencher>ENDEREÇO</Preencher>}
+      {v.nome || <Preencher>RAZÃO SOCIAL</Preencher>}, inscrita no CNPJ sob o nº {v.documento || <Preencher>CNPJ</Preencher>},
+      com sede em {v.endereco || <Preencher>ENDEREÇO</Preencher>}
     </b>
   );
 }
@@ -95,6 +98,7 @@ export default function Legal({ pagina, titulo, resumo, children }: { pagina: Do
       <footer className="g-leg-pe">
         <Link href="/gestao/termos">Termos de uso</Link>
         <Link href="/gestao/privacidade">Política de privacidade</Link>
+        <Link href="/gestao/para-o-tutor">Para o tutor</Link>
         <Link href="/gestao">Conhecer o Gestão</Link>
         <a href="/gestao/entrar">Entrar</a>
       </footer>

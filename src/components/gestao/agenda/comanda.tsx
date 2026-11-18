@@ -16,7 +16,7 @@ import { repartirPagamento } from "@/lib/gestao/hotel";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { servicosAMais } from "@/lib/gestao/servicos-do-horario";
 import { taxaDoLevaTraz, taxaSugerida, temTaxa } from "@/lib/gestao/quadro";
-import { brl, dataCompleta, dataCurta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias, centavos } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { conferirDiaDoHorario } from "@/lib/gestao/dia-do-horario";
 import { useGestao } from "../contexto";
@@ -35,7 +35,6 @@ import { LinhaPromoNaConta, usePromoDoHorario } from "./promo-do-horario";
 import { AvisoPacoteAcabando } from "../pacote-acabando";
 import { descontoDaPromo } from "@/lib/gestao/promocoes";
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 /** Uma conta que o tutor ficou devendo de antes (fiado, taxa de falta, resto de um pagamento). */
 type Antiga = { id: string; valor: number; descricao: string | null; categoria: string; data: string; vencimento: string | null; agendamento_id: string | null; multa_recebida: number | null; multa_recebida_em: string | null };
 /** Quanto do que entrou vai para cada conta antiga (das mais velhas para as mais novas). */
@@ -515,7 +514,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
         {promoDoHorario.promo?.tirada && (
           <p className="g-pp g-muted" style={{ margin: 0 }}>Promoção {promoDoHorario.promo.nome} tirada deste horário. <button type="button" className="g-link" disabled={promoDoHorario.ocupado || salvando} onClick={() => void promoDoHorario.porDeVolta()}>Pôr de volta</button></p>
         )}
-        <FechamentoDaConta subtotal={contas.subtotal} desconto={Math.max(0, Math.round((contas.desconto - promoValor) * 100) / 100)} total={contas.total}
+        <FechamentoDaConta subtotal={contas.subtotal} desconto={Math.max(0, centavos((contas.desconto - promoValor)))} total={contas.total}
           promo={promoValor > 0 && promoAtiva ? { nome: promoAtiva.nome, valor: promoValor } : undefined} descontoDigitado={desconto} aoDesconto={setDesconto}
           pagamento={pagamento} aoPagamento={(e) => { setPagamento(e); setErroForma(null); }} erroForma={erroForma}
           depois={depois} aoDepois={(d) => { setDepois(d); setErroForma(null); }} aceitaResto receberAgora={aPagar} junto={junto} credito={credito} />

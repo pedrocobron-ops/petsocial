@@ -86,6 +86,10 @@ export default function ChatVendas() {
         <input ref={campo} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escreva a sua dúvida" maxLength={600} aria-label="Sua mensagem" enterKeyHint="send" />
         <button type="submit" disabled={!texto.trim() || pensando} aria-label="Enviar"><ArrowUp /></button>
       </form>
+      <p className="gp-chat-aviso">
+        A Nina é uma inteligência artificial. O que você escrever vai para o nosso fornecedor de IA (Anthropic, fora do Brasil) só para responder, e não fica guardado.
+        Não escreva dados pessoais. <a href="/politica-de-privacidade#nina">Saiba mais</a>
+      </p>
     </section>
   );
 }

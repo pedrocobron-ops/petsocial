@@ -1,7 +1,7 @@
 "use client";
 
 import { Tag } from "lucide-react";
-import { brl } from "@/lib/gestao/util";
+import { brl, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { useDados } from "../ui";
@@ -22,7 +22,7 @@ export default function PromocoesNoRelatorio({ de, ate }: { de: string; ate: str
     return r.error || !Array.isArray(r.data) ? [] : (r.data as LinhaPromo[]).map((x) => ({ ...x, desconto: Number(x.desconto) }));
   }, [petshop.id, de, ate]);
   if (!dados?.length) return null;
-  const total = Math.round(dados.reduce((t, x) => t + x.desconto, 0) * 100) / 100;
+  const total = centavos(dados.reduce((t, x) => t + x.desconto, 0));
   return (
     <section className="g-card" aria-label="Promoções">
       <div className="g-card-t"><h3><Tile icone={Tag} tom="menta" tamanho="p" />Promoções</h3><span className="g-muted g-pp">desconto dado: {brl(total)}</span></div>

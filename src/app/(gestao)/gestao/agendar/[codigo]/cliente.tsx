@@ -15,7 +15,9 @@ import LogoLoja from "@/components/gestao/logo-loja";
 import { aplicarTema } from "@/lib/gestao/identidade";
 import { MUITOS_PEDIDOS, lembrarPedido } from "@/lib/gestao/link-opcoes";
 import { AceiteDosTermos, PedidosDesteAparelho, SEM_ACEITE, faltaAceitar, pedirPeloLink, useTermosDoLink } from "./termos";
-import type { LinkInicial } from "@/lib/gestao/link-servidor";
+import { lerLinkJunto, type LinkInicial } from "@/lib/gestao/link-inicial";
+import { enderecoDaLoja, linkDoMapa } from "@/lib/gestao/endereco";
+import { comDesconto, portePorExtenso, real, totalPorExtenso, valorDoServico, valorNaFrase, valorPorExtenso, type LinhaDeValor } from "@/lib/gestao/link-precos";
 import type { Sugestao } from "@/lib/gestao/link-ia-comum";
 import { diasCurtos, etiquetaPromo, horasPorExtenso, precoComPromo, promoDoHorario, validadePorExtenso, type Promocao } from "@/lib/gestao/promocoes";
 import { precoDoServico } from "@/lib/gestao/util";
@@ -34,6 +36,8 @@ type ServicoDoLink = {
 type Info = {
   logo?: string | null; tema?: string | null;
   nome: string; telefone: string | null; cidade: string | null; uf: string | null; horario: unknown; aviso: string | null; hoje: string;
+  /** endereço do pet shop (migração 20261235; tudo opcional) */
+  endereco?: string | null; bairro?: string | null; complemento?: string | null;
   servicos: ServicoDoLink[];
   creche?: { diaria: number | null } | null; hotel?: { diaria: number | null } | null;
 };
@@ -42,7 +46,28 @@ type Passo = "servico" | "quando" | "dados" | "enviado";
 type PromoDoLink = Omit<Promocao, "id" | "ativa" | "criado_em">;
 type Especie = "cao" | "gato" | "outro";
 type PetDoPedido = { id: number; nome: string; especie: Especie; porte: Porte | null };
-type Enviado = { id: string | null; servico: string; dia: string; pets: { nome: string; hora: string }[]; promo?: string | null };
+type Enviado = { id: string | null; servico: string; dia: string; pets: { nome: string; hora: string }[]; promo?: string | null; valores: LinhaDeValor[] };
+/**
+ * O que a pessoa já preencheu no pedido de horário, guardado só nesta aba (sessionStorage): recarregar a página ou voltar
+ * de outro aplicativo não perde o pedido. Sai ao enviar e deixa de valer depois de 2 horas (não fica dado pessoal guardado).
+ */
+type Rascunho = { em: number; passo: "quando" | "dados"; servicoId: string; dia: string | null; hora: string | null; pets: { nome: string; especie: Especie; porte: Porte | null }[]; tutor: string; telefone: string; obs: string };
+const VALE_RASCUNHO = 2 * 36e5;
+function lerRascunho(chave: string): Rascunho | null {
+  try {
+    const r = JSON.parse(sessionStorage.getItem(chave) ?? "null") as Partial<Rascunho> | null;
+    if (!r || typeof r.em !== "number" || Date.now() - r.em > VALE_RASCUNHO || typeof r.servicoId !== "string" || !Array.isArray(r.pets) || !r.pets.length) { sessionStorage.removeItem(chave); return null; }
+    const txt = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
+    const pets = r.pets.slice(0, MAX_PETS).map((x) => ({
+      nome: txt(x?.nome, 80), especie: (x?.especie === "gato" || x?.especie === "outro" ? x.especie : "cao") as Especie,
+      porte: (x?.porte === "P" || x?.porte === "M" || x?.porte === "G" || x?.porte === "GG" ? x.porte : null) as Porte | null,
+    }));
+    return { em: r.em, passo: r.passo === "dados" ? "dados" : "quando", servicoId: r.servicoId, dia: /^\d{4}-\d{2}-\d{2}$/.test(String(r.dia)) ? String(r.dia) : null,
+      hora: /^\d{2}:\d{2}$/.test(String(r.hora)) ? String(r.hora) : null, pets, tutor: txt(r.tutor, 120), telefone: txt(r.telefone, 20), obs: txt(r.obs, 300) };
+  } catch { return null; }
+}
+/** O código do link é sempre em minúsculas: quem digitou do cartaz em maiúsculas chega no mesmo lugar. */
+const codigoLimpo = (bruto: unknown) => { let c = ""; try { c = decodeURIComponent(String(bruto ?? "")).trim(); } catch { c = ""; } return /^[0-9A-Fa-f]{6,40}$/.test(c) ? c.toLowerCase() : c; };
 
 /** Quantos pets cabem num pedido só (o banco aceita até 4). */
 const MAX_PETS = 4;
@@ -123,7 +148,7 @@ function lerPromos(dados: unknown): { servicos: Promocao[]; casa: PromoDoLink[] 
  */
 export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) {
   const { codigo: bruto } = useParams<{ codigo: string }>();
-  const codigo = decodeURIComponent(String(bruto ?? "")).trim();
+  const codigo = codigoLimpo(bruto);
   const promosIniciais = useMemo(() => lerPromos(inicial?.promocoes), [inicial]);
 
   // undefined = carregando; null = link desligado ou inexistente
@@ -138,6 +163,15 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
     try { if (t) sessionStorage.setItem(chaveEstadia, t); else sessionStorage.removeItem(chaveEstadia); } catch { /* sem armazenamento: segue sem lembrar */ }
   };
   const voltouDaEstadia = useRef(false);
+  // creche e hotel abrem com uma entrada no histórico: o voltar do celular fecha o pedido de vaga, em vez de sair da página
+  const abrirEstadia = (t: "creche" | "hotel") => {
+    try { window.history.pushState({ ...(window.history.state ?? {}), est: t }, ""); } catch { /* sem histórico: segue sem */ }
+    setEstadia(t);
+  };
+  const fecharEstadia = () => {
+    try { if ((window.history.state as { est?: string } | null)?.est === estadia) { window.history.back(); return; } } catch { /* segue */ }
+    setEstadia(null);
+  };
 
   const [servicoId, setServicoId] = useState<string | null>(null);
   const [dia, setDia] = useState<string | null>(null);
@@ -163,6 +197,9 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
   const [aceite, setAceite] = useState(SEM_ACEITE);
   // nome de quem é o link, para a página dizer com quem falar quando o link está desligado
   const [nomeDoLink, setNomeDoLink] = useState<string | null>(inicial?.nome ?? null);
+  // o WhatsApp de quem é o link, para a página do link desligado ter o botão (e o que a pessoa estava pedindo, se já tinha começado)
+  const [foneDoLink, setFoneDoLink] = useState<string | null>(inicial?.telefone ?? null);
+  const [pedia, setPedia] = useState<string | null>(null);
   const [lembrados, setLembrados] = useState(0);
 
   // dias que o negócio marcou como fechados (feriado, folga): o link não oferece horário neles
@@ -181,26 +218,23 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
     setSemRede(false);
     setInfo(undefined);
     if (!configurado || !codigo) { setInfo(null); return; }
-    const { data, error } = await banco().rpc("link_info", { p_codigo: codigo });
-    if (error) { setSemRede(true); return; }
-    const lido = data as unknown as Info | null;
-    setInfo(lerInfo(lido));
-    aplicarTema(lido && typeof lido === "object" ? lido.tema : null); // as cores do pet shop, não as da Maestro Pet
-    void banco().rpc("link_google", { p_codigo: codigo }).then((g) => setGoogle(typeof g.data === "string" ? g.data : null), () => setGoogle(null));
-    void (banco() as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown }> }).rpc("link_promocoes", { p_codigo: codigo }).then((r) => {
-      const l = lerPromos(r.data);
-      setPromos(l.servicos);
-      setPromosCasa(l.casa);
-    }, () => { setPromos([]); setPromosCasa([]); });
-    // se a função ainda não existe no banco, segue sem dias fechados (como sempre foi)
-    const f = await banco().rpc("link_fechados", { p_codigo: codigo });
-    setFechados(new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []));
-    if (lido && typeof lido === "object" && lido.nome) void banco().rpc("link_ia_ligada", { p_codigo: codigo }).then(({ data: ia }) => setComDuvida(ia === true));
-    if (lido && typeof lido === "object" && lido.hotel) {
-      const o = await banco().rpc("link_hotel_opcoes", { p_codigo: codigo });
-      const preco = (o.data as { preco?: PrecoDoHotel } | null)?.preco;
-      setPrecoHotel(preco && typeof preco === "object" ? preco : null);
-    }
+    // o servidor não conseguiu ler: o navegador lê a mesma coisa, também numa ida só (link_inicial), não em oito
+    type Rpc = { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> };
+    const ler = (f: string, a: Record<string, unknown>) => Promise.resolve((banco() as unknown as Rpc).rpc(f, a)).catch((e: unknown) => ({ data: null, error: e ?? "falhou" }));
+    const lido = await lerLinkJunto(ler, codigo);
+    if (!lido) { setSemRede(true); return; }
+    const novo = lerInfo(lido.info);
+    setInfo(novo);
+    aplicarTema(novo?.tema ?? null); // as cores do pet shop, não as da Maestro Pet
+    setNomeDoLink((n) => lido.nome ?? n);
+    setFoneDoLink((t) => lido.telefone ?? t);
+    setGoogle(lido.google);
+    const l = lerPromos(lido.promocoes);
+    setPromos(l.servicos);
+    setPromosCasa(l.casa);
+    setFechados(new Set(lido.fechados));
+    setComDuvida(lido.ia);
+    setPrecoHotel(lido.precoHotel as PrecoDoHotel | null | undefined);
   }, [codigo]);
   // o servidor já leu: só pinta com as cores do pet shop (o HTML já veio pintado) e baixa creche e hotel em segundo plano
   useEffect(() => {
@@ -220,11 +254,47 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
     } catch { /* sem armazenamento */ }
   }, [info, chaveEstadia]);
   useEffect(() => {
-    if (info !== null || nomeDoLink || !configurado || !codigo) return;
+    if (info !== null || (nomeDoLink && foneDoLink) || !configurado || !codigo) return;
     let vale = true;
-    void banco().rpc("link_nome", { p_codigo: codigo }).then(({ data }) => { if (vale && typeof data === "string" && data.trim()) setNomeDoLink(data.trim()); });
+    // banco com a migração 20261235: nome e WhatsApp de quem é o link; antes dela, só o nome (como era)
+    void (banco() as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }).rpc("link_contato", { p_codigo: codigo }).then(({ data, error }) => {
+      if (!vale) return;
+      const c = data as { nome?: unknown; telefone?: unknown } | null;
+      if (!error && c && typeof c === "object") {
+        if (typeof c.nome === "string" && c.nome.trim()) setNomeDoLink(c.nome.trim());
+        if (typeof c.telefone === "string" && c.telefone.trim()) setFoneDoLink(c.telefone.trim());
+      } else if (!nomeDoLink) void banco().rpc("link_nome", { p_codigo: codigo }).then(({ data: n }) => { if (vale && typeof n === "string" && n.trim()) setNomeDoLink(n.trim()); });
+    }, () => undefined);
     return () => { vale = false; };
-  }, [info, nomeDoLink, codigo]);
+  }, [info, nomeDoLink, foneDoLink, codigo]);
+
+  // ---------- rascunho do pedido de horário (só nesta aba) ----------
+  const chaveRascunho = `maestro-link-rascunho:${codigo}:servico`;
+  const rascunhoLido = useRef(false);
+  useEffect(() => {
+    if (!info || rascunhoLido.current) return;
+    rascunhoLido.current = true;
+    const r = lerRascunho(chaveRascunho);
+    if (!r || !info.servicos.some((s) => s.id === r.servicoId)) return;
+    try { if (sessionStorage.getItem(chaveEstadia)) return; } catch { /* sem armazenamento */ }
+    const diaBom = r.dia && r.dia >= info.hoje ? r.dia : null;
+    setServicoId(r.servicoId);
+    setPets(r.pets.map((x) => ({ ...x, id: ++proximoPet })));
+    setTutor(r.tutor); setTelefone(r.telefone); setObs(r.obs);
+    diaSozinho.current = false;
+    setDia(diaBom);
+    setHoraEscolhida(diaBom ? r.hora : null);
+    setPasso(r.passo === "dados" && diaBom && r.hora ? "dados" : "quando");
+  }, [info, chaveRascunho, chaveEstadia]);
+  useEffect(() => {
+    if (!rascunhoLido.current) return;
+    try {
+      if (passo === "enviado") { sessionStorage.removeItem(chaveRascunho); return; }
+      if ((passo !== "quando" && passo !== "dados") || !servicoId) return;
+      const r: Rascunho = { em: Date.now(), passo, servicoId, dia, hora: horaEscolhida, pets: pets.map(({ nome, especie, porte }) => ({ nome, especie, porte })), tutor, telefone, obs };
+      sessionStorage.setItem(chaveRascunho, JSON.stringify(r));
+    } catch { /* sem armazenamento: segue sem guardar */ }
+  }, [chaveRascunho, passo, servicoId, dia, horaEscolhida, pets, tutor, telefone, obs]);
 
   const servico = info?.servicos.find((s) => s.id === servicoId) ?? null;
   /** A promoção de um horário deste serviço (a mesma escolha do banco; o pedido leva a que vale). */
@@ -273,7 +343,36 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
     if (passo === "quando" && servicoId && dia) void buscarHorarios(servicoId, dia, qtd);
   }, [passo, servicoId, dia, qtd, buscarHorarios]);
 
-  const ir = (p: Passo) => { setPasso(p); setErro(null); setNaoCabe(null); window.scrollTo({ top: 0 }); };
+  // cada passo é uma entrada no histórico do navegador: o botão de voltar do celular volta um passo, em vez de sair da página
+  const mostrar = (p: Passo) => { setPasso(p); setErro(null); setNaoCabe(null); window.scrollTo({ top: 0 }); };
+  const ir = (p: Passo) => {
+    try { if (p !== "servico" && p !== passo) window.history.pushState({ ...(window.history.state ?? {}), lk: p }, ""); } catch { /* sem histórico: segue sem */ }
+    mostrar(p);
+  };
+  /** "Voltar" e "Trocar" da página: se o passo de agora veio do histórico, volta por ele (o botão do celular e o da página andam juntos). */
+  const voltar = (p: Passo) => {
+    try { if ((window.history.state as { lk?: string } | null)?.lk === passo && passo !== "servico") { window.history.back(); return; } } catch { /* segue */ }
+    mostrar(p);
+  };
+  const noHistorico = useRef({ passo, estadia });
+  noHistorico.current = { passo, estadia };
+  useEffect(() => {
+    const aoVoltar = (e: PopStateEvent) => {
+      const s = (e.state ?? {}) as { lk?: string; est?: string };
+      const agora = noHistorico.current;
+      if (agora.passo === "enviado") return; // pedido enviado: o voltar não reabre o formulário
+      if (agora.estadia) {
+        if (s.est !== agora.estadia) { setEstadiaJa(null); try { sessionStorage.removeItem(`maestro-link-estadia:${codigo}`); } catch { /* sem armazenamento */ } }
+        return;
+      }
+      const alvo: Passo = s.lk === "dados" ? "dados" : s.lk === "quando" ? "quando" : "servico";
+      // só anda para trás (voltar nunca pula para um passo que ainda não foi preenchido)
+      const ordem: Passo[] = ["servico", "quando", "dados"];
+      if (ordem.indexOf(alvo) < ordem.indexOf(agora.passo)) { setPasso(alvo); setErro(null); setNaoCabe(null); window.scrollTo({ top: 0 }); }
+    };
+    window.addEventListener("popstate", aoVoltar);
+    return () => window.removeEventListener("popstate", aoVoltar);
+  }, [codigo]);
 
   /** Muda quantos pets vêm: completa a lista com pets em branco ou tira os últimos. */
   function mudarQtd(n: number) {
@@ -320,9 +419,22 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
     setAvisoQuando(null);
   }
 
+  /** O valor de cada pet deste pedido (preço da lista no porte, com a promoção do horário): a mesma conta que o banco guarda com o pedido. */
+  const valoresDe = (lista: { nome: string; porte: Porte | null }[]): LinhaDeValor[] => {
+    if (!servico || !dia || !horaEscolhida) return [];
+    return lista.flatMap((x, i) => {
+      // a promoção de cada pet vale para a hora dele (os pets são atendidos um depois do outro)
+      const pr = promoEm(servico, dia, somaMin(horaEscolhida, servico.duracao_min * i), x.porte);
+      const v = valorDoServico(servico, x.porte, pr ? { nome: pr.nome, tipo: pr.tipo, valor: Number(pr.valor) } : null);
+      return v ? [{ nome: x.nome.trim() || `Pet ${i + 1}`, v }] : [];
+    });
+  };
+  // dois toques seguidos em "Enviar pedido" valem um (a trava é na hora do toque, antes de a tela redesenhar)
+  const enviandoJa = useRef(false);
+
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    if (!info || !servico || !dia || !horaEscolhida || enviando) return;
+    if (!info || !servico || !dia || !horaEscolhida || enviando || enviandoJa.current) return;
     const lista = pets.map((x) => ({ ...x, nome: x.nome.trim() }));
     const nomeTutor = tutor.trim(), fone = soDigitos(telefone);
     setLimite(false);
@@ -334,17 +446,22 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
     if (falta) return setErro(falta);
     setErro(null);
     setEnviando(true);
-    const { data, error } = await pedirPeloLink("link_pedir", {
-      p_codigo: codigo, p_servico: servico.id, p_dia: dia, p_hora: horaEscolhida, p_tutor: nomeTutor, p_telefone: fone, p_pet: lista[0].nome,
-      p_especie: lista[0].especie, p_porte: lista[0].porte ?? undefined, p_obs: obs.trim() || undefined,
-      p_outros: lista.length > 1 ? lista.slice(1).map((x) => ({ nome: x.nome, especie: x.especie, porte: x.porte })) : undefined,
-    }, termos, aceite);
-    setEnviando(false);
+    enviandoJa.current = true;
+    let data: unknown, error: unknown;
+    try {
+      ({ data, error } = await pedirPeloLink("link_pedir", {
+        p_codigo: codigo, p_servico: servico.id, p_dia: dia, p_hora: horaEscolhida, p_tutor: nomeTutor, p_telefone: fone, p_pet: lista[0].nome,
+        p_especie: lista[0].especie, p_porte: lista[0].porte ?? undefined, p_obs: obs.trim() || undefined,
+        p_outros: lista.length > 1 ? lista.slice(1).map((x) => ({ nome: x.nome, especie: x.especie, porte: x.porte })) : undefined,
+      }, termos, aceite));
+    } catch (x) { error = x; } finally { enviandoJa.current = false; setEnviando(false); }
     if (error) return setErro("Não consegui enviar agora. Confira a internet e tente de novo.");
     const r = data as unknown as { ok: boolean; erro?: string; motivo?: string; id?: string } | null;
     if (r?.ok) {
       const pr = promoEm(servico, dia, horaEscolhida, lista[0].porte);
-      setEnviado({ id: r.id ?? null, servico: servico.nome, dia, pets: lista.map((x, i) => ({ nome: x.nome, hora: somaMin(horaEscolhida, servico.duracao_min * i) })), promo: pr ? `${pr.nome} (${etiquetaPromo(pr)})` : null });
+      setEnviado({ id: r.id ?? null, servico: servico.nome, dia, pets: lista.map((x, i) => ({ nome: x.nome, hora: somaMin(horaEscolhida, servico.duracao_min * i) })), promo: pr ? `${pr.nome} (${etiquetaPromo(pr)})` : null, valores: valoresDe(lista) });
+      // enviado: o rascunho sai (nome e telefone não ficam guardados na aba)
+      try { sessionStorage.removeItem(chaveRascunho); } catch { /* sem armazenamento */ }
       // o endereço de acompanhar fica guardado neste aparelho: recarregar a página não perde o pedido
       if (r.id) { lembrarPedido(codigo, r.id, `${servico.nome} de ${listaDeNomes(lista.map((x) => x.nome))}`); setLembrados((n) => n + 1); }
       setAceite(SEM_ACEITE);
@@ -365,6 +482,12 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
       setAceite(SEM_ACEITE);
       setErro(`As regras de ${info.nome} mudaram agora há pouco. Leia de novo e marque para enviar.`);
     } else if (r?.erro === "fechado") {
+      // o link foi desligado enquanto a pessoa preenchia: a página diz isso e oferece o WhatsApp já com o pedido escrito.
+      // O que foi preenchido continua guardado nesta aba: se o link voltar, "Tentar de novo" traz tudo de volta.
+      setFoneDoLink((t) => info.telefone ?? t);
+      setNomeDoLink((n) => info.nome ?? n);
+      setPedia(`${servico.nome.toLowerCase()} para ${listaDeNomes(lista.map((x) => x.nome))}, ${diaPorExtenso(dia, info.hoje)} às ${horaEscolhida}`);
+      rascunhoLido.current = false;
       setInfo(null);
     } else if (r?.erro === "dados") {
       setErro("Confira o nome de cada pet, o seu nome e o WhatsApp com DDD.");
@@ -376,7 +499,7 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
   /** O "Tirar dúvida" ofereceu o pedido: abre o formulário já no serviço (e no dia), e o cliente continua dali. Nada é enviado. */
   function pedirPelaDuvida(s: Sugestao) {
     if (passo === "enviado") { setEnviado(null); setPets([novoPet()]); setObs(""); }
-    if (s.tipo !== "servico") { if (s.tipo === "hotel" ? info?.hotel : info?.creche) { setEstadia(s.tipo); ir("servico"); } return; }
+    if (s.tipo !== "servico") { if (s.tipo === "hotel" ? info?.hotel : info?.creche) { abrirEstadia(s.tipo); mostrar("servico"); } return; }
     if (!info?.servicos.some((x) => x.id === s.servicoId)) return;
     setEstadia(null);
     setServicoId(s.servicoId);
@@ -422,12 +545,16 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
     );
   }
   if (info === null) {
+    const zapFora = linkWhatsApp(foneDoLink, pedia ? `Oi! Tentei pedir ${pedia} pelo link, mas ele não está recebendo pedidos agora. Podemos combinar por aqui?` : "Oi! Abri o link de pedidos e ele não está disponível. Quero marcar um horário.");
     return (
       <Moldura>
         <div className="g-lk-fim">
           <Selo tamanho={72} tom="suave" />
           <h1>Este link não está disponível</h1>
           <p className="g-muted">{nomeDoLink ? `${nomeDoLink} não está recebendo pedidos por aqui agora. Fale direto com ${nomeDoLink} para combinar.` : "Quem mandou este link pode ter desligado os pedidos por aqui. Fale direto com quem mandou para combinar."}</p>
+          {pedia && <p className="g-muted" data-teste="pedia">O que você preencheu não foi enviado, mas continua guardado nesta página: {pedia}.</p>}
+          {zapFora && <a className="g-btn zap" href={zapFora} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {nomeDoLink ?? "o pet shop"} no WhatsApp</a>}
+          {pedia && <button type="button" className="g-btn sec" onClick={() => void carregar()}>Tentar de novo</button>}
           <PedidosDesteAparelho codigo={codigo} />
         </div>
       </Moldura>
@@ -436,6 +563,10 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
 
   const zapLoja = linkWhatsApp(info.telefone, `Oi! Quero marcar um horário.`);
   const onde = [info.cidade, info.uf].filter(Boolean).join(" · ");
+  // o endereço (quando o pet shop escreveu a rua em Meu pet shop) e o link do mapa
+  const endereco = enderecoDaLoja(info);
+  const mapa = linkDoMapa(info, info.nome);
+  const valores = passo === "dados" ? valoresDe(pets) : [];
   const manha = (horarios ?? []).filter((h) => h < "12:00");
   const tarde = (horarios ?? []).filter((h) => h >= "12:00");
   const indice = PASSOS.findIndex((p) => p.id === passo);
@@ -451,7 +582,8 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
           <LogoLoja nome={info.nome} logo={info.logo} tamanho={54} />
           <div>
             <h1>{info.nome}</h1>
-            {onde && <p className="g-lk-onde"><MapPin aria-hidden />{onde}</p>}
+            {endereco ? <p className="g-lk-onde" data-teste="endereco"><MapPin aria-hidden /><span>{endereco}{mapa && <> · <a href={mapa} target="_blank" rel="noopener noreferrer">Abrir no mapa</a></>}</span></p>
+              : onde && <p className="g-lk-onde"><MapPin aria-hidden />{onde}</p>}
           </div>
         </div>
         {passo !== "enviado" && <p className="g-lk-cab-frase">{estadia || (!info.servicos.length && (info.creche || info.hotel)) ? "Peça uma vaga por aqui" : info.creche || info.hotel ? "Peça um horário ou uma vaga por aqui" : "Peça um horário por aqui"}. A confirmação chega pelo seu WhatsApp.</p>}
@@ -465,10 +597,10 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
 
       {estadia && (
         <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} fechados={fechados} horario={info.horario} termos={termos} recarregarTermos={recarregarTermos}
-          aoPedir={() => setLembrados((n) => n + 1)}
+          aoPedir={() => setLembrados((n) => n + 1)} endereco={endereco} mapa={mapa}
           zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)} zapCom={(t) => linkWhatsApp(info.telefone, t)}
           preco={estadia === "hotel" ? precoHotel : undefined}
-          diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={() => setEstadia(null)}
+          diaria={(estadia === "creche" ? info.creche?.diaria : info.hotel?.diaria) ?? null} aoVoltar={fecharEstadia}
           promos={promosCasa.filter((x) => x.casa?.includes(estadia))} />
       )}
 
@@ -489,7 +621,7 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
           {(info.creche || info.hotel) && (
             <div className="g-lk-servicos" style={{ marginBottom: 12 }}>
               {info.creche && (
-                <button type="button" className="g-lk-serv" style={{ "--cor": "#3b9bd9" } as React.CSSProperties} onClick={() => setEstadia("creche")}>
+                <button type="button" className="g-lk-serv" style={{ "--cor": "#3b9bd9" } as React.CSSProperties} onClick={() => abrirEstadia("creche")}>
                   <i className="g-lk-serv-cor" aria-hidden><Sun /></i>
                   <span className="g-lk-serv-t"><b>Creche</b><span>Passar o dia{info.creche.diaria != null && <em>{brlCurto(Number(info.creche.diaria))} a diária</em>}</span>
                     {promosCasa.filter((x) => x.casa?.includes("creche")).slice(0, 2).map((x, i) => (
@@ -499,7 +631,7 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
                 </button>
               )}
               {info.hotel && (
-                <button type="button" className="g-lk-serv" style={{ "--cor": "#7c6bd6" } as React.CSSProperties} onClick={() => setEstadia("hotel")}>
+                <button type="button" className="g-lk-serv" style={{ "--cor": "#7c6bd6" } as React.CSSProperties} onClick={() => abrirEstadia("hotel")}>
                   <i className="g-lk-serv-cor" aria-hidden><BedDouble /></i>
                   <span className="g-lk-serv-t"><b>Hotel</b><span>Dormir com a gente{precoHotel === undefined || precoHotel?.mostrar === false ? null
                     : precoHotel?.de != null ? <em>{precoHotel.ate != null && precoHotel.ate !== precoHotel.de ? "a partir de " : ""}{brlCurto(Number(precoHotel.de))} a diária</em>
@@ -529,8 +661,9 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
                     <i className="g-lk-serv-cor" aria-hidden><Scissors /></i>
                     <span className="g-lk-serv-t">
                       <b>{s.nome}</b>
-                      <span><Clock aria-hidden />{duracao(s.duracao_min)}{preco && <em>{preco}</em>}</span>
-                      {promos.filter((x) => x.servicos.includes(s.id)).slice(0, 2).map((x) => (
+                      <span><Clock aria-hidden />{duracao(s.duracao_min)}<em>{preco ?? "valor a combinar"}</em></span>
+                      {/* promoção só com preço à vista: "15% off" de um valor que o link não mostra não diz nada */}
+                      {preco && promos.filter((x) => x.servicos.includes(s.id)).slice(0, 2).map((x) => (
                         <span key={x.id} className="g-lk-promo-serv">{etiquetaPromo(x)} · {diasCurtos(x.dias)}{horasPorExtenso(x) ? `, ${horasPorExtenso(x)}` : ""}{validadePorExtenso(x) ? ` · ${validadePorExtenso(x)}` : ""}</span>
                       ))}
                     </span>
@@ -546,7 +679,7 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
       {/* ---------- 2. dia e hora ---------- */}
       {!estadia && passo === "quando" && servico && (
         <section className="g-lk-secao">
-          <button type="button" className="g-lk-escolhido" style={{ "--cor": servico.cor ?? "#f97316" } as React.CSSProperties} onClick={() => ir("servico")}>
+          <button type="button" className="g-lk-escolhido" style={{ "--cor": servico.cor ?? "#f97316" } as React.CSSProperties} onClick={() => voltar("servico")}>
             <i aria-hidden />
             <span><b>{servico.nome}</b> · {duracao(servico.duracao_min)}</span>
             <u>Trocar</u>
@@ -634,7 +767,7 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
           )}
 
           <div className="g-lk-pe">
-            <button type="button" className="g-btn sec" onClick={() => ir("servico")}><ArrowLeft />Voltar</button>
+            <button type="button" className="g-btn sec" onClick={() => voltar("servico")}><ArrowLeft />Voltar</button>
             <button type="button" className="g-btn pri" disabled={!dia || !horaEscolhida} onClick={() => ir("dados")}>Continuar<ArrowRight /></button>
           </div>
         </section>
@@ -643,22 +776,11 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
       {/* ---------- 3. dados ---------- */}
       {!estadia && passo === "dados" && servico && dia && horaEscolhida && (
         <form className="g-lk-secao" onSubmit={enviar} noValidate>
-          <button type="button" className="g-lk-escolhido" style={{ "--cor": servico.cor ?? "#f97316" } as React.CSSProperties} onClick={() => ir("quando")}>
+          <button type="button" className="g-lk-escolhido" style={{ "--cor": servico.cor ?? "#f97316" } as React.CSSProperties} onClick={() => voltar("quando")}>
             <i aria-hidden />
             <span><b>{servico.nome}</b> · {diaPorExtenso(dia, info.hoje)}, {qtd > 1 ? `das ${horaEscolhida} às ${fimEstimado}` : `às ${horaEscolhida}`}</span>
             <u>Trocar</u>
           </button>
-          {(() => {
-            const pr = promoEm(servico, dia, horaEscolhida, pets[0]?.porte);
-            if (!pr) return null;
-            const v = dePor(servico, pr, pets[0]?.porte);
-            return (
-              <p className="g-lk-promo">
-                <b>Promoção {pr.nome}: {etiquetaPromo(pr)}.</b>{" "}
-                {v ? <>De <s>{brlCurto(v.de)}</s> por <b>{brlCurto(v.por)}</b>{qtd > 1 ? " cada pet" : ""}{pets[0]?.porte ? ` (porte ${pets[0].porte})` : ""}.</> : "Escolha o porte para ver o preço com desconto."}{" "}O pedido vai com a promoção.
-              </p>
-            );
-          })()}
 
           <div className="g-lk-bloco g-form">
             <div className="g-lk-bloco-t"><h2>Quem vem?</h2>{qtd > 1 && <span className="g-muted g-pp">{qtd} pets</span>}</div>
@@ -724,6 +846,23 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
             </label>
           </div>
 
+          {/* o valor, pet por pet (cada um no seu porte, com a promoção do horário) e o total: o mesmo que o pet shop vê no pedido */}
+          <div className="g-lk-conta" role="status" aria-live="polite" data-teste="valor-do-pedido">
+            <b>Valor{valores.some((l) => l.v.promo) ? ` com a promoção ${valores.find((l) => l.v.promo)!.v.promo!.nome}` : ""}</b>
+            {valores.map((l, i) => (
+              <div key={i} className="l" data-teste="valor-do-pet">
+                <span>{l.nome} <small>{portePorExtenso(l.v)}{l.v.promo ? ` · ${etiquetaPromo(l.v.promo)}` : ""}</small></span>
+                <span>{comDesconto(l.v) && l.v.valor != null ? <><s>{real(l.v.base!)}</s> <b>{real(l.v.valor)}</b></> : valorPorExtenso(l.v)}</span>
+              </div>
+            ))}
+            {valores.length > 1 && <div className="l forte" data-teste="valor-total"><span>Total</span><span>{totalPorExtenso(valores)}</span></div>}
+            <small>
+              {!valores.length ? `O valor de ${servico.nome} não aparece por aqui: ${info.nome} passa pelo WhatsApp. ` : ""}
+              {valores.some((l) => l.v.valor == null) ? "O preço muda com o porte: escolha o porte de cada pet para ver o valor certo. " : ""}
+              Quem confirma o valor é {info.nome}. Nada é pago por aqui.
+            </small>
+          </div>
+
           <AceiteDosTermos termos={termos} loja={info.nome} pets={qtd} aceite={aceite} aoMudar={(a) => { setAceite(a); setErro(null); }} />
 
           {erro && (
@@ -734,7 +873,7 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
           )}
 
           <div className="g-lk-pe">
-            <button type="button" className="g-btn sec" onClick={() => ir("quando")}><ArrowLeft />Voltar</button>
+            <button type="button" className="g-btn sec" onClick={() => voltar("quando")}><ArrowLeft />Voltar</button>
             <button className="g-btn pri" disabled={enviando}>{enviando ? "Enviando…" : "Enviar pedido"}</button>
           </div>
           <p className="g-lk-nota">Isto é um pedido. O horário só vale depois que {info.nome} confirmar.</p>
@@ -766,12 +905,29 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
                 </dd>
               </div>
             )}
+            {enviado.valores.length > 0 && (
+              <div data-teste="valor-enviado">
+                <dt>Valor</dt>
+                <dd>
+                  {enviado.valores.length === 1
+                    ? <>{comDesconto(enviado.valores[0].v) && enviado.valores[0].v.valor != null ? <>de <s>{real(enviado.valores[0].v.base!)}</s> por {real(enviado.valores[0].v.valor)}</> : `${valorPorExtenso(enviado.valores[0].v)}${enviado.valores[0].v.valor == null ? ", conforme o porte" : ""}`}</>
+                    : (
+                      <ul className="g-lk-resumo-pets">
+                        {enviado.valores.map((l, i) => <li key={i}><span>{l.nome} <small>({portePorExtenso(l.v)})</small></span><b>{comDesconto(l.v) && l.v.valor != null ? <><s>{real(l.v.base!)}</s> {real(l.v.valor)}</> : valorPorExtenso(l.v)}</b></li>)}
+                        <li><span>Total</span><b>{totalPorExtenso(enviado.valores)}</b></li>
+                      </ul>
+                    )}
+                  <small> Quem confirma o valor é {info.nome}.</small>
+                </dd>
+              </div>
+            )}
+            {endereco && <div data-teste="endereco-enviado"><dt>Onde</dt><dd>{endereco}{mapa && <> · <a href={mapa} target="_blank" rel="noopener noreferrer">Abrir no mapa</a></>}</dd></div>}
           </dl>
           <p className="g-lk-nota">{enviado.pets.length > 1 ? "Os horários ainda não estão marcados. Espere a confirmação pelo WhatsApp." : "O horário ainda não está marcado. Espere a confirmação pelo WhatsApp."}</p>
           <div className="g-lk-ok-acoes">
             {enviado.id && <a className="g-btn verde" href={`/gestao/agendar/${codigo}/pedido/${enviado.id}`}>Acompanhar o pedido</a>}
             <button type="button" className="g-btn sec" onClick={pedirOutro}>Pedir outro horário</button>
-            {zapLoja && <a className="g-btn fantasma" href={linkWhatsApp(info.telefone, `Oi! Acabei de pedir ${enviado.servico.toLowerCase()} para ${listaDeNomes(enviado.pets.map((x) => x.nome))} pelo link, ${diaPorExtenso(enviado.dia, info.hoje)} às ${enviado.pets[0]?.hora ?? ""}.`) ?? zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {info.nome}</a>}
+            {zapLoja && <a className="g-btn fantasma" href={linkWhatsApp(info.telefone, `Oi! Acabei de pedir ${enviado.servico.toLowerCase()} para ${listaDeNomes(enviado.pets.map((x) => x.nome))} pelo link, ${diaPorExtenso(enviado.dia, info.hoje)} às ${enviado.pets[0]?.hora ?? ""}.${valorNaFrase(enviado.valores) ? ` O link mostrou o valor de ${valorNaFrase(enviado.valores)}.` : ""}`) ?? zapLoja} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {info.nome}</a>}
           </div>
         </section>
       )}

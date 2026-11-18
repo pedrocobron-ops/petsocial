@@ -1,5 +1,6 @@
 "use client";
 
+import { enderecoEmLinha } from "@/lib/gestao/endereco";
 import { lerBase } from "@/lib/gestao/reservado";
 import { temCheckout, usarLinksDoBanco } from "@/lib/gestao/planos";
 import { Selo } from "./marca";
@@ -42,10 +43,12 @@ export type Gestao = {
   /** Dias que faltam de teste (null quando não está em teste). */
   diasDeTeste: number | null;
   /**
-   * A assinatura já abriu (dá para pagar)? Enquanto não abriu, o teste vencido não bloqueia nada (o banco segue a mesma
-   * regra, em `acesso_liberado`) e os botões de assinar ficam como "Disponível em breve".
+   * O botão Assinar leva direto à página de pagamento (o administrador ligou e existe link)? Sem isso, a pessoa assina
+   * falando com a equipe pelo WhatsApp. O fim do teste vale nos dois casos (mesma regra do banco, em `acesso_liberado`).
    */
   assinaturaAberta: boolean;
+  /** Assinatura atrasada: o dia em que a conta fica só para consulta e quantos dias de tolerância são (null = não está atrasada). */
+  atraso: { travaEm: Date; dias: number } | null;
   /** Recarrega pet shop, equipe e serviços depois de uma alteração. */
   recarregarBase: () => Promise<void>;
   sair: () => Promise<void>;
@@ -87,6 +90,8 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   const [erro, setErro] = useState<string | null>(null);
   /** A assinatura abriu (o fim do teste vale)? null = não deu para ler do banco: segue a regra antiga, pelos links. */
   const [aberta, setAberta] = useState<boolean | null>(null);
+  /** Assinatura atrasada: quando trava (função `assinatura_situacao`). null = não está atrasada ou o banco ainda não diz. */
+  const [atraso, setAtraso] = useState<{ loja: string; travaEm: Date; dias: number } | null>(null);
   /** Documentos com versão nova que esta pessoa ainda não aceitou: com algum, o aplicativo mostra a tela de aceite. */
   const [faltam, setFaltam] = useState<Documento[]>([]);
   const [exclusao, setExclusao] = useState<Exclusao | null>(null);
@@ -162,22 +167,37 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     return () => { vivo = false; sub.subscription.unsubscribe(); };
   }, [sb, router, buscarBase, aplicarBase, lerExclusao]);
 
+  // assinatura atrasada: pergunta ao banco quando a conta trava (banco de antes da migração 20261237: segue liberada)
+  const lojaAtrasada = petshop?.status === "atrasada" ? petshop.id : null;
+  useEffect(() => {
+    if (!lojaAtrasada) return;
+    let vivo = true;
+    void sb.rpc("assinatura_situacao", { p: lojaAtrasada }).then((r) => {
+      const s = r.data as { trava_em?: string | null; atraso_dias?: number } | null;
+      if (!vivo || r.error || !s?.trava_em) return;
+      setAtraso({ loja: lojaAtrasada, travaEm: new Date(s.trava_em), dias: Number(s.atraso_dias) || 10 });
+    }, () => undefined);
+    return () => { vivo = false; };
+  }, [sb, lojaAtrasada]);
+
   const valor = useMemo<Gestao | null>(() => {
     if (!user || !eu || !petshop) return null;
     const emTeste = petshop.status === "teste";
     const resta = new Date(petshop.teste_ate).getTime() - Date.now();
     // quem cancelou continua usando até o fim do período que já pagou
     const pagoAinda = petshop.status === "cancelada" && petshop.pago_ate != null && new Date(petshop.pago_ate).getTime() > Date.now();
-    // enquanto a assinatura não abriu, o teste não bloqueia ninguém: a pessoa não teria como pagar (mesma regra do banco)
     const aberto = aberta ?? temCheckout();
+    // atrasada: liberada até a data da trava (10 dias depois da cobrança recusada, por padrão)
+    const meuAtraso = petshop.status === "atrasada" && atraso?.loja === petshop.id ? { travaEm: atraso.travaEm, dias: atraso.dias } : null;
+    const atrasadaLiberada = petshop.status === "atrasada" && (!meuAtraso || meuAtraso.travaEm.getTime() > Date.now());
     // conta marcada para ser apagada: só para consulta até a data (mesma regra do banco, em acesso_liberado)
-    const liberado = !exclusao && (["ativa", "atrasada", "cortesia"].includes(petshop.status) || (emTeste && (resta > 0 || !aberto)) || pagoAinda);
+    const liberado = !exclusao && (["ativa", "cortesia"].includes(petshop.status) || atrasadaLiberada || (emTeste && resta > 0) || pagoAinda);
     const titular = equipe.filter((x) => x.papel === "dono").sort((a, b) => a.criado_em.localeCompare(b.criado_em) || a.id.localeCompare(b.id))[0];
     // as mensagens de erro só falam em "conta só para consulta" quando a conta está mesmo assim
     soConsulta = !liberado;
     definirLoja(petshop.id, !liberado); // o registro de erros leva o pet shop aberto
     // o comprovante impresso sai no papel escolhido em Meu pet shop, com o telefone e a cidade embaixo do nome
-    definirImpressaoDoComprovante({ papel: papelDoComprovante(petshop), contato: [petshop.telefone ? fmtTelefone(petshop.telefone) : "", [petshop.cidade, petshop.uf].filter(Boolean).join("/")].filter(Boolean).join(" · ") });
+    definirImpressaoDoComprovante({ papel: papelDoComprovante(petshop), contato: [petshop.telefone ? fmtTelefone(petshop.telefone) : "", enderecoEmLinha(petshop) ?? [petshop.cidade, petshop.uf].filter(Boolean).join("/")].filter(Boolean).join(" · ") });
     return {
       sb, user, petshop, eu, equipe, servicos,
       souDono: eu.papel === "dono",
@@ -190,6 +210,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       souTitular: titular?.id === eu.id,
       diasDeTeste: emTeste ? Math.max(0, Math.ceil(resta / 864e5)) : null,
       assinaturaAberta: aberto,
+      atraso: meuAtraso,
       recarregarBase: async () => {
         const [todos, marcada] = await Promise.all([carregarBase(petshop.id), lerExclusao(petshop.id)]);
         setExclusao(marcada);
@@ -198,7 +219,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       },
       sair: async () => { try { localStorage.removeItem(CHAVE_NOME); } catch { /* sem armazenamento */ } await sb.auth.signOut(); router.replace("/gestao/entrar"); },
     };
-  }, [sb, user, eu, petshop, equipe, servicos, carregarBase, router, aberta, exclusao, lerExclusao]);
+  }, [sb, user, eu, petshop, equipe, servicos, carregarBase, router, aberta, atraso, exclusao, lerExclusao]);
 
   if (erro) {
     return (

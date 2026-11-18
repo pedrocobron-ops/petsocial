@@ -3,7 +3,7 @@ import "../gestao.css";
 import { VigiaDeErros } from "@/components/gestao/erros";
 import { Robustez } from "@/components/gestao/robustez";
 
-/** Maestro Pet Gestão: aplicativo e telas de entrada. Fora do Google enquanto o produto não é lançado. */
+/** Maestro Pet Gestão: aplicativo e telas de entrada. Ficam fora do Google; a página de venda (/gestao) tem a própria regra e aparece. */
 export const metadata: Metadata = {
   title: { default: "Maestro Pet Gestão", template: "%s | Maestro Pet Gestão" },
   description: "Banho e tosa, creche, hotel e loja num sistema só, com todas as funções em todos os planos e o Mozart, assistente por voz e texto, sem pagar à parte.",

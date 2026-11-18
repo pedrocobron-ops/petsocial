@@ -5,7 +5,7 @@ import LogoLoja from "@/components/gestao/logo-loja";
 import { corPropria, TEMAS } from "@/lib/gestao/identidade";
 import { lerOrcamento } from "@/lib/gestao/orcamento-servidor";
 import { STATUS_ORCAMENTO, textoQueroFechar } from "@/lib/gestao/orcamento";
-import { brl, linkWhatsApp } from "@/lib/gestao/util";
+import { brl, linkWhatsApp, centavos } from "@/lib/gestao/util";
 import "../../agendar/[codigo]/agendar.css";
 import "./orcamento.css";
 
@@ -69,7 +69,7 @@ export default async function Orcamento({ params }: { params: Promise<{ token: s
               <li key={n}>
                 <span className="ico" aria-hidden>{i.tipo === "servico" ? <Scissors /> : <Package />}</span>
                 <span className="t"><b>{i.nome}</b>{i.qtd !== 1 && <small>{fmtQtd(i.qtd)} × {brl(i.valor)}</small>}</span>
-                <b className="v">{brl(Math.round(i.qtd * i.valor * 100) / 100)}</b>
+                <b className="v">{brl(centavos(i.qtd * i.valor))}</b>
               </li>
             ))}
           </ul>

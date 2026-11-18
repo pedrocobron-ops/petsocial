@@ -192,7 +192,7 @@ const T = require('../lib/teste')('caixa-trava-recibos-tela');
   const tela = await txt(page.locator('.g-main'));
   // dinheiro de verdade que entrou hoje: creche 63,00 + banho avulso 50,00 + coleira 29,99 + diferença da troca 4,91 = 147,90
   // (com o produto trocado contado como dinheiro seriam 177,89)
-  T.ok('"Entrou hoje" = R$ 147,90 (63,00 + 50,00 + 29,99 + 4,91), sem os R$ 29,99 do produto trocado', /R\$ 147,90/.test(tela) && !/177,89/.test(tela), tela.match(/Entrou hoje[^\n]*\n[^\n]*/g));
+  T.ok('"Recebido hoje" = R$ 147,90 (63,00 + 50,00 + 29,99 + 4,91), sem os R$ 29,99 do produto trocado', /R\$ 147,90/.test(tela) && !/177,89/.test(tela), tela.match(/Recebido hoje[^\n]*\n[^\n]*/g));
   // saiu: devolução de 20,00 (a devolução da troca, de 29,99, é só produto)
   T.ok('"Saiu hoje" = R$ 20,00 (a devolução em Pix), sem os R$ 29,99 da troca', /Saiu hoje[^\n]*\n?[^\n]*R\$ 20,00/.test(tela) && !/49,99/.test(tela), tela.match(/Saiu hoje[^\n]*\n[^\n]*/g));
   const linhaTroca = await txt(page.locator('.g-linha', { hasText: 'Troca: 1 Shampoo' }).first());

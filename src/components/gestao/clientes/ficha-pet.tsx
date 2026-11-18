@@ -9,7 +9,7 @@ import Link from "@/components/gestao/link-depois";
 import { AlertTriangle, ArrowLeft, ArrowLeftRight, BedDouble, CalendarClock, CalendarPlus, History, MessageCircle, NotebookPen, PawPrint, Pencil, Scissors, Ticket, UserPen, UserRound, Wallet } from "lucide-react";
 import type { Agendamento, Cliente, Estadia, PacoteCliente, Pet } from "@/lib/gestao/tipos";
 import { STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, fmtTelefone, haQuanto, hora, idade, inicioDoDia, linkWhatsApp, nomeDiaCurto, telefoneValido } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, fmtTelefone, haQuanto, hora, idade, inicioDoDia, linkWhatsApp, nomeDiaCurto, telefoneValido, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
 import { Anel, Tile, type Tom } from "../painel";
@@ -95,7 +95,7 @@ export default function FichaPet({ id, voltar, aoAbrir }: { id: string; voltar: 
         const devolvido = (devolucoes.data ?? []).filter((x) => doPet(x.descricao)).reduce((t, x) => t + Number(x.valor), 0);
         const credito = ((creditos.data ?? []) as { valor: number; lancamento_id: string | null }[])
           .reduce((t, c) => t + (Number(c.valor) > 0 ? -Number(c.valor) : c.lancamento_id ? 0 : -Number(c.valor)), 0);
-        return Math.max(0, Math.round((entrou - devolvido + credito) * 100) / 100);
+        return Math.max(0, centavos((entrou - devolvido + credito)));
       })(),
     ]);
     // quem está na casa agora veio hoje; estadia encerrada conta pelo dia em que saiu

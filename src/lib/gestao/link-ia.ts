@@ -9,6 +9,7 @@
  * `link-ia-comum.ts`, que este arquivo reexporta.
  */
 import { MAX_LETRAS_PERGUNTA, MAX_PERGUNTAS_CONVERSA, OPCAO_LINK_IA, limiteConversaTexto, type Sugestao } from "./link-ia-comum";
+import { centavos } from "./util";
 export { MAX_LETRAS_PERGUNTA, MAX_PERGUNTAS_CONVERSA, OPCAO_LINK_IA, limiteConversaTexto, type Sugestao };
 
 export const MAX_LETRAS_RESPOSTA = 900;
@@ -16,6 +17,8 @@ export const MAX_LETRAS_RESPOSTA = 900;
 export const DIAS_NO_LINK = 14;
 
 export const MARCA_NAO_SEI = "[[NAO_SEI]]";
+/** A pergunta tinha mais de uma parte e o assistente respondeu só o que sabia: a página mostra a resposta e o botão do WhatsApp para o resto. */
+export const MARCA_RESTO = "[[RESTO_NO_WHATSAPP]]";
 
 export type ServicoPublico = {
   id: string; nome: string; duracao_min: number;
@@ -25,10 +28,14 @@ type DiaDoHorario = { abre?: string | null; fecha?: string | null; almoco?: { de
 export type DadosDoLink = {
   info: {
     nome: string; cidade?: string | null; uf?: string | null; horario?: unknown; aviso?: string | null; hoje: string;
+    /** endereço do pet shop (migração 20261235; tudo opcional) */
+    endereco?: string | null; bairro?: string | null; complemento?: string | null;
     servicos: ServicoPublico[];
     creche?: { diaria: number | null } | null; hotel?: { diaria: number | null } | null;
   };
   fechados?: string[] | null;
+  /** `link_promocoes`: as promoções que a página do link mostra (dias, horas, desconto e os serviços, a creche ou o hotel em que valem) */
+  promocoes?: PromoPublica[] | null;
   /** `link_hotel_opcoes` (null: banco antigo ou sem hotel) */
   hotel?: {
     preco?: { mostrar?: boolean; de?: number | null; ate?: number | null; varia?: boolean | null } | null;
@@ -52,8 +59,14 @@ export type DadosDoLink = {
   taxi?: { sem_preco?: boolean; modo?: string | null; valor?: unknown; bairros?: { nome?: unknown; valor?: unknown }[] | null; mensalista?: boolean } | null;
 };
 
+export type PromoPublica = {
+  nome?: unknown; dias?: unknown; hora_de?: unknown; hora_ate?: unknown; tipo?: unknown; valor?: unknown; comeca_em?: unknown; termina_em?: unknown;
+  servicos?: unknown; casa?: unknown;
+};
+
 export type Fala = { de: "eu" | "ia"; texto: string };
-export type Resposta = { texto: string; naoSei: boolean; sugestao: Sugestao | null };
+/** `resto`: a resposta veio pela metade (o que o assistente sabia) e a página oferece o WhatsApp para o que faltou. */
+export type Resposta = { texto: string; naoSei: boolean; sugestao: Sugestao | null; resto?: boolean };
 
 const NOME_PORTE = { P: "pequeno", M: "médio", G: "grande", GG: "gigante" } as const;
 const SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -98,6 +111,47 @@ function duracao(min: number) {
   return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
 }
 
+const centavos = (n: number) => Math.round(n * 100) / 100;
+/** "R$ 42,41": preço de promoção sempre com os centavos (é o valor da conta). */
+const reaisCheio = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** O preço com a promoção (% arredonda no centavo; R$ vai até o preço): a mesma conta da página e do banco. */
+const comPromo = (tipo: string, valor: number, preco: number) => centavos(preco - (tipo === "pct" ? centavos((preco * valor) / 100) : Math.min(valor, preco)));
+const diasDaPromo = (dias: unknown) => [1, 2, 3, 4, 5, 6, 0].filter((d) => Array.isArray(dias) && dias.map(Number).includes(d)).map((d) => SEMANA[d]);
+
+/**
+ * As promoções que a página do link mostra, já com o preço de cada porte calculado ("de X por Y"): o assistente repete o
+ * número, não faz a conta. Promoção de serviço sem preço no link entra só com o desconto.
+ */
+function promocoesDoLink(d: DadosDoLink): string[] {
+  const l: string[] = [];
+  const hoje = ehDia(d.info.hoje) ? d.info.hoje : null;
+  const refs = referencias(d);
+  for (const p of (d.promocoes ?? []).slice(0, 12)) {
+    const valor = num(p?.valor), tipo = p?.tipo === "reais" ? "reais" : p?.tipo === "pct" ? "pct" : null;
+    const dias = diasDaPromo(p?.dias);
+    if (!p || valor == null || valor <= 0 || !tipo || !dias.length) continue;
+    if (hoje && ehDia(p.termina_em) && p.termina_em < hoje) continue;
+    const nome = dado(String(p.nome ?? "Promoção"), 60);
+    const desconto = tipo === "pct" ? `${valor.toLocaleString("pt-BR")}% de desconto` : `${reais(valor)} de desconto`;
+    const horas = ehHora(p.hora_de) && ehHora(p.hora_ate) ? `, das ${p.hora_de.slice(0, 5)} às ${p.hora_ate.slice(0, 5)}` : ehHora(p.hora_de) ? `, a partir das ${p.hora_de.slice(0, 5)}` : ehHora(p.hora_ate) ? `, antes das ${p.hora_ate.slice(0, 5)}` : "";
+    const validade = [ehDia(p.comeca_em) && (!hoje || p.comeca_em > hoje) ? `começa em ${curto(p.comeca_em)}` : "", ehDia(p.termina_em) ? `vai até ${curto(p.termina_em)}` : ""].filter(Boolean).join(", ");
+    const quando = `${dias.length === 7 ? "todos os dias" : dias.join(", ")}${horas}${validade ? ` (${validade})` : ""}`;
+    const ids = Array.isArray(p.servicos) ? p.servicos.map(String) : [];
+    const servicos = refs.filter((r) => ids.includes(r.servico.id));
+    const casa = (Array.isArray(p.casa) ? p.casa.map(String) : []).filter((c) => (c === "creche" && d.info.creche) || (c === "hotel" && hotelComPreco(d)));
+    if (!servicos.length && !casa.length) continue;
+    l.push(`- Promoção "${nome}": ${desconto}, ${quando}.`);
+    for (const { ref, servico: s } of servicos) {
+      const v = PORTES.map(([porte, k]) => [porte, num(s[k])] as const).filter(([, x]) => x != null) as [string, number][];
+      if (!v.length) { l.push(`  - ${ref} (${dado(s.nome, 80)}): entra na promoção; o preço não está no link (o pet shop passa pelo WhatsApp)`); continue; }
+      const por = (x: number) => `de ${reaisCheio(x)} por ${reaisCheio(comPromo(tipo, valor, x))}`;
+      l.push(`  - ${ref} (${dado(s.nome, 80)}) na promoção: ${v.every(([, x]) => x === v[0][1]) ? por(v[0][1]) : v.map(([porte, x]) => `porte ${porte} ${por(x)}`).join(", ")}`);
+    }
+    for (const c of casa) l.push(`  - vale ${c === "hotel" ? "nas noites do hotel" : "na diária da creche"} nesses dias (o desconto entra na conta final, que o pet shop confirma)`);
+  }
+  return l;
+}
+
 /** Hotel com preço visível no link? (sem a resposta de `link_hotel_opcoes`, vale a diária comum, como a página) */
 export function hotelComPreco(d: DadosDoLink) {
   return !!d.info.hotel && d.hotel?.preco?.mostrar !== false;
@@ -111,7 +165,9 @@ export function contextoDoLink(d: DadosDoLink): string {
   const l: string[] = [];
   l.push(`Pet shop: ${dado(i.nome, 80)}`);
   const onde = [i.cidade, i.uf].filter(Boolean).map((x) => dado(String(x), 60)).join(" / ");
-  l.push(onde ? `Cidade: ${onde} (o endereço completo não está no link)` : "Cidade e endereço: não informados no link");
+  const rua = i.endereco?.trim() ? [i.endereco, i.complemento, i.bairro].filter((x) => x && String(x).trim()).map((x) => dado(String(x), 120)).join(", ") : "";
+  if (rua) l.push(`Endereço: ${rua}${onde ? `, ${onde}` : ""} (a página tem o botão "Abrir no mapa")`);
+  else l.push(onde ? `Cidade: ${onde} (o endereço completo não está no link)` : "Cidade e endereço: não informados no link");
   if (ehDia(i.hoje)) l.push(`Hoje é ${SEMANA[diaDaSemana(i.hoje)]}, ${curto(i.hoje)}/${i.hoje.slice(0, 4)} (data ${i.hoje}).`);
 
   l.push("", "Horário de funcionamento:");
@@ -131,6 +187,12 @@ export function contextoDoLink(d: DadosDoLink): string {
   const refs = referencias(d);
   if (!refs.length) l.push("- nenhum serviço de horário no link");
   for (const { ref, servico: s } of refs) l.push(`- ${ref}: ${dado(s.nome, 80)}, dura cerca de ${duracao(s.duracao_min)}, ${precoDoServico(s)}`);
+
+  const promos = promocoesDoLink(d);
+  if (promos.length) {
+    l.push("", "Promoções que a página do link mostra (o pedido feito num horário da promoção já vai com ela; fora desses dias e horas vale o preço normal):");
+    l.push(...promos);
+  } else l.push("", "Promoções: nenhuma no link agora");
 
   if (i.creche) {
     l.push("", "Creche (passar o dia): dá para pedir vaga pelo link.");
@@ -202,6 +264,8 @@ export function contextoDoLink(d: DadosDoLink): string {
   const c = d.opcoes?.cancelar;
   if (c && typeof c.horas === "number") l.push(`Cancelar pelo link: na página do pedido, ${c.horas <= 0 ? "até a hora marcada" : `até ${c.horas} horas antes`}.`);
 
+  l.push("", `Dados do cliente: o que ele escreve no pedido (nome do pet, espécie, porte, nome e WhatsApp do tutor) vai só para ${dado(i.nome, 80)}, para responder ao pedido. A página não pede CPF nem cartão e nada é pago por ela. O link "Privacidade", no fim da página, explica o resto; para apagar ou corrigir os dados, o cliente fala com o pet shop.`);
+
   return l.join("\n");
 }
 
@@ -209,8 +273,12 @@ export function contextoDoLink(d: DadosDoLink): string {
 export const INSTRUCOES_LINK_IA = `Você responde dúvidas de clientes (tutores de pets) na página de pedidos de um pet shop, em português do Brasil.
 
 Regras:
-- Responda SOMENTE com o que está em <dados_do_pet_shop> ou no resultado das ferramentas. Não invente preço, serviço, horário, regra, endereço, telefone, promoção ou qualquer outra coisa.
-- Se a resposta não estiver nos dados, escreva só ${MARCA_NAO_SEI} e nada mais. A página mostra a frase e o botão do WhatsApp.
+- Responda SOMENTE com o que está em <dados_do_pet_shop> ou no resultado das ferramentas. Não invente preço, serviço, horário, regra, endereço, telefone, promoção ou qualquer outra coisa. Promoção e endereço só os que estão nos dados.
+- Se NADA do que o cliente perguntou estiver nos dados, escreva só ${MARCA_NAO_SEI} e nada mais. A página mostra a frase e o botão do WhatsApp.
+- Pergunta com mais de uma parte: responda TODAS as partes que estão nos dados. Só para a parte que não está, diga numa frase curta que isso é com o pet shop, pelo WhatsApp, e ponha ${MARCA_RESTO} no fim da resposta (a página mostra o botão do WhatsApp). Nunca deixe de responder a parte que você sabe por causa da que você não sabe.
+- Promoção: quando o cliente perguntar o preço para um dia (ou hora) em que vale uma promoção da lista "Promoções", diga o preço "de X por Y" como está escrito e o nome da promoção; se o dia não for de promoção, diga o preço normal. Se o cliente não disse o dia, dê o preço normal e avise em que dias a promoção vale. Nunca calcule o desconto você mesmo.
+- Endereço: se houver a linha "Endereço", pode dizer onde fica; sem ela, o endereço é com o pet shop pelo WhatsApp.
+- Uso dos dados do cliente: responda com a linha "Dados do cliente".
 - Preço "não informado no link" quer dizer que você não sabe o valor: diga que o pet shop passa o valor pelo WhatsApp.
 - Você NÃO marca, NÃO confirma e NÃO cancela nada. Quem pede é o cliente, pelo formulário da página, e o pet shop confirma depois pelo WhatsApp.
 - Quando o cliente quiser marcar, ofereça o pedido pondo no fim da resposta uma marca: [[PEDIR S1 2026-01-31]] (serviço e dia), [[PEDIR S1]] (sem dia), [[PEDIR creche]] ou [[PEDIR hotel]]. Use só as referências S1, S2… da lista. A página transforma a marca num botão.
@@ -239,7 +307,10 @@ export const perguntasNaConversa = (bruto: unknown) => (Array.isArray(bruto) ? b
 /** Lê a resposta do modelo: tira marcas e links, confere a sugestão de pedido contra os dados do próprio link. */
 export function lerResposta(bruto: string, d: DadosDoLink): Resposta {
   let texto = String(bruto ?? "");
-  const naoSei = texto.includes(MARCA_NAO_SEI);
+  // "não sei" junto de uma resposta de verdade (pergunta de duas partes): fica a resposta, e a página oferece o WhatsApp para o resto
+  const temResposta = texto.replace(/\[\[[^\]]*\]\]/g, " ").replace(/\s+/g, " ").trim().length >= 25;
+  const resto = (texto.includes(MARCA_RESTO) || texto.includes(MARCA_NAO_SEI)) && temResposta;
+  const naoSei = texto.includes(MARCA_NAO_SEI) && !temResposta;
   let sugestao: Sugestao | null = null;
   const m = /\[\[PEDIR\s+([A-Za-z0-9]+)(?:\s+(\d{4}-\d{2}-\d{2}))?\s*\]\]/.exec(texto);
   if (m) {
@@ -261,7 +332,7 @@ export function lerResposta(bruto: string, d: DadosDoLink): Resposta {
     .replace(/[ \t]+/g, " ").replace(/ +([.,!?])/g, "$1").trim();
   if (texto.length > MAX_LETRAS_RESPOSTA) texto = `${texto.slice(0, MAX_LETRAS_RESPOSTA).replace(/\s+\S*$/, "")}…`;
   if (naoSei || !texto) return { texto: naoSeiTexto(d.info.nome), naoSei: true, sugestao: null };
-  return { texto, naoSei: false, sugestao };
+  return { texto, naoSei: false, sugestao, ...(resto ? { resto: true } : {}) };
 }
 
 /**
@@ -360,9 +431,9 @@ export function estimarCreche(input: unknown, d: DadosDoLink): string {
   const pets = Math.min(5, Math.max(1, Math.round(num(x.pets) ?? 1)));
   const exp = d.experiencia?.ativo && x.experiencia === true ? num(d.experiencia.preco) : null;
   const porPet = exp != null ? exp + di * (validos.length - 1) : di * validos.length;
-  const total = Math.round(porPet * pets * 100) / 100;
+  const total = centavos(porPet * pets);
   const partes = [`${validos.length} ${validos.length === 1 ? "dia" : "dias"} de creche${pets > 1 ? ` para ${pets} pets` : ""}: total estimado ${reais(total)}`];
-  if (pets > 1) partes.push(`${reais(Math.round(porPet * 100) / 100)} por pet`);
+  if (pets > 1) partes.push(`${reais(centavos(porPet))} por pet`);
   if (exp != null) partes.push(`o primeiro dia é de experiência (${exp === 0 ? "gratuito" : reais(exp)})`);
   if (fechados.length) partes.push(`a creche não abre ${fechados.map(curto).join(", ")} (fora da conta)`);
   const s = d.hotel?.sinal as { modo?: string | null; valor?: unknown; creche?: boolean } | null | undefined;
@@ -416,8 +487,33 @@ export function pedidoDeTeste(pergunta: string, d: DadosDoLink): { nome: string;
  * para o teste provar o que entra no contexto (preço escondido não aparece, dia fechado aparece etc.).
  */
 export function respostaDeTeste(pergunta: string, contexto: string, d: DadosDoLink): string {
+  // pergunta de duas partes ("Quanto é o banho na quinta? E qual o endereço?"): responde cada parte; o que não souber vira o resto
+  const partes = pergunta.split(/\?\s+/).map((x) => x.trim()).filter((x) => x.length > 3);
+  if (partes.length > 1) {
+    const r = partes.map((x) => respostaDeUmaParte(x, contexto, d));
+    const boas = r.filter((x) => !x.includes(MARCA_NAO_SEI));
+    if (!boas.length) return MARCA_NAO_SEI;
+    return boas.length < r.length ? `${boas.join(" ")} O resto é com o pet shop, pelo WhatsApp. ${MARCA_RESTO}` : boas.join(" ");
+  }
+  return respostaDeUmaParte(pergunta, contexto, d);
+}
+function respostaDeUmaParte(pergunta: string, contexto: string, d: DadosDoLink): string {
   const p = pergunta.toLowerCase();
   const linhas = contexto.split("\n");
+  if (/endere[çc]o|onde fica|onde voc[êe]s ficam/.test(p)) return linhas.find((l) => l.startsWith("Endereço:")) ?? MARCA_NAO_SEI;
+  if (/meus dados|dados pessoais|privacidade|lgpd/.test(p)) return linhas.find((l) => l.startsWith("Dados do cliente:")) ?? MARCA_NAO_SEI;
+  if (/promo|desconto na|na (segunda|terça|quarta|quinta|sexta)|no (sábado|domingo)/.test(p)) {
+    const r = referencias(d).find((x) => p.includes(x.servico.nome.toLowerCase()));
+    const dia = SEMANA.find((s) => p.includes(s));
+    const k = linhas.findIndex((l) => l.startsWith('- Promoção "') && (!dia || l.includes(dia) || l.includes("todos os dias")));
+    if (k >= 0) {
+      const dela = [];
+      for (let j = k + 1; j < linhas.length && linhas[j].startsWith("  - "); j++) dela.push(linhas[j].trim().replace(/^- /, ""));
+      const doServico = r ? dela.find((l) => l.startsWith(`${r.ref} `)) : null;
+      return `${linhas[k].replace(/^- /, "")} ${doServico ?? dela.join("; ")}`;
+    }
+    if (/promo/.test(p)) return linhas.find((l) => l.startsWith("Promoções: nenhuma")) ?? MARCA_NAO_SEI;
+  }
   if (/marcar|agendar|pedir|quero ir/.test(p)) {
     const r = referencias(d).find((x) => p.includes(x.servico.nome.toLowerCase())) ?? referencias(d)[0];
     if (r && ehDia(d.info.hoje)) {

@@ -111,6 +111,7 @@ type Registro = { acao: string; quem: string | null; quando: string; detalhe: Re
 const ACAO: Record<string, string> = {
   baixou_dados: "Baixou todos os dados", baixou_tutor: "Baixou os dados de um tutor", apagou_tutor: "Apagou os dados de um tutor",
   pediu_exclusao: "Pediu para apagar a conta", cancelou_exclusao: "Cancelou a exclusão da conta", saiu_da_equipe: "Saiu da equipe",
+  excluiu_tutor: "Excluiu um cliente de vez", exportou_clientes: "Exportou a lista de clientes", copia_completa: "Cópia completa feita pela equipe Maestro Pet", conta_apagada: "Conta apagada",
 };
 
 /** O que foi pedido de dados neste pet shop (baixar, apagar tutor, encerrar a conta, sair da equipe): quem e quando. */
@@ -120,7 +121,7 @@ export function RegistroDeDados() {
   return (
     <section className="g-card gl-cartao">
       <div className="g-card-t"><h3><Tile icone={History} tom="lilas" tamanho="p" />Registro de pedidos de dados</h3></div>
-      <p className="g-muted g-pp">Fica anotado quem baixou ou apagou dados, de qual cliente e quando, com um protocolo para você dar ao cliente e mostrar, se precisar, que atendeu o pedido. Depois de apagar, o cliente aparece só como &quot;Cliente removido&quot;.</p>
+      <p className="g-muted g-pp">Fica anotado quem baixou, apagou ou excluiu dados, de qual cliente e quando, com um protocolo para você dar ao cliente e mostrar, se precisar, que atendeu o pedido. Depois de apagar, o cliente aparece só como &quot;Cliente removido&quot;.</p>
       {erro ? <p className="g-erro">{erro}</p> : !dados ? <p className="g-muted g-pp">Carregando…</p> : !dados.length ? <p className="g-muted g-pp">Nada ainda.</p> : (
         <ul className="gl-registro">
           {dados.slice(0, 10).map((r, i) => (

@@ -55,9 +55,9 @@ export default function DuvidaNoLink({ codigo, loja, telefone, aoPedir }: {
         body: JSON.stringify({ codigo, falas: nova.map((f) => ({ de: f.de, texto: f.texto })) }),
       });
       if (r.status === 403) { setDesligado(true); setFalas([...nova, { de: "ia", texto: `As dúvidas por aqui foram desligadas. Fale com ${loja} no WhatsApp.`, zap: true }]); return; }
-      const j = (await r.json().catch(() => null)) as { texto?: string; naoSei?: boolean; limite?: boolean; fora?: boolean; sugestao?: Sugestao | null } | null;
+      const j = (await r.json().catch(() => null)) as { texto?: string; naoSei?: boolean; limite?: boolean; fora?: boolean; resto?: boolean; sugestao?: Sugestao | null } | null;
       if (!r.ok || !j?.texto) throw new Error("falhou");
-      setFalas([...nova, { de: "ia", texto: j.texto, zap: Boolean(j.naoSei || j.limite || j.fora), sugestao: j.sugestao ?? null }]);
+      setFalas([...nova, { de: "ia", texto: j.texto, zap: Boolean(j.naoSei || j.limite || j.fora || j.resto), sugestao: j.sugestao ?? null }]);
     } catch {
       setFalas([...nova, { de: "ia", texto: `Não consegui responder agora. Confira a internet ou fale com ${loja} no WhatsApp.`, zap: true }]);
     } finally { setEsperando(false); }
@@ -82,7 +82,7 @@ export default function DuvidaNoLink({ codigo, loja, telefone, aoPedir }: {
       </div>
       <div className="g-lk-duv-falas" aria-live="polite">
         <p className="g-lk-duv-aviso">Não coloque dados pessoais aqui (nome completo, telefone, endereço, documentos). A conversa não fica guardada.</p>
-        {!falas.length && <p className="g-lk-duv-ia g-lk-duv-ola">Oi! Pergunte sobre horário, serviços, preços que aparecem aqui, creche ou hotel. Para marcar, você mesmo envia o pedido nesta página.</p>}
+        {!falas.length && <p className="g-lk-duv-ia g-lk-duv-ola">Oi! Pergunte sobre horário, endereço, serviços, preços e promoções que aparecem aqui, creche ou hotel. Para marcar, você mesmo envia o pedido nesta página.</p>}
         {falas.map((f, i) => (
           <div key={i} className={f.de === "eu" ? "g-lk-duv-eu" : "g-lk-duv-ia"}>
             <span>{f.texto}</span>

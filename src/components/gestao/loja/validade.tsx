@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { CalendarX, PackageX, Trash2 } from "lucide-react";
 import { novaChaveDeOperacao } from "@/lib/gestao/dinheiro";
 import type { Produto } from "@/lib/gestao/tipos";
-import { brl, dataCurta, semAcento } from "@/lib/gestao/util";
+import { brl, dataCurta, semAcento, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { fmtQtd, lerQtd } from "./pecas";
@@ -227,7 +227,7 @@ export function contaDoKit(itens: { componente_id: string; quantidade: number }[
     monta = Math.min(monta, Math.floor(Number(p.estoque) / i.quantidade));
     custo = custo == null || p.custo == null ? null : custo + Number(p.custo) * i.quantidade;
   }
-  return { monta: itens.length && Number.isFinite(monta) ? Math.max(0, monta) : 0, custo: custo == null || !itens.length ? null : Math.round(custo * 100) / 100 };
+  return { monta: itens.length && Number.isFinite(monta) ? Math.max(0, monta) : 0, custo: custo == null || !itens.length ? null : centavos(custo) };
 }
 
 /** A lista de produtos do kit: busca, quantidade de cada um e o que dá para montar. */

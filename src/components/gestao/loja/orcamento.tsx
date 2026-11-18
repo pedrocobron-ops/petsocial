@@ -8,7 +8,7 @@ import {
 } from "@/lib/gestao/orcamento";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { PetComTutor } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, fmtTelefone, isoDia, precoDoServico, semAcento } from "@/lib/gestao/util";
+import { brl, dataCompleta, fmtTelefone, isoDia, precoDoServico, semAcento, centavos } from "@/lib/gestao/util";
 import FormAgendamento from "../agenda/form-agendamento";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -267,7 +267,7 @@ function VerOrcamento({ o, tutor, aoFechar, aoEditar, aoConverter, aoMarcar, aoM
           {o.itens.map((i, n) => (
             <div key={n} className="g-orc-item">
               <span className="t"><b>{i.nome}</b><span>{i.tipo === "servico" ? "Serviço" : "Produto"}{i.qtd !== 1 ? ` · ${fmtQtd(i.qtd)} × ${brl(i.valor)}` : ""}</span></span>
-              <b className="g-tab">{brl(Math.round(i.qtd * i.valor * 100) / 100)}</b>
+              <b className="g-tab">{brl(centavos(i.qtd * i.valor))}</b>
             </div>
           ))}
           {Number(o.desconto) > 0 && <div className="g-orc-item menos"><span className="t"><span>Soma {brl(o.subtotal)} · desconto</span></span><b className="g-tab">− {brl(o.desconto)}</b></div>}

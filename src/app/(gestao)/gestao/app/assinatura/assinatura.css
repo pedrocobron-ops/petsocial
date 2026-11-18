@@ -51,3 +51,12 @@
 .g-as-inclui li { display: flex; gap: 10px; align-items: flex-start; font-size: .9375rem; }
 .g-as-inclui svg { width: 20px; height: 20px; flex: none; padding: 3px; border-radius: 50%; background: var(--t-menta); color: var(--i-menta); margin-top: 1px; }
 .g-as-dados-t { display: flex; align-items: center; gap: 10px; }
+
+/* conselho do plano, cupom e as regras de quem assina */
+.g-raiz .g-as-conselho { margin-bottom: 0; background: var(--g-menta); color: var(--txt-verde); flex-wrap: nowrap; align-items: flex-start; }
+.g-as-conselho span { min-width: 0; }
+.g-card.g-as-plano.realce { grid-template-rows: auto auto auto 1fr; }
+.g-as-cupom .g-input { max-width: 260px; text-transform: uppercase; }
+.g-as-regras { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: .9375rem; max-width: 76ch; }
+.g-as-regras li { display: flex; gap: 10px; align-items: flex-start; }
+.g-as-regras li > svg { width: 20px; height: 20px; flex: none; padding: 3px; border-radius: 50%; background: var(--t-menta); color: var(--i-menta); margin-top: 1px; }

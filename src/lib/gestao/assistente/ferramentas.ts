@@ -23,11 +23,14 @@ import type { Horario, Petshop, Profissional, Servico } from "../tipos";
 import { bloqueioPega, datasDaSerie, diasUteis, horariosLivres, vagasDe } from "../agenda";
 import { partesPorForma } from "../dinheiro";
 import { CATEGORIAS_DEVOLUCAO, faturamentoLiquido, montarAjustes } from "../faturamento";
+import { comTrocas, resumoDoCaixa as resumoDaTela, type MovimentoDoCaixa } from "../caixa-contas";
+import { lerCadeia, cadeiaEmFrase } from "../cadeia";
+import { lerSaldos } from "../contador";
 import { foraDoLimite } from "../fiado";
 import { anotarParcelasComRetry, idsDaOperacao, lojaPerguntaParcelas } from "../maquininha";
 import { juntarServicosAMais, nomeDosServicos, valorDoHorario } from "../servicos-do-horario";
 import { parecidos } from "./parecido";
-import { almocoNoDiaDaSemana, brl, fmtTelefone, lerTelefone, linkWhatsApp, precoDoServico, semAcento, soDigitos } from "../util";
+import { almocoNoDiaDaSemana, brl, fmtTelefone, lerTelefone, linkWhatsApp, precoDoServico, semAcento, soDigitos, centavos, centavos as real } from "../util";
 
 /**
  * O que o Mozart sabe fazer no sistema.
@@ -128,7 +131,7 @@ export const FERRAMENTAS: Def[] = ([
     input_schema: obj({ dias: { ...N, description: "Quantidade de dias sem vir, ex.: 30 ou 60" } }, ["dias"]) },
   { grava: false, name: "ver_estoque", description: "Lista produtos do estoque com saldo, mínimo e preço (kit: o saldo é quantos dá para montar). Sem termo, mostra os que estão acabando primeiro. Traz também os lotes vencidos e vencendo em 60 dias (vencendo), para \"o que está vencendo?\".",
     input_schema: obj({ termo: S }) },
-  { grava: false, financeiro: true, name: "resumo_financeiro", description: "Soma o dinheiro que entrou e saiu entre dois dias (inclusive), por categoria e por forma de pagamento, e informa se há caixa aberto. Traz o faturamento e o resultado prontos, com a mesma conta do Financeiro (devolução e crédito deixado para o tutor já tirados) e, se houver, o resultado depois das taxas da maquininha: use para \"quanto eu ganhei\".",
+  { grava: false, financeiro: true, name: "resumo_financeiro", description: "O dinheiro entre dois dias (inclusive), com a mesma conta e os mesmos nomes da tela Financeiro: Recebido, Devolvido, Crédito deixado e usado, Faturamento, Despesas, Resultado, Taxas da maquininha e Resultado depois das taxas; por categoria e por forma de pagamento; o valor médio por conta; se há caixa aberto; e os saldos em aberto hoje (fiado, crédito de tutores, pacotes não usados, sinais). Use para \"quanto eu ganhei\", \"quanto entrou\" e \"quanto de crédito os tutores têm\".",
     input_schema: obj({ de: DIA, ate: DIA }, ["de", "ate"]) },
   { grava: false, financeiro: true, name: "contas_em_aberto", description: "Lista contas a pagar e a receber ainda não pagas, com vencimento (as a receber dizem de qual tutor são). Para \"quem me deve\", use quem_me_deve.",
     input_schema: obj({}) },
@@ -142,7 +145,7 @@ export const FERRAMENTAS: Def[] = ([
   FERRAMENTA_DESCONTOS,
   { grava: false, name: "ver_pacotes", description: "Lista os modelos de pacote à venda (com pacote_id e preço) e os pacotes ativos, com usados e restantes. Com pet_id, só os pacotes daquele pet.",
     input_schema: obj({ pet_id: S }) },
-  { grava: false, financeiro: true, name: "ver_caixa", description: "Diz se o caixa está aberto ou fechado, desde quando, o troco inicial, quanto entrou e saiu por forma de pagamento e o dinheiro esperado na gaveta. Com o caixa fechado, mostra o que foi lançado hoje e o último fechamento.",
+  { grava: false, financeiro: true, name: "ver_caixa", description: "Diz se o caixa está aberto ou fechado, desde quando, o troco inicial, quanto foi recebido e quanto saiu, separado por forma de pagamento (dinheiro, Pix, débito, crédito), e o dinheiro esperado na gaveta: os mesmos números da tela do Caixa. Com o caixa fechado, mostra o que foi lançado hoje e o último fechamento.",
     input_schema: obj({}) },
   { grava: false, name: "ver_saude", description: "Cuidados de saúde anotados (vacina, vermífugo, antipulgas, outros). Com pet_id, lista os do pet. Sem pet_id, lista os que vencem nos próximos N dias no pet shop e os que venceram há pouco.",
     input_schema: obj({ pet_id: S, dias: { ...N, description: "Sem pet_id: quantos dias à frente. Padrão: 30" } }) },
@@ -231,7 +234,6 @@ export function anotacaoDoPet(pet: { alertas?: string | null; obs?: string | nul
 /* ---------- o que os clientes devem (as mesmas contas do Caixa, Contas de clientes, e da ficha do tutor) ---------- */
 
 type ContaDeCliente = { id: string; valor: number; descricao: string | null; categoria: string; vencimento: string | null; data: string; criado_em: string; cliente_id: string | null; devido_desde: string | null };
-const real = (n: number) => Math.round(n * 100) / 100;
 /** Da mais antiga para a mais nova: vencimento (ou o dia da conta) e, no empate, quando foi anotada. */
 const maisAntigaPrimeiro = (a: ContaDeCliente, b: ContaDeCliente) =>
   (a.vencimento ?? a.data).localeCompare(b.vencimento ?? b.data) || a.criado_em.localeCompare(b.criado_em) || a.id.localeCompare(b.id);
@@ -407,7 +409,6 @@ async function planoDeRemoverBloqueio(c: Contexto, e: Entrada) {
 /* ---------- creche e hotel ---------- */
 
 const TIPO_ESTADIA: Record<string, string> = { creche: "Creche", hotel: "Hotel" };
-const centavos = (n: number) => Math.round(n * 100) / 100;
 const diasEntre = (de: string, ate: string) => Math.round((Date.parse(`${ate.slice(0, 10)}T00:00:00Z`) - Date.parse(`${de.slice(0, 10)}T00:00:00Z`)) / 864e5);
 /** Hotel cobra por noite; creche cobra por dia em que o pet esteve aqui. Sempre pelo menos 1 (a mesma conta da tela). */
 function contarDiarias(c: Contexto, e: { tipo: string; entrada: string }) {
@@ -496,31 +497,25 @@ async function pacoteParaUsar(c: Contexto, e: Entrada) {
 
 /* ---------- caixa ---------- */
 
-type Movimento = { tipo: string; valor: number; forma: string | null; pagamentos: unknown; movimento: string | null };
-/** Lançamentos pagos de um caixa; sem caixa, os de hoje que ficaram soltos. De mil em mil, para a soma não sair cortada. */
+type Movimento = MovimentoDoCaixa & { id: string; descricao: string | null };
+/** Os lançamentos pagos de um caixa (ou os de hoje sem caixa), com o crédito do tutor usado e o produto de trocas marcados. */
 async function movimentosDoCaixa(c: Contexto, caixaId: string | null) {
   const tudo: Movimento[] = [];
   for (let de = 0; de < 20000; de += 1000) {
-    const q = c.sb.from("lancamentos").select("tipo, valor, forma, pagamentos, movimento").eq("petshop_id", c.petshop.id).eq("pago", true);
+    const q = c.sb.from("lancamentos").select("id, tipo, valor, forma, pagamentos, movimento, credito_usado, descricao").eq("petshop_id", c.petshop.id).eq("pago", true);
     const r = ok(await (caixaId ? q.eq("caixa_id", caixaId) : q.is("caixa_id", null).eq("data", c.agora.slice(0, 10))).order("criado_em").order("id").range(de, de + 999));
     tudo.push(...r);
     if (r.length < 1000) break;
   }
-  return tudo;
+  return comTrocas(c.sb, c.petshop.id, tudo);
 }
 /**
- * As contas de um caixa, iguais às da tela: na gaveta só conta o dinheiro (no pagamento dividido, só a parte em dinheiro).
- * Sangria e suprimento (movimento de gaveta) mexem na gaveta, mas não são entrada nem saída.
+ * As contas de um caixa: as MESMAS da tela (`caixa-contas.ts`). "entrou" é o Recebido (sem a parte paga com crédito do tutor e
+ * sem o produto de trocas); na gaveta só conta o dinheiro; sangria e suprimento não são entrada nem saída.
  */
 function resumoDoCaixa(valorInicial: number, todos: Movimento[]) {
-  const ls = todos.filter((l) => !l.movimento);
-  const soma = (tipo: string, forma?: string) => centavos(ls.filter((l) => l.tipo === tipo)
-    .reduce((t, l) => t + (forma ? partesPorForma(l).filter((p) => p.forma === forma).reduce((s, p) => s + p.valor, 0) : Number(l.valor)), 0));
-  const gaveta = (m: string) => centavos(todos.filter((l) => l.movimento === m).reduce((t, l) => t + Number(l.valor), 0));
-  const porForma = Object.keys(FORMA).map((id) => ({ id, rotulo: FORMA[id], entrou: soma("entrada", id), saiu: soma("saida", id) }));
-  const suprimentos = gaveta("suprimento"), sangrias = gaveta("sangria");
-  return { entrou: soma("entrada"), saiu: soma("saida"), porForma, suprimentos, sangrias,
-    esperado: centavos(Number(valorInicial) + soma("entrada", "dinheiro") + suprimentos - soma("saida", "dinheiro") - sangrias), lancamentos: ls.length };
+  const r = resumoDaTela(valorInicial, todos);
+  return { ...r, lancamentos: r.nEntradas + r.nSaidas };
 }
 function diferencaDoCaixa(contado: number, esperado: number) {
   const d = centavos(contado - esperado);
@@ -758,7 +753,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       // por forma, o pagamento dividido entra repartido (parte no Pix, parte em dinheiro)
       const soma = (filtro: (l: (typeof todos)[number]) => boolean, chave: "categoria" | "forma") => {
         const m: Record<string, number> = {};
-        const por = (k: string, v: number) => { m[k] = Math.round(((m[k] ?? 0) + v) * 100) / 100; };
+        const por = (k: string, v: number) => { m[k] = centavos(((m[k] ?? 0) + v)); };
         for (const l of todos) {
           if (!filtro(l)) continue;
           if (chave === "forma") for (const p of partesPorForma(l)) por(p.forma, p.valor);
@@ -769,7 +764,7 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
       };
       const total = (filtro: (l: (typeof todos)[number]) => boolean) => real(todos.filter(filtro).reduce((t, l) => t + Number(l.valor), 0));
       // a mesma conta do Financeiro (faturamento.ts): entrou − devolvido − crédito deixado + crédito usado fora de uma conta − saiu
-      const ajustes = montarAjustes(todos.filter(ehDevolucao).map((l) => ({ valor: Number(l.valor), data: de, cliente_id: null })), creditos);
+      const ajustes = montarAjustes(todos.filter(ehDevolucao).map((l) => ({ valor: Number(l.valor), data: de, cliente_id: null })), creditos, petshop.fuso);
       const entrou = total((l) => l.tipo === "entrada");
       const saiu = total((l) => l.tipo === "saida" && !ehDevolucao(l));
       const faturamento = faturamentoLiquido(entrou, ajustes);
@@ -781,10 +776,20 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
         const t = await sb.from("lancamentos_taxas").select("taxa").eq("petshop_id", petshop.id).in("lancamento_id", idsEntrada.slice(i, i + 150));
         for (const x of t.data ?? []) taxas = real(taxas + Number(x.taxa));
       }
-      return { resultado: { de, ate, entrou, devolvido_ao_cliente: ajustes.devolvido, credito_deixado_para_tutores: ajustes.creditoDeixado, credito_usado_fora_de_conta: ajustes.creditoUsadoFora,
-        faturamento, saiu, resultado,
+      // a cadeia do dinheiro, feita no banco: a MESMA das telas Financeiro e Relatórios (cada passo com o nome da tela)
+      const cadeia = await lerCadeia(sb, petshop.id, de, ate).catch(() => null);
+      const saldos = await lerSaldos(sb, petshop.id).catch(() => null);
+      return { resultado: { de, ate,
+        ...(cadeia ? { cadeia_do_dinheiro: { recebido: cadeia.recebido, devolvido_aos_tutores: cadeia.devolvido, credito_deixado_para_tutores: cadeia.creditoDeixado, credito_usado_por_tutores: cadeia.creditoUsado,
+          faturamento: cadeia.faturamento, despesas: cadeia.despesas, ...(cadeia.retiradaDoDono > 0 ? { retirada_do_dono_dentro_das_despesas: cadeia.retiradaDoDono } : {}), resultado: cadeia.resultado,
+          taxas_da_maquininha: cadeia.taxas, resultado_depois_das_taxas: cadeia.resultadoDepoisDasTaxas, em_uma_linha: cadeiaEmFrase(cadeia, brl) },
+          valor_medio_por_conta: cadeia.valorMedio.medio, contas_pagas: cadeia.valorMedio.contas } : {}),
+        ...(saldos ? { saldos_em_aberto_hoje: { fiado: saldos.fiado.total, credito_de_tutores: saldos.credito.total, credito_por_tutor: saldos.credito.linhas.slice(0, 30).map((x) => ({ tutor: x.nome, valor: x.valor })),
+          pacotes_vendidos_e_nao_usados: saldos.pacotes.total, sinais_de_reservas: saldos.sinais.total } } : {}),
+        entradas_lancadas: entrou, devolvido_ao_cliente: ajustes.devolvido, credito_deixado_para_tutores: ajustes.creditoDeixado, credito_usado_fora_de_conta: ajustes.creditoUsadoFora,
+        faturamento: cadeia?.faturamento ?? faturamento, saiu, resultado: cadeia?.resultado ?? resultado,
         ...(taxas > 0 ? { taxas_da_maquininha: taxas, resultado_depois_das_taxas: real(resultado - taxas) } : {}),
-        como_e_a_conta: "Igual ao Financeiro, Resultado do mês: faturamento = entrou − devolvido ao cliente − crédito deixado para tutores (ainda é deles) + crédito usado fora de uma conta; resultado = faturamento − saiu. Devolução não está em saiu. Diga esses números como estão: não refaça a conta. Taxas da maquininha já estão em resultado_depois_das_taxas (não tire de novo).",
+        como_e_a_conta: "Use os números de cadeia_do_dinheiro, com estes nomes (são os da tela Financeiro): Recebido − Devolvido aos tutores − Crédito deixado para tutores + Crédito usado por tutores = Faturamento; Faturamento − Despesas = Resultado; Resultado − Taxas da maquininha = Resultado depois das taxas. Recebido é dinheiro, Pix e cartão que entraram de verdade. entradas_lancadas é só a soma das linhas de entrada (tem dentro conta paga com crédito do tutor e produto de troca): não chame de recebido nem de faturamento. Diga os números como estão: não refaça a conta. O total de crédito de tutores em aberto está em saldos_em_aberto_hoje.",
         entradas_por_categoria: soma((l) => l.tipo === "entrada", "categoria"), entradas_por_forma: soma((l) => l.tipo === "entrada", "forma"), saidas_por_categoria: soma((l) => l.tipo === "saida" && !ehDevolucao(l), "categoria"),
         lancamentos: todos.length, caixa_aberto: caixa.data ? { desde: utcParaLocal(caixa.data.aberto_em, c.fusoMin), troco_inicial: caixa.data.valor_inicial } : null } };
     }
@@ -858,16 +863,18 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
         const r = resumoDoCaixa(aberto.valor_inicial, await movimentosDoCaixa(c, aberto.id));
         const desde = utcParaLocal(aberto.aberto_em, c.fusoMin);
         return { resultado: { caixa: "aberto", desde, ...(desde.slice(0, 10) !== hoje ? { aviso: "Este caixa foi aberto em outro dia. Vale fechar e abrir outro para o dia de hoje ficar separado." } : {}),
-          troco_inicial: aberto.valor_inicial, entrou: r.entrou, saiu: r.saiu, lancamentos: r.lancamentos,
-          por_forma: Object.fromEntries(r.porForma.filter((f) => f.entrou || f.saiu).map((f) => [f.rotulo, { entrou: f.entrou, saiu: f.saiu }])),
+          troco_inicial: aberto.valor_inicial, recebido: r.entrou, saiu: r.saiu, lancamentos: r.lancamentos,
+          recebido_por_forma: Object.fromEntries(r.porForma.filter((f) => f.entrou || f.saiu).map((f) => [f.rotulo, { recebido: f.entrou, saiu: f.saiu }])),
+          recebido_em_dinheiro: r.porForma.find((f) => f.id === "dinheiro")?.entrou ?? 0,
+          ...(r.credito > 0 ? { contas_pagas_com_credito_do_tutor: r.credito } : {}),
           ...(r.suprimentos ? { colocado_na_gaveta_suprimento: r.suprimentos } : {}), ...(r.sangrias ? { tirado_da_gaveta_sangria: r.sangrias } : {}),
-          dinheiro_esperado_na_gaveta: r.esperado, observacao: "Os totais são deste caixa, desde a abertura. Na gaveta só conta o dinheiro. Sangria e suprimento mexem na gaveta, mas não são entrada nem saída." } };
+          dinheiro_esperado_na_gaveta: r.esperado, observacao: "São os mesmos números da tela do Caixa, deste caixa, desde a abertura. Recebido é dinheiro, Pix e cartão que entraram de verdade: conta paga com crédito do tutor e produto de troca ficam fora. O sistema SEPARA por forma (recebido_por_forma): quanto entrou em dinheiro está em recebido_em_dinheiro. Na gaveta só conta o dinheiro. Sangria e suprimento mexem na gaveta, mas não são entrada nem saída." } };
       }
       const r = resumoDoCaixa(0, await movimentosDoCaixa(c, null));
       const { data: ultimo } = await sb.from("caixas").select("*").eq("petshop_id", petshop.id).not("fechado_em", "is", null).order("fechado_em", { ascending: false }).limit(1).maybeSingle();
       const ru = ultimo ? resumoDoCaixa(ultimo.valor_inicial, await movimentosDoCaixa(c, ultimo.id)) : null;
-      return { resultado: { caixa: "fechado", lancado_hoje_sem_caixa: { entrou: r.entrou, saiu: r.saiu, por_forma: Object.fromEntries(r.porForma.filter((f) => f.entrou || f.saiu).map((f) => [f.rotulo, { entrou: f.entrou, saiu: f.saiu }])) },
-        ultimo_fechamento: ultimo && ru ? { aberto_em: utcParaLocal(ultimo.aberto_em, c.fusoMin), fechado_em: utcParaLocal(ultimo.fechado_em!, c.fusoMin), ...(c.cuidoDoFinanceiro ? { entrou: ru.entrou, saiu: ru.saiu } : {}), esperado_na_gaveta: ultimo.valor_esperado ?? ru.esperado, contado: ultimo.valor_contado,
+      return { resultado: { caixa: "fechado", lancado_hoje_sem_caixa: { recebido: r.entrou, saiu: r.saiu, recebido_por_forma: Object.fromEntries(r.porForma.filter((f) => f.entrou || f.saiu).map((f) => [f.rotulo, { recebido: f.entrou, saiu: f.saiu }])) },
+        ultimo_fechamento: ultimo && ru ? { aberto_em: utcParaLocal(ultimo.aberto_em, c.fusoMin), fechado_em: utcParaLocal(ultimo.fechado_em!, c.fusoMin), ...(c.cuidoDoFinanceiro ? { recebido: ru.entrou, saiu: ru.saiu } : {}), esperado_na_gaveta: ultimo.valor_esperado ?? ru.esperado, contado: ultimo.valor_contado,
           ...(ultimo.valor_contado != null ? { diferenca: diferencaDoCaixa(ultimo.valor_contado, Number(ultimo.valor_esperado ?? ru.esperado)).texto } : {}), ...(ultimo.obs ? { obs: ultimo.obs } : {}) } : null } };
     }
     case "ver_saude": {
@@ -1017,7 +1024,7 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       } else if (outros.length) {
         // cada serviço com o valor dele, e o total do horário
         const precos = [preco, ...outros.map((x) => precoDoServico(x, pet.porte))];
-        const total = Math.round(precos.reduce<number>((t, v) => t + (v ?? 0), 0) * 100) / 100;
+        const total = centavos(precos.reduce<number>((t, v) => t + (v ?? 0), 0));
         linhas.push(["Valor", `${brl(total)}${inicios.length > 1 ? " cada" : ""} (${[servico, ...outros].map((x, i) => `${x.nome} ${precos[i] != null ? brl(precos[i]!) : "a definir"}`).join(" + ")})`]);
         linhas.push(["Duração", `${duracaoMin} min`]);
       } else linhas.push(["Valor", preco != null ? `${brl(preco)}${inicios.length > 1 ? " cada" : ""}` : "a definir"]);
@@ -1487,7 +1494,7 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
         custo_unitario: e.tipo === "entrada" ? custo : null, motivo: texto(e.motivo, 80) || null, origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
       let despesa = false;
       if (e.lancar_despesa && custo != null && e.tipo === "entrada" && c.vejoFinanceiro) {
-        ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "saida", valor: Math.round(custo * qtd * 100) / 100, forma: String(e.forma), categoria: "Produtos e material",
+        ok(await sb.from("lancamentos").insert({ petshop_id: petshop.id, tipo: "saida", valor: centavos(custo * qtd), forma: String(e.forma), categoria: "Produtos e material",
           descricao: `Compra: ${qtd} ${unidade} de ${nomeProd}`, data: hoje, pago: true, caixa_id: await caixaAbertoId(c), origem: "assistente", criado_por: c.userId, chave: c.chave ?? null }).select("id").single());
         despesa = true;
       }

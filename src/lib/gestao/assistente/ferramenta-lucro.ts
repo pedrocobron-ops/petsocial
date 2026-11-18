@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Contexto } from "./ferramentas";
 import { montarLucro, porLucro, type LinhaLucro, type LucroDoBanco } from "../lucro";
+import { centavos } from "../util";
 
 /**
  * Ferramenta de consulta "ver_lucro" do Mozart: "qual serviço dá mais lucro?", "quanto sobrou dos produtos?". É a conta de
@@ -25,7 +26,7 @@ const linha = (l: LinhaLucro) => ({
   nome: l.nome, tipo: l.tipo, quantidade: Math.round((l.quantidade - l.devolvidos) * 1000) / 1000, entrou: l.receita,
   custo: l.custo, comissao_da_linha: l.comissao, sobrou: l.margem, sobrou_pct: l.pct == null ? null : Math.round(l.pct * 10) / 10,
   ...(l.custo == null ? { custo_nao_informado: l.falta ?? "custo não informado" } : {}),
-  ...(l.devolvido > 0 ? { devolvido_ao_cliente: l.devolvido, unidades_que_voltaram: l.devolvidos, entrou_sem_o_devolvido: Math.round((l.receita - l.devolvido) * 100) / 100 } : {}),
+  ...(l.devolvido > 0 ? { devolvido_ao_cliente: l.devolvido, unidades_que_voltaram: l.devolvidos, entrou_sem_o_devolvido: centavos((l.receita - l.devolvido)) } : {}),
 });
 
 /** Roda a ferramenta; devolve null quando o nome não é desta lista. Erro de uso: lança Error com a frase para o modelo. */

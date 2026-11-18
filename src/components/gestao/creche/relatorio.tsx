@@ -8,7 +8,7 @@ import {
 import { diaFechado } from "@/lib/gestao/feriados";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { comValoresDeEstadia } from "@/lib/gestao/reservado";
-import { brl, dataCurta, deIsoDia, isoDia, nomeMes, somaDias } from "@/lib/gestao/util";
+import { brl, dataCurta, deIsoDia, isoDia, nomeMes, somaDias, centavos as real } from "@/lib/gestao/util";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Barras, Kpi, Tile } from "../painel";
@@ -21,7 +21,6 @@ import "./creche.css";
  * as mensalidades dos meses do período (recebido, a vencer, atrasado), com quem está devendo.
  * Só número que está no banco: nada é estimado. Só aparece para quem usa creche.
  */
-const real = (n: number) => Math.round(n * 100) / 100;
 const um = (n: number, s: string, p: string) => (n === 1 ? `1 ${s}` : `${n.toLocaleString("pt-BR")} ${p}`);
 
 export default function CrecheNoRelatorio({ de, ate }: { de: Date; ate: Date }) {

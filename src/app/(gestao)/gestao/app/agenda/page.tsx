@@ -1,5 +1,6 @@
 "use client";
 
+import { enderecoEmLinha } from "@/lib/gestao/endereco";
 import { alertaCurto } from "@/lib/gestao/quadro";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
 import { modoSimples } from "@/lib/gestao/modo-simples";
@@ -510,7 +511,7 @@ function MarcadoAgora({ marcado, lista, prontoEm, aoAbrir, aoFechar }: { marcado
   // horário que já passou (marcado depois, para anotar): confirmação para o tutor não faz sentido (achado da Neide)
   const passou = new Date(marcado.inicio).getTime() < Date.now();
   const zap = a && !passou ? linkWhatsApp(tutor?.telefone, textoConfirmacao({
-    tutor: tutor?.nome, pet: a.pets?.nome ?? "seu pet", sexo: a.pets?.sexo ?? marcado.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+    tutor: tutor?.nome, pet: a.pets?.nome ?? "seu pet", sexo: a.pets?.sexo ?? marcado.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome, onde: enderecoEmLinha(petshop),
   })) : null;
   const nome = a?.pets?.nome ?? marcado.pet;
   return (

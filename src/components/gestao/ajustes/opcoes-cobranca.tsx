@@ -6,7 +6,7 @@ import { MARCAS_DO_MODELO, mensagemDeDivida, MODELO_COBRANCA, multaSugerida, OPC
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
 import { limitePadrao, OPCAO_LIMITE_FIADO } from "@/lib/gestao/fiado";
 import { usaModulo } from "@/lib/gestao/modulos";
-import { brl, isoDia, somaDias } from "@/lib/gestao/util";
+import { brl, isoDia, somaDias, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { CampoDinheiro } from "../loja/pecas";
 import { Tile } from "../painel";
@@ -18,7 +18,7 @@ function lerPct(texto: string): number | null {
   const t = texto.trim().replace(",", ".");
   if (!t) return 0;
   const n = Number(t);
-  return Number.isFinite(n) && n >= 0 && n <= 100 ? Math.round(n * 100) / 100 : null;
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? centavos(n) : null;
 }
 const pctTexto = (n: number) => (n > 0 ? String(n).replace(".", ",") : "");
 const soPct = (s: string) => s.replace(/[^\d,.]/g, "").slice(0, 6);

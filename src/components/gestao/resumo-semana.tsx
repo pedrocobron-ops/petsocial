@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import { CalendarRange, Check, ChevronRight, Copy, Lightbulb } from "lucide-react";
 import type { Banco } from "@/lib/gestao/supabase";
-import { brl, dataCurta, inicioDaSemana, inicioDoDia, isoDia, somaDias } from "@/lib/gestao/util";
+import { brl, dataCurta, inicioDaSemana, inicioDoDia, isoDia, somaDias, centavos } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { buscarVisitas, diasSemVir, sumiu } from "@/lib/gestao/visitas";
 import { buscarTudo } from "./clientes/comum";
@@ -45,7 +45,7 @@ export async function buscarResumo(sb: Banco, petshop: { id: string; criado_em: 
     const dentro = (iso: string) => { const t = new Date(iso).getTime(); return t >= ini.getTime() && t < fim.getTime(); };
     const doPeriodo = (ags.data ?? []).filter((x) => dentro(x.inicio));
     return {
-      entrou: Math.round((lancs.data ?? []).filter((l) => l.data >= a && l.data < b).reduce((s, l) => s + Number(l.valor), 0) * 100) / 100,
+      entrou: centavos((lancs.data ?? []).filter((l) => l.data >= a && l.data < b).reduce((s, l) => s + Number(l.valor), 0)),
       concluidos: doPeriodo.filter((x) => x.status === "concluido").length,
       faltas: doPeriodo.filter((x) => x.status === "faltou").length,
       petsNovos: (pets.data ?? []).filter((p) => dentro(p.criado_em)).length,
@@ -61,7 +61,7 @@ export async function buscarResumo(sb: Banco, petshop: { id: string; criado_em: 
     de, ate: somaDias(seg, -1),
     semana: conta(de),
     antes: new Date(petshop.criado_em).getTime() < de.getTime() ? conta(antesDe) : null,
-    aReceber: Math.round((abertas.data ?? []).reduce((s, l) => s + Number(l.valor), 0) * 100) / 100,
+    aReceber: centavos((abertas.data ?? []).reduce((s, l) => s + Number(l.valor), 0)),
     contasAReceber: (abertas.data ?? []).length,
     sumidos,
   };
@@ -70,7 +70,7 @@ export async function buscarResumo(sb: Banco, petshop: { id: string; criado_em: 
 /** "R$ 200,00 a mais", "igual", "2 a menos": a diferença para a semana anterior, sem enfeite. */
 export function comparar(agora: number, antes: number | undefined, fmt: (n: number) => string = String) {
   if (antes === undefined) return null;
-  const d = Math.round((agora - antes) * 100) / 100;
+  const d = centavos((agora - antes));
   return d === 0 ? "igual à semana anterior" : `${fmt(Math.abs(d))} a ${d > 0 ? "mais" : "menos"} que na semana anterior`;
 }
 const lista = (nomes: string[]) => nomes.length > 3 ? `${nomes.slice(0, 3).join(", ")} e mais ${nomes.length - 3}`
@@ -83,7 +83,7 @@ export function textoDoResumo(r: Resumo, nome: string) {
   const linhas = [`Resumo da semana no ${nome} (${dataCurta(r.de)} a ${dataCurta(r.ate)})`];
   if (semMovimento(r)) linhas.push("Nenhum movimento lançado na semana.");
   else linhas.push(
-    `Entrou: ${brl(r.semana.entrou)}${c(comparar(r.semana.entrou, r.antes?.entrou, brl))}`,
+    `Entradas lançadas: ${brl(r.semana.entrou)}${c(comparar(r.semana.entrou, r.antes?.entrou, brl))}`,
     `Atendimentos concluídos: ${r.semana.concluidos}${c(comparar(r.semana.concluidos, r.antes?.concluidos))}`,
     `Faltas: ${r.semana.faltas}${c(comparar(r.semana.faltas, r.antes?.faltas))}`,
     `Pets novos: ${r.semana.petsNovos}${c(comparar(r.semana.petsNovos, r.antes?.petsNovos))}`,
@@ -121,7 +121,7 @@ function Conteudo({ aoIr }: { aoIr?: () => void }) {
             : dicaLink;
 
   const celulas = [
-    !vazia && { rotulo: "Entrou", valor: brl(s.entrou), apoio: comparar(s.entrou, a?.entrou, brl) },
+    !vazia && { rotulo: "Entradas lançadas", valor: brl(s.entrou), apoio: comparar(s.entrou, a?.entrou, brl) },
     !vazia && { rotulo: "Atendimentos concluídos", valor: String(s.concluidos), apoio: comparar(s.concluidos, a?.concluidos) },
     !vazia && { rotulo: "Faltas", valor: String(s.faltas), apoio: comparar(s.faltas, a?.faltas) },
     !vazia && { rotulo: "Pets novos", valor: String(s.petsNovos), apoio: comparar(s.petsNovos, a?.petsNovos) },

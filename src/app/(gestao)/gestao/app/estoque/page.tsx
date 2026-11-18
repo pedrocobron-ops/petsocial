@@ -26,7 +26,7 @@ import { conferirCaixa, conferirValorAlto, gravarMovimentos, lancarPago, parteDa
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { FORMAS, type MovimentoEstoque, type Produto } from "@/lib/gestao/tipos";
-import { brl, brlCurto, dataCompleta, dataCurta, isoDia, semAcento } from "@/lib/gestao/util";
+import { brl, brlCurto, dataCompleta, dataCurta, isoDia, semAcento, centavos } from "@/lib/gestao/util";
 import "./estoque.css";
 import { limparNome } from "@/lib/gestao/validacao";
 
@@ -51,7 +51,6 @@ type Motivo = (typeof MOTIVOS)[number]["id"];
 
 const zerado = (p: Produto) => Number(p.estoque) <= 0;
 const acabando = (p: Produto) => !zerado(p) && Number(p.estoque_minimo) > 0 && Number(p.estoque) <= Number(p.estoque_minimo);
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /** Nível do estoque em relação ao mínimo: vermelho abaixo, amarelo perto, verde com folga. */
 function nivel(p: Produto): { tom: "ok" | "perto" | "baixo"; parte: number | null } {
@@ -751,7 +750,7 @@ function Saida({ produto, loteInicial, aoFechar, aoGravar }: { produto: Produto;
           tipo: "entrada", valor, forma: pg.forma, pagamentos: pg.pagamentos, categoria: "Venda de produtos",
           descricao: `Venda: ${fmtQtd(n)} ${produto.unidade} de ${produto.nome}`,
           // com os itens, apagar esta venda depois devolve o produto ao estoque
-          itens: [{ tipo: "produto", nome: produto.nome, qtd: n, valor: Math.round((valor / n) * 100) / 100, produto_id: produto.id }],
+          itens: [{ tipo: "produto", nome: produto.nome, qtd: n, valor: centavos((valor / n)), produto_id: produto.id }],
           chave,
         });
         // crédito parcelado: em quantas vezes (tenta de novo e avisa se não der; a venda já entrou)

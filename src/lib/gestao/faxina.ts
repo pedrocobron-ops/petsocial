@@ -71,6 +71,9 @@ export type ResultadoDaFaxina = {
   contasPendentes: number;
   /** linhas apagadas das contas nesta rodada */
   linhas: number;
+  /** privacidade (migração 20261236): linhas do freio do link com mais de 2 dias, pedidos pelo link que não viraram horário
+   *  com mais de 90 dias e fotos sem ficha (formulário cancelado) postas na fila */
+  freio: number; pedidosVelhos: number; semFicha: number;
 };
 
 async function apagar(sb: Banco, bucket: string, caminhos: string[]): Promise<{ ok: number; falhas: number }> {
@@ -85,9 +88,10 @@ async function apagar(sb: Banco, bucket: string, caminhos: string[]): Promise<{ 
 
 /** Uma faxina completa: algumas voltas de até 500 arquivos por bucket, até a fila esvaziar. `petshop`: só os arquivos dele (testes). */
 export async function faxinaGeral(sb: Banco, petshop?: string, o: { segundosDasContas?: number } = {}): Promise<ResultadoDaFaxina> {
-  const x: ResultadoDaFaxina = { albuns: 0, reservas: 0, fotos: 0, pdfs: 0, falhas: 0, contas: 0, logins: 0, arquivos: 0, contasPendentes: 0, linhas: 0 };
+  const x: ResultadoDaFaxina = { albuns: 0, reservas: 0, fotos: 0, pdfs: 0, falhas: 0, contas: 0, logins: 0, arquivos: 0, contasPendentes: 0, linhas: 0, freio: 0, pedidosVelhos: 0, semFicha: 0 };
   await apagarContasVencidas(sb, x, petshop, o.segundosDasContas ?? SEGUNDOS_DAS_CONTAS);
   await apagarLoginsDaFila(sb, x, petshop);
+  await faxinaDaPrivacidade(sb, x, petshop);
   for (let volta = 0; volta < VOLTAS; volta++) {
     const r = await sb.rpc("gestao_faxina_arquivos", { p_limite: LIMITE, ...(petshop ? { p_petshop: petshop } : {}) });
     if (r.error) throw Object.assign(new Error(r.error.message), { name: "ErroDaFaxina" });
@@ -143,6 +147,21 @@ async function apagarContasVencidas(sb: Banco, x: ResultadoDaFaxina, petshop: st
     if (!lojas && !linhas) break;
     if (Date.now() >= ate) break;
   }
+}
+
+/**
+ * Privacidade (gestao_faxina_lgpd, migração 20261236): apaga o freio do link com mais de 2 dias e os pedidos pelo link que
+ * não viraram horário há mais de 90 dias, e põe na fila as fotos do bucket `pets` com mais de 1 dia que nenhuma ficha usa
+ * (formulário cancelado). Os arquivos da fila saem logo abaixo, em faxinaGeral. Banco de antes da migração: segue sem isso.
+ */
+async function faxinaDaPrivacidade(sb: Banco, x: ResultadoDaFaxina, petshop?: string) {
+  const r = await (sb.rpc.bind(sb) as unknown as RpcSolto)("gestao_faxina_lgpd", petshop ? { p_petshop: petshop } : {});
+  if (r.error) {
+    if (/PGRST202|42883/.test(r.error.code ?? "") || /Could not find the function/i.test(r.error.message)) return;
+    throw Object.assign(new Error(r.error.message), { name: "ErroDaFaxina" });
+  }
+  const d = (r.data ?? {}) as { freio?: number; pedidos?: number; fotos?: number };
+  x.freio += Number(d.freio ?? 0); x.pedidosVelhos += Number(d.pedidos ?? 0); x.semFicha += Number(d.fotos ?? 0);
 }
 
 type RpcSolto = (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }>;

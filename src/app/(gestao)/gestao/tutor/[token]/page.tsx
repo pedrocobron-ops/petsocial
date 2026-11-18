@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
+import { origemDoPedido, previaDaLoja } from "@/lib/gestao/link-og";
 import { BedDouble, CalendarDays, Check, MessageCircle, PawPrint, ShieldAlert, Sun, Syringe } from "lucide-react";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { corPropria, TEMAS } from "@/lib/gestao/identidade";
@@ -17,7 +19,18 @@ import "./tutor.css";
  * Código errado, trocado ou opção desligada: 404. Sem preços.
  */
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Página do tutor", robots: { index: false, follow: false }, referrer: "no-referrer" };
+/** A prévia do link no WhatsApp: o nome e a logo do pet shop (nada do pet nem do tutor); fora dos buscadores. */
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  const base: Metadata = { robots: { index: false, follow: false, nocache: true }, referrer: "no-referrer" };
+  const p = await ler(token);
+  if (!p || p === "devagar") return { ...base, title: { absolute: "Página do tutor" }, description: "O dia do seu pet com o pet shop.", openGraph: { title: "Página do tutor", description: "O dia do seu pet com o pet shop.", siteName: "Página do tutor", locale: "pt_BR", images: [] } };
+  const origem = await origemDoPedido();
+  return previaDaLoja({
+    titulo: `Página do tutor · ${p.petshop.nome}`, descricao: `O dia do seu pet em ${p.petshop.nome}: diário, fotos e o que está marcado.`, loja: p.petshop.nome, logo: p.petshop.logo,
+    url: `${origem}/gestao/tutor`, origem, imagemNeutra: "/gestao/agendar/neutra/previa?t=tutor", particular: true,
+  });
+}
 
 type Foto = { id: string; caminho: string; legenda: string | null; em: string };
 type Dia = { dia: string; tipo: string | null; itens: string[]; nota: string | null; ocorrencias: { tipo: string; texto: string; quando: string }[]; fotos: Foto[] };
@@ -37,13 +50,14 @@ type Pagina = {
 const OCORRENCIAS: Record<string, string> = { briga: "Briga", machucado: "Machucado", fugiu: "Tentou fugir", vomitou: "Vomitou", outro: "Para você saber" };
 const SAUDE: Record<string, string> = { vacina: "Vacina", vermifugo: "Vermífugo", antipulgas: "Antipulgas", outro: "Cuidado" };
 
-async function ler(token: string): Promise<Pagina | "devagar" | null> {
+// uma leitura só por abertura (a prévia do link e a página usam a mesma; o banco conta cada leitura no limite por minuto)
+const ler = cache(async (token: string): Promise<Pagina | "devagar" | null> => {
   if (!codigoValido(token)) return null;
   const r = await bancoDoTutor(token).rpc("tutor_pagina", { p_token: token });
   if (r.error?.code === "PT429") return "devagar";
   if (r.error || !r.data) return null;
   return r.data as unknown as Pagina;
-}
+});
 
 function Devagar() {
   return (

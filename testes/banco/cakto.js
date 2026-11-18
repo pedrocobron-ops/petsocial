@@ -65,7 +65,7 @@ const PRECOS = { solo: [79, 215, 399], equipe: [129, 349, 659], petshop: [179, 4
     T.recusa(`dono comum não chama ${fn}`, await comum.sb.dono.rpc(fn, args), /restrito/i);
   }
   const pub = B.must(await anon.rpc('gestao_assinatura'), 'gestao_assinatura');
-  T.ok('gestao_assinatura é público e só traz "aberta" e os links', Object.keys(pub).sort().join() === 'aberta,links', pub);
+  T.ok('gestao_assinatura é público e só traz "aberta", os links, os dias do atraso e quem vende', Object.keys(pub).sort().join() === 'aberta,atraso_dias,links,vendedor', pub);
   T.ok('cakto_aplicar não é chamável de fora', !!(await anon.rpc('cakto_aplicar', { p_petshop: comum.P, p_evento: 'purchase_approved', p_email: 'x', p_assinatura: null, p_oferta: null })).error);
   T.ok('cakto_segredo_ok não é chamável de fora', !!(await anon.rpc('cakto_segredo_ok', { p_segredo: 'x' })).error);
 
@@ -102,10 +102,21 @@ const PRECOS = { solo: [79, 215, 399], equipe: [129, 349, 659], petshop: [179, 4
   T.ok('renovada → ativa, pago até +1 mês +1 dia', r.corpo?.resultado === 'ok' && l.status === 'ativa' && Math.abs(l.pago - esperado(1)) < 120, l);
   r = await post('subscription_renewed', pedido({ email: pagou('trocado'), oferta: OFERTAS[0].oferta, preco: 79, assinatura: `sub-${suf}-1` }));
   T.ok('renovação com outro e-mail casa pela assinatura', r.corpo?.resultado === 'ok', r);
+  // cupom (rodada 9, vendas): o aviso da Cakto traz `couponCode`; o sistema guarda o código, o desconto e o valor de tabela
+  const comCupom = pedido({ email: a1.emails.dono, oferta: OFERTAS[0].oferta, preco: 71.1, assinatura: `sub-${suf}-1` });
+  r = await post('subscription_renewed', { ...comCupom, baseAmount: 79, discount: '7.90', couponCode: ' ana10 ' });
+  const guardado = JSON.parse(B.sql(`select payload from cakto_eventos where petshop_id='${a1.P}' and payload->>'pedido'='${comCupom.id}'`) || '{}');
+  T.ok('pagamento com cupom: o código (em maiúsculas), o desconto e o valor de tabela ficam guardados', r.corpo?.resultado === 'ok' && guardado.cupom === 'ANA10' && guardado.desconto === 7.9 && guardado.valor_cheio === 79 && guardado.valor === 71.1, guardado);
+  const semCupom = JSON.parse(B.sql(`select payload from cakto_eventos where petshop_id='${a1.P}' and coalesce(payload->>'cupom','')='' order by id desc limit 1`) || '{}');
+  T.ok('pagamento sem cupom não ganha a chave', !('cupom' in semCupom) && !('desconto' in semCupom), semCupom);
+  T.ok('o aviso guardado continua sem documento nem telefone do comprador', !/12345678909|5511999999999/.test(JSON.stringify(guardado)));
   await ev('subscription_late', { status: 'waiting_payment' });
   T.ok('atrasada → atrasada, e continua com acesso', loja(a1.P).status === 'atrasada' && B.sql(`select acesso_liberado('${a1.P}')`) === 't');
+  T.ok('atrasada: o dia do atraso fica anotado, e a trava é 10 dias depois', B.num(`select count(*) from assinatura_atrasos where petshop_id='${a1.P}'`) === 1
+    && Math.abs(Number(B.sql(`select extract(epoch from assinatura_trava_em('${a1.P}') - now())`)) - 10 * 86400) < 300);
   await ev('subscription_late_recovered');
   T.ok('recuperada → ativa', loja(a1.P).status === 'ativa');
+  T.ok('recuperada: a anotação do atraso some', B.num(`select count(*) from assinatura_atrasos where petshop_id='${a1.P}'`) === 0);
   await ev('subscription_canceled', { status: 'canceled' }); l = loja(a1.P);
   T.ok('cancelada → cancelada, usa até o fim do que pagou', l.status === 'cancelada' && l.pago > Date.now() / 1000 && B.sql(`select acesso_liberado('${a1.P}')`) === 't', l);
 

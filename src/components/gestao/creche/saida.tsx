@@ -9,12 +9,11 @@ import {
   partesDoDesconto, regraIrmaoDe, valorDoDescontoIrmao,
 } from "@/lib/gestao/creche";
 import { calendarioGuardado, lerCalendario } from "@/lib/gestao/feriados";
-import { brl, dataCompleta, dataCurta, deIsoDia, isoDia, nomeMes } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, deIsoDia, isoDia, nomeMes, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, Esqueleto, Folha, ok, useAvisos, useDados } from "../ui";
 import "./creche.css";
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /** Dias extras e taxas de busca, até o fim do plano, que ainda não entraram em nenhuma cobrança. */
 export type SobrasDaSaida = { plano: PlanoCompleto; extras: string[]; taxas: { dia: string; valor: number }[]; total: number; taxi?: { dia: string; valor: number }[] };

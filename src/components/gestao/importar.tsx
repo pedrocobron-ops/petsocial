@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Camera, Download, FileSpreadsheet, History, TriangleAlert, Undo2, Upload } from "lucide-react";
-import { dataCurta, hora, isoDia, semAcento } from "@/lib/gestao/util";
+import { dataCurta, hora, isoDia, semAcento, centavos } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { fraseDesfeita, frasesDoResumo, lerTabela, linhasParaOBanco, tabelaComoTexto, type ResumoDaImportacao } from "@/lib/gestao/planilha";
 import { ehXlsx, inflarNoNavegador, lerXlsx, temInflarNoNavegador } from "@/lib/gestao/xlsx";
@@ -290,7 +290,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
         if (desta.controla && !val && !lt) { repetidoSemLote++; continue; }
         await gravarMovimentos(sb, petshop.id, [{
           petshop_id: petshop.id, produto_id: desta.id, tipo: "entrada", quantidade: q, motivo: "Saldo trazido da planilha", criado_por: u.user?.id ?? null,
-          custo_unitario: c != null ? Math.round(c * 100) / 100 : null, ...(desta.controla ? { lote: lt, validade: val || null } : {}), chave: parteDaChave(chave, "saldo", i),
+          custo_unitario: c != null ? centavos(c) : null, ...(desta.controla ? { lote: lt, validade: val || null } : {}), chave: parteDaChave(chave, "saldo", i),
         }]);
         outroLote++;
         continue;
@@ -308,7 +308,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
       const fornecedorId = await fornecedorDe(l.fornecedor);
       const r = await sb.from("produtos").insert({
         petshop_id: petshop.id, nome, categoria: l.categoria?.trim() || null, unidade: unidadeDaPlanilha(l.unidade),
-        preco_venda: preco != null ? Math.round(preco * 100) / 100 : null, custo: custo != null ? Math.round(custo * 100) / 100 : null,
+        preco_venda: preco != null ? centavos(preco) : null, custo: custo != null ? centavos(custo) : null,
         estoque_minimo: minimo ?? 0, ...(codigo ? { codigo_barras: codigo } : {}), ...(controla ? { controla_validade: true } : {}),
         ...(fornecedorId ? { fornecedor_id: fornecedorId } : {}),
       }).select("id").single();
@@ -322,7 +322,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
         // com validade ou lote, entra como o lote do que já está na prateleira (no Vencendo e no "vence antes sai antes")
         await gravarMovimentos(sb, petshop.id, [controla ? {
           petshop_id: petshop.id, produto_id: r.data.id, tipo: "entrada", quantidade: qtd, motivo: "Saldo trazido da planilha", criado_por: u.user?.id ?? null,
-          custo_unitario: custo != null ? Math.round(custo * 100) / 100 : null, lote, validade: validade || null, chave: parteDaChave(chave, "saldo", i),
+          custo_unitario: custo != null ? centavos(custo) : null, lote, validade: validade || null, chave: parteDaChave(chave, "saldo", i),
         } : {
           petshop_id: petshop.id, produto_id: r.data.id, tipo: "ajuste", quantidade: qtd, motivo: "Saldo trazido da planilha", criado_por: u.user?.id ?? null,
           chave: parteDaChave(chave, "saldo", i),

@@ -8,19 +8,17 @@ import { Tile } from "@/components/gestao/painel";
 import { mensagemDeErro, useAvisos } from "@/components/gestao/ui";
 import { ESPECIES, nomePorte } from "@/components/gestao/clientes/comum";
 import {
-  baixarArquivo, categoriaAtual, textoDaAlteracao, dinheiroCsv, numeroCsv, paginar, resumoDoCaixa, rotuloForma, textoCsv, type Cel,
+  baixarArquivo, categoriaAtual, textoDaAlteracao, dinheiroCsv, numeroCsv, paginar, resumoDoCaixa, textoCsv, type Cel,
 } from "@/components/gestao/financeiro/comum";
-import { itensDoLancamento, nomeDoMovimento, partesPorForma, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import {
   COLS_MOVIMENTO, COLS_PACOTE, COLS_PACOTE_CLIENTE, COLS_PRODUTO, comCustos, custosDeTodosOsMovimentos, comPrecosDePacote, lerEquipe, COLS_ESTADIA, comValoresDeEstadia,
   comPrecosDeAgendamento, comPrecosDeProduto, COLS_SERVICO, comPrecosDeServico,
 } from "@/lib/gestao/reservado";
 import { FORMAS, STATUS_AGENDAMENTO, type AlteracaoLancamento, type Caixa, type Cliente, type Estadia, type Lancamento, type Pet, type Servico, type StatusAgendamento } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, fmtTelefone, hora, isoDia, semAcento } from "@/lib/gestao/util";
+import { dataCompleta, fmtTelefone, hora, isoDia, semAcento, centavos } from "@/lib/gestao/util";
 import { montarZip, type ArquivoZip } from "@/lib/gestao/zip";
 import { acomodacoesDe } from "@/lib/gestao/hotel-opcoes";
-import { cobradoPorItem } from "@/lib/gestao/loja-vendas";
-import { CATEGORIAS_DEVOLUCAO } from "@/lib/gestao/faturamento";
+import { lerParaContador, lerSaldos, planilhaDeLancamentos, planilhaDeRepasses, planilhaDeSaldos, planilhaDeVendas, planilhaParaOContador, type ParaContador } from "@/lib/gestao/contador";
 import "./copia-seguranca.css";
 
 /* ---------- o que vem do banco ---------- */
@@ -57,13 +55,25 @@ type PedidoLido = { tutor_nome: string; telefone: string; pet_nome: string; tipo
 type DiaEspecialLido = { dia: string; nome: string; fechado: boolean; feriado: boolean };
 type ComissaoPagaLida = { profissional_id: string; de: string; ate: string; valor: number; pago_em: string };
 type BoletimLido = { criado_em: string; enviado_em: string | null; expira_em: string; fotos: string[] | null; agendamento_id: string | null; estadia_id: string | null; texto: string | null; pets: DoPet };
+type ContatoLido = { tipo: string; nome: string; relacao: string | null; telefone: string | null; obs: string | null; cliente_id: string | null; pets: DoPet };
+type OrcamentoLido = { numero: number; nome: string | null; telefone: string | null; itens: unknown; total: number | null; validade: string | null; status: string; obs: string | null; criado_em: string; cliente_id: string | null };
+type EntradaLida = {
+  criado_em: string; temperamento: string[] | null; cuidados: string | null; lesoes: string[] | null; lesoes_obs: string | null; idoso_doente: boolean | null; pertences: string[] | null;
+  pertences_outros: string | null; obs: string | null; fotos: string[] | null; aceite: string | null; aceite_nome: string | null; aceito_em: string | null; aceite_ip: string | null;
+  aceite_navegador: string | null; devolvido_em: string | null; pets: DoPet;
+};
+type FotoDoDiarioLida = { dia: string; caminho: string; pets: DoPet };
 type AutorizacaoLida = { autorizado_em: string; escopo: string; marcar: string | null; texto: string; retirado_em: string | null; retirado_motivo: string | null; pets: DoPet };
 
 /* ---------- células ---------- */
 
+const agoraC = () => new Date();
+
 /** "14/11/2026" para dia; "14/11/2026 09:30" para dia e hora. */
 const quando = (s: string | null | undefined) => (!s ? "" : s.length === 10 ? dataCompleta(s) : `${dataCompleta(s)} ${hora(s)}`);
 const simNao = (v: boolean | null | undefined) => (v ? "Sim" : "Não");
+/** Aniversário do tutor: "17/05" quando o ano não foi informado (o banco guarda 1904), senão a data inteira. */
+const aniversario = (iso: string | null | undefined) => (!iso ? "" : iso.startsWith("1904-") ? iso.slice(5).split("-").reverse().join("/") : dataCompleta(iso));
 const dinheiro = (n: number | null | undefined): Cel => (n == null ? "" : dinheiroCsv(Number(n)));
 const numero = (n: number | null | undefined): Cel => (n == null ? "" : numeroCsv(Number(n)));
 const tutorDe = (p: DoPet) => p?.clientes?.nome ?? "";
@@ -91,12 +101,16 @@ const rotulo = (mapa: Record<string, string>, v: string | null | undefined) => (
 
 /** Os assuntos da cópia, na ordem em que são juntados. O texto também vai no LEIA-ME. */
 const ASSUNTOS = [
-  { arquivo: "clientes.csv", nome: "clientes", explica: "Os tutores: nome, telefone, e-mail, endereço e observações." },
+  { arquivo: "clientes.csv", nome: "clientes", explica: "Os tutores: nome, telefone, e-mail, endereço, aniversário, observações e se não quer receber mensagens." },
+  { arquivo: "contatos.csv", nome: "quem pode buscar e veterinários", explica: "As outras pessoas anotadas na ficha de cada tutor ou pet: quem pode buscar e o veterinário, com telefone e observação." },
   { arquivo: "pets.csv", nome: "pets", explica: "Os pets, cada um com o nome do tutor, espécie, raça, porte, alertas e observações." },
   { arquivo: "cuidados-de-saude.csv", nome: "cuidados de saúde", explica: "Vacinas, vermífugos, antipulgas e outros cuidados anotados na ficha de cada pet." },
   { arquivo: "agendamentos.csv", nome: "agendamentos", explica: "Todos os horários da agenda, com pet, tutor, serviço (e os outros serviços do mesmo horário), profissional, situação e preço." },
-  { arquivo: "vendas.csv", nome: "vendas", explica: "Cada item vendido ou cobrado (produto, serviço, pacote): dia da venda, cliente, quantidade, preço da lista e, nas últimas colunas, o desconto do item e o que foi cobrado de verdade (a soma de Total cobrado é o que entrou), o vencimento de quem ficou de pagar e o que voltou em troca ou devolução. A forma mostra cada parte do pagamento dividido. Linha negativa (promoção, sinal, crédito) já está repartida nas outras: o cobrado dela é zero. Vem dos lançamentos que têm itens." },
-  { arquivo: "lancamentos.csv", nome: "lançamentos", explica: "O financeiro: tudo o que entrou e saiu, as contas a pagar e a receber. Saídas aparecem com valor negativo. Sangria e suprimento aparecem com o tipo Gaveta: mexem só no dinheiro da gaveta e não entram no resultado (veja a coluna Entra no resultado). Conta recebida em partes: cada parte é uma linha, e a linha da conta traz o valor cheio na coluna Valor cheio." },
+  { arquivo: "vendas.csv", nome: "vendas", explica: "Cada item vendido ou cobrado (produto, serviço e extra de cada conta; a venda de pacote e as contas de creche e hotel entram com uma linha cada): dia da venda, cliente, quantidade, preço da lista, o desconto do item, o que foi cobrado de verdade, o vencimento de quem ficou de pagar e o que voltou em troca ou devolução. Pago: Sim, Não ou Em parte (conta recebida em partes). Já recebido + Em aberto = Total cobrado de cada linha; a soma de Já recebido é o que já entrou dessas contas e a soma de Em aberto é o que os clientes ainda devem delas. A forma mostra cada parte do pagamento dividido. Linha negativa (promoção, sinal, crédito) já está repartida nas outras: o cobrado dela é zero. Check-out pago só com o sinal e com crédito não tem lançamento novo e por isso não tem linha." },
+  { arquivo: "lancamentos.csv", nome: "lançamentos", explica: "O financeiro: tudo o que entrou e saiu, as contas a pagar e a receber. Saídas aparecem com valor negativo. Data: o dia do pagamento; conta em aberto, o dia em que foi anotada (o vencimento tem coluna própria). Sangria e suprimento aparecem com o tipo Gaveta: mexem só no dinheiro da gaveta e não entram no resultado. Conta recebida em partes: cada parte é uma linha, e a linha da conta traz o valor cheio na coluna Valor cheio. Para o contador: Parcelas, Taxa da maquininha, Valor líquido (valor − taxa), Cai em (quando a maquininha paga), Data do atendimento ou da venda (competência), Lançado em (quando foi lançado de verdade) e Retroativo (Sim quando a data é anterior ao dia em que foi lançado). COMO SOMAR: filtre um mês pela coluna Data e some Conta no faturamento: dá o Faturamento da tela Financeiro; some Conta no resultado: dá o Resultado. Por isso o crédito deixado para o tutor (negativo) e o crédito usado no check-out (positivo) têm linhas próprias, com o tipo Crédito do tutor, no fim da planilha." },
+  { arquivo: "para-o-contador.csv", nome: "planilha para o contador", explica: "Uma linha por recebimento (entrada paga): data do recebimento, data do atendimento ou da venda, quando foi lançado, se é retroativo, cliente, categoria, forma, parcelas, bruto, taxa da maquininha, líquido, quando cai, desconto, devolvido, crédito do tutor usado, produto trocado e custo dos produtos. Bruto − crédito do tutor usado − produto trocado = Recebido da tela Financeiro. A mesma planilha, só de um mês e com o resumo embaixo, sai em Financeiro, Para o contador." },
+  { arquivo: "repasses-da-maquininha.csv", nome: "repasses da maquininha", explica: "Cada parcela que a maquininha paga, de cada pagamento com cartão ou Pix que tem taxa guardada: valor da parcela, taxa, valor que cai e o dia. Situação A receber: cai depois do dia da cópia (a soma de Valor que cai dessas linhas é o A receber da maquininha da tela). O dia pula sábado e domingo; feriado só entra com a opção ligada em Meu pet shop. Já caiu é pela data: o Maestro não fala com a maquininha." },
+  { arquivo: "saldos-em-aberto.csv", nome: "saldos em aberto", explica: "Na data da cópia: fiado em aberto por cliente, crédito de tutores ainda não usado, pacotes vendidos e ainda não usados (o serviço devido: usos que faltam × preço pago por uso) e sinais já recebidos de reservas que ainda vão acontecer." },
   { arquivo: "caixas.csv", nome: "caixas", explica: "Cada caixa aberto e fechado, com o troco, o que entrou e saiu, o dinheiro esperado e o contado." },
   { arquivo: "produtos.csv", nome: "produtos", explica: "Os produtos do estoque, com preço, custo, último custo, código de barras, último fornecedor, quantidade atual e mínima, e os lotes com saldo (lote, validade e quantidade)." },
   { arquivo: "movimentos-de-estoque.csv", nome: "movimentos de estoque", explica: "Cada entrada, saída e correção de saldo dos produtos, com o lote e a validade. Nas saídas, o custo é o do produto naquele momento." },
@@ -117,6 +131,9 @@ const ASSUNTOS = [
   { arquivo: "servicos.csv", nome: "serviços", explica: "Os serviços e os preços por porte." },
   { arquivo: "boletins.csv", nome: "boletins", explica: "Os boletins do pet mandados aos tutores: pet, tutor, quando foi feito e mandado, quantas fotos e até quando a página abre. As fotos não entram." },
   { arquivo: "autorizacoes-de-fotos.csv", nome: "autorizações de fotos", explica: "As autorizações dos tutores para postar as fotos dos pets nas redes da loja: o texto exato aceito, quando, quais fotos, o perfil para marcar e quando foi tirada." },
+  { arquivo: "orcamentos.csv", nome: "orçamentos", explica: "Os orçamentos feitos: para quem, os itens, o total, a validade e a situação." },
+  { arquivo: "checklists-de-entrada.csv", nome: "checklists de entrada", explica: "O que foi anotado na chegada de cada pet (temperamento, cuidados, marcas, pertences) e quem aceitou, com a hora, o IP e o navegador. As fotos e a assinatura não entram." },
+  { arquivo: "fotos.csv", nome: "lista das fotos", explica: "A lista das fotos guardadas (perfil, antes e depois, diário): de qual pet, de quando e o nome do arquivo. As imagens em si não entram na cópia." },
 ] as const;
 type NomeArquivo = (typeof ASSUNTOS)[number]["arquivo"];
 
@@ -142,6 +159,7 @@ function leiaMe(petshop: string, agora: Date, linhas: Map<NomeArquivo, number>) 
     "- As fotos dos pets, do boletim e do diário e o logotipo não entram na cópia.",
     "- Valores em reais, com vírgula nos centavos e sem o R$, para a planilha conseguir somar.",
     "- Datas no formato dia/mês/ano.",
+    "- Os nomes dos números do dinheiro são os mesmos das telas: Recebido − Devolvido − Crédito deixado + Crédito usado = Faturamento; Faturamento − Despesas = Resultado; Resultado − Taxas da maquininha = Resultado depois das taxas.",
     "- Aqui tem dados dos seus clientes. Guarde em um lugar seguro.",
     "",
   ];
@@ -173,8 +191,18 @@ export default function CopiaSeguranca() {
       const clientes = await todas<Cliente>((a, b) => sb.from("clientes").select("*").eq("petshop_id", id).order("nome").order("id").range(a, b));
       const nomeCliente = new Map(clientes.map((c) => [c.id, c.nome]));
       tabelas.set("clientes.csv", [
-        ["Nome", "Telefone", "E-mail", "Endereço", "Observações", "Cliente desde"],
-        ...clientes.map((c): Cel[] => [c.nome, fmtTelefone(c.telefone), c.email ?? "", c.endereco ?? "", c.obs ?? "", quando(isoDia(new Date(c.criado_em)))]),
+        ["Nome", "Telefone", "E-mail", "Endereço", "Observações", "Cliente desde", "Aniversário", "Não quer receber mensagens"],
+        ...clientes.map((c): Cel[] => [c.nome, fmtTelefone(c.telefone), c.email ?? "", c.endereco ?? "", c.obs ?? "", quando(isoDia(new Date(c.criado_em))),
+          aniversario((c as { nascimento?: string | null }).nascimento), simNao((c as { nao_quer_mensagens?: boolean | null }).nao_quer_mensagens)]),
+      ]);
+
+      etapa("quem pode buscar e veterinários");
+      const contatos = await seExistir(() => todas<ContatoLido>((a, b) => sb.from("pets_contatos").select("tipo, nome, relacao, telefone, obs, cliente_id, pets(nome, clientes(nome))")
+        .eq("petshop_id", id).order("criado_em").order("id").range(a, b) as never));
+      tabelas.set("contatos.csv", [
+        ["Tutor", "Pet", "É", "Nome", "Relação", "Telefone", "Observação"],
+        ...contatos.map((x): Cel[] => [(x.cliente_id && nomeCliente.get(x.cliente_id)) || tutorDe(x.pets), x.pets?.nome ?? "", x.tipo === "veterinario" ? "Veterinário" : "Pode buscar", x.nome,
+          x.relacao ?? "", fmtTelefone(x.telefone), x.obs ?? ""]),
       ]);
 
       etapa("pets");
@@ -217,7 +245,7 @@ export default function CopiaSeguranca() {
           g.origem === "link" ? rotulo(ORIGEM, g.origem) : autor(g.criado_por, g.origem),
           // horário com mais de um serviço: os outros, na ordem, e a soma dos preços deles
           [...(g.agendamento_servicos ?? [])].sort((x, y) => x.ordem - y.ordem).map((o) => o.servicos?.nome ?? "Serviço").join(" + "),
-          g.agendamento_servicos?.length ? dinheiro(Math.round(g.agendamento_servicos.reduce((t, o) => t + Number(o.preco ?? 0), 0) * 100) / 100) : "",
+          g.agendamento_servicos?.length ? dinheiro(centavos(g.agendamento_servicos.reduce((t, o) => t + Number(o.preco ?? 0), 0))) : "",
         ]),
       ]);
 
@@ -226,25 +254,27 @@ export default function CopiaSeguranca() {
       etapa("caixas");
       const caixas = await todas<Caixa>((a, b) => sb.from("caixas").select("*").eq("petshop_id", id).order("aberto_em").order("id").range(a, b));
       const caixaPorId = new Map(caixas.map((c) => [c.id, c]));
-      const qtd = (x: number) => x.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
-      // o que entra no resultado do mês (Financeiro): sangria e suprimento só mexem na gaveta; conta em aberto ainda não entrou
-      const noResultado = (l: Lancamento) => (l.movimento ? "Não (só mexe na gaveta)" : !l.pago ? "Não (ainda não foi pago)"
-        : l.tipo === "saida" && CATEGORIAS_DEVOLUCAO.includes(l.categoria) ? "Sim (devolução: tira do faturamento)" : "Sim");
-      tabelas.set("lancamentos.csv", [
-        ["Data", "Hora do lançamento", "Tipo", "Categoria", "Descrição", "Cliente", "Itens", "Forma", "Partes do pagamento", "Valor", "Pago", "Vencimento", "Movimento de gaveta", "Caixa aberto em", "Quem lançou", "Valor cheio da conta (recebida em partes)", "Alterado depois de recebido em", "Entra no resultado", "Crédito do tutor usado"],
-        ...lancamentos.map((l): Cel[] => [
-          dataCompleta(l.data), hora(l.criado_em), l.movimento ? "Gaveta" : l.tipo === "entrada" ? "Entrada" : "Saída", categoriaAtual(l.categoria), l.descricao ?? "",
-          l.cliente_id ? nomeCliente.get(l.cliente_id) ?? "" : "",
-          itensDoLancamento(l).map((i) => `${qtd(i.qtd)} x ${i.nome} (${brl(i.valor)} cada)`).join(" | "),
-          l.forma ? textoDoPagamento({ ...l, pagamentos: null }) : "",
-          partesPorForma(l).length > 1 ? textoDoPagamento(l) : "",
-          dinheiroCsv(l.tipo === "entrada" ? Number(l.valor) : -Number(l.valor)),
-          simNao(l.pago), quando(l.vencimento), nomeDoMovimento(l.movimento),
-          l.caixa_id ? quando(caixaPorId.get(l.caixa_id)?.aberto_em) : "", autor(l.criado_por, l.origem),
-          l.valor_original != null ? dinheiroCsv(Number(l.valor_original)) : "", quando(l.alterado_em),
-          noResultado(l), l.credito_usado ? dinheiroCsv(Number(l.credito_usado)) : "",
-        ]),
-      ]);
+      // taxa, parcelas, repasses, data do atendimento, "lançado em", retroativo, devolvido e custo de cada lançamento (o banco monta);
+      // banco antes da atualização: as colunas novas saem em branco
+      const hojeC = isoDia(agoraC());
+      const primeiro = lancamentos.reduce((m, l) => { const d = l.data < isoDia(new Date(l.criado_em)) ? l.data : isoDia(new Date(l.criado_em)); return d < m ? d : m; }, hojeC);
+      const ultimo = lancamentos.reduce((m, l) => (l.data > m ? l.data : m), hojeC);
+      const extrasC: ParaContador = lancamentos.length
+        ? await lerParaContador(sb, id, primeiro, ultimo).catch(() => ({ linhas: new Map(), creditos: [], hoje: hojeC }))
+        : { linhas: new Map(), creditos: [], hoje: hojeC };
+      const nomesC = {
+        cliente: (c: string) => nomeCliente.get(c) ?? "",
+        quem: (l: { criado_por?: string | null; origem?: string | null }) => autor(l.criado_por ?? null, l.origem ?? "tela"),
+        categoria: (c: string, d?: string | null) => categoriaAtual(c, petshop, d),
+        caixa: (c: string) => quando(caixaPorId.get(c)?.aberto_em),
+      };
+      tabelas.set("lancamentos.csv", planilhaDeLancamentos(lancamentos, extrasC, nomesC));
+      etapa("planilha para o contador");
+      tabelas.set("para-o-contador.csv", planilhaParaOContador(lancamentos, extrasC, nomesC));
+      etapa("repasses da maquininha");
+      tabelas.set("repasses-da-maquininha.csv", planilhaDeRepasses(lancamentos, extrasC, extrasC.hoje || hojeC, nomesC));
+      etapa("saldos em aberto");
+      tabelas.set("saldos-em-aberto.csv", await lerSaldos(sb, id).then(planilhaDeSaldos).catch(() => [["Saldos em aberto"]]));
       const quemVendeu = new Map(equipe.map((x) => [x.id, x.nome]));
       // troca e devolução de cada venda, por produto: o que voltou e como (dinheiro, crédito, troca)
       type DevolucaoLida = { venda_id: string | null; modo: string; itens: unknown; criado_em: string; saida_id: string | null; credito_id: string | null };
@@ -255,27 +285,16 @@ export default function CopiaSeguranca() {
         if (!d.venda_id || !(d.saida_id || d.credito_id || d.modo === "troca")) continue;
         for (const i of (Array.isArray(d.itens) ? d.itens : []) as { produto_id?: string; qtd?: number; valor?: number }[]) {
           const k = `${d.venda_id}|${i.produto_id ?? ""}`, x = voltou.get(k) ?? { qtd: 0, valor: 0, textos: [] };
-          x.qtd += Number(i.qtd ?? 0); x.valor = Math.round((x.valor + Number(i.valor ?? 0)) * 100) / 100;
+          x.qtd += Number(i.qtd ?? 0); x.valor = centavos((x.valor + Number(i.valor ?? 0)));
           x.textos.push(`${Number(i.qtd ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} em ${dataCompleta(isoDia(new Date(d.criado_em)))} (${MODO[d.modo] ?? d.modo})`);
           voltou.set(k, x);
         }
       }
-      tabelas.set("vendas.csv", [
-        ["Data", "Item", "Quantidade", "Valor unitário", "Total do item", "Cliente", "Forma", "Pago", "Quem vendeu", "Descrição do lançamento",
-          "Desconto no item", "Total cobrado", "Vencimento", "Devolvido (quantidade)", "Devolvido (valor)", "Devolução"],
-        // conta recebida em partes: a parte não repete os itens (a conta, com o valor cheio, já traz)
-        ...lancamentos.filter((l) => l.tipo === "entrada" && !l.movimento && !l.conta_id).flatMap((l) => cobradoPorItem(l).map((i): Cel[] => {
-          const d = i.produto_id ? voltou.get(`${l.id}|${i.produto_id}`) : undefined;
-          return [
-            // o dia da venda: conta em aberto guarda o vencimento em "data"; vale o dia em que foi anotada
-            dataCompleta(l.pago ? l.data : l.devido_desde ?? isoDia(new Date(l.criado_em))), i.nome, numero(i.qtd), dinheiro(i.valor), dinheiro(i.bruto),
-            l.cliente_id ? nomeCliente.get(l.cliente_id) ?? "" : "", l.forma ? textoDoPagamento(l) : "", simNao(l.pago),
-            (l.vendido_por && quemVendeu.get(l.vendido_por)) || autor(l.criado_por, l.origem), l.descricao ?? "",
-            dinheiro(i.desconto), dinheiro(i.cobrado), l.pago ? "" : quando(l.vencimento),
-            d ? numero(d.qtd) : "", d ? dinheiro(d.valor) : "", d ? d.textos.join(" | ") : "",
-          ];
-        })),
-      ]);
+      // cada item vendido, com "Já recebido" e "Em aberto"; pacote vendido e contas de creche e hotel entram com uma linha
+      tabelas.set("vendas.csv", planilhaDeVendas(lancamentos, {
+        cliente: (c) => nomeCliente.get(c) ?? "",
+        quem: (l) => (l.vendido_por && quemVendeu.get(l.vendido_por)) || autor(l.criado_por ?? null, l.origem ?? "tela"),
+      }, { voltou }));
       const doCaixa = new Map<string, Lancamento[]>();
       for (const l of lancamentos) if (l.caixa_id && l.pago) doCaixa.set(l.caixa_id, [...(doCaixa.get(l.caixa_id) ?? []), l]);
       tabelas.set("caixas.csv", [
@@ -288,7 +307,7 @@ export default function CopiaSeguranca() {
           return [
             quando(c.aberto_em), c.fechado_em ? quando(c.fechado_em) : "Ainda aberto", dinheiro(c.valor_inicial), dinheiro(r.entrou), ...r.porForma.map((f) => dinheiro(f.entrou)),
             dinheiro(r.saiu), dinheiro(r.porForma.find((f) => f.id === "dinheiro")?.saiu ?? 0), dinheiro(r.suprimentos), dinheiro(r.sangrias), dinheiro(esperado),
-            dinheiro(c.valor_contado), c.valor_contado == null ? "" : dinheiro(Math.round((Number(c.valor_contado) - esperado) * 100) / 100), c.obs ?? "",
+            dinheiro(c.valor_contado), c.valor_contado == null ? "" : dinheiro(centavos((Number(c.valor_contado) - esperado))), c.obs ?? "",
           ];
         }),
       ]);
@@ -338,7 +357,7 @@ export default function CopiaSeguranca() {
       tabelas.set("creditos-dos-tutores.csv", [
         ["Quando", "Tutor", "Movimento", "Valor", "Saldo do tutor depois", "Motivo"],
         ...creditos.map((c): Cel[] => {
-          const s = Math.round(((saldo.get(c.cliente_id) ?? 0) + Number(c.valor)) * 100) / 100;
+          const s = centavos(((saldo.get(c.cliente_id) ?? 0) + Number(c.valor)));
           saldo.set(c.cliente_id, s);
           return [quando(c.criado_em), nomeCliente.get(c.cliente_id) ?? "", Number(c.valor) >= 0 ? "Ficou de crédito" : "Usou o crédito", dinheiroCsv(Number(c.valor)), dinheiroCsv(s), c.motivo ?? ""];
         }),
@@ -451,7 +470,7 @@ export default function CopiaSeguranca() {
           return [
             dataCompleta(c.mes).slice(3), c.pets?.nome ?? "", tutorDe(c.pets), dinheiro(c.valor_mensal), numero(Array.isArray(c.extras) ? c.extras.length : 0), dinheiro(c.valor_extras), dinheiro(c.desconto), dinheiro(c.total),
             quando(c.vencimento), c.status === "cancelada" ? "Cancelada" : paga ? "Paga" : "Em aberto", c.status === "cancelada" || paga ? "" : dinheiro(conta ? Number(conta.valor) : Number(c.total)), c.obs ?? "",
-            Array.isArray(c.taxas) && c.taxas.length ? dinheiro(Math.round((c.taxas as { valor?: number }[]).reduce((t, x) => t + Number(x?.valor ?? 0), 0) * 100) / 100) : "",
+            Array.isArray(c.taxas) && c.taxas.length ? dinheiro(centavos((c.taxas as { valor?: number }[]).reduce((t, x) => t + Number(x?.valor ?? 0), 0))) : "",
           ];
         }),
       ]);
@@ -531,6 +550,45 @@ export default function CopiaSeguranca() {
         ["Pet", "Tutor", "Autorizado em", "Quais fotos", "Perfil para marcar", "Texto aceito", "Tirada em", "Por quê saiu"],
         ...autorizacoes.map((x): Cel[] => [x.pets?.nome ?? "", tutorDe(x.pets), quando(x.autorizado_em), x.escopo === "boletim" ? "Só as daquele boletim" : "Daquele boletim e das próximas visitas",
           x.marcar ?? "", x.texto, quando(x.retirado_em), x.retirado_motivo === "tutor" ? "O tutor tirou (Não quero mais)" : x.retirado_motivo === "trocada" ? "Trocada por uma nova" : ""]),
+      ]);
+
+      etapa("orçamentos");
+      const orcamentos = await seExistir(() => todas<OrcamentoLido>((a, b) => sb.from("orcamentos").select("numero, nome, telefone, itens, total, validade, status, obs, criado_em, cliente_id")
+        .eq("petshop_id", id).order("criado_em").order("id").range(a, b) as never));
+      const STATUS_ORCAMENTO: Record<string, string> = { aberto: "Aberto", aceito: "Aceito pelo cliente", convertido: "Virou venda" };
+      tabelas.set("orcamentos.csv", [
+        ["Número", "Feito em", "Para", "Telefone", "Itens", "Total", "Vale até", "Situação", "Observação"],
+        ...orcamentos.map((x): Cel[] => [numero(x.numero), quando(x.criado_em), (x.cliente_id && nomeCliente.get(x.cliente_id)) || x.nome || "", fmtTelefone(x.telefone),
+          (Array.isArray(x.itens) ? x.itens as { nome?: string; qtd?: number }[] : []).map((i) => `${i.qtd && i.qtd !== 1 ? `${i.qtd}x ` : ""}${i.nome ?? ""}`).join("; "),
+          dinheiro(x.total), quando(x.validade), rotulo(STATUS_ORCAMENTO, x.status), x.obs ?? ""]),
+      ]);
+
+      etapa("checklists de entrada");
+      const entradas = await seExistir(() => todas<EntradaLida>((a, b) => sb.from("entradas")
+        .select("criado_em, temperamento, cuidados, lesoes, lesoes_obs, idoso_doente, pertences, pertences_outros, obs, fotos, aceite, aceite_nome, aceito_em, aceite_ip, aceite_navegador, devolvido_em, pets(nome, clientes(nome))")
+        .eq("petshop_id", id).order("criado_em").order("id").range(a, b) as never));
+      tabelas.set("checklists-de-entrada.csv", [
+        ["Feito em", "Pet", "Tutor", "Temperamento", "Cuidados", "Marcas e lesões", "Sobre as lesões", "Idoso ou doente", "Pertences", "Outros pertences", "Observações", "Fotos",
+          "Aceito por", "Aceito em", "Como aceitou", "IP", "Navegador", "Devolvido em"],
+        ...entradas.map((x): Cel[] => [quando(x.criado_em), x.pets?.nome ?? "", tutorDe(x.pets), (x.temperamento ?? []).join(", "), x.cuidados ?? "", (x.lesoes ?? []).join(", "), x.lesoes_obs ?? "",
+          simNao(x.idoso_doente), (x.pertences ?? []).join(", "), x.pertences_outros ?? "", x.obs ?? "", numero(x.fotos?.length ?? 0), x.aceite_nome ?? "", quando(x.aceito_em),
+          x.aceite === "link" ? "Pelo link" : x.aceite === "aparelho" ? "No aparelho do pet shop" : "", x.aceite_ip ?? "", x.aceite_navegador ?? "", quando(x.devolvido_em)]),
+      ]);
+
+      etapa("a lista das fotos");
+      const fotosDoDiario = await seExistir(() => todas<FotoDoDiarioLida>((a, b) => sb.from("diario_fotos").select("dia, caminho, pets(nome, clientes(nome))")
+        .eq("petshop_id", id).order("dia").order("id").range(a, b) as never));
+      const fotosDosHorarios = await seExistir(() => todas<{ inicio: string; foto_antes: string | null; foto_depois: string | null; pets: DoPet }>((a, b) => sb.from("agendamentos")
+        .select("inicio, foto_antes, foto_depois, pets(nome, clientes(nome))").eq("petshop_id", id).or("foto_antes.not.is.null,foto_depois.not.is.null").order("inicio").order("id").range(a, b) as never));
+      const arquivoDe = (caminho: string) => caminho.split("/").pop() ?? caminho;
+      tabelas.set("fotos.csv", [
+        ["Pet", "Tutor", "O que é", "Data", "Arquivo"],
+        ...pets.filter((x) => x.foto).map((x): Cel[] => [x.nome, x.clientes?.nome ?? "", "Foto do perfil", quando(isoDia(new Date(x.criado_em))), arquivoDe(x.foto!)]),
+        ...fotosDosHorarios.flatMap((x): Cel[][] => [
+          ...(x.foto_antes ? [[x.pets?.nome ?? "", tutorDe(x.pets), "Antes do atendimento", quando(isoDia(new Date(x.inicio))), arquivoDe(x.foto_antes)] as Cel[]] : []),
+          ...(x.foto_depois ? [[x.pets?.nome ?? "", tutorDe(x.pets), "Depois do atendimento", quando(isoDia(new Date(x.inicio))), arquivoDe(x.foto_depois)] as Cel[]] : []),
+        ]),
+        ...fotosDoDiario.map((x): Cel[] => [x.pets?.nome ?? "", tutorDe(x.pets), "Diário da creche ou do hotel", quando(x.dia), arquivoDe(x.caminho)]),
       ]);
 
       fazendo = "o arquivo";

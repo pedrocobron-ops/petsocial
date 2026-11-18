@@ -1,5 +1,6 @@
 "use client";
 
+import { enderecoEmLinha } from "@/lib/gestao/endereco";
 import AceiteDoLink from "@/components/gestao/agenda/aceite-do-link";
 import { COLS_PACOTE_CLIENTE } from "@/lib/gestao/reservado";
 import { foraDoLimite } from "@/lib/gestao/fiado";
@@ -17,7 +18,7 @@ import { useOperacao } from "@/lib/gestao/uma-vez";
 import { conferirDiaDoHorario } from "@/lib/gestao/dia-do-horario";
 import { fazerTudoOuNada } from "@/lib/gestao/tudo-ou-nada";
 import { nomeDosServicos, servicosAMais, servicosPorExtenso, valorDoHorario } from "@/lib/gestao/servicos-do-horario";
-import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, mesmoDia, soDigitos, somaDias, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPet, Folha, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { FolhaBaixa, FolhaLancamento } from "../financeiro/comum";
@@ -140,7 +141,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   }
   // mais de um serviço no mesmo horário: o pacote cobre só o principal; os outros entram na conta
   const outros = servicosAMais(a);
-  const valorOutros = Math.round(outros.reduce((t, o) => t + Number(o.preco ?? 0), 0) * 100) / 100;
+  const valorOutros = centavos(outros.reduce((t, o) => t + Number(o.preco ?? 0), 0));
   const total = valorDoHorario(a);
   const pago = (extra?.pago.length ?? 0) > 0 || (Boolean(a.pacote_cliente_id) && !outros.length);
   // pacote que ainda pode cobrir o serviço principal (se este horário já usou um, não oferece de novo)
@@ -166,8 +167,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
     return t + (servicos.length ? servicos.reduce((s, i) => s + i.qtd * i.valor, 0) : Number(l.valor_original ?? l.valor));
   }, 0);
   // o que já foi cobrado à parte por "Cobrar a diferença" conta como pago
-  const diferenca = lancado > 0 && aCobrar != null ? Math.max(0, Math.round((aCobrar - daConta - (extra?.diferencaCobrada ?? 0)) * 100) / 100) : 0;
-  const deveAntes = Math.round((extra?.antigas ?? []).reduce((t, l) => t + Number(l.valor), 0) * 100) / 100;
+  const diferenca = lancado > 0 && aCobrar != null ? Math.max(0, centavos((aCobrar - daConta - (extra?.diferencaCobrada ?? 0)))) : 0;
+  const deveAntes = centavos((extra?.antigas ?? []).reduce((t, l) => t + Number(l.valor), 0));
   const formasDoRecebido = [...new Set(recebidos.map((l) => textoDoPagamento(l)))].join(" e ");
   // como chamar o que está lançado neste horário, nas perguntas de apagar
   const oLancado = recebido > 0 && aReceber > 0 ? "o recebimento e a conta a receber" : aReceber > 0 ? "a conta a receber" : "o recebimento";
@@ -389,7 +390,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   // marcado há pouco e ainda sem lembrete: a mensagem certa é a confirmação, não a remarcação
   const recemMarcado = !foiRemarcado && remarcadoEm !== undefined && !a.lembrete_em && Date.now() - new Date(a.criado_em).getTime() < 864e5;
   const zapConfirmacao = recemMarcado ? linkWhatsApp(tutor?.telefone, textoConfirmacao({
-    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", sexo: pet?.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", sexo: pet?.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome, onde: enderecoEmLinha(petshop),
   })) : null;
 
   // remarcou ou cancelou: a mensagem para o tutor já vem pronta (quem manda é a pessoa, pelo WhatsApp)
@@ -552,7 +553,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
           ))}
           {vejoFinanceiro && recebido > 0 && <div className="g-fila entre"><span className="g-muted">Recebido</span><b className="g-tab g-verde-t">{brl(recebido)}{formasDoRecebido ? ` · ${formasDoRecebido}` : ""}</b></div>}
           {vejoFinanceiro && (extra?.diferencaCobrada ?? 0) > 0 && <div className="g-fila entre"><span className="g-muted">Diferença recebida</span><b className="g-tab g-verde-t">{brl(extra!.diferencaCobrada)}</b></div>}
-          {vejoFinanceiro && (extra?.diferencaCobrada ?? 0) > 0 && lancado > 0 && <div className="g-fila entre"><span className="g-muted">Total cobrado</span><b className="g-tab">{brl(Math.round((lancado + extra!.diferencaCobrada) * 100) / 100)}</b></div>}
+          {vejoFinanceiro && (extra?.diferencaCobrada ?? 0) > 0 && lancado > 0 && <div className="g-fila entre"><span className="g-muted">Total cobrado</span><b className="g-tab">{brl(centavos((lancado + extra!.diferencaCobrada)))}</b></div>}
           {devidos.map((l) => (
             <div className="g-fila entre" key={l.id}>
               <span className="g-muted">A receber</span>
@@ -628,7 +629,7 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
             )}
             {sabe && vejoFinanceiro && !pago && (
               <button className={`g-btn ${pacote ? "sec" : "pri"} cheio`} disabled={ocupado || !sabe} onClick={() => { if (!somenteLeitura()) setComanda("sim"); }}>
-                <Receipt />{pacote ? "Cobrar à parte, sem usar o pacote" : "Fechar a conta"}{aCobrar ? ` · ${brl(Math.max(0, Math.round((aCobrar - promoValor) * 100) / 100))}` : ""}
+                <Receipt />{pacote ? "Cobrar à parte, sem usar o pacote" : "Fechar a conta"}{aCobrar ? ` · ${brl(Math.max(0, centavos((aCobrar - promoValor))))}` : ""}
               </button>
             )}
             {sabe && (!vejoFinanceiro || pago) && <button className={`g-btn ${pacote && !pago ? "sec" : "pri"} cheio`} disabled={ocupado} onClick={() => void conferirDiaDoHorario(a.inicio, confirmar).then((sim) => sim && mudar({ status: "concluido" }, ofereceAvisar ? "Atendimento concluído. Quer avisar o tutor? O botão está logo abaixo." : "Atendimento concluído.")).then((deu) => deu && !ofereceAvisar && aoFechar())}><Check />{pacote && !pago ? "Concluir sem usar o pacote" : "Concluir atendimento"}</button>}

@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Contexto } from "./ferramentas";
 import { lerSinaisDoPeriodo } from "../sinais";
+import { centavos as real } from "../util";
 
 /**
  * Mozart: "quanto recebi de sinal este mês?", "quanto falta receber dos sinais?", "devolvi quanto de sinal?".
@@ -15,7 +16,6 @@ export const FERRAMENTA_SINAIS: Anthropic.Tool & { grava: false; financeiro: tru
 };
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
-const real = (n: number) => Math.round(n * 100) / 100;
 
 export async function consultarSinais(c: Contexto, nome: string, e: Record<string, unknown>, erro: (m: string) => Error): Promise<{ resultado: unknown } | null> {
   if (nome !== "ver_sinais") return null;

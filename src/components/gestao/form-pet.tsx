@@ -19,6 +19,7 @@ import { AvisoDeRascunho, useRascunho } from "./rascunho";
 /** Nome do rascunho do "Pet novo" (a lista de Clientes reabre o formulário quando ele existe). */
 export { RASCUNHO_PET_NOVO } from "./rascunho";
 import { RASCUNHO_PET_NOVO } from "./rascunho";
+import { DICA_OBS } from "@/lib/gestao/privacidade-textos";
 
 /**
  * Cadastro ou edição de um pet. Em cadastro novo, escolhe um tutor existente ou cria o tutor junto.
@@ -234,7 +235,7 @@ export default function FormPet({ pet, clienteFixo, nomeInicial, aoFechar, aoSal
         <Campo rotulo="Cuidados e alertas" dica={comBanho ? "Aparece em destaque na agenda. Ex.: alergia a shampoo, medo de secador, morde." : "Aparece em destaque junto do nome do pet. Ex.: alergia, briga com outros cães, foge no portão."}>
           <CampoComVoz valor={alertas} aoMudar={setAlertas} maxLength={400} rotulo="Ditar os cuidados e alertas"><textarea className="g-textarea" value={alertas} maxLength={400} onChange={(e) => setAlertas(e.target.value)} /></CampoComVoz>
         </Campo>
-        <Campo rotulo="Observações"><CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} /></CampoComVoz></Campo>
+        <Campo rotulo="Observações" dica={DICA_OBS}><CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} /></CampoComVoz></Campo>
       </form>
     </Folha>
   );

@@ -36,3 +36,28 @@
 .g-lkp-recado svg { width: 18px; height: 18px; flex: none; margin-top: 2px; }
 .g-lkp-recado span { min-width: 0; overflow-wrap: anywhere; }
 .g-lkp-erro { padding: 10px 14px; border-radius: 14px; background: var(--g-vermelho-tint); color: #7a281b; font-size: .9375rem; line-height: 1.4; }
+
+/* rodada 9 (N7): valor do pedido, endereço e outro horário */
+.g-lkp-valor { width: 100%; display: grid; gap: 6px; padding: 12px 14px; border-radius: 14px; background: rgba(255, 253, 249, .85); border: 1px solid var(--g-linha); font-size: .9375rem; text-align: left; }
+.g-lkp-valor .l { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.g-lkp-valor .l > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.g-lkp-valor .l > span:last-child { font-variant-numeric: tabular-nums; text-align: right; }
+.g-lkp-valor .l small { color: var(--g-cinza); white-space: nowrap; }
+.g-lkp-valor .l.forte { font-weight: 700; border-top: 1px solid var(--g-linha); padding-top: 6px; }
+.g-lkp-valor s { color: var(--g-cinza); font-weight: 400; }
+.g-lkp-valor > small { color: var(--g-cinza); font-size: .8125rem; line-height: 1.4; }
+.g-lkp-onde { width: 100%; display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: .9375rem; line-height: 1.4; text-align: left; }
+.g-lkp-onde svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--g-verde); }
+.g-lkp-onde span { min-width: 0; overflow-wrap: anywhere; }
+.g-lkp-onde a { color: var(--txt-verde, var(--g-verde)); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.g-lkp-outro { display: grid; gap: 8px; margin: 4px 0 8px; }
+.g-lkp-dias { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.g-lkp-dia { flex: none; display: grid; justify-items: center; gap: 2px; min-width: 52px; min-height: 56px; padding: 6px 8px; border-radius: var(--g-raio-p, 12px); border: 1px solid var(--g-linha-forte, var(--g-linha)); background: var(--g-campo, #fff); color: inherit; font: inherit; cursor: pointer; }
+.g-lkp-dia span { font-size: .75rem; color: var(--g-cinza); }
+.g-lkp-dia b { font-size: 1.0625rem; }
+.g-lkp-dia:disabled { opacity: .45; cursor: not-allowed; }
+.g-lkp-dia[aria-pressed="true"], .g-lkp-hora[aria-pressed="true"] { background: var(--g-verde); border-color: var(--g-verde); color: var(--g-creme, #f6f1e8); }
+.g-lkp-dia[aria-pressed="true"] span { color: inherit; }
+.g-lkp-horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.g-lkp-hora { min-height: 44px; border-radius: var(--g-raio-p, 12px); border: 1px solid var(--g-linha-forte, var(--g-linha)); background: var(--g-campo, #fff); color: inherit; font: 600 .9375rem/1 var(--sans, inherit); font-variant-numeric: tabular-nums; cursor: pointer; }
+.g-lkp-dia:focus-visible, .g-lkp-hora:focus-visible { outline: 3px solid var(--g-laranja); outline-offset: 2px; }

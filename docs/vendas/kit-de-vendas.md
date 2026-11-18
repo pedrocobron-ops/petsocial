@@ -10,9 +10,13 @@ Tudo aqui foi conferido com o manual do sistema (`src/lib/gestao/manual.ts`) e c
 - Não prometer resultado: nada de "fature mais", "dobre os clientes", "nunca mais perca dinheiro".
 - Não usar depoimento, número de clientes, estatística ou "x% dos pet shops". Não temos esses dados.
 - Sem urgência falsa: nada de "só hoje", "últimas vagas", contador, preço riscado.
-- Não dizer o que o sistema não faz: **não emite nota fiscal (nem NF-e, nem NFS-e, nem cupom)**, **não envia WhatsApp
-  sozinho e não tem integração com a API do WhatsApp**, **não tem aplicativo na loja** (nem para o pet shop, nem para o tutor),
-  não recebe pagamento pela internet, não avisa a hora do remédio, não é para clínica veterinária.
+- Não afirmar que o sistema faz o que ele não faz. E dizer com franqueza, quando perguntarem, o que ele não faz:
+  **não emite nota fiscal (nem NF-e, nem NFS-e, nem cupom fiscal)**, **não envia WhatsApp sozinho e não tem integração com a
+  API do WhatsApp**, **não tem aplicativo na loja** (nem para o pet shop, nem para o tutor), não recebe pagamento pela
+  internet, não avisa a hora do remédio, não é para clínica veterinária.
+- Não falar da idade do sistema: nem "novo", "lançamento", "estamos começando" ou "primeiros clientes", nem tempo de mercado
+  inventado. A resposta aprovada está na seção d.
+- Desconto só por cupom de verdade, criado pela dona na Cakto, com a validade real (seção g). Sem preço riscado.
 - Não citar outro sistema pelo nome, não comparar, não dizer "único", "o melhor", "ninguém mais tem".
 - Português simples, frases curtas, "você".
 
@@ -33,7 +37,7 @@ E quem está com a mão no banho fala com o Mozart, o assistente de dentro do si
 
 Cada um com: **o que é**, **por que importa para a dona do pet shop** e **como mostrar em 30 segundos**.
 
-### 1. Boletim do pet pelo link (novo)
+### 1. Boletim do pet pelo link
 
 - **O que é:** depois do banho, do dia de creche ou de um dia de hotel, a equipe toca em **Mandar boletim**, põe até 4 fotos,
   toca em como foi (Comportado, Perfume, Lacinho, Comeu tudo…) e, se quiser, toca em **Escrever com o Mozart** para o texto
@@ -46,7 +50,7 @@ Cada um com: **o que é**, **por que importa para a dona do pet shop** e **como 
   (um bichinho de pelúcia serve) → toque em **Comportado** e **Perfume** → **Escrever com o Mozart** → **Salvar boletim** →
   abra o link no seu celular e mostre a página. Diga: "É isso que o seu cliente recebe. Ele abre no WhatsApp, sem baixar nada."
 
-### 2. Trazer do caderno ou do outro sistema (novo)
+### 2. Trazer do caderno ou do outro sistema
 
 - **O que é:** em **Clientes e pets → Foto do caderno**, a pessoa escolhe o que tem na página (Clientes e pets, Quem me deve,
   Agenda, Tabela de preços ou Não sei, descubra), fotografa uma página por vez ou manda prints e o PDF do sistema antigo. O
@@ -59,7 +63,7 @@ Cada um com: **o que é**, **por que importa para a dona do pet shop** e **como 
   **Ler** → mostre as linhas, uma marcada como **Já existe** e outra como **Verificar** → desmarque uma → **Salvar**. Diga:
   "Você confere linha por linha antes de entrar. Se a letra estiver difícil, ele avisa em vez de inventar."
 
-### 3. Falar em vez de digitar (novo)
+### 3. Falar em vez de digitar
 
 - **O que é:** no Mozart, toque no microfone e fale o pedido ("marca banho do Thor amanhã às dez e meia"). O texto aparece na
   caixa e dá para corrigir. Dá para segurar o microfone enquanto fala. Nos campos de observação (ficha do pet e do tutor,
@@ -135,7 +139,8 @@ Cada um com: **o que é**, **por que importa para a dona do pet shop** e **como 
    houver, pule o botão do Google na demo e apenas mencione.
 6. Use um bichinho de pelúcia para as fotos. Nada de foto de pet ou pessoa de verdade.
 
-Durante o teste de 7 dias a conta fica no plano maior. Se o teste acabar, a conta fica só para consulta.
+Durante o teste de 7 dias a conta fica no plano maior (até 6 pessoas com login). Quando o teste acaba, a conta fica só
+para consulta até assinar: os dados continuam guardados. Nada é cobrado sozinho, porque o teste não pede cartão.
 
 **Na demonstração:**
 
@@ -171,15 +176,29 @@ fiscal. Se você precisa emitir nota, continua usando o emissor que usa hoje."
 **"É caro?"**
 "O Solo, para quem trabalha sozinho, é R$ 79 por mês. Para até 3 pessoas, R$ 129; para até 6, R$ 179. Todos têm as mesmas
 funções, inclusive o Mozart, creche e hotel. Pagando 3 ou 6 meses de uma vez sai mais barato. Não tem fidelidade, e você
-testa 7 dias sem cartão antes de decidir."
+testa 7 dias sem cartão antes de decidir. Nada é cobrado no fim do teste. E se assinar e se arrepender, pedindo em até
+7 dias devolvemos o primeiro pagamento inteiro, inclusive nos planos de 3 e 6 meses."
 
-**Cupom de desconto (só o vendedor oferece, na conversa).** O vendedor pode dar um cupom da Cakto para fechar a venda. Regras:
-- Use só os cupons criados pela dona na Cakto, com o valor e a validade que ela definiu. Não invente cupom nem porcentagem.
-- Diga o que o cupom é de verdade: "Consigo um cupom de X% para você assinar até [data]". A data tem que ser a validade real do
-  cupom na Cakto.
-- Não diga que o preço "vai subir", que "é a última vaga" ou que "é só hoje" se não for verdade. Não fale em "primeiros
-  clientes".
-- O cupom é digitado pelo cliente na tela de pagamento da Cakto, no campo de cupom.
+**"Qual plano eu preciso?"**
+"Conte só quem vai entrar no sistema com login. Se a sua ajudante só dá banho e não mexe no sistema, ela aparece na agenda
+sem ocupar acesso: o Solo, de R$ 79, basta. Se a recepção ou um sócio também vão lançar, aí é o Equipe." Indique sempre o
+menor plano que serve. Não empurre o plano maior.
+
+**"Vocês são novos? Há quanto tempo existem? Quantos clientes têm?"**
+"A gente não divulga número de clientes nem usa depoimento. Por isso o teste é de 7 dias, sem cartão, com os seus dados:
+você julga pelo que vê funcionando. E a página lista com franqueza o que o sistema não faz." Se a pessoa insistir em datas
+ou números, diga "vou confirmar com a dona e te respondo" e não invente. Não diga "novo" nem tempo de mercado.
+
+**"Como eu pago?"**
+"Pela Cakto, que cuida da cobrança para nós. As formas de pagamento aparecem na tela da Cakto, na hora de pagar." Não afirme
+Pix, cartão, boleto ou parcelamento de cabeça: só diga uma forma se a dona confirmou que ela está ligada.
+
+**"E quando o teste acabar?"**
+"Nada é cobrado sozinho. A conta fica só para consulta: você vê e baixa o que lançou, mas não marca nem lança. Para voltar
+a usar, é só assinar, na tela Assinatura." Se a assinatura atrasar depois, a conta continua funcionando por 10 dias, com
+aviso na tela, e só então fica para consulta.
+
+Cupom de desconto: as regras estão na seção g. Só o vendedor oferece, na conversa.
 
 **"Minha equipe não sabe usar."**
 "Foi feito primeiro para o celular. Cada pessoa vê só as áreas que você libera, então a tela dela é menor. Quem não gosta de
@@ -199,7 +218,7 @@ Outras que aparecem:
 
 ### 6 posts curtos para Instagram
 
-Use o desenho do boletim (seção Novidades da página) ou prints da conta de demonstração. Sem foto de cliente real.
+Use o desenho do boletim (logo depois da capa da página) ou prints da conta de demonstração. Sem foto de cliente real.
 
 **Post 1 — Boletim do pet**
 > Terminou o banho? Em poucos toques sai o boletim do pet: fotos, o recado da equipe e o que foi feito.
@@ -237,9 +256,10 @@ Use o desenho do boletim (seção Novidades da página) ou prints da conta de de
 ### 4 mensagens de WhatsApp para prospecção
 
 Mande só para quem você já conhece ou que deu o contato. Uma mensagem, sem insistir. Troque [Nome] e [Pet shop].
+No fim do link, ponha o seu código de vendedor (seção g): `maestropet.com/gestao?v=seucodigo`.
 
 **Mensagem 1 — Primeiro contato (banho e tosa)**
-> Oi, [Nome], tudo bem? Aqui é [seu nome], do Maestro Pet. A gente fez um sistema para pet shop pequeno que roda no celular.
+> Oi, [Nome], tudo bem? Aqui é [seu nome], do Maestro Pet. O Maestro Pet Gestão é um sistema para pet shop pequeno, que roda no celular.
 > Uma coisa que talvez te interesse: depois do banho, você manda ao tutor um boletim com as fotos e o recado, por link, sem ele
 > instalar nada. Posso te mandar um exemplo?
 
@@ -255,11 +275,135 @@ Mande só para quem você já conhece ou que deu o contato. Uma mensagem, sem in
 **Mensagem 4 — Retorno depois de mostrar**
 > Oi, [Nome], obrigado pelo tempo ontem. Ficou alguma dúvida? Só para lembrar com franqueza: o sistema não emite nota fiscal e
 > não envia WhatsApp sozinho, ele deixa a mensagem pronta para você. Se fizer sentido, o teste é 7 dias sem cartão:
-> maestropet.com/gestao
+> maestropet.com/gestao?v=[seu código]
 
 ---
 
-## f) Checklist do que ainda depende da dona do Maestro Pet
+## f) Acompanhar quem está testando (mensagens do teste)
+
+Regras para todas: uma mensagem, espere a resposta. Só chame quem te deu o número ou quem marcou **Quero ajuda da equipe
+pelo WhatsApp durante o teste** ao criar a conta (aparece no painel, aba Vendas, com o botão do WhatsApp). Quem não marcou e não te deu o número
+não é chamado. Nunca mande link de pagamento solto: a pessoa assina pela tela **Assinatura** do sistema, para o pagamento
+cair na conta certa. Nunca diga que o preço vai subir, e só diga "até hoje" se o cupom realmente vence hoje. Troque [ ].
+
+**Dia 0 ou 1 — começou o teste**
+> Oi, [Nome]! Aqui é [seu nome], do Maestro Pet Gestão. Vi que você abriu o teste. Para o teste valer a pena, o melhor é
+> fazer uma coisa de verdade hoje: marcar o próximo banho ou tirar foto de uma página do caderno em Clientes e pets → Foto do
+> caderno. Leva poucos minutos. Travou em alguma tela? Me fala qual e eu te mostro.
+
+**Dia 3 ou 4 — meio do teste**
+> Oi, [Nome]. O seu teste vai até [dia/mês]. Já mandou um boletim com foto para algum tutor? Depois do banho, toque em
+> Mandar boletim, ponha a foto e mande pelo seu WhatsApp. Só para ficar claro desde já: o sistema não emite nota fiscal e não
+> envia WhatsApp sozinho, ele deixa a mensagem pronta. Ficou alguma dúvida?
+
+**Objeção de preço no meio do teste**
+> Entendo, [Nome]. O que eu posso te dizer é o que tem no preço: R$ [79/129/179] por mês com tudo liberado, inclusive creche,
+> hotel, loja e o Mozart, sem pagar à parte por função e sem fidelidade. Pagando 6 meses de uma vez fica R$ [399/659/909].
+> E se você assinar e se arrepender, pedindo em até 7 dias devolvemos o primeiro pagamento inteiro. Faz sentido para o tamanho
+> da [Pet shop]? Se não fizer, tudo bem.
+
+**Dia 6 ou 7 — fim do teste, sem cupom**
+> Oi, [Nome]. O teste da [Pet shop] termina [amanhã/hoje]. Nada é cobrado sozinho: se você não assinar, a conta fica só para
+> consulta e os dados continuam guardados. Se quiser continuar, é em Mais → Assinatura: escolha o plano e toque em Assinar.
+> Quer que eu te ajude a escolher o plano pelo número de pessoas que entram?
+
+**Dia 6 ou 7 — fim do teste, com um cupom de verdade**
+> Oi, [Nome]. O teste da [Pet shop] termina [amanhã/hoje]. Nada é cobrado sozinho: se você não assinar, a conta fica só para
+> consulta. Se quiser continuar, eu tenho um cupom de [X]% para o primeiro pagamento: o código é [CÓDIGO] e ele vale até
+> [data real do cupom na Cakto]. No primeiro pagamento do plano [Plano] fica R$ [valor]; os seguintes são R$ [preço normal].
+> Para usar: abra Assinatura no sistema, toque em Tenho um cupom, escreva o código e toque em Assinar.
+
+**Depois que o teste acabou (uma vez só, 2 ou 3 dias depois)**
+> Oi, [Nome]. A conta da [Pet shop] está só para consulta, com tudo o que você lançou guardado. Se quiser voltar a usar, é em
+> Assinatura. Se decidiu não seguir, me conta o motivo? Ajuda a gente a melhorar. E obrigado por ter testado.
+
+---
+
+## g) Cupons: a política honesta
+
+O preço de tabela é o preço de verdade. Cupom é exceção, existe na Cakto com data para acabar, e o vendedor diz exatamente o
+que está escrito nele.
+
+**Princípios**
+
+1. Todo cupom vale **só na primeira cobrança**. Do segundo pagamento em diante é o preço normal, e o vendedor diz isso.
+2. Todo cupom tem **data de validade gravada na Cakto**. A data que o vendedor fala é essa. Sem data, não existe o cupom.
+3. **Um código por vendedor e por nível** (por exemplo `ANA10`, `ANA15`). O código também mostra de quem foi a venda.
+4. Um código vencido **não é recriado com o mesmo nome**, e ninguém diz "último dia" de um nível que volta no mês seguinte.
+   A frase honesta é: "esse código vale até dia X; não sei dizer se vai ter outro".
+5. **Nada de cupom em público**: nem no site, nem em post, nem com a Nina (ela só confirma que cupom existe e manda para a equipe).
+6. **Um cupom por pet shop**, sem somar, e nunca aplicado depois do pagamento.
+7. Quem cria os códigos é a dona, na Cakto. Vendedor não cria nem pede "um jeitinho".
+
+**Níveis**
+
+| Nível | Desconto na 1ª cobrança | Quem dá | Quando | Validade do código |
+| --- | --- | --- | --- | --- |
+| 0 | nenhum | todos | é o padrão; fale primeiro dos planos de 3 e 6 meses, que já saem mais baratos | — |
+| 1 | 10% | qualquer vendedor | quem testou de verdade (marcou ou trouxe clientes) e perguntou de preço | o mês corrente, até o último dia |
+| 2 | 15% | qualquer vendedor | só nos planos de 3 e 6 meses | o mês corrente, até o último dia |
+| 3 | 20% | só com aprovação da dona, caso a caso | pet shop que paga outro sistema até uma data certa, ou com mais de uma unidade | 7 dias a partir da criação, um código por caso |
+
+**Valores da primeira cobrança com cupom** (para ninguém fazer conta na conversa; confira com a tela da Cakto antes de falar):
+
+- 10% no mensal: Solo R$ 71,10 · Equipe R$ 116,10 · Pet shop R$ 161,10.
+- 15% em 3 meses: Solo R$ 182,75 · Equipe R$ 296,65 · Pet shop R$ 407,15.
+- 15% em 6 meses: Solo R$ 339,15 · Equipe R$ 560,15 · Pet shop R$ 772,65.
+- 20% no mensal: Solo R$ 63,20 · Equipe R$ 103,20 · Pet shop R$ 143,20.
+
+**Como o cliente usa o cupom:** dentro do sistema, em **Mais → Assinatura → Tenho um cupom**: escreve o código e toca em
+Assinar. O link já leva o e-mail da conta e o cupom, e o pagamento cai na conta certa. O desconto aparece na página de
+pagamento antes de pagar; se o código estiver vencido ou errado, a página segue com o preço normal. **Nunca mande um link de
+pagamento da Cakto solto no WhatsApp**: sem o caminho pela tela Assinatura, o pagamento pode não ser ligado à conta sozinho.
+
+**O seu link de vendedor:** ponha o seu código no fim do link que você manda: `maestropet.com/gestao?v=seucodigo` (só letras
+minúsculas, números e traço). O pet shop que criar a conta por esse link fica marcado com o seu código no painel (aba Vendas).
+
+**O que dizer**
+
+- "Consigo um cupom de [X]% no primeiro pagamento. Ele vale até [data]. Do segundo pagamento em diante é o preço normal, R$ [valor]."
+- "Depois dessa data esse código para de funcionar. Não sei dizer se vai ter outro."
+- "Com ou sem cupom, se você se arrepender em até 7 dias do pagamento, devolvemos o valor inteiro."
+
+**O que nunca dizer**
+
+- "Só hoje" (se a data do cupom é outra) · "o preço vai subir" · "últimas vagas" · "preço de lançamento" · "para os primeiros clientes".
+- "De R$ 129 por R$ 99", com o preço antigo riscado. Diga: "o primeiro pagamento sai por R$ X; os seguintes, R$ Y".
+- "Consegui com a minha gerente" (se é o cupom padrão) ou qualquer porcentagem que não esteja num cupom criado pela dona.
+- "Você vai faturar mais", "vai dobrar os clientes", "nunca mais perde dinheiro" ou qualquer promessa de resultado.
+- "Fulana usa e adora", "mais de X pet shops usam": não usamos depoimento nem número de clientes.
+- "É novo", "acabou de lançar", "estamos começando", nem tempo de mercado inventado.
+- "Emite nota", "manda WhatsApp sozinho", "tem aplicativo na loja", "recebe pelo link": o sistema não faz nada disso.
+- Nome de outro sistema, "o melhor", "o único".
+
+**Controle (todo mês, pela dona):** quantas vendas saíram com cupom e o desconto médio por vendedor (painel, aba Vendas). Se
+quase toda venda usa o nível 1, o preço de verdade é o com desconto: aí o certo é mudar a tabela, não manter o cupom.
+
+---
+
+## h) Os 11 números do funil
+
+Por semana e por origem (código do vendedor, Instagram, Google, direto). O painel do administrador já mostra os cadastros por
+semana, quem está testando e quem assinou (Visão geral), o uso de cada conta (Uso) e as vendas por vendedor e cupom (Vendas).
+O que o painel não mostra, o vendedor anota.
+
+1. **Visitas → cadastros.** Quantas pessoas abriram a página de venda e quantas criaram conta.
+2. **Cadastros → ativados em 48 horas.** Ativado = marcou o primeiro horário, mandou o link do cliente ou trouxe clientes.
+   É o número que mais antecipa o pagamento.
+3. **Tempo do cadastro até o primeiro horário marcado.**
+4. **Uso no teste:** dias com uso nos 7 dias, boletins mandados, pessoas da equipe convidadas, conversas com o Mozart.
+5. **Assinatura:** abriu a tela → tocou em Assinar → pagou. Por plano e por período.
+6. **Teste → pagante**, por semana de cadastro, separando ativados de não ativados e por vendedor.
+7. **Devoluções em 7 dias, primeira renovação e cancelamentos por mês.**
+8. **Cupons:** parte das vendas com cupom, desconto médio, por vendedor e por nível.
+9. **Vendedores:** conversas começadas → respostas → testes → vendas; e a taxa de resposta de cada mensagem.
+10. **Nina:** conversas, quantas terminam no botão do WhatsApp, quantas viram cadastro e as dez perguntas mais feitas.
+11. **Motivos de quem não comprou**, anotados pelo vendedor numa lista fixa: preço, nota fiscal, WhatsApp automático, já tem
+    sistema, sem tempo, outro.
+
+---
+
+## i) Checklist do que ainda depende da dona do Maestro Pet
 
 - [ ] **Preços confirmados.** O código (`src/lib/gestao/planos.ts`) tem hoje:
       Solo (1 pessoa) R$ 79/mês, R$ 215 a cada 3 meses, R$ 399 a cada 6 meses;
@@ -268,8 +412,14 @@ Mande só para quem você já conhece ou que deu o contato. Uma mensagem, sem in
       Se algum valor mudar, mudar no código (a página e a Nina leem dali) e neste kit.
 - [ ] **Checkout da Cakto pendente.** Criar o produto de assinatura e as ofertas (mensal, 3 e 6 meses de cada plano), colar os
       links no painel do administrador (aba Cakto) ou nas variáveis `NEXT_PUBLIC_GESTAO_CHECKOUT_*`, ligar cada oferta ao plano
-      em `config_interna` e criar o webhook para `/api/gestao/cakto` (passo a passo no `README.md`). Sem link, o botão de assinar
-      aparece como "em breve".
+      em `config_interna` e criar o webhook para `/api/gestao/cakto` (passo a passo no `README.md`). Depois, ligar "Pagamento
+      pela Cakto" no painel (aba Cakto). Enquanto não houver link, o botão da tela Assinatura é **Assinar pelo WhatsApp**:
+      a pessoa fala com a equipe, paga pelo link que a equipe mandar e a dona libera a conta no painel (aba Contas).
+- [ ] **Quem vende.** Preencher o nome e o CPF ou CNPJ de quem vende no painel (aba Vendas). Aparecem no rodapé da página de
+      venda e na tela Assinatura.
+- [ ] **Cupons.** Criar na Cakto os códigos de cada vendedor (seção g), sempre "só na 1ª cobrança" e com data de fim.
+- [ ] **Formas de pagamento.** Conferir na Cakto quais estão ligadas. O site diz só que "aparecem na tela da Cakto".
+- [ ] **Código de cada vendedor** para o link (`?v=codigo`) e quem acompanha os testes pelo WhatsApp.
 - [ ] **Chave da IA em produção** (`ANTHROPIC_API_KEY` na Vercel) para o Mozart, o boletim ("Escrever com o Mozart"), a leitura
       do caderno, a Nina e o "Tirar dúvida" do link. Sem ela, essas partes avisam e o resto funciona.
 - [ ] **Conta de demonstração** criada e preparada (seção c), com nome de exemplo e sem dado de cliente real.

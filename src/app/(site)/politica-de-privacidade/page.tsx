@@ -48,6 +48,12 @@ export default function PrivacidadePage() {
             <td>Responder e resolver o seu pedido</td>
             <td>Execução de contrato (V) e legítimo interesse (IX)</td>
           </tr>
+          <tr id="nina">
+            <td>No chat da Nina (página do sistema para pet shop)</td>
+            <td>O texto que você escreve e um código feito a partir do seu endereço de internet (IP), para contar as mensagens</td>
+            <td>Responder a sua dúvida e evitar abuso. O texto vai à inteligência artificial só para responder e não fica guardado; fica só a contagem</td>
+            <td>Legítimo interesse (IX)</td>
+          </tr>
           <tr>
             <td>Na navegação</td>
             <td>Páginas vistas, aparelho, navegador, endereço IP e cookies do Pixel da Meta</td>
@@ -66,13 +72,15 @@ export default function PrivacidadePage() {
         <li><b>Cakto</b>: plataforma de pagamento e entrega dos produtos.</li>
         <li><b>Vercel</b>: hospedagem do site.</li>
         <li><b>Google</b> (Planilhas, Drive e Gmail): guardar a lista de quem pediu materiais gratuitos, entregar arquivos e responder e-mails.</li>
-        <li><b>Meta</b> (Facebook e Instagram): medir e direcionar anúncios, pelo Pixel.</li>
+        <li><b>Meta</b> (Facebook e Instagram): medir e direcionar anúncios, pelo Pixel, só depois que você aceita os cookies de medição.</li>
+        <li><b>Anthropic</b>: inteligência artificial que responde no chat da Nina. Recebe o que você escreve ali.</li>
+        <li><b>Supabase</b>: banco de dados onde fica a contagem de mensagens do chat da Nina.</li>
         <li><b>Autoridades</b>: só quando a lei ou uma ordem judicial exigir.</li>
       </ul>
 
       <h2>4. Transferência para fora do Brasil</h2>
       <p>
-        Alguns desses serviços (Vercel, Google e Meta) guardam dados em servidores fora do Brasil, principalmente nos Estados Unidos.
+        Alguns desses serviços (Vercel, Google, Meta e Anthropic) guardam ou processam dados em servidores fora do Brasil, principalmente nos Estados Unidos.
         Essa transferência acontece para executar o contrato com você e com empresas que adotam cláusulas contratuais e padrões de
         segurança reconhecidos, como prevê o artigo 33 da LGPD.
       </p>
@@ -97,6 +105,7 @@ export default function PrivacidadePage() {
         <li><b>Dados da compra:</b> pelo prazo exigido pelas leis fiscais e de defesa do consumidor (em geral, 5 anos).</li>
         <li><b>Lista de materiais gratuitos:</b> até você pedir para sair ou retirar o consentimento.</li>
         <li><b>Conversas de suporte:</b> até 2 anos depois do último contato.</li>
+        <li><b>Chat da Nina:</b> o texto não fica guardado; a contagem de mensagens por visitante, por poucos dias.</li>
         <li><b>Dados de navegação:</b> pelo prazo definido pela Meta e pela Vercel (o cookie do Pixel, por exemplo, expira em 90 dias se você não voltar ao site).</li>
       </ul>
 

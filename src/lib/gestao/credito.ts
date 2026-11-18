@@ -1,5 +1,6 @@
 import type { Banco } from "./supabase";
 import type { Database } from "./banco";
+import { centavos as real } from "./util";
 
 /**
  * Crédito do tutor: o que ele pagou a mais (por exemplo, o pet saiu antes do fim de uma estadia paga adiantado) e
@@ -8,7 +9,6 @@ import type { Database } from "./banco";
  */
 export type MovimentoDeCredito = Pick<Database["public"]["Tables"]["clientes_creditos"]["Row"], "id" | "valor" | "motivo" | "criado_em" | "estadia_id">;
 
-const real = (n: number) => Math.round(n * 100) / 100;
 
 /** Saldo e movimentos de crédito de um tutor (os mais novos primeiro). Sem acesso, ou sem a tabela, volta zero. */
 export async function creditoDoTutor(sb: Banco, petshopId: string, clienteId: string | null | undefined): Promise<{ saldo: number; movimentos: MovimentoDeCredito[] }> {

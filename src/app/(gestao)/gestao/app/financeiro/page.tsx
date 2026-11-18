@@ -11,7 +11,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura, Vazio } from "@/components/gestao/ui";
 import { CampoDinheiro } from "@/components/gestao/loja/pecas";
 import {
-  Apagados, baixarPlanilha, brlMini, categoriaAtual, Chips, COR_FORMA, dinheiroCsv, ehDeServico, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, SemAcesso, soma, somaPorForma,
+  Apagados, baixarPlanilha, brlMini, categoriaAtual, Chips, COR_FORMA, ehDeServico, ErroDeCarga, FolhaBaixa, FolhaLancamento, hojeIso, PALETA, paginar, resumoDeItens, SemAcesso, soma, somaPorForma,
   TagAlterado, textoJaRecebido, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import CustoDasVendas from "@/components/gestao/financeiro/custo-vendas";
@@ -21,12 +21,15 @@ import AlteracoesDoPeriodo from "@/components/gestao/financeiro/alteracoes-perio
 import ContasFixas, { FolhaContaFixa } from "@/components/gestao/financeiro/contas-fixas";
 import { gerarContasFixas, type ContaFixa } from "@/lib/gestao/contas-fixas";
 import { Kpi, Ranking, Rosca, Tendencia, Tile } from "@/components/gestao/painel";
-import { contasDaMeta, descricaoAtual, itensDoLancamento, partesDoLancamento, partesPorForma, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
+import { contasDaMeta, descricaoAtual, partesDoLancamento, percentuaisQueFecham, textoDoPagamento } from "@/lib/gestao/dinheiro";
 import { FORMAS } from "@/lib/gestao/tipos";
 import type { AlteracaoLancamento, Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, isoDia, nomeMes, semAcento, somaDias } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, isoDia, nomeMes, semAcento, somaDias, centavos } from "@/lib/gestao/util";
 import { ajustesDoFaturamento, CATEGORIAS_DEVOLUCAO, faturamentoLiquido, SEM_AJUSTES } from "@/lib/gestao/faturamento";
 import { FORMA_CREDITO } from "@/components/gestao/financeiro/comum";
+import { CadeiaDoDinheiro, ParaOContador } from "@/components/gestao/financeiro/cadeia";
+import { lerCadeia } from "@/lib/gestao/cadeia";
+import { lerParaContador, planilhaDeLancamentos, type LancamentoLido } from "@/lib/gestao/contador";
 import "./financeiro.css";
 
 export default function PaginaFinanceiro() {
@@ -74,7 +77,7 @@ function porCategoria(lista: Lancamento[], petshop: { modulos?: string[] | null 
     por("Venda de produtos", partes.produto);
     por("Taxas e extras", partes.extra);
   }
-  return [...mapa].map(([nome, valor]) => ({ nome, valor: Math.round(valor * 100) / 100 })).sort((a, b) => b.valor - a.valor);
+  return [...mapa].map(([nome, valor]) => ({ nome, valor: centavos(valor) })).sort((a, b) => b.valor - a.valor);
 }
 
 function Financeiro() {
@@ -106,6 +109,9 @@ function Financeiro() {
     const apP = Promise.resolve(sb.from("lancamentos_alteracoes").select("*").eq("petshop_id", petshop.id).eq("acao", "apagou")
       .gte("antes->>data", inicio).lte("antes->>data", fim).order("quando", { ascending: false }).limit(200));
     const ajustesP = ajustesDoFaturamento(sb, petshop.id, inicio, fim).catch(() => SEM_AJUSTES);
+    // a cadeia do dinheiro (Recebido → Faturamento → Resultado → taxas): a conta única, feita no banco; a do mês anterior, para comparar
+    const cadeiaP = lerCadeia(sb, petshop.id, inicio, fim).catch(() => null);
+    const cadeiaAntesP = lerCadeia(sb, petshop.id, isoDia(mesAnterior), isoDia(somaDias(deIsoDia(inicio), -1))).catch(() => null);
     const [doMes, anterior, contas] = await Promise.all([
       paginar<Lancamento>((de, ate) => sb.from("lancamentos").select("*").eq("petshop_id", petshop.id).eq("pago", true).is("movimento", null)
         .gte("data", inicio).lte("data", fim).order("data", { ascending: false }).order("criado_em", { ascending: false }).order("id").range(de, ate)),
@@ -119,16 +125,16 @@ function Financeiro() {
     const tutores = new Map<string, string>();
     const lotes: string[][] = [];
     for (let i = 0; i < devedores.length; i += 150) lotes.push(devedores.slice(i, i + 150));
-    const [nomes, ap, ajustes] = await Promise.all([
+    const [nomes, ap, ajustes, cadeia, cadeiaAntes] = await Promise.all([
       Promise.all(lotes.map((ids) => sb.from("clientes").select("id, nome").eq("petshop_id", petshop.id).in("id", ids))),
       // valores recebidos neste mês que alguém apagou depois
       apP,
       // crédito do tutor deixado e usado no mês (o resultado não conta o crédito que ainda é do tutor)
-      ajustesP,
+      ajustesP, cadeiaP, cadeiaAntesP,
     ]);
     for (const r of nomes) for (const c of r.data ?? []) tutores.set(c.id, c.nome);
     const apagados: AlteracaoLancamento[] = ap.data ?? [];
-    return { doMes, anterior, contas, tutores, apagados, ajustes };
+    return { doMes, anterior, contas, tutores, apagados, ajustes, cadeia, cadeiaAntes };
   }, [petshop.id, inicio]);
 
   const contas = useMemo(() => {
@@ -140,9 +146,9 @@ function Financeiro() {
     const anterior = dados?.anterior ?? [];
     const devolvido = soma(devolucoes);
     return {
-      entrou: Math.round((soma(entradas) - devolvido) * 100) / 100, saiu: soma(saidas), bruto: soma(entradas), devolvido,
+      entrou: centavos((soma(entradas) - devolvido)), saiu: soma(saidas), bruto: soma(entradas), devolvido,
       entradasPorCategoria: porCategoria(entradas, petshop), saidasPorCategoria: porCategoria(saidas, petshop),
-      entrouAntes: Math.round((soma(anterior.filter((l) => l.tipo === "entrada")) - soma(anterior.filter(ehDevolucao))) * 100) / 100,
+      entrouAntes: centavos((soma(anterior.filter((l) => l.tipo === "entrada")) - soma(anterior.filter(ehDevolucao)))),
       saiuAntes: soma(anterior.filter((l) => l.tipo === "saida" && !ehDevolucao(l))),
       temAnterior: anterior.length > 0,
       aPagar: (dados?.contas ?? []).filter((l) => l.tipo === "saida"),
@@ -152,7 +158,10 @@ function Financeiro() {
   // o resultado conta o faturamento: o crédito que ficou com o tutor ainda é dele (só conta quando ele usar)
   const ajustes = dados?.ajustes ?? SEM_AJUSTES;
   const faturamento = faturamentoLiquido(contas.bruto, ajustes);
-  const resultado = Math.round((faturamento - contas.saiu) * 100) / 100;
+  const resultado = centavos((faturamento - contas.saiu));
+  const cadeia = dados?.cadeia ?? null;
+  // comparação com o mês anterior pelos mesmos nomes: faturamento e despesas
+  const comparar = { entrou: faturamento, saiu: contas.saiu, entrouAntes: dados?.cadeiaAntes?.faturamento ?? contas.entrouAntes, saiuAntes: dados?.cadeiaAntes?.despesas ?? contas.saiuAntes, temAnterior: contas.temAnterior };
 
   // desenhos do resumo: semanas do mês, entradas acumuladas e formas de pagamento
   const graficos = useMemo(() => {
@@ -168,9 +177,7 @@ function Financeiro() {
     for (const l of doMes) {
       const dia = deIsoDia(l.data).getDate(), v = Number(l.valor), sem = semanas[Math.floor((dia - 1) / 7)];
       if (ehDevolucao(l)) {
-        // devolveu ao tutor: o que entrou diminui naquele dia (não é uma despesa)
-        if (sem) sem.entrou -= v;
-        porDia[dia - 1] -= v;
+        // devolveu ao tutor: sai do faturamento daquele dia (não é uma despesa); entra abaixo, com o crédito do tutor
       } else if (l.tipo === "entrada") {
         nEntradas++;
         if (sem) sem.entrou += v;
@@ -180,16 +187,25 @@ function Financeiro() {
         if (sem) sem.saiu += v;
       }
     }
+    // devoluções, crédito deixado e crédito usado no check-out, no dia de cada um (a mesma regra do faturamento)
+    for (const [d, v] of ajustes.porDia) {
+      const dia = deIsoDia(d).getDate(), sem = semanas[Math.floor((dia - 1) / 7)];
+      if (sem) sem.entrou += v;
+      if (porDia[dia - 1] != null) porDia[dia - 1] += v;
+    }
+    // a parte de uma troca que é só produto trocado não é forma de pagamento
+    const troca = cadeia?.troca ?? 0;
+    if (troca > 0) formas.set("outro", Math.max(0, (formas.get("outro") ?? 0) - troca));
     const ate = mesAtual ? deIsoDia(hoje).getDate() : ultimoDia;
     let corrido = 0;
     const acumulado = porDia.slice(0, ate).map((v) => (corrido += v));
     return {
       semanas, acumulado, ate, nEntradas, nSaidas,
       semanaAtual: mesAtual ? Math.floor((deIsoDia(hoje).getDate() - 1) / 7) : -1,
-      formas: [...FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: Math.round((formas.get(f.id) ?? 0) * 100) / 100, cor: COR_FORMA[f.id] })),
-        { id: FORMA_CREDITO, rotulo: "Crédito do tutor", valor: Math.round((formas.get(FORMA_CREDITO) ?? 0) * 100) / 100, cor: COR_FORMA[FORMA_CREDITO] }].filter((f) => f.valor > 0),
+      formas: [...FORMAS.map((f) => ({ id: f.id as string, rotulo: f.rotulo as string, valor: centavos((formas.get(f.id) ?? 0)), cor: COR_FORMA[f.id] })),
+        { id: FORMA_CREDITO, rotulo: "Crédito do tutor", valor: centavos((formas.get(FORMA_CREDITO) ?? 0)), cor: COR_FORMA[FORMA_CREDITO] }].filter((f) => f.valor > 0),
     };
-  }, [dados, fim, mesAtual, hoje]);
+  }, [dados, fim, mesAtual, hoje, ajustes, cadeia]);
   const atrasadasPagar = contas.aPagar.filter((c) => c.vencimento && c.vencimento < hoje);
   const n = (q: number, um: string, varios: string) => (q === 1 ? `1 ${um}` : `${q} ${varios}`);
 
@@ -212,22 +228,13 @@ function Financeiro() {
         for (const c of r.data ?? []) nomes.set(c.id, c.nome);
       }
       const quem = new Map(equipe.filter((p) => p.user_id).map((p) => [p.user_id!, p.nome]));
-      const qtd = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
-      const tabela: Cel[][] = [
-        ["Data", "Hora do lançamento", "Tipo", "Categoria", "Descrição", "Cliente", "Itens", "Forma", "Partes do pagamento", "Valor", "Quem lançou"],
-        ...[...linhas].reverse().map((l): Cel[] => {
-          const partes = partesPorForma(l);
-          return [
-            dataCompleta(l.data), hora(l.criado_em), l.tipo === "entrada" ? "Entrada" : "Saída", categoriaAtual(l.categoria), l.descricao ?? "",
-            l.cliente_id ? nomes.get(l.cliente_id) ?? "" : "",
-            itensDoLancamento(l).map((i) => `${qtd(i.qtd)} x ${i.nome} (${brl(i.valor)} cada)`).join(" | "),
-            textoDoPagamento({ ...l, pagamentos: null }),
-            partes.length > 1 ? textoDoPagamento(l) : "",
-            dinheiroCsv(l.tipo === "entrada" ? Number(l.valor) : -Number(l.valor)),
-            l.origem === "assistente" ? `${(l.criado_por && quem.get(l.criado_por)) || "Alguém"}, pelo Mozart` : (l.criado_por && quem.get(l.criado_por)) || "",
-          ];
-        }),
-      ];
+      // taxa, parcelas, quando cai, data do atendimento, "lançado em" e retroativo vêm do banco (as mesmas colunas da cópia completa)
+      const extras = await lerParaContador(sb, petshop.id, inicio, fim);
+      const tabela: Cel[][] = planilhaDeLancamentos([...linhas].reverse() as LancamentoLido[], extras, {
+        cliente: (id) => nomes.get(id) ?? "",
+        quem: (l) => (l.origem === "assistente" ? `${(l.criado_por && quem.get(l.criado_por)) || "Alguém"}, pelo Mozart` : (l.criado_por && quem.get(l.criado_por)) || ""),
+        categoria: (c, d) => categoriaAtual(c, petshop, d),
+      });
       baixarPlanilha(tabela, `financeiro-${inicio.slice(0, 7)}.csv`);
     } catch (e) { avisarErro(e); } finally { setExportando(false); }
   }
@@ -268,15 +275,14 @@ function Financeiro() {
         {!dados ? (carregando ? <Esqueleto linhas={4} /> : null) : (
           <>
             <section className="g-grade kpis" aria-label={`Números de ${tituloMes}`}>
-              <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Entrou" valor={<span className="gf-kpi-v">{brl(contas.entrou)}</span>}
-                apoio={contas.devolvido > 0 ? `já sem ${brl(contas.devolvido)} devolvidos` : graficos.nEntradas ? n(graficos.nEntradas, "entrada", "entradas") : "nada ainda"} />
-              <Kpi icone={ArrowUpRight} tom="rosa" rotulo="Saiu" valor={<span className="gf-kpi-v">{brl(contas.saiu)}</span>}
+              {/* os três primeiros fecham: Faturamento − Despesas = Resultado (os passos estão em "Como os números se ligam") */}
+              <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Faturamento" valor={<span className="gf-kpi-v">{brl(faturamento)}</span>}
+                apoio={cadeia && cadeia.recebido !== faturamento ? `recebido ${brl(cadeia.recebido)}, com devoluções e crédito acertados` : graficos.nEntradas ? n(graficos.nEntradas, "entrada", "entradas") : "nada ainda"} />
+              <Kpi icone={ArrowUpRight} tom="rosa" rotulo="Despesas" valor={<span className="gf-kpi-v">{brl(contas.saiu)}</span>}
                 apoio={graficos.nSaidas ? n(graficos.nSaidas, "saída", "saídas") : "nada ainda"} />
               <Kpi icone={Scale} tom={resultado < 0 ? "rosa" : "ceu"} rotulo="Resultado do mês"
                 valor={<span className={`gf-kpi-v${resultado < 0 ? " g-vermelho-t" : ""}`}>{brl(resultado)}</span>}
-                apoio={ajustes.creditoDeixado > 0 || ajustes.creditoUsadoFora > 0
-                  ? `sem ${brl(Math.max(0, Math.round((ajustes.creditoDeixado - ajustes.creditoUsadoFora) * 100) / 100))} de crédito de tutores`
-                  : resultado < 0 ? "saiu mais do que entrou" : resultado > 0 ? (mesAtual ? "sobrando até agora" : "sobrou no mês") : "empatado"} />
+                apoio={resultado < 0 ? "as despesas passaram do faturamento" : resultado > 0 ? (mesAtual ? "faturamento menos despesas, até agora" : "faturamento menos despesas") : "empatado"} />
               <Kpi icone={Receipt} tom="manteiga" rotulo="Contas a pagar" valor={<span className="gf-kpi-v">{brl(soma(contas.aPagar))}</span>}
                 apoio={!contas.aPagar.length ? "nenhuma em aberto" : atrasadasPagar.length ? `${n(atrasadasPagar.length, "atrasada", "atrasadas")} de ${contas.aPagar.length}` : n(contas.aPagar.length, "conta em aberto", "contas em aberto")} />
             </section>
@@ -295,14 +301,6 @@ function Financeiro() {
             </div>
 
             {aba === "resumo" && mesAtual && <CartaoMeta entrou={faturamento} aoEditar={() => abrir({ tipo: "meta" })} />}
-            {aba === "resumo" && (ajustes.creditoDeixado > 0 || ajustes.creditoUsadoFora > 0 || contas.devolvido > 0) && (
-              <p className="g-muted g-pp" role="note">
-                {contas.devolvido > 0 && `Devolvido aos tutores neste mês: ${brl(contas.devolvido)} (já tirado do que entrou; não conta como despesa). `}
-                {ajustes.creditoDeixado > 0 && `Ficou de crédito para tutores: ${brl(ajustes.creditoDeixado)}. O dinheiro está com vocês, mas é deles: só conta no resultado quando eles usarem. `}
-                {ajustes.creditoUsadoFora > 0 && `Crédito usado no check-out do hotel: ${brl(ajustes.creditoUsadoFora)} (soma no resultado). `}
-                Resultado do mês: {brl(contas.bruto)} que entraram{contas.devolvido > 0 ? ` − ${brl(contas.devolvido)} devolvidos` : ""}{ajustes.creditoDeixado > 0 ? ` − ${brl(ajustes.creditoDeixado)} de crédito` : ""}{ajustes.creditoUsadoFora > 0 ? ` + ${brl(ajustes.creditoUsadoFora)} de crédito usado` : ""} − {brl(contas.saiu)} que saíram = {brl(resultado)}.
-              </p>
-            )}
 
             {aba === "resumo" && (
               dados.doMes.length ? (
@@ -310,15 +308,15 @@ function Financeiro() {
                   <div className="g-pilha">
                     <section className="g-card">
                       <div className="g-card-t g-fin-cab">
-                        <h3><Tile icone={ChartColumn} tom="menta" tamanho="p" />Entradas e saídas por semana</h3>
-                        <div className="g-fin-leg"><span><i className="e" />Entrou</span><span><i className="s" />Saiu</span></div>
+                        <h3><Tile icone={ChartColumn} tom="menta" tamanho="p" />Faturamento e despesas por semana</h3>
+                        <div className="g-fin-leg"><span><i className="e" />Faturamento</span><span><i className="s" />Despesas</span></div>
                       </div>
                       <Fluxo semanas={graficos.semanas} atual={graficos.semanaAtual} />
-                      <div className="g-fin-nota"><Comparacao contas={contas} mesAtual={mesAtual} nomeAnterior={nomeMes(mesAnterior)} /></div>
+                      <div className="g-fin-nota"><Comparacao contas={comparar} mesAtual={mesAtual} nomeAnterior={nomeMes(mesAnterior)} /></div>
                     </section>
                     <div className="g-fin-par">
                       <section className="g-card">
-                        <div className="g-card-t"><h3><Tile icone={CreditCard} tom="ceu" tamanho="p" />Como entrou</h3><span className="g-muted g-pp">forma de pagamento</span></div>
+                        <div className="g-card-t"><h3><Tile icone={CreditCard} tom="ceu" tamanho="p" />Como foi recebido</h3><span className="g-muted g-pp">forma de pagamento</span></div>
                         {graficos.formas.length ? (
                           <div className="g-fin-rosca">
                             <Rosca fatias={graficos.formas} tamanho={116}>{graficos.formas.length}<small>{graficos.formas.length === 1 ? "forma" : "formas"}</small></Rosca>
@@ -329,10 +327,15 @@ function Financeiro() {
                             </div>
                           </div>
                         ) : <p className="g-muted g-p">Nenhuma entrada neste mês.</p>}
+                        {cadeia && graficos.formas.length > 0 && (
+                          <p className="g-muted g-pp" style={{ marginTop: 8 }}>
+                            Soma {brl(centavos(cadeia.recebido + cadeia.creditoNasContas))}: o Recebido ({brl(cadeia.recebido)}){cadeia.creditoNasContas > 0 ? ` mais ${brl(cadeia.creditoNasContas)} pagos com crédito do tutor` : ""}, antes das devoluções.
+                          </p>
+                        )}
                       </section>
                       <section className="g-card g-fin-acum">
-                        <div className="g-card-t"><h3><Tile icone={TrendingUp} tom="menta" tamanho="p" />Entradas acumuladas</h3><span className="g-muted g-pp">{mesAtual ? `até o dia ${graficos.ate}` : "mês inteiro"}</span></div>
-                        <p className="g-num m">{brl(contas.entrou)}</p>
+                        <div className="g-card-t"><h3><Tile icone={TrendingUp} tom="menta" tamanho="p" />Faturamento acumulado</h3><span className="g-muted g-pp">{mesAtual ? `até o dia ${graficos.ate}` : "mês inteiro"}</span></div>
+                        <p className="g-num m">{brl(faturamento)}</p>
                         {graficos.acumulado.length >= 2 && contas.entrou > 0
                           ? <Tendencia valores={graficos.acumulado} largura={300} altura={84} />
                           : <p className="g-muted g-p" style={{ marginTop: 8 }}>{contas.entrou > 0 ? "A linha aparece a partir do segundo dia do mês." : "Nenhuma entrada neste mês."}</p>}
@@ -341,13 +344,15 @@ function Financeiro() {
                     </div>
                   </div>
                   <div className="g-pilha">
+                    <CadeiaDoDinheiro cadeia={cadeia} />
                     <Categorias titulo="De onde veio" icone={ArrowDownLeft} tom="menta" total={contas.bruto} linhas={contas.entradasPorCategoria} vazio="Nenhuma entrada neste mês."
-                      nota={contas.devolvido > 0 ? `Antes das devoluções. Devolvido aos tutores: − ${brl(contas.devolvido)}.` : undefined} />
+                      nota={faturamento !== contas.bruto ? `Entradas lançadas, por categoria: ${brl(contas.bruto)}. Ainda sem tirar as devoluções e o crédito de tutores; o Faturamento do mês é ${brl(faturamento)}.` : undefined} />
                     <PorServico inicio={inicio} fim={fim} />
                     <Categorias titulo="Para onde foi" icone={ArrowUpRight} tom="rosa" total={contas.saiu} linhas={contas.saidasPorCategoria} vazio="Nenhuma saída neste mês." quente />
                     <CustoDasVendas inicio={inicio} fim={fim} doMes={dados.doMes} resultado={resultado} mesAtual={mesAtual}
                       entrouDeProdutos={contas.entradasPorCategoria.find((c) => c.nome === "Venda de produtos")?.valor ?? 0} />
                     <CartaoMaquininha de={inicio} ate={fim} faturamento={faturamento} rotuloPeriodo="no mês" />
+                    <ParaOContador de={inicio} ate={fim} rotulo={tituloMes} />
                   </div>
                 </div>
               ) : (
@@ -384,8 +389,9 @@ function Financeiro() {
                 {filtrados.length > 0 && (
                   <p className="g-muted g-pp g-tab" style={{ margin: "12px 4px 0" }}>
                     {n(filtrados.length, "lançamento", "lançamentos")}
-                    {filtro !== "saida" && ` · entrou ${brl(soma(filtrados.filter((l) => l.tipo === "entrada")))}`}
-                    {filtro !== "entrada" && ` · saiu ${brl(soma(filtrados.filter((l) => l.tipo === "saida")))}`}
+                    {filtro !== "saida" && ` · entradas lançadas ${brl(soma(filtrados.filter((l) => l.tipo === "entrada")))}`}
+                    {filtro !== "entrada" && ` · saídas lançadas ${brl(soma(filtrados.filter((l) => l.tipo === "saida")))}`}
+                    {filtro !== "entrada" && filtrados.some(ehDevolucao) && " (com as devoluções, que não são despesa)"}
                   </p>
                 )}
                 {filtrados.length ? (
@@ -541,13 +547,13 @@ function Comparacao({ contas, mesAtual, nomeAnterior }: {
 }) {
   if (!contas.temAnterior) return <p className="g-muted g-p">Não há lançamentos em {nomeAnterior} para comparar.</p>;
   const frase = (agora: number, antes: number) => {
-    const d = Math.round((agora - antes) * 100) / 100;
+    const d = centavos((agora - antes));
     if (d === 0) return `o mesmo que em ${nomeAnterior}`;
     return `${brl(Math.abs(d))} a ${d > 0 ? "mais" : "menos"} que em ${nomeAnterior}`;
   };
   return (
     <p className="g-p">
-      {mesAtual ? "Até agora, entrou " : "Entrou "}<b>{frase(contas.entrou, contas.entrouAntes)}</b> e saiu <b>{frase(contas.saiu, contas.saiuAntes)}</b>.
+      {mesAtual ? "Até agora, o faturamento é " : "O faturamento foi "}<b>{frase(contas.entrou, contas.entrouAntes)}</b> e as despesas, <b>{frase(contas.saiu, contas.saiuAntes)}</b>.
       {mesAtual && <span className="g-muted"> O mês ainda não acabou.</span>}
     </p>
   );
@@ -559,9 +565,9 @@ function Fluxo({ semanas, atual }: { semanas: { rotulo: string; entrou: number; 
   const altura = (v: number) => (v ? Math.max(3, (v / maior) * 100) : 0);
   return (
     <div className="g-fin-fluxo" role="img"
-      aria-label={semanas.map((s) => `Dias ${s.rotulo}: entrou ${brl(s.entrou)}, saiu ${brl(s.saiu)}`).join(". ")}>
+      aria-label={semanas.map((s) => `Dias ${s.rotulo}: faturamento ${brl(s.entrou)}, despesas ${brl(s.saiu)}`).join(". ")}>
       {semanas.map((s, i) => (
-        <div key={s.rotulo} className={i === atual ? "agora" : undefined} title={`Dias ${s.rotulo}: entrou ${brl(s.entrou)}, saiu ${brl(s.saiu)}`}>
+        <div key={s.rotulo} className={i === atual ? "agora" : undefined} title={`Dias ${s.rotulo}: faturamento ${brl(s.entrou)}, despesas ${brl(s.saiu)}`}>
           <div className="cols">
             <span className="e"><b style={{ bottom: `${altura(s.entrou)}%` }}>{s.entrou ? brlMini(s.entrou) : ""}</b><i style={{ height: `${altura(s.entrou)}%` }} /></span>
             <span className="s"><b style={{ bottom: `${altura(s.saiu)}%` }}>{s.saiu ? brlMini(s.saiu) : ""}</b><i style={{ height: `${altura(s.saiu)}%` }} /></span>

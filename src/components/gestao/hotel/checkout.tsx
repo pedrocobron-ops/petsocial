@@ -21,7 +21,7 @@ import { comValoresDeEstadia } from "@/lib/gestao/reservado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { imprimirComprovante } from "@/lib/gestao/comprovante";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, linkWhatsApp, precoDoServico, soDigitos } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, linkWhatsApp, precoDoServico, soDigitos, centavos } from "@/lib/gestao/util";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -38,7 +38,6 @@ import { LinhaPromoDaEstadia, usePromoDaEstadia } from "./promo-da-estadia";
 import { horaCurta, nomeTipo, type EstadiaCompleta } from "./tipos";
 import "./hotel.css";
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 const quando = (d: string | Date) => `${dataAmigavel(new Date(d))}, ${horaCurta(d)}`;
 
 /* ---------- pacote do pet que serve para a estadia ---------- */

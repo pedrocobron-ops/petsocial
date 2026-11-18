@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { quemOferece } from "@/lib/gestao/vendedor-documentos";
 import Legal, { Email, EmailJuridico, Foro, Indice, Parte, QuemResponde, Zap } from "@/components/gestao/legal";
 import { EMPRESA } from "@/lib/empresa";
 import { DIAS_DO_BOLETIM } from "@/lib/gestao/boletim";
@@ -47,7 +48,8 @@ const PARTES: [string, string][] = [
   ["geral", "Regras gerais"],
 ];
 
-export default function TermosDoGestao() {
+export default async function TermosDoGestao() {
+  const v = await quemOferece();
   let n = 0;
   const p = (id: string, resumo: string, children: React.ReactNode) => {
     n += 1;
@@ -68,10 +70,10 @@ export default function TermosDoGestao() {
 
       <Indice partes={PARTES} />
 
-      {p("quem-somos", EMPRESA.pessoaFisica ? `O Gestão é oferecido por ${EMPRESA.nome}, pessoa física responsável pela marca ${EMPRESA.marca}. Ao criar a conta, você faz um contrato com ele.` : `O Gestão é oferecido pela empresa responsável pela marca ${EMPRESA.marca}. Ao criar a conta, você faz um contrato com ela.`, <>
+      {p("quem-somos", v.pessoaFisica ? `O Gestão é oferecido por ${v.nome}, pessoa física responsável pela marca ${EMPRESA.marca}. Ao criar a conta, você faz um contrato com ele.` : `O Gestão é oferecido pela empresa responsável pela marca ${EMPRESA.marca}. Ao criar a conta, você faz um contrato com ela.`, <>
         <p>
-          O Maestro Pet Gestão (o &quot;Gestão&quot; ou o &quot;sistema&quot;) é oferecido por <QuemResponde />, {EMPRESA.pessoaFisica ? "responsável" : "dona"} pela marca {EMPRESA.marca}.
-          Neste texto, &quot;nós&quot; é quem oferece o Gestão: hoje, {EMPRESA.pessoaFisica ? "a pessoa física indicada acima" : "a empresa indicada acima"}; depois, a empresa que assumir o serviço (parte 26). &quot;Você&quot; ou &quot;assinante&quot; é a pessoa ou a empresa que cria a conta do pet shop.
+          O Maestro Pet Gestão (o &quot;Gestão&quot; ou o &quot;sistema&quot;) é oferecido por <QuemResponde v={v} />, {v.pessoaFisica ? "responsável" : "dona"} pela marca {EMPRESA.marca}.
+          Neste texto, &quot;nós&quot; é quem oferece o Gestão: hoje, {v.pessoaFisica ? "a pessoa física indicada acima" : "a empresa indicada acima"}; depois, a empresa que assumir o serviço (parte 26). &quot;Você&quot; ou &quot;assinante&quot; é a pessoa ou a empresa que cria a conta do pet shop.
           &quot;Equipe&quot; são as pessoas que você convida para entrar na conta. &quot;Clientes&quot; ou &quot;tutores&quot; são os clientes do seu pet shop.
         </p>
         <p>
@@ -79,7 +81,7 @@ export default function TermosDoGestao() {
           Se algo combinado por escrito com você for diferente, vale o combinado.
         </p>
         <p>
-          {EMPRESA.pessoaFisica ? <>Hoje quem responde pelo Gestão é uma pessoa física, e não uma empresa. Isso não muda os seus direitos: os dados continuam do seu pet shop (parte 10), você baixa tudo quando quiser (parte 22) e, se um dia o serviço deixar de ser oferecido, avisamos com pelo menos 60 dias de antecedência e devolvemos o que foi pago e não usado (parte 21). Quando abrirmos a empresa, ela assume este contrato com as mesmas condições (parte 26). </> : null}
+          {v.pessoaFisica ? <>Hoje quem responde pelo Gestão é uma pessoa física, e não uma empresa. Isso não muda os seus direitos: os dados continuam do seu pet shop (parte 10), você baixa tudo quando quiser (parte 22) e, se um dia o serviço deixar de ser oferecido, avisamos com pelo menos 60 dias de antecedência e devolvemos o que foi pago e não usado (parte 21). Quando abrirmos a empresa, ela assume este contrato com as mesmas condições (parte 26). </> : null}
           Contato: <Email /> ou <Zap />.{EMPRESA.emailJuridico && EMPRESA.emailJuridico !== EMPRESA.email ? <> Assuntos jurídicos e de privacidade: <EmailJuridico />.</> : " O mesmo e-mail atende assuntos jurídicos e de privacidade."}
         </p>
       </>)}
@@ -139,6 +141,7 @@ export default function TermosDoGestao() {
         </ul>
         <ul>
           <li>O preço que vale para você é o mostrado na tela Assinatura e no checkout no momento em que você assina. É o valor final, sem acréscimos. O comprovante do pagamento é enviado pela Cakto.</li>
+          <li><b>Quem vende e nota fiscal:</b> quem vende a assinatura é quem oferece o Gestão (parte 1){v.pessoaFisica ? ", hoje uma pessoa física" : ""}. <b>Por enquanto a assinatura não tem nota fiscal</b>: você recebe o comprovante de pagamento da Cakto. Se precisar de nota fiscal para o seu negócio, fale com a gente antes de assinar.</li>
           <li>O pagamento é feito na <b>Cakto</b>, a plataforma de pagamentos que usamos. Os dados do cartão ou do Pix são digitados no ambiente dela, sob as regras dela. Nós não recebemos nem guardamos o número do seu cartão.</li>
           <li>A cobrança é <b>recorrente</b>: conforme o período escolhido, todo mês, a cada 3 ou a cada 6 meses, e a assinatura se renova sozinha pelo mesmo período até você cancelar.</li>
           <li>Use no checkout o mesmo e-mail da sua conta: é por ele que o sistema reconhece o pagamento e libera o acesso. Pagamento com outro e-mail pode demorar a ser reconhecido.</li>
@@ -220,9 +223,9 @@ export default function TermosDoGestao() {
           <li>tratar os dados dos seus clientes e da sua equipe só para prestar o serviço. Estes termos e o que você faz no sistema (lançar, apagar, baixar, ligar ou desligar funções) são as suas instruções para nós;</li>
           <li>limitar o acesso da nossa equipe ao necessário para suporte que você pediu, manutenção, segurança ou obrigação legal, sempre com sigilo;</li>
           <li>usar só os fornecedores listados na Política de privacidade (parte 5), inclusive os que ficam fora do Brasil (parte 6). Ao aceitar estes termos, você autoriza esse uso. Se incluirmos um fornecedor novo que receba dados dos seus clientes, avisamos com pelo menos 15 dias de antecedência; se não concordar, você pode cancelar e receber de volta a parte não usada do período pago;</li>
-          <li>avisar você sem demora, em até 2 dias úteis depois de confirmarmos, de qualquer incidente de segurança que atinja dados do seu pet shop, com o que soubermos, para você decidir sobre a comunicação à ANPD e aos tutores;</li>
+          <li>avisar você sem demora, em até 48 horas depois de tomarmos conhecimento de um incidente de segurança que possa ter atingido dados do seu pet shop, mesmo que a investigação não tenha terminado, dizendo o que já sabemos; depois, completamos as informações, para você decidir sobre a comunicação à ANPD e aos tutores;</li>
           <li>ajudar você a atender os pedidos dos tutores e da ANPD;</li>
-          <li>não usar os dados dos seus clientes para fins nossos (propaganda, venda, treino de inteligência artificial). Para melhorar o sistema, usamos só números gerais, que não identificam tutor nem pet;</li>
+          <li>não usar os dados dos seus clientes para fins nossos (propaganda, venda, treino de inteligência artificial). Para melhorar o sistema, usamos números gerais, que não identificam tutor nem pet. Das conversas com o Mozart e a Ajuda, a nossa equipe vê só números; a única exceção é abrir uma conversa para dar suporte, uma de cada vez, com o motivo escrito. Cada abertura fica registrada e você vê a lista em Meu pet shop, em &quot;Acessos da equipe Maestro Pet&quot;. Essas conversas não são usadas em propaganda nem para treinar inteligência artificial;</li>
           <li>apagar os dados quando a conta acabar, como explica a parte 22, salvo o que a lei mandar guardar;</li>
           <li>dar, quando você pedir por escrito, as informações de que precisar para mostrar que cumpre a LGPD.</li>
         </ul>
@@ -233,7 +236,7 @@ export default function TermosDoGestao() {
           <li>Você só deve enviar ao sistema fotos que tem o direito de usar. <b>Fotografe o pet, não as pessoas.</b> Evite rostos de tutores, funcionários e principalmente crianças; se alguém aparecer, a autorização dessa pessoa é sua responsabilidade.</li>
           <li>As fotos do boletim e do antes e depois ficam no <b>álbum do pet</b> enquanto o pet estiver cadastrado. O dono pode apagar uma foto a qualquer momento: ela sai do álbum, do boletim e dos links já enviados.</li>
           <li>Antes de postar foto ou vídeo de um pet de cliente nas redes sociais do pet shop ou em qualquer divulgação, tenha a <b>autorização do tutor</b>.</li>
-          <li><b>Autorização pelo boletim:</b> na página do boletim, o tutor pode tocar em &quot;Pode postar a foto&quot; e escolher, sem nada marcado de início, se autoriza só as fotos daquele boletim ou também as das próximas visitas e, se quiser, o perfil dele para a loja marcar. O sistema guarda o texto exato que ele aceitou, o dia e a hora, e mostra na ficha e no álbum do pet (&quot;Pode postar&quot;, com a data). A autorização só pode ser dada pela página do boletim, não pelas telas do sistema. Quem abre o link é tratado como o tutor: mande o boletim só a ele, e ninguém da equipe deve autorizar no lugar dele. O sistema guarda também o endereço de internet e o navegador de quem autorizou.</li>
+          <li><b>Autorização pelo boletim:</b> na página do boletim, o tutor pode responder à pergunta &quot;Pode postar a foto?&quot; tocando em &quot;Quero autorizar&quot; e escolher, sem nada marcado de início, se autoriza só as fotos daquele boletim ou também as das próximas visitas e, se quiser, o perfil dele para a loja marcar. O sistema guarda o texto exato que ele aceitou, o dia e a hora, e mostra na ficha e no álbum do pet (&quot;Pode postar&quot;, com a data). A autorização só pode ser dada pela página do boletim, não pelas telas do sistema. Quem abre o link é tratado como o tutor: mande o boletim só a ele, e ninguém da equipe deve autorizar no lugar dele. O sistema guarda também o endereço de internet e o navegador de quem autorizou.</li>
           <li><b>O tutor tira quando quiser,</b> pelo link &quot;Não quero mais&quot;, que continua funcionando mesmo depois que a página do boletim para de abrir. A partir daí a ficha mostra &quot;Sem autorização&quot;. Não poste fotos novas desse pet e avalie retirar das suas redes o que já foi postado.</li>
           <li>O sistema <b>não posta nada</b> nas redes sociais. Quem escolhe a foto, posta e responde pela postagem é o pet shop. Para autorizações pedidas fora do sistema (papel, mensagem), guardá-las é com você.</li>
           <li><b>Checklist de entrada:</b> as fotos de como o pet chegou (ferida, pulgas, nós) e a assinatura ou o aceite do tutor ficam guardados com o atendimento ou a estadia. O texto do termo é seu: o sistema traz um modelo, que você pode mudar, e você responde pelo que ele diz. O Maestro Pet só guarda o registro do aceite (nome, hora, endereço de internet, navegador e um código de conferência do texto e das fotos aceitos); ele não garante que o termo tenha valor em uma disputa.</li>
@@ -301,7 +304,7 @@ export default function TermosDoGestao() {
           <li>Fazemos o possível para o Gestão funcionar bem e sem interrupção, mas <b>não garantimos um tempo mínimo no ar</b> nem ausência de erros. Pode haver paradas para manutenção (de preferência fora do horário comercial), falhas nossas ou dos fornecedores (hospedagem, banco de dados, pagamentos, IA) e problemas de internet ou do seu aparelho.</li>
           <li>
             <b>Cópias de segurança que existem hoje:</b> (1) as cópias automáticas do banco de dados feitas pelo fornecedor (Supabase), na frequência e pelo tempo do plano contratado com ele;
-            (2) uma cópia completa do banco que a nossa equipe baixa de tempos em tempos (o nosso painel lembra de fazer uma a cada 7 dias) e guarda fora do fornecedor.
+            (2) uma cópia completa do banco que a nossa equipe baixa de tempos em tempos (o nosso painel lembra de fazer uma a cada 7 dias) e guarda fora do fornecedor, em local protegido por senha a que só o responsável tem acesso, mantendo no máximo as 4 mais recentes (cerca de 1 mês).
             Nenhuma das duas inclui as fotos. Elas existem para recuperar o sistema em caso de problema grave; não prometemos frequência, prazo de guarda nem que uma cópia vá existir para o dia de que você precisa.
           </li>
           <li>
@@ -366,10 +369,10 @@ export default function TermosDoGestao() {
       {p("fim", `Você baixa todos os dados quando quiser. Para apagar a conta, o titular pede no próprio sistema: ela fica ${DIAS_ATE_APAGAR_A_PEDIDO} dias só para consulta (dá para cancelar) e depois é apagada. Alguns registros ficam pelo prazo da lei.`, <>
         <ul>
           <li><b>Baixar todos os dados:</b> a qualquer momento, inclusive com a conta só para consulta, o dono baixa em Meu pet shop um arquivo .zip com uma planilha para cada parte (clientes, pets, saúde, agenda, creche e hotel, pacotes, vendas, financeiro, caixa, estoque, boletins, autorizações de fotos, equipe e outras) e um README que explica cada uma. As planilhas abrem no Excel e servem para levar os dados a outro sistema. As fotos não entram, e a equipe vem sem senhas.</li>
-          <li><b>Dados de um tutor:</b> na ficha do tutor, o dono baixa num toque os dados daquele cliente, para responder a um pedido dele. Em &quot;Apagar dados deste tutor&quot;, depois de digitar o nome dele, o nome vira &quot;Cliente removido&quot;, telefone, e-mail, endereço e observações são apagados, os pets ficam sem nome, foto, saúde, boletins e autorizações, os orçamentos ficam sem nome e telefone, as conversas com o Mozart que citam o tutor são apagadas, e os valores continuam no financeiro sem o nome, para a contabilidade. Não dá para desfazer.</li>
+          <li><b>Dados de um tutor:</b> na ficha do tutor, o dono baixa num toque os dados daquele cliente, para responder a um pedido dele. Em &quot;Apagar dados deste tutor&quot;, depois de digitar o nome dele, o nome vira &quot;Cliente removido&quot;, telefone, e-mail, endereço e observações são apagados (inclusive o endereço do leva e traz e os cuidados anotados nos horários e nas estadias), os pets ficam sem nome, foto, saúde, boletins e autorizações, a lista de espera e os orçamentos ficam sem nome e telefone, os pedidos pelo link e as conversas com o Mozart que citam o tutor são apagados, e os valores continuam no financeiro sem o nome, para a contabilidade. &quot;Excluir de vez&quot; faz a mesma limpeza e ainda apaga a ficha, os pets e o histórico de atendimentos. As fotos saem do armazenamento em até 1 dia. Não dá para desfazer.</li>
           <li><b>Encerrar e apagar a conta:</b> o titular da conta pede em Meu pet shop, digitando o nome do pet shop. A conta fica <b>{DIAS_ATE_APAGAR_A_PEDIDO} dias só para consulta</b> (ninguém lança e o link para de receber pedidos), com o aviso na tela, e qualquer dono pode cancelar nesse prazo. Passados os {DIAS_ATE_APAGAR_A_PEDIDO} dias, apagamos o pet shop, todos os dados lançados, os arquivos (fotos e documentos) e os logins da equipe que não estão em outro pet shop. Isso não cancela a assinatura: cancele também pela tela Assinatura (parte 7).</li>
-          <li><b>Sair de uma equipe:</b> quem trabalha num pet shop e não é o titular pode tocar em &quot;Sair desta equipe&quot;. O login deixa de abrir aquele pet shop; o nome continua no histórico dele.</li>
-          <li>Os pedidos de dados (baixar todos os dados, baixar ou apagar os dados de um tutor, pedir ou cancelar a exclusão, sair da equipe) ficam registrados com quem pediu e quando, sem os dados dos clientes, para o pet shop mostrar que atendeu o pedido.</li>
+          <li><b>Sair de uma equipe:</b> quem trabalha num pet shop e não é o titular pode tocar em &quot;Sair desta equipe&quot;. O login deixa de abrir aquele pet shop; o nome continua no histórico dele. Quem não está em nenhum pet shop pode apagar o próprio login em &quot;Apagar o meu login&quot;. Cada pessoa baixa os próprios dados em &quot;Baixar os meus dados&quot;.</li>
+          <li>Os pedidos de dados (baixar todos os dados, baixar, apagar ou excluir os dados de um tutor, pedir ou cancelar a exclusão, sair da equipe) ficam registrados com quem pediu e quando, sem os dados dos clientes, para o pet shop mostrar que atendeu o pedido.</li>
           <li>Também atendemos esses pedidos pelo nosso contato; confirmamos que o pedido é de quem pode fazê-lo.</li>
           <li>Conta encerrada por falta de pagamento segue a parte 8.</li>
           <li>As cópias de segurança (parte 16) são substituídas com o tempo: o que foi apagado pode continuar nelas até serem trocadas, e elas só servem para recuperar o sistema. Registros de pagamento, de aceite destes termos e outros que a lei nos obrigue a guardar, ou que sejam necessários para nos defendermos, ficam pelo prazo legal.</li>

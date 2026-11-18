@@ -8,7 +8,7 @@ import {
 } from "@/lib/gestao/contas-fixas";
 import { montarLucro, type LucroDoBanco } from "@/lib/gestao/lucro";
 import { CATEGORIAS_SAIDA } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, isoDia } from "@/lib/gestao/util";
+import { brl, dataCompleta, isoDia, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { CampoDinheiro } from "../loja/pecas";
@@ -67,7 +67,7 @@ export default function ContasFixas({ versao, aoEditar, aoCriar }: { versao: num
                     {terminou ? <span className="g-tag">terminou</span>
                       : !c.ativa ? <span className="g-tag amarelo">pausada</span>
                       : c.valor_varia ? <span className="g-tag">valor varia</span>
-                      : naoMensal ? <span className="g-tag">{brl(Math.round(valorPorMes(c) * 100) / 100)} por mês</span> : null}
+                      : naoMensal ? <span className="g-tag">{brl(centavos(valorPorMes(c)))} por mês</span> : null}
                   </span>
                 </button>
               );
@@ -104,7 +104,7 @@ function QuantoCusta({ resumo: r, contas, lucro }: { resumo: ResumoContasFixas; 
   const vendeComCusto = Boolean(lucro && lucro.produtos.length > 0);
   const meta = comMargem ? comMargem.faturamento : r.total_mensal;
   const pct = comMargem ? Math.floor((Math.max(0, r.faturamento_mes) / meta) * 100) : r.pct ?? 0;
-  const falta = Math.max(0, Math.round((meta - r.faturamento_mes) * 100) / 100);
+  const falta = Math.max(0, centavos((meta - r.faturamento_mes)));
   return (
     <section className="g-card g-fin-meta" aria-label="Quanto custa manter o pet shop" data-teste="quanto-custa">
       <div className="g-card-t"><h3><Tile icone={Building2} tom="manteiga" tamanho="p" />Quanto custa manter o pet shop</h3></div>
@@ -122,7 +122,7 @@ function QuantoCusta({ resumo: r, contas, lucro }: { resumo: ResumoContasFixas; 
       )}
       {r.nao_mensais > 0 && exemplo && (
         <p className="g-muted g-pp" style={{ margin: 0 }}>
-          Contas que não vencem todo mês entram divididas pelos meses: {exemplo.nome} ({brl(exemplo.valor)} {FREQ_FRASE[exemplo.frequencia]}) conta {brl(Math.round(valorPorMes(exemplo) * 100) / 100)} por mês.
+          Contas que não vencem todo mês entram divididas pelos meses: {exemplo.nome} ({brl(exemplo.valor)} {FREQ_FRASE[exemplo.frequencia]}) conta {brl(centavos(valorPorMes(exemplo)))} por mês.
         </p>
       )}
       <div className="g-fin-meta-topo">

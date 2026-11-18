@@ -71,7 +71,11 @@ end $$; select current_setting('teste.soltas');`);
   T.ok('a loja tem história para comparar', B.num(`select count(*) from lancamentos where petshop_id='${P}'`) > 700 && B.num(`select count(*) from agendamentos where petshop_id='${P}'`) >= 420);
 
   for (const [nome, de, ate] of [['30 dias', 'current_date - 30', 'current_date'], ['3 meses (meio de mês a meio de mês)', 'current_date - 97', 'current_date - 5'], ['12 meses', 'current_date - 365', 'current_date'], ['um dia', 'current_date - 40', 'current_date - 40']]) {
-    const r = como(uid, `select (${antes}.indicadores_do_periodo('${P}', ${de}, ${ate})::text = public.indicadores_do_periodo('${P}', ${de}, ${ate})::text)::text || '|' || jsonb_array_length(public.indicadores_do_periodo('${P}', ${de}, ${ate}) -> 'meses') || '|' || (public.indicadores_do_periodo('${P}', ${de}, ${ate}) -> 'meses' -> 0 ->> 'entradas')`);
+    // rodada 9 (N4, migração 20261234): o valor médio por conta ganhou uma definição única (contas, valor_contas, valor_medio, pacotes)
+    // e cada serviço ganhou "pagos": esses campos mudaram de propósito e ficam fora da comparação; todo o resto continua igual ao centavo
+    const sem = (j) => `(select jsonb_set(jsonb_set(j, '{meses}', (select coalesce(jsonb_agg(m - 'contas' - 'valor_contas' - 'valor_medio' - 'pacotes' - 'valor_pacotes' order by o), '[]'::jsonb) from jsonb_array_elements(j -> 'meses') with ordinality x(m, o))),
+      '{servicos}', (select coalesce(jsonb_agg(s - 'pagos' order by o), '[]'::jsonb) from jsonb_array_elements(j -> 'servicos') with ordinality y(s, o))) from (select ${j} as j) z)`;
+    const r = como(uid, `select (${sem(`${antes}.indicadores_do_periodo('${P}', ${de}, ${ate})`)}::text = ${sem(`public.indicadores_do_periodo('${P}', ${de}, ${ate})`)}::text)::text || '|' || jsonb_array_length(public.indicadores_do_periodo('${P}', ${de}, ${ate}) -> 'meses') || '|' || (public.indicadores_do_periodo('${P}', ${de}, ${ate}) -> 'meses' -> 0 ->> 'entradas')`);
     T.ok(`indicadores_do_periodo, ${nome}: igual ao centavo`, r.startsWith('true|') && Number(r.split('|')[1]) >= 1, r);
   }
   const comDinheiro = como(uid, `select sum((m ->> 'entradas')::numeric)::text || '|' || sum((m ->> 'contas')::int) || '|' || sum((m ->> 'taxas')::numeric) || '|' || sum((m ->> 'primeira_vez')::int) from jsonb_array_elements(public.indicadores_do_periodo('${P}', current_date - 365, current_date) -> 'meses') m`).split('|').map(Number);

@@ -53,11 +53,12 @@ import CuidadosDeAgora from "@/components/gestao/hotel/cuidados-de-agora";
 import { principalDe, usaModulo } from "@/lib/gestao/modulos";
 import type { Banco } from "@/lib/gestao/supabase";
 import type { Estadia, Petshop } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, juntaDiaHora, nomeMes, somaDias } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, deIsoDia, inicioDoDia, isoDia, juntaDiaHora, nomeMes, somaDias, centavos } from "@/lib/gestao/util";
 import { conflitoDoPet, type Periodo } from "@/lib/gestao/conflito-estadia";
 import "./creche-hotel.css";
 import "@/components/gestao/hotel/hotel.css";
 import { CampoComVoz } from "@/components/gestao/ditado";
+import { DICA_OBS } from "@/lib/gestao/privacidade-textos";
 
 // As outras partes da tela (Chamada, Ocupação, Diário, Mensalistas, Cobranças) vêm à parte: a Casa agora abre sem esperar
 // baixar todas. Depois que a tela abriu, elas baixam em segundo plano (useAdiantar): no toque, já estão aqui.
@@ -87,7 +88,6 @@ type Ver = "chamada" | "casa" | "ocupacao" | "diario" | "mensalistas" | "cobranc
 
 /** "ontem, 8h" */
 const quando = (d: string | Date) => `${dataAmigavel(new Date(d))}, ${horaCurta(d)}`;
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 
 // A regra de ocupação de vaga (`estadiaOcupa`) mora em src/lib/gestao/creche.ts, junto da conta dos mensalistas;
@@ -1442,7 +1442,7 @@ function NovaEstadia({ jaAquiInicial, tipoInicial, diaInicial, saidaInicial, hor
         {ofereceSinal && <CamposSinal estado={sinal} aoMudar={(s) => { setMexeuNoSinal(true); setSinal(s); setErroSinal(null); }} sugerido={sugerido} erro={erroSinal} semTutor={!pet.clientes?.id} />}
         {ofereceAdiantado && <CamposAdiantado estado={adiantado} aoMudar={(s) => { setAdiantado(s); setErroSinal(null); }} erro={erroSinal} />}
         {comCuidados && <EditorDeCuidados valor={cuidados} aoMudar={setCuidados} />}
-        <Campo rotulo="Observações">
+        <Campo rotulo="Observações" dica={DICA_OBS}>
           <CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações da estadia"><textarea className="g-textarea" value={obs} maxLength={600} onChange={(e) => setObs(e.target.value)} placeholder={comCuidados ? "Horário de passeio, o que trouxe na mochila, recados do tutor…" : "Ração, remédio, horário de passeio, o que trouxe na mochila…"} /></CampoComVoz>
         </Campo>
         {comCuidados && !cuidados.some((c) => c.tipo === "remedio" && c.oque.trim()) && falaDeRemedio(obs, pet.alertas) && (

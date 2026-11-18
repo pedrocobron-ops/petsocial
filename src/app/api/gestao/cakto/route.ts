@@ -7,6 +7,14 @@ import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/er
 
 export const runtime = "nodejs";
 
+/** O cupom do aviso da Cakto, só quando veio: código em maiúsculas (até 40), desconto e valor antes do desconto. */
+function cupomDoAviso(dados: Record<string, unknown>) {
+  const codigo = typeof dados.couponCode === "string" ? dados.couponCode.trim().toUpperCase().slice(0, 40) : "";
+  if (!codigo) return {};
+  const numero = (v: unknown) => { const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN; return Number.isFinite(n) ? n : null; };
+  return { cupom: codigo, desconto: numero(dados.discount), valor_cheio: numero(dados.baseAmount) };
+}
+
 /**
  * Aviso de pagamento da Cakto (webhook): libera, marca como atrasada ou encerra a assinatura do pet shop.
  * Quem confere o segredo e muda o status é a função `cakto_evento` do banco (o segredo fica lá, só como hash).
@@ -64,7 +72,9 @@ async function tratar(req: Request) {
     p_produto_curto: texto(produto.short_id) as string,
     // guarda só o necessário para conferir depois (sem documento nem telefone do comprador). `pago_em`: quando a compra foi
     // feita; o e-mail do dono só puxa o pagamento se já estava na conta antes disso (migração 20261209)
-    p_payload: { oferta: oferta?.id ?? null, assinatura: idAssinatura, pedido: dados.id ?? null, status: dados.status ?? null, produto: produto.short_id ?? produto.id ?? null, valor: dados.amount ?? null, metodo: dados.paymentMethod ?? null, pago_em: texto(dados.paidAt) ?? texto(dados.createdAt) } as never,
+    p_payload: { oferta: oferta?.id ?? null, assinatura: idAssinatura, pedido: dados.id ?? null, status: dados.status ?? null, produto: produto.short_id ?? produto.id ?? null, valor: dados.amount ?? null, metodo: dados.paymentMethod ?? null, pago_em: texto(dados.paidAt) ?? texto(dados.createdAt),
+      // cupom usado no pagamento (campo `couponCode` do aviso), o desconto e o valor de tabela: o painel mostra as vendas por cupom
+      ...cupomDoAviso(dados) } as never,
   });
   if (error) { await registrarErroServidor("/api/gestao/cakto", erroDoBanco(error, "cakto_evento")); return NextResponse.json({ ok: false }, { status: 500 }); }
   if (data === "recusado") return NextResponse.json({ ok: false }, { status: 401 });

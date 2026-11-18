@@ -99,9 +99,10 @@ export function textoPronto(p: { tutor?: string | null; pet: string; sexo?: Sexo
 }
 
 /** Confirmação de um horário recém-marcado: "O banho da Mel ficou marcado para segunda, 16/11 às 09:00." */
-export function textoConfirmacao(p: { tutor?: string | null; pet: string; sexo?: SexoPet; servico?: string | null; quando: string; hora: string; petshop: string }) {
+/** `onde`: o endereço do pet shop numa linha (Meu pet shop › Dados); com ele, a mensagem diz onde fica. */
+export function textoConfirmacao(p: { tutor?: string | null; pet: string; sexo?: SexoPet; servico?: string | null; quando: string; hora: string; petshop: string; onde?: string | null }) {
   const x = servicoComArtigo(p.servico) ?? { texto: "O horário", varios: false, feminino: false };
-  return `${saudacaoZap(p.tutor, p.petshop)} ${x.texto} ${doPet(p.pet, p.sexo)} ${concorda(x, "ficou", "ficaram", "marcad")} para ${p.quando} às ${p.hora}. Qualquer coisa, é só chamar por aqui.`;
+  return `${saudacaoZap(p.tutor, p.petshop)} ${x.texto} ${doPet(p.pet, p.sexo)} ${concorda(x, "ficou", "ficaram", "marcad")} para ${p.quando} às ${p.hora}.${p.onde?.trim() ? ` Nosso endereço: ${p.onde.trim()}${/[.!?]$/.test(p.onde.trim()) ? "" : "."}` : ""} Qualquer coisa, é só chamar por aqui.`;
 }
 
 /** Aviso de que o horário mudou: "O banho da Nina foi remarcado para amanhã às 14:00." A pessoa manda pelo WhatsApp. */

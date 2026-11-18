@@ -6,7 +6,7 @@ import { mensagemDeDivida, multaSugerida } from "@/lib/gestao/dinheiro-opcoes";
 import { dividaPorVencimento, fraseDoDisponivel, fraseDoVencimento, limiteDoCliente, type DividaPorVencimento } from "@/lib/gestao/fiado";
 import { descricaoAtual } from "@/lib/gestao/dinheiro";
 import type { Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, dataCurta, dataCurtaOuAno, hora, isoDia, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, dataCurtaOuAno, hora, isoDia, linkWhatsApp, telefoneValido, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { BarraDoLimite } from "./limite-fiado";
@@ -25,7 +25,6 @@ export type Devedor = { chave: string; tutor: Tutor | null; contas: Lancamento[]
   /** O total separado por vencimento e o que conta no limite de fiado (sem a mensalidade e o sinal que ainda não venceram). */
   partes: DividaPorVencimento };
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 const quandoFoi = (iso: string) => `${dataCurta(iso)} às ${hora(iso)}`;
 
 /** As contas em aberto de clientes: de todos, ou de um tutor só. */

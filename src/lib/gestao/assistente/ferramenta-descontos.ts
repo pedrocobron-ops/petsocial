@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Contexto } from "./ferramentas";
+import { centavos as real } from "../util";
 
 /**
  * Mozart: "quanto eu dei de desconto este mês?". A mesma lista de Financeiro, Alterações (função `alteracoes_do_periodo`,
@@ -14,7 +15,6 @@ export const FERRAMENTA_DESCONTOS: Anthropic.Tool & { grava: false; financeiro: 
 };
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
-const real = (n: number) => Math.round(n * 100) / 100;
 type Linha = { tipo: string; quando: string; quem_nome: string | null; descricao: string; de: number | null; para: number | null };
 
 export async function consultarDescontos(c: Contexto, nome: string, e: Record<string, unknown>, erro: (m: string) => Error): Promise<{ resultado: unknown } | null> {

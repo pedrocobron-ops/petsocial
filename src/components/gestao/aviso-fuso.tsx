@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import { Clock } from "lucide-react";
 import { useGestao } from "./contexto";
+import { definirFusoDaLoja } from "@/lib/gestao/util";
 
 /** Dia e hora "de parede" num fuso, como minutos desde 1970 (para comparar com a hora do aparelho). null se o fuso não existe. */
 function paredeEm(fuso: string, d: Date): number | null {
@@ -25,6 +26,8 @@ export default function AvisoDeFuso() {
   const { petshop, souDono } = useGestao();
   const [dif, setDif] = useState<{ horas: string; adiantado: boolean; la: string } | null>(null);
   const [visto, setVisto] = useState(false);
+  // o dinheiro por dia segue o fuso do pet shop, não o do aparelho (faturamento.ts, hojeDaLoja)
+  definirFusoDaLoja(petshop.fuso);
   useEffect(() => {
     const medir = () => {
       const agora = new Date();

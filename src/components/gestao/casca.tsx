@@ -12,6 +12,7 @@ import { planoPorId } from "@/lib/gestao/planos";
 import { DIAS_DE_AVISO, fimDoTeste } from "./fim-do-teste";
 import { dataCompleta, dataLonga } from "@/lib/gestao/util";
 import SairDaEquipe from "./lgpd/sair-da-equipe";
+import { BaixarMeusDados } from "./lgpd/meus-dados";
 import { AvatarPessoa, EVENTO_ASSISTENTE, EVENTO_MUDOU, Folha } from "./ui";
 import BuscaGeral from "./busca-geral";
 import { areaDaRota } from "@/lib/gestao/acessos";
@@ -105,7 +106,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("pointerdown", tocou, true);
   }, []);
   const caminho = usePathname();
-  const { sb, user, petshop, eu, souDono, posso, liberado, exclusao, souTitular, diasDeTeste, assinaturaAberta, sair } = useGestao();
+  const { sb, user, petshop, eu, souDono, posso, liberado, exclusao, souTitular, diasDeTeste, atraso, sair } = useGestao();
   const [pedidos, setPedidos] = useState(0);
   const [assistente, setAssistente] = useState<{ aberta: boolean; pedido: string }>({ aberta: false, pedido: "" });
   // a página recarregou com a conversa do Mozart aberta (ou no meio de um "Pode fazer"): ela volta aberta, como estava
@@ -288,13 +289,14 @@ export default function Casca({ children }: { children: React.ReactNode }) {
           {souDono && diasDeTeste !== null && (
             <div className="g-lado-plano">
               <b>Teste grátis</b>
-              <span>{!teste || teste.vencido ? (liberado ? "Terminou. Você continua usando até a assinatura abrir." : "Terminou. A conta está só para consulta.") : teste.dias === 0 ? "Termina hoje." : teste.dias === 1 ? "Termina amanhã." : `Faltam ${teste.dias} dias.`}</span>
+              <span>{!teste || teste.vencido ? "Terminou. A conta está só para consulta." : teste.dias === 0 ? "Termina hoje." : teste.dias === 1 ? "Termina amanhã." : `Faltam ${teste.dias} dias.`}</span>
               <div className="g-prog"><i style={{ width: `${Math.max(4, Math.min(100, ((7 - diasDeTeste) / 7) * 100))}%` }} /></div>
               <Link prefetch={false} href="/gestao/app/assinatura">Ver assinatura</Link>
             </div>
           )}
           <div className="g-nav" style={{ marginTop: 10 }}>
             <button onClick={() => { setAssistente({ aberta: false, pedido: "" }); setCentral(true); }}><LifeBuoy />Ajuda</button>
+            <BaixarMeusDados lateral />
             {!souTitular && <SairDaEquipe lateral />}
           </div>
           <div className="g-lado-eu">
@@ -328,21 +330,25 @@ export default function Casca({ children }: { children: React.ReactNode }) {
         {!liberado && !exclusao && !cartaoNoHoje && !caminho.endsWith("/assinatura") && (
           <div className="g-aviso vermelho" role="alert">
             <TriangleAlert />
-            <span>{petshop.status === "teste" ? "Seu teste grátis terminou." : "Sua assinatura está inativa."} Seus dados estão guardados e a conta fica só para consulta até você assinar.</span>
+            <span>{petshop.status === "teste" ? "Seu teste grátis terminou. Seus dados estão guardados e a conta fica só para consulta até você assinar."
+              : petshop.status === "atrasada" ? "O pagamento da assinatura não foi aprovado e o prazo para acertar passou. Seus dados estão guardados e a conta fica só para consulta até o pagamento entrar."
+                : "Sua assinatura está inativa. Seus dados estão guardados e a conta fica só para consulta até você assinar."}</span>
             {souDono && <Link className="g-btn p verde" href="/gestao/app/assinatura">Ver assinatura</Link>}
           </div>
         )}
         {liberado && petshop.status === "atrasada" && (
           <div className="g-aviso" role="alert">
             <TriangleAlert />
-            <span>O pagamento da assinatura não foi aprovado. Regularize para não perder o acesso.</span>
+            <span>{atraso
+              ? `O pagamento da assinatura não foi aprovado. Acerte até ${dataCompleta(atraso.travaEm)}: depois desse dia, a conta fica só para consulta.`
+              : "O pagamento da assinatura não foi aprovado. Acerte para a conta não ficar só para consulta."}</span>
             {souDono && <Link className="g-btn p verde" href="/gestao/app/assinatura">Resolver</Link>}
           </div>
         )}
         {liberado && diasDeTeste !== null && diasDeTeste <= 3 && !teste?.vencido && souDono && !caminho.endsWith("/assinatura") && !cartaoNoHoje && (
           <div className="g-aviso">
             <span>{teste && teste.dias <= 1 ? `Seu teste grátis termina ${teste.quando}.` : `Faltam ${teste?.dias ?? diasDeTeste} dias do seu teste grátis.`}</span>
-            <Link className="g-btn p verde" href="/gestao/app/assinatura">{assinaturaAberta ? "Assinar" : "Ver assinatura"}</Link>
+            <Link className="g-btn p verde" href="/gestao/app/assinatura">Assinar</Link>
           </div>
         )}
         {semAcesso ? (
@@ -408,6 +414,7 @@ export default function Casca({ children }: { children: React.ReactNode }) {
             )}
             <button className="g-btn verde" onClick={() => { setMais(false); setCentral(true); }}><LifeBuoy />Ajuda</button>
             <button className="g-btn sec" onClick={() => void sair()}><LogOut />Sair</button>
+            <BaixarMeusDados />
             {!souTitular && <SairDaEquipe />}
           </div>
         </Folha>

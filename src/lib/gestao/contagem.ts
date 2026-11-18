@@ -1,3 +1,4 @@
+import { centavos } from "./util";
 /**
  * Contagem de estoque (inventário), migração 20261201: o que a tela e a folha impressa calculam a partir de `contagem_ler`.
  * A diferença de cada produto é contado − esperado (o saldo do sistema na hora em que a pessoa contou); o banco ajusta o saldo
@@ -21,7 +22,6 @@ export type ContagemNaLista = {
 
 const n = (v: unknown) => (v == null ? null : Number(v));
 const mil = (x: number) => Math.round(x * 1000) / 1000;
-const centavos = (x: number) => Math.round(x * 100) / 100;
 
 /** Números chegam do banco como texto ou número: deixa tudo número (ou null). */
 export function lerContagem(d: unknown): Contagem {

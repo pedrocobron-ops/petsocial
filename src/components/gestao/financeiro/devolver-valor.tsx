@@ -5,13 +5,12 @@ import { conferirCaixa } from "@/lib/gestao/dinheiro";
 import { nomeDeQuemAtende, textoComprovanteDevolucao } from "@/lib/gestao/comprovante";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataCurta } from "@/lib/gestao/util";
+import { brl, dataCurta, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, useCaixaAberto, type Forma } from "../loja/pecas";
 import { FolhaVendaFeita } from "../loja/comprovante-venda";
 import { avisarMudanca, Campo, Esqueleto, Folha, useAvisos, useDados, useSomenteLeitura } from "../ui";
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /** Quanto já voltou de cada entrada (devolução ligada à entrada e troca ou devolução de produto). Só quem mexe com dinheiro lê. */
 export async function lerDevolvido(sb: ReturnType<typeof useGestao>["sb"], petshopId: string, ids: string[]): Promise<Map<string, number>> {

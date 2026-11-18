@@ -28,13 +28,12 @@ export const chaveAgoraNao = (petshopId: string) => `maestro-gestao-teste-agora-
 
 /**
  * O que acontece depois do teste: o mesmo que a tela Assinatura, o Manual e o banco (`acesso_liberado`) dizem.
- * Enquanto a assinatura não abriu, o teste vencido não bloqueia nada; depois que abriu, a conta fica só para consulta.
+ * Acabou o teste, a conta fica só para consulta (com ou sem link de pagamento cadastrado: sem link, assina-se pelo WhatsApp).
  */
 export const TEXTO_TESTE = {
   seNaoAssinar: "Se você não assinar, a conta fica só para consulta: você continua vendo o que lançou, mas não consegue marcar, lançar nem alterar. Os dados continuam guardados e, para voltar a usar, é só assinar.",
   soConsulta: "A conta está só para consulta: você continua vendo o que lançou, mas não consegue marcar, lançar nem alterar. Os dados continuam guardados e, para voltar a usar, é só assinar.",
-  antesDeAbrir: "A assinatura ainda não abriu. Até ela abrir, você continua usando o sistema normalmente, sem pagar nada. Avisamos por aqui quando os planos estiverem disponíveis.",
-  vencidoSemAbrir: "Você continua usando tudo normalmente, sem pagar nada, até a assinatura abrir. Avisamos por aqui quando os planos estiverem disponíveis. Os seus dados ficam guardados.",
+  nadaCobrado: "Nada é cobrado sozinho no fim do teste: o teste não pede cartão.",
 };
 
 /**
@@ -48,7 +47,7 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
   numeros: { pets: number; horarios: number; concluidos: number } | null;
   aoDispensar: () => void;
 }) {
-  const { sb, petshop, cuidoDoFinanceiro, assinaturaAberta: abre } = useGestao();
+  const { sb, petshop, cuidoDoFinanceiro } = useGestao();
   const teste = fimDoTeste(petshop);
   const cartao = modo === "cartao";
   // dinheiro lançado: só entradas recebidas, sem contar movimentos internos do caixa
@@ -66,7 +65,7 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
   if (modo === "linha") {
     return (
       <Link className="g-ret-linha" href={ASSINATURA}>
-        <Clock aria-hidden /><span>{teste.vencido ? `Seu teste grátis terminou ${teste.quando}. Você continua usando normalmente até a assinatura abrir.` : `Seu teste grátis termina ${teste.quando}.`} <b>Ver assinatura</b></span><ChevronRight aria-hidden />
+        <Clock aria-hidden /><span>{teste.vencido ? `Seu teste grátis terminou ${teste.quando}. A conta está só para consulta.` : `Seu teste grátis termina ${teste.quando}.`} <b>Ver assinatura</b></span><ChevronRight aria-hidden />
       </Link>
     );
   }
@@ -78,8 +77,8 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
     numeros.concluidos > 0 && n(numeros.concluidos, "atendimento concluído", "atendimentos concluídos"),
     (dinheiro ?? 0) > 0 && `${brl(dinheiro)} em entradas lançadas`,
   ].filter(Boolean) as string[] : null;
-  // vencido de verdade: a assinatura abriu e o banco já recusa gravar
-  const bloqueado = teste.vencido && abre;
+  // vencido: o banco já recusa gravar
+  const bloqueado = teste.vencido;
 
   return (
     <section className={`g-card g-ret-teste${bloqueado ? " vencido bloqueado" : ""}`} aria-label="Teste grátis" role={bloqueado ? "alert" : undefined}>
@@ -103,8 +102,7 @@ export default function FimDoTeste({ modo, numeros, aoDispensar }: {
       ))}
 
       <p className="g-p g-ret-explica">
-        {abre ? (teste.vencido ? TEXTO_TESTE.soConsulta : TEXTO_TESTE.seNaoAssinar)
-          : teste.vencido ? TEXTO_TESTE.vencidoSemAbrir : TEXTO_TESTE.antesDeAbrir}
+        {teste.vencido ? TEXTO_TESTE.soConsulta : `${TEXTO_TESTE.seNaoAssinar} ${TEXTO_TESTE.nadaCobrado}`}
       </p>
 
       <div className="g-fila">

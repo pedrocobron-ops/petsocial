@@ -6,7 +6,7 @@ import Link from "@/components/gestao/link-depois";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Cake, CalendarHeart, ChevronRight, HandCoins, Mail, MapPin, Merge, MessageCircle, NotebookPen, PawPrint, Pencil, Phone, Plus, Receipt, RotateCcw, Users, Wallet } from "lucide-react";
 import type { Cliente, Lancamento, Pet } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
+import { brl, dataCompleta, fmtTelefone, haQuanto, linkWhatsApp, telefoneValido, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { CartaoFidelidade } from "../fidelidade";
 import CartaoPaginaDoTutor from "../casa/pagina-do-tutor";
@@ -62,11 +62,11 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
     if (cliente.error) throw new Error(cliente.error.message);
     if (pets.error) throw new Error(pets.error.message);
     if (entradas?.error) throw new Error(entradas.error.message);
-    const devolvido = Math.round(((devolucoes?.data ?? []) as { valor: number }[]).reduce((s, l) => s + Number(l.valor), 0) * 100) / 100;
+    const devolvido = centavos(((devolucoes?.data ?? []) as { valor: number }[]).reduce((s, l) => s + Number(l.valor), 0));
     // crédito do tutor (a mesma regra do faturamento): o que ficou com ele ainda é dele; o usado no check-out (fora de uma entrada) conta
     const creditos = cuidoDoFinanceiro ? await sb.from("clientes_creditos").select("valor, lancamento_id").eq("petshop_id", petshop.id).eq("cliente_id", id).limit(1000) : null;
-    const ajusteCredito = Math.round(((creditos?.data ?? []) as { valor: number; lancamento_id: string | null }[])
-      .reduce((s, c) => s + (Number(c.valor) > 0 ? -Number(c.valor) : c.lancamento_id ? 0 : -Number(c.valor)), 0) * 100) / 100;
+    const ajusteCredito = centavos(((creditos?.data ?? []) as { valor: number; lancamento_id: string | null }[])
+      .reduce((s, c) => s + (Number(c.valor) > 0 ? -Number(c.valor) : c.lancamento_id ? 0 : -Number(c.valor)), 0));
     return { cliente: cliente.data as Cliente | null, pets: (pets.data ?? []) as Pet[], entradas: (entradas?.data ?? []) as Entrada[], devolvido, ajusteCredito };
   }, [petshop.id, id, cuidoDoFinanceiro]);
   useEffect(() => { if (!carregando) aoAbrir?.(); }, [carregando]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -85,7 +85,7 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
   const { cliente, pets, entradas, devolvido, ajusteCredito } = dados;
   const zap = linkWhatsApp(cliente.telefone, `${saudacaoZap(cliente.nome, petshop.nome)} `);
   const pagas = entradas.filter((l) => l.pago);
-  const total = Math.max(0, Math.round((pagas.reduce((s, l) => s + Number(l.valor), 0) - devolvido + ajusteCredito) * 100) / 100);
+  const total = Math.max(0, centavos((pagas.reduce((s, l) => s + Number(l.valor), 0) - devolvido + ajusteCredito)));
   const emAberto = entradas.filter((l) => !l.pago);
   const aReceber = emAberto.reduce((s, l) => s + Number(l.valor), 0);
   const ativos = pets.filter((p) => p.ativo).length;
@@ -96,7 +96,9 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
     const sim = await confirmar({
       titulo: `Excluir ${cliente.nome} de vez?`,
       texto: `Isso apaga ${pets.length ? `${pets.length === 1 ? "o pet" : "os pets"} (${nomes}), ` : ""}os horários marcados e já atendidos, os pacotes, as estadias de creche e hotel e todo o histórico. `
+        + "Também saem o nome e o telefone dele da lista de espera e dos orçamentos, os pedidos pelo link, as fotos e as conversas com o Mozart que citam o cliente. "
         + "Os relatórios e a comissão de meses passados mudam, porque esses atendimentos deixam de existir. O dinheiro já lançado continua no financeiro, sem o nome do cliente. "
+        + (aReceber > 0 ? `Este cliente ainda deve ${brl(aReceber)}: depois de excluir, a conta fica sem nome e não dá mais para cobrar por aqui. ` : "")
         + `Não dá para desfazer. ${pets.some((p) => p.ativo) ? "Se a ideia é só tirar da lista, volte e use Desativar pet na ficha de cada pet: o histórico fica guardado." : "Os pets já estão desativados e fora da lista; se não precisa apagar, é só voltar."}`,
       confirmar: "Excluir de vez", perigo: true,
     });
@@ -105,8 +107,8 @@ export default function FichaTutor({ id, voltar, aoExcluir, aoAbrir }: { id: str
     try {
       const apagados = ok(await sb.from("clientes").delete().eq("id", cliente.id).eq("petshop_id", petshop.id).select("id"));
       if (!apagados.length) throw new Error("Não consegui excluir. Sua conta pode estar só para consulta.");
-      const fotos = pets.map((p) => p.foto).filter((f): f is string => !!f);
-      if (fotos.length) await sb.storage.from("pets").remove(fotos).catch(() => null); // as fichas já foram; a foto é limpeza
+      // as fotos (perfil, antes e depois, diário, boletim, checklist) e o que cita o cliente em outras tabelas (lista de espera,
+      // orçamentos, pedidos pelo link, conversas) saem pelo banco: gatilho clientes_lgpd_ao_excluir e a fila da faxina (20261236)
       avisar(`${cliente.nome} foi excluído.`);
       aoExcluir();
       avisarMudanca();

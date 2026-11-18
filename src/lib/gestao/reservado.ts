@@ -33,7 +33,7 @@ export const COLS_PROFISSIONAL = "id, petshop_id, user_id, nome, papel, ve_finan
 export const COLS_ESTADIA = "id, petshop_id, pet_id, tipo, entrada, saida_prevista, saida, status, obs, criado_em, diarias_cobradas, plano_id, mensalista, dia, cobranca_id, acomodacao, cuidados, avisos, sinal_estado, experiencia, leva_traz_buscar, leva_traz_levar, endereco_leva_traz, promo";
 
 /** Tudo do pet shop menos a meta do mês, as diárias padrão, as opções (`petshop_opcoes`) e os dados da assinatura na Cakto. */
-export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos, principal, creche_bloqueia_vacina";
+export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, endereco, bairro, complemento, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos, principal, creche_bloqueia_vacina";
 
 type Linhas = Record<string, unknown>[];
 /**

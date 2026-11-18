@@ -10,6 +10,7 @@ import { CampoComVoz } from "../ditado";
 import { diasNoMes, lerNascimento, MESES, montarNascimento } from "@/lib/gestao/aniversario";
 import "./aniversario.css";
 import { limparNome } from "@/lib/gestao/validacao";
+import { DICA_OBS } from "@/lib/gestao/privacidade-textos";
 
 /** Cadastro ou edição de um tutor (cliente). */
 export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: Cliente; aoFechar: () => void; aoSalvar: (c: Cliente) => void }) {
@@ -121,7 +122,7 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
           <input type="checkbox" checked={naoQuer} onChange={(e) => setNaoQuer(e.target.checked)} />
           <span><b>Não quer receber mensagens</b><small> O Mandar mensagens pula este tutor (lembretes, avisos, aniversário, cobrança).</small></span>
         </label>
-        <Campo rotulo="Observações"><CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações"><textarea className="g-textarea" maxLength={600} value={obs} onChange={(e) => setObs(e.target.value)} /></CampoComVoz></Campo>
+        <Campo rotulo="Observações" dica={DICA_OBS}><CampoComVoz valor={obs} aoMudar={setObs} maxLength={600} rotulo="Ditar as observações"><textarea className="g-textarea" maxLength={600} value={obs} onChange={(e) => setObs(e.target.value)} /></CampoComVoz></Campo>
       </form>
     </Folha>
   );

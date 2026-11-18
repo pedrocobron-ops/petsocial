@@ -1,7 +1,7 @@
 import type { Database } from "./banco";
 import type { Banco } from "./supabase";
 import { FORMAS } from "./tipos";
-import { brl, horarioDoDia, isoDia } from "./util";
+import { brl, horarioDoDia, isoDia, centavos, hojeDaLoja } from "./util";
 import { ehFalhaDeRede, textoDeRede } from "./validacao";
 
 /** Forma de pagamento aceita num lançamento. */
@@ -100,7 +100,8 @@ export async function lancarPago(sb: Banco, petshopId: string, l: {
   /** Parte da conta paga com o crédito do tutor (vai como parte "outro" no pagamento; o banco tira do crédito na mesma gravação). */
   creditoUsado?: number | null;
 }) {
-  const hoje = isoDia(new Date());
+  // hoje no fuso do pet shop (aparelho em outro fuso gravava o dia errado perto da meia-noite)
+  const hoje = hojeDaLoja();
   // só o dinheiro de hoje entra no caixa aberto: um valor de outro dia (pacote comprado ontem) fica fora da conferência da gaveta
   const deHoje = (l.data ?? hoje) === hoje;
   const caixa = deHoje || l.exigeCaixa ? await caixaAberto(sb, petshopId) : null;
@@ -217,7 +218,6 @@ export function vencimentoDaDivida(combinado: string, devidoDesde?: string | nul
   return devidoDesde && /^\d{4}-\d{2}-\d{2}$/.test(devidoDesde) && devidoDesde < combinado ? devidoDesde : combinado;
 }
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /* ---------- pagamento dividido e movimentos de gaveta ---------- */
 
@@ -311,7 +311,8 @@ export function itensDoLancamento(l: { itens?: unknown } | null | undefined): It
 
 /** Soma dos itens e o desconto dado (quando a soma passa do valor do lançamento). */
 export function contaDosItens(itens: ItemLancamento[], valorDoLancamento: number) {
-  const soma = centavos(itens.reduce((t, i) => t + i.qtd * i.valor, 0));
+  // linha a linha, como o banco (`anotar_preco_da_venda`): cada linha arredonda sozinha (0,35 kg × 18,90 = 6,62) e depois soma
+  const soma = centavos(itens.reduce((t, i) => t + centavos(i.qtd * i.valor), 0));
   return { soma, desconto: Math.max(0, centavos(soma - Number(valorDoLancamento))) };
 }
 

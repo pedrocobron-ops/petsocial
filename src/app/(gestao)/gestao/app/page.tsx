@@ -19,7 +19,7 @@ import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
 import { alertaCurto } from "@/lib/gestao/quadro";
-import { nomeNaEquipe } from "@/lib/gestao/util";
+import { nomeNaEquipe, centavos } from "@/lib/gestao/util";
 
 import { brl, dataAmigavel, dataLonga, hora, inicioDaSemana, inicioDoDia, isoDia, nomeDiaCurto, saudacao, soDigitos, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
@@ -52,6 +52,7 @@ const PedidosLink = dynamic(() => import("@/components/gestao/agenda/pedidos-lin
 // menor no celular com internet fraca. Os cartões aparecem quando chegam; o que mostram não muda.
 const EntradaModoEnvio = dynamic(() => import("@/components/gestao/modo-envio-entrada"), { ssr: false });
 const MetaMes = dynamic(() => import("@/components/gestao/meta-mes"), { ssr: false });
+const ContasFixasHoje = dynamic(() => import("@/components/gestao/contas-fixas-hoje"), { ssr: false });
 const MeuMes = dynamic(() => import("@/components/gestao/meu-mes"), { ssr: false });
 const MinhaComissao = dynamic(() => import("@/components/gestao/minha-comissao"), { ssr: false });
 // o dia de quem atende (tosador, banhista) e as doses de agora de quem cuida da creche e do hotel
@@ -143,7 +144,7 @@ export default function Hoje() {
       // o passo "primeiro check-in" só conta o pet que entrou (reserva aceita pelo link não é check-in)
       checkinsTotal: h.contagens.checkins ?? h.contagens.estadias,
       produtosTotal: h.contagens.produtos,
-      entrou: Math.round((h.entradas.filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0) + ajusteDe(hojeIso)) * 100) / 100,
+      entrou: centavos((h.entradas.filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0) + ajusteDe(hojeIso))),
       ajusteHoje: ajusteDe(hojeIso),
       saiu: cuidoDoFinanceiro ? h.entradas.filter((l) => l.tipo === "saida" && !CATEGORIAS_DEVOLUCAO.includes(l.categoria ?? "")).reduce((s, l) => s + Number(l.valor), 0) : 0,
       vendasHoje: h.entradas.filter((l) => l.tipo === "entrada" && l.categoria === "Venda de produtos"),
@@ -162,8 +163,8 @@ export default function Hoje() {
       }),
       servicosMes: vejoAgenda ? [...h.servicosMes].sort((a, b) => b.valor - a.valor).slice(0, 5) : [],
       // de segunda até hoje (a segunda desta semana está sempre dentro dos últimos 7 dias)
-      recebidoSemana: Math.round((h.ultimos7.filter((l) => l.data >= isoDia(seg)).reduce((t, l) => t + Number(l.valor), 0)
-        + [...aj.porDia].filter(([d]) => d >= isoDia(seg)).reduce((t, [, v]) => t + v, 0)) * 100) / 100,
+      recebidoSemana: centavos((h.ultimos7.filter((l) => l.data >= isoDia(seg)).reduce((t, l) => t + Number(l.valor), 0)
+        + [...aj.porDia].filter(([d]) => d >= isoDia(seg)).reduce((t, [, v]) => t + v, 0))),
       entradas7: Array.from({ length: 7 }, (_, i) => {
         const iso = isoDia(somaDias(ha6, i));
         return h.ultimos7.filter((l) => l.data === iso).reduce((t, l) => t + Number(l.valor), 0) + ajusteDe(iso);
@@ -481,7 +482,7 @@ export default function Hoje() {
             lado={dados && ativos.length > 0 ? <Anel parte={feitos / ativos.length} cor="var(--g-laranja)">{Math.round((feitos / ativos.length) * 100)}%</Anel> : undefined} />}
           {frente !== "casa" && kpiCasa}
           {vejoFinanceiro ? (
-            <Kpi href={posso("caixa") ? "/gestao/app/caixa" : "/gestao/app/financeiro"} icone={Wallet} tom="menta" rotulo="Entrou hoje" valor={dados ? brl(dados.entrou) : "–"}
+            <Kpi href={posso("caixa") ? "/gestao/app/caixa" : "/gestao/app/financeiro"} icone={Wallet} tom="menta" rotulo={cuidoDoFinanceiro ? "Faturamento de hoje" : "Entradas de hoje"} valor={dados ? brl(dados.entrou) : "–"}
               apoio={dados && cuidoDoFinanceiro && dados.ajusteHoje < 0 ? `já sem ${brl(-dados.ajusteHoje)} devolvidos ou de crédito` : dados && cuidoDoFinanceiro && dados.saiu > 0 ? `saiu ${brl(dados.saiu)}` : posso("caixa") ? "ver o caixa" : "ver o financeiro"}
               lado={dados && cuidoDoFinanceiro ? <Tendencia valores={dados.entradas7} /> : undefined} />
           ) : (
@@ -572,6 +573,8 @@ export default function Hoje() {
             )}
 
             {primeiroOlhar && <MetaMes />}
+            {/* quanto falta faturar para cobrir as contas fixas do mês (só para quem cuida do financeiro e já cadastrou contas fixas) */}
+            {primeiroOlhar && cuidoDoFinanceiro && <ContasFixasHoje />}
 
             {!contaNova && !semAgenda && <section className="g-card">
               <div className="g-card-t"><h3>Movimento da semana</h3><span className="g-muted g-pp">horários por dia</span></div>

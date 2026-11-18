@@ -17,7 +17,7 @@ import { calendarioGuardado, lerCalendario } from "@/lib/gestao/feriados";
 import { AvisoCaixaFechado, ChipsForma, PerguntaParcelas, useAnotarParcelas, useCaixaAberto } from "../loja/pecas";
 import { idsDaOperacao } from "@/lib/gestao/maquininha";
 import { FORMAS, type Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, dataCurta, deIsoDia, fmtTelefone, isoDia, linkWhatsApp, nomeMes } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, deIsoDia, fmtTelefone, isoDia, linkWhatsApp, nomeMes, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { FolhaBaixa, UsarCredito } from "../financeiro/comum";
 import { Kpi, Tile } from "../painel";
@@ -27,7 +27,6 @@ import "./creche.css";
 import "../loja/venda.css";
 import "@/components/gestao/hotel/hotel.css";
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 const BLOCOS: { id: EstadoCobranca; titulo: string; vazio?: string }[] = [
   { id: "hoje", titulo: "Vencem hoje" },
   { id: "atrasada", titulo: "Atrasadas" },

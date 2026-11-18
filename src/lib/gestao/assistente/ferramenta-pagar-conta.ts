@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Contexto, Resumo } from "./ferramentas";
 import { gerarContasFixas } from "../contas-fixas";
-import { brl } from "../util";
+import { brl, centavos as real } from "../util";
 
 /**
  * Pagar uma conta que já está em A pagar, pelo Mozart (rodada 9): "paguei a luz hoje no pix".
@@ -17,7 +17,6 @@ type Def = Anthropic.Tool & { grava: boolean; financeiro?: boolean };
 const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
 const FORMAS: Record<string, string> = { pix: "Pix", dinheiro: "Dinheiro", debito: "Débito", credito: "Crédito", outro: "Outro" };
-const real = (n: number) => Math.round(n * 100) / 100;
 const dataBr = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const palavras = (s: string) => semAcento(s).replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter((w) => w.length >= 3 && !["conta", "contas", "paguei", "pagamento", "mes", "deste", "desse", "hoje", "pix", "dinheiro", "debito", "credito", "para", "com"].includes(w));

@@ -9,7 +9,7 @@ import { usaModulo } from "@/lib/gestao/modulos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { COLS_PRODUTO, comCustos, comPrecosDeProduto } from "@/lib/gestao/reservado";
 import type { Produto } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, deIsoDia } from "@/lib/gestao/util";
+import { brl, dataCompleta, deIsoDia, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { baixarPlanilha, dinheiroCsv, numeroCsv, paginar, type Cel } from "../financeiro/comum";
 import { Kpi, Ranking, Tile } from "../painel";
@@ -70,9 +70,9 @@ function Bloco({ de, ate }: { de: string; ate: string }) {
     const vendidos = new Set(x.linhas.map((l) => l.produtoId).filter(Boolean));
     // kit não conta: o saldo dele é o dos produtos do kit (não entra duas vezes no valor parado)
     const parados = dados.produtos.filter((p) => p.ativo && p.tipo !== "kit" && Number(p.estoque) > 0 && !vendidos.has(p.id))
-      .map((p) => ({ p, valor: p.custo != null ? Math.round(Number(p.estoque) * Number(p.custo) * 100) / 100 : null }))
+      .map((p) => ({ p, valor: p.custo != null ? centavos(Number(p.estoque) * Number(p.custo)) : null }))
       .sort((a, b) => (b.valor ?? -1) - (a.valor ?? -1) || a.p.nome.localeCompare(b.p.nome, "pt-BR"));
-    return { ...x, unidade, parados, valorParado: Math.round(parados.reduce((t, i) => t + (i.valor ?? 0), 0) * 100) / 100 };
+    return { ...x, unidade, parados, valorParado: centavos(parados.reduce((t, i) => t + (i.valor ?? 0), 0)) };
   }, [dados]);
 
   const linhas = useMemo(() => {
