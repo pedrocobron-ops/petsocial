@@ -106,6 +106,8 @@ const T = require('../lib/teste')('rede-lenta');
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     await page.goto(`${B.BASE_URL}/gestao/app`);
     await page.waitForSelector('.g-main h1', { timeout: 30000 });
+    // a saudação vem antes da agenda: espera o Thor aparecer (sem isso, o teste às vezes olhava cedo demais)
+    await page.waitForFunction(() => document.querySelector('.g-main')?.innerText.includes('Thor'), null, { timeout: 30000 }).catch(() => {});
     T.ok('depois, a Hoje abre normalmente (Boa/Bom …, Thor na agenda)', /Bom dia|Boa tarde|Boa noite/.test(await page.locator('.g-main h1').innerText()) && (await page.locator('.g-main').innerText()).includes('Thor'));
     T.ok('sem erro na página', !erros.filter((e) => !/ERR_FAILED|net::/.test(e)).length, erros);
     await ctx.close();
