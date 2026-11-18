@@ -2,7 +2,7 @@
 .g-niver-campos { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.4fr) minmax(0, 1fr); gap: 8px; min-width: 0; }
 .g-niver-meses { display: flex; flex-wrap: wrap; gap: 6px; }
 .g-niver-dia { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; height: 40px; border-radius: 12px; background: var(--g-carta-2); font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
-.g-niver-dia.hoje { background: var(--g-laranja-tint); color: #9a4508; }
+.g-niver-dia.hoje { background: var(--g-laranja-tint); color: var(--txt-laranja); }
 .g-niver-linha { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--g-linha); min-width: 0; }
 .g-niver-linha:last-child { border-bottom: 0; }
 .g-niver-linha .t { display: grid; gap: 2px; min-width: 0; }

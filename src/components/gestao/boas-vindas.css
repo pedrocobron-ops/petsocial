@@ -38,10 +38,10 @@
 .g-bv-principal button b { flex: 1; min-width: 0; font-weight: 600; font-size: .9375rem; line-height: 1.2; }
 .g-bv-principal .ic { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 11px; background: var(--g-carta-2); color: var(--g-cinza); }
 .g-bv-principal .ic svg { width: 18px; height: 18px; }
-.g-bv-principal .ok { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid var(--g-linha-forte); color: #1f1b17; }
+.g-bv-principal .ok { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid var(--g-linha-forte); color: var(--g-tinta); }
 .g-bv-principal .ok svg { width: 14px; height: 14px; stroke-width: 3; }
 .g-bv-principal button.on { border-color: var(--g-laranja); background: var(--g-laranja-tint); }
-.g-bv-principal button.on .ic { background: var(--g-laranja); color: #1f1b17; }
+.g-bv-principal button.on .ic { background: var(--g-laranja); color: var(--g-tinta); }
 .g-bv-principal button.on .ok { background: var(--g-laranja); border-color: var(--g-laranja); }
 .g-bv-qual { display: grid; gap: 8px; padding: 14px; border-radius: 18px; background: var(--g-carta-2); animation: g-bv-chega .3s cubic-bezier(.2, .7, .2, 1) both; }
 .g-bv-qual h3 { font: 480 1.125rem/1.2 var(--display); margin: 0; }
@@ -49,17 +49,17 @@
 
 /* miniatura do painel: pinta com as cores do tema, então muda na hora */
 .g-bv-previa { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); border-radius: 18px; overflow: hidden; border: 1px solid var(--g-linha); box-shadow: var(--g-sombra); background: var(--g-fundo); }
-.g-bv-previa .lado { display: grid; gap: 4px; align-content: start; padding: 12px 10px; color: #f6f1e8; background: linear-gradient(180deg, var(--g-escuro-a), var(--g-escuro-b)); transition: background .25s; }
+.g-bv-previa .lado { display: grid; gap: 4px; align-content: start; padding: 12px 10px; color: var(--g-creme); background: linear-gradient(180deg, var(--g-escuro-a), var(--g-escuro-b)); transition: background .25s; }
 .g-bv-previa .marca { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; min-width: 0; }
 .g-bv-previa .marca b { font: 500 .9375rem/1.15 var(--display); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-bv-previa .item { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 10px; font-size: .8125rem; opacity: .78; white-space: nowrap; overflow: hidden; }
 .g-bv-previa .item svg { width: 15px; height: 15px; flex: none; }
-.g-bv-previa .item.on { background: #f6f1e8; color: var(--g-verde); font-weight: 600; opacity: 1; }
+.g-bv-previa .item.on { background: var(--g-creme); color: var(--g-verde); font-weight: 600; opacity: 1; }
 .g-bv-previa .tela { display: grid; gap: 6px; align-content: center; justify-items: start; padding: 12px; min-width: 0; }
 .g-bv-previa .tela small { font-size: .625rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--g-cinza); }
 .g-bv-previa .tela b { font: 460 1.125rem/1.1 var(--display); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-bv-previa .tela em { font-style: italic; color: var(--g-verde); }
-.g-bv-previa .botao { padding: 7px 12px; border-radius: 999px; background: var(--g-laranja); color: #1f1b17; font-size: .8125rem; font-weight: 600; white-space: nowrap; transition: background .25s; }
+.g-bv-previa .botao { padding: 7px 12px; border-radius: 999px; background: var(--g-laranja); color: var(--g-tinta); font-size: .8125rem; font-weight: 600; white-space: nowrap; transition: background .25s; }
 .g-bv-pressa { display: inline-block; margin-top: 2px; font-size: .875rem; }
 
 .g-bv-logo { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 18px; background: var(--g-carta); border: 1px solid var(--g-linha); }
@@ -68,7 +68,7 @@
 .g-bv-logo .acoes { display: flex; flex-wrap: wrap; gap: 6px; }
 .g-bv-onde { display: grid; gap: 8px; }
 .g-bv-onde > p { margin: 0; }
-.g-bv-cliente { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; color: #f6f1e8;
+.g-bv-cliente { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; color: var(--g-creme);
   background: radial-gradient(260px 160px at 110% -10%, color-mix(in srgb, var(--g-laranja) 34%, transparent), transparent 62%), linear-gradient(135deg, var(--g-escuro-a), var(--g-escuro-b)); }
 .g-bv-cliente div { min-width: 0; }
 .g-bv-cliente b { display: block; font: 500 1rem/1.15 var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -101,7 +101,7 @@
 @media (max-width: 420px) { .g-hoje-semana > b { font-size: 1.375rem; } .g-hoje-semana > svg { display: none; } }
 
 /* modo simples na segunda pergunta: a linha inteira é o toque */
-.g-bv-simples { display: flex; align-items: flex-start; gap: 12px; min-height: 48px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--g-linha-forte); background: #fffdf9; cursor: pointer; }
+.g-bv-simples { display: flex; align-items: flex-start; gap: 12px; min-height: 48px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--g-linha-forte); background: var(--g-campo); cursor: pointer; }
 .g-bv-simples input { width: 22px; height: 22px; margin-top: 1px; flex: none; accent-color: var(--g-verde); }
 .g-bv-simples span { display: grid; gap: 2px; }
 .g-bv-simples small { color: var(--g-cinza); font-size: .8125rem; line-height: 1.35; }

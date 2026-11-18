@@ -11,7 +11,7 @@
 /* legenda do gráfico de semanas */
 .g-fin-leg { display: flex; gap: 12px; font-size: .8125rem; color: var(--g-cinza); flex: none; }
 .g-fin-leg span { display: inline-flex; align-items: center; gap: 6px; }
-.g-fin-leg i, .g-fin-fluxo i { --e: #2f6b4c; --s: #cf6f7a; }
+.g-fin-leg i, .g-fin-fluxo i { --e: var(--txt-verde-2); --s: #cf6f7a; }
 .g-fin-leg i { width: 10px; height: 10px; border-radius: 4px; }
 .g-fin-leg i.e { background: var(--e); } .g-fin-leg i.s { background: var(--s); }
 
@@ -70,7 +70,7 @@
 .g-fin-meta-num .g-num { font-size: clamp(1.625rem, 1.2rem + 2vw, 2.25rem); white-space: nowrap; }
 .g-fin-meta-num span { white-space: nowrap; }
 .g-fin-meta-barra { height: 12px; border-radius: 999px; background: var(--g-carta-2); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(31, 27, 23, .04); }
-.g-fin-meta-barra i { display: block; height: 100%; min-width: 6px; border-radius: 999px; background: linear-gradient(90deg, #47856a, #2f6b4c); transition: width .6s cubic-bezier(.2, .7, .2, 1); }
+.g-fin-meta-barra i { display: block; height: 100%; min-width: 6px; border-radius: 999px; background: linear-gradient(90deg, #47856a, var(--txt-verde-2)); transition: width .6s cubic-bezier(.2, .7, .2, 1); }
 .g-fin-meta-fatos { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
 .g-fin-meta-fatos > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 0 10px; min-width: 0; padding: 10px 12px; border-radius: 14px; background: var(--g-carta-2); }
 .g-fin-meta-fatos small { font-size: .8125rem; color: var(--g-cinza); }

@@ -28,7 +28,7 @@
 
 /* quadro de destaque e lista de "quem faz o quê" (sem tabela, para não rolar para o lado) */
 .g-leg-quadro { padding: 14px 16px; border-radius: 16px; background: var(--t-menta); color: #1f4633; }
-.g-leg-quadro.aviso { background: var(--t-manteiga); color: #5b4708; }
+.g-leg-quadro.aviso { background: var(--t-manteiga); color: var(--txt-amarelo); }
 .g-leg-pares { display: grid; gap: 10px; margin-bottom: 0; }
 .g-leg-pares > div { display: grid; gap: 2px; min-width: 0; padding: 12px 14px; border-radius: 14px; background: var(--g-carta-2); }
 .g-leg-pares dt { font-weight: 600; }

@@ -3,7 +3,7 @@
 .g-pl-t { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .g-pl-t > div { flex: 1; min-width: 0; }
 .g-pl-t p { color: #6b4a2f; }
-.g-pl-ico { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 13px; background: var(--g-laranja); color: #1f1b17; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 8px 14px -8px rgba(249, 115, 22, .9); }
+.g-pl-ico { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 13px; background: var(--g-laranja); color: var(--g-tinta); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 8px 14px -8px rgba(249, 115, 22, .9); }
 .g-pl-ico svg { width: 20px; height: 20px; }
 
 .g-pl-lista { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
@@ -25,7 +25,7 @@
 /* etiqueta comprida ("aceitou as regras e declarou vacinas em dia em…") quebra de linha em vez de passar do cartão */
 .g-pl-quando { min-width: 0; }
 .g-pl-quando .g-tag { white-space: normal; text-align: left; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-.g-pl-obs { padding: 8px 12px; border-radius: 12px; background: var(--t-manteiga); color: #5b4708; font-size: .9375rem; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
+.g-pl-obs { padding: 8px 12px; border-radius: 12px; background: var(--t-manteiga); color: var(--txt-amarelo); font-size: .9375rem; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-line; }
 
 /* vários pets do mesmo tutor num cartão só */
 .g-pl-varios { display: flex; flex: none; }
@@ -45,9 +45,9 @@
 @media (min-width: 560px) { .g-pl-com { flex: 1 1 200px; } }
 
 /* já respondido: falta só avisar o tutor */
-.g-pl-item.respondido { border-left-color: #2f6b4c; background: #f1f7ee; }
+.g-pl-item.respondido { border-left-color: var(--txt-verde-2); background: #f1f7ee; }
 .g-pl-item.respondido.recusado { border-left-color: var(--g-linha-forte); background: var(--g-carta); }
-.g-pl-feito { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 50%; background: #2f6b4c; color: #fff; }
+.g-pl-feito { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 50%; background: var(--txt-verde-2); color: #fff; }
 .g-pl-item.recusado .g-pl-feito { background: var(--g-carta-2); color: var(--g-cinza); }
 .g-pl-feito svg { width: 18px; height: 18px; }
 

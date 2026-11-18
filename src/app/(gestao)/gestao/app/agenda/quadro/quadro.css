@@ -23,7 +23,7 @@
 }
 .g-qd-col-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 600 1rem/1.2 var(--sans); padding: 2px 4px; }
 .g-qd-col-t b { min-width: 28px; height: 28px; display: inline-grid; place-items: center; border-radius: 999px; background: var(--g-carta); font: 600 .875rem/1 var(--sans); }
-.g-qd-col.pronto .g-qd-col-t b { background: var(--g-menta); color: #24543b; }
+.g-qd-col.pronto .g-qd-col-t b { background: var(--g-menta); color: var(--txt-verde); }
 .g-qd-lista { display: grid; gap: 10px; min-width: 0; }
 .g-qd-nada { margin: 0; padding: 14px 6px; color: var(--g-cinza); font-size: .875rem; text-align: center; }
 

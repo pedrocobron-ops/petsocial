@@ -39,7 +39,7 @@
 .g-pac-barra { background: var(--t-lilas); }
 .g-pac-barra i { background: #7c62c0; }
 .g-pac-barra.laranja i { background: var(--g-laranja); }
-.g-pac-falta { color: #9a4508; font-weight: 600; }
+.g-pac-falta { color: var(--txt-laranja); font-weight: 600; }
 .g-pac-acoes { padding-top: 12px; border-top: 1px dashed var(--g-linha); }
 
 /* modelos de pacote */

@@ -117,7 +117,7 @@ const { falsos } = require('../lib/voz-falsa');
     await page.route('**/api/gestao/caderno', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ leitura, restam: 29, limite: 30, paginas: 1 }) }));
     await N.entrar(page, L.emails.dono, L.senha);
     await N.ir(page, '/gestao/app/clientes');
-    await page.locator('button', { hasText: 'Foto do caderno' }).click();
+    await N.doAlto(page, 'Foto do caderno');
     const folha = page.locator('.g-folha');
     await folha.locator('.g-cad-tipo', { hasText: 'Tabela de preços' }).click();
     const img = await page.screenshot({ type: 'png' });

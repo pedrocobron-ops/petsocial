@@ -5,7 +5,7 @@
 
 /* bloco de destaque: caixa aberto (verde-garrafa) ou fechado (menta clara) */
 .g-cx-heroi {
-  position: relative; overflow: hidden; display: grid; gap: 16px; align-content: space-between; padding: 22px; border-radius: 22px; color: #f6f1e8;
+  position: relative; overflow: hidden; display: grid; gap: 16px; align-content: space-between; padding: 22px; border-radius: 22px; color: var(--g-creme);
   background: radial-gradient(520px 300px at 110% -10%, rgba(120, 190, 150, .34), transparent 62%), radial-gradient(420px 300px at -10% 120%, rgba(255, 255, 255, .1), transparent 60%), linear-gradient(135deg, var(--g-escuro-a) 0%, var(--g-escuro-b) 100%);
   box-shadow: 0 2px 4px rgba(31, 27, 23, .1), 0 30px 50px -28px rgba(23, 48, 42, .8);
 }
@@ -20,7 +20,7 @@
 .g-cx-heroi .gf-formas { margin-top: 0; }
 .g-cx-heroi .gf-formas b { font: 480 1.125rem/1.2 var(--display); }
 .g-cx-heroi .gf-dupla .g-btn { min-height: 52px; }
-.g-btn.g-cx-claro { background: rgba(246, 241, 232, .1); color: #f6f1e8; border-color: rgba(246, 241, 232, .26); }
+.g-btn.g-cx-claro { background: rgba(246, 241, 232, .1); color: var(--g-creme); border-color: rgba(246, 241, 232, .26); }
 .g-btn.g-cx-claro:hover:not(:disabled) { background: rgba(246, 241, 232, .2); }
 @media (min-width: 720px) { .g-cx-heroi { padding: 26px; } .g-cx-heroi .gf-dupla { max-width: 420px; } }
 
@@ -54,5 +54,5 @@
 .g-cx-dia dt { font-size: .875rem; color: rgba(246, 241, 232, .8); min-width: 0; }
 .g-cx-dia dd { margin: 0; font-size: .9375rem; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .g-cx-dia > .forte { border-top: 1px dashed rgba(246, 241, 232, .22); margin-top: 3px; padding-top: 7px; }
-.g-cx-dia > .forte dt { color: #f6f1e8; font-weight: 600; }
+.g-cx-dia > .forte dt { color: var(--g-creme); font-weight: 600; }
 .g-cx-neg { color: #ffb4a6; }

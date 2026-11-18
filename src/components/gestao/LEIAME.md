@@ -123,6 +123,24 @@ chips (`g-chip` com `aria-pressed`), seletor (`g-seg`). Nada de `<table>` com gr
 - Carregando: `<Esqueleto />`. Confirmação antes de apagar: `await confirmar({ titulo, texto, perigo: true })`.
 - Ícones: `lucide-react`. Sem emoji. Primeiro o celular (390 px), depois o computador.
 
+### Desenho e acessibilidade (rodada 9)
+
+- Variáveis antes de valor solto: cores de texto sobre fundo claro `--txt-verde`, `--txt-verde-2`, `--txt-vermelho`, `--txt-amarelo`,
+  `--txt-laranja`; `--g-creme` (texto sobre o verde), `--g-campo` (fundo de campo), `--g-apagado` (dica dentro do campo), `--g-zap`;
+  raios `--g-raio-p` (12), `--g-raio-m` (14), `--g-raio-g` (16), `--g-raio` (18). Não crie raio de 11, 13, 15 ou 17 px.
+- Contraste: texto 4,5:1 e borda de campo 3:1 (`--g-linha-forte`). `testes/unidade/desenho.js` confere as variáveis.
+- Nome comprido nunca alarga a tela: grade nova usa `minmax(0, 1fr)` (nunca `1fr` puro nem coluna `auto` com texto que não quebra) e
+  o filho com reticências precisa de `min-width: 0`. `testes/telas/desenho-nomes-longos.js` mede todas as telas e folhas com pet de
+  40 letras, tutor de 61 e produto de 67, em 360, 390, 768 e 1366 px, celular deitado, letra em 150% e zoom de 200%.
+- `<Folha>` já cuida do teclado (nome pelo título, foco entra, Tab preso, Esc fecha, foco volta para quem abriu): não refaça isso
+  na tela. Em `confirmar({ perigo: true })` o foco começa em Voltar. Não use `aria-label` que troca o texto visível do botão.
+- Cabeçalho com mais de três botões: os secundários vão dentro de `<MaisAcoes>` (`mais-acoes.tsx`); no celular viram o botão
+  "Mais", no computador continuam à vista. Nos testes de tela, toque neles com `N.doAlto(page, "Nome")`.
+- Aviso rápido: o tempo na tela sai do tamanho do texto (`tempoDoAviso`, `src/lib/gestao/desenho.ts`); erro vai no canto `role="alert"`.
+- Comprovante impresso: `htmlDoComprovante` (`comprovante.ts`) no papel de `comprovante.papel` (folha comum, bobina de 80 ou 58 mm;
+  `comprovante-papel.ts`, cartão Papel do comprovante em Meu pet shop).
+- Tela que não baixou por falta de internet: `TelaDeErro` mostra "Sem internet agora" (`ehFaltaDeInternet`), não "esta tela travou".
+
 ### Painel (segunda demão do visual)
 
 A plataforma não pode parecer "pobrinha": cada tela abre com um resumo visual antes das listas. Peças prontas em

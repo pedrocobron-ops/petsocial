@@ -76,7 +76,7 @@
   transition: transform .18s cubic-bezier(.2, .7, .2, 1), box-shadow .18s, border-color .18s;
 }
 .g-cli-pet:hover { transform: translateY(-2px); border-color: var(--g-linha-forte); box-shadow: 0 2px 4px rgba(31, 27, 23, .05), 0 22px 36px -22px rgba(31, 27, 23, .4); }
-.g-cli-grade.dentro .g-cli-pet { box-shadow: none; background: #fffdf9; }
+.g-cli-grade.dentro .g-cli-pet { box-shadow: none; background: var(--g-campo); }
 .g-cli-pet.apagado { opacity: .62; }
 .g-cli-pet .cab { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .g-cli-pet .g-avatar { box-shadow: 0 0 0 3px #fffbf5, 0 0 0 4px var(--g-linha), 0 8px 16px -10px rgba(31, 27, 23, .5); }

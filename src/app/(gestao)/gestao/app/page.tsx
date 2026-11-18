@@ -251,6 +251,8 @@ export default function Hoje() {
   // conta nova com primeiros passos na tela: o Mozart, o botão do topo e o cartão apontam o mesmo próximo passo
   const passoNovo = contaNova && pp.estado === "ativo" ? pp.proximo : null;
   const fraseDoPasso = passoNovo ? `Tudo pronto para começar. O próximo passo é ${passoNovo.texto.charAt(0).toLowerCase()}${passoNovo.texto.slice(1)}${passoNovo.id === "pet" && (souDono || eu.papel === "gerente") ? ", ou trazer os seus clientes de uma planilha" : ""}.` : null;
+  // o cartão "Próximo atendimento" (ao lado do Mozart) já diz quem é o próximo e a que horas: a fala não repete
+  const proximoNoCartao = Boolean(proximo?.pets);
   const frase = !dados ? "" : fraseDoPasso ?? (contaNova && frente === "loja" ? "Tudo pronto para começar. O primeiro passo é cadastrar o que você vende."
     : contaNova ? (posso("clientes") ? (souDono || eu.papel === "gerente" ? "Tudo pronto para começar. O primeiro passo é cadastrar um pet, ou trazer os seus clientes de uma planilha." : "Tudo pronto para começar. O primeiro passo é cadastrar um pet.") : "Tudo pronto para começar.")
     : frente === "loja" ? `${dados.acabando.length === 0 ? "Nenhum produto acabando" : dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}.${vendas ? (vendas.quantas ? ` Hoje ${vendas.quantas === 1 ? "saiu 1 venda" : `saíram ${vendas.quantas} vendas`} no balcão: ${brl(vendas.total)} (produtos vendidos na conta do atendimento entram em Relatórios).` : " Nenhuma venda no balcão hoje, por enquanto.") : ""}${ativos.length ? ` Na agenda, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
@@ -259,7 +261,7 @@ export default function Hoje() {
     : frente === "casa" ? `${temCasa ? linhaCasa : "Nenhum pet na casa agora"}.${ativos.length ? ` No banho e tosa, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : soCasa && !ativos.length ? (temCasa ? `${linhaCasa}.` : `Nenhum pet na casa agora.`)
     : !ativos.length ? `Nenhum horário marcado para hoje.${proximoDia ? ` O próximo é ${proximoDia.pets?.nome ?? "um pet"}, ${quandoFoi(proximoDia.inicio)}.` : ""}${linhaCasa ? ` ${linhaCasa}.` : ""}`
-    : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}` : feitos === ativos.length ? (faltaCobrarHoje > 0 ? `, todos concluídos. ${faltaCobrarHoje === 1 ? "Falta cobrar 1" : `Falta cobrar ${faltaCobrarHoje}`}` : ", todos concluídos") : ""}.`);
+    : `Hoje ${ativos.length === 1 ? "é 1 atendimento" : `são ${ativos.length} atendimentos`}${proximo ? (proximoNoCartao ? "" : `. O próximo é ${proximo.pets?.nome ?? "um pet"}, às ${hora(proximo.inicio)}`) : feitos === ativos.length ? (faltaCobrarHoje > 0 ? `, todos concluídos. ${faltaCobrarHoje === 1 ? "Falta cobrar 1" : `Falta cobrar ${faltaCobrarHoje}`}` : ", todos concluídos") : ""}.`);
 
   const cr = dados?.creche ?? null;
   const cartaoDaChamada = Boolean(cr && cr.esperados > 0);
@@ -349,7 +351,7 @@ export default function Hoje() {
             aoDispensar={() => { guardarLembrado(chaveAgoraNao(petshop.id), hojeIso); setAgoraNao(true); }} />
         )}
         {testePerto && !souDono && liberado && <FimDoTeste modo="equipe" numeros={null} aoDispensar={() => {}} />}
-        {!testePerto && souDono && liberado && <ProgressoDoTeste numeros={dados ? { pets: dados.pets, horarios: dados.totalAgs } : null} proximo={pp.proximo} />}
+        {!testePerto && souDono && liberado && <ProgressoDoTeste numeros={dados ? { pets: dados.pets, horarios: dados.totalAgs } : null} proximo={passoNovo || cartaoPassos ? null : pp.proximo} />}
 
         {/* dia fechado sem a agenda na tela (creche ou hotel): o aviso vem no alto, antes do botão de check-in */}
         {fechadoHoje && casa && !banho && <p className="g-aviso" role="status" style={{ margin: 0 }}><span className="g-cresce"><b>{fechadoHoje}.</b> {rotuloCasa === "Hotel" ? "O hotel não recebe chegadas hoje. Quem está hospedado continua hospedado." : rotuloCasa === "Creche" ? "A creche não abre hoje: ninguém é esperado na chamada e ninguém leva falta." : "A creche não abre hoje e ninguém leva falta. Quem está hospedado no hotel continua hospedado."}</span></p>}
@@ -381,7 +383,7 @@ export default function Hoje() {
               </div>
             </div>
             <div className="g-pilha p">
-              <div className="g-fila"><button className="g-btn pri" onClick={() => abrirAssistente()}><Mic />Falar com o Mozart</button></div>
+              <div className="g-fila"><button className="g-btn" onClick={() => abrirAssistente()}><Mic />Falar com o Mozart</button></div>
               <div className="g-sugestoes">
                 {pedidosDaFrente(frente, PEDIDOS).filter((p) => (cuidoDoFinanceiro || !p.startsWith("Quanto")) && (posso("agenda") || !p.includes("horários")) && (posso("clientes") || !p.startsWith("Quem não vem"))).map((p) => <button key={p} onClick={() => abrirAssistente(p)}>{p}</button>)}
               </div>

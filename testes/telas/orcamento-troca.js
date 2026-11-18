@@ -32,7 +32,7 @@ const limpa = (s) => s.replace(/[  ]/g, ' ');
     const { ctx, page, erros } = await N.contexto(390, 844);
     await N.entrar(page, L.emails.caixa, L.senha);
     await N.ir(page, '/gestao/app/caixa');
-    await page.getByRole('button', { name: 'Orçamentos' }).first().click(); await page.waitForTimeout(1200);
+    await N.doAlto(page, 'Orçamentos'); await page.waitForTimeout(1200);
     await page.locator('.g-folha').last().getByRole('button', { name: 'Orçamento novo' }).click(); await page.waitForTimeout(1000);
     let f = page.locator('.g-folha').last();
     await f.getByRole('button', { name: /Dizer quem comprou/ }).click(); await page.waitForTimeout(400);

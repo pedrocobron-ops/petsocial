@@ -4,7 +4,7 @@
 .g-promo-linha.tirada > span:first-child { font-weight: 400; }
 .g-promo-linha .g-link { display: inline-flex; align-items: center; gap: 4px; }
 .g-promo-conta .t b, .g-promo-conta .t span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
-.g-promo-etq { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: var(--g-menta); color: #24543b; white-space: nowrap; }
+.g-promo-etq { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: var(--g-menta); color: var(--txt-verde); white-space: nowrap; }
 /* Meu pet shop: a lista de promoções */
 .g-promo-item { display: grid; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--g-linha); min-width: 0; }
 .g-promo-item:last-child { border-bottom: 0; }

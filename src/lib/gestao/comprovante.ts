@@ -1,4 +1,5 @@
 import { contaDosItens, itensDoLancamento, partesPorForma, type FormaPagamento } from "./dinheiro";
+import { impressaoDoComprovante, type PapelDoComprovante } from "./comprovante-papel";
 import { FORMAS } from "./tipos";
 import { brl, chamar, dataCompleta, hora, isoDia } from "./util";
 
@@ -131,18 +132,42 @@ export function textoComprovante(p: {
 }
 
 /**
- * Imprime o mesmo comprovante numa folha simples (ou salva em PDF), sem a saudação do WhatsApp.
+ * A página do comprovante para imprimir. Cada linha "nome: R$ valor" vira uma fileira com o valor encostado à direita
+ * (números alinhados); na bobina a margem é mínima, a letra é menor e tudo sai em preto (impressora térmica não tem cinza).
+ */
+export function htmlDoComprovante(texto: string, titulo = "Comprovante de atendimento", o: { papel: PapelDoComprovante; contato?: string } = impressaoDoComprovante()): string {
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const [, , loja = "", ...resto] = texto.split("\n");
+  const ehTotal = (l: string) => /^(Total|Total da estadia|Valor na saída|Total pago agora|Total da conta|Pago agora|Devolvido ao cliente|Diferença paga pelo cliente|Diferença devolvida ao cliente|Ficou de crédito na sua ficha):/.test(l);
+  const corpo = resto.map((l) => {
+    if (!l) return "<hr>";
+    const classe = ehTotal(l) ? ' class="t"' : "";
+    // "2 x Shampoo (R$ 29,90 cada): R$ 59,80" → nome à esquerda, valor à direita
+    const m = /^(.*\S): (-? ?R\$\s?[\d.]+,\d{2})$/.exec(l);
+    return m ? `<p${classe.replace('"t"', '"t f"') || ' class="f"'}><span>${esc(m[1])}</span><b>${esc(m[2])}</b></p>` : `<p${classe}>${esc(l)}</p>`;
+  }).join("");
+  const bobina = o.papel === "80" || o.papel === "58";
+  const pagina = o.papel === "80" ? "@page { size: 80mm 297mm; margin: 3mm 4mm; }" : o.papel === "58" ? "@page { size: 58mm 297mm; margin: 2mm 3mm; }" : "@page { margin: 14mm; }";
+  const corpoCss = bobina
+    ? `body { font: ${o.papel === "58" ? 11 : 12}px/1.35 system-ui, sans-serif; color: #000; margin: 0; } h1 { font-size: ${o.papel === "58" ? 14 : 16}px; margin: 0 0 2px; text-align: center; }
+    h2, .c { font-size: ${o.papel === "58" ? 10 : 11}px; font-weight: 600; color: #000; margin: 0 0 6px; text-align: center; } h2 { text-transform: uppercase; letter-spacing: .04em; }
+    p.t { font-weight: 700; font-size: ${o.papel === "58" ? 13 : 14}px; margin-top: 6px; } hr { border: 0; border-top: 1px dashed #000; margin: 6px 0; }`
+    : `body { font: 15px/1.5 system-ui, sans-serif; color: #1f1b17; max-width: 380px; margin: 0 auto; } h1 { font-size: 20px; margin: 0 0 4px; }
+    h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #4a433c; margin: 0 0 14px; } .c { font-size: 13px; color: #4a433c; margin: 0 0 4px; }
+    p.t { font-weight: 700; font-size: 17px; margin-top: 8px; } hr { border: 0; border-top: 1px dashed #b9ae9f; margin: 10px 0; }`;
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Comprovante · ${esc(loja)}</title><style>
+    ${pagina} ${corpoCss}
+    p { margin: 2px 0; overflow-wrap: anywhere; } p.f { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+    p.f span { min-width: 0; } p.f b { flex: none; font-weight: inherit; font-variant-numeric: tabular-nums; white-space: nowrap; } p.t b { font-weight: 700; }
+  </style></head><body data-papel="${o.papel}"><h1>${esc(loja)}</h1>${o.contato ? `<p class="c">${esc(o.contato)}</p>` : ""}<h2>${esc(titulo)}</h2>${corpo}</body></html>`;
+}
+
+/**
+ * Imprime o mesmo comprovante (ou salva em PDF), sem a saudação do WhatsApp, no papel escolhido em Meu pet shop.
  * Usa uma moldura escondida na própria página: não abre janela nova nem esbarra no bloqueador de janelas.
  */
 export function imprimirComprovante(texto: string, titulo = "Comprovante de atendimento") {
-  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const [, , loja = "", ...resto] = texto.split("\n");
-  const corpo = resto.map((l) => (l ? `<p${/^(Total|Total da estadia|Valor na saída|Total pago agora|Total da conta|Pago agora|Devolvido ao cliente|Diferença paga pelo cliente|Diferença devolvida ao cliente|Ficou de crédito na sua ficha):/.test(l) ? ' class="t"' : ""}>${esc(l)}</p>` : "<hr>")).join("");
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Comprovante · ${esc(loja)}</title><style>
-    @page { margin: 14mm; } body { font: 15px/1.5 system-ui, sans-serif; color: #1f1b17; max-width: 380px; margin: 0 auto; }
-    h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6a625a; margin: 0 0 14px; }
-    p { margin: 2px 0; } p.t { font-weight: 700; font-size: 17px; margin-top: 8px; } hr { border: 0; border-top: 1px dashed #b9ae9f; margin: 10px 0; }
-  </style></head><body><h1>${esc(loja)}</h1><h2>${esc(titulo)}</h2>${corpo}</body></html>`;
+  const html = htmlDoComprovante(texto, titulo);
   const f = document.createElement("iframe");
   f.setAttribute("aria-hidden", "true");
   f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";

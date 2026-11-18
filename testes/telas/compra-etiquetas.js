@@ -61,7 +61,7 @@ async function pdf(page, nome) {
     const { ctx, page, erros } = await N.contexto(larg, alt);
     await N.entrar(page, L.emails.dono, L.senha);
     await N.ir(page, '/gestao/app/estoque');
-    await page.getByRole('button', { name: 'O que comprar' }).click();
+    await N.doAlto(page, 'O que comprar');
     const folha = page.locator('.g-folha').last();
     await folha.locator('.g-lj-sug').first().waitFor({ timeout: 15000 });
     let t = tx(await folha.innerText());
@@ -146,7 +146,7 @@ async function pdf(page, nome) {
   const { ctx, page, erros } = await N.contexto(390, 844);
   await N.entrar(page, L.emails.estoque, L.senha);
   await N.ir(page, '/gestao/app/estoque');
-  await page.getByRole('button', { name: 'O que comprar' }).click();
+  await N.doAlto(page, 'O que comprar');
   const folha = page.locator('.g-folha').last();
   await folha.locator('.g-lj-sug').first().waitFor({ timeout: 15000 });
   const t = tx(await folha.innerText());

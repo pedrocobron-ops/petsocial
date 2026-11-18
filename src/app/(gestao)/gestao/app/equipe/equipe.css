@@ -12,7 +12,7 @@
 .g-eq-plano.cheio .g-eq-plano-t .g-rotulo { color: #8a4a17; }
 .g-eq-plano .g-eq-plano-t h2 { font: 480 clamp(1.25rem, 1.1rem + .7vw, 1.625rem)/1.15 var(--display); letter-spacing: -.01em; text-wrap: balance; }
 .g-eq-plano .g-eq-plano-t h2 em { font-style: normal; white-space: nowrap; color: var(--i-menta); }
-.g-eq-plano.cheio .g-eq-plano .g-eq-plano-t h2 em { color: #9a4508; }
+.g-eq-plano.cheio .g-eq-plano .g-eq-plano-t h2 em { color: var(--txt-laranja); }
 .g-eq-plano-n { font-size: .9375rem; line-height: 1.45; color: #33423a; }
 .g-eq-plano.cheio .g-eq-plano-n { color: #5a3a1c; }
 .g-eq-plano-c { display: block; margin-top: 4px; font-size: .8125rem; opacity: .8; }
@@ -46,7 +46,7 @@
 .g-eq-topo .g-avatar { box-shadow: 0 0 0 3px var(--g-carta), 0 8px 18px -8px rgba(31, 27, 23, .5); }
 .g-eq-topo-t { flex: 1; min-width: 0; display: grid; gap: 3px; padding-top: 18px; }
 .g-eq-nome { display: block; font: 480 1.25rem/1.15 var(--display); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.g-eq-funcao { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: .9375rem; font-weight: 600; color: color-mix(in srgb, var(--cor) 62%, #1f1b17); }
+.g-eq-funcao { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: .9375rem; font-weight: 600; color: color-mix(in srgb, var(--cor) 62%, var(--g-tinta)); }
 .g-eq-seta { flex: none; align-self: center; margin-top: 18px; opacity: .4; }
 .g-eq-acesso { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: var(--g-carta-2); color: var(--g-cinza); }
 .g-eq-acesso.login { background: var(--t-menta); color: var(--i-menta); }
@@ -61,7 +61,7 @@
 .g-eq-abre { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .g-eq-abre-r { margin-right: 2px; font-size: .6875rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--g-cinza); }
 .g-eq-pilula { padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 600; line-height: 1.5; color: #33423a; background: transparent; box-shadow: inset 0 0 0 1px var(--g-linha-forte); white-space: nowrap; }
-.g-eq-pilula.tudo { background: var(--g-verde); color: #f6f1e8; box-shadow: none; }
+.g-eq-pilula.tudo { background: var(--g-verde); color: var(--g-creme); box-shadow: none; }
 .g-eq-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .g-eq-tags .g-tag svg { width: 13px; height: 13px; flex: none; }
 .g-eq-trabalha { display: grid; gap: 6px; }
@@ -83,8 +83,8 @@
 .g-eq-escala { display: grid; grid-template-columns: minmax(0, 3.75rem) repeat(7, minmax(0, 1fr)); gap: 5px; align-items: stretch; }
 .g-eq-esc-dia { display: grid; place-items: center; padding: 4px 0 6px; font-size: .6875rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--g-cinza); border-radius: 8px; }
 .g-eq-esc-dia abbr { text-decoration: none; }
-.g-eq-esc-dia.hoje { color: var(--g-laranja-2); background: rgba(249, 115, 22, .1); }
-.g-eq-esc-dia.fechado { opacity: .55; }
+.g-eq-esc-dia.hoje { color: var(--txt-laranja); background: rgba(249, 115, 22, .1); }
+.g-eq-esc-dia.fechado { color: var(--g-apagado); font-weight: 500; }
 .g-eq-esc-nome { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: .875rem; font-weight: 600; overflow: hidden; white-space: nowrap; }
 .g-eq-esc-nome > i { width: 10px; height: 10px; border-radius: 4px; flex: none; }
 .g-eq-esc-cel { --cor: var(--g-verde); position: relative; display: grid; align-content: center; justify-items: center; gap: 1px; min-height: 44px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--g-linha); }
@@ -96,5 +96,5 @@
 .g-eq-leg { display: flex; gap: 6px 14px; flex-wrap: wrap; margin-top: 12px; font-size: .8125rem; color: var(--g-cinza); }
 .g-eq-leg > span { display: inline-flex; align-items: center; gap: 6px; }
 .g-eq-leg i { width: 14px; height: 14px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--g-linha-forte); }
-.g-eq-leg i.on { background: var(--t-menta); box-shadow: inset 0 -3px 0 #2f6b4c; }
+.g-eq-leg i.on { background: var(--t-menta); box-shadow: inset 0 -3px 0 var(--txt-verde-2); }
 .g-eq-leg i.fechado { box-shadow: none; background: repeating-linear-gradient(135deg, rgba(31, 27, 23, .14) 0 3px, transparent 3px 6px); }

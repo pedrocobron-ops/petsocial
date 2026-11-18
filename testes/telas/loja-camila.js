@@ -46,7 +46,7 @@ const foto = (alvo, nome) => alvo.screenshot({ path: `${B.RAIZ}/testes/saida/cam
       await page.locator('.g-est-prod', { hasText: 'Ração Golden' }).waitFor({ timeout: 20000 });
       const tela = limpo(await page.locator('.g-main').innerText());
       T.ok('a lista não mostra margem nem valor em estoque a preço de custo', !/margem/i.test(tela) && !/Valor em estoque/i.test(tela) && !/preço de custo/i.test(tela), tela.slice(0, 500));
-      await page.locator('.g-est-prod', { hasText: 'Ração Golden' }).getByRole('button', { name: 'Abrir Ração Golden' }).click();
+      await page.locator('.g-est-prod', { hasText: 'Ração Golden' }).locator('.g-est-cab').click();
       const ficha = page.locator('.g-folha').last();
       await ficha.getByText('Últimos movimentos').waitFor({ timeout: 15000 });
       await page.waitForTimeout(600);
@@ -148,7 +148,7 @@ const foto = (alvo, nome) => alvo.screenshot({ path: `${B.RAIZ}/testes/saida/cam
           { tipo: 'servico', nome: 'Banho', qtd: 1, valor: 45, servico_id: L.S.Banho },
         ];
         const orc = B.must(await dono.from('orcamentos').insert({ petshop_id: P, cliente_id: L.tutores.Ana, itens, desconto: 10, validade: L.dia(7), chave: D.novaChaveDeOperacao() }).select('id, numero').single(), 'orçamento');
-        await page.getByRole('button', { name: 'Orçamentos' }).click();
+        await N.doAlto(page, 'Orçamentos');
         const lo = page.locator('.g-folha').last();
         await lo.locator('.g-linha', { hasText: `Nº ${orc.numero}` }).click();
         const vo = page.locator('.g-folha').last();

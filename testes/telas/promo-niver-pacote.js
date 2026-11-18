@@ -101,7 +101,7 @@ const SAIDA = path.join(__dirname, '..', 'saida');
 
   // Aniversariantes do mês
   await N.ir(page, '/gestao/app/clientes');
-  await page.locator('button', { hasText: 'Aniversariantes do mês' }).click();
+  await N.doAlto(page, 'Aniversariantes do mês');
   const niver = page.locator('.g-folha').last();
   await niver.locator('.g-niver-linha').first().waitFor({ timeout: 15000 });
   const parabens = niver.locator('.g-niver-linha', { hasText: 'Ana Souza' }).locator('a', { hasText: 'Dar parabéns' });

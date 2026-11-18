@@ -2149,6 +2149,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"logins_lixo": {
+                  Row: {
+                    "criado_em": string,"erro": string | null,"petshop_id": string | null,"tentativas": number,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "criado_em"?: string,"erro"?: string | null,"petshop_id"?: string | null,"tentativas"?: number,"user_id": string
+                  }
+                  Update: {
+                    "criado_em"?: string,"erro"?: string | null,"petshop_id"?: string | null,"tentativas"?: number,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"lojas_novas_rede": {
                   Row: {
                     "dia": string,"n": number,"rede": string
@@ -3244,7 +3258,7 @@ isOneToOne: false
 { Args: { "p_canal": string,"p_limite": number,"p_petshop": string,"p_tipo": string }; Returns: boolean
                            },
 "assistente_contar_v2":
-{ Args: { "p_canal": string,"p_limite": number,"p_petshop": string,"p_tipo": string }; Returns: Json
+{ Args: { "p_canal": string,"p_limite": number,"p_petshop": string,"p_segredo"?: string,"p_tipo": string }; Returns: Json
                            },
 "avaliar_conversa":
 { Args: { "p_id": string,"p_pediu_equipe"?: boolean,"p_resolveu"?: boolean }; Returns: undefined
@@ -4549,6 +4563,9 @@ isOneToOne: false
 { Args: { "p": string }; Returns: {
               "id": string,"preco_g": number,"preco_gg": number,"preco_m": number,"preco_p": number,"varia": boolean
             }[]
+                           },
+"servidor_chamada_ok":
+{ Args: { "p_segredo": string }; Returns: boolean
                            },
 "servidor_segredo_confere":
 { Args: { "p_segredo": string }; Returns: boolean
