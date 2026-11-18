@@ -368,6 +368,8 @@
 .gp-bm-quando span { padding: 2px 9px; border-radius: 999px; background: #dcebe2; color: var(--v); font-weight: 600; }
 .gp-nv-tela .gp-bm-fotos img { width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; display: block; border-radius: 14px; background: #f3ece2; }
 .gp-bm-fotos { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+.gp-bm-fotos figure { position: relative; margin: 0; }
+.gp-bm-fotos figcaption { position: absolute; left: .4rem; bottom: .4rem; padding: .15rem .5rem; border-radius: 999px; background: rgba(31, 27, 23, .72); color: #fff; font-size: .6875rem; font-weight: 700; }
 .gp-bm-carta { position: relative; padding: .75rem .8rem .7rem 2.2rem; border-radius: 14px; background: #fff; border: 1px solid rgba(31, 27, 23, .08); }
 .gp-bm-carta > svg { position: absolute; left: .75rem; top: .8rem; color: var(--laranja2); }
 .gp-bm-carta small { display: block; margin-top: .3rem; font-size: .75rem; color: var(--cinza); }

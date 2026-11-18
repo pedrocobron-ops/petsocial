@@ -2,24 +2,30 @@ import { Camera, Check, FileText, HeartPulse, Mic, PawPrint, Sparkles, Star } fr
 
 /**
  * As três vitrines logo depois da capa (boletim do pet, trazer do caderno e falar em vez de digitar), cada uma com um desenho
- * da tela feito em HTML e SVG. No boletim, as duas fotos são de verdade: a mesma poodle depois do banho (public/gestao/boletim,
- * recortadas das fotos do feed pronto do pet shop). Nada de foto de pessoa. Os nomes (Pipoca, Thor, Ana) são de exemplo.
+ * da tela feito em HTML e SVG. No boletim, as duas fotos são o antes e o depois do mesmo shih-tzu
+ * (public/gestao/boletim/antes.webp e depois.webp, enviadas pelo dono do produto). Nada de foto de pessoa. Os nomes (Pipoca, Thor, Ana) são de exemplo.
  * Os textos seguem o manual (src/lib/gestao/manual.ts: boletim, caderno, mozart-voz).
  */
 
 function Boletim() {
   return (
-    <div className="gp-nv-fone" role="img" aria-label="Exemplo do boletim do pet no celular do tutor: duas fotos da Pipoca, uma poodle branca de lacinho rosa, depois do banho, o recado da equipe, o quadro Para você ficar de olho, o que foi feito, o botão Marcar o próximo e o convite para avaliar no Google">
+    <div className="gp-nv-fone" role="img" aria-label="Exemplo do boletim do pet no celular do tutor: a foto de antes e a de depois da Pipoca, uma shih-tzu que chegou embolada e saiu escovada e de lacinho azul, o recado da equipe, o quadro Para você ficar de olho, o que foi feito, o botão Marcar o próximo e o convite para avaliar no Google">
       <div className="gp-nv-tela" aria-hidden>
         <div className="gp-bm-loja"><span className="gp-bm-logo"><PawPrint /></span><span><b>Banho &amp; Cia</b><small>Exemplo · SP</small></span></div>
         <p className="gp-bm-sobre">Boletim da Pipoca</p>
         <p className="gp-bm-nome">Pipoca</p>
         <p className="gp-bm-quando"><span>Banho e tosa</span>sexta, 14 de novembro</p>
         <div className="gp-bm-fotos">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gestao/boletim/pipoca-1.webp" alt="" width={320} height={400} loading="lazy" decoding="async" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gestao/boletim/pipoca-2.webp" alt="" width={320} height={400} loading="lazy" decoding="async" />
+          <figure>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/gestao/boletim/antes.webp" alt="" width={480} height={600} loading="lazy" decoding="async" />
+            <figcaption>Antes</figcaption>
+          </figure>
+          <figure>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/gestao/boletim/depois.webp" alt="" width={480} height={600} loading="lazy" decoding="async" />
+            <figcaption>Depois</figcaption>
+          </figure>
         </div>
         <div className="gp-bm-carta">
           <Sparkles />
