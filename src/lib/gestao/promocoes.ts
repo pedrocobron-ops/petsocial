@@ -23,13 +23,34 @@ export type Promocao = {
   id: string; nome: string; dias: number[]; hora_de: string | null; hora_ate: string | null; servicos: string[];
   tipo: TipoPromo; valor: number; comeca_em: string | null; termina_em: string | null; ativa: boolean; criado_em?: string;
   banho_tosa?: boolean; casa?: CasaPromo[];
+  /** Só vale perto do aniversário do pet (7 dias antes a 7 dias depois; `pets.nascimento`, o ano não importa). */
+  aniversario?: boolean;
 };
 
 /** A cópia que fica no horário (e no pedido do link). `tirada`: a equipe tirou a promoção deste horário. */
 export type PromoDoHorario = { id: string; nome: string; tipo: TipoPromo; valor: number; servicos: string[]; tirada?: boolean };
 
 /** Colunas lidas da tabela. */
-export const COLS_PROMOCAO = "id, nome, dias, hora_de, hora_ate, servicos, tipo, valor, comeca_em, termina_em, ativa, criado_em, banho_tosa, casa";
+export const COLS_PROMOCAO = "id, nome, dias, hora_de, hora_ate, servicos, tipo, valor, comeca_em, termina_em, ativa, criado_em, banho_tosa, casa, aniversario";
+
+/** Dias antes e depois do aniversário do pet em que a promoção de aniversário vale (a mesma janela do banco, niver_perto). */
+export const JANELA_NIVER = 7;
+
+/**
+ * O dia ("AAAA-MM-DD") cai a até `janela` dias do aniversário (dia e mês de `nascimento`), em qualquer ano (perto da virada também)?
+ * 29/02 vale como 28/02 em ano comum. A mesma conta do banco (niver_perto).
+ */
+export function niverPerto(nascimento: string | null | undefined, dia: string, janela = JANELA_NIVER) {
+  if (!nascimento || !/^\d{4}-\d{2}-\d{2}/.test(nascimento)) return false;
+  const m = Number(nascimento.slice(5, 7)), d = Number(nascimento.slice(8, 10));
+  const alvo = deIsoDia(dia);
+  for (let y = alvo.getFullYear() - 1; y <= alvo.getFullYear() + 1; y++) {
+    const bissexto = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+    const niver = m === 2 && d === 29 && !bissexto ? new Date(y, 1, 28) : new Date(y, m - 1, d);
+    if (Math.abs(Math.round((alvo.getTime() - niver.getTime()) / 864e5)) <= janela) return true;
+  }
+  return false;
+}
 
 /** Vale no banho e tosa? (sem o campo: sim, como sempre) */
 export const valeNoBanho = (p: Pick<Promocao, "banho_tosa">) => p.banho_tosa !== false;
@@ -87,9 +108,11 @@ export const precoComPromo = (p: Pick<PromoDoHorario, "tipo" | "valor">, preco: 
  */
 export function promoDoHorario<P extends Promocao>(promos: P[], o: {
   servicoId: string | null; dia: string; hora: string; preco?: number | null; categoriaDe: (id: string) => string | null | undefined; criadoAte?: string;
+  /** Data de nascimento do pet: a promoção de aniversário só entra perto dela (sem o pet, nunca). */
+  nascimento?: string | null;
 }): P | null {
   const base = o.preco ?? 100;
-  const lista = promos.filter((p) => p.ativa && valeNoBanho(p) && (!o.criadoAte || !p.criado_em || p.criado_em <= o.criadoAte) && valeNoHorario(p, o.dia, o.hora) && servicoEntra(p.servicos, o.servicoId, o.categoriaDe));
+  const lista = promos.filter((p) => p.ativa && valeNoBanho(p) && (!p.aniversario || niverPerto(o.nascimento, o.dia)) && (!o.criadoAte || !p.criado_em || p.criado_em <= o.criadoAte) && valeNoHorario(p, o.dia, o.hora) && servicoEntra(p.servicos, o.servicoId, o.categoriaDe));
   lista.sort((a, b) => descontoNoPreco(b, base) - descontoNoPreco(a, base) || String(a.criado_em ?? "").localeCompare(String(b.criado_em ?? "")));
   return lista[0] ?? null;
 }
@@ -165,6 +188,10 @@ function horasDoTexto(p: Promocao) {
 export function resumoDaPromo(p: Promocao, nomeDe: (id: string) => string | null | undefined) {
   const dias = diasPorExtenso(p.dias);
   const horas = horasDoTexto(p);
+  if (p.aniversario) {
+    const quando = p.dias.length === 7 ? "" : ` (${dias}${horas ? `, ${horas}` : ""})`;
+    return `Perto do aniversário do pet, de ${JANELA_NIVER} dias antes a ${JANELA_NIVER} dias depois${quando}: ${valorPorExtenso(p)} ${ondePorExtenso(p, nomeDe)}.`;
+  }
   return `${dias.charAt(0).toUpperCase()}${dias.slice(1)}${horas ? `, ${horas}` : ""}: ${valorPorExtenso(p)} ${ondePorExtenso(p, nomeDe)}.`;
 }
 
@@ -193,6 +220,9 @@ export function textoDaPromocao(p: Promocao, loja: string, nomeDe: (id: string) 
   const horas = horasDoTexto(p);
   const validade = validadePorExtenso(p);
   const pede = valeNoBanho(p) ? (p.casa?.length ? "Quer marcar um horário ou reservar uma vaga?" : "Quer marcar um horário?") : "Quer reservar uma vaga?";
+  if (p.aniversario) {
+    return `${loja}: no aniversário do seu pet tem presente. Marcando de ${JANELA_NIVER} dias antes a ${JANELA_NIVER} dias depois do aniversário, tem ${valorPorExtenso(p)} ${ondePorExtenso(p, nomeDe)}.${validade ? ` Vale ${validade}.` : ""} ${pede} É só responder esta mensagem.`;
+  }
   return `${loja}: ${dias}${horas ? `, ${horas},` : ""} tem ${valorPorExtenso(p)} ${ondePorExtenso(p, nomeDe)}.${validade ? ` Vale ${validade}.` : ""} ${pede} É só responder esta mensagem.`;
 }
 
@@ -206,6 +236,7 @@ export function lerPromocao(x: Record<string, unknown>): Promocao {
     criado_em: (x.criado_em as string | undefined) ?? undefined,
     banho_tosa: x.banho_tosa !== false,
     casa: Array.isArray(x.casa) ? (x.casa as unknown[]).map(String).filter((c): c is CasaPromo => c === "creche" || c === "hotel") : [],
+    aniversario: x.aniversario === true,
   };
 }
 

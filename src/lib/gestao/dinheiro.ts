@@ -171,6 +171,8 @@ export async function gravarMovimentos(sb: Banco, petshopId: string, linhas: Lin
 /**
  * Anota uma conta que o cliente vai pagar depois (fiado): uma entrada ainda não paga, com vencimento.
  * Não entra no caixa nem nas somas do que entrou; aparece em Financeiro, A receber, até alguém dar baixa.
+ * Dívida de antes (`devidoDesde`, trazida do caderno): já está vencida desde o dia anotado. O vencimento é esse dia, nunca
+ * um prazo inventado para a frente (senão a tela e o Mozart diriam "ainda não está atrasado" de um fiado de semanas).
  */
 export async function lancarAReceber(sb: Banco, petshopId: string, l: {
   valor: number; vencimento: string; categoria: string; descricao?: string | null; agendamentoId?: string | null; clienteId?: string | null;
@@ -181,9 +183,10 @@ export async function lancarAReceber(sb: Banco, petshopId: string, l: {
   chave?: string | null;
 }) {
   const { data: u } = await sb.auth.getUser();
+  const vencimento = vencimentoDaDivida(l.vencimento, l.devidoDesde);
   const { data, error } = await gravarLancamento(sb, petshopId, {
     petshop_id: petshopId, tipo: "entrada", valor: l.valor, forma: null, categoria: l.categoria, descricao: l.descricao ?? null,
-    data: l.vencimento, vencimento: l.vencimento, pago: false,
+    data: vencimento, vencimento, pago: false,
     agendamento_id: l.agendamentoId ?? null, cliente_id: l.clienteId ?? null, origem: "tela", criado_por: u.user?.id ?? null,
     ...(l.itens?.length ? { itens: l.itens } : {}),
     ...(l.devidoDesde ? { devido_desde: l.devidoDesde } : {}),
@@ -191,6 +194,11 @@ export async function lancarAReceber(sb: Banco, petshopId: string, l: {
   if (error?.code === "23505") throw new Error("Este atendimento já tem recebimento lançado. Atualize a tela para ver.");
   if (error) throw new Error(error.message);
   return data!;
+}
+
+/** Vencimento de uma conta a receber: a dívida de antes (com o dia em que começou) vence nesse dia; as outras, no combinado. */
+export function vencimentoDaDivida(combinado: string, devidoDesde?: string | null) {
+  return devidoDesde && /^\d{4}-\d{2}-\d{2}$/.test(devidoDesde) && devidoDesde < combinado ? devidoDesde : combinado;
 }
 
 const centavos = (n: number) => Math.round(n * 100) / 100;
@@ -369,7 +377,11 @@ export function partesDoLancamento(l: { valor: number; itens?: unknown }): { ser
   const itens = itensDoLancamento(l);
   if (!itens.length) return null;
   const bruto = { servico: 0, produto: 0, extra: 0 };
-  for (const i of itens) bruto[i.tipo] += Math.max(0, i.qtd * i.valor);
+  // linhas negativas (sinal já pago, crédito usado, promoção da diária) abatem o que elas pagam: as diárias e os serviços
+  // primeiro, depois produtos e extras. Sem isso, o sinal se espalhava pela taxa de busca e a taxa de R$ 40 virava R$ 29,60.
+  let abate = 0;
+  for (const i of itens) { const v = i.qtd * i.valor; if (v >= 0) bruto[i.tipo] += v; else abate -= v; }
+  for (const k of ["servico", "produto", "extra"] as const) { const tira = Math.min(bruto[k], abate); bruto[k] -= tira; abate -= tira; }
   const soma = bruto.servico + bruto.produto + bruto.extra;
   const total = Number(l.valor);
   if (!(soma > 0)) return null;
@@ -402,6 +414,13 @@ export async function ultimoContado(sb: Banco, petshopId: string): Promise<numbe
   const { data } = await sb.from("caixas").select("valor_contado").eq("petshop_id", petshopId).not("fechado_em", "is", null)
     .order("fechado_em", { ascending: false }).limit(1).maybeSingle();
   return data?.valor_contado == null ? null : Number(data.valor_contado);
+}
+
+/** O último caixa fechado: quando fechou e quanto foi contado (para "o caixa de hoje já foi fechado" e o troco de quem reabre). */
+export async function ultimoFechamento(sb: Banco, petshopId: string): Promise<{ fechadoEm: string; contado: number | null } | null> {
+  const { data } = await sb.from("caixas").select("fechado_em, valor_contado").eq("petshop_id", petshopId).not("fechado_em", "is", null)
+    .order("fechado_em", { ascending: false }).limit(1).maybeSingle();
+  return data?.fechado_em ? { fechadoEm: data.fechado_em, contado: data.valor_contado == null ? null : Number(data.valor_contado) } : null;
 }
 
 /**

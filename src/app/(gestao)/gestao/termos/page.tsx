@@ -78,7 +78,10 @@ export default function TermosDoGestao() {
           Estes Termos de uso e a <Link href="/gestao/privacidade">Política de privacidade</Link> formam o contrato entre você e nós.
           Se algo combinado por escrito com você for diferente, vale o combinado.
         </p>
-        <p>Contato: <Email /> ou <Zap />. Assuntos jurídicos e de privacidade: <EmailJuridico />.</p>
+        <p>
+          {EMPRESA.pessoaFisica ? <>Hoje quem responde pelo Gestão é uma pessoa física, e não uma empresa. Isso não muda os seus direitos: os dados continuam do seu pet shop (parte 10), você baixa tudo quando quiser (parte 22) e, se um dia o serviço deixar de ser oferecido, avisamos com pelo menos 60 dias de antecedência e devolvemos o que foi pago e não usado (parte 21). Quando abrirmos a empresa, ela assume este contrato com as mesmas condições (parte 26). </> : null}
+          Contato: <Email /> ou <Zap />.{EMPRESA.emailJuridico && EMPRESA.emailJuridico !== EMPRESA.email ? <> Assuntos jurídicos e de privacidade: <EmailJuridico />.</> : " O mesmo e-mail atende assuntos jurídicos e de privacidade."}
+        </p>
       </>)}
 
       {p("quem-pode", "É um serviço para empresas e profissionais do ramo pet, usado no trabalho. Precisa ter 18 anos ou mais.", <>
@@ -144,14 +147,23 @@ export default function TermosDoGestao() {
         </ul>
       </>)}
 
-      {p("cancelar", "Sem fidelidade e sem multa. Pediu em até 7 dias do primeiro pagamento, devolvemos tudo. Depois disso, usa até o fim do período pago.", <>
+      {p("cancelar", "Sem fidelidade e sem multa. Pediu em até 7 dias do primeiro pagamento, devolvemos tudo. Depois disso, usa até o fim do período pago. Para mudar de plano, cancele e assine o novo; os meses que sobraram não viram crédito.", <>
         <ul>
           <li><b>Sem fidelidade e sem multa.</b> Você cancela quando quiser, pela página da Cakto (o botão fica na tela Assinatura) ou pedindo pelo nosso contato.</li>
           <li>O cancelamento encerra as renovações seguintes. Você continua usando até o fim do período que já pagou; depois a conta fica só para consulta.</li>
           <li><b>Arrependimento em 7 dias:</b> se pedir o cancelamento em até 7 dias depois do primeiro pagamento de uma assinatura, devolvemos o valor integral desse pagamento, mesmo nos planos de 3 e 6 meses.</li>
           <li>Fora desse prazo, não devolvemos o valor de períodos já começados, inclusive se você deixar de usar o sistema, salvo quando a lei mandar ou quando o serviço não puder ser usado por falha nossa.</li>
           <li>A devolução é feita pela Cakto, pelo mesmo meio de pagamento, nos prazos dela e da operadora do cartão. Se as regras da Cakto derem a você mais prazo ou mais direitos, valem as dela.</li>
-          <li>Para mudar de plano, cancele o atual e assine o novo: os dados do pet shop continuam os mesmos.</li>
+          <li>
+            <b>Mudar de plano ou de período</b> (por exemplo, do Equipe para o Pet shop, ou do mensal para o de 6 meses): hoje a troca não é automática.
+            Cancele a assinatura atual pela página da Cakto e, depois, assine o plano novo pela tela Assinatura. Não deixe as duas assinaturas ativas ao mesmo tempo:
+            as duas seriam cobradas, e o pagamento novo pode não ser reconhecido sozinho. Os dados do pet shop continuam os mesmos.
+          </li>
+          <li>
+            O plano novo vale a partir do pagamento dele, pelo período escolhido, com o preço e o número de logins dele. O período que você já tinha pago
+            não se perde: o acesso continua, no mínimo, até o fim dele. Mas os meses que sobraram de um plano de 3 ou 6 meses <b>não viram crédito nem desconto</b>{" "}
+            no plano novo e não são devolvidos, salvo dentro dos 7 dias do arrependimento ou nos casos do item acima. Por isso, se puder esperar, troque perto do fim do período pago.
+          </li>
         </ul>
       </>)}
 
@@ -186,7 +198,7 @@ export default function TermosDoGestao() {
       {p("dados", "Pela LGPD, o seu pet shop é o controlador dos dados dos seus clientes e nós somos o operador. Cabe a você ter motivo legal para usar esses dados e informar os seus clientes.", <>
         <p>
           O que você e a sua equipe lançam (clientes, pets, agenda, financeiro, estoque, fotos) <b>pertence ao seu pet shop</b>.
-          Pela Lei Geral de Proteção de Dados (LGPD), quanto aos dados dos seus clientes e da sua equipe, o seu pet shop é o <b>controlador</b>
+          Pela Lei Geral de Proteção de Dados (LGPD), quanto aos dados dos seus clientes e da sua equipe, o seu pet shop é o <b>controlador</b>{" "}
           (decide o que lançar e para quê) e nós somos o <b>operador</b> (guardamos e processamos esses dados para o sistema funcionar, seguindo as suas instruções
           e a <Link href="/gestao/privacidade">Política de privacidade</Link>).
         </p>
@@ -284,10 +296,18 @@ export default function TermosDoGestao() {
         </ul>
       </>)}
 
-      {p("disponivel", "Trabalhamos para o sistema ficar no ar, mas não garantimos funcionamento sem parada. Baixe as suas cópias de tempos em tempos.", <>
+      {p("disponivel", "Trabalhamos para o sistema ficar no ar, mas não garantimos funcionamento sem parada. Existem cópias de segurança do banco, mas sem prazo de guarda garantido; a sua própria cópia você baixa quando quiser.", <>
         <ul>
           <li>Fazemos o possível para o Gestão funcionar bem e sem interrupção, mas <b>não garantimos um tempo mínimo no ar</b> nem ausência de erros. Pode haver paradas para manutenção (de preferência fora do horário comercial), falhas nossas ou dos fornecedores (hospedagem, banco de dados, pagamentos, IA) e problemas de internet ou do seu aparelho.</li>
-          <li>O banco de dados pode ter cópias de segurança feitas pelo fornecedor, conforme o plano contratado com ele, mas elas servem para recuperar o sistema em caso de problema grave, não para desfazer o que alguém apagou ou mudou na sua conta.</li>
+          <li>
+            <b>Cópias de segurança que existem hoje:</b> (1) as cópias automáticas do banco de dados feitas pelo fornecedor (Supabase), na frequência e pelo tempo do plano contratado com ele;
+            (2) uma cópia completa do banco que a nossa equipe baixa de tempos em tempos (o nosso painel lembra de fazer uma a cada 7 dias) e guarda fora do fornecedor.
+            Nenhuma das duas inclui as fotos. Elas existem para recuperar o sistema em caso de problema grave; não prometemos frequência, prazo de guarda nem que uma cópia vá existir para o dia de que você precisa.
+          </li>
+          <li>
+            <b>Apagou algo por engano?</b> Fale com a gente o quanto antes. Se o que sumiu estiver numa dessas cópias, podemos tentar recuperar a parte do seu pet shop, sem garantia de resultado nem de prazo.
+            Valores recebidos que alguém mudou ou apagou continuam registrados no próprio sistema, com quem fez e quando (Financeiro, Alterações em valores, e Caixa, Apagados deste caixa).
+          </li>
           <li><b>A sua cópia é sua:</b> baixe de tempos em tempos todos os dados (Meu pet shop, Baixar todos os dados) e as planilhas (Clientes, Financeiro, Relatórios) e guarde os registros que a lei exige de você (fiscais, trabalhistas, sanitários) fora do sistema.</li>
           <li>Podemos incluir, mudar ou retirar funções. Quando uma mudança tirar algo importante do seu uso, avisamos antes.</li>
         </ul>
@@ -319,7 +339,7 @@ export default function TermosDoGestao() {
 
       {p("marca", `O sistema, o código, as telas, a marca ${EMPRESA.marca} e o Mozart são nossos. A assinatura dá o direito de usar enquanto a conta estiver ativa.`, <>
         <p>
-          O Gestão, o código, o desenho das telas, os textos, o manual, os materiais da Escola de Gestão, a marca {EMPRESA.marca} e o personagem Mozart são nossos
+          O Gestão, o código, o desenho das telas, os textos, o manual, os materiais da Escola de Gestão (a área do sistema com aulas e os guias vendidos à parte pela {EMPRESA.marca}), a marca {EMPRESA.marca} e o personagem Mozart são nossos
           ou licenciados para nós, e protegidos por lei. Enquanto a conta estiver em dia, damos a você e à sua equipe uma licença pessoal, não exclusiva e
           intransferível para usar o sistema na gestão do seu negócio. A licença não transfere a propriedade de nada disso e termina quando a conta acaba.
         </p>
@@ -352,7 +372,7 @@ export default function TermosDoGestao() {
           <li>Os pedidos de dados (baixar todos os dados, baixar ou apagar os dados de um tutor, pedir ou cancelar a exclusão, sair da equipe) ficam registrados com quem pediu e quando, sem os dados dos clientes, para o pet shop mostrar que atendeu o pedido.</li>
           <li>Também atendemos esses pedidos pelo nosso contato; confirmamos que o pedido é de quem pode fazê-lo.</li>
           <li>Conta encerrada por falta de pagamento segue a parte 8.</li>
-          <li>Cópias de segurança do fornecedor são substituídas com o tempo, no ciclo dele. Registros de pagamento, de aceite destes termos e outros que a lei nos obrigue a guardar, ou que sejam necessários para nos defendermos, ficam pelo prazo legal.</li>
+          <li>As cópias de segurança (parte 16) são substituídas com o tempo: o que foi apagado pode continuar nelas até serem trocadas, e elas só servem para recuperar o sistema. Registros de pagamento, de aceite destes termos e outros que a lei nos obrigue a guardar, ou que sejam necessários para nos defendermos, ficam pelo prazo legal.</li>
         </ul>
       </>)}
 
@@ -367,8 +387,8 @@ export default function TermosDoGestao() {
 
       {p("avisos", "Falamos com você pelo e-mail da conta, pelo aplicativo e pelo telefone do pet shop. Mantenha esses dados atualizados.", <>
         <ul>
-          <li>Os avisos sobre a conta, a cobrança e estes termos vão para o e-mail do dono, aparecem no aplicativo ou chegam pelo WhatsApp do pet shop. Consideramos o aviso recebido quando enviado para esses contatos.</li>
-          <li>Você fala com a gente por <Email />, pelo <Zap /> ou pela Ajuda do aplicativo. Assuntos jurídicos e de privacidade: <EmailJuridico />.</li>
+          <li>Os avisos sobre a conta, a cobrança e estes termos vão para o e-mail do dono, aparecem no aplicativo ou chegam pelo WhatsApp do pet shop. Consideramos o aviso recebido quando enviado para esses contatos. Os avisos que pedem uma ação sua, como o de apagar uma conta só para consulta (parte 8), também aparecem na tela do aplicativo sempre que alguém do pet shop entra.</li>
+          <li>Você fala com a gente por <Email />, pelo <Zap /> ou pela Ajuda do aplicativo.{EMPRESA.emailJuridico && EMPRESA.emailJuridico !== EMPRESA.email ? <> Assuntos jurídicos e de privacidade: <EmailJuridico />.</> : null}</li>
         </ul>
       </>)}
 

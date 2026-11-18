@@ -182,11 +182,18 @@ const BUSCA = "https://www.google.com/maps/search/?api=1&query=";
 /** Abre o endereço no Google Maps (celular abre o aplicativo). */
 export const linkDoMapa = (endereco: string, cidade?: string | null) => `${BUSCA}${encodeURIComponent(comCidade(endereco, cidade))}`;
 
-/** Endereço sem a cidade ganha a cidade do pet shop, para o mapa não procurar em outro lugar. */
-function comCidade(endereco: string, cidade?: string | null) {
+/**
+ * Endereço sem a cidade ganha a cidade do pet shop, para o mapa não procurar em outro lugar. `cidade` pode vir com a UF
+ * ("Campinas - SP"): endereço que já diz "Campinas" ganha só a UF (antes saía "Taquaral, Campinas, Campinas - SP").
+ */
+export function comCidade(endereco: string, cidade?: string | null) {
   const e = endereco.trim();
   const c = (cidade ?? "").trim();
-  return c && !semAcento(e).includes(semAcento(c)) ? `${e}, ${c}` : e;
+  if (!c) return e;
+  const [nome, uf] = c.split(/\s+-\s+/);
+  const tem = (x: string) => new RegExp(`(^|[^a-z0-9])${semAcento(x).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(semAcento(e));
+  if (!tem(nome)) return `${e}, ${c}`;
+  return uf && !tem(uf) ? `${e} - ${uf}` : e;
 }
 
 /** O Google Maps aceita até 9 paradas no meio do caminho: a rota leva no máximo 10 endereços (9 + o destino). */

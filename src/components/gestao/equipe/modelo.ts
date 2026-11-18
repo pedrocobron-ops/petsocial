@@ -151,6 +151,9 @@ export const erroDeLimite = (e: unknown) => /plano atual permite/i.test(e instan
 
 export const emailValido = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 export const primeiroNome = (n: string) => n.trim().split(/\s+/)[0] ?? "";
+/** Como chamar a pessoa nas telas da equipe: nome de até duas palavras fica inteiro ("Recepção Teste", "Ana Souza"), porque a
+ *  primeira pode ser um cargo (achado da Juliana: "E-mail de Recepção"); nome comprido, só o primeiro. */
+export const nomeCurtoDe = (n: string) => (n.trim().split(/\s+/).length <= 2 ? n.trim().replace(/\s+/g, " ") : primeiroNome(n));
 
 /** Link do convite: o e-mail já vem preenchido e o código (`convite`) é o que liga a conta à equipe. Vale 7 dias, uma vez só. */
 export function linkDoConvite(origem: string, email: string, codigo: string) {

@@ -284,7 +284,10 @@ function CaixaDoDia() {
                 <Tile icone={Lock} tom="menta" tamanho="g" />
                 <div style={{ minWidth: 0 }}>
                   <h2>O caixa está fechado</h2>
-                  <p>Abra o caixa para começar o dia. Você conta o troco da gaveta e o resto a gente soma.</p>
+                  {/* fechou hoje: não manda "começar o dia" de novo; só se precisar receber em dinheiro */}
+                  {ultimo?.fechado_em && isoDia(new Date(ultimo.fechado_em)) === isoDia(new Date())
+                    ? <p>O caixa de hoje já foi fechado, às {hora(ultimo.fechado_em)}. Se ainda for receber em dinheiro hoje, dá para abrir de novo.</p>
+                    : <p>Abra o caixa para começar o dia. Você conta o troco da gaveta e o resto a gente soma.</p>}
                 </div>
               </div>
               <div><button className="g-btn pri" onClick={() => void abrir({ tipo: "abrir" })}><Wallet />Abrir o caixa</button></div>
@@ -719,7 +722,8 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo, aoMu
     return x.error ? 0 : Number(x.data ?? 0);
   }, [caixa.id]);
   const avisoCobrar = paraCobrar.n ? `${paraCobrar.n === 1 ? "1 atendimento concluído está" : `${paraCobrar.n} atendimentos concluídos estão`} sem conta fechada (${brl(paraCobrar.total)}).` : "";
-  const avisoAlteracoes = alteracoes ? `${alteracoes === 1 ? "1 alteração" : `${alteracoes} alterações`} em valores desde que este caixa abriu.` : "";
+  // conta as de todos (as suas e as da equipe): o link abre Alterações no período deste caixa, com "Todas" marcado, e a conta bate
+  const avisoAlteracoes = alteracoes ? `${alteracoes === 1 ? "1 alteração" : `${alteracoes} alterações`} em valores (suas e da equipe) desde que este caixa abriu.` : "";
   const dif = diferenca(contado, esperado);
 
   async function salvar() {

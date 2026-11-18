@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDownRight, ArrowUpRight, CalendarDays, CircleCheck, Package, PiggyBank, Receipt, Repeat, Scissors, TrendingUp, UserPlus, UserX } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BedDouble, CalendarDays, CircleCheck, Package, PiggyBank, Receipt, Repeat, Scissors, TrendingUp, UserPlus, UserX } from "lucide-react";
+import { usaModulo } from "@/lib/gestao/modulos";
+import { vagasDoTipo } from "@/lib/gestao/hotel";
 import { useGestao } from "@/components/gestao/contexto";
 import { Esqueleto, useDados, Vazio } from "@/components/gestao/ui";
 import { brlMini, Chips, ErroDeCarga, SemAcesso } from "@/components/gestao/financeiro/comum";
 import { Barras, Kpi, Ranking, Tile } from "@/components/gestao/painel";
 import AbasDeRelatorios from "@/components/gestao/relatorios/abas";
 import {
-  carregarIndicadores, comparacao, DIAS_SEMANA_CURTOS, intervaloAnterior, intervaloIndicadores, pct1, PERIODOS_INDICADORES, rotuloMes, temDados, totaisIndicadores,
+  carregarIndicadores, comparacao, DIAS_SEMANA_CURTOS, intervaloAnterior, intervaloIndicadores, pct1, PERIODO_INICIAL, PERIODOS_INDICADORES, rotuloMes, temDados, totaisIndicadores,
   type IndicadoresDoBanco, type PeriodoIndicadores,
 } from "@/lib/gestao/indicadores";
 import { brl, dataCompleta } from "@/lib/gestao/util";
@@ -28,7 +30,7 @@ const n = (v: number, um: string, varios: string) => `${v.toLocaleString("pt-BR"
  */
 function Indicadores() {
   const { sb, petshop } = useGestao();
-  const [periodo, setPeriodo] = useState<PeriodoIndicadores>("6");
+  const [periodo, setPeriodo] = useState<PeriodoIndicadores>(PERIODO_INICIAL);
   const hoje = useMemo(() => new Date(), []);
   const { de, ate } = intervaloIndicadores(periodo, hoje);
   const antes = intervaloAnterior(periodo, hoje);
@@ -73,7 +75,15 @@ function Comparar({ atual, anterior }: { atual: number | null; anterior: number 
 }
 
 function Graficos({ d, antes, fixas, periodoAnterior }: { d: IndicadoresDoBanco; antes: IndicadoresDoBanco | null; fixas: SaidasDoPeriodo | null; periodoAnterior: string }) {
+  const { petshop } = useGestao();
   const t = totaisIndicadores(d), ta = antes ? totaisIndicadores(antes) : null;
+  // só o que faz sentido para o negócio: hotel e creche sem agenda não têm horário, serviço nem produto para mostrar
+  const comAgenda = usaModulo(petshop, "banho_tosa"), comLoja = usaModulo(petshop, "loja"), comHotel = usaModulo(petshop, "hotel");
+  const verMapa = comAgenda || d.mapa.length > 0, verServicos = comAgenda || d.servicos.length > 0, verProdutos = comLoja || d.produtos.length > 0;
+  // ocupação do hotel: noites ocupadas sobre as vagas de cada noite do período (até hoje), como em Relatórios
+  const vagasHotel = comHotel ? vagasDoTipo(petshop, "hotel") : null;
+  const noitesDoPeriodo = d.meses.reduce((s, m) => s + Math.max(0, Math.round((new Date(`${m.ate}T12:00:00`).getTime() - new Date(`${m.de}T12:00:00`).getTime()) / 864e5) + 1), 0);
+  const ocupacao = vagasHotel && noitesDoPeriodo ? t.noitesHotel / (vagasHotel * noitesDoPeriodo) : null;
   const comAno = new Set(d.meses.map((m) => m.mes.slice(0, 4))).size > 1;
   const rot = (mes: string) => rotuloMes(mes, comAno);
   const visitas = t.atendimentos + t.estadias;
@@ -87,12 +97,16 @@ function Graficos({ d, antes, fixas, periodoAnterior }: { d: IndicadoresDoBanco;
         )}
         {d.dinheiro && (
           <Kpi icone={Receipt} tom="ceu" rotulo="Valor médio por conta" valor={t.valorMedio == null ? "–" : brl(t.valorMedio)}
-            apoio={<span className="g-ind-apoio"><span>{n(t.contas, "conta paga", "contas pagas")}</span><Comparar atual={t.valorMedio} anterior={ta?.valorMedio ?? null} /></span>} />
+            apoio={<span className="g-ind-apoio"><span>{n(t.contas, "conta paga", "contas pagas")}{comHotel ? " (o sinal conta junto da conta da estadia)" : ""}</span><Comparar atual={t.valorMedio} anterior={ta?.valorMedio ?? null} /></span>} />
         )}
         <Kpi icone={CircleCheck} tom="pessego" rotulo={temEstadias ? "Atendimentos e estadias" : "Atendimentos"} valor={visitas.toLocaleString("pt-BR")}
           apoio={<Comparar atual={visitas} anterior={visitasAntes} />} />
         <Kpi icone={Repeat} tom="lilas" rotulo="Voltaram em 60 dias" valor={pct1(t.retorno)}
           apoio={d.retorno_60.clientes ? `${d.retorno_60.voltaram} de ${n(d.retorno_60.clientes, "cliente atendido", "clientes atendidos")}` : "nenhum cliente atendido"} />
+        {ocupacao != null && (
+          <Kpi icone={BedDouble} tom="ceu" rotulo="Ocupação do hotel" valor={pct1(ocupacao * 100)}
+            apoio={`${n(t.noitesHotel, "noite ocupada", "noites ocupadas")} de ${(vagasHotel! * noitesDoPeriodo).toLocaleString("pt-BR")}`} />
+        )}
       </div>
       <p className="g-muted g-pp">Comparando com o período anterior, {periodoAnterior}.</p>
 
@@ -127,32 +141,34 @@ function Graficos({ d, antes, fixas, periodoAnterior }: { d: IndicadoresDoBanco;
           <div className="g-card-t"><h3><Tile icone={UserX} tom="rosa" tamanho="p" />Faltas e cancelamentos</h3></div>
           <div className="g-ind-dois">
             <div><small>Faltas</small><b>{pct1(t.pctFaltas)}</b><small>{n(t.faltas, "falta", "faltas")} de {t.atendimentos + t.faltas} que deviam vir</small><Comparar atual={t.pctFaltas} anterior={ta?.pctFaltas ?? null} /></div>
-            <div><small>Cancelamentos</small><b>{pct1(t.pctCancelados)}</b><small>{n(t.cancelados, "cancelado", "cancelados")} de {n(t.marcados, "marcado", "marcados")}</small><Comparar atual={t.pctCancelados} anterior={ta?.pctCancelados ?? null} /></div>
+            <div><small>Cancelamentos</small><b>{pct1(t.pctCancelados)}</b><small>{n(t.cancelados, "cancelado", "cancelados")} de {n(t.marcados, "marcado", "marcados")}{t.reservasMarcadas > 0 ? ` (${n(t.reservasCanceladas, "reserva cancelada", "reservas canceladas")} de ${n(t.reservasMarcadas, "reserva", "reservas")} da creche e do hotel, pela data de entrada)` : ""}</small>
+              {t.canceladasNoPeriodo > 0 && <small>{t.canceladasNoPeriodo === 1 ? "1 reserva da creche ou do hotel foi cancelada" : `${t.canceladasNoPeriodo.toLocaleString("pt-BR")} reservas da creche e do hotel foram canceladas`} neste período (pela data do cancelamento)</small>}<Comparar atual={t.pctCancelados} anterior={ta?.pctCancelados ?? null} /></div>
           </div>
+          {t.reservasMarcadas > 0 && <p className="g-muted g-pp">Reservas pelo dia da entrada, sem os dias dos mensalistas. Faltas são só dos horários da agenda.</p>}
         </section>
       </div>
 
-      <section className="g-card" aria-label="Dias e horários mais cheios">
+      {verMapa && <section className="g-card" aria-label="Dias e horários mais cheios">
         <div className="g-card-t"><h3><Tile icone={CalendarDays} tom="ceu" tamanho="p" />Dias e horários mais cheios</h3></div>
         <Mapa mapa={d.mapa} />
-      </section>
+      </section>}
 
-      <div className="g-duas meio">
-        <section className="g-card" aria-label="Serviços mais vendidos">
+      {(verServicos || verProdutos) && <div className={verServicos && verProdutos ? "g-duas meio" : undefined}>
+        {verServicos && <section className="g-card" aria-label="Serviços mais vendidos">
           <div className="g-card-t"><h3><Tile icone={Scissors} tom="pessego" tamanho="p" />Serviços mais vendidos</h3><span className="g-muted g-pp">vezes feitas</span></div>
           {d.servicos.length ? <>
             <Ranking itens={d.servicos.slice(0, 8).map((s) => ({ rotulo: s.nome, valor: s.vezes }))} />
             {d.dinheiro && d.servicos.some((s) => (s.receita ?? 0) > 0) && <p className="g-muted g-pp">Entrou: {d.servicos.slice(0, 8).filter((s) => (s.receita ?? 0) > 0).map((s) => `${s.nome} ${brl(s.receita)}`).join(" · ")}.</p>}
           </> : <p className="g-muted g-p">Nenhum atendimento concluído neste período.</p>}
-        </section>
-        <section className="g-card" aria-label="Produtos mais vendidos">
+        </section>}
+        {verProdutos && <section className="g-card" aria-label="Produtos mais vendidos">
           <div className="g-card-t"><h3><Tile icone={Package} tom="manteiga" tamanho="p" />Produtos mais vendidos</h3><span className="g-muted g-pp">quantidade</span></div>
           {d.produtos.length ? <>
             <Ranking itens={d.produtos.slice(0, 8).map((p) => ({ rotulo: `${p.nome} (${p.unidade})`, valor: p.quantidade }))} formato={(v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 3 })} />
             {d.dinheiro && d.produtos.some((p) => (p.receita ?? 0) > 0) && <p className="g-muted g-pp">Entrou: {d.produtos.slice(0, 8).filter((p) => (p.receita ?? 0) > 0).map((p) => `${p.nome} ${brl(p.receita)}`).join(" · ")}.</p>}
           </> : <p className="g-muted g-p">Nenhum produto vendido neste período.</p>}
-        </section>
-      </div>
+        </section>}
+      </div>}
 
       {d.dinheiro && (
         <section className="g-card" aria-label="Quanto sobrou por mês">

@@ -17,6 +17,7 @@ import { servicosAMais } from "@/lib/gestao/servicos-do-horario";
 import { taxaDoLevaTraz, taxaSugerida, temTaxa } from "@/lib/gestao/quadro";
 import { brl, dataCompleta, hora, isoDia, linkWhatsApp, precoDoServico, soDigitos, somaDias } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { conferirDiaDoHorario } from "@/lib/gestao/dia-do-horario";
 import { useGestao } from "../contexto";
 import { usaModulo } from "@/lib/gestao/modulos";
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
@@ -44,6 +45,12 @@ function alocarNasAntigas(antigas: Antiga[], sobra: number) {
     resto -= usa;
     return { conta: c, valor: usa / 100 };
   });
+}
+
+/** Quanto o cliente entregou em dinheiro ("Recebeu quanto?"), quando passou da parte em dinheiro (há troco). */
+function dinheiroEntregue(e: { entregue?: number | null; parte?: boolean }, formas: { forma: string; valor: number }[]) {
+  const emDinheiro = centavos(formas.filter((f) => f.forma === "dinheiro").reduce((t, f) => t + f.valor, 0));
+  return !e.parte && e.entregue && emDinheiro > 0 && e.entregue > emDinheiro + 0.005 ? centavos(e.entregue) : null;
 }
 
 /**
@@ -165,6 +172,8 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
     if (nadaAFazer || somenteLeitura()) return false;
     const problema = erroDaConta(itens, desconto, contas.total);
     if (problema) { avisarErro(problema); return false; }
+    // horário de amanhã (ou depois) concluído hoje: confirma antes (achado da Neide: concluiu os de amanhã sem perceber)
+    if (a.status !== "concluido" && !(await conferirDiaDoHorario(a.inicio, perguntar, contas.total > 0 || junto > 0))) return false;
     const fiado = depois.ativo && contas.total > 0;
     if (fiado && (!depois.quando || depois.quando < isoDia(new Date()))) { setErroForma(depois.quando ? "Essa data já passou. Escolha um dia de hoje em diante." : "Escolha um dia de hoje em diante."); avisarErro(depois.quando ? "A data em que o cliente vai pagar já passou. Escolha um dia de hoje em diante." : "Escolha quando o cliente vai pagar."); return false; }
     if (aMenos && !parteDasAntigas) return receberParte(chave, aMenos);
@@ -235,16 +244,19 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       if (pg && !("erro" in pg)) await anotarParcelas(idsDaOperacao(feito, passos), pagamento.parcelas);
       const usos = feito.passos.find((p) => p.t === "pacote");
       const lancado = lanca && !fiado ? (lancamentoDe(feito, "principal") as unknown as Lancamento | null) : null;
+      // dinheiro entregue a mais (troco): fica guardado para o comprovante dizer o troco também quando for mandado depois, do horário
+      const formasPagas = pg && !("erro" in pg) ? pg.pagamentos ?? [{ forma: pg.forma, valor: recebendo }] : [];
+      const entregue = dinheiroEntregue(pagamento, formasPagas);
+      if (entregue && lancado?.id) void Promise.resolve(sb.rpc("comprovante_guardar_entregue", { p_lancamento: lancado.id, p_entregue: entregue })).catch(() => {});
       if (vejoFinanceiro && pg && !("erro" in pg) && soDigitos(tutor?.telefone).length >= 8 && (lancado || pagouAntigas > 0)) {
-        const formas = pg.pagamentos ?? [{ forma: pg.forma, valor: recebendo }];
         zapComprovante = junto > 0
           ? linkWhatsApp(tutor?.telefone, textoComprovanteDaParte({
-              petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, itens: gravar, total: contas.total, desconto: contas.desconto,
-              pago: centavos(contas.total + pagouAntigas), formas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas, antigoDevia: devido,
+              petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, quando: a.inicio, pagoEm: isoDia(new Date()), itens: gravar, total: contas.total, desconto: contas.desconto,
+              pago: centavos(contas.total + pagouAntigas), formas: formasPagas, falta: centavos(devido - pagouAntigas), antigo: pagouAntigas, antigoDevia: devido, entregue,
             }))
-          : lancado ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] })) : null;
+          : lancado ? linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, pagoEm: isoDia(new Date()), recebidos: [lancado], entregue })) : null;
       } else if (vejoFinanceiro && lancado && soDigitos(tutor?.telefone).length >= 8) {
-        zapComprovante = linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, recebidos: [lancado] }));
+        zapComprovante = linkWhatsApp(tutor?.telefone, textoComprovante({ petshop: petshop.nome, tutor: tutor?.nome, pet: pet?.nome, servico, quando: a.inicio, pagoEm: isoDia(new Date()), recebidos: [lancado], entregue }));
       }
       const recebeu = lanca;
       const notaAntigas = pagouAntigas > 0
@@ -338,7 +350,7 @@ export default function Comanda({ agendamento: a, pacote, aoFechar, aoPronto }: 
       avisarMudanca();
       // quem fica devendo é quem mais precisa do comprovante do que já pagou
       const zap = vejoFinanceiro ? linkWhatsApp(tutor.telefone, textoComprovanteDaParte({
-        petshop: petshop.nome, tutor: tutor.nome, pet: pet?.nome, quando: a.inicio, itens: gravar, total: contas.total, desconto: contas.desconto,
+        petshop: petshop.nome, tutor: tutor.nome, pet: pet?.nome, quando: a.inicio, pagoEm: isoDia(new Date()), itens: gravar, total: contas.total, desconto: contas.desconto,
         pago: entregue, formas: m.pagamentos ?? [{ forma: m.forma, valor: entregue }], falta, pagaAte: depois.quando,
       })) : null;
       if (zap && soDigitos(tutor.telefone).length >= 8) setRecebida({ valor: entregue, nota, zap });

@@ -116,13 +116,13 @@ export function montarFila(d: DadosDoEnvio, petshop: Petshop, agora = new Date()
     mensagens.push({ chave, tipo, refs, tutorId: tutor?.id ?? null, quem, telefone: fone, porque, texto: texto(tutor?.nome ?? null) });
   }
   const nomes = (l: { pet: Pet }[]) => juntarNomes([...new Set(l.map((x) => x.pet.nome))]);
-  const comoHorario = (a: ItemHorario, tutor: string | null) => ({ inicio: a.inicio, servicos: a.servicos, agendamento_servicos: a.agendamento_servicos, pets: { nome: a.pet.nome, clientes: tutor ? { nome: tutor } : null } });
+  const comoHorario = (a: ItemHorario, tutor: string | null) => ({ inicio: a.inicio, servicos: a.servicos, agendamento_servicos: a.agendamento_servicos, pets: { nome: a.pet.nome, sexo: a.pet.sexo, clientes: tutor ? { nome: tutor } : null } });
 
   // pet pronto: um tutor com dois pets prontos recebe uma mensagem só
   for (const g of porTutor(d.itens.pronto ?? [])) {
     const servico = g.length === 1 ? servicosPorExtenso(g[0]) : null;
     entrar("pronto", g.map((a) => a.id), g[0].tutor, g[0].pet.id, `${servico ?? "Atendimento"} de ${nomes(g)} concluído hoje`,
-      (t) => textoPronto({ tutor: t, pet: nomes(g), petshop: loja, servico }));
+      (t) => textoPronto({ tutor: t, pet: nomes(g), sexo: new Set(g.map((x) => x.pet.id)).size === 1 ? g[0].pet.sexo : null, petshop: loja, servico }));
   }
   for (const g of porTutor(d.itens.lembrete ?? [])) {
     const quando = g.map((a) => `${servicosPorExtenso(a) ?? "Horário"} de ${a.pet.nome} ${dataAmigavel(a.inicio)} às ${hora(a.inicio)}`).join("; ");

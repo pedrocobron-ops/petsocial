@@ -10,6 +10,7 @@ import { corDoNome, iniciais, lerValorEstrito, semAcento, valor2 } from "@/lib/g
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { contaSoConsulta, useGestao } from "./contexto";
 import { registrarErroMostrado } from "@/lib/gestao/erros-navegador";
+import { textoAmigavel } from "@/lib/gestao/erros";
 
 /* ---------- carregar dados ---------- */
 
@@ -102,6 +103,9 @@ export function mensagemDeErro(e: unknown): string {
   if (/caixas_um_aberto/i.test(m)) return "Já existe um caixa aberto.";
   if (/numeric field overflow|out of range/i.test(m)) return "Esse valor é grande demais. Confira os números.";
   if (/violates check constraint/i.test(m)) return "Confira os valores: algum número está negativo ou fora do permitido.";
+  // tempo esgotado e outros textos técnicos do banco ou do servidor: nunca em inglês na tela
+  const amigavel = textoAmigavel(m);
+  if (amigavel) return amigavel;
   return m || "Algo deu errado. Tente de novo.";
 }
 

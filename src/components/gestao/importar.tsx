@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Camera, Download, FileSpreadsheet, History, TriangleAlert, Undo2, Upload } from "lucide-react";
-import { dataCurta, fimDoTelefone, hora, lerTelefone, semAcento } from "@/lib/gestao/util";
+import { dataCurta, hora, semAcento } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
+import { fraseDesfeita, frasesDoResumo, lerTabela, linhasParaOBanco, tabelaComoTexto, type ResumoDaImportacao } from "@/lib/gestao/planilha";
+import { ehXlsx, inflarNoNavegador, lerXlsx, temInflarNoNavegador } from "@/lib/gestao/xlsx";
 import { limparCodigo, opcoesDaLoja } from "@/lib/gestao/loja-opcoes";
 import { gravarMovimentos, parteDaChave } from "@/lib/gestao/dinheiro";
+import { unidadeDaPlanilha, validadeDaPlanilha } from "@/lib/gestao/planilha-produtos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
+import type { Json } from "@/lib/gestao/banco";
 import { useGestao } from "./contexto";
 import { guardarLembrado, lerLembrado } from "./lembrado";
 import { Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useSomenteLeitura } from "./ui";
@@ -28,7 +32,9 @@ const COLUNAS: Record<Tipo, Coluna[]> = {
     { id: "raca", rotulo: "Raça", nomes: ["raca"], parece: /raca/, exemplo: "Poodle" },
     { id: "especie", rotulo: "Espécie", nomes: ["especie", "tipo", "bicho"], parece: /especie|\btipo\b/, exemplo: "cão" },
     { id: "porte", rotulo: "Porte", nomes: ["porte", "tamanho"], parece: /porte|tamanho/, exemplo: "P" },
-    { id: "obs", rotulo: "Observações", nomes: ["observacao", "observacoes", "obs", "anotacao", "anotacoes", "cuidados", "alertas", "notas"], parece: /observa|\bobs\b|anota|cuidado|alerta|\bnotas?\b/, exemplo: "Tem medo de secador" },
+    // alergia, medo, doença: vai para os alertas do pet (aparecem na agenda). Observação que fala disso também vira alerta.
+    { id: "alertas", rotulo: "Alertas", nomes: ["alerta", "alertas", "cuidados", "cuidado", "atencao", "saude", "alergia", "alergias"], parece: /alerta|cuidado|atencao|alergi/, exemplo: "Alergia a shampoo comum" },
+    { id: "obs", rotulo: "Observações", nomes: ["observacao", "observacoes", "obs", "anotacao", "anotacoes", "notas"], parece: /observa|\bobs\b|anota|\bnotas?\b/, exemplo: "Gosta de laço" },
     { id: "tutor", rotulo: "Tutor", nomes: ["tutor", "cliente", "nome do tutor", "nome do cliente", "dono", "dona", "responsavel", "proprietario", "nome"], parece: /tutor|cliente|\bdon[oa]\b|responsavel|proprietari/, obrigatoria: true, exemplo: "Roberta Dias" },
     { id: "pet", rotulo: "Pet", nomes: ["pet", "nome do pet", "animal", "nome do animal", "bichinho", "cachorro", "mascote", "paciente"], parece: /\bpet\b|bichinho|animal|cachorro|mascote/, exemplo: "Mel" },
   ],
@@ -42,39 +48,25 @@ const COLUNAS: Record<Tipo, Coluna[]> = {
     { id: "custo", rotulo: "Custo", nomes: ["custo", "preco de custo", "valor de custo", "compra"], exemplo: "140,00" },
     { id: "estoque", rotulo: "Quantidade em estoque", nomes: ["estoque", "quantidade", "qtd", "saldo", "quantidade em estoque"], exemplo: "10" },
     { id: "minimo", rotulo: "Estoque mínimo", nomes: ["minimo", "estoque minimo", "alerta"], exemplo: "3" },
+    // com a validade, o produto passa a "Controlar validade" e a quantidade entra como um lote (com o código do lote, se tiver)
+    { id: "validade", rotulo: "Validade", nomes: ["validade", "data de validade", "vencimento", "vence", "vence em", "val"], parece: /validade|vencimento/, exemplo: "10/02/2027" },
+    { id: "lote", rotulo: "Lote", nomes: ["lote", "numero do lote", "cod lote", "codigo do lote"], parece: /\blote\b/, exemplo: "L2311A" },
+    // só entra quando o pet shop ligou os fornecedores nas opções da loja (o que não existe é cadastrado)
+    { id: "fornecedor", rotulo: "Fornecedor", nomes: ["fornecedor", "distribuidor", "marca do fornecedor"], parece: /fornecedor|distribuidor/, exemplo: "Distribuidora Pet Sul" },
   ],
 };
 /** Ordem em que as colunas aparecem para a pessoa (na lista do seletor e na planilha modelo). */
 const ORDEM: Record<Tipo, string[]> = {
-  clientes: ["tutor", "telefone", "pet", "especie", "raca", "porte", "obs", "email", "endereco"],
-  produtos: ["nome", "codigo", "categoria", "unidade", "preco", "custo", "estoque", "minimo"],
+  clientes: ["tutor", "telefone", "pet", "especie", "raca", "porte", "alertas", "obs", "email", "endereco"],
+  produtos: ["nome", "codigo", "categoria", "unidade", "preco", "custo", "estoque", "minimo", "validade", "lote", "fornecedor"],
 };
-/** As colunas aceitas; a de código de barras só para quem ligou a opção. */
-const colunasDe = (tipo: Tipo, comCodigo: boolean) => COLUNAS[tipo].filter((c) => c.id !== "codigo" || comCodigo);
-const emOrdem = (tipo: Tipo, comCodigo: boolean) => ORDEM[tipo].filter((id) => id !== "codigo" || comCodigo).map((id) => COLUNAS[tipo].find((c) => c.id === id)!);
+/** Colunas que dependem de uma opção da loja: código de barras e fornecedor. */
+type Extras = { codigo: boolean; fornecedor: boolean };
+const vale = (id: string, x: Extras) => (id !== "codigo" || x.codigo) && (id !== "fornecedor" || x.fornecedor);
+/** As colunas aceitas; a de código de barras e a de fornecedor só para quem ligou a opção. */
+const colunasDe = (tipo: Tipo, x: Extras) => COLUNAS[tipo].filter((c) => vale(c.id, x));
+const emOrdem = (tipo: Tipo, x: Extras) => ORDEM[tipo].filter((id) => vale(id, x)).map((id) => COLUNAS[tipo].find((c) => c.id === id)!);
 const MAXIMO = 2000;
-
-/** Lê texto de planilha: CSV com ; ou , e também o que vem colado do Excel ou do Google Planilhas (separado por tabulação). */
-function lerTabela(texto: string): string[][] {
-  const limpo = texto.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
-  const primeira = limpo.split("\n")[0] ?? "";
-  const sep = primeira.includes("\t") ? "\t" : (primeira.match(/;/g)?.length ?? 0) >= (primeira.match(/,/g)?.length ?? 0) ? ";" : ",";
-  const linhas: string[][] = [];
-  let campo = "", linha: string[] = [], aspas = false;
-  for (let i = 0; i < limpo.length; i++) {
-    const c = limpo[i];
-    if (aspas) {
-      if (c === '"' && limpo[i + 1] === '"') { campo += '"'; i++; }
-      else if (c === '"') aspas = false;
-      else campo += c;
-    } else if (c === '"' && campo === "") aspas = true;
-    else if (c === sep) { linha.push(campo); campo = ""; }
-    else if (c === "\n") { linha.push(campo); linhas.push(linha); linha = []; campo = ""; }
-    else campo += c;
-  }
-  if (campo !== "" || linha.length) { linha.push(campo); linhas.push(linha); }
-  return linhas.map((l) => l.map((x) => x.trim())).filter((l) => l.some(Boolean));
-}
 
 /** Palpite de qual coluna da planilha é o quê: primeiro os títulos exatos, depois os parecidos. Cada campo fica com uma coluna só. */
 function adivinhar(titulos: string[], cols: Coluna[]): string[] {
@@ -101,24 +93,10 @@ function numero(v: string | undefined) {
   const n = Number(s.includes(",") ? s.replace(/\./g, "").replace(",", ".") : /^\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g, "") : s);
   return Number.isFinite(n) && n >= 0 && n < 1e7 ? Math.round(n * 1000) / 1000 : null;
 }
-function especieDe(v: string | undefined) {
-  const s = semAcento(v ?? "");
-  return /gat|felin/.test(s) ? "gato" : !s || /cao|cach|can|dog/.test(s) ? "cao" : "outro";
-}
-function porteDe(v: string | undefined) {
-  const s = semAcento(v ?? "").replace(/[^a-z]/g, "");
-  if (["gg", "gigante", "extragrande"].includes(s)) return "GG";
-  if (["g", "grande"].includes(s)) return "G";
-  if (["m", "medio"].includes(s)) return "M";
-  if (["p", "pequeno", "mini", "pp"].includes(s)) return "P";
-  return null;
-}
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
-/** "Ana, Bia e mais 3". */
-const alguns = (nomes: string[], max = 6) => (nomes.length <= max ? nomes.join(", ") : `${nomes.slice(0, max).join(", ")} e mais ${nomes.length - max}`);
 
-function baixarModelo(tipo: Tipo, comCodigo: boolean) {
-  const cols = emOrdem(tipo, comCodigo);
+function baixarModelo(tipo: Tipo, extras: Extras) {
+  const cols = emOrdem(tipo, extras);
   const csv = "﻿" + [cols.map((c) => c.rotulo), cols.map((c) => c.exemplo)].map((l) => l.map((x) => `"${x.replace(/"/g, '""')}"`).join(";")).join("\r\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
@@ -127,23 +105,43 @@ function baixarModelo(tipo: Tipo, comCodigo: boolean) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/* ---------- última importação (guardada neste aparelho, por pet shop) ---------- */
+/* ---------- última importação ---------- */
 
 type Ultima = {
+  /** A importação guardada no banco (clientes); sem id, a guardada neste aparelho (produtos, ou de antes da mudança). */
+  id?: string;
   /** Quando terminou (ISO). */
   em: string;
-  /** O resumo, como apareceu na tela. */
+  /** O resumo, como aparece na tela. */
   linhas: string[];
   /** O que esta importação criou (para poder desfazer). */
   clientes: string[]; pets: string[];
   desfeitaEm?: string;
 };
+type Banco = ReturnType<typeof useGestao>["sb"];
 const chaveUltima = (petshopId: string, tipo: Tipo) => `maestro-gestao-importacao:${petshopId}:${tipo}`;
 export function lerUltimaImportacao(petshopId: string, tipo: Tipo): Ultima | null {
   try {
     const v = JSON.parse(lerLembrado(chaveUltima(petshopId, tipo)) ?? "null") as Ultima | null;
     return v && typeof v.em === "string" && Array.isArray(v.linhas) ? { ...v, clientes: v.clientes ?? [], pets: v.pets ?? [] } : null;
   } catch { return null; }
+}
+/**
+ * A última importação de clientes vem do banco (qualquer aparelho vê, e o resumo é o que o banco contou). Sem nada no banco
+ * (ou banco antes da atualização), a guardada neste aparelho.
+ */
+async function lerUltima(sb: Banco, petshopId: string, tipo: Tipo): Promise<Ultima | null> {
+  const local = lerUltimaImportacao(petshopId, tipo);
+  if (tipo !== "clientes") return local;
+  const r = await sb.from("importacoes").select("id, criado_em, resumo, clientes, pets, desfeita_em, desfeita")
+    .eq("petshop_id", petshopId).order("criado_em", { ascending: false }).limit(1).maybeSingle();
+  if (r.error || !r.data) return local;
+  const d = r.data;
+  const doBanco: Ultima = {
+    id: d.id, em: d.criado_em, clientes: d.clientes ?? [], pets: d.pets ?? [], desfeitaEm: d.desfeita_em ?? undefined,
+    linhas: d.desfeita_em && d.desfeita ? [fraseDesfeita(d.desfeita as Record<string, number>)] : frasesDoResumo(d.resumo as unknown as ResumoDaImportacao),
+  };
+  return local && Date.parse(local.em) > Date.parse(doBanco.em) ? local : doBanco;
 }
 const quando = (iso: string) => `${dataCurta(iso)} às ${hora(iso)}`;
 /** Dá para desfazer por 7 dias (o banco usa o mesmo prazo). */
@@ -169,11 +167,16 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
   const [mesmoAssim, setMesmoAssim] = useState(false);
   // a lista está no caderno ou noutro sistema (print, PDF): a mesma folha vira a leitura por foto
   const [caderno, setCaderno] = useState(false);
-  const comCodigo = opcoesDaLoja(petshop).codigoBarras;
-  const cols = useMemo(() => colunasDe(tipo, comCodigo), [tipo, comCodigo]);
+  const { codigoBarras: comCodigo, fornecedores: comFornecedor } = opcoesDaLoja(petshop);
+  const extras = useMemo(() => ({ codigo: comCodigo, fornecedor: comFornecedor }), [comCodigo, comFornecedor]);
+  const cols = useMemo(() => colunasDe(tipo, extras), [tipo, extras]);
   const principal = cols.find((c) => c.obrigatoria)!;
 
-  useEffect(() => { setUltima(lerUltimaImportacao(petshop.id, tipo)); }, [petshop.id, tipo]);
+  useEffect(() => {
+    let vale = true;
+    void lerUltima(sb, petshop.id, tipo).then((u) => { if (vale) setUltima(u); }, () => {});
+    return () => { vale = false; };
+  }, [sb, petshop.id, tipo]);
   const guardarUltima = (u: Ultima) => { guardarLembrado(chaveUltima(petshop.id, tipo), JSON.stringify(u)); setUltima(u); };
 
   const tabela = useMemo(() => lerTabela(texto), [texto]);
@@ -212,120 +215,39 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
   async function escolherArquivo(arquivo: File | undefined) {
     if (!arquivo) return;
     setErro(null); setResultado(null);
-    if (/\.(xlsx?|ods|numbers)$/i.test(arquivo.name)) {
-      setErro("Esse é um arquivo de planilha fechado. Abra no Excel ou no Google Planilhas, selecione as células, copie e cole no campo abaixo. Ou use Arquivo → Salvar como → CSV.");
+    if (/\.(xls|ods|numbers)$/i.test(arquivo.name)) {
+      setErro("Esse formato de planilha eu não abro. No Excel ou no Google Planilhas, use Arquivo → Salvar como (ou Fazer download) → Excel (.xlsx) ou CSV. Ou selecione as células, copie e cole no campo abaixo.");
+      return;
+    }
+    if (arquivo.size > 8_000_000) { setErro("O arquivo é grande demais. Divida em partes de até 2.000 linhas."); return; }
+    const bytes = new Uint8Array(await arquivo.arrayBuffer());
+    // planilha do Excel ou do Google Planilhas (.xlsx): lida aqui mesmo, a primeira aba
+    if (ehXlsx(bytes) || /\.xlsx$/i.test(arquivo.name)) {
+      if (!temInflarNoNavegador()) { setErro("Este navegador não abre planilha do Excel. Salve como CSV, ou selecione as células, copie e cole no campo abaixo."); return; }
+      try {
+        const linhas = await lerXlsx(bytes, inflarNoNavegador);
+        if (linhas.length < 2) { setErro("A primeira aba da planilha está vazia ou só tem os títulos. Confira se os clientes estão na primeira aba."); return; }
+        setTexto(tabelaComoTexto(linhas));
+      } catch { setErro("Não consegui abrir essa planilha. No Excel, use Arquivo → Salvar como → CSV, ou copie as células e cole no campo abaixo."); }
       return;
     }
     if (arquivo.size > 2_000_000) { setErro("O arquivo é grande demais. Divida em partes de até 2.000 linhas."); return; }
-    const bytes = new Uint8Array(await arquivo.arrayBuffer());
     // planilha salva pelo Excel antigo vem em outro alfabeto: se o UTF-8 der caractere quebrado, tenta o do Windows
     let t = new TextDecoder("utf-8").decode(bytes);
     if (t.includes("�")) t = new TextDecoder("windows-1252").decode(bytes);
     setTexto(t);
   }
 
-  async function importarClientes(linhas: Record<string, string>[], criados: { clientes: string[]; pets: string[] }) {
-    type Tutor = { id: string; nome: string; telefone: string | null; email: string | null; endereco: string | null };
-    type PetJa = { id: string; cliente_id: string; nome: string; especie: string; raca: string | null; porte: string | null; obs: string | null };
-    const existentes = await lerTudo<Tutor>((de, ate, contar) =>
-      sb.from("clientes").select("id, nome, telefone, email, endereco", contando(contar)).eq("petshop_id", petshop.id).order("id").range(de, ate));
-    const petsJa = await lerTudo<PetJa>((de, ate, contar) =>
-      sb.from("pets").select("id, cliente_id, nome, especie, raca, porte, obs", contando(contar)).eq("petshop_id", petshop.id).order("id").range(de, ate));
-
-    const tutores = new Map<string, Tutor>(existentes.map((c) => [c.id, c]));
-    const porFone = new Map<string, string>(), porNome = new Map<string, string>();
-    for (const c of existentes) { if (fimDoTelefone(c.telefone)) porFone.set(fimDoTelefone(c.telefone), c.id); porNome.set(semAcento(c.nome), c.id); }
-    const chavePet = (clienteId: string, nome: string) => `${clienteId}:${semAcento(nome)}`;
-    const pets = new Map<string, PetJa>(petsJa.map((p) => [chavePet(p.cliente_id, p.nome), p]));
-    const novosAgora = new Set<string>(); // tutores e pets criados nesta importação
-    const completados = { tutores: new Set<string>(), pets: new Set<string>() };
-
-    let nTutores = 0, nPets = 0, jaEstavam = 0, homonimos = 0, linhasRepetidas = 0;
-    const foneRuim: string[] = [], doisFones: string[] = [], mesmoNome: string[] = [];
-
-    for (const l of linhas) {
-      const nome = l.tutor.trim().slice(0, 120);
-      const lida = lerTelefone(l.telefone);
-      if (lida.incompleto) foneRuim.push(nome);
-      if (lida.tinhaOutro) doisFones.push(nome);
-      const fone = lida.fone;
-      const chaveFone = fimDoTelefone(fone);
-      const email = l.email?.trim().slice(0, 160) || null, endereco = l.endereco?.trim().slice(0, 200) || null;
-      // mesmo telefone é a mesma pessoa. Mesmo nome com outro telefone é outra pessoa (duas "Maria Silva").
-      const peloNome = porNome.get(semAcento(nome)) ?? null;
-      const foneDoHomonimo = peloNome ? fimDoTelefone(tutores.get(peloNome)?.telefone) : "";
-      const outroFone = Boolean(peloNome && chaveFone && foneDoHomonimo && foneDoHomonimo !== chaveFone);
-      let clienteId = (chaveFone && porFone.get(chaveFone)) || (outroFone ? null : peloNome) || null;
-      if (!clienteId) {
-        const novo = ok(await sb.from("clientes").insert({ petshop_id: petshop.id, nome, telefone: fone, email, endereco }).select("id").single());
-        clienteId = novo.id;
-        criados.clientes.push(novo.id);
-        novosAgora.add(novo.id);
-        nTutores++;
-        if (outroFone) homonimos++;
-        tutores.set(novo.id, { id: novo.id, nome, telefone: fone, email, endereco });
-        if (chaveFone) porFone.set(chaveFone, novo.id);
-        porNome.set(semAcento(nome), novo.id);
-      } else {
-        // já existe: só preenche o que está em branco, nunca troca o que a pessoa já tinha
-        const t = tutores.get(clienteId)!;
-        const falta: Partial<Tutor> = {};
-        if (!t.telefone?.trim() && fone) falta.telefone = fone;
-        if (!t.email?.trim() && email) falta.email = email;
-        if (!t.endereco?.trim() && endereco) falta.endereco = endereco;
-        if (Object.keys(falta).length) {
-          ok(await sb.from("clientes").update(falta).eq("id", clienteId).eq("petshop_id", petshop.id).select("id").single());
-          tutores.set(clienteId, { ...t, ...falta });
-          if (falta.telefone && chaveFone) porFone.set(chaveFone, clienteId);
-          if (!novosAgora.has(clienteId)) completados.tutores.add(clienteId);
-        }
-      }
-
-      const pet = (l.pet ?? "").trim().slice(0, 80);
-      if (!pet) continue;
-      const especie = especieDe(l.especie), raca = l.raca?.trim().slice(0, 60) || null, porte = porteDe(l.porte), obs = l.obs?.trim().slice(0, 600) || null;
-      const chave = chavePet(clienteId, pet);
-      const ja = pets.get(chave);
-      if (!ja) {
-        // as observações da planilha são anotações livres: vão para "Observações" da ficha, não para os alertas
-        const r = ok(await sb.from("pets").insert({ petshop_id: petshop.id, cliente_id: clienteId, nome: pet, especie, raca, porte, obs }).select("id").single());
-        criados.pets.push(r.id);
-        novosAgora.add(r.id);
-        pets.set(chave, { id: r.id, cliente_id: clienteId, nome: pet, especie, raca, porte, obs });
-        nPets++;
-        continue;
-      }
-      if (novosAgora.has(ja.id)) {
-        // mesmo tutor, mesmo nome de pet, duas linhas na mesma planilha: linha repetida ou dois pets de verdade?
-        const difere = (a: string | null, b: string | null) => !!a && !!b && semAcento(a) !== semAcento(b);
-        const outroPet = (l.especie?.trim() && especie !== ja.especie) || difere(raca, ja.raca) || difere(porte, ja.porte);
-        if (outroPet) { mesmoNome.push(`${pet} (de ${nome})`); continue; }
-        linhasRepetidas++; // a mesma linha duas vezes: se esta trouxe algo que a outra não tinha, completa
-      }
-      const falta: Partial<PetJa> = {};
-      if (!ja.raca?.trim() && raca) falta.raca = raca;
-      if (!ja.porte && porte) falta.porte = porte;
-      if (!ja.obs?.trim() && obs) falta.obs = obs;
-      if (Object.keys(falta).length) {
-        ok(await sb.from("pets").update(falta).eq("id", ja.id).eq("petshop_id", petshop.id).select("id").single());
-        pets.set(chave, { ...ja, ...falta });
-        if (!novosAgora.has(ja.id)) completados.pets.add(ja.id);
-      } else if (!novosAgora.has(ja.id)) jaEstavam++;
-    }
-
-    const nada = nTutores + nPets + completados.tutores.size + completados.pets.size === 0;
-    return [
-      nada ? "Nada novo: tudo o que estava na planilha já estava no cadastro." : `${plural(nTutores, "tutor novo", "tutores novos")} e ${plural(nPets, "pet novo", "pets novos")} no cadastro.`,
-      ...(completados.tutores.size ? [`${plural(completados.tutores.size, "tutor que já estava aqui ganhou", "tutores que já estavam aqui ganharam")} o que faltava (telefone, e-mail ou endereço).`] : []),
-      ...(completados.pets.size ? [`${plural(completados.pets.size, "pet que já estava aqui ganhou", "pets que já estavam aqui ganharam")} o que faltava (raça, porte ou observações).`] : []),
-      ...(jaEstavam ? [`${plural(jaEstavam, "pet já estava no cadastro e ficou como estava", "pets já estavam no cadastro e ficaram como estavam")}.`] : []),
-      ...(linhasRepetidas ? [`${plural(linhasRepetidas, "linha repetia", "linhas repetiam")} um pet que já tinha aparecido na planilha e ${linhasRepetidas === 1 ? "foi pulada" : "foram puladas"}.`] : []),
-      ...(mesmoNome.length ? [`${plural(mesmoNome.length, "pet ficou de fora porque o tutor já tem outro pet com o mesmo nome nesta planilha", "pets ficaram de fora porque o tutor já tem outro pet com o mesmo nome nesta planilha")}: ${alguns(mesmoNome, 12)}. Se forem pets diferentes, cadastre na ficha do tutor com um nome que diferencie (Thor filhote, Thor 2).`] : []),
-      ...(homonimos ? [`${plural(homonimos, "tutor novo tem o mesmo nome de outro cliente, com telefone diferente, e entrou como pessoa separada", "tutores novos têm o mesmo nome de outro cliente, com telefone diferente, e entraram como pessoas separadas")}.`] : []),
-      ...(doisFones.length ? [`${plural(doisFones.length, "linha tinha dois telefones: ficou o primeiro", "linhas tinham dois telefones: ficou o primeiro de cada")} (${alguns(doisFones)}).`] : []),
-      ...(foneRuim.length ? [`${plural(foneRuim.length, "telefone estava incompleto e ficou em branco", "telefones estavam incompletos e ficaram em branco")}: ${alguns(foneRuim)}. Confira depois.`] : []),
-      ...(!("pet" in (lido?.onde ?? {})) ? ["Nenhum pet entrou, porque a planilha veio sem coluna de pet."] : []),
-    ];
+  /**
+   * Clientes e pets: uma operação só, no banco (função importar_clientes). Entra tudo ou nada; o resumo é contado lá, na mesma
+   * gravação, e fica guardado. Sair da tela no meio não deixa metade: ao voltar, a última importação mostra o que entrou.
+   */
+  async function importarClientes(linhas: Record<string, string>[], chave: string): Promise<Ultima> {
+    const { linhas: paraOBanco, extra } = linhasParaOBanco(linhas, Boolean(lido && "pet" in lido.onde));
+    const r = ok(await sb.rpc("importar_clientes", { p_petshop: petshop.id, p_chave: chave, p_linhas: paraOBanco as unknown as Json, p_extra: extra as unknown as Json })) as unknown as {
+      id: string; em: string; resumo: ResumoDaImportacao; clientes: string[]; pets: string[];
+    };
+    return { id: r.id, em: r.em, linhas: frasesDoResumo(r.resumo), clientes: r.clientes ?? [], pets: r.pets ?? [] };
   }
 
   async function importarProdutos(linhas: Record<string, string>[], chave: string) {
@@ -336,7 +258,22 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     const codigos = new Set((existentes.data ?? []).filter((p) => p.ativo && p.codigo_barras).map((p) => p.codigo_barras!));
     let repetidos = 0;
     const { data: u } = await sb.auth.getUser();
-    let novos = 0, pulados = 0, ignorados = 0;
+    let novos = 0, pulados = 0, ignorados = 0, semValidade = 0, comLote = 0;
+    // fornecedores pelo nome (sem acento); o que a planilha traz e não existe é cadastrado uma vez
+    const fornecedores = new Map<string, string>();
+    if (comFornecedor && linhas.some((l) => l.fornecedor?.trim())) {
+      const fs = ok(await sb.from("fornecedores").select("id, nome").eq("petshop_id", petshop.id).order("id").limit(1000));
+      for (const f of fs) fornecedores.set(semAcento(f.nome), f.id);
+    }
+    const fornecedorDe = async (nome: string | undefined) => {
+      const n = (nome ?? "").trim().slice(0, 120);
+      if (!comFornecedor || !n) return null;
+      const ja = fornecedores.get(semAcento(n));
+      if (ja) return ja;
+      const f = ok(await sb.from("fornecedores").insert({ petshop_id: petshop.id, nome: n }).select("id").single());
+      fornecedores.set(semAcento(n), f.id);
+      return f.id;
+    };
     const ruim = (v: string | undefined) => Boolean((v ?? "").trim()) && numero(v) == null;
     for (const [i, l] of linhas.entries()) {
       const nome = l.nome.trim().slice(0, 120);
@@ -345,21 +282,33 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
       if (ruim(l.preco) || ruim(l.custo) || ruim(l.estoque) || ruim(l.minimo)) ignorados++;
       let codigo = comCodigo ? limparCodigo(l.codigo) : null;
       if (codigo && codigos.has(codigo)) { codigo = null; repetidos++; }
+      const validade = validadeDaPlanilha(l.validade);
+      if (validade === undefined) semValidade++;
+      const lote = (l.lote ?? "").trim().slice(0, 60) || null;
+      // com validade (ou lote) na planilha, o produto controla a validade e o saldo entra como um lote
+      const controla = Boolean(validade || lote);
+      const fornecedorId = await fornecedorDe(l.fornecedor);
       const r = await sb.from("produtos").insert({
-        petshop_id: petshop.id, nome, categoria: l.categoria?.trim() || null, unidade: l.unidade?.trim().slice(0, 12) || "un",
+        petshop_id: petshop.id, nome, categoria: l.categoria?.trim() || null, unidade: unidadeDaPlanilha(l.unidade),
         preco_venda: preco != null ? Math.round(preco * 100) / 100 : null, custo: custo != null ? Math.round(custo * 100) / 100 : null,
-        estoque_minimo: minimo ?? 0, ...(codigo ? { codigo_barras: codigo } : {}),
+        estoque_minimo: minimo ?? 0, ...(codigo ? { codigo_barras: codigo } : {}), ...(controla ? { controla_validade: true } : {}),
+        ...(fornecedorId ? { fornecedor_id: fornecedorId } : {}),
       }).select("id").single();
       if (r.error) throw new Error(r.error.message);
       tem.add(semAcento(nome));
       if (codigo) codigos.add(codigo);
       novos++;
       if (qtd && qtd > 0) {
-        // o saldo de cada linha da planilha entra uma vez só por importação (a chave é da folha + o número da linha)
-        await gravarMovimentos(sb, petshop.id, [{
+        // o saldo de cada linha da planilha entra uma vez só por importação (a chave é da folha + o número da linha);
+        // com validade ou lote, entra como o lote do que já está na prateleira (no Vencendo e no "vence antes sai antes")
+        await gravarMovimentos(sb, petshop.id, [controla ? {
+          petshop_id: petshop.id, produto_id: r.data.id, tipo: "entrada", quantidade: qtd, motivo: "Saldo trazido da planilha", criado_por: u.user?.id ?? null,
+          custo_unitario: custo != null ? Math.round(custo * 100) / 100 : null, lote, validade: validade || null, chave: parteDaChave(chave, "saldo", i),
+        } : {
           petshop_id: petshop.id, produto_id: r.data.id, tipo: "ajuste", quantidade: qtd, motivo: "Saldo trazido da planilha", criado_por: u.user?.id ?? null,
           chave: parteDaChave(chave, "saldo", i),
         }]);
+        if (controla) comLote++;
       }
     }
     return [
@@ -367,6 +316,8 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
       ...(ignorados ? [`${ignorados} ${ignorados === 1 ? "produto tinha" : "produtos tinham"} preço, custo ou quantidade que não era número (ou era negativo) e ficou em branco. Confira no Estoque.`] : []),
       ...(pulados ? [`${pulados} já ${pulados === 1 ? "existia" : "existiam"} com o mesmo nome e ${pulados === 1 ? "foi pulado" : "foram pulados"}.`] : []),
       ...(repetidos ? [`${repetidos} ${repetidos === 1 ? "produto veio" : "produtos vieram"} com um código de barras que já estava em outro produto e ${repetidos === 1 ? "entrou" : "entraram"} sem código. Confira no Estoque.`] : []),
+      ...(comLote ? [`${comLote} ${comLote === 1 ? "produto entrou" : "produtos entraram"} com a validade ou o lote: ${comLote === 1 ? "já aparece" : "já aparecem"} no Vencendo.`] : []),
+      ...(semValidade ? [`${semValidade} ${semValidade === 1 ? "produto tinha" : "produtos tinham"} uma validade que não deu para ler (use 10/02/2027) e ${semValidade === 1 ? "entrou" : "entraram"} sem ela. Confira no Estoque.`] : []),
     ];
   }
 
@@ -378,21 +329,25 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     if (semColuna.length && !mesmoAssim) return;
     if (lido.linhas.length > MAXIMO) { setErro(`São ${lido.linhas.length} linhas. Traga até ${MAXIMO} por vez.`); return; }
     setIndo(true); setErro(null);
-    const criados = { clientes: [] as string[], pets: [] as string[] };
     try {
-      const r = tipo === "clientes" ? await importarClientes(lido.linhas, criados) : await importarProdutos(lido.linhas, chave);
-      setResultado(r);
-      guardarUltima({ em: new Date().toISOString(), linhas: r, ...criados });
+      if (tipo === "clientes") {
+        const u = await importarClientes(lido.linhas, chave);
+        setResultado(u.linhas);
+        setUltima(u);
+      } else {
+        const r = await importarProdutos(lido.linhas, chave);
+        setResultado(r);
+        guardarUltima({ em: new Date().toISOString(), linhas: r, clientes: [], pets: [] });
+      }
       avisar("Planilha trazida para o sistema.");
       avisarMudanca();
       aoTerminar?.();
     } catch (e) {
-      setErro(`Parou no meio: ${mensagemDeErro(e)} O que entrou antes do erro ficou salvo; pode trazer a planilha de novo, que os repetidos são pulados.`);
-      if (criados.clientes.length + criados.pets.length) {
-        guardarUltima({ em: new Date().toISOString(), linhas: [`A importação parou no meio. Entraram ${plural(criados.clientes.length, "tutor", "tutores")} e ${plural(criados.pets.length, "pet", "pets")} antes do erro.`], ...criados });
-      }
+      setErro(tipo === "clientes"
+        ? `Não deu para trazer: ${mensagemDeErro(e)} Nada da planilha entrou. Confira a internet e toque em Trazer de novo.`
+        : `Parou no meio: ${mensagemDeErro(e)} O que entrou antes do erro ficou salvo; pode trazer a planilha de novo, que os repetidos são pulados.`);
       aoTerminar?.();
-      // parou no meio: a mesma chave na nova tentativa não dá entrada duas vezes no mesmo estoque
+      // a mesma chave na nova tentativa: o banco devolve o que já entrou (clientes) e não dá entrada duas vezes no mesmo estoque
       return false;
     } finally { setIndo(false); }
   }
@@ -409,11 +364,11 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
     if (!sim) return;
     setDesfazendo(true);
     try {
-      const r = ok(await sb.rpc("importacao_desfazer", { p_petshop: petshop.id, p_clientes: ultima.clientes, p_pets: ultima.pets })) as { pets: number; tutores: number; pets_ficaram: number; tutores_ficaram: number };
-      const ficaram = r.pets_ficaram + r.tutores_ficaram;
-      const frase = `Importação desfeita: ${plural(r.tutores, "tutor saiu", "tutores saíram")} e ${plural(r.pets, "pet saiu", "pets saíram")} do cadastro.`
-        + (ficaram ? ` ${plural(r.tutores_ficaram, "tutor", "tutores")} e ${plural(r.pets_ficaram, "pet", "pets")} ficaram, porque já têm horário, conta ou outra coisa ligada a eles (ou já tinham sido apagados).` : "");
-      guardarUltima({ ...ultima, desfeitaEm: new Date().toISOString(), linhas: [frase] });
+      const r = (ultima.id
+        ? ok(await sb.rpc("importacao_desfazer_registro", { p_petshop: petshop.id, p_id: ultima.id }))
+        : ok(await sb.rpc("importacao_desfazer", { p_petshop: petshop.id, p_clientes: ultima.clientes, p_pets: ultima.pets }))) as { pets: number; tutores: number; pets_ficaram: number; tutores_ficaram: number };
+      const desfeita = { ...ultima, desfeitaEm: new Date().toISOString(), linhas: [fraseDesfeita(r)] };
+      if (ultima.id) setUltima(desfeita); else guardarUltima(desfeita);
       setResultado(null);
       avisar("Importação desfeita.");
       avisarMudanca();
@@ -436,7 +391,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
         <div className="g-pilha">
           <div className="g-aviso verde g-imp-resumo" role="status">{resultado.map((r) => <p key={r}>{r}</p>)}</div>
           {botaoDesfazer}
-          <p className="g-muted g-pp">Este resumo fica guardado neste aparelho: é só abrir Trazer de planilha de novo para ver.</p>
+          <p className="g-muted g-pp">{tipo === "clientes" ? "Este resumo fica guardado: é só abrir Trazer de planilha de novo para ver, de qualquer aparelho." : "Este resumo fica guardado neste aparelho: é só abrir Trazer de planilha de novo para ver."}</p>
           <button className="g-btn verde" onClick={aoFechar}>Pronto</button>
         </div>
       ) : (
@@ -460,16 +415,16 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
           <div className="g-card liso g-pilha p">
             <b className="g-p">1. A planilha precisa de uma linha de títulos</b>
             <p className="g-muted g-pp">
-              Colunas aceitas: {emOrdem(tipo, comCodigo).map((c) => c.rotulo).join(", ")}. Só <b>{principal.rotulo}</b> é obrigatória.
+              Colunas aceitas: {emOrdem(tipo, extras).map((c) => c.rotulo).join(", ")}. Só <b>{principal.rotulo}</b> é obrigatória.
               {tipo === "clientes" && " Um tutor com dois pets ocupa duas linhas, repetindo o nome e o telefone. Se os títulos da sua planilha forem outros (Responsável, Zap, Bichinho), você escolhe o que é cada coluna antes de trazer."}
             </p>
-            <div><button className="g-btn sec p" onClick={() => baixarModelo(tipo, comCodigo)}><Download />Baixar planilha modelo</button></div>
+            <div><button className="g-btn sec p" onClick={() => baixarModelo(tipo, extras)}><Download />Baixar planilha modelo</button></div>
           </div>
           <div className="g-card liso g-pilha p">
             <b className="g-p">2. Escolha o arquivo ou cole as células</b>
             <label className="g-btn sec" style={{ justifySelf: "start", cursor: "pointer" }}>
-              <Upload />Escolher arquivo CSV
-              <input type="file" accept=".csv,.txt,text/csv,text/plain" hidden onChange={(e) => { void escolherArquivo(e.target.files?.[0]); e.target.value = ""; }} />
+              <Upload />Escolher planilha (Excel ou CSV)
+              <input type="file" accept=".csv,.txt,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={(e) => { void escolherArquivo(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
             <textarea className="g-textarea" style={{ minHeight: 110, fontFamily: "ui-monospace, monospace", fontSize: ".8125rem" }} value={texto}
               placeholder="Ou selecione as células no Excel ou no Google Planilhas (com a linha de títulos), copie e cole aqui."
@@ -490,7 +445,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
                         <td key={i}>
                           <select className={`g-select g-imp-sel${lido.mapa[i] ? " usa" : ""}`} value={lido.mapa[i]} aria-label={`A coluna “${t || i + 1}” é`} onChange={(e) => escolher(i, e.target.value)}>
                             <option value="">Não usar</option>
-                            {emOrdem(tipo, comCodigo).map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
+                            {emOrdem(tipo, extras).map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
                           </select>
                         </td>
                       ))}
@@ -534,7 +489,7 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
           )}
           <div className="g-fila">
             <button className="g-btn pri" disabled={!lido || Boolean(lido.faltou) || !lido.linhas.length || indo || (semColuna.length > 0 && !mesmoAssim)} onClick={() => void importar()}>
-              {indo ? "Trazendo… não feche" : lido?.linhas.length ? `Trazer ${lido.linhas.length} ${lido.linhas.length === 1 ? "linha" : "linhas"}` : "Trazer"}
+              {indo ? "Trazendo…" : lido?.linhas.length ? `Trazer ${lido.linhas.length} ${lido.linhas.length === 1 ? "linha" : "linhas"}` : "Trazer"}
             </button>
             <button className="g-btn sec" disabled={indo} onClick={aoFechar}>Cancelar</button>
           </div>
@@ -546,9 +501,13 @@ export default function Importar({ tipo, aoFechar, aoTerminar }: { tipo: Tipo; a
 
 /** Linha discreta com a última importação (data e resumo), para a tela de clientes. Toca e abre a folha, onde dá para desfazer. */
 export function UltimaImportacao({ tipo, aoAbrir, versao }: { tipo: Tipo; aoAbrir: () => void; versao?: unknown }) {
-  const { petshop } = useGestao();
+  const { sb, petshop } = useGestao();
   const [u, setU] = useState<Ultima | null>(null);
-  useEffect(() => { setU(lerUltimaImportacao(petshop.id, tipo)); }, [petshop.id, tipo, versao]);
+  useEffect(() => {
+    let vale = true;
+    void lerUltima(sb, petshop.id, tipo).then((x) => { if (vale) setU(x); }, () => {});
+    return () => { vale = false; };
+  }, [sb, petshop.id, tipo, versao]);
   // some sozinha depois de uma semana
   if (!u || Date.now() - Date.parse(u.em) > 7 * 864e5) return null;
   return (

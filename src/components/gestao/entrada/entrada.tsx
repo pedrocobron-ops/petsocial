@@ -2,17 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Camera, Check, ClipboardCheck, Copy, Eraser, ImagePlus, Loader2, MessageCircle, PenLine, Printer, X } from "lucide-react";
+import { Camera, Check, ClipboardCheck, Copy, Eraser, ImagePlus, Loader2, MessageCircle, PenLine, Printer, RotateCcw, X } from "lucide-react";
 import {
   abreSozinha, assinarParaOLink, COLS_ENTRADA, descartarArquivo, ehIdoso, enderecoDaEntrada, enderecosDosArquivos, enviarAssinatura,
-  enviarFotoDaEntrada, faxinaDaEntrada, LESOES, linkValendo, MAX_FOTOS_ENTRADA, mensagemDaEntrada, PERTENCES, pertencesDe, resumoDaEntrada as resumo, TEMPERAMENTOS,
+  faxinaDaEntrada, prepararFotoDaEntrada, subirFotoDaEntrada, LESOES, linkValendo, MAX_FOTOS_ENTRADA, mensagemDaEntrada, PERTENCES, pertencesDe, resumoDaEntrada as resumo, TEMPERAMENTOS,
   termoComPet, termoDoPetshop, textoDevolver, type Entrada, type FotoDaEntrada,
 } from "@/lib/gestao/entrada";
 import type { Banco } from "@/lib/gestao/supabase";
 import { dataCurta, hora, linkWhatsApp } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { CampoComVoz } from "../ditado";
-import { avisarMudanca, Esqueleto, Folha, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
+import { avisarMudanca, Esqueleto, Folha, mensagemDeErro, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import "../boletim/boletim.css";
 import "./entrada.css";
 
@@ -199,8 +199,17 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
   const [pertences, setPertences] = useState<string[]>([]);
   const [outros, setOutros] = useState("");
   const [obs, setObs] = useState("");
-  const [fotos, setFotos] = useState<FotoDaEntrada[]>([]);
-  const [subindo, setSubindo] = useState(0);
+  const [fotos, setFotosNaTela] = useState<FotoDaEntrada[]>([]);
+  // a lista de fotos também num ref, atualizado na hora: o salvar espera as fotos que estão subindo e lê o que ficou
+  const listaDeFotos = useRef<FotoDaEntrada[]>([]);
+  const setFotos = (f: FotoDaEntrada[] | ((l: FotoDaEntrada[]) => FotoDaEntrada[])) => {
+    listaDeFotos.current = typeof f === "function" ? f(listaDeFotos.current) : f;
+    setFotosNaTela(listaDeFotos.current);
+  };
+  // as fotos que estão subindo agora (por caminho provisório): o salvar espera por elas em vez de mandar subir de novo
+  const emVoo = useRef(new Map<string, Promise<boolean>>());
+  // o que deu errado ao salvar ou ao subir uma foto fica escrito na folha (o aviso rápido some e pode passar despercebido)
+  const [aviso, setAviso] = useState<string | null>(null);
   const [mudou, setMudou] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [assinatura, setAssinatura] = useState<string | null>(null);
@@ -238,48 +247,99 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
     const arquivos = Array.from(ev.target.files ?? []);
     ev.target.value = "";
     if (!arquivos.length || somenteLeitura()) return;
-    const vao = arquivos.slice(0, Math.max(0, MAX_FOTOS_ENTRADA - fotos.length - subindo));
+    const vao = arquivos.slice(0, Math.max(0, MAX_FOTOS_ENTRADA - listaDeFotos.current.length));
     if (!vao.length) return avisarErro(new Error(`Até ${MAX_FOTOS_ENTRADA} fotos na entrada. Tire uma para pôr outra.`));
-    setSubindo((n) => n + vao.length);
     for (const f of vao) {
-      try {
-        const x = await enviarFotoDaEntrada(sb, petshop.id, f);
-        novas.current.add(x.caminho);
-        setFotos((l) => [...l, x]);
-        setMudou(true);
-      } catch (e) { avisarErro(e); }
-      setSubindo((n) => n - 1);
+      let blob: Blob;
+      try { blob = await prepararFotoDaEntrada(f); } catch (e) { avisarErro(e); continue; }
+      // a foto aparece na hora (prévia do aparelho) e sobe em seguida; se não subir, continua na folha para tentar de novo
+      const provisoria: FotoDaEntrada = { caminho: `pendente:${crypto.randomUUID()}`, url: URL.createObjectURL(blob), pendente: { arquivo: blob, estado: "falhou" } };
+      setFotos((l) => [...l, provisoria]);
+      setMudou(true);
+      void subir(provisoria);
     }
+  }
+  /** Sobe (ou tenta de novo) uma foto que ainda não subiu. Devolve se subiu. */
+  function subir(f: FotoDaEntrada): Promise<boolean> {
+    const ja = emVoo.current.get(f.caminho);
+    if (ja) return ja;
+    if (!f.pendente) return Promise.resolve(true);
+    const arquivo = f.pendente.arquivo;
+    setFotos((l) => l.map((x) => (x.caminho === f.caminho ? { ...x, pendente: { arquivo, estado: "subindo" } } : x)));
+    const p = (async () => {
+      try {
+        const caminho = await subirFotoDaEntrada(sb, petshop.id, arquivo);
+        // tirada da folha enquanto subia: o arquivo sai do bucket
+        if (!listaDeFotos.current.some((x) => x.caminho === f.caminho)) { descartarArquivo(sb, caminho); return false; }
+        novas.current.add(caminho);
+        setFotos((l) => l.map((x) => (x.caminho === f.caminho ? { caminho, url: x.url } : x)));
+        setMudou(true);
+        return true;
+      } catch (e) {
+        const erro = e instanceof Error ? e.message : "A foto não subiu.";
+        setFotos((l) => l.map((x) => (x.caminho === f.caminho ? { ...x, pendente: { arquivo, estado: "falhou", erro } } : x)));
+        return false;
+      } finally { emVoo.current.delete(f.caminho); }
+    })();
+    emVoo.current.set(f.caminho, p);
+    return p;
   }
   function tirarFoto(f: FotoDaEntrada) {
     setFotos((l) => l.filter((x) => x.caminho !== f.caminho));
     if (novas.current.has(f.caminho)) { novas.current.delete(f.caminho); descartarArquivo(sb, f.caminho); }
+    if (f.pendente && f.url.startsWith("blob:")) URL.revokeObjectURL(f.url);
     setMudou(true);
   }
 
   const termo = guardada?.aceito_em ? guardada.termo : termoComPet(termoDoPetshop(petshop), v.pet);
 
-  /** Grava (sem mudança desde a última gravação, só devolve a guardada). */
+  /**
+   * Grava (sem mudança desde a última gravação, só devolve a guardada). A entrada não depende das fotos: grava com as que já
+   * subiram, depois espera (ou tenta de novo) as que faltam e grava de novo com elas. Foto que não subiu fica na folha, com aviso.
+   */
   async function salvar(): Promise<Entrada | null> {
     if (somenteLeitura()) return null;
-    if (guardada && !mudou && guardada.termo === termo) return guardada;
-    if (subindo) { avisarErro(new Error("Espere as fotos terminarem de subir.")); return null; }
+    if (guardada && !mudou && guardada.termo === termo && !listaDeFotos.current.some((f) => f.pendente)) return guardada;
     setSalvando(true);
-    try {
+    setAviso(null);
+    const gravar = async (id: string | null) => {
       const r = ok(await sb.rpc("entrada_salvar", {
-        p_petshop: petshop.id, p_id: guardada?.id ?? (null as unknown as string), p_pet: v.petId,
+        p_petshop: petshop.id, p_id: id ?? (null as unknown as string), p_pet: v.petId,
         p_agendamento: v.agendamentoId ?? (null as unknown as string), p_estadia: v.estadiaId ?? (null as unknown as string),
         p_dados: { temperamento, cuidados, lesoes, lesoes_obs: lesoesObs, idoso_doente: idoso, pertences, pertences_outros: outros, obs, termo },
-        p_fotos: fotos.map((f) => f.caminho),
+        p_fotos: listaDeFotos.current.filter((f) => !f.pendente).map((f) => f.caminho),
       })) as { id: string; aceite_zerado: boolean };
       novas.current.clear();
-      const e = ok(await sb.from("entradas").select(COLS_ENTRADA).eq("id", r.id).single()) as unknown as Entrada;
-      setGuardada(e); setMudou(false);
+      return r;
+    };
+    let salvou: { id: string; aceite_zerado: boolean } | null = null;
+    try {
+      salvou = await gravar(guardada?.id ?? null);
+      // as fotos que ainda não subiram: espera as que estão subindo e tenta de novo as que falharam; as que subirem entram na entrada
+      const faltam = listaDeFotos.current.filter((f) => f.pendente);
+      if (faltam.length) {
+        const subiram = (await Promise.all(faltam.map((f) => subir(f)))).some(Boolean);
+        if (subiram) salvou = { ...(await gravar(salvou.id)), aceite_zerado: salvou.aceite_zerado };
+      }
+      const e = ok(await sb.from("entradas").select(COLS_ENTRADA).eq("id", salvou.id).single()) as unknown as Entrada;
+      setGuardada(e);
       if (!e.aceite_assinatura) setAssinatura(null);
-      avisar(r.aceite_zerado ? "Entrada atualizada. Como mudou, o tutor precisa aceitar de novo." : guardada ? "Entrada atualizada." : "Entrada conferida.");
+      const naoSubiram = listaDeFotos.current.filter((f) => f.pendente).length;
+      setMudou(naoSubiram > 0);
       avisarMudanca();
+      if (naoSubiram > 0) {
+        // salvou sem a foto: a pessoa decide (tentar de novo ou tirar), nada some sozinho
+        const t = `A entrada foi salva, mas ${naoSubiram === 1 ? "1 foto não subiu" : `${naoSubiram} fotos não subiram`} (internet fraca ou servidor lento). ${naoSubiram === 1 ? "Ela continua" : "Elas continuam"} na folha: toque em Tentar de novo, ou tire a foto para seguir sem ela.`;
+        setAviso(t); avisarErro(new Error(t));
+        return null;
+      }
+      avisar(salvou.aceite_zerado ? "Entrada atualizada. Como mudou, o tutor precisa aceitar de novo." : guardada ? "Entrada atualizada." : "Entrada conferida.");
       return e;
-    } catch (e) { avisarErro(e); return null; } finally { setSalvando(false); }
+    } catch (e) {
+      const t = `${salvou ? "A entrada foi salva, mas não terminou" : "A entrada não foi salva"}: ${mensagemDeErro(e)} Nada se perdeu: as marcações e as fotos continuam aqui. Toque de novo para tentar.`;
+      setAviso(t); avisarErro(new Error(t));
+      return null;
+    } finally { setSalvando(false); }
   }
 
   async function seguirParaAceite() {
@@ -326,7 +386,7 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
       <>
         {aceito
           ? <Link className="g-btn pri" href={`/gestao/app/entrada?id=${aceito.id}`}><Printer />Comprovante</Link>
-          : <button type="button" className="g-btn pri" data-teste="salvar-entrada" disabled={salvando || subindo > 0} onClick={() => void seguirParaAceite()}>
+          : <button type="button" className="g-btn pri" data-teste="salvar-entrada" disabled={salvando} onClick={() => void seguirParaAceite()}>
               {salvando ? <><Loader2 className="g-gira" />Salvando…</> : guardada && !mudou ? "Pedir o aceite do tutor" : "Salvar e pedir o aceite"}
             </button>}
         {!aceito && guardada && mudou && <button type="button" className="g-btn sec" disabled={salvando} onClick={() => void salvar()}>Só salvar</button>}
@@ -334,6 +394,7 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
       </>
     )}>
       {erro && <p className="g-erro" role="alert">{erro}</p>}
+      {aviso && <p className="g-erro" role="alert" data-teste="aviso-entrada">{aviso}</p>}
       {!pronto ? (carregando ? <Esqueleto linhas={5} /> : null) : (
         <div className="g-pilha g-ent">
           {guardada && (
@@ -348,7 +409,7 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
               {guardada.aceito_em && assinatura && /* eslint-disable-next-line @next/next/no-img-element */ <img className="g-ent-assinatura-mini" src={assinatura} alt={`Assinatura de ${guardada.aceite_nome ?? "tutor"}`} />}
             </div>
           )}
-          {automatica && !guardada && <p className="g-muted g-pp">Leva um minuto e protege a loja e o tutor. Se não der agora, toque em Pular agora: dá para fazer depois pelo horário.</p>}
+          {automatica && !guardada && <p className="g-muted g-pp">Leva um minuto e protege a loja e o tutor. Se não der agora, toque em Pular agora: dá para fazer depois {v.tipo === "banho" ? "pelo horário" : "pelo cartão do pet, em Conferir a entrada"}.</p>}
 
           <section className="g-bol-parte" aria-label="Temperamento">
             <div className="g-bol-t"><b>Temperamento</b><small>como chegou hoje</small></div>
@@ -370,14 +431,19 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
             <input className="g-input" maxLength={300} value={lesoesObs} aria-label="Onde e como" placeholder="Onde? Ex.: ferida na pata de trás" onChange={(e) => mexer(setLesoesObs)(e.target.value)} />
             <ul className="g-bol-fotos" aria-label="Fotos do que já existia">
               {fotos.map((f, i) => (
-                <li key={f.caminho}>
+                <li key={f.caminho} className={f.pendente ? `pendente ${f.pendente.estado}` : undefined}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {f.url ? <img src={f.url} alt={`Foto ${i + 1} da entrada de ${v.pet}`} /> : <span className="sem">foto</span>}
+                  {f.pendente?.estado === "subindo" && <span className="g-ent-foto-estado" aria-label="Foto subindo"><Loader2 className="g-gira" aria-hidden /></span>}
+                  {f.pendente?.estado === "falhou" && (
+                    <button type="button" className="g-ent-foto-estado falhou" data-teste="foto-tentar-de-novo" title={f.pendente.erro} onClick={() => void subir(f)}>
+                      <RotateCcw aria-hidden /><span>Não subiu. Tentar de novo</span>
+                    </button>
+                  )}
                   <button type="button" className="g-bol-foto-x" aria-label={`Tirar a foto ${i + 1}`} onClick={() => tirarFoto(f)}><X aria-hidden /></button>
                 </li>
               ))}
-              {Array.from({ length: subindo }, (_, i) => <li key={`s${i}`} className="subindo" aria-label="Foto subindo"><Loader2 className="g-gira" aria-hidden /></li>)}
-              {fotos.length + subindo < MAX_FOTOS_ENTRADA && (
+              {fotos.length < MAX_FOTOS_ENTRADA && (
                 <li className="mais">
                   <button type="button" onClick={() => { if (!somenteLeitura()) camera.current?.click(); }}><Camera aria-hidden /><span>Tirar foto</span></button>
                   <button type="button" onClick={() => { if (!somenteLeitura()) galeria.current?.click(); }}><ImagePlus aria-hidden /><span>Galeria</span></button>
@@ -391,7 +457,9 @@ export function FolhaEntrada({ visita: v, aoFechar, automatica }: { visita: Visi
 
           <section className="g-bol-parte" aria-label="Idoso ou doente">
             <div className="g-chips"><button type="button" className="g-chip" aria-pressed={idoso} onClick={() => mexer(setIdoso)(!idoso)}>Pet idoso ou doente</button></div>
-            {idoso && <p className="g-ent-nota" role="note">Manuseio com mais calma: pausas, menos tempo de secador e atenção à respiração. Se ele não estiver bem, pare e avise o tutor.</p>}
+            {idoso && <p className="g-ent-nota" role="note">{v.tipo === "banho"
+              ? "Manuseio com mais calma: pausas, menos tempo de secador e atenção à respiração. Se ele não estiver bem, pare e avise o tutor."
+              : "Mais calma com ele: descanso, água por perto, menos correria com os outros cães e atenção à respiração. Se ele não estiver bem, avise o tutor."}</p>}
           </section>
 
           <section className="g-bol-parte" aria-label="Pertences deixados">

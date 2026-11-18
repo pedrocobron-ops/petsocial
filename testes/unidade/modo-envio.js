@@ -74,14 +74,16 @@ T.secao('o texto é o mesmo das outras telas');
 t('lembrete = mensagemDoLembrete (Agenda, "Mandar os lembretes")', () => {
   const l = de('lembrete')[0];
   const esperado = MP.mensagemDoLembrete([
-    { inicio: amanha(9), pets: { nome: 'Thor', clientes: { nome: 'Ana Souza' } }, ...banho },
-    { inicio: amanha(10), pets: { nome: 'Mel', clientes: { nome: 'Ana Souza' } }, servicos: { nome: 'Banho' }, agendamento_servicos: [{ ordem: 1, servicos: { nome: 'Hidratação' } }] },
+    { inicio: amanha(9), pets: { nome: 'Thor', sexo: 'M', clientes: { nome: 'Ana Souza' } }, ...banho },
+    { inicio: amanha(10), pets: { nome: 'Mel', sexo: 'F', clientes: { nome: 'Ana Souza' } }, servicos: { nome: 'Banho' }, agendamento_servicos: [{ ordem: 1, servicos: { nome: 'Hidratação' } }] },
   ], 'Banho da Neide');
   assert.equal(l.texto, esperado);
-  assert.match(l.texto, /^Oi, Ana! Aqui é Banho da Neide\. Passando para lembrar dos horários de amanhã: banho de Thor às 09:00 e banho e hidratação de Mel às 10:00\. Posso confirmar\?$/);
+  assert.match(l.texto, /^Oi, Ana! Aqui é Banho da Neide\. Passando para lembrar dos horários de amanhã: o banho do Thor às 09:00 e o banho e a hidratação da Mel às 10:00\. Posso confirmar\?$/);
 });
-t('pet pronto = textoPronto ("O banho de Thor terminou. Já pode vir buscar.")', () =>
-  assert.equal(de('pronto')[0].texto, AG.textoPronto({ tutor: 'Ana Souza', pet: 'Thor', petshop: 'Banho da Neide', servico: 'Banho' })));
+t('pet pronto = textoPronto ("O banho do Thor terminou. Já pode vir buscar.", do/da pelo sexo)', () => {
+  assert.equal(de('pronto')[0].texto, AG.textoPronto({ tutor: 'Ana Souza', pet: 'Thor', sexo: 'M', petshop: 'Banho da Neide', servico: 'Banho' }));
+  assert.match(de('pronto')[0].texto, /O banho do Thor terminou\. Já pode vir buscar\.$/);
+});
 t('saúde: uma mensagem com os dois cuidados do Thor (mensagemSaude)', () => {
   const s = de('saude')[0];
   assert.deepEqual(s.refs, ['s1', 's2']);

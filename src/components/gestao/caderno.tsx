@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, CalendarDays, FileText, HandCoins, ImagePlus, Lock, NotebookPen, Syringe, Tags, Trash2, TriangleAlert, Users, X } from "lucide-react";
-import { brl, fimDoTelefone, isoDia, juntaDiaHora, lerTelefone, semAcento } from "@/lib/gestao/util";
+import { Camera, CalendarDays, FileText, HandCoins, History, ImagePlus, Lock, NotebookPen, Syringe, Tags, Trash2, TriangleAlert, Users, X } from "lucide-react";
+import { brl, dataCurta, fimDoTelefone, hora as horaDe, isoDia, juntaDiaHora, lerTelefone, semAcento } from "@/lib/gestao/util";
+import type { Json } from "@/lib/gestao/banco";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { lancarAReceber, parteDaChave } from "@/lib/gestao/dinheiro";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import {
   BUCKET_CADERNO_TMP, LADO_DA_FOTO, LIMITE_DO_ENVIO, MAX_BYTES_PDF, MAX_IMAGENS, MAX_PAGINAS_PDF, MAX_PDFS, TIPOS_DA_PAGINA,
-  type AreaLida, type Leitura, type RespostaCaderno, type TipoCuidado, type TipoDaPagina,
+  type AreaLida, type DestinoDoPreco, type Leitura, type RespostaCaderno, type TipoCuidado, type TipoDaPagina,
 } from "@/lib/gestao/caderno";
 import { AREAS_DE_SERVICO, areaDoServico, areasDeServicoPara, categoriaDaArea } from "@/lib/gestao/modulos";
+import { gravarPrecoDaCasa, rotuloDoDestino } from "@/lib/gestao/tabela-precos";
 import { CAMPOS_PRECO, corLivre, inserirServico, mudarServico, type Precos } from "./servico-campos";
 import { TIPOS_SAUDE } from "./clientes/saude";
 import { useGestao } from "./contexto";
@@ -22,9 +24,20 @@ type Pet = { nome: string; especie: "cao" | "gato" | "outro"; raca: string; port
 type LinhaCliente = { id: string; marcado: boolean; nome: string; telefone: string; obs: string; pets: Pet[]; duvida: boolean; juntar: boolean };
 type LinhaDivida = { id: string; marcado: boolean; nome: string; telefone: string; valor: number | null; desde: string; descricao: string; duvida: boolean; juntar: boolean };
 type LinhaHorario = { id: string; marcado: boolean; dia: string; hora: string; pet: string; tutor: string; servico: string; duvida: boolean };
-type LinhaServico = { id: string; marcado: boolean; nome: string; area: AreaLida; duracao: number | null; precos: Precos; duvida: boolean };
+type LinhaServico = { id: string; marcado: boolean; nome: string; area: AreaLida; duracao: number | null; precos: Precos; duvida: boolean; destino?: DestinoDoPreco; vezes?: number | null };
 type LinhaVacina = { id: string; marcado: boolean; tipo: TipoCuidado; nome: string; aplicado: string; vence: string; vet: string; duvida: boolean };
 type SaudeJa = { tipo: string; nome: string; aplicado_em: string | null };
+/** A conferência como está na tela: o que fica guardado no rascunho enquanto não é salva. */
+type Estado = { clientes: LinhaCliente[]; dividas: LinhaDivida[]; horarios: LinhaHorario[]; linhasS: LinhaServico[]; linhasV: LinhaVacina[]; duvidas: string[] };
+/**
+ * Rascunho da leitura (tabela `rascunhos`, migração 20261217): a rota grava a leitura assim que ela chega (`leitura`); a tela grava
+ * a conferência com as correções (`estado`) e o que já foi salvo (`criados`, para tentar de novo sem repetir).
+ */
+type Rascunho = { versao: 1; tipo: TipoDaPagina; lido_em: string; leitura?: Leitura; estado?: Estado; criados?: [string, string][]; paginas?: number };
+/** Rascunho esquecido não volta depois de 7 dias (o banco também apaga). */
+const VALIDADE_RASCUNHO = 7 * 864e5;
+const quantosItens = (e: Estado) => e.clientes.length + e.dividas.length + e.horarios.length + e.linhasS.length + e.linhasV.length;
+const itensDaLeitura = (l: Leitura) => l.clientes.length + l.dividas.length + l.agenda.length + l.servicos.length + l.vacinas.length;
 type ClienteJa = { id: string; nome: string; telefone: string | null; obs: string | null };
 type PetJa = { id: string; cliente_id: string; nome: string; raca: string | null; porte: string | null };
 
@@ -83,7 +96,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
   pet?: { id: string; nome: string };
 }) {
   const { sb, petshop, user, servicos, posso, vejoFinanceiro, souDono, recarregarBase } = useGestao();
-  const { avisar } = useAvisos();
+  const { avisar, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
   const podeDivida = vejoFinanceiro;
   const podeAgenda = posso("agenda");
@@ -105,6 +118,25 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
   const [resumo, setResumo] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
   const hoje = isoDia(new Date());
+  // a leitura guardada no banco (paga e ainda não salva): volta depois de recarregar a página ou de sair e voltar
+  const contexto = pet ? `caderno_pet:${pet.id}` : "caderno";
+  const [pendente, setPendente] = useState<Rascunho | null>(null);
+  const [lidoEm, setLidoEm] = useState<string | null>(null);
+  const [voltando, setVoltando] = useState(false);
+  useEffect(() => {
+    let vale = true;
+    void sb.from("rascunhos").select("dados, atualizado_em").eq("petshop_id", petshop.id).eq("tipo", contexto).maybeSingle().then((r) => {
+      if (!vale || r.error || !r.data) return;
+      const d = r.data.dados as unknown as Rascunho | null;
+      const velho = Date.now() - Date.parse(r.data.atualizado_em) > VALIDADE_RASCUNHO;
+      if (!d || d.versao !== 1 || (!d.leitura && !d.estado) || velho) { void apagarRascunho(); return; }
+      setPendente(d);
+    }, () => {});
+    return () => { vale = false; };
+  }, [sb, petshop.id, contexto]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function apagarRascunho() {
+    await sb.from("rascunhos").delete().eq("petshop_id", petshop.id).eq("tipo", contexto).then(() => null, () => null);
+  }
 
   // quanto ainda dá para ler hoje (sem gastar nada)
   useEffect(() => {
@@ -183,6 +215,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
       const form = new FormData();
       form.set("petshopId", petshop.id);
       form.set("tipo", tipo);
+      form.set("rascunho", contexto);
       form.set("paginas", arqs.filter((a) => a.pdf && !subir.has(a.id)).map((a) => a.paginas).join(","));
       arqs.forEach((a) => { if (!subir.has(a.id)) form.append("arquivo", a.blob, a.pdf ? a.nome : `${a.id}.jpg`); });
       const subidos = arqs.filter((a) => subir.has(a.id));
@@ -204,6 +237,9 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
       setJa(existentes);
       if (pet) setSaudeJa(ok(await sb.from("pets_saude").select("tipo, nome, aplicado_em").eq("petshop_id", petshop.id).eq("pet_id", pet.id).limit(500)));
       montarConferencia(j.leitura);
+      criados.current.clear();
+      setLidoEm(new Date().toISOString());
+      setPendente(null);
       setEtapa("conferir");
     } catch (e) {
       setErro(mensagemDeErro(e));
@@ -227,11 +263,49 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
       pets: c.pets.map((p) => ({ nome: p.nome, especie: p.especie, raca: p.raca, porte: p.porte ?? "", marcado: true })) })));
     setDividas(l.dividas.map((d) => ({ id: uid(), marcado: Boolean(d.cliente_nome) && d.valor != null, nome: d.cliente_nome, telefone: d.telefone, valor: d.valor, desde: d.desde ?? "", descricao: d.descricao, duvida: d.duvida, juntar: true })));
     setHorarios(l.agenda.map((a) => ({ id: uid(), marcado: Boolean(a.dia && a.hora && a.dia >= hoje && a.pet_nome), dia: a.dia ?? "", hora: a.hora ?? "", pet: a.pet_nome, tutor: a.tutor_nome, servico: a.servico, duvida: a.duvida })));
-    setLinhasS(l.servicos.map((x) => ({ id: uid(), marcado: true, nome: x.nome, area: x.area, duracao: x.duracao_min, duvida: x.duvida,
+    setLinhasS(l.servicos.map((x) => ({ id: uid(), marcado: x.destino !== "pacote", nome: x.nome, area: x.area, duracao: x.duracao_min, duvida: x.duvida, destino: x.destino, vezes: x.vezes,
       precos: { preco_p: x.preco_p, preco_m: x.preco_m, preco_g: x.preco_g, preco_gg: x.preco_gg } })));
     setLinhasV(l.vacinas.map((x) => ({ id: uid(), marcado: true, tipo: x.tipo, nome: x.nome, aplicado: x.aplicado ?? "", vence: x.vence ?? "", vet: x.veterinario, duvida: x.duvida })));
     setDuvidas(l.duvidas);
   }
+
+  /** Volta para a conferência guardada: com as correções, se a pessoa já tinha mexido; senão, a leitura como chegou. */
+  async function continuarRevisao() {
+    const d = pendente;
+    if (!d || voltando) return;
+    setVoltando(true); setErro(null);
+    try {
+      const existentes = await lerExistentes();
+      setJa(existentes);
+      if (pet) setSaudeJa(ok(await sb.from("pets_saude").select("tipo, nome, aplicado_em").eq("petshop_id", petshop.id).eq("pet_id", pet.id).limit(500)));
+      if (d.tipo) setTipo(d.tipo);
+      if (d.estado) {
+        setClientes(d.estado.clientes ?? []); setDividas(d.estado.dividas ?? []); setHorarios(d.estado.horarios ?? []);
+        setLinhasS(d.estado.linhasS ?? []); setLinhasV(d.estado.linhasV ?? []); setDuvidas(d.estado.duvidas ?? []);
+      } else if (d.leitura) montarConferencia(d.leitura);
+      criados.current = new Map(d.criados ?? []);
+      setLidoEm(d.lido_em);
+      setPendente(null);
+      setEtapa("conferir");
+    } catch (e) { setErro(mensagemDeErro(e)); } finally { setVoltando(false); }
+  }
+  async function descartarRevisao() {
+    const sim = await confirmar({ titulo: "Descartar esta leitura?", texto: "O que foi lido e ainda não foi salvo sai daqui. Para trazer de novo, será preciso ler as páginas outra vez (conta no limite do dia).", confirmar: "Descartar", perigo: true });
+    if (!sim) return;
+    setPendente(null);
+    await apagarRascunho();
+  }
+  // cada correção na conferência fica guardada (um instante depois de parar de mexer)
+  useEffect(() => {
+    if (etapa !== "conferir" || !tipo || !lidoEm) return;
+    const estado: Estado = { clientes, dividas, horarios, linhasS, linhasV, duvidas };
+    if (!quantosItens(estado)) return;
+    const t = setTimeout(() => {
+      const dados: Rascunho = { versao: 1, tipo, lido_em: lidoEm, estado, criados: [...criados.current.entries()] };
+      void sb.from("rascunhos").upsert({ petshop_id: petshop.id, tipo: contexto, dados: dados as unknown as NonNullable<Json> }, { onConflict: "petshop_id,user_id,tipo" }).then(() => null, () => null);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [etapa, tipo, lidoEm, clientes, dividas, horarios, linhasS, linhasV, duvidas]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------- quem já existe ---------- */
 
@@ -252,6 +326,8 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
   const servicoDe = (nome: string) => servicos.find((x) => semAcento(x.nome) === semAcento(nome));
   /** Os preços (e o tempo) que mudariam num serviço que já existe. */
   function mudancasDe(x: LinhaServico) {
+    // creche e hotel não são serviço da agenda (vão para a diária ou para o modelo de plano)
+    if (x.destino && x.destino !== "servico") return null;
     const ja = servicoDe(x.nome);
     if (!ja) return null;
     const precos = CAMPOS_PRECO.filter((c) => x.precos[c] != null && Number(ja[c] ?? -1) !== x.precos[c]).map((c) => ({ campo: c, de: ja[c] == null ? null : Number(ja[c]), para: x.precos[c]! }));
@@ -281,7 +357,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
   async function gravar(chave: string): Promise<boolean | void> {
     if (!total || salvando || somenteLeitura()) return;
     setSalvando(true); setErro(null);
-    const r = { novos: 0, juntados: 0, pets: 0, dividas: 0, horarios: 0, horariosJa: 0, semPet: [] as string[], servicosNovos: 0, servicosMudados: 0, cuidados: 0 };
+    const r = { novos: 0, juntados: 0, pets: 0, dividas: 0, horarios: 0, horariosJa: 0, semPet: [] as string[], servicosNovos: 0, servicosMudados: 0, cuidados: 0, casa: [] as string[] };
     try {
       const e = await lerExistentes();
       const lista = [...e.clientes];
@@ -338,7 +414,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
         const id = (d.juntar ? doLote.get(semAcento(d.nome)) : undefined) ?? await cliente(`d:${d.id}`, d.nome, d.telefone, d.juntar);
         if (criados.current.has(`d:${d.id}:conta`)) continue;
         await lancarAReceber(sb, petshop.id, {
-          valor: d.valor!, vencimento: isoDia(new Date(Date.now() + 7 * 864e5)), categoria: "Outros",
+          valor: d.valor!, vencimento: hoje, categoria: "Outros",
           descricao: (d.descricao.trim() || "Trazido do caderno").slice(0, 120), clienteId: id,
           devidoDesde: d.desde && d.desde <= hoje ? d.desde : null, chave: parteDaChave(chave, "divida", d.id),
         });
@@ -380,6 +456,13 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
         const cores = agora.filter((x) => x.ativo).map((x) => x.cor);
         for (const x of marcadosS) {
           if (criados.current.has(`s:${x.id}`)) continue;
+          // creche e hotel: a diária ou o modelo de plano, nunca um serviço de 1 hora na agenda
+          if (x.destino && x.destino !== "servico") {
+            const frase = await gravarPrecoDaCasa(sb, petshop.id, x);
+            if (frase) r.casa.push(frase);
+            criados.current.set(`s:${x.id}`, "1");
+            continue;
+          }
           const m = mudancasDe(x);
           const ja = agora.find((y) => semAcento(y.nome) === semAcento(x.nome));
           if (ja && m) {
@@ -418,6 +501,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
       setResumo([
         r.servicosNovos ? `${plural(r.servicosNovos, "serviço novo", "serviços novos")} na lista de preços.` : "",
         r.servicosMudados ? `${plural(r.servicosMudados, "serviço teve", "serviços tiveram")} o preço atualizado.` : "",
+        ...r.casa,
         r.cuidados ? `${plural(r.cuidados, "cuidado anotado", "cuidados anotados")} na saúde de ${pet?.nome ?? "pet"}.` : "",
         r.novos || r.juntados ? `${plural(r.novos, "cliente novo", "clientes novos")}${r.juntados ? ` e ${plural(r.juntados, "junto com a ficha que já existia", "juntos com fichas que já existiam")}` : ""}.` : "",
         r.pets ? `${plural(r.pets, "pet novo", "pets novos")} no cadastro.` : "",
@@ -428,11 +512,18 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
         r.semPet.length ? `Sem o nome do tutor, ${r.semPet.join(", ")} ${r.semPet.length === 1 ? "ficou" : "ficaram"} fora da agenda: marque pela Agenda.` : "",
       ].filter(Boolean));
       setEtapa("pronto");
+      setLidoEm(null);
+      void apagarRascunho();
       avisar("Pronto: o que você conferiu foi salvo.");
       avisarMudanca();
       aoTerminar?.();
     } catch (err) {
       setErro(`Parou no meio: ${mensagemDeErro(err)} O que entrou antes do erro ficou salvo; toque em Salvar de novo, que nada se repete.`);
+      // o que já entrou fica anotado no rascunho: recarregar a página e salvar de novo também não repete
+      if (lidoEm && tipo) {
+        const dados: Rascunho = { versao: 1, tipo, lido_em: lidoEm, estado: { clientes, dividas, horarios, linhasS, linhasV, duvidas }, criados: [...criados.current.entries()] };
+        void sb.from("rascunhos").upsert({ petshop_id: petshop.id, tipo: contexto, dados: dados as unknown as NonNullable<Json> }, { onConflict: "petshop_id,user_id,tipo" }).then(() => null, () => null);
+      }
       aoTerminar?.();
       return false;
     } finally { setSalvando(false); }
@@ -449,7 +540,11 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
     <div className="g-cad-rodape">
       {marcadosD.length > 0 && <span className="g-muted g-pp">Dívidas marcadas: <b>{brl(totalDividas)}</b></span>}
       <div className="g-fila">
-        <button type="button" className="g-btn sec" disabled={salvando} onClick={() => { setEtapa("escolher"); setErro(null); }}>Ler outras páginas</button>
+        <button type="button" className="g-btn sec" disabled={salvando} onClick={() => {
+          // a conferência fica guardada: dá para voltar a ela pelo aviso, em vez de ler de novo
+          if (tipo && lidoEm) setPendente({ versao: 1, tipo, lido_em: lidoEm, estado: { clientes, dividas, horarios, linhasS, linhasV, duvidas }, criados: [...criados.current.entries()] });
+          setEtapa("escolher"); setErro(null);
+        }}>Ler outras páginas</button>
         <button type="button" className="g-btn verde" disabled={!total || salvando || op.ocupado} onClick={() => void salvar()}>
           {salvando ? "Salvando… não feche" : total ? `Salvar ${plural(total, "item", "itens")}` : "Marque o que quer salvar"}
         </button>
@@ -472,7 +567,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
         <div className="g-cad-lendo" role="status" aria-live="polite">
           <NotebookPen aria-hidden />
           <b>Lendo {plural(paginas, "página", "páginas")}…</b>
-          <p className="g-muted">Pode levar até um minuto. Não feche esta janela.</p>
+          <p className="g-muted">Pode levar até um minuto. Se a página fechar, a leitura fica guardada: é só abrir de novo e tocar em Continuar a revisão.</p>
         </div>
       ) : etapa === "conferir" ? (
         <div className="g-pilha">
@@ -545,7 +640,10 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
             <section className="g-cad-secao" aria-label="Quem me deve">
               <h3><HandCoins aria-hidden />Quem me deve <span className="g-muted">({dividas.length})</span></h3>
               {dividas.map((d) => {
-                const existe = existeCliente(d.nome, d.telefone) ?? (clientes.some((c) => c.marcado && semAcento(c.nome) === semAcento(d.nome)) ? { id: "", nome: d.nome } : null);
+                const noCadastro = existeCliente(d.nome, d.telefone);
+                // o tutor está na lista de clientes desta mesma leitura (ainda não existe no cadastro): a dívida vai para ele
+                const daLeitura = !noCadastro && clientes.some((c) => c.marcado && semAcento(c.nome) === semAcento(d.nome) && !(c.juntar && existeCliente(c.nome, c.telefone)));
+                const existe = noCadastro ?? (daLeitura ? { id: "", nome: d.nome } : null);
                 const verificar = d.duvida || d.valor == null;
                 return (
                   <div key={d.id} className={`g-cad-linha${d.marcado ? "" : " fora"}`} data-linha="divida">
@@ -554,7 +652,8 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
                       <input className="g-input" value={d.nome} onChange={(e) => mudarD(d.id, { nome: e.target.value })} placeholder="Nome do cliente" aria-label="Nome do cliente" />
                     </div>
                     <div className="g-cad-tags">
-                      {existe && d.juntar && <span className="g-tag azul">Já existe</span>}
+                      {noCadastro && d.juntar && <span className="g-tag azul">Já existe</span>}
+                      {daLeitura && d.juntar && <span className="g-tag">Cliente novo, desta leitura</span>}
                       {!existe && <span className="g-tag">Cliente novo</span>}
                       {verificar && <span className="g-tag amarelo">Verificar{d.valor == null ? ": valor" : ""}</span>}
                     </div>
@@ -620,7 +719,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
                       <input className="g-input" value={x.nome} onChange={(e) => mudarS({ nome: e.target.value })} placeholder="Serviço" aria-label="Nome do serviço" />
                     </div>
                     <div className="g-cad-tags">
-                      {!m && <span className="g-tag verde">Serviço novo</span>}
+                      {rotuloDoDestino(x.destino, x.vezes) ? <span className="g-tag azul">{rotuloDoDestino(x.destino, x.vezes)}</span> : !m && <span className="g-tag verde">Serviço novo</span>}
                       {igual && <span className="g-tag">Igual ao que já está</span>}
                       {(x.duvida || semPreco) && <span className="g-tag amarelo">Verificar{semPreco ? ": sem preço" : ""}</span>}
                     </div>
@@ -636,7 +735,7 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
                           <CampoValor valor={x.precos[c]} aoMudar={(v) => mudarS({ precos: { ...x.precos, [c]: v } })} rotulo={`Preço ${NOME_PORTE[c]} de ${x.nome}`} />
                         </label>
                       ))}
-                      {!m && (
+                      {!m && (!x.destino || x.destino === "servico") && (
                         <label className="g-campo"><span>Área</span>
                           <select className="g-select" value={x.area} onChange={(e) => mudarS({ area: e.target.value as AreaLida })}>
                             {AREAS_DE_SERVICO.filter((a) => areasDeServicoPara(petshop, areaDoServico(x.area)).includes(a.id)).map((a) => <option key={a.id} value={a.id}>{a.rotulo}</option>)}
@@ -690,6 +789,20 @@ export default function FotoCaderno({ aoFechar, aoTerminar, tipoInicial, pet }: 
         </div>
       ) : (
         <div className="g-pilha">
+          {pendente && (
+            <div className="g-aviso amarelo g-cad-pendente" role="status" data-teste="leitura-pendente">
+              <History aria-hidden />
+              <div className="g-pilha p">
+                <span><b>Você tem uma leitura que ainda não foi salva</b>, de {dataCurta(pendente.lido_em)} às {horaDe(pendente.lido_em)}
+                  {" "}({(() => { const n = pendente.estado ? quantosItens(pendente.estado) : pendente.leitura ? itensDaLeitura(pendente.leitura) : 0; return n === 1 ? "1 item" : `${n} itens`; })()} para conferir).
+                  {" "}Continue de onde parou, sem ler de novo.</span>
+                <div className="g-fila">
+                  <button type="button" className="g-btn verde p" disabled={voltando} onClick={() => void continuarRevisao()}>{voltando ? "Abrindo…" : "Continuar a revisão"}</button>
+                  <button type="button" className="g-btn fantasma p" disabled={voltando} onClick={() => void descartarRevisao()}><Trash2 />Descartar</button>
+                </div>
+              </div>
+            </div>
+          )}
           <p className="g-muted g-p">
             {pet ? `Tire foto das páginas da carteirinha de vacinação de ${pet.nome}. Eu leio, você confere, e só então salva na saúde dele.`
               : "Tire foto do caderno, mande um print da tela ou o PDF da lista do sistema que você usava. Eu leio, você confere, e só então salva."}

@@ -49,7 +49,12 @@ const foto = (page, nome) => page.screenshot({ path: `${B.RAIZ}/testes/saida/ind
     await page.waitForURL('**/relatorios/indicadores', { timeout: 20000 });
     const fat = page.locator('section[aria-label="Faturamento por mês"]');
     await fat.waitFor({ timeout: 20000 });
-    await page.waitForTimeout(600);
+    // a tela abre em "Este mês" (o primeiro botão; Bia, rodada 2); os números abaixo são dos últimos 6 meses
+    const chipMes = page.locator('button.g-chip', { hasText: 'Este mês' }).first();
+    T.ok('a tela abre em Este mês (o primeiro botão)', (await chipMes.getAttribute('aria-pressed')) === 'true');
+    await page.locator('button.g-chip', { hasText: 'Últimos 6 meses' }).first().click();
+    await page.waitForTimeout(1500);
+    await fat.waitFor({ timeout: 20000 });
     const t = limpo(await page.locator('.g-main').innerText());
     T.ok('a aba Indicadores vem primeiro e abre os gráficos (últimos 6 meses)', /Indicadores[\s\S]{0,40}Relatório do período/.test(t) && /Últimos 6 meses/.test(t), t.slice(0, 300));
     // 250 do mês passado + 100 de hoje (+ a venda de R$ 29,90 da volta de 390)

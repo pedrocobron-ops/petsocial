@@ -25,6 +25,10 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   só para consulta vira botão apagado. Teste vencido só trava quando a assinatura abriu (`assinaturaAberta` no `useGestao()`, mesma
   regra do banco em `acesso_liberado`); os textos do fim do teste ficam em `TEXTO_TESTE` (`fim-do-teste.tsx`).
 - Dinheiro só aparece para `vejoFinanceiro`. Ajustes do pet shop só para `souDono`.
+- Custo e margem de produto (custo médio, último custo, margem, valor em estoque a preço de custo, custo de lote, compra e
+  contagem) só para `vejoCusto` (dono, Financeiro, Relatórios ou a chave "custo" em Equipe; banco: `vejo_custo`, migração 20261214).
+  Quem não vê recebe o custo vazio: nunca regrave `produtos.custo` com o que veio vazio. No Mozart: `veCusto(c.eu)`.
+- Entrada de estoque com a despesa da compra: só por `estoque_entrada` (as duas na mesma transação).
 - Estadias: nunca `select("*")` em `estadias` (o banco recusa). Use `COLS_ESTADIA` / `SELECT_ESTADIA`; a diária e o valor cobrado
   vêm por `comValoresDeEstadia` (`src/lib/gestao/reservado.ts`), só para quem recebe. Quem não recebe não manda `valor_diaria`:
   o banco coloca a sugerida. Coluna nova em `estadias` precisa de `grant select (coluna)`. Em produção a 49 e a 57 rodam DEPOIS
@@ -67,6 +71,10 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   Somas por forma: `somaPorForma` separa a parte do crédito em `FORMA_CREDITO`; `textoDoPagamento` mostra "Crédito do tutor".
 - "Cobrar a diferença": a entrada fica em `lancamentos.diferenca_de` (o banco liga pela marca do item e recusa a segunda); comissão, relatórios
   (`cobradoPorServico(..., diferenca)`) e o horário somam a conta fechada e a diferença.
+- Valor em estoque: sempre `valorEmEstoque` (`compra.ts`), que usa o custo médio sem arredondar (`custo_exato`, que `comCustos` traz
+  pela função `produtos_custo_exato`, migração 20261222). Entrada de produto com Controlar validade pede a validade (`estoque_entrada` recusa sem ela).
+- Texto para o tutor que fala do pet: passe o `sexo` do pet (`textoConfirmacao`, `textoLembrete`, `textoPronto`… em `agenda.ts`; `marcadoPara`
+  para "Mel marcada"). Nome de alguém da equipe em chip ou lista: `nomeNaEquipe(nome, todos)` (não o primeiro nome solto).
 - Saída de estoque de uma conta: `baixarEstoque(..., lancamentoId, chave, estadiaId)`; sem lançamento (check-out pago pelo sinal ou pelo crédito), a estadia.
 - Conta do atendimento: o que o tutor deve de antes entra com "Incluir nesta conta?" (baixa por `receberConta` com `parteDaChave`); pagamento em
   parte em qualquer forma por `pagoAMenos` (`EstadoPagamento.parte`/`resto`, só com `aceitaResto`).
@@ -79,6 +87,10 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   Troca e devolução só por `devolver` (`src/lib/gestao/devolucao.ts`, função `venda_devolver`, folha `loja/devolucao.tsx`): nunca
   apague a venda para devolver um produto. Limite de fiado: toda conta a receber nova de um cliente passa antes por `conferirLimite`
   (`src/lib/gestao/fiado.ts`); o banco recusa sem liberação (`maestro:limite_fiado`), e só dono ou financeiro libera (`fiado_liberar`).
+- O que a pessoa começou e não pode se perder ao recarregar (leitura paga do caderno): tabela `rascunhos` (migração 20261217), uma linha
+  por pet shop, pessoa e `tipo`, só a própria pessoa lê; sai ao salvar ou descartar e sozinha depois de 7 dias. Rascunho de digitação
+  barata (guia inicial, formulários) continua no aparelho (`lembrado.ts`). Planilha de clientes: só por `importar_clientes` (tudo ou nada,
+  resumo contado no banco, guardado em `importacoes`), com as linhas montadas por `linhasParaOBanco` (`src/lib/gestao/planilha.ts`).
 - Datas: `agendamentos.inicio/fim` são `timestamptz`; campos `date` são texto `AAAA-MM-DD` (use `isoDia`, `deIsoDia`).
   Formatação em `src/lib/gestao/util.ts` (`brl`, `hora`, `dataAmigavel`, `dataCurta`, `fmtTelefone`, `linkWhatsApp`…).
 
@@ -118,6 +130,10 @@ A plataforma não pode parecer "pobrinha": cada tela abre com um resumo visual a
 Português do Brasil, frases curtas, tom de gente ("Nenhum banho marcado para hoje."), sem jargão de sistema
 ("registro", "cadastro efetuado com sucesso"). Sem promessa de resultado, sem número inventado, sem urgência falsa.
 O assistente se chama Mozart. Para abrir o assistente com um pedido pronto: `abrirAssistente("texto")`.
+Mozart (migração 20261215): a conversa e o cartão pendente ficam na aba (`assistente/guardada.ts`) e voltam depois de recarregar;
+cada cartão confirmado é marcado no banco antes de gravar (`assistente_acao_reservar`, por `responderCartoes`), então a mesma
+confirmação de novo não grava duas vezes. Creche e hotel nunca viram horário da agenda: reserva é `reservar_estadia`
+(`assistente/ferramenta-estadia.ts`). A bolha mostra negrito e lista por `TextoMozart` (`assistente/markdown.ts`); nada vira HTML.
 
 Nome da casa: quem usa só hotel lê "Hotel", só creche lê "Creche" (`nomeDaCasa`). A categoria gravada continua "Creche e hotel"; na tela,
 use `categoriaAtual(categoria, petshop)` (Financeiro, Caixa, contas). Áreas da equipe com `areasPara(petshop)` / `pilulasDe(p, petshop)`.

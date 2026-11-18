@@ -10,9 +10,9 @@ import type { AgendamentoCompleto, Bloqueio, PetComTutor } from "@/lib/gestao/ti
 import { SELECT_AGENDAMENTO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { nomeDosServicos, servicosPorExtenso } from "@/lib/gestao/servicos-do-horario";
 
-import { deMin, paraMin, textoConfirmacao, vagasDe } from "@/lib/gestao/agenda";
+import { deMin, marcadoPara, paraMin, textoConfirmacao, vagasDe } from "@/lib/gestao/agenda";
 
-import { almocoDoDia, dataAmigavel, dataLonga, linkWhatsApp, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
+import { almocoDoDia, dataAmigavel, nomeNaEquipe, dataLonga, linkWhatsApp, deIsoDia, hora, horarioDoDia, inicioDaSemana, isoDia, mesmoDia, nomeDiaCurto, nomeMes, somaDias } from "@/lib/gestao/util";
 import { useGestao } from "@/components/gestao/contexto";
 import { Rosca } from "@/components/gestao/painel";
 import { AvatarPet, DICA_SO_CONSULTA, Esqueleto, Vazio, abrirAssistente, ok, useAdiantar, useDados, useSomenteLeitura } from "@/components/gestao/ui";
@@ -113,7 +113,8 @@ function Agenda() {
   const abrirNovo = (n: Novo) => { if (!somenteLeitura()) setNovo(n); };
 
   // bloqueios: com filtro de profissional, só os dele e os do pet shop inteiro
-  const nomeDe = (id: string | null) => (id ? equipe.find((p) => p.id === id)?.nome.split(" ")[0] ?? "Profissional" : "Pet shop inteiro");
+  const nomesDaEquipe = equipe.map((p) => p.nome);
+  const nomeDe = (id: string | null) => (id ? nomeNaEquipe(equipe.find((p) => p.id === id)?.nome, nomesDaEquipe) || "Profissional" : "Pet shop inteiro");
   const bloqueiosVisiveis = (bloqueios ?? []).filter((b) => !prof || !b.profissional_id || b.profissional_id === prof);
   const trechosDe = (d: Date): Trecho[] => {
     const base = d.getTime(), fimDoDia = Math.round((somaDias(d, 1).getTime() - base) / 60000);
@@ -250,7 +251,7 @@ function Agenda() {
         {quemAtende.length > 1 && (
           <div className="g-chips">
             <button className="g-chip" aria-pressed={prof === null} onClick={() => setProf(null)}>Todos</button>
-            {quemAtende.map((p) => <button key={p.id} className="g-chip" aria-pressed={prof === p.id} onClick={() => setProf(p.id)}><i style={{ background: p.cor }} />{p.nome.split(" ")[0]}</button>)}
+            {quemAtende.map((p) => <button key={p.id} className="g-chip" aria-pressed={prof === p.id} onClick={() => setProf(p.id)}><i style={{ background: p.cor }} />{nomeNaEquipe(p.nome, nomesDaEquipe)}</button>)}
           </div>
         )}
 
@@ -429,7 +430,7 @@ function Agenda() {
                     {l.a.pets && <AvatarPet pet={l.a.pets} />}
                     <span className="t">
                       <b>{l.a.pets?.nome}</b>
-                      <span className="serv"><i />{[nomeDosServicos(l.a), quemAtende.length > 1 ? l.a.profissionais?.nome.split(" ")[0] : null].filter(Boolean).join(" · ") || "Atendimento"}</span>
+                      <span className="serv"><i />{[nomeDosServicos(l.a), quemAtende.length > 1 && l.a.profissionais ? nomeNaEquipe(l.a.profissionais.nome, nomesDaEquipe) : null].filter(Boolean).join(" · ") || "Atendimento"}</span>
                       {l.a.pets?.clientes?.nome && <span className="g-agd-tutor">Tutor: {l.a.pets.clientes.nome}</span>}
                       {lotados.has(l.a.id) && !["cancelado", "faltou"].includes(l.a.status) && <span className="g-agd-lotado"><Users size={13} aria-hidden />Passa das vagas: {lotados.get(l.a.id)} ao mesmo tempo</span>}
                     </span>
@@ -489,15 +490,18 @@ function MarcadoAgora({ marcado, lista, prontoEm, aoAbrir, aoFechar }: { marcado
   const { petshop } = useGestao();
   const a = lista.find((x) => x.id === marcado.id);
   const tutor = a?.pets?.clientes;
-  const zap = a ? linkWhatsApp(tutor?.telefone, textoConfirmacao({
-    tutor: tutor?.nome, pet: a.pets?.nome ?? "seu pet", servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
+  // horário que já passou (marcado depois, para anotar): confirmação para o tutor não faz sentido (achado da Neide)
+  const passou = new Date(marcado.inicio).getTime() < Date.now();
+  const zap = a && !passou ? linkWhatsApp(tutor?.telefone, textoConfirmacao({
+    tutor: tutor?.nome, pet: a.pets?.nome ?? "seu pet", sexo: a.pets?.sexo ?? marcado.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
   })) : null;
+  const nome = a?.pets?.nome ?? marcado.pet;
   return (
     <section className="g-card g-agd-recem" role="status" aria-live="polite">
       <div className="g-fila" style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
         <CalendarCheck2 aria-hidden />
         <div className="g-cresce">
-          <b>{a?.pets?.nome ?? marcado.pet ? `${a?.pets?.nome ?? marcado.pet} marcado` : "Horário marcado"}: {dataAmigavel(marcado.inicio)} às {hora(marcado.inicio)}.</b>
+          <b>{nome ? marcadoPara(nome, a?.pets?.sexo ?? marcado.sexo) : "Horário marcado"}: {dataAmigavel(marcado.inicio)} às {hora(marcado.inicio)}.</b>
           {prontoEm != null && <p className="g-pp" data-teste="pronto-em" style={{ margin: "2px 0 0", fontWeight: 600, color: "#24543b" }}>O primeiro horário {petshop.nome.length <= 40 ? `${artigoDe(petshop.nome).do} ${petshop.nome} ` : ""}está marcado. {textoProntoEm(prontoEm)}</p>}
           <p className="g-muted g-pp">{marcado.quantos > 1 ? `E mais ${marcado.quantos - 1 === 1 ? "1 data" : `${marcado.quantos - 1} datas`} da repetição. ` : ""}O horário está em destaque logo abaixo.</p>
         </div>
@@ -505,6 +509,7 @@ function MarcadoAgora({ marcado, lista, prontoEm, aoAbrir, aoFechar }: { marcado
       </div>
       <div className="g-fila">
         {zap ? <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Mandar confirmação no WhatsApp</a>
+          : passou ? <span className="g-muted g-pp">Este horário já passou: não precisa mandar confirmação.</span>
           : a && <span className="g-muted g-pp">Sem telefone do tutor para mandar a confirmação.</span>}
         <button className="g-btn fantasma p" onClick={aoAbrir} disabled={!a}>Abrir o horário</button>
       </div>

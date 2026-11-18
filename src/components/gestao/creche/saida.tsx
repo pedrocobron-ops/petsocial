@@ -17,18 +17,20 @@ import "./creche.css";
 const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /** Dias extras e taxas de busca, até o fim do plano, que ainda não entraram em nenhuma cobrança. */
-export type SobrasDaSaida = { plano: PlanoCompleto; extras: string[]; taxas: { dia: string; valor: number }[]; total: number };
+export type SobrasDaSaida = { plano: PlanoCompleto; extras: string[]; taxas: { dia: string; valor: number }[]; total: number; taxi?: { dia: string; valor: number }[] };
 
 /** Que planos que já acabaram têm dia extra ou taxa sem cobrança que nenhuma cobrança futura vai pegar. */
 export async function lerSobrasDaSaida(sb: ReturnType<typeof useGestao>["sb"], petshopId: string, planos: PlanoCompleto[], diaria: number | null, hoje: string): Promise<SobrasDaSaida[]> {
   const acabaram = planos.filter((p) => p.fim && p.fim <= hoje);
   if (!acabaram.length) return [];
   const pets = [...new Set(acabaram.map((p) => p.pet_id))];
-  const [ex, tx, cs] = await Promise.all([
+  const [ex, tx, cs, tg] = await Promise.all([
     sb.from("estadias").select("pet_id, dia").eq("petshop_id", petshopId).eq("mensalista", "extra").in("status", ["em_casa", "encerrada"])
       .is("cobranca_id", null).in("pet_id", pets).order("dia").limit(1000),
     sb.from("creche_atrasos").select("pet_id, dia, valor").eq("petshop_id", petshopId).eq("estado", "mensalidade").is("cobranca_id", null).in("pet_id", pets).order("dia").limit(1000),
     sb.from("creche_cobrancas").select("plano_id, mes").eq("petshop_id", petshopId).in("plano_id", acabaram.map((p) => p.id)).limit(5000),
+    // dias de táxi pet sem cobrança (migração 20261218; sem a tabela, nada muda)
+    sb.from("creche_taxi").select("pet_id, dia, valor").eq("petshop_id", petshopId).is("cobranca_id", null).in("pet_id", pets).order("dia").limit(2000),
   ]);
   const lista: SobrasDaSaida[] = [];
   for (const p of acabaram) {
@@ -40,18 +42,21 @@ export async function lerSobrasDaSaida(sb: ReturnType<typeof useGestao>["sb"], p
     const conta = (dia: string) => dia <= p.fim! && (!vaiGerar || dia >= mesFim);
     const extras = (ex.data ?? []).filter((e) => e.pet_id === p.pet_id && e.dia && conta(e.dia)).map((e) => e.dia!);
     const taxas = (tx.error ? [] : tx.data ?? []).filter((a) => a.pet_id === p.pet_id && conta(a.dia)).map((a) => ({ dia: a.dia, valor: Number(a.valor ?? 0) }));
-    if (!extras.length && !taxas.length) continue;
+    const taxi = (tg.error ? [] : tg.data ?? []).filter((a) => a.pet_id === p.pet_id && conta(a.dia)).map((a) => ({ dia: a.dia, valor: Number(a.valor ?? 0) }));
+    if (!extras.length && !taxas.length && !taxi.length) continue;
     const unit = p.valor_extra ?? diaria ?? 0;
-    lista.push({ plano: p, extras, taxas, total: centavos(extras.length * unit + taxas.reduce((s, x) => s + x.valor, 0)) });
+    lista.push({ plano: p, extras, taxas, taxi, total: centavos(extras.length * unit + taxas.reduce((s, x) => s + x.valor, 0) + taxi.reduce((s, x) => s + x.valor, 0)) });
   }
   return lista;
 }
 
 /** "1 dia extra (10/11)" e "1 taxa de busca fora do horário (12/11)" */
-export function textoDasSobras(s: Pick<SobrasDaSaida, "extras" | "taxas">) {
+export function textoDasSobras(s: Pick<SobrasDaSaida, "extras" | "taxas" | "taxi">) {
+  const taxi = s.taxi ?? [];
   return [
     s.extras.length ? `${s.extras.length === 1 ? "1 dia extra" : `${s.extras.length} dias extras`} (${textoDasDatas(s.extras)})` : "",
     s.taxas.length ? `${textoDasTaxas(s.taxas.length)} (${textoDasDatas(s.taxas.map((x) => x.dia))})` : "",
+    taxi.length ? `${taxi.length === 1 ? "1 dia" : `${taxi.length} dias`} de táxi pet (${textoDasDatas(taxi.map((x) => x.dia))})` : "",
   ].filter(Boolean).join(" e ");
 }
 
@@ -217,7 +222,7 @@ export default function AcertoDaSaida({ plano, aoFechar }: { plano: PlanoComplet
           })}
           {sobras && (
             <div className={`g-ht-atraso${feitas.sobras ? " ok" : ""}`}>
-              <p><b>{textoDasSobras(sobras)} sem cobrança: {brl(sobras.total)}.</b> {nome} não tem cobrança do mês seguinte para levar {sobras.extras.length + sobras.taxas.length === 1 ? "esse valor" : "esses valores"}.</p>
+              <p><b>{textoDasSobras(sobras)} sem cobrança: {brl(sobras.total)}.</b> {nome} não tem cobrança do mês seguinte para levar {sobras.extras.length + sobras.taxas.length + (sobras.taxi?.length ?? 0) === 1 ? "esse valor" : "esses valores"}.</p>
               <p className="g-p">{sobrasNoMes ? `Entra na cobrança de ${nomeMes(deIsoDia(mesFim))}, que ainda não foi paga.` : `Vira uma cobrança à parte (acerto da saída), em Cobranças e em A receber, vencendo hoje.`}</p>
               {feitas.sobras ? <p className="g-pp"><Check size={14} aria-hidden /> {feitas.sobras.texto}</p> : (
                 <div className="g-fila">

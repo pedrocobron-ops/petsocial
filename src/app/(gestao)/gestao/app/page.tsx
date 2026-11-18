@@ -125,6 +125,8 @@ export default function Hoje() {
       concluidos: h.contagens.concluidos,
       lembrados: h.contagens.lembrados,
       estadiasTotal: h.contagens.estadias,
+      // o passo "primeiro check-in" só conta o pet que entrou (reserva aceita pelo link não é check-in)
+      checkinsTotal: h.contagens.checkins ?? h.contagens.estadias,
       produtosTotal: h.contagens.produtos,
       entrou: Math.round((h.entradas.filter((l) => l.tipo === "entrada").reduce((s, l) => s + Number(l.valor), 0) + ajusteDe(hojeIso)) * 100) / 100,
       ajusteHoje: ajusteDe(hojeIso),
@@ -204,7 +206,7 @@ export default function Hoje() {
   const [agoraNao, setAgoraNao] = useState(() => lerLembrado(chaveAgoraNao(petshop.id)) === hojeIso);
   const cartaoTeste = testePerto && souDono && (!liberado || !agoraNao);
   const pp = usePrimeirosPassos(
-    dados ? { pets: dados.pets, horarios: dados.totalAgs, concluidos: dados.concluidos, lembretes: dados.lembrados, amanha: dados.amanha, estadias: dados.estadiasTotal, produtos: dados.produtosTotal } : null,
+    dados ? { pets: dados.pets, horarios: dados.totalAgs, concluidos: dados.concluidos, lembretes: dados.lembrados, amanha: dados.amanha, estadias: dados.checkinsTotal, produtos: dados.produtosTotal } : null,
     () => setLembretes(true),
   );
   const cartaoPassos = !cartaoTeste && pp.estado !== "some";
@@ -234,7 +236,7 @@ export default function Hoje() {
   const fraseDoPasso = passoNovo ? `Tudo pronto para começar. O próximo passo é ${passoNovo.texto.charAt(0).toLowerCase()}${passoNovo.texto.slice(1)}${passoNovo.id === "pet" && (souDono || eu.papel === "gerente") ? ", ou trazer os seus clientes de uma planilha" : ""}.` : null;
   const frase = !dados ? "" : fraseDoPasso ?? (contaNova && frente === "loja" ? "Tudo pronto para começar. O primeiro passo é cadastrar o que você vende."
     : contaNova ? (posso("clientes") ? (souDono || eu.papel === "gerente" ? "Tudo pronto para começar. O primeiro passo é cadastrar um pet, ou trazer os seus clientes de uma planilha." : "Tudo pronto para começar. O primeiro passo é cadastrar um pet.") : "Tudo pronto para começar.")
-    : frente === "loja" ? `${dados.acabando.length === 0 ? "Nenhum produto acabando" : dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}.${vendas ? (vendas.quantas ? ` Hoje ${vendas.quantas === 1 ? "saiu 1 venda" : `saíram ${vendas.quantas} vendas`} de produtos: ${brl(vendas.total)}.` : " Nenhuma venda de produtos hoje, por enquanto.") : ""}${ativos.length ? ` Na agenda, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
+    : frente === "loja" ? `${dados.acabando.length === 0 ? "Nenhum produto acabando" : dados.acabando.length === 1 ? "1 produto está acabando" : `${dados.acabando.length} produtos estão acabando`}.${vendas ? (vendas.quantas ? ` Hoje ${vendas.quantas === 1 ? "saiu 1 venda" : `saíram ${vendas.quantas} vendas`} no balcão: ${brl(vendas.total)} (produtos vendidos na conta do atendimento entram em Relatórios).` : " Nenhuma venda no balcão hoje, por enquanto.") : ""}${ativos.length ? ` Na agenda, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : frente === "casa" ? `${temCasa ? linhaCasa : "Nenhum pet na casa agora"}.${ativos.length ? ` No banho e tosa, ${n(ativos.length, "atendimento", "atendimentos")} hoje.` : ""}`
     : soCasa && !ativos.length ? (temCasa ? `${linhaCasa}.` : `Nenhum pet na casa agora.`)
     : !ativos.length ? `Nenhum horário marcado para hoje.${proximoDia ? ` O próximo é ${proximoDia.pets?.nome ?? "um pet"}, ${quandoFoi(proximoDia.inicio)}.` : ""}${linhaCasa ? ` ${linhaCasa}.` : ""}`

@@ -48,17 +48,22 @@ export const IDADE_IDOSO = 8;
 export const TERMO_PADRAO = `Conferi com a equipe como {pet} chegou hoje: o temperamento, as alergias e os cuidados, as feridas, pulgas, carrapatos ou nós que já existiam antes do atendimento e os pertences que deixei.
 Contei tudo o que sei sobre a saúde de {pet}. Entendo que pets idosos, doentes, agitados ou com medo podem se cansar ou se estressar com o banho, a secagem, a tosa ou a estadia, mesmo com todo o cuidado. Se a equipe perceber que {pet} não está bem, ela pode parar o que estiver fazendo e vai me avisar.`;
 
+/** O texto padrão com as palavras do negócio: quem não tem banho e tosa não lê "banho, secagem e tosa" (só a estadia). */
+export function termoPadraoPara(petshop: { modulos?: string[] | null }): string {
+  const semBanho = Array.isArray(petshop.modulos) && petshop.modulos.length > 0 && !petshop.modulos.includes("banho_tosa");
+  return semBanho ? TERMO_PADRAO.replace("com o banho, a secagem, a tosa ou a estadia", "com a estadia").replace("parar o que estiver fazendo", "parar a atividade") : TERMO_PADRAO;
+}
 export function exigirDo(petshop: { opcoes?: unknown }): Exigir {
   const v = opcao<string>(petshop, CHAVE_EXIGIR, "idosos");
   return v === "todos" || v === "opcional" ? v : "idosos";
 }
-export const termoDoPetshop = (petshop: { opcoes?: unknown }) => opcao<string>(petshop, CHAVE_TERMO, "").trim() || TERMO_PADRAO;
+export const termoDoPetshop = (petshop: { opcoes?: unknown; modulos?: string[] | null }) => opcao<string>(petshop, CHAVE_TERMO, "").trim() || termoPadraoPara(petshop);
 /** O texto que o tutor lê, com o nome do pet. */
 export const termoComPet = (modelo: string, pet: string) => modelo.replace(/\{pet\}/g, pet.trim() || "o pet").trim();
 
 /** Anos completos pela data de nascimento (null sem data). */
 export function anosDe(nascimento: string | null | undefined, hoje = new Date()): number | null {
-  if (!nascimento || !/^\d{4}-\d{2}-\d{2}/.test(nascimento)) return null;
+  if (!nascimento || !/^\d{4}-\d{2}-\d{2}/.test(nascimento) || nascimento.startsWith("1904-")) return null;
   const n = deIsoDia(nascimento.slice(0, 10));
   let a = hoje.getFullYear() - n.getFullYear();
   if (hoje.getMonth() < n.getMonth() || (hoje.getMonth() === n.getMonth() && hoje.getDate() < n.getDate())) a--;
@@ -86,12 +91,17 @@ export const COLS_ENTRADA = "id, petshop_id, pet_id, agendamento_id, estadia_id,
 
 /** Os pertences para devolver, por extenso: ["Coleira", "Caminha", "Casinha azul"]. */
 export function pertencesDe(e: Pick<Entrada, "pertences" | "pertences_outros">): string[] {
-  return [...rotulos(PERTENCES, e.pertences), ...(e.pertences_outros?.trim() ? [e.pertences_outros.trim()] : [])];
+  const outros = e.pertences_outros?.trim() ?? "";
+  const minus = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  // "Remédio" marcado e "remédio da artrose" escrito: fica só "remédio da artrose" (não "remédio e remédio da artrose")
+  const marcados = rotulos(PERTENCES, e.pertences).filter((r) => !outros || !minus(outros).includes(minus(r)));
+  return [...marcados, ...(outros ? [outros] : [])];
 }
 /** "Devolver: coleira, caminha e casinha azul" (vazio: nada a devolver). */
 export function textoDevolver(e: Pick<Entrada, "pertences" | "pertences_outros">): string {
   const l = pertencesDe(e);
-  return l.length ? `Devolver: ${emLista(l.map((x, i) => (i < e.pertences.length ? x.toLowerCase() : x)))}` : "";
+  const marcados = l.length - (e.pertences_outros?.trim() ? 1 : 0);
+  return l.length ? `Devolver: ${emLista(l.map((x, i) => (i < marcados ? x.toLowerCase() : x)))}` : "";
 }
 /** O link de aceite ainda vale? */
 export const linkValendo = (e: Pick<Entrada, "token" | "token_expira">, agora = new Date()) => Boolean(e.token && e.token_expira && new Date(e.token_expira) > agora);
@@ -140,7 +150,43 @@ async function prepararFoto(f: File): Promise<Blob> {
   } catch { throw new Error(`Não consegui ler "${f.name}". Escolha uma foto JPG ou PNG.`); }
 }
 
-export type FotoDaEntrada = { caminho: string; url: string };
+/**
+ * Uma foto da folha de entrada. `pendente`: escolhida, mas ainda não subiu (ou não conseguiu subir). Ela continua na folha
+ * (com a prévia do aparelho) para tentar de novo, e a entrada pode ser salva sem ela: a foto nunca some sem aviso.
+ */
+export type FotoDaEntrada = { caminho: string; url: string; pendente?: { arquivo: Blob; estado: "subindo" | "falhou"; erro?: string } };
+
+/** Reduz a foto no aparelho (o erro aqui é da foto, não da internet: não adianta tentar de novo). */
+export const prepararFotoDaEntrada = prepararFoto;
+
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Desiste de uma tentativa que passa disto (internet fraca): a próxima tentativa começa do zero. */
+export const TEMPO_DA_FOTO_MS = 20000;
+
+/**
+ * Sobe a foto já reduzida, tentando de novo quando a internet ou o servidor falham (até 3 vezes, com uma pausa entre elas).
+ * Cada tentativa vai para um arquivo novo: uma tentativa que demorou e chegou depois fica sem uso e sai na faxina.
+ */
+export async function subirFotoDaEntrada(sb: Banco, petshopId: string, blob: Blob, tentativas = 3, tempo = TEMPO_DA_FOTO_MS): Promise<string> {
+  let ultimo: unknown = null;
+  for (let i = 0; i < tentativas; i++) {
+    if (i > 0) await esperar(1000 * i);
+    const caminho = `${petshopId}/${crypto.randomUUID()}.jpg`;
+    try {
+      const up = await Promise.race([
+        sb.storage.from(BUCKET_ENTRADA).upload(caminho, blob, { contentType: "image/jpeg" }),
+        esperar(tempo).then(() => ({ error: { message: "tempo esgotado" } })),
+      ]);
+      if (!up.error) return caminho;
+      if (up.error.message.includes("size")) throw Object.assign(new Error("A foto ficou grande demais."), { final: true });
+      ultimo = up.error;
+    } catch (e) {
+      if ((e as { final?: boolean }).final) throw e;
+      ultimo = e;
+    }
+  }
+  throw new Error(`A foto não subiu${ultimo ? " (a internet ou o servidor demoraram)" : ""}. Ela continua na folha: toque em Tentar de novo.`);
+}
 
 /** Reduz a foto no aparelho (até 1600 px, JPEG) e sobe para o bucket privado. */
 export async function enviarFotoDaEntrada(sb: Banco, petshopId: string, f: File): Promise<FotoDaEntrada> {

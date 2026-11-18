@@ -42,7 +42,9 @@ export function FolhaFotos({ estadia: e, aoFechar }: { estadia: EstadiaComTutor;
   const camera = useRef<HTMLInputElement>(null);
   const galeria = useRef<HTMLInputElement>(null);
   const [legenda, setLegenda] = useState("");
-  const [enviando, setEnviando] = useState<{ feitas: number; total: number } | null>(null);
+  const [enviando, setEnviando] = useState<{ feitas: number; total: number; lenta?: boolean } | null>(null);
+  // a sessão do login já é conferida (e renovada, se preciso) quando a folha abre: a primeira foto não espera por isso
+  useEffect(() => { void sb.auth.getSession().catch(() => null); }, [sb]);
   const { link, erro: erroLink, garantir } = useLinkDoTutor(tutor?.id, true);
 
   const { dados, carregando, erro, recarregar } = useDados(() => fotosDoDia(sb, petshop.id, [e.pet_id], hoje), [petshop.id, e.pet_id, hoje]);
@@ -56,7 +58,8 @@ export function FolhaFotos({ estadia: e, aoFechar }: { estadia: EstadiaComTutor;
     const vao = lista.slice(0, cabem);
     if (!vao.length) return avisarErro(new Error(`${pet.nome} já tem ${MAX_FOTOS_DIA} fotos hoje. Apague uma para pôr outra.`));
     setEnviando({ feitas: 0, total: vao.length });
-    const r = await enviarFotos(sb, { petshopId: petshop.id, estadiaId: e.id, petId: e.pet_id, dia: hoje, legenda }, vao, (feitas) => setEnviando({ feitas, total: vao.length }));
+    const r = await enviarFotos(sb, { petshopId: petshop.id, estadiaId: e.id, petId: e.pet_id, dia: hoje, legenda }, vao,
+      (feitas) => setEnviando((x) => ({ feitas, total: vao.length, lenta: x?.lenta })), () => setEnviando((x) => (x ? { ...x, lenta: true } : x)));
     setEnviando(null);
     if (r.enviadas) { avisar(r.enviadas === 1 ? "Foto guardada." : `${r.enviadas} fotos guardadas.`); setLegenda(""); avisarMudanca(); }
     if (r.erros.length) avisarErro(new Error(r.erros.join(" ")));
@@ -100,7 +103,7 @@ export function FolhaFotos({ estadia: e, aoFechar }: { estadia: EstadiaComTutor;
           <span>Recado para as próximas fotos <small>(opcional)</small></span>
           <input className="g-input" maxLength={200} value={legenda} placeholder="Ex.: brincando com a Mel no quintal" onChange={(x) => setLegenda(x.target.value)} />
         </label>
-        {enviando && <p className="g-muted g-p" role="status">Mandando {enviando.feitas < enviando.total ? `${enviando.feitas + 1} de ${enviando.total}` : "as fotos"}…</p>}
+        {enviando && <p className="g-muted g-p" role="status">Mandando {enviando.feitas < enviando.total ? `${enviando.feitas + 1} de ${enviando.total}` : "as fotos"}…{enviando.lenta ? " A internet está lenta: tentando de novo." : ""}</p>}
         {erro && <p className="g-erro" role="alert">{erro}</p>}
         {carregando && !dados ? <Esqueleto linhas={2} /> : fotos.length ? (
           <ul className="g-cs-fotos" aria-label={`Fotos de hoje de ${pet.nome}`}>

@@ -7,6 +7,8 @@
  * Os arquivos não são guardados: PDF grande passa pela pasta temporária (caderno-tmp) e é apagado logo depois de ler.
  */
 
+import { destinoDaLinha } from "./tabela-precos";
+
 export type TipoDaPagina = "clientes" | "dividas" | "agenda" | "precos" | "vacinas" | "auto";
 export const TIPOS_DA_PAGINA: { id: TipoDaPagina; rotulo: string; apoio: string }[] = [
   { id: "clientes", rotulo: "Clientes e pets", apoio: "Nome, telefone, pets." },
@@ -41,7 +43,13 @@ export type ClienteLido = { nome: string; telefone: string; pets: PetLido[]; obs
 export type DividaLida = { cliente_nome: string; telefone: string; valor: number | null; desde: string | null; desde_texto: string; descricao: string; duvida: boolean };
 export type HorarioLido = { dia: string | null; dia_texto: string; hora: string | null; pet_nome: string; tutor_nome: string; servico: string; duvida: boolean };
 export type AreaLida = "banho_tosa" | "creche" | "hotel" | "loja";
-export type ServicoLido = { nome: string; area: AreaLida; duracao_min: number | null; preco_p: number | null; preco_m: number | null; preco_g: number | null; preco_gg: number | null; duvida: boolean };
+/**
+ * Para onde vai cada linha da tabela de preços (`destinoDaLinha`, em tabela-precos.ts): serviço da agenda, a diária da creche,
+ * a diária do hotel ou um modelo de plano de mensalista (`vezes`: dias por semana). Creche e hotel nunca viram serviço da agenda.
+ */
+export type DestinoDoPreco = "servico" | "creche_diaria" | "creche_plano" | "hotel_diaria" | "pacote";
+export type ServicoLido = { nome: string; area: AreaLida; duracao_min: number | null; preco_p: number | null; preco_m: number | null; preco_g: number | null; preco_gg: number | null; duvida: boolean;
+  destino?: DestinoDoPreco; vezes?: number | null };
 export type TipoCuidado = "vacina" | "vermifugo" | "antipulgas" | "outro";
 /** Da carteirinha: `vence` só quando a data está escrita (nunca calculada). */
 export type CuidadoLido = { tipo: TipoCuidado; nome: string; aplicado: string | null; aplicado_texto: string; vence: string | null; vence_texto: string; veterinario: string; duvida: boolean };
@@ -144,11 +152,15 @@ export function limparLeitura(bruto: unknown, hoje: string): Leitura {
     const porte = { preco_p: valor(v.preco_p), preco_m: valor(v.preco_m), preco_g: valor(v.preco_g), preco_gg: valor(v.preco_gg) };
     const temPorte = Object.values(porte).some((n) => n != null);
     const precos = temPorte ? porte : { preco_p: unico, preco_m: unico, preco_g: unico, preco_gg: unico };
-    const area = texto(v.area, 12);
-    const dur = typeof v.duracao_min === "number" && Number.isFinite(v.duracao_min) && v.duracao_min >= 5 && v.duracao_min <= 1440 ? Math.round(v.duracao_min) : null;
+    const area = (["creche", "hotel", "loja"].includes(texto(v.area, 12)) ? texto(v.area, 12) : "banho_tosa") as AreaLida;
+    const nome = texto(v.nome, 80);
+    // creche e hotel nunca viram serviço de 1 hora na agenda: a leitura e o nome decidem (o nome vale mesmo se a leitura errar)
+    const { destino, vezes } = destinoDaLinha(nome, area, texto(v.cobranca, 10), typeof v.vezes_semana === "number" ? v.vezes_semana : null);
+    const dur = destino === "servico" && typeof v.duracao_min === "number" && Number.isFinite(v.duracao_min) && v.duracao_min >= 5 && v.duracao_min <= 1440 ? Math.round(v.duracao_min) : null;
     return {
-      nome: texto(v.nome, 80), area: (["creche", "hotel", "loja"].includes(area) ? area : "banho_tosa") as AreaLida, duracao_min: dur, ...precos,
-      duvida: sim(v.certeza) || Object.values(precos).every((n) => n == null),
+      nome, area: destino === "creche_diaria" || destino === "creche_plano" ? "creche" : destino === "hotel_diaria" ? "hotel" : area, duracao_min: dur, ...precos,
+      duvida: sim(v.certeza) || Object.values(precos).every((n) => n == null) || (destino === "creche_plano" && !vezes),
+      destino, vezes,
     };
   }).filter((x) => x.nome);
   const vacinas: CuidadoLido[] = lista(b.vacinas, 60).map((x) => {

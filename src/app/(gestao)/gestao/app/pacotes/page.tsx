@@ -17,13 +17,14 @@ import { brl, dataCompleta, dataCurta, dataCurtaOuAno, deIsoDia, inicioDoDia, is
 import { usaModulo } from "@/lib/gestao/modulos";
 import { LinhaAcabando } from "@/components/gestao/pacote-acabando";
 import { lerPacotesAcabando, PACOTE_ACABOU_DIAS, PACOTE_VENCENDO_DIAS } from "@/lib/gestao/pacote-acabando";
+import { comPrecosPorte, PORTES_DO_PACOTE, precoDoPacote, resumoPorPorte, sugestaoPorPorte, type PortePacote, type PrecosPorte } from "@/lib/gestao/pacote-porte";
 import "./pacotes.css";
 
 /** Exemplo de nome de pacote, no assunto do pet shop: quem não faz banho e tosa não lê "4 banhos no mês". */
 const exemploDePacote = (petshop: { modulos?: string[] | null }) =>
   usaModulo(petshop, "banho_tosa") ? "4 banhos no mês" : usaModulo(petshop, "creche") ? "10 diárias de creche" : usaModulo(petshop, "hotel") ? "5 diárias de hotel" : "4 banhos no mês";
 
-type PetDoPacote = Pick<Pet, "id" | "nome" | "foto" | "especie"> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
+type PetDoPacote = Pick<Pet, "id" | "nome" | "foto" | "especie"> & Partial<Pick<Pet, "porte">> & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
 type PacoteDoPet = PacoteCliente & { pets: PetDoPacote | null };
 
 const FILTROS = [
@@ -58,6 +59,9 @@ function KpiAcao({ ativo, aoTocar, children }: { ativo: boolean; aoTocar: () => 
   );
 }
 
+/** O modelo de pacote com os preços por porte (só para quem vê o preço). */
+type ModeloPacote = Pacote & { precos_porte?: PrecosPorte | null };
+
 type Venda = { pet?: PetDoPacote; base?: Pick<PacoteCliente, "pacote_id" | "nome" | "servico_id" | "total" | "preco"> & { validade: number | null } };
 
 export default function Pacotes() {
@@ -67,21 +71,21 @@ export default function Pacotes() {
   const [aba, setAba] = useState<"clientes" | "modelos">("clientes");
   const [filtro, setFiltro] = useState<Filtro>("ativos");
   const [venda, setVenda] = useState<Venda | null>(null);
-  const [modelo, setModelo] = useState<Pacote | "novo" | null>(null);
+  const [modelo, setModelo] = useState<ModeloPacote | "novo" | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
 
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [modelos, vendidos] = await Promise.all([
       sb.from("pacotes").select(COLS_PACOTE).eq("petshop_id", petshop.id).order("ativo", { ascending: false }).order("nome"),
-      lerTudo((de, ate, contar) => sb.from("pacotes_clientes").select(`${COLS_PACOTE_CLIENTE}, pets(id, nome, foto, especie, clientes(id, nome, telefone))`, contando(contar)).eq("petshop_id", petshop.id)
+      lerTudo((de, ate, contar) => sb.from("pacotes_clientes").select(`${COLS_PACOTE_CLIENTE}, pets(id, nome, foto, especie, porte, clientes(id, nome, telefone))`, contando(contar)).eq("petshop_id", petshop.id)
         .order("criado_em", { ascending: false }).order("id").range(de, ate)).then((data) => ({ data, error: null })),
     ]);
     // o preço só vem para quem cuida de pacotes ou vê o financeiro
     const [m, v] = await Promise.all([
-      comPrecosDePacote(sb, petshop.id, ok(modelos) as unknown as { id: string }[]),
+      comPrecosDePacote(sb, petshop.id, ok(modelos) as unknown as { id: string }[]).then((l) => comPrecosPorte(sb, petshop.id, l)),
       comPrecosDePacote(sb, petshop.id, ok(vendidos) as unknown as { id: string }[]),
     ]);
-    return { modelos: m as unknown as Pacote[], vendidos: v as unknown as PacoteDoPet[] };
+    return { modelos: m as unknown as ModeloPacote[], vendidos: v as unknown as PacoteDoPet[] };
   }, [petshop.id]);
 
   const modelos = useMemo(() => dados?.modelos ?? [], [dados]);
@@ -157,7 +161,7 @@ export default function Pacotes() {
     setVenda({ pet: p.pets, base: { pacote_id: doModelo?.ativo ? doModelo.id : null, nome: p.nome, servico_id: p.servico_id, total: p.total, preco: p.preco, validade } });
   }
 
-  async function ativarModelo(m: Pacote, ativo: boolean) {
+  async function ativarModelo(m: ModeloPacote, ativo: boolean) {
     if (somenteLeitura()) return;
     if (!ativo && !(await confirmar({ titulo: `Desativar "${m.nome}"?`, texto: "Ele some da hora de vender. Quem já comprou continua com o pacote.", confirmar: "Desativar", perigo: true }))) return;
     try {
@@ -300,7 +304,7 @@ export default function Pacotes() {
                         {!m.ativo && <span className="g-tag">desativado</span>}
                       </span>
                     </span>
-                    <b className="preco g-tab">{brl(m.preco)}</b>
+                    <b className="preco g-tab">{m.precos_porte ? <small style={{ display: "block", fontSize: ".8rem" }}>{resumoPorPorte(m.precos_porte, brl)}</small> : brl(m.preco)}</b>
                   </button>
                   <div className="pe">
                     {m.ativo
@@ -324,7 +328,7 @@ export default function Pacotes() {
 
 /* ---------- modelo de pacote ---------- */
 
-function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: Pacote | null; aoFechar: () => void; aoGravar: () => void }) {
+function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: ModeloPacote | null; aoFechar: () => void; aoGravar: () => void }) {
   const { sb, petshop, servicos } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const [nome, setNome] = useState(modelo?.nome ?? "");
@@ -332,8 +336,14 @@ function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: Pacote | null; aoF
   const [quantidade, setQuantidade] = useState(String(modelo?.quantidade ?? 4));
   const [validade, setValidade] = useState(String(modelo?.validade_dias ?? 30));
   const [preco, setPreco] = useState<number | null>(modelo ? Number(modelo.preco) : null);
+  // preço por porte (opcional): na venda vale o do porte do pet
+  const [porPorte, setPorPorte] = useState(Boolean(modelo?.precos_porte));
+  const [precosPorte, setPrecosPorte] = useState<PrecosPorte>(modelo?.precos_porte ?? {});
   const [salvando, setSalvando] = useState(false);
   const opcoes = servicos.filter((s) => s.ativo || s.id === modelo?.servico_id);
+  const doServico = servicos.find((s) => s.id === servico);
+  const sugestao = sugestaoPorPorte(doServico, Number(quantidade));
+  const temSugestao = Object.keys(sugestao).length > 0;
 
   async function salvar() {
     const q = Number(quantidade), v = Number(validade);
@@ -342,9 +352,12 @@ function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: Pacote | null; aoF
     if (!Number.isInteger(v) || v < 1) { avisarErro("A validade precisa ser de 1 dia ou mais."); return; }
     const precoRuim = erroDeValor(preco, "O preço");
     if (precoRuim) { avisarErro(precoRuim); return; }
+    const porte = porPorte ? Object.fromEntries(PORTES_DO_PACOTE.filter((p) => precosPorte[p] != null).map((p) => [p, precosPorte[p]!])) as PrecosPorte : null;
+    if (porPorte && !Object.keys(porte ?? {}).length) { avisarErro("Escreva o preço de pelo menos um porte, ou desligue Preço por porte."); return; }
+    if (porte && PORTES_DO_PACOTE.some((p) => porte[p] != null && erroDeValor(porte[p]!, `O preço do porte ${p}`))) { avisarErro("Confira os preços por porte."); return; }
     setSalvando(true);
     try {
-      const campos = { nome: nome.trim(), servico_id: servico || null, quantidade: q, validade_dias: v, preco: preco ?? 0 };
+      const campos = { nome: nome.trim(), servico_id: servico || null, quantidade: q, validade_dias: v, preco: preco ?? 0, precos_porte: porte && Object.keys(porte).length ? porte : null };
       if (modelo) ok(await sb.from("pacotes").update(campos).eq("id", modelo.id).eq("petshop_id", petshop.id).select("id").single());
       else ok(await sb.from("pacotes").insert({ ...campos, petshop_id: petshop.id }).select("id").single());
       avisar(modelo ? "Modelo atualizado." : "Modelo criado.");
@@ -370,7 +383,25 @@ function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: Pacote | null; aoF
           <Campo rotulo="Quantidade"><input className="g-input g-tab" inputMode="numeric" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} /></Campo>
           <Campo rotulo="Validade (dias)"><input className="g-input g-tab" inputMode="numeric" value={validade} onChange={(e) => setValidade(e.target.value)} /></Campo>
         </div>
-        <Campo rotulo="Preço" erro={erroDeValor(preco, "O preço")}><CampoDinheiro valor={preco} aoMudar={setPreco} /></Campo>
+        <Campo rotulo={porPorte ? "Preço para pet sem porte na ficha" : "Preço"} erro={erroDeValor(preco, "O preço")}><CampoDinheiro valor={preco} aoMudar={setPreco} /></Campo>
+        <label className="g-check">
+          <input type="checkbox" checked={porPorte} onChange={(e) => { setPorPorte(e.target.checked); if (e.target.checked && !Object.keys(precosPorte).length && temSugestao) setPrecosPorte(sugestao); }} />
+          <span>Preço por porte</span>
+        </label>
+        {porPorte && (
+          <div className="g-pilha p" role="group" aria-label="Preço por porte">
+            <div className="dupla">
+              {PORTES_DO_PACOTE.map((p) => (
+                <Campo key={p} rotulo={`Porte ${p}`}>
+                  <CampoDinheiro valor={precosPorte[p] ?? null} rotulo={`Preço do pacote para porte ${p}`}
+                    aoMudar={(v) => setPrecosPorte((x) => { const n: PrecosPorte = { ...x }; if (v == null) delete n[p as PortePacote]; else n[p as PortePacote] = v; return n; })} />
+                </Campo>
+              ))}
+            </div>
+            {temSugestao && <button type="button" className="g-btn fantasma p" style={{ justifySelf: "start" }} onClick={() => setPrecosPorte(sugestao)}>Sugerir pela tabela: {quantidade} × o preço de {doServico?.nome ?? "o serviço"}</button>}
+            <small className="g-muted">Na venda vale o preço do porte do pet. Porte em branco (ou pet sem porte na ficha): o preço de cima.</small>
+          </div>
+        )}
       </div>
     </Folha>
   );
@@ -378,7 +409,7 @@ function FormModelo({ modelo, aoFechar, aoGravar }: { modelo: Pacote | null; aoF
 
 /* ---------- vender pacote ---------- */
 
-function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; modelos: Pacote[]; aoFechar: () => void; aoGravar: (vendido: PacoteDoPet | null) => void }) {
+function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; modelos: ModeloPacote[]; aoFechar: () => void; aoGravar: (vendido: PacoteDoPet | null) => void }) {
   const { sb, petshop, servicos, vejoFinanceiro, cuidoDoFinanceiro } = useGestao();
   const { avisar, avisarErro, confirmar } = useAvisos();
   // preço travado (opção do dono): quem só opera o caixa vende o pacote da lista, pelo preço da lista
@@ -394,7 +425,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
   const [preco, setPreco] = useState<number | null>(() => {
     if (!inicio.base) return null;
     const modelo = precoTravado ? modelos.find((m) => m.id === inicio.base!.pacote_id) : null;
-    return modelo ? Number(modelo.preco) : Number(inicio.base.preco);
+    return modelo ? precoDoPacote(modelo, inicio.pet?.porte) : Number(inicio.base.preco);
   });
   const [compra, setCompra] = useState(isoDia(new Date()));
   // mesmo recebimento da comanda: uma forma, dividido em até três, ou "Cliente paga depois" (vira conta a receber)
@@ -411,13 +442,22 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
     if (!doModeloFixo || !modeloAtual) return;
     setTotal(String(modeloAtual.quantidade)); setValidade(String(modeloAtual.validade_dias)); setServico(modeloAtual.servico_id ?? "");
   }, [doModeloFixo, modeloAtual]);
-  function escolherModelo(m: Pacote | null) {
+  // trocou o pet com o modelo já escolhido: o preço volta a ser o do porte do novo pet
+  const petId = pet?.id ?? null;
+  const [petDoPreco, setPetDoPreco] = useState(petId);
+  useEffect(() => {
+    if (petId === petDoPreco) return;
+    setPetDoPreco(petId);
+    if (modeloAtual && pet) setPreco(precoDoPacote(modeloAtual, pet.porte));
+  }, [petId, petDoPreco, modeloAtual, pet]);
+  function escolherModelo(m: ModeloPacote | null) {
     setPacoteId(m?.id ?? null);
     setNome(m?.nome ?? "");
     setServico(m?.servico_id ?? "");
     setTotal(String(m?.quantidade ?? 4));
     setValidade(String(m?.validade_dias ?? 30));
-    setPreco(m ? Number(m.preco) : null);
+    // preço por porte: o do porte deste pet
+    setPreco(m ? precoDoPacote(m, pet?.porte) : null);
     setEscolhido(true);
   }
 
@@ -539,7 +579,7 @@ function VenderPacote({ inicio, modelos, aoFechar, aoGravar }: { inicio: Venda; 
             {modelos.map((m) => (
               <button key={m.id} type="button" className="g-linha" onClick={() => escolherModelo(m)}>
                 <span className="t"><b>{m.nome}</b><span>{m.quantidade}x · vale {m.validade_dias} dias</span></span>
-                <span className="d"><b>{brl(m.preco)}</b></span>
+                <span className="d"><b>{brl(precoDoPacote(m, pet.porte))}</b>{m.precos_porte && pet.porte && m.precos_porte[pet.porte as PortePacote] != null ? <small className="g-muted" style={{ display: "block" }}>porte {pet.porte}</small> : null}</span>
               </button>
             ))}
           </div>

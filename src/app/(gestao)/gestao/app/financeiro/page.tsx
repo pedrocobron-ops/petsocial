@@ -14,6 +14,7 @@ import {
   TagAlterado, textoJaRecebido, type Cel, type Tipo,
 } from "@/components/gestao/financeiro/comum";
 import CustoDasVendas from "@/components/gestao/financeiro/custo-vendas";
+import PorServico from "@/components/gestao/financeiro/por-servico";
 import CartaoMaquininha from "@/components/gestao/financeiro/maquininha";
 import AlteracoesDoPeriodo from "@/components/gestao/financeiro/alteracoes-periodo";
 import ContasFixas, { FolhaContaFixa } from "@/components/gestao/financeiro/contas-fixas";
@@ -59,7 +60,8 @@ const ehDevolucao = (l: Pick<Lancamento, "tipo" | "categoria">) => l.tipo === "s
 
 /**
  * Soma por categoria. Uma conta com serviço, produto e extra é repartida: o serviço fica na categoria do lançamento,
- * o produto em "Venda de produtos" e o extra em "Extras", com o desconto rateado na proporção de cada parte.
+ * o produto em "Venda de produtos" e o extra (taxas, leva e traz, outros) em "Taxas e extras", com o desconto rateado na proporção
+ * de cada parte. Sinal já pago e crédito usado (linhas negativas) abatem primeiro o serviço: a taxa de R$ 40 aparece como R$ 40.
  */
 function porCategoria(lista: Lancamento[], petshop: { modulos?: string[] | null }) {
   const mapa = new Map<string, number>();
@@ -69,7 +71,7 @@ function porCategoria(lista: Lancamento[], petshop: { modulos?: string[] | null 
     if (!partes) { por(categoriaAtual(l.categoria, petshop), Number(l.valor)); continue; }
     por(categoriaAtual(l.categoria, petshop), partes.servico);
     por("Venda de produtos", partes.produto);
-    por("Extras", partes.extra);
+    por("Taxas e extras", partes.extra);
   }
   return [...mapa].map(([nome, valor]) => ({ nome, valor: Math.round(valor * 100) / 100 })).sort((a, b) => b.valor - a.valor);
 }
@@ -339,6 +341,7 @@ function Financeiro() {
                   <div className="g-pilha">
                     <Categorias titulo="De onde veio" icone={ArrowDownLeft} tom="menta" total={contas.bruto} linhas={contas.entradasPorCategoria} vazio="Nenhuma entrada neste mês."
                       nota={contas.devolvido > 0 ? `Antes das devoluções. Devolvido aos tutores: − ${brl(contas.devolvido)}.` : undefined} />
+                    <PorServico inicio={inicio} fim={fim} />
                     <Categorias titulo="Para onde foi" icone={ArrowUpRight} tom="rosa" total={contas.saiu} linhas={contas.saidasPorCategoria} vazio="Nenhuma saída neste mês." quente />
                     <CustoDasVendas inicio={inicio} fim={fim} doMes={dados.doMes} resultado={resultado} mesAtual={mesAtual}
                       entrouDeProdutos={contas.entradasPorCategoria.find((c) => c.nome === "Venda de produtos")?.valor ?? 0} />

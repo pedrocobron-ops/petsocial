@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ScrollText } from "lucide-react";
-import { EXEMPLO_DE_REGRAS, MAX_HORAS, MAX_TERMOS, OPCOES_LINK as K, opcoesDoLink, prazoPorExtenso } from "@/lib/gestao/link-opcoes";
+import { exemploDeRegras, MAX_HORAS, MAX_TERMOS, OPCOES_LINK as K, opcoesDoLink, prazoPorExtenso } from "@/lib/gestao/link-opcoes";
 import { opcao, salvarOpcoes } from "@/lib/gestao/opcoes";
 import { OPCAO_LINK_IA } from "@/lib/gestao/link-ia-comum";
 import { useGestao } from "../contexto";
@@ -79,7 +79,7 @@ export default function OpcoesDoLink() {
             <>
               <form className="g-form" onSubmit={(e) => { e.preventDefault(); void gravar({ [K.termosTexto]: textoLimpo }, textoLimpo ? "Regras salvas. Quem pedir daqui em diante aceita este texto." : "Texto apagado."); }}>
                 <Campo rotulo="Suas regras" dica={`Escreva com as suas palavras. O sistema não escreve nem confere este texto. ${MAX_TERMOS - texto.length} letras sobrando.`}>
-                  <textarea className="g-textarea" rows={5} value={texto} maxLength={MAX_TERMOS} placeholder={EXEMPLO_DE_REGRAS} onChange={(e) => setTexto(e.target.value)} />
+                  <textarea className="g-textarea" rows={5} value={texto} maxLength={MAX_TERMOS} placeholder={exemploDeRegras(petshop)} onChange={(e) => setTexto(e.target.value)} />
                 </Campo>
                 <div><button className="g-btn sec" disabled={ocupado || !mudouTexto}>{ocupado ? "Salvando…" : "Salvar regras"}</button></div>
               </form>

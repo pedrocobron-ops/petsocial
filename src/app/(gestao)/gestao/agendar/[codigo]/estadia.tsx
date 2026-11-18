@@ -114,6 +114,10 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
   const [atraso, setAtraso] = useState<AtrasoDoLink | null>(null);
   // com a taxa de busca fora do horário ligada, dá para buscar depois do horário até esta hora ("21:00"); a hora da taxa vem junto
   const [buscaAte, setBuscaAte] = useState<{ ate: string; hora: string } | null>(null);
+  // a hora de entrada e de saída combinadas pelo hotel (Meu pet shop) e a chave Pix (com o sinal ligado)
+  const [horasLoja, setHorasLoja] = useState<{ entrada?: string; saida?: string } | null>(null);
+  const [pix, setPix] = useState<string | null>(null);
+  const mexeuNaHora = useRef(Boolean(rascunho));
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [pedidoId, setPedidoId] = useState<string | null>(null);
@@ -138,6 +142,29 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
     });
     return () => { vale = false; };
   }, [codigo, hotel]);
+  // o nome dos dias fechados (feriado), para a recusa dizer o porquê
+  const [nomesFechados, setNomesFechados] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!fechados?.size) return;
+    let vale = true;
+    void (banco() as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }).rpc("link_fechados_nomes", { p_codigo: codigo }).then(({ data, error }) => {
+      if (vale && !error && data && typeof data === "object") setNomesFechados(data as Record<string, string>);
+    });
+    return () => { vale = false; };
+  }, [codigo, fechados]);
+  /** "sexta, 20/11 (Consciência Negra)": com o nome que o dono deu ao dia fechado */
+  const diaFechadoComNome = (d: string) => `${dia(d)}${nomesFechados[d] ? ` (${nomesFechados[d]})` : ""}`;
+  // planos mensais da creche (só com a opção ligada em Meu pet shop): o tutor vê os planos antes do dia de experiência
+  const [planosLink, setPlanosLink] = useState<{ planos: { nome: string; vezes: number | null; valor: number | null }[]; pix: string | null } | null>(null);
+  useEffect(() => {
+    if (hotel) return;
+    let vale = true;
+    void banco().rpc("link_creche_planos", { p_codigo: codigo }).then(({ data, error }) => {
+      const x = data as { planos?: { nome: string; vezes: number | null; valor: number | string | null }[]; pix?: string | null } | null;
+      if (vale && !error && x?.planos?.length) setPlanosLink({ planos: x.planos.map((p) => ({ nome: String(p.nome), vezes: p.vezes == null ? null : Number(p.vezes), valor: p.valor == null ? null : Number(p.valor) })), pix: x.pix ? String(x.pix) : null });
+    });
+    return () => { vale = false; };
+  }, [codigo, hotel]);
   const podeExperiencia = Boolean(expLink?.ativo) && !hotel && !naEspera && entrada === saida;
 
   const dias = hotel ? entre(entrada, saida) : entre(entrada, saida) + 1;
@@ -146,7 +173,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
   const fala = (hhmm: string) => { const [h, m] = hhmm.split(":"); return m === "00" ? `${Number(h)}h` : `${Number(h)}h${m}`; };
   const erroDoDia = (d: string, hh: string, chegada: boolean): string | null => {
     if (!hotel || !d) return null;
-    if (fechados?.has(d) || !abreNoDia(horario, d)) return `Não abrimos em ${dia(d)}. Escolha outro dia para ${chegada ? "a chegada" : "buscar o pet"}.`;
+    if (fechados?.has(d) || !abreNoDia(horario, d)) return `Não abrimos em ${diaFechadoComNome(d)}. Escolha outro dia para ${chegada ? "a chegada" : "buscar o pet"}.`;
     const h = horasDoDia(d);
     if (!h || !/^\d{2}:\d{2}$/.test(hh)) return null;
     if (!chegada && buscaAte && hh > h.fecha.slice(0, 5) && hh <= buscaAte.ate) return null;
@@ -231,8 +258,20 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
       if (vale && s && (hotel || s.creche) && s.valor) setSinal(s);
       const a = (data as { atraso?: AtrasoDoLink | null } | null)?.atraso;
       if (vale && hotel && a && ehHora(a.hora) && Number(a.valor) > 0) setAtraso({ hora: a.hora, valor: Number(a.valor), tolerancia: Number(a.tolerancia) || 0 });
-      const b = data as { busca_ate?: string | null; busca_hora?: string | null } | null;
+      const b = data as { busca_ate?: string | null; busca_hora?: string | null; horas?: { entrada?: string; saida?: string } | null; pix?: string | null } | null;
       if (vale && hotel && b?.busca_ate && ehHora(b.busca_ate)) setBuscaAte({ ate: b.busca_ate, hora: ehHora(b.busca_hora ?? "") ? b.busca_hora! : b.busca_ate });
+      if (vale && (hotel || s?.creche) && b?.pix) setPix(String(b.pix).slice(0, 120));
+      if (vale && hotel) {
+        const hs = { entrada: ehHora(b?.horas?.entrada ?? "") ? b!.horas!.entrada : undefined, saida: ehHora(b?.horas?.saida ?? "") ? b!.horas!.saida : undefined };
+        setHorasLoja(hs.entrada || hs.saida ? hs : null);
+        // a hora sugerida: a combinada pelo hotel; sem ela, buscar até a hora da taxa de busca fora do horário (a taxa não aparece antes de valer)
+        const horaDaTaxa = a && ehHora(a.hora) && Number(a.valor) > 0 ? a.hora : null;
+        if (!mexeuNaHora.current) {
+          if (hs.entrada) setHoraEntrada(dentroDoHorario(entrada, hs.entrada));
+          const sai = hs.saida ?? horaDaTaxa;
+          if (sai) setHoraSaida(dentroDoHorario(saida, sai));
+        }
+      }
     });
     return () => { vale = false; };
   }, [codigo, hotel]);
@@ -245,10 +284,14 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
   // busca depois da hora da taxa (com a tolerância): a estimativa avisa a taxa, que é cobrada na saída
   const minutos = (hh: string) => { const [h, m] = hh.split(":").map(Number); return h * 60 + (m || 0); };
   const comTaxaDeBusca = hotel && atraso && ehHora(horaSaida) && minutos(horaSaida) > minutos(atraso.hora) + atraso.tolerancia ? atraso : null;
+  // "dá para buscar até as X" só faz sentido quando X passa da hora de fechar do dia da saída (antes, a frase dizia "até as 15h"
+  // com o hotel aberto até as 18h: a hora vinha da taxa + 3 horas, nada que o dono escreveu)
+  const fechaNaSaida = saida ? horasDoDia(saida)?.fecha.slice(0, 5) ?? null : null;
+  const buscaDepoisDeFechar = Boolean(buscaAte && fechaNaSaida && buscaAte.ate > fechaNaSaida);
   // a taxa é uma por busca: dois pets buscados juntos pagam uma vez (o check-out do hotel faz igual)
   const fraseDaTaxa = comTaxaDeBusca
-    ? `Buscar às ${fala(horaSaida)} tem taxa de busca fora do horário (depois das ${fala(comTaxaDeBusca.hora)}${comTaxaDeBusca.tolerancia ? `, com ${comTaxaDeBusca.tolerancia} minutos de tolerância` : ""}): ${brl(comTaxaDeBusca.valor)}${pets.length > 1 ? " por busca" : ""}, cobrada na saída.${buscaAte ? ` Dá para buscar até as ${fala(buscaAte.ate)}.` : ""}`
-    : hotel && !atraso && buscaAte && ehHora(horaSaida) && minutos(horaSaida) > minutos(buscaAte.hora) ? `Buscar depois das ${fala(buscaAte.hora)} tem taxa de busca fora do horário, cobrada na saída. Dá para buscar até as ${fala(buscaAte.ate)}.`
+    ? `Buscar às ${fala(horaSaida)} tem taxa de busca fora do horário (${horasLoja?.saida && horasLoja.saida !== comTaxaDeBusca.hora ? `a saída combinada é até as ${fala(horasLoja.saida)}; a taxa vale depois das ${fala(comTaxaDeBusca.hora)}` : `depois das ${fala(comTaxaDeBusca.hora)}`}${comTaxaDeBusca.tolerancia ? `, com ${comTaxaDeBusca.tolerancia} minutos de tolerância` : ""}): ${brl(comTaxaDeBusca.valor)}${pets.length > 1 ? " por busca" : ""}, cobrada na saída.${buscaDepoisDeFechar ? ` Depois que fechamos, dá para buscar até as ${fala(buscaAte!.ate)}.` : ""}`
+    : hotel && !atraso && buscaAte && ehHora(horaSaida) && minutos(horaSaida) > minutos(buscaAte.hora) ? `Buscar depois das ${fala(buscaAte.hora)} tem taxa de busca fora do horário, cobrada na saída.${buscaDepoisDeFechar ? ` Depois que fechamos, dá para buscar até as ${fala(buscaAte!.ate)}.` : ""}`
     : null;
   // guarda o que já foi preenchido nesta aba (o aceite das regras não: a pessoa marca de novo)
   useEffect(() => {
@@ -342,7 +385,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
           : r.erro === "datas" ? "Confira as datas: a entrada não pode ser no passado, a saída vem depois da entrada e o período vai até 60 dias."
           : r.erro === "repetido" ? `Você já pediu vaga para ${listaE(nomes)} nessas datas. Acompanhe o pedido ou fale com a gente.`
           : r.erro === "horas" ? "No mesmo dia, a hora de buscar vem depois da hora de chegada."
-          : r.erro === "dia_fechado" ? `Não abrimos em ${r.dia ? dia(r.dia) : "um dos dias"}. Escolha outro dia para ${r.quando === "saida" ? "buscar o pet" : "a chegada"}.`
+          : r.erro === "dia_fechado" ? `Não abrimos em ${r.dia ? diaFechadoComNome(r.dia) : "um dos dias"}. Escolha outro dia para ${r.quando === "saida" ? "buscar o pet" : "a chegada"}.`
           : r.erro === "fora_do_horario" ? `${r.dia ? naDia(r.dia) : "Nesse dia"} atendemos das ${fala(r.abre ?? "")} às ${fala(r.fecha ?? "")}. ${r.quando === "saida" && r.ate ? `Buscar depois disso tem taxa e vai até as ${fala(r.ate)}. Escolha uma hora até as ${fala(r.ate)}.` : `Escolha uma hora de ${r.quando === "saida" ? "buscar" : "chegada"} nesse horário.`}`
           : r.erro === "dados" ? "Confira o nome do pet, o seu nome e o WhatsApp com DDD."
           : r.erro === "experiencia" ? "O dia de experiência é para um dia só na creche. Confira o dia ou tire a marca de dia de experiência."
@@ -397,7 +440,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
           {estimativa && <div><dt>Estimativa</dt><dd>cerca de {brl(estimativa.total)} <small>({dias} {dias === 1 ? "noite" : "noites"}{estimativa.pets.length > 1 ? `, ${estimativa.pets.length} pets` : ""})</small></dd></div>}
         </dl>
         <p className="g-lk-nota">A vaga ainda não está reservada. Espere a confirmação.</p>
-        {fraseDoSinalEnviado && <p className="g-lk-nota">Depois da confirmação, {fraseDoSinalEnviado}{sinal?.politica ? ` ${sinal.politica}` : ""} O pagamento é combinado direto com {loja}: nada é pago por aqui.</p>}
+        {fraseDoSinalEnviado && <p className="g-lk-nota">Depois da confirmação, {fraseDoSinalEnviado}{sinal?.politica ? ` ${sinal.politica}` : ""} O pagamento é combinado direto com {loja}: nada é pago por aqui.{pix ? ` Chave Pix de ${loja}: ${pix}.` : ""}</p>}
         <div className="g-lk-ok-acoes">
           {pedidoId && <a className="g-btn verde" href={`/gestao/agendar/${codigo}/pedido/${pedidoId}`}>Acompanhar o pedido</a>}
           <button type="button" className="g-btn sec" onClick={aoVoltar}>Fazer outro pedido</button>
@@ -407,11 +450,23 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
     );
   }
 
+  const blocoPlanos = planosLink && (
+    <div className="g-lk-bloco" data-teste="planos-da-creche">
+      <h3 style={{ margin: "0 0 6px" }}>Planos mensais</h3>
+      <ul className="g-lk-planos">
+        {planosLink.planos.map((p, i) => (
+          <li key={i}><span>{p.nome}{p.vezes && !new RegExp(`\\b${p.vezes}\\s*(x|vez|dia)`, "i").test(p.nome) ? ` · ${p.vezes === 1 ? "1 dia" : `${p.vezes} dias`} por semana` : ""}</span>{p.valor != null && <b>{brl(p.valor)} por mês</b>}</li>
+        ))}
+      </ul>
+      <p className="g-lk-nota" style={{ marginBottom: 0 }}>Para virar mensalista, combine com {loja} pelo WhatsApp.{planosLink.pix ? ` A mensalidade pode ser paga pelo Pix: ${planosLink.pix}.` : ""}</p>
+    </div>
+  );
+
   if (passo === "quando") {
     const temCheio = (cheios?.length ?? 0) > 0;
     // dia fechado não é "sem vaga": diz que não abre, e não oferece lista de espera para ele
     const diasFechados = (cheios ?? []).filter(naoAbre), lotados = (cheios ?? []).filter((d) => !naoAbre(d));
-    const lista = (l: string[]) => `${l.slice(0, 4).map(dia).join("; ")}${l.length > 4 ? " e outros dias" : ""}`;
+    const lista = (l: string[]) => `${l.slice(0, 4).map(diaFechadoComNome).join("; ")}${l.length > 4 ? " e outros dias" : ""}`;
     return (
       <section className="g-lk-secao">
         <h2>{hotel ? "Quando o seu pet fica com a gente?" : "Que dia o seu pet vem para a creche?"}</h2>
@@ -424,12 +479,13 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
           </label>
           <div className="dupla">
             <label className="g-campo"><span>Hora de chegada</span>
-              <input className="g-input" type="time" value={horaEntrada} onChange={(e) => { setErro(null); setHoraEntrada(e.target.value); }} />
+              <input className="g-input" type="time" value={horaEntrada} onChange={(e) => { setErro(null); mexeuNaHora.current = true; setHoraEntrada(e.target.value); }} />
             </label>
             <label className="g-campo"><span>Hora de buscar</span>
-              <input className="g-input" type="time" value={horaSaida} onChange={(e) => { setErro(null); setHoraSaida(e.target.value); }} />
+              <input className="g-input" type="time" value={horaSaida} onChange={(e) => { setErro(null); mexeuNaHora.current = true; setHoraSaida(e.target.value); }} />
             </label>
           </div>
+          {hotel && horasLoja && <p className="g-pp g-muted">{[horasLoja.entrada ? `Entrada a partir das ${fala(horasLoja.entrada)}` : "", horasLoja.saida ? `saída até as ${fala(horasLoja.saida)}` : ""].filter(Boolean).join(" e ")}.</p>}
           {datasOk && (
             <p className="g-p">
               <b>{dias} {hotel ? (dias === 1 ? "noite" : "noites") : (dias === 1 ? "dia" : "dias")}</b>
@@ -462,6 +518,7 @@ export default function EstadiaPeloLink({ codigo, tipo, hoje, loja, diaria, prec
             </div>
           )}
         </div>
+        {blocoPlanos}
         <div className="g-lk-pe">
           <button type="button" className="g-btn sec" onClick={aoVoltar}><ArrowLeft />Voltar</button>
           <button type="button" className="g-btn pri" disabled={!datasOk || cheios === null || temCheio} onClick={() => { setNaEspera(false); setPasso("dados"); }}>{cheios === null && datasOk ? "Conferindo as vagas…" : "Continuar"}</button>

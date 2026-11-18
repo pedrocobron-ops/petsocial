@@ -8,7 +8,7 @@ import { CORES, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/gr
 import type { Horario } from "@/lib/gestao/tipos";
 import { perfilParaOPetshop } from "@/lib/gestao/acessos";
 import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
-import { ESCOLHA_VAZIA, camposDaEscolha, ehSocio, emailValido, erroDeLimite, lerComissao, nAcessos, perfilPorId, primeiroNome, sugereLogin, usoDoPlano, type Escolha } from "./modelo";
+import { ESCOLHA_VAZIA, camposDaEscolha, ehSocio, emailValido, erroDeLimite, lerComissao, nAcessos, nomeCurtoDe, perfilPorId, sugereLogin, usoDoPlano, type Escolha } from "./modelo";
 import { Areas, Chave, Convite, DetalhesAgenda, EscolherPerfil, ModelosProntos, Opcao, PlanoCheio, Trilho, Vagas } from "./pecas";
 
 type Passo = "quem" | "login" | "areas" | "detalhes";
@@ -40,7 +40,8 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
   useEffect(() => { topo.current?.scrollIntoView({ block: "start" }); }, [passo, feito]);
 
   const n = nome.trim();
-  const primeiro = primeiroNome(n);
+  // nome de duas palavras fica inteiro ("Recepção Teste", "Ana Souza"): só a primeira pode ser um cargo (achado da Juliana)
+  const primeiro = nomeCurtoDe(n);
   const socio = ehSocio(escolha);
   const e = email.trim().toLowerCase();
   const semVaga = uso.cheio;
@@ -48,7 +49,8 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
   const passos: Passo[] = ["quem", "login", ...(comLogin ? (["areas"] as Passo[]) : []), "detalhes"];
   const indice = passos.indexOf(passo);
   const ultimo = indice === passos.length - 1;
-  const rotuloPasso = `Passo ${indice + 1} de ${passos.length}`;
+  // antes de escolher o login, conta o passo das áreas (o total não muda de 3 para 4 no meio do caminho)
+  const rotuloPasso = `Passo ${indice + 1} de ${passos.length + (comLogin == null ? 1 : 0)}`;
 
   function recomecar() {
     setPasso("quem"); setNome(""); setEscolha(ESCOLHA_VAZIA); setComLogin(null); setEmail(""); setComissao(""); setSegueLoja(true); setEscala(loja);
@@ -234,17 +236,17 @@ export default function AdicionarPessoa({ aoFechar }: { aoFechar: () => void }) 
         {feito && (
           <div className="g-eq-fim">
             <span className="g-eq-fim-ok" aria-hidden><Check /></span>
-            <h3 className="g-eq-h">Pronto, {primeiroNome(feito.nome)} está na equipe.</h3>
+            <h3 className="g-eq-h">Pronto, {nomeCurtoDe(feito.nome)} está na equipe.</h3>
             {feito.email ? (
               <>
-                <p className="g-muted">Falta só mandar o convite. O acesso já está guardado para {primeiroNome(feito.nome)}: {uso.usados} de {nAcessos(uso.limite)} em uso.</p>
+                <p className="g-muted">Falta só mandar o convite. O acesso já está guardado para {nomeCurtoDe(feito.nome)}: {uso.usados} de {nAcessos(uso.limite)} em uso.</p>
                 <Convite pessoaId={feito.id} nome={feito.nome} email={feito.email} />
               </>
             ) : (
               <p className="g-muted">
                 {feito.atende
-                  ? `${primeiroNome(feito.nome)} já aparece na agenda para você marcar os horários. Não ocupa acesso do plano.`
-                  : `${primeiroNome(feito.nome)} já está na lista da equipe. Se quiser dar login depois, é só tocar no cartão.`}
+                  ? `${nomeCurtoDe(feito.nome)} já aparece na agenda para você marcar os horários. Não ocupa acesso do plano.`
+                  : `${nomeCurtoDe(feito.nome)} já está na lista da equipe. Se quiser dar login depois, é só tocar no cartão.`}
               </p>
             )}
           </div>

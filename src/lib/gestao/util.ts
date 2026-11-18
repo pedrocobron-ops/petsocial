@@ -57,7 +57,8 @@ export function haQuanto(d: Date | string | null | undefined) {
   return meses === 1 ? "há 1 mês" : meses < 12 ? `há ${meses} meses` : "há mais de 1 ano";
 }
 export function idade(nascimento: string | null | undefined) {
-  if (!nascimento) return null;
+  // sem o ano (guardado como 1904, ver aniversario.ts): não dá para saber a idade
+  if (!nascimento || nascimento.startsWith("1904-")) return null;
   const n = deIsoDia(nascimento), h = new Date();
   let meses = (h.getFullYear() - n.getFullYear()) * 12 + h.getMonth() - n.getMonth();
   if (h.getDate() < n.getDate()) meses--;
@@ -238,6 +239,22 @@ export const valor2 = (n: number | null | undefined) => Number(n ?? 0).toLocaleS
  * Como chamar a pessoa numa mensagem: o primeiro nome, mantendo o tratamento quando houver
  * ("Dona Zefa", "Seu João", "Dr. Paulo"), para não sair "Oi, Dona!".
  */
+/**
+ * Nome curto de alguém da equipe, para chips e listas: o primeiro nome; se outra pessoa da lista começa igual, junta as palavras
+ * até diferenciar ("Banhista Ana" e "Banhista Beto", não "Banhista" e "Banhista"). Nomes iguais: o nome inteiro.
+ */
+export function nomeNaEquipe(nome: string | null | undefined, todos: (string | null | undefined)[]): string {
+  const partes = (nome ?? "").trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return "";
+  const eu = partes.join(" ").toLowerCase();
+  const outros = todos.map((x) => (x ?? "").trim().split(/\s+/).filter(Boolean)).filter((x) => x.length && x.join(" ").toLowerCase() !== eu);
+  for (let k = 1; k <= partes.length; k++) {
+    const comeco = partes.slice(0, k).join(" ").toLowerCase();
+    if (!outros.some((o) => o.slice(0, k).join(" ").toLowerCase() === comeco)) return partes.slice(0, k).join(" ");
+  }
+  return partes.join(" ");
+}
+
 export function chamar(nome: string | null | undefined) {
   const partes = (nome ?? "").trim().split(/\s+/).filter(Boolean);
   if (!partes.length) return "";

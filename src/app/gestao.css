@@ -704,6 +704,14 @@ a.g-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(31, 27,
 .g-bolha.erro.rabo::before { background: var(--g-vermelho-tint); }
 /* resposta chegando aos poucos: a bolha cresce; a final entra no lugar sem a animação de chegada */
 .g-bolha.g-ass-aovivo, .g-bolha.ja { animation: none; }
+/* resposta do Mozart com negrito e lista (texto-mozart.tsx) */
+.g-ass-txt { display: block; }
+.g-ass-txt p { margin: 0; }
+.g-ass-txt p + p, .g-ass-txt p + ul, .g-ass-txt ul + p { margin-top: 8px; }
+.g-ass-txt ul { margin: 2px 0 0; padding-left: 18px; list-style: disc; white-space: normal; }
+.g-ass-txt li + li { margin-top: 2px; }
+.g-ass-txt b { font-weight: 650; }
+.g-ass-sem-voz { display: block; margin: 4px 0 0; font-size: .8125rem; color: var(--g-cinza); white-space: normal; }
 .g-ass-progresso { margin: -2px 0 0 4px; font-size: .8125rem; color: var(--g-cinza); font-style: italic; overflow-wrap: anywhere; }
 .g-ass-voz { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; padding-top: 4px; }
 .g-ass-voz label { display: grid; gap: 2px; flex: 1 1 200px; min-width: 0; font-size: .875rem; }

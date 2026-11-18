@@ -45,7 +45,7 @@ const limpo = (s) => s.replace(/[  ]/g, ' ');
     T.ok('… e a conta do mês já entrou em A pagar', B.num(`select count(*) from lancamentos where petshop_id='${P}' and descricao='${c.modelo}' and not pago and competencia is not null`) === 1);
 
     const quadro = limpo(await page.locator('[data-teste="quanto-custa"]').innerText().catch(() => ''));
-    T.ok(`"Quanto custa manter o pet shop": precisa faturar ${c.total} por mês`, quadro.includes(`você precisa faturar ${c.total} por mês`), quadro.slice(0, 300));
+    T.ok(`"Quanto custa manter o pet shop": as contas somam ${c.total} por mês (sem custo do que vende: o mínimo a faturar)`, quadro.includes(`As contas fixas somam ${c.total} por mês`) && quadro.includes('o mínimo a faturar por mês'), quadro.slice(0, 300));
     const lista = limpo(await page.locator('[data-teste="contas-fixas"]').innerText());
     T.ok(`a lista mostra ${c.modelo}, todo dia ${dia}`, lista.includes(c.modelo) && lista.includes(`todo dia ${dia}`), lista.slice(0, 400));
     await page.screenshot({ path: `${B.RAIZ}/testes/saida/contas-fixas-${c.larg}.png`, fullPage: true }).catch(() => {});

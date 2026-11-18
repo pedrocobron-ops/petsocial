@@ -40,7 +40,7 @@ function termo(v: unknown): string {
 }
 
 type Entrada = Record<string, unknown>;
-const FRASES: Record<string, (e: Entrada | null, agora?: string) => string> = {
+const FRASES: Record<string, (e: Entrada | null, agora?: string, casa?: string) => string> = {
   buscar_pets: (e) => { const t = termo(e?.termo); return t ? `Procurando ${t}…` : "Procurando o pet…"; },
   ver_agenda: (e, agora) => { const p = e ? periodo(e.de, e.ate, agora) : ""; return p ? `Olhando a agenda ${p}…` : "Olhando a agenda…"; },
   horarios_livres: (e, agora) => { const d = typeof e?.dia === "string" ? nomeDoDia(e.dia, agora) : ""; return d ? `Vendo os horários livres de ${d}…` : "Vendo os horários livres…"; },
@@ -49,7 +49,12 @@ const FRASES: Record<string, (e: Entrada | null, agora?: string) => string> = {
   resumo_financeiro: (e, agora) => { const p = e ? periodo(e.de, e.ate, agora) : ""; return p ? `Somando o dinheiro ${p}…` : "Somando o dinheiro…"; },
   contas_em_aberto: () => "Conferindo as contas em aberto…",
   quem_me_deve: () => "Vendo quem está devendo…",
-  ver_hospedes: () => "Olhando quem está na creche e no hotel…",
+  // só hotel: "no hotel"; só creche: "na creche"
+  ver_hospedes: (_e, _a, casa) => (casa === "Hotel" ? "Olhando quem está no hotel…" : casa === "Creche" ? "Olhando quem está na creche…" : "Olhando quem está na creche e no hotel…"),
+  reservar_estadia: () => "Preparando a reserva para você conferir…",
+  ver_sinais: () => "Somando os sinais…",
+  ver_maquininha: () => "Olhando o que a maquininha vai pagar…",
+  ver_descontos: () => "Somando os descontos…",
   ver_pacotes: () => "Conferindo os pacotes…",
   ver_caixa: () => "Conferindo o caixa…",
   ver_saude: () => "Olhando as vacinas e os cuidados…",
@@ -62,15 +67,24 @@ const FRASES: Record<string, (e: Entrada | null, agora?: string) => string> = {
   ver_contas_fixas: () => "Somando as contas fixas…",
 };
 
+/** A primeira frase de cada pedido, antes de o modelo responder: "Pensando…" ou, depois do "Pode fazer", "Conferindo o que ficou feito…". */
+export function fraseInicial(mensagens: { role: string; content?: unknown }[]): string {
+  const ultima = mensagens[mensagens.length - 1];
+  const respondeuCartao = ultima?.role === "user" && Array.isArray(ultima.content) && ultima.content.some((b) => (b as { type?: string })?.type === "tool_result");
+  return respondeuCartao ? "Conferindo o que ficou feito…" : "Pensando…";
+}
+/** Depois das consultas, enquanto o modelo escreve a resposta com o que elas trouxeram. */
+export const FRASE_JUNTANDO = "Juntando a resposta…";
+
 /** Frase de uma ferramenta que grava (o cartão): o Mozart prepara para a pessoa conferir. */
 const PREPARANDO = "Preparando para você conferir…";
 
-/** A frase de uma ferramenta. Nome desconhecido: "Conferindo…". */
-export function fraseDaFerramenta(nome: string, entrada?: unknown, agora?: string, grava?: boolean): string {
+/** A frase de uma ferramenta. Nome desconhecido: "Conferindo…". `casa`: "Creche", "Hotel" ou "Creche e hotel" (`nomeDaCasa`). */
+export function fraseDaFerramenta(nome: string, entrada?: unknown, agora?: string, grava?: boolean, casa?: string): string {
   const f = FRASES[nome];
   if (!f) return grava ? PREPARANDO : "Conferindo…";
   const e = entrada && typeof entrada === "object" ? (entrada as Entrada) : null;
-  return f(e, agora);
+  return f(e, agora, casa);
 }
 
 /** Todas as consultas que têm frase própria (o teste confere que nenhuma ferramenta de leitura ficou sem). */

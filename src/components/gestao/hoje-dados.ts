@@ -14,7 +14,8 @@ import type { CuidadoResumido } from "@/components/gestao/clientes/saude";
  * as mesmas regras de cada tabela e as mesmas funções de preço. Se a função ainda não existe (banco antes da atualização) ou
  * falhar, lê do jeito de antes, uma consulta por parte, ao mesmo tempo. As duas leituras entregam a mesma coisa.
  */
-export type Contagens = { pets: number; agendamentos: number; concluidos: number; lembrados: number; estadias: number; produtos: number };
+/** `checkins`: estadias que entraram na casa (em casa ou encerradas); banco antigo não manda, e vale `estadias`. */
+export type Contagens = { pets: number; agendamentos: number; concluidos: number; lembrados: number; estadias: number; produtos: number; checkins?: number };
 type Curto = { id: string; inicio: string; pets: { nome: string } | null };
 type Amanha = { id: string; lembrete_em: string | null; status: string; pets: { clientes: { id: string; telefone: string | null } | null } | null };
 type Lanc = { valor: number; tipo: string; categoria?: string | null };
@@ -83,7 +84,7 @@ export async function lerDadosDoHoje(sb: Banco, petshopId: string, hoje: Date, q
     amanha: lin<Amanha>("amanha"),
     emCasa: lin<EmCasa>("em_casa"),
     acabando: lin<Produto>("acabando"),
-    contagens: { pets: Number(c.pets ?? 0), agendamentos: Number(c.agendamentos ?? 0), concluidos: Number(c.concluidos ?? 0), lembrados: Number(c.lembrados ?? 0), estadias: Number(c.estadias ?? 0), produtos: Number(c.produtos ?? 0) },
+    contagens: { pets: Number(c.pets ?? 0), agendamentos: Number(c.agendamentos ?? 0), concluidos: Number(c.concluidos ?? 0), lembrados: Number(c.lembrados ?? 0), estadias: Number(c.estadias ?? 0), produtos: Number(c.produtos ?? 0), ...(c.checkins == null ? {} : { checkins: Number(c.checkins) }) },
     entradas: lin<Lanc>("entradas"),
     contas: lin<Conta>("contas"),
     pacotes: lin<{ id: string }>("pacotes").length,

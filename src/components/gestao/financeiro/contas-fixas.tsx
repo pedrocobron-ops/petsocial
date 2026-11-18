@@ -4,8 +4,9 @@ import { useState } from "react";
 import { Building2, Plus, Repeat, Trash2 } from "lucide-react";
 import {
   FORMAS_CONTA_FIXA, FREQUENCIAS, lerResumoContasFixas, MESES, MODELOS_CONTA_FIXA, quandoVence, valorPorMes, ANTECEDENCIA_CONTAS_FIXAS,
-  type ContaFixa, type Frequencia, type ResumoContasFixas,
+  DIAS_DA_MARGEM, faturamentoComMargem, type ContaFixa, type Frequencia, type ResumoContasFixas,
 } from "@/lib/gestao/contas-fixas";
+import { montarLucro, type LucroDoBanco } from "@/lib/gestao/lucro";
 import { CATEGORIAS_SAIDA } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, isoDia } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
@@ -22,12 +23,15 @@ import { categoriaAtual, Chips, ErroDeCarga, Grupo } from "./comum";
 export default function ContasFixas({ versao, aoEditar, aoCriar }: { versao: number; aoEditar: (c: ContaFixa) => void; aoCriar: () => void }) {
   const { sb, petshop } = useGestao();
   const { dados, erro, recarregar } = useDados(async () => {
-    const [contas, resumo] = await Promise.all([
+    // a margem do que vende nos últimos 90 dias: o faturamento que paga as contas fixas é maior que a soma delas
+    const hojeIso = isoDia(new Date());
+    const [contas, resumo, lucro] = await Promise.all([
       sb.from("contas_fixas").select("*").eq("petshop_id", petshop.id).order("ativa", { ascending: false }).order("nome").limit(200),
       lerResumoContasFixas(sb, petshop.id),
+      sb.rpc("lucro_do_periodo", { p_petshop: petshop.id, p_de: isoDia(new Date(Date.now() - (DIAS_DA_MARGEM - 1) * 864e5)), p_ate: hojeIso }).then((r) => (r.error ? null : montarLucro(r.data as unknown as LucroDoBanco)), () => null),
     ]);
     if (contas.error) throw new Error(contas.error.message);
-    return { contas: (contas.data ?? []) as unknown as ContaFixa[], resumo };
+    return { contas: (contas.data ?? []) as unknown as ContaFixa[], resumo, lucro };
   }, [petshop.id, versao]);
 
   if (erro) return <ErroDeCarga erro={erro} tentar={recarregar} />;
@@ -35,7 +39,7 @@ export default function ContasFixas({ versao, aoEditar, aoCriar }: { versao: num
   const hoje = isoDia(new Date());
   return (
     <div className="g-pilha" data-teste="contas-fixas">
-      <QuantoCusta resumo={dados.resumo} contas={dados.contas} />
+      <QuantoCusta resumo={dados.resumo} contas={dados.contas} lucro={dados.lucro} />
       {dados.contas.length ? (
         <section className="g-card">
           <div className="g-card-t">
@@ -82,7 +86,7 @@ export default function ContasFixas({ versao, aoEditar, aoCriar }: { versao: num
 const FREQ_FRASE: Record<string, string> = { trimestral: "a cada 3 meses", semestral: "a cada 6 meses", anual: "por ano" };
 
 /** "Quanto custa manter o pet shop": o total por mês das contas fixas e quanto já entrou no mês. Só números de verdade. */
-function QuantoCusta({ resumo: r, contas }: { resumo: ResumoContasFixas; contas: ContaFixa[] }) {
+function QuantoCusta({ resumo: r, contas, lucro }: { resumo: ResumoContasFixas; contas: ContaFixa[]; lucro: ReturnType<typeof montarLucro> | null }) {
   const exemplo = contas.find((c) => c.ativa && c.frequencia !== "mensal");
   if (!(r.total_mensal > 0)) {
     return (
@@ -95,26 +99,42 @@ function QuantoCusta({ resumo: r, contas }: { resumo: ResumoContasFixas; contas:
       </section>
     );
   }
-  const pct = r.pct ?? 0;
+  // com a margem do que vende: contas fixas ÷ margem média (só quando dá para confiar na margem)
+  const comMargem = lucro ? faturamentoComMargem(r.total_mensal, lucro) : null;
+  const vendeComCusto = Boolean(lucro && lucro.produtos.length > 0);
+  const meta = comMargem ? comMargem.faturamento : r.total_mensal;
+  const pct = comMargem ? Math.floor((Math.max(0, r.faturamento_mes) / meta) * 100) : r.pct ?? 0;
+  const falta = Math.max(0, Math.round((meta - r.faturamento_mes) * 100) / 100);
   return (
     <section className="g-card g-fin-meta" aria-label="Quanto custa manter o pet shop" data-teste="quanto-custa">
       <div className="g-card-t"><h3><Tile icone={Building2} tom="manteiga" tamanho="p" />Quanto custa manter o pet shop</h3></div>
-      <p className="g-p">Para pagar as contas fixas, você precisa faturar <b className="g-tab">{brl(r.total_mensal)}</b> por mês.</p>
+      <p className="g-p">As contas fixas somam <b className="g-tab">{brl(r.total_mensal)}</b> por mês.</p>
+      {comMargem ? (
+        <p className="g-p" data-teste="faturar-com-margem">
+          De cada venda sobra, em média, {comMargem.pct.toLocaleString("pt-BR")}% depois do custo (últimos {DIAS_DA_MARGEM} dias). Para pagar as contas fixas, você precisa faturar cerca de <b className="g-tab">{brl(comMargem.faturamento)}</b> por mês.
+        </p>
+      ) : vendeComCusto ? (
+        <p className="g-muted g-pp" style={{ margin: 0 }} data-teste="faturar-sem-margem">
+          Esse valor é o que precisa sobrar depois do custo do que você vende, não o faturamento. Com o custo dos produtos e o custo do material dos serviços preenchidos, a conta mostra quanto faturar.
+        </p>
+      ) : (
+        <p className="g-muted g-pp" style={{ margin: 0 }}>Sem custo do que vende, isso é o mínimo a faturar por mês só para pagar as contas fixas.</p>
+      )}
       {r.nao_mensais > 0 && exemplo && (
         <p className="g-muted g-pp" style={{ margin: 0 }}>
           Contas que não vencem todo mês entram divididas pelos meses: {exemplo.nome} ({brl(exemplo.valor)} {FREQ_FRASE[exemplo.frequencia]}) conta {brl(Math.round(valorPorMes(exemplo) * 100) / 100)} por mês.
         </p>
       )}
       <div className="g-fin-meta-topo">
-        <p className="g-fin-meta-num"><b className="g-num">{brl(r.faturamento_mes)}</b> <span className="g-muted">faturados neste mês</span></p>
+        <p className="g-fin-meta-num"><b className="g-num">{brl(r.faturamento_mes)}</b> <span className="g-muted">faturados neste mês{comMargem ? ` de ${brl(comMargem.faturamento)}` : ""}</span></p>
         <span className={`g-tag g-tab${pct >= 100 ? " verde" : ""}`}>{pct}%</span>
       </div>
       <div className="g-fin-meta-barra" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, pct)} aria-label={`${pct}% das contas fixas do mês`}>
         <i style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
       </div>
       <p className="g-muted g-pp" style={{ margin: 0 }}>
-        {r.falta > 0 ? `Faltam ${brl(r.falta)} de faturamento para cobrir as contas fixas deste mês. ` : "O faturamento deste mês já cobre as contas fixas. "}
-        Faturamento do dia 1 até hoje, a mesma conta de Relatórios. As contas fixas não incluem produtos, comissões e outras despesas: elas vêm por cima.
+        {falta > 0 ? `Faltam ${brl(falta)} de faturamento para cobrir as contas fixas deste mês${comMargem ? ", pela margem média" : ""}. ` : "O faturamento deste mês já cobre as contas fixas. "}
+        Faturamento do dia 1 até hoje, a mesma conta de Relatórios.{comMargem ? " Conta: contas fixas ÷ margem média (o que sobra de cada venda depois do custo). É uma estimativa: muda com o que você vende." : " Compras de mercadoria, comissões e outras despesas vêm por cima."}
       </p>
     </section>
   );
@@ -165,9 +185,11 @@ export function FolhaContaFixa({ conta, aoFechar, aoSalvo }: { conta?: ContaFixa
       if (r.error) throw new Error(r.error.message);
       const gerados = Number((r.data as { gerados?: number } | null)?.gerados ?? 0);
       avisar(`${conta ? "Conta fixa salva." : "Conta fixa cadastrada."}${gerados ? ` ${gerados === 1 ? "A conta deste mês já está" : `${gerados} contas já estão`} em A pagar.` : ""}`);
+      // fecha já: a lista recarrega depois (achado da Bia: a folha ficava em "Salvando…" com os campos abertos, e a próxima conta
+      // digitada ali se perdia)
+      aoFechar();
       await aoSalvo();
       avisarMudanca();
-      aoFechar();
     } catch (e) {
       avisarErro(e);
       setSalvando(false);
@@ -187,9 +209,9 @@ export function FolhaContaFixa({ conta, aoFechar, aoSalvo }: { conta?: ContaFixa
       const r = await sb.rpc("contas_fixas_apagar", { p: petshop.id, p_id: conta.id });
       if (r.error) throw new Error(r.error.message);
       avisar("Conta fixa apagada.");
+      aoFechar();
       await aoSalvo();
       avisarMudanca();
-      aoFechar();
     } catch (e) {
       avisarErro(e);
       setSalvando(false);

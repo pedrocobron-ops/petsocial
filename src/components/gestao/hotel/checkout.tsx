@@ -27,6 +27,7 @@ import { AvatarPet, Campo, Folha, mensagemDeErro, useAvisos, useDados } from "..
 import { BuscaProduto, comProduto, encurtar, erroDaConta, faltaNoEstoque, LEVA_E_TRAZ, LinhaDaConta, novaChave, produtosDaConta, useProdutosDaLoja, valorDaLinha, type ItemConta } from "../loja/conta";
 import { AvisoCaixaFechado, CampoDinheiro, ChipsForma, erroDeValor, EscolhaPagamento, fecharRecebimento, lembrarForma, pagaDepoisInicial, ParcelasNaTela, QuandoPaga, useAnotarParcelas, useCaixaAberto, usePagamento, type Forma, type PagaDepois } from "../loja/pecas";
 import { idsDaOperacao } from "@/lib/gestao/maquininha";
+import { ehDemora, mensagemDe } from "@/lib/gestao/erros";
 import { ehAdiantado } from "./sinal";
 import { PertencesNaSaida } from "../entrada/entrada";
 import { descontoDaPromoNaEstadia } from "@/lib/gestao/promocoes";
@@ -377,7 +378,9 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
         // o banco conferiu com o que já foi pago (sinal, crédito) e o valor passava do que falta: lê tudo de novo e mostra a conta certa
         if (casoDoErro(e) === "maestro:passa_do_devido") { avisarErro(`Nada foi cobrado. ${mensagemDeErro(e)}`); setValorEditado(undefined); void lerMais(); return; }
         // nada ficou gravado (ou a resposta não chegou): a mesma chave na nova tentativa não lança nada duas vezes
-        avisarErro(`${pendente ? "A estadia não foi acertada" : "O check-out não foi feito"}: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`);
+        // demorou demais: sem o texto técnico; a nova tentativa usa a mesma chave, então não cobra duas vezes
+        if (ehDemora(mensagemDe(e))) avisarErro(`${pendente ? "A estadia não foi acertada" : "O check-out não foi feito"}: demorou demais e nada ficou pela metade. Toque de novo para tentar (não cobra duas vezes).`);
+        else avisarErro(`${pendente ? "A estadia não foi acertada" : "O check-out não foi feito"}: nada ficou pela metade. Toque de novo para tentar. (${mensagemDeErro(e)})`);
         return false;
       }
       if (pacote) {
@@ -505,8 +508,10 @@ export default function CheckOut({ estadia, aoFechar, aoGravar, pendente = false
                     <button key={b.nome} type="button" className="g-chip" onClick={() => { setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome: LEVA_E_TRAZ, qtd: 1, valor: b.valor }]); setValorEditado(undefined); }}>{b.nome} · {brl(b.valor)}</button>
                   ))}
                   {!temTaxa(taxaTaxi) && <button type="button" className="g-chip" onClick={() => setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome: LEVA_E_TRAZ, qtd: 1, valor: null }])}><Plus />{LEVA_E_TRAZ}</button>}
+                  {/* bairro fora da lista: a linha entra sem valor, para digitar */}
+                  {taxaTaxi.modo === "bairro" && temTaxa(taxaTaxi) && <button type="button" className="g-chip" onClick={() => { setItens((l) => [...l, { chave: novaChave(), tipo: "extra", nome: LEVA_E_TRAZ, qtd: 1, valor: null }]); setValorEditado(undefined); }}><Plus />Outro bairro</button>}
                 </div>
-                {estadia.leva_traz_buscar !== estadia.leva_traz_levar && sugeridaTaxi && <small className="g-muted">Foi só uma viagem: dá para mudar o valor na linha, depois de pôr na conta.</small>}
+                {estadia.leva_traz_buscar !== estadia.leva_traz_levar && temTaxa(taxaTaxi) && <small className="g-muted">O preço da lista é o do leva e traz combinado. Foi só uma viagem ({estadia.leva_traz_buscar ? "só buscar" : "só levar"})? Dá para mudar o valor na linha, depois de pôr na conta.</small>}
               </div>
             )}
             {itens.length > 0 && (

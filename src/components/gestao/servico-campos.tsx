@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Banco } from "@/lib/gestao/supabase";
 import { AREAS_DE_SERVICO, type AreaDoServico } from "@/lib/gestao/modulos";
 import { lerValor, lerValorEstrito, valor2 } from "@/lib/gestao/util";
@@ -45,12 +45,24 @@ export function erroDoPreco(texto: string): string | null {
 function CampoPreco({ porte, servico, valor, aoMudar }: { porte: string; servico: string; valor: number | null; aoMudar: (v: number | null, erro: string | null) => void }) {
   const [texto, setTexto] = useState(valor == null ? "" : valor2(valor));
   const erro = erroDoPreco(texto);
+  // o preço mudou por fora (a foto da tabela de preços acabou de gravar, por exemplo): o campo mostra o novo.
+  // O que a própria pessoa digita volta igual e não mexe no texto (ela pode estar no meio de "45,").
+  const ultimo = useRef(valor);
+  useEffect(() => {
+    if (valor !== ultimo.current) { ultimo.current = valor; setTexto(valor == null ? "" : valor2(valor)); }
+  }, [valor]);
   return (
     <label>
       <span>{porte === "todos" ? "Preço" : porte}</span>
       <input className={`g-input g-tab${erro ? " ruim" : ""}`} inputMode="decimal" placeholder="R$" value={texto} aria-invalid={!!erro}
         aria-label={porte === "todos" ? `${servico}, preço para todos os portes` : `${servico}, porte ${NOME_PORTE[porte] ?? porte}`}
-        onChange={(e) => { setTexto(e.target.value); const ruim = erroDoPreco(e.target.value); aoMudar(ruim ? null : lerValor(e.target.value), ruim); }}
+        onChange={(e) => {
+          setTexto(e.target.value);
+          const ruim = erroDoPreco(e.target.value);
+          const v = ruim ? null : lerValor(e.target.value);
+          ultimo.current = v;
+          aoMudar(v, ruim);
+        }}
         onBlur={() => { if (!erro && texto.trim()) { const n = lerValor(texto); if (n != null) setTexto(valor2(n)); } }} />
       {erro && <small className="erro" role="alert">{erro}</small>}
     </label>

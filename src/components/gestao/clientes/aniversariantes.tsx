@@ -2,21 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Gift, MessageCircle } from "lucide-react";
+import { Gift, MessageCircle, PawPrint } from "lucide-react";
 import { anosQueFaz, diaNoMes, MESES } from "@/lib/gestao/aniversario";
 import { CHAVE_NO_BANCO, MODELOS_PADRAO, montarMensagem } from "@/lib/gestao/mensagens-prontas";
 import { linkWhatsApp } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Esqueleto, Folha, Vazio, useAvisos, useDados } from "../ui";
-import { buscarTudo, linkTutor } from "./comum";
+import { buscarTudo, linkPet, linkTutor } from "./comum";
 import "./aniversario.css";
 import "./chamar-de-volta.css";
 
 type TutorNiver = { id: string; nome: string; telefone: string | null; nascimento: string; nao_quer_mensagens: boolean; pets: { nome: string; ativo: boolean }[] | null };
+type PetNiver = { id: string; nome: string; nascimento: string; clientes: { id: string; nome: string; telefone: string | null; nao_quer_mensagens: boolean } | null };
 type Resposta<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
 /**
- * Aniversariantes do mês (Clientes): os tutores com o aniversário anotado na ficha, dia a dia.
+ * Aniversariantes do mês (Clientes): os tutores e os pets com o aniversário anotado na ficha, dia a dia (os pets entraram na
+ * 2ª rodada: a Neide via "Ninguém faz aniversário" com a Pipoca fazendo aniversário no dia 20).
  * Quem faz aniversário hoje tem o botão "Dar parabéns" (o WhatsApp abre com o texto do pet shop; nada vai sozinho).
  * Os parabéns do dia também entram no Mandar mensagens. Quem marcou "Não quer receber mensagens" fica sem o botão.
  */
@@ -26,20 +28,30 @@ export default function Aniversariantes({ aoFechar }: { aoFechar: () => void }) 
   const hoje = new Date();
   const [mes, setMes] = useState(hoje.getMonth() + 1);
   const [modelo, setModelo] = useState(MODELOS_PADRAO.niver_tutor);
+  const [modeloPet, setModeloPet] = useState(MODELOS_PADRAO.niver);
   const [editando, setEditando] = useState(false);
   const podeMudarTexto = souDono || posso("clientes") || posso("agenda");
   const relogio = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let vivo = true;
-    void sb.from("modelos_mensagem").select("texto").eq("petshop_id", petshop.id).eq("chave", CHAVE_NO_BANCO.niver_tutor).maybeSingle()
-      .then(({ data }) => { if (vivo && data?.texto != null) setModelo(data.texto); });
+    void sb.from("modelos_mensagem").select("chave, texto").eq("petshop_id", petshop.id).in("chave", [CHAVE_NO_BANCO.niver_tutor, CHAVE_NO_BANCO.niver])
+      .then(({ data }) => {
+        if (!vivo) return;
+        for (const m of data ?? []) {
+          if (m.texto == null) continue;
+          if (m.chave === CHAVE_NO_BANCO.niver_tutor) setModelo(m.texto); else setModeloPet(m.texto);
+        }
+      });
     return () => { vivo = false; };
   }, [sb, petshop.id]);
 
   const { dados, carregando, erro, recarregar } = useDados(() => buscarTudo<TutorNiver>((de, ate) => sb.from("clientes")
     .select("id, nome, telefone, nascimento, nao_quer_mensagens, pets(nome, ativo)").eq("petshop_id", petshop.id).not("nascimento", "is", null)
     .order("nome").order("id").range(de, ate) as unknown as Resposta<TutorNiver>), [petshop.id]);
+  const { dados: petsDoMes } = useDados(() => buscarTudo<PetNiver>((de, ate) => sb.from("pets")
+    .select("id, nome, nascimento, clientes(id, nome, telefone, nao_quer_mensagens)").eq("petshop_id", petshop.id).eq("ativo", true).not("nascimento", "is", null)
+    .order("nome").order("id").range(de, ate) as unknown as Resposta<PetNiver>), [petshop.id]);
 
   function mudarModelo(texto: string) {
     setModelo(texto);
@@ -51,10 +63,29 @@ export default function Aniversariantes({ aoFechar }: { aoFechar: () => void }) 
   }
 
   const ano = hoje.getFullYear();
-  const doMes = (dados ?? []).map((c) => ({ c, dia: diaNoMes(c.nascimento, mes, ano) })).filter((x): x is { c: TutorNiver; dia: number } => x.dia != null)
-    .sort((a, b) => a.dia - b.dia || a.c.nome.localeCompare(b.c.nome));
   const ehHoje = (dia: number) => mes === hoje.getMonth() + 1 && dia === hoje.getDate();
   const pets = (c: TutorNiver) => (c.pets ?? []).filter((p) => p.ativo).map((p) => p.nome);
+  // tutores e pets juntos, dia a dia
+  type Linha = { chave: string; pet: boolean; nome: string; dia: number; apoio: string; zap: string | null; href: string };
+  const doMes: Linha[] = [
+    ...(dados ?? []).map((c) => ({ c, dia: diaNoMes(c.nascimento, mes, ano) })).filter((x): x is { c: TutorNiver; dia: number } => x.dia != null).map(({ c, dia }) => {
+      const anos = anosQueFaz(c.nascimento, ano);
+      return {
+        chave: `t:${c.id}`, pet: false, nome: c.nome, dia, href: linkTutor(c.id),
+        apoio: [pets(c).join(", ") || null, anos && anos > 0 && anos < 120 ? `faz ${anos} anos` : null, c.nao_quer_mensagens ? "não quer receber mensagens" : null].filter(Boolean).join(" · "),
+        zap: ehHoje(dia) && !c.nao_quer_mensagens ? linkWhatsApp(c.telefone, montarMensagem("niver_tutor", modelo, { tutor: c.nome, pets: pets(c), petshop: petshop.nome })) : null,
+      };
+    }),
+    ...(petsDoMes ?? []).map((p) => ({ p, dia: diaNoMes(p.nascimento, mes, ano) })).filter((x): x is { p: PetNiver; dia: number } => x.dia != null).map(({ p, dia }) => {
+      const anos = anosQueFaz(p.nascimento, ano);
+      const t = p.clientes;
+      return {
+        chave: `p:${p.id}`, pet: true, nome: p.nome, dia, href: linkPet(p.id),
+        apoio: [t?.nome ? `pet de ${t.nome}` : "pet", anos && anos > 0 && anos < 40 ? `faz ${anos === 1 ? "1 ano" : `${anos} anos`}` : null, t?.nao_quer_mensagens ? "não quer receber mensagens" : null].filter(Boolean).join(" · "),
+        zap: ehHoje(dia) && t && !t.nao_quer_mensagens ? linkWhatsApp(t.telefone, montarMensagem("niver", modeloPet, { tutor: t.nome, pets: [p.nome], petshop: petshop.nome })) : null,
+      };
+    }),
+  ].sort((a, b) => a.dia - b.dia || Number(a.pet) - Number(b.pet) || a.nome.localeCompare(b.nome));
   const exemplo = montarMensagem("niver_tutor", modelo, { tutor: "Ana", pets: ["Thor"], petshop: petshop.nome });
 
   return (
@@ -81,29 +112,25 @@ export default function Aniversariantes({ aoFechar }: { aoFechar: () => void }) 
 
         {erro && !dados ? <Vazio titulo="Não consegui montar a lista" texto={erro}><button className="g-btn verde" onClick={() => void recarregar()}>Tentar de novo</button></Vazio>
           : carregando && !dados ? <Esqueleto linhas={4} />
-          : !doMes.length ? <Vazio titulo={`Ninguém faz aniversário em ${MESES[mes - 1]}`} texto="Aparecem aqui os tutores com o aniversário anotado na ficha (Editar, Aniversário)." />
+          : !doMes.length ? <Vazio titulo={`Ninguém faz aniversário em ${MESES[mes - 1]}`} texto="Aparecem aqui os tutores e os pets com o aniversário anotado na ficha (Editar, Aniversário)." />
           : (
             <div>
-              {doMes.map(({ c, dia }) => {
-                const anos = anosQueFaz(c.nascimento, ano);
-                const zap = ehHoje(dia) && !c.nao_quer_mensagens ? linkWhatsApp(c.telefone, montarMensagem("niver_tutor", modelo, { tutor: c.nome, pets: pets(c), petshop: petshop.nome })) : null;
-                return (
-                  <div key={c.id} className="g-niver-linha">
-                    <span className={`g-niver-dia${ehHoje(dia) ? " hoje" : ""}`} aria-label={`dia ${dia}`}>{dia}</span>
-                    <span className="t">
-                      <b>{c.nome}{ehHoje(dia) && <> <span className="g-tag laranja"><Gift size={12} aria-hidden />hoje</span></>}</b>
-                      <span>{[pets(c).join(", ") || null, anos && anos > 0 && anos < 120 ? `faz ${anos} anos` : null, c.nao_quer_mensagens ? "não quer receber mensagens" : null].filter(Boolean).join(" · ") || " "}</span>
-                    </span>
-                    <span className="acoes">
-                      {zap && <a className="g-btn zap p" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Dar parabéns</a>}
-                      <Link className="g-btn sec p" href={linkTutor(c.id)} onClick={aoFechar}>Ver ficha</Link>
-                    </span>
-                  </div>
-                );
-              })}
+              {doMes.map((l) => (
+                <div key={l.chave} className="g-niver-linha" data-pet={l.pet || undefined}>
+                  <span className={`g-niver-dia${ehHoje(l.dia) ? " hoje" : ""}`} aria-label={`dia ${l.dia}`}>{l.dia}</span>
+                  <span className="t">
+                    <b>{l.pet && <PawPrint size={13} aria-label="pet" style={{ marginRight: 4, verticalAlign: "-1px" }} />}{l.nome}{ehHoje(l.dia) && <> <span className="g-tag laranja"><Gift size={12} aria-hidden />hoje</span></>}</b>
+                    <span>{l.apoio || " "}</span>
+                  </span>
+                  <span className="acoes">
+                    {l.zap && <a className="g-btn zap p" href={l.zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Dar parabéns</a>}
+                    <Link className="g-btn sec p" href={l.href} onClick={aoFechar}>Ver ficha</Link>
+                  </span>
+                </div>
+              ))}
             </div>
           )}
-        <p className="g-pp g-muted">No dia, os parabéns também aparecem em Mandar mensagens. Nada é enviado sozinho.</p>
+        <p className="g-pp g-muted">No dia, os parabéns também aparecem em Mandar mensagens. Nada é enviado sozinho. Para os pets, vai o texto do aniversário do pet (o mesmo de Chamar de volta, Aniversário).</p>
       </div>
     </Folha>
   );

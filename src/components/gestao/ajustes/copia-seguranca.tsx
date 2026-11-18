@@ -180,7 +180,7 @@ export default function CopiaSeguranca() {
         ["Pet", "Tutor", "Telefone do tutor", "Espécie", "Raça", "Porte", "Sexo", "Nascimento", "Alertas", "Observações", "Ativo", "Adicionado em"],
         ...pets.map((p): Cel[] => [
           p.nome, p.clientes?.nome ?? "", fmtTelefone(p.clientes?.telefone), ESPECIES[p.especie] ?? p.especie, p.raca ?? "", nomePorte(p.porte), rotulo(SEXO, p.sexo),
-          quando(p.nascimento), p.alertas ?? "", p.obs ?? "", simNao(p.ativo), quando(isoDia(new Date(p.criado_em))),
+          p.nascimento?.startsWith("1904-") ? `${p.nascimento.slice(8, 10)}/${p.nascimento.slice(5, 7)}` : quando(p.nascimento), p.alertas ?? "", p.obs ?? "", simNao(p.ativo), quando(isoDia(new Date(p.criado_em))),
         ]),
       ]);
 
@@ -497,7 +497,7 @@ export default function CopiaSeguranca() {
   }
 
   return (
-    <section className="g-card gj-copia" aria-busy={Boolean(passo)}>
+    <section className="g-card gj-copia" id="baixar-todos-os-dados" aria-busy={Boolean(passo)}>
       <div className="g-card-t"><h3><Tile icone={Archive} tom="ceu" tamanho="p" />Baixar todos os dados</h3></div>
       <p className="g-muted g-p">
         Um arquivo .zip com tudo do seu pet shop, uma planilha para cada parte: clientes, pets, saúde, agenda, creche e hotel (com os mensalistas, as mensalidades, o diário, as ocorrências e a lista de espera), pacotes, vendas, financeiro, caixas, estoque, pedidos pelo link, boletins, autorizações de fotos, feriados, equipe, comissões pagas e serviços.

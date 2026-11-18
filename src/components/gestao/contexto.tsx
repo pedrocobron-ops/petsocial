@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { banco, configurado, type Banco } from "@/lib/gestao/supabase";
 import type { Petshop, Profissional, Servico } from "@/lib/gestao/tipos";
-import { podeArea, type Area } from "@/lib/gestao/acessos";
+import { podeArea, veCusto, type Area } from "@/lib/gestao/acessos";
 import { registrarAcesso } from "@/lib/gestao/registro-acesso";
 import { definirLoja } from "@/lib/gestao/erros-navegador";
 import { pendentes, type Documento } from "@/lib/gestao/documentos";
@@ -27,6 +27,8 @@ export type Gestao = {
   vejoFinanceiro: boolean;
   /** Dono, ou quem tem Financeiro ou Relatórios: vê todo o dinheiro (despesas, contas, histórico, meta) e corrige valor já recebido. */
   cuidoDoFinanceiro: boolean;
+  /** Vê o custo e a margem dos produtos: dono, quem cuida do financeiro ou quem tem "Ver custo e margem" (o banco confere de novo). */
+  vejoCusto: boolean;
   /** A pessoa abre esta área do aplicativo? (o dono libera área por área em Equipe) */
   posso: (area: Area) => boolean;
   /** false = teste vencido, assinatura cancelada ou conta marcada para ser apagada: a conta fica só para consulta. */
@@ -113,6 +115,8 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       // celular). Só vale se for o mesmo que a conta abre agora; senão (ou se a conta não estiver mais nele) é descartado.
       const palpite = ultimo && ultimo.startsWith(`${u.id}:`) ? ultimo.slice(u.id.length + 1) : null;
       const adiantado = palpite ? buscarBase(palpite).catch(() => null) : null;
+      // a marca de "conta para apagar" do mesmo pet shop também sai já (era uma ida ao banco a mais, depois de tudo)
+      const exclusaoAdiantada = palpite ? lerExclusao(palpite) : null;
       // links de pagamento e se a assinatura abriu: vêm do banco (junto com a conta), para trocar um link sem publicar o site de novo
       const assinatura = sb.rpc("gestao_assinatura").then((r) => {
         if (r.error || !r.data) return;
@@ -132,7 +136,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       try {
         const base = (meu.petshop_id === palpite ? await adiantado : null) ?? await buscarBase(meu.petshop_id);
         try { localStorage.setItem(CHAVE_ULTIMA, `${u.id}:${meu.petshop_id}`); } catch { /* sem armazenamento: segue */ }
-        const [todos, , falta, marcada] = await Promise.all([aplicarBase(base), assinatura, aceites, lerExclusao(meu.petshop_id)]);
+        const [todos, , falta, marcada] = await Promise.all([aplicarBase(base), assinatura, aceites, (meu.petshop_id === palpite && exclusaoAdiantada) || lerExclusao(meu.petshop_id)]);
         if (!vivo) return;
         setFaltam(falta);
         setExclusao(marcada);
@@ -167,6 +171,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       souDono: eu.papel === "dono",
       vejoFinanceiro: podeArea(eu, "caixa") || podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
       cuidoDoFinanceiro: podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
+      vejoCusto: veCusto(eu),
       posso: (area: Area) => podeArea(eu, area),
       liberado,
       exclusao,

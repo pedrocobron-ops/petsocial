@@ -6,6 +6,7 @@ import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
 import { ferramentasPara, type Contexto } from "@/lib/gestao/assistente/ferramentas";
 import { medidasZeradas, responderCartoes, voltas, type Msg, type Resultado } from "@/lib/gestao/assistente/conversa";
 import { INSTRUCOES, contextoDoPetshop } from "@/lib/gestao/assistente/instrucoes";
+import { modeloDeTeste } from "@/lib/gestao/assistente/modelo-de-teste";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 
 export const runtime = "nodejs";
@@ -13,6 +14,8 @@ export const maxDuration = 60;
 
 /** Modelo do assistente (variável na Vercel). */
 const MODELO = process.env.GESTAO_MODELO ?? "claude-haiku-5-5";
+/** Só para testes automáticos: o Mozart responde por um roteiro fixo, sem chamar o modelo. Nunca vale na Vercel. */
+const DE_TESTE = process.env.GESTAO_MOZART_FALSO === "1" && !process.env.VERCEL;
 /** Pedidos por pet shop por dia: segura o custo de uma conta que dispare. */
 const LIMITE_DIA = Number(process.env.GESTAO_ASSISTENTE_LIMITE_DIA ?? 150);
 /** Chamadas ao modelo por pet shop por dia (cada pedido usa uma ou mais; os cartões confirmados também contam). */
@@ -111,10 +114,14 @@ async function tratar(req: Request) {
   const sb = bancoDoUsuario(token);
   const { data: u } = await sb.auth.getUser(token);
   if (!u.user) return erro(401, "sem_login", "Entre de novo para falar com o Mozart.");
-  const [p, e, s] = await Promise.all([
+  // dias fechados e feriados (Meu pet shop) dos próximos 14 dias, com um dia de folga dos dois lados (o relógio é conferido abaixo)
+  const diaDoAparelho = corpo.agora!.slice(0, 10);
+  const somaDia = (n: number) => new Date(Date.parse(`${diaDoAparelho}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
+  const [p, e, s, especiais] = await Promise.all([
     lerPetshop(sb, corpo.petshopId),
     lerEquipe(sb, corpo.petshopId),
     lerServicos(sb, corpo.petshopId),
+    sb.from("dias_especiais").select("dia, nome, fechado, feriado").eq("petshop_id", corpo.petshopId).gte("dia", somaDia(-1)).lte("dia", somaDia(15)).order("dia").limit(40),
   ]);
   const eu = (e.data ?? []).find((x) => x.user_id === u.user!.id && x.ativo);
   if (!p.data || !eu) return erro(403, "sem_acesso", "Você não faz parte deste pet shop.");
@@ -124,6 +131,7 @@ async function tratar(req: Request) {
     vejoFinanceiro: podeArea(eu, "caixa") || podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
     cuidoDoFinanceiro: podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
     fusoMin: corpo.fusoMin, agora: corpo.agora!.slice(0, 16),
+    diasEspeciais: especiais.error ? undefined : (especiais.data ?? []),
   };
   // o relógio que vale é o do servidor: o do aparelho só é usado se bate com ele (aparelho em outro fuso de propósito)
   const doServidor = agoraNoFuso(p.data.fuso || "America/Sao_Paulo");
@@ -148,6 +156,14 @@ async function tratar(req: Request) {
     const r = await responderCartoes({
       c, pendentes, liberado, decisoes: corpo.decisoes, parciais: corpo.parciais,
       anotar: async (acao, detalhes) => { await sb.from("assistente_eventos").insert({ petshop_id: c.petshop.id, user_id: c.userId, acao, detalhes: detalhes as never }); },
+      // cada cartão grava uma vez só: a conversa volta depois de recarregar e a mesma confirmação pode chegar de novo
+      reservar: async (uso) => {
+        const r = await sb.rpc("assistente_acao_reservar", { p_petshop: c.petshop.id, p_uso: uso });
+        // banco sem a função (antes da migração 20261215): segue como antes (dinheiro e estoque já têm a chave)
+        if (r.error) { if (r.error.code !== "PGRST202" && r.error.code !== "42883") console.error("[assistente] reservar ação falhou", r.error.code); return true; }
+        return r.data === true;
+      },
+      liberar: async (uso) => { await sb.rpc("assistente_acao_liberar", { p_petshop: c.petshop.id, p_uso: uso }); },
     });
     mudou = r.mudou;
     mensagens.push({ role: "user", content: r.resultados });
@@ -212,6 +228,7 @@ async function tratar(req: Request) {
             tools: ferramentasPara(c),
             messages: msgs,
           };
+          if (DE_TESTE) return modeloDeTeste(msgs, ao);
           if (!emitir) return cliente.beta.messages.create(pedido, { signal: parar.signal });
           const fluxo = cliente.beta.messages.stream(pedido, { signal: parar.signal });
           fluxo.on("text", (d) => ao.texto(d));
@@ -256,7 +273,8 @@ async function tratar(req: Request) {
     },
     cancel() { aberto = false; parar.abort(); },
   });
-  return new Response(corrente, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-cache, no-transform", "x-accel-buffering": "no" } });
+  // nada de guardar a resposta no meio do caminho: sem cache, sem compressão (no-transform) e sem buffer de proxy
+  return new Response(corrente, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-cache, no-store, no-transform", "x-accel-buffering": "no", "content-encoding": "identity" } });
 }
 
 export const POST = comRegistro("/api/gestao/assistente", tratar);

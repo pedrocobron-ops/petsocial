@@ -28,7 +28,7 @@ export type Porte = "P" | "M" | "G" | "GG";
 export type PetComTutor = Pet & { clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null };
 /** Agendamento com pet, tutor, serviço e profissional. */
 export type AgendamentoCompleto = Agendamento & {
-  pets: (Pick<Pet, "id" | "nome" | "foto" | "porte" | "especie" | "raca" | "alertas"> & {
+  pets: (Pick<Pet, "id" | "nome" | "foto" | "porte" | "especie" | "raca" | "alertas"> & Partial<Pick<Pet, "sexo">> & {
     clientes: Pick<Cliente, "id" | "nome" | "telefone"> | null;
   }) | null;
   servicos: Pick<Servico, "id" | "nome" | "cor" | "categoria"> | null;
@@ -41,7 +41,7 @@ export type AgendamentoCompleto = Agendamento & {
 };
 /** O horário com pet, tutor, serviços e profissional, sem os preços: junte com `comPrecosDeAgendamento` (`reservado.ts`). */
 export const SELECT_AGENDAMENTO =
-  `${COLS_AGENDAMENTO}, pets(id, nome, foto, porte, especie, raca, alertas, clientes(id, nome, telefone)), servicos(id, nome, cor, categoria), profissionais(id, nome, cor), agendamento_servicos(id, servico_id, ordem, servicos(id, nome, cor, categoria))`;
+  `${COLS_AGENDAMENTO}, pets(id, nome, foto, porte, especie, raca, alertas, sexo, clientes(id, nome, telefone)), servicos(id, nome, cor, categoria), profissionais(id, nome, cor), agendamento_servicos(id, servico_id, ordem, servicos(id, nome, cor, categoria))`;
 
 /**
  * Horário de funcionamento: uma chave por dia da semana ("0" domingo … "6" sábado), `null` = fechado.

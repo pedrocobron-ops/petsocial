@@ -11,11 +11,45 @@ type ComOpcoes = { opcoes?: unknown };
 export const CHAVES_HOTEL = {
   sinal: "hotel.sinal", pix: "hotel.pix", porte: "hotel.diaria_por_porte", temporadas: "hotel.temporadas",
   segundoPet: "hotel.desconto_segundo_pet", taxas: "hotel.taxas", cuidados: "hotel.cuidados", acomodacoes: "hotel.acomodacoes",
-  mensagens: "hotel.mensagens", linkSemPreco: "hotel.link_sem_preco",
+  mensagens: "hotel.mensagens", linkSemPreco: "hotel.link_sem_preco", horas: "hotel.horas",
 } as const;
 
+/**
+ * A hora de entrada (check-in a partir de) e de saída (check-out até) do hotel. Vazio = sem hora combinada: o link e a reserva
+ * sugerem a hora como antes (a de abrir e, na saída, a hora da taxa de busca fora do horário, se houver, ou a de fechar).
+ */
+export type HorasDoHotel = { entrada: string | null; saida: string | null };
+const ehHora = (v: unknown): v is string => typeof v === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+export function horasDoHotel(p: ComOpcoes): HorasDoHotel {
+  const o = obj(opcao<unknown>(p, CHAVES_HOTEL.horas, {}));
+  return { entrada: ehHora(o.entrada) ? o.entrada : null, saida: ehHora(o.saida) ? o.saida : null };
+}
+
+/** O que acontece com o sinal quando o tutor cancela: fica com o pet shop, é devolvido ou vira crédito do tutor. */
+export type DestinoDoSinal = "ficar" | "devolver" | "credito";
+/**
+ * A regra de cancelamento, em campos (opcional): cancelou com menos de `dias` dias da entrada → `perto`; com mais tempo → `longe`.
+ * Na hora de cancelar, a folha já vem com a escolha da regra marcada (dá para mudar). Sem regra, nada vem marcado.
+ */
+export type RegraDeCancelamento = { dias: number | null; perto: DestinoDoSinal | null; longe: DestinoDoSinal | null };
 /** Sinal na reserva: sugestão em % do total previsto ou em valor fixo, e o texto da política (escrito pelo dono). */
-export type OpcaoSinal = { ativo: boolean; modo: "pct" | "valor"; valor: number | null; politica: string; creche: boolean };
+export type OpcaoSinal = { ativo: boolean; modo: "pct" | "valor"; valor: number | null; politica: string; creche: boolean; cancela: RegraDeCancelamento };
+const destino = (v: unknown): DestinoDoSinal | null => (v === "ficar" || v === "devolver" || v === "credito" ? v : null);
+/**
+ * A escolha que a regra pede para um cancelamento feito `faltam` dias antes da entrada (0 = no dia; negativo = já passou).
+ * Sem regra que responda, null (nada vem marcado).
+ */
+export function destinoPelaRegra(r: RegraDeCancelamento, faltam: number): DestinoDoSinal | null {
+  if (r.dias == null) return r.perto && r.perto === r.longe ? r.perto : null;
+  return faltam < r.dias ? r.perto : r.longe;
+}
+export const NOME_DESTINO: Record<DestinoDoSinal, string> = { ficar: "fica com o pet shop", devolver: "é devolvido", credito: "vira crédito do tutor" };
+/** "Com menos de 7 dias da entrada, o sinal vira crédito do tutor. Com mais tempo, é devolvido." (vazio sem regra) */
+export function textoDaRegra(r: RegraDeCancelamento): string {
+  if (r.dias == null || (!r.perto && !r.longe)) return "";
+  const d = r.dias === 1 ? "1 dia" : `${r.dias} dias`;
+  return [r.perto ? `Cancelou com menos de ${d} da entrada: o sinal ${NOME_DESTINO[r.perto]}.` : "", r.longe ? `Com ${d} ou mais: o sinal ${NOME_DESTINO[r.longe]}.` : ""].filter(Boolean).join(" ");
+}
 /** Diária do hotel por porte. Porte sem preço usa a diária do hotel de Meu pet shop. */
 export type OpcaoPorte = { ativo: boolean } & Record<Porte, number | null>;
 /** Temporada: um período com diária própria ("valor"), ou com acréscimo em % ("pct") ou em reais ("mais") por noite. */
@@ -46,7 +80,10 @@ const diasEntre = (de: string, ate: string) => Math.round((Date.parse(`${ate}T00
 
 export function sinalDe(p: ComOpcoes): OpcaoSinal {
   const o = obj(opcao<unknown>(p, CHAVES_HOTEL.sinal, {}));
-  return { ativo: o.ativo === true, modo: o.modo === "valor" ? "valor" : "pct", valor: num(o.valor), politica: texto(o.politica, 400), creche: o.creche === true };
+  const c = obj(o.cancela);
+  const dias = num(c.dias);
+  return { ativo: o.ativo === true, modo: o.modo === "valor" ? "valor" : "pct", valor: num(o.valor), politica: texto(o.politica, 400), creche: o.creche === true,
+    cancela: { dias: dias == null ? null : Math.min(365, Math.round(dias)), perto: destino(c.perto), longe: destino(c.longe) } };
 }
 export const pixDe = (p: ComOpcoes) => texto(opcao<unknown>(p, CHAVES_HOTEL.pix, ""), 120).trim();
 export function porteDe(p: ComOpcoes): OpcaoPorte {

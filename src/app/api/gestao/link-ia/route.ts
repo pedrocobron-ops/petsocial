@@ -6,7 +6,7 @@ import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "@/lib/gestao/supabase
 import { segredoDoServidor } from "@/lib/gestao/servidor";
 import { comRegistro, erroDoBanco, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 import {
-  FERRAMENTA_HORARIOS, FERRAMENTA_HOTEL, INSTRUCOES_LINK_IA, MAX_PERGUNTAS_CONVERSA, contextoDoLink, entradaHorarios, entradaHotel,
+  FERRAMENTA_CRECHE, FERRAMENTA_HORARIOS, FERRAMENTA_HOTEL, INSTRUCOES_LINK_IA, estimarCreche, pedidoDeTeste, MAX_PERGUNTAS_CONVERSA, contextoDoLink, entradaHorarios, entradaHotel,
   ferramentasDoLink, foraTexto, lerResposta, limiteConversaTexto, limiteTexto, limparFalas, perguntasNaConversa, respostaDeTeste, resumoDaEstimativa, type DadosDoLink,
 } from "@/lib/gestao/link-ia";
 
@@ -58,12 +58,15 @@ async function tratar(req: Request) {
   const info = infoR.data as unknown as DadosDoLink["info"] | null;
   if (infoR.error || !info || typeof info !== "object" || !info.nome) return NextResponse.json({ erro: "desligado" }, { status: 403 });
   info.servicos = Array.isArray(info.servicos) ? info.servicos : [];
-  const [fechados, hotel, opcoes, experiencia, espera] = await Promise.all([
+  const [fechados, hotel, opcoes, experiencia, espera, planos, taxi] = await Promise.all([
     sb.rpc("link_fechados", { p_codigo: codigo }),
     info.hotel ? sb.rpc("link_hotel_opcoes", { p_codigo: codigo }) : Promise.resolve({ data: null }),
     sb.rpc("link_opcoes", { p_codigo: codigo }),
     info.creche ? sb.rpc("link_creche_experiencia", { p_codigo: codigo }) : Promise.resolve({ data: null }),
     info.creche || info.hotel ? sb.rpc("link_espera_ativa", { p_codigo: codigo }) : Promise.resolve({ data: false }),
+    // os planos mensais que a página mostra e o táxi pet (banco sem a função nova: segue sem)
+    info.creche ? sb.rpc("link_creche_planos", { p_codigo: codigo }) : Promise.resolve({ data: null }),
+    sb.rpc("link_taxi", { p_codigo: codigo }).then((r) => r, () => ({ data: null })),
   ]);
   const d: DadosDoLink = {
     info,
@@ -73,8 +76,18 @@ async function tratar(req: Request) {
     opcoes: (opcoes.data as DadosDoLink["opcoes"]) ?? null,
     experiencia: (experiencia.data as DadosDoLink["experiencia"]) ?? null,
     espera: espera.data === true,
+    planos: (planos.data as DadosDoLink["planos"]) ?? null,
+    taxi: (taxi.data as DadosDoLink["taxi"]) ?? null,
   };
   const nome = info.nome;
+  // a diária comum de cada porte, pela estimativa do próprio link (uma noite de cada porte, sem desconto): o assistente
+  // responde "quanto é para cachorro pequeno e médio?" com os números da página
+  if (d.hotel?.preco?.mostrar !== false && d.hotel?.preco && /^\d{4}-\d{2}-\d{2}$/.test(String(info.hoje ?? ""))) {
+    const amanha = new Date(Date.parse(`${info.hoje}T12:00:00Z`) + 864e5).toISOString().slice(0, 10);
+    const r = await sb.rpc("link_hotel_estimativa", { p_codigo: codigo, p_entrada: info.hoje, p_saida: amanha, p_pets: ["P", "M", "G", "GG"].map((porte) => ({ porte })), p_juntos: false });
+    const pets = (r.data as { pets?: { porte?: string | null; diaria?: unknown }[] } | null)?.pets;
+    if (!r.error && Array.isArray(pets)) d.hotel.porPorte = Object.fromEntries(pets.filter((x) => x.porte && Number.isFinite(Number(x.diaria))).map((x) => [x.porte, Number(x.diaria)]));
+  }
 
   // freios: por conversa, por endereço de internet e por dia (no banco)
   const rede = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "sem-rede";
@@ -93,7 +106,9 @@ async function tratar(req: Request) {
 
   let bruto = "";
   if (DE_TESTE) {
-    bruto = respostaDeTeste(falas[falas.length - 1].texto, contexto, d);
+    // a pergunta de total passa pela mesma ferramenta que o modelo usaria (a estimativa do próprio link)
+    const pedido = pedidoDeTeste(falas[falas.length - 1].texto, d);
+    bruto = pedido ? await rodarFerramenta(sb, codigo, d, pedido.nome, pedido.input) : respostaDeTeste(falas[falas.length - 1].texto, contexto, d);
   } else {
     try {
       bruto = await perguntarAoModelo(sb, codigo, d, contexto, falas);
@@ -162,6 +177,7 @@ async function rodarFerramenta(sb: Banco, codigo: string, d: DadosDoLink, nome: 
     if (error) return "Não deu para estimar agora.";
     return resumoDaEstimativa(data);
   }
+  if (nome === FERRAMENTA_CRECHE) return estimarCreche(input, d);
   return "Ferramenta indisponível.";
 }
 

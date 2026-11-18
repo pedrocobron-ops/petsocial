@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { ClipboardCheck, RotateCcw } from "lucide-react";
-import { CHAVE_EXIGIR, CHAVE_TERMO, exigirDo, IDADE_IDOSO, TERMO_PADRAO, type Exigir } from "@/lib/gestao/entrada";
+import { CHAVE_EXIGIR, CHAVE_TERMO, exigirDo, IDADE_IDOSO, termoPadraoPara, type Exigir } from "@/lib/gestao/entrada";
 import { opcao, salvarOpcoes } from "@/lib/gestao/opcoes";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -10,11 +11,17 @@ import { avisarMudanca, useAvisos, useSomenteLeitura } from "../ui";
 import "../loja/loja.css";
 import "../entrada/entrada.css";
 
-const QUANDO: { id: Exigir; rotulo: string; apoio: string }[] = [
-  { id: "idosos", rotulo: "Só pet idoso", apoio: `Abre sozinho na chegada de pet com ${IDADE_IDOSO} anos ou mais (pela data de nascimento da ficha).` },
-  { id: "todos", rotulo: "Todos os pets", apoio: "Abre sozinho em todo Chegou do banho e em todo check-in." },
-  { id: "opcional", rotulo: "Só quando eu quiser", apoio: "Nunca abre sozinho: fica o botão Conferir a entrada no horário e no cartão." },
-];
+/** As opções, com as palavras do negócio: só hotel ou só creche não lê "Chegou do banho". */
+function quando(p: Parameters<typeof usaModulo>[0]): { id: Exigir; rotulo: string; apoio: string }[] {
+  const banho = usaModulo(p, "banho_tosa"), casa = usaCasa(p), creche = usaModulo(p, "creche");
+  const chegadas = [banho ? "todo Chegou do banho" : "", casa ? `todo check-in${creche ? " e todo Chegou da Chamada da creche" : ""}` : ""].filter(Boolean).join(" e em ");
+  const onde = [banho ? "no horário" : "", casa ? "no cartão do pet" : ""].filter(Boolean).join(" e ");
+  return [
+    { id: "idosos", rotulo: "Só pet idoso", apoio: `Abre sozinho na chegada de pet com ${IDADE_IDOSO} anos ou mais (pela data de nascimento da ficha).` },
+    { id: "todos", rotulo: "Todos os pets", apoio: `Abre sozinho em ${chegadas || "toda chegada"}.` },
+    { id: "opcional", rotulo: "Só quando eu quiser", apoio: `Nunca abre sozinho: fica o botão Conferir a entrada ${onde || "na chegada"}.` },
+  ];
+}
 
 /**
  * Checklist de entrada (Meu pet shop, O negócio): quando a folha abre sozinha na chegada e o texto que o tutor aceita.
@@ -26,6 +33,7 @@ export function OpcoesDaEntrada() {
   const somenteLeitura = useSomenteLeitura();
   const exigir = exigirDo(petshop);
   const guardado = opcao<string>(petshop, CHAVE_TERMO, "").trim();
+  const TERMO_PADRAO = termoPadraoPara(petshop);
   const [texto, setTexto] = useState(guardado || TERMO_PADRAO);
   const [salvando, setSalvando] = useState(false);
 
@@ -49,7 +57,7 @@ export function OpcoesDaEntrada() {
       <div className="g-campo">
         <span>Abrir sozinho na chegada</span>
         <div className="g-ent-escolha" role="radiogroup" aria-label="Quando o checklist abre sozinho">
-          {QUANDO.map((q) => (
+          {quando(petshop).map((q) => (
             <button key={q.id} type="button" role="radio" aria-checked={exigir === q.id} className="g-ent-op" disabled={!souDono || salvando}
               style={exigir === q.id ? { borderColor: "var(--g-verde)", background: "var(--g-verde-tint)" } : undefined}
               onClick={() => { if (exigir !== q.id) void gravar({ [CHAVE_EXIGIR]: q.id }, `Checklist de entrada: ${q.rotulo.toLowerCase()}.`); }}>

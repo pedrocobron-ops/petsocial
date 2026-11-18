@@ -52,7 +52,7 @@ export function FrenteDaLoja({ carregando, produtos, acabando, vendas, novo }: {
           <b style={{ whiteSpace: "normal", fontSize: "1.375rem" }}>
             {carregando ? "Olhando a prateleira…" : novo ? "A loja começa pelo primeiro produto" : acabando.length === 0 ? "Nenhum produto acabando" : acabando.length === 1 ? "1 produto acabando" : `${acabando.length} produtos acabando`}
           </b>
-          {!carregando && !novo && <span style={{ whiteSpace: "normal" }}>{produtos === 1 ? "1 produto na prateleira" : `${produtos} produtos na prateleira`}{vendas ? ` · ${vendas.quantas === 0 ? "nenhuma venda hoje" : `${vendas.quantas === 1 ? "1 venda" : `${vendas.quantas} vendas`} hoje, ${brl(vendas.total)}`}` : ""}</span>}
+          {!carregando && !novo && <span style={{ whiteSpace: "normal" }}>{produtos === 1 ? "1 produto na prateleira" : `${produtos} produtos na prateleira`}{vendas ? ` · ${vendas.quantas === 0 ? "nenhuma venda no balcão hoje" : `${vendas.quantas === 1 ? "1 venda" : `${vendas.quantas} vendas`} no balcão hoje, ${brl(vendas.total)}`}` : ""}</span>}
           {!carregando && novo && <span style={{ whiteSpace: "normal" }}>Cadastre o que você vende. Depois, cada venda dá baixa no estoque sozinha.</span>}
         </div>
       </div>

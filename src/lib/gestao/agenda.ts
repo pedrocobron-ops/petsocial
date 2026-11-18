@@ -53,42 +53,66 @@ export function textoDoLink(petshop: { nome: string; modulos?: string[] | null }
   return `${saudacaoZap(tutor, petshop.nome)} ${corpo} ${endereco}`;
 }
 
-/** Texto do lembrete que vai para o WhatsApp do tutor. */
-export function textoLembrete(p: { tutor?: string | null; pet: string; servico?: string | null; quando: string; hora: string; petshop: string }) {
-  return `${saudacaoZap(p.tutor, p.petshop)} Passando para lembrar ${p.servico ? `do ${p.servico.toLowerCase()}` : "do horário"} de ${p.pet} ${p.quando} às ${p.hora}. Posso confirmar?`;
+/** Sexo do pet na ficha ("M", "F" ou vazio). */
+export type SexoPet = string | null | undefined;
+/** "do Thor", "da Mel", "de Bidu" (sem sexo na ficha). */
+export const doPet = (pet: string, sexo?: SexoPet) => `${sexo === "F" ? "da" : sexo === "M" ? "do" : "de"} ${pet}`;
+/** "Thor marcado", "Mel marcada" (sem sexo: "Bidu marcado", como antes). */
+export const marcadoPara = (pet: string, sexo?: SexoPet) => `${pet} ${sexo === "F" ? "marcada" : "marcado"}`;
+
+// serviços que pedem "a" (o resto é "o": o banho, o corte de unhas, o spa)
+const FEMININO = /^(tosa|hidrata|escova|limpeza|consulta|vacina|aplica|massagem|tintura|pintura|cauteriza|sess|avalia|higieniza|reconstru|depila|desembara|remo|aromaterapia|ozonioterapia|banheira|selagem|botox|cromoterapia|pedicure|manicure|tosagem|lavagem|secagem)/;
+// serviços conhecidos: com eles a mensagem diz o nome ("O banho e a hidratação"); com outros, "O horário" / "O atendimento"
+const CONHECIDO = /^(banho|tosa|hidrata|escova|corte|limpeza|spa|desembolo|desembara|tratamento|massagem|banho|tosagem|pedicure|aplica|vacina|consulta|higieniza|cauteriza|reconstru|ozonio|aromaterapia|selagem|botox|cromoterapia|lavagem|secagem)/;
+
+/**
+ * "Banho, Hidratação e Tosa" → "O banho, a hidratação e a tosa", com o que o verbo precisa saber: mais de um (plural) e
+ * se todos são femininos. Serviço com nome que o sistema não conhece: null (a mensagem diz "O horário").
+ */
+export function servicoComArtigo(servico: string | null | undefined): { texto: string; varios: boolean; feminino: boolean } | null {
+  const s = (servico ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!s) return null;
+  const partes = s.split(/, | e /).map((x) => x.trim()).filter(Boolean);
+  if (!partes.length || !partes.every((x) => CONHECIDO.test(x))) return null;
+  const com = partes.map((x) => `${FEMININO.test(x) ? "a" : "o"} ${x}`);
+  const lista = com.length === 1 ? com[0] : `${com.slice(0, -1).join(", ")} e ${com[com.length - 1]}`;
+  return { texto: lista[0].toUpperCase() + lista.slice(1), varios: partes.length > 1, feminino: partes.every((x) => FEMININO.test(x)) };
+}
+/** "ficou marcado", "ficou marcada", "ficaram marcados", "ficaram marcadas". */
+const concorda = (x: { varios: boolean; feminino: boolean }, um: string, varios: string, part: string) =>
+  `${x.varios ? varios : um} ${part}${x.feminino ? "a" : "o"}${x.varios ? "s" : ""}`;
+
+/** Texto do lembrete que vai para o WhatsApp do tutor: "Passando para lembrar do banho e da hidratação da Luna hoje às 16:00." */
+export function textoLembrete(p: { tutor?: string | null; pet: string; sexo?: SexoPet; servico?: string | null; quando: string; hora: string; petshop: string }) {
+  const x = servicoComArtigo(p.servico);
+  const doQue = x ? x.texto.toLowerCase().replace(/(^|, | e )([oa]) /g, (_m, sep: string, art: string) => `${sep}d${art} `) : "do horário";
+  return `${saudacaoZap(p.tutor, p.petshop)} Passando para lembrar ${doQue} ${doPet(p.pet, p.sexo)} ${p.quando} às ${p.hora}. Posso confirmar?`;
 }
 
 /**
  * Texto do aviso de que o atendimento terminou e o pet pode ir para casa (WhatsApp do tutor).
- * Sem "pronto/pronta", que erra com metade dos pets: "O banho de Mel terminou. Já pode vir buscar."
+ * Sem "pronto/pronta", que erra com metade dos pets: "O banho da Mel terminou. Já pode vir buscar."
  */
-export function textoPronto(p: { tutor?: string | null; pet: string; petshop: string; servico?: string | null }) {
-  const s = (p.servico ?? "").trim().toLowerCase();
-  const oQue = /^banho/.test(s) ? `O ${s}` : /^(tosa|hidratação|escovação)/.test(s) ? `A ${s}` : "O atendimento";
-  // dois serviços ("banho e hidratação"): o verbo vai para o plural
-  const varios = / e |, /.test(s.replace(/^banho e tosa( higiênica)?/, "banho"));
-  return `${saudacaoZap(p.tutor, p.petshop)} ${oQue} de ${p.pet} ${varios && oQue !== "O atendimento" ? "terminaram" : "terminou"}. Já pode vir buscar.`;
+export function textoPronto(p: { tutor?: string | null; pet: string; sexo?: SexoPet; petshop: string; servico?: string | null }) {
+  const x = servicoComArtigo(p.servico);
+  return `${saudacaoZap(p.tutor, p.petshop)} ${x ? x.texto : "O atendimento"} ${doPet(p.pet, p.sexo)} ${x?.varios ? "terminaram" : "terminou"}. Já pode vir buscar.`;
 }
 
-/** Confirmação de um horário recém-marcado: "O banho de Mel ficou marcado para segunda, 16/11 às 09:00." */
-export function textoConfirmacao(p: { tutor?: string | null; pet: string; servico?: string | null; quando: string; hora: string; petshop: string }) {
-  const s = (p.servico ?? "").trim().toLowerCase();
-  const oQue = /^banho/.test(s) ? `O ${s}` : /^(tosa|hidratação|escovação)/.test(s) ? `A ${s}` : "O horário";
-  const ficou = oQue.startsWith("A ") ? "ficou marcada" : "ficou marcado";
-  return `${saudacaoZap(p.tutor, p.petshop)} ${oQue} de ${p.pet} ${ficou} para ${p.quando} às ${p.hora}. Qualquer coisa, é só chamar por aqui.`;
+/** Confirmação de um horário recém-marcado: "O banho da Mel ficou marcado para segunda, 16/11 às 09:00." */
+export function textoConfirmacao(p: { tutor?: string | null; pet: string; sexo?: SexoPet; servico?: string | null; quando: string; hora: string; petshop: string }) {
+  const x = servicoComArtigo(p.servico) ?? { texto: "O horário", varios: false, feminino: false };
+  return `${saudacaoZap(p.tutor, p.petshop)} ${x.texto} ${doPet(p.pet, p.sexo)} ${concorda(x, "ficou", "ficaram", "marcad")} para ${p.quando} às ${p.hora}. Qualquer coisa, é só chamar por aqui.`;
 }
 
-/** Aviso de que o horário mudou: "O banho de Nina foi remarcado para amanhã às 14:00." A pessoa manda pelo WhatsApp. */
-export function textoRemarcado(p: { tutor?: string | null; pet: string; servico?: string | null; quando: string; hora: string; petshop: string }) {
-  const s = (p.servico ?? "").trim().toLowerCase();
-  const oQue = /^banho/.test(s) ? `O ${s}` : /^(tosa|hidratação|escovação)/.test(s) ? `A ${s}` : "O horário";
-  const foi = oQue.startsWith("A ") ? "foi remarcada" : "foi remarcado";
-  return `${saudacaoZap(p.tutor, p.petshop)} ${oQue} de ${p.pet} ${foi} para ${p.quando} às ${p.hora}. Se esse horário não der, é só avisar que a gente acha outro.`;
+/** Aviso de que o horário mudou: "O banho da Nina foi remarcado para amanhã às 14:00." A pessoa manda pelo WhatsApp. */
+export function textoRemarcado(p: { tutor?: string | null; pet: string; sexo?: SexoPet; servico?: string | null; quando: string; hora: string; petshop: string }) {
+  const x = servicoComArtigo(p.servico) ?? { texto: "O horário", varios: false, feminino: false };
+  return `${saudacaoZap(p.tutor, p.petshop)} ${x.texto} ${doPet(p.pet, p.sexo)} ${concorda(x, "foi", "foram", "remarcad")} para ${p.quando} às ${p.hora}. Se esse horário não der, é só avisar que a gente acha outro.`;
 }
 
 /** Aviso de que o horário foi cancelado, com o convite para marcar outro dia. */
-export function textoCancelado(p: { tutor?: string | null; pet: string; quando: string; hora: string; petshop: string }) {
-  return `${saudacaoZap(p.tutor, p.petshop)} O horário de ${p.pet} de ${p.quando} às ${p.hora} foi cancelado. Quando quiser marcar outro dia, é só chamar.`;
+export function textoCancelado(p: { tutor?: string | null; pet: string; sexo?: SexoPet; quando: string; hora: string; petshop: string }) {
+  return `${saudacaoZap(p.tutor, p.petshop)} O horário ${doPet(p.pet, p.sexo)} de ${p.quando} às ${p.hora} foi cancelado. Quando quiser marcar outro dia, é só chamar.`;
 }
 
 /* ---------- série (horário que se repete) e bloqueio ---------- */

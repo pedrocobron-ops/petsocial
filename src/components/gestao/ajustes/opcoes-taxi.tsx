@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Trash2, Truck } from "lucide-react";
 import { CHAVE_TAXA, taxaDoLevaTraz, taxaParaGravar, type Bairro, type TaxaLevaTraz } from "@/lib/gestao/quadro";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
+import { usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { brl } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -46,7 +47,10 @@ export default function OpcoesDoLevaTraz() {
   return (
     <section className="g-card g-pilha" id="opcoes-leva-traz">
       <div className="g-mp-t"><Tile icone={Truck} tom="ceu" /><div><h2>Taxa de leva e traz</h2></div></div>
-      <p className="g-muted g-p">Quando o horário tem leva e traz, Fechar a conta sugere esta taxa. Ela só entra na conta se a pessoa tocar em Pôr na conta: nenhum preço muda sozinho.</p>
+      <p className="g-muted g-p">{[
+        usaModulo(petshop, "banho_tosa") ? "Quando o horário tem leva e traz, Fechar a conta sugere esta taxa." : "",
+        usaCasa(petshop) ? "No check-out de uma estadia com leva e traz (diária avulsa ou hotel), a conta sugere esta taxa." : "",
+      ].filter(Boolean).join(" ")} Ela só entra na conta se a pessoa tocar em Pôr na conta: nenhum preço muda sozinho.{usaModulo(petshop, "creche") ? " O táxi dos mensalistas tem o preço no plano de cada um (Creche, Mensalistas)." : ""}</p>
       <div className="g-seg" role="group" aria-label="Como cobrar">
         <button type="button" aria-pressed={modo === "fixo"} disabled={!souDono} onClick={() => setModo("fixo")}>Valor fixo</button>
         <button type="button" aria-pressed={modo === "bairro"} disabled={!souDono} onClick={() => setModo("bairro")}>Por bairro</button>

@@ -7,7 +7,10 @@ import { ArrowLeft, Check, ChevronLeft, ChevronRight, MapPin, MessageCircle, Nav
 import type { AgendamentoCompleto } from "@/lib/gestao/tipos";
 import { SELECT_AGENDAMENTO } from "@/lib/gestao/tipos";
 import { nomeDosServicos } from "@/lib/gestao/servicos-do-horario";
-import { dataAmigavel, dataLonga, deIsoDia, fmtTelefone, hora, isoDia, linkWhatsApp, mesmoDia, somaDias, telefoneLimpo } from "@/lib/gestao/util";
+import { dataAmigavel, dataLonga, deIsoDia, fmtTelefone, hora, horarioDoDia, isoDia, linkWhatsApp, mesmoDia, somaDias, telefoneLimpo } from "@/lib/gestao/util";
+import { lerPresencas, montarChamada, taxiDe, type PlanoCompleto } from "@/lib/gestao/creche";
+import { lerCalendarioUmaVez } from "@/lib/gestao/feriados";
+import { nomeDaCasa, usaModulo } from "@/lib/gestao/modulos";
 import {
   alertasDoPet, juntarViagens, linkDaRota, linkDoMapa, montarViagens, textoChegando, viagensDaEstadia, MAX_PARADAS,
   type EstadiaLevaTraz, type Etapa, type LinhaQuadro, type Viagem, type ViagemFeita,
@@ -26,6 +29,43 @@ const SELECT_ESTADIA_LT = "id, tipo, entrada, saida_prevista, saida, status, men
 
 /** O que a linha precisa saber do pet, venha de um horário ou de uma estadia. */
 type Item = { pet: PetDaEstadiaLT | Horario["pets"]; tutor: Tutor | null; detalhe: string; obs: string | null; status: string; estadia: boolean };
+/** Táxi do mensalista: a viagem é do plano e do dia (não precisa de reserva). */
+type ViagemMensalista = Viagem & { planoId: string; dia: string };
+const SELECT_PLANO_TAXI = "*, pets(id, nome, foto, especie, sexo, alertas, ativo, clientes(id, nome, telefone, endereco))";
+
+/**
+ * As viagens do táxi dos mensalistas num dia: quem tem táxi no plano e é esperado (ou já veio) na chamada. Buscar fica na hora
+ * em que a creche abre; levar, na hora em que fecha, e só fica pronto depois que o pet chegou. Quem faltou sai da lista.
+ */
+async function viagensDosMensalistas(sb: ReturnType<typeof useGestao>["sb"], petshopId: string, horario: unknown, dia: string) {
+  const r = await sb.from("creche_planos").select(SELECT_PLANO_TAXI).eq("petshop_id", petshopId).not("taxi", "is", null).lte("inicio", dia).limit(1000);
+  if (r.error) return { viagens: [] as ViagemMensalista[], planos: [] as PlanoCompleto[] };
+  const planos = ((r.data ?? []) as unknown as PlanoCompleto[]).filter((p) => !p.fim || p.fim >= dia).map((p) => ({ ...p, valor_mensal: null, valor_extra: null, temValor: false }));
+  if (!planos.length) return { viagens: [] as ViagemMensalista[], planos };
+  const [mov, feitas] = await Promise.all([
+    lerPresencas(sb, petshopId, dia, dia),
+    sb.from("creche_taxi_viagens").select("plano_id, perna, feito_em, feito_por").eq("petshop_id", petshopId).eq("dia", dia),
+    lerCalendarioUmaVez(sb, petshopId, false).catch(() => null),
+  ]);
+  const feita = new Map(((feitas.data ?? []) as { plano_id: string; perna: string; feito_em: string; feito_por: string | null }[]).map((x) => [`${x.plano_id}:${x.perna}`, x]));
+  const h = horarioDoDia(horario, deIsoDia(dia));
+  const naHora = (hh: string) => { const d = deIsoDia(dia); const [a, m] = hh.split(":").map(Number); d.setHours(a, m || 0, 0, 0); return d.toISOString(); };
+  const viagens: ViagemMensalista[] = [];
+  for (const l of montarChamada(planos, dia, mov.presencas, mov.faltas, horario)) {
+    const taxi = taxiDe(l.plano);
+    if (!taxi || l.estado === "faltou") continue;
+    const endereco = (l.plano.pets?.clientes as Tutor | null | undefined)?.endereco?.trim() || null;
+    const chegou = l.estado === "na_casa" || l.estado === "saiu";
+    for (const perna of (taxi === "ida" ? ["buscar"] : taxi === "volta" ? ["levar"] : ["buscar", "levar"]) as ("buscar" | "levar")[]) {
+      const f = feita.get(`${l.plano.id}:${perna}`);
+      const quando = perna === "buscar" ? (l.presenca?.entrada && chegou ? l.presenca.entrada : naHora(h?.abre.slice(0, 5) ?? "08:00"))
+        : (l.presenca?.saida ?? naHora(h?.fecha.slice(0, 5) ?? "18:00"));
+      viagens.push({ chave: `m${l.plano.id}:${perna}`, agendamentoId: null, estadiaId: null, perna, quando, pronto: perna === "buscar" || chegou, prontoEm: null,
+        feitoEm: f?.feito_em ?? null, feitoPor: f?.feito_por ?? null, endereco, planoId: l.plano.id, dia });
+    }
+  }
+  return { viagens, planos };
+}
 
 /**
  * Leva e traz do dia, para quem dirige: buscar o pet na casa do tutor e levar de volta, na ordem do relógio. Junta os horários do
@@ -50,7 +90,11 @@ function LevaTraz({ origem }: { origem: "agenda" | "casa" }) {
     return () => { document.title = antes; };
   }, [dia, petshop.nome]);
 
+  const comCreche = veEstadias && usaModulo(petshop, "creche");
   const { dados, carregando, erro, recarregar } = useDados(async () => {
+    // o táxi dos mensalistas (plano com táxi) corre junto das outras leituras
+    const mensP = comCreche ? viagensDosMensalistas(sb, petshop.id, petshop.horario, dia).catch(() => ({ viagens: [] as ViagemMensalista[], planos: [] as PlanoCompleto[] }))
+      : Promise.resolve({ viagens: [] as ViagemMensalista[], planos: [] as PlanoCompleto[] });
     const [ags, ests] = await Promise.all([
       veHorarios ? sb.from("agendamentos").select(SELECT).eq("petshop_id", petshop.id).eq("leva_traz", true)
         .gte("inicio", data.toISOString()).lt("inicio", somaDias(data, 1).toISOString()).order("inicio").then((r) => ok(r) as unknown as Horario[]) : Promise.resolve([] as Horario[]),
@@ -73,8 +117,9 @@ function LevaTraz({ origem }: { origem: "agenda" | "casa" }) {
     const ve = eIds.length ? await sb.from("leva_traz_estadias").select("estadia_id, perna, feito_em, feito_por").eq("petshop_id", petshop.id).in("estadia_id", eIds) : { data: [], error: null };
     if (ve.error) throw new Error(ve.error.message);
     const feitasE = new Map(((ve.data ?? []) as (ViagemFeita & { estadia_id: string })[]).map((x) => [`${x.estadia_id}:${x.perna}`, x]));
-    return { ags, ests: doDia, viagens: juntarViagens(montarViagens(ags, quadro, feitas), ...doDia.map((e) => viagensDaEstadia(e, dia, feitasE))) };
-  }, [petshop.id, dia, veHorarios, veEstadias]);
+    const mens = await mensP;
+    return { ags, ests: doDia, mens: mens.planos, viagens: juntarViagens(montarViagens(ags, quadro, feitas), ...doDia.map((e) => viagensDaEstadia(e, dia, feitasE)), mens.viagens) };
+  }, [petshop.id, dia, veHorarios, veEstadias, comCreche]);
 
   // de hoje: atualiza sozinho a cada minuto (o pet fica pronto no banho enquanto o motorista está na rua)
   useEffect(() => {
@@ -89,9 +134,15 @@ function LevaTraz({ origem }: { origem: "agenda" | "casa" }) {
     for (const e of dados?.ests ?? []) {
       m.set(`e${e.id}`, { pet: e.pets, tutor: e.pets?.clientes ?? null, detalhe: e.tipo === "hotel" ? "Hotel" : "Creche", obs: e.obs, status: e.status, estadia: true });
     }
+    for (const p of dados?.mens ?? []) {
+      const pet = p.pets as unknown as PetDaEstadiaLT | null;
+      const chegou = (dados?.viagens ?? []).some((v) => (v as ViagemMensalista).planoId === p.id && v.perna === "levar" && v.pronto);
+      m.set(`m${p.id}`, { pet, tutor: pet?.clientes ?? null, detalhe: "Creche · mensalista", obs: null, status: chegou ? "em_casa" : "reservada", estadia: true });
+    }
     return m;
   }, [dados]);
-  const itemDe = (v: Viagem) => itens.get(v.estadiaId ? `e${v.estadiaId}` : v.agendamentoId ?? "");
+  const planoDa = (v: Viagem) => (v as Partial<ViagemMensalista>).planoId ?? null;
+  const itemDe = (v: Viagem) => itens.get(planoDa(v) ? `m${planoDa(v)}` : v.estadiaId ? `e${v.estadiaId}` : v.agendamentoId ?? "");
   const viagens = dados?.viagens ?? [];
   const faltam = viagens.filter((v) => !v.feitoEm);
   const mostradas = todas ? viagens : faltam;
@@ -106,7 +157,10 @@ function LevaTraz({ origem }: { origem: "agenda" | "casa" }) {
     if (somenteLeitura() || mexendo) return;
     setMexendo(v.chave);
     try {
-      const r = v.estadiaId
+      const m = v as Partial<ViagemMensalista>;
+      const r = m.planoId && m.dia
+        ? await sb.rpc("creche_taxi_viagem_marcar", { p_petshop: petshop.id, p_plano: m.planoId, p_dia: m.dia, p_perna: v.perna, p_feito: feito })
+        : v.estadiaId
         ? await sb.rpc("leva_traz_estadia_marcar", { p_petshop: petshop.id, p_estadia: v.estadiaId, p_perna: v.perna, p_feito: feito })
         : await sb.rpc("leva_traz_marcar", { p_petshop: petshop.id, p_agendamento: v.agendamentoId!, p_perna: v.perna, p_feito: feito });
       if (r.error) throw new Error(r.error.message);
@@ -117,10 +171,11 @@ function LevaTraz({ origem }: { origem: "agenda" | "casa" }) {
     } catch (e) { avisarErro(e); } finally { setMexendo(null); }
   }
 
-  const voltar = origem === "casa" ? { href: "/gestao/app/creche-hotel", rotulo: "Creche e hotel" } : { href: `/gestao/app/agenda?dia=${dia}`, rotulo: "Agenda" };
+  const casa = nomeDaCasa(petshop);
+  const voltar = origem === "casa" ? { href: "/gestao/app/creche-hotel", rotulo: casa } : { href: `/gestao/app/agenda?dia=${dia}`, rotulo: "Agenda" };
   const textoVazio = veHorarios && veEstadias
-    ? "Para entrar aqui, marque Leva e traz no horário da Agenda ou na reserva da Creche e hotel, com o endereço."
-    : veEstadias ? "Para uma estadia entrar aqui, marque Leva e traz na reserva ou no check-in da Creche e hotel, com o endereço."
+    ? `Para entrar aqui, marque Leva e traz no horário da Agenda ou na reserva (${casa}), com o endereço.${comCreche ? " Mensalista com táxi no plano aparece sozinho nos dias do plano." : ""}`
+    : veEstadias ? `Para uma estadia entrar aqui, marque Leva e traz na reserva ou no check-in (${casa}), com o endereço.${comCreche ? " Mensalista com táxi no plano aparece sozinho nos dias do plano." : ""}`
     : "Para um horário entrar aqui, marque Leva e traz ao marcar ou alterar o horário na Agenda e escreva o endereço.";
 
   return (

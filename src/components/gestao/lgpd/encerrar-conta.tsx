@@ -107,7 +107,7 @@ function FolhaEncerrar({ aoFechar }: { aoFechar: () => void }) {
   );
 }
 
-type Registro = { acao: string; quem: string | null; quando: string; detalhe: Record<string, unknown> };
+type Registro = { acao: string; quem: string | null; quando: string; detalhe: Record<string, unknown>; protocolo?: string | null; cliente?: string | null };
 const ACAO: Record<string, string> = {
   baixou_dados: "Baixou todos os dados", baixou_tutor: "Baixou os dados de um tutor", apagou_tutor: "Apagou os dados de um tutor",
   pediu_exclusao: "Pediu para apagar a conta", cancelou_exclusao: "Cancelou a exclusão da conta", saiu_da_equipe: "Saiu da equipe",
@@ -120,11 +120,15 @@ export function RegistroDeDados() {
   return (
     <section className="g-card gl-cartao">
       <div className="g-card-t"><h3><Tile icone={History} tom="lilas" tamanho="p" />Registro de pedidos de dados</h3></div>
-      <p className="g-muted g-pp">Fica anotado quem baixou ou apagou dados e quando, para você mostrar, se precisar, que atendeu o pedido de um cliente.</p>
+      <p className="g-muted g-pp">Fica anotado quem baixou ou apagou dados, de qual cliente e quando, com um protocolo para você dar ao cliente e mostrar, se precisar, que atendeu o pedido. Depois de apagar, o cliente aparece só como &quot;Cliente removido&quot;.</p>
       {erro ? <p className="g-erro">{erro}</p> : !dados ? <p className="g-muted g-pp">Carregando…</p> : !dados.length ? <p className="g-muted g-pp">Nada ainda.</p> : (
         <ul className="gl-registro">
           {dados.slice(0, 10).map((r, i) => (
-            <li key={i}><b>{ACAO[r.acao] ?? r.acao}</b><span>{dataCompleta(r.quando)} às {hora(r.quando)}{r.quem ? ` · ${r.quem}` : ""}</span></li>
+            <li key={i}>
+              <b>{ACAO[r.acao] ?? r.acao}{r.cliente ? `: ${r.cliente}` : ""}</b>
+              <span>{dataCompleta(r.quando)} às {hora(r.quando)}{r.quem ? ` · ${r.quem}` : ""}</span>
+              {r.protocolo && <span className="gl-protocolo">Protocolo <b className="g-tab">{r.protocolo}</b></span>}
+            </li>
           ))}
         </ul>
       )}
