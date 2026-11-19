@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, KeyRound, Link2, Search } from "lucide-react";
+import { ClipboardPaste, ExternalLink, Eye, EyeOff, KeyRound, Link2, Search } from "lucide-react";
 import { Esqueleto, Folha, mensagemDeErro, ok, useAvisos } from "@/components/gestao/ui";
 import { PERIODOS, PLANOS, precoDe, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
 import { banco } from "@/lib/gestao/supabase";
@@ -158,6 +158,18 @@ function Segredo({ qual, titulo, feito, em, aoGravar }: { qual: "gestao" | "esco
   const { avisar, avisarErro } = useAvisos();
   const [valor, setValor] = useState("");
   const [indo, setIndo] = useState(false);
+  // o campo nasce escondido; o olho mostra o que foi colado, para conferir antes de gravar
+  const [ver, setVer] = useState(false);
+  async function colar() {
+    try {
+      const t = (await navigator.clipboard.readText()).trim();
+      if (!t) { avisar("A área de transferência está vazia. Copie a chave na Cakto e toque em Colar de novo."); return; }
+      setValor(t);
+      setVer(true);
+    } catch {
+      avisar("O navegador não deixou colar por aqui. Clique no campo e use Ctrl+V (no celular, toque e segure).");
+    }
+  }
   async function gravar() {
     const v = valor.trim();
     if (v.length < 8) { avisar("Cole a chave inteira, como aparece na Cakto."); return; }
@@ -177,10 +189,15 @@ function Segredo({ qual, titulo, feito, em, aoGravar }: { qual: "gestao" | "esco
       </div>
       <form className="g-fila" style={{ alignItems: "end", flexWrap: "wrap" }} onSubmit={(e) => { e.preventDefault(); void gravar(); }}>
         <label className="g-campo" style={{ flex: "1 1 240px" }}><span>{feito ? "Trocar a chave" : "Colar a chave"}</span>
-          <input className="g-input" type="password" autoComplete="off" spellCheck={false} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="cole aqui a chave secreta" aria-label={titulo} />
+          <span className="g-fila" style={{ gap: 6, flexWrap: "nowrap" }}>
+            <input className="g-input" style={{ flex: 1, minWidth: 0 }} type={ver ? "text" : "password"} autoComplete="off" spellCheck={false} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="cole aqui a chave secreta" aria-label={titulo} />
+            <button type="button" className="g-btn fantasma p" onClick={() => setVer((x) => !x)} aria-label={ver ? "Esconder a chave" : "Mostrar a chave"} aria-pressed={ver}>{ver ? <EyeOff aria-hidden /> : <Eye aria-hidden />}</button>
+          </span>
         </label>
+        <button type="button" className="g-btn fantasma" onClick={() => void colar()}><ClipboardPaste aria-hidden />Colar</button>
         <button className="g-btn sec" type="submit" disabled={indo || !valor.trim()}>{indo ? "Gravando…" : "Gravar chave"}</button>
       </form>
+      <p className="g-pp g-muted">Na Cakto, toque no olho do campo da chave antes de copiar: com a chave escondida, o navegador copia outra coisa no lugar dela.</p>
     </div>
   );
 }

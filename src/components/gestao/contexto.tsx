@@ -52,6 +52,8 @@ export type Gestao = {
   atraso: { travaEm: Date; dias: number } | null;
   /** Recarrega pet shop, equipe e serviços depois de uma alteração. */
   recarregarBase: () => Promise<void>;
+  /** Lê de novo se o pagamento está aberto e os links de cada plano (a tela Assinatura chama ao abrir). */
+  recarregarAssinatura: () => Promise<void>;
   sair: () => Promise<void>;
 };
 
@@ -110,6 +112,8 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
   const [erro, setErro] = useState<string | null>(null);
   /** A assinatura abriu (o fim do teste vale)? null = não deu para ler do banco: segue a regra antiga, pelos links. */
   const [aberta, setAberta] = useState<boolean | null>(null);
+  /** Muda quando os links de pagamento são lidos de novo: faz as telas desenharem os botões com o link novo. */
+  const [vezDosLinks, setVezDosLinks] = useState(0);
   /** Assinatura atrasada: quando trava (função `assinatura_situacao`). null = não está atrasada ou o banco ainda não diz. */
   const [atraso, setAtraso] = useState<{ loja: string; travaEm: Date; dias: number } | null>(null);
   /** Documentos com versão nova que esta pessoa ainda não aceitou: com algum, o aplicativo mostra a tela de aceite. */
@@ -219,6 +223,16 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     return () => { vivo = false; };
   }, [sb, lojaAtrasada]);
 
+  // a tela Assinatura lê de novo ao abrir (o administrador pode ter ligado o pagamento com o aplicativo já aberto)
+  const recarregarAssinatura = useCallback(async () => {
+    const r = await sb.rpc("gestao_assinatura");
+    if (r.error || !r.data) return;
+    const a = r.data as { aberta?: boolean; links?: Record<string, string> };
+    usarLinksDoBanco(a.links);
+    setAberta(Boolean(a.aberta));
+    setVezDosLinks((n) => n + 1);
+  }, [sb]);
+
   const valor = useMemo<Gestao | null>(() => {
     if (!user || !eu || !petshop) return null;
     const emTeste = petshop.status === "teste";
@@ -256,9 +270,11 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
         const novo = todos.find((x) => x.id === eu.id);
         if (novo) setEu(novo);
       },
+      recarregarAssinatura,
       sair: async () => { try { localStorage.removeItem(CHAVE_NOME); } catch { /* sem armazenamento */ } esquecerTudo(); await sb.auth.signOut(); router.replace("/gestao/entrar"); },
     };
-  }, [sb, user, eu, petshop, equipe, servicos, carregarBase, router, aberta, atraso, exclusao, lerExclusao]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- vezDosLinks só serve para refazer o valor quando os links mudam
+  }, [sb, user, eu, petshop, equipe, servicos, carregarBase, router, aberta, atraso, exclusao, lerExclusao, vezDosLinks, recarregarAssinatura]);
 
   /** "Tentar de novo" na abertura: refaz a abertura aqui mesmo (sem baixar o aplicativo outra vez). */
   const tentarDeNovo = () => { setErro(null); setEtapa("login"); setTentativa((n) => n + 1); };

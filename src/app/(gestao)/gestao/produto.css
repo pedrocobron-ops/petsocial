@@ -139,6 +139,7 @@
 .gp-planos-grade ul { list-style: none; padding: 0; margin: 1rem 0 1.25rem; display: grid; gap: .55rem; }
 .gp-planos-grade ul li { display: flex; gap: .6rem; align-items: flex-start; }
 .gp-planos-grade ul svg { width: 19px; height: 19px; flex: none; margin-top: .2rem; color: var(--v); }
+.gp-taxa { text-align: center; color: var(--cinza); font-size: .82rem; margin: .9rem auto 0 !important; }
 .gp-planos-nota { text-align: center; color: var(--cinza); margin: 1.75rem auto 0 !important; max-width: 60ch; }
 @media (min-width: 820px) { .gp-planos-grade { grid-template-columns: repeat(3, 1fr); align-items: stretch; } }
 

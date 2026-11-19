@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import { AlertTriangle, BadgeCheck, Check, Clock, Database, ExternalLink, Gift, Lock, MessageCircle, Sparkles, Store, Ticket, User, Users } from "lucide-react";
 import { Tile, type Tom } from "@/components/gestao/painel";
@@ -8,7 +8,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { Vazio, useDados } from "@/components/gestao/ui";
 import { linkSuporte } from "@/lib/gestao/contato";
 import { artigoDe } from "@/lib/gestao/modulos";
-import { DIAS_DE_ATRASO_PADRAO, PERIODOS, PLANOS, TEXTOS_ASSINAR, conselhoDoPlano, limparCupom, linkDoCheckout, ofertaDe, planoPorId, textoParaAssinar, textoPessoas, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
+import { DIAS_DE_ATRASO_PADRAO, PERIODOS, PLANOS, TEXTOS_ASSINAR, TEXTO_TAXA, conselhoDoPlano, limparCupom, linkDoCheckout, ofertaDe, planoPorId, textoParaAssinar, textoPessoas, type PeriodoId, type PlanoId } from "@/lib/gestao/planos";
 import { linhaDoVendedor, temVendedor, vendedorDe } from "@/lib/gestao/vendedor";
 import { ocupaAcesso } from "@/components/gestao/equipe/modelo";
 import { TEXTO_TESTE } from "@/components/gestao/fim-do-teste";
@@ -42,7 +42,9 @@ function Acessos({ n }: { n: number }) {
 }
 
 export default function Assinatura() {
-  const { sb, souDono, petshop, user, equipe, liberado, diasDeTeste, assinaturaAberta, atraso } = useGestao();
+  const { sb, souDono, petshop, user, equipe, liberado, diasDeTeste, assinaturaAberta, atraso, recarregarAssinatura } = useGestao();
+  // o administrador pode ter ligado o pagamento (ou trocado um link) com o aplicativo já aberto: confere de novo ao abrir a tela
+  useEffect(() => { void recarregarAssinatura(); }, [recarregarAssinatura]);
   const [periodo, setPeriodo] = useState<PeriodoId>("mensal");
   // "Tenho um cupom": o código vai junto no link de pagamento (ou na mensagem do WhatsApp); quem confere é a Cakto
   const [comCupom, setComCupom] = useState(false);
@@ -127,6 +129,7 @@ export default function Assinatura() {
                 );
               })}
             </div>
+            <p className="g-muted g-pp g-as-taxa">{TEXTO_TAXA}</p>
             <div className="g-card g-pilha">
               <div className="g-card-t" style={{ marginBottom: 0 }}><h3><Tile icone={Sparkles} tom="lilas" tamanho="p" />Todos os planos incluem</h3></div>
               <ul className="g-as-inclui">

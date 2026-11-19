@@ -34,6 +34,13 @@ const MESES: Record<PeriodoId, number> = { mensal: 1, trimestral: 3, semestral: 
 let doBanco: Record<string, string> = {};
 export function usarLinksDoBanco(links: Record<string, string> | null | undefined) { doBanco = links ?? {}; }
 
+/**
+ * A plataforma de pagamento soma uma pequena taxa de serviço ao valor (o comprador vê antes de pagar; o valor varia de
+ * compra para compra). Linha discreta embaixo dos preços, na página de vendas e na tela Assinatura. Tirar quando a taxa
+ * deixar de ser cobrada do comprador.
+ */
+export const TEXTO_TAXA = "Taxa de serviço do pagamento mostrada antes de concluir.";
+
 /** Link de pagamento de um plano e período: primeiro o do banco, depois o da variável da Vercel. */
 export function linkDe(plano: PlanoId, periodo: PeriodoId) {
   return (doBanco[`${plano}:${MESES[periodo]}`] || CHECKOUTS[plano][periodo] || "").trim();

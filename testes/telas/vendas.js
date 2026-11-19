@@ -80,6 +80,9 @@ const foto = async (page, nome, inteira = false) => { if (process.env.FOTOS) awa
     T.ok('embaixo dos preços: nada é cobrado no fim do teste', /Nada é cobrado sozinho no fim do teste/.test(regras), regras);
     T.ok('embaixo dos preços: devolução em 7 dias, inclusive 3 e 6 meses', /em até 7 dias depois do primeiro pagamento, devolvemos o valor inteiro, inclusive nos planos de 3 e 6 meses/.test(regras));
     T.ok('embaixo dos preços: as formas de pagamento aparecem na tela da Cakto (sem prometer Pix nem cartão)', /As formas de pagamento aparecem na tela da Cakto/.test(regras) && !/pix|boleto/i.test(regras));
+    const taxa = page.locator('.gp-taxa');
+    T.ok('embaixo dos preços: a linha discreta da taxa de serviço, sem nome de empresa', (await taxa.count()) === 1 && limpo(await taxa.innerText()) === 'Taxa de serviço do pagamento mostrada antes de concluir.'
+      && parseFloat(await taxa.evaluate((e) => getComputedStyle(e).fontSize)) < 15, await taxa.innerText().catch(() => ''));
     T.ok('embaixo dos preços: cupom é da equipe, com validade', /cupom\?.*equipe de atendimento.*data combinada/i.test(regras));
     T.ok('legenda do exemplo: fotos e nomes ilustrativos', /Boletim de exemplo\. Fotos e nomes ilustrativos\./.test(limpo(await page.locator('#destaques').innerText())));
     const capa = limpo(await page.locator('.gp-capa-texto').innerText());
@@ -183,6 +186,20 @@ const foto = async (page, nome, inteira = false) => { if (process.env.FOTOS) awa
     T.ok('pelo WhatsApp, o cupom e o período vão na mensagem', /Plano Equipe, de 6 meses/.test(zapCupom) && /Tenho o cupom BIA15/.test(zapCupom), zapCupom);
     T.ok('sem rolagem para o lado', (await N.rolagemLateral(page)) <= 1);
     await foto(page, `assinatura-whatsapp-${larg}`, true);
+
+    T.secao(`Assinatura: o pagamento ligado com o aplicativo já aberto (${larg})`);
+    T.ok('a linha da taxa de serviço aparece embaixo dos planos', limpo(await page.locator('.g-as-taxa').innerText()) === 'Taxa de serviço do pagamento mostrada antes de concluir.');
+    await N.ir(page, '/gestao/app', '.g-main');
+    await page.unroute('**/rest/v1/rpc/gestao_assinatura*');
+    await comConfig(page, { aberta: true, links: LINKS });
+    // sem recarregar: o menu leva à Assinatura dentro do aplicativo, como quem já estava com ele aberto
+    await page.evaluate(() => document.querySelector('a[href="/gestao/app/assinatura"]').click());
+    await page.waitForSelector('.g-as-planos');
+    await page.waitForFunction((l) => (document.querySelector('[data-teste=assinar-solo]')?.getAttribute('href') ?? '').startsWith(l), LINKS['solo:1'], { timeout: 15000 }).catch(() => {});
+    const hrefSemRecarregar = await page.locator('[data-teste=assinar-solo]').getAttribute('href');
+    T.ok('o botão vira "Assinar" com o link de pagamento, sem apertar F5', (hrefSemRecarregar ?? '').startsWith(LINKS['solo:1']) && !/Assinar pelo WhatsApp/.test(limpo(await page.locator('.g-as-planos').innerText())), hrefSemRecarregar);
+    await page.unroute('**/rest/v1/rpc/gestao_assinatura*');
+    await comConfig(page, { aberta: false, links: {} });
 
     T.secao(`Assinatura com link de pagamento e cupom (${larg})`);
     await page.unroute('**/rest/v1/rpc/gestao_assinatura*');
@@ -299,6 +316,16 @@ const foto = async (page, nome, inteira = false) => { if (process.env.FOTOS) awa
     await page.locator('.g-adm-abas button', { hasText: 'Cakto' }).click();
     await page.waitForTimeout(1500);
     const cakto = limpo(await page.locator('.g-main, body').first().innerText());
+    {
+      const campo = page.locator('input[placeholder="cole aqui a chave secreta"]').first();
+      await campo.fill('chave-de-teste-123456');
+      const antes = await campo.getAttribute('type');
+      await page.getByRole('button', { name: 'Mostrar a chave' }).first().click();
+      const depois = await campo.getAttribute('type');
+      T.ok(`${larg}: a chave nasce escondida e o olho mostra o que foi colado`, antes === 'password' && depois === 'text', [antes, depois]);
+      T.ok(`${larg}: tem o botão Colar e a dica de copiar na Cakto com a chave à mostra`, (await page.getByRole('button', { name: 'Colar' }).count()) >= 1 && /toque no olho do campo da chave antes de copiar/.test(limpo(await page.locator('body').innerText())));
+      await campo.fill('');
+    }
     T.ok(`${larg}: aba Cakto fala em "Pagamento pela Cakto" e que o teste vencido fica só para consulta nos dois casos`, /Pagamento pela Cakto/.test(cakto) && /Nos dois casos, quem termina o teste de 7 dias fica só para consulta/.test(cakto) && !/o teste não bloqueia ninguém/.test(cakto));
     await ctx.close();
   }
