@@ -67,3 +67,14 @@ Como responder
 
 Guia
 ${TOPICOS.map((t) => `## ${t.titulo}\n${t.resposta}`).join("\n\n")}`;
+
+/**
+ * Bloco curto que diz à Ajuda quem está perguntando. Para o dono, ela nunca responde "isso é com o dono": é com ele mesmo.
+ * Para a equipe, continua dizendo quem libera (o dono, em Equipe).
+ */
+export function quemPergunta(papel: string | null | undefined): string {
+  if (papel === "dono") {
+    return "Quem está perguntando é o DONO do pet shop: ele tem todas as áreas e é quem libera acesso para a equipe. Nunca diga que algo \"é com o dono\", \"fica com o dono\", \"só o dono\" ou \"peça ao dono\": fale direto com ele (\"você faz isso em…\", \"isso é com você, que é o dono\"). Quando o guia disser que só o dono ou quem vê o financeiro faz algo, apenas explique o caminho.";
+  }
+  return "Quem está perguntando é da equipe, não é o dono. Quando algo depende do dono ou de uma área que a pessoa pode não ter, diga com naturalidade que o dono libera em Equipe.";
+}

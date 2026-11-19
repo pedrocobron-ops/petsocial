@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarCheck, CalendarClock, CalendarX, Clock, Hourglass, MessageCircle, RefreshCw } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarPlus, CalendarX, Clock, Hourglass, MapPin, MessageCircle, RefreshCw } from "lucide-react";
 import { configurado } from "@/lib/gestao/supabase-config";
 import { adiantarBanco, bancoDepois as banco } from "@/lib/gestao/supabase-depois";
 import { Marca } from "@/components/gestao/marca";
-import { dataLonga, deIsoDia, hora as horaDe, linkWhatsApp } from "@/lib/gestao/util";
+import { dataLonga, deIsoDia, hora as horaDe, horarioDoDia, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
+import { enderecoDaLoja, enderecoEmLinha, linkDoMapa } from "@/lib/gestao/endereco";
+import { comDesconto, lerVisto, portePorExtenso, real, totalPorExtenso, valorPorExtenso, type LinhaDeValor } from "@/lib/gestao/link-precos";
+import { icsDaAgenda } from "@/lib/gestao/ics";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { aplicarTema } from "@/lib/gestao/identidade";
 import { MUITOS_PEDIDOS, prazoPorExtenso } from "@/lib/gestao/link-opcoes";
@@ -14,8 +17,18 @@ import "./pedido.css";
 import type { PedidoInicial } from "@/lib/gestao/link-servidor";
 
 type Situacao = "pendente" | "aceito" | "recusado" | "cancelado" | "concluido" | "cliente";
-type Item = { pet: string; servico: string | null; dia: string; hora: string; status: Situacao; tipo?: string | null; ate?: string | null };
-type Pedido = { logo?: string | null; tema?: string | null; petshop: string; telefone: string | null; codigo: string; tutor: string; itens: Item[] };
+type Item = {
+  pet: string; servico: string | null; dia: string; hora: string; status: Situacao; tipo?: string | null; ate?: string | null;
+  /** banco com a migração 20261235: o serviço, o começo e o fim de verdade, a hora de buscar (creche e hotel) e o valor que o link mostrou */
+  servico_id?: string | null; inicio?: string | null; fim?: string | null; hora_fim?: string | null; ate_hora?: string | null; valor?: unknown;
+};
+type Pedido = {
+  logo?: string | null; tema?: string | null; petshop: string; telefone: string | null; codigo: string; tutor: string; itens: Item[];
+  endereco?: string | null; bairro?: string | null; complemento?: string | null; cidade?: string | null; uf?: string | null;
+};
+/** O que a página precisa do link para oferecer outro horário (link_info e link_fechados). */
+type Agenda = { hoje: string; horario: unknown; fechados: Set<string> };
+const DIAS_PARA_MUDAR = 14;
 /** O que o tutor pode fazer com o pedido (vem de `link_pedido_cliente`; só existe quando quem recebe o pedido ligou a opção). */
 type Acoes = {
   ligado: boolean; horas: number; aberto: boolean; limite: string | null; limite_dia?: string | null; limite_hora?: string | null; no_prazo: boolean;
@@ -69,6 +82,14 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
   const [sinal, setSinal] = useState<{ valor: number; estado: string } | null>(() => (primeiro && comVagaAceita(primeiro.pedido) ? lerSinal(inicial?.sinal) : null));
   const [ocupado, setOcupado] = useState(false);
   const travado = useRef(false);
+  // datas e horas que dependem do relógio do aparelho só entram depois de a página abrir no navegador (o servidor tem outro fuso)
+  const [montado, setMontado] = useState(false);
+  useEffect(() => { setMontado(true); }, []);
+  // "Pedir outra data" escolhendo um horário livre do link (só pedido de horário; creche e hotel seguem pelo recado)
+  const [agenda, setAgenda] = useState<Agenda | null | undefined>(undefined);
+  const [diaNovo, setDiaNovo] = useState<string | null>(null);
+  const [horasLivres, setHorasLivres] = useState<string[] | null>(null);
+  const [horaNova, setHoraNova] = useState<string | null>(null);
 
   const buscar = useCallback(async () => {
     if (!configurado || !/^[0-9a-f-]{36}$/i.test(id)) { setPedido(null); return; }
@@ -113,8 +134,65 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
   const soEstadia = itens.length > 0 && itens.every(ehEstadia);
   const umaEstadia = itens.find(ehEstadia);
   const oPedido = soEstadia ? `um pedido de vaga ${umaEstadia?.tipo === "hotel" ? "no hotel" : "na creche"}` : "um pedido de horário";
-  const zap = pedido ? linkWhatsApp(pedido.telefone, `Oi! Fiz ${oPedido} pelo link e queria falar sobre ele.`) : null;
   const loja = pedido?.petshop ?? "";
+  // a conversa já começa dizendo de que pedido se trata (pet, serviço e dia)
+  const resumoDoPedido = (() => {
+    const i = itens[0];
+    if (!i) return "";
+    const nomes = listaE([...new Set(itens.map((x) => x.pet))]);
+    const quando = `${dataLonga(deIsoDia(i.dia))}${ehEstadia(i) ? (i.ate && i.ate !== i.dia ? ` até ${dataLonga(deIsoDia(i.ate))}` : "") : `, às ${i.hora}`}`;
+    return `${ehEstadia(i) ? (i.tipo === "hotel" ? "hotel" : "creche") : (i.servico ?? "horário").toLowerCase()} para ${nomes}, ${quando}`;
+  })();
+  const zap = pedido ? linkWhatsApp(pedido.telefone, resumoDoPedido ? `Oi! Fiz ${oPedido} pelo link (${resumoDoPedido}) e queria falar sobre ele.` : `Oi! Fiz ${oPedido} pelo link e queria falar sobre ele.`) : null;
+  // tudo já aconteceu (atendido, estadia encerrada): a página não diz mais "Está confirmado!"
+  const feitoTudo = todos("concluido");
+  // o valor que o link mostrou, pet por pet (o banco guardou ao receber o pedido); só no que não foi recusado nem cancelado
+  const valores: LinhaDeValor[] = itens.filter((i) => !fora(i)).flatMap((i) => { const v = lerVisto(i.valor); return v ? [{ nome: i.pet, v }] : []; });
+  const total = totalPorExtenso(valores);
+  const endereco = enderecoDaLoja(pedido), mapa = linkDoMapa(pedido, pedido?.petshop);
+  // "Adicionar à agenda": só o que está confirmado e ainda vai acontecer
+  const paraAgenda = itens.filter((i) => i.status === "aceito" && i.inicio && i.fim);
+  function baixarAgenda() {
+    const ics = icsDaAgenda(paraAgenda.map((i, n) => ({
+      id: `${id}-${n}`, titulo: `${i.servico ?? "Horário"} de ${i.pet} · ${loja}`, inicio: i.inicio!, fim: i.fim!,
+      onde: enderecoEmLinha(pedido) ?? loja, descricao: `Pedido confirmado por ${loja}. Para mudar ou cancelar: ${window.location.href}`,
+    })));
+    if (!ics) return;
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "pedido.ics";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  // outro horário: os itens de serviço ainda abertos, todos do mesmo serviço (o link marca um depois do outro)
+  const abertosDeServico = itens.filter((i) => (i.status === "pendente" || i.status === "aceito") && !ehEstadia(i) && i.servico_id);
+  const servicoParaMudar = abertosDeServico.length > 0 && abertosDeServico.length === itens.filter((i) => i.status === "pendente" || i.status === "aceito").length
+    && abertosDeServico.every((i) => i.servico_id === abertosDeServico[0].servico_id) ? abertosDeServico[0].servico_id! : null;
+  const codigoDoLink = pedido?.codigo ?? codigo;
+  useEffect(() => {
+    if (painel !== "mudar" || !servicoParaMudar || agenda !== undefined) return;
+    let vale = true;
+    void Promise.all([banco().rpc("link_info", { p_codigo: codigoDoLink }), banco().rpc("link_fechados", { p_codigo: codigoDoLink })]).then(([i, f]) => {
+      if (!vale) return;
+      const x = i.data as { hoje?: unknown; horario?: unknown } | null;
+      // link desligado ou sem leitura: fica só o recado escrito, como sempre foi
+      setAgenda(!i.error && x && typeof x.hoje === "string" ? { hoje: x.hoje, horario: x.horario, fechados: new Set(Array.isArray(f.data) ? (f.data as unknown as string[]) : []) } : null);
+    }, () => { if (vale) setAgenda(null); });
+    return () => { vale = false; };
+  }, [painel, servicoParaMudar, agenda, codigoDoLink]);
+  const diasParaMudar = agenda ? Array.from({ length: DIAS_PARA_MUDAR }, (_, n) => somaDias(deIsoDia(agenda.hoje), n)).map((d) => ({ iso: isoDia(d), data: d, aberto: !!horarioDoDia(agenda.horario, d) && !agenda.fechados.has(isoDia(d)) })) : [];
+  useEffect(() => {
+    if (!diaNovo || !servicoParaMudar) return;
+    let vale = true;
+    setHorasLivres(null);
+    setHoraNova(null);
+    void banco().rpc("link_horarios", { p_codigo: codigoDoLink, p_servico: servicoParaMudar, p_dia: diaNovo, p_pets: Math.min(4, Math.max(1, abertosDeServico.length)) }).then(({ data, error }) => {
+      if (vale) setHorasLivres(error ? [] : ((data ?? []) as string[]).map((h) => String(h).slice(0, 5)));
+    });
+    return () => { vale = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diaNovo, servicoParaMudar, codigoDoLink, abertosDeServico.length]);
 
   // cancelar e pedir outra data por aqui: só quando quem recebe o pedido ligou, e só no que ainda está por vir
   const podeMexer = !!acoes?.ligado && acoes.aberto;
@@ -124,14 +202,17 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
   async function mandar(qual: "cancelar" | "mudar") {
     if (travado.current) return; // dois toques seguidos valem um
     const texto = recado.trim();
-    if (qual === "mudar" && texto.length < 3) { setErro("Escreva que dia e horário ficam bons para você."); return; }
+    const comHorario = qual === "mudar" && !!diaNovo && !!horaNova;
+    if (qual === "mudar" && !comHorario && texto.length < 3) { setErro(agenda ? "Escolha um dia e um horário, ou escreva o que fica bom para você." : "Escreva que dia e horário ficam bons para você."); return; }
     travado.current = true;
     setOcupado(true);
     setErro(null);
     try {
       const { data, error } = qual === "cancelar"
         ? await banco().rpc("link_pedido_cancelar", { p_id: id, p_recado: texto || undefined })
-        : await banco().rpc("link_pedido_pedir_mudanca", { p_id: id, p_recado: texto });
+        : comHorario
+          ? await (banco() as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }).rpc("link_pedido_pedir_horario", { p_id: id, p_dia: diaNovo, p_hora: horaNova })
+          : await banco().rpc("link_pedido_pedir_mudanca", { p_id: id, p_recado: texto });
       const r = data as unknown as { ok?: boolean; erro?: string; cancelados?: number; pedidos?: number } | null;
       if (error || !r) { setErro("Não deu para enviar agora. Confira a internet e tente de novo."); return; }
       if (!r.ok) {
@@ -139,12 +220,15 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
           : r.erro === "desligado" ? `${loja} não está recebendo isso por aqui agora. Fale pelo WhatsApp.`
           : r.erro === "fechado" ? "Este pedido já foi encerrado. Atualizei a página."
           : r.erro === "recado" ? "Escreva que dia e horário ficam bons para você."
+          : r.erro === "ocupado" ? "Esse horário acabou de ser ocupado. Escolha outro, por favor."
           : r.erro === "muitos" ? MUITOS_PEDIDOS
           : "Algo deu errado. Tente de novo em instantes.");
+        if (r.erro === "ocupado") { const d = diaNovo; setDiaNovo(null); setHoraNova(null); setTimeout(() => setDiaNovo(d), 0); return; }
         if (r.erro !== "recado" && r.erro !== "muitos") void buscar();
         return;
       }
-      setFeito(qual === "mudar" ? `Recado enviado. ${loja} responde pelo seu WhatsApp. Até lá, o que está combinado continua valendo.`
+      setDiaNovo(null); setHoraNova(null); setHorasLivres(null);
+      setFeito(qual === "mudar" ? `${comHorario ? "Pedido de outro horário enviado" : "Recado enviado"}. ${loja} responde pelo seu WhatsApp. Até lá, o que está combinado continua valendo.`
         : (r.pedidos ?? 0) > 0 && !(r.cancelados ?? 0) ? `Pedido de cancelamento enviado. Como há pagamento combinado, ${loja} conclui o cancelamento e fala com você.`
         : (r.pedidos ?? 0) > 0 ? `Cancelado em parte. Onde há pagamento combinado, ${loja} conclui o cancelamento e fala com você.`
         : (r.cancelados ?? 0) > 0 ? "Cancelado." : "Este pedido já estava cancelado.");
@@ -153,7 +237,7 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
       await buscar();
     } finally { travado.current = false; setOcupado(false); }
   }
-  const abrir = (qual: "cancelar" | "mudar") => { setPainel(qual); setRecado(""); setErro(null); setFeito(null); };
+  const abrir = (qual: "cancelar" | "mudar") => { setPainel(qual); setRecado(""); setErro(null); setFeito(null); setDiaNovo(null); setHoraNova(null); };
 
   return (
     <main className="g-lkp">
@@ -170,9 +254,10 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
             <section className={`g-card g-lkp-cartao ${geral}`}>
               <span className={`g-lkp-selo ${geral}`}>{geral === "aguardando" ? <Hourglass /> : geral === "recusado" ? <CalendarX /> : <CalendarCheck />}</span>
               <p className="g-lkp-loja"><LogoLoja nome={pedido.petshop} logo={pedido.logo} tamanho={28} /><span className="g-rotulo">{pedido.petshop}</span></p>
-              <h1>{desistiu ? "Pedido cancelado." : geral === "aguardando" ? `${pedido.tutor}, seu pedido chegou.` : geral === "confirmado" ? "Está confirmado!" : geral === "recusado" ? (soEstadia ? "Não temos vaga nessas datas." : "Não deu neste horário.") : `${pedido.petshop} respondeu.`}</h1>
+              <h1>{desistiu ? "Pedido cancelado." : geral === "aguardando" ? `${pedido.tutor}, seu pedido chegou.` : feitoTudo ? (soEstadia ? "Estadia encerrada." : "Atendimento feito.") : geral === "confirmado" ? "Está confirmado!" : geral === "recusado" ? (soEstadia ? "Não temos vaga nessas datas." : "Não deu neste horário.") : `${pedido.petshop} respondeu.`}</h1>
               <p className="g-muted">
                 {desistiu ? `Você cancelou este pedido e ${pedido.petshop} já vê isso por lá. Se quiser, é só pedir de novo.`
+                  : feitoTudo ? `${soEstadia ? "A estadia já terminou" : "O atendimento já foi feito"}. Obrigado por vir! Quando quiser, é só pedir de novo.`
                   : geral === "aguardando" ? `${pedido.petshop} ainda vai confirmar. Esta página atualiza sozinha; pode deixar aberta ou voltar depois.`
                   : geral === "confirmado" ? (soEstadia ? `${pedido.petshop} confirmou a vaga. É só trazer no dia combinado.` : `${pedido.petshop} confirmou. É só aparecer no dia e na hora.`)
                   : geral === "recusado" ? (soEstadia ? `${pedido.petshop} não tem vaga nesse período. Escolha outras datas.` : `${pedido.petshop} não consegue atender nesse horário. Escolha outro dia ou hora.`)
@@ -183,7 +268,7 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
                   <li key={n}>
                     <div>
                       <b>{i.pet}</b>
-                      <span>{[i.servico, `${dataLonga(deIsoDia(i.dia))}${ehEstadia(i) && i.hora ? `, chegada às ${i.hora}` : ""}`, i.ate && i.ate !== i.dia ? `até ${dataLonga(deIsoDia(i.ate))}` : null].filter(Boolean).join(" · ")}</span>
+                      <span>{[i.servico, `${dataLonga(deIsoDia(i.dia))}${ehEstadia(i) && i.hora ? `, chegada às ${i.hora}` : ""}`, i.ate && i.ate !== i.dia ? `até ${dataLonga(deIsoDia(i.ate))}${i.ate_hora ? `, busca às ${i.ate_hora}` : ""}` : ehEstadia(i) && i.ate_hora ? `busca às ${i.ate_hora}` : null].filter(Boolean).join(" · ")}</span>
                     </div>
                     <div className="lado">
                       {(!i.tipo || i.tipo === "servico") && <span className="hora"><Clock aria-hidden />{i.hora}</span>}
@@ -192,6 +277,22 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
                   </li>
                 ))}
               </ul>
+              {valores.length > 0 && geral !== "recusado" && !desistiu && (
+                <div className="g-lkp-valor" data-teste="valor-do-pedido">
+                  <b>{valores[0].v.tipo === "servico" ? "Valor" : "Estimativa"}{valores.some((l) => l.v.promo) ? ` com a promoção ${valores.find((l) => l.v.promo)!.v.promo!.nome}` : ""}</b>
+                  {valores.map((l, n) => (
+                    <div key={n} className="l" data-teste="valor-do-pet">
+                      <span>{l.nome}{l.v.tipo === "servico" ? <small> {portePorExtenso(l.v)}</small> : l.v.tipo === "hotel" && l.v.noites ? <small> {l.v.noites} {l.v.noites === 1 ? "noite" : "noites"}</small> : l.v.dias ? <small> {l.v.dias} {l.v.dias === 1 ? "dia" : "dias"}</small> : null}</span>
+                      <span>{comDesconto(l.v) && l.v.valor != null ? <><s>{real(l.v.base!)}</s> <b>{real(l.v.valor)}</b></> : `${valorPorExtenso(l.v)}${l.v.valor == null ? ", conforme o porte" : ""}`}</span>
+                    </div>
+                  ))}
+                  {valores.length > 1 && total && <div className="l forte" data-teste="valor-total"><span>Total</span><span>{total}</span></div>}
+                  <small>{valores[0].v.tipo === "servico" ? "É o valor que o link mostrou quando você pediu" : "É a estimativa que o link mostrou quando você pediu"}. Quem confirma o valor é {pedido.petshop}. Nada é pago por aqui.</small>
+                </div>
+              )}
+              {endereco && geral !== "recusado" && !desistiu && !feitoTudo && (
+                <p className="g-lkp-onde" data-teste="endereco"><MapPin aria-hidden /><span>{endereco}{mapa && <> · <a href={mapa} target="_blank" rel="noopener noreferrer">Abrir no mapa</a></>}</span></p>
+              )}
               {sinal && geral !== "recusado" && !desistiu && (
                 <p className="g-lkp-recado" role="status">
                   <span>{sinal.estado === "pago"
@@ -200,19 +301,21 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
                 </p>
               )}
               {feito && <p className="g-lkp-feito" role="status">{feito}</p>}
-              {acoes?.pediu && acoes.aberto && !painel && (
+              {acoes?.pediu && acoes.aberto && !painel && !feito && (
                 <p className="g-lkp-recado">
                   <CalendarClock aria-hidden />
                   <span>
                     {acoes.pediu === "mudar" && acoes.remarcado_depois
-                      ? <>Você pediu outra data{acoes.pediu_em ? ` em ${diaEHora(acoes.pediu_em)}` : ""}, e {pedido.petshop} já remarcou. A data que vale é a que está aqui em cima.</>
-                      : <>{acoes.pediu === "mudar" ? "Você pediu outra data" : "Você pediu para cancelar"}{acoes.pediu_em ? ` em ${diaEHora(acoes.pediu_em)}` : ""}.
+                      ? <>Você pediu outra data{acoes.pediu_em && montado ? ` em ${diaEHora(acoes.pediu_em)}` : ""}, e {pedido.petshop} já remarcou. A data que vale é a que está aqui em cima.</>
+                      : <>{acoes.pediu === "mudar" ? "Você pediu outra data" : "Você pediu para cancelar"}{acoes.pediu_em && montado ? ` em ${diaEHora(acoes.pediu_em)}` : ""}.
                     {acoes.recado ? ` Seu recado: “${acoes.recado}”` : ""} {pedido.petshop} responde pelo seu WhatsApp.{acoes.pediu === "mudar" ? " Até lá, o que está combinado continua valendo." : ""}</>}
                   </span>
                 </p>
               )}
               <div className="g-lkp-acoes">
                 {algumRecusado && <Link className="g-btn pri" href={`/gestao/agendar/${pedido.codigo}`}>{desistiu ? "Fazer um novo pedido" : soEstadia ? "Escolher outras datas" : "Escolher outro horário"}</Link>}
+                {feitoTudo && <Link className="g-btn pri" href={`/gestao/agendar/${pedido.codigo}`}>Fazer um novo pedido</Link>}
+                {!aguardando && !feitoTudo && paraAgenda.length > 0 && <button type="button" className="g-btn sec" onClick={baixarAgenda}><CalendarPlus />Adicionar à agenda</button>}
                 {aguardando && <button className="g-btn sec" onClick={() => void buscar()} disabled={atualizando}><RefreshCw />{atualizando ? "Atualizando…" : "Atualizar"}</button>}
                 {zap && <a className="g-btn zap" href={zap} target="_blank" rel="noopener noreferrer"><MessageCircle />Falar com {pedido.petshop}</a>}
               </div>
@@ -222,7 +325,7 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
               <section className="g-card g-lkp-mexer">
                 <h2>Precisa mudar ou cancelar?</h2>
                 <p className="g-muted g-p">
-                  {acoes!.limite ? `Dá para fazer por aqui ${prazo}: até ${acoes!.limite_dia && acoes!.limite_hora ? `${dataLonga(deIsoDia(acoes!.limite_dia))}, às ${acoes!.limite_hora}` : diaEHora(acoes!.limite)}.` : "Dá para fazer por aqui enquanto o pedido espera a confirmação."}
+                  {acoes!.limite ? `Dá para fazer por aqui ${prazo}${acoes!.limite_dia && acoes!.limite_hora ? `: até ${dataLonga(deIsoDia(acoes!.limite_dia))}, às ${acoes!.limite_hora}` : montado ? `: até ${diaEHora(acoes!.limite)}` : ""}.` : "Dá para fazer por aqui enquanto o pedido espera a confirmação."}
                 </p>
                 <div className="g-lkp-acoes">
                   <button type="button" className="g-btn sec" onClick={() => abrir("mudar")}><CalendarClock />Pedir outra data</button>
@@ -238,15 +341,41 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
                     ? `${abertos.length > 1 ? "O cancelamento vale para todos os pets deste pedido. " : ""}${soEstadia ? "A vaga" : "O horário"} volta a ficar livre para outro cliente. Se você já pagou algum valor, combine direto com ${pedido.petshop}: nada é devolvido por aqui.`
                     : `Nada é desmarcado agora: ${pedido.petshop} recebe o seu recado e responde pelo WhatsApp. Até lá, o que está combinado continua valendo.`}
                 </p>
-                <label className="g-campo"><span>{painel === "cancelar" ? <>Quer dizer o motivo? <small>(opcional)</small></> : "Que dia e horário ficam bons para você?"}</span>
-                  <textarea className="g-textarea" value={recado} maxLength={300} placeholder={painel === "cancelar" ? "" : "Pode ser na sexta de manhã ou no sábado à tarde"} onChange={(e) => { setRecado(e.target.value); setErro(null); }} />
-                </label>
+                {painel === "mudar" && servicoParaMudar && agenda && (
+                  <div className="g-lkp-outro" data-teste="outro-horario">
+                    <span className="g-rotulo" id="g-lkp-outro-dia">Escolha um dia</span>
+                    <div className="g-lkp-dias" role="group" aria-labelledby="g-lkp-outro-dia">
+                      {diasParaMudar.map((d) => (
+                        <button key={d.iso} type="button" className="g-lkp-dia" disabled={!d.aberto} aria-pressed={d.iso === diaNovo}
+                          aria-label={`${nomeDia(d.data)}, ${d.data.getDate()}${d.aberto ? "" : ", fechado"}`} onClick={() => { setDiaNovo(d.iso); setErro(null); }}>
+                          <span>{d.iso === agenda.hoje ? "hoje" : nomeDiaCurto(d.data)}</span><b>{d.data.getDate()}</b>
+                        </button>
+                      ))}
+                    </div>
+                    {diaNovo && (horasLivres === null ? <p className="g-muted g-p" aria-busy="true">Vendo os horários livres…</p>
+                      : !horasLivres.length ? <p className="g-muted g-p">Sem horário livre nesse dia. Escolha outro dia ou escreva abaixo.</p>
+                      : (
+                        <>
+                          <span className="g-rotulo" id="g-lkp-outro-hora">Horários livres em {dataLonga(deIsoDia(diaNovo))}</span>
+                          <div className="g-lkp-horas" role="group" aria-labelledby="g-lkp-outro-hora">
+                            {horasLivres.map((h) => <button key={h} type="button" className="g-lkp-hora" aria-pressed={h === horaNova} onClick={() => { setHoraNova(h); setErro(null); }}>{h}</button>)}
+                          </div>
+                        </>
+                      ))}
+                    {diaNovo && horaNova && <p className="g-p" role="status"><b>Pedir para mudar para {dataLonga(deIsoDia(diaNovo))}, às {horaNova}.</b> {pedido.petshop} confirma a mudança.</p>}
+                  </div>
+                )}
+                {!(painel === "mudar" && diaNovo && horaNova) && (
+                  <label className="g-campo"><span>{painel === "cancelar" ? <>Quer dizer o motivo? <small>(opcional)</small></> : servicoParaMudar && agenda ? "Nenhum desses serve? Escreva o que fica bom para você" : "Que dia e horário ficam bons para você?"}</span>
+                    <textarea className="g-textarea" value={recado} maxLength={300} placeholder={painel === "cancelar" ? "" : "Pode ser na sexta de manhã ou no sábado à tarde"} onChange={(e) => { setRecado(e.target.value); setErro(null); }} />
+                  </label>
+                )}
                 {erro && <p className="g-lkp-erro" role="alert">{erro}</p>}
                 <div className="g-lkp-acoes">
                   <button type="button" className="g-btn sec" disabled={ocupado} onClick={() => { setPainel(null); setErro(null); }}>Voltar</button>
                   {painel === "cancelar"
                     ? <button type="button" className="g-btn perigo" disabled={ocupado} onClick={() => void mandar("cancelar")}>{ocupado ? "Cancelando…" : "Sim, cancelar"}</button>
-                    : <button type="button" className="g-btn pri" disabled={ocupado} onClick={() => void mandar("mudar")}>{ocupado ? "Enviando…" : "Enviar recado"}</button>}
+                    : <button type="button" className="g-btn pri" disabled={ocupado} onClick={() => void mandar("mudar")}>{ocupado ? "Enviando…" : diaNovo && horaNova ? "Pedir este horário" : "Enviar recado"}</button>}
                 </div>
               </section>
             )}

@@ -6,6 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src next.config.ts",
+    "test:unidade": "node testes/rodar.js unidade",
     "test:banco": "node testes/rodar.js banco",
     "test:telas": "node testes/rodar.js telas",
     "test:migracoes": "node testes/rodar.js migracoes",
@@ -22,9 +25,12 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.0",
     "typescript": "~5.9.2"
   },
   "overrides": {

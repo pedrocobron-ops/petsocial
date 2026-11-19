@@ -2,7 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { Contexto, Resumo } from "./ferramentas";
 import { DIAS_DA_MARGEM, faturamentoComMargem, fraseDaSituacao, FREQUENCIAS, gerarContasFixas, lerResumoContasFixas, lerSituacaoContasFixas, quandoVence, valorPorMes, vencimentoNoMes, type ContaFixa } from "../contas-fixas";
 import { montarLucro, type LucroDoBanco } from "../lucro";
-import { brl } from "../util";
+import { brl, centavos, centavos as real } from "../util";
 
 /**
  * Contas fixas no Mozart (migração 20261212):
@@ -16,7 +16,6 @@ import { brl } from "../util";
 type Def = Anthropic.Tool & { grava: boolean; financeiro?: boolean };
 const RE_MES = /^\d{4}-\d{2}$/;
 const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const real = (n: number) => Math.round(n * 100) / 100;
 const frequencia = (f: string) => FREQUENCIAS.find((x) => x.id === f)?.rotulo.toLowerCase() ?? f;
 const mesBr = (mes: string) => `${mes.slice(5, 7)}/${mes.slice(0, 4)}`;
 
@@ -73,7 +72,7 @@ export async function consultarContasFixas(c: Contexto, nome: string, erroDeUso:
       // sem margem confiável, o mínimo é a soma das contas; com margem, contas ÷ margem média (de cada venda só sobra a margem)
       precisa_sobrar_por_mes_depois_do_custo: resumo.total_mensal,
       ...(comMargem
-        ? { margem_media_pct: comMargem.pct, precisa_faturar_por_mes: comMargem.faturamento, falta_faturar_no_mes: Math.max(0, Math.round((comMargem.faturamento - resumo.faturamento_mes) * 100) / 100),
+        ? { margem_media_pct: comMargem.pct, precisa_faturar_por_mes: comMargem.faturamento, falta_faturar_no_mes: Math.max(0, centavos((comMargem.faturamento - resumo.faturamento_mes))),
             como_foi_calculado: `contas fixas ÷ margem média dos últimos ${DIAS_DA_MARGEM} dias (estimativa)` }
         : { precisa_faturar_por_mes: resumo.total_mensal, falta_faturar_no_mes: resumo.falta,
             como_foi_calculado: lucro && lucro.produtos.length ? "soma das contas fixas: falta custo informado para descontar a margem; diga que o faturamento real precisa ser maior porque de cada venda só sobra a margem" : "soma das contas fixas" }),

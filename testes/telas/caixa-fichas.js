@@ -87,10 +87,11 @@ const ddmm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
     await page.screenshot({ path: `${B.RAIZ}/testes/saida/caixa-fichas-caixa-${larg}.png`, fullPage: larg === 390 }).catch(() => {});
     T.ok('gaveta R$ 102,75 (100,00 + 2,75 em dinheiro)', /Dinheiro na gaveta\s*R\$ 102,75/.test(h), h.slice(0, 400));
     T.ok('Saldo de hoje R$ 567,40', /Saldo de hoje\s*R\$ 567,40/.test(h), h.slice(0, 400));
-    T.ok('Entrou hoje + R$ 677,40 e Saiu hoje (devoluções e saídas) − R$ 110,00', /Entrou hoje\s*\+ R\$ 677,40/.test(h) && /Saiu hoje \(devoluções e saídas\)\s*− R\$ 110,00/.test(h), h.slice(0, 600));
+    T.ok('Recebido hoje + R$ 677,40 e Saiu hoje (devoluções e saídas) − R$ 110,00', /Recebido hoje\s*\+ R\$ 677,40/.test(h) && /Saiu hoje \(devoluções e saídas\)\s*− R\$ 110,00/.test(h), h.slice(0, 600));
     T.ok('a gaveta com os números: troco R$ 100,00 + R$ 2,75 que entrou em dinheiro', /troco de R\$ 100,00 \+ R\$ 2,75 que entrou em dinheiro\./.test(h), h.slice(0, 800));
     T.ok('o crédito deixado é avisado: R$ 190,00 do que entrou ficou de crédito', /R\$ 190,00 do que entrou ficou de crédito para tutores/.test(h), h.slice(0, 900));
-    T.ok('não diz mais "Recebido hoje" sozinho', !/Recebido hoje/.test(h));
+    // rodada 9 (N4): o nome do número é "Recebido hoje" (dinheiro, Pix e cartão que entraram), o mesmo passo Recebido da cadeia do dinheiro
+    T.ok('não diz mais "Entrou hoje" (o nome agora é Recebido hoje, o da cadeia do dinheiro)', !/Entrou hoje/.test(h));
     const lista = txt(await page.locator('.g-card', { hasText: 'Lançamentos deste caixa' }).innerText());
     T.ok('sinal sem a data velha na lista ("Sinal da reserva: hotel de Thor", nada de ", dd/mm")', /Sinal da reserva: hotel de Thor/.test(lista) && !/hotel de Thor, \d\d\/\d\d/.test(lista), lista.slice(0, 600));
     T.ok('categoria "Hotel" na lista, nunca "Creche e hotel"', !/Creche e hotel/.test(lista) && /Hotel/.test(lista));

@@ -55,7 +55,7 @@ const soma = (P) => B.sql(`select coalesce(sum(case when tipo='entrada' then val
     await N.ir(page, '/gestao/app/meu-petshop#encerrar-conta');
     await page.waitForSelector('#encerrar-conta', { state: 'visible', timeout: 15000 });
     const grupo = page.locator('#grupo-copia');
-    T.ok('o grupo "Seus dados e a conta" com os três cartões', /Seus dados e a conta/.test(await grupo.innerText()) && await grupo.locator('.g-mp-cartao').count() === 3);
+    T.ok('o grupo "Seus dados e a conta" com os cinco cartões (os três de antes, os acessos da equipe Maestro Pet e o aviso de privacidade)', /Seus dados e a conta/.test(await grupo.innerText()) && await grupo.locator('.g-mp-cartao').count() === 5);
     await grupo.scrollIntoViewIfNeeded();
     await foto(page, `meu-petshop-${largura}`);
     const z = await baixar(page, () => grupo.getByRole('button', { name: 'Baixar todos os dados' }).click());

@@ -19,7 +19,8 @@ import nextDynamic from "next/dynamic";
 import { FileText } from "lucide-react";
 import { Barras, Kpi, Rosca, Tile, type Tom } from "@/components/gestao/painel";
 import type { AlteracaoLancamento, Caixa, Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, hora, isoDia } from "@/lib/gestao/util";
+import { brl, dataAmigavel, dataCompleta, dataCurta, dataLonga, hora, isoDia, centavos } from "@/lib/gestao/util";
+import { comTrocas } from "@/lib/gestao/caixa-contas";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { AtendimentosParaCobrar, useParaCobrarComValor } from "@/components/gestao/agenda/para-cobrar";
 import "./caixa.css";
@@ -81,7 +82,7 @@ function exportarCaixa(caixa: Caixa, lancamentos: Lancamento[]) {
     linha("Dinheiro esperado na gaveta", esperado),
     ...(caixa.valor_contado == null ? [] : [
       linha("Dinheiro contado", Number(caixa.valor_contado)),
-      linha("Diferença (contado menos esperado)", Math.round((Number(caixa.valor_contado) - esperado) * 100) / 100),
+      linha("Diferença (contado menos esperado)", centavos((Number(caixa.valor_contado) - esperado))),
       ["Resultado", dif?.texto ?? ""] as Cel[],
     ]),
     ...(caixa.obs ? [["Observação", caixa.obs] as Cel[]] : []),
@@ -135,15 +136,11 @@ function CaixaDoDia() {
     });
     // troca de produto: o valor do produto que voltou aparece na entrada nova e na devolução, mas não é dinheiro.
     // O banco diz quanto de cada lançamento é só o trocado, e o Caixa conta só a diferença.
-    const deTroca = [...new Set([...dosCaixas, ...doDia].filter((l) => /^Troca:/.test(l.descricao ?? "")).map((l) => l.id))];
-    if (deTroca.length) {
-      const t = await sb.rpc("trocas_do_caixa", { p_petshop: petshop.id, p_ids: deTroca.slice(0, 2000) });
-      const quanto = new Map(((t.data ?? []) as { lancamento_id: string; trocado: number }[]).map((x) => [x.lancamento_id, Number(x.trocado)]));
-      for (const l of [...dosCaixas, ...doDia]) { const v = quanto.get(l.id); if (v) (l as Lancamento & { trocado?: number }).trocado = Math.min(v, Number(l.valor)); }
-    }
+    await comTrocas(sb, petshop.id, [...dosCaixas, ...doDia] as (Lancamento & { trocado?: number | null })[]);
     dosCaixas.sort(porPagamento); doDia.sort(porPagamento); soltos.sort(porPagamento);
     return { aberto, fechados, dosCaixas, soltos, doDia, apagados, creditoDeixado: ajustes.creditoDeixado };
-  }, [petshop.id, hoje, fin]);
+  // memória curta: voltar ao Caixa pelo menu não baixa tudo de novo (qualquer gravação faz buscar outra vez)
+  }, [petshop.id, hoje, fin], { guardar: "caixa" });
 
   async function abrir(f: FolhaAberta) {
     if (f.tipo !== "resumo" && somenteLeitura()) return;
@@ -185,12 +182,12 @@ function CaixaDoDia() {
   const vendasDoDia = semMovimentos(doDia), vendasSoltas = semMovimentos(soltos);
   // o que foi pago com o crédito do tutor não é dinheiro que entrou hoje
   // … nem o produto trocado numa troca (só a diferença é dinheiro)
-  const entrouDe = (lista: Lancamento[]) => Math.round((soma(lista) - lista.reduce((t, l) => t + creditoDaEntrada(l) + trocadoDe(l), 0)) * 100) / 100;
+  const entrouDe = (lista: Lancamento[]) => centavos((soma(lista) - lista.reduce((t, l) => t + creditoDaEntrada(l) + trocadoDe(l), 0)));
   const entrouNoDia = entrouDe(vendasDoDia.filter((l) => l.tipo === "entrada")), saiuNoDia = saiuDe(vendasDoDia.filter((l) => l.tipo === "saida"));
   const entrouFora = entrouDe(vendasSoltas.filter((l) => l.tipo === "entrada")), saiuFora = saiuDe(vendasSoltas.filter((l) => l.tipo === "saida"));
   // dinheiro em espécie fora do caixa: no pagamento dividido, só a parte em dinheiro
-  const dinheiroFora = Math.round(((somaPorForma(vendasSoltas.filter((l) => l.tipo === "entrada")).get("dinheiro") ?? 0) - (somaPorForma(vendasSoltas.filter((l) => l.tipo === "saida")).get("dinheiro") ?? 0)) * 100) / 100;
-  const emOutrosCaixas = Math.round((entrouNoDia - entrouFora - (aberto ? entrouDe(semMovimentos(doCaixa(aberto.id)).filter((l) => l.tipo === "entrada" && l.data === hoje)) : 0)) * 100) / 100;
+  const dinheiroFora = centavos(((somaPorForma(vendasSoltas.filter((l) => l.tipo === "entrada")).get("dinheiro") ?? 0) - (somaPorForma(vendasSoltas.filter((l) => l.tipo === "saida")).get("dinheiro") ?? 0)));
+  const emOutrosCaixas = centavos((entrouNoDia - entrouFora - (aberto ? entrouDe(semMovimentos(doCaixa(aberto.id)).filter((l) => l.tipo === "entrada" && l.data === hoje)) : 0)));
   const resumo = aberto ? resumoDoCaixa(aberto.valor_inicial, lancamentos) : null;
   const abertoEmOutroDia = aberto && isoDia(new Date(aberto.aberto_em)) !== hoje;
   const ultimo = fechados[0];
@@ -201,9 +198,9 @@ function CaixaDoDia() {
   const podeMexer = (l: Lancamento) => fin || (l.criado_por === user.id && Boolean(aberto) && l.caixa_id === aberto?.id);
   const editar = (l: Lancamento) => void abrir((l.movimento === "sangria" || l.movimento === "suprimento") && podeMexer(l) ? { tipo: "gaveta", de: l.movimento, lancamento: l } : { tipo: "editar", lancamento: l });
   const saiuEmDinheiro = resumo?.porForma.find((f) => f.id === "dinheiro")?.saiu ?? 0;
-  const saldo = resumo ? Math.round((resumo.entrou - resumo.saiu) * 100) / 100 : 0;
+  const saldo = resumo ? centavos((resumo.entrou - resumo.saiu)) : 0;
   // o dia: entrou menos o que saiu (devoluções e despesas pagas hoje); sangria e suprimento não entram, só mexem na gaveta
-  const saldoDoDia = Math.round((entrouNoDia - saiuNoDia) * 100) / 100;
+  const saldoDoDia = centavos((entrouNoDia - saiuNoDia));
   const dinheiroDoCaixa = resumo?.porForma.find((f) => f.id === "dinheiro");
   const resumoUltimo = ultimo ? resumoDoCaixa(ultimo.valor_inicial, doCaixa(ultimo.id)) : null;
   // do mais antigo para o mais novo, para ler da esquerda para a direita
@@ -236,13 +233,13 @@ function CaixaDoDia() {
                   <p className="g-cx-gaveta">{brl(resumo.esperado)}</p>
                 </div>
                 <div>
-                  <p className="g-cx-leg">{fin ? "Saldo de hoje" : "Entrou hoje"}</p>
+                  <p className="g-cx-leg">{fin ? "Saldo de hoje" : "Recebido hoje"}</p>
                   <p className={`g-cx-gaveta${fin && saldoDoDia < 0 ? " g-cx-neg" : ""}`}>{brl(fin ? saldoDoDia : entrouNoDia)}</p>
                 </div>
               </div>
               {/* o dia em três números que fecham: entrou − saiu = saldo (quem só opera o caixa vê o que saiu da gaveta) */}
               <dl className="g-cx-dia" aria-label="Hoje">
-                <div><dt>Entrou hoje</dt><dd>+ {brl(entrouNoDia)}</dd></div>
+                <div><dt>Recebido hoje</dt><dd>+ {brl(entrouNoDia)}</dd></div>
                 {fin
                   ? <div><dt>Saiu hoje (devoluções e saídas)</dt><dd>− {brl(saiuNoDia)}</dd></div>
                   : <div><dt>Saiu em dinheiro (da gaveta)</dt><dd>− {brl(saiuEmDinheiro)}</dd></div>}
@@ -254,7 +251,7 @@ function CaixaDoDia() {
                 {dinheiroDoCaixa && dinheiroDoCaixa.saiu > 0 ? ` − ${brl(dinheiroDoCaixa.saiu)} que saiu em dinheiro` : ""}
                 {resumo.suprimentos > 0 ? ` + ${brl(resumo.suprimentos)} colocado` : ""}
                 {resumo.sangrias > 0 ? ` − ${brl(resumo.sangrias)} tirado` : ""}.
-                {" "}Entrou e saiu hoje: tudo, em dinheiro, Pix ou cartão.
+                {" "}Recebido e saiu hoje: tudo, em dinheiro, Pix ou cartão (conta paga com crédito do tutor e produto trocado não são dinheiro novo e ficam fora).
                 {fin && creditoDeixado > 0 ? ` ${brl(creditoDeixado)} do que entrou ficou de crédito para tutores: não saiu dinheiro, mas é deles até usarem.` : ""}
               </p>
               <details className="g-cx-detalhes">
@@ -270,7 +267,7 @@ function CaixaDoDia() {
                     ))}
                   </div>
                   <p className="g-cx-leg">
-                    Entrou {brl(resumo.entrou)} neste caixa{fin ? (resumo.saiu > 0 ? ` e saiu ${brl(resumo.saiu)}` : "") : saiuEmDinheiro > 0 ? ` e ${brl(saiuEmDinheiro)} saíram em dinheiro` : ""}.
+                    Recebido {brl(resumo.entrou)} neste caixa{fin ? (resumo.saiu > 0 ? ` e saiu ${brl(resumo.saiu)}` : "") : saiuEmDinheiro > 0 ? ` e ${brl(saiuEmDinheiro)} saíram em dinheiro` : ""}.
                     {resumo.suprimentos > 0 && ` Colocado na gaveta: ${brl(resumo.suprimentos)}.`}
                     {resumo.sangrias > 0 && ` Tirado da gaveta: ${brl(resumo.sangrias)}.`}
                   </p>
@@ -323,7 +320,7 @@ function CaixaDoDia() {
             <div>
               <div className="g-grade kpis">
                 <>
-              <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Entrou neste caixa" valor={<span className="gf-kpi-v">{brl(resumo.entrou)}</span>}
+              <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Recebido neste caixa" valor={<span className="gf-kpi-v">{brl(resumo.entrou)}</span>}
                 apoio={entradasDoCaixa ? (entradasDoCaixa === 1 ? "1 entrada" : `${entradasDoCaixa} entradas`) : "nada ainda"} />
               {fin ? (
                 <>
@@ -337,12 +334,12 @@ function CaixaDoDia() {
                   <Kpi icone={Scale} tom="ceu" rotulo="Dinheiro na gaveta" valor={<span className="gf-kpi-v">{brl(resumo.esperado)}</span>} apoio="pelas contas, agora" />
                 </>
               )}
-              <Kpi icone={Coins} tom="manteiga" rotulo="Entrou hoje, no dia" valor={<span className="gf-kpi-v">{brl(entrouNoDia)}</span>}
+              <Kpi icone={Coins} tom="manteiga" rotulo="Recebido hoje, no dia" valor={<span className="gf-kpi-v">{brl(entrouNoDia)}</span>}
                 apoio={entrouFora > 0 ? `${brl(entrouFora)} fora do caixa` : emOutrosCaixas > 0 ? `${brl(emOutrosCaixas)} em caixa já fechado` : abertoEmOutroDia ? "só o que é de hoje" : "tudo neste caixa"} />
             </>
               </div>
               <section className="g-card">
-              <div className="g-card-t"><h3><Tile icone={CreditCard} tom="ceu" tamanho="p" />Como entrou</h3><span className="g-muted g-pp">neste caixa</span></div>
+              <div className="g-card-t"><h3><Tile icone={CreditCard} tom="ceu" tamanho="p" />Como foi recebido</h3><span className="g-muted g-pp">neste caixa</span></div>
               {resumo.entrou > 0 ? (
                 <div className="g-cx-rosca">
                   <Rosca fatias={resumo.porForma.map((f) => ({ valor: f.entrou, cor: COR_FORMA[f.id] }))} tamanho={124}>
@@ -362,7 +359,7 @@ function CaixaDoDia() {
           <>
             <div className="g-grade kpis">
               <>
-              <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Entrou hoje, no dia" valor={<span className="gf-kpi-v">{brl(entrouNoDia)}</span>}
+              <Kpi icone={ArrowDownLeft} tom="menta" rotulo="Recebido hoje, no dia" valor={<span className="gf-kpi-v">{brl(entrouNoDia)}</span>}
                 apoio={emOutrosCaixas > 0 ? `${brl(entrouFora)} fora do caixa` : entrouNoDia > 0 ? "tudo fora do caixa" : "sem caixa aberto"} />
               {fin && <Kpi icone={ArrowUpRight} tom="rosa" rotulo="Saiu hoje, no dia" valor={<span className="gf-kpi-v">{brl(saiuNoDia)}</span>} apoio={saiuNoDia > 0 && saiuFora < saiuNoDia ? `${brl(saiuFora)} fora do caixa` : "sem caixa aberto"} />}
               {ultimo && resumoUltimo && (
@@ -534,9 +531,11 @@ function FolhaGaveta({ tipo, inicial, naGaveta, aoFechar, aoSalvo }: {
   const [erro, setErro] = useState<string | null>(null);
   const [erroMotivo, setErroMotivo] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // retirada do dono: vira uma saída na categoria "Retirada do dono" (conta no Resultado, como a lançada no Financeiro), não uma sangria
+  const [doDono, setDoDono] = useState(false);
   // o que tem na gaveta sem este movimento (na edição, desfaz o valor antigo) e o que fica depois dele
-  const base = Math.round((inicial ? naGaveta + (tirar ? Number(inicial.valor) : -Number(inicial.valor)) : naGaveta) * 100) / 100;
-  const depois = Math.round((base + (tirar ? -(valor ?? 0) : valor ?? 0)) * 100) / 100;
+  const base = centavos((inicial ? naGaveta + (tirar ? Number(inicial.valor) : -Number(inicial.valor)) : naGaveta));
+  const depois = centavos((base + (tirar ? -(valor ?? 0) : valor ?? 0)));
 
   const op = useOperacao();
   const salvar = () => op.fazer(gravar);
@@ -557,6 +556,9 @@ function FolhaGaveta({ tipo, inicial, naGaveta, aoFechar, aoSalvo }: {
         if (r.error) throw new Error(r.error.message);
         if (!r.data?.length) throw new Error("Não deu para salvar. Este movimento pode ter sido apagado, ou só o dono e quem cuida do financeiro podem alterar.");
         avisar("Alteração salva.");
+      } else if (tirar && doDono) {
+        await lancarPago(sb, petshop.id, { tipo: "saida", valor, forma: "dinheiro", categoria: "Retirada do dono", descricao: texto || "Retirada do dono", exigeCaixa: true, chave });
+        avisar(`Anotado: retirada do dono de ${brl(valor)}. Saiu da gaveta e conta nas despesas do mês.`);
       } else {
         await lancarPago(sb, petshop.id, {
           tipo: tirar ? "saida" : "entrada", valor, forma: "dinheiro", categoria: CATEGORIA_GAVETA, descricao: texto || (tirar ? null : "Troco"),
@@ -602,10 +604,16 @@ function FolhaGaveta({ tipo, inicial, naGaveta, aoFechar, aoSalvo }: {
       <form className="g-form" onSubmit={(e) => { e.preventDefault(); void salvar(); }}>
         <p className="g-muted g-p">
           {tirar
-            ? "Use quando você tira dinheiro da gaveta sem ser uma despesa do pet shop: levou ao banco, guardou no cofre, o dono retirou. O nome disso é sangria."
+            ? "Use quando você tira dinheiro da gaveta sem ser uma despesa do pet shop: levou ao banco, guardou no cofre. O nome disso é sangria."
             : "Use quando você coloca dinheiro na gaveta sem ser uma venda: mais troco, por exemplo. O nome disso é suprimento."}
           {" "}Não conta como {tirar ? "despesa" : "venda"}: só entra na conferência da gaveta.
         </p>
+        {tirar && !inicial && (
+          <label className="g-check">
+            <input type="checkbox" checked={doDono} onChange={(e) => setDoDono(e.target.checked)} />
+            <span>É retirada do dono <span className="g-muted">(dinheiro que o dono levou para ele: sai da gaveta e conta nas despesas do mês, na categoria Retirada do dono, igual à lançada no Financeiro)</span></span>
+          </label>
+        )}
         <Campo rotulo="Valor em dinheiro" erro={erro}>
           <CampoDinheiro valor={valor} aoMudar={(v) => { setValor(v); setErro(null); }} autoFocus={!inicial} maximo={99999999} />
         </Campo>
@@ -779,7 +787,7 @@ function FolhaFechar({ caixa, lancamentos, dinheiroFora, aoFechar, aoSalvo, aoMu
       const resposta = (u.data ?? {}) as { fechado?: boolean; motivo?: string; esperado?: number; fechado_em?: string | null; contado?: number | null };
       if (!resposta.fechado) {
         if (resposta.motivo !== "mudou") { await jaFechado(resposta.fechado_em, resposta.contado); return; }
-        const agora = Number(resposta.esperado), d = Math.round((agora - esperado) * 100) / 100;
+        const agora = Number(resposta.esperado), d = centavos((agora - esperado));
         setMudou({
           esperado: agora,
           texto: `${d > 0 ? `Entrou mais ${brl(d)}` : `Saiu ${brl(-d)}`} enquanto você contava. O esperado agora é ${brl(agora)}.`,

@@ -16,6 +16,7 @@ import {
   type Coluna, type Destino, type Etapa, type LinhaQuadro,
 } from "@/lib/gestao/quadro";
 import { useGestao } from "@/components/gestao/contexto";
+import { lerSinal } from "@/lib/gestao/sinal";
 import { AvatarPet, DICA_SO_CONSULTA, Esqueleto, Folha, Vazio, avisarMudanca, ok, useAvisos, useDados, useSomenteLeitura } from "@/components/gestao/ui";
 import { useParaCobrar } from "@/components/gestao/agenda/para-cobrar";
 import { guardarLembrado, lerLembrado } from "@/components/gestao/lembrado";
@@ -77,18 +78,22 @@ function Quadro() {
       // a entrada é um apoio (alertas): se não der para ler, o quadro abre do mesmo jeito
       entradas: new Map(((e.error ? [] : e.data ?? []) as Entrada[]).map((x) => [x.agendamento_id, x])),
     };
-  }, [petshop.id, hoje.getTime(), vejoFinanceiro]);
+  // atualização sozinha (Modo TV a cada 30 s; no aparelho da equipe, a cada minuto): a pergunta leve "mudou algo?" e, só se
+  // mudou, os dados de novo. A hora do "Atualizado às" anda a cada pergunta respondida.
+  }, [petshop.id, hoje.getTime(), vejoFinanceiro], {
+    aCada: tv ? 30_000 : 60_000,
+    sinal: async () => { const v = await lerSinal(sb, petshop.id, hoje, somaDias(hoje, 1)); if (v) setAtualizado(Date.now()); return v; },
+  });
 
-  // relógio do "há 20 min" e a atualização sozinha (Modo TV a cada 30 s; no aparelho da equipe, a cada minuto)
+  // relógio do "há 20 min"; ao voltar para a aba, busca na hora
   const recarregarRef = useRef(recarregar);
   recarregarRef.current = recarregar;
   useEffect(() => {
     const relogio = setInterval(() => setAgora(Date.now()), 20000);
-    const busca = setInterval(() => { if (document.visibilityState === "visible") void recarregarRef.current(); }, tv ? 30000 : 60000);
     const voltou = () => { if (document.visibilityState === "visible") { setAgora(Date.now()); void recarregarRef.current(); } };
     document.addEventListener("visibilitychange", voltou);
-    return () => { clearInterval(relogio); clearInterval(busca); document.removeEventListener("visibilitychange", voltou); };
-  }, [tv]);
+    return () => { clearInterval(relogio); document.removeEventListener("visibilitychange", voltou); };
+  }, []);
 
   // concluídos de hoje sem conta fechada (o banco diz quais, sem valor): o pet entregue sem pagar mostra Falta cobrar
   const { ids: semConta, recarregar: recarregarSemConta } = useParaCobrar(hoje, hoje, !tv);

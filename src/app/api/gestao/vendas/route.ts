@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/gestao/banco";
 import { SUPABASE_CHAVE, SUPABASE_URL, configurado } from "@/lib/gestao/supabase";
 import { garantirTrava, segredoDoServidor, visitante } from "@/lib/gestao/servidor";
-import { INSTRUCOES_VENDAS, MARCA_PESSOA, RESPOSTA_SEM_IA } from "@/lib/gestao/vendas";
+import { INSTRUCOES_VENDAS, MARCA_PESSOA, RESPOSTA_SEM_IA, mandaParaAEquipe } from "@/lib/gestao/vendas";
 import { comRegistro, registrarErroServidor } from "@/lib/gestao/erros-servidor";
 
 export const runtime = "nodejs";
@@ -74,9 +74,10 @@ async function tratar(req: Request) {
       });
     if (r.stop_reason === "max_tokens" || r.stop_reason === "refusal") return semIa();
     const bruto = r.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
-    const texto = bruto.replace(MARCA_PESSOA, "").trim();
+    const texto = bruto.replaceAll(MARCA_PESSOA, "").trim();
     if (!texto) return semIa();
-    return NextResponse.json({ texto, pessoa: bruto.includes(MARCA_PESSOA) });
+    // o botão do WhatsApp aparece com a marca ou quando a resposta manda falar com a equipe (número escrito não é tocável)
+    return NextResponse.json({ texto, pessoa: bruto.includes(MARCA_PESSOA) || mandaParaAEquipe(texto) });
   } catch (err) {
     if (!(err instanceof Anthropic.APIError)) await registrarErroServidor("/api/gestao/vendas", err);
     return semIa();

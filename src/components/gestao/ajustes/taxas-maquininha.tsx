@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { CreditCard } from "lucide-react";
-import { apagarTaxas, calcularTaxa, carregarTaxas, MAX_DIAS, MAX_FIXO, MAX_PCT, salvarTaxas, TAXAS_ZERADAS, type TaxasMaquininha } from "@/lib/gestao/maquininha";
-import { brl } from "@/lib/gestao/util";
+import { apagarTaxas, calcularTaxa, carregarTaxas, MAX_DIAS, MAX_FIXO, MAX_PCT, OPCAO_REPASSE_FERIADO, repassePulaFeriado, salvarTaxas, TAXAS_ZERADAS, type TaxasMaquininha } from "@/lib/gestao/maquininha";
+import { salvarOpcoes } from "@/lib/gestao/opcoes";
+import { brl, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { avisarMudanca, useAvisos, useDados, useSomenteLeitura } from "../ui";
@@ -19,7 +20,7 @@ function ler(t: string, max: number): number | null | "erro" {
   const v = t.trim().replace(",", ".");
   if (!v) return null;
   const n = Number(v);
-  return Number.isFinite(n) && n >= 0 && n <= max ? Math.round(n * 100) / 100 : "erro";
+  return Number.isFinite(n) && n >= 0 && n <= max ? centavos(n) : "erro";
 }
 
 type Linha = { pct: string; fixo: string; dias: string };
@@ -49,9 +50,21 @@ const PARCELAS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
  * Serve só para o dono ver quanto recebe de verdade (o preço do cliente não muda). Cada pagamento guarda a taxa do dia.
  */
 export default function TaxasDaMaquininha() {
-  const { sb, petshop } = useGestao();
+  const { sb, petshop, recarregarBase } = useGestao();
   const { avisar, avisarErro } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
+  const [mudandoFeriado, setMudandoFeriado] = useState(false);
+  /** O repasse que cai num feriado da lista do pet shop passa para o próximo dia útil (só muda a data mostrada; nenhum valor muda). */
+  async function trocarFeriado(v: boolean) {
+    if (somenteLeitura() || mudandoFeriado) return;
+    setMudandoFeriado(true);
+    try {
+      await salvarOpcoes(sb, petshop.id, { [OPCAO_REPASSE_FERIADO]: v });
+      await recarregarBase();
+      avisarMudanca();
+      avisar(v ? "Os repasses agora pulam os feriados da sua lista." : "Os repasses não pulam mais os feriados.");
+    } catch (e) { avisarErro(e); } finally { setMudandoFeriado(false); }
+  }
   const [r, setR] = useState<Rascunho | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -179,6 +192,10 @@ export default function TaxasDaMaquininha() {
             As taxas valem para os pagamentos de agora em diante. Cada pagamento guarda a taxa do dia: se você mudar aqui depois, o que já foi pago não muda.
             Se você já lança a taxa da maquininha como saída no Financeiro, não precisa mais: ela aparece sozinha em Relatórios.
           </p>
+          <label className="g-check" data-teste="repasse-feriado">
+            <input type="checkbox" checked={repassePulaFeriado(petshop)} disabled={mudandoFeriado} onChange={(e) => void trocarFeriado(e.target.checked)} />
+            <span>A maquininha não paga em feriado <span className="g-muted">(o repasse que cai num feriado marcado em Feriados e dias fechados passa para o próximo dia útil; sábado e domingo já passam para a segunda)</span></span>
+          </label>
           {erro && <p className="g-erro" role="alert">{erro}</p>}
           <div className="g-fila">
             <button className="g-btn verde" disabled={ocupado}>{ocupado ? "Salvando…" : "Salvar taxas"}</button>

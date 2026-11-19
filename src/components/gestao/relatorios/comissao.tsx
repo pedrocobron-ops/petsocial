@@ -5,7 +5,7 @@ import { Check, ChevronDown, ChevronUp, HandCoins } from "lucide-react";
 import { opcoesDeComissao } from "@/lib/gestao/dinheiro-opcoes";
 import { FORMAS } from "@/lib/gestao/tipos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
-import { brl, dataCompleta, dataCurta, isoDia } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, isoDia, centavos, centavos as real } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Chips, Grupo, LinhaResumo } from "../financeiro/comum";
 import { Tile } from "../painel";
@@ -23,7 +23,6 @@ type Forma = (typeof FORMAS)[number]["id"];
 type Pendencia = { profissional_id: string; nome: string; de: string; ate: string; comissao: number; pago: number; falta: number };
 /** O que a folha de pagar precisa saber: de quem, de que datas, quanto, e se é a diferença de um período já pago. */
 type APagar = { profissional_id: string; nome: string; de: string; ate: string; valor: number; comissao: number; jaPago: number; apoio?: string };
-const real = (n: number) => Math.round(n * 100) / 100;
 
 const atendimentos = (n: number) => (n === 1 ? "1 atendimento" : `${n} atendimentos`);
 
@@ -57,7 +56,7 @@ export default function BlocoComissao({ de, ate, aoCalcular }: { de: string; ate
   useEffect(() => { aoCalcular?.(dados?.linhas ?? null); }, [dados]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const linhas = dados?.linhas ?? [];
-  const total = Math.round(linhas.reduce((s, c) => s + c.comissao, 0) * 100) / 100;
+  const total = centavos(linhas.reduce((s, c) => s + c.comissao, 0));
   const maior = linhas[0]?.comissao ?? 0;
 
   async function desfazer(c: LinhaComissao, g: Paga) {

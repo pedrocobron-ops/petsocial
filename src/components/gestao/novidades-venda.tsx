@@ -11,7 +11,7 @@ function Boletim() {
   return (
     <div className="gp-nv-fone" role="img" aria-label="Exemplo do boletim do pet no celular do tutor: a foto de antes e a de depois da Pipoca, uma shih-tzu que chegou embolada e saiu escovada e de lacinho azul, o recado da equipe, o quadro Para você ficar de olho, o que foi feito, o botão Marcar o próximo e o convite para avaliar no Google">
       <div className="gp-nv-tela" aria-hidden>
-        <div className="gp-bm-loja"><span className="gp-bm-logo"><PawPrint /></span><span><b>Banho &amp; Cia</b><small>Exemplo · SP</small></span></div>
+        <div className="gp-bm-loja"><span className="gp-bm-logo"><PawPrint /></span><span><b>Banho &amp; Cia</b><small>Pet shop de exemplo</small></span></div>
         <p className="gp-bm-sobre">Boletim da Pipoca</p>
         <p className="gp-bm-nome">Pipoca</p>
         <p className="gp-bm-quando"><span>Banho e tosa</span>sexta, 14 de novembro</p>
@@ -141,27 +141,35 @@ const NOVIDADES: { id: string; selo: string; titulo: React.ReactNode; texto: str
   },
 ];
 
-/** Seção logo depois da capa: o boletim do pet, o caderno que vira cadastro e a voz, com o desenho da tela ao lado. */
-export default function NovidadesVenda() {
+/**
+ * As vitrines com o desenho da tela ao lado, em duas partes da página de venda:
+ * `boletim` vem logo depois da capa (o exemplo com as fotos de antes e depois, antes dos preços);
+ * `resto` (o caderno que vira cadastro e a voz) vem mais abaixo.
+ */
+export default function NovidadesVenda({ parte }: { parte: "boletim" | "resto" }) {
+  const itens = NOVIDADES.filter((n) => (n.id === "boletim") === (parte === "boletim"));
+  const boletim = parte === "boletim";
   return (
-    <section className="gp-nv-sec" id="destaques" aria-labelledby="destaques-titulo">
+    <section className={`gp-nv-sec${boletim ? " so-boletim" : ""}`} id={boletim ? "destaques" : "caderno-e-voz"} aria-labelledby={`${parte}-titulo`}>
       <div className="gp-c">
-        <p className="gp-ia"><Sparkles />Para quem está com o pet na mão</p>
-        <h2 id="destaques-titulo">Boletim do pet, caderno que vira cadastro <em>e voz no lugar do teclado.</em></h2>
-        <p className="gp-lead">Três coisas feitas para a rotina de quem atende: o tutor vê o cuidado, você não digita de novo e fala em vez de escrever.</p>
-        <nav className="gp-nv-atalhos" aria-label="Destaques">
-          {NOVIDADES.map((n, i) => <a key={n.id} href={`#novo-${n.id}`}><span>{String(i + 1).padStart(2, "0")}</span>{n.selo}</a>)}
-        </nav>
+        <p className="gp-ia"><Sparkles />{boletim ? "O que o tutor recebe" : "Para quem está com o pet na mão"}</p>
+        {boletim
+          ? <h2 id="boletim-titulo">O banho termina <em>e o tutor vê o cuidado.</em></h2>
+          : <h2 id="resto-titulo">Caderno que vira cadastro <em>e voz no lugar do teclado.</em></h2>}
+        {!boletim && <p className="gp-lead">Duas coisas feitas para a rotina de quem atende: você não digita de novo e fala em vez de escrever.</p>}
         <ol className="gp-nv">
-          {NOVIDADES.map(({ id, selo, titulo, texto, itens, Desenho }, i) => (
+          {itens.map(({ id, selo, titulo, texto, itens: linhas, Desenho }, i) => (
             <li key={id} id={`novo-${id}`} className={`gp-nv-item${i % 2 ? " inverte" : ""}`}>
               <div className="gp-nv-texto">
                 <span className="gp-nv-selo">{selo}</span>
                 <h3>{titulo}</h3>
                 <p>{texto}</p>
-                <ul>{itens.map((t) => <li key={t}><Check />{t}</li>)}</ul>
+                <ul>{linhas.map((t) => <li key={t}><Check />{t}</li>)}</ul>
               </div>
-              <div className="gp-nv-desenho"><Desenho /></div>
+              <div className="gp-nv-desenho">
+                <Desenho />
+                {id === "boletim" && <p className="gp-nv-legenda">Boletim de exemplo. Fotos e nomes ilustrativos.</p>}
+              </div>
             </li>
           ))}
         </ol>

@@ -5,13 +5,12 @@ import { opcoesDaLoja, pct } from "@/lib/gestao/loja-opcoes";
 import { lerDevolucoesPorProduto, vendasPorProduto, type DevolucaoLida, type SaidaLida, type VendaLida } from "@/lib/gestao/loja-vendas";
 import { usaModulo } from "@/lib/gestao/modulos";
 import type { Lancamento } from "@/lib/gestao/tipos";
-import { brl } from "@/lib/gestao/util";
+import { brl, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { useDados } from "../ui";
 import { paginar } from "./comum";
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Resumo do Financeiro, só para quem ligou "Margem e custo médio" nas opções da loja: o custo dos produtos vendidos no mês

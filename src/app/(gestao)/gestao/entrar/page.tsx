@@ -125,6 +125,7 @@ function Formulario({ codigo }: { codigo: string }) {
       </form>
       <div className="g-pilha p g-p">
         <Link className="g-link" href="/gestao/recuperar">Esqueci a senha</Link>
+        <span className="g-muted g-pp" style={{ display: "block", marginTop: 10 }}><Link className="g-link" href="/gestao/termos">Termos de uso</Link> · <Link className="g-link" href="/gestao/privacidade">Política de privacidade</Link></span>
         {codigo
           ? <p className="g-muted">Ainda não tem conta? <Link className="g-link" href={`/gestao/criar-conta?convite=${encodeURIComponent(codigo)}`}>Criar a conta para entrar na equipe</Link></p>
           : <p className="g-muted">Ainda não tem conta? <Link className="g-link" href="/gestao/criar-conta">Teste 7 dias grátis</Link></p>}

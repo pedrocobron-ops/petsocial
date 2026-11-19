@@ -33,7 +33,21 @@ export const COLS_PROFISSIONAL = "id, petshop_id, user_id, nome, papel, ve_finan
 export const COLS_ESTADIA = "id, petshop_id, pet_id, tipo, entrada, saida_prevista, saida, status, obs, criado_em, diarias_cobradas, plano_id, mensalista, dia, cobranca_id, acomodacao, cuidados, avisos, sinal_estado, experiencia, leva_traz_buscar, leva_traz_levar, endereco_leva_traz, promo";
 
 /** Tudo do pet shop menos a meta do mês, as diárias padrão, as opções (`petshop_opcoes`) e os dados da assinatura na Cakto. */
-export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos, principal, creche_bloqueia_vacina";
+export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, endereco, bairro, complemento, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos, principal, creche_bloqueia_vacina";
+
+/**
+ * O tutor sem e-mail e sem endereço: é o que lê quem atende mas não tem a área Clientes (tosador, banhista, quem cuida da
+ * creche). Nunca `select("*")` em `clientes`: use `colsDoTutor(posso("clientes"))` e passe a linha por `tutorLido`.
+ * Na edição, quem não lê o contato também não manda `email` nem `endereco` (regravaria vazio por cima do que existe).
+ */
+export const COLS_CLIENTE = "id, petshop_id, nome, telefone, obs, criado_em, nao_quer_mensagens, limite_fiado, nascimento";
+export const COLS_CLIENTE_CONTATO = `${COLS_CLIENTE}, email, endereco`;
+/** As colunas do tutor para quem pede: com e-mail e endereço só para quem tem a área Clientes (o dono tem todas). */
+export const colsDoTutor = (vejoContato: boolean) => (vejoContato ? COLS_CLIENTE_CONTATO : COLS_CLIENTE);
+/** A linha do tutor como a tela espera: quem não lê o contato recebe e-mail e endereço vazios. */
+export function tutorLido<C extends object>(linha: C): T["clientes"]["Row"] {
+  return { email: null, endereco: null, ...linha } as unknown as T["clientes"]["Row"];
+}
 
 type Linhas = Record<string, unknown>[];
 /**

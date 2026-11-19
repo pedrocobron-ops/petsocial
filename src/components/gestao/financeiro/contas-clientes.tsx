@@ -6,7 +6,7 @@ import { mensagemDeDivida, multaSugerida } from "@/lib/gestao/dinheiro-opcoes";
 import { dividaPorVencimento, fraseDoDisponivel, fraseDoVencimento, limiteDoCliente, type DividaPorVencimento } from "@/lib/gestao/fiado";
 import { descricaoAtual } from "@/lib/gestao/dinheiro";
 import type { Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, dataCurta, dataCurtaOuAno, hora, isoDia, linkWhatsApp, telefoneValido } from "@/lib/gestao/util";
+import { brl, dataCompleta, dataCurta, dataCurtaOuAno, hora, isoDia, linkWhatsApp, telefoneValido, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { BarraDoLimite } from "./limite-fiado";
@@ -25,7 +25,6 @@ export type Devedor = { chave: string; tutor: Tutor | null; contas: Lancamento[]
   /** O total separado por vencimento e o que conta no limite de fiado (sem a mensalidade e o sinal que ainda não venceram). */
   partes: DividaPorVencimento };
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 const quandoFoi = (iso: string) => `${dataCurta(iso)} às ${hora(iso)}`;
 
 /** As contas em aberto de clientes: de todos, ou de um tutor só. */
@@ -45,7 +44,8 @@ export function useContasDeClientes(clienteId?: string) {
       for (const c of t.data ?? []) tutores.set(c.id, c);
     }
     return { contas, tutores };
-  }, [petshop.id, vejoFinanceiro, clienteId ?? ""]);
+  // memória curta: o Caixa, o Financeiro e a ficha do tutor pedem a mesma lista; voltar pelo menu não baixa de novo
+  }, [petshop.id, vejoFinanceiro, clienteId ?? ""], { guardar: "contas-de-clientes" });
 }
 
 /** Desde quando o cliente deve esta conta: o dia anotado (dívida trazida do caderno) ou o dia em que foi anotada. */

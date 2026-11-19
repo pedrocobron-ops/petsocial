@@ -7,7 +7,7 @@ import { Lock, Plus, Split, Trash2 } from "lucide-react";
 import { caixaAberto, formaPrincipal, ultimoFechamento, VALOR_MAXIMO, type PartePagamento } from "@/lib/gestao/dinheiro";
 import { anotarParcelasComRetry, aoMudarTaxas, avisoParcelasNaoAnotadas, calcularTaxa, carregarTaxas, lojaPerguntaParcelas, perguntaParcelas, temTaxa, type TaxasMaquininha } from "@/lib/gestao/maquininha";
 import { FORMAS } from "@/lib/gestao/tipos";
-import { brl, hora, isoDia, somaDias } from "@/lib/gestao/util";
+import { brl, hora, isoDia, somaDias, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { avisarMudanca, useAvisos, useCampoDeValor, useDados } from "../ui";
 import "./loja.css";
@@ -45,7 +45,6 @@ export function lembrarForma(forma: Forma) { void forma; }
 
 /* ---------- pagamento dividido ---------- */
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 /** Máximo de formas num pagamento dividido. */
 const MAX_PARTES = 3;
 

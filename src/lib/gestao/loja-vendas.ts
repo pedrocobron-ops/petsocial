@@ -1,5 +1,6 @@
 import { itensDoLancamento, partesDoLancamento } from "./dinheiro";
 import type { Banco } from "./supabase";
+import { centavos } from "./util";
 
 /**
  * Vendas por produto num período, só com o que está gravado:
@@ -29,7 +30,6 @@ export type LinhaProduto = {
   devolvidos: number; devolvido: number;
 };
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 const milesimos = (n: number) => Math.round(n * 1000) / 1000;
 
 /** Margem em reais e em % (sobre a receita) da parte com custo registrado; null quando nada tem custo. */

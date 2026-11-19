@@ -1,6 +1,7 @@
 import { AREAS, FUNCAO_CUIDADOR, PERFIS, areasDe, areasPara, perfilParaOPetshop, veDinheiro, type Area } from "@/lib/gestao/acessos";
 import { PLANOS, planoPorId } from "@/lib/gestao/planos";
 import type { Petshop, Profissional } from "@/lib/gestao/tipos";
+import { centavos } from "@/lib/gestao/util";
 
 /**
  * Equipe: o que cada escolha grava no banco.
@@ -180,5 +181,5 @@ export function textoDoConvite({ nome, petshop, email, origem, codigo }: { nome:
 /** Comissão digitada ("7,5") em número; null se não é um valor entre 0 e 100. */
 export function lerComissao(texto: string): number | null {
   const c = texto.trim() ? Number(texto.replace(",", ".")) : 0;
-  return Number.isFinite(c) && c >= 0 && c <= 100 ? Math.round(c * 100) / 100 : null;
+  return Number.isFinite(c) && c >= 0 && c <= 100 ? centavos(c) : null;
 }

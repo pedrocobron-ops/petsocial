@@ -12,7 +12,7 @@ import { FiadoDoTutor } from "../financeiro/limite-fiado";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import type { Cliente } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, fmtTelefone, isoDia, semAcento } from "@/lib/gestao/util";
+import { brl, dataCompleta, fmtTelefone, isoDia, semAcento, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { AvatarPessoa, Folha, avisarMudanca, mensagemDeErro, ok, useAvisos, useDados, useSomenteLeitura } from "../ui";
 import { UsarCredito } from "../financeiro/comum";
@@ -65,8 +65,8 @@ export default function VendaBalcao({ aoFechar, aoPronto, inicial, orcamento }: 
   // Na venda "paga depois" o crédito não entra: fica para quando ele vier pagar.
   const { dados: saldoCredito } = useDados(async () => (vejoFinanceiro && tutor?.id ? (await creditoDoTutor(sb, petshop.id, tutor.id)).saldo : 0), [petshop.id, tutor?.id ?? "", vejoFinanceiro]);
   const [usarCredito, setUsarCredito] = useState(true);
-  const credito = usarCredito && !depois.ativo && (saldoCredito ?? 0) > 0 && contas.total > 0 ? Math.round(Math.min(saldoCredito ?? 0, contas.total) * 100) / 100 : 0;
-  const aPagar = Math.round((contas.total - credito) * 100) / 100;
+  const credito = usarCredito && !depois.ativo && (saldoCredito ?? 0) > 0 && contas.total > 0 ? centavos(Math.min(saldoCredito ?? 0, contas.total)) : 0;
+  const aPagar = centavos((contas.total - credito));
   const soCredito = credito > 0 && aPagar <= 0.005;
   // venda começada: recarregar ou fechar a aba pede confirmação antes de perder o que já está na conta
   const temItens = itens.length > 0;

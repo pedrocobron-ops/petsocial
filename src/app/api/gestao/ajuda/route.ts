@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { garantirTrava, segredoDoServidor } from "@/lib/gestao/servidor";
 import Anthropic from "@anthropic-ai/sdk";
 import { bancoDoUsuario, configurado } from "@/lib/gestao/supabase";
-import { INSTRUCOES_AJUDA, lerRespostaDaAjuda, procurarTopico } from "@/lib/gestao/ajuda";
+import { INSTRUCOES_AJUDA, lerRespostaDaAjuda, procurarTopico, quemPergunta } from "@/lib/gestao/ajuda";
 import { topicosPara } from "@/lib/gestao/manual";
 import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { comRegistro, registrarErroServidor } from "@/lib/gestao/erros-servidor";
@@ -38,7 +38,7 @@ async function tratar(req: Request) {
   const sb = bancoDoUsuario(token);
   const { data: u } = await sb.auth.getUser(token);
   if (!u.user) return erro(401, "sem_login", "Entre de novo para usar a ajuda.");
-  const { data: eu } = await sb.from("profissionais").select("id").eq("petshop_id", corpo.petshopId).eq("user_id", u.user.id).eq("ativo", true).maybeSingle();
+  const { data: eu } = await sb.from("profissionais").select("id, papel").eq("petshop_id", corpo.petshopId).eq("user_id", u.user.id).eq("ativo", true).maybeSingle();
   if (!eu) return erro(403, "sem_acesso", "Você não faz parte deste pet shop.");
 
   // sem a IA, a resposta sai do manual: primeiro entre os tópicos do que este pet shop usa (com os passos dele);
@@ -66,7 +66,8 @@ async function tratar(req: Request) {
     const r = await cliente.messages.create({
       // o raciocínio do modelo conta no limite de tokens: folga para ele e esforço baixo (dúvida de uso é simples)
       model: MODELO, max_tokens: 3000, output_config: { effort: "low" },
-      system: [{ type: "text", text: INSTRUCOES_AJUDA, cache_control: { type: "ephemeral" } }],
+      // o guia fica guardado (cache); quem está perguntando (dono ou equipe) vai num bloco curto à parte
+      system: [{ type: "text", text: INSTRUCOES_AJUDA, cache_control: { type: "ephemeral" } }, { type: "text", text: quemPergunta(eu.papel) }],
       messages: falas.map((f) => ({ role: f.de === "eu" ? ("user" as const) : ("assistant" as const), content: f.texto })),
     });
     // resposta cortada (pode ter perdido a marca de chamar a equipe) ou recusada: responde pelo manual

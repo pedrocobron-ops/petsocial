@@ -13,10 +13,12 @@ import { pixDoSinal } from "@/lib/gestao/hotel";
 import { porteDe, sinalDe } from "@/lib/gestao/hotel-opcoes";
 import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { opcoesDoLink, prazoPorExtenso, usouOpcoesDoLink } from "@/lib/gestao/link-opcoes";
-import { brl, NOTA_PORTE, precoMudaComPorte } from "@/lib/gestao/util";
+import { brl, NOTA_PORTE, precoMudaComPorte, centavos } from "@/lib/gestao/util";
 import { PORTES } from "@/lib/gestao/tipos";
 import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar, semAcento } from "@/lib/gestao/util";
 import { precoDoPedido } from "@/lib/gestao/preco-do-pedido";
+import { lerVisto, valorNaFrase, type LinhaDeValor } from "@/lib/gestao/link-precos";
+import { fraseDoEndereco } from "@/lib/gestao/endereco";
 import "./pedidos-link.css";
 
 type Pedido = Database["public"]["Tables"]["pedidos_agendamento"]["Row"];
@@ -89,6 +91,14 @@ export default function PedidosLink() {
   const somenteLeitura = useSomenteLeitura();
   const [quem, setQuem] = useState<Record<string, string>>({});
   const [ocupado, setOcupado] = useState<string | null>(null);
+  // enquanto um pedido está sendo aceito, fechar ou recarregar a aba pede confirmação (o aceite é uma operação só no banco,
+  // mas a pessoa precisa ver o resultado antes de sair)
+  useEffect(() => {
+    if (!ocupado) return;
+    const segurar = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", segurar);
+    return () => window.removeEventListener("beforeunload", segurar);
+  }, [ocupado]);
   // nome de quem ficou com o pedido, quando a pessoa escolheu usar a ficha de um tutor que já existia (vale até recarregar)
   const [tutores, setTutores] = useState<Record<string, string>>({});
   const [duvida, setDuvida] = useState<Duvida | null>(null);
@@ -101,13 +111,16 @@ export default function PedidosLink() {
   const doLink = opcoesDoLink(petshop);
 
   const { dados: tudo, recarregar } = useDados(async () => {
-    const [pendentes, semAviso, recados] = await Promise.all([
+    const [pendentes, semAviso, recados, vistosLidos] = await Promise.all([
       sb.from("pedidos_agendamento").select("*").eq("petshop_id", petshop.id).eq("status", "pendente").order("inicio").limit(100),
       // respondidos em que o tutor ainda não foi avisado (e os que o próprio tutor cancelou, até alguém ver)
       sb.from("pedidos_agendamento").select("*").eq("petshop_id", petshop.id).in("status", ["aceito", "recusado"]).is("avisado_em", null).order("inicio").limit(60),
       // o tutor pediu outra data, ou pediu para cancelar algo que tem dinheiro no meio: só para quem ligou isso no link
       comOpcoes ? sb.from("pedidos_agendamento").select("*").eq("petshop_id", petshop.id).not("cliente_pediu", "is", null).is("cliente_pedido_visto_em", null).order("inicio").limit(40) : null,
+      // o valor que o link mostrou ao tutor em cada pedido (só quem recebe lê; banco antes da migração 20261235: sem isso)
+      vejoFinanceiro ? Promise.resolve((sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }).rpc("pedidos_vistos", { p: petshop.id })).then((r) => (r.error ? null : r.data), () => null) : null,
     ]);
+    const vistos = (vistosLidos && typeof vistosLidos === "object" ? vistosLidos : {}) as Record<string, unknown>;
     // o sinal das reservas aceitas que ainda esperam o aviso: só quem recebe lê o valor (para a mensagem levar quanto é)
     const sinais = new Map<string, number>();
     const sinaisPagos = new Map<string, number>();
@@ -146,7 +159,7 @@ export default function PedidosLink() {
       for (const x of h.data ?? []) atual.set(x.id, { inicio: x.inicio, fim: x.fim });
     }
     const emDia = (l: Pedido[]) => l.map((p) => (p.agendamento_id && atual.has(p.agendamento_id) && !ehEstadia(p) ? { ...p, ...atual.get(p.agendamento_id)! } : p));
-    return { pendentes: ok(pendentes) as Pedido[], semAviso: emDia(respondidosAinda), recados: emDia(recadosLidos), sinais, sinaisPagos, canceladas };
+    return { pendentes: ok(pendentes) as Pedido[], semAviso: emDia(respondidosAinda), recados: emDia(recadosLidos), sinais, sinaisPagos, canceladas, vistos };
   }, [petshop.id, comOpcoes, vejoFinanceiro]);
   const dados = tudo?.pendentes;
 
@@ -168,6 +181,14 @@ export default function PedidosLink() {
     const v = precoDoPedido(p, servicos.find((s) => s.id === p.servico_id), { diaria_creche: petshop.diaria_creche, diaria_hotel: petshop.diaria_hotel,
       diariaHotelDoPorte: porte.ativo && p.porte ? porte[p.porte as "P" | "M" | "G" | "GG"] ?? null : null });
     return v && <span className="g-pl-valor">{v}</span>;
+  };
+  /** O que o link mostrou ao tutor (o banco guardou ao receber o pedido): linhas de valor dos pedidos da lista. Só para quem recebe. */
+  const vistosDe = (lista: Pedido[]): LinhaDeValor[] => lista.flatMap((p) => { const v = lerVisto(tudo?.vistos?.[p.id]); return v ? [{ nome: p.pet_nome, v }] : []; });
+  /** "o cliente viu: R$ 118,82 (Mel R$ 42,41 e Bob R$ 76,41)" — o cartão diz o mesmo número que o tutor leu no link. */
+  const vistoDe = (lista: Pedido[]) => {
+    const linhas = vistosDe(lista);
+    const frase = linhas.length === lista.length ? valorNaFrase(linhas) : null;
+    return frase ? <span className="g-tag azul" data-teste="cliente-viu" title="O valor que o link mostrou ao tutor quando ele pediu (preço da lista no porte, com a promoção do horário; no hotel, a estimativa das datas).">o cliente viu: {frase}</span> : null;
   };
   const corServico = (id: string | null) => servicos.find((s) => s.id === id)?.cor ?? "#f97316";
   const respondidos: Respondido[] = (tudo?.semAviso ?? []).map((p) => ({ pedido: p, servico: rotulo(p), resposta: p.cliente_cancelou_em ? "cancelou" : p.status === "aceito" ? "aceito" : "recusado", tutor: tutores[p.id] }));
@@ -269,8 +290,33 @@ export default function PedidosLink() {
     }
     const feitos: Pedido[] = [];
     let falha: unknown = null;
-    for (const p of lista) {
-      const args = { p_id: p.id, p_profissional: ehEstadia(p) ? undefined : profissional, p_tutor_novo: decisao.como === "novo" };
+    let comSinal = 0;
+    // Uma operação só no banco (pedidos_aceitar_juntos, migração 20261235): ou todos os pets do pedido são aceitos, com a diária
+    // do porte e o sinal, ou nenhum. Antes era uma ida ao banco por pet e por passo: demorava, e sair da tela no meio deixava
+    // o pedido aceito pela metade.
+    type Solto = { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }> };
+    const comoNovo = decisao.como === "novo";
+    const juntos = (forcar: boolean) => (sb as unknown as Solto).rpc("pedidos_aceitar_juntos", {
+      p_ids: lista.map((p) => p.id), p_profissional: profissional ?? null, p_forcar: forcar, p_tutor_novo: comoNovo, p_portes: portes ?? null,
+    });
+    let r = await juntos(false);
+    // creche ou hotel sem vaga em algum dia: o banco recusa e explica; a pessoa decide se aceita assim mesmo
+    const cheia = r.error ? /CASA_CHEIA:\s*(.+)/.exec(textoDoErro(r.error))?.[1]?.trim() : null;
+    if (cheia) {
+      const forcar = await confirmar({
+        titulo: "Casa cheia",
+        texto: `${cheia.charAt(0).toUpperCase()}${cheia.slice(1)} Aceitar ${lista.length > 1 ? `os pedidos de ${listaDe(lista.map((p) => p.pet_nome))}` : `o pedido de ${lista[0].pet_nome}`} mesmo assim? Se não, o pedido continua esperando a sua resposta.`,
+        confirmar: "Aceitar mesmo assim", perigo: true,
+      });
+      if (!forcar) { setOcupado(null); return; } // desistiu: o pedido segue pendente
+      r = await juntos(true);
+    }
+    const semFuncao = !!r.error && (r.error.code === "PGRST202" || r.error.code === "42883");
+    if (!semFuncao && r.error) falha = r.error;
+    else if (!semFuncao) { feitos.push(...lista); comSinal = Number((r.data as { sinais?: unknown } | null)?.sinais ?? 0) || 0; }
+    // banco antes da atualização: um por um, como era
+    if (semFuncao) for (const p of lista) {
+      const args = { p_id: p.id, p_profissional: ehEstadia(p) ? undefined : profissional, p_tutor_novo: comoNovo };
       try {
         const criado = ok(await sb.rpc("pedido_aceitar_como", args));
         if (portes?.[p.id]) await depoisDoPorte(criado, portes[p.id]);
@@ -293,9 +339,8 @@ export default function PedidosLink() {
     }
     // com todas as reservas do pedido criadas: a diária de cada pet (pelo porte) e, por último, o sinal da regra do dono.
     // Nessa ordem a conta do sinal já enxerga os outros pets do mesmo tutor (desconto do segundo pet).
-    const reservas = feitos.filter(ehEstadia);
+    const reservas = semFuncao ? feitos.filter(ehEstadia) : [];
     for (const p of reservas) await acertarDiaria(p);
-    let comSinal = 0;
     for (const p of reservas) if (await criarSinal(p)) comSinal++;
     if (feitos.length) {
       const tutor = decisao.tutor;
@@ -404,19 +449,19 @@ export default function PedidosLink() {
     const pagos = lista.map((x) => (x.estadia_id ? tudo?.sinaisPagos.get(x.estadia_id) : undefined));
     // o sinal de todos já entrou: a mensagem diz que foi recebido, sem pedir de novo
     if (pagos.every((v): v is number => v != null)) {
-      const total = Math.round(pagos.reduce((t, v) => t + v, 0) * 100) / 100;
+      const total = centavos(pagos.reduce((t, v) => t + v, 0));
       return ` O sinal de ${brl(total)} já foi recebido.${politica}`;
     }
     // parte pago, parte a receber: pede só o que falta
     if (valores.some((v) => v != null) && valores.every((v, i) => v != null || pagos[i] != null)) {
       const falta = lista.flatMap((x, i) => (valores[i] != null ? [{ nome: x.pet_nome, v: valores[i]! }] : []));
-      const total = Math.round(falta.reduce((t, x) => t + x.v, 0) * 100) / 100;
+      const total = centavos(falta.reduce((t, x) => t + x.v, 0));
       const partes = lista.length > 1 ? ` (${listaDe(falta.map((x) => `${brl(x.v)} de ${x.nome}`))})` : "";
       const pix = pixDoSinal(petshop);
       return ` Para garantir a reserva, pedimos um sinal de ${brl(total)}${partes}.${politica}${pix ? ` Pix: ${pix}.` : " Me diga como prefere pagar."}`;
     }
     if (valores.every((v): v is number => v != null)) {
-      const total = Math.round(valores.reduce((t, v) => t + v, 0) * 100) / 100;
+      const total = centavos(valores.reduce((t, v) => t + v, 0));
       const partes = lista.length > 1 ? ` (${listaDe(lista.map((x, i) => `${brl(valores[i])} de ${x.pet_nome}`))})` : "";
       const pix = pixDoSinal(petshop);
       return ` Para garantir a reserva, pedimos um sinal de ${brl(total)}${partes}.${politica}${pix ? ` Pix: ${pix}.` : " Me diga como prefere pagar."}`;
@@ -435,6 +480,11 @@ export default function PedidosLink() {
     // o prazo de cancelar pelo link conta da chegada: se ele já passou (reserva para amanhã, prazo de 2 dias), a mensagem não promete
     const noPrazo = new Date(p.inicio).getTime() - doLink.cancelarHoras * 36e5 > Date.now();
     const acompanhar = `\n\nVeja a confirmação aqui: ${base}/pedido/${p.id}${!doLink.cancelar ? "" : noPrazo ? `\nPor esse endereço você também cancela ou pede outra data, ${prazoPorExtenso(doLink.cancelarHoras)}.` : "\nSe precisar mudar ou cancelar, fale com a gente por aqui."}`;
+    // o valor que o tutor viu no link (só quem recebe lê) e o endereço do pet shop, quando preenchido em Meu pet shop
+    const linhasVistas = vistosDe(lista.map((r) => r.pedido));
+    const visto = lista[0].resposta === "aceito" && linhasVistas.length === lista.length ? valorNaFrase(linhasVistas) : null;
+    const doValor = !visto ? "" : ehEstadia(p) ? ` A estimativa que o link mostrou: ${visto}.` : ` Valor: ${visto}.`;
+    const ondeFica = fraseDoEndereco(petshop);
     if (ehEstadia(p)) {
       // dia de experiência: a mensagem diz que é o dia de experiência e quanto custa (o preço só para quem vê o dinheiro)
       const exp = p.tipo === "creche" && lista.every((r) => r.pedido.experiencia);
@@ -443,14 +493,14 @@ export default function PedidosLink() {
       const doPreco = !exp || lista[0].resposta === "recusado" ? "" : precoExp == null ? "" : precoExp > 0 ? ` O dia de experiência custa ${brl(precoExp)}${lista.length > 1 ? " por pet" : ""}, pago na saída.` : " O dia de experiência é por nossa conta.";
       return lista[0].resposta === "recusado"
         ? `${oi} Recebemos o seu pedido para ${oQue}, mas não temos vaga nessas datas. Você pode escolher outras datas aqui: ${base}\n\nSe preferir, me diga o período que fica bom para você.`
-        : `${oi} Está confirmado: ${oQue}, com chegada às ${hora(p.inicio)}${p.tipo === "hotel" ? ` e saída às ${hora(p.fim)}` : ""}.${doPreco}${fraseDoSinal(lista.map((r) => r.pedido))} Esperamos vocês!${acompanhar}`;
+        : `${oi} Está confirmado: ${oQue}, com chegada às ${hora(p.inicio)}${p.tipo === "hotel" ? ` e saída às ${hora(p.fim)}` : ""}.${doPreco}${doValor}${fraseDoSinal(lista.map((r) => r.pedido))}${ondeFica} Esperamos vocês!${acompanhar}`;
     }
     if (lista[0].resposta === "recusado") {
       return `${oi} Recebemos o seu pedido para ${nomes}, mas ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}, não vamos conseguir atender. Você pode escolher outro horário livre aqui: ${base}\n\nSe preferir, me diga os dias e períodos que ficam bons para você.`;
     }
     if (lista.length === 1) {
       const oQue = lista[0].servico ? `${lista[0].servico} de ${p.pet_nome}` : `horário de ${p.pet_nome}`;
-      return `${oi} Está confirmado: ${oQue} ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}. Esperamos vocês!${acompanhar}`;
+      return `${oi} Está confirmado: ${oQue} ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}.${doValor}${ondeFica} Esperamos vocês!${acompanhar}`;
     }
     // cada pet com o seu serviço, o seu dia e a sua hora (o dia só se repete quando muda)
     const linhas = lista.map((r, i) => {
@@ -458,7 +508,7 @@ export default function PedidosLink() {
       const mesmoDia = i > 0 && dia === quandoNaFrase(lista[i - 1].pedido.inicio);
       return `${r.servico ? `${r.servico} de ${r.pedido.pet_nome}` : r.pedido.pet_nome} ${mesmoDia ? "" : `${dia}, `}às ${hora(r.pedido.inicio)}`;
     });
-    return `${oi} Está confirmado: ${listaDe(linhas)}. Esperamos vocês!${acompanhar}`;
+    return `${oi} Está confirmado: ${listaDe(linhas)}.${doValor}${ondeFica} Esperamos vocês!${acompanhar}`;
   }
 
   if (!pendentes.length && !respondidos.length && !gruposRecados.length) return null;
@@ -594,6 +644,7 @@ export default function PedidosLink() {
                   <span className="g-pl-serv"><i aria-hidden />{servico ?? "Serviço"}</span>
                   <span className="g-pl-hora"><Clock aria-hidden />{ehEstadia(p) ? periodoDe(p) : `${quandoNaTela(p.inicio)}, ${hora(p.inicio)}`}</span>
                   {valorDe(p)}
+                  {vistoDe([p])}
                   {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
                   {p.experiencia && <span className="g-tag azul">pediu dia de experiência</span>}
                   {p.tipo === "creche" && fechadosDe(p, petshop.horario).length > 0 && <span className="g-tag amarelo">pelo seu horário, a creche não abre em {fechadosDe(p, petshop.horario).map((d) => dataCurta(d)).join(", ")}</span>}
@@ -603,9 +654,10 @@ export default function PedidosLink() {
                 {p.obs && <p className="g-pl-obs">{p.obs}</p>}
                 <div className="g-pl-acoes">
                   {seletor}
-                  <button type="button" className="g-btn verde p" disabled={ocupado !== null} onClick={() => void aceitar([p], g.id)}><Check />{ocupado === p.id ? "Um instante…" : "Aceitar"}</button>
+                  <button type="button" className="g-btn verde p" disabled={ocupado !== null} aria-busy={ocupado === p.id} onClick={() => void aceitar([p], g.id)}><Check />{ocupado === p.id ? "Aceitando…" : "Aceitar"}</button>
                   <button type="button" className="g-btn sec p" disabled={ocupado !== null} onClick={() => void recusar([p], g.id)}>Recusar</button>
                 </div>
+                {ocupado === p.id && <p className="g-pl-andando" role="status">Marcando o pedido de {p.pet_nome}… Espere só um instante nesta tela.</p>}
               </article>
             );
           }
@@ -625,6 +677,7 @@ export default function PedidosLink() {
                 <span className="g-pl-serv"><i aria-hidden />{servico ?? "Serviço"}</span>
                 <span className="g-pl-hora"><Clock aria-hidden />{ehEstadia(p) ? `${periodoDe(p)}, chega às ${hora(p.inicio)} e sai às ${hora(p.fim)}` : `${quandoNaTela(p.inicio)}, das ${hora(p.inicio)} às ${hora(fim)}`}</span>
                 <span className="g-tag azul">{ehEstadia(p) ? `${g.lista.length} pets do mesmo tutor` : `${g.lista.length} pets, um depois do outro`}</span>
+                {vistoDe(g.lista)}
                 {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
                 {p.experiencia && <span className="g-tag azul">pediram dia de experiência</span>}
                 {promoDe(p)}
@@ -648,9 +701,10 @@ export default function PedidosLink() {
               {p.obs && <p className="g-pl-obs">{p.obs}</p>}
               <div className="g-pl-acoes">
                 {seletor}
-                <button type="button" className="g-btn verde p" disabled={ocupado !== null} onClick={() => void aceitar(g.lista, g.id)}><Check />{ocupado === g.id ? "Um instante…" : "Aceitar todos"}</button>
+                <button type="button" className="g-btn verde p" disabled={ocupado !== null} aria-busy={ocupado === g.id} onClick={() => void aceitar(g.lista, g.id)}><Check />{ocupado === g.id ? "Aceitando todos…" : "Aceitar todos"}</button>
                 <button type="button" className="g-btn sec p" disabled={ocupado !== null} onClick={() => void recusar(g.lista, g.id)}>Recusar todos</button>
               </div>
+              {ocupado === g.id && <p className="g-pl-andando" role="status">Marcando os {g.lista.length} pedidos de uma vez… Espere só um instante nesta tela.</p>}
             </article>
           );
         })}

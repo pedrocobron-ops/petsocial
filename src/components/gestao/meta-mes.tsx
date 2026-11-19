@@ -3,7 +3,7 @@
 import Link from "@/components/gestao/link-depois";
 import { ChevronRight, Target } from "lucide-react";
 import { contasDaMeta } from "@/lib/gestao/dinheiro";
-import { brl, isoDia, nomeMes } from "@/lib/gestao/util";
+import { brl, isoDia, nomeMes, centavos } from "@/lib/gestao/util";
 import { useGestao } from "./contexto";
 import { paginar } from "./financeiro/comum";
 import { Anel, Tile } from "./painel";
@@ -29,7 +29,7 @@ export default function MetaMes() {
     if (!temMeta) return null;
     const linhas = await paginar<{ valor: number }>((de, ate) => sb.from("lancamentos").select("valor").eq("petshop_id", petshop.id)
       .eq("tipo", "entrada").eq("pago", true).is("movimento", null).gte("data", inicio).lte("data", fim).order("id").range(de, ate));
-    return Math.round(linhas.reduce((t, l) => t + Number(l.valor), 0) * 100) / 100;
+    return centavos(linhas.reduce((t, l) => t + Number(l.valor), 0));
   }, [petshop.id, temMeta, inicio]);
 
   if (!vejoFinanceiro) return null;

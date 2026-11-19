@@ -1,5 +1,6 @@
 import type { Banco } from "./supabase";
 import type { FormaPagamento } from "./dinheiro";
+import { centavos } from "./util";
 
 /**
  * Troca e devolução de produto (migração 20261200: `venda_devolvivel`, `venda_devolver`, tabela `devolucoes`).
@@ -12,7 +13,6 @@ import type { FormaPagamento } from "./dinheiro";
 export type LinhaDevolvivel = { produto_id: string; nome: string; vendido: number; pago: number; devolvido: number; devolvido_valor: number };
 export type ModoDevolucao = "dinheiro" | "credito" | "troca";
 
-const centavos = (n: number) => Math.round(Number((n * 100).toPrecision(12))) / 100;
 const qtd3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** O que ainda pode voltar de cada produto da venda. */

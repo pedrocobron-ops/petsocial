@@ -255,3 +255,23 @@
 .g-lk-planos li { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--g-linha); }
 .g-lk-planos li:last-child { border-bottom: 0; }
 .g-lk-planos b { white-space: nowrap; }
+
+/* rodada 9 (N7): endereço no cabeçalho, valor por pet e o "Tirar dúvida" fora de cima do preço */
+.g-lk-onde { align-items: flex-start; }
+.g-lk-onde svg { margin-top: 3px; }
+.g-lk-onde span { min-width: 0; overflow-wrap: anywhere; }
+.g-lk-onde a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.g-lk-resumo dd a { color: var(--txt-verde, var(--g-verde)); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.g-lk-resumo-pets s, .g-lk-resumo dd s { font-weight: 400; color: var(--g-cinza); }
+.g-lk-conta .l > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.g-lk-conta .l small { white-space: nowrap; }
+.g-lk-conta s { color: var(--g-cinza); font-weight: 400; }
+.g-lk-conta .l > span:last-child { text-align: right; }
+@media (max-width: 420px) { .g-lk-conta .l > span:last-child { white-space: normal; } }
+/* no celular, o botão de dúvidas fica no fim da página, em linha (antes flutuava por cima do preço do primeiro serviço) */
+@media (max-width: 719px) {
+  .g-lk-duv-abrir { position: static; display: flex; justify-content: center; width: calc(100% - 32px); max-width: 520px; margin: 4px auto 0; box-shadow: none; }
+  .g-lk.com-duvida .g-lk-rodape { padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+}
+.g-lk-fim-ico { display: grid; place-items: center; width: 84px; height: 84px; margin: 22px 0 18px; border-radius: 50%; background: rgba(227, 232, 223, .7); color: var(--g-verde); }
+.g-lk-fim-ico svg { width: 36px; height: 36px; }

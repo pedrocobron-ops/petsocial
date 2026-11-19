@@ -1,3 +1,5 @@
+import { centavos, inicioDoDiaNoFuso, isoDia, somaDias, deIsoDia } from "./util";
+import type { Banco } from "./supabase";
 /**
  * "Quanto sobrou" (lucro por serviço e por produto) e "Por pessoa" (produtividade da equipe), a partir do que o banco
  * devolve em `lucro_do_periodo` e `equipe_do_periodo` (migração 20261193). O banco faz a conta do dinheiro; aqui só se
@@ -15,7 +17,7 @@
 
 export const OPCAO_COMISSAO_CUSTO = "lucro.comissao_custo";
 
-const real = (n: unknown) => Math.round(Number(n ?? 0) * 100) / 100;
+const real = (n: unknown) => centavos(Number(n ?? 0));
 const qtd = (n: unknown) => Math.round(Number(n ?? 0) * 1000) / 1000;
 
 /** O que `lucro_do_periodo` devolve. */
@@ -155,13 +157,44 @@ export const CATEGORIAS_DA_CASA = ["Creche: mensalidade", "Creche e hotel"] as c
  * Financeiro não muda (o valor continua nos outros lançamentos).
  * `nome`: o nome que a tela mostra para a categoria (Creche, Hotel ou Creche e hotel, conforme a loja).
  */
-export function linhasDaCasa(outros: { categoria: string; valor: number; lancamentos: number }[], nome: (categoria: string) => string): LinhaLucro[] {
+export function linhasDaCasa(outros: { categoria: string; valor: number; lancamentos: number }[], nome: (categoria: string) => string,
+  acertos?: AcertosDaCasa | null, brl: (v: number) => string = (v) => v.toFixed(2).replace(".", ",")): LinhaLucro[] {
+  // a linha mostra o bruto (o que foi lançado: sinais e contas); com sinal devolvido, sinal que virou crédito ou crédito usado
+  // no check-out, diz também quanto ficou de verdade (o número da ponte não muda: os acertos já estão no faturamento)
+  const real = (v: number) => centavos(v);
+  const deVerdade = (o: { categoria: string; valor: number }) => {
+    if (!acertos || o.categoria !== "Creche e hotel" || !(acertos.devolvido > 0 || acertos.virouCredito > 0 || acertos.creditoUsado > 0)) return null;
+    const ficou = real(o.valor - acertos.devolvido - acertos.virouCredito + acertos.creditoUsado);
+    const partes = [acertos.devolvido > 0 && `− ${brl(acertos.devolvido)} de sinal devolvido`, acertos.virouCredito > 0 && `− ${brl(acertos.virouCredito)} que viraram crédito do tutor`,
+      acertos.creditoUsado > 0 && `+ ${brl(acertos.creditoUsado)} de crédito usado no check-out`].filter(Boolean).join(", ");
+    return `bruto ${brl(o.valor)}; de verdade ficaram ${brl(ficou)} (${partes})`;
+  };
   return outros.filter((o) => (CATEGORIAS_DA_CASA as readonly string[]).includes(o.categoria) && o.valor !== 0).map((o) => ({
     chave: `casa:${o.categoria}`, tipo: "extra", id: null,
     nome: o.categoria === "Creche: mensalidade" ? "Creche: mensalidades" : `${nome(o.categoria)}: diárias e taxas`,
     quantidade: o.lancamentos, unidade: o.lancamentos === 1 ? "conta" : "contas", receita: real(o.valor), material: null, comissao: 0, custo: null, margem: null, pct: null,
-    falta: "sem custo por serviço: o que sobra é o resultado (entrou − saiu)", custoDeHoje: 0, devolvido: 0, devolvidos: 0,
+    falta: [deVerdade(o), "sem custo por serviço: o que sobra é o Resultado (faturamento − despesas)"].filter(Boolean).join(" · "), custoDeHoje: 0, devolvido: 0, devolvidos: 0,
   }));
+}
+
+/** Sinal devolvido, sinal que virou crédito e crédito usado no check-out da creche e do hotel no período. */
+export type AcertosDaCasa = { devolvido: number; virouCredito: number; creditoUsado: number };
+
+/** Lê os acertos da creche e do hotel (só quem cuida do financeiro lê; para os outros, zeros). */
+export async function acertosDaCasa(sb: Banco, petshopId: string, de: string, ate: string, fuso?: string | null): Promise<AcertosDaCasa> {
+  const ini = inicioDoDiaNoFuso(de, fuso), fim = inicioDoDiaNoFuso(isoDia(somaDias(deIsoDia(ate), 1)), fuso);
+  const [dev, cred] = await Promise.all([
+    sb.from("lancamentos").select("valor").eq("petshop_id", petshopId).eq("tipo", "saida").eq("pago", true).is("movimento", null).eq("categoria", "Devolução de sinal").gte("data", de).lte("data", ate).limit(1000),
+    sb.from("clientes_creditos").select("valor, lancamento_id").eq("petshop_id", petshopId).not("estadia_id", "is", null).gte("criado_em", ini.toISOString()).lt("criado_em", fim.toISOString()).limit(1000),
+  ]);
+  const x: AcertosDaCasa = { devolvido: 0, virouCredito: 0, creditoUsado: 0 };
+  for (const l of dev.data ?? []) x.devolvido = centavos(x.devolvido + Number(l.valor));
+  for (const c of cred.data ?? []) {
+    const v = Number(c.valor);
+    if (v > 0) x.virouCredito = centavos(x.virouCredito + v);
+    else if (!c.lancamento_id) x.creditoUsado = centavos(x.creditoUsado - v);
+  }
+  return x;
 }
 
 /** As linhas que dão mais lucro primeiro (margem em reais); sem custo informado, vão para o fim, pela receita. */

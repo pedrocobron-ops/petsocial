@@ -86,3 +86,6 @@
 .g-rel-conta { display: grid; gap: 2px; margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px; background: var(--g-carta-2); font-size: .875rem; }
 .g-rel-conta b { font-weight: 700; }
 .g-rel-conta small { margin-top: 4px; font-size: .78rem; line-height: 1.4; }
+
+/* o par do dinheiro de cada serviço (pelo dia do pagamento), na linha do que foi feito */
+.g-rel-pago { font-style: normal; }

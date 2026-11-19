@@ -83,6 +83,38 @@ export function LembreteDaCopia({ aoAbrir }: { aoAbrir: () => void }) {
 }
 
 /** Aba "Dados" do painel: cópia completa do banco e contas marcadas para serem apagadas. */
+type LoginMantido = { user_id: string; email: string | null; motivo: string | null; em: string };
+
+/**
+ * Logins que NÃO foram apagados junto com a conta (ou a pedido da pessoa) porque têm, ou podem ter, dados em outro produto
+ * do mesmo projeto do Supabase. O banco nunca apaga esses logins sozinho (migração 20261236): a equipe confere e decide.
+ */
+function LoginsMantidos() {
+  const [itens, setItens] = useState<LoginMantido[] | null>(null);
+  useEffect(() => {
+    let vale = true;
+    (async () => { try { const r = ok(await banco().rpc("admin_logins_mantidos")) as unknown as LoginMantido[]; if (vale) setItens(r ?? []); } catch { /* sem a migração: a lista não aparece */ } })();
+    return () => { vale = false; };
+  }, []);
+  if (!itens) return null;
+  return (
+    <section className="g-pilha" data-teste="logins-mantidos">
+      <h2>Logins que ficaram</h2>
+      <p className="g-muted g-p">Quando uma conta é apagada, o login de quem também usa outro produto nosso (Escala CEO) não é apagado junto. Confira cada um e fale com a pessoa antes de apagar à mão.</p>
+      <div className="g-card g-lista" style={{ paddingBlock: 6 }}>
+        {!itens.length ? <p className="g-muted g-p">Nenhum login nessa situação.</p> : itens.map((x) => (
+          <div key={x.user_id} className="g-linha">
+            <span className="t">
+              <b style={{ overflowWrap: "anywhere", whiteSpace: "normal" }}>{x.email ?? "login já apagado"}</b>
+              <span style={{ overflowWrap: "anywhere", whiteSpace: "normal" }}>{x.motivo ?? "sem motivo anotado"} · {quando(x.em)}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function AbaDados() {
   const { avisar, avisarErro } = useAvisos();
   const [copias, setCopias] = useState<Copia[] | null>(null);
@@ -143,9 +175,15 @@ export default function AbaDados() {
             {ultima ? `Última cópia baixada em ${quando(ultima.quando)}${ultima.quem ? ` por ${ultima.quem}` : ""} (${ultima.tabelas ?? "?"} tabelas, ${ultima.linhas ?? "?"} linhas).` : "Nenhuma cópia completa baixada ainda."}
             {copiaVelha(ultima?.quando) ? ` Faz mais de ${DIAS_SEM_COPIA} dias: baixe uma agora.` : ""}
           </p>
+          <p className="g-p" data-teste="regra-da-copia">
+            <b>Como guardar (é o que a Política de privacidade promete):</b> em disco ou pasta protegidos por senha, a que só você tem acesso.
+            Guarde no máximo as 4 mais recentes (cerca de 1 mês) e apague as mais antigas de vez, inclusive da lixeira e da nuvem.
+          </p>
           <div><button className="g-btn verde" onClick={() => void baixar()} disabled={baixando}><DatabaseBackup />{baixando ? "Montando a cópia…" : "Baixar cópia completa"}</button></div>
         </div>
       </section>
+
+      <LoginsMantidos />
 
       {rotinas && (
         <section className="g-pilha" data-teste="rotinas">

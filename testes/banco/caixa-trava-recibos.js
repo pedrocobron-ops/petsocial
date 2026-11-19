@@ -1,7 +1,7 @@
 // Rodada 9 (N5), migração 20261231: caixa, trava de preço e recibos. Todos os totais conferidos à mão.
 // - C1 trava em creche e hotel: com `dinheiro.preco_travado` e desconto máximo de 10%, a recepção (área Caixa, sem Financeiro)
 //   não faz check-in abaixo da diária da lista (creche R$ 70), não cobra menos diárias do que as datas (hotel: 4 noites),
-//   nem recebe abaixo da conta (creche 70: 10% = 7,00, então 63,00 passa e 62,99 não); pela API direta também não.
+//   nem recebe abaixo da conta (creche 70: 10% = 7,00, então 63,00 passa e 62,98 não; um centavo de folga para o arredondamento, rodada 9 N4); pela API direta também não.
 //   Pacote do próprio pet zera as diárias; pacote de outro pet não. O dono muda, e fica em Alterações (diaria, diarias, checkout).
 // - H1 apagar um valor recebido com a trava: recusado para a recepção (venda de 12,50), como baixar o valor; o dono apaga.
 // - H2 fiado pelo que fica: limite 150, conta de 175,50 com 100,00 pagos na hora fica 75,50 e passa; depois, mais 80,00
@@ -51,8 +51,8 @@ void lib;
   r = await checkout(cx, mel, { total: 10, soma: 70 });
   T.recusa('recepção: "Valor a receber" de 60 para 10 (conta de R$ 70,00) recusado', r, /Pela conta, a estadia dá R\$ 70,00.*máximo de 10 por cento.*R\$ 7,00/);
   T.ok('nada gravado: Mel continua na casa', status(mel) === 'em_casa');
-  r = await checkout(cx, mel, { total: 62.99, soma: 70 });
-  T.recusa('R$ 62,99 (desconto de 7,01, um centavo acima dos 10%) recusado', r, /desconto passa do máximo/);
+  r = await checkout(cx, mel, { total: 62.98, soma: 70 });
+  T.recusa('R$ 62,98 (desconto de 7,02, dois centavos acima dos 10%: passa da folga de um centavo) recusado', r, /desconto passa do máximo/);
   r = await cx.from('estadias').update({ status: 'encerrada', saida: agora(), diarias_cobradas: 1, valor_cobrado: 5 }).eq('id', mel).select('id');
   T.recusa('pela API direta (sem a função do check-out): R$ 5,00 recusado', r, /Pela conta, a estadia dá R\$ 70,00/);
   let n0 = alteracoes('checkout');

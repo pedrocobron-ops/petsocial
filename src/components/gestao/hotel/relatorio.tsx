@@ -5,7 +5,7 @@ import { contarDiarias, diasDasNoites, lerConta, type ValoresDaEstadia } from "@
 import { usaModulo } from "@/lib/gestao/modulos";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
 import type { Estadia } from "@/lib/gestao/tipos";
-import { brl, dataCurta, isoDia, somaDias } from "@/lib/gestao/util";
+import { brl, dataCurta, isoDia, somaDias, centavos as real } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { useDados } from "../ui";
@@ -16,7 +16,6 @@ import { useDados } from "../ui";
  * Os valores vêm da conta guardada no check-out (`estadias_valores.conta`): nada é recalculado.
  */
 type E = Pick<Estadia, "id" | "tipo" | "status" | "entrada" | "saida" | "saida_prevista" | "diarias_cobradas">;
-const real = (n: number) => Math.round(n * 100) / 100;
 
 /** As noites de uma estadia de hotel: as que aconteceram (encerrada), as que já passaram e as reservadas (aberta). */
 function noitesDe(e: E, hoje: string): string[] {

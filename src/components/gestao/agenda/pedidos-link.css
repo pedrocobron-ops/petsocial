@@ -65,3 +65,4 @@
 .g-pl-aceite svg { width: 15px; height: 15px; flex: none; margin-top: 2px; }
 .g-pl-aceite details summary { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; min-height: 28px; }
 .g-pl-aceite details div { margin-top: 4px; padding: 10px 12px; border-radius: 12px; background: var(--g-carta-2); white-space: pre-line; overflow-wrap: anywhere; color: var(--g-tinta); }
+.g-pl-andando { margin: 0; padding: 8px 12px; border-radius: var(--g-raio-p, 12px); background: var(--t-manteiga, #fbf0c9); color: #5b4708; font-size: .875rem; line-height: 1.35; }

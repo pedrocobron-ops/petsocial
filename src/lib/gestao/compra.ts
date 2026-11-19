@@ -1,5 +1,6 @@
 import type { Banco } from "./supabase";
 import { contando, lerTudo } from "./paginas";
+import { centavos } from "./util";
 
 /**
  * Sugestão de compra e análise do estoque ("O que comprar", na tela Estoque, e o Mozart em "o que preciso comprar?").
@@ -74,7 +75,6 @@ const ehVendaDesfeita = (motivo: string | null | undefined) => /venda desfeita|d
 export const num1 = (n: number) => (Math.round(n * 10) / 10).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 const qtd = (n: number) => Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
 const medida = (n: number, unidade: string) => `${qtd(n)} ${unidade === "un" ? (n === 1 ? "unidade" : "unidades") : unidade}`;
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /** Semanas que o saldo aguenta, em palavras. */
 export function textoDasSemanas(s: number | null): string {

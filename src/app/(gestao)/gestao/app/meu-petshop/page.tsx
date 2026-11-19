@@ -7,6 +7,7 @@ import { abrirGuia } from "@/components/gestao/ui";
 import Identidade from "@/components/gestao/ajustes/identidade";
 import CopiaSeguranca from "@/components/gestao/ajustes/copia-seguranca";
 import EncerrarConta, { RegistroDeDados } from "@/components/gestao/lgpd/encerrar-conta";
+import { AcessosDaEquipeMaestro, AvisoParaOsClientes } from "@/components/gestao/lgpd/privacidade-da-loja";
 import { AjustesCrecheHotel, VagasBanho } from "@/components/gestao/ajustes/capacidade";
 import AjusteFidelidade from "@/components/gestao/ajustes/fidelidade";
 import OpcoesDeCobranca from "@/components/gestao/ajustes/opcoes-cobranca";
@@ -117,7 +118,7 @@ export default function MeuPetshop() {
         <Grupo id="negocio" titulo="O negócio" icone={Store} tom="rosa"
           cartoes={[["Dados", <Dados key="d" />], ["O que você usa", <OQueUsa key="o" />], ["Modo simples", <ModoSimples key="ms" />], ["Identidade do pet shop", <Identidade key="i" />], ["Sua loja aparece no Google?", <LojaNoGoogle key="g" />], ["Boletim do pet", <OpcoesDoBoletim key="b" />], (usaModulo(petshop, "banho_tosa") || usaCasa(petshop)) && ["Checklist de entrada", <OpcoesDaEntrada key="e" />]]} />
         <Grupo id="copia" titulo="Seus dados e a conta" icone={Archive} tom="ceu" largo
-          cartoes={[["Baixar todos os dados", <CopiaSeguranca key="c" />], ["Encerrar e apagar a conta", <EncerrarConta key="e" />], ["Registro de pedidos de dados", <RegistroDeDados key="r" />]]} />
+          cartoes={[["Baixar todos os dados", <CopiaSeguranca key="c" />], ["Encerrar e apagar a conta", <EncerrarConta key="e" />], ["Registro de pedidos de dados", <RegistroDeDados key="r" />], ["Acessos da equipe Maestro Pet", <AcessosDaEquipeMaestro key="m" />], ["Aviso de privacidade para os seus clientes", <AvisoParaOsClientes key="av" />]]} />
       </div>
     </>
   );
@@ -206,6 +207,10 @@ function Dados() {
   const [telefone, setTelefone] = useState(fmtTelefone(petshop.telefone));
   const [cidade, setCidade] = useState(petshop.cidade ?? "");
   const [uf, setUf] = useState(petshop.uf ?? "");
+  // endereço (opcional): aparece no link do cliente, na confirmação e nos comprovantes
+  const [endereco, setEndereco] = useState(petshop.endereco ?? "");
+  const [bairro, setBairro] = useState(petshop.bairro ?? "");
+  const [complemento, setComplemento] = useState(petshop.complemento ?? "");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -219,7 +224,10 @@ function Dados() {
     setErro(null);
     setSalvando(true);
     try {
-      ok(await sb.from("petshops").update({ nome: n.slice(0, 80), telefone: tel || null, cidade: cidade.trim() || null, uf: uf || null }).eq("id", petshop.id).select("id"));
+      ok(await sb.from("petshops").update({
+        nome: n.slice(0, 80), telefone: tel || null, cidade: cidade.trim() || null, uf: uf || null,
+        endereco: limparNome(endereco).slice(0, 120) || null, bairro: limparNome(bairro).slice(0, 80) || null, complemento: limparNome(complemento).slice(0, 80) || null,
+      }).eq("id", petshop.id).select("id"));
       await recarregarBase();
       setTelefone(fmtTelefone(tel));
       avisar("Dados salvos.");
@@ -228,7 +236,7 @@ function Dados() {
 
   return (
     <form className="g-card g-form" onSubmit={salvar}>
-      <div className="g-mp-t"><Tile icone={Store} tom="menta" /><div><h2>Dados</h2><p className="g-muted g-p">Nome, contato e cidade.</p></div></div>
+      <div className="g-mp-t"><Tile icone={Store} tom="menta" /><div><h2>Dados</h2><p className="g-muted g-p">Nome, contato e endereço.</p></div></div>
       <Campo rotulo="Nome do pet shop"><input className="g-input" value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} /></Campo>
       <Campo rotulo="WhatsApp" dica="O número que os clientes usam para falar com vocês.">
         <input className="g-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 91234-5678" value={telefone}
@@ -243,6 +251,13 @@ function Dados() {
             {UFS.map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
         </Campo>
+      </div>
+      <Campo rotulo="Endereço (rua e número)" dica="Opcional. Aparece no Link do cliente com o botão Abrir no mapa, na confirmação do pedido e nos comprovantes.">
+        <input className="g-input" value={endereco} maxLength={120} autoComplete="street-address" placeholder="Rua das Flores, 120" onChange={(e) => setEndereco(e.target.value)} />
+      </Campo>
+      <div className="dupla" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
+        <Campo rotulo="Bairro"><input className="g-input" value={bairro} maxLength={80} onChange={(e) => setBairro(e.target.value)} /></Campo>
+        <Campo rotulo="Complemento"><input className="g-input" value={complemento} maxLength={80} placeholder="Loja 2, fundos" onChange={(e) => setComplemento(e.target.value)} /></Campo>
       </div>
       {erro && <p className="g-erro" role="alert">{erro}</p>}
       <div><button className="g-btn verde" disabled={salvando}>{salvando ? "Salvando…" : "Salvar dados"}</button></div>

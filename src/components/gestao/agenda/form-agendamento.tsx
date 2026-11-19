@@ -7,7 +7,7 @@ import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { PORTES } from "@/lib/gestao/tipos";
 import { REPETICOES, bloqueioPega, datasDaSerie, deMin, horariosLivres, marcadoPara, paraMin, textoRemarcado, vagasDe } from "@/lib/gestao/agenda";
 import { definirServicosAMais, juntarServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-horario";
-import { almocoDoDia, brl, nomeNaEquipe, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, linkWhatsApp, nomeDiaCurto, NOTA_PORTE, precoDoServico, precoMudaComPorte, somaDias } from "@/lib/gestao/util";
+import { almocoDoDia, brl, nomeNaEquipe, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, linkWhatsApp, nomeDiaCurto, NOTA_PORTE, precoDoServico, precoMudaComPorte, somaDias, centavos } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
@@ -22,6 +22,7 @@ import { CampoComVoz } from "../ditado";
 import { COLS_PROMOCAO, descontoDaPromo, descontoCurto, lerPromocao, promoDoHorario } from "@/lib/gestao/promocoes";
 import { Tag } from "lucide-react";
 import "./promo.css";
+import { DICA_OBS } from "@/lib/gestao/privacidade-textos";
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
 type Problema = { tipo: "fechado" | "bloqueio" | "conflito" | "vagas" | "fora" | "almoco"; texto: string };
@@ -173,7 +174,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   }
   const mudarValor = (id: string, v: number | null) => setEscolhidos((l) => l.map((x) => (x.servicoId === id ? { ...x, preco: v, mexido: true } : x)));
   const mudarTexto = (id: string, t: string) => setEscolhidos((l) => l.map((x) => (x.servicoId === id ? { ...x, texto: t } : x)));
-  const totalDoHorario = Math.round(escolhidos.reduce((t, o) => t + (o.preco ?? 0), 0) * 100) / 100;
+  const totalDoHorario = centavos(escolhidos.reduce((t, o) => t + (o.preco ?? 0), 0));
   // promoção em dias fracos: ao marcar, o banco põe a promoção que vale no dia, na hora e no serviço. Aqui a tela mostra antes
   // (com a mesma conta) e deixa tirar. Alterando um horário, a promoção fica no detalhe do horário.
   const { dados: promos } = useDados(async () => {
@@ -695,7 +696,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
 
           <label className="g-check"><input type="checkbox" checked={levaTraz} onChange={(e) => setLevaTraz(e.target.checked)} /><Truck size={18} /> Leva e traz</label>
           {levaTraz && <Campo rotulo="Endereço para buscar"><input className="g-input" value={endereco} onChange={(e) => setEndereco(e.target.value)} /></Campo>}
-          <Campo rotulo="Observação"><CampoComVoz valor={obs} aoMudar={setObs} maxLength={400} rotulo="Ditar a observação"><textarea className="g-textarea" value={obs} maxLength={400} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: tosa na máquina 4, laço rosa" /></CampoComVoz></Campo>
+          <Campo rotulo="Observação" dica={DICA_OBS}><CampoComVoz valor={obs} aoMudar={setObs} maxLength={400} rotulo="Ditar a observação"><textarea className="g-textarea" value={obs} maxLength={400} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: tosa na máquina 4, laço rosa" /></CampoComVoz></Campo>
         </form>
       )}
     </Folha>

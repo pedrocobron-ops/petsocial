@@ -8,6 +8,7 @@
  */
 
 import { destinoDaLinha } from "./tabela-precos";
+import { centavos } from "./util";
 
 export type TipoDaPagina = "clientes" | "dividas" | "agenda" | "precos" | "vacinas" | "auto";
 export const TIPOS_DA_PAGINA: { id: TipoDaPagina; rotulo: string; apoio: string }[] = [
@@ -112,7 +113,7 @@ function porte(v: unknown): PetLido["porte"] {
 }
 function valor(v: unknown): number | null {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", ".")) : NaN;
-  return Number.isFinite(n) && n > 0 && n < 1e6 ? Math.round(n * 100) / 100 : null;
+  return Number.isFinite(n) && n > 0 && n < 1e6 ? centavos(n) : null;
 }
 
 /**

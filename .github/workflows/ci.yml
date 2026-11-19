@@ -1,0 +1,40 @@
+# Conferência a cada pull request (e a cada envio para a main): tipos, ESLint e os testes de unidade.
+# Nada aqui usa banco de dados nem chave de verdade: os testes de unidade rodam as funções de src/lib/gestao direto no Node.
+# Os testes de banco e de telas (npm run test:banco, test:telas) precisam do Supabase local e ficam para rodar na máquina.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  conferir:
+    name: Tipos, ESLint e testes de unidade
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: America/Sao_Paulo
+      # os testes de unidade não falam com banco nenhum; a biblioteca dos testes só exige que os dois valores existam
+      SUPABASE_URL: http://127.0.0.1:54321
+      SUPABASE_KEY: chave-de-teste-sem-banco
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Tipos (tsc)
+        run: npm run typecheck
+      - name: ESLint
+        run: npm run lint
+      - name: Testes de unidade (sem banco)
+        run: npm run test:unidade

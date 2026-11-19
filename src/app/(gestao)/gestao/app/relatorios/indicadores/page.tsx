@@ -13,7 +13,7 @@ import {
   carregarIndicadores, comparacao, DIAS_SEMANA_CURTOS, intervaloAnterior, intervaloIndicadores, pct1, PERIODO_INICIAL, PERIODOS_INDICADORES, rotuloMes, temDados, totaisIndicadores,
   type IndicadoresDoBanco, type PeriodoIndicadores,
 } from "@/lib/gestao/indicadores";
-import { brl, dataCompleta } from "@/lib/gestao/util";
+import { brl, dataCompleta, centavos } from "@/lib/gestao/util";
 import { lerSaidasDoPeriodo, type SaidasDoPeriodo } from "@/lib/gestao/contas-fixas";
 import "@/components/gestao/relatorios/indicadores.css";
 
@@ -97,7 +97,7 @@ function Graficos({ d, antes, fixas, periodoAnterior }: { d: IndicadoresDoBanco;
         )}
         {d.dinheiro && (
           <Kpi icone={Receipt} tom="ceu" rotulo="Valor médio por conta" valor={t.valorMedio == null ? "–" : brl(t.valorMedio)}
-            apoio={<span className="g-ind-apoio"><span>{n(t.contas, "conta paga", "contas pagas")}{comHotel ? " (o sinal conta junto da conta da estadia)" : ""}</span><Comparar atual={t.valorMedio} anterior={ta?.valorMedio ?? null} /></span>} />
+            apoio={<span className="g-ind-apoio"><span>{n(t.contas, "conta paga", "contas pagas")}{comHotel ? " (o sinal conta junto da conta da estadia)" : ""} · pacote vendido, multa e venda devolvida não são conta</span><Comparar atual={t.valorMedio} anterior={ta?.valorMedio ?? null} /></span>} />
         )}
         <Kpi icone={CircleCheck} tom="pessego" rotulo={temEstadias ? "Atendimentos e estadias" : "Atendimentos"} valor={visitas.toLocaleString("pt-BR")}
           apoio={<Comparar atual={visitas} anterior={visitasAntes} />} />
@@ -155,17 +155,17 @@ function Graficos({ d, antes, fixas, periodoAnterior }: { d: IndicadoresDoBanco;
 
       {(verServicos || verProdutos) && <div className={verServicos && verProdutos ? "g-duas meio" : undefined}>
         {verServicos && <section className="g-card" aria-label="Serviços mais vendidos">
-          <div className="g-card-t"><h3><Tile icone={Scissors} tom="pessego" tamanho="p" />Serviços mais vendidos</h3><span className="g-muted g-pp">vezes feitas</span></div>
+          <div className="g-card-t"><h3><Tile icone={Scissors} tom="pessego" tamanho="p" />Serviços mais feitos</h3><span className="g-muted g-pp">pelo dia do atendimento</span></div>
           {d.servicos.length ? <>
             <Ranking itens={d.servicos.slice(0, 8).map((s) => ({ rotulo: s.nome, valor: s.vezes }))} />
-            {d.dinheiro && d.servicos.some((s) => (s.receita ?? 0) > 0) && <p className="g-muted g-pp">Entrou: {d.servicos.slice(0, 8).filter((s) => (s.receita ?? 0) > 0).map((s) => `${s.nome} ${brl(s.receita)}`).join(" · ")}.</p>}
+            {d.dinheiro && d.servicos.some((s) => (s.receita ?? 0) > 0) && <p className="g-muted g-pp" data-teste="servicos-pagos">Pelo dia do pagamento (o mesmo par de Quanto sobrou e do Financeiro): {d.servicos.slice(0, 8).filter((s) => (s.receita ?? 0) > 0).map((s) => `${s.nome} ${s.pagos === 1 ? "1 pago" : `${s.pagos.toLocaleString("pt-BR")} pagos`}, ${brl(s.receita)}`).join(" · ")}.</p>}
           </> : <p className="g-muted g-p">Nenhum atendimento concluído neste período.</p>}
         </section>}
         {verProdutos && <section className="g-card" aria-label="Produtos mais vendidos">
           <div className="g-card-t"><h3><Tile icone={Package} tom="manteiga" tamanho="p" />Produtos mais vendidos</h3><span className="g-muted g-pp">quantidade</span></div>
           {d.produtos.length ? <>
             <Ranking itens={d.produtos.slice(0, 8).map((p) => ({ rotulo: `${p.nome} (${p.unidade})`, valor: p.quantidade }))} formato={(v) => v.toLocaleString("pt-BR", { maximumFractionDigits: 3 })} />
-            {d.dinheiro && d.produtos.some((p) => (p.receita ?? 0) > 0) && <p className="g-muted g-pp">Entrou: {d.produtos.slice(0, 8).filter((p) => (p.receita ?? 0) > 0).map((p) => `${p.nome} ${brl(p.receita)}`).join(" · ")}.</p>}
+            {d.dinheiro && d.produtos.some((p) => (p.receita ?? 0) > 0) && <p className="g-muted g-pp">Receita: {d.produtos.slice(0, 8).filter((p) => (p.receita ?? 0) > 0).map((p) => `${p.nome} ${brl(p.receita)}`).join(" · ")}.</p>}
           </> : <p className="g-muted g-p">Nenhum produto vendido neste período.</p>}
         </section>}
       </div>}
@@ -173,16 +173,16 @@ function Graficos({ d, antes, fixas, periodoAnterior }: { d: IndicadoresDoBanco;
       {d.dinheiro && (
         <section className="g-card" aria-label="Quanto sobrou por mês">
           <div className="g-card-t"><h3><Tile icone={PiggyBank} tom="menta" tamanho="p" />Quanto sobrou por mês</h3></div>
-          <p className="g-muted g-pp" style={{ marginTop: 0 }}>Entrou − saiu, como no Resultado do Financeiro.</p>
+          <p className="g-muted g-pp" style={{ marginTop: 0 }}>Faturamento − despesas, como no Resultado do Financeiro.</p>
           <Sobras meses={d.meses.map((m) => ({ rotulo: rot(m.mes), valor: m.resultado ?? 0, taxas: m.taxas ?? 0, depois: m.resultado_depois_taxas ?? 0 }))} />
           {(t.taxas ?? 0) > 0 && <p className="g-muted g-pp">Taxas da maquininha no período: {brl(t.taxas)}. Depois delas, sobrou {brl(t.resultadoDepoisTaxas)}.</p>}
           {fixas && fixas.total > 0 && (
             <div data-teste="indicadores-contas-fixas">
-              <p className="g-muted g-pp">Das saídas do período ({brl(fixas.saiu)}), {brl(fixas.total)} foram contas fixas (aluguel, luz, salários…) e {brl(Math.round((fixas.saiu - fixas.total) * 100) / 100)} as outras.</p>
+              <p className="g-muted g-pp">Das saídas do período ({brl(fixas.saiu)}), {brl(fixas.total)} foram contas fixas (aluguel, luz, salários…) e {brl(centavos((fixas.saiu - fixas.total)))} as outras.</p>
               <TabelaMeses cab={["Mês", "Saiu", "Contas fixas", "Outras saídas"]} linhas={d.meses.map((m) => {
                 const f = fixas.meses.find((x) => x.mes === m.mes);
                 const saiu = m.saiu ?? 0, fx = f?.contas_fixas ?? 0;
-                return [rot(m.mes), brl(saiu), brl(fx), brl(Math.round((saiu - fx) * 100) / 100)];
+                return [rot(m.mes), brl(saiu), brl(fx), brl(centavos((saiu - fx)))];
               })} />
             </div>
           )}

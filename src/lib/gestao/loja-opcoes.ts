@@ -1,4 +1,5 @@
 import { opcao } from "./opcoes";
+import { centavos } from "./util";
 
 /**
  * Opções da loja: cada negócio liga só o que usa. Todas começam desligadas, e desligado o estoque funciona como sempre.
@@ -37,7 +38,6 @@ export function limparCodigo(s: string | null | undefined): string | null {
   return t ? t.slice(0, 64) : null;
 }
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Margem de um produto pelo preço e pelo custo de hoje: quanto sobra em reais e quanto isso é do preço de venda.

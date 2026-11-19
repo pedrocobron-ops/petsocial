@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Contexto } from "./ferramentas";
+import { centavos } from "../util";
 
 /**
  * Ferramenta de consulta "ver_comissao" do Mozart: a comissão de cada pessoa num período, separada por pessoa, com os
@@ -30,7 +31,7 @@ type Pessoa = {
   pagamentos: { de: string; ate: string; valor: number; pago_em: string }[]; linhas: Linha[];
 };
 
-const real = (n: unknown) => Math.round(Number(n ?? 0) * 100) / 100;
+const real = (n: unknown) => centavos(Number(n ?? 0));
 const diaLocal = (iso: string, fusoMin: number) => new Date(new Date(iso).getTime() + fusoMin * 60000).toISOString().slice(0, 10);
 
 /** Roda a ferramenta; devolve null quando o nome não é desta lista. Erro de uso: lança Error com a frase para o modelo. */

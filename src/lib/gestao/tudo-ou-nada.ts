@@ -1,5 +1,6 @@
 import type { Banco } from "./supabase";
 import { parteDaChave, type ItemLancamento, type PartePagamento } from "./dinheiro";
+import { centavos as real } from "./util";
 
 /**
  * Operação de dinheiro com mais de uma gravação (check-out, sinal, "Fechar a conta", baixa com crédito): a tela monta a lista
@@ -85,6 +86,5 @@ export function passoDoEstoque(produtos: { produtoId?: string; qtd: number }[], 
   return linhas.length ? { t: "estoque", linhas } : null;
 }
 
-const real = (n: number) => Math.round(n * 100) / 100;
 /** Pagamento dividido só vai com mais de uma parte (como em `lancarPago`). */
 export const partesOuNada = (p: PartePagamento[] | null | undefined) => (p && p.length > 1 ? p.map((x) => ({ ...x, valor: real(x.valor) })) : null);

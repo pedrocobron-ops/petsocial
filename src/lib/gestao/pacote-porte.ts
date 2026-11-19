@@ -1,4 +1,5 @@
 import type { Banco } from "./supabase";
+import { centavos } from "./util";
 
 /**
  * Pacote com preço por porte ("4 banhos": P R$ 160, M R$ 180, G R$ 200). O modelo guarda os preços em `pacotes.precos_porte`
@@ -18,7 +19,7 @@ export function lerPrecosPorte(x: unknown): PrecosPorte | null {
   const out: PrecosPorte = {};
   for (const [k, v] of Object.entries(x as Record<string, unknown>)) {
     const n = Number(v);
-    if (ehPorte(k) && v != null && Number.isFinite(n) && n >= 0) out[k] = Math.round(n * 100) / 100;
+    if (ehPorte(k) && v != null && Number.isFinite(n) && n >= 0) out[k] = centavos(n);
   }
   return Object.keys(out).length ? out : null;
 }
@@ -45,7 +46,7 @@ export function sugestaoPorPorte(servico: { preco_p?: number | null; preco_m?: n
   const out: PrecosPorte = {};
   for (const p of PORTES_DO_PACOTE) {
     const v = de[p];
-    if (v != null && Number(v) > 0) out[p] = Math.round(Number(v) * quantidade * 100) / 100;
+    if (v != null && Number(v) > 0) out[p] = centavos(Number(v) * quantidade);
   }
   return out;
 }

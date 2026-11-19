@@ -25,6 +25,7 @@ export default function SairDaEquipe({ lateral }: { lateral?: boolean }) {
     setIndo(true);
     try {
       ok(await sb.rpc("equipe_sair", { p_petshop: petshop.id }));
+      try { sessionStorage.setItem("maestro-gestao-saiu", petshop.nome); } catch { /* sem armazenamento: a tela seguinte usa o texto geral */ }
       try { localStorage.removeItem("maestro-gestao-petshop"); localStorage.removeItem("maestro-gestao-ultima-loja"); localStorage.removeItem("maestro-gestao-nome-loja"); } catch { /* sem armazenamento: segue */ }
       location.href = "/gestao/app";
     } catch (e) {

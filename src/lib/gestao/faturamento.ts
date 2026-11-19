@@ -1,6 +1,6 @@
 import type { Banco } from "./supabase";
 import { lerTudo, contando } from "./paginas";
-import { isoDia, deIsoDia, somaDias } from "./util";
+import { isoDia, deIsoDia, somaDias, centavos as real, diaNoFuso, inicioDoDiaNoFuso, fusoDaLoja } from "./util";
 
 /**
  * Faturamento: a regra única de quanto o negócio faturou num período (Relatórios, Hoje, Financeiro, meta do mês).
@@ -39,22 +39,26 @@ export type AjustesDoFaturamento = {
   porCliente: Map<string, number>;
 };
 
-const real = (n: number) => Math.round(n * 100) / 100;
 export const SEM_AJUSTES: AjustesDoFaturamento = { devolvido: 0, devolucoes: 0, creditoDeixado: 0, creditoUsadoFora: 0, porDia: new Map(), porCliente: new Map() };
 
-/** Os ajustes do faturamento de `de` a `ate` (AAAA-MM-DD, os dois entram). */
-export async function ajustesDoFaturamento(sb: Banco, petshopId: string, de: string, ate: string): Promise<AjustesDoFaturamento> {
+/**
+ * Os ajustes do faturamento de `de` a `ate` (AAAA-MM-DD, os dois entram). `fuso`: o fuso do pet shop (nas telas, o do pet shop aberto; no servidor, passe `petshop.fuso`): o
+ * crédito conta no dia em que aconteceu LÁ, não no relógio do aparelho (aparelho em outro fuso mudava o total de cada dia).
+ */
+export async function ajustesDoFaturamento(sb: Banco, petshopId: string, de: string, ate: string, fuso: string | null | undefined = fusoDaLoja()): Promise<AjustesDoFaturamento> {
+  const ini = fuso ? inicioDoDiaNoFuso(de, fuso) : deIsoDia(de);
+  const fim = fuso ? inicioDoDiaNoFuso(isoDia(somaDias(deIsoDia(ate), 1)), fuso) : somaDias(deIsoDia(ate), 1);
   const [devolucoes, creditos] = await Promise.all([
     lerTudo<{ id: string; valor: number; data: string; cliente_id: string | null }>((a, b, contar) => sb.from("lancamentos").select("id, valor, data, cliente_id", contando(contar)).eq("petshop_id", petshopId)
       .eq("tipo", "saida").eq("pago", true).is("movimento", null).in("categoria", CATEGORIAS_DEVOLUCAO).gte("data", de).lte("data", ate).order("data").order("id").range(a, b)).catch(() => []),
     lerTudo<{ id: string; valor: number; criado_em: string; lancamento_id: string | null; cliente_id: string }>((a, b, contar) => sb.from("clientes_creditos").select("id, valor, criado_em, lancamento_id, cliente_id", contando(contar)).eq("petshop_id", petshopId)
-      .gte("criado_em", deIsoDia(de).toISOString()).lt("criado_em", somaDias(deIsoDia(ate), 1).toISOString()).order("criado_em").order("id").range(a, b)).catch(() => []),
+      .gte("criado_em", ini.toISOString()).lt("criado_em", fim.toISOString()).order("criado_em").order("id").range(a, b)).catch(() => []),
   ]);
-  return montarAjustes(devolucoes, creditos);
+  return montarAjustes(devolucoes, creditos, fuso);
 }
 
 /** A conta dos ajustes com as linhas já lidas (devoluções pagas e movimento de crédito do período). */
-export function montarAjustes(devolucoes: { valor: number; data: string; cliente_id: string | null }[], creditos: { valor: number; criado_em: string; lancamento_id: string | null; cliente_id: string }[]): AjustesDoFaturamento {
+export function montarAjustes(devolucoes: { valor: number; data: string; cliente_id: string | null }[], creditos: { valor: number; criado_em: string; lancamento_id: string | null; cliente_id: string }[], fuso: string | null | undefined = fusoDaLoja()): AjustesDoFaturamento {
   const x: AjustesDoFaturamento = { devolvido: 0, devolucoes: devolucoes.length, creditoDeixado: 0, creditoUsadoFora: 0, porDia: new Map(), porCliente: new Map() };
   const somar = (dia: string, cliente: string | null, v: number) => {
     x.porDia.set(dia, real((x.porDia.get(dia) ?? 0) + v));
@@ -62,7 +66,7 @@ export function montarAjustes(devolucoes: { valor: number; data: string; cliente
   };
   for (const l of devolucoes) { x.devolvido = real(x.devolvido + Number(l.valor)); somar(l.data, l.cliente_id, -Number(l.valor)); }
   for (const c of creditos) {
-    const v = Number(c.valor), dia = isoDia(new Date(c.criado_em));
+    const v = Number(c.valor), dia = fuso ? diaNoFuso(c.criado_em, fuso) : isoDia(new Date(c.criado_em));
     if (v > 0) { x.creditoDeixado = real(x.creditoDeixado + v); somar(dia, c.cliente_id, -v); }
     else if (!c.lancamento_id) { x.creditoUsadoFora = real(x.creditoUsadoFora - v); somar(dia, c.cliente_id, -v); }
   }

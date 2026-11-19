@@ -1,6 +1,6 @@
 import { saudacaoZap } from "./agenda";
 import { opcao } from "./opcoes";
-import { brl, dataCompleta, deIsoDia } from "./util";
+import { brl, dataCompleta, deIsoDia, centavos } from "./util";
 
 /**
  * Opções de cobrança e de comissão (ficam em `petshops.opcoes`). Tudo desligado por padrão:
@@ -40,7 +40,6 @@ export const OPCOES_DINHEIRO = {
 } as const;
 
 type ComOpcoes = { opcoes?: unknown };
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 export type OpcoesDeCobranca = {
   multa: boolean; multaFixa: number; multaPct: number; jurosMesPct: number; multaNaMensagem: boolean; pix: string; modelo: string;

@@ -2,14 +2,13 @@
 
 import Link from "@/components/gestao/link-depois";
 import { CreditCard } from "lucide-react";
-import { NOME_FORMA_TAXA, taxasDoPeriodo } from "@/lib/gestao/maquininha";
-import { brl, dataAmigavel } from "@/lib/gestao/util";
+import { feriadosDoRepasse, NOME_FORMA_TAXA, repassePulaFeriado, taxasDoPeriodo } from "@/lib/gestao/maquininha";
+import { brl, dataAmigavel, centavos as real } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
 import { useDados } from "../ui";
 import "../ajustes/taxas-maquininha.css";
 
-const real = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Taxas da maquininha no período (Financeiro e Relatórios): quanto a maquininha ficou, o faturamento depois das taxas e o
@@ -18,7 +17,8 @@ const real = (n: number) => Math.round(n * 100) / 100;
  */
 export default function CartaoMaquininha({ de, ate, faturamento, rotuloPeriodo = "no período" }: { de: string; ate: string; faturamento: number; rotuloPeriodo?: string }) {
   const { sb, petshop, cuidoDoFinanceiro, souDono } = useGestao();
-  const { dados } = useDados(async () => (cuidoDoFinanceiro ? taxasDoPeriodo(sb, petshop.id, de, ate) : null), [petshop.id, de, ate, cuidoDoFinanceiro]);
+  const pulaFeriado = repassePulaFeriado(petshop);
+  const { dados } = useDados(async () => (cuidoDoFinanceiro ? taxasDoPeriodo(sb, petshop.id, de, ate, await feriadosDoRepasse(sb, petshop)) : null), [petshop.id, de, ate, cuidoDoFinanceiro, pulaFeriado]);
   if (!cuidoDoFinanceiro || !dados) return null;
   if (!dados.configurada && dados.taxa === 0) {
     return souDono ? (
@@ -60,8 +60,9 @@ export default function CartaoMaquininha({ de, ate, faturamento, rotuloPeriodo =
         </div>
       )}
       <p className="g-muted g-pp">
-        A taxa de cada venda é a do dia em que foi paga. O que a maquininha ainda vai pagar sai dos dias para cair que você colocou em Meu pet shop, já sem a taxa.
-        O resultado do Financeiro continua sendo entrou − saiu; a taxa aparece aqui à parte.
+        A taxa de cada venda é a do dia em que foi paga. O que a maquininha ainda vai pagar sai dos dias para cair que você colocou em Meu pet shop, já sem a taxa: dias corridos, e o que cai no sábado ou no domingo passa para a segunda.
+        {pulaFeriado ? " O que cai num feriado da sua lista passa para o próximo dia útil." : " Feriado não é pulado (dá para ligar em Meu pet shop, Taxas da maquininha)."}{" "}
+        O Resultado do Financeiro é faturamento − despesas; a taxa aparece aqui à parte e na última linha de Como os números se ligam.
       </p>
     </section>
   );

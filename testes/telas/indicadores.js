@@ -62,7 +62,7 @@ const foto = (page, nome) => page.screenshot({ path: `${B.RAIZ}/testes/saida/ind
     T.ok(`Faturamento do período: ${reais(esperado)}`, new RegExp(`Faturamento\\s*R\\$\\s?${reais(esperado).replace('R$ ', '').replace('.', '\\.')}`, 'i').test(t), t.slice(0, 600));
     T.ok('Atendimentos: 3 e voltaram em 60 dias: 50% (1 de 2)', /Atendimentos\s*3/i.test(t) && /Voltaram em 60 dias\s*50%/i.test(t) && /1 de 2 clientes atendidos/.test(t), t.slice(0, 900));
     T.ok('faltas 25% (1 de 4 que deviam vir)', /Faltas\s*25%/i.test(t) && /1 falta de 4 que deviam vir/.test(t));
-    T.ok('mapa de dias e horários e Quanto sobrou por mês aparecem', (await page.locator('.g-ind-mapa td.forte').count()) >= 1 && /Quanto sobrou por mês/.test(t) && /Serviços mais vendidos[\s\S]{0,80}Banho/.test(t));
+    T.ok('mapa de dias e horários e Quanto sobrou por mês aparecem', (await page.locator('.g-ind-mapa td.forte').count()) >= 1 && /Quanto sobrou por mês/.test(t) && /Serviços mais feitos[\s\S]{0,80}Banho/.test(t));
     // 390: 100 − 30 − 2 = 68,00; 1366: + 29,90 − 2,74 = 95,16
     const depois = larg === 390 ? '68,00' : '95,16';
     T.ok(`Quanto sobrou por mês: depois das taxas R$ ${depois} neste mês`, new RegExp(`depois das taxas: R\\$\\s?${depois}`).test(t), t.slice(t.indexOf('Quanto sobrou por mês'), t.indexOf('Quanto sobrou por mês') + 300));

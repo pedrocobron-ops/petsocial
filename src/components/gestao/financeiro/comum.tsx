@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { History, Lock, Package, RotateCcw, Scissors, Sparkles, Trash2 } from "lucide-react";
-import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, creditoDaEntrada, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, partesPorForma, produtosDaVenda, receberConta, separarMulta, textoDoPagamento, type ContaRecebida } from "@/lib/gestao/dinheiro";
+import { caixaAberto, conferirCaixa, conferirValorAlto, contaDosItens, desfazerVenda, ehDividido, gravarLancamento, itensDoLancamento, lancarPago, parteDaChave, nomeDoMovimento, produtosDaVenda, receberConta, separarMulta, textoDoPagamento, type ContaRecebida } from "@/lib/gestao/dinheiro";
 import { fazerTudoOuNada, type Passo } from "@/lib/gestao/tudo-ou-nada";
 import { creditoDoTutor } from "@/lib/gestao/credito";
 import { vendaComProduto } from "@/lib/gestao/devolucao";
@@ -14,7 +14,8 @@ import { diaFechado, nomeDoDiaFechado } from "@/lib/gestao/feriados";
 import { nomeDaCategoria, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { useOperacao } from "@/lib/gestao/uma-vez";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Caixa, type Lancamento } from "@/lib/gestao/tipos";
-import { brl, dataCompleta, deIsoDia, hora, isoDia } from "@/lib/gestao/util";
+import { brl, dataCompleta, deIsoDia, hora, isoDia, centavos, hojeDaLoja } from "@/lib/gestao/util";
+import { resumoDoCaixa } from "@/lib/gestao/caixa-contas";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -35,9 +36,9 @@ const FolhaDevolverValor = dynamic(() => import("./devolver-valor"), { ssr: fals
 export type FormaId = (typeof FORMAS)[number]["id"];
 export type Tipo = "entrada" | "saida";
 
-export const hojeIso = () => isoDia(new Date());
+/** Hoje, para o dinheiro: o dia no fuso do pet shop (o mesmo do banco), não o do aparelho. */
+export const hojeIso = () => hojeDaLoja();
 export const rotuloForma = (f: string | null | undefined) => FORMAS.find((x) => x.id === f)?.rotulo ?? "Sem forma";
-const centavos = (n: number) => Math.round(n * 100) / 100;
 export const soma = (lista: { valor: number }[]) => centavos(lista.reduce((s, l) => s + Number(l.valor), 0));
 /** Valor curto para rótulo de gráfico: "850", "1,2 mil". */
 export const brlMini = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil` : String(Math.round(n)));
@@ -46,60 +47,9 @@ export const COR_FORMA: Record<string, string> = { pix: "#2f6b4c", dinheiro: "#c
 /** Cores para fatias e barras quando o item não tem cor própria. */
 export const PALETA = ["#2f6b4c", "#ea670c", "#2f6f8a", "#5b4590", "#c99a2e", "#b3402e", "#6a625a", "#a39a90"];
 
-type Movimento = Pick<Lancamento, "tipo" | "valor" | "forma"> & { pagamentos?: unknown; movimento?: string | null; credito_usado?: number | null; trocado?: number | null };
-
-/**
- * Troca de produto: a entrada nova leva, na forma "outro", o valor do produto que voltou, e a devolução sai pelo mesmo valor.
- * Essa parte não é dinheiro: o Caixa tira dos totais (`trocado`, que a tela junta pela função `trocas_do_caixa`), e só a
- * diferença paga (ou devolvida) conta como dinheiro que andou.
- */
-export const trocadoDe = (l: object) => Math.max(0, Number((l as { trocado?: number | null }).trocado ?? 0));
-/** O que saiu de verdade: as saídas sem a parte que é só produto trocado. */
-export const saiuDe = (saidas: { valor: number }[]) => centavos(soma(saidas) - saidas.reduce((t, l) => t + trocadoDe(l), 0));
-
-/** Tira sangrias e suprimentos: dinheiro que só entrou ou saiu da gaveta não é receita nem despesa. */
-export const semMovimentos = <T extends { movimento?: string | null }>(lista: T[]) => lista.filter((l) => !l.movimento);
-
-/** Soma por forma de pagamento, repartindo o pagamento dividido entre as formas dele. */
-export function somaPorForma(lista: { valor: number; forma?: string | null; pagamentos?: unknown; credito_usado?: number | null; trocado?: number | null }[]) {
-  const mapa = new Map<string, number>();
-  const somar = (k: string, v: number) => mapa.set(k, centavos((mapa.get(k) ?? 0) + v));
-  for (const l of lista) {
-    // a parte paga com o crédito do tutor fica à parte (FORMA_CREDITO): não é dinheiro que entrou no dia
-    const credito = creditoDaEntrada(l);
-    // o produto trocado (na forma "outro") também não é dinheiro: sai da soma
-    const fora = credito + trocadoDe(l);
-    for (const p of partesPorForma(l)) somar(p.forma, p.forma === "outro" && fora > 0 ? p.valor - fora : p.valor);
-    if (credito > 0) somar(FORMA_CREDITO, credito);
-  }
-  for (const [k, v] of mapa) if (Math.abs(v) < 0.005) mapa.delete(k);
-  return mapa;
-}
-/** A chave, nas somas por forma, da parte paga com o crédito do tutor. */
-export const FORMA_CREDITO = "credito_tutor";
-
-/**
- * Quanto entrou e saiu por forma de pagamento, e quanto deve ter de dinheiro na gaveta:
- * troco inicial + dinheiro recebido + colocado na gaveta (suprimento) − saídas em dinheiro − tirado da gaveta (sangria).
- * `entrou` e `saiu` não contam sangria nem suprimento.
- */
-export function resumoDoCaixa(valorInicial: number, lancamentos: Movimento[]) {
-  const vendas = semMovimentos(lancamentos);
-  const entradas = vendas.filter((l) => l.tipo === "entrada");
-  const saidas = vendas.filter((l) => l.tipo === "saida");
-  const entrouPor = somaPorForma(entradas), saiuPor = somaPorForma(saidas);
-  const porForma = FORMAS.map((f) => ({ id: f.id, rotulo: f.rotulo, entrou: entrouPor.get(f.id) ?? 0, saiu: saiuPor.get(f.id) ?? 0 }));
-  const dinheiro = porForma.find((f) => f.id === "dinheiro")!;
-  const suprimentos = soma(lancamentos.filter((l) => l.movimento === "suprimento"));
-  const sangrias = soma(lancamentos.filter((l) => l.movimento === "sangria"));
-  // o que foi pago com o crédito do tutor não entrou no caixa (é dinheiro de antes)
-  const credito = centavos(entradas.reduce((t, l) => t + creditoDaEntrada(l), 0));
-  return {
-    entrou: centavos(soma(entradas) - credito - entradas.reduce((t, l) => t + trocadoDe(l), 0)), saiu: saiuDe(saidas), porForma, suprimentos, sangrias, credito,
-    nEntradas: entradas.length, nSaidas: saidas.length,
-    esperado: centavos(Number(valorInicial) + dinheiro.entrou + suprimentos - dinheiro.saiu - sangrias),
-  };
-}
+// As contas do caixa (por forma, crédito do tutor e produto trocado fora, dinheiro esperado na gaveta) ficam em
+// `src/lib/gestao/caixa-contas.ts`: a tela do Caixa, o fechamento, as planilhas e o Mozart usam as MESMAS funções.
+export { FORMA_CREDITO, resumoDoCaixa, saiuDe, semMovimentos, somaPorForma, trocadoDe } from "@/lib/gestao/caixa-contas";
 
 /** Dinheiro esperado na gaveta: num caixa fechado vale o que o banco anotou na hora de fechar. */
 export function esperadoDoCaixa(caixa: Caixa, lancamentos: Lancamento[]) {
@@ -109,7 +59,7 @@ export function esperadoDoCaixa(caixa: Caixa, lancamentos: Lancamento[]) {
 /** Contado menos esperado: bateu, sobra ou falta (null antes de contar). */
 export function diferencaDoCaixa(contado: number | null, esperado: number) {
   if (contado == null) return null;
-  const d = Math.round((contado - esperado) * 100) / 100;
+  const d = centavos((contado - esperado));
   if (d === 0) return { tom: "certo", etiqueta: "verde", texto: "Bateu certinho.", curto: "bateu", valor: 0 } as const;
   if (d > 0) return { tom: "sobra", etiqueta: "azul", texto: `Sobra de ${brl(d)}.`, curto: `sobra ${brl(d)}`, valor: d } as const;
   return { tom: "falta", etiqueta: "vermelho", texto: `Falta de ${brl(-d)}.`, curto: `falta ${brl(-d)}`, valor: d } as const;
@@ -256,7 +206,7 @@ export function ItensDoLancamento({ lancamento }: { lancamento: Pick<Lancamento,
               <b>{i.qtd !== 1 && <span className="g-tab">{fmtQtd(i.qtd)} × </span>}{i.nome}</b>
               {i.qtd !== 1 && <small className="g-tab">{brl(i.valor)} cada</small>}
             </span>
-            <b className="g-tab v">{brl(Math.round(i.qtd * i.valor * 100) / 100)}</b>
+            <b className="g-tab v">{brl(centavos(i.qtd * i.valor))}</b>
           </li>
         ))}
       </ul>
@@ -472,7 +422,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
   }, [vezesAntes]);
   // entrada recebida de um cliente corrigida para menos: a diferença pode continuar devida (não some calada)
   const baixou = inicial && inicial.pago && inicial.tipo === "entrada" && inicial.cliente_id && !inicial.conta_id && !inicial.movimento && !travado && !soVer && valor != null && valor > 0
-    ? Math.max(0, Math.round((Number(inicial.valor) - valor) * 100) / 100) : 0;
+    ? Math.max(0, centavos((Number(inicial.valor) - valor))) : 0;
   const { dados: nomeDoClienteLido } = useDados(async () => {
     if (!inicial?.cliente_id) return null;
     const r = await sb.from("clientes").select("nome").eq("id", inicial.cliente_id).maybeSingle();
@@ -516,7 +466,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
     // dinheiro de hoje: se o caixa fechou enquanto esta folha estava aberta, pergunta antes de lançar fora dele
     if (!inicial && !conta && (!escolheData || data === hoje) && !(await conferirCaixa(sb, petshop.id, confirmar))) return;
     // conta nova a receber de um cliente: passa do limite de fiado? quem pode libera (fica anotado)
-    if (!inicial && conta && entrada && tutorConta && !(await conferirLimite(sb, petshop.id, tutorConta.id, Math.round(valor * vezes * 100) / 100, { perguntar: confirmar, podeLiberar: souDono || cuidoDoFinanceiro, avisarErro }))) return false;
+    if (!inicial && conta && entrada && tutorConta && !(await conferirLimite(sb, petshop.id, tutorConta.id, centavos(valor * vezes), { perguntar: confirmar, podeLiberar: souDono || cuidoDoFinanceiro, avisarErro }))) return false;
     setSalvando(true);
     try {
       if (inicial) {
@@ -1055,6 +1005,11 @@ export function FolhaBaixa({ conta, aoFechar, aoSalvo }: { conta: Lancamento; ao
           </Campo>
         ) : <p className="g-muted g-pp">{erro ? <span className="erro" role="alert">{erro} </span> : null}Entra com a data de hoje.</p>}
         {data === hoje && <AvisoCaixaFechado aberto={caixaAgora} saida={!entrada} />}
+        {entrada && data && data < hoje && caixaAgora === true && (pagamento.forma === "dinheiro" || (pagamento.dividido && pagamento.partes.some((p) => p.forma === "dinheiro"))) && (
+          <p className="g-aviso" role="status" data-teste="aviso-dinheiro-de-outro-dia">
+            <span>Com a data de {dataCompleta(data)}, este dinheiro <b>não entra no caixa de hoje</b> nem na conferência da gaveta. Se o dinheiro foi para a gaveta hoje, deixe a data de hoje.</span>
+          </p>
+        )}
       </div>
     </Folha>
     </ParcelasNaTela.Provider>

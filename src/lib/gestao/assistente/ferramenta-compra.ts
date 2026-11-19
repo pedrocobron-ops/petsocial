@@ -4,6 +4,7 @@ import { analisarCompra, lerMovimentosDaCompra, PERIODOS, textoDasSemanas } from
 import { contando, lerTudo } from "../paginas";
 import { comCustos } from "../reservado";
 import type { Contexto } from "./ferramentas";
+import { centavos as real } from "../util";
 
 /**
  * Ferramenta de consulta "o_que_comprar" do Mozart ("o que preciso comprar?"): a mesma conta da tela Estoque, O que comprar
@@ -22,7 +23,6 @@ export const FERRAMENTAS_COMPRA: Def[] = [
     }, required: [], additionalProperties: false } },
 ];
 
-const real = (n: number) => Math.round(n * 100) / 100;
 
 /** Roda a ferramenta; devolve null quando o nome não é desta lista. Erro de uso: lança Error com a frase para o modelo. */
 export async function consultarCompra(c: Contexto, nome: string, e: Record<string, unknown>, erroDeUso: (msg: string) => Error) {

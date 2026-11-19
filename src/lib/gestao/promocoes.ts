@@ -1,4 +1,4 @@
-import { brl, brlCurto, dataCurta, deIsoDia, isoDia } from "./util";
+import { brl, brlCurto, dataCurta, deIsoDia, isoDia, centavos } from "./util";
 
 /**
  * Promoção em dias fracos: "Terça e quarta, 10% no banho", "antes das 11h, R$ 10 off".
@@ -65,7 +65,6 @@ export const ORDEM_SEMANA = [1, 2, 3, 4, 5, 6, 0];
 /** Áreas de serviço que entram no "todos os serviços" (banho e tosa: nem creche, nem hotel, nem loja). */
 const DO_BANHO = new Set(["banho", "tosa", "banho_tosa", "outro"]);
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 const hhmm = (h: string | null | undefined) => (h ? String(h).slice(0, 5) : null);
 
 /** "10% off" ou "R$ 10 off": a etiqueta do horário no link. */

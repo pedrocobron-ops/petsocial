@@ -261,6 +261,12 @@ button.g-linha:hover, a.g-linha:hover { background: rgba(31, 27, 23, .03); borde
 .g-aviso.vermelho { background: var(--g-vermelho-tint); color: var(--txt-vermelho); }
 .g-aviso.verde { background: var(--g-menta); color: var(--txt-verde); }
 .g-aviso > svg { width: 20px; height: 20px; flex: none; }
+/* leitura que falhou e a tela não tratou (ui.tsx, LeiturasComErro): fica por cima de tudo, até da folha aberta */
+.g-leitura-falhou { position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 50%; translate: -50% 0; z-index: 96; width: min(94vw, 600px); margin: 0; box-shadow: var(--g-sombra, 0 10px 30px rgba(31, 27, 23, .18)); border: 1px solid color-mix(in srgb, var(--txt-vermelho) 30%, transparent); }
+.g-leitura-falhou > span:first-child { flex: 1 1 220px; min-width: 0; }
+.g-leitura-falhou-acoes { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.g-leitura-falhou .g-btn { margin-left: 0; }
+@media print { .g-leitura-falhou { display: none; } }
 .g-aviso .g-btn { margin-left: auto; }
 .g-erro { color: var(--g-vermelho); font-size: .9375rem; }
 

@@ -43,7 +43,8 @@ const continuar = async (page) => { await page.locator('.g-guia-pe .g-btn.pri').
     await page.click('button.g-btn.pri');
     await page.waitForURL('**/gestao/comecar', { timeout: 30000 });
     await page.waitForSelector('.g-guia-h');
-    T.ok('"WhatsApp e cidade" já vem aberto', await page.locator('details.g-bv-mais').evaluate((d) => d.open));
+    // rodada 9: o WhatsApp saiu da parte recolhida e fica sempre à vista (só "Cidade e estado" continua recolhido)
+    T.ok('o WhatsApp já vem à vista, sem abrir nada', await page.locator('input[name=whatsapp]').isVisible());
     await page.fill('input[minlength="2"]', 'Banho da Bia');
     await page.getByLabel('E como eu chamo você?').fill('Bia');
     await page.fill('input[type=tel]', '(11) 98888-7777');

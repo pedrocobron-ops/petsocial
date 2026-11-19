@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Contexto } from "./ferramentas";
 import { taxasDoPeriodo } from "../maquininha";
+import { centavos as real } from "../util";
 
 /**
  * Mozart: "quanto a maquininha ainda vai me pagar e em que datas?", "quanto a maquininha ficou este mês?". A mesma conta do
@@ -16,7 +17,6 @@ export const FERRAMENTA_MAQUININHA: Anthropic.Tool & { grava: false; financeiro:
 };
 
 const RE_DIA = /^\d{4}-\d{2}-\d{2}$/;
-const real = (n: number) => Math.round(n * 100) / 100;
 const FORMA: Record<string, string> = { debito: "débito", credito: "crédito", pix: "Pix" };
 
 export async function consultarMaquininha(c: Contexto, nome: string, e: Record<string, unknown>, erro: (m: string) => Error): Promise<{ resultado: unknown } | null> {

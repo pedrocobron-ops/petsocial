@@ -3,11 +3,11 @@
 import { useMemo, useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import { Coins, Download, PiggyBank, Receipt, Scale, TrendingUp } from "lucide-react";
-import { linhasDaCasa, montarLucro, OPCAO_COMISSAO_CUSTO, porLucro, type LinhaLucro, type LucroDoBanco } from "@/lib/gestao/lucro";
+import { acertosDaCasa, linhasDaCasa, montarLucro, OPCAO_COMISSAO_CUSTO, porLucro, type LinhaLucro, type LucroDoBanco } from "@/lib/gestao/lucro";
 import { nomeDaCategoria, usaCasa, usaModulo } from "@/lib/gestao/modulos";
 import { aindaAPagar, fraseDaSituacao, lerSaidasDoPeriodo, lerSituacaoContasFixas, type SaidasDoPeriodo, type SituacaoContaFixa } from "@/lib/gestao/contas-fixas";
 import { salvarOpcoes } from "@/lib/gestao/opcoes";
-import { brl, dataCompleta, deIsoDia, isoDia } from "@/lib/gestao/util";
+import { brl, dataCompleta, deIsoDia, isoDia, centavos } from "@/lib/gestao/util";
 import { useGestao } from "../contexto";
 import { baixarPlanilha, Chips, dinheiroCsv, numeroCsv, type Cel } from "../financeiro/comum";
 import { Kpi, Tile } from "../painel";
@@ -38,13 +38,15 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
   const { dados, erro, recarregar } = useDados(async () => {
     // as saídas separadas em "Contas fixas" e o resto (o total é o mesmo; sem a função, as saídas aparecem como antes)
     // e as contas fixas do período que ainda não foram pagas (em A pagar ou ainda por entrar): ficam fora do resultado, à parte
-    const [r, fixas, situacao] = await Promise.all([
+    const [r, fixas, situacao, acertos] = await Promise.all([
       sb.rpc("lucro_do_periodo", { p_petshop: petshop.id, p_de: de, p_ate: ate }),
       lerSaidasDoPeriodo(sb, petshop.id, de, ate).catch(() => null),
       lerSituacaoContasFixas(sb, petshop.id, de, ate).catch(() => null),
+      // sinal devolvido, sinal que virou crédito e crédito usado no check-out: a linha da creche e do hotel mostra o bruto e o que ficou
+      acertosDaCasa(sb, petshop.id, de, ate, petshop.fuso).catch(() => null),
     ]);
     if (r.error) throw new Error(r.error.message);
-    return { lucro: r.data as unknown as LucroDoBanco, fixas, situacao };
+    return { lucro: r.data as unknown as LucroDoBanco, fixas, situacao, acertos };
   }, [petshop.id, de, ate]);
   const x = useMemo(() => (dados ? montarLucro(dados.lucro) : null), [dados]);
   // a separação só vale se fecha com o "saiu" de Quanto sobrou (a mesma regra; conferido aqui também)
@@ -78,22 +80,22 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
       ["Como é a conta", `Receita: o que entrou no período, com o desconto, repartido como na comissão. Custo: produto pelo custo guardado na venda (sem ele, o custo de hoje do cadastro); serviço pelo custo do material × vezes${x.comissaoComoCusto ? "; a comissão da linha entra no custo" : ""}. Sem custo informado, a linha fica sem margem.`],
       [],
       ["Tipo", "Nome", "Quantidade", "Receita", "Material ou custo dos produtos", "Comissão", "Custo", "Sobrou", "Sobrou %", "Observação"],
-      ...x.servicos.map(linha), ...x.produtos.map(linha), ...(x.extras ? [linha(x.extras)] : []),
+      ...x.servicos.map(linha), ...x.produtos.map(linha), ...(x.extras ? [linha(x.extras)] : []), ...casa.map(linha),
       ["Total das linhas", "", "", dinheiroCsv(x.totais.receita), "", dinheiroCsv(x.totais.comissao), dinheiroCsv(x.totais.custo), dinheiroCsv(x.totais.margem), x.totais.pct == null ? "" : numeroCsv(Math.round(x.totais.pct * 10) / 10), x.totais.linhasSemCusto ? `${x.totais.linhasSemCusto} linhas sem custo informado (${brl(x.totais.receitaSemCusto)} de receita fora da margem)` : ""],
       [],
       ["Como fecha com o Financeiro"],
       ["Serviços, produtos e extras", dinheiroCsv(p.linhas)],
       ...p.outros.map((o): Cel[] => [`Outros lançamentos: ${categoria(o.categoria)}`, dinheiroCsv(o.valor)]),
-      ["Entrou (entradas recebidas)", dinheiroCsv(p.entradas)],
-      ["Devolvido ao tutor", dinheiroCsv(-p.devolvido)],
-      ["Ficou de crédito para o tutor", dinheiroCsv(-p.creditoDeixado)],
+      ["Entradas lançadas", dinheiroCsv(p.entradas)],
+      ["Devoluções lançadas (com o produto de trocas)", dinheiroCsv(-p.devolvido)],
+      ["Crédito deixado para tutores", dinheiroCsv(-p.creditoDeixado)],
       ["Crédito usado no check-out", dinheiroCsv(p.creditoUsadoFora)],
       ["Faturamento", dinheiroCsv(p.faturamento)],
       ...(fixas
         ? [["Saída: Contas fixas", dinheiroCsv(-fixas.total)] as Cel[], ...fixas.contas.map((c): Cel[] => [`Conta fixa: ${c.nome}`, dinheiroCsv(-c.valor)]),
           ...fixas.outras.map((s): Cel[] => [`Saída: ${categoria(s.categoria)}`, dinheiroCsv(-s.valor)])]
         : p.saidas.map((s): Cel[] => [`Saída: ${categoria(s.categoria)}`, dinheiroCsv(-s.valor)])),
-      ["Resultado do período (entrou − saiu)", dinheiroCsv(p.resultado)],
+      ["Resultado do período (faturamento − despesas)", dinheiroCsv(p.resultado)],
       ...(p.taxas > 0 ? [["Taxas da maquininha", dinheiroCsv(-p.taxas)], ["Resultado depois das taxas da maquininha", dinheiroCsv(p.resultadoDepoisDasTaxas)]] satisfies Cel[][] : []),
     ];
     baixarPlanilha(t, `quanto-sobrou-${de}-a-${ate}.csv`);
@@ -101,7 +103,7 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
   }
 
   // creche e hotel: o que entrou deles aparece como linhas (sem custo por serviço), não só em "Outros lançamentos"
-  const casa = x && usaCasa(petshop) ? linhasDaCasa(x.ponte.outros, categoria) : [];
+  const casa = x && usaCasa(petshop) ? linhasDaCasa(x.ponte.outros, categoria, dados?.acertos ?? null, brl) : [];
   const daCasa = casa.reduce((t, l) => t + l.receita, 0);
   const banho = usaModulo(petshop, "banho_tosa");
   const nomeCasa = categoria("Creche e hotel");
@@ -120,16 +122,14 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
       {erro ? <p className="g-erro" role="alert">{erro}</p> : !x ? <Esqueleto linhas={3} /> : (
         <>
           <div className="g-grade kpis">
-            <Kpi icone={Receipt} tom="ceu" rotulo={daCasa > 0 ? (banho ? "Entrou de serviços, casa e produtos" : `Entrou ${categoria("Creche e hotel") === "Hotel" ? "do hotel" : "da creche"} e de produtos`) : "Entrou de serviços e produtos"}
-              valor={brl(x.totais.receita + daCasa)} apoio="com o desconto, já recebido" />
+            <Kpi icone={Receipt} tom="ceu" rotulo={daCasa > 0 ? (banho ? "Receita de serviços, casa e produtos" : `Receita ${categoria("Creche e hotel") === "Hotel" ? "do hotel" : "da creche"} e de produtos`) : "Receita de serviços e produtos"}
+              valor={brl(x.totais.receita + daCasa)} apoio="contas pagas, com o desconto; antes de devoluções e crédito" />
             <Kpi icone={Coins} tom="rosa" rotulo="Custo informado" valor={brl(x.totais.custo)}
               apoio={!banho && !temProdutos && daCasa > 0 ? `${aCasa} custo por serviço` : x.totais.linhasSemCusto ? `${x.totais.linhasSemCusto === 1 ? "1 linha" : `${x.totais.linhasSemCusto} linhas`} sem custo` : "de todas as linhas"} />
-            {x.totais.receitaComCusto <= 0 && daCasa > 0
-              // creche e hotel não têm custo por serviço: o que sobra é o resultado do período (o mesmo do Financeiro)
-              ? <Kpi icone={TrendingUp} tom={x.ponte.resultado < 0 ? "manteiga" : "menta"} rotulo="Sobrou" valor={brl(x.ponte.resultado)} apoio={`entrou − saiu: ${aCasa} custo por serviço`} />
-              : <Kpi icone={TrendingUp} tom={x.totais.margem < 0 ? "manteiga" : "menta"} rotulo="Sobrou" valor={x.totais.receitaComCusto > 0 ? brl(x.totais.margem) : "–"}
-                  apoio={x.totais.pct != null ? `${pct(x.totais.pct)} do que tem custo · antes das despesas` : "falta informar os custos"} />}
-            <Kpi icone={Scale} tom={x.ponte.resultado < 0 ? "rosa" : "lilas"} rotulo={inteiro ? "Resultado do mês" : "Resultado do período"} valor={brl(x.ponte.resultado)} apoio="entrou − saiu, como no Financeiro" />
+            {/* "Sobrou" é sempre a mesma conta: receita − custo das linhas que têm custo. Sem custo nenhum (só creche e hotel), fica em branco e o Resultado está ao lado. */}
+            <Kpi icone={TrendingUp} tom={x.totais.margem < 0 ? "manteiga" : "menta"} rotulo="Sobrou das vendas" valor={x.totais.receitaComCusto > 0 ? brl(x.totais.margem) : "–"}
+              apoio={x.totais.pct != null ? `${pct(x.totais.pct)} do que tem custo · antes das despesas` : daCasa > 0 && !temProdutos ? `${aCasa} custo por serviço: veja o Resultado` : "falta informar os custos"} />
+            <Kpi icone={Scale} tom={x.ponte.resultado < 0 ? "rosa" : "lilas"} rotulo={inteiro ? "Resultado do mês" : "Resultado do período"} valor={brl(x.ponte.resultado)} apoio="faturamento − despesas, como no Financeiro" />
           </div>
 
           {(banho || temProdutos) && <div className="g-lu-op">
@@ -145,7 +145,7 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
           {linhas.length ? (
             <div className="g-lu-tab" role="table" aria-label={vista === "servicos" ? "Quanto sobrou por serviço" : "Quanto sobrou por produto"}>
               <div className="g-lu-l cab" role="row">
-                <span role="columnheader">{vista === "servicos" ? (banho ? "Serviço" : "O que entrou") : "Produto"}</span><span role="columnheader">{vista === "servicos" ? "Vezes" : "Vendidos"}</span><span role="columnheader">Entrou</span><span role="columnheader">Custo</span><span role="columnheader">Sobrou</span><span role="columnheader">%</span>
+                <span role="columnheader">{vista === "servicos" ? (banho ? "Serviço" : "O que entrou") : "Produto"}</span><span role="columnheader">{vista === "servicos" ? "Vezes" : "Vendidos"}</span><span role="columnheader">Receita</span><span role="columnheader">Custo</span><span role="columnheader">Sobrou</span><span role="columnheader">%</span>
               </div>
               {linhas.map((l) => <Linha key={l.chave} l={l} comComissao={x.comissaoComoCusto} />)}
             </div>
@@ -160,9 +160,9 @@ export default function QuantoSobrou({ de, ate }: { de: string; ate: string }) {
           <Ponte x={x} categoria={categoria} inteiro={inteiro} fixas={fixas} situacao={dados?.situacao ?? null} />
 
           <p className="g-muted g-pp">
-            Entrou: o dinheiro recebido no período, já com o desconto, repartido entre os serviços de cada conta como na comissão (conta paga em partes conta cada parte no dia em que entrou; as vezes contam uma vez, quando a conta fecha).
+            Receita: o valor das contas pagas no período, já com o desconto (antes de devoluções e do crédito de tutores), repartido entre os serviços de cada conta como na comissão (conta paga em partes conta cada parte no dia em que entrou; as vezes contam uma vez, quando a conta fecha).
             {" "}Custo: produto pelo custo guardado na venda (sem ele, pelo custo de hoje do cadastro); serviço pelo custo do material × vezes{x.comissaoComoCusto ? "; a comissão do período entra no custo de cada linha" : "; a comissão aparece em cada linha, mas não entra no custo"}.
-            {" "}Compra de mercadoria e comissão paga já estão nas saídas do Financeiro: o que sobrou aqui é por serviço e por produto, o resultado é o do caixa. Não some os dois.
+            {" "}Compra de mercadoria e comissão paga já estão nas saídas do Financeiro: o que sobrou aqui é por serviço e por produto; o Resultado é faturamento − despesas. Não some os dois.
           </p>
         </>
       )}
@@ -184,7 +184,7 @@ function Linha({ l, comComissao }: { l: LinhaLucro; comComissao: boolean }) {
     <div className="g-lu-l" role="row">
       <span role="cell" className="n"><b>{l.nome}</b>{sub && <small>{sub}</small>}</span>
       <span role="cell"><i>{l.tipo === "produto" ? "Vendidos " : "Vezes "}</i><em>{l.chave.startsWith("casa:") ? `${fmtQtd(l.quantidade)} ${l.unidade}` : l.tipo === "extra" ? "–" : `${fmtQtd(l.quantidade)}${l.tipo === "produto" ? ` ${l.unidade}` : ""}`}</em></span>
-      <span role="cell"><i>Entrou </i><em>{brl(l.receita)}</em></span>
+      <span role="cell"><i>Receita </i><em>{brl(l.receita)}</em></span>
       <span role="cell">{l.custo == null ? <em className="sem">{l.chave.startsWith("casa:") ? "sem custo por serviço" : "custo não informado"}</em> : <><i>Custo </i><em>{brl(l.custo)}</em></>}</span>
       <span role="cell"><i>Sobrou </i><em className={ruim ? "ruim" : undefined}>{l.margem == null ? "–" : brl(l.margem)}</em></span>
       <span role="cell"><i>Margem </i><em className={ruim ? "ruim" : undefined}>{pct(l.pct)}</em></span>
@@ -202,14 +202,14 @@ function Ponte({ x, categoria, inteiro, fixas, situacao }: { x: ReturnType<typeo
     <div className="g-lu-ponte" role="group" aria-label="Como fecha com o Financeiro">
       <p className="g-rotulo" style={{ marginBottom: 4 }}>Como fecha com o Financeiro</p>
       <div><span>Serviços, produtos e extras</span><b>{brl(p.linhas)}</b></div>
-      {p.outros.length > 0 && <div><span>Outros lançamentos (sem serviço ou produto)</span><b>+ {brl(p.somaOutros)}</b></div>}
+      {p.outros.length > 0 && <div><span>Outros lançamentos (lançados sem escolher serviço ou produto)</span><b>+ {brl(p.somaOutros)}</b></div>}
       {p.outros.map((o) => <div key={o.categoria} className="sub"><span>{categoria(o.categoria)}{o.lancamentos > 1 ? ` · ${o.lancamentos} lançamentos` : ""}</span><b>{brl(o.valor)}</b></div>)}
-      <div className="igual"><span>Entrou</span><b>{brl(p.entradas)}</b></div>
-      {p.devolvido > 0 && <div><span>Devolvido ao tutor</span><b>− {brl(p.devolvido)}</b></div>}
-      {p.creditoDeixado > 0 && <div><span>Ficou de crédito para o tutor</span><b>− {brl(p.creditoDeixado)}</b></div>}
+      <div className="igual"><span>Entradas lançadas</span><b>{brl(p.entradas)}</b></div>
+      {p.devolvido > 0 && <div><span>Devoluções lançadas (com o produto de trocas)</span><b>− {brl(p.devolvido)}</b></div>}
+      {p.creditoDeixado > 0 && <div><span>Crédito deixado para tutores</span><b>− {brl(p.creditoDeixado)}</b></div>}
       {p.creditoUsadoFora > 0 && <div><span>Crédito usado no check-out</span><b>+ {brl(p.creditoUsadoFora)}</b></div>}
       {(p.devolvido > 0 || p.creditoDeixado > 0 || p.creditoUsadoFora > 0) && <div className="igual"><span>Faturamento</span><b>{brl(p.faturamento)}</b></div>}
-      <div><span>Saídas (despesas gerais, compras, comissão paga…)</span><b>− {brl(p.saiu)}</b></div>
+      <div><span>Despesas (contas, compras, comissão paga…)</span><b>− {brl(p.saiu)}</b></div>
       {fixas ? <>
         <div className="sub" data-teste="saidas-contas-fixas"><span><b>Contas fixas</b></span><b>{brl(fixas.total)}</b></div>
         {fixas.contas.map((c) => <div key={`${c.conta_fixa_id ?? ""}${c.nome}`} className="sub fixa"><span>{c.nome}</span><b>{brl(c.valor)}</b></div>)}
@@ -227,7 +227,7 @@ function Ponte({ x, categoria, inteiro, fixas, situacao }: { x: ReturnType<typeo
             <div key={`${c.conta_fixa_id ?? c.nome}${c.mes}`} className="sub fixa"><span>{c.nome} · {fraseDaSituacao(c, hoje)}</span><b>{brl(c.valor)}</b></div>
           ))}
           <div><span>Total a pagar</span><b>− {brl(falta.total)}</b></div>
-          <div className="igual fim"><span>Se pagar essas contas, o resultado fica</span><b className={base - falta.total < 0 ? "g-vermelho-t" : undefined}>{brl(Math.round((base - falta.total) * 100) / 100)}</b></div>
+          <div className="igual fim"><span>Se pagar essas contas, o resultado fica</span><b className={base - falta.total < 0 ? "g-vermelho-t" : undefined}>{brl(centavos((base - falta.total)))}</b></div>
         </>
       )}
     </div>

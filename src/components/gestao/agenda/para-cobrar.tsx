@@ -5,7 +5,7 @@ import { ChevronRight, HandCoins } from "lucide-react";
 import { nomeDosServicos, valorDoHorario, servicosAMais } from "@/lib/gestao/servicos-do-horario";
 import { COLS_PACOTE_CLIENTE, comPrecosDeAgendamento } from "@/lib/gestao/reservado";
 import { SELECT_AGENDAMENTO, type AgendamentoCompleto, type PacoteCliente } from "@/lib/gestao/tipos";
-import { brl, dataAmigavel, hora, isoDia } from "@/lib/gestao/util";
+import { brl, dataAmigavel, hora, isoDia, centavos } from "@/lib/gestao/util";
 import { travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
 import { useGestao } from "../contexto";
 import { AvatarPet, avisarMudanca, useAvisos, useDados, useSomenteLeitura } from "../ui";
@@ -50,7 +50,7 @@ export function MarcaSemCobranca({ a }: { a: { sem_cobranca_nome?: string | null
 
 /** O que a conta deste horário ainda cobra: tudo, ou só os outros serviços quando o principal foi (ou vai) pelo pacote. */
 const aCobrarDe = (a: AgendamentoCompleto, comPacote = false) => (a.pacote_cliente_id || comPacote
-  ? Math.round(servicosAMais(a).reduce((t, o) => t + Number(o.preco ?? 0), 0) * 100) / 100
+  ? centavos(servicosAMais(a).reduce((t, o) => t + Number(o.preco ?? 0), 0))
   : valorDoHorario(a) ?? 0);
 
 /** Quantos atendimentos estão para cobrar e quanto somam (para o fechamento do caixa). Só para quem recebe. */
@@ -63,7 +63,7 @@ export function useParaCobrarComValor() {
     const r = await sb.from("agendamentos").select(SELECT_AGENDAMENTO).eq("petshop_id", petshop.id).in("id", ids.split(",").slice(0, 200));
     if (r.error) return { n: lista.length, total: 0 };
     const ags = await comPrecosDeAgendamento(sb, petshop.id, (r.data ?? []) as unknown as AgendamentoCompleto[]) as unknown as AgendamentoCompleto[];
-    return { n: ags.length, total: Math.round(ags.reduce((t, a) => t + aCobrarDe(a), 0) * 100) / 100 };
+    return { n: ags.length, total: centavos(ags.reduce((t, a) => t + aCobrarDe(a), 0)) };
   }, [petshop.id, ids, vejoFinanceiro]);
   return dados ?? { n: 0, total: 0 };
 }
@@ -105,7 +105,7 @@ export function AtendimentosParaCobrar({ aoMudar }: { aoMudar?: () => void }) {
   const [ocupado, setOcupado] = useState(false);
   if (!vejoFinanceiro || !dados?.lista.length) return null;
   const pacoteDe = (a: AgendamentoCompleto) => dados.pacotes.get(a.id) ?? null;
-  const total = Math.round(dados.lista.reduce((t, a) => t + aCobrarDe(a, Boolean(pacoteDe(a))), 0) * 100) / 100;
+  const total = centavos(dados.lista.reduce((t, a) => t + aCobrarDe(a, Boolean(pacoteDe(a))), 0));
   const mudou = () => { void recarregar(); avisarMudanca(); aoMudar?.(); };
 
   async function naoCobrar(a: AgendamentoCompleto) {

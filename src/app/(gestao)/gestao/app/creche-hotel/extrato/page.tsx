@@ -8,7 +8,7 @@ import {
   SELECT_COBRANCA, textoDasDatas, textoDoExtratoDoPet, textoDosDias, type CobrancaCompleta, type ExtratoDoPet, type Falta, type Presenca,
 } from "@/lib/gestao/creche";
 import { calendarioGuardado, lerCalendario } from "@/lib/gestao/feriados";
-import { brl, dataCurta, deIsoDia, fmtTelefone, isoDia, linkWhatsApp, nomeMes, somaDias } from "@/lib/gestao/util";
+import { brl, dataCurta, deIsoDia, fmtTelefone, isoDia, linkWhatsApp, nomeMes, somaDias, centavos } from "@/lib/gestao/util";
 import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { useGestao } from "@/components/gestao/contexto";
 import { Esqueleto, ok, useAvisos, useDados } from "@/components/gestao/ui";
@@ -147,7 +147,7 @@ function ExtratoDoCao() {
             {c ? (
               <>
                 <Pares linhas={[...linhasDaCobrancaDoPet(c).map((l) => ({ nome: l.nome, valor: l.valor < 0 ? `− ${brl(-l.valor)}` : brl(l.valor), recuo: l.valor < 0 })), { nome: "Total", valor: brl(c.total), forte: true }]} />
-                {!c.lancamentos?.pago && faltaDaCobranca(c) < Number(c.total) && <p className="g-pa-nota">Já pago {brl(Math.round((Number(c.total) - faltaDaCobranca(c)) * 100) / 100)}. Falta {brl(faltaDaCobranca(c))}.</p>}
+                {!c.lancamentos?.pago && faltaDaCobranca(c) < Number(c.total) && <p className="g-pa-nota">Já pago {brl(centavos((Number(c.total) - faltaDaCobranca(c))))}. Falta {brl(faltaDaCobranca(c))}.</p>}
               </>
             ) : <p className="g-pa-vazio">Nenhuma mensalidade de {nomeMes(mes)} para {x.pet}.</p>}
           </section>

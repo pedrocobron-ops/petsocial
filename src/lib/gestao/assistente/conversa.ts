@@ -37,6 +37,41 @@ export const MAX_VOLTAS = 6;
  * novo, consulta as contas…) chegou a levar 50 s; passou disso, o Mozart responde com o que tem.
  */
 export const PRAZO_MS = 28_000;
+/**
+ * Prazo do pedido inteiro, contado desde que a rota começou (a rota tem 60 s; sobra folga para gravar o registro e responder).
+ * Cada chamada ao modelo recebe só o tempo que falta, e depois da primeira volta não há nova tentativa.
+ */
+export const PRAZO_TOTAL_MS = 50_000;
+/** Menos que isto de sobra: não começa outra chamada; o Mozart responde com o que tem. */
+export const SOBRA_MINIMA_MS = 4_000;
+export type TempoDaChamada = { volta: number; restaMs: number };
+
+/**
+ * Prazo e tentativas de uma chamada ao modelo: no máximo 25 s e nunca mais do que falta para o prazo total. Na primeira
+ * volta, uma nova tentativa cabe (cada uma com metade do que falta, até 25 s); nas seguintes, nenhuma.
+ */
+export function limitesDaChamada(t: TempoDaChamada | undefined): { timeout: number; maxRetries: number } {
+  if (!t) return { timeout: 25_000, maxRetries: 1 };
+  const resta = Math.max(1_000, t.restaMs);
+  if (t.volta === 0) return { timeout: Math.min(25_000, Math.max(1_000, Math.floor(resta / 2))), maxRetries: 1 };
+  return { timeout: Math.min(25_000, resta), maxRetries: 0 };
+}
+
+/** O erro é o modelo que não respondeu a tempo (ou a conexão que caiu no meio)? */
+export const ehDemoraDoModelo = (e: unknown) => {
+  const nome = e instanceof Error ? e.name : "", m = e instanceof Error ? e.message : String(e ?? "");
+  return /Timeout|ConnectionError/i.test(nome) || /timed? ?out|timeout|connection error/i.test(m);
+};
+
+/**
+ * A conta pode gravar? Vale o que o banco diz (`acesso_liberado`: teste que ainda vale ou que venceu com a assinatura
+ * fechada, assinatura em dia, cancelada com período pago, e nunca a conta marcada para apagar). Sem a resposta do banco
+ * (falha na leitura), a regra antiga pelo status, para o Mozart não travar.
+ */
+export function contaLiberada(doBanco: unknown, petshop: { status: string; teste_ate: string }, agora = new Date()): boolean {
+  if (typeof doBanco === "boolean") return doBanco;
+  return ["ativa", "atrasada", "cortesia"].includes(petshop.status) || (petshop.status === "teste" && new Date(petshop.teste_ate) > agora);
+}
 export const DEMOROU = "Esse pedido está demorando mais que o normal e eu parei por aqui. Pode repetir de um jeito mais direto (por exemplo: o nome do pet, o valor e a forma de pagamento)?";
 
 type Saida =
@@ -56,7 +91,9 @@ function nomesDaConversa(mensagens: Msg[]): string[] {
 
 export async function voltas(o: {
   c: Contexto; mensagens: Msg[]; liberado: boolean;
-  chamar: (mensagens: Msg[], avisos: AvisosDaChamada) => Promise<RespostaDoModelo>;
+  chamar: (mensagens: Msg[], avisos: AvisosDaChamada, tempo: TempoDaChamada) => Promise<RespostaDoModelo>;
+  /** Quando o pedido começou na rota (padrão: agora) e o prazo total dele (padrão: PRAZO_TOTAL_MS). */
+  inicioDoPedido?: number; prazoTotalMs?: number;
   /** Conta uma chamada no dia do pet shop; false: passou do limite. */
   contar: () => Promise<boolean>;
   maxVoltas?: number; prazoMs?: number; relogio?: () => number;
@@ -76,6 +113,9 @@ export async function voltas(o: {
   const max = o.maxVoltas ?? MAX_VOLTAS;
   for (let volta = 0; volta < max; volta++) {
     if (volta > 0 && relogio() - inicio > (o.prazoMs ?? PRAZO_MS)) { cortou = true; break; }
+    // prazo do pedido inteiro: sem tempo para mais uma chamada, responde com o que tem (a rota não pode passar de 60 s)
+    const restaMs = (o.prazoTotalMs ?? PRAZO_TOTAL_MS) - (relogio() - (o.inicioDoPedido ?? inicio));
+    if (volta > 0 && restaMs < SOBRA_MINIMA_MS) { cortou = true; break; }
     if (!(await o.contar())) {
       if (!texto) return { tipo: "limite" };
       break;
@@ -83,15 +123,22 @@ export async function voltas(o: {
     let comecouVolta = false;
     // a pessoa sempre lê o que está acontecendo, mesmo quando o modelo demora para escrever ou pedir uma consulta
     o.avisos?.progresso?.(volta === 0 ? fraseInicial(mensagens) : FRASE_JUNTANDO);
-    const resposta = await o.chamar(mensagens, {
-      texto: (pedaco) => {
-        if (!pedaco || !o.avisos?.texto) return;
-        if (!comecouVolta) { comecouVolta = true; if (mostrou) o.avisos.texto("\n\n"); }
-        mostrou = true;
-        o.avisos.texto(pedaco);
-      },
-      ferramenta: (nome) => o.avisos?.progresso?.(fraseDaFerramenta(nome, undefined, c.agora, definicao(nome)?.grava, nomeDaCasa(c.petshop))),
-    });
+    let resposta: RespostaDoModelo;
+    try {
+      resposta = await o.chamar(mensagens, {
+        texto: (pedaco) => {
+          if (!pedaco || !o.avisos?.texto) return;
+          if (!comecouVolta) { comecouVolta = true; if (mostrou) o.avisos.texto("\n\n"); }
+          mostrou = true;
+          o.avisos.texto(pedaco);
+        },
+        ferramenta: (nome) => o.avisos?.progresso?.(fraseDaFerramenta(nome, undefined, c.agora, definicao(nome)?.grava, nomeDaCasa(c.petshop))),
+      }, { volta, restaMs });
+    } catch (err) {
+      // depois da primeira volta, o modelo que não respondeu a tempo não derruba o pedido: o Mozart responde com o que já tem
+      if (volta > 0 && ehDemoraDoModelo(err)) { cortou = true; break; }
+      throw err;
+    }
     m.voltas++;
     m.entrada += resposta.usage?.input_tokens ?? 0;
     m.saida += resposta.usage?.output_tokens ?? 0;

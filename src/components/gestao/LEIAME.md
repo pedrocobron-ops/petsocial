@@ -10,6 +10,24 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
 - Toda consulta filtra por `petshop_id = petshop.id`. Toda inserção envia `petshop_id`.
 - Buscar: `useDados(async () => ok(await sb.from(...)...), [deps])`. Depois de gravar: `recarregar()` e, se outra tela
   pode ser afetada, `avisarMudanca()`.
+- `useDados` (rodada 9; `ui.tsx` + `src/lib/gestao/dados-memoria.ts`):
+  - Erro: leia `erro` e mostre o aviso com "Tentar de novo" quando `erro && !dados`. Se a tela não ler `erro`, o aviso comum da
+    casca (`<LeiturasComErro />`, "Uma parte desta tela não carregou") aparece sozinho: leitura que falhou nunca vira lista vazia.
+  - Relê sozinha ao voltar para a aba ou a janela (no máximo a cada 30 s), quando o dia vira e, com `{ aCada, sinal }`, quando o
+    banco diz que algo mudou (`lerSinal`, função `gestao_sinal`: Hoje, Agenda e Quadro). Não relê com folha aberta nem com a
+    pessoa digitando. Releitura que traz o mesmo resultado não mexe na tela; a que falha não troca dados por erro.
+  - Memória curta: `{ guardar: "nome" }` guarda o resultado por nome + dependências. Voltar pelo menu mostra na hora; em menos de
+    30 s e sem gravação no meio, nem busca. Só use em leitura que depende APENAS das dependências e do pet shop. Qualquer
+    `recarregar()`, `avisarMudanca()`, gravação direta em tabela ou função que grava (`pedidoGrava`, em `supabase.ts`) faz buscar de novo.
+  - Prazo: pedido ao banco sem resposta em 30 s é cortado (`buscarComPrazo`) e a leitura inteira tem 60 s (a biblioteca do banco tenta de novo
+    sozinha uma leitura cortada); passou disso, vira "Demorou demais", com "Tentar de novo". Se a resposta ainda chegar, ela vale.
+- Tutor (`clientes`): nunca `select("*")`. Use `colsDoTutor(posso("clientes"))` + `tutorLido` (`reservado.ts`): e-mail e endereço só
+  para quem tem a área Clientes. Quem não lê o contato não manda `email` nem `endereco` na edição.
+- Tela Hoje: os cartões de baixo (quem chamar, aniversariantes, dicas do Mozart, "Mandar N mensagens") vêm contados do banco por
+  `lerExtrasDoHoje` (`hoje-extras.ts`, função `gestao_hoje_extras`). Cartão novo na Hoje não baixa lista inteira: conta no banco.
+- Banco do build: `supabase-config.ts` não tem padrão. Sem as variáveis, só o build de produção da Vercel usa o projeto de produção
+  (`banco-do-build.ts`, aplicado no `next.config.ts`); em qualquer outro lugar o aplicativo abre dizendo que o banco não foi configurado.
+- Antes de abrir um pull request: `npm run typecheck`, `npm run lint` e `npm run test:unidade` (é o que o CI roda, `.github/workflows/ci.yml`).
 - Lista que pode passar de mil linhas (clientes, pets, agendamentos, lançamentos, produtos, movimentos, estadias): o banco
   entrega no máximo 1000 por consulta e `.limit(5000)` não muda isso. Leia em páginas com `lerTudo` + `contando`
   (`src/lib/gestao/paginas.ts`), sempre com ordem fixa terminando em `.order("id")`.
@@ -51,6 +69,13 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   Não filtre nem ordene por essas colunas pela API. Coluna nova em `agendamentos`, `agendamento_servicos` ou `servicos` precisa de
   `grant select (coluna)` (migração 20261157). Gravação nessas tabelas sempre com `.select("id")`.
 - Link do cliente: todo pedido vai por `pedirPeloLink` (função `link_pedir_com_termos`); as funções de pedido não aceitam chamada direta.
+- O que o tutor vê (rodada 9, migração 20261235): o valor do pedido pelo link sai de `link-precos.ts` (`valorDoServico`: preço da lista
+  no porte de cada pet, com a promoção do horário; nunca o preço do primeiro pet para todos) e o banco guarda a mesma conta em
+  `pedidos_valores` (sem leitura direta: `link_pedido` devolve ao tutor, `pedidos_vistos` a quem recebe; `lerVisto`). Endereço do pet
+  shop: `endereco.ts` (`enderecoDaLoja`, `linkDoMapa`, `fraseDoEndereco`); coluna nova de `petshops` entra em `COLS_PETSHOP` E em
+  `gestao_base`. Prévia do link (Open Graph) das páginas do tutor: `previaDaLoja` (`link-og.ts`), nunca a do site. Página pública com
+  código (boletim, álbum, entrada, tutor, orçamento, autorização) tem `not-found.tsx` com `<LinkQueNaoAbre />`. Abertura do link pelo
+  navegador: `lerLinkJunto` (`link-inicial.ts`), uma ida só. "Aceitar todos": `pedidos_aceitar_juntos` (tudo ou nada).
 - Opções do negócio: chegam em `petshop.opcoes` pela função `petshop_opcoes` (nunca `select("opcoes")`). Opção nova com preço
   dentro entra na lista da função `opcoes_sem_valores`, no banco, para a equipe sem dinheiro não ler pela API.
 - Dinheiro que entra ou sai na hora: `lancarPago()` de `src/lib/gestao/dinheiro.ts` (já liga ao caixa aberto).
@@ -71,6 +96,19 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   menor com horário recente e forma de pagamento trocada (`alterou_forma`) também aparecem em Alterações em valores.
 - Faturamento (Relatórios, Hoje, Financeiro, meta): sempre por `ajustesDoFaturamento` + `faturamentoLiquido` (`src/lib/gestao/faturamento.ts`):
   entradas − devoluções (saídas em `CATEGORIAS_DEVOLUCAO`) − crédito deixado para o tutor + crédito usado fora de uma entrada. O Caixa conta só dinheiro.
+  O crédito é datado pelo fuso do pet shop (`diaNoFuso`), não pelo do aparelho; "hoje" do dinheiro é `hojeDaLoja()` (`hojeIso()` nas telas do financeiro).
+- Os nomes do dinheiro (rodada 9, N4): cada palavra é UMA conta, igual em toda tela, planilha e no Mozart. A cadeia vem do banco
+  (`dinheiro_cadeia`, migração 20261234) por `lerCadeia` / `passosDaCadeia` (`src/lib/gestao/cadeia.ts`) e aparece em `<CadeiaDoDinheiro>`
+  (`financeiro/cadeia.tsx`): **Recebido** (dinheiro, Pix e cartão; sem conta paga com crédito do tutor e sem produto de troca) − **Devolvido aos
+  tutores** − **Crédito deixado** + **Crédito usado** = **Faturamento** − **Despesas** = **Resultado** − **Taxas da maquininha** = **Resultado
+  depois das taxas**. Não use "Entrou" para rotular número novo: a soma das linhas de entrada chama **Entradas lançadas**; em Quanto sobrou,
+  **Receita**. Cartões que aparecem juntos têm de fechar (Faturamento − Despesas = Resultado). **Valor médio por conta** só pela cadeia
+  (`valorMedio`) ou por `indicadores_do_periodo` (a mesma função `contas_do_valor_medio`). Retirada do dono é despesa (categoria "Retirada do dono"),
+  no Financeiro e no Caixa. Contas do caixa (Recebido, por forma, gaveta): `src/lib/gestao/caixa-contas.ts`, a mesma função para a tela e o Mozart.
+- Arredondar dinheiro: só `centavos` de `src/lib/gestao/util.ts` (igual ao `round(x, 2)` do banco; nunca `Math.round(n * 100) / 100`). Soma de itens:
+  cada linha arredonda sozinha e depois soma (`contaDosItens`), como o banco. Conferido em `testes/banco/dinheiro-n4.js`.
+- Planilhas do dinheiro: montadas em `src/lib/gestao/contador.ts` (lançamentos, para o contador, repasses, vendas, saldos), com o que o banco
+  devolve em `lancamentos_para_contador` e `saldos_em_aberto`. Coluna nova de dinheiro entra lá, e o teste soma as colunas contra a cadeia.
 - Crédito do tutor numa conta: a entrada vai pelo valor cheio com `creditoUsado` em `lancarPago` (parte "outro" no pagamento, montada por
   `pagamentoComCredito`); conta a receber paga com crédito por `receberComCredito` (função `receber_conta_com_credito`). O banco tira do crédito
   na mesma gravação (`clientes_creditos.lancamento_id`; apagar a entrada devolve). Na tela: `<UsarCredito>` (`financeiro/comum.tsx`).
@@ -218,6 +256,26 @@ O manual troca sozinho (`textoDaCasa` em `manual.ts`). Interruptor (`role="switc
   `gestao_cakto_ligar_ao_provar` liga o pagamento que esperava.
 - **Versões dos documentos**: subiu `versao` em `documentos.ts`? Ponha a linha em `documentos_versoes` numa migração
   (`aceitar_documentos` só aceita versão da tabela ou a seguinte à maior).
+- **Privacidade (LGPD, migração 20261236)**. Trabalho técnico de conformidade, não parecer jurídico.
+  - **Apagar tutor**: uma limpeza só, `lgpd_limpar_tutor`, usada por "Apagar dados deste tutor" (`cliente_anonimizar`) e por
+    "Excluir de vez" (gatilho `clientes_lgpd_ao_excluir`, que também cobre apagar direto no banco). Tabela ou coluna nova com
+    dado de tutor ou de pet (nome, telefone, endereço, texto livre, foto)? Acrescente na função. `testes/banco/lgpd-rodada9.js`
+    enche tudo com uma marca, apaga e varre o banco inteiro: ponha o campo novo em `semear` para o teste cobrir.
+  - **Fotos do bucket `pets`**: o banco põe na fila `arquivos_lixo` a foto trocada, tirada ou de ficha apagada (gatilho
+    `lgpd_foto_para_lixo` em `pets`, `agendamentos` e `petshops`); a faxina apaga só o que nenhuma ficha usa
+    (`lgpd_foto_em_uso`). Coluna nova que guarda caminho desse bucket entra no gatilho e em `lgpd_foto_em_uso`, senão a
+    faxina apaga a foto como "sem ficha" depois de 1 dia.
+  - **Painel da equipe**: `admin_conversas` não devolve texto. Ler uma conversa só por `admin_conversa_abrir(conversa, motivo)`,
+    que grava em `equipe_maestro_acessos` (o dono vê em Meu pet shop). Função nova do painel não devolve texto de conversa,
+    nome de cliente nem valor do pet shop sem passar por um registro igual.
+  - **Login de outro produto** (o projeto do Supabase é dividido): nunca chame `auth.admin.deleteUser` fora da fila
+    `logins_lixo`. `gestao_logins_lixo` e `gestao_loja_apagar` conferem `login_fora_do_gestao` e deixam o login em
+    `logins_mantidos` quando ele tem dados fora do Gestão. Tabela nova do Gestão que guarda login e não sai com o pet shop
+    entra na lista de `gestao_tabelas()`.
+  - **Quem vende** (nome e CPF/CNPJ): `lerVendedor()` em `src/lib/gestao/vendedor.ts` (lê `config_interna` por
+    `gestao_vendedor()`, preenchido no painel). Nos Termos e na Política: `quemOferece()` em `vendedor-documentos.ts`, que cai
+    na identificação geral do site enquanto o painel está vazio. Nunca escreva nome ou documento em tela ou documento.
+  - Campo de observação livre sobre tutor, pet, horário ou estadia leva `dica={DICA_OBS}` (`privacidade-textos.ts`).
 - **Planilha (CSV)** com texto vindo de fora: `celulaCsv` (`src/lib/gestao/csv.ts`). **Cabeçalhos de segurança**: `next.config.ts`
   (script ou serviço de fora novo entra na lista de lá).
 

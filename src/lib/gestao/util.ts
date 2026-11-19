@@ -265,8 +265,47 @@ export function chamar(nome: string | null | undefined) {
 }
 
 /**
- * Arredonda em centavos, meio centavo para cima, sem o resto que a conta em ponto flutuante deixa (96,6 × 1,25 = 120,74999…).
- * É o mesmo arredondamento que o banco faz (`round(..., 2)` em `hotel_noite`, `creche_sugestao_mensal`): as contas da tela
- * e do banco têm de dar o mesmo centavo.
+ * Arredonda em centavos: A ÚNICA função de arredondar dinheiro do aplicativo (não copie `Math.round(n * 100) / 100`: erra para
+ * baixo quando a conta em ponto flutuante deixa resto, como 0,35 × 18,90 = 6,61499… ou 5% de 48,90 = 2,44499…).
+ * Meio centavo vai para longe do zero, igual ao `round(x, 2)` do banco, também nos negativos (−6,615 vira −6,62):
+ * a tela, o comprovante e o banco têm de dar o mesmo centavo. Conferido contra o banco em `testes/banco/dinheiro-n4.js`.
  */
-export const centavos = (n: number) => Math.round(Number((n * 100).toPrecision(12))) / 100;
+export function centavos(n: number): number {
+  if (!Number.isFinite(n)) return n;
+  const c = Math.round(Number((Math.abs(n) * 100).toPrecision(12))) / 100;
+  return n < 0 ? (c === 0 ? 0 : -c) : c;
+}
+
+/**
+ * O dia (AAAA-MM-DD) de um instante NO FUSO DO PET SHOP, não no do aparelho: um crédito deixado às 23:30 de São Paulo é do
+ * mesmo dia para quem olha de Tóquio. Use para datar dinheiro por dia. Fuso desconhecido: cai no do aparelho.
+ */
+export function diaNoFuso(quando: Date | string | number, fuso: string | null | undefined): string {
+  const d = quando instanceof Date ? quando : new Date(quando);
+  try {
+    // en-CA escreve AAAA-MM-DD
+    return new Intl.DateTimeFormat("en-CA", { timeZone: fuso || "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  } catch { return isoDia(d); }
+}
+
+/** "Hoje" no fuso do pet shop (o mesmo dia que o banco usa em `hoje_do_petshop`). */
+export const hojeNoFuso = (fuso: string | null | undefined) => diaNoFuso(new Date(), fuso);
+
+/** O instante em que um dia (AAAA-MM-DD) começa no fuso do pet shop, para filtrar `criado_em` pelo dia da loja. */
+export function inicioDoDiaNoFuso(dia: string, fuso: string | null | undefined): Date {
+  const meioDia = new Date(`${dia}T12:00:00Z`);
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: fuso || "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(meioDia).map((x) => [x.type, x.value]));
+    // quanto o relógio da loja está à frente do UTC neste dia (minutos)
+    const dif = (Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour) % 24, Number(p.minute)) - meioDia.getTime()) / 60000;
+    return new Date(Date.UTC(Number(dia.slice(0, 4)), Number(dia.slice(5, 7)) - 1, Number(dia.slice(8, 10))) - dif * 60000);
+  } catch { return deIsoDia(dia); }
+}
+
+/* O fuso do pet shop aberto no navegador (o aviso de fuso, sempre montado, guarda aqui). No servidor fica vazio: passe o fuso. */
+let fusoGuardado: string | null = null;
+export function definirFusoDaLoja(fuso: string | null | undefined) { fusoGuardado = fuso || null; }
+export const fusoDaLoja = () => fusoGuardado;
+/** "Hoje" para o dinheiro: o dia no fuso do pet shop aberto (sem ele, o do aparelho). É o dia que o banco usa. */
+export const hojeDaLoja = () => (fusoGuardado ? hojeNoFuso(fusoGuardado) : isoDia(new Date()));

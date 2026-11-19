@@ -66,10 +66,10 @@ const ta = async (nome, f) => { try { await f(); T.ok(nome, true); } catch (e) {
   });
 
   T.secao('termos');
-  t('Termos e Política 2.3 vigentes desde 17/11/2026', () => {
-    assert.equal(DOC.DOCUMENTOS.termos.versao, '2.3');
-    assert.equal(DOC.textoVigencia('termos'), 'Versão 2.3 — vigente desde 17/11/2026');
-    assert.equal(DOC.textoVigencia('privacidade'), 'Versão 2.3 — vigente desde 17/11/2026');
+  t('Termos e Política 2.4 vigentes desde 18/11/2026', () => {
+    assert.equal(DOC.DOCUMENTOS.termos.versao, '2.4');
+    assert.equal(DOC.textoVigencia('termos'), 'Versão 2.4 — vigente desde 18/11/2026');
+    assert.equal(DOC.textoVigencia('privacidade'), 'Versão 2.4 — vigente desde 18/11/2026');
   });
 
   T.secao('mapa do leva e traz');

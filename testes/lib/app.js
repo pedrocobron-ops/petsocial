@@ -4,7 +4,11 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
-const { RAIZ } = require('./base');
+const { RAIZ, SUPABASE_URL, SUPABASE_KEY } = require('./base');
+// O aplicativo não tem mais banco padrão no código (supabase-config.ts): os módulos carregados aqui enxergam o mesmo banco
+// dos testes, como num build com as variáveis definidas.
+process.env.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL;
+process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || SUPABASE_KEY;
 const ts = require(path.join(RAIZ, 'node_modules', 'typescript'));
 
 if (!require.extensions['.ts']) {

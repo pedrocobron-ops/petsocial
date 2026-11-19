@@ -2,13 +2,14 @@
 
 import Link from "@/components/gestao/link-depois";
 import { Selo } from "./marca";
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { SELETOR_FOCAVEL, proximoNoTab, tempoDoAviso } from "@/lib/gestao/desenho";
 import { Cat, Dog, PawPrint, Search, X } from "lucide-react";
-import { fotoPet } from "@/lib/gestao/supabase";
+import { fotoPet, ouvirGravacoes } from "@/lib/gestao/supabase";
 import type { PetComTutor } from "@/lib/gestao/tipos";
 import { corDoNome, iniciais, lerValorEstrito, semAcento, valor2 } from "@/lib/gestao/util";
 import { contando, lerTudo } from "@/lib/gestao/paginas";
+import { PRAZO_DA_LEITURA_MS, TempoEsgotado, anotarLeituraComErro, buscarGuardando, chaveDaLeitura, comPrazo, diaDoAparelho, ehRecusaDeAcesso, iguais, leiturasComErro, lerGuardado, marcarTudoVelho, msAteVirarODia, nenhumaLeituraComErro, ouvirLeiturasComErro, podeReler } from "@/lib/gestao/dados-memoria";
 import { contaSoConsulta, useGestao } from "./contexto";
 import { registrarErroMostrado } from "@/lib/gestao/erros-navegador";
 import { textoAmigavel } from "@/lib/gestao/erros";
@@ -57,34 +58,220 @@ export function useAdiantar(...carregar: (() => Promise<unknown>)[]) {
   useEffect(() => quandoATelaAbrir(() => { for (const c of carregar) void c().catch(() => undefined); }), []); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-/** Busca dados e guarda o resultado. `recarregar()` busca de novo sem piscar a tela. */
-export function useDados<T>(buscar: () => Promise<T>, deps: unknown[]) {
-  const [dados, setDados] = useState<T | null>(null);
-  const [carregando, setCarregando] = useState(true);
+/* ---------- releitura sozinha: ao voltar para a aba, na virada do dia ---------- */
+
+const EVENTO_RELER = "gestao:reler";
+const EVENTO_VIROU = "gestao:virou-o-dia";
+let vigia = false, ultimaReleitura = 0, diaVisto = "";
+/** A pessoa está no meio de alguma coisa (folha aberta, digitando)? Então a tela não se mexe sozinha. */
+const ocupada = () => {
+  const a = document.activeElement as HTMLElement | null;
+  return Boolean(document.querySelector('[role="dialog"], [role="alertdialog"]')) || Boolean(a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable));
+};
+/** Liga, uma vez só, quem avisa as leituras: aba ou janela de volta (no máximo a cada 30 s) e o dia que virou. */
+function ligarVigia() {
+  if (vigia || typeof window === "undefined") return;
+  vigia = true;
+  ultimaReleitura = Date.now();
+  diaVisto = diaDoAparelho();
+  const conferirDia = () => {
+    if (diaDoAparelho() === diaVisto) return false;
+    diaVisto = diaDoAparelho();
+    marcarTudoVelho();
+    window.dispatchEvent(new Event(EVENTO_VIROU));
+    return true;
+  };
+  const voltou = () => {
+    if (document.visibilityState !== "visible") return;
+    if (conferirDia()) { ultimaReleitura = Date.now(); return; }
+    if (!podeReler(ultimaReleitura, Date.now()) || ocupada()) return;
+    ultimaReleitura = Date.now();
+    window.dispatchEvent(new Event(EVENTO_RELER));
+  };
+  document.addEventListener("visibilitychange", voltou);
+  window.addEventListener("focus", voltou);
+  // o tablet do balcão fica aberto de um dia para o outro: quando o dia vira, a tela amanhece com a data e os dados de hoje
+  const armar = () => { setTimeout(() => { conferirDia(); armar(); }, msAteVirarODia()); };
+  armar();
+  // qualquer gravação avisada: o que está na memória curta ainda aparece na hora, mas é buscado de novo
+  window.addEventListener(EVENTO_MUDOU, () => marcarTudoVelho());
+  // gravação feita direto pelo cliente do banco (mesmo que a tela não avise): idem
+  ouvirGravacoes(marcarTudoVelho);
+}
+
+export type OpcoesDeDados = {
+  /**
+   * Nome da leitura, para a memória curta (30 s; `dados-memoria.ts`): voltar à tela pelo menu mostra na hora o que estava
+   * guardado e só busca de novo se passou o tempo ou se algo foi gravado. Só use em leitura que depende APENAS das
+   * dependências (`deps`) e do pet shop: o nome mais as dependências são a chave.
+   */
+  guardar?: string;
+  /** Reler sozinha a cada tantos milissegundos enquanto a tela está à vista (Hoje, Agenda, Quadro). */
+  aCada?: number;
+  /**
+   * Com `aCada`: pergunta leve ("mudou alguma coisa?", `lerSinal` em `sinal.ts`). A tela só baixa os dados de novo quando a
+   * resposta muda (e, por garantia, a cada 10 minutos). Sem resposta (banco antes da atualização): relê a cada 2 minutos.
+   */
+  sinal?: () => Promise<string | null>;
+  /** Prazo da leitura inteira, em milissegundos (padrão: 60 s). Passou: vira erro, com "Tentar de novo". */
+  prazo?: number;
+};
+
+let proximaLeitura = 1;
+
+/**
+ * Busca dados e guarda o resultado. `recarregar()` busca de novo sem piscar a tela.
+ * - Erro: `erro` vem preenchido. Se a tela nem olha o `erro` e não há nada para mostrar, o aviso comum da casca
+ *   (`<LeiturasComErro />`) diz que uma parte não carregou e oferece "Tentar de novo": leitura que falhou nunca fica
+ *   parecendo "nada cadastrado".
+ * - Relê sozinha ao voltar para a aba ou a janela (no máximo a cada 30 s), quando o dia vira e, com `aCada`, de tempos em
+ *   tempos. Releitura sozinha que falha não troca o que está na tela por erro; a que traz o mesmo resultado não mexe em nada.
+ * - Pedido que não responde termina em erro depois do prazo.
+ */
+export function useDados<T>(buscar: () => Promise<T>, deps: unknown[], opcoes?: OpcoesDeDados) {
+  const chave = opcoes?.guardar ? chaveDaLeitura(opcoes.guardar, deps) : null;
+  // o que a memória curta tem para esta leitura já entra no primeiro desenho (sem esqueleto)
+  const [dados, setDados] = useState<T | null>(() => (chave ? lerGuardado<T>(chave)?.valor ?? null : null));
+  const [carregando, setCarregando] = useState(() => !(chave && lerGuardado<T>(chave)));
   const [erro, setErro] = useState<string | null>(null);
+  const [, setVirou] = useState(0);
+  /** o erro é de falta de acesso? (esse não entra no aviso comum: "Tentar de novo" não resolve) */
+  const recusa = useRef(false);
   const vez = useRef(0);
+  const id = useRef(0);
+  if (!id.current) id.current = proximaLeitura++;
   const fn = useRef(buscar);
   fn.current = buscar;
-  const recarregar = useCallback(async () => {
+  const atual = useRef<T | null>(dados);
+  atual.current = dados;
+  const chaveRef = useRef(chave);
+  chaveRef.current = chave;
+  const prazo = opcoes?.prazo ?? PRAZO_DA_LEITURA_MS;
+  const sinal = useRef(opcoes?.sinal);
+  sinal.current = opcoes?.sinal;
+  /** o sinal visto na última leitura (undefined: ainda não se sabe) e quando foi a última leitura */
+  const ultimoSinal = useRef<string | null | undefined>(undefined);
+  const lidoEm = useRef(0);
+
+  const ler = useCallback(async (modo: "normal" | "fundo") => {
     const minha = ++vez.current;
+    const k = chaveRef.current;
+    const aceitar = (r: T) => {
+      if (minha !== vez.current) return;
+      // veio a mesma coisa: a tela não se mexe (não pisca nem desfaz o que a pessoa está fazendo)
+      if (!iguais(atual.current, r)) setDados(r);
+      recusa.current = false;
+      setErro(null);
+      setCarregando(false);
+    };
+    // o sinal é pedido antes dos dados: se algo mudar depois, a próxima pergunta vem diferente e a tela relê
+    const s = sinal.current;
+    if (s) void s().then((v) => { if (minha === vez.current) ultimoSinal.current = v; }, () => { if (minha === vez.current) ultimoSinal.current = null; });
+    lidoEm.current = Date.now();
+    const pedido = k ? buscarGuardando(k, () => fn.current()) : fn.current();
     try {
-      const r = await fn.current();
-      if (minha === vez.current) { setDados(r); setErro(null); }
+      aceitar(await comPrazo(pedido, prazo));
     } catch (e) {
-      if (minha === vez.current) { setErro(mensagemDeErro(e)); registrarErroMostrado(e); }
-    } finally {
-      if (minha === vez.current) setCarregando(false);
+      if (minha !== vez.current) return;
+      // passou do prazo, mas se a resposta ainda chegar (internet muito fraca) ela vale
+      if (e instanceof TempoEsgotado) void pedido.then(aceitar, () => undefined);
+      // releitura sozinha que falhou: fica o que já estava na tela
+      if (modo === "fundo" && atual.current !== null) { setCarregando(false); return; }
+      const cru = e instanceof Error ? e.message : String((e as { message?: unknown } | null)?.message ?? e);
+      recusa.current = ehRecusaDeAcesso(cru, String((e as { code?: unknown } | null)?.code ?? ""));
+      setErro(mensagemDeErro(e));
+      registrarErroMostrado(e);
+      setCarregando(false);
     }
-  }, []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setCarregando(true); void recarregar(); }, deps);
-  // a assistente (ou outra tela) avisa que algo mudou: busca de novo
+  }, [prazo]);
+  /** Busca de novo (a tela pediu, quase sempre depois de gravar): o que está na memória curta deixa de valer. */
+  const recarregar = useCallback(async () => { marcarTudoVelho(); await ler("normal"); }, [ler]);
+
   useEffect(() => {
-    const ouvir = () => { void recarregar(); };
-    window.addEventListener(EVENTO_MUDOU, ouvir);
-    return () => window.removeEventListener(EVENTO_MUDOU, ouvir);
-  }, [recarregar]);
-  return { dados, carregando, erro, recarregar };
+    ligarVigia();
+    const k = chaveRef.current;
+    const guardado = k ? lerGuardado<T>(k) : null;
+    if (guardado) {
+      // memória curta: aparece na hora; só busca de novo se já não é nova
+      if (!iguais(atual.current, guardado.valor)) setDados(guardado.valor);
+      setErro(null);
+      setCarregando(false);
+      if (!guardado.fresco) void ler("fundo");
+      else vez.current++;
+      return;
+    }
+    setCarregando(true);
+    void ler("normal");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- as dependências são as de quem chama, como no useEffect
+  }, deps);
+
+  // a assistente (ou outra tela) avisa que algo mudou: busca de novo. Aba de volta, dia que virou e intervalo: por trás.
+  useEffect(() => {
+    const mudou = () => { void ler("normal"); };
+    const reler = () => { void ler("fundo"); };
+    // o dia virou: a tela redesenha (o "hoje" dela muda) e, se as dependências não mudarem, relê assim mesmo
+    const virou = () => { setVirou((n) => n + 1); void ler("fundo"); };
+    window.addEventListener(EVENTO_MUDOU, mudou);
+    window.addEventListener(EVENTO_RELER, reler);
+    window.addEventListener(EVENTO_VIROU, virou);
+    return () => { window.removeEventListener(EVENTO_MUDOU, mudou); window.removeEventListener(EVENTO_RELER, reler); window.removeEventListener(EVENTO_VIROU, virou); };
+  }, [ler]);
+
+  const aCada = opcoes?.aCada ?? 0;
+  useEffect(() => {
+    if (!(aCada > 0)) return;
+    const t = setInterval(() => {
+      if (document.visibilityState !== "visible" || ocupada() || semInternet()) return;
+      const s = sinal.current, faz = Date.now() - lidoEm.current;
+      // sem pergunta leve, ou já faz 10 minutos: relê de qualquer jeito
+      if (!s || faz > 10 * 60_000 || ultimoSinal.current === undefined) { void ler("fundo"); return; }
+      void s().then((v) => {
+        if (v === null) { if (Date.now() - lidoEm.current > 2 * 60_000) void ler("fundo"); return; }
+        if (v !== ultimoSinal.current) void ler("fundo");
+      }, () => undefined);
+    }, Math.max(15_000, aCada));
+    return () => clearInterval(t);
+  }, [aCada, ler]);
+
+  // falhou, não há nada para mostrar e a tela não olhou o erro: o aviso comum da casca mostra, com "Tentar de novo"
+  const olhou = useRef(false);
+  olhou.current = false;
+  const tentar = useCallback(() => { void recarregar(); }, [recarregar]);
+  const semTratar = Boolean(erro) && dados === null && !carregando && !recusa.current;
+  useEffect(() => {
+    const meu = id.current;
+    anotarLeituraComErro(meu, semTratar && !olhou.current && erro ? { texto: erro, tentar } : null);
+  });
+  useEffect(() => { const meu = id.current; return () => anotarLeituraComErro(meu, null); }, []);
+
+  return {
+    dados, carregando, recarregar,
+    /** Texto do erro, ou null. Ler este campo diz que a tela cuida do erro (o aviso comum não aparece para esta leitura). */
+    get erro() { olhou.current = true; return erro; },
+  };
+}
+
+/**
+ * Aviso comum de leitura que falhou (fica na casca): aparece quando alguma parte da tela não carregou e a própria tela não
+ * mostra o erro. Assim uma lista que não veio nunca fica parecendo "nada cadastrado".
+ */
+export function LeiturasComErro() {
+  const lista = useSyncExternalStore(ouvirLeiturasComErro, leiturasComErro, nenhumaLeituraComErro);
+  const [fechado, setFechado] = useState<string | null>(null);
+  const [tentando, setTentando] = useState(false);
+  const assinatura = lista.map((l) => l.texto).join("|");
+  useEffect(() => { setTentando(false); }, [assinatura]);
+  if (!lista.length || fechado === assinatura) return null;
+  const textos = [...new Set(lista.map((l) => l.texto))];
+  return (
+    <div className="g-aviso vermelho g-leitura-falhou" role="alert" data-teste="leitura-falhou">
+      <span><b>Uma parte desta tela não carregou.</b> O que aparece pode estar incompleto: não quer dizer que não há nada cadastrado. {textos[0]}</span>
+      <span className="g-leitura-falhou-acoes">
+        <button type="button" className="g-btn sec p" disabled={tentando} onClick={() => { setTentando(true); for (const l of lista) l.tentar(); setTimeout(() => setTentando(false), 4000); }}>{tentando ? "Tentando…" : "Tentar de novo"}</button>
+        <button type="button" className="g-ico" aria-label="Fechar este aviso" title="Fechar" onClick={() => setFechado(assinatura)}><X /></button>
+      </span>
+    </div>
+  );
 }
 
 /** Lança o erro do Supabase, se houver (com o código, para o registro de erros), e devolve os dados. */

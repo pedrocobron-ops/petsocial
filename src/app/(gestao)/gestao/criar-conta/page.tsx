@@ -177,7 +177,7 @@ function Formulario({ emailInicial, codigo }: { emailInicial: string; codigo: st
           <input type="checkbox" name="aceite" checked={aceito} onChange={(e) => { setAceito(e.target.checked); setErro(null); }} />
           <span>
             Li e aceito os <Link className="g-link" href="/gestao/termos" target="_blank">Termos de uso</Link> e a <Link className="g-link" href="/gestao/privacidade" target="_blank">Política de privacidade</Link>.
-            <small className="g-muted" style={{ display: "block", marginTop: 2 }}>{convidado ? "Uso profissional, no trabalho com a equipe do pet shop." : "Uso profissional, para o meu negócio."} Versão {DOCUMENTOS.termos.versao} dos Termos e {DOCUMENTOS.privacidade.versao} da Política.</small>
+            <small className="g-muted" style={{ display: "block", marginTop: 2 }}>{convidado ? "Uso profissional, no trabalho com a equipe do pet shop. Para maiores de 18 anos: se você é menor, peça ao responsável pelo pet shop para cadastrar você na equipe sem login." : "Uso profissional, para o meu negócio, por maior de 18 anos."} Versão {DOCUMENTOS.termos.versao} dos Termos e {DOCUMENTOS.privacidade.versao} da Política.</small>
           </span>
         </label>
         {erro && <p className="g-erro" role="alert">{erro}</p>}

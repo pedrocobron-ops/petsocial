@@ -36,7 +36,10 @@ const SAIDA = path.join(__dirname, '..', 'saida');
   await page.goto(`${B.BASE_URL}/gestao/boletim/${bol.token}`);
   const pode = page.locator('[data-teste=pode-postar]');
   await pode.waitFor({ timeout: 30000 });
-  T.ok('o botão diz "Pode postar a foto do Thor nas redes …"', /^Pode postar a foto do Thor nas redes (do|da) /.test((await pode.textContent()).trim()), await pode.textContent());
+  // rodada 9 (N7): uma pergunta ("Pode postar a foto do Thor nas redes …?") e um botão de escolha ("Quero autorizar"), não um botão com cara de aviso
+  const pergunta = ((await page.locator('[data-teste=pergunta-das-fotos]').textContent()) ?? '').trim();
+  T.ok('a página pergunta "Pode postar a foto do Thor nas redes …?"', /^Pode postar a foto do Thor nas redes (do|da) .+\?$/.test(pergunta), pergunta);
+  T.ok('o botão é uma escolha: "Quero autorizar"', (await pode.textContent()).trim() === 'Quero autorizar', await pode.textContent());
   await pode.click();
   const autorizar = page.locator('.g-bo-redes button.g-btn', { hasText: 'Autorizar' });
   T.ok('nada vem marcado: nenhuma opção escolhida e Autorizar apagado', (await page.locator('.g-bo-redes-op[aria-checked=true]').count()) === 0 && await autorizar.isDisabled());
@@ -81,7 +84,10 @@ const SAIDA = path.join(__dirname, '..', 'saida');
   await foto(page, '1366-ficha');
 
   // o tutor tira pelo link "Não quero mais"
-  const codigo = await (async () => { const p2 = await ctx.newPage(); await p2.goto(`${B.BASE_URL}/gestao/boletim/${bol.token}`); const h = await p2.locator('.g-bo-redes-sair').getAttribute('href'); await p2.goto(B.BASE_URL + h); await p2.locator('[data-teste=nao-quero-mais]').click(); await p2.locator('[data-teste=confirmar-retirar]').click(); await p2.locator('[data-teste=retirada]').waitFor({ timeout: 15000 }); if (process.env.FOTOS) await p2.screenshot({ path: path.join(SAIDA, 'fotos-redes-1366-retirada.png'), fullPage: true }); await p2.close(); return h; })();
+  let tituloAntes = '', tituloDepois = '';
+  const codigo = await (async () => { const p2 = await ctx.newPage(); await p2.goto(`${B.BASE_URL}/gestao/boletim/${bol.token}`); const h = await p2.locator('.g-bo-redes-sair').getAttribute('href'); await p2.goto(B.BASE_URL + h); tituloAntes = (await p2.locator('[data-teste=titulo-da-autorizacao]').textContent()).trim(); await p2.locator('[data-teste=nao-quero-mais]').click(); await p2.locator('[data-teste=confirmar-retirar]').click(); await p2.locator('[data-teste=retirada]').waitFor({ timeout: 15000 }); tituloDepois = (await p2.locator('[data-teste=titulo-da-autorizacao]').textContent()).trim(); if (process.env.FOTOS) await p2.screenshot({ path: path.join(SAIDA, 'fotos-redes-1366-retirada.png'), fullPage: true }); await p2.close(); return h; })();
+  // rodada 9 (N7): o título muda na hora (antes continuava "A autorização está valendo" até recarregar)
+  T.ok('o título da página acompanha: "A autorização está valendo" vira "Autorização retirada" sem recarregar', tituloAntes === 'A autorização está valendo' && tituloDepois === 'Autorização retirada', `${tituloAntes} → ${tituloDepois}`);
   T.ok('"Não quero mais" pediu confirmação e tirou', Boolean(codigo) && B.sql(`select count(*) from fotos_autorizacoes where pet_id = '${L.pets.Thor}' and retirado_em is null`) === '0');
   await page.reload();
   linha = page.locator('[data-teste=fotos-nas-redes]');

@@ -5,7 +5,7 @@ import { Trash2 } from "lucide-react";
 import { conferirCaixa } from "@/lib/gestao/dinheiro";
 import { contaDaTroca, devolver, lerDevolvivel, resta, valorQueVolta, type LinhaDevolvivel, type ModoDevolucao } from "@/lib/gestao/devolucao";
 import { useOperacao } from "@/lib/gestao/uma-vez";
-import { brl, dataCompleta } from "@/lib/gestao/util";
+import { brl, dataCompleta, centavos } from "@/lib/gestao/util";
 import { nomeDeQuemAtende, textoComprovanteDevolucao } from "@/lib/gestao/comprovante";
 import { FolhaVendaFeita } from "./comprovante-venda";
 import { useGestao } from "../contexto";
@@ -25,7 +25,6 @@ export type VendaParaDevolver = { id: string; data: string; valor: number; descr
 const MODOS: { id: ModoDevolucao; rotulo: string }[] = [
   { id: "dinheiro", rotulo: "Devolver dinheiro" }, { id: "credito", rotulo: "Deixar de crédito" }, { id: "troca", rotulo: "Trocar por outro" },
 ];
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 function CampoNumero({ valor, aoMudar, max, rotulo }: { valor: number; aoMudar: (n: number) => void; max: number; rotulo: string }) {
   const [texto, setTexto] = useState(fmtQtd(valor));

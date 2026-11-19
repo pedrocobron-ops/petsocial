@@ -6,12 +6,13 @@ import Link from "@/components/gestao/link-depois";
 import dynamic from "next/dynamic";
 import { AlertTriangle, Cake, Cat, ChevronRight, Dog, Camera, Download, HandCoins, MessageCircle, PawPrint, Phone, PiggyBank, Plus, Search, Sparkles, Upload, UserPlus, UserSearch, Users } from "lucide-react";
 import type { Cliente } from "@/lib/gestao/tipos";
-import { brl, fmtTelefone, haQuanto, isoDia, semAcento, soDigitos } from "@/lib/gestao/util";
+import { brl, fmtTelefone, haQuanto, isoDia, semAcento, soDigitos, centavos } from "@/lib/gestao/util";
 import { buscarVisitas, sumiu } from "@/lib/gestao/visitas";
 import { useGestao } from "../contexto";
 import { chaveDoRascunho, lerRascunho, RASCUNHO_PET_NOVO } from "../rascunho";
 import { Anel, Kpi } from "../painel";
 import { abrirAssistente, AvatarPessoa, AvatarPet, avisarMudanca, Esqueleto, useAdiantar, useAvisos, useDados, useSomenteLeitura, Vazio } from "../ui";
+import { tutorLido } from "@/lib/gestao/reservado";
 import { baixarCsv, buscarTudo, ESPECIES, linkPet, linkTutor, nomePorte, type PetDaLista } from "./comum";
 
 // folhas que só abrem com um toque (caderno, planilha, pet novo, tutor novo, chamar de volta, aniversariantes) vêm à parte e baixam
@@ -113,14 +114,21 @@ export default function Lista({ aoAbrir, irPara }: {
   const [chamando, setChamando] = useState(false);
   const [niverDoMes, setNiverDoMes] = useState(false);
 
+  // e-mail e endereço do tutor são de quem tem a área Clientes
+  const vejoContato = posso("clientes");
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     const [pets, clientes] = await Promise.all([
-      buscarTudo<PetDaLista>((de, ate) => sb.from("pets").select("*, clientes(id, nome, telefone)").eq("petshop_id", petshop.id).eq("ativo", true)
+      // só o que a lista mostra (a ficha lê o resto quando abre); o tutor de cada pet vem da lista de tutores, não repetido em cada pet
+      buscarTudo<PetDaLista>((de, ate) => sb.from("pets").select("id, cliente_id, nome, especie, raca, porte, alertas, foto").eq("petshop_id", petshop.id).eq("ativo", true)
         .order("nome").order("id").range(de, ate) as unknown as PromiseLike<{ data: PetDaLista[] | null; error: { message: string } | null }>),
-      buscarTudo<Cliente>((de, ate) => sb.from("clientes").select("*").eq("petshop_id", petshop.id).order("nome").order("id").range(de, ate)),
+      // só as colunas que a lista usa; o e-mail (busca e planilha) só para quem tem a área Clientes
+      buscarTudo<Cliente>((de, ate) => sb.from("clientes").select(`id, nome, telefone${vejoContato ? ", email" : ""}`).eq("petshop_id", petshop.id).order("nome").order("id").range(de, ate) as unknown as PromiseLike<{ data: Cliente[] | null; error: { message: string } | null }>),
     ]);
-    return { pets, clientes };
-  }, [petshop.id]);
+    const tutores = clientes.map((c) => tutorLido(c));
+    const porId = new Map(tutores.map((c) => [c.id, c]));
+    return { pets: pets.map((p) => { const c = porId.get(p.cliente_id); return { ...p, clientes: c ? { id: c.id, nome: c.nome, telefone: c.telefone } : null }; }), clientes: tutores };
+  // memória curta: voltar para Clientes pelo menu não baixa a lista inteira de novo (qualquer gravação faz buscar outra vez)
+  }, [petshop.id, vejoContato], { guardar: "clientes-lista" });
 
   // Última visita de cada pet e se já tem algo marcado: a mesma conta da folha "Chamar de volta" (src/lib/gestao/visitas.ts).
   // Refaz quando a lista de pets muda.
@@ -134,7 +142,7 @@ export default function Lista({ aoAbrir, irPara }: {
     if (totalAntes.current !== null && totalAntes.current !== totalPets) setVersaoPets((v) => v + 1);
     totalAntes.current = totalPets;
   }, [totalPets]);
-  const { dados: ultimos, erro: erroUltimos } = useDados(() => buscarVisitas(sb, petshop.id), [petshop.id, versaoPets]);
+  const { dados: ultimos, erro: erroUltimos } = useDados(() => buscarVisitas(sb, petshop.id), [petshop.id, versaoPets], { guardar: "clientes-visitas" });
 
   // quem deve e quem tem crédito (só para quem mexe com dinheiro): uma linha por tutor, sem valores para a equipe
   const { dados: dinheiro } = useDados(async () => {
@@ -142,11 +150,11 @@ export default function Lista({ aoAbrir, irPara }: {
     const r = await sb.rpc("tutores_dinheiro", { p_petshop: petshop.id });
     if (r.error) return null;
     return new Map(((r.data ?? []) as ({ cliente_id: string } & DinheiroDoTutor)[]).map((x) => [x.cliente_id, { deve: Number(x.deve), vencido: Number(x.vencido), contas: x.contas, credito: Number(x.credito) }]));
-  }, [petshop.id, vejoFinanceiro, versaoPets]);
+  }, [petshop.id, vejoFinanceiro, versaoPets], { guardar: "clientes-dinheiro" });
   const totalDevido = useMemo(() => {
     let v = 0, n = 0, cred = 0, nc = 0;
     for (const x of dinheiro?.values() ?? []) { if (x.deve > 0) { v += x.deve; n++; } if (x.credito > 0) { cred += x.credito; nc++; } }
-    return { valor: Math.round(v * 100) / 100, tutores: n, credito: Math.round(cred * 100) / 100, comCredito: nc };
+    return { valor: centavos(v), tutores: n, credito: centavos(cred), comCredito: nc };
   }, [dinheiro]);
 
   // Saúde: pets com cuidado vencido ou vencendo em 30 dias (consulta leve, só de leitura)
@@ -220,6 +228,8 @@ export default function Lista({ aoAbrir, irPara }: {
     try {
       baixarCsv(clientes, pets, `clientes-e-pets-${isoDia(new Date())}.csv`);
       avisar("Lista baixada.");
+      // fica no Registro de pedidos de dados (quem exportou e quantas linhas, sem o conteúdo); banco antigo sem a função: segue
+      void (sb.rpc as unknown as (f: string, a: Record<string, unknown>) => PromiseLike<unknown>)("lgpd_registrar_exportacao", { p_petshop: petshop.id, p_linhas: clientes.length }).then(() => undefined, () => undefined);
     } catch (e) { avisarErro(e); }
   }
 

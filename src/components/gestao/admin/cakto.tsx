@@ -70,7 +70,7 @@ export default function AbaCakto({ lojas, aoMudar }: { lojas: LojaCakto[]; aoMud
     if (!(await confirmar({ titulo: sim ? "Abrir a assinatura?" : "Fechar a assinatura?", texto, confirmar: sim ? "Abrir" : "Fechar" }))) return;
     try {
       ok(await banco().rpc("admin_cakto_abrir", { p_aberta: sim }));
-      avisar(sim ? "Assinatura aberta." : "Assinatura fechada.");
+      avisar(sim ? "Pagamento pela Cakto ligado." : "Agora a assinatura é pelo WhatsApp.");
       await carregar();
     } catch (e) { avisarErro(e); }
   }
@@ -97,14 +97,14 @@ export default function AbaCakto({ lojas, aoMudar }: { lojas: LojaCakto[]; aoMud
       <section className="g-card g-pilha">
         <div className="g-fila entre">
           <div>
-            <h2>Assinatura</h2>
+            <h2>Pagamento pela Cakto</h2>
             <p className="g-muted g-p">{cfg.aberta
-              ? "Aberta: quem tem o teste vencido fica só para consulta até assinar."
-              : "Fechada: o teste não bloqueia ninguém, mesmo vencido. Abra depois de colar os links e testar uma compra."}</p>
+              ? "Ligado: na tela Assinatura, o botão Assinar abre a página de pagamento da Cakto (nos planos que têm link colado aqui embaixo)."
+              : "Desligado: na tela Assinatura, o botão é Assinar pelo WhatsApp. A pessoa fala com a equipe, e você libera a conta em Contas. Ligue depois de colar os links e testar uma compra."} Nos dois casos, quem termina o teste de 7 dias fica só para consulta até assinar.</p>
           </div>
-          <span className={`g-tag ${cfg.aberta ? "verde" : "amarelo"}`}>{cfg.aberta ? "aberta" : "fechada"}</span>
+          <span className={`g-tag ${cfg.aberta ? "verde" : "amarelo"}`}>{cfg.aberta ? "ligado" : "pelo WhatsApp"}</span>
         </div>
-        <div><button className={`g-btn ${cfg.aberta ? "sec" : "verde"}`} onClick={() => void abrir(!cfg.aberta)}>{cfg.aberta ? "Fechar a assinatura" : "Abrir a assinatura"}</button></div>
+        <div><button className={`g-btn ${cfg.aberta ? "sec" : "verde"}`} onClick={() => void abrir(!cfg.aberta)}>{cfg.aberta ? "Voltar para o WhatsApp" : "Ligar o pagamento pela Cakto"}</button></div>
       </section>
 
       <section className="g-pilha">

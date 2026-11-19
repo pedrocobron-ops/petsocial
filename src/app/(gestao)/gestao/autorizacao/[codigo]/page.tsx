@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Check, Share2 } from "lucide-react";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { corPropria, TEMAS } from "@/lib/gestao/identidade";
 import { lerAutorizacao } from "@/lib/gestao/boletim-servidor";
@@ -42,14 +41,13 @@ export default async function Autorizacao({ params }: { params: Promise<{ codigo
           <p className="g-bo-sobre">Fotos {doPet(a.pet)} nas redes</p>
           <h1>{a.pet.nome}</h1>
         </header>
-        <section className={`g-bo-redes ${valendo ? "aberto" : "ok"}`} aria-label="Autorização">
-          <p className="g-bo-redes-t">{valendo ? <Share2 aria-hidden /> : <Check aria-hidden />}<b>{valendo ? "A autorização está valendo" : "Autorização retirada"}</b></p>
+        {/* o título acompanha o que o tutor acabou de fazer: tirou a autorização, o título muda na hora (antes só mudava ao recarregar) */}
+        <NaoQueroMais codigo={codigo} valendo={valendo} dePet={doPet(a.pet)} loja={a.petshop.nome}>
           <div className="g-bo-redes-texto previa">
             <small>O que você autorizou em {desde}:</small>
             <p>{a.texto}</p>
           </div>
-          <NaoQueroMais codigo={codigo} valendo={valendo} dePet={doPet(a.pet)} loja={a.petshop.nome} />
-        </section>
+        </NaoQueroMais>
       </main>
       <footer className="g-lk-rodape">
         <span>Este link é seu: guarde para tirar a autorização quando quiser.</span>

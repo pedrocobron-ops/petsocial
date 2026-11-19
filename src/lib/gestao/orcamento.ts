@@ -1,4 +1,4 @@
-import { brl, dataCompleta, deIsoDia, isoDia, linkWhatsApp, somaDias } from "./util";
+import { brl, dataCompleta, deIsoDia, isoDia, linkWhatsApp, somaDias, centavos } from "./util";
 
 /**
  * Orçamento (migração 20261200, tabela `orcamentos`): produtos e serviços com preço, desconto, validade e, se quiser, o cliente.
@@ -20,7 +20,6 @@ export const STATUS_ORCAMENTO: Record<StatusOrcamento, { rotulo: string; tom: "a
 export const VALIDADE_PADRAO = 7;
 export const validadePadrao = (hoje = new Date()) => isoDia(somaDias(hoje, VALIDADE_PADRAO));
 
-const centavos = (n: number) => Math.round(Number((n * 100).toPrecision(12))) / 100;
 
 /** Subtotal (cada linha arredondada ao centavo, como o banco), desconto que cabe e total. */
 export function contaDoOrcamento(itens: Pick<ItemOrcamento, "qtd" | "valor">[], desconto: number | null | undefined) {

@@ -1,6 +1,6 @@
 import { saudacaoZap } from "./agenda";
 import { opcao } from "./opcoes";
-import { semAcento } from "./util";
+import { semAcento, centavos } from "./util";
 
 /**
  * Quadro de atendimento (banho e tosa) e leva e traz. Contas sem tela: em que coluna fica cada pet, qual é a próxima etapa,
@@ -252,7 +252,6 @@ export const CHAVE_TAXA = "taxi.taxa";
 export type Bairro = { nome: string; valor: number };
 export type TaxaLevaTraz = { modo: "fixo" | "bairro"; valor: number | null; bairros: Bairro[] };
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 const valorOk = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 9999.99 ? centavos(v) : null);
 
 /** A taxa guardada (ou a de quem nunca mexeu: fixa e sem valor). Quem não recebe recebe sem valor (o banco não entrega). */

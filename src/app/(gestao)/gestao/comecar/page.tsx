@@ -1,9 +1,11 @@
 "use client";
 
 import { ERRO_TELEFONE, mascaraTelefone, telefoneValido } from "@/lib/gestao/util";
+import { esquecerOrigem, origemGuardada } from "@/lib/gestao/origem";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Porta from "@/components/gestao/porta";
+import { ApagarMeuLogin, BaixarMeusDados } from "@/components/gestao/lgpd/meus-dados";
 import { banco } from "@/lib/gestao/supabase";
 import EscolherModulos from "@/components/gestao/modulos";
 import { MODULOS, areasParaPrincipal, principalPara, type Modulo, type Principal } from "@/lib/gestao/modulos";
@@ -21,7 +23,7 @@ const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","P
 const RASCUNHO = "maestro-gestao-comecar";
 /** Uma chave por conta: duas pessoas no mesmo aparelho não misturam as respostas. A chave antiga (uma só) ainda é lida. */
 const rascunhoDe = (user: string) => `${RASCUNHO}-${user}`;
-type Rascunho = { user: string; passo: 0 | 1; nome: string; seuNome: string; telefone: string; cidade: string; uf: string; modulos: Modulo[]; principal: Principal | null; simples?: boolean };
+type Rascunho = { user: string; passo: 0 | 1; nome: string; seuNome: string; telefone: string; cidade: string; uf: string; modulos: Modulo[]; principal: Principal | null; simples?: boolean; ajuda?: boolean };
 
 /**
  * Primeiro acesso: o Mozart pergunta o nome do negócio e o que ele faz, cria o pet shop e começa o teste de 7 dias.
@@ -31,11 +33,13 @@ export default function Comecar() {
   const router = useRouter();
   const [pronto, setPronto] = useState(false);
   // por que a pessoa caiu aqui sem pet shop: perdeu o acesso, o convite não foi achado ou é conta nova mesmo
-  const [motivo, setMotivo] = useState<{ tipo: "retirado" | "sem-convite"; loja?: string; email?: string } | null>(null);
+  const [motivo, setMotivo] = useState<{ tipo: "retirado" | "saiu" | "sem-convite"; loja?: string; email?: string } | null>(null);
   const [conferindo, setConferindo] = useState(false);
   const [nome, setNome] = useState("");
   const [seuNome, setSeuNome] = useState("");
   const [telefone, setTelefone] = useState("");
+  // "quero ajuda da equipe no WhatsApp durante o teste": só vale com o telefone preenchido; começa desmarcado
+  const [ajuda, setAjuda] = useState(false);
   const [cidade, setCidade] = useState("");
   const [uf, setUf] = useState("");
   // o mais comum já vem marcado; cada opção é um toque
@@ -67,12 +71,17 @@ export default function Comecar() {
           setNome(r.nome); setSeuNome(r.seuNome); setTelefone(r.telefone); setCidade(r.cidade); setUf(r.uf);
           setModulos(r.modulos.filter((m) => MODULOS.some((x) => x.id === m))); setPrincipal(r.principal); setPasso(r.passo === 1 ? 1 : 0);
           if (typeof r.simples === "boolean") setSimples(r.simples);
+          setAjuda(r.ajuda === true);
         }
       } catch { /* sem rascunho: começa do zero */ }
       // esta conta já entrou num pet shop neste aparelho e agora não tem nenhum: o acesso foi retirado
       let antes: { user?: string; nome?: string } | null = null;
       try { antes = JSON.parse(localStorage.getItem("maestro-gestao-ultimo-acesso") ?? "null"); } catch { antes = null; }
-      if (antes?.user === u.id) setMotivo({ tipo: "retirado", loja: antes.nome });
+      // saiu por vontade própria ("Sair desta equipe" deixa o nome do pet shop anotado nesta aba): a frase é outra
+      let saiu: string | null = null;
+      try { saiu = sessionStorage.getItem("maestro-gestao-saiu"); } catch { saiu = null; }
+      if (saiu) setMotivo({ tipo: "saiu", loja: saiu });
+      else if (antes?.user === u.id) setMotivo({ tipo: "retirado", loja: antes.nome });
       // criou a conta pelo link de um convite, mas o convite não entrou (link antigo sem código, vencido ou de outro e-mail)
       else if (u.user_metadata?.convidado) setMotivo({ tipo: "sem-convite", email: u.email });
       setPronto(true);
@@ -81,9 +90,9 @@ export default function Comecar() {
 
   useEffect(() => {
     if (!pronto || !userId) return;
-    const r: Rascunho = { user: userId, passo, nome, seuNome, telefone, cidade, uf, modulos, principal, simples };
+    const r: Rascunho = { user: userId, passo, nome, seuNome, telefone, cidade, uf, modulos, principal, simples, ajuda };
     try { localStorage.setItem(rascunhoDe(userId), JSON.stringify(r)); localStorage.removeItem(RASCUNHO); } catch { /* sem armazenamento: só não lembra */ }
-  }, [pronto, userId, passo, nome, seuNome, telefone, cidade, uf, modulos, principal, simples]);
+  }, [pronto, userId, passo, nome, seuNome, telefone, cidade, uf, modulos, principal, simples, ajuda]);
 
   const areas = areasParaPrincipal(modulos);
   const primeiro = seuNome.trim().split(/\s+/)[0] ?? "";
@@ -110,6 +119,12 @@ export default function Comecar() {
     if (error || !id) { setIndo(false); setErro("Não consegui criar o pet shop. Confira os dados e tente de novo."); return; }
     // modo simples: menos menus para começar (muda em Meu pet shop). Se não gravar agora, o pet shop abre completo, como sempre.
     if (simples) await salvarOpcoes(banco(), id, { [CHAVE_MODO_SIMPLES]: true }).catch(() => undefined);
+    // de onde a pessoa veio (link do vendedor, campanha) e se pediu a ajuda da equipe: uma vez só, sem travar o começo
+    const origem = origemGuardada();
+    const querAjuda = ajuda && telefoneValido(telefone);
+    if (origem || querAjuda) {
+      await Promise.resolve(banco().rpc("origem_registrar", { p: id, p_vendedor: origem?.vendedor || undefined, p_utm: origem?.utm ?? {}, p_quer_ajuda: querAjuda })).then(() => esquecerOrigem(), () => undefined);
+    }
     // a conversa continua dentro do aplicativo, pela cor
     guardarLembrado(chaveBoasVindas(id), "cor");
     guardarLembrado("maestro-gestao-petshop", id);
@@ -125,6 +140,7 @@ export default function Comecar() {
     else setErro("Ainda não achei nenhum pet shop ligado a esta conta.");
   }
   async function sair() {
+    try { sessionStorage.removeItem("maestro-gestao-saiu"); } catch { /* segue */ }
     await banco().auth.signOut();
     router.replace("/gestao/entrar");
   }
@@ -133,16 +149,22 @@ export default function Comecar() {
 
   if (motivo) {
     const retirado = motivo.tipo === "retirado";
+    const saiu = motivo.tipo === "saiu";
     return (
-      <Porta titulo={retirado ? "Seu acesso a este pet shop foi retirado" : "Não achei o seu convite"}
-        texto={retirado
+      <Porta titulo={saiu ? `Você saiu da equipe${motivo.loja ? ` de ${motivo.loja}` : ""}` : retirado ? "Seu acesso a este pet shop foi retirado" : "Não achei o seu convite"}
+        texto={saiu
+          ? "O seu nome continua no histórico de lá. Este login não abre mais nenhum pet shop. Se não vai mais usar, você pode apagar o login."
+          : retirado
           ? `Esta conta não está mais ligada ${motivo.loja ? `ao ${motivo.loja}` : "ao pet shop"}. Fale com o dono para ele liberar de novo, em Equipe.`
           : `A conta ${motivo.email ?? ""} foi criada, mas ainda não entrou em nenhuma equipe. Peça ao dono do pet shop para mandar o convite de novo, em Equipe, e abra o link novo: ele vale por 7 dias e é feito para o e-mail ${motivo.email ?? "desta conta"}.`}>
         <div className="g-pilha p">
           {erro && <p className="g-erro" role="alert">{erro}</p>}
-          <button type="button" className="g-btn pri cheio" onClick={() => void conferirDeNovo()} disabled={conferindo}>{conferindo ? "Conferindo…" : "O dono já liberou: tentar de novo"}</button>
-          <button type="button" className="g-btn sec cheio" onClick={() => void sair()}>Sair desta conta</button>
-          <p className="g-muted g-p">Quer abrir um pet shop seu, separado desse? <button type="button" className="g-link" onClick={() => { setErro(null); setMotivo(null); }}>Criar um pet shop novo</button></p>
+          {!saiu && <button type="button" className="g-btn pri cheio" onClick={() => void conferirDeNovo()} disabled={conferindo}>{conferindo ? "Conferindo…" : "O dono já liberou: tentar de novo"}</button>}
+          <button type="button" className={`g-btn ${saiu ? "pri" : "sec"} cheio`} onClick={() => void sair()}>Sair desta conta</button>
+          {/* quem ficou sem pet shop: baixa o que guardamos dele e, se quiser, apaga o próprio login */}
+          <BaixarMeusDados className="g-btn fantasma cheio" />
+          <ApagarMeuLogin aoApagar={() => { try { sessionStorage.removeItem("maestro-gestao-saiu"); localStorage.removeItem("maestro-gestao-ultimo-acesso"); } catch { /* segue */ } router.replace("/gestao/entrar"); }} />
+          <p className="g-muted g-p">Quer abrir um pet shop seu, separado desse? <button type="button" className="g-link" onClick={() => { setErro(null); setMotivo(null); try { sessionStorage.removeItem("maestro-gestao-saiu"); } catch { /* segue */ } }}>Criar um pet shop novo</button></p>
         </div>
       </Porta>
     );
@@ -171,12 +193,19 @@ export default function Comecar() {
               <label className="g-campo"><span>E como eu chamo você?</span>
                 <input className="g-input" required maxLength={80} value={seuNome} onChange={(e) => setSeuNome(e.target.value)} enterKeyHint="next" />
               </label>
-              <details className="g-bv-mais" open>
-                <summary>WhatsApp e cidade (se quiser)<ChevronDown /></summary>
+              <label className="g-campo"><span>WhatsApp do pet shop (se quiser)</span>
+                <input className="g-input" name="whatsapp" type="tel" inputMode="tel" autoComplete="tel" placeholder="(11) 99999-9999" value={telefone} onChange={(e) => { setTelefone(mascaraTelefone(e.target.value)); setErro(null); }} enterKeyHint="next" />
+                <small>Aparece nas mensagens que você manda aos clientes e no seu link. Não mandamos propaganda.</small>
+              </label>
+              <label className="g-check" data-teste="quero-ajuda">
+                <input type="checkbox" name="quero_ajuda" checked={ajuda && telefone.trim() !== ""} disabled={telefone.trim() === ""} onChange={(e) => setAjuda(e.target.checked)} />
+                <span>Quero ajuda da equipe Maestro Pet pelo WhatsApp durante o teste.
+                  <small className="g-muted" style={{ display: "block", marginTop: 2 }}>{telefone.trim() === "" ? "Para marcar, escreva o WhatsApp acima." : "Marcando, a nossa equipe pode te chamar nesse número para ajudar durante o teste: mostrar como marcar, trazer o caderno, tirar dúvida. Não mandamos propaganda."}</small>
+                </span>
+              </label>
+              <details className="g-bv-mais">
+                <summary>Cidade e estado (se quiser)<ChevronDown /></summary>
                 <div className="dentro">
-                  <label className="g-campo"><span>WhatsApp do pet shop</span>
-                    <input className="g-input" type="tel" inputMode="tel" placeholder="(11) 99999-9999" value={telefone} onChange={(e) => { setTelefone(mascaraTelefone(e.target.value)); setErro(null); }} />
-                  </label>
                   <div className="dupla">
                     <label className="g-campo"><span>Cidade</span>
                       <input className="g-input" value={cidade} onChange={(e) => setCidade(e.target.value)} />

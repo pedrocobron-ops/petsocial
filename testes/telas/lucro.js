@@ -52,7 +52,7 @@ const limpo = (s) => String(s ?? '').replace(/[  ]/g, ' ');
     T.ok('Banho: 2 vezes, entrou R$ 113,33, custo R$ 17,00, sobrou R$ 96,33', /Banho[\s\S]{0,120}material R\$ 17,00/.test(t) && /R\$ 113,33/.test(t) && /R\$ 96,33/.test(t), t.slice(0, 900));
     const linhaH = limpo(await sec.locator('.g-lu-l', { hasText: 'Hidratação' }).first().innerText());
     T.ok('Hidratação: R$ 26,67 com "custo não informado" (e sem 100%)', /Hidratação[\s\S]{0,200}R\$ 26,67[\s\S]{0,80}custo não informado/.test(linhaH) && !/100/.test(linhaH), linhaH);
-    T.ok('Como fecha: serviços e produtos R$ 199,80 + outros R$ 200,00 = Entrou R$ 399,80; resultado − R$ 50,20', /Serviços, produtos e extras\s*R\$ 199,80/.test(t) && /Entrou\s*R\$ 399,80/.test(t) && /Resultado do mês \(o mesmo do Financeiro\)\s*\S*\s*R?\$?\s*-?50,20/.test(t), t.slice(t.indexOf('Como fecha'), t.indexOf('Como fecha') + 600));
+    T.ok('Como fecha: serviços e produtos R$ 199,80 + outros R$ 200,00 = Entrou R$ 399,80; resultado − R$ 50,20', /Serviços, produtos e extras\s*R\$ 199,80/.test(t) && /Entradas lançadas\s*R\$ 399,80/.test(t) && /Resultado do mês \(o mesmo do Financeiro\)\s*\S*\s*R?\$?\s*-?50,20/.test(t), t.slice(t.indexOf('Como fecha'), t.indexOf('Como fecha') + 600));
     if (larg === 390) {
       // a lista de produtos
       await sec.getByRole('button', { name: 'Produtos' }).click(); await page.waitForTimeout(400);

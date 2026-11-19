@@ -1,4 +1,4 @@
-// Aviso de cookies e Termos/Política 2.3 no navegador (Juliana, 17/11):
+// Aviso de cookies e Termos/Política no navegador (Juliana, 17/11; versão 2.4 em 18/11):
 //   - o aviso só aparece onde o Pixel carrega: na capa /gestao sim; no cadastro, na entrada, nos Termos e na Política do Gestão não;
 //   - o aviso tem Aceitar e Recusar; recusando, a escolha fica guardada, o cookie _fbp some, o fbevents.js não baixa e o aviso não volta;
 //   - consentimento primeiro (Juliana, 2ª rodada): antes de escolher, o fbevents.js não baixa; só depois do Aceitar;
@@ -77,7 +77,7 @@ const { EMPRESA } = require('../lib/app').lib('../empresa');
     await ctx.close();
   }
 
-  T.secao('Política do Gestão 2.3');
+  T.secao('Política do Gestão 2.4');
   const { ctx, page, erros } = await N.contexto(390, 844);
   await page.goto(B.BASE_URL + '/gestao/privacidade');
   await page.waitForSelector('#direitos');
@@ -91,17 +91,17 @@ const { EMPRESA } = require('../lib/app').lib('../empresa');
   const aparelho = await page.locator('#aparelho').textContent();
   T.ok('parte 10: sem a promessa errada de "página nova, sem o pixel"', !/página nova/.test(aparelho) && /mesma aba/.test(aparelho));
   T.ok('parte 11: as cópias de segurança dizem o que existe', /cópia completa/.test(await page.locator('#guarda').textContent()));
-  T.ok('versão 2.3 no topo', /Versão 2\.3/.test(await page.locator('body').textContent()));
+  T.ok('versão 2.4 no topo', /Versão 2\.4/.test(await page.locator('body').textContent()));
   await page.screenshot({ path: path.join(SAIDA, 'termos-privacidade-390.png') });
 
-  T.secao('Termos 2.3');
+  T.secao('Termos 2.4');
   await page.goto(B.BASE_URL + '/gestao/termos');
   await page.waitForSelector('#disponivel');
   const disp = await page.locator('#disponivel').textContent();
   T.ok('parte 16: as duas cópias, sem prometer prazo, e o que fazer se apagar por engano', /Supabase/.test(disp) && /cópia completa/.test(disp) && /não prometemos/.test(disp) && /Apagou algo por engano/.test(disp));
   const cancelar = await page.locator('#cancelar').textContent();
   T.ok('parte 7: troca de plano e os meses que sobraram', /Mudar de plano ou de período/.test(cancelar) && /não viram crédito nem desconto/.test(cancelar));
-  T.ok('Termos 2.3: "vigente desde 17/11/2026" (o dia em que entrou no ar; Neide e Rafael aceitaram em 17/11)', /vigente desde 17\/11\/2026/.test(await page.locator('body').textContent()));
+  T.ok('Termos 2.4: "vigente desde 18/11/2026" (a 2.3 entrou em 17/11; a 2.4, da revisão de privacidade, em 18/11)', /vigente desde 18\/11\/2026/.test(await page.locator('body').textContent()));
   T.ok('sem palavras grudadas: "desconto no plano" e "controlador (decide"', /desconto no plano novo/.test(cancelar) && /controlador \(decide/.test(await page.locator('body').textContent()));
   T.ok('parte 19: "Escola de Gestão" explicada', /Escola de Gestão \(a área do sistema/.test(await page.locator('#marca').textContent()));
   await page.locator('#disponivel').scrollIntoViewIfNeeded();

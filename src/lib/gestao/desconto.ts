@@ -1,9 +1,9 @@
+import { centavos } from "./util";
 /**
  * Desconto em % na conta (caixa e conta do atendimento). O banco guarda o desconto em reais (a conta fecha em reais e a trava
  * de preço confere em reais): a % vira reais aqui, sobre a soma da conta (já sem a promoção do horário), arredondada no centavo.
  */
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 
 /** 10% de R$ 95,00 = R$ 9,50. `maximo`: o teto em reais da trava de preço (o arredondamento nunca passa dele). */
 export function descontoDoPct(base: number, pct: number | null | undefined, maximo?: number | null): number | null {

@@ -12,16 +12,18 @@
 export type Documento = "termos" | "privacidade";
 
 export const DOCUMENTOS: Record<Documento, { nome: string; caminho: string; versao: string; vigenteDesde: string }> = {
-  termos: { nome: "Termos de uso", caminho: "/gestao/termos", versao: "2.3", vigenteDesde: "2026-11-17" },
-  privacidade: { nome: "Política de privacidade", caminho: "/gestao/privacidade", versao: "2.3", vigenteDesde: "2026-11-17" },
+  termos: { nome: "Termos de uso", caminho: "/gestao/termos", versao: "2.4", vigenteDesde: "2026-11-18" },
+  privacidade: { nome: "Política de privacidade", caminho: "/gestao/privacidade", versao: "2.4", vigenteDesde: "2026-11-18" },
 };
 
 /** O que mudou nesta versão, em poucas linhas, para a tela de aceite de quem já tinha conta. */
 export const MUDANCAS: string[] = [
-  "Cópias de segurança: explicamos quais existem hoje (as do fornecedor do banco e uma cópia completa feita pela nossa equipe), para que servem e o que fazer se algo for apagado por engano. Não há prazo de guarda garantido.",
-  "Mudar de plano ou de período: como fazer, quando o plano novo começa e o que acontece com os meses que sobraram de um plano de 3 ou 6 meses.",
-  "Cookies: o aviso aparece só nas páginas do site que medem visitas, com Aceitar e Recusar. O aplicativo e o cadastro continuam sem pixel.",
-  "Textos mais claros sobre quem oferece o serviço hoje, o banco de dados dividido com o Escala CEO e os avisos que aparecem na tela.",
+  "Conversas com o Mozart e a Ajuda: a nossa equipe passa a ver só números. Para ler uma conversa e dar suporte, a pessoa da equipe precisa escrever o motivo, e cada abertura aparece para o dono em Meu pet shop, em \"Acessos da equipe Maestro Pet\".",
+  "Inteligência artificial: dizemos com todas as letras o que vai ao fornecedor (Anthropic, fora do Brasil): além de nomes, serviços, horários e valores, também telefones de tutores, alertas, observações e ficha de saúde dos pets, conforme o que cada pessoa pode ver.",
+  "Apagar e excluir: \"Excluir de vez\" e \"Apagar dados deste tutor\" agora limpam as mesmas coisas, e as fotos trocadas ou de fichas apagadas saem em até 1 dia. Prazos novos: pedido pelo link que não virou horário, 90 dias; proteção contra abuso do link, 2 dias.",
+  "Pagamento: quem vende, o reembolso integral em 7 dias e que a assinatura, por enquanto, não tem nota fiscal (você recebe o comprovante da Cakto).",
+  "Incidente de segurança: avisamos em até 48 horas depois de sabermos. Também explicamos melhor os dados fora do Brasil, a cópia completa do banco e a lista de fornecedores.",
+  "Cada pessoa com login pode baixar os próprios dados e, depois de sair de uma equipe, apagar o próprio login.",
 ];
 
 /** "17/11/2026" a partir de "2026-11-17" (sem fuso: é uma data de calendário). */

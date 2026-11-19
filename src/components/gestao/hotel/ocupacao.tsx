@@ -36,7 +36,7 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
   const primeiro = isoDia(mes), ultimo = isoDia(new Date(mes.getFullYear(), mes.getMonth() + 1, 0));
 
   // dias que já passaram: as estadias encerradas que tocam o mês. De hoje em diante: as faltas avisadas dos mensalistas.
-  const { dados, carregando } = useDados(async () => {
+  const { dados, carregando, erro, recarregar } = useDados(async () => {
     // as encerradas de hoje também entram: na creche, quem já veio e saiu conta na ocupação do dia
     const temPassado = primeiro <= hojeIso;
     const encerradas = temPassado ? await lerTudo<EstadiaCompleta>((de, ate, contar) =>
@@ -91,7 +91,13 @@ export default function Ocupacao({ abertas, mens, aoNovaReserva }: {
             <button type="button" className="g-btn sec p" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))} aria-label="Próximo mês"><ChevronRight /></button>
           </div>
         </div>
-        {carregando && !dados ? <Esqueleto linhas={4} /> : (
+        {/* a leitura falhou: diz isso, em vez de mostrar o mês inteiro como livre */}
+        {erro && !dados ? (
+          <div className="g-aviso vermelho" role="alert" style={{ marginBottom: 0 }}>
+            <span>Não consegui ler a ocupação deste mês. {erro}</span>
+            <button type="button" className="g-btn sec p" onClick={() => void recarregar()}>Tentar de novo</button>
+          </div>
+        ) : carregando && !dados ? <Esqueleto linhas={4} /> : (
           <>
             <div className="g-ht-mes" role="group" aria-label={`Ocupação de ${nomeMes(mes)}`}>
               {SEMANA.map((s) => <span key={s} className="g-ht-sem">{s}</span>)}

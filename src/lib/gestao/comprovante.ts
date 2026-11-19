@@ -1,7 +1,7 @@
 import { contaDosItens, itensDoLancamento, partesPorForma, type FormaPagamento } from "./dinheiro";
 import { impressaoDoComprovante, type PapelDoComprovante } from "./comprovante-papel";
 import { FORMAS } from "./tipos";
-import { brl, chamar, dataCompleta, hora, isoDia } from "./util";
+import { brl, chamar, dataCompleta, hora, isoDia, centavos } from "./util";
 
 type Recebido = { valor: number; forma?: string | null; pagamentos?: unknown; itens?: unknown; data?: string | null; credito_usado?: number | null };
 
@@ -19,7 +19,6 @@ export function linhasDaData(quando: Date | string, pagoEm?: string | null): str
 /** O que entrou na mesma conta para o que o tutor devia de antes (fiado, resto de outra conta): quanto e como. */
 export type AntigaNoComprovante = { recebido: number; falta: number; forma?: string | null; pagamentos?: unknown };
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
 const nomeDaForma = (f: string) => (f === "credito_tutor" ? "Crédito do tutor" : FORMAS.find((x) => x.id === f)?.rotulo ?? "Outro");
 /** As partes do pagamento, com a parte paga com o crédito do tutor pelo nome (no pagamento ela é "outro"). */
 function partesComCredito(l: Recebido): { forma: string; valor: number }[] {
