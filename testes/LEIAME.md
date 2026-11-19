@@ -976,3 +976,21 @@ Outro processo testando o link ou a Cakto no mesmo banco ao mesmo tempo pode ver
 ### Link com mais de um serviço no mesmo pedido (migração 20261239)
 - `banco/link-varios-servicos.js`: Banho e tosa (90 min) + Hidratação (30) + Corte de unhas (15) pela API: `link_horarios` com `p_extras` conta os 135 min (último horário 17:30; dois pets com dois serviços, 16:00), lista com serviço de outra loja ou id inválido recusada, o pedido guarda `outros_servicos` e dura 135 min, o valor visto é a soma com a promoção só no principal (de 135,00 por 126,00, cada serviço guardado) igual à conta da página (`valorDosServicos`), outra data que não comporta os três recusada, aceitar vira UM horário com os outros serviços em `agendamento_servicos` (30,00 e 15,00) e a conta dá 126,00; dois pets (P e G) com o preço de cada porte; sem porte, faixa 95,00 a 135,00 e o porte respondido ao aceitar põe o preço em todos; pedido de um serviço só segue igual.
 - `telas/link-varios-servicos.js`: em 390x844 e 1366x900: um toque marca (✓) e outro tira, a barra de baixo com "3 serviços", 2h15 e "a partir de R$ 120", o passo 2 com os três serviços e o último horário 17:30, o valor somado (R$ 135,00) com cada serviço, o "Pedido enviado" e a página do pedido com os três, a mensagem do WhatsApp; quem recebe vê os três serviços e "o cliente viu: R$ 135,00", e Aceitar cria um horário só. `FOTOS=1` guarda as capturas em `testes/saida/link-varios-*.png`.
+
+### Pet com nome parecido no pedido do link (migração 20261243)
+- `unidade/pet-parecido.js`: `src/lib/gestao/pet-parecido.ts`: nome igual sem acento (Pérola = Perola) não pergunta; Thor/Tor, Mel/Melzinha, Bob/Bobby, Luna/Lua e
+  Pipoquinha/Pipoqinha perguntam; Rex/Mel e Mel/Bel não; pet inativo não entra na pergunta; com um pet só da mesma espécie a régua é um pouco mais larga
+  (Luna/Lulu); mais de um parecido (do mais perto para o mais longe, até 3); as frases "É o Thor que já está cadastrado?", "Sim, é ela", neutra sem sexo;
+  `nomeDePet` com a tabela de troca do banco (ø, ÿ, ç, ã, Ł, Đ; letra fora da tabela fica como está).
+- `banco/pet-parecido.js`: pela API, com o tosador: "  thor " e "PEROLA" usam a ficha; `p_pets` põe "Tor" no Thor (com o preço do porte da ficha); pet de
+  outro tutor, de outra loja, id inválido e `p_pets` que não é objeto são recusados (o pedido continua esperando); "Tor" sem escolha cria o pet e marca
+  `pet_novo` (tutor novo: sem marca); `pedido_trocar_pet` passa o horário e a reserva (creche e hotel) e apaga o pet criado só se não tem mais nada
+  (com outro horário, fica); recusa anônimo, outra loja, pet de outro tutor, pedido pendente e reserva em cima de outra; grupo com um pet errado não aceita
+  nenhum, e o mesmo pet para dois pedidos também não; "Era outro pet?" só por quem cuida da área (monitor recusado no horário,
+  tosador na reserva), só em pedido com pet novo, não em horário concluído nem com choque de horário do pet escolhido; pet novo
+  que ganhou raça não é apagado; porte P → M refaz o preço da lista, preço mudado à mão fica; "Jose  acento" = José (sem tutor
+  novo) e, com `p_pet`, o tutor é o dono do pet; `nome_de_pet` (banco) = `nomeDePet` (tela) em nomes com ø, ÿ, ç, Ł, Ş; as chamadas de antes (`pedidos_aceitar_juntos` sem `p_pets`, `pedido_aceitar_como` de 4 argumentos, `pedido_aceitar` só com `p_id`) seguem.
+- `telas/pet-parecido.js`: em 390x844 e 1366x900: "Tor" com o Thor na ficha pergunta "É o Thor que já está cadastrado?" (com o porte do Thor);
+  "Sim, é ele" usa o Thor (o aviso, o cartão e a confirmação no WhatsApp dizem Thor); "Thorr" → "É outro pet" cria o Thorr; "Rex" aceita sem perguntar e mostra "pet novo"; "Era outro pet?" → Mel passa o
+  horário para a Mel e apaga o Rex; pedido com "Tor", "Thorr" e "Tôr" (Thor e Thorn na ficha): o Thor escolhido no Tor fica
+  desligado no Thorr e, no Tôr, só "É outro pet" com "Thor já foi escolhido para outro pedido"; a página do pedido do tutor não mostra os pets da ficha; sem rolagem para o lado e sem erro na página.
