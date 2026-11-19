@@ -7,8 +7,9 @@ import { contando, lerTudo } from "@/lib/gestao/paginas";
 import { PORTES } from "@/lib/gestao/tipos";
 import { REPETICOES, bloqueioPega, datasDaSerie, deMin, horariosLivres, marcadoPara, paraMin, textoRemarcado, vagasDe } from "@/lib/gestao/agenda";
 import { definirServicosAMais, juntarServicosAMais, servicosAMais } from "@/lib/gestao/servicos-do-horario";
-import { almocoDoDia, brl, nomeNaEquipe, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, horarioDoDia, isoDia, juntaDiaHora, lerValor, linkWhatsApp, nomeDiaCurto, NOTA_PORTE, precoDoServico, precoMudaComPorte, somaDias, centavos } from "@/lib/gestao/util";
+import { almocoDoDia, brl, nomeNaEquipe, dataAmigavel, dataCompleta, dataCurta, deIsoDia, hora, isoDia, juntaDiaHora, lerValor, linkWhatsApp, nomeDiaCurto, NOTA_PORTE, precoDoServico, precoMudaComPorte, somaDias, centavos } from "@/lib/gestao/util";
 import { diaFechado, fraseDoDiaFechado } from "@/lib/gestao/feriados";
+import { horarioDoServico, janelaDoDia, servicoTemHorario } from "@/lib/gestao/horario-loja";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import FormPet from "../form-pet";
@@ -216,7 +217,17 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const nomesDaEquipe = quemAtende.map((p) => p.nome);
   const nomeDe = (id: string | null) => (id ? nomeNaEquipe(quemAtende.find((p) => p.id === id)?.nome, nomesDaEquipe) || "profissional" : "pet shop inteiro");
 
-  const funcionamento = horarioDoDia(petshop.horario, deIsoDia(dia));
+  // o horário que vale neste atendimento: a parte do dia em que todos os serviços escolhidos funcionam (cada um no horário
+  // próprio, ou no do pet shop). Sem serviço escolhido, o do pet shop. O almoço do pet shop vale quando algum segue o pet shop.
+  const servicosDoHorario = escolhidos.map((o) => servicoDe(o.servicoId));
+  const comHorarioProprio = servicosDoHorario.some((x) => servicoTemHorario(x));
+  const seguemALoja = !servicosDoHorario.length || servicosDoHorario.some((x) => !servicoTemHorario(x));
+  const horariosDoAtendimento = servicosDoHorario.length ? servicosDoHorario.map((x) => horarioDoServico(x, petshop.horario)) : [petshop.horario];
+  const chaveDoHorario = JSON.stringify(horariosDoAtendimento);
+  const funcionamentoEm = (d: string) => (RE_DIA.test(d) ? janelaDoDia(horariosDoAtendimento, deIsoDia(d).getDay()) : null);
+  const almocoNoDia = (d: Date) => (seguemALoja ? almocoDoDia(petshop.horario, d) : null);
+  const funcionamento = useMemo(() => funcionamentoEm(dia), [dia, chaveDoHorario]); // eslint-disable-line react-hooks/exhaustive-deps
+  const quemAbre = comHorarioProprio ? (servicosDoHorario.length > 1 ? "esses serviços funcionam" : "este serviço funciona") : "o pet shop abre";
   // a folha aberta por muito tempo: a cada minuto a lista de hoje tira o horário que já passou (09:30 some às 09:31)
   const [minuto, setMinuto] = useState(0);
   useEffect(() => { const id = setInterval(() => setMinuto((m) => m + 1), 60000); return () => clearInterval(id); }, []);
@@ -230,12 +241,12 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     // tempo bloqueado (do pet shop inteiro ou de quem vai atender) não é oferecido
     const bloqueados = (bloqueios ?? []).filter((b) => !b.profissional_id || b.profissional_id === profId).map(emMin);
     // o almoço do pet shop (Meu pet shop > Horário) fica fechado todos os dias
-    const almoco = almocoDoDia(petshop.horario, deIsoDia(dia));
+    const almoco = almocoNoDia(deIsoDia(dia));
     if (almoco) bloqueados.push({ inicio: almoco.inicio, fim: almoco.fim });
     const agora = new Date();
     const aPartirDe = dia === isoDia(agora) ? agora.getHours() * 60 + agora.getMinutes() : undefined;
     return horariosLivres({ abre: funcionamento.abre, fecha: funcionamento.fecha, duracaoMin: duracao, ocupados, bloqueados, vagas: profId ? 1 : vagasDe(petshop, equipe), aPartirDe });
-  }, [funcionamento, dia, doDia, bloqueios, profId, duracao, agendamento, petshop, equipe, minuto]);
+  }, [funcionamento, dia, doDia, bloqueios, profId, duracao, agendamento, petshop, equipe, minuto, seguemALoja]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bloqueioEm = (d: string) => {
     const ini = juntaDiaHora(d, hhmm).getTime();
@@ -244,7 +255,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   const bloqueioAqui = diaOk && hhmm ? bloqueioEm(dia) : null;
   /** O horário escolhido cruza o almoço do pet shop no dia `d`? */
   const almocoEm = (d: string) => {
-    const al = hhmm ? almocoDoDia(petshop.horario, deIsoDia(d)) : null;
+    const al = hhmm ? almocoNoDia(deIsoDia(d)) : null;
     if (!al) return null;
     const ini = paraMin(hhmm);
     return ini < al.fim && ini + duracao > al.inicio ? al : null;
@@ -263,7 +274,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   };
   /** O horário escolhido cabe no expediente do dia `d`? (dia fechado é outro aviso) */
   const foraDoExpediente = (d: string) => {
-    const f = horarioDoDia(petshop.horario, deIsoDia(d));
+    const f = funcionamentoEm(d);
     if (!f || !hhmm) return null;
     const ini = paraMin(hhmm);
     return ini < paraMin(f.abre) || ini + duracao > paraMin(f.fecha) ? f : null;
@@ -288,7 +299,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
     const out: Record<string, Problema[]> = {};
     lista.forEach((d, i) => {
       const p: Problema[] = [];
-      if (!horarioDoDia(petshop.horario, deIsoDia(d)) || diaFechado(d)) p.push({ tipo: "fechado", texto: diaFechado(d) ? "dia fechado" : "fechado" });
+      if (!funcionamentoEm(d) || diaFechado(d)) p.push({ tipo: "fechado", texto: diaFechado(d) ? "dia fechado" : "fechado" });
       else if (foraDoExpediente(d)) p.push({ tipo: "fora", texto: "fora do expediente" });
       if (almocoEm(d)) p.push({ tipo: "almoco", texto: "hora do almoço" });
       const b = bloqueioEm(d);
@@ -583,7 +594,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
           {diaOk && anoOk && diaFechado(dia) && (
             <div className="g-aviso" role="status" style={{ marginBottom: 0 }}><CalendarOff /><span className="g-cresce"><b>{fraseDoDiaFechado(dia)}.</b> Vocês marcaram {dataAmigavel(dia)} como dia fechado em Meu pet shop. Dá para marcar mesmo assim.</span></div>
           )}
-          {!diaOk || !anoOk ? null : !funcionamento ? <p className="g-pp g-muted">O pet shop não abre {dataAmigavel(dia)}. Você pode marcar mesmo assim.</p>
+          {!diaOk || !anoOk ? null : !funcionamento ? <p className="g-pp g-muted" data-teste="nao-abre">{comHorarioProprio ? `${servicosDoHorario.length > 1 ? "Esses serviços não funcionam juntos" : "Este serviço não funciona"} ${dataAmigavel(dia)}, pelo horário próprio dele em Meu pet shop.` : `O pet shop não abre ${dataAmigavel(dia)}.`} Você pode marcar mesmo assim.</p>
             : livres.length > 0 ? (
               <div className="g-campo g-agd-livres"><span className="g-muted" style={{ fontWeight: 500 }}>Horários livres {dataAmigavel(dia)}</span>
                 {PARTES.map((parte) => {
@@ -607,7 +618,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
           )}
           {foraAqui && !repetindo && (
             <p className="g-agd-alerta" role="status"><Clock />
-              <span><b>Fora do horário de funcionamento.</b> {dataAmigavel(dia).replace(/^./, (c) => c.toUpperCase())} o pet shop abre das {foraAqui.abre} às {foraAqui.fecha}.{" "}
+              <span><b>Fora do horário de funcionamento.</b> {dataAmigavel(dia).replace(/^./, (c) => c.toUpperCase())} {quemAbre} das {foraAqui.abre} às {foraAqui.fecha}.{" "}
                 {paraMin(hhmm) >= paraMin(foraAqui.abre) && paraMin(hhmm) < paraMin(foraAqui.fecha)
                   ? `O atendimento leva ${duracao >= 60 ? textoDuracao(duracao) : `${duracao} min`}: começando às ${hhmm}, termina às ${deMin(paraMin(hhmm) + duracao)}, depois do horário de fechar. `
                   : ""}Você pode marcar mesmo assim.</span>

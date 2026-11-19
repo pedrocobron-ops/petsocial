@@ -23,11 +23,15 @@ export const MARCA_RESTO = "[[RESTO_NO_WHATSAPP]]";
 export type ServicoPublico = {
   id: string; nome: string; duracao_min: number;
   preco_p: number | null; preco_m: number | null; preco_g: number | null; preco_gg: number | null;
+  /** horário próprio do serviço (migração 20261242); null ou ausente = o do pet shop */
+  horario?: unknown;
 };
 type DiaDoHorario = { abre?: string | null; fecha?: string | null; almoco?: { de?: string | null; ate?: string | null } | null } | null;
 export type DadosDoLink = {
   info: {
     nome: string; cidade?: string | null; uf?: string | null; horario?: unknown; aviso?: string | null; hoje: string;
+    /** o horário da creche e do hotel, já com o do pet shop quando não têm (migração 20261242) */
+    horario_creche?: unknown; horario_hotel?: unknown;
     /** endereço do pet shop (migração 20261235; tudo opcional) */
     endereco?: string | null; bairro?: string | null; complemento?: string | null;
     servicos: ServicoPublico[];
@@ -89,10 +93,20 @@ function horarioDo(horario: unknown, dia: number): DiaDoHorario {
   const h = horario && typeof horario === "object" ? (horario as Record<string, DiaDoHorario>)[String(dia)] : null;
   return h && ehHora(h.abre) && ehHora(h.fecha) ? h : null;
 }
-/** Aberto nesse dia? (dia da semana com horário e não marcado como fechado) */
-export function abertoNoDia(d: DadosDoLink, iso: string) {
-  return !!horarioDo(d.info.horario, diaDaSemana(iso)) && !(d.fechados ?? []).includes(iso);
+/** O horário de um serviço (o próprio, ou o do pet shop), da creche ou do hotel (o deles, ou o do pet shop). */
+export function horarioDe(d: DadosDoLink, de?: ServicoPublico | "creche" | "hotel" | null): unknown {
+  const proprio = de === "creche" ? d.info.horario_creche : de === "hotel" ? d.info.horario_hotel : de?.horario;
+  return proprio && typeof proprio === "object" ? proprio : d.info.horario;
 }
+/** Aberto nesse dia? (dia da semana com horário e não marcado como fechado). Com `de`: o horário do serviço, da creche ou do hotel. */
+export function abertoNoDia(d: DadosDoLink, iso: string, de?: ServicoPublico | "creche" | "hotel" | null) {
+  return !!horarioDo(horarioDe(d, de), diaDaSemana(iso)) && !(d.fechados ?? []).includes(iso);
+}
+const semanaEmTexto = (horario: unknown) => [1, 2, 3, 4, 5, 6, 0].map((dia) => {
+  const h = horarioDo(horario, dia);
+  return `${SEMANA[dia]} ${h ? `${h.abre!.slice(0, 5)} às ${h.fecha!.slice(0, 5)}` : "fechado"}`;
+}).join("; ");
+const mesmaSemana = (a: unknown, b: unknown) => semanaEmTexto(a) === semanaEmTexto(b);
 
 /** Referência curta de cada serviço no texto do modelo (S1, S2…): o modelo nunca vê nem devolve o id do banco. */
 export function referencias(d: DadosDoLink) {
@@ -185,7 +199,10 @@ export function contextoDoLink(d: DadosDoLink): string {
   l.push("", "Serviços que dá para pedir pelo link:");
   const refs = referencias(d);
   if (!refs.length) l.push("- nenhum serviço de horário no link");
-  for (const { ref, servico: s } of refs) l.push(`- ${ref}: ${dado(s.nome, 80)}, dura cerca de ${duracao(s.duracao_min)}, ${precoDoServico(s)}`);
+  for (const { ref, servico: s } of refs) {
+    const proprio = s.horario && typeof s.horario === "object" && !mesmaSemana(s.horario, i.horario) ? `; horário deste serviço: ${semanaEmTexto(s.horario)}` : "";
+    l.push(`- ${ref}: ${dado(s.nome, 80)}, dura cerca de ${duracao(s.duracao_min)}, ${precoDoServico(s)}${proprio}`);
+  }
 
   const promos = promocoesDoLink(d);
   if (promos.length) {
@@ -195,6 +212,7 @@ export function contextoDoLink(d: DadosDoLink): string {
 
   if (i.creche) {
     l.push("", "Creche (passar o dia): dá para pedir vaga pelo link.");
+    if (!mesmaSemana(horarioDe(d, "creche"), i.horario)) l.push(`- horário da creche (chegada e busca): ${semanaEmTexto(horarioDe(d, "creche"))}`);
     const di = num(i.creche.diaria);
     l.push(di != null ? `- diária da creche: ${reais(di)}; para um total de dias ou de pets, use estimar_creche` : "- diária da creche: não informada no link");
     const sc = d.hotel?.sinal as { modo?: string | null; valor?: unknown; creche?: boolean } | null | undefined;
@@ -208,6 +226,7 @@ export function contextoDoLink(d: DadosDoLink): string {
   }
   if (i.hotel) {
     l.push("", "Hotel (dormir no pet shop): dá para pedir vaga pelo link.");
+    if (!mesmaSemana(horarioDe(d, "hotel"), i.horario)) l.push(`- horário do hotel (chegada e busca): ${semanaEmTexto(horarioDe(d, "hotel"))}`);
     const pr = d.hotel?.preco;
     if (!hotelComPreco(d)) l.push("- valor do hotel: não informado no link (o pet shop passa pelo WhatsApp). Não dê valor nem estimativa de hotel.");
     else if (pr && num(pr.de) != null) {
@@ -319,7 +338,7 @@ export function lerResposta(bruto: string, d: DadosDoLink): Resposta {
     else {
       const r = referencias(d).find((x) => x.ref.toLowerCase() === alvo);
       if (r) {
-        const dia = m[2] && ehDia(m[2]) && ehDia(d.info.hoje) && m[2] >= d.info.hoje && m[2] <= somaDia(d.info.hoje, DIAS_NO_LINK - 1) && abertoNoDia(d, m[2]) ? m[2] : null;
+        const dia = m[2] && ehDia(m[2]) && ehDia(d.info.hoje) && m[2] >= d.info.hoje && m[2] <= somaDia(d.info.hoje, DIAS_NO_LINK - 1) && abertoNoDia(d, m[2], r.servico) ? m[2] : null;
         sugestao = { tipo: "servico", servicoId: r.servico.id, nome: r.servico.nome, dia };
       }
     }
@@ -399,7 +418,7 @@ export function entradaHorarios(input: unknown, d: DadosDoLink): { ok: true; ser
   if (!r) return { ok: false, erro: "Serviço não está no link. Use S1, S2…" };
   const dia = String(x.dia ?? "");
   if (!ehDia(dia) || !ehDia(d.info.hoje) || dia < d.info.hoje || dia > somaDia(d.info.hoje, DIAS_NO_LINK - 1)) return { ok: false, erro: `O link só mostra horários de ${d.info.hoje} até ${somaDia(d.info.hoje, DIAS_NO_LINK - 1)}.` };
-  if (!abertoNoDia(d, dia)) return { ok: false, erro: "O pet shop não abre nesse dia." };
+  if (!abertoNoDia(d, dia, r.servico)) return { ok: false, erro: r.servico.horario && typeof r.servico.horario === "object" ? "Esse serviço não funciona nesse dia." : "O pet shop não abre nesse dia." };
   const pets = Math.min(4, Math.max(1, Math.round(num(x.pets) ?? 1)));
   return { ok: true, servicoId: r.servico.id, dia, pets };
 }
@@ -424,8 +443,8 @@ export function estimarCreche(input: unknown, d: DadosDoLink): string {
   const dias = [...new Set((Array.isArray(x.dias) ? x.dias : []).map((v) => String(v).slice(0, 10)).filter(ehDia))].sort().slice(0, 31);
   if (!dias.length) return "Passe os dias (AAAA-MM-DD).";
   if (ehDia(d.info.hoje) && dias[0] < d.info.hoje) return "Esse dia já passou.";
-  const fechados = dias.filter((x2) => !abertoNoDia(d, x2));
-  const validos = dias.filter((x2) => abertoNoDia(d, x2));
+  const fechados = dias.filter((x2) => !abertoNoDia(d, x2, "creche"));
+  const validos = dias.filter((x2) => abertoNoDia(d, x2, "creche"));
   if (!validos.length) return `A creche não abre ${fechados.map(curto).join(", ")}.`;
   const pets = Math.min(5, Math.max(1, Math.round(num(x.pets) ?? 1)));
   const exp = d.experiencia?.ativo && x.experiencia === true ? num(d.experiencia.preco) : null;
@@ -516,7 +535,7 @@ function respostaDeUmaParte(pergunta: string, contexto: string, d: DadosDoLink):
   if (/marcar|agendar|pedir|quero ir/.test(p)) {
     const r = referencias(d).find((x) => p.includes(x.servico.nome.toLowerCase())) ?? referencias(d)[0];
     if (r && ehDia(d.info.hoje)) {
-      const dia = Array.from({ length: DIAS_NO_LINK }, (_, k) => somaDia(d.info.hoje, k)).find((x) => abertoNoDia(d, x) && x > d.info.hoje);
+      const dia = Array.from({ length: DIAS_NO_LINK }, (_, k) => somaDia(d.info.hoje, k)).find((x) => abertoNoDia(d, x, r.servico) && x > d.info.hoje);
       return `Dá para pedir ${r.servico.nome} pela página. [[PEDIR ${r.ref}${dia ? ` ${dia}` : ""}]]`;
     }
     if (d.info.hotel) return "Dá para pedir vaga no hotel pela página. [[PEDIR hotel]]";

@@ -11,6 +11,8 @@ import type { AvisosDaChamada, Msg, RespostaDoModelo } from "./conversa";
  *   ids tirados do contexto do pet shop (`sistema`). Os cartões aparecem juntos, com Confirmar tudo.
  * - pedido com "vendi 2 mordedores": cartão de vender 2 "Mordedor" no Pix (vender_produto, o produto pelo nome); com "vendi 10
  *   pacotes de ração": a ração não está no Estoque, o mesmo cartão cadastra (R$ 100 o pacote) e vende 10 em dinheiro.
+ * - pedido "domingo a creche e o hotel abrem das 8h às 18h": dois cartões de alterar_funcionamento (alvo creche e alvo hotel),
+ *   juntos, com Confirmar tudo.
  * - qualquer outro: uma frase escrita devagar, palavra por palavra (cerca de 60 ms entre as palavras).
  */
 const espera = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
@@ -75,6 +77,16 @@ export async function modeloDeTeste(msgs: Msg[], ao: AvisosDaChamada, sistema = 
       content: [{ type: "text", text: t, citations: null }, { type: "tool_use", id: `toolu_teste${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, name: "vender_produto", input: venda }],
       stop_reason: "tool_use",
     } as unknown as RespostaDoModelo;
+  }
+  if (/domingo a creche e o hotel abrem/.test(texto)) {
+    const t = "Combinado: no domingo a creche e o hotel abrem das 8h às 18h, e o pet shop continua fechado. Confere nos cartões.";
+    await escrever(t, ao, 10);
+    const usos = (["creche", "hotel"] as const).map((alvo, i) => {
+      ao.ferramenta("alterar_funcionamento");
+      return { type: "tool_use", id: `toolu_teste${Date.now().toString(36)}h${i}${Math.random().toString(36).slice(2, 6)}`, name: "alterar_funcionamento",
+        input: { alvo, dias: [{ dia: "domingo", abre: "08:00", fecha: "18:00" }] } };
+    });
+    return { content: [{ type: "text", text: t, citations: null }, ...usos], stop_reason: "tool_use" } as unknown as RespostaDoModelo;
   }
   if (/bloqueia/.test(texto)) {
     const t = "Vou bloquear o almoço de amanhã. Confere no cartão e clica em Pode fazer.";

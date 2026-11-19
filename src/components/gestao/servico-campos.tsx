@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Banco } from "@/lib/gestao/supabase";
+import type { Horario } from "@/lib/gestao/tipos";
 import { AREAS_DE_SERVICO, type AreaDoServico } from "@/lib/gestao/modulos";
 import { lerValor, lerValorEstrito, valor2 } from "@/lib/gestao/util";
 import { ok } from "./ui";
@@ -131,6 +132,8 @@ type LinhaServico = {
   nome: string; categoria: string; duracao_min: number; cor: string; ordem?: number; ativo?: boolean;
   /** Custo do material por atendimento (só o dono; em branco = não informado). Só vai quando a tela mexeu nele. */
   custo_material?: number | null;
+  /** Horário próprio do serviço (null = igual ao pet shop). Só vai quando a tela mexeu nele. */
+  horario?: Horario | null;
 } & Precos;
 /** Antes da migração 20261179, o banco não conhece a categoria 'loja': o serviço da loja entra como 'outro'. */
 const semLoja = (e: { message?: string } | null) => !!e && /servicos_categoria_check/.test(e.message ?? "");

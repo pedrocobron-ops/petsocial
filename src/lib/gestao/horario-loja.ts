@@ -62,3 +62,103 @@ export function erroDoHorario(h: Horario): string | null {
   return null;
 }
 
+/* ---------- horário da creche, do hotel e de cada serviço ---------- */
+/*
+ * `petshops.horario_creche` e `petshops.horario_hotel`: a janela de chegada e de busca em cada dia (null = igual ao pet shop).
+ * `servicos.horario`: o horário próprio de um serviço da agenda (null = segue o pet shop). Mesmo formato, sem almoço:
+ * o almoço do pet shop vale para os serviços que seguem o pet shop. O banco confere o formato (`horario_valido`).
+ */
+export type Area = "creche" | "hotel";
+type ComHorarios = { horario?: unknown; horario_creche?: unknown; horario_hotel?: unknown };
+const temAlgo = (h: unknown) => !!h && typeof h === "object" && !Array.isArray(h);
+
+/** O horário que vale na creche ou no hotel: o próprio, ou o do pet shop. */
+export function horarioDaArea(p: ComHorarios, area: Area): unknown {
+  const proprio = area === "creche" ? p.horario_creche : p.horario_hotel;
+  return temAlgo(proprio) ? proprio : p.horario;
+}
+export const horarioDaCreche = (p: ComHorarios) => horarioDaArea(p, "creche");
+export const horarioDoHotel = (p: ComHorarios) => horarioDaArea(p, "hotel");
+/** A creche ou o hotel tem horário próprio (diferente do pet shop)? */
+export const areaTemHorario = (p: ComHorarios, area: Area) => temAlgo(area === "creche" ? p.horario_creche : p.horario_hotel);
+
+/** O horário que vale num serviço: o próprio, ou o do pet shop. */
+export function horarioDoServico(s: { horario?: unknown } | null | undefined, loja: unknown): unknown {
+  return s && temAlgo(s.horario) ? s.horario : loja;
+}
+export const servicoTemHorario = (s: { horario?: unknown } | null | undefined) => !!s && temAlgo(s.horario);
+
+const minutos = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+const deMinutos = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+const diaDe = (bruto: unknown, diaDaSemana: number) => {
+  const v = bruto && typeof bruto === "object" ? (bruto as Horario)[String(diaDaSemana)] : null;
+  return v && typeof v.abre === "string" && typeof v.fecha === "string" && /^\d{2}:\d{2}/.test(v.abre) && /^\d{2}:\d{2}/.test(v.fecha) ? v : null;
+};
+
+/**
+ * A janela de um dia da semana (0 = domingo) em que todos os horários dados funcionam: abre na maior hora de abrir e
+ * fecha na menor hora de fechar. Algum fechado no dia, ou janela vazia: null. Serve para um horário com vários serviços.
+ */
+export function janelaDoDia(horarios: unknown[], diaDaSemana: number): { abre: string; fecha: string } | null {
+  let abre = 0, fecha = 24 * 60;
+  for (const bruto of horarios) {
+    const v = diaDe(bruto, diaDaSemana);
+    if (!v) return null;
+    abre = Math.max(abre, minutos(v.abre));
+    fecha = Math.min(fecha, minutos(v.fecha));
+  }
+  return horarios.length && fecha > abre ? { abre: deMinutos(abre), fecha: deMinutos(fecha) } : null;
+}
+
+/**
+ * A janela mais larga do dia: do primeiro que abre ao último que fecha (o pet shop e os serviços com horário próprio).
+ * É o que a agenda mostra no dia: domingo com o pet shop fechado e o "Banho de domingo" aberto continua aparecendo.
+ */
+export function janelaLarga(horarios: unknown[], diaDaSemana: number): { abre: string; fecha: string } | null {
+  let abre = Infinity, fecha = -Infinity;
+  for (const bruto of horarios) {
+    const v = diaDe(bruto, diaDaSemana);
+    if (!v) continue;
+    abre = Math.min(abre, minutos(v.abre));
+    fecha = Math.max(fecha, minutos(v.fecha));
+  }
+  return fecha > abre ? { abre: deMinutos(abre), fecha: deMinutos(fecha) } : null;
+}
+
+/** O horário que a agenda mostra: o do pet shop, aberto também nos dias e horas dos serviços com horário próprio. */
+export function horarioDaAgenda(loja: unknown, servicos: { horario?: unknown; ativo?: boolean; categoria?: string }[]): unknown {
+  const proprios = servicos.filter((s) => s.ativo !== false && s.categoria !== "creche" && s.categoria !== "hotel" && servicoTemHorario(s)).map((s) => s.horario);
+  if (!proprios.length) return loja;
+  const base = lerHorario(loja);
+  const novo: Horario = {};
+  for (const d of ORDEM_DIAS) {
+    const j = janelaLarga([loja, ...proprios], Number(d));
+    // o almoço do pet shop continua no dia em que só o pet shop define as horas
+    novo[d] = j ? { ...j, ...(base[d]?.almoco && base[d]!.abre === j.abre && base[d]!.fecha === j.fecha ? { almoco: base[d]!.almoco } : {}) } : null;
+  }
+  return novo;
+}
+
+/** Tira o almoço (horário de serviço, creche e hotel não têm). */
+export const semAlmoco = (h: Horario): Horario => comAlmoco(h, null);
+
+/** Frase de erro de um horário próprio (serviço, creche, hotel); null se está certo. Precisa de ao menos um dia aberto. */
+export function erroDoHorarioProprio(h: Horario): string | null {
+  const e = erroDoHorario(semAlmoco(h));
+  if (e) return e;
+  return ORDEM_DIAS.some((d) => h[d]) ? null : "Deixe ao menos um dia aberto, ou volte para \"igual ao pet shop\".";
+}
+
+/** O mesmo horário (dias e horas, sem olhar o almoço)? */
+export function mesmoHorario(a: unknown, b: unknown): boolean {
+  const x = lerHorario(a), y = lerHorario(b);
+  return ORDEM_DIAS.every((d) => (!x[d] && !y[d]) || (!!x[d] && !!y[d] && x[d]!.abre === y[d]!.abre && x[d]!.fecha === y[d]!.fecha));
+}
+
+/** "segunda 8h às 18h; …; domingo fechado", para o Mozart e as telas. */
+export function horarioEmTexto(bruto: unknown): string {
+  const h = lerHorario(bruto);
+  const hb = (x: string) => (x.endsWith(":00") ? `${Number(x.slice(0, 2))}h` : `${Number(x.slice(0, 2))}h${x.slice(3, 5)}`);
+  return ORDEM_DIAS.map((d) => `${NOME_DIAS[d]} ${h[d] ? `${hb(h[d]!.abre)} às ${hb(h[d]!.fecha)}` : "fechado"}`).join("; ");
+}
+

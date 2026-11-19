@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import { CalendarCheck2, Pencil, Plus, Printer } from "lucide-react";
@@ -38,7 +39,7 @@ export function ResumoDosMeses({ plano, presencas, faltas }: { plano: PlanoCompl
     <div className="g-cm-meses">
       {/* o mês passado só aparece quando o plano já valia nele */}
       {[agora, anterior(agora)].filter((mes, i) => i === 0 || plano.inicio < isoDia(new Date(agora.getFullYear(), agora.getMonth(), 1))).map((mes, i) => {
-        const r = resumoDoMes(plano, mes, presencas, faltas, petshop.horario, hoje);
+        const r = resumoDoMes(plano, mes, presencas, faltas, horarioDaCreche(petshop), hoje);
         const nada = !r.esperados && !r.vieram && !r.extras.length && !r.reposicoes.length && !r.faltas.length && !r.vaiFaltar.length;
         return (
           <div key={i} className="g-cm-mes">

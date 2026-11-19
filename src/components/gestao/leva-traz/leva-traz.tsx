@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "@/components/gestao/link-depois";
 import { useSearchParams } from "next/navigation";
@@ -93,7 +94,7 @@ function LevaTraz({ origem }: { origem: "agenda" | "casa" }) {
   const comCreche = veEstadias && usaModulo(petshop, "creche");
   const { dados, carregando, erro, recarregar } = useDados(async () => {
     // o táxi dos mensalistas (plano com táxi) corre junto das outras leituras
-    const mensP = comCreche ? viagensDosMensalistas(sb, petshop.id, petshop.horario, dia).catch(() => ({ viagens: [] as ViagemMensalista[], planos: [] as PlanoCompleto[] }))
+    const mensP = comCreche ? viagensDosMensalistas(sb, petshop.id, horarioDaCreche(petshop), dia).catch(() => ({ viagens: [] as ViagemMensalista[], planos: [] as PlanoCompleto[] }))
       : Promise.resolve({ viagens: [] as ViagemMensalista[], planos: [] as PlanoCompleto[] });
     const [ags, ests] = await Promise.all([
       veHorarios ? sb.from("agendamentos").select(SELECT).eq("petshop_id", petshop.id).eq("leva_traz", true)
