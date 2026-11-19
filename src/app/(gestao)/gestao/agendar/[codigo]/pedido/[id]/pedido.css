@@ -61,3 +61,4 @@
 .g-lkp-horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
 .g-lkp-hora { min-height: 44px; border-radius: var(--g-raio-p, 12px); border: 1px solid var(--g-linha-forte, var(--g-linha)); background: var(--g-campo, #fff); color: inherit; font: 600 .9375rem/1 var(--sans, inherit); font-variant-numeric: tabular-nums; cursor: pointer; }
 .g-lkp-dia:focus-visible, .g-lkp-hora:focus-visible { outline: 3px solid var(--g-laranja); outline-offset: 2px; }
+.g-lkp-partes { margin-top: -4px; overflow-wrap: anywhere; }

@@ -120,6 +120,7 @@ const SAIDA = path.join(__dirname, '..', 'saida');
   await cartaoBanho.locator('.g-lk-promo-serv').first().waitFor({ timeout: 10000 });
   T.ok('o serviço Banho mostra "10% off · todos os dias" (a promoção desligada não aparece)', /10% off · todos os dias/.test(await cartaoBanho.innerText()) && (await cartaoBanho.locator('.g-lk-promo-serv').count()) === 1, await cartaoBanho.innerText());
   await cartaoBanho.click();
+  await page.locator('[data-teste=escolha-servicos] button').click();
   await page.locator('.g-lk-hora').first().waitFor({ timeout: 30000 });
   const comPromo = page.locator('.g-lk-hora.com-promo');
   T.ok('os horários mostram "10% off"', (await comPromo.count()) > 0 && /10% off/.test(await comPromo.first().innerText()));

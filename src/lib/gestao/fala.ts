@@ -135,3 +135,30 @@ export function criarJuntaFrases() {
     },
   };
 }
+
+/* ---------- juntar o que o ditado ouviu ---------- */
+
+const palavras = (t: string) => t.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+const igual = (a: string, b: string) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }) === 0;
+
+/**
+ * Junta dois pedaços do ditado sem repetir. Alguns celulares (Chrome no Android) mandam cada pedaço já com o anterior
+ * dentro ("Mozart Tobias" e depois "Mozart Tobias a dona é a Valéria"): somar os dois repetia o começo. Regras:
+ * o novo começa com tudo o que já havia → fica o novo; o que já havia termina com o novo → nada muda; o fim do que
+ * havia é o começo do novo (2 palavras ou mais) → entra só o resto; senão, os dois em sequência.
+ */
+export function juntarFala(antes: string, novo: string): string {
+  const a = palavras(antes), b = palavras(novo);
+  if (!a.length) return b.join(" ");
+  if (!b.length) return a.join(" ");
+  const comeca = (x: string[], y: string[]) => y.length <= x.length && y.every((p, i) => igual(p, x[i]));
+  if (comeca(b, a)) return b.join(" ");
+  if (comeca(a.slice(a.length - b.length), b) && b.length <= a.length) return a.join(" ");
+  for (let k = Math.min(a.length, b.length - 1); k >= 2; k--) {
+    if (comeca(b, a.slice(a.length - k))) return [...a, ...b.slice(k)].join(" ");
+  }
+  return [...a, ...b].join(" ");
+}
+
+/** Junta os pedaços de uma escuta (a lista `results` do navegador), na ordem, sem repetir. */
+export const juntarPedacos = (pedacos: readonly string[]) => pedacos.reduce((t, p) => juntarFala(t, p), "");

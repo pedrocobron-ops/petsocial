@@ -173,12 +173,16 @@ export default function PedidosLink() {
 
   const atendem = equipe.filter((p) => p.ativo && p.atende);
   const nomeServico = (id: string | null) => servicos.find((s) => s.id === id)?.nome ?? null;
-  const rotulo = (p: Pedido) => (p.tipo === "creche" ? "Creche" : p.tipo === "hotel" ? "Hotel" : nomeServico(p.servico_id));
+  /** Os serviços do pedido: o principal e os que vêm junto no mesmo horário (migração 20261239). */
+  const servicosDe = (p: Pedido) => [p.servico_id, ...(p.outros_servicos ?? [])].filter((id): id is string => !!id).map((id) => servicos.find((s) => s.id === id));
+  /** "Banho e tosa" ou "Banho e tosa + Hidratação + Corte de unhas". */
+  const rotulo = (p: Pedido) => (p.tipo === "creche" ? "Creche" : p.tipo === "hotel" ? "Hotel"
+    : p.outros_servicos?.length ? [nomeServico(p.servico_id), ...p.outros_servicos.map(nomeServico)].filter(Boolean).join(" + ") || null : nomeServico(p.servico_id));
   // o valor do pedido, como o link mostrou ao tutor (só para quem vê o dinheiro)
   const valorDe = (p: Pedido) => {
     if (!vejoFinanceiro) return null;
     const porte = porteDe(petshop);
-    const v = precoDoPedido(p, servicos.find((s) => s.id === p.servico_id), { diaria_creche: petshop.diaria_creche, diaria_hotel: petshop.diaria_hotel,
+    const v = precoDoPedido(p, p.outros_servicos?.length ? servicosDe(p) : servicos.find((s) => s.id === p.servico_id), { diaria_creche: petshop.diaria_creche, diaria_hotel: petshop.diaria_hotel,
       diariaHotelDoPorte: porte.ativo && p.porte ? porte[p.porte as "P" | "M" | "G" | "GG"] ?? null : null });
     return v && <span className="g-pl-valor">{v}</span>;
   };
@@ -357,7 +361,7 @@ export default function PedidosLink() {
 
   /** Dos pedidos da lista, os de serviço em que o valor muda com o porte e nem o pedido nem a ficha do pet dizem o porte. */
   async function semPorteParaPerguntar(lista: Pedido[]): Promise<Pedido[]> {
-    const candidatos = lista.filter((p) => !ehEstadia(p) && !p.porte && precoMudaComPorte(servicos.find((s) => s.id === p.servico_id)));
+    const candidatos = lista.filter((p) => !ehEstadia(p) && !p.porte && servicosDe(p).some((s) => precoMudaComPorte(s)));
     if (!candidatos.length) return [];
     // pet que já é da casa e tem porte na ficha: o banco usa o da ficha, não precisa perguntar
     const r = await sb.rpc("pedido_tutores_do_telefone", { p_id: lista[0].id });
@@ -498,15 +502,17 @@ export default function PedidosLink() {
     if (lista[0].resposta === "recusado") {
       return `${oi} Recebemos o seu pedido para ${nomes}, mas ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}, não vamos conseguir atender. Você pode escolher outro horário livre aqui: ${base}\n\nSe preferir, me diga os dias e períodos que ficam bons para você.`;
     }
+    // na mensagem, vários serviços viram uma lista: "Banho e tosa, Hidratação e Corte de unhas"
+    const naFrase = (x: Respondido) => (x.pedido.outros_servicos?.length ? listaDe(servicosDe(x.pedido).flatMap((s) => (s ? [s.nome] : []))) || x.servico : x.servico);
     if (lista.length === 1) {
-      const oQue = lista[0].servico ? `${lista[0].servico} de ${p.pet_nome}` : `horário de ${p.pet_nome}`;
+      const oQue = naFrase(lista[0]) ? `${naFrase(lista[0])} de ${p.pet_nome}` : `horário de ${p.pet_nome}`;
       return `${oi} Está confirmado: ${oQue} ${quandoNaFrase(p.inicio)}, às ${hora(p.inicio)}.${doValor}${ondeFica} Esperamos vocês!${acompanhar}`;
     }
     // cada pet com o seu serviço, o seu dia e a sua hora (o dia só se repete quando muda)
     const linhas = lista.map((r, i) => {
       const dia = quandoNaFrase(r.pedido.inicio);
       const mesmoDia = i > 0 && dia === quandoNaFrase(lista[i - 1].pedido.inicio);
-      return `${r.servico ? `${r.servico} de ${r.pedido.pet_nome}` : r.pedido.pet_nome} ${mesmoDia ? "" : `${dia}, `}às ${hora(r.pedido.inicio)}`;
+      return `${naFrase(r) ? `${naFrase(r)} de ${r.pedido.pet_nome}` : r.pedido.pet_nome} ${mesmoDia ? "" : `${dia}, `}às ${hora(r.pedido.inicio)}`;
     });
     return `${oi} Está confirmado: ${listaDe(linhas)}.${doValor}${ondeFica} Esperamos vocês!${acompanhar}`;
   }
@@ -723,11 +729,16 @@ export default function PedidosLink() {
             <div className="g-pilha">
               <p className="g-muted g-p">O pedido veio sem o porte, e o valor do serviço muda com ele. Escolha o porte para o horário já entrar com o valor certo. Fechando esta janela, o pedido continua esperando.</p>
               {q.faltam.map((p) => {
-                const s = servicos.find((x) => x.id === p.servico_id);
-                const precoDe = (porte: string) => (s ? { P: s.preco_p, M: s.preco_m, G: s.preco_g, GG: s.preco_gg }[porte] ?? null : null);
+                const lista = servicosDe(p);
+                // com mais de um serviço, o preço do porte é a soma (sem preço em algum deles: não mostra)
+                const precoDe = (porte: string) => {
+                  if (!lista.length || lista.some((s) => !s)) return null;
+                  const v = lista.map((s) => ({ P: s!.preco_p, M: s!.preco_m, G: s!.preco_g, GG: s!.preco_gg }[porte] ?? null));
+                  return v.some((x) => x == null) ? null : centavos(v.reduce<number>((t, x) => t + Number(x), 0));
+                };
                 return (
                   <div key={p.id} className="g-card areia g-pilha p" role="group" aria-label={`Porte de ${p.pet_nome}`}>
-                    <div className="g-fila"><AvatarPet pet={{ nome: p.pet_nome, especie: p.especie }} /><div className="g-cresce"><b>{p.pet_nome}</b><div className="g-pp g-muted">{s?.nome ?? "Serviço"} · {quandoNaTela(p.inicio)}, {hora(p.inicio)}</div></div></div>
+                    <div className="g-fila"><AvatarPet pet={{ nome: p.pet_nome, especie: p.especie }} /><div className="g-cresce"><b>{p.pet_nome}</b><div className="g-pp g-muted">{rotulo(p) ?? "Serviço"} · {quandoNaTela(p.inicio)}, {hora(p.inicio)}</div></div></div>
                     <div className="g-chips">
                       {PORTES.map((x) => <button key={x.id} type="button" className="g-chip" aria-pressed={q.respostas[p.id] === x.id} onClick={() => responder(p.id, x.id)}>{x.rotulo}{vejoFinanceiro && precoDe(x.id) != null ? ` · ${brl(precoDe(x.id))}` : ""}</button>)}
                     </div>

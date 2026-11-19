@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check } from "lucide-react";
-import { PERIODOS, PLANOS, ofertaDe, type PeriodoId } from "@/lib/gestao/planos";
+import { PERIODOS, PLANOS, TEXTO_TAXA, ofertaDe, type PeriodoId } from "@/lib/gestao/planos";
 import { brlCurto } from "@/lib/gestao/util";
 
 /** "Para quem é" de cada plano, na página de venda: vale para banho e tosa, creche, hotel e loja (o nome do plano não muda). */
@@ -47,6 +47,7 @@ export default function PlanosVenda({ criar }: { criar: string }) {
           );
         })}
       </ul>
+      <p className="gp-taxa">{TEXTO_TAXA}</p>
     </>
   );
 }
