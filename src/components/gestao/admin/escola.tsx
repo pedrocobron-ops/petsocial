@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { FileUp, Trash2 } from "lucide-react";
 import { Esqueleto, mensagemDeErro, ok, useAvisos } from "@/components/gestao/ui";
-import { MATERIAIS } from "@/lib/gestao/escola";
+import { MATERIAIS, MATERIAIS_PAGOS_A_VENDA, foraDaLoja } from "@/lib/gestao/escola";
 import { banco } from "@/lib/gestao/supabase";
 import { dataCompleta } from "@/lib/gestao/util";
 
@@ -79,6 +79,12 @@ export default function AbaEscola() {
 
   return (
     <div className="g-pilha g">
+      {!MATERIAIS_PAGOS_A_VENDA && (
+        <p className="g-aviso amarelo" data-teste="escola-escondida">
+          Os materiais pagos estão escondidos da loja até ter PDF e o aviso de pagamento. Os clientes não veem esses materiais na Escola,
+          no manual nem na Ajuda. Para voltar a vender, ligue MATERIAIS_PAGOS_A_VENDA em src/lib/gestao/escola-venda.ts.
+        </p>
+      )}
       <section className="g-pilha">
         <div>
           <h2>PDF de cada material</h2>
@@ -92,8 +98,12 @@ export default function AbaEscola() {
               <div key={m.slug} className="g-card" style={{ display: "grid", gap: 8 }}>
                 <div className="g-fila entre">
                   <b style={{ minWidth: 0, overflowWrap: "anywhere" }}>{m.nome}</b>
-                  <span className={`g-tag ${a ? "verde" : "amarelo"}`}>{a ? "com PDF" : "sem PDF"}</span>
+                  <span className="g-fila" style={{ gap: 6 }}>
+                    {foraDaLoja(m) && <span className="g-tag vermelho" title="escondido da loja até ter PDF e o aviso de pagamento">escondido da loja</span>}
+                    <span className={`g-tag ${a ? "verde" : "amarelo"}`}>{a ? "com PDF" : "sem PDF"}</span>
+                  </span>
                 </div>
+                {foraDaLoja(m) && <p className="g-pp">Escondido da loja até ter PDF e o aviso de pagamento.</p>}
                 <p className="g-pp g-muted">
                   {a ? `Enviado em ${dataCompleta(new Date(a.atualizado_em))}${a.tamanho ? ` · ${mega(a.tamanho)}` : ""}. ` : "Sem o PDF, quem compra vê o material em Meus materiais, mas lê só pelo e-mail. "}
                   {quantos} {quantos === 1 ? "pessoa tem" : "pessoas têm"} este material · código na Cakto: {m.codigo || "sem código"}

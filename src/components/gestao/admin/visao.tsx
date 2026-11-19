@@ -15,6 +15,8 @@ type Visao = {
   planos: { plano: string; meses: number; status: "ativa" | "atrasada" | "cortesia"; n: number }[];
   cancelamentos: { mes: string; n: number }[];
   canceladas_sem_data: number;
+  /** Contas marcadas como de teste: ficam fora de todos os números desta aba (banco antes da migração 20261240: ausente). */
+  contas_teste?: number;
 };
 
 const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -99,6 +101,7 @@ export default function AbaVisao() {
 
   return (
     <div className="g-pilha g">
+      {(v.contas_teste ?? 0) > 0 && <p className="g-pp g-muted" data-teste="contas-teste-fora">{v.contas_teste === 1 ? "1 conta de teste fica fora destes números." : `${v.contas_teste} contas de teste ficam fora destes números.`}</p>}
       <CartaoPagantes />
       <section className="g-grade c4" aria-label="Pet shops por situação">
         <Num rotulo="Pet shops cadastrados" valor={s.total} />

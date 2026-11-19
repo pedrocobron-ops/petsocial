@@ -8,7 +8,7 @@ import Leitor from "@/components/gestao/escola/leitor";
 import { Tile } from "@/components/gestao/painel";
 import { Folha, Vazio, ok, useAvisos, useDados } from "@/components/gestao/ui";
 import type { Banco } from "@/lib/gestao/supabase";
-import { AULAS, MATERIAIS, linkDeCompra, type Aula, type Material } from "@/lib/gestao/escola";
+import { AULAS, MATERIAIS, MATERIAIS_NA_LOJA, linkDeCompra, type Aula, type Material } from "@/lib/gestao/escola";
 import { brlCurto } from "@/lib/gestao/util";
 
 const TOM: Record<Aula["tema"], "pessego" | "menta" | "ceu" | "lilas" | "manteiga" | "rosa"> = { Preço: "manteiga", Agenda: "pessego", Clientes: "menta", Dinheiro: "ceu", Equipe: "lilas", "Creche e hotel": "ceu", Divulgação: "rosa", Estoque: "pessego" };
@@ -36,7 +36,8 @@ export default function Escola() {
   }, [user.email]);
 
   const meus = useMemo(() => MATERIAIS.filter((m) => dados?.meus.has(m.slug)), [dados]);
-  const estante = useMemo(() => MATERIAIS.filter((m) => !dados?.meus.has(m.slug)), [dados]);
+  // a estante mostra só o que está à venda (escola.ts, MATERIAIS_PAGOS_A_VENDA); o que a pessoa já tem continua em Meus materiais
+  const estante = useMemo(() => MATERIAIS_NA_LOJA.filter((m) => !dados?.meus.has(m.slug)), [dados]);
   const podeLer = (m: Material) => Boolean(dados?.comArquivo.has(m.slug));
 
   if (!souDono) return <Vazio titulo="A Escola de Gestão é do dono do pet shop." texto="Peça a quem é dono ou sócio para abrir por aqui." />;
@@ -51,7 +52,7 @@ export default function Escola() {
         <section className="g-esc-capa">
           <Tile icone={GraduationCap} tom="manteiga" tamanho="g" />
           <h2>Cuidar bem dos pets você já sabe. Aqui é a parte do negócio.</h2>
-          <p>Aulas curtas e gratuitas sobre preço, agenda, caixa e equipe, sempre mostrando onde fazer no sistema. E materiais completos da Maestro Pet para quem quer oferecer um serviço novo.</p>
+          <p>Aulas curtas e gratuitas sobre preço, agenda, caixa e equipe, sempre mostrando onde fazer no sistema.{MATERIAIS_NA_LOJA.length > 0 && " E materiais completos da Maestro Pet para quem quer oferecer um serviço novo."}</p>
         </section>
 
         {meus.length > 0 && (
@@ -67,7 +68,7 @@ export default function Escola() {
                     <div className="g-esc-preco">
                       {podeLer(m)
                         ? <button className="g-btn verde p" onClick={() => setLendo(m)}><BookOpen />Ler aqui</button>
-                        : <span className="g-pp g-muted" style={{ fontWeight: 400 }}><Mail style={{ width: 15, height: 15, verticalAlign: "-2px", marginRight: 4 }} />O arquivo chegou no seu e-mail. A leitura por aqui entra em breve.</span>}
+                        : <span className="g-pp g-muted" style={{ fontWeight: 400 }}><Mail style={{ width: 15, height: 15, verticalAlign: "-2px", marginRight: 4 }} />Para ler, abra o e-mail da compra.</span>}
                     </div>
                   </div>
                 </div>
@@ -121,7 +122,7 @@ export default function Escola() {
         )}
 
         {/* no fim, e fechado: quem nunca comprou nada não precisa achar que tem de confirmar o e-mail (estreante, L12) */}
-        {dados && !dados.provado && user.email && <ConfirmarEmail sb={sb} email={user.email} aoConfirmar={() => void recarregar()} />}
+        {dados && !dados.provado && user.email && MATERIAIS_NA_LOJA.length > 0 && <ConfirmarEmail sb={sb} email={user.email} aoConfirmar={() => void recarregar()} />}
       </div>
 
       {aulaAberta && (

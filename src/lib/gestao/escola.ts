@@ -1,4 +1,5 @@
 import { PRODUTOS, linhaDe, type Produto } from "@/lib/produtos";
+import { MATERIAIS_PAGOS_A_VENDA } from "./escola-venda";
 
 /**
  * Escola de Gestão: aulas curtas e gratuitas sobre a rotina do pet shop e a estante de materiais da Maestro Pet
@@ -51,6 +52,15 @@ export const MATERIAIS: Material[] = PRODUTOS
   .map((p) => ({ ...p, ...OLHAR[p.slug], codigo: codigoDe(p.checkout) }));
 
 export const material = (slug: string) => MATERIAIS.find((m) => m.slug === slug) ?? null;
+
+export { MATERIAIS_PAGOS_A_VENDA };
+
+/** O material fica fora da loja? (pago, com a venda desligada). Material gratuito sempre aparece. */
+export const foraDaLoja = (m: { preco: number }, aVenda = MATERIAIS_PAGOS_A_VENDA) => !aVenda && m.preco > 0;
+
+/** A estante que o cliente vê: só o que está à venda (e os gratuitos). */
+export const materiaisNaLoja = (aVenda = MATERIAIS_PAGOS_A_VENDA) => MATERIAIS.filter((m) => !foraDaLoja(m, aVenda));
+export const MATERIAIS_NA_LOJA: Material[] = materiaisNaLoja();
 
 /** Link de pagamento com o e-mail da conta já preenchido: é por ele que o sistema reconhece a compra. */
 export function linkDeCompra(m: Material, email: string | null | undefined) {

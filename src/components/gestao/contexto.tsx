@@ -16,6 +16,7 @@ import { fmtTelefone } from "@/lib/gestao/util";
 import { comPrazo, definirDonoDaMemoria, esquecerTudo } from "@/lib/gestao/dados-memoria";
 import { definirImpressaoDoComprovante, papelDoComprovante } from "@/lib/gestao/comprovante-papel";
 import { pendentes, type Documento } from "@/lib/gestao/documentos";
+import { comUmaTentativaAMais } from "@/lib/gestao/abertura";
 import Reaceite from "./reaceite";
 
 export type Gestao = {
@@ -77,15 +78,20 @@ const CHAVE_ULTIMA = "maestro-gestao-ultima-loja";
  */
 const CHAVE_NOME = "maestro-gestao-nome-loja";
 const SCRIPT_DO_NOME = `try{var n=localStorage.getItem(${JSON.stringify(CHAVE_NOME)}),e=document.getElementById("g-abrindo");if(n&&e)e.textContent="Abrindo "+n.slice(0,80)+"\u2026"}catch(x){}`;
-/** Depois de quanto tempo a tela de abertura explica a demora e oferece "Tentar de novo". */
-export const DEMORA_DA_ABERTURA_MS = 8000;
+/**
+ * Depois de quanto tempo (desde que a página começou a abrir) a tela de abertura explica a demora e oferece "Tentar de novo".
+ * 12 s: num 4G fraco, baixar o aplicativo, conferir o login e ler a conta já passa de 6 a 8 s, e o banco corta uma consulta
+ * em 8 s; com a tentativa quieta (abertura.ts) a abertura ainda chega antes do aviso. Antes eram 8 s: o aviso aparecia
+ * numa abertura que só estava lenta.
+ */
+export const DEMORA_DA_ABERTURA_MS = 12_000;
 /** Depois de quanto tempo sem conseguir abrir a tela desiste de esperar e mostra o erro (com "Tentar de novo"). */
 const LIMITE_DA_ABERTURA_MS = 45_000;
 /** Prazo para o aparelho dizer se há login guardado (se outra aba travou essa conferência, não fica esperando para sempre). */
 const PRAZO_DO_LOGIN_MS = 15_000;
 /**
  * A saída da tela de abertura também vale antes de o aplicativo baixar (internet fraca): um script pequeno mostra o aviso
- * depois de 8 segundos e liga o botão, que recarrega a página.
+ * depois de 12 segundos e liga o botão, que recarrega a página.
  */
 const SCRIPT_DA_DEMORA = `setTimeout(function(){try{var d=document.getElementById("g-abrindo-demora");if(d){d.style.display="";var b=d.querySelector("button");if(b&&!b.onclick)b.onclick=function(){location.reload()}}}catch(x){}},${DEMORA_DA_ABERTURA_MS});`;
 const ETAPAS = {
@@ -128,8 +134,9 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
     (r) => (r.error || !r.data ? null : (r.data as unknown as Exclusao)), () => null), [sb]);
 
   const buscarBase = useCallback(async (petshopId: string) => {
-    // pet shop, equipe e serviços numa ida só ao banco (com o banco antes da atualização, um pedido por parte, como antes)
-    const b = await lerBase(sb, petshopId);
+    // pet shop, equipe e serviços numa ida só ao banco (com o banco antes da atualização, um pedido por parte, como antes).
+    // Banco que demorou ou internet que piscou: mais uma tentativa, quieta, antes de dizer que não carregou.
+    const b = await comUmaTentativaAMais(() => lerBase(sb, petshopId).then((x) => ({ ...x, error: x.erro })));
     if (b.erro || !b.petshop) throw b.erro ?? new Error("pet shop");
     return { petshop: b.petshop, equipe: b.equipe, servicos: b.servicos };
   }, [sb]);
@@ -144,7 +151,7 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let vivo = true;
-    // abertura que não termina: aos 8 s a tela explica e oferece "Tentar de novo"; aos 45 s desiste de esperar e mostra o erro
+    // abertura que não termina: aos 12 s a tela explica e oferece "Tentar de novo"; aos 45 s desiste de esperar e mostra o erro
     setDemorou(false);
     const desde = tentativa === 0 && typeof performance !== "undefined" ? performance.now() : 0;
     const tDemora = setTimeout(() => { if (vivo) setDemorou(true); }, Math.max(0, DEMORA_DA_ABERTURA_MS - desde));
@@ -181,7 +188,8 @@ export function GestaoProvider({ children }: { children: React.ReactNode }) {
       // a tela de aceite volta a ser conferida na próxima vez que o aplicativo abrir.
       const aceites = sb.from("aceites").select("documento, versao").eq("user_id", u.id).then(
         (r) => (r.error ? [] : pendentes(r.data ?? [])), () => [] as Documento[]);
-      const { data: vinculos, error } = await sb.rpc("entrar");
+      // a conta (de que pet shops a pessoa faz parte): demora do banco ou rede que piscou ganham mais uma tentativa, quieta
+      const { data: vinculos, error } = await comUmaTentativaAMais(() => sb.rpc("entrar"), { seguir: () => vivo });
       if (!vivo) return;
       if (error) { terminou(); setErro("Não consegui carregar a sua conta. Tente de novo em instantes."); return; }
       if (!vinculos?.length) { router.replace("/gestao/comecar"); return; }
