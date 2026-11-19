@@ -19,7 +19,8 @@ const { falsos } = require('../lib/voz-falsa');
     const gravacoes = [];
     page.on('request', (r) => { if (r.method() !== 'GET' && /\/rest\/v1\/(pets|clientes|agendamentos)/.test(r.url())) gravacoes.push(r.url()); });
     const ouvir = (partes) => page.evaluate((p) => window.__voz.ultimo._ouvir(p), partes);
-    const silencio = () => page.evaluate(() => window.__voz.ultimo._fim());
+    // parar de falar: a fala termina depois da pausa de 3 s (o navegador encerrar a escuta sozinho só faz ela recomeçar)
+    const silencio = () => page.waitForTimeout(3300);
 
     T.secao(`${largura}: ficha do pet nova`);
     await N.ir(page, '/gestao/app/clientes?novo=1');
