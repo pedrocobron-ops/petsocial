@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Square, Volume2 } from "lucide-react";
-import { criarJuntaFrases, dividirEmFrases, melhorVoz, nomeDaVoz, textoParaFalar, vozesEmPortugues } from "@/lib/gestao/fala";
+import { criarJuntaFrases, dividirEmFrases, juntarFala, juntarPedacos, melhorVoz, nomeDaVoz, textoParaFalar, vozesEmPortugues } from "@/lib/gestao/fala";
 import { guardarLembrado, lerLembrado } from "./lembrado";
 
 /**
@@ -10,7 +10,8 @@ import { guardarLembrado, lerLembrado } from "./lembrado";
  * nenhum áudio passa pelo nosso servidor e não há serviço pago. Sem ditado no navegador (alguns Firefox),
  * o botão não aparece e a pessoa usa o microfone do teclado.
  * - Segurar e soltar (celular) ou tocar para começar e tocar para parar.
- * - O texto aparece na caixa enquanto a pessoa fala; para sozinho no silêncio e depois de 30 s.
+ * - O texto aparece na caixa enquanto a pessoa fala; para sozinho depois de uma pausa de 3 s (respirar ou pensar não
+ *   corta a fala) e depois de 60 s. Se o navegador encerrar a escuta antes disso, ela recomeça sem perder o que já foi dito.
  */
 
 type Resultado = ArrayLike<{ transcript: string }> & { isFinal: boolean };
@@ -27,9 +28,11 @@ function classeDoDitado(): (new () => Reconhecedor) | null {
 }
 
 /** Tempo máximo de uma fala. */
-export const MAXIMO_MS = 30_000;
-/** Sem ouvir nada por este tempo, para (o navegador às vezes não para sozinho). */
-const SILENCIO_MS = 8_000;
+export const MAXIMO_MS = 60_000;
+/** Depois de começar a falar, esta pausa encerra a fala (respirar ou pensar um pouco não corta). */
+export const PAUSA_MS = 3_000;
+/** Sem ouvir nada desde o toque no microfone, para por este tempo. */
+const SEM_FALA_MS = 8_000;
 /** Segurou o botão por mais que isso: ao soltar, para de ouvir (segurar para falar). Menos: foi um toque. */
 const SEGURAR_MS = 450;
 
@@ -76,41 +79,77 @@ export function useDitado(aoOuvir: (texto: string) => void, aoTerminar: (texto: 
     };
   }, []);
 
-  const parar = useCallback(() => { try { rec.current?.stop(); } catch { /* já parou */ } }, []);
+  /** Encerra a fala de agora (toque no botão, soltar o botão, pausa longa ou tempo máximo). */
+  const pararAgora = useRef<() => void>(() => {});
+  const parar = useCallback(() => pararAgora.current(), []);
 
   const comecar = useCallback((jaEscrito: string) => {
     if (rec.current) return;
     const Classe = classeDoDitado();
     if (!Classe) return;
     pararDeFalar(); // o Mozart lendo em voz alta não pode virar o pedido
-    let r: Reconhecedor;
-    try { r = new Classe(); } catch { setErro("falhou"); return; }
     const antes = jaEscrito.trim() ? `${jaEscrito.trim()} ` : "";
-    let dito = "";
+    const inicio = Date.now();
+    // escuta contínua: o navegador não encerra na primeira pausa; quem decide o fim é a pausa de PAUSA_MS. Se ele encerrar
+    // sozinho (o Android faz isso), uma escuta nova continua a mesma fala: `guardado` é o que veio das escutas anteriores.
+    let guardado = "";
+    let sessao = "";
+    let falou = false;
     let errou: ErroVoz | null = null;
-    const vigiarSilencio = () => { window.clearTimeout(silencio.current); silencio.current = window.setTimeout(() => { try { r.stop(); } catch { /* já parou */ } }, SILENCIO_MS); };
-    r.lang = "pt-BR"; r.continuous = false; r.interimResults = true; r.maxAlternatives = 1;
-    r.onresult = (e) => {
-      let t = "";
-      for (let i = 0; i < e.results.length; i++) t += e.results[i][0]?.transcript ?? "";
-      dito = t.replace(/\s+/g, " ").trim();
-      avisos.current.aoOuvir(antes + dito);
-      vigiarSilencio();
-    };
-    r.onerror = (e) => { const x = erroDoNavegador(e.error); if (x) { errou = x; setErro(x); } };
-    r.onend = () => {
+    let encerrando = false;
+    let terminou = false;
+    let atual: Reconhecedor | null = null;
+    const texto = () => juntarFala(guardado, sessao);
+    const terminar = () => {
+      if (terminou) return;
+      terminou = true;
       limparRelogios();
-      if (rec.current === r) rec.current = null;
+      rec.current = null;
       setOuvindo(false);
+      const dito = texto();
       if (!dito && !errou) setErro("sem-fala");
       avisos.current.aoTerminar(dito ? antes + dito : jaEscrito, Boolean(dito));
     };
-    rec.current = r;
+    const encerrar = () => {
+      encerrando = true;
+      try { atual?.stop(); } catch { terminar(); }
+    };
+    pararAgora.current = encerrar;
+    const vigiar = () => { window.clearTimeout(silencio.current); silencio.current = window.setTimeout(encerrar, falou ? PAUSA_MS : SEM_FALA_MS); };
+    const abrir = (): boolean => {
+      let r: Reconhecedor;
+      try { r = new Classe(); } catch { return false; }
+      r.lang = "pt-BR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+      r.onresult = (e) => {
+        const pedacos: string[] = [];
+        for (let i = 0; i < e.results.length; i++) pedacos.push(e.results[i][0]?.transcript ?? "");
+        sessao = juntarPedacos(pedacos);
+        if (sessao) falou = true;
+        avisos.current.aoOuvir(antes + texto());
+        vigiar();
+      };
+      r.onerror = (e) => {
+        const x = erroDoNavegador(e.error);
+        // "não ouvi nada" depois que a pessoa já falou é só o fim da fala, não um erro
+        if (x === "sem-fala" && falou) { encerrando = true; return; }
+        if (x) { errou = x; setErro(x); }
+      };
+      r.onend = () => {
+        guardado = texto();
+        sessao = "";
+        if (!encerrando && !errou && !terminou && Date.now() - inicio < MAXIMO_MS - 1_000 && abrir()) return;
+        terminar();
+      };
+      try { r.start(); } catch { return false; }
+      atual = r;
+      rec.current = r;
+      return true;
+    };
     setErro(null);
-    try { r.start(); } catch { rec.current = null; setErro("falhou"); return; }
+    if (!abrir()) { setErro("falhou"); return; }
     setOuvindo(true);
-    relogios.current.push(window.setTimeout(() => { try { r.stop(); } catch { /* já parou */ } }, MAXIMO_MS));
-    vigiarSilencio();
+    relogios.current.push(window.setTimeout(encerrar, MAXIMO_MS));
+    vigiar();
   }, []);
 
   const estaOuvindo = useCallback(() => rec.current !== null, []);

@@ -43,7 +43,8 @@ const SAIDA = `${B.RAIZ}/testes/saida`;
     const faixa = painel.locator('.g-voz-faixa');
     const voz = (f) => page.evaluate(f);
     const ouvir = (partes) => page.evaluate((p) => window.__voz.ultimo._ouvir(p), partes);
-    const silencio = () => voz(() => window.__voz.ultimo._fim());
+    // parar de falar: a fala termina depois da pausa de 3 s (respirar não corta); o navegador encerrar a escuta sozinho não termina
+    const silencio = () => page.waitForTimeout(3300);
     const tela = (nome) => page.screenshot({ path: `${SAIDA}/mozart-voz-${nome}-${largura}.png` }).catch(() => {});
     const esperarResposta = () => page.waitForFunction(() => !document.querySelector('.g-bolha.pensa'), null, { timeout: 10000 });
 
@@ -64,17 +65,27 @@ const SAIDA = `${B.RAIZ}/testes/saida`;
     T.ok('o pedaço provisório aparece na caixa enquanto fala', (await caixa.inputValue()) === 'marca banho', await caixa.inputValue());
     await tela('ouvindo');
     await ouvir([['marca banho do tor amanhã às dez e meia', true]]);
+    // respirar no meio da frase não corta: 1,5 s sem som e o navegador encerrando a escuta sozinho
+    await page.waitForTimeout(1500);
+    await voz(() => window.__voz.ultimo._fim());
+    await page.waitForTimeout(200);
+    const retomou = await voz(() => ({ comecou: window.__voz.comecou, continua: window.__voz.ultimo.continuous }));
+    T.ok('uma pausa de 1,5 s não corta: continua ouvindo, sem mandar', (await mic.getAttribute('aria-label')) === 'Parar de ouvir' && pedidos.length === 0 && (await caixa.inputValue()) === 'marca banho do tor amanhã às dez e meia');
+    T.ok('o navegador encerrou a escuta sozinho: ela recomeça (escuta contínua) e o que foi dito fica', retomou.comecou === 2 && retomou.continua === true, retomou);
+    await ouvir([['marca banho do tor amanhã às dez e meia', true], ['com hidratação', true]]);
+    await page.waitForTimeout(100);
+    T.ok('o celular que repete o pedaço anterior não duplica o texto', (await caixa.inputValue()) === 'marca banho do tor amanhã às dez e meia com hidratação', await caixa.inputValue());
     await silencio();
     await page.waitForTimeout(150);
 
     T.secao(`${largura}: 2 segundos para corrigir e envia sozinho`);
-    T.ok('o texto final fica na caixa', (await caixa.inputValue()) === 'marca banho do tor amanhã às dez e meia', await caixa.inputValue());
+    T.ok('o texto final fica na caixa', (await caixa.inputValue()) === 'marca banho do tor amanhã às dez e meia com hidratação', await caixa.inputValue());
     const contagem = (await faixa.innerText().catch(() => '')).replace(/\s+/g, ' ');
     T.ok('"Enviando… · Editar" com a contagem', /Enviando… 2/.test(contagem) && /Editar/.test(contagem), contagem);
     await tela('enviando');
     T.ok('ainda não foi mandado', pedidos.length === 0);
     await page.waitForTimeout(2400);
-    T.ok('depois de 2 s foi mandado, uma vez, com o texto falado', pedidos.length === 1 && pedidos[0].texto === 'marca banho do tor amanhã às dez e meia', pedidos.map((p) => p.texto));
+    T.ok('depois de 2 s foi mandado, uma vez, com o texto falado', pedidos.length === 1 && pedidos[0].texto === 'marca banho do tor amanhã às dez e meia com hidratação', pedidos.map((p) => p.texto));
     T.ok('a caixa fica livre e a faixa some', (await caixa.inputValue()) === '' && (await faixa.count()) === 0);
     await esperarResposta();
     await page.waitForTimeout(1500);
@@ -201,7 +212,7 @@ const SAIDA = `${B.RAIZ}/testes/saida`;
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
-    T.secao(`${largura}: para no silêncio e depois de 30 s`);
+    T.secao(`${largura}: para no silêncio e depois de 60 s`);
     await page.clock.install();
     painel = await abrirMozart();
     await page.evaluate(() => { window.__voz.parou = 0; });
@@ -210,9 +221,14 @@ const SAIDA = `${B.RAIZ}/testes/saida`;
     await page.waitForTimeout(150);
     T.ok('8 s sem ouvir nada: para sozinho', (await voz(() => window.__voz.parou)) === 1 && (await mic.getAttribute('aria-label')) !== 'Parar de ouvir');
     await mic.click();
-    for (let s = 0; s < 6; s++) { await ouvir([[`fala comprida ${s}`, false]]); await page.clock.runFor(5500); }
+    await ouvir([['fala comprida', false]]);
+    await page.clock.runFor(3500);
     await page.waitForTimeout(150);
-    T.ok('falando sem parar: para em 30 s', (await voz(() => window.__voz.parou)) === 2 && (await mic.getAttribute('aria-label')) !== 'Parar de ouvir');
+    T.ok('depois de falar, 3 s em silêncio: para sozinho', (await voz(() => window.__voz.parou)) === 2 && (await mic.getAttribute('aria-label')) !== 'Parar de ouvir');
+    await mic.click();
+    for (let s = 0; s < 26; s++) { await ouvir([[`fala comprida ${s}`, false]]); await page.clock.runFor(2500); }
+    await page.waitForTimeout(150);
+    T.ok('falando sem parar (com pausas curtas): para em 60 s', (await voz(() => window.__voz.parou)) === 3 && (await mic.getAttribute('aria-label')) !== 'Parar de ouvir');
     await caixa.fill('');
     await page.keyboard.press('Escape');
 

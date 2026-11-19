@@ -6,7 +6,7 @@ import { BotaoMic, TEXTO_ERRO_VOZ, useDitado } from "./voz";
 /**
  * Ditado em qualquer campo de texto livre (observações, alertas, diário, boletim…): um microfone pequeno no canto do campo.
  * Mesmo ditado do navegador que o Mozart usa (voz.tsx): pt-BR, o texto aparece enquanto a pessoa fala, para sozinho no
- * silêncio e depois de 30 s, nada vai para o nosso servidor. O que é falado entra DEPOIS do que já estava escrito, com um
+ * silêncio (pausa de 3 s) e depois de 60 s, nada vai para o nosso servidor. O que é falado entra DEPOIS do que já estava escrito, com um
  * espaço. Nunca envia nem salva sozinho. Navegador sem ditado: o campo fica igual, sem botão.
  *
  * Uso (o campo continua sendo do formulário; o componente só põe o botão e a linha "Ouvindo…"):
