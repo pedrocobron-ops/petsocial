@@ -4,11 +4,13 @@ import Link from "next/link";
 import { Instagram, Mail, MessageCircle } from "lucide-react";
 import { Seta } from "@/components/icones";
 import { EMPRESA, linkInstagram, linkWhatsapp } from "@/lib/empresa";
-import { PRODUTOS, linhaDe } from "@/lib/produtos";
+import { PRODUTOS, linhaDe, lojaNegociosNoSite, noSite } from "@/lib/produtos";
 
 export const metadata: Metadata = {
   title: "Quem faz",
-  description: "O Maestro Pet faz guias práticos para tutores de cães e gatos e manuais para quem trabalha no mercado pet. Só o que dá para provar.",
+  description: lojaNegociosNoSite()
+    ? "O Maestro Pet faz guias práticos para tutores de cães e gatos e manuais para quem trabalha no mercado pet. Só o que dá para provar."
+    : "O Maestro Pet faz guias práticos para tutores de cães e gatos e um sistema para pet shop. Só o que dá para provar.",
   alternates: { canonical: "/sobre" },
 };
 
@@ -29,10 +31,12 @@ export default function SobrePage() {
   const wa = linkWhatsapp();
   const ig = linkInstagram();
   const guiasAVenda = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "tutor").length;
-  const manuaisAVenda = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "negocios").length;
+  // manuais fora do site (MATERIAIS_PAGOS_A_VENDA = false): sem o número, sem o botão e sem a menção a eles
+  const manuaisAVenda = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "negocios" && noSite(p)).length;
+  const comNegocios = lojaNegociosNoSite();
   const fatos: [string, string][] = [
     [String(guiasAVenda), "guias e kits para tutores, à venda hoje"],
-    [String(manuaisAVenda), manuaisAVenda === 1 ? "manual para quem trabalha com pets" : "manuais para quem trabalha com pets"],
+    ...(manuaisAVenda > 0 ? [[String(manuaisAVenda), manuaisAVenda === 1 ? "manual para quem trabalha com pets" : "manuais para quem trabalha com pets"] as [string, string]] : []),
     ["7 dias", "para desistir de qualquer compra"],
   ];
   const identificacao: [string, string][] = [
@@ -50,7 +54,7 @@ export default function SobrePage() {
           <div className="hero-texto">
             <span className="rotulo">Quem faz</span>
             <h1>Um tutor, um border collie <em>e uma regra.</em></h1>
-            <p className="lead">A regra: só o que dá para provar. Fazemos guias para quem tem cão ou gato e manuais para quem trabalha com eles.</p>
+            <p className="lead">A regra: só o que dá para provar. {comNegocios ? "Fazemos guias para quem tem cão ou gato e manuais para quem trabalha com eles." : "Fazemos guias para quem tem cão ou gato e um sistema para quem tem pet shop."}</p>
             {f.nome && <p className="inst-assina">{f.nome}, {f.papel}</p>}
           </div>
           <ul className="inst-fatos">
@@ -72,7 +76,7 @@ export default function SobrePage() {
           </ol>
           <div className="botoes inst-botoes">
             <Link className="btn btn-secundario" href="/tutor">Ver os guias<Seta /></Link>
-            <Link className="btn btn-secundario" href="/negocios">Ver os manuais<Seta /></Link>
+            {comNegocios && <Link className="btn btn-secundario" href="/negocios">Ver os manuais<Seta /></Link>}
           </div>
         </div>
       </section>

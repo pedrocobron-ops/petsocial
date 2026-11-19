@@ -336,6 +336,7 @@ main:has(.venda) + .rodape .rodape-aviso { display: none !important; }
 @media (min-width: 900px) {
   .rodape { padding: 96px 0 48px; }
   .rodape-grade { grid-template-columns: 1.4fr repeat(4, 1fr); gap: 40px; }
+  .rodape-grade-3 { grid-template-columns: 1.4fr repeat(3, 1fr); }
   .rodape-marca { grid-column: auto; padding-right: 0; }
   .rodape-mozart { position: static; margin-top: 8px; }
 }
@@ -666,7 +667,7 @@ main:has(.venda) + .rodape .rodape-aviso { display: none !important; }
 .inst-fatos span { font-size: var(--t-pequeno); line-height: 1.4; color: var(--cinza); max-width: 30ch; }
 @media (min-width: 900px) {
   .hero-inst { padding-bottom: var(--s9); }
-  .inst-fatos { grid-template-columns: repeat(3, 1fr); margin-top: 72px; }
+  .inst-fatos { grid-auto-flow: column; grid-auto-columns: 1fr; margin-top: 72px; }
   .inst-fatos li { padding: 28px 24px 28px 0; }
   .inst-fatos li + li { border-top: 0; border-left: 1px solid var(--linho); padding-left: 24px; }
 }
@@ -1579,6 +1580,7 @@ html:has(dialog[open]) .barra { visibility: hidden; }
 @media (min-width: 900px) {
   .h2-hero { padding: 80px 0 72px; }
   .h2-portas { grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 48px; }
+  .h2-portas-2 { grid-template-columns: repeat(2, 1fr); }
   .h2-porta { padding: 28px 60px 28px 28px; }
 }
 

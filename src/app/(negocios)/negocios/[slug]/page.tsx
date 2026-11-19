@@ -3,21 +3,23 @@ import { join } from "node:path";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import PaginaVendas from "@/components/pagina-vendas";
-import { PRODUTOS, linhaDe } from "@/lib/produtos";
+import { PRODUTOS, linhaDe, noSite } from "@/lib/produtos";
 import { PAGINAS } from "@/lib/vendas";
 
 type Params = { params: Promise<{ slug: string }> };
 
 export const dynamicParams = false;
 
+/** Manual fora do site (venda desligada em MATERIAIS_PAGOS_A_VENDA): a página não é gerada e o endereço dá 404. */
 export function generateStaticParams() {
-  return PRODUTOS.filter((p) => linhaDe(p) === "negocios" && PAGINAS[p.slug]).map((p) => ({ slug: p.slug }));
+  return PRODUTOS.filter((p) => linhaDe(p) === "negocios" && noSite(p) && PAGINAS[p.slug]).map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const slug = (await params).slug;
   const c = PAGINAS[slug];
   const p = PRODUTOS.find((x) => x.slug === slug);
+  if (!c || !p || !noSite(p)) return {};
   return {
     // Guia ainda não lançado: a página existe para revisão, mas fica fora do Google até entrar na vitrine.
     ...(p && !p.lancado ? { robots: { index: false, follow: false } } : {}),
@@ -32,6 +34,6 @@ export default async function Page({ params }: Params) {
   const { slug } = await params;
   const c = PAGINAS[slug];
   const p = PRODUTOS.find((x) => x.slug === slug && linhaDe(x) === "negocios");
-  if (!c || !p) notFound();
+  if (!c || !p || !noSite(p)) notFound();
   return <PaginaVendas c={c} p={p} />;
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { EMPRESA, identificacao, linkWhatsapp } from "@/lib/empresa";
+import { lojaNegociosNoSite } from "@/lib/produtos";
 
 export const metadata: Metadata = {
   title: "Termos de uso",
@@ -32,7 +33,7 @@ export default function TermosPage() {
       <h2>2. O que vendemos</h2>
       <ul>
         <li><b>Guias e kits para tutores</b> (área <Link href="/tutor">Para tutores</Link>): materiais digitais em PDF para ler na tela ou imprimir, sobre cuidados, comportamento e rotina de cães e gatos.</li>
-        <li><b>Manuais de negócio</b> (área <Link href="/negocios">Para negócios pet</Link>): materiais digitais com plano de trabalho, planilhas e modelos editáveis para quem quer trabalhar no mercado pet.</li>
+        <li><b>Manuais de negócio</b>{lojaNegociosNoSite() && <> (área <Link href="/negocios">Para negócios pet</Link>)</>}: materiais digitais com plano de trabalho, planilhas e modelos editáveis para quem quer trabalhar no mercado pet.</li>
         <li><b>Feed Pronto</b>: pacotes de posts editáveis no Canva, com legendas, para o perfil de negócios pet.</li>
       </ul>
       <p>

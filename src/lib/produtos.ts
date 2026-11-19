@@ -1,3 +1,5 @@
+import { MATERIAIS_PAGOS_A_VENDA } from "@/lib/gestao/escola-venda";
+
 /**
  * Catálogo de guias do Maestro Pet.
  *
@@ -245,11 +247,28 @@ export const linhaDe = (p: Produto): Linha => p.linha ?? "tutor";
 export const urlProduto = (p: Produto) => (linhaDe(p) === "negocios" ? `/negocios/${p.slug}` : `/${p.slug}`);
 
 /**
+ * Os manuais pagos da linha de negócios são os mesmos produtos da Cakto (mesmo checkout) que os materiais pagos da
+ * Escola de Gestão. Com a venda desligada (MATERIAIS_PAGOS_A_VENDA = false, a única chave), eles saem do site inteiro:
+ * vitrine /negocios, página de venda, sitemap, menus, rodapé e página inicial. Os guias para tutores não mudam.
+ */
+export const foraDoSite = (p: Produto, aVenda = MATERIAIS_PAGOS_A_VENDA) => !aVenda && linhaDe(p) === "negocios" && p.preco > 0;
+
+/** O produto aparece para o cliente no site (vitrines, sitemap, links)? Lançado ou não, conta só a chave da venda. */
+export const noSite = (p: Produto, aVenda = MATERIAIS_PAGOS_A_VENDA) => !foraDoSite(p, aVenda);
+
+/** Os manuais da vitrine /negocios ("Comece o seu negócio") que o cliente vê. Vazio: não há loja de negócios no site. */
+export const manuaisNoSite = (aVenda = MATERIAIS_PAGOS_A_VENDA) =>
+  PRODUTOS.filter((p) => linhaDe(p) === "negocios" && p.grupo === "comece" && noSite(p, aVenda));
+
+/** Há loja de negócios no site (a vitrine /negocios e os links para ela)? */
+export const lojaNegociosNoSite = (aVenda = MATERIAIS_PAGOS_A_VENDA) => manuaisNoSite(aVenda).length > 0;
+
+/**
  * Produtos para indicar no fim da página: já lançados, da mesma linha e para o mesmo bicho
  * (nada de guia de cachorro para quem tem gato). Os do mesmo grupo vêm primeiro.
  */
 export const daFamilia = (p: Produto, max = 3) =>
-  PRODUTOS.filter((x) => x.slug !== p.slug && x.lancado && linhaDe(x) === linhaDe(p) && (!x.para || !p.para || x.para === p.para))
+  PRODUTOS.filter((x) => x.slug !== p.slug && x.lancado && noSite(x) && linhaDe(x) === linhaDe(p) && (!x.para || !p.para || x.para === p.para))
     .sort((a, b) => Number(b.grupo === p.grupo) - Number(a.grupo === p.grupo))
     .slice(0, max);
 
