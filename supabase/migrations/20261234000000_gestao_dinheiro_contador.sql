@@ -734,3 +734,90 @@ begin
 end $$;
 revoke execute on function public.saldos_em_aberto(uuid) from public, anon;
 grant execute on function public.saldos_em_aberto(uuid) to authenticated;
+
+-- (rodada 9, junção) comissao_linhas_calc: a mesma da 20261229, com desempate na ordem das linhas (duas partes do mesmo
+-- atendimento com a mesma ordem saíam em ordem variável; os valores não mudam)
+CREATE OR REPLACE FUNCTION public.comissao_linhas_calc(p_petshop uuid, p_de date, p_ate date, p_profissional uuid DEFAULT NULL::uuid)
+ RETURNS TABLE(profissional_id uuid, agendamento_id uuid, inicio timestamp with time zone, pacote boolean, tipo text, servico_id uuid, base numeric, pct numeric, valor numeric)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  with s as (
+    select coalesce(x.fuso, 'America/Sao_Paulo') as fuso,
+      coalesce(x.opcoes -> 'comissao.em_extras' = 'true'::jsonb, false) as em_extras,
+      coalesce(x.opcoes -> 'comissao.por_servico' = 'true'::jsonb, false) as por_servico,
+      case when coalesce(x.opcoes -> 'comissao.em_produtos' = 'true'::jsonb, false) and jsonb_typeof(x.opcoes -> 'comissao.produtos_pct') = 'number'
+        then least(100, greatest(0, (x.opcoes ->> 'comissao.produtos_pct')::numeric)) else 0 end as produtos_pct
+    from public.petshops x where x.id = p_petshop
+  ), difs as materialized (
+    -- o que foi recebido à parte depois de a conta fechar, por atendimento (pela coluna; nas antigas, pela marca no item)
+    select x.ag, sum(x.v) as valor from (
+      select d.diferenca_de::text as ag, coalesce(d.valor_original, d.valor) as v
+        from public.lancamentos d
+       where d.petshop_id = p_petshop and d.tipo = 'entrada' and d.agendamento_id is null and d.diferenca_de is not null
+      union all
+      select m.ag, coalesce(d.valor_original, d.valor)
+        from public.lancamentos d
+        cross join lateral (
+          select distinct e ->> 'diferenca_de' as ag
+            from jsonb_array_elements(case when jsonb_typeof(d.itens) = 'array' then d.itens else '[]'::jsonb end) e
+           where jsonb_typeof(e) = 'object' and jsonb_typeof(e -> 'diferenca_de') = 'string'
+        ) m
+       where d.petshop_id = p_petshop and d.tipo = 'entrada' and d.agendamento_id is null and d.diferenca_de is null
+         and jsonb_typeof(d.itens) = 'array' and d.itens @? '$[*].diferenca_de'
+    ) x group by x.ag
+  ), ags as (
+    select a.id, a.inicio, a.servico_id, a.profissional_id, a.preco, a.pacote_cliente_id, p.comissao_pct, s.por_servico,
+      l.id as conta_id, l.itens, pt.servico as parte_servico, coalesce(l.valor_original, l.valor) as valor_conta,
+      exists (select 1 from public.agendamento_servicos e where e.agendamento_id = a.id) as varios,
+      (l.id is null and a.pacote_cliente_id is not null) as pacote,
+      case when l.id is not null then coalesce(pt.servico, coalesce(l.valor_original, l.valor)) + coalesce(df.valor, 0) else coalesce(a.preco, 0) end as base_servico,
+      case when l.id is not null and s.em_extras then coalesce(pt.extra, 0) else 0 end as base_extra,
+      case when l.id is not null and s.produtos_pct > 0 then greatest(0, coalesce(pt.produto, 0) - coalesce(dv.valor, 0)) else 0 end as produtos,
+      case when s.por_servico then coalesce(cs.pct, p.comissao_pct) else p.comissao_pct end as pct,
+      s.produtos_pct
+    from s
+    join public.agendamentos a on a.petshop_id = p_petshop and a.status = 'concluido' and a.profissional_id is not null
+      and a.inicio >= (p_de::timestamp at time zone s.fuso) and a.inicio < ((p_ate + 1)::timestamp at time zone s.fuso)
+    join public.profissionais p on p.id = a.profissional_id
+    left join public.lancamentos l on l.agendamento_id = a.id and l.tipo = 'entrada'
+    left join public.comissao_servicos cs on cs.servico_id = a.servico_id
+    left join lateral public.partes_do_lancamento(coalesce(l.valor_original, l.valor), l.itens) pt on l.id is not null
+    -- "Cobrar a diferença": o que foi recebido à parte depois de a conta fechar
+    left join difs df on l.id is not null and df.ag = a.id::text
+    -- produtos desta conta que voltaram (troca ou devolução que continua valendo)
+    left join lateral (
+      select sum(v.valor) as valor from public.devolucoes v
+      where v.venda_id = l.id and v.petshop_id = p_petshop and coalesce(v.saida_id, v.credito_id) is not null
+    ) dv on l.id is not null
+    where p_profissional is null or a.profissional_id = p_profissional
+  ), partes as (
+    -- um só serviço: o serviço (e os extras) no percentual do serviço
+    select g.id, 1 as ordem, 'servico' as tipo, g.servico_id, g.base_servico as base, g.pct from ags g where not g.varios
+    union all
+    select g.id, 8, 'extra', null::uuid, g.base_extra, g.pct from ags g where g.base_extra <> 0
+    -- vários serviços: cada um com o valor dele e o percentual que vale para ele
+    union all
+    select g.id, 2, 'servico', r.servico_id, r.valor, case when g.por_servico then coalesce(c2.pct, g.comissao_pct) else g.comissao_pct end
+    from ags g
+    cross join lateral (
+      select t.servico_id, t.valor from public.partes_por_servico(g.id, g.base_servico, g.itens, g.parte_servico is not null) t where g.conta_id is not null
+      union all
+      select e.servico_id, coalesce(e.preco, 0) from public.agendamento_servicos e where g.conta_id is null and e.agendamento_id = g.id
+    ) r
+    left join public.comissao_servicos c2 on c2.servico_id = r.servico_id
+    where g.varios
+    union all
+    select g.id, 1, case when g.pacote_cliente_id is not null then 'pacote' else 'servico' end, g.servico_id, coalesce(g.preco, 0), g.pct from ags g where g.varios and (g.conta_id is null or g.pacote_cliente_id is not null)
+    union all
+    select g.id, 9, 'produto', null::uuid, g.produtos, g.produtos_pct from ags g where g.produtos <> 0
+  )
+  select g.profissional_id, g.id, g.inicio, (g.pacote or (g.varios and g.pacote_cliente_id is not null)),
+    coalesce(x.tipo, 'nada'), x.servico_id, coalesce(x.base, 0), coalesce(x.pct, 0), coalesce(x.base * x.pct / 100, 0)
+  from ags g
+  left join partes x on x.id = g.id
+  order by g.inicio, g.id, x.ordem, x.tipo, x.servico_id, x.base, x.pct
+$function$;
+
+notify pgrst, 'reload schema';

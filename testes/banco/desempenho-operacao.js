@@ -118,11 +118,12 @@ end $$; select current_setting('teste.soltas');`);
     from lancamentos l, (values (true), (false)) v(c) where l.petshop_id = '${P}' and l.agendamento_id is not null) y`).split('|').map(Number);
   T.ok('partes_por_servico: igual (com e sem itens, um e vários serviços)', pps[0] > 500 && pps[1] === pps[0] && pps[2] > 20, pps);
   for (const [nome, de] of [['12 meses', 'current_date - 365'], ['30 dias', 'current_date - 30']]) {
-    const cl = B.sql(`select (select md5(coalesce(string_agg(x::text, ';'), '')) from ${antes}.comissao_linhas_calc('${P}', ${de}, current_date) x) = (select md5(coalesce(string_agg(x::text, ';'), '')) from public.comissao_linhas_calc('${P}', ${de}, current_date) x),
+    // a versão antiga não desempatava duas partes do mesmo atendimento com a mesma ordem: a comparação ordena as linhas (a nova desempata, migração 20261234)
+    const cl = B.sql(`select (select md5(coalesce(string_agg(x::text, ';' order by x::text), '')) from ${antes}.comissao_linhas_calc('${P}', ${de}, current_date) x) = (select md5(coalesce(string_agg(x::text, ';' order by x::text), '')) from public.comissao_linhas_calc('${P}', ${de}, current_date) x),
       (select count(*) from public.comissao_linhas_calc('${P}', ${de}, current_date) x where x.valor <> 0)`).split('|');
-    T.ok(`comissao_linhas_calc, ${nome}: mesmas linhas, na mesma ordem (com "cobrar a diferença" pela coluna e pela marca antiga)`, cl[0] === 't' && Number(cl[1]) > 5, cl);
+    T.ok(`comissao_linhas_calc, ${nome}: mesmas linhas (com "cobrar a diferença" pela coluna e pela marca antiga)`, cl[0] === 't' && Number(cl[1]) > 5, cl);
   }
-  T.ok('comissao_linhas_calc: igual para uma pessoa só', B.sql(`select (select md5(coalesce(string_agg(x::text, ';'), '')) from ${antes}.comissao_linhas_calc('${P}', current_date - 365, current_date, '${L.ids.tosador}') x) = (select md5(coalesce(string_agg(x::text, ';'), '')) from public.comissao_linhas_calc('${P}', current_date - 365, current_date, '${L.ids.tosador}') x)`) === 't');
+  T.ok('comissao_linhas_calc: igual para uma pessoa só', B.sql(`select (select md5(coalesce(string_agg(x::text, ';' order by x::text), '')) from ${antes}.comissao_linhas_calc('${P}', current_date - 365, current_date, '${L.ids.tosador}') x) = (select md5(coalesce(string_agg(x::text, ';' order by x::text), '')) from public.comissao_linhas_calc('${P}', current_date - 365, current_date, '${L.ids.tosador}') x)`) === 't');
   T.ok('a diferença entra na comissão (a marca antiga com dois itens conta uma vez só)', B.num(`select count(*) from lancamentos d where d.petshop_id='${P}' and d.descricao = 'Diferença (marca antiga)'`) > 5);
   const lucro = B.must(await L.sb.dono.rpc('lucro_do_periodo', { p_petshop: P, p_de: L.dia(-365), p_ate: L.hoje }), 'lucro_do_periodo');
   const equipe = B.must(await L.sb.dono.rpc('equipe_do_periodo', { p_petshop: P, p_de: L.dia(-365), p_ate: L.hoje }), 'equipe_do_periodo');
