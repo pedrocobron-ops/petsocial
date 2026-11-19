@@ -451,7 +451,7 @@ function CaixaDoDia() {
       </div>
 
       {folha?.tipo === "abrir" && <FolhaAbrir aoFechar={() => setFolha(null)} aoSalvo={recarregar} dinheiroDeHoje={!aberto && dinheiroFora > 0 ? dinheiroFora : 0} />}
-      {folha?.tipo === "novo" && <FolhaLancamento modo="pago" tipo={folha.de} aoFechar={() => setFolha(null)} aoSalvo={recarregar} />}
+      {folha?.tipo === "novo" && <FolhaLancamento modo="pago" tipo={folha.de} aoFechar={() => setFolha(null)} aoSalvo={recarregar} aoVenderProduto={() => setFolha({ tipo: "venda" })} />}
       {folha?.tipo === "editar" && (
         <FolhaLancamento modo="pago" tipo={folha.lancamento.tipo as Tipo} inicial={folha.lancamento} aoFechar={() => setFolha(null)} aoSalvo={recarregar} />
       )}

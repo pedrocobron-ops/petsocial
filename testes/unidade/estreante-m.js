@@ -70,5 +70,18 @@ t('Faltam 2 / Falta 1 / Tudo pronto', () => {
   assert.equal(PP.textoFaltam(1), 'Falta 1 coisa para começar');
   assert.equal(PP.textoFaltam(0), 'Tudo pronto para começar');
 });
+// o passo dos preços só fica feito com todos os serviços ativos com preço (1 de 5 não é "feito"); creche e hotel ficam de fora
+const sv = (categoria, preco, ativo = true) => ({ ativo, categoria, preco_p: null, preco_m: preco, preco_g: null, preco_gg: null });
+t('preços: 1 de 5 com preço não marca o passo e a dica conta', () => {
+  const r = PP.precosDosServicos([sv('banho', 50), sv('banho_tosa', null), sv('tosa', null), sv('outro', null), sv('outro', null)]);
+  assert.deepEqual(r, { comPreco: 1, total: 5, feito: false });
+  assert.equal(PP.dicaDosPrecos(r), '1 de 5 com preço. Em Meu pet shop, na parte Serviços e preços.');
+});
+t('preços: todos com preço marca; creche, hotel e serviço desligado não contam', () => {
+  const r = PP.precosDosServicos([sv('banho', 50), sv('tosa', 0), sv('creche', null), sv('hotel', null), sv('outro', null, false)]);
+  assert.deepEqual(r, { comPreco: 2, total: 2, feito: true });
+  assert.equal(PP.dicaDosPrecos({ comPreco: 0, total: 3 }), 'Em Meu pet shop, na parte Serviços e preços.');
+  assert.equal(PP.precosDosServicos([sv('creche', null)]).total, 0);
+});
 
 T.rodar(async () => {});

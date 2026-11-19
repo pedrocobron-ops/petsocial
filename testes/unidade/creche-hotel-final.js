@@ -109,4 +109,31 @@ t('cancelamentos somam as reservas da creche e do hotel', () => {
   assert.equal(x.cancelados, 3); assert.equal(x.marcados, 10); assert.equal(x.reservasCanceladas, 2);
 });
 
+T.secao('reserva que passou da hora sem check-in');
+const HT = lib('hotel');
+{
+  const agora = new Date(2026, 10, 19, 10, 5);
+  const as = (d, h, m) => new Date(2026, 10, d, h, m).toISOString();
+  const quando = (d) => `hoje, ${new Date(d).getHours()}h${String(new Date(d).getMinutes()).padStart(2, '0')}`;
+  t('9h38 de hoje, às 10h05, sem check-in: atrasada · não chegou (não é mais "próxima")', () => {
+    assert.equal(HT.situacaoDaReserva(as(19, 9, 38), agora).situacao, 'atrasada');
+    assert.deepEqual(HT.etiquetaDaReserva(as(19, 9, 38), agora), { texto: 'atrasada · não chegou', tom: 'vermelho' });
+    assert.equal(HT.resumoDasReservas([{ entrada: as(19, 9, 38) }, { entrada: as(19, 15, 0) }], agora, quando), '1 atrasada · não chegou');
+    assert.equal(HT.resumoDasReservas([{ entrada: as(19, 9, 38) }, { entrada: as(19, 9, 50) }], agora, quando), '2 atrasadas · não chegaram');
+  });
+  t('mais tarde hoje: chega hoje e é a próxima; amanhã, depois e dia passado', () => {
+    assert.deepEqual(HT.etiquetaDaReserva(as(19, 15, 0), agora), { texto: 'chega hoje', tom: 'verde' });
+    assert.equal(HT.resumoDasReservas([{ entrada: as(18, 9, 0) }, { entrada: as(19, 15, 0) }], agora, quando), 'próxima: hoje, 15h00');
+    assert.equal(HT.etiquetaDaReserva(as(20, 9, 0), agora).texto, 'chega amanhã');
+    assert.equal(HT.etiquetaDaReserva(as(23, 9, 0), agora).texto, 'em 4 dias');
+    assert.deepEqual(HT.etiquetaDaReserva(as(18, 9, 0), agora), { texto: 'não veio', tom: 'amarelo' });
+    assert.equal(HT.resumoDasReservas([{ entrada: as(18, 9, 0) }], agora, quando), 'com a data já passada');
+    assert.equal(HT.resumoDasReservas([], agora, quando), 'nenhuma marcada');
+  });
+  t('ordem: a atrasada de hoje vem primeiro, as outras na ordem da chegada', () => {
+    const l = [{ id: 'ontem', entrada: as(18, 9, 0) }, { id: 'atrasada', entrada: as(19, 9, 38) }, { id: 'tarde', entrada: as(19, 15, 0) }, { id: 'amanha', entrada: as(20, 8, 0) }];
+    assert.deepEqual(HT.ordenarReservas(l, agora).map((r) => r.id), ['atrasada', 'ontem', 'tarde', 'amanha']);
+  });
+}
+
 T.rodar(async () => {});

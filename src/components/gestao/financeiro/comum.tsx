@@ -16,6 +16,8 @@ import { useOperacao } from "@/lib/gestao/uma-vez";
 import { CATEGORIAS_ENTRADA, CATEGORIAS_SAIDA, FORMAS, type AlteracaoLancamento, type Caixa, type Lancamento } from "@/lib/gestao/tipos";
 import { brl, dataCompleta, deIsoDia, hora, isoDia, centavos, hojeDaLoja } from "@/lib/gestao/util";
 import { resumoDoCaixa } from "@/lib/gestao/caixa-contas";
+import { avisoDaVendaSolta, ehVendaSolta, produtoCitado } from "@/lib/gestao/venda-solta";
+import Link from "../link-depois";
 import { useCalendario } from "../calendario";
 import { useGestao } from "../contexto";
 import { Tile } from "../painel";
@@ -344,12 +346,42 @@ export const categoriaAtual = (c: string, petshop?: { modulos?: string[] | null 
   petshop ? nomeDaCategoria(c, petshop, descricao) : c === "Produtos e insumos" ? "Produtos e material" : c;
 
 /**
+ * Entrada escrita à mão em Venda de produtos ("Venda de 10 pacotes de ração"): o dinheiro entra, mas o estoque não muda e a venda
+ * não aparece no Estoque. Um aviso calmo, sem travar: diz se o item está no Estoque (pela descrição) e oferece escolher o produto
+ * na Venda no balcão ou cadastrar no Estoque.
+ */
+function AvisoVendaSolta({ descricao, aoVenderProduto }: { descricao: string; aoVenderProduto?: () => void }) {
+  const { sb, petshop, posso } = useGestao();
+  const { dados: produtos } = useDados(async () => {
+    const r = await sb.from("produtos").select("id, nome").eq("petshop_id", petshop.id).eq("ativo", true).order("nome").limit(2000);
+    return r.data ?? [];
+  }, [petshop.id]);
+  const citado = produtoCitado(descricao, produtos ?? []);
+  const aviso = avisoDaVendaSolta(citado);
+  const cadastrar = !citado && posso("estoque");
+  return (
+    <div className="g-aviso" role="note" data-teste="venda-solta" style={{ margin: 0 }}>
+      <Package aria-hidden />
+      <span className="g-cresce"><b>{aviso.titulo}.</b> {aviso.texto}</span>
+      {(aoVenderProduto || cadastrar) && (
+        <span className="g-fila" style={{ width: "100%" }}>
+          {aoVenderProduto && <button type="button" className="g-btn sec p" style={{ marginLeft: 0 }} onClick={aoVenderProduto}>Escolher o produto do Estoque</button>}
+          {cadastrar && <Link className="g-btn fantasma p" style={{ marginLeft: 0 }} href="/gestao/app/estoque?novo=1">Cadastrar no Estoque</Link>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * Cria ou edita um lançamento.
  * `modo = "pago"`: dinheiro que já entrou ou saiu. `modo = "conta"`: conta a pagar ou a receber, com vencimento.
  */
-export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData, escolheTipo, aoFechar, aoSalvo, tutor: tutorFixo }: {
+export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData, escolheTipo, aoFechar, aoSalvo, tutor: tutorFixo, aoVenderProduto }: {
   modo: "pago" | "conta"; tipo: Tipo; inicial?: Lancamento | null; escolheData?: boolean; escolheTipo?: boolean;
   aoFechar: () => void; aoSalvo: () => void | Promise<void>;
+  /** No Caixa: troca esta entrada pela Venda no balcão (o aviso de venda escrita à mão oferece escolher o produto do Estoque). */
+  aoVenderProduto?: () => void;
   /** Conta a receber anotada na ficha de um tutor (taxa de falta, diferença esquecida): já vem com ele. */
   tutor?: { id: string; nome: string } | null;
 }) {
@@ -688,6 +720,7 @@ export function FolhaLancamento({ modo, tipo: tipoInicial, inicial, escolheData,
               placeholder={entrada ? "Ex.: banho da Mel" : "Ex.: shampoo, troco do motoboy"} />
           </Campo>
         )}
+        {!inicial && !conta && ehVendaSolta({ tipo, categoria }) && <AvisoVendaSolta descricao={descricao} aoVenderProduto={aoVenderProduto ? () => { aoFechar(); aoVenderProduto(); } : undefined} />}
         {baixou > 0 && (
           <div className="g-card liso g-pilha p" role="group" aria-label="A diferença ainda é devida?">
             <p className="g-p">O valor baixou {brl(baixou)}. {nomeDoCliente} ainda deve essa diferença?</p>

@@ -127,6 +127,8 @@ export default function Estoque() {
     const busca = new URLSearchParams(window.location.search);
     // atalho do aviso de validade da tela Hoje (/gestao/app/estoque?ver=vencendo)
     if (busca.get("ver") === "vencendo") { window.history.replaceState(null, "", window.location.pathname); setAberta({ tipo: "vencendo" }); return; }
+    // atalho "Cadastrar no Estoque" do aviso de venda escrita à mão (Caixa, Entrada em Venda de produtos)
+    if (busca.get("novo") === "1") { window.history.replaceState(null, "", window.location.pathname); if (!somenteLeitura()) setAberta({ tipo: "novo" }); return; }
     if (!temProdutos || !busca.has("vender")) return;
     window.history.replaceState(null, "", window.location.pathname);
     if (!somenteLeitura()) setAberta({ tipo: "venda" });
