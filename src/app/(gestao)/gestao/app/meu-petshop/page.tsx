@@ -38,7 +38,7 @@ import { useGestao } from "@/components/gestao/contexto";
 import { Campo, Folha, Vazio, avisarMudanca, ok, useAvisos, useSomenteLeitura } from "@/components/gestao/ui";
 import { EscolherCor, GradeHorario, NOME_DIAS, ORDEM_DIAS, erroDoHorario, lerHorario } from "@/components/gestao/ajustes/grade-horario";
 import { HorarioProprio } from "@/components/gestao/ajustes/horario-proprio";
-import { areaTemHorario, erroDoHorarioProprio, mesmoHorario, semAlmoco, servicoTemHorario, type Area } from "@/lib/gestao/horario-loja";
+import { areaTemHorario, chaveDoHorario, erroDoHorarioProprio, semAlmoco, servicoTemHorario, type Area } from "@/lib/gestao/horario-loja";
 import { PORTES, type Horario, type Servico } from "@/lib/gestao/tipos";
 import { brl, brlCurto, fmtTelefone, lerValor, soDigitos, mascaraTelefone, valor2 } from "@/lib/gestao/util";
 import "@/components/gestao/ajustes/ajustes.css";
@@ -420,7 +420,8 @@ function HorarioDaArea({ area }: { area: Area }) {
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const nome = area === "creche" ? "da creche" : "do hotel";
-  const mudou = JSON.stringify(valor) !== JSON.stringify(salvo);
+  // compara dia a dia (o banco devolve as chaves do jsonb em outra ordem)
+  const mudou = chaveDoHorario(valor) !== chaveDoHorario(salvo);
 
   async function salvar() {
     if (somenteLeitura()) return;
@@ -430,7 +431,8 @@ function HorarioDaArea({ area }: { area: Area }) {
     setSalvando(true);
     try {
       // igual ao do pet shop vira "igual ao pet shop" (null): muda junto quando o pet shop mudar
-      const guardar = valor && !mesmoHorario(valor, petshop.horario) ? valor : null;
+      // horário próprio fica próprio mesmo igual ao do pet shop: só "Igual ao pet shop" volta a seguir (null)
+      const guardar = valor;
       ok(await sb.from("petshops").update(area === "creche" ? { horario_creche: guardar } : { horario_hotel: guardar }).eq("id", petshop.id).select("id"));
       await recarregarBase();
       avisarMudanca();
@@ -603,10 +605,10 @@ function FolhaServico({ servico, aoFechar }: { servico: Servico | null; aoFechar
     setErro(null);
     setSalvando(true);
     const custoMaterial = custo.mexeu && custo.texto.trim() !== (custo.lido ?? "") ? { custo_material: custo.texto.trim() ? lerValor(custo.texto) : null } : {};
-    // horário igual ao do pet shop vira "igual ao pet shop" (null): muda junto quando o pet shop mudar
-    const horarioDele = daAgenda && horario && !mesmoHorario(horario, petshop.horario) ? horario : null;
-    const mexeuNoHorario = JSON.stringify(horarioDele) !== JSON.stringify(servicoTemHorario(servico) ? servico!.horario : null);
-    const campos = { nome: n.slice(0, 80), categoria: categoriaDaArea(area, servico?.categoria), duracao_min: min, cor, ativo, ...precosDele, ...custoMaterial, ...(mexeuNoHorario ? { horario: horarioDele } : {}) };
+    // o horário só vai quando a pessoa mudou a escolha ou a grade (comparado dia a dia: o banco devolve o jsonb com as chaves em
+    // outra ordem). Horário próprio igual ao do pet shop continua próprio: só "Igual ao pet shop" volta a seguir (null).
+    const mexeuNoHorario = daAgenda && chaveDoHorario(horario) !== chaveDoHorario(servicoTemHorario(servico) ? servico!.horario : null);
+    const campos = { nome: n.slice(0, 80), categoria: categoriaDaArea(area, servico?.categoria), duracao_min: min, cor, ativo, ...precosDele, ...custoMaterial, ...(mexeuNoHorario ? { horario } : {}) };
     try {
       if (servico) {
         await mudarServico(sb, petshop.id, servico.id, campos);

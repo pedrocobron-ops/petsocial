@@ -85,6 +85,17 @@ const TARDE = { 0: null, 1: dia('14:00', '18:00'), 2: dia('14:00', '18:00'), 3: 
   t('certo: null', () => assert.equal(H.erroDoHorarioProprio(CASA), null));
   t('horário próprio não leva almoço', () => assert.equal(H.semAlmoco(LOJA)['1'].almoco, undefined));
   t('mesmoHorario não olha o almoço', () => { assert.ok(H.mesmoHorario(LOJA, H.semAlmoco(LOJA))); assert.ok(!H.mesmoHorario(LOJA, CASA)); });
+  t('chaveDoHorario: as chaves em outra ordem (como o banco devolve o jsonb) dão a mesma chave', () => {
+    const embaralhado = JSON.parse(JSON.stringify({ 6: { fecha: '19:00', abre: '07:00' }, 0: { fecha: '18:00', abre: '08:00' }, 3: CASA[3], 1: CASA[1], 5: CASA[5], 2: CASA[2], 4: CASA[4] }));
+    assert.equal(H.chaveDoHorario(embaralhado), H.chaveDoHorario(CASA));
+    assert.notEqual(JSON.stringify(embaralhado), JSON.stringify(CASA), 'o JSON é diferente');
+  });
+  t('chaveDoHorario: null é "igual"; horário próprio igual ao do pet shop continua diferente de "igual"', () => {
+    assert.equal(H.chaveDoHorario(null), 'igual');
+    assert.equal(H.chaveDoHorario(undefined), 'igual');
+    assert.notEqual(H.chaveDoHorario(H.semAlmoco(LOJA)), 'igual');
+    assert.equal(H.chaveDoHorario(LOJA), H.chaveDoHorario(H.semAlmoco(LOJA)), 'o almoço não conta');
+  });
   t('horarioEmTexto', () => assert.equal(H.horarioEmTexto(DOMINGO), 'segunda fechado; terça fechado; quarta fechado; quinta fechado; sexta fechado; sábado fechado; domingo 9h às 15h'));
 
   T.secao('Link do cliente (assistente do link)');
@@ -104,6 +115,26 @@ const TARDE = { 0: null, 1: dia('14:00', '18:00'), 2: dia('14:00', '18:00'), 3: 
     const r = IA.entradaHorarios({ servico: 'S2', dia: '2026-11-21' }, dados);
     assert.equal(r.ok, false); assert.match(r.erro, /serviço não funciona/);
     assert.equal(IA.entradaHorarios({ servico: 'S2', dia: '2026-11-22' }, dados).ok, true);
+  });
+  // "Tosa da tarde" (S3): dias úteis 14h às 18h
+  dados.info.servicos.push({ id: 'c', nome: 'Tosa da tarde', duracao_min: 60, preco_p: 50, preco_m: null, preco_g: null, preco_gg: null, horario: TARDE });
+  t('vários serviços: o dia precisa servir a todos (a mesma conta do banco)', () => {
+    // 2026-11-23 é segunda: Banho (pet shop 8h–18h) e Tosa da tarde (14h–18h) funcionam juntos; Banho de domingo não
+    assert.equal(IA.abertoNoDia(dados, '2026-11-23', [dados.info.servicos[0], dados.info.servicos[2]]), true);
+    assert.equal(IA.abertoNoDia(dados, '2026-11-22', [dados.info.servicos[1], dados.info.servicos[0]]), false, 'domingo: o banho segue o pet shop, fechado');
+    assert.equal(IA.abertoNoDia(dados, '2026-11-23', [dados.info.servicos[1], dados.info.servicos[2]]), false);
+    assert.equal(IA.abertoNoDia(dados, '2026-11-21', [dados.info.servicos[0], dados.info.servicos[2]]), false, 'sábado: a tosa da tarde não funciona');
+  });
+  t('horarios_livres do link com outros serviços: confere todos e manda os extras para o banco', () => {
+    assert.ok(IA.ferramentasDoLink(dados).find((f) => f.name === 'horarios_livres').input_schema.properties.outros);
+    const r = IA.entradaHorarios({ servico: 'S1', outros: ['S3'], dia: '2026-11-23' }, dados);
+    assert.equal(r.ok, true); assert.deepEqual(r.extras, ['c']);
+    const n = IA.entradaHorarios({ servico: 'S1', outros: ['S3'], dia: '2026-11-21' }, dados);
+    assert.equal(n.ok, false); assert.match(n.erro, /não funcionam juntos/);
+    const d = IA.entradaHorarios({ servico: 'S2', outros: ['S1'], dia: '2026-11-22' }, dados);
+    assert.equal(d.ok, false, 'domingo: banho de domingo + banho (segue o pet shop)');
+    assert.equal(IA.entradaHorarios({ servico: 'S1', outros: ['S9'], dia: '2026-11-23' }, dados).ok, false);
+    assert.deepEqual(IA.entradaHorarios({ servico: 'S1', dia: '2026-11-23' }, dados).extras, []);
   });
   t('o contexto do link conta o horário do serviço e da creche', () => {
     const c = IA.contextoDoLink(dados);

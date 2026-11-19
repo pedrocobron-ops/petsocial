@@ -149,6 +149,16 @@ export function erroDoHorarioProprio(h: Horario): string | null {
   return ORDEM_DIAS.some((d) => h[d]) ? null : "Deixe ao menos um dia aberto, ou volte para \"igual ao pet shop\".";
 }
 
+/**
+ * Uma chave canônica do horário (dia a dia, abre e fecha, sem almoço): o jsonb do banco volta com as chaves em outra ordem,
+ * então não dá para comparar com JSON.stringify. null (ou sem horário) = "igual" (segue o pet shop).
+ */
+export function chaveDoHorario(bruto: unknown): string {
+  if (!temAlgo(bruto)) return "igual";
+  const h = lerHorario(bruto);
+  return ORDEM_DIAS.map((d) => `${d}:${h[d] ? `${h[d]!.abre}-${h[d]!.fecha}` : "-"}`).join(",");
+}
+
 /** O mesmo horário (dias e horas, sem olhar o almoço)? */
 export function mesmoHorario(a: unknown, b: unknown): boolean {
   const x = lerHorario(a), y = lerHorario(b);

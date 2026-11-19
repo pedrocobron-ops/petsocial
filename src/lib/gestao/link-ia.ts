@@ -9,6 +9,7 @@
  * `link-ia-comum.ts`, que este arquivo reexporta.
  */
 import { MAX_LETRAS_PERGUNTA, MAX_PERGUNTAS_CONVERSA, OPCAO_LINK_IA, limiteConversaTexto, type Sugestao } from "./link-ia-comum";
+import { janelaDoDia } from "./horario-loja";
 import { centavos } from "./util";
 export { MAX_LETRAS_PERGUNTA, MAX_PERGUNTAS_CONVERSA, OPCAO_LINK_IA, limiteConversaTexto, type Sugestao };
 
@@ -98,9 +99,15 @@ export function horarioDe(d: DadosDoLink, de?: ServicoPublico | "creche" | "hote
   const proprio = de === "creche" ? d.info.horario_creche : de === "hotel" ? d.info.horario_hotel : de?.horario;
   return proprio && typeof proprio === "object" ? proprio : d.info.horario;
 }
-/** Aberto nesse dia? (dia da semana com horário e não marcado como fechado). Com `de`: o horário do serviço, da creche ou do hotel. */
-export function abertoNoDia(d: DadosDoLink, iso: string, de?: ServicoPublico | "creche" | "hotel" | null) {
-  return !!horarioDo(horarioDe(d, de), diaDaSemana(iso)) && !(d.fechados ?? []).includes(iso);
+/**
+ * Aberto nesse dia? (dia da semana com horário e não marcado como fechado). Com `de`: o horário do serviço, da creche ou do
+ * hotel; com uma lista de serviços (o principal e os outros do mesmo pedido), todos precisam funcionar no dia, com uma parte
+ * do dia em comum (a mesma conta de link_horarios no banco).
+ */
+export function abertoNoDia(d: DadosDoLink, iso: string, de?: ServicoPublico | ServicoPublico[] | "creche" | "hotel" | null): boolean {
+  if ((d.fechados ?? []).includes(iso)) return false;
+  if (Array.isArray(de)) return de.length ? !!janelaDoDia(de.map((s) => horarioDe(d, s)), diaDaSemana(iso)) : abertoNoDia(d, iso);
+  return !!horarioDo(horarioDe(d, de), diaDaSemana(iso));
 }
 const semanaEmTexto = (horario: unknown) => [1, 2, 3, 4, 5, 6, 0].map((dia) => {
   const h = horarioDo(horario, dia);
@@ -378,10 +385,11 @@ export function ferramentasDoLink(d: DadosDoLink) {
   const lista: { name: string; description: string; input_schema: { type: "object"; properties: Record<string, unknown>; required: string[]; additionalProperties: false } }[] = [];
   if (d.info.servicos.length) lista.push({
     name: FERRAMENTA_HORARIOS,
-    description: `Horários livres de um serviço do link num dia (de hoje até ${DIAS_NO_LINK - 1} dias à frente).`,
+    description: `Horários livres de um serviço do link num dia (de hoje até ${DIAS_NO_LINK - 1} dias à frente). Se o cliente quer mais de um serviço no mesmo horário, passe os outros em outros (o horário precisa caber no de todos e o tempo soma).`,
     input_schema: {
       type: "object", additionalProperties: false, required: ["servico", "dia"],
-      properties: { servico: { type: "string", description: "Referência do serviço: S1, S2…" }, dia: { type: "string", description: "AAAA-MM-DD" }, pets: { type: "integer", description: "Quantos pets, de 1 a 4" } },
+      properties: { servico: { type: "string", description: "Referência do serviço: S1, S2…" }, dia: { type: "string", description: "AAAA-MM-DD" }, pets: { type: "integer", description: "Quantos pets, de 1 a 4" },
+        outros: { type: "array", items: { type: "string" }, description: "Opcional: os outros serviços do mesmo horário (S2, S3…)" } },
     },
   });
   if (hotelComPreco(d) && d.hotel?.preco) lista.push({
@@ -412,15 +420,28 @@ export function ferramentasDoLink(d: DadosDoLink) {
 }
 
 /** Confere a entrada de horarios_livres. Devolve os parâmetros da função do banco, ou a frase de erro para o modelo. */
-export function entradaHorarios(input: unknown, d: DadosDoLink): { ok: true; servicoId: string; dia: string; pets: number } | { ok: false; erro: string } {
+export function entradaHorarios(input: unknown, d: DadosDoLink): { ok: true; servicoId: string; extras: string[]; dia: string; pets: number } | { ok: false; erro: string } {
   const x = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const r = referencias(d).find((y) => y.ref.toLowerCase() === String(x.servico ?? "").trim().toLowerCase());
   if (!r) return { ok: false, erro: "Serviço não está no link. Use S1, S2…" };
   const dia = String(x.dia ?? "");
   if (!ehDia(dia) || !ehDia(d.info.hoje) || dia < d.info.hoje || dia > somaDia(d.info.hoje, DIAS_NO_LINK - 1)) return { ok: false, erro: `O link só mostra horários de ${d.info.hoje} até ${somaDia(d.info.hoje, DIAS_NO_LINK - 1)}.` };
-  if (!abertoNoDia(d, dia, r.servico)) return { ok: false, erro: r.servico.horario && typeof r.servico.horario === "object" ? "Esse serviço não funciona nesse dia." : "O pet shop não abre nesse dia." };
+  // os outros serviços do mesmo horário (S2, S3…): o dia precisa servir a todos, como no banco (link_horarios com p_extras)
+  const refs = referencias(d);
+  const pedidos = (Array.isArray(x.outros) ? x.outros : []).slice(0, 6).map((v) => String(v).trim().toLowerCase());
+  const outros: ServicoPublico[] = [];
+  for (const ref of pedidos) {
+    const o = refs.find((y) => y.ref.toLowerCase() === ref);
+    if (!o) return { ok: false, erro: "Serviço não está no link. Use S1, S2…" };
+    if (o.servico.id !== r.servico.id && !outros.some((s) => s.id === o.servico.id)) outros.push(o.servico);
+  }
+  const todos = [r.servico, ...outros];
+  if (!abertoNoDia(d, dia, todos)) {
+    const proprio = todos.some((s) => s.horario && typeof s.horario === "object");
+    return { ok: false, erro: !proprio ? "O pet shop não abre nesse dia." : todos.length > 1 ? "Esses serviços não funcionam juntos nesse dia." : "Esse serviço não funciona nesse dia." };
+  }
   const pets = Math.min(4, Math.max(1, Math.round(num(x.pets) ?? 1)));
-  return { ok: true, servicoId: r.servico.id, dia, pets };
+  return { ok: true, servicoId: r.servico.id, extras: outros.map((s) => s.id), dia, pets };
 }
 export function entradaHotel(input: unknown, d: DadosDoLink): { ok: true; entrada: string; saida: string; pets: { porte: string | null }[] } | { ok: false; erro: string } {
   if (!hotelComPreco(d)) return { ok: false, erro: "O valor do hotel não é informado no link." };

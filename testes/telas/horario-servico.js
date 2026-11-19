@@ -2,7 +2,10 @@
 // - Meu pet shop, Horário de funcionamento: o pet shop fecha no domingo; em "Creche", "Horário próprio" e o domingo das 08:00
 //   às 18:00, salvo no banco (o hotel continua "Igual ao pet shop");
 // - a folha do serviço (Hidratação): "Horário próprio" só no domingo, das 09:00 às 15:00;
-// - o link do cliente: com a Hidratação, só os domingos ficam abertos e os horários vão das 09:00 às 14:30;
+// - salvar de novo sem mexer no horário não muda nada (o banco devolve o jsonb com as chaves em outra ordem): a creche não pede
+//   "Salvar" ao recarregar; mudar só a duração da Hidratação mantém o horário; o Banho com horário próprio IGUAL ao do pet shop
+//   continua próprio depois de salvar outro campo (só "Igual ao pet shop" volta a seguir);
+// - o link do cliente: com a Hidratação (45 min), só os domingos ficam abertos e os horários vão das 09:00 às 14:00;
 // - o Mozart (roteiro de teste, GESTAO_MOZART_FALSO=1): "domingo a creche e o hotel abrem das 8h às 18h" vira dois cartões
 //   com "Confirmar tudo (2)", e um toque grava os dois.
 // Sem erro na página e sem rolagem para o lado.
@@ -17,13 +20,13 @@ const semana = (f) => JSON.stringify(Object.fromEntries([0, 1, 2, 3, 4, 5, 6].ma
 (async () => T.rodar(async () => {
   if (!(await B.servidorNoAr())) throw new Error(`servidor fora do ar em ${B.BASE_URL} (veja testes/LEIAME.md)`);
   const L = await criarLoja(T, { nome: 'Horario telas', equipe: false, dados: false });
-  const HIDRA = L.S['Hidratação'];
+  const HIDRA = L.S['Hidratação'], BANHO = L.S['Banho'];
   const LOJA_H = semana((d) => (d === 0 ? null : { abre: '08:00', fecha: '18:00' }));
   const dia0 = (coluna, tabela = 'petshops', id = L.P) => B.sql(`select coalesce(${coluna} -> '0' ->> 'abre', '-') || '-' || coalesce(${coluna} -> '0' ->> 'fecha', '-') || '|' || coalesce(${coluna} -> '1' ->> 'abre', 'x') from ${tabela} where id='${id}'`);
   const esperar = async (f, ms = 10000) => { const fim = Date.now() + ms; while (Date.now() < fim) { if (f()) return true; await new Promise((ok) => setTimeout(ok, 250)); } return f(); };
 
   for (const [larg, alt] of [[390, 844], [1366, 900]]) {
-    B.sql(`update petshops set horario='${LOJA_H}'::jsonb, horario_creche=null, horario_hotel=null where id='${L.P}'; update servicos set horario=null where id='${HIDRA}'`);
+    B.sql(`update petshops set horario='${LOJA_H}'::jsonb, horario_creche=null, horario_hotel=null where id='${L.P}'; update servicos set horario=null, duracao_min=30 where id='${HIDRA}'; update servicos set horario='${LOJA_H}'::jsonb, duracao_min=60 where id='${BANHO}'`);
     const { ctx, page, erros } = await N.contexto(larg, alt);
     await N.entrar(page, L.emails.dono, L.senha);
 
@@ -66,6 +69,29 @@ const semana = (f) => JSON.stringify(Object.fromEntries([0, 1, 2, 3, 4, 5, 6].ma
     await page.locator('.g-mp-serv', { hasText: 'Hidratação' }).first().waitFor({ timeout: 10000 });
     T.ok('a lista de serviços diz "horário próprio"', /horário próprio/.test(await page.locator('.g-mp-serv', { hasText: 'Hidratação' }).first().innerText()));
 
+    T.secao(`${larg}: salvar sem mexer no horário não muda o horário`);
+    await N.ir(page, '/gestao/app/meu-petshop');
+    const creche2 = page.locator('[data-teste=horario-creche]');
+    await creche2.waitFor({ timeout: 20000 });
+    T.ok('ao recarregar, a creche está em "Horário próprio" e sem botão de salvar (nada mudou)', (await creche2.locator('button', { hasText: 'Horário próprio' }).getAttribute('aria-pressed')) === 'true'
+      && (await creche2.locator('button', { hasText: 'Salvar horário da creche' }).count()) === 0);
+    const soDuracao = async (nome, rotulo) => {
+      await page.locator('.g-mp-serv', { has: page.locator('b', { hasText: new RegExp(`^${nome}$`) }) }).first().click();
+      const f = page.locator('.g-folha').last();
+      await f.locator('[data-teste=horario-do-servico]').waitFor({ timeout: 10000 });
+      const proprio = (await f.locator('[data-teste=horario-do-servico] button', { hasText: 'Horário próprio' }).getAttribute('aria-pressed')) === 'true';
+      await f.locator('.g-chip', { hasText: new RegExp(`^${rotulo}$`) }).first().click();
+      await f.locator('button.g-btn.pri', { hasText: 'Salvar' }).click();
+      await f.waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+      return proprio;
+    };
+    await soDuracao('Hidratação', '45 min');
+    T.ok('mudar só a duração da Hidratação: duração nova e o horário próprio fica', await esperar(() => B.num(`select duracao_min from servicos where id='${HIDRA}'`) === 45) && dia0('horario', 'servicos', HIDRA) === '09:00-15:00|x', dia0('horario', 'servicos', HIDRA));
+    const banhoProprio = await soDuracao('Banho', '1h30');
+    T.ok('o Banho com horário próprio igual ao do pet shop abre em "Horário próprio"', banhoProprio);
+    T.ok('salvar a duração do Banho não vira "igual ao pet shop" (o horário próprio fica)', await esperar(() => B.num(`select duracao_min from servicos where id='${BANHO}'`) === 90)
+      && dia0('horario', 'servicos', BANHO) === '---|08:00', dia0('horario', 'servicos', BANHO));
+
     T.secao(`${larg}: o link do cliente com a Hidratação`);
     const { ctx: ctx2, page: link, erros: erros2 } = await N.contexto(larg, alt);
     await link.goto(`${B.BASE_URL}/gestao/agendar/${L.codigo}`);
@@ -81,7 +107,7 @@ const semana = (f) => JSON.stringify(Object.fromEntries([0, 1, 2, 3, 4, 5, 6].ma
     await respostas;
     await link.waitForFunction(() => !document.querySelector('.g-lk-hora-esq') && document.querySelectorAll('.g-lk-hora').length > 0, null, { timeout: 20000 });
     const hs = (await link.locator('.g-lk-hora').allInnerTexts()).map((h) => h.slice(0, 5)).sort();
-    T.ok('os horários vão das 09:00 às 14:30', hs[0] === '09:00' && hs[hs.length - 1] === '14:30', hs);
+    T.ok('os horários vão das 09:00 às 14:00 (45 min, fecha às 15:00)', hs[0] === '09:00' && hs[hs.length - 1] === '14:00', hs);
     T.ok(`sem rolagem para o lado no link (${larg})`, (await N.rolagemLateral(link)) <= 1);
     await foto(link, `${larg}-link`);
     T.ok('nenhum erro no link', erros2.length === 0, erros2.slice(0, 3));
