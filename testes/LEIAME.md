@@ -987,5 +987,5 @@ Outro processo testando o link ou a Cakto no mesmo banco ao mesmo tempo pode ver
   (com outro horário, fica); recusa anônimo, outra loja, pet de outro tutor, pedido pendente e reserva em cima de outra; grupo com um pet errado não aceita
   nenhum; as chamadas de antes (`pedidos_aceitar_juntos` sem `p_pets`, `pedido_aceitar_como` de 4 argumentos, `pedido_aceitar` só com `p_id`) seguem.
 - `telas/pet-parecido.js`: em 390x844 e 1366x900: "Tor" com o Thor na ficha pergunta "É o Thor que já está cadastrado?" (com o porte do Thor);
-  "Sim, é ele" usa o Thor; "Thorr" → "É outro pet" cria o Thorr; "Rex" aceita sem perguntar e mostra "pet novo"; "Era outro pet?" → Mel passa o
+  "Sim, é ele" usa o Thor (o aviso, o cartão e a confirmação no WhatsApp dizem Thor); "Thorr" → "É outro pet" cria o Thorr; "Rex" aceita sem perguntar e mostra "pet novo"; "Era outro pet?" → Mel passa o
   horário para a Mel e apaga o Rex; a página do pedido do tutor não mostra os pets da ficha; sem rolagem para o lado e sem erro na página.

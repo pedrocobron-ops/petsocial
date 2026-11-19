@@ -142,8 +142,8 @@ export default function PedidosLink() {
     const idsEstadia = [...respondidosAinda, ...recadosLidos].filter((p) => p.status === "aceito" && p.estadia_id).map((p) => p.estadia_id!);
     const idsHorario = [...respondidosAinda, ...recadosLidos].filter((p) => p.status === "aceito" && p.agendamento_id).map((p) => p.agendamento_id!);
     const [estEstadias, estHorarios] = await Promise.all([
-      idsEstadia.length ? sb.from("estadias").select("id, status, entrada").eq("petshop_id", petshop.id).in("id", idsEstadia) : null,
-      idsHorario.length ? sb.from("agendamentos").select("id, status").eq("petshop_id", petshop.id).in("id", idsHorario) : null,
+      idsEstadia.length ? sb.from("estadias").select("id, status, entrada, pets(nome)").eq("petshop_id", petshop.id).in("id", idsEstadia) : null,
+      idsHorario.length ? sb.from("agendamentos").select("id, status, pets(nome)").eq("petshop_id", petshop.id).in("id", idsHorario) : null,
     ]);
     const canceladas = new Set([...(estEstadias?.data ?? []).filter((e) => e.status === "cancelada"), ...(estHorarios?.data ?? []).filter((a) => a.status === "cancelado")].map((x) => x.id));
     if (canceladas.size) respondidosAinda = respondidosAinda.filter((p) => !(p.status === "aceito" && !p.cliente_cancelou_em && ((p.estadia_id && canceladas.has(p.estadia_id)) || (p.agendamento_id && canceladas.has(p.agendamento_id)))));
@@ -169,7 +169,13 @@ export default function PedidosLink() {
       const h = await sb.from("agendamentos").select("id, inicio, fim").eq("petshop_id", petshop.id).in("id", [...new Set(comHorario.map((p) => p.agendamento_id!))]);
       for (const x of h.data ?? []) atual.set(x.id, { inicio: x.inicio, fim: x.fim });
     }
-    const emDia = (l: Pedido[]) => l.map((p) => (p.agendamento_id && atual.has(p.agendamento_id) && !ehEstadia(p) ? { ...p, ...atual.get(p.agendamento_id)! } : p));
+    // aceito: o nome do pet é o da ficha (o tutor escreveu "Tor", a pessoa disse que é o Thor; ou trocou em "Era outro pet?").
+    // O cartão e a mensagem de confirmação usam esse nome.
+    const nomeDe = (x: { pets?: unknown }) => { const t = Array.isArray(x.pets) ? x.pets[0] : x.pets; return t && typeof t === "object" && typeof (t as { nome?: unknown }).nome === "string" ? (t as { nome: string }).nome : null; };
+    const naFicha = new Map<string, string>();
+    for (const x of [...(estEstadias?.data ?? []), ...(estHorarios?.data ?? [])] as { id: string; pets?: unknown }[]) { const n = nomeDe(x); if (n) naFicha.set(x.id, n); }
+    const nomeDaFicha = (p: Pedido) => { const n = p.status === "aceito" ? naFicha.get(p.estadia_id ?? p.agendamento_id ?? "") : undefined; return n && n !== p.pet_nome ? { ...p, pet_nome: n } : p; };
+    const emDia = (l: Pedido[]) => l.map(nomeDaFicha).map((p) => (p.agendamento_id && atual.has(p.agendamento_id) && !ehEstadia(p) ? { ...p, ...atual.get(p.agendamento_id)! } : p));
     return { pendentes: ok(pendentes) as Pedido[], semAviso: emDia(respondidosAinda), recados: emDia(recadosLidos), sinais, sinaisPagos, canceladas, vistos };
   }, [petshop.id, comOpcoes, vejoFinanceiro]);
   const dados = tudo?.pendentes;
@@ -375,8 +381,10 @@ export default function PedidosLink() {
       if (tutor) setTutores((t) => ({ ...t, ...Object.fromEntries(feitos.map((p) => [p.id, tutor])) }));
       marcarRespondidos(feitos.map((p) => p.id));
       const doSinal = comSinal ? ` ${comSinal === 1 ? "O sinal já ficou" : "Os sinais já ficaram"} em A receber, pela sua regra.` : "";
-      avisar(feitos.length === 1 ? (ehEstadia(feitos[0]) ? `Reserva de ${feitos[0].pet_nome} feita. Ela está em ${casa}.${doSinal}` : `Horário de ${feitos[0].pet_nome} marcado.`)
-        : feitos.every(ehEstadia) ? `Reservas de ${listaDe(feitos.map((p) => p.pet_nome))} feitas. Elas estão em ${casa}.${doSinal}` : `Horários de ${listaDe(feitos.map((p) => p.pet_nome))} marcados.`);
+      // o pet confirmado na pergunta do nome parecido: a mensagem usa o nome da ficha (Thor, não o "Tor" do pedido)
+      const nomeDoPet = (p: Pedido) => escolhidos?.[p.id]?.nome ?? p.pet_nome;
+      avisar(feitos.length === 1 ? (ehEstadia(feitos[0]) ? `Reserva de ${nomeDoPet(feitos[0])} feita. Ela está em ${casa}.${doSinal}` : `Horário de ${nomeDoPet(feitos[0])} marcado.`)
+        : feitos.every(ehEstadia) ? `Reservas de ${listaDe(feitos.map(nomeDoPet))} feitas. Elas estão em ${casa}.${doSinal}` : `Horários de ${listaDe(feitos.map(nomeDoPet))} marcados.`);
       avisarMudanca();
     }
     if (falha) { avisarErro(falha); void recarregar(); }

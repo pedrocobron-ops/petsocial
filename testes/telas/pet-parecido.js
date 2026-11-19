@@ -1,8 +1,9 @@
 // Pedido pelo link com o nome do pet parecido com um da ficha (migração 20261243), no navegador, em 390x844 e 1366x900:
-// - "Tor" com o Thor na ficha: Aceitar pergunta "É o Thor que já está cadastrado?"; "Sim, é ele" põe o horário no Thor;
+// - "Tor" com o Thor na ficha: Aceitar pergunta "É o Thor que já está cadastrado?"; "Sim, é ele" põe o horário no Thor, e o
+//   aviso, o cartão e a mensagem de confirmação no WhatsApp usam o nome da ficha (Thor, não "Tor");
 // - "Thorr": a mesma pergunta; "É outro pet" cria o pet Thorr;
 // - "Rex" (bem diferente): aceita sem perguntar, o cartão mostra "pet novo"; "Era outro pet?" → Mel passa o horário para a
-//   Mel e o Rex criado no aceite sai da ficha;
+//   Mel, o Rex criado no aceite sai da ficha e o cartão e a confirmação passam a dizer Mel;
 // - a página do pedido (o link do tutor) não mostra nenhum pet da ficha.
 const B = require('../lib/base');
 const { criarLoja } = require('../lib/semente');
@@ -54,9 +55,13 @@ const foto = async (page, nome) => { if (process.env.FOTOS) await page.screensho
     T.ok(`sem rolagem para o lado com a pergunta aberta (${larg})`, (await N.rolagemLateral(page)) <= 0);
     await foto(page, `${larg}-1-pergunta`);
     await pergunta.getByRole('button', { name: 'Sim, é ele' }).click();
-    await respondido('Tor').waitFor({ timeout: 30000 });
+    T.ok('o aviso diz o nome da ficha: "Horário de Thor marcado."', await page.getByText('Horário de Thor marcado.').first().waitFor({ timeout: 20000 }).then(() => true, () => false));
+    await respondido('Thor').waitFor({ timeout: 30000 });
+    const zapDe = async (c) => decodeURIComponent(((await c.locator('a.g-btn.zap').getAttribute('href')) ?? '').split('text=')[1] ?? '');
+    const zapThor = await zapDe(respondido('Thor'));
+    T.ok('o cartão e a confirmação no WhatsApp usam "Thor" (e não "Tor")', /de Thor\b/.test(zapThor) && !/\bTor\b/.test(zapThor.split('Veja a confirmação')[0]), zapThor);
     T.ok('"Sim, é ele": o horário é do Thor', petDo(pTor) === THOR, petDo(pTor));
-    T.ok('sem "pet novo" no cartão', (await respondido('Tor').locator('[data-teste=pet-novo]').count()) === 0);
+    T.ok('sem "pet novo" no cartão', (await respondido('Thor').locator('[data-teste=pet-novo]').count()) === 0);
 
     T.secao(`${larg} px: "Thorr" é outro pet`);
     await pendente('Thorr').getByRole('button', { name: /^Aceitar/ }).click();
@@ -85,7 +90,10 @@ const foto = async (page, nome) => { if (process.env.FOTOS) await page.screensho
     T.ok('o horário passou para a Mel', petDo(pRex) === MEL, petDo(pRex));
     T.ok('o Rex criado no aceite saiu da ficha', B.num(`select count(*) from pets where id='${REX}'`) === 0);
     await page.waitForTimeout(1500);
-    T.ok('e o "pet novo" sumiu do cartão do Rex', (await respondido('Rex').locator('[data-teste=pet-novo]').count()) === 0);
+    await respondido('Mel').waitFor({ timeout: 20000 });
+    T.ok('o cartão passa a dizer Mel, sem o "pet novo"', (await respondido('Rex').count()) === 0 && (await respondido('Mel').locator('[data-teste=pet-novo]').count()) === 0);
+    const zapMel = await zapDe(respondido('Mel'));
+    T.ok('e a confirmação no WhatsApp diz Mel', /de Mel\b/.test(zapMel) && !/\bRex\b/.test(zapMel), zapMel);
 
     T.secao(`${larg} px: o link do tutor não muda`);
     await page.goto(`${B.BASE_URL}/gestao/agendar/${L.codigo}/pedido/${pTor}`);
