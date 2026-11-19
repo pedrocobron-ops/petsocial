@@ -246,8 +246,10 @@ export async function gravarChao(c: Contexto, nome: string, e: Entrada, erro: Er
   }
   if (nome === "registrar_ocorrencia") {
     const p = await planoDaOcorrencia(c, e, erro);
-    // a mesma confirmação de novo não registra duas vezes: mesma estadia, tipo, texto e hora
-    const ja = await c.sb.from("estadias_ocorrencias").select("id").eq("petshop_id", c.petshop.id).eq("estadia_id", p.h.id).eq("tipo", p.tipo).eq("texto", p.texto).eq("quando", p.quando).limit(1);
+    // a mesma confirmação de novo não registra duas vezes: mesma estadia, tipo e texto gravados nos últimos 10 minutos.
+    // Não compara a hora: o banco troca uma hora que ainda não chegou pela de agora, e a comparação nunca batia.
+    const desde = new Date(Date.now() - 10 * 60_000).toISOString();
+    const ja = await c.sb.from("estadias_ocorrencias").select("id").eq("petshop_id", c.petshop.id).eq("estadia_id", p.h.id).eq("tipo", p.tipo).eq("texto", p.texto).gte("criado_em", desde).limit(1);
     if (ja.data?.length) return { feito: true, ocorrencia_id: ja.data[0].id, ja_estava: true };
     const r = await c.sb.from("estadias_ocorrencias").insert({ petshop_id: c.petshop.id, estadia_id: p.h.id, pet_id: p.h.pet_id, tipo: p.tipo, texto: p.texto, quando: p.quando }).select("id").single();
     if (r.error) throw erro(r.error.message);
