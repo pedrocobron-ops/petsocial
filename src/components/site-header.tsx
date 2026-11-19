@@ -6,16 +6,20 @@ import { useRef } from "react";
 import { Instagram, Mail, MessageCircle, X } from "lucide-react";
 import Logo from "@/components/logo";
 import { EMPRESA, linkInstagram, linkWhatsapp } from "@/lib/empresa";
+import { MATERIAIS_PAGOS_A_VENDA } from "@/lib/gestao/escola-venda";
 
-const NAV_TUTOR: [string, string][] = [["/tutor", "Para tutores"], ["/negocios", "Para negócios pet"], ["/sobre", "Quem faz"], ["/contato", "Ajuda"], ["/gestao", "Sistema para pet shop"]];
-const NAV_NEGOCIOS: [string, string][] = [["/negocios#manuais", "Manuais"], ["/negocios#como-fazemos", "Como fazemos"], ["/tutor", "Para tutores"], ["/contato", "Ajuda"], ["/gestao", "Sistema para pet shop"]];
+/** Com os manuais de negócio fora do site (MATERIAIS_PAGOS_A_VENDA = false), nenhum link leva à vitrine /negocios. */
+const LOJA_NEGOCIOS = MATERIAIS_PAGOS_A_VENDA;
+const semNegocios = (nav: [string, string][]) => (LOJA_NEGOCIOS ? nav : nav.filter(([href]) => !href.startsWith("/negocios")));
+const NAV_TUTOR = semNegocios([["/tutor", "Para tutores"], ["/negocios", "Para negócios pet"], ["/sobre", "Quem faz"], ["/contato", "Ajuda"], ["/gestao", "Sistema para pet shop"]]);
+const NAV_NEGOCIOS = semNegocios([["/negocios#manuais", "Manuais"], ["/negocios#como-fazemos", "Como fazemos"], ["/tutor", "Para tutores"], ["/contato", "Ajuda"], ["/gestao", "Sistema para pet shop"]]);
 
 /**
  * Topo das vitrines e institucionais (brief 20, 6.1): sticky de 60/72 px, logo à esquerda,
  * nav no desktop e hambúrguer com menu em tela cheia no celular (6.2). Nada encolhe.
  */
 export default function SiteHeader() {
-  const negocios = usePathname()?.startsWith("/negocios") ?? false;
+  const negocios = (usePathname()?.startsWith("/negocios") ?? false) && LOJA_NEGOCIOS;
   const nav = negocios ? NAV_NEGOCIOS : NAV_TUTOR;
   const menu = useRef<HTMLDialogElement>(null);
   const fechar = () => menu.current?.close();

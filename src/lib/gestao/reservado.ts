@@ -1,5 +1,6 @@
 import type { Banco } from "./supabase";
 import type { Database } from "./banco";
+import { leituraAntigaVale } from "./hoje-reserva";
 
 /**
  * Colunas reservadas: custo de produto, preço de pacote, comissão e e-mail de convite.
@@ -312,6 +313,10 @@ type ServicoLido = T["servicos"]["Row"] & { preco_varia: boolean };
  */
 export async function lerBase(sb: Banco, petshopId: string): Promise<{ petshop: PetshopLinha | null; erro: { message: string } | null; equipe: ProfissionalLinha[]; servicos: ServicoLido[] }> {
   const r = await (sb as unknown as { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }).rpc("gestao_base", { p: petshopId });
+  // banco demorou, sem conexão ou servidor fora: sobe o erro (a abertura tenta mais uma vez). Ler em pedaços, aí, só pioraria a fila.
+  if (r.error && !leituraAntigaVale(r.error as { code?: string; message?: string })) {
+    return { petshop: null, erro: { message: String((r.error as { message?: string }).message ?? "falha ao ler o pet shop"), ...(r.error as object) }, equipe: [], servicos: [] };
+  }
   const b = (r.error ? null : r.data) as Record<string, unknown> | null;
   if (!b) {
     const [p, e, s] = await Promise.all([lerPetshop(sb, petshopId), lerEquipe(sb, petshopId), lerServicos(sb, petshopId)]);

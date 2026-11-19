@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Seta } from "@/components/icones";
 import { FaixaProva } from "@/components/pagamento";
 import { Rico, pares } from "@/components/pagina-vendas";
@@ -9,7 +10,7 @@ import { FaqVitrine } from "@/components/vitrine-blocos";
 import { FaixaMercado } from "@/components/mercado";
 import { fixa } from "@/lib/faq";
 import { FEED_AREAS } from "@/lib/feed-pronto";
-import { PRODUTOS, linhaDe } from "@/lib/produtos";
+import { manuaisNoSite } from "@/lib/produtos";
 import { PAGINAS } from "@/lib/vendas";
 
 export const metadata: Metadata = {
@@ -36,7 +37,9 @@ const FAQ: [string, string][] = [
 ];
 
 export default function Negocios() {
-  const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios" && p.grupo === "comece").sort((a, b) => Number(b.lancado) - Number(a.lancado));
+  const manuais = manuaisNoSite().sort((a, b) => Number(b.lancado) - Number(a.lancado));
+  // Sem manual à venda no site (MATERIAIS_PAGOS_A_VENDA = false): não há vitrine vazia, o endereço leva à página inicial.
+  if (manuais.length === 0) redirect("/");
   const aVenda = manuais.filter((p) => p.lancado).length;
   // Feed Pronto só aparece quando houver área lançada (7.3 e 7.9); até lá, nem botão nem bloco.
   const feedLancado = FEED_AREAS.some((a) => a.lancado);

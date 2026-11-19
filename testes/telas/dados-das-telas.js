@@ -1,5 +1,5 @@
 // Camada de dados e casca do aplicativo (rodada 9, N3), no navegador:
-//  1. Abertura "Abrindo <pet shop>…" que demora: aos 8 s a tela diz o que está acontecendo e oferece "Tentar de novo";
+//  1. Abertura "Abrindo <pet shop>…" que demora: aos 12 s a tela diz o que está acontecendo e oferece "Tentar de novo";
 //     o botão refaz a abertura e o aplicativo abre (antes ficava só "Abrindo…", sem saída).
 //  2. Leitura que falhou e a tela não trata: o aviso comum "Uma parte desta tela não carregou" com "Tentar de novo"
 //     (a leitura que falha nunca fica parecendo "nada cadastrado"); com a leitura principal da Hoje falhando, a tela diz
@@ -36,11 +36,11 @@ const T = require('../lib/teste')('telas-dados-das-telas');
     await page.route('**/rest/v1/rpc/entrar', async (rota) => { if (preso) return; await rota.continue(); });
     await page.goto(B.BASE_URL + '/gestao/app');
     const demora = page.locator('#g-abrindo-demora');
-    await page.waitForTimeout(3000);
-    T.ok('antes dos 8 s: só "Abrindo <pet shop>…"', !(await demora.isVisible()) && /Abrindo Dados telas/.test(await page.locator('#g-abrindo').innerText()), await page.locator('body').innerText());
-    await demora.waitFor({ state: 'visible', timeout: 9000 });
+    await page.waitForTimeout(8500); // aos 8,5 s ainda não: num 4G fraco a abertura normal passa de 8 s
+    T.ok('aos 8,5 s (antes dos 12 s): só "Abrindo <pet shop>…"', !(await demora.isVisible()) && /Abrindo Dados telas/.test(await page.locator('#g-abrindo').innerText()), await page.locator('body').innerText());
+    await demora.waitFor({ state: 'visible', timeout: 13000 });
     const texto = await demora.innerText();
-    T.ok('aos 8 s a tela diz o que está acontecendo', /Ainda buscando a sua conta|Ainda conferindo o seu login/.test(texto) && /Nada do que você salvou se perdeu/.test(texto), texto);
+    T.ok('aos 12 s a tela diz o que está acontecendo', /Ainda buscando a sua conta|Ainda conferindo o seu login/.test(texto) && /Nada do que você salvou se perdeu/.test(texto), texto);
     T.ok('e oferece "Tentar de novo"', await demora.getByRole('button', { name: 'Tentar de novo' }).isVisible());
     await page.screenshot({ path: `${B.RAIZ}/testes/saida/dados-abertura-demora-390.png` }).catch(() => {});
     preso = false;
@@ -54,8 +54,8 @@ const T = require('../lib/teste')('telas-dados-das-telas');
     const { page } = await N.contexto(390, 800);
     await page.route('**/_next/static/chunks/**', (rota) => new Promise(() => { void rota; }));
     await page.goto(B.BASE_URL + '/gestao/app', { waitUntil: 'commit' });
-    await page.locator('#g-abrindo-demora').waitFor({ state: 'visible', timeout: 12000 });
-    T.ok('com o aplicativo ainda baixando, aos 8 s o aviso e o botão já aparecem (vêm no HTML)', /ainda está baixando/.test(await page.locator('#g-abrindo-demora').innerText()), await page.locator('#g-abrindo-demora').innerText());
+    await page.locator('#g-abrindo-demora').waitFor({ state: 'visible', timeout: 16000 });
+    T.ok('com o aplicativo ainda baixando, aos 12 s o aviso e o botão já aparecem (vêm no HTML)', /ainda está baixando/.test(await page.locator('#g-abrindo-demora').innerText()), await page.locator('#g-abrindo-demora').innerText());
     await page.context().close();
   }
 

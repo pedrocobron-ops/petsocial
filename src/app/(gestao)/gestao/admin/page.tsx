@@ -26,6 +26,8 @@ type Loja = {
   cakto_email: string | null; dono_email: string | null; dono_nome: string | null;
   equipe: number; clientes: number; pets: number; agendamentos: number; agendamentos_7d: number;
   pedidos_assistente: number; ultimo_agendamento: string | null; nota: string | null;
+  /** Conta de teste (da equipe ou dos testes): fica fora de todos os números do painel. Só o administrador marca. */
+  conta_teste?: boolean;
 };
 type EventoCakto = { id: number; evento: string | null; email: string | null; petshop_id: string | null; recebido_em: string };
 
@@ -62,7 +64,7 @@ function engajamento(l: Loja): { cor: string; texto: string } {
 const local = (l: Loja) => [l.cidade, l.uf].filter(Boolean).join("/") || "cidade não informada";
 const dataHora = (d: string) => `${dataCompleta(new Date(d))} às ${hora(d)}`;
 
-type Filtro = "todos" | Status | "vencido" | "ligar";
+type Filtro = "todos" | Status | "vencido" | "ligar" | "conta_teste";
 const FILTROS: { id: Filtro; rotulo: string }[] = [
   { id: "todos", rotulo: "Todos" },
   { id: "ligar", rotulo: "Teste vence em 2 dias" },
@@ -72,8 +74,12 @@ const FILTROS: { id: Filtro; rotulo: string }[] = [
   { id: "atrasada", rotulo: "Atrasadas" },
   { id: "cancelada", rotulo: "Canceladas" },
   { id: "cortesia", rotulo: "Cortesia" },
+  { id: "conta_teste", rotulo: "Contas de teste" },
 ];
+/** As contas de teste só aparecem no filtro delas: nenhum outro filtro (nem "Todos") as conta. */
 function passa(l: Loja, f: Filtro, agora: number) {
+  if (f === "conta_teste") return Boolean(l.conta_teste);
+  if (l.conta_teste) return false;
   if (f === "todos") return true;
   if (f === "ligar") return venceEm2Dias(l, agora);
   if (f === "teste") return emTeste(l, agora);
@@ -150,6 +156,9 @@ function Admin() {
   }, [lojas, busca, filtro, agora]);
 
   const aberta = abertaId ? (lojas ?? []).find((l) => l.id === abertaId) ?? null : null;
+  // contas de teste: fora dos números (Uso); a lista Contas mostra no filtro "Contas de teste"
+  const testes = useMemo(() => new Set((lojas ?? []).filter((l) => l.conta_teste).map((l) => l.id)), [lojas]);
+  const reais = useMemo(() => (lojas ?? []).filter((l) => !l.conta_teste), [lojas]);
 
   function exportar() {
     const cab = ["Pet shop", "Cidade", "UF", "Telefone", "Dono", "E-mail do dono", "E-mail na Cakto", "Status", "Plano", "Teste até", "Criado em",
@@ -201,7 +210,7 @@ function Admin() {
           <button key={id} aria-pressed={aba === id} onClick={() => setAba(id)}>{r}</button>
         ))}
       </div>
-      {!lojas ? (!erro && <Esqueleto linhas={6} />) : aba === "visao" ? <AbaVisao key={vez} /> : aba === "uso" ? <AbaUso lojas={lojas} uso={uso} contas={contas} aoAbrir={setAbertaId} />
+      {!lojas ? (!erro && <Esqueleto linhas={6} />) : <NaAba aba={aba}>{aba === "visao" ? <AbaVisao key={vez} /> : aba === "uso" ? <AbaUso lojas={reais} uso={uso.filter((u) => !testes.has(u.id))} contas={contas.filter((c) => !testes.has(c.id))} contasDeTeste={testes.size} aoAbrir={setAbertaId} />
         : aba === "conversas" ? <AbaConversas key={vez} /> : aba === "escola" ? <AbaEscola /> : aba === "cakto" ? <AbaCakto lojas={lojas} aoMudar={carregar} /> : aba === "vendas" ? <AbaVendas key={vez} /> : aba === "erros" ? <AbaErros key={vez} /> : aba === "aceites" ? <AbaAceites key={vez} /> : aba === "dados" ? <AbaDados key={vez} /> : (
         <div className="g-pilha g">
           <section className="g-pilha">
@@ -220,6 +229,7 @@ function Admin() {
               })}
             </div>
 
+            {testes.size > 0 && filtro !== "conta_teste" && <p className="g-pp g-muted" data-teste="contas-teste-fora">{testes.size === 1 ? "1 conta de teste fica fora desta lista e dos números." : `${testes.size} contas de teste ficam fora desta lista e dos números.`} Veja em Contas de teste.</p>}
             {!lojas.length ? <Vazio titulo="Nenhum pet shop ainda." texto="Quando alguém criar uma conta, aparece aqui." />
               : !visiveis.length ? <Vazio titulo="Nada com esse filtro." texto="Tente outro nome ou outro filtro." />
               : (
@@ -231,6 +241,7 @@ function Admin() {
                         <span className="g-fila entre">
                           <b style={{ font: "500 1.125rem/1.2 var(--display)", minWidth: 0, overflowWrap: "anywhere" }}>{l.nome}</b>
                           <span className="g-fila" style={{ gap: 6 }}>
+                            {l.conta_teste && <span className="g-tag">conta de teste</span>}
                             <span className={`g-tag ${e.cor}`}>{e.texto}</span>
                             <span className={`g-tag ${u.cor}`}>{u.texto}</span>
                           </span>
@@ -251,11 +262,29 @@ function Admin() {
 
           <AvisosCakto lojas={lojas} />
         </div>
-      )}
+      )}</NaAba>}
 
       {aberta && <Detalhe key={aberta.id} loja={aberta} uso={uso.find((u) => u.id === aberta.id)} conta={contas.find((c) => c.id === aberta.id)} agora={agora} aoFechar={() => setAbertaId(null)} aoMudar={carregar} />}
     </main>
   );
+}
+
+/* ---------- troca de aba ---------- */
+
+/**
+ * A aba nova aparece já com o "carregando" dela, no mesmo toque: o conteúdo de verdade só monta depois que a tela pintou.
+ * Antes, a aba tocada ficava marcada mas a tela continuava mostrando a aba anterior até a nova terminar de montar (Uso e
+ * Contas desenham centenas de linhas de uma vez), e por um instante parecia que a aba nova tinha o conteúdo da outra.
+ */
+function NaAba({ aba, children }: { aba: string; children: React.ReactNode }) {
+  const [mostrada, setMostrada] = useState<string | null>(null);
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const q = requestAnimationFrame(() => { t = setTimeout(() => setMostrada(aba), 0); });
+    return () => { cancelAnimationFrame(q); if (t) clearTimeout(t); };
+  }, [aba]);
+  if (mostrada !== aba) return <div key={`c-${aba}`} data-aba={aba} data-aba-carregando aria-busy="true"><Esqueleto linhas={6} /></div>;
+  return <div key={aba} data-aba={aba}>{children}</div>;
 }
 
 /* ---------- folha de um pet shop ---------- */
@@ -264,6 +293,7 @@ function Detalhe({ loja, uso, conta, agora, aoFechar, aoMudar }: { loja: Loja; u
   const { avisar, avisarErro, confirmar } = useAvisos();
   const [nota, setNota] = useState(loja.nota ?? "");
   const [indo, setIndo] = useState(false);
+  const [teste, setTeste] = useState(Boolean(loja.conta_teste));
   const e = etiqueta(loja, agora), u = engajamento(loja);
   const sinais = conta ? sinaisDe(conta, agora) : [];
 
@@ -289,6 +319,21 @@ function Detalhe({ loja, uso, conta, agora, aoFechar, aoMudar }: { loja: Loja; u
   async function mudarStatus(status: Status, titulo: string, texto: string, feito: string, perigo?: boolean) {
     if (!(await confirmar({ titulo, texto, perigo, confirmar: perigo ? "Cancelar a conta" : "Confirmar" }))) return;
     await gravar({ p_status: status }, feito);
+  }
+  async function marcarTeste(teste: boolean) {
+    setIndo(true);
+    setTeste(teste); // a caixa muda na hora; volta se o banco recusar
+    try {
+      const r = await banco().rpc("admin_conta_teste", { p_petshop: loja.id, p_teste: teste });
+      if (r.error) throw new Error(r.error.message);
+      avisar(teste ? "Marcada como conta de teste. Saiu dos números." : "Desmarcada. Voltou para os números.");
+      await aoMudar();
+    } catch (err) {
+      setTeste(!teste);
+      avisarErro(err);
+    } finally {
+      setIndo(false);
+    }
   }
   async function trocarPlano(plano: string) {
     if (plano === loja.plano) return;
@@ -321,6 +366,7 @@ function Detalhe({ loja, uso, conta, agora, aoFechar, aoMudar }: { loja: Loja; u
     <Folha titulo={loja.nome} aoFechar={aoFechar} larga>
       <div className="g-pilha">
         <div className="g-fila">
+          {loja.conta_teste && <span className="g-tag">conta de teste</span>}
           <span className={`g-tag ${e.cor}`}>{e.texto}</span>
           <span className={`g-tag ${u.cor}`}>{u.texto}</span>
         </div>
@@ -356,6 +402,17 @@ function Detalhe({ loja, uso, conta, agora, aoFechar, aoMudar }: { loja: Loja; u
               <button className="g-btn perigo" disabled={indo} onClick={() => void mudarStatus("cancelada", "Marcar como cancelada?", `${loja.nome} fica só para consulta. Isto não cancela a cobrança na Cakto.`, "Marcada como cancelada.", true)}>Marcar como cancelada</button>
             )}
           </div>
+        </div>
+
+        <div className="g-pilha p" data-teste="conta-teste">
+          <h3>Conta de teste</h3>
+          <label className="g-check" style={{ alignItems: "flex-start", cursor: "pointer" }}>
+            <input type="checkbox" checked={teste} disabled={indo} onChange={(ev) => void marcarTeste(ev.target.checked)} style={{ flex: "none", marginTop: 2 }} />
+            <span>
+              <b>É uma conta de teste</b>
+              <span className="g-pp g-muted" style={{ display: "block" }}>Fica fora da Visão geral, do Uso, das Vendas e da contagem de pagantes. O pet shop continua funcionando igual.</span>
+            </span>
+          </label>
         </div>
 
         <div className="g-pilha p">

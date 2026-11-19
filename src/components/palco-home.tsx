@@ -29,7 +29,7 @@ export default function PalcoHome({ cenas }: { cenas: Cena[] }) {
   const ir = (d: number) => setI((n) => (n + d + cenas.length) % cenas.length);
   const atual = cenas[i];
   return (
-    <section className="pc" aria-roledescription="carrossel" aria-label="Guias e manuais em destaque"
+    <section className="pc" aria-roledescription="carrossel" aria-label="Destaques"
       onTouchStart={(e) => { toque.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
       onTouchEnd={(e) => {
         const t = toque.current; toque.current = null;

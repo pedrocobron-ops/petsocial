@@ -3,6 +3,7 @@ import MetaPixel from "@/components/meta-pixel";
 import AvisoCookies from "@/components/aviso-cookies";
 import Revela from "@/components/revela";
 import localFont from "next/font/local";
+import { lojaNegociosNoSite } from "@/lib/produtos";
 import "./globals.css";
 
 /* Brief 20, 4.1: três arquivos (90 KB). Fraunces com opsz 144 e SOFT 50 fixos, peso variável; itálico 400; Instrument Sans 400–700.
@@ -28,8 +29,10 @@ export const metadata: Metadata = {
     default: "Maestro Pet — conhecimento prático para quem ama pets e para quem vive deles",
     template: "%s | Maestro Pet",
   },
-  description:
-    "Guias e kits práticos para tutores de cães e gatos, e manuais completos para quem quer empreender no mercado pet.",
+  // manuais fora do site (MATERIAIS_PAGOS_A_VENDA = false): a descrição não os promete
+  description: lojaNegociosNoSite()
+    ? "Guias e kits práticos para tutores de cães e gatos, e manuais completos para quem quer empreender no mercado pet."
+    : "Guias e kits práticos para tutores de cães e gatos, e um sistema para o seu pet shop.",
   applicationName: "Maestro Pet",
   icons: {
     icon: [{ url: "/marca/icon.svg", type: "image/svg+xml" }, { url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
@@ -40,7 +43,7 @@ export const metadata: Metadata = {
     locale: "pt_BR",
     siteName: "Maestro Pet",
     title: "Maestro Pet",
-    description: "Guias para tutores e manuais para quem trabalha no mercado pet.",
+    description: lojaNegociosNoSite() ? "Guias para tutores e manuais para quem trabalha no mercado pet." : "Guias para tutores e um sistema para pet shop.",
     images: [{ url: "/og/home.png", width: 1200, height: 630 }],
   },
   twitter: { card: "summary_large_image" },
