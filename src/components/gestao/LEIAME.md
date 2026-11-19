@@ -75,7 +75,7 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   shop: `endereco.ts` (`enderecoDaLoja`, `linkDoMapa`, `fraseDoEndereco`); coluna nova de `petshops` entra em `COLS_PETSHOP` E em
   `gestao_base`. Prévia do link (Open Graph) das páginas do tutor: `previaDaLoja` (`link-og.ts`), nunca a do site. Página pública com
   código (boletim, álbum, entrada, tutor, orçamento, autorização) tem `not-found.tsx` com `<LinkQueNaoAbre />`. Abertura do link pelo
-  navegador: `lerLinkJunto` (`link-inicial.ts`), uma ida só. "Aceitar todos": `pedidos_aceitar_juntos` (tudo ou nada).
+  navegador: `lerLinkJunto` (`link-inicial.ts`), uma ida só. "Aceitar todos": `pedidos_aceitar_juntos` (tudo ou nada). Nome do pet parecido com um da ficha do tutor (`pet-parecido.ts`): pergunta "É o Thor que já está cadastrado?" e manda `p_pets`; nome diferente: "pet novo" no cartão aceito, com "Era outro pet?" (`pedido_trocar_pet`).
 - Mais de um serviço no pedido pelo link (migração 20261239): o principal em `pedidos_agendamento.servico_id`, os outros em
   `outros_servicos` (na ordem do tutor). `link_horarios` e `link_pedir` recebem `p_extras` (o tempo de cada pet é a soma); o valor é
   `valorDosServicos` (promoção só no principal) e o banco guarda o mesmo em `pedidos_valores` (com `servicos`, cada um com o seu

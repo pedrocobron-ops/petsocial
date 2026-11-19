@@ -19,6 +19,7 @@ import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDi
 import { precoDoPedido } from "@/lib/gestao/preco-do-pedido";
 import { lerVisto, valorNaFrase, type LinhaDeValor } from "@/lib/gestao/link-precos";
 import { fraseDoEndereco } from "@/lib/gestao/endereco";
+import { acharPet, perguntaDoPet, simDoPet, type PetDaFicha } from "@/lib/gestao/pet-parecido";
 import "./pedidos-link.css";
 
 type Pedido = Database["public"]["Tables"]["pedidos_agendamento"]["Row"];
@@ -29,11 +30,19 @@ const diaHora = (iso: string) => `${dataCurta(new Date(iso))} às ${hora(iso)}`;
 type TutorDoTelefone = { id: string; nome: string; telefone: string | null };
 /** O telefone do pedido já é de outro nome: espera a pessoa dizer se é a mesma. */
 type Duvida = { lista: Pedido[]; grupo: string; existente: TutorDoTelefone };
-type Decisao = { como: "existente" | "novo"; tutor?: string };
+/** `alvo`: o tutor da ficha em que o pedido vai entrar (sem ele, o tutor é novo e não há pet para conferir). */
+type Decisao = { como: "existente" | "novo"; tutor?: string; alvo?: string };
+type PetDoTutor = PetDaFicha & { foto: string | null; raca: string | null };
+/** O pet da ficha que a pessoa confirmou em cada pedido ("Sim, é ele"): id do pedido → pet. Fora daqui, o banco decide (nome igual ou pet novo). */
+type Escolhidos = Record<string, PetDoTutor>;
+/** O nome do pet do pedido parece o de um pet da ficha: espera a pessoa dizer se é o mesmo. */
+type PerguntaPet = { lista: Pedido[]; grupo: string; decisao: Decisao; tutor: string; perguntas: { pedido: Pedido; pets: PetDoTutor[] }[]; respostas: Record<string, PetDoTutor | "outro"> };
+/** "Era outro pet?": o pedido aceito que criou um pet novo, e os outros pets do mesmo tutor. */
+type Troca = { pedido: Pedido; pets: PetDoTutor[] };
 /** Porte respondido na hora de aceitar: P, M, G, GG ou "depois" (não sabe ainda: o valor fica para conferir na hora). */
 type Portes = Record<string, string>;
 /** Pedido de serviço sem porte e com preço que muda com o porte: espera a pessoa dizer o porte (ou que não sabe). */
-type PerguntaPorte = { lista: Pedido[]; grupo: string; decisao: Decisao; faltam: Pedido[]; respostas: Portes };
+type PerguntaPorte = { lista: Pedido[]; grupo: string; decisao: Decisao; escolhidos: Escolhidos; faltam: Pedido[]; respostas: Portes };
 
 const ESPECIE: Record<string, string> = { cao: "cão", gato: "gato", outro: "outro" };
 
@@ -103,6 +112,8 @@ export default function PedidosLink() {
   const [tutores, setTutores] = useState<Record<string, string>>({});
   const [duvida, setDuvida] = useState<Duvida | null>(null);
   const [perguntaPorte, setPerguntaPorte] = useState<PerguntaPorte | null>(null);
+  const [perguntaPet, setPerguntaPet] = useState<PerguntaPet | null>(null);
+  const [troca, setTroca] = useState<Troca | null>(null);
   // pedidos que acabaram de ser aceitos ou recusados aqui: saem da lista na hora, sem esperar a busca de novo
   // (antes, o cartão com Aceitar e Recusar ficava na tela uns segundos e convidava a um segundo toque)
   const [respondidosAgora, setRespondidosAgora] = useState<Set<string>>(() => new Set());
@@ -268,8 +279,8 @@ export default function PedidosLink() {
   // trava na hora do primeiro toque: dois toques seguidos em Aceitar não respondem o pedido duas vezes
   // (o banco aceitaria só o primeiro, mas a pessoa veria um erro de "já foi respondido" sem ter feito nada errado)
   const umaVez = useTrava();
-  const aceitar = (lista: Pedido[], grupo: string, decisao?: Decisao, portes?: Portes) => umaVez(() => aceitarJa(lista, grupo, decisao, portes));
-  async function aceitarJa(lista: Pedido[], grupo: string, decisao?: Decisao, portes?: Portes) {
+  const aceitar = (lista: Pedido[], grupo: string, decisao?: Decisao, escolhidos?: Escolhidos, portes?: Portes) => umaVez(() => aceitarJa(lista, grupo, decisao, escolhidos, portes));
+  async function aceitarJa(lista: Pedido[], grupo: string, decisao?: Decisao, escolhidos?: Escolhidos, portes?: Portes) {
     if (somenteLeitura() || ocupado) return;
     const profissional = atendem.length > 1 ? quem[grupo] || undefined : atendem[0]?.id;
     setOcupado(lista.length > 1 ? grupo : lista[0].id);
@@ -281,16 +292,26 @@ export default function PedidosLink() {
       if (donos.length && igual < 0) {
         // a pergunta é uma só por pedido: se outro pet do mesmo pedido (ou do mesmo tutor, na mesma hora) já foi aceito
         // e ninguém ganhou ficha com o nome de quem pediu, a resposta foi "é a mesma pessoa"
-        if (await jaRespondeu(lista[0])) decisao = { como: "existente", tutor: donos[0].nome };
+        if (await jaRespondeu(lista[0])) decisao = { como: "existente", tutor: donos[0].nome, alvo: donos[0].id };
         else { setDuvida({ lista, grupo, existente: donos[0] }); setOcupado(null); return; }
       }
       // já existe um tutor com esse telefone e esse nome: é ele (mesmo que não seja o mais antigo com o número)
-      decisao ??= { como: igual > 0 ? "novo" : "existente" };
+      decisao ??= igual > 0 ? { como: "novo", alvo: donos[igual].id } : { como: "existente", alvo: donos[0]?.id };
+    }
+    // o nome do pet parece o de um pet da ficha do tutor (Tor e Thor, Mel e Melzinha): pergunta se é o mesmo, antes de marcar
+    if (!escolhidos) {
+      const perguntas = await petsParaPerguntar(lista, decisao.alvo);
+      if (perguntas.length) {
+        setPerguntaPet({ lista, grupo, decisao, tutor: decisao.tutor ?? lista[0].tutor_nome, perguntas, respostas: {} });
+        setOcupado(null);
+        return;
+      }
+      escolhidos = {};
     }
     // o valor depende do porte e ninguém disse o porte (nem o pedido, nem a ficha do pet): pergunta agora, antes de marcar
     if (!portes) {
-      const faltam = await semPorteParaPerguntar(lista);
-      if (faltam.length) { setPerguntaPorte({ lista, grupo, decisao, faltam, respostas: {} }); setOcupado(null); return; }
+      const faltam = await semPorteParaPerguntar(lista, escolhidos);
+      if (faltam.length) { setPerguntaPorte({ lista, grupo, decisao, escolhidos, faltam, respostas: {} }); setOcupado(null); return; }
     }
     const feitos: Pedido[] = [];
     let falha: unknown = null;
@@ -300,8 +321,11 @@ export default function PedidosLink() {
     // o pedido aceito pela metade.
     type Solto = { rpc: (f: string, a: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }> };
     const comoNovo = decisao.como === "novo";
+    // o pet confirmado em cada pedido (migração 20261243). Sem nenhum, a chamada é a de sempre.
+    const pets = Object.fromEntries(Object.entries(escolhidos).map(([pedido, pet]) => [pedido, pet.id]));
     const juntos = (forcar: boolean) => (sb as unknown as Solto).rpc("pedidos_aceitar_juntos", {
       p_ids: lista.map((p) => p.id), p_profissional: profissional ?? null, p_forcar: forcar, p_tutor_novo: comoNovo, p_portes: portes ?? null,
+      ...(Object.keys(pets).length ? { p_pets: pets } : {}),
     });
     let r = await juntos(false);
     // creche ou hotel sem vaga em algum dia: o banco recusa e explica; a pessoa decide se aceita assim mesmo
@@ -359,9 +383,51 @@ export default function PedidosLink() {
     setOcupado(null);
   }
 
+  /**
+   * Dos pedidos da lista, os em que o nome do pet parece o de um pet ativo da ficha do tutor (e não é igual: igual, o banco já
+   * usa a ficha). Tutor novo (sem `alvo`): nenhum. A conta é de src/lib/gestao/pet-parecido.ts.
+   */
+  async function petsParaPerguntar(lista: Pedido[], alvo: string | undefined): Promise<PerguntaPet["perguntas"]> {
+    if (!alvo) return [];
+    const r = await sb.from("pets").select("id, nome, especie, sexo, porte, ativo, foto, raca").eq("petshop_id", petshop.id).eq("cliente_id", alvo).order("criado_em").limit(100);
+    const pets = (r.error ? [] : r.data ?? []) as PetDoTutor[];
+    if (!pets.length) return [];
+    const achados = lista.map((p) => ({ pedido: p, achado: acharPet(p.pet_nome, p.especie, pets) }));
+    // o pet que já é de outro pedido da lista pelo nome igual não entra na pergunta dos outros
+    const usados = new Set(achados.flatMap((x) => (x.achado.tipo === "igual" ? [x.achado.pet.id] : [])));
+    return achados.flatMap(({ pedido, achado }) => {
+      const candidatos = achado.tipo === "parecido" ? achado.pets.filter((x) => !usados.has(x.id)) : [];
+      return candidatos.length ? [{ pedido, pets: candidatos }] : [];
+    });
+  }
+
+  /** "Era outro pet?": busca os outros pets do tutor do pedido aceito e abre a escolha. */
+  async function abrirTroca(p: Pedido) {
+    try {
+      const deOnde = p.estadia_id ? await sb.from("estadias").select("pet_id").eq("id", p.estadia_id).eq("petshop_id", petshop.id).maybeSingle()
+        : p.agendamento_id ? await sb.from("agendamentos").select("pet_id").eq("id", p.agendamento_id).eq("petshop_id", petshop.id).maybeSingle() : null;
+      const atual = deOnde?.data?.pet_id;
+      const dono = atual ? (await sb.from("pets").select("cliente_id").eq("id", atual).eq("petshop_id", petshop.id).maybeSingle()).data?.cliente_id : null;
+      if (!atual || !dono) throw new Error("Não achei o horário deste pedido. Recarregue a tela e tente de novo.");
+      const outros = ok(await sb.from("pets").select("id, nome, especie, sexo, porte, ativo, foto, raca").eq("petshop_id", petshop.id).eq("cliente_id", dono).eq("ativo", true).neq("id", atual).order("nome").limit(100)) as PetDoTutor[];
+      if (!outros.length) { avisar(`${primeiroNome(p.tutor_nome)} não tem outro pet na ficha.`); return; }
+      setTroca({ pedido: p, pets: outros });
+    } catch (e) { avisarErro(e); }
+  }
+  const trocarPet = (pedido: Pedido, pet: PetDoTutor) => umaVez(async () => {
+    try {
+      const r = ok(await sb.rpc("pedido_trocar_pet", { p_id: pedido.id, p_pet: pet.id })) as { apagado?: boolean } | null;
+      setTroca(null);
+      avisar(`Pronto: ${ehEstadia(pedido) ? "a reserva" : "o horário"} agora é de ${pet.nome}.${r?.apagado ? ` A ficha de ${pedido.pet_nome}, criada no pedido, foi apagada.` : ""}`);
+      avisarMudanca();
+      void recarregar();
+    } catch (e) { avisarErro(e); }
+  });
+
   /** Dos pedidos da lista, os de serviço em que o valor muda com o porte e nem o pedido nem a ficha do pet dizem o porte. */
-  async function semPorteParaPerguntar(lista: Pedido[]): Promise<Pedido[]> {
-    const candidatos = lista.filter((p) => !ehEstadia(p) && !p.porte && servicosDe(p).some((s) => precoMudaComPorte(s)));
+  async function semPorteParaPerguntar(lista: Pedido[], escolhidos: Escolhidos = {}): Promise<Pedido[]> {
+    // o pet confirmado na pergunta do nome parecido: vale o porte da ficha dele
+    const candidatos = lista.filter((p) => !ehEstadia(p) && !p.porte && !escolhidos[p.id]?.porte && servicosDe(p).some((s) => precoMudaComPorte(s)));
     if (!candidatos.length) return [];
     // pet que já é da casa e tem porte na ficha: o banco usa o da ficha, não precisa perguntar
     const r = await sb.rpc("pedido_tutores_do_telefone", { p_id: lista[0].id });
@@ -606,6 +672,17 @@ export default function PedidosLink() {
                       : ehEstadia(p) ? `Reserva de ${p.tipo === "hotel" ? "hotel" : "creche"} feita: ${periodoDe(p)}.`
                       : `Marcado para ${quandoNaTela(p.inicio)}, às ${hora(p.inicio)}.`} Avise {primeiroNome(g.lista[0].tutor ?? p.tutor_nome)}.
                   </span>
+                  {/* o aceite criou um pet novo para um tutor que já tinha outros: um toque para corrigir, se era um deles */}
+                  {aceito && g.lista.some((r) => r.pedido.pet_novo) && (
+                    <span className="g-pl-petnovo">
+                      {g.lista.filter((r) => r.pedido.pet_novo).map((r) => (
+                        <span key={r.pedido.id} data-teste="pet-novo">
+                          <span className="g-tag amarelo" title="O nome não bate com nenhum pet da ficha deste tutor. Foi criado um pet novo.">{varios ? `${r.pedido.pet_nome}: pet novo` : "pet novo"}</span>
+                          <button type="button" className="g-link" aria-label={`${r.pedido.pet_nome} era outro pet?`} onClick={() => void abrirTroca(r.pedido)}>Era outro pet?</button>
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="g-pl-acoes">
@@ -724,7 +801,7 @@ export default function PedidosLink() {
           <Folha titulo={q.faltam.length > 1 ? "Qual é o porte de cada um?" : `Qual é o porte de ${q.faltam[0].pet_nome}?`} aoFechar={() => setPerguntaPorte(null)}
             rodape={<>
               <button type="button" className="g-btn sec" onClick={() => setPerguntaPorte(null)}>Voltar</button>
-              <button type="button" className="g-btn pri" disabled={!tudoRespondido} onClick={() => { setPerguntaPorte(null); void aceitar(q.lista, q.grupo, q.decisao, q.respostas); }}>{q.lista.length > 1 ? "Aceitar todos" : "Aceitar"}</button>
+              <button type="button" className="g-btn pri" disabled={!tudoRespondido} onClick={() => { setPerguntaPorte(null); void aceitar(q.lista, q.grupo, q.decisao, q.escolhidos, q.respostas); }}>{q.lista.length > 1 ? "Aceitar todos" : "Aceitar"}</button>
             </>}>
             <div className="g-pilha">
               <p className="g-muted g-p">O pedido veio sem o porte, e o valor do serviço muda com ele. Escolha o porte para o horário já entrar com o valor certo. Fechando esta janela, o pedido continua esperando.</p>
@@ -752,11 +829,69 @@ export default function PedidosLink() {
         );
       })()}
 
+      {perguntaPet && (() => {
+        const q = perguntaPet;
+        const umSo = q.perguntas.length === 1 && q.perguntas[0].pets.length === 1;
+        // um toque por pergunta: respondida a última, o aceite segue sozinho
+        const responder = (id: string, r: PetDoTutor | "outro") => {
+          const respostas = { ...q.respostas, [id]: r };
+          if (!q.perguntas.every((x) => respostas[x.pedido.id])) { setPerguntaPet({ ...q, respostas }); return; }
+          setPerguntaPet(null);
+          const escolhidos: Escolhidos = {};
+          for (const [pedido, v] of Object.entries(respostas)) if (v !== "outro") escolhidos[pedido] = v;
+          void aceitar(q.lista, q.grupo, q.decisao, escolhidos);
+        };
+        const detalhesDoPet = (x: PetDoTutor) => [ESPECIE[x.especie ?? ""] ?? null, x.raca, x.porte ? `porte ${x.porte}` : null].filter(Boolean).join(" · ");
+        return (
+          <Folha titulo={umSo ? perguntaDoPet(q.perguntas[0].pets[0]) : q.perguntas.length > 1 ? "Esses pets já estão na ficha?" : `${q.perguntas[0].pedido.pet_nome} já está na ficha?`} aoFechar={() => setPerguntaPet(null)}>
+            <div className="g-pilha" data-teste="pergunta-pet">
+              <p className="g-muted g-p">Na ficha de {primeiroNome(q.tutor)} tem um nome parecido com o do pedido. Fechando esta janela, o pedido continua esperando.</p>
+              {q.perguntas.map(({ pedido, pets }) => {
+                const r = q.respostas[pedido.id];
+                return (
+                  <div key={pedido.id} className="g-card areia g-pilha p" role="group" aria-label={`Pet do pedido: ${pedido.pet_nome}`}>
+                    <div className="g-pp g-muted">No pedido: <b>{pedido.pet_nome}</b>{ESPECIE[pedido.especie] ? ` · ${ESPECIE[pedido.especie]}` : ""}{pedido.porte ? ` · porte ${pedido.porte}` : ""}</div>
+                    {pets.map((x) => (
+                      <div key={x.id} className="g-fila">
+                        <AvatarPet pet={x} />
+                        <div className="g-cresce"><b>{x.nome}</b><div className="g-pp g-muted">{detalhesDoPet(x) || "já é da casa"}</div></div>
+                      </div>
+                    ))}
+                    <div className="g-fila g-pl-sim">
+                      {pets.map((x) => (
+                        <button key={x.id} type="button" className="g-btn pri p" aria-pressed={r !== undefined && r !== "outro" && r.id === x.id} onClick={() => responder(pedido.id, x)}>{simDoPet(x, pets.length > 1)}</button>
+                      ))}
+                      <button type="button" className="g-btn sec p" aria-pressed={r === "outro"} onClick={() => responder(pedido.id, "outro")}>É outro pet</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Folha>
+        );
+      })()}
+
+      {troca && (
+        <Folha titulo="Era outro pet?" aoFechar={() => setTroca(null)} rodape={<button type="button" className="g-btn sec" onClick={() => setTroca(null)}>Voltar</button>}>
+          <div className="g-pilha" data-teste="troca-pet">
+            <p className="g-muted g-p">
+              Escolha o pet certo: {ehEstadia(troca.pedido) ? "a reserva passa" : "o horário passa"} para ele. A ficha de {troca.pedido.pet_nome}, criada neste pedido, sai se não tiver mais nada.
+            </p>
+            {troca.pets.map((x) => (
+              <button key={x.id} type="button" className="g-card areia g-fila p g-pl-trocar" onClick={() => trocarPet(troca.pedido, x)}>
+                <AvatarPet pet={x} />
+                <span className="g-cresce"><b>{x.nome}</b><span className="g-pp g-muted">{[ESPECIE[x.especie ?? ""] ?? null, x.porte ? `porte ${x.porte}` : null].filter(Boolean).join(" · ")}</span></span>
+              </button>
+            ))}
+          </div>
+        </Folha>
+      )}
+
       {duvida && (
         <Folha titulo={`Este telefone já é de ${duvida.existente.nome}`} aoFechar={() => setDuvida(null)}
           rodape={<>
             <button type="button" className="g-btn sec" onClick={() => { const d = duvida; setDuvida(null); void aceitar(d.lista, d.grupo, { como: "novo" }); }}>Criar outro tutor</button>
-            <button type="button" className="g-btn pri" autoFocus onClick={() => { const d = duvida; setDuvida(null); void aceitar(d.lista, d.grupo, { como: "existente", tutor: d.existente.nome }); }}>Usar {duvida.existente.nome}</button>
+            <button type="button" className="g-btn pri" autoFocus onClick={() => { const d = duvida; setDuvida(null); void aceitar(d.lista, d.grupo, { como: "existente", tutor: d.existente.nome, alvo: d.existente.id }); }}>Usar {duvida.existente.nome}</button>
           </>}>
           <div className="g-pilha">
             <div className="g-card areia g-pilha p">
