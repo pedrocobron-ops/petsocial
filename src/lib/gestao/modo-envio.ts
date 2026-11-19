@@ -40,7 +40,7 @@ export const DIAS_SAUDE = 15;
 type Tutor = { id: string | null; nome: string | null; telefone: string | null; nao_quer: boolean | null } | null;
 type Pet = { id: string; nome: string; sexo: string | null };
 type Servicos = { servicos: { nome: string } | null; agendamento_servicos: { ordem: number; servicos: { nome: string } | null }[] | null };
-type ItemHorario = Servicos & { id: string; inicio: string; pet: Pet; tutor: Tutor };
+type ItemHorario = Servicos & { id: string; inicio: string; fim?: string | null; pet: Pet; tutor: Tutor };
 type ItemChegada = { id: string; tipo: string; entrada: string; saida_prevista: string | null; pet: Pet; tutor: Tutor };
 type ItemSaude = { id: string; pet_id: string; tipo: string; nome: string; vence_em: string; pet: Pet; tutor: Tutor };
 type ItemNiver = { id: string; nome: string; nascimento: string; pet: Pet; tutor: Tutor };
@@ -116,7 +116,7 @@ export function montarFila(d: DadosDoEnvio, petshop: Petshop, agora = new Date()
     mensagens.push({ chave, tipo, refs, tutorId: tutor?.id ?? null, quem, telefone: fone, porque, texto: texto(tutor?.nome ?? null) });
   }
   const nomes = (l: { pet: Pet }[]) => juntarNomes([...new Set(l.map((x) => x.pet.nome))]);
-  const comoHorario = (a: ItemHorario, tutor: string | null) => ({ inicio: a.inicio, servicos: a.servicos, agendamento_servicos: a.agendamento_servicos, pets: { nome: a.pet.nome, sexo: a.pet.sexo, clientes: tutor ? { nome: tutor } : null } });
+  const comoHorario = (a: ItemHorario, tutor: string | null) => ({ inicio: a.inicio, fim: a.fim ?? null, servicos: a.servicos, agendamento_servicos: a.agendamento_servicos, pets: { nome: a.pet.nome, sexo: a.pet.sexo, clientes: tutor ? { nome: tutor } : null } });
 
   // pet pronto: um tutor com dois pets prontos recebe uma mensagem só
   for (const g of porTutor(d.itens.pronto ?? [])) {
@@ -126,7 +126,7 @@ export function montarFila(d: DadosDoEnvio, petshop: Petshop, agora = new Date()
   }
   for (const g of porTutor(d.itens.lembrete ?? [])) {
     const quando = g.map((a) => `${servicosPorExtenso(a) ?? "Horário"} de ${a.pet.nome} ${dataAmigavel(a.inicio)} às ${hora(a.inicio)}`).join("; ");
-    entrar("lembrete", g.map((a) => a.id), g[0].tutor, g[0].pet.id, quando, (t) => mensagemDoLembrete(g.map((a) => comoHorario(a, t)), loja));
+    entrar("lembrete", g.map((a) => a.id), g[0].tutor, g[0].pet.id, quando, (t) => mensagemDoLembrete(g.map((a) => comoHorario(a, t)), petshop, agora));
   }
   for (const g of porTutor(d.itens.chegada ?? [])) {
     const lugar = (e: ItemChegada) => (e.tipo === "hotel" ? "Hotel" : "Creche");

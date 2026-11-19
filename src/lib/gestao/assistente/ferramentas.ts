@@ -12,6 +12,7 @@ import { consultarSinais, FERRAMENTA_SINAIS } from "./ferramenta-sinais";
 import { consultarChao, descreverChao, FERRAMENTAS_CHAO, gravarChao } from "./ferramenta-chao";
 import { consultarMaquininha, FERRAMENTA_MAQUININHA } from "./ferramenta-maquininha";
 import { consultarDescontos, FERRAMENTA_DESCONTOS } from "./ferramenta-descontos";
+import { descreverCadastro, FERRAMENTAS_CADASTROS, gravarCadastro } from "./ferramenta-cadastros";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
@@ -30,7 +31,8 @@ import { foraDoLimite } from "../fiado";
 import { anotarParcelasComRetry, idsDaOperacao, lojaPerguntaParcelas } from "../maquininha";
 import { juntarServicosAMais, nomeDosServicos, valorDoHorario } from "../servicos-do-horario";
 import { parecidos } from "./parecido";
-import { almocoNoDiaDaSemana, brl, fmtTelefone, lerTelefone, linkWhatsApp, precoDoServico, semAcento, soDigitos, centavos, centavos as real } from "../util";
+import { lembreteDaEstadia, lembreteDoHorario } from "../lembrete-zap";
+import { almocoNoDiaDaSemana, brl, fmtTelefone, lerTelefone, linkWhatsApp, precoDoServico, semAcento, soDigitos, telefoneValido, centavos, centavos as real } from "../util";
 
 /**
  * O que o Mozart sabe fazer no sistema.
@@ -52,6 +54,8 @@ export type Contexto = {
   cuidoDoFinanceiro: boolean;
   /** As áreas que a pessoa abre (`areasDe`): ferramenta de uma área que ela não tem não é oferecida nem roda. */
   areas?: string[];
+  /** Tem o papel dono (dono ou sócio): só ele muda o que fica em Meu pet shop (serviços, horário, diárias). */
+  dono?: boolean;
   /** Minutos a leste de UTC no aparelho de quem pediu (Brasília = -180). */
   fusoMin: number;
   /** Agora, no horário local: "AAAA-MM-DDTHH:mm". */
@@ -93,7 +97,7 @@ const uuid = (v: unknown) => (typeof v === "string" && RE_UUID.test(v) ? v : nul
 
 /* ---------- definição das ferramentas (o que o modelo enxerga) ---------- */
 
-type Def = Anthropic.Tool & { grava: boolean; financeiro?: boolean; areas?: readonly string[] };
+type Def = Anthropic.Tool & { grava: boolean; financeiro?: boolean; areas?: readonly string[]; soDono?: boolean };
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: "object" as const, properties, required, additionalProperties: false });
 const S = { type: "string" }, N = { type: "number" }, B = { type: "boolean" };
 /** Crédito em quantas vezes (a taxa do parcelado da maquininha). A ferramenta pede quando a loja tem taxa de parcelado. */
@@ -118,6 +122,9 @@ const AREAS_DA_FERRAMENTA: Record<string, readonly string[]> = {
   ver_agenda: ["agenda", "caixa", "financeiro", "relatorios"],
   // equipe do chão (ferramenta-chao.ts): doses e ocorrências são da creche e do hotel; o quadro é da agenda
   ver_cuidados: ["creche_hotel"], marcar_cuidado: ["creche_hotel"], registrar_ocorrencia: ["creche_hotel"], mover_no_quadro: ["agenda"],
+  // cadastros (ferramenta-cadastros.ts): as mesmas áreas das telas. Serviços, horário e diárias são só do dono (soDono)
+  criar_produto: ["estoque"], alterar_produto: ["estoque"], alterar_tutor: ["clientes", "agenda", "creche_hotel"],
+  criar_pacote: ["pacotes"], alterar_pacote: ["pacotes"],
 };
 
 export const FERRAMENTAS: Def[] = ([
@@ -149,8 +156,12 @@ export const FERRAMENTAS: Def[] = ([
     input_schema: obj({}) },
   { grava: false, name: "ver_saude", description: "Cuidados de saúde anotados (vacina, vermífugo, antipulgas, outros). Com pet_id, lista os do pet. Sem pet_id, lista os que vencem nos próximos N dias no pet shop e os que venceram há pouco.",
     input_schema: obj({ pet_id: S, dias: { ...N, description: "Sem pet_id: quantos dias à frente. Padrão: 30" } }) },
-  { grava: false, name: "preparar_mensagens", description: "Prepara mensagens de WhatsApp para tutores (lembrete de horário, convite para quem está sumido). Não envia nada: mostra botões para a pessoa abrir o WhatsApp e enviar. Escreva cada texto completo, simpático e curto, assinado com o nome do pet shop.",
-    input_schema: obj({ mensagens: { type: "array", items: obj({ pet_id: S, texto: S }, ["pet_id", "texto"]) } }, ["mensagens"]) },
+  { grava: false, name: "preparar_mensagens", description: "Prepara mensagens de WhatsApp para tutores. Não envia nada: mostra botões que abrem o WhatsApp com o texto pronto. Lembrete de horário: passe agendamento_ids (de ver_agenda; os horários do mesmo tutor numa mensagem só) e não escreva o texto: o sistema usa o modelo de lembrete do pet shop. Lembrete de creche ou hotel: estadia_id (de ver_hospedes). Outras mensagens (convite para quem está sumido, recado): pet_id e texto, curto e simpático, começando com \"Olá, [primeiro nome]!\" e com o nome do pet shop. Tutor sem telefone no cadastro (sem_telefone): pergunte o WhatsApp na conversa; com o número, passe telefone aqui e, na mesma resposta, alterar_tutor para salvar na ficha. Se a pessoa não quiser dar ou salvar o número, passe sem_numero: true (o botão abre o WhatsApp com o texto pronto e a pessoa escolhe o contato).",
+    input_schema: obj({ mensagens: { type: "array", items: obj({ pet_id: S, texto: { ...S, description: "Só para mensagem que não é lembrete" },
+      agendamento_ids: { type: "array", items: S, description: "Lembrete: os horários (do mesmo tutor) que a mensagem lembra" },
+      estadia_id: { ...S, description: "Lembrete da creche ou do hotel: a reserva" },
+      telefone: { ...S, description: "Só quando o tutor não tem telefone no cadastro e a pessoa disse o número agora (DDD e número)" },
+      sem_numero: { ...B, description: "true: botão sem número, a pessoa escolhe o contato no WhatsApp" } }) } }, ["mensagens"]) },
 
   { grava: true, name: "cadastrar_pet", description: "Cadastra um pet novo. Se o tutor já é cliente, passe cliente_id; senão, passe tutor_nome (e telefone, se a pessoa disse) e o tutor é criado junto.",
     input_schema: obj({ nome: S, cliente_id: S, tutor_nome: S, tutor_telefone: S, especie: { type: "string", enum: ["cao", "gato", "outro"] }, raca: S, porte: { type: "string", enum: ["P", "M", "G", "GG"] }, alertas: { ...S, description: "Cuidados: alergia, medo, comportamento" } }, ["nome"]) },
@@ -190,8 +201,8 @@ export const FERRAMENTAS: Def[] = ([
     input_schema: obj({ cliente_id: S, valor: N, descricao: { ...S, description: "Do que é (ex.: Perfume, Taxa de falta de 18/11)" }, vencimento: DIA, categoria: { ...S, description: "Padrão: Outros" } }, ["cliente_id", "valor", "descricao"]) },
   { grava: true, financeiro: true, name: "receber_de_cliente", description: "Um cliente pagou o que devia (\"o dono do Bob me pagou os 35\", \"a Joana acertou o fiado\"): dá baixa nas contas em aberto dele, da mais antiga para a mais nova, e o dinheiro entra uma vez só. Pode ser só uma parte: o resto continua devido. Se pagou mais do que deve, pergunte se a diferença fica de crédito para ele (sobra: \"credito\"). O cartão mostra quanto ele deve, quais contas quita e o que fica faltando.",
     input_schema: obj({ cliente_id: { ...S, description: "Tutor (de buscar_pets)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, sobra: { type: "string", enum: ["credito"], description: "Só quando pagou a mais e a pessoa disse que a diferença fica de crédito" } }, ["cliente_id", "valor", "forma"]) },
-  { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar. Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento. Produto que controla validade (ver_estoque diz): a entrada precisa da validade; pergunte à pessoa, nunca invente.",
-    input_schema: obj({ produto_id: S, produto_nome: S, unidade: { ...S, description: "un, kg, g, L, ml, pacote, saco" }, tipo: { type: "string", enum: ["entrada", "saida"] }, quantidade: N, custo_unitario: N, lancar_despesa: B, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, motivo: S,
+  { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar, e o preço de venda em preco_venda se a pessoa disse (produto que já existe muda o preço com alterar_produto). Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento. Produto que controla validade (ver_estoque diz): a entrada precisa da validade; pergunte à pessoa, nunca invente.",
+    input_schema: obj({ produto_id: S, produto_nome: S, unidade: { ...S, description: "un, kg, g, L, ml, pacote, saco" }, preco_venda: { ...N, description: "Só para produto novo: preço de venda de cada unidade" }, tipo: { type: "string", enum: ["entrada", "saida"] }, quantidade: N, custo_unitario: N, lancar_despesa: B, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, motivo: S,
       validade: { ...DIA, description: "Só na entrada: validade do que está entrando (AAAA-MM-DD). Obrigatória quando o produto controla validade." }, lote: { ...S, description: "Só na entrada: número do lote, se a pessoa disser" } }, ["tipo", "quantidade"]) },
   ...FERRAMENTAS_CHAO,
   ...FERRAMENTAS_COMISSAO,
@@ -200,10 +211,11 @@ export const FERRAMENTAS: Def[] = ([
   ...FERRAMENTAS_ENVIO,
   ...FERRAMENTAS_CONTAS_FIXAS,
   ...FERRAMENTAS_PAGAR_CONTA,
+  ...FERRAMENTAS_CADASTROS,
 ] as Def[]).map((f) => (AREAS_DA_FERRAMENTA[f.name] ? { ...f, areas: AREAS_DA_FERRAMENTA[f.name] } : f));
 
-export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro" | "areas">): Anthropic.Tool[] =>
-  FERRAMENTAS.filter((f) => ferramentaLiberada(f, c)).map(({ grava: _g, financeiro: _f, areas: _a, ...t }) => t);
+export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro" | "areas" | "dono">): Anthropic.Tool[] =>
+  FERRAMENTAS.filter((f) => ferramentaLiberada(f, c)).map(({ grava: _g, financeiro: _f, areas: _a, soDono: _d, ...t }) => t);
 export const definicao = (nome: string) => FERRAMENTAS.find((f) => f.name === nome);
 
 /* ---------- consultas ---------- */
@@ -903,17 +915,52 @@ async function consultar(c: Contexto, nome: string, e: Entrada): Promise<{ resul
     case "preparar_mensagens": {
       const itens = Array.isArray(e.mensagens) ? (e.mensagens as Entrada[]).slice(0, 30) : [];
       exigir(itens.length, "Passe ao menos uma mensagem.");
-      const ids = itens.map((m) => uuid(m.pet_id)).filter(Boolean) as string[];
-      const pets = ok(await sb.from("pets").select("id, nome, clientes(nome, telefone)").eq("petshop_id", petshop.id).in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]));
+      // lembretes: o texto sai do modelo aprovado (lembrete-zap.ts), com os horários e as reservas do banco
+      const idsAg = itens.flatMap((m) => (Array.isArray(m.agendamento_ids) ? m.agendamento_ids : []).map(uuid)).filter(Boolean) as string[];
+      const idsEst = itens.map((m) => uuid(m.estadia_id)).filter(Boolean) as string[];
+      const NENHUM = ["00000000-0000-0000-0000-000000000000"];
+      const [ags, ests] = await Promise.all([
+        idsAg.length ? sb.from("agendamentos").select("id, pet_id, inicio, fim, servicos(nome), agendamento_servicos(ordem, servicos(nome))").eq("petshop_id", petshop.id).in("id", idsAg) : Promise.resolve({ data: [], error: null }),
+        idsEst.length ? sb.from("estadias").select("id, pet_id, tipo, entrada, saida_prevista").eq("petshop_id", petshop.id).in("id", idsEst) : Promise.resolve({ data: [], error: null }),
+      ]);
+      type AgLido = { id: string; pet_id: string; inicio: string; fim: string | null; servicos: { nome: string } | null; agendamento_servicos: { ordem: number; servicos: { nome: string } | null }[] | null };
+      type EstLida = { id: string; pet_id: string; tipo: string; entrada: string; saida_prevista: string | null };
+      const agsLidos = ((ags.data ?? []) as unknown as AgLido[]), estsLidas = ((ests.data ?? []) as unknown as EstLida[]);
+      const ids = [...new Set([...itens.map((m) => uuid(m.pet_id)), ...agsLidos.map((a) => a.pet_id), ...estsLidas.map((x) => x.pet_id)].filter(Boolean))] as string[];
+      const pets = ok(await sb.from("pets").select("id, nome, clientes(nome, telefone)").eq("petshop_id", petshop.id).in("id", ids.length ? ids : NENHUM));
+      const onde = { nome: petshop.nome, endereco: petshop.endereco, bairro: petshop.bairro };
       const links: LinkZap[] = [], semTelefone: string[] = [];
       for (const m of itens) {
-        const p = pets.find((x) => x.id === m.pet_id);
+        const meus = (Array.isArray(m.agendamento_ids) ? m.agendamento_ids : []).map((id) => agsLidos.find((a) => a.id === id)).filter((a): a is AgLido => Boolean(a));
+        const est = estsLidas.find((x) => x.id === m.estadia_id);
+        exigir(!(Array.isArray(m.agendamento_ids) && m.agendamento_ids.length && !meus.length), "agendamento_ids inválidos: use ver_agenda para pegar os ids dos horários.");
+        exigir(!(m.estadia_id && !est), "estadia_id inválido: use ver_hospedes.");
+        const p = pets.find((x) => x.id === (meus[0]?.pet_id ?? est?.pet_id ?? m.pet_id));
         if (!p) continue;
-        const url = linkWhatsApp(p.clientes?.telefone, texto(m.texto, 900));
-        if (url) links.push({ nome: `${p.nome}${p.clientes?.nome ? ` · ${p.clientes.nome}` : ""}`, texto: texto(m.texto, 900), url });
+        let msg = texto(m.texto, 900);
+        if (meus.length) {
+          msg = lembreteDoHorario({ tutor: p.clientes?.nome, petshop: onde, hoje,
+            horarios: meus.map((a) => ({ inicio: utcParaLocal(a.inicio, c.fusoMin), fim: a.fim ? utcParaLocal(a.fim, c.fusoMin) : null,
+              pets: [{ nome: pets.find((x) => x.id === a.pet_id)?.nome ?? p.nome, servicos: [a.servicos?.nome, ...[...(a.agendamento_servicos ?? [])].sort((x, y) => x.ordem - y.ordem).map((x) => x.servicos?.nome)].filter((n): n is string => Boolean(n)) }] })) });
+        } else if (est) {
+          msg = lembreteDaEstadia({ tutor: p.clientes?.nome, petshop: onde, hoje, tipo: est.tipo === "hotel" ? "hotel" : "creche", pets: [p.nome],
+            entrada: utcParaLocal(est.entrada, c.fusoMin), saida: est.saida_prevista ? utcParaLocal(est.saida_prevista, c.fusoMin) : null });
+        }
+        exigir(msg, "Falta o texto da mensagem (ou os agendamento_ids, para um lembrete).");
+        const petsDaMsg = [...new Set(meus.map((a) => pets.find((x) => x.id === a.pet_id)?.nome ?? p.nome))];
+        const nome = `${petsDaMsg.length > 1 ? petsDaMsg.join(" e ") : p.nome}${p.clientes?.nome ? ` · ${p.clientes.nome}` : ""}`;
+        // o número que a pessoa acabou de dizer (o tutor não tinha no cadastro); o do cadastro vale primeiro
+        const dito = texto(m.telefone, 40);
+        exigir(!dito || (soDigitos(dito).length >= 10 && telefoneValido(dito)), `O WhatsApp ${dito} não parece certo (DDD e número). Pergunte de novo.`);
+        const url = linkWhatsApp(p.clientes?.telefone || dito, msg);
+        if (url) links.push({ nome, texto: msg, url });
+        // sem número: o WhatsApp abre com o texto pronto e a pessoa escolhe o contato
+        else if (m.sem_numero === true) links.push({ nome: `${nome} (escolha o contato)`, texto: msg, url: `https://wa.me/?text=${encodeURIComponent(msg)}` });
         else semTelefone.push(p.nome);
       }
-      return { resultado: { preparadas: links.length, sem_telefone: semTelefone, aviso: "As mensagens aparecem como botões na tela. Nada foi enviado: a pessoa toca para abrir o WhatsApp." }, links };
+      return { resultado: { preparadas: links.length, sem_telefone: semTelefone,
+        ...(semTelefone.length ? { sem_telefone_o_que_fazer: "O tutor não tem WhatsApp no cadastro. Peça o número na conversa (\"Me passa o WhatsApp que eu salvo na ficha e já preparo a mensagem\"); com o número, chame alterar_tutor (salvar) e preparar_mensagens com telefone na mesma resposta. Se a pessoa não quiser, preparar_mensagens com sem_numero: true." } : {}),
+        aviso: "As mensagens aparecem como botões na tela. Nada foi enviado: a pessoa toca para abrir o WhatsApp. Não repita o texto do lembrete na resposta." }, links };
     }
   }
   const chao = await consultarChao(c, nome, e, (m) => new ErroDeUso(m));
@@ -1260,8 +1307,12 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       exigir(nomeProd, "Diga qual é o produto.");
       exigir(!(novo && e.tipo === "saida"), "Esse produto não está no estoque: use ver_estoque para achar o nome certo.");
       const custo = numero(e.custo_unitario);
+      const precoVenda = numero(e.preco_venda);
+      exigir(e.preco_venda == null || (precoVenda != null && precoVenda >= 0 && precoVenda <= 99999), "preco_venda: use um valor entre R$ 0 e R$ 99.999.");
+      exigir(e.preco_venda == null || novo, "Esse produto já existe: para mudar o preço de venda, use alterar_produto junto com esta entrada.");
       const linhas: [string, string][] = [["Produto", novo ? `${nomeProd} (novo no estoque)` : nomeProd], [e.tipo === "saida" ? "Sai" : "Entra", `${qtd} ${unidade}`], ["Saldo fica", `${e.tipo === "saida" ? saldo - qtd : saldo + qtd} ${unidade}`]];
       if (custo != null && e.tipo === "entrada") linhas.push(["Custo", `${brl(custo)} cada · total ${brl(custo * qtd)}`]);
+      if (novo && precoVenda != null) linhas.push(["Preço de venda", `${brl(precoVenda)} cada`]);
       if (e.lancar_despesa && custo != null && e.tipo === "entrada" && c.vejoFinanceiro) {
         exigir(FORMA[String(e.forma)], "Para lançar a despesa, pergunte como foi pago (Pix, dinheiro, débito ou crédito).");
         linhas.push(["Despesa", `${brl(custo * qtd)} no ${FORMA[String(e.forma)]}`]);
@@ -1279,6 +1330,8 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
   if (estadia) return estadia;
   const chao = await descreverChao(c, nome, e, (m) => new ErroDeUso(m));
   if (chao) return chao;
+  const cadastro = await descreverCadastro(c, nome, e, (m) => new ErroDeUso(m));
+  if (cadastro) return cadastro;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 
@@ -1497,7 +1550,7 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
       if (!produtoId) {
         // produto novo: se a tentativa anterior já criou (o pedido chegou de novo), aproveita o que está lá em vez de criar outro
         const igual = await sb.from("produtos").select("id").eq("petshop_id", petshop.id).eq("nome", nomeProd).eq("ativo", true).limit(1);
-        produtoId = igual.data?.[0]?.id ?? ok(await sb.from("produtos").insert({ petshop_id: petshop.id, nome: nomeProd, unidade, custo }).select("id").single()).id;
+        produtoId = igual.data?.[0]?.id ?? ok(await sb.from("produtos").insert({ petshop_id: petshop.id, nome: nomeProd, unidade, custo, ...(numero(e.preco_venda) != null ? { preco_venda: centavos(numero(e.preco_venda)!) } : {}) }).select("id").single()).id;
       } else { const p = ok(await sb.from("produtos").select("nome, unidade").eq("id", produtoId).single()); nomeProd = p.nome; unidade = p.unidade; }
       if (e.tipo !== "entrada") {
         ok(await sb.from("movimentos_estoque").insert({ petshop_id: petshop.id, produto_id: produtoId, tipo: "saida", quantidade: qtd,
@@ -1526,6 +1579,8 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
   if (fixa) return fixa;
   const baixa = await gravarPagarConta(c, nome, e, (m) => new ErroDeUso(m));
   if (baixa) return baixa;
+  const cadastro = await gravarCadastro(c, nome, e, (m) => new ErroDeUso(m));
+  if (cadastro) return cadastro;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 

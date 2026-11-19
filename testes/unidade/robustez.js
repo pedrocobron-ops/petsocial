@@ -127,7 +127,7 @@ const ta = async (nome, f) => { try { await f(); T.ok(nome, true); } catch (e) {
     assert.ok(n.includes('marcar_horario') && n.includes('cadastrar_pet'));
     assert.ok(!n.includes('lancar_dinheiro') && !n.includes('fazer_checkin') && !n.includes('fechar_caixa'));
   });
-  t('dono: todas as ferramentas', () => assert.equal(nomes({ vejoFinanceiro: true, areas: A.areasDe({ papel: 'dono' }) }).length, F.FERRAMENTAS.length));
+  t('dono: todas as ferramentas', () => assert.equal(nomes({ vejoFinanceiro: true, areas: A.areasDe({ papel: 'dono' }), dono: true }).length, F.FERRAMENTAS.length));
   t('o contexto diz o que a pessoa não abre e manda não montar cartão', () => {
     const c = { petshop: { nome: 'Loja', horario: null, modulos: ['banho_tosa'], opcoes: {} }, servicos: [], equipe: [], eu: caio, vejoFinanceiro: true, cuidoDoFinanceiro: false, areas: A.areasDe(caio), agora: '2026-11-18T09:00' };
     assert.match(I.contextoDoPetshop(c), /Não abre: Agenda, Clientes e pets.*não monte cartão/);

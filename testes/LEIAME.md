@@ -18,7 +18,8 @@ ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 
 #    GESTAO_BOLETIM_FALSO=1: "Escrever com o Mozart" no boletim do pet responde sem chamar o modelo.
 #    GESTAO_MOZART_FALSO=1: o Mozart responde por um roteiro fixo (assistente/modelo-de-teste.ts), sem chamar o modelo:
 #    "bloqueia…" traz o cartão de bloquear o almoço de amanhã; "markdown" responde com negrito e lista; o resto, uma frase
-#    escrita palavra por palavra. Precisa dele: banco/mozart-rota.js e telas/mozart-consertos.js.
+#    escrita palavra por palavra; "tabela de preços" traz os quatro cartões de serviço juntos (Confirmar tudo). Precisa dele:
+#    banco/mozart-rota.js, telas/mozart-consertos.js e telas/mozart-cadastros.js.
 npx next build
 ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_BOLETIM_FALSO=1 npx next start -p 3214
 
@@ -87,6 +88,13 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
   outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
 - `estreante-m.js`: rodada 8 (estreante): valor no cartão do pedido pelo link (`precoDoPedido`), a anotação do Mozart na ficha do pet (`anotacaoDoPet`), o modo simples (`foraNoModoSimples`) e "Faltam N coisas para começar".
+- `mozart-cadastros.js`: as ferramentas de cadastro do Mozart (`assistente/ferramenta-cadastros.ts`), sem banco: serviços, horário e
+  diárias só do dono (nem o gerente), produto só com Estoque, pacote só com Pacotes, tutor com Clientes, Agenda ou Creche e hotel;
+  preço único ou por porte, aniversário, horário de funcionamento e almoço; vários cartões juntos gravam em ordem e o primeiro que
+  falha para os seguintes (`PAROU_ANTES`); a tabela de preços vira quatro cartões numa resposta.
+- `lembrete-zap.js`: o lembrete de WhatsApp aprovado pelo dono (`lembrete-zap.ts`), o mesmo da Agenda, do Modo envio e do Mozart:
+  com e sem endereço, hoje e amanhã, término previsto, dois pets no mesmo horário, serviços por pet, creche e hotel, e o link
+  `wa.me` com emoji e quebra de linha codificados.
 - `mozart-consertos.js`: os consertos depois dos cinco testadores, com modelo de mentira e sem banco: creche e hotel nunca viram
   horário da agenda (`ferramenta-estadia.ts`: o serviço "Creche diária" é recusado em marcar_horario), quem não vê dinheiro nunca
   ouve "não deve nada", ver_sinais, frase de espera com o nome da casa, o texto do cartão sem "Pode fazer" (`semPedidoDeConfirmar`),
@@ -116,7 +124,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   dono…"), Termos e Política 2.3 (`documentos.ts`: quem aceitou a 2.2 vê o aceite de novo, resumo com cópias, troca de plano e cookies) e
   a Ajuda achando "vocês fazem cópia dos meus dados?" (tópico `copias`, sem prometer prazo) e "como mudar de plano".
 - `loja-textos-lgpd.js`: 2ª rodada (Camila, Neide, Juliana): mensagens com do/da pelo sexo do pet e o verbo concordando ("Pipoca
-  marcada", "O banho e a hidratação da Luna ficaram marcados", "lembrar do banho e da hidratação da Luna"; sem sexo, como antes;
+  marcada", "O banho e a hidratação da Luna ficaram marcados", o lembrete no modelo aprovado ("✂️ Banho + hidratação"); sem sexo, como antes;
   serviço desconhecido diz "O horário"); nome curto da equipe que diferencia ("Banhista Ana"/"Banhista Beto", `nomeNaEquipe`);
   valor em estoque com o custo médio sem arredondar (5 × 142 + 4 × 150 = 1.310,00, não 1.310,04); unidade e validade da planilha de
   produtos (`planilha-produtos.ts`); selo do boletim com os serviços e "Comportada"; aniversário do pet sem o ano (1904: sem idade, sem idoso).
@@ -295,6 +303,10 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   reserva e em outro dia vira dia extra, hotel com entrada e saída, `ver_hospedes` com a creche dia a dia (mensalista de todo dia),
   a busca do tosador sem valor, `ver_sinais` igual a `lerSinaisDoPeriodo` (Relatórios), conta fixa que "não entrou este mês",
   criar_conta_fixa, e a tabela de preços gravando a diária da creche, o modelo de plano e a diária do hotel por porte.
+- `mozart-cadastros.js`: com o banco de verdade e modelo de mentira: a tabela de preços do dono em quatro cartões (Confirmar tudo grava
+  os quatro), leva que para na falha, produto novo que chegou com quantidade entra com o preço de venda, produto pelo Edu (sem custo),
+  tutor pelo Tito, modelo de pacote pela Rita, horário e diárias só do dono, e o lembrete para tutor sem telefone (pede o número,
+  um cartão salva na ficha e o botão do WhatsApp já vem pronto; sem salvar, o botão sem número).
 - `mozart-rota.js` (servidor com GESTAO_MOZART_FALSO=1 e GESTAO_LINK_IA_FALSO=1): a resposta do Mozart chega palavra por palavra
   pela rota de verdade mesmo pedindo gzip (content-encoding identity), o texto do cartão sem "Pode fazer", a mesma confirmação
   mandada duas vezes grava um bloqueio só, e o "Tirar dúvida" responde o total dos dois pets igual a `link_hotel_estimativa`.
@@ -678,6 +690,8 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   microfone bloqueado ("Libere o microfone nas configurações do navegador"); microfone na Ajuda (não manda sozinho); para sozinho em
   8 s de silêncio e em 30 s (`page.clock`); navegador sem ditado: sem botão, escrever continua igual. Capturas em `testes/saida/mozart-voz-*`.
 - `mozart-v2.js` (servidor com GESTAO_MOZART_FALSO=1): "Pensando…" logo depois de mandar; recarregar no meio da resposta traz a parte que chegou marcada "Resposta interrompida" e "Perguntar de novo" traz a resposta inteira (390 e 1366).
+- `mozart-cadastros.js` (servidor com GESTAO_MOZART_FALSO=1): a tabela de preços em quatro cartões com "Confirmar tudo (4)" (cabe
+  no painel em 390 e 1366), um toque grava os quatro e os preços ficam no banco.
 - `mozart-consertos.js` (servidor com GESTAO_MOZART_FALSO=1): negrito e lista na bolha; recarregar traz a conversa e o cartão
   pendente (o painel abre sozinho) e confirmar grava uma vez; recarregar no meio do "Pode fazer" termina sozinho, sem gravar duas
   vezes; "Ouvir esta resposta" sem voz no aparelho mostra o aviso; com o Tirar dúvida aberto no celular, o fim da página sobe acima

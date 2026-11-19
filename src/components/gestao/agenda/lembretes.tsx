@@ -68,7 +68,7 @@ export function BotaoLembrete({ agendamento: a, doDia, aoMandar }: { agendamento
     ? doDia.filter((x) => x.pets?.clientes?.id === tutorId && new Date(x.inicio).toDateString() === dia && precisaDeLembrete(x)).sort((x, y) => x.inicio.localeCompare(y.inicio))
     : [];
   const grupo = juntos.length > 1 ? juntos : [a];
-  const zap = linkWhatsApp(a.pets?.clientes?.telefone, mensagemDoLembrete(grupo, petshop.nome));
+  const zap = linkWhatsApp(a.pets?.clientes?.telefone, mensagemDoLembrete(grupo, petshop));
   if (!zap) return null;
   const para = `${a.pets?.clientes?.nome ?? a.pets?.nome ?? "o tutor"}${grupo.length > 1 ? ` (${grupo.length} horários numa mensagem só)` : ""}`;
   return (
@@ -145,7 +145,7 @@ export default function LembretesDoDia({ dia, aoFechar, aoMudar }: { dia: string
           {comTelefone.length > 0 && (
             <div className="g-lb-lista">
               {comTelefone.map((g) => {
-                const zap = linkWhatsApp(g.telefone, mensagemDoLembrete(g.ags, petshop.nome))!;
+                const zap = linkWhatsApp(g.telefone, mensagemDoLembrete(g.ags, petshop))!;
                 const vez = g.chave === proximo;
                 return (
                   <div key={g.chave} className={`g-lb-linha${vez ? " vez" : ""}${g.enviadoEm ? " feito" : ""}`}>

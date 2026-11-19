@@ -73,7 +73,7 @@ async function sairEVoltar(page) {
   const caixaTexto = page.locator('.g-me-msg textarea');
   await caixaTexto.fill((await caixaTexto.inputValue()) + ' Obrigada!');
   const href = await page.locator('.g-me-abrir').getAttribute('href');
-  T.ok('o texto mudado vai no link do WhatsApp (wa.me com o número da Ana)', href.startsWith('https://wa.me/5511988880001?text=') && decodeURIComponent(href.split('text=')[1]).endsWith('Posso confirmar? Obrigada!'), href);
+  T.ok('o texto mudado vai no link do WhatsApp (wa.me com o número da Ana)', href.startsWith('https://wa.me/5511988880001?text=') && decodeURIComponent(href.split('text=')[1]).endsWith('Até lá! Obrigada!'), href);
   await foto(page, '390-mensagem');
   await page.locator('.g-me-abrir').click();
   await page.waitForTimeout(500);

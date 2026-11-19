@@ -6,6 +6,9 @@ import type { AvisosDaChamada, Msg, RespostaDoModelo } from "./conversa";
  * o markdown na bolha, o cartão que volta depois de recarregar e que grava uma vez só.
  * - pedido com "bloqueia": cartão de bloquear o almoço de amanhã (12h às 13h); depois do "Pode fazer", "Prontinho…".
  * - pedido com "markdown": resposta com negrito e lista.
+ * - pedido com "tabela de preços": os quatro serviços do dono numa resposta só (banho P e M R$ 100, G e GG R$ 130; corte de unhas
+ *   R$ 30 qualquer porte; escovação R$ 20; hidratação P/M R$ 60, G/GG R$ 80): muda o que existe e cadastra o que falta, com os
+ *   ids tirados do contexto do pet shop (`sistema`). Os cartões aparecem juntos, com Confirmar tudo.
  * - qualquer outro: uma frase escrita devagar, palavra por palavra (cerca de 60 ms entre as palavras).
  */
 const espera = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
@@ -30,12 +33,35 @@ async function escrever(texto: string, ao: AvisosDaChamada, ms: number) {
   for (const p of partes) { ao.texto(p); await espera(ms); }
 }
 
-export async function modeloDeTeste(msgs: Msg[], ao: AvisosDaChamada): Promise<RespostaDoModelo> {
+/** O id de um serviço na lista "Serviços:" do contexto ("- Banho | id … | 60 min…"); null se não está lá. */
+function idDoServico(sistema: string, nome: string): string | null {
+  const m = new RegExp(`^- ${nome} \\| id ([0-9a-f-]{36})`, "m").exec(sistema);
+  return m ? m[1] : null;
+}
+const PRECOS_TESTE: { nome: string; precos: Record<string, number>; duracao: number }[] = [
+  { nome: "Banho", precos: { preco_p: 100, preco_m: 100, preco_g: 130, preco_gg: 130 }, duracao: 60 },
+  { nome: "Corte de unhas", precos: { preco: 30 }, duracao: 15 },
+  { nome: "Escovação", precos: { preco: 20 }, duracao: 15 },
+  { nome: "Hidratação", precos: { preco_p: 60, preco_m: 60, preco_g: 80, preco_gg: 80 }, duracao: 30 },
+];
+
+export async function modeloDeTeste(msgs: Msg[], ao: AvisosDaChamada, sistema = ""): Promise<RespostaDoModelo> {
   const { texto, resultado, hoje } = ultimoTexto(msgs);
   if (resultado) {
     const t = "Prontinho, ficou feito.";
     await escrever(t, ao, 20);
     return { content: [{ type: "text", text: t, citations: null }], stop_reason: "end_turn" } as unknown as RespostaDoModelo;
+  }
+  if (/tabela de pre[cç]os/.test(texto)) {
+    const t = "Deixa comigo: são quatro serviços.";
+    await escrever(t, ao, 10);
+    const usos = PRECOS_TESTE.map((x, i) => {
+      const id = idDoServico(sistema, x.nome);
+      ao.ferramenta(id ? "alterar_servico" : "criar_servico");
+      return { type: "tool_use", id: `toolu_teste${Date.now().toString(36)}p${i}${Math.random().toString(36).slice(2, 6)}`,
+        name: id ? "alterar_servico" : "criar_servico", input: id ? { servico_id: id, ...x.precos } : { nome: x.nome, duracao_min: x.duracao, ...x.precos } };
+    });
+    return { content: [{ type: "text", text: t, citations: null }, ...usos], stop_reason: "tool_use" } as unknown as RespostaDoModelo;
   }
   if (/bloqueia/.test(texto)) {
     const t = "Vou bloquear o almoço de amanhã. Confere no cartão e clica em Pode fazer.";

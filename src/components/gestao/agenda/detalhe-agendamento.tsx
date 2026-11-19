@@ -9,7 +9,8 @@ import Link from "@/components/gestao/link-depois";
 import { BellRing, CalendarClock, CalendarX, Check, ChevronDown, HandCoins, MessageCircle, Play, Printer, Receipt, Repeat, Trash2, Truck, UserX, NotebookPen } from "lucide-react";
 import type { AgendamentoCompleto, Lancamento, PacoteCliente, StatusAgendamento } from "@/lib/gestao/tipos";
 import { CHECKLIST_BANHO, STATUS_AGENDAMENTO } from "@/lib/gestao/tipos";
-import { textoCancelado, textoConfirmacao, textoLembrete, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
+import { textoCancelado, textoConfirmacao, textoPronto, textoRemarcado } from "@/lib/gestao/agenda";
+import { mensagemDoLembrete } from "@/lib/gestao/mensagens-prontas";
 import { imprimirComprovante, textoComprovante, type AntigaNoComprovante } from "@/lib/gestao/comprovante";
 import { conferirCaixa, desfazerVenda, itensDoLancamento, lancarAReceber, lancarPago, produtosDaVenda, textoDoPagamento, type ItemLancamento } from "@/lib/gestao/dinheiro";
 import { taxaDeFalta, travaDePreco } from "@/lib/gestao/dinheiro-opcoes";
@@ -377,9 +378,8 @@ export default function DetalheAgendamento({ agendamento: a, aoFechar, aoMudar, 
   const opTaxa = useOperacao();
   // horário que já começou (ou foi marcado depois, para anotar): lembrete e confirmação para o tutor não fazem sentido (achado da Neide)
   const jaPassou = new Date(a.inicio).getTime() < Date.now();
-  const zap = linkWhatsApp(tutor?.telefone, textoLembrete({
-    tutor: tutor?.nome, pet: pet?.nome ?? "seu pet", sexo: pet?.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop: petshop.nome,
-  }));
+  // o mesmo lembrete de "Mandar os lembretes", do Modo envio e do Mozart (lembrete-zap.ts)
+  const zap = linkWhatsApp(tutor?.telefone, mensagemDoLembrete([{ ...a, pets: pet ? { nome: pet.nome, clientes: tutor ? { nome: tutor.nome } : null } : null }], petshop));
 
   // remarcado de verdade? o banco anota quando o início muda (migração 20261166). Sem a função no banco, vale o de antes.
   const { dados: remarcadoEm } = useDados(async () => {

@@ -78,7 +78,9 @@ t('lembrete = mensagemDoLembrete (Agenda, "Mandar os lembretes")', () => {
     { inicio: amanha(10), pets: { nome: 'Mel', sexo: 'F', clientes: { nome: 'Ana Souza' } }, servicos: { nome: 'Banho' }, agendamento_servicos: [{ ordem: 1, servicos: { nome: 'Hidratação' } }] },
   ], 'Banho da Neide');
   assert.equal(l.texto, esperado);
-  assert.match(l.texto, /^Oi, Ana! Aqui é Banho da Neide\. Passando para lembrar dos horários de amanhã: o banho do Thor às 09:00 e o banho e a hidratação da Mel às 10:00\. Posso confirmar\?$/);
+  // o modelo aprovado (lembrete-zap.ts): dois horários da Ana amanhã, cada pet com o seu serviço
+  const ddmm = String(new Date(Y, M, D + 1).getDate()).padStart(2, '0') + '/' + String(new Date(Y, M, D + 1).getMonth() + 1).padStart(2, '0');
+  assert.equal(l.texto, `Olá, Ana! 🐾\nAqui é do *Banho da Neide*. Passando para lembrar dos horários do *Thor* e do *Mel*:\n\n📅 *Amanhã, ${ddmm}*\n🕒 *9h*\n✂️ Thor: Banho\n🕒 *10h*\n✂️ Mel: Banho + hidratação\n\nPode confirmar respondendo esta mensagem? Se precisar remarcar, é só avisar.\nAté lá!`);
 });
 t('pet pronto = textoPronto ("O banho do Thor terminou. Já pode vir buscar.", do/da pelo sexo)', () => {
   assert.equal(de('pronto')[0].texto, AG.textoPronto({ tutor: 'Ana Souza', pet: 'Thor', sexo: 'M', petshop: 'Banho da Neide', servico: 'Banho' }));

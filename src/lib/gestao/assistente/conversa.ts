@@ -192,6 +192,8 @@ export async function voltas(o: {
 }
 
 const JA_GRAVADA = "Esta ação já tinha sido gravada (o pedido chegou repetido). Nada foi gravado de novo.";
+/** Cartões confirmados juntos (Confirmar tudo) gravam em ordem; o primeiro que falha para os que vêm depois dele. */
+export const PAROU_ANTES = "Não foi feito: uma ação anterior desta leva não deu certo, então parei ali para nada ficar pela metade. Nada foi gravado desta. Diga o que deu errado e pergunte se quer tentar de novo.";
 
 /**
  * O texto que acompanha os cartões não pede confirmação: o cartão já tem os botões, e depois do "Pode fazer" a frase
@@ -210,7 +212,11 @@ export function semPedidoDeConfirmar(texto: string, temCartao: boolean): string 
   return temCartao ? "" : texto;
 }
 
-/** Grava o que a pessoa confirmou nos cartões e devolve o resultado de cada ferramenta (na ordem dos pedidos do modelo). */
+/**
+ * Grava o que a pessoa confirmou nos cartões e devolve o resultado de cada ferramenta (na ordem dos pedidos do modelo).
+ * Vários cartões da mesma resposta (confirmados um a um ou com "Confirmar tudo") gravam em ordem; se um confirmado falha,
+ * os confirmados depois dele não gravam (PAROU_ANTES) e o modelo conta à pessoa o que ficou feito e o que não.
+ */
 export async function responderCartoes(o: {
   c: Contexto; pendentes: Anthropic.Beta.BetaToolUseBlockParam[] | Anthropic.Beta.BetaContentBlockParam[]; liberado: boolean;
   decisoes?: { id: string; ok: boolean }[]; parciais?: Resultado[];
@@ -227,6 +233,7 @@ export async function responderCartoes(o: {
   const { c, liberado } = o;
   const resultados: Resultado[] = [];
   let mudou = false;
+  let falhou = false;
   for (const uso of o.pendentes) {
     if (uso.type !== "tool_use") continue;
     const parcial = o.parciais?.find((r) => r.tool_use_id === uso.id);
@@ -234,9 +241,10 @@ export async function responderCartoes(o: {
     const def = definicao(uso.name);
     const decisao = o.decisoes?.find((d) => d.id === uso.id);
     if (!def?.grava || !decisao?.ok) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A pessoa descartou esta ação. Nada foi gravado." }); continue; }
+    if (falhou) { resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: PAROU_ANTES }); continue; }
     // a conversa vem do navegador: confere de novo se esta pessoa pode usar a ferramenta (igual à volta do modelo)
-    if (!ferramentaLiberada(def, c)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: motivoDaRecusa(def, c) }); continue; }
-    if (!liberado) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Nada foi gravado.", is_error: true }); continue; }
+    if (!ferramentaLiberada(def, c)) { falhou = true; resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: motivoDaRecusa(def, c) }); continue; }
+    if (!liberado) { falhou = true; resultados.push({ type: "tool_result", tool_use_id: uso.id, content: "A conta está só para consulta (teste vencido ou assinatura inativa). Nada foi gravado.", is_error: true }); continue; }
     if (o.reservar && !(await o.reservar(uso.id))) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JA_GRAVADA }); continue; }
     let gravou = false;
     try {
@@ -251,6 +259,7 @@ export async function responderCartoes(o: {
       if (err instanceof Error && /_chave_uniq/.test(err.message)) { resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JA_GRAVADA }); continue; }
       // não gravou: a pessoa pode tentar de novo
       if (!gravou && o.liberar) await o.liberar(uso.id).catch(() => undefined);
+      falhou = true;
       const semPermissao = err instanceof Error && /row-level security|permission denied/i.test(err.message);
       resultados.push({ type: "tool_result", tool_use_id: uso.id, is_error: true, content: ehErroDeUso(err) ? err.message : semPermissao ? "Sem permissão para gravar isso." : "Não consegui gravar agora." });
     } finally {
