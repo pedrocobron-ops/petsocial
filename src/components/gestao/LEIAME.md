@@ -76,6 +76,11 @@ navegador; quem protege é o banco (RLS). Estrutura do banco: `supabase/migratio
   `gestao_base`. Prévia do link (Open Graph) das páginas do tutor: `previaDaLoja` (`link-og.ts`), nunca a do site. Página pública com
   código (boletim, álbum, entrada, tutor, orçamento, autorização) tem `not-found.tsx` com `<LinkQueNaoAbre />`. Abertura do link pelo
   navegador: `lerLinkJunto` (`link-inicial.ts`), uma ida só. "Aceitar todos": `pedidos_aceitar_juntos` (tudo ou nada).
+- Mais de um serviço no pedido pelo link (migração 20261239): o principal em `pedidos_agendamento.servico_id`, os outros em
+  `outros_servicos` (na ordem do tutor). `link_horarios` e `link_pedir` recebem `p_extras` (o tempo de cada pet é a soma); o valor é
+  `valorDosServicos` (promoção só no principal) e o banco guarda o mesmo em `pedidos_valores` (com `servicos`, cada um com o seu
+  valor; `partesPorExtenso`). Aceitar cria UM horário: os outros entram em `agendamento_servicos`, com o preço da lista no porte.
+  Na tela de quem recebe, `rotulo` junta os nomes ("Banho e tosa + Hidratação") e `precoDoPedido` aceita a lista e soma.
 - Opções do negócio: chegam em `petshop.opcoes` pela função `petshop_opcoes` (nunca `select("opcoes")`). Opção nova com preço
   dentro entra na lista da função `opcoes_sem_valores`, no banco, para a equipe sem dinheiro não ler pela API.
 - Dinheiro que entra ou sai na hora: `lancarPago()` de `src/lib/gestao/dinheiro.ts` (já liga ao caixa aberto).

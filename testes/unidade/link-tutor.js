@@ -33,6 +33,25 @@ const quinta = { nome: 'Quinta do banho', tipo: 'pct', valor: 15 };
     assert.equal(P.fraseDoPet(linhas[1]), 'Bob (porte G): de R$ 89,90 por R$ 76,41');
     assert.equal(P.valorNaFrase(linhas), 'R$ 118,82 (Mel R$ 42,41 e Bob R$ 76,41)');
   });
+  await t('vários serviços (migração 20261239): a soma, a promoção só no principal e cada serviço', () => {
+    const tosa = { nome: 'Banho e tosa', preco_p: 80, preco_m: 90, preco_g: 100, preco_gg: 120 };
+    const hidra = { nome: 'Hidratação', preco_p: 25, preco_m: 30, preco_g: 35, preco_gg: 40 };
+    const unha = { nome: 'Corte de unhas', preco_p: 15, preco_m: 15, preco_g: 15, preco_gg: 15 };
+    const v = P.valorDosServicos([tosa, hidra, unha], 'M', { nome: 'Tosa', tipo: 'pct', valor: 10 });
+    assert.equal(v.base, 135); assert.equal(v.valor, 126); assert.equal(v.servicos.length, 3);
+    assert.equal(P.partesPorExtenso(v), 'Banho e tosa R$ 81,00 + Hidratação R$ 30,00 + Corte de unhas R$ 15,00');
+    const faixa = P.valorDosServicos([tosa, unha], null, null);
+    assert.equal(faixa.valor, undefined); assert.equal(faixa.de, 95); assert.equal(faixa.ate, 135);
+    assert.equal(P.valorPorExtenso(faixa), 'de R$ 95,00 a R$ 135,00');
+    assert.equal(P.valorDosServicos([tosa, { nome: 'Sem preço', preco_p: null, preco_m: null, preco_g: null, preco_gg: null }], 'M', null), null);
+    assert.equal(P.partesPorExtenso(P.valorDoServico(tosa, 'M', null)), null);
+    const lido = P.lerVisto({ tipo: 'servico', porte: 'M', base: 135, valor: 126, servicos: [{ nome: 'Banho e tosa', base: 90, valor: 81 }, { nome: 'Hidratação', base: 30, valor: 30 }] });
+    assert.equal(lido.servicos.length, 2); assert.equal(lido.servicos[0].valor, 81);
+    const PP = lib('preco-do-pedido');
+    assert.equal(PP.precoDoPedido({ tipo: 'servico', porte: 'M' }, [tosa, hidra, unha], {}), 'R$ 135,00');
+    assert.equal(PP.precoDoPedido({ tipo: 'servico', porte: null }, [tosa, unha], {}), 'R$ 95,00 a R$ 135,00, conforme o porte');
+    assert.equal(PP.precoDoPedido({ tipo: 'servico', porte: 'M' }, [tosa], {}), 'R$ 90,00');
+  });
   await t('sem promoção: o preço do porte de cada pet e o total', () => {
     const linhas = [{ nome: 'Mel', v: P.valorDoServico(banho, 'P', null) }, { nome: 'Bob', v: P.valorDoServico(banho, 'G', null) }];
     assert.equal(P.fraseDoPet(linhas[1]), 'Bob (porte G): R$ 89,90');

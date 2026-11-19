@@ -70,6 +70,7 @@ const T = require('../lib/teste')('rede-lenta');
     const { ctx, page, erros } = await N.contexto(larg, alt);
     await page.goto(LINK);
     await page.locator('.g-lk-serv', { hasText: 'Corte de unhas' }).click();
+    await page.locator('[data-teste=escolha-servicos] button').click();
     await page.getByText('Quantos pets vêm?').waitFor({ timeout: 15000 });
     const hora = page.locator('.g-lk-hora').first();
     await hora.waitFor({ timeout: 20000 });

@@ -118,6 +118,7 @@ const FACEBOOK = /facebook\.(com|net)/;
     await semRolagem(p2, 'dúvidas');
     await p2.locator('.g-lk-duv-x').click();
     await p2.locator('.g-lk-serv', { hasText: 'Banho' }).first().click();
+    await p2.locator('[data-teste=escolha-servicos] button').click();
     await p2.locator('.g-lk-hora').first().waitFor({ timeout: 30000 });
     await p2.locator('.g-lk-hora').first().click();
     await p2.locator('button', { hasText: 'Continuar' }).click();
