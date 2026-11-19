@@ -7,7 +7,7 @@ import { useGestao } from "./contexto";
 import { Tile } from "./painel";
 import { Folha, abrirPersonalizarMenu } from "./ui";
 import { abrirLinkDeAgendamento, guardarLembrado, lerLembrado } from "./lembrado";
-import { textoFaltam } from "@/lib/gestao/primeiros-passos";
+import { dicaDosPrecos, precosDosServicos, textoFaltam } from "@/lib/gestao/primeiros-passos";
 import { frenteDe, nomeDaCasa, usaCasa, usaModulo, type Frente } from "@/lib/gestao/modulos";
 
 /** Com área principal, os passos dela vêm primeiro; das outras áreas marcadas entra só o primeiro passo de cada uma. */
@@ -36,8 +36,7 @@ export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: ()
   const chaveMenu = `${chave}-menu`;
   const [menu, setMenu] = useState(() => lerLembrado(chaveMenu) === "1");
 
-  const ativos = servicos.filter((s) => s.ativo);
-  const temPreco = ativos.some((s) => s.preco_p != null || s.preco_m != null || s.preco_g != null || s.preco_gg != null);
+  const precos = precosDosServicos(servicos);
   // os passos seguem o que o negócio faz: banho e tosa passa pela agenda; creche e hotel, pelo check-in; loja, pelo estoque
   const banho = usaModulo(petshop, "banho_tosa"), casa = usaCasa(petshop), loja = usaModulo(petshop, "loja");
   const agenda = posso("agenda") && banho;
@@ -48,7 +47,7 @@ export function usePrimeirosPassos(dados: DadosDosPassos | null, aoLembretes: ()
   const banhoInteiro = !frente || frente === "banho";
   const temDiaria = (!usaModulo(petshop, "creche") || petshop.diaria_creche != null) && (!usaModulo(petshop, "hotel") || petshop.diaria_hotel != null);
   const todos: (Passo & { so: boolean })[] = dados ? [
-    { id: "precos", so: souDono && banho && banhoInteiro && ativos.length > 0, feito: temPreco, texto: "Colocar os preços dos serviços", dica: "Em Meu pet shop, na parte Serviços e preços.", href: "/gestao/app/meu-petshop" },
+    { id: "precos", so: souDono && banho && banhoInteiro && precos.total > 0, feito: precos.feito, texto: "Colocar os preços dos serviços", dica: dicaDosPrecos(precos), href: "/gestao/app/meu-petshop" },
     { id: "diaria", so: souDono && soCasa, feito: temDiaria, texto: "Colocar o preço da diária", dica: `Em Meu pet shop, na parte ${nomeDaCasa(petshop)}.`, href: "/gestao/app/meu-petshop" },
     // com a agenda, o pet entra junto ao marcar o primeiro horário: não é um passo à parte (era o mesmo pedido três vezes na tela)
     { id: "pet", so: posso("clientes") && !(agenda && banhoInteiro), feito: dados.pets > 0, texto: "Cadastrar o primeiro pet", dica: "Já abre a ficha para preencher.", href: "/gestao/app/clientes?novo=1" },

@@ -578,3 +578,43 @@ export const NOTA_PACOTE = "Saiu usando o pacote.";
 export function estadiaSemCobranca(e: Pick<Estadia, "status" | "mensalista" | "diarias_cobradas" | "valor_cobrado" | "obs">) {
   return e.status === "encerrada" && !e.mensalista && e.diarias_cobradas != null && e.valor_cobrado == null && !e.obs?.includes(NOTA_PACOTE);
 }
+
+/**
+ * Como está uma reserva agora: "atrasada" quando a hora da chegada de hoje já passou e o pet não fez check-in
+ * (antes ficava "próxima: hoje, 9h38" depois das 10h); "nao_veio" quando a chegada era de um dia que já passou.
+ * Compara o instante da chegada com o de agora; `dias` é a distância em dias do calendário.
+ */
+export type SituacaoDaReserva = "nao_veio" | "atrasada" | "hoje" | "amanha" | "depois";
+export function situacaoDaReserva(entrada: string | Date, agora: Date = new Date()): { situacao: SituacaoDaReserva; dias: number } {
+  const chega = new Date(entrada);
+  const dias = Math.round((inicioDoDia(chega).getTime() - inicioDoDia(agora).getTime()) / 864e5);
+  const situacao: SituacaoDaReserva = dias < 0 ? "nao_veio" : dias === 0 ? (chega.getTime() < agora.getTime() ? "atrasada" : "hoje") : dias === 1 ? "amanha" : "depois";
+  return { situacao, dias };
+}
+
+/** A etiqueta curta da reserva no cartão. */
+export function etiquetaDaReserva(entrada: string | Date, agora: Date = new Date()): { texto: string; tom: "vermelho" | "amarelo" | "verde" | "azul" } {
+  const { situacao, dias } = situacaoDaReserva(entrada, agora);
+  if (situacao === "atrasada") return { texto: "atrasada · não chegou", tom: "vermelho" };
+  if (situacao === "nao_veio") return { texto: "não veio", tom: "amarelo" };
+  if (situacao === "hoje") return { texto: "chega hoje", tom: "verde" };
+  return { texto: situacao === "amanha" ? "chega amanhã" : `em ${dias} dias`, tom: "azul" };
+}
+
+/** Reservas na ordem da tela: as atrasadas de hoje primeiro (pedem um olhar agora), depois as outras na ordem da chegada. */
+export function ordenarReservas<R extends { entrada: string }>(reservas: R[], agora: Date = new Date()): R[] {
+  const atrasada = (r: R) => (situacaoDaReserva(r.entrada, agora).situacao === "atrasada" ? 0 : 1);
+  return reservas.map((r, i) => ({ r, i })).sort((a, b) => atrasada(a.r) - atrasada(b.r) || a.i - b.i).map((x) => x.r);
+}
+
+/**
+ * O apoio do número "Reservas" no topo: as atrasadas de hoje vêm antes da próxima ("1 atrasada · não chegou").
+ * A próxima é a primeira com a chegada ainda por vir (a que já passou da hora não é mais "próxima").
+ */
+export function resumoDasReservas<R extends { entrada: string }>(reservas: R[], agora: Date, quando: (d: string) => string): string {
+  const atrasadas = reservas.filter((r) => situacaoDaReserva(r.entrada, agora).situacao === "atrasada").length;
+  if (atrasadas) return atrasadas === 1 ? "1 atrasada · não chegou" : `${atrasadas} atrasadas · não chegaram`;
+  const proxima = reservas.filter((r) => new Date(r.entrada).getTime() >= agora.getTime())
+    .sort((a, b) => new Date(a.entrada).getTime() - new Date(b.entrada).getTime())[0];
+  return proxima ? `próxima: ${quando(proxima.entrada)}` : reservas.length ? "com a data já passada" : "nenhuma marcada";
+}

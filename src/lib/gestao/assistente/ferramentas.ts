@@ -13,6 +13,8 @@ import { consultarChao, descreverChao, FERRAMENTAS_CHAO, gravarChao } from "./fe
 import { consultarMaquininha, FERRAMENTA_MAQUININHA } from "./ferramenta-maquininha";
 import { consultarDescontos, FERRAMENTA_DESCONTOS } from "./ferramenta-descontos";
 import { descreverCadastro, FERRAMENTAS_CADASTROS, gravarCadastro } from "./ferramenta-cadastros";
+import { descreverVendaDeProduto, FERRAMENTA_VENDER_PRODUTO, gravarVendaDeProduto } from "./ferramenta-venda";
+import { CATEGORIA_VENDA_DE_PRODUTOS } from "../venda-solta";
 import { diariaSugerida } from "../hotel";
 import { contando, lerTudo } from "../paginas";
 import { buscarVisitas } from "../visitas";
@@ -118,6 +120,8 @@ const AREAS_DA_FERRAMENTA: Record<string, readonly string[]> = {
   fazer_checkin: ["creche_hotel"], fazer_checkout: ["creche_hotel"], reservar_estadia: ["creche_hotel"], ver_hospedes: ["creche_hotel"], ver_planos_creche: ["creche_hotel"],
   vender_pacote: ["pacotes"], usar_pacote: ["pacotes", "agenda", "creche_hotel"],
   movimentar_estoque: ["estoque"], ver_estoque: ["estoque"], o_que_comprar: ["estoque"],
+  // vender produto: as mesmas áreas da Venda no balcão (Caixa) e do Estoque; quem só tem o Estoque dá baixa sem o dinheiro
+  vender_produto: ["caixa", "financeiro", "estoque"],
   // a agenda de banho e tosa é de quem tem a Agenda ou recebe: quem só cuida da creche e do hotel não lê os horários pelo Mozart
   ver_agenda: ["agenda", "caixa", "financeiro", "relatorios"],
   // equipe do chão (ferramenta-chao.ts): doses e ocorrências são da creche e do hotel; o quadro é da agenda
@@ -193,15 +197,15 @@ export const FERRAMENTAS: Def[] = ([
     input_schema: obj({ troco_inicial: N }) },
   { grava: true, financeiro: true, name: "fechar_caixa", description: "Fecha o caixa aberto. Passe o dinheiro contado na gaveta (só dinheiro; Pix e cartão não entram). O cartão mostra o esperado, o contado e a diferença.",
     input_schema: obj({ valor_contado: N, obs: S }, ["valor_contado"]) },
-  { grava: true, financeiro: true, name: "lancar_dinheiro", description: "Registra dinheiro NOVO que entrou ou saiu hoje (entra no caixa aberto): venda, serviço sem horário, despesa. Para receber um atendimento, passe agendamento_id: ele fica como concluído. Nunca use para um cliente pagando o que devia (fiado, conta anotada, taxa de falta): isso é receber_de_cliente, que dá baixa nas contas. Se o dinheiro veio de um cliente, passe cliente_id; se ele tem contas em aberto, a ferramenta recusa e manda usar receber_de_cliente, a não ser que a pessoa tenha dito que é outra coisa (aí passe nao_e_divida: true). Nunca use para pagar uma conta que está em A pagar ou que é conta fixa (luz, aluguel, internet, salário, fornecedor anotado): isso é pagar_conta, que dá baixa na conta; a ferramenta recusa a saída que parece uma conta de A pagar, a não ser que a pessoa tenha dito que é outra despesa (aí passe nao_e_conta_a_pagar: true).",
-    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e material, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S, cliente_id: { ...S, description: "Tutor que pagou (de buscar_pets)" }, nao_e_divida: { ...B, description: "true só quando a pessoa disse que este dinheiro não é pagamento do que o cliente devia" }, nao_e_conta_a_pagar: { ...B, description: "true só quando a pessoa disse que esta saída não é o pagamento de uma conta que está em A pagar nem de uma conta fixa" } }, ["tipo", "valor", "forma", "categoria"]) },
+  { grava: true, financeiro: true, name: "lancar_dinheiro", description: "Registra dinheiro NOVO que entrou ou saiu hoje (entra no caixa aberto): venda, serviço sem horário, despesa. Para receber um atendimento, passe agendamento_id: ele fica como concluído. Nunca use para um cliente pagando o que devia (fiado, conta anotada, taxa de falta): isso é receber_de_cliente, que dá baixa nas contas. Se o dinheiro veio de um cliente, passe cliente_id; se ele tem contas em aberto, a ferramenta recusa e manda usar receber_de_cliente, a não ser que a pessoa tenha dito que é outra coisa (aí passe nao_e_divida: true). Nunca use para pagar uma conta que está em A pagar ou que é conta fixa (luz, aluguel, internet, salário, fornecedor anotado): isso é pagar_conta, que dá baixa na conta; a ferramenta recusa a saída que parece uma conta de A pagar, a não ser que a pessoa tenha dito que é outra despesa (aí passe nao_e_conta_a_pagar: true). Nunca use para venda de produto (categoria Venda de produtos): isso é vender_produto, que baixa o estoque junto; a ferramenta recusa, a não ser que a pessoa tenha dito que o item não fica no Estoque (aí passe nao_e_do_estoque: true).",
+    input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, categoria: { ...S, description: "Entradas: Banho e tosa, Creche e hotel, Pacotes, Venda de produtos, Outros. Saídas: Produtos e material, Salários e comissões, Aluguel, Água, luz e internet, Impostos e taxas, Manutenção, Marketing, Outros" }, descricao: S, agendamento_id: S, cliente_id: { ...S, description: "Tutor que pagou (de buscar_pets)" }, nao_e_divida: { ...B, description: "true só quando a pessoa disse que este dinheiro não é pagamento do que o cliente devia" }, nao_e_conta_a_pagar: { ...B, description: "true só quando a pessoa disse que esta saída não é o pagamento de uma conta que está em A pagar nem de uma conta fixa" }, nao_e_do_estoque: { ...B, description: "true só quando a pessoa disse que o produto vendido não fica no Estoque (não quer controlar)" } }, ["tipo", "valor", "forma", "categoria"]) },
   { grava: true, financeiro: true, name: "criar_conta", description: "Cria uma conta a pagar (saida) ou uma conta a receber (entrada) que não é de um cliente. O que um cliente ficou devendo é anotar_divida.",
     input_schema: obj({ tipo: { type: "string", enum: ["entrada", "saida"] }, valor: N, vencimento: DIA, descricao: S, categoria: S }, ["tipo", "valor", "vencimento", "descricao"]) },
   { grava: true, financeiro: true, name: "anotar_divida", description: "Anota o que um cliente ficou devendo (fiado, taxa de falta, perfume que levou e vai pagar depois). Fica na ficha do tutor (\"Deve R$ X\"), em Caixa, Contas de clientes, em A receber e aparece como \"Deve de antes\" no próximo atendimento. Precisa do cliente_id (de buscar_pets). Sem vencimento, vence em 7 dias.",
     input_schema: obj({ cliente_id: S, valor: N, descricao: { ...S, description: "Do que é (ex.: Perfume, Taxa de falta de 18/11)" }, vencimento: DIA, categoria: { ...S, description: "Padrão: Outros" } }, ["cliente_id", "valor", "descricao"]) },
   { grava: true, financeiro: true, name: "receber_de_cliente", description: "Um cliente pagou o que devia (\"o dono do Bob me pagou os 35\", \"a Joana acertou o fiado\"): dá baixa nas contas em aberto dele, da mais antiga para a mais nova, e o dinheiro entra uma vez só. Pode ser só uma parte: o resto continua devido. Se pagou mais do que deve, pergunte se a diferença fica de crédito para ele (sobra: \"credito\"). O cartão mostra quanto ele deve, quais contas quita e o que fica faltando.",
     input_schema: obj({ cliente_id: { ...S, description: "Tutor (de buscar_pets)" }, valor: N, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, parcelas: PARCELAS, sobra: { type: "string", enum: ["credito"], description: "Só quando pagou a mais e a pessoa disse que a diferença fica de crédito" } }, ["cliente_id", "valor", "forma"]) },
-  { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Se o produto não existe, passe produto_nome (e unidade) para criar, e o preço de venda em preco_venda se a pessoa disse (produto que já existe muda o preço com alterar_produto). Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento. Produto que controla validade (ver_estoque diz): a entrada precisa da validade; pergunte à pessoa, nunca invente.",
+  { grava: true, name: "movimentar_estoque", description: "Dá entrada ou saída de um produto. Venda não é aqui: venda de produto é vender_produto (o dinheiro e a saída juntos); saída aqui é perda, uso interno, vencido ou acerto. Se o produto não existe, passe produto_nome (e unidade) para criar, e o preço de venda em preco_venda se a pessoa disse (produto que já existe muda o preço com alterar_produto). Em entrada com custo, pode lançar a compra como despesa (lancar_despesa) informando a forma de pagamento. Produto que controla validade (ver_estoque diz): a entrada precisa da validade; pergunte à pessoa, nunca invente.",
     input_schema: obj({ produto_id: S, produto_nome: S, unidade: { ...S, description: "un, kg, g, L, ml, pacote, saco" }, preco_venda: { ...N, description: "Só para produto novo: preço de venda de cada unidade" }, tipo: { type: "string", enum: ["entrada", "saida"] }, quantidade: N, custo_unitario: N, lancar_despesa: B, forma: { type: "string", enum: ["pix", "dinheiro", "debito", "credito", "outro"] }, motivo: S,
       validade: { ...DIA, description: "Só na entrada: validade do que está entrando (AAAA-MM-DD). Obrigatória quando o produto controla validade." }, lote: { ...S, description: "Só na entrada: número do lote, se a pessoa disser" } }, ["tipo", "quantidade"]) },
   ...FERRAMENTAS_CHAO,
@@ -212,6 +216,7 @@ export const FERRAMENTAS: Def[] = ([
   ...FERRAMENTAS_CONTAS_FIXAS,
   ...FERRAMENTAS_PAGAR_CONTA,
   ...FERRAMENTAS_CADASTROS,
+  ...FERRAMENTA_VENDER_PRODUTO,
 ] as Def[]).map((f) => (AREAS_DA_FERRAMENTA[f.name] ? { ...f, areas: AREAS_DA_FERRAMENTA[f.name] } : f));
 
 export const ferramentasPara = (c: Pick<Contexto, "vejoFinanceiro" | "areas" | "dono">): Anthropic.Tool[] =>
@@ -561,6 +566,17 @@ async function planoDaDivida(c: Contexto, e: Entrada) {
   exigir(RE_DIA.test(vencimento), "vencimento no formato AAAA-MM-DD.");
   const jaDeve = real((await contasDeClientes(c, cliente.id)).reduce((s, l) => s + l.valor, 0));
   return { cliente, valor: real(valor), descricao, vencimento, categoria: texto(e.categoria, 60) || "Outros", jaDeve };
+}
+
+/**
+ * Entrada em Venda de produtos pelo lancar_dinheiro: o dinheiro entraria, mas o estoque não baixaria e a venda não apareceria no
+ * Estoque (foi o que aconteceu com "Venda de 10 pacotes de ração"). Recusa e manda usar vender_produto, a não ser que a pessoa
+ * tenha dito que o item não fica no Estoque.
+ */
+export function conferirSeEVendaDeProduto(e: Entrada) {
+  if (e.tipo !== "entrada" || uuid(e.agendamento_id) || e.nao_e_do_estoque === true) return;
+  if (semAcento(texto(e.categoria, 60)) !== semAcento(CATEGORIA_VENDA_DE_PRODUTOS)) return;
+  throw new ErroDeUso("Nada foi lançado: venda de produto é vender_produto, que lança o dinheiro e tira do estoque juntos (assim a venda aparece no Estoque). Passe o produto (produto_id de ver_estoque, ou produto_nome), a quantidade e a forma. Se o produto não está no Estoque, ofereça cadastrar: vender_produto com produto_nome e preco_unitario faz os dois num cartão só. Só use lancar_dinheiro de novo, com nao_e_do_estoque: true, se a pessoa disser que esse item não fica no Estoque.");
 }
 
 /**
@@ -1253,6 +1269,7 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       const linhas: [string, string][] = [[e.tipo === "saida" ? "Saiu" : "Entrou", brl(valor)], ["Forma", `${FORMA[String(e.forma)]}${vezes ? ` ${vezes}` : ""}`], ["Categoria", texto(e.categoria, 60) || "Outros"]];
       if (texto(e.descricao)) linhas.push(["Descrição", texto(e.descricao)]);
       await conferirSeEDivida(c, e);
+      conferirSeEVendaDeProduto(e);
       // saída que parece ser uma conta de A pagar (ou uma conta fixa): é pagar_conta, para a despesa não contar duas vezes
       await conferirSeEContaAPagar(c, e, (m) => new ErroDeUso(m));
       if (uuid(e.cliente_id)) linhas.push(["Cliente", (await clientePorId(c, e.cliente_id)).nome]);
@@ -1306,6 +1323,8 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
       exigir(e.validade == null || e.validade === "" || RE_DIA.test(String(e.validade)), "validade no formato AAAA-MM-DD.");
       exigir(nomeProd, "Diga qual é o produto.");
       exigir(!(novo && e.tipo === "saida"), "Esse produto não está no estoque: use ver_estoque para achar o nome certo.");
+      // venda pela saída solta não conta como venda no Estoque nem leva o dinheiro: é vender_produto
+      exigir(!(e.tipo === "saida" && /\bvend/i.test(texto(e.motivo, 80))), "Nada saiu do estoque: venda de produto é vender_produto, que tira do estoque e lança o dinheiro juntos (a venda aparece no Estoque). Use vender_produto com este produto_id e a quantidade. Saída aqui é só perda, uso interno, vencido ou acerto.");
       const custo = numero(e.custo_unitario);
       const precoVenda = numero(e.preco_venda);
       exigir(e.preco_venda == null || (precoVenda != null && precoVenda >= 0 && precoVenda <= 99999), "preco_venda: use um valor entre R$ 0 e R$ 99.999.");
@@ -1332,6 +1351,8 @@ export async function descrever(c: Contexto, nome: string, e: Entrada): Promise<
   if (chao) return chao;
   const cadastro = await descreverCadastro(c, nome, e, (m) => new ErroDeUso(m));
   if (cadastro) return cadastro;
+  const venda = await descreverVendaDeProduto(c, nome, e, (m) => new ErroDeUso(m));
+  if (venda) return venda;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 
@@ -1349,6 +1370,11 @@ export async function gravar(c: Contexto, nome: string, e: Entrada): Promise<unk
     // o mesmo "Pode fazer" chegou de novo: as contas já estão pagas, e o banco devolve o que a primeira vez fez
     const ja = await sb.rpc("lote_ja_feito", { p_petshop: petshop.id, p_chave: c.chave });
     if (ja.data) return { feito: true, repetido: true, aviso: "Isso já tinha sido recebido. Nada foi recebido de novo." };
+  }
+  if (nome === "vender_produto" && c.chave) {
+    // a venda já foi gravada: não confere de novo (o saldo do cartão mudaria) nem vende outra vez
+    const ja = await sb.rpc("lote_ja_feito", { p_petshop: petshop.id, p_chave: c.chave });
+    if (ja.data) return { feito: true, repetido: true, aviso: "Essa venda já tinha sido anotada. Nada foi vendido de novo." };
   }
   const resumo = await descrever(c, nome, e); // confere de novo na hora de gravar
   return comOCartao(await gravarConferido(c, nome, e), resumo);
@@ -1581,6 +1607,8 @@ async function gravarConferido(c: Contexto, nome: string, e: Entrada): Promise<u
   if (baixa) return baixa;
   const cadastro = await gravarCadastro(c, nome, e, (m) => new ErroDeUso(m));
   if (cadastro) return cadastro;
+  const venda = await gravarVendaDeProduto(c, nome, e, (m) => new ErroDeUso(m));
+  if (venda) return venda;
   throw new ErroDeUso(`Ferramenta desconhecida: ${nome}`);
 }
 

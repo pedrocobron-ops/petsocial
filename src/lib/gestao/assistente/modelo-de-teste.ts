@@ -9,6 +9,8 @@ import type { AvisosDaChamada, Msg, RespostaDoModelo } from "./conversa";
  * - pedido com "tabela de preços": os quatro serviços do dono numa resposta só (banho P e M R$ 100, G e GG R$ 130; corte de unhas
  *   R$ 30 qualquer porte; escovação R$ 20; hidratação P/M R$ 60, G/GG R$ 80): muda o que existe e cadastra o que falta, com os
  *   ids tirados do contexto do pet shop (`sistema`). Os cartões aparecem juntos, com Confirmar tudo.
+ * - pedido com "vendi 2 mordedores": cartão de vender 2 "Mordedor" no Pix (vender_produto, o produto pelo nome); com "vendi 10
+ *   pacotes de ração": a ração não está no Estoque, o mesmo cartão cadastra (R$ 100 o pacote) e vende 10 em dinheiro.
  * - qualquer outro: uma frase escrita devagar, palavra por palavra (cerca de 60 ms entre as palavras).
  */
 const espera = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
@@ -62,6 +64,17 @@ export async function modeloDeTeste(msgs: Msg[], ao: AvisosDaChamada, sistema = 
         name: id ? "alterar_servico" : "criar_servico", input: id ? { servico_id: id, ...x.precos } : { nome: x.nome, duracao_min: x.duracao, ...x.precos } };
     });
     return { content: [{ type: "text", text: t, citations: null }, ...usos], stop_reason: "tool_use" } as unknown as RespostaDoModelo;
+  }
+  const venda = /vendi 2 mordedores/.test(texto) ? { itens: [{ produto_nome: "Mordedor", quantidade: 2 }], forma: "pix" }
+    : /vendi 10 pacotes de ra[cç][aã]o/.test(texto) ? { itens: [{ produto_nome: "Ração", unidade: "pacote", quantidade: 10, preco_unitario: 100 }], forma: "dinheiro" } : null;
+  if (venda) {
+    const t = "Anoto a venda e o estoque baixa junto. Confere no cartão.";
+    await escrever(t, ao, 10);
+    ao.ferramenta("vender_produto");
+    return {
+      content: [{ type: "text", text: t, citations: null }, { type: "tool_use", id: `toolu_teste${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, name: "vender_produto", input: venda }],
+      stop_reason: "tool_use",
+    } as unknown as RespostaDoModelo;
   }
   if (/bloqueia/.test(texto)) {
     const t = "Vou bloquear o almoço de amanhã. Confere no cartão e clica em Pode fazer.";

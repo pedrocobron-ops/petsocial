@@ -47,7 +47,7 @@ import {
   aceitaSinal, contaDasDiarias, contarDiarias, diariaFixa, diasDasNoites, diariaSugerida, estadiaSemCobranca, fatosDoDia, lerConta, lerCuidados, nivelDeOcupacao, nomeDaAcomodacao, ocupadasNoDia, ocupaNoDia, precoPorNoite, sinalSugerido,
   taxaNaConta, taxasGuardadas, temNoiteDiferente, oQueMudouNasNoites, textoDoCuidado, vagasDoTipo, type ContaDaEstadia, type Cuidado, type CuidadoFeito, type EstadiaDoTutor, type Mens, type ValoresDaEstadia,
 } from "@/lib/gestao/hotel";
-import { falaDeRemedio } from "@/lib/gestao/hotel";
+import { etiquetaDaReserva, falaDeRemedio, ordenarReservas, resumoDasReservas } from "@/lib/gestao/hotel";
 import { acomodacoesDe, cuidadosLigados, horasDoHotel, novoCodigo, porteDe, taxasDe } from "@/lib/gestao/hotel-opcoes";
 import CuidadosDeAgora from "@/components/gestao/hotel/cuidados-de-agora";
 import { principalDe, usaModulo } from "@/lib/gestao/modulos";
@@ -513,7 +513,6 @@ export default function CrecheHotel() {
   };
 
   const agora = new Date();
-  const hoje0 = inicioDoDia(agora).getTime();
   const hojeIso = isoDia(agora);
   const amanhaIso = isoDia(somaDias(agora, 1));
 
@@ -527,7 +526,8 @@ export default function CrecheHotel() {
   const vagasHoje = TIPOS.map((t) => ({ ...t, total: vagasDoTipo(petshop, t.id), ocupadas: ocupadasNoDia(t.id, abertas, null, hojeIso, agora, mens ?? null, petshop.horario) }))
     .filter((v) => v.total != null);
   const noHotel = naCasa.filter((e) => e.tipo === "hotel").length;
-  const proximaReserva = reservas.find((e) => new Date(e.entrada).getTime() >= hoje0);
+  // a reserva de hoje que passou da hora sem check-in aparece como atrasada (não como "próxima")
+  const apoioReservas = resumoDasReservas(reservas, agora, quando);
   // check-out que fechou sem cobrança, sem pacote e sem plano: o dono precisa ver e acertar
   const semCobranca = vejoFinanceiro ? dados?.semCobranca ?? [] : [];
   const atrasosPendentes = vejoFinanceiro ? dados?.atrasos ?? [] : [];
@@ -636,7 +636,7 @@ export default function CrecheHotel() {
             </KpiAcao>
             <KpiAcao ativo={aba === "reservas"} aoTocar={() => setAba("reservas")}>
               <Kpi icone={CalendarCheck} tom="lilas" rotulo="Reservas" valor={reservas.length}
-                apoio={proximaReserva ? `próxima: ${quando(proximaReserva.entrada)}` : reservas.length ? "com a data já passada" : "nenhuma marcada"} />
+                apoio={apoioReservas} />
             </KpiAcao>
           </div>
 
@@ -786,7 +786,7 @@ export default function CrecheHotel() {
           {aba === "reservas" && (() => {
             const fimDoMes = isoDia(new Date(agora.getFullYear(), agora.getMonth() + 1, 0));
             const [pDe, pAte] = periodo === "7" ? [hojeIso, isoDia(somaDias(agora, 7))] : periodo === "mes" ? [hojeIso.slice(0, 8) + "01", fimDoMes] : periodo === "outro" ? [de, ate] : ["", "9999-12-31"];
-            const lista = reservas.filter(doTipo).filter((e) => { const d = isoDia(new Date(e.entrada)); return d >= pDe && d <= pAte; });
+            const lista = ordenarReservas(reservas.filter(doTipo).filter((e) => { const d = isoDia(new Date(e.entrada)); return d >= pDe && d <= pAte; }), agora);
             const juntos = vejoFinanceiro ? gruposDeSinal(lista.map((e) => {
               const v = valoresDe(e);
               return { id: e.id, entrada: e.entrada, status: e.status, criado: e.criado_em, pet: e.pets?.nome ?? "Pet", tutorId: e.pets?.clientes?.id ?? null, tutor: e.pets?.clientes?.nome ?? null,
@@ -809,8 +809,7 @@ export default function CrecheHotel() {
               <div className="g-ch-grade">
                 {lista.map((e) => {
                   const pet = e.pets;
-                  const dias = Math.round((inicioDoDia(new Date(e.entrada)).getTime() - hoje0) / 864e5);
-                  const passou = dias < 0;
+                  const etiqueta = etiquetaDaReserva(e.entrada, agora);
                   const v = valoresDe(e);
                   return (
                     <div key={e.id} className={`g-ch-cartao reserva ${e.tipo === "hotel" ? "hotel" : "creche"}`}>
@@ -826,8 +825,7 @@ export default function CrecheHotel() {
                       <div className="g-ch-rota">
                         <span><small>chega</small><b>{quando(e.entrada)}</b></span>
                         {e.saida_prevista && <><ArrowRight aria-hidden /><span><small>sai</small><b>{quando(e.saida_prevista)}</b></span></>}
-                        {passou ? <span className="g-tag amarelo">não veio</span>
-                          : <span className={`g-tag ${dias === 0 ? "verde" : "azul"}`}>{dias === 0 ? "chega hoje" : dias === 1 ? "chega amanhã" : `em ${dias} dias`}</span>}
+                        <span className={`g-tag ${etiqueta.tom}`} data-teste="situacao-reserva">{etiqueta.texto}</span>
                       </div>
 
                       <LinhaValor e={e} abertas={doTutor} valores={v} />

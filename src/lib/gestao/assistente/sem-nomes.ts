@@ -52,6 +52,7 @@ const NOMES: Record<string, [string, string]> = {
   anotar_divida: ["a", "anotação da dívida"],
   receber_de_cliente: ["o", "recebimento"],
   movimentar_estoque: ["o", "movimento do estoque"],
+  vender_produto: ["a", "venda do produto"],
   criar_servico: ["o", "cadastro do serviço"],
   alterar_servico: ["a", "mudança no serviço"],
   criar_produto: ["o", "cadastro do produto"],

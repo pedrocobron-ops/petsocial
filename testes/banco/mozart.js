@@ -131,7 +131,8 @@ const ultimoResultado = (msgs) => {
   T.ok('com cliente_id de quem deve: recusa', /receber_de_cliente/.test(await tenta({ cliente_id: ana })));
   T.ok('a descrição cita o pet de quem deve: recusa', /receber_de_cliente/.test(await tenta({ descricao: 'pagamento da Luna' })));
   T.ok('com nao_e_divida: lança', (await tenta({ cliente_id: ana, nao_e_divida: true })) === null);
-  T.ok('venda que não cita ninguém: lança', (await tenta({ descricao: 'Coleira vendida no balcão', categoria: 'Venda de produtos' })) === null);
+  T.ok('venda que não cita ninguém, com nao_e_do_estoque: lança', (await tenta({ descricao: 'Coleira vendida no balcão', categoria: 'Venda de produtos', nao_e_do_estoque: true })) === null);
+  T.ok('venda de produto sem nao_e_do_estoque: manda usar vender_produto (o estoque baixa junto)', /vender_produto/.test(await tenta({ descricao: 'Coleira vendida no balcão', categoria: 'Venda de produtos' }) || ''));
   T.ok('cliente que não deve: lança', (await tenta({ cliente_id: L.tutores.Davi })) === null);
 
   T.secao('papéis');

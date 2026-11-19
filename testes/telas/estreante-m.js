@@ -21,6 +21,8 @@ const txt = async (l) => (await l.innerText()).replace(/ /g, ' ');
 (async () => T.rodar(async () => {
   if (!(await B.servidorNoAr())) throw new Error(`servidor fora do ar em ${B.BASE_URL} (veja testes/LEIAME.md)`);
   const L = await criarLoja(T, { nome: 'Banho e Tosa da Cida', modulos: ['banho_tosa'], dados: false, equipe: false });
+  // todo serviço com preço (a semente não dá preço à Tosa higiênica): o passo dos preços só fica feito assim
+  B.sql(`update servicos set preco_m = 45 where petshop_id='${L.P}' and preco_p is null and preco_m is null and preco_g is null and preco_gg is null`);
   const { ctx, page, erros } = await N.contexto(360, 740);
   await N.entrar(page, L.emails.dono, L.senha);
 
