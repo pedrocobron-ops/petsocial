@@ -9,15 +9,22 @@
 -- A conta do "parecido" é da tela (src/lib/gestao/pet-parecido.ts). O link do tutor não muda e nunca mostra os pets da ficha.
 --
 -- 1. pedidos_agendamento.pet_novo: o aceite criou um pet novo para um tutor que já tinha outros pets.
--- 2. nome_de_pet(text): o nome do jeito de comparar (minúsculas, sem acento, um espaço só).
+-- 2. nome_de_pet(text): o nome (de pet ou de tutor) do jeito de comparar: sem acento (tabela de troca fixa, a mesma de
+--    nomeDePet em src/lib/gestao/pet-parecido.ts, para a tela e o banco darem sempre o mesmo resultado), minúsculas,
+--    um espaço só. Não usa a extensão unaccent (não está instalada no projeto) e não depende do idioma do banco.
 -- 3. pedido_aceitar: uma versão nova com p_pet (obrigatório, para não haver duas funções que servem à mesma chamada);
 --    a de sempre (sem p_pet) passa a chamar a nova com p_pet nulo. O nome igual passa a ignorar acento.
 --    p_pet só vale se for um pet do mesmo pet shop cujo tutor tem o telefone do pedido; senão, o aceite é recusado.
 -- 4. pedido_aceitar_como: uma versão nova com p_pet (obrigatório); a de sempre chama a nova com p_pet nulo.
+--    O nome do tutor também passa a ignorar acento (José = Jose), e com p_pet o
+--    tutor é o dono do pet escolhido: nada de tutor novo.
 -- 5. pedidos_aceitar_juntos: uma versão nova com p_pets ({ "<id do pedido>": "<id do pet>" }, obrigatório);
---    a de sempre chama a nova com p_pets nulo.
--- 6. pedido_trocar_pet(p_id, p_pet): "Era outro pet?" — o horário (ou a reserva) do pedido aceito passa para outro pet do
---    mesmo tutor; o pet que nasceu no aceite é apagado só se nasceu depois do pedido e não tem mais nada ligado a ele.
+--    a de sempre chama a nova com p_pets nulo. O mesmo pet escolhido para dois pedidos é recusado.
+-- 6. pedido_trocar_pet(p_id, p_pet): "Era outro pet?" — só no pedido marcado como pet novo, por quem cuida da área
+--    (agenda para horário, creche_hotel para reserva). O horário (marcado ou confirmado, sem choque com outro horário do
+--    pet escolhido) ou a reserva passa para outro pet do mesmo tutor; com porte diferente, o preço da lista é refeito
+--    (só onde o valor ainda é o da lista do porte antigo). O pet que nasceu no aceite é apagado só se nasceu depois do
+--    pedido, não tem nada ligado a ele e a ficha continua como o aceite deixou (sem foto, raça, sexo, nascimento, alertas, obs).
 --
 -- Trocas (cópia fiel da definição mais recente, mais o que está dito):
 --   pedido_aceitar (20261239), pedido_aceitar_como (20261137), pedidos_aceitar_juntos (20261235).
@@ -29,8 +36,9 @@ alter table public.pedidos_agendamento add column if not exists pet_novo boolean
 -- ---------- 2. o nome do jeito de comparar ----------
 create or replace function public.nome_de_pet(p text) returns text
   language sql immutable parallel safe set search_path = '' as $$
-  select btrim(regexp_replace(translate(lower(coalesce(p, '')),
-    'áàâãäåéèêëíìîïóòôõöúùûüçñý', 'aaaaaaeeeeiiiiooooouuuucny'), '\s+', ' ', 'g'))
+  select btrim(regexp_replace(lower(translate(coalesce(p, ''),
+    'ÁÀÂÃÄÅĀĂĄÉÈÊËĒĖĘĚÍÌÎÏĪĮÓÒÔÕÖØŌŐÚÙÛÜŪŮŰÇĆČÑŃÝŸŽŹŻŠŚŁĐĎŤŘĞŞáàâãäåāăąéèêëēėęěíìîïīįóòôõöøōőúùûüūůűçćčñńýÿžźżšśłđďťřğş',
+    'aaaaaaaaaeeeeeeeeiiiiiioooooooouuuuuuucccnnyyzzzsslddtrgsaaaaaaaaaeeeeeeeeiiiiiioooooooouuuuuuucccnnyyzzzsslddtrgs')), '\s+', ' ', 'g'))
 $$;
 grant execute on function public.nome_de_pet(text) to authenticated, service_role;
 
@@ -158,7 +166,8 @@ declare
   igual boolean;
 begin
   v_ag := public.pedido_aceitar(p_id, p_profissional, p_forcar, p_pet); -- confere dono do pedido, conta liberada, vagas, o pet escolhido
-  if not coalesce(p_tutor_novo, false) then return v_ag; end if;
+  -- com o pet escolhido, o tutor é o dono dele: nada a separar
+  if not coalesce(p_tutor_novo, false) or p_pet is not null then return v_ag; end if;
 
   select * into v from public.pedidos_agendamento where id = p_id;
   if v.estadia_id is not null then select pet_id into v_pet from public.estadias where id = v.estadia_id;
@@ -167,12 +176,12 @@ begin
   if v_pet is null then return v_ag; end if;
   select * into p from public.pets where id = v_pet;
   select * into c from public.clientes where id = p.cliente_id;
-  igual := lower(btrim(c.nome)) = lower(btrim(v.tutor_nome));
+  igual := public.nome_de_pet(c.nome) = public.nome_de_pet(v.tutor_nome);
   -- o tutor já é novo (criado agora) ou já tem o nome do pedido: nada a separar
   if c.criado_em >= now() or igual then return v_ag; end if;
 
   select x.id into v_novo from public.clientes x
-    where x.petshop_id = v.petshop_id and x.id <> c.id and lower(btrim(x.nome)) = lower(btrim(v.tutor_nome))
+    where x.petshop_id = v.petshop_id and x.id <> c.id and public.nome_de_pet(x.nome) = public.nome_de_pet(v.tutor_nome)
       and right(regexp_replace(coalesce(x.telefone, ''), '\D', '', 'g'), 8) = right(regexp_replace(v.telefone, '\D', '', 'g'), 8)
     order by x.criado_em limit 1;
   if v_novo is null then
@@ -217,6 +226,9 @@ declare
 begin
   if p_ids is null or cardinality(p_ids) < 1 or cardinality(p_ids) > 8 then raise exception 'Pedido não encontrado.' using errcode = 'P0002'; end if;
   if p_pets is not null and jsonb_typeof(p_pets) not in ('object', 'null') then raise exception 'Esse pet não é deste tutor.'; end if;
+  if jsonb_typeof(p_pets) = 'object' and (select count(*) <> count(distinct lower(x.value)) from jsonb_each_text(p_pets) x) then
+    raise exception 'O mesmo pet foi escolhido para dois pedidos.';
+  end if;
   for q in select x.id, x.tipo from public.pedidos_agendamento x where x.id = any (p_ids) order by x.inicio, x.id loop
     v_n := v_n + 1;
     v_pet_txt := case when jsonb_typeof(p_pets) = 'object' then p_pets ->> q.id::text end;
@@ -268,23 +280,29 @@ revoke execute on function public.pedidos_aceitar_juntos(uuid[], uuid, boolean, 
 grant execute on function public.pedidos_aceitar_juntos(uuid[], uuid, boolean, boolean, jsonb) to authenticated, service_role;
 
 -- ---------- 6. "Era outro pet?": o pedido aceito passa para outro pet do mesmo tutor ----------
--- Quem pode: quem pode aceitar o pedido (a mesma conferência de pedido_aceitar). O pet de antes só é apagado se nasceu
--- depois do pedido chegar (foi o aceite que criou) e não tem mais nada ligado a ele (nenhuma tabela que aponta para pets).
+-- Quem pode: quem cuida da área do pedido (agenda para horário, creche_hotel para reserva), com a conta liberada.
+-- Só no pedido marcado como pet novo (o aceite criou o pet). O pet de antes só é apagado se nasceu depois do pedido chegar,
+-- a ficha está como o aceite deixou e nada aponta para ele (nenhuma tabela que aponta para pets, nem creche_taxi).
 create or replace function public.pedido_trocar_pet(p_id uuid, p_pet uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   v public.pedidos_agendamento;
   s public.petshops;
   a public.pets; b public.pets;
-  v_de uuid; e public.estadias; v_outra public.estadias;
-  k record; v_tem boolean := false; v_apagado boolean := false;
+  v_de uuid; e public.estadias; ag public.agendamentos; v_outra public.estadias;
+  v_porte_antes text; v_porte_agora text;
+  k record; v_tem boolean := false; v_apagado boolean := false; v_preco_mudou boolean := false;
 begin
   select * into v from public.pedidos_agendamento where id = p_id for update;
   if not found or v.petshop_id not in (select public.meus_petshops()) then raise exception 'Pedido não encontrado.'; end if;
+  if not public.tenho_area(v.petshop_id, case when v.tipo in ('creche', 'hotel') then array['creche_hotel'] else array['agenda'] end) then
+    raise exception 'Você não tem acesso a %.', case when v.tipo in ('creche', 'hotel') then 'Creche e hotel' else 'Agenda' end;
+  end if;
   if not public.acesso_liberado(v.petshop_id) then raise exception 'Sua conta está só para consulta.'; end if;
   if v.status <> 'aceito' then raise exception 'Esse pedido ainda não foi aceito.'; end if;
-  if v.estadia_id is not null then select * into e from public.estadias where id = v.estadia_id; v_de := e.pet_id;
-  elsif v.agendamento_id is not null then select pet_id into v_de from public.agendamentos where id = v.agendamento_id;
+  if not v.pet_novo then raise exception 'Esse pedido não criou pet novo.'; end if;
+  if v.estadia_id is not null then select * into e from public.estadias where id = v.estadia_id for update; v_de := e.pet_id;
+  elsif v.agendamento_id is not null then select * into ag from public.agendamentos where id = v.agendamento_id for update; v_de := ag.pet_id;
   end if;
   if v_de is null then raise exception 'Esse pedido não tem horário nem reserva.'; end if;
   select * into a from public.pets where id = v_de;
@@ -303,14 +321,41 @@ begin
     if found then raise exception '% já tem reserva nessas datas.', b.nome; end if;
     update public.estadias set pet_id = b.id where id = e.id;
   else
-    update public.agendamentos set pet_id = b.id where id = v.agendamento_id;
+    -- só horário que ainda vai acontecer (marcado ou confirmado), e sem choque com outro horário do pet escolhido
+    if ag.status not in ('marcado', 'confirmado') then raise exception 'Esse horário já foi atendido ou desmarcado.'; end if;
+    if exists (select 1 from public.agendamentos x where x.pet_id = b.id and x.id <> ag.id and x.status in ('marcado', 'confirmado', 'em_atendimento')
+                 and x.inicio < ag.fim and x.fim > ag.inicio) then
+      raise exception '% já tem horário nesse momento.', b.nome;
+    end if;
+    update public.agendamentos set pet_id = b.id where id = ag.id;
   end if;
   -- o porte que veio no pedido vai para a ficha, se ela estava sem
-  if b.porte is null and a.porte is not null then update public.pets set porte = a.porte where id = b.id; end if;
+  if b.porte is null and a.porte is not null then update public.pets set porte = a.porte where id = b.id; b.porte := a.porte; end if;
+  -- porte diferente: o preço da lista é refeito (a mesma regra do aceite), só onde o valor ainda é o da lista do porte
+  -- antigo; valor mudado à mão fica como está
+  v_porte_antes := coalesce(a.porte, v.porte);
+  v_porte_agora := b.porte;
+  if v.agendamento_id is not null and v_porte_agora is not null and v_porte_antes is distinct from v_porte_agora then
+    update public.agendamentos x
+       set preco = case v_porte_agora when 'P' then sv.preco_p when 'M' then sv.preco_m when 'G' then sv.preco_g when 'GG' then sv.preco_gg end
+      from public.servicos sv
+     where x.id = ag.id and sv.id = x.servico_id and sv.petshop_id = x.petshop_id
+       and x.preco is not distinct from (case v_porte_antes when 'P' then sv.preco_p when 'M' then sv.preco_m when 'G' then sv.preco_g when 'GG' then sv.preco_gg end)
+       and (case v_porte_agora when 'P' then sv.preco_p when 'M' then sv.preco_m when 'G' then sv.preco_g when 'GG' then sv.preco_gg end) is not null;
+    v_preco_mudou := found;
+    update public.agendamento_servicos o
+       set preco = case v_porte_agora when 'P' then sv.preco_p when 'M' then sv.preco_m when 'G' then sv.preco_g when 'GG' then sv.preco_gg end
+      from public.servicos sv
+     where o.agendamento_id = ag.id and sv.id = o.servico_id and sv.petshop_id = o.petshop_id
+       and o.preco is not distinct from (case v_porte_antes when 'P' then sv.preco_p when 'M' then sv.preco_m when 'G' then sv.preco_g when 'GG' then sv.preco_gg end)
+       and (case v_porte_agora when 'P' then sv.preco_p when 'M' then sv.preco_m when 'G' then sv.preco_g when 'GG' then sv.preco_gg end) is not null;
+    v_preco_mudou := v_preco_mudou or found;
+  end if;
   update public.pedidos_agendamento set pet_novo = false where id = p_id;
 
-  -- o pet de antes: só sai se foi o aceite que criou (nasceu depois do pedido) e não tem mais nada ligado a ele
-  if a.criado_em >= v.criado_em then
+  -- o pet de antes: só sai se foi o aceite que criou, a ficha está como o aceite deixou e nada aponta para ele
+  if a.criado_em >= v.criado_em and a.ativo and coalesce(btrim(a.foto), '') = '' and coalesce(btrim(a.obs), '') = ''
+     and coalesce(btrim(a.raca), '') = '' and coalesce(btrim(a.alertas), '') = '' and a.nascimento is null and a.sexo is null then
     for k in select c.conrelid::regclass as tabela, t.attname as coluna
                from pg_constraint c join pg_attribute t on t.attrelid = c.conrelid and t.attnum = c.conkey[1]
               where c.contype = 'f' and c.confrelid = 'public.pets'::regclass
@@ -323,7 +368,7 @@ begin
       v_apagado := true;
     end if;
   end if;
-  return jsonb_build_object('ok', true, 'apagado', v_apagado, 'pet', b.nome);
+  return jsonb_build_object('ok', true, 'apagado', v_apagado, 'pet', b.nome, 'preco', v_preco_mudou);
 end $$;
 revoke execute on function public.pedido_trocar_pet(uuid, uuid) from public, anon;
 grant execute on function public.pedido_trocar_pet(uuid, uuid) to authenticated;
