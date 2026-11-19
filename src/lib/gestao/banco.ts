@@ -2531,14 +2531,14 @@ isOneToOne: false
                   ]
                 },"pedidos_agendamento": {
                   Row: {
-                    "agendamento_id": string | null,"avisado_em": string | null,"cliente_cancelou_em": string | null,"cliente_pedido_visto_em": string | null,"cliente_pediu": string | null,"cliente_pediu_em": string | null,"cliente_recado": string | null,"criado_em": string,"especie": string,"estadia_id": string | null,"experiencia": boolean,"fim": string,"grupo_id": string | null,"id": string,"inicio": string,"obs": string | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"promo": Json | null,"servico_id": string | null,"status": string,"telefone": string,"termos_aceitos_em": string | null,"termos_texto": string | null,"termos_vacinas": boolean | null,"tipo": string,"tutor_nome": string
+                    "agendamento_id": string | null,"avisado_em": string | null,"cliente_cancelou_em": string | null,"cliente_pedido_visto_em": string | null,"cliente_pediu": string | null,"cliente_pediu_em": string | null,"cliente_recado": string | null,"criado_em": string,"especie": string,"estadia_id": string | null,"experiencia": boolean,"fim": string,"grupo_id": string | null,"id": string,"inicio": string,"obs": string | null,"outros_servicos": (string)[] | null,"pet_nome": string,"petshop_id": string,"porte": string | null,"promo": Json | null,"servico_id": string | null,"status": string,"telefone": string,"termos_aceitos_em": string | null,"termos_texto": string | null,"termos_vacinas": boolean | null,"tipo": string,"tutor_nome": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim": string,"grupo_id"?: string | null,"id"?: string,"inicio": string,"obs"?: string | null,"pet_nome": string,"petshop_id": string,"porte"?: string | null,"promo"?: Json | null,"servico_id"?: string | null,"status"?: string,"telefone": string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome": string
+                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim": string,"grupo_id"?: string | null,"id"?: string,"inicio": string,"obs"?: string | null,"outros_servicos"?: (string)[] | null,"pet_nome": string,"petshop_id": string,"porte"?: string | null,"promo"?: Json | null,"servico_id"?: string | null,"status"?: string,"telefone": string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome": string
                   }
                   Update: {
-                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim"?: string,"grupo_id"?: string | null,"id"?: string,"inicio"?: string,"obs"?: string | null,"pet_nome"?: string,"petshop_id"?: string,"porte"?: string | null,"promo"?: Json | null,"servico_id"?: string | null,"status"?: string,"telefone"?: string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome"?: string
+                    "agendamento_id"?: string | null,"avisado_em"?: string | null,"cliente_cancelou_em"?: string | null,"cliente_pedido_visto_em"?: string | null,"cliente_pediu"?: string | null,"cliente_pediu_em"?: string | null,"cliente_recado"?: string | null,"criado_em"?: string,"especie"?: string,"estadia_id"?: string | null,"experiencia"?: boolean,"fim"?: string,"grupo_id"?: string | null,"id"?: string,"inicio"?: string,"obs"?: string | null,"outros_servicos"?: (string)[] | null,"pet_nome"?: string,"petshop_id"?: string,"porte"?: string | null,"promo"?: Json | null,"servico_id"?: string | null,"status"?: string,"telefone"?: string,"termos_aceitos_em"?: string | null,"termos_texto"?: string | null,"termos_vacinas"?: boolean | null,"tipo"?: string,"tutor_nome"?: string
                   }
                   Relationships: [
                     {
@@ -4306,6 +4306,9 @@ isOneToOne: false
 "link_estadia_cheios":
 { Args: { "p_ate": string,"p_codigo": string,"p_de": string,"p_tipo": string }; Returns: string[]
                            },
+"link_extras":
+{ Args: { "p_extras": Json,"p_petshop": string,"p_principal": string }; Returns: (string)[]
+                           },
 "link_fechados":
 { Args: { "p_codigo": string }; Returns: string[]
                            },
@@ -4319,7 +4322,7 @@ isOneToOne: false
 { Args: { "p_codigo": string }; Returns: string
                            },
 "link_horarios":
-{ Args: { "p_codigo": string,"p_dia": string,"p_pets"?: number,"p_servico": string }; Returns: string[]
+{ Args: { "p_codigo": string,"p_dia": string,"p_extras"?: Json,"p_pets"?: number,"p_servico": string }; Returns: string[]
                            },
 "link_hotel_dia_recusado":
 { Args: { "p_dia": string,"p_hora": string,"p_petshop": string,"p_quando": string }; Returns: Json
@@ -4391,6 +4394,8 @@ isOneToOne: false
                            },
 "link_pedir":
 { Args: { "p_codigo": string,"p_dia": string,"p_especie"?: string,"p_hora": string,"p_obs"?: string,"p_outros"?: Json,"p_pet": string,"p_porte"?: string,"p_servico": string,"p_telefone": string,"p_tutor": string }; Returns: Json
+                           } |
+{ Args: { "p_codigo": string,"p_dia": string,"p_especie"?: string,"p_extras": Json,"p_hora": string,"p_obs"?: string,"p_outros"?: Json,"p_pet": string,"p_porte"?: string,"p_servico": string,"p_telefone": string,"p_tutor": string }; Returns: Json
                            },
 "link_pedir_com_termos":
 { Args: { "p_args": Json,"p_funcao": string,"p_termos"?: string,"p_vacinas"?: boolean }; Returns: Json

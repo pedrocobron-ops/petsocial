@@ -20,7 +20,11 @@ export type ValorDoPet = {
   promo?: PromoDoPreco | null;
   /** creche e hotel */
   dias?: number | null; noites?: number | null; diaria?: number | null; total?: number | null; sinal?: number | null; varia?: boolean | null; desconto?: boolean | null;
+  /** mais de um serviço no pedido (migração 20261239): cada serviço com o valor dele; o valor do pet é a soma */
+  servicos?: ParteDoValor[] | null;
 };
+/** Um serviço dentro do valor do pet: "Hidratação R$ 30,00" ou "Hidratação de R$ 25,00 a R$ 40,00". */
+export type ParteDoValor = { nome: string; base?: number | null; valor?: number | null; base_de?: number | null; base_ate?: number | null; de?: number | null; ate?: number | null };
 export type LinhaDeValor = { nome: string; v: ValorDoPet };
 
 const num = (x: unknown): number | null => (x == null || x === "" || !Number.isFinite(Number(x)) ? null : Number(x));
@@ -50,6 +54,35 @@ export function valorDoServico(s: PrecosDaLista | null | undefined, porte: strin
   return { tipo: "servico", porte: porte ?? null, base_de: min, base_ate: max, de: centavos(min - descontoDaPromo(pr, min)), ate: centavos(max - descontoDaPromo(pr, max)), promo: pr };
 }
 
+/**
+ * O valor de um pet em vários serviços (o primeiro é o principal): a soma do valor de cada um. A promoção do horário vale só
+ * para o principal (como no horário da agenda). Algum serviço sem preço no link: null (o pedido fica "a combinar").
+ * É a mesma conta que o banco guarda com o pedido (`pedidos_valor_visto`, migração 20261239).
+ */
+export function valorDosServicos(lista: (PrecosDaLista & { nome: string })[], porte: string | null | undefined, promo?: PromoDoPreco | null): ValorDoPet | null {
+  if (!lista.length) return null;
+  if (lista.length === 1) return valorDoServico(lista[0], porte, promo);
+  const partes = lista.map((s, i) => ({ nome: s.nome, v: valorDoServico(s, porte, i === 0 ? promo : null) }));
+  if (partes.some((p) => !p.v)) return null;
+  const soma = (f: (v: ValorDoPet) => number) => centavos(partes.reduce((t, p) => t + f(p.v!), 0));
+  const servicos: ParteDoValor[] = partes.map(({ nome, v }) => (v!.base != null ? { nome, base: v!.base, valor: v!.valor } : { nome, base_de: v!.base_de, base_ate: v!.base_ate, de: v!.de, ate: v!.ate }));
+  const pr = partes[0].v!.promo ?? null;
+  if (partes.every((p) => p.v!.base != null)) return { tipo: "servico", porte: porte ?? null, base: soma((v) => v.base!), valor: soma((v) => v.valor!), promo: pr, servicos };
+  return {
+    tipo: "servico", porte: porte ?? null, promo: pr, servicos,
+    base_de: soma((v) => v.base ?? v.base_de!), base_ate: soma((v) => v.base ?? v.base_ate!), de: soma((v) => v.valor ?? v.de!), ate: soma((v) => v.valor ?? v.ate!),
+  };
+}
+
+/** "Banho e tosa R$ 90,00 + Hidratação R$ 30,00" (cada serviço com o que o tutor paga). Um serviço só: null. */
+export function partesPorExtenso(v: ValorDoPet): string | null {
+  if (!v.servicos || v.servicos.length < 2) return null;
+  return v.servicos.map((p) => {
+    const quanto = p.valor != null ? real(p.valor) : p.de != null && p.ate != null ? (p.de === p.ate ? real(p.de) : `de ${real(p.de)} a ${real(p.ate)}`) : "a combinar";
+    return `${p.nome} ${quanto}`;
+  }).join(" + ");
+}
+
 /** O que o banco guardou (`pedidos_valores.visto`), com os números como número. null = nada guardado. */
 export function lerVisto(x: unknown): ValorDoPet | null {
   if (!x || typeof x !== "object") return null;
@@ -63,6 +96,9 @@ export function lerVisto(x: unknown): ValorDoPet | null {
     base_de: num(o.base_de), base_ate: num(o.base_ate), de: num(o.de), ate: num(o.ate), promo,
     dias: num(o.dias), noites: num(o.noites), diaria: num(o.diaria), total: num(o.total), sinal: num(o.sinal),
     varia: o.varia === true, desconto: o.desconto === true,
+    servicos: Array.isArray(o.servicos) ? (o.servicos as unknown[]).filter((x): x is Record<string, unknown> => !!x && typeof x === "object").map((x) => ({
+      nome: String(x.nome ?? "Serviço"), base: num(x.base), valor: num(x.valor), base_de: num(x.base_de), base_ate: num(x.base_ate), de: num(x.de), ate: num(x.ate),
+    })) : null,
   };
 }
 

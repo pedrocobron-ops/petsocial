@@ -9,7 +9,27 @@ type Casa = { diaria_creche?: number | null; diaria_hotel?: number | null; diari
 
 const real = (v: number) => `R$ ${v.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
 
-export function precoDoPedido(p: Pedido, servico: Precos | null | undefined, casa: Casa): string | null {
+/**
+ * `servico` pode ser a lista dos serviços do pedido (o principal e os que vêm junto, migração 20261239): o valor é a soma.
+ * Algum deles sem preço: sem valor (fica a combinar).
+ */
+export function precoDoPedido(p: Pedido, servico: Precos | (Precos | null | undefined)[] | null | undefined, casa: Casa): string | null {
+  if (Array.isArray(servico)) {
+    if (servico.length <= 1) return precoDoPedido(p, servico[0], casa);
+    if (p.tipo === "hotel" || p.tipo === "creche") return precoDoPedido(p, null, casa);
+    let de = 0, ate = 0;
+    for (const s of servico) {
+      if (!s) return null;
+      const mapa: Record<string, number | null> = { P: s.preco_p, M: s.preco_m, G: s.preco_g, GG: s.preco_gg };
+      const doPorte = p.porte ? mapa[p.porte] : null;
+      if (doPorte != null) { de += Number(doPorte); ate += Number(doPorte); continue; }
+      const valores = Object.values(mapa).filter((v): v is number => v != null).map(Number);
+      if (!valores.length) return null;
+      de += Math.min(...valores); ate += Math.max(...valores);
+    }
+    de = Math.round(de * 100) / 100; ate = Math.round(ate * 100) / 100;
+    return de === ate ? real(de) : `${real(de)} a ${real(ate)}, conforme o porte`;
+  }
   if (p.tipo === "hotel") {
     const d = casa.diariaHotelDoPorte ?? casa.diaria_hotel;
     return d != null ? `${real(Number(d))} a diária` : null;

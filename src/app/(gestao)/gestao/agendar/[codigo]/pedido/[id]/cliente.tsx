@@ -8,7 +8,7 @@ import { adiantarBanco, bancoDepois as banco } from "@/lib/gestao/supabase-depoi
 import { Marca } from "@/components/gestao/marca";
 import { dataLonga, deIsoDia, hora as horaDe, horarioDoDia, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, somaDias } from "@/lib/gestao/util";
 import { enderecoDaLoja, enderecoEmLinha, linkDoMapa } from "@/lib/gestao/endereco";
-import { comDesconto, lerVisto, portePorExtenso, real, totalPorExtenso, valorPorExtenso, type LinhaDeValor } from "@/lib/gestao/link-precos";
+import { comDesconto, lerVisto, partesPorExtenso, portePorExtenso, real, totalPorExtenso, valorPorExtenso, type LinhaDeValor } from "@/lib/gestao/link-precos";
 import { icsDaAgenda } from "@/lib/gestao/ics";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { aplicarTema } from "@/lib/gestao/identidade";
@@ -20,7 +20,9 @@ type Situacao = "pendente" | "aceito" | "recusado" | "cancelado" | "concluido" |
 type Item = {
   pet: string; servico: string | null; dia: string; hora: string; status: Situacao; tipo?: string | null; ate?: string | null;
   /** banco com a migração 20261235: o serviço, o começo e o fim de verdade, a hora de buscar (creche e hotel) e o valor que o link mostrou */
-  servico_id?: string | null; inicio?: string | null; fim?: string | null; hora_fim?: string | null; ate_hora?: string | null; valor?: unknown;
+  servico_id?: string | null; inicio?: string | null;
+  /** banco com a migração 20261239: com mais de um serviço, os nomes de todos e os ids dos que vêm junto com o principal */
+  servicos?: string[] | null; extras?: string[] | null; fim?: string | null; hora_fim?: string | null; ate_hora?: string | null; valor?: unknown;
 };
 type Pedido = {
   logo?: string | null; tema?: string | null; petshop: string; telefone: string | null; codigo: string; tutor: string; itens: Item[];
@@ -168,7 +170,9 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
   // outro horário: os itens de serviço ainda abertos, todos do mesmo serviço (o link marca um depois do outro)
   const abertosDeServico = itens.filter((i) => (i.status === "pendente" || i.status === "aceito") && !ehEstadia(i) && i.servico_id);
   const servicoParaMudar = abertosDeServico.length > 0 && abertosDeServico.length === itens.filter((i) => i.status === "pendente" || i.status === "aceito").length
-    && abertosDeServico.every((i) => i.servico_id === abertosDeServico[0].servico_id) ? abertosDeServico[0].servico_id! : null;
+    && abertosDeServico.every((i) => i.servico_id === abertosDeServico[0].servico_id && (i.extras ?? []).join(",") === (abertosDeServico[0].extras ?? []).join(",")) ? abertosDeServico[0].servico_id! : null;
+  // os serviços que vêm junto (o tempo de cada pet é a soma de todos)
+  const extrasParaMudar = servicoParaMudar ? (abertosDeServico[0].extras ?? []) : [];
   const codigoDoLink = pedido?.codigo ?? codigo;
   useEffect(() => {
     if (painel !== "mudar" || !servicoParaMudar || agenda !== undefined) return;
@@ -187,12 +191,12 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
     let vale = true;
     setHorasLivres(null);
     setHoraNova(null);
-    void banco().rpc("link_horarios", { p_codigo: codigoDoLink, p_servico: servicoParaMudar, p_dia: diaNovo, p_pets: Math.min(4, Math.max(1, abertosDeServico.length)) }).then(({ data, error }) => {
+    void banco().rpc("link_horarios", { p_codigo: codigoDoLink, p_servico: servicoParaMudar, p_dia: diaNovo, p_pets: Math.min(4, Math.max(1, abertosDeServico.length)), ...(extrasParaMudar.length ? { p_extras: extrasParaMudar } : {}) }).then(({ data, error }) => {
       if (vale) setHorasLivres(error ? [] : ((data ?? []) as string[]).map((h) => String(h).slice(0, 5)));
     });
     return () => { vale = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diaNovo, servicoParaMudar, codigoDoLink, abertosDeServico.length]);
+  }, [diaNovo, servicoParaMudar, codigoDoLink, abertosDeServico.length, extrasParaMudar.join(",")]);
 
   // cancelar e pedir outra data por aqui: só quando quem recebe o pedido ligou, e só no que ainda está por vir
   const podeMexer = !!acoes?.ligado && acoes.aberto;
@@ -280,12 +284,13 @@ export default function AcompanharPedido({ codigo, id, inicial }: { codigo: stri
               {valores.length > 0 && geral !== "recusado" && !desistiu && (
                 <div className="g-lkp-valor" data-teste="valor-do-pedido">
                   <b>{valores[0].v.tipo === "servico" ? "Valor" : "Estimativa"}{valores.some((l) => l.v.promo) ? ` com a promoção ${valores.find((l) => l.v.promo)!.v.promo!.nome}` : ""}</b>
-                  {valores.map((l, n) => (
+                  {valores.map((l, n) => [
                     <div key={n} className="l" data-teste="valor-do-pet">
                       <span>{l.nome}{l.v.tipo === "servico" ? <small> {portePorExtenso(l.v)}</small> : l.v.tipo === "hotel" && l.v.noites ? <small> {l.v.noites} {l.v.noites === 1 ? "noite" : "noites"}</small> : l.v.dias ? <small> {l.v.dias} {l.v.dias === 1 ? "dia" : "dias"}</small> : null}</span>
                       <span>{comDesconto(l.v) && l.v.valor != null ? <><s>{real(l.v.base!)}</s> <b>{real(l.v.valor)}</b></> : `${valorPorExtenso(l.v)}${l.v.valor == null ? ", conforme o porte" : ""}`}</span>
-                    </div>
-                  ))}
+                    </div>,
+                    partesPorExtenso(l.v) ? <small key={`${n}-p`} className="g-lkp-partes" data-teste="valor-partes">{partesPorExtenso(l.v)}</small> : null,
+                  ])}
                   {valores.length > 1 && total && <div className="l forte" data-teste="valor-total"><span>Total</span><span>{total}</span></div>}
                   <small>{valores[0].v.tipo === "servico" ? "É o valor que o link mostrou quando você pediu" : "É a estimativa que o link mostrou quando você pediu"}. Quem confirma o valor é {pedido.petshop}. Nada é pago por aqui.</small>
                 </div>

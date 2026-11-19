@@ -38,6 +38,8 @@ const abrir = async (page, url) => { const r = await page.goto(url); await page.
   async function ateOsDados(page) {
     await abrir(page, LINK);
     await page.locator('.g-lk-serv', { has: page.locator('b', { hasText: /^Banho$/ }) }).click();
+    // migração 20261239: um toque marca o serviço; a barra de baixo leva ao dia e à hora
+    await page.locator('[data-teste=escolha-servicos] button').click();
     await page.locator('.g-lk-qtd[aria-label="2 pets"]').click();
     // um dia com folga (não hoje): o terceiro dia aberto
     await page.locator('.g-lk-dia:not([disabled])').nth(3).click();
