@@ -139,6 +139,7 @@ async function tratar(req: Request) {
     vejoFinanceiro: podeArea(eu, "caixa") || podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
     cuidoDoFinanceiro: podeArea(eu, "financeiro") || podeArea(eu, "relatorios"),
     areas: areasDe(eu),
+    dono: eu.papel === "dono",
     fusoMin: corpo.fusoMin, agora: corpo.agora!.slice(0, 16),
     diasEspeciais: especiais.error ? undefined : (especiais.data ?? []),
   };
@@ -258,7 +259,7 @@ async function tratar(req: Request) {
             tools: ferramentasPara(c),
             messages: msgs,
           };
-          if (DE_TESTE) return modeloDeTeste(msgs, ao);
+          if (DE_TESTE) return modeloDeTeste(msgs, ao, contextoDoPetshop(c));
           if (!emitir) return cliente.beta.messages.create(pedido, { signal: parar.signal, ...limites });
           const fluxo = cliente.beta.messages.stream(pedido, { signal: parar.signal, ...limites });
           fluxo.on("text", (d) => ao.texto(d));

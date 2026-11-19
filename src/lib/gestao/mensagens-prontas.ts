@@ -1,6 +1,6 @@
-import { doPet, saudacaoZap, servicoComArtigo, textoLembrete } from "./agenda";
-import { servicosPorExtenso } from "./servicos-do-horario";
-import { dataAmigavel, dataCompleta, deIsoDia, hora, inicioDoDia, semAcento } from "./util";
+import { saudacaoZap } from "./agenda";
+import { lembreteDoHorario, localDe, type OndeDoPetshop } from "./lembrete-zap";
+import { dataCompleta, deIsoDia, inicioDoDia, semAcento } from "./util";
 
 /**
  * Textos de WhatsApp que mais de uma tela monta (a tela de origem e o Modo envio): o lembrete do horário, o aviso de saúde
@@ -13,24 +13,27 @@ type NaOrdem = { ordem: number };
 /** O mínimo de um horário para o lembrete. */
 export type HorarioDoLembrete = {
   inicio: string;
+  /** Fim do horário (para o "término previsto"); sem ele, a linha não diz o término. */
+  fim?: string | null;
   pets?: { nome: string; sexo?: string | null; clientes?: { nome: string } | null } | null;
   servicos?: { nome: string } | null;
   agendamento_servicos?: (NaOrdem & { servicos: { nome: string } | null })[] | null;
 };
 
-/** Mensagem do lembrete. Um horário: a mesma do detalhe. Mais de um do mesmo tutor no dia: uma mensagem só, citando todos. */
-export function mensagemDoLembrete(ags: HorarioDoLembrete[], petshop: string) {
-  const tutor = ags[0]?.pets?.clientes?.nome;
-  if (ags.length === 1) {
-    const a = ags[0];
-    return textoLembrete({ tutor, pet: a.pets?.nome ?? "seu pet", sexo: a.pets?.sexo, servico: servicosPorExtenso(a), quando: dataAmigavel(a.inicio), hora: hora(a.inicio), petshop });
-  }
-  const partes = ags.map((a) => {
-    const x = servicoComArtigo(servicosPorExtenso(a));
-    return `${x ? x.texto.toLowerCase() : "o horário"} ${doPet(a.pets?.nome ?? "seu pet", a.pets?.sexo)} às ${hora(a.inicio)}`;
+/** Os nomes dos serviços do horário, na ordem (o principal primeiro). */
+const nomesDosServicos = (a: HorarioDoLembrete) => [a.servicos?.nome, ...[...(a.agendamento_servicos ?? [])].sort((x, y) => x.ordem - y.ordem).map((x) => x.servicos?.nome)].filter((n): n is string => Boolean(n));
+
+/**
+ * Mensagem do lembrete (o modelo de `lembrete-zap.ts`). Um horário ou mais de um do mesmo tutor no dia: uma mensagem só.
+ * `petshop`: o nome, ou o nome com o endereço (com ele, a linha 📍). `agora`: para "Hoje" e "Amanhã" (relógio do aparelho).
+ */
+export function mensagemDoLembrete(ags: HorarioDoLembrete[], petshop: string | OndeDoPetshop, agora: Date = new Date()) {
+  return lembreteDoHorario({
+    tutor: ags[0]?.pets?.clientes?.nome,
+    petshop: typeof petshop === "string" ? { nome: petshop } : petshop,
+    hoje: localDe(agora).slice(0, 10),
+    horarios: ags.map((a) => ({ inicio: localDe(a.inicio), fim: a.fim ? localDe(a.fim) : null, pets: [{ nome: a.pets?.nome ?? "seu pet", servicos: nomesDosServicos(a) }] })),
   });
-  const lista = `${partes.slice(0, -1).join(", ")} e ${partes[partes.length - 1]}`;
-  return `${saudacaoZap(tutor, petshop)} Passando para lembrar dos horários de ${dataAmigavel(ags[0].inicio)}: ${lista}. Posso confirmar?`;
 }
 
 /* ---------- saúde (ficha do pet, Modo envio) ---------- */

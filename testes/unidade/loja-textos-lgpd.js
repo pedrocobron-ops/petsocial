@@ -10,6 +10,7 @@ const assert = require('node:assert/strict');
 const { lib } = require('../lib/app');
 const T = require('../lib/teste')('unidade-loja-textos-lgpd');
 const A = lib('agenda');
+const LZ = lib('lembrete-zap');
 const U = lib('util');
 const C = lib('compra');
 const P = lib('planilha-produtos');
@@ -36,22 +37,22 @@ t('pronto: "O banho e a hidratação da Luna terminaram"; um serviço: "O banho 
   assert.match(A.textoPronto({ ...base, pet: 'Luna', sexo: 'F', servico: 'Banho e Hidratação' }), /O banho e a hidratação da Luna terminaram\. Já pode vir buscar\./);
   assert.match(A.textoPronto({ ...base, pet: 'Thor', sexo: 'M', servico: 'Banho' }), /O banho do Thor terminou\./);
 });
-t('lembrete: "lembrar do banho e da hidratação da Luna"', () =>
-  assert.match(A.textoLembrete({ ...base, pet: 'Luna', sexo: 'F', servico: 'Banho e Hidratação' }), /Passando para lembrar do banho e da hidratação da Luna sexta, 20\/11 às 10:00\./));
+t('lembrete: o modelo aprovado (lembrete-zap.ts), "Banho + hidratação" da Luna', () =>
+  assert.match(LZ.lembreteDoHorario({ tutor: 'Neide Teste', petshop: { nome: 'Banho da Neide' }, horarios: [{ inicio: '2026-11-20T10:00', pets: [{ nome: 'Luna', servicos: ['Banho', 'Hidratação'] }] }] }), /lembrar do horário do \*Luna\*:\n\n📅 \*Sexta-feira, 20\/11\*\n🕒 \*10h\*\n✂️ Banho \+ hidratação\n/));
 t('remarcado: "A tosa e a hidratação do Rex foram remarcadas"', () =>
   assert.match(A.textoRemarcado({ ...base, pet: 'Rex', sexo: 'M', servico: 'Tosa e Hidratação' }), /A tosa e a hidratação do Rex foram remarcadas/));
 t('cancelado: "O horário da Mel de ..."', () => assert.match(A.textoCancelado({ ...base, pet: 'Mel', sexo: 'F' }), /O horário da Mel de sexta/));
 t('serviço com nome que o sistema não conhece: "O horário do Rex ficou marcado"', () =>
   assert.match(A.textoConfirmacao({ ...base, pet: 'Rex', sexo: 'M', servico: 'Pacote mensal' }), /O horário do Rex ficou marcado/));
 t('sem sexo na ficha: "de Luna", como antes', () => assert.match(A.textoPronto({ ...base, pet: 'Luna', servico: 'Banho' }), /O banho de Luna terminou/));
-t('lembrete de dois horários do mesmo tutor: "o banho do Thor às 09:00 e o banho e a hidratação da Mel às 10:00"', () => {
+t('lembrete de dois horários do mesmo tutor: uma mensagem, "Thor: Banho" às 9h e "Mel: Banho + hidratação" às 10h', () => {
   const dia = new Date(); dia.setDate(dia.getDate() + 1);
   const as = (h) => { const d = new Date(dia); d.setHours(h, 0, 0, 0); return d.toISOString(); };
   const s = MP.mensagemDoLembrete([
     { inicio: as(9), pets: { nome: 'Thor', sexo: 'M', clientes: { nome: 'Ana' } }, servicos: { nome: 'Banho' } },
     { inicio: as(10), pets: { nome: 'Mel', sexo: 'F', clientes: { nome: 'Ana' } }, servicos: { nome: 'Banho' }, agendamento_servicos: [{ ordem: 1, servicos: { nome: 'Hidratação' } }] },
   ], 'Banho da Neide');
-  assert.match(s, /o banho do Thor às 09:00 e o banho e a hidratação da Mel às 10:00/);
+  assert.match(s, /🕒 \*9h\*\n✂️ Thor: Banho\n🕒 \*10h\*\n✂️ Mel: Banho \+ hidratação/);
 });
 
 T.secao('equipe com o mesmo primeiro nome (Camila)');

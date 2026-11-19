@@ -82,12 +82,7 @@ export function servicoComArtigo(servico: string | null | undefined): { texto: s
 const concorda = (x: { varios: boolean; feminino: boolean }, um: string, varios: string, part: string) =>
   `${x.varios ? varios : um} ${part}${x.feminino ? "a" : "o"}${x.varios ? "s" : ""}`;
 
-/** Texto do lembrete que vai para o WhatsApp do tutor: "Passando para lembrar do banho e da hidratação da Luna hoje às 16:00." */
-export function textoLembrete(p: { tutor?: string | null; pet: string; sexo?: SexoPet; servico?: string | null; quando: string; hora: string; petshop: string }) {
-  const x = servicoComArtigo(p.servico);
-  const doQue = x ? x.texto.toLowerCase().replace(/(^|, | e )([oa]) /g, (_m, sep: string, art: string) => `${sep}d${art} `) : "do horário";
-  return `${saudacaoZap(p.tutor, p.petshop)} Passando para lembrar ${doQue} ${doPet(p.pet, p.sexo)} ${p.quando} às ${p.hora}. Posso confirmar?`;
-}
+/* O lembrete do horário fica em lembrete-zap.ts (um modelo só para a Agenda, o Modo envio e o Mozart). */
 
 /**
  * Texto do aviso de que o atendimento terminou e o pet pode ir para casa (WhatsApp do tutor).

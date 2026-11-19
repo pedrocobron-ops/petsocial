@@ -401,6 +401,9 @@ button.g-linha:hover, a.g-linha:hover { background: rgba(31, 27, 23, .03); borde
 .g-proposta dd { margin: 0; font-weight: 500; }
 .g-proposta .bts { display: flex; gap: 8px; }
 .g-proposta .bts .g-btn { flex: 1; }
+/* vários cartões juntos: Confirmar tudo maior, Nenhum menor, sem passar da largura no celular */
+.g-ass-tudo .bts .g-btn { min-width: 0; white-space: normal; }
+.g-ass-tudo .bts .g-btn.pri { flex: 2; }
 .g-proposta.feita { border-color: transparent; background: var(--g-menta); box-shadow: none; }
 .g-proposta.descartada { opacity: .6; box-shadow: none; }
 .g-sugestoes { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 10px; scrollbar-width: none; }

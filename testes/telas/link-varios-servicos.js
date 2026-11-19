@@ -52,7 +52,10 @@ const abrir = async (page, url) => { await page.goto(url); await page.waitForLoa
     const escolhido = page.locator('[data-teste=servicos-escolhidos]');
     await escolhido.waitFor({ timeout: 15000 });
     T.ok('o passo 2 mostra os três serviços e 2h15', /Banho e tosa \+ Hidratação \+ Corte de unhas/.test(await escolhido.innerText()) && /2h15/.test(await escolhido.innerText()), await escolhido.innerText());
+    // espera a resposta dos horários do dia novo: sem isso, a lista do dia anterior (ou vazia, na troca) era lida antes
+    const horariosDoDia = page.waitForResponse((r) => /\/rpc\/link_horarios/.test(r.url()), { timeout: 20000 }).catch(() => null);
     await page.locator('.g-lk-dia:not([disabled])').nth(3).click();
+    await horariosDoDia;
     // os horários do dia novo (enquanto lê, a página mostra o esqueleto)
     await page.waitForFunction(() => !document.querySelector('.g-lk-hora-esq') && document.querySelectorAll('.g-lk-hora').length > 0, null, { timeout: 20000 });
     const horas = await page.locator('.g-lk-hora').allInnerTexts();

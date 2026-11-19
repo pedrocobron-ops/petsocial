@@ -378,6 +378,16 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
     if (completo) void chamar({ decisoes: lista.map((p) => ({ id: p.id, ok: p.estado === "sim" })), parciais: memoria.parciais });
   }
 
+  /** Vários cartões da mesma resposta: um toque decide todos os que ainda estão em aberto (e manda tudo de uma vez). */
+  function decidirTudo(grupo: Extract<Item, { tipo: "propostas" }>, sim: boolean) {
+    const grupoId = grupo.lista.map((p) => p.id).join(",");
+    if (respondidos.current.has(grupoId)) return;
+    respondidos.current.add(grupoId);
+    const lista = grupo.lista.map((p) => (p.estado === "pendente" ? { ...p, estado: sim ? ("sim" as const) : ("nao" as const) } : p));
+    guardar(memoria.itens.map((i) => (i === grupo ? { ...grupo, lista, enviado: true } : i)));
+    void chamar({ decisoes: lista.map((p) => ({ id: p.id, ok: p.estado === "sim" })), parciais: memoria.parciais });
+  }
+
   function novaConversa() {
     cancelarEnvio(); pararDeFalar(); setLendo(null); setSemVoz(null);
     memoria.itens = []; memoria.mensagens = []; memoria.parciais = []; memoria.decidindo = null; memoria.esperando = false;
@@ -430,7 +440,11 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
             </div>
           )}
           {itens.map((item, i) => item.tipo === "propostas" ? (
-            item.lista.map((p) => (
+            <div key={`g${i}`} className="g-ass-grupo" style={{ display: "contents" }}>
+            {item.lista.length > 1 && item.lista.filter((p) => p.estado === "pendente").length > 1 && (
+              <p className="g-ass-progresso" role="status">{item.lista.length} coisas para conferir. Pode confirmar uma por uma ou tudo de uma vez, no fim.</p>
+            )}
+            {item.lista.map((p) => (
               <div key={p.id} className={`g-proposta${p.estado === "sim" ? " feita" : p.estado === "nao" ? " descartada" : ""}`}>
                 <div className="cab"><b>{p.resumo.titulo}</b>{p.estado === "sim" && <span className="g-tag verde"><Check size={13} />confirmado</span>}{p.estado === "nao" && <span className="g-tag">descartado</span>}</div>
                 <dl>{p.resumo.linhas.map(([k, v], n) => <div key={n} style={{ display: "contents" }}><dt>{k}</dt><dd style={k === "Atenção" ? { color: "var(--g-vermelho)" } : undefined}>{v}</dd></div>)}</dl>
@@ -441,7 +455,17 @@ export default function Assistente({ pedidoInicial, aoFechar }: { pedidoInicial?
                   </div>
                 )}
               </div>
-            ))
+            ))}
+            {item.lista.filter((p) => p.estado === "pendente").length > 1 && (
+              <div className="g-proposta g-ass-tudo">
+                <div className="bts">
+                  <button className="g-btn sec" disabled={pensando} onClick={() => decidirTudo(item, false)}>Nenhum</button>
+                  <button className="g-btn pri" disabled={pensando} onClick={() => decidirTudo(item, true)}><CheckCheck />Confirmar tudo ({item.lista.filter((p) => p.estado === "pendente").length})</button>
+                </div>
+                <p className="g-pp g-muted" style={{ margin: "8px 0 0" }}>Faço na ordem. Se uma der errado, paro ali e te conto.</p>
+              </div>
+            )}
+            </div>
           ) : item.tipo === "links" ? (
             <div key={i} className="g-proposta">
               <div className="cab"><b>Mensagens prontas</b><span className="g-tag">toque para abrir o WhatsApp</span></div>
