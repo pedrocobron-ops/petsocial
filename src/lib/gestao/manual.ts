@@ -3386,7 +3386,7 @@ const BASE: TopicoBase[] = [
       "A tela Hoje mostra quantos dias faltam de teste, o que você já deixou pronto e o próximo passo.",
       "Quando o teste termina, a conta fica só para consulta e os dados continuam guardados. Nada é cobrado sozinho: o teste não pede cartão.",
       "Assinou e se arrependeu? Pedindo o cancelamento em até 7 dias depois do primeiro pagamento, o valor inteiro volta, inclusive nos planos de 3 e 6 meses.",
-      "O pagamento é feito na Cakto. As formas de pagamento aparecem na tela da Cakto, na hora de pagar.",
+      "O pagamento é feito numa plataforma segura de cobrança. As formas de pagamento aparecem na tela de pagamento, na hora de pagar.",
       "Se um pagamento da assinatura não passar, a conta continua funcionando por 10 dias, e a tela diz até que dia. Depois disso fica só para consulta, até o pagamento entrar.",
       "Quem já assina usa Trocar cartão ou cancelar.",
       "Assine sempre pelo botão Assinar desta tela: assim o pagamento já chega ligado ao seu pet shop. Pagou por outro caminho (um link recebido por fora, por exemplo) e a conta não liberou? Saia, toque em Esqueci a senha na tela de entrada e entre pelo link que chega no seu e-mail: isso mostra que o e-mail é seu e o pagamento é ligado na hora. Se não ligar, fale com a nossa equipe pela Ajuda.",

@@ -60,3 +60,6 @@
 .g-as-regras { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: .9375rem; max-width: 76ch; }
 .g-as-regras li { display: flex; gap: 10px; align-items: flex-start; }
 .g-as-regras li > svg { width: 20px; height: 20px; flex: none; padding: 3px; border-radius: 50%; background: var(--t-menta); color: var(--i-menta); margin-top: 1px; }
+
+/* taxa de serviço do pagamento: uma linha discreta logo embaixo dos planos */
+.g-as-taxa { text-align: center; margin: -4px 0 0; font-size: .8rem; }

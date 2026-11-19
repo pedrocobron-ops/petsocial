@@ -34,6 +34,13 @@ const MESES: Record<PeriodoId, number> = { mensal: 1, trimestral: 3, semestral: 
 let doBanco: Record<string, string> = {};
 export function usarLinksDoBanco(links: Record<string, string> | null | undefined) { doBanco = links ?? {}; }
 
+/**
+ * A plataforma de pagamento soma uma pequena taxa de serviço ao valor (o comprador vê antes de pagar; o valor varia de
+ * compra para compra). Linha discreta embaixo dos preços, na página de vendas e na tela Assinatura. Tirar quando a taxa
+ * deixar de ser cobrada do comprador.
+ */
+export const TEXTO_TAXA = "Taxa de serviço do pagamento mostrada antes de concluir.";
+
 /** Link de pagamento de um plano e período: primeiro o do banco, depois o da variável da Vercel. */
 export function linkDe(plano: PlanoId, periodo: PeriodoId) {
   return (doBanco[`${plano}:${MESES[periodo]}`] || CHECKOUTS[plano][periodo] || "").trim();
@@ -75,7 +82,7 @@ export const TEXTOS_ASSINAR = {
   fimDoTeste: "Quando os 7 dias acabam, a conta fica só para consulta: os dados continuam guardados e dá para ver e baixar tudo. Para voltar a usar, é só assinar.",
   semFidelidade: "Sem fidelidade: você cancela quando quiser e usa até o fim do período já pago.",
   arrependimento: `Assinou e se arrependeu? Pedindo o cancelamento em até ${DIAS_DE_ARREPENDIMENTO} dias depois do primeiro pagamento, devolvemos o valor inteiro, inclusive nos planos de 3 e 6 meses.`,
-  pagamento: "O pagamento é feito na Cakto, a empresa que cuida da cobrança para nós. As formas de pagamento aparecem na tela da Cakto.",
+  pagamento: "O pagamento é feito numa plataforma segura de cobrança. As formas de pagamento aparecem na tela de pagamento.",
   cupom: "Tem um cupom? Ele é dado pela nossa equipe de atendimento, vale até a data combinada e é digitado na hora de pagar.",
   semLogin: "Banhista ou tosador que só aparece na agenda, sem entrar no sistema, não conta como pessoa com login.",
 } as const;

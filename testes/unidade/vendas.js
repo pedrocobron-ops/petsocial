@@ -81,10 +81,10 @@ const reais = (n) => `R$ ${n.toFixed(2).replace('.', ',').replace(',00', '')}`;
     assert.equal(c.cabe, false);
     assert.ok(/Equipe/.test(c.texto) && /6 logins/.test(c.texto), c.texto);
   });
-  t('as frases de venda falam da devolução em 7 dias, do fim do teste e da tela da Cakto', () => {
+  t('as frases de venda falam da devolução em 7 dias, do fim do teste e da tela de pagamento, sem nome de empresa', () => {
     assert.ok(P.TEXTOS_ASSINAR.arrependimento.includes(`${P.DIAS_DE_ARREPENDIMENTO} dias`) && /3 e 6 meses/.test(P.TEXTOS_ASSINAR.arrependimento));
     assert.ok(/Nada é cobrado/.test(P.TEXTOS_ASSINAR.nadaCobrado));
-    assert.ok(/aparecem na tela da Cakto/.test(P.TEXTOS_ASSINAR.pagamento) && !/pix|cartão|boleto/i.test(P.TEXTOS_ASSINAR.pagamento));
+    assert.ok(/aparecem na tela de pagamento/.test(P.TEXTOS_ASSINAR.pagamento) && !/pix|cartão|boleto|cakto/i.test(P.TEXTOS_ASSINAR.pagamento));
   });
 
   T.secao('de onde veio o pet shop');
@@ -134,7 +134,7 @@ const reais = (n) => `R$ ${n.toFixed(2).replace('.', ',').replace(',00', '')}`;
   const I = N.INSTRUCOES_VENDAS;
   t('sabe a devolução em 7 dias, inclusive nos planos de 3 e 6 meses', () => assert.ok(/Devolução: quem pede o cancelamento em até 7 dias depois do primeiro pagamento recebe de volta o valor inteiro/.test(I) && /inclusive nos planos de 3 e 6 meses/.test(I)));
   t('nada é cobrado no fim do teste, e depois a conta fica só para consulta', () => assert.ok(/Nada é cobrado sozinho no fim do teste/.test(I) && /fica só para consulta/.test(I)));
-  t('pagamento: as formas aparecem na tela da Cakto; ela não afirma Pix nem cartão', () => assert.ok(/As formas de pagamento aparecem na tela da Cakto/.test(I) && /não afirme que aceita Pix, cartão, boleto ou parcelamento/.test(I)));
+  t('pagamento: as formas aparecem na tela de pagamento; ela não afirma Pix nem cartão nem diz o nome da empresa', () => assert.ok(/As formas de pagamento aparecem na tela de pagamento/.test(I) && /não afirme que aceita Pix, cartão, boleto ou parcelamento/.test(I) && /não diga o nome da empresa/.test(I)));
   t('cupom: existe, é da equipe, digitado ao assinar; nunca nega, nunca inventa', () => assert.ok(/cupom existe/.test(I) && /nunca diga que não existe cupom/.test(I) && /Nunca diga o código nem o valor de um cupom/.test(I) && /Tenho um cupom/.test(I)));
   t('plano: o menor que serve; ajudante que só atende não pede o Equipe', () => assert.ok(/MENOR plano que serve/.test(I) && /ela vai mexer no sistema ou só atender\?/.test(I) && /o Solo basta/.test(I)));
   t('"vocês são novos?": nem idade nem novidade', () => assert.ok(/Não diga há quanto tempo o sistema existe/.test(I) && /não invente tempo de mercado nem diga que é antigo/.test(I)));
