@@ -4,19 +4,25 @@
 // - pet de outro tutor, de outra loja ou id inválido: recusado, e o pedido continua esperando;
 // - nome diferente com tutor que já tem pets: pet novo e o pedido marcado (pet_novo); tutor novo: sem marca;
 // - pedido_trocar_pet ("Era outro pet?"): passa o horário (ou a reserva) para o pet escolhido e apaga o pet criado só se
-//   ele não tem mais nada; recusa pet de outro tutor, pedido de outra loja, pedido não aceito e quem não entrou;
+//   ele não tem mais nada e a ficha está como o aceite deixou; recusa pet de outro tutor, pedido de outra loja, pedido não
+//   aceito, quem não entrou, quem não cuida da área (agenda / creche_hotel), horário que já passou e choque de horário;
+//   com porte diferente refaz o preço da lista (o mudado à mão fica);
+// - nome do tutor sem acento (José = Jose) e, com p_pet, o tutor é o dono do pet; o mesmo pet em dois pedidos: recusado;
+// - public.nome_de_pet dá o mesmo que nomeDePet da tela;
 // - as chamadas de antes (sem p_pet / p_pets) continuam servindo.
 const B = require('../lib/base');
 const { criarLoja } = require('../lib/semente');
+const { lib } = require('../lib/app');
+const PP = lib('pet-parecido');
 const T = require('../lib/teste')('pet-parecido');
 
 (async () => T.rodar(async () => {
   const L = await criarLoja(T, { nome: 'Parecido', dados: false });
-  const { dono, tosador } = L.sb;
+  const { dono, tosador, monitor, caixa } = L.sb;
   const LOJA = L.P, BANHO = L.S['Banho'];
   const outra = await criarLoja(T, { nome: 'Outra Parecido', equipe: false, dados: false });
   const fim8 = String(Date.now()).slice(-7);
-  const FONE = `1197${fim8}`, FONE2 = `1196${fim8}`, FONE3 = `1195${fim8}`;
+  const FONE = `1197${fim8}`, FONE2 = `1196${fim8}`, FONE3 = `1195${fim8}`, FONE4 = `1194${fim8}`;
   const ins = async (sb, tabela, linha, oque) => B.must(await sb.from(tabela).insert(linha).select('id').single(), oque).id;
   const ana = await ins(dono, 'clientes', { petshop_id: LOJA, nome: 'Ana Parecida', telefone: FONE }, 'tutora');
   const beto = await ins(dono, 'clientes', { petshop_id: LOJA, nome: 'Beto Outro', telefone: FONE2 }, 'outro tutor');
@@ -113,13 +119,14 @@ const T = require('../lib/teste')('pet-parecido');
   T.passa('hotel: aceita "Bolinha" (pet novo)', await aceitar(c2));
   const BOLINHA = petDo(c2);
   T.ok('marcado como pet novo', marca(c2) === 't');
-  const t3 = await tosador.rpc('pedido_trocar_pet', { p_id: c2, p_pet: ZECA });
-  T.passa('"Era outro pet?" na reserva: passa para o Zeca', t3, t3.data?.apagado === true);
+  T.recusa('o tosador (sem Creche e hotel) não troca a reserva', await tosador.rpc('pedido_trocar_pet', { p_id: c2, p_pet: ZECA }), /acesso a Creche e hotel/);
+  const t3 = await caixa.rpc('pedido_trocar_pet', { p_id: c2, p_pet: ZECA });
+  T.passa('"Era outro pet?" na reserva, pela recepção: passa para o Zeca', t3, t3.data?.apagado === true);
   T.ok('a reserva é do Zeca e a Bolinha sumiu', petDo(c2) === ZECA && B.num(`select count(*) from pets where id='${BOLINHA}'`) === 0);
   const c3 = pedido('Tor', { tipo: 'creche' });
   B.sql(`update pedidos_agendamento set inicio = (select inicio from pedidos_agendamento where id='${c1}'), fim = (select fim from pedidos_agendamento where id='${c1}') where id='${c3}'`);
   T.passa('outra creche no mesmo dia, como pet novo', await aceitar(c3));
-  T.recusa('trocar para o Thor, que já tem reserva nesse dia: recusado', await tosador.rpc('pedido_trocar_pet', { p_id: c3, p_pet: THOR }), /já tem reserva/);
+  T.recusa('trocar para o Thor, que já tem reserva nesse dia: recusado', await monitor.rpc('pedido_trocar_pet', { p_id: c3, p_pet: THOR }), /já tem reserva/);
 
   T.secao('vários pets no mesmo pedido');
   const g = B.uuid();
@@ -131,6 +138,63 @@ const T = require('../lib/teste')('pet-parecido');
   const h1 = pedido('Tor', { grupo: h }), h2 = pedido('Mel', { grupo: h });
   T.recusa('um pet errado no grupo: nenhum é aceito', await aceitar([h1, h2], { [h1]: THOR, [h2]: BIDU }), /não é deste tutor/);
   T.ok('os dois continuam esperando', status(h1) === 'pendente' && status(h2) === 'pendente');
+
+  T.recusa('o mesmo pet escolhido para dois pedidos: recusado', await aceitar([h1, h2], { [h1]: THOR, [h2]: THOR }), /mesmo pet/);
+  T.ok('e os dois continuam esperando', status(h1) === 'pendente' && status(h2) === 'pendente');
+
+  T.secao('"Era outro pet?": quem pode e o que já passou');
+  const trocar = (id, petId, sb = tosador) => sb.rpc('pedido_trocar_pet', { p_id: id, p_pet: petId });
+  const agDo = (id) => `(select agendamento_id from pedidos_agendamento where id='${id}')`;
+  const q1 = pedido('Faísca');
+  T.passa('aceita "Faísca" (pet novo)', await aceitar(q1));
+  const FAISCA = petDo(q1);
+  T.recusa('o monitor (sem Agenda) não troca o horário', await trocar(q1, ZECA, monitor), /acesso a Agenda/);
+  T.recusa('pedido que não criou pet novo: recusado', await trocar(p3, ZECA), /não criou pet novo/);
+  B.sql(`update pets set raca = 'SRD' where id='${FAISCA}'`);
+  const t4 = await trocar(q1, ZECA);
+  T.passa('pet novo que já ganhou raça: troca, mas não apaga', t4, t4.data?.ok === true && t4.data?.apagado === false);
+  T.ok('a Faísca continua na ficha', B.num(`select count(*) from pets where id='${FAISCA}'`) === 1);
+  const q2 = pedido('Faro');
+  T.passa('aceita "Faro" (pet novo)', await aceitar(q2));
+  B.sql(`update agendamentos set status = 'concluido' where id=${agDo(q2)}`);
+  T.recusa('horário já concluído: recusado', await trocar(q2, ZECA), /já foi atendido/);
+  const q3 = pedido('Nino');
+  T.passa('aceita "Nino" (pet novo)', await aceitar(q3));
+  B.sql(`insert into agendamentos (petshop_id, pet_id, servico_id, inicio, fim) select petshop_id, '${THOR}', servico_id, inicio + interval '30 minutes', fim + interval '30 minutes' from agendamentos where id=${agDo(q3)}`);
+  T.recusa('o Thor já tem horário nesse momento: recusado', await trocar(q3, THOR), /já tem horário/);
+  T.ok('o horário continua do Nino', petDo(q3) !== THOR);
+
+  T.secao('"Era outro pet?": o preço do porte');
+  const precoDo = (id) => Number(B.sql(`select preco from agendamentos where id=${agDo(id)}`));
+  const q4 = pedido('Pingo', { porte: 'P' });
+  T.passa('aceita "Pingo", porte P (pet novo)', await aceitar(q4));
+  T.ok('preço do P', precoDo(q4) === L.preco('Banho', 'P'), precoDo(q4));
+  const t5 = await trocar(q4, THOR);
+  T.passa('troca para o Thor (porte M)', t5, t5.data?.preco === true);
+  T.ok('o preço passa para o do M', precoDo(q4) === L.preco('Banho', 'M'), precoDo(q4));
+  const q5 = pedido('Pinga', { porte: 'P' });
+  T.passa('aceita "Pinga", porte P (pet novo)', await aceitar(q5));
+  B.sql(`update agendamentos set preco = 99.5 where id=${agDo(q5)}`);
+  const t6 = await trocar(q5, THOR);
+  T.passa('troca para o Thor com o preço mudado à mão', t6, t6.data?.preco === false);
+  T.ok('o preço mudado à mão fica', precoDo(q5) === 99.5, precoDo(q5));
+
+  T.secao('nome do tutor sem acento e tutor pelo pet escolhido');
+  const jose = await ins(dono, 'clientes', { petshop_id: LOJA, nome: 'José Acento', telefone: FONE4 }, 'tutor José');
+  const DUQUE = await pet(jose, 'Duque');
+  const tutoresDoFone = () => B.num(`select count(*) from clientes where petshop_id='${LOJA}' and telefone='${FONE4}'`);
+  const j1 = pedido('Duque', { tutor: 'Jose  acento', fone: FONE4 });
+  T.passa('"Jose  acento" com "tutor novo": é o José (nome igual sem acento)', await tosador.rpc('pedido_aceitar_como', { p_id: j1, p_profissional: null, p_forcar: false, p_tutor_novo: true }));
+  T.ok('nenhum tutor novo e o horário é do Duque', tutoresDoFone() === 1 && petDo(j1) === DUQUE, [tutoresDoFone(), petDo(j1)]);
+  const j2 = pedido('Duk', { tutor: 'Marina Outra', fone: FONE4 });
+  T.passa('outro nome com "tutor novo", mas escolhendo o Duque', await tosador.rpc('pedido_aceitar_como', { p_id: j2, p_profissional: null, p_forcar: false, p_tutor_novo: true, p_pet: DUQUE }));
+  T.ok('o tutor é o dono do Duque: nenhum tutor novo', tutoresDoFone() === 1 && petDo(j2) === DUQUE, [tutoresDoFone(), petDo(j2)]);
+
+  T.secao('nome_de_pet (banco) = nomeDePet (tela)');
+  for (const nome of ['  Bjørn  ', 'ÿves', 'Çãø JOSÉ', 'Pérola   da Silva', 'ŁUKASZ Đorđe', 'Mel\tzinha', 'Ünal Şahin']) {
+    const banco = B.sql(`select public.nome_de_pet(${B.q(nome)})`);
+    T.ok(`"${nome}" → "${PP.nomeDePet(nome)}"`, banco === PP.nomeDePet(nome), [banco, PP.nomeDePet(nome)]);
+  }
 
   T.secao('as chamadas de antes');
   const v1 = pedido('Thor');

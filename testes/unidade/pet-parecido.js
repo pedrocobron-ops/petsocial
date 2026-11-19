@@ -16,6 +16,12 @@ T.secao('nome igual: é ele, sem perguntar');
 t('maiúsculas e espaços', () => assert.equal(tipo('  thor ', comOutro(pet('Thor'))), 'igual'));
 t('Pérola = Perola (acento não conta)', () => { assert.equal(tipo('Perola', comOutro(pet('Pérola'))), 'igual'); assert.equal(tipo('PÉROLA', comOutro(pet('Perola'))), 'igual'); });
 t('a mesma conta do banco (nome_de_pet)', () => assert.equal(P.nomeDePet('  Pérola   da  Silva '), 'perola da silva'));
+t('a tabela de troca do banco: ø, ÿ, ç, ã, maiúsculas', () => {
+  assert.equal(P.nomeDePet('Bjørn'), 'bjorn'); assert.equal(P.nomeDePet('ÿves'), 'yves');
+  assert.equal(P.nomeDePet('Çãø JOSÉ'), 'cao jose'); assert.equal(P.nomeDePet('ŁUKASZ Đorđe'), 'lukasz dorde');
+});
+t('Bjørn = Bjorn, Pipoção = Pipocao (acento fora do NFD também não conta)', () => { assert.equal(tipo('Bjorn', comOutro(pet('Bjørn'))), 'igual'); assert.equal(tipo('PIPOCAO', comOutro(pet('Pipoção'))), 'igual'); });
+t('letra fora da tabela fica como está (o banco faz o mesmo)', () => assert.equal(P.nomeDePet('Æsir  Ω'), 'æsir ω'));
 t('pet inativo com o mesmo nome: igual (o banco usa a ficha dele)', () => assert.equal(tipo('Mel', [pet('Mel', { ativo: false })]), 'igual'));
 
 T.secao('nome parecido: pergunta');

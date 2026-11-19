@@ -10,9 +10,14 @@ import { distancia, pelaFala } from "./assistente/parecido";
 export type PetDaFicha = { id: string; nome: string; especie?: string | null; sexo?: string | null; porte?: string | null; ativo?: boolean | null };
 export type Achado<T extends PetDaFicha> = { tipo: "igual"; pet: T } | { tipo: "parecido"; pets: T[] } | { tipo: "novo" };
 
-/** O nome do jeito de comparar: minúsculas, sem acento, um espaço só (a mesma conta de public.nome_de_pet no banco). */
+// A mesma tabela de troca de public.nome_de_pet (migração 20261243): a tela e o banco dão sempre o mesmo resultado.
+const COM_ACENTO = "áàâãäåāăąéèêëēėęěíìîïīįóòôõöøōőúùûüūůűçćčñńýÿžźżšśłđďťřğş";
+const SEM_ACENTO = "aaaaaaaaaeeeeeeeeiiiiiioooooooouuuuuuucccnnyyzzzsslddtrgs";
+const TROCA = new Map<string, string>([...COM_ACENTO].flatMap((c, i) => [[c, SEM_ACENTO[i]], [c.toUpperCase(), SEM_ACENTO[i]]]));
+
+/** O nome (de pet ou de tutor) do jeito de comparar: sem acento, minúsculas, um espaço só (a conta de public.nome_de_pet). */
 export function nomeDePet(s: string | null | undefined): string {
-  return (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  return [...(s ?? "")].map((c) => TROCA.get(c) ?? c).join("").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 const soLetras = (s: string) => nomeDePet(s).replace(/[^a-z0-9]/g, "");

@@ -4,6 +4,8 @@
 // - "Thorr": a mesma pergunta; "É outro pet" cria o pet Thorr;
 // - "Rex" (bem diferente): aceita sem perguntar, o cartão mostra "pet novo"; "Era outro pet?" → Mel passa o horário para a
 //   Mel, o Rex criado no aceite sai da ficha e o cartão e a confirmação passam a dizer Mel;
+// - vários pets no mesmo pedido ("Tor", "Thorr" e "Tôr", com Thor e Thorn na ficha): o Thor escolhido no Tor fica desligado no
+//   Thorr, e no Tôr (só o Thor parecido) aparece só "É outro pet", com "Thor já foi escolhido para outro pedido";
 // - a página do pedido (o link do tutor) não mostra nenhum pet da ficha.
 const B = require('../lib/base');
 const { criarLoja } = require('../lib/semente');
@@ -94,6 +96,42 @@ const foto = async (page, nome) => { if (process.env.FOTOS) await page.screensho
     T.ok('o cartão passa a dizer Mel, sem o "pet novo"', (await respondido('Rex').count()) === 0 && (await respondido('Mel').locator('[data-teste=pet-novo]').count()) === 0);
     const zapMel = await zapDe(respondido('Mel'));
     T.ok('e a confirmação no WhatsApp diz Mel', /de Mel\b/.test(zapMel) && !/\bRex\b/.test(zapMel), zapMel);
+
+    T.secao(`${larg} px: vários pets no pedido, o mesmo pet não vale para dois`);
+    const fone2 = `118${larg === 390 ? 3 : 4}${String(Date.now()).slice(-7)}`;
+    const tutor2 = larg === 390 ? 'Caio Lima' : 'Duda Lima';
+    const cli2 = await ins('clientes', { petshop_id: L.P, nome: tutor2, telefone: fone2 }, 'tutor do grupo');
+    const THOR2 = await ins('pets', { petshop_id: L.P, cliente_id: cli2, nome: 'Thor', especie: 'cao', porte: 'M', sexo: 'M' }, 'Thor do grupo');
+    const THORN = await ins('pets', { petshop_id: L.P, cliente_id: cli2, nome: 'Thorn', especie: 'cao', porte: 'G', sexo: 'M' }, 'Thorn');
+    const grupo = B.uuid();
+    n++;
+    const diaG = L.dia(2 + n);
+    const doGrupo = (nome, h) => B.sql(`insert into pedidos_agendamento (petshop_id, tipo, servico_id, inicio, fim, tutor_nome, telefone, pet_nome, especie, porte, grupo_id)
+      values ('${L.P}', 'servico', '${BANHO}', ('${diaG} ${h}:00'::timestamp at time zone '${L.fuso}'), ('${diaG} ${h}:30'::timestamp at time zone '${L.fuso}'),
+        '${tutor2}', '${fone2}', ${B.q(nome)}, 'cao', 'P', '${grupo}') returning id`);
+    const gTor = doGrupo('Tor', '09'), gThorr = doGrupo('Thorr', '10'), gTor2 = doGrupo('Tôr', '11');
+    await page.reload();
+    await pendente('Tor').waitFor({ timeout: 30000 });
+    await pendente('Tor').getByRole('button', { name: 'Aceitar todos' }).click();
+    await pergunta.waitFor({ timeout: 20000 });
+    const card = (nome) => pergunta.getByRole('group', { name: `Pet do pedido: ${nome}`, exact: true });
+    T.ok('uma pergunta para cada pet parecido (Tor, Thorr, Tôr)', (await card('Tor').count()) === 1 && (await card('Thorr').count()) === 1 && (await card('Tôr').count()) === 1, await pergunta.innerText());
+    await card('Tor').getByRole('button', { name: 'Sim, é ele' }).click();
+    const simThor = card('Thorr').getByRole('button', { name: 'Sim, é o Thor', exact: true });
+    T.ok('no Thorr, o botão do Thor fica desligado', await simThor.isDisabled(), await card('Thorr').innerText());
+    T.ok('e o do Thorn continua ligado', await card('Thorr').getByRole('button', { name: 'Sim, é o Thorn' }).isEnabled());
+    const tor2 = await card('Tôr').innerText();
+    T.ok('no Tôr: "Thor já foi escolhido para outro pedido" e só "É outro pet"', /Thor já foi escolhido para outro pedido/.test(tor2)
+      && (await card('Tôr').getByRole('button').count()) === 1 && (await card('Tôr').getByRole('button', { name: 'É outro pet' }).count()) === 1, tor2);
+    T.ok(`sem rolagem para o lado (${larg})`, (await N.rolagemLateral(page)) <= 0);
+    await foto(page, `${larg}-4-grupo`);
+    await card('Thorr').getByRole('button', { name: 'Sim, é o Thorn' }).click();
+    await card('Tôr').getByRole('button', { name: 'É outro pet' }).click();
+    const aceitos = async () => B.num(`select count(*) from pedidos_agendamento where grupo_id='${grupo}' and status='aceito'`);
+    for (let i = 0; i < 40 && (await aceitos()) < 3; i++) await page.waitForTimeout(500);
+    T.ok('os três aceitos: Tor → Thor, Thorr → Thorn', petDo(gTor) === THOR2 && petDo(gThorr) === THORN, [petDo(gTor), petDo(gThorr)]);
+    const tor2Pet = B.sql(`select t.nome || '|' || t.cliente_id from pedidos_agendamento p join agendamentos a on a.id = p.agendamento_id join pets t on t.id = a.pet_id where p.id='${gTor2}'`);
+    T.ok('e o Tôr nasceu como pet novo do mesmo tutor', tor2Pet === `Tôr|${cli2}`, tor2Pet);
 
     T.secao(`${larg} px: o link do tutor não muda`);
     await page.goto(`${B.BASE_URL}/gestao/agendar/${L.codigo}/pedido/${pTor}`);

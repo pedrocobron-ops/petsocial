@@ -15,11 +15,11 @@ import { nomeDaCasa } from "@/lib/gestao/modulos";
 import { opcoesDoLink, prazoPorExtenso, usouOpcoesDoLink } from "@/lib/gestao/link-opcoes";
 import { brl, NOTA_PORTE, precoMudaComPorte, centavos } from "@/lib/gestao/util";
 import { PORTES } from "@/lib/gestao/tipos";
-import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar, semAcento } from "@/lib/gestao/util";
+import { dataCurta, fmtTelefone, hora, inicioDoDia, isoDia, linkWhatsApp, nomeDia, somaDias, chamar } from "@/lib/gestao/util";
 import { precoDoPedido } from "@/lib/gestao/preco-do-pedido";
 import { lerVisto, valorNaFrase, type LinhaDeValor } from "@/lib/gestao/link-precos";
 import { fraseDoEndereco } from "@/lib/gestao/endereco";
-import { acharPet, perguntaDoPet, simDoPet, type PetDaFicha } from "@/lib/gestao/pet-parecido";
+import { acharPet, nomeDePet, perguntaDoPet, simDoPet, type PetDaFicha } from "@/lib/gestao/pet-parecido";
 import "./pedidos-link.css";
 
 type Pedido = Database["public"]["Tables"]["pedidos_agendamento"]["Row"];
@@ -94,7 +94,7 @@ const porHora = (a: Pedido, b: Pedido) => a.inicio.localeCompare(b.inicio) || ne
  * o pedido respondido continua na lista até alguém avisar o tutor (ou marcar "Já avisei"), e isso fica gravado no pedido.
  */
 export default function PedidosLink() {
-  const { sb, petshop, equipe, servicos, vejoFinanceiro } = useGestao();
+  const { sb, petshop, equipe, servicos, vejoFinanceiro, posso } = useGestao();
   const casa = nomeDaCasa(petshop);
   const { avisar, avisarErro, confirmar } = useAvisos();
   const somenteLeitura = useSomenteLeitura();
@@ -274,7 +274,7 @@ export default function PedidosLink() {
     const base = () => sb.from("pedidos_agendamento").select("id, tutor_nome, criado_em").eq("petshop_id", petshop.id).eq("status", "aceito").neq("id", p.id);
     const r = p.grupo_id ? await base().eq("grupo_id", p.grupo_id).limit(1)
       : await base().eq("telefone", p.telefone).gte("criado_em", somaDias(new Date(p.criado_em), -1).toISOString()).lte("criado_em", somaDias(new Date(p.criado_em), 1).toISOString()).limit(20);
-    return (r.data ?? []).some((x) => semAcento(x.tutor_nome) === semAcento(p.tutor_nome));
+    return (r.data ?? []).some((x) => nomeDePet(x.tutor_nome) === nomeDePet(p.tutor_nome));
   }
 
   /**
@@ -294,7 +294,8 @@ export default function PedidosLink() {
       // sem resposta do banco, segue como sempre foi (o pedido entra no tutor que tem o telefone)
       const r = await sb.rpc("pedido_tutores_do_telefone", { p_id: lista[0].id });
       const donos = (r.error ? [] : r.data ?? []) as TutorDoTelefone[];
-      const igual = donos.findIndex((c) => semAcento(c.nome) === semAcento(lista[0].tutor_nome));
+      // a mesma conta do banco (nome_de_pet): sem acento, maiúsculas e espaços ("José" = "Jose")
+      const igual = donos.findIndex((c) => nomeDePet(c.nome) === nomeDePet(lista[0].tutor_nome));
       if (donos.length && igual < 0) {
         // a pergunta é uma só por pedido: se outro pet do mesmo pedido (ou do mesmo tutor, na mesma hora) já foi aceito
         // e ninguém ganhou ficha com o nome de quem pediu, a resposta foi "é a mesma pessoa"
@@ -442,8 +443,8 @@ export default function PedidosLink() {
     const donos = (r.error ? [] : r.data ?? []) as TutorDoTelefone[];
     if (!donos.length) return candidatos;
     const pets = (await sb.from("pets").select("nome, porte").eq("petshop_id", petshop.id).in("cliente_id", donos.map((d) => d.id)).not("porte", "is", null).limit(200)).data ?? [];
-    const comPorte = new Set(pets.map((x) => semAcento(x.nome)));
-    return candidatos.filter((p) => !comPorte.has(semAcento(p.pet_nome)));
+    const comPorte = new Set(pets.map((x) => nomeDePet(x.nome)));
+    return candidatos.filter((p) => !comPorte.has(nomeDePet(p.pet_nome)));
   }
   /**
    * Depois de aceitar com o porte respondido na hora. Com o porte: guarda na ficha do pet (se estava em branco) e coloca no
@@ -681,9 +682,10 @@ export default function PedidosLink() {
                       : `Marcado para ${quandoNaTela(p.inicio)}, às ${hora(p.inicio)}.`} Avise {primeiroNome(g.lista[0].tutor ?? p.tutor_nome)}.
                   </span>
                   {/* o aceite criou um pet novo para um tutor que já tinha outros: um toque para corrigir, se era um deles */}
-                  {aceito && g.lista.some((r) => r.pedido.pet_novo) && (
+                  {/* só para quem cuida da área do pedido (o banco confere o mesmo: agenda para horário, creche_hotel para reserva) */}
+                  {aceito && g.lista.some((r) => r.pedido.pet_novo && posso(ehEstadia(r.pedido) ? "creche_hotel" : "agenda")) && (
                     <span className="g-pl-petnovo">
-                      {g.lista.filter((r) => r.pedido.pet_novo).map((r) => (
+                      {g.lista.filter((r) => r.pedido.pet_novo && posso(ehEstadia(r.pedido) ? "creche_hotel" : "agenda")).map((r) => (
                         <span key={r.pedido.id} data-teste="pet-novo">
                           <span className="g-tag amarelo" title="O nome não bate com nenhum pet da ficha deste tutor. Foi criado um pet novo.">{varios ? `${r.pedido.pet_nome}: pet novo` : "pet novo"}</span>
                           <button type="button" className="g-link" aria-label={`${r.pedido.pet_nome} era outro pet?`} onClick={() => void abrirTroca(r.pedido)}>Era outro pet?</button>
@@ -849,6 +851,9 @@ export default function PedidosLink() {
           for (const [pedido, v] of Object.entries(respostas)) if (v !== "outro") escolhidos[pedido] = v;
           void aceitar(q.lista, q.grupo, q.decisao, escolhidos);
         };
+        // o mesmo pet não serve a dois pedidos (o banco recusa): o escolhido num pedido fica desligado nos outros
+        const escolhidoEm = (pet: PetDoTutor, pedido: string) =>
+          Object.entries(q.respostas).some(([outro, v]) => outro !== pedido && v !== "outro" && v.id === pet.id);
         const detalhesDoPet = (x: PetDoTutor) => [ESPECIE[x.especie ?? ""] ?? null, x.raca, x.porte ? `porte ${x.porte}` : null].filter(Boolean).join(" · ");
         return (
           <Folha titulo={umSo ? perguntaDoPet(q.perguntas[0].pets[0]) : q.perguntas.length > 1 ? "Esses pets já estão na ficha?" : `${q.perguntas[0].pedido.pet_nome} já está na ficha?`} aoFechar={() => setPerguntaPet(null)}>
@@ -856,18 +861,26 @@ export default function PedidosLink() {
               <p className="g-muted g-p">Na ficha de {primeiroNome(q.tutor)} tem um nome parecido com o do pedido. Fechando esta janela, o pedido continua esperando.</p>
               {q.perguntas.map(({ pedido, pets }) => {
                 const r = q.respostas[pedido.id];
+                const livres = pets.filter((x) => !escolhidoEm(x, pedido.id));
                 return (
                   <div key={pedido.id} className="g-card areia g-pilha p" role="group" aria-label={`Pet do pedido: ${pedido.pet_nome}`}>
                     <div className="g-pp g-muted">No pedido: <b>{pedido.pet_nome}</b>{ESPECIE[pedido.especie] ? ` · ${ESPECIE[pedido.especie]}` : ""}{pedido.porte ? ` · porte ${pedido.porte}` : ""}</div>
-                    {pets.map((x) => (
+                    {!livres.length && (
+                      <p className="g-pp g-muted" data-teste="pet-ja-escolhido">
+                        {pets.map((x) => x.nome).join(" e ")} já {pets.length > 1 ? "foram escolhidos" : "foi escolhido"} para outro pedido.
+                      </p>
+                    )}
+                    {livres.length > 0 && pets.map((x) => (
                       <div key={x.id} className="g-fila">
                         <AvatarPet pet={x} />
                         <div className="g-cresce"><b>{x.nome}</b><div className="g-pp g-muted">{detalhesDoPet(x) || "já é da casa"}</div></div>
                       </div>
                     ))}
                     <div className="g-fila g-pl-sim">
-                      {pets.map((x) => (
-                        <button key={x.id} type="button" className="g-btn pri p" aria-pressed={r !== undefined && r !== "outro" && r.id === x.id} onClick={() => responder(pedido.id, x)}>{simDoPet(x, pets.length > 1)}</button>
+                      {livres.length > 0 && pets.map((x) => (
+                        <button key={x.id} type="button" className="g-btn pri p" aria-pressed={r !== undefined && r !== "outro" && r.id === x.id}
+                          disabled={escolhidoEm(x, pedido.id)} title={escolhidoEm(x, pedido.id) ? `${x.nome} já foi escolhido para outro pedido` : undefined}
+                          onClick={() => responder(pedido.id, x)}>{simDoPet(x, pets.length > 1)}</button>
                       ))}
                       <button type="button" className="g-btn sec p" aria-pressed={r === "outro"} onClick={() => responder(pedido.id, "outro")}>É outro pet</button>
                     </div>
