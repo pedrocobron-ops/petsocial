@@ -7,7 +7,7 @@ import { veCusto } from "../acessos";
 import { travaDePreco } from "../dinheiro-opcoes";
 import { limparNome } from "../validacao";
 import { montarNascimento, nascimentoPorExtenso } from "../aniversario";
-import { ALMOCO_PADRAO, NOME_DIAS, ORDEM_DIAS, PADRAO, almocoDe, comAlmoco, erroDoHorario, lerHorario, type Almoco } from "../horario-loja";
+import { ALMOCO_PADRAO, NOME_DIAS, ORDEM_DIAS, PADRAO, almocoDe, areaTemHorario, comAlmoco, erroDoHorario, erroDoHorarioProprio, horarioEmTexto, lerHorario, mesmoHorario, semAlmoco, type Almoco } from "../horario-loja";
 import { brl, centavos, fmtTelefone, semAcento, telefoneLimpo, telefoneValido } from "../util";
 import type { Horario } from "../tipos";
 import { comPrecosPorte, resumoPorPorte, type PrecosPorte } from "../pacote-porte";
@@ -24,7 +24,8 @@ import { comPrecosPorte, resumoPorPorte, type PrecosPorte } from "../pacote-port
  *   mensagens". E-mail e endereço só para quem tem a área Clientes e pets (igual à tela). Apagar e exportar (LGPD) ficam na tela.
  * - criar_pacote / alterar_pacote: Pacotes, Modelo de pacote (nome, serviço ou qualquer serviço, quantos usos, validade em dias,
  *   preço e preço por porte, à venda ou desativado). Quem tem a área Pacotes (o banco confere: `pacotes_criar`/`pacotes_editar`).
- * - alterar_funcionamento / alterar_diarias: Meu pet shop, Horário de funcionamento e a diária da creche e do hotel. Só o dono.
+ * - alterar_funcionamento / alterar_diarias: Meu pet shop, Horário de funcionamento (do pet shop, da creche, do hotel ou o
+ *   horário próprio de um serviço) e a diária da creche e do hotel. Só o dono (o banco confere: `petshops_editar`, `servicos_editar`).
  * Cada gravação lê de novo do banco (o cartão confirmado pode estar na mesma leva de outro que mudou a mesma coisa).
  */
 
@@ -89,8 +90,11 @@ export const FERRAMENTAS_CADASTROS: Def[] = [
     description: "Muda um modelo de pacote (pacote_id de ver_pacotes): nome, serviço (servico_id; \"\" = qualquer serviço), quantidade de usos, validade em dias, preço, preço por porte (só os portes ditos; sem_preco_por_porte: true tira todos) ou ativo (false tira da venda; quem já comprou continua com o pacote; true volta para a venda).",
     input_schema: obj({ pacote_id: S, nome: S, servico_id: S, quantidade: N, validade_dias: N, preco: N, preco_p: N, preco_m: N, preco_g: N, preco_gg: N, sem_preco_por_porte: B, ativo: B }, ["pacote_id"]) },
   { grava: true, soDono: true, name: "alterar_funcionamento",
-    description: "Muda o horário de funcionamento do pet shop (Meu pet shop, Horário de funcionamento). Em dias, passe só os dias que mudam: abre e fecha (HH:mm) ou fechado: true. O almoço vale para todos os dias abertos: almoco_de e almoco_ate, ou sem_almoco: true. Feriado ou folga de um dia só não é aqui: é bloquear_horario.",
-    input_schema: obj({ dias: { type: "array", items: obj({ dia: { type: "string", enum: Object.keys(DIAS_PEDIDO) }, abre: { type: "string", description: "HH:mm" }, fecha: { type: "string", description: "HH:mm" }, fechado: B }, ["dia"]) },
+    description: "Muda um horário de Meu pet shop. alvo: pet_shop (o padrão: Horário de funcionamento), creche ou hotel (a janela de chegada e de busca de cada dia) ou servico (o horário próprio de um serviço da agenda, com servico_id). Cada um pode ter o seu horário (ex.: o pet shop fecha no domingo e a creche abre). Creche, hotel e serviço sem horário próprio seguem o do pet shop; igual_ao_pet_shop: true volta a seguir. Em dias, passe só os dias que mudam: abre e fecha (HH:mm) ou fechado: true. O almoço é só do pet shop e vale para todos os dias abertos: almoco_de e almoco_ate, ou sem_almoco: true. Creche e hotel juntos: duas chamadas na mesma resposta (um cartão para cada, confirmados juntos). Feriado ou folga de um dia só não é aqui: é bloquear_horario.",
+    input_schema: obj({ alvo: { type: "string", enum: ["pet_shop", "creche", "hotel", "servico"], description: "De quem é o horário. Padrão: pet_shop" },
+      servico_id: { ...S, description: "Com alvo servico: o id do serviço (da lista do contexto)" },
+      igual_ao_pet_shop: { ...B, description: "Creche, hotel ou serviço: volta a seguir o horário do pet shop" },
+      dias: { type: "array", items: obj({ dia: { type: "string", enum: Object.keys(DIAS_PEDIDO) }, abre: { type: "string", description: "HH:mm" }, fecha: { type: "string", description: "HH:mm" }, fechado: B }, ["dia"]) },
       almoco_de: { type: "string", description: "HH:mm" }, almoco_ate: { type: "string", description: "HH:mm" }, sem_almoco: B }) },
   { grava: true, soDono: true, name: "alterar_diarias",
     description: "Muda o valor da diária da creche (por dia) e/ou do hotel (por noite) em Meu pet shop. Preço do hotel por porte, por temporada ou de feriado fica na tela (Meu pet shop, Hotel).",
@@ -473,6 +477,69 @@ export function horarioDoPedido(atual: Horario, e: Entrada, erro: Erro): { novo:
   return { novo, mudou };
 }
 
+type AlvoDoHorario = { alvo: "pet_shop" } | { alvo: "creche" | "hotel" } | { alvo: "servico"; servico: ServicoLido & { horario?: unknown } };
+const NOME_DO_ALVO = { pet_shop: "do pet shop", creche: "da creche", hotel: "do hotel" } as const;
+
+/** De quem é o horário do pedido (alvo), conferido: a área ligada, o serviço da lista e da agenda. */
+async function alvoDoHorario(c: Contexto, e: Entrada, erro: Erro): Promise<AlvoDoHorario> {
+  const alvo = semAcento(texto(e.alvo || "pet_shop", 20).toLowerCase()).replace(/\s+/g, "_");
+  if (alvo === "pet_shop" || alvo === "petshop" || alvo === "loja") return { alvo: "pet_shop" };
+  if (alvo === "creche" || alvo === "hotel") {
+    if (!usaModulo(c.petshop, alvo)) throw erro(`Este pet shop não usa ${alvo === "creche" ? "a Creche" : "o Hotel"} no sistema. Nada foi mudado. Diga que dá para ligar em Meu pet shop, O que você usa.`);
+    return { alvo };
+  }
+  if (alvo !== "servico") throw erro("alvo deve ser pet_shop, creche, hotel ou servico.");
+  const id = uuid(e.servico_id);
+  if (!id) throw erro("Com alvo servico, passe servico_id (o id do serviço na lista do contexto).");
+  const servico = (await servicosDoBanco(c, erro)).find((x) => x.id === id);
+  if (!servico) throw erro("Serviço não encontrado: use o id da lista de serviços do contexto.");
+  if (servico.categoria === "creche" || servico.categoria === "hotel") throw erro(`"${servico.nome}" é creche/hotel: o horário é o da creche ou do hotel (alvo creche ou hotel).`);
+  return { alvo: "servico", servico };
+}
+
+/**
+ * O que muda num horário de creche, hotel ou serviço. Parte do horário próprio de agora ou, sem ele, do pet shop (sem o
+ * almoço). novo null = igual ao pet shop.
+ */
+export function horarioProprioDoPedido(loja: unknown, atual: unknown, e: Entrada, erro: Erro, quem: string): { novo: Horario | null; mudou: [string, string][] } {
+  if (tem(e, "almoco_de") || tem(e, "almoco_ate") || e.sem_almoco === true) throw erro(`O almoço é só do pet shop (alvo pet_shop): o horário ${quem} não tem almoço. Nada foi mudado.`);
+  const proprio = atual && typeof atual === "object" ? semAlmoco(lerHorario(atual)) : null;
+  if (e.igual_ao_pet_shop === true) {
+    if (!proprio) throw erro(`Nada para mudar: o horário ${quem} já é igual ao do pet shop. Diga isso à pessoa.`);
+    return { novo: null, mudou: [["Horário", `volta a ser igual ao do pet shop (${horarioEmTexto(loja)})`]] };
+  }
+  const { novo, mudou } = horarioDoPedido(proprio ?? semAlmoco(lerHorario(loja)), e, erro);
+  const problema = erroDoHorarioProprio(novo);
+  if (problema) throw erro(`${problema} Nada foi mudado.`);
+  if (!mudou.length || (!proprio && mesmoHorario(novo, loja))) throw erro(`Nada para mudar: o horário ${quem} já está assim. Diga isso à pessoa.`);
+  return { novo: semAlmoco(novo), mudou: proprio ? mudou : [["Antes", "igual ao pet shop"], ...mudou] };
+}
+
+/** O plano de alterar_funcionamento: o cartão e a gravação. */
+async function planoDoFuncionamento(c: Contexto, e: Entrada, erro: Erro) {
+  const p = await petshopDoBanco(c, erro);
+  const a = await alvoDoHorario(c, e, erro);
+  const semanaDe = (h: Horario) => ORDEM_DIAS.map((d) => `${NOME_DIAS[d].slice(0, 3)} ${diaEmTexto(h[d])}`).join(" · ");
+  if (a.alvo === "pet_shop") {
+    if (e.igual_ao_pet_shop === true) throw erro("igual_ao_pet_shop é para creche, hotel ou serviço.");
+    const { novo, mudou } = horarioDoPedido(p.horario as Horario, e, erro);
+    if (!mudou.length) throw erro("Nada para mudar: o horário já está assim. Diga isso à pessoa.");
+    const seguem = (["creche", "hotel"] as const).filter((x) => usaModulo(c.petshop, x) && !areaTemHorario(p, x));
+    const linhas: [string, string][] = [...mudou, ["Fica assim", semanaDe(novo)], ["Onde vale", `agenda, horários livres e link do cliente${seguem.length ? `; também ${seguem.join(" e ")}, que seguem o pet shop` : ""}`]];
+    return { resumo: { titulo: "Mudar horário de funcionamento", linhas }, gravar: { tabela: "petshops" as const, id: c.petshop.id, campos: { horario: novo } as Record<string, unknown> } };
+  }
+  if (a.alvo === "servico") {
+    const { novo, mudou } = horarioProprioDoPedido(p.horario, a.servico.horario, e, erro, `de ${a.servico.nome}`);
+    const linhas: [string, string][] = [...mudou, ["Fica assim", novo ? semanaDe(novo) : "igual ao pet shop"], ["Onde vale", "agenda, horários livres e link do cliente, só para este serviço"]];
+    return { resumo: { titulo: `Mudar horário de ${a.servico.nome}`, linhas }, gravar: { tabela: "servicos" as const, id: a.servico.id, campos: { horario: novo } as Record<string, unknown> } };
+  }
+  const coluna = a.alvo === "creche" ? "horario_creche" : "horario_hotel";
+  const { novo, mudou } = horarioProprioDoPedido(p.horario, (p as Record<string, unknown>)[coluna], e, erro, NOME_DO_ALVO[a.alvo]);
+  const linhas: [string, string][] = [...mudou, ["Fica assim", novo ? semanaDe(novo) : "igual ao pet shop"],
+    ["Onde vale", a.alvo === "creche" ? "chegada e busca na creche, os dias da creche e o link do cliente" : "chegada e busca no hotel e o link do cliente"]];
+  return { resumo: { titulo: `Mudar horário ${NOME_DO_ALVO[a.alvo]}`, linhas }, gravar: { tabela: "petshops" as const, id: c.petshop.id, campos: { [coluna]: novo } as Record<string, unknown> } };
+}
+
 async function petshopDoBanco(c: Contexto, erro: Erro) {
   const r = await lerPetshop(c.sb, c.petshop.id);
   if (!r.data) throw erro("Não consegui ler os dados do pet shop agora.");
@@ -488,13 +555,7 @@ export async function descreverCadastro(c: Contexto, nome: string, e: Entrada, e
     case "criar_produto": case "alterar_produto": return (await planoDoProduto(c, nome, e, erro)).resumo;
     case "alterar_tutor": return (await planoDoTutor(c, e, erro)).resumo;
     case "criar_pacote": case "alterar_pacote": return (await planoDoPacote(c, nome, e, erro)).resumo;
-    case "alterar_funcionamento": {
-      const p = await petshopDoBanco(c, erro);
-      const { novo, mudou } = horarioDoPedido(p.horario as Horario, e, erro);
-      if (!mudou.length) throw erro("Nada para mudar: o horário já está assim. Diga isso à pessoa.");
-      const semana = ORDEM_DIAS.map((d) => `${NOME_DIAS[d].slice(0, 3)} ${diaEmTexto(novo[d])}`).join(" · ");
-      return { titulo: "Mudar horário de funcionamento", linhas: [...mudou, ["Fica assim", semana], ["Onde vale", "agenda, horários livres e link do cliente"]] };
-    }
+    case "alterar_funcionamento": return (await planoDoFuncionamento(c, e, erro)).resumo;
     case "alterar_diarias": {
       const p = await petshopDoBanco(c, erro);
       const linhas: [string, string][] = [];
@@ -572,11 +633,12 @@ export async function gravarCadastro(c: Contexto, nome: string, e: Entrada, erro
       return { feito: true, cliente_id: antes.id };
     }
     case "alterar_funcionamento": {
-      const p = await petshopDoBanco(c, erro);
-      const { novo } = horarioDoPedido(p.horario as Horario, e, erro);
-      const r = await sb.from("petshops").update({ horario: novo } as never).eq("id", petshop.id).select("id");
+      const { gravar } = await planoDoFuncionamento(c, e, erro);
+      const r = gravar.tabela === "servicos"
+        ? await sb.from("servicos").update(gravar.campos as never).eq("id", gravar.id).eq("petshop_id", petshop.id).select("id")
+        : await sb.from("petshops").update(gravar.campos as never).eq("id", petshop.id).select("id");
       if (r.error) throw new Error(r.error.message);
-      if (!r.data?.length) throw erro("Sem permissão: o horário de funcionamento só o dono muda. Nada foi mudado.");
+      if (!r.data?.length) throw erro("Sem permissão: o horário só o dono muda. Nada foi mudado.");
       return { feito: true };
     }
     case "alterar_diarias": {

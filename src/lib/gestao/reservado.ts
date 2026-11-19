@@ -22,7 +22,7 @@ export const COLS_MOVIMENTO = "id, petshop_id, produto_id, tipo, quantidade, mot
 export const COLS_PACOTE = "id, petshop_id, nome, servico_id, quantidade, validade_dias, ativo, criado_em";
 export const COLS_PACOTE_CLIENTE = "id, petshop_id, pet_id, pacote_id, nome, servico_id, total, usados, comprado_em, vence_em, ativo, criado_em";
 /** O serviço sem os preços da lista (`comPrecosDeServico`). O banco não entrega `select("*")` em servicos. */
-export const COLS_SERVICO = "id, petshop_id, nome, categoria, duracao_min, cor, ordem, ativo, criado_em";
+export const COLS_SERVICO = "id, petshop_id, nome, categoria, duracao_min, cor, ordem, ativo, criado_em, horario";
 /**
  * O horário sem o preço (`comPrecosDeAgendamento`). O banco não entrega `select("*")` em agendamentos nem o preço
  * dos serviços a mais (`agendamento_servicos.preco`): leia `id, servico_id, ordem` e junte o preço depois.
@@ -34,7 +34,7 @@ export const COLS_PROFISSIONAL = "id, petshop_id, user_id, nome, papel, ve_finan
 export const COLS_ESTADIA = "id, petshop_id, pet_id, tipo, entrada, saida_prevista, saida, status, obs, criado_em, diarias_cobradas, plano_id, mensalista, dia, cobranca_id, acomodacao, cuidados, avisos, sinal_estado, experiencia, leva_traz_buscar, leva_traz_levar, endereco_leva_traz, promo";
 
 /** Tudo do pet shop menos a meta do mês, as diárias padrão, as opções (`petshop_opcoes`) e os dados da assinatura na Cakto. */
-export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, endereco, bairro, complemento, fuso, horario, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos, principal, creche_bloqueia_vacina";
+export const COLS_PETSHOP = "id, nome, telefone, cidade, uf, endereco, bairro, complemento, fuso, horario, horario_creche, horario_hotel, status, plano, teste_ate, assinatura_desde, criado_por, criado_em, whatsapp, link_codigo, link_ativo, link_aviso, vagas, guia_feito_em, logo, tema, pago_ate, periodo_meses, vagas_creche, vagas_hotel, link_creche, link_hotel, fidelidade_cada, fidelidade_premio, fidelidade_desde, modulos, principal, creche_bloqueia_vacina";
 
 /**
  * O tutor sem e-mail e sem endereço: é o que lê quem atende mas não tem a área Clientes (tosador, banhista, quem cuida da

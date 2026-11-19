@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { etiquetaPromo, lerPromoDoHorario } from "@/lib/gestao/promocoes";
 import { saudacaoZap } from "@/lib/gestao/agenda";
 import { useEffect, useState } from "react";
@@ -653,7 +654,7 @@ export default function PedidosLink() {
                   {vistoDe([p])}
                   {passou && <span className="g-tag vermelho">{ehEstadia(p) ? "a data já passou" : "horário já passou"}</span>}
                   {p.experiencia && <span className="g-tag azul">pediu dia de experiência</span>}
-                  {p.tipo === "creche" && fechadosDe(p, petshop.horario).length > 0 && <span className="g-tag amarelo">pelo seu horário, a creche não abre em {fechadosDe(p, petshop.horario).map((d) => dataCurta(d)).join(", ")}</span>}
+                  {p.tipo === "creche" && fechadosDe(p, horarioDaCreche(petshop)).length > 0 && <span className="g-tag amarelo">pelo seu horário, a creche não abre em {fechadosDe(p, horarioDaCreche(petshop)).map((d) => dataCurta(d)).join(", ")}</span>}
                   {promoDe(p)}
                   {aceiteDe(p)}
                 </div>

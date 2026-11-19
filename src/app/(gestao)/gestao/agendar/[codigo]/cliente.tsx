@@ -10,7 +10,8 @@ import { Marca, Selo } from "@/components/gestao/marca";
 import { configurado } from "@/lib/gestao/supabase-config";
 import { adiantarBanco, bancoDepois as banco } from "@/lib/gestao/supabase-depois";
 import { PORTES, type Porte } from "@/lib/gestao/tipos";
-import { brlCurto, deIsoDia, fmtTelefone, horarioDoDia, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, nomeMes, soDigitos, somaDias } from "@/lib/gestao/util";
+import { brlCurto, deIsoDia, fmtTelefone, isoDia, linkWhatsApp, nomeDia, nomeDiaCurto, nomeMes, soDigitos, somaDias } from "@/lib/gestao/util";
+import { horarioDoServico, janelaDoDia } from "@/lib/gestao/horario-loja";
 import LogoLoja from "@/components/gestao/logo-loja";
 import { aplicarTema } from "@/lib/gestao/identidade";
 import { MUITOS_PEDIDOS, lembrarPedido } from "@/lib/gestao/link-opcoes";
@@ -32,10 +33,14 @@ const DuvidaNoLink = dynamic(() => import("./duvida"));
 type ServicoDoLink = {
   id: string; nome: string; duracao_min: number; cor: string | null;
   preco_p: number | null; preco_m: number | null; preco_g: number | null; preco_gg: number | null;
+  /** horário próprio do serviço (migração 20261242); null ou ausente = o do pet shop */
+  horario?: unknown;
 };
 type Info = {
   logo?: string | null; tema?: string | null;
   nome: string; telefone: string | null; cidade: string | null; uf: string | null; horario: unknown; aviso: string | null; hoje: string;
+  /** o horário da creche e do hotel, já com o do pet shop quando não têm (migração 20261242; ausente = o do pet shop) */
+  horario_creche?: unknown; horario_hotel?: unknown;
   /** endereço do pet shop (migração 20261235; tudo opcional) */
   endereco?: string | null; bairro?: string | null; complemento?: string | null;
   servicos: ServicoDoLink[];
@@ -143,10 +148,9 @@ function diaPorExtenso(dia: string, hoje: string) {
  * Já passou da hora de fechar hoje? Usa o relógio do aparelho e só responde sim quando o dia do aparelho
  * é o mesmo dia do pet shop (quem está em outro fuso cai na frase geral "não há mais horário hoje").
  */
-function passouDoFechamento(horario: unknown, hoje: string) {
+function passouDoFechamento(h: { abre: string; fecha: string } | null, hoje: string) {
   const agora = new Date();
   if (isoDia(agora) !== hoje) return false;
-  const h = horarioDoDia(horario, agora);
   if (!h) return false;
   return `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}` >= String(h.fecha).slice(0, 5);
 }
@@ -324,6 +328,8 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
   }, [chaveRascunho, passo, servicoId, servicoIds, dia, horaEscolhida, pets, tutor, telefone, obs]);
 
   const escolhidos = useMemo(() => servicoIds.flatMap((id) => info?.servicos.filter((s) => s.id === id) ?? []), [servicoIds, info]);
+  /** O horário de cada serviço escolhido (o próprio, ou o do pet shop); sem serviço, o do pet shop. */
+  const horariosDosEscolhidos = useMemo(() => (escolhidos.length ? escolhidos.map((s) => horarioDoServico(s, info?.horario)) : [info?.horario]), [escolhidos, info]);
   const servico = escolhidos[0] ?? null;
   const extras = escolhidos.slice(1);
   /** O tempo de um pet: todos os serviços, um depois do outro (como o banco conta). */
@@ -346,9 +352,10 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
     const base = deIsoDia(info.hoje);
     return Array.from({ length: DIAS_NA_FAIXA }, (_, i) => {
       const d = somaDias(base, i);
-      return { iso: isoDia(d), data: d, aberto: !!horarioDoDia(info.horario, d) && !fechados.has(isoDia(d)), hoje: i === 0 };
+      // aberto: dia em que todos os serviços escolhidos funcionam (cada um no horário próprio, ou no do pet shop)
+      return { iso: isoDia(d), data: d, aberto: !!janelaDoDia(horariosDosEscolhidos, d.getDay()) && !fechados.has(isoDia(d)), hoje: i === 0 };
     });
-  }, [info, fechados]);
+  }, [info, fechados, horariosDosEscolhidos]);
   const meses = useMemo(() => [...new Set(dias.map((d) => nomeMes(d.data)))].join(" e "), [dias]);
 
   // horários livres do dia escolhido
@@ -610,7 +617,7 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
   const tarde = (horarios ?? []).filter((h) => h >= "12:00");
   const indice = PASSOS.findIndex((p) => p.id === passo);
   // pedido para hoje depois da hora de fechar: o dia não está cheio, já fechou
-  const hojeFechou = dia === info.hoje && passouDoFechamento(info.horario, info.hoje);
+  const hojeFechou = dia === info.hoje && passouDoFechamento(janelaDoDia(horariosDosEscolhidos, deIsoDia(info.hoje).getDay()), info.hoje);
   const fimEstimado = servico && horaEscolhida ? somaMin(horaEscolhida, durPet * qtd) : null;
 
   return (
@@ -635,7 +642,7 @@ export default function AgendarPeloLink({ inicial }: { inicial?: LinkInicial }) 
       {!estadia && passo === "servico" && <PedidosDesteAparelho codigo={codigo} versao={lembrados} />}
 
       {estadia && (
-        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} fechados={fechados} horario={info.horario} termos={termos} recarregarTermos={recarregarTermos}
+        <EstadiaPeloLink key={estadia} codigo={codigo} tipo={estadia} hoje={info.hoje} loja={info.nome} fechados={fechados} horario={(estadia === "creche" ? info.horario_creche : info.horario_hotel) ?? info.horario} termos={termos} recarregarTermos={recarregarTermos}
           aoPedir={() => setLembrados((n) => n + 1)} endereco={endereco} mapa={mapa}
           zapLoja={linkWhatsApp(info.telefone, `Oi! Quero falar sobre uma vaga ${estadia === "hotel" ? "no hotel" : "na creche"}.`)} zapCom={(t) => linkWhatsApp(info.telefone, t)}
           preco={estadia === "hotel" ? precoHotel : undefined}

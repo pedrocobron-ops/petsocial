@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { useState } from "react";
 import { CalendarX2, Check } from "lucide-react";
 import { esperadoNoDia, type Falta, type PlanoCompleto } from "@/lib/gestao/creche";
@@ -33,7 +34,7 @@ export default function FaltaAvisada({ plano, aoFechar }: { plano: PlanoCompleto
   }, [petshop.id, plano.pet_id, amanha]);
 
   const dias: string[] = [];
-  for (let d = deIsoDia(amanha); isoDia(d) <= ate; d = somaDias(d, 1)) if (esperadoNoDia(plano, isoDia(d), petshop.horario)) dias.push(isoDia(d));
+  for (let d = deIsoDia(amanha); isoDia(d) <= ate; d = somaDias(d, 1)) if (esperadoNoDia(plano, isoDia(d), horarioDaCreche(petshop))) dias.push(isoDia(d));
 
   async function trocar(dia: string, marcar: boolean) {
     if (somenteLeitura() || ocupado) return;

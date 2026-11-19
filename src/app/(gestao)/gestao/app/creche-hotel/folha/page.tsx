@@ -1,5 +1,6 @@
 "use client";
 
+import { horarioDaCreche } from "@/lib/gestao/horario-loja";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { esperadoNoDia, lerPlanos, lerPresencas } from "@/lib/gestao/creche";
@@ -56,7 +57,7 @@ function FolhaDoDia() {
     const pedidos = pedidosR.data ?? [];
     let esperados: { id: string; petId: string; nome: string; tutor: string; telefone: string | null; alertas: string | null; obs?: string | null }[] = [];
     if (comMensalistas) {
-      esperados = planos.filter((p) => p.pets?.ativo && esperadoNoDia(p, dia, petshop.horario) && !mov.faltas.some((f) => f.pet_id === p.pet_id && f.dia === dia))
+      esperados = planos.filter((p) => p.pets?.ativo && esperadoNoDia(p, dia, horarioDaCreche(petshop)) && !mov.faltas.some((f) => f.pet_id === p.pet_id && f.dia === dia))
         .map((p) => ({ id: p.id, petId: p.pet_id, nome: p.pets!.nome, tutor: p.pets!.clientes?.nome ?? "", telefone: p.pets!.clientes?.telefone ?? null, alertas: p.pets!.alertas, obs: (p.pets as { obs?: string | null }).obs ?? null }));
     }
     return { abertas: ok(abertas) as unknown as EstadiaCompleta[], encerradas: ok(encerradas) as unknown as EstadiaCompleta[], esperados, pedidos };
