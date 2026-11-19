@@ -19,7 +19,8 @@ ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 
 #    GESTAO_MOZART_FALSO=1: o Mozart responde por um roteiro fixo (assistente/modelo-de-teste.ts), sem chamar o modelo:
 #    "bloqueia…" traz o cartão de bloquear o almoço de amanhã; "markdown" responde com negrito e lista; o resto, uma frase
 #    escrita palavra por palavra; "tabela de preços" traz os quatro cartões de serviço juntos (Confirmar tudo). Precisa dele:
-#    banco/mozart-rota.js, telas/mozart-consertos.js e telas/mozart-cadastros.js.
+#    banco/mozart-rota.js, telas/mozart-consertos.js, telas/mozart-cadastros.js e telas/operacao-estoque.js ("vendi 2 mordedores",
+#    "vendi 10 pacotes de ração": cartão de vender_produto).
 npx next build
 ANTHROPIC_API_KEY=sk-ant-chave-falsa GESTAO_LINK_IA_FALSO=1 GESTAO_ERRO_TESTE=1 GESTAO_BOLETIM_FALSO=1 npx next start -p 3214
 
@@ -88,6 +89,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
 - `conflito-estadia.js`: reservas do mesmo pet que se cruzam (`conflitoDoPet`): dia extra para depois com o cão na creche hoje passa;
   outro check-in e reserva para hoje continuam recusados; hotel sem saída prevista continua cruzando.
 - `estreante-m.js`: rodada 8 (estreante): valor no cartão do pedido pelo link (`precoDoPedido`), a anotação do Mozart na ficha do pet (`anotacaoDoPet`), o modo simples (`foraNoModoSimples`) e "Faltam N coisas para começar".
+- `venda-produto.js`: venda de produto que bate com o Estoque, sem banco: a entrada escrita à mão em Venda de produtos (`venda-solta.ts`: "Venda de 2 mordedores" acha "Mordedor de plástico") e o aviso; `vender_produto` do Mozart (quem recebe a ferramenta, o cartão com valor, total, forma, saldo e o produto novo), a recusa do `lancar_dinheiro` em Venda de produtos e as instruções.
 - `mozart-cadastros.js`: as ferramentas de cadastro do Mozart (`assistente/ferramenta-cadastros.ts`), sem banco: serviços, horário e
   diárias só do dono (nem o gerente), produto só com Estoque, pacote só com Pacotes, tutor com Clientes, Agenda ou Creche e hotel;
   preço único ou por porte, aniversário, horário de funcionamento e almoço; vários cartões juntos gravam em ordem e o primeiro que
@@ -303,6 +305,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   reserva e em outro dia vira dia extra, hotel com entrada e saída, `ver_hospedes` com a creche dia a dia (mensalista de todo dia),
   a busca do tosador sem valor, `ver_sinais` igual a `lerSinaisDoPeriodo` (Relatórios), conta fixa que "não entrou este mês",
   criar_conta_fixa, e a tabela de preços gravando a diária da creche, o modelo de plano e a diária do hotel por porte.
+- `mozart-venda.js`: o Mozart vende produto pelo caminho da Venda no balcão (`venda_registrar`): mordedor sem preço vendido a R$ 100 vira um lançamento só ligado à saída com motivo Venda (saldo 98, 1 venda no Estoque, o produto ganha o preço), sem repetir na segunda confirmação; ração fora do Estoque cadastrada e vendida no mesmo cartão; `lancar_dinheiro` em Venda de produtos e saída de estoque "de venda" recusados; Rita (Caixa) vende mas não cadastra; Edu (só Estoque) dá baixa sem dinheiro; pagar depois em A receber.
 - `mozart-cadastros.js`: com o banco de verdade e modelo de mentira: a tabela de preços do dono em quatro cartões (Confirmar tudo grava
   os quatro), leva que para na falha, produto novo que chegou com quantidade entra com o preço de venda, produto pelo Edu (sem custo),
   tutor pelo Tito, modelo de pacote pela Rita, horário e diárias só do dono, e o lembrete para tutor sem telefone (pede o número,
@@ -690,6 +693,7 @@ O Playwright não é dependência do projeto (é pesado): o executor usa o que e
   microfone bloqueado ("Libere o microfone nas configurações do navegador"); microfone na Ajuda (não manda sozinho); para sozinho em
   8 s de silêncio e em 30 s (`page.clock`); navegador sem ditado: sem botão, escrever continua igual. Capturas em `testes/saida/mozart-voz-*`.
 - `mozart-v2.js` (servidor com GESTAO_MOZART_FALSO=1): "Pensando…" logo depois de mandar; recarregar no meio da resposta traz a parte que chegou marcada "Resposta interrompida" e "Perguntar de novo" traz a resposta inteira (390 e 1366).
+- `operacao-estoque.js` (servidor com GESTAO_MOZART_FALSO=1), em 390 e 1366: o Mozart vende 2 mordedores (cartão, um lançamento ligado à saída, o Estoque conta a venda) e cadastra e vende a ração; no Caixa, Entrada em Venda de produtos escrita à mão mostra o aviso ("Mordedor de plástico está no Estoque" / "Este item não está no Estoque"), sem travar o Lançar, e "Escolher o produto do Estoque" abre a Venda no balcão; Creche e hotel: a reserva de hoje que passou da hora aparece "atrasada · não chegou", primeiro, com o Check-in, e o número Reservas diz "1 atrasada · não chegou"; Primeiros passos: com 1 de N serviços com preço, o passo dos preços não fica feito e diz "1 de N com preço".
 - `mozart-cadastros.js` (servidor com GESTAO_MOZART_FALSO=1): a tabela de preços em quatro cartões com "Confirmar tudo (4)" (cabe
   no painel em 390 e 1366), um toque grava os quatro e os preços ficam no banco.
 - `mozart-consertos.js` (servidor com GESTAO_MOZART_FALSO=1): negrito e lista na bolha; recarregar traz a conversa e o cartão

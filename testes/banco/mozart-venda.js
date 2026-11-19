@@ -95,6 +95,9 @@ const uso = (name, input) => ({ type: 'tool_use', id: `toolu_vnd${Date.now().toS
   const s5b = await pedir(cDono, 'tira 1 mordedor que estragou', [uso('movimentar_estoque', { produto_id: mordedor, tipo: 'saida', quantidade: 1, motivo: 'Estragou' })]);
   T.ok('saída por outro motivo continua com o cartão de sempre', s5b.propostas.length === 1, s5b.vistos);
 
+  const s5c = await pedir(cDono, 'vendi 1 mordedor', [uso('vender_produto', { itens: [{ produto_nome: 'mordedor', quantidade: 1 }], forma: 'pix' })]);
+  T.ok('pelo pedaço do nome ("mordedor") acha o único produto que bate', linhas(s5c)[0] === '1 un de Mordedor de plástico: R$ 100,00', linhas(s5c));
+
   T.secao('Rita (Caixa) e Edu (só Estoque)');
   const cRita = await contexto('caixa');
   const s6 = await pedir(cRita, 'vendi 1 mordedor no débito', [uso('vender_produto', { itens: [{ produto_id: mordedor, quantidade: 1 }], forma: 'debito' })]);

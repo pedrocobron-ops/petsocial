@@ -84,7 +84,13 @@ export async function planoDaVendaDeProduto(c: Contexto, e: Entrada, erro: Erro)
     if (p.preco_unitario != null && (precoDito == null || precoDito < 0 || precoDito > 99999)) throw erro("preco_unitario: use um valor entre R$ 0 e R$ 99.999.");
     const id = uuid(p.produto_id);
     const nomeDito = limparNome(texto(p.produto_nome, 300));
-    const achado = id ? comPreco.find((x) => x.id === id) : nomeDito ? comPreco.find((x) => mesmoNome(x.nome, nomeDito)) : undefined;
+    // pelo nome: o igual; senão, o único que contém o que foi dito ("mordedor" acha "Mordedor de plástico"); com mais de um, pergunta
+    let achado = id ? comPreco.find((x) => x.id === id) : nomeDito ? comPreco.find((x) => mesmoNome(x.nome, nomeDito)) : undefined;
+    if (!id && !achado && nomeDito) {
+      const parecidos = comPreco.filter((x) => semAcento(x.nome).includes(semAcento(nomeDito)));
+      if (parecidos.length > 1) throw erro(`Há mais de um produto com "${nomeDito}": ${parecidos.slice(0, 6).map((x) => `${x.nome} (produto_id ${x.id})`).join("; ")}. Pergunte qual foi vendido.`);
+      achado = parecidos[0];
+    }
     if (id && !achado) throw erro("produto_id inválido: use ver_estoque.");
     let item: ItemDaVenda;
     if (achado) {
