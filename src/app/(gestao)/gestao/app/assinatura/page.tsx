@@ -96,7 +96,7 @@ export default function Assinatura() {
             </div>
             <div className="g-card g-pilha">
               <div><a className={`g-btn ${status === "atrasada" ? "verde" : "sec"}`} href={PORTAL} target="_blank" rel="noopener noreferrer">Trocar cartão ou cancelar<ExternalLink aria-hidden /></a></div>
-              <p className="g-muted g-pp">Abre a página da Cakto, que cuida da cobrança. Lá você entra com o e-mail usado na compra{petshop.cakto_email ? ` (${petshop.cakto_email})` : ""}. Para mudar de plano ou de período, cancele por lá e depois assine o novo aqui: os seus dados continuam. O plano novo começa a contar do dia em que você pagar, e os meses que sobraram do atual não viram crédito nem desconto (<Link className="g-link" href="/gestao/termos#cancelar" target="_blank">Termos, parte 7</Link>).</p>
+              <p className="g-muted g-pp">Abre a página de pagamento, que cuida da cobrança. Lá você entra com o e-mail usado na compra{petshop.cakto_email ? ` (${petshop.cakto_email})` : ""}. Para mudar de plano ou de período, cancele por lá e depois assine o novo aqui: os seus dados continuam. O plano novo começa a contar do dia em que você pagar, e os meses que sobraram do atual não viram crédito nem desconto (<Link className="g-link" href="/gestao/termos#cancelar" target="_blank">Termos, parte 7</Link>).</p>
             </div>
           </section>
         )}
@@ -227,10 +227,10 @@ export default function Assinatura() {
         <section className="g-as-estado alerta">
           <div className="g-as-estado-t"><Tile icone={liberado ? AlertTriangle : Lock} tom="rosa" tamanho="g" /><div><p className="g-rotulo">Pagamento pendente</p><h2>{liberado ? "O último pagamento não foi aprovado" : "Assinatura atrasada: a conta está só para consulta"}</h2></div></div>
           <p className="g-p" data-teste="aviso-de-atraso">{!liberado
-            ? "O pagamento não foi aprovado e o prazo para acertar passou. Você continua vendo o que lançou, mas não consegue marcar, lançar nem alterar. Os dados continuam guardados: assim que o pagamento entrar, tudo volta a funcionar. Confira o cartão na página da Cakto, no botão logo abaixo."
+            ? "O pagamento não foi aprovado e o prazo para acertar passou. Você continua vendo o que lançou, mas não consegue marcar, lançar nem alterar. Os dados continuam guardados: assim que o pagamento entrar, tudo volta a funcionar. Confira o cartão na página de pagamento, no botão logo abaixo."
             : atraso
-              ? `Seu acesso continua até ${dataCompleta(atraso.travaEm)} (${atraso.dias} dias depois da cobrança que não passou). Se o pagamento não entrar até lá, a conta fica só para consulta. Os dados continuam guardados. Confira o cartão na página da Cakto, no botão logo abaixo.`
-              : `Seu acesso continua por enquanto: são ${DIAS_DE_ATRASO_PADRAO} dias para acertar, a contar da cobrança que não passou. Depois disso a conta fica só para consulta. Confira o cartão na página da Cakto, no botão logo abaixo.`}</p>
+              ? `Seu acesso continua até ${dataCompleta(atraso.travaEm)} (${atraso.dias} dias depois da cobrança que não passou). Se o pagamento não entrar até lá, a conta fica só para consulta. Os dados continuam guardados. Confira o cartão na página de pagamento, no botão logo abaixo.`
+              : `Seu acesso continua por enquanto: são ${DIAS_DE_ATRASO_PADRAO} dias para acertar, a contar da cobrança que não passou. Depois disso a conta fica só para consulta. Confira o cartão na página de pagamento, no botão logo abaixo.`}</p>
         </section>
       );
     }
