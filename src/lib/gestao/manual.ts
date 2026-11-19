@@ -1,4 +1,5 @@
 import { nomeDaCasa, principalDe, usaCasa, usaModulo } from "./modulos";
+import { MATERIAIS_PAGOS_A_VENDA } from "./escola-venda";
 
 /**
  * Manual do Maestro Pet Gestão, em dados. É a única fonte:
@@ -3412,15 +3413,22 @@ const BASE: TopicoBase[] = [
     atencao: ["Assine pelo botão desta tela, e não por um link solto: assim o pagamento chega ligado ao seu pet shop."],
     palavras: ["cupom", "cupom de desconto", "desconto", "codigo promocional", "codigo de desconto", "tenho um cupom", "promocao", "vendedor me deu"] },
   { id: "escola", titulo: "Como usar a Escola de Gestão", secao: "ajustes", quem: "dono", rota: ESCOLA,
-    passos: [
+    // materiais pagos fora da loja (escola-venda.ts): o tópico fala só das aulas, sem citar compra
+    passos: MATERIAIS_PAGOS_A_VENDA ? [
       "Abra o menu e toque em Escola de Gestão, na parte Aprender.",
       "Em Aulas gratuitas, escolha um assunto e toque na aula.",
       "Mais abaixo ficam os materiais completos da Maestro Pet, vendidos à parte.",
       "Se você comprou um material com o e-mail da conta, toque em Mandar o código para o meu e-mail e digite o código que chegar (ou abra o link do e-mail neste aparelho). É uma vez só.",
       "Depois disso, o material aparece em Meus materiais, com o botão Ler aqui.",
+    ] : [
+      "Abra o menu e toque em Escola de Gestão, na parte Aprender.",
+      "Em Aulas gratuitas, escolha um assunto e toque na aula.",
+      "No fim de cada aula, o botão leva direto para a tela do sistema onde fazer o que a aula ensina.",
     ],
-    dicas: ["Os materiais não fazem parte da assinatura. Ninguém precisa comprar nada para usar o sistema.", "Comprou com um e-mail diferente do da conta? Fale com a nossa equipe para liberar."],
-    atencao: ["O código existe para provar que o e-mail é seu: sem ele, ninguém lê um material comprado por outra pessoa só por criar uma conta com o mesmo e-mail."],
+    dicas: MATERIAIS_PAGOS_A_VENDA
+      ? ["Os materiais não fazem parte da assinatura. Ninguém precisa comprar nada para usar o sistema.", "Comprou com um e-mail diferente do da conta? Fale com a nossa equipe para liberar."]
+      : ["As aulas já fazem parte da assinatura. Não precisa comprar nada."],
+    ...(MATERIAIS_PAGOS_A_VENDA ? { atencao: ["O código existe para provar que o e-mail é seu: sem ele, ninguém lê um material comprado por outra pessoa só por criar uma conta com o mesmo e-mail."] } : {}),
     palavras: ["escola", "aula", "aulas", "curso", "material", "comprei", "ler o material", "meus materiais", "aprender", "confirmar email", "codigo do email", "material nao aparece"] },
   /* ---------- O que o sistema não faz ---------- */
   { id: "tela-travou", titulo: "Apareceu \"Opa, esta tela travou\": e agora?", secao: "limites", quem: "todos", rota: null,

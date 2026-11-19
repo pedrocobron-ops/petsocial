@@ -3,7 +3,7 @@ import Logo from "@/components/logo";
 import { LogosPagamento } from "@/components/pagamento";
 import { EMPRESA, identificacao, linkInstagram, linkWhatsapp, redes } from "@/lib/empresa";
 import { FEED_AREAS } from "@/lib/feed-pronto";
-import { PRODUTOS, linhaDe, urlProduto } from "@/lib/produtos";
+import { PRODUTOS, linhaDe, manuaisNoSite, urlProduto } from "@/lib/produtos";
 import { nomeCurto } from "@/components/vitrine";
 
 /**
@@ -12,14 +12,15 @@ import { nomeCurto } from "@/components/vitrine";
  */
 export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocios" }) {
   const guias = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "tutor");
-  const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios" && p.grupo === "comece");
+  // sem manual no site (MATERIAIS_PAGOS_A_VENDA = false), a coluna Manuais sai e o sistema vai para "Maestro Pet"
+  const manuais = manuaisNoSite();
   const feedLancado = FEED_AREAS.some((a) => a.lancado);
   const wa = linkWhatsapp();
   const ig = linkInstagram();
   const id = identificacao();
   return (
     <footer className={`rodape${linha === "negocios" ? " negocios" : ""}`}>
-      <div className="container rodape-grade">
+      <div className={`container rodape-grade${manuais.length ? "" : " rodape-grade-3"}`}>
         <div className="rodape-marca">
           <Logo clara preguicosa />
           <p className="rodape-tag so-tutor">Feito com calma, para quem cuida de pets com pressa.</p>
@@ -32,15 +33,17 @@ export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocio
             <li><Link href="/tutor">Todos os guias e kits</Link></li>
           </ul>
         </nav>
-        <nav aria-label="Manuais">
-          <h2 className="rotulo">Manuais</h2>
-          <ul>
-            {manuais.slice(0, 6).map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{nomeCurto(p.nome).split(":")[0]}</Link></li>)}
-            {feedLancado && <li><Link href="/negocios/feed-pronto">Feed Pronto</Link></li>}
-            <li><Link href="/negocios">Todos os manuais</Link></li>
-            <li><Link href="/gestao">Sistema para pet shop</Link></li>
-          </ul>
-        </nav>
+        {manuais.length > 0 && (
+          <nav aria-label="Manuais">
+            <h2 className="rotulo">Manuais</h2>
+            <ul>
+              {manuais.slice(0, 6).map((p) => <li key={p.slug}><Link href={urlProduto(p)}>{nomeCurto(p.nome).split(":")[0]}</Link></li>)}
+              {feedLancado && <li><Link href="/negocios/feed-pronto">Feed Pronto</Link></li>}
+              <li><Link href="/negocios">Todos os manuais</Link></li>
+              <li><Link href="/gestao">Sistema para pet shop</Link></li>
+            </ul>
+          </nav>
+        )}
         <nav aria-label="Ajuda">
           <h2 className="rotulo">Ajuda</h2>
           <ul>
@@ -54,6 +57,7 @@ export default function Rodape({ linha = "tutor" }: { linha?: "tutor" | "negocio
           <h2 className="rotulo">Maestro Pet</h2>
           <ul>
             <li><Link href="/sobre">Quem faz</Link></li>
+            {manuais.length === 0 && <li><Link href="/gestao">Sistema para pet shop</Link></li>}
             <li><a href={`mailto:${EMPRESA.email}`}>Contato</a></li>
             {ig && <li><a href={ig} rel="noopener noreferrer">Instagram</a></li>}
             {redes().map((r) => <li key={r.nome}><a href={r.url} rel="noopener noreferrer">{r.nome}</a></li>)}

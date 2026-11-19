@@ -7,7 +7,7 @@ import { FaixaProva } from "@/components/pagamento";
 import PalcoHome, { type Cena } from "@/components/palco-home";
 import { Marquee } from "@/components/vitrine-blocos";
 import type { Produto } from "@/lib/produtos";
-import { PRODUTOS, linhaDe, produto, reais, urlProduto } from "@/lib/produtos";
+import { PRODUTOS, linhaDe, manuaisNoSite, noSite, produto, reais, urlProduto } from "@/lib/produtos";
 import { PLANOS } from "@/lib/gestao/planos";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
@@ -39,12 +39,14 @@ const PILARES = [
 export default function Home() {
   const lancados = PRODUTOS.filter((p) => p.lancado && linhaDe(p) === "tutor");
   const destaque = ["xixi", "sozinho", "gato", "normal"].map(produto).filter((p): p is Produto => !!p?.lancado);
-  const manuais = PRODUTOS.filter((p) => linhaDe(p) === "negocios" && p.grupo === "comece");
+  // sem manual no site (MATERIAIS_PAGOS_A_VENDA = false): sai a porta, o bloco, as cenas e as capas da linha de negócios
+  const manuais = manuaisNoSite();
+  const comNegocios = manuais.length > 0;
   const capas = [...lancados, ...manuais].filter((p) => p.capa);
   const confeitaria = produto("confeitaria");
   const cena = (slug: string, foto: string, alt: string, rotulo: string): Cena | null => {
     const p = produto(slug);
-    return p ? { foto: `/fotos/${foto}.webp`, alt, rotulo, nome: p.nome.split(":")[0], href: urlProduto(p) } : null;
+    return p && noSite(p) ? { foto: `/fotos/${foto}.webp`, alt, rotulo, nome: p.nome.split(":")[0], href: urlProduto(p) } : null;
   };
   const cenas = [
     cena("filhote", "tutor-filhote-duvida-4x5", "Tutora cochilando no sofá com um filhote no colo", "Para tutores"),
@@ -56,19 +58,21 @@ export default function Home() {
   const menorGuia = Math.min(...lancados.map((p) => p.preco));
   const menorPlano = Math.min(...PLANOS.map((p) => p.preco));
   const portas = (
-    <nav className="h2-portas" aria-label="Escolha o seu caminho">
+    <nav className={`h2-portas${comNegocios ? "" : " h2-portas-2"}`} aria-label="Escolha o seu caminho">
       <Link className="h2-porta" href="/tutor">
         <span className="h2-porta-tag">Para tutores</span>
         <b>Tenho um pet</b>
         <small>Guias passo a passo, a partir de {reais(menorGuia)}</small>
         <Seta />
       </Link>
-      <Link className="h2-porta" href="/negocios">
-        <span className="h2-porta-tag">Para negócios pet</span>
-        <b>Trabalho com pets</b>
-        <small>Confeitaria, passeio, pet sitter, fotografia e roupa pet</small>
-        <Seta />
-      </Link>
+      {comNegocios && (
+        <Link className="h2-porta" href="/negocios">
+          <span className="h2-porta-tag">Para negócios pet</span>
+          <b>Trabalho com pets</b>
+          <small>Confeitaria, passeio, pet sitter, fotografia e roupa pet</small>
+          <Seta />
+        </Link>
+      )}
       <Link className="h2-porta h2-porta-gestao" href="/gestao">
         <span className="h2-porta-tag"><span className="h2-novo">Novo</span>Sistema</span>
         <b>Tenho pet shop</b>
@@ -82,9 +86,9 @@ export default function Home() {
       <section className="h2-hero">
         <div className="container h2-hero-grade">
           <div className="h2-hero-texto">
-            <span className="h2-selo-claro"><i />Guias, manuais e sistema para pet shop</span>
+            <span className="h2-selo-claro"><i />{comNegocios ? "Guias, manuais e sistema para pet shop" : "Guias e sistema para pet shop"}</span>
             <h1>Tudo para quem <em>cuida</em> de pets.</h1>
-            <p className="lead">Guias passo a passo para o dia a dia com cão ou gato, a partir de {reais(menorGuia)}. Manuais para quem trabalha com pets e um sistema para o seu pet shop.</p>
+            <p className="lead">Guias passo a passo para o dia a dia com cão ou gato, a partir de {reais(menorGuia)}. {comNegocios ? "Manuais para quem trabalha com pets e um sistema" : "E um sistema"} para o seu pet shop.</p>
           </div>
           <div className="h2-hero-palco"><PalcoHome cenas={cenas} /></div>
           {portas}
@@ -145,31 +149,33 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="secao h2-duo" aria-label="Guias e manuais">
-        <div className="container h2-duo-grade">
-          <Link className="h2-bloco" href="/tutor">
-            <span className="foto-porta">
-              <Image src="/fotos/tutor-petiscos-duvida-4x5.webp" alt="" width={960} height={1200} sizes="(max-width: 899px) 100vw, 580px" />
-            </span>
-            <span className="rotulo">Para tutores</span>
-            <h3>Um problema por guia, <em>um passo por página.</em></h3>
-            <p>Xixi no lugar certo, filhote, petiscos seguros e kits para imprimir.</p>
-            <span className="btn-link">Ver os guias</span>
-          </Link>
-          <Link className="h2-bloco h2-bloco-negocios" href="/negocios">
-            <span className="foto-porta">
-              <Image src="/fotos/negocios-confeitaria-porta-16x10.webp" alt="" width={1600} height={1000} sizes="(max-width: 899px) 100vw, 580px" />
-              {confeitaria?.capa && <Image className="foto-porta-capa" src={confeitaria.capa} alt="" width={300} height={424} sizes="140px" />}
-            </span>
-            <span className="rotulo">Para negócios pet</span>
-            <h3>Viver de pets é um <em>ofício.</em></h3>
-            <p>Confeitaria, passeio, pet sitter, fotografia e roupa pet: a lei, o preço e as ferramentas.</p>
-            <span className="btn-link">Ver os manuais</span>
-          </Link>
-        </div>
-      </section>
+      {comNegocios && (
+        <section className="secao h2-duo" aria-label="Guias e manuais">
+          <div className="container h2-duo-grade">
+            <Link className="h2-bloco" href="/tutor">
+              <span className="foto-porta">
+                <Image src="/fotos/tutor-petiscos-duvida-4x5.webp" alt="" width={960} height={1200} sizes="(max-width: 899px) 100vw, 580px" />
+              </span>
+              <span className="rotulo">Para tutores</span>
+              <h3>Um problema por guia, <em>um passo por página.</em></h3>
+              <p>Xixi no lugar certo, filhote, petiscos seguros e kits para imprimir.</p>
+              <span className="btn-link">Ver os guias</span>
+            </Link>
+            <Link className="h2-bloco h2-bloco-negocios" href="/negocios">
+              <span className="foto-porta">
+                <Image src="/fotos/negocios-confeitaria-porta-16x10.webp" alt="" width={1600} height={1000} sizes="(max-width: 899px) 100vw, 580px" />
+                {confeitaria?.capa && <Image className="foto-porta-capa" src={confeitaria.capa} alt="" width={300} height={424} sizes="140px" />}
+              </span>
+              <span className="rotulo">Para negócios pet</span>
+              <h3>Viver de pets é um <em>ofício.</em></h3>
+              <p>Confeitaria, passeio, pet sitter, fotografia e roupa pet: a lei, o preço e as ferramentas.</p>
+              <span className="btn-link">Ver os manuais</span>
+            </Link>
+          </div>
+        </section>
+      )}
 
-      <Marquee capas={capas} rotulo="Guias e manuais" />
+      <Marquee capas={capas} rotulo={comNegocios ? "Guias e manuais" : "Guias e kits"} />
 
       <section className="secao secao-prova">
         <div className="container"><FaixaProva /></div>

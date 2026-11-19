@@ -87,7 +87,7 @@ export default function FormTutor({ cliente, aoFechar, aoSalvar }: { cliente?: C
       <FolhaMesmaPessoa igual={igual} digitado={nome} ocupado={salvando} aoFechar={() => setIgual(null)}
         aoUsar={() => {
           // já existe: abre a ficha que já estava lá, sem criar outra
-          void sb.from("clientes").select(colsDoTutor(posso("clientes"))).eq("id", igual.tutor.id).eq("petshop_id", petshop.id).single().then(({ data, error }) => {
+          void sb.from("clientes").select(colsDoTutor(posso("clientes"))).eq("id", igual.tutor.id).eq("petshop_id", petshop.id).maybeSingle().then(({ data, error }) => {
             if (error || !data) { avisarErro(error ?? new Error("Não achei esse tutor.")); return; }
             const achado = tutorLido(data);
             avisar(`Abri a ficha de ${achado.nome}, que já existia.`);

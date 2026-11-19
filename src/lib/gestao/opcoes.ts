@@ -32,9 +32,10 @@ export async function salvarOpcoes(sb: Banco, petshopId: string, mudancas: Recor
   if (!r.error) return;
   if (r.error.code !== "PGRST202" && r.error.code !== "42883") throw new Error(r.error.message);
   // banco antes da atualização: lê, junta e grava
-  const atual = await sb.from("petshops").select("opcoes").eq("id", petshopId).single();
+  const atual = await sb.from("petshops").select("opcoes").eq("id", petshopId).maybeSingle();
   if (atual.error) throw new Error(atual.error.message);
-  const base = atual.data.opcoes && typeof atual.data.opcoes === "object" && !Array.isArray(atual.data.opcoes) ? (atual.data.opcoes as Record<string, unknown>) : {};
+  const op = atual.data?.opcoes;
+  const base = op && typeof op === "object" && !Array.isArray(op) ? (op as Record<string, unknown>) : {};
   const g = await sb.from("petshops").update({ opcoes: { ...base, ...mudancas } as never }).eq("id", petshopId).select("id");
   if (g.error) throw new Error(g.error.message);
   if (!g.data?.length) throw new Error("Só o dono muda as opções do negócio.");

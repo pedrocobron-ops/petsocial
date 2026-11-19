@@ -120,7 +120,7 @@ export default function FormAgendamento({ agendamento, petInicial, diaInicial, h
   // em edição, carrega o pet completo (com tutor)
   useEffect(() => {
     if (agendamento && !pet) {
-      void sb.from("pets").select("*, clientes(id, nome, telefone)").eq("id", agendamento.pet_id).single().then(({ data }) => { if (data) setPet(data as PetComTutor); });
+      void sb.from("pets").select("*, clientes(id, nome, telefone)").eq("id", agendamento.pet_id).maybeSingle().then(({ data }) => { if (data) setPet(data as PetComTutor); });
     }
   }, [agendamento, pet, sb]);
 

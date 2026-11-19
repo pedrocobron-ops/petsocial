@@ -72,7 +72,7 @@ export function vistoHa(d: string | null) {
 
 type Ordem = "recente" | "sumidos" | "dias" | "acoes" | "tempo";
 
-export default function AbaUso({ lojas, uso, contas, aoAbrir }: { lojas: LojaBasica[]; uso: Uso[]; contas: UsoConta[]; aoAbrir: (id: string) => void }) {
+export default function AbaUso({ lojas, uso, contas, contasDeTeste = 0, aoAbrir }: { lojas: LojaBasica[]; uso: Uso[]; contas: UsoConta[]; contasDeTeste?: number; aoAbrir: (id: string) => void }) {
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState<Ordem>("recente");
   const [sinal, setSinal] = useState<Sinal | "todos">("todos");
@@ -104,6 +104,7 @@ export default function AbaUso({ lojas, uso, contas, aoAbrir }: { lojas: LojaBas
 
   return (
     <div className="g-pilha g">
+      {contasDeTeste > 0 && <p className="g-pp g-muted" data-teste="contas-teste-fora">{contasDeTeste === 1 ? "1 conta de teste fica fora destes números." : `${contasDeTeste} contas de teste ficam fora destes números.`}</p>}
       <section className="g-grade c4" aria-label="Uso em números">
         <div className="g-card"><p className="g-rotulo">Online agora</p><p className="g-num" style={{ marginTop: 10 }}>{online}</p></div>
         <div className="g-card"><p className="g-rotulo">Usaram em 7 dias</p><p className="g-num" style={{ marginTop: 10 }}>{ativos7}</p><p className="g-pp g-muted" style={{ marginTop: 6 }}>de {lojas.length} cadastrados</p></div>
