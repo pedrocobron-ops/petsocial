@@ -111,4 +111,21 @@ async function adminForte(sb) {
   return segredo;
 }
 
-module.exports = { totp, segredosMfa, adminForte, RAIZ, dadosDoCadastro, ENV, SUPABASE_URL, SUPABASE_KEY, BASE_URL, DB_CONTAINER, cliente, sql, num, q, must, uuid, sufixo, ipAleatorio, centavos, hojeNo, somaDias, diaDaSemana, proximoDia, instante, servidorNoAr };
+/* ---------- trava do servidor (segredo que só o servidor tem; ver src/lib/gestao/servidor.ts) ---------- */
+/** O segredo do servidor de teste: GESTAO_SEGREDO_SERVIDOR ou o derivado da chave da Anthropic (a falsa dos testes). */
+const segredoDoServidor = () => (process.env.GESTAO_SEGREDO_SERVIDOR ?? '').trim().length >= 32 ? process.env.GESTAO_SEGREDO_SERVIDOR.trim()
+  : crypto.createHmac('sha256', (process.env.ANTHROPIC_API_KEY || 'sk-ant-chave-falsa').replace(/[^\x21-\x7E]/g, '')).update('maestro-pet:servidor:v1').digest('hex');
+/**
+ * Roda `f` com a trava do servidor gravada (como em produção, onde o servidor grava sozinho com a chave de serviço) e volta
+ * como estava. O IP e o navegador que o servidor repassa nos aceites públicos só valem com ela (migração 20261245).
+ */
+async function comTravaDoServidor(f) {
+  const antes = sql(`select coalesce((select valor from config_interna where chave = 'servidor_segredo_sha256'), '')`);
+  sql(`select servidor_segredo_registrar(${q(segredoDoServidor())})`);
+  try { return await f(); } finally {
+    sql(antes ? `update config_interna set valor = ${q(antes)} where chave = 'servidor_segredo_sha256'`
+      : `delete from config_interna where chave in ('servidor_segredo_sha256', 'servidor_segredo_sha256_em', 'servidor_segredo_origem')`);
+  }
+}
+
+module.exports = { segredoDoServidor, comTravaDoServidor, totp, segredosMfa, adminForte, RAIZ, dadosDoCadastro, ENV, SUPABASE_URL, SUPABASE_KEY, BASE_URL, DB_CONTAINER, cliente, sql, num, q, must, uuid, sufixo, ipAleatorio, centavos, hojeNo, somaDias, diaDaSemana, proximoDia, instante, servidorNoAr };

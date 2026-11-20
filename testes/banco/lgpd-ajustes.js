@@ -155,7 +155,8 @@ const clienteCom = (ip, nav = NAV) => createClient(B.SUPABASE_URL, B.SUPABASE_KE
   T.ok('autorização antiga continua com o texto que o tutor aceitou', de_novo.codigo === fa.codigo && de_novo.texto === antiga, de_novo);
   if (await B.servidorNoAr()) {
     const ipR = B.ipAleatorio();
-    const rr = await fetch(`${B.BASE_URL}/gestao/boletim/${bol.token}/autorizacao`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': ipR, 'user-agent': 'NavegadorDoTutor/2.0' }, body: JSON.stringify({ escopo: 'todas', marcar: '@ana.pets' }) });
+    // o IP e o navegador que o servidor repassa só valem com a trava do servidor (20261245), como em produção
+    const rr = await B.comTravaDoServidor(() => fetch(`${B.BASE_URL}/gestao/boletim/${bol.token}/autorizacao`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': ipR, 'user-agent': 'NavegadorDoTutor/2.0' }, body: JSON.stringify({ escopo: 'todas', marcar: '@ana.pets' }) }));
     const jr = await rr.json().catch(() => ({}));
     const q2 = B.sql(`select coalesce(ip, '') || '|' || coalesce(navegador, '') from fotos_autorizacoes where codigo = ${B.q(jr.codigo ?? '')}`);
     T.ok('pela rota da página: guarda o IP e o navegador do tutor (não os do servidor)', rr.status === 200 && q2 === `${ipR}|NavegadorDoTutor/2.0`, `${rr.status} ${q2}`);

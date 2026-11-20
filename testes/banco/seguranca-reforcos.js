@@ -103,7 +103,7 @@ function configTemporaria(chave, valor) {
   T.ok('… e o texto do boletim', B.must(await O.sb.dono.rpc('boletim_ia_contar', { p_petshop: O.P }), 'boletim pago').ok === true);
   B.sql(`update petshops set status = 'teste' where id = '${O.P}'`);
 
-  for (const c of ['mozart', 'boletim', 'caderno', 'ajuda']) config(`${c}_dia_geral_teste`, '1000000'); // o fim do teste volta ao que era
+  for (const c of ['mozart', 'boletim', 'caderno', 'ajuda']) config(`${c}_dia_geral_teste`, '999999'); // o fim do teste volta ao que era
   const N = await criarLoja(T, { nome: 'Reforcos Sem Email', equipe: false, emailSemConfirmar: true });
   const semEmail = N.sb.dono;
   r = B.must(await conta(semEmail, N.P), 'conta sem e-mail');
