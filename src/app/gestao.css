@@ -1140,7 +1140,7 @@ a.g-ret-linha:hover, button.g-ret-linha:hover { border-color: var(--g-linha-fort
 .g-rs-grade .g-num.m { font-size: 1.5rem; }
 .g-rs-dica { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; padding: 14px; border-radius: var(--g-raio-m); background: var(--g-verde-tint); }
 .g-rs-dica .g-btn { grid-column: 1 / -1; justify-self: start; max-width: 100%; white-space: normal; text-align: left; padding-block: 8px; }
-@media (max-width: 480px) {
+@media (min-width: 0) {
   /* no celular a lista fica curta: só o próximo passo mostra a explicação */
   .g-pps-passo { min-height: 48px; padding-block: 8px; }
   .g-pps-passo:not(.agora) .t small { display: none; }
@@ -1348,7 +1348,7 @@ small.erro.g-valor-erro { display: block; color: var(--g-vermelho); font-size: .
 .g-ag .t b { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; line-height: 1.2; }
 .g-ag .t .g-agd-tutor { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* no celular, o selo de estado e os ícones descem para uma linha própria: o nome fica com a largura toda do cartão */
-@media (max-width: 480px) {
+@media (min-width: 0) {
   .g-ag { flex-wrap: wrap; row-gap: 6px; }
   .g-ag .t { flex: 1 1 calc(100% - 56px); }
   .g-ag .t + * { margin-left: 56px; }
@@ -1402,3 +1402,31 @@ small.erro.g-valor-erro { display: block; color: var(--g-vermelho); font-size: .
 /* ---------- 6) sem internet: a tela que não chegou a abrir (erros.tsx) ---------- */
 .g-sem-rede-ico { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--g-amarelo-tint); color: var(--txt-amarelo); }
 .g-sem-rede-ico svg { width: 32px; height: 32px; }
+
+/* ---------- 7) Mozart no modo automático: o selo no topo, o cartão "Feito" com Desfazer e o aviso para ligar ---------- */
+.g-ass-painel { position: relative; }
+.g-ass-auto { flex: none; display: inline-flex; align-items: center; gap: 4px; margin-left: auto; min-height: 32px; padding: 4px 10px; border: 0; border-radius: 999px;
+  background: var(--g-laranja); color: var(--g-tinta); font-size: .75rem; font-weight: 600; line-height: 1; cursor: pointer; white-space: nowrap; }
+.g-ass-auto svg { width: 13px; height: 13px; }
+.g-ass-auto:hover { background: var(--g-laranja-2); }
+.g-ass-auto:focus-visible { outline: 2px solid var(--g-creme); outline-offset: 2px; }
+.g-proposta.g-ass-feito { gap: 6px; padding: 10px 12px; }
+.g-proposta.g-ass-feito dl { font-size: .875rem; gap: 2px 10px; }
+.g-proposta.g-ass-feito .bts { justify-content: flex-end; }
+.g-proposta.g-ass-feito .bts .g-btn { flex: 0 0 auto; min-height: 40px; }
+.g-proposta.g-ass-feito.descartada { opacity: .75; }
+.g-ass-feito-nota { margin: 0; font-size: .8125rem; color: #8b2f20; overflow-wrap: anywhere; }
+.g-ass-modal { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; background: rgba(31, 27, 23, .45); }
+.g-ass-modal-caixa { width: 100%; max-width: 380px; max-height: 100%; overflow-y: auto; display: grid; gap: 10px; padding: 18px 16px 16px; border-radius: 20px;
+  background: var(--g-carta); box-shadow: 0 20px 40px -18px rgba(31, 27, 23, .6); }
+.g-ass-modal-caixa h2 { margin: 0; font: 500 1.25rem/1.2 var(--display); }
+.g-ass-modal-caixa p { margin: 0; font-size: .9375rem; line-height: 1.45; }
+.g-ass-modal-caixa .bts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.g-ass-modal-caixa .bts .g-btn { flex: 1 1 140px; }
+/* o painel é estreito (celular e a janelinha de 400 px): com o selo, o topo fica mais junto e o nome nunca some */
+@media (min-width: 0) {
+  .g-ass-topo.com-auto { gap: 4px; padding-right: 6px; }
+  .g-ass-topo.com-auto > div { flex: 1 1 62px; margin-left: 4px; }
+  .g-ass-topo.com-auto .g-ass-auto { padding: 4px 8px; }
+  .g-ass-topo.com-auto .g-ass-auto svg { display: none; }
+}

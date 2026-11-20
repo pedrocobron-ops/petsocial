@@ -1,6 +1,7 @@
 "use client";
 
 import ModoSimples from "@/components/gestao/ajustes/modo-simples";
+import MozartAutomatico from "@/components/gestao/ajustes/mozart-automatico";
 import LinkCrecheHotel from "@/components/gestao/creche/link-creche-hotel";
 
 import { abrirGuia } from "@/components/gestao/ui";
@@ -116,7 +117,7 @@ export default function MeuPetshop() {
         <Grupo id="dinheiro" titulo="Cobrança e fidelidade" icone={HandCoins} tom="menta"
           cartoes={[["Opções de cobrança", <OpcoesDeCobranca key="c" />], ["Taxas da maquininha", <TaxasDaMaquininha key="t" />], ["Papel do comprovante", <PapelDoComprovante key="pc" />], ["Fidelidade", <AjusteFidelidade key="f" />]]} />
         <Grupo id="negocio" titulo="O negócio" icone={Store} tom="rosa"
-          cartoes={[["Dados", <Dados key="d" />], ["O que você usa", <OQueUsa key="o" />], ["Modo simples", <ModoSimples key="ms" />], ["Identidade do pet shop", <Identidade key="i" />], ["Sua loja aparece no Google?", <LojaNoGoogle key="g" />], ["Boletim do pet", <OpcoesDoBoletim key="b" />], (usaModulo(petshop, "banho_tosa") || usaCasa(petshop)) && ["Checklist de entrada", <OpcoesDaEntrada key="e" />]]} />
+          cartoes={[["Dados", <Dados key="d" />], ["O que você usa", <OQueUsa key="o" />], ["Modo simples", <ModoSimples key="ms" />], ["Mozart automático", <MozartAutomatico key="ma" />], ["Identidade do pet shop", <Identidade key="i" />], ["Sua loja aparece no Google?", <LojaNoGoogle key="g" />], ["Boletim do pet", <OpcoesDoBoletim key="b" />], (usaModulo(petshop, "banho_tosa") || usaCasa(petshop)) && ["Checklist de entrada", <OpcoesDaEntrada key="e" />]]} />
         <Grupo id="copia" titulo="Seus dados e a conta" icone={Archive} tom="ceu" largo
           cartoes={[["Baixar todos os dados", <CopiaSeguranca key="c" />], ["Encerrar e apagar a conta", <EncerrarConta key="e" />], ["Registro de pedidos de dados", <RegistroDeDados key="r" />], ["Acessos da equipe Maestro Pet", <AcessosDaEquipeMaestro key="m" />], ["Aviso de privacidade para os seus clientes", <AvisoParaOsClientes key="av" />]]} />
       </div>
